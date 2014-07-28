@@ -1,8 +1,11 @@
 package rpc;
 
-enum ContainerError {
+enum EContainerError {
 	Success = 0;
-	InvalidMethod = 1;
+	Error = 1;
+	InvalidMethod = 2;
+	AlreadyExists = 3;
+	DoesNotExist = 4;
 }
 
 message TContainerCreateRequest {
@@ -28,9 +31,27 @@ message TContainerGetDataRequest {
 	required string name = 1;
 }
 
+message TContainerStartRequest {
+	required string name = 1;
+}
+
+message TContainerStopRequest {
+	required string name = 1;
+}
+
+message TContainerPauseRequest {
+	required string name = 1;
+}
+
+message TContainerResumeRequest {
+	required string name = 1;
+}
+
 message TContainerRequest {
 	// TODO: add some message to get API version
 	// or embed REQUIRED version here
+
+	//required uint32 version;
 
 	optional TContainerCreateRequest create = 1;
 	optional TContainerDestroyRequest destroy = 2;
@@ -38,22 +59,27 @@ message TContainerRequest {
 	optional TContainerGetPropertyRequest getProperty = 4;
 	optional TContainerSetPropertyRequest setProperty = 5;
 	optional TContainerGetDataRequest getData = 6;
+
+	optional TContainerStartRequest start = 7;
+	optional TContainerStopRequest stop = 8;
+	optional TContainerPauseRequest pause = 9;
+	optional TContainerResumeRequest resume = 10;
 }
 
 message TContainerListResponse {
-	repeated string name = 2;
+	repeated string name = 1;
 }
 
 message TContainerGetPropertyResponse {
-	required string value = 2;
+	required string value = 1;
 }
 
 message TContainerGetDataResponse {
-	required string value = 2;
+	required string value = 1;
 }
 
 message TContainerResponse {
-	required ContainerError error = 1;
+	required EContainerError error = 1;
 
 	optional TContainerListResponse list = 2;
 	optional TContainerGetPropertyResponse getProperty = 3;

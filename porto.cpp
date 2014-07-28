@@ -1,129 +1,93 @@
-#include <iostream>
-#include <string>
-#include <mutex>
-#include <map>
-#include <vector>
+#include "porto.h"
 
-using namespace std;
+TContainer::TContainer(const string _name) : name(_name), state(Stopped) {
+}
 
-class TContainer {
-	const string name;
+TContainer::~TContainer() {
+    lock_guard<mutex> guard(lock);
+    state = Destroying;
 
-	mutex lock;
-	enum EContainerState {
-		Stopped,
-		Running,
-		Paused,
-		Destroying
-	};
-	EContainerState state;
+    //TBD: perform actual work
+}
 
-	mutex _data_lock;
-	// data
+string TContainer::Name() {
+    return name;
+}
 
-	bool CheckState(EContainerState expected) {
-		return state == expected;
-	}
+bool TContainer::Start() {
+    lock_guard<mutex> guard(lock);
 
-public:
-	TContainer(const string _name) : name(_name), state(Stopped) {
-	}
+    if (!CheckState(Stopped))
+        return false;
 
-	~TContainer() {
-		lock_guard<mutex> guard(lock);
-		state = Destroying;
+    state = Running;
+    return true;
+}
 
-		//TBD: perform actual work
-	}
+bool TContainer::Stop() {
+    lock_guard<mutex> guard(lock);
 
-	string Name() {
-		return name;
-	}
+    if (!CheckState(Running))
+        return false;
 
-	bool Start() {
-		lock_guard<mutex> guard(lock);
+    state = Stopped;
+    return true;
+}
 
-		if (!CheckState(Stopped))
-			return false;
+bool TContainer::Pause() {
+    lock_guard<mutex> guard(lock);
 
-		state = Running;
-		return true;
-	}
+    if (!CheckState(Running))
+        return false;
 
-	bool Stop() {
-		lock_guard<mutex> guard(lock);
+    state = Paused;
+    return true;
+}
 
-		if (!CheckState(Running))
-			return false;
+bool TContainer::Resume() {
+    lock_guard<mutex> guard(lock);
 
-		state = Stopped;
-		return true;
-	}
+    if (!CheckState(Paused))
+        return false;
 
-	bool Pause() {
-		lock_guard<mutex> guard(lock);
+    state = Running;
+    return true;
+}
 
-		if (!CheckState(Running))
-			return false;
+TContainer* TContainerHolder::Create(string name) {
+    lock_guard<mutex> guard(lock);
 
-		state = Paused;
-		return true;
-	}
+    if (containers[name] == nullptr)
+        containers[name] = new TContainer(name);
+    else
+        throw "container " + name + " already exists";
 
-	bool Resume() {
-		lock_guard<mutex> guard(lock);
+    return containers[name];
+}
 
-		if (!CheckState(Paused))
-			return false;
+TContainer* TContainerHolder::Find(string name) {
+    lock_guard<mutex> guard(lock);
 
-		state = Running;
-		return true;
-	}
+    return containers[name];
+}
 
-	string GetProperty(string property);
-	bool SetProperty(string property, string value);
+void TContainerHolder::Destroy(string name) {
+    lock_guard<mutex> guard(lock);
+    delete containers[name];
+    containers[name] = nullptr;
+}
 
-	string GetData(string data);
-};
+vector<string> TContainerHolder::List() {
+    vector<string> ret;
 
-class TContainerHolder {
-	mutex lock;
-	map <string, TContainer*> containers;
+    lock_guard<mutex> guard(lock);
+    for (auto c : containers)
+        ret.push_back(c.second->Name());
 
-public:
-	TContainer* Create(string name) {
-		lock_guard<mutex> guard(lock);
+    return ret;
+}
 
-		if (containers[name] == nullptr)
-			containers[name] = new TContainer(name);
-		else
-			throw "container " + name + " already exists";
-	}
-
-	TContainer* Find(string name) {
-		lock_guard<mutex> guard(lock);
-
-		return containers[name];
-	}
-
-	void Destroy(string name) {
-		lock_guard<mutex> guard(lock);
-		delete containers[name];
-		containers[name] = nullptr;
-	}
-
-	vector<string> List() {
-		vector<string> ret;
-
-		lock_guard<mutex> guard(lock);
-		for (auto c : containers)
-			ret.push_back(c.second->Name());
-
-		return ret;
-	}
-};
-
-int main(int argc, const char *argv[])
+int main2(int argc, const char *argv[])
 {
 	//TMountState ms;
 

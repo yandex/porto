@@ -1,3 +1,5 @@
 /porto
 /porto.o
 /cgroup.o
+/rpc.pb.cc
+/rpc.pb.h
