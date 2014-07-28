@@ -96,7 +96,7 @@ public:
 
 int main(int argc, const char *argv[])
 {
-	TMountState ms;
+	//TMountState ms;
 
 	return EXIT_SUCCESS;
 }
