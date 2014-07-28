@@ -88,10 +88,10 @@ public:
 		return true;
 	}
 
-	string getProperty(string property);
-	bool setProperty(string property, string value);
+	string GetProperty(string property);
+	bool SetProperty(string property, string value);
 
-	string getData(string data);
+	string GetData(string data);
 };
 
 int main(int argc, const char *argv[])
