@@ -40,12 +40,12 @@ public:
 
 	~TContainer() {
 		lock_guard<mutex> guard(lock);
-
 		state = Destroying;
-		//TBD: perform actual work
 
 		lock_guard<mutex> guard2(containers_lock);
 		containers[name] = nullptr;
+
+		//TBD: perform actual work
 	}
 
 	bool Start() {
@@ -96,5 +96,7 @@ public:
 
 int main(int argc, const char *argv[])
 {
+	TMountState ms;
+
 	return EXIT_SUCCESS;
 }
