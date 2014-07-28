@@ -13,5 +13,13 @@ $(EXECUTABLE): $(OBJECTS)
 .cpp.o:
 	$(CC) $(CFLAGS) $< -o $@
 
+.PHONY: rpc
+rpc:
+	protoc rpc.proto --cpp_out=.
+	g++ rpc.cc rpc.pb.cc -std=c++11 -lprotobuf -o rpc
+	echo 'create: { name: "test" }' | ./rpc
+	echo 'list: { }' | ./rpc
+	echo '' | ./rpc
+
 clean:
 	rm -f $(OBJECTS) $(EXECUTABLE)
