@@ -5,32 +5,31 @@
 
 using namespace std;
 
-enum cs_state {
-	CS_STOPPED,
-	CS_RUNNING,
-	CS_PAUSED,
-	CS_DESTROYING
-};
-
-class Container;
+class TContainer;
 mutex containers_lock;
-map<string, Container*> containers;
+map<string, TContainer*> containers;
 
-class Container {
+class TContainer {
 	const string name;
 
 	mutex lock;
-	cs_state state;
+	enum EContainerState {
+		Stopped,
+		Running,
+		Paused,
+		Destroying
+	};
+	EContainerState state;
 
 	mutex _data_lock;
 	// data
 
-	bool CheckState(cs_state expected) {
+	bool CheckState(EContainerState expected) {
 		return state == expected;
 	}
 
 public:
-	Container(const string _name) : name(_name), state(CS_STOPPED) {
+	TContainer(const string _name) : name(_name), state(Stopped) {
 		lock_guard<mutex> guard(containers_lock);
 
 		if (containers[name] == nullptr)
@@ -39,10 +38,10 @@ public:
 			throw "container " + name + " already exists";
 	}
 
-	~Container() {
+	~TContainer() {
 		lock_guard<mutex> guard(lock);
 
-		state = CS_DESTROYING;
+		state = Destroying;
 		//TBD: perform actual work
 
 		lock_guard<mutex> guard2(containers_lock);
@@ -52,40 +51,40 @@ public:
 	bool Start() {
 		lock_guard<mutex> guard(lock);
 
-		if (!CheckState(CS_STOPPED))
+		if (!CheckState(Stopped))
 			return false;
 
-		state = CS_RUNNING;
+		state = Running;
 		return true;
 	}
 
 	bool Stop() {
 		lock_guard<mutex> guard(lock);
 
-		if (!CheckState(CS_RUNNING))
+		if (!CheckState(Running))
 			return false;
 
-		state = CS_STOPPED;
+		state = Stopped;
 		return true;
 	}
 
 	bool Pause() {
 		lock_guard<mutex> guard(lock);
 
-		if (!CheckState(CS_RUNNING))
+		if (!CheckState(Running))
 			return false;
 
-		state = CS_PAUSED;
+		state = Paused;
 		return true;
 	}
 
 	bool Resume() {
 		lock_guard<mutex> guard(lock);
 
-		if (!CheckState(CS_PAUSED))
+		if (!CheckState(Paused))
 			return false;
 
-		state = CS_RUNNING;
+		state = Running;
 		return true;
 	}
 
