@@ -2,12 +2,9 @@
 #include <string>
 #include <mutex>
 #include <map>
+#include <vector>
 
 using namespace std;
-
-class TContainer;
-mutex containers_lock;
-map<string, TContainer*> containers;
 
 class TContainer {
 	const string name;
@@ -30,22 +27,17 @@ class TContainer {
 
 public:
 	TContainer(const string _name) : name(_name), state(Stopped) {
-		lock_guard<mutex> guard(containers_lock);
-
-		if (containers[name] == nullptr)
-			containers[name] = this;
-		else
-			throw "container " + name + " already exists";
 	}
 
 	~TContainer() {
 		lock_guard<mutex> guard(lock);
 		state = Destroying;
 
-		lock_guard<mutex> guard2(containers_lock);
-		containers[name] = nullptr;
-
 		//TBD: perform actual work
+	}
+
+	string Name() {
+		return name;
 	}
 
 	bool Start() {
@@ -92,6 +84,43 @@ public:
 	bool SetProperty(string property, string value);
 
 	string GetData(string data);
+};
+
+class TContainerHolder {
+	mutex lock;
+	map <string, TContainer*> containers;
+
+public:
+	TContainer* Create(string name) {
+		lock_guard<mutex> guard(lock);
+
+		if (containers[name] == nullptr)
+			containers[name] = new TContainer(name);
+		else
+			throw "container " + name + " already exists";
+	}
+
+	TContainer* Find(string name) {
+		lock_guard<mutex> guard(lock);
+
+		return containers[name];
+	}
+
+	void Destroy(string name) {
+		lock_guard<mutex> guard(lock);
+		delete containers[name];
+		containers[name] = nullptr;
+	}
+
+	vector<string> List() {
+		vector<string> ret;
+
+		lock_guard<mutex> guard(lock);
+		for (auto c : containers)
+			ret.push_back(c.second->Name());
+
+		return ret;
+	}
 };
 
 int main(int argc, const char *argv[])
