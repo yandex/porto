@@ -30,21 +30,21 @@ static rpc::TContainerResponse ListContainers()
 static rpc::TContainerResponse
 HandleRequest(const rpc::TContainerRequest &req)
 {
-        if (req.has_create())
-            return CreateContainer(req.create());
+    if (req.has_create())
+        return CreateContainer(req.create());
 
-        // TODO ...
+    // TODO ...
 
-        else if (req.has_list())
-            return ListContainers();
+    else if (req.has_list())
+        return ListContainers();
 
-        // TODO ...
+    // TODO ...
 
-        else {
-            rpc::TContainerResponse rsp;
-            rsp.set_error(rpc::ContainerError::InvalidMethod);
-            return rsp;
-        }
+    else {
+        rpc::TContainerResponse rsp;
+        rsp.set_error(rpc::ContainerError::InvalidMethod);
+        return rsp;
+    }
 }
 
 int main(int argc, char *argv[])
