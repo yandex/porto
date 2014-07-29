@@ -9,6 +9,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
+#include <unistd.h>
 #include <string.h>
 #include <errno.h>
 
@@ -19,6 +20,8 @@ using namespace std;
 set<string> subsystems = {"cpuset", "cpu", "cpuacct", "memory", "devices",
                           "freezer", "net_cls", "net_prio", "blkio",
                           "perf_event", "hugetlb", "name=systemd"};
+
+set<string> create_subsystems = {"cpuset", "cpu", "cpuacct", "memory"};
 
 void TCgroup::FindChildren() {
     DIR *dirp;
@@ -45,17 +48,20 @@ void TCgroup::FindChildren() {
 }
 
 void TCgroup::Create() {
-    if (parent == nullptr)
-        throw "Cannot create root cgroup";
-
     if (mkdir(name.c_str(), mode)) {
         switch (errno) {
         case EEXIST:
             throw "Cgroup already exists";
         default:
-            throw "Cannot create cgroup";
+            cerr << name << endl;
+            throw "Cannot create cgroup: " + string(strerror(errno));
         }
     }
+}
+
+void TCgroup::Remove() {
+    if (rmdir(name.c_str()))
+        throw "Cannot remove cgroup: " + name;
 }
 
 ostream& operator<<(ostream& os, const TCgroup& cg) {
@@ -70,7 +76,17 @@ ostream& operator<<(ostream& os, const TCgroup& cg) {
 }
 
 TCgroupState::TCgroupState() {
+    Update();
+}
+
+void TCgroupState::Update() {
     TMountState ms;
+    
+    for (auto c : controllers)
+        delete c.second;
+
+    controllers.clear();
+    raw_controllers.clear();
 
     for (auto m : ms.Mounts()) {
         set<string> flags = m->Flags();
@@ -91,24 +107,47 @@ TCgroupState::TCgroupState() {
         }
 
         TCgroup *cg = new TCgroup(m->Mountpoint());
-        mounts[name] = cg;
+        controllers[name] = cg;
 
         for (auto c : cs)
-            controllers[name] = cg;
+            raw_controllers[name] = cg;
     }
 }
     
 void TCgroupState::MountMissingControllers() {
-    for (auto c : subsystems) {
-        if (controllers[c] == nullptr) {
-            TMount mount("cgroup", DefaultMountpoint(c),
-                         "cgroup", 0, set<string>{c});
+    if (controllers.empty()) {
+        TMount root("cgroups", DefaultMountpoint(""),
+                    "tmpfs", 0, set<string>{});
+        root.Mount();
+    }
 
-            mount.Mount();
+    for (auto c : create_subsystems) {
+        if (raw_controllers[c] == nullptr) {
+            TCgroup *cg = new TCgroup(DefaultMountpoint(c));
+            cg->Create();
 
-            TCgroup *cg = new TCgroup(mount.Mountpoint());
-            mounts[c] = cg;
+            TMount *mount = new TMount("cgroup", DefaultMountpoint(c),
+                                       "cgroup", 0, set<string>{c});
+            mount->Mount();
+            delete mount;
+
+            raw_controllers[c] = cg;
             controllers[c] = cg;
+
+            cg->FindChildren();
         }
     }
+}
+
+void TCgroupState::UmountAll() {
+    Update();
+
+    for (auto cg : controllers) {
+        TMount *mount = new TMount("cgroup", cg.second->Name(),
+                                   "cgroup", 0, set<string>{});
+        mount->Umount();
+        cg.second->Remove();
+    }
+
+    Update();
 }

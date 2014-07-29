@@ -92,7 +92,24 @@ int rpc_main(TContainerHolder &cholder) {
 
 int main(int argc, const char *argv[])
 {
-    TContainerHolder cholder;
+    try {
+        TContainerHolder cholder;
+        TCgroupState cs;
+    
+        cs.MountMissingControllers();
 
-    return rpc_main(cholder);
+        //cout << cs << endl;
+
+        cs.UmountAll();
+
+        //cout << cs << endl;
+    } catch (const char *e) {
+        cerr << "Error: " << e << endl;
+        return EXIT_FAILURE;
+    } catch (string e) {
+        cerr << "Error: " << e << endl;
+        return EXIT_FAILURE;
+    }
+
+    //return rpc_main(cholder);
 }

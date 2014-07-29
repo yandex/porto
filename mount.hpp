@@ -1,6 +1,9 @@
 #include <string>
 #include <set>
+#include <iostream>
 
+#include <string.h>
+#include <errno.h>
 #include <sys/mount.h>
 
 using namespace std;
@@ -19,8 +22,7 @@ public:
     TMount(string device, string mountpoint, string vfstype,
            unsigned long mountflags, set<string> flags) :
         device (device), mountpoint (mountpoint), vfstype (vfstype),
-        flags (flags), mountflags (mountflags) {
-    }
+        flags (flags), mountflags (mountflags) {}
 
     friend ostream& operator<<(ostream& os, const TMount& m) {
         os << m.device << " " << m.mountpoint << " ";
@@ -32,6 +34,10 @@ public:
 
     const string Mountpoint() {
         return mountpoint;
+    }
+
+    const string ParentFolder() {
+        return mountpoint.substr(0, mountpoint.find_last_of("/"));
     }
 
     set<string> const& Flags() {
@@ -51,6 +57,7 @@ public:
     void Mount() {
         if (mount(device.c_str(), mountpoint.c_str(), vfstype.c_str(),
                   mountflags, CommaDelimitedFlags().c_str())) {
+            cerr << "mount " + mountpoint + strerror(errno) << endl;
             if (errno == EBUSY)
                 throw "Already mounted";
             else
@@ -59,8 +66,11 @@ public:
     }
 
     void Umount () {
-        if (umount(mountpoint.c_str()))
-            throw "Cannot umount filesystem " + mountpoint;
+        if (umount(mountpoint.c_str())) {
+            cerr << "umount " + mountpoint + strerror(errno) << endl;
+            throw "Cannot umount filesystem " + mountpoint +
+                string (strerror(errno));
+        }
     }
 };
 

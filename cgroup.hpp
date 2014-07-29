@@ -13,14 +13,7 @@ class TCgroup {
 
 public:
     TCgroup(string path, TCgroup *parent = nullptr, int level = 0) :
-        name (path), parent(parent), level(level) {
-        try {
-            FindChildren();
-        } catch (...) {
-            DropChildren();
-            throw;
-        }
-    }
+        name (path), parent(parent), level(level) {}
 
     void FindChildren();
 
@@ -33,21 +26,26 @@ public:
         DropChildren();
     }
 
+    string Name() {
+        return name;
+    }
+
     void Create();
+    void Remove();
     
     friend ostream& operator<<(ostream& os, const TCgroup& cg);
 };
 
 class TCgroupState {
-    // cgroups are owned by mounts, not controllers
-    map<string, TCgroup*> mounts; // can be net_cls,netprio
-    map<string, TCgroup*> controllers; // can be net_cls _or_ net_prio
+    // cgroups are owned by controllers, not raw_controllers
+    map<string, TCgroup*> controllers; // can be net_cls,netprio
+    map<string, TCgroup*> raw_controllers; // can be net_cls _or_ net_prio
 
 public:
     TCgroupState();
 
     ~TCgroupState() {
-        for (auto c : mounts)
+        for (auto c : controllers)
             delete c.second;
     }
 
@@ -63,6 +61,8 @@ public:
     const string DefaultMountpoint(const string controller) {
         return "/sys/fs/cgroup/" + controller;
     }
-    
+
+    void Update();
     void MountMissingControllers();
+    void UmountAll();
 };
