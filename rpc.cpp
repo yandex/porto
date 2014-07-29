@@ -254,11 +254,3 @@ int HandleRpcFromSocket(TContainerHolder &cholder, const char *path)
 
     return ret;
 }
-
-int main(int argc, char *argv[])
-{
-    TContainerHolder cholder;
-
-    //return HandleRpcFromStream(cholder, std::cin, std::cout);
-    return HandleRpcFromSocket(cholder, RPC_SOCK_PATH);
-}
