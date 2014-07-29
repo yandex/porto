@@ -59,19 +59,16 @@ void HandleConnection(TContainerHolder &cholder, int fd)
     close(fd);
 }
 
-int main(int argc, const char *argv[])
-{
-    TContainerHolder cholder;
+int rpc_main(TContainerHolder &cholder) {
     struct sockaddr_un peer_addr;
     socklen_t peer_addr_size;
     int sfd;
     int cfd;
-    int ret = 0;
 
     sfd = CreateRpcServer(RPC_SOCK_PATH);
     if (sfd < 0) {
-        std::cerr<<"Can't create RPC server"<<std::endl;
-        return sfd;
+        std::cerr << "Can't create RPC server" << std::endl;
+        return -1;
     }
 
     TThreadPool pool(16);
@@ -81,7 +78,7 @@ int main(int argc, const char *argv[])
         cfd = accept(sfd, (struct sockaddr *) &peer_addr,
                      &peer_addr_size);
         if (cfd < 0) {
-            std::cerr<<"accept() error: "<<strerror(errno)<<std::endl;
+            std::cerr << "accept() error: " << strerror(errno) << std::endl;
             break;
         }
 
@@ -90,5 +87,12 @@ int main(int argc, const char *argv[])
 
     close(sfd);
 
-    return ret;
+    return 0;
+}
+
+int main(int argc, const char *argv[])
+{
+    TContainerHolder cholder;
+
+    return rpc_main(cholder);
 }
