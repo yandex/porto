@@ -1,14 +1,21 @@
 #include <iostream>
+#include <fstream>
 #include <google/protobuf/text_format.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
+#include <ext/stdio_filebuf.h>
 
 #include "rpc.pb.h"
-#include "porto.h"
+#include "rpc.h"
 
-TContainerHolder cholder;
+extern "C" {
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+}
 
 static rpc::TContainerResponse
-CreateContainer(const rpc::TContainerCreateRequest &req)
+CreateContainer(TContainerHolder &cholder, const rpc::TContainerCreateRequest &req)
 {
     rpc::TContainerResponse rsp;
 
@@ -25,7 +32,7 @@ CreateContainer(const rpc::TContainerCreateRequest &req)
 }
 
 static rpc::TContainerResponse
-DestroyContainer(const rpc::TContainerDestroyRequest &req)
+DestroyContainer(TContainerHolder &cholder, const rpc::TContainerDestroyRequest &req)
 {
     rpc::TContainerResponse rsp;
 
@@ -38,7 +45,7 @@ DestroyContainer(const rpc::TContainerDestroyRequest &req)
 }
 
 static rpc::TContainerResponse
-StartContainer(const rpc::TContainerStartRequest &req)
+StartContainer(TContainerHolder &cholder, const rpc::TContainerStartRequest &req)
 {
     rpc::TContainerResponse rsp;
 
@@ -59,7 +66,7 @@ StartContainer(const rpc::TContainerStartRequest &req)
 }
 
 static rpc::TContainerResponse
-StopContainer(const rpc::TContainerStopRequest &req)
+StopContainer(TContainerHolder &cholder, const rpc::TContainerStopRequest &req)
 {
     rpc::TContainerResponse rsp;
 
@@ -80,7 +87,7 @@ StopContainer(const rpc::TContainerStopRequest &req)
 }
 
 static rpc::TContainerResponse
-PauseContainer(const rpc::TContainerPauseRequest &req)
+PauseContainer(TContainerHolder &cholder, const rpc::TContainerPauseRequest &req)
 {
     rpc::TContainerResponse rsp;
 
@@ -101,7 +108,7 @@ PauseContainer(const rpc::TContainerPauseRequest &req)
 }
 
 static rpc::TContainerResponse
-ResumeContainer(const rpc::TContainerResumeRequest &req)
+ResumeContainer(TContainerHolder &cholder, const rpc::TContainerResumeRequest &req)
 {
     rpc::TContainerResponse rsp;
 
@@ -121,7 +128,7 @@ ResumeContainer(const rpc::TContainerResumeRequest &req)
     return rsp;
 }
 
-static rpc::TContainerResponse ListContainers()
+static rpc::TContainerResponse ListContainers(TContainerHolder &cholder)
 {
     rpc::TContainerResponse rsp;
 
@@ -135,30 +142,30 @@ static rpc::TContainerResponse ListContainers()
 }
 
 static rpc::TContainerResponse
-HandleRequest(const rpc::TContainerRequest &req)
+HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req)
 {
     if (req.has_create())
-        return CreateContainer(req.create());
+        return CreateContainer(cholder, req.create());
 
     else if (req.has_destroy())
-        return DestroyContainer(req.destroy());
+        return DestroyContainer(cholder, req.destroy());
 
     else if (req.has_start())
-        return StartContainer(req.start());
+        return StartContainer(cholder, req.start());
 
     else if (req.has_stop())
-        return StopContainer(req.stop());
+        return StopContainer(cholder, req.stop());
 
     else if (req.has_pause())
-        return PauseContainer(req.pause());
+        return PauseContainer(cholder, req.pause());
 
     else if (req.has_resume())
-        return ResumeContainer(req.resume());
+        return ResumeContainer(cholder, req.resume());
 
     // TODO ...
 
     else if (req.has_list())
-        return ListContainers();
+        return ListContainers(cholder);
 
     // TODO ...
 
@@ -169,26 +176,89 @@ HandleRequest(const rpc::TContainerRequest &req)
     }
 }
 
-int main(int argc, char *argv[])
+string HandleRpcRequest(TContainerHolder &cholder, const string msg)
 {
+    string str;
+
     rpc::TContainerRequest request;
-    auto out = new google::protobuf::io::OstreamOutputStream(&std::cout);
-    std::string str;
+    if (!google::protobuf::TextFormat::ParseFromString(msg, &request) ||
+        !request.IsInitialized())
+        return "";
 
-    for (std::string msg; std::getline(std::cin, msg);) {
-        request.Clear();
-        if (!google::protobuf::TextFormat::ParseFromString(msg, &request) ||
-            !request.IsInitialized()) {
-            std::cout<<"Skip invalid message:"<<std::endl;
-            std::cout<<request.DebugString();
-            std::cout<<std::endl;
-            continue;
-        }
+    auto rsp = HandleRpcRequest(cholder, request);
+    google::protobuf::TextFormat::PrintToString(rsp, &str);
 
-        auto rsp = HandleRequest(request);
-        google::protobuf::TextFormat::PrintToString(rsp, &str);
-        std::cout<<str<<std::endl;
+    return str;
+}
+
+int HandleRpcFromStream(TContainerHolder &cholder, istream &in, ostream &out)
+{
+    for (std::string msg; std::getline(in, msg);) {
+        auto rsp = HandleRpcRequest(cholder, msg);
+        if (rsp.length())
+            out<<rsp<<std::endl;
+        else
+            out<<"Skip invalid message: "<<msg<<std::endl;
     }
 
     return 0;
+}
+
+int HandleRpcFromSocket(TContainerHolder &cholder, const char path)
+{
+    int sfd, cfd;
+    struct sockaddr_un my_addr, peer_addr;
+    socklen_t peer_addr_size;
+    int ret;
+
+    memset(&my_addr, 0, sizeof(struct sockaddr_un));
+
+    sfd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sfd < 0) {
+        std::cerr<<"socket() error: "<<strerror(errno)<<std::endl;
+        return -1;
+    }
+
+    my_addr.sun_family = AF_UNIX;
+    strncpy(my_addr.sun_path, path, sizeof(my_addr.sun_path) - 1);
+
+    if (bind(sfd, (struct sockaddr *) &my_addr,
+             sizeof(struct sockaddr_un)) < 0) {
+        std::cerr<<"bind() error: "<<strerror(errno)<<std::endl;
+        return -2;
+    }
+
+    if (listen(sfd, 0) < 0) {
+        std::cerr<<"listen() error: "<<strerror(errno)<<std::endl;
+        return -3;
+    }
+
+    peer_addr_size = sizeof(struct sockaddr_un);
+    cfd = accept(sfd, (struct sockaddr *) &peer_addr,
+                 &peer_addr_size);
+    if (cfd < 0) {
+        std::cerr<<"accept() error: "<<strerror(errno)<<std::endl;
+        return -4;
+    }
+
+    __gnu_cxx::stdio_filebuf<char> ibuf(cfd, std::ios_base::in, 1);
+    __gnu_cxx::stdio_filebuf<char> obuf(cfd, std::ios_base::out, 1);
+
+    std::istream ist(&ibuf);
+    std::ostream ost(&obuf);
+
+    ret = HandleRpcFromStream(cholder, ist, ost);
+
+    ibuf.close();
+    obuf.close();
+
+    return ret;
+}
+
+int main(int argc, char *argv[])
+{
+    TContainerHolder cholder;
+
+    //return HandleRpcFromStream(cholder, std::cin, std::cout);
+    return HandleRpcFromSocket(cholder, RPC_SOCK_PATH);
 }
