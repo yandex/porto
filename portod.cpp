@@ -1,5 +1,6 @@
 #include "protobuf.hpp"
 #include "rpc.hpp"
+#include "cgroup.hpp"
 
 extern "C" {
 #include <signal.h>
