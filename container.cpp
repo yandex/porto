@@ -1,4 +1,4 @@
-#include "porto.h"
+#include "container.h"
 
 TContainer::TContainer(const string _name) : name(_name), state(Stopped) {
 }
@@ -85,11 +85,4 @@ vector<string> TContainerHolder::List() {
         ret.push_back(c.second->Name());
 
     return ret;
-}
-
-int main2(int argc, const char *argv[])
-{
-	//TMountState ms;
-
-	return EXIT_SUCCESS;
 }

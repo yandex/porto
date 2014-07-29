@@ -1,5 +1,4 @@
-/porto
-/porto.o
-/cgroup.o
+/portod
+/*.o
 /rpc.pb.cc
 /rpc.pb.h

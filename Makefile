@@ -1,25 +1,21 @@
 CC=g++
 CFLAGS=-c -Wall -g -std=c++11
-LDFLAGS=
-SOURCES=porto.cpp cgroup.cpp
+LDFLAGS=-lprotobuf
+SOURCES=portod.cpp rpc.cpp rpc.pb.cc container.cpp cgroup.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
-EXECUTABLE=porto
+EXECUTABLE=portod
+PROTOBUF=rpc.pb.h rpc.pb.cc
 
 all: $(SOURCES) $(EXECUTABLE)
 
-$(EXECUTABLE): $(OBJECTS)
-	$(CC) $(LDFLAGS) $(OBJECTS) -o $@
+$(EXECUTABLE): $(OBJECTS) $(PROTOBUF)
+	$(CC) $(OBJECTS) $(LDFLAGS) -o $@
 
 .cpp.o:
 	$(CC) $(CFLAGS) $< -o $@
 
-.PHONY: rpc
-rpc:
+$(PROTOBUF):
 	protoc rpc.proto --cpp_out=.
-	g++ porto.cpp rpc.cpp rpc.pb.cc -std=c++11 -lprotobuf -o rpc
-	echo 'create: { name: "test" }' | ./rpc
-	echo 'list: { }' | ./rpc
-	echo '' | ./rpc
 
 clean:
-	rm -f $(OBJECTS) $(EXECUTABLE)
+	rm -f $(OBJECTS) $(EXECUTABLE) $(PROTOBUF)
