@@ -1,10 +1,11 @@
 #ifndef __RPC_H__
 #define __RPC_H__
 
+// TODO: /run/porto.socket
+#define RPC_SOCK_PATH "/tmp/porto.socket"
+
 #include "container.h"
 
-string HandleRpcRequest(TContainerHolder &cholder, const string req);
 int HandleRpcFromStream(TContainerHolder &cholder, istream &in, ostream &out);
-int HandleRpcFromSocket(TContainerHolder &cholder, const char *path);
 
 #endif

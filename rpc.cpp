@@ -1,15 +1,12 @@
-#include <iostream>
 #include <fstream>
 #include <google/protobuf/text_format.h>
 #include <google/protobuf/io/zero_copy_stream_impl.h>
-#include <ext/stdio_filebuf.h>
 
 #include "rpc.pb.h"
 #include "rpc.h"
+#include "fdstream.h"
 
 extern "C" {
-#include <unistd.h>
-#include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 }
@@ -209,7 +206,7 @@ HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req)
     return rsp;
 }
 
-string HandleRpcRequest(TContainerHolder &cholder, const string msg)
+static string HandleRpcRequest(TContainerHolder &cholder, const string msg)
 {
     string str;
 
@@ -235,55 +232,4 @@ int HandleRpcFromStream(TContainerHolder &cholder, istream &in, ostream &out)
     }
 
     return 0;
-}
-
-int HandleRpcFromSocket(TContainerHolder &cholder, const char *path)
-{
-    int sfd, cfd;
-    struct sockaddr_un my_addr, peer_addr;
-    socklen_t peer_addr_size;
-    int ret;
-
-    memset(&my_addr, 0, sizeof(struct sockaddr_un));
-
-    sfd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (sfd < 0) {
-        std::cerr<<"socket() error: "<<strerror(errno)<<std::endl;
-        return -1;
-    }
-
-    my_addr.sun_family = AF_UNIX;
-    strncpy(my_addr.sun_path, path, sizeof(my_addr.sun_path) - 1);
-
-    if (bind(sfd, (struct sockaddr *) &my_addr,
-             sizeof(struct sockaddr_un)) < 0) {
-        std::cerr<<"bind() error: "<<strerror(errno)<<std::endl;
-        return -2;
-    }
-
-    if (listen(sfd, 0) < 0) {
-        std::cerr<<"listen() error: "<<strerror(errno)<<std::endl;
-        return -3;
-    }
-
-    peer_addr_size = sizeof(struct sockaddr_un);
-    cfd = accept(sfd, (struct sockaddr *) &peer_addr,
-                 &peer_addr_size);
-    if (cfd < 0) {
-        std::cerr<<"accept() error: "<<strerror(errno)<<std::endl;
-        return -4;
-    }
-
-    __gnu_cxx::stdio_filebuf<char> ibuf(cfd, std::ios_base::in, 1);
-    __gnu_cxx::stdio_filebuf<char> obuf(cfd, std::ios_base::out, 1);
-
-    std::istream ist(&ibuf);
-    std::ostream ost(&obuf);
-
-    ret = HandleRpcFromStream(cholder, ist, ost);
-
-    ibuf.close();
-    obuf.close();
-
-    return ret;
 }
