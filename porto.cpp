@@ -1,8 +1,8 @@
 #include <iostream>
 #include <sstream>
 
-#include "rpc.h"
-#include "protobuf.h"
+#include "rpc.hpp"
+#include "protobuf.hpp"
 
 extern "C" {
 #include <unistd.h>

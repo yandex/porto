@@ -1,5 +1,5 @@
-#include "protobuf.h"
-#include "rpc.h"
+#include "protobuf.hpp"
+#include "rpc.hpp"
 
 extern "C" {
 #include <signal.h>

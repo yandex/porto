@@ -2,7 +2,7 @@
 #define __RPC_H__
 
 #include "rpc.pb.h"
-#include "container.h"
+#include "container.hpp"
 
 // TODO: /run/porto.socket
 #define RPC_SOCK_PATH "/tmp/porto.socket"

@@ -5,7 +5,7 @@
 // http://stackoverflow.com/questions/2340730/are-there-c-equivalents-for-the-protocol-buffers-delimited-i-o-functions-in-ja
 
 bool writeDelimitedTo(const google::protobuf::MessageLite& message,
-		      google::protobuf::io::ZeroCopyOutputStream* rawOutput);
+                      google::protobuf::io::ZeroCopyOutputStream* rawOutput);
 
 bool readDelimitedFrom(google::protobuf::io::ZeroCopyInputStream* rawInput,
-		       google::protobuf::MessageLite* message);
+                       google::protobuf::MessageLite* message);

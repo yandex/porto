@@ -1,4 +1,4 @@
-#include "protobuf.h"
+#include "protobuf.hpp"
 
 bool writeDelimitedTo(
                       const google::protobuf::MessageLite& message,

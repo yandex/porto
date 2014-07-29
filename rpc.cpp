@@ -1,6 +1,6 @@
 #include <fstream>
 
-#include "rpc.h"
+#include "rpc.hpp"
 
 extern "C" {
 #include <sys/socket.h>
