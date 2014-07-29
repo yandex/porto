@@ -110,7 +110,7 @@ static void GetContainerProperty(TContainerHolder &cholder,
                                  const rpc::TContainerGetPropertyRequest &req,
                                  rpc::TContainerResponse &rsp)
 {
-    std::cout<<"-> Get "<<req.name()<<":"<<req.property()<<std::endl;
+    std::cout<<"-> Get "<<req.name()<<std::endl;
 
     auto container = cholder.Find(req.name());
     if (!container) {
@@ -118,12 +118,17 @@ static void GetContainerProperty(TContainerHolder &cholder,
         return;
     }
 
-
+    for (int i = 0; i < req.property_size(); i++) {
+        std::cout<<"-> Get "<<req.name()<<":"<<req.property(i)<<std::endl;
 #if 0
-    auto val = container->GetProperty(req.property());
-    rsp.getproperty.set_value(val);
-    rsp.set_error(rpc::EContainerError::Success);
+        auto val = container->GetProperty(req.property(i));
+#else
+        auto val = "null";
 #endif
+        rsp.mutable_getproperty()->add_value(val);
+    }
+
+    rsp.set_error(rpc::EContainerError::Success);
 }
 
 static void SetContainerProperty(TContainerHolder &cholder,
@@ -138,7 +143,6 @@ static void SetContainerProperty(TContainerHolder &cholder,
         return;
     }
 
-
 #if 0
     if (container->SetProperty(req.property(), req.value()))
         rsp.set_error(rpc::EContainerError::Success);
@@ -149,7 +153,7 @@ static void GetContainerData(TContainerHolder &cholder,
                              const rpc::TContainerGetDataRequest &req,
                              rpc::TContainerResponse &rsp)
 {
-    std::cout<<"-> Get data "<<req.name()<<":"<<req.data()<<std::endl;
+    std::cout<<"-> Get data "<<req.name()<<std::endl;
 
     auto container = cholder.Find(req.name());
     if (!container) {
@@ -158,11 +162,17 @@ static void GetContainerData(TContainerHolder &cholder,
     }
 
 
+    for (int i = 0; i < req.data_size(); i++) {
+        std::cout<<"-> Get data "<<req.name()<<":"<<req.data(i)<<std::endl;
 #if 0
-    auto val = container->GetData(req.data());
-    rsp.getproperty.set_value(val);
-    rsp.set_error(rpc::EContainerError::Success);
+        auto val = container->GetData(req.data(i));
+#else
+        auto val = "null";
 #endif
+        rsp.mutable_getdata()->add_value(val);
+
+    }
+    rsp.set_error(rpc::EContainerError::Success);
 }
 
 rpc::TContainerResponse
