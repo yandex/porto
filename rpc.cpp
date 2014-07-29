@@ -204,7 +204,7 @@ int HandleRpcFromStream(TContainerHolder &cholder, istream &in, ostream &out)
     return 0;
 }
 
-int HandleRpcFromSocket(TContainerHolder &cholder, const char path)
+int HandleRpcFromSocket(TContainerHolder &cholder, const char *path)
 {
     int sfd, cfd;
     struct sockaddr_un my_addr, peer_addr;
