@@ -10,100 +10,13 @@
 #include <dirent.h>
 #include <string.h>
 
+#include "mount.hpp"
+
 using namespace std;
 
 set<string> subsystems = {"cpuset", "cpu", "cpuacct", "memory", "devices",
                           "freezer", "net_cls", "net_prio", "blkio",
                           "perf_event", "hugetlb", "name=systemd"};
-
-class TMount {
-    string device;
-    string mountpoint;
-    string vfstype;
-    set<string> flags;
-
-public:
-    TMount(string mounts_line) {
-        // from single /proc/self/mounts line, like:
-        // /dev/sda1 /boot ext4 rw,seclabel,relatime,data=ordered 0 0
-
-        istringstream ss(mounts_line);
-        string flag_string, t;
-        ss >> device >> mountpoint >> vfstype >> flag_string;
-
-        for (auto i = flag_string.begin(); i != flag_string.end(); i++) {
-            if (*i == ',' && !t.empty()) {
-                flags.insert(t);
-                t.clear();
-            } else
-                t += *i;
-        }
-
-        if (!t.empty())
-            flags.insert(t);
-    }
-
-    set<string> CgroupSubsystems() {
-        set<string> ss;
-
-        set_intersection(flags.begin(), flags.end(),
-                         subsystems.begin(), subsystems.end(),
-                         inserter(ss, ss.begin()));
-        // TODO: systemd
-
-        return ss;
-    }
-
-    friend ostream& operator<<(ostream& os, const TMount& m) {
-        os << m.device << " " << m.mountpoint << " ";
-        for (auto f : m.flags)
-            os << f << " ";
-
-        return os;
-    }
-
-    string Mountpoint() {
-        return mountpoint;
-    }
-};
-
-class TMountState {
-    set<TMount*> mounts;
-    map<string, TMount*> cgroup_mounts;
-
-public:
-    TMountState() {
-        ifstream s("/proc/self/mounts");
-        string line;
-
-        while (getline(s, line)) {
-            TMount *mount = new TMount(line);
-            mounts.insert(mount);
-
-            set<string> ss = mount->CgroupSubsystems();
-            if (!ss.empty()) {
-                for (auto s : ss)
-                    cgroup_mounts[s] = mount;
-            }
-        }
-    }
-
-    ~TMountState() {
-        for (auto m : mounts)
-            delete m;
-    }
-
-    TMount* CgroupMountpoint(string subsystem) {
-        return cgroup_mounts[subsystem];
-    }
-
-    friend ostream& operator<<(ostream& os, const TMountState& ms) {
-        for (auto m : ms.mounts)
-            os << *m << endl;
-
-        return os;
-    }
-};
 
 class TCgroup {
     string name;
@@ -156,15 +69,31 @@ class TCgroupState {
 
 public:
     TCgroupState() {
-        TMountState mounts;
+        TMountState ms;
 
-        for (auto s : subsystems) {
-            TMount *mount = mounts.CgroupMountpoint(s);
-            if (!mount)
+        for (auto m : ms.Mounts()) {
+            set<string> flags = m->Flags();
+            set<string> cs;
+
+            set_intersection(flags.begin(), flags.end(),
+                             subsystems.begin(), subsystems.end(),
+                             inserter(cs, cs.begin()));
+
+            if (cs.size() == 0)
                 continue;
 
-            controllers[s] = new TCgroup(mount->Mountpoint());
+            string name;
+            for (auto c : cs)
+                name += c; //TODO: add ","
+
+            TCgroup *cg = new TCgroup(m->Mountpoint());
+            controllers[name] = cg;
         }
+    }
+
+    ~TCgroupState() {
+        for (auto c : controllers)
+            delete c.second;
     }
 
     friend ostream& operator<<(ostream& os, const TCgroupState& st) {
@@ -176,11 +105,3 @@ public:
         return os;
     }
 };
-
-int main() {
-    TMountState m;
-    TCgroupState s;
-
-    cout << m;
-    cout << s;
-}
