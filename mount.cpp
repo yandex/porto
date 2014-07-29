@@ -3,10 +3,9 @@
 
 #include "mount.hpp"
 
+// from single /proc/self/mounts line, like:
+// /dev/sda1 /boot ext4 rw,seclabel,relatime,data=ordered 0 0
 TMount::TMount(string mounts_line) {
-    // from single /proc/self/mounts line, like:
-    // /dev/sda1 /boot ext4 rw,seclabel,relatime,data=ordered 0 0
-
     istringstream ss(mounts_line);
     string flag_string, t;
     ss >> device >> mountpoint >> vfstype >> flag_string;
@@ -26,6 +25,9 @@ TMount::TMount(string mounts_line) {
 TMountState::TMountState() {
     ifstream s("/proc/self/mounts");
     string line;
+
+    if (!s.is_open())
+        throw "Cannot open /proc/self/mounts";
 
     while (getline(s, line)) {
         TMount *mount = new TMount(line);

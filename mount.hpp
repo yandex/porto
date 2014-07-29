@@ -1,6 +1,8 @@
 #include <string>
 #include <set>
 
+#include <sys/mount.h>
+
 using namespace std;
 
 class TMount {
@@ -9,8 +11,16 @@ class TMount {
     string vfstype;
     set<string> flags;
 
+    unsigned long mountflags = 0;
+
 public:
     TMount(string mounts_line);
+
+    TMount(string device, string mountpoint, string vfstype,
+           unsigned long mountflags, set<string> flags) :
+        device (device), mountpoint (mountpoint), vfstype (vfstype),
+        flags (flags), mountflags (mountflags) {
+    }
 
     friend ostream& operator<<(ostream& os, const TMount& m) {
         os << m.device << " " << m.mountpoint << " ";
@@ -20,12 +30,37 @@ public:
         return os;
     }
 
-    string Mountpoint() {
+    const string Mountpoint() {
         return mountpoint;
     }
 
-    set<string> Flags() {
+    set<string> const& Flags() {
         return flags;
+    }
+
+    string CommaDelimitedFlags() {
+        string ret;
+        for (auto c = flags.begin(); c != flags.end(); ) {
+            ret += *c;
+            if (++c != flags.end())
+                ret += ",";
+        }
+        return ret;
+    }
+
+    void Mount() {
+        if (mount(device.c_str(), mountpoint.c_str(), vfstype.c_str(),
+                  mountflags, CommaDelimitedFlags().c_str())) {
+            if (errno == EBUSY)
+                throw "Already mounted";
+            else
+                throw "Cannot mount filesystem " + mountpoint;
+        }
+    }
+
+    void Umount () {
+        if (umount(mountpoint.c_str()))
+            throw "Cannot umount filesystem " + mountpoint;
     }
 };
 
@@ -39,7 +74,7 @@ public:
             delete m;
     }
 
-    set<TMount*>& Mounts() {
+    set<TMount*> const& Mounts() {
         return mounts;
     }
 

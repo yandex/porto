@@ -6,9 +6,11 @@
 #include <set>
 #include <algorithm>
 
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
 #include <string.h>
+#include <errno.h>
 
 #include "mount.hpp"
 
@@ -24,32 +26,64 @@ class TCgroup {
     int level;
     set<TCgroup*> children;
 
+    mode_t mode = 0x666;
+
 public:
     TCgroup(string path, TCgroup *parent = nullptr, int level = 0) :
         name (path), parent(parent), level(level) {
+        try {
+            FindChildren();
+        } catch (...) {
+            DropChildren();
+            throw;
+        }
+    }
+
+    void FindChildren() {
             DIR *dirp;
             struct dirent *dp;
 
-            dirp = opendir(path.c_str());
+            dirp = opendir(name.c_str());
             if (!dirp)
-                throw errno;
+                throw "Cannot read sysfs";
 
-            while ((dp = readdir(dirp)) != nullptr) {
-                if (!strcmp(".", dp->d_name) ||
-                    !strcmp ("..", dp->d_name) ||
-                    !(dp->d_type & DT_DIR) || (dp->d_type & DT_LNK))
-                    continue;
+            try {
+                while ((dp = readdir(dirp)) != nullptr) {
+                    if (!strcmp(".", dp->d_name) ||
+                        !strcmp ("..", dp->d_name) ||
+                        !(dp->d_type & DT_DIR) || (dp->d_type & DT_LNK))
+                        continue;
 
-                string cp = path + "/" + string(dp->d_name);
-                children.insert(new TCgroup(cp, this, level + 1));
+                    string cp = name + "/" + string(dp->d_name);
+                    children.insert(new TCgroup(cp, this, level + 1));
+                }
+            } catch (...) {
+                closedir(dirp);
+                throw;
             }
+    }
 
-            closedir(dirp);
+    void DropChildren() {
+        for (auto c : children)
+            delete c;
     }
 
     ~TCgroup() {
-        for (auto c : children)
-            delete c;
+        DropChildren();
+    }
+
+    void Create() {
+        if (parent == nullptr)
+            throw "Cannot create root cgroup";
+
+        if (mkdir(name.c_str(), mode)) {
+            switch (errno) {
+            case EEXIST:
+                throw "Cgroup already exists";
+            default:
+                throw "Cannot create cgroup";
+            }
+        }
     }
     
     friend ostream& operator<<(ostream& os, const TCgroup& cg) {
@@ -65,7 +99,9 @@ public:
 };
 
 class TCgroupState {
-    map<string, TCgroup*> controllers;
+    // cgroups are owned by mounts, not controllers
+    map<string, TCgroup*> mounts; // can be net_cls,netprio
+    map<string, TCgroup*> controllers; // can be net_cls _or_ net_prio
 
 public:
     TCgroupState() {
@@ -83,16 +119,22 @@ public:
                 continue;
 
             string name;
-            for (auto c : cs)
-                name += c; //TODO: add ","
+            for (auto c = cs.begin(); c != cs.end(); ) {
+                name += *c;
+                if (++c != cs.end())
+                    name += ",";
+            }
 
             TCgroup *cg = new TCgroup(m->Mountpoint());
-            controllers[name] = cg;
+            mounts[name] = cg;
+
+            for (auto c : cs)
+                controllers[name] = cg;
         }
     }
 
     ~TCgroupState() {
-        for (auto c : controllers)
+        for (auto c : mounts)
             delete c.second;
     }
 
@@ -103,5 +145,24 @@ public:
         }
 
         return os;
+    }
+
+    const string DefaultMountpoint(const string controller) {
+        return "/sys/fs/cgroup/" + controller;
+    }
+    
+    void MountMissingControllers() {
+        for (auto c : subsystems) {
+            if (controllers[c] == nullptr) {
+                TMount mount("cgroup", DefaultMountpoint(c),
+                             "cgroup", 0, set<string>{c});
+
+                mount.Mount();
+
+                TCgroup *cg = new TCgroup(mount.Mountpoint());
+                mounts[c] = cg;
+                controllers[c] = cg;
+            }
+        }
     }
 };
