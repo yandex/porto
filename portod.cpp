@@ -1,8 +1,8 @@
 #include "protobuf.hpp"
 #include "rpc.hpp"
+#include "threadpool.hpp"
 
 extern "C" {
-#include <signal.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -40,10 +40,22 @@ static int CreateRpcServer(const char *path)
     return fd;
 }
 
-static int sfd;
-void cleanup(int signum)
+void HandleConnection(TContainerHolder &cholder, int fd)
 {
-    close(sfd);
+    google::protobuf::io::FileInputStream pist(fd);
+    google::protobuf::io::FileOutputStream post(fd);
+
+    rpc::TContainerRequest request;
+    while (readDelimitedFrom(&pist, &request)) {
+        auto rsp = HandleRpcRequest(cholder, request);
+
+        if (rsp.IsInitialized()) {
+            writeDelimitedTo(rsp, &post);
+            post.Flush();
+        }
+    }
+
+    close(fd);
 }
 
 int main(int argc, const char *argv[])
@@ -51,6 +63,7 @@ int main(int argc, const char *argv[])
     TContainerHolder cholder;
     struct sockaddr_un peer_addr;
     socklen_t peer_addr_size;
+    int sfd;
     int cfd;
     int ret = 0;
 
@@ -60,7 +73,7 @@ int main(int argc, const char *argv[])
         return sfd;
     }
 
-    signal(SIGINT, cleanup);
+    TThreadPool pool(16);
 
     while (true) {
         peer_addr_size = sizeof(struct sockaddr_un);
@@ -71,23 +84,10 @@ int main(int argc, const char *argv[])
             break;
         }
 
-        google::protobuf::io::FileInputStream pist(cfd);
-        google::protobuf::io::FileOutputStream post(cfd);
-
-        rpc::TContainerRequest request;
-        while (readDelimitedFrom(&pist, &request)) {
-            auto rsp = HandleRpcRequest(cholder, request);
-
-            if (rsp.IsInitialized()) {
-                writeDelimitedTo(rsp, &post);
-                post.Flush();
-            }
-        }
-
-        close(cfd);
+        pool.Enqueue([&cholder, cfd]{ HandleConnection(cholder, cfd); });
     }
 
-    cleanup(SIGINT);
+    close(sfd);
 
     return ret;
 }
