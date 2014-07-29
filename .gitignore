@@ -2,3 +2,4 @@
 /*.o
 /rpc.pb.cc
 /rpc.pb.h
+/CMakeCache.txt
