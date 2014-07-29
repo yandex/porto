@@ -20,15 +20,18 @@ message TContainerListRequest { }
 
 message TContainerGetPropertyRequest {
 	required string name = 1;
+	required string property = 2;
 }
 
 message TContainerSetPropertyRequest {
 	required string name = 1;
-	required string value = 2;
+	required string property = 2;
+	required string value = 3;
 }
 
 message TContainerGetDataRequest {
 	required string name = 1;
+	required string data = 2;
 }
 
 message TContainerStartRequest {
