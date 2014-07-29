@@ -1,18 +1,12 @@
-#include "portod.h"
-#include "fdstream.h"
+#include "protobuf.h"
+#include "rpc.h"
 
 extern "C" {
 #include <signal.h>
+#include <unistd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 }
-
-/* Example:
- * nc -U /run/porto.socket
- * create: { name: "test" }
- * list: { }
- *
- */
 
 static int CreateRpcServer(const char *path)
 {
@@ -28,7 +22,9 @@ static int CreateRpcServer(const char *path)
     }
 
     my_addr.sun_family = AF_UNIX;
-    strncpy(my_addr.sun_path, RPC_SOCK_PATH, sizeof(my_addr.sun_path) - 1);
+    strncpy(my_addr.sun_path, path, sizeof(my_addr.sun_path) - 1);
+
+    unlink(path);
 
     if (bind(fd, (struct sockaddr *) &my_addr,
              sizeof(struct sockaddr_un)) < 0) {
@@ -41,7 +37,7 @@ static int CreateRpcServer(const char *path)
         return -3;
     }
 
-    return 0;
+    return fd;
 }
 
 static int sfd;
@@ -56,7 +52,7 @@ int main(int argc, const char *argv[])
     struct sockaddr_un peer_addr;
     socklen_t peer_addr_size;
     int cfd;
-    int ret;
+    int ret = 0;
 
     sfd = CreateRpcServer(RPC_SOCK_PATH);
     if (sfd < 0) {
@@ -75,10 +71,20 @@ int main(int argc, const char *argv[])
             break;
         }
 
-        cout<<"New client"<<endl;
+        google::protobuf::io::FileInputStream pist(cfd);
+        google::protobuf::io::FileOutputStream post(cfd);
 
-        FdStream str(cfd);
-        ret = HandleRpcFromStream(cholder, str.ist, str.ost);
+        rpc::TContainerRequest request;
+        while (readDelimitedFrom(&pist, &request)) {
+            auto rsp = HandleRpcRequest(cholder, request);
+
+            if (rsp.IsInitialized()) {
+                writeDelimitedTo(rsp, &post);
+                post.Flush();
+            }
+        }
+
+        close(cfd);
     }
 
     cleanup(SIGINT);

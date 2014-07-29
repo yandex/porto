@@ -4,3 +4,6 @@
 /rpc.pb.cc
 /rpc.pb.h
 /CMakeCache.txt
+/CMakeFiles/
+/cmake_install.cmake
+/Makefile

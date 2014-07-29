@@ -1,10 +1,6 @@
 #include <fstream>
-#include <google/protobuf/text_format.h>
-#include <google/protobuf/io/zero_copy_stream_impl.h>
 
-#include "rpc.pb.h"
 #include "rpc.h"
-#include "fdstream.h"
 
 extern "C" {
 #include <sys/socket.h>
@@ -169,7 +165,7 @@ static void GetContainerData(TContainerHolder &cholder,
 #endif
 }
 
-static rpc::TContainerResponse
+rpc::TContainerResponse
 HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req)
 {
     rpc::TContainerResponse rsp;
@@ -204,32 +200,4 @@ HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req)
     }
 
     return rsp;
-}
-
-static string HandleRpcRequest(TContainerHolder &cholder, const string msg)
-{
-    string str;
-
-    rpc::TContainerRequest request;
-    if (!google::protobuf::TextFormat::ParseFromString(msg, &request) ||
-        !request.IsInitialized())
-        return "";
-
-    auto rsp = HandleRpcRequest(cholder, request);
-    google::protobuf::TextFormat::PrintToString(rsp, &str);
-
-    return str;
-}
-
-int HandleRpcFromStream(TContainerHolder &cholder, istream &in, ostream &out)
-{
-    for (std::string msg; std::getline(in, msg);) {
-        auto rsp = HandleRpcRequest(cholder, msg);
-        if (rsp.length())
-            out<<rsp<<std::endl;
-        else
-            out<<"Skip invalid message: "<<msg<<std::endl;
-    }
-
-    return 0;
 }

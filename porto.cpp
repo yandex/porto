@@ -1,7 +1,11 @@
+#include <iostream>
+#include <sstream>
+
 #include "rpc.h"
-#include "fdstream.h"
+#include "protobuf.h"
 
 extern "C" {
+#include <unistd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
 }
@@ -21,7 +25,7 @@ static int ConnectToRpcServer(const char *path)
     }
 
     peer_addr.sun_family = AF_UNIX;
-    strncpy(peer_addr.sun_path, RPC_SOCK_PATH, sizeof(peer_addr.sun_path) - 1);
+    strncpy(peer_addr.sun_path, path, sizeof(peer_addr.sun_path) - 1);
 
     peer_addr_size = sizeof(struct sockaddr_un);
     if (connect(sfd, (struct sockaddr *) &peer_addr, peer_addr_size) < 0) {
@@ -29,11 +33,12 @@ static int ConnectToRpcServer(const char *path)
         return -2;
     }
 
-    return 0;
+    return sfd;
 }
 
 int main(int argc, char *argv[])
 {
+    string s;
     int fd = ConnectToRpcServer(RPC_SOCK_PATH);
 
     if (fd < 0) {
@@ -41,14 +46,34 @@ int main(int argc, char *argv[])
         return fd;
     }
 
-    FdStream str(fd);
-
-    str.ost<<"list: {}"<<std::endl;
-    str.ost.flush();
-
-    for (std::string msg; std::getline(str.ist, msg);) {
-            cout<<msg<<std::endl;
+    if (argc <= 1) {
+        std::cerr<<"Please specify message!";
+        return -1;
     }
+
+    stringstream msg;
+    std::vector<std::string> args(argv + 1, argv + argc);
+    copy(args.begin(), args.end(), ostream_iterator<string>(msg, " "));
+
+    rpc::TContainerRequest request;
+    if (!google::protobuf::TextFormat::ParseFromString(msg.str(), &request) ||
+        !request.IsInitialized())
+        return -1;
+
+    google::protobuf::io::FileInputStream pist(fd);
+    google::protobuf::io::FileOutputStream post(fd);
+
+    rpc::TContainerResponse response;
+
+    writeDelimitedTo(request, &post);
+    post.Flush();
+
+    if (readDelimitedFrom(&pist, &response)) {
+        google::protobuf::TextFormat::PrintToString(response, &s);
+        cout<<s<<endl;
+    }
+
+    close(fd);
 
     return 0;
 }
