@@ -110,7 +110,7 @@ static void Usage(char *name, const char *command)
 
 static bool NeedHelp(int argc, char *argv[], bool canBeEmpty)
 {
-    if (argc >= 2) {
+    if (argc >= 3) {
         string arg = argv[2];
         if (arg == "-h" || arg == "--help" || arg == "help")
             return true;
@@ -118,6 +118,22 @@ static bool NeedHelp(int argc, char *argv[], bool canBeEmpty)
             return false;
     }
     return canBeEmpty ? false : true;
+}
+
+static int SendReceive(int fd,
+                       rpc::TContainerRequest &req,
+                       rpc::TContainerResponse &rsp)
+{
+    google::protobuf::io::FileInputStream pist(fd);
+    google::protobuf::io::FileOutputStream post(fd);
+
+    writeDelimitedTo(req, &post);
+    post.Flush();
+
+    if (readDelimitedFrom(&pist, &rsp))
+        return (int)rsp.error();
+    else
+        return -1;
 }
 
 class TSendCmd : public ICmd {
@@ -139,6 +155,61 @@ public:
 
     int Execute(int argc, char *argv[])
     {
+        stringstream msg;
+
+        if (NeedHelp(argc, argv, false)) {
+            Usage(argv[0], GetName().c_str());
+            return EXIT_FAILURE;
+        }
+
+        int fd = ConnectToRpcServer(RPC_SOCK_PATH);
+        if (fd < 0) {
+            std::cerr<<"Can't connect to RPC server"<<std::endl;
+            return fd;
+        }
+
+        argv += 2;
+        argc -= 2;
+
+        std::vector<std::string> args(argv, argv + argc);
+        copy(args.begin(), args.end(), ostream_iterator<string>(msg, " "));
+
+        rpc::TContainerRequest req;
+        rpc::TContainerResponse rsp;
+        if (!google::protobuf::TextFormat::ParseFromString(msg.str(), &req) ||
+            !req.IsInitialized()) {
+            close(fd);
+            return -1;
+        }
+
+        int ret = SendReceive(fd, req, rsp);
+        if (!ret)
+            cout << rsp.ShortDebugString() << endl;
+
+        close(fd);
+        return 0;
+    }
+};
+
+class TCreateCmd : public ICmd {
+public:
+    string GetName()
+    {
+        return "create";
+    }
+
+    string GetUsage()
+    {
+        return "<name>";
+    }
+
+    string GetDescription()
+    {
+        return "create container with given name";
+    }
+
+    int Execute(int argc, char *argv[])
+    {
         string s;
         stringstream msg;
 
@@ -153,36 +224,79 @@ public:
             return fd;
         }
 
-        std::vector<std::string> args(argv + 1, argv + argc);
-        copy(args.begin(), args.end(), ostream_iterator<string>(msg, " "));
+        string name = string(argv[2]);
 
-        rpc::TContainerRequest request;
-        if (!google::protobuf::TextFormat::ParseFromString(msg.str(), &request) ||
-            !request.IsInitialized()) {
-            close(fd);
-            return -1;
-        }
+        rpc::TContainerRequest req;
+        rpc::TContainerResponse rsp;
+        ::rpc::TContainerCreateRequest *create = req.mutable_create();
 
-        google::protobuf::io::FileInputStream pist(fd);
-        google::protobuf::io::FileOutputStream post(fd);
+        create->set_name(name);
 
-        rpc::TContainerResponse response;
-
-        writeDelimitedTo(request, &post);
-        post.Flush();
-
-        if (readDelimitedFrom(&pist, &response)) {
-            google::protobuf::TextFormat::PrintToString(response, &s);
-            cout<<s<<endl;
-        }
+        int ret = SendReceive(fd, req, rsp);
+        if (ret)
+            cerr << "Can't create container, error = " << ret << endl;
 
         close(fd);
-        return 0;
+        return ret;
     }
 };
 
+class TDestroyCmd : public ICmd {
+public:
+    string GetName()
+    {
+        return "destroy";
+    }
+
+    string GetUsage()
+    {
+        return "<name>";
+    }
+
+    string GetDescription()
+    {
+        return "destroy container with given name";
+    }
+
+    int Execute(int argc, char *argv[])
+    {
+        string s;
+        stringstream msg;
+
+        if (NeedHelp(argc, argv, false)) {
+            Usage(argv[0], GetName().c_str());
+            return EXIT_FAILURE;
+        }
+
+        int fd = ConnectToRpcServer(RPC_SOCK_PATH);
+        if (fd < 0) {
+            std::cerr<<"Can't connect to RPC server"<<std::endl;
+            return fd;
+        }
+
+        string name = string(argv[2]);
+
+        rpc::TContainerRequest req;
+        rpc::TContainerResponse rsp;
+        ::rpc::TContainerDestroyRequest *destroy = req.mutable_destroy();
+
+        destroy->set_name(name);
+
+        int ret = SendReceive(fd, req, rsp);
+        if (ret)
+            cerr << "Can't destroy container, error = " << ret << endl;
+
+        close(fd);
+        return ret;
+    }
+};
 int main(int argc, char *argv[])
 {
+    commands.push_back(new THelpCmd());
+    commands.push_back(new TCreateCmd());
+    commands.push_back(new TDestroyCmd());
+    commands.push_back(new TSendCmd());
+
     if (argc <= 1) {
         Usage(argv[0], NULL);
         return EXIT_FAILURE;
@@ -193,9 +307,6 @@ int main(int argc, char *argv[])
         Usage(argv[0], NULL);
         return EXIT_FAILURE;
     }
-
-    commands.push_back(new THelpCmd());
-    commands.push_back(new TSendCmd());
 
     for (ICmd *cmd : commands)
         if (cmd->GetName() == name)
