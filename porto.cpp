@@ -322,12 +322,108 @@ public:
     }
 };
 
+class TGetPropertyCmd : public ICmd {
+public:
+    string GetName()
+    {
+        return "get";
+    }
+
+    string GetUsage()
+    {
+        return "<name> <property>";
+    }
+
+    string GetDescription()
+    {
+        return "get container property";
+    }
+
+    int Execute(int argc, char *argv[])
+    {
+        string s;
+        stringstream msg;
+
+        if (NeedHelp(argc, argv, false) || argc < 4) {
+            Usage(argv[0], GetName().c_str());
+            return EXIT_FAILURE;
+        }
+
+        string name = string(argv[2]);
+        string property = string(argv[3]);
+
+        rpc::TContainerRequest req;
+        rpc::TContainerResponse rsp;
+
+        req.mutable_getproperty()->set_name(name);
+        req.mutable_getproperty()->add_property(property);
+
+        int ret = Rpc(req, rsp);
+        if (ret) {
+            cerr << "Can't get property, error = " << ret << endl;
+        } else {
+            for (int i = 0; i < rsp.getproperty().value_size(); i++)
+                cout << rsp.getproperty().value(i) << endl;
+        }
+
+        return ret;
+    }
+};
+
+class TSetPropertyCmd : public ICmd {
+public:
+    string GetName()
+    {
+        return "set";
+    }
+
+    string GetUsage()
+    {
+        return "<name> <property> <value>";
+    }
+
+    string GetDescription()
+    {
+        return "set container property";
+    }
+
+    int Execute(int argc, char *argv[])
+    {
+        string s;
+        stringstream msg;
+
+        if (NeedHelp(argc, argv, false) || argc < 5) {
+            Usage(argv[0], GetName().c_str());
+            return EXIT_FAILURE;
+        }
+
+        string name = string(argv[2]);
+        string property = string(argv[3]);
+        string value = string(argv[4]);
+
+        rpc::TContainerRequest req;
+        rpc::TContainerResponse rsp;
+
+        req.mutable_setproperty()->set_name(name);
+        req.mutable_setproperty()->set_property(property);
+        req.mutable_setproperty()->set_value(value);
+
+        int ret = Rpc(req, rsp);
+        if (ret)
+            cerr << "Can't get property, error = " << ret << endl;
+
+        return ret;
+    }
+};
+
 int main(int argc, char *argv[])
 {
     commands.push_back(new THelpCmd());
     commands.push_back(new TCreateCmd());
     commands.push_back(new TDestroyCmd());
     commands.push_back(new TListCmd());
+    commands.push_back(new TGetPropertyCmd());
+    commands.push_back(new TSetPropertyCmd());
     commands.push_back(new TSendCmd());
 
     if (argc <= 1) {

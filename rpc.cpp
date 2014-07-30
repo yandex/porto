@@ -128,8 +128,8 @@ static void SetContainerProperty(TContainerHolder &cholder,
 
 #if 0
     if (container->SetProperty(req.property(), req.value()))
-        rsp.set_error(rpc::EContainerError::Success);
 #endif
+        rsp.set_error(rpc::EContainerError::Success);
 }
 
 static void GetContainerData(TContainerHolder &cholder,
