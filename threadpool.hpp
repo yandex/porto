@@ -20,14 +20,15 @@ public:
             workers.emplace_back([this]{ worker_fn(); });
 #else
         workers.resize(size);
-        for (size_t i = 0; i < size; i++)
-            if (pthread_create(&workers[i], nullptr, TThreadPool::worker_fn, this))
-                throw "TThreadPool: can't create worker thread";
 
         if (pthread_mutex_init(&mutex, NULL))
                 throw "TThreadPool: can't initialize mutex";
         if (pthread_cond_init(&cond, NULL))
                 throw "TThreadPool: can't initialize conditional variable";
+
+        for (size_t i = 0; i < size; i++)
+            if (pthread_create(&workers[i], nullptr, TThreadPool::worker_fn, this))
+                throw "TThreadPool: can't create worker thread";
 #endif
     }
 
@@ -130,28 +131,34 @@ private:
 #else
     static void *worker_fn(void *arg)
     {
-        TThreadPool *pool = static_cast<TThreadPool *>(arg);
+        try {
+            TThreadPool *pool = static_cast<TThreadPool *>(arg);
 
-        while (true) {
-            if (pthread_mutex_lock(&pool->mutex))
-                throw "TThreadPool: can't lock mutex";
+            while (true) {
+                int ret;
+                if ((ret = pthread_mutex_lock(&pool->mutex)))
+                    throw "TThreadPool: can't lock mutex ";
 
-            while (pool->run && pool->jobs.empty()) {
-                if (pthread_cond_wait(&pool->cond, &pool->mutex))
-                    throw "TThreadPool: can't wait on conditional variable";
-            }
+                while (pool->run && pool->jobs.empty()) {
+                    if (pthread_cond_wait(&pool->cond, &pool->mutex))
+                        throw "TThreadPool: can't wait on conditional variable";
+                }
 
-            if (!pool->run) {
+                if (!pool->run) {
+                    if (pthread_mutex_unlock(&pool->mutex))
+                        throw "TThreadPool: can't unlock mutex";
+                    return nullptr;
+                }
+
+                auto f(pool->jobs.front());
+                pool->jobs.pop();
                 if (pthread_mutex_unlock(&pool->mutex))
                     throw "TThreadPool: can't unlock mutex";
-                return nullptr;
+                f();
             }
-
-            auto f(pool->jobs.front());
-            pool->jobs.pop();
-            if (pthread_mutex_unlock(&pool->mutex))
-                throw "TThreadPool: can't unlock mutex";
-            f();
+        } catch (const char *msg) {
+            cerr << msg << endl;
+            throw;
         }
     }
 #endif
