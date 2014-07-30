@@ -15,3 +15,5 @@ target_link_libraries(portod ${PROTOBUF_LIBRARIES})
 
 add_executable(porto porto.cpp protobuf.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 target_link_libraries(porto ${PROTOBUF_LIBRARIES})
+
+add_executable(test test.cpp mount.cpp)

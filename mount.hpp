@@ -1,3 +1,6 @@
+#ifndef __MOUNT_HPP__
+#define __MOUNT_HPP__
+
 #include <string>
 #include <set>
 #include <iostream>
@@ -100,3 +103,4 @@ public:
         return os;
     }
 };
+#endif
