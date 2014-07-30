@@ -10,8 +10,6 @@
 #include <sys/types.h>
 #include <dirent.h>
 #include <unistd.h>
-#include <string.h>
-#include <errno.h>
 
 #include "cgroup.hpp"
 
@@ -48,19 +46,26 @@ void TCgroup::FindChildren() {
 }
 
 void TCgroup::Create() {
-    if (mkdir(name.c_str(), mode)) {
+    int ret = mkdir(name.c_str(), mode);
+
+    TLogger::LogAction("mkdir " + name, ret, errno);
+
+    if (ret) {
         switch (errno) {
         case EEXIST:
             throw "Cgroup already exists";
         default:
-            cerr << name << endl;
             throw "Cannot create cgroup: " + string(strerror(errno));
         }
     }
 }
 
 void TCgroup::Remove() {
-    if (rmdir(name.c_str()))
+    int ret = rmdir(name.c_str());
+
+    TLogger::LogAction("rmdir " + name, ret, errno);
+
+    if (ret)
         throw "Cannot remove cgroup: " + name;
 }
 

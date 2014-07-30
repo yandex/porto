@@ -2,9 +2,9 @@
 #include <set>
 #include <iostream>
 
-#include <string.h>
-#include <errno.h>
 #include <sys/mount.h>
+
+#include "log.hpp"
 
 using namespace std;
 
@@ -55,9 +55,12 @@ public:
     }
 
     void Mount() {
-        if (mount(device.c_str(), mountpoint.c_str(), vfstype.c_str(),
-                  mountflags, CommaDelimitedFlags().c_str())) {
-            cerr << "mount " + mountpoint + strerror(errno) << endl;
+        int ret = mount(device.c_str(), mountpoint.c_str(), vfstype.c_str(),
+                        mountflags, CommaDelimitedFlags().c_str());
+
+        TLogger::LogAction("mount " + mountpoint, ret, errno);
+
+        if (ret) {
             if (errno == EBUSY)
                 throw "Already mounted";
             else
@@ -66,11 +69,12 @@ public:
     }
 
     void Umount () {
-        if (umount(mountpoint.c_str())) {
-            cerr << "umount " + mountpoint + strerror(errno) << endl;
-            throw "Cannot umount filesystem " + mountpoint +
-                string (strerror(errno));
-        }
+        int ret = umount(mountpoint.c_str());
+
+        TLogger::LogAction("umount " + mountpoint, ret, errno);
+
+        if (ret)
+            throw "Cannot umount filesystem " + mountpoint;
     }
 };
 
