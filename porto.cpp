@@ -26,7 +26,7 @@ public:
 
         memset(&peer_addr, 0, sizeof(struct sockaddr_un));
 
-        sfd = socket(AF_UNIX, SOCK_STREAM, 0);
+        sfd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
         if (sfd < 0) {
             std::cerr<<"socket() error: "<<strerror(errno)<<std::endl;
             return -1;

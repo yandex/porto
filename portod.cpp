@@ -16,7 +16,7 @@ static int CreateRpcServer(const char *path)
 
     memset(&my_addr, 0, sizeof(struct sockaddr_un));
 
-    fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (fd < 0) {
         std::cerr<<"socket() error: "<<strerror(errno)<<std::endl;
         return -1;
@@ -75,8 +75,8 @@ int rpc_main(TContainerHolder &cholder) {
 
     while (true) {
         peer_addr_size = sizeof(struct sockaddr_un);
-        cfd = accept(sfd, (struct sockaddr *) &peer_addr,
-                     &peer_addr_size);
+        cfd = accept4(sfd, (struct sockaddr *) &peer_addr,
+                      &peer_addr_size, SOCK_CLOEXEC);
         if (cfd < 0) {
             std::cerr << "accept() error: " << strerror(errno) << std::endl;
             break;
