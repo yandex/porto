@@ -74,7 +74,7 @@ TContainer* TContainerHolder::Find(string name) {
 void TContainerHolder::Destroy(string name) {
     lock_guard<mutex> guard(lock);
     delete containers[name];
-    containers[name] = nullptr;
+    containers.erase(name);
 }
 
 vector<string> TContainerHolder::List() {
