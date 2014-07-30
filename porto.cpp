@@ -145,11 +145,11 @@ static bool NeedHelp(int argc, char *argv[], bool canBeEmpty)
     return canBeEmpty ? false : true;
 }
 
-class TSendCmd : public ICmd {
+class TRawCmd : public ICmd {
 public:
     string GetName()
     {
-        return "send";
+        return "raw";
     }
 
     string GetUsage()
@@ -643,7 +643,7 @@ int main(int argc, char *argv[])
     commands.push_back(new TGetPropertyCmd());
     commands.push_back(new TSetPropertyCmd());
     commands.push_back(new TGetDataCmd());
-    commands.push_back(new TSendCmd());
+    commands.push_back(new TRawCmd());
 
     if (argc <= 1) {
         Usage(argv[0], NULL);
