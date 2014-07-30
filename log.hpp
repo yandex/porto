@@ -18,6 +18,13 @@ public:
         else if (error)
             cerr << "Error: " << action << ": " << strerror(errcode) << endl;
     }
+
+    static void LogRequest(string message) {
+        cerr << "-> " << message << endl;
+    }
+    static void LogResponse(string message) {
+        cerr << "<- " << message << endl;
+    }
 };
 
 #endif /* __LOG_HPP__ */

@@ -1,6 +1,8 @@
 #include <fstream>
 
+#include "log.hpp"
 #include "rpc.hpp"
+#include "protobuf.hpp"
 
 extern "C" {
 #include <sys/socket.h>
@@ -11,8 +13,6 @@ static void CreateContainer(TContainerHolder &cholder,
                             const rpc::TContainerCreateRequest &req,
                             rpc::TContainerResponse &rsp)
 {
-    std::cout<<"-> Create container: "<<req.name()<<std::endl;
-
     try {
         cholder.Create(req.name());
         rsp.set_error(rpc::EContainerError::Success);
@@ -25,8 +25,6 @@ static void DestroyContainer(TContainerHolder &cholder,
                              const rpc::TContainerDestroyRequest &req,
                              rpc::TContainerResponse &rsp)
 {
-    std::cout<<"-> Destroy container: "<<req.name()<<std::endl;
-
     cholder.Destroy(req.name());
     rsp.set_error(rpc::EContainerError::Success);
 }
@@ -35,8 +33,6 @@ static void StartContainer(TContainerHolder &cholder,
                            const rpc::TContainerStartRequest &req,
                            rpc::TContainerResponse &rsp)
 {
-    std::cout<<"-> Start container: "<<req.name()<<std::endl;
-
     auto container = cholder.Find(req.name());
     if (!container) {
         rsp.set_error(rpc::EContainerError::DoesNotExist);
@@ -51,8 +47,6 @@ static void StopContainer(TContainerHolder &cholder,
                           const rpc::TContainerStopRequest &req,
                           rpc::TContainerResponse &rsp)
 {
-    std::cout<<"-> Stop container: "<<req.name()<<std::endl;
-
     auto container = cholder.Find(req.name());
     if (!container) {
         rsp.set_error(rpc::EContainerError::DoesNotExist);
@@ -67,8 +61,6 @@ static void PauseContainer(TContainerHolder &cholder,
                            const rpc::TContainerPauseRequest &req,
                            rpc::TContainerResponse &rsp)
 {
-    std::cout<<"-> Pause container: "<<req.name()<<std::endl;
-
     auto container = cholder.Find(req.name());
     if (!container) {
         rsp.set_error(rpc::EContainerError::DoesNotExist);
@@ -83,8 +75,6 @@ static void ResumeContainer(TContainerHolder &cholder,
                             const rpc::TContainerResumeRequest &req,
                             rpc::TContainerResponse &rsp)
 {
-    std::cout<<"-> Resume container: "<<req.name()<<std::endl;
-
     auto container = cholder.Find(req.name());
     if (!container) {
         rsp.set_error(rpc::EContainerError::DoesNotExist);
@@ -98,8 +88,6 @@ static void ResumeContainer(TContainerHolder &cholder,
 static void ListContainers(TContainerHolder &cholder,
                            rpc::TContainerResponse &rsp)
 {
-    std::cout<<"-> List containers "<<std::endl;
-
     for (auto name : cholder.List())
         rsp.mutable_list()->add_name(name);
 
@@ -110,8 +98,6 @@ static void GetContainerProperty(TContainerHolder &cholder,
                                  const rpc::TContainerGetPropertyRequest &req,
                                  rpc::TContainerResponse &rsp)
 {
-    std::cout<<"-> Get "<<req.name()<<std::endl;
-
     auto container = cholder.Find(req.name());
     if (!container) {
         rsp.set_error(rpc::EContainerError::DoesNotExist);
@@ -119,7 +105,6 @@ static void GetContainerProperty(TContainerHolder &cholder,
     }
 
     for (int i = 0; i < req.property_size(); i++) {
-        std::cout<<"-> Get "<<req.name()<<":"<<req.property(i)<<std::endl;
 #if 0
         auto val = container->GetProperty(req.property(i));
 #else
@@ -135,8 +120,6 @@ static void SetContainerProperty(TContainerHolder &cholder,
                                  const rpc::TContainerSetPropertyRequest &req,
                                  rpc::TContainerResponse &rsp)
 {
-    std::cout<<"-> Set "<<req.name()<<":"<<req.property()<<"="<<req.value()<<std::endl;
-
     auto container = cholder.Find(req.name());
     if (!container) {
         rsp.set_error(rpc::EContainerError::DoesNotExist);
@@ -153,8 +136,6 @@ static void GetContainerData(TContainerHolder &cholder,
                              const rpc::TContainerGetDataRequest &req,
                              rpc::TContainerResponse &rsp)
 {
-    std::cout<<"-> Get data "<<req.name()<<std::endl;
-
     auto container = cholder.Find(req.name());
     if (!container) {
         rsp.set_error(rpc::EContainerError::DoesNotExist);
@@ -163,7 +144,6 @@ static void GetContainerData(TContainerHolder &cholder,
 
 
     for (int i = 0; i < req.data_size(); i++) {
-        std::cout<<"-> Get data "<<req.name()<<":"<<req.data(i)<<std::endl;
 #if 0
         auto val = container->GetData(req.data(i));
 #else
@@ -179,6 +159,9 @@ rpc::TContainerResponse
 HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req)
 {
     rpc::TContainerResponse rsp;
+    string str;
+
+    TLogger::LogRequest(req.ShortDebugString());
 
     rsp.set_error(rpc::EContainerError::Error);
 
@@ -206,8 +189,11 @@ HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req)
         else
             rsp.set_error(rpc::EContainerError::InvalidMethod);
     } catch (...) {
+        rsp.Clear();
         rsp.set_error(rpc::EContainerError::Error);
     }
+
+    TLogger::LogResponse(rsp.ShortDebugString());
 
     return rsp;
 }
