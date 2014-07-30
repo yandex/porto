@@ -6,9 +6,6 @@
 
 #include <algorithm>
 
-#include <dirent.h>
-#include <unistd.h>
-
 #include "cgroup.hpp"
 #include "folder.hpp"
 
@@ -21,26 +18,14 @@ set<string> subsystems = {"cpuset", "cpu", "cpuacct", "memory", "devices",
 set<string> create_subsystems = {"cpuset", "cpu", "cpuacct", "memory"};
 
 void TCgroup::FindChildren() {
-    DIR *dirp;
-    struct dirent *dp;
+    TFolder f(name);
 
-    dirp = opendir(name.c_str());
-    if (!dirp)
-        throw "Cannot read sysfs";
+    children.clear();
 
-    try {
-        while ((dp = readdir(dirp)) != nullptr) {
-            if (!strcmp(".", dp->d_name) ||
-                !strcmp ("..", dp->d_name) ||
-                !(dp->d_type & DT_DIR) || (dp->d_type & DT_LNK))
-                continue;
-
-            string cp = name + "/" + string(dp->d_name);
-            children.insert(new TCgroup(cp, this, level + 1));
-        }
-    } catch (...) {
-        closedir(dirp);
-        throw;
+    for (auto s : f.Subfolders()) {
+        TCgroup *cg = new TCgroup(s, this, level + 1);
+        cg->FindChildren();
+        children.insert(cg);
     }
 }
 
