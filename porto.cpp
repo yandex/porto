@@ -290,11 +290,65 @@ public:
         return ret;
     }
 };
+
+class TListCmd : public ICmd {
+public:
+    string GetName()
+    {
+        return "list";
+    }
+
+    string GetUsage()
+    {
+        return "";
+    }
+
+    string GetDescription()
+    {
+        return "list created containers";
+    }
+
+    int Execute(int argc, char *argv[])
+    {
+        string s;
+        stringstream msg;
+
+        if (NeedHelp(argc, argv, true)) {
+            Usage(argv[0], GetName().c_str());
+            return EXIT_FAILURE;
+        }
+
+        int fd = ConnectToRpcServer(RPC_SOCK_PATH);
+        if (fd < 0) {
+            std::cerr<<"Can't connect to RPC server"<<std::endl;
+            return fd;
+        }
+
+        rpc::TContainerRequest req;
+        rpc::TContainerResponse rsp;
+
+        auto *list = new ::rpc::TContainerListRequest();
+        req.set_allocated_list(list);
+
+        int ret = SendReceive(fd, req, rsp);
+        if (ret) {
+            cerr << "Can't list containers, error = " << ret << endl;
+        } else {
+            for (int i = 0; i < rsp.list().name_size(); i++)
+                cout << rsp.list().name(i) << endl;
+        }
+
+        close(fd);
+        return ret;
+    }
+};
+
 int main(int argc, char *argv[])
 {
     commands.push_back(new THelpCmd());
     commands.push_back(new TCreateCmd());
     commands.push_back(new TDestroyCmd());
+    commands.push_back(new TListCmd());
     commands.push_back(new TSendCmd());
 
     if (argc <= 1) {
