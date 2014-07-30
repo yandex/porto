@@ -1,24 +1,34 @@
 #ifndef __TASK_HPP__
 #define __TASK_HPP__
 
-#include "cgroup.hpp"
+#include <mutex>
+#include <string>
+#include <vector>
+
+using namespace std;
+
+class TCgroup;
 
 class TTask {
+    mutex lock;
+    enum ETaskState { Stopped, Running } state;
+    string path;
+    vector<string> args;
+    int exit_status;
+
     pid_t pid;
 
     vector<TCgroup*> cgroups;
 
 public:
-    FindCgroups() {
-        ifstream in("proc/self/cgroup");
+    TTask(string &path, vector<string> &args);
 
-        if (!in.is_open())
-            throw "Cannot open /proc/self/cgroup";
+    void FindCgroups();
 
-        while (getline(in, line)) {
-            // new TCgroup
-        }
-    }
+    int GetPid();
+    bool IsRunning();
+    int GetExitStatus();
+    void Kill();
 };
 
 #endif

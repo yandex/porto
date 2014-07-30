@@ -1,4 +1,5 @@
 #include "container.hpp"
+#include "task.hpp"
 
 TContainer::TContainer(const string _name) : name(_name), state(Stopped) {
 }
@@ -20,6 +21,16 @@ bool TContainer::Start() {
     if (!CheckState(Stopped))
         return false;
 
+    try {
+        string path = string("sleep");
+        vector<string> args = { "10" };
+        task = new TTask(path, args);
+    } catch (const char *s) {
+        cerr << "Start error: " << s << endl;
+        // TODO: log
+        return false;
+    }
+
     state = Running;
     return true;
 }
@@ -29,6 +40,11 @@ bool TContainer::Stop() {
 
     if (!CheckState(Running))
         return false;
+
+    if (task->IsRunning())
+        task->Kill();
+    delete task;
+    task = nullptr;
 
     state = Stopped;
     return true;
@@ -52,6 +68,26 @@ bool TContainer::Resume() {
 
     state = Running;
     return true;
+}
+
+string TContainer::GetData(string data) {
+    lock_guard<mutex> guard(lock);
+
+    if (data == "root_pid") {
+        if (!task)
+            return "nil";
+        return to_string(task->GetPid());
+    } else if (data == "exit_status") {
+        if (!task)
+            return "nil";
+
+        if (task->IsRunning())
+            return "nil";
+
+        return to_string(task->GetExitStatus());
+    } else {
+        return "nil";
+    }
 }
 
 TContainer* TContainerHolder::Create(string name) {

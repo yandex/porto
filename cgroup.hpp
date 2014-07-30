@@ -3,6 +3,7 @@
 
 #include <set>
 #include <string>
+#include <map>
 
 #include "mount.hpp"
 #include "folder.hpp"

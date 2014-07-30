@@ -144,11 +144,7 @@ static void GetContainerData(TContainerHolder &cholder,
 
 
     for (int i = 0; i < req.data_size(); i++) {
-#if 0
         auto val = container->GetData(req.data(i));
-#else
-        auto val = "null";
-#endif
         rsp.mutable_getdata()->add_value(val);
 
     }
