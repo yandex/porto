@@ -95,21 +95,19 @@ int main(int argc, const char *argv[])
     try {
         TContainerHolder cholder;
         TCgroupState cs;
-    
-        cs.MountMissingControllers();
 
-        //cout << cs << endl;
+        while (1) {
+            cs.MountMissingTmpfs();
+            cs.UpdateFromProcFs();
+            cs.MountMissingControllers();
+            cs.UpdateFromProcFs();
+            cs.UmountAll();
+            cs.UpdateFromProcFs();
+        }
 
-        cs.UmountAll();
-
-        //cout << cs << endl;
-    } catch (const char *e) {
-        cerr << "Error: " << e << endl;
-        return EXIT_FAILURE;
-    } catch (string e) {
-        cerr << "Error: " << e << endl;
+        throw;
+        return rpc_main(cholder);
+    } catch (...) {
         return EXIT_FAILURE;
     }
-
-    //return rpc_main(cholder);
 }

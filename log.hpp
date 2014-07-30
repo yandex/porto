@@ -1,3 +1,6 @@
+#ifndef __LOG_HPP__
+#define __LOG_HPP__
+
 #include <iostream>
 
 #include "string.h"
@@ -16,3 +19,5 @@ public:
             cerr << "Error: " << action << ": " << strerror(errcode) << endl;
     }
 };
+
+#endif /* __LOG_HPP__ */

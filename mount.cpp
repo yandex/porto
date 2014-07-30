@@ -22,7 +22,7 @@ TMount::TMount(string mounts_line) {
         flags.insert(t);
 }
 
-TMountState::TMountState() {
+void TMountState::UpdateFromProcfs() {
     ifstream s("/proc/self/mounts");
     string line;
 

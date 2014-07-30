@@ -1,7 +1,39 @@
+#ifndef __CGROUP_HPP__
+#define __CGROUP_HPP__
+
 #include <set>
 #include <string>
 
 #include "mount.hpp"
+#include "folder.hpp"
+
+class TController {
+    string name;
+    TMount *mount;
+
+    mode_t mode = 0x666;
+    string tmpfs = "/sys/fs/cgroup"; // TODO: detect dynamically
+
+public:
+    TController(string name, TMount *mount) : name(name), mount(mount) {}
+    TController(string name) {
+        string path = tmpfs + "/" + name;
+        mount = new TMount("cgroup", path, "cgroup", 0, set<string>{name});
+    }
+
+    void Attach() {
+        TFolder f(mount->Mountpoint());
+        if (!f.Exists())
+            f.Create(mode);
+        mount->Mount();
+    }
+
+    void Detach() {
+        TFolder f(mount->Mountpoint());
+        mount->Umount();
+        f.Remove();
+    }
+};
 
 class TCgroup {
     string name;
@@ -37,20 +69,17 @@ public:
 };
 
 class TCgroupState {
-    // cgroups are owned by controllers, not raw_controllers
-    map<string, TCgroup*> controllers; // can be net_cls,netprio
-    map<string, TCgroup*> raw_controllers; // can be net_cls _or_ net_prio
+    map<string, TCgroup*> root_cgroups; // can be net_cls,netprio
+    map<string, TController*> controllers; // can be net_cls _or_ net_prio
 
 public:
-    TCgroupState();
-
     ~TCgroupState() {
-        for (auto c : controllers)
+        for (auto c : root_cgroups)
             delete c.second;
     }
 
     friend ostream& operator<<(ostream& os, const TCgroupState& st) {
-        for (auto ss : st.controllers) {
+        for (auto ss : st.root_cgroups) {
             os << ss.first << ":" << endl;
             os << *ss.second << endl;
         }
@@ -58,11 +87,11 @@ public:
         return os;
     }
 
-    const string DefaultMountpoint(const string controller) {
-        return "/sys/fs/cgroup/" + controller;
-    }
+    void UpdateFromProcFs();
 
-    void Update();
+    void MountMissingTmpfs(string tmpfs = "/sys/fs/cgroup");
     void MountMissingControllers();
     void UmountAll();
 };
+
+#endif

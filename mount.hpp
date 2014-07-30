@@ -82,7 +82,8 @@ class TMountState {
     set<TMount*> mounts;
 
 public:
-    TMountState();
+    void UpdateFromProcfs();
+    
     ~TMountState() {
         for (auto m : mounts)
             delete m;
