@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 #include <sstream>
 
 #include "rpc.hpp"
@@ -98,8 +99,7 @@ public:
         cout << endl;
         cout << "list of commands:" << endl;
         for (ICmd *cmd : commands)
-            cout << " " << cmd->GetName() <<
-                "\t\t" << cmd->GetDescription()<<endl;
+            cout << " " << left << setw(16) << cmd->GetName() << cmd->GetDescription() << endl;
     }
 
     int Execute(int argc, char *argv[])
@@ -205,7 +205,7 @@ public:
 
     string GetDescription()
     {
-        return "create container with given name";
+        return "create container";
     }
 
     int Execute(int argc, char *argv[])
@@ -222,9 +222,8 @@ public:
 
         rpc::TContainerRequest req;
         rpc::TContainerResponse rsp;
-        ::rpc::TContainerCreateRequest *create = req.mutable_create();
 
-        create->set_name(name);
+        req.mutable_create()->set_name(name);
 
         int ret = Rpc(req, rsp);
         if (ret)
@@ -248,7 +247,7 @@ public:
 
     string GetDescription()
     {
-        return "destroy container with given name";
+        return "destroy container";
     }
 
     int Execute(int argc, char *argv[])
@@ -265,9 +264,8 @@ public:
 
         rpc::TContainerRequest req;
         rpc::TContainerResponse rsp;
-        ::rpc::TContainerDestroyRequest *destroy = req.mutable_destroy();
 
-        destroy->set_name(name);
+        req.mutable_destroy()->set_name(name);
 
         int ret = Rpc(req, rsp);
         if (ret)
@@ -416,14 +414,235 @@ public:
     }
 };
 
+class TGetDataCmd : public ICmd {
+public:
+    string GetName()
+    {
+        return "data";
+    }
+
+    string GetUsage()
+    {
+        return "<name> <data>";
+    }
+
+    string GetDescription()
+    {
+        return "get container data";
+    }
+
+    int Execute(int argc, char *argv[])
+    {
+        string s;
+        stringstream msg;
+
+        if (NeedHelp(argc, argv, false) || argc < 4) {
+            Usage(argv[0], GetName().c_str());
+            return EXIT_FAILURE;
+        }
+
+        string name = string(argv[2]);
+        string data = string(argv[3]);
+
+        rpc::TContainerRequest req;
+        rpc::TContainerResponse rsp;
+
+        req.mutable_getdata()->set_name(name);
+        req.mutable_getdata()->add_data(data);
+
+        int ret = Rpc(req, rsp);
+        if (ret) {
+            cerr << "Can't get data, error = " << ret << endl;
+        } else {
+            for (int i = 0; i < rsp.getdata().value_size(); i++)
+                cout << rsp.getdata().value(i) << endl;
+        }
+
+        return ret;
+    }
+};
+
+class TStartCmd : public ICmd {
+public:
+    string GetName()
+    {
+        return "start";
+    }
+
+    string GetUsage()
+    {
+        return "<name>";
+    }
+
+    string GetDescription()
+    {
+        return "start container";
+    }
+
+    int Execute(int argc, char *argv[])
+    {
+        string s;
+        stringstream msg;
+
+        if (NeedHelp(argc, argv, false)) {
+            Usage(argv[0], GetName().c_str());
+            return EXIT_FAILURE;
+        }
+
+        string name = string(argv[2]);
+
+        rpc::TContainerRequest req;
+        rpc::TContainerResponse rsp;
+
+        req.mutable_start()->set_name(name);
+
+        int ret = Rpc(req, rsp);
+        if (ret)
+            cerr << "Can't start container, error = " << ret << endl;
+
+        return ret;
+    }
+};
+
+class TStopCmd : public ICmd {
+public:
+    string GetName()
+    {
+        return "stop";
+    }
+
+    string GetUsage()
+    {
+        return "<name>";
+    }
+
+    string GetDescription()
+    {
+        return "stop container";
+    }
+
+    int Execute(int argc, char *argv[])
+    {
+        string s;
+        stringstream msg;
+
+        if (NeedHelp(argc, argv, false)) {
+            Usage(argv[0], GetName().c_str());
+            return EXIT_FAILURE;
+        }
+
+        string name = string(argv[2]);
+
+        rpc::TContainerRequest req;
+        rpc::TContainerResponse rsp;
+
+        req.mutable_stop()->set_name(name);
+
+        int ret = Rpc(req, rsp);
+        if (ret)
+            cerr << "Can't stop container, error = " << ret << endl;
+
+        return ret;
+    }
+};
+
+class TPauseCmd : public ICmd {
+public:
+    string GetName()
+    {
+        return "pause";
+    }
+
+    string GetUsage()
+    {
+        return "<name>";
+    }
+
+    string GetDescription()
+    {
+        return "pause container";
+    }
+
+    int Execute(int argc, char *argv[])
+    {
+        string s;
+        stringstream msg;
+
+        if (NeedHelp(argc, argv, false)) {
+            Usage(argv[0], GetName().c_str());
+            return EXIT_FAILURE;
+        }
+
+        string name = string(argv[2]);
+
+        rpc::TContainerRequest req;
+        rpc::TContainerResponse rsp;
+
+        req.mutable_pause()->set_name(name);
+
+        int ret = Rpc(req, rsp);
+        if (ret)
+            cerr << "Can't pause container, error = " << ret << endl;
+
+        return ret;
+    }
+};
+
+class TResumeCmd : public ICmd {
+public:
+    string GetName()
+    {
+        return "resume";
+    }
+
+    string GetUsage()
+    {
+        return "<name>";
+    }
+
+    string GetDescription()
+    {
+        return "resume container";
+    }
+
+    int Execute(int argc, char *argv[])
+    {
+        string s;
+        stringstream msg;
+
+        if (NeedHelp(argc, argv, false)) {
+            Usage(argv[0], GetName().c_str());
+            return EXIT_FAILURE;
+        }
+
+        string name = string(argv[2]);
+
+        rpc::TContainerRequest req;
+        rpc::TContainerResponse rsp;
+
+        req.mutable_resume()->set_name(name);
+
+        int ret = Rpc(req, rsp);
+        if (ret)
+            cerr << "Can't resume container, error = " << ret << endl;
+
+        return ret;
+    }
+};
+
 int main(int argc, char *argv[])
 {
     commands.push_back(new THelpCmd());
     commands.push_back(new TCreateCmd());
     commands.push_back(new TDestroyCmd());
     commands.push_back(new TListCmd());
+    commands.push_back(new TStartCmd());
+    commands.push_back(new TStopCmd());
+    commands.push_back(new TPauseCmd());
+    commands.push_back(new TResumeCmd());
     commands.push_back(new TGetPropertyCmd());
     commands.push_back(new TSetPropertyCmd());
+    commands.push_back(new TGetDataCmd());
     commands.push_back(new TSendCmd());
 
     if (argc <= 1) {
