@@ -11,44 +11,69 @@ extern "C" {
 }
 
 class ICmd {
-protected:
-    int fd;
-
 public:
-    void SetFd(int fd) { this->fd = fd; }
     virtual string GetName() = 0;
     virtual string GetUsage() = 0;
     virtual string GetDescription() = 0;
     virtual int Execute(int argc, char *argv[]) = 0;
+
+    static int ConnectToRpcServer(const char *path)
+    {
+        int sfd;
+        struct sockaddr_un peer_addr;
+        socklen_t peer_addr_size;
+
+        memset(&peer_addr, 0, sizeof(struct sockaddr_un));
+
+        sfd = socket(AF_UNIX, SOCK_STREAM, 0);
+        if (sfd < 0) {
+            std::cerr<<"socket() error: "<<strerror(errno)<<std::endl;
+            return -1;
+        }
+
+        peer_addr.sun_family = AF_UNIX;
+        strncpy(peer_addr.sun_path, path, sizeof(peer_addr.sun_path) - 1);
+
+        peer_addr_size = sizeof(struct sockaddr_un);
+        if (connect(sfd, (struct sockaddr *) &peer_addr, peer_addr_size) < 0) {
+            std::cerr<<"connect() error: "<<strerror(errno)<<std::endl;
+            return -2;
+        }
+
+        return sfd;
+    }
+
+    static int SendReceive(int fd,
+                           rpc::TContainerRequest &req,
+                           rpc::TContainerResponse &rsp)
+    {
+        google::protobuf::io::FileInputStream pist(fd);
+        google::protobuf::io::FileOutputStream post(fd);
+
+        writeDelimitedTo(req, &post);
+        post.Flush();
+
+        if (readDelimitedFrom(&pist, &rsp))
+            return (int)rsp.error();
+        else
+            return -1;
+    }
+
+    int Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp)
+    {
+        int fd = ConnectToRpcServer(RPC_SOCK_PATH);
+
+        if (fd < 0)
+            throw "Can't connect to RPC server";
+
+        int ret = SendReceive(fd, req, rsp);
+
+        close(fd);
+        return ret;
+    }
 };
 
 static vector<ICmd *> commands;
-
-static int ConnectToRpcServer(const char *path)
-{
-    int sfd;
-    struct sockaddr_un peer_addr;
-    socklen_t peer_addr_size;
-
-    memset(&peer_addr, 0, sizeof(struct sockaddr_un));
-
-    sfd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (sfd < 0) {
-        std::cerr<<"socket() error: "<<strerror(errno)<<std::endl;
-        return -1;
-    }
-
-    peer_addr.sun_family = AF_UNIX;
-    strncpy(peer_addr.sun_path, path, sizeof(peer_addr.sun_path) - 1);
-
-    peer_addr_size = sizeof(struct sockaddr_un);
-    if (connect(sfd, (struct sockaddr *) &peer_addr, peer_addr_size) < 0) {
-        std::cerr<<"connect() error: "<<strerror(errno)<<std::endl;
-        return -2;
-    }
-
-    return sfd;
-}
 
 class THelpCmd : public ICmd {
 public:
@@ -120,22 +145,6 @@ static bool NeedHelp(int argc, char *argv[], bool canBeEmpty)
     return canBeEmpty ? false : true;
 }
 
-static int SendReceive(int fd,
-                       rpc::TContainerRequest &req,
-                       rpc::TContainerResponse &rsp)
-{
-    google::protobuf::io::FileInputStream pist(fd);
-    google::protobuf::io::FileOutputStream post(fd);
-
-    writeDelimitedTo(req, &post);
-    post.Flush();
-
-    if (readDelimitedFrom(&pist, &rsp))
-        return (int)rsp.error();
-    else
-        return -1;
-}
-
 class TSendCmd : public ICmd {
 public:
     string GetName()
@@ -162,12 +171,6 @@ public:
             return EXIT_FAILURE;
         }
 
-        int fd = ConnectToRpcServer(RPC_SOCK_PATH);
-        if (fd < 0) {
-            std::cerr<<"Can't connect to RPC server"<<std::endl;
-            return fd;
-        }
-
         argv += 2;
         argc -= 2;
 
@@ -177,16 +180,13 @@ public:
         rpc::TContainerRequest req;
         rpc::TContainerResponse rsp;
         if (!google::protobuf::TextFormat::ParseFromString(msg.str(), &req) ||
-            !req.IsInitialized()) {
-            close(fd);
+            !req.IsInitialized())
             return -1;
-        }
 
-        int ret = SendReceive(fd, req, rsp);
+        int ret = Rpc(req, rsp);
         if (!ret)
             cout << rsp.ShortDebugString() << endl;
 
-        close(fd);
         return 0;
     }
 };
@@ -218,12 +218,6 @@ public:
             return EXIT_FAILURE;
         }
 
-        int fd = ConnectToRpcServer(RPC_SOCK_PATH);
-        if (fd < 0) {
-            std::cerr<<"Can't connect to RPC server"<<std::endl;
-            return fd;
-        }
-
         string name = string(argv[2]);
 
         rpc::TContainerRequest req;
@@ -232,11 +226,10 @@ public:
 
         create->set_name(name);
 
-        int ret = SendReceive(fd, req, rsp);
+        int ret = Rpc(req, rsp);
         if (ret)
             cerr << "Can't create container, error = " << ret << endl;
 
-        close(fd);
         return ret;
     }
 };
@@ -268,12 +261,6 @@ public:
             return EXIT_FAILURE;
         }
 
-        int fd = ConnectToRpcServer(RPC_SOCK_PATH);
-        if (fd < 0) {
-            std::cerr<<"Can't connect to RPC server"<<std::endl;
-            return fd;
-        }
-
         string name = string(argv[2]);
 
         rpc::TContainerRequest req;
@@ -282,11 +269,10 @@ public:
 
         destroy->set_name(name);
 
-        int ret = SendReceive(fd, req, rsp);
+        int ret = Rpc(req, rsp);
         if (ret)
             cerr << "Can't destroy container, error = " << ret << endl;
 
-        close(fd);
         return ret;
     }
 };
@@ -318,19 +304,13 @@ public:
             return EXIT_FAILURE;
         }
 
-        int fd = ConnectToRpcServer(RPC_SOCK_PATH);
-        if (fd < 0) {
-            std::cerr<<"Can't connect to RPC server"<<std::endl;
-            return fd;
-        }
-
         rpc::TContainerRequest req;
         rpc::TContainerResponse rsp;
 
         auto *list = new ::rpc::TContainerListRequest();
         req.set_allocated_list(list);
 
-        int ret = SendReceive(fd, req, rsp);
+        int ret = Rpc(req, rsp);
         if (ret) {
             cerr << "Can't list containers, error = " << ret << endl;
         } else {
@@ -338,7 +318,6 @@ public:
                 cout << rsp.list().name(i) << endl;
         }
 
-        close(fd);
         return ret;
     }
 };
