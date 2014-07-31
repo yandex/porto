@@ -12,8 +12,7 @@
 using namespace std;
 
 class TKeyValueStorage {
-    TMount tmpfs {.device = "tmpfs", .mountpoint = "/tmp/porto",
-            .vfstype = "tmpfs", .mountflags = 0, .flags = {"size=32m"}};
+    TMount tmpfs;
 
     string Path(string name) {
         return tmpfs.Mountpoint() + "/" + name;
@@ -24,6 +23,8 @@ class TKeyValueStorage {
     }
 
 public:
+    TKeyValueStorage() : tmpfs("tmpfs", "/tmp/porto", "tmpfs", 0, {"size=32m"}) {}
+
     void MountTmpfs() {
         TMountState ms;
         ms.UpdateFromProcfs();
