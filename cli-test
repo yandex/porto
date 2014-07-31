@@ -1,0 +1,53 @@
+#!/bin/bash
+
+output=""
+
+expect() {
+	local ret=$1
+	local expected=$2
+	if [ ! $ret -eq $expected ]; then
+		echo "Unexpected shit happened!!!!11"
+		exit 1
+	fi
+}
+
+output_should() {
+	local op="$1"
+	local to="$2"
+
+	if [ ! "$output" $op "$to" ]; then
+		echo "Unexpected shit happened!!!!11"
+		exit 1
+	fi
+}
+
+
+porto() {
+	local expected=$1
+	shift
+	#echo "$@"
+	output="$(./porto "$@")"
+	expect $? $expected
+}
+
+porto 0 create t
+output_should = ""
+
+porto 0 set t command "sleep234 10"
+porto 1 start t
+porto 0 data t root_pid
+porto 0 data t exit_status
+
+porto 0 set t command "sleep 3"
+porto 0 start t
+porto 0 data t exit_status
+sleep 4
+porto 0 data t exit_status
+porto 0 stop t
+
+porto 0 set t command "sleep 100"
+porto 0 start t
+porto 0 data t root_pid
+porto 0 data t exit_status
+porto 0 stop t
+porto 0 destroy t
