@@ -25,6 +25,7 @@ class TContainer {
     };
     EContainerState state;
     TTask *task;
+    map<string, string> properties;
 
     mutex _data_lock;
     // data
@@ -34,7 +35,7 @@ class TContainer {
     }
 
     public:
-    TContainer(const string _name);
+    TContainer(const string name);
     ~TContainer();
 
     string Name();

@@ -105,11 +105,7 @@ static void GetContainerProperty(TContainerHolder &cholder,
     }
 
     for (int i = 0; i < req.property_size(); i++) {
-#if 0
         auto val = container->GetProperty(req.property(i));
-#else
-        auto val = "null";
-#endif
         rsp.mutable_getproperty()->add_value(val);
     }
 
@@ -126,9 +122,7 @@ static void SetContainerProperty(TContainerHolder &cholder,
         return;
     }
 
-#if 0
     if (container->SetProperty(req.property(), req.value()))
-#endif
         rsp.set_error(rpc::EContainerError::Success);
 }
 
