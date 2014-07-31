@@ -39,11 +39,15 @@ public:
         return mountpoint;
     }
 
+    const string VFSType() {
+        return vfstype;
+    }
+
     const string ParentFolder() {
         return mountpoint.substr(0, mountpoint.find_last_of("/"));
     }
 
-    set<string> const& Flags() {
+    set<string> const Flags() {
         return flags;
     }
 

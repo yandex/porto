@@ -2,8 +2,33 @@
 #include <vector>
 
 #include "kvalue.hpp"
+#include "cgroup.hpp"
 
 int main() {
+    TCgroupState cgs;
+
+    try {
+        cgs.UpdateFromProcfs();
+        cgs.MountMissingTmpfs();
+        cgs.MountMissingControllers();
+
+        cgs.UpdateFromProcfs();
+        cout << cgs << endl;
+
+        cgs.UmountAll();
+        cgs.UpdateFromProcfs();
+        cout << cgs << endl;
+
+    } catch (const char *e) {
+        cerr << e << endl;
+        return EXIT_FAILURE;
+    } catch (string e) {
+        cerr << e << endl;
+        return EXIT_FAILURE;
+    }
+}
+
+int main2() {
     try {
         TKeyValueStorage st;
 
@@ -47,4 +72,6 @@ int main() {
         cerr << "Error!" << endl;
         return EXIT_FAILURE;
     }
+
+    return EXIT_SUCCESS;
 }

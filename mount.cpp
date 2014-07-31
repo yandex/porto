@@ -29,6 +29,10 @@ void TMountState::UpdateFromProcfs() {
     if (!s.is_open())
         throw "Cannot open /proc/self/mounts";
 
+    for (auto m : mounts)
+        delete m;
+    mounts.clear();
+
     while (getline(s, line)) {
         TMount *mount = new TMount(line);
         mounts.insert(mount);

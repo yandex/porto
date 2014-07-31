@@ -8,36 +8,12 @@
 #include "mount.hpp"
 #include "folder.hpp"
 
-class TController {
-    string name;
-    TMount *mount;
-
-    mode_t mode = 0x666;
-    string tmpfs = "/sys/fs/cgroup"; // TODO: detect dynamically
-
-public:
-    TController(string name, TMount *mount) : name(name), mount(mount) {}
-    TController(string name) {
-        string path = tmpfs + "/" + name;
-        mount = new TMount("cgroup", path, "cgroup", 0, set<string>{name});
-    }
-
-    void Attach() {
-        TFolder f(mount->Mountpoint());
-        if (!f.Exists())
-            f.Create(mode);
-        mount->Mount();
-    }
-
-    void Detach() {
-        TFolder f(mount->Mountpoint());
-        mount->Umount();
-        f.Remove();
-    }
-};
-
+class TRootCgroup;
 class TCgroup {
+protected:
     string name;
+private:
+    TRootCgroup *root;
     TCgroup *parent;
     int level;
     set<TCgroup*> children;
@@ -45,23 +21,14 @@ class TCgroup {
     mode_t mode = 0x666;
 
 public:
-    TCgroup(string path, TCgroup *parent = nullptr, int level = 0) :
-        name (path), parent(parent), level(level) {}
+    TCgroup(string name, TRootCgroup *root, TCgroup *parent, int level);
+    ~TCgroup();
 
     void FindChildren();
+    void DropChildren();
 
-    void DropChildren() {
-        for (auto c : children)
-            delete c;
-    }
-
-    ~TCgroup() {
-        DropChildren();
-    }
-
-    string Name() {
-        return name;
-    }
+    string Name();
+    string Path();
 
     void Create();
     void Remove();
@@ -69,30 +36,49 @@ public:
     friend ostream& operator<<(ostream& os, const TCgroup& cg);
 };
 
-class TCgroupState {
-    map<string, TCgroup*> root_cgroups; // can be net_cls,netprio
-    map<string, TController*> controllers; // can be net_cls _or_ net_prio
+class TController {
+    string name;
 
 public:
-    ~TCgroupState() {
-        for (auto c : root_cgroups)
-            delete c.second;
-    }
+    TController(string name);
+    string Name();
+};
 
-    friend ostream& operator<<(ostream& os, const TCgroupState& st) {
-        for (auto ss : st.root_cgroups) {
-            os << ss.first << ":" << endl;
-            os << *ss.second << endl;
-        }
+class TRootCgroup : public TCgroup {
+    TMount *mount;
+    set<TController*> controllers;
 
-        return os;
-    }
+    mode_t mode = 0x666;
+    string tmpfs = "/sys/fs/cgroup";
 
-    void UpdateFromProcFs();
+public:
+    TRootCgroup(TMount *mount, set<TController*> controllers);
+    TRootCgroup(set<TController*> controller);
+    ~TRootCgroup();
+
+    string Path();
+
+    void Attach();
+    void Detach();
+};
+
+class TCgroupState {
+    map<string, TRootCgroup*> root_cgroups; // can be net_cls,netprio
+    map<string, TController*> controllers; // can be net_cls _or_ net_prio
+
+    TMountState *ms;
+
+public:
+    TCgroupState();
+    ~TCgroupState();
+
+    void UpdateFromProcfs();
 
     void MountMissingTmpfs(string tmpfs = "/sys/fs/cgroup");
     void MountMissingControllers();
     void UmountAll();
+
+    friend ostream& operator<<(ostream& os, const TCgroupState& st);
 };
 
 #endif

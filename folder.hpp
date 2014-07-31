@@ -145,7 +145,7 @@ public:
                  {DT_SOCK, TFile::Socket}};
 
             if (type == TFile::Any || type == d_type_to_type[res->d_type])
-                ret.push_back(path + "/" + string(res->d_name));
+                ret.push_back(string(res->d_name));
         }
 
         closedir(dirp);

@@ -97,9 +97,9 @@ int main(int argc, const char *argv[])
         TCgroupState cs;
 
         cs.MountMissingTmpfs();
-        cs.UpdateFromProcFs();
+        cs.UpdateFromProcfs();
         cs.MountMissingControllers();
-        cs.UpdateFromProcFs();
+        cs.UpdateFromProcfs();
         //cs.UmountAll();
         //    cs.UpdateFromProcFs();
 
