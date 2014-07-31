@@ -21,10 +21,13 @@ public:
         Fifo,
         Link,
         Socket,
-        Unknown
+        Unknown,
+        Any
     };    
 
     TFile(string path) : path(path) {};
+
+    string Path() { return path; }
 
     EFileType Type() {
         struct stat st;
@@ -64,6 +67,7 @@ class TFolder {
 
 public:
     TFolder(string path) : path(path) {}
+    TFolder(TFile file) : path(file.Path()) {}
 
     void Create(mode_t mode = 0x755) {
         int ret = mkdir(path.c_str(), mode);
@@ -82,7 +86,7 @@ public:
 
     void Remove(bool recursive = false) {
         if (recursive) {
-            for (auto f : Items()) {
+            for (auto f : Items(TFile::Any)) {
                 TFile child(f);
 
                 if (child.Type() == TFile::Directory)
@@ -114,10 +118,10 @@ public:
     }
 
     vector<string> Subfolders() {
-        return Items(true, true);
+        return Items(TFile::Directory);
     }
 
-    vector<string> Items(bool only_folders = false, bool skip_links = true) {
+    vector<string> Items(TFile::EFileType type) {
         DIR *dirp;
         struct dirent dp, *res;
         vector<string> ret;
@@ -129,12 +133,19 @@ public:
         while (!readdir_r(dirp, &dp, &res) && res != nullptr) {
             if (!strcmp(".", res->d_name) || !strcmp ("..", res->d_name))
                 continue;
-            if (only_folders && !(res->d_type == DT_DIR))
-                continue;
-            if (skip_links && (res->d_type == DT_LNK))
-                continue;
 
-            ret.push_back(path + "/" + string(res->d_name));
+            static map<unsigned char, TFile::EFileType> d_type_to_type =
+                {{DT_UNKNOWN, TFile::Unknown},
+                 {DT_FIFO, TFile::Fifo},
+                 {DT_CHR, TFile::Character},
+                 {DT_DIR, TFile::Directory},
+                 {DT_BLK, TFile::Block},
+                 {DT_REG, TFile::Regular},
+                 {DT_LNK, TFile::Link},
+                 {DT_SOCK, TFile::Socket}};
+
+            if (type == TFile::Any || type == d_type_to_type[res->d_type])
+                ret.push_back(path + "/" + string(res->d_name));
         }
 
         closedir(dirp);
