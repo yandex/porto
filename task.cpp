@@ -1,4 +1,3 @@
-#include <fstream>
 #include <climits>
 
 #include "task.hpp"
@@ -115,16 +114,6 @@ bool TTask::Start() {
 
 void TTask::FindCgroups()
 {
-#if 0
-    ifstream in("proc/self/cgroup");
-
-    if (!in.is_open())
-        throw "Cannot open /proc/self/cgroup";
-
-    while (getline(in, line)) {
-        // new TCgroup
-    }
-#endif
 }
 
 int TTask::GetPid()

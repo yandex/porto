@@ -1,5 +1,3 @@
-#include <fstream>
-
 #include "log.hpp"
 #include "rpc.hpp"
 #include "protobuf.hpp"
