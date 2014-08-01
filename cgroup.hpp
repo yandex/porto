@@ -5,6 +5,7 @@
 #include <string>
 #include <map>
 
+#include "error.hpp"
 #include "mount.hpp"
 #include "folder.hpp"
 
@@ -33,7 +34,7 @@ public:
     void Create();
     void Remove();
 
-    int Attach(int pid);
+    TError Attach(int pid);
     
     friend ostream& operator<<(ostream& os, const TCgroup& cg);
 };

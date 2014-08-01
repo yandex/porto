@@ -22,8 +22,8 @@ struct TExitStatus {
 class TTask {
     mutex lock;
     enum ETaskState { Stopped, Running } state;
-    string path;
-    vector<string> args;
+    const string path;
+    const vector<string> args;
     TExitStatus exitStatus;
 
     pid_t pid;
@@ -33,7 +33,7 @@ class TTask {
     int CloseAllFds(int except);
     const char** GetArgv();
 public:
-    TTask(string &path, vector<string> &args);
+    TTask(const string &path, const vector<string> &args);
 
     void FindCgroups();
 

@@ -12,7 +12,7 @@ extern "C" {
 #include <unistd.h>
 }
 
-TTask::TTask(string &path, vector<string> &args) : path(path), args(args)
+TTask::TTask(const string &path, const vector<string> &args) : path(path), args(args)
 {
 }
 
