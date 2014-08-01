@@ -9,6 +9,7 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <unistd.h>
 }
 
 TTask::TTask(string &path, vector<string> &args) : path(path), args(args)

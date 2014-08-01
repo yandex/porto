@@ -2,66 +2,32 @@
 #define __KVALUE_HPP__
 
 #include <string>
-#include <map>
+#include <vector>
 
 #include "mount.hpp"
-#include "folder.hpp"
-#include "file.hpp"
-
-using namespace std;
 
 class TKeyValueStorage {
     TMount tmpfs;
 
-    string Path(string name) {
-        return tmpfs.Mountpoint() + "/" + name;
-    }
+    std::string Path(std::string name);
+    std::string Path(std::string name, std::string key);
 
-    string Path(string name, string key) {
-        return Path(name) + "/" + key;
-    }
+    static bool ValidName(std::string name);
+    static std::string RemovingName(std::string name);
 
 public:
-    TKeyValueStorage() : tmpfs("tmpfs", "/tmp/porto", "tmpfs", 0, {"size=32m"}) {}
+    TKeyValueStorage();
 
-    void MountTmpfs() {
-        TMountState ms;
-        ms.UpdateFromProcfs();
+    void MountTmpfs();
 
-        for (auto m : ms.Mounts())
-            if (m->Mountpoint() == tmpfs.Mountpoint())
-                return;
-        
-        TFolder mnt(tmpfs.Mountpoint());
-        if (!mnt.Exists())
-            mnt.Create();
+    void CreateNode(std::string name);
+    void RemoveNode(std::string name);
 
-        tmpfs.Mount();
-    }
+    void Save(std::string node, std::string key, std::string value);
+    std::string Load(std::string node, std::string key);
 
-    void CreateNode(string name) {
-        TFolder node(Path(name));
-        if (!node.Exists())
-            node.Create();
-    }
-
-    void RemoveNode(string name) {
-        TFolder node(Path(name));
-        if (node.Exists())
-            node.Remove(true);
-    }
-
-    void Save(string node, string key, string value) {
-        TFile f(Path(node, key));
-
-        f.WriteStringNoAppend(value);
-    }
-
-    string Load(string node, string key) {
-        TFile f(Path(node, key));
-
-        return f.AsString();
-    }
+    std::vector<std::string> ListNodes();
+    std::vector<std::string> ListKeys(std::string node);
 };
 
 #endif
