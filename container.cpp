@@ -8,6 +8,13 @@ TContainer::TContainer(const string name) : name(name), state(Stopped)
 {
 }
 
+bool TContainer::CheckState(EContainerState expected) {
+    if (state == Running && (!task || !task->IsRunning()))
+        state = Stopped;
+
+    return state == expected;
+}
+
 TContainer::~TContainer()
 {
     Stop();
@@ -104,14 +111,10 @@ string TContainer::GetData(string data)
         case Stopped:
             return "stopped";
         case Running:
-            if (task) {
-                if (task->IsRunning())
-                    tstat = "/running";
-                else
-                    tstat = "/stopped";
-            }
+            if (!CheckState(Running))
+                return "stopped";
 
-            return "running" + tstat;
+            return "running";
         case Paused:
             return "paused";
         case Destroying:

@@ -32,6 +32,8 @@ public:
 
     void Create();
     void Remove();
+
+    int Attach(int pid);
     
     friend ostream& operator<<(ostream& os, const TCgroup& cg);
 };

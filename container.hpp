@@ -30,9 +30,7 @@ class TContainer {
     mutex _data_lock;
     // data
 
-    bool CheckState(EContainerState expected) {
-        return state == expected;
-    }
+    bool CheckState(EContainerState expected);
 
     public:
     TContainer(const string name);

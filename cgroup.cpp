@@ -67,6 +67,11 @@ void TCgroup::Remove() {
     f.Remove();
 }
 
+int TCgroup::Attach(int pid) {
+    TFile f(Path() + "/cgroup.procs");
+    return f.AppendString(to_string(pid));
+}
+
 ostream& operator<<(ostream& os, const TCgroup& cg) {
     os << string(4 * cg.level, ' ') << cg.name << " {" << endl;
 

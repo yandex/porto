@@ -31,6 +31,7 @@ public:
     std::vector<std::string> AsLines();
 
     void WriteStringNoAppend(std::string str);
+    int AppendString(std::string str);
 };
 
 #endif

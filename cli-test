@@ -43,7 +43,6 @@ porto 0 start t
 porto 0 data t exit_status
 sleep 4
 porto 0 data t exit_status
-porto 0 stop t
 
 porto 0 set t command "sleep 100"
 porto 0 start t

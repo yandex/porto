@@ -82,3 +82,16 @@ void TFile::WriteStringNoAppend(string str)
     } else
         TLogger::LogAction("write " + path, -1, errno);
 }
+
+int TFile::AppendString(string str)
+{
+    ofstream out(path, ofstream::out);
+    if (out.is_open()) {
+        out << str;
+        TLogger::LogAction("append " + path, 0, 0);
+        return true;
+    } else {
+        TLogger::LogAction("append " + path, -1, errno);
+        return errno;
+    }
+}
