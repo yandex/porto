@@ -1,5 +1,5 @@
-#ifndef __FOLDER_H__
-#define __FOLDER_H__
+#ifndef __FOLDER_HPP__
+#define __FOLDER_HPP__
 
 #include <string>
 #include <vector>
