@@ -8,6 +8,7 @@
 #include <sys/mount.h>
 
 #include "log.hpp"
+#include "stringutil.hpp"
 
 using namespace std;
 
@@ -51,19 +52,9 @@ public:
         return flags;
     }
 
-    string CommaDelimitedFlags() {
-        string ret;
-        for (auto c = flags.begin(); c != flags.end(); ) {
-            ret += *c;
-            if (++c != flags.end())
-                ret += ",";
-        }
-        return ret;
-    }
-
     void Mount() {
         int ret = mount(device.c_str(), mountpoint.c_str(), vfstype.c_str(),
-                        mountflags, CommaDelimitedFlags().c_str());
+                        mountflags, CommaSeparatedList(flags).c_str());
 
         TLogger::LogAction("mount " + mountpoint, ret, errno);
 

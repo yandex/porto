@@ -93,17 +93,14 @@ TRootCgroup::TRootCgroup(TMount *mount, set<TController*> controllers) :
 
 TRootCgroup::TRootCgroup(set<TController*> controllers) :
     TCgroup("/", this, 0), controllers(controllers) {
-    string mnt;
+
     set<string> flags;
-    for (auto c = controllers.begin(); c != controllers.end(); ) {
-        TController *ctrl = *c;
-        string name = ctrl->Name();
-        flags.insert(name);
-        mnt += name;
-        if (++c != controllers.end())
-            mnt += ",";
-    }
-    mount = new TMount("cgroup", tmpfs + "/" + mnt, "cgroup", 0, flags);
+
+    for (auto c : controllers)
+        flags.insert(c->Name());
+    
+    mount = new TMount("cgroup", tmpfs + "/" + CommaSeparatedList(flags),
+                       "cgroup", 0, flags);
 }
 
 TRootCgroup::~TRootCgroup() {
@@ -159,12 +156,7 @@ void TCgroupState::UpdateFromProcfs() {
         if (cs.size() == 0)
             continue;
 
-        string name;
-        for (auto c = cs.begin(); c != cs.end(); ) {
-            name += *c;
-            if (++c != cs.end())
-                name += ",";
-        }
+        string name = CommaSeparatedList(cs);
 
         set<TController*> cg_controllers;
         for (auto c : cs) {
