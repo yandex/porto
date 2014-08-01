@@ -1,13 +1,12 @@
 #ifndef __KVALUE_HPP__
 #define __KVALUE_HPP__
 
-#include <fstream>
-#include <sstream>
 #include <string>
 #include <map>
 
 #include "mount.hpp"
 #include "folder.hpp"
+#include "file.hpp"
 
 using namespace std;
 
@@ -53,22 +52,15 @@ public:
     }
 
     void Save(string node, string key, string value) {
-        ofstream out(Path(node, key), ofstream::trunc);
-        if (!out.is_open())
-            throw "Cannot open " + Path(node, key);
+        TFile f(Path(node, key));
 
-        out << value;
+        f.WriteStringNoAppend(value);
     }
 
     string Load(string node, string key) {
-        ifstream in(Path(node, key));
-        if (!in.is_open())
-            throw "Cannot open " + Path(node, key);
+        TFile f(Path(node, key));
 
-        string ret;
-        in >> ret;
-
-        return ret;
+        return f.AsString();
     }
 };
 

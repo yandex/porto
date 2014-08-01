@@ -1,6 +1,8 @@
 #include "file.hpp"
 #include "log.hpp"
 
+#include <fstream>
+
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -46,3 +48,37 @@ void TFile::Remove() {
         throw "Cannot delete file: " + path;
 }
 
+string TFile::AsString() {
+    ifstream in(Path());
+    if (!in.is_open())
+        throw "Cannot open " + Path();
+
+    string ret;
+    in >> ret;
+
+    return ret;
+}
+
+vector<string> TFile::AsLines() {
+    ifstream in(path);
+    string line;
+
+    if (!in.is_open())
+        throw "Cannot open " + path;
+
+    vector<string> ret;
+    while (getline(in, line))
+        ret.push_back(line);
+
+    return ret;
+}
+
+void TFile::WriteStringNoAppend(string str)
+{
+    ofstream out(path, ofstream::trunc);
+    if (out.is_open()) {
+        out << str;
+        TLogger::LogAction("write " + path, 0, 0);
+    } else
+        TLogger::LogAction("write " + path, -1, errno);
+}

@@ -2,6 +2,7 @@
 #define __FILE_HPP__
 
 #include <string>
+#include <vector>
 
 class TFile {
     std::string path;
@@ -22,10 +23,14 @@ public:
     TFile(std::string path);
 
     std::string Path();
-
     EFileType Type();
 
     void Remove();
+
+    std::string AsString();
+    std::vector<std::string> AsLines();
+
+    void WriteStringNoAppend(std::string str);
 };
 
 #endif
