@@ -8,15 +8,17 @@
 
 class TCgroup;
 
-class TExecEnv {
+class TTaskEnv {
     std::string path;
     std::vector<std::string> args;
+    std::string cwd;
     //std::vector<std::string> env;
 
 public:
-    TExecEnv(const std::string &command);
+    TTaskEnv(const std::string &command, const std::string cwd);
     std::string GetPath();
     std::vector<std::string> GetArgs();
+    std::string GetCwd();
 };
 
 class TContainerEnv {
@@ -25,15 +27,15 @@ class TContainerEnv {
     // virtual devices
     // ...
 
-    TExecEnv env;
-
 public:
+    TTaskEnv taskEnv;
+
     TContainerEnv(std::vector<TCgroup*> &cgroups,
-                  TExecEnv &env) : cgroups(cgroups), env(env) {
+                  TTaskEnv &taskEnv) : cgroups(cgroups), taskEnv(taskEnv) {
     }
 
     void Create();
-    TError Enter();
+    TError Attach();
 };
 
 #endif

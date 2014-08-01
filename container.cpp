@@ -46,12 +46,12 @@ bool TContainer::Start()
     lock_guard<mutex> guard(lock); /* should not deadlock with GetProperty */
 
     std::vector<TCgroup*> cgroups;
-    TExecEnv execEnv(command);
+    TTaskEnv taskEnv(command, "");
 
-    auto *env = new TContainerEnv(cgroups, execEnv);
+    auto *env = new TContainerEnv(cgroups, taskEnv);
     env->Create();
 
-    task = new TTask(execEnv.GetPath(), execEnv.GetArgs());
+    task = new TTask(env);
     bool ret = task->Start();
     if (ret)
         state = Running;

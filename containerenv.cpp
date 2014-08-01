@@ -6,11 +6,13 @@
 
 extern "C" {
 #include <sys/types.h>
+#include <unistd.h>
 }
 
 using namespace std;
 
-TExecEnv::TExecEnv(const string &command) {
+TTaskEnv::TTaskEnv(const std::string &command, const string cwd)
+    : cwd(cwd) {
     // TODO: support quoting
 
     istringstream s(command);
@@ -22,12 +24,16 @@ TExecEnv::TExecEnv(const string &command) {
     args.erase(args.begin());
 }
 
-std::string TExecEnv::GetPath() {
+string TTaskEnv::GetPath() {
     return path;
 }
 
-std::vector<std::string> TExecEnv::GetArgs() {
+vector<string> TTaskEnv::GetArgs() {
     return args;
+}
+
+string TTaskEnv::GetCwd() {
+    return cwd;
 }
 
 void TContainerEnv::Create() {
@@ -35,7 +41,7 @@ void TContainerEnv::Create() {
         cg->Create();
 }
 
-TError TContainerEnv::Enter() {
+TError TContainerEnv::Attach() {
     pid_t self = getpid();
 
     for (auto cg : cgroups) {
@@ -43,5 +49,7 @@ TError TContainerEnv::Enter() {
         if (!error.Ok())
             return error;
     }
+
+    return TError();
 }
 

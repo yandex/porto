@@ -1,5 +1,6 @@
 #include <climits>
 
+#include "containerenv.hpp"
 #include "task.hpp"
 #include "cgroup.hpp"
 #include "log.hpp"
@@ -12,12 +13,10 @@ extern "C" {
 #include <unistd.h>
 }
 
-TTask::TTask(const string &path, const vector<string> &args) : path(path), args(args)
-{
+TTask::TTask(TContainerEnv *env) : env(env) {
 }
 
-int TTask::CloseAllFds(int except)
-{
+int TTask::CloseAllFds(int except) {
     close(0);
     except = dup3(except, 0, O_CLOEXEC);
     if (except < 0)
@@ -37,8 +36,10 @@ int TTask::CloseAllFds(int except)
     return except;
 }
 
-const char** TTask::GetArgv()
-{
+const char** TTask::GetArgv() {
+    auto args = env->taskEnv.GetArgs();
+    auto path = env->taskEnv.GetPath();
+
     auto argv = new const char* [args.size() + 2];
     argv[0] = path.c_str();
     for (size_t i = 0; i < args.size(); i++)
@@ -48,9 +49,13 @@ const char** TTask::GetArgv()
     return argv;
 }
 
-bool TTask::Start() {
-    lock_guard<mutex> guard(lock);
+void TTask::ReportResultAndExit(int fd, int result)
+{
+    if (write(fd, &result, sizeof(result))) {}
+    exit(EXIT_FAILURE);
+}
 
+bool TTask::Start() {
     int ret;
     int pfd[2];
 
@@ -78,20 +83,23 @@ bool TTask::Start() {
         close(rfd);
 
         if (setsid() < 0)
-            return -errno;
+            ReportResultAndExit(wfd, -errno);
 
-        // TODO: move to cgroups
-        // chdir(controller->root);
+        string cwd = env->taskEnv.GetCwd();
+
+        if (cwd.length() && chdir(cwd.c_str()) < 0)
+            ReportResultAndExit(wfd, -errno);
+
+        env->Attach();
 
         wfd = CloseAllFds(wfd);
         if (wfd < 0)
-            return wfd;
+            exit(wfd);
 
         auto argv = GetArgv();
-        execvp(path.c_str(), (char *const *)argv);
+        execvp(argv[0], (char *const *)argv);
 
-        if (write(wfd, &errno, sizeof(errno)) == 0) {}
-        exit(EXIT_FAILURE);
+        ReportResultAndExit(wfd, errno);
     }
 
     close(wfd);
@@ -113,32 +121,23 @@ bool TTask::Start() {
     }
 }
 
-void TTask::FindCgroups()
-{
+void TTask::FindCgroups() {
 }
 
-int TTask::GetPid()
-{
-    lock_guard<mutex> guard(lock);
-
+int TTask::GetPid() {
     if (state == Running)
         return pid;
     else
         return 0;
 }
 
-bool TTask::IsRunning()
-{
+bool TTask::IsRunning() {
     GetExitStatus();
 
-    lock_guard<mutex> guard(lock);
     return state == Running;
 }
 
-TExitStatus TTask::GetExitStatus()
-{
-    lock_guard<mutex> guard(lock);
-
+TExitStatus TTask::GetExitStatus() {
     if (state != Stopped) {
         int status;
         pid_t ret;
@@ -153,10 +152,7 @@ TExitStatus TTask::GetExitStatus()
     return exitStatus;
 }
 
-void TTask::Kill()
-{
-    lock_guard<mutex> guard(lock);
-
+void TTask::Kill() {
     int ret = kill(pid, SIGTERM);
     if (ret == ESRCH)
         return;
