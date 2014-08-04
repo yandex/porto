@@ -4,13 +4,12 @@
 #include <string>
 #include <set>
 #include <iostream>
+#include <memory>
 
 #include <sys/mount.h>
 
 #include "log.hpp"
 #include "stringutil.hpp"
-
-using namespace std;
 
 class TMount {
     string device;
@@ -77,25 +76,13 @@ public:
 };
 
 class TMountState {
-    set<TMount*> mounts;
+    std::set<std::shared_ptr<TMount> > mounts;
 
 public:
-    void UpdateFromProcfs();
-    
-    ~TMountState() {
-        for (auto m : mounts)
-            delete m;
-    }
+    TMountState();
 
-    set<TMount*> const& Mounts() {
-        return mounts;
-    }
+    std::set<std::shared_ptr<TMount> > const& Mounts();
 
-    friend ostream& operator<<(ostream& os, const TMountState& ms) {
-        for (auto m : ms.mounts)
-            os << *m << endl;
-
-        return os;
-    }
+    friend ostream& operator<<(std::ostream& os, const TMountState& ms);
 };
 #endif

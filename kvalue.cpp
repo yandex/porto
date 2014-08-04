@@ -30,7 +30,6 @@ string TKeyValueStorage::RemovingName(string name) {
 
 void TKeyValueStorage::MountTmpfs() {
     TMountState ms;
-    ms.UpdateFromProcfs();
 
     for (auto m : ms.Mounts())
         if (m->Mountpoint() == tmpfs.Mountpoint())

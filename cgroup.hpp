@@ -47,14 +47,14 @@ public:
 };
 
 class TRootCgroup : public TCgroup {
-    TMount *mount;
+    std::shared_ptr<TMount> mount;
     set<TController*> controllers;
 
     mode_t mode = 0x666;
     string tmpfs = "/sys/fs/cgroup";
 
 public:
-    TRootCgroup(TMount *mount, set<TController*> controllers);
+    TRootCgroup(std::shared_ptr<TMount> mount, set<TController*> controllers);
     TRootCgroup(set<TController*> controller);
     ~TRootCgroup();
 

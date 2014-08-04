@@ -92,7 +92,8 @@ string TController::Name() {
 }
 
 // TRootCgroup
-TRootCgroup::TRootCgroup(TMount *mount, set<TController*> controllers) :
+TRootCgroup::TRootCgroup(shared_ptr<TMount> mount,
+                         set<TController*> controllers) :
     TCgroup("/", this, 0), mount(mount), controllers(controllers) {
 }
 
@@ -104,8 +105,8 @@ TRootCgroup::TRootCgroup(set<TController*> controllers) :
     for (auto c : controllers)
         flags.insert(c->Name());
     
-    mount = new TMount("cgroup", tmpfs + "/" + CommaSeparatedList(flags),
-                       "cgroup", 0, flags);
+    mount = make_shared<TMount>("cgroup", tmpfs + "/" + CommaSeparatedList(flags),
+                                "cgroup", 0, flags);
 }
 
 TRootCgroup::~TRootCgroup() {
@@ -147,8 +148,6 @@ void TCgroupState::UpdateFromProcfs() {
     for (auto c : root_cgroups)
         delete c.second;
     root_cgroups.clear();
-    
-    ms->UpdateFromProcfs();
 
     for (auto m : ms->Mounts()) {
         set<string> flags = m->Flags();
@@ -190,8 +189,6 @@ void TCgroupState::MountMissingControllers() {
 }
 
 void TCgroupState::MountMissingTmpfs(string tmpfs) {
-    ms->UpdateFromProcfs();
-
     for (auto m : ms->Mounts())
         if (m->Mountpoint() == tmpfs)
             return;
