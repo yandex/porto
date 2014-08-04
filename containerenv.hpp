@@ -4,23 +4,38 @@
 #include <vector>
 #include <string>
 
+#include "error.hpp"
+
 class TCgroup;
 
+class TTaskEnv {
+    std::string path;
+    std::vector<std::string> args;
+    std::string cwd;
+    //std::vector<std::string> env;
+
+public:
+    TTaskEnv(const std::string &command, const std::string cwd);
+    std::string GetPath();
+    std::vector<std::string> GetArgs();
+    std::string GetCwd();
+};
+
 class TContainerEnv {
-    std::vector<TCgroup*> leaf_cgroups;
+    std::vector<TCgroup*> cgroups;
     // namespaces
     // virtual devices
     // ...
 
-    class TExecEnv {
-        std::string path;
-        std::vector<std::string> args;
-        std::vector<std::string> env;
-    } exec_env;
-
 public:
+    TTaskEnv taskEnv;
+
+    TContainerEnv(std::vector<TCgroup*> &cgroups,
+                  TTaskEnv &taskEnv) : cgroups(cgroups), taskEnv(taskEnv) {
+    }
+
     void Create();
-    void Enter();
+    TError Attach();
 };
 
 #endif

@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "error.hpp"
+
 class TFile {
     std::string path;
 
@@ -31,7 +33,7 @@ public:
     std::vector<std::string> AsLines();
 
     void WriteStringNoAppend(std::string str);
-    int AppendString(std::string str);
+    TError AppendString(std::string str);
 };
 
 #endif

@@ -1,7 +1,7 @@
-#include <iterator>
 #include <sstream>
 
 #include "container.hpp"
+#include "containerenv.hpp"
 #include "task.hpp"
 
 TContainer::TContainer(const string name) : name(name), state(Stopped)
@@ -34,24 +34,24 @@ string TContainer::Name()
 
 bool TContainer::Start()
 {
+    {
+        lock_guard<mutex> guard(lock);
+
+        if (!CheckState(Stopped))
+            return false;
+    }
+
     string command = GetProperty("command");
 
-    lock_guard<mutex> guard(lock);
+    lock_guard<mutex> guard(lock); /* should not deadlock with GetProperty */
 
-    if (!CheckState(Stopped))
-        return false;
+    std::vector<TCgroup*> cgroups;
+    TTaskEnv taskEnv(command, "");
 
-    vector<string> args;
+    auto *env = new TContainerEnv(cgroups, taskEnv);
+    env->Create();
 
-    istringstream s(command);
-    args.insert(args.end(),
-                istream_iterator<string>(s),
-                istream_iterator<string>());
-
-    string path = args.front();
-    args.erase(args.begin());
-
-    task = new TTask(path, args);
+    task = new TTask(env);
     bool ret = task->Start();
     if (ret)
         state = Running;

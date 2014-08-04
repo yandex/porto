@@ -8,7 +8,7 @@
 
 using namespace std;
 
-class TCgroup;
+class TContainerEnv;
 
 struct TExitStatus {
     // Task was not started due to the following error
@@ -20,20 +20,17 @@ struct TExitStatus {
 };
 
 class TTask {
-    mutex lock;
     enum ETaskState { Stopped, Running } state;
-    string path;
-    vector<string> args;
+    TContainerEnv *env;
     TExitStatus exitStatus;
 
     pid_t pid;
 
-    vector<TCgroup*> cgroups;
-
     int CloseAllFds(int except);
     const char** GetArgv();
+    void ReportResultAndExit(int fd, int result);
 public:
-    TTask(string &path, vector<string> &args);
+    TTask(TContainerEnv *env);
 
     void FindCgroups();
 
