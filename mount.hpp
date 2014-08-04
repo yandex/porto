@@ -82,15 +82,15 @@ public:
     }
 };
 
-class TMountState {
+class TMountSnapshot {
     std::set<std::shared_ptr<TMount> > mounts;
 
 public:
-    TMountState();
+    TMountSnapshot();
 
     std::set<std::shared_ptr<TMount> > const& Mounts();
 
-    friend ostream& operator<<(std::ostream& os, const TMountState& ms);
+    friend ostream& operator<<(std::ostream& os, const TMountSnapshot& ms);
 };
 
 #endif

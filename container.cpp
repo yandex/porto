@@ -47,7 +47,7 @@ bool TContainer::Start()
     vector<shared_ptr<TCgroup> > cgroups;
 
     // TODO: get real cgroups list
-    //TCgroupState cs;
+    //TCgroupSnapshot cs;
 #if 0
     if (false) {
         auto mem = new TController("memory");

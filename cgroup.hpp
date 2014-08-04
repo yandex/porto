@@ -67,13 +67,13 @@ public:
     void Detach();
 };
 
-class TCgroupState {
+class TCgroupSnapshot {
     map<string, std::shared_ptr<TRootCgroup> > root_cgroups; // can be net_cls,netprio
     map<string, TController*> controllers; // can be net_cls _or_ net_prio
 
 public:
-    TCgroupState();
-    ~TCgroupState();
+    TCgroupSnapshot();
+    ~TCgroupSnapshot();
 
     /*
     void MountMissingTmpfs(string tmpfs = "/sys/fs/cgroup");
@@ -81,7 +81,7 @@ public:
     void UmountAll();
     */
 
-    friend ostream& operator<<(ostream& os, const TCgroupState& st);
+    friend ostream& operator<<(ostream& os, const TCgroupSnapshot& st);
 };
 
 #endif

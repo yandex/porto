@@ -122,9 +122,9 @@ void TRootCgroup::Detach() {
     f.Remove();
 }
 
-// TCgroupState
-TCgroupState::TCgroupState() {
-    TMountState ms;
+// TCgroupSnapshot
+TCgroupSnapshot::TCgroupSnapshot() {
+    TMountSnapshot ms;
 
     for (auto m : ms.Mounts()) {
         set<string> flags = m->Flags();
@@ -150,12 +150,12 @@ TCgroupState::TCgroupState() {
     }
 }
 
-TCgroupState::~TCgroupState() {
+TCgroupSnapshot::~TCgroupSnapshot() {
     root_cgroups.clear();
 }
 
 /*
-void TCgroupState::MountMissingControllers() {
+void TCgroupSnapshot::MountMissingControllers() {
     for (auto c : create_subsystems) {
         if (controllers[c] == nullptr) {
             TController *controller = new TController(c);
@@ -170,8 +170,8 @@ void TCgroupState::MountMissingControllers() {
     }
 }
 
-void TCgroupState::MountMissingTmpfs(string tmpfs) {
-    TMountState ms;
+void TCgroupSnapshot::MountMissingTmpfs(string tmpfs) {
+    TMountSnapshot ms;
 
     for (auto m : ms.Mounts())
         if (m->Mountpoint() == tmpfs)
@@ -181,14 +181,14 @@ void TCgroupState::MountMissingTmpfs(string tmpfs) {
     mount.Mount();
 }
 
-void TCgroupState::UmountAll() {
+void TCgroupSnapshot::UmountAll() {
     for (auto root : root_cgroups) {
         root.second->Detach();
     }
 }
 */
 
-ostream& operator<<(ostream& os, const TCgroupState& st) {
+ostream& operator<<(ostream& os, const TCgroupSnapshot& st) {
     for (auto ss : st.root_cgroups) {
         os << ss.first << ":" << endl;
         os << *ss.second << endl;

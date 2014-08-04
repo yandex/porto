@@ -25,7 +25,7 @@ TMount::TMount(string mounts_line) {
         flags.insert(t);
 }
 
-TMountState::TMountState() {
+TMountSnapshot::TMountSnapshot() {
     TFile f("/proc/self/mounts");
 
     for (auto line : f.AsLines()) {
@@ -34,11 +34,11 @@ TMountState::TMountState() {
     }
 }
 
-set<shared_ptr<TMount> > const& TMountState::Mounts() {
+set<shared_ptr<TMount> > const& TMountSnapshot::Mounts() {
     return mounts;
 }
 
-ostream& operator<<(ostream& os, const TMountState& ms) {
+ostream& operator<<(ostream& os, const TMountSnapshot& ms) {
     for (auto m : ms.mounts)
         os << *m << endl;
 

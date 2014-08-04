@@ -94,10 +94,12 @@ int main(int argc, const char *argv[])
 {
     try {
         TContainerHolder cholder;
-        TCgroupState cs;
+        TCgroupSnapshot cs;
 
+        /*
         cs.MountMissingTmpfs();
         cs.MountMissingControllers();
+        */
 
         //cs.UmountAll();
         //    cs.UpdateFromProcFs();

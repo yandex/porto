@@ -6,24 +6,28 @@
 
 extern void dump_reg(void);
 int main() {
-    TMountState ms;
-    TMountState ms1;
+    TMountSnapshot ms;
+    TMountSnapshot ms1;
     {
-        TMountState ms2;
+        TMountSnapshot ms2;
     }
     dump_reg();
+
+    return EXIT_SUCCESS;
 }
 
 int main3() {
-    TCgroupState cgs;
+    TCgroupSnapshot cgs;
 
     try {
+        /*
         cgs.MountMissingTmpfs();
         cgs.MountMissingControllers();
+        */
 
         cout << cgs << endl;
 
-        cgs.UmountAll();
+        //cgs.UmountAll();
 
     } catch (const char *e) {
         cerr << e << endl;
@@ -32,6 +36,8 @@ int main3() {
         cerr << e << endl;
         return EXIT_FAILURE;
     }
+
+    return EXIT_SUCCESS;
 }
 
 int main2() {
