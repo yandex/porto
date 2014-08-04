@@ -51,6 +51,7 @@ bool TContainer::Start()
     vector<TCgroup*> cgroups;
 
     // TODO: get real cgroups list
+    //TCgroupState cs;
 #if 0
     if (false) {
         auto mem = new TController("memory");

@@ -109,7 +109,7 @@ string TRootCgroup::Path() {
     return mount->Mountpoint();
 }
 
-void TRootCgroup::Attach() {
+void TRootCgroup::Mount() {
     TFolder f(mount->Mountpoint());
     if (!f.Exists())
         f.Create(mode);
@@ -154,6 +154,7 @@ TCgroupState::~TCgroupState() {
     root_cgroups.clear();
 }
 
+/*
 void TCgroupState::MountMissingControllers() {
     for (auto c : create_subsystems) {
         if (controllers[c] == nullptr) {
@@ -161,7 +162,7 @@ void TCgroupState::MountMissingControllers() {
             set<TController*> tmp = {controller};
             auto cg = TRegistry<TRootCgroup>::Get(TRootCgroup(tmp));
 
-            cg->Attach();
+            cg->Mount();
 
             root_cgroups[c] = cg;
             controllers[c] = controller;
@@ -185,6 +186,7 @@ void TCgroupState::UmountAll() {
         root.second->Detach();
     }
 }
+*/
 
 ostream& operator<<(ostream& os, const TCgroupState& st) {
     for (auto ss : st.root_cgroups) {

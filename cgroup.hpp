@@ -63,7 +63,7 @@ public:
 
     virtual string Path();
 
-    void Attach();
+    void Mount();
     void Detach();
 };
 
@@ -75,9 +75,11 @@ public:
     TCgroupState();
     ~TCgroupState();
 
+    /*
     void MountMissingTmpfs(string tmpfs = "/sys/fs/cgroup");
     void MountMissingControllers();
     void UmountAll();
+    */
 
     friend ostream& operator<<(ostream& os, const TCgroupState& st);
 };
