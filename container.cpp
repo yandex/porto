@@ -3,8 +3,8 @@
 #include "container.hpp"
 #include "containerenv.hpp"
 #include "task.hpp"
-
 #include "cgroup.hpp"
+#include "registry.hpp"
 
 TContainer::TContainer(const string name) : name(name), state(Stopped)
 {
@@ -47,17 +47,13 @@ bool TContainer::Start()
     vector<shared_ptr<TCgroup> > cgroups;
 
     // TODO: get real cgroups list
-    //TCgroupSnapshot cs;
-#if 0
-    if (false) {
-        auto mem = new TSubsys("memory");
-        set<TSubsys *> cset;
-        cset.insert(mem);
-        auto rootmem = new TRootCgroup(cset);
-        auto cg = new TCgroup(name, rootmem, rootmem);
-        cgroups.push_back(cg);
-    }
-#endif
+
+    auto mem = TRegistry<TSubsystem>::Get(TSubsystem("memory"));
+    set<shared_ptr<TSubsystem>> set;
+    set.insert(mem);
+    auto rootmem = TRegistry<TRootCgroup>::Get(TRootCgroup(set));
+    auto cg = TRegistry<TCgroup>::Get(TCgroup(name, rootmem));
+    cgroups.push_back(cg);
 
     TTaskEnv taskEnv(command, "");
 
