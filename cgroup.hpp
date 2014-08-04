@@ -13,7 +13,6 @@ class TCgroup {
 protected:
     string name;
 private:
-    TRootCgroup *root;
     TCgroup *parent;
     int level;
     set<TCgroup*> children;
@@ -21,7 +20,7 @@ private:
     mode_t mode = 0x666;
 
 public:
-    TCgroup(string name, TRootCgroup *root, TCgroup *parent, int level);
+    TCgroup(string name, TCgroup *parent, int level);
     ~TCgroup();
 
     void FindChildren();

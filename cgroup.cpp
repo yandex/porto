@@ -18,8 +18,8 @@ set<string> create_subsystems = {"cpuset", "cpu", "cpuacct", "memory"};
 
 // TCgroup
 
-TCgroup::TCgroup(string name, TRootCgroup *root, TCgroup *parent = nullptr,
-                 int level = 0) : name(name), root(root), parent(parent),
+TCgroup::TCgroup(string name, TCgroup *parent = nullptr,
+                 int level = 0) : name(name), parent(parent),
                                   level(level) {
 }
 
@@ -44,17 +44,14 @@ void TCgroup::FindChildren() {
     DropChildren();
 
     for (auto s : f.Subfolders()) {
-        TCgroup *cg = new TCgroup(s, root, this, level + 1);
+        TCgroup *cg = new TCgroup(s, this, level + 1);
         cg->FindChildren();
         children.insert(cg);
     }
 }
 
 string TCgroup::Path() {
-    if (parent == nullptr)
-        return root->Path() +  "/" + name;
-    else
-        return parent->Path() + "/" + name;
+    return parent->Path() + "/" + name;
 }
 
 void TCgroup::Create() {
