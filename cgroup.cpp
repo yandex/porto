@@ -15,8 +15,6 @@ set<string> supported_subsystems = {"cpuset", "cpu", "cpuacct", "memory",
     "devices", "freezer", "net_cls", "net_prio", "blkio",
     "perf_event", "hugetlb", "name=systemd"};
 
-set<string> create_subsystems = {"cpuset", "cpu", "cpuacct", "memory"};
-
 // TCgroup
 
 TCgroup::TCgroup(string name, shared_ptr<TCgroup> parent, int level) :
@@ -40,13 +38,6 @@ TCgroup::TCgroup(set<shared_ptr<TSubsystem>> subsystems) :
     mount = TRegistry<TMount>::Get(TMount("cgroup", tmpfs + "/" +
                                           CommaSeparatedList(flags),
                                           "cgroup", 0, flags));
-}
-
-TCgroup::~TCgroup() {
-}
-
-string TCgroup::Name() {
-    return name;
 }
 
 vector<shared_ptr<TCgroup> > TCgroup::FindChildren() {
@@ -118,6 +109,16 @@ TError TCgroup::Attach(int pid) {
     return 0;
 }
 
+bool operator==(const TCgroup& c1, const TCgroup& c2) {
+    if (c1.name != c2.name)
+        return false;
+    if (c1.parent != c2.parent)
+        return false;
+    if (!c1.parent && !c2.parent)
+        return c1.subsystems == c2.subsystems;
+    return true;
+}
+
 ostream& operator<<(ostream& os, const TCgroup& cg) {
     if (cg.IsRoot()) {
         for (auto s : cg.subsystems)
@@ -147,7 +148,8 @@ TCgroupSnapshot::TCgroupSnapshot() {
         set<string> cs;
 
         set_intersection(flags.begin(), flags.end(),
-                         supported_subsystems.begin(), supported_subsystems.end(),
+                         supported_subsystems.begin(),
+                         supported_subsystems.end(),
                          inserter(cs, cs.begin()));
 
         if (cs.size() == 0)
