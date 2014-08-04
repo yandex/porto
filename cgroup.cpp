@@ -99,6 +99,12 @@ string TRootCgroup::Path() {
 }
 
 void TRootCgroup::Create() {
+    TMountSnapshot ms;
+    for (auto m : ms.Mounts()) {
+        if (m == mount)
+            return;
+    }
+
     TFolder f(mount->Mountpoint());
     if (!f.Exists())
         f.Create(mode);
@@ -135,7 +141,7 @@ TCgroupSnapshot::TCgroupSnapshot() {
         }
 
         root_cgroups[name] = TRegistry<TRootCgroup>::Get(TRootCgroup(m, cg_controllers));
-        root_cgroups[name]->FindChildren();
+        //root_cgroups[name]->FindChildren();
     }
 }
 

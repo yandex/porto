@@ -97,7 +97,11 @@ int main(int argc, const char *argv[])
         TCgroupSnapshot cs;
 
         return rpc_main(cholder);
-    } catch (...) {
+    } catch (string s) {
+        cout << s << endl;
+        return EXIT_FAILURE;
+    } catch (const char *s) {
+        cout << s << endl;
         return EXIT_FAILURE;
     }
 }

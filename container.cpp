@@ -41,7 +41,7 @@ bool TContainer::Start()
     if (!CheckState(Stopped))
         return false;
 
-    string command = GetProperty("command");
+    string command = GetPropertyLocked("command");
     string name = Name();
 
     vector<shared_ptr<TCgroup> > cgroups;
@@ -49,8 +49,10 @@ bool TContainer::Start()
     // TODO: get real cgroups list
 
     auto mem = TRegistry<TSubsystem>::Get(TSubsystem("memory"));
+    auto freezer = TRegistry<TSubsystem>::Get(TSubsystem("freezer"));
     set<shared_ptr<TSubsystem>> set;
     set.insert(mem);
+    set.insert(freezer);
     auto rootmem = TRegistry<TRootCgroup>::Get(TRootCgroup(set));
     auto cg = TRegistry<TCgroup>::Get(TCgroup(name, rootmem));
     cgroups.push_back(cg);

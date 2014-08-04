@@ -37,7 +37,7 @@ public:
     virtual TError Attach(int pid);
 
     friend bool operator==(const TCgroup& c1, const TCgroup& c2) {
-        return c1.name == c2.name && *c1.parent == *c2.parent;
+        return c1.name == c2.name && c1.parent == c2.parent;
     }
 
     friend ostream& operator<<(ostream& os, const TCgroup& cg);

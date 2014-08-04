@@ -3,6 +3,7 @@
 
 #include <list>
 #include <mutex>
+#include <iostream>
 
 template <class T>
 class TRegistry {
@@ -11,7 +12,7 @@ class TRegistry {
 
     TRegistry() {};
     TRegistry(const TRegistry &);
-    void operato(const TRegistry &);
+    void operator=(const TRegistry &);
 
 public:
     static TRegistry &GetInstance() {
