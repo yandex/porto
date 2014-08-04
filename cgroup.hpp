@@ -47,19 +47,22 @@ class TController {
 public:
     TController(string name);
     string Name();
+
+    friend bool operator==(const TController& c1, const TController& c2) {
+        return c1.name == c2.name;
+    }
 };
 
 class TRootCgroup : public TCgroup {
     std::shared_ptr<TMount> mount;
-    std::set<TController*> controllers;
+    std::set<std::shared_ptr<TController>> controllers;
 
     mode_t mode = 0x666;
     string tmpfs = "/sys/fs/cgroup";
 
 public:
-    TRootCgroup(std::shared_ptr<TMount> mount, set<TController*> controllers);
-    TRootCgroup(set<TController*> controller);
-    virtual ~TRootCgroup();
+    TRootCgroup(std::shared_ptr<TMount> mount, set<std::shared_ptr<TController>> controllers);
+    TRootCgroup(set<std::shared_ptr<TController>> controller);
 
     virtual string Path();
 
@@ -68,8 +71,8 @@ public:
 };
 
 class TCgroupSnapshot {
-    map<string, std::shared_ptr<TRootCgroup> > root_cgroups; // can be net_cls,netprio
-    map<string, TController*> controllers; // can be net_cls _or_ net_prio
+    map<string, std::shared_ptr<TRootCgroup>> root_cgroups; // can be net_cls,netprio
+    map<string, std::shared_ptr<TController>> controllers; // can be net_cls _or_ net_prio
 
 public:
     TCgroupSnapshot();

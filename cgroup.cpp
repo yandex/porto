@@ -83,11 +83,11 @@ string TController::Name() {
 
 // TRootCgroup
 TRootCgroup::TRootCgroup(shared_ptr<TMount> mount,
-                         set<TController*> controllers) :
+                         set<shared_ptr<TController>> controllers) :
     TCgroup("/", shared_ptr<TCgroup>(nullptr), 0), mount(mount), controllers(controllers) {
 }
 
-TRootCgroup::TRootCgroup(set<TController*> controllers) :
+TRootCgroup::TRootCgroup(set<shared_ptr<TController>> controllers) :
     TCgroup("/", shared_ptr<TCgroup>(nullptr), 0), controllers(controllers) {
 
     set<string> flags;
@@ -98,11 +98,6 @@ TRootCgroup::TRootCgroup(set<TController*> controllers) :
     mount = TRegistry<TMount>::Get(TMount("cgroup", tmpfs + "/" +
                                           CommaSeparatedList(flags),
                                           "cgroup", 0, flags));
-}
-
-TRootCgroup::~TRootCgroup() {
-    for (auto c : controllers)
-        delete c;
 }
 
 string TRootCgroup::Path() {
@@ -139,9 +134,9 @@ TCgroupSnapshot::TCgroupSnapshot() {
 
         string name = CommaSeparatedList(cs);
 
-        set<TController*> cg_controllers;
+        set<shared_ptr<TController>> cg_controllers;
         for (auto c : cs) {
-            controllers[c] = new TController(name);
+            controllers[c] = TRegistry<TController>::Get(TController(name));
             cg_controllers.insert(controllers[c]);
         }
 
