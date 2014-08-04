@@ -10,68 +10,55 @@
 #include "folder.hpp"
 #include "subsystem.hpp"
 
-class TRootCgroup;
 class TCgroup {
-protected:
     std::string name;
-private:
     std::shared_ptr<TCgroup> parent;
     int level;
     vector<std::weak_ptr<TCgroup>> children;
 
+    std::shared_ptr<TMount> mount;
+    std::set<std::shared_ptr<TSubsystem>> subsystems;
+
+    std::string tmpfs = "/sys/fs/cgroup";
     mode_t mode = 0x666;
 
 public:
     TCgroup(std::string name, std::shared_ptr<TCgroup> parent, int level = 0);
-    virtual ~TCgroup();
+    TCgroup(std::shared_ptr<TMount> mount, set<std::shared_ptr<TSubsystem>> subsystems);
+    TCgroup(set<std::shared_ptr<TSubsystem>> controller);
 
-    void FindChildren();
+    ~TCgroup();
 
+    std::vector<std::shared_ptr<TCgroup> > FindChildren();
 
-    virtual std::string Name();
-    virtual std::string Path();
+    std::string Name();
+    std::string Path();
 
-    virtual void Create();
-    virtual void Remove();
+    void Create();
+    void Remove();
 
-    virtual TError Attach(int pid);
+    bool IsRoot() const;
+
+    TError Attach(int pid);
 
     friend bool operator==(const TCgroup& c1, const TCgroup& c2) {
-        return c1.name == c2.name && c1.parent == c2.parent;
+        if (c1.name != c2.name)
+            return false;
+        if (c1.parent != c2.parent)
+            return false;
+        if (!c1.parent && !c2.parent)
+            return c1.subsystems == c2.subsystems;
+        return true;
     }
 
     friend ostream& operator<<(ostream& os, const TCgroup& cg);
 };
 
-class TRootCgroup : public TCgroup {
-    std::shared_ptr<TMount> mount;
-    std::set<std::shared_ptr<TSubsystem>> subsystems;
-
-    mode_t mode = 0x666;
-    std::string tmpfs = "/sys/fs/cgroup";
-
-public:
-    TRootCgroup(std::shared_ptr<TMount> mount, set<std::shared_ptr<TSubsystem>> subsystems);
-    TRootCgroup(set<std::shared_ptr<TSubsystem>> controller);
-
-    virtual string Path();
-    virtual void Create();
-    virtual void Remove();
-};
-
 class TCgroupSnapshot {
-    std::map<string, std::shared_ptr<TRootCgroup>> root_cgroups; // can be net_cls,netprio
-    std::map<string, std::shared_ptr<TSubsystem>> subsystems; // can be net_cls _or_ net_prio
-
+    std::vector<std::shared_ptr<TCgroup> > cgroups;
+    std::map<string, std::shared_ptr<TSubsystem> > subsystems; // can be net_cls _or_ net_prio
 public:
     TCgroupSnapshot();
-    ~TCgroupSnapshot();
-
-    /*
-    void MountMissingTmpfs(string tmpfs = "/sys/fs/cgroup");
-    void MountMissingControllers();
-    void UmountAll();
-    */
 
     friend ostream& operator<<(ostream& os, const TCgroupSnapshot& st);
 };

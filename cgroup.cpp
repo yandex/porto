@@ -23,66 +23,14 @@ TCgroup::TCgroup(string name, shared_ptr<TCgroup> parent, int level) :
     name(name), parent(parent), level(level) {
 }
 
-TCgroup::~TCgroup() {
+TCgroup::TCgroup(shared_ptr<TMount> mount, set<shared_ptr<TSubsystem>> subsystems) :
+    name("/"), parent(shared_ptr<TCgroup>(nullptr)), level(0), mount(mount),
+    subsystems(subsystems) {
 }
 
-string TCgroup::Name() {
-    return name;
-}
-
-void TCgroup::FindChildren() {
-    TFolder f(Path());
-
-    for (auto s : f.Subfolders()) {
-        auto self = TRegistry<TCgroup>::Get(*this);
-
-        auto cg = TRegistry<TCgroup>::Get(TCgroup(s, self, level + 1));
-        cg->FindChildren();
-        children.push_back(weak_ptr<TCgroup>(cg));
-    }
-}
-
-string TCgroup::Path() {
-    return parent->Path() + "/" + name;
-}
-
-void TCgroup::Create() {
-    parent->Create();
-
-    TFolder f(Path());
-    f.Create(mode);
-}
-
-void TCgroup::Remove() {
-    TFolder f(Path());
-    f.Remove();
-}
-
-TError TCgroup::Attach(int pid) {
-    TFile f(Path() + "/cgroup.procs");
-    return f.AppendString(to_string(pid));
-}
-
-ostream& operator<<(ostream& os, const TCgroup& cg) {
-    os << string(4 * cg.level, ' ') << cg.name << " {" << endl;
-
-    for (auto c : cg.children) {
-        os << *c.lock() << endl;
-    }
-
-    os << string(4 * cg.level, ' ') << "}";
-
-    return os;
-}
-
-// TRootCgroup
-TRootCgroup::TRootCgroup(shared_ptr<TMount> mount,
-                         set<shared_ptr<TSubsystem>> subsystems) :
-    TCgroup("/", shared_ptr<TCgroup>(nullptr), 0), mount(mount), subsystems(subsystems) {
-}
-
-TRootCgroup::TRootCgroup(set<shared_ptr<TSubsystem>> subsystems) :
-    TCgroup("/", shared_ptr<TCgroup>(nullptr), 0), subsystems(subsystems) {
+TCgroup::TCgroup(set<shared_ptr<TSubsystem>> subsystems) :
+    name("/"), parent(shared_ptr<TCgroup>(nullptr)), level(0),
+    subsystems(subsystems) {
 
     set<string> flags;
 
@@ -94,27 +42,100 @@ TRootCgroup::TRootCgroup(set<shared_ptr<TSubsystem>> subsystems) :
                                           "cgroup", 0, flags));
 }
 
-string TRootCgroup::Path() {
-    return mount->Mountpoint();
+TCgroup::~TCgroup() {
 }
 
-void TRootCgroup::Create() {
-    TMountSnapshot ms;
-    for (auto m : ms.Mounts()) {
-        if (m == mount)
-            return;
+string TCgroup::Name() {
+    return name;
+}
+
+vector<shared_ptr<TCgroup> > TCgroup::FindChildren() {
+    TFolder f(Path());
+    vector<shared_ptr<TCgroup> > ret;
+    auto self = TRegistry<TCgroup>::Get(*this);
+
+    for (auto s : f.Subfolders()) {
+        auto cg = TRegistry<TCgroup>::Get(TCgroup(s, self, level + 1));
+        
+        children.push_back(weak_ptr<TCgroup>(cg));
+        for (auto c : cg->FindChildren())
+            ret.push_back(c);
     }
 
-    TFolder f(mount->Mountpoint());
-    if (!f.Exists())
-        f.Create(mode);
-    mount->Mount();
+    ret.push_back(self);
+    
+    return ret;
 }
 
-void TRootCgroup::Remove() {
-    TFolder f(mount->Mountpoint());
-    mount->Umount();
-    f.Remove();
+bool TCgroup::IsRoot() const {
+    return !parent;
+}
+
+string TCgroup::Path() {
+    if (IsRoot())
+        return mount->Mountpoint();
+    else
+        return parent->Path() + "/" + name;
+}
+
+void TCgroup::Create() {
+    if (IsRoot()) {
+        TMountSnapshot ms;
+        for (auto m : ms.Mounts()) {
+            if (m == mount)
+                return;
+        }
+
+        TFolder f(mount->Mountpoint());
+        f.Create(mode);
+        mount->Mount();
+
+    } else {
+        parent->Create();
+
+        TFolder f(Path());
+        f.Create(mode);
+    }
+}
+
+void TCgroup::Remove() {
+    if (IsRoot()) {
+        TFolder f(mount->Mountpoint());
+        mount->Umount();
+        f.Remove();
+    } else {
+        TFolder f(Path());
+        f.Remove();
+    }
+}
+
+TError TCgroup::Attach(int pid) {
+    if (!IsRoot()) {
+        TFile f(Path() + "/cgroup.procs");
+        return f.AppendString(to_string(pid));
+    }
+
+    return 0;
+}
+
+ostream& operator<<(ostream& os, const TCgroup& cg) {
+    if (cg.IsRoot()) {
+        for (auto s : cg.subsystems)
+            os << *s << ",";
+
+        os << " {" << endl;
+    } else
+        os << string(4 * cg.level, ' ') << cg.name << " {" << endl;
+
+    for (auto c : cg.children) {
+        auto child = c.lock();
+        if (child)
+            os << *child << endl;
+    }
+
+    os << string(4 * cg.level, ' ') << "}";
+
+    return os;
 }
 
 // TCgroupSnapshot
@@ -140,31 +161,15 @@ TCgroupSnapshot::TCgroupSnapshot() {
             cg_controllers.insert(subsystems[c]);
         }
 
-        root_cgroups[name] = TRegistry<TRootCgroup>::Get(TRootCgroup(m, cg_controllers));
-        //root_cgroups[name]->FindChildren();
-    }
-}
+        auto root = TRegistry<TCgroup>::Get(TCgroup(m, cg_controllers));
+        cgroups.push_back(root);
 
-TCgroupSnapshot::~TCgroupSnapshot() {
-    root_cgroups.clear();
+        for (auto cg : root->FindChildren())
+            cgroups.push_back(cg);
+    }
 }
 
 /*
-void TCgroupSnapshot::MountMissingControllers() {
-    for (auto c : create_subsystems) {
-        if (subsystems[c] == nullptr) {
-            TSubsystem *controller = new TSubsystem(c);
-            set<TSubsystem*> tmp = {controller};
-            auto cg = TRegistry<TRootCgroup>::Get(TRootCgroup(tmp));
-
-            cg->Mount();
-
-            root_cgroups[c] = cg;
-            subsystems[c] = controller;
-        }
-    }
-}
-
 void TCgroupSnapshot::MountMissingTmpfs(string tmpfs) {
     TMountSnapshot ms;
 
@@ -184,10 +189,9 @@ void TCgroupSnapshot::UmountAll() {
 */
 
 ostream& operator<<(ostream& os, const TCgroupSnapshot& st) {
-    for (auto ss : st.root_cgroups) {
-        os << ss.first << ":" << endl;
-        os << *ss.second << endl;
-    }
+    for (auto ss : st.cgroups)
+        if (ss->IsRoot())
+            os << *ss << endl;
 
     return os;
 }

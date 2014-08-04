@@ -6,13 +6,11 @@
 
 extern void dump_reg(void);
 int main() {
-    TMountSnapshot ms;
-    TMountSnapshot ms1;
-    {
-        TMountSnapshot ms2;
+    while (true) {
+        TCgroupSnapshot cgs;
+        cout << cgs << endl;
     }
-    dump_reg();
-
+ 
     return EXIT_SUCCESS;
 }
 

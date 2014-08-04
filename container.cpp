@@ -53,7 +53,7 @@ bool TContainer::Start()
     set<shared_ptr<TSubsystem>> set;
     set.insert(mem);
     set.insert(freezer);
-    auto rootmem = TRegistry<TRootCgroup>::Get(TRootCgroup(set));
+    auto rootmem = TRegistry<TCgroup>::Get(TCgroup(set));
     auto cg = TRegistry<TCgroup>::Get(TCgroup(name, rootmem));
     cgroups.push_back(cg);
 
