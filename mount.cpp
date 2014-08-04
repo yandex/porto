@@ -6,8 +6,6 @@
 
 using namespace std;
 
-TRegistry<TMount> registry;
-
 // from single /proc/self/mounts line, like:
 // /dev/sda1 /boot ext4 rw,seclabel,relatime,data=ordered 0 0
 TMount::TMount(string mounts_line) {
@@ -32,7 +30,7 @@ TMountState::TMountState() {
 
     for (auto line : f.AsLines()) {
         TMount m(line);
-        mounts.insert(registry.GetInstance(m));
+        mounts.insert(TRegistry<TMount>::Get(m));
     }
 }
 
@@ -48,5 +46,5 @@ ostream& operator<<(ostream& os, const TMountState& ms) {
 }
 
 void dump_reg(void) {
-    cerr << registry << endl;
+    cerr << TRegistry<TMount>::GetInstance() << endl;
 }

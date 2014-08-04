@@ -7,6 +7,7 @@
 
 #include "cgroup.hpp"
 #include "folder.hpp"
+#include "registry.hpp"
 
 using namespace std;
 
@@ -32,11 +33,13 @@ string TCgroup::Name() {
 void TCgroup::FindChildren() {
     TFolder f(Path());
 
-    // for (auto s : f.Subfolders()) {
-    //     auto cg = make_shared<TCgroup>(s, this, level + 1);
-    //     cg->FindChildren();
-    //     children.push_back(weak_ptr<TCgroup>(cg));
-    // }
+    for (auto s : f.Subfolders()) {
+        auto self = TRegistry<TCgroup>::Get(*this);
+
+        auto cg = TRegistry<TCgroup>::Get(TCgroup(s, self, level + 1));
+        cg->FindChildren();
+        children.push_back(weak_ptr<TCgroup>(cg));
+    }
 }
 
 string TCgroup::Path() {
@@ -92,8 +95,9 @@ TRootCgroup::TRootCgroup(set<TController*> controllers) :
     for (auto c : controllers)
         flags.insert(c->Name());
     
-    mount = make_shared<TMount>("cgroup", tmpfs + "/" + CommaSeparatedList(flags),
-                                "cgroup", 0, flags);
+    mount = TRegistry<TMount>::Get(TMount("cgroup", tmpfs + "/" +
+                                          CommaSeparatedList(flags),
+                                          "cgroup", 0, flags));
 }
 
 TRootCgroup::~TRootCgroup() {
@@ -141,7 +145,7 @@ TCgroupState::TCgroupState() {
             cg_controllers.insert(controllers[c]);
         }
 
-        root_cgroups[name] = make_shared<TRootCgroup>(m, cg_controllers);
+        root_cgroups[name] = TRegistry<TRootCgroup>::Get(TRootCgroup(m, cg_controllers));
         root_cgroups[name]->FindChildren();
     }
 }
@@ -155,7 +159,7 @@ void TCgroupState::MountMissingControllers() {
         if (controllers[c] == nullptr) {
             TController *controller = new TController(c);
             set<TController*> tmp = {controller};
-            auto cg = make_shared<TRootCgroup>(tmp);
+            auto cg = TRegistry<TRootCgroup>::Get(TRootCgroup(tmp));
 
             cg->Attach();
 

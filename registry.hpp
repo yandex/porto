@@ -2,14 +2,24 @@
 #define __REGISTRY_HPP__
 
 #include <list>
+#include <mutex>
 
 template <class T>
 class TRegistry {
     std::list<std::weak_ptr<T>> items;
     std::mutex mutex;
 
+    TRegistry() {};
+    TRegistry(const TRegistry &);
+    void operato(const TRegistry &);
+
 public:
-    std::shared_ptr<T> GetInstance(const T &item) {
+    static TRegistry &GetInstance() {
+        static TRegistry instance;
+        return instance;
+    }
+
+    std::shared_ptr<T> GetItem(const T &item) {
         std::lock_guard<std::mutex> lock(mutex);
 
         items.remove_if([] (std::weak_ptr<T> i) { return i.expired(); });
@@ -26,8 +36,12 @@ public:
         return n;
     }
 
-    friend ostream& operator<<(std::ostream& os, const TRegistry<T> &r) {
-        std::lock_guard<std::mutex> lock(mutex);
+    static std::shared_ptr<T> Get(const T &item) {
+        return TRegistry<T>::GetInstance().GetItem(item);
+    }
+
+    friend ostream& operator<<(std::ostream& os, TRegistry<T> &r) {
+        std::lock_guard<std::mutex> lock(r.mutex);
 
         for (auto m : r.items)
             os << m.use_count() << " " << *m.lock() << std::endl;
