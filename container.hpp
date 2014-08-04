@@ -31,8 +31,9 @@ class TContainer {
     // data
 
     bool CheckState(EContainerState expected);
+    string GetPropertyLocked(string property);
 
-    public:
+public:
     TContainer(const string name);
     ~TContainer();
 

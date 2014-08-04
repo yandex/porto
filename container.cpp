@@ -36,19 +36,15 @@ string TContainer::Name()
 
 bool TContainer::Start()
 {
-    {
-        lock_guard<mutex> guard(lock);
+    lock_guard<mutex> guard(lock);
 
-        if (!CheckState(Stopped))
-            return false;
-    }
+    if (!CheckState(Stopped))
+        return false;
 
     string command = GetProperty("command");
     string name = Name();
 
-    lock_guard<mutex> guard(lock); /* should not deadlock with GetProperty */
-
-    vector<TCgroup*> cgroups;
+    vector<shared_ptr<TCgroup> > cgroups;
 
     // TODO: get real cgroups list
 #if 0
@@ -157,15 +153,20 @@ string TContainer::GetData(string data)
     return "unknown";
 }
 
-string TContainer::GetProperty(string property)
+string TContainer::GetPropertyLocked(string property)
 {
-    lock_guard<mutex> guard(lock);
-
     auto val = properties.find(property);
     if (val == properties.end())
         return "";
 
     return val->second;
+}
+
+string TContainer::GetProperty(string property)
+{
+    lock_guard<mutex> guard(lock);
+
+    return GetPropertyLocked(property);
 }
 
 bool TContainer::SetProperty(string property, string value)
