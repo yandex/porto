@@ -4,20 +4,26 @@
 #include "kvalue.hpp"
 #include "cgroup.hpp"
 
+extern void dump_reg(void);
 int main() {
+    TMountState ms;
+    TMountState ms1;
+    {
+        TMountState ms2;
+    }
+    dump_reg();
+}
+
+int main3() {
     TCgroupState cgs;
 
     try {
-        cgs.UpdateFromProcfs();
         cgs.MountMissingTmpfs();
         cgs.MountMissingControllers();
 
-        cgs.UpdateFromProcfs();
         cout << cgs << endl;
 
         cgs.UmountAll();
-        cgs.UpdateFromProcfs();
-        cout << cgs << endl;
 
     } catch (const char *e) {
         cerr << e << endl;

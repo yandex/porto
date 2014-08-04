@@ -13,21 +13,21 @@ class TCgroup {
 protected:
     string name;
 private:
-    TCgroup *parent;
+    std::shared_ptr<TCgroup> parent;
     int level;
-    set<TCgroup*> children;
+    vector<std::weak_ptr<TCgroup> > children;
 
     mode_t mode = 0x666;
 
 public:
-    TCgroup(string name, TCgroup *parent, int level);
-    ~TCgroup();
+    TCgroup(string name, std::shared_ptr<TCgroup> parent, int level);
+    virtual ~TCgroup();
 
     void FindChildren();
     void DropChildren();
 
     string Name();
-    string Path();
+    virtual string Path();
 
     void Create();
     void Remove();
@@ -47,7 +47,7 @@ public:
 
 class TRootCgroup : public TCgroup {
     std::shared_ptr<TMount> mount;
-    set<TController*> controllers;
+    std::set<TController*> controllers;
 
     mode_t mode = 0x666;
     string tmpfs = "/sys/fs/cgroup";
@@ -55,31 +55,35 @@ class TRootCgroup : public TCgroup {
 public:
     TRootCgroup(std::shared_ptr<TMount> mount, set<TController*> controllers);
     TRootCgroup(set<TController*> controller);
-    ~TRootCgroup();
+    virtual ~TRootCgroup();
 
-    string Path();
+    virtual string Path();
 
     void Attach();
     void Detach();
 };
 
 class TCgroupState {
-    map<string, TRootCgroup*> root_cgroups; // can be net_cls,netprio
+    map<string, std::shared_ptr<TRootCgroup> > root_cgroups; // can be net_cls,netprio
     map<string, TController*> controllers; // can be net_cls _or_ net_prio
-
-    TMountState *ms;
 
 public:
     TCgroupState();
     ~TCgroupState();
-
-    void UpdateFromProcfs();
 
     void MountMissingTmpfs(string tmpfs = "/sys/fs/cgroup");
     void MountMissingControllers();
     void UmountAll();
 
     friend ostream& operator<<(ostream& os, const TCgroupState& st);
+};
+
+class TCgroupRegistry {
+    std::vector<std::weak_ptr<TCgroup>> cgroups;
+
+    std::shared_ptr<TCgroup> GetCgroup(std::string name,
+                                       std::shared_ptr<TCgroup> parent);
+    std::shared_ptr<TRootCgroup> GetRootCgroup();
 };
 
 #endif

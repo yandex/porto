@@ -18,20 +18,11 @@ set<string> create_subsystems = {"cpuset", "cpu", "cpuacct", "memory"};
 
 // TCgroup
 
-TCgroup::TCgroup(string name, TCgroup *parent = nullptr,
-                 int level = 0) : name(name), parent(parent),
-                                  level(level) {
-}
-
-void TCgroup::DropChildren() {
-    for (auto c : children)
-        delete c;
-
-    children.clear();
+TCgroup::TCgroup(string name, shared_ptr<TCgroup> parent, int level = 0) :
+    name(name), parent(parent), level(level) {
 }
 
 TCgroup::~TCgroup() {
-    DropChildren();
 }
 
 string TCgroup::Name() {
@@ -41,13 +32,11 @@ string TCgroup::Name() {
 void TCgroup::FindChildren() {
     TFolder f(Path());
 
-    DropChildren();
-
-    for (auto s : f.Subfolders()) {
-        TCgroup *cg = new TCgroup(s, this, level + 1);
-        cg->FindChildren();
-        children.insert(cg);
-    }
+    // for (auto s : f.Subfolders()) {
+    //     auto cg = make_shared<TCgroup>(s, this, level + 1);
+    //     cg->FindChildren();
+    //     children.push_back(weak_ptr<TCgroup>(cg));
+    // }
 }
 
 string TCgroup::Path() {
@@ -72,8 +61,9 @@ int TCgroup::Attach(int pid) {
 ostream& operator<<(ostream& os, const TCgroup& cg) {
     os << string(4 * cg.level, ' ') << cg.name << " {" << endl;
 
-    for (auto c : cg.children)
-        os << *c << endl;
+    for (auto c : cg.children) {
+        os << *c.lock() << endl;
+    }
 
     os << string(4 * cg.level, ' ') << "}";
 
@@ -91,11 +81,11 @@ string TController::Name() {
 // TRootCgroup
 TRootCgroup::TRootCgroup(shared_ptr<TMount> mount,
                          set<TController*> controllers) :
-    TCgroup("/", this, 0), mount(mount), controllers(controllers) {
+    TCgroup("/", shared_ptr<TCgroup>(nullptr), 0), mount(mount), controllers(controllers) {
 }
 
 TRootCgroup::TRootCgroup(set<TController*> controllers) :
-    TCgroup("/", this, 0), controllers(controllers) {
+    TCgroup("/", shared_ptr<TCgroup>(nullptr), 0), controllers(controllers) {
 
     set<string> flags;
 
@@ -130,23 +120,9 @@ void TRootCgroup::Detach() {
 
 // TCgroupState
 TCgroupState::TCgroupState() {
-    ms = new TMountState;
-}
+    TMountState ms;
 
-TCgroupState::~TCgroupState() {
-    for (auto c : root_cgroups)
-        delete c.second;
-    root_cgroups.clear();
-
-    delete ms;
-}
-
-void TCgroupState::UpdateFromProcfs() {
-    for (auto c : root_cgroups)
-        delete c.second;
-    root_cgroups.clear();
-
-    for (auto m : ms->Mounts()) {
+    for (auto m : ms.Mounts()) {
         set<string> flags = m->Flags();
         set<string> cs;
 
@@ -165,17 +141,21 @@ void TCgroupState::UpdateFromProcfs() {
             cg_controllers.insert(controllers[c]);
         }
 
-        TRootCgroup *cg = new TRootCgroup(m, cg_controllers);
-        cg->FindChildren();
-        root_cgroups[name] = cg;
+        root_cgroups[name] = make_shared<TRootCgroup>(m, cg_controllers);
+        root_cgroups[name]->FindChildren();
     }
+}
+
+TCgroupState::~TCgroupState() {
+    root_cgroups.clear();
 }
 
 void TCgroupState::MountMissingControllers() {
     for (auto c : create_subsystems) {
         if (controllers[c] == nullptr) {
             TController *controller = new TController(c);
-            TRootCgroup *cg = new TRootCgroup({controller});
+            set<TController*> tmp = {controller};
+            auto cg = make_shared<TRootCgroup>(tmp);
 
             cg->Attach();
 
@@ -186,7 +166,9 @@ void TCgroupState::MountMissingControllers() {
 }
 
 void TCgroupState::MountMissingTmpfs(string tmpfs) {
-    for (auto m : ms->Mounts())
+    TMountState ms;
+
+    for (auto m : ms.Mounts())
         if (m->Mountpoint() == tmpfs)
             return;
 
