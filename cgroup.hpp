@@ -27,13 +27,14 @@ public:
 
     void FindChildren();
 
-    std::string Name();
-    virtual string Path();
 
-    void Create();
-    void Remove();
+    virtual std::string Name();
+    virtual std::string Path();
 
-    TError Attach(int pid);
+    virtual void Create();
+    virtual void Remove();
+
+    virtual TError Attach(int pid);
 
     friend bool operator==(const TCgroup& c1, const TCgroup& c2) {
         return c1.name == c2.name && *c1.parent == *c2.parent;
@@ -54,9 +55,8 @@ public:
     TRootCgroup(set<std::shared_ptr<TSubsystem>> controller);
 
     virtual string Path();
-
-    void Mount();
-    void Detach();
+    virtual void Create();
+    virtual void Remove();
 };
 
 class TCgroupSnapshot {

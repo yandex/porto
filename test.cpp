@@ -17,18 +17,9 @@ int main() {
 }
 
 int main3() {
-    TCgroupSnapshot cgs;
-
     try {
-        /*
-        cgs.MountMissingTmpfs();
-        cgs.MountMissingControllers();
-        */
-
+        TCgroupSnapshot cgs;
         cout << cgs << endl;
-
-        //cgs.UmountAll();
-
     } catch (const char *e) {
         cerr << e << endl;
         return EXIT_FAILURE;

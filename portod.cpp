@@ -96,14 +96,6 @@ int main(int argc, const char *argv[])
         TContainerHolder cholder;
         TCgroupSnapshot cs;
 
-        /*
-        cs.MountMissingTmpfs();
-        cs.MountMissingControllers();
-        */
-
-        //cs.UmountAll();
-        //    cs.UpdateFromProcFs();
-
         return rpc_main(cholder);
     } catch (...) {
         return EXIT_FAILURE;

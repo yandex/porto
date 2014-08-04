@@ -47,6 +47,8 @@ string TCgroup::Path() {
 }
 
 void TCgroup::Create() {
+    parent->Create();
+
     TFolder f(Path());
     f.Create(mode);
 }
@@ -96,14 +98,14 @@ string TRootCgroup::Path() {
     return mount->Mountpoint();
 }
 
-void TRootCgroup::Mount() {
+void TRootCgroup::Create() {
     TFolder f(mount->Mountpoint());
     if (!f.Exists())
         f.Create(mode);
     mount->Mount();
 }
 
-void TRootCgroup::Detach() {
+void TRootCgroup::Remove() {
     TFolder f(mount->Mountpoint());
     mount->Umount();
     f.Remove();
