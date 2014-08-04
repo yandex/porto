@@ -35,6 +35,12 @@ public:
         return os;
     }
 
+    friend bool operator==(const TMount& m1, const TMount& m2) {
+        return m1.device == m2.device &&
+            m1.mountpoint == m2.mountpoint &&
+            m1.vfstype == m2.vfstype;
+    }
+
     const string Mountpoint() {
         return mountpoint;
     }
@@ -84,5 +90,12 @@ public:
     std::set<std::shared_ptr<TMount> > const& Mounts();
 
     friend ostream& operator<<(std::ostream& os, const TMountState& ms);
+};
+
+class TMountRegistry {
+    std::vector<std::weak_ptr<TMount>> mounts;
+
+public:
+    std::shared_ptr<TMount> GetMount(std::string mounts_line);
 };
 #endif
