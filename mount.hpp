@@ -108,12 +108,11 @@ class TRegistry {
 
 public:
     std::shared_ptr<T> GetInstance(const T &item) {
+        items.remove_if([] (std::weak_ptr<T> i) { return i.expired(); });
         for (auto i : items) {
             if (auto il = i.lock()) {
                 if (item == *il)
                     return il;
-            } else {
-                items.remove(i);
             }
         }
 

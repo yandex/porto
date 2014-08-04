@@ -25,7 +25,6 @@ public:
     virtual ~TCgroup();
 
     void FindChildren();
-    void DropChildren();
 
     string Name();
     virtual string Path();

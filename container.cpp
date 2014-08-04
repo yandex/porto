@@ -51,6 +51,7 @@ bool TContainer::Start()
     vector<TCgroup*> cgroups;
 
     // TODO: get real cgroups list
+#if 0
     if (false) {
         auto mem = new TController("memory");
         set<TController *> cset;
@@ -59,6 +60,7 @@ bool TContainer::Start()
         auto cg = new TCgroup(name, rootmem, rootmem);
         cgroups.push_back(cg);
     }
+#endif
 
     TTaskEnv taskEnv(command, "");
 
