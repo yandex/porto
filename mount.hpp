@@ -102,32 +102,4 @@ public:
     friend ostream& operator<<(std::ostream& os, const TMountRegistry& ms);
 };
 
-template <class T>
-class TRegistry {
-    std::list<std::weak_ptr<T>> items;
-
-public:
-    std::shared_ptr<T> GetInstance(const T &item) {
-        items.remove_if([] (std::weak_ptr<T> i) { return i.expired(); });
-        for (auto i : items) {
-            if (auto il = i.lock()) {
-                if (item == *il)
-                    return il;
-            }
-        }
-
-        auto n = make_shared<T>(item);
-        items.push_back(n);
-
-        return n;
-    }
-
-    friend ostream& operator<<(std::ostream& os, const TRegistry<T> &r) {
-        for (auto m : r.items)
-            os << m.use_count() << " " << *m.lock() << endl;
-
-        return os;
-    }
-
-};
 #endif

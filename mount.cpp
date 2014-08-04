@@ -2,6 +2,7 @@
 
 #include "mount.hpp"
 #include "file.hpp"
+#include "registry.hpp"
 
 using namespace std;
 
