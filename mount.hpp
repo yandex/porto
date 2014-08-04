@@ -93,13 +93,4 @@ public:
     friend ostream& operator<<(std::ostream& os, const TMountState& ms);
 };
 
-class TMountRegistry {
-    std::list<std::weak_ptr<TMount>> mounts;
-
-public:
-    std::shared_ptr<TMount> GetMount(std::string mounts_line);
-
-    friend ostream& operator<<(std::ostream& os, const TMountRegistry& ms);
-};
-
 #endif

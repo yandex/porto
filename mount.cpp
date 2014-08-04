@@ -47,28 +47,6 @@ ostream& operator<<(ostream& os, const TMountState& ms) {
     return os;
 }
 
-shared_ptr<TMount> TMountRegistry::GetMount(string mounts_line) {
-    auto tmp = make_shared<TMount>(mounts_line);
-
-    for (auto mount : mounts) {
-        if (auto m = mount.lock()) {
-            if (*tmp == *m)
-                return m;
-        } // TODO
-    }
-
-    mounts.push_back(tmp);
-
-    return tmp;
-}
-
-ostream& operator<<(std::ostream& os, const TMountRegistry& ms) {
-    for (auto m : ms.mounts)
-        os << m.use_count() << " " << *m.lock() << endl;
-    
-    return os;
-}
-
 void dump_reg(void) {
     cerr << registry << endl;
 }

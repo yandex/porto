@@ -78,12 +78,4 @@ public:
     friend ostream& operator<<(ostream& os, const TCgroupState& st);
 };
 
-class TCgroupRegistry {
-    std::vector<std::weak_ptr<TCgroup>> cgroups;
-
-    std::shared_ptr<TCgroup> GetCgroup(std::string name,
-                                       std::shared_ptr<TCgroup> parent);
-    std::shared_ptr<TRootCgroup> GetRootCgroup();
-};
-
 #endif
