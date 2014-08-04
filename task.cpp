@@ -106,7 +106,7 @@ bool TTask::Start() {
 
     int n = read(rfd, &ret, sizeof(ret));
     if (n < 0) {
-        TLogger::LogAction("read child status failed", true, errno);
+        TLogger::LogAction("read child status failed", false, errno);
         exitStatus.error = errno;
         return false;
     } else if (n == 0) {
@@ -114,7 +114,7 @@ bool TTask::Start() {
         this->pid = pid;
         return true;
     } else {
-        TLogger::LogAction("got status from child", true, errno);
+        TLogger::LogAction("got status from child", false, errno);
         (void)waitpid(pid, NULL, WNOHANG);
         exitStatus.error = ret;
         return false;

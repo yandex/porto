@@ -4,6 +4,8 @@
 #include "containerenv.hpp"
 #include "task.hpp"
 
+#include "cgroup.hpp"
+
 TContainer::TContainer(const string name) : name(name), state(Stopped)
 {
 }
@@ -42,10 +44,22 @@ bool TContainer::Start()
     }
 
     string command = GetProperty("command");
+    string name = Name();
 
     lock_guard<mutex> guard(lock); /* should not deadlock with GetProperty */
 
-    std::vector<TCgroup*> cgroups;
+    vector<TCgroup*> cgroups;
+
+    // TODO: get real cgroups list
+    if (false) {
+        auto mem = new TController("memory");
+        set<TController *> cset;
+        cset.insert(mem);
+        auto rootmem = new TRootCgroup(cset);
+        auto cg = new TCgroup(name, rootmem, rootmem);
+        cgroups.push_back(cg);
+    }
+
     TTaskEnv taskEnv(command, "");
 
     auto *env = new TContainerEnv(cgroups, taskEnv);
@@ -70,6 +84,12 @@ bool TContainer::Stop()
         task->Kill();
     delete task;
     task = nullptr;
+
+    // TODO: freeze and kill all other processes if any
+    // Pause()
+    // for each pid in cgroup:
+    // auto task = TTask(pid)
+    // task.kill()
 
     state = Stopped;
     return true;

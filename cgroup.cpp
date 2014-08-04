@@ -18,8 +18,15 @@ set<string> create_subsystems = {"cpuset", "cpu", "cpuacct", "memory"};
 
 // TCgroup
 
-TCgroup::TCgroup(string name, shared_ptr<TCgroup> parent, int level = 0) :
+TCgroup::TCgroup(string name, shared_ptr<TCgroup> parent, int level) :
     name(name), parent(parent), level(level) {
+}
+
+void TCgroup::DropChildren() {
+    for (auto c : children)
+        delete c;
+
+    children.clear();
 }
 
 TCgroup::~TCgroup() {

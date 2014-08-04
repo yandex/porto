@@ -21,7 +21,7 @@ private:
     mode_t mode = 0x666;
 
 public:
-    TCgroup(string name, std::shared_ptr<TCgroup> parent, int level);
+    TCgroup(string name, std::shared_ptr<TCgroup> parent, int level = 0);
     virtual ~TCgroup();
 
     void FindChildren();
@@ -34,7 +34,7 @@ public:
     void Remove();
 
     TError Attach(int pid);
-    
+
     friend ostream& operator<<(ostream& os, const TCgroup& cg);
 };
 

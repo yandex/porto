@@ -656,9 +656,13 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    for (ICmd *cmd : commands)
-        if (cmd->GetName() == name)
-            return cmd->Execute(argc, argv);
+    try {
+        for (ICmd *cmd : commands)
+            if (cmd->GetName() == name)
+                return cmd->Execute(argc, argv);
+    } catch (const char *err) {
+        cerr << err << endl;
+    }
 
     return EXIT_FAILURE;
 }
