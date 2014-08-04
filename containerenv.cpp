@@ -37,14 +37,14 @@ string TTaskEnv::GetCwd() {
 }
 
 void TContainerEnv::Create() {
-    for (auto cg : cgroups)
+    for (auto cg : leaf_cgroups)
         cg->Create();
 }
 
 TError TContainerEnv::Attach() {
     pid_t self = getpid();
 
-    for (auto cg : cgroups) {
+    for (auto cg : leaf_cgroups) {
         auto error = cg->Attach(self);
         if (!error.Ok())
             return error;

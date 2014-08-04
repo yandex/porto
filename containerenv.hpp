@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <string>
+#include <memory>
 
 #include "error.hpp"
 
@@ -22,7 +23,7 @@ public:
 };
 
 class TContainerEnv {
-    std::vector<TCgroup*> cgroups;
+    std::vector<std::shared_ptr<TCgroup> > leaf_cgroups;
     // namespaces
     // virtual devices
     // ...
@@ -30,8 +31,8 @@ class TContainerEnv {
 public:
     TTaskEnv taskEnv;
 
-    TContainerEnv(std::vector<TCgroup*> &cgroups,
-                  TTaskEnv &taskEnv) : cgroups(cgroups), taskEnv(taskEnv) {
+    TContainerEnv(std::vector<std::shared_ptr<TCgroup> > &cgroups,
+                  TTaskEnv &taskEnv) : leaf_cgroups(cgroups), taskEnv(taskEnv) {
     }
 
     void Create();
