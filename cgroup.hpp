@@ -8,25 +8,26 @@
 #include "error.hpp"
 #include "mount.hpp"
 #include "folder.hpp"
+#include "subsystem.hpp"
 
 class TRootCgroup;
 class TCgroup {
 protected:
-    string name;
+    std::string name;
 private:
     std::shared_ptr<TCgroup> parent;
     int level;
-    vector<std::weak_ptr<TCgroup> > children;
+    vector<std::weak_ptr<TCgroup>> children;
 
     mode_t mode = 0x666;
 
 public:
-    TCgroup(string name, std::shared_ptr<TCgroup> parent, int level = 0);
+    TCgroup(std::string name, std::shared_ptr<TCgroup> parent, int level = 0);
     virtual ~TCgroup();
 
     void FindChildren();
 
-    string Name();
+    std::string Name();
     virtual string Path();
 
     void Create();
@@ -41,28 +42,16 @@ public:
     friend ostream& operator<<(ostream& os, const TCgroup& cg);
 };
 
-class TController {
-    string name;
-
-public:
-    TController(string name);
-    string Name();
-
-    friend bool operator==(const TController& c1, const TController& c2) {
-        return c1.name == c2.name;
-    }
-};
-
 class TRootCgroup : public TCgroup {
     std::shared_ptr<TMount> mount;
-    std::set<std::shared_ptr<TController>> controllers;
+    std::set<std::shared_ptr<TSubsystem>> subsystems;
 
     mode_t mode = 0x666;
-    string tmpfs = "/sys/fs/cgroup";
+    std::string tmpfs = "/sys/fs/cgroup";
 
 public:
-    TRootCgroup(std::shared_ptr<TMount> mount, set<std::shared_ptr<TController>> controllers);
-    TRootCgroup(set<std::shared_ptr<TController>> controller);
+    TRootCgroup(std::shared_ptr<TMount> mount, set<std::shared_ptr<TSubsystem>> subsystems);
+    TRootCgroup(set<std::shared_ptr<TSubsystem>> controller);
 
     virtual string Path();
 
@@ -71,8 +60,8 @@ public:
 };
 
 class TCgroupSnapshot {
-    map<string, std::shared_ptr<TRootCgroup>> root_cgroups; // can be net_cls,netprio
-    map<string, std::shared_ptr<TController>> controllers; // can be net_cls _or_ net_prio
+    std::map<string, std::shared_ptr<TRootCgroup>> root_cgroups; // can be net_cls,netprio
+    std::map<string, std::shared_ptr<TSubsystem>> subsystems; // can be net_cls _or_ net_prio
 
 public:
     TCgroupSnapshot();

@@ -11,9 +11,9 @@
 
 using namespace std;
 
-set<string> subsystems = {"cpuset", "cpu", "cpuacct", "memory", "devices",
-                          "freezer", "net_cls", "net_prio", "blkio",
-                          "perf_event", "hugetlb", "name=systemd"};
+set<string> supported_subsystems = {"cpuset", "cpu", "cpuacct", "memory",
+    "devices", "freezer", "net_cls", "net_prio", "blkio",
+    "perf_event", "hugetlb", "name=systemd"};
 
 set<string> create_subsystems = {"cpuset", "cpu", "cpuacct", "memory"};
 
@@ -73,28 +73,20 @@ ostream& operator<<(ostream& os, const TCgroup& cg) {
     return os;
 }
 
-// TController
-TController::TController(string name) : name(name) {
-}
-
-string TController::Name() {
-    return name;
-}
-
 // TRootCgroup
 TRootCgroup::TRootCgroup(shared_ptr<TMount> mount,
-                         set<shared_ptr<TController>> controllers) :
-    TCgroup("/", shared_ptr<TCgroup>(nullptr), 0), mount(mount), controllers(controllers) {
+                         set<shared_ptr<TSubsystem>> subsystems) :
+    TCgroup("/", shared_ptr<TCgroup>(nullptr), 0), mount(mount), subsystems(subsystems) {
 }
 
-TRootCgroup::TRootCgroup(set<shared_ptr<TController>> controllers) :
-    TCgroup("/", shared_ptr<TCgroup>(nullptr), 0), controllers(controllers) {
+TRootCgroup::TRootCgroup(set<shared_ptr<TSubsystem>> subsystems) :
+    TCgroup("/", shared_ptr<TCgroup>(nullptr), 0), subsystems(subsystems) {
 
     set<string> flags;
 
-    for (auto c : controllers)
+    for (auto c : subsystems)
         flags.insert(c->Name());
-    
+
     mount = TRegistry<TMount>::Get(TMount("cgroup", tmpfs + "/" +
                                           CommaSeparatedList(flags),
                                           "cgroup", 0, flags));
@@ -126,7 +118,7 @@ TCgroupSnapshot::TCgroupSnapshot() {
         set<string> cs;
 
         set_intersection(flags.begin(), flags.end(),
-                         subsystems.begin(), subsystems.end(),
+                         supported_subsystems.begin(), supported_subsystems.end(),
                          inserter(cs, cs.begin()));
 
         if (cs.size() == 0)
@@ -134,10 +126,10 @@ TCgroupSnapshot::TCgroupSnapshot() {
 
         string name = CommaSeparatedList(cs);
 
-        set<shared_ptr<TController>> cg_controllers;
+        set<shared_ptr<TSubsystem>> cg_controllers;
         for (auto c : cs) {
-            controllers[c] = TRegistry<TController>::Get(TController(name));
-            cg_controllers.insert(controllers[c]);
+            subsystems[c] = TRegistry<TSubsystem>::Get(TSubsystem(name));
+            cg_controllers.insert(subsystems[c]);
         }
 
         root_cgroups[name] = TRegistry<TRootCgroup>::Get(TRootCgroup(m, cg_controllers));
@@ -152,15 +144,15 @@ TCgroupSnapshot::~TCgroupSnapshot() {
 /*
 void TCgroupSnapshot::MountMissingControllers() {
     for (auto c : create_subsystems) {
-        if (controllers[c] == nullptr) {
-            TController *controller = new TController(c);
-            set<TController*> tmp = {controller};
+        if (subsystems[c] == nullptr) {
+            TSubsystem *controller = new TSubsystem(c);
+            set<TSubsystem*> tmp = {controller};
             auto cg = TRegistry<TRootCgroup>::Get(TRootCgroup(tmp));
 
             cg->Mount();
 
             root_cgroups[c] = cg;
-            controllers[c] = controller;
+            subsystems[c] = controller;
         }
     }
 }

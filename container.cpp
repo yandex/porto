@@ -50,8 +50,8 @@ bool TContainer::Start()
     //TCgroupSnapshot cs;
 #if 0
     if (false) {
-        auto mem = new TController("memory");
-        set<TController *> cset;
+        auto mem = new TSubsys("memory");
+        set<TSubsys *> cset;
         cset.insert(mem);
         auto rootmem = new TRootCgroup(cset);
         auto cg = new TCgroup(name, rootmem, rootmem);
