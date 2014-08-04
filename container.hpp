@@ -9,14 +9,12 @@
 
 #include "kvalue.hpp"
 
-using namespace std;
-
 class TTask;
 
 class TContainer {
-    const string name;
+    const std::string name;
 
-    mutex lock;
+    std::mutex lock;
     enum EContainerState {
         Stopped,
         Running,
@@ -25,16 +23,15 @@ class TContainer {
     };
     EContainerState state;
     TTask *task;
-    map<string, string> properties;
+    std::map<std::string, std::string> properties;
 
-    mutex _data_lock;
+    std::mutex _data_lock;
     // data
 
     bool CheckState(EContainerState expected);
     string GetPropertyLocked(string property);
 
-public:
-    TContainer(const string name);
+    TContainer(const std::string name);
     ~TContainer();
 
     string Name();
@@ -44,23 +41,23 @@ public:
     bool Pause();
     bool Resume();
 
-    string GetProperty(string property);
-    bool SetProperty(string property, string value);
+    std::string GetProperty(std::string property);
+    bool SetProperty(std::string property, std::string value);
 
-    string GetData(string data);
+    string GetData(std::string data);
 };
 
 class TContainerHolder {
-    mutex lock;
-    map <string, TContainer*> containers;
+    std::mutex lock;
+    std::map <std::string, TContainer*> containers;
 
     public:
-    TContainer* Create(string name);
-    TContainer* Find(string name);
+    TContainer* Create(std::string name);
+    TContainer* Find(std::string name);
 
-    void Destroy(string name);
+    void Destroy(std::string name);
 
-    vector<string> List();
+    vector<std::string> List();
 };
 
 #endif
