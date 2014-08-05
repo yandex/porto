@@ -165,6 +165,15 @@ bool TContainer::SetProperty(string property, string value)
     return true;
 }
 
+// TContainerHolder
+TContainerHolder::TContainerHolder() {
+    Create("/");
+}
+
+TContainerHolder::~TContainerHolder() {
+    Destroy("/");
+}
+
 shared_ptr<TContainer> TContainerHolder::Create(string name)
 {
     if (containers[name] == nullptr)

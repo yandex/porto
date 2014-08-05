@@ -49,6 +49,9 @@ class TContainerHolder {
     std::map <std::string, std::shared_ptr<TContainer> > containers;
 
 public:
+    TContainerHolder();
+    ~TContainerHolder();
+
     std::shared_ptr<TContainer> Create(std::string name);
     std::shared_ptr<TContainer> Find(std::string name);
 
