@@ -13,7 +13,11 @@ shared_ptr<TCgroup> TCgroup::Get(string name, shared_ptr<TCgroup> parent) {
     return TRegistry<TCgroup>::Get(TCgroup(name, parent));
 }
 
-shared_ptr<TCgroup> TCgroup::Get(shared_ptr<TSubsystem> subsystem) {
+shared_ptr<TCgroup> TCgroup::GetRoot(std::shared_ptr<TMount> mount, std::vector<std::shared_ptr<TSubsystem>> subsystems) {
+    return TRegistry<TCgroup>::Get(TCgroup(mount, subsystems));
+}
+
+shared_ptr<TCgroup> TCgroup::GetRoot(shared_ptr<TSubsystem> subsystem) {
     return TRegistry<TCgroup>::Get(TCgroup({subsystem}));
 }
 
@@ -66,6 +70,9 @@ vector<pid_t> TCgroup::Tasks() {
     return PidsFromLine(GetKnobValue("tasks"));
 }
 
+bool TCgroup::IsEmpty() {
+    return Tasks().empty();
+}
 
 bool TCgroup::IsRoot() const {
     return !parent;
@@ -106,8 +113,12 @@ void TCgroup::Create() {
 }
 
 void TCgroup::Remove() {
-    if (IsRoot())
+    if (IsRoot()) {
         mount->Umount();
+    } else {
+        if (!IsEmpty())
+            return;
+    }
 
     TFolder f(Path());
     f.Remove();
@@ -192,7 +203,7 @@ TCgroupSnapshot::TCgroupSnapshot() {
             cg_controllers.push_back(subsystems[c]);
         }
 
-        auto root = TRegistry<TCgroup>::Get(TCgroup(mount, cg_controllers));
+        auto root = TCgroup::GetRoot(mount, cg_controllers);
         cgroups.push_back(root);
 
         for (auto cg : root->FindChildren())

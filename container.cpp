@@ -48,7 +48,7 @@ bool TContainer::IsRoot() {
 }
 
 vector<pid_t> TContainer::Processes() {
-    auto cg = TCgroup::Get(name, TCgroup::Get(TSubsystem::Freezer()));
+    auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
     return cg->Processes();
 }
 
@@ -62,11 +62,11 @@ bool TContainer::Start()
         return false;
 
     if (IsRoot()) {
-        leaf_cgroups.push_back(TCgroup::Get(TSubsystem::Memory()));
-        leaf_cgroups.push_back(TCgroup::Get(TSubsystem::Freezer()));
+        leaf_cgroups.push_back(TCgroup::GetRoot(TSubsystem::Memory()));
+        leaf_cgroups.push_back(TCgroup::GetRoot(TSubsystem::Freezer()));
     } else {
-        leaf_cgroups.push_back(TCgroup::Get(name, TCgroup::Get(TSubsystem::Memory())));
-        leaf_cgroups.push_back(TCgroup::Get(name, TCgroup::Get(TSubsystem::Freezer())));
+        leaf_cgroups.push_back(TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Memory())));
+        leaf_cgroups.push_back(TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer())));
     }
 
     for (auto cg : leaf_cgroups)
@@ -123,7 +123,7 @@ bool TContainer::Kill(int signal)
     if (name == "/")
         return false;
 
-    auto cg = TCgroup::Get(name, TCgroup::Get(TSubsystem::Freezer()));
+    auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
     for (auto t : cg->Tasks()) {
         TTask task(t);
         task.Kill(signal);
@@ -137,7 +137,7 @@ bool TContainer::Pause()
     if (name == "/" || !CheckState(Running))
         return false;
 
-    auto cg = TCgroup::Get(name, TCgroup::Get(TSubsystem::Freezer()));
+    auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
     TSubsystem::Freezer()->Freeze(*cg);
 
     state = Paused;
@@ -149,7 +149,7 @@ bool TContainer::Resume()
     if (!CheckState(Paused))
         return false;
 
-    auto cg = TCgroup::Get(name, TCgroup::Get(TSubsystem::Freezer()));
+    auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
     TSubsystem::Freezer()->Unfreeze(*cg);
 
     state = Running;

@@ -24,7 +24,8 @@ class TCgroup {
 public:
     static std::shared_ptr<TCgroup> Get(std::string name,
                                               std::shared_ptr<TCgroup> parent);
-    static std::shared_ptr<TCgroup> Get(std::shared_ptr<TSubsystem> subsystem);
+    static std::shared_ptr<TCgroup> GetRoot(std::shared_ptr<TMount> mount, std::vector<std::shared_ptr<TSubsystem>> subsystems);
+    static std::shared_ptr<TCgroup> GetRoot(std::shared_ptr<TSubsystem> subsystem);
 
     TCgroup(std::string name, std::shared_ptr<TCgroup> parent, int level = 0);
     TCgroup(std::shared_ptr<TMount> mount, vector<std::shared_ptr<TSubsystem>> subsystems);
@@ -41,6 +42,7 @@ public:
 
     std::vector<pid_t> Processes();
     std::vector<pid_t> Tasks();
+    bool IsEmpty();
 
     TError Attach(int pid);
 
