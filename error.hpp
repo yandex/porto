@@ -1,23 +1,22 @@
 #ifndef __ERROR_HPP__
 #define __ERROR_HPP__
 
+#include <string>
+
 class TError {
     int error;
+    std::string msg;
 
 public:
-    TError() : error(0) {
-    }
+    TError();
+    TError(const std::string &msg);
+    TError(int error, const std::string &msg = "");
 
-    TError(int error) : error(error) {
-    }
+    // return true if non-successful
+    operator bool() const;
 
-    bool Ok() {
-        return error == 0;
-    }
-
-    int GetError() {
-        return error;
-    }
+    int GetError();
+    const std::string &GetMsg();
 };
 
 #endif

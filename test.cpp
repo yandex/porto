@@ -6,7 +6,7 @@
 #include "cgroup.hpp"
 
 extern void dump_reg(void);
-int main() {
+int main2() {
     while (true) {
         TCgroupSnapshot cgs;
         cout << cgs << endl;
@@ -30,12 +30,8 @@ int main3() {
     return EXIT_SUCCESS;
 }
 
-int main2() {
+int main() {
     try {
-        TKeyValueStorage st;
-
-        st.MountTmpfs();
-
         map<string, map<string, string> >data =
             {{"basesearch_1",
               {{"memory_guarantee", "10G"},
@@ -55,20 +51,42 @@ int main2() {
                {"memory_guarantee", "500M"},
                {"policy", "batch"}}}};
 
+        TKeyValueStorage st;
+        st.MountTmpfs();
+
         for (auto node : data) {
-            st.CreateNode(node.first);
+            kv::TNode wr;
 
-            for (auto key : node.second)
-                st.Save(node.first, key.first, key.second);
+            for (auto key : node.second) {
+                auto pair = wr.add_pairs();
+                pair->set_key(key.first);
+                pair->set_val(key.second);
+            }
 
-            for (auto key : node.second)
-                if (st.Load(node.first, key.first) != key.second)
-                    throw;
+            TError error = st.SaveNode(node.first, wr);
+            if (error)
+                throw error.GetMsg();
+
+            kv::TNode rd;
+            error = st.LoadNode(node.first, rd);
+            if (error)
+                throw error;
+
+            int i = 0;
+            for (auto key : node.second) {
+                auto pair = rd.pairs(i);
+
+                if (pair.key() != key.first ||
+                    pair.val() != key.second)
+                    throw string("Invalid serialized data!");
+
+                i++;
+            }
 
             st.RemoveNode(node.first);
         }
     } catch (string e) {
-        cerr << e << endl;
+        cerr << "Error: " << e << endl;
         return EXIT_FAILURE;
     } catch (...) {
         cerr << "Error!" << endl;

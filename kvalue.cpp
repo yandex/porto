@@ -1,7 +1,14 @@
 #include "kvalue.hpp"
-
-#include "folder.hpp"
 #include "file.hpp"
+#include "folder.hpp"
+#include "protobuf.hpp"
+
+extern "C" {
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+}
 
 using namespace std;
 
@@ -13,19 +20,41 @@ string TKeyValueStorage::Path(string name) {
     return tmpfs.Mountpoint() + "/" + name;
 }
 
-string TKeyValueStorage::Path(string name, string key) {
-    return Path(name) + "/" + key;
+TError TKeyValueStorage::LoadNode(std::string name, kv::TNode &node)
+{
+    int fd = open(Path(name).c_str(), O_RDONLY);
+    node.Clear();
+    TError error;
+    try {
+        google::protobuf::io::FileInputStream pist(fd);
+        if (!readDelimitedFrom(&pist, &node)) {
+            error = TError("protobuf read error");
+        }
+    } catch (...) {
+        error = TError("unhandled exception");
+    }
+    close(fd);
+    return error;
 }
 
-bool TKeyValueStorage::ValidName(string name) {
-    if (name.size() > 0 && name[0] != '.')
-        return true;
-
-    return false;
+TError TKeyValueStorage::SaveNode(std::string name, const kv::TNode &node)
+{
+    int fd = open(Path(name).c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0755);
+    TError error;
+    try {
+        google::protobuf::io::FileOutputStream post(fd);
+        if (!writeDelimitedTo(node, &post))
+            error = TError("protobuf write error");
+    } catch (...) {
+        error = TError("unhandled exception");
+    }
+    close(fd);
+    return error;
 }
 
-string TKeyValueStorage::RemovingName(string name) {
-    return "." + name;
+void TKeyValueStorage::RemoveNode(std::string name) {
+    TFile node(Path(name));
+    node.Remove();
 }
 
 void TKeyValueStorage::MountTmpfs() {
@@ -40,46 +69,4 @@ void TKeyValueStorage::MountTmpfs() {
         mnt.Create();
 
     tmpfs.Mount();
-}
-
-void TKeyValueStorage::CreateNode(string name) {
-    if (!ValidName(name))
-        throw "Invalid node name";
-
-    TFolder node(Path(name));
-    if (!node.Exists())
-        node.Create();
-}
-
-void TKeyValueStorage::RemoveNode(string name) {
-    TFolder node(Path(name));
-    if (node.Exists()) {
-        // rename to .name to be atomic
-        node.Rename(RemovingName(name));
-        node.Remove(true);
-    }
-}
-
-void TKeyValueStorage::Save(string node, string key, string value) {
-    TFile f(Path(node, key));
-
-    f.WriteStringNoAppend(value);
-}
-
-string TKeyValueStorage::Load(string node, string key) {
-    TFile f(Path(node, key));
-
-    return f.AsString();
-}
-
-std::vector<std::string> TKeyValueStorage::ListNodes() {
-    TFolder f(tmpfs.Mountpoint());
-
-    return f.Items(TFile::Directory);
-}
-
-std::vector<std::string> TKeyValueStorage::ListKeys(std::string node) {
-    TFolder f(Path(node));
-
-    return f.Items(TFile::Regular);
 }
