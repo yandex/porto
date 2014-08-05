@@ -36,7 +36,7 @@ bool TContainer::Start()
     if (!CheckState(Stopped))
         return false;
 
-    string command = GetPropertyLocked("command");
+    string command = GetProperty("command");
     string name = Name();
 
     vector<shared_ptr<TCgroup> > cgroups;
@@ -140,18 +140,13 @@ string TContainer::GetData(string data)
     return "unknown";
 }
 
-string TContainer::GetPropertyLocked(string property)
+string TContainer::GetProperty(string property)
 {
     auto val = properties.find(property);
     if (val == properties.end())
         return "";
 
     return val->second;
-}
-
-string TContainer::GetProperty(string property)
-{
-    return GetPropertyLocked(property);
 }
 
 bool TContainer::SetProperty(string property, string value)

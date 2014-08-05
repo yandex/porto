@@ -26,7 +26,6 @@ class TContainer {
 
     // data
     bool CheckState(EContainerState expected);
-    string GetPropertyLocked(string property);
 
 public:
     TContainer(const std::string name);
