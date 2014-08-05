@@ -3,6 +3,7 @@
 
 #include <list>
 #include <iostream>
+#include <memory>
 
 template <class T>
 class TRegistry {
@@ -28,7 +29,7 @@ public:
             }
         }
 
-        auto n = make_shared<T>(item);
+        auto n = std::make_shared<T>(item);
         items.push_back(n);
 
         return n;
@@ -38,7 +39,7 @@ public:
         return TRegistry<T>::GetInstance().GetItem(item);
     }
 
-    friend ostream& operator<<(std::ostream& os, TRegistry<T> &r) {
+    friend std::ostream& operator<<(std::ostream& os, TRegistry<T> &r) {
         for (auto m : r.items)
             os << m.use_count() << " " << *m.lock() << std::endl;
 

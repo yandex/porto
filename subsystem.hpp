@@ -3,11 +3,16 @@
 
 #include <ostream>
 #include <string>
+#include <memory>
 
 class TSubsystem {
     std::string name;
 
 public:
+    static std::shared_ptr<TSubsystem> Memory();
+    static std::shared_ptr<TSubsystem> Freezer();
+    static std::shared_ptr<TSubsystem> Cpu();
+    
     TSubsystem(std::string name);
     std::string Name();
 
