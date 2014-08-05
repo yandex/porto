@@ -48,17 +48,12 @@ bool TContainer::Start()
 
     vector<shared_ptr<TCgroup> > cgroups;
 
-    auto rootmem = TRegistry<TCgroup>::Get(TCgroup({TSubsystem::Memory()}));
-    auto rootfreezer = TRegistry<TCgroup>::Get(TCgroup({TSubsystem::Freezer()}));
-
     if (IsRoot()) {
-        cgroups.push_back(rootmem);
-        cgroups.push_back(rootfreezer);
+        cgroups.push_back(TCgroup::Get(TSubsystem::Memory()));
+        cgroups.push_back(TCgroup::Get(TSubsystem::Freezer()));
     } else {
-        auto memcg = TRegistry<TCgroup>::Get(TCgroup(name, rootmem));
-        auto freezercg = TRegistry<TCgroup>::Get(TCgroup(name, rootfreezer));
-        cgroups.push_back(memcg);
-        cgroups.push_back(freezercg);
+        cgroups.push_back(TCgroup::Get(name, TCgroup::Get(TSubsystem::Memory())));
+        cgroups.push_back(TCgroup::Get(name, TCgroup::Get(TSubsystem::Freezer())));
     }
 
     env = make_shared<TContainerEnv>(cgroups);

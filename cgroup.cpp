@@ -12,6 +12,13 @@
 using namespace std;
 
 // TCgroup
+shared_ptr<TCgroup> TCgroup::Get(string name, shared_ptr<TCgroup> parent) {
+    return TRegistry<TCgroup>::Get(TCgroup(name, parent));
+}
+
+shared_ptr<TCgroup> TCgroup::Get(shared_ptr<TSubsystem> subsystem) {
+    return TRegistry<TCgroup>::Get(TCgroup({subsystem}));
+}
 
 TCgroup::TCgroup(string name, shared_ptr<TCgroup> parent, int level) :
     name(name), parent(parent), level(level) {

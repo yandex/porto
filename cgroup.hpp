@@ -22,6 +22,10 @@ class TCgroup {
     mode_t mode = 0x666;
 
 public:
+    static std::shared_ptr<TCgroup> Get(std::string name,
+                                              std::shared_ptr<TCgroup> parent);
+    static std::shared_ptr<TCgroup> Get(std::shared_ptr<TSubsystem> subsystem);
+
     TCgroup(std::string name, std::shared_ptr<TCgroup> parent, int level = 0);
     TCgroup(std::shared_ptr<TMount> mount, vector<std::shared_ptr<TSubsystem>> subsystems);
     TCgroup(std::vector<std::shared_ptr<TSubsystem>> controller);
