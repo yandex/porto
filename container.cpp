@@ -1,8 +1,10 @@
+#include <sys/types.h>
+#include <unistd.h>
+
 #include <sstream>
 #include <memory>
 
 #include "container.hpp"
-#include "containerenv.hpp"
 #include "task.hpp"
 #include "cgroup.hpp"
 #include "registry.hpp"
@@ -43,27 +45,33 @@ bool TContainer::Start()
     if (!CheckState(Stopped))
         return false;
 
-    string command = GetProperty("command");
-    string name = Name();
-
-    vector<shared_ptr<TCgroup> > cgroups;
-
     if (IsRoot()) {
-        cgroups.push_back(TCgroup::Get(TSubsystem::Memory()));
-        cgroups.push_back(TCgroup::Get(TSubsystem::Freezer()));
+        leaf_cgroups.push_back(TCgroup::Get(TSubsystem::Memory()));
+        leaf_cgroups.push_back(TCgroup::Get(TSubsystem::Freezer()));
     } else {
-        cgroups.push_back(TCgroup::Get(name, TCgroup::Get(TSubsystem::Memory())));
-        cgroups.push_back(TCgroup::Get(name, TCgroup::Get(TSubsystem::Freezer())));
+        leaf_cgroups.push_back(TCgroup::Get(name, TCgroup::Get(TSubsystem::Memory())));
+        leaf_cgroups.push_back(TCgroup::Get(name, TCgroup::Get(TSubsystem::Freezer())));
     }
 
-    env = make_shared<TContainerEnv>(cgroups);
-    env->Create();
+    for (auto cg : leaf_cgroups)
+        cg->Create();
 
     if (IsRoot())
         return true;
 
-    TTaskEnv taskEnv(command, "");
-    task = make_shared<TTask>(taskEnv, [this](){env->Attach();});
+    TTaskEnv taskEnv(GetProperty("command"), "");
+    task = unique_ptr<TTask>(new TTask(taskEnv, [this] () {
+            pid_t self = getpid();
+
+            for (auto cg : leaf_cgroups) {
+                auto error = cg->Attach(self);
+                if (!error.Ok())
+                    return error;
+            }
+
+            return TError();
+        }));
+
     bool ret = task->Start();
     if (ret)
         state = Running;

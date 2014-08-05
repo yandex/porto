@@ -10,6 +10,7 @@
 #include "kvalue.hpp"
 
 class TTask;
+class TCgroup;
 class TContainerEnv;
 
 class TContainer {
@@ -25,8 +26,8 @@ class TContainer {
 
     std::map<std::string, std::string> properties;
 
-    std::shared_ptr<TContainerEnv> env;
-    std::shared_ptr<TTask> task;
+    std::vector<std::shared_ptr<TCgroup> > leaf_cgroups;
+    std::unique_ptr<TTask> task;
 
     // data
     bool CheckState(EContainerState expected);
