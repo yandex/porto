@@ -60,12 +60,12 @@ bool TContainer::Start()
         return true;
 
     TTaskEnv taskEnv(GetProperty("command"), "");
-    task = unique_ptr<TTask>(new TTask(taskEnv, [this] () {
+    task = unique_ptr<TTask>(new TTask(taskEnv, [&this->leaf_cgroups] () {
             pid_t self = getpid();
 
             for (auto cg : leaf_cgroups) {
                 auto error = cg->Attach(self);
-                if (!error.Ok())
+                if (error)
                     return error;
             }
 
