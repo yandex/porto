@@ -9,6 +9,14 @@
 #include "cgroup.hpp"
 #include "registry.hpp"
 
+extern "C" {
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <unistd.h>
+}
+
 using namespace std;
 
 TContainer::TContainer(const string name) : name(name), state(Stopped)
@@ -24,11 +32,10 @@ bool TContainer::CheckState(EContainerState expected) {
 
 TContainer::~TContainer()
 {
+    if (state == Paused)
+        Resume();
+
     Stop();
-
-    state = Destroying;
-
-    //TBD: perform actual work
 }
 
 string TContainer::Name()
@@ -38,6 +45,15 @@ string TContainer::Name()
 
 bool TContainer::IsRoot() {
     return name == "/";
+}
+
+vector<pid_t> TContainer::Processes() {
+    auto cg = TCgroup::Get(name, TCgroup::Get(TSubsystem::Freezer()));
+    return cg->Processes();
+}
+
+bool TContainer::IsAlive() {
+    return IsRoot() || !Processes().empty();
 }
 
 bool TContainer::Start()
@@ -84,21 +100,35 @@ bool TContainer::Stop()
     if (name == "/" || !CheckState(Running))
         return false;
 
-    if (task->IsRunning())
-        task->Kill();
+    Pause();
+    Kill(SIGTERM);
+    Resume();
+    usleep(100000);
+    
+    while (IsAlive()) {
+        Pause();
+        Kill(SIGKILL);
+        Resume();
+    }
 
     task = nullptr;
 
-    auto cg = TCgroup::Get(name, TCgroup::Get(TSubsystem::Freezer()));
-    TSubsystem::Freezer()->Freeze(*cg);
-    
-    // TODO: freeze and kill all other processes if any
-    // Pause()
-    // for each pid in cgroup:
-    // auto task = TTask(pid)
-    // task.kill()
-
     state = Stopped;
+
+    return true;
+}
+
+bool TContainer::Kill(int signal)
+{
+    if (name == "/")
+        return false;
+
+    auto cg = TCgroup::Get(name, TCgroup::Get(TSubsystem::Freezer()));
+    for (auto t : cg->Tasks()) {
+        TTask task(t);
+        task.Kill(signal);
+    }
+
     return true;
 }
 
@@ -106,6 +136,9 @@ bool TContainer::Pause()
 {
     if (name == "/" || !CheckState(Running))
         return false;
+
+    auto cg = TCgroup::Get(name, TCgroup::Get(TSubsystem::Freezer()));
+    TSubsystem::Freezer()->Freeze(*cg);
 
     state = Paused;
     return true;
@@ -115,6 +148,9 @@ bool TContainer::Resume()
 {
     if (!CheckState(Paused))
         return false;
+
+    auto cg = TCgroup::Get(name, TCgroup::Get(TSubsystem::Freezer()));
+    TSubsystem::Freezer()->Unfreeze(*cg);
 
     state = Running;
     return true;
@@ -139,8 +175,6 @@ string TContainer::GetData(string data)
             return "running";
         case Paused:
             return "paused";
-        case Destroying:
-            return "destroying";
         };
     } else if (data == "exit_status") {
         if (!task)

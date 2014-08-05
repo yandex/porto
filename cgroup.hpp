@@ -39,7 +39,13 @@ public:
 
     std::vector<std::shared_ptr<TCgroup> > FindChildren();
 
+    std::vector<pid_t> Processes();
+    std::vector<pid_t> Tasks();
+
     TError Attach(int pid);
+
+    std::string GetKnobValue(std::string knob);
+    void SetKnobValue(std::string knob, std::string value, bool append = false);
 
     friend bool operator==(const TCgroup& c1, const TCgroup& c2);
     friend ostream& operator<<(ostream& os, const TCgroup& cg);

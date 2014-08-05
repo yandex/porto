@@ -35,6 +35,8 @@ public:
 class TMemorySubsystem : public TSubsystem {
 public:
     TMemorySubsystem() : TSubsystem("memory") {}
+
+    unsigned long Usage(TCgroup &cg);
 };
 
 class TFreezerSubsystem : public TSubsystem {

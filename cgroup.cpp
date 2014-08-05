@@ -35,9 +35,9 @@ TCgroup::TCgroup(vector<shared_ptr<TSubsystem>> subsystems) :
     for (auto c : subsystems)
         flags.insert(c->Name());
 
-    mount = TRegistry<TMount>::Get(TMount("cgroup", tmpfs + "/" +
-                                          CommaSeparatedList(flags),
-                                          "cgroup", 0, flags));
+    mount = make_shared<TMount>("cgroup", tmpfs + "/" +
+                                CommaSeparatedList(flags),
+                                "cgroup", 0, flags);
 }
 
 vector<shared_ptr<TCgroup> > TCgroup::FindChildren() {
@@ -57,6 +57,15 @@ vector<shared_ptr<TCgroup> > TCgroup::FindChildren() {
     
     return ret;
 }
+
+vector<pid_t> TCgroup::Processes() {
+    return PidsFromLine(GetKnobValue("cgroup.procs"));
+}
+
+vector<pid_t> TCgroup::Tasks() {
+    return PidsFromLine(GetKnobValue("tasks"));
+}
+
 
 bool TCgroup::IsRoot() const {
     return !parent;
@@ -104,11 +113,22 @@ void TCgroup::Remove() {
     f.Remove();
 }
 
+std::string TCgroup::GetKnobValue(std::string knob) {
+    TFile f(Path() + "/" + knob);
+    return f.AsString();
+}
+
+void TCgroup::SetKnobValue(std::string knob, std::string value, bool append) {
+    TFile f(Path() + "/" + knob);
+    if (append)
+        f.AppendString(value);
+    else
+        f.WriteStringNoAppend(value);
+}
+
 TError TCgroup::Attach(int pid) {
-    if (!IsRoot()) {
-        TFile f(Path() + "/cgroup.procs");
-        return f.AppendString(to_string(pid));
-    }
+    if (!IsRoot())
+        SetKnobValue("cgroup.procs", to_string(pid), true);
 
     return 0;
 }

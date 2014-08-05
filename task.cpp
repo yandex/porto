@@ -163,12 +163,8 @@ TExitStatus TTask::GetExitStatus() {
     return exitStatus;
 }
 
-void TTask::Kill() {
-    int ret = kill(pid, SIGTERM);
+void TTask::Kill(int signal) {
+    int ret = kill(pid, signal);
     if (ret == ESRCH)
         return;
-
-    // TODO: add some sleep before killing with -9 ?
-
-    kill(pid, SIGKILL);
 }

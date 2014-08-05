@@ -28,10 +28,8 @@ TMount::TMount(string mounts_line) {
 TMountSnapshot::TMountSnapshot() {
     TFile f("/proc/self/mounts");
 
-    for (auto line : f.AsLines()) {
-        TMount m(line);
-        mounts.insert(TRegistry<TMount>::Get(m));
-    }
+    for (auto line : f.AsLines())
+        mounts.insert(make_shared<TMount>(line));
 }
 
 set<shared_ptr<TMount> > const& TMountSnapshot::Mounts() {
@@ -43,8 +41,4 @@ ostream& operator<<(ostream& os, const TMountSnapshot& ms) {
         os << *m << endl;
 
     return os;
-}
-
-void dump_reg(void) {
-    cerr << TRegistry<TMount>::GetInstance() << endl;
 }

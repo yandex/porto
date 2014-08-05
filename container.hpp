@@ -19,8 +19,7 @@ class TContainer {
     enum EContainerState {
         Stopped,
         Running,
-        Paused,
-        Destroying
+        Paused
     };
     EContainerState state;
 
@@ -39,6 +38,11 @@ public:
     string Name();
 
     bool IsRoot();
+    
+    vector<pid_t> Processes();
+    bool IsAlive();
+
+    bool Kill(int SIGNAL);
 
     bool Start();
     bool Stop();

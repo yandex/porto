@@ -28,6 +28,7 @@ class TTaskEnv {
     //std::vector<std::string> env;
 
 public:
+    TTaskEnv() {};
     TTaskEnv(const std::string command, const std::string cwd);
 };
 
@@ -47,13 +48,15 @@ class TTask {
 public:
     TTask(TTaskEnv& env, std::function<void(void)> fork_hook) : env(env),
         fork_hook(fork_hook) {};
+    TTask(pid_t pid) : pid(pid) {};
+
     void FindCgroups();
 
     bool Start();
     int GetPid();
     bool IsRunning();
     TExitStatus GetExitStatus();
-    void Kill();
+    void Kill(int signal);
 };
 
 #endif
