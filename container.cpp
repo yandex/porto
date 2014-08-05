@@ -90,7 +90,7 @@ bool TContainer::Stop()
     task = nullptr;
 
     auto cg = TCgroup::Get(name, TCgroup::Get(TSubsystem::Freezer()));
-    //TSubsystem::Freezer()->Freeze(cg);
+    TSubsystem::Freezer()->Freeze(*cg);
     
     // TODO: freeze and kill all other processes if any
     // Pause()

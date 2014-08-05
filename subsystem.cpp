@@ -32,12 +32,12 @@ string TSubsystem::Name() {
 
 // Memory
 shared_ptr<TMemorySubsystem> TSubsystem::Memory() {
-    return static_pointer_cast<TMemorySubsystem>(subsystems["memory"]);
+    return static_pointer_cast<TMemorySubsystem>(Get("memory"));
 }
 
 // Freezer
 shared_ptr<TFreezerSubsystem> TSubsystem::Freezer() {
-    return static_pointer_cast<TFreezerSubsystem>(subsystems["freezer"]);
+    return static_pointer_cast<TFreezerSubsystem>(Get("freezer"));
 }
 
 void TFreezerSubsystem::Freeze(TCgroup &cg) {
@@ -50,5 +50,5 @@ void TFreezerSubsystem::Unfreeze(TCgroup &cg) {
 
 // Cpu
 shared_ptr<TCpuSubsystem> TSubsystem::Cpu() {
-    return static_pointer_cast<TCpuSubsystem>(subsystems["cpu"]);
+    return static_pointer_cast<TCpuSubsystem>(Get("cpu"));
 }
