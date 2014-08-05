@@ -67,7 +67,7 @@ bool TContainer::Start()
 
 bool TContainer::Stop()
 {
-    if (!CheckState(Running))
+    if (name == "/" || !CheckState(Running))
         return false;
 
     if (task->IsRunning())
@@ -87,7 +87,7 @@ bool TContainer::Stop()
 
 bool TContainer::Pause()
 {
-    if (!CheckState(Running))
+    if (name == "/" || !CheckState(Running))
         return false;
 
     state = Paused;
@@ -151,6 +151,8 @@ string TContainer::GetProperty(string property)
 
 bool TContainer::SetProperty(string property, string value)
 {
+    if (name == "/")
+        return false;
     if (property.length())
         properties[property] = value;
     else
@@ -162,7 +164,8 @@ bool TContainer::SetProperty(string property, string value)
 
 // TContainerHolder
 TContainerHolder::TContainerHolder() {
-    Create("/");
+    auto root = Create("/");
+    root->Start();
 }
 
 TContainerHolder::~TContainerHolder() {
