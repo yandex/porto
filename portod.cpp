@@ -69,6 +69,9 @@ int AcceptClient(int sfd, std::vector<int> &clients)
     cfd = accept4(sfd, (struct sockaddr *) &peer_addr,
                   &peer_addr_size, SOCK_CLOEXEC);
     if (cfd < 0) {
+        if (errno == EAGAIN)
+            return 0;
+
         std::cerr << "accept() error: " << strerror(errno) << std::endl;
         return -1;
     }
@@ -80,9 +83,31 @@ int AcceptClient(int sfd, std::vector<int> &clients)
 #define MAX_CLIENTS     (16)
 #define MAX_CONNECTIONS (MAX_CLIENTS + 1)
 
+sig_atomic_t done = false;
+int exit_status = 0;
+
+extern "C" {
+#include <syslog.h>
+}
+
+void stop(int signum)
+{
+    done = true;
+    exit_status = -signum;
+}
+
 int rpc_main(TContainerHolder &cholder) {
+    int ret = 0;
     int sfd;
     std::vector<int> clients;
+
+    openlog("portod", LOG_NDELAY | LOG_CONS, LOG_DAEMON);
+    syslog(LOG_INFO, "hello");
+
+    signal(SIGQUIT, stop);
+    signal(SIGTERM, stop);
+    signal(SIGINT, stop);
+    signal(SIGHUP, stop);
 
     sfd = CreateRpcServer(RPC_SOCK_PATH);
     if (sfd < 0) {
@@ -90,7 +115,7 @@ int rpc_main(TContainerHolder &cholder) {
         return -1;
     }
 
-    while (true) {
+    while (!done) {
         struct pollfd fds[MAX_CONNECTIONS];
         memset(fds, 0, sizeof(fds));
 
@@ -102,7 +127,7 @@ int rpc_main(TContainerHolder &cholder) {
         fds[MAX_CLIENTS].fd = sfd;
         fds[MAX_CLIENTS].events = POLLIN | POLLHUP;
 
-        int ret = poll(fds, MAX_CONNECTIONS, 1000);
+        ret = poll(fds, MAX_CONNECTIONS, 1000);
         if (ret < 0) {
             std::cerr << "poll() error: " << strerror(errno) << std::endl;
             break;
@@ -110,8 +135,8 @@ int rpc_main(TContainerHolder &cholder) {
 
         if (fds[MAX_CLIENTS].revents && clients.size() < MAX_CLIENTS) {
             ret = AcceptClient(sfd, clients);
-            if (ret && ret != EAGAIN)
-                return ret;
+            if (ret < 0)
+                break;
         }
 
         for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -129,9 +154,15 @@ int rpc_main(TContainerHolder &cholder) {
         }
     }
 
-    close(sfd);
+    syslog(LOG_INFO, "bye");
 
-    return 0;
+    for (size_t i = 0; i < clients.size(); i++)
+        close(clients[i]);
+
+    close(sfd);
+    closelog();
+
+    return exit_status;
 }
 
 int main(int argc, const char *argv[])

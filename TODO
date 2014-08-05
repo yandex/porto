@@ -5,3 +5,5 @@
 - TError
 - recovery
 - portod signal handling & cleanup
+- portod make sure no other daemon is running
+- portod TLogger should use syslog
