@@ -1,6 +1,7 @@
 #include <climits>
+#include <sstream>
+#include <iterator>
 
-#include "containerenv.hpp"
 #include "task.hpp"
 #include "cgroup.hpp"
 #include "log.hpp"
@@ -13,9 +14,23 @@ extern "C" {
 #include <unistd.h>
 }
 
-TTask::TTask(TContainerEnv *env) : env(env) {
+using namespace std;
+
+// TTaskEnv
+TTaskEnv::TTaskEnv(const std::string &command, const string cwd)
+    : cwd(cwd) {
+    // TODO: support quoting
+
+    istringstream s(command);
+    args.insert(args.end(),
+                istream_iterator<string>(s),
+                istream_iterator<string>());
+
+    path = args.front();
+    args.erase(args.begin());
 }
 
+// TTask
 int TTask::CloseAllFds(int except) {
     close(0);
     except = dup3(except, 0, O_CLOEXEC);
@@ -37,14 +52,11 @@ int TTask::CloseAllFds(int except) {
 }
 
 const char** TTask::GetArgv() {
-    auto args = env->taskEnv.GetArgs();
-    auto path = env->taskEnv.GetPath();
-
-    auto argv = new const char* [args.size() + 2];
-    argv[0] = path.c_str();
-    for (size_t i = 0; i < args.size(); i++)
-        argv[i + 1] = args[i].c_str();
-    argv[args.size() + 1] = NULL;
+    auto argv = new const char* [env.args.size() + 2];
+    argv[0] = env.path.c_str();
+    for (size_t i = 0; i < env.args.size(); i++)
+        argv[i + 1] = env.args[i].c_str();
+    argv[env.args.size() + 1] = NULL;
 
     return argv;
 }
@@ -85,12 +97,10 @@ bool TTask::Start() {
         if (setsid() < 0)
             ReportResultAndExit(wfd, -errno);
 
-        string cwd = env->taskEnv.GetCwd();
-
-        if (cwd.length() && chdir(cwd.c_str()) < 0)
+        if (env.cwd.length() && chdir(env.cwd.c_str()) < 0)
             ReportResultAndExit(wfd, -errno);
 
-        env->Attach();
+        fork_hook();
 
         wfd = CloseAllFds(wfd);
         if (wfd < 0)

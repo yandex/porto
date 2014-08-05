@@ -1,10 +1,13 @@
 #include <sstream>
+#include <memory>
 
 #include "container.hpp"
 #include "containerenv.hpp"
 #include "task.hpp"
 #include "cgroup.hpp"
 #include "registry.hpp"
+
+using namespace std;
 
 TContainer::TContainer(const string name) : name(name), state(Stopped)
 {
@@ -45,19 +48,16 @@ bool TContainer::Start()
 
     auto mem = TRegistry<TSubsystem>::Get(TSubsystem("memory"));
     auto freezer = TRegistry<TSubsystem>::Get(TSubsystem("freezer"));
-    set<shared_ptr<TSubsystem>> set;
-    set.insert(mem);
-    set.insert(freezer);
+    set<shared_ptr<TSubsystem>> set = {mem, freezer};
     auto rootmem = TRegistry<TCgroup>::Get(TCgroup(set));
     auto cg = TRegistry<TCgroup>::Get(TCgroup(name, rootmem));
     cgroups.push_back(cg);
 
-    TTaskEnv taskEnv(command, "");
-
-    auto *env = new TContainerEnv(cgroups, taskEnv);
+    env = make_shared<TContainerEnv>(cgroups);
     env->Create();
 
-    task = new TTask(env);
+    TTaskEnv taskEnv(command, "");
+    task = make_shared<TTask>(taskEnv, [this](){env->Attach();});
     bool ret = task->Start();
     if (ret)
         state = Running;
@@ -72,7 +72,7 @@ bool TContainer::Stop()
 
     if (task->IsRunning())
         task->Kill();
-    delete task;
+
     task = nullptr;
 
     // TODO: freeze and kill all other processes if any

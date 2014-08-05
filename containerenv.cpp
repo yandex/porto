@@ -11,31 +11,6 @@ extern "C" {
 
 using namespace std;
 
-TTaskEnv::TTaskEnv(const std::string &command, const string cwd)
-    : cwd(cwd) {
-    // TODO: support quoting
-
-    istringstream s(command);
-    args.insert(args.end(),
-                istream_iterator<string>(s),
-                istream_iterator<string>());
-
-    path = args.front();
-    args.erase(args.begin());
-}
-
-string TTaskEnv::GetPath() {
-    return path;
-}
-
-vector<string> TTaskEnv::GetArgs() {
-    return args;
-}
-
-string TTaskEnv::GetCwd() {
-    return cwd;
-}
-
 void TContainerEnv::Create() {
     for (auto cg : leaf_cgroups)
         cg->Create();

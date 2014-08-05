@@ -4,9 +4,11 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <functional>
 
 using namespace std;
 
+class TTask;
 class TContainerEnv;
 
 struct TExitStatus {
@@ -18,9 +20,22 @@ struct TExitStatus {
     int status;
 };
 
+class TTaskEnv {
+    friend TTask;
+    std::string path;
+    std::vector<std::string> args;
+    std::string cwd;
+    //std::vector<std::string> env;
+
+public:
+    TTaskEnv(const std::string &command, const std::string cwd);
+};
+
 class TTask {
+    TTaskEnv env;
+    std::function<void(void)> fork_hook;
+
     enum ETaskState { Stopped, Running } state;
-    TContainerEnv *env;
     TExitStatus exitStatus;
 
     pid_t pid;
@@ -28,9 +43,10 @@ class TTask {
     int CloseAllFds(int except);
     const char** GetArgv();
     void ReportResultAndExit(int fd, int result);
-public:
-    TTask(TContainerEnv *env);
 
+public:
+    TTask(TTaskEnv& env, std::function<void(void)> fork_hook) : env(env),
+        fork_hook(fork_hook) {};
     void FindCgroups();
 
     bool Start();

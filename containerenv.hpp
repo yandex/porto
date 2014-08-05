@@ -9,19 +9,6 @@
 
 class TCgroup;
 
-class TTaskEnv {
-    std::string path;
-    std::vector<std::string> args;
-    std::string cwd;
-    //std::vector<std::string> env;
-
-public:
-    TTaskEnv(const std::string &command, const std::string cwd);
-    std::string GetPath();
-    std::vector<std::string> GetArgs();
-    std::string GetCwd();
-};
-
 class TContainerEnv {
     std::vector<std::shared_ptr<TCgroup> > leaf_cgroups;
     // namespaces
@@ -29,10 +16,8 @@ class TContainerEnv {
     // ...
 
 public:
-    TTaskEnv taskEnv;
 
-    TContainerEnv(std::vector<std::shared_ptr<TCgroup> > &cgroups,
-                  TTaskEnv &taskEnv) : leaf_cgroups(cgroups), taskEnv(taskEnv) {
+    TContainerEnv(std::vector<std::shared_ptr<TCgroup> > &cgroups) : leaf_cgroups(cgroups) {
     }
 
     void Create();

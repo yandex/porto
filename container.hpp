@@ -10,6 +10,7 @@
 #include "kvalue.hpp"
 
 class TTask;
+class TContainerEnv;
 
 class TContainer {
     const std::string name;
@@ -21,8 +22,11 @@ class TContainer {
         Destroying
     };
     EContainerState state;
-    TTask *task;
+
     std::map<std::string, std::string> properties;
+
+    std::shared_ptr<TContainerEnv> env;
+    std::shared_ptr<TTask> task;
 
     // data
     bool CheckState(EContainerState expected);
