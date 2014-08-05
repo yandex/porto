@@ -1,7 +1,6 @@
 #ifndef __TASK_HPP__
 #define __TASK_HPP__
 
-#include <mutex>
 #include <string>
 #include <vector>
 #include <cstdint>

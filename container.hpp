@@ -3,7 +3,6 @@
 
 #include <iostream>
 #include <string>
-#include <mutex>
 #include <map>
 #include <vector>
 
@@ -14,7 +13,6 @@ class TTask;
 class TContainer {
     const std::string name;
 
-    std::mutex lock;
     enum EContainerState {
         Stopped,
         Running,
@@ -25,9 +23,7 @@ class TContainer {
     TTask *task;
     std::map<std::string, std::string> properties;
 
-    std::mutex _data_lock;
     // data
-
     bool CheckState(EContainerState expected);
     string GetPropertyLocked(string property);
 
@@ -49,7 +45,6 @@ public:
 };
 
 class TContainerHolder {
-    std::mutex lock;
     std::map <std::string, TContainer*> containers;
 
     public:

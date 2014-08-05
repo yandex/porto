@@ -21,10 +21,7 @@ TContainer::~TContainer()
 {
     Stop();
 
-    {
-        lock_guard<mutex> guard(lock);
-        state = Destroying;
-    }
+    state = Destroying;
 
     //TBD: perform actual work
 }
@@ -36,8 +33,6 @@ string TContainer::Name()
 
 bool TContainer::Start()
 {
-    lock_guard<mutex> guard(lock);
-
     if (!CheckState(Stopped))
         return false;
 
@@ -72,8 +67,6 @@ bool TContainer::Start()
 
 bool TContainer::Stop()
 {
-    lock_guard<mutex> guard(lock);
-
     if (!CheckState(Running))
         return false;
 
@@ -94,8 +87,6 @@ bool TContainer::Stop()
 
 bool TContainer::Pause()
 {
-    lock_guard<mutex> guard(lock);
-
     if (!CheckState(Running))
         return false;
 
@@ -105,8 +96,6 @@ bool TContainer::Pause()
 
 bool TContainer::Resume()
 {
-    lock_guard<mutex> guard(lock);
-
     if (!CheckState(Paused))
         return false;
 
@@ -116,7 +105,6 @@ bool TContainer::Resume()
 
 string TContainer::GetData(string data)
 {
-    lock_guard<mutex> guard(lock);
     string tstat;
 
     if (data == "root_pid") {
@@ -163,15 +151,11 @@ string TContainer::GetPropertyLocked(string property)
 
 string TContainer::GetProperty(string property)
 {
-    lock_guard<mutex> guard(lock);
-
     return GetPropertyLocked(property);
 }
 
 bool TContainer::SetProperty(string property, string value)
 {
-    lock_guard<mutex> guard(lock);
-
     if (property.length())
         properties[property] = value;
     else
@@ -183,8 +167,6 @@ bool TContainer::SetProperty(string property, string value)
 
 TContainer* TContainerHolder::Create(string name)
 {
-    lock_guard<mutex> guard(lock);
-
     if (containers[name] == nullptr)
         containers[name] = new TContainer(name);
     else
@@ -195,14 +177,11 @@ TContainer* TContainerHolder::Create(string name)
 
 TContainer* TContainerHolder::Find(string name)
 {
-    lock_guard<mutex> guard(lock);
-
     return containers[name];
 }
 
 void TContainerHolder::Destroy(string name)
 {
-    lock_guard<mutex> guard(lock);
     delete containers[name];
     containers.erase(name);
 }
@@ -211,7 +190,6 @@ vector<string> TContainerHolder::List()
 {
     vector<string> ret;
 
-    lock_guard<mutex> guard(lock);
     for (auto c : containers)
         ret.push_back(c.second->Name());
 

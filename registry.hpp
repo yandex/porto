@@ -2,13 +2,11 @@
 #define __REGISTRY_HPP__
 
 #include <list>
-#include <mutex>
 #include <iostream>
 
 template <class T>
 class TRegistry {
     std::list<std::weak_ptr<T>> items;
-    std::mutex mutex;
 
     TRegistry() {};
     TRegistry(const TRegistry &);
@@ -21,9 +19,8 @@ public:
     }
 
     std::shared_ptr<T> GetItem(const T &item) {
-        std::lock_guard<std::mutex> lock(mutex);
-
         items.remove_if([] (std::weak_ptr<T> i) { return i.expired(); });
+
         for (auto i : items) {
             if (auto il = i.lock()) {
                 if (item == *il)
@@ -42,8 +39,6 @@ public:
     }
 
     friend ostream& operator<<(std::ostream& os, TRegistry<T> &r) {
-        std::lock_guard<std::mutex> lock(r.mutex);
-
         for (auto m : r.items)
             os << m.use_count() << " " << *m.lock() << std::endl;
 
