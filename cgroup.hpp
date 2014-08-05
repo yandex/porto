@@ -1,7 +1,6 @@
 #ifndef __CGROUP_HPP__
 #define __CGROUP_HPP__
 
-#include <set>
 #include <string>
 #include <map>
 
@@ -17,15 +16,15 @@ class TCgroup {
     vector<std::weak_ptr<TCgroup>> children;
 
     std::shared_ptr<TMount> mount;
-    std::set<std::shared_ptr<TSubsystem>> subsystems;
+    std::vector<std::shared_ptr<TSubsystem>> subsystems;
 
     std::string tmpfs = "/sys/fs/cgroup";
     mode_t mode = 0x666;
 
 public:
     TCgroup(std::string name, std::shared_ptr<TCgroup> parent, int level = 0);
-    TCgroup(std::shared_ptr<TMount> mount, set<std::shared_ptr<TSubsystem>> subsystems);
-    TCgroup(set<std::shared_ptr<TSubsystem>> controller);
+    TCgroup(std::shared_ptr<TMount> mount, vector<std::shared_ptr<TSubsystem>> subsystems);
+    TCgroup(std::vector<std::shared_ptr<TSubsystem>> controller);
 
     bool IsRoot() const;
 

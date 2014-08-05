@@ -2,10 +2,9 @@
 #define __MOUNT_HPP__
 
 #include <string>
-#include <set>
 #include <iostream>
 #include <memory>
-#include <list>
+#include <set>
 
 #include <sys/mount.h>
 
@@ -16,7 +15,7 @@ class TMount {
     string device;
     string mountpoint;
     string vfstype;
-    set<string> flags;
+    std::set<string> flags;
 
     unsigned long mountflags = 0;
 
@@ -24,7 +23,7 @@ public:
     TMount(string mounts_line);
 
     TMount(string device, string mountpoint, string vfstype,
-           unsigned long mountflags, set<string> flags) :
+           unsigned long mountflags, std::set<std::string> flags) :
         device (device), mountpoint (mountpoint), vfstype (vfstype),
         flags (flags), mountflags (mountflags) {}
 
