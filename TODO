@@ -1,2 +1,7 @@
 - porto debug
 - porto debug set container_kill_timeout 100000
+- TProperty
+- TGetData
+- TError
+- recovery
+- portod signal handling & cleanup

@@ -100,42 +100,22 @@ bool TContainer::Stop()
     if (name == "/" || !CheckState(Running))
         return false;
 
-    Pause();
-    Kill(SIGTERM);
-    Resume();
+    if (task->IsRunning())
+        task->Kill(SIGTERM);
+
     usleep(kill_timeout);
-    
-    while (IsAlive()) {
-        Pause();
-        Kill(SIGKILL);
-        Resume();
-    }
+
+    auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
+
+    TSubsystem::Freezer()->Freeze(*cg);
+    cg->Kill(SIGKILL);
+    TSubsystem::Freezer()->Unfreeze(*cg);
+
+    leaf_cgroups.erase(std::remove(leaf_cgroups.begin(), leaf_cgroups.end(), cg));
+    leaf_cgroups.clear();
 
     task = nullptr;
-
     state = Stopped;
-
-    return true;
-}
-
-bool TContainer::Kill(int signal)
-{
-    if (name == "/")
-        return false;
-
-    // stop main task
-    if (task->IsRunning())
-        task->Kill(signal);
-
-    // cleanup leftovers
-    auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
-    for (auto t : cg->Tasks()) {
-        if (t == task->GetPid())
-            continue;
-
-        TTask task(t);
-        task.Kill(signal);
-    }
 
     return true;
 }
