@@ -168,7 +168,7 @@ TCgroupSnapshot::TCgroupSnapshot() {
 
         vector<shared_ptr<TSubsystem>> cg_controllers;
         for (auto c : cs) {
-            subsystems[c] = TRegistry<TSubsystem>::Get(TSubsystem(name));
+            subsystems[c] = TSubsystem::Get(name);
             cg_controllers.push_back(subsystems[c]);
         }
 
