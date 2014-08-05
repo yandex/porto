@@ -7,7 +7,7 @@
 #include <dirent.h>
 #include <unistd.h>
 
-#include <map>
+#include <unordered_map>
 
 using namespace std;
 
@@ -83,7 +83,7 @@ vector<string> TFolder::Items(TFile::EFileType type) {
         if (!strcmp(".", res->d_name) || !strcmp ("..", res->d_name))
             continue;
 
-        static map<unsigned char, TFile::EFileType> d_type_to_type =
+        static unordered_map<unsigned char, TFile::EFileType> d_type_to_type =
             {{DT_UNKNOWN, TFile::Unknown},
              {DT_FIFO, TFile::Fifo},
              {DT_CHR, TFile::Character},

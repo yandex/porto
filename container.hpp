@@ -3,7 +3,7 @@
 
 #include <iostream>
 #include <string>
-#include <map>
+#include <unordered_map>
 #include <vector>
 #include <memory>
 
@@ -24,7 +24,7 @@ class TContainer {
     };
     EContainerState state;
 
-    std::map<std::string, std::string> properties;
+    std::unordered_map<std::string, std::string> properties;
 
     std::vector<std::shared_ptr<TCgroup> > leaf_cgroups;
     std::unique_ptr<TTask> task;
@@ -52,7 +52,7 @@ public:
 };
 
 class TContainerHolder {
-    std::map <std::string, std::shared_ptr<TContainer> > containers;
+    std::unordered_map <std::string, std::shared_ptr<TContainer> > containers;
 
 public:
     TContainerHolder();

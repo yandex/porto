@@ -2,7 +2,7 @@
 #define __CGROUP_HPP__
 
 #include <string>
-#include <map>
+#include <unordered_map>
 
 #include "error.hpp"
 #include "mount.hpp"
@@ -47,7 +47,7 @@ public:
 
 class TCgroupSnapshot {
     std::vector<std::shared_ptr<TCgroup> > cgroups;
-    std::map<string, std::shared_ptr<TSubsystem> > subsystems; // can be net_cls _or_ net_prio
+    std::unordered_map<string, std::shared_ptr<TSubsystem> > subsystems; // can be net_cls _or_ net_prio
 public:
     TCgroupSnapshot();
 
