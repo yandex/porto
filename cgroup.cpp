@@ -76,28 +76,23 @@ void TCgroup::Create() {
             if (m == mount)
                 return;
         }
-
-        TFolder f(mount->Mountpoint());
-        f.Create(mode);
-        mount->Mount();
-
-    } else {
+    } else
         parent->Create();
 
-        TFolder f(Path());
+    TFolder f(Path());
+    if (!f.Exists())
         f.Create(mode);
-    }
+
+    if (IsRoot())
+        mount->Mount();
 }
 
 void TCgroup::Remove() {
-    if (IsRoot()) {
-        TFolder f(mount->Mountpoint());
+    if (IsRoot())
         mount->Umount();
-        f.Remove();
-    } else {
-        TFolder f(Path());
-        f.Remove();
-    }
+
+    TFolder f(Path());
+    f.Remove();
 }
 
 TError TCgroup::Attach(int pid) {
