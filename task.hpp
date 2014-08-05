@@ -6,6 +6,10 @@
 #include <cstdint>
 #include <functional>
 
+extern "C" {
+#include <signal.h>
+}
+
 using namespace std;
 
 class TTask;

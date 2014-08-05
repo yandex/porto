@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "cgroup.hpp"
+#include "task.hpp"
 #include "folder.hpp"
 #include "registry.hpp"
 
@@ -121,12 +122,22 @@ void TCgroup::Remove() {
     if (IsRoot()) {
         mount->Umount();
     } else {
-        if (!IsEmpty())
-            return;
+        while (!IsEmpty())
+            Kill(SIGINT);
     }
 
     TFolder f(Path());
     f.Remove();
+}
+
+void TCgroup::Kill(int signal) {
+    if (IsRoot())
+        return;
+
+    for (auto pid : Tasks()) {
+        TTask task(pid);
+        task.Kill(signal);
+    }
 }
 
 std::string TCgroup::GetKnobValue(std::string knob) {

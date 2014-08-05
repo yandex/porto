@@ -46,6 +46,8 @@ public:
     void Create();
     void Remove();
 
+    void Kill(int signal);
+
     std::vector<std::shared_ptr<TCgroup> > FindChildren();
 
     std::vector<pid_t> Processes();
