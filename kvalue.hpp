@@ -5,29 +5,20 @@
 #include <vector>
 
 #include "mount.hpp"
+#include "kv.pb.h"
+#include "error.hpp"
 
 class TKeyValueStorage {
     TMount tmpfs;
-
     std::string Path(std::string name);
-    std::string Path(std::string name, std::string key);
-
-    static bool ValidName(std::string name);
-    static std::string RemovingName(std::string name);
 
 public:
-    TKeyValueStorage();
-
     void MountTmpfs();
 
-    void CreateNode(std::string name);
+    TKeyValueStorage();
+    TError LoadNode(std::string name, kv::TNode &node);
+    TError SaveNode(std::string name, const kv::TNode &node);
     void RemoveNode(std::string name);
-
-    void Save(std::string node, std::string key, std::string value);
-    std::string Load(std::string node, std::string key);
-
-    std::vector<std::string> ListNodes();
-    std::vector<std::string> ListKeys(std::string node);
 };
 
 #endif

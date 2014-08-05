@@ -7,13 +7,14 @@ find_package(Protobuf REQUIRED)
 include_directories(${PROTOBUF_INCLUDE_DIRS})
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
-PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS rpc.proto)
+PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS rpc.proto kv.proto)
 
-add_executable(portod portod.cpp cgroup.cpp mount.cpp rpc.cpp protobuf.cpp container.cpp task.cpp file.cpp stringutil.cpp kvalue.cpp subsystem.cpp folder.cpp
+add_executable(portod portod.cpp cgroup.cpp mount.cpp rpc.cpp protobuf.cpp container.cpp task.cpp file.cpp stringutil.cpp kvalue.cpp subsystem.cpp folder.cpp error.cpp
 		       ${PROTO_SRCS} ${PROTO_HDRS})
 target_link_libraries(portod ${PROTOBUF_LIBRARIES})
 
 add_executable(porto porto.cpp protobuf.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 target_link_libraries(porto ${PROTOBUF_LIBRARIES})
 
-add_executable(test test.cpp mount.cpp cgroup.cpp mount.cpp file.cpp stringutil.cpp kvalue.cpp subsystem.cpp folder.cpp)
+add_executable(test test.cpp mount.cpp cgroup.cpp mount.cpp file.cpp stringutil.cpp kvalue.cpp subsystem.cpp folder.cpp kv.pb.cc protobuf.cpp error.cpp)
+target_link_libraries(test ${PROTOBUF_LIBRARIES})

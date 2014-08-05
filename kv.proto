@@ -1,0 +1,10 @@
+package kv;
+
+message TPair {
+	required string key = 1;
+	required string val = 2;
+}
+
+message TNode {
+	repeated TPair pairs = 1;
+}
