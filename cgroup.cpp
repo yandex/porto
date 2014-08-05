@@ -44,6 +44,11 @@ TCgroup::TCgroup(vector<shared_ptr<TSubsystem>> subsystems) :
                                 "cgroup", 0, flags);
 }
 
+TCgroup::~TCgroup() {
+    if (need_cleanup)
+        Remove();
+}
+
 vector<shared_ptr<TCgroup> > TCgroup::FindChildren() {
     TFolder f(Path());
     vector<shared_ptr<TCgroup> > ret;

@@ -164,6 +164,7 @@ TExitStatus TTask::GetExitStatus() {
 }
 
 void TTask::Kill(int signal) {
+cerr << signal << " to " << pid << " (me: " << getpid() << ")" << endl;
     int ret = kill(pid, signal);
     if (ret == ESRCH)
         return;

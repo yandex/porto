@@ -21,6 +21,8 @@ class TCgroup {
     std::string tmpfs = "/sys/fs/cgroup";
     mode_t mode = 0x666;
 
+    bool need_cleanup = false;
+
 public:
     static std::shared_ptr<TCgroup> Get(std::string name,
                                               std::shared_ptr<TCgroup> parent);
@@ -30,6 +32,12 @@ public:
     TCgroup(std::string name, std::shared_ptr<TCgroup> parent, int level = 0);
     TCgroup(std::shared_ptr<TMount> mount, vector<std::shared_ptr<TSubsystem>> subsystems);
     TCgroup(std::vector<std::shared_ptr<TSubsystem>> controller);
+
+    ~TCgroup();
+
+    void SetNeedCleanup() {
+        need_cleanup = true;
+    }
 
     bool IsRoot() const;
 

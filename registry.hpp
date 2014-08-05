@@ -31,6 +31,7 @@ public:
 
         auto n = std::make_shared<T>(item);
         items.push_back(n);
+        n->SetNeedCleanup();
 
         return n;
     }
