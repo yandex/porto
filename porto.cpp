@@ -12,10 +12,16 @@ extern "C" {
 }
 
 class ICmd {
+protected:
+    string name, usage, desc;
+
 public:
-    virtual string GetName() = 0;
-    virtual string GetUsage() = 0;
-    virtual string GetDescription() = 0;
+    ICmd(const string& name, const string& usage, const string& desc) : name(name), usage(usage), desc(desc) {}
+
+    string& GetName() { return name; }
+    string& GetUsage() { return usage; }
+    string& GetDescription() { return desc; }
+
     virtual int Execute(int argc, char *argv[]) = 0;
 
     static int ConnectToRpcServer(const char *path)
@@ -78,20 +84,7 @@ static vector<ICmd *> commands;
 
 class THelpCmd : public ICmd {
 public:
-    string GetName()
-    {
-        return "help";
-    }
-
-    string GetUsage()
-    {
-        return "[command]";
-    }
-
-    string GetDescription()
-    {
-        return "print help message for command";
-    }
+    THelpCmd() : ICmd("help", "[command]", "print help message for command") {}
 
     void Usage(const char *name)
     {
@@ -147,20 +140,7 @@ static bool NeedHelp(int argc, char *argv[], bool canBeEmpty)
 
 class TRawCmd : public ICmd {
 public:
-    string GetName()
-    {
-        return "raw";
-    }
-
-    string GetUsage()
-    {
-        return "<message>";
-    }
-
-    string GetDescription()
-    {
-        return "send raw protobuf message";
-    }
+    TRawCmd() : ICmd("raw", "<message>", "send raw protobuf message") {}
 
     int Execute(int argc, char *argv[])
     {
@@ -193,20 +173,7 @@ public:
 
 class TCreateCmd : public ICmd {
 public:
-    string GetName()
-    {
-        return "create";
-    }
-
-    string GetUsage()
-    {
-        return "<name>";
-    }
-
-    string GetDescription()
-    {
-        return "create container";
-    }
+    TCreateCmd() : ICmd("create", "<name>", "create container") {}
 
     int Execute(int argc, char *argv[])
     {
@@ -235,20 +202,7 @@ public:
 
 class TDestroyCmd : public ICmd {
 public:
-    string GetName()
-    {
-        return "destroy";
-    }
-
-    string GetUsage()
-    {
-        return "<name>";
-    }
-
-    string GetDescription()
-    {
-        return "destroy container";
-    }
+    TDestroyCmd() : ICmd("destroy", "<name>", "destroy container") {}
 
     int Execute(int argc, char *argv[])
     {
@@ -277,20 +231,7 @@ public:
 
 class TListCmd : public ICmd {
 public:
-    string GetName()
-    {
-        return "list";
-    }
-
-    string GetUsage()
-    {
-        return "";
-    }
-
-    string GetDescription()
-    {
-        return "list created containers";
-    }
+    TListCmd() : ICmd("list", "", "list created containers") {}
 
     int Execute(int argc, char *argv[])
     {
@@ -322,20 +263,7 @@ public:
 
 class TGetPropertyCmd : public ICmd {
 public:
-    string GetName()
-    {
-        return "get";
-    }
-
-    string GetUsage()
-    {
-        return "<name> <property>";
-    }
-
-    string GetDescription()
-    {
-        return "get container property";
-    }
+    TGetPropertyCmd() : ICmd("get", "<name> <property>", "get container property") {}
 
     int Execute(int argc, char *argv[])
     {
@@ -370,20 +298,7 @@ public:
 
 class TSetPropertyCmd : public ICmd {
 public:
-    string GetName()
-    {
-        return "set";
-    }
-
-    string GetUsage()
-    {
-        return "<name> <property> <value>";
-    }
-
-    string GetDescription()
-    {
-        return "set container property";
-    }
+    TSetPropertyCmd() : ICmd("set", "<name> <property>", "set container property") {}
 
     int Execute(int argc, char *argv[])
     {
@@ -416,20 +331,7 @@ public:
 
 class TGetDataCmd : public ICmd {
 public:
-    string GetName()
-    {
-        return "data";
-    }
-
-    string GetUsage()
-    {
-        return "<name> <data>";
-    }
-
-    string GetDescription()
-    {
-        return "get container data";
-    }
+    TGetDataCmd() : ICmd("data", "<name> <data>", "get container data") {}
 
     int Execute(int argc, char *argv[])
     {
@@ -464,20 +366,7 @@ public:
 
 class TStartCmd : public ICmd {
 public:
-    string GetName()
-    {
-        return "start";
-    }
-
-    string GetUsage()
-    {
-        return "<name>";
-    }
-
-    string GetDescription()
-    {
-        return "start container";
-    }
+    TStartCmd() : ICmd("start", "<name>", "start container") {}
 
     int Execute(int argc, char *argv[])
     {
@@ -506,20 +395,7 @@ public:
 
 class TStopCmd : public ICmd {
 public:
-    string GetName()
-    {
-        return "stop";
-    }
-
-    string GetUsage()
-    {
-        return "<name>";
-    }
-
-    string GetDescription()
-    {
-        return "stop container";
-    }
+    TStopCmd() : ICmd("stop", "<name>", "stop container") {}
 
     int Execute(int argc, char *argv[])
     {
@@ -548,20 +424,7 @@ public:
 
 class TPauseCmd : public ICmd {
 public:
-    string GetName()
-    {
-        return "pause";
-    }
-
-    string GetUsage()
-    {
-        return "<name>";
-    }
-
-    string GetDescription()
-    {
-        return "pause container";
-    }
+    TPauseCmd() : ICmd("pause", "<name>", "pause container") {}
 
     int Execute(int argc, char *argv[])
     {
@@ -590,20 +453,7 @@ public:
 
 class TResumeCmd : public ICmd {
 public:
-    string GetName()
-    {
-        return "resume";
-    }
-
-    string GetUsage()
-    {
-        return "<name>";
-    }
-
-    string GetDescription()
-    {
-        return "resume container";
-    }
+    TResumeCmd() : ICmd("resume", "<name>", "resume container") {}
 
     int Execute(int argc, char *argv[])
     {
@@ -632,18 +482,20 @@ public:
 
 int main(int argc, char *argv[])
 {
-    commands.push_back(new THelpCmd());
-    commands.push_back(new TCreateCmd());
-    commands.push_back(new TDestroyCmd());
-    commands.push_back(new TListCmd());
-    commands.push_back(new TStartCmd());
-    commands.push_back(new TStopCmd());
-    commands.push_back(new TPauseCmd());
-    commands.push_back(new TResumeCmd());
-    commands.push_back(new TGetPropertyCmd());
-    commands.push_back(new TSetPropertyCmd());
-    commands.push_back(new TGetDataCmd());
-    commands.push_back(new TRawCmd());
+    commands = {
+        new THelpCmd(),
+        new TCreateCmd(),
+        new TDestroyCmd(),
+        new TListCmd(),
+        new TStartCmd(),
+        new TStopCmd(),
+        new TPauseCmd(),
+        new TResumeCmd(),
+        new TGetPropertyCmd(),
+        new TSetPropertyCmd(),
+        new TGetDataCmd(),
+        new TRawCmd()
+    };
 
     if (argc <= 1) {
         Usage(argv[0], NULL);
