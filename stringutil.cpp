@@ -29,9 +29,11 @@ vector<int> PidsFromLine(const std::string line) {
 
     istringstream iss(line);
     while (iss) {
-        int p;
-        iss >> p;
-        ret.push_back(p);
+        string tmp;
+        iss >> tmp;
+        try {
+            ret.push_back(stoi(tmp));
+        } catch (...) { }
     }
 
     return ret;

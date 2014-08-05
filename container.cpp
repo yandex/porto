@@ -77,10 +77,8 @@ bool TContainer::Start()
 
     TTaskEnv taskEnv(GetProperty("command"), "");
     task = unique_ptr<TTask>(new TTask(taskEnv, [&this->leaf_cgroups] () {
-            pid_t self = getpid();
-
             for (auto cg : leaf_cgroups) {
-                auto error = cg->Attach(self);
+                auto error = cg->Attach(getpid());
                 if (error)
                     return error;
             }
@@ -95,6 +93,8 @@ bool TContainer::Start()
     return ret;
 }
 
+static const auto kill_timeout = 100000;
+
 bool TContainer::Stop()
 {
     if (name == "/" || !CheckState(Running))
@@ -103,7 +103,7 @@ bool TContainer::Stop()
     Pause();
     Kill(SIGTERM);
     Resume();
-    usleep(100000);
+    usleep(kill_timeout);
     
     while (IsAlive()) {
         Pause();
@@ -123,8 +123,16 @@ bool TContainer::Kill(int signal)
     if (name == "/")
         return false;
 
+    // stop main task
+    if (task->IsRunning())
+        task->Kill(signal);
+
+    // cleanup leftovers
     auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
     for (auto t : cg->Tasks()) {
+        if (t == task->GetPid())
+            continue;
+
         TTask task(t);
         task.Kill(signal);
     }
