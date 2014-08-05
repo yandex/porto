@@ -165,25 +165,24 @@ bool TContainer::SetProperty(string property, string value)
     return true;
 }
 
-TContainer* TContainerHolder::Create(string name)
+shared_ptr<TContainer> TContainerHolder::Create(string name)
 {
     if (containers[name] == nullptr)
-        containers[name] = new TContainer(name);
+        containers[name] = make_shared<TContainer>(name);
     else
         throw "container " + name + " already exists";
 
     return containers[name];
 }
 
-TContainer* TContainerHolder::Find(string name)
+shared_ptr<TContainer> TContainerHolder::Find(string name)
 {
     return containers[name];
 }
 
 void TContainerHolder::Destroy(string name)
 {
-    delete containers[name];
-    containers.erase(name);
+    containers[name] = nullptr;
 }
 
 vector<string> TContainerHolder::List()

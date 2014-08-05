@@ -5,6 +5,7 @@
 #include <string>
 #include <map>
 #include <vector>
+#include <memory>
 
 #include "kvalue.hpp"
 
@@ -45,11 +46,11 @@ public:
 };
 
 class TContainerHolder {
-    std::map <std::string, TContainer*> containers;
+    std::map <std::string, std::shared_ptr<TContainer> > containers;
 
-    public:
-    TContainer* Create(std::string name);
-    TContainer* Find(std::string name);
+public:
+    std::shared_ptr<TContainer> Create(std::string name);
+    std::shared_ptr<TContainer> Find(std::string name);
 
     void Destroy(std::string name);
 
