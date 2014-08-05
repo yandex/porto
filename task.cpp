@@ -17,9 +17,10 @@ extern "C" {
 using namespace std;
 
 // TTaskEnv
-TTaskEnv::TTaskEnv(const std::string &command, const string cwd)
-    : cwd(cwd) {
+TTaskEnv::TTaskEnv(const std::string command, const string cwd) : cwd(cwd) {
     // TODO: support quoting
+    if (command.empty())
+        return;
 
     istringstream s(command);
     args.insert(args.end(),

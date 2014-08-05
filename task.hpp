@@ -28,7 +28,7 @@ class TTaskEnv {
     //std::vector<std::string> env;
 
 public:
-    TTaskEnv(const std::string &command, const std::string cwd);
+    TTaskEnv(const std::string command, const std::string cwd);
 };
 
 class TTask {

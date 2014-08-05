@@ -37,6 +37,8 @@ public:
 
     string Name();
 
+    bool IsRoot();
+
     bool Start();
     bool Stop();
     bool Pause();

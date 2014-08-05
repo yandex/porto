@@ -34,6 +34,10 @@ string TContainer::Name()
     return name;
 }
 
+bool TContainer::IsRoot() {
+    return name == "/";
+}
+
 bool TContainer::Start()
 {
     if (!CheckState(Stopped))
@@ -44,17 +48,27 @@ bool TContainer::Start()
 
     vector<shared_ptr<TCgroup> > cgroups;
 
-    // TODO: get real cgroups list
-
     auto mem = TRegistry<TSubsystem>::Get(TSubsystem("memory"));
+    auto rootmem = TRegistry<TCgroup>::Get(TCgroup({mem}));
+
     auto freezer = TRegistry<TSubsystem>::Get(TSubsystem("freezer"));
-    set<shared_ptr<TSubsystem>> set = {mem, freezer};
-    auto rootmem = TRegistry<TCgroup>::Get(TCgroup(set));
-    auto cg = TRegistry<TCgroup>::Get(TCgroup(name, rootmem));
-    cgroups.push_back(cg);
+    auto rootfreezer = TRegistry<TCgroup>::Get(TCgroup({freezer}));
+
+    if (IsRoot()) {
+        cgroups.push_back(rootmem);
+        cgroups.push_back(rootfreezer);
+    } else {
+        auto memcg = TRegistry<TCgroup>::Get(TCgroup(name, rootmem));
+        auto freezercg = TRegistry<TCgroup>::Get(TCgroup(name, rootfreezer));
+        cgroups.push_back(memcg);
+        cgroups.push_back(freezercg);
+    }
 
     env = make_shared<TContainerEnv>(cgroups);
     env->Create();
+
+    if (IsRoot())
+        return true;
 
     TTaskEnv taskEnv(command, "");
     task = make_shared<TTask>(taskEnv, [this](){env->Attach();});
@@ -169,7 +183,6 @@ TContainerHolder::TContainerHolder() {
 }
 
 TContainerHolder::~TContainerHolder() {
-    Destroy("/");
 }
 
 shared_ptr<TContainer> TContainerHolder::Create(string name)
@@ -189,7 +202,8 @@ shared_ptr<TContainer> TContainerHolder::Find(string name)
 
 void TContainerHolder::Destroy(string name)
 {
-    containers[name] = nullptr;
+    if (name != "/")
+        containers.erase(name);
 }
 
 vector<string> TContainerHolder::List()
