@@ -136,6 +136,7 @@ std::string TCgroup::GetKnobValue(std::string knob) {
 
 void TCgroup::SetKnobValue(std::string knob, std::string value, bool append) {
     TFile f(Path() + "/" + knob);
+    TLogger::LogAction("attach " + f.Path(), 0, 0);
     if (append)
         f.AppendString(value);
     else
