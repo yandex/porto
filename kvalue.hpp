@@ -10,15 +10,19 @@
 
 class TKeyValueStorage {
     TMount tmpfs;
-    std::string Path(std::string name);
+    std::string Path(const std::string &name);
+
+    void Merge(kv::TNode &node, kv::TNode &next);
 
 public:
     void MountTmpfs();
 
     TKeyValueStorage();
-    TError LoadNode(std::string name, kv::TNode &node);
-    TError SaveNode(std::string name, const kv::TNode &node);
-    void RemoveNode(std::string name);
+    TError LoadNode(const std::string &name, kv::TNode &node);
+    TError SaveNode(const std::string &name, const kv::TNode &node);
+    TError AppendNode(const std::string &name, const kv::TNode &node);
+    TError RemoveNode(const std::string &name);
+    std::vector<std::string> ListNodes();
 };
 
 #endif

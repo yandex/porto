@@ -59,7 +59,7 @@ struct TData {
 
 // TContainer
 
-TContainer::TContainer(const string name) : name(name), state(Stopped)
+TContainer::TContainer(const string name) : name(name), state(Stopped), spec(name)
 {
     data = {{"state", TData::State},
             {"root_pid", TData::RootPid}};

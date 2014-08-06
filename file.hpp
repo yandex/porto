@@ -27,7 +27,7 @@ public:
     std::string Path();
     EFileType Type();
 
-    void Remove();
+    TError Remove();
 
     std::string AsString();
     int AsInt();

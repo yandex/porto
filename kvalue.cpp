@@ -16,11 +16,32 @@ TKeyValueStorage::TKeyValueStorage() :
     tmpfs("tmpfs", "/tmp/porto", "tmpfs", 0, {"size=32m"}) {
 }
 
-string TKeyValueStorage::Path(string name) {
+string TKeyValueStorage::Path(const string &name) {
     return tmpfs.Mountpoint() + "/" + name;
 }
 
-TError TKeyValueStorage::LoadNode(std::string name, kv::TNode &node)
+void TKeyValueStorage::Merge(kv::TNode &node, kv::TNode &next) {
+    for (int i = 0; i < next.pairs_size(); i++) {
+        auto key = next.pairs(i).key();
+        auto value = next.pairs(i).val();
+
+        bool replaced = false;
+        for (int j = 0; j < node.pairs_size(); j++)
+            if (key == node.pairs(j).key()) {
+                node.mutable_pairs(j)->set_val(value);
+                replaced = true;
+                break;
+            }
+
+        if (!replaced) {
+            auto pair = node.add_pairs();
+            pair->set_key(key);
+            pair->set_val(value);
+        }
+    }
+}
+
+TError TKeyValueStorage::LoadNode(const std::string &name, kv::TNode &node)
 {
     int fd = open(Path(name).c_str(), O_RDONLY);
     node.Clear();
@@ -30,6 +51,11 @@ TError TKeyValueStorage::LoadNode(std::string name, kv::TNode &node)
         if (!readDelimitedFrom(&pist, &node)) {
             error = TError("protobuf read error");
         }
+
+        kv::TNode next;
+        next.Clear();
+        while (readDelimitedFrom(&pist, &next))
+            Merge(node, next);
     } catch (...) {
         error = TError("unhandled exception");
     }
@@ -37,7 +63,22 @@ TError TKeyValueStorage::LoadNode(std::string name, kv::TNode &node)
     return error;
 }
 
-TError TKeyValueStorage::SaveNode(std::string name, const kv::TNode &node)
+TError TKeyValueStorage::AppendNode(const std::string &name, const kv::TNode &node)
+{
+    int fd = open(Path(name).c_str(), O_CREAT | O_APPEND, 0755);
+    TError error;
+    try {
+        google::protobuf::io::FileOutputStream post(fd);
+        if (!writeDelimitedTo(node, &post))
+            error = TError("protobuf write error");
+    } catch (...) {
+        error = TError("unhandled exception");
+    }
+    close(fd);
+    return error;
+}
+
+TError TKeyValueStorage::SaveNode(const std::string &name, const kv::TNode &node)
 {
     int fd = open(Path(name).c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0755);
     TError error;
@@ -52,9 +93,9 @@ TError TKeyValueStorage::SaveNode(std::string name, const kv::TNode &node)
     return error;
 }
 
-void TKeyValueStorage::RemoveNode(std::string name) {
+TError TKeyValueStorage::RemoveNode(const std::string &name) {
     TFile node(Path(name));
-    node.Remove();
+    return node.Remove();
 }
 
 void TKeyValueStorage::MountTmpfs() {
@@ -69,4 +110,9 @@ void TKeyValueStorage::MountTmpfs() {
         mnt.Create();
 
     tmpfs.Mount();
+}
+
+std::vector<std::string> TKeyValueStorage::ListNodes() {
+    TFolder f(tmpfs.Mountpoint());
+    return f.Items(TFile::Directory);
 }
