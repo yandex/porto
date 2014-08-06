@@ -323,7 +323,7 @@ public:
 
         int ret = Rpc(req, rsp);
         if (ret)
-            cerr << "Can't get property, error = " << ret << endl;
+            cerr << "Can't set property, error = " << ret << endl;
 
         return ret;
     }
