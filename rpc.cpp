@@ -37,7 +37,7 @@ static void StartContainer(TContainerHolder &cholder,
         return;
     }
 
-    if (container->Start())
+    if (!container->Start())
         rsp.set_error(rpc::EContainerError::Success);
 }
 
@@ -51,7 +51,7 @@ static void StopContainer(TContainerHolder &cholder,
         return;
     }
 
-    if (container->Stop())
+    if (!container->Stop())
         rsp.set_error(rpc::EContainerError::Success);
 }
 
@@ -65,7 +65,7 @@ static void PauseContainer(TContainerHolder &cholder,
         return;
     }
 
-    if (container->Pause())
+    if (!container->Pause())
         rsp.set_error(rpc::EContainerError::Success);
 }
 
@@ -79,7 +79,7 @@ static void ResumeContainer(TContainerHolder &cholder,
         return;
     }
 
-    if (container->Resume())
+    if (!container->Resume())
         rsp.set_error(rpc::EContainerError::Success);
 }
 
@@ -103,8 +103,9 @@ static void GetContainerProperty(TContainerHolder &cholder,
     }
 
     for (int i = 0; i < req.property_size(); i++) {
-        auto val = container->GetProperty(req.property(i));
-        rsp.mutable_getproperty()->add_value(val);
+        string value;
+        container->GetProperty(req.property(i), value);
+        rsp.mutable_getproperty()->add_value(value);
     }
 
     rsp.set_error(rpc::EContainerError::Success);
@@ -134,10 +135,10 @@ static void GetContainerData(TContainerHolder &cholder,
         return;
     }
 
-
     for (int i = 0; i < req.data_size(); i++) {
-        auto val = container->GetData(req.data(i));
-        rsp.mutable_getdata()->add_value(val);
+        string value;
+        container->GetData(req.data(i), value);
+        rsp.mutable_getdata()->add_value(value);
 
     }
     rsp.set_error(rpc::EContainerError::Success);

@@ -68,7 +68,7 @@ void TTask::ReportResultAndExit(int fd, int result)
     exit(EXIT_FAILURE);
 }
 
-bool TTask::Start() {
+TError TTask::Start() {
     int ret;
     int pfd[2];
 
@@ -79,8 +79,7 @@ bool TTask::Start() {
     ret = pipe2(pfd, O_CLOEXEC);
     if (ret) {
         TLogger::LogAction("pipe2", ret == 0, errno);
-        exitStatus.error = errno;
-        return false;
+        return TError(errno);
     }
 
     int rfd = pfd[0];
@@ -90,8 +89,8 @@ bool TTask::Start() {
 
     if (pid < 0) {
         TLogger::LogAction("fork", ret == 0, errno);
-        exitStatus.error = errno;
-        return false;
+        return TError(errno);
+
     } else if (pid == 0) {
         close(rfd);
 
@@ -101,7 +100,11 @@ bool TTask::Start() {
         if (env.cwd.length() && chdir(env.cwd.c_str()) < 0)
             ReportResultAndExit(wfd, -errno);
 
-        fork_hook();
+        for (auto cg : leaf_cgroups) {
+            auto error = cg->Attach(getpid());
+            if (error)
+                ReportResultAndExit(wfd, error);
+        }
 
         wfd = CloseAllFds(wfd);
         if (wfd < 0)
@@ -118,12 +121,11 @@ bool TTask::Start() {
     int n = read(rfd, &ret, sizeof(ret));
     if (n < 0) {
         TLogger::LogAction("read child status failed", false, errno);
-        exitStatus.error = errno;
-        return false;
+        return TError(errno);
     } else if (n == 0) {
         state = Running;
         this->pid = pid;
-        return true;
+        return TError();
     } else {
         TLogger::LogAction("got status from child", false, errno);
         (void)waitpid(pid, NULL, WNOHANG);

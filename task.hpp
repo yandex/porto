@@ -4,11 +4,12 @@
 #include <string>
 #include <vector>
 #include <cstdint>
-#include <functional>
 
 extern "C" {
 #include <signal.h>
 }
+
+#include "cgroup.hpp"
 
 using namespace std;
 
@@ -38,7 +39,7 @@ public:
 
 class TTask {
     TTaskEnv env;
-    std::function<void(void)> fork_hook;
+    std::vector<std::shared_ptr<TCgroup>> leaf_cgroups;
 
     enum ETaskState { Stopped, Running } state;
     TExitStatus exitStatus;
@@ -50,13 +51,12 @@ class TTask {
     void ReportResultAndExit(int fd, int result);
 
 public:
-    TTask(TTaskEnv& env, std::function<void(void)> fork_hook) : env(env),
-        fork_hook(fork_hook) {};
+    TTask(TTaskEnv& env, std::vector<std::shared_ptr<TCgroup>> &leaf_cgroups) : env(env), leaf_cgroups(leaf_cgroups) {};
     TTask(pid_t pid) : pid(pid) {};
 
     void FindCgroups();
 
-    bool Start();
+    TError Start();
     int GetPid();
     bool IsRunning();
     TExitStatus GetExitStatus();

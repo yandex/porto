@@ -14,7 +14,7 @@
 class TTask;
 class TCgroup;
 class TContainerEnv;
-class TData;
+struct TData;
 
 class TContainer {
     const std::string name;
@@ -34,7 +34,7 @@ class TContainer {
 
     // data
     bool CheckState(EContainerState expected);
-    void PrepareCgroups();
+    TError PrepareCgroups();
 
 public:
     TContainer(const std::string &name);
@@ -50,15 +50,15 @@ public:
 
     void UpdateState();
 
-    bool Start();
-    bool Stop();
-    bool Pause();
-    bool Resume();
+    TError Start();
+    TError Stop();
+    TError Pause();
+    TError Resume();
 
-    std::string GetProperty(std::string property);
-    bool SetProperty(std::string property, std::string value);
+    TError GetProperty(std::string property, std::string &value);
+    TError SetProperty(std::string property, std::string value);
 
-    string GetData(std::string data);
+    TError GetData(std::string data, std::string &value);
     TError Restore();
 };
 

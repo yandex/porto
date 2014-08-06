@@ -111,7 +111,7 @@ void TContainer::UpdateState() {
         Stop();
 }
 
-void TContainer::PrepareCgroups() {
+TError TContainer::PrepareCgroups() {
     if (IsRoot()) {
         leaf_cgroups.push_back(TCgroup::GetRoot(TSubsystem::Memory()));
         leaf_cgroups.push_back(TCgroup::GetRoot(TSubsystem::Freezer()));
@@ -120,42 +120,46 @@ void TContainer::PrepareCgroups() {
         leaf_cgroups.push_back(TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer())));
     }
 
-    for (auto cg : leaf_cgroups)
-        cg->Create();
+    for (auto cg : leaf_cgroups) {
+        auto ret = cg->Create();
+        if (ret) {
+            leaf_cgroups.clear();
+            return ret;
+        }
+    }
+
+    return TError();
 }
 
-bool TContainer::Start()
+TError TContainer::Start()
 {
     if (!CheckState(Stopped))
-        return false;
+        return TError();
 
-    PrepareCgroups();
+    auto ret = PrepareCgroups();
+    if (ret)
+        return ret;
 
     if (IsRoot())
-        return true;
+        return ret;
 
     TTaskEnv taskEnv(spec.Get("command"), "");
-    task = unique_ptr<TTask>(new TTask(taskEnv, [&this->leaf_cgroups] () {
-            for (auto cg : leaf_cgroups) {
-                auto error = cg->Attach(getpid());
-                if (error)
-                    return error;
-            }
+    task = unique_ptr<TTask>(new TTask(taskEnv, leaf_cgroups));
 
-            // TODO!!!!
-            return TError();
-        }));
+    ret = task->Start();
+    if (ret) {
+        leaf_cgroups.clear();
+        return ret;
+    }
 
-    bool ret = task->Start();
-    if (ret)
-        state = Running;
+    state = Running;
 
     return ret;
 }
 
 static const auto kill_timeout = 100000;
 
-bool TContainer::Stop()
+TError TContainer::Stop()
 {
     if (name == "/" || !CheckState(Running))
         return false;
@@ -176,10 +180,10 @@ bool TContainer::Stop()
 
     state = Stopped;
 
-    return true;
+    return TError();
 }
 
-bool TContainer::Pause()
+TError TContainer::Pause()
 {
     if (name == "/" || !CheckState(Running))
         return false;
@@ -191,7 +195,7 @@ bool TContainer::Pause()
     return true;
 }
 
-bool TContainer::Resume()
+TError TContainer::Resume()
 {
     if (!CheckState(Paused))
         return false;
@@ -203,18 +207,24 @@ bool TContainer::Resume()
     return true;
 }
 
-string TContainer::GetData(string name)
+TError TContainer::GetData(string name, string &value)
 {
-    return data[name](*this);
+    if (data.find(name) == data.end())
+        return TError("No such data");
+
+    value = data[name](*this);
+    return TError();
+    
 }
 
-string TContainer::GetProperty(string property)
+TError TContainer::GetProperty(string property, string &value)
 {
-    //TODO: catch exception
-    return spec.Get(property);
+    // TODO!!!
+    value = spec.Get(property);
+    return TError();
 }
 
-bool TContainer::SetProperty(string property, string value)
+TError TContainer::SetProperty(string property, string value)
 {
     if (name == "/")
         return false;
