@@ -47,7 +47,7 @@ public:
     vector<pid_t> Processes();
     bool IsAlive();
 
-    bool Kill(int SIGNAL);
+    void UpdateState();
 
     bool Start();
     bool Stop();

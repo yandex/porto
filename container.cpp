@@ -23,7 +23,7 @@ using namespace std;
 
 struct TData {
     static string State(TContainer& c) {
-        // TODO: update state
+        c.UpdateState();
 
         switch (c.state) {
         case TContainer::Stopped:
@@ -96,6 +96,11 @@ vector<pid_t> TContainer::Processes() {
 
 bool TContainer::IsAlive() {
     return IsRoot() || !Processes().empty();
+}
+
+void TContainer::UpdateState() {
+    if (state == Running && !IsAlive())
+        Stop();
 }
 
 bool TContainer::Start()
