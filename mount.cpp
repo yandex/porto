@@ -28,7 +28,9 @@ TMount::TMount(string mounts_line) {
 TMountSnapshot::TMountSnapshot() {
     TFile f("/proc/self/mounts");
 
-    for (auto line : f.AsLines())
+    vector<string> lines;
+    f.AsLines(lines);
+    for (auto line : lines)
         mounts.insert(make_shared<TMount>(line));
 }
 

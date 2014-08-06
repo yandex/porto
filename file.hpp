@@ -29,9 +29,9 @@ public:
 
     TError Remove();
 
-    std::string AsString();
-    int AsInt();
-    std::vector<std::string> AsLines();
+    TError AsString(std::string &value);
+    TError AsInt(int &value);
+    TError AsLines(std::vector<std::string> &value);
 
     TError WriteStringNoAppend(std::string str);
     TError AppendString(std::string str);

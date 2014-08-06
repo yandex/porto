@@ -35,10 +35,6 @@ shared_ptr<TMemorySubsystem> TSubsystem::Memory() {
     return static_pointer_cast<TMemorySubsystem>(Get("memory"));
 }
 
-unsigned long TMemorySubsystem::Usage(TCgroup &cg) {
-    return stoul(cg.GetKnobValue("memory.usage_in_bytes"));
-}
-
 // Freezer
 shared_ptr<TFreezerSubsystem> TSubsystem::Freezer() {
     return static_pointer_cast<TFreezerSubsystem>(Get("freezer"));

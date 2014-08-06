@@ -43,22 +43,22 @@ public:
 
     std::string Path();
 
-    void Create();
-    void Remove();
+    TError Create();
+    TError Remove();
 
-    void Kill(int signal);
+    TError Kill(int signal);
 
     std::vector<std::shared_ptr<TCgroup> > FindChildren();
 
-    std::vector<pid_t> Processes();
-    std::vector<pid_t> Tasks();
+    TError GetProcesses(std::vector<pid_t> &processes);
+    TError GetTasks(std::vector<pid_t> &tasks);
     bool IsEmpty();
 
     TError Attach(int pid);
 
-    std::string GetKnobValue(std::string knob);
-    std::vector<std::string> GetKnobValueAsLines(std::string knob);
-    void SetKnobValue(std::string knob, std::string value, bool append = false);
+    TError GetKnobValue(std::string knob, std::string &value);
+    TError GetKnobValueAsLines(std::string knob, std::vector<std::string> &lines);
+    TError SetKnobValue(std::string knob, std::string value, bool append = false);
 
     friend bool operator==(const TCgroup& c1, const TCgroup& c2);
     friend ostream& operator<<(ostream& os, const TCgroup& cg);

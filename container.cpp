@@ -99,7 +99,10 @@ bool TContainer::IsRoot() {
 
 vector<pid_t> TContainer::Processes() {
     auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
-    return cg->Processes();
+
+    vector<pid_t> ret;
+    cg->GetProcesses(ret);
+    return ret;
 }
 
 bool TContainer::IsAlive() {
@@ -222,25 +225,25 @@ bool TContainer::SetProperty(string property, string value)
 
 // TContainerHolder
 TContainerHolder::TContainerHolder() {
-    auto root = Create("/");
+    if (Create("/"))
+        throw "Cannot create root container";
+
+    auto root = Get("/");
     root->Start();
 }
 
 TContainerHolder::~TContainerHolder() {
 }
 
-shared_ptr<TContainer> TContainerHolder::Create(string name)
-{
-    if (containers[name] == nullptr)
+TError TContainerHolder::Create(string name) {
+    if (containers[name] == nullptr) {
         containers[name] = make_shared<TContainer>(name);
-    else
-        throw "container " + name + " already exists";
-
-    return containers[name];
+        return TError();
+    } else
+        return TError("container " + name + " already exists");
 }
 
-shared_ptr<TContainer> TContainerHolder::Find(string name)
-{
+shared_ptr<TContainer> TContainerHolder::Get(string name) {
     return containers[name];
 }
 

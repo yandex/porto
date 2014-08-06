@@ -24,11 +24,15 @@ string CommaSeparatedList(const set<string> &list) {
     return ret;
 }
 
-std::vector<int> StringsToIntegers(std::vector<std::string> lines) {
-    vector<int> ret;
+TError StringsToIntegers(std::vector<std::string> &strings,
+                         std::vector<int> &integers) {
+    for (auto l : strings) {
+        try {
+            integers.push_back(stoi(l));
+        } catch (...) {
+            return TError("Bad integer value");
+        }
+    }
 
-    for (auto l : lines)
-        ret.push_back(stoi(l));
-
-    return ret;
+    return TError();
 }

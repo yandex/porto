@@ -68,8 +68,8 @@ public:
     TContainerHolder();
     ~TContainerHolder();
 
-    std::shared_ptr<TContainer> Create(std::string name);
-    std::shared_ptr<TContainer> Find(std::string name);
+    TError Create(std::string name);
+    std::shared_ptr<TContainer> Get(std::string name);
     TError Restore(const std::string &name, const kv::TNode &node);
 
     void Destroy(std::string name);

@@ -102,15 +102,7 @@ static void Stop(int signum)
 
 static bool AnotherInstanceRunning(const string &path)
 {
-    TFile f(path);
-    int pid = f.AsInt();
-    if (pid == 0)
-        return false;
-
-    if (kill(pid, 0))
-        return false;
-
-    return true;
+    return false; // TODO!!
 }
 
 static TError CreatePidFile(const string &path)

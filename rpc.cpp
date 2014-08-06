@@ -31,7 +31,7 @@ static void StartContainer(TContainerHolder &cholder,
                            const rpc::TContainerStartRequest &req,
                            rpc::TContainerResponse &rsp)
 {
-    auto container = cholder.Find(req.name());
+    auto container = cholder.Get(req.name());
     if (!container) {
         rsp.set_error(rpc::EContainerError::DoesNotExist);
         return;
@@ -45,7 +45,7 @@ static void StopContainer(TContainerHolder &cholder,
                           const rpc::TContainerStopRequest &req,
                           rpc::TContainerResponse &rsp)
 {
-    auto container = cholder.Find(req.name());
+    auto container = cholder.Get(req.name());
     if (!container) {
         rsp.set_error(rpc::EContainerError::DoesNotExist);
         return;
@@ -59,7 +59,7 @@ static void PauseContainer(TContainerHolder &cholder,
                            const rpc::TContainerPauseRequest &req,
                            rpc::TContainerResponse &rsp)
 {
-    auto container = cholder.Find(req.name());
+    auto container = cholder.Get(req.name());
     if (!container) {
         rsp.set_error(rpc::EContainerError::DoesNotExist);
         return;
@@ -73,7 +73,7 @@ static void ResumeContainer(TContainerHolder &cholder,
                             const rpc::TContainerResumeRequest &req,
                             rpc::TContainerResponse &rsp)
 {
-    auto container = cholder.Find(req.name());
+    auto container = cholder.Get(req.name());
     if (!container) {
         rsp.set_error(rpc::EContainerError::DoesNotExist);
         return;
@@ -96,7 +96,7 @@ static void GetContainerProperty(TContainerHolder &cholder,
                                  const rpc::TContainerGetPropertyRequest &req,
                                  rpc::TContainerResponse &rsp)
 {
-    auto container = cholder.Find(req.name());
+    auto container = cholder.Get(req.name());
     if (!container) {
         rsp.set_error(rpc::EContainerError::DoesNotExist);
         return;
@@ -114,7 +114,7 @@ static void SetContainerProperty(TContainerHolder &cholder,
                                  const rpc::TContainerSetPropertyRequest &req,
                                  rpc::TContainerResponse &rsp)
 {
-    auto container = cholder.Find(req.name());
+    auto container = cholder.Get(req.name());
     if (!container) {
         rsp.set_error(rpc::EContainerError::DoesNotExist);
         return;
@@ -128,7 +128,7 @@ static void GetContainerData(TContainerHolder &cholder,
                              const rpc::TContainerGetDataRequest &req,
                              rpc::TContainerResponse &rsp)
 {
-    auto container = cholder.Find(req.name());
+    auto container = cholder.Get(req.name());
     if (!container) {
         rsp.set_error(rpc::EContainerError::DoesNotExist);
         return;

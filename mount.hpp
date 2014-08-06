@@ -57,27 +57,27 @@ public:
         return flags;
     }
 
-    void Mount() {
+    TError Mount() {
         int ret = mount(device.c_str(), mountpoint.c_str(), vfstype.c_str(),
                         mountflags, CommaSeparatedList(flags).c_str());
 
         TLogger::LogAction("mount " + mountpoint, ret, errno);
 
-        if (ret) {
-            if (errno == EBUSY)
-                throw "Already mounted";
-            else
-                throw "Cannot mount filesystem " + mountpoint;
-        }
+        if (ret)
+            return TError("Cannot mount filesystem " + mountpoint);
+
+        return TError();
     }
 
-    void Umount () {
+    TError Umount () {
         int ret = umount(mountpoint.c_str());
 
         TLogger::LogAction("umount " + mountpoint, ret, errno);
 
         if (ret)
-            throw "Cannot umount filesystem " + mountpoint;
+            return TError("Cannot umount filesystem " + mountpoint);
+
+        return TError();
     }
 };
 

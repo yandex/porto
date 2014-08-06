@@ -20,7 +20,7 @@ TFile::EFileType TFile::Type() {
     struct stat st;
 
     if (lstat(path.c_str(), &st))
-        throw "Cannot stat: " + path;
+        return Unknown;
 
     if (S_ISREG(st.st_mode))
         return Regular;
@@ -42,6 +42,7 @@ TFile::EFileType TFile::Type() {
     
 TError TFile::Remove() {
     int ret = unlink(path.c_str());
+
     TLogger::LogAction("unlink " + path, ret, errno);
 
     if (ret && (errno != ENOENT))
@@ -49,44 +50,40 @@ TError TFile::Remove() {
     return TError();
 }
 
-string TFile::AsString() {
+TError TFile::AsString(string &value) {
     ifstream in(Path());
     if (!in.is_open())
-        throw "Cannot open " + Path();
+        return TError("Cannot open " + Path());
 
-    string ret;
-    in >> ret;
+    in >> value;
 
-    return ret;
+    return TError();
 }
 
-int TFile::AsInt() {
-    ifstream in(Path());
-    if (!in.is_open())
-        return 0;
-
+TError TFile::AsInt(int &value) {
     string s;
-    in >> s;
-
+    auto ret = AsString(s);
+    if (ret)
+        return ret;
     try {
-        return stoi(s);
+        value = stoi(s);
+        return TError();
     } catch (...) {
-        return 0;
+        return TError("Bad integer value");
     }
 }
 
-vector<string> TFile::AsLines() {
+TError TFile::AsLines(vector<string> &value) {
     ifstream in(path);
     string line;
 
     if (!in.is_open())
-        throw "Cannot open " + path;
+        return TError("Cannot open " + path);
 
-    vector<string> ret;
     while (getline(in, line))
-        ret.push_back(line);
+        value.push_back(line);
 
-    return ret;
+    return TError();
 }
 
 TError TFile::WriteStringNoAppend(string str)
