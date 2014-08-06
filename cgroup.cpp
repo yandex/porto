@@ -145,16 +145,15 @@ TError TCgroup::Remove() {
 }
 
 TError TCgroup::Kill(int signal) {
-    if (IsRoot())
-        return TError();
-
-    vector<pid_t> tasks;
-    GetTasks(tasks);
-    for (auto pid : tasks) {
-        TTask task(pid);
-        task.Kill(signal);
+    if (!IsRoot()) {
+        vector<pid_t> tasks;
+        if (!GetTasks(tasks)) {
+            for (auto pid : tasks) {
+                TTask task(pid);
+                task.Kill(signal);
+            }
+        }
     }
-
     return TError();
 }
 
@@ -169,22 +168,19 @@ TError TCgroup::GetKnobValueAsLines(std::string knob, vector<string> &lines) {
 }
 
 TError TCgroup::SetKnobValue(std::string knob, std::string value, bool append) {
-    TError ret;
     TFile f(Path() + "/" + knob);
 
     if (append)
-        ret = f.AppendString(value);
+        return f.AppendString(value);
     else
-        ret = f.WriteStringNoAppend(value);
-
-    return ret;
+        return f.WriteStringNoAppend(value);
 }
 
 TError TCgroup::Attach(int pid) {
     if (!IsRoot())
-        SetKnobValue("cgroup.procs", to_string(pid), true);
+        return SetKnobValue("cgroup.procs", to_string(pid), true);
 
-    return 0;
+    return TError();
 }
 
 bool operator==(const TCgroup& c1, const TCgroup& c2) {

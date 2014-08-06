@@ -27,6 +27,8 @@ class TContainerSpec {
 
     std::map<std::string, TProperty> data = {
         {"command", TProperty()},
+        {"user", TProperty()},
+        {"group", TProperty()},
         {"low_limit", TProperty()},
     };
 
