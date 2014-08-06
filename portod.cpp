@@ -206,9 +206,13 @@ int main(int argc, const char *argv[])
         TContainerHolder cholder;
         TCgroupSnapshot cs;
 
-        for (auto &r : storage.Restore())
-            // TODO: handle error
-            cholder.Restore(r.first, r.second);
+        for (auto &r : storage.Restore()) {
+            TError e = cholder.Restore(r.first, r.second);
+            if (e) {
+                cerr << "Couldn't restore " << r.first << " state!" << endl;
+                // TODO: report user?!
+            }
+        }
 
         ret = RpcMain(cholder);
     } catch (string s) {

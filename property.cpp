@@ -8,6 +8,10 @@ string TContainerSpec::Get(const string &property) {
     return data[property].value;
 }
 
+bool TContainerSpec::IsRoot() {
+    return name == "/";
+}
+
 bool TContainerSpec::Set(const string &property, const string &value) {
     if (data.count(property)) {
         if (data[property].checker && !data[property].checker(value))
@@ -23,8 +27,7 @@ bool TContainerSpec::Set(const string &property, const string &value) {
 TContainerSpec::TContainerSpec(const std::string &name) : name(name) {
 }
 
-#if 0
-TContainer::TContainerSpec(const std::string &name, const kv::TNode &node) : name(name) {
+TContainerSpec::TContainerSpec(const std::string &name, const kv::TNode &node) : name(name) {
     for (int i = 0; i < node.pairs_size(); i++) {
         auto key = node.pairs(i).key();
         auto value = node.pairs(i).val();
@@ -34,9 +37,16 @@ TContainer::TContainerSpec(const std::string &name, const kv::TNode &node) : nam
 
     SyncStorage();
 }
-#endif
+
+TContainerSpec::~TContainerSpec() {
+    if (!IsRoot())
+        storage.RemoveNode(name);
+}
 
 TError TContainerSpec::SyncStorage() {
+    if (IsRoot())
+        return TError();
+
     kv::TNode node;
 
     for (auto &kv : data) {
@@ -50,6 +60,9 @@ TError TContainerSpec::SyncStorage() {
 }
 
 TError TContainerSpec::AppendStorage(const string& key, const string& value) {
+    if (IsRoot())
+        return TError();
+
     kv::TNode node;
 
     auto pair = node.add_pairs();

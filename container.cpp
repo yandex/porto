@@ -57,21 +57,18 @@ struct TData {
     };
 };
 
+static std::map<std::string, std::function<std::string(TContainer& c)>> data = {
+    {"state", TData::State},
+    {"root_pid", TData::RootPid}
+};
+
 // TContainer
 
 TContainer::TContainer(const string &name) : name(name), state(Stopped), spec(name) {
-    data = {
-        {"state", TData::State},
-        {"root_pid", TData::RootPid}
-    };
 }
 
-#if 0
-TContainer(const std::string &name, const kv::TNode &node) : name(name), state(Stopped), spec(name) {
-    // TODO recover state, task, etc
-    cerr << "TODO: NEED TO FIND TASK AND SET PROPER STATE" << endl;
+TContainer::TContainer(const std::string &name, const kv::TNode &node) : name(name), state(Stopped), spec(name, node) {
 }
-#endif
 
 bool TContainer::CheckState(EContainerState expected) {
     if (state == Running && (!task || !task->IsRunning()))
@@ -114,11 +111,7 @@ void TContainer::UpdateState() {
         Stop();
 }
 
-bool TContainer::Start()
-{
-    if (!CheckState(Stopped))
-        return false;
-
+void TContainer::PrepareCgroups() {
     if (IsRoot()) {
         leaf_cgroups.push_back(TCgroup::GetRoot(TSubsystem::Memory()));
         leaf_cgroups.push_back(TCgroup::GetRoot(TSubsystem::Freezer()));
@@ -129,6 +122,14 @@ bool TContainer::Start()
 
     for (auto cg : leaf_cgroups)
         cg->Create();
+}
+
+bool TContainer::Start()
+{
+    if (!CheckState(Stopped))
+        return false;
+
+    PrepareCgroups();
 
     if (IsRoot())
         return true;
@@ -223,6 +224,18 @@ bool TContainer::SetProperty(string property, string value)
     return true;
 }
 
+TError TContainer::Restore() {
+    // TODO recover state, task, etc
+    // probably need to PTRACE_SEIZE to be able to do waitpid ("reparent")
+
+    PrepareCgroups();
+
+    state = Stopped;
+    task = nullptr;
+
+    return TError();
+}
+
 // TContainerHolder
 TContainerHolder::TContainerHolder() {
     if (Create("/"))
@@ -266,7 +279,11 @@ vector<string> TContainerHolder::List()
 TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
 {
     // TODO: we DO trust data from the persistent storage, do we?
-    //containers[name] = make_shared<TContainer>(name, node);
+    auto c = make_shared<TContainer>(name, node);
+    auto e = c->Restore();
+    if (e)
+        return e;
 
+    containers[name] = c;
     return TError();
 }
