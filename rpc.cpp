@@ -103,7 +103,7 @@ static void GetContainerProperty(TContainerHolder &cholder,
     }
 
     for (int i = 0; i < req.property_size(); i++) {
-        if (!propertySpec.count(req.property(i))) {
+        if (propertySpec.find(req.property(i)) == propertySpec.end()) {
             rsp.Clear();
             rsp.set_error(rpc::EContainerError::InvalidProperty);
             return;
@@ -127,7 +127,7 @@ static void SetContainerProperty(TContainerHolder &cholder,
         return;
     }
 
-    if (!propertySpec.count(req.value())) {
+    if (propertySpec.find(req.property()) == propertySpec.end()) {
         rsp.set_error(rpc::EContainerError::InvalidProperty);
         return;
     }
@@ -147,7 +147,7 @@ static void GetContainerData(TContainerHolder &cholder,
     }
 
     for (int i = 0; i < req.data_size(); i++) {
-        if (!dataSpec.count(req.data(i))) {
+        if (dataSpec.find(req.data(i)) == dataSpec.end()) {
             rsp.Clear();
             rsp.set_error(rpc::EContainerError::InvalidData);
             return;
