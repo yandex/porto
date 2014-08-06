@@ -204,13 +204,14 @@ int main(int argc, const char *argv[])
         storage.MountTmpfs();
 
         TContainerHolder cholder;
-        TCgroupSnapshot cs;
-
-        for (auto &r : storage.Restore()) {
-            TError e = cholder.Restore(r.first, r.second);
-            if (e) {
-                cerr << "Couldn't restore " << r.first << " state!" << endl;
-                // TODO: report user?!
+        {
+            TCgroupSnapshot cs;
+            for (auto &r : storage.Restore()) {
+                TError e = cholder.Restore(r.first, r.second);
+                if (e) {
+                    cerr << "Couldn't restore " << r.first << " state!" << endl;
+                    // TODO: report user?!
+                }
             }
         }
 
