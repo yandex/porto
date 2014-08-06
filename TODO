@@ -1,6 +1,5 @@
 - porto debug
 - porto debug set container_kill_timeout 100000
-- porto plist
 - porto get <> UKNOWN_PROPRTY - should return error
 - +- error handling
 - +- recovery (task recovery)

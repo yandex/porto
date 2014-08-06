@@ -57,9 +57,9 @@ struct TData {
     };
 };
 
-static std::map<std::string, std::function<std::string(TContainer& c)>> data = {
-    {"state", TData::State},
-    {"root_pid", TData::RootPid}
+std::map<std::string, const TDataSpec> dataSpec = {
+    { "state", { "container state", TData::State } },
+    { "root_pid", { "root process id", TData::RootPid } },
 };
 
 // TContainer
@@ -209,17 +209,15 @@ TError TContainer::Resume()
 
 TError TContainer::GetData(string name, string &value)
 {
-    if (data.find(name) == data.end())
+    if (dataSpec.find(name) == dataSpec.end())
         return TError("No such data");
 
-    value = data[name](*this);
+    value = dataSpec[name].Handler(*this);
     return TError();
-    
 }
 
 TError TContainer::GetProperty(string property, string &value)
 {
-    // TODO!!!
     value = spec.Get(property);
     return TError();
 }

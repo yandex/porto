@@ -235,6 +235,76 @@ public:
     }
 };
 
+class TPropertyListCmd : public ICmd {
+public:
+    TPropertyListCmd() : ICmd("plist", "", "list supported container properties") {}
+
+    int Execute(int argc, char *argv[])
+    {
+        string s;
+        stringstream msg;
+
+        if (NeedHelp(argc, argv, true)) {
+            Usage(argv[0], GetName().c_str());
+            return EXIT_FAILURE;
+        }
+
+        rpc::TContainerRequest req;
+        rpc::TContainerResponse rsp;
+
+        auto *list = new ::rpc::TContainerPropertyListRequest();
+        req.set_allocated_propertylist(list);
+
+        int ret = Rpc(req, rsp);
+        if (ret) {
+            cerr << "Can't list properties, error = " << ret << endl;
+        } else {
+            auto list = rsp.propertylist();
+
+            for (int i = 0; i < list.list_size(); i++) {
+                cout << list.list(i).name() << " - " << list.list(i).desc() << endl;
+            }
+        }
+
+        return ret;
+    }
+};
+
+class TDataListCmd : public ICmd {
+public:
+    TDataListCmd() : ICmd("dlist", "", "list supported container data") {}
+
+    int Execute(int argc, char *argv[])
+    {
+        string s;
+        stringstream msg;
+
+        if (NeedHelp(argc, argv, true)) {
+            Usage(argv[0], GetName().c_str());
+            return EXIT_FAILURE;
+        }
+
+        rpc::TContainerRequest req;
+        rpc::TContainerResponse rsp;
+
+        auto *list = new ::rpc::TContainerDataListRequest();
+        req.set_allocated_datalist(list);
+
+        int ret = Rpc(req, rsp);
+        if (ret) {
+            cerr << "Can't list data, error = " << ret << endl;
+        } else {
+            auto list = rsp.datalist();
+
+            for (int i = 0; i < list.list_size(); i++) {
+                cout << list.list(i).name() << " - " << list.list(i).desc() << endl;
+            }
+        }
+
+        return ret;
+    }
+};
+
 class TGetPropertyCmd : public ICmd {
 public:
     TGetPropertyCmd() : ICmd("get", "<name> <property>", "get container property") {}
@@ -461,6 +531,8 @@ int main(int argc, char *argv[])
         new TCreateCmd(),
         new TDestroyCmd(),
         new TListCmd(),
+        new TPropertyListCmd(),
+        new TDataListCmd(),
         new TStartCmd(),
         new TStopCmd(),
         new TPauseCmd(),
