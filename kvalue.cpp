@@ -48,13 +48,13 @@ TError TKeyValueStorage::LoadNode(const std::string &name, kv::TNode &node)
     TError error;
     try {
         google::protobuf::io::FileInputStream pist(fd);
-        if (!readDelimitedFrom(&pist, &node)) {
+        if (!ReadDelimitedFrom(&pist, &node)) {
             error = TError("TKeyValueStorage: protobuf read error");
         }
 
         kv::TNode next;
         next.Clear();
-        while (readDelimitedFrom(&pist, &next))
+        while (ReadDelimitedFrom(&pist, &next))
             Merge(node, next);
     } catch (...) {
         error = TError("TKeyValueStorage: unhandled exception");
@@ -74,7 +74,7 @@ TError TKeyValueStorage::AppendNode(const std::string &name, const kv::TNode &no
     }
     try {
         google::protobuf::io::FileOutputStream post(fd);
-        if (!writeDelimitedTo(node, &post))
+        if (!WriteDelimitedTo(node, &post))
             error = TError("TKeyValueStorage: protobuf write error");
     } catch (...) {
         error = TError("TKeyValueStorage: unhandled exception");
@@ -89,7 +89,7 @@ TError TKeyValueStorage::SaveNode(const std::string &name, const kv::TNode &node
     TError error;
     try {
         google::protobuf::io::FileOutputStream post(fd);
-        if (!writeDelimitedTo(node, &post))
+        if (!WriteDelimitedTo(node, &post))
             error = TError("TKeyValueStorage: protobuf write error");
     } catch (...) {
         error = TError("TKeyValueStorage: unhandled exception");

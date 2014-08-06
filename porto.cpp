@@ -24,32 +24,6 @@ public:
 
     virtual int Execute(int argc, char *argv[]) = 0;
 
-    static int ConnectToRpcServer(const string& path)
-    {
-        int sfd;
-        struct sockaddr_un peer_addr;
-        socklen_t peer_addr_size;
-
-        memset(&peer_addr, 0, sizeof(struct sockaddr_un));
-
-        sfd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
-        if (sfd < 0) {
-            std::cerr<<"socket() error: "<<strerror(errno)<<std::endl;
-            return -1;
-        }
-
-        peer_addr.sun_family = AF_UNIX;
-        strncpy(peer_addr.sun_path, path.c_str(), sizeof(peer_addr.sun_path) - 1);
-
-        peer_addr_size = sizeof(struct sockaddr_un);
-        if (connect(sfd, (struct sockaddr *) &peer_addr, peer_addr_size) < 0) {
-            std::cerr<<"connect() error: "<<strerror(errno)<<std::endl;
-            return -2;
-        }
-
-        return sfd;
-    }
-
     static int SendReceive(int fd,
                            rpc::TContainerRequest &req,
                            rpc::TContainerResponse &rsp)
@@ -57,10 +31,10 @@ public:
         google::protobuf::io::FileInputStream pist(fd);
         google::protobuf::io::FileOutputStream post(fd);
 
-        writeDelimitedTo(req, &post);
+        WriteDelimitedTo(req, &post);
         post.Flush();
 
-        if (readDelimitedFrom(&pist, &rsp))
+        if (ReadDelimitedFrom(&pist, &rsp))
             return (int)rsp.error();
         else
             return -1;
@@ -68,10 +42,10 @@ public:
 
     int Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp)
     {
-        int fd = ConnectToRpcServer(RPC_SOCK_PATH);
-
-        if (fd < 0)
-            throw "Can't connect to RPC server";
+        int fd;
+        TError error = ConnectToRpcServer(RPC_SOCK_PATH, fd);
+        if (error)
+            throw "Can't connect to RPC server: " + error.GetMsg();
 
         int ret = SendReceive(fd, req, rsp);
 
