@@ -1,7 +1,9 @@
 - porto debug
 - porto debug set container_kill_timeout 100000
+- porto plist
 - TProperty
 - TGetData
 - TError
 - recovery
 - ? portod TLogger should use syslog
+- fix: porto stop sends kill to 0

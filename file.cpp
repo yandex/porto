@@ -40,12 +40,13 @@ TFile::EFileType TFile::Type() {
         return Unknown;
 }
     
-void TFile::Remove() {
+TError TFile::Remove() {
     int ret = unlink(path.c_str());
     TLogger::LogAction("unlink " + path, ret, errno);
 
     if (ret && (errno != ENOENT))
-        throw "Cannot delete file: " + path;
+        return TError(errno);
+    return TError();
 }
 
 string TFile::AsString() {
