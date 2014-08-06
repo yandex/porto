@@ -108,11 +108,7 @@ void TContainer::UpdateState() {
         Stop();
 }
 
-bool TContainer::Start()
-{
-    if (!CheckState(Stopped))
-        return false;
-
+void TContainer::PrepareCgroups() {
     if (IsRoot()) {
         leaf_cgroups.push_back(TCgroup::GetRoot(TSubsystem::Memory()));
         leaf_cgroups.push_back(TCgroup::GetRoot(TSubsystem::Freezer()));
@@ -123,6 +119,14 @@ bool TContainer::Start()
 
     for (auto cg : leaf_cgroups)
         cg->Create();
+}
+
+bool TContainer::Start()
+{
+    if (!CheckState(Stopped))
+        return false;
+
+    PrepareCgroups();
 
     if (IsRoot())
         return true;
@@ -219,7 +223,13 @@ bool TContainer::SetProperty(string property, string value)
 
 TError TContainer::Restore() {
     // TODO recover state, task, etc
-    cerr << "TODO: NEED TO FIND TASK AND SET PROPER STATE" << endl;
+    // probably need to PTRACE_SEIZE to be able to do waitpid ("reparent")
+
+    PrepareCgroups();
+
+    state = Stopped;
+    task = nullptr;
+
     return TError();
 }
 

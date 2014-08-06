@@ -8,4 +8,5 @@
 - recovery
 - ? portod TLogger should use syslog
 - fix: porto stop sends kill to 0
-- fix: portod cheks if there is already running daemon (but somebody can reuse pid)
+- fix: portod checks if there is already running daemon (but somebody can reuse pid)
+- filter container name [A-Za-z0-9_]

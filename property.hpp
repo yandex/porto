@@ -32,10 +32,12 @@ class TContainerSpec {
 
     TError SyncStorage();
     TError AppendStorage(const string& key, const string& value);
+    bool IsRoot();
 
 public:
     TContainerSpec(const std::string &name);
     TContainerSpec(const std::string &name, const kv::TNode &node);
+    ~TContainerSpec();
     std::string Get(const std::string &property);
     bool Set(const std::string &property, const std::string &value);
 };

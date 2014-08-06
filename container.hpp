@@ -34,6 +34,7 @@ class TContainer {
 
     // data
     bool CheckState(EContainerState expected);
+    void PrepareCgroups();
 
 public:
     TContainer(const std::string &name);
