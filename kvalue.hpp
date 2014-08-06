@@ -14,6 +14,7 @@ class TKeyValueStorage {
 
     void Merge(kv::TNode &node, kv::TNode &next);
     std::vector<std::string> ListNodes();
+    TError ListNodes(std::vector<std::string> &list);
 
 public:
     void MountTmpfs();
@@ -23,7 +24,7 @@ public:
     TError SaveNode(const std::string &name, const kv::TNode &node);
     TError AppendNode(const std::string &name, const kv::TNode &node);
     TError RemoveNode(const std::string &name);
-    std::map<std::string, kv::TNode> Restore();
+    TError Restore(std::map<std::string, kv::TNode> &map);
 };
 
 #endif

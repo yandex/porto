@@ -14,24 +14,22 @@ using namespace std;
 TFolder::TFolder(string path) : path(path) {}
 TFolder::TFolder(TFile file) : path(file.Path()) {}
 
-void TFolder::Create(mode_t mode) {
+TError TFolder::Create(mode_t mode) {
     int ret = mkdir(path.c_str(), mode);
 
     TLogger::LogAction("mkdir " + path, ret, errno);
 
-    if (ret) {
-        switch (errno) {
-        case EEXIST:
-            throw "Folder already exists";
-        default:
-            throw "Cannot create folder: " + string(strerror(errno));
-        }
-    }
+    return TError(errno);
 }
 
-void TFolder::Remove(bool recursive) {
+TError TFolder::Remove(bool recursive) {
     if (recursive) {
-        for (auto f : Items(TFile::Any)) {
+        vector<string> items;
+        TError error = Items(TFile::Any, items);
+        if (error)
+            return error;
+
+        for (auto f : items) {
             TFile child(f);
 
             if (child.Type() == TFile::Directory)
@@ -45,12 +43,12 @@ void TFolder::Remove(bool recursive) {
 
     TLogger::LogAction("rmdir " + path, ret, errno);
 
-    if (ret)
-        throw "Cannot remove folder: " + path;
+    return TError(errno);
 }
 
-void TFolder::Rename(std::string newname) {
+TError TFolder::Rename(std::string newname) {
     //TODO
+    return TError("TODO");
 }
 
 bool TFolder::Exists() {
@@ -66,19 +64,18 @@ bool TFolder::Exists() {
         throw "Cannot stat folder: " + path;
 }
 
-vector<string> TFolder::Subfolders() {
-    return Items(TFile::Directory);
+TError TFolder::Subfolders(std::vector<std::string> &list) {
+    return Items(TFile::Directory, list);
 }
 
-vector<string> TFolder::Items(TFile::EFileType type) {
+TError TFolder::Items(const TFile::EFileType type, std::vector<std::string> &list) {
     DIR *dirp;
     struct dirent dp, *res;
-    vector<string> ret;
 
     dirp = opendir(path.c_str());
     if (!dirp)
-        throw "Cannot open folder " + path;
-        
+        return TError("Cannot open folder " + path);
+
     while (!readdir_r(dirp, &dp, &res) && res != nullptr) {
         if (!strcmp(".", res->d_name) || !strcmp ("..", res->d_name))
             continue;
@@ -94,9 +91,9 @@ vector<string> TFolder::Items(TFile::EFileType type) {
              {DT_SOCK, TFile::Socket}};
 
         if (type == TFile::Any || type == d_type_to_type[res->d_type])
-            ret.push_back(string(res->d_name));
+            list.push_back(string(res->d_name));
     }
 
     closedir(dirp);
-    return ret;
+    return TError();
 }

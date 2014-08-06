@@ -117,28 +117,33 @@ void TKeyValueStorage::MountTmpfs() {
     tmpfs.Mount();
 }
 
-std::vector<std::string> TKeyValueStorage::ListNodes() {
+TError TKeyValueStorage::ListNodes(std::vector<std::string> &list) {
     TFolder f(tmpfs.Mountpoint());
-    return f.Items(TFile::Regular);
+    return f.Items(TFile::Regular, list);
 }
 
-std::map<std::string, kv::TNode> TKeyValueStorage::Restore() {
-    std::map<std::string, kv::TNode> map;
+TError TKeyValueStorage::Restore(std::map<std::string, kv::TNode> &map) {
+    std::vector<std::string> nodes;
 
-    for (auto &name : ListNodes()) {
+    TError error = ListNodes(nodes);
+    if (error) {
+        TLogger::LogError(error);
+        return error;
+    }
+
+    for (auto &name : nodes) {
         TError error;
         kv::TNode node;
         node.Clear();
 
         error = LoadNode(name, node);
         if (error) {
-            // TODO: does it make sense to report to upper layer?
             TLogger::LogError(error);
-            continue;
+            return error;
         }
 
         map[name] = node;
     }
 
-    return map;
+    return TError();
 }

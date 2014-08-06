@@ -181,7 +181,15 @@ int main(int argc, const char *argv[])
         TContainerHolder cholder;
         {
             TCgroupSnapshot cs;
-            for (auto &r : storage.Restore()) {
+            std::map<std::string, kv::TNode> m;
+
+            TError error = storage.Restore(m);
+            if (error) {
+                cerr << "Couldn't restore state!" << endl;
+                    // TODO: report user?!
+            }
+
+            for (auto &r : m) {
                 TError e = cholder.Restore(r.first, r.second);
                 if (e) {
                     cerr << "Couldn't restore " << r.first << " state!" << endl;

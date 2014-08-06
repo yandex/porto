@@ -14,12 +14,12 @@ public:
     TFolder(TFile file);
 
     bool Exists();
-    void Create(mode_t mode = 0x755);
-    void Remove(bool recursive = false);
-    void Rename(std::string newname);
+    TError Create(mode_t mode = 0x755);
+    TError Remove(bool recursive = false);
+    TError Rename(std::string newname);
 
-    std::vector<std::string> Items(TFile::EFileType type);
-    std::vector<std::string> Subfolders();
+    TError Items(const TFile::EFileType type, std::vector<std::string> &list);
+    TError Subfolders(std::vector<std::string> &list);
 };
 
 #endif

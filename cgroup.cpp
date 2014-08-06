@@ -54,17 +54,23 @@ vector<shared_ptr<TCgroup> > TCgroup::FindChildren() {
     TFolder f(Path());
     vector<shared_ptr<TCgroup> > ret;
     auto self = TRegistry<TCgroup>::Get(*this);
+    vector<string> list;
 
-    for (auto s : f.Subfolders()) {
+    TError error = f.Subfolders(list);
+    if (error) {
+        // TODO: handle error
+    }
+
+    for (auto s : list) {
         auto cg = TRegistry<TCgroup>::Get(TCgroup(s, self, level + 1));
-        
+
         children.push_back(weak_ptr<TCgroup>(cg));
         for (auto c : cg->FindChildren())
             ret.push_back(c);
     }
 
     ret.push_back(self);
-    
+
     return ret;
 }
 
