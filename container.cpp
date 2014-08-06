@@ -57,9 +57,9 @@ struct TData {
     };
 };
 
-static std::map<std::string, std::function<std::string(TContainer& c)>> data = {
-    {"state", TData::State},
-    {"root_pid", TData::RootPid}
+std::map<std::string, const TDataSpec> dataSpec = {
+    { "state", { "container state", TData::State } },
+    { "root_pid", { "root process id", TData::RootPid } },
 };
 
 // TContainer
@@ -205,7 +205,8 @@ bool TContainer::Resume()
 
 string TContainer::GetData(string name)
 {
-    return data[name](*this);
+    //TODO: catch exception
+    return dataSpec[name].Handler(*this);
 }
 
 string TContainer::GetProperty(string property)

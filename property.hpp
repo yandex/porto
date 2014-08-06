@@ -9,28 +9,20 @@
 #include "error.h"
 #include "kvalue.hpp"
 
-struct TProperty {
-    std::string value;
-    bool dynamic; // can be modified in running state
-
-    std::function<bool (std::string)> checker;
-
-    TProperty(std::string value = "", bool dynamic = false) : value(value),
-                                                              dynamic(dynamic) {}
-
-    TError Sync();
+struct TPropertySpec {
+    std::string description;
+    // can be modified in running state
+    bool dynamic;
+    std::function<bool (std::string)> Valid;
 };
+
+extern std::map<std::string, const TPropertySpec> propertySpec;
 
 class TContainerSpec {
     TKeyValueStorage storage;
     std::string name;
 
-    std::map<std::string, TProperty> data = {
-        {"command", TProperty()},
-        {"user", TProperty()},
-        {"group", TProperty()},
-        {"low_limit", TProperty()},
-    };
+    std::map<std::string, std::string> data;
 
     TError SyncStorage();
     TError AppendStorage(const string& key, const string& value);

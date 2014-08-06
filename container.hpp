@@ -15,6 +15,14 @@ class TTask;
 class TCgroup;
 class TContainerEnv;
 class TData;
+class TContainer;
+
+struct TDataSpec {
+    std::string description;
+    std::function<std::string(TContainer& c)> Handler;
+};
+
+extern std::map<std::string, const TDataSpec> dataSpec;
 
 class TContainer {
     const std::string name;

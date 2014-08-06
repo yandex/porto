@@ -4,8 +4,16 @@
 
 using namespace std;
 
+std::map<std::string, const TPropertySpec> propertySpec = {
+    {"command", { "command executed upon container start" }},
+    {"low_limit", { "memory low limit in bytes" }},
+    {"user", { "start command with given user" }},
+    {"group", { "start command with given group" }},
+};
+
 string TContainerSpec::Get(const string &property) {
-    return data[property].value;
+    // TODO: get default value from propertySpec if nothing in data
+    return data[property];
 }
 
 bool TContainerSpec::IsRoot() {
@@ -13,11 +21,12 @@ bool TContainerSpec::IsRoot() {
 }
 
 bool TContainerSpec::Set(const string &property, const string &value) {
-    if (data.count(property)) {
-        if (data[property].checker && !data[property].checker(value))
+    if (propertySpec.count(property)) {
+        if (propertySpec[property].Valid &&
+            !propertySpec[property].Valid(value))
             return false;
 
-        data[property].value = value;
+        data[property] = value;
         return AppendStorage(property, value);
     }
 
@@ -32,7 +41,7 @@ TContainerSpec::TContainerSpec(const std::string &name, const kv::TNode &node) :
         auto key = node.pairs(i).key();
         auto value = node.pairs(i).val();
 
-        data[key].value = value;
+        data[key] = value;
     }
 
     SyncStorage();
@@ -54,7 +63,7 @@ TError TContainerSpec::SyncStorage() {
 
         auto pair = node.add_pairs();
         pair->set_key(kv.first);
-        pair->set_val(kv.second.value);
+        pair->set_val(kv.second);
     }
     return storage.SaveNode(name, node);
 }

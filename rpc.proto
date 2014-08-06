@@ -4,8 +4,10 @@ enum EContainerError {
 	Success = 0;
 	Error = 1;
 	InvalidMethod = 2;
-	AlreadyExists = 3;
-	DoesNotExist = 4;
+	ContainerAlreadyExists = 3;
+	ContainerDoesNotExist = 4;
+	InvalidProperty = 5;
+	InvalidData = 6;
 }
 
 message TContainerCreateRequest {
@@ -50,6 +52,10 @@ message TContainerResumeRequest {
 	required string name = 1;
 }
 
+message TContainerPropertyListRequest { }
+
+message TContainerDataListRequest { }
+
 message TContainerRequest {
 	// TODO: add some message to get API version
 	// or embed REQUIRED version here
@@ -67,6 +73,8 @@ message TContainerRequest {
 	optional TContainerStopRequest stop = 8;
 	optional TContainerPauseRequest pause = 9;
 	optional TContainerResumeRequest resume = 10;
+	optional TContainerPropertyListRequest propertyList = 11;
+	optional TContainerDataListRequest dataList = 12;
 }
 
 message TContainerListResponse {
@@ -81,10 +89,29 @@ message TContainerGetDataResponse {
 	repeated string value = 1;
 }
 
+message TContainerPropertyListResponse {
+	message TContainerPropertyListEntry {
+		required string name = 1;
+		required string desc = 2;
+	}
+	repeated TContainerPropertyListEntry list = 1;
+}
+
+message TContainerDataListResponse {
+	message TContainerDataListEntry {
+		required string name = 1;
+		required string desc = 2;
+	}
+	repeated TContainerDataListEntry list = 1;
+}
+
+
 message TContainerResponse {
 	required EContainerError error = 1;
 
 	optional TContainerListResponse list = 2;
 	optional TContainerGetPropertyResponse getProperty = 3;
 	optional TContainerGetDataResponse getData = 4;
+	optional TContainerPropertyListResponse propertyList = 5;
+	optional TContainerDataListResponse dataList = 6;
 }
