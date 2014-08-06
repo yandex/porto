@@ -30,9 +30,10 @@ public:
     void Remove();
 
     std::string AsString();
+    int AsInt();
     std::vector<std::string> AsLines();
 
-    void WriteStringNoAppend(std::string str);
+    TError WriteStringNoAppend(std::string str);
     TError AppendString(std::string str);
 };
 

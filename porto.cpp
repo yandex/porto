@@ -24,7 +24,7 @@ public:
 
     virtual int Execute(int argc, char *argv[]) = 0;
 
-    static int ConnectToRpcServer(const char *path)
+    static int ConnectToRpcServer(const string& path)
     {
         int sfd;
         struct sockaddr_un peer_addr;
@@ -39,7 +39,7 @@ public:
         }
 
         peer_addr.sun_family = AF_UNIX;
-        strncpy(peer_addr.sun_path, path, sizeof(peer_addr.sun_path) - 1);
+        strncpy(peer_addr.sun_path, path.c_str(), sizeof(peer_addr.sun_path) - 1);
 
         peer_addr_size = sizeof(struct sockaddr_un);
         if (connect(sfd, (struct sockaddr *) &peer_addr, peer_addr_size) < 0) {

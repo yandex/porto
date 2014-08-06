@@ -59,6 +59,21 @@ string TFile::AsString() {
     return ret;
 }
 
+int TFile::AsInt() {
+    ifstream in(Path());
+    if (!in.is_open())
+        return 0;
+
+    string s;
+    in >> s;
+
+    try {
+        return stoi(s);
+    } catch (...) {
+        return 0;
+    }
+}
+
 vector<string> TFile::AsLines() {
     ifstream in(path);
     string line;
@@ -73,14 +88,17 @@ vector<string> TFile::AsLines() {
     return ret;
 }
 
-void TFile::WriteStringNoAppend(string str)
+TError TFile::WriteStringNoAppend(string str)
 {
     ofstream out(path, ofstream::trunc);
     if (out.is_open()) {
         out << str;
         TLogger::LogAction("write " + path, 0, 0);
-    } else
+        return TError();
+    } else {
         TLogger::LogAction("write " + path, -1, errno);
+        return TError(errno);
+    }
 }
 
 TError TFile::AppendString(string str)
