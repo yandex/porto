@@ -3,7 +3,6 @@
 - porto get <> UKNOWN_PROPRTY - should return error
 - +- error handling
 - +- recovery (task recovery)
-- fix: porto stop sends kill to 0 - throw TError
 - filter container name [A-Za-z0-9_]
 - move porto.socket to /run
 - porto set <> env a=b;c=d;

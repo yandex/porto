@@ -166,6 +166,9 @@ TExitStatus TTask::GetExitStatus() {
 }
 
 void TTask::Kill(int signal) {
+    if (!pid)
+        throw "Tried to kill invalid process!";
+
     int ret = kill(pid, signal);
 
     TLogger::LogAction("kill " + to_string(pid), ret, errno);
