@@ -11,7 +11,12 @@ extern "C" {
 #include <poll.h>
 }
 
-static int CreateRpcServer(const char *path)
+static const int MAX_CLIENTS = 16;
+static const int MAX_CONNECTIONS = MAX_CLIENTS + 1;
+static const int POLL_TIMEOUT_MS = 1000;
+static const string PID_FILE = "/tmp/porto.pid";
+
+int CreateRpcServer(const string &path)
 {
     int fd;
     struct sockaddr_un my_addr;
@@ -25,9 +30,9 @@ static int CreateRpcServer(const char *path)
     }
 
     my_addr.sun_family = AF_UNIX;
-    strncpy(my_addr.sun_path, path, sizeof(my_addr.sun_path) - 1);
+    strncpy(my_addr.sun_path, path.c_str(), sizeof(my_addr.sun_path) - 1);
 
-    unlink(path);
+    unlink(path.c_str());
 
     if (bind(fd, (struct sockaddr *) &my_addr,
              sizeof(struct sockaddr_un)) < 0) {
@@ -43,7 +48,13 @@ static int CreateRpcServer(const char *path)
     return fd;
 }
 
-void HandleRequest(TContainerHolder &cholder, int fd)
+static void RemoveRpcServer(const string &path)
+{
+    TFile f(path);
+    f.Remove();
+}
+
+static void HandleRequest(TContainerHolder &cholder, int fd)
 {
     google::protobuf::io::FileInputStream pist(fd);
     google::protobuf::io::FileOutputStream post(fd);
@@ -59,7 +70,7 @@ void HandleRequest(TContainerHolder &cholder, int fd)
     }
 }
 
-int AcceptClient(int sfd, std::vector<int> &clients)
+static int AcceptClient(int sfd, std::vector<int> &clients)
 {
     int cfd;
     struct sockaddr_un peer_addr;
@@ -80,34 +91,45 @@ int AcceptClient(int sfd, std::vector<int> &clients)
     return 0;
 }
 
-#define MAX_CLIENTS     (16)
-#define MAX_CONNECTIONS (MAX_CLIENTS + 1)
+static sig_atomic_t done = false;
+static int ExitStatus = 0;
 
-sig_atomic_t done = false;
-int exit_status = 0;
-
-extern "C" {
-#include <syslog.h>
-}
-
-void stop(int signum)
+static void Stop(int signum)
 {
     done = true;
-    exit_status = -signum;
+    ExitStatus = -signum;
 }
 
-int rpc_main(TContainerHolder &cholder) {
+static bool AnotherInstanceRunning(const string &path)
+{
+    TFile f(path);
+    int pid = f.AsInt();
+    if (pid == 0)
+        return false;
+
+    if (kill(pid, 0))
+        return false;
+
+    return true;
+}
+
+static TError CreatePidFile(const string &path)
+{
+    TFile f(path);
+
+    return f.WriteStringNoAppend(to_string(getpid()));
+}
+
+static void RemovePidFile(const string &path)
+{
+    TFile f(path);
+    f.Remove();
+}
+
+static int RpcMain(TContainerHolder &cholder) {
     int ret = 0;
     int sfd;
     std::vector<int> clients;
-
-    openlog("portod", LOG_NDELAY | LOG_CONS, LOG_DAEMON);
-    syslog(LOG_INFO, "hello");
-
-    signal(SIGQUIT, stop);
-    signal(SIGTERM, stop);
-    signal(SIGINT, stop);
-    signal(SIGHUP, stop);
 
     sfd = CreateRpcServer(RPC_SOCK_PATH);
     if (sfd < 0) {
@@ -127,7 +149,7 @@ int rpc_main(TContainerHolder &cholder) {
         fds[MAX_CLIENTS].fd = sfd;
         fds[MAX_CLIENTS].events = POLLIN | POLLHUP;
 
-        ret = poll(fds, MAX_CONNECTIONS, 1000);
+        ret = poll(fds, MAX_CONNECTIONS, POLL_TIMEOUT_MS);
         if (ret < 0) {
             std::cerr << "poll() error: " << strerror(errno) << std::endl;
             break;
@@ -154,34 +176,55 @@ int rpc_main(TContainerHolder &cholder) {
         }
     }
 
-    syslog(LOG_INFO, "bye");
-
     for (size_t i = 0; i < clients.size(); i++)
         close(clients[i]);
 
     close(sfd);
-    closelog();
 
-    return exit_status;
+    return ExitStatus;
 }
 
 int main(int argc, const char *argv[])
 {
+    int ret = 0;
+
+    // in case client closes pipe we are writing to in the protobuf code
     signal(SIGPIPE, SIG_IGN);
+
+    // do proper cleanup in case of signal
+    signal(SIGQUIT, Stop);
+    signal(SIGTERM, Stop);
+    signal(SIGINT, Stop);
+    signal(SIGHUP, Stop);
+
+    if (AnotherInstanceRunning(PID_FILE)) {
+        std::cerr << "Another instance of portod is running!" << std::endl;
+        return -1;
+    }
+
+    if (CreatePidFile(PID_FILE)) {
+        std::cerr << "Can't create pid file " << PID_FILE << "!" << std::endl;
+        return -1;
+    }
 
     try {
         TContainerHolder cholder;
         TCgroupSnapshot cs;
 
-        return rpc_main(cholder);
+        ret = RpcMain(cholder);
     } catch (string s) {
         cout << s << endl;
-        return EXIT_FAILURE;
+        ret = EXIT_FAILURE;
     } catch (const char *s) {
         cout << s << endl;
-        return EXIT_FAILURE;
+        ret = EXIT_FAILURE;
     } catch (...) {
         cout << "Uncaught exception!" << endl;
-        return EXIT_FAILURE;
+        ret = EXIT_FAILURE;
     }
+
+    RemovePidFile(PID_FILE);
+    RemoveRpcServer(RPC_SOCK_PATH);
+
+    return ret;
 }
