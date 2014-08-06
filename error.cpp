@@ -19,10 +19,10 @@ TError::operator bool() const {
     return error != 0;
 }
 
-int TError::GetError() {
+int TError::GetError() const {
     return error;
 }
 
-const std::string &TError::GetMsg() {
+const std::string &TError::GetMsg() const {
     return msg;
 }

@@ -208,8 +208,15 @@ int main(int argc, const char *argv[])
     }
 
     try {
+        TKeyValueStorage storage;
+        storage.MountTmpfs();
+
         TContainerHolder cholder;
         TCgroupSnapshot cs;
+
+        for (auto &r : storage.Restore())
+            // TODO: handle error
+            cholder.Restore(r.first, r.second);
 
         ret = RpcMain(cholder);
     } catch (string s) {

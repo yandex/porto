@@ -27,6 +27,7 @@ class TContainerSpec {
 
     std::map<std::string, TProperty> data = {
         {"command", TProperty()},
+        {"low_limit", TProperty()},
     };
 
     TError SyncStorage();
@@ -34,6 +35,7 @@ class TContainerSpec {
 
 public:
     TContainerSpec(const std::string &name);
+    TContainerSpec(const std::string &name, const kv::TNode &node);
     std::string Get(const std::string &property);
     bool Set(const std::string &property, const std::string &value);
 };

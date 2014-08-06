@@ -15,8 +15,8 @@ public:
     // return true if non-successful
     operator bool() const;
 
-    int GetError();
-    const std::string &GetMsg();
+    int GetError() const;
+    const std::string &GetMsg() const;
 };
 
 #endif

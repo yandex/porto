@@ -59,11 +59,19 @@ struct TData {
 
 // TContainer
 
-TContainer::TContainer(const string name) : name(name), state(Stopped), spec(name)
-{
-    data = {{"state", TData::State},
-            {"root_pid", TData::RootPid}};
+TContainer::TContainer(const string &name) : name(name), state(Stopped), spec(name) {
+    data = {
+        {"state", TData::State},
+        {"root_pid", TData::RootPid}
+    };
 }
+
+#if 0
+TContainer(const std::string &name, const kv::TNode &node) : name(name), state(Stopped), spec(name) {
+    // TODO recover state, task, etc
+    cerr << "TODO: NEED TO FIND TASK AND SET PROPER STATE" << endl;
+}
+#endif
 
 bool TContainer::CheckState(EContainerState expected) {
     if (state == Running && (!task || !task->IsRunning()))
@@ -250,4 +258,12 @@ vector<string> TContainerHolder::List()
         ret.push_back(c.second->Name());
 
     return ret;
+}
+
+TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
+{
+    // TODO: we DO trust data from the persistent storage, do we?
+    //containers[name] = make_shared<TContainer>(name, node);
+
+    return TError();
 }

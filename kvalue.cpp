@@ -65,8 +65,13 @@ TError TKeyValueStorage::LoadNode(const std::string &name, kv::TNode &node)
 
 TError TKeyValueStorage::AppendNode(const std::string &name, const kv::TNode &node)
 {
-    int fd = open(Path(name).c_str(), O_CREAT | O_APPEND, 0755);
+    int fd = open(Path(name).c_str(), O_CREAT | O_WRONLY, 0755);
     TError error;
+
+    if (lseek(fd, 0, SEEK_END) < 0) {
+        close(fd);
+        return TError(errno);
+    }
     try {
         google::protobuf::io::FileOutputStream post(fd);
         if (!writeDelimitedTo(node, &post))
@@ -114,5 +119,26 @@ void TKeyValueStorage::MountTmpfs() {
 
 std::vector<std::string> TKeyValueStorage::ListNodes() {
     TFolder f(tmpfs.Mountpoint());
-    return f.Items(TFile::Directory);
+    return f.Items(TFile::Regular);
+}
+
+std::map<std::string, kv::TNode> TKeyValueStorage::Restore() {
+    std::map<std::string, kv::TNode> map;
+
+    for (auto &name : ListNodes()) {
+        TError error;
+        kv::TNode node;
+        node.Clear();
+
+        error = LoadNode(name, node);
+        if (error) {
+            // TODO: does it make sense to report to upper layer?
+            TLogger::LogError(error);
+            continue;
+        }
+
+        map[name] = node;
+    }
+
+    return map;
 }

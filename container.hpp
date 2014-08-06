@@ -37,13 +37,14 @@ class TContainer {
     bool CheckState(EContainerState expected);
 
 public:
-    TContainer(const std::string name);
+    TContainer(const std::string &name);
+    //TContainer(const std::string &name, const kv::TNode &node);
     ~TContainer();
 
     string Name();
 
     bool IsRoot();
-    
+
     vector<pid_t> Processes();
     bool IsAlive();
 
@@ -69,6 +70,7 @@ public:
 
     std::shared_ptr<TContainer> Create(std::string name);
     std::shared_ptr<TContainer> Find(std::string name);
+    TError Restore(const std::string &name, const kv::TNode &node);
 
     void Destroy(std::string name);
 

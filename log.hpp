@@ -3,6 +3,8 @@
 
 #include <iostream>
 
+#include "error.hpp"
+
 #include "string.h"
 #include "errno.h"
 
@@ -17,6 +19,10 @@ public:
             cerr << "Ok: " << action << endl;
         else if (error)
             cerr << "Error: " << action << ": " << strerror(errcode) << endl;
+    }
+
+    static void LogError(const TError &e) {
+        cerr << "Error(" << e.GetError() << "): " << e.GetMsg() << endl;
     }
 
     static void LogRequest(string message) {
