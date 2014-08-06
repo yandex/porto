@@ -8,11 +8,16 @@ string TContainerSpec::Get(const string &property) {
     return data[property].value;
 }
 
-void TContainerSpec::Set(const string &property, const string &value) {
-    if (data[property].checker(value)) {
+bool TContainerSpec::Set(const string &property, const string &value) {
+    if (data.count(property)) {
+        if (data[property].checker && !data[property].checker(value))
+            return false;
+
         data[property].value = value;
-        AppendStorage(property, value);
+        return AppendStorage(property, value);
     }
+
+    return false;
 }
 
 TContainerSpec::TContainerSpec(const std::string &name) : name(name) {

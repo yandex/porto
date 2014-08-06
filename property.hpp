@@ -35,7 +35,7 @@ class TContainerSpec {
 public:
     TContainerSpec(const std::string &name);
     std::string Get(const std::string &property);
-    void Set(const std::string &property, const std::string &value);
+    bool Set(const std::string &property, const std::string &value);
 };
 
 #endif
