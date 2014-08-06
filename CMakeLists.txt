@@ -15,6 +15,3 @@ target_link_libraries(portod ${PROTOBUF_LIBRARIES})
 
 add_executable(porto porto.cpp protobuf.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 target_link_libraries(porto ${PROTOBUF_LIBRARIES})
-
-add_executable(test test.cpp mount.cpp cgroup.cpp mount.cpp file.cpp stringutil.cpp kvalue.cpp subsystem.cpp folder.cpp kv.pb.cc protobuf.cpp error.cpp task.cpp)
-target_link_libraries(test ${PROTOBUF_LIBRARIES})
