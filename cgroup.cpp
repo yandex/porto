@@ -69,11 +69,11 @@ vector<shared_ptr<TCgroup> > TCgroup::FindChildren() {
 }
 
 vector<pid_t> TCgroup::Processes() {
-    return PidsFromLine(GetKnobValue("cgroup.procs"));
+    return StringsToIntegers(GetKnobValueAsLines("cgroup.procs"));
 }
 
 vector<pid_t> TCgroup::Tasks() {
-    return PidsFromLine(GetKnobValue("tasks"));
+    return StringsToIntegers(GetKnobValueAsLines("tasks"));
 }
 
 bool TCgroup::IsEmpty() {
@@ -140,9 +140,14 @@ void TCgroup::Kill(int signal) {
     }
 }
 
-std::string TCgroup::GetKnobValue(std::string knob) {
+string TCgroup::GetKnobValue(std::string knob) {
     TFile f(Path() + "/" + knob);
     return f.AsString();
+}
+
+vector<string> TCgroup::GetKnobValueAsLines(std::string knob) {
+    TFile f(Path() + "/" + knob);
+    return f.AsLines();
 }
 
 void TCgroup::SetKnobValue(std::string knob, std::string value, bool append) {

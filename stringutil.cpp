@@ -24,17 +24,11 @@ string CommaSeparatedList(const set<string> &list) {
     return ret;
 }
 
-vector<int> PidsFromLine(const std::string line) {
+std::vector<int> StringsToIntegers(std::vector<std::string> lines) {
     vector<int> ret;
 
-    istringstream iss(line);
-    while (iss) {
-        string tmp;
-        iss >> tmp;
-        try {
-            ret.push_back(stoi(tmp));
-        } catch (...) { }
-    }
+    for (auto l : lines)
+        ret.push_back(stoi(l));
 
     return ret;
 }

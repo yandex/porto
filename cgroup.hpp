@@ -57,6 +57,7 @@ public:
     TError Attach(int pid);
 
     std::string GetKnobValue(std::string knob);
+    std::vector<std::string> GetKnobValueAsLines(std::string knob);
     void SetKnobValue(std::string knob, std::string value, bool append = false);
 
     friend bool operator==(const TCgroup& c1, const TCgroup& c2);

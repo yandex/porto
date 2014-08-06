@@ -8,6 +8,6 @@
 std::string CommaSeparatedList(const std::vector<std::string> &list);
 std::string CommaSeparatedList(const std::set<std::string> &list);
 
-std::vector<int> PidsFromLine(const std::string line);
+std::vector<int> StringsToIntegers(std::vector<std::string> lines);
 
 #endif
