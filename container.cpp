@@ -75,7 +75,7 @@ bool TContainer::Start()
     if (IsRoot())
         return true;
 
-    TTaskEnv taskEnv(GetProperty("command"), "");
+    TTaskEnv taskEnv(spec.Get("command"), "");
     task = unique_ptr<TTask>(new TTask(taskEnv, [&this->leaf_cgroups] () {
             for (auto cg : leaf_cgroups) {
                 auto error = cg->Attach(getpid());
@@ -181,22 +181,17 @@ string TContainer::GetData(string data)
 
 string TContainer::GetProperty(string property)
 {
-    auto val = properties.find(property);
-    if (val == properties.end())
-        return "";
-
-    return val->second;
+    //TODO: catch exception
+    return spec.Get(property);
 }
 
 bool TContainer::SetProperty(string property, string value)
 {
     if (name == "/")
         return false;
-    if (property.length())
-        properties[property] = value;
-    else
-        properties.erase(property);
-    // TODO: write to persistent storage
+
+    //TODO: catch exception
+    spec.Set(property, value);
 
     return true;
 }

@@ -8,6 +8,7 @@
 #include <memory>
 
 #include "kvalue.hpp"
+#include "property.hpp"
 
 class TTask;
 class TCgroup;
@@ -23,7 +24,7 @@ class TContainer {
     };
     EContainerState state;
 
-    std::unordered_map<std::string, std::string> properties;
+    TContainerSpec spec;
 
     std::vector<std::shared_ptr<TCgroup> > leaf_cgroups;
     std::unique_ptr<TTask> task;
