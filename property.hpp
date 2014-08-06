@@ -10,13 +10,13 @@
 #include "kvalue.hpp"
 
 struct TProperty {
-    bool dynamic; // can be modified in running state
     std::string value;
+    bool dynamic; // can be modified in running state
 
     std::function<bool (std::string)> checker;
 
-    TProperty() : dynamic(false) {}
-    TProperty(bool dynamic) : dynamic(dynamic) {}
+    TProperty(std::string value = "", bool dynamic = false) : value(value),
+                                                              dynamic(dynamic) {}
 
     TError Sync();
 };
@@ -26,7 +26,7 @@ class TContainerSpec {
     std::string name;
 
     std::map<std::string, TProperty> data = {
-        {"command", TProperty(false)},
+        {"command", TProperty()},
     };
 
     TError SyncStorage();

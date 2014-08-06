@@ -149,6 +149,7 @@ bool TContainer::Stop()
 
     if (task->IsRunning())
         task->Kill(SIGTERM);
+    task = nullptr;
 
     usleep(kill_timeout);
 
@@ -158,10 +159,8 @@ bool TContainer::Stop()
     cg->Kill(SIGKILL);
     TSubsystem::Freezer()->Unfreeze(*cg);
 
-    leaf_cgroups.erase(std::remove(leaf_cgroups.begin(), leaf_cgroups.end(), cg));
     leaf_cgroups.clear();
 
-    task = nullptr;
     state = Stopped;
 
     return true;
