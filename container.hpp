@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <vector>
 #include <memory>
+#include <functional>
 
 #include "kvalue.hpp"
 #include "property.hpp"
@@ -13,6 +14,7 @@
 class TTask;
 class TCgroup;
 class TContainerEnv;
+class TData;
 
 class TContainer {
     const std::string name;
@@ -25,6 +27,8 @@ class TContainer {
     EContainerState state;
 
     TContainerSpec spec;
+    friend TData;
+    std::map<std::string, std::function<std::string(TContainer& c)>> data;
 
     std::vector<std::shared_ptr<TCgroup> > leaf_cgroups;
     std::unique_ptr<TTask> task;

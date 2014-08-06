@@ -19,8 +19,50 @@ extern "C" {
 
 using namespace std;
 
+// Data
+
+struct TData {
+    static string State(TContainer& c) {
+        // TODO: update state
+
+        switch (c.state) {
+        case TContainer::Stopped:
+            return "stopped";
+        case TContainer::Running:
+            return "running";
+        case TContainer::Paused:
+            return "paused";
+        default:
+            return "unknown";
+        }
+    }
+
+    static string RootPid(TContainer& c) {
+        if (c.task)
+            return to_string(c.task->GetPid());
+        else
+            return "unknown";
+    };
+
+    static string ExitStatus(TContainer& c) {
+        if (c.task) {
+            TExitStatus status = c.task->GetExitStatus();
+            stringstream ss;
+            //ss << status.error << ";" << status.signal << ";" << status.status;
+            ss << "error=" << status.error << ";signal=" << status.signal << ";status=" << status.status;
+            return ss.str();
+        }
+        else
+            return "unknown";
+    };
+};
+
+// TContainer
+
 TContainer::TContainer(const string name) : name(name), state(Stopped)
 {
+    data = {{"state", TData::State},
+            {"root_pid", TData::RootPid}};
 }
 
 bool TContainer::CheckState(EContainerState expected) {
@@ -144,39 +186,9 @@ bool TContainer::Resume()
     return true;
 }
 
-string TContainer::GetData(string data)
+string TContainer::GetData(string name)
 {
-    string tstat;
-
-    if (data == "root_pid") {
-        if (!task)
-            return "0";
-        return to_string(task->GetPid());
-    } else if (data == "state") {
-        switch (state) {
-        case Stopped:
-            return "stopped";
-        case Running:
-            if (!CheckState(Running))
-                return "stopped";
-
-            return "running";
-        case Paused:
-            return "paused";
-        };
-    } else if (data == "exit_status") {
-        if (!task)
-            return "nil";
-
-        TExitStatus status = task->GetExitStatus();
-        stringstream ss;
-        //ss << status.error << ";" << status.signal << ";" << status.status;
-        ss << "error=" << status.error << ";signal=" << status.signal << ";status=" << status.status;
-        return ss.str();
-    } else {
-        return "nil";
-    }
-    return "unknown";
+    return data[name](*this);
 }
 
 string TContainer::GetProperty(string property)
