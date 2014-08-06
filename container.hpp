@@ -28,7 +28,6 @@ class TContainer {
 
     TContainerSpec spec;
     friend TData;
-    std::map<std::string, std::function<std::string(TContainer& c)>> data;
 
     std::vector<std::shared_ptr<TCgroup> > leaf_cgroups;
     std::unique_ptr<TTask> task;
@@ -38,7 +37,7 @@ class TContainer {
 
 public:
     TContainer(const std::string &name);
-    //TContainer(const std::string &name, const kv::TNode &node);
+    TContainer(const std::string &name, const kv::TNode &node);
     ~TContainer();
 
     string Name();
@@ -59,6 +58,7 @@ public:
     bool SetProperty(std::string property, std::string value);
 
     string GetData(std::string data);
+    TError Restore();
 };
 
 class TContainerHolder {

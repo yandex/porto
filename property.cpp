@@ -23,8 +23,7 @@ bool TContainerSpec::Set(const string &property, const string &value) {
 TContainerSpec::TContainerSpec(const std::string &name) : name(name) {
 }
 
-#if 0
-TContainer::TContainerSpec(const std::string &name, const kv::TNode &node) : name(name) {
+TContainerSpec::TContainerSpec(const std::string &name, const kv::TNode &node) : name(name) {
     for (int i = 0; i < node.pairs_size(); i++) {
         auto key = node.pairs(i).key();
         auto value = node.pairs(i).val();
@@ -34,7 +33,6 @@ TContainer::TContainerSpec(const std::string &name, const kv::TNode &node) : nam
 
     SyncStorage();
 }
-#endif
 
 TError TContainerSpec::SyncStorage() {
     kv::TNode node;
