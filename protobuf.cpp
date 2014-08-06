@@ -1,6 +1,12 @@
 #include "protobuf.hpp"
 
-bool writeDelimitedTo(
+extern "C" {
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+}
+
+bool WriteDelimitedTo(
                       const google::protobuf::MessageLite& message,
                       google::protobuf::io::ZeroCopyOutputStream* rawOutput) {
     // We create a new coded stream for each message.  Don't worry, this is fast.
@@ -24,7 +30,7 @@ bool writeDelimitedTo(
     return true;
 }
 
-bool readDelimitedFrom(
+bool ReadDelimitedFrom(
                        google::protobuf::io::ZeroCopyInputStream* rawInput,
                        google::protobuf::MessageLite* message) {
     // We create a new coded stream for each message.  Don't worry, this is fast,
@@ -49,4 +55,56 @@ bool readDelimitedFrom(
     input.PopLimit(limit);
 
     return true;
+}
+
+TError ConnectToRpcServer(const std::string& path, int &fd)
+{
+    struct sockaddr_un peer_addr;
+    socklen_t peer_addr_size;
+
+    memset(&peer_addr, 0, sizeof(struct sockaddr_un));
+
+    fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
+    if (fd < 0)
+        return TError(errno);
+
+    peer_addr.sun_family = AF_UNIX;
+    strncpy(peer_addr.sun_path, path.c_str(), sizeof(peer_addr.sun_path) - 1);
+
+    peer_addr_size = sizeof(struct sockaddr_un);
+    if (connect(fd, (struct sockaddr *) &peer_addr, peer_addr_size) < 0) {
+        close(fd);
+        return TError(errno);
+    }
+
+    return TError();
+}
+
+TError CreateRpcServer(const std::string &path, int &fd)
+{
+    struct sockaddr_un my_addr;
+
+    memset(&my_addr, 0, sizeof(struct sockaddr_un));
+
+    fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
+    if (fd < 0)
+        return TError(errno);
+
+    my_addr.sun_family = AF_UNIX;
+    strncpy(my_addr.sun_path, path.c_str(), sizeof(my_addr.sun_path) - 1);
+
+    unlink(path.c_str());
+
+    if (bind(fd, (struct sockaddr *) &my_addr,
+             sizeof(struct sockaddr_un)) < 0) {
+        close(fd);
+        return TError(errno);
+    }
+
+    if (listen(fd, 0) < 0) {
+        close(fd);
+        return TError(errno);
+    }
+
+    return TError();
 }

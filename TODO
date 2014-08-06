@@ -2,11 +2,12 @@
 - porto debug set container_kill_timeout 100000
 - porto plist
 - porto get <> UKNOWN_PROPRTY - should return error
-- TProperty
-- TGetData
-- TError
-- recovery
-- ? portod TLogger should use syslog
-- fix: porto stop sends kill to 0
-- fix: portod checks if there is already running daemon (but somebody can reuse pid)
+- +- error handling
+- +- recovery (task recovery)
+- fix: porto stop sends kill to 0 - throw TError
 - filter container name [A-Za-z0-9_]
+- move porto.socket to /run
+- porto set <> env a=b;c=d;
+- porto start -> setuid()/setgid()
+- ? subprocess stdout (ptty)
+- permissions of .pid, .socket, etc

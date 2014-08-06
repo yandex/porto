@@ -16,38 +16,6 @@ static const int MAX_CONNECTIONS = MAX_CLIENTS + 1;
 static const int POLL_TIMEOUT_MS = 1000;
 static const string PID_FILE = "/tmp/porto.pid";
 
-int CreateRpcServer(const string &path)
-{
-    int fd;
-    struct sockaddr_un my_addr;
-
-    memset(&my_addr, 0, sizeof(struct sockaddr_un));
-
-    fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
-    if (fd < 0) {
-        std::cerr << "socket() error: " << strerror(errno) << std::endl;
-        return -1;
-    }
-
-    my_addr.sun_family = AF_UNIX;
-    strncpy(my_addr.sun_path, path.c_str(), sizeof(my_addr.sun_path) - 1);
-
-    unlink(path.c_str());
-
-    if (bind(fd, (struct sockaddr *) &my_addr,
-             sizeof(struct sockaddr_un)) < 0) {
-        std::cerr << "bind() error: " << strerror(errno) << std::endl;
-        return -2;
-    }
-
-    if (listen(fd, 0) < 0) {
-        std::cerr << "listen() error: " << strerror(errno) << std::endl;
-        return -3;
-    }
-
-    return fd;
-}
-
 static void RemoveRpcServer(const string &path)
 {
     TFile f(path);
@@ -60,11 +28,11 @@ static void HandleRequest(TContainerHolder &cholder, int fd)
     google::protobuf::io::FileOutputStream post(fd);
 
     rpc::TContainerRequest request;
-    if (readDelimitedFrom(&pist, &request)) {
+    if (ReadDelimitedFrom(&pist, &request)) {
         auto rsp = HandleRpcRequest(cholder, request);
 
         if (rsp.IsInitialized()) {
-            writeDelimitedTo(rsp, &post);
+            WriteDelimitedTo(rsp, &post);
             post.Flush();
         }
     }
@@ -102,7 +70,14 @@ static void Stop(int signum)
 
 static bool AnotherInstanceRunning(const string &path)
 {
-    return false; // TODO!!
+    int fd;
+    TError error = ConnectToRpcServer(path, fd);
+
+    if (error)
+        return false;
+
+    close(fd);
+    return true;
 }
 
 static TError CreatePidFile(const string &path)
@@ -123,9 +98,9 @@ static int RpcMain(TContainerHolder &cholder) {
     int sfd;
     std::vector<int> clients;
 
-    sfd = CreateRpcServer(RPC_SOCK_PATH);
-    if (sfd < 0) {
-        std::cerr << "Can't create RPC server" << std::endl;
+    TError error = CreateRpcServer(RPC_SOCK_PATH, sfd);
+    if (error) {
+        cerr << "Can't create RPC server: " << error.GetMsg() << endl;
         return -1;
     }
 
@@ -189,7 +164,7 @@ int main(int argc, const char *argv[])
     signal(SIGINT, Stop);
     signal(SIGHUP, Stop);
 
-    if (AnotherInstanceRunning(PID_FILE)) {
+    if (AnotherInstanceRunning(RPC_SOCK_PATH)) {
         std::cerr << "Another instance of portod is running!" << std::endl;
         return -1;
     }
