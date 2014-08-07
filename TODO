@@ -5,7 +5,7 @@
 - move porto.socket to /run
 - porto set <> env a=b;c=d;
 - porto start -> setuid()/setgid()
-- subprocess stdout/stderr into file
+- rotate subprocess stdout/stderr
 - permissions of .pid, .socket, etc
 - move all 'extern "C"' into one file
 - monitoring/statistics

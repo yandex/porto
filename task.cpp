@@ -1,6 +1,8 @@
 #include <climits>
 #include <sstream>
 #include <iterator>
+#include <random>
+#include <algorithm>
 
 #include "task.hpp"
 #include "cgroup.hpp"
@@ -46,9 +48,6 @@ int TTask::CloseAllFds(int except) {
         return except;
     close(0);
 
-    for (int i = 0; i < 3; i++)
-        open("/dev/null", O_RDWR);
-
     return except;
 }
 
@@ -68,6 +67,39 @@ void TTask::ReportResultAndExit(int fd, int result)
     exit(EXIT_FAILURE);
 }
 
+static std::string GetRandomName(const int len) {
+    static const string charset = "0123456789abcdefghijklmnopqrstuvwxyz";
+    static mt19937 mt;
+    static random_device rd;
+    static bool seeded = false;
+    static uniform_int_distribution<int32_t> dist(0, charset.length() - 1);
+
+    if (!seeded) {
+        mt.seed(rd());
+        seeded = true;
+    }
+
+    string str(len, 0);
+    generate_n(str.begin(), len, []() { return charset[dist(mt)]; });
+
+    return str;
+}
+
+TTask::~TTask() {
+    if (stdoutFile.length()) {
+        TFile f(stdoutFile);
+        TError e = f.Remove();
+        if (e)
+            TLogger::LogError(e, "Can't remove task stdout " + stdoutFile);
+    }
+    if (stderrFile.length()) {
+        TFile f(stderrFile);
+        TError e = f.Remove();
+        if (e)
+            TLogger::LogError(e, "Can't remove task stderr " + stdoutFile);
+    }
+}
+
 TError TTask::Start() {
     int ret;
     int pfd[2];
@@ -75,6 +107,12 @@ TError TTask::Start() {
     exitStatus.error = 0;
     exitStatus.signal = 0;
     exitStatus.status = 0;
+
+    // TODO: use real container root directory
+    string rootDir = "/tmp/";
+
+    stdoutFile = rootDir + GetRandomName(32);
+    stderrFile = rootDir + GetRandomName(32);
 
     ret = pipe2(pfd, O_CLOEXEC);
     if (ret) {
@@ -94,6 +132,13 @@ TError TTask::Start() {
     } else if (pid == 0) {
         close(rfd);
 
+        /*
+         * ReportResultAndExit(fd, -errno) means we failed while preparing
+         * to execve, which should never happen (but it will :-)
+         *
+         * ReportResultAndExit(fd, +errno) means execve failed
+         */
+
         if (setsid() < 0)
             ReportResultAndExit(wfd, -errno);
 
@@ -103,12 +148,28 @@ TError TTask::Start() {
         for (auto cg : leaf_cgroups) {
             auto error = cg->Attach(getpid());
             if (error)
-                ReportResultAndExit(wfd, error);
+                ReportResultAndExit(wfd, -error.GetError());
         }
 
         wfd = CloseAllFds(wfd);
         if (wfd < 0)
-            exit(wfd);
+            /* there is no way of telling parent that we failed (because we
+             * screwed up fds), so exit with some eye catching error code */
+            exit(0xAA);
+
+        ret = open("/dev/null", O_RDONLY);
+        if (ret < 0)
+            ReportResultAndExit(wfd, -errno);
+
+        // TODO: O_APPEND to support rotation?
+        ret = open(stdoutFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0700);
+        if (ret < 0)
+            ReportResultAndExit(wfd, -errno);
+
+        // TODO: O_APPEND to support rotation?
+        ret = open(stderrFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0700);
+        if (ret < 0)
+            ReportResultAndExit(wfd, -errno);
 
         auto argv = GetArgv();
         execvp(argv[0], (char *const *)argv);
@@ -175,4 +236,22 @@ void TTask::Kill(int signal) {
 
     if (ret == ESRCH)
         return;
+}
+
+std::string TTask::GetStdout() {
+    string s;
+    TFile f(stdoutFile);
+    TError e = f.AsString(s);
+    if (e)
+        TLogger::LogError(e);
+    return s;
+}
+
+std::string TTask::GetStderr() {
+    string s;
+    TFile f(stderrFile);
+    TError e = f.AsString(s);
+    if (e)
+        TLogger::LogError(e);
+    return s;
 }

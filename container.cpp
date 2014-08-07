@@ -55,11 +55,26 @@ struct TData {
         else
             return "unknown";
     };
+
+    static string Stdout(TContainer& c) {
+        if (c.task)
+            return c.task->GetStdout();
+        return "";
+    };
+
+    static string Stderr(TContainer& c) {
+        if (c.task)
+            return c.task->GetStderr();
+        return "";
+    };
 };
 
 std::map<std::string, const TDataSpec> dataSpec = {
     { "state", { "container state", TData::State } },
+    { "exit_status", { "container exit status", TData::ExitStatus } },
     { "root_pid", { "root process id", TData::RootPid } },
+    { "stdout", { "return task stdout", TData::Stdout } },
+    { "stderr", { "return task stderr", TData::Stderr } },
 };
 
 // TContainer

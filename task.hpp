@@ -45,6 +45,8 @@ class TTask {
     TExitStatus exitStatus;
 
     pid_t pid;
+    std::string stdoutFile;
+    std::string stderrFile;
 
     int CloseAllFds(int except);
     const char** GetArgv();
@@ -53,6 +55,7 @@ class TTask {
 public:
     TTask(TTaskEnv& env, std::vector<std::shared_ptr<TCgroup>> &leaf_cgroups) : env(env), leaf_cgroups(leaf_cgroups) {};
     TTask(pid_t pid) : pid(pid) {};
+    ~TTask();
 
     void FindCgroups();
 
@@ -61,6 +64,9 @@ public:
     bool IsRunning();
     TExitStatus GetExitStatus();
     void Kill(int signal);
+
+    std::string GetStdout();
+    std::string GetStderr();
 };
 
 #endif

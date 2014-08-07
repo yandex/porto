@@ -55,7 +55,11 @@ TError TFile::AsString(string &value) {
     if (!in.is_open())
         return TError("Cannot open " + Path());
 
-    in >> value;
+    in.seekg(0, std::ios::end);
+    value.reserve(in.tellg());
+    in.seekg(0, std::ios::beg);
+
+    value.assign((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
 
     return TError();
 }

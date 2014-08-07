@@ -21,8 +21,8 @@ public:
             cerr << "Error: " << action << ": " << strerror(errcode) << endl;
     }
 
-    static void LogError(const TError &e) {
-        cerr << "Error(" << e.GetError() << "): " << e.GetMsg() << endl;
+    static void LogError(const TError &e, const string &s = "") {
+        cerr << "Error(" << e.GetError() << "): " << e.GetMsg() << " - " << s << endl;
     }
 
     static void LogRequest(string message) {
