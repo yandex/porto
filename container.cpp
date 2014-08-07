@@ -158,7 +158,7 @@ TError TContainer::Start()
     if (IsRoot())
         return ret;
 
-    TTaskEnv taskEnv(spec.Get("command"), "");
+    TTaskEnv taskEnv(spec.Get("command"), "", spec.Get("user"), spec.Get("group"));
     task = unique_ptr<TTask>(new TTask(taskEnv, leaf_cgroups));
 
     ret = task->Start();

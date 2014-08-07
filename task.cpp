@@ -14,12 +14,13 @@ extern "C" {
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <grp.h>
 }
 
 using namespace std;
 
 // TTaskEnv
-TTaskEnv::TTaskEnv(const std::string command, const string cwd) : cwd(cwd) {
+TTaskEnv::TTaskEnv(const std::string &command, const std::string &cwd, const std::string &user, const std::string &group) : cwd(cwd), user(user), group(group) {
     // TODO: support quoting
     if (command.empty())
         return;
@@ -31,6 +32,25 @@ TTaskEnv::TTaskEnv(const std::string command, const string cwd) : cwd(cwd) {
 
     path = args.front();
     args.erase(args.begin());
+}
+
+int TTaskEnv::GetUid() {
+    // TODO: getpwnam
+    return stoi(user);
+}
+int TTaskEnv::GetGid() {
+    // TODO: getpwnam
+    return stoi(group);
+}
+
+const char** TTaskEnv::GetArgv() {
+    auto argv = new const char* [args.size() + 2];
+    argv[0] = path.c_str();
+    for (size_t i = 0; i < args.size(); i++)
+        argv[i + 1] = args[i].c_str();
+    argv[args.size() + 1] = NULL;
+
+    return argv;
 }
 
 // TTask
@@ -49,16 +69,6 @@ int TTask::CloseAllFds(int except) {
     close(0);
 
     return except;
-}
-
-const char** TTask::GetArgv() {
-    auto argv = new const char* [env.args.size() + 2];
-    argv[0] = env.path.c_str();
-    for (size_t i = 0; i < env.args.size(); i++)
-        argv[i + 1] = env.args[i].c_str();
-    argv[env.args.size() + 1] = NULL;
-
-    return argv;
 }
 
 void TTask::ReportResultAndExit(int fd, int result)
@@ -120,6 +130,8 @@ TError TTask::Start() {
         return TError(errno);
     }
 
+    int uid = env.GetUid();
+    int gid = env.GetGid();
     int rfd = pfd[0];
     int wfd = pfd[1];
 
@@ -166,12 +178,30 @@ TError TTask::Start() {
         if (ret < 0)
             ReportResultAndExit(wfd, -errno);
 
+        ret = fchown(ret, uid, gid);
+        if (ret < 0)
+            ReportResultAndExit(wfd, -errno);
+
         // TODO: O_APPEND to support rotation?
         ret = open(stderrFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0700);
         if (ret < 0)
             ReportResultAndExit(wfd, -errno);
 
-        auto argv = GetArgv();
+        ret = fchown(ret, uid, gid);
+        if (ret < 0)
+            ReportResultAndExit(wfd, -errno);
+
+        // drop privileges
+        if (setgroups(0, NULL) < 0)
+            ReportResultAndExit(wfd, -errno);
+
+        if (setgid(gid) < 0)
+            ReportResultAndExit(wfd, -errno);
+
+        if (setuid(uid) < 0)
+            ReportResultAndExit(wfd, -errno);
+
+        auto argv = env.GetArgv();
         execvp(argv[0], (char *const *)argv);
 
         ReportResultAndExit(wfd, errno);

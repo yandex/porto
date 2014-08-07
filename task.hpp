@@ -31,10 +31,15 @@ class TTaskEnv {
     std::vector<std::string> args;
     std::string cwd;
     //std::vector<std::string> env;
+    std::string user;
+    std::string group;
 
 public:
     TTaskEnv() {};
-    TTaskEnv(const std::string command, const std::string cwd);
+    TTaskEnv(const std::string &command, const std::string &cwd, const std::string &user, const std::string &group);
+    int GetUid();
+    int GetGid();
+    const char** GetArgv();
 };
 
 class TTask {
@@ -49,7 +54,6 @@ class TTask {
     std::string stderrFile;
 
     int CloseAllFds(int except);
-    const char** GetArgv();
     void ReportResultAndExit(int fd, int result);
 
 public:

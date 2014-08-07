@@ -5,14 +5,16 @@
 using namespace std;
 
 std::map<std::string, const TPropertySpec> propertySpec = {
-    {"command", { "command executed upon container start" }},
-    {"low_limit", { "memory low limit in bytes" }},
-    {"user", { "start command with given user" }},
-    {"group", { "start command with given group" }},
+    {"command", { "command executed upon container start", "id" }},
+    {"low_limit", { "memory low limit in bytes", "0" }},
+    {"user", { "start command with given user", "65534" }},
+    {"group", { "start command with given group", "65534" }},
 };
 
 string TContainerSpec::Get(const string &property) {
-    // TODO: get default value from propertySpec if nothing in data
+    if (data.find(property) == data.end())
+        return propertySpec[property].def;
+
     return data[property];
 }
 

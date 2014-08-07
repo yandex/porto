@@ -1,11 +1,17 @@
-- porto debug
-- porto debug set container_kill_timeout 100000
-- +- error handling
-- +- recovery (task recovery)
-- move porto.socket to /run
 - porto set <> env a=b;c=d;
-- porto start -> setuid()/setgid()
+- support user/group conversion to uid/gid
 - rotate subprocess stdout/stderr
+- monitoring/statistics
+
+# cleanup
+- move porto.socket and porto.pid to /run
 - permissions of .pid, .socket, etc
 - move all 'extern "C"' into one file
-- monitoring/statistics
+
+# debug
+- porto debug
+- porto debug set container_kill_timeout 100000
+
+# +-
+- error handling
+- recovery (task recovery)

@@ -11,6 +11,7 @@
 
 struct TPropertySpec {
     std::string description;
+    std::string def;
     // can be modified in running state
     bool dynamic;
     std::function<bool (std::string)> Valid;
