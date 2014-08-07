@@ -257,7 +257,23 @@ TContainerHolder::TContainerHolder() {
 TContainerHolder::~TContainerHolder() {
 }
 
+bool TContainerHolder::ValidName(const string &name)
+{
+    if (name == "/")
+        return true;
+
+    return find_if(name.begin(), name.end(),
+                   [](const char c) -> bool {
+                        return !(isalnum(c) || c == '_');
+                   }) == name.end();
+}
+
 TError TContainerHolder::Create(string name) {
+    if (!ValidName(name)) {
+        cerr << "ZZZ" <<endl;
+        return TError("invalid container name " + name);
+    }
+
     if (containers[name] == nullptr) {
         containers[name] = make_shared<TContainer>(name);
         return TError();

@@ -158,8 +158,8 @@ int main(int argc, const char *argv[])
     // in case client closes pipe we are writing to in the protobuf code
     signal(SIGPIPE, SIG_IGN);
 
-    // do proper cleanup in case of signal
-    signal(SIGQUIT, Stop);
+    // do proper cleanup in case of a deadly signal
+    // don't catch SIGQUIT, may be useful to create core dump
     signal(SIGTERM, Stop);
     signal(SIGINT, Stop);
     signal(SIGHUP, Stop);

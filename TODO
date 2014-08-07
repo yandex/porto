@@ -1,12 +1,11 @@
 - porto debug
 - porto debug set container_kill_timeout 100000
-- porto get <> UKNOWN_PROPRTY - should return error
 - +- error handling
 - +- recovery (task recovery)
-- filter container name [A-Za-z0-9_]
 - move porto.socket to /run
 - porto set <> env a=b;c=d;
 - porto start -> setuid()/setgid()
-- ? subprocess stdout (ptty)
+- subprocess stdout/stderr into file
 - permissions of .pid, .socket, etc
 - move all 'extern "C"' into one file
+- monitoring/statistics

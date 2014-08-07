@@ -12,8 +12,9 @@ static void CreateContainer(TContainerHolder &cholder,
                             rpc::TContainerResponse &rsp)
 {
     try {
-        cholder.Create(req.name());
-        rsp.set_error(rpc::EContainerError::Success);
+        TError error = cholder.Create(req.name());
+        if (!error)
+            rsp.set_error(rpc::EContainerError::Success);
     } catch (...) {
         rsp.set_error(rpc::EContainerError::ContainerAlreadyExists);
     }
