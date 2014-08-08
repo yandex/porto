@@ -13,5 +13,5 @@ add_executable(portod portod.cpp cgroup.cpp mount.cpp rpc.cpp protobuf.cpp conta
 		       ${PROTO_SRCS} ${PROTO_HDRS})
 target_link_libraries(portod ${PROTOBUF_LIBRARIES})
 
-add_executable(porto porto.cpp protobuf.cpp error.cpp ${PROTO_SRCS} ${PROTO_HDRS})
+add_executable(porto porto.cpp protobuf.cpp error.cpp libporto.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 target_link_libraries(porto ${PROTOBUF_LIBRARIES})

@@ -2,22 +2,14 @@
 #include <iomanip>
 #include <sstream>
 
-#include "rpc.hpp"
-#include "protobuf.hpp"
-
-extern "C" {
-#include <unistd.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-}
+#include "libporto.hpp"
 
 class ICmd {
 protected:
     string name, usage, desc;
     int need_args;
 
-    rpc::TContainerRequest req;
-    rpc::TContainerResponse rsp;
+    TPortoAPI api;
 
 public:
     ICmd(const string& name, int args, const string& usage, const string& desc) :
@@ -35,35 +27,6 @@ public:
     }
 
     virtual int Execute(int argc, char *argv[]) = 0;
-
-    static int SendReceive(int fd,
-                           rpc::TContainerRequest &req,
-                           rpc::TContainerResponse &rsp)
-    {
-        google::protobuf::io::FileInputStream pist(fd);
-        google::protobuf::io::FileOutputStream post(fd);
-
-        WriteDelimitedTo(req, &post);
-        post.Flush();
-
-        if (ReadDelimitedFrom(&pist, &rsp))
-            return (int)rsp.error();
-        else
-            return -1;
-    }
-
-    int Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp)
-    {
-        int fd;
-        TError error = ConnectToRpcServer(RPC_SOCK_PATH, fd);
-        if (error)
-            throw "Can't connect to RPC server: " + error.GetMsg();
-
-        int ret = SendReceive(fd, req, rsp);
-
-        close(fd);
-        return ret;
-    }
 };
 
 static vector<ICmd *> commands;
@@ -72,8 +35,7 @@ class THelpCmd : public ICmd {
 public:
     THelpCmd() : ICmd("help", 1, "[command]", "print help message for command") {}
 
-    void Usage(const char *name)
-    {
+    void Usage(const char *name) {
         cout << "usage: " << name << " <command> [<args>]" << endl;
         cout << endl;
         cout << "list of commands:" << endl;
@@ -81,8 +43,7 @@ public:
             cout << " " << left << setw(16) << cmd->GetName() << cmd->GetDescription() << endl;
     }
 
-    int Execute(int argc, char *argv[])
-    {
+    int Execute(int argc, char *argv[]) {
         string name = argv[0];
         for (ICmd *cmd : commands) {
             if (cmd->GetName() == name) {
@@ -99,8 +60,7 @@ public:
     }
 };
 
-static void Usage(char *name, const char *command)
-{
+static void Usage(char *name, const char *command) {
     ICmd *cmd = new THelpCmd();
     char *argv[] = { name, (char *)"help", (char *)command, NULL };
 
@@ -111,20 +71,15 @@ class TRawCmd : public ICmd {
 public:
     TRawCmd() : ICmd("raw", 2, "<message>", "send raw protobuf message") {}
 
-    int Execute(int argc, char *argv[])
-    {
+    int Execute(int argc, char *argv[]) {
         stringstream msg;
 
         std::vector<std::string> args(argv, argv + argc);
         copy(args.begin(), args.end(), ostream_iterator<string>(msg, " "));
 
-        if (!google::protobuf::TextFormat::ParseFromString(msg.str(), &req) ||
-            !req.IsInitialized())
-            return -1;
-
-        int ret = Rpc(req, rsp);
-        if (!ret)
-            cout << rsp.ShortDebugString() << endl;
+        string resp;
+        if (!api.Raw(msg.str(), resp))
+            cout << resp << endl;
 
         return 0;
     }
@@ -136,11 +91,7 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string name = string(argv[0]);
-
-        req.mutable_create()->set_name(name);
-
-        int ret = Rpc(req, rsp);
+        int ret = api.Create(argv[0]);
         if (ret)
             cerr << "Can't create container, error = " << ret << endl;
 
@@ -154,11 +105,7 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string name = string(argv[0]);
-
-        req.mutable_destroy()->set_name(name);
-
-        int ret = Rpc(req, rsp);
+        int ret = api.Destroy(argv[0]);
         if (ret)
             cerr << "Can't destroy container, error = " << ret << endl;
 
@@ -172,16 +119,13 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        auto *list = new ::rpc::TContainerListRequest();
-        req.set_allocated_list(list);
-
-        int ret = Rpc(req, rsp);
-        if (ret) {
+        vector<string> clist;
+        int ret = api.List(clist);
+        if (ret)
             cerr << "Can't list containers, error = " << ret << endl;
-        } else {
-            for (int i = 0; i < rsp.list().name_size(); i++)
-                cout << rsp.list().name(i) << endl;
-        }
+        else
+            for (auto c : clist)
+                cout << c << endl;
 
         return ret;
     }
@@ -193,19 +137,13 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        auto *list = new ::rpc::TContainerPropertyListRequest();
-        req.set_allocated_propertylist(list);
-
-        int ret = Rpc(req, rsp);
-        if (ret) {
+        vector<TProperty> plist;
+        int ret = api.Plist(plist);
+        if (ret)
             cerr << "Can't list properties, error = " << ret << endl;
-        } else {
-            auto list = rsp.propertylist();
-
-            for (int i = 0; i < list.list_size(); i++) {
-                cout << list.list(i).name() << " - " << list.list(i).desc() << endl;
-            }
-        }
+        else
+            for (auto p : plist)
+                cout << p.name << " - " << p.description << endl;
 
         return ret;
     }
@@ -217,19 +155,13 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        auto *list = new ::rpc::TContainerDataListRequest();
-        req.set_allocated_datalist(list);
-
-        int ret = Rpc(req, rsp);
-        if (ret) {
+        vector<TData> dlist;
+        int ret = api.Dlist(dlist);
+        if (ret)
             cerr << "Can't list data, error = " << ret << endl;
-        } else {
-            auto list = rsp.datalist();
-
-            for (int i = 0; i < list.list_size(); i++) {
-                cout << list.list(i).name() << " - " << list.list(i).desc() << endl;
-            }
-        }
+        else
+            for (auto d : dlist)
+                cout << d.name << " - " << d.description << endl;
 
         return ret;
     }
@@ -241,19 +173,13 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string name = string(argv[0]);
-        string property = string(argv[1]);
-
-        req.mutable_getproperty()->set_name(name);
-        req.mutable_getproperty()->add_property(property);
-
-        int ret = Rpc(req, rsp);
-        if (ret) {
+        vector<string> value;
+        int ret = api.GetProperties(argv[0], argv[1], value);
+        if (ret)
             cerr << "Can't get property, error = " << ret << endl;
-        } else {
-            for (int i = 0; i < rsp.getproperty().value_size(); i++)
-                cout << rsp.getproperty().value(i) << endl;
-        }
+        else
+            for (auto v : value)
+                cout << v << endl;
 
         return ret;
     }
@@ -265,15 +191,7 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string name = string(argv[0]);
-        string property = string(argv[1]);
-        string value = string(argv[2]);
-
-        req.mutable_setproperty()->set_name(name);
-        req.mutable_setproperty()->set_property(property);
-        req.mutable_setproperty()->set_value(value);
-
-        int ret = Rpc(req, rsp);
+        int ret = api.SetProperty(argv[0], argv[1], argv[2]);
         if (ret)
             cerr << "Can't set property, error = " << ret << endl;
 
@@ -287,19 +205,13 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string name = string(argv[0]);
-        string data = string(argv[1]);
-
-        req.mutable_getdata()->set_name(name);
-        req.mutable_getdata()->add_data(data);
-
-        int ret = Rpc(req, rsp);
-        if (ret) {
+        vector<string> value;
+        int ret = api.GetData(argv[0], argv[1], value);
+        if (ret)
             cerr << "Can't get data, error = " << ret << endl;
-        } else {
-            for (int i = 0; i < rsp.getdata().value_size(); i++)
-                cout << rsp.getdata().value(i) << endl;
-        }
+        else
+            for (auto v : value)
+                cout << v << endl;
 
         return ret;
     }
@@ -311,11 +223,7 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string name = string(argv[0]);
-
-        req.mutable_start()->set_name(name);
-
-        int ret = Rpc(req, rsp);
+        int ret = api.Start(argv[0]);
         if (ret)
             cerr << "Can't start container, error = " << ret << endl;
 
@@ -329,11 +237,7 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string name = string(argv[0]);
-
-        req.mutable_stop()->set_name(name);
-
-        int ret = Rpc(req, rsp);
+        int ret = api.Stop(argv[0]);
         if (ret)
             cerr << "Can't stop container, error = " << ret << endl;
 
@@ -347,11 +251,7 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string name = string(argv[0]);
-
-        req.mutable_pause()->set_name(name);
-
-        int ret = Rpc(req, rsp);
+        int ret = api.Pause(argv[0]);
         if (ret)
             cerr << "Can't pause container, error = " << ret << endl;
 
@@ -365,11 +265,7 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string name = string(argv[0]);
-
-        req.mutable_resume()->set_name(name);
-
-        int ret = Rpc(req, rsp);
+        int ret = api.Resume(argv[0]);
         if (ret)
             cerr << "Can't resume container, error = " << ret << endl;
 
@@ -421,4 +317,4 @@ int main(int argc, char *argv[])
     }
 
     return EXIT_FAILURE;
-}
+};
