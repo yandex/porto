@@ -14,13 +14,25 @@ extern "C" {
 class ICmd {
 protected:
     string name, usage, desc;
+    int need_args;
+
+    rpc::TContainerRequest req;
+    rpc::TContainerResponse rsp;
 
 public:
-    ICmd(const string& name, const string& usage, const string& desc) : name(name), usage(usage), desc(desc) {}
+    ICmd(const string& name, int args, const string& usage, const string& desc) :
+        name(name), usage(usage), desc(desc), need_args(args) {}
 
     string& GetName() { return name; }
     string& GetUsage() { return usage; }
     string& GetDescription() { return desc; }
+
+    bool ValidArgs(int argc, char *argv[]) {
+        if (need_args < argc)
+            return false;
+
+        return true;
+    }
 
     virtual int Execute(int argc, char *argv[]) = 0;
 
@@ -58,7 +70,7 @@ static vector<ICmd *> commands;
 
 class THelpCmd : public ICmd {
 public:
-    THelpCmd() : ICmd("help", "[command]", "print help message for command") {}
+    THelpCmd() : ICmd("help", 0, "[command]", "print help message for command") {}
 
     void Usage(const char *name)
     {
@@ -100,30 +112,13 @@ static void Usage(char *name, const char *command)
     cmd->Execute(command ? 3 : 1, argv);
 }
 
-static bool NeedHelp(int argc, char *argv[], bool canBeEmpty)
-{
-    if (argc >= 3) {
-        string arg = argv[2];
-        if (arg == "-h" || arg == "--help" || arg == "help")
-            return true;
-        else
-            return false;
-    }
-    return canBeEmpty ? false : true;
-}
-
 class TRawCmd : public ICmd {
 public:
-    TRawCmd() : ICmd("raw", "<message>", "send raw protobuf message") {}
+    TRawCmd() : ICmd("raw", 2, "<message>", "send raw protobuf message") {}
 
     int Execute(int argc, char *argv[])
     {
         stringstream msg;
-
-        if (NeedHelp(argc, argv, false)) {
-            Usage(argv[0], GetName().c_str());
-            return EXIT_FAILURE;
-        }
 
         argv += 2;
         argc -= 2;
@@ -131,8 +126,6 @@ public:
         std::vector<std::string> args(argv, argv + argc);
         copy(args.begin(), args.end(), ostream_iterator<string>(msg, " "));
 
-        rpc::TContainerRequest req;
-        rpc::TContainerResponse rsp;
         if (!google::protobuf::TextFormat::ParseFromString(msg.str(), &req) ||
             !req.IsInitialized())
             return -1;
@@ -147,22 +140,13 @@ public:
 
 class TCreateCmd : public ICmd {
 public:
-    TCreateCmd() : ICmd("create", "<name>", "create container") {}
+    TCreateCmd() : ICmd("create", 1, "<name>", "create container") {}
 
     int Execute(int argc, char *argv[])
     {
         string s;
-        stringstream msg;
-
-        if (NeedHelp(argc, argv, false)) {
-            Usage(argv[0], GetName().c_str());
-            return EXIT_FAILURE;
-        }
 
         string name = string(argv[2]);
-
-        rpc::TContainerRequest req;
-        rpc::TContainerResponse rsp;
 
         req.mutable_create()->set_name(name);
 
@@ -176,22 +160,13 @@ public:
 
 class TDestroyCmd : public ICmd {
 public:
-    TDestroyCmd() : ICmd("destroy", "<name>", "destroy container") {}
+    TDestroyCmd() : ICmd("destroy", 1, "<name>", "destroy container") {}
 
     int Execute(int argc, char *argv[])
     {
         string s;
-        stringstream msg;
-
-        if (NeedHelp(argc, argv, false)) {
-            Usage(argv[0], GetName().c_str());
-            return EXIT_FAILURE;
-        }
 
         string name = string(argv[2]);
-
-        rpc::TContainerRequest req;
-        rpc::TContainerResponse rsp;
 
         req.mutable_destroy()->set_name(name);
 
@@ -205,20 +180,11 @@ public:
 
 class TListCmd : public ICmd {
 public:
-    TListCmd() : ICmd("list", "", "list created containers") {}
+    TListCmd() : ICmd("list", 0, "", "list created containers") {}
 
     int Execute(int argc, char *argv[])
     {
         string s;
-        stringstream msg;
-
-        if (NeedHelp(argc, argv, true)) {
-            Usage(argv[0], GetName().c_str());
-            return EXIT_FAILURE;
-        }
-
-        rpc::TContainerRequest req;
-        rpc::TContainerResponse rsp;
 
         auto *list = new ::rpc::TContainerListRequest();
         req.set_allocated_list(list);
@@ -237,20 +203,11 @@ public:
 
 class TPropertyListCmd : public ICmd {
 public:
-    TPropertyListCmd() : ICmd("plist", "", "list supported container properties") {}
+    TPropertyListCmd() : ICmd("plist", 1, "", "list supported container properties") {}
 
     int Execute(int argc, char *argv[])
     {
         string s;
-        stringstream msg;
-
-        if (NeedHelp(argc, argv, true)) {
-            Usage(argv[0], GetName().c_str());
-            return EXIT_FAILURE;
-        }
-
-        rpc::TContainerRequest req;
-        rpc::TContainerResponse rsp;
 
         auto *list = new ::rpc::TContainerPropertyListRequest();
         req.set_allocated_propertylist(list);
@@ -272,20 +229,11 @@ public:
 
 class TDataListCmd : public ICmd {
 public:
-    TDataListCmd() : ICmd("dlist", "", "list supported container data") {}
+    TDataListCmd() : ICmd("dlist", 1, "", "list supported container data") {}
 
     int Execute(int argc, char *argv[])
     {
         string s;
-        stringstream msg;
-
-        if (NeedHelp(argc, argv, true)) {
-            Usage(argv[0], GetName().c_str());
-            return EXIT_FAILURE;
-        }
-
-        rpc::TContainerRequest req;
-        rpc::TContainerResponse rsp;
 
         auto *list = new ::rpc::TContainerDataListRequest();
         req.set_allocated_datalist(list);
@@ -307,23 +255,14 @@ public:
 
 class TGetPropertyCmd : public ICmd {
 public:
-    TGetPropertyCmd() : ICmd("get", "<name> <property>", "get container property") {}
+    TGetPropertyCmd() : ICmd("get", 2, "<name> <property>", "get container property") {}
 
     int Execute(int argc, char *argv[])
     {
         string s;
-        stringstream msg;
-
-        if (NeedHelp(argc, argv, false) || argc < 4) {
-            Usage(argv[0], GetName().c_str());
-            return EXIT_FAILURE;
-        }
 
         string name = string(argv[2]);
         string property = string(argv[3]);
-
-        rpc::TContainerRequest req;
-        rpc::TContainerResponse rsp;
 
         req.mutable_getproperty()->set_name(name);
         req.mutable_getproperty()->add_property(property);
@@ -342,24 +281,15 @@ public:
 
 class TSetPropertyCmd : public ICmd {
 public:
-    TSetPropertyCmd() : ICmd("set", "<name> <property>", "set container property") {}
+    TSetPropertyCmd() : ICmd("set", 3, "<name> <property>", "set container property") {}
 
     int Execute(int argc, char *argv[])
     {
         string s;
-        stringstream msg;
-
-        if (NeedHelp(argc, argv, false) || argc < 5) {
-            Usage(argv[0], GetName().c_str());
-            return EXIT_FAILURE;
-        }
 
         string name = string(argv[2]);
         string property = string(argv[3]);
         string value = string(argv[4]);
-
-        rpc::TContainerRequest req;
-        rpc::TContainerResponse rsp;
 
         req.mutable_setproperty()->set_name(name);
         req.mutable_setproperty()->set_property(property);
@@ -375,23 +305,14 @@ public:
 
 class TGetDataCmd : public ICmd {
 public:
-    TGetDataCmd() : ICmd("data", "<name> <data>", "get container data") {}
+    TGetDataCmd() : ICmd("data", 2, "<name> <data>", "get container data") {}
 
     int Execute(int argc, char *argv[])
     {
         string s;
-        stringstream msg;
-
-        if (NeedHelp(argc, argv, false) || argc < 4) {
-            Usage(argv[0], GetName().c_str());
-            return EXIT_FAILURE;
-        }
 
         string name = string(argv[2]);
         string data = string(argv[3]);
-
-        rpc::TContainerRequest req;
-        rpc::TContainerResponse rsp;
 
         req.mutable_getdata()->set_name(name);
         req.mutable_getdata()->add_data(data);
@@ -410,22 +331,13 @@ public:
 
 class TStartCmd : public ICmd {
 public:
-    TStartCmd() : ICmd("start", "<name>", "start container") {}
+    TStartCmd() : ICmd("start", 1, "<name>", "start container") {}
 
     int Execute(int argc, char *argv[])
     {
         string s;
-        stringstream msg;
-
-        if (NeedHelp(argc, argv, false)) {
-            Usage(argv[0], GetName().c_str());
-            return EXIT_FAILURE;
-        }
 
         string name = string(argv[2]);
-
-        rpc::TContainerRequest req;
-        rpc::TContainerResponse rsp;
 
         req.mutable_start()->set_name(name);
 
@@ -439,22 +351,13 @@ public:
 
 class TStopCmd : public ICmd {
 public:
-    TStopCmd() : ICmd("stop", "<name>", "stop container") {}
+    TStopCmd() : ICmd("stop", 1, "<name>", "stop container") {}
 
     int Execute(int argc, char *argv[])
     {
         string s;
-        stringstream msg;
-
-        if (NeedHelp(argc, argv, false)) {
-            Usage(argv[0], GetName().c_str());
-            return EXIT_FAILURE;
-        }
 
         string name = string(argv[2]);
-
-        rpc::TContainerRequest req;
-        rpc::TContainerResponse rsp;
 
         req.mutable_stop()->set_name(name);
 
@@ -468,22 +371,13 @@ public:
 
 class TPauseCmd : public ICmd {
 public:
-    TPauseCmd() : ICmd("pause", "<name>", "pause container") {}
+    TPauseCmd() : ICmd("pause", 1, "<name>", "pause container") {}
 
     int Execute(int argc, char *argv[])
     {
         string s;
-        stringstream msg;
-
-        if (NeedHelp(argc, argv, false)) {
-            Usage(argv[0], GetName().c_str());
-            return EXIT_FAILURE;
-        }
 
         string name = string(argv[2]);
-
-        rpc::TContainerRequest req;
-        rpc::TContainerResponse rsp;
 
         req.mutable_pause()->set_name(name);
 
@@ -497,22 +391,13 @@ public:
 
 class TResumeCmd : public ICmd {
 public:
-    TResumeCmd() : ICmd("resume", "<name>", "resume container") {}
+    TResumeCmd() : ICmd("resume", 1, "<name>", "resume container") {}
 
     int Execute(int argc, char *argv[])
     {
         string s;
-        stringstream msg;
-
-        if (NeedHelp(argc, argv, false)) {
-            Usage(argv[0], GetName().c_str());
-            return EXIT_FAILURE;
-        }
 
         string name = string(argv[2]);
-
-        rpc::TContainerRequest req;
-        rpc::TContainerResponse rsp;
 
         req.mutable_resume()->set_name(name);
 
@@ -556,8 +441,13 @@ int main(int argc, char *argv[])
 
     try {
         for (ICmd *cmd : commands)
-            if (cmd->GetName() == name)
+            if (cmd->GetName() == name) {
+                if (!cmd->ValidArgs(argc - 2, &argv[2])) {
+                    Usage(argv[0], cmd->GetName().c_str());
+                    return EXIT_FAILURE;
+                }
                 return cmd->Execute(argc, argv);
+            }
     } catch (const char *err) {
         cerr << err << endl;
     }
