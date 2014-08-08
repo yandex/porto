@@ -32,7 +32,7 @@ public:
             return false;
 
         if (argc >= 1) {
-            string arg = argv[0];
+            string arg(argv[0]);
             if (arg == "-h" || arg == "--help" || arg == "help")
                 return false;;
         }
@@ -94,7 +94,7 @@ public:
             return EXIT_FAILURE;
         }
 
-        string name = argv[0];
+        string name(argv[0]);
         for (ICmd *cmd : commands) {
             if (cmd->GetName() == name) {
                 cout << "usage: " << program_invocation_short_name << " " << name << " " << cmd->GetUsage() << endl;
@@ -147,7 +147,7 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string name = string(argv[0]);
+        string name(argv[0]);
 
         req.mutable_create()->set_name(name);
 
@@ -165,7 +165,7 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string name = string(argv[0]);
+        string name(argv[0]);
 
         req.mutable_destroy()->set_name(name);
 
@@ -252,8 +252,8 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string name = string(argv[0]);
-        string property = string(argv[1]);
+        string name(argv[0]);
+        string property(argv[1]);
 
         req.mutable_getproperty()->set_name(name);
         req.mutable_getproperty()->add_property(property);
@@ -276,9 +276,9 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string name = string(argv[0]);
-        string property = string(argv[1]);
-        string value = string(argv[2]);
+        string name(argv[0]);
+        string property(argv[1]);
+        string value(argv[2]);
 
         req.mutable_setproperty()->set_name(name);
         req.mutable_setproperty()->set_property(property);
@@ -298,8 +298,8 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string name = string(argv[0]);
-        string data = string(argv[1]);
+        string name(argv[0]);
+        string data(argv[1]);
 
         req.mutable_getdata()->set_name(name);
         req.mutable_getdata()->add_data(data);
@@ -322,7 +322,7 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string name = string(argv[0]);
+        string name(argv[0]);
 
         req.mutable_start()->set_name(name);
 
@@ -340,7 +340,7 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string name = string(argv[0]);
+        string name(argv[0]);
 
         req.mutable_stop()->set_name(name);
 
@@ -358,7 +358,7 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string name = string(argv[0]);
+        string name(argv[0]);
 
         req.mutable_pause()->set_name(name);
 
@@ -376,7 +376,7 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string name = string(argv[0]);
+        string name(argv[0]);
 
         req.mutable_resume()->set_name(name);
 
@@ -412,7 +412,7 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
-    string name = argv[1];
+    string name(argv[1]);
     if (name == "-h" || name == "--help") {
         Usage(NULL);
         return EXIT_FAILURE;
