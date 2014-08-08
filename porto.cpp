@@ -70,7 +70,7 @@ static vector<ICmd *> commands;
 
 class THelpCmd : public ICmd {
 public:
-    THelpCmd() : ICmd("help", 0, "[command]", "print help message for command") {}
+    THelpCmd() : ICmd("help", 1, "[command]", "print help message for command") {}
 
     void Usage(const char *name)
     {
@@ -84,15 +84,15 @@ public:
     int Execute(int argc, char *argv[])
     {
         string name = argv[0];
-        // for (ICmd *cmd : commands) {
-        //     if (cmd->GetName() == name) {
-        //         cout << "usage: " << argv[0] << " " << name << " " << cmd->GetUsage() << endl;
-        //         cout << endl;
-        //         cout << cmd->GetDescription() << endl;
+        for (ICmd *cmd : commands) {
+            if (cmd->GetName() == name) {
+                cout << "usage: " << argv[0] << " " << name << " " << cmd->GetUsage() << endl;
+                cout << endl;
+                cout << cmd->GetDescription() << endl;
 
-        //         return EXIT_SUCCESS;
-        //     }
-        // }
+                return EXIT_SUCCESS;
+            }
+        }
 
         Usage(argv[0]);
         return EXIT_FAILURE;
