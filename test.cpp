@@ -16,17 +16,16 @@ int main(int argc, char *argv[])
     assert(api.Create("t") == 0);
     assert(api.Start("t") == 0);
 
-    std::vector<std::string> v;
+    std::string v;
     api.GetData("t", "root_pid", v);
-    assert(v[0] != "0");
+    assert(v != "0");
 
     api.GetData("t", "exit_status", v);
 
     usleep(1000000);
 
-    std::vector<std::string> s;
-    api.GetData("t", "stdout", s);
-    std::cout << s[0] << endl;
+    api.GetData("t", "stdout", v);
+    std::cout << v << endl;
 
     return 0;
 }

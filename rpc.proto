@@ -22,7 +22,7 @@ message TContainerListRequest { }
 
 message TContainerGetPropertyRequest {
 	required string name = 1;
-	repeated string property = 2;
+	required string property = 2;
 }
 
 message TContainerSetPropertyRequest {
@@ -33,7 +33,7 @@ message TContainerSetPropertyRequest {
 
 message TContainerGetDataRequest {
 	required string name = 1;
-	repeated string data = 2;
+	required string data = 2;
 }
 
 message TContainerStartRequest {
@@ -82,11 +82,11 @@ message TContainerListResponse {
 }
 
 message TContainerGetPropertyResponse {
-	repeated string value = 1;
+	required string value = 1;
 }
 
 message TContainerGetDataResponse {
-	repeated string value = 1;
+	required string value = 1;
 }
 
 message TContainerPropertyListResponse {

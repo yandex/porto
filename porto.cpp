@@ -186,13 +186,12 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        vector<string> value;
-        int ret = api.GetProperties(argv[0], argv[1], value);
+        string value;
+        int ret = api.GetProperty(argv[0], argv[1], value);
         if (ret)
             cerr << "Can't get property, error = " << ret << endl;
         else
-            for (auto v : value)
-                cout << v << endl;
+            cout << value << endl;
 
         return ret;
     }
@@ -218,13 +217,12 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        vector<string> value;
+        string value;
         int ret = api.GetData(argv[0], argv[1], value);
         if (ret)
             cerr << "Can't get data, error = " << ret << endl;
         else
-            for (auto v : value)
-                cout << v << endl;
+            cout << value << endl;
 
         return ret;
     }

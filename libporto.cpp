@@ -36,7 +36,7 @@ int TPortoAPI::Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
     return ret;
 }
 
-int TPortoAPI::Raw(std::string message, string &responce) {
+int TPortoAPI::Raw(const std::string &message, string &responce) {
     if (!google::protobuf::TextFormat::ParseFromString(message, &req) ||
         !req.IsInitialized())
         return -1;
@@ -48,13 +48,13 @@ int TPortoAPI::Raw(std::string message, string &responce) {
     return ret;
 }
 
-int TPortoAPI::Create(string name) {
+int TPortoAPI::Create(const string &name) {
     req.mutable_create()->set_name(name);
 
     return Rpc(req, rsp);
 }
 
-int TPortoAPI::Destroy(string name) {
+int TPortoAPI::Destroy(const string &name) {
     req.mutable_destroy()->set_name(name);
 
     return Rpc(req, rsp);
@@ -105,19 +105,18 @@ int TPortoAPI::Dlist(vector<TData> &dlist) {
     return ret;
 }
 
-int TPortoAPI::GetProperties(string name, string property, vector<string> &value) {
+int TPortoAPI::GetProperty(const string &name, const string &property, string &value) {
     req.mutable_getproperty()->set_name(name);
-    req.mutable_getproperty()->add_property(property);
+    req.mutable_getproperty()->set_property(property);
 
     int ret = Rpc(req, rsp);
     if (!ret)
-        for (int i = 0; i < rsp.getproperty().value_size(); i++)
-            value.push_back(rsp.getproperty().value(i));
+        value.assign(rsp.getproperty().value());
 
     return ret;
 }
 
-int TPortoAPI::SetProperty(string name, string property, string value) {
+int TPortoAPI::SetProperty(const string &name, const string &property, string value) {
     req.mutable_setproperty()->set_name(name);
     req.mutable_setproperty()->set_property(property);
     req.mutable_setproperty()->set_value(value);
@@ -125,37 +124,36 @@ int TPortoAPI::SetProperty(string name, string property, string value) {
     return Rpc(req, rsp);
 }
 
-int TPortoAPI::GetData(string name, string data, vector<string> &value) {
+int TPortoAPI::GetData(const string &name, const string &data, string &value) {
     req.mutable_getdata()->set_name(name);
-    req.mutable_getdata()->add_data(data);
+    req.mutable_getdata()->set_data(data);
 
     int ret = Rpc(req, rsp);
     if (!ret)
-        for (int i = 0; i < rsp.getdata().value_size(); i++)
-            value.push_back(rsp.getdata().value(i));
+        value.assign(rsp.getdata().value());
 
     return ret;
 }
 
-int TPortoAPI::Start(string name) {
+int TPortoAPI::Start(const string &name) {
     req.mutable_start()->set_name(name);
 
     return Rpc(req, rsp);
 }
 
-int TPortoAPI::Stop(string name) {
+int TPortoAPI::Stop(const string &name) {
     req.mutable_stop()->set_name(name);
 
     return Rpc(req, rsp);
 }
 
-int TPortoAPI::Pause(string name) {
+int TPortoAPI::Pause(const string &name) {
     req.mutable_pause()->set_name(name);
 
     return Rpc(req, rsp);
 }
 
-int TPortoAPI::Resume(string name) {
+int TPortoAPI::Resume(const string &name) {
     req.mutable_resume()->set_name(name);
 
     return Rpc(req, rsp);

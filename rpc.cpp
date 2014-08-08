@@ -103,18 +103,14 @@ static void GetContainerProperty(TContainerHolder &cholder,
         return;
     }
 
-    for (int i = 0; i < req.property_size(); i++) {
-        if (propertySpec.find(req.property(i)) == propertySpec.end()) {
-            rsp.Clear();
-            rsp.set_error(rpc::EContainerError::InvalidProperty);
-            return;
-        }
-
-        string value;
-        container->GetProperty(req.property(i), value);
-        rsp.mutable_getproperty()->add_value(value);
+    if (propertySpec.find(req.property()) == propertySpec.end()) {
+        rsp.set_error(rpc::EContainerError::InvalidProperty);
+        return;
     }
 
+    string value;
+    container->GetProperty(req.property(), value);
+    rsp.mutable_getproperty()->set_value(value);
     rsp.set_error(rpc::EContainerError::Success);
 }
 
@@ -147,17 +143,14 @@ static void GetContainerData(TContainerHolder &cholder,
         return;
     }
 
-    for (int i = 0; i < req.data_size(); i++) {
-        if (dataSpec.find(req.data(i)) == dataSpec.end()) {
-            rsp.Clear();
-            rsp.set_error(rpc::EContainerError::InvalidData);
-            return;
-        }
-
-        string value;
-        container->GetData(req.data(i), value);
-        rsp.mutable_getdata()->add_value(value);
+    if (dataSpec.find(req.data()) == dataSpec.end()) {
+        rsp.set_error(rpc::EContainerError::InvalidData);
+        return;
     }
+
+    string value;
+    container->GetData(req.data(), value);
+    rsp.mutable_getdata()->set_value(value);
     rsp.set_error(rpc::EContainerError::Success);
 }
 

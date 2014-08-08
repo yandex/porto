@@ -37,24 +37,24 @@ class TPortoAPI {
 public:
     TPortoAPI();
     ~TPortoAPI();
-    int Create(std::string name);
-    int Destroy(std::string name);
+    int Create(const std::string &name);
+    int Destroy(const std::string &name);
 
-    int Start(std::string name);
-    int Stop(std::string name);
-    int Pause(std::string name);
-    int Resume(std::string name);
+    int Start(const std::string &name);
+    int Stop(const std::string &name);
+    int Pause(const std::string &name);
+    int Resume(const std::string &name);
 
     int List(std::vector<std::string> &clist);
     int Plist(std::vector<TProperty> &plist);
     int Dlist(std::vector<TData> &dlist);
 
-    int GetProperties(std::string name, std::string property, std::vector<std::string> &value);
-    int SetProperty(std::string name, std::string property, std::string value);
+    int GetProperty(const std::string &name, const std::string &property, std::string &value);
+    int SetProperty(const std::string &name, const std::string &property, std::string value);
 
-    int GetData(std::string name, std::string data, std::vector<std::string> &value);
+    int GetData(const std::string &name, const std::string &data, std::string &value);
 
-    int Raw(std::string message, std::string &response);
+    int Raw(const std::string &message, std::string &response);
 };
 
 #endif

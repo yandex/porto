@@ -59,7 +59,7 @@ static int AcceptClient(int sfd, std::vector<int> &clients)
     return 0;
 }
 
-static sig_atomic_t done = false;
+static volatile sig_atomic_t done = false;
 static int ExitStatus = 0;
 
 static void Stop(int signum)
