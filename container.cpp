@@ -155,8 +155,10 @@ TError TContainer::Start()
     if (ret)
         return ret;
 
-    if (IsRoot())
+    if (IsRoot()) {
+        state = Running;
         return ret;
+    }
 
     TTaskEnv taskEnv(spec.Get("command"), "", spec.Get("user"), spec.Get("group"));
     task = unique_ptr<TTask>(new TTask(taskEnv, leaf_cgroups));
@@ -254,7 +256,7 @@ TError TContainer::Restore() {
 
     PrepareCgroups();
 
-    state = Stopped;
+    state = IsAlive() ? Running : Stopped;
     task = nullptr;
 
     return TError();
