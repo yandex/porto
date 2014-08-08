@@ -137,8 +137,15 @@ public:
         if (ret)
             cerr << "Can't list containers, error = " << ret << endl;
         else
-            for (auto c : clist)
-                cout << c << endl;
+            for (auto c : clist) {
+                string s;
+                ret = api.GetData(c, "state", s);
+                if (ret)
+                    cerr << "Can't get container state, error = " << ret << endl;
+                cout << left << setw(40) << c
+                     << setw(40) << s << endl;
+
+            }
 
         return ret;
     }
@@ -156,7 +163,8 @@ public:
             cerr << "Can't list properties, error = " << ret << endl;
         else
             for (auto p : plist)
-                cout << p.name << " - " << p.description << endl;
+                cout << left << setw(40) << p.name
+                     << setw(40) << p.description << endl;
 
         return ret;
     }
@@ -174,7 +182,8 @@ public:
             cerr << "Can't list data, error = " << ret << endl;
         else
             for (auto d : dlist)
-                cout << d.name << " - " << d.description << endl;
+                cout << left << setw(40) << d.name
+                     << setw(40) << d.description << endl;
 
         return ret;
     }
