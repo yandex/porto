@@ -164,9 +164,26 @@ static int RpcMain(TContainerHolder &cholder) {
     return ret;
 }
 
-int main(int argc, const char *argv[])
+void KvDump()
+{
+        TKeyValueStorage storage;
+        storage.Dump();
+}
+
+int main(int argc, char * const argv[])
 {
     int ret = 0;
+    int opt;
+
+    while ((opt = getopt(argc, argv, "d")) != -1) {
+        switch (opt) {
+        case 'd':
+            KvDump();
+            return EXIT_SUCCESS;
+        default:
+            exit(EXIT_FAILURE);
+        }
+    }
 
     // in case client closes pipe we are writing to in the protobuf code
     signal(SIGPIPE, SIG_IGN);

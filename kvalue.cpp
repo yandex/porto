@@ -151,3 +151,36 @@ TError TKeyValueStorage::Restore(std::map<std::string, kv::TNode> &map) {
 
     return TError();
 }
+
+TError TKeyValueStorage::Dump() {
+    std::vector<std::string> nodes;
+
+    TError error = ListNodes(nodes);
+    if (error) {
+        cerr << "Can't list nodes: " << error.GetMsg() << endl;
+        return error;
+    }
+
+    for (auto &name : nodes) {
+        TError error;
+        kv::TNode node;
+        node.Clear();
+
+        cout << name << ":" << endl;
+
+        error = LoadNode(name, node);
+        if (error) {
+            cerr << "Can't load node: " << error.GetMsg() << endl;
+            continue;
+        }
+
+        for (int i = 0; i < node.pairs_size(); i++) {
+            auto key = node.pairs(i).key();
+            auto value = node.pairs(i).val();
+
+            cout << " " << key << " = " << value << endl;
+        }
+    }
+
+    return TError();
+}
