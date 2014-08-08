@@ -284,10 +284,8 @@ bool TContainerHolder::ValidName(const string &name)
 }
 
 TError TContainerHolder::Create(string name) {
-    if (!ValidName(name)) {
-        cerr << "ZZZ" <<endl;
+    if (!ValidName(name))
         return TError("invalid container name " + name);
-    }
 
     if (containers[name] == nullptr) {
         containers[name] = make_shared<TContainer>(name);

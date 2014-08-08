@@ -23,6 +23,12 @@ public:
         if (need_args < argc)
             return false;
 
+        if (argc >= 1) {
+            string arg(argv[0]);
+            if (arg == "-h" || arg == "--help" || arg == "help")
+                return false;;
+        }
+
         return true;
     }
 
@@ -35,19 +41,26 @@ class THelpCmd : public ICmd {
 public:
     THelpCmd() : ICmd("help", 1, "[command]", "print help message for command") {}
 
-    void Usage(const char *name) {
-        cout << "usage: " << name << " <command> [<args>]" << endl;
+    void Usage()
+    {
+        cout << "usage: " << program_invocation_short_name << " <command> [<args>]" << endl;
         cout << endl;
         cout << "list of commands:" << endl;
         for (ICmd *cmd : commands)
             cout << " " << left << setw(16) << cmd->GetName() << cmd->GetDescription() << endl;
     }
 
-    int Execute(int argc, char *argv[]) {
-        string name = argv[0];
+    int Execute(int argc, char *argv[])
+    {
+        if (argc == 0) {
+            Usage();
+            return EXIT_FAILURE;
+        }
+
+        string name(argv[0]);
         for (ICmd *cmd : commands) {
             if (cmd->GetName() == name) {
-                cout << "usage: " << argv[0] << " " << name << " " << cmd->GetUsage() << endl;
+                cout << "usage: " << program_invocation_short_name << " " << name << " " << cmd->GetUsage() << endl;
                 cout << endl;
                 cout << cmd->GetDescription() << endl;
 
@@ -55,16 +68,16 @@ public:
             }
         }
 
-        Usage(argv[0]);
+        Usage();
         return EXIT_FAILURE;
     }
 };
 
-static void Usage(char *name, const char *command) {
+static void Usage(const char *command) {
     ICmd *cmd = new THelpCmd();
-    char *argv[] = { name, (char *)"help", (char *)command, NULL };
+    char *argv[] = { (char *)command, NULL };
 
-    cmd->Execute(command ? 3 : 1, argv);
+    cmd->Execute(command ? 1 : 0, argv);
 }
 
 class TRawCmd : public ICmd {
@@ -293,13 +306,13 @@ int main(int argc, char *argv[])
     };
 
     if (argc <= 1) {
-        Usage(argv[0], NULL);
+        Usage(NULL);
         return EXIT_FAILURE;
     }
 
-    string name = argv[1];
+    string name(argv[1]);
     if (name == "-h" || name == "--help") {
-        Usage(argv[0], NULL);
+        Usage(NULL);
         return EXIT_FAILURE;
     }
 
@@ -307,10 +320,11 @@ int main(int argc, char *argv[])
         for (ICmd *cmd : commands)
             if (cmd->GetName() == name) {
                 if (!cmd->ValidArgs(argc - 2, argv + 2)) {
-                    Usage(argv[0], cmd->GetName().c_str());
+                    Usage(cmd->GetName().c_str());
                     return EXIT_FAILURE;
                 }
-                return cmd->Execute(argc, argv);
+
+                return cmd->Execute(argc - 2, argv + 2);
             }
     } catch (const char *err) {
         cerr << err << endl;
