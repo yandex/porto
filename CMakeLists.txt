@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 2.8)
 
 set(CMAKE_CXX_FLAGS "-O2 -Wall -std=c++11 -g")
-set(CMAKE_EXE_LINKER_FLAGS "-lpthread -static-libstdc++ -static-libgcc -Wl,-Bstatic -lprotobuf")
+set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc")
+
+find_library(PB NAMES libprotobuf.a)
 
 find_package(Protobuf REQUIRED)
 include_directories(${PROTOBUF_INCLUDE_DIRS})
@@ -11,10 +13,10 @@ PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS rpc.proto kv.proto)
 
 add_executable(portod portod.cpp cgroup.cpp mount.cpp rpc.cpp protobuf.cpp container.cpp task.cpp file.cpp stringutil.cpp kvalue.cpp subsystem.cpp folder.cpp error.cpp property.cpp
 		       ${PROTO_SRCS} ${PROTO_HDRS})
-target_link_libraries(portod ${PROTOBUF_LIBRARIES})
+target_link_libraries(portod ${PB})
 
 add_executable(porto porto.cpp protobuf.cpp error.cpp libporto.cpp ${PROTO_SRCS} ${PROTO_HDRS})
-target_link_libraries(porto ${PROTOBUF_LIBRARIES})
+target_link_libraries(porto ${PB})
 
 add_executable(test test.cpp protobuf.cpp error.cpp libporto.cpp ${PROTO_SRCS} ${PROTO_HDRS})
-target_link_libraries(test ${PROTOBUF_LIBRARIES})
+target_link_libraries(test ${PB})
