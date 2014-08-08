@@ -83,21 +83,16 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        if (argc <= 2) {
-            Usage(argv[0]);
-            return EXIT_FAILURE;
-        }
+        string name = argv[0];
+        // for (ICmd *cmd : commands) {
+        //     if (cmd->GetName() == name) {
+        //         cout << "usage: " << argv[0] << " " << name << " " << cmd->GetUsage() << endl;
+        //         cout << endl;
+        //         cout << cmd->GetDescription() << endl;
 
-        string name = argv[2];
-        for (ICmd *cmd : commands) {
-            if (cmd->GetName() == name) {
-                cout << "usage: " << argv[0] << " " << name << " " << cmd->GetUsage() << endl;
-                cout << endl;
-                cout << cmd->GetDescription() << endl;
-
-                return EXIT_SUCCESS;
-            }
-        }
+        //         return EXIT_SUCCESS;
+        //     }
+        // }
 
         Usage(argv[0]);
         return EXIT_FAILURE;
@@ -120,9 +115,6 @@ public:
     {
         stringstream msg;
 
-        argv += 2;
-        argc -= 2;
-
         std::vector<std::string> args(argv, argv + argc);
         copy(args.begin(), args.end(), ostream_iterator<string>(msg, " "));
 
@@ -144,9 +136,7 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string s;
-
-        string name = string(argv[2]);
+        string name = string(argv[0]);
 
         req.mutable_create()->set_name(name);
 
@@ -164,9 +154,7 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string s;
-
-        string name = string(argv[2]);
+        string name = string(argv[0]);
 
         req.mutable_destroy()->set_name(name);
 
@@ -184,8 +172,6 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string s;
-
         auto *list = new ::rpc::TContainerListRequest();
         req.set_allocated_list(list);
 
@@ -207,8 +193,6 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string s;
-
         auto *list = new ::rpc::TContainerPropertyListRequest();
         req.set_allocated_propertylist(list);
 
@@ -233,8 +217,6 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string s;
-
         auto *list = new ::rpc::TContainerDataListRequest();
         req.set_allocated_datalist(list);
 
@@ -259,10 +241,8 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string s;
-
-        string name = string(argv[2]);
-        string property = string(argv[3]);
+        string name = string(argv[0]);
+        string property = string(argv[1]);
 
         req.mutable_getproperty()->set_name(name);
         req.mutable_getproperty()->add_property(property);
@@ -285,11 +265,9 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string s;
-
-        string name = string(argv[2]);
-        string property = string(argv[3]);
-        string value = string(argv[4]);
+        string name = string(argv[0]);
+        string property = string(argv[1]);
+        string value = string(argv[2]);
 
         req.mutable_setproperty()->set_name(name);
         req.mutable_setproperty()->set_property(property);
@@ -309,10 +287,8 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string s;
-
-        string name = string(argv[2]);
-        string data = string(argv[3]);
+        string name = string(argv[0]);
+        string data = string(argv[1]);
 
         req.mutable_getdata()->set_name(name);
         req.mutable_getdata()->add_data(data);
@@ -335,9 +311,7 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string s;
-
-        string name = string(argv[2]);
+        string name = string(argv[0]);
 
         req.mutable_start()->set_name(name);
 
@@ -355,9 +329,7 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string s;
-
-        string name = string(argv[2]);
+        string name = string(argv[0]);
 
         req.mutable_stop()->set_name(name);
 
@@ -375,9 +347,7 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string s;
-
-        string name = string(argv[2]);
+        string name = string(argv[0]);
 
         req.mutable_pause()->set_name(name);
 
@@ -395,9 +365,7 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        string s;
-
-        string name = string(argv[2]);
+        string name = string(argv[0]);
 
         req.mutable_resume()->set_name(name);
 
@@ -442,7 +410,7 @@ int main(int argc, char *argv[])
     try {
         for (ICmd *cmd : commands)
             if (cmd->GetName() == name) {
-                if (!cmd->ValidArgs(argc - 2, &argv[2])) {
+                if (!cmd->ValidArgs(argc - 2, argv + 2)) {
                     Usage(argv[0], cmd->GetName().c_str());
                     return EXIT_FAILURE;
                 }
