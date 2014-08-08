@@ -1,8 +1,6 @@
 #include <climits>
 #include <sstream>
 #include <iterator>
-#include <random>
-#include <algorithm>
 
 #include "task.hpp"
 #include "cgroup.hpp"
@@ -77,24 +75,6 @@ void TTask::ReportResultAndExit(int fd, int result)
     exit(EXIT_FAILURE);
 }
 
-static std::string GetRandomName(const int len) {
-    static const string charset = "0123456789abcdefghijklmnopqrstuvwxyz";
-    static mt19937 mt;
-    static random_device rd;
-    static bool seeded = false;
-    static uniform_int_distribution<int32_t> dist(0, charset.length() - 1);
-
-    if (!seeded) {
-        mt.seed(rd());
-        seeded = true;
-    }
-
-    string str(len, 0);
-    generate_n(str.begin(), len, []() { return charset[dist(mt)]; });
-
-    return str;
-}
-
 TTask::~TTask() {
     if (stdoutFile.length()) {
         TFile f(stdoutFile);
@@ -110,6 +90,17 @@ TTask::~TTask() {
     }
 }
 
+static string GetTmpFile() {
+    char p[] = "/tmp/XXXXXX";
+    int fd = mkstemp(p);
+    if (fd < 0)
+        return "";
+
+    string path(p);
+    close(fd);
+    return path;
+}
+
 TError TTask::Start() {
     int ret;
     int pfd[2];
@@ -119,10 +110,8 @@ TError TTask::Start() {
     exitStatus.status = 0;
 
     // TODO: use real container root directory
-    string rootDir = "/tmp/";
-
-    stdoutFile = rootDir + GetRandomName(32);
-    stderrFile = rootDir + GetRandomName(32);
+    stdoutFile = GetTmpFile();
+    stderrFile = GetTmpFile();
 
     ret = pipe2(pfd, O_CLOEXEC);
     if (ret) {
