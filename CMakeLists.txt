@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 
 set(CMAKE_CXX_FLAGS "-O2 -Wall -std=c++11 -g")
-set(CMAKE_EXE_LINKER_FLAGS -static)
+set(CMAKE_EXE_LINKER_FLAGS "-lpthread -static-libstdc++ -static-libgcc -Wl,-Bstatic -lprotobuf")
 
 find_package(Protobuf REQUIRED)
 include_directories(${PROTOBUF_INCLUDE_DIRS})
