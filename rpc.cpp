@@ -129,7 +129,8 @@ static void SetContainerProperty(TContainerHolder &cholder,
         return;
     }
 
-    if (container->SetProperty(req.property(), req.value()))
+    TError error(container->SetProperty(req.property(), req.value()));
+    if (!error)
         rsp.set_error(rpc::EContainerError::Success);
 }
 

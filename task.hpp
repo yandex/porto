@@ -7,6 +7,7 @@
 
 extern "C" {
 #include <signal.h>
+#include <grp.h>
 }
 
 #include "cgroup.hpp"
@@ -33,12 +34,12 @@ class TTaskEnv {
     //std::vector<std::string> env;
     std::string user;
     std::string group;
+    int uid, gid;
+    std::vector<gid_t> groups;
 
 public:
     TTaskEnv() {};
     TTaskEnv(const std::string &command, const std::string &cwd, const std::string &user, const std::string &group);
-    int GetUid();
-    int GetGid();
     const char** GetArgv();
 };
 

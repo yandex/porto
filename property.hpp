@@ -9,6 +9,8 @@
 #include "error.h"
 #include "kvalue.hpp"
 
+const string RootName = "/";
+
 struct TPropertySpec {
     std::string description;
     std::string def;
@@ -34,7 +36,7 @@ public:
     TContainerSpec(const std::string &name, const kv::TNode &node);
     ~TContainerSpec();
     std::string Get(const std::string &property);
-    bool Set(const std::string &property, const std::string &value);
+    TError Set(const std::string &property, const std::string &value);
 };
 
 #endif

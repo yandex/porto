@@ -2,13 +2,26 @@
 
 #include <map>
 
+extern "C" {
+#include <grp.h>
+#include <pwd.h>
+}
+
 using namespace std;
+
+static bool ValidUser(string user) {
+    return getpwnam(user.c_str()) != NULL;
+}
+
+static bool ValidGroup(string group) {
+    return getgrnam(group.c_str()) != NULL;
+}
 
 std::map<std::string, const TPropertySpec> propertySpec = {
     {"command", { "command executed upon container start", "id" }},
     {"low_limit", { "memory low limit in bytes", "0" }},
-    {"user", { "start command with given user", "65534" }},
-    {"group", { "start command with given group", "65534" }},
+    {"user", { "start command with given user", "nobody", false, ValidUser }},
+    {"group", { "start command with given group", "nogroup", false, ValidGroup }},
 };
 
 string TContainerSpec::Get(const string &property) {
@@ -19,20 +32,28 @@ string TContainerSpec::Get(const string &property) {
 }
 
 bool TContainerSpec::IsRoot() {
-    return name == "/";
+    return name == RootName;
 }
 
-bool TContainerSpec::Set(const string &property, const string &value) {
-    if (propertySpec.count(property)) {
-        if (propertySpec[property].Valid &&
-            !propertySpec[property].Valid(value))
-            return false;
-
-        data[property] = value;
-        return AppendStorage(property, value);
+TError TContainerSpec::Set(const string &property, const string &value) {
+    if (propertySpec.find(property) == propertySpec.end()) {
+        TError error("property not found");
+        TLogger::LogError(error);
+        return error;
     }
 
-    return false;
+    if (propertySpec[property].Valid &&
+        !propertySpec[property].Valid(value)) {
+        TError error("invalid property value");
+        TLogger::LogError(error);
+        return error;
+    }
+
+    data[property] = value;
+    TError error(AppendStorage(property, value));
+    if (error)
+        TLogger::LogError(error);
+    return error;
 }
 
 TContainerSpec::TContainerSpec(const std::string &name) : name(name) {

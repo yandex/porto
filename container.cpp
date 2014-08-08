@@ -106,7 +106,7 @@ string TContainer::Name()
 }
 
 bool TContainer::IsRoot() {
-    return name == "/";
+    return name == RootName;
 }
 
 vector<pid_t> TContainer::Processes() {
@@ -178,7 +178,7 @@ static const auto kill_timeout = 100000;
 
 TError TContainer::Stop()
 {
-    if (name == "/" || !CheckState(Running))
+    if (IsRoot() || !CheckState(Running))
         return false;
 
     if (task->IsRunning())
@@ -202,7 +202,7 @@ TError TContainer::Stop()
 
 TError TContainer::Pause()
 {
-    if (name == "/" || !CheckState(Running))
+    if (IsRoot() || !CheckState(Running))
         return false;
 
     auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
@@ -241,13 +241,9 @@ TError TContainer::GetProperty(string property, string &value)
 
 TError TContainer::SetProperty(string property, string value)
 {
-    if (name == "/")
+    if (IsRoot())
         return false;
-
-    //TODO: catch exception
-    spec.Set(property, value);
-
-    return true;
+    return spec.Set(property, value);
 }
 
 TError TContainer::Restore() {
@@ -264,10 +260,10 @@ TError TContainer::Restore() {
 
 // TContainerHolder
 TContainerHolder::TContainerHolder() {
-    if (Create("/"))
+    if (Create(RootName))
         throw "Cannot create root container";
 
-    auto root = Get("/");
+    auto root = Get(RootName);
     root->Start();
 }
 
@@ -276,7 +272,7 @@ TContainerHolder::~TContainerHolder() {
 
 bool TContainerHolder::ValidName(const string &name)
 {
-    if (name == "/")
+    if (name == RootName)
         return true;
 
     return find_if(name.begin(), name.end(),
@@ -302,7 +298,7 @@ shared_ptr<TContainer> TContainerHolder::Get(string name) {
 
 void TContainerHolder::Destroy(string name)
 {
-    if (name != "/")
+    if (name != RootName)
         containers.erase(name);
 }
 

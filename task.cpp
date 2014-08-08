@@ -13,6 +13,7 @@ extern "C" {
 #include <fcntl.h>
 #include <unistd.h>
 #include <grp.h>
+#include <pwd.h>
 }
 
 using namespace std;
@@ -30,15 +31,31 @@ TTaskEnv::TTaskEnv(const std::string &command, const std::string &cwd, const std
 
     path = args.front();
     args.erase(args.begin());
-}
 
-int TTaskEnv::GetUid() {
-    // TODO: getpwnam
-    return stoi(user);
-}
-int TTaskEnv::GetGid() {
-    // TODO: getpwnam
-    return stoi(group);
+    struct passwd *p = getpwnam(user.c_str());
+    if (!p) {
+        uid = 65534;
+        TLogger::LogAction("getpwnam " + user, true, errno);
+    } else {
+        uid = p->pw_uid;
+    }
+
+    struct group *g = getgrnam(group.c_str());
+    if (!g) {
+        TLogger::LogAction("getgrnam " + user, true, errno);
+        gid = 65534;
+    } else {
+        gid = g->gr_gid;
+    }
+
+    int ngroups = NGROUPS_MAX;
+    groups.resize(ngroups);
+    if (getgrouplist(user.c_str(), gid, groups.data(), &ngroups) < 0) {
+        TLogger::LogAction("getgrouplist " + user, true, errno);
+        groups.resize(0);
+    } else {
+        groups.resize(ngroups);
+    }
 }
 
 const char** TTaskEnv::GetArgv() {
@@ -119,8 +136,6 @@ TError TTask::Start() {
         return TError(errno);
     }
 
-    int uid = env.GetUid();
-    int gid = env.GetGid();
     int rfd = pfd[0];
     int wfd = pfd[1];
 
@@ -167,7 +182,7 @@ TError TTask::Start() {
         if (ret < 0)
             ReportResultAndExit(wfd, -errno);
 
-        ret = fchown(ret, uid, gid);
+        ret = fchown(ret, env.uid, env.gid);
         if (ret < 0)
             ReportResultAndExit(wfd, -errno);
 
@@ -176,19 +191,21 @@ TError TTask::Start() {
         if (ret < 0)
             ReportResultAndExit(wfd, -errno);
 
-        ret = fchown(ret, uid, gid);
+        ret = fchown(ret, env.uid, env.gid);
         if (ret < 0)
             ReportResultAndExit(wfd, -errno);
 
         // drop privileges
-        if (setgroups(0, NULL) < 0)
+        if (setgid(env.gid) < 0)
             ReportResultAndExit(wfd, -errno);
 
-        if (setgid(gid) < 0)
+        if (setgroups(env.groups.size(), env.groups.data()) < 0)
             ReportResultAndExit(wfd, -errno);
 
-        if (setuid(uid) < 0)
+        if (setuid(env.uid) < 0)
             ReportResultAndExit(wfd, -errno);
+
+        umask(0);
 
         auto argv = env.GetArgv();
         execvp(argv[0], (char *const *)argv);

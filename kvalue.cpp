@@ -70,7 +70,9 @@ TError TKeyValueStorage::AppendNode(const std::string &name, const kv::TNode &no
 
     if (lseek(fd, 0, SEEK_END) < 0) {
         close(fd);
-        return TError(errno);
+        TError error(errno);
+        TLogger::LogError(error);
+        return error;
     }
     try {
         google::protobuf::io::FileOutputStream post(fd);
@@ -80,6 +82,8 @@ TError TKeyValueStorage::AppendNode(const std::string &name, const kv::TNode &no
         error = TError("TKeyValueStorage: unhandled exception");
     }
     close(fd);
+    if (error)
+        TLogger::LogError(error);
     return error;
 }
 
