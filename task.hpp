@@ -35,7 +35,6 @@ class TTaskEnv {
     std::string user;
     std::string group;
     int uid, gid;
-    std::vector<gid_t> groups;
 
 public:
     TTaskEnv() {};

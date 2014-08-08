@@ -47,15 +47,6 @@ TTaskEnv::TTaskEnv(const std::string &command, const std::string &cwd, const std
     } else {
         gid = g->gr_gid;
     }
-
-    int ngroups = NGROUPS_MAX;
-    groups.resize(ngroups);
-    if (getgrouplist(user.c_str(), gid, groups.data(), &ngroups) < 0) {
-        TLogger::LogAction("getgrouplist " + user, true, errno);
-        groups.resize(0);
-    } else {
-        groups.resize(ngroups);
-    }
 }
 
 const char** TTaskEnv::GetArgv() {
@@ -199,7 +190,7 @@ TError TTask::Start() {
         if (setgid(env.gid) < 0)
             ReportResultAndExit(wfd, -errno);
 
-        if (setgroups(env.groups.size(), env.groups.data()) < 0)
+        if (initgroups(env.user.c_str(), env.gid) < 0)
             ReportResultAndExit(wfd, -errno);
 
         if (setuid(env.uid) < 0)
