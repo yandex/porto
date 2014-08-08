@@ -35,6 +35,13 @@ bool TContainerSpec::IsRoot() {
     return name == RootName;
 }
 
+bool TContainerSpec::IsDynamic(const std::string &property) {
+    if (propertySpec.find(property) == propertySpec.end())
+        return false;
+
+    return propertySpec[property].dynamic;
+}
+
 TError TContainerSpec::Set(const string &property, const string &value) {
     if (propertySpec.find(property) == propertySpec.end()) {
         TError error("property not found");

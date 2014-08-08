@@ -3,7 +3,6 @@
 - rotate subprocess stdout/stderr
 - monitoring/statistics
 - ? use syslog for errors while forking
-- check property dynamic
 
 # cleanup
 - move porto.socket and porto.pid to /run

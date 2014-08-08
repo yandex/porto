@@ -242,7 +242,11 @@ TError TContainer::GetProperty(string property, string &value)
 TError TContainer::SetProperty(string property, string value)
 {
     if (IsRoot())
-        return false;
+        return TError("Can't set property for root");
+
+    if (task && task->IsRunning() && !spec.IsDynamic(property))
+        return TError("Can't set dynamic property " + property + " for running container");
+
     return spec.Set(property, value);
 }
 

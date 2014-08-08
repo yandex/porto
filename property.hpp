@@ -37,6 +37,7 @@ public:
     ~TContainerSpec();
     std::string Get(const std::string &property);
     TError Set(const std::string &property, const std::string &value);
+    bool IsDynamic(const std::string &property);
 };
 
 #endif
