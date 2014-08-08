@@ -60,13 +60,21 @@ static int AcceptClient(int sfd, std::vector<int> &clients)
 }
 
 static volatile sig_atomic_t done = false;
-static int ExitStatus = 0;
+static volatile sig_atomic_t hup = false;
+static volatile sig_atomic_t RaiseSignal = 0;
 
 static void Stop(int signum)
 {
     done = true;
-    ExitStatus = -signum;
+    RaiseSignal = signum;
 }
+
+/*
+static void Hangup(int signum)
+{
+    hup = true;
+}
+*/
 
 static bool AnotherInstanceRunning(const string &path)
 {
@@ -116,6 +124,11 @@ static int RpcMain(TContainerHolder &cholder) {
         fds[MAX_CLIENTS].fd = sfd;
         fds[MAX_CLIENTS].events = POLLIN | POLLHUP;
 
+        if (hup) {
+            // TODO: reread config; rotate logs
+            hup = false;
+        }
+
         ret = poll(fds, MAX_CONNECTIONS, POLL_TIMEOUT_MS);
         if (ret < 0) {
             std::cerr << "poll() error: " << strerror(errno) << std::endl;
@@ -148,7 +161,7 @@ static int RpcMain(TContainerHolder &cholder) {
 
     close(sfd);
 
-    return ExitStatus;
+    return ret;
 }
 
 int main(int argc, const char *argv[])
@@ -163,6 +176,7 @@ int main(int argc, const char *argv[])
     signal(SIGTERM, Stop);
     signal(SIGINT, Stop);
     signal(SIGHUP, Stop);
+    //signal(SIGHUP, Hangup);
 
     if (AnotherInstanceRunning(RPC_SOCK_PATH)) {
         std::cerr << "Another instance of portod is running!" << std::endl;
@@ -212,6 +226,12 @@ int main(int argc, const char *argv[])
 
     RemovePidFile(PID_FILE);
     RemoveRpcServer(RPC_SOCK_PATH);
+
+    signal(SIGTERM, SIG_DFL);
+    signal(SIGINT, SIG_DFL);
+    signal(SIGHUP, SIG_DFL);
+    if (RaiseSignal)
+        raise(RaiseSignal);
 
     return ret;
 }
