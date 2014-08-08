@@ -26,6 +26,7 @@ struct TValue {
 };
 
 class TPortoAPI {
+    int fd;
     rpc::TContainerRequest req;
     rpc::TContainerResponse rsp;
 
@@ -34,6 +35,8 @@ class TPortoAPI {
     int Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp);
 
 public:
+    TPortoAPI();
+    ~TPortoAPI();
     int Create(std::string name);
     int Destroy(std::string name);
 

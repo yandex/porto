@@ -19,15 +19,20 @@ int TPortoAPI::SendReceive(int fd, rpc::TContainerRequest &req, rpc::TContainerR
         return -1;
 }
 
-int TPortoAPI::Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
-    int fd;
+TPortoAPI::TPortoAPI() {
     TError error = ConnectToRpcServer(RPC_SOCK_PATH, fd);
     if (error)
         throw "Can't connect to RPC server: " + error.GetMsg();
+}
 
-    int ret = SendReceive(fd, req, rsp);
-
+TPortoAPI::~TPortoAPI() {
     close(fd);
+}
+
+int TPortoAPI::Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
+    rsp.Clear();
+    int ret = SendReceive(fd, req, rsp);
+    req.Clear();
     return ret;
 }
 
