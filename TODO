@@ -4,6 +4,7 @@
 - property:env support ; (via \;)
 
 # cleanup
+- add missing const everywhere
 - move porto.socket and porto.pid to /run
 - permissions of .pid, .socket, etc
 - move all 'extern "C"' into one file

@@ -3,6 +3,7 @@
 
 #include "error.hpp"
 
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <set>
@@ -12,5 +13,6 @@ std::string CommaSeparatedList(const std::set<std::string> &list);
 
 TError StringsToIntegers(std::vector<std::string> &strings,
                          std::vector<int> &integers);
+TError StringToUint64(const std::string &string, uint64_t &value);
 
 #endif

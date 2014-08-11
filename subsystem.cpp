@@ -35,6 +35,16 @@ shared_ptr<TMemorySubsystem> TSubsystem::Memory() {
     return static_pointer_cast<TMemorySubsystem>(Get("memory"));
 }
 
+#include <iostream>
+
+TError TMemorySubsystem::Usage(shared_ptr<TCgroup> &cg, uint64_t &value) {
+    string s;
+    TError error = cg->GetKnobValue("memory.usage_in_bytes", s);
+    if (error)
+        return error;
+    return StringToUint64(s, value);
+}
+
 // Freezer
 shared_ptr<TFreezerSubsystem> TSubsystem::Freezer() {
     return static_pointer_cast<TFreezerSubsystem>(Get("freezer"));
@@ -51,4 +61,17 @@ void TFreezerSubsystem::Unfreeze(TCgroup &cg) {
 // Cpu
 shared_ptr<TCpuSubsystem> TSubsystem::Cpu() {
     return static_pointer_cast<TCpuSubsystem>(Get("cpu"));
+}
+
+// Cpuacct
+shared_ptr<TCpuacctSubsystem> TSubsystem::Cpuacct() {
+    return static_pointer_cast<TCpuacctSubsystem>(Get("cpuacct"));
+}
+
+TError TCpuacctSubsystem::Usage(shared_ptr<TCgroup> &cg, uint64_t &value) {
+    string s;
+    TError error = cg->GetKnobValue("cpuacct.usage", s);
+    if (error)
+        return error;
+    return StringToUint64(s, value);
 }

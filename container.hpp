@@ -16,6 +16,7 @@ class TCgroup;
 class TContainerEnv;
 struct TData;
 class TContainer;
+class TSubsystem;
 
 struct TDataSpec {
     std::string description;
@@ -68,6 +69,8 @@ public:
 
     TError GetData(std::string data, std::string &value);
     TError Restore();
+
+    std::shared_ptr<TCgroup> GetCgroup(shared_ptr<TSubsystem> subsys);
 };
 
 class TContainerHolder {

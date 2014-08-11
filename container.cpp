@@ -67,6 +67,42 @@ struct TData {
             return c.task->GetStderr();
         return "";
     };
+
+    static string CpuUsage(TContainer& c) {
+        auto subsys = TSubsystem::Cpuacct();
+        auto cg = c.GetCgroup(subsys);
+        if (!cg) {
+            TLogger::LogAction("cpuacct cgroup not found");
+            return "-1";
+        }
+
+        uint64_t val;
+        TError error = subsys->Usage(cg, val);
+        if (error) {
+            TLogger::LogError(error);
+            return "-1";
+        }
+
+        return to_string(val);
+    };
+
+    static string MemUsage(TContainer& c) {
+        auto subsys = TSubsystem::Memory();
+        auto cg = c.GetCgroup(subsys);
+        if (!cg) {
+            TLogger::LogAction("memory cgroup not found");
+            return "-1";
+        }
+
+        uint64_t val;
+        TError error = subsys->Usage(cg, val);
+        if (error) {
+            TLogger::LogError(error);
+            return "-1";
+        }
+
+        return to_string(val);
+    };
 };
 
 std::map<std::string, const TDataSpec> dataSpec = {
@@ -75,6 +111,8 @@ std::map<std::string, const TDataSpec> dataSpec = {
     { "root_pid", { "root process id", TData::RootPid } },
     { "stdout", { "return task stdout", TData::Stdout } },
     { "stderr", { "return task stderr", TData::Stderr } },
+    { "cpu_usage", { "return consumed CPU time in nanoseconds", TData::CpuUsage } },
+    { "mem_usage", { "return consumed memory in bytes", TData::MemUsage } },
 };
 
 // TContainer
@@ -128,9 +166,11 @@ void TContainer::UpdateState() {
 
 TError TContainer::PrepareCgroups() {
     if (IsRoot()) {
+        leaf_cgroups.push_back(TCgroup::GetRoot(TSubsystem::Cpuacct()));
         leaf_cgroups.push_back(TCgroup::GetRoot(TSubsystem::Memory()));
         leaf_cgroups.push_back(TCgroup::GetRoot(TSubsystem::Freezer()));
     } else {
+        leaf_cgroups.push_back(TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Cpuacct())));
         leaf_cgroups.push_back(TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Memory())));
         leaf_cgroups.push_back(TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer())));
     }
@@ -260,6 +300,10 @@ TError TContainer::Restore() {
     task = nullptr;
 
     return TError();
+}
+
+std::shared_ptr<TCgroup> TContainer::GetCgroup(shared_ptr<TSubsystem> subsys) {
+    return TCgroup::Get(name, TCgroup::GetRoot(subsys));
 }
 
 // TContainerHolder

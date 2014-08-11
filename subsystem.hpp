@@ -9,6 +9,7 @@ class TCgroup;
 class TMemorySubsystem;
 class TFreezerSubsystem;
 class TCpuSubsystem;
+class TCpuacctSubsystem;
 
 class TSubsystem {
     std::string name;
@@ -19,6 +20,7 @@ public:
     static std::shared_ptr<TMemorySubsystem> Memory();
     static std::shared_ptr<TFreezerSubsystem> Freezer();
     static std::shared_ptr<TCpuSubsystem> Cpu();
+    static std::shared_ptr<TCpuacctSubsystem> Cpuacct();
     
     TSubsystem(std::string name);
     std::string Name();
@@ -35,6 +37,7 @@ public:
 class TMemorySubsystem : public TSubsystem {
 public:
     TMemorySubsystem() : TSubsystem("memory") {}
+    TError Usage(shared_ptr<TCgroup> &cg, uint64_t &value);
 };
 
 class TFreezerSubsystem : public TSubsystem {
@@ -48,6 +51,12 @@ public:
 class TCpuSubsystem : public TSubsystem {
 public:
     TCpuSubsystem() : TSubsystem("cpu") {}
+};
+
+class TCpuacctSubsystem : public TSubsystem {
+public:
+    TCpuacctSubsystem() : TSubsystem("cpuacct") {}
+    TError Usage(shared_ptr<TCgroup> &cg, uint64_t &value);
 };
 
 #endif

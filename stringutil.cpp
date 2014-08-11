@@ -36,3 +36,13 @@ TError StringsToIntegers(std::vector<std::string> &strings,
 
     return TError();
 }
+
+TError StringToUint64(const std::string &string, uint64_t &value) {
+    try {
+        value = stoull(string);
+    } catch (...) {
+        return TError("Bad integer value");
+    }
+
+    return TError();
+}
