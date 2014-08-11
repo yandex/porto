@@ -4,7 +4,6 @@
 #include "rpc.pb.h"
 #include "container.hpp"
 
-// TODO: /run/porto.socket
 const std::string RPC_SOCK_PATH = "/run/portod.socket";
 
 rpc::TContainerResponse
