@@ -74,7 +74,7 @@ public:
 };
 
 class TContainerHolder {
-    std::unordered_map <std::string, std::shared_ptr<TContainer> > containers;
+    std::map <std::string, std::shared_ptr<TContainer> > containers;
 
     bool ValidName(const std::string &name);
 public:

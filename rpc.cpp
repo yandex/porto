@@ -14,11 +14,17 @@ static void CreateContainer(TContainerHolder &cholder,
                             rpc::TContainerResponse &rsp)
 {
     try {
+        auto c = cholder.Get(req.name());
+        if (c) {
+            rsp.set_error(rpc::EContainerError::ContainerAlreadyExists);
+            return;
+        }
         TError error = cholder.Create(req.name());
         if (!error)
             rsp.set_error(rpc::EContainerError::Success);
     } catch (...) {
-        rsp.set_error(rpc::EContainerError::ContainerAlreadyExists);
+        rsp.Clear();
+        rsp.set_error(rpc::EContainerError::Error);
     }
 }
 

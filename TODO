@@ -1,10 +1,10 @@
-- rotate subprocess stdout/stderr
-- monitoring/statistics
+- pget pset dget get
 - property:command quoting
-- property:env support ; (via \;)
+- wordexp may leak environment, so clear it prior to execution
 
 # cleanup
-- add missing const everywhere
+- rotate subprocess stdout/stderr
+- property:env support ; (via \;)
 - move porto.socket and porto.pid to /run
 - permissions of .pid, .socket, etc
 - move all 'extern "C"' into one file

@@ -295,6 +295,17 @@ public:
     }
 };
 
+extern int Selftest();
+class TSelftestCmd : public ICmd {
+public:
+    TSelftestCmd() : ICmd("selftest", 0, "", "perform selftest") {}
+
+    int Execute(int argc, char *argv[])
+    {
+        return Selftest();
+    }
+};
+
 int main(int argc, char *argv[])
 {
     commands = {
@@ -311,7 +322,8 @@ int main(int argc, char *argv[])
         new TGetPropertyCmd(),
         new TSetPropertyCmd(),
         new TGetDataCmd(),
-        new TRawCmd()
+        new TRawCmd(),
+        new TSelftestCmd()
     };
 
     if (argc <= 1) {

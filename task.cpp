@@ -16,25 +16,16 @@ extern "C" {
 #include <grp.h>
 #include <pwd.h>
 #include <syslog.h>
+#include <wordexp.h>
 }
 
 using namespace std;
 
 // TTaskEnv
-    TTaskEnv::TTaskEnv(const std::string &command, const std::string &cwd, const std::string &user, const std::string &group, const std::string &envir) {
+    TTaskEnv::TTaskEnv(const std::string &command, const std::string &cwd, const std::string &user, const std::string &group, const std::string &envir) : command(command) {
     // TODO: support quoting
     if (command.empty())
         return;
-
-    {
-        istringstream s(command);
-        args.insert(args.end(),
-                    istream_iterator<string>(s),
-                    istream_iterator<string>());
-
-        path = args.front();
-        args.erase(args.begin());
-    }
 
     {
         istringstream s(envir);
@@ -65,19 +56,8 @@ using namespace std;
     }
 }
 
-const char** TTaskEnv::GetArgv() {
-    auto argv = new const char* [args.size() + 2];
-    argv[0] = path.c_str();
-    for (size_t i = 0; i < args.size(); i++)
-        argv[i + 1] = args[i].c_str();
-    argv[args.size() + 1] = NULL;
-
-    return argv;
-}
-
 const char** TTaskEnv::GetEnvp() {
     auto envp = new const char* [env.size() + 1];
-    envp[0] = path.c_str();
     for (size_t i = 0; i < env.size(); i++)
         envp[i] = env[i].c_str();
     envp[env.size()] = NULL;
@@ -244,9 +224,14 @@ int TTask::ChildCallback() {
 
     umask(0);
 
-    auto argv = env.GetArgv();
+	wordexp_t result;
+	if (wordexp(env.command.c_str(), &result, 0) < 0) {
+        Syslog(string("wordexp(): ") + strerror(errno));
+        ReportResultAndExit(wfd, -errno);
+    }
+
     auto envp = env.GetEnvp();
-    execvpe(argv[0], (char *const *)argv, (char *const *)envp);
+    execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
 
     Syslog(string("execvpe(): ") + strerror(errno));
     ReportResultAndExit(wfd, errno);

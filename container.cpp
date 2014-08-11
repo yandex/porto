@@ -41,19 +41,18 @@ struct TData {
         if (c.task)
             return to_string(c.task->GetPid());
         else
-            return "unknown";
+            return "-1";
     };
 
     static string ExitStatus(TContainer& c) {
         if (c.task) {
             TExitStatus status = c.task->GetExitStatus();
             stringstream ss;
-            //ss << status.error << ";" << status.signal << ";" << status.status;
-            ss << "error=" << status.error << ";signal=" << status.signal << ";status=" << status.status;
+            ss << status.error << ";" << status.signal << ";" << status.status;
             return ss.str();
         }
         else
-            return "unknown";
+            return "-1";
     };
 
     static string Stdout(TContainer& c) {

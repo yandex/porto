@@ -26,7 +26,7 @@ struct TExitStatus {
 
 class TTaskEnv {
     friend TTask;
-    std::string path;
+    std::string command;
     std::vector<std::string> args;
     std::string cwd;
     std::vector<std::string> env;
@@ -37,7 +37,6 @@ class TTaskEnv {
 public:
     TTaskEnv() {};
     TTaskEnv(const std::string &command, const std::string &cwd, const std::string &user, const std::string &group, const std::string &envir);
-    const char** GetArgv();
     const char** GetEnvp();
 };
 
