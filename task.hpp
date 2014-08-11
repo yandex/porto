@@ -44,6 +44,7 @@ public:
 };
 
 class TTask {
+    int rfd, wfd;
     TTaskEnv env;
     std::vector<std::shared_ptr<TCgroup>> leaf_cgroups;
 
@@ -73,6 +74,8 @@ public:
 
     std::string GetStdout();
     std::string GetStderr();
+
+    int ChildCallback();
 };
 
 #endif

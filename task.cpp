@@ -141,6 +141,113 @@ static string GetTmpFile() {
     return path;
 }
 
+static int child_fn(void *arg) {
+    TTask *task = static_cast<TTask*>(arg);
+    return task->ChildCallback();
+}
+
+int TTask::ChildCallback() {
+    TMount proc("proc", "/proc", "proc", 0, {});
+    if (proc.Mount()) {
+        Syslog(string("remount procfs: ") + strerror(errno));
+        ReportResultAndExit(wfd, -errno);
+    }
+
+    close(rfd);
+
+    /*
+     * ReportResultAndExit(fd, -errno) means we failed while preparing
+     * to execve, which should never happen (but it will :-)
+     *
+     * ReportResultAndExit(fd, +errno) means execve failed
+     */
+
+    if (setsid() < 0) {
+        Syslog(string("setsid(): ") + strerror(errno));
+        ReportResultAndExit(wfd, -errno);
+    }
+
+    if (env.cwd.length() && chdir(env.cwd.c_str()) < 0) {
+        Syslog(string("chdir(): ") + strerror(errno));
+        ReportResultAndExit(wfd, -errno);
+    }
+
+    for (auto cg : leaf_cgroups) {
+        auto error = cg->Attach(getpid());
+        if (error) {
+            Syslog(string("cgroup attach: ") + error.GetMsg());
+            ReportResultAndExit(wfd, -error.GetError());
+        }
+    }
+
+    wfd = CloseAllFds(wfd);
+    if (wfd < 0) {
+        Syslog(string("close fds: ") + strerror(errno));
+        /* there is no way of telling parent that we failed (because we
+         * screwed up fds), so exit with some eye catching error code */
+        exit(0xAA);
+    }
+
+    int ret = open("/dev/null", O_RDONLY);
+    if (ret < 0) {
+        Syslog(string("open(0): ") + strerror(errno));
+        ReportResultAndExit(wfd, -errno);
+    }
+
+    // TODO: O_APPEND to support rotation?
+    ret = open(stdoutFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0700);
+    if (ret < 0) {
+        Syslog(string("open(1): ") + strerror(errno));
+        ReportResultAndExit(wfd, -errno);
+    }
+
+    ret = fchown(ret, env.uid, env.gid);
+    if (ret < 0) {
+        Syslog(string("fchown(1): ") + strerror(errno));
+        ReportResultAndExit(wfd, -errno);
+    }
+
+    // TODO: O_APPEND to support rotation?
+    ret = open(stderrFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0700);
+    if (ret < 0) {
+        Syslog(string("open(2): ") + strerror(errno));
+        ReportResultAndExit(wfd, -errno);
+    }
+
+    ret = fchown(ret, env.uid, env.gid);
+    if (ret < 0) {
+        Syslog(string("fchown(2): ") + strerror(errno));
+        ReportResultAndExit(wfd, -errno);
+    }
+
+    // drop privileges
+    if (setgid(env.gid) < 0) {
+        Syslog(string("setgid(): ") + strerror(errno));
+        ReportResultAndExit(wfd, -errno);
+    }
+
+    if (initgroups(env.user.c_str(), env.gid) < 0) {
+        Syslog(string("initgroups(): ") + strerror(errno));
+        ReportResultAndExit(wfd, -errno);
+    }
+
+    if (setuid(env.uid) < 0) {
+        Syslog(string("setuid(): ") + strerror(errno));
+        ReportResultAndExit(wfd, -errno);
+    }
+
+    umask(0);
+
+    auto argv = env.GetArgv();
+    auto envp = env.GetEnvp();
+    execvpe(argv[0], (char *const *)argv, (char *const *)envp);
+
+    Syslog(string("execvpe(): ") + strerror(errno));
+    ReportResultAndExit(wfd, errno);
+
+    return 0;
+}
+
 TError TTask::Start() {
     int ret;
     int pfd[2];
@@ -159,106 +266,15 @@ TError TTask::Start() {
         return TError(errno);
     }
 
-    int rfd = pfd[0];
-    int wfd = pfd[1];
+    rfd = pfd[0];
+    wfd = pfd[1];
 
-    pid_t pid = fork();
-
+    char stack[8192];
+    pid_t pid = clone(child_fn, stack + sizeof(stack),
+                      CLONE_NEWNS | CLONE_NEWPID, this);
     if (pid < 0) {
         TLogger::LogAction("fork", ret == 0, errno);
         return TError(errno);
-    } else if (pid == 0) {
-        close(rfd);
-
-        /*
-         * ReportResultAndExit(fd, -errno) means we failed while preparing
-         * to execve, which should never happen (but it will :-)
-         *
-         * ReportResultAndExit(fd, +errno) means execve failed
-         */
-
-        if (setsid() < 0) {
-            Syslog(string("setsid(): ") + strerror(errno));
-            ReportResultAndExit(wfd, -errno);
-        }
-
-        if (env.cwd.length() && chdir(env.cwd.c_str()) < 0) {
-            Syslog(string("chdir(): ") + strerror(errno));
-            ReportResultAndExit(wfd, -errno);
-        }
-
-        for (auto cg : leaf_cgroups) {
-            auto error = cg->Attach(getpid());
-            if (error) {
-                Syslog(string("cgroup attach: ") + error.GetMsg());
-                ReportResultAndExit(wfd, -error.GetError());
-            }
-        }
-
-        wfd = CloseAllFds(wfd);
-        if (wfd < 0) {
-            Syslog(string("close fds: ") + strerror(errno));
-            /* there is no way of telling parent that we failed (because we
-             * screwed up fds), so exit with some eye catching error code */
-            exit(0xAA);
-        }
-
-        ret = open("/dev/null", O_RDONLY);
-        if (ret < 0) {
-            Syslog(string("open(0): ") + strerror(errno));
-            ReportResultAndExit(wfd, -errno);
-        }
-
-        // TODO: O_APPEND to support rotation?
-        ret = open(stdoutFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0700);
-        if (ret < 0) {
-            Syslog(string("open(1): ") + strerror(errno));
-            ReportResultAndExit(wfd, -errno);
-        }
-
-        ret = fchown(ret, env.uid, env.gid);
-        if (ret < 0) {
-            Syslog(string("fchown(1): ") + strerror(errno));
-            ReportResultAndExit(wfd, -errno);
-        }
-
-        // TODO: O_APPEND to support rotation?
-        ret = open(stderrFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0700);
-        if (ret < 0) {
-            Syslog(string("open(2): ") + strerror(errno));
-            ReportResultAndExit(wfd, -errno);
-        }
-
-        ret = fchown(ret, env.uid, env.gid);
-        if (ret < 0) {
-            Syslog(string("fchown(2): ") + strerror(errno));
-            ReportResultAndExit(wfd, -errno);
-        }
-
-        // drop privileges
-        if (setgid(env.gid) < 0) {
-            Syslog(string("setgid(): ") + strerror(errno));
-            ReportResultAndExit(wfd, -errno);
-        }
-
-        if (initgroups(env.user.c_str(), env.gid) < 0) {
-            Syslog(string("initgroups(): ") + strerror(errno));
-            ReportResultAndExit(wfd, -errno);
-        }
-
-        if (setuid(env.uid) < 0) {
-            Syslog(string("setuid(): ") + strerror(errno));
-            ReportResultAndExit(wfd, -errno);
-        }
-
-        umask(0);
-
-        auto argv = env.GetArgv();
-        auto envp = env.GetEnvp();
-        execvpe(argv[0], (char *const *)argv, (char *const *)envp);
-
-        Syslog(string("execvpe(): ") + strerror(errno));
-        ReportResultAndExit(wfd, errno);
     }
 
     close(wfd);
