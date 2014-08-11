@@ -178,7 +178,7 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
 
     cerr << "Check exit status of invalid command" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "__invalid_command_name__"));
-    ExpectSuccess(api.Start(name));
+    ExpectFailure(api.Start(name), rpc::EContainerError::Error);
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     // TODO: this may blow things up inside portod
     ShouldBeEq(pid, "0");
