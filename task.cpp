@@ -308,8 +308,10 @@ TExitStatus TTask::GetExitStatus() {
         pid_t ret;
         ret = waitpid(pid, &status, WNOHANG | WUNTRACED | WCONTINUED);
         if (ret) {
-            exitStatus.signal = WTERMSIG(status);
-            exitStatus.status = WEXITSTATUS(status);
+            if (!exitStatus.error) {
+                exitStatus.signal = WTERMSIG(status);
+                exitStatus.status = WEXITSTATUS(status);
+            }
             state = Stopped;
         }
     }
