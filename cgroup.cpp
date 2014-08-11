@@ -10,28 +10,28 @@
 using namespace std;
 
 // TCgroup
-shared_ptr<TCgroup> TCgroup::Get(string name, shared_ptr<TCgroup> parent) {
+shared_ptr<TCgroup> TCgroup::Get(const string &name, const shared_ptr<TCgroup> &parent) {
     return TRegistry<TCgroup>::Get(TCgroup(name, parent));
 }
 
-shared_ptr<TCgroup> TCgroup::GetRoot(std::shared_ptr<TMount> mount, std::vector<std::shared_ptr<TSubsystem>> subsystems) {
+shared_ptr<TCgroup> TCgroup::GetRoot(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems) {
     return TRegistry<TCgroup>::Get(TCgroup(mount, subsystems));
 }
 
-shared_ptr<TCgroup> TCgroup::GetRoot(shared_ptr<TSubsystem> subsystem) {
+shared_ptr<TCgroup> TCgroup::GetRoot(const shared_ptr<TSubsystem> subsystem) {
     return TRegistry<TCgroup>::Get(TCgroup({subsystem}));
 }
 
-TCgroup::TCgroup(string name, shared_ptr<TCgroup> parent, int level) :
+TCgroup::TCgroup(const string &name, const shared_ptr<TCgroup> parent, int level) :
     name(name), parent(parent), level(level) {
 }
 
-TCgroup::TCgroup(shared_ptr<TMount> mount, vector<shared_ptr<TSubsystem>> subsystems) :
+TCgroup::TCgroup(const shared_ptr<TMount> mount, const vector<shared_ptr<TSubsystem>> subsystems) :
     name("/"), parent(shared_ptr<TCgroup>(nullptr)), level(0), mount(mount),
     subsystems(subsystems) {
 }
 
-TCgroup::TCgroup(vector<shared_ptr<TSubsystem>> subsystems) :
+TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems) :
     name("/"), parent(shared_ptr<TCgroup>(nullptr)), level(0),
     subsystems(subsystems) {
 
@@ -163,17 +163,17 @@ TError TCgroup::Kill(int signal) {
     return TError();
 }
 
-TError TCgroup::GetKnobValue(std::string knob, std::string &value) {
+TError TCgroup::GetKnobValue(const std::string &knob, std::string &value) {
     TFile f(Path() + "/" + knob);
     return f.AsString(value);
 }
 
-TError TCgroup::GetKnobValueAsLines(std::string knob, vector<string> &lines) {
+TError TCgroup::GetKnobValueAsLines(const std::string &knob, vector<string> &lines) {
     TFile f(Path() + "/" + knob);
     return f.AsLines(lines);
 }
 
-TError TCgroup::SetKnobValue(std::string knob, std::string value, bool append) {
+TError TCgroup::SetKnobValue(const std::string &knob, const std::string &value, bool append) {
     TFile f(Path() + "/" + knob);
 
     if (append)

@@ -10,8 +10,8 @@
 #include "subsystem.hpp"
 
 class TCgroup {
-    std::string name;
-    std::shared_ptr<TCgroup> parent;
+    const std::string name;
+    const std::shared_ptr<TCgroup> parent;
     int level;
     vector<std::weak_ptr<TCgroup>> children;
 
@@ -24,14 +24,14 @@ class TCgroup {
     bool need_cleanup = false;
 
 public:
-    static std::shared_ptr<TCgroup> Get(std::string name,
-                                              std::shared_ptr<TCgroup> parent);
-    static std::shared_ptr<TCgroup> GetRoot(std::shared_ptr<TMount> mount, std::vector<std::shared_ptr<TSubsystem>> subsystems);
-    static std::shared_ptr<TCgroup> GetRoot(std::shared_ptr<TSubsystem> subsystem);
+    static std::shared_ptr<TCgroup> Get(const std::string &name,
+                                        const std::shared_ptr<TCgroup> &parent);
+    static std::shared_ptr<TCgroup> GetRoot(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems);
+    static std::shared_ptr<TCgroup> GetRoot(const std::shared_ptr<TSubsystem> subsystem);
 
-    TCgroup(std::string name, std::shared_ptr<TCgroup> parent, int level = 0);
-    TCgroup(std::shared_ptr<TMount> mount, vector<std::shared_ptr<TSubsystem>> subsystems);
-    TCgroup(std::vector<std::shared_ptr<TSubsystem>> controller);
+    TCgroup(const std::string &name, const std::shared_ptr<TCgroup> parent, int level = 0);
+    TCgroup(const std::shared_ptr<TMount> mount, const vector<std::shared_ptr<TSubsystem>> subsystems);
+    TCgroup(const std::vector<std::shared_ptr<TSubsystem>> controller);
 
     ~TCgroup();
 
@@ -56,9 +56,9 @@ public:
 
     TError Attach(int pid);
 
-    TError GetKnobValue(std::string knob, std::string &value);
-    TError GetKnobValueAsLines(std::string knob, std::vector<std::string> &lines);
-    TError SetKnobValue(std::string knob, std::string value, bool append = false);
+    TError GetKnobValue(const std::string &knob, std::string &value);
+    TError GetKnobValueAsLines(const std::string &knob, std::vector<std::string> &lines);
+    TError SetKnobValue(const std::string &knob, const std::string &value, bool append = false);
 
     friend bool operator==(const TCgroup& c1, const TCgroup& c2);
     friend ostream& operator<<(ostream& os, const TCgroup& cg);
