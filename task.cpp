@@ -14,23 +14,38 @@ extern "C" {
 #include <unistd.h>
 #include <grp.h>
 #include <pwd.h>
+#include <syslog.h>
 }
 
 using namespace std;
 
 // TTaskEnv
-TTaskEnv::TTaskEnv(const std::string &command, const std::string &cwd, const std::string &user, const std::string &group) : cwd(cwd), user(user), group(group) {
+    TTaskEnv::TTaskEnv(const std::string &command, const std::string &cwd, const std::string &user, const std::string &group, const std::string &envir) {
     // TODO: support quoting
     if (command.empty())
         return;
 
-    istringstream s(command);
-    args.insert(args.end(),
-                istream_iterator<string>(s),
-                istream_iterator<string>());
+    {
+        istringstream s(command);
+        args.insert(args.end(),
+                    istream_iterator<string>(s),
+                    istream_iterator<string>());
 
-    path = args.front();
-    args.erase(args.begin());
+        path = args.front();
+        args.erase(args.begin());
+    }
+
+    {
+        istringstream s(envir);
+        string token;
+
+        env.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
+        env.push_back("HOME=/home/" + user);
+        env.push_back("USER=" + user);
+
+        while (getline(s, token, ';'))
+            env.push_back(token);
+    }
 
     struct passwd *p = getpwnam(user.c_str());
     if (!p) {
@@ -59,6 +74,16 @@ const char** TTaskEnv::GetArgv() {
     return argv;
 }
 
+const char** TTaskEnv::GetEnvp() {
+    auto envp = new const char* [env.size() + 1];
+    envp[0] = path.c_str();
+    for (size_t i = 0; i < env.size(); i++)
+        envp[i] = env[i].c_str();
+    envp[env.size()] = NULL;
+
+    return envp;
+}
+
 // TTask
 int TTask::CloseAllFds(int except) {
     close(0);
@@ -81,6 +106,13 @@ void TTask::ReportResultAndExit(int fd, int result)
 {
     if (write(fd, &result, sizeof(result))) {}
     exit(EXIT_FAILURE);
+}
+
+void TTask::Syslog(const string &s)
+{
+    openlog("portod", LOG_NDELAY, LOG_DAEMON);
+    syslog(LOG_ERR, "%s", s.c_str());
+    closelog();
 }
 
 TTask::~TTask() {
@@ -135,7 +167,6 @@ TError TTask::Start() {
     if (pid < 0) {
         TLogger::LogAction("fork", ret == 0, errno);
         return TError(errno);
-
     } else if (pid == 0) {
         close(rfd);
 
@@ -146,61 +177,87 @@ TError TTask::Start() {
          * ReportResultAndExit(fd, +errno) means execve failed
          */
 
-        if (setsid() < 0)
+        if (setsid() < 0) {
+            Syslog(string("setsid(): ") + strerror(errno));
             ReportResultAndExit(wfd, -errno);
+        }
 
-        if (env.cwd.length() && chdir(env.cwd.c_str()) < 0)
+        if (env.cwd.length() && chdir(env.cwd.c_str()) < 0) {
+            Syslog(string("chdir(): ") + strerror(errno));
             ReportResultAndExit(wfd, -errno);
+        }
 
         for (auto cg : leaf_cgroups) {
             auto error = cg->Attach(getpid());
-            if (error)
+            if (error) {
+                Syslog(string("cgroup attach: ") + error.GetMsg());
                 ReportResultAndExit(wfd, -error.GetError());
+            }
         }
 
         wfd = CloseAllFds(wfd);
-        if (wfd < 0)
+        if (wfd < 0) {
+            Syslog(string("close fds: ") + strerror(errno));
             /* there is no way of telling parent that we failed (because we
              * screwed up fds), so exit with some eye catching error code */
             exit(0xAA);
+        }
 
         ret = open("/dev/null", O_RDONLY);
-        if (ret < 0)
+        if (ret < 0) {
+            Syslog(string("open(0): ") + strerror(errno));
             ReportResultAndExit(wfd, -errno);
+        }
 
         // TODO: O_APPEND to support rotation?
         ret = open(stdoutFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0700);
-        if (ret < 0)
+        if (ret < 0) {
+            Syslog(string("open(1): ") + strerror(errno));
             ReportResultAndExit(wfd, -errno);
+        }
 
         ret = fchown(ret, env.uid, env.gid);
-        if (ret < 0)
+        if (ret < 0) {
+            Syslog(string("fchown(1): ") + strerror(errno));
             ReportResultAndExit(wfd, -errno);
+        }
 
         // TODO: O_APPEND to support rotation?
         ret = open(stderrFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0700);
-        if (ret < 0)
+        if (ret < 0) {
+            Syslog(string("open(2): ") + strerror(errno));
             ReportResultAndExit(wfd, -errno);
+        }
 
         ret = fchown(ret, env.uid, env.gid);
-        if (ret < 0)
+        if (ret < 0) {
+            Syslog(string("fchown(2): ") + strerror(errno));
             ReportResultAndExit(wfd, -errno);
+        }
 
         // drop privileges
-        if (setgid(env.gid) < 0)
+        if (setgid(env.gid) < 0) {
+            Syslog(string("setgid(): ") + strerror(errno));
             ReportResultAndExit(wfd, -errno);
+        }
 
-        if (initgroups(env.user.c_str(), env.gid) < 0)
+        if (initgroups(env.user.c_str(), env.gid) < 0) {
+            Syslog(string("initgroups(): ") + strerror(errno));
             ReportResultAndExit(wfd, -errno);
+        }
 
-        if (setuid(env.uid) < 0)
+        if (setuid(env.uid) < 0) {
+            Syslog(string("setuid(): ") + strerror(errno));
             ReportResultAndExit(wfd, -errno);
+        }
 
         umask(0);
 
         auto argv = env.GetArgv();
-        execvp(argv[0], (char *const *)argv);
+        auto envp = env.GetEnvp();
+        execvpe(argv[0], (char *const *)argv, (char *const *)envp);
 
+        Syslog(string("execvpe(): ") + strerror(errno));
         ReportResultAndExit(wfd, errno);
     }
 

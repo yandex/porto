@@ -1,8 +1,7 @@
-- porto set <> env a=b;c=d;
-- support user/group conversion to uid/gid
 - rotate subprocess stdout/stderr
 - monitoring/statistics
-- ? use syslog for errors while forking
+- property:command quoting
+- property:env support ; (via \;)
 
 # cleanup
 - move porto.socket and porto.pid to /run

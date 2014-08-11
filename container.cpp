@@ -160,7 +160,7 @@ TError TContainer::Start()
         return ret;
     }
 
-    TTaskEnv taskEnv(spec.Get("command"), "", spec.Get("user"), spec.Get("group"));
+    TTaskEnv taskEnv(spec.Get("command"), "", spec.Get("user"), spec.Get("group"), spec.Get("env"));
     task = unique_ptr<TTask>(new TTask(taskEnv, leaf_cgroups));
 
     ret = task->Start();
