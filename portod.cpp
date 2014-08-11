@@ -16,7 +16,7 @@ using namespace std;
 static const int MAX_CLIENTS = 16;
 static const int MAX_CONNECTIONS = MAX_CLIENTS + 1;
 static const int POLL_TIMEOUT_MS = 1000;
-static const string PID_FILE = "/tmp/porto.pid";
+static const string PID_FILE = "/run/portod.pid";
 
 static void RemoveRpcServer(const string &path)
 {

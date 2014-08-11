@@ -5,7 +5,7 @@
 #include "container.hpp"
 
 // TODO: /run/porto.socket
-const std::string RPC_SOCK_PATH = "/tmp/porto.socket";
+const std::string RPC_SOCK_PATH = "/run/portod.socket";
 
 rpc::TContainerResponse
 HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req);

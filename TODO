@@ -1,11 +1,10 @@
 - pget pset dget get
-- property:command quoting
+- log into file + info about file:line that failed
 - wordexp may leak environment, so clear it prior to execution
 
 # cleanup
 - rotate subprocess stdout/stderr
 - property:env support ; (via \;)
-- move porto.socket and porto.pid to /run
 - permissions of .pid, .socket, etc
 - move all 'extern "C"' into one file
 
