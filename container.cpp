@@ -181,12 +181,12 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
-    return TError();
+    return NoError;
 }
 
 TError TContainer::Start() {
     if (!CheckState(Stopped))
-        return TError();
+        return NoError;
 
     auto ret = PrepareCgroups();
     if (ret)
@@ -215,7 +215,7 @@ static const auto kill_timeout = 100000;
 
 TError TContainer::Stop() {
     if (IsRoot() || !CheckState(Running))
-        return false;
+        return TError(TError::BadValue);
 
     if (task->IsRunning())
         task->Kill(SIGTERM);
@@ -233,50 +233,50 @@ TError TContainer::Stop() {
 
     state = Stopped;
 
-    return TError();
+    return NoError;
 }
 
 TError TContainer::Pause() {
     if (IsRoot() || !CheckState(Running))
-        return false;
+        return TError(TError::BadValue);
 
     auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
     TSubsystem::Freezer()->Freeze(*cg);
 
     state = Paused;
-    return true;
+    return NoError;
 }
 
 TError TContainer::Resume() {
     if (!CheckState(Paused))
-        return false;
+        return TError(TError::BadValue);
 
     auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
     TSubsystem::Freezer()->Unfreeze(*cg);
 
     state = Running;
-    return true;
+    return NoError;
 }
 
 TError TContainer::GetData(const string &name, string &value) {
     if (dataSpec.find(name) == dataSpec.end())
-        return TError("No such data");
+        return TError(TError::BadValue);
 
     value = dataSpec[name].Handler(*this);
-    return TError();
+    return NoError;
 }
 
 TError TContainer::GetProperty(const string &property, string &value) {
     value = spec.Get(property);
-    return TError();
+    return NoError;
 }
 
 TError TContainer::SetProperty(const string &property, const string &value) {
     if (IsRoot())
-        return TError("Can't set property for root");
+        return TError(TError::BadValue, "Can't set property for root");
 
     if (task && task->IsRunning() && !spec.IsDynamic(property))
-        return TError("Can't set dynamic property " + property + " for running container");
+        return TError(TError::BadValue, "Can't set dynamic property " + property + " for running container");
 
     return spec.Set(property, value);
 }
@@ -290,7 +290,7 @@ TError TContainer::Restore() {
     state = IsAlive() ? Running : Stopped;
     task = nullptr;
 
-    return TError();
+    return NoError;
 }
 
 std::shared_ptr<TCgroup> TContainer::GetCgroup(shared_ptr<TSubsystem> subsys) {
@@ -321,13 +321,13 @@ bool TContainerHolder::ValidName(const string &name) {
 
 TError TContainerHolder::Create(const string &name) {
     if (!ValidName(name))
-        return TError("invalid container name " + name);
+        return TError(TError::BadValue, "invalid container name " + name);
 
     if (containers[name] == nullptr) {
         containers[name] = make_shared<TContainer>(name);
-        return TError();
+        return NoError;
     } else
-        return TError("container " + name + " already exists");
+        return TError(TError::BadValue, "container " + name + " already exists");
 }
 
 shared_ptr<TContainer> TContainerHolder::Get(const string &name) {
@@ -359,5 +359,5 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
         return e;
 
     containers[name] = c;
-    return TError();
+    return NoError;
 }

@@ -4,19 +4,18 @@ extern "C" {
 #include <string.h>
 }
 
-TError::TError() : error(0) {
+TError NoError;
+
+TError::TError(EError e, std::string description) :
+    error(e), description(description) {
 }
 
-TError::TError(const std::string &msg) : error(-1), msg(msg) {
-}
-
-TError::TError(int error, const std::string &_msg) : error(error) {
-    if (!_msg.length())
-        msg = std::string(strerror(error));
+TError::TError(EError e, int err) :
+    error(e), description(strerror(err)) {
 }
 
 TError::operator bool() const {
-    return error != 0;
+    return error != NoError;
 }
 
 int TError::GetError() const {
@@ -24,5 +23,5 @@ int TError::GetError() const {
 }
 
 const std::string &TError::GetMsg() const {
-    return msg;
+    return description;
 }

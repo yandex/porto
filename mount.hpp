@@ -64,9 +64,9 @@ public:
         TLogger::LogAction("mount " + mountpoint, ret, errno);
 
         if (ret)
-            return TError("Cannot mount filesystem " + mountpoint);
+            return TError(TError::Unrecovable);
 
-        return TError();
+        return NoError;
     }
 
     TError Umount () {
@@ -75,9 +75,9 @@ public:
         TLogger::LogAction("umount " + mountpoint, ret, errno);
 
         if (ret)
-            return TError("Cannot umount filesystem " + mountpoint);
+            return TError(TError::Unrecovable);
 
-        return TError();
+        return NoError;
     }
 };
 

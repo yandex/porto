@@ -269,7 +269,7 @@ TError TTask::Start() {
     ret = pipe2(pfd, O_CLOEXEC);
     if (ret) {
         TLogger::LogAction("pipe2", ret == 0, errno);
-        return TError(errno);
+        return TError(TError::Unknown, errno);
     }
 
     rfd = pfd[0];
@@ -280,7 +280,7 @@ TError TTask::Start() {
                       CLONE_NEWNS | CLONE_NEWPID, this);
     if (pid < 0) {
         TLogger::LogAction("fork", ret == 0, errno);
-        return TError(errno);
+        return TError(TError::Unknown, errno);
     }
 
     close(wfd);
@@ -288,16 +288,16 @@ TError TTask::Start() {
     int n = read(rfd, &ret, sizeof(ret));
     if (n < 0) {
         TLogger::LogAction("read child status failed", false, errno);
-        return TError(errno);
+        return TError(TError::Unknown, errno);
     } else if (n == 0) {
         state = Running;
         this->pid = pid;
-        return TError();
+        return NoError;
     } else {
         TLogger::LogAction("got status from child", false, errno);
         (void)waitpid(pid, NULL, WNOHANG);
         exitStatus.error = ret;
-        return false;
+        return TError(TError::Unknown);
     }
 }
 

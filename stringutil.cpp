@@ -30,19 +30,19 @@ TError StringsToIntegers(const std::vector<std::string> &strings,
         try {
             integers.push_back(stoi(l));
         } catch (...) {
-            return TError("Bad integer value");
+            return TError(TError::Unknown, "Bad integer value");
         }
     }
 
-    return TError();
+    return NoError;
 }
 
 TError StringToUint64(const std::string &string, uint64_t &value) {
     try {
         value = stoull(string);
     } catch (...) {
-        return TError("Bad integer value");
+        return TError(TError::Unknown, "Bad integer value");
     }
 
-    return TError();
+    return NoError;
 }

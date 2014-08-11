@@ -45,14 +45,14 @@ bool TContainerSpec::IsDynamic(const std::string &property) {
 
 TError TContainerSpec::Set(const string &property, const string &value) {
     if (propertySpec.find(property) == propertySpec.end()) {
-        TError error("property not found");
+        TError error(TError::Unknown, "property not found");
         TLogger::LogError(error);
         return error;
     }
 
     if (propertySpec[property].Valid &&
         !propertySpec[property].Valid(value)) {
-        TError error("invalid property value");
+        TError error(TError::Unknown, "invalid property value");
         TLogger::LogError(error);
         return error;
     }
@@ -85,7 +85,7 @@ TContainerSpec::~TContainerSpec() {
 
 TError TContainerSpec::SyncStorage() {
     if (IsRoot())
-        return TError();
+        return NoError;
 
     kv::TNode node;
 
@@ -101,7 +101,7 @@ TError TContainerSpec::SyncStorage() {
 
 TError TContainerSpec::AppendStorage(const string& key, const string& value) {
     if (IsRoot())
-        return TError();
+        return NoError;
 
     kv::TNode node;
 

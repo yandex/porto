@@ -46,14 +46,14 @@ TError TFile::Remove() {
     TLogger::LogAction("unlink " + path, ret, errno);
 
     if (ret && (errno != ENOENT))
-        return TError(errno);
-    return TError();
+        return TError(TError::Unknown, errno);
+    return NoError;
 }
 
 TError TFile::AsString(string &value) {
     ifstream in(Path());
     if (!in.is_open())
-        return TError("Cannot open " + Path());
+        return TError(TError::Unknown, "Cannot open " + Path());
 
     in.seekg(0, std::ios::end);
     value.reserve(in.tellg());
@@ -61,7 +61,7 @@ TError TFile::AsString(string &value) {
 
     value.assign((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
 
-    return TError();
+    return NoError;
 }
 
 TError TFile::AsInt(int &value) {
@@ -71,9 +71,9 @@ TError TFile::AsInt(int &value) {
         return ret;
     try {
         value = stoi(s);
-        return TError();
+        return NoError;
     } catch (...) {
-        return TError("Bad integer value");
+        return TError(TError::Unknown, "Bad integer value");
     }
 }
 
@@ -82,12 +82,12 @@ TError TFile::AsLines(vector<string> &value) {
     string line;
 
     if (!in.is_open())
-        return TError("Cannot open " + path);
+        return TError(TError::Unknown, "Cannot open " + path);
 
     while (getline(in, line))
         value.push_back(line);
 
-    return TError();
+    return NoError;
 }
 
 TError TFile::WriteStringNoAppend(const string &str) {
@@ -95,10 +95,10 @@ TError TFile::WriteStringNoAppend(const string &str) {
     if (out.is_open()) {
         out << str;
         TLogger::LogAction("write " + path, 0, 0);
-        return TError();
+        return NoError;
     } else {
         TLogger::LogAction("write " + path, -1, errno);
-        return TError(errno);
+        return TError(TError::Unknown, errno);
     }
 }
 
@@ -107,9 +107,9 @@ TError TFile::AppendString(const string &str) {
     if (out.is_open()) {
         out << str;
         TLogger::LogAction("append " + path, 0, 0);
-        return TError();
+        return NoError;
     } else {
         TLogger::LogAction("append " + path, -1, errno);
-        return TError(errno);
+        return TError(TError::Unknown, errno);
     }
 }

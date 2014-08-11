@@ -66,7 +66,7 @@ TError ConnectToRpcServer(const std::string& path, int &fd)
 
     fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (fd < 0)
-        return TError(errno);
+        return TError(TError::Unknown, errno);
 
     peer_addr.sun_family = AF_UNIX;
     strncpy(peer_addr.sun_path, path.c_str(), sizeof(peer_addr.sun_path) - 1);
@@ -74,10 +74,10 @@ TError ConnectToRpcServer(const std::string& path, int &fd)
     peer_addr_size = sizeof(struct sockaddr_un);
     if (connect(fd, (struct sockaddr *) &peer_addr, peer_addr_size) < 0) {
         close(fd);
-        return TError(errno);
+        return TError(TError::Unknown, errno);
     }
 
-    return TError();
+    return NoError;
 }
 
 TError CreateRpcServer(const std::string &path, int &fd)
@@ -88,7 +88,7 @@ TError CreateRpcServer(const std::string &path, int &fd)
 
     fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
     if (fd < 0)
-        return TError(errno);
+        return TError(TError::Unknown, errno);
 
     my_addr.sun_family = AF_UNIX;
     strncpy(my_addr.sun_path, path.c_str(), sizeof(my_addr.sun_path) - 1);
@@ -98,13 +98,13 @@ TError CreateRpcServer(const std::string &path, int &fd)
     if (bind(fd, (struct sockaddr *) &my_addr,
              sizeof(struct sockaddr_un)) < 0) {
         close(fd);
-        return TError(errno);
+        return TError(TError::Unknown, errno);
     }
 
     if (listen(fd, 0) < 0) {
         close(fd);
-        return TError(errno);
+        return TError(TError::Unknown, errno);
     }
 
-    return TError();
+    return NoError;
 }
