@@ -1,5 +1,7 @@
 #include "libporto.hpp"
 
+using namespace std;
+
 extern "C" {
 #include <unistd.h>
 #include <sys/socket.h>

@@ -12,22 +12,22 @@
 #include "stringutil.hpp"
 
 class TMount {
-    string device;
-    string mountpoint;
-    string vfstype;
-    std::set<string> flags;
+    std::string device;
+    std::string mountpoint;
+    std::string vfstype;
+    std::set<std::string> flags;
 
     unsigned long mountflags = 0;
 
 public:
-    TMount(const string &mounts_line);
+    TMount(const std::string &mounts_line);
 
-    TMount(const string &device, const string &mountpoint, const string &vfstype,
+    TMount(const std::string &device, const std::string &mountpoint, const std::string &vfstype,
            unsigned long mountflags, std::set<std::string> flags) :
         device (device), mountpoint (mountpoint), vfstype (vfstype),
         flags (flags), mountflags (mountflags) {}
 
-    friend ostream& operator<<(ostream& os, const TMount& m) {
+    friend std::ostream& operator<<(std::ostream& os, const TMount& m) {
         os << m.device << " " << m.mountpoint << " ";
         for (auto f : m.flags)
             os << f << " ";
@@ -41,19 +41,19 @@ public:
             m1.vfstype == m2.vfstype;
     }
 
-    const string Mountpoint() {
+    const std::string Mountpoint() {
         return mountpoint;
     }
 
-    const string VFSType() {
+    const std::string VFSType() {
         return vfstype;
     }
 
-    const string ParentFolder() {
+    const std::string ParentFolder() {
         return mountpoint.substr(0, mountpoint.find_last_of("/"));
     }
 
-    set<string> const Flags() {
+    std::set<std::string> const Flags() {
         return flags;
     }
 
@@ -89,7 +89,7 @@ public:
 
     std::set<std::shared_ptr<TMount> > const& Mounts();
 
-    friend ostream& operator<<(std::ostream& os, const TMountSnapshot& ms);
+    friend std::ostream& operator<<(std::ostream& os, const TMountSnapshot& ms);
 };
 
 #endif

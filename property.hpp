@@ -9,7 +9,7 @@
 #include "error.h"
 #include "kvalue.hpp"
 
-const string RootName = "/";
+const std::string RootName = "/";
 
 struct TPropertySpec {
     std::string description;
@@ -28,7 +28,7 @@ class TContainerSpec {
     std::map<std::string, std::string> data;
 
     TError SyncStorage();
-    TError AppendStorage(const string& key, const string& value);
+    TError AppendStorage(const std::string& key, const std::string& value);
     bool IsRoot();
 
 public:

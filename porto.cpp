@@ -4,6 +4,8 @@
 
 #include "libporto.hpp"
 
+using namespace std;
+
 class ICmd {
 protected:
     string name, usage, desc;

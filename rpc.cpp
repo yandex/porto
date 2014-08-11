@@ -7,6 +7,8 @@ extern "C" {
 #include <sys/un.h>
 }
 
+using namespace std;
+
 static void CreateContainer(TContainerHolder &cholder,
                             const rpc::TContainerCreateRequest &req,
                             rpc::TContainerResponse &rsp)

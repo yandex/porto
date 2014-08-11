@@ -11,6 +11,8 @@ extern "C" {
 #include <poll.h>
 }
 
+using namespace std;
+
 static const int MAX_CLIENTS = 16;
 static const int MAX_CONNECTIONS = MAX_CLIENTS + 1;
 static const int POLL_TIMEOUT_MS = 1000;

@@ -37,7 +37,7 @@ public:
 class TMemorySubsystem : public TSubsystem {
 public:
     TMemorySubsystem() : TSubsystem("memory") {}
-    TError Usage(shared_ptr<TCgroup> &cg, uint64_t &value);
+    TError Usage(std::shared_ptr<TCgroup> &cg, uint64_t &value);
 };
 
 class TFreezerSubsystem : public TSubsystem {
@@ -56,7 +56,7 @@ public:
 class TCpuacctSubsystem : public TSubsystem {
 public:
     TCpuacctSubsystem() : TSubsystem("cpuacct") {}
-    TError Usage(shared_ptr<TCgroup> &cg, uint64_t &value);
+    TError Usage(std::shared_ptr<TCgroup> &cg, uint64_t &value);
 };
 
 #endif

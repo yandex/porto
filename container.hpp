@@ -50,11 +50,11 @@ public:
     TContainer(const std::string &name, const kv::TNode &node);
     ~TContainer();
 
-    string Name();
+    std::string Name();
 
     bool IsRoot();
 
-    vector<pid_t> Processes();
+    std::vector<pid_t> Processes();
     bool IsAlive();
 
     void UpdateState();
@@ -70,7 +70,7 @@ public:
     TError GetData(const std::string &data, std::string &value);
     TError Restore();
 
-    std::shared_ptr<TCgroup> GetCgroup(shared_ptr<TSubsystem> subsys);
+    std::shared_ptr<TCgroup> GetCgroup(std::shared_ptr<TSubsystem> subsys);
 };
 
 class TContainerHolder {
@@ -87,7 +87,7 @@ public:
 
     void Destroy(const std::string &name);
 
-    vector<std::string> List();
+    std::vector<std::string> List();
 };
 
 #endif

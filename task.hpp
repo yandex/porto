@@ -12,8 +12,6 @@ extern "C" {
 
 #include "cgroup.hpp"
 
-using namespace std;
-
 class TTask;
 class TContainerEnv;
 
