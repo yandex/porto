@@ -341,6 +341,9 @@ TError TContainerHolder::Create(string name) {
 }
 
 shared_ptr<TContainer> TContainerHolder::Get(string name) {
+    if (containers.find(name) == containers.end())
+        return shared_ptr<TContainer>();
+
     return containers[name];
 }
 
