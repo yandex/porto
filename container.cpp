@@ -130,16 +130,14 @@ bool TContainer::CheckState(EContainerState expected) {
     return state == expected;
 }
 
-TContainer::~TContainer()
-{
+TContainer::~TContainer() {
     if (state == Paused)
         Resume();
 
     Stop();
 }
 
-string TContainer::Name()
-{
+string TContainer::Name() {
     return name;
 }
 
@@ -186,8 +184,7 @@ TError TContainer::PrepareCgroups() {
     return TError();
 }
 
-TError TContainer::Start()
-{
+TError TContainer::Start() {
     if (!CheckState(Stopped))
         return TError();
 
@@ -216,8 +213,7 @@ TError TContainer::Start()
 
 static const auto kill_timeout = 100000;
 
-TError TContainer::Stop()
-{
+TError TContainer::Stop() {
     if (IsRoot() || !CheckState(Running))
         return false;
 
@@ -240,8 +236,7 @@ TError TContainer::Stop()
     return TError();
 }
 
-TError TContainer::Pause()
-{
+TError TContainer::Pause() {
     if (IsRoot() || !CheckState(Running))
         return false;
 
@@ -252,8 +247,7 @@ TError TContainer::Pause()
     return true;
 }
 
-TError TContainer::Resume()
-{
+TError TContainer::Resume() {
     if (!CheckState(Paused))
         return false;
 
@@ -264,8 +258,7 @@ TError TContainer::Resume()
     return true;
 }
 
-TError TContainer::GetData(string name, string &value)
-{
+TError TContainer::GetData(const string &name, string &value) {
     if (dataSpec.find(name) == dataSpec.end())
         return TError("No such data");
 
@@ -273,14 +266,12 @@ TError TContainer::GetData(string name, string &value)
     return TError();
 }
 
-TError TContainer::GetProperty(string property, string &value)
-{
+TError TContainer::GetProperty(const string &property, string &value) {
     value = spec.Get(property);
     return TError();
 }
 
-TError TContainer::SetProperty(string property, string value)
-{
+TError TContainer::SetProperty(const string &property, const string &value) {
     if (IsRoot())
         return TError("Can't set property for root");
 
@@ -318,8 +309,7 @@ TContainerHolder::TContainerHolder() {
 TContainerHolder::~TContainerHolder() {
 }
 
-bool TContainerHolder::ValidName(const string &name)
-{
+bool TContainerHolder::ValidName(const string &name) {
     if (name == RootName)
         return true;
 
@@ -329,7 +319,7 @@ bool TContainerHolder::ValidName(const string &name)
                    }) == name.end();
 }
 
-TError TContainerHolder::Create(string name) {
+TError TContainerHolder::Create(const string &name) {
     if (!ValidName(name))
         return TError("invalid container name " + name);
 
@@ -340,21 +330,19 @@ TError TContainerHolder::Create(string name) {
         return TError("container " + name + " already exists");
 }
 
-shared_ptr<TContainer> TContainerHolder::Get(string name) {
+shared_ptr<TContainer> TContainerHolder::Get(const string &name) {
     if (containers.find(name) == containers.end())
         return shared_ptr<TContainer>();
 
     return containers[name];
 }
 
-void TContainerHolder::Destroy(string name)
-{
+void TContainerHolder::Destroy(const string &name) {
     if (name != RootName)
         containers.erase(name);
 }
 
-vector<string> TContainerHolder::List()
-{
+vector<string> TContainerHolder::List() {
     vector<string> ret;
 
     for (auto c : containers)
@@ -363,8 +351,7 @@ vector<string> TContainerHolder::List()
     return ret;
 }
 
-TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
-{
+TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node) {
     // TODO: we DO trust data from the persistent storage, do we?
     auto c = make_shared<TContainer>(name, node);
     auto e = c->Restore();

@@ -64,10 +64,10 @@ public:
     TError Pause();
     TError Resume();
 
-    TError GetProperty(std::string property, std::string &value);
-    TError SetProperty(std::string property, std::string value);
+    TError GetProperty(const std::string &property, std::string &value);
+    TError SetProperty(const std::string &property, const std::string &value);
 
-    TError GetData(std::string data, std::string &value);
+    TError GetData(const std::string &data, std::string &value);
     TError Restore();
 
     std::shared_ptr<TCgroup> GetCgroup(shared_ptr<TSubsystem> subsys);
@@ -81,11 +81,11 @@ public:
     TContainerHolder();
     ~TContainerHolder();
 
-    TError Create(std::string name);
-    std::shared_ptr<TContainer> Get(std::string name);
+    TError Create(const std::string &name);
+    std::shared_ptr<TContainer> Get(const std::string &name);
     TError Restore(const std::string &name, const kv::TNode &node);
 
-    void Destroy(std::string name);
+    void Destroy(const std::string &name);
 
     vector<std::string> List();
 };
