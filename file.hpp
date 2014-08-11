@@ -7,7 +7,7 @@
 #include "error.hpp"
 
 class TFile {
-    std::string path;
+    const std::string path;
 
 public:
     enum EFileType {
@@ -22,7 +22,7 @@ public:
         Any
     };    
 
-    TFile(std::string path);
+    TFile(const std::string &path);
 
     std::string Path();
     EFileType Type();
@@ -33,8 +33,8 @@ public:
     TError AsInt(int &value);
     TError AsLines(std::vector<std::string> &value);
 
-    TError WriteStringNoAppend(std::string str);
-    TError AppendString(std::string str);
+    TError WriteStringNoAppend(const std::string &str);
+    TError AppendString(const std::string &str);
 };
 
 #endif

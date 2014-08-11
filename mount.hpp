@@ -20,9 +20,9 @@ class TMount {
     unsigned long mountflags = 0;
 
 public:
-    TMount(string mounts_line);
+    TMount(const string &mounts_line);
 
-    TMount(string device, string mountpoint, string vfstype,
+    TMount(const string &device, const string &mountpoint, const string &vfstype,
            unsigned long mountflags, std::set<std::string> flags) :
         device (device), mountpoint (mountpoint), vfstype (vfstype),
         flags (flags), mountflags (mountflags) {}

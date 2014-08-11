@@ -11,7 +11,7 @@
 
 using namespace std;
 
-TFolder::TFolder(string path) : path(path) {}
+TFolder::TFolder(const string &path) : path(path) {}
 TFolder::TFolder(TFile file) : path(file.Path()) {}
 
 TError TFolder::Create(mode_t mode) {
@@ -46,7 +46,7 @@ TError TFolder::Remove(bool recursive) {
     return TError(errno);
 }
 
-TError TFolder::Rename(std::string newname) {
+TError TFolder::Rename(const std::string &newname) {
     //TODO
     return TError("TODO");
 }

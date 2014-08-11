@@ -9,7 +9,7 @@
 
 using namespace std;
 
-TFile::TFile(std::string path) : path(path) {
+TFile::TFile(const std::string &path) : path(path) {
 };
 
 string TFile::Path() {
@@ -90,8 +90,7 @@ TError TFile::AsLines(vector<string> &value) {
     return TError();
 }
 
-TError TFile::WriteStringNoAppend(string str)
-{
+TError TFile::WriteStringNoAppend(const string &str) {
     ofstream out(path, ofstream::trunc);
     if (out.is_open()) {
         out << str;
@@ -103,8 +102,7 @@ TError TFile::WriteStringNoAppend(string str)
     }
 }
 
-TError TFile::AppendString(string str)
-{
+TError TFile::AppendString(const string &str) {
     ofstream out(path, ofstream::out);
     if (out.is_open()) {
         out << str;

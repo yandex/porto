@@ -7,16 +7,16 @@
 #include "file.hpp"
 
 class TFolder {
-    std::string path;
+    const std::string path;
 
 public:
-    TFolder(std::string path);
+    TFolder(const std::string &path);
     TFolder(TFile file);
 
     bool Exists();
     TError Create(mode_t mode = 0x755);
     TError Remove(bool recursive = false);
-    TError Rename(std::string newname);
+    TError Rename(const std::string &newname);
 
     TError Items(const TFile::EFileType type, std::vector<std::string> &list);
     TError Subfolders(std::vector<std::string> &list);

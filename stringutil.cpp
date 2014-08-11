@@ -24,7 +24,7 @@ string CommaSeparatedList(const set<string> &list) {
     return ret;
 }
 
-TError StringsToIntegers(std::vector<std::string> &strings,
+TError StringsToIntegers(const std::vector<std::string> &strings,
                          std::vector<int> &integers) {
     for (auto l : strings) {
         try {

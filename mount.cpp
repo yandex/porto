@@ -8,7 +8,7 @@ using namespace std;
 
 // from single /proc/self/mounts line, like:
 // /dev/sda1 /boot ext4 rw,seclabel,relatime,data=ordered 0 0
-TMount::TMount(string mounts_line) {
+TMount::TMount(const string &mounts_line) {
     istringstream ss(mounts_line);
     string flag_string, t;
     ss >> device >> mountpoint >> vfstype >> flag_string;

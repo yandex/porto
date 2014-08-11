@@ -14,7 +14,7 @@ static bool verbose = true;
 
 class TLogger {
 public:
-    static void LogAction(string action, bool error = false, int errcode = 0) {
+    static void LogAction(const string &action, bool error = false, int errcode = 0) {
         if (!error && verbose)
             cerr << "Ok: " << action << endl;
         else if (error)
@@ -25,10 +25,10 @@ public:
         cerr << "Error(" << e.GetError() << "): " << e.GetMsg() << " - " << s << endl;
     }
 
-    static void LogRequest(string message) {
+    static void LogRequest(const string &message) {
         cerr << "-> " << message << endl;
     }
-    static void LogResponse(string message) {
+    static void LogResponse(const string &message) {
         cerr << "<- " << message << endl;
     }
 };
