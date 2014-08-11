@@ -1,4 +1,3 @@
-- pget pset dget get
 - log into file + info about file:line that failed
 - wordexp may leak environment, so clear it prior to execution
 

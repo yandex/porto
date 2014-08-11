@@ -21,6 +21,10 @@ public:
     string& GetUsage() { return usage; }
     string& GetDescription() { return desc; }
 
+    const string &ErrorName(int err) {
+        return rpc::EContainerError_Name(static_cast<rpc::EContainerError>(err));
+    }
+
     bool ValidArgs(int argc, char *argv[]) {
         if (need_args < argc)
             return false;
@@ -108,7 +112,7 @@ public:
     {
         int ret = api.Create(argv[0]);
         if (ret)
-            cerr << "Can't create container, error = " << ret << endl;
+            cerr << "Can't create container, error = " << ErrorName(ret) << endl;
 
         return ret;
     }
@@ -122,7 +126,7 @@ public:
     {
         int ret = api.Destroy(argv[0]);
         if (ret)
-            cerr << "Can't destroy container, error = " << ret << endl;
+            cerr << "Can't destroy container, error = " << ErrorName(ret) << endl;
 
         return ret;
     }
@@ -137,13 +141,13 @@ public:
         vector<string> clist;
         int ret = api.List(clist);
         if (ret)
-            cerr << "Can't list containers, error = " << ret << endl;
+            cerr << "Can't list containers, error = " << ErrorName(ret) << endl;
         else
             for (auto c : clist) {
                 string s;
                 ret = api.GetData(c, "state", s);
                 if (ret)
-                    cerr << "Can't get container state, error = " << ret << endl;
+                    cerr << "Can't get container state, error = " << ErrorName(ret) << endl;
                 cout << left << setw(40) << c
                      << setw(40) << s << endl;
 
@@ -162,7 +166,7 @@ public:
         vector<TProperty> plist;
         int ret = api.Plist(plist);
         if (ret)
-            cerr << "Can't list properties, error = " << ret << endl;
+            cerr << "Can't list properties, error = " << ErrorName(ret) << endl;
         else
             for (auto p : plist)
                 cout << left << setw(40) << p.name
@@ -181,7 +185,7 @@ public:
         vector<TData> dlist;
         int ret = api.Dlist(dlist);
         if (ret)
-            cerr << "Can't list data, error = " << ret << endl;
+            cerr << "Can't list data, error = " << ErrorName(ret) << endl;
         else
             for (auto d : dlist)
                 cout << left << setw(40) << d.name
@@ -193,14 +197,14 @@ public:
 
 class TGetPropertyCmd : public ICmd {
 public:
-    TGetPropertyCmd() : ICmd("get", 2, "<name> <property>", "get container property") {}
+    TGetPropertyCmd() : ICmd("pget", 2, "<name> <property>", "get container property") {}
 
     int Execute(int argc, char *argv[])
     {
         string value;
         int ret = api.GetProperty(argv[0], argv[1], value);
         if (ret)
-            cerr << "Can't get property, error = " << ret << endl;
+            cerr << "Can't get property, error = " << ErrorName(ret) << endl;
         else
             cout << value << endl;
 
@@ -210,13 +214,13 @@ public:
 
 class TSetPropertyCmd : public ICmd {
 public:
-    TSetPropertyCmd() : ICmd("set", 3, "<name> <property>", "set container property") {}
+    TSetPropertyCmd() : ICmd("pset", 3, "<name> <property>", "set container property") {}
 
     int Execute(int argc, char *argv[])
     {
         int ret = api.SetProperty(argv[0], argv[1], argv[2]);
         if (ret)
-            cerr << "Can't set property, error = " << ret << endl;
+            cerr << "Can't set property, error = " << ErrorName(ret) << endl;
 
         return ret;
     }
@@ -224,14 +228,14 @@ public:
 
 class TGetDataCmd : public ICmd {
 public:
-    TGetDataCmd() : ICmd("data", 2, "<name> <data>", "get container data") {}
+    TGetDataCmd() : ICmd("dget", 2, "<name> <data>", "get container data") {}
 
     int Execute(int argc, char *argv[])
     {
         string value;
         int ret = api.GetData(argv[0], argv[1], value);
         if (ret)
-            cerr << "Can't get data, error = " << ret << endl;
+            cerr << "Can't get data, error = " << ErrorName(ret) << endl;
         else
             cout << value << endl;
 
@@ -247,7 +251,7 @@ public:
     {
         int ret = api.Start(argv[0]);
         if (ret)
-            cerr << "Can't start container, error = " << ret << endl;
+            cerr << "Can't start container, error = " << ErrorName(ret) << endl;
 
         return ret;
     }
@@ -261,7 +265,7 @@ public:
     {
         int ret = api.Stop(argv[0]);
         if (ret)
-            cerr << "Can't stop container, error = " << ret << endl;
+            cerr << "Can't stop container, error = " << ErrorName(ret) << endl;
 
         return ret;
     }
@@ -275,7 +279,7 @@ public:
     {
         int ret = api.Pause(argv[0]);
         if (ret)
-            cerr << "Can't pause container, error = " << ret << endl;
+            cerr << "Can't pause container, error = " << ErrorName(ret) << endl;
 
         return ret;
     }
@@ -289,7 +293,7 @@ public:
     {
         int ret = api.Resume(argv[0]);
         if (ret)
-            cerr << "Can't resume container, error = " << ret << endl;
+            cerr << "Can't resume container, error = " << ErrorName(ret) << endl;
 
         return ret;
     }
@@ -303,6 +307,33 @@ public:
     int Execute(int argc, char *argv[])
     {
         return Selftest();
+    }
+};
+
+class TGetCmd : public ICmd {
+public:
+    TGetCmd() : ICmd("get", 2, "<name> <data>", "get container property or data") {}
+
+    int Execute(int argc, char *argv[])
+    {
+        string value;
+        int ret;
+
+        ret = api.GetData(argv[0], argv[1], value);
+        if (!ret) {
+            cout << value << endl;
+            return 0;
+        }
+
+        ret = api.GetProperty(argv[0], argv[1], value);
+        if (!ret) {
+            cout << value << endl;
+            return 0;
+        }
+
+        cerr << "Invalid property or data = " << ErrorName(ret) << endl;
+
+        return 1;
     }
 };
 
@@ -322,6 +353,7 @@ int main(int argc, char *argv[])
         new TGetPropertyCmd(),
         new TSetPropertyCmd(),
         new TGetDataCmd(),
+        new TGetCmd(),
         new TRawCmd(),
         new TSelftestCmd()
     };
