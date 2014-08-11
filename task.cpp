@@ -10,6 +10,7 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <sys/prctl.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <grp.h>
@@ -161,6 +162,11 @@ int TTask::ChildCallback() {
      *
      * ReportResultAndExit(fd, +errno) means execve failed
      */
+
+    if (prctl(PR_SET_KEEPCAPS, 0, 0, 0, 0) < 0) {
+        Syslog(string("prctl(PR_SET_KEEPCAPS): ") + strerror(errno));
+        ReportResultAndExit(wfd, -errno);
+    }
 
     if (setsid() < 0) {
         Syslog(string("setsid(): ") + strerror(errno));
