@@ -1,6 +1,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <sstream>
 #include <memory>
 
@@ -209,8 +210,6 @@ TError TContainer::Start() {
 
     return ret;
 }
-
-static const auto kill_timeout = 100000;
 
 TError TContainer::Stop() {
     if (IsRoot() || !CheckState(Running))

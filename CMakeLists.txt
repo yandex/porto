@@ -13,7 +13,7 @@ PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS rpc.proto kv.proto)
 
 add_executable(portod portod.cpp cgroup.cpp mount.cpp rpc.cpp protobuf.cpp container.cpp task.cpp file.cpp stringutil.cpp kvalue.cpp subsystem.cpp folder.cpp error.cpp property.cpp
 		       ${PROTO_SRCS} ${PROTO_HDRS})
-target_link_libraries(portod ${PB})
+target_link_libraries(portod ${PB} pthread)
 
 add_executable(porto porto.cpp protobuf.cpp error.cpp selftest.cpp libporto.cpp ${PROTO_SRCS} ${PROTO_HDRS})
-target_link_libraries(porto ${PB})
+target_link_libraries(porto ${PB} pthread)

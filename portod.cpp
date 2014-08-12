@@ -1,4 +1,5 @@
 #include <vector>
+#include <algorithm>
 
 #include "protobuf.hpp"
 #include "rpc.hpp"
@@ -9,6 +10,8 @@ extern "C" {
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <poll.h>
+#include <sys/types.h>
+#include <signal.h>
 }
 
 using namespace std;
