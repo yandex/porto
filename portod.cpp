@@ -1,6 +1,7 @@
 #include <vector>
 #include <algorithm>
 
+#include "version.hpp"
 #include "protobuf.hpp"
 #include "rpc.hpp"
 #include "cgroup.hpp"
@@ -180,11 +181,14 @@ int main(int argc, char * const argv[])
     int ret = 0;
     int opt;
 
-    while ((opt = getopt(argc, argv, "d")) != -1) {
+    while ((opt = getopt(argc, argv, "dv")) != -1) {
         switch (opt) {
         case 'd':
             KvDump();
             return EXIT_SUCCESS;
+        case 'v':
+            cout << GIT_REVISION <<endl;
+            return EXIT_FAILURE;
         default:
             exit(EXIT_FAILURE);
         }

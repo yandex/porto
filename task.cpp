@@ -223,10 +223,9 @@ int TTask::ChildCallback() {
     }
 
     umask(0);
+    clearenv();
 
 	wordexp_t result;
-
-    // TODO: clear environment
 
 	ret = wordexp(env.command.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
     switch (ret) {

@@ -12,9 +12,15 @@ include_directories(${PROTOBUF_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS rpc.proto kv.proto)
 
+add_custom_target(version.hpp
+	git log -1 "--format=format:const std::string GIT_REVISION = \"%H\";%n" HEAD > version.hpp
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} VERBATIM)
+
 add_executable(portod portod.cpp cgroup.cpp mount.cpp rpc.cpp protobuf.cpp container.cpp task.cpp file.cpp stringutil.cpp kvalue.cpp subsystem.cpp folder.cpp error.cpp property.cpp
 		       ${PROTO_SRCS} ${PROTO_HDRS})
+add_dependencies(portod version.hpp)
 target_link_libraries(portod ${PB} pthread)
 
 add_executable(porto porto.cpp protobuf.cpp error.cpp selftest.cpp libporto.cpp ${PROTO_SRCS} ${PROTO_HDRS})
+add_dependencies(porto version.hpp)
 target_link_libraries(porto ${PB} pthread)

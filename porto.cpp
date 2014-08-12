@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <sstream>
 
+#include "version.hpp"
 #include "libporto.hpp"
 
 using namespace std;
@@ -366,6 +367,11 @@ int main(int argc, char *argv[])
     string name(argv[1]);
     if (name == "-h" || name == "--help") {
         Usage(NULL);
+        return EXIT_FAILURE;
+    }
+
+    if (name == "-v" || name == "--version") {
+        cout << GIT_REVISION <<endl;
         return EXIT_FAILURE;
     }
 

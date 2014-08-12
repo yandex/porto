@@ -1,9 +1,8 @@
 - log into file + info about file:line that failed
-- wordexp may leak environment, so clear it prior to execution
 - sleeps & finite number of retries in cgroup kill
 - state recovery: kill freezed tasks fails
 - freezer wait finite number of times for freezed state
-- -v should return git commit hash
+- -v should return git commit hash AND recent git tag (git describe, see http://git.kernel.org/cgit/git/git.git/tree/GIT-VERSION-GEN?id=master)
 
 # cleanup
 - rotate subprocess stdout/stderr
