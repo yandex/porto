@@ -66,7 +66,6 @@ int TPortoAPI::Destroy(const string &name) {
 }
 
 int TPortoAPI::List(vector<string> &clist) {
-    auto list = new ::rpc::TContainerListRequest();
     req.mutable_list();
 
     int ret = Rpc(req, rsp);
@@ -79,7 +78,6 @@ int TPortoAPI::List(vector<string> &clist) {
 }
 
 int TPortoAPI::Plist(vector<TProperty> &plist) {
-    auto *list = new ::rpc::TContainerPropertyListRequest();
     req.mutable_propertylist();
 
     int ret = Rpc(req, rsp);
@@ -95,7 +93,6 @@ int TPortoAPI::Plist(vector<TProperty> &plist) {
 }
 
 int TPortoAPI::Dlist(vector<TData> &dlist) {
-    auto *list = new ::rpc::TContainerDataListRequest();
     req.mutable_datalist();
 
     int ret = Rpc(req, rsp);

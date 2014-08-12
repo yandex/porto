@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 
 set(CMAKE_CXX_FLAGS "-O2 -Wall -std=c++11 -g")
 set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc")
+#set(CMAKE_CXX_COMPILER "g++-4.7")
 
 find_library(PB NAMES libprotobuf.a)
 
