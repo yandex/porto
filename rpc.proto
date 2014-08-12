@@ -1,67 +1,111 @@
+// Общение с демоном осуществляется через unix сокет /run/portod.socket.
+// Сообщения отправляются/принимаются в виде delimited пакетов: сначала отправляется/принимается длина сообщения, затем само сообщение (http://stackoverflow.com/questions/2340730/are-there-c-equivalents-for-the-protocol-buffers-delimited-i-o-functions-in-ja, https://developers.google.com/protocol-buffers/docs/reference/java/com/google/protobuf/MessageLite#writeDelimitedTo%28java.io.OutputStream%29).
+// Тип отправляемого сообщения - TContainerRequest, тип принимаемого - TContainerResponse.
+
 package rpc;
 
+// Возможная ошибка в ответе
 enum EContainerError {
+	// Запрос выполнен без ошибок
 	Success = 0;
+	// Неизвестная критическая ошибка
 	Error = 1;
+	// Неизвестный запрос
 	InvalidMethod = 2;
+	// Запрос на создание существующего конейнера
 	ContainerAlreadyExists = 3;
+	// Выполнение операции над несуществующим конейнером
 	ContainerDoesNotExist = 4;
+	// Неизвестное свойство
 	InvalidProperty = 5;
+	// Неизвестное runtime data
 	InvalidData = 6;
 }
 
+// Запрос на создание контейнера
+//
+// При создании контейнера и последующей установке свойств не производится
+// никаких проверок на доступность ресурсов.
 message TContainerCreateRequest {
+	// Имя контейнера
 	required string name = 1;
 }
 
+// Запрос на удаление контейнера
 message TContainerDestroyRequest {
+	// Имя контейнера
 	required string name = 1;
 }
 
-message TContainerListRequest { }
+// Запрос на получение списка контейнеров
+//
+// Список содержит в себе созданные и запущенные контейнеры.
+message TContainerListRequest {
+}
 
+// Запрос на получение свойства контейнера
 message TContainerGetPropertyRequest {
+	// Имя контейнера
 	required string name = 1;
+	// Свойство контейнера
 	required string property = 2;
 }
 
+// Запрос на изменение свойства контейнера
 message TContainerSetPropertyRequest {
+	// Имя контейнера
 	required string name = 1;
+	// Свойство контейнера
 	required string property = 2;
+	// Значение свойства
 	required string value = 3;
 }
 
+// Запрос runtime данных контейнера
 message TContainerGetDataRequest {
+	// Имя контейнера
 	required string name = 1;
+	// Runtime data контейнера
 	required string data = 2;
 }
 
+// Запрос на запуск контейнера
 message TContainerStartRequest {
+	// Имя контейнера
 	required string name = 1;
 }
 
+// Запрос на остановку контейнера
+//
+// После получения ответа на этот запрос все процессы контейнера будут
+// гарантированно остановлены.
 message TContainerStopRequest {
+	// Имя контейнера
 	required string name = 1;
 }
 
+// Запрос на приостановку контейнера
 message TContainerPauseRequest {
 	required string name = 1;
 }
 
+// Запрос на продолжение работы после приостановки контейнера
 message TContainerResumeRequest {
 	required string name = 1;
 }
 
-message TContainerPropertyListRequest { }
+// Запрос на получение списка свойств
+message TContainerPropertyListRequest {
+}
 
-message TContainerDataListRequest { }
+// Запрос на получение списка runtime data
+message TContainerDataListRequest {
+}
 
+// Сообщение-запрос
+// В запросе может быть только одно опциональное сообщение, только оно
+// и будет выполнено.
 message TContainerRequest {
-	// TODO: add some message to get API version
-	// or embed REQUIRED version here
-
-	//required uint32 version;
-
 	optional TContainerCreateRequest create = 1;
 	optional TContainerDestroyRequest destroy = 2;
 	optional TContainerListRequest list = 3;
@@ -77,35 +121,49 @@ message TContainerRequest {
 	optional TContainerDataListRequest dataList = 12;
 }
 
+// Ответ на запрос списка контейнеров
 message TContainerListResponse {
+	// Список имен контейнеров
 	repeated string name = 1;
 }
 
+// Ответ на запрос свойства контейнера
 message TContainerGetPropertyResponse {
+	// Значение свойства
 	required string value = 1;
 }
 
+// Ответ на запрос runtime data контейнера
 message TContainerGetDataResponse {
+	// Значение runtime data
 	required string value = 1;
 }
 
+// Ответ на запрос списка свойств
 message TContainerPropertyListResponse {
 	message TContainerPropertyListEntry {
+		// Имя свойства
 		required string name = 1;
+		// Описание свойства
 		required string desc = 2;
 	}
 	repeated TContainerPropertyListEntry list = 1;
 }
 
+// Ответ на запрос списка runtime data
 message TContainerDataListResponse {
 	message TContainerDataListEntry {
+		// Имя runtime data
 		required string name = 1;
+		// Описание runtime data
 		required string desc = 2;
 	}
 	repeated TContainerDataListEntry list = 1;
 }
 
-
+// Сообщение-ответ
+// В ответе будет присутствовать статус запроса (ошибка) и соответствующей
+// запросу результат.
 message TContainerResponse {
 	required EContainerError error = 1;
 
