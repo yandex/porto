@@ -225,10 +225,35 @@ int TTask::ChildCallback() {
     umask(0);
 
 	wordexp_t result;
-	if (wordexp(env.command.c_str(), &result, 0) < 0) {
-        Syslog(string("wordexp(): ") + strerror(errno));
-        ReportResultAndExit(wfd, -errno);
+
+    // TODO: clear environment
+
+	ret = wordexp(env.command.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
+    switch (ret) {
+    case WRDE_BADCHAR:
+        Syslog(string("wordexp(): illegal occurrence of newline or one of |, &, ;, <, >, (, ), {, }"));
+        ReportResultAndExit(wfd, -EINVAL);
+    case WRDE_BADVAL:
+        Syslog(string("wordexp(): undefined shell variable was referenced"));
+        ReportResultAndExit(wfd, -EINVAL);
+    case WRDE_CMDSUB:
+        Syslog(string("wordexp(): command substitution is not supported"));
+        ReportResultAndExit(wfd, -EINVAL);
+    case WRDE_SYNTAX:
+        Syslog(string("wordexp(): syntax error"));
+        ReportResultAndExit(wfd, -EINVAL);
+    default:
+    case WRDE_NOSPACE:
+        Syslog(string("wordexp(): error ") + strerror(ret));
+        ReportResultAndExit(wfd, -EINVAL);
+    case 0:
+        break;
     }
+
+#ifdef __DEBUG__
+    for (int i = 0; i < result.we_wordc; i++)
+        Syslog(result.we_wordv[i]);
+#endif
 
     auto envp = env.GetEnvp();
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
