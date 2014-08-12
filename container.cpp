@@ -216,20 +216,35 @@ TError TContainer::Stop() {
     if (IsRoot() || !CheckState(Running))
         return TError(TError::BadValue);
 
-    if (task->IsRunning())
-        task->Kill(SIGTERM);
-    task = nullptr;
-
-    usleep(kill_timeout);
-
     auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
 
+    vector<pid_t> reap;
+    TError error = cg->GetTasks(reap);
+    if (error)
+        TLogger::LogError(error);
+
+    // try to stop all tasks gracefully
+    cg->Kill(SIGTERM);
+
+    // then kill any task that didn't want to stop via SIGTERM;
+    // freeze all container tasks to make sure no one forks and races with us
     TSubsystem::Freezer()->Freeze(*cg);
+    error = cg->GetTasks(reap);
+    if (error)
+        TLogger::LogError(error);
     cg->Kill(SIGKILL);
     TSubsystem::Freezer()->Unfreeze(*cg);
 
+    // after we killed all tasks, collect and ignore their exit status
+    for (auto pid : reap) {
+        cerr << "REAP " << pid << endl;
+        TTask t(pid);
+        t.Reap();
+    }
+
     leaf_cgroups.clear();
 
+    task = nullptr;
     state = Stopped;
 
     return NoError;

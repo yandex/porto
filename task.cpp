@@ -319,16 +319,17 @@ TExitStatus TTask::GetExitStatus() {
     return exitStatus;
 }
 
+void TTask::Reap() {
+    int ret = waitpid(pid, NULL, 0);
+    TLogger::LogAction("wait " + to_string(pid) + " ret=" + to_string(ret), ret != pid, errno);
+}
+
 void TTask::Kill(int signal) {
     if (!pid)
         throw "Tried to kill invalid process!";
 
     int ret = kill(pid, signal);
-
-    TLogger::LogAction("kill " + to_string(pid), ret, errno);
-
-    if (ret == ESRCH)
-        return;
+    TLogger::LogAction("kill " + to_string(pid) + " ret=" + to_string(ret), ret != 0, errno);
 }
 
 std::string TTask::GetStdout() {

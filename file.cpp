@@ -55,9 +55,14 @@ TError TFile::AsString(string &value) {
     if (!in.is_open())
         return TError(TError::Unknown, "Cannot open " + Path());
 
-    in.seekg(0, std::ios::end);
-    value.reserve(in.tellg());
-    in.seekg(0, std::ios::beg);
+    try {
+        in.seekg(0, std::ios::end);
+        value.reserve(in.tellg());
+        in.seekg(0, std::ios::beg);
+    } catch (...) {
+        // for /proc files we can't reserve space because there is no
+        // seek() support
+    }
 
     value.assign((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
 

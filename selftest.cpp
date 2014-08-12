@@ -11,6 +11,7 @@ extern "C" {
 
 using namespace std;
 
+#define Expect(ret) _ExpectFailure(ret, true, __LINE__, __func__)
 #define ExpectSuccess(ret) _ExpectFailure(ret, 0, __LINE__, __func__)
 #define ExpectFailure(ret, exp) _ExpectFailure(ret, exp, __LINE__, __func__)
 static void _ExpectFailure(int ret, int exp, int line, const char *func) {
@@ -132,6 +133,15 @@ static void TestHolder(TPortoAPI &api) {
     ShouldHaveOnlyRoot(api);
 }
 
+static bool TaskRunning(TPortoAPI &api, const string &pid, const string &name) {
+    int p = stoi(pid);
+
+    string ret;
+    (void)api.GetData(name, "exit_status", ret);
+
+    return kill(p, 0) == 0;
+}
+
 static void WaitPid(TPortoAPI &api, const string &pid, const string &name) {
     cerr << "Waiting for " << pid << " to exit..." << endl;
 
@@ -194,7 +204,6 @@ static void TestStreams(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     WaitPid(api, pid, name);
-    usleep(1000000);
     ExpectSuccess(api.GetData(name, "stdout", ret));
     ShouldBeEq(ret, string("out\n"));
     ExpectSuccess(api.GetData(name, "stderr", ret));
@@ -204,7 +213,6 @@ static void TestStreams(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     WaitPid(api, pid, name);
-    usleep(1000000);
     ExpectSuccess(api.GetData(name, "stdout", ret));
     ShouldBeEq(ret, string(""));
     ExpectSuccess(api.GetData(name, "stderr", ret));
@@ -212,7 +220,19 @@ static void TestStreams(TPortoAPI &api, const string &name) {
 }
 
 static void TestLongRunning(TPortoAPI &api, const string &name) {
-    // TODO: sleep 100 and check that process is actually running
+    string pid;
+
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    usleep(1000000);
+    Expect(TaskRunning(api, pid, name) == true);
+
+    // TODO: check namespace, cgroup, etc
+
+    ExpectSuccess(api.Stop(name));
+    usleep(1000000);
+    Expect(TaskRunning(api, pid, name) == false);
 }
 
 static void TestIsolation(TPortoAPI &api, const string &name) {

@@ -140,8 +140,11 @@ TError TCgroup::Remove() {
     if (IsRoot()) {
         mount->Umount();
     } else {
+        // at this point we should have gracefully terminated all tasks
+        // in the container; if anything is still alive we have no other choice
+        // but to kill it with SIGKILL
         while (!IsEmpty())
-            Kill(SIGINT);
+            Kill(SIGKILL);
     }
 
     TFolder f(Path());

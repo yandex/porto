@@ -379,6 +379,8 @@ int main(int argc, char *argv[])
 
                 return cmd->Execute(argc - 2, argv + 2);
             }
+
+        cerr << "Invalid command " << name << "!" << endl;
     } catch (const char *err) {
         cerr << err << endl;
     }

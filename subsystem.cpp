@@ -50,12 +50,23 @@ shared_ptr<TFreezerSubsystem> TSubsystem::Freezer() {
     return static_pointer_cast<TFreezerSubsystem>(Get("freezer"));
 }
 
+void TFreezerSubsystem::WaitState(TCgroup &cg, const std::string &state) {
+    string s;
+    do {
+        TError error = cg.GetKnobValue("freezer.state", s);
+        if (error)
+            TLogger::LogError(error);
+    } while (s != state);
+}
+
 void TFreezerSubsystem::Freeze(TCgroup &cg) {
     cg.SetKnobValue("freezer.state", "FROZEN");
+    WaitState(cg, "FROZEN\n");
 }
 
 void TFreezerSubsystem::Unfreeze(TCgroup &cg) {
     cg.SetKnobValue("freezer.state", "THAWED");
+    WaitState(cg, "THAWED\n");
 }
 
 // Cpu

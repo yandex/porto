@@ -68,6 +68,7 @@ public:
     bool IsRunning();
     TExitStatus GetExitStatus();
     void Kill(int signal);
+    void Reap();
 
     std::string GetStdout();
     std::string GetStderr();

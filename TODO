@@ -1,5 +1,8 @@
 - log into file + info about file:line that failed
 - wordexp may leak environment, so clear it prior to execution
+- sleeps & finite number of retries in cgroup kill
+- state recovery: kill freezed tasks fails
+- -v should return git commit hash
 
 # cleanup
 - rotate subprocess stdout/stderr
