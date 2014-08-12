@@ -2,6 +2,7 @@
 - wordexp may leak environment, so clear it prior to execution
 - sleeps & finite number of retries in cgroup kill
 - state recovery: kill freezed tasks fails
+- freezer wait finite number of times for freezed state
 - -v should return git commit hash
 
 # cleanup
