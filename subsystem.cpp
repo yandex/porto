@@ -25,9 +25,6 @@ shared_ptr<TSubsystem> TSubsystem::Get(std::string name) {
     return subsystems[name];
 }
 
-TSubsystem::TSubsystem(string name) : name(name) {
-}
-
 string TSubsystem::Name() {
     return name;
 }

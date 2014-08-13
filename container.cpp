@@ -118,12 +118,6 @@ std::map<std::string, const TDataSpec> dataSpec = {
 
 // TContainer
 
-TContainer::TContainer(const string &name) : name(name), state(Stopped), spec(name) {
-}
-
-TContainer::TContainer(const std::string &name, const kv::TNode &node) : name(name), state(Stopped), spec(name, node) {
-}
-
 bool TContainer::CheckState(EContainerState expected) {
     if (state == Running && (!task || !task->IsRunning()))
         state = Stopped;
@@ -189,30 +183,39 @@ TError TContainer::Start() {
     if (!CheckState(Stopped))
         return TError::Success();
 
-    auto ret = PrepareCgroups();
-    if (ret)
-        return ret;
+    TError error = PrepareCgroups();
+    if (error) {
+        TLogger::LogError(error, "Can't prepare task's cgroups");
+        return error;
+    }
 
     if (IsRoot()) {
         state = Running;
-        return ret;
+        return TError::Success();
     }
 
     if (!spec.Get("command").length())
         return TError(EError::InvalidValue, "invalid container command");
 
     TTaskEnv taskEnv(spec.Get("command"), "", spec.Get("user"), spec.Get("group"), spec.Get("env"));
+    error = taskEnv.Prepare();
+    if (error) {
+        TLogger::LogError(error, "Can't prepare task environment");
+        return error;
+    }
+
     task = unique_ptr<TTask>(new TTask(taskEnv, leaf_cgroups));
 
-    ret = task->Start();
-    if (ret) {
+    error = task->Start();
+    if (error) {
         leaf_cgroups.clear();
-        return ret;
+        TLogger::LogError(error, "Can't start task");
+        return error;
     }
 
     state = Running;
 
-    return ret;
+    return TError::Success();
 }
 
 TError TContainer::Stop() {
@@ -297,11 +300,21 @@ TError TContainer::SetProperty(const string &property, const string &value) {
     return spec.Set(property, value);
 }
 
-TError TContainer::Restore() {
+TError TContainer::Restore(const kv::TNode &node) {
+    TError error = spec.Restore(node);
+    if (error) {
+        TLogger::LogError(error, "Can't restore task's spec");
+        return error;
+    }
+
+    error = PrepareCgroups();
+    if (error) {
+        TLogger::LogError(error, "Can't restore task's cgroups");
+        return error;
+    }
+
     // TODO recover state, task, etc
     // probably need to PTRACE_SEIZE to be able to do waitpid ("reparent")
-
-    PrepareCgroups();
 
     state = IsAlive() ? Running : Stopped;
     task = nullptr;
@@ -317,15 +330,16 @@ std::shared_ptr<TCgroup> TContainer::GetCgroup(shared_ptr<TSubsystem> subsys) {
 }
 
 // TContainerHolder
-TContainerHolder::TContainerHolder() {
-    if (Create(RootName))
-        throw "Cannot create root container";
+
+TError TContainerHolder::CreateRoot() {
+    TError error = Create(RootName);
+    if (error)
+        return error;
 
     auto root = Get(RootName);
     root->Start();
-}
 
-TContainerHolder::~TContainerHolder() {
+    return TError::Success();
 }
 
 bool TContainerHolder::ValidName(const string &name) {
@@ -372,8 +386,8 @@ vector<string> TContainerHolder::List() {
 
 TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node) {
     // TODO: we DO trust data from the persistent storage, do we?
-    auto c = make_shared<TContainer>(name, node);
-    auto e = c->Restore();
+    auto c = make_shared<TContainer>(name);
+    auto e = c->Restore(node);
     if (e)
         return e;
 

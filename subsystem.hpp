@@ -22,7 +22,7 @@ public:
     static std::shared_ptr<TCpuSubsystem> Cpu();
     static std::shared_ptr<TCpuacctSubsystem> Cpuacct();
     
-    TSubsystem(std::string name);
+    TSubsystem(const std::string &name) : name(name) { }
     std::string Name();
 
     friend bool operator==(const TSubsystem& c1, const TSubsystem& c2) {

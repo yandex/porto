@@ -10,8 +10,8 @@
 
 #include "kvalue.hpp"
 #include "property.hpp"
+#include "task.hpp"
 
-class TTask;
 class TCgroup;
 class TContainerEnv;
 struct TData;
@@ -46,8 +46,7 @@ class TContainer {
     TError PrepareCgroups();
 
 public:
-    TContainer(const std::string &name);
-    TContainer(const std::string &name, const kv::TNode &node);
+    TContainer(const std::string &name) : name(name), state(Stopped), spec(name) { }
     ~TContainer();
 
     std::string Name();
@@ -68,7 +67,7 @@ public:
     TError SetProperty(const std::string &property, const std::string &value);
 
     TError GetData(const std::string &data, std::string &value);
-    TError Restore();
+    TError Restore(const kv::TNode &node);
 
     std::shared_ptr<TCgroup> GetCgroup(std::shared_ptr<TSubsystem> subsys);
 };
@@ -78,9 +77,7 @@ class TContainerHolder {
 
     bool ValidName(const std::string &name);
 public:
-    TContainerHolder();
-    ~TContainerHolder();
-
+    TError CreateRoot();
     TError Create(const std::string &name);
     std::shared_ptr<TContainer> Get(const std::string &name);
     TError Restore(const std::string &name, const kv::TNode &node);

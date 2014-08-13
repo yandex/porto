@@ -306,6 +306,10 @@ int Selftest() {
         TestIsolation(api, "a");
         ExpectSuccess(api.Destroy("a"));
 
+
+        // TODO: test environment parsing
+        // TODO: test user/group parsing
+
     } catch (string e) {
         cerr << "Exception: " << e << endl;
         return 1;

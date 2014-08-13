@@ -29,8 +29,11 @@ public:
     static std::shared_ptr<TCgroup> GetRoot(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems);
     static std::shared_ptr<TCgroup> GetRoot(const std::shared_ptr<TSubsystem> subsystem);
 
-    TCgroup(const std::string &name, const std::shared_ptr<TCgroup> parent, int level = 0);
-    TCgroup(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems);
+    TCgroup(const std::string &name, const std::shared_ptr<TCgroup> parent, int level = 0) :
+        name(name), parent(parent), level(level) { }
+    TCgroup(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems) :
+        name("/"), parent(std::shared_ptr<TCgroup>(nullptr)), level(0), mount(mount), subsystems(subsystems) { }
+
     TCgroup(const std::vector<std::shared_ptr<TSubsystem>> controller);
 
     ~TCgroup();

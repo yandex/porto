@@ -243,6 +243,12 @@ int main(int argc, char * const argv[])
         (void)storage.MountTmpfs();
 
         TContainerHolder cholder;
+        TError error = cholder.CreateRoot();
+        if (error) {
+            cerr << "Couldn't create root container" << endl;
+            // TODO: report user?!
+        }
+
         {
             TCgroupSnapshot cs;
             std::map<std::string, kv::TNode> m;
@@ -250,7 +256,7 @@ int main(int argc, char * const argv[])
             TError error = storage.Restore(m);
             if (error) {
                 cerr << "Couldn't restore state!" << endl;
-                    // TODO: report user?!
+                // TODO: report user?!
             }
 
             for (auto &r : m) {

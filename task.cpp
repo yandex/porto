@@ -5,6 +5,7 @@
 #include "task.hpp"
 #include "cgroup.hpp"
 #include "log.hpp"
+#include "util/string.hpp"
 
 extern "C" {
 #include <string.h>
@@ -23,38 +24,37 @@ extern "C" {
 using namespace std;
 
 // TTaskEnv
-    TTaskEnv::TTaskEnv(const std::string &command, const std::string &cwd, const std::string &user, const std::string &group, const std::string &envir) : command(command) {
-    // TODO: support quoting
+TError TTaskEnv::Prepare() {
     if (command.empty())
-        return;
+        return TError::Success();
 
-    {
-        istringstream s(envir);
-        string token;
+    env.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
 
-        env.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
-        env.push_back("HOME=/home/" + user);
-        env.push_back("USER=" + user);
-
-        while (getline(s, token, ';'))
-            env.push_back(token);
+    if (SplitString(envir, ';', env)) {
+        TError error(EError::InvalidValue, errno, "split(" + envir + ")");
+        return error;
     }
+
+    env.push_back("HOME=/home/" + user);
+    env.push_back("USER=" + user);
 
     struct passwd *p = getpwnam(user.c_str());
     if (!p) {
-        uid = 65534;
-        TLogger::LogAction("getpwnam " + user, true, errno);
+        TError error(EError::InvalidValue, EINVAL, "getpwnam(" + user + ")");
+        return error;
     } else {
         uid = p->pw_uid;
     }
 
     struct group *g = getgrnam(group.c_str());
     if (!g) {
-        TLogger::LogAction("getgrnam " + user, true, errno);
-        gid = 65534;
+        TError error(EError::InvalidValue, EINVAL, "getgrnam(" + group + ")");
+        return error;
     } else {
         gid = g->gr_gid;
     }
+
+    return TError::Success();
 }
 
 const char** TTaskEnv::GetEnvp() {

@@ -12,9 +12,6 @@ extern "C" {
 
 using namespace std;
 
-TFile::TFile(const std::string &path) : path(path) {
-};
-
 string TFile::Path() {
     return path;
 }

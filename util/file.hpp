@@ -22,7 +22,7 @@ public:
         Any
     };    
 
-    TFile(const std::string &path);
+    TFile(const std::string &path) : path(path) { };
 
     std::string Path();
     EFileType Type();

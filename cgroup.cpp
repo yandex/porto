@@ -23,15 +23,6 @@ shared_ptr<TCgroup> TCgroup::GetRoot(const shared_ptr<TSubsystem> subsystem) {
     return TRegistry<TCgroup>::Get(TCgroup({subsystem}));
 }
 
-TCgroup::TCgroup(const string &name, const shared_ptr<TCgroup> parent, int level) :
-    name(name), parent(parent), level(level) {
-}
-
-TCgroup::TCgroup(const shared_ptr<TMount> mount, const vector<shared_ptr<TSubsystem>> subsystems) :
-    name("/"), parent(shared_ptr<TCgroup>(nullptr)), level(0), mount(mount),
-    subsystems(subsystems) {
-}
-
 TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems) :
     name("/"), parent(shared_ptr<TCgroup>(nullptr)), level(0),
     subsystems(subsystems) {

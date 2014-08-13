@@ -12,9 +12,6 @@
 
 using namespace std;
 
-TFolder::TFolder(const string &path) : path(path) {}
-TFolder::TFolder(TFile file) : path(file.Path()) {}
-
 TError TFolder::Create(mode_t mode) {
     TLogger::Log("mkdir " + path);
 

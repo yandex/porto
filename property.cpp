@@ -65,10 +65,7 @@ TError TContainerSpec::Set(const string &property, const string &value) {
     return error;
 }
 
-TContainerSpec::TContainerSpec(const std::string &name) : name(name) {
-}
-
-TContainerSpec::TContainerSpec(const std::string &name, const kv::TNode &node) : name(name) {
+TError TContainerSpec::Restore(const kv::TNode &node) {
     for (int i = 0; i < node.pairs_size(); i++) {
         auto key = node.pairs(i).key();
         auto value = node.pairs(i).val();
@@ -76,7 +73,7 @@ TContainerSpec::TContainerSpec(const std::string &name, const kv::TNode &node) :
         data[key] = value;
     }
 
-    SyncStorage();
+    return SyncStorage();
 }
 
 TContainerSpec::~TContainerSpec() {

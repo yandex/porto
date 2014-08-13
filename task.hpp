@@ -32,11 +32,13 @@ class TTaskEnv {
     std::vector<std::string> env;
     std::string user;
     std::string group;
+    std::string envir;
     int uid, gid;
 
 public:
     TTaskEnv() {};
-    TTaskEnv(const std::string &command, const std::string &cwd, const std::string &user, const std::string &group, const std::string &envir);
+    TTaskEnv(const std::string &command, const std::string &cwd, const std::string &user, const std::string &group, const std::string &envir) : command(command), cwd(cwd), user(user), group(group), envir(envir) { }
+    TError Prepare();
     const char** GetEnvp();
 };
 

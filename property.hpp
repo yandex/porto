@@ -32,12 +32,12 @@ class TContainerSpec {
     bool IsRoot();
 
 public:
-    TContainerSpec(const std::string &name);
-    TContainerSpec(const std::string &name, const kv::TNode &node);
+    TContainerSpec(const std::string &name) : name(name) { }
     ~TContainerSpec();
     std::string Get(const std::string &property);
     TError Set(const std::string &property, const std::string &value);
     bool IsDynamic(const std::string &property);
+    TError Restore(const kv::TNode &node);
 };
 
 #endif
