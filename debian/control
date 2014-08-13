@@ -1,0 +1,16 @@
+Source: yandex-porto
+Section: utils
+Priority: extra
+Maintainer: Eugene Kilimchuk <ekilimchuk@yandex-team.ru>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: 3.9.2
+Homepage: https://wiki.yandex-team.ru/users/klamm/Porto
+#Vcs-Git: kernel1.yandex.ru:/home/klamm/porto 
+
+Package: yandex-porto
+Section: utils
+Priority: extra
+Architecture: all
+Depends: ${shlibs:Depends}, ${utils:DependsI}
+Description: Component of Nirvana
+ Porto allows to run process in namespace with cgroup.

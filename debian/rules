@@ -1,0 +1,25 @@
+#!/usr/bin/make -f
+
+DESTDIR=$(CURDIR)/debian/yandex-porto
+SBINDIR=$(DESTDIR)/usr/sbin
+
+clean:
+	dh_testdir
+	dh_auto_clean
+	dh_clean
+
+build:
+	dh_testdir
+	cmake .
+	make
+
+binary:
+	dh_testdir
+	dh_installdirs
+	dh_install
+	dh_installchangelogs
+	dh_installdeb
+	dh_gencontrol
+	dh_md5sums
+	dh_builddeb
+
