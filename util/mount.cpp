@@ -1,13 +1,15 @@
 #include <sstream>
 
-#include "mount.hpp"
-#include "file.hpp"
-#include "registry.hpp"
+#include "util/mount.hpp"
+#include "util/file.hpp"
 #include "util/string.hpp"
+#include "log.hpp"
 
 using namespace std;
 
 TError TMount::Mount() {
+    TLogger::Log("mount " + mountpoint);
+
     int ret = mount(device.c_str(), mountpoint.c_str(), vfstype.c_str(),
                     mountflags, CommaSeparatedList(flags).c_str());
 
@@ -18,6 +20,8 @@ TError TMount::Mount() {
 }
 
 TError TMount::Umount() {
+    TLogger::Log("umount " + mountpoint);
+
     int ret = umount(mountpoint.c_str());
 
     if (ret)

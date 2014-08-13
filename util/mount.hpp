@@ -8,7 +8,7 @@
 
 #include <sys/mount.h>
 
-#include "log.hpp"
+#include "error.hpp"
 
 class TMount {
     std::string device;

@@ -297,7 +297,7 @@ TError TTask::Start() {
 
     int n = read(rfd, &ret, sizeof(ret));
     if (n < 0) {
-        return TError(EError::Unknown, errno, "read(rfd)");
+        TError error(EError::Unknown, errno, "read(rfd)");
         TLogger::LogError(error);
         return error;
     } else if (n == 0) {

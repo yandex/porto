@@ -9,6 +9,7 @@
 #include "task.hpp"
 #include "cgroup.hpp"
 #include "registry.hpp"
+#include "log.hpp"
 
 extern "C" {
 #include <sys/types.h>

@@ -8,12 +8,16 @@
 
 #include <unordered_map>
 
+#include "log.hpp"
+
 using namespace std;
 
 TFolder::TFolder(const string &path) : path(path) {}
 TFolder::TFolder(TFile file) : path(file.Path()) {}
 
 TError TFolder::Create(mode_t mode) {
+    TLogger::Log("mkdir " + path);
+
     if (mkdir(path.c_str(), mode) < 0)
         return TError(EError::Unknown, errno, "mkdir(" + path + ", " + to_string(mode) + ")");
 
@@ -41,6 +45,7 @@ TError TFolder::Remove(bool recursive) {
         }
     }
 
+    TLogger::Log("rmdir " + path);
     if (rmdir(path.c_str()) < 0)
         return TError(EError::Unknown, errno, "rmdir(" + path + ")");
 

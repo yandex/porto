@@ -1,4 +1,5 @@
 #include "kvalue.hpp"
+#include "log.hpp"
 #include "util/protobuf.hpp"
 #include "util/file.hpp"
 #include "util/folder.hpp"
@@ -149,7 +150,7 @@ TError TKeyValueStorage::Restore(std::map<std::string, kv::TNode> &map) {
         map[name] = node;
     }
 
-    return TError::Success;
+    return TError::Success();
 }
 
 TError TKeyValueStorage::Dump() {
@@ -182,5 +183,5 @@ TError TKeyValueStorage::Dump() {
         }
     }
 
-    return TError::Success;
+    return TError::Success();
 }

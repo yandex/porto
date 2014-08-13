@@ -5,6 +5,7 @@
 #include "cgroup.hpp"
 #include "task.hpp"
 #include "registry.hpp"
+#include "log.hpp"
 #include "util/string.hpp"
 
 using namespace std;

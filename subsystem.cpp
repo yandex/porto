@@ -2,6 +2,7 @@
 
 #include "cgroup.hpp"
 #include "subsystem.hpp"
+#include "log.hpp"
 #include "util/string.hpp"
 
 using namespace std;

@@ -19,7 +19,7 @@ TError::operator bool() const {
     return error != EError::Success;
 }
 
-int TError::GetError() const {
+EError TError::GetError() const {
     return error;
 }
 

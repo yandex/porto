@@ -1,4 +1,5 @@
 #include "property.hpp"
+#include "log.hpp"
 
 #include <map>
 
