@@ -76,7 +76,6 @@ public:
             for (auto d : dlist)
                 cout << " " << left << setw(16) << d.name
                      << setw(40) << d.description << endl;
-
     }
 
     int Execute(int argc, char *argv[])
@@ -297,12 +296,42 @@ public:
 
 class TGetCmd : public ICmd {
 public:
-    TGetCmd() : ICmd("get", 2, "<name> <data>", "get container property or data") {}
+    TGetCmd() : ICmd("get", 1, "<name> <data>", "get container property or data") {}
 
     int Execute(int argc, char *argv[])
     {
         string value;
         int ret;
+
+        if (argc <= 1) {
+            vector<TProperty> plist;
+            ret = api.Plist(plist);
+            if (ret) {
+                cerr << "Can't list properties, error = " << ErrorName(ret) << endl;
+                return 1;
+            }
+
+            vector<TData> dlist;
+            ret = api.Dlist(dlist);
+            if (ret) {
+                cerr << "Can't list data, error = " << ErrorName(ret) << endl;
+                return 1;
+            }
+
+            for (auto p : plist) {
+                ret = api.GetProperty(argv[0], p.name, value);
+                if (!ret)
+                    cout << p.name << " = " << value << endl;
+            }
+
+            for (auto d : dlist) {
+                ret = api.GetData(argv[0], d.name, value);
+                if (!ret)
+                    cout << d.name << " = " << value << endl;
+            }
+
+            return 0;
+        }
 
         ret = api.GetData(argv[0], argv[1], value);
         if (!ret) {

@@ -306,7 +306,10 @@ TError TContainer::Restore() {
 }
 
 std::shared_ptr<TCgroup> TContainer::GetCgroup(shared_ptr<TSubsystem> subsys) {
-    return TCgroup::Get(name, TCgroup::GetRoot(subsys));
+    if (name == RootName)
+        return TCgroup::GetRoot(subsys);
+    else
+        return TCgroup::Get(name, TCgroup::GetRoot(subsys));
 }
 
 // TContainerHolder
