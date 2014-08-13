@@ -223,7 +223,6 @@ static void TestStreams(TPortoAPI &api, const string &name) {
 }
 
 static string GetNamespace(const string &pid, const string &ns) {
-    TError error;
     string link;
     TFile m("/proc/" + pid + "/ns/" + ns);
     (void)m.ReadLink(link);

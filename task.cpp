@@ -101,14 +101,12 @@ TTask::~TTask() {
     if (stdoutFile.length()) {
         TFile f(stdoutFile);
         TError e = f.Remove();
-        if (e)
-            TLogger::LogError(e, "Can't remove task stdout " + stdoutFile);
+        TLogger::LogError(e, "Can't remove task stdout " + stdoutFile);
     }
     if (stderrFile.length()) {
         TFile f(stderrFile);
         TError e = f.Remove();
-        if (e)
-            TLogger::LogError(e, "Can't remove task stderr " + stdoutFile);
+        TLogger::LogError(e, "Can't remove task stderr " + stdoutFile);
     }
 }
 
@@ -279,7 +277,7 @@ TError TTask::Start() {
     ret = pipe2(pfd, O_CLOEXEC);
     if (ret) {
         TLogger::LogAction("pipe2", ret == 0, errno);
-        return TError(EError::Unknown, errno);
+        return TError(EError::Unknown, errno, "pipe2()");
     }
 
     rfd = pfd[0];
@@ -290,7 +288,7 @@ TError TTask::Start() {
                       CLONE_NEWNS | CLONE_NEWPID, this);
     if (pid < 0) {
         TLogger::LogAction("fork", ret == 0, errno);
-        return TError(EError::Unknown, errno);
+        return TError(EError::Unknown, errno, "fork()");
     }
 
     close(wfd);
@@ -298,7 +296,7 @@ TError TTask::Start() {
     int n = read(rfd, &ret, sizeof(ret));
     if (n < 0) {
         TLogger::LogAction("read child status failed", false, errno);
-        return TError(EError::Unknown, errno);
+        return TError(EError::Unknown, errno, "read(rfd)");
     } else if (n == 0) {
         state = Running;
         this->pid = pid;
@@ -307,7 +305,7 @@ TError TTask::Start() {
         TLogger::LogAction("got status from child", false, errno);
         (void)waitpid(pid, NULL, WNOHANG);
         exitStatus.error = ret;
-        return TError(EError::Unknown);
+        return TError(EError::Unknown, "child returned " + to_string(ret));
     }
 }
 

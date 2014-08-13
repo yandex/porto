@@ -131,8 +131,12 @@ TError TCgroup::Create() {
         parent->Create();
 
     TFolder f(Path());
-    if (!f.Exists())
-        f.Create(mode);
+    if (!f.Exists()) {
+        TError error = f.Create(mode);
+        TLogger::LogError(error, "Can't create cgroup directory");
+        if (error)
+            return error;
+    }
 
     if (IsRoot()) {
         TError error = mount->Mount();
@@ -159,7 +163,8 @@ TError TCgroup::Remove() {
     }
 
     TFolder f(Path());
-    f.Remove();
+    TError error = f.Remove();
+    TLogger::LogError(error, "Can't remove cgroup directory");
 
     return TError::Success();
 }

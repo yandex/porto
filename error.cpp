@@ -4,16 +4,15 @@ extern "C" {
 #include <string.h>
 }
 
+TError::TError() : error(EError::Success) {
+}
+
 TError::TError(EError e, std::string description) :
     error(e), description(description) {
 }
 
-TError::TError(EError e, int err, std::string _d) :
-    error(e) {
-    if (_d.length())
-        description = _d;
-    else
-        description = strerror(err);
+TError::TError(EError e, int eno, std::string description) :
+    error(e), description(std::string(strerror(eno)) + ": " + description) {
 }
 
 TError::operator bool() const {

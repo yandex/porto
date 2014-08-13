@@ -103,7 +103,7 @@ TError TFile::ReadLink(std::string &value) {
 
     len = readlink(path.c_str(), buf, sizeof(buf) - 1);
     if (len < 0)
-        return TError(EError::Unknown, errno);
+        return TError(EError::Unknown, errno, "readlink(" + path + ")");
 
     buf[len] = '\0';
 

@@ -9,8 +9,9 @@ using ::rpc::EError;
 
 class TError {
 public:
-    TError(EError e = EError::Success, std::string description = "");
-    TError(EError e, int err, std::string description = "");
+    TError();
+    TError(EError e, std::string description);
+    TError(EError e, int eno, std::string description);
 
     // return true if non-successful
     operator bool() const;

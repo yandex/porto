@@ -12,7 +12,7 @@ TError TMount::Mount() {
                     mountflags, CommaSeparatedList(flags).c_str());
 
     if (ret)
-        return TError(EError::Unknown);
+        return TError(EError::Unknown, errno, "mount(" + device + ", " + mountpoint + ", " + vfstype + ", " + to_string(mountflags) + ", " + CommaSeparatedList(flags) + ")");
 
     return TError::Success();
 }
@@ -21,7 +21,7 @@ TError TMount::Umount() {
     int ret = umount(mountpoint.c_str());
 
     if (ret)
-        return TError(EError::Unknown);
+        return TError(EError::Unknown, errno, "umount(" + mountpoint + ")");
 
     return TError::Success();
 }

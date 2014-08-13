@@ -70,7 +70,7 @@ TError TKeyValueStorage::AppendNode(const std::string &name, const kv::TNode &no
 
     if (lseek(fd, 0, SEEK_END) < 0) {
         close(fd);
-        TError error(EError::Unknown, errno);
+        TError error(EError::Unknown, errno, "TKeyValueStorage open(" + Path(name) + ")");
         TLogger::LogError(error);
         return error;
     }

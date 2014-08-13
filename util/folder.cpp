@@ -1,5 +1,4 @@
 #include "folder.hpp"
-#include "log.hpp"
 
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -15,11 +14,10 @@ TFolder::TFolder(const string &path) : path(path) {}
 TFolder::TFolder(TFile file) : path(file.Path()) {}
 
 TError TFolder::Create(mode_t mode) {
-    int ret = mkdir(path.c_str(), mode);
+    if (mkdir(path.c_str(), mode) < 0)
+        return TError(EError::Unknown, errno, "mkdir(" + path + ")");
 
-    TLogger::LogAction("mkdir " + path, ret, errno);
-
-    return TError(EError::Unknown, errno);
+    return TError::Success();
 }
 
 TError TFolder::Remove(bool recursive) {
@@ -31,19 +29,22 @@ TError TFolder::Remove(bool recursive) {
 
         for (auto f : items) {
             TFile child(f);
+            TError error;
 
             if (child.Type() == TFile::Directory)
-                TFolder(f).Remove(recursive);
+                error = TFolder(f).Remove(recursive);
             else
-                child.Remove();
+                error = child.Remove();
+
+            if (error)
+                return error;
         }
     }
 
-    int ret = rmdir(path.c_str());
+    if (rmdir(path.c_str()) < 0)
+        return TError(EError::Unknown, errno, "rmdir(" + path + ")");
 
-    TLogger::LogAction("rmdir " + path, ret, errno);
-
-    return TError(EError::Unknown, errno);
+    return TError::Success();
 }
 
 TError TFolder::Rename(const std::string &newname) {
