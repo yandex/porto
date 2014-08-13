@@ -35,7 +35,7 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     string v;
 
     ExpectSuccess(api.GetProperty(name, "command", v));
-    Expect(v == string("id"));
+    Expect(v == string(""));
     ExpectSuccess(api.GetProperty(name, "low_limit", v));
     Expect(v == string("0"));
     ExpectSuccess(api.GetProperty(name, "user", v));
@@ -126,6 +126,13 @@ static void TestHolder(TPortoAPI &api) {
     ShouldHaveOnlyRoot(api);
 }
 
+static void TestEmpty(TPortoAPI &api) {
+    cerr << "Make sure we can't start empty container" << endl;
+    ExpectSuccess(api.Create("b"));
+    ExpectFailure(api.Start("b"), rpc::EContainerError::Error);
+    ExpectSuccess(api.Destroy("b"));
+}
+
 static bool TaskRunning(TPortoAPI &api, const string &pid, const string &name) {
     int p = stoi(pid);
 
@@ -169,7 +176,7 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     WaitPid(api, pid, name);
     ExpectSuccess(api.GetData(name, "exit_status", ret));
-    Expect(ret == string("0;0;1"));
+    Expect(ret == string("0 0 1"));
 
     cerr << "Check exit status of 'true'" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "true"));
@@ -177,7 +184,7 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     WaitPid(api, pid, name);
     ExpectSuccess(api.GetData(name, "exit_status", ret));
-    Expect(ret == string("0;0;0"));
+    Expect(ret == string("0 0 0"));
 
     cerr << "Check exit status of invalid command" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "__invalid_command_name__"));
@@ -186,7 +193,7 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     // TODO: this may blow things up inside portod
     Expect(pid == "0");
     ExpectSuccess(api.GetData(name, "exit_status", ret));
-    Expect(ret == string("2;0;0"));
+    Expect(ret == string("2 0 0"));
 }
 
 static void TestStreams(TPortoAPI &api, const string &name) {
@@ -290,6 +297,7 @@ int Selftest() {
 
     try {
         TestHolder(api);
+        TestEmpty(api);
 
         ExpectSuccess(api.Create("a"));
         TestExitStatus(api, "a");

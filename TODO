@@ -1,11 +1,13 @@
-- remove default command property and test for it
-
 - ? get exit_status from time to time in portod mail loop
 - log into file + info about file:line that failed
 - sleeps & finite number of retries in cgroup kill
 - state recovery: kill freezed tasks fails
 - freezer wait finite number of times for freezed state
 - -v should return git commit hash AND recent git tag (git describe, see http://git.kernel.org/cgit/git/git.git/tree/GIT-VERSION-GEN?id=master)
+
+# error handling
+- TError should return rpc::Error enum so we can pass it directly to client
+- ? RPC api to get last error message
 
 # cleanup
 - rotate subprocess stdout/stderr
