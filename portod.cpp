@@ -4,6 +4,7 @@
 #include "version.hpp"
 #include "rpc.hpp"
 #include "cgroup.hpp"
+#include "log.hpp"
 #include "util/protobuf.hpp"
 
 extern "C" {
@@ -21,6 +22,7 @@ static const size_t MAX_CLIENTS = 16;
 static const size_t MAX_CONNECTIONS = MAX_CLIENTS + 1;
 static const size_t POLL_TIMEOUT_MS = 1000;
 static const string PID_FILE = "/run/portod.pid";
+static const string LOG_FILE = "/var/log/portod";
 
 static void RemoveRpcServer(const string &path)
 {
@@ -75,6 +77,7 @@ static void DoExit(int signum)
     Done = true;
     Cleanup = false;
     RaiseSignum = signum;
+    TLogger::CloseLog();
 }
 
 static void DoExitAndCleanup(int signum)
@@ -82,12 +85,12 @@ static void DoExitAndCleanup(int signum)
     Done = true;
     Cleanup = true;
     RaiseSignum = signum;
+    TLogger::CloseLog();
 }
 
 static void DoHangup(int signum)
 {
     Hup = true;
-    DoExit(signum);
 }
 
 static bool AnotherInstanceRunning(const string &path)
@@ -138,15 +141,18 @@ static int RpcMain(TContainerHolder &cholder) {
         fds[MAX_CLIENTS].fd = sfd;
         fds[MAX_CLIENTS].events = POLLIN | POLLHUP;
 
-        if (Hup) {
-            // TODO: reread config; rotate logs
-            Hup = false;
-        }
-
         ret = poll(fds, MAX_CONNECTIONS, POLL_TIMEOUT_MS);
         if (ret < 0) {
             std::cerr << "poll() error: " << strerror(errno) << std::endl;
-            break;
+
+            if (!Hup)
+                break;
+        }
+
+        if (Hup) {
+            TLogger::CloseLog();
+            TLogger::OpenLog(LOG_FILE);
+            Hup = false;
         }
 
         if (fds[MAX_CLIENTS].revents && clients.size() < MAX_CLIENTS) {
@@ -228,6 +234,8 @@ int main(int argc, char * const argv[])
         std::cerr << "Can't create pid file " << PID_FILE << "!" << std::endl;
         return -1;
     }
+
+    TLogger::OpenLog(LOG_FILE);
 
     try {
         TKeyValueStorage storage;
