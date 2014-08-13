@@ -27,7 +27,7 @@ public:
     }
 
     bool ValidArgs(int argc, char *argv[]) {
-        if (need_args < argc)
+        if (argc < need_args)
             return false;
 
         if (argc >= 1) {
