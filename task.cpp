@@ -276,8 +276,9 @@ TError TTask::Start() {
 
     ret = pipe2(pfd, O_CLOEXEC);
     if (ret) {
-        TLogger::LogAction("pipe2", ret == 0, errno);
-        return TError(EError::Unknown, errno, "pipe2(pdf)");
+        TError error(EError::Unknown, errno, "pipe2(pdf)");
+        TLogger::LogError(error);
+        return error;
     }
 
     rfd = pfd[0];
@@ -287,25 +288,28 @@ TError TTask::Start() {
     pid_t pid = clone(child_fn, stack + sizeof(stack),
                       CLONE_NEWNS | CLONE_NEWPID, this);
     if (pid < 0) {
-        TLogger::LogAction("fork", ret == 0, errno);
-        return TError(EError::Unknown, errno, "fork()");
+        TError error(EError::Unknown, errno, "fork()");
+        TLogger::LogError(error);
+        return error;
     }
 
     close(wfd);
 
     int n = read(rfd, &ret, sizeof(ret));
     if (n < 0) {
-        TLogger::LogAction("read child status failed", false, errno);
         return TError(EError::Unknown, errno, "read(rfd)");
+        TLogger::LogError(error);
+        return error;
     } else if (n == 0) {
         state = Running;
         this->pid = pid;
         return TError::Success();
     } else {
-        TLogger::LogAction("got status from child", false, errno);
         (void)waitpid(pid, NULL, WNOHANG);
         exitStatus.error = ret;
-        return TError(EError::Unknown, "child returned " + to_string(ret));
+        TError error(EError::Unknown, "child returned " + to_string(ret));
+        TLogger::LogError(error);
+        return error;
     }
 }
 
@@ -344,7 +348,10 @@ TExitStatus TTask::GetExitStatus() {
 
 void TTask::Reap() {
     int ret = waitpid(pid, NULL, 0);
-    TLogger::LogAction("wait " + to_string(pid) + " ret=" + to_string(ret), ret != pid, errno);
+    if (ret != pid) {
+        TError error(EError::Unknown, errno, "waitpid(" + to_string(pid) + ")");
+        TLogger::LogError(error);
+    }
 }
 
 void TTask::Kill(int signal) {
@@ -352,7 +359,10 @@ void TTask::Kill(int signal) {
         throw "Tried to kill invalid process!";
 
     int ret = kill(pid, signal);
-    TLogger::LogAction("kill " + to_string(pid) + " ret=" + to_string(ret), ret != 0, errno);
+    if (ret != 0) {
+        TError error(EError::Unknown, errno, "kill(" + to_string(pid) + ")");
+        TLogger::LogError(error);
+    }
 }
 
 std::string TTask::GetStdout() {
