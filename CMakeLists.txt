@@ -4,7 +4,7 @@ PROJECT(yandex-porto)
 
 set(CMAKE_CXX_FLAGS "-O2 -Wall -std=c++11 -g")
 set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc")
-set(CMAKE_CXX_COMPILER "g++-4.7")
+#set(CMAKE_CXX_COMPILER "g++-4.7")
 
 find_library(PB NAMES libprotobuf.a)
 
@@ -23,7 +23,7 @@ add_executable(portod portod.cpp cgroup.cpp mount.cpp rpc.cpp protobuf.cpp conta
 add_dependencies(portod version.hpp)
 target_link_libraries(portod ${PB} pthread)
 
-add_executable(porto porto.cpp protobuf.cpp error.cpp selftest.cpp libporto.cpp ${PROTO_SRCS} ${PROTO_HDRS})
+add_executable(porto porto.cpp protobuf.cpp error.cpp selftest.cpp file.cpp stringutil.cpp libporto.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(porto version.hpp)
 target_link_libraries(porto ${PB} pthread)
 
@@ -34,12 +34,12 @@ set(CPACK_INSTALL_PREFIX "/")
 install(
     FILES ${CMAKE_SOURCE_DIR}/portod
     PERMISSIONS OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-    DESTINATION usr/bin 
+    DESTINATION usr/sbin
 )
 install(
     FILES ${CMAKE_SOURCE_DIR}/porto
     PERMISSIONS OWNER_READ OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
-    DESTINATION usr/bin 
+    DESTINATION usr/sbin
 )
 
 set(CPACK_GENERATOR "DEB")

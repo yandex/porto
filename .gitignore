@@ -11,3 +11,7 @@
 /Makefile
 /test
 /version.hpp
+/CPackConfig.cmake
+/CPackSourceConfig.cmake
+/debian-binary
+/install_manifest.txt
