@@ -3,9 +3,12 @@
 
 #include <fstream>
 
+extern "C" {
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <linux/limits.h>
+}
 
 using namespace std;
 
@@ -92,6 +95,20 @@ TError TFile::AsLines(vector<string> &value) {
     while (getline(in, line))
         value.push_back(line);
 
+    return NoError;
+}
+
+TError TFile::ReadLink(std::string &value) {
+    char buf[PATH_MAX];
+    ssize_t len;
+
+    len = readlink(path.c_str(), buf, sizeof(buf) - 1);
+    if (len < 0)
+        return TError(TError::Unknown, errno);
+
+    buf[len] = '\0';
+
+    value.assign(buf);
     return NoError;
 }
 

@@ -236,7 +236,6 @@ TError TContainer::Stop() {
 
     // after we killed all tasks, collect and ignore their exit status
     for (auto pid : reap) {
-        cerr << "REAP " << pid << endl;
         TTask t(pid);
         t.Reap();
     }

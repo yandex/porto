@@ -147,7 +147,7 @@ static int RpcMain(TContainerHolder &cholder) {
                 break;
         }
 
-        for (int i = 0; i < MAX_CLIENTS; i++) {
+        for (size_t i = 0; i < MAX_CLIENTS; i++) {
             if (!fds[i].revents)
                 continue;
 

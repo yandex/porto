@@ -215,7 +215,7 @@ public:
 
 class TSetPropertyCmd : public ICmd {
 public:
-    TSetPropertyCmd() : ICmd("pset", 3, "<name> <property>", "set container property") {}
+    TSetPropertyCmd() : ICmd("set", 3, "<name> <property>", "set container property") {}
 
     int Execute(int argc, char *argv[])
     {

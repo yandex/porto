@@ -32,6 +32,7 @@ public:
     TError AsString(std::string &value);
     TError AsInt(int &value);
     TError AsLines(std::vector<std::string> &value);
+    TError ReadLink(std::string &value);
 
     TError WriteStringNoAppend(const std::string &str);
     TError AppendString(const std::string &str);

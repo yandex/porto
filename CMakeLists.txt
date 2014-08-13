@@ -21,6 +21,6 @@ add_executable(portod portod.cpp cgroup.cpp mount.cpp rpc.cpp protobuf.cpp conta
 add_dependencies(portod version.hpp)
 target_link_libraries(portod ${PB} pthread)
 
-add_executable(porto porto.cpp protobuf.cpp error.cpp selftest.cpp libporto.cpp ${PROTO_SRCS} ${PROTO_HDRS})
+add_executable(porto porto.cpp protobuf.cpp error.cpp selftest.cpp file.cpp stringutil.cpp libporto.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(porto version.hpp)
 target_link_libraries(porto ${PB} pthread)

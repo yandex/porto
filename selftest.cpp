@@ -4,6 +4,7 @@
 
 #include "rpc.pb.h"
 #include "libporto.hpp"
+#include "file.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -21,57 +22,47 @@ static void _ExpectFailure(int ret, int exp, int line, const char *func) {
         throw string(to_string(ret) + " != " + to_string(exp) + " at " + func + ":" + to_string(line));
 }
 
-#define ShouldBeEq(A, B) _ShouldBeEq(A, B, __LINE__, __func__)
-static void _ShouldBeEq(const int a, const int b, int line, const char *func) {
-    if (a != b)
-        throw string(to_string(a) + " != " + to_string(b) + " at " + func + ":" + to_string(line));
-}
-static void _ShouldBeEq(const string &a, const string &b, int line, const char *func) {
-    if (a != b)
-        throw string(a + " != " + b + " at " + func + ":" + to_string(line));
-}
-
 static void ShouldHaveOnlyRoot(TPortoAPI &api) {
     std::vector<std::string> containers;
 
     containers.clear();
     ExpectSuccess(api.List(containers));
-    ShouldBeEq(containers.size(), 1);
-    ShouldBeEq(containers[0], string("/"));
+    Expect(containers.size() == 1);
+    Expect(containers[0] == string("/"));
 }
 
 static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     string v;
 
     ExpectSuccess(api.GetProperty(name, "command", v));
-    ShouldBeEq(v, string("id"));
+    Expect(v == string("id"));
     ExpectSuccess(api.GetProperty(name, "low_limit", v));
-    ShouldBeEq(v, string("0"));
+    Expect(v == string("0"));
     ExpectSuccess(api.GetProperty(name, "user", v));
-    ShouldBeEq(v, string("nobody"));
+    Expect(v == string("nobody"));
     ExpectSuccess(api.GetProperty(name, "group", v));
-    ShouldBeEq(v, string("nogroup"));
+    Expect(v == string("nogroup"));
     ExpectSuccess(api.GetProperty(name, "env", v));
-    ShouldBeEq(v, string(""));
+    Expect(v == string(""));
 }
 
 static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     string v;
 
     ExpectSuccess(api.GetData(name, "state", v));
-    ShouldBeEq(v, string("stopped"));
+    Expect(v == string("stopped"));
     ExpectSuccess(api.GetData(name, "exit_status", v));
-    ShouldBeEq(v, string("-1"));
+    Expect(v == string("-1"));
     ExpectSuccess(api.GetData(name, "root_pid", v));
-    ShouldBeEq(v, string("-1"));
+    Expect(v == string("-1"));
     ExpectSuccess(api.GetData(name, "stdout", v));
-    ShouldBeEq(v, string(""));
+    Expect(v == string(""));
     ExpectSuccess(api.GetData(name, "stderr", v));
-    ShouldBeEq(v, string(""));
+    Expect(v == string(""));
     ExpectSuccess(api.GetData(name, "cpu_usage", v));
-    ShouldBeEq(v, string("-1"));
+    Expect(v == string("-1"));
     ExpectSuccess(api.GetData(name, "mem_usage", v));
-    ShouldBeEq(v, string("-1"));
+    Expect(v == string("-1"));
 }
 
 static void TestHolder(TPortoAPI &api) {
@@ -83,9 +74,9 @@ static void TestHolder(TPortoAPI &api) {
     ExpectSuccess(api.Create("a"));
     containers.clear();
     ExpectSuccess(api.List(containers));
-    ShouldBeEq(containers.size(), 2);
-    ShouldBeEq(containers[0], string("/"));
-    ShouldBeEq(containers[1], string("a"));
+    Expect(containers.size() == 2);
+    Expect(containers[0] == string("/"));
+    Expect(containers[1] == string("a"));
     ShouldHaveValidProperties(api, "a");
     ShouldHaveValidData(api, "a");
 
@@ -93,9 +84,9 @@ static void TestHolder(TPortoAPI &api) {
     ExpectFailure(api.Create("a"), rpc::EContainerError::ContainerAlreadyExists);
     containers.clear();
     ExpectSuccess(api.List(containers));
-    ShouldBeEq(containers.size(), 2);
-    ShouldBeEq(containers[0], string("/"));
-    ShouldBeEq(containers[1], string("a"));
+    Expect(containers.size() == 2);
+    Expect(containers[0] == string("/"));
+    Expect(containers[1] == string("a"));
     ShouldHaveValidProperties(api, "a");
     ShouldHaveValidData(api, "a");
 
@@ -103,10 +94,10 @@ static void TestHolder(TPortoAPI &api) {
     ExpectSuccess(api.Create("b"));
     containers.clear();
     ExpectSuccess(api.List(containers));
-    ShouldBeEq(containers.size(), 3);
-    ShouldBeEq(containers[0], string("/"));
-    ShouldBeEq(containers[1], string("a"));
-    ShouldBeEq(containers[2], string("b"));
+    Expect(containers.size() == 3);
+    Expect(containers[0] == string("/"));
+    Expect(containers[1] == string("a"));
+    Expect(containers[2] == string("b"));
     ShouldHaveValidProperties(api, "b");
     ShouldHaveValidData(api, "b");
 
@@ -114,9 +105,9 @@ static void TestHolder(TPortoAPI &api) {
     ExpectSuccess(api.Destroy("a"));
     containers.clear();
     ExpectSuccess(api.List(containers));
-    ShouldBeEq(containers.size(), 2);
-    ShouldBeEq(containers[0], string("/"));
-    ShouldBeEq(containers[1], string("b"));
+    Expect(containers.size() == 2);
+    Expect(containers[0] == string("/"));
+    Expect(containers[1] == string("b"));
 
     cerr << "Remove container B" << endl;
     ExpectSuccess(api.Destroy("b"));
@@ -178,7 +169,7 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     WaitPid(api, pid, name);
     ExpectSuccess(api.GetData(name, "exit_status", ret));
-    ShouldBeEq(ret, string("0;0;1"));
+    Expect(ret == string("0;0;1"));
 
     cerr << "Check exit status of 'true'" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "true"));
@@ -186,59 +177,112 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     WaitPid(api, pid, name);
     ExpectSuccess(api.GetData(name, "exit_status", ret));
-    ShouldBeEq(ret, string("0;0;0"));
+    Expect(ret == string("0;0;0"));
 
     cerr << "Check exit status of invalid command" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "__invalid_command_name__"));
     ExpectFailure(api.Start(name), rpc::EContainerError::Error);
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     // TODO: this may blow things up inside portod
-    ShouldBeEq(pid, "0");
+    Expect(pid == "0");
     ExpectSuccess(api.GetData(name, "exit_status", ret));
-    ShouldBeEq(ret, string("2;0;0"));
+    Expect(ret == string("2;0;0"));
 }
 
 static void TestStreams(TPortoAPI &api, const string &name) {
     string pid;
     string ret;
 
+    cerr << "Make sure stdout works" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "bash -c 'echo out >&1'"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     WaitPid(api, pid, name);
     ExpectSuccess(api.GetData(name, "stdout", ret));
-    ShouldBeEq(ret, string("out\n"));
+    Expect(ret == string("out\n"));
     ExpectSuccess(api.GetData(name, "stderr", ret));
-    ShouldBeEq(ret, string(""));
+    Expect(ret == string(""));
 
+    cerr << "Make sure stderr works" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "bash -c 'echo err >&2'"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     WaitPid(api, pid, name);
     ExpectSuccess(api.GetData(name, "stdout", ret));
-    ShouldBeEq(ret, string(""));
+    Expect(ret == string(""));
     ExpectSuccess(api.GetData(name, "stderr", ret));
-    ShouldBeEq(ret, string("err\n"));
+    Expect(ret == string("err\n"));
+}
+
+static string GetNamespace(const string &pid, const string &ns) {
+    TError error;
+    string link;
+    TFile m("/proc/" + pid + "/ns/" + ns);
+    (void)m.ReadLink(link);
+    return link;
+}
+
+static map<string, string> GetCgroups(const string &pid) {
+    TFile f("/proc/" + pid + "/cgroup");
+    vector<string> lines;
+    map<string, string> cgmap;
+    (void)f.AsLines(lines);
+
+    vector<string> tokens;
+    for (auto l : lines) {
+        tokens.clear();
+        (void)SplitString(l, ':', tokens);
+        cgmap[tokens[1]] = tokens[2];
+    }
+
+    return cgmap;
 }
 
 static void TestLongRunning(TPortoAPI &api, const string &name) {
     string pid;
 
+    cerr << "Spawn long running task" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
-    usleep(1000000);
     Expect(TaskRunning(api, pid, name) == true);
 
-    // TODO: check namespace, cgroup, etc
+    cerr << "Check that task namespaces are correct" << endl;
+    Expect(GetNamespace("self", "pid") != GetNamespace(pid, "pid"));
+    Expect(GetNamespace("self", "mnt") != GetNamespace(pid, "mnt"));
+    Expect(GetNamespace("self", "ipc") == GetNamespace(pid, "ipc"));
+    Expect(GetNamespace("self", "net") == GetNamespace(pid, "net"));
+    Expect(GetNamespace("self", "user") == GetNamespace(pid, "user"));
+    Expect(GetNamespace("self", "uts") == GetNamespace(pid, "uts"));
+
+    cerr << "Check that task cgroups are correct" << endl;
+    auto cgmap = GetCgroups("self");
+    for (auto name : cgmap) {
+        Expect(name.second == "/");
+    }
+
+    cgmap = GetCgroups(pid);
+    Expect(cgmap.size() == 3);
+    for (auto kv : cgmap) {
+        Expect(kv.second == "/" + name);
+    }
 
     ExpectSuccess(api.Stop(name));
-    usleep(1000000);
     Expect(TaskRunning(api, pid, name) == false);
 }
 
 static void TestIsolation(TPortoAPI &api, const string &name) {
-    // TODO: ps aux and check output
+    string ret;
+    string pid;
+
+    cerr << "Make sure PID isolation works" << endl;
+    ExpectSuccess(api.SetProperty(name, "command", "bash -c 'echo $BASHPID'"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    WaitPid(api, pid, name);
+
+    ExpectSuccess(api.GetData(name, "stdout", ret));
+    Expect(ret == string("1\n"));
 }
 
 int Selftest() {

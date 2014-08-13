@@ -46,3 +46,17 @@ TError StringToUint64(const std::string &string, uint64_t &value) {
 
     return NoError;
 }
+
+TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens) {
+    try {
+        istringstream ss(s);
+        string tok;
+
+        while(std::getline(ss, tok, sep))
+            tokens.push_back(tok);
+    } catch (...) {
+        return TError(TError::Unknown, "Can't split string");
+    }
+
+    return NoError;
+}

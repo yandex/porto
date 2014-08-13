@@ -1,3 +1,9 @@
+- porto plist dlist into help
+- porto argument number handling is wrong
+- porto swap first to args to be able to do porto t create, porto t get X
+- porto get without arguments should print everythin
+- print human friendly exit_status
+
 - log into file + info about file:line that failed
 - sleeps & finite number of retries in cgroup kill
 - state recovery: kill freezed tasks fails

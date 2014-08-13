@@ -15,4 +15,6 @@ TError StringsToIntegers(const std::vector<std::string> &strings,
                          std::vector<int> &integers);
 TError StringToUint64(const std::string &string, uint64_t &value);
 
+TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens);
+
 #endif
