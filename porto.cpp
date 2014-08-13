@@ -55,7 +55,7 @@ public:
     string& GetDescription() { return desc; }
 
     const string &ErrorName(int err) {
-        return rpc::EContainerError_Name(static_cast<rpc::EContainerError>(err));
+        return rpc::EError_Name(static_cast<rpc::EError>(err));
     }
 
     bool ValidArgs(int argc, char *argv[]) {

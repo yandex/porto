@@ -82,7 +82,7 @@ static void TestHolder(TPortoAPI &api) {
     ShouldHaveValidData(api, "a");
 
     cerr << "Try to create existing container A" << endl;
-    ExpectFailure(api.Create("a"), rpc::EContainerError::ContainerAlreadyExists);
+    ExpectFailure(api.Create("a"), EError::ContainerAlreadyExists);
     containers.clear();
     ExpectSuccess(api.List(containers));
     Expect(containers.size() == 2);
@@ -114,15 +114,15 @@ static void TestHolder(TPortoAPI &api) {
     ExpectSuccess(api.Destroy("b"));
 
     cerr << "Try to execute operations on invalid container" << endl;
-    ExpectFailure(api.Start("a"), rpc::EContainerError::ContainerDoesNotExist);
-    ExpectFailure(api.Stop("a"), rpc::EContainerError::ContainerDoesNotExist);
-    ExpectFailure(api.Pause("a"), rpc::EContainerError::ContainerDoesNotExist);
-    ExpectFailure(api.Resume("a"), rpc::EContainerError::ContainerDoesNotExist);
+    ExpectFailure(api.Start("a"), EError::ContainerDoesNotExist);
+    ExpectFailure(api.Stop("a"), EError::ContainerDoesNotExist);
+    ExpectFailure(api.Pause("a"), EError::ContainerDoesNotExist);
+    ExpectFailure(api.Resume("a"), EError::ContainerDoesNotExist);
 
     string value;
-    ExpectFailure(api.GetProperty("a", "command", value), rpc::EContainerError::ContainerDoesNotExist);
-    ExpectFailure(api.SetProperty("a", "command", value), rpc::EContainerError::ContainerDoesNotExist);
-    ExpectFailure(api.GetData("a", "root_pid", value), rpc::EContainerError::ContainerDoesNotExist);
+    ExpectFailure(api.GetProperty("a", "command", value), EError::ContainerDoesNotExist);
+    ExpectFailure(api.SetProperty("a", "command", value), EError::ContainerDoesNotExist);
+    ExpectFailure(api.GetData("a", "root_pid", value), EError::ContainerDoesNotExist);
 
     ShouldHaveOnlyRoot(api);
 }
@@ -130,7 +130,7 @@ static void TestHolder(TPortoAPI &api) {
 static void TestEmpty(TPortoAPI &api) {
     cerr << "Make sure we can't start empty container" << endl;
     ExpectSuccess(api.Create("b"));
-    ExpectFailure(api.Start("b"), rpc::EContainerError::Error);
+    ExpectFailure(api.Start("b"), EError::Unknown);
     ExpectSuccess(api.Destroy("b"));
 }
 
@@ -189,7 +189,7 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
 
     cerr << "Check exit status of invalid command" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "__invalid_command_name__"));
-    ExpectFailure(api.Start(name), rpc::EContainerError::Error);
+    ExpectFailure(api.Start(name), EError::Unknown);
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     // TODO: this may blow things up inside portod
     Expect(pid == "0");

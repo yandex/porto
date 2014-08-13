@@ -16,15 +16,15 @@ static void CreateContainer(TContainerHolder &cholder,
     try {
         auto c = cholder.Get(req.name());
         if (c) {
-            rsp.set_error(rpc::EContainerError::ContainerAlreadyExists);
+            rsp.set_error(EError::ContainerAlreadyExists);
             return;
         }
         TError error = cholder.Create(req.name());
         if (!error)
-            rsp.set_error(rpc::EContainerError::Success);
+            rsp.set_error(EError::Success);
     } catch (...) {
         rsp.Clear();
-        rsp.set_error(rpc::EContainerError::Error);
+        rsp.set_error(EError::Unknown);
     }
 }
 
@@ -33,7 +33,7 @@ static void DestroyContainer(TContainerHolder &cholder,
                              rpc::TContainerResponse &rsp)
 {
     cholder.Destroy(req.name());
-    rsp.set_error(rpc::EContainerError::Success);
+    rsp.set_error(EError::Success);
 }
 
 static void StartContainer(TContainerHolder &cholder,
@@ -42,12 +42,12 @@ static void StartContainer(TContainerHolder &cholder,
 {
     auto container = cholder.Get(req.name());
     if (!container) {
-        rsp.set_error(rpc::EContainerError::ContainerDoesNotExist);
+        rsp.set_error(EError::ContainerDoesNotExist);
         return;
     }
 
     if (!container->Start())
-        rsp.set_error(rpc::EContainerError::Success);
+        rsp.set_error(EError::Success);
 }
 
 static void StopContainer(TContainerHolder &cholder,
@@ -56,12 +56,12 @@ static void StopContainer(TContainerHolder &cholder,
 {
     auto container = cholder.Get(req.name());
     if (!container) {
-        rsp.set_error(rpc::EContainerError::ContainerDoesNotExist);
+        rsp.set_error(EError::ContainerDoesNotExist);
         return;
     }
 
     if (!container->Stop())
-        rsp.set_error(rpc::EContainerError::Success);
+        rsp.set_error(EError::Success);
 }
 
 static void PauseContainer(TContainerHolder &cholder,
@@ -70,12 +70,12 @@ static void PauseContainer(TContainerHolder &cholder,
 {
     auto container = cholder.Get(req.name());
     if (!container) {
-        rsp.set_error(rpc::EContainerError::ContainerDoesNotExist);
+        rsp.set_error(EError::ContainerDoesNotExist);
         return;
     }
 
     if (!container->Pause())
-        rsp.set_error(rpc::EContainerError::Success);
+        rsp.set_error(EError::Success);
 }
 
 static void ResumeContainer(TContainerHolder &cholder,
@@ -84,12 +84,12 @@ static void ResumeContainer(TContainerHolder &cholder,
 {
     auto container = cholder.Get(req.name());
     if (!container) {
-        rsp.set_error(rpc::EContainerError::ContainerDoesNotExist);
+        rsp.set_error(EError::ContainerDoesNotExist);
         return;
     }
 
     if (!container->Resume())
-        rsp.set_error(rpc::EContainerError::Success);
+        rsp.set_error(EError::Success);
 }
 
 static void ListContainers(TContainerHolder &cholder,
@@ -98,7 +98,7 @@ static void ListContainers(TContainerHolder &cholder,
     for (auto name : cholder.List())
         rsp.mutable_list()->add_name(name);
 
-    rsp.set_error(rpc::EContainerError::Success);
+    rsp.set_error(EError::Success);
 }
 
 static void GetContainerProperty(TContainerHolder &cholder,
@@ -107,19 +107,19 @@ static void GetContainerProperty(TContainerHolder &cholder,
 {
     auto container = cholder.Get(req.name());
     if (!container) {
-        rsp.set_error(rpc::EContainerError::ContainerDoesNotExist);
+        rsp.set_error(EError::ContainerDoesNotExist);
         return;
     }
 
     if (propertySpec.find(req.property()) == propertySpec.end()) {
-        rsp.set_error(rpc::EContainerError::InvalidProperty);
+        rsp.set_error(EError::InvalidProperty);
         return;
     }
 
     string value;
     container->GetProperty(req.property(), value);
     rsp.mutable_getproperty()->set_value(value);
-    rsp.set_error(rpc::EContainerError::Success);
+    rsp.set_error(EError::Success);
 }
 
 static void SetContainerProperty(TContainerHolder &cholder,
@@ -128,18 +128,18 @@ static void SetContainerProperty(TContainerHolder &cholder,
 {
     auto container = cholder.Get(req.name());
     if (!container) {
-        rsp.set_error(rpc::EContainerError::ContainerDoesNotExist);
+        rsp.set_error(EError::ContainerDoesNotExist);
         return;
     }
 
     if (propertySpec.find(req.property()) == propertySpec.end()) {
-        rsp.set_error(rpc::EContainerError::InvalidProperty);
+        rsp.set_error(EError::InvalidProperty);
         return;
     }
 
     TError error(container->SetProperty(req.property(), req.value()));
     if (!error)
-        rsp.set_error(rpc::EContainerError::Success);
+        rsp.set_error(EError::Success);
 }
 
 static void GetContainerData(TContainerHolder &cholder,
@@ -148,19 +148,19 @@ static void GetContainerData(TContainerHolder &cholder,
 {
     auto container = cholder.Get(req.name());
     if (!container) {
-        rsp.set_error(rpc::EContainerError::ContainerDoesNotExist);
+        rsp.set_error(EError::ContainerDoesNotExist);
         return;
     }
 
     if (dataSpec.find(req.data()) == dataSpec.end()) {
-        rsp.set_error(rpc::EContainerError::InvalidData);
+        rsp.set_error(EError::InvalidData);
         return;
     }
 
     string value;
     container->GetData(req.data(), value);
     rsp.mutable_getdata()->set_value(value);
-    rsp.set_error(rpc::EContainerError::Success);
+    rsp.set_error(EError::Success);
 }
 
 static void ListProperty(TContainerHolder &cholder,
@@ -175,7 +175,7 @@ static void ListProperty(TContainerHolder &cholder,
         entry->set_desc(kv.second.description);
     }
 
-    rsp.set_error(rpc::EContainerError::Success);
+    rsp.set_error(EError::Success);
 }
 
 static void ListData(TContainerHolder &cholder,
@@ -190,7 +190,7 @@ static void ListData(TContainerHolder &cholder,
         entry->set_desc(kv.second.description);
     }
 
-    rsp.set_error(rpc::EContainerError::Success);
+    rsp.set_error(EError::Success);
 }
 
 rpc::TContainerResponse
@@ -201,7 +201,7 @@ HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req)
 
     TLogger::LogRequest(req.ShortDebugString());
 
-    rsp.set_error(rpc::EContainerError::Error);
+    rsp.set_error(EError::Unknown);
 
     try {
         if (req.has_create())
@@ -229,10 +229,10 @@ HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req)
         else if (req.has_datalist())
             ListData(cholder, rsp);
         else
-            rsp.set_error(rpc::EContainerError::InvalidMethod);
+            rsp.set_error(EError::InvalidMethod);
     } catch (...) {
         rsp.Clear();
-        rsp.set_error(rpc::EContainerError::Error);
+        rsp.set_error(EError::Unknown);
     }
 
     TLogger::LogResponse(rsp.ShortDebugString());

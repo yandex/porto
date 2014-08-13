@@ -1,3 +1,4 @@
+- remove all functionality from constructors and destructors
 - ? get exit_status from time to time in portod mail loop
 - log into file + info about file:line that failed
 - sleeps & finite number of retries in cgroup kill

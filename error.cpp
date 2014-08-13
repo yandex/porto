@@ -4,8 +4,6 @@ extern "C" {
 #include <string.h>
 }
 
-TError NoError;
-
 TError::TError(EError e, std::string description) :
     error(e), description(description) {
 }
@@ -19,7 +17,7 @@ TError::TError(EError e, int err, std::string _d) :
 }
 
 TError::operator bool() const {
-    return error != NoError;
+    return error != EError::Success;
 }
 
 int TError::GetError() const {

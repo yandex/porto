@@ -30,21 +30,21 @@ TError StringsToIntegers(const std::vector<std::string> &strings,
         try {
             integers.push_back(stoi(l));
         } catch (...) {
-            return TError(TError::Unknown, "Bad integer value");
+            return TError(EError::Unknown, "Bad integer value");
         }
     }
 
-    return NoError;
+    return TError::Success();
 }
 
 TError StringToUint64(const std::string &string, uint64_t &value) {
     try {
         value = stoull(string);
     } catch (...) {
-        return TError(TError::Unknown, "Bad integer value");
+        return TError(EError::Unknown, "Bad integer value");
     }
 
-    return NoError;
+    return TError::Success();
 }
 
 TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens) {
@@ -55,8 +55,8 @@ TError SplitString(const std::string &s, const char sep, std::vector<std::string
         while(std::getline(ss, tok, sep))
             tokens.push_back(tok);
     } catch (...) {
-        return TError(TError::Unknown, "Can't split string");
+        return TError(EError::Unknown, "Can't split string");
     }
 
-    return NoError;
+    return TError::Success();
 }

@@ -49,7 +49,7 @@ TError TKeyValueStorage::LoadNode(const std::string &name, kv::TNode &node)
     try {
         google::protobuf::io::FileInputStream pist(fd);
         if (!ReadDelimitedFrom(&pist, &node)) {
-            error = TError(TError::Unknown, "TKeyValueStorage: protobuf read error");
+            error = TError(EError::Unknown, "TKeyValueStorage: protobuf read error");
         }
 
         kv::TNode next;
@@ -57,7 +57,7 @@ TError TKeyValueStorage::LoadNode(const std::string &name, kv::TNode &node)
         while (ReadDelimitedFrom(&pist, &next))
             Merge(node, next);
     } catch (...) {
-        error = TError(TError::Unknown, "TKeyValueStorage: unhandled exception");
+        error = TError(EError::Unknown, "TKeyValueStorage: unhandled exception");
     }
     close(fd);
     return error;
@@ -70,16 +70,16 @@ TError TKeyValueStorage::AppendNode(const std::string &name, const kv::TNode &no
 
     if (lseek(fd, 0, SEEK_END) < 0) {
         close(fd);
-        TError error(TError::Unknown, errno);
+        TError error(EError::Unknown, errno);
         TLogger::LogError(error);
         return error;
     }
     try {
         google::protobuf::io::FileOutputStream post(fd);
         if (!WriteDelimitedTo(node, &post))
-            error = TError(TError::Unknown, "TKeyValueStorage: protobuf write error");
+            error = TError(EError::Unknown, "TKeyValueStorage: protobuf write error");
     } catch (...) {
-        error = TError(TError::Unknown, "TKeyValueStorage: unhandled exception");
+        error = TError(EError::Unknown, "TKeyValueStorage: unhandled exception");
     }
     close(fd);
     if (error)
@@ -94,9 +94,9 @@ TError TKeyValueStorage::SaveNode(const std::string &name, const kv::TNode &node
     try {
         google::protobuf::io::FileOutputStream post(fd);
         if (!WriteDelimitedTo(node, &post))
-            error = TError(TError::Unknown, "TKeyValueStorage: protobuf write error");
+            error = TError(EError::Unknown, "TKeyValueStorage: protobuf write error");
     } catch (...) {
-        error = TError(TError::Unknown, "TKeyValueStorage: unhandled exception");
+        error = TError(EError::Unknown, "TKeyValueStorage: unhandled exception");
     }
     close(fd);
     return error;

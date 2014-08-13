@@ -3,18 +3,13 @@
 
 #include <string>
 
+#include "rpc.pb.h"
+
+using ::rpc::EError;
+
 class TError {
 public:
-    enum EError {
-        NoError = 0,
-        BadValue,
-        BadState,
-        Unrecovable,
-        NotImplemented,
-        Unknown,
-    };
-
-    TError(EError e = NoError, std::string description = "");
+    TError(EError e = EError::Success, std::string description = "");
     TError(EError e, int err, std::string description = "");
 
     // return true if non-successful
@@ -23,11 +18,14 @@ public:
     int GetError() const;
     const std::string &GetMsg() const;
 
+    static const TError& Success() {
+        static TError e;
+        return e;
+    }
+
 private:
     EError error;
     std::string description;
 };
-
-extern TError NoError;
 
 #endif

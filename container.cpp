@@ -181,12 +181,12 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
-    return NoError;
+    return TError::Success();
 }
 
 TError TContainer::Start() {
     if (!CheckState(Stopped))
-        return NoError;
+        return TError::Success();
 
     auto ret = PrepareCgroups();
     if (ret)
@@ -198,7 +198,7 @@ TError TContainer::Start() {
     }
 
     if (!spec.Get("command").length()) {
-        return TError(TError::BadValue, "invalid container command");
+        return TError(EError::InvalidValue, "invalid container command");
     }
 
     TTaskEnv taskEnv(spec.Get("command"), "", spec.Get("user"), spec.Get("group"), spec.Get("env"));
@@ -217,7 +217,7 @@ TError TContainer::Start() {
 
 TError TContainer::Stop() {
     if (IsRoot() || !CheckState(Running))
-        return TError(TError::BadValue);
+        return TError(EError::InvalidValue, "invalid container state");
 
     auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
 
@@ -249,50 +249,50 @@ TError TContainer::Stop() {
     task = nullptr;
     state = Stopped;
 
-    return NoError;
+    return TError::Success();
 }
 
 TError TContainer::Pause() {
     if (IsRoot() || !CheckState(Running))
-        return TError(TError::BadValue);
+        return TError(EError::InvalidValue, "invalid container state");
 
     auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
     TSubsystem::Freezer()->Freeze(*cg);
 
     state = Paused;
-    return NoError;
+    return TError::Success();
 }
 
 TError TContainer::Resume() {
     if (!CheckState(Paused))
-        return TError(TError::BadValue);
+        return TError(EError::InvalidValue, "invalid container state");
 
     auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
     TSubsystem::Freezer()->Unfreeze(*cg);
 
     state = Running;
-    return NoError;
+    return TError::Success();
 }
 
 TError TContainer::GetData(const string &name, string &value) {
     if (dataSpec.find(name) == dataSpec.end())
-        return TError(TError::BadValue);
+        return TError(EError::InvalidValue, "invalid container state");
 
     value = dataSpec[name].Handler(*this);
-    return NoError;
+    return TError::Success();
 }
 
 TError TContainer::GetProperty(const string &property, string &value) {
     value = spec.Get(property);
-    return NoError;
+    return TError::Success();
 }
 
 TError TContainer::SetProperty(const string &property, const string &value) {
     if (IsRoot())
-        return TError(TError::BadValue, "Can't set property for root");
+        return TError(EError::InvalidValue, "Can't set property for root");
 
     if (task && task->IsRunning() && !spec.IsDynamic(property))
-        return TError(TError::BadValue, "Can't set dynamic property " + property + " for running container");
+        return TError(EError::InvalidValue, "Can't set dynamic property " + property + " for running container");
 
     return spec.Set(property, value);
 }
@@ -306,7 +306,7 @@ TError TContainer::Restore() {
     state = IsAlive() ? Running : Stopped;
     task = nullptr;
 
-    return NoError;
+    return TError::Success();
 }
 
 std::shared_ptr<TCgroup> TContainer::GetCgroup(shared_ptr<TSubsystem> subsys) {
@@ -340,13 +340,13 @@ bool TContainerHolder::ValidName(const string &name) {
 
 TError TContainerHolder::Create(const string &name) {
     if (!ValidName(name))
-        return TError(TError::BadValue, "invalid container name " + name);
+        return TError(EError::InvalidValue, "invalid container name " + name);
 
     if (containers[name] == nullptr) {
         containers[name] = make_shared<TContainer>(name);
-        return NoError;
+        return TError::Success();
     } else
-        return TError(TError::BadValue, "container " + name + " already exists");
+        return TError(EError::InvalidValue, "container " + name + " already exists");
 }
 
 shared_ptr<TContainer> TContainerHolder::Get(const string &name) {
@@ -378,5 +378,5 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
         return e;
 
     containers[name] = c;
-    return NoError;
+    return TError::Success();
 }

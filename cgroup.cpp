@@ -118,7 +118,7 @@ TError TCgroup::Create() {
             if (*m == root)
                 mount_root = false;
             if (*m == *mount)
-                return NoError;
+                return TError::Success();
         }
 
         if (mount_root) {
@@ -141,7 +141,7 @@ TError TCgroup::Create() {
             return error;
     }
 
-    return NoError;
+    return TError::Success();
 }
 
 TError TCgroup::Remove() {
@@ -161,7 +161,7 @@ TError TCgroup::Remove() {
     TFolder f(Path());
     f.Remove();
 
-    return NoError;
+    return TError::Success();
 }
 
 TError TCgroup::Kill(int signal) {
@@ -174,7 +174,7 @@ TError TCgroup::Kill(int signal) {
             }
         }
     }
-    return NoError;
+    return TError::Success();
 }
 
 TError TCgroup::GetKnobValue(const std::string &knob, std::string &value) {
@@ -202,7 +202,7 @@ TError TCgroup::Attach(int pid) {
         TLogger::LogError(error, "Can't attach " + to_string(pid) + " to " + name);
     }
 
-    return NoError;
+    return TError::Success();
 }
 
 bool operator==(const TCgroup& c1, const TCgroup& c2) {

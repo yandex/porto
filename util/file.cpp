@@ -42,20 +42,20 @@ TFile::EFileType TFile::Type() {
     else
         return Unknown;
 }
-    
+
 TError TFile::Remove() {
     int ret = unlink(path.c_str());
 
     if (ret && (errno != ENOENT))
-        return TError(TError::Unknown, errno, "unlink " + path);
+        return TError(EError::Unknown, errno, "unlink " + path);
 
-    return NoError;
+    return TError::Success();
 }
 
 TError TFile::AsString(string &value) {
     ifstream in(Path());
     if (!in.is_open())
-        return TError(TError::Unknown, "Cannot open " + Path());
+        return TError(EError::Unknown, "Cannot open " + Path());
 
     try {
         in.seekg(0, std::ios::end);
@@ -68,7 +68,7 @@ TError TFile::AsString(string &value) {
 
     value.assign((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
 
-    return NoError;
+    return TError::Success();
 }
 
 TError TFile::AsInt(int &value) {
@@ -78,9 +78,9 @@ TError TFile::AsInt(int &value) {
         return ret;
     try {
         value = stoi(s);
-        return NoError;
+        return TError::Success();
     } catch (...) {
-        return TError(TError::Unknown, "Bad integer value");
+        return TError(EError::Unknown, "Bad integer value");
     }
 }
 
@@ -89,12 +89,12 @@ TError TFile::AsLines(vector<string> &value) {
     string line;
 
     if (!in.is_open())
-        return TError(TError::Unknown, "Cannot open " + path);
+        return TError(EError::Unknown, "Cannot open " + path);
 
     while (getline(in, line))
         value.push_back(line);
 
-    return NoError;
+    return TError::Success();
 }
 
 TError TFile::ReadLink(std::string &value) {
@@ -103,21 +103,21 @@ TError TFile::ReadLink(std::string &value) {
 
     len = readlink(path.c_str(), buf, sizeof(buf) - 1);
     if (len < 0)
-        return TError(TError::Unknown, errno);
+        return TError(EError::Unknown, errno);
 
     buf[len] = '\0';
 
     value.assign(buf);
-    return NoError;
+    return TError::Success();
 }
 
 TError TFile::WriteStringNoAppend(const string &str) {
     ofstream out(path, ofstream::trunc);
     if (out.is_open()) {
         out << str;
-        return NoError;
+        return TError::Success();
     } else {
-        return TError(TError::Unknown, errno, "write " + path);
+        return TError(EError::Unknown, errno, "write " + path);
     }
 }
 
@@ -125,8 +125,8 @@ TError TFile::AppendString(const string &str) {
     ofstream out(path, ofstream::out);
     if (out.is_open()) {
         out << str;
-        return NoError;
+        return TError::Success();
     } else {
-        return TError(TError::Unknown, errno, "append " + path);
+        return TError(EError::Unknown, errno, "append " + path);
     }
 }

@@ -5,11 +5,11 @@
 package rpc;
 
 // Возможная ошибка в ответе
-enum EContainerError {
+enum EError {
 	// Запрос выполнен без ошибок
 	Success = 0;
 	// Неизвестная критическая ошибка
-	Error = 1;
+	Unknown = 1;
 	// Неизвестный запрос
 	InvalidMethod = 2;
 	// Запрос на создание существующего конейнера
@@ -20,6 +20,8 @@ enum EContainerError {
 	InvalidProperty = 5;
 	// Неизвестное runtime data
 	InvalidData = 6;
+	// Неверное значение свойств контейнера
+	InvalidValue = 7;
 }
 
 // Запрос на создание контейнера
@@ -165,7 +167,7 @@ message TContainerDataListResponse {
 // В ответе будет присутствовать статус запроса (ошибка) и соответствующей
 // запросу результат.
 message TContainerResponse {
-	required EContainerError error = 1;
+	required EError error = 1;
 
 	optional TContainerListResponse list = 2;
 	optional TContainerGetPropertyResponse getProperty = 3;

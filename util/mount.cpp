@@ -12,18 +12,18 @@ TError TMount::Mount() {
                     mountflags, CommaSeparatedList(flags).c_str());
 
     if (ret)
-        return TError(TError::Unrecovable);
+        return TError(EError::Unknown);
 
-    return NoError;
+    return TError::Success();
 }
 
 TError TMount::Umount() {
     int ret = umount(mountpoint.c_str());
 
     if (ret)
-        return TError(TError::Unrecovable);
+        return TError(EError::Unknown);
 
-    return NoError;
+    return TError::Success();
 }
 
 // from single /proc/self/mounts line, like:
