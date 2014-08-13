@@ -2,9 +2,9 @@
 #include <algorithm>
 
 #include "version.hpp"
-#include "protobuf.hpp"
 #include "rpc.hpp"
 #include "cgroup.hpp"
+#include "util/protobuf.hpp"
 
 extern "C" {
 #include <unistd.h>

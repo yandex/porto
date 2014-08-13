@@ -4,7 +4,8 @@
 
 #include "rpc.pb.h"
 #include "libporto.hpp"
-#include "file.hpp"
+#include "util/file.hpp"
+#include "util/string.hpp"
 
 extern "C" {
 #include <unistd.h>

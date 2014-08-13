@@ -4,6 +4,7 @@
 
 #include "version.hpp"
 #include "libporto.hpp"
+#include "util/string.hpp"
 
 using namespace std;
 
@@ -441,6 +442,7 @@ int main(int argc, char *argv[])
         // porto <command> <arg2> <arg2>
         TryExec(argc, argv);
 
+#if 0
         // porto <arg1> <command> <arg2>
         if (argc >= 2) {
             char *p = argv[1];
@@ -449,6 +451,7 @@ int main(int argc, char *argv[])
 
             TryExec(argc, argv);
         }
+#endif
 
         cerr << "Invalid command " << name << "!" << endl;
     } catch (string err) {

@@ -5,9 +5,9 @@
 #include <unordered_map>
 
 #include "error.hpp"
-#include "mount.hpp"
-#include "folder.hpp"
 #include "subsystem.hpp"
+#include "util/mount.hpp"
+#include "util/folder.hpp"
 
 class TCgroup {
     const std::string name;

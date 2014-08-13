@@ -1,6 +1,6 @@
 #include <sstream>
 
-#include "stringutil.hpp"
+#include "util/string.hpp"
 
 using namespace std;
 

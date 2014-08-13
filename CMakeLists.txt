@@ -18,12 +18,12 @@ add_custom_target(version.hpp
     git log -1 "--format=format:const std::string GIT_REVISION = \"%H\";%n" HEAD > version.hpp
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} VERBATIM)
 
-add_executable(portod portod.cpp cgroup.cpp mount.cpp rpc.cpp protobuf.cpp container.cpp task.cpp file.cpp stringutil.cpp kvalue.cpp subsystem.cpp folder.cpp error.cpp property.cpp log.cpp
+add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp task.cpp kvalue.cpp subsystem.cpp error.cpp property.cpp log.cpp util/protobuf.cpp util/mount.cpp util/file.cpp util/folder.cpp util/string.cpp
     ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(portod version.hpp)
 target_link_libraries(portod ${PB} pthread)
 
-add_executable(porto porto.cpp protobuf.cpp error.cpp selftest.cpp file.cpp stringutil.cpp libporto.cpp ${PROTO_SRCS} ${PROTO_HDRS})
+add_executable(porto porto.cpp error.cpp selftest.cpp libporto.cpp util/protobuf.cpp util/file.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(porto version.hpp)
 target_link_libraries(porto ${PB} pthread)
 

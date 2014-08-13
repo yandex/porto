@@ -1,6 +1,6 @@
 #include "log.hpp"
 #include "rpc.hpp"
-#include "protobuf.hpp"
+#include "util/protobuf.hpp"
 
 extern "C" {
 #include <sys/socket.h>

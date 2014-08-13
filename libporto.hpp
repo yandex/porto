@@ -2,7 +2,7 @@
 #define __LIBPORTO_HPP__
 
 #include "rpc.hpp"
-#include "protobuf.hpp"
+#include "util/protobuf.hpp"
 
 struct TProperty {
     std::string name;

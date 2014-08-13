@@ -4,8 +4,8 @@
 
 #include "cgroup.hpp"
 #include "task.hpp"
-#include "folder.hpp"
 #include "registry.hpp"
+#include "util/string.hpp"
 
 using namespace std;
 

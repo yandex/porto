@@ -1,7 +1,7 @@
 #include "kvalue.hpp"
-#include "file.hpp"
-#include "folder.hpp"
-#include "protobuf.hpp"
+#include "util/protobuf.hpp"
+#include "util/file.hpp"
+#include "util/folder.hpp"
 
 extern "C" {
 #include <sys/types.h>

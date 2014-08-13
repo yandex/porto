@@ -9,7 +9,6 @@
 #include <sys/mount.h>
 
 #include "log.hpp"
-#include "stringutil.hpp"
 
 class TMount {
     std::string device;
@@ -57,24 +56,8 @@ public:
         return flags;
     }
 
-    TError Mount() {
-        int ret = mount(device.c_str(), mountpoint.c_str(), vfstype.c_str(),
-                        mountflags, CommaSeparatedList(flags).c_str());
-
-        if (ret)
-            return TError(TError::Unrecovable);
-
-        return NoError;
-    }
-
-    TError Umount() {
-        int ret = umount(mountpoint.c_str());
-
-        if (ret)
-            return TError(TError::Unrecovable);
-
-        return NoError;
-    }
+    TError Mount();
+    TError Umount();
 };
 
 class TMountSnapshot {

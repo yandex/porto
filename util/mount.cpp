@@ -3,8 +3,28 @@
 #include "mount.hpp"
 #include "file.hpp"
 #include "registry.hpp"
+#include "util/string.hpp"
 
 using namespace std;
+
+TError TMount::Mount() {
+    int ret = mount(device.c_str(), mountpoint.c_str(), vfstype.c_str(),
+                    mountflags, CommaSeparatedList(flags).c_str());
+
+    if (ret)
+        return TError(TError::Unrecovable);
+
+    return NoError;
+}
+
+TError TMount::Umount() {
+    int ret = umount(mountpoint.c_str());
+
+    if (ret)
+        return TError(TError::Unrecovable);
+
+    return NoError;
+}
 
 // from single /proc/self/mounts line, like:
 // /dev/sda1 /boot ext4 rw,seclabel,relatime,data=ordered 0 0
