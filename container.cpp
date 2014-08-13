@@ -49,7 +49,7 @@ struct TData {
         if (c.task) {
             TExitStatus status = c.task->GetExitStatus();
             stringstream ss;
-            ss << status.error << ";" << status.signal << ";" << status.status;
+            ss << status.error << " " << status.signal << " " << status.status;
             return ss.str();
         }
         else

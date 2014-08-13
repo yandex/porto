@@ -7,6 +7,37 @@
 
 using namespace std;
 
+static string DataValue(const string &name, const string &val) {
+    if (name == "exit_status") {
+        vector<string> status_str;
+
+        TError error = SplitString(val, ' ', status_str);
+        if (error)
+            return val;
+
+        vector<int> status;
+        error = StringsToIntegers(status_str, status);
+        if (error)
+            return val;
+
+        string ret;
+
+        if (status[0] != 0) {
+            ret = string(strerror(status[0]));
+        } else if (status[1] != 0) {
+            return "Container killed by signal " + to_string(status[1]);
+        } else if (status[2] != 0) {
+            return "Container exited with " + to_string(status[2]);
+        } else {
+            ret = "Success";
+        }
+
+        return ret;
+    } else {
+        return val;
+    }
+}
+
 class ICmd {
 protected:
     string name, usage, desc;
@@ -327,7 +358,7 @@ public:
             for (auto d : dlist) {
                 ret = api.GetData(argv[0], d.name, value);
                 if (!ret)
-                    cout << d.name << " = " << value << endl;
+                    cout << d.name << " = " << DataValue(d.name, value) << endl;
             }
 
             return 0;
@@ -335,7 +366,7 @@ public:
 
         ret = api.GetData(argv[0], argv[1], value);
         if (!ret) {
-            cout << value << endl;
+            cout << DataValue(argv[1], value) << endl;
             return 0;
         }
 
