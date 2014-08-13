@@ -1,5 +1,4 @@
 - remove default command property and test for it
-- porto set use all args as value
 
 - ? get exit_status from time to time in portod mail loop
 - log into file + info about file:line that failed

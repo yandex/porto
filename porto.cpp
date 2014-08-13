@@ -233,7 +233,13 @@ public:
 
     int Execute(int argc, char *argv[])
     {
-        int ret = api.SetProperty(argv[0], argv[1], argv[2]);
+        string val = argv[2];
+        for (int i = 3; i < argc; i++) {
+            val += " ";
+            val += argv[i];
+        }
+
+        int ret = api.SetProperty(argv[0], argv[1], val);
         if (ret)
             cerr << "Can't set property, error = " << ErrorName(ret) << endl;
 
