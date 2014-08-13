@@ -47,21 +47,21 @@ bool TContainerSpec::IsDynamic(const std::string &property) {
 TError TContainerSpec::Set(const string &property, const string &value) {
     if (propertySpec.find(property) == propertySpec.end()) {
         TError error(EError::InvalidValue, "property not found");
-        TLogger::LogError(error);
+        TLogger::LogError(error, "Can't set property");
         return error;
     }
 
     if (propertySpec[property].Valid &&
         !propertySpec[property].Valid(value)) {
         TError error(EError::InvalidValue, "invalid property value");
-        TLogger::LogError(error);
+        TLogger::LogError(error, "Can't set property");
         return error;
     }
 
     data[property] = value;
     TError error(AppendStorage(property, value));
     if (error)
-        TLogger::LogError(error);
+        TLogger::LogError(error, "Can't append property to key-value store");
     return error;
 }
 

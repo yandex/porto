@@ -21,7 +21,7 @@ void TLogger::LogAction(const std::string &action, bool error, int errcode) {
 
 void TLogger::LogError(const TError &e, const std::string &s) {
     if (e)
-        std::cerr << "Error(" << rpc::EError_Name(e.GetError()) << "): " << e.GetMsg() << " - " << s << std::endl;
+        std::cerr << "Error(" << rpc::EError_Name(e.GetError()) << "): " << s << ": " << e.GetMsg() << std::endl;
 }
 
 void TLogger::LogRequest(const std::string &message) {

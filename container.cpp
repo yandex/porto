@@ -80,7 +80,7 @@ struct TData {
         uint64_t val;
         TError error = subsys->Usage(cg, val);
         if (error) {
-            TLogger::LogError(error);
+            TLogger::LogError(error, "Can't get CPU usage");
             return "-1";
         }
 
@@ -98,7 +98,7 @@ struct TData {
         uint64_t val;
         TError error = subsys->Usage(cg, val);
         if (error) {
-            TLogger::LogError(error);
+            TLogger::LogError(error, "Can't get CPU usage");
             return "-1";
         }
 
@@ -224,7 +224,7 @@ TError TContainer::Stop() {
     vector<pid_t> reap;
     TError error = cg->GetTasks(reap);
     if (error)
-        TLogger::LogError(error);
+        TLogger::LogError(error, "Can't read tasks list while stopping container");
 
     // try to stop all tasks gracefully
     cg->Kill(SIGTERM);
@@ -234,7 +234,7 @@ TError TContainer::Stop() {
     TSubsystem::Freezer()->Freeze(*cg);
     error = cg->GetTasks(reap);
     if (error)
-        TLogger::LogError(error);
+        TLogger::LogError(error, "Can't read tasks list while stopping container");
     cg->Kill(SIGKILL);
     TSubsystem::Freezer()->Unfreeze(*cg);
 

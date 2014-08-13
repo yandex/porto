@@ -57,7 +57,7 @@ void TFreezerSubsystem::WaitState(TCgroup &cg, const std::string &state) {
     do {
         TError error = cg.GetKnobValue("freezer.state", s);
         if (error)
-            TLogger::LogError(error);
+            TLogger::LogError(error, "Can't freeze cgroup");
     } while (s != state);
 }
 

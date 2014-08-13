@@ -277,7 +277,7 @@ TError TTask::Start() {
     ret = pipe2(pfd, O_CLOEXEC);
     if (ret) {
         TError error(EError::Unknown, errno, "pipe2(pdf)");
-        TLogger::LogError(error);
+        TLogger::LogError(error, "Can't create communication pipe for child");
         return error;
     }
 
@@ -289,7 +289,7 @@ TError TTask::Start() {
                       CLONE_NEWNS | CLONE_NEWPID, this);
     if (pid < 0) {
         TError error(EError::Unknown, errno, "fork()");
-        TLogger::LogError(error);
+        TLogger::LogError(error, "Can't spawn child");
         return error;
     }
 
@@ -298,7 +298,7 @@ TError TTask::Start() {
     int n = read(rfd, &ret, sizeof(ret));
     if (n < 0) {
         TError error(EError::Unknown, errno, "read(rfd)");
-        TLogger::LogError(error);
+        TLogger::LogError(error, "Can't read result from the child");
         return error;
     } else if (n == 0) {
         state = Running;
@@ -308,7 +308,7 @@ TError TTask::Start() {
         (void)waitpid(pid, NULL, WNOHANG);
         exitStatus.error = ret;
         TError error(EError::Unknown, "child returned " + to_string(ret));
-        TLogger::LogError(error);
+        TLogger::LogError(error, "Child process couldn't exec");
         return error;
     }
 }
@@ -350,7 +350,7 @@ void TTask::Reap() {
     int ret = waitpid(pid, NULL, 0);
     if (ret != pid) {
         TError error(EError::Unknown, errno, "waitpid(" + to_string(pid) + ")");
-        TLogger::LogError(error);
+        TLogger::LogError(error, "Can't reap child process");
     }
 }
 
@@ -361,7 +361,7 @@ void TTask::Kill(int signal) {
     int ret = kill(pid, signal);
     if (ret != 0) {
         TError error(EError::Unknown, errno, "kill(" + to_string(pid) + ")");
-        TLogger::LogError(error);
+        TLogger::LogError(error, "Can't kill child process");
     }
 }
 
@@ -369,7 +369,7 @@ std::string TTask::GetStdout() {
     string s;
     TFile f(stdoutFile);
     TError e = f.AsString(s);
-    TLogger::LogError(e);
+    TLogger::LogError(e, "Can't read container stdout");
     return s;
 }
 
@@ -377,6 +377,6 @@ std::string TTask::GetStderr() {
     string s;
     TFile f(stderrFile);
     TError e = f.AsString(s);
-    TLogger::LogError(e);
+    TLogger::LogError(e, "Can't read container stderr");
     return s;
 }
