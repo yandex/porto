@@ -1,0 +1,14 @@
+#!/bin/sh
+# prerm script
+case "$1" in
+    purge|remove|upgrade)
+    ;;
+    failed-upgrade|abort-install|abort-upgrade|disappear)
+    ;;
+    *)
+        echo "prerm called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+exit 0
