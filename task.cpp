@@ -277,7 +277,7 @@ TError TTask::Start() {
     ret = pipe2(pfd, O_CLOEXEC);
     if (ret) {
         TLogger::LogAction("pipe2", ret == 0, errno);
-        return TError(EError::Unknown, errno, "pipe2()");
+        return TError(EError::Unknown, errno, "pipe2(pdf)");
     }
 
     rfd = pfd[0];
@@ -359,8 +359,7 @@ std::string TTask::GetStdout() {
     string s;
     TFile f(stdoutFile);
     TError e = f.AsString(s);
-    if (e)
-        TLogger::LogError(e);
+    TLogger::LogError(e);
     return s;
 }
 
@@ -368,7 +367,6 @@ std::string TTask::GetStderr() {
     string s;
     TFile f(stderrFile);
     TError e = f.AsString(s);
-    if (e)
-        TLogger::LogError(e);
+    TLogger::LogError(e);
     return s;
 }

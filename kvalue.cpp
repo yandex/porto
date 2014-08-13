@@ -149,7 +149,7 @@ TError TKeyValueStorage::Restore(std::map<std::string, kv::TNode> &map) {
         map[name] = node;
     }
 
-    return TError();
+    return TError::Success;
 }
 
 TError TKeyValueStorage::Dump() {
@@ -182,5 +182,5 @@ TError TKeyValueStorage::Dump() {
         }
     }
 
-    return TError();
+    return TError::Success;
 }

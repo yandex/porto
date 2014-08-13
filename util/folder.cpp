@@ -15,7 +15,7 @@ TFolder::TFolder(TFile file) : path(file.Path()) {}
 
 TError TFolder::Create(mode_t mode) {
     if (mkdir(path.c_str(), mode) < 0)
-        return TError(EError::Unknown, errno, "mkdir(" + path + ")");
+        return TError(EError::Unknown, errno, "mkdir(" + path + ", " + to_string(mode) + ")");
 
     return TError::Success();
 }
@@ -49,7 +49,7 @@ TError TFolder::Remove(bool recursive) {
 
 TError TFolder::Rename(const std::string &newname) {
     //TODO
-    return TError(EError::Unknown, "TODO");
+    return TError(EError::Unknown, "Rename: TODO");
 }
 
 bool TFolder::Exists() {
@@ -75,7 +75,7 @@ TError TFolder::Items(const TFile::EFileType type, std::vector<std::string> &lis
 
     dirp = opendir(path.c_str());
     if (!dirp)
-        return TError(EError::Unknown, "Cannot open folder " + path);
+        return TError(EError::Unknown, "Cannot open directory " + path);
 
     while (!readdir_r(dirp, &dp, &res) && res != nullptr) {
         if (string(".") == res->d_name || string("..") == res->d_name)
@@ -96,5 +96,5 @@ TError TFolder::Items(const TFile::EFileType type, std::vector<std::string> &lis
     }
 
     closedir(dirp);
-    return TError();
+    return TError::Success();
 }

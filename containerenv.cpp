@@ -25,6 +25,6 @@ TError TContainerEnv::Attach() {
             return error;
     }
 
-    return TError();
+    return TError::Success;
 }
 

@@ -197,9 +197,8 @@ TError TContainer::Start() {
         return ret;
     }
 
-    if (!spec.Get("command").length()) {
+    if (!spec.Get("command").length())
         return TError(EError::InvalidValue, "invalid container command");
-    }
 
     TTaskEnv taskEnv(spec.Get("command"), "", spec.Get("user"), spec.Get("group"), spec.Get("env"));
     task = unique_ptr<TTask>(new TTask(taskEnv, leaf_cgroups));

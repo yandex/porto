@@ -45,14 +45,14 @@ bool TContainerSpec::IsDynamic(const std::string &property) {
 
 TError TContainerSpec::Set(const string &property, const string &value) {
     if (propertySpec.find(property) == propertySpec.end()) {
-        TError error(EError::Unknown, "property not found");
+        TError error(EError::InvalidValue, "property not found");
         TLogger::LogError(error);
         return error;
     }
 
     if (propertySpec[property].Valid &&
         !propertySpec[property].Valid(value)) {
-        TError error(EError::Unknown, "invalid property value");
+        TError error(EError::InvalidValue, "invalid property value");
         TLogger::LogError(error);
         return error;
     }
