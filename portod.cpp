@@ -65,22 +65,30 @@ static int AcceptClient(int sfd, std::vector<int> &clients)
     return 0;
 }
 
-static volatile sig_atomic_t done = false;
-static volatile sig_atomic_t hup = false;
-static volatile sig_atomic_t RaiseSignal = 0;
+static volatile sig_atomic_t Done = false;
+static volatile sig_atomic_t Cleanup = true;
+static volatile sig_atomic_t Hup = false;
+static volatile sig_atomic_t RaiseSignum = 0;
 
-static void Stop(int signum)
+static void DoExit(int signum)
 {
-    done = true;
-    RaiseSignal = signum;
+    Done = true;
+    Cleanup = false;
+    RaiseSignum = signum;
 }
 
-/*
-static void Hangup(int signum)
+static void DoExitAndCleanup(int signum)
 {
-    hup = true;
+    Done = true;
+    Cleanup = true;
+    RaiseSignum = signum;
 }
-*/
+
+static void DoHangup(int signum)
+{
+    Hup = true;
+    DoExit(signum);
+}
 
 static bool AnotherInstanceRunning(const string &path)
 {
@@ -118,7 +126,7 @@ static int RpcMain(TContainerHolder &cholder) {
         return -1;
     }
 
-    while (!done) {
+    while (!Done) {
         struct pollfd fds[MAX_CONNECTIONS];
         memset(fds, 0, sizeof(fds));
 
@@ -130,9 +138,9 @@ static int RpcMain(TContainerHolder &cholder) {
         fds[MAX_CLIENTS].fd = sfd;
         fds[MAX_CLIENTS].events = POLLIN | POLLHUP;
 
-        if (hup) {
+        if (Hup) {
             // TODO: reread config; rotate logs
-            hup = false;
+            Hup = false;
         }
 
         ret = poll(fds, MAX_CONNECTIONS, POLL_TIMEOUT_MS);
@@ -170,8 +178,14 @@ static int RpcMain(TContainerHolder &cholder) {
     return ret;
 }
 
-void KvDump()
-{
+static void ReaiseSignal(int signum) {
+    signal(SIGTERM, SIG_DFL);
+    signal(SIGINT, SIG_DFL);
+    signal(SIGHUP, SIG_DFL);
+    raise(signum);
+}
+
+void KvDump() {
         TKeyValueStorage storage;
         storage.Dump();
 }
@@ -197,12 +211,13 @@ int main(int argc, char * const argv[])
     // in case client closes pipe we are writing to in the protobuf code
     signal(SIGPIPE, SIG_IGN);
 
-    // do proper cleanup in case of a deadly signal
+    // don't stop containers when terminating
     // don't catch SIGQUIT, may be useful to create core dump
-    signal(SIGTERM, Stop);
-    signal(SIGINT, Stop);
-    signal(SIGHUP, Stop);
-    //signal(SIGHUP, Hangup);
+    signal(SIGTERM, DoExit);
+    signal(SIGHUP, DoHangup);
+
+    // kill all running containers in case of SIGINT (useful for debugging)
+    signal(SIGINT, DoExitAndCleanup);
 
     if (AnotherInstanceRunning(RPC_SOCK_PATH)) {
         std::cerr << "Another instance of portod is running!" << std::endl;
@@ -239,6 +254,8 @@ int main(int argc, char * const argv[])
         }
 
         ret = RpcMain(cholder);
+        if (!Cleanup && RaiseSignum)
+            ReaiseSignal(RaiseSignum);
     } catch (string s) {
         cout << s << endl;
         ret = EXIT_FAILURE;
@@ -253,11 +270,8 @@ int main(int argc, char * const argv[])
     RemovePidFile(PID_FILE);
     RemoveRpcServer(RPC_SOCK_PATH);
 
-    signal(SIGTERM, SIG_DFL);
-    signal(SIGINT, SIG_DFL);
-    signal(SIGHUP, SIG_DFL);
-    if (RaiseSignal)
-        raise(RaiseSignal);
+    if (RaiseSignum)
+        ReaiseSignal(RaiseSignum);
 
     return ret;
 }
