@@ -121,8 +121,12 @@ TError TCgroup::Create() {
                 return NoError;
         }
 
-        if (mount_root)
-            root.Mount();
+        if (mount_root) {
+            TError error = root.Mount();
+            TLogger::LogError(error, "Can't mount root cgroup");
+            if (error)
+                return error;
+        }
     } else
         parent->Create();
 
@@ -130,15 +134,22 @@ TError TCgroup::Create() {
     if (!f.Exists())
         f.Create(mode);
 
-    if (IsRoot())
-        mount->Mount();
+    if (IsRoot()) {
+        TError error = mount->Mount();
+        TLogger::LogError(error, "Can't mount root cgroup for root container");
+        if (error)
+            return error;
+    }
 
     return NoError;
 }
 
 TError TCgroup::Remove() {
     if (IsRoot()) {
-        mount->Umount();
+        TError error = mount->Umount();
+        TLogger::LogError(error, "Can't umount root cgroup for root container");
+        if (error)
+            return error;
     } else {
         // at this point we should have gracefully terminated all tasks
         // in the container; if anything is still alive we have no other choice
@@ -186,8 +197,10 @@ TError TCgroup::SetKnobValue(const std::string &knob, const std::string &value, 
 }
 
 TError TCgroup::Attach(int pid) {
-    if (!IsRoot())
-        return SetKnobValue("cgroup.procs", to_string(pid), true);
+    if (!IsRoot()) {
+        TError error = SetKnobValue("cgroup.procs", to_string(pid), true);
+        TLogger::LogError(error, "Can't attach " + to_string(pid) + " to " + name);
+    }
 
     return NoError;
 }

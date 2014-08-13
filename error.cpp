@@ -10,8 +10,12 @@ TError::TError(EError e, std::string description) :
     error(e), description(description) {
 }
 
-TError::TError(EError e, int err) :
-    error(e), description(strerror(err)) {
+TError::TError(EError e, int err, std::string _d) :
+    error(e) {
+    if (_d.length())
+        description = _d;
+    else
+        description = strerror(err);
 }
 
 TError::operator bool() const {

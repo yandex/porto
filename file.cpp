@@ -46,10 +46,9 @@ TFile::EFileType TFile::Type() {
 TError TFile::Remove() {
     int ret = unlink(path.c_str());
 
-    TLogger::LogAction("unlink " + path, ret, errno);
-
     if (ret && (errno != ENOENT))
-        return TError(TError::Unknown, errno);
+        return TError(TError::Unknown, errno, "unlink " + path);
+
     return NoError;
 }
 
@@ -116,11 +115,9 @@ TError TFile::WriteStringNoAppend(const string &str) {
     ofstream out(path, ofstream::trunc);
     if (out.is_open()) {
         out << str;
-        TLogger::LogAction("write " + path, 0, 0);
         return NoError;
     } else {
-        TLogger::LogAction("write " + path, -1, errno);
-        return TError(TError::Unknown, errno);
+        return TError(TError::Unknown, errno, "write " + path);
     }
 }
 
@@ -128,10 +125,8 @@ TError TFile::AppendString(const string &str) {
     ofstream out(path, ofstream::out);
     if (out.is_open()) {
         out << str;
-        TLogger::LogAction("append " + path, 0, 0);
         return NoError;
     } else {
-        TLogger::LogAction("append " + path, -1, errno);
-        return TError(TError::Unknown, errno);
+        return TError(TError::Unknown, errno, "append " + path);
     }
 }

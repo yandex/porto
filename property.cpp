@@ -79,8 +79,10 @@ TContainerSpec::TContainerSpec(const std::string &name, const kv::TNode &node) :
 }
 
 TContainerSpec::~TContainerSpec() {
-    if (!IsRoot())
-        storage.RemoveNode(name);
+    if (!IsRoot()) {
+        TError error = storage.RemoveNode(name);
+        TLogger::LogError(error, "Can't remove key-value node " + name);
+    }
 }
 
 TError TContainerSpec::SyncStorage() {

@@ -61,18 +61,14 @@ public:
         int ret = mount(device.c_str(), mountpoint.c_str(), vfstype.c_str(),
                         mountflags, CommaSeparatedList(flags).c_str());
 
-        TLogger::LogAction("mount " + mountpoint, ret, errno);
-
         if (ret)
             return TError(TError::Unrecovable);
 
         return NoError;
     }
 
-    TError Umount () {
+    TError Umount() {
         int ret = umount(mountpoint.c_str());
-
-        TLogger::LogAction("umount " + mountpoint, ret, errno);
 
         if (ret)
             return TError(TError::Unrecovable);

@@ -118,7 +118,8 @@ void TKeyValueStorage::MountTmpfs() {
     if (!mnt.Exists())
         mnt.Create();
 
-    tmpfs.Mount();
+    TError error = tmpfs.Mount();
+    TLogger::LogError(error, "Can't mount key-valye tmpfs");
 }
 
 TError TKeyValueStorage::ListNodes(std::vector<std::string> &list) {

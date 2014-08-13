@@ -77,7 +77,7 @@ TError TFolder::Items(const TFile::EFileType type, std::vector<std::string> &lis
         return TError(TError::Unknown, "Cannot open folder " + path);
 
     while (!readdir_r(dirp, &dp, &res) && res != nullptr) {
-        if (!strcmp(".", res->d_name) || !strcmp ("..", res->d_name))
+        if (string(".") == res->d_name || string("..") == res->d_name)
             continue;
 
         static unordered_map<unsigned char, TFile::EFileType> d_type_to_type =

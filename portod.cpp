@@ -25,7 +25,7 @@ static const string PID_FILE = "/run/portod.pid";
 static void RemoveRpcServer(const string &path)
 {
     TFile f(path);
-    f.Remove();
+    (void)f.Remove();
 }
 
 static void HandleRequest(TContainerHolder &cholder, int fd)
@@ -112,7 +112,7 @@ static TError CreatePidFile(const string &path)
 static void RemovePidFile(const string &path)
 {
     TFile f(path);
-    f.Remove();
+    (void)f.Remove();
 }
 
 static int RpcMain(TContainerHolder &cholder) {
@@ -231,7 +231,8 @@ int main(int argc, char * const argv[])
 
     try {
         TKeyValueStorage storage;
-        storage.MountTmpfs();
+        // don't fail, try to recover anyway
+        (void)storage.MountTmpfs();
 
         TContainerHolder cholder;
         {

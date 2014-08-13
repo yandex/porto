@@ -15,7 +15,7 @@ public:
     };
 
     TError(EError e = NoError, std::string description = "");
-    TError(EError e, int err);
+    TError(EError e, int err, std::string description = "");
 
     // return true if non-successful
     operator bool() const;

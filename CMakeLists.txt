@@ -18,7 +18,7 @@ add_custom_target(version.hpp
     git log -1 "--format=format:const std::string GIT_REVISION = \"%H\";%n" HEAD > version.hpp
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} VERBATIM)
 
-add_executable(portod portod.cpp cgroup.cpp mount.cpp rpc.cpp protobuf.cpp container.cpp task.cpp file.cpp stringutil.cpp kvalue.cpp subsystem.cpp folder.cpp error.cpp property.cpp
+add_executable(portod portod.cpp cgroup.cpp mount.cpp rpc.cpp protobuf.cpp container.cpp task.cpp file.cpp stringutil.cpp kvalue.cpp subsystem.cpp folder.cpp error.cpp property.cpp log.cpp
     ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(portod version.hpp)
 target_link_libraries(portod ${PB} pthread)
