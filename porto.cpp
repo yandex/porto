@@ -55,6 +55,28 @@ public:
         cout << "list of commands:" << endl;
         for (ICmd *cmd : commands)
             cout << " " << left << setw(16) << cmd->GetName() << cmd->GetDescription() << endl;
+
+        int ret;
+        cout << endl << "list of properties:" << endl;
+        vector<TProperty> plist;
+        ret = api.Plist(plist);
+        if (ret)
+            cerr << "Can't list properties, error = " << ErrorName(ret) << endl;
+        else
+            for (auto p : plist)
+                cout << " " << left << setw(16) << p.name
+                     << setw(40) << p.description << endl;
+
+        cout << endl << "list of data:" << endl;
+        vector<TData> dlist;
+        ret = api.Dlist(dlist);
+        if (ret)
+            cerr << "Can't list data, error = " << ErrorName(ret) << endl;
+        else
+            for (auto d : dlist)
+                cout << " " << left << setw(16) << d.name
+                     << setw(40) << d.description << endl;
+
     }
 
     int Execute(int argc, char *argv[])
@@ -153,44 +175,6 @@ public:
                      << setw(40) << s << endl;
 
             }
-
-        return ret;
-    }
-};
-
-class TPropertyListCmd : public ICmd {
-public:
-    TPropertyListCmd() : ICmd("plist", 1, "", "list supported container properties") {}
-
-    int Execute(int argc, char *argv[])
-    {
-        vector<TProperty> plist;
-        int ret = api.Plist(plist);
-        if (ret)
-            cerr << "Can't list properties, error = " << ErrorName(ret) << endl;
-        else
-            for (auto p : plist)
-                cout << left << setw(40) << p.name
-                     << setw(40) << p.description << endl;
-
-        return ret;
-    }
-};
-
-class TDataListCmd : public ICmd {
-public:
-    TDataListCmd() : ICmd("dlist", 1, "", "list supported container data") {}
-
-    int Execute(int argc, char *argv[])
-    {
-        vector<TData> dlist;
-        int ret = api.Dlist(dlist);
-        if (ret)
-            cerr << "Can't list data, error = " << ErrorName(ret) << endl;
-        else
-            for (auto d : dlist)
-                cout << left << setw(40) << d.name
-                     << setw(40) << d.description << endl;
 
         return ret;
     }
@@ -345,8 +329,6 @@ int main(int argc, char *argv[])
         new TCreateCmd(),
         new TDestroyCmd(),
         new TListCmd(),
-        new TPropertyListCmd(),
-        new TDataListCmd(),
         new TStartCmd(),
         new TStopCmd(),
         new TPauseCmd(),
@@ -387,7 +369,7 @@ int main(int argc, char *argv[])
             }
 
         cerr << "Invalid command " << name << "!" << endl;
-    } catch (const char *err) {
+    } catch (string err) {
         cerr << err << endl;
     }
 

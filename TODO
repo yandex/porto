@@ -1,4 +1,3 @@
-- porto plist dlist into help
 - porto argument number handling is wrong
 - porto swap first to args to be able to do porto t create, porto t get X
 - porto get without arguments should print everythin
