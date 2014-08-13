@@ -4,7 +4,10 @@ PROJECT(yandex-porto)
 
 set(CMAKE_CXX_FLAGS "-O2 -Wall -std=c++11 -g")
 set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc")
-#set(CMAKE_CXX_COMPILER "g++-4.7")
+
+if(EXISTS "/usr/bin/g++-4.7")
+    set(CMAKE_CXX_COMPILER "g++-4.7")
+endif()
 
 find_library(PB NAMES libprotobuf.a)
 
