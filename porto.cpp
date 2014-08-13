@@ -322,6 +322,20 @@ public:
     }
 };
 
+void TryExec(int argc, char *argv[]) {
+    string name(argv[1]);
+
+    for (ICmd *cmd : commands)
+        if (cmd->GetName() == name) {
+            if (!cmd->ValidArgs(argc - 2, argv + 2)) {
+                Usage(cmd->GetName().c_str());
+                exit(EXIT_FAILURE);
+            }
+
+            exit(cmd->Execute(argc - 2, argv + 2));
+        }
+}
+
 int main(int argc, char *argv[])
 {
     commands = {
@@ -358,15 +372,17 @@ int main(int argc, char *argv[])
     }
 
     try {
-        for (ICmd *cmd : commands)
-            if (cmd->GetName() == name) {
-                if (!cmd->ValidArgs(argc - 2, argv + 2)) {
-                    Usage(cmd->GetName().c_str());
-                    return EXIT_FAILURE;
-                }
+        // porto <command> <arg2> <arg2>
+        TryExec(argc, argv);
 
-                return cmd->Execute(argc - 2, argv + 2);
-            }
+        // porto <arg1> <command> <arg2>
+        if (argc >= 2) {
+            char *p = argv[1];
+            argv[1] = argv[2];
+            argv[2] = p;
+
+            TryExec(argc, argv);
+        }
 
         cerr << "Invalid command " << name << "!" << endl;
     } catch (string err) {
