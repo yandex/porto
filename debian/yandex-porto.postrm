@@ -6,6 +6,7 @@ case "$1" in
         if [ $? -ne 0 ]; then
             echo "Group 'porto' does not remove!"
         fi
+        update-rc.d -f yandex-porto remove >/dev/null || exit $?
     ;;
     remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
     ;;

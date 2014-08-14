@@ -1,0 +1,26 @@
+#!/bin/sh
+# postinst script
+case "$1" in
+    configure)
+    ;;
+    install|upgrade)
+        if [ -e "/etc/init.d/yandex-porto" ] && [ ! -L "/etc/init.d/yandex-porto" ]; then
+            if [ "`md5sum \"/etc/init.d/yandex-porto\" | sed -e \"s/ .*//\"`" != \
+                "`dpkg-query -W -f='${Conffiles}' yandex-porto | sed -n -e \"\\\\' /etc/init.d/yandex-porto '{s/ obsolete$//;s/.* //p}\"`" ]
+            then
+                echo "Obsolete conffile /etc/init.d/yandex-porto has been modified by you, renaming to .dpkg-bak"
+                mv -f "/etc/init.d/yandex-porto" "/etc/init.d/yandex-porto.dpkg-bak"
+            else
+                rm -f "/etc/init.d/yandex-porto"
+            fi
+        fi
+    ;;
+    abort-upgrade)
+    ;;
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+exit 0

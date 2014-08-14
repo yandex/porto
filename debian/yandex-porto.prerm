@@ -1,9 +1,12 @@
 #!/bin/sh
 # prerm script
 case "$1" in
-    purge|remove|upgrade)
+    purge|remove)
+    if [ -e "/etc/init/yandex-porto.conf" ]; then
+        stop yandex-porto || true
+    fi
     ;;
-    failed-upgrade|abort-install|abort-upgrade|disappear)
+    upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
     ;;
     *)
         echo "prerm called with unknown argument \`$1'" >&2

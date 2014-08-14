@@ -1,0 +1,13 @@
+# yandex-porto - Porto is component of Nirvana.
+#
+# The Porto allows run processes with use linux namespaces.
+
+description	"Porto"
+author "Eugene Kilimchuk <ekilimchuk@yandex-team.ru>"
+
+start on runlevel [2345]
+
+expect fork
+respawn
+
+exec portod &

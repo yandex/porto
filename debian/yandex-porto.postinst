@@ -8,8 +8,14 @@ case "$1" in
                 echo "Group 'porto' does not create!" >&2
             fi
         fi
+        update-rc.d yandex-porto start 90 2 3 4 5 . || exit $?
     ;;
-    upgrade|abort-upgrade)
+    install|upgrade)
+        if [ -e "/etc/init/yandex-porto.conf" ]; then
+            start yandex-porto || exit $?
+        fi
+    ;;
+    abort-upgrade)
     ;;
     *)
         echo "postinst called with unknown argument \`$1'" >&2
