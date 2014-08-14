@@ -11,6 +11,8 @@ extern "C" {
 #include <unistd.h>
 #include <sys/types.h>
 #include <signal.h>
+#include <grp.h>
+#include <pwd.h>
 }
 
 using namespace std;
@@ -292,6 +294,147 @@ static void TestIsolation(TPortoAPI &api, const string &name) {
     Expect(ret == string("1\n"));
 }
 
+static string GetEnv(const string &pid) {
+    string env;
+    TFile f("/proc/" + pid + "/environ");
+    (void)f.AsString(env);
+
+    return env;
+}
+
+static void TestEnvironment(TPortoAPI &api, const string &name) {
+    string pid;
+
+    cerr << "Check default environment" << endl;
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+
+    string env = GetEnv(pid);
+    static const char empty_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
+        "HOME=/home/nobody\0"
+        "USER=nobody\0";
+
+    Expect(memcmp(empty_env, env.data(), sizeof(empty_env)) == 0);
+    ExpectSuccess(api.Stop(name));
+
+    cerr << "Check user-defined environment" << endl;
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.SetProperty(name, "env", "a=b;c=d;"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+
+    env = GetEnv(pid);
+    static const char ab_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
+        "a=b\0"
+        "c=d\0"
+        "HOME=/home/nobody\0"
+        "USER=nobody\0";
+
+    Expect(memcmp(ab_env, env.data(), sizeof(ab_env)) == 0);
+    ExpectSuccess(api.Stop(name));
+}
+
+static void GetUidGid(const string &pid, int &uid, int &gid) {
+    vector<string> st;
+    TFile f("/proc/" + pid + "/status");
+    (void)f.AsLines(st);
+
+    string name;
+    string stuid = st[7];
+    stringstream ssuid(stuid);
+
+    int euid, suid, fsuid;
+    ssuid >> name;
+    ssuid >> uid;
+    ssuid >> euid;
+    ssuid >> suid;
+    ssuid >> fsuid;
+
+    if (name != "Uid:" || uid != euid || euid != suid || suid != fsuid)
+        uid = -2;
+
+    string stgid = st[8];
+    stringstream ssgid(stgid);
+
+    int egid, sgid, fsgid;
+    ssgid >> name;
+    ssgid >> gid;
+    ssgid >> egid;
+    ssgid >> sgid;
+    ssgid >> fsgid;
+
+    if (name != "Gid:" || gid != egid || egid != sgid || sgid != fsgid)
+        gid = -2;
+}
+
+static int UserUid(const string &user) {
+    struct passwd *p = getpwnam(user.c_str());
+    if (!p)
+        return -1;
+    else
+        return p->pw_uid;
+}
+
+static int GroupGid(const string &group) {
+    struct group *g = getgrnam(group.c_str());
+    if (!g)
+        return -1;
+    else
+        return g->gr_gid;
+}
+
+static void TestUserGroup(TPortoAPI &api, const string &name) {
+    int uid, gid;
+    string pid;
+
+    cerr << "Check default user & group" << endl;
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+
+    GetUidGid(pid, uid, gid);
+
+    Expect(uid == UserUid("nobody"));
+    Expect(gid == GroupGid("nogroup"));
+    ExpectSuccess(api.Stop(name));
+
+    cerr << "Check custom user & group" << endl;
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.SetProperty(name, "user", "daemon"));
+    ExpectSuccess(api.SetProperty(name, "group", "bin"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+
+    GetUidGid(pid, uid, gid);
+
+    Expect(uid == UserUid("daemon"));
+    Expect(gid == GroupGid("bin"));
+    ExpectSuccess(api.Stop(name));
+}
+
+static string GetCwd(const string &pid) {
+    string lnk;
+    TFile f("/proc/" + pid + "/cwd");
+    (void)f.ReadLink(lnk);
+    return lnk;
+}
+
+static void TestCwd(TPortoAPI &api, const string &name) {
+    string pid;
+
+    cerr << "Check user defined working directory" << endl;
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.SetProperty(name, "cwd", "/tmp"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+
+    string cwd = GetCwd(pid);
+
+    Expect(cwd == "/tmp");
+    ExpectSuccess(api.Stop(name));
+}
+
 int Selftest() {
     TPortoAPI api;
 
@@ -304,14 +447,12 @@ int Selftest() {
         TestStreams(api, "a");
         TestLongRunning(api, "a");
         TestIsolation(api, "a");
+        TestEnvironment(api, "a");
+        TestUserGroup(api, "a");
+        TestCwd(api, "a");
         ExpectSuccess(api.Destroy("a"));
-
-
-        // TODO: test environment parsing
-        // TODO: test user/group parsing
-
     } catch (string e) {
-        cerr << "Exception: " << e << endl;
+        cerr << "EXCEPTION: " << e << endl;
         return 1;
     }
 

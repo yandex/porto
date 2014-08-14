@@ -24,6 +24,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
     {"user", { "start command with given user", "nobody", false, ValidUser }},
     {"group", { "start command with given group", "nogroup", false, ValidGroup }},
     {"env", { "container environment variables" }},
+    {"cwd", { "container working directory", "" }},
 };
 
 string TContainerSpec::Get(const string &property) {
