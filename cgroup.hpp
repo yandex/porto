@@ -71,8 +71,7 @@ class TCgroupSnapshot {
     std::vector<std::shared_ptr<TCgroup> > cgroups;
     std::unordered_map<std::string, std::shared_ptr<TSubsystem>> subsystems; // can be net_cls _or_ net_prio
 public:
-    TCgroupSnapshot();
-
+    TError Create();
     friend std::ostream& operator<<(std::ostream& os, const TCgroupSnapshot& st);
 };
 

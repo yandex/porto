@@ -106,7 +106,7 @@ TError TCgroup::Create() {
         set<shared_ptr<TMount>> mounts;
         TError error = ms.Mounts(mounts);
         if (error) {
-            TLogger::LogError(error, "Can't create mount snapshow");
+            TLogger::LogError(error, "Can't create mount snapshot");
             return error;
         }
 
@@ -241,14 +241,14 @@ ostream& operator<<(ostream& os, const TCgroup& cg) {
 }
 
 // TCgroupSnapshot
-TCgroupSnapshot::TCgroupSnapshot() {
+TError TCgroupSnapshot::Create() {
     TMountSnapshot ms;
 
     set<shared_ptr<TMount>> mounts;
     TError error = ms.Mounts(mounts);
     if (error) {
-        TLogger::LogError(error, "Can't create mount snapshow");
-        //return error;
+        TLogger::LogError(error, "Can't create mount snapshot");
+        return error;
     }
 
     static set<string> supported_subsystems =
@@ -282,6 +282,8 @@ TCgroupSnapshot::TCgroupSnapshot() {
         for (auto cg : root->FindChildren())
             cgroups.push_back(cg);
     }
+
+    return TError::Success();
 }
 
 ostream& operator<<(ostream& os, const TCgroupSnapshot& st) {
