@@ -13,7 +13,6 @@ public:
     TFolder(const std::string &path) : path(path) {}
     TFolder(TFile file) : path(file.Path()) {}
 
-
     bool Exists();
     TError Create(mode_t mode = 0x755);
     TError Remove(bool recursive = false);

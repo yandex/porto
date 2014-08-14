@@ -251,9 +251,14 @@ int main(int argc, char * const argv[])
 
         {
             TCgroupSnapshot cs;
-            std::map<std::string, kv::TNode> m;
+            TError error = cs.Create();
+            if (error) {
+                cerr << "Couldn't create cgroup snapshot!" << endl;
+                // TODO: report user?!
+            }
 
-            TError error = storage.Restore(m);
+            std::map<std::string, kv::TNode> m;
+            error = storage.Restore(m);
             if (error) {
                 cerr << "Couldn't restore state!" << endl;
                 // TODO: report user?!

@@ -34,7 +34,7 @@ TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems) :
 
     mount = make_shared<TMount>("cgroup", tmpfs + "/" +
                                 CommaSeparatedList(flags),
-                                "cgroup", 0, flags);
+                                "cgroup", flags);
 }
 
 TCgroup::~TCgroup() {
@@ -103,10 +103,18 @@ TError TCgroup::Create() {
     if (IsRoot()) {
         TMountSnapshot ms;
 
-        TMount root("cgroup", tmpfs, "tmpfs", 0, set<string>{});
+        set<shared_ptr<TMount>> mounts;
+        TError error = ms.Mounts(mounts);
+        if (error) {
+            TLogger::LogError(error, "Can't create mount snapshot");
+            return error;
+        }
+
+
+        TMount root("cgroup", tmpfs, "tmpfs", {});
         bool mount_root = true;
 
-        for (auto m : ms.Mounts()) {
+        for (auto m : mounts) {
             if (*m == root)
                 mount_root = false;
             if (*m == *mount)
@@ -233,15 +241,22 @@ ostream& operator<<(ostream& os, const TCgroup& cg) {
 }
 
 // TCgroupSnapshot
-TCgroupSnapshot::TCgroupSnapshot() {
+TError TCgroupSnapshot::Create() {
     TMountSnapshot ms;
+
+    set<shared_ptr<TMount>> mounts;
+    TError error = ms.Mounts(mounts);
+    if (error) {
+        TLogger::LogError(error, "Can't create mount snapshot");
+        return error;
+    }
 
     static set<string> supported_subsystems =
         {"cpuset", "cpu", "cpuacct", "memory",
          "devices", "freezer", "net_cls", "net_prio", "blkio",
          "perf_event", "hugetlb", "name=systemd"};
 
-    for (auto mount : ms.Mounts()) {
+    for (auto mount : mounts) {
         set<string> flags = mount->Flags();
         set<string> cs;
 
@@ -267,6 +282,8 @@ TCgroupSnapshot::TCgroupSnapshot() {
         for (auto cg : root->FindChildren())
             cgroups.push_back(cg);
     }
+
+    return TError::Success();
 }
 
 ostream& operator<<(ostream& os, const TCgroupSnapshot& st) {
