@@ -16,15 +16,11 @@ class TMount {
     std::string vfstype;
     std::set<std::string> flags;
 
-    unsigned long mountflags = 0;
-
 public:
-    TMount(const std::string &mounts_line);
-
     TMount(const std::string &device, const std::string &mountpoint, const std::string &vfstype,
-           unsigned long mountflags, std::set<std::string> flags) :
+           std::set<std::string> flags) :
         device (device), mountpoint (mountpoint), vfstype (vfstype),
-        flags (flags), mountflags (mountflags) {}
+        flags (flags) {}
 
     friend std::ostream& operator<<(std::ostream& os, const TMount& m) {
         os << m.device << " " << m.mountpoint << " ";
@@ -56,19 +52,13 @@ public:
         return flags;
     }
 
-    TError Mount();
+    TError Mount(bool rdonly = false, bool bind = false);
     TError Umount();
 };
 
 class TMountSnapshot {
-    std::set<std::shared_ptr<TMount> > mounts;
-
 public:
-    TMountSnapshot();
-
-    std::set<std::shared_ptr<TMount> > const& Mounts();
-
-    friend std::ostream& operator<<(std::ostream& os, const TMountSnapshot& ms);
+    TError Mounts(std::set<std::shared_ptr<TMount>> &mounts);
 };
 
 #endif

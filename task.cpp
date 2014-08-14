@@ -127,7 +127,7 @@ static int child_fn(void *arg) {
 }
 
 int TTask::ChildCallback() {
-    TMount proc("proc", "/proc", "proc", 0, {});
+    TMount proc("proc", "/proc", "proc", {});
     if (proc.Mount()) {
         Syslog(string("remount procfs: ") + strerror(errno));
         ReportResultAndExit(wfd, -errno);

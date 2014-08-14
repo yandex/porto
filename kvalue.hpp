@@ -17,7 +17,7 @@ class TKeyValueStorage {
     TError ListNodes(std::vector<std::string> &list);
 
 public:
-    void MountTmpfs();
+    TError MountTmpfs();
 
     TKeyValueStorage();
     TError LoadNode(const std::string &name, kv::TNode &node);

@@ -14,7 +14,7 @@ extern "C" {
 using namespace std;
 
 TKeyValueStorage::TKeyValueStorage() :
-    tmpfs("tmpfs", "/tmp/porto", "tmpfs", 0, {"size=32m"}) {
+    tmpfs("tmpfs", "/tmp/porto", "tmpfs", {"size=32m"}) {
 }
 
 string TKeyValueStorage::Path(const string &name) {
@@ -108,19 +108,27 @@ TError TKeyValueStorage::RemoveNode(const std::string &name) {
     return node.Remove();
 }
 
-void TKeyValueStorage::MountTmpfs() {
+TError TKeyValueStorage::MountTmpfs() {
     TMountSnapshot ms;
 
-    for (auto m : ms.Mounts())
+    set<shared_ptr<TMount>> mounts;
+    TError error = ms.Mounts(mounts);
+    if (error) {
+        TLogger::LogError(error, "Can't create mount snapshot");
+        return error;
+    }
+
+    for (auto m : mounts)
         if (m->Mountpoint() == tmpfs.Mountpoint())
-            return;
+            return TError::Success();
 
     TFolder mnt(tmpfs.Mountpoint());
     if (!mnt.Exists())
         mnt.Create();
 
-    TError error = tmpfs.Mount();
+    error = tmpfs.Mount();
     TLogger::LogError(error, "Can't mount key-value tmpfs");
+    return error;
 }
 
 TError TKeyValueStorage::ListNodes(std::vector<std::string> &list) {

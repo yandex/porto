@@ -5,10 +5,17 @@
 #include "util/string.hpp"
 #include "log.hpp"
 
+extern "C" {
+#include <stdio.h>
+#include <mntent.h>
+}
+
 using namespace std;
 
-TError TMount::Mount() {
+TError TMount::Mount(bool rdonly, bool bind) {
     TLogger::Log("mount " + mountpoint);
+    int mountflags = (rdonly ? MS_RDONLY : 0) |
+                    (bind ? MS_BIND : 0);
 
     int ret = mount(device.c_str(), mountpoint.c_str(), vfstype.c_str(),
                     mountflags, CommaSeparatedList(flags).c_str());
@@ -30,41 +37,23 @@ TError TMount::Umount() {
     return TError::Success();
 }
 
-// from single /proc/self/mounts line, like:
-// /dev/sda1 /boot ext4 rw,seclabel,relatime,data=ordered 0 0
-TMount::TMount(const string &mounts_line) {
-    istringstream ss(mounts_line);
-    string flag_string, t;
-    ss >> device >> mountpoint >> vfstype >> flag_string;
+TError TMountSnapshot::Mounts(std::set<std::shared_ptr<TMount>> &mounts) {
+    FILE* f = setmntent("/proc/self/mounts", "r");
+    struct mntent* m;
+    while ((m = getmntent(f)) != NULL) {
+           vector<string> vflags;
+           set<string> flags;
 
-    for (auto i = flag_string.begin(); i != flag_string.end(); i++) {
-        if (*i == ',' && !t.empty()) {
-            flags.insert(t);
-            t.clear();
-        } else
-            t += *i;
+           TError error = SplitString(m->mnt_opts, ',', vflags);
+           if (error)
+               return error;
+
+           for (auto kv : vflags)
+               flags.insert(kv);
+
+        mounts.insert(make_shared<TMount>(m->mnt_fsname, m->mnt_dir, m->mnt_type, flags));
     }
+    endmntent(f);
 
-    if (!t.empty())
-        flags.insert(t);
-}
-
-TMountSnapshot::TMountSnapshot() {
-    TFile f("/proc/self/mounts");
-
-    vector<string> lines;
-    f.AsLines(lines);
-    for (auto line : lines)
-        mounts.insert(make_shared<TMount>(line));
-}
-
-set<shared_ptr<TMount> > const& TMountSnapshot::Mounts() {
-    return mounts;
-}
-
-ostream& operator<<(ostream& os, const TMountSnapshot& ms) {
-    for (auto m : ms.mounts)
-        os << *m << endl;
-
-    return os;
+    return TError::Success();
 }
