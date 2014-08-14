@@ -332,6 +332,17 @@ public:
     }
 };
 
+extern int Stresstest();
+class TStresstestCmd : public ICmd {
+public:
+    TStresstestCmd() : ICmd("stresstest", 0, "", "perform stresstest") {}
+
+    int Execute(int argc, char *argv[])
+    {
+        return Stresstest();
+    }
+};
+
 class TGetCmd : public ICmd {
 public:
     TGetCmd() : ICmd("get", 1, "<name> <data>", "get container property or data") {}
@@ -419,7 +430,8 @@ int main(int argc, char *argv[])
         new TGetDataCmd(),
         new TGetCmd(),
         new TRawCmd(),
-        new TSelftestCmd()
+        new TSelftestCmd(),
+        new TStresstestCmd(),
     };
 
     if (argc <= 1) {
