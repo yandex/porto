@@ -197,7 +197,7 @@ TError TContainer::Start() {
     if (!spec.Get("command").length())
         return TError(EError::InvalidValue, "invalid container command");
 
-    TTaskEnv taskEnv(spec.Get("command"), spec.Get("cwd"), spec.Get("user"), spec.Get("group"), spec.Get("env"));
+    TTaskEnv taskEnv(spec.Get("command"), spec.Get("cwd"), spec.Get("root"), spec.Get("user"), spec.Get("group"), spec.Get("env"));
     error = taskEnv.Prepare();
     if (error) {
         TLogger::LogError(error, "Can't prepare task environment");

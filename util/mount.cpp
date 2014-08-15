@@ -12,14 +12,14 @@ extern "C" {
 
 using namespace std;
 
-TError TMount::Mount(bool rdonly, bool bind) {
+TError TMount::Mount(bool rdonly, bool bind, bool remount) {
     TLogger::Log("mount " + mountpoint);
     int mountflags = (rdonly ? MS_RDONLY : 0) |
-                    (bind ? MS_BIND : 0);
+                    (bind ? MS_BIND : 0) |
+                    (remount ? MS_REMOUNT : 0);
 
     int ret = mount(device.c_str(), mountpoint.c_str(), vfstype.c_str(),
                     mountflags, CommaSeparatedList(flags).c_str());
-
     if (ret)
         return TError(EError::Unknown, errno, "mount(" + device + ", " + mountpoint + ", " + vfstype + ", " + to_string(mountflags) + ", " + CommaSeparatedList(flags) + ")");
 
@@ -30,7 +30,6 @@ TError TMount::Umount() {
     TLogger::Log("umount " + mountpoint);
 
     int ret = umount(mountpoint.c_str());
-
     if (ret)
         return TError(EError::Unknown, errno, "umount(" + mountpoint + ")");
 

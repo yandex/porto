@@ -262,7 +262,7 @@ static void TestLongRunning(TPortoAPI &api, const string &name) {
     Expect(GetNamespace("self", "ipc") == GetNamespace(pid, "ipc"));
     Expect(GetNamespace("self", "net") == GetNamespace(pid, "net"));
     Expect(GetNamespace("self", "user") == GetNamespace(pid, "user"));
-    Expect(GetNamespace("self", "uts") == GetNamespace(pid, "uts"));
+    Expect(GetNamespace("self", "uts") != GetNamespace(pid, "uts"));
 
     cerr << "Check that task cgroups are correct" << endl;
     auto cgmap = GetCgroups("self");
@@ -435,6 +435,28 @@ static void TestCwd(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.Stop(name));
 }
 
+/*
+static void TestRoot(TPortoAPI &api, const string &name) {
+    string pid;
+
+    cerr << "Check filesystem isolation" << endl;
+    ExpectSuccess(api.SetProperty(name, "command", "pwd"));
+    ExpectSuccess(api.SetProperty(name, "cwd", ""));
+    ExpectSuccess(api.SetProperty(name, "root", "/root/chroot"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+
+    string cwd = GetCwd(pid);
+    WaitPid(api, pid, name);
+
+    Expect(cwd == "/root/chroot");
+
+    string v;
+    ExpectSuccess(api.GetData(name, "stdout", v));
+    Expect(v == string("/\n"));
+}
+*/
+
 int Selftest() {
     TPortoAPI api;
 
@@ -450,6 +472,7 @@ int Selftest() {
         TestEnvironment(api, "a");
         TestUserGroup(api, "a");
         TestCwd(api, "a");
+        //TestRoot(api, "a");
         ExpectSuccess(api.Destroy("a"));
     } catch (string e) {
         cerr << "EXCEPTION: " << e << endl;

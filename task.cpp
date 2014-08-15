@@ -13,6 +13,7 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
+#include <sys/syscall.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <grp.h>
@@ -68,18 +69,9 @@ const char** TTaskEnv::GetEnvp() {
 
 // TTask
 int TTask::CloseAllFds(int except) {
-    close(0);
-    except = dup3(except, 0, O_CLOEXEC);
-    if (except < 0)
-        return except;
-
-    for (int i = 1; i < getdtablesize(); i++)
-        close(i);
-
-    except = dup3(except, 3, O_CLOEXEC);
-    if (except < 0)
-        return except;
-    close(0);
+    for (int i = 0; i < getdtablesize(); i++)
+        if (i != except)
+            close(i);
 
     return except;
 }
@@ -127,12 +119,6 @@ static int child_fn(void *arg) {
 }
 
 int TTask::ChildCallback() {
-    TMount proc("proc", "/proc", "proc", {});
-    if (proc.Mount()) {
-        Syslog(string("remount procfs: ") + strerror(errno));
-        ReportResultAndExit(wfd, -errno);
-    }
-
     close(rfd);
 
     /*
@@ -152,12 +138,17 @@ int TTask::ChildCallback() {
         ReportResultAndExit(wfd, -errno);
     }
 
-    if (env.cwd.length() && chdir(env.cwd.c_str()) < 0) {
-        Syslog(string("chdir(): ") + strerror(errno));
+    // remount proc so PID namespace works
+    TMount proc("proc", "/proc", "proc", {});
+    if (proc.Remount()) {
+        Syslog(string("remount procfs: ") + strerror(errno));
         ReportResultAndExit(wfd, -errno);
     }
 
+    // move to target cgroups
     for (auto cg : leaf_cgroups) {
+        Syslog(string("attach ") + to_string(getpid()));
+
         auto error = cg->Attach(getpid());
         if (error) {
             Syslog(string("cgroup attach: ") + error.GetMsg());
@@ -202,6 +193,72 @@ int TTask::ChildCallback() {
     ret = fchown(ret, env.uid, env.gid);
     if (ret < 0) {
         Syslog(string("fchown(2): ") + strerror(errno));
+        ReportResultAndExit(wfd, -errno);
+    }
+
+    TMount new_root(env.root, env.root + "/", "none", {});
+    TMount new_proc("proc", env.root + "/proc", "proc", {});
+    TMount new_sys("/sys", env.root + "/sys", "none", {});
+    TMount new_dev("/dev", env.root + "/dev", "none", {});
+    TMount new_var("/var", env.root + "/var", "none", {});
+    TMount new_run("/run", env.root + "/run", "none", {});
+    TMount new_tmp("/tmp", env.root + "/tmp", "none", {});
+
+    if (env.root.length()) {
+        if (new_root.Bind()) {
+            Syslog(string("remount /: ") + strerror(errno));
+            ReportResultAndExit(wfd, -errno);
+        }
+
+        if (new_tmp.Bind()) {
+            Syslog(string("remount /tmp: ") + strerror(errno));
+            ReportResultAndExit(wfd, -errno);
+        }
+
+        if (new_sys.Bind()) {
+            Syslog(string("remount /sys: ") + strerror(errno));
+            ReportResultAndExit(wfd, -errno);
+        }
+
+        if (new_run.Bind()) {
+            Syslog(string("remount /run: ") + strerror(errno));
+            ReportResultAndExit(wfd, -errno);
+        }
+
+        if (new_dev.Bind()) {
+            Syslog(string("remount /dev: ") + strerror(errno));
+            ReportResultAndExit(wfd, -errno);
+        }
+
+        if (new_var.Bind()) {
+            Syslog(string("remount /var: ") + strerror(errno));
+            ReportResultAndExit(wfd, -errno);
+        }
+
+        if (new_proc.Mount()) {
+            Syslog(string("remount /proc: ") + strerror(errno));
+            ReportResultAndExit(wfd, -errno);
+        }
+
+        if (chdir(env.root.c_str()) < 0) {
+            Syslog(string("chdir(): ") + strerror(errno));
+            ReportResultAndExit(wfd, -errno);
+        }
+
+        if (chroot(env.root.c_str()) < 0) {
+            Syslog(string("chroot(): ") + strerror(errno));
+            ReportResultAndExit(wfd, -errno);
+        }
+
+        if (chdir("/") < 0) {
+            Syslog(string("chdir(): ") + strerror(errno));
+            ReportResultAndExit(wfd, -errno);
+        }
+
+    }
+
+    if (env.cwd.length() && chdir(env.cwd.c_str()) < 0) {
+        Syslog(string("chdir(): ") + strerror(errno));
         ReportResultAndExit(wfd, -errno);
     }
 
@@ -286,7 +343,7 @@ TError TTask::Start() {
 
     char stack[8192];
     pid_t pid = clone(child_fn, stack + sizeof(stack),
-                      CLONE_NEWNS | CLONE_NEWPID, this);
+                      SIGCHLD | CLONE_NEWNS | CLONE_NEWPID | CLONE_NEWUTS, this);
     if (pid < 0) {
         TError error(EError::Unknown, errno, "fork()");
         TLogger::LogError(error, "Can't spawn child");
@@ -294,8 +351,8 @@ TError TTask::Start() {
     }
 
     close(wfd);
-
     int n = read(rfd, &ret, sizeof(ret));
+    close(rfd);
     if (n < 0) {
         TError error(EError::Unknown, errno, "read(rfd)");
         TLogger::LogError(error, "Can't read result from the child");
@@ -305,7 +362,12 @@ TError TTask::Start() {
         this->pid = pid;
         return TError::Success();
     } else {
-        (void)waitpid(pid, NULL, WNOHANG);
+        int p = waitpid(pid, NULL, 0);
+        if (p != pid) {
+            TError error(EError::Unknown, "waitpid() " + to_string(errno));
+            TLogger::LogError(error, "Couldn't reap child process");
+        }
+
         exitStatus.error = ret;
         TError error(EError::Unknown, "child returned " + to_string(ret));
         TLogger::LogError(error, "Child process couldn't exec");

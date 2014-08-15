@@ -1,4 +1,4 @@
-- remove all functionality from constructors and destructors
+- return error message along with the number
 - ? get exit_status from time to time in portod mail loop
 - sleeps & finite number of retries in cgroup kill
 - state recovery: kill freezed tasks fails

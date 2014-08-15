@@ -121,7 +121,7 @@ TError TFile::WriteStringNoAppend(const string &str) {
 }
 
 TError TFile::AppendString(const string &str) {
-    ofstream out(path, ofstream::out);
+    ofstream out(path, ofstream::app);
     if (out.is_open()) {
         out << str;
         return TError::Success();

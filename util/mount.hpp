@@ -52,7 +52,9 @@ public:
         return flags;
     }
 
-    TError Mount(bool rdonly = false, bool bind = false);
+    TError Mount(bool rdonly = false, bool bind = false, bool remount = false);
+    TError Remount() { return Mount(false, false, true); }
+    TError Bind() { return Mount(false, true); }
     TError Umount();
 };
 
