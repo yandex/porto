@@ -332,14 +332,14 @@ public:
     }
 };
 
-extern int Stresstest();
-class TStresstestCmd : public ICmd {
+extern int StressTest();
+class TStressTestCmd : public ICmd {
 public:
-    TStresstestCmd() : ICmd("stresstest", 0, "", "perform stresstest") {}
+    TStressTestCmd() : ICmd("stresstest", 0, "", "perform stresstest") {}
 
     int Execute(int argc, char *argv[])
     {
-        return Stresstest();
+        return StressTest();
     }
 };
 
@@ -431,7 +431,7 @@ int main(int argc, char *argv[])
         new TGetCmd(),
         new TRawCmd(),
         new TSelftestCmd(),
-        new TStresstestCmd(),
+        new TStressTestCmd(),
     };
 
     if (argc <= 1) {

@@ -17,14 +17,14 @@ static std::atomic<int> readers;
 static std::mutex write_lock;
 static bool run_status = true;
 
-static void Changerunstatus(bool status) {
+static void ChangeRunStatus(bool status) {
     write_lock.lock();
     while(readers > 0);
     run_status = status;
     write_lock.unlock();
 }
 
-static bool Runstatus() {
+static bool GetRunStatus() {
     bool res;
     write_lock.lock();
     readers++;
@@ -36,12 +36,12 @@ static bool Runstatus() {
 
 static void Tasks() {
     usleep(60000000);
-    Changerunstatus(false);
+    ChangeRunStatus(false);
     std::cout << "Tasks completed.\n";
 }
 
-static void Stresskill() {
-    while(Runstatus()) {
+static void StressKill() {
+    while(GetRunStatus()) {
         usleep(rand() % 2000000);
         TFile f(PID_FILE);
         int pid;
@@ -55,9 +55,9 @@ static void Stresskill() {
     }
 }
 
-int Stresstest() {
+int StressTest() {
     std::thread thr_tasks(Tasks);
-    std::thread thr_stress_kill(Stresskill);
+    std::thread thr_stress_kill(StressKill);
     
     thr_tasks.join();
     thr_stress_kill.join();
