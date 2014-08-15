@@ -1,6 +1,5 @@
 #include <iostream>
 #include <thread>
-#include <mutex>
 #include <atomic>
 #include <unistd.h>
 #include "util/file.hpp"
@@ -13,35 +12,16 @@ extern "C" {
 
 static const std::string PID_FILE = "/run/portod.pid";
 
-static std::atomic<int> readers;
-static std::mutex write_lock;
-static bool run_status = true;
-
-static void ChangeRunStatus(bool status) {
-    write_lock.lock();
-    while(readers > 0);
-    run_status = status;
-    write_lock.unlock();
-}
-
-static bool GetRunStatus() {
-    bool res;
-    write_lock.lock();
-    readers++;
-    write_lock.unlock();
-    res = run_status;
-    readers--;
-    return res;
-}
+static std::atomic<int> done;
 
 static void Tasks() {
     usleep(60000000);
-    ChangeRunStatus(false);
+    done++;
     std::cout << "Tasks completed.\n";
 }
 
 static void StressKill() {
-    while(GetRunStatus()) {
+    while (!done) {
         usleep(rand() % 2000000);
         TFile f(PID_FILE);
         int pid;
