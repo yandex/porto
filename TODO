@@ -1,4 +1,3 @@
-- fix SyncStorage
 - ? add zombie/ghost/dead state
 - return error message along with the number
 - ? get exit_status from time to time in portod mail loop

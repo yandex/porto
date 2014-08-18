@@ -96,23 +96,18 @@ TContainerSpec::~TContainerSpec() {
 }
 
 TError TContainerSpec::SyncStorage() {
-#if 0
     if (IsRoot())
         return TError::Success();
 
     kv::TNode node;
 
     for (auto &kv : data) {
-        kv::TNode node;
-
         auto pair = node.add_pairs();
         pair->set_key(kv.first);
         pair->set_val(kv.second);
     }
+
     return storage.SaveNode(name, node);
-#else
-    return TError::Success();
-#endif
 }
 
 TError TContainerSpec::AppendStorage(const string& key, const string& value) {
