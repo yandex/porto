@@ -193,8 +193,7 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.SetProperty(name, "command", "__invalid_command_name__"));
     ExpectFailure(api.Start(name), EError::Unknown);
     ExpectSuccess(api.GetData(name, "root_pid", pid));
-    // TODO: this may blow things up inside portod
-    Expect(pid == "0");
+    Expect(pid == "-1");
     ExpectSuccess(api.GetData(name, "exit_status", ret));
     Expect(ret == string("2 0 0"));
 }

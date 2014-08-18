@@ -93,7 +93,7 @@ TError CreateRpcServer(const std::string &path, int &fd)
     my_addr.sun_family = AF_UNIX;
     strncpy(my_addr.sun_path, path.c_str(), sizeof(my_addr.sun_path) - 1);
 
-    unlink(path.c_str());
+    (void)unlink(path.c_str());
 
     if (bind(fd, (struct sockaddr *) &my_addr,
              sizeof(struct sockaddr_un)) < 0) {

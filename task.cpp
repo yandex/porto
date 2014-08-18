@@ -14,7 +14,6 @@ extern "C" {
 #include <sys/wait.h>
 #include <sys/prctl.h>
 #include <sys/syscall.h>
-#include <sys/ptrace.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <grp.h>
@@ -102,12 +101,10 @@ TTask::~TTask() {
         TLogger::LogError(e, "Can't remove task stderr " + stdoutFile);
     }
 
-    if (fwdpid) {
-        (void)kill(fwdpid, SIGKILL);
-        (void)waitpid(fwdpid, NULL, 0);
+    if (pid) {
+        (void)kill(pid, SIGKILL);
+        (void)waitpid(pid, NULL, 0);
     }
-    (void)kill(pid, SIGKILL);
-    (void)waitpid(pid, NULL, 0);
 }
 
 static string GetTmpFile() {
@@ -391,7 +388,7 @@ int TTask::GetPid() {
     if (state == Started)
         return pid;
     else
-        return 0;
+        return -1;
 }
 
 bool TTask::IsRunning() {
@@ -413,16 +410,28 @@ TError TTask::Reap(bool wait) {
     pid_t ret;
     ret = waitpid(pid, &status, wait ? 0 : WNOHANG);
     if (ret == pid) {
-        exitStatus.signal = WTERMSIG(status);
-        exitStatus.status = WEXITSTATUS(status);
-        state = Stopped;
+        DeliverExitStatus(status);
     } else if (ret < 0) {
+        if (kill(pid, 0) == 0) {
+            // process is still running but we can't use wait() on it
+            // (probably from the previous session) -> state should
+            // be changed via DeliverExitStatus
+
+            return TError::Success();
+        }
+
         exitStatus.error = -1;
         state = Stopped;
         return TError(EError::Unknown, errno, "waitpid()");
     }
 
     return TError::Success();
+}
+
+void TTask::DeliverExitStatus(int status) {
+    exitStatus.signal = WTERMSIG(status);
+    exitStatus.status = WEXITSTATUS(status);
+    state = Stopped;
 }
 
 void TTask::Kill(int signal) {
@@ -452,86 +461,21 @@ std::string TTask::GetStderr() {
     return s;
 }
 
-static int exitfwd_fn(int pid) {
-    string name("fwd " + to_string(pid));
-    (void)prctl(PR_SET_NAME, name.c_str());
-
-    if (prctl(PR_SET_PDEATHSIG, SIGTERM) < 0) {
-        TError error(EError::Unknown, errno, "prctl(PR_SET_PDEATHSIG)");
-        TLogger::LogError(error, "Can't create forwarding process");
-        return -1;
-    }
-
-    if (ptrace(PTRACE_SEIZE, pid, NULL, 0) < 0) {
-        TError error(EError::Unknown, errno, "ptrace(PTRACE_SEIZE)");
-        TLogger::LogError(error, "Can't create forwarding process");
-        return -2;
-    }
-
-    /*
-    for (int i = 0; i < getdtablesize(); i++)
-        close(i);
-        */
-
-    for (int i = 0; i < 32; i++)
-        signal(i, SIG_DFL);
-
-    while (true) {
-        int status;
-        pid_t ret;
-
-        TLogger::Log("fwd waitpid");
-        ret = waitpid(pid, &status, __WALL);
-        TLogger::Log("fwd status = " + to_string(status));
-        if (ret == pid) {
-            if (WIFEXITED(status)) {
-                TLogger::Log("fwd exited = " + to_string(WEXITSTATUS(status)));
-                return WEXITSTATUS(status);
-            }
-
-            if (WIFSIGNALED(status)) {
-                TLogger::Log("fwd signaled = " + to_string(WTERMSIG(status)));
-                raise(WTERMSIG(status));
-                return -3;
-            }
-
-            if (WIFSTOPPED(status)) {
-                TLogger::Log("fwd stopped = " + to_string(WSTOPSIG(status)));
-                ptrace(PTRACE_SYSCALL, pid, 0, WSTOPSIG(status));
-            }
-        } else if (ret < 0) {
-            return -4;
-        }
-    }
-}
-
 TError TTask::Seize(int pid_) {
     exitStatus.error = 0;
     exitStatus.signal = 0;
     exitStatus.status = 0;
 
-    pid = fork();
-    if (pid < 0) {
-        state = Stopped;
-        pid = 0;
-        return TError(EError::Unknown, errno, "clone()");
-    } else if (pid == 0) {
-        exit(exitfwd_fn(pid_));
-    }
-
-    TLogger::Log("Started forwarding thread " + to_string(pid));
-    fwdpid = pid_;
+    pid = pid_;
     state = Started;
+
+    // TODO: recover stdout/stderr files
 
     return TError::Success();
 }
 
 TError TTask::ValidateCgroups() {
-    pid_t p = fwdpid ?: pid;
-
-    TFile f("/proc/" + to_string(p) + "/cgroup");
-
-    TLogger::Log(string("validate ") + "/proc/" + to_string(p) + "/cgroup");
+    TFile f("/proc/" + to_string(pid) + "/cgroup");
 
     vector<string> lines;
     map<string, string> cgmap;

@@ -72,6 +72,8 @@ public:
     TError GetData(const std::string &data, std::string &value);
     TError Restore(const kv::TNode &node);
 
+    bool DeliverExitStatus(int pid, int status);
+
     std::shared_ptr<TCgroup> GetCgroup(std::shared_ptr<TSubsystem> subsys);
 };
 
@@ -86,6 +88,7 @@ public:
     TError Restore(const std::string &name, const kv::TNode &node);
 
     void Destroy(const std::string &name);
+    bool DeliverExitStatus(int pid, int status);
 
     std::vector<std::string> List();
 };

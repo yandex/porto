@@ -1,6 +1,7 @@
 #include <vector>
 #include <algorithm>
 
+#include "porto.hpp"
 #include "version.hpp"
 #include "rpc.hpp"
 #include "cgroup.hpp"
@@ -8,6 +9,7 @@
 #include "util/protobuf.hpp"
 
 extern "C" {
+#include <fcntl.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -21,17 +23,14 @@ using namespace std;
 static const size_t MAX_CLIENTS = 16;
 static const size_t MAX_CONNECTIONS = MAX_CLIENTS + 1;
 static const size_t POLL_TIMEOUT_MS = 1000;
-static const string PID_FILE = "/run/portod.pid";
-static const string LOG_FILE = "/var/log/portod";
+static const int REAP_FD = 3;
 
-static void RemoveRpcServer(const string &path)
-{
+static void RemoveRpcServer(const string &path) {
     TFile f(path);
     (void)f.Remove();
 }
 
-static void HandleRequest(TContainerHolder &cholder, int fd)
-{
+static void HandleRequest(TContainerHolder &cholder, int fd) {
     google::protobuf::io::FileInputStream pist(fd);
     google::protobuf::io::FileOutputStream post(fd);
 
@@ -46,8 +45,7 @@ static void HandleRequest(TContainerHolder &cholder, int fd)
     }
 }
 
-static int AcceptClient(int sfd, std::vector<int> &clients)
-{
+static int AcceptClient(int sfd, std::vector<int> &clients) {
     int cfd;
     struct sockaddr_un peer_addr;
     socklen_t peer_addr_size;
@@ -59,7 +57,7 @@ static int AcceptClient(int sfd, std::vector<int> &clients)
         if (errno == EAGAIN)
             return 0;
 
-        std::cerr << "accept() error: " << strerror(errno) << std::endl;
+        TLogger::Log(string("accept() error: ") + strerror(errno));
         return -1;
     }
 
@@ -72,29 +70,25 @@ static volatile sig_atomic_t Cleanup = true;
 static volatile sig_atomic_t Hup = false;
 static volatile sig_atomic_t RaiseSignum = 0;
 
-static void DoExit(int signum)
-{
+static void DoExit(int signum) {
     Done = true;
     Cleanup = false;
     RaiseSignum = signum;
     TLogger::CloseLog();
 }
 
-static void DoExitAndCleanup(int signum)
-{
+static void DoExitAndCleanup(int signum) {
     Done = true;
     Cleanup = true;
     RaiseSignum = signum;
     TLogger::CloseLog();
 }
 
-static void DoHangup(int signum)
-{
+static void DoHangup(int signum) {
     Hup = true;
 }
 
-static bool AnotherInstanceRunning(const string &path)
-{
+static bool AnotherInstanceRunning(const string &path) {
     int fd;
     TError error = ConnectToRpcServer(path, fd);
 
@@ -105,17 +99,47 @@ static bool AnotherInstanceRunning(const string &path)
     return true;
 }
 
-static TError CreatePidFile(const string &path)
-{
+static TError CreatePidFile(const string &path) {
     TFile f(path);
 
     return f.WriteStringNoAppend(to_string(getpid()));
 }
 
-static void RemovePidFile(const string &path)
-{
+static void RemovePidFile(const string &path) {
     TFile f(path);
     (void)f.Remove();
+}
+
+static void ReapSpawner(int fd, TContainerHolder &cholder) {
+    struct pollfd fds[1];
+    int nr = 100;
+
+    fds[0].fd = fd;
+    fds[0].events = POLLIN | POLLHUP;
+
+    while (nr--) {
+        int ret = poll(fds, 1, 0);
+        if (ret < 0) {
+            TLogger::Log(string("poll() error: ") + strerror(errno));
+            break;
+        }
+
+        if (!fds[0].revents)
+            break;
+
+        int pid, status;
+        if (read(fd, &pid, sizeof(pid)) < 0) {
+            TLogger::Log(string("read(pid): ") + strerror(errno));
+            break;
+        }
+        if (read(fd, &status, sizeof(status)) < 0) {
+            TLogger::Log(string("read(status): ") + strerror(errno));
+            break;
+        }
+
+        if (!cholder.DeliverExitStatus(pid, status))
+            TLogger::Log("Can't deliver " + to_string(pid) + " exit status " + to_string(status));
+    }
 }
 
 static int RpcMain(TContainerHolder &cholder) {
@@ -123,9 +147,9 @@ static int RpcMain(TContainerHolder &cholder) {
     int sfd;
     std::vector<int> clients;
 
-    TError error = CreateRpcServer(RPC_SOCK_PATH, sfd);
+    TError error = CreateRpcServer(RPC_SOCK, sfd);
     if (error) {
-        cerr << "Can't create RPC server: " << error.GetMsg() << endl;
+        TLogger::Log("Can't create RPC server: " + error.GetMsg());
         return -1;
     }
 
@@ -143,7 +167,7 @@ static int RpcMain(TContainerHolder &cholder) {
 
         ret = poll(fds, MAX_CONNECTIONS, POLL_TIMEOUT_MS);
         if (ret < 0) {
-            std::cerr << "poll() error: " << strerror(errno) << std::endl;
+            TLogger::Log(string("poll() error: ") + strerror(errno));
 
             if (!Hup)
                 break;
@@ -154,6 +178,8 @@ static int RpcMain(TContainerHolder &cholder) {
             TLogger::OpenLog(LOG_FILE);
             Hup = false;
         }
+
+        (void)ReapSpawner(REAP_FD, cholder);
 
         if (fds[MAX_CLIENTS].revents && clients.size() < MAX_CLIENTS) {
             ret = AcceptClient(sfd, clients);
@@ -214,6 +240,13 @@ int main(int argc, char * const argv[])
         }
     }
 
+    TLogger::OpenLog(LOG_FILE);
+
+    if (fcntl(REAP_FD, F_SETFD, FD_CLOEXEC) < 0) {
+        TLogger::Log(string("Can't set close-on-exec flag on REAP_FD: ") + strerror(errno));
+        return EXIT_FAILURE;
+    }
+
     // in case client closes pipe we are writing to in the protobuf code
     signal(SIGPIPE, SIG_IGN);
 
@@ -225,17 +258,15 @@ int main(int argc, char * const argv[])
     // kill all running containers in case of SIGINT (useful for debugging)
     signal(SIGINT, DoExitAndCleanup);
 
-    if (AnotherInstanceRunning(RPC_SOCK_PATH)) {
-        std::cerr << "Another instance of portod is running!" << std::endl;
+    if (AnotherInstanceRunning(RPC_SOCK)) {
+        TLogger::Log("Another instance of portod is running!");
         return -1;
     }
 
     if (CreatePidFile(PID_FILE)) {
-        std::cerr << "Can't create pid file " << PID_FILE << "!" << std::endl;
+        TLogger::Log("Can't create pid file " + PID_FILE + "!");
         return -1;
     }
-
-    TLogger::OpenLog(LOG_FILE);
 
     try {
         TKeyValueStorage storage;
@@ -245,7 +276,7 @@ int main(int argc, char * const argv[])
         TContainerHolder cholder;
         TError error = cholder.CreateRoot();
         if (error) {
-            cerr << "Couldn't create root container" << endl;
+            TLogger::Log("Couldn't create root container");
             // TODO: report user?!
         }
 
@@ -253,21 +284,21 @@ int main(int argc, char * const argv[])
             TCgroupSnapshot cs;
             TError error = cs.Create();
             if (error) {
-                cerr << "Couldn't create cgroup snapshot!" << endl;
+                TLogger::Log("Couldn't create cgroup snapshot!");
                 // TODO: report user?!
             }
 
             std::map<std::string, kv::TNode> m;
             error = storage.Restore(m);
             if (error) {
-                cerr << "Couldn't restore state!" << endl;
+                TLogger::Log("Couldn't restore state!");
                 // TODO: report user?!
             }
 
             for (auto &r : m) {
                 TError e = cholder.Restore(r.first, r.second);
                 if (e) {
-                    cerr << "Couldn't restore " << r.first << " state!" << endl;
+                    TLogger::Log("Couldn't restore " + r.first + " state!");
                     // TODO: report user?!
                 }
             }
@@ -288,7 +319,7 @@ int main(int argc, char * const argv[])
     }
 
     RemovePidFile(PID_FILE);
-    RemoveRpcServer(RPC_SOCK_PATH);
+    RemoveRpcServer(RPC_SOCK);
 
     if (RaiseSignum)
         ReaiseSignal(RaiseSignum);

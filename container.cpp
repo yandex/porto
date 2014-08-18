@@ -224,7 +224,7 @@ TError TContainer::Start() {
         return error;
     }
 
-    spec.SetInternal("__pid", to_string(task->GetPid()));
+    spec.SetInternal("root_pid", to_string(task->GetPid()));
     state = Running;
 
     return TError::Success();
@@ -341,7 +341,7 @@ TError TContainer::Restore(const kv::TNode &node) {
 
     int pid;
     try {
-        pid = stoi(spec.GetInternal("__pid"));
+        pid = stoi(spec.GetInternal("root_pid"));
     } catch (...) {
         pid = 0;
     }
@@ -363,8 +363,6 @@ TError TContainer::Restore(const kv::TNode &node) {
         return error;
     }
 
-    TLogger::Log(name + ": " + to_string(__LINE__));
-    // make it possible to do waitpid on non-child task
     error = task->Seize(pid);
     if (error) {
         task = nullptr;
@@ -374,7 +372,6 @@ TError TContainer::Restore(const kv::TNode &node) {
         return error;
     }
 
-    TLogger::Log(name + ": " + to_string(__LINE__));
     error = task->ValidateCgroups();
     if (error) {
         task = nullptr;
@@ -384,9 +381,7 @@ TError TContainer::Restore(const kv::TNode &node) {
         return error;
     }
 
-    TLogger::Log(name + ": " + to_string(__LINE__));
     state = task->IsRunning() ? Running : Stopped;
-    TLogger::Log(name + ": " + to_string(__LINE__));
 
     return TError::Success();
 }
@@ -396,6 +391,17 @@ std::shared_ptr<TCgroup> TContainer::GetCgroup(shared_ptr<TSubsystem> subsys) {
         return TCgroup::GetRoot(subsys);
     else
         return TCgroup::Get(name, TCgroup::GetRoot(subsys));
+}
+
+bool TContainer::DeliverExitStatus(int pid, int status) {
+    if (!task)
+        return false;
+
+    if (task->GetPid() != pid)
+        return false;
+
+    task->DeliverExitStatus(status);
+    return true;
 }
 
 // TContainerHolder
@@ -462,4 +468,12 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
 
     containers[name] = c;
     return TError::Success();
+}
+
+bool TContainerHolder::DeliverExitStatus(int pid, int status) {
+    for (auto c : containers)
+        if (c.second->DeliverExitStatus(pid, status))
+            return true;
+
+    return false;
 }

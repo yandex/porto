@@ -1,3 +1,4 @@
+#include "porto.hpp"
 #include "libporto.hpp"
 
 using namespace std;
@@ -30,7 +31,7 @@ TPortoAPI::~TPortoAPI() {
 
 int TPortoAPI::Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
     if (fd < 0) {
-        TError error = ConnectToRpcServer(RPC_SOCK_PATH, fd);
+        TError error = ConnectToRpcServer(RPC_SOCK, fd);
         if (error)
             throw "Can't connect to RPC server: " + error.GetMsg();
     }

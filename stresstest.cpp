@@ -2,6 +2,8 @@
 #include <thread>
 #include <atomic>
 #include <unistd.h>
+
+#include "porto.hpp"
 #include "util/file.hpp"
 
 extern "C" {
@@ -9,8 +11,6 @@ extern "C" {
     #include <sys/types.h>
     #include <signal.h>
 }
-
-static const std::string PID_FILE = "/run/portod.pid";
 
 static std::atomic<int> done;
 
