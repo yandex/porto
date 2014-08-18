@@ -21,6 +21,7 @@ static void CreateContainer(TContainerHolder &cholder,
         }
         TError error(cholder.Create(req.name()));
         rsp.set_error(error.GetError());
+        rsp.set_errormsg(error.GetMsg());
     } catch (...) {
         rsp.Clear();
         rsp.set_error(EError::Unknown);
@@ -47,6 +48,7 @@ static void StartContainer(TContainerHolder &cholder,
 
     TError error(container->Start());
     rsp.set_error(error.GetError());
+    rsp.set_errormsg(error.GetMsg());
 }
 
 static void StopContainer(TContainerHolder &cholder,
@@ -61,6 +63,7 @@ static void StopContainer(TContainerHolder &cholder,
 
     TError error(container->Stop());
     rsp.set_error(error.GetError());
+    rsp.set_errormsg(error.GetMsg());
 }
 
 static void PauseContainer(TContainerHolder &cholder,
@@ -75,6 +78,7 @@ static void PauseContainer(TContainerHolder &cholder,
 
     TError error(container->Pause());
     rsp.set_error(error.GetError());
+    rsp.set_errormsg(error.GetMsg());
 }
 
 static void ResumeContainer(TContainerHolder &cholder,
@@ -89,6 +93,7 @@ static void ResumeContainer(TContainerHolder &cholder,
 
     TError error(container->Resume());
     rsp.set_error(error.GetError());
+    rsp.set_errormsg(error.GetMsg());
 }
 
 static void ListContainers(TContainerHolder &cholder,
@@ -118,6 +123,7 @@ static void GetContainerProperty(TContainerHolder &cholder,
     string value;
     TError error(container->GetProperty(req.property(), value));
     rsp.set_error(error.GetError());
+    rsp.set_errormsg(error.GetMsg());
     if (!error)
         rsp.mutable_getproperty()->set_value(value);
 }
@@ -139,6 +145,7 @@ static void SetContainerProperty(TContainerHolder &cholder,
 
     TError error(container->SetProperty(req.property(), req.value()));
     rsp.set_error(error.GetError());
+    rsp.set_errormsg(error.GetMsg());
 }
 
 static void GetContainerData(TContainerHolder &cholder,
@@ -159,6 +166,7 @@ static void GetContainerData(TContainerHolder &cholder,
     string value;
     TError error(container->GetData(req.data(), value));
     rsp.set_error(error.GetError());
+    rsp.set_errormsg(error.GetMsg());
     if (!error)
         rsp.mutable_getdata()->set_value(value);
 }

@@ -168,10 +168,12 @@ message TContainerDataListResponse {
 // запросу результат.
 message TContainerResponse {
 	required EError error = 1;
+	// Опциональное сообщение об ошибке
+	optional string errorMsg = 2;
 
-	optional TContainerListResponse list = 2;
-	optional TContainerGetPropertyResponse getProperty = 3;
-	optional TContainerGetDataResponse getData = 4;
-	optional TContainerPropertyListResponse propertyList = 5;
-	optional TContainerDataListResponse dataList = 6;
+	optional TContainerListResponse list = 3;
+	optional TContainerGetPropertyResponse getProperty = 4;
+	optional TContainerGetDataResponse getData = 5;
+	optional TContainerPropertyListResponse propertyList = 6;
+	optional TContainerDataListResponse dataList = 7;
 }
