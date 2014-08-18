@@ -466,10 +466,18 @@ TError TTask::Seize(int pid_) {
     exitStatus.signal = 0;
     exitStatus.status = 0;
 
+    TFile stdoutLink("/proc/" + to_string(pid_) + "/fd/1");
+    TError error = stdoutLink.ReadLink(stdoutFile);
+    if (error)
+        return error;
+
+    TFile stderrLink("/proc/" + to_string(pid_) + "/fd/2");
+    error = stderrLink.ReadLink(stderrFile);
+    if (error)
+        return error;
+
     pid = pid_;
     state = Started;
-
-    // TODO: recover stdout/stderr files
 
     return TError::Success();
 }
