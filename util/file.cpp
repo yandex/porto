@@ -1,7 +1,8 @@
+#include <fstream>
+
 #include "file.hpp"
 #include "log.hpp"
-
-#include <fstream>
+#include "util/string.hpp"
 
 extern "C" {
 #include <sys/stat.h>
@@ -75,12 +76,8 @@ TError TFile::AsInt(int &value) {
     auto ret = AsString(s);
     if (ret)
         return ret;
-    try {
-        value = stoi(s);
-        return TError::Success();
-    } catch (...) {
-        return TError(EError::Unknown, string(__func__) + ": Bad integer value");
-    }
+
+    return StringToInt(s, value);
 }
 
 TError TFile::AsLines(vector<string> &value) {

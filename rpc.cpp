@@ -13,19 +13,14 @@ static void CreateContainer(TContainerHolder &cholder,
                             const rpc::TContainerCreateRequest &req,
                             rpc::TContainerResponse &rsp)
 {
-    try {
-        auto c = cholder.Get(req.name());
-        if (c) {
-            rsp.set_error(EError::ContainerAlreadyExists);
-            return;
-        }
-        TError error(cholder.Create(req.name()));
-        rsp.set_error(error.GetError());
-        rsp.set_errormsg(error.GetMsg());
-    } catch (...) {
-        rsp.Clear();
-        rsp.set_error(EError::Unknown);
+    auto c = cholder.Get(req.name());
+    if (c) {
+        rsp.set_error(EError::ContainerAlreadyExists);
+        return;
     }
+    TError error(cholder.Create(req.name()));
+    rsp.set_error(error.GetError());
+    rsp.set_errormsg(error.GetMsg());
 }
 
 static void DestroyContainer(TContainerHolder &cholder,

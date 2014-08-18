@@ -78,7 +78,7 @@ public:
     std::string GetStderr();
 
     int ChildCallback();
-    TError Seize(int pid);
+    TError Restore(int pid);
     TError ValidateCgroups();
 };
 

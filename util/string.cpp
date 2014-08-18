@@ -47,6 +47,16 @@ TError StringToUint64(const std::string &str, uint64_t &value) {
     return TError::Success();
 }
 
+TError StringToInt(const std::string &str, int &value) {
+    try {
+        value = stoi(str);
+    } catch (...) {
+        return TError(EError::Unknown, string(__func__) + ": Bad integer value");
+    }
+
+    return TError::Success();
+}
+
 TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens) {
     try {
         istringstream ss(s);

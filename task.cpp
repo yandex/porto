@@ -461,7 +461,7 @@ std::string TTask::GetStderr() {
     return s;
 }
 
-TError TTask::Seize(int pid_) {
+TError TTask::Restore(int pid_) {
     exitStatus.error = 0;
     exitStatus.signal = 0;
     exitStatus.status = 0;

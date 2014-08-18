@@ -10,6 +10,7 @@
 #include "cgroup.hpp"
 #include "registry.hpp"
 #include "log.hpp"
+#include "util/string.hpp"
 
 extern "C" {
 #include <sys/types.h>
@@ -340,18 +341,16 @@ TError TContainer::Restore(const kv::TNode &node) {
     }
 
     int pid;
-    try {
-        pid = stoi(spec.GetInternal("root_pid"));
-    } catch (...) {
+    error = StringToInt(spec.GetInternal("root_pid"), pid);
+    if (error)
         pid = 0;
-    }
 
     TLogger::Log(name + ": restore process " + to_string(pid));
 
     state = Stopped;
 
     // if we didn't start container, make sure nobody is running
-    if (pid == 0) {
+    if (pid <= 0) {
         TError error = KillAll();
         if (error)
             return error;
@@ -363,7 +362,7 @@ TError TContainer::Restore(const kv::TNode &node) {
         return error;
     }
 
-    error = task->Seize(pid);
+    error = task->Restore(pid);
     if (error) {
         task = nullptr;
         (void)KillAll();
