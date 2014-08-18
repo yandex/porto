@@ -406,7 +406,6 @@ TError TTask::Reap(bool wait) {
     pid_t ret;
     ret = waitpid(pid, &status, wait ? 0 : WNOHANG);
     if (ret == pid) {
-        cerr << "status=" << status << endl;
         exitStatus.signal = WTERMSIG(status);
         exitStatus.status = WEXITSTATUS(status);
         state = Stopped;
@@ -483,9 +482,7 @@ TError TTask::ValidateCgroups() {
 
         bool valid = false;
         for (auto cg : leaf_cgroups) {
-            cerr << "("<<cg->Relpath() << ") (" << path << ")"<<endl;
             if (cg->HasSubsystem(subsys)) {
-               cerr << "has subsys " << subsys << endl;
                if (cg->Relpath() == path) {
                 valid = true;
                 break;

@@ -132,7 +132,7 @@ static void TestHolder(TPortoAPI &api) {
 static void TestEmpty(TPortoAPI &api) {
     cerr << "Make sure we can't start empty container" << endl;
     ExpectSuccess(api.Create("b"));
-    ExpectFailure(api.Start("b"), EError::Unknown);
+    ExpectFailure(api.Start("b"), EError::InvalidValue);
     ExpectSuccess(api.Destroy("b"));
 }
 
@@ -433,6 +433,7 @@ static void TestCwd(TPortoAPI &api, const string &name) {
 
     Expect(cwd == "/tmp");
     ExpectSuccess(api.Stop(name));
+    ExpectSuccess(api.SetProperty(name, "cwd", ""));
 }
 
 /*
@@ -459,12 +460,51 @@ static void TestRoot(TPortoAPI &api, const string &name) {
 }
 */
 
+static void TestStateMachine(TPortoAPI &api, const string &name) {
+    string pid;
+    string v;
+
+    cerr << "Check container state machine" << endl;
+
+    ExpectSuccess(api.Create(name));
+    ExpectSuccess(api.GetData(name, "state", v));
+    Expect(v == "stopped");
+
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "state", v));
+    Expect(v == "running");
+
+    ExpectFailure(api.Start(name), EError::InvalidValue);
+
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    WaitPid(api, pid, name);
+    ExpectSuccess(api.GetData(name, "state", v));
+    Expect(v == "dead");
+
+    ExpectFailure(api.Start(name), EError::InvalidValue);
+
+    ExpectSuccess(api.Stop(name));
+    ExpectSuccess(api.GetData(name, "state", v));
+    Expect(v == "stopped");
+
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.Stop(name));
+    ExpectSuccess(api.GetData(name, "state", v));
+    Expect(v == "stopped");
+
+    // TODO: add pause/resume
+
+    ExpectSuccess(api.Destroy(name));
+}
+
 int Selftest() {
     TPortoAPI api;
 
     try {
         TestHolder(api);
         TestEmpty(api);
+        TestStateMachine(api, "a");
 
         ExpectSuccess(api.Create("a"));
         TestExitStatus(api, "a");

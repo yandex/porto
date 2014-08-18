@@ -30,6 +30,8 @@ struct TData {
         switch (c.state) {
         case TContainer::Stopped:
             return "stopped";
+        case TContainer::Dead:
+            return "dead";
         case TContainer::Running:
             return "running";
         case TContainer::Paused:
@@ -153,8 +155,10 @@ bool TContainer::IsAlive() {
 }
 
 void TContainer::UpdateState() {
-    if (state == Running && !IsAlive())
+    if (state == Running && !IsAlive()) {
         Stop();
+        state = Dead;
+    }
 }
 
 TError TContainer::PrepareCgroups() {
@@ -191,7 +195,7 @@ TError TContainer::PrepareTask() {
 
 TError TContainer::Start() {
     if (!CheckState(Stopped))
-        return TError::Success();
+        return TError(EError::InvalidValue, "invalid container state");
 
     TError error = PrepareCgroups();
     if (error) {
@@ -263,7 +267,7 @@ TError TContainer::KillAll() {
 }
 
 TError TContainer::Stop() {
-    if (IsRoot() || !CheckState(Running))
+    if (IsRoot() || !(CheckState(Running) || CheckState(Dead)))
         return TError(EError::InvalidValue, "invalid container state");
 
     TError error = KillAll();

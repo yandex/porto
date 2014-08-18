@@ -30,6 +30,7 @@ class TContainer {
 
     enum EContainerState {
         Stopped,
+        Dead,
         Running,
         Paused
     };

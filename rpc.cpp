@@ -19,9 +19,8 @@ static void CreateContainer(TContainerHolder &cholder,
             rsp.set_error(EError::ContainerAlreadyExists);
             return;
         }
-        TError error = cholder.Create(req.name());
-        if (!error)
-            rsp.set_error(EError::Success);
+        TError error(cholder.Create(req.name()));
+        rsp.set_error(error.GetError());
     } catch (...) {
         rsp.Clear();
         rsp.set_error(EError::Unknown);
@@ -46,8 +45,8 @@ static void StartContainer(TContainerHolder &cholder,
         return;
     }
 
-    if (!container->Start())
-        rsp.set_error(EError::Success);
+    TError error(container->Start());
+    rsp.set_error(error.GetError());
 }
 
 static void StopContainer(TContainerHolder &cholder,
@@ -60,8 +59,8 @@ static void StopContainer(TContainerHolder &cholder,
         return;
     }
 
-    if (!container->Stop())
-        rsp.set_error(EError::Success);
+    TError error(container->Stop());
+    rsp.set_error(error.GetError());
 }
 
 static void PauseContainer(TContainerHolder &cholder,
@@ -74,8 +73,8 @@ static void PauseContainer(TContainerHolder &cholder,
         return;
     }
 
-    if (!container->Pause())
-        rsp.set_error(EError::Success);
+    TError error(container->Pause());
+    rsp.set_error(error.GetError());
 }
 
 static void ResumeContainer(TContainerHolder &cholder,
@@ -88,8 +87,8 @@ static void ResumeContainer(TContainerHolder &cholder,
         return;
     }
 
-    if (!container->Resume())
-        rsp.set_error(EError::Success);
+    TError error(container->Resume());
+    rsp.set_error(error.GetError());
 }
 
 static void ListContainers(TContainerHolder &cholder,
@@ -117,9 +116,10 @@ static void GetContainerProperty(TContainerHolder &cholder,
     }
 
     string value;
-    container->GetProperty(req.property(), value);
-    rsp.mutable_getproperty()->set_value(value);
-    rsp.set_error(EError::Success);
+    TError error(container->GetProperty(req.property(), value));
+    rsp.set_error(error.GetError());
+    if (!error)
+        rsp.mutable_getproperty()->set_value(value);
 }
 
 static void SetContainerProperty(TContainerHolder &cholder,
@@ -138,8 +138,7 @@ static void SetContainerProperty(TContainerHolder &cholder,
     }
 
     TError error(container->SetProperty(req.property(), req.value()));
-    if (!error)
-        rsp.set_error(EError::Success);
+    rsp.set_error(error.GetError());
 }
 
 static void GetContainerData(TContainerHolder &cholder,
@@ -158,9 +157,10 @@ static void GetContainerData(TContainerHolder &cholder,
     }
 
     string value;
-    container->GetData(req.data(), value);
-    rsp.mutable_getdata()->set_value(value);
-    rsp.set_error(EError::Success);
+    TError error(container->GetData(req.data(), value));
+    rsp.set_error(error.GetError());
+    if (!error)
+        rsp.mutable_getdata()->set_value(value);
 }
 
 static void ListProperty(TContainerHolder &cholder,

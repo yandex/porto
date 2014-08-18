@@ -168,7 +168,7 @@ TError TKeyValueStorage::Dump() {
 
     TError error = ListNodes(nodes);
     if (error) {
-        cerr << "Can't list nodes: " << error.GetMsg() << endl;
+        TLogger::Log("Can't list nodes: " << error.GetMsg());
         return error;
     }
 
@@ -181,7 +181,7 @@ TError TKeyValueStorage::Dump() {
 
         error = LoadNode(name, node);
         if (error) {
-            cerr << "Can't load node: " << error.GetMsg() << endl;
+            TLogger::Log("Can't load node: " << error.GetMsg());
             continue;
         }
 
