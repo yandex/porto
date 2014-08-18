@@ -55,6 +55,8 @@ class TTask {
     std::string stdoutFile;
     std::string stderrFile;
 
+    pid_t fwdpid;
+
     int CloseAllFds(int except);
     void Syslog(const std::string &s);
     void ReportResultAndExit(int fd, int result);

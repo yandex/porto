@@ -3,10 +3,7 @@
 - state recovery: kill freezed tasks fails
 - freezer wait finite number of times for freezed state
 - -v should return git commit hash AND recent git tag (git describe, see http://git.kernel.org/cgit/git/git.git/tree/GIT-VERSION-GEN?id=master)
-
-# error handling
-- TError should return rpc::Error enum so we can pass it directly to client
-- ? RPC api to get last error message
+- correctly handle syscall results (in particular EBUSY)
 
 # cleanup
 - rotate subprocess stdout/stderr
@@ -19,5 +16,4 @@
 - porto debug set container_kill_timeout 100000
 
 # +-
-- error handling
 - recovery (task recovery)

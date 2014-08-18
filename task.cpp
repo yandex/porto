@@ -101,6 +101,13 @@ TTask::~TTask() {
         TError e = f.Remove();
         TLogger::LogError(e, "Can't remove task stderr " + stdoutFile);
     }
+
+    if (fwdpid) {
+        (void)kill(fwdpid, SIGKILL);
+        (void)waitpid(fwdpid, NULL, 0);
+    }
+    (void)kill(pid, SIGKILL);
+    (void)waitpid(pid, NULL, 0);
 }
 
 static string GetTmpFile() {
@@ -445,25 +452,87 @@ std::string TTask::GetStderr() {
     return s;
 }
 
+static int exitfwd_fn(int pid) {
+    string name("fwd " + to_string(pid));
+    (void)prctl(PR_SET_NAME, name.c_str());
+
+    if (prctl(PR_SET_PDEATHSIG, SIGTERM) < 0) {
+        TError error(EError::Unknown, errno, "prctl(PR_SET_PDEATHSIG)");
+        TLogger::LogError(error, "Can't create forwarding process");
+        return -1;
+    }
+
+    if (ptrace(PTRACE_SEIZE, pid, NULL, 0) < 0) {
+        TError error(EError::Unknown, errno, "ptrace(PTRACE_SEIZE)");
+        TLogger::LogError(error, "Can't create forwarding process");
+        return -2;
+    }
+
+    /*
+    for (int i = 0; i < getdtablesize(); i++)
+        close(i);
+        */
+
+    for (int i = 0; i < 32; i++)
+        signal(i, SIG_DFL);
+
+    while (true) {
+        int status;
+        pid_t ret;
+
+        TLogger::Log("fwd waitpid");
+        ret = waitpid(pid, &status, __WALL);
+        TLogger::Log("fwd status = " + to_string(status));
+        if (ret == pid) {
+            if (WIFEXITED(status)) {
+                TLogger::Log("fwd exited = " + to_string(WEXITSTATUS(status)));
+                return WEXITSTATUS(status);
+            }
+
+            if (WIFSIGNALED(status)) {
+                TLogger::Log("fwd signaled = " + to_string(WTERMSIG(status)));
+                raise(WTERMSIG(status));
+                return -3;
+            }
+
+            if (WIFSTOPPED(status)) {
+                TLogger::Log("fwd stopped = " + to_string(WSTOPSIG(status)));
+                ptrace(PTRACE_SYSCALL, pid, 0, WSTOPSIG(status));
+            }
+        } else if (ret < 0) {
+            return -4;
+        }
+    }
+}
+
 TError TTask::Seize(int pid_) {
     exitStatus.error = 0;
     exitStatus.signal = 0;
     exitStatus.status = 0;
 
-    pid = pid_;
-    if (ptrace(PTRACE_SEIZE, pid, NULL, 0) < 0) {
-        state = Started;
-
-        return TError(EError::Unknown, errno, "ptrace(" + to_string(pid) + ")");
+    pid = fork();
+    if (pid < 0) {
+        state = Stopped;
+        pid = 0;
+        return TError(EError::Unknown, errno, "clone()");
+    } else if (pid == 0) {
+        exit(exitfwd_fn(pid_));
     }
 
+    TLogger::Log("Started forwarding thread " + to_string(pid));
+    fwdpid = pid_;
     state = Started;
 
     return TError::Success();
 }
 
 TError TTask::ValidateCgroups() {
-    TFile f("/proc/" + to_string(pid) + "/cgroup");
+    pid_t p = fwdpid ?: pid;
+
+    TFile f("/proc/" + to_string(p) + "/cgroup");
+
+    TLogger::Log(string("validate ") + "/proc/" + to_string(p) + "/cgroup");
+
     vector<string> lines;
     map<string, string> cgmap;
     TError error = f.AsLines(lines);
@@ -483,10 +552,10 @@ TError TTask::ValidateCgroups() {
         bool valid = false;
         for (auto cg : leaf_cgroups) {
             if (cg->HasSubsystem(subsys)) {
-               if (cg->Relpath() == path) {
-                valid = true;
-                break;
-            }
+                if (cg->Relpath() == path) {
+                    valid = true;
+                    break;
+                }
             }
         }
 

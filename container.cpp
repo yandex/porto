@@ -363,28 +363,30 @@ TError TContainer::Restore(const kv::TNode &node) {
         return error;
     }
 
-    if (task->GetPid()) {
-        // make it possible to do waitpid on non-child task
-        error = task->Seize(pid);
-        if (error) {
-            task = nullptr;
-            (void)KillAll();
+    TLogger::Log(name + ": " + to_string(__LINE__));
+    // make it possible to do waitpid on non-child task
+    error = task->Seize(pid);
+    if (error) {
+        task = nullptr;
+        (void)KillAll();
 
-            TLogger::LogError(error, "Can't seize task");
-            return error;
-        }
-
-        error = task->ValidateCgroups();
-        if (error) {
-            task = nullptr;
-            (void)KillAll();
-
-            TLogger::LogError(error, "Can't validate task cgroups");
-            return error;
-        }
+        TLogger::LogError(error, "Can't seize task");
+        return error;
     }
 
+    TLogger::Log(name + ": " + to_string(__LINE__));
+    error = task->ValidateCgroups();
+    if (error) {
+        task = nullptr;
+        (void)KillAll();
+
+        TLogger::LogError(error, "Can't validate task cgroups");
+        return error;
+    }
+
+    TLogger::Log(name + ": " + to_string(__LINE__));
     state = task->IsRunning() ? Running : Stopped;
+    TLogger::Log(name + ": " + to_string(__LINE__));
 
     return TError::Success();
 }
