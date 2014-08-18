@@ -47,7 +47,7 @@ struct TData {
     };
 
     static string ExitStatus(TContainer& c) {
-        if (c.task) {
+        if (c.task && !c.task->IsRunning()) {
             TExitStatus status = c.task->GetExitStatus();
             stringstream ss;
             ss << status.error << " " << status.signal << " " << status.status;
@@ -179,13 +179,23 @@ TError TContainer::PrepareCgroups() {
     return TError::Success();
 }
 
+TError TContainer::PrepareTask() {
+    TTaskEnv taskEnv(spec.Get("command"), spec.Get("cwd"), spec.Get("root"), spec.Get("user"), spec.Get("group"), spec.Get("env"));
+    TError error = taskEnv.Prepare();
+    if (error)
+        return error;
+
+    task = unique_ptr<TTask>(new TTask(taskEnv, leaf_cgroups));
+    return TError::Success();
+}
+
 TError TContainer::Start() {
     if (!CheckState(Stopped))
         return TError::Success();
 
     TError error = PrepareCgroups();
     if (error) {
-        TLogger::LogError(error, "Can't prepare task's cgroups");
+        TLogger::LogError(error, "Can't prepare task cgroups");
         return error;
     }
 
@@ -197,14 +207,11 @@ TError TContainer::Start() {
     if (!spec.Get("command").length())
         return TError(EError::InvalidValue, "invalid container command");
 
-    TTaskEnv taskEnv(spec.Get("command"), spec.Get("cwd"), spec.Get("root"), spec.Get("user"), spec.Get("group"), spec.Get("env"));
-    error = taskEnv.Prepare();
+    error = PrepareTask();
     if (error) {
-        TLogger::LogError(error, "Can't prepare task environment");
+        TLogger::LogError(error, "Can't prepare task");
         return error;
     }
-
-    task = unique_ptr<TTask>(new TTask(taskEnv, leaf_cgroups));
 
     error = task->Start();
     if (error) {
@@ -213,21 +220,21 @@ TError TContainer::Start() {
         return error;
     }
 
+    spec.SetInternal("__pid", to_string(task->GetPid()));
     state = Running;
 
     return TError::Success();
 }
 
-TError TContainer::Stop() {
-    if (IsRoot() || !CheckState(Running))
-        return TError(EError::InvalidValue, "invalid container state");
-
+TError TContainer::KillAll() {
     auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
 
     vector<pid_t> reap;
     TError error = cg->GetTasks(reap);
-    if (error)
+    if (error) {
         TLogger::LogError(error, "Can't read tasks list while stopping container");
+        return error;
+    }
 
     // try to stop all tasks gracefully
     cg->Kill(SIGTERM);
@@ -236,20 +243,35 @@ TError TContainer::Stop() {
     // freeze all container tasks to make sure no one forks and races with us
     TSubsystem::Freezer()->Freeze(*cg);
     error = cg->GetTasks(reap);
-    if (error)
+    if (error) {
         TLogger::LogError(error, "Can't read tasks list while stopping container");
+        return error;
+    }
     cg->Kill(SIGKILL);
     TSubsystem::Freezer()->Unfreeze(*cg);
 
     // after we killed all tasks, collect and ignore their exit status
     for (auto pid : reap) {
         TTask t(pid);
-        t.Reap();
+        TError error = t.Reap(true);
+        TLogger::LogError(error, "Can't reap task " + to_string(pid));
     }
+
+    task = nullptr;
+
+    return TError::Success();
+}
+
+TError TContainer::Stop() {
+    if (IsRoot() || !CheckState(Running))
+        return TError(EError::InvalidValue, "invalid container state");
+
+    TError error = KillAll();
+    if (error)
+        TLogger::LogError(error, "Can't kill all tasks in container");
 
     leaf_cgroups.clear();
 
-    task = nullptr;
     state = Stopped;
 
     return TError::Success();
@@ -309,15 +331,54 @@ TError TContainer::Restore(const kv::TNode &node) {
 
     error = PrepareCgroups();
     if (error) {
-        TLogger::LogError(error, "Can't restore task's cgroups");
+        TLogger::LogError(error, "Can't restore task cgroups");
         return error;
     }
 
-    // TODO recover state, task, etc
-    // probably need to PTRACE_SEIZE to be able to do waitpid ("reparent")
+    int pid;
+    try {
+        pid = stoi(spec.GetInternal("__pid"));
+    } catch (...) {
+        pid = 0;
+    }
 
-    state = IsAlive() ? Running : Stopped;
-    task = nullptr;
+    TLogger::Log(name + ": restore process " + to_string(pid));
+
+    state = Stopped;
+
+    // if we didn't start container, make sure nobody is running
+    if (pid == 0) {
+        TError error = KillAll();
+        if (error)
+            return error;
+    }
+
+    error = PrepareTask();
+    if (error) {
+        TLogger::LogError(error, "Can't prepare task");
+        return error;
+    }
+
+    // make it possible to do waitpid on non-child task
+    error = task->Seize(pid);
+    if (error) {
+        task = nullptr;
+        (void)KillAll();
+
+        TLogger::LogError(error, "Can't seize task");
+        return error;
+    }
+
+    error = task->ValidateCgroups();
+    if (error) {
+        task = nullptr;
+        (void)KillAll();
+
+        TLogger::LogError(error, "Can't validate task cgroups");
+        return error;
+    }
+
+    state = task->IsRunning() ? Running : Stopped;
 
     return TError::Success();
 }

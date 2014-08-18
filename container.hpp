@@ -44,6 +44,8 @@ class TContainer {
     // data
     bool CheckState(EContainerState expected);
     TError PrepareCgroups();
+    TError PrepareTask();
+    TError KillAll();
 
 public:
     TContainer(const std::string &name) : name(name), state(Stopped), spec(name) { }

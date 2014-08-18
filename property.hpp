@@ -36,6 +36,8 @@ public:
     ~TContainerSpec();
     std::string Get(const std::string &property);
     TError Set(const std::string &property, const std::string &value);
+    std::string GetInternal(const std::string &property);
+    TError SetInternal(const std::string &property, const std::string &value);
     bool IsDynamic(const std::string &property);
     TError Restore(const kv::TNode &node);
 };

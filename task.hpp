@@ -48,7 +48,7 @@ class TTask {
     TTaskEnv env;
     std::vector<std::shared_ptr<TCgroup>> leaf_cgroups;
 
-    enum ETaskState { Stopped, Running } state;
+    enum ETaskState { Stopped, Started } state;
     TExitStatus exitStatus;
 
     pid_t pid;
@@ -71,12 +71,14 @@ public:
     bool IsRunning();
     TExitStatus GetExitStatus();
     void Kill(int signal);
-    void Reap();
+    TError Reap(bool wait);
 
     std::string GetStdout();
     std::string GetStderr();
 
     int ChildCallback();
+    TError Seize(int pid);
+    TError ValidateCgroups();
 };
 
 #endif

@@ -149,6 +149,8 @@ TError TKeyValueStorage::Restore(std::map<std::string, kv::TNode> &map) {
         kv::TNode node;
         node.Clear();
 
+        TLogger::Log("Restoring " + name);
+
         TError error = LoadNode(name, node);
         if (error) {
             TLogger::LogError(error, "Can't load key-value node");

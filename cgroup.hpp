@@ -45,6 +45,7 @@ public:
     bool IsRoot() const;
 
     std::string Path();
+    std::string Relpath();
 
     TError Create();
     TError Remove();
@@ -62,6 +63,7 @@ public:
     TError GetKnobValue(const std::string &knob, std::string &value);
     TError GetKnobValueAsLines(const std::string &knob, std::vector<std::string> &lines);
     TError SetKnobValue(const std::string &knob, const std::string &value, bool append = false);
+    bool HasSubsystem(const std::string &name);
 
     friend bool operator==(const TCgroup& c1, const TCgroup& c2);
     friend std::ostream& operator<<(std::ostream& os, const TCgroup& cg);

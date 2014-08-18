@@ -14,6 +14,7 @@ extern "C" {
 #include <sys/wait.h>
 #include <sys/prctl.h>
 #include <sys/syscall.h>
+#include <sys/ptrace.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <grp.h>
@@ -358,18 +359,19 @@ TError TTask::Start() {
         TLogger::LogError(error, "Can't read result from the child");
         return error;
     } else if (n == 0) {
-        state = Running;
+        state = Started;
         this->pid = pid;
         return TError::Success();
     } else {
-        int p = waitpid(pid, NULL, 0);
-        if (p != pid) {
-            TError error(EError::Unknown, "waitpid() " + to_string(errno));
+        TError error = Reap(true);
+        if (error)
             TLogger::LogError(error, "Couldn't reap child process");
-        }
 
         exitStatus.error = ret;
-        TError error(EError::Unknown, "child returned " + to_string(ret));
+        exitStatus.signal = 0;
+        exitStatus.status = 0;
+
+        error = TError(EError::Unknown, "child returned " + to_string(ret));
         TLogger::LogError(error, "Child process couldn't exec");
         return error;
     }
@@ -379,41 +381,42 @@ void TTask::FindCgroups() {
 }
 
 int TTask::GetPid() {
-    if (state == Running)
+    if (state == Started)
         return pid;
     else
         return 0;
 }
 
 bool TTask::IsRunning() {
-    GetExitStatus();
+    if (state == Started)
+        (void)Reap(false);
 
-    return state == Running;
+    return state == Started;
 }
 
 TExitStatus TTask::GetExitStatus() {
-    if (state != Stopped) {
-        int status;
-        pid_t ret;
-        ret = waitpid(pid, &status, WNOHANG | WUNTRACED | WCONTINUED);
-        if (ret) {
-            if (!exitStatus.error) {
-                exitStatus.signal = WTERMSIG(status);
-                exitStatus.status = WEXITSTATUS(status);
-            }
-            state = Stopped;
-        }
-    }
+    if (state == Started)
+        (void)Reap(false);
 
     return exitStatus;
 }
 
-void TTask::Reap() {
-    int ret = waitpid(pid, NULL, 0);
-    if (ret != pid) {
-        TError error(EError::Unknown, errno, "waitpid(" + to_string(pid) + ")");
-        TLogger::LogError(error, "Can't reap child process");
+TError TTask::Reap(bool wait) {
+    int status;
+    pid_t ret;
+    ret = waitpid(pid, &status, wait ? 0 : WNOHANG);
+    if (ret == pid) {
+        cerr << "status=" << status << endl;
+        exitStatus.signal = WTERMSIG(status);
+        exitStatus.status = WEXITSTATUS(status);
+        state = Stopped;
+    } else if (ret < 0) {
+        exitStatus.error = -1;
+        state = Stopped;
+        return TError(EError::Unknown, errno, "waitpid()");
     }
+
+    return TError::Success();
 }
 
 void TTask::Kill(int signal) {
@@ -441,4 +444,58 @@ std::string TTask::GetStderr() {
     TError e = f.AsString(s);
     TLogger::LogError(e, "Can't read container stderr");
     return s;
+}
+
+TError TTask::Seize(int pid_) {
+    exitStatus.error = 0;
+    exitStatus.signal = 0;
+    exitStatus.status = 0;
+
+    pid = pid_;
+    if (ptrace(PTRACE_SEIZE, pid, NULL, 0) < 0) {
+        state = Started;
+
+        return TError(EError::Unknown, errno, "ptrace(" + to_string(pid) + ")");
+    }
+
+    state = Started;
+
+    return TError::Success();
+}
+
+TError TTask::ValidateCgroups() {
+    TFile f("/proc/" + to_string(pid) + "/cgroup");
+    vector<string> lines;
+    map<string, string> cgmap;
+    TError error = f.AsLines(lines);
+    if (error)
+        return error;
+
+    vector<string> tokens;
+    for (auto l : lines) {
+        tokens.clear();
+        error = SplitString(l, ':', tokens);
+        if (error)
+            return error;
+
+        const string &subsys = tokens[1];
+        const string &path = tokens[2];
+
+        bool valid = false;
+        for (auto cg : leaf_cgroups) {
+            cerr << "("<<cg->Relpath() << ") (" << path << ")"<<endl;
+            if (cg->HasSubsystem(subsys)) {
+               cerr << "has subsys " << subsys << endl;
+               if (cg->Relpath() == path) {
+                valid = true;
+                break;
+            }
+            }
+        }
+
+        if (!valid)
+            return TError(EError::Unknown, "Task belongs to invalid subsystem " + subsys + ":" + path);
+    }
+
+    return TError::Success();
 }

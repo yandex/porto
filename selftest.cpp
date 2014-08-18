@@ -454,6 +454,8 @@ static void TestRoot(TPortoAPI &api, const string &name) {
     string v;
     ExpectSuccess(api.GetData(name, "stdout", v));
     Expect(v == string("/\n"));
+
+    // TODO: check /proc/<PID>/root
 }
 */
 

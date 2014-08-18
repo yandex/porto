@@ -46,6 +46,20 @@ bool TContainerSpec::IsDynamic(const std::string &property) {
     return propertySpec[property].dynamic;
 }
 
+string TContainerSpec::GetInternal(const string &property) {
+    if (data.find(property) == data.end())
+        return "";
+    return data[property];
+}
+
+TError TContainerSpec::SetInternal(const string &property, const string &value) {
+    data[property] = value;
+    TError error(AppendStorage(property, value));
+    if (error)
+        TLogger::LogError(error, "Can't append property to key-value store");
+    return error;
+}
+
 TError TContainerSpec::Set(const string &property, const string &value) {
     if (propertySpec.find(property) == propertySpec.end()) {
         TError error(EError::InvalidValue, "property not found");
@@ -60,11 +74,7 @@ TError TContainerSpec::Set(const string &property, const string &value) {
         return error;
     }
 
-    data[property] = value;
-    TError error(AppendStorage(property, value));
-    if (error)
-        TLogger::LogError(error, "Can't append property to key-value store");
-    return error;
+    return SetInternal(property, value);
 }
 
 TError TContainerSpec::Restore(const kv::TNode &node) {
@@ -86,6 +96,7 @@ TContainerSpec::~TContainerSpec() {
 }
 
 TError TContainerSpec::SyncStorage() {
+#if 0
     if (IsRoot())
         return TError::Success();
 
@@ -99,6 +110,9 @@ TError TContainerSpec::SyncStorage() {
         pair->set_val(kv.second);
     }
     return storage.SaveNode(name, node);
+#else
+    return TError::Success();
+#endif
 }
 
 TError TContainerSpec::AppendStorage(const string& key, const string& value) {

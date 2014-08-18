@@ -99,6 +99,13 @@ string TCgroup::Path() {
         return parent->Path() + "/" + name;
 }
 
+string TCgroup::Relpath() {
+    if (IsRoot())
+        return "";
+    else
+        return parent->Relpath() + "/" + name;
+}
+
 TError TCgroup::Create() {
     if (IsRoot()) {
         TMountSnapshot ms;
@@ -208,6 +215,20 @@ TError TCgroup::Attach(int pid) {
     }
 
     return TError::Success();
+}
+
+bool TCgroup::HasSubsystem(const string &name) {
+    auto cg = parent;
+    while (cg->parent)
+        cg = cg->parent;
+
+    for (auto c : cg->subsystems) {
+        cerr<<c->Name()<<" "<<name<<endl;
+        if (c->Name() == name)
+            return true;
+    }
+
+    return false;
 }
 
 bool operator==(const TCgroup& c1, const TCgroup& c2) {
