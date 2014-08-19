@@ -24,11 +24,17 @@ static void SendPidStatus(int fd, int pid, int status) {
 
 static pid_t portod_pid;
 static volatile sig_atomic_t Done = false;
+static volatile sig_atomic_t NeedUpdate = false;
 
 static void DoExitAndCleanup(int signum)
 {
     Done = true;
     (void)kill(portod_pid, SIGINT);
+}
+
+static void DoUpdate(int signum)
+{
+    NeedUpdate = true;
 }
 
 static int SpawnPortod() {
@@ -56,6 +62,21 @@ static int SpawnPortod() {
     cerr << PREFIX << "Spawned portod " << portod_pid << endl;
 
     while (!Done) {
+        if (NeedUpdate) {
+            cerr << PREFIX << "Updating" << endl;
+
+            if (!kill(portod_pid, SIGKILL))
+                cerr << PREFIX << "Can't send SIGKILL to portod" << endl;
+            if (waitpid(portod_pid, NULL, 0) != portod_pid)
+                cerr << PREFIX << "Can't wait for portod exit status" << endl;
+
+            close(pfd[1]);
+
+            execlp(program_invocation_name, program_invocation_short_name, nullptr);
+            cerr << PREFIX << "Can't execlp(" << program_invocation_name << ", " << program_invocation_short_name << ", NULL)" << endl;
+            return EXIT_FAILURE;
+        }
+
         int status;
         pid_t pid = wait(&status);
         if (pid == EINTR)
@@ -79,6 +100,7 @@ int main(int argc, char * const argv[])
     signal(SIGPIPE, SIG_IGN);
 
     signal(SIGINT, DoExitAndCleanup);
+    signal(SIGUSR1, DoUpdate);
 
     if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0) {
         cerr << PREFIX << "Can't set myself as a subreaper" << endl;
