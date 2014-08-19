@@ -163,6 +163,7 @@ static int RpcMain(TContainerHolder &cholder) {
         return -1;
     }
 
+    int starved = 0;
     while (!Done) {
         struct pollfd fds[MAX_CONNECTIONS];
         memset(fds, 0, sizeof(fds));
@@ -181,6 +182,13 @@ static int RpcMain(TContainerHolder &cholder) {
 
             if (!Hup)
                 break;
+        }
+
+        if (ret == 0 || starved <= 0) {
+            starved = 1000;
+            cholder.Heartbeat();
+        } else {
+            starved--;
         }
 
         if (Hup) {

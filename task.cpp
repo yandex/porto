@@ -175,8 +175,7 @@ int TTask::ChildCallback() {
         ReportResultAndExit(wfd, -errno);
     }
 
-    // TODO: O_APPEND to support rotation?
-    ret = open(stdoutFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0700);
+    ret = open(stdoutFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0700);
     if (ret < 0) {
         Syslog(string("open(1): ") + strerror(errno));
         ReportResultAndExit(wfd, -errno);
@@ -188,8 +187,7 @@ int TTask::ChildCallback() {
         ReportResultAndExit(wfd, -errno);
     }
 
-    // TODO: O_APPEND to support rotation?
-    ret = open(stderrFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0700);
+    ret = open(stderrFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0700);
     if (ret < 0) {
         Syslog(string("open(2): ") + strerror(errno));
         ReportResultAndExit(wfd, -errno);
@@ -514,6 +512,35 @@ TError TTask::ValidateCgroups() {
         if (!valid)
             return TError(EError::Unknown, "Task belongs to invalid subsystem " + subsys + ":" + path);
     }
+
+    return TError::Success();
+}
+
+const ssize_t MAX_LOG_SIZE = 10 * 1024 * 1024;
+
+TError TTask::RotateFile(const std::string path) {
+    struct stat st;
+
+    if (stat(path.c_str(), &st) < 0)
+        return TError(EError::Unknown, errno, "stat(" + path + ")");
+
+    if (st.st_size > MAX_LOG_SIZE)
+        if (truncate(path.c_str(), 0) < 0)
+            return TError(EError::Unknown, errno, "truncate(" + path + ")");
+
+    return TError::Success();
+}
+
+TError TTask::Rotate() {
+    TError error;
+
+    error = RotateFile(stdoutFile);
+    if (error)
+        return error;
+
+    error = RotateFile(stderrFile);
+    if (error)
+        return error;
 
     return TError::Success();
 }

@@ -59,6 +59,7 @@ class TTask {
     void Syslog(const std::string &s);
     void ReportResultAndExit(int fd, int result);
 
+    TError RotateFile(const std::string path);
 public:
     TTask(TTaskEnv& env, std::vector<std::shared_ptr<TCgroup>> &leaf_cgroups) : env(env), leaf_cgroups(leaf_cgroups) {};
     TTask(pid_t pid) : pid(pid) {};
@@ -80,6 +81,7 @@ public:
     int ChildCallback();
     TError Restore(int pid);
     TError ValidateCgroups();
+    TError Rotate();
 };
 
 #endif

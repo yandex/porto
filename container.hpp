@@ -75,6 +75,7 @@ public:
     bool DeliverExitStatus(int pid, int status);
 
     std::shared_ptr<TCgroup> GetCgroup(std::shared_ptr<TSubsystem> subsys);
+    void Heartbeat();
 };
 
 class TContainerHolder {
@@ -91,6 +92,7 @@ public:
     bool DeliverExitStatus(int pid, int status);
 
     std::vector<std::string> List();
+    void Heartbeat();
 };
 
 #endif

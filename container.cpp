@@ -238,6 +238,8 @@ TError TContainer::KillAll() {
     // try to stop all tasks gracefully
     cg->Kill(SIGTERM);
 
+    // TODO: do we need timeout here?!
+
     // then kill any task that didn't want to stop via SIGTERM;
     // freeze all container tasks to make sure no one forks and races with us
     TSubsystem::Freezer()->Freeze(*cg);
@@ -397,6 +399,11 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
     return true;
 }
 
+void TContainer::Heartbeat() {
+    if (task)
+        task->Rotate();
+}
+
 // TContainerHolder
 
 TError TContainerHolder::CreateRoot() {
@@ -469,4 +476,9 @@ bool TContainerHolder::DeliverExitStatus(int pid, int status) {
             return true;
 
     return false;
+}
+
+void TContainerHolder::Heartbeat() {
+    for (auto c : containers)
+        c.second->Heartbeat();
 }
