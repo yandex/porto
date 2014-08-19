@@ -144,7 +144,7 @@ bool TContainer::IsRoot() {
 }
 
 vector<pid_t> TContainer::Processes() {
-    auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
+    auto cg = GetCgroup(TSubsystem::Freezer());
 
     vector<pid_t> ret;
     cg->GetProcesses(ret);
@@ -163,15 +163,9 @@ void TContainer::UpdateState() {
 }
 
 TError TContainer::PrepareCgroups() {
-    if (IsRoot()) {
-        leaf_cgroups.push_back(TCgroup::GetRoot(TSubsystem::Cpuacct()));
-        leaf_cgroups.push_back(TCgroup::GetRoot(TSubsystem::Memory()));
-        leaf_cgroups.push_back(TCgroup::GetRoot(TSubsystem::Freezer()));
-    } else {
-        leaf_cgroups.push_back(TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Cpuacct())));
-        leaf_cgroups.push_back(TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Memory())));
-        leaf_cgroups.push_back(TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer())));
-    }
+    leaf_cgroups.push_back(GetCgroup(TSubsystem::Cpuacct()));
+    leaf_cgroups.push_back(GetCgroup(TSubsystem::Memory()));
+    leaf_cgroups.push_back(GetCgroup(TSubsystem::Freezer()));
 
     for (auto cg : leaf_cgroups) {
         auto ret = cg->Create();
@@ -232,7 +226,7 @@ TError TContainer::Start() {
 }
 
 TError TContainer::KillAll() {
-    auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
+    auto cg = GetCgroup(TSubsystem::Freezer());
 
     vector<pid_t> reap;
     TError error = cg->GetTasks(reap);
@@ -286,7 +280,7 @@ TError TContainer::Pause() {
     if (IsRoot() || !CheckState(Running))
         return TError(EError::InvalidValue, "invalid container state");
 
-    auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
+    auto cg = GetCgroup(TSubsystem::Freezer());
     TSubsystem::Freezer()->Freeze(*cg);
 
     state = Paused;
@@ -297,7 +291,7 @@ TError TContainer::Resume() {
     if (!CheckState(Paused))
         return TError(EError::InvalidValue, "invalid container state");
 
-    auto cg = TCgroup::Get(name, TCgroup::GetRoot(TSubsystem::Freezer()));
+    auto cg = GetCgroup(TSubsystem::Freezer());
     TSubsystem::Freezer()->Unfreeze(*cg);
 
     state = Running;
