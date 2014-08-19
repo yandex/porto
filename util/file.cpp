@@ -3,6 +3,7 @@
 #include "file.hpp"
 #include "log.hpp"
 #include "util/string.hpp"
+#include "util/unix.hpp"
 
 extern "C" {
 #include <fcntl.h>
@@ -45,7 +46,7 @@ TFile::EFileType TFile::Type() {
 TError TFile::Remove() {
     TLogger::Log("unlink " + path);
 
-    int ret = unlink(path.c_str());
+    int ret = RetryBusy(10, 10000, [=]{ return unlink(path.c_str()); });
 
     if (ret && (errno != ENOENT))
         return TError(EError::Unknown, errno, "unlink(" + path + ")");

@@ -1,7 +1,8 @@
 #include <unordered_map>
 
-#include "folder.hpp"
 #include "log.hpp"
+#include "util/unix.hpp"
+#include "util/folder.hpp"
 
 extern "C" {
 #include <sys/stat.h>
@@ -58,7 +59,9 @@ TError TFolder::Remove(bool recursive) {
     }
 
     TLogger::Log("rmdir " + path);
-    if (rmdir(path.c_str()) < 0)
+
+    int ret = RetryBusy(10, 10000, [=]{ return rmdir(path.c_str()); });
+    if (ret < 0)
         return TError(EError::Unknown, errno, "rmdir(" + path + ")");
 
     return TError::Success();

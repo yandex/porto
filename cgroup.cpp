@@ -7,6 +7,7 @@
 #include "registry.hpp"
 #include "log.hpp"
 #include "util/string.hpp"
+#include "util/unix.hpp"
 
 using namespace std;
 
@@ -187,13 +188,11 @@ TError TCgroup::Remove() {
         // at this point we should have gracefully terminated all tasks
         // in the container; if anything is still alive we have no other choice
         // but to kill it with SIGKILL
-        int retry = CGROUP_REMOVE_TIMEOUT_S * 10;
-        while (retry--) {
-            Kill(SIGKILL);
-            if (IsEmpty())
-                break;
-            usleep(100000);
-        }
+        int ret = RetryFailed(CGROUP_REMOVE_TIMEOUT_S * 10, 100000,
+                              [=]{ Kill(SIGKILL); if (IsEmpty()) return 0; else return -1; });
+
+        if (ret < 0)
+            TLogger::Log("Can't kill all tasks in cgroup " + Path());
     }
 
     TFolder f(Path());

@@ -15,7 +15,7 @@ const std::string KVALUE_ROOT = "/tmp/porto";
 const std::string KVALUE_SIZE = "size=32m";
 const size_t PORTOD_MAX_CLIENTS = 16;
 const size_t PORTOD_POLL_TIMEOUT_MS = 1000;
-const size_t CGROUP_REMOVE_TIMEOUT_S = 10;
+const size_t CGROUP_REMOVE_TIMEOUT_S = 1;
 
 const std::string RPC_SOCK = "/run/portod.socket";
 const std::string RPC_SOCK_GROUP = "porto";
