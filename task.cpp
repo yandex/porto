@@ -2,6 +2,7 @@
 #include <sstream>
 #include <iterator>
 
+#include "porto.hpp"
 #include "task.hpp"
 #include "cgroup.hpp"
 #include "log.hpp"
@@ -36,7 +37,7 @@ TError TTaskEnv::Prepare() {
         return error;
     }
 
-    env.push_back("HOME=/home/" + user);
+    env.push_back("HOME=" + cwd);
     env.push_back("USER=" + user);
 
     struct passwd *p = getpwnam(user.c_str());
@@ -370,9 +371,11 @@ TError TTask::Start() {
         this->pid = pid;
         return TError::Success();
     } else {
+        this->pid = pid;
         TError error = Reap(true);
         if (error)
             TLogger::LogError(error, "Couldn't reap child process");
+        this->pid = 0;
 
         exitStatus.error = ret;
         exitStatus.signal = 0;
@@ -382,9 +385,6 @@ TError TTask::Start() {
         TLogger::LogError(error, "Child process couldn't exec");
         return error;
     }
-}
-
-void TTask::FindCgroups() {
 }
 
 int TTask::GetPid() {
@@ -411,6 +411,7 @@ TExitStatus TTask::GetExitStatus() {
 TError TTask::Reap(bool wait) {
     int status;
     pid_t ret;
+
     ret = waitpid(pid, &status, wait ? 0 : WNOHANG);
     if (ret == pid) {
         DeliverExitStatus(status);
@@ -521,15 +522,13 @@ TError TTask::ValidateCgroups() {
     return TError::Success();
 }
 
-const ssize_t MAX_LOG_SIZE = 10 * 1024 * 1024;
-
 TError TTask::RotateFile(const std::string path) {
     struct stat st;
 
     if (stat(path.c_str(), &st) < 0)
         return TError(EError::Unknown, errno, "stat(" + path + ")");
 
-    if (st.st_size > MAX_LOG_SIZE)
+    if (st.st_size > CONTAINER_MAX_LOG_SIZE)
         if (truncate(path.c_str(), 0) < 0)
             return TError(EError::Unknown, errno, "truncate(" + path + ")");
 

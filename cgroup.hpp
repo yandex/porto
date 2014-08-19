@@ -4,12 +4,11 @@
 #include <string>
 #include <unordered_map>
 
+#include "porto.hpp"
 #include "error.hpp"
 #include "subsystem.hpp"
 #include "util/mount.hpp"
 #include "util/folder.hpp"
-
-const std::string RootCgroup = "porto";
 
 class TCgroup {
     const std::string name;

@@ -1,3 +1,4 @@
+#include "porto.hpp"
 #include "kvalue.hpp"
 #include "log.hpp"
 #include "util/protobuf.hpp"
@@ -14,7 +15,7 @@ extern "C" {
 using namespace std;
 
 TKeyValueStorage::TKeyValueStorage() :
-    tmpfs("tmpfs", "/tmp/porto", "tmpfs", {"size=32m"}) {
+    tmpfs("tmpfs", KVALUE_ROOT, "tmpfs", {KVALUE_SIZE}) {
 }
 
 string TKeyValueStorage::Path(const string &name) {

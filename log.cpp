@@ -1,4 +1,6 @@
 #include <fstream>
+
+#include "porto.hpp"
 #include "log.hpp"
 
 extern "C" {
@@ -9,8 +11,6 @@ extern "C" {
 #include <string.h>
 #include <errno.h>
 }
-
-bool verbose = true;
 
 static std::ofstream file;
 
@@ -42,7 +42,7 @@ static std::string GetTime() {
 }
 
 void TLogger::Log(const std::string &action) {
-    if (verbose) {
+    if (LOG_VEBOSE) {
         if (file.is_open())
             file << GetTime() << " " << action << std::endl;
         else
@@ -51,7 +51,7 @@ void TLogger::Log(const std::string &action) {
 }
 
 void TLogger::LogAction(const std::string &action, bool error, int errcode) {
-    if (!error && verbose) {
+    if (!error && LOG_VEBOSE) {
         if (file.is_open())
             file << GetTime() << " Ok: " << action << std::endl;
         else

@@ -311,7 +311,7 @@ static void TestEnvironment(TPortoAPI &api, const string &name) {
 
     string env = GetEnv(pid);
     static const char empty_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
-        "HOME=/home/nobody\0"
+        "HOME=/db/porto/a\0"
         "USER=nobody\0";
 
     Expect(memcmp(empty_env, env.data(), sizeof(empty_env)) == 0);
@@ -327,7 +327,7 @@ static void TestEnvironment(TPortoAPI &api, const string &name) {
     static const char ab_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
         "a=b\0"
         "c=d\0"
-        "HOME=/home/nobody\0"
+        "HOME=/db/porto/a\0"
         "USER=nobody\0";
 
     Expect(memcmp(ab_env, env.data(), sizeof(ab_env)) == 0);

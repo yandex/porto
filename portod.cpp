@@ -20,9 +20,7 @@ extern "C" {
 
 using namespace std;
 
-static const size_t MAX_CLIENTS = 16;
-static const size_t MAX_CONNECTIONS = MAX_CLIENTS + 1;
-static const size_t POLL_TIMEOUT_MS = 1000;
+static const size_t MAX_CONNECTIONS = PORTOD_MAX_CLIENTS + 1;
 static const int REAP_FD = 3;
 
 static void RemoveRpcServer(const string &path) {
@@ -174,10 +172,10 @@ static int RpcMain(TContainerHolder &cholder) {
             fds[i].events = POLLIN | POLLHUP;
         }
 
-        fds[MAX_CLIENTS].fd = sfd;
-        fds[MAX_CLIENTS].events = POLLIN | POLLHUP;
+        fds[PORTOD_MAX_CLIENTS].fd = sfd;
+        fds[PORTOD_MAX_CLIENTS].events = POLLIN | POLLHUP;
 
-        ret = poll(fds, MAX_CONNECTIONS, POLL_TIMEOUT_MS);
+        ret = poll(fds, MAX_CONNECTIONS, PORTOD_POLL_TIMEOUT_MS);
         if (ret < 0) {
             TLogger::Log(string("poll() error: ") + strerror(errno));
 
@@ -202,13 +200,13 @@ static int RpcMain(TContainerHolder &cholder) {
         if (Done)
             break;
 
-        if (fds[MAX_CLIENTS].revents && clients.size() < MAX_CLIENTS) {
+        if (fds[PORTOD_MAX_CLIENTS].revents && clients.size() < PORTOD_MAX_CLIENTS) {
             ret = AcceptClient(sfd, clients);
             if (ret < 0)
                 break;
         }
 
-        for (size_t i = 0; i < MAX_CLIENTS && !Done; i++) {
+        for (size_t i = 0; i < PORTOD_MAX_CLIENTS && !Done; i++) {
             if (!fds[i].revents)
                 continue;
 
@@ -312,32 +310,24 @@ int main(int argc, char * const argv[])
 
         TContainerHolder cholder;
         TError error = cholder.CreateRoot();
-        if (error) {
+        if (error)
             TLogger::Log("Couldn't create root container");
-            // TODO: report user?!
-        }
 
         {
             TCgroupSnapshot cs;
             TError error = cs.Create();
-            if (error) {
+            if (error)
                 TLogger::Log("Couldn't create cgroup snapshot!");
-                // TODO: report user?!
-            }
 
             std::map<std::string, kv::TNode> m;
             error = storage.Restore(m);
-            if (error) {
+            if (error)
                 TLogger::Log("Couldn't restore state!");
-                // TODO: report user?!
-            }
 
             for (auto &r : m) {
-                TError e = cholder.Restore(r.first, r.second);
-                if (e) {
+                error = cholder.Restore(r.first, r.second);
+                if (error)
                     TLogger::Log("Couldn't restore " + r.first + " state!");
-                    // TODO: report user?!
-                }
             }
         }
 

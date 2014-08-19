@@ -142,7 +142,7 @@ string TContainer::Name() {
 }
 
 bool TContainer::IsRoot() {
-    return name == RootName;
+    return name == ROOT_CONTAINER;
 }
 
 vector<pid_t> TContainer::Processes() {
@@ -184,9 +184,7 @@ TError TContainer::PrepareTask() {
     string cwd = spec.Get("cwd");
 
     if (!cwd.length()) {
-        cwd = CONTAINERS_BASEDIR + name;
-
-        TLogger::Log("cwd=" + cwd);
+        cwd = CONTAINER_BASEDIR + name;
 
         dir = unique_ptr<TFolder>(new TFolder(cwd));
         if (dir->Exists()) {
@@ -241,6 +239,8 @@ TError TContainer::Start() {
         TLogger::LogError(error, "Can't start task");
         return error;
     }
+
+    TLogger::Log(name + " started " + to_string(task->GetPid()));
 
     spec.SetInternal("root_pid", to_string(task->GetPid()));
     state = Running;
@@ -411,10 +411,10 @@ TError TContainer::Restore(const kv::TNode &node) {
 }
 
 std::shared_ptr<TCgroup> TContainer::GetCgroup(shared_ptr<TSubsystem> subsys) {
-    if (name == RootName)
-        return TCgroup::Get(RootCgroup, TCgroup::GetRoot(subsys));
+    if (name == ROOT_CONTAINER)
+        return TCgroup::Get(ROOT_CGROUP, TCgroup::GetRoot(subsys));
     else
-        return TCgroup::Get(name, TCgroup::Get(RootCgroup, TCgroup::GetRoot(subsys)));
+        return TCgroup::Get(name, TCgroup::Get(ROOT_CGROUP, TCgroup::GetRoot(subsys)));
 }
 
 bool TContainer::DeliverExitStatus(int pid, int status) {
@@ -436,18 +436,18 @@ void TContainer::Heartbeat() {
 // TContainerHolder
 
 TError TContainerHolder::CreateRoot() {
-    TError error = Create(RootName);
+    TError error = Create(ROOT_CONTAINER);
     if (error)
         return error;
 
-    auto root = Get(RootName);
+    auto root = Get(ROOT_CONTAINER);
     root->Start();
 
     return TError::Success();
 }
 
 bool TContainerHolder::ValidName(const string &name) {
-    if (name == RootName)
+    if (name == ROOT_CONTAINER)
         return true;
 
     return find_if(name.begin(), name.end(),
@@ -475,7 +475,7 @@ shared_ptr<TContainer> TContainerHolder::Get(const string &name) {
 }
 
 void TContainerHolder::Destroy(const string &name) {
-    if (name != RootName)
+    if (name != ROOT_CONTAINER)
         containers.erase(name);
 }
 

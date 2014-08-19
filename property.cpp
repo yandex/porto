@@ -6,6 +6,7 @@
 extern "C" {
 #include <grp.h>
 #include <pwd.h>
+#include <error.h>
 }
 
 using namespace std;
@@ -36,7 +37,7 @@ string TContainerSpec::Get(const string &property) {
 }
 
 bool TContainerSpec::IsRoot() {
-    return name == RootName;
+    return name == ROOT_CONTAINER;
 }
 
 bool TContainerSpec::IsDynamic(const std::string &property) {

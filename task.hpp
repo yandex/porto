@@ -65,8 +65,6 @@ public:
     TTask(pid_t pid) : pid(pid) {};
     ~TTask();
 
-    void FindCgroups();
-
     TError Start();
     int GetPid();
     bool IsRunning();

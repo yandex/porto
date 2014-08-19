@@ -6,10 +6,8 @@
 #include <memory>
 #include <functional>
 
-#include "error.h"
+#include "porto.hpp"
 #include "kvalue.hpp"
-
-const std::string RootName = "/";
 
 struct TPropertySpec {
     std::string description;

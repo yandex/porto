@@ -12,8 +12,6 @@
 #include "property.hpp"
 #include "task.hpp"
 
-const std::string CONTAINERS_BASEDIR = "/db/porto/";
-
 class TCgroup;
 class TContainerEnv;
 struct TData;

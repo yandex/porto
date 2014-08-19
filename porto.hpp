@@ -5,6 +5,17 @@
 
 #include "version.hpp"
 
+const bool LOG_VEBOSE = true;
+
+const std::string ROOT_CONTAINER = "/";
+const std::string ROOT_CGROUP = "porto";
+const std::string CONTAINER_BASEDIR = "/db/porto/";
+const ssize_t CONTAINER_MAX_LOG_SIZE = 10 * 1024 * 1024;
+const std::string KVALUE_ROOT = "/tmp/porto";
+const std::string KVALUE_SIZE = "size=32m";
+const size_t PORTOD_MAX_CLIENTS = 16;
+const size_t PORTOD_POLL_TIMEOUT_MS = 1000;
+
 const std::string RPC_SOCK = "/run/portod.socket";
 const std::string RPC_SOCK_GROUP = "porto";
 const int RPC_SOCK_PERM = 0660;
