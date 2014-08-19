@@ -2,6 +2,10 @@
 #include "log.hpp"
 
 extern "C" {
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <string.h>
 #include <errno.h>
 }
@@ -10,9 +14,12 @@ bool verbose = true;
 
 static std::ofstream file;
 
-void TLogger::OpenLog(const std::string &path) {
+void TLogger::OpenLog(const std::string &path, const int mode) {
     if (file.is_open())
         file.close();
+
+    (void)unlink(path.c_str());
+    (void)creat(path.c_str(), mode);
 
     file.open(path);
 }

@@ -8,6 +8,7 @@
 
 class TFile {
     const std::string path;
+    const int mode; // currently used only by WriteStringNoAppend
 
 public:
     enum EFileType {
@@ -22,7 +23,7 @@ public:
         Any
     };    
 
-    TFile(const std::string &path) : path(path) { };
+    TFile(const std::string &path, const int mode = 0600) : path(path), mode(mode) { };
 
     std::string Path();
     EFileType Type();

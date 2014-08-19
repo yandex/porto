@@ -5,6 +5,7 @@
 #include "util/string.hpp"
 
 extern "C" {
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -108,13 +109,22 @@ TError TFile::ReadLink(std::string &value) {
 }
 
 TError TFile::WriteStringNoAppend(const string &str) {
-    ofstream out(path, ofstream::trunc);
-    if (out.is_open()) {
-        out << str;
-        return TError::Success();
-    } else {
-        return TError(EError::Unknown, errno, "write(" + path + ", " + str + ")");
-    }
+    TError error = TError::Success();
+
+    int fd = open(path.c_str(), O_CREAT | O_TRUNC | O_WRONLY, mode);
+    if (!fd)
+        return TError(EError::Unknown, errno, "open(" + path + ")");
+
+retry:
+    ssize_t ret = write(fd, str.c_str(), str.length());
+    if (ret == EINTR)
+        goto retry;
+    if (ret != (ssize_t)str.length())
+        error = TError(EError::Unknown, errno, "write(" + str + ")");
+
+    close(fd);
+
+    return error;
 }
 
 TError TFile::AppendString(const string &str) {

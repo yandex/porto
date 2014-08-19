@@ -15,4 +15,4 @@ bool ReadDelimitedFrom(google::protobuf::io::ZeroCopyInputStream* rawInput,
                        google::protobuf::MessageLite* message);
 
 TError ConnectToRpcServer(const std::string& path, int &fd);
-TError CreateRpcServer(const std::string &path, int &fd);
+TError CreateRpcServer(const std::string &path, const int mode, const int uid, const int gid, int &fd);

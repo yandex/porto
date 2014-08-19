@@ -4,11 +4,12 @@
 - freezer wait finite number of times for freezed state
 - -v should return git commit hash AND recent git tag (git describe, see http://git.kernel.org/cgit/git/git.git/tree/GIT-VERSION-GEN?id=master)
 - correctly handle syscall results (in particular EBUSY)
+- /porto cgroup
 
 # cleanup
 - rotate subprocess stdout/stderr
 - property:env support ; (via \;)
-- permissions of .pid, .socket, etc
+- permissions of cgroups
 - move all 'extern "C"' into one file
 
 # debug

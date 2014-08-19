@@ -15,6 +15,7 @@ extern "C" {
 #include <sys/un.h>
 #include <poll.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <signal.h>
 }
 
@@ -99,8 +100,8 @@ static bool AnotherInstanceRunning(const string &path) {
     return true;
 }
 
-static TError CreatePidFile(const string &path) {
-    TFile f(path);
+static TError CreatePidFile(const string &path, const int mode) {
+    TFile f(path, mode);
 
     return f.WriteStringNoAppend(to_string(getpid()));
 }
@@ -147,7 +148,15 @@ static int RpcMain(TContainerHolder &cholder) {
     int sfd;
     std::vector<int> clients;
 
-    TError error = CreateRpcServer(RPC_SOCK, sfd);
+    uid_t uid = getuid();
+    gid_t gid = getgid();
+    struct group *g = getgrnam(RPC_SOCK_GROUP.c_str());
+    if (g)
+        gid = g->gr_gid;
+    else
+        TLogger::Log("Can't get gid for " + RPC_SOCK_GROUP + " group");
+
+    TError error = CreateRpcServer(RPC_SOCK, RPC_SOCK_PERM, uid, gid, sfd);
     if (error) {
         TLogger::Log("Can't create RPC server: " + error.GetMsg());
         return -1;
@@ -175,7 +184,7 @@ static int RpcMain(TContainerHolder &cholder) {
 
         if (Hup) {
             TLogger::CloseLog();
-            TLogger::OpenLog(LOG_FILE);
+            TLogger::OpenLog(LOG_FILE, LOG_FILE_PERM);
             Hup = false;
         }
 
@@ -240,7 +249,9 @@ int main(int argc, char * const argv[])
         }
     }
 
-    TLogger::OpenLog(LOG_FILE);
+    TLogger::OpenLog(LOG_FILE, LOG_FILE_PERM);
+
+    umask(0);
 
     if (fcntl(REAP_FD, F_SETFD, FD_CLOEXEC) < 0) {
         TLogger::Log(string("Can't set close-on-exec flag on REAP_FD: ") + strerror(errno));
@@ -263,7 +274,7 @@ int main(int argc, char * const argv[])
         return -1;
     }
 
-    if (CreatePidFile(PID_FILE)) {
+    if (CreatePidFile(PID_FILE, PID_FILE_PERM)) {
         TLogger::Log("Can't create pid file " + PID_FILE + "!");
         return -1;
     }

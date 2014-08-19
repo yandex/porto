@@ -1,9 +1,14 @@
+#include <string>
+
 #include "protobuf.hpp"
+
+using namespace std;
 
 extern "C" {
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/stat.h>
 }
 
 bool WriteDelimitedTo(
@@ -80,7 +85,7 @@ TError ConnectToRpcServer(const std::string& path, int &fd)
     return TError::Success();
 }
 
-TError CreateRpcServer(const std::string &path, int &fd)
+TError CreateRpcServer(const std::string &path, const int mode, const int uid, const int gid, int &fd)
 {
     struct sockaddr_un my_addr;
 
@@ -94,11 +99,20 @@ TError CreateRpcServer(const std::string &path, int &fd)
     strncpy(my_addr.sun_path, path.c_str(), sizeof(my_addr.sun_path) - 1);
 
     (void)unlink(path.c_str());
+    if (fchmod(fd, mode) < 0) {
+        close(fd);
+        return TError(EError::Unknown, errno, "fchmod(" + path + ", " + to_string(mode) + ")");
+    }
 
     if (bind(fd, (struct sockaddr *) &my_addr,
              sizeof(struct sockaddr_un)) < 0) {
         close(fd);
         return TError(EError::Unknown, errno, "bind(" + path + ")");
+    }
+
+    if (chown(path.c_str(), uid, gid) < 0) {
+        close(fd);
+        return TError(EError::Unknown, errno, "chown(" + path + ", " + to_string(uid) + ", " + to_string(gid) + ")");
     }
 
     if (listen(fd, 0) < 0) {
