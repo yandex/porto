@@ -54,7 +54,7 @@ vector<shared_ptr<TCgroup> > TCgroup::FindChildren() {
     }
 
     for (auto s : list) {
-        auto cg = TRegistry<TCgroup>::Get(TCgroup(s, self, level + 1));
+        auto cg = TRegistry<TCgroup>::Get(TCgroup(s, self));
 
         children.push_back(weak_ptr<TCgroup>(cg));
         for (auto c : cg->FindChildren())
@@ -155,7 +155,25 @@ TError TCgroup::Create() {
     return TError::Success();
 }
 
+bool TCgroup::RemoveSubtree(void) {
+    if (IsRoot())
+        return false;
+
+    if (level == 1 && name == RootCgroup)
+        return true;
+
+    for (auto cg = parent; cg; cg = cg->parent)
+        if (cg->level == 1 && cg->name == RootCgroup)
+            return true;
+
+    return false;
+}
+
 TError TCgroup::Remove() {
+    // we don't manage anything outside /porto
+    if (!RemoveSubtree())
+        return TError::Success();
+
     if (IsRoot()) {
         TError error = mount->Umount();
         TLogger::LogError(error, "Can't umount root cgroup for root container");

@@ -381,9 +381,9 @@ TError TContainer::Restore(const kv::TNode &node) {
 
 std::shared_ptr<TCgroup> TContainer::GetCgroup(shared_ptr<TSubsystem> subsys) {
     if (name == RootName)
-        return TCgroup::GetRoot(subsys);
+        return TCgroup::Get(RootCgroup, TCgroup::GetRoot(subsys));
     else
-        return TCgroup::Get(name, TCgroup::GetRoot(subsys));
+        return TCgroup::Get(name, TCgroup::Get(RootCgroup, TCgroup::GetRoot(subsys)));
 }
 
 bool TContainer::DeliverExitStatus(int pid, int status) {

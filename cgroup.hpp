@@ -9,6 +9,8 @@
 #include "util/mount.hpp"
 #include "util/folder.hpp"
 
+const std::string RootCgroup = "porto";
+
 class TCgroup {
     const std::string name;
     const std::shared_ptr<TCgroup> parent;
@@ -23,14 +25,16 @@ class TCgroup {
 
     bool need_cleanup = false;
 
+    bool RemoveSubtree(void);
+
 public:
     static std::shared_ptr<TCgroup> Get(const std::string &name,
                                         const std::shared_ptr<TCgroup> &parent);
     static std::shared_ptr<TCgroup> GetRoot(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems);
     static std::shared_ptr<TCgroup> GetRoot(const std::shared_ptr<TSubsystem> subsystem);
 
-    TCgroup(const std::string &name, const std::shared_ptr<TCgroup> parent, int level = 0) :
-        name(name), parent(parent), level(level) { }
+    TCgroup(const std::string &name, const std::shared_ptr<TCgroup> parent) :
+        name(name), parent(parent), level(parent->level + 1) { }
     TCgroup(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems) :
         name("/"), parent(std::shared_ptr<TCgroup>(nullptr)), level(0), mount(mount), subsystems(subsystems) { }
 

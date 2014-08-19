@@ -272,7 +272,7 @@ static void TestLongRunning(TPortoAPI &api, const string &name) {
     cgmap = GetCgroups(pid);
     Expect(cgmap.size() == 3);
     for (auto kv : cgmap) {
-        Expect(kv.second == "/" + name);
+        Expect(kv.second == "/porto/" + name);
     }
 
     ExpectSuccess(api.Stop(name));
