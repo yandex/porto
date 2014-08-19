@@ -115,10 +115,7 @@ TError TFile::WriteStringNoAppend(const string &str) {
     if (!fd)
         return TError(EError::Unknown, errno, "open(" + path + ")");
 
-retry:
     ssize_t ret = write(fd, str.c_str(), str.length());
-    if (ret == EINTR)
-        goto retry;
     if (ret != (ssize_t)str.length())
         error = TError(EError::Unknown, errno, "write(" + str + ")");
 

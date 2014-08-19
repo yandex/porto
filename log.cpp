@@ -18,8 +18,8 @@ void TLogger::OpenLog(const std::string &path, const int mode) {
     if (file.is_open())
         file.close();
 
-    (void)unlink(path.c_str());
     (void)creat(path.c_str(), mode);
+    if (truncate(path.c_str(), 0)) {}
 
     file.open(path);
 }
@@ -28,24 +28,39 @@ void TLogger::CloseLog() {
     file.close();
 }
 
+static std::string GetTime() {
+    char tmstr[256];
+    time_t t;
+    struct tm *tmp;
+    t = time(NULL);
+    tmp = localtime(&t);
+
+    if (tmp && strftime(tmstr, sizeof(tmstr), "%c", tmp))
+        return std::string(tmstr);
+
+    return std::string();
+}
+
 void TLogger::Log(const std::string &action) {
     if (verbose) {
-        std::cerr << action << std::endl;
-
         if (file.is_open())
-            file << action << std::endl;
+            file << GetTime() << " " << action << std::endl;
+        else
+            std::cerr << GetTime() << " " << action << std::endl;
     }
 }
 
 void TLogger::LogAction(const std::string &action, bool error, int errcode) {
     if (!error && verbose) {
-        std::cerr << "Ok: " << action << std::endl;
         if (file.is_open())
-            file << "Ok: " << action << std::endl;
+            file << GetTime() << " Ok: " << action << std::endl;
+        else
+            std::cerr << GetTime() << " Ok: " << action << std::endl;
     } else if (error) {
-        std::cerr << "Error: " << action << ": " << strerror(errcode) << std::endl;
         if (file.is_open())
-            file << "Error: " << action << ": " << strerror(errcode) << std::endl;
+            file << GetTime() << " Error: " << action << ": " << strerror(errcode) << std::endl;
+        else
+            std::cerr << GetTime() << " Error: " << action << ": " << strerror(errcode) << std::endl;
     }
 }
 
@@ -53,19 +68,22 @@ void TLogger::LogError(const TError &e, const std::string &s) {
     if (!e)
         return;
 
-    std::cerr << "Error(" << rpc::EError_Name(e.GetError()) << "): " << s << ": " << e.GetMsg() << std::endl;
     if (file.is_open())
-        file << "Error(" << rpc::EError_Name(e.GetError()) << "): " << s << ": " << e.GetMsg() << std::endl;
+        file << GetTime() << " Error(" << rpc::EError_Name(e.GetError()) << "): " << s << ": " << e.GetMsg() << std::endl;
+    else
+        std::cerr << GetTime() << " Error(" << rpc::EError_Name(e.GetError()) << "): " << s << ": " << e.GetMsg() << std::endl;
 }
 
 void TLogger::LogRequest(const std::string &message) {
-    std::cerr << "-> " << message << std::endl;
     if (file.is_open())
-        file << "-> " << message << std::endl;
+        file << GetTime() << " -> " << message << std::endl;
+    else
+        std::cerr << GetTime() << " -> " << message << std::endl;
 }
 
 void TLogger::LogResponse(const std::string &message) {
-    std::cerr << "<- " << message << std::endl;
     if (file.is_open())
-        file << "<- " << message << std::endl;
+        file << GetTime() << " <- " << message << std::endl;
+    else
+        std::cerr << GetTime() << " <- " << message << std::endl;
 }

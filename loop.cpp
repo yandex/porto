@@ -1,25 +1,41 @@
 #include <iostream>
 #include <vector>
 
+#include "porto.hpp"
+
 extern "C" {
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <sys/prctl.h>
+#include <fcntl.h>
 }
 
 using namespace std;
 
-const string PREFIX = "loop: ";
+static basic_ostream<char> &Log() {
+    char tmstr[256];
+    time_t t;
+    struct tm *tmp;
+    t = time(NULL);
+    tmp = localtime(&t);
+
+    if (tmp && strftime(tmstr, sizeof(tmstr), "%c", tmp))
+        cerr << tmstr << " ";
+
+    cerr << program_invocation_short_name << ": ";
+    return cerr;
+}
 
 static void SendPidStatus(int fd, int pid, int status) {
-    cerr << PREFIX << pid << " finished with " << status << endl;
+    Log() << "Deliver " << pid << " status " << status << endl;
 
     if (write(fd, &pid, sizeof(pid)) < 0)
-        cerr << PREFIX << "write(pid): " << strerror(errno);
+        Log() << "write(pid): " << strerror(errno) << endl;
     if (write(fd, &status, sizeof(status)) < 0)
-        cerr << PREFIX << "write(status): " << strerror(errno);
+        Log() << "write(status): " << strerror(errno) << endl;
 }
 
 static pid_t portod_pid;
@@ -29,7 +45,6 @@ static volatile sig_atomic_t NeedUpdate = false;
 static void DoExitAndCleanup(int signum)
 {
     Done = true;
-    (void)kill(portod_pid, SIGINT);
 }
 
 static void DoUpdate(int signum)
@@ -41,13 +56,13 @@ static int SpawnPortod() {
     int pfd[2];
     int ret = EXIT_FAILURE;
     if (pipe(pfd) < 0) {
-        cerr << PREFIX << "pipe(): " << strerror(errno);
+        Log() << "pipe(): " << strerror(errno) << endl;
         return EXIT_FAILURE;
     }
 
     portod_pid = fork();
     if (portod_pid < 0) {
-        cerr << PREFIX << "fork(): " << strerror(errno);
+        Log() << "fork(): " << strerror(errno) << endl;
         ret = EXIT_FAILURE;
         goto exit;
     } else if (portod_pid == 0) {
@@ -59,27 +74,27 @@ static int SpawnPortod() {
 
     close(pfd[0]);
 
-    cerr << PREFIX << "Spawned portod " << portod_pid << endl;
+    Log() << "Spawned portod " << portod_pid << endl;
 
     while (!Done) {
         if (NeedUpdate) {
-            cerr << PREFIX << "Updating" << endl;
+            Log() << "Updating" << endl;
 
-            if (!kill(portod_pid, SIGKILL))
-                cerr << PREFIX << "Can't send SIGKILL to portod" << endl;
+            if (kill(portod_pid, SIGKILL) < 0)
+                Log() << "Can't send SIGKILL to portod: " << strerror(errno) << endl;
             if (waitpid(portod_pid, NULL, 0) != portod_pid)
-                cerr << PREFIX << "Can't wait for portod exit status" << endl;
+                Log() << "Can't wait for portod exit status: " << strerror(errno) << endl;
 
             close(pfd[1]);
 
-            execlp(program_invocation_name, program_invocation_short_name, nullptr);
-            cerr << PREFIX << "Can't execlp(" << program_invocation_name << ", " << program_invocation_short_name << ", NULL)" << endl;
+            execl(program_invocation_name, program_invocation_short_name, nullptr);
+            Log() << "Can't execl(" << program_invocation_name << ", " << program_invocation_short_name << ", NULL)" << endl;
             return EXIT_FAILURE;
         }
 
         int status;
         pid_t pid = wait(&status);
-        if (pid == EINTR)
+        if (errno == EINTR)
             continue;
         if (pid == portod_pid)
             break;
@@ -94,21 +109,38 @@ exit:
     return ret;
 }
 
+static void RegisterSignal(int signum, void (*handler)(int)) {
+    struct sigaction sa = { 0 };
+
+    sa.sa_handler = handler;
+    if (sigaction(signum, &sa, NULL) < 0)
+        Log() << "Can't change disposition of " << signum << endl;
+}
+
 int main(int argc, char * const argv[])
 {
-    // portod may die while we are writing into communication pipe
-    signal(SIGPIPE, SIG_IGN);
+    Log() << "Started" << endl;
 
-    signal(SIGINT, DoExitAndCleanup);
-    signal(SIGUSR1, DoUpdate);
+    // portod may die while we are writing into communication pipe
+    RegisterSignal(SIGPIPE, SIG_IGN);
+    RegisterSignal(SIGINT, DoExitAndCleanup);
+    RegisterSignal(SIGHUP, DoUpdate);
 
     if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0) {
-        cerr << PREFIX << "Can't set myself as a subreaper" << endl;
+        Log() << "Can't set myself as a subreaper" << endl;
         return EXIT_FAILURE;
     }
 
-    while (!Done)
-        cerr << PREFIX << "Returned " << SpawnPortod() << endl;
+    int ret = EXIT_SUCCESS;
+    while (!Done) {
+        ret = SpawnPortod();
+        Log() << "Returned " << ret << endl;
+    }
 
-    return EXIT_SUCCESS;
+    if (kill(portod_pid, SIGINT) < 0)
+        Log() << "Can't send SIGINT to portod" << endl;
+
+    Log() << "Stopped" << endl;
+
+    return ret;
 }

@@ -82,7 +82,6 @@ static void DoExitAndCleanup(int signum) {
     Done = true;
     Cleanup = true;
     RaiseSignum = signum;
-    TLogger::CloseLog();
 }
 
 static void DoHangup(int signum) {
@@ -111,7 +110,7 @@ static void RemovePidFile(const string &path) {
     (void)f.Remove();
 }
 
-static void ReapSpawner(int fd, TContainerHolder &cholder) {
+static int ReapSpawner(int fd, TContainerHolder &cholder) {
     struct pollfd fds[1];
     int nr = 100;
 
@@ -122,25 +121,28 @@ static void ReapSpawner(int fd, TContainerHolder &cholder) {
         int ret = poll(fds, 1, 0);
         if (ret < 0) {
             TLogger::Log(string("poll() error: ") + strerror(errno));
+            return ret;
             break;
         }
 
         if (!fds[0].revents)
-            break;
+            return 0;
 
         int pid, status;
         if (read(fd, &pid, sizeof(pid)) < 0) {
             TLogger::Log(string("read(pid): ") + strerror(errno));
-            break;
+            return 0;
         }
         if (read(fd, &status, sizeof(status)) < 0) {
             TLogger::Log(string("read(status): ") + strerror(errno));
-            break;
+            return 0;
         }
 
         if (!cholder.DeliverExitStatus(pid, status))
             TLogger::Log("Can't deliver " + to_string(pid) + " exit status " + to_string(status));
     }
+
+    return 0;
 }
 
 static int RpcMain(TContainerHolder &cholder) {
@@ -188,7 +190,11 @@ static int RpcMain(TContainerHolder &cholder) {
             Hup = false;
         }
 
-        (void)ReapSpawner(REAP_FD, cholder);
+        ret = ReapSpawner(REAP_FD, cholder);
+        if (ret < 0) {
+            if (!Hup)
+                break;
+        }
 
         if (fds[MAX_CLIENTS].revents && clients.size() < MAX_CLIENTS) {
             ret = AcceptClient(sfd, clients);
@@ -220,20 +226,34 @@ static int RpcMain(TContainerHolder &cholder) {
 }
 
 static void ReaiseSignal(int signum) {
-    signal(SIGTERM, SIG_DFL);
-    signal(SIGINT, SIG_DFL);
-    signal(SIGHUP, SIG_DFL);
+    struct sigaction sa = { 0 };
+    sa.sa_handler = SIG_DFL;
+
+    TLogger::CloseLog();
+
+    (void)sigaction(SIGTERM, &sa, NULL);
+    (void)sigaction(SIGINT, &sa, NULL);
+    (void)sigaction(SIGHUP, &sa, NULL);
     raise(signum);
+    exit(-signum);
 }
 
-void KvDump() {
+static void KvDump() {
         TKeyValueStorage storage;
         storage.Dump();
 }
 
+static void RegisterSignal(int signum, void (*handler)(int)) {
+    struct sigaction sa = { 0 };
+
+    sa.sa_handler = handler;
+    if (sigaction(signum, &sa, NULL) < 0)
+        TLogger::Log("Can't change disposition of " + to_string(signum));
+}
+
 int main(int argc, char * const argv[])
 {
-    int ret = 0;
+    int ret = EXIT_SUCCESS;
     int opt;
 
     while ((opt = getopt(argc, argv, "dv")) != -1) {
@@ -259,24 +279,24 @@ int main(int argc, char * const argv[])
     }
 
     // in case client closes pipe we are writing to in the protobuf code
-    signal(SIGPIPE, SIG_IGN);
+    RegisterSignal(SIGPIPE, SIG_IGN);
 
     // don't stop containers when terminating
     // don't catch SIGQUIT, may be useful to create core dump
-    signal(SIGTERM, DoExit);
-    signal(SIGHUP, DoHangup);
+    RegisterSignal(SIGTERM, DoExit);
+    RegisterSignal(SIGHUP, DoHangup);
 
     // kill all running containers in case of SIGINT (useful for debugging)
-    signal(SIGINT, DoExitAndCleanup);
+    RegisterSignal(SIGINT, DoExitAndCleanup);
 
     if (AnotherInstanceRunning(RPC_SOCK)) {
         TLogger::Log("Another instance of portod is running!");
-        return -1;
+        return EXIT_FAILURE;
     }
 
     if (CreatePidFile(PID_FILE, PID_FILE_PERM)) {
         TLogger::Log("Can't create pid file " + PID_FILE + "!");
-        return -1;
+        return EXIT_FAILURE;
     }
 
     try {
