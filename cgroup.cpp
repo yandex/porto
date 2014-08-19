@@ -10,6 +10,10 @@
 
 using namespace std;
 
+extern "C" {
+#include <unistd.h>
+}
+
 // TCgroup
 shared_ptr<TCgroup> TCgroup::Get(const string &name, const shared_ptr<TCgroup> &parent) {
     return TRegistry<TCgroup>::Get(TCgroup(name, parent));
@@ -183,8 +187,13 @@ TError TCgroup::Remove() {
         // at this point we should have gracefully terminated all tasks
         // in the container; if anything is still alive we have no other choice
         // but to kill it with SIGKILL
-        while (!IsEmpty())
+        int retry = CGROUP_REMOVE_TIMEOUT_S * 10;
+        while (retry--) {
             Kill(SIGKILL);
+            if (IsEmpty())
+                break;
+            usleep(100000);
+        }
     }
 
     TFolder f(Path());
