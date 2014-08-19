@@ -21,7 +21,7 @@ class TCgroup {
     std::vector<std::shared_ptr<TSubsystem>> subsystems;
 
     std::string tmpfs = "/sys/fs/cgroup";
-    mode_t mode = 0x666;
+    mode_t mode = 0755;
 
     bool need_cleanup = false;
 

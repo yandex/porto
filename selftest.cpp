@@ -515,6 +515,7 @@ int Selftest() {
         TestCwd(api, "a");
         //TestRoot(api, "a");
         ExpectSuccess(api.Destroy("a"));
+        // TODO: check cgroups permissions
     } catch (string e) {
         cerr << "EXCEPTION: " << e << endl;
         return 1;

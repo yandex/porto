@@ -43,7 +43,7 @@ TFile::EFileType TFile::Type() {
 }
 
 TError TFile::Remove() {
-    TLogger::Log("rm " + path);
+    TLogger::Log("unlink " + path);
 
     int ret = unlink(path.c_str());
 

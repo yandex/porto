@@ -14,7 +14,7 @@ public:
     TFolder(TFile file) : path(file.Path()) {}
 
     bool Exists();
-    TError Create(mode_t mode = 0x755);
+    TError Create(mode_t mode = 0755);
     TError Remove(bool recursive = false);
     TError Rename(const std::string &newname);
 
