@@ -1,4 +1,3 @@
-- portod start containers in predefined directory and remove it when finished
 - sleeps & finite number of retries in cgroup kill
 - state recovery: kill freezed tasks fails
 - freezer wait finite number of times for freezed state

@@ -1,19 +1,34 @@
-#include "folder.hpp"
+#include <unordered_map>
 
+#include "folder.hpp"
+#include "log.hpp"
+
+extern "C" {
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <dirent.h>
 #include <unistd.h>
-
-#include <unordered_map>
-
-#include "log.hpp"
+#include <libgen.h>
+}
 
 using namespace std;
 
-TError TFolder::Create(mode_t mode) {
+TError TFolder::Create(mode_t mode, bool recursive) {
     TLogger::Log("mkdir " + path);
+
+    if (recursive) {
+        string copy(path);
+        char *dup = strdup(copy.c_str());
+        char *p = dirname(dup);
+        TFolder f(p);
+        free(dup);
+        if (!f.Exists()) {
+            TError error(f.Create(mode, true));
+            if (error)
+                return error;
+        }
+    }
 
     if (mkdir(path.c_str(), mode) < 0)
         return TError(EError::Unknown, errno, "mkdir(" + path + ", " + to_string(mode) + ")");

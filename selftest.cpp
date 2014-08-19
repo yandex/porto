@@ -22,7 +22,7 @@ using namespace std;
 #define ExpectFailure(ret, exp) _ExpectFailure(ret, exp, __LINE__, __func__)
 static void _ExpectFailure(int ret, int exp, int line, const char *func) {
     if (ret != exp)
-        throw string(to_string(ret) + " != " + to_string(exp) + " at " + func + ":" + to_string(line));
+        throw string("Got " + to_string(ret) + ", but expected " + to_string(exp) + " at " + func + ":" + to_string(line));
 }
 
 static void ShouldHaveOnlyRoot(TPortoAPI &api) {
@@ -145,7 +145,7 @@ static bool TaskRunning(TPortoAPI &api, const string &pid, const string &name) {
     return kill(p, 0) == 0;
 }
 
-static void WaitPid(TPortoAPI &api, const string &pid, const string &name) {
+static void WaitExit(TPortoAPI &api, const string &pid, const string &name) {
     cerr << "Waiting for " << pid << " to exit..." << endl;
 
     int times = 100;
@@ -177,7 +177,7 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.SetProperty(name, "command", "false"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
-    WaitPid(api, pid, name);
+    WaitExit(api, pid, name);
     ExpectSuccess(api.GetData(name, "exit_status", ret));
     Expect(ret == string("0 0 1"));
 
@@ -185,7 +185,7 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.SetProperty(name, "command", "true"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
-    WaitPid(api, pid, name);
+    WaitExit(api, pid, name);
     ExpectSuccess(api.GetData(name, "exit_status", ret));
     Expect(ret == string("0 0 0"));
 
@@ -206,7 +206,7 @@ static void TestStreams(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.SetProperty(name, "command", "bash -c 'echo out >&1'"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
-    WaitPid(api, pid, name);
+    WaitExit(api, pid, name);
     ExpectSuccess(api.GetData(name, "stdout", ret));
     Expect(ret == string("out\n"));
     ExpectSuccess(api.GetData(name, "stderr", ret));
@@ -216,7 +216,7 @@ static void TestStreams(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.SetProperty(name, "command", "bash -c 'echo err >&2'"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
-    WaitPid(api, pid, name);
+    WaitExit(api, pid, name);
     ExpectSuccess(api.GetData(name, "stdout", ret));
     Expect(ret == string(""));
     ExpectSuccess(api.GetData(name, "stderr", ret));
@@ -287,7 +287,7 @@ static void TestIsolation(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.SetProperty(name, "command", "bash -c 'echo $BASHPID'"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
-    WaitPid(api, pid, name);
+    WaitExit(api, pid, name);
 
     ExpectSuccess(api.GetData(name, "stdout", ret));
     Expect(ret == string("1\n"));
@@ -415,12 +415,27 @@ static void TestUserGroup(TPortoAPI &api, const string &name) {
 static string GetCwd(const string &pid) {
     string lnk;
     TFile f("/proc/" + pid + "/cwd");
-    (void)f.ReadLink(lnk);
+    TError error(f.ReadLink(lnk));
+    if (error)
+        return error.GetMsg();
     return lnk;
 }
 
 static void TestCwd(TPortoAPI &api, const string &name) {
     string pid;
+    string cwd;
+
+    cerr << "Check default working directory" << endl;
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    string expcwd = "/db/porto/" + name;
+    cwd = GetCwd(pid);
+
+    Expect(cwd == expcwd);
+    Expect(access(expcwd.c_str(), F_OK) == 0);
+    ExpectSuccess(api.Stop(name));
+    Expect(access(expcwd.c_str(), F_OK) != 0);
 
     cerr << "Check user defined working directory" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
@@ -428,11 +443,12 @@ static void TestCwd(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
 
-    string cwd = GetCwd(pid);
+    cwd = GetCwd(pid);
 
     Expect(cwd == "/tmp");
     ExpectSuccess(api.Stop(name));
     ExpectSuccess(api.SetProperty(name, "cwd", ""));
+    Expect(access("/tmp", F_OK) == 0);
 }
 
 /*
@@ -447,7 +463,7 @@ static void TestRoot(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetData(name, "root_pid", pid));
 
     string cwd = GetCwd(pid);
-    WaitPid(api, pid, name);
+    WaitExit(api, pid, name);
 
     Expect(cwd == "/root/chroot");
 
@@ -477,7 +493,7 @@ static void TestStateMachine(TPortoAPI &api, const string &name) {
     ExpectFailure(api.Start(name), EError::InvalidValue);
 
     ExpectSuccess(api.GetData(name, "root_pid", pid));
-    WaitPid(api, pid, name);
+    WaitExit(api, pid, name);
     ExpectSuccess(api.GetData(name, "state", v));
     Expect(v == "dead");
 

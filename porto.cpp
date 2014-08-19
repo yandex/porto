@@ -382,16 +382,12 @@ public:
         }
 
         ret = api.GetData(argv[0], argv[1], value);
-        if (!ret) {
+        if (!ret)
             cout << DataValue(argv[1], value) << endl;
-            return 0;
-        }
 
         ret = api.GetProperty(argv[0], argv[1], value);
-        if (!ret) {
+        if (!ret)
             cout << value << endl;
-            return 0;
-        }
 
         cerr << "Invalid property or data = " << ErrorName(ret) << endl;
 

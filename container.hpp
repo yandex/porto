@@ -12,6 +12,8 @@
 #include "property.hpp"
 #include "task.hpp"
 
+const std::string CONTAINERS_BASEDIR = "/db/porto/";
+
 class TCgroup;
 class TContainerEnv;
 struct TData;
@@ -39,8 +41,9 @@ class TContainer {
     TContainerSpec spec;
     friend TData;
 
-    std::vector<std::shared_ptr<TCgroup> > leaf_cgroups;
+    std::vector<std::shared_ptr<TCgroup>> leaf_cgroups;
     std::unique_ptr<TTask> task;
+    std::unique_ptr<TFolder> dir;
 
     // data
     bool CheckState(EContainerState expected);
@@ -79,7 +82,7 @@ public:
 };
 
 class TContainerHolder {
-    std::map <std::string, std::shared_ptr<TContainer> > containers;
+    std::map <std::string, std::shared_ptr<TContainer>> containers;
 
     bool ValidName(const std::string &name);
 public:

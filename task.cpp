@@ -260,7 +260,12 @@ int TTask::ChildCallback() {
 
     }
 
-    if (env.cwd.length() && chdir(env.cwd.c_str()) < 0) {
+    if (chown(env.cwd.c_str(), env.uid, env.gid) < 0) {
+        Syslog("chown(" + env.cwd + "): " + strerror(errno));
+        ReportResultAndExit(wfd, -errno);
+    }
+
+    if (chdir(env.cwd.c_str()) < 0) {
         Syslog(string("chdir(): ") + strerror(errno));
         ReportResultAndExit(wfd, -errno);
     }

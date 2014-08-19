@@ -121,7 +121,6 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
         if (ret < 0) {
             TLogger::Log(string("poll() error: ") + strerror(errno));
             return ret;
-            break;
         }
 
         if (!fds[0].revents)
@@ -137,8 +136,10 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
             return 0;
         }
 
-        if (!cholder.DeliverExitStatus(pid, status))
+        if (!cholder.DeliverExitStatus(pid, status)) {
             TLogger::Log("Can't deliver " + to_string(pid) + " exit status " + to_string(status));
+            return 0;
+        }
     }
 
     return 0;
@@ -180,7 +181,7 @@ static int RpcMain(TContainerHolder &cholder) {
         if (ret < 0) {
             TLogger::Log(string("poll() error: ") + strerror(errno));
 
-            if (!Hup)
+            if (Done)
                 break;
         }
 
@@ -198,10 +199,8 @@ static int RpcMain(TContainerHolder &cholder) {
         }
 
         ret = ReapSpawner(REAP_FD, cholder);
-        if (ret < 0) {
-            if (!Hup)
-                break;
-        }
+        if (Done)
+            break;
 
         if (fds[MAX_CLIENTS].revents && clients.size() < MAX_CLIENTS) {
             ret = AcceptClient(sfd, clients);
@@ -209,7 +208,7 @@ static int RpcMain(TContainerHolder &cholder) {
                 break;
         }
 
-        for (size_t i = 0; i < MAX_CLIENTS; i++) {
+        for (size_t i = 0; i < MAX_CLIENTS && !Done; i++) {
             if (!fds[i].revents)
                 continue;
 

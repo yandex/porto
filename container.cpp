@@ -132,6 +132,8 @@ TContainer::~TContainer() {
     if (state == Paused)
         Resume();
 
+    TLogger::Log("stop " + name);
+
     Stop();
 }
 
@@ -179,7 +181,28 @@ TError TContainer::PrepareCgroups() {
 }
 
 TError TContainer::PrepareTask() {
-    TTaskEnv taskEnv(spec.Get("command"), spec.Get("cwd"), spec.Get("root"), spec.Get("user"), spec.Get("group"), spec.Get("env"));
+    string cwd = spec.Get("cwd");
+
+    if (!cwd.length()) {
+        cwd = CONTAINERS_BASEDIR + name;
+
+        TLogger::Log("cwd=" + cwd);
+
+        dir = unique_ptr<TFolder>(new TFolder(cwd));
+        if (dir->Exists()) {
+            TError error(dir->Remove());
+            if (error)
+                return error;
+        }
+        TError error(dir->Create(0750, true));
+        if (error)
+            return error;
+    } else if (dir) {
+        dir->Remove();
+        dir = nullptr;
+    }
+
+    TTaskEnv taskEnv(spec.Get("command"), cwd, spec.Get("root"), spec.Get("user"), spec.Get("group"), spec.Get("env"));
     TError error = taskEnv.Prepare();
     if (error)
         return error;
@@ -274,6 +297,12 @@ TError TContainer::Stop() {
     leaf_cgroups.clear();
 
     state = Stopped;
+
+    if (dir) {
+        error = dir->Remove();
+        if (error)
+            return error;
+    }
 
     return TError::Success();
 }
