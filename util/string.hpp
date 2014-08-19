@@ -1,12 +1,12 @@
 #ifndef __STRINGUTIL_HPP__
 #define __STRINGUTIL_HPP__
 
-#include "error.hpp"
-
 #include <cstdint>
 #include <string>
 #include <vector>
 #include <set>
+
+#include "error.hpp"
 
 std::string CommaSeparatedList(const std::vector<std::string> &list);
 std::string CommaSeparatedList(const std::set<std::string> &list);

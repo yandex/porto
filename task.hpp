@@ -5,11 +5,6 @@
 #include <vector>
 #include <cstdint>
 
-extern "C" {
-#include <signal.h>
-#include <grp.h>
-}
-
 #include "cgroup.hpp"
 
 class TTask;

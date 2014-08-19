@@ -6,6 +6,7 @@
 #include "log.hpp"
 
 extern "C" {
+#include <sys/mount.h>
 #include <stdio.h>
 #include <mntent.h>
 }

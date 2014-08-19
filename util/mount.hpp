@@ -6,8 +6,6 @@
 #include <memory>
 #include <set>
 
-#include <sys/mount.h>
-
 #include "error.hpp"
 
 class TMount {

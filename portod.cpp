@@ -16,6 +16,7 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>
+#include <grp.h>
 }
 
 using namespace std;

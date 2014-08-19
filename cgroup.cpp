@@ -12,7 +12,7 @@
 using namespace std;
 
 extern "C" {
-#include <unistd.h>
+#include <signal.h>
 }
 
 // TCgroup
