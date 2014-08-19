@@ -17,9 +17,7 @@ include_directories(${PROTOBUF_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS rpc.proto kv.proto)
 
-add_custom_target(version.hpp
-    git log -1 "--format=format:const std::string GIT_REVISION = \"%H\";%n" HEAD > version.hpp
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} VERBATIM)
+add_custom_target(version.hpp ./GIT-VERSION-GEN WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} VERBATIM)
 
 add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp task.cpp kvalue.cpp subsystem.cpp error.cpp property.cpp log.cpp util/protobuf.cpp util/mount.cpp util/file.cpp util/folder.cpp util/string.cpp
     ${PROTO_SRCS} ${PROTO_HDRS})

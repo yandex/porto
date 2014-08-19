@@ -3,6 +3,8 @@
 
 #include <string>
 
+#include "version.hpp"
+
 const std::string RPC_SOCK = "/run/portod.socket";
 const std::string RPC_SOCK_GROUP = "porto";
 const int RPC_SOCK_PERM = 0660;

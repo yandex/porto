@@ -2,7 +2,6 @@
 #include <algorithm>
 
 #include "porto.hpp"
-#include "version.hpp"
 #include "rpc.hpp"
 #include "cgroup.hpp"
 #include "log.hpp"
@@ -262,7 +261,7 @@ int main(int argc, char * const argv[])
             KvDump();
             return EXIT_SUCCESS;
         case 'v':
-            cout << GIT_REVISION <<endl;
+            cout << GIT_TAG << " " << GIT_REVISION <<endl;
             return EXIT_FAILURE;
         default:
             exit(EXIT_FAILURE);

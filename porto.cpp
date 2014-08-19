@@ -2,7 +2,6 @@
 #include <iomanip>
 #include <sstream>
 
-#include "version.hpp"
 #include "libporto.hpp"
 #include "util/string.hpp"
 
@@ -446,7 +445,7 @@ int main(int argc, char *argv[])
     }
 
     if (name == "-v" || name == "--version") {
-        cout << GIT_REVISION <<endl;
+        cout << GIT_TAG << " " << GIT_REVISION <<endl;
         return EXIT_FAILURE;
     }
 

@@ -119,6 +119,14 @@ static void RegisterSignal(int signum, void (*handler)(int)) {
 
 int main(int argc, char * const argv[])
 {
+    if (argc > 1) {
+        string name(argv[1]);
+
+        if (name == "-v" || name == "--version") {
+            cout << GIT_TAG << " " << GIT_REVISION <<endl;
+            return EXIT_FAILURE;
+        }
+    }
     Log() << "Started" << endl;
 
     // portod may die while we are writing into communication pipe

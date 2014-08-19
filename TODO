@@ -1,10 +1,9 @@
+- portod start containers in predefined directory and remove it when finished
 - ? get exit_status from time to time in portod mail loop
 - sleeps & finite number of retries in cgroup kill
 - state recovery: kill freezed tasks fails
 - freezer wait finite number of times for freezed state
-- -v should return git commit hash AND recent git tag (git describe, see http://git.kernel.org/cgit/git/git.git/tree/GIT-VERSION-GEN?id=master)
 - correctly handle syscall results (in particular EBUSY)
-- portod start containers in predefined directory and remove it when finished
 
 # cleanup
 - rotate subprocess stdout/stderr
