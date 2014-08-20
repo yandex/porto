@@ -3,11 +3,7 @@
 
 #include "cgroup.hpp"
 #include "containerenv.hpp"
-
-extern "C" {
-#include <sys/types.h>
-#include <unistd.h>
-}
+#include "util/unix.hpp"
 
 using namespace std;
 
@@ -17,7 +13,7 @@ void TContainerEnv::Create() {
 }
 
 TError TContainerEnv::Attach() {
-    pid_t self = getpid();
+    int self = GetPid();
 
     for (auto cg : leaf_cgroups) {
         auto error = cg->Attach(self);

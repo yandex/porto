@@ -2,6 +2,7 @@
 #include <vector>
 
 #include "porto.hpp"
+#include "util/unix.hpp"
 
 extern "C" {
 #include <string.h>
@@ -109,14 +110,6 @@ exit:
     return ret;
 }
 
-static void RegisterSignal(int signum, void (*handler)(int)) {
-    struct sigaction sa = { 0 };
-
-    sa.sa_handler = handler;
-    if (sigaction(signum, &sa, NULL) < 0)
-        Log() << "Can't change disposition of " << signum << endl;
-}
-
 int main(int argc, char * const argv[])
 {
     if (argc > 1) {
@@ -130,9 +123,9 @@ int main(int argc, char * const argv[])
     Log() << "Started" << endl;
 
     // portod may die while we are writing into communication pipe
-    RegisterSignal(SIGPIPE, SIG_IGN);
-    RegisterSignal(SIGINT, DoExitAndCleanup);
-    RegisterSignal(SIGHUP, DoUpdate);
+    (void)RegisterSignal(SIGPIPE, SIG_IGN);
+    (void)RegisterSignal(SIGINT, DoExitAndCleanup);
+    (void)RegisterSignal(SIGHUP, DoUpdate);
 
     if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0) {
         Log() << "Can't set myself as a subreaper" << endl;

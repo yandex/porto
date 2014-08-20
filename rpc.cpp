@@ -2,11 +2,6 @@
 #include "rpc.hpp"
 #include "util/protobuf.hpp"
 
-extern "C" {
-#include <sys/socket.h>
-#include <sys/un.h>
-}
-
 using namespace std;
 
 static void CreateContainer(TContainerHolder &cholder,

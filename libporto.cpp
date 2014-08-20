@@ -4,8 +4,6 @@ using namespace std;
 
 extern "C" {
 #include <unistd.h>
-#include <sys/socket.h>
-#include <sys/un.h>
 }
 
 int TPortoAPI::SendReceive(int fd, rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {

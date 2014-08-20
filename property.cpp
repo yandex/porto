@@ -6,7 +6,6 @@
 extern "C" {
 #include <grp.h>
 #include <pwd.h>
-#include <error.h>
 }
 
 using namespace std;

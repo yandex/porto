@@ -6,6 +6,7 @@
 #include "cgroup.hpp"
 #include "log.hpp"
 #include "util/protobuf.hpp"
+#include "util/unix.hpp"
 
 extern "C" {
 #include <fcntl.h>
@@ -160,7 +161,6 @@ static int RpcMain(TContainerHolder &cholder) {
     TError error = CreateRpcServer(RPC_SOCK, RPC_SOCK_PERM, uid, gid, sfd);
     if (error) {
         TLogger::Log("Can't create RPC server: " + error.GetMsg());
-        return -1;
     }
 
     int starved = 0;
@@ -248,14 +248,6 @@ static void KvDump() {
         storage.Dump();
 }
 
-static void RegisterSignal(int signum, void (*handler)(int)) {
-    struct sigaction sa = { 0 };
-
-    sa.sa_handler = handler;
-    if (sigaction(signum, &sa, NULL) < 0)
-        TLogger::Log("Can't change disposition of " + to_string(signum));
-}
-
 int main(int argc, char * const argv[])
 {
     int ret = EXIT_SUCCESS;
@@ -284,15 +276,15 @@ int main(int argc, char * const argv[])
     }
 
     // in case client closes pipe we are writing to in the protobuf code
-    RegisterSignal(SIGPIPE, SIG_IGN);
+    (void)RegisterSignal(SIGPIPE, SIG_IGN);
 
     // don't stop containers when terminating
     // don't catch SIGQUIT, may be useful to create core dump
-    RegisterSignal(SIGTERM, DoExit);
-    RegisterSignal(SIGHUP, DoHangup);
+    (void)RegisterSignal(SIGTERM, DoExit);
+    (void)RegisterSignal(SIGHUP, DoHangup);
 
     // kill all running containers in case of SIGINT (useful for debugging)
-    RegisterSignal(SIGINT, DoExitAndCleanup);
+    (void)RegisterSignal(SIGINT, DoExitAndCleanup);
 
     if (AnotherInstanceRunning(RPC_SOCK)) {
         TLogger::Log("Another instance of portod is running!");

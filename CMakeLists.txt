@@ -28,5 +28,5 @@ add_executable(porto porto.cpp error.cpp selftest.cpp stresstest.cpp libporto.cp
 add_dependencies(porto version.hpp)
 target_link_libraries(porto ${PB} pthread)
 
-add_executable(portoloop loop.cpp)
+add_executable(portoloop loop.cpp util/unix.cpp)
 target_link_libraries(portoloop)
