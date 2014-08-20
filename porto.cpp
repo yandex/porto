@@ -90,7 +90,7 @@ public:
         cout << endl;
         cout << "list of commands:" << endl;
         for (ICmd *cmd : commands)
-            cout << " " << left << setw(16) << cmd->GetName() << cmd->GetDescription() << endl;
+            cout << " " << left << setw(24) << cmd->GetName() << cmd->GetDescription() << endl;
 
         int ret;
         cout << endl << "list of properties:" << endl;
@@ -100,7 +100,7 @@ public:
             cerr << "Can't list properties, error = " << ErrorName(ret) << endl;
         else
             for (auto p : plist)
-                cout << " " << left << setw(16) << p.name
+                cout << " " << left << setw(24) << p.name
                      << setw(40) << p.description << endl;
 
         cout << endl << "list of data:" << endl;
@@ -110,7 +110,7 @@ public:
             cerr << "Can't list data, error = " << ErrorName(ret) << endl;
         else
             for (auto d : dlist)
-                cout << " " << left << setw(16) << d.name
+                cout << " " << left << setw(24) << d.name
                      << setw(40) << d.description << endl;
     }
 
