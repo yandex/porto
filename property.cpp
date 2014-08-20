@@ -73,7 +73,6 @@ static TError ValidCpuPriority(string str) {
 
 std::map<std::string, const TPropertySpec> propertySpec = {
     {"command", { "command executed upon container start", "" }},
-    {"low_limit", { "memory low limit in bytes", "0" }},
     {"user", { "start command with given user", "nobody", false, ValidUser }},
     {"group", { "start command with given group", "nogroup", false, ValidGroup }},
     {"env", { "container environment variables" }},
