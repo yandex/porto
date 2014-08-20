@@ -41,7 +41,6 @@ class TContainer {
 
     std::vector<std::shared_ptr<TCgroup>> leaf_cgroups;
     std::unique_ptr<TTask> task;
-    std::unique_ptr<TFolder> dir;
 
     // data
     bool CheckState(EContainerState expected);

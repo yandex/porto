@@ -311,7 +311,7 @@ static void TestEnvironment(TPortoAPI &api, const string &name) {
 
     string env = GetEnv(pid);
     static const char empty_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
-        "HOME=/db/porto/a\0"
+        "HOME=/home/nobody\0"
         "USER=nobody\0";
 
     Expect(memcmp(empty_env, env.data(), sizeof(empty_env)) == 0);
@@ -327,7 +327,7 @@ static void TestEnvironment(TPortoAPI &api, const string &name) {
     static const char ab_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
         "a=b\0"
         "c=d\0"
-        "HOME=/db/porto/a\0"
+        "HOME=/home/nobody\0"
         "USER=nobody\0";
 
     Expect(memcmp(ab_env, env.data(), sizeof(ab_env)) == 0);
@@ -424,18 +424,22 @@ static string GetCwd(const string &pid) {
 static void TestCwd(TPortoAPI &api, const string &name) {
     string pid;
     string cwd;
+    string portod_pid, portod_cwd;
+
+    TFile portod(PID_FILE);
+    (void)portod.AsString(portod_pid);
+    portod_cwd = GetCwd(portod_pid);
 
     cerr << "Check default working directory" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
-    string expcwd = "/db/porto/" + name;
     cwd = GetCwd(pid);
 
-    Expect(cwd == expcwd);
-    Expect(access(expcwd.c_str(), F_OK) == 0);
+    Expect(cwd == portod_cwd);
+    Expect(access(portod_cwd.c_str(), F_OK) == 0);
     ExpectSuccess(api.Stop(name));
-    Expect(access(expcwd.c_str(), F_OK) != 0);
+    Expect(access(portod_cwd.c_str(), F_OK) == 0);
 
     cerr << "Check user defined working directory" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
@@ -446,6 +450,7 @@ static void TestCwd(TPortoAPI &api, const string &name) {
     cwd = GetCwd(pid);
 
     Expect(cwd == "/tmp");
+    Expect(access("/tmp", F_OK) == 0);
     ExpectSuccess(api.Stop(name));
     ExpectSuccess(api.SetProperty(name, "cwd", ""));
     Expect(access("/tmp", F_OK) == 0);

@@ -38,7 +38,10 @@ TError TTaskEnv::Prepare() {
         return error;
     }
 
-    env.push_back("HOME=" + cwd);
+    if (cwd.length())
+        env.push_back("HOME=" + cwd);
+    else
+        env.push_back("HOME=/home/" + user);
     env.push_back("USER=" + user);
 
     struct passwd *p = getpwnam(user.c_str());
@@ -262,12 +265,7 @@ int TTask::ChildCallback() {
 
     }
 
-    if (chown(env.cwd.c_str(), env.uid, env.gid) < 0) {
-        Syslog("chown(" + env.cwd + "): " + strerror(errno));
-        ReportResultAndExit(wfd, -errno);
-    }
-
-    if (chdir(env.cwd.c_str()) < 0) {
+    if (env.cwd.length() && chdir(env.cwd.c_str()) < 0) {
         Syslog(string("chdir(): ") + strerror(errno));
         ReportResultAndExit(wfd, -errno);
     }
