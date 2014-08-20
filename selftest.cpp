@@ -160,6 +160,14 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     Expect(v == string("nogroup"));
     ExpectSuccess(api.GetProperty(name, "env", v));
     Expect(v == string(""));
+    ExpectSuccess(api.GetProperty(name, "memory_guarantee", v));
+    Expect(v == string("0"));
+    ExpectSuccess(api.GetProperty(name, "memory_limit", v));
+    Expect(v == string("0"));
+    ExpectSuccess(api.GetProperty(name, "cpu_policy", v));
+    Expect(v == string("normal"));
+    ExpectSuccess(api.GetProperty(name, "cpu_priority", v));
+    Expect(v == string("50"));
 }
 
 static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
@@ -174,7 +182,7 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     ExpectFailure(api.GetData(name, "stdout", v), EError::InvalidState);
     ExpectFailure(api.GetData(name, "stderr", v), EError::InvalidState);
     ExpectFailure(api.GetData(name, "cpu_usage", v), EError::InvalidState);
-    ExpectFailure(api.GetData(name, "mem_usage", v), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "memory_usage", v), EError::InvalidState);
 }
 
 static void TestHolder(TPortoAPI &api) {

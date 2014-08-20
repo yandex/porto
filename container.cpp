@@ -120,7 +120,7 @@ std::map<std::string, const TDataSpec> dataSpec = {
     { "stdout", { "return task stdout", TData::Stdout, { EContainerState::Running, EContainerState::Dead } } },
     { "stderr", { "return task stderr", TData::Stderr, { EContainerState::Running, EContainerState::Dead } } },
     { "cpu_usage", { "return consumed CPU time in nanoseconds", TData::CpuUsage, { EContainerState::Running, EContainerState::Dead } } },
-    { "mem_usage", { "return consumed memory in bytes", TData::MemUsage, { EContainerState::Running, EContainerState::Dead } } },
+    { "memory_usage", { "return consumed memory in bytes", TData::MemUsage, { EContainerState::Running, EContainerState::Dead } } },
 };
 
 // TContainer

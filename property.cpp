@@ -1,5 +1,6 @@
 #include "property.hpp"
 #include "log.hpp"
+#include "util/string.hpp"
 
 #include <map>
 
@@ -18,6 +19,40 @@ static bool ValidGroup(string group) {
     return getgrnam(group.c_str()) != NULL;
 }
 
+static bool ValidMemGuarantee(string str) {
+    uint64_t val;
+
+    if (StringToUint64(str, val))
+        return false;
+
+    // TODO: make sure we can really guarantee this amount of memory to
+    // a container
+
+    return true;
+}
+
+static bool ValidMemLimit(string str) {
+    uint64_t val;
+
+    if (StringToUint64(str, val))
+        return false;
+
+    return true;
+}
+
+static bool ValidCpuPolicy(string str) {
+    return str == "normal";
+}
+
+static bool ValidCpuPriority(string str) {
+    int val;
+
+    if (StringToInt(str, val))
+        return false;
+
+    return val >= 0 && val <= 99;
+}
+
 std::map<std::string, const TPropertySpec> propertySpec = {
     {"command", { "command executed upon container start", "" }},
     {"low_limit", { "memory low limit in bytes", "0" }},
@@ -26,6 +61,10 @@ std::map<std::string, const TPropertySpec> propertySpec = {
     {"env", { "container environment variables" }},
     //{"root", { "container root directory", "" }},
     {"cwd", { "container working directory", "" }},
+    {"memory_guarantee", { "guaranteed amount of memory", "0", false, ValidMemGuarantee }},
+    {"memory_limit", { "memory hard limit", "0", false, ValidMemLimit }},
+    {"cpu_policy", { "CPU policy: rt, normal, idle", "normal", false, ValidCpuPolicy }},
+    {"cpu_priority", { "CPU priority: 0-99", "50", false, ValidCpuPriority }},
 };
 
 string TContainerSpec::Get(const string &property) {
