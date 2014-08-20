@@ -1,6 +1,5 @@
 #!/bin/sh
 # preinst script
-echo "!!! preinst $1"
 case "$1" in
     configure)
     ;;

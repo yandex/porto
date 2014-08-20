@@ -1,8 +1,6 @@
 #!/bin/sh
 # postinst script
 
-echo "!!! postinst $1"
-
 case "$1" in
     configure)
         if ! getent group porto >/dev/null; then

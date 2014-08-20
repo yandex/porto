@@ -1,7 +1,5 @@
 #!/bin/sh
 # postrm script
-echo "!!! postrm $1"
-
 case "$1" in
     purge)
         groupdel porto

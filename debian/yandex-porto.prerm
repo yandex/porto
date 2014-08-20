@@ -1,6 +1,5 @@
 #!/bin/sh
 # prerm script
-echo "!!! prerm $1"
 case "$1" in
     purge|remove)
     if [ -e "/etc/init/yandex-porto.conf" ]; then
