@@ -1,5 +1,6 @@
 #include "property.hpp"
 #include "log.hpp"
+#include "cgroup.hpp"
 #include "util/string.hpp"
 
 #include <map>
@@ -11,46 +12,63 @@ extern "C" {
 
 using namespace std;
 
-static bool ValidUser(string user) {
-    return getpwnam(user.c_str()) != NULL;
+static TError ValidUser(string user) {
+    if (getpwnam(user.c_str()) == NULL)
+        return TError(EError::InvalidValue, "invalid value");
+
+    return TError::Success();
 }
 
-static bool ValidGroup(string group) {
-    return getgrnam(group.c_str()) != NULL;
+static TError ValidGroup(string group) {
+    if (getgrnam(group.c_str()) == NULL)
+        return TError(EError::InvalidValue, "invalid value");
+
+    return TError::Success();
 }
 
-static bool ValidMemGuarantee(string str) {
+static TError ValidMemGuarantee(string str) {
     uint64_t val;
 
+    auto memroot = TCgroup::GetRoot(TSubsystem::Memory());
+    if (memroot->HasKnob("memory.low_limit_in_bytes"))
+        return TError(EError::NotSupported, "invalid kernel");
+
+
     if (StringToUint64(str, val))
-        return false;
+        return TError(EError::InvalidValue, "invalid value");
 
     // TODO: make sure we can really guarantee this amount of memory to
     // a container
 
-    return true;
+    return TError::Success();
 }
 
-static bool ValidMemLimit(string str) {
+static TError ValidMemLimit(string str) {
     uint64_t val;
 
     if (StringToUint64(str, val))
-        return false;
+        return TError(EError::InvalidValue, "invalid value");
 
-    return true;
+    return TError::Success();
 }
 
-static bool ValidCpuPolicy(string str) {
-    return str == "normal";
+static TError ValidCpuPolicy(string str) {
+    if (str != "normal")
+        return TError(EError::NotSupported, "not implemented");
+
+    return TError::Success();
 }
 
-static bool ValidCpuPriority(string str) {
+static TError ValidCpuPriority(string str) {
     int val;
 
     if (StringToInt(str, val))
-        return false;
+        return TError(EError::InvalidValue, "invalid value");
 
-    return val >= 0 && val <= 99;
+    if (val < 0 && val > 99)
+        return TError(EError::InvalidValue, "invalid value");
+
+    return TError::Success();
 }
 
 std::map<std::string, const TPropertySpec> propertySpec = {
@@ -61,8 +79,8 @@ std::map<std::string, const TPropertySpec> propertySpec = {
     {"env", { "container environment variables" }},
     //{"root", { "container root directory", "" }},
     {"cwd", { "container working directory", "" }},
-    {"memory_guarantee", { "guaranteed amount of memory", "0", false, ValidMemGuarantee }},
-    {"memory_limit", { "memory hard limit", "0", false, ValidMemLimit }},
+    {"memory_guarantee", { "guaranteed amount of memory", "-1", false, ValidMemGuarantee }},
+    {"memory_limit", { "memory hard limit", "-1", false, ValidMemLimit }},
     {"cpu_policy", { "CPU policy: rt, normal, idle", "normal", false, ValidCpuPolicy }},
     {"cpu_priority", { "CPU priority: 0-99", "50", false, ValidCpuPriority }},
 };
@@ -106,11 +124,11 @@ TError TContainerSpec::Set(const string &property, const string &value) {
         return error;
     }
 
-    if (propertySpec[property].Valid &&
-        !propertySpec[property].Valid(value)) {
-        TError error(EError::InvalidValue, "invalid property value");
+    if (propertySpec[property].Valid) {
+        TError error = propertySpec[property].Valid(value);
         TLogger::LogError(error, "Can't set property");
-        return error;
+        if (error)
+            return error;
     }
 
     return SetInternal(property, value);

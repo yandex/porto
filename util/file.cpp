@@ -134,3 +134,7 @@ TError TFile::AppendString(const string &str) {
         return TError(EError::Unknown, errno, "append(" + path + ", " + str + ")");
     }
 }
+
+bool TFile::Exists() {
+    return access(path.c_str(), F_OK) == 0;
+}

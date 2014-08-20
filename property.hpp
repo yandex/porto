@@ -14,7 +14,7 @@ struct TPropertySpec {
     std::string def;
     // can be modified in running state
     bool dynamic;
-    std::function<bool (std::string)> Valid;
+    std::function<TError (std::string)> Valid;
 };
 
 extern std::map<std::string, const TPropertySpec> propertySpec;

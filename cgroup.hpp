@@ -63,6 +63,7 @@ public:
 
     TError Attach(int pid);
 
+    bool HasKnob(const std::string &knob);
     TError GetKnobValue(const std::string &knob, std::string &value);
     TError GetKnobValueAsLines(const std::string &knob, std::vector<std::string> &lines);
     TError SetKnobValue(const std::string &knob, const std::string &value, bool append = false);

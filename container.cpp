@@ -183,6 +183,23 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
+    auto memroot = TCgroup::GetRoot(TSubsystem::Memory());
+    auto memcg = GetCgroup(TSubsystem::Memory());
+
+    if (memroot->HasKnob("memory.low_limit_in_bytes")) {
+        TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", spec.Get("memory_guarantee"), false);
+        if (error)
+            return error;
+    }
+
+#if 0
+    TError error = memcg->SetKnobValue("memory.limit_in_bytes", spec.Get("memory_limit"), false);
+    TLogger::Log("ERR " + error.GetMsg());
+    if (error) {
+        return error;
+    }
+#endif
+
     return TError::Success();
 }
 

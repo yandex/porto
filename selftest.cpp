@@ -161,9 +161,9 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetProperty(name, "env", v));
     Expect(v == string(""));
     ExpectSuccess(api.GetProperty(name, "memory_guarantee", v));
-    Expect(v == string("0"));
+    Expect(v == string("-1"));
     ExpectSuccess(api.GetProperty(name, "memory_limit", v));
-    Expect(v == string("0"));
+    Expect(v == string("-1"));
     ExpectSuccess(api.GetProperty(name, "cpu_policy", v));
     Expect(v == string("normal"));
     ExpectSuccess(api.GetProperty(name, "cpu_priority", v));
@@ -572,6 +572,7 @@ int Selftest() {
         //TestRoot(api, "a");
         ExpectSuccess(api.Destroy("a"));
         // TODO: check cgroups permissions
+        // TODO: check cgroups limits
     } catch (string e) {
         cerr << "EXCEPTION: " << e << endl;
         return 1;

@@ -215,6 +215,11 @@ TError TCgroup::Kill(int signal) {
     return TError::Success();
 }
 
+bool TCgroup::HasKnob(const std::string &knob) {
+    TFile f(Path() + "/" + knob);
+    return f.Exists();
+}
+
 TError TCgroup::GetKnobValue(const std::string &knob, std::string &value) {
     TFile f(Path() + "/" + knob);
     return f.AsString(value);

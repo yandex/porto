@@ -79,10 +79,8 @@ bool TFolder::Exists() {
 
     if (ret == 0 && S_ISDIR(st.st_mode))
         return true;
-    else if (ret && errno == ENOENT)
-        return false;
     else
-        throw "Cannot stat folder: " + path;
+        return false;
 }
 
 TError TFolder::Subfolders(std::vector<std::string> &list) {

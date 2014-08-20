@@ -37,6 +37,7 @@ public:
 
     TError WriteStringNoAppend(const std::string &str);
     TError AppendString(const std::string &str);
+    bool Exists();
 };
 
 #endif
