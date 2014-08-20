@@ -332,7 +332,6 @@ TError TTask::Start() {
     int pfd[2];
 
     exitStatus.error = 0;
-    exitStatus.signal = 0;
     exitStatus.status = 0;
 
     // TODO: use real container root directory
@@ -377,10 +376,12 @@ TError TTask::Start() {
         this->pid = 0;
 
         exitStatus.error = ret;
-        exitStatus.signal = 0;
-        exitStatus.status = 0;
+        exitStatus.status = -1;
 
-        error = TError(EError::Unknown, "child returned " + to_string(ret));
+        if (ret < 0)
+            error = TError(EError::Unknown, string("child prepare: ") + strerror(-ret));
+        else
+            error = TError(EError::Unknown, string("child exec: ") + strerror(ret));
         TLogger::LogError(error, "Child process couldn't exec");
         return error;
     }
@@ -432,8 +433,8 @@ TError TTask::Reap(bool wait) {
 }
 
 void TTask::DeliverExitStatus(int status) {
-    exitStatus.signal = WTERMSIG(status);
-    exitStatus.status = WEXITSTATUS(status);
+    exitStatus.error = 0;
+    exitStatus.status = status;
     state = Stopped;
 }
 
@@ -466,7 +467,6 @@ std::string TTask::GetStderr() {
 
 TError TTask::Restore(int pid_) {
     exitStatus.error = 0;
-    exitStatus.signal = 0;
     exitStatus.status = 0;
 
     TFile stdoutLink("/proc/" + to_string(pid_) + "/fd/1");

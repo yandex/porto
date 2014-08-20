@@ -9,28 +9,33 @@ using namespace std;
 
 static string DataValue(const string &name, const string &val) {
     if (name == "exit_status") {
-        vector<string> status_str;
-
-        TError error = SplitString(val, ' ', status_str);
-        if (error)
+        int status;
+        if (StringToInt(val, status))
             return val;
 
-        vector<int> status;
-        error = StringsToIntegers(status_str, status);
-        if (error)
+        string ret = val + " ";
+
+        if (WIFEXITED(status))
+            ret += "Container exited with " + to_string(status);
+        else if (WIFSIGNALED(status))
+            ret += "Container killed by signal " + to_string(status);
+        else if (status == 0)
+            ret += "Success";
+
+        return ret;
+    } else if (name == "errno") {
+        int status;
+        if (StringToInt(val, status))
             return val;
 
-        string ret;
+        string ret = val + " ";
 
-        if (status[0] != 0) {
-            ret = string(strerror(status[0]));
-        } else if (status[1] != 0) {
-            return "Container killed by signal " + to_string(status[1]);
-        } else if (status[2] != 0) {
-            return "Container exited with " + to_string(status[2]);
-        } else {
-            ret = "Success";
-        }
+        if (status < 0)
+            ret += "Prepare failed: " + string(strerror(-status));
+        else if (status > 0)
+            ret += "Exec failed: " + string(strerror(status));
+        else if (status == 0)
+            ret += "Success";
 
         return ret;
     } else {
@@ -388,8 +393,6 @@ public:
         ret = api.GetProperty(argv[0], argv[1], value);
         if (!ret)
             cout << value << endl;
-
-        cerr << "Invalid property or data = " << ErrorName(ret) << endl;
 
         return 1;
     }

@@ -48,9 +48,16 @@ struct TData {
     static string ExitStatus(TContainer& c) {
         if (c.task && !c.task->IsRunning()) {
             TExitStatus status = c.task->GetExitStatus();
-            stringstream ss;
-            ss << status.error << " " << status.signal << " " << status.status;
-            return ss.str();
+            return to_string(status.status);
+        }
+        else
+            return "-1";
+    };
+
+    static string StartErrno(TContainer& c) {
+        if (c.task && !c.task->IsRunning()) {
+            TExitStatus status = c.task->GetExitStatus();
+            return to_string(status.error);
         }
         else
             return "-1";
@@ -108,6 +115,7 @@ struct TData {
 std::map<std::string, const TDataSpec> dataSpec = {
     { "state", { "container state", TData::State } },
     { "exit_status", { "container exit status", TData::ExitStatus } },
+    { "start_errno", { "container start error", TData::StartErrno } },
     { "root_pid", { "root process id", TData::RootPid } },
     { "stdout", { "return task stdout", TData::Stdout } },
     { "stderr", { "return task stderr", TData::Stderr } },

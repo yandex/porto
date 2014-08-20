@@ -56,6 +56,8 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     Expect(v == string("stopped"));
     ExpectSuccess(api.GetData(name, "exit_status", v));
     Expect(v == string("-1"));
+    ExpectSuccess(api.GetData(name, "start_errno", v));
+    Expect(v == string("-1"));
     ExpectSuccess(api.GetData(name, "root_pid", v));
     Expect(v == string("-1"));
     ExpectSuccess(api.GetData(name, "stdout", v));
@@ -179,7 +181,9 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     WaitExit(api, pid, name);
     ExpectSuccess(api.GetData(name, "exit_status", ret));
-    Expect(ret == string("0 0 1"));
+    Expect(ret == string("256"));
+    ExpectSuccess(api.GetData(name, "start_errno", ret));
+    Expect(ret == string("0"));
 
     cerr << "Check exit status of 'true'" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "true"));
@@ -187,7 +191,9 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     WaitExit(api, pid, name);
     ExpectSuccess(api.GetData(name, "exit_status", ret));
-    Expect(ret == string("0 0 0"));
+    Expect(ret == string("0"));
+    ExpectSuccess(api.GetData(name, "start_errno", ret));
+    Expect(ret == string("0"));
 
     cerr << "Check exit status of invalid command" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "__invalid_command_name__"));
@@ -195,7 +201,32 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     Expect(pid == "-1");
     ExpectSuccess(api.GetData(name, "exit_status", ret));
-    Expect(ret == string("2 0 0"));
+    Expect(ret == string("-1"));
+    ExpectSuccess(api.GetData(name, "start_errno", ret));
+    Expect(ret == string("2"));
+
+    cerr << "Check exit status of invalid directory" << endl;
+    ExpectSuccess(api.SetProperty(name, "command", "true"));
+    ExpectSuccess(api.SetProperty(name, "cwd", "/__invalid__dir__"));
+    ExpectFailure(api.Start(name), EError::Unknown);
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    Expect(pid == "-1");
+    ExpectSuccess(api.GetData(name, "exit_status", ret));
+    Expect(ret == string("-1"));
+    ExpectSuccess(api.GetData(name, "start_errno", ret));
+    Expect(ret == string("-2"));
+
+    cerr << "Check exit status when killed by signal" << endl;
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.SetProperty(name, "cwd", ""));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    kill(stoi(pid), SIGKILL);
+    WaitExit(api, pid, name);
+    ExpectSuccess(api.GetData(name, "exit_status", ret));
+    Expect(ret == string("9"));
+    ExpectSuccess(api.GetData(name, "start_errno", ret));
+    Expect(ret == string("0"));
 }
 
 static void TestStreams(TPortoAPI &api, const string &name) {

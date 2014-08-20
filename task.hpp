@@ -13,9 +13,7 @@ class TContainerEnv;
 struct TExitStatus {
     // Task was not started due to the following error
     int error;
-    // Task is terminated by given signal
-    int signal;
-    // Task exited normally with given status
+    // Task exited with given status
     int status;
 };
 
