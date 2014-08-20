@@ -2,6 +2,7 @@
 
 extern "C" {
 #include <unistd.h>
+#include <errno.h>
 }
 
 int RetryBusy(int times, int timeo, std::function<int()> handler) {
