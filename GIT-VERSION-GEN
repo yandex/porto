@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 TAG="$(git describe --match "v[0-9]*" --abbrev=7 HEAD 2>/dev/null)"
 HASH="$(git log -1 "--format=format:const std::string GIT_REVISION = \"%H\";" HEAD)"
