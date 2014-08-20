@@ -88,7 +88,7 @@ static int SpawnPortod() {
 
             close(pfd[1]);
 
-            execl(program_invocation_name, program_invocation_short_name, nullptr);
+            execlp(program_invocation_name, program_invocation_short_name, nullptr);
             Log() << "Can't execl(" << program_invocation_name << ", " << program_invocation_short_name << ", NULL)" << endl;
             return EXIT_FAILURE;
         }

@@ -1,5 +1,7 @@
 #!/bin/sh
 # postrm script
+echo "!!! postrm $1"
+
 case "$1" in
     purge)
         groupdel porto
@@ -7,6 +9,11 @@ case "$1" in
             echo "Group 'porto' does not remove!"
         fi
         update-rc.d -f yandex-porto remove >/dev/null || exit $?
+    ;;
+    upgrade)
+        if [ -e "/etc/init/yandex-porto.conf" ]; then
+            reload yandex-porto || exit $?
+        fi
     ;;
     remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
     ;;

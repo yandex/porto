@@ -1,5 +1,6 @@
 #!/bin/sh
-# postinst script
+# preinst script
+echo "!!! preinst $1"
 case "$1" in
     configure)
     ;;
