@@ -25,6 +25,119 @@ static void _ExpectFailure(int ret, int exp, int line, const char *func) {
         throw string("Got " + to_string(ret) + ", but expected " + to_string(exp) + " at " + func + ":" + to_string(line));
 }
 
+static void WaitExit(TPortoAPI &api, const string &pid, const string &name) {
+    cerr << "Waiting for " << pid << " to exit..." << endl;
+
+    int times = 100;
+    int p = stoi(pid);
+
+    do {
+        if (times-- <= 0)
+            break;
+
+        usleep(100000);
+
+        /* we need to reap our child process which happens in the
+         * exit_status handler, so execute it periodically */
+        string ret;
+        (void)api.GetData(name, "exit_status", ret);
+
+        kill(p, 0);
+    } while (errno != ESRCH);
+
+    if (times <= 0)
+        throw string("Waited too long for task to exit");
+}
+
+static string GetCwd(const string &pid) {
+    string lnk;
+    TFile f("/proc/" + pid + "/cwd");
+    TError error(f.ReadLink(lnk));
+    if (error)
+        return error.GetMsg();
+    return lnk;
+}
+
+static string GetNamespace(const string &pid, const string &ns) {
+    string link;
+    TFile m("/proc/" + pid + "/ns/" + ns);
+    (void)m.ReadLink(link);
+    return link;
+}
+
+static map<string, string> GetCgroups(const string &pid) {
+    TFile f("/proc/" + pid + "/cgroup");
+    vector<string> lines;
+    map<string, string> cgmap;
+    (void)f.AsLines(lines);
+
+    vector<string> tokens;
+    for (auto l : lines) {
+        tokens.clear();
+        (void)SplitString(l, ':', tokens);
+        cgmap[tokens[1]] = tokens[2];
+    }
+
+    return cgmap;
+}
+
+static void GetUidGid(const string &pid, int &uid, int &gid) {
+    vector<string> st;
+    TFile f("/proc/" + pid + "/status");
+    (void)f.AsLines(st);
+
+    string name;
+    string stuid = st[7];
+    stringstream ssuid(stuid);
+
+    int euid, suid, fsuid;
+    ssuid >> name;
+    ssuid >> uid;
+    ssuid >> euid;
+    ssuid >> suid;
+    ssuid >> fsuid;
+
+    if (name != "Uid:" || uid != euid || euid != suid || suid != fsuid)
+        uid = -2;
+
+    string stgid = st[8];
+    stringstream ssgid(stgid);
+
+    int egid, sgid, fsgid;
+    ssgid >> name;
+    ssgid >> gid;
+    ssgid >> egid;
+    ssgid >> sgid;
+    ssgid >> fsgid;
+
+    if (name != "Gid:" || gid != egid || egid != sgid || sgid != fsgid)
+        gid = -2;
+}
+
+static int UserUid(const string &user) {
+    struct passwd *p = getpwnam(user.c_str());
+    if (!p)
+        return -1;
+    else
+        return p->pw_uid;
+}
+
+static int GroupGid(const string &group) {
+    struct group *g = getgrnam(group.c_str());
+    if (!g)
+        return -1;
+    else
+        return g->gr_gid;
+}
+
+static string GetEnv(const string &pid) {
+    string env;
+    TFile f("/proc/" + pid + "/environ");
+    (void)f.AsString(env);
+
+    return env;
+}
+
 static void ShouldHaveOnlyRoot(TPortoAPI &api) {
     std::vector<std::string> containers;
 
@@ -147,30 +260,6 @@ static bool TaskRunning(TPortoAPI &api, const string &pid, const string &name) {
     return kill(p, 0) == 0;
 }
 
-static void WaitExit(TPortoAPI &api, const string &pid, const string &name) {
-    cerr << "Waiting for " << pid << " to exit..." << endl;
-
-    int times = 100;
-    int p = stoi(pid);
-
-    do {
-        if (times-- <= 0)
-            break;
-
-        usleep(100000);
-
-        /* we need to reap our child process which happens in the
-         * exit_status handler, so execute it periodically */
-        string ret;
-        (void)api.GetData(name, "exit_status", ret);
-
-        kill(p, 0);
-    } while (errno != ESRCH);
-
-    if (times <= 0)
-        throw string("Waited too long for task to exit");
-}
-
 static void TestExitStatus(TPortoAPI &api, const string &name) {
     string pid;
     string ret;
@@ -243,6 +332,7 @@ static void TestStreams(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetData(name, "stderr", ret));
     Expect(ret == string(""));
 
+
     cerr << "Make sure stderr works" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "bash -c 'echo err >&2'"));
     ExpectSuccess(api.Start(name));
@@ -252,29 +342,6 @@ static void TestStreams(TPortoAPI &api, const string &name) {
     Expect(ret == string(""));
     ExpectSuccess(api.GetData(name, "stderr", ret));
     Expect(ret == string("err\n"));
-}
-
-static string GetNamespace(const string &pid, const string &ns) {
-    string link;
-    TFile m("/proc/" + pid + "/ns/" + ns);
-    (void)m.ReadLink(link);
-    return link;
-}
-
-static map<string, string> GetCgroups(const string &pid) {
-    TFile f("/proc/" + pid + "/cgroup");
-    vector<string> lines;
-    map<string, string> cgmap;
-    (void)f.AsLines(lines);
-
-    vector<string> tokens;
-    for (auto l : lines) {
-        tokens.clear();
-        (void)SplitString(l, ':', tokens);
-        cgmap[tokens[1]] = tokens[2];
-    }
-
-    return cgmap;
 }
 
 static void TestLongRunning(TPortoAPI &api, const string &name) {
@@ -324,14 +391,6 @@ static void TestIsolation(TPortoAPI &api, const string &name) {
     Expect(ret == string("1\n"));
 }
 
-static string GetEnv(const string &pid) {
-    string env;
-    TFile f("/proc/" + pid + "/environ");
-    (void)f.AsString(env);
-
-    return env;
-}
-
 static void TestEnvironment(TPortoAPI &api, const string &name) {
     string pid;
 
@@ -365,55 +424,6 @@ static void TestEnvironment(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.Stop(name));
 }
 
-static void GetUidGid(const string &pid, int &uid, int &gid) {
-    vector<string> st;
-    TFile f("/proc/" + pid + "/status");
-    (void)f.AsLines(st);
-
-    string name;
-    string stuid = st[7];
-    stringstream ssuid(stuid);
-
-    int euid, suid, fsuid;
-    ssuid >> name;
-    ssuid >> uid;
-    ssuid >> euid;
-    ssuid >> suid;
-    ssuid >> fsuid;
-
-    if (name != "Uid:" || uid != euid || euid != suid || suid != fsuid)
-        uid = -2;
-
-    string stgid = st[8];
-    stringstream ssgid(stgid);
-
-    int egid, sgid, fsgid;
-    ssgid >> name;
-    ssgid >> gid;
-    ssgid >> egid;
-    ssgid >> sgid;
-    ssgid >> fsgid;
-
-    if (name != "Gid:" || gid != egid || egid != sgid || sgid != fsgid)
-        gid = -2;
-}
-
-static int UserUid(const string &user) {
-    struct passwd *p = getpwnam(user.c_str());
-    if (!p)
-        return -1;
-    else
-        return p->pw_uid;
-}
-
-static int GroupGid(const string &group) {
-    struct group *g = getgrnam(group.c_str());
-    if (!g)
-        return -1;
-    else
-        return g->gr_gid;
-}
-
 static void TestUserGroup(TPortoAPI &api, const string &name) {
     int uid, gid;
     string pid;
@@ -443,15 +453,6 @@ static void TestUserGroup(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.Stop(name));
 }
 
-static string GetCwd(const string &pid) {
-    string lnk;
-    TFile f("/proc/" + pid + "/cwd");
-    TError error(f.ReadLink(lnk));
-    if (error)
-        return error.GetMsg();
-    return lnk;
-}
-
 static void TestCwd(TPortoAPI &api, const string &name) {
     string pid;
     string cwd;
@@ -477,6 +478,9 @@ static void TestCwd(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.SetProperty(name, "cwd", "/tmp"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
+
+    Expect(access("/tmp/stdout", F_OK) == 0);
+    Expect(access("/tmp/stderr", F_OK) == 0);
 
     cwd = GetCwd(pid);
 

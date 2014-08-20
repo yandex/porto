@@ -334,9 +334,13 @@ TError TTask::Start() {
     exitStatus.error = 0;
     exitStatus.status = 0;
 
-    // TODO: use real container root directory
-    stdoutFile = GetTmpFile();
-    stderrFile = GetTmpFile();
+    if (env.cwd.length()) {
+        stdoutFile = env.cwd + "/stdout";
+        stderrFile = env.cwd + "/stderr";
+    } else {
+        stdoutFile = GetTmpFile();
+        stderrFile = GetTmpFile();
+    }
 
     ret = pipe2(pfd, O_CLOEXEC);
     if (ret) {
