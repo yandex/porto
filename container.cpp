@@ -25,13 +25,13 @@ struct TData {
         c.UpdateState();
 
         switch (c.state) {
-        case TContainer::Stopped:
+        case EContainerState::Stopped:
             return "stopped";
-        case TContainer::Dead:
+        case EContainerState::Dead:
             return "dead";
-        case TContainer::Running:
+        case EContainerState::Running:
             return "running";
-        case TContainer::Paused:
+        case EContainerState::Paused:
             return "paused";
         default:
             return "unknown";
@@ -113,27 +113,27 @@ struct TData {
 };
 
 std::map<std::string, const TDataSpec> dataSpec = {
-    { "state", { "container state", TData::State } },
-    { "exit_status", { "container exit status", TData::ExitStatus } },
-    { "start_errno", { "container start error", TData::StartErrno } },
-    { "root_pid", { "root process id", TData::RootPid } },
-    { "stdout", { "return task stdout", TData::Stdout } },
-    { "stderr", { "return task stderr", TData::Stderr } },
-    { "cpu_usage", { "return consumed CPU time in nanoseconds", TData::CpuUsage } },
-    { "mem_usage", { "return consumed memory in bytes", TData::MemUsage } },
+    { "state", { "container state", TData::State, { EContainerState::Stopped, EContainerState::Dead, EContainerState::Running, EContainerState::Paused } } },
+    { "exit_status", { "container exit status", TData::ExitStatus, { EContainerState::Dead } } },
+    { "start_errno", { "container start error", TData::StartErrno, { EContainerState::Stopped } } },
+    { "root_pid", { "root process id", TData::RootPid, { EContainerState::Running } } },
+    { "stdout", { "return task stdout", TData::Stdout, { EContainerState::Running, EContainerState::Dead } } },
+    { "stderr", { "return task stderr", TData::Stderr, { EContainerState::Running, EContainerState::Dead } } },
+    { "cpu_usage", { "return consumed CPU time in nanoseconds", TData::CpuUsage, { EContainerState::Running, EContainerState::Dead } } },
+    { "mem_usage", { "return consumed memory in bytes", TData::MemUsage, { EContainerState::Running, EContainerState::Dead } } },
 };
 
 // TContainer
 
 bool TContainer::CheckState(EContainerState expected) {
-    if (state == Running && (!task || !task->IsRunning()))
-        state = Stopped;
+    if (state == EContainerState::Running && (!task || !task->IsRunning()))
+        state = EContainerState::Stopped;
 
     return state == expected;
 }
 
 TContainer::~TContainer() {
-    if (state == Paused)
+    if (state == EContainerState::Paused)
         Resume();
 
     TLogger::Log("stop " + name);
@@ -162,9 +162,11 @@ bool TContainer::IsAlive() {
 }
 
 void TContainer::UpdateState() {
-    if (state == Running && !IsAlive()) {
+    if (state == EContainerState::Running && !IsAlive()) {
+        if (task)
+            task->Reap(false);
         Stop();
-        state = Dead;
+        state = EContainerState::Dead;
     }
 }
 
@@ -195,7 +197,7 @@ TError TContainer::PrepareTask() {
 }
 
 TError TContainer::Start() {
-    if (!CheckState(Stopped))
+    if (!CheckState(EContainerState::Stopped))
         return TError(EError::InvalidValue, "invalid container state");
 
     TError error = PrepareCgroups();
@@ -205,7 +207,7 @@ TError TContainer::Start() {
     }
 
     if (IsRoot()) {
-        state = Running;
+        state = EContainerState::Running;
         return TError::Success();
     }
 
@@ -228,7 +230,7 @@ TError TContainer::Start() {
     TLogger::Log(name + " started " + to_string(task->GetPid()));
 
     spec.SetInternal("root_pid", to_string(task->GetPid()));
-    state = Running;
+    state = EContainerState::Running;
 
     return TError::Success();
 }
@@ -272,7 +274,7 @@ TError TContainer::KillAll() {
 }
 
 TError TContainer::Stop() {
-    if (IsRoot() || !(CheckState(Running) || CheckState(Dead)))
+    if (IsRoot() || !(CheckState(EContainerState::Running) || CheckState(EContainerState::Dead)))
         return TError(EError::InvalidValue, "invalid container state");
 
     TError error = KillAll();
@@ -281,36 +283,39 @@ TError TContainer::Stop() {
 
     leaf_cgroups.clear();
 
-    state = Stopped;
+    state = EContainerState::Stopped;
 
     return TError::Success();
 }
 
 TError TContainer::Pause() {
-    if (IsRoot() || !CheckState(Running))
+    if (IsRoot() || !CheckState(EContainerState::Running))
         return TError(EError::InvalidValue, "invalid container state");
 
     auto cg = GetCgroup(TSubsystem::Freezer());
     TSubsystem::Freezer()->Freeze(*cg);
 
-    state = Paused;
+    state = EContainerState::Paused;
     return TError::Success();
 }
 
 TError TContainer::Resume() {
-    if (!CheckState(Paused))
+    if (!CheckState(EContainerState::Paused))
         return TError(EError::InvalidValue, "invalid container state");
 
     auto cg = GetCgroup(TSubsystem::Freezer());
     TSubsystem::Freezer()->Unfreeze(*cg);
 
-    state = Running;
+    state = EContainerState::Running;
     return TError::Success();
 }
 
 TError TContainer::GetData(const string &name, string &value) {
     if (dataSpec.find(name) == dataSpec.end())
-        return TError(EError::InvalidValue, "invalid container state");
+        return TError(EError::InvalidValue, "invalid container data");
+
+    if (dataSpec[name].valid.find(state) == dataSpec[name].valid.end())
+        return TError(EError::InvalidState, "invalid container state");
 
     value = dataSpec[name].Handler(*this);
     return TError::Success();
@@ -351,7 +356,7 @@ TError TContainer::Restore(const kv::TNode &node) {
 
     TLogger::Log(name + ": restore process " + to_string(pid));
 
-    state = Stopped;
+    state = EContainerState::Stopped;
 
     // if we didn't start container, make sure nobody is running
     if (pid <= 0) {
@@ -384,7 +389,7 @@ TError TContainer::Restore(const kv::TNode &node) {
         return error;
     }
 
-    state = task->IsRunning() ? Running : Stopped;
+    state = task->IsRunning() ? EContainerState::Running : EContainerState::Stopped;
 
     return TError::Success();
 }
@@ -408,6 +413,7 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
 }
 
 void TContainer::Heartbeat() {
+    UpdateState();
     if (task)
         task->Rotate();
 }

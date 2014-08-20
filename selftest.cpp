@@ -40,7 +40,7 @@ static void WaitExit(TPortoAPI &api, const string &pid, const string &name) {
         /* we need to reap our child process which happens in the
          * exit_status handler, so execute it periodically */
         string ret;
-        (void)api.GetData(name, "exit_status", ret);
+        (void)api.GetData(name, "state", ret);
 
         kill(p, 0);
     } while (errno != ESRCH);
@@ -167,20 +167,14 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
 
     ExpectSuccess(api.GetData(name, "state", v));
     Expect(v == string("stopped"));
-    ExpectSuccess(api.GetData(name, "exit_status", v));
-    Expect(v == string("-1"));
+    ExpectFailure(api.GetData(name, "exit_status", v), EError::InvalidState);
     ExpectSuccess(api.GetData(name, "start_errno", v));
     Expect(v == string("-1"));
-    ExpectSuccess(api.GetData(name, "root_pid", v));
-    Expect(v == string("-1"));
-    ExpectSuccess(api.GetData(name, "stdout", v));
-    Expect(v == string(""));
-    ExpectSuccess(api.GetData(name, "stderr", v));
-    Expect(v == string(""));
-    ExpectSuccess(api.GetData(name, "cpu_usage", v));
-    Expect(v == string("-1"));
-    ExpectSuccess(api.GetData(name, "mem_usage", v));
-    Expect(v == string("-1"));
+    ExpectFailure(api.GetData(name, "root_pid", v), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "stdout", v), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "stderr", v), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "cpu_usage", v), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "mem_usage", v), EError::InvalidState);
 }
 
 static void TestHolder(TPortoAPI &api) {
@@ -255,7 +249,7 @@ static bool TaskRunning(TPortoAPI &api, const string &pid, const string &name) {
     int p = stoi(pid);
 
     string ret;
-    (void)api.GetData(name, "exit_status", ret);
+    (void)api.GetData(name, "state", ret);
 
     return kill(p, 0) == 0;
 }
@@ -271,8 +265,8 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     WaitExit(api, pid, name);
     ExpectSuccess(api.GetData(name, "exit_status", ret));
     Expect(ret == string("256"));
-    ExpectSuccess(api.GetData(name, "start_errno", ret));
-    Expect(ret == string("0"));
+    ExpectFailure(api.GetData(name, "start_errno", ret), EError::InvalidState);
+    ExpectSuccess(api.Stop(name));
 
     cerr << "Check exit status of 'true'" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "true"));
@@ -281,16 +275,14 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     WaitExit(api, pid, name);
     ExpectSuccess(api.GetData(name, "exit_status", ret));
     Expect(ret == string("0"));
-    ExpectSuccess(api.GetData(name, "start_errno", ret));
-    Expect(ret == string("0"));
+    ExpectFailure(api.GetData(name, "start_errno", ret), EError::InvalidState);
+    ExpectSuccess(api.Stop(name));
 
     cerr << "Check exit status of invalid command" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "__invalid_command_name__"));
     ExpectFailure(api.Start(name), EError::Unknown);
-    ExpectSuccess(api.GetData(name, "root_pid", pid));
-    Expect(pid == "-1");
-    ExpectSuccess(api.GetData(name, "exit_status", ret));
-    Expect(ret == string("-1"));
+    ExpectFailure(api.GetData(name, "root_pid", ret), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "exit_status", ret), EError::InvalidState);
     ExpectSuccess(api.GetData(name, "start_errno", ret));
     Expect(ret == string("2"));
 
@@ -298,10 +290,8 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.SetProperty(name, "command", "true"));
     ExpectSuccess(api.SetProperty(name, "cwd", "/__invalid__dir__"));
     ExpectFailure(api.Start(name), EError::Unknown);
-    ExpectSuccess(api.GetData(name, "root_pid", pid));
-    Expect(pid == "-1");
-    ExpectSuccess(api.GetData(name, "exit_status", ret));
-    Expect(ret == string("-1"));
+    ExpectFailure(api.GetData(name, "root_pid", ret), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "exit_status", ret), EError::InvalidState);
     ExpectSuccess(api.GetData(name, "start_errno", ret));
     Expect(ret == string("-2"));
 
@@ -314,8 +304,8 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     WaitExit(api, pid, name);
     ExpectSuccess(api.GetData(name, "exit_status", ret));
     Expect(ret == string("9"));
-    ExpectSuccess(api.GetData(name, "start_errno", ret));
-    Expect(ret == string("0"));
+    ExpectFailure(api.GetData(name, "start_errno", ret), EError::InvalidState);
+    ExpectSuccess(api.Stop(name));
 }
 
 static void TestStreams(TPortoAPI &api, const string &name) {
@@ -331,7 +321,7 @@ static void TestStreams(TPortoAPI &api, const string &name) {
     Expect(ret == string("out\n"));
     ExpectSuccess(api.GetData(name, "stderr", ret));
     Expect(ret == string(""));
-
+    ExpectSuccess(api.Stop(name));
 
     cerr << "Make sure stderr works" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "bash -c 'echo err >&2'"));
@@ -342,6 +332,7 @@ static void TestStreams(TPortoAPI &api, const string &name) {
     Expect(ret == string(""));
     ExpectSuccess(api.GetData(name, "stderr", ret));
     Expect(ret == string("err\n"));
+    ExpectSuccess(api.Stop(name));
 }
 
 static void TestLongRunning(TPortoAPI &api, const string &name) {
@@ -389,6 +380,7 @@ static void TestIsolation(TPortoAPI &api, const string &name) {
 
     ExpectSuccess(api.GetData(name, "stdout", ret));
     Expect(ret == string("1\n"));
+    ExpectSuccess(api.Stop(name));
 }
 
 static void TestEnvironment(TPortoAPI &api, const string &name) {

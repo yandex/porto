@@ -7,6 +7,7 @@
 #include <vector>
 #include <memory>
 #include <functional>
+#include <set>
 
 #include "kvalue.hpp"
 #include "property.hpp"
@@ -18,9 +19,17 @@ struct TData;
 class TContainer;
 class TSubsystem;
 
+enum class EContainerState {
+    Stopped,
+    Dead,
+    Running,
+    Paused
+};
+
 struct TDataSpec {
     std::string description;
     std::function<std::string(TContainer& c)> Handler;
+    std::set<EContainerState> valid;
 };
 
 extern std::map<std::string, const TDataSpec> dataSpec;
@@ -28,12 +37,6 @@ extern std::map<std::string, const TDataSpec> dataSpec;
 class TContainer {
     const std::string name;
 
-    enum EContainerState {
-        Stopped,
-        Dead,
-        Running,
-        Paused
-    };
     EContainerState state;
 
     TContainerSpec spec;
@@ -49,7 +52,7 @@ class TContainer {
     TError KillAll();
 
 public:
-    TContainer(const std::string &name) : name(name), state(Stopped), spec(name) { }
+    TContainer(const std::string &name) : name(name), state(EContainerState::Stopped), spec(name) { }
     ~TContainer();
 
     std::string Name();
