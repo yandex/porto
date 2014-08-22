@@ -2,6 +2,8 @@
 #include <iomanip>
 #include <sstream>
 #include <csignal>
+#include <cstdio>
+#include <cstdio>
 
 #include "rpc.pb.h"
 #include "libporto.hpp"
@@ -13,6 +15,7 @@ extern "C" {
 #include <sys/types.h>
 #include <grp.h>
 #include <pwd.h>
+#include <dirent.h>
 }
 
 using namespace std;
@@ -620,6 +623,34 @@ static void TestStateMachine(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.Destroy(name));
 }
 
+static void TestDaemon() {
+    string pid;
+
+    cerr << "Make sure we don't have zombies" << endl;
+    FILE *f = popen("pgrep -x portod", "r");
+    Expect(f != nullptr);
+
+    char *line = nullptr;
+    size_t n;
+
+    int instances = 0;
+    while (getline(&line, &n, f) >= 0) {
+        pid.assign(line);
+        pid.erase(pid.find('\n'));
+        instances++;
+    }
+
+    Expect(instances == 1);
+    fclose(f);
+
+    cerr << "Make sure we don't have invalid FDs" << endl;
+    struct dirent **lst;
+    string path = ("/proc/" + pid + "/fd");
+    n = scandir(path.c_str(), &lst, NULL, alphasort);
+    // . .. 0 1 2 3 4 5 6 7
+    Expect(n == 9 + 1);
+}
+
 int Selftest() {
     TPortoAPI api;
 
@@ -640,6 +671,7 @@ int Selftest() {
         ExpectSuccess(api.Destroy("a"));
         // TODO: check cgroups permissions
         // TODO: check cgroups limits
+        TestDaemon();
     } catch (string e) {
         cerr << "EXCEPTION: " << e << endl;
         return 1;
