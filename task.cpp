@@ -31,17 +31,20 @@ TError TTaskEnv::Prepare() {
     if (command.empty())
         return TError::Success();
 
-    env.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
+    string workdir;
+    if (cwd.length())
+        workdir = cwd;
+    else
+        workdir = "/home/" + user;
+
+    env.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:" + workdir);
 
     if (SplitString(envir, ';', env)) {
         TError error(EError::InvalidValue, errno, "split(" + envir + ")");
         return error;
     }
 
-    if (cwd.length())
-        env.push_back("HOME=" + cwd);
-    else
-        env.push_back("HOME=/home/" + user);
+    env.push_back("HOME=" + workdir);
     env.push_back("USER=" + user);
 
     struct passwd *p = getpwnam(user.c_str());
