@@ -78,7 +78,7 @@ public:
 
     bool DeliverExitStatus(int pid, int status);
 
-    std::shared_ptr<TCgroup> GetCgroup(std::shared_ptr<TSubsystem> subsys);
+    std::shared_ptr<TCgroup> GetLeafCgroup(std::shared_ptr<TSubsystem> subsys);
     void Heartbeat();
 };
 

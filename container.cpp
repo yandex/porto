@@ -77,7 +77,7 @@ struct TData {
 
     static string CpuUsage(TContainer& c) {
         auto subsys = TSubsystem::Cpuacct();
-        auto cg = c.GetCgroup(subsys);
+        auto cg = c.GetLeafCgroup(subsys);
         if (!cg) {
             TLogger::LogAction("cpuacct cgroup not found");
             return "-1";
@@ -95,7 +95,7 @@ struct TData {
 
     static string MemUsage(TContainer& c) {
         auto subsys = TSubsystem::Memory();
-        auto cg = c.GetCgroup(subsys);
+        auto cg = c.GetLeafCgroup(subsys);
         if (!cg) {
             TLogger::LogAction("memory cgroup not found");
             return "-1";
@@ -150,7 +150,7 @@ bool TContainer::IsRoot() {
 }
 
 vector<pid_t> TContainer::Processes() {
-    auto cg = GetCgroup(TSubsystem::Freezer());
+    auto cg = GetLeafCgroup(TSubsystem::Freezer());
 
     vector<pid_t> ret;
     cg->GetProcesses(ret);
@@ -171,9 +171,9 @@ void TContainer::UpdateState() {
 }
 
 TError TContainer::PrepareCgroups() {
-    leaf_cgroups.push_back(GetCgroup(TSubsystem::Cpuacct()));
-    leaf_cgroups.push_back(GetCgroup(TSubsystem::Memory()));
-    leaf_cgroups.push_back(GetCgroup(TSubsystem::Freezer()));
+    leaf_cgroups.push_back(GetLeafCgroup(TSubsystem::Cpuacct()));
+    leaf_cgroups.push_back(GetLeafCgroup(TSubsystem::Memory()));
+    leaf_cgroups.push_back(GetLeafCgroup(TSubsystem::Freezer()));
 
     for (auto cg : leaf_cgroups) {
         auto ret = cg->Create();
@@ -184,7 +184,7 @@ TError TContainer::PrepareCgroups() {
     }
 
     auto memroot = TCgroup::GetRoot(TSubsystem::Memory());
-    auto memcg = GetCgroup(TSubsystem::Memory());
+    auto memcg = GetLeafCgroup(TSubsystem::Memory());
 
     if (memroot->HasKnob("memory.low_limit_in_bytes")) {
         TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", spec.Get("memory_guarantee"), false);
@@ -251,7 +251,7 @@ TError TContainer::Start() {
 }
 
 TError TContainer::KillAll() {
-    auto cg = GetCgroup(TSubsystem::Freezer());
+    auto cg = GetLeafCgroup(TSubsystem::Freezer());
 
     TLogger::Log("killall " + name);
 
@@ -316,7 +316,7 @@ TError TContainer::Pause() {
     if (IsRoot() || !CheckState(EContainerState::Running))
         return TError(EError::InvalidValue, "invalid container state");
 
-    auto cg = GetCgroup(TSubsystem::Freezer());
+    auto cg = GetLeafCgroup(TSubsystem::Freezer());
     TError error(TSubsystem::Freezer()->Freeze(*cg));
     if (error) {
         TLogger::LogError(error, "Can't pause " + name);
@@ -331,7 +331,7 @@ TError TContainer::Resume() {
     if (!CheckState(EContainerState::Paused))
         return TError(EError::InvalidValue, "invalid container state");
 
-    auto cg = GetCgroup(TSubsystem::Freezer());
+    auto cg = GetLeafCgroup(TSubsystem::Freezer());
     TError error(TSubsystem::Freezer()->Unfreeze(*cg));
     if (error) {
         TLogger::LogError(error, "Can't resume " + name);
@@ -432,7 +432,7 @@ TError TContainer::Restore(const kv::TNode &node) {
     return TError::Success();
 }
 
-std::shared_ptr<TCgroup> TContainer::GetCgroup(shared_ptr<TSubsystem> subsys) {
+std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys) {
     if (name == ROOT_CONTAINER)
         return TCgroup::Get(PORTO_ROOT_CGROUP, TCgroup::GetRoot(subsys));
     else
