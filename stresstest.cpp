@@ -66,8 +66,11 @@ static bool TaskRunning(TPortoAPI &api, const std::string &pid, const std::strin
 static void Create(std::string name) {
     TPortoAPI api;
     std::vector<std::string> containers;
+    
+    ExpectSuccess([&]{return api.List(containers);});
     Expect([&]{return std::find(containers.begin(),containers.end(),name) == containers.end();});
     ExpectSuccess([&]{return api.Create(name);});
+    containers.clear();
     ExpectSuccess([&]{return api.List(containers);});
     Expect([&]{return std::find(containers.begin(),containers.end(),name) != containers.end();});
 }
@@ -84,6 +87,7 @@ static void SetProperty(std::string name, std::string type, std::string value) {
 static void Start(std::string name) {
     TPortoAPI api;
     std::string pid;
+    
     ExpectSuccess([&]{return api.Start(name);});
     ExpectSuccess([&]{return api.GetData(name, "root_pid", pid);});
     Expect([&]{return TaskRunning(api, pid, name) == true;});
@@ -91,7 +95,15 @@ static void Start(std::string name) {
 
 static void Destroy(std::string name) {
     TPortoAPI api;
+    std::vector<std::string> containers;
+    
+    ExpectSuccess([&]{return api.List(containers);});
+    Expect([&]{return std::find(containers.begin(),containers.end(),name) != containers.end();});
     ExpectSuccess([&]{return api.Destroy(name);});
+    containers.clear();
+    ExpectSuccess([&]{return api.List(containers);});
+    Expect([&]{return std::find(containers.begin(),containers.end(),name) == containers.end();});
+    
 }
 
 static void Tasks() {
