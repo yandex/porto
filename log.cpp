@@ -52,48 +52,30 @@ static std::string GetTime() {
 }
 
 void TLogger::Log(const std::string &action) {
-    if (LOG_VEBOSE) {
-        if (file.is_open())
-            file << GetTime() << " " << action << std::endl;
-        else
-            std::cerr << GetTime() << " " << action << std::endl;
-    }
+    if (!LOG_VEBOSE)
+        return;
+    
+    file << GetTime() << " " << action << std::endl;
 }
 
 void TLogger::LogAction(const std::string &action, bool error, int errcode) {
-    if (!error && LOG_VEBOSE) {
-        if (file.is_open())
-            file << GetTime() << " Ok: " << action << std::endl;
-        else
-            std::cerr << GetTime() << " Ok: " << action << std::endl;
-    } else if (error) {
-        if (file.is_open())
-            file << GetTime() << " Error: " << action << ": " << strerror(errcode) << std::endl;
-        else
-            std::cerr << GetTime() << " Error: " << action << ": " << strerror(errcode) << std::endl;
-    }
+    if (!error && LOG_VEBOSE)
+        file << GetTime() << " Ok: " << action << std::endl;
+    else if (error)
+        file << GetTime() << " Error: " << action << ": " << strerror(errcode) << std::endl;
 }
 
 void TLogger::LogError(const TError &e, const std::string &s) {
     if (!e)
         return;
 
-    if (file.is_open())
-        file << GetTime() << " Error(" << rpc::EError_Name(e.GetError()) << "): " << s << ": " << e.GetMsg() << std::endl;
-    else
-        std::cerr << GetTime() << " Error(" << rpc::EError_Name(e.GetError()) << "): " << s << ": " << e.GetMsg() << std::endl;
+    file << GetTime() << " Error(" << rpc::EError_Name(e.GetError()) << "): " << s << ": " << e.GetMsg() << std::endl;
 }
 
 void TLogger::LogRequest(const std::string &message) {
-    if (file.is_open())
-        file << GetTime() << " -> " << message << std::endl;
-    else
-        std::cerr << GetTime() << " -> " << message << std::endl;
+    file << GetTime() << " -> " << message << std::endl;
 }
 
 void TLogger::LogResponse(const std::string &message) {
-    if (file.is_open())
-        file << GetTime() << " <- " << message << std::endl;
-    else
-        std::cerr << GetTime() << " <- " << message << std::endl;
+    file << GetTime() << " <- " << message << std::endl;
 }
