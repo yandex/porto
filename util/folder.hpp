@@ -16,7 +16,6 @@ public:
     bool Exists();
     TError Create(mode_t mode = 0755, bool recursive = false);
     TError Remove(bool recursive = false);
-    TError Rename(const std::string &newname);
 
     TError Items(const TFile::EFileType type, std::vector<std::string> &list);
     TError Subfolders(std::vector<std::string> &list);

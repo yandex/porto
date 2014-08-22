@@ -67,11 +67,6 @@ TError TFolder::Remove(bool recursive) {
     return TError::Success();
 }
 
-TError TFolder::Rename(const std::string &newname) {
-    //TODO
-    return TError(EError::Unknown, "Rename: TODO");
-}
-
 bool TFolder::Exists() {
     struct stat st;
 
