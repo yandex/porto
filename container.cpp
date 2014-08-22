@@ -188,17 +188,15 @@ TError TContainer::PrepareCgroups() {
 
     if (memroot->HasKnob("memory.low_limit_in_bytes")) {
         TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", spec.Get("memory_guarantee"), false);
+        TLogger::LogError(error, "Can't set memory_guarantee");
         if (error)
             return error;
     }
 
-#if 0
     TError error = memcg->SetKnobValue("memory.limit_in_bytes", spec.Get("memory_limit"), false);
-    TLogger::Log("ERR " + error.GetMsg());
-    if (error) {
+    TLogger::LogError(error, "Can't set memory_limit");
+    if (error)
         return error;
-    }
-#endif
 
     return TError::Success();
 }

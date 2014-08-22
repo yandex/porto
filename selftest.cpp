@@ -161,16 +161,20 @@ static string GetEnv(const string &pid) {
     return env;
 }
 
+static string CgRoot(const string &subsystem, const string &name) {
+    return "/sys/fs/cgroup/" + subsystem + "/porto/" + name + "/";
+}
+
 static string GetFreezer(const string &name) {
     string link;
-    TFile m("/sys/fs/cgroup/freezer/porto/" + name + "/freezer.state");
+    TFile m(CgRoot("freezer", name) + "freezer.state");
     (void)m.AsString(link);
     return link;
 }
 
 static void SetFreezer(const string &name, const string &state) {
     string link;
-    TFile m("/sys/fs/cgroup/freezer/porto/" + name + "/freezer.state");
+    TFile m(CgRoot("freezer", name) + "freezer.state");
     (void)m.WriteStringNoAppend(state);
 
     int retries = 1000000;
@@ -179,6 +183,14 @@ static void SetFreezer(const string &name, const string &state) {
             return;
 
     ExpectSuccess(-1);
+}
+
+static string GetCgKnob(const string &subsys, const string &name, const string &knob) {
+    string val;
+    TFile m(CgRoot(subsys, name) + knob);
+    (void)m.AsString(val);
+    val.erase(val.find('\n'));
+    return val;
 }
 
 static void ShouldHaveOnlyRoot(TPortoAPI &api) {
@@ -623,6 +635,33 @@ static void TestStateMachine(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.Destroy(name));
 }
 
+static void TestLimits(TPortoAPI &api, const string &name) {
+    string pid;
+
+    cerr << "Check default limits" << endl;
+    string current;
+
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.Start(name));
+
+    current = GetCgKnob("memory", name, "memory.limit_in_bytes");
+    Expect(current == to_string(LLONG_MAX) || current == to_string(ULLONG_MAX));
+    ExpectSuccess(api.Stop(name));
+
+    cerr << "Check custom limits" << endl;
+    string expected = "524288";
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.SetProperty(name, "memory_limit", expected));
+    ExpectSuccess(api.Start(name));
+
+    current = GetCgKnob("memory", name, "memory.limit_in_bytes");
+    Expect(current == expected);
+    ExpectSuccess(api.Stop(name));
+
+    // TODO: low_limit
+    // TODO: cpu_priority/cpu_policy
+}
+
 static void TestDaemon() {
     string pid;
 
@@ -668,9 +707,9 @@ int Selftest() {
         TestUserGroup(api, "a");
         TestCwd(api, "a");
         //TestRoot(api, "a");
+        TestLimits(api, "a");
         ExpectSuccess(api.Destroy("a"));
         // TODO: check cgroups permissions
-        // TODO: check cgroups limits
         TestDaemon();
     } catch (string e) {
         cerr << "EXCEPTION: " << e << endl;
