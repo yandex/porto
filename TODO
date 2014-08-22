@@ -1,4 +1,3 @@
-- state recovery: kill freezed tasks fails
 - return only N last lines in stdout/stderr
 - add CWD to PATH
 

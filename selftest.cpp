@@ -158,6 +158,26 @@ static string GetEnv(const string &pid) {
     return env;
 }
 
+static string GetFreezer(const string &name) {
+    string link;
+    TFile m("/sys/fs/cgroup/freezer/porto/" + name + "/freezer.state");
+    (void)m.AsString(link);
+    return link;
+}
+
+static void SetFreezer(const string &name, const string &state) {
+    string link;
+    TFile m("/sys/fs/cgroup/freezer/porto/" + name + "/freezer.state");
+    (void)m.WriteStringNoAppend(state);
+
+    int retries = 1000000;
+    while (retries--)
+        if (GetFreezer(name) == state + "\n")
+            return;
+
+    ExpectSuccess(-1);
+}
+
 static void ShouldHaveOnlyRoot(TPortoAPI &api) {
     std::vector<std::string> containers;
 
@@ -582,6 +602,20 @@ static void TestStateMachine(TPortoAPI &api, const string &name) {
 
     ExpectSuccess(api.Stop(name));
     Expect(TaskRunning(api, pid, name) == false);
+
+    cerr << "Make sure we can stop unintentionally frozen container " << endl;
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.Start(name));
+
+    v = GetFreezer(name);
+    Expect(v == "THAWED\n");
+
+    SetFreezer(name, "FROZEN");
+
+    v = GetFreezer(name);
+    Expect(v == "FROZEN\n");
+
+    ExpectSuccess(api.Stop(name));
 
     ExpectSuccess(api.Destroy(name));
 }

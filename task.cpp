@@ -105,11 +105,6 @@ TTask::~TTask() {
         TError e = f.Remove();
         TLogger::LogError(e, "Can't remove task stderr " + stdoutFile);
     }
-
-    if (pid) {
-        (void)kill(pid, SIGKILL);
-        (void)waitpid(pid, NULL, 0);
-    }
 }
 
 static string GetTmpFile() {

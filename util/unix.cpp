@@ -41,6 +41,16 @@ int RetryFailed(int times, int timeo_ms, std::function<int()> handler) {
     return ret;
 }
 
+void SleepWhile(int timeo_ms, std::function<bool()> handler) {
+    const int resolution = 10;
+    int times = timeo_ms / resolution;
+
+    if (!times)
+        times = 0;
+
+    (void)RetryFailed(times, resolution, [&]{ return handler() != true; });
+}
+
 int GetPid() {
     return getpid();
 }

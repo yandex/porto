@@ -9,6 +9,7 @@
 #include "registry.hpp"
 #include "log.hpp"
 #include "util/string.hpp"
+#include "util/unix.hpp"
 
 extern "C" {
 #include <sys/types.h>
@@ -264,7 +265,7 @@ TError TContainer::KillAll() {
     // try to stop all tasks gracefully
     cg->Kill(SIGTERM);
 
-    // TODO: do we need timeout here?!
+    SleepWhile(100, [&]{ return !cg->IsEmpty(); });
 
     // then kill any task that didn't want to stop via SIGTERM;
     // freeze all container tasks to make sure no one forks and races with us

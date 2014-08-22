@@ -24,7 +24,7 @@ class TCgroup {
 
     bool need_cleanup = false;
 
-    bool RemoveSubtree(void);
+    bool RemoveSubtree();
 
 public:
     static std::shared_ptr<TCgroup> Get(const std::string &name,
