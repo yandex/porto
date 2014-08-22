@@ -97,8 +97,10 @@ static int SpawnPortod() {
         pid_t pid = wait(&status);
         if (errno == EINTR)
             continue;
-        if (pid == portod_pid)
+        if (pid == portod_pid) {
+            ret = EXIT_SUCCESS;
             break;
+        }
 
         SendPidStatus(pfd[1], pid, status);
     }
@@ -120,6 +122,12 @@ int main(int argc, char * const argv[])
             return EXIT_FAILURE;
         }
     }
+
+    if (getuid() != 0) {
+        Log() << "Need root privileges to start" << endl;
+        return EXIT_FAILURE;
+    }
+
     Log() << "Started" << endl;
 
     // portod may die while we are writing into communication pipe
@@ -136,6 +144,8 @@ int main(int argc, char * const argv[])
     while (!Done) {
         ret = SpawnPortod();
         Log() << "Returned " << ret << endl;
+        if (ret != EXIT_SUCCESS)
+            usleep(1000000);
     }
 
     if (kill(portod_pid, SIGINT) < 0)
