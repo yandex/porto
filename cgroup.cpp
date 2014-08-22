@@ -168,11 +168,11 @@ bool TCgroup::RemoveSubtree(void) {
     if (IsRoot())
         return false;
 
-    if (level == 1 && name == ROOT_CGROUP)
+    if (level == 1 && name == PORTO_ROOT_CGROUP)
         return true;
 
     for (auto cg = parent; cg; cg = cg->parent)
-        if (cg->level == 1 && cg->name == ROOT_CGROUP)
+        if (cg->level == 1 && cg->name == PORTO_ROOT_CGROUP)
             return true;
 
     return false;
