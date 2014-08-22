@@ -60,8 +60,8 @@ TError TFolder::Remove(bool recursive) {
 
     TLogger::Log("rmdir " + path);
 
-    int ret = RetryBusy(10, 10000, [=]{ return rmdir(path.c_str()); });
-    if (ret < 0)
+    int ret = RetryBusy(10, 100, [&]{ return rmdir(path.c_str()); });
+    if (ret)
         return TError(EError::Unknown, errno, "rmdir(" + path + ")");
 
     return TError::Success();

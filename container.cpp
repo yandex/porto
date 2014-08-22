@@ -115,11 +115,11 @@ std::map<std::string, const TDataSpec> dataSpec = {
     { "state", { "container state", TData::State, { EContainerState::Stopped, EContainerState::Dead, EContainerState::Running, EContainerState::Paused } } },
     { "exit_status", { "container exit status", TData::ExitStatus, { EContainerState::Dead } } },
     { "start_errno", { "container start error", TData::StartErrno, { EContainerState::Stopped } } },
-    { "root_pid", { "root process id", TData::RootPid, { EContainerState::Running } } },
-    { "stdout", { "return task stdout", TData::Stdout, { EContainerState::Running, EContainerState::Dead } } },
-    { "stderr", { "return task stderr", TData::Stderr, { EContainerState::Running, EContainerState::Dead } } },
-    { "cpu_usage", { "return consumed CPU time in nanoseconds", TData::CpuUsage, { EContainerState::Running, EContainerState::Dead } } },
-    { "memory_usage", { "return consumed memory in bytes", TData::MemUsage, { EContainerState::Running, EContainerState::Dead } } },
+    { "root_pid", { "root process id", TData::RootPid, { EContainerState::Running, EContainerState::Paused } } },
+    { "stdout", { "return task stdout", TData::Stdout, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "stderr", { "return task stderr", TData::Stderr, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "cpu_usage", { "return consumed CPU time in nanoseconds", TData::CpuUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "memory_usage", { "return consumed memory in bytes", TData::MemUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
 };
 
 // TContainer
@@ -268,14 +268,19 @@ TError TContainer::KillAll() {
 
     // then kill any task that didn't want to stop via SIGTERM;
     // freeze all container tasks to make sure no one forks and races with us
-    TSubsystem::Freezer()->Freeze(*cg);
+    error = TSubsystem::Freezer()->Freeze(*cg);
+    if (error)
+        TLogger::LogError(error, "Can't kill all tasks");
+
     error = cg->GetTasks(reap);
     if (error) {
         TLogger::LogError(error, "Can't read tasks list while stopping container");
         return error;
     }
     cg->Kill(SIGKILL);
-    TSubsystem::Freezer()->Unfreeze(*cg);
+    error = TSubsystem::Freezer()->Unfreeze(*cg);
+    if (error)
+        TLogger::LogError(error, "Can't kill all tasks");
 
     // after we killed all tasks, collect and ignore their exit status
     for (auto pid : reap) {
@@ -309,7 +314,11 @@ TError TContainer::Pause() {
         return TError(EError::InvalidValue, "invalid container state");
 
     auto cg = GetCgroup(TSubsystem::Freezer());
-    TSubsystem::Freezer()->Freeze(*cg);
+    TError error(TSubsystem::Freezer()->Freeze(*cg));
+    if (error) {
+        TLogger::LogError(error, "Can't pause " + name);
+        return error;
+    }
 
     state = EContainerState::Paused;
     return TError::Success();
@@ -320,7 +329,12 @@ TError TContainer::Resume() {
         return TError(EError::InvalidValue, "invalid container state");
 
     auto cg = GetCgroup(TSubsystem::Freezer());
-    TSubsystem::Freezer()->Unfreeze(*cg);
+    TError error(TSubsystem::Freezer()->Unfreeze(*cg));
+    if (error) {
+        TLogger::LogError(error, "Can't resume " + name);
+        return error;
+    }
+
 
     state = EContainerState::Running;
     return TError::Success();

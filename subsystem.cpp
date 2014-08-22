@@ -4,6 +4,7 @@
 #include "subsystem.hpp"
 #include "log.hpp"
 #include "util/string.hpp"
+#include "util/unix.hpp"
 
 using namespace std;
 
@@ -49,23 +50,39 @@ shared_ptr<TFreezerSubsystem> TSubsystem::Freezer() {
     return static_pointer_cast<TFreezerSubsystem>(Get("freezer"));
 }
 
-void TFreezerSubsystem::WaitState(TCgroup &cg, const std::string &state) {
-    string s;
-    do {
+TError TFreezerSubsystem::WaitState(TCgroup &cg, const std::string &state) {
+
+    int ret = RetryFailed(FREEZER_WAIT_TIMEOUT_S * 10, 100, [&]{
+        string s;
         TError error = cg.GetKnobValue("freezer.state", s);
         if (error)
             TLogger::LogError(error, "Can't freeze cgroup");
-    } while (s != state);
+
+        return s != state;
+    });
+
+    if (ret) {
+        TError error(EError::Unknown, "Can't wait for freezer state " + state);
+        TLogger::LogError(error, cg.Relpath());
+        return error;
+    }
+    return TError::Success();
 }
 
-void TFreezerSubsystem::Freeze(TCgroup &cg) {
-    cg.SetKnobValue("freezer.state", "FROZEN");
-    WaitState(cg, "FROZEN\n");
+TError TFreezerSubsystem::Freeze(TCgroup &cg) {
+    TError error(cg.SetKnobValue("freezer.state", "FROZEN"));
+    if (error)
+        return error;
+
+    return WaitState(cg, "FROZEN\n");
 }
 
-void TFreezerSubsystem::Unfreeze(TCgroup &cg) {
-    cg.SetKnobValue("freezer.state", "THAWED");
-    WaitState(cg, "THAWED\n");
+TError TFreezerSubsystem::Unfreeze(TCgroup &cg) {
+    TError error(cg.SetKnobValue("freezer.state", "THAWED"));
+    if (error)
+        return error;
+
+    return WaitState(cg, "THAWED\n");
 }
 
 // Cpu

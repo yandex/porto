@@ -81,6 +81,26 @@ static map<string, string> GetCgroups(const string &pid) {
     return cgmap;
 }
 
+static string GetState(const string &pid) {
+    vector<string> st;
+    TFile f("/proc/" + pid + "/status");
+    if (f.AsLines(st))
+        return "INVALID PID";
+
+    stringstream ss(st[1]);
+
+    string name, state, desc;
+
+    ss>> name;
+    ss>> state;
+    ss>> desc;
+
+    if (name != "State:")
+        return "PARSING ERROR";
+
+    return state;
+}
+
 static void GetUidGid(const string &pid, int &uid, int &gid) {
     vector<string> st;
     TFile f("/proc/" + pid + "/status");
@@ -546,7 +566,22 @@ static void TestStateMachine(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetData(name, "state", v));
     Expect(v == "stopped");
 
-    // TODO: add pause/resume
+    ExpectSuccess(api.SetProperty(name, "command", "bash -c 'while :; do :; done'"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    v = GetState(pid);
+    Expect(v == "R");
+
+    ExpectSuccess(api.Pause(name));
+    v = GetState(pid);
+    Expect(v == "D");
+
+    ExpectSuccess(api.Resume(name));
+    v = GetState(pid);
+    Expect(v == "R");
+
+    ExpectSuccess(api.Stop(name));
+    Expect(TaskRunning(api, pid, name) == false);
 
     ExpectSuccess(api.Destroy(name));
 }
@@ -575,6 +610,8 @@ int Selftest() {
         cerr << "EXCEPTION: " << e << endl;
         return 1;
     }
+
+    cerr << "All tests successfully passed!" << endl;
 
     return 0;
 }

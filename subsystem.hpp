@@ -44,9 +44,9 @@ class TFreezerSubsystem : public TSubsystem {
 public:
     TFreezerSubsystem() : TSubsystem("freezer") {}
 
-    void WaitState(TCgroup &cg, const std::string &state);
-    void Freeze(TCgroup &cg);
-    void Unfreeze(TCgroup &cg);
+    TError WaitState(TCgroup &cg, const std::string &state);
+    TError Freeze(TCgroup &cg);
+    TError Unfreeze(TCgroup &cg);
 };
 
 class TCpuSubsystem : public TSubsystem {

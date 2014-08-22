@@ -1,6 +1,4 @@
 - state recovery: kill freezed tasks fails
-- freezer wait finite number of times for freezed state
-- correctly handle syscall results (in particular EBUSY)
 - return only N last lines in stdout/stderr
 - add CWD to PATH
 

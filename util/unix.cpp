@@ -9,8 +9,8 @@ extern "C" {
 #include <errno.h>
 }
 
-int RetryBusy(int times, int timeo, std::function<int()> handler) {
-    int ret = 0;
+int RetryBusy(int times, int timeo_ms, std::function<int()> handler) {
+    int ret;
 
     if (!times)
         times = 1;
@@ -19,13 +19,13 @@ int RetryBusy(int times, int timeo, std::function<int()> handler) {
         ret = handler();
         if (errno != EBUSY)
             return ret;
-        usleep(timeo);
+        usleep(timeo_ms * 1000);
     }
 
     return ret;
 }
 
-int RetryFailed(int times, int timeo, std::function<int()> handler) {
+int RetryFailed(int times, int timeo_ms, std::function<int()> handler) {
     int ret;
 
     if (!times)
@@ -33,9 +33,9 @@ int RetryFailed(int times, int timeo, std::function<int()> handler) {
 
     while (times--) {
         ret = handler();
-        if (ret >= 0)
+        if (ret == 0)
             return ret;
-        usleep(timeo);
+        usleep(timeo_ms * 1000);
     }
 
     return ret;

@@ -3,6 +3,7 @@
 #include "util/mount.hpp"
 #include "util/file.hpp"
 #include "util/string.hpp"
+#include "util/unix.hpp"
 #include "log.hpp"
 
 extern "C" {
@@ -19,8 +20,11 @@ TError TMount::Mount(bool rdonly, bool bind, bool remount) {
                     (bind ? MS_BIND : 0) |
                     (remount ? MS_REMOUNT : 0);
 
-    int ret = mount(device.c_str(), mountpoint.c_str(), vfstype.c_str(),
-                    mountflags, CommaSeparatedList(flags).c_str());
+    int ret = RetryBusy(10, 100, [&]{ return mount(device.c_str(),
+                                                   mountpoint.c_str(),
+                                                   vfstype.c_str(),
+                                                   mountflags,
+                                                   CommaSeparatedList(flags).c_str()); });
     if (ret)
         return TError(EError::Unknown, errno, "mount(" + device + ", " + mountpoint + ", " + vfstype + ", " + to_string(mountflags) + ", " + CommaSeparatedList(flags) + ")");
 
@@ -30,7 +34,7 @@ TError TMount::Mount(bool rdonly, bool bind, bool remount) {
 TError TMount::Umount() {
     TLogger::Log("umount " + mountpoint);
 
-    int ret = umount(mountpoint.c_str());
+    int ret = RetryBusy(10, 100, [&]{ return umount(mountpoint.c_str()); });
     if (ret)
         return TError(EError::Unknown, errno, "umount(" + mountpoint + ")");
 
