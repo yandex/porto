@@ -356,21 +356,21 @@ public:
         string value;
         int ret;
 
+        vector<TProperty> plist;
+        ret = api.Plist(plist);
+        if (ret) {
+            cerr << "Can't list properties, error = " << ErrorName(ret) << endl;
+            return 1;
+        }
+
+        vector<TData> dlist;
+        ret = api.Dlist(dlist);
+        if (ret) {
+            cerr << "Can't list data, error = " << ErrorName(ret) << endl;
+            return 1;
+        }
+
         if (argc <= 1) {
-            vector<TProperty> plist;
-            ret = api.Plist(plist);
-            if (ret) {
-                cerr << "Can't list properties, error = " << ErrorName(ret) << endl;
-                return 1;
-            }
-
-            vector<TData> dlist;
-            ret = api.Dlist(dlist);
-            if (ret) {
-                cerr << "Can't list data, error = " << ErrorName(ret) << endl;
-                return 1;
-            }
-
             for (auto p : plist) {
                 ret = api.GetProperty(argv[0], p.name, value);
                 if (!ret)
@@ -386,13 +386,34 @@ public:
             return 0;
         }
 
-        ret = api.GetData(argv[0], argv[1], value);
-        if (!ret)
-            cout << DataValue(argv[1], value) << endl;
+        bool validProperty = false;
+        for (auto p : plist)
+            if (p.name == argv[1]) {
+                validProperty = true;
+                break;
+            }
 
-        ret = api.GetProperty(argv[0], argv[1], value);
-        if (!ret)
-            cout << value << endl;
+        bool validData = false;
+        for (auto d : dlist)
+            if (d.name == argv[1]) {
+                validData = true;
+                break;
+            }
+
+        if (validData) {
+            ret = api.GetData(argv[0], argv[1], value);
+            if (!ret)
+                cout << DataValue(argv[1], value) << endl;
+        }
+
+        if (validProperty) {
+            ret = api.GetProperty(argv[0], argv[1], value);
+            if (!ret)
+                cout << value << endl;
+        }
+
+        if (!validProperty && !validData)
+            cerr << "Invalid property or data" << endl;
 
         return 1;
     }
