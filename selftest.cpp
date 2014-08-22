@@ -193,6 +193,12 @@ static string GetCgKnob(const string &subsys, const string &name, const string &
     return val;
 }
 
+static bool HaveCgKnob(const string &subsys, const string &name, const string &knob) {
+    string val;
+    TFile m(CgRoot(subsys, name) + knob);
+    return m.Exists();
+}
+
 static void ShouldHaveOnlyRoot(TPortoAPI &api) {
     std::vector<std::string> containers;
 
@@ -646,19 +652,30 @@ static void TestLimits(TPortoAPI &api, const string &name) {
 
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
     Expect(current == to_string(LLONG_MAX) || current == to_string(ULLONG_MAX));
+
+    if (HaveCgKnob("memory", name, "memory.low_limit_in_bytes")) {
+        current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
+        Expect(current == to_string(LLONG_MAX) || current == to_string(ULLONG_MAX));
+    }
     ExpectSuccess(api.Stop(name));
 
     cerr << "Check custom limits" << endl;
-    string expected = "524288";
+    string exp_limit = "524288";
+    string exp_guar = "16384";
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
-    ExpectSuccess(api.SetProperty(name, "memory_limit", expected));
+    ExpectSuccess(api.SetProperty(name, "memory_limit", exp_limit));
+    if (HaveCgKnob("memory", name, "memory.low_limit_in_bytes"))
+        ExpectSuccess(api.SetProperty(name, "memory_guarantee", exp_guar));
     ExpectSuccess(api.Start(name));
 
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
-    Expect(current == expected);
+    Expect(current == exp_limit);
     ExpectSuccess(api.Stop(name));
+    if (HaveCgKnob("memory", name, "memory.low_limit_in_bytes")) {
+        current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
+        Expect(current == exp_guar);
+    }
 
-    // TODO: low_limit
     // TODO: cpu_priority/cpu_policy
 }
 
