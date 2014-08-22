@@ -55,7 +55,7 @@ public:
 
     TError Kill(int signal);
 
-    std::vector<std::shared_ptr<TCgroup> > FindChildren();
+    TError FindChildren(std::vector<std::shared_ptr<TCgroup>> cgroups);
 
     TError GetProcesses(std::vector<pid_t> &processes);
     TError GetTasks(std::vector<pid_t> &tasks);

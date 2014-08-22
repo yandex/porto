@@ -44,28 +44,27 @@ TCgroup::~TCgroup() {
         Remove();
 }
 
-vector<shared_ptr<TCgroup> > TCgroup::FindChildren() {
+TError TCgroup::FindChildren(std::vector<std::shared_ptr<TCgroup>> cglist) {
     TFolder f(Path());
-    vector<shared_ptr<TCgroup> > ret;
     auto self = TRegistry<TCgroup>::Get(*this);
     vector<string> list;
 
     TError error = f.Subfolders(list);
-    if (error) {
-        // TODO: handle error
-    }
+    if (error)
+        return error;
 
     for (auto s : list) {
         auto cg = TRegistry<TCgroup>::Get(TCgroup(s, self));
 
         children.push_back(weak_ptr<TCgroup>(cg));
-        for (auto c : cg->FindChildren())
-            ret.push_back(c);
+        TError error = cg->FindChildren(cglist);
+        if (error)
+            return error;
     }
 
-    ret.push_back(self);
+    cglist.push_back(self);
 
-    return ret;
+    return TError::Success();
 }
 
 TError TCgroup::GetProcesses(vector<pid_t> &processes) {
@@ -326,8 +325,11 @@ TError TCgroupSnapshot::Create() {
         auto root = TCgroup::GetRoot(mount, cg_controllers);
         cgroups.push_back(root);
 
-        for (auto cg : root->FindChildren())
-            cgroups.push_back(cg);
+        TError error = root->FindChildren(cgroups);
+        if (error) {
+            TLogger::LogError(error, "Can't find children for " + root->Relpath());
+            return error;
+        }
     }
 
     return TError::Success();
