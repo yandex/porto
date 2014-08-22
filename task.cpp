@@ -451,7 +451,7 @@ void TTask::Kill(int signal) {
 std::string TTask::GetStdout() {
     string s;
     TFile f(stdoutFile);
-    TError e = f.AsString(s);
+    TError e(f.LastStrings(STDOUT_READ_BYTES, s));
     TLogger::LogError(e, "Can't read container stdout");
     return s;
 }
@@ -459,7 +459,7 @@ std::string TTask::GetStdout() {
 std::string TTask::GetStderr() {
     string s;
     TFile f(stderrFile);
-    TError e = f.AsString(s);
+    TError e(f.LastStrings(STDOUT_READ_BYTES, s));
     TLogger::LogError(e, "Can't read container stderr");
     return s;
 }

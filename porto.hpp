@@ -17,6 +17,7 @@ const size_t PORTOD_MAX_CLIENTS = 16;
 const size_t PORTOD_POLL_TIMEOUT_MS = 1000;
 const size_t CGROUP_REMOVE_TIMEOUT_S = 1;
 const size_t FREEZER_WAIT_TIMEOUT_S = 1;
+const size_t STDOUT_READ_BYTES = 8 * 1024 * 1024;
 
 const std::string RPC_SOCK = "/run/portod.socket";
 const std::string RPC_SOCK_GROUP = "porto";

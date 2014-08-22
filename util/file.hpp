@@ -21,7 +21,7 @@ public:
         Socket,
         Unknown,
         Any
-    };    
+    };
 
     TFile(const std::string &path, const int mode = 0600) : path(path), mode(mode) { };
 
@@ -33,6 +33,7 @@ public:
     TError AsString(std::string &value);
     TError AsInt(int &value);
     TError AsLines(std::vector<std::string> &value);
+    TError LastStrings(const size_t size, std::string &value);
     TError ReadLink(std::string &value);
 
     TError WriteStringNoAppend(const std::string &str);

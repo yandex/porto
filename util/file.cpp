@@ -95,6 +95,41 @@ TError TFile::AsLines(vector<string> &value) {
     return TError::Success();
 }
 
+TError TFile::LastStrings(const size_t size, std::string &value) {
+    ifstream f(path);
+    if (!f.is_open())
+        return TError(EError::Unknown, string(__func__) + ": Cannot open " + path);
+
+    try {
+        size_t end = f.seekg(0, ios_base::end).tellg();
+        size_t copy = end < size ? end : size;
+
+        f.seekg(-copy, ios_base::end);
+
+        vector<char> s;
+        s.resize(copy);
+        f.read(s.data(), copy);
+
+        if (end > size) {
+            auto iter = s.begin();
+
+            for (; iter != s.end(); iter++)
+                if (*iter == '\n') {
+                    iter++;
+                    break;
+                }
+
+            value.assign(iter, s.end());
+        } else {
+            value.assign(s.begin(), s.begin() + copy);
+        }
+    } catch (...) {
+        return TError(EError::Unknown, string(__func__) + ": Uncaught exception");
+    }
+
+    return TError::Success();
+}
+
 TError TFile::ReadLink(std::string &value) {
     char buf[PATH_MAX];
     ssize_t len;
