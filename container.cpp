@@ -1,9 +1,7 @@
-#include <sys/types.h>
-#include <unistd.h>
-
 #include <algorithm>
 #include <sstream>
 #include <memory>
+#include <csignal>
 
 #include "container.hpp"
 #include "task.hpp"
@@ -13,7 +11,8 @@
 #include "util/string.hpp"
 
 extern "C" {
-#include <signal.h>
+#include <sys/types.h>
+#include <unistd.h>
 }
 
 using namespace std;

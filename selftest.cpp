@@ -1,6 +1,7 @@
 #include <iostream>
 #include <iomanip>
 #include <sstream>
+#include <csignal>
 
 #include "rpc.pb.h"
 #include "libporto.hpp"
@@ -10,7 +11,6 @@
 extern "C" {
 #include <unistd.h>
 #include <sys/types.h>
-#include <signal.h>
 #include <grp.h>
 #include <pwd.h>
 }
@@ -152,8 +152,6 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
 
     ExpectSuccess(api.GetProperty(name, "command", v));
     Expect(v == string(""));
-    ExpectSuccess(api.GetProperty(name, "low_limit", v));
-    Expect(v == string("0"));
     ExpectSuccess(api.GetProperty(name, "user", v));
     Expect(v == string("nobody"));
     ExpectSuccess(api.GetProperty(name, "group", v));

@@ -1,9 +1,9 @@
+#include <map>
+
 #include "property.hpp"
 #include "log.hpp"
 #include "cgroup.hpp"
 #include "util/string.hpp"
-
-#include <map>
 
 extern "C" {
 #include <grp.h>

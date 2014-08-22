@@ -2,14 +2,14 @@
 #include <thread>
 #include <atomic>
 #include <unistd.h>
+#include <csignal>
 
 #include "porto.hpp"
 #include "util/file.hpp"
 
 extern "C" {
-    #include <unistd.h>
-    #include <sys/types.h>
-    #include <signal.h>
+#include <unistd.h>
+#include <sys/types.h>
 }
 
 static std::atomic<int> done;

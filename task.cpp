@@ -1,6 +1,7 @@
 #include <climits>
 #include <sstream>
 #include <iterator>
+#include <csignal>
 
 #include "porto.hpp"
 #include "task.hpp"
@@ -21,7 +22,6 @@ extern "C" {
 #include <pwd.h>
 #include <syslog.h>
 #include <wordexp.h>
-#include <signal.h>
 }
 
 using namespace std;

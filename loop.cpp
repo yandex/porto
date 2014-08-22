@@ -144,7 +144,7 @@ int main(int argc, char * const argv[])
     while (!Done) {
         ret = SpawnPortod();
         Log() << "Returned " << ret << endl;
-        if (ret != EXIT_SUCCESS)
+        if (!Done && ret != EXIT_SUCCESS)
             usleep(1000000);
     }
 

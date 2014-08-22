@@ -1,10 +1,10 @@
 #include <string>
+#include <csignal>
 
 #include "log.hpp"
 #include "unix.hpp"
 
 extern "C" {
-#include <signal.h>
 #include <unistd.h>
 #include <errno.h>
 }

@@ -1,6 +1,7 @@
 #include <iostream>
 #include <sstream>
 #include <algorithm>
+#include <csignal>
 
 #include "cgroup.hpp"
 #include "task.hpp"
@@ -10,10 +11,6 @@
 #include "util/unix.hpp"
 
 using namespace std;
-
-extern "C" {
-#include <signal.h>
-}
 
 // TCgroup
 shared_ptr<TCgroup> TCgroup::Get(const string &name, const shared_ptr<TCgroup> &parent) {
