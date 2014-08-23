@@ -12,14 +12,26 @@ extern "C" {
 
 static std::ofstream file;
 
-void TLogger::OpenLog(const std::string &path, const int mode) {
+void TLogger::OpenLog(const std::string &path, const unsigned int mode) {
     if (file.is_open())
         file.close();
 
-    (void)creat(path.c_str(), mode);
-    if (truncate(path.c_str(), 0)) {}
+    struct stat st;
+    bool need_create = false;
 
-    file.open(path);
+    if (lstat(path.c_str(), &st) == 0) {
+        if (st.st_mode != (mode | S_IFREG)) {
+            unlink(path.c_str());
+            need_create = true;
+        }
+    } else {
+        need_create = true;
+    }
+
+    if (need_create)
+        close(creat(path.c_str(), mode));
+
+    file.open(path, std::ios_base::app);
 }
 
 void TLogger::CloseLog() {

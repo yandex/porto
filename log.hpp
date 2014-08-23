@@ -10,7 +10,7 @@ extern bool verbose;
 
 class TLogger {
 public:
-    static void OpenLog(const std::string &path, const int mode);
+    static void OpenLog(const std::string &path, const unsigned int mode);
     static void CloseLog();
     static void Log(const std::string &action);
     static void LogAction(const std::string &action, bool error = false, int errcode = 0);
