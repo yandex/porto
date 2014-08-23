@@ -36,6 +36,10 @@ int TPortoAPI::Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
     rsp.Clear();
     int ret = SendReceive(fd, req, rsp);
     req.Clear();
+    if (ret < 0) {
+        close(fd);
+        fd = -1;
+    }
     return ret;
 }
 
