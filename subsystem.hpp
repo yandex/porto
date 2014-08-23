@@ -38,6 +38,7 @@ class TMemorySubsystem : public TSubsystem {
 public:
     TMemorySubsystem() : TSubsystem("memory") {}
     TError Usage(std::shared_ptr<TCgroup> &cg, uint64_t &value);
+    TError UseHierarchy(TCgroup &cg);
 };
 
 class TFreezerSubsystem : public TSubsystem {

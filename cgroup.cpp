@@ -153,6 +153,14 @@ TError TCgroup::Create() {
             return error;
     }
 
+    auto memsubsys = TSubsystem::Memory();
+    if (HasSubsystem(memsubsys->Name())) {
+        TError error = memsubsys->UseHierarchy(*this);
+        TLogger::LogError(error, "Can't set use_hierarchy for " + Relpath());
+        if (error)
+            return error;
+    }
+
     return TError::Success();
 }
 

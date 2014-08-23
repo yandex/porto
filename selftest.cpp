@@ -647,8 +647,14 @@ static void TestLimits(TPortoAPI &api, const string &name) {
     cerr << "Check default limits" << endl;
     string current;
 
+    current = GetCgKnob("memory", "", "memory.use_hierarchy");
+    Expect(current == "1");
+
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
+
+    current = GetCgKnob("memory", name, "memory.use_hierarchy");
+    Expect(current == "1");
 
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
     Expect(current == to_string(LLONG_MAX) || current == to_string(ULLONG_MAX));
@@ -727,6 +733,8 @@ int Selftest() {
         TestLimits(api, "a");
         ExpectSuccess(api.Destroy("a"));
         // TODO: check cgroups permissions
+        // TODO: check root container and which root data we can read
+        // TODO: check cpu_usage/memory_usage
         TestDaemon();
     } catch (string e) {
         cerr << "EXCEPTION: " << e << endl;

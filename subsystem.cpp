@@ -45,6 +45,10 @@ TError TMemorySubsystem::Usage(shared_ptr<TCgroup> &cg, uint64_t &value) {
     return StringToUint64(s, value);
 }
 
+TError TMemorySubsystem::UseHierarchy(TCgroup &cg) {
+    return TError(cg.SetKnobValue("memory.use_hierarchy", "1"));
+}
+
 // Freezer
 shared_ptr<TFreezerSubsystem> TSubsystem::Freezer() {
     return static_pointer_cast<TFreezerSubsystem>(Get("freezer"));
