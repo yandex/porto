@@ -70,6 +70,7 @@ static int SpawnPortod() {
         close(pfd[1]);
 
         ret = execlp("portod", "portod", nullptr);
+        Log() << "execlp(): " << strerror(errno) << endl;
         goto exit;
     }
 
@@ -89,15 +90,18 @@ static int SpawnPortod() {
             close(pfd[1]);
 
             execlp(program_invocation_name, program_invocation_short_name, nullptr);
-            Log() << "Can't execl(" << program_invocation_name << ", " << program_invocation_short_name << ", NULL)" << endl;
+            Log() << "Can't execlp(" << program_invocation_name << ", " << program_invocation_short_name << ", NULL)" << endl;
             return EXIT_FAILURE;
         }
 
         int status;
         pid_t pid = wait(&status);
-        if (errno == EINTR)
+        if (errno == EINTR) {
+            Log() << "wiat(): " << strerror(errno) << endl;
             continue;
+        }
         if (pid == portod_pid) {
+            Log() << "portod exited with " << status << endl;
             ret = EXIT_SUCCESS;
             break;
         }
