@@ -343,17 +343,20 @@ TError TContainer::GetData(const string &name, string &value) {
     if (dataSpec.find(name) == dataSpec.end())
         return TError(EError::InvalidValue, "invalid container data");
 
+    if (IsRoot() && !dataSpec[name].root_valid)
+        return TError(EError::InvalidData, "invalid data for root container");
+
     if (dataSpec[name].valid.find(state) == dataSpec[name].valid.end())
         return TError(EError::InvalidState, "invalid container state");
-
-    if (IsRoot() && !dataSpec[name].root_valid)
-        return TError(EError::InvalidValue, "invalid data for root container");
 
     value = dataSpec[name].handler(*this);
     return TError::Success();
 }
 
 TError TContainer::GetProperty(const string &property, string &value) {
+    if (IsRoot())
+        return TError(EError::InvalidProperty, "no properties for root container");
+
     value = spec.Get(property);
     return TError::Success();
 }

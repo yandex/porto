@@ -641,6 +641,50 @@ static void TestStateMachine(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.Destroy(name));
 }
 
+static void TestRoot(TPortoAPI &api) {
+    string v;
+    string root = "/";
+    vector<string> properties = { "command", "user", "group", "env", "memory_guarantee", "memory_limit", "cpu_policy", "cpu_priority" };
+
+    cerr << "Check root properties & data" << endl;
+    for (auto p : properties)
+        ExpectFailure(api.GetProperty(root, p, v), EError::InvalidProperty);
+
+    ExpectSuccess(api.GetData(root, "state", v));
+    Expect(v == string("running"));
+    ExpectFailure(api.GetData(root, "exit_status", v), EError::InvalidData);
+    ExpectFailure(api.GetData(root, "start_errno", v), EError::InvalidData);
+    ExpectFailure(api.GetData(root, "root_pid", v), EError::InvalidData);
+    ExpectFailure(api.GetData(root, "stdout", v), EError::InvalidData);
+    ExpectFailure(api.GetData(root, "stderr", v), EError::InvalidData);
+
+    cerr << "Check root cpu_usage & memory_usage" << endl;
+    ExpectSuccess(api.GetData(root, "cpu_usage", v));
+    Expect(v == "0");
+    ExpectSuccess(api.GetData(root, "memory_usage", v));
+    Expect(v == "0");
+
+    string name = "a";
+    ExpectSuccess(api.Create(name));
+    ExpectSuccess(api.SetProperty(name, "command", "true"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(root, "cpu_usage", v));
+    Expect(v != "0");
+    ExpectSuccess(api.GetData(root, "memory_usage", v));
+    Expect(v != "0");
+
+    string pid;
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    WaitExit(api, pid, name);
+
+    ExpectSuccess(api.GetData(name, "cpu_usage", v));
+    Expect(v != "0");
+    ExpectSuccess(api.GetData(name, "memory_usage", v));
+    Expect(v != "0");
+
+    ExpectSuccess(api.Destroy(name));
+}
+
 static void TestLimits(TPortoAPI &api, const string &name) {
     string pid;
 
@@ -717,6 +761,7 @@ int Selftest() {
     TPortoAPI api;
 
     try {
+        TestRoot(api);
         TestHolder(api);
         TestEmpty(api);
         TestStateMachine(api, "a");
@@ -733,8 +778,6 @@ int Selftest() {
         TestLimits(api, "a");
         ExpectSuccess(api.Destroy("a"));
         // TODO: check cgroups permissions
-        // TODO: check root container and which root data we can read
-        // TODO: check cpu_usage/memory_usage
         TestDaemon();
     } catch (string e) {
         cerr << "EXCEPTION: " << e << endl;

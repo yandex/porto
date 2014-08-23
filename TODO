@@ -1,3 +1,5 @@
+- task stderr/stdout recovery may fail
+
 # cleanup
 - rotate subprocess stdout/stderr
 - property:env support ; (via \;)
