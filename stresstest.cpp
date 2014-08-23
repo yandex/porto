@@ -12,6 +12,21 @@ extern "C" {
 #include <sys/types.h>
 }
 
+#define Expect(ret) _ExpectFailure(ret, true, 5, __LINE__, __func__)
+#define ExpectSuccess(ret) _ExpectFailure(ret, 0, 5, __LINE__, __func__)
+#define ExpectFailure(ret, exp) _ExpectFailure(ret, exp, 5, __LINE__, __func__)
+static void _ExpectFailure(std::function<int()> f, int exp, int retry, int line, const char *func) {
+    int ret;
+    while (retry--) {
+        ret = f();
+        if (ret == exp)
+            return;
+
+        usleep(100000);
+    }
+    throw std::string("Got " + std::to_string(ret) + ", but expected " + std::to_string(exp) + " at " + func + ":" + std::to_string(line));
+}
+
 static std::atomic<int> done;
 
 static void Tasks() {
@@ -36,6 +51,8 @@ static void StressKill() {
 }
 
 int StressTest() {
+    Expect([&]{ std::cerr << "try" << std::endl; return true; });
+
     std::thread thr_tasks(Tasks);
     std::thread thr_stress_kill(StressKill);
     
