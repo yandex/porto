@@ -150,7 +150,7 @@ TError TKeyValueStorage::Restore(std::map<std::string, kv::TNode> &map) {
         kv::TNode node;
         node.Clear();
 
-        TLogger::Log("Restoring " + name);
+        TLogger::Log("Restoring " + name + " from key-value storage");
 
         TError error = LoadNode(name, node);
         if (error) {

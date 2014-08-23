@@ -753,8 +753,8 @@ static void TestDaemon() {
     struct dirent **lst;
     string path = ("/proc/" + pid + "/fd");
     n = scandir(path.c_str(), &lst, NULL, alphasort);
-    // . .. 0 1 2 3 4 5 6 7
-    Expect(n == 9 + 1);
+    // . .. 0(stdin) 1(stdout) 2(stderr) 3(portod pipe) 4(log) 5(rpc socket)
+    Expect(n == 8 + 1);
 }
 
 int Selftest() {

@@ -296,6 +296,7 @@ int main(int argc, char * const argv[])
         return EXIT_FAILURE;
     }
 
+    TLogger::Log("Started");
     try {
         TKeyValueStorage storage;
         // don't fail, try to recover anyway

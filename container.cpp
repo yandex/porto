@@ -253,6 +253,8 @@ TError TContainer::Start() {
 TError TContainer::KillAll() {
     auto cg = GetCgroup(TSubsystem::Freezer());
 
+    TLogger::Log("killall " + name);
+
     vector<pid_t> reap;
     TError error = cg->GetTasks(reap);
     if (error) {
@@ -284,8 +286,10 @@ TError TContainer::KillAll() {
     // after we killed all tasks, collect and ignore their exit status
     for (auto pid : reap) {
         TTask t(pid);
-        TError error = t.Reap(true);
-        TLogger::LogError(error, "Can't reap task " + to_string(pid));
+        if (t.CanReap()) {
+            TError error = t.Reap(true);
+            TLogger::LogError(error, "Can't reap task " + to_string(pid));
+        }
     }
 
     task = nullptr;
@@ -385,46 +389,45 @@ TError TContainer::Restore(const kv::TNode &node) {
     }
 
     int pid;
+    bool started = true;
     error = StringToInt(spec.GetInternal("root_pid"), pid);
     if (error)
-        pid = 0;
+        started = false;
 
     TLogger::Log(name + ": restore process " + to_string(pid));
 
     state = EContainerState::Stopped;
 
-    // if we didn't start container, make sure nobody is running
-    if (pid <= 0) {
-        TError error = KillAll();
-        if (error)
+    if (started) {
+        error = PrepareTask();
+        if (error) {
+            TLogger::LogError(error, "Can't prepare task");
             return error;
+        }
+
+        error = task->Restore(pid);
+        if (error) {
+            task = nullptr;
+            (void)KillAll();
+
+            TLogger::LogError(error, "Can't restore task");
+            return error;
+        }
+
+        state = task->IsRunning() ? EContainerState::Running : EContainerState::Stopped;
+    } else {
+        if (IsAlive()) {
+            // we started container but died before saving root_pid,
+            // state may be inconsistent so restart task
+
+            (void)KillAll();
+            return Start();
+        } else {
+            // if we didn't start container, make sure nobody is running
+
+            (void)KillAll();
+        }
     }
-
-    error = PrepareTask();
-    if (error) {
-        TLogger::LogError(error, "Can't prepare task");
-        return error;
-    }
-
-    error = task->Restore(pid);
-    if (error) {
-        task = nullptr;
-        (void)KillAll();
-
-        TLogger::LogError(error, "Can't seize task");
-        return error;
-    }
-
-    error = task->ValidateCgroups();
-    if (error) {
-        task = nullptr;
-        (void)KillAll();
-
-        TLogger::LogError(error, "Can't validate task cgroups");
-        return error;
-    }
-
-    state = task->IsRunning() ? EContainerState::Running : EContainerState::Stopped;
 
     return TError::Success();
 }
@@ -440,6 +443,7 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
     if (!task)
         return false;
 
+    TLogger::Log("Considering " + name + " with root_pid " + to_string(task->GetPid()));
     if (task->GetPid() != pid)
         return false;
 

@@ -390,10 +390,7 @@ TError TTask::Start() {
 }
 
 int TTask::GetPid() {
-    if (state == Started)
-        return pid;
-    else
-        return -1;
+    return pid;
 }
 
 bool TTask::IsRunning() {
@@ -410,11 +407,18 @@ TExitStatus TTask::GetExitStatus() {
     return exitStatus;
 }
 
+bool TTask::CanReap() {
+    // May give false-positive when task is running, but we are not its
+    // parent
+    return kill(pid, 0) == 0;
+}
+
 TError TTask::Reap(bool wait) {
     int status;
     pid_t ret;
 
     ret = waitpid(pid, &status, wait ? 0 : WNOHANG);
+    TLogger::Log("reap(" + to_string(pid) + ") = " + to_string(ret));
     if (ret == pid) {
         DeliverExitStatus(status);
     } else if (ret < 0) {
@@ -423,6 +427,7 @@ TError TTask::Reap(bool wait) {
             // (probably from the previous session) -> state should
             // be changed via DeliverExitStatus
 
+            TLogger::Log(to_string(pid) + " is still running, will wait for status delivery" );
             return TError::Success();
         }
 
@@ -471,18 +476,35 @@ TError TTask::Restore(int pid_) {
     exitStatus.error = 0;
     exitStatus.status = 0;
 
+    // There are to possibilities here:
+    // 1. We died and loop reaped container, so it will deliver
+    // exit_status later;
+    // 2. In previous session we died right after we reaped exit_status
+    // but didn't change persistent store.
+    //
+    // Thus, we need to be in Started state so we can possibly receive
+    // exit_status from (1); if it was really case (2) we will indicate
+    // error when user tries to get task state in Reap() from waitpit().
+    //
+    // Moreover, if task didn't die, but we are restoring, it can go
+    // away under us any time, so don't fail if we can't recover
+    // something.
+
+    // TODO: look for stdout/stderr in standard places in case we fail
+
     TFile stdoutLink("/proc/" + to_string(pid_) + "/fd/1");
     TError error = stdoutLink.ReadLink(stdoutFile);
-    if (error)
-        return error;
+    TLogger::LogError(error, "Restore stdout");
 
     TFile stderrLink("/proc/" + to_string(pid_) + "/fd/2");
     error = stderrLink.ReadLink(stderrFile);
-    if (error)
-        return error;
+    TLogger::LogError(error, "Restore stderr");
 
     pid = pid_;
     state = Started;
+
+    error = ValidateCgroups();
+    TLogger::LogError(error, "Can't validate cgroups");
 
     return TError::Success();
 }

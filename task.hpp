@@ -63,6 +63,7 @@ public:
     bool IsRunning();
     TExitStatus GetExitStatus();
     void Kill(int signal);
+    bool CanReap();
     TError Reap(bool wait);
     void DeliverExitStatus(int status);
 
