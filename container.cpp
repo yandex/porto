@@ -113,14 +113,14 @@ struct TData {
 };
 
 std::map<std::string, const TDataSpec> dataSpec = {
-    { "state", { "container state", TData::State, { EContainerState::Stopped, EContainerState::Dead, EContainerState::Running, EContainerState::Paused } } },
-    { "exit_status", { "container exit status", TData::ExitStatus, { EContainerState::Dead } } },
-    { "start_errno", { "container start error", TData::StartErrno, { EContainerState::Stopped } } },
-    { "root_pid", { "root process id", TData::RootPid, { EContainerState::Running, EContainerState::Paused } } },
-    { "stdout", { "return task stdout", TData::Stdout, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "stderr", { "return task stderr", TData::Stderr, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "cpu_usage", { "return consumed CPU time in nanoseconds", TData::CpuUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "memory_usage", { "return consumed memory in bytes", TData::MemUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "state", { "container state", true, TData::State, { EContainerState::Stopped, EContainerState::Dead, EContainerState::Running, EContainerState::Paused } } },
+    { "exit_status", { "container exit status", false, TData::ExitStatus, { EContainerState::Dead } } },
+    { "start_errno", { "container start error", false, TData::StartErrno, { EContainerState::Stopped } } },
+    { "root_pid", { "root process id", false, TData::RootPid, { EContainerState::Running, EContainerState::Paused } } },
+    { "stdout", { "return task stdout", false, TData::Stdout, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "stderr", { "return task stderr", false, TData::Stderr, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "cpu_usage", { "return consumed CPU time in nanoseconds", true, TData::CpuUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "memory_usage", { "return consumed memory in bytes", true, TData::MemUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
 };
 
 // TContainer
@@ -346,7 +346,10 @@ TError TContainer::GetData(const string &name, string &value) {
     if (dataSpec[name].valid.find(state) == dataSpec[name].valid.end())
         return TError(EError::InvalidState, "invalid container state");
 
-    value = dataSpec[name].Handler(*this);
+    if (IsRoot() && !dataSpec[name].root_valid)
+        return TError(EError::InvalidValue, "invalid data for root container");
+
+    value = dataSpec[name].handler(*this);
     return TError::Success();
 }
 

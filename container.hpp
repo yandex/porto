@@ -28,7 +28,8 @@ enum class EContainerState {
 
 struct TDataSpec {
     std::string description;
-    std::function<std::string(TContainer& c)> Handler;
+    bool root_valid;
+    std::function<std::string(TContainer& c)> handler;
     std::set<EContainerState> valid;
 };
 
