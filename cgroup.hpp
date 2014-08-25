@@ -23,18 +23,18 @@ class TCgroup {
 
     bool need_cleanup = false;
 
-public:
-    static std::shared_ptr<TCgroup> Get(const std::string &name,
-                                        const std::shared_ptr<TCgroup> &parent);
-    static std::shared_ptr<TCgroup> GetRoot(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems);
-    static std::shared_ptr<TCgroup> GetRoot(const std::shared_ptr<TSubsystem> subsystem);
-
     TCgroup(const std::string &name, const std::shared_ptr<TCgroup> parent) :
         name(name), parent(parent) { }
     TCgroup(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems) :
         name("/"), parent(std::shared_ptr<TCgroup>(nullptr)), mount(mount), subsystems(subsystems) { }
 
     TCgroup(const std::vector<std::shared_ptr<TSubsystem>> controller);
+    
+public:
+    static std::shared_ptr<TCgroup> Get(const std::string &name,
+                                        const std::shared_ptr<TCgroup> &parent);
+    static std::shared_ptr<TCgroup> GetRoot(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems);
+    static std::shared_ptr<TCgroup> GetRoot(const std::shared_ptr<TSubsystem> subsystem);
 
     ~TCgroup();
 
