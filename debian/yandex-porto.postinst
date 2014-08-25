@@ -11,7 +11,7 @@ case "$1" in
         fi
         update-rc.d yandex-porto start 90 2 3 4 5 . || exit $?
         if [ -e "/etc/init/yandex-porto.conf" ]; then
-            start yandex-porto || exit $?
+            start yandex-porto
         fi
     ;;
     install|upgrade|abort-upgrade)

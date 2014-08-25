@@ -17,7 +17,7 @@ binary:
 	dh_testdir
 	dh_installdirs
 	dh_install
-	dh_installinit
+	dh_installinit --noscripts
 	dh_installchangelogs
 	dh_installdeb
 	dh_gencontrol

@@ -10,7 +10,7 @@ case "$1" in
     ;;
     upgrade)
         if [ -e "/etc/init/yandex-porto.conf" ]; then
-            reload yandex-porto || exit $?
+            reload yandex-porto
         fi
     ;;
     remove|upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
