@@ -6,8 +6,6 @@
 
 #include "error.hpp"
 
-extern bool verbose;
-
 class TLogger {
 public:
     static void OpenLog(const std::string &path, const unsigned int mode);

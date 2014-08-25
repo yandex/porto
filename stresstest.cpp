@@ -19,9 +19,11 @@ extern "C" {
 #include <sys/types.h>
 }
 
-#define Expect(ret) _ExpectFailure(ret, true, 5, __LINE__, __func__)
-#define ExpectSuccess(ret) _ExpectFailure(ret, 0, 5, __LINE__, __func__)
-#define ExpectFailure(ret, exp) _ExpectFailure(ret, exp, 5, __LINE__, __func__)
+static const int retries = 10;
+
+#define Expect(ret) _ExpectFailure(ret, true, retries, __LINE__, __func__)
+#define ExpectSuccess(ret) _ExpectFailure(ret, 0, retries, __LINE__, __func__)
+#define ExpectFailure(ret, exp) _ExpectFailure(ret, exp, retries, __LINE__, __func__)
 
 static void _ExpectFailure(std::function<int()> f, int exp, int retry, int line, const char *func) {
     int ret;
@@ -55,24 +57,13 @@ static std::vector<std::map<std::string, std::string>> vtasks =
     }
 };
 
-static bool TaskRunning(TPortoAPI &api, const std::string &pid, const std::string &name) {
-    int p = stoi(pid);
-    std::string ret;
-    
-    (void)api.GetData(name, "state", ret);
-        return kill(p, 0) == 0;
-}
-
 static void Create(std::string name) {
     TPortoAPI api;
     std::vector<std::string> containers;
     
-    ExpectSuccess([&]{return api.List(containers);});
-    Expect([&]{return std::find(containers.begin(),containers.end(),name) == containers.end();});
-    ExpectSuccess([&]{return api.Create(name);});
-    containers.clear();
-    ExpectSuccess([&]{return api.List(containers);});
-    Expect([&]{return std::find(containers.begin(),containers.end(),name) != containers.end();});
+    Expect([&]{ containers.clear(); api.List(containers); return std::find(containers.begin(),containers.end(),name) == containers.end();});
+    Expect([&]{ auto ret = api.Create(name); return ret == EError::Success || ret == EError::ContainerAlreadyExists; });
+    Expect([&]{ containers.clear(); api.List(containers); return std::find(containers.begin(),containers.end(),name) != containers.end();});
 }
 
 static void SetProperty(std::string name, std::string type, std::string value) {
@@ -87,10 +78,10 @@ static void SetProperty(std::string name, std::string type, std::string value) {
 static void Start(std::string name) {
     TPortoAPI api;
     std::string pid;
+    std::string v;
     
     ExpectSuccess([&]{return api.Start(name);});
-    ExpectSuccess([&]{return api.GetData(name, "root_pid", pid);});
-    Expect([&]{return TaskRunning(api, pid, name) == true;});
+    Expect([&]{ api.GetData(name, "state", v); return v == "dead" || v == "running"; });
 }
 
 static void Destroy(std::string name) {

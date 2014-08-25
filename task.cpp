@@ -490,14 +490,16 @@ TError TTask::Restore(int pid_) {
     // away under us any time, so don't fail if we can't recover
     // something.
 
-    // TODO: look for stdout/stderr in standard places in case we fail
-
     TFile stdoutLink("/proc/" + to_string(pid_) + "/fd/1");
     TError error = stdoutLink.ReadLink(stdoutFile);
+    if (error)
+        stdoutFile = env.cwd + "/stdout";
     TLogger::LogError(error, "Restore stdout");
 
     TFile stderrLink("/proc/" + to_string(pid_) + "/fd/2");
     error = stderrLink.ReadLink(stderrFile);
+    if (error)
+        stderrFile = env.cwd + "/stderr";
     TLogger::LogError(error, "Restore stderr");
 
     pid = pid_;

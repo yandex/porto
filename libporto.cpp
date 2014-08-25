@@ -30,7 +30,7 @@ int TPortoAPI::Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
     if (fd < 0) {
         TError error = ConnectToRpcServer(RPC_SOCK, fd);
         if (error)
-            throw "Can't connect to RPC server: " + error.GetMsg();
+            return INT_MIN;
     }
 
     rsp.Clear();

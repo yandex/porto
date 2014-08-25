@@ -13,6 +13,7 @@
 extern "C" {
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <grp.h>
 #include <pwd.h>
 #include <dirent.h>
@@ -726,7 +727,44 @@ static void TestLimits(TPortoAPI &api, const string &name) {
         Expect(current == exp_guar);
     }
 
-    // TODO: cpu_priority/cpu_policy
+    cerr << "Check cpu_priority" << endl;
+    ExpectFailure(api.SetProperty(name, "cpu_priority", "-1"), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "cpu_priority", "100"), EError::InvalidValue);
+    ExpectSuccess(api.SetProperty(name, "cpu_priority", "0"));
+    ExpectSuccess(api.SetProperty(name, "cpu_priority", "99"));
+    // TODO: cpu_priority - check functionality when implemented
+
+
+    cerr << "Check cpu_policy" << endl;
+    ExpectFailure(api.SetProperty(name, "cpu_policy", "somecrap"), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "cpu_policy", "rt"), EError::NotSupported);
+    ExpectFailure(api.SetProperty(name, "cpu_policy", "idle"), EError::NotSupported);
+    ExpectSuccess(api.SetProperty(name, "cpu_policy", "normal"));
+    // TODO: cpu_policy - check functionality when implemented
+}
+
+static void TestPermissions(TPortoAPI &api, const string &name) {
+    struct stat st;
+    string path;
+
+    cerr << "Check permissions" << endl;
+
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.Start(name));
+
+    path = "/sys/fs/cgroup/memory/porto";
+    Expect(lstat(path.c_str(), &st) == 0);
+    Expect(st.st_mode == (0755 | S_IFDIR));
+
+    path = "/sys/fs/cgroup/memory/porto/" + name;
+    Expect(lstat(path.c_str(), &st) == 0);
+    Expect(st.st_mode == (0755 | S_IFDIR));
+
+    path = "/sys/fs/cgroup/memory/porto/" + name + "/tasks";
+    Expect(lstat(path.c_str(), &st) == 0);
+    Expect(st.st_mode == (0644 | S_IFREG));
+
+    ExpectSuccess(api.Stop(name));
 }
 
 static void TestDaemon() {
@@ -776,8 +814,8 @@ int Selftest() {
         TestCwd(api, "a");
         //TestRoot(api, "a");
         TestLimits(api, "a");
+        TestPermissions(api, "a");
         ExpectSuccess(api.Destroy("a"));
-        // TODO: check cgroups permissions
         TestDaemon();
     } catch (string e) {
         cerr << "EXCEPTION: " << e << endl;

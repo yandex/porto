@@ -165,7 +165,10 @@ TError TCgroup::Remove() {
         // in the container; if anything is still alive we have no other choice
         // but to kill it with SIGKILL
         int ret = RetryFailed(CGROUP_REMOVE_TIMEOUT_S * 10, 100,
-                              [&]{ Kill(SIGKILL); return !IsEmpty(); });
+                              [&]{ Kill(SIGKILL);
+                                   if (HasSubsystem(TSubsystem::Freezer()->Name()))
+                                       (void)TSubsystem::Freezer()->Unfreeze(*this);
+                                   return !IsEmpty(); });
 
         if (ret)
             TLogger::Log("Can't kill all tasks in cgroup " + Path());
@@ -257,7 +260,7 @@ TError TCgroupSnapshot::Create() {
         return error;
     }
 
-    static set<string> supported_subsystems =
+    const static set<string> supported_subsystems =
         {"cpuset", "cpu", "cpuacct", "memory",
          "devices", "freezer", "net_cls", "net_prio", "blkio",
          "perf_event", "hugetlb", "name=systemd"};

@@ -210,6 +210,10 @@ TError TContainer::PrepareTask() {
     return TError::Success();
 }
 
+TError TContainer::Create() {
+    return spec.Create();
+}
+
 TError TContainer::Start() {
     if (!CheckState(EContainerState::Stopped))
         return TError(EError::InvalidValue, "invalid container state");
@@ -442,11 +446,12 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
     if (!task)
         return false;
 
-    TLogger::Log("Considering " + name + " with root_pid " + to_string(task->GetPid()));
     if (task->GetPid() != pid)
         return false;
 
     task->DeliverExitStatus(status);
+    TLogger::Log("Delivered " + to_string(status) + " to " + name + " with root_pid " + to_string(task->GetPid()));
+    state = EContainerState::Dead;
     return true;
 }
 
@@ -473,6 +478,9 @@ bool TContainerHolder::ValidName(const string &name) {
     if (name == ROOT_CONTAINER)
         return true;
 
+    if (name.length() == 0 || name.length() > 128)
+        return false;
+
     return find_if(name.begin(), name.end(),
                    [](const char c) -> bool {
                         return !(isalnum(c) || c == '_');
@@ -484,7 +492,12 @@ TError TContainerHolder::Create(const string &name) {
         return TError(EError::InvalidValue, "invalid container name " + name);
 
     if (containers[name] == nullptr) {
-        containers[name] = make_shared<TContainer>(name);
+        auto c(make_shared<TContainer>(name));
+        TError error(c->Create());
+        if (error)
+            return error;
+
+        containers[name] = c;
         return TError::Success();
     } else
         return TError(EError::InvalidValue, "container " + name + " already exists");

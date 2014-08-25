@@ -37,6 +37,7 @@ public:
     std::string GetInternal(const std::string &property);
     TError SetInternal(const std::string &property, const std::string &value);
     bool IsDynamic(const std::string &property);
+    TError Create();
     TError Restore(const kv::TNode &node);
 };
 
