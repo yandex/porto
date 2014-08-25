@@ -49,6 +49,10 @@ TError TCgroup::FindChildren(std::vector<std::shared_ptr<TCgroup>> cglist) {
     auto self = TRegistry<TCgroup>::Get(*this);
     vector<string> list;
 
+    // Ignore non-porto subtrees
+    if (parent->IsRoot() && name != PORTO_ROOT_CGROUP)
+        return TError::Success();
+
     TError error = f.Subfolders(list);
     if (error)
         return error;
@@ -164,25 +168,7 @@ TError TCgroup::Create() {
     return TError::Success();
 }
 
-bool TCgroup::RemoveSubtree(void) {
-    if (IsRoot())
-        return false;
-
-    if (level == 1 && name == PORTO_ROOT_CGROUP)
-        return true;
-
-    for (auto cg = parent; cg; cg = cg->parent)
-        if (cg->level == 1 && cg->name == PORTO_ROOT_CGROUP)
-            return true;
-
-    return false;
-}
-
 TError TCgroup::Remove() {
-    // we don't manage anything outside /porto
-    if (!RemoveSubtree())
-        return TError::Success();
-
     if (IsRoot()) {
         TError error = mount->Umount();
         TLogger::LogError(error, "Can't umount root cgroup for root container");
