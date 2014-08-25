@@ -39,14 +39,6 @@ public:
     static std::shared_ptr<T> Get(const T &item) {
         return TRegistry<T>::GetInstance().GetItem(item);
     }
-
-    friend std::ostream& operator<<(std::ostream& os, TRegistry<T> &r) {
-        for (auto m : r.items)
-            os << m.use_count() << " " << *m.lock() << std::endl;
-
-        return os;
-    }
-
 };
 
 #endif

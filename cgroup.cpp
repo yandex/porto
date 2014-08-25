@@ -274,26 +274,6 @@ bool operator==(const TCgroup& c1, const TCgroup& c2) {
     return true;
 }
 
-ostream& operator<<(ostream& os, const TCgroup& cg) {
-    if (cg.IsRoot()) {
-        for (auto s : cg.subsystems)
-            os << *s << ",";
-
-        os << " {" << endl;
-    } else
-        os << string(4 * cg.level, ' ') << cg.name << " {" << endl;
-
-    for (auto c : cg.children) {
-        auto child = c.lock();
-        if (child)
-            os << *child << endl;
-    }
-
-    os << string(4 * cg.level, ' ') << "}";
-
-    return os;
-}
-
 // TCgroupSnapshot
 TError TCgroupSnapshot::Create() {
     TMountSnapshot ms;
@@ -341,12 +321,4 @@ TError TCgroupSnapshot::Create() {
     }
 
     return TError::Success();
-}
-
-ostream& operator<<(ostream& os, const TCgroupSnapshot& st) {
-    for (auto ss : st.cgroups)
-        if (ss->IsRoot())
-            os << *ss << endl;
-
-    return os;
 }

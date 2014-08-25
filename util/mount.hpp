@@ -20,14 +20,6 @@ public:
         device (device), mountpoint (mountpoint), vfstype (vfstype),
         flags (flags) {}
 
-    friend std::ostream& operator<<(std::ostream& os, const TMount& m) {
-        os << m.device << " " << m.mountpoint << " ";
-        for (auto f : m.flags)
-            os << f << " ";
-
-        return os;
-    }
-
     friend bool operator==(const TMount& m1, const TMount& m2) {
         return m1.device == m2.device &&
             m1.mountpoint == m2.mountpoint &&

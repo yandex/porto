@@ -70,7 +70,6 @@ public:
     bool HasSubsystem(const std::string &name);
 
     friend bool operator==(const TCgroup& c1, const TCgroup& c2);
-    friend std::ostream& operator<<(std::ostream& os, const TCgroup& cg);
 };
 
 class TCgroupSnapshot {
@@ -78,7 +77,6 @@ class TCgroupSnapshot {
     std::unordered_map<std::string, std::shared_ptr<TSubsystem>> subsystems; // can be net_cls _or_ net_prio
 public:
     TError Create();
-    friend std::ostream& operator<<(std::ostream& os, const TCgroupSnapshot& st);
 };
 
 #endif
