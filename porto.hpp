@@ -26,7 +26,7 @@ const unsigned int RPC_SOCK_PERM = 0660;
 const std::string PID_FILE = "/run/portod.pid";
 const unsigned int PID_FILE_PERM = 0644;
 
-const std::string LOG_FILE = "/var/log/portod";
+const std::string LOG_FILE = "/var/log/portod.log";
 const unsigned int LOG_FILE_PERM = 0644;
 
 #endif
