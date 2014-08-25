@@ -92,7 +92,7 @@ void TTask::ReportResultAndExit(int fd, int result)
 
 void TTask::Syslog(const string &s)
 {
-    openlog("portod", LOG_NDELAY, LOG_DAEMON);
+    openlog("portod.log", LOG_NDELAY, LOG_DAEMON);
     syslog(LOG_ERR, "%s", s.c_str());
     closelog();
 }
