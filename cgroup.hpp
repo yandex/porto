@@ -79,8 +79,8 @@ class TCgroupRegistry {
     std::list<std::weak_ptr<TCgroup>> items;
 
     TCgroupRegistry() {};
-    TCgroupRegistry(const TCgroupRegistry &) = delete;
-    void operator=(const TCgroupRegistry &) = delete;
+    TCgroupRegistry(TCgroupRegistry const&) = delete;
+    void operator=(TCgroupRegistry const&) = delete;
 
     static TCgroupRegistry &GetInstance() {
         static TCgroupRegistry instance;
