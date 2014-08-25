@@ -5,7 +5,6 @@
 
 #include "cgroup.hpp"
 #include "task.hpp"
-#include "registry.hpp"
 #include "log.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
@@ -14,15 +13,15 @@ using namespace std;
 
 // TCgroup
 shared_ptr<TCgroup> TCgroup::Get(const string &name, const shared_ptr<TCgroup> &parent) {
-    return TRegistry<TCgroup>::Get(TCgroup(name, parent));
+    return TCgroupRegistry::Get(TCgroup(name, parent));
 }
 
 shared_ptr<TCgroup> TCgroup::GetRoot(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems) {
-    return TRegistry<TCgroup>::Get(TCgroup(mount, subsystems));
+    return TCgroupRegistry::Get(TCgroup(mount, subsystems));
 }
 
 shared_ptr<TCgroup> TCgroup::GetRoot(const shared_ptr<TSubsystem> subsystem) {
-    return TRegistry<TCgroup>::Get(TCgroup({subsystem}));
+    return TCgroupRegistry::Get(TCgroup({subsystem}));
 }
 
 TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems) :
@@ -45,7 +44,7 @@ TCgroup::~TCgroup() {
 
 TError TCgroup::FindChildren(std::vector<std::shared_ptr<TCgroup>> cglist) {
     TFolder f(Path());
-    auto self = TRegistry<TCgroup>::Get(*this);
+    auto self = TCgroupRegistry::Get(*this);
     vector<string> list;
 
     // Ignore non-porto subtrees
@@ -57,7 +56,7 @@ TError TCgroup::FindChildren(std::vector<std::shared_ptr<TCgroup>> cglist) {
         return error;
 
     for (auto s : list) {
-        auto cg = TRegistry<TCgroup>::Get(TCgroup(s, self));
+        auto cg = TCgroupRegistry::Get(TCgroup(s, self));
 
         children.push_back(weak_ptr<TCgroup>(cg));
         TError error = cg->FindChildren(cglist);

@@ -3,6 +3,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <list>
 
 #include "porto.hpp"
 #include "error.hpp"
@@ -74,6 +75,43 @@ class TCgroupSnapshot {
     std::unordered_map<std::string, std::shared_ptr<TSubsystem>> subsystems; // can be net_cls _or_ net_prio
 public:
     TError Create();
+};
+
+class TCgroupRegistry {
+    std::list<std::weak_ptr<TCgroup>> items;
+
+    TCgroupRegistry() {};
+    TCgroupRegistry(const TCgroupRegistry &);
+    void operator=(const TCgroupRegistry &);
+
+public:
+    static TCgroupRegistry &GetInstance() {
+        static TCgroupRegistry instance;
+        return instance;
+    }
+
+    std::shared_ptr<TCgroup> GetItem(const TCgroup &item) {
+        items.remove_if([] (std::weak_ptr<TCgroup> i) {
+                return i.expired();
+            });
+
+        for (auto i : items) {
+            if (auto il = i.lock()) {
+                if (item == *il)
+                    return il;
+            }
+        }
+
+        auto n = std::make_shared<TCgroup>(item);
+        items.push_back(n);
+        n->SetNeedCleanup();
+
+        return n;
+    }
+
+    static std::shared_ptr<TCgroup> Get(const TCgroup &item) {
+        return TCgroupRegistry::GetInstance().GetItem(item);
+    }
 };
 
 #endif

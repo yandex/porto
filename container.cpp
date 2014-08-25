@@ -6,7 +6,6 @@
 #include "container.hpp"
 #include "task.hpp"
 #include "cgroup.hpp"
-#include "registry.hpp"
 #include "log.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
