@@ -11,6 +11,8 @@
 #include "util/mount.hpp"
 #include "util/folder.hpp"
 
+class TCgroupRegistry;
+
 class TCgroup {
     const std::string name;
     const std::shared_ptr<TCgroup> parent;
@@ -24,6 +26,7 @@ class TCgroup {
 
     bool need_cleanup = false;
 
+    friend TCgroupRegistry;
     TCgroup(const std::string &name, const std::shared_ptr<TCgroup> parent) :
         name(name), parent(parent) { }
     TCgroup(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems) :
@@ -32,11 +35,6 @@ class TCgroup {
     TCgroup(const std::vector<std::shared_ptr<TSubsystem>> controller);
     
 public:
-    static std::shared_ptr<TCgroup> Get(const std::string &name,
-                                        const std::shared_ptr<TCgroup> &parent);
-    static std::shared_ptr<TCgroup> GetRoot(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems);
-    static std::shared_ptr<TCgroup> GetRoot(const std::shared_ptr<TSubsystem> subsystem);
-
     ~TCgroup();
 
     void SetNeedCleanup() {
@@ -81,10 +79,9 @@ class TCgroupRegistry {
     std::list<std::weak_ptr<TCgroup>> items;
 
     TCgroupRegistry() {};
-    TCgroupRegistry(const TCgroupRegistry &);
-    void operator=(const TCgroupRegistry &);
+    TCgroupRegistry(const TCgroupRegistry &) = delete;
+    void operator=(const TCgroupRegistry &) = delete;
 
-public:
     static TCgroupRegistry &GetInstance() {
         static TCgroupRegistry instance;
         return instance;
@@ -109,9 +106,13 @@ public:
         return n;
     }
 
-    static std::shared_ptr<TCgroup> Get(const TCgroup &item) {
-        return TCgroupRegistry::GetInstance().GetItem(item);
-    }
+public:
+    static std::shared_ptr<TCgroup> Get(const TCgroup &item);
+    static std::shared_ptr<TCgroup> Get(const std::string &name,
+                                        const std::shared_ptr<TCgroup> &parent);
+    static std::shared_ptr<TCgroup> GetRoot(const std::shared_ptr<TMount> mount,
+                                            const std::vector<std::shared_ptr<TSubsystem>> subsystems);
+    static std::shared_ptr<TCgroup> GetRoot(const std::shared_ptr<TSubsystem> subsystem);
 };
 
 #endif

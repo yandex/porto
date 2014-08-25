@@ -182,7 +182,7 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
-    auto memroot = TCgroup::GetRoot(TSubsystem::Memory());
+    auto memroot = TCgroupRegistry::GetRoot(TSubsystem::Memory());
     auto memcg = GetLeafCgroup(TSubsystem::Memory());
 
     if (memroot->HasKnob("memory.low_limit_in_bytes")) {
@@ -433,9 +433,9 @@ TError TContainer::Restore(const kv::TNode &node) {
 
 std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys) {
     if (name == ROOT_CONTAINER)
-        return TCgroup::Get(PORTO_ROOT_CGROUP, TCgroup::GetRoot(subsys));
+        return TCgroupRegistry::Get(PORTO_ROOT_CGROUP, TCgroupRegistry::GetRoot(subsys));
     else
-        return TCgroup::Get(name, TCgroup::Get(PORTO_ROOT_CGROUP, TCgroup::GetRoot(subsys)));
+        return TCgroupRegistry::Get(name, TCgroupRegistry::Get(PORTO_ROOT_CGROUP, TCgroupRegistry::GetRoot(subsys)));
 }
 
 bool TContainer::DeliverExitStatus(int pid, int status) {

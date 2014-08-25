@@ -12,18 +12,6 @@
 using namespace std;
 
 // TCgroup
-shared_ptr<TCgroup> TCgroup::Get(const string &name, const shared_ptr<TCgroup> &parent) {
-    return TCgroupRegistry::Get(TCgroup(name, parent));
-}
-
-shared_ptr<TCgroup> TCgroup::GetRoot(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems) {
-    return TCgroupRegistry::Get(TCgroup(mount, subsystems));
-}
-
-shared_ptr<TCgroup> TCgroup::GetRoot(const shared_ptr<TSubsystem> subsystem) {
-    return TCgroupRegistry::Get(TCgroup({subsystem}));
-}
-
 TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems) :
     name("/"), parent(shared_ptr<TCgroup>(nullptr)), subsystems(subsystems) {
 
@@ -294,7 +282,7 @@ TError TCgroupSnapshot::Create() {
             cg_controllers.push_back(subsystems[c]);
         }
 
-        auto root = TCgroup::GetRoot(mount, cg_controllers);
+        auto root = TCgroupRegistry::GetRoot(mount, cg_controllers);
         cgroups.push_back(root);
 
         TError error = root->FindChildren(cgroups);
@@ -305,4 +293,21 @@ TError TCgroupSnapshot::Create() {
     }
 
     return TError::Success();
+}
+
+//TCgroupRegistry
+shared_ptr<TCgroup> TCgroupRegistry::Get(const TCgroup &item) {
+    return TCgroupRegistry::GetInstance().GetItem(item);
+}
+
+shared_ptr<TCgroup> TCgroupRegistry::Get(const string &name, const shared_ptr<TCgroup> &parent) {
+    return TCgroupRegistry::Get(TCgroup(name, parent));
+}
+
+shared_ptr<TCgroup> TCgroupRegistry::GetRoot(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems) {
+    return TCgroupRegistry::Get(TCgroup(mount, subsystems));
+}
+
+shared_ptr<TCgroup> TCgroupRegistry::GetRoot(const shared_ptr<TSubsystem> subsystem) {
+    return TCgroupRegistry::Get(TCgroup({subsystem}));
 }

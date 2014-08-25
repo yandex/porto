@@ -29,7 +29,7 @@ static TError ValidGroup(string group) {
 static TError ValidMemGuarantee(string str) {
     uint64_t val;
 
-    auto memroot = TCgroup::GetRoot(TSubsystem::Memory());
+    auto memroot = TCgroupRegistry::GetRoot(TSubsystem::Memory());
     if (memroot->HasKnob("memory.low_limit_in_bytes"))
         return TError(EError::NotSupported, "invalid kernel");
 
