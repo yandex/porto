@@ -26,8 +26,7 @@ shared_ptr<TCgroup> TCgroup::GetRoot(const shared_ptr<TSubsystem> subsystem) {
 }
 
 TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems) :
-    name("/"), parent(shared_ptr<TCgroup>(nullptr)), level(0),
-    subsystems(subsystems) {
+    name("/"), parent(shared_ptr<TCgroup>(nullptr)), subsystems(subsystems) {
 
     set<string> flags;
 

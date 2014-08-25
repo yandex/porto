@@ -13,7 +13,6 @@
 class TCgroup {
     const std::string name;
     const std::shared_ptr<TCgroup> parent;
-    int level;
     std::vector<std::weak_ptr<TCgroup>> children;
 
     std::shared_ptr<TMount> mount;
@@ -31,9 +30,9 @@ public:
     static std::shared_ptr<TCgroup> GetRoot(const std::shared_ptr<TSubsystem> subsystem);
 
     TCgroup(const std::string &name, const std::shared_ptr<TCgroup> parent) :
-        name(name), parent(parent), level(parent->level + 1) { }
+        name(name), parent(parent) { }
     TCgroup(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems) :
-        name("/"), parent(std::shared_ptr<TCgroup>(nullptr)), level(0), mount(mount), subsystems(subsystems) { }
+        name("/"), parent(std::shared_ptr<TCgroup>(nullptr)), mount(mount), subsystems(subsystems) { }
 
     TCgroup(const std::vector<std::shared_ptr<TSubsystem>> controller);
 
