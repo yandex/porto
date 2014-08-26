@@ -53,7 +53,10 @@ static TError ValidMemLimit(string str) {
 }
 
 static TError ValidCpuPolicy(string str) {
-    if (str != "normal")
+    if (str != "normal" && str != "rt" && str != "idle")
+        return TError(EError::InvalidValue, "invalid policy");
+
+    if (str == "rt" || str == "idle")
         return TError(EError::NotSupported, "not implemented");
 
     return TError::Success();
@@ -65,7 +68,7 @@ static TError ValidCpuPriority(string str) {
     if (StringToInt(str, val))
         return TError(EError::InvalidValue, "invalid value");
 
-    if (val < 0 && val > 99)
+    if (val < 0 || val > 99)
         return TError(EError::InvalidValue, "invalid value");
 
     return TError::Success();
