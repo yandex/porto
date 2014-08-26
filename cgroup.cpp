@@ -228,15 +228,14 @@ TError TCgroup::Attach(int pid) {
 }
 
 bool TCgroup::HasSubsystem(const string &name) {
-    auto cg = parent;
-    while (cg->parent)
-        cg = cg->parent;
-
-    for (auto c : cg->subsystems)
-        if (c->Name() == name)
-            return true;
-
-    return false;
+    if (!IsRoot())
+        return parent->HasSubsystem(name);
+    else {
+        for (auto c : subsystems)
+            if (c->Name() == name)
+                return true;
+        return false;
+    }
 }
 
 bool operator==(const TCgroup& c1, const TCgroup& c2) {
