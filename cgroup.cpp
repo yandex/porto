@@ -36,7 +36,7 @@ TError TCgroup::FindChildren(std::vector<std::shared_ptr<TCgroup>> cglist) {
     vector<string> list;
 
     // Ignore non-porto subtrees
-    if (parent->IsRoot() && name != PORTO_ROOT_CGROUP)
+    if (parent && parent->IsRoot() && name != PORTO_ROOT_CGROUP)
         return TError::Success();
 
     TError error = f.Subfolders(list);
