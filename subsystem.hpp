@@ -10,10 +10,11 @@ class TCgroup;
 class TSubsystem {
     std::string name;
 
+protected:
+    TSubsystem(const std::string &name) : name(name) {}
+
 public:
     static std::shared_ptr<TSubsystem> Get(std::string name);
-    
-    TSubsystem(const std::string &name) : name(name) { }
     const std::string& Name() const;
 
     TSubsystem(const TSubsystem&) = delete;
