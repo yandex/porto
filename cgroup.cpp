@@ -308,7 +308,7 @@ TError TCgroupSnapshot::Create() {
         return error;
     }
 
-    static set<string> supported_subsystems =
+    const static set<string> supported_subsystems =
         {"cpuset", "cpu", "cpuacct", "memory",
          "devices", "freezer", "net_cls", "net_prio", "blkio",
          "perf_event", "hugetlb", "name=systemd"};
