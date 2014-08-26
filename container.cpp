@@ -423,9 +423,9 @@ TError TContainer::Restore(const kv::TNode &node) {
 
 std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys) {
     if (name == ROOT_CONTAINER)
-        return TCgroupRegistry::Get(PORTO_ROOT_CGROUP, TCgroupRegistry::GetRoot(subsys));
+        return TCgroupRegistry::GetRoot(subsys)->GetChild(PORTO_ROOT_CGROUP);
     else
-        return TCgroupRegistry::Get(name, TCgroupRegistry::Get(PORTO_ROOT_CGROUP, TCgroupRegistry::GetRoot(subsys)));
+        return TCgroupRegistry::GetRoot(subsys)->GetChild(PORTO_ROOT_CGROUP)->GetChild(name);
 }
 
 bool TContainer::DeliverExitStatus(int pid, int status) {

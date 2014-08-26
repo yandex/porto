@@ -30,9 +30,26 @@ TCgroup::~TCgroup() {
         Remove();
 }
 
+shared_ptr<TCgroup> TCgroup::GetChild(const std::string& name) {
+    vector<weak_ptr<TCgroup>>::iterator iter;
+    for (iter = children.begin(); iter != children.end();) {
+        if (auto child = iter->lock()) {
+            if (child->name == name)
+                return child;
+        } else {
+            iter = children.erase(iter);
+            continue;
+        }
+        iter++;
+    }
+
+    auto child = make_shared<TCgroup>(name, shared_from_this());
+    children.push_back(weak_ptr<TCgroup>(child));
+    return child;
+}
+
 TError TCgroup::FindChildren(std::vector<std::shared_ptr<TCgroup>> cglist) {
     TFolder f(Path());
-    auto self = TCgroupRegistry::Get(*this);
     vector<string> list;
 
     // Ignore non-porto subtrees
@@ -44,15 +61,14 @@ TError TCgroup::FindChildren(std::vector<std::shared_ptr<TCgroup>> cglist) {
         return error;
 
     for (auto s : list) {
-        auto cg = TCgroupRegistry::Get(TCgroup(s, self));
+        auto cg = GetChild(s);
 
-        children.push_back(weak_ptr<TCgroup>(cg));
         TError error = cg->FindChildren(cglist);
         if (error)
             return error;
     }
 
-    cglist.push_back(self);
+    cglist.push_back(shared_from_this());
 
     return TError::Success();
 }
@@ -301,18 +317,10 @@ TError TCgroupSnapshot::Create() {
 }
 
 //TCgroupRegistry
-shared_ptr<TCgroup> TCgroupRegistry::Get(const TCgroup &item) {
-    return TCgroupRegistry::GetInstance().GetItem(item);
-}
-
-shared_ptr<TCgroup> TCgroupRegistry::Get(const string &name, const shared_ptr<TCgroup> &parent) {
-    return TCgroupRegistry::Get(TCgroup(name, parent));
-}
-
 shared_ptr<TCgroup> TCgroupRegistry::GetRoot(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems) {
-    return TCgroupRegistry::Get(TCgroup(mount, subsystems));
+    return TCgroupRegistry::GetInstance().GetItem(TCgroup(mount, subsystems));
 }
 
 shared_ptr<TCgroup> TCgroupRegistry::GetRoot(const shared_ptr<TSubsystem> subsystem) {
-    return TCgroupRegistry::Get(TCgroup({subsystem}));
+    return TCgroupRegistry::GetInstance().GetItem(TCgroup({subsystem}));
 }

@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 #include <list>
+#include <memory>
 
 #include "porto.hpp"
 #include "error.hpp"
@@ -13,7 +14,7 @@
 
 class TCgroupRegistry;
 
-class TCgroup {
+class TCgroup : public std::enable_shared_from_this<TCgroup> {
     const std::string name;
     const std::shared_ptr<TCgroup> parent;
     std::vector<std::weak_ptr<TCgroup>> children;
@@ -27,15 +28,17 @@ class TCgroup {
     bool need_cleanup = false;
 
     friend TCgroupRegistry;
-    TCgroup(const std::string &name, const std::shared_ptr<TCgroup> parent) :
-        name(name), parent(parent) { }
     TCgroup(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems) :
         name("/"), parent(std::shared_ptr<TCgroup>(nullptr)), mount(mount), subsystems(subsystems) { }
 
     TCgroup(const std::vector<std::shared_ptr<TSubsystem>> controller);
     
 public:
+    TCgroup(const std::string &name, std::shared_ptr<TCgroup> parent) :
+        name(name), parent(parent) { }
     ~TCgroup();
+
+    std::shared_ptr<TCgroup> GetChild(const std::string& name);
 
     void SetNeedCleanup() {
         need_cleanup = true;
@@ -107,9 +110,6 @@ class TCgroupRegistry {
     }
 
 public:
-    static std::shared_ptr<TCgroup> Get(const TCgroup &item);
-    static std::shared_ptr<TCgroup> Get(const std::string &name,
-                                        const std::shared_ptr<TCgroup> &parent);
     static std::shared_ptr<TCgroup> GetRoot(const std::shared_ptr<TMount> mount,
                                             const std::vector<std::shared_ptr<TSubsystem>> subsystems);
     static std::shared_ptr<TCgroup> GetRoot(const std::shared_ptr<TSubsystem> subsystem);
