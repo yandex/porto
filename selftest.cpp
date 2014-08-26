@@ -767,6 +767,66 @@ static void TestPermissions(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.Stop(name));
 }
 
+static string GetVmRss(const string &pid) {
+    vector<string> st;
+    TFile f("/proc/" + pid + "/status");
+    if (f.AsLines(st))
+        return "INVALID PID";
+
+    stringstream ss(st[16]);
+
+    string name, size, unit;
+
+    ss>> name;
+    ss>> size;
+    ss>> unit;
+
+    if (name != "VmRSS:")
+        return "PARSING ERROR";
+
+    return size;
+}
+
+static void TestLeaks(TPortoAPI &api) {
+    string pid;
+    string name;
+    int nr = 100;
+    string size;
+
+    TFile f(PID_FILE);
+    Expect(f.AsString(pid) == false);
+
+    cerr << "Check daemon leaks" << endl;
+
+    for (int i = 0; i < nr; i++) {
+        name = "a" + to_string(i);
+        ExpectSuccess(api.Create(name));
+        ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+        ExpectSuccess(api.Start(name));
+    }
+
+    for (int i = 0; i < nr; i++) {
+        name = to_string(i);
+        ExpectSuccess(api.Destroy(name));
+    }
+
+    size = GetVmRss(pid);
+
+    for (int i = 0; i < nr; i++) {
+        name = "another" + to_string(i);
+        ExpectSuccess(api.Create(name));
+        ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+        ExpectSuccess(api.Start(name));
+    }
+
+    for (int i = 0; i < nr; i++) {
+        name = "b" + to_string(i);
+        ExpectSuccess(api.Destroy(name));
+    }
+
+    Expect(size == GetVmRss(pid));
+}
+
 static void TestDaemon() {
     string pid;
 
@@ -816,6 +876,7 @@ int Selftest() {
         TestLimits(api, "a");
         TestPermissions(api, "a");
         ExpectSuccess(api.Destroy("a"));
+        TestLeaks(api);
         TestDaemon();
     } catch (string e) {
         cerr << "EXCEPTION: " << e << endl;

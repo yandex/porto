@@ -1,3 +1,5 @@
+- check log size on production machine (whether daily logrotate is enough)
+
 # cleanup
 - rotate subprocess stdout/stderr
 - property:env support ; (via \;)
