@@ -479,6 +479,9 @@ bool TContainerHolder::ValidName(const string &name) {
     if (name == ROOT_CONTAINER)
         return true;
 
+    if (name.length() == 0 || name.length() > 128)
+        return false;
+
     return find_if(name.begin(), name.end(),
                    [](const char c) -> bool {
                         return !(isalnum(c) || c == '_');

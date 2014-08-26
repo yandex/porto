@@ -1,5 +1,4 @@
 - task stderr/stdout recovery may fail
-- limit container name length
 
 # cleanup
 - rotate subprocess stdout/stderr
