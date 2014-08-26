@@ -31,8 +31,7 @@ TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems,
 }
 
 TCgroup::~TCgroup() {
-    if (need_cleanup)
-        Remove();
+    Remove();
 }
 
 shared_ptr<TCgroup> TCgroup::GetChild(const std::string& name) {
