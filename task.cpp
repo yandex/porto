@@ -514,11 +514,9 @@ TError TTask::ValidateCgroups() {
 
         bool valid = false;
         for (auto cg : leaf_cgroups) {
-            if (cg->HasSubsystem(subsys)) {
-                if (cg->Relpath() == path) {
-                    valid = true;
-                    break;
-                }
+            if (cg->Relpath() == path) {
+                valid = true;
+                break;
             }
         }
 

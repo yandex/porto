@@ -5,10 +5,13 @@
 #include <string>
 #include <memory>
 
+#include "cgroup.hpp"
+
 class TCgroup;
 
-class TSubsystem {
+class TSubsystem : public std::enable_shared_from_this<TSubsystem> {
     std::string name;
+    std::shared_ptr<TCgroup> root_cgroup;
 
 protected:
     TSubsystem(const std::string &name) : name(name) {}
@@ -18,6 +21,14 @@ public:
     const std::string& Name() const;
 
     TSubsystem(const TSubsystem&) = delete;
+
+    std::shared_ptr<TCgroup> GetRootCgroup(std::shared_ptr<TMount> mount=nullptr) {
+        if (!root_cgroup) {
+            TCgroup *root = new TCgroup({shared_from_this()}, mount);
+            root_cgroup = std::shared_ptr<TCgroup>(root);
+        }
+        return root_cgroup;
+    }
 };
 
 class TMemorySubsystem : public TSubsystem {

@@ -6,6 +6,7 @@
 #include "container.hpp"
 #include "task.hpp"
 #include "cgroup.hpp"
+#include "subsystem.hpp"
 #include "log.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
@@ -169,8 +170,13 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
-    auto memroot = TCgroupRegistry::GetRoot(MemorySubsystem);
+    auto memroot = MemorySubsystem->GetRootCgroup();
     auto memcg = GetLeafCgroup(MemorySubsystem);
+
+    TError error = MemorySubsystem->UseHierarchy(*memcg);
+    TLogger::LogError(error, "Can't set use_hierarchy for " + memcg->Relpath());
+    if (error)
+        return error;
 
     if (memroot->HasKnob("memory.low_limit_in_bytes")) {
         TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", spec.Get("memory_guarantee"), false);
@@ -179,7 +185,7 @@ TError TContainer::PrepareCgroups() {
             return error;
     }
 
-    TError error = memcg->SetKnobValue("memory.limit_in_bytes", spec.Get("memory_limit"), false);
+    error = memcg->SetKnobValue("memory.limit_in_bytes", spec.Get("memory_limit"), false);
     TLogger::LogError(error, "Can't set memory_limit");
     if (error)
         return error;
@@ -429,9 +435,9 @@ std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys
         return leaf_cgroups[subsys];
 
     if (name == ROOT_CONTAINER)
-        return TCgroupRegistry::GetRoot(subsys)->GetChild(PORTO_ROOT_CGROUP);
+        return subsys->GetRootCgroup()->GetChild(PORTO_ROOT_CGROUP);
     else
-        return TCgroupRegistry::GetRoot(subsys)->GetChild(PORTO_ROOT_CGROUP)->GetChild(name);
+        return subsys->GetRootCgroup()->GetChild(PORTO_ROOT_CGROUP)->GetChild(name);
 }
 
 bool TContainer::DeliverExitStatus(int pid, int status) {
@@ -483,7 +489,7 @@ TError TContainerHolder::Create(const string &name) {
         return TError(EError::InvalidValue, "invalid container name " + name);
 
     if (containers[name] == nullptr) {
-        auto c(make_shared<TContainer>(name));
+        auto c = make_shared<TContainer>(name);
         TError error(c->Create());
         if (error)
             return error;
