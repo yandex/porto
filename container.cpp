@@ -211,6 +211,10 @@ TError TContainer::PrepareTask() {
     return TError::Success();
 }
 
+TError TContainer::Create() {
+    return spec.Create();
+}
+
 TError TContainer::Start() {
     if (!CheckState(EContainerState::Stopped))
         return TError(EError::InvalidValue, "invalid container state");
@@ -486,7 +490,12 @@ TError TContainerHolder::Create(const string &name) {
         return TError(EError::InvalidValue, "invalid container name " + name);
 
     if (containers[name] == nullptr) {
-        containers[name] = make_shared<TContainer>(name);
+        auto c(make_shared<TContainer>(name));
+        TError error(c->Create());
+        if (error)
+            return error;
+
+        containers[name] = c;
         return TError::Success();
     } else
         return TError(EError::InvalidValue, "container " + name + " already exists");

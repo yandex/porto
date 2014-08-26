@@ -133,6 +133,11 @@ TError TContainerSpec::Set(const string &property, const string &value) {
     return SetInternal(property, value);
 }
 
+TError TContainerSpec::Create() {
+    kv::TNode node;
+    return storage.SaveNode(name, node);
+}
+
 TError TContainerSpec::Restore(const kv::TNode &node) {
     for (int i = 0; i < node.pairs_size(); i++) {
         auto key = node.pairs(i).key();

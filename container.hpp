@@ -65,6 +65,7 @@ public:
 
     void UpdateState();
 
+    TError Create();
     TError Start();
     TError Stop();
     TError Pause();
