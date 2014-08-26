@@ -10,7 +10,7 @@ Homepage: https://wiki.yandex-team.ru/users/klamm/Porto
 Package: yandex-porto
 Section: utils
 Priority: extra
-Architecture: all
+Architecture: amd64
 Depends: ${shlibs:Depends}, ${utils:DependsI}, logrotate
 Description: Component of Nirvana
  Porto allows to run process in namespace with cgroup.
