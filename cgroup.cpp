@@ -17,17 +17,18 @@ TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems,
                  const std::shared_ptr<TMount> m) :
     name("/"), parent(shared_ptr<TCgroup>(nullptr)) {
 
-    set<string> flags;
-
-    for (auto c : subsystems)
-        flags.insert(c->Name());
-
     if (m)
         mount = m;
-    else
+    else {
+        set<string> flags;
+
+        for (auto c : subsystems)
+            flags.insert(c->Name());
+
         mount = make_shared<TMount>("cgroup", tmpfs + "/" +
                                     CommaSeparatedList(flags),
                                     "cgroup", flags);
+    }
 }
 
 TCgroup::~TCgroup() {
