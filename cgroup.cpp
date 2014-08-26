@@ -194,7 +194,7 @@ TError TCgroup::Remove() {
         // but to kill it with SIGKILL
         int ret = RetryFailed(CGROUP_REMOVE_TIMEOUT_S * 10, 100,
                               [&]{ Kill(SIGKILL);
-                                   if (HasSubsystem(TSubsystem::Frezzer()->Name()))
+                                   if (HasSubsystem(TSubsystem::Freezer()->Name()))
                                        (void)TSubsystem::Freezer()->Unfreeze(*this);
                                    return !IsEmpty(); });
 
