@@ -73,7 +73,7 @@ struct TData {
     };
 
     static string CpuUsage(TContainer& c) {
-        auto subsys = TSubsystem::Cpuacct();
+        auto subsys = CpuacctSubsystem;
         auto cg = c.GetLeafCgroup(subsys);
         if (!cg) {
             TLogger::LogAction("cpuacct cgroup not found");
@@ -91,7 +91,7 @@ struct TData {
     };
 
     static string MemUsage(TContainer& c) {
-        auto subsys = TSubsystem::Memory();
+        auto subsys = MemorySubsystem;
         auto cg = c.GetLeafCgroup(subsys);
         if (!cg) {
             TLogger::LogAction("memory cgroup not found");
@@ -145,7 +145,7 @@ bool TContainer::IsRoot() {
 }
 
 vector<pid_t> TContainer::Processes() {
-    auto cg = GetLeafCgroup(TSubsystem::Freezer());
+    auto cg = GetLeafCgroup(FreezerSubsystem);
 
     vector<pid_t> ret;
     cg->GetProcesses(ret);
@@ -157,9 +157,9 @@ bool TContainer::IsAlive() {
 }
 
 TError TContainer::PrepareCgroups() {
-    leaf_cgroups.push_back(GetLeafCgroup(TSubsystem::Cpuacct()));
-    leaf_cgroups.push_back(GetLeafCgroup(TSubsystem::Memory()));
-    leaf_cgroups.push_back(GetLeafCgroup(TSubsystem::Freezer()));
+    leaf_cgroups.push_back(GetLeafCgroup(CpuacctSubsystem));
+    leaf_cgroups.push_back(GetLeafCgroup(MemorySubsystem));
+    leaf_cgroups.push_back(GetLeafCgroup(FreezerSubsystem));
 
     for (auto cg : leaf_cgroups) {
         auto ret = cg->Create();
@@ -169,8 +169,8 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
-    auto memroot = TCgroupRegistry::GetRoot(TSubsystem::Memory());
-    auto memcg = GetLeafCgroup(TSubsystem::Memory());
+    auto memroot = TCgroupRegistry::GetRoot(MemorySubsystem);
+    auto memcg = GetLeafCgroup(MemorySubsystem);
 
     if (memroot->HasKnob("memory.low_limit_in_bytes")) {
         TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", spec.Get("memory_guarantee"), false);
@@ -242,7 +242,7 @@ TError TContainer::Start() {
 }
 
 TError TContainer::KillAll() {
-    auto cg = GetLeafCgroup(TSubsystem::Freezer());
+    auto cg = GetLeafCgroup(FreezerSubsystem);
 
     TLogger::Log("killall " + name);
 
@@ -260,7 +260,7 @@ TError TContainer::KillAll() {
 
     // then kill any task that didn't want to stop via SIGTERM;
     // freeze all container tasks to make sure no one forks and races with us
-    error = TSubsystem::Freezer()->Freeze(*cg);
+    error = FreezerSubsystem->Freeze(*cg);
     if (error)
         TLogger::LogError(error, "Can't kill all tasks");
 
@@ -270,7 +270,7 @@ TError TContainer::KillAll() {
         return error;
     }
     cg->Kill(SIGKILL);
-    error = TSubsystem::Freezer()->Unfreeze(*cg);
+    error = FreezerSubsystem->Unfreeze(*cg);
     if (error)
         TLogger::LogError(error, "Can't kill all tasks");
 
@@ -305,8 +305,8 @@ TError TContainer::Pause() {
     if (IsRoot() || !CheckState(EContainerState::Running))
         return TError(EError::InvalidValue, "invalid container state");
 
-    auto cg = GetLeafCgroup(TSubsystem::Freezer());
-    TError error(TSubsystem::Freezer()->Freeze(*cg));
+    auto cg = GetLeafCgroup(FreezerSubsystem);
+    TError error(FreezerSubsystem->Freeze(*cg));
     if (error) {
         TLogger::LogError(error, "Can't pause " + name);
         return error;
@@ -320,8 +320,8 @@ TError TContainer::Resume() {
     if (!CheckState(EContainerState::Paused))
         return TError(EError::InvalidValue, "invalid container state");
 
-    auto cg = GetLeafCgroup(TSubsystem::Freezer());
-    TError error(TSubsystem::Freezer()->Unfreeze(*cg));
+    auto cg = GetLeafCgroup(FreezerSubsystem);
+    TError error(FreezerSubsystem->Unfreeze(*cg));
     if (error) {
         TLogger::LogError(error, "Can't resume " + name);
         return error;

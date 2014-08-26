@@ -6,28 +6,17 @@
 #include <memory>
 
 class TCgroup;
-class TMemorySubsystem;
-class TFreezerSubsystem;
-class TCpuSubsystem;
-class TCpuacctSubsystem;
 
 class TSubsystem {
     std::string name;
 
 public:
     static std::shared_ptr<TSubsystem> Get(std::string name);
-
-    static std::shared_ptr<TMemorySubsystem> Memory();
-    static std::shared_ptr<TFreezerSubsystem> Freezer();
-    static std::shared_ptr<TCpuSubsystem> Cpu();
-    static std::shared_ptr<TCpuacctSubsystem> Cpuacct();
     
     TSubsystem(const std::string &name) : name(name) { }
-    std::string Name();
+    const std::string& Name() const;
 
-    friend bool operator==(const TSubsystem& c1, const TSubsystem& c2) {
-        return c1.name == c2.name;
-    }
+    TSubsystem(const TSubsystem&) = delete;
 };
 
 class TMemorySubsystem : public TSubsystem {
@@ -56,5 +45,10 @@ public:
     TCpuacctSubsystem() : TSubsystem("cpuacct") {}
     TError Usage(std::shared_ptr<TCgroup> &cg, uint64_t &value);
 };
+
+extern std::shared_ptr<TMemorySubsystem> MemorySubsystem;
+extern std::shared_ptr<TFreezerSubsystem> FreezerSubsystem;
+extern std::shared_ptr<TCpuSubsystem> CpuSubsystem;
+extern std::shared_ptr<TCpuacctSubsystem> CpuacctSubsystem;
 
 #endif

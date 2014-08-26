@@ -143,7 +143,7 @@ TError TCgroup::Create() {
             return error;
     }
 
-    auto memsubsys = TSubsystem::Memory();
+    auto memsubsys = MemorySubsystem;
     if (HasSubsystem(memsubsys->Name())) {
         TError error = memsubsys->UseHierarchy(*this);
         TLogger::LogError(error, "Can't set use_hierarchy for " + Relpath());
@@ -166,8 +166,8 @@ TError TCgroup::Remove() {
         // but to kill it with SIGKILL
         int ret = RetryFailed(CGROUP_REMOVE_TIMEOUT_S * 10, 100,
                               [&]{ Kill(SIGKILL);
-                                   if (HasSubsystem(TSubsystem::Freezer()->Name()))
-                                       (void)TSubsystem::Freezer()->Unfreeze(*this);
+                                  if (HasSubsystem(FreezerSubsystem->Name()))
+                                      (void)FreezerSubsystem->Unfreeze(*this);
                                    return !IsEmpty(); });
 
         if (ret)
@@ -280,7 +280,10 @@ TError TCgroupSnapshot::Create() {
 
         vector<shared_ptr<TSubsystem>> cg_controllers;
         for (auto c : cs) {
-            subsystems[c] = TSubsystem::Get(name);
+            auto subsys = TSubsystem::Get(name);
+            if (!subsys)
+                continue;
+            subsystems[c] = subsys;
             cg_controllers.push_back(subsystems[c]);
         }
 
