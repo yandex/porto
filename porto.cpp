@@ -13,14 +13,14 @@ static string DataValue(const string &name, const string &val) {
         if (StringToInt(val, status))
             return val;
 
-        string ret = val + " ";
+        string ret;
 
         if (WIFEXITED(status))
-            ret += "Container exited with " + to_string(status);
+            ret = "Container exited with " + to_string(WEXITSTATUS(status));
         else if (WIFSIGNALED(status))
-            ret += "Container killed by signal " + to_string(status);
+            ret = "Container killed by signal " + to_string(WTERMSIG(status));
         else if (status == 0)
-            ret += "Success";
+            ret = "Success";
 
         return ret;
     } else if (name == "errno") {
@@ -28,16 +28,16 @@ static string DataValue(const string &name, const string &val) {
         if (StringToInt(val, status))
             return val;
 
-        string ret = val + " ";
+        string ret;
 
         if (status < 0)
-            ret += "Prepare failed: " + string(strerror(-status));
+            ret = "Prepare failed: " + string(strerror(-status));
         else if (status > 0)
-            ret += "Exec failed: " + string(strerror(status));
+            ret = "Exec failed: " + string(strerror(status));
         else if (status == 0)
-            ret += "Success";
+            ret = "Success";
 
-        return ret;
+        return ret + " (" + val + ")";
     } else {
         return val;
     }
@@ -64,6 +64,16 @@ public:
             return err;
         }
         return rpc::EError_Name(static_cast<rpc::EError>(err));
+    }
+
+    void PrintError(const string &str) {
+        int error;
+        string msg;
+        api.GetLastError(error, msg);
+        if (msg.length())
+            cerr << str << ": " << msg << " (" << ErrorName(error) << ")" << endl;
+        else
+            cerr << str << ": " << ErrorName(error) << endl;
     }
 
     bool ValidArgs(int argc, char *argv[]) {
@@ -101,7 +111,7 @@ public:
         vector<TProperty> plist;
         ret = api.Plist(plist);
         if (ret)
-            cerr << "Can't list properties, error = " << ErrorName(ret) << endl;
+            PrintError("Can't list properties");
         else
             for (auto p : plist)
                 cout << " " << left << setw(24) << p.name
@@ -111,7 +121,7 @@ public:
         vector<TData> dlist;
         ret = api.Dlist(dlist);
         if (ret)
-            cerr << "Can't list data, error = " << ErrorName(ret) << endl;
+            PrintError("Can't list data");
         else
             for (auto d : dlist)
                 cout << " " << left << setw(24) << d.name
@@ -174,7 +184,7 @@ public:
     {
         int ret = api.Create(argv[0]);
         if (ret)
-            cerr << "Can't create container, error = " << ErrorName(ret) << endl;
+            PrintError("Can't create container");
 
         return ret;
     }
@@ -188,7 +198,7 @@ public:
     {
         int ret = api.Destroy(argv[0]);
         if (ret)
-            cerr << "Can't destroy container, error = " << ErrorName(ret) << endl;
+            PrintError("Can't destroy container");
 
         return ret;
     }
@@ -203,16 +213,15 @@ public:
         vector<string> clist;
         int ret = api.List(clist);
         if (ret)
-            cerr << "Can't list containers, error = " << ErrorName(ret) << endl;
+            PrintError("Can't list containers");
         else
             for (auto c : clist) {
                 string s;
                 ret = api.GetData(c, "state", s);
                 if (ret)
-                    cerr << "Can't get container state, error = " << ErrorName(ret) << endl;
+                    PrintError("Can't get container state");
                 cout << left << setw(40) << c
                      << setw(40) << s << endl;
-
             }
 
         return ret;
@@ -228,7 +237,7 @@ public:
         string value;
         int ret = api.GetProperty(argv[0], argv[1], value);
         if (ret)
-            cerr << "Can't get property, error = " << ErrorName(ret) << endl;
+            PrintError("Can't get property");
         else
             cout << value << endl;
 
@@ -250,7 +259,7 @@ public:
 
         int ret = api.SetProperty(argv[0], argv[1], val);
         if (ret)
-            cerr << "Can't set property, error = " << ErrorName(ret) << endl;
+            PrintError("Can't set property");
 
         return ret;
     }
@@ -265,7 +274,7 @@ public:
         string value;
         int ret = api.GetData(argv[0], argv[1], value);
         if (ret)
-            cerr << "Can't get data, error = " << ErrorName(ret) << endl;
+            PrintError("Can't get data");
         else
             cout << value << endl;
 
@@ -281,7 +290,7 @@ public:
     {
         int ret = api.Start(argv[0]);
         if (ret)
-            cerr << "Can't start container, error = " << ErrorName(ret) << endl;
+            PrintError("Can't start container");
 
         return ret;
     }
@@ -295,7 +304,7 @@ public:
     {
         int ret = api.Stop(argv[0]);
         if (ret)
-            cerr << "Can't stop container, error = " << ErrorName(ret) << endl;
+            PrintError("Can't stop container");
 
         return ret;
     }
@@ -309,7 +318,7 @@ public:
     {
         int ret = api.Pause(argv[0]);
         if (ret)
-            cerr << "Can't pause container, error = " << ErrorName(ret) << endl;
+            PrintError("Can't pause container");
 
         return ret;
     }
@@ -323,7 +332,7 @@ public:
     {
         int ret = api.Resume(argv[0]);
         if (ret)
-            cerr << "Can't resume container, error = " << ErrorName(ret) << endl;
+            PrintError("Can't resume container");
 
         return ret;
     }
@@ -355,6 +364,19 @@ class TGetCmd : public ICmd {
 public:
     TGetCmd() : ICmd("get", 1, "<name> <data>", "get container property or data") {}
 
+    bool ValidProperty(const vector<TProperty> &plist, const string &name) {
+        return find_if(plist.begin(), plist.end(),
+                       [&](const TProperty &i)->bool { return i.name == name; })
+            != plist.end();
+    }
+
+    bool ValidData(const vector<TData> &dlist, const string &name) {
+        return find_if(dlist.begin(), dlist.end(),
+                       [&](const TData &i)->bool { return i.name == name; })
+            != dlist.end();
+    }
+
+
     int Execute(int argc, char *argv[])
     {
         string value;
@@ -363,25 +385,31 @@ public:
         vector<TProperty> plist;
         ret = api.Plist(plist);
         if (ret) {
-            cerr << "Can't list properties, error = " << ErrorName(ret) << endl;
+            PrintError("Can't list properties");
             return 1;
         }
 
         vector<TData> dlist;
         ret = api.Dlist(dlist);
         if (ret) {
-            cerr << "Can't list data, error = " << ErrorName(ret) << endl;
+            PrintError("Can't list data");
             return 1;
         }
 
         if (argc <= 1) {
             for (auto p : plist) {
+                if (!ValidProperty(plist, p.name))
+                    continue;
+
                 ret = api.GetProperty(argv[0], p.name, value);
                 if (!ret)
                     cout << p.name << " = " << value << endl;
             }
 
             for (auto d : dlist) {
+                if (!ValidData(dlist, d.name))
+                    continue;
+
                 ret = api.GetData(argv[0], d.name, value);
                 if (!ret)
                     cout << d.name << " = " << DataValue(d.name, value) << endl;
@@ -390,30 +418,23 @@ public:
             return 0;
         }
 
-        bool validProperty = false;
-        for (auto p : plist)
-            if (p.name == argv[1]) {
-                validProperty = true;
-                break;
-            }
-
-        bool validData = false;
-        for (auto d : dlist)
-            if (d.name == argv[1]) {
-                validData = true;
-                break;
-            }
+        bool validProperty = ValidProperty(plist, argv[1]);
+        bool validData = ValidData(dlist, argv[1]);
 
         if (validData) {
             ret = api.GetData(argv[0], argv[1], value);
             if (!ret)
                 cout << DataValue(argv[1], value) << endl;
+            else if (ret != EError::InvalidData)
+                PrintError("Can't get data");
         }
 
         if (validProperty) {
             ret = api.GetProperty(argv[0], argv[1], value);
             if (!ret)
                 cout << value << endl;
+            else if (ret != EError::InvalidProperty)
+                PrintError("Can't get data");
         }
 
         if (!validProperty && !validData)

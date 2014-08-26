@@ -231,7 +231,7 @@ TError TContainer::Start() {
     }
 
     if (!spec.Get("command").length())
-        return TError(EError::InvalidValue, "invalid container command");
+        return TError(EError::InvalidValue, "container command is empty");
 
     error = PrepareTask();
     if (error) {
