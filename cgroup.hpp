@@ -35,7 +35,8 @@ class TCgroup : public std::enable_shared_from_this<TCgroup> {
     
 public:
     TCgroup(const std::string &name, std::shared_ptr<TCgroup> parent) :
-        name(name), parent(parent) { }
+        name(name), parent(parent) {}
+
     ~TCgroup();
 
     std::shared_ptr<TCgroup> GetChild(const std::string& name);

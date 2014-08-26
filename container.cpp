@@ -157,12 +157,12 @@ bool TContainer::IsAlive() {
 }
 
 TError TContainer::PrepareCgroups() {
-    leaf_cgroups.push_back(GetLeafCgroup(CpuacctSubsystem));
-    leaf_cgroups.push_back(GetLeafCgroup(MemorySubsystem));
-    leaf_cgroups.push_back(GetLeafCgroup(FreezerSubsystem));
+    leaf_cgroups[CpuacctSubsystem] = GetLeafCgroup(CpuacctSubsystem);
+    leaf_cgroups[MemorySubsystem] = GetLeafCgroup(MemorySubsystem);
+    leaf_cgroups[FreezerSubsystem] = GetLeafCgroup(FreezerSubsystem);
 
     for (auto cg : leaf_cgroups) {
-        auto ret = cg->Create();
+        auto ret = cg.second->Create();
         if (ret) {
             leaf_cgroups.clear();
             return ret;
@@ -193,7 +193,10 @@ TError TContainer::PrepareTask() {
     if (error)
         return error;
 
-    task = unique_ptr<TTask>(new TTask(taskEnv, leaf_cgroups));
+    vector<shared_ptr<TCgroup>> cgroups;
+    for (auto cg : leaf_cgroups)
+        cgroups.push_back(cg.second);
+    task = unique_ptr<TTask>(new TTask(taskEnv, cgroups));
     return TError::Success();
 }
 
@@ -422,6 +425,9 @@ TError TContainer::Restore(const kv::TNode &node) {
 }
 
 std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys) {
+    if (leaf_cgroups.find(subsys) != leaf_cgroups.end())
+        return leaf_cgroups[subsys];
+
     if (name == ROOT_CONTAINER)
         return TCgroupRegistry::GetRoot(subsys)->GetChild(PORTO_ROOT_CGROUP);
     else

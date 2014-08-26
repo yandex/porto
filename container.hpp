@@ -43,7 +43,7 @@ class TContainer {
     TContainerSpec spec;
     friend TData;
 
-    std::vector<std::shared_ptr<TCgroup>> leaf_cgroups;
+    std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> leaf_cgroups;
     std::unique_ptr<TTask> task;
 
     // data
