@@ -59,6 +59,10 @@ public:
     string& GetDescription() { return desc; }
 
     const string &ErrorName(int err) {
+        if (err == INT_MIN) {
+            static const string err = "portod unavailable";
+            return err;
+        }
         return rpc::EError_Name(static_cast<rpc::EError>(err));
     }
 

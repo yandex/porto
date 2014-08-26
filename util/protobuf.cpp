@@ -79,6 +79,7 @@ TError ConnectToRpcServer(const std::string& path, int &fd)
     peer_addr_size = sizeof(struct sockaddr_un);
     if (connect(fd, (struct sockaddr *) &peer_addr, peer_addr_size) < 0) {
         close(fd);
+        fd = -1;
         return TError(EError::Unknown, errno, "connect(" + path + ")");
     }
 
