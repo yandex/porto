@@ -2,6 +2,7 @@
 #define __ERROR_HPP__
 
 #include <string>
+#include <ostream>
 
 #include "rpc.pb.h"
 
@@ -22,6 +23,11 @@ public:
     static const TError& Success() {
         static TError e;
         return e;
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const TError& err) {
+        os << err.error << " (" << err.description << ")";
+        return os;
     }
 
 private:
