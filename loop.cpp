@@ -97,7 +97,7 @@ static int SpawnPortod() {
         int status;
         pid_t pid = wait(&status);
         if (errno == EINTR) {
-            Log() << "wiat(): " << strerror(errno) << endl;
+            Log() << "wait(): " << strerror(errno) << endl;
             continue;
         }
         if (pid == portod_pid) {
