@@ -443,11 +443,12 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
     if (!task)
         return false;
 
-    TLogger::Log("Considering " + name + " with root_pid " + to_string(task->GetPid()));
     if (task->GetPid() != pid)
         return false;
 
     task->DeliverExitStatus(status);
+    TLogger::Log("Delivered " + to_string(status) + " to " + name + " with root_pid " + to_string(task->GetPid()));
+    state = EContainerState::Dead;
     return true;
 }
 
