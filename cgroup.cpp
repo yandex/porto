@@ -193,7 +193,10 @@ TError TCgroup::Remove() {
         // in the container; if anything is still alive we have no other choice
         // but to kill it with SIGKILL
         int ret = RetryFailed(CGROUP_REMOVE_TIMEOUT_S * 10, 100,
-                              [&]{ Kill(SIGKILL); return !IsEmpty(); });
+                              [&]{ Kill(SIGKILL);
+                                   if (HasSubsystem(TSubsystem::Frezzer()->Name()))
+                                       (void)TSubsystem::Freezer()->Unfreeze(*this);
+                                   return !IsEmpty(); });
 
         if (ret)
             TLogger::Log("Can't kill all tasks in cgroup " + Path());
