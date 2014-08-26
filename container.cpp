@@ -211,6 +211,7 @@ TError TContainer::PrepareTask() {
 }
 
 TError TContainer::Create() {
+    TLogger::Log("Create " + name);
     return spec.Create();
 }
 

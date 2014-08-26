@@ -10,4 +10,6 @@ start on runlevel [2345]
 expect fork
 respawn
 
+kill signal SIGINT
+
 exec portoloop &
