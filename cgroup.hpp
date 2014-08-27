@@ -22,6 +22,8 @@ class TCgroup : public std::enable_shared_from_this<TCgroup> {
 
     std::string tmpfs = "/sys/fs/cgroup";
     mode_t mode = 0755;
+    TCgroup(const TCgroup &) = delete;
+    TCgroup &operator=(const TCgroup &) = delete;
 
 public:
     TCgroup(const std::vector<std::shared_ptr<TSubsystem>> controller,
@@ -43,7 +45,7 @@ public:
 
     TError Kill(int signal);
 
-    TError FindChildren(std::vector<std::shared_ptr<TCgroup>> cgroups);
+    TError FindChildren(std::vector<std::shared_ptr<TCgroup>> &cgroups);
 
     TError GetProcesses(std::vector<pid_t> &processes);
     TError GetTasks(std::vector<pid_t> &tasks);

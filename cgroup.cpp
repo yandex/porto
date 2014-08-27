@@ -53,7 +53,7 @@ shared_ptr<TCgroup> TCgroup::GetChild(const std::string& name) {
     return child;
 }
 
-TError TCgroup::FindChildren(std::vector<std::shared_ptr<TCgroup>> cglist) {
+TError TCgroup::FindChildren(std::vector<std::shared_ptr<TCgroup>> &cglist) {
     TFolder f(Path());
     vector<string> list;
 
@@ -240,51 +240,31 @@ TError TCgroup::Attach(int pid) {
 
 // TCgroupSnapshot
 TError TCgroupSnapshot::Create() {
-    //TMountSnapshot ms;
+    TMountSnapshot ms;
 
-    // set<shared_ptr<TMount>> mounts;
-    // TError error = ms.Mounts(mounts);
-    // if (error) {
-    //     TLogger::LogError(error, "Can't create mount snapshot");
-    //     return error;
-    // }
+     set<shared_ptr<TMount>> mounts;
+     TError error = ms.Mounts(mounts);
+     if (error) {
+         TLogger::LogError(error, "Can't create mount snapshot");
+         return error;
+     }
 
-    // const static set<string> supported_subsystems =
-    //     {"cpuset", "cpu", "cpuacct", "memory",
-    //      "devices", "freezer", "net_cls", "net_prio", "blkio",
-    //      "perf_event", "hugetlb", "name=systemd"};
+     for (auto mount : mounts) {
+         for (auto name : mount->Flags()) {
+             auto subsys = TSubsystem::Get(name);
+             if (!subsys)
+                 continue;
 
-    // for (auto mount : mounts) {
-    //     set<string> flags = mount->Flags();
-    //     set<string> cs;
+             auto root = subsys->GetRootCgroup(mount);
+             cgroups.push_back(root);
 
-    //     set_intersection(flags.begin(), flags.end(),
-    //                      supported_subsystems.begin(),
-    //                      supported_subsystems.end(),
-    //                      inserter(cs, cs.begin()));
-
-    //     if (cs.empty())
-    //         continue;
-
-    //     string name = CommaSeparatedList(cs);
-
-    //     vector<shared_ptr<TSubsystem>> cg_controllers;
-    //     for (auto c : cs) {
-    //         auto subsys = TSubsystem::Get(name);
-    //         if (!subsys)
-    //             continue;
-    //         cg_controllers.push_back(subsystems[c]);
-    //     }
-
-    //     auto root = TCgroupRegistry::GetRoot(mount, cg_controllers);
-    //     cgroups.push_back(root);
-
-    //     TError error = root->FindChildren(cgroups);
-    //     if (error) {
-    //         TLogger::LogError(error, "Can't find children for " + root->Relpath());
-    //         return error;
-    //     }
-    // }
+             TError error = root->FindChildren(cgroups);
+             if (error) {
+                 TLogger::LogError(error, "Can't find children for " + root->Relpath());
+                 return error;
+             }
+         }
+     }
 
     return TError::Success();
 }
