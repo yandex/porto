@@ -31,7 +31,7 @@ static TError ValidMemGuarantee(string str) {
     uint64_t val;
 
     auto memroot = MemorySubsystem->GetRootCgroup();
-    if (memroot->HasKnob("memory.low_limit_in_bytes"))
+    if (!memroot->HasKnob("memory.low_limit_in_bytes"))
         return TError(EError::NotSupported, "invalid kernel");
 
 
