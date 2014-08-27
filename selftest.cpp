@@ -85,13 +85,21 @@ static map<string, string> GetCgroups(const string &pid) {
     return cgmap;
 }
 
-static string GetState(const string &pid) {
+static string GetStatusLine(const string &pid, const string &prefix) {
     vector<string> st;
     TFile f("/proc/" + pid + "/status");
     if (f.AsLines(st))
         return "INVALID PID";
 
-    stringstream ss(st[1]);
+    for (auto &s : st)
+        if (s.substr(0, prefix.length()) == prefix)
+            return s;
+
+    return "INVALID PREFIX";
+}
+
+static string GetState(const string &pid) {
+    stringstream ss(GetStatusLine(pid, "State:"));
 
     string name, state, desc;
 
@@ -106,12 +114,8 @@ static string GetState(const string &pid) {
 }
 
 static void GetUidGid(const string &pid, int &uid, int &gid) {
-    vector<string> st;
-    TFile f("/proc/" + pid + "/status");
-    (void)f.AsLines(st);
-
     string name;
-    string stuid = st[7];
+    string stuid = GetStatusLine(pid, "Uid:");
     stringstream ssuid(stuid);
 
     int euid, suid, fsuid;
@@ -124,7 +128,7 @@ static void GetUidGid(const string &pid, int &uid, int &gid) {
     if (name != "Uid:" || uid != euid || euid != suid || suid != fsuid)
         uid = -2;
 
-    string stgid = st[8];
+    string stgid = GetStatusLine(pid, "Gid:");
     stringstream ssgid(stgid);
 
     int egid, sgid, fsgid;
@@ -768,12 +772,7 @@ static void TestPermissions(TPortoAPI &api, const string &name) {
 }
 
 static string GetVmRss(const string &pid) {
-    vector<string> st;
-    TFile f("/proc/" + pid + "/status");
-    if (f.AsLines(st))
-        return "INVALID PID";
-
-    stringstream ss(st[16]);
+    stringstream ss(GetStatusLine(pid, "VmRSS:"));
 
     string name, size, unit;
 
@@ -806,14 +805,14 @@ static void TestLeaks(TPortoAPI &api) {
     }
 
     for (int i = 0; i < nr; i++) {
-        name = to_string(i);
+        name = "a" + to_string(i);
         ExpectSuccess(api.Destroy(name));
     }
 
     size = GetVmRss(pid);
 
     for (int i = 0; i < nr; i++) {
-        name = "another" + to_string(i);
+        name = "b" + to_string(i);
         ExpectSuccess(api.Create(name));
         ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
         ExpectSuccess(api.Start(name));
