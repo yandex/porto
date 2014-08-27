@@ -8,6 +8,7 @@
 #include "cgroup.hpp"
 #include "log.hpp"
 #include "util/string.hpp"
+#include "util/unix.hpp"
 
 extern "C" {
 #include <string.h>
