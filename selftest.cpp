@@ -674,14 +674,15 @@ static void TestRoot(TPortoAPI &api) {
     ExpectSuccess(api.Create(name));
     ExpectSuccess(api.SetProperty(name, "command", "true"));
     ExpectSuccess(api.Start(name));
-    ExpectSuccess(api.GetData(root, "cpu_usage", v));
-    Expect(v != "0");
-    ExpectSuccess(api.GetData(root, "memory_usage", v));
-    Expect(v != "0");
 
     string pid;
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     WaitExit(api, pid, name);
+
+    ExpectSuccess(api.GetData(root, "cpu_usage", v));
+    Expect(v != "0");
+    ExpectSuccess(api.GetData(root, "memory_usage", v));
+    Expect(v != "0");
 
     ExpectSuccess(api.GetData(name, "cpu_usage", v));
     Expect(v != "0");
