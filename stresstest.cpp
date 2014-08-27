@@ -61,16 +61,16 @@ static std::vector<std::map<std::string, std::string>> vtasks =
         {"env", "A=qwerty"},
         {"stdout", "qwerty\n"},
         {"stderr", ""},
-        {"exit_status", "1"},
+        {"exit_status", "256"},
         {"timeout", "5"}
     },
     {
-        {"command", "bash -ec 'for i in $A; do sleep 1; echo $i >&2; done'"},
+        {"command", "bash -ec 'for i in 1 2 3; do sleep 1; echo $i >&2; done'"},
         {"env", "A=1 2 3"},
         {"stdout", ""},
         {"stderr", "1\n2\n3\n"},
         {"exit_status", "0"},
-        {"timeout", "5"}
+        {"timeout", "10"}
     }
 };
 
@@ -154,10 +154,9 @@ static void CheckStderr(std::string name, std::string stream) {
 static void CheckExit(std::string name, std::string stream) {
     TPortoAPI api;
     std::string ret;
-    int exit_ret, exit_stream;
     std::cout << "CheckExit container: " << name << std::endl;
-    
-    Expect([&]{api.GetData(name, "exit_status", ret); StringToInt(ret, exit_ret); StringToInt(stream, exit_stream); return WEXITSTATUS(exit_ret) == exit_stream;});
+
+    Expect([&]{api.GetData(name, "exit_status", ret); return ret == stream;});
 }
 
 static void Destroy(const std::string &name, const std::string &cwd) {
