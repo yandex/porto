@@ -46,21 +46,32 @@ static std::vector<std::map<std::string, std::string>> vtasks =
         {"env", "N=1"},
         {"stdout", ""},
         {"stderr", ""},
-        {"exit_status", "0"}
+        {"exit_status", "0"},
+        {"timeout", "5"}
     },
     {
         {"command", "bash -ec 'echo $A'"},
         {"env", "A=qwerty"},
         {"stdout", "qwerty\n"},
         {"stderr", ""},
-        {"exit_status", "0"}
+        {"exit_status", "0"},
+        {"timeout", "5"}
     },
     {
         {"command", "bash -ec 'echo $A && false'"},
         {"env", "A=qwerty"},
         {"stdout", "qwerty\n"},
         {"stderr", ""},
-        {"exit_status", "1"}
+        {"exit_status", "1"},
+        {"timeout", "5"}
+    },
+    {
+        {"command", "bash -ec 'for i in $A; do sleep 1; echo $i >&2; done'"},
+        {"env", "A=1 2 3"},
+        {"stdout", ""},
+        {"stderr", "1\n2\n3\n"},
+        {"exit_status", "0"},
+        {"timeout", "5"}
     }
 };
 
@@ -95,6 +106,28 @@ static void Start(std::string name) {
     
     ExpectSuccess([&]{return api.Start(name);});
     Expect([&]{ api.GetData(name, "state", ret); return ret == "dead" || ret == "running";});
+}
+
+static void CheckRuning(std::string name, std::string timeout) {
+    TPortoAPI api;
+    std::string pid;
+    std::string ret;
+    int t;
+    
+    std::cout << "CheckRuning container: " << name << std::endl;
+    
+    StringToInt(timeout, t);
+    while (t--) {
+        api.GetData(name, "state", ret);
+        std::cout << "Poll " << name << ": "<< ret << std::endl;
+        if (ret == "dead") {
+            return;
+        }
+        usleep(1000000);
+    }
+    fail++;
+    done++;
+    throw std::string("Timeout");
 }
 
 static void CheckStdout(std::string name, std::string stream) {
@@ -150,7 +183,7 @@ static void Tasks() {
                 SetProperty(name, "env", vtasks[t]["env"]);
                 SetProperty(name, "command", vtasks[t]["command"]);
                 Start(name);
-                //CheckRuning(name);
+                CheckRuning(name, vtasks[t]["timeout"]);
                 CheckStdout(name, vtasks[t]["stdout"]);
                 CheckStderr(name, vtasks[t]["stderr"]);
                 CheckExit(name, vtasks[t]["exit_status"]);
