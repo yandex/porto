@@ -16,9 +16,6 @@ int TPortoAPI::SendReceive(int fd, rpc::TContainerRequest &req, rpc::TContainerR
     if (ReadDelimitedFrom(&pist, &rsp)) {
         LastErrorMsg = rsp.errormsg();
         LastError = (int)rsp.error();
-    } else {
-        LastErrorMsg = "";
-        LastError = -1;
     }
 
     return LastError;
@@ -32,10 +29,14 @@ TPortoAPI::~TPortoAPI() {
 }
 
 int TPortoAPI::Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
+    LastErrorMsg = "";
+    LastError = (int)EError::Unknown;
+
     if (fd < 0) {
         TError error = ConnectToRpcServer(RPC_SOCK, fd);
-        if (error)
+        if (error) {
             return INT_MIN;
+        }
     }
 
     rsp.Clear();
