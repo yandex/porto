@@ -13,10 +13,15 @@ int TPortoAPI::SendReceive(int fd, rpc::TContainerRequest &req, rpc::TContainerR
     WriteDelimitedTo(req, &post);
     post.Flush();
 
-    if (ReadDelimitedFrom(&pist, &rsp))
-        return (int)rsp.error();
-    else
-        return -1;
+    if (ReadDelimitedFrom(&pist, &rsp)) {
+        LastErrorMsg = rsp.errormsg();
+        LastError = (int)rsp.error();
+    } else {
+        LastErrorMsg = "";
+        LastError = -1;
+    }
+
+    return LastError;
 }
 
 TPortoAPI::TPortoAPI() : fd(-1) {
@@ -161,4 +166,9 @@ int TPortoAPI::Resume(const string &name) {
     req.mutable_resume()->set_name(name);
 
     return Rpc(req, rsp);
+}
+
+void TPortoAPI::GetLastError(int &error, std::string &msg) const {
+    error = LastError;
+    msg = LastErrorMsg;
 }

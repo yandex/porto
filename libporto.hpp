@@ -30,9 +30,11 @@ class TPortoAPI {
     int fd;
     rpc::TContainerRequest req;
     rpc::TContainerResponse rsp;
+    int LastError;
+    std::string LastErrorMsg;
 
-    static int SendReceive(int fd, rpc::TContainerRequest &req,
-                           rpc::TContainerResponse &rsp);
+    int SendReceive(int fd, rpc::TContainerRequest &req,
+                    rpc::TContainerResponse &rsp);
     int Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp);
 
 public:
@@ -56,6 +58,7 @@ public:
     int GetData(const std::string &name, const std::string &data, std::string &value);
 
     int Raw(const std::string &message, std::string &response);
+    void GetLastError(int &error, std::string &msg) const;
 };
 
 #endif
