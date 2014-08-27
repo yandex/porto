@@ -66,6 +66,16 @@ public:
         return rpc::EError_Name(static_cast<rpc::EError>(err));
     }
 
+    void PrintError(const string &str) {
+        int error;
+        string msg;
+        api.GetLastError(error, msg);
+        if (msg.length())
+            cerr << str << ": " << msg << " (" << ErrorName(error) << ")" << endl;
+        else
+            cerr << str << ": " << ErrorName(error) << endl;
+    }
+
     bool ValidArgs(int argc, char *argv[]) {
         if (argc < need_args)
             return false;
@@ -101,7 +111,7 @@ public:
         vector<TProperty> plist;
         ret = api.Plist(plist);
         if (ret)
-            cerr << "Can't list properties, error = " << ErrorName(ret) << endl;
+            PrintError("Can't list properties");
         else
             for (auto p : plist)
                 cout << " " << left << setw(24) << p.name
@@ -111,7 +121,7 @@ public:
         vector<TData> dlist;
         ret = api.Dlist(dlist);
         if (ret)
-            cerr << "Can't list data, error = " << ErrorName(ret) << endl;
+            PrintError("Can't list data");
         else
             for (auto d : dlist)
                 cout << " " << left << setw(24) << d.name
@@ -174,7 +184,7 @@ public:
     {
         int ret = api.Create(argv[0]);
         if (ret)
-            cerr << "Can't create container, error = " << ErrorName(ret) << endl;
+            PrintError("Can't create container");
 
         return ret;
     }
@@ -188,7 +198,7 @@ public:
     {
         int ret = api.Destroy(argv[0]);
         if (ret)
-            cerr << "Can't destroy container, error = " << ErrorName(ret) << endl;
+            PrintError("Can't destroy container");
 
         return ret;
     }
@@ -203,16 +213,15 @@ public:
         vector<string> clist;
         int ret = api.List(clist);
         if (ret)
-            cerr << "Can't list containers, error = " << ErrorName(ret) << endl;
+            PrintError("Can't list containers");
         else
             for (auto c : clist) {
                 string s;
                 ret = api.GetData(c, "state", s);
                 if (ret)
-                    cerr << "Can't get container state, error = " << ErrorName(ret) << endl;
+                    PrintError("Can't get container state");
                 cout << left << setw(40) << c
                      << setw(40) << s << endl;
-
             }
 
         return ret;
@@ -228,7 +237,7 @@ public:
         string value;
         int ret = api.GetProperty(argv[0], argv[1], value);
         if (ret)
-            cerr << "Can't get property, error = " << ErrorName(ret) << endl;
+            PrintError("Can't get property");
         else
             cout << value << endl;
 
@@ -250,7 +259,7 @@ public:
 
         int ret = api.SetProperty(argv[0], argv[1], val);
         if (ret)
-            cerr << "Can't set property, error = " << ErrorName(ret) << endl;
+            PrintError("Can't set property");
 
         return ret;
     }
@@ -265,7 +274,7 @@ public:
         string value;
         int ret = api.GetData(argv[0], argv[1], value);
         if (ret)
-            cerr << "Can't get data, error = " << ErrorName(ret) << endl;
+            PrintError("Can't get data");
         else
             cout << value << endl;
 
@@ -281,7 +290,7 @@ public:
     {
         int ret = api.Start(argv[0]);
         if (ret)
-            cerr << "Can't start container, error = " << ErrorName(ret) << endl;
+            PrintError("Can't start container");
 
         return ret;
     }
@@ -295,7 +304,7 @@ public:
     {
         int ret = api.Stop(argv[0]);
         if (ret)
-            cerr << "Can't stop container, error = " << ErrorName(ret) << endl;
+            PrintError("Can't stop container");
 
         return ret;
     }
@@ -309,7 +318,7 @@ public:
     {
         int ret = api.Pause(argv[0]);
         if (ret)
-            cerr << "Can't pause container, error = " << ErrorName(ret) << endl;
+            PrintError("Can't pause container");
 
         return ret;
     }
@@ -323,7 +332,7 @@ public:
     {
         int ret = api.Resume(argv[0]);
         if (ret)
-            cerr << "Can't resume container, error = " << ErrorName(ret) << endl;
+            PrintError("Can't resume container");
 
         return ret;
     }
@@ -363,14 +372,14 @@ public:
         vector<TProperty> plist;
         ret = api.Plist(plist);
         if (ret) {
-            cerr << "Can't list properties, error = " << ErrorName(ret) << endl;
+            PrintError("Can't list properties");
             return 1;
         }
 
         vector<TData> dlist;
         ret = api.Dlist(dlist);
         if (ret) {
-            cerr << "Can't list data, error = " << ErrorName(ret) << endl;
+            PrintError("Can't list data");
             return 1;
         }
 
@@ -417,7 +426,7 @@ public:
         }
 
         if (!validProperty && !validData)
-            cerr << "Invalid property or data" << endl;
+            PrintError("Invalid property or data");
 
         return 1;
     }
