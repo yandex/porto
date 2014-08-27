@@ -13,14 +13,14 @@ static string DataValue(const string &name, const string &val) {
         if (StringToInt(val, status))
             return val;
 
-        string ret = val + " ";
+        string ret;
 
         if (WIFEXITED(status))
-            ret += "Container exited with " + to_string(status);
+            ret = "Container exited with " + to_string(WEXITSTATUS(status));
         else if (WIFSIGNALED(status))
-            ret += "Container killed by signal " + to_string(status);
+            ret = "Container killed by signal " + to_string(WTERMSIG(status));
         else if (status == 0)
-            ret += "Success";
+            ret = "Success";
 
         return ret;
     } else if (name == "errno") {
@@ -28,16 +28,16 @@ static string DataValue(const string &name, const string &val) {
         if (StringToInt(val, status))
             return val;
 
-        string ret = val + " ";
+        string ret;
 
         if (status < 0)
-            ret += "Prepare failed: " + string(strerror(-status));
+            ret = "Prepare failed: " + string(strerror(-status));
         else if (status > 0)
-            ret += "Exec failed: " + string(strerror(status));
+            ret = "Exec failed: " + string(strerror(status));
         else if (status == 0)
-            ret += "Success";
+            ret = "Success";
 
-        return ret;
+        return ret + " (" + val + ")";
     } else {
         return val;
     }
@@ -364,6 +364,19 @@ class TGetCmd : public ICmd {
 public:
     TGetCmd() : ICmd("get", 1, "<name> <data>", "get container property or data") {}
 
+    bool ValidProperty(const vector<TProperty> &plist, const string &name) {
+        return find_if(plist.begin(), plist.end(),
+                       [&](const TProperty &i)->bool { return i.name == name; })
+            != plist.end();
+    }
+
+    bool ValidData(const vector<TData> &dlist, const string &name) {
+        return find_if(dlist.begin(), dlist.end(),
+                       [&](const TData &i)->bool { return i.name == name; })
+            != dlist.end();
+    }
+
+
     int Execute(int argc, char *argv[])
     {
         string value;
@@ -385,12 +398,18 @@ public:
 
         if (argc <= 1) {
             for (auto p : plist) {
+                if (!ValidProperty(plist, p.name))
+                    continue;
+
                 ret = api.GetProperty(argv[0], p.name, value);
                 if (!ret)
                     cout << p.name << " = " << value << endl;
             }
 
             for (auto d : dlist) {
+                if (!ValidData(dlist, d.name))
+                    continue;
+
                 ret = api.GetData(argv[0], d.name, value);
                 if (!ret)
                     cout << d.name << " = " << DataValue(d.name, value) << endl;
@@ -399,34 +418,27 @@ public:
             return 0;
         }
 
-        bool validProperty = false;
-        for (auto p : plist)
-            if (p.name == argv[1]) {
-                validProperty = true;
-                break;
-            }
-
-        bool validData = false;
-        for (auto d : dlist)
-            if (d.name == argv[1]) {
-                validData = true;
-                break;
-            }
+        bool validProperty = ValidProperty(plist, argv[1]);
+        bool validData = ValidData(dlist, argv[1]);
 
         if (validData) {
             ret = api.GetData(argv[0], argv[1], value);
             if (!ret)
                 cout << DataValue(argv[1], value) << endl;
+            else if (ret != EError::InvalidData)
+                PrintError("Can't get data");
         }
 
         if (validProperty) {
             ret = api.GetProperty(argv[0], argv[1], value);
             if (!ret)
                 cout << value << endl;
+            else if (ret != EError::InvalidProperty)
+                PrintError("Can't get data");
         }
 
         if (!validProperty && !validData)
-            PrintError("Invalid property or data");
+            cerr << "Invalid property or data" << endl;
 
         return 1;
     }
