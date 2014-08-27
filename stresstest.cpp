@@ -65,7 +65,7 @@ static std::vector<std::map<std::string, std::string>> vtasks =
         {"timeout", "5"}
     },
     {
-        {"command", "bash -ec 'for i in 1 2 3; do sleep 1; echo $i >&2; done'"},
+        {"command", "bash -ec 'for i in $A; do sleep 1; echo $i >&2; done'"},
         {"env", "A=1 2 3"},
         {"stdout", ""},
         {"stderr", "1\n2\n3\n"},
