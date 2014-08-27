@@ -7,11 +7,10 @@
 #include <algorithm>
 
 #include "porto.hpp"
-#include "util/file.hpp"
-#include "rpc.pb.h"
 #include "libporto.hpp"
 #include "util/file.hpp"
 #include "util/string.hpp"
+#include "util/folder.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -75,7 +74,7 @@ static std::vector<std::map<std::string, std::string>> vtasks =
     }
 };
 
-static void Create(std::string name) {
+static void Create(const std::string &name, const std::string &cwd) {
     TPortoAPI api;
     std::vector<std::string> containers;
     
@@ -84,6 +83,10 @@ static void Create(std::string name) {
     Expect([&]{ containers.clear(); api.List(containers); return std::find(containers.begin(),containers.end(),name) == containers.end();});
     Expect([&]{ auto ret = api.Create(name); return ret == EError::Success || ret == EError::ContainerAlreadyExists; });
     Expect([&]{ containers.clear(); api.List(containers); return std::find(containers.begin(),containers.end(),name) != containers.end();});
+
+    TFolder f(cwd);
+    if (!f.Exists())
+        Expect([&]{ TError error = f.Create(0755, true); return error == false; });
 }
 
 static void SetProperty(std::string name, std::string type, std::string value) {
@@ -157,7 +160,7 @@ static void CheckExit(std::string name, std::string stream) {
     Expect([&]{api.GetData(name, "exit_status", ret); StringToInt(ret, exit_ret); StringToInt(stream, exit_stream); return WEXITSTATUS(exit_ret) == exit_stream;});
 }
 
-static void Destroy(std::string name) {
+static void Destroy(const std::string &name, const std::string &cwd) {
     TPortoAPI api;
     std::vector<std::string> containers;
     
@@ -169,7 +172,8 @@ static void Destroy(std::string name) {
     containers.clear();
     ExpectSuccess([&]{return api.List(containers);});
     Expect([&]{return std::find(containers.begin(),containers.end(),name) == containers.end();});
-    
+    TFolder f(cwd);
+    f.Remove(true);
 }
 
 static void Tasks() {
@@ -179,15 +183,17 @@ static void Tasks() {
         while (i--) {
             for (unsigned int t=0; t < vtasks.size(); t++) {
                 std::string name = "stresstest" + std::to_string(t);
-                Create(name);
+                std::string cwd = "/tmp/stresstest/" + name;
+                Create(name, cwd);
                 SetProperty(name, "env", vtasks[t]["env"]);
                 SetProperty(name, "command", vtasks[t]["command"]);
+                SetProperty(name, "cwd", cwd);
                 Start(name);
                 CheckRuning(name, vtasks[t]["timeout"]);
                 CheckStdout(name, vtasks[t]["stdout"]);
                 CheckStderr(name, vtasks[t]["stderr"]);
                 CheckExit(name, vtasks[t]["exit_status"]);
-                Destroy(name);
+                Destroy(name, cwd);
             }
         }
     } catch (std::string e) {
@@ -222,7 +228,6 @@ static void StressKill() {
 int StressTest() {
     try {
         (void)signal(SIGPIPE, SIG_IGN);
-        Expect([&]{ std::cerr << "try" << std::endl; return true; });
 
         std::thread thr_tasks(Tasks);
         std::thread thr_stress_kill(StressKill);
