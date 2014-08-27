@@ -55,6 +55,15 @@ static void DoUpdate(int signum)
     NeedUpdate = true;
 }
 
+static void ReceiveAcks(int fd, map<int,int> &PidToStatus) {
+    int pid;
+
+    while (read(fd, &pid, sizeof(pid)) == sizeof(pid)) {
+        Log() << "Got acknowledge for " << pid << endl;
+        PidToStatus.erase(pid);
+    }
+}
+
 static int SpawnPortod(map<int,int> &PidToStatus) {
     int evtfd[2];
     int ackfd[2];
@@ -95,10 +104,7 @@ static int SpawnPortod(map<int,int> &PidToStatus) {
     while (!Done) {
         int pid;
 
-        while (read(ackfd[0], &pid, sizeof(pid)) == sizeof(pid)) {
-            Log() << "Got acknowledge for " << pid << endl;
-            PidToStatus.erase(pid);
-        }
+        ReceiveAcks(ackfd[0], PidToStatus);
 
         if (NeedUpdate) {
             Log() << "Updating" << endl;
@@ -132,6 +138,8 @@ static int SpawnPortod(map<int,int> &PidToStatus) {
         SendPidStatus(evtfd[1], pid, status, PidToStatus.size());
         PidToStatus[pid] = status;
     }
+
+    ReceiveAcks(ackfd[0], PidToStatus);
 
 exit:
     close(evtfd[0]);

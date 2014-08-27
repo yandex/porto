@@ -380,23 +380,23 @@ TError TContainer::Restore(const kv::TNode &node) {
         return error;
     }
 
-    error = PrepareCgroups();
-    if (error) {
-        TLogger::LogError(error, "Can't restore task cgroups");
-        return error;
-    }
-
     int pid;
     bool started = true;
     error = StringToInt(spec.GetInternal("root_pid"), pid);
     if (error)
         started = false;
 
-    TLogger::Log(name + ": restore process " + to_string(pid));
+    TLogger::Log(name + ": restore process " + to_string(pid) + " which " + (started ? "started" : "didn't start"));
 
     state = EContainerState::Stopped;
 
     if (started) {
+        error = PrepareCgroups();
+        if (error) {
+            TLogger::LogError(error, "Can't restore task cgroups");
+            return error;
+        }
+
         error = PrepareTask();
         if (error) {
             TLogger::LogError(error, "Can't prepare task");
