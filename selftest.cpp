@@ -352,6 +352,7 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
 
     cerr << "Check exit status of invalid command" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "__invalid_command_name__"));
+    ExpectSuccess(api.SetProperty(name, "cwd", "/"));
     ExpectFailure(api.Start(name), EError::Unknown);
     ExpectFailure(api.GetData(name, "root_pid", ret), EError::InvalidState);
     ExpectFailure(api.GetData(name, "exit_status", ret), EError::InvalidState);
