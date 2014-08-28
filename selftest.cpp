@@ -339,6 +339,19 @@ static void TestHolder(TPortoAPI &api) {
     ExpectFailure(api.SetProperty("a", "command", value), EError::ContainerDoesNotExist);
     ExpectFailure(api.GetData("a", "root_pid", value), EError::ContainerDoesNotExist);
 
+    cerr << "Try to create container with invalid name" << endl;
+    string name;
+
+    name = "z@";
+    ExpectFailure(api.Create(name), EError::InvalidValue);
+
+    name = string(128, 'z');
+    ExpectSuccess(api.Create(name));
+    ExpectSuccess(api.Destroy(name));
+
+    name = string(129, 'z');
+    ExpectFailure(api.Create(name), EError::InvalidValue);
+
     ShouldHaveOnlyRoot(api);
 }
 
@@ -948,6 +961,8 @@ static void TestRecovery(TPortoAPI &api) {
     Expect(TaskZombie(api, pid) == false);
 
     ExpectSuccess(api.Destroy(name));
+
+    // TODO: check that all (add more) properties are recovered correctly
 }
 
 int Selftest() {
@@ -980,10 +995,6 @@ int Selftest() {
             TPortoAPI api;
             TestRecovery(api);
         }
-
-        // TODO: try to create container with length 129
-        // TODO: test recovery and keyvalue
-
     } catch (string e) {
         cerr << "EXCEPTION: " << e << endl;
         return 1;
