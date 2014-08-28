@@ -67,6 +67,24 @@ static void WaitState(TPortoAPI &api, const string &name, const string &state) {
         throw string("Waited too long for task to change state");
 }
 
+static void WaitPortod(TPortoAPI &api) {
+    cerr << "Waiting for portod startup" << endl;
+
+    int times = 10;
+
+    vector<string> clist;
+    do {
+        if (times-- <= 0)
+            break;
+
+        usleep(1000000);
+
+    } while (api.List(clist) != 0);
+
+    if (times <= 0)
+        throw string("Waited too long for portod startup");
+}
+
 static string GetCwd(const string &pid) {
     string lnk;
     TFile f("/proc/" + pid + "/cwd");
@@ -336,11 +354,9 @@ static bool TaskRunning(TPortoAPI &api, const string &pid) {
     return kill(p, 0) == 0;
 }
 
-/*
 static bool TaskZombie(TPortoAPI &api, const string &pid) {
     return GetState(pid) == "Z";
 }
-*/
 
 static void TestExitStatus(TPortoAPI &api, const string &name) {
     string pid;
@@ -879,6 +895,38 @@ static void TestDaemon() {
     // TODO: check portoloop
 }
 
+static void TestRecovery(TPortoAPI &api) {
+    string pid, v;
+    string name = "a";
+
+    cerr << "Make sure we don't kill containers when doing recovery" << endl;
+    ExpectSuccess(api.Create(name));
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.Start(name));
+
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    Expect(TaskRunning(api, pid) == true);
+    Expect(TaskZombie(api, pid) == false);
+
+    string portod_pid;
+    TFile portod(PID_FILE);
+    ExpectSuccess(portod.AsString(portod_pid));
+
+    kill(stoi(portod_pid), SIGKILL);
+    WaitExit(api, portod_pid);
+    WaitPortod(api);
+
+    ExpectSuccess(api.GetData(name, "state", v));
+    Expect(v == "running");
+    ExpectSuccess(api.GetData(name, "root_pid", v));
+    Expect(v == pid);
+
+    Expect(TaskRunning(api, pid) == true);
+    Expect(TaskZombie(api, pid) == false);
+
+    ExpectSuccess(api.Destroy(name));
+}
+
 int Selftest() {
     TPortoAPI api;
 
@@ -902,6 +950,7 @@ int Selftest() {
         ExpectSuccess(api.Destroy("a"));
         TestLeaks(api);
         TestDaemon();
+        TestRecovery(api);
     } catch (string e) {
         cerr << "EXCEPTION: " << e << endl;
         return 1;
