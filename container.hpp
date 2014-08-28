@@ -41,6 +41,7 @@ class TContainer {
     EContainerState state;
 
     TContainerSpec spec;
+    bool MaybeReturnedOk = false;
     friend TData;
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> leaf_cgroups;

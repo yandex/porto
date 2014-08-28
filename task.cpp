@@ -351,27 +351,28 @@ TError TTask::Start() {
     rfd = pfd[0];
     wfd = pfd[1];
 
-    char stack[8192];
-
-    int ppid = fork();
-    if (ppid < 0) {
-        TError error(EError::Unknown, errno, "clone()");
+    pid_t fork_pid = fork();
+    if (fork_pid < 0) {
+        TError error(EError::Unknown, errno, "fork()");
         TLogger::LogError(error, "Can't spawn child");
         return error;
-    } else if (ppid == 0) {
+    } else if (fork_pid == 0) {
+        char stack[8192];
+
         (void)setsid();
 
-        pid_t pid = clone(child_fn, stack + sizeof(stack),
-                          SIGCHLD | CLONE_NEWNS | CLONE_NEWPID | CLONE_NEWUTS, this);
-        if (write(wfd, &pid, sizeof(pid))) {}
-        if (pid < 0) {
+        pid_t clone_pid = clone(child_fn, stack + sizeof(stack),
+                                SIGCHLD | CLONE_NEWNS | CLONE_NEWPID | CLONE_NEWUTS,
+                                this);
+        if (write(wfd, &clone_pid, sizeof(clone_pid))) {}
+        if (clone_pid < 0) {
             TError error(EError::Unknown, errno, "clone()");
             TLogger::LogError(error, "Can't spawn child");
             return error;
         }
         exit(EXIT_SUCCESS);
     }
-    (void)waitpid(ppid, NULL, 0);
+    (void)waitpid(fork_pid, NULL, 0);
 
     close(wfd);
     int n = read(rfd, &pid, sizeof(pid));
@@ -384,16 +385,15 @@ TError TTask::Start() {
     n = read(rfd, &ret, sizeof(ret));
     close(rfd);
     if (n < 0) {
+        pid = 0;
         TError error(EError::Unknown, errno, "read(rfd)");
         TLogger::LogError(error, "Can't read result from the child");
         return error;
     } else if (n == 0) {
         state = Started;
-        this->pid = pid;
         return TError::Success();
     } else {
-        this->pid = pid;
-        this->pid = 0;
+        pid = 0;
 
         exitStatus.error = ret;
         exitStatus.status = -1;

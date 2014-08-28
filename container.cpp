@@ -211,9 +211,31 @@ TError TContainer::Create() {
     return spec.Create();
 }
 
+static string ContainerStateName(EContainerState state) {
+    switch (state) {
+    case EContainerState::Stopped:
+        return "stopped";
+    case EContainerState::Dead:
+        return "dead";
+    case EContainerState::Running:
+        return "running";
+    case EContainerState::Paused:
+        return "paused";
+    default:
+        return "?";
+    }
+}
+
 TError TContainer::Start() {
+    if ((state == EContainerState::Running || state == EContainerState::Dead) && MaybeReturnedOk) {
+        TLogger::Log("Maybe running");
+        MaybeReturnedOk = false;
+        return TError::Success();
+    }
+    MaybeReturnedOk = false;
+
     if (!CheckState(EContainerState::Stopped))
-        return TError(EError::InvalidValue, "invalid container state");
+        return TError(EError::InvalidValue, "invalid container state " + ContainerStateName(state));
 
     TError error = PrepareCgroups();
     if (error) {
@@ -291,7 +313,7 @@ extern void AckExitStatus(int pid);
 
 TError TContainer::Stop() {
     if (IsRoot() || !(CheckState(EContainerState::Running) || CheckState(EContainerState::Dead)))
-        return TError(EError::InvalidValue, "invalid container state");
+        return TError(EError::InvalidValue, "invalid container state " + ContainerStateName(state));
 
     TLogger::Log("stop " + name);
 
@@ -312,7 +334,7 @@ TError TContainer::Stop() {
 
 TError TContainer::Pause() {
     if (IsRoot() || !CheckState(EContainerState::Running))
-        return TError(EError::InvalidValue, "invalid container state");
+        return TError(EError::InvalidValue, "invalid container state " + ContainerStateName(state));
 
     auto cg = GetLeafCgroup(FreezerSubsystem);
     TError error(FreezerSubsystem->Freeze(*cg));
@@ -327,7 +349,7 @@ TError TContainer::Pause() {
 
 TError TContainer::Resume() {
     if (!CheckState(EContainerState::Paused))
-        return TError(EError::InvalidValue, "invalid container state");
+        return TError(EError::InvalidValue, "invalid container state " + ContainerStateName(state));
 
     auto cg = GetLeafCgroup(FreezerSubsystem);
     TError error(FreezerSubsystem->Unfreeze(*cg));
@@ -349,7 +371,7 @@ TError TContainer::GetData(const string &name, string &value) {
         return TError(EError::InvalidData, "invalid data for root container");
 
     if (dataSpec[name].valid.find(state) == dataSpec[name].valid.end())
-        return TError(EError::InvalidState, "invalid container state");
+        return TError(EError::InvalidState, "invalid container state " + ContainerStateName(state));
 
     value = dataSpec[name].handler(*this);
     return TError::Success();
@@ -413,6 +435,8 @@ TError TContainer::Restore(const kv::TNode &node) {
         }
 
         state = task->IsRunning() ? EContainerState::Running : EContainerState::Stopped;
+        if (state == EContainerState::Running)
+            MaybeReturnedOk = true;
     } else {
         if (IsAlive()) {
             // we started container but died before saving root_pid,
