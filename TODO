@@ -1,5 +1,8 @@
 - check log size on production machine (whether daily logrotate is enough)
 - code style https://wiki.yandex-team.ru/Development/Poisk/PutevoditelRazrabotchika/CPPStyleGuide
+- use normal logger in portoloop (/var/log/portoloop.log)
+- after container->Stop() returns, we have zombie process for some time (it will take a while for portoloop to reap it and deliver exit status to portod)
+- remove extern AckExitStatus from container->Stop()
 
 # cleanup
 - rotate subprocess stdout/stderr

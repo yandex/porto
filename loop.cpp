@@ -65,7 +65,7 @@ static int SpawnPortod(map<int,int> &PidToStatus) {
         return EXIT_FAILURE;
     }
 
-    if (pipe(ackfd) < 0) {
+    if (pipe2(ackfd, O_NONBLOCK) < 0) {
         Log() << "pipe(): " << strerror(errno) << endl;
         return EXIT_FAILURE;
     }
@@ -86,9 +86,6 @@ static int SpawnPortod(map<int,int> &PidToStatus) {
 
     close(evtfd[0]);
     close(ackfd[1]);
-
-    if (fcntl(ackfd[0], F_SETFD, O_NONBLOCK) < 0)
-        Log() << "fcntl(O_NONBLOCK): " << strerror(errno) << endl;
 
     Log() << "Spawned portod " << portod_pid << endl;
 

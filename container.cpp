@@ -358,7 +358,7 @@ TError TContainer::SetProperty(const string &property, const string &value) {
     if (IsRoot())
         return TError(EError::InvalidValue, "Can't set property for root");
 
-    if (task && task->IsRunning() && !spec.IsDynamic(property))
+    if (state != EContainerState::Stopped && !spec.IsDynamic(property))
         return TError(EError::InvalidValue, "Can't set dynamic property " + property + " for running container");
 
     return spec.Set(property, value);
@@ -429,7 +429,7 @@ std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys
 }
 
 bool TContainer::DeliverExitStatus(int pid, int status) {
-    if (!task)
+    if (state != EContainerState::Running || !task)
         return false;
 
     if (task->GetPid() != pid)
