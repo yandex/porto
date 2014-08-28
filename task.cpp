@@ -352,7 +352,7 @@ TError TTask::Start() {
 
     char stack[8192];
     pid_t pid = clone(child_fn, stack + sizeof(stack),
-                      SIGCHLD | CLONE_NEWNS | CLONE_NEWPID | CLONE_NEWUTS, this);
+                      SIGCHLD | CLONE_NEWNS | CLONE_NEWPID | CLONE_NEWUTS | CLONE_PARENT, this);
     if (pid < 0) {
         TError error(EError::Unknown, errno, "clone()");
         TLogger::LogError(error, "Can't spawn child");
@@ -372,14 +372,12 @@ TError TTask::Start() {
         return TError::Success();
     } else {
         this->pid = pid;
-        TError error = Reap(true);
-        if (error)
-            TLogger::LogError(error, "Couldn't reap child process");
         this->pid = 0;
 
         exitStatus.error = ret;
         exitStatus.status = -1;
 
+        TError error;
         if (ret < 0)
             error = TError(EError::Unknown, string("child prepare: ") + strerror(-ret));
         else
@@ -394,49 +392,11 @@ int TTask::GetPid() {
 }
 
 bool TTask::IsRunning() {
-    if (state == Started)
-        (void)Reap(false);
-
     return state == Started;
 }
 
 TExitStatus TTask::GetExitStatus() {
-    if (state == Started)
-        (void)Reap(false);
-
     return exitStatus;
-}
-
-bool TTask::CanReap() {
-    // May give false-positive when task is running, but we are not its
-    // parent
-    return kill(pid, 0) == 0;
-}
-
-TError TTask::Reap(bool wait) {
-    int status;
-    pid_t ret;
-
-    ret = waitpid(pid, &status, wait ? 0 : WNOHANG);
-    TLogger::Log("reap(" + to_string(pid) + ") = " + to_string(ret));
-    if (ret == pid) {
-        DeliverExitStatus(status);
-    } else if (ret < 0) {
-        if (kill(pid, 0) == 0) {
-            // process is still running but we can't use wait() on it
-            // (probably from the previous session) -> state should
-            // be changed via DeliverExitStatus
-
-            TLogger::Log(to_string(pid) + " is still running, will wait for status delivery" );
-            return TError::Success();
-        }
-
-        exitStatus.error = -1;
-        state = Stopped;
-        return TError(EError::Unknown, errno, "waitpid()");
-    }
-
-    return TError::Success();
 }
 
 void TTask::DeliverExitStatus(int status) {

@@ -63,8 +63,6 @@ public:
     std::vector<pid_t> Processes();
     bool IsAlive();
 
-    void UpdateState();
-
     TError Create();
     TError Start();
     TError Stop();

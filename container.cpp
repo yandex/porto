@@ -21,8 +21,6 @@ using namespace std;
 
 struct TData {
     static string State(TContainer& c) {
-        c.UpdateState();
-
         switch (c.state) {
         case EContainerState::Stopped:
             return "stopped";
@@ -158,15 +156,6 @@ bool TContainer::IsAlive() {
     return IsRoot() || !Processes().empty();
 }
 
-void TContainer::UpdateState() {
-    if (state == EContainerState::Running && !IsAlive()) {
-        if (task)
-            task->Reap(false);
-        Stop();
-        state = EContainerState::Dead;
-    }
-}
-
 TError TContainer::PrepareCgroups() {
     leaf_cgroups.push_back(GetLeafCgroup(TSubsystem::Cpuacct()));
     leaf_cgroups.push_back(GetLeafCgroup(TSubsystem::Memory()));
@@ -284,17 +273,6 @@ TError TContainer::KillAll() {
     error = TSubsystem::Freezer()->Unfreeze(*cg);
     if (error)
         TLogger::LogError(error, "Can't kill all tasks");
-
-    // after we killed all tasks, collect and ignore their exit status
-    for (auto pid : reap) {
-        TTask t(pid);
-        if (t.CanReap()) {
-            TError error = t.Reap(true);
-            TLogger::LogError(error, "Can't reap task " + to_string(pid));
-        }
-    }
-
-//    task = nullptr;
 
     return TError::Success();
 }
@@ -464,7 +442,6 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
 }
 
 void TContainer::Heartbeat() {
-    UpdateState();
     if (task)
         task->Rotate();
 }
