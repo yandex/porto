@@ -190,9 +190,9 @@ static void Tasks() {
                 SetProperty(name, "cwd", cwd);
                 Start(name);
                 CheckRuning(name, vtasks[t]["timeout"]);
+                CheckExit(name, vtasks[t]["exit_status"]);
                 CheckStdout(name, vtasks[t]["stdout"]);
                 CheckStderr(name, vtasks[t]["stderr"]);
-                CheckExit(name, vtasks[t]["exit_status"]);
                 Destroy(name, cwd);
             }
         }

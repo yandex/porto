@@ -354,7 +354,7 @@ TError TTask::Start() {
     pid_t pid = clone(child_fn, stack + sizeof(stack),
                       SIGCHLD | CLONE_NEWNS | CLONE_NEWPID | CLONE_NEWUTS, this);
     if (pid < 0) {
-        TError error(EError::Unknown, errno, "fork()");
+        TError error(EError::Unknown, errno, "clone()");
         TLogger::LogError(error, "Can't spawn child");
         return error;
     }

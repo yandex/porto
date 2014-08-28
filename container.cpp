@@ -135,8 +135,6 @@ TContainer::~TContainer() {
     if (state == EContainerState::Paused)
         Resume();
 
-    TLogger::Log("stop " + name);
-
     Stop();
 }
 
@@ -296,20 +294,29 @@ TError TContainer::KillAll() {
         }
     }
 
-    task = nullptr;
+//    task = nullptr;
 
     return TError::Success();
 }
 
+// TODO: rework this into some kind of notify interface
+extern void AckExitStatus(int pid);
+
 TError TContainer::Stop() {
     if (IsRoot() || !(CheckState(EContainerState::Running) || CheckState(EContainerState::Dead)))
         return TError(EError::InvalidValue, "invalid container state");
+
+    TLogger::Log("stop " + name);
+
+    int pid = task->GetPid();
 
     TError error = KillAll();
     if (error)
         TLogger::LogError(error, "Can't kill all tasks in container");
 
     leaf_cgroups.clear();
+
+    AckExitStatus(pid);
 
     state = EContainerState::Stopped;
 

@@ -23,7 +23,8 @@ extern "C" {
 using namespace std;
 
 static const size_t MAX_CONNECTIONS = PORTOD_MAX_CLIENTS + 1;
-static const int REAP_FD = 3;
+static const int REAP_EVT_FD = 3;
+static const int REAP_ACK_FD = 6;
 
 static void RemoveRpcServer(const string &path) {
     TFile f(path);
@@ -109,6 +110,19 @@ static void RemovePidFile(const string &path) {
     (void)f.Remove();
 }
 
+void AckExitStatus(int pid) {
+    if (!pid)
+        return;
+
+    int ret = write(REAP_ACK_FD, &pid, sizeof(pid));
+    if (ret == sizeof(pid)) {
+        TLogger::Log("Acknowledge exit status for " + to_string(pid));
+    } else {
+        TError error(EError::Unknown, errno, "write(): returned " + to_string(ret));
+        TLogger::LogError(error, "Can't acknowledge exit status for " + to_string(pid));
+    }
+}
+
 static int ReapSpawner(int fd, TContainerHolder &cholder) {
     struct pollfd fds[1];
     int nr = 100;
@@ -138,6 +152,7 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
 
         if (!cholder.DeliverExitStatus(pid, status)) {
             TLogger::Log("Can't deliver " + to_string(pid) + " exit status " + to_string(status));
+            AckExitStatus(pid);
             return 0;
         }
     }
@@ -197,7 +212,7 @@ static int RpcMain(TContainerHolder &cholder) {
             Hup = false;
         }
 
-        ret = ReapSpawner(REAP_FD, cholder);
+        ret = ReapSpawner(REAP_EVT_FD, cholder);
         if (Done)
             break;
 
@@ -270,8 +285,13 @@ int main(int argc, char * const argv[])
 
     umask(0);
 
-    if (fcntl(REAP_FD, F_SETFD, FD_CLOEXEC) < 0) {
-        TLogger::Log(string("Can't set close-on-exec flag on REAP_FD: ") + strerror(errno));
+    if (fcntl(REAP_EVT_FD, F_SETFD, FD_CLOEXEC) < 0) {
+        TLogger::Log(string("Can't set close-on-exec flag on REAP_EVT_FD: ") + strerror(errno));
+        return EXIT_FAILURE;
+    }
+
+    if (fcntl(REAP_ACK_FD, F_SETFD, FD_CLOEXEC) < 0) {
+        TLogger::Log(string("Can't set close-on-exec flag on REAP_ACK_FD: ") + strerror(errno));
         return EXIT_FAILURE;
     }
 

@@ -1,4 +1,5 @@
 - check log size on production machine (whether daily logrotate is enough)
+- code style https://wiki.yandex-team.ru/Development/Poisk/PutevoditelRazrabotchika/CPPStyleGuide
 
 # cleanup
 - rotate subprocess stdout/stderr

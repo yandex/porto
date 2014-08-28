@@ -854,6 +854,8 @@ static void TestDaemon() {
     n = scandir(path.c_str(), &lst, NULL, alphasort);
     // . .. 0(stdin) 1(stdout) 2(stderr) 3(portod pipe) 4(log) 5(rpc socket)
     Expect(n == 8 + 1);
+
+    // TODO: check portoloop
 }
 
 int Selftest() {
