@@ -684,6 +684,11 @@ static void TestStateMachine(TPortoAPI &api, const string &name) {
 
     ExpectSuccess(api.Stop(name));
 
+    cerr << "Make sure we can remove paused container " << endl;
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.Pause(name));
+
     ExpectSuccess(api.Destroy(name));
 }
 
@@ -967,6 +972,7 @@ int Selftest() {
             TestLimits(api, "a");
             TestPermissions(api, "a");
             ExpectSuccess(api.Destroy("a"));
+
             TestLeaks(api);
         }
         TestDaemon();
@@ -975,7 +981,6 @@ int Selftest() {
             TestRecovery(api);
         }
 
-        // TODO: destroy paused container
         // TODO: try to create container with length 129
         // TODO: test recovery and keyvalue
 
