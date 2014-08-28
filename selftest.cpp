@@ -658,6 +658,9 @@ static void TestStateMachine(TPortoAPI &api, const string &name) {
     v = GetState(pid);
     Expect(v == "D");
 
+    ExpectSuccess(api.GetData(name, "state", v));
+    Expect(v == "paused");
+
     ExpectSuccess(api.Resume(name));
     v = GetState(pid);
     Expect(v == "R");
@@ -865,16 +868,14 @@ static void TestLeaks(TPortoAPI &api) {
     Expect(size == GetVmRss(pid));
 }
 
-static void TestDaemon() {
-    string pid;
-
-    cerr << "Make sure we don't have zombies" << endl;
-    FILE *f = popen("pgrep -x portod", "r");
+static string Pgrep(const string &name) {
+    FILE *f = popen(("pgrep -x " + name).c_str(), "r");
     Expect(f != nullptr);
 
     char *line = nullptr;
     size_t n;
 
+    string pid;
     int instances = 0;
     while (getline(&line, &n, f) >= 0) {
         pid.assign(line);
@@ -885,14 +886,31 @@ static void TestDaemon() {
     Expect(instances == 1);
     fclose(f);
 
-    cerr << "Make sure we don't have invalid FDs" << endl;
+    return pid;
+}
+
+static void TestDaemon() {
     struct dirent **lst;
+    size_t n;
+    string pid;
+
+    cerr << "Make sure portod doesn't have zombies" << endl;
+    pid = Pgrep("portod");
+
+    cerr << "Make sure portod doesn't have invalid FDs" << endl;
     string path = ("/proc/" + pid + "/fd");
     n = scandir(path.c_str(), &lst, NULL, alphasort);
-    // . .. 0(stdin) 1(stdout) 2(stderr) 3(portod event pipe) 4(log) 5(rpc socket) 6(portod ack pipe)
-    Expect(n == 2 + 7 + 1);
+    // . .. 0(stdin) 1(stdout) 2(stderr) 3(event pipe) 4(log) 5(rpc socket) 6(ack pipe)
+    Expect(n == 2 + 7);
 
-    // TODO: check portoloop
+    cerr << "Make sure portoloop doesn't have zombies" << endl;
+    pid = Pgrep("portoloop");
+
+    cerr << "Make sure portoloop doesn't have invalid FDs" << endl;
+    path = ("/proc/" + pid + "/fd");
+    n = scandir(path.c_str(), &lst, NULL, alphasort);
+    // . .. 0(stdin) 1(stdout) 2(stderr) 4(event pipe) 5(ack pipe)
+    Expect(n == 2 + 5);
 }
 
 static void TestRecovery(TPortoAPI &api) {
@@ -928,29 +946,39 @@ static void TestRecovery(TPortoAPI &api) {
 }
 
 int Selftest() {
-    TPortoAPI api;
 
     try {
-        TestRoot(api);
-        TestHolder(api);
-        TestEmpty(api);
-        TestStateMachine(api, "a");
+        {
+            TPortoAPI api;
+            TestRoot(api);
+            TestHolder(api);
+            TestEmpty(api);
+            TestStateMachine(api, "a");
 
-        ExpectSuccess(api.Create("a"));
-        TestExitStatus(api, "a");
-        TestStreams(api, "a");
-        TestLongRunning(api, "a");
-        TestIsolation(api, "a");
-        TestEnvironment(api, "a");
-        TestUserGroup(api, "a");
-        TestCwd(api, "a");
-        //TestRoot(api, "a");
-        TestLimits(api, "a");
-        TestPermissions(api, "a");
-        ExpectSuccess(api.Destroy("a"));
-        TestLeaks(api);
+            ExpectSuccess(api.Create("a"));
+            TestExitStatus(api, "a");
+            TestStreams(api, "a");
+            TestLongRunning(api, "a");
+            TestIsolation(api, "a");
+            TestEnvironment(api, "a");
+            TestUserGroup(api, "a");
+            TestCwd(api, "a");
+            //TestRoot(api, "a");
+            TestLimits(api, "a");
+            TestPermissions(api, "a");
+            ExpectSuccess(api.Destroy("a"));
+            TestLeaks(api);
+        }
         TestDaemon();
-        TestRecovery(api);
+        {
+            TPortoAPI api;
+            TestRecovery(api);
+        }
+
+        // TODO: destroy paused container
+        // TODO: try to create container with length 129
+        // TODO: test recovery and keyvalue
+
     } catch (string e) {
         cerr << "EXCEPTION: " << e << endl;
         return 1;
