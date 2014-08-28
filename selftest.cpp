@@ -935,9 +935,18 @@ static void TestRecovery(TPortoAPI &api) {
     string pid, v;
     string name = "a";
 
+    map<string,string> props = {
+        { "command", "sleep 1000" },
+        { "user", "bin" },
+        { "group", "daemon" },
+        { "env", "a=a;b=b" },
+    };
+
     cerr << "Make sure we don't kill containers when doing recovery" << endl;
     ExpectSuccess(api.Create(name));
-    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+
+    for (auto &pair : props)
+        ExpectSuccess(api.SetProperty(name, pair.first, pair.second));
     ExpectSuccess(api.Start(name));
 
     ExpectSuccess(api.GetData(name, "root_pid", pid));
@@ -960,9 +969,13 @@ static void TestRecovery(TPortoAPI &api) {
     Expect(TaskRunning(api, pid) == true);
     Expect(TaskZombie(api, pid) == false);
 
-    ExpectSuccess(api.Destroy(name));
+    for (auto &pair : props) {
+        string v;
+        ExpectSuccess(api.GetProperty(name, pair.first, v));
+        Expect(v == pair.second);
+    }
 
-    // TODO: check that all (add more) properties are recovered correctly
+    ExpectSuccess(api.Destroy(name));
 }
 
 int Selftest() {
