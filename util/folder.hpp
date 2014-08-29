@@ -7,11 +7,11 @@
 #include "file.hpp"
 
 class TFolder {
-    const std::string path;
+    const std::string Path;
 
 public:
-    TFolder(const std::string &path) : path(path) {}
-    TFolder(TFile file) : path(file.Path()) {}
+    TFolder(const std::string &path) : Path(path) {}
+    TFolder(TFile file) : Path(file.GetPath()) {}
 
     bool Exists();
     TError Create(mode_t mode = 0755, bool recursive = false);

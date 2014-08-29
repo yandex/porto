@@ -7,8 +7,8 @@
 #include "error.hpp"
 
 class TFile {
-    const std::string path;
-    const int mode; // currently used only by WriteStringNoAppend
+    const std::string Path;
+    const int Mode; // currently used only by WriteStringNoAppend
 
 public:
     enum EFileType {
@@ -23,9 +23,9 @@ public:
         Any
     };
 
-    TFile(const std::string &path, const int mode = 0600) : path(path), mode(mode) { };
+    TFile(const std::string &path, const int mode = 0600) : Path(path), Mode(mode) { };
 
-    std::string Path();
+    std::string GetPath();
     EFileType Type();
 
     TError Remove();

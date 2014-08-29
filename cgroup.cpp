@@ -106,7 +106,7 @@ bool TCgroup::IsRoot() const {
 
 string TCgroup::Path() {
     if (IsRoot())
-        return mount->Mountpoint();
+        return mount->GetMountpoint();
     else
         return parent->Path() + "/" + name;
 }
@@ -250,7 +250,7 @@ TError TCgroupSnapshot::Create() {
      }
 
      for (auto mount : mounts) {
-         for (auto name : mount->Flags()) {
+         for (auto name : mount->GetFlags()) {
              auto subsys = TSubsystem::Get(name);
              if (!subsys)
                  continue;

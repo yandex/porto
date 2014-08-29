@@ -16,10 +16,10 @@ extern "C" {
 using namespace std;
 
 TError TFolder::Create(mode_t mode, bool recursive) {
-    TLogger::Log("mkdir " + path);
+    TLogger::Log("mkdir " + Path);
 
     if (recursive) {
-        string copy(path);
+        string copy(Path);
         char *dup = strdup(copy.c_str());
         char *p = dirname(dup);
         TFolder f(p);
@@ -31,8 +31,8 @@ TError TFolder::Create(mode_t mode, bool recursive) {
         }
     }
 
-    if (mkdir(path.c_str(), mode) < 0)
-        return TError(EError::Unknown, errno, "mkdir(" + path + ", " + to_string(mode) + ")");
+    if (mkdir(Path.c_str(), mode) < 0)
+        return TError(EError::Unknown, errno, "mkdir(" + Path + ", " + to_string(mode) + ")");
 
     return TError::Success();
 }
@@ -58,11 +58,11 @@ TError TFolder::Remove(bool recursive) {
         }
     }
 
-    TLogger::Log("rmdir " + path);
+    TLogger::Log("rmdir " + Path);
 
-    int ret = RetryBusy(10, 100, [&]{ return rmdir(path.c_str()); });
+    int ret = RetryBusy(10, 100, [&]{ return rmdir(Path.c_str()); });
     if (ret)
-        return TError(EError::Unknown, errno, "rmdir(" + path + ")");
+        return TError(EError::Unknown, errno, "rmdir(" + Path + ")");
 
     return TError::Success();
 }
@@ -70,7 +70,7 @@ TError TFolder::Remove(bool recursive) {
 bool TFolder::Exists() {
     struct stat st;
 
-    int ret = stat(path.c_str(), &st);
+    int ret = stat(Path.c_str(), &st);
 
     if (ret == 0 && S_ISDIR(st.st_mode))
         return true;
@@ -86,9 +86,9 @@ TError TFolder::Items(const TFile::EFileType type, std::vector<std::string> &lis
     DIR *dirp;
     struct dirent dp, *res;
 
-    dirp = opendir(path.c_str());
+    dirp = opendir(Path.c_str());
     if (!dirp)
-        return TError(EError::Unknown, "Cannot open directory " + path);
+        return TError(EError::Unknown, "Cannot open directory " + Path);
 
     while (!readdir_r(dirp, &dp, &res) && res != nullptr) {
         if (string(".") == res->d_name || string("..") == res->d_name)
