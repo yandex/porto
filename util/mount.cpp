@@ -15,28 +15,28 @@ extern "C" {
 using namespace std;
 
 TError TMount::Mount(bool rdonly, bool bind, bool remount) {
-    TLogger::Log("mount " + mountpoint);
+    TLogger::Log("mount " + Mountpoint);
     int mountflags = (rdonly ? MS_RDONLY : 0) |
                     (bind ? MS_BIND : 0) |
                     (remount ? MS_REMOUNT : 0);
 
-    int ret = RetryBusy(10, 100, [&]{ return mount(device.c_str(),
-                                                   mountpoint.c_str(),
-                                                   vfstype.c_str(),
+    int ret = RetryBusy(10, 100, [&]{ return mount(Device.c_str(),
+                                                   Mountpoint.c_str(),
+                                                   Vfstype.c_str(),
                                                    mountflags,
-                                                   CommaSeparatedList(flags).c_str()); });
+                                                   CommaSeparatedList(Flags).c_str()); });
     if (ret)
-        return TError(EError::Unknown, errno, "mount(" + device + ", " + mountpoint + ", " + vfstype + ", " + to_string(mountflags) + ", " + CommaSeparatedList(flags) + ")");
+        return TError(EError::Unknown, errno, "mount(" + Device + ", " + Mountpoint + ", " + Vfstype + ", " + to_string(mountflags) + ", " + CommaSeparatedList(Flags) + ")");
 
     return TError::Success();
 }
 
 TError TMount::Umount() {
-    TLogger::Log("umount " + mountpoint);
+    TLogger::Log("umount " + Mountpoint);
 
-    int ret = RetryBusy(10, 100, [&]{ return umount(mountpoint.c_str()); });
+    int ret = RetryBusy(10, 100, [&]{ return umount(Mountpoint.c_str()); });
     if (ret)
-        return TError(EError::Unknown, errno, "umount(" + mountpoint + ")");
+        return TError(EError::Unknown, errno, "umount(" + Mountpoint + ")");
 
     return TError::Success();
 }

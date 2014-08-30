@@ -8,35 +8,30 @@
 
 using namespace std;
 
-static unordered_map<string, shared_ptr<TSubsystem>> subsystems;
+shared_ptr<TMemorySubsystem> MemorySubsystem(new TMemorySubsystem);
+shared_ptr<TFreezerSubsystem> FreezerSubsystem(new TFreezerSubsystem);
+shared_ptr<TCpuSubsystem> CpuSubsystem(new TCpuSubsystem);
+shared_ptr<TCpuacctSubsystem> CpuacctSubsystem(new TCpuacctSubsystem);
 
 // TSubsystem
 shared_ptr<TSubsystem> TSubsystem::Get(std::string name) {
-    if (subsystems.find(name) == subsystems.end()) {
-        if (name == "memory")
-            subsystems[name] = make_shared<TMemorySubsystem>();
-        else if (name == "freezer")
-            subsystems[name] = make_shared<TFreezerSubsystem>();
-        else if (name == "cpu")
-            subsystems[name] = make_shared<TCpuSubsystem>();
-        else
-            subsystems[name] = make_shared<TSubsystem>(name);
-    }
+    if (name == "memory")
+        return MemorySubsystem;
+    else if (name == "freezer")
+        return FreezerSubsystem;
+    else if (name == "cpu")
+        return CpuSubsystem;
+    else if (name == "cpuacct")
+        return CpuacctSubsystem;
 
-    return subsystems[name];
+    return nullptr;
 }
 
-string TSubsystem::Name() {
+const string& TSubsystem::Name() const {
     return name;
 }
 
 // Memory
-shared_ptr<TMemorySubsystem> TSubsystem::Memory() {
-    return static_pointer_cast<TMemorySubsystem>(Get("memory"));
-}
-
-#include <iostream>
-
 TError TMemorySubsystem::Usage(shared_ptr<TCgroup> &cg, uint64_t &value) {
     string s;
     TError error = cg->GetKnobValue("memory.usage_in_bytes", s);
@@ -50,10 +45,6 @@ TError TMemorySubsystem::UseHierarchy(TCgroup &cg) {
 }
 
 // Freezer
-shared_ptr<TFreezerSubsystem> TSubsystem::Freezer() {
-    return static_pointer_cast<TFreezerSubsystem>(Get("freezer"));
-}
-
 TError TFreezerSubsystem::WaitState(TCgroup &cg, const std::string &state) {
 
     int ret = RetryFailed(FREEZER_WAIT_TIMEOUT_S * 10, 100, [&]{
@@ -90,15 +81,9 @@ TError TFreezerSubsystem::Unfreeze(TCgroup &cg) {
 }
 
 // Cpu
-shared_ptr<TCpuSubsystem> TSubsystem::Cpu() {
-    return static_pointer_cast<TCpuSubsystem>(Get("cpu"));
-}
+
 
 // Cpuacct
-shared_ptr<TCpuacctSubsystem> TSubsystem::Cpuacct() {
-    return static_pointer_cast<TCpuacctSubsystem>(Get("cpuacct"));
-}
-
 TError TCpuacctSubsystem::Usage(shared_ptr<TCgroup> &cg, uint64_t &value) {
     string s;
     TError error = cg->GetKnobValue("cpuacct.usage", s);

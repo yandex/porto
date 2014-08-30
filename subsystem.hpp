@@ -5,28 +5,29 @@
 #include <string>
 #include <memory>
 
-class TCgroup;
-class TMemorySubsystem;
-class TFreezerSubsystem;
-class TCpuSubsystem;
-class TCpuacctSubsystem;
+#include "cgroup.hpp"
 
-class TSubsystem {
+class TCgroup;
+
+class TSubsystem : public std::enable_shared_from_this<TSubsystem> {
     std::string name;
+    std::shared_ptr<TCgroup> root_cgroup;
+
+protected:
+    TSubsystem(const std::string &name) : name(name) {}
 
 public:
     static std::shared_ptr<TSubsystem> Get(std::string name);
+    const std::string& Name() const;
 
-    static std::shared_ptr<TMemorySubsystem> Memory();
-    static std::shared_ptr<TFreezerSubsystem> Freezer();
-    static std::shared_ptr<TCpuSubsystem> Cpu();
-    static std::shared_ptr<TCpuacctSubsystem> Cpuacct();
-    
-    TSubsystem(const std::string &name) : name(name) { }
-    std::string Name();
+    TSubsystem(const TSubsystem&) = delete;
 
-    friend bool operator==(const TSubsystem& c1, const TSubsystem& c2) {
-        return c1.name == c2.name;
+    std::shared_ptr<TCgroup> GetRootCgroup(std::shared_ptr<TMount> mount=nullptr) {
+        if (!root_cgroup) {
+            TCgroup *root = new TCgroup({shared_from_this()}, mount);
+            root_cgroup = std::shared_ptr<TCgroup>(root);
+        }
+        return root_cgroup;
     }
 };
 
@@ -56,5 +57,10 @@ public:
     TCpuacctSubsystem() : TSubsystem("cpuacct") {}
     TError Usage(std::shared_ptr<TCgroup> &cg, uint64_t &value);
 };
+
+extern std::shared_ptr<TMemorySubsystem> MemorySubsystem;
+extern std::shared_ptr<TFreezerSubsystem> FreezerSubsystem;
+extern std::shared_ptr<TCpuSubsystem> CpuSubsystem;
+extern std::shared_ptr<TCpuacctSubsystem> CpuacctSubsystem;
 
 #endif

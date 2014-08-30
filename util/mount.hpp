@@ -9,37 +9,37 @@
 #include "error.hpp"
 
 class TMount {
-    std::string device;
-    std::string mountpoint;
-    std::string vfstype;
-    std::set<std::string> flags;
+    std::string Device;
+    std::string Mountpoint;
+    std::string Vfstype;
+    std::set<std::string> Flags;
 
 public:
     TMount(const std::string &device, const std::string &mountpoint, const std::string &vfstype,
            std::set<std::string> flags) :
-        device (device), mountpoint (mountpoint), vfstype (vfstype),
-        flags (flags) {}
+        Device(device), Mountpoint(mountpoint), Vfstype(vfstype),
+        Flags(flags) {}
 
     friend bool operator==(const TMount& m1, const TMount& m2) {
-        return m1.device == m2.device &&
-            m1.mountpoint == m2.mountpoint &&
-            m1.vfstype == m2.vfstype;
+        return m1.Device == m2.Device &&
+            m1.Mountpoint == m2.Mountpoint &&
+            m1.Vfstype == m2.Vfstype;
     }
 
-    const std::string Mountpoint() {
-        return mountpoint;
+    const std::string GetMountpoint() {
+        return Mountpoint;
     }
 
     const std::string VFSType() {
-        return vfstype;
+        return Vfstype;
     }
 
     const std::string ParentFolder() {
-        return mountpoint.substr(0, mountpoint.find_last_of("/"));
+        return Mountpoint.substr(0, Mountpoint.find_last_of("/"));
     }
 
-    std::set<std::string> const Flags() {
-        return flags;
+    std::set<std::string> const GetFlags() {
+        return Flags;
     }
 
     TError Mount(bool rdonly = false, bool bind = false, bool remount = false);

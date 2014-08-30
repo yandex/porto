@@ -19,7 +19,7 @@ TKeyValueStorage::TKeyValueStorage() :
 }
 
 string TKeyValueStorage::Path(const string &name) {
-    return tmpfs.Mountpoint() + "/" + name;
+    return tmpfs.GetMountpoint() + "/" + name;
 }
 
 void TKeyValueStorage::Merge(kv::TNode &node, kv::TNode &next) {
@@ -120,10 +120,10 @@ TError TKeyValueStorage::MountTmpfs() {
     }
 
     for (auto m : mounts)
-        if (m->Mountpoint() == tmpfs.Mountpoint())
+        if (m->GetMountpoint() == tmpfs.GetMountpoint())
             return TError::Success();
 
-    TFolder mnt(tmpfs.Mountpoint());
+    TFolder mnt(tmpfs.GetMountpoint());
     if (!mnt.Exists())
         mnt.Create();
 
@@ -133,7 +133,7 @@ TError TKeyValueStorage::MountTmpfs() {
 }
 
 TError TKeyValueStorage::ListNodes(std::vector<std::string> &list) {
-    TFolder f(tmpfs.Mountpoint());
+    TFolder f(tmpfs.GetMountpoint());
     return f.Items(TFile::Regular, list);
 }
 

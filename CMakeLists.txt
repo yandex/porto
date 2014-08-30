@@ -4,6 +4,8 @@ PROJECT(yandex-porto)
 
 set(CMAKE_CXX_FLAGS "-O2 -Wall -std=c++11 -g")
 set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc")
+#set(CMAKE_CXX_FLAGS "-O0 -Wall -std=c++11 -g -fprofile-arcs -ftest-coverage")
+#set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc -fprofile-arcs -ftest-coverage")
 
 if(EXISTS "/usr/bin/g++-4.7")
     set(CMAKE_CXX_COMPILER "g++-4.7")

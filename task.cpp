@@ -8,6 +8,7 @@
 #include "cgroup.hpp"
 #include "log.hpp"
 #include "util/string.hpp"
+#include "util/unix.hpp"
 
 extern "C" {
 #include <string.h>
@@ -128,6 +129,7 @@ static int child_fn(void *arg) {
 
 int TTask::ChildCallback() {
     close(rfd);
+    ResetAllSignalHandlers();
 
     /*
      * ReportResultAndExit(fd, -errno) means we failed while preparing
@@ -155,8 +157,6 @@ int TTask::ChildCallback() {
 
     // move to target cgroups
     for (auto cg : leaf_cgroups) {
-        Syslog(string("attach ") + to_string(getpid()));
-
         auto error = cg->Attach(getpid());
         if (error) {
             Syslog(string("cgroup attach: ") + error.GetMsg());
@@ -312,7 +312,8 @@ int TTask::ChildCallback() {
     }
 
 #ifdef __DEBUG__
-    for (int i = 0; i < result.we_wordc; i++)
+    Syslog(env.command.c_str());
+    for (unsigned i = 0; i < result.we_wordc; i++)
         Syslog(result.we_wordv[i]);
 #endif
 
@@ -350,36 +351,54 @@ TError TTask::Start() {
     rfd = pfd[0];
     wfd = pfd[1];
 
-    char stack[8192];
-    pid_t pid = clone(child_fn, stack + sizeof(stack),
-                      SIGCHLD | CLONE_NEWNS | CLONE_NEWPID | CLONE_NEWUTS, this);
-    if (pid < 0) {
+    pid_t fork_pid = fork();
+    if (fork_pid < 0) {
         TError error(EError::Unknown, errno, "fork()");
         TLogger::LogError(error, "Can't spawn child");
         return error;
+    } else if (fork_pid == 0) {
+        char stack[8192];
+
+        (void)setsid();
+
+        pid_t clone_pid = clone(child_fn, stack + sizeof(stack),
+                                SIGCHLD | CLONE_NEWNS | CLONE_NEWPID | CLONE_NEWUTS,
+                                this);
+        if (write(wfd, &clone_pid, sizeof(clone_pid))) {}
+        if (clone_pid < 0) {
+            TError error(EError::Unknown, errno, "clone()");
+            TLogger::LogError(error, "Can't spawn child");
+            return error;
+        }
+        exit(EXIT_SUCCESS);
     }
+    (void)waitpid(fork_pid, NULL, 0);
 
     close(wfd);
-    int n = read(rfd, &ret, sizeof(ret));
+    int n = read(rfd, &pid, sizeof(pid));
+    if (n <= 0) {
+        TError error(EError::Unknown, errno, "read(rfd)");
+        TLogger::LogError(error, "Can't read pid from the child");
+        return error;
+    }
+
+    n = read(rfd, &ret, sizeof(ret));
     close(rfd);
     if (n < 0) {
+        pid = 0;
         TError error(EError::Unknown, errno, "read(rfd)");
         TLogger::LogError(error, "Can't read result from the child");
         return error;
     } else if (n == 0) {
         state = Started;
-        this->pid = pid;
         return TError::Success();
     } else {
-        this->pid = pid;
-        TError error = Reap(true);
-        if (error)
-            TLogger::LogError(error, "Couldn't reap child process");
-        this->pid = 0;
+        pid = 0;
 
         exitStatus.error = ret;
         exitStatus.status = -1;
 
+        TError error;
         if (ret < 0)
             error = TError(EError::Unknown, string("child prepare: ") + strerror(-ret));
         else
@@ -394,49 +413,11 @@ int TTask::GetPid() {
 }
 
 bool TTask::IsRunning() {
-    if (state == Started)
-        (void)Reap(false);
-
     return state == Started;
 }
 
 TExitStatus TTask::GetExitStatus() {
-    if (state == Started)
-        (void)Reap(false);
-
     return exitStatus;
-}
-
-bool TTask::CanReap() {
-    // May give false-positive when task is running, but we are not its
-    // parent
-    return kill(pid, 0) == 0;
-}
-
-TError TTask::Reap(bool wait) {
-    int status;
-    pid_t ret;
-
-    ret = waitpid(pid, &status, wait ? 0 : WNOHANG);
-    TLogger::Log("reap(" + to_string(pid) + ") = " + to_string(ret));
-    if (ret == pid) {
-        DeliverExitStatus(status);
-    } else if (ret < 0) {
-        if (kill(pid, 0) == 0) {
-            // process is still running but we can't use wait() on it
-            // (probably from the previous session) -> state should
-            // be changed via DeliverExitStatus
-
-            TLogger::Log(to_string(pid) + " is still running, will wait for status delivery" );
-            return TError::Success();
-        }
-
-        exitStatus.error = -1;
-        state = Stopped;
-        return TError(EError::Unknown, errno, "waitpid()");
-    }
-
-    return TError::Success();
 }
 
 void TTask::DeliverExitStatus(int status) {
@@ -448,6 +429,8 @@ void TTask::DeliverExitStatus(int status) {
 void TTask::Kill(int signal) {
     if (!pid)
         throw "Tried to kill invalid process!";
+
+    TLogger::Log("kill " + to_string(pid));
 
     int ret = kill(pid, signal);
     if (ret != 0) {
@@ -532,11 +515,9 @@ TError TTask::ValidateCgroups() {
 
         bool valid = false;
         for (auto cg : leaf_cgroups) {
-            if (cg->HasSubsystem(subsys)) {
-                if (cg->Relpath() == path) {
-                    valid = true;
-                    break;
-                }
+            if (cg->Relpath() == path) {
+                valid = true;
+                break;
             }
         }
 

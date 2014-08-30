@@ -1,5 +1,6 @@
 #include <map>
 
+#include "subsystem.hpp"
 #include "property.hpp"
 #include "log.hpp"
 #include "cgroup.hpp"
@@ -29,8 +30,8 @@ static TError ValidGroup(string group) {
 static TError ValidMemGuarantee(string str) {
     uint64_t val;
 
-    auto memroot = TCgroupRegistry::GetRoot(TSubsystem::Memory());
-    if (memroot->HasKnob("memory.low_limit_in_bytes"))
+    auto memroot = MemorySubsystem->GetRootCgroup();
+    if (!memroot->HasKnob("memory.low_limit_in_bytes"))
         return TError(EError::NotSupported, "invalid kernel");
 
 

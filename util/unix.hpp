@@ -8,5 +8,6 @@ int RetryFailed(int times, int timeo_ms, std::function<int()> handler);
 void SleepWhile(int timeo_ms, std::function<bool()> handler);
 int GetPid();
 int RegisterSignal(int signum, void (*handler)(int));
+void ResetAllSignalHandlers(void);
 
 #endif

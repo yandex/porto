@@ -5,6 +5,7 @@
 
 #include "libporto.hpp"
 #include "util/string.hpp"
+#include "util/unix.hpp"
 
 using namespace std;
 
@@ -503,6 +504,9 @@ int main(int argc, char *argv[])
         cout << GIT_TAG << " " << GIT_REVISION <<endl;
         return EXIT_FAILURE;
     }
+
+    // in case client closes pipe we are writing to in the protobuf code
+    (void)RegisterSignal(SIGPIPE, SIG_IGN);
 
     try {
         // porto <command> <arg2> <arg2>

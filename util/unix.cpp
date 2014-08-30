@@ -63,3 +63,18 @@ int RegisterSignal(int signum, void (*handler)(int)) {
         return -1;
     return 0;
 }
+
+void ResetAllSignalHandlers(void) {
+    int sig;
+
+    for (sig = 1; sig < _NSIG; sig++) {
+        struct sigaction sa = { 0 };
+        sa.sa_handler = SIG_DFL;
+        sa.sa_flags = SA_RESTART;
+
+        if (sig == SIGKILL || sig == SIGSTOP)
+            continue;
+
+        (void)sigaction(sig, &sa, NULL);
+    }
+}

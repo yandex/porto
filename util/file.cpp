@@ -15,14 +15,14 @@ extern "C" {
 
 using namespace std;
 
-string TFile::Path() {
-    return path;
+string TFile::GetPath() {
+    return Path;
 }
 
 TFile::EFileType TFile::Type() {
     struct stat st;
 
-    if (lstat(path.c_str(), &st))
+    if (lstat(Path.c_str(), &st))
         return Unknown;
 
     if (S_ISREG(st.st_mode))
@@ -44,20 +44,20 @@ TFile::EFileType TFile::Type() {
 }
 
 TError TFile::Remove() {
-    TLogger::Log("unlink " + path);
+    TLogger::Log("unlink " + Path);
 
-    int ret = RetryBusy(10, 100, [&]{ return unlink(path.c_str()); });
+    int ret = RetryBusy(10, 100, [&]{ return unlink(Path.c_str()); });
 
     if (ret && (errno != ENOENT))
-        return TError(EError::Unknown, errno, "unlink(" + path + ")");
+        return TError(EError::Unknown, errno, "unlink(" + Path + ")");
 
     return TError::Success();
 }
 
 TError TFile::AsString(string &value) {
-    ifstream in(Path());
+    ifstream in(Path);
     if (!in.is_open())
-        return TError(EError::Unknown, string(__func__) + ": Cannot open " + Path());
+        return TError(EError::Unknown, string(__func__) + ": Cannot open " + Path);
 
     try {
         in.seekg(0, std::ios::end);
@@ -83,11 +83,11 @@ TError TFile::AsInt(int &value) {
 }
 
 TError TFile::AsLines(vector<string> &value) {
-    ifstream in(path);
+    ifstream in(Path);
     string line;
 
     if (!in.is_open())
-        return TError(EError::Unknown, string(__func__) + ": Cannot open " + path);
+        return TError(EError::Unknown, string(__func__) + ": Cannot open " + Path);
 
     while (getline(in, line))
         value.push_back(line);
@@ -96,9 +96,9 @@ TError TFile::AsLines(vector<string> &value) {
 }
 
 TError TFile::LastStrings(const size_t size, std::string &value) {
-    ifstream f(path);
+    ifstream f(Path);
     if (!f.is_open())
-        return TError(EError::Unknown, string(__func__) + ": Cannot open " + path);
+        return TError(EError::Unknown, string(__func__) + ": Cannot open " + Path);
 
     try {
         size_t end = f.seekg(0, ios_base::end).tellg();
@@ -134,9 +134,9 @@ TError TFile::ReadLink(std::string &value) {
     char buf[PATH_MAX];
     ssize_t len;
 
-    len = readlink(path.c_str(), buf, sizeof(buf) - 1);
+    len = readlink(Path.c_str(), buf, sizeof(buf) - 1);
     if (len < 0)
-        return TError(EError::Unknown, errno, "readlink(" + path + ")");
+        return TError(EError::Unknown, errno, "readlink(" + Path + ")");
 
     buf[len] = '\0';
 
@@ -147,9 +147,9 @@ TError TFile::ReadLink(std::string &value) {
 TError TFile::WriteStringNoAppend(const string &str) {
     TError error = TError::Success();
 
-    int fd = open(path.c_str(), O_CREAT | O_TRUNC | O_WRONLY, mode);
+    int fd = open(Path.c_str(), O_CREAT | O_TRUNC | O_WRONLY, Mode);
     if (!fd)
-        return TError(EError::Unknown, errno, "open(" + path + ")");
+        return TError(EError::Unknown, errno, "open(" + Path + ")");
 
     ssize_t ret = write(fd, str.c_str(), str.length());
     if (ret != (ssize_t)str.length())
@@ -161,15 +161,15 @@ TError TFile::WriteStringNoAppend(const string &str) {
 }
 
 TError TFile::AppendString(const string &str) {
-    ofstream out(path, ofstream::app);
+    ofstream out(Path, ofstream::app);
     if (out.is_open()) {
         out << str;
         return TError::Success();
     } else {
-        return TError(EError::Unknown, errno, "append(" + path + ", " + str + ")");
+        return TError(EError::Unknown, errno, "append(" + Path + ", " + str + ")");
     }
 }
 
 bool TFile::Exists() {
-    return access(path.c_str(), F_OK) == 0;
+    return access(Path.c_str(), F_OK) == 0;
 }

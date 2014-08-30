@@ -1,5 +1,6 @@
 #include <iostream>
 #include <vector>
+#include <map>
 
 #include "porto.hpp"
 #include "util/unix.hpp"
@@ -12,6 +13,7 @@ extern "C" {
 #include <sys/wait.h>
 #include <sys/prctl.h>
 #include <fcntl.h>
+#include <poll.h>
 }
 
 using namespace std;
@@ -30,8 +32,8 @@ static basic_ostream<char> &Log() {
     return cerr;
 }
 
-static void SendPidStatus(int fd, int pid, int status) {
-    Log() << "Deliver " << pid << " status " << status << endl;
+static void SendPidStatus(int fd, int pid, int status, size_t queued) {
+    Log() << "Deliver " << pid << " status " << status << " (" + to_string(queued) + " queued)" << endl;
 
     if (write(fd, &pid, sizeof(pid)) < 0)
         Log() << "write(pid): " << strerror(errno) << endl;
@@ -53,10 +55,26 @@ static void DoUpdate(int signum)
     NeedUpdate = true;
 }
 
-static int SpawnPortod() {
-    int pfd[2];
+static void ReceiveAcks(int fd, map<int,int> &PidToStatus) {
+    int pid;
+
+    while (read(fd, &pid, sizeof(pid)) == sizeof(pid)) {
+        Log() << "Got acknowledge for " << pid << endl;
+        PidToStatus.erase(pid);
+    }
+}
+
+static int SpawnPortod(map<int,int> &PidToStatus) {
+    int evtfd[2];
+    int ackfd[2];
     int ret = EXIT_FAILURE;
-    if (pipe(pfd) < 0) {
+
+    if (pipe(evtfd) < 0) {
+        Log() << "pipe(): " << strerror(errno) << endl;
+        return EXIT_FAILURE;
+    }
+
+    if (pipe2(ackfd, O_NONBLOCK) < 0) {
         Log() << "pipe(): " << strerror(errno) << endl;
         return EXIT_FAILURE;
     }
@@ -67,18 +85,27 @@ static int SpawnPortod() {
         ret = EXIT_FAILURE;
         goto exit;
     } else if (portod_pid == 0) {
-        close(pfd[1]);
+        close(evtfd[1]);
+        close(ackfd[0]);
 
         ret = execlp("portod", "portod", nullptr);
         Log() << "execlp(): " << strerror(errno) << endl;
         goto exit;
     }
 
-    close(pfd[0]);
+    close(evtfd[0]);
+    close(ackfd[1]);
 
     Log() << "Spawned portod " << portod_pid << endl;
 
+    for (auto &pair : PidToStatus)
+        SendPidStatus(evtfd[1], pair.first, pair.second, PidToStatus.size());
+
     while (!Done) {
+        int pid;
+
+        ReceiveAcks(ackfd[0], PidToStatus);
+
         if (NeedUpdate) {
             Log() << "Updating" << endl;
 
@@ -87,15 +114,17 @@ static int SpawnPortod() {
             if (waitpid(portod_pid, NULL, 0) != portod_pid)
                 Log() << "Can't wait for portod exit status: " << strerror(errno) << endl;
 
-            close(pfd[1]);
+            close(evtfd[1]);
+            close(ackfd[0]);
 
             execlp(program_invocation_name, program_invocation_short_name, nullptr);
             Log() << "Can't execlp(" << program_invocation_name << ", " << program_invocation_short_name << ", NULL)" << endl;
-            return EXIT_FAILURE;
+            ret = EXIT_FAILURE;
+            break;
         }
 
         int status;
-        pid_t pid = wait(&status);
+        pid = wait(&status);
         if (errno == EINTR) {
             Log() << "wait(): " << strerror(errno) << endl;
             continue;
@@ -106,12 +135,18 @@ static int SpawnPortod() {
             break;
         }
 
-        SendPidStatus(pfd[1], pid, status);
+        SendPidStatus(evtfd[1], pid, status, PidToStatus.size());
+        PidToStatus[pid] = status;
     }
 
+    ReceiveAcks(ackfd[0], PidToStatus);
+
 exit:
-    close(pfd[0]);
-    close(pfd[1]);
+    close(evtfd[0]);
+    close(evtfd[1]);
+
+    close(ackfd[0]);
+    close(ackfd[1]);
 
     return ret;
 }
@@ -145,8 +180,10 @@ int main(int argc, char * const argv[])
     }
 
     int ret = EXIT_SUCCESS;
+    map<int,int> PidToStatus;
+
     while (!Done) {
-        ret = SpawnPortod();
+        ret = SpawnPortod(PidToStatus);
         Log() << "Returned " << ret << endl;
         if (!Done && ret != EXIT_SUCCESS)
             usleep(1000000);

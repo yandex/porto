@@ -4,6 +4,7 @@
 #include <csignal>
 
 #include "cgroup.hpp"
+#include "subsystem.hpp"
 #include "task.hpp"
 #include "log.hpp"
 #include "util/string.hpp"
@@ -12,27 +13,48 @@
 using namespace std;
 
 // TCgroup
-TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems) :
-    name("/"), parent(shared_ptr<TCgroup>(nullptr)), subsystems(subsystems) {
+TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems,
+                 const std::shared_ptr<TMount> m) :
+    name("/"), parent(shared_ptr<TCgroup>(nullptr)) {
 
-    set<string> flags;
+    if (m)
+        mount = m;
+    else {
+        set<string> flags;
 
-    for (auto c : subsystems)
-        flags.insert(c->Name());
+        for (auto c : subsystems)
+            flags.insert(c->Name());
 
-    mount = make_shared<TMount>("cgroup", tmpfs + "/" +
-                                CommaSeparatedList(flags),
-                                "cgroup", flags);
+        mount = make_shared<TMount>("cgroup", tmpfs + "/" +
+                                    CommaSeparatedList(flags),
+                                    "cgroup", flags);
+    }
 }
 
 TCgroup::~TCgroup() {
-    if (need_cleanup)
-        Remove();
+    Remove();
 }
 
-TError TCgroup::FindChildren(std::vector<std::shared_ptr<TCgroup>> cglist) {
+shared_ptr<TCgroup> TCgroup::GetChild(const std::string& name) {
+    vector<weak_ptr<TCgroup>>::iterator iter;
+    for (iter = children.begin(); iter != children.end();) {
+        if (auto child = iter->lock()) {
+            if (child->name == name)
+                return child;
+        } else {
+            iter = children.erase(iter);
+            continue;
+        }
+        iter++;
+    }
+
+    auto child = make_shared<TCgroup>(name, shared_from_this());
+    children.push_back(weak_ptr<TCgroup>(child));
+    return child;
+}
+
+TError TCgroup::FindChildren(std::vector<std::shared_ptr<TCgroup>> &cglist) {
     TFolder f(Path());
-    auto self = TCgroupRegistry::Get(*this);
     vector<string> list;
 
     // Ignore non-porto subtrees
@@ -44,15 +66,14 @@ TError TCgroup::FindChildren(std::vector<std::shared_ptr<TCgroup>> cglist) {
         return error;
 
     for (auto s : list) {
-        auto cg = TCgroupRegistry::Get(TCgroup(s, self));
+        auto cg = GetChild(s);
 
-        children.push_back(weak_ptr<TCgroup>(cg));
         TError error = cg->FindChildren(cglist);
         if (error)
             return error;
     }
 
-    cglist.push_back(self);
+    cglist.push_back(shared_from_this());
 
     return TError::Success();
 }
@@ -85,7 +106,7 @@ bool TCgroup::IsRoot() const {
 
 string TCgroup::Path() {
     if (IsRoot())
-        return mount->Mountpoint();
+        return mount->GetMountpoint();
     else
         return parent->Path() + "/" + name;
 }
@@ -143,14 +164,6 @@ TError TCgroup::Create() {
             return error;
     }
 
-    auto memsubsys = TSubsystem::Memory();
-    if (HasSubsystem(memsubsys->Name())) {
-        TError error = memsubsys->UseHierarchy(*this);
-        TLogger::LogError(error, "Can't set use_hierarchy for " + Relpath());
-        if (error)
-            return error;
-    }
-
     return TError::Success();
 }
 
@@ -166,8 +179,6 @@ TError TCgroup::Remove() {
         // but to kill it with SIGKILL
         int ret = RetryFailed(CGROUP_REMOVE_TIMEOUT_S * 10, 100,
                               [&]{ Kill(SIGKILL);
-                                   if (HasSubsystem(TSubsystem::Freezer()->Name()))
-                                       (void)TSubsystem::Freezer()->Unfreeze(*this);
                                    return !IsEmpty(); });
 
         if (ret)
@@ -227,89 +238,33 @@ TError TCgroup::Attach(int pid) {
     return TError::Success();
 }
 
-bool TCgroup::HasSubsystem(const string &name) {
-    if (!IsRoot())
-        return parent->HasSubsystem(name);
-    else {
-        for (auto c : subsystems)
-            if (c->Name() == name)
-                return true;
-        return false;
-    }
-}
-
-bool operator==(const TCgroup& c1, const TCgroup& c2) {
-    if (c1.name != c2.name)
-        return false;
-    if (c1.parent != c2.parent)
-        return false;
-    if (!c1.parent && !c2.parent)
-        return c1.subsystems == c2.subsystems;
-    return true;
-}
-
 // TCgroupSnapshot
 TError TCgroupSnapshot::Create() {
     TMountSnapshot ms;
 
-    set<shared_ptr<TMount>> mounts;
-    TError error = ms.Mounts(mounts);
-    if (error) {
-        TLogger::LogError(error, "Can't create mount snapshot");
-        return error;
-    }
+     set<shared_ptr<TMount>> mounts;
+     TError error = ms.Mounts(mounts);
+     if (error) {
+         TLogger::LogError(error, "Can't create mount snapshot");
+         return error;
+     }
 
-    const static set<string> supported_subsystems =
-        {"cpuset", "cpu", "cpuacct", "memory",
-         "devices", "freezer", "net_cls", "net_prio", "blkio",
-         "perf_event", "hugetlb", "name=systemd"};
+     for (auto mount : mounts) {
+         for (auto name : mount->GetFlags()) {
+             auto subsys = TSubsystem::Get(name);
+             if (!subsys)
+                 continue;
 
-    for (auto mount : mounts) {
-        set<string> flags = mount->Flags();
-        set<string> cs;
+             auto root = subsys->GetRootCgroup(mount);
+             cgroups.push_back(root);
 
-        set_intersection(flags.begin(), flags.end(),
-                         supported_subsystems.begin(),
-                         supported_subsystems.end(),
-                         inserter(cs, cs.begin()));
-
-        if (cs.empty())
-            continue;
-
-        string name = CommaSeparatedList(cs);
-
-        vector<shared_ptr<TSubsystem>> cg_controllers;
-        for (auto c : cs) {
-            subsystems[c] = TSubsystem::Get(name);
-            cg_controllers.push_back(subsystems[c]);
-        }
-
-        auto root = TCgroupRegistry::GetRoot(mount, cg_controllers);
-        cgroups.push_back(root);
-
-        TError error = root->FindChildren(cgroups);
-        if (error) {
-            TLogger::LogError(error, "Can't find children for " + root->Relpath());
-            return error;
-        }
-    }
+             TError error = root->FindChildren(cgroups);
+             if (error) {
+                 TLogger::LogError(error, "Can't find children for " + root->Relpath());
+                 return error;
+             }
+         }
+     }
 
     return TError::Success();
-}
-
-//TCgroupRegistry
-shared_ptr<TCgroup> TCgroupRegistry::Get(const TCgroup &item) {
-    return TCgroupRegistry::GetInstance().GetItem(item);
-}
-
-shared_ptr<TCgroup> TCgroupRegistry::Get(const string &name, const shared_ptr<TCgroup> &parent) {
-    return TCgroupRegistry::Get(TCgroup(name, parent));
-}
-
-shared_ptr<TCgroup> TCgroupRegistry::GetRoot(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems) {
-    return TCgroupRegistry::Get(TCgroup(mount, subsystems));
-}
-
-shared_ptr<TCgroup> TCgroupRegistry::GetRoot(const shared_ptr<TSubsystem> subsystem) {
-    return TCgroupRegistry::Get(TCgroup({subsystem}));
 }

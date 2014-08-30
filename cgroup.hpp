@@ -4,42 +4,36 @@
 #include <string>
 #include <unordered_map>
 #include <list>
+#include <memory>
 
 #include "porto.hpp"
 #include "error.hpp"
-#include "subsystem.hpp"
 #include "util/mount.hpp"
 #include "util/folder.hpp"
 
-class TCgroupRegistry;
+class TSubsystem;
 
-class TCgroup {
+class TCgroup : public std::enable_shared_from_this<TCgroup> {
     const std::string name;
     const std::shared_ptr<TCgroup> parent;
     std::vector<std::weak_ptr<TCgroup>> children;
 
     std::shared_ptr<TMount> mount;
-    std::vector<std::shared_ptr<TSubsystem>> subsystems;
 
     std::string tmpfs = "/sys/fs/cgroup";
     mode_t mode = 0755;
+    TCgroup(const TCgroup &) = delete;
+    TCgroup &operator=(const TCgroup &) = delete;
 
-    bool need_cleanup = false;
-
-    friend TCgroupRegistry;
-    TCgroup(const std::string &name, const std::shared_ptr<TCgroup> parent) :
-        name(name), parent(parent) { }
-    TCgroup(const std::shared_ptr<TMount> mount, const std::vector<std::shared_ptr<TSubsystem>> subsystems) :
-        name("/"), parent(std::shared_ptr<TCgroup>(nullptr)), mount(mount), subsystems(subsystems) { }
-
-    TCgroup(const std::vector<std::shared_ptr<TSubsystem>> controller);
-    
 public:
+    TCgroup(const std::vector<std::shared_ptr<TSubsystem>> controller,
+            std::shared_ptr<TMount> mount = nullptr);
+    TCgroup(const std::string &name, std::shared_ptr<TCgroup> parent) :
+        name(name), parent(parent) {}
+
     ~TCgroup();
 
-    void SetNeedCleanup() {
-        need_cleanup = true;
-    }
+    std::shared_ptr<TCgroup> GetChild(const std::string& name);
 
     bool IsRoot() const;
 
@@ -51,7 +45,7 @@ public:
 
     TError Kill(int signal);
 
-    TError FindChildren(std::vector<std::shared_ptr<TCgroup>> cgroups);
+    TError FindChildren(std::vector<std::shared_ptr<TCgroup>> &cgroups);
 
     TError GetProcesses(std::vector<pid_t> &processes);
     TError GetTasks(std::vector<pid_t> &tasks);
@@ -63,9 +57,6 @@ public:
     TError GetKnobValue(const std::string &knob, std::string &value);
     TError GetKnobValueAsLines(const std::string &knob, std::vector<std::string> &lines);
     TError SetKnobValue(const std::string &knob, const std::string &value, bool append = false);
-    bool HasSubsystem(const std::string &name);
-
-    friend bool operator==(const TCgroup& c1, const TCgroup& c2);
 };
 
 class TCgroupSnapshot {
@@ -73,46 +64,6 @@ class TCgroupSnapshot {
     std::unordered_map<std::string, std::shared_ptr<TSubsystem>> subsystems; // can be net_cls _or_ net_prio
 public:
     TError Create();
-};
-
-class TCgroupRegistry {
-    std::list<std::weak_ptr<TCgroup>> items;
-
-    TCgroupRegistry() {};
-    TCgroupRegistry(TCgroupRegistry const&) = delete;
-    void operator=(TCgroupRegistry const&) = delete;
-
-    static TCgroupRegistry &GetInstance() {
-        static TCgroupRegistry instance;
-        return instance;
-    }
-
-    std::shared_ptr<TCgroup> GetItem(const TCgroup &item) {
-        items.remove_if([] (std::weak_ptr<TCgroup> i) {
-                return i.expired();
-            });
-
-        for (auto i : items) {
-            if (auto il = i.lock()) {
-                if (item == *il)
-                    return il;
-            }
-        }
-
-        auto n = std::make_shared<TCgroup>(item);
-        items.push_back(n);
-        n->SetNeedCleanup();
-
-        return n;
-    }
-
-public:
-    static std::shared_ptr<TCgroup> Get(const TCgroup &item);
-    static std::shared_ptr<TCgroup> Get(const std::string &name,
-                                        const std::shared_ptr<TCgroup> &parent);
-    static std::shared_ptr<TCgroup> GetRoot(const std::shared_ptr<TMount> mount,
-                                            const std::vector<std::shared_ptr<TSubsystem>> subsystems);
-    static std::shared_ptr<TCgroup> GetRoot(const std::shared_ptr<TSubsystem> subsystem);
 };
 
 #endif
