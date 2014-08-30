@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <sstream>
 #include <algorithm>
+#include <sys/signal.h>
 
 #include "libporto.hpp"
 #include "util/string.hpp"
