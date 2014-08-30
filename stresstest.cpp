@@ -18,6 +18,8 @@ extern "C" {
 }
 
 static const int retries = 10;
+static std::atomic<int> done;
+static __thread int tid;
 
 #define Expect(ret) _ExpectFailure(ret, true, retries, __LINE__, __func__)
 #define ExpectSuccess(ret) _ExpectFailure(ret, 0, retries, __LINE__, __func__)
@@ -26,17 +28,17 @@ static const int retries = 10;
 static void _ExpectFailure(std::function<int()> f, int exp, int retry, int line, const char *func) {
     int ret;
     while (retry--) {
+        if (done)
+             throw std::string("stop thread.");
         ret = f();
         if (ret == exp)
             return;
         usleep(1000000);
-        std::cout << "Retry " << func << ":" << line << " Ret=" << ret << std::endl;
+        std::cerr << "[" << tid << "] "<< "Retry " << func << ":" << line << " Ret=" << ret << " " << std::endl;
     }
+    done++;
     throw std::string("Got " + std::to_string(ret) + ", but expected " + std::to_string(exp) + " at " + func + ":" + std::to_string(line));
 }
-
-static std::atomic<int> fail;
-static std::atomic<int> done;
 
 static std::vector<std::map<std::string, std::string>> vtasks =
 {
@@ -77,9 +79,9 @@ static std::vector<std::map<std::string, std::string>> vtasks =
 static void Create(const std::string &name, const std::string &cwd) {
     TPortoAPI api;
     std::vector<std::string> containers;
-    
-    std::cout << "Create container: " << name << std::endl;
-    
+
+    std::cout << "[" << tid << "] " << "Create container: " << name << std::endl;
+
     Expect([&]{ containers.clear(); api.List(containers); return std::find(containers.begin(),containers.end(),name) == containers.end();});
     Expect([&]{ auto ret = api.Create(name); return ret == EError::Success || ret == EError::ContainerAlreadyExists; });
     Expect([&]{ containers.clear(); api.List(containers); return std::find(containers.begin(),containers.end(),name) != containers.end();});
@@ -92,9 +94,9 @@ static void Create(const std::string &name, const std::string &cwd) {
 static void SetProperty(std::string name, std::string type, std::string value) {
     TPortoAPI api;
     std::string res_value;
-    
-    std::cout << "SetProperty container: " << name << std::endl;
-    
+
+    std::cout << "[" << tid << "] " << "SetProperty container: " << name << std::endl;
+
     ExpectSuccess([&]{return api.SetProperty(name, type, value);});
     ExpectSuccess([&]{return api.GetProperty(name, type, res_value);});
     Expect([&]{return res_value==value;});
@@ -104,9 +106,9 @@ static void Start(std::string name) {
     TPortoAPI api;
     std::string pid;
     std::string ret;
-    
-    std::cout << "Start container: " << name << std::endl;
-    
+
+    std::cout << "[" << tid << "] " << "Start container: " << name << std::endl;
+
     ExpectSuccess([&]{return api.Start(name);});
     Expect([&]{ api.GetData(name, "state", ret); return ret == "dead" || ret == "running";});
 }
@@ -116,19 +118,18 @@ static void CheckRuning(std::string name, std::string timeout) {
     std::string pid;
     std::string ret;
     int t;
-    
-    std::cout << "CheckRuning container: " << name << std::endl;
-    
+
+    std::cout << "[" << tid << "] " << "CheckRuning container: " << name << std::endl;
+
     StringToInt(timeout, t);
     while (t--) {
         api.GetData(name, "state", ret);
-        std::cout << "Poll " << name << ": "<< ret << std::endl;
+        std::cout << "[" << tid << "] " << "Poll " << name << ": "<< ret << std::endl;
         if (ret == "dead") {
             return;
         }
         usleep(1000000);
     }
-    fail++;
     done++;
     throw std::string("Timeout");
 }
@@ -136,18 +137,18 @@ static void CheckRuning(std::string name, std::string timeout) {
 static void CheckStdout(std::string name, std::string stream) {
     TPortoAPI api;
     std::string ret;
-    
-    std::cout << "CheckStdout container: " << name << std::endl;
-    
+
+    std::cout << "[" << tid << "] " << "CheckStdout container: " << name << std::endl;
+
     Expect([&]{api.GetData(name, "stdout", ret); return ret == stream;});
 }
 
 static void CheckStderr(std::string name, std::string stream) {
     TPortoAPI api;
     std::string ret;
-    
-    std::cout << "CheckStderr container: " << name << std::endl;
-    
+
+    std::cout << "[" << tid << "] " << "CheckStderr container: " << name << std::endl;
+
     Expect([&]{api.GetData(name, "stderr", ret); return ret == stream;});
 }
 
@@ -155,17 +156,17 @@ static void CheckExit(std::string name, std::string stream) {
     TPortoAPI api;
     std::string ret;
     int exit_ret, exit_stream;
-    std::cout << "CheckExit container: " << name << std::endl;
-    
+    std::cout << "[" << tid << "] " << "CheckExit container: " << name << std::endl;
+
     Expect([&]{api.GetData(name, "exit_status", ret); StringToInt(ret, exit_ret); StringToInt(stream, exit_stream); return WEXITSTATUS(exit_ret) == exit_stream;});
 }
 
 static void Destroy(const std::string &name, const std::string &cwd) {
     TPortoAPI api;
     std::vector<std::string> containers;
-    
-    std::cout << "Destroy container: " << name << std::endl;
-    
+
+    std::cout << "[" << tid << "] " << "Destroy container: " << name << std::endl;
+
     ExpectSuccess([&]{return api.List(containers);});
     Expect([&]{return std::find(containers.begin(),containers.end(),name) != containers.end();});
     ExpectSuccess([&]{return api.Destroy(name);});
@@ -176,13 +177,15 @@ static void Destroy(const std::string &name, const std::string &cwd) {
     f.Remove(true);
 }
 
-static void Tasks() {
+static void Tasks(int n, int tsk_repeat) {
+    tid = n;
+    std::cout << "[" << tid << "] " << "Run task" << std::to_string(n) << std::endl;
+    usleep(10000*n);
     try {
         TPortoAPI api;
-        int i = 1000;
-        while (i--) {
+        while (tsk_repeat--) {
             for (unsigned int t=0; t < vtasks.size(); t++) {
-                std::string name = "stresstest" + std::to_string(t);
+                std::string name = "stresstest" + std::to_string(n) + "_" + std::to_string(t);
                 std::string cwd = "/tmp/stresstest/" + name;
                 Create(name, cwd);
                 SetProperty(name, "env", vtasks[t]["env"]);
@@ -197,17 +200,16 @@ static void Tasks() {
             }
         }
     } catch (std::string e) {
-        std::cerr << "ERROR: Exception " << e << std::endl;
-        fail++;
-        done++;
+        std::cerr << "[" << tid << "] " << "ERROR: Exception " << e << std::endl;
+        std::cerr << "[" << tid << "] " << "ERROR: Stop task" << std::to_string(n) << std::endl;
         return;
     }
-    done++;
+    std::cout << "[" << tid << "] " << "Stop task" << std::to_string(n) << std::endl;
 }
 
 static void StressKill() {
     TPortoAPI api;
-
+    std::cout << "Run kill" << std::endl;
     while (!done) {
         usleep(1000000);
         TFile f(PID_FILE);
@@ -216,30 +218,35 @@ static void StressKill() {
         if (api.List(containers) != 0)
             continue;
         if (f.AsInt(pid))
-            std::cerr << "ERROR: Don't open " << PID_FILE << std::endl;
+            std::cerr << "[" << tid << "] " << "ERROR: Don't open " << PID_FILE << std::endl;
         if (kill(pid, SIGKILL)) {
-            std::cerr << "ERROR: Don't send kill to " << pid << std::endl;
+            std::cerr << "[" << tid << "] " << "ERROR: Don't send kill to " << pid << std::endl;
         } else {
             std::cout << "Killed " << pid << std::endl;
         }
     }
 }
 
-int StressTest() {
+int StressTest(int thr_count, int tsk_repeat, bool kill_on) {
+    int i;
+    std::vector<std::thread> thr_tasks;
+    std::thread thr_stress_kill;
+
     try {
         (void)signal(SIGPIPE, SIG_IGN);
+        for (i=1; i<=thr_count; i++) {
+            thr_tasks.push_back(std::thread(Tasks, i, tsk_repeat));
+        }
+        if (kill_on)
+            thr_stress_kill=std::thread(StressKill);
+        for (auto& th : thr_tasks)
+            th.join();
+        done++;
+        if (kill_on)
+            thr_stress_kill.join();
 
-        std::thread thr_tasks(Tasks);
-        std::thread thr_stress_kill(StressKill);
-    
-        thr_tasks.join();
-        thr_stress_kill.join();
     } catch (std::string e) {
         std::cerr << "ERROR: Exception " << e << std::endl;
-        return 1;
-    }
-    if (fail) {
-        std::cerr << "ERROR: Test fail!!!" << std::endl;
         return 1;
     }
     std::cout << "Test completed!" << std::endl;

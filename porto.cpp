@@ -350,14 +350,23 @@ public:
     }
 };
 
-extern int StressTest();
+extern int StressTest(int, int, bool);
 class TStressTestCmd : public ICmd {
 public:
     TStressTestCmd() : ICmd("stresstest", 0, "", "perform stresstest") {}
 
     int Execute(int argc, char *argv[])
     {
-        return StressTest();
+        int n = 1, tsk_repeat=1;
+        bool b = true;
+        if (argc >= 1)
+            StringToInt(argv[0], n);
+        if (argc >= 2)
+            StringToInt(argv[1], tsk_repeat);
+        if (argc >= 3 && strcmp(argv[2], "off") == 0)
+            b = false;
+        cout << "Threads: " << n << " Repeat: " << tsk_repeat << " Kill: " << b << endl;
+        return StressTest(n, tsk_repeat, b);
     }
 };
 
