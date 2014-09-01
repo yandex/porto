@@ -1,3 +1,9 @@
+yandex-porto (0.2) stable; urgency=low
+
+  * Phase 1 release.
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 01 Sep 2014 15:48:46 +0400
+
 yandex-porto (0.1) stable; urgency=low
 
   * Initial release.
