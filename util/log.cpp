@@ -56,7 +56,7 @@ std::basic_ostream<char> &TLogger::Log() {
 void TLogger::Log(const std::string &action) {
     if (!LOG_VEBOSE)
         return;
-    
+
     Log() << " " << action << std::endl;
 }
 

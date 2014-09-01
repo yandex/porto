@@ -2,7 +2,7 @@
 #include <iomanip>
 #include <sstream>
 #include <algorithm>
-#include <sys/signal.h>
+#include <csignal>
 
 #include "libporto.hpp"
 #include "util/string.hpp"
@@ -354,20 +354,20 @@ public:
 extern int StressTest(int, int, bool);
 class TStressTestCmd : public ICmd {
 public:
-    TStressTestCmd() : ICmd("stresstest", 0, "", "perform stresstest") {}
+    TStressTestCmd() : ICmd("stresstest", 0, "[threads] [iterations] [kill=on/off]", "perform stresstest") {}
 
     int Execute(int argc, char *argv[])
     {
-        int n = 1, tsk_repeat=1;
-        bool b = true;
+        int threads = 1, iter = 1000;
+        bool killPorto = true;
         if (argc >= 1)
-            StringToInt(argv[0], n);
+            StringToInt(argv[0], threads);
         if (argc >= 2)
-            StringToInt(argv[1], tsk_repeat);
+            StringToInt(argv[1], iter);
         if (argc >= 3 && strcmp(argv[2], "off") == 0)
-            b = false;
-        cout << "Threads: " << n << " Repeat: " << tsk_repeat << " Kill: " << b << endl;
-        return StressTest(n, tsk_repeat, b);
+            killPorto = false;
+        cout << "Threads: " << threads << " Iterations: " << iter << " Kill: " << killPorto << endl;
+        return StressTest(threads, iter, killPorto);
     }
 };
 
