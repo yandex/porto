@@ -23,6 +23,10 @@ EError TError::GetError() const {
     return Error;
 }
 
+std::string TError::GetErrorName() const {
+    return rpc::EError_Name(Error);
+}
+
 const std::string &TError::GetMsg() const {
     return Description;
 }

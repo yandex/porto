@@ -1,5 +1,3 @@
-#include <fstream>
-
 #include "porto.hpp"
 #include "log.hpp"
 
@@ -51,31 +49,28 @@ static std::string GetTime() {
     return std::string();
 }
 
+std::basic_ostream<char> &TLogger::Log() {
+    return file << GetTime() << " ";
+}
+
 void TLogger::Log(const std::string &action) {
     if (!LOG_VEBOSE)
         return;
     
-    file << GetTime() << " " << action << std::endl;
+    Log() << " " << action << std::endl;
 }
 
 void TLogger::LogAction(const std::string &action, bool error, int errcode) {
     if (!error && LOG_VEBOSE)
-        file << GetTime() << " Ok: " << action << std::endl;
+        Log() << " Ok: " << action << std::endl;
     else if (error)
-        file << GetTime() << " Error: " << action << ": " << strerror(errcode) << std::endl;
-}
-
-void TLogger::LogError(const TError &e, const std::string &s) {
-    if (!e)
-        return;
-
-    file << GetTime() << " Error(" << rpc::EError_Name(e.GetError()) << "): " << s << ": " << e.GetMsg() << std::endl;
+        Log() << " Error: " << action << ": " << strerror(errcode) << std::endl;
 }
 
 void TLogger::LogRequest(const std::string &message) {
-    file << GetTime() << " -> " << message << std::endl;
+    Log() << " -> " << message << std::endl;
 }
 
 void TLogger::LogResponse(const std::string &message) {
-    file << GetTime() << " <- " << message << std::endl;
+    Log() << " <- " << message << std::endl;
 }

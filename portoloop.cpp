@@ -1,8 +1,9 @@
-#include <iostream>
 #include <vector>
 #include <map>
+#include <iostream>
 
 #include "porto.hpp"
+#include "log.hpp"
 #include "util/unix.hpp"
 
 extern "C" {
@@ -18,27 +19,13 @@ extern "C" {
 
 using namespace std;
 
-static basic_ostream<char> &Log() {
-    char tmstr[256];
-    time_t t;
-    struct tm *tmp;
-    t = time(NULL);
-    tmp = localtime(&t);
-
-    if (tmp && strftime(tmstr, sizeof(tmstr), "%c", tmp))
-        cerr << tmstr << " ";
-
-    cerr << program_invocation_short_name << ": ";
-    return cerr;
-}
-
 static void SendPidStatus(int fd, int pid, int status, size_t queued) {
-    Log() << "Deliver " << pid << " status " << status << " (" + to_string(queued) + " queued)" << endl;
+    TLogger::Log() << "Deliver " << pid << " status " << status << " (" + to_string(queued) + " queued)" << endl;
 
     if (write(fd, &pid, sizeof(pid)) < 0)
-        Log() << "write(pid): " << strerror(errno) << endl;
+        TLogger::Log() << "write(pid): " << strerror(errno) << endl;
     if (write(fd, &status, sizeof(status)) < 0)
-        Log() << "write(status): " << strerror(errno) << endl;
+        TLogger::Log() << "write(status): " << strerror(errno) << endl;
 }
 
 static pid_t portoPid;
@@ -63,7 +50,7 @@ static void ReceiveAcks(int fd, map<int,int> &pidToStatus) {
     int pid;
 
     while (read(fd, &pid, sizeof(pid)) == sizeof(pid)) {
-        Log() << "Got acknowledge for " << pid << endl;
+        TLogger::Log() << "Got acknowledge for " << pid << endl;
         pidToStatus.erase(pid);
     }
 }
@@ -74,19 +61,19 @@ static void SignalMask(int how) {
 
 
     if (sigemptyset(&mask) < 0) {
-        Log() << "Can't initialize signal mask: " << strerror(errno) << endl;
+        TLogger::Log() << "Can't initialize signal mask: " << strerror(errno) << endl;
         return;
     }
 
     for (auto sig: sigs)
         if (sigaddset(&mask, sig) < 0) {
-            Log() << "Can't add signal to mask: " << strerror(errno) << endl;
+            TLogger::Log() << "Can't add signal to mask: " << strerror(errno) << endl;
             return;
         }
 
 
     if (sigprocmask(how, &mask, NULL) < 0)
-        Log() << "Can't set signal mask: " << strerror(errno) << endl;
+        TLogger::Log() << "Can't set signal mask: " << strerror(errno) << endl;
 }
 
 static int SpawnPortod(map<int,int> &pidToStatus) {
@@ -95,18 +82,18 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
     int ret = EXIT_FAILURE;
 
     if (pipe(evtfd) < 0) {
-        Log() << "pipe(): " << strerror(errno) << endl;
+        TLogger::Log() << "pipe(): " << strerror(errno) << endl;
         return EXIT_FAILURE;
     }
 
     if (pipe2(ackfd, O_NONBLOCK) < 0) {
-        Log() << "pipe(): " << strerror(errno) << endl;
+        TLogger::Log() << "pipe(): " << strerror(errno) << endl;
         return EXIT_FAILURE;
     }
 
     portoPid = fork();
     if (portoPid < 0) {
-        Log() << "fork(): " << strerror(errno) << endl;
+        TLogger::Log() << "fork(): " << strerror(errno) << endl;
         ret = EXIT_FAILURE;
         goto exit;
     } else if (portoPid == 0) {
@@ -114,14 +101,14 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
         close(ackfd[0]);
 
         ret = execlp("portod", "portod", nullptr);
-        Log() << "execlp(): " << strerror(errno) << endl;
+        TLogger::Log() << "execlp(): " << strerror(errno) << endl;
         goto exit;
     }
 
     close(evtfd[0]);
     close(ackfd[1]);
 
-    Log() << "Spawned portod " << portoPid << endl;
+    TLogger::Log() << "Spawned portod " << portoPid << endl;
 
     for (auto &pair : pidToStatus)
         SendPidStatus(evtfd[1], pair.first, pair.second, pidToStatus.size());
@@ -134,18 +121,21 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
         ReceiveAcks(ackfd[0], pidToStatus);
 
         if (needUpdate) {
-            Log() << "Updating" << endl;
+            TLogger::Log() << "Updating" << endl;
 
             if (kill(portoPid, SIGKILL) < 0)
-                Log() << "Can't send SIGKILL to portod: " << strerror(errno) << endl;
+                TLogger::Log() << "Can't send SIGKILL to portod: " << strerror(errno) << endl;
             if (waitpid(portoPid, NULL, 0) != portoPid)
-                Log() << "Can't wait for portod exit status: " << strerror(errno) << endl;
+                TLogger::Log() << "Can't wait for portod exit status: " << strerror(errno) << endl;
 
             close(evtfd[1]);
             close(ackfd[0]);
 
+            TLogger::CloseLog();
             execlp(program_invocation_name, program_invocation_short_name, nullptr);
-            Log() << "Can't execlp(" << program_invocation_name << ", " << program_invocation_short_name << ", NULL)" << endl;
+            TLogger::OpenLog(LOOP_LOG_FILE, LOOP_LOG_FILE_PERM);
+            TLogger::Log() << "Can't execlp(" << program_invocation_name << ", " << program_invocation_short_name << ", NULL)" << endl;
+            TLogger::CloseLog();
             ret = EXIT_FAILURE;
             break;
         }
@@ -163,11 +153,11 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
         }
 
         if (errno == EINTR) {
-            Log() << "wait(): " << strerror(errno) << endl;
+            TLogger::Log() << "wait(): " << strerror(errno) << endl;
             continue;
         }
         if (pid == portoPid) {
-            Log() << "portod exited with " << status << endl;
+            TLogger::Log() << "portod exited with " << status << endl;
             ret = EXIT_SUCCESS;
             break;
         }
@@ -201,12 +191,14 @@ int main(int argc, char * const argv[])
         }
     }
 
+    TLogger::OpenLog(LOOP_LOG_FILE, LOOP_LOG_FILE_PERM);
+
     if (getuid() != 0) {
-        Log() << "Need root privileges to start" << endl;
+        TLogger::Log() << "Need root privileges to start" << endl;
         return EXIT_FAILURE;
     }
 
-    Log() << "Started" << endl;
+    TLogger::Log() << "Started" << endl;
 
     // portod may die while we are writing into communication pipe
     (void)RegisterSignal(SIGPIPE, SIG_IGN);
@@ -217,7 +209,7 @@ int main(int argc, char * const argv[])
     SignalMask(SIG_UNBLOCK);
 
     if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0) {
-        Log() << "Can't set myself as a subreaper" << endl;
+        TLogger::Log() << "Can't set myself as a subreaper" << endl;
         return EXIT_FAILURE;
     }
 
@@ -226,15 +218,17 @@ int main(int argc, char * const argv[])
 
     while (!done) {
         ret = SpawnPortod(pidToStatus);
-        Log() << "Returned " << ret << endl;
+        TLogger::Log() << "Returned " << ret << endl;
         if (!done && ret != EXIT_SUCCESS)
             usleep(1000000);
     }
 
     if (kill(portoPid, SIGINT) < 0)
-        Log() << "Can't send SIGINT to portod" << endl;
+        TLogger::Log() << "Can't send SIGINT to portod" << endl;
 
-    Log() << "Stopped" << endl;
+    TLogger::Log() << "Stopped" << endl;
+
+    TLogger::CloseLog();
 
     return ret;
 }

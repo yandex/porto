@@ -6,3 +6,12 @@
         notifempty
     nocreate
 }
+
+/var/log/portoloop.log {
+        daily
+        missingok
+        rotate 7
+        compress
+        notifempty
+    nocreate
+}

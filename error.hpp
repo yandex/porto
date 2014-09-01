@@ -18,6 +18,7 @@ public:
     operator bool() const;
 
     EError GetError() const;
+    std::string GetErrorName() const;
     const std::string &GetMsg() const;
 
     static const TError& Success() {

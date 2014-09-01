@@ -29,6 +29,9 @@ const unsigned int PID_FILE_PERM = 0644;
 const std::string LOG_FILE = "/var/log/portod.log";
 const unsigned int LOG_FILE_PERM = 0644;
 
+const std::string LOOP_LOG_FILE = "/var/log/portoloop.log";
+const unsigned int LOOP_LOG_FILE_PERM = 0644;
+
 const unsigned int LOOP_WAIT_TIMEOUT_S = 10;
 
 #endif
