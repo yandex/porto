@@ -15,17 +15,17 @@ using namespace std;
 // TCgroup
 TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems,
                  const std::shared_ptr<TMount> m) :
-    name("/"), parent(shared_ptr<TCgroup>(nullptr)) {
+    Name("/"), Parent(shared_ptr<TCgroup>(nullptr)) {
 
     if (m)
-        mount = m;
+        Mount = m;
     else {
         set<string> flags;
 
         for (auto c : subsystems)
-            flags.insert(c->Name());
+            flags.insert(c->GetName());
 
-        mount = make_shared<TMount>("cgroup", tmpfs + "/" +
+        Mount = make_shared<TMount>("cgroup", Tmpfs + "/" +
                                     CommaSeparatedList(flags),
                                     "cgroup", flags);
     }
@@ -37,19 +37,19 @@ TCgroup::~TCgroup() {
 
 shared_ptr<TCgroup> TCgroup::GetChild(const std::string& name) {
     vector<weak_ptr<TCgroup>>::iterator iter;
-    for (iter = children.begin(); iter != children.end();) {
+    for (iter = Children.begin(); iter != Children.end();) {
         if (auto child = iter->lock()) {
-            if (child->name == name)
+            if (child->Name == name)
                 return child;
         } else {
-            iter = children.erase(iter);
+            iter = Children.erase(iter);
             continue;
         }
         iter++;
     }
 
     auto child = make_shared<TCgroup>(name, shared_from_this());
-    children.push_back(weak_ptr<TCgroup>(child));
+    Children.push_back(weak_ptr<TCgroup>(child));
     return child;
 }
 
@@ -58,7 +58,7 @@ TError TCgroup::FindChildren(std::vector<std::shared_ptr<TCgroup>> &cglist) {
     vector<string> list;
 
     // Ignore non-porto subtrees
-    if (parent && parent->IsRoot() && name != PORTO_ROOT_CGROUP)
+    if (Parent && Parent->IsRoot() && Name != PORTO_ROOT_CGROUP)
         return TError::Success();
 
     TError error = f.Subfolders(list);
@@ -101,21 +101,21 @@ bool TCgroup::IsEmpty() {
 }
 
 bool TCgroup::IsRoot() const {
-    return !parent;
+    return !Parent;
 }
 
 string TCgroup::Path() {
     if (IsRoot())
-        return mount->GetMountpoint();
+        return Mount->GetMountpoint();
     else
-        return parent->Path() + "/" + name;
+        return Parent->Path() + "/" + Name;
 }
 
 string TCgroup::Relpath() {
     if (IsRoot())
         return "";
     else
-        return parent->Relpath() + "/" + name;
+        return Parent->Relpath() + "/" + Name;
 }
 
 TError TCgroup::Create() {
@@ -130,13 +130,13 @@ TError TCgroup::Create() {
         }
 
 
-        TMount root("cgroup", tmpfs, "tmpfs", {});
+        TMount root("cgroup", Tmpfs, "tmpfs", {});
         bool mount_root = true;
 
         for (auto m : mounts) {
             if (*m == root)
                 mount_root = false;
-            if (*m == *mount)
+            if (*m == *Mount)
                 return TError::Success();
         }
 
@@ -147,18 +147,18 @@ TError TCgroup::Create() {
                 return error;
         }
     } else
-        parent->Create();
+        Parent->Create();
 
     TFolder f(Path());
     if (!f.Exists()) {
-        TError error = f.Create(mode);
+        TError error = f.Create(Mode);
         TLogger::LogError(error, "Can't create cgroup directory");
         if (error)
             return error;
     }
 
     if (IsRoot()) {
-        TError error = mount->Mount();
+        TError error = Mount->Mount();
         TLogger::LogError(error, "Can't mount root cgroup for root container");
         if (error)
             return error;
@@ -169,7 +169,7 @@ TError TCgroup::Create() {
 
 TError TCgroup::Remove() {
     if (IsRoot()) {
-        TError error = mount->Umount();
+        TError error = Mount->Umount();
         TLogger::LogError(error, "Can't umount root cgroup for root container");
         if (error)
             return error;
@@ -232,7 +232,7 @@ TError TCgroup::SetKnobValue(const std::string &knob, const std::string &value, 
 TError TCgroup::Attach(int pid) {
     if (!IsRoot()) {
         TError error = SetKnobValue("cgroup.procs", to_string(pid), true);
-        TLogger::LogError(error, "Can't attach " + to_string(pid) + " to " + name);
+        TLogger::LogError(error, "Can't attach " + to_string(pid) + " to " + Name);
     }
 
     return TError::Success();
@@ -256,9 +256,9 @@ TError TCgroupSnapshot::Create() {
                  continue;
 
              auto root = subsys->GetRootCgroup(mount);
-             cgroups.push_back(root);
+             Cgroups.push_back(root);
 
-             TError error = root->FindChildren(cgroups);
+             TError error = root->FindChildren(Cgroups);
              if (error) {
                  TLogger::LogError(error, "Can't find children for " + root->Relpath());
                  return error;

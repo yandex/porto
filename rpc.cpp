@@ -105,7 +105,7 @@ static void GetContainerProperty(TContainerHolder &cholder,
         return;
     }
 
-    if (propertySpec.find(req.property()) == propertySpec.end()) {
+    if (PropertySpec.find(req.property()) == PropertySpec.end()) {
         rsp.set_error(EError::InvalidProperty);
         return;
     }
@@ -128,7 +128,7 @@ static void SetContainerProperty(TContainerHolder &cholder,
         return;
     }
 
-    if (propertySpec.find(req.property()) == propertySpec.end()) {
+    if (PropertySpec.find(req.property()) == PropertySpec.end()) {
         rsp.set_error(EError::InvalidProperty);
         return;
     }
@@ -148,7 +148,7 @@ static void GetContainerData(TContainerHolder &cholder,
         return;
     }
 
-    if (dataSpec.find(req.data()) == dataSpec.end()) {
+    if (DataSpec.find(req.data()) == DataSpec.end()) {
         rsp.set_error(EError::InvalidData);
         return;
     }
@@ -166,11 +166,11 @@ static void ListProperty(TContainerHolder &cholder,
 {
     auto list = rsp.mutable_propertylist();
 
-    for (auto kv : propertySpec) {
+    for (auto kv : PropertySpec) {
         auto entry = list->add_list();
 
         entry->set_name(kv.first);
-        entry->set_desc(kv.second.description);
+        entry->set_desc(kv.second.Description);
     }
 
     rsp.set_error(EError::Success);
@@ -181,11 +181,11 @@ static void ListData(TContainerHolder &cholder,
 {
     auto list = rsp.mutable_datalist();
 
-    for (auto kv : dataSpec) {
+    for (auto kv : DataSpec) {
         auto entry = list->add_list();
 
         entry->set_name(kv.first);
-        entry->set_desc(kv.second.description);
+        entry->set_desc(kv.second.Description);
     }
 
     rsp.set_error(EError::Success);

@@ -26,13 +26,13 @@ public:
     }
 
     friend std::ostream& operator<<(std::ostream& os, const TError& err) {
-        os << err.error << " (" << err.description << ")";
+        os << err.Error << " (" << err.Description << ")";
         return os;
     }
 
 private:
-    EError error;
-    std::string description;
+    EError Error;
+    std::string Description;
 };
 
 #endif

@@ -29,39 +29,39 @@ using namespace std;
 
 // TTaskEnv
 TError TTaskEnv::Prepare() {
-    if (command.empty())
+    if (Command.empty())
         return TError::Success();
 
     string workdir;
-    if (cwd.length())
-        workdir = cwd;
+    if (Cwd.length())
+        workdir = Cwd;
     else
-        workdir = "/home/" + user;
+        workdir = "/home/" + User;
 
     env.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:" + workdir);
 
-    if (SplitString(envir, ';', env)) {
-        TError error(EError::InvalidValue, errno, "split(" + envir + ")");
+    if (SplitString(Envir, ';', env)) {
+        TError error(EError::InvalidValue, errno, "split(" + Envir + ")");
         return error;
     }
 
     env.push_back("HOME=" + workdir);
-    env.push_back("USER=" + user);
+    env.push_back("USER=" + User);
 
-    struct passwd *p = getpwnam(user.c_str());
+    struct passwd *p = getpwnam(User.c_str());
     if (!p) {
-        TError error(EError::InvalidValue, EINVAL, "getpwnam(" + user + ")");
+        TError error(EError::InvalidValue, EINVAL, "getpwnam(" + User + ")");
         return error;
     } else {
-        uid = p->pw_uid;
+        Uid = p->pw_uid;
     }
 
-    struct group *g = getgrnam(group.c_str());
+    struct group *g = getgrnam(Group.c_str());
     if (!g) {
-        TError error(EError::InvalidValue, EINVAL, "getgrnam(" + group + ")");
+        TError error(EError::InvalidValue, EINVAL, "getgrnam(" + Group + ")");
         return error;
     } else {
-        gid = g->gr_gid;
+        Gid = g->gr_gid;
     }
 
     return TError::Success();
@@ -184,7 +184,7 @@ int TTask::ChildCallback() {
         ReportResultAndExit(wfd, -errno);
     }
 
-    ret = fchown(ret, env.uid, env.gid);
+    ret = fchown(ret, env.Uid, env.Gid);
     if (ret < 0) {
         Syslog(string("fchown(1): ") + strerror(errno));
         ReportResultAndExit(wfd, -errno);
@@ -196,21 +196,21 @@ int TTask::ChildCallback() {
         ReportResultAndExit(wfd, -errno);
     }
 
-    ret = fchown(ret, env.uid, env.gid);
+    ret = fchown(ret, env.Uid, env.Gid);
     if (ret < 0) {
         Syslog(string("fchown(2): ") + strerror(errno));
         ReportResultAndExit(wfd, -errno);
     }
 
-    TMount new_root(env.root, env.root + "/", "none", {});
-    TMount new_proc("proc", env.root + "/proc", "proc", {});
-    TMount new_sys("/sys", env.root + "/sys", "none", {});
-    TMount new_dev("/dev", env.root + "/dev", "none", {});
-    TMount new_var("/var", env.root + "/var", "none", {});
-    TMount new_run("/run", env.root + "/run", "none", {});
-    TMount new_tmp("/tmp", env.root + "/tmp", "none", {});
+    TMount new_root(env.Root, env.Root + "/", "none", {});
+    TMount new_proc("proc", env.Root + "/proc", "proc", {});
+    TMount new_sys("/sys", env.Root + "/sys", "none", {});
+    TMount new_dev("/dev", env.Root + "/dev", "none", {});
+    TMount new_var("/var", env.Root + "/var", "none", {});
+    TMount new_run("/run", env.Root + "/run", "none", {});
+    TMount new_tmp("/tmp", env.Root + "/tmp", "none", {});
 
-    if (env.root.length()) {
+    if (env.Root.length()) {
         if (new_root.Bind()) {
             Syslog(string("remount /: ") + strerror(errno));
             ReportResultAndExit(wfd, -errno);
@@ -246,12 +246,12 @@ int TTask::ChildCallback() {
             ReportResultAndExit(wfd, -errno);
         }
 
-        if (chdir(env.root.c_str()) < 0) {
+        if (chdir(env.Root.c_str()) < 0) {
             Syslog(string("chdir(): ") + strerror(errno));
             ReportResultAndExit(wfd, -errno);
         }
 
-        if (chroot(env.root.c_str()) < 0) {
+        if (chroot(env.Root.c_str()) < 0) {
             Syslog(string("chroot(): ") + strerror(errno));
             ReportResultAndExit(wfd, -errno);
         }
@@ -263,23 +263,23 @@ int TTask::ChildCallback() {
 
     }
 
-    if (env.cwd.length() && chdir(env.cwd.c_str()) < 0) {
+    if (env.Cwd.length() && chdir(env.Cwd.c_str()) < 0) {
         Syslog(string("chdir(): ") + strerror(errno));
         ReportResultAndExit(wfd, -errno);
     }
 
     // drop privileges
-    if (setgid(env.gid) < 0) {
+    if (setgid(env.Gid) < 0) {
         Syslog(string("setgid(): ") + strerror(errno));
         ReportResultAndExit(wfd, -errno);
     }
 
-    if (initgroups(env.user.c_str(), env.gid) < 0) {
+    if (initgroups(env.User.c_str(), env.Gid) < 0) {
         Syslog(string("initgroups(): ") + strerror(errno));
         ReportResultAndExit(wfd, -errno);
     }
 
-    if (setuid(env.uid) < 0) {
+    if (setuid(env.Uid) < 0) {
         Syslog(string("setuid(): ") + strerror(errno));
         ReportResultAndExit(wfd, -errno);
     }
@@ -289,7 +289,7 @@ int TTask::ChildCallback() {
 
 	wordexp_t result;
 
-	ret = wordexp(env.command.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
+	ret = wordexp(env.Command.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
     switch (ret) {
     case WRDE_BADCHAR:
         Syslog(string("wordexp(): illegal occurrence of newline or one of |, &, ;, <, >, (, ), {, }"));
@@ -312,7 +312,7 @@ int TTask::ChildCallback() {
     }
 
 #ifdef __DEBUG__
-    Syslog(env.command.c_str());
+    Syslog(env.Command.c_str());
     for (unsigned i = 0; i < result.we_wordc; i++)
         Syslog(result.we_wordv[i]);
 #endif
@@ -330,12 +330,12 @@ TError TTask::Start() {
     int ret;
     int pfd[2];
 
-    exitStatus.error = 0;
-    exitStatus.status = 0;
+    exitStatus.Error = 0;
+    exitStatus.Status = 0;
 
-    if (env.cwd.length()) {
-        stdoutFile = env.cwd + "/stdout";
-        stderrFile = env.cwd + "/stderr";
+    if (env.Cwd.length()) {
+        stdoutFile = env.Cwd + "/stdout";
+        stderrFile = env.Cwd + "/stderr";
     } else {
         stdoutFile = GetTmpFile();
         stderrFile = GetTmpFile();
@@ -395,8 +395,8 @@ TError TTask::Start() {
     } else {
         pid = 0;
 
-        exitStatus.error = ret;
-        exitStatus.status = -1;
+        exitStatus.Error = ret;
+        exitStatus.Status = -1;
 
         TError error;
         if (ret < 0)
@@ -421,8 +421,8 @@ TExitStatus TTask::GetExitStatus() {
 }
 
 void TTask::DeliverExitStatus(int status) {
-    exitStatus.error = 0;
-    exitStatus.status = status;
+    exitStatus.Error = 0;
+    exitStatus.Status = status;
     state = Stopped;
 }
 
@@ -456,8 +456,8 @@ std::string TTask::GetStderr() {
 }
 
 TError TTask::Restore(int pid_) {
-    exitStatus.error = 0;
-    exitStatus.status = 0;
+    exitStatus.Error = 0;
+    exitStatus.Status = 0;
 
     // There are to possibilities here:
     // 1. We died and loop reaped container, so it will deliver
@@ -476,13 +476,13 @@ TError TTask::Restore(int pid_) {
     TFile stdoutLink("/proc/" + to_string(pid_) + "/fd/1");
     TError error = stdoutLink.ReadLink(stdoutFile);
     if (error)
-        stdoutFile = env.cwd + "/stdout";
+        stdoutFile = env.Cwd + "/stdout";
     TLogger::LogError(error, "Restore stdout");
 
     TFile stderrLink("/proc/" + to_string(pid_) + "/fd/2");
     error = stderrLink.ReadLink(stderrFile);
     if (error)
-        stderrFile = env.cwd + "/stderr";
+        stderrFile = env.Cwd + "/stderr";
     TLogger::LogError(error, "Restore stderr");
 
     pid = pid_;

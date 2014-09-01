@@ -10,24 +10,24 @@
 class TCgroup;
 
 class TSubsystem : public std::enable_shared_from_this<TSubsystem> {
-    std::string name;
-    std::shared_ptr<TCgroup> root_cgroup;
+    std::string Name;
+    std::shared_ptr<TCgroup> RootCgroup;
 
 protected:
-    TSubsystem(const std::string &name) : name(name) {}
+    TSubsystem(const std::string &name) : Name(name) {}
 
 public:
     static std::shared_ptr<TSubsystem> Get(std::string name);
-    const std::string& Name() const;
+    const std::string& GetName() const;
 
     TSubsystem(const TSubsystem&) = delete;
 
     std::shared_ptr<TCgroup> GetRootCgroup(std::shared_ptr<TMount> mount=nullptr) {
-        if (!root_cgroup) {
+        if (!RootCgroup) {
             TCgroup *root = new TCgroup({shared_from_this()}, mount);
-            root_cgroup = std::shared_ptr<TCgroup>(root);
+            RootCgroup = std::shared_ptr<TCgroup>(root);
         }
-        return root_cgroup;
+        return RootCgroup;
     }
 };
 

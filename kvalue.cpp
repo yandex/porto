@@ -15,11 +15,11 @@ extern "C" {
 using namespace std;
 
 TKeyValueStorage::TKeyValueStorage() :
-    tmpfs("tmpfs", KVALUE_ROOT, "tmpfs", {KVALUE_SIZE}) {
+    Tmpfs("tmpfs", KVALUE_ROOT, "tmpfs", {KVALUE_SIZE}) {
 }
 
 string TKeyValueStorage::Path(const string &name) {
-    return tmpfs.GetMountpoint() + "/" + name;
+    return Tmpfs.GetMountpoint() + "/" + name;
 }
 
 void TKeyValueStorage::Merge(kv::TNode &node, kv::TNode &next) {
@@ -120,20 +120,20 @@ TError TKeyValueStorage::MountTmpfs() {
     }
 
     for (auto m : mounts)
-        if (m->GetMountpoint() == tmpfs.GetMountpoint())
+        if (m->GetMountpoint() == Tmpfs.GetMountpoint())
             return TError::Success();
 
-    TFolder mnt(tmpfs.GetMountpoint());
+    TFolder mnt(Tmpfs.GetMountpoint());
     if (!mnt.Exists())
         mnt.Create();
 
-    error = tmpfs.Mount();
+    error = Tmpfs.Mount();
     TLogger::LogError(error, "Can't mount key-value tmpfs");
     return error;
 }
 
 TError TKeyValueStorage::ListNodes(std::vector<std::string> &list) {
-    TFolder f(tmpfs.GetMountpoint());
+    TFolder f(Tmpfs.GetMountpoint());
     return f.Items(TFile::Regular, list);
 }
 

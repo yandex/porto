@@ -14,14 +14,14 @@
 class TSubsystem;
 
 class TCgroup : public std::enable_shared_from_this<TCgroup> {
-    const std::string name;
-    const std::shared_ptr<TCgroup> parent;
-    std::vector<std::weak_ptr<TCgroup>> children;
+    const std::string Name;
+    const std::shared_ptr<TCgroup> Parent;
+    std::vector<std::weak_ptr<TCgroup>> Children;
 
-    std::shared_ptr<TMount> mount;
+    std::shared_ptr<TMount> Mount;
 
-    std::string tmpfs = "/sys/fs/cgroup";
-    mode_t mode = 0755;
+    std::string Tmpfs = "/sys/fs/cgroup";
+    mode_t Mode = 0755;
     TCgroup(const TCgroup &) = delete;
     TCgroup &operator=(const TCgroup &) = delete;
 
@@ -29,7 +29,7 @@ public:
     TCgroup(const std::vector<std::shared_ptr<TSubsystem>> controller,
             std::shared_ptr<TMount> mount = nullptr);
     TCgroup(const std::string &name, std::shared_ptr<TCgroup> parent) :
-        name(name), parent(parent) {}
+        Name(name), Parent(parent) {}
 
     ~TCgroup();
 
@@ -60,8 +60,7 @@ public:
 };
 
 class TCgroupSnapshot {
-    std::vector<std::shared_ptr<TCgroup> > cgroups;
-    std::unordered_map<std::string, std::shared_ptr<TSubsystem>> subsystems; // can be net_cls _or_ net_prio
+    std::vector<std::shared_ptr<TCgroup>> Cgroups;
 public:
     TError Create();
 };

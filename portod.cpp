@@ -125,7 +125,7 @@ void AckExitStatus(int pid) {
 
 static int ReapSpawner(int fd, TContainerHolder &cholder) {
     struct pollfd fds[1];
-    int nr = 100;
+    int nr = 1000;
 
     fds[0].fd = fd;
     fds[0].events = POLLIN | POLLHUP;

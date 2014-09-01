@@ -97,7 +97,8 @@ static string GetCwd(const string &pid) {
 static string GetNamespace(const string &pid, const string &ns) {
     string link;
     TFile m("/proc/" + pid + "/ns/" + ns);
-    (void)m.ReadLink(link);
+    if (m.ReadLink(link))
+        throw string("Can't get ") + ns + " namespace for " + pid;
     return link;
 }
 
@@ -105,12 +106,14 @@ static map<string, string> GetCgroups(const string &pid) {
     TFile f("/proc/" + pid + "/cgroup");
     vector<string> lines;
     map<string, string> cgmap;
-    (void)f.AsLines(lines);
+    if (f.AsLines(lines))
+        throw string("Can't get cgroups");
 
     vector<string> tokens;
     for (auto l : lines) {
         tokens.clear();
-        (void)SplitString(l, ':', tokens);
+        if (SplitString(l, ':', tokens))
+            throw string("Can't split cgroup string");
         cgmap[tokens[1]] = tokens[2];
     }
 
@@ -121,13 +124,13 @@ static string GetStatusLine(const string &pid, const string &prefix) {
     vector<string> st;
     TFile f("/proc/" + pid + "/status");
     if (f.AsLines(st))
-        return "INVALID PID";
+        throw string("INVALID PID");
 
     for (auto &s : st)
         if (s.substr(0, prefix.length()) == prefix)
             return s;
 
-    return "INVALID PREFIX";
+    throw string("INVALID PREFIX");
 }
 
 static string GetState(const string &pid) {
@@ -140,7 +143,7 @@ static string GetState(const string &pid) {
     ss>> desc;
 
     if (name != "State:")
-        return "PARSING ERROR";
+        throw string("PARSING ERROR");
 
     return state;
 }
@@ -158,7 +161,7 @@ static void GetUidGid(const string &pid, int &uid, int &gid) {
     ssuid >> fsuid;
 
     if (name != "Uid:" || uid != euid || euid != suid || suid != fsuid)
-        uid = -2;
+        throw string("Invalid uid");
 
     string stgid = GetStatusLine(pid, "Gid:");
     stringstream ssgid(stgid);
@@ -171,13 +174,13 @@ static void GetUidGid(const string &pid, int &uid, int &gid) {
     ssgid >> fsgid;
 
     if (name != "Gid:" || gid != egid || egid != sgid || sgid != fsgid)
-        gid = -2;
+        throw string("Invalid gid");
 }
 
 static int UserUid(const string &user) {
     struct passwd *p = getpwnam(user.c_str());
     if (!p)
-        return -1;
+        throw string("Invalid user");
     else
         return p->pw_uid;
 }
@@ -185,7 +188,7 @@ static int UserUid(const string &user) {
 static int GroupGid(const string &group) {
     struct group *g = getgrnam(group.c_str());
     if (!g)
-        return -1;
+        throw string("Invalid group");
     else
         return g->gr_gid;
 }
@@ -193,7 +196,8 @@ static int GroupGid(const string &group) {
 static string GetEnv(const string &pid) {
     string env;
     TFile f("/proc/" + pid + "/environ");
-    (void)f.AsString(env);
+    if (f.AsString(env))
+        throw string("Can't get environment");
 
     return env;
 }
@@ -205,14 +209,16 @@ static string CgRoot(const string &subsystem, const string &name) {
 static string GetFreezer(const string &name) {
     string link;
     TFile m(CgRoot("freezer", name) + "freezer.state");
-    (void)m.AsString(link);
+    if (m.AsString(link))
+        throw string("Can't get freezer");
     return link;
 }
 
 static void SetFreezer(const string &name, const string &state) {
     string link;
     TFile m(CgRoot("freezer", name) + "freezer.state");
-    (void)m.WriteStringNoAppend(state);
+    if (m.WriteStringNoAppend(state))
+        throw string("Can't set freezer");
 
     int retries = 1000000;
     while (retries--)
@@ -225,7 +231,8 @@ static void SetFreezer(const string &name, const string &state) {
 static string GetCgKnob(const string &subsys, const string &name, const string &knob) {
     string val;
     TFile m(CgRoot(subsys, name) + knob);
-    (void)m.AsString(val);
+    if (m.AsString(val))
+        throw string("Can't get cgroup knob");
     val.erase(val.find('\n'));
     return val;
 }
@@ -234,6 +241,42 @@ static bool HaveCgKnob(const string &subsys, const string &name, const string &k
     string val;
     TFile m(CgRoot(subsys, name) + knob);
     return m.Exists();
+}
+
+static int GetVmRss(const string &pid) {
+    stringstream ss(GetStatusLine(pid, "VmRSS:"));
+
+    string name, size, unit;
+
+    ss>> name;
+    ss>> size;
+    ss>> unit;
+
+    if (name != "VmRSS:")
+        throw string("PARSING ERROR");
+
+    return stoi(size);
+}
+
+static string Pgrep(const string &name) {
+    FILE *f = popen(("pgrep -x " + name).c_str(), "r");
+    Expect(f != nullptr);
+
+    char *line = nullptr;
+    size_t n;
+
+    string pid;
+    int instances = 0;
+    while (getline(&line, &n, f) >= 0) {
+        pid.assign(line);
+        pid.erase(pid.find('\n'));
+        instances++;
+    }
+
+    Expect(instances == 1);
+    fclose(f);
+
+    return pid;
 }
 
 static void ShouldHaveOnlyRoot(TPortoAPI &api) {
@@ -468,7 +511,7 @@ static void TestLongRunning(TPortoAPI &api, const string &name) {
     Expect(GetNamespace("self", "mnt") != GetNamespace(pid, "mnt"));
     Expect(GetNamespace("self", "ipc") == GetNamespace(pid, "ipc"));
     Expect(GetNamespace("self", "net") == GetNamespace(pid, "net"));
-    Expect(GetNamespace("self", "user") == GetNamespace(pid, "user"));
+    //Expect(GetNamespace("self", "user") == GetNamespace(pid, "user"));
     Expect(GetNamespace("self", "uts") != GetNamespace(pid, "uts"));
 
     cerr << "Check that task cgroups are correct" << endl;
@@ -831,26 +874,11 @@ static void TestPermissions(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.Stop(name));
 }
 
-static string GetVmRss(const string &pid) {
-    stringstream ss(GetStatusLine(pid, "VmRSS:"));
-
-    string name, size, unit;
-
-    ss>> name;
-    ss>> size;
-    ss>> unit;
-
-    if (name != "VmRSS:")
-        return "PARSING ERROR";
-
-    return size;
-}
-
 static void TestLeaks(TPortoAPI &api) {
     string pid;
     string name;
-    int nr = 100;
-    string size;
+    int nr = 1000;
+    int slack = 4096;
 
     TFile f(PID_FILE);
     Expect(f.AsString(pid) == false);
@@ -860,7 +888,7 @@ static void TestLeaks(TPortoAPI &api) {
     for (int i = 0; i < nr; i++) {
         name = "a" + to_string(i);
         ExpectSuccess(api.Create(name));
-        ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+        ExpectSuccess(api.SetProperty(name, "command", "true"));
         ExpectSuccess(api.Start(name));
     }
 
@@ -869,12 +897,12 @@ static void TestLeaks(TPortoAPI &api) {
         ExpectSuccess(api.Destroy(name));
     }
 
-    size = GetVmRss(pid);
+    int prev = GetVmRss(pid);
 
     for (int i = 0; i < nr; i++) {
         name = "b" + to_string(i);
         ExpectSuccess(api.Create(name));
-        ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+        ExpectSuccess(api.SetProperty(name, "command", "true"));
         ExpectSuccess(api.Start(name));
     }
 
@@ -883,28 +911,9 @@ static void TestLeaks(TPortoAPI &api) {
         ExpectSuccess(api.Destroy(name));
     }
 
-    Expect(size == GetVmRss(pid));
-}
+    int now = GetVmRss(pid);
 
-static string Pgrep(const string &name) {
-    FILE *f = popen(("pgrep -x " + name).c_str(), "r");
-    Expect(f != nullptr);
-
-    char *line = nullptr;
-    size_t n;
-
-    string pid;
-    int instances = 0;
-    while (getline(&line, &n, f) >= 0) {
-        pid.assign(line);
-        pid.erase(pid.find('\n'));
-        instances++;
-    }
-
-    Expect(instances == 1);
-    fclose(f);
-
-    return pid;
+    Expect(now <= prev + slack);
 }
 
 static void TestDaemon() {

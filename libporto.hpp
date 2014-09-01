@@ -6,30 +6,25 @@
 #include "util/protobuf.hpp"
 
 struct TProperty {
-    std::string name;
-    std::string description;
+    std::string Name;
+    std::string Description;
 
     TProperty(std::string name, std::string description) :
-        name(name), description(description) {}
+        Name(name), Description(description) {}
 };
 
 struct TData {
-    std::string name;
-    std::string description;
+    std::string Name;
+    std::string Description;
 
     TData(std::string name, std::string description) :
-        name(name), description(description) {}
-};
-
-struct TValue {
-    int error; // change to enum
-    std::string value;
+        Name(name), Description(description) {}
 };
 
 class TPortoAPI {
-    int fd;
-    rpc::TContainerRequest req;
-    rpc::TContainerResponse rsp;
+    int Fd;
+    rpc::TContainerRequest Req;
+    rpc::TContainerResponse Rsp;
     int LastError;
     std::string LastErrorMsg;
 

@@ -27,8 +27,8 @@ shared_ptr<TSubsystem> TSubsystem::Get(std::string name) {
     return nullptr;
 }
 
-const string& TSubsystem::Name() const {
-    return name;
+const string& TSubsystem::GetName() const {
+    return Name;
 }
 
 // Memory

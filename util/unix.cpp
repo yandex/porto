@@ -1,7 +1,7 @@
 #include <string>
 #include <csignal>
+#include <chrono>
 
-#include "log.hpp"
 #include "unix.hpp"
 
 extern "C" {
@@ -10,45 +10,48 @@ extern "C" {
 }
 
 int RetryBusy(int times, int timeo_ms, std::function<int()> handler) {
-    int ret;
+    int ret = 0;
 
     if (!times)
         times = 1;
 
-    while (times--) {
+    while (times-- > 0) {
         ret = handler();
         if (errno != EBUSY)
             return ret;
-        usleep(timeo_ms * 1000);
+        if (usleep(timeo_ms * 1000) < 0)
+            return -1;
     }
 
     return ret;
 }
 
 int RetryFailed(int times, int timeo_ms, std::function<int()> handler) {
-    int ret;
+    int ret = 0;
 
     if (!times)
         times = 1;
 
-    while (times--) {
+    while (times-- > 0) {
         ret = handler();
+
         if (ret == 0)
             return ret;
-        usleep(timeo_ms * 1000);
+        if (usleep(timeo_ms * 1000) < 0)
+            return -1;
     }
 
     return ret;
 }
 
-void SleepWhile(int timeo_ms, std::function<bool()> handler) {
-    const int resolution = 10;
+int SleepWhile(int timeo_ms, std::function<int()> handler) {
+    const int resolution = 5;
     int times = timeo_ms / resolution;
 
     if (!times)
         times = 0;
 
-    (void)RetryFailed(times, resolution, [&]{ return handler() != true; });
+    return RetryFailed(times, resolution, handler);
 }
 
 int GetPid() {

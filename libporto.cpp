@@ -22,75 +22,75 @@ int TPortoAPI::SendReceive(int fd, rpc::TContainerRequest &req, rpc::TContainerR
     }
 }
 
-TPortoAPI::TPortoAPI() : fd(-1) {
+TPortoAPI::TPortoAPI() : Fd(-1) {
 }
 
 TPortoAPI::~TPortoAPI() {
-    close(fd);
+    close(Fd);
 }
 
 int TPortoAPI::Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
     LastErrorMsg = "";
     LastError = (int)EError::Unknown;
 
-    if (fd < 0) {
-        TError error = ConnectToRpcServer(RPC_SOCK, fd);
+    if (Fd < 0) {
+        TError error = ConnectToRpcServer(RPC_SOCK, Fd);
         if (error)
             return INT_MIN;
     }
 
     rsp.Clear();
-    int ret = SendReceive(fd, req, rsp);
+    int ret = SendReceive(Fd, req, rsp);
     req.Clear();
     if (ret < 0) {
-        close(fd);
-        fd = -1;
+        close(Fd);
+        Fd = -1;
     }
     return LastError;
 }
 
 int TPortoAPI::Raw(const std::string &message, string &responce) {
-    if (!google::protobuf::TextFormat::ParseFromString(message, &req) ||
-        !req.IsInitialized())
+    if (!google::protobuf::TextFormat::ParseFromString(message, &Req) ||
+        !Req.IsInitialized())
         return -1;
 
-    int ret = Rpc(req, rsp);
+    int ret = Rpc(Req, Rsp);
     if (!ret)
-        responce = rsp.ShortDebugString();
+        responce = Rsp.ShortDebugString();
 
     return ret;
 }
 
 int TPortoAPI::Create(const string &name) {
-    req.mutable_create()->set_name(name);
+    Req.mutable_create()->set_name(name);
 
-    return Rpc(req, rsp);
+    return Rpc(Req, Rsp);
 }
 
 int TPortoAPI::Destroy(const string &name) {
-    req.mutable_destroy()->set_name(name);
+    Req.mutable_destroy()->set_name(name);
 
-    return Rpc(req, rsp);
+    return Rpc(Req, Rsp);
 }
 
 int TPortoAPI::List(vector<string> &clist) {
-    req.mutable_list();
+    Req.mutable_list();
 
-    int ret = Rpc(req, rsp);
+    int ret = Rpc(Req, Rsp);
     if (!ret) {
-        for (int i = 0; i < rsp.list().name_size(); i++)
-            clist.push_back(rsp.list().name(i));
+        for (int i = 0; i < Rsp.list().name_size(); i++)
+            clist.push_back(Rsp.list().name(i));
     }
 
     return ret;
 }
 
 int TPortoAPI::Plist(vector<TProperty> &plist) {
-    req.mutable_propertylist();
+    Req.mutable_propertylist();
 
-    int ret = Rpc(req, rsp);
+    int ret = Rpc(Req, Rsp);
     if (!ret) {
-        auto list = rsp.propertylist();
+        auto list = Rsp.propertylist();
 
         for (int i = 0; i < list.list_size(); i++)
             plist.push_back(TProperty(list.list(i).name(),
@@ -101,11 +101,11 @@ int TPortoAPI::Plist(vector<TProperty> &plist) {
 }
 
 int TPortoAPI::Dlist(vector<TData> &dlist) {
-    req.mutable_datalist();
+    Req.mutable_datalist();
 
-    int ret = Rpc(req, rsp);
+    int ret = Rpc(Req, Rsp);
     if (!ret) {
-        auto list = rsp.datalist();
+        auto list = Rsp.datalist();
 
         for (int i = 0; i < list.list_size(); i++)
             dlist.push_back(TData(list.list(i).name(),
@@ -116,57 +116,57 @@ int TPortoAPI::Dlist(vector<TData> &dlist) {
 }
 
 int TPortoAPI::GetProperty(const string &name, const string &property, string &value) {
-    req.mutable_getproperty()->set_name(name);
-    req.mutable_getproperty()->set_property(property);
+    Req.mutable_getproperty()->set_name(name);
+    Req.mutable_getproperty()->set_property(property);
 
-    int ret = Rpc(req, rsp);
+    int ret = Rpc(Req, Rsp);
     if (!ret)
-        value.assign(rsp.getproperty().value());
+        value.assign(Rsp.getproperty().value());
 
     return ret;
 }
 
 int TPortoAPI::SetProperty(const string &name, const string &property, string value) {
-    req.mutable_setproperty()->set_name(name);
-    req.mutable_setproperty()->set_property(property);
-    req.mutable_setproperty()->set_value(value);
+    Req.mutable_setproperty()->set_name(name);
+    Req.mutable_setproperty()->set_property(property);
+    Req.mutable_setproperty()->set_value(value);
 
-    return Rpc(req, rsp);
+    return Rpc(Req, Rsp);
 }
 
 int TPortoAPI::GetData(const string &name, const string &data, string &value) {
-    req.mutable_getdata()->set_name(name);
-    req.mutable_getdata()->set_data(data);
+    Req.mutable_getdata()->set_name(name);
+    Req.mutable_getdata()->set_data(data);
 
-    int ret = Rpc(req, rsp);
+    int ret = Rpc(Req, Rsp);
     if (!ret)
-        value.assign(rsp.getdata().value());
+        value.assign(Rsp.getdata().value());
 
     return ret;
 }
 
 int TPortoAPI::Start(const string &name) {
-    req.mutable_start()->set_name(name);
+    Req.mutable_start()->set_name(name);
 
-    return Rpc(req, rsp);
+    return Rpc(Req, Rsp);
 }
 
 int TPortoAPI::Stop(const string &name) {
-    req.mutable_stop()->set_name(name);
+    Req.mutable_stop()->set_name(name);
 
-    return Rpc(req, rsp);
+    return Rpc(Req, Rsp);
 }
 
 int TPortoAPI::Pause(const string &name) {
-    req.mutable_pause()->set_name(name);
+    Req.mutable_pause()->set_name(name);
 
-    return Rpc(req, rsp);
+    return Rpc(Req, Rsp);
 }
 
 int TPortoAPI::Resume(const string &name) {
-    req.mutable_resume()->set_name(name);
+    Req.mutable_resume()->set_name(name);
 
-    return Rpc(req, rsp);
+    return Rpc(Req, Rsp);
 }
 
 void TPortoAPI::GetLastError(int &error, std::string &msg) const {

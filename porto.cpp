@@ -117,8 +117,8 @@ public:
             PrintError("Can't list properties");
         else
             for (auto p : plist)
-                cout << " " << left << setw(24) << p.name
-                     << setw(40) << p.description << endl;
+                cout << " " << left << setw(24) << p.Name
+                     << setw(40) << p.Description << endl;
 
         cout << endl << "list of data:" << endl;
         vector<TData> dlist;
@@ -127,8 +127,8 @@ public:
             PrintError("Can't list data");
         else
             for (auto d : dlist)
-                cout << " " << left << setw(24) << d.name
-                     << setw(40) << d.description << endl;
+                cout << " " << left << setw(24) << d.Name
+                     << setw(40) << d.Description << endl;
     }
 
     int Execute(int argc, char *argv[])
@@ -378,13 +378,13 @@ public:
 
     bool ValidProperty(const vector<TProperty> &plist, const string &name) {
         return find_if(plist.begin(), plist.end(),
-                       [&](const TProperty &i)->bool { return i.name == name; })
+                       [&](const TProperty &i)->bool { return i.Name == name; })
             != plist.end();
     }
 
     bool ValidData(const vector<TData> &dlist, const string &name) {
         return find_if(dlist.begin(), dlist.end(),
-                       [&](const TData &i)->bool { return i.name == name; })
+                       [&](const TData &i)->bool { return i.Name == name; })
             != dlist.end();
     }
 
@@ -410,21 +410,21 @@ public:
 
         if (argc <= 1) {
             for (auto p : plist) {
-                if (!ValidProperty(plist, p.name))
+                if (!ValidProperty(plist, p.Name))
                     continue;
 
-                ret = api.GetProperty(argv[0], p.name, value);
+                ret = api.GetProperty(argv[0], p.Name, value);
                 if (!ret)
-                    cout << p.name << " = " << value << endl;
+                    cout << p.Name << " = " << value << endl;
             }
 
             for (auto d : dlist) {
-                if (!ValidData(dlist, d.name))
+                if (!ValidData(dlist, d.Name))
                     continue;
 
-                ret = api.GetData(argv[0], d.name, value);
+                ret = api.GetData(argv[0], d.Name, value);
                 if (!ret)
-                    cout << d.name << " = " << DataValue(d.name, value) << endl;
+                    cout << d.Name << " = " << DataValue(d.Name, value) << endl;
             }
 
             return 0;

@@ -27,25 +27,23 @@ enum class EContainerState {
 };
 
 struct TDataSpec {
-    std::string description;
-    bool root_valid;
-    std::function<std::string(TContainer& c)> handler;
-    std::set<EContainerState> valid;
+    std::string Description;
+    bool RootValid;
+    std::function<std::string(TContainer& c)> Handler;
+    std::set<EContainerState> Valid;
 };
 
-extern std::map<std::string, const TDataSpec> dataSpec;
+extern std::map<std::string, const TDataSpec> DataSpec;
 
 class TContainer {
-    const std::string name;
-
-    EContainerState state;
-
-    TContainerSpec spec;
+    const std::string Name;
+    EContainerState State;
+    TContainerSpec Spec;
     bool MaybeReturnedOk = false;
     friend TData;
 
-    std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> leaf_cgroups;
-    std::unique_ptr<TTask> task;
+    std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
+    std::unique_ptr<TTask> Task;
 
     // data
     bool CheckState(EContainerState expected);
@@ -54,10 +52,10 @@ class TContainer {
     TError KillAll();
 
 public:
-    TContainer(const std::string &name) : name(name), state(EContainerState::Stopped), spec(name) { }
+    TContainer(const std::string &name) : Name(name), State(EContainerState::Stopped), Spec(name) { }
     ~TContainer();
 
-    std::string Name();
+    std::string GetName();
 
     bool IsRoot();
 
@@ -83,7 +81,7 @@ public:
 };
 
 class TContainerHolder {
-    std::map <std::string, std::shared_ptr<TContainer>> containers;
+    std::map <std::string, std::shared_ptr<TContainer>> Containers;
 
     bool ValidName(const std::string &name);
 public:

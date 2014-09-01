@@ -41,9 +41,10 @@ static void SendPidStatus(int fd, int pid, int status, size_t queued) {
         Log() << "write(status): " << strerror(errno) << endl;
 }
 
-static pid_t portod_pid;
+static pid_t PortoPid;
 static volatile sig_atomic_t Done = false;
 static volatile sig_atomic_t NeedUpdate = false;
+static volatile sig_atomic_t Alarm = false;
 
 static void DoExitAndCleanup(int signum)
 {
@@ -55,16 +56,43 @@ static void DoUpdate(int signum)
     NeedUpdate = true;
 }
 
-static void ReceiveAcks(int fd, map<int,int> &PidToStatus) {
+static void DoAlarm(int signum)
+{
+    // we just need to interrupt poll
+    Alarm = true;
+}
+
+static void ReceiveAcks(int fd, map<int,int> &pidToStatus) {
     int pid;
 
     while (read(fd, &pid, sizeof(pid)) == sizeof(pid)) {
         Log() << "Got acknowledge for " << pid << endl;
-        PidToStatus.erase(pid);
+        pidToStatus.erase(pid);
     }
 }
 
-static int SpawnPortod(map<int,int> &PidToStatus) {
+static void SignalMask(int how) {
+    sigset_t mask;
+    int sigs[] = { SIGALRM };
+
+
+    if (sigemptyset(&mask) < 0) {
+        Log() << "Can't initialize signal mask: " << strerror(errno) << endl;
+        return;
+    }
+
+    for (auto sig: sigs)
+        if (sigaddset(&mask, sig) < 0) {
+            Log() << "Can't add signal to mask: " << strerror(errno) << endl;
+            return;
+        }
+
+
+    if (sigprocmask(how, &mask, NULL) < 0)
+        Log() << "Can't set signal mask: " << strerror(errno) << endl;
+}
+
+static int SpawnPortod(map<int,int> &pidToStatus) {
     int evtfd[2];
     int ackfd[2];
     int ret = EXIT_FAILURE;
@@ -79,12 +107,12 @@ static int SpawnPortod(map<int,int> &PidToStatus) {
         return EXIT_FAILURE;
     }
 
-    portod_pid = fork();
-    if (portod_pid < 0) {
+    PortoPid = fork();
+    if (PortoPid < 0) {
         Log() << "fork(): " << strerror(errno) << endl;
         ret = EXIT_FAILURE;
         goto exit;
-    } else if (portod_pid == 0) {
+    } else if (PortoPid == 0) {
         close(evtfd[1]);
         close(ackfd[0]);
 
@@ -96,22 +124,24 @@ static int SpawnPortod(map<int,int> &PidToStatus) {
     close(evtfd[0]);
     close(ackfd[1]);
 
-    Log() << "Spawned portod " << portod_pid << endl;
+    Log() << "Spawned portod " << PortoPid << endl;
 
-    for (auto &pair : PidToStatus)
-        SendPidStatus(evtfd[1], pair.first, pair.second, PidToStatus.size());
+    for (auto &pair : pidToStatus)
+        SendPidStatus(evtfd[1], pair.first, pair.second, pidToStatus.size());
+
+    SignalMask(SIG_BLOCK);
 
     while (!Done) {
         int pid;
 
-        ReceiveAcks(ackfd[0], PidToStatus);
+        ReceiveAcks(ackfd[0], pidToStatus);
 
         if (NeedUpdate) {
             Log() << "Updating" << endl;
 
-            if (kill(portod_pid, SIGKILL) < 0)
+            if (kill(PortoPid, SIGKILL) < 0)
                 Log() << "Can't send SIGKILL to portod: " << strerror(errno) << endl;
-            if (waitpid(portod_pid, NULL, 0) != portod_pid)
+            if (waitpid(PortoPid, NULL, 0) != PortoPid)
                 Log() << "Can't wait for portod exit status: " << strerror(errno) << endl;
 
             close(evtfd[1]);
@@ -123,23 +153,35 @@ static int SpawnPortod(map<int,int> &PidToStatus) {
             break;
         }
 
+        (void)alarm(LOOP_WAIT_TIMEOUT_S);
+
+        SignalMask(SIG_UNBLOCK);
         int status;
         pid = wait(&status);
+        SignalMask(SIG_BLOCK);
+
+        if (Alarm) {
+            Alarm = false;
+            continue;
+        }
+
         if (errno == EINTR) {
             Log() << "wait(): " << strerror(errno) << endl;
             continue;
         }
-        if (pid == portod_pid) {
+        if (pid == PortoPid) {
             Log() << "portod exited with " << status << endl;
             ret = EXIT_SUCCESS;
             break;
         }
 
-        SendPidStatus(evtfd[1], pid, status, PidToStatus.size());
-        PidToStatus[pid] = status;
+        SendPidStatus(evtfd[1], pid, status, pidToStatus.size());
+        pidToStatus[pid] = status;
     }
 
-    ReceiveAcks(ackfd[0], PidToStatus);
+    SignalMask(SIG_UNBLOCK);
+
+    ReceiveAcks(ackfd[0], pidToStatus);
 
 exit:
     close(evtfd[0]);
@@ -173,6 +215,9 @@ int main(int argc, char * const argv[])
     (void)RegisterSignal(SIGPIPE, SIG_IGN);
     (void)RegisterSignal(SIGINT, DoExitAndCleanup);
     (void)RegisterSignal(SIGHUP, DoUpdate);
+    (void)RegisterSignal(SIGALRM, DoAlarm);
+
+    SignalMask(SIG_UNBLOCK);
 
     if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0) {
         Log() << "Can't set myself as a subreaper" << endl;
@@ -180,16 +225,16 @@ int main(int argc, char * const argv[])
     }
 
     int ret = EXIT_SUCCESS;
-    map<int,int> PidToStatus;
+    map<int,int> pidToStatus;
 
     while (!Done) {
-        ret = SpawnPortod(PidToStatus);
+        ret = SpawnPortod(pidToStatus);
         Log() << "Returned " << ret << endl;
         if (!Done && ret != EXIT_SUCCESS)
             usleep(1000000);
     }
 
-    if (kill(portod_pid, SIGINT) < 0)
+    if (kill(PortoPid, SIGINT) < 0)
         Log() << "Can't send SIGINT to portod" << endl;
 
     Log() << "Stopped" << endl;

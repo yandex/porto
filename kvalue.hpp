@@ -9,9 +9,8 @@
 #include "util/mount.hpp"
 
 class TKeyValueStorage {
-    TMount tmpfs;
+    TMount Tmpfs;
     std::string Path(const std::string &name);
-
     void Merge(kv::TNode &node, kv::TNode &next);
     std::vector<std::string> ListNodes();
     TError ListNodes(std::vector<std::string> &list);

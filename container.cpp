@@ -14,6 +14,7 @@
 extern "C" {
 #include <sys/types.h>
 #include <unistd.h>
+#include <sys/time.h>
 }
 
 using namespace std;
@@ -22,7 +23,7 @@ using namespace std;
 
 struct TData {
     static string State(TContainer& c) {
-        switch (c.state) {
+        switch (c.State) {
         case EContainerState::Stopped:
             return "stopped";
         case EContainerState::Dead:
@@ -37,39 +38,39 @@ struct TData {
     }
 
     static string RootPid(TContainer& c) {
-        if (c.task)
-            return to_string(c.task->GetPid());
+        if (c.Task)
+            return to_string(c.Task->GetPid());
         else
             return "-1";
     };
 
     static string ExitStatus(TContainer& c) {
-        if (c.task && !c.task->IsRunning()) {
-            TExitStatus status = c.task->GetExitStatus();
-            return to_string(status.status);
+        if (c.Task && !c.Task->IsRunning()) {
+            TExitStatus status = c.Task->GetExitStatus();
+            return to_string(status.Status);
         }
         else
             return "-1";
     };
 
     static string StartErrno(TContainer& c) {
-        if (c.task && !c.task->IsRunning()) {
-            TExitStatus status = c.task->GetExitStatus();
-            return to_string(status.error);
+        if (c.Task && !c.Task->IsRunning()) {
+            TExitStatus status = c.Task->GetExitStatus();
+            return to_string(status.Error);
         }
         else
             return "-1";
     };
 
     static string Stdout(TContainer& c) {
-        if (c.task)
-            return c.task->GetStdout();
+        if (c.Task)
+            return c.Task->GetStdout();
         return "";
     };
 
     static string Stderr(TContainer& c) {
-        if (c.task)
-            return c.task->GetStderr();
+        if (c.Task)
+            return c.Task->GetStderr();
         return "";
     };
 
@@ -110,7 +111,7 @@ struct TData {
     };
 };
 
-std::map<std::string, const TDataSpec> dataSpec = {
+std::map<std::string, const TDataSpec> DataSpec = {
     { "state", { "container state", true, TData::State, { EContainerState::Stopped, EContainerState::Dead, EContainerState::Running, EContainerState::Paused } } },
     { "exit_status", { "container exit status", false, TData::ExitStatus, { EContainerState::Dead } } },
     { "start_errno", { "container start error", false, TData::StartErrno, { EContainerState::Stopped } } },
@@ -124,25 +125,25 @@ std::map<std::string, const TDataSpec> dataSpec = {
 // TContainer
 
 bool TContainer::CheckState(EContainerState expected) {
-    if (state == EContainerState::Running && (!task || !task->IsRunning()))
-        state = EContainerState::Stopped;
+    if (State == EContainerState::Running && (!Task || !Task->IsRunning()))
+        State = EContainerState::Stopped;
 
-    return state == expected;
+    return State == expected;
 }
 
 TContainer::~TContainer() {
-    if (state == EContainerState::Paused)
+    if (State == EContainerState::Paused)
         Resume();
 
     Stop();
 }
 
-string TContainer::Name() {
-    return name;
+string TContainer::GetName() {
+    return Name;
 }
 
 bool TContainer::IsRoot() {
-    return name == ROOT_CONTAINER;
+    return Name == ROOT_CONTAINER;
 }
 
 vector<pid_t> TContainer::Processes() {
@@ -158,14 +159,14 @@ bool TContainer::IsAlive() {
 }
 
 TError TContainer::PrepareCgroups() {
-    leaf_cgroups[CpuacctSubsystem] = GetLeafCgroup(CpuacctSubsystem);
-    leaf_cgroups[MemorySubsystem] = GetLeafCgroup(MemorySubsystem);
-    leaf_cgroups[FreezerSubsystem] = GetLeafCgroup(FreezerSubsystem);
+    LeafCgroups[CpuacctSubsystem] = GetLeafCgroup(CpuacctSubsystem);
+    LeafCgroups[MemorySubsystem] = GetLeafCgroup(MemorySubsystem);
+    LeafCgroups[FreezerSubsystem] = GetLeafCgroup(FreezerSubsystem);
 
-    for (auto cg : leaf_cgroups) {
+    for (auto cg : LeafCgroups) {
         auto ret = cg.second->Create();
         if (ret) {
-            leaf_cgroups.clear();
+            LeafCgroups.clear();
             return ret;
         }
     }
@@ -179,13 +180,13 @@ TError TContainer::PrepareCgroups() {
         return error;
 
     if (memroot->HasKnob("memory.low_limit_in_bytes")) {
-        TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", spec.Get("memory_guarantee"), false);
+        TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", Spec.Get("memory_guarantee"), false);
         TLogger::LogError(error, "Can't set memory_guarantee");
         if (error)
             return error;
     }
 
-    error = memcg->SetKnobValue("memory.limit_in_bytes", spec.Get("memory_limit"), false);
+    error = memcg->SetKnobValue("memory.limit_in_bytes", Spec.Get("memory_limit"), false);
     TLogger::LogError(error, "Can't set memory_limit");
     if (error)
         return error;
@@ -194,21 +195,21 @@ TError TContainer::PrepareCgroups() {
 }
 
 TError TContainer::PrepareTask() {
-    TTaskEnv taskEnv(spec.Get("command"), spec.Get("cwd"), spec.Get("root"), spec.Get("user"), spec.Get("group"), spec.Get("env"));
+    TTaskEnv taskEnv(Spec.Get("command"), Spec.Get("cwd"), Spec.Get("root"), Spec.Get("user"), Spec.Get("group"), Spec.Get("env"));
     TError error = taskEnv.Prepare();
     if (error)
         return error;
 
     vector<shared_ptr<TCgroup>> cgroups;
-    for (auto cg : leaf_cgroups)
+    for (auto cg : LeafCgroups)
         cgroups.push_back(cg.second);
-    task = unique_ptr<TTask>(new TTask(taskEnv, cgroups));
+    Task = unique_ptr<TTask>(new TTask(taskEnv, cgroups));
     return TError::Success();
 }
 
 TError TContainer::Create() {
-    TLogger::Log("Create " + name);
-    return spec.Create();
+    TLogger::Log("Create " + Name);
+    return Spec.Create();
 }
 
 static string ContainerStateName(EContainerState state) {
@@ -227,7 +228,7 @@ static string ContainerStateName(EContainerState state) {
 }
 
 TError TContainer::Start() {
-    if ((state == EContainerState::Running || state == EContainerState::Dead) && MaybeReturnedOk) {
+    if ((State == EContainerState::Running || State == EContainerState::Dead) && MaybeReturnedOk) {
         TLogger::Log("Maybe running");
         MaybeReturnedOk = false;
         return TError::Success();
@@ -235,7 +236,7 @@ TError TContainer::Start() {
     MaybeReturnedOk = false;
 
     if (!CheckState(EContainerState::Stopped))
-        return TError(EError::InvalidValue, "invalid container state " + ContainerStateName(state));
+        return TError(EError::InvalidValue, "invalid container state " + ContainerStateName(State));
 
     TError error = PrepareCgroups();
     if (error) {
@@ -244,11 +245,11 @@ TError TContainer::Start() {
     }
 
     if (IsRoot()) {
-        state = EContainerState::Running;
+        State = EContainerState::Running;
         return TError::Success();
     }
 
-    if (!spec.Get("command").length())
+    if (!Spec.Get("command").length())
         return TError(EError::InvalidValue, "container command is empty");
 
     error = PrepareTask();
@@ -257,17 +258,17 @@ TError TContainer::Start() {
         return error;
     }
 
-    error = task->Start();
+    error = Task->Start();
     if (error) {
-        leaf_cgroups.clear();
+        LeafCgroups.clear();
         TLogger::LogError(error, "Can't start task");
         return error;
     }
 
-    TLogger::Log(name + " started " + to_string(task->GetPid()));
+    TLogger::Log(Name + " started " + to_string(Task->GetPid()));
 
-    spec.SetInternal("root_pid", to_string(task->GetPid()));
-    state = EContainerState::Running;
+    Spec.SetInternal("root_pid", to_string(Task->GetPid()));
+    State = EContainerState::Running;
 
     return TError::Success();
 }
@@ -275,7 +276,7 @@ TError TContainer::Start() {
 TError TContainer::KillAll() {
     auto cg = GetLeafCgroup(FreezerSubsystem);
 
-    TLogger::Log("killall " + name);
+    TLogger::Log("killall " + Name);
 
     vector<pid_t> reap;
     TError error = cg->GetTasks(reap);
@@ -287,7 +288,11 @@ TError TContainer::KillAll() {
     // try to stop all tasks gracefully
     cg->Kill(SIGTERM);
 
-    SleepWhile(100, [&]{ return !cg->IsEmpty(); });
+    int ret = SleepWhile(1000, [&]{ return cg->IsEmpty() == false; });
+    if (ret) {
+        error = TError(EError::Unknown, errno, "sleep()");
+        TLogger::LogError(error, "Error while sleeping");
+    }
 
     // then kill any task that didn't want to stop via SIGTERM;
     // freeze all container tasks to make sure no one forks and races with us
@@ -313,67 +318,67 @@ extern void AckExitStatus(int pid);
 
 TError TContainer::Stop() {
     if (IsRoot() || !(CheckState(EContainerState::Running) || CheckState(EContainerState::Dead)))
-        return TError(EError::InvalidValue, "invalid container state " + ContainerStateName(state));
+        return TError(EError::InvalidValue, "invalid container state " + ContainerStateName(State));
 
-    TLogger::Log("stop " + name);
+    TLogger::Log("stop " + Name);
 
-    int pid = task->GetPid();
+    int pid = Task->GetPid();
 
     TError error = KillAll();
     if (error)
         TLogger::LogError(error, "Can't kill all tasks in container");
 
-    leaf_cgroups.clear();
+    LeafCgroups.clear();
 
     AckExitStatus(pid);
 
-    state = EContainerState::Stopped;
+    State = EContainerState::Stopped;
 
     return TError::Success();
 }
 
 TError TContainer::Pause() {
     if (IsRoot() || !CheckState(EContainerState::Running))
-        return TError(EError::InvalidValue, "invalid container state " + ContainerStateName(state));
+        return TError(EError::InvalidValue, "invalid container state " + ContainerStateName(State));
 
     auto cg = GetLeafCgroup(FreezerSubsystem);
     TError error(FreezerSubsystem->Freeze(*cg));
     if (error) {
-        TLogger::LogError(error, "Can't pause " + name);
+        TLogger::LogError(error, "Can't pause " + Name);
         return error;
     }
 
-    state = EContainerState::Paused;
+    State = EContainerState::Paused;
     return TError::Success();
 }
 
 TError TContainer::Resume() {
     if (!CheckState(EContainerState::Paused))
-        return TError(EError::InvalidValue, "invalid container state " + ContainerStateName(state));
+        return TError(EError::InvalidValue, "invalid container state " + ContainerStateName(State));
 
     auto cg = GetLeafCgroup(FreezerSubsystem);
     TError error(FreezerSubsystem->Unfreeze(*cg));
     if (error) {
-        TLogger::LogError(error, "Can't resume " + name);
+        TLogger::LogError(error, "Can't resume " + Name);
         return error;
     }
 
 
-    state = EContainerState::Running;
+    State = EContainerState::Running;
     return TError::Success();
 }
 
 TError TContainer::GetData(const string &name, string &value) {
-    if (dataSpec.find(name) == dataSpec.end())
+    if (DataSpec.find(name) == DataSpec.end())
         return TError(EError::InvalidValue, "invalid container data");
 
-    if (IsRoot() && !dataSpec[name].root_valid)
+    if (IsRoot() && !DataSpec[name].RootValid)
         return TError(EError::InvalidData, "invalid data for root container");
 
-    if (dataSpec[name].valid.find(state) == dataSpec[name].valid.end())
-        return TError(EError::InvalidState, "invalid container state " + ContainerStateName(state));
+    if (DataSpec[name].Valid.find(State) == DataSpec[name].Valid.end())
+        return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
 
-    value = dataSpec[name].handler(*this);
+    value = DataSpec[name].Handler(*this);
     return TError::Success();
 }
 
@@ -381,7 +386,7 @@ TError TContainer::GetProperty(const string &property, string &value) {
     if (IsRoot())
         return TError(EError::InvalidProperty, "no properties for root container");
 
-    value = spec.Get(property);
+    value = Spec.Get(property);
     return TError::Success();
 }
 
@@ -389,14 +394,14 @@ TError TContainer::SetProperty(const string &property, const string &value) {
     if (IsRoot())
         return TError(EError::InvalidValue, "Can't set property for root");
 
-    if (state != EContainerState::Stopped && !spec.IsDynamic(property))
+    if (State != EContainerState::Stopped && !Spec.IsDynamic(property))
         return TError(EError::InvalidValue, "Can't set dynamic property " + property + " for running container");
 
-    return spec.Set(property, value);
+    return Spec.Set(property, value);
 }
 
 TError TContainer::Restore(const kv::TNode &node) {
-    TError error = spec.Restore(node);
+    TError error = Spec.Restore(node);
     if (error) {
         TLogger::LogError(error, "Can't restore task's spec");
         return error;
@@ -404,13 +409,13 @@ TError TContainer::Restore(const kv::TNode &node) {
 
     int pid;
     bool started = true;
-    error = StringToInt(spec.GetInternal("root_pid"), pid);
+    error = StringToInt(Spec.GetInternal("root_pid"), pid);
     if (error)
         started = false;
 
-    TLogger::Log(name + ": restore process " + to_string(pid) + " which " + (started ? "started" : "didn't start"));
+    TLogger::Log(Name + ": restore process " + to_string(pid) + " which " + (started ? "started" : "didn't start"));
 
-    state = EContainerState::Stopped;
+    State = EContainerState::Stopped;
 
     if (started) {
         error = PrepareCgroups();
@@ -425,17 +430,17 @@ TError TContainer::Restore(const kv::TNode &node) {
             return error;
         }
 
-        error = task->Restore(pid);
+        error = Task->Restore(pid);
         if (error) {
-            task = nullptr;
+            Task = nullptr;
             (void)KillAll();
 
             TLogger::LogError(error, "Can't restore task");
             return error;
         }
 
-        state = task->IsRunning() ? EContainerState::Running : EContainerState::Stopped;
-        if (state == EContainerState::Running)
+        State = Task->IsRunning() ? EContainerState::Running : EContainerState::Stopped;
+        if (State == EContainerState::Running)
             MaybeReturnedOk = true;
     } else {
         if (IsAlive()) {
@@ -455,31 +460,31 @@ TError TContainer::Restore(const kv::TNode &node) {
 }
 
 std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys) {
-    if (leaf_cgroups.find(subsys) != leaf_cgroups.end())
-        return leaf_cgroups[subsys];
+    if (LeafCgroups.find(subsys) != LeafCgroups.end())
+        return LeafCgroups[subsys];
 
-    if (name == ROOT_CONTAINER)
+    if (Name == ROOT_CONTAINER)
         return subsys->GetRootCgroup()->GetChild(PORTO_ROOT_CGROUP);
     else
-        return subsys->GetRootCgroup()->GetChild(PORTO_ROOT_CGROUP)->GetChild(name);
+        return subsys->GetRootCgroup()->GetChild(PORTO_ROOT_CGROUP)->GetChild(Name);
 }
 
 bool TContainer::DeliverExitStatus(int pid, int status) {
-    if (state != EContainerState::Running || !task)
+    if (State != EContainerState::Running || !Task)
         return false;
 
-    if (task->GetPid() != pid)
+    if (Task->GetPid() != pid)
         return false;
 
-    task->DeliverExitStatus(status);
-    TLogger::Log("Delivered " + to_string(status) + " to " + name + " with root_pid " + to_string(task->GetPid()));
-    state = EContainerState::Dead;
+    Task->DeliverExitStatus(status);
+    TLogger::Log("Delivered " + to_string(status) + " to " + Name + " with root_pid " + to_string(Task->GetPid()));
+    State = EContainerState::Dead;
     return true;
 }
 
 void TContainer::Heartbeat() {
-    if (task)
-        task->Rotate();
+    if (Task)
+        Task->Rotate();
 }
 
 // TContainerHolder
@@ -512,35 +517,35 @@ TError TContainerHolder::Create(const string &name) {
     if (!ValidName(name))
         return TError(EError::InvalidValue, "invalid container name " + name);
 
-    if (containers[name] == nullptr) {
+    if (Containers[name] == nullptr) {
         auto c = make_shared<TContainer>(name);
         TError error(c->Create());
         if (error)
             return error;
 
-        containers[name] = c;
+        Containers[name] = c;
         return TError::Success();
     } else
         return TError(EError::InvalidValue, "container " + name + " already exists");
 }
 
 shared_ptr<TContainer> TContainerHolder::Get(const string &name) {
-    if (containers.find(name) == containers.end())
+    if (Containers.find(name) == Containers.end())
         return shared_ptr<TContainer>();
 
-    return containers[name];
+    return Containers[name];
 }
 
 void TContainerHolder::Destroy(const string &name) {
     if (name != ROOT_CONTAINER)
-        containers.erase(name);
+        Containers.erase(name);
 }
 
 vector<string> TContainerHolder::List() {
     vector<string> ret;
 
-    for (auto c : containers)
-        ret.push_back(c.second->Name());
+    for (auto c : Containers)
+        ret.push_back(c.second->GetName());
 
     return ret;
 }
@@ -552,12 +557,12 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
     if (e)
         return e;
 
-    containers[name] = c;
+    Containers[name] = c;
     return TError::Success();
 }
 
 bool TContainerHolder::DeliverExitStatus(int pid, int status) {
-    for (auto c : containers)
+    for (auto c : Containers)
         if (c.second->DeliverExitStatus(pid, status))
             return true;
 
@@ -565,6 +570,6 @@ bool TContainerHolder::DeliverExitStatus(int pid, int status) {
 }
 
 void TContainerHolder::Heartbeat() {
-    for (auto c : containers)
+    for (auto c : Containers)
         c.second->Heartbeat();
 }

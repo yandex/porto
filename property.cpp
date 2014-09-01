@@ -75,7 +75,7 @@ static TError ValidCpuPriority(string str) {
     return TError::Success();
 }
 
-std::map<std::string, const TPropertySpec> propertySpec = {
+std::map<std::string, const TPropertySpec> PropertySpec = {
     {"command", { "command executed upon container start", "" }},
     {"user", { "start command with given user", "nobody", false, ValidUser }},
     {"group", { "start command with given group", "nogroup", false, ValidGroup }},
@@ -89,31 +89,31 @@ std::map<std::string, const TPropertySpec> propertySpec = {
 };
 
 string TContainerSpec::Get(const string &property) {
-    if (data.find(property) == data.end())
-        return propertySpec[property].def;
+    if (Data.find(property) == Data.end())
+        return PropertySpec[property].Def;
 
-    return data[property];
+    return Data[property];
 }
 
 bool TContainerSpec::IsRoot() {
-    return name == ROOT_CONTAINER;
+    return Name == ROOT_CONTAINER;
 }
 
 bool TContainerSpec::IsDynamic(const std::string &property) {
-    if (propertySpec.find(property) == propertySpec.end())
+    if (PropertySpec.find(property) == PropertySpec.end())
         return false;
 
-    return propertySpec[property].dynamic;
+    return PropertySpec[property].Dynamic;
 }
 
 string TContainerSpec::GetInternal(const string &property) {
-    if (data.find(property) == data.end())
+    if (Data.find(property) == Data.end())
         return "";
-    return data[property];
+    return Data[property];
 }
 
 TError TContainerSpec::SetInternal(const string &property, const string &value) {
-    data[property] = value;
+    Data[property] = value;
     TError error(AppendStorage(property, value));
     if (error)
         TLogger::LogError(error, "Can't append property to key-value store");
@@ -121,14 +121,14 @@ TError TContainerSpec::SetInternal(const string &property, const string &value) 
 }
 
 TError TContainerSpec::Set(const string &property, const string &value) {
-    if (propertySpec.find(property) == propertySpec.end()) {
+    if (PropertySpec.find(property) == PropertySpec.end()) {
         TError error(EError::InvalidValue, "property not found");
         TLogger::LogError(error, "Can't set property");
         return error;
     }
 
-    if (propertySpec[property].Valid) {
-        TError error = propertySpec[property].Valid(value);
+    if (PropertySpec[property].Valid) {
+        TError error = PropertySpec[property].Valid(value);
         TLogger::LogError(error, "Can't set property");
         if (error)
             return error;
@@ -139,7 +139,7 @@ TError TContainerSpec::Set(const string &property, const string &value) {
 
 TError TContainerSpec::Create() {
     kv::TNode node;
-    return storage.SaveNode(name, node);
+    return Storage.SaveNode(Name, node);
 }
 
 TError TContainerSpec::Restore(const kv::TNode &node) {
@@ -147,7 +147,7 @@ TError TContainerSpec::Restore(const kv::TNode &node) {
         auto key = node.pairs(i).key();
         auto value = node.pairs(i).val();
 
-        data[key] = value;
+        Data[key] = value;
     }
 
     return SyncStorage();
@@ -155,8 +155,8 @@ TError TContainerSpec::Restore(const kv::TNode &node) {
 
 TContainerSpec::~TContainerSpec() {
     if (!IsRoot()) {
-        TError error = storage.RemoveNode(name);
-        TLogger::LogError(error, "Can't remove key-value node " + name);
+        TError error = Storage.RemoveNode(Name);
+        TLogger::LogError(error, "Can't remove key-value node " + Name);
     }
 }
 
@@ -166,13 +166,13 @@ TError TContainerSpec::SyncStorage() {
 
     kv::TNode node;
 
-    for (auto &kv : data) {
+    for (auto &kv : Data) {
         auto pair = node.add_pairs();
         pair->set_key(kv.first);
         pair->set_val(kv.second);
     }
 
-    return storage.SaveNode(name, node);
+    return Storage.SaveNode(Name, node);
 }
 
 TError TContainerSpec::AppendStorage(const string& key, const string& value) {
@@ -185,5 +185,5 @@ TError TContainerSpec::AppendStorage(const string& key, const string& value) {
     pair->set_key(key);
     pair->set_val(value);
 
-    return storage.AppendNode(name, node);
+    return Storage.AppendNode(Name, node);
 }

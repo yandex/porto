@@ -10,11 +10,11 @@ extern "C" {
 #include <fcntl.h>
 }
 
-static std::ofstream file;
+static std::ofstream File;
 
 void TLogger::OpenLog(const std::string &path, const unsigned int mode) {
-    if (file.is_open())
-        file.close();
+    if (File.is_open())
+        File.close();
 
     struct stat st;
     bool need_create = false;
@@ -31,11 +31,11 @@ void TLogger::OpenLog(const std::string &path, const unsigned int mode) {
     if (need_create)
         close(creat(path.c_str(), mode));
 
-    file.open(path, std::ios_base::app);
+    File.open(path, std::ios_base::app);
 }
 
 void TLogger::CloseLog() {
-    file.close();
+    File.close();
 }
 
 static std::string GetTime() {
@@ -55,27 +55,27 @@ void TLogger::Log(const std::string &action) {
     if (!LOG_VEBOSE)
         return;
     
-    file << GetTime() << " " << action << std::endl;
+    File << GetTime() << " " << action << std::endl;
 }
 
 void TLogger::LogAction(const std::string &action, bool error, int errcode) {
     if (!error && LOG_VEBOSE)
-        file << GetTime() << " Ok: " << action << std::endl;
+        File << GetTime() << " Ok: " << action << std::endl;
     else if (error)
-        file << GetTime() << " Error: " << action << ": " << strerror(errcode) << std::endl;
+        File << GetTime() << " Error: " << action << ": " << strerror(errcode) << std::endl;
 }
 
 void TLogger::LogError(const TError &e, const std::string &s) {
     if (!e)
         return;
 
-    file << GetTime() << " Error(" << rpc::EError_Name(e.GetError()) << "): " << s << ": " << e.GetMsg() << std::endl;
+    File << GetTime() << " Error(" << rpc::EError_Name(e.GetError()) << "): " << s << ": " << e.GetMsg() << std::endl;
 }
 
 void TLogger::LogRequest(const std::string &message) {
-    file << GetTime() << " -> " << message << std::endl;
+    File << GetTime() << " -> " << message << std::endl;
 }
 
 void TLogger::LogResponse(const std::string &message) {
-    file << GetTime() << " <- " << message << std::endl;
+    File << GetTime() << " <- " << message << std::endl;
 }

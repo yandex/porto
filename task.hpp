@@ -12,26 +12,25 @@ class TContainerEnv;
 
 struct TExitStatus {
     // Task was not started due to the following error
-    int error;
+    int Error;
     // Task exited with given status
-    int status;
+    int Status;
 };
 
 class TTaskEnv {
     friend TTask;
-    std::string command;
-    std::vector<std::string> args;
-    std::string cwd;
-    std::string root;
+    std::string Command;
+    std::string Cwd;
+    std::string Root;
     std::vector<std::string> env;
-    std::string user;
-    std::string group;
-    std::string envir;
-    int uid, gid;
+    std::string User;
+    std::string Group;
+    std::string Envir;
+    int Uid, Gid;
 
 public:
     TTaskEnv() {};
-    TTaskEnv(const std::string &command, const std::string &cwd, const std::string &root, const std::string &user, const std::string &group, const std::string &envir) : command(command), cwd(cwd), root(root), user(user), group(group), envir(envir) { }
+    TTaskEnv(const std::string &command, const std::string &cwd, const std::string &root, const std::string &user, const std::string &group, const std::string &envir) : Command(command), Cwd(cwd), Root(root), User(user), Group(group), Envir(envir) { }
     TError Prepare();
     const char** GetEnvp();
 };
