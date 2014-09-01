@@ -1,5 +1,5 @@
-#include "log.hpp"
 #include "rpc.hpp"
+#include "util/log.hpp"
 #include "util/protobuf.hpp"
 
 using namespace std;

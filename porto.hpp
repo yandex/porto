@@ -34,4 +34,7 @@ const unsigned int LOOP_LOG_FILE_PERM = 0644;
 
 const unsigned int LOOP_WAIT_TIMEOUT_S = 10;
 
+const int REAP_EVT_FD = 128;
+const int REAP_ACK_FD = 129;
+
 #endif

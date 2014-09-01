@@ -2,8 +2,6 @@
 - after container->Stop() returns, we have zombie process for some time (it will take a while for portoloop to reap it and deliver exit status to portod)
 - remove extern AckExitStatus from container->Stop()
 - porto support auto-respawning containers
-- try to compile with clang and check warning
-
 - stresstest: check for zombies, delivery queue overruns, fd leaks
 
 # cleanup

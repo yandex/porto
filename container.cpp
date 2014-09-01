@@ -407,7 +407,7 @@ TError TContainer::Restore(const kv::TNode &node) {
         return error;
     }
 
-    int pid;
+    int pid = 0;
     bool started = true;
     string pidStr;
     error = Spec.GetInternal("root_pid", pidStr);

@@ -23,8 +23,6 @@ extern "C" {
 using namespace std;
 
 static const size_t MAX_CONNECTIONS = PORTOD_MAX_CLIENTS + 1;
-static const int REAP_EVT_FD = 3;
-static const int REAP_ACK_FD = 6;
 
 static void RemoveRpcServer(const string &path) {
     TFile f(path);
@@ -246,7 +244,7 @@ static int RpcMain(TContainerHolder &cholder) {
 }
 
 static void ReaiseSignal(int signum) {
-    struct sigaction sa = { 0 };
+    struct sigaction sa = {};
     sa.sa_handler = SIG_DFL;
 
     TLogger::CloseLog();

@@ -105,7 +105,7 @@ TError CreateRpcServer(const std::string &path, const int mode, const int uid, c
         return TError(EError::Unknown, errno, "fchmod(" + path + ", " + to_string(mode) + ")");
     }
 
-    if (bind(fd, (struct sockaddr *) &my_addr,
+    if (::bind(fd, (struct sockaddr *) &my_addr,
              sizeof(struct sockaddr_un)) < 0) {
         close(fd);
         return TError(EError::Unknown, errno, "bind(" + path + ")");

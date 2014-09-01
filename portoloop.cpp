@@ -99,6 +99,11 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
     } else if (portoPid == 0) {
         close(evtfd[1]);
         close(ackfd[0]);
+        TLogger::CloseLog();
+        dup2(evtfd[0], REAP_EVT_FD);
+        dup2(ackfd[1], REAP_ACK_FD);
+        close(evtfd[0]);
+        close(ackfd[1]);
 
         ret = execlp("portod", "portod", nullptr);
         TLogger::Log() << "execlp(): " << strerror(errno) << endl;
@@ -127,15 +132,12 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
                 TLogger::Log() << "Can't send SIGKILL to portod: " << strerror(errno) << endl;
             if (waitpid(portoPid, NULL, 0) != portoPid)
                 TLogger::Log() << "Can't wait for portod exit status: " << strerror(errno) << endl;
-
+            TLogger::CloseLog();
             close(evtfd[1]);
             close(ackfd[0]);
-
-            TLogger::CloseLog();
             execlp(program_invocation_name, program_invocation_short_name, nullptr);
             TLogger::OpenLog(LOOP_LOG_FILE, LOOP_LOG_FILE_PERM);
             TLogger::Log() << "Can't execlp(" << program_invocation_name << ", " << program_invocation_short_name << ", NULL)" << endl;
-            TLogger::CloseLog();
             ret = EXIT_FAILURE;
             break;
         }

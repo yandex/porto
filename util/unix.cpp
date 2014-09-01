@@ -59,7 +59,7 @@ int GetPid() {
 }
 
 int RegisterSignal(int signum, void (*handler)(int)) {
-    struct sigaction sa = { 0 };
+    struct sigaction sa = {};
 
     sa.sa_handler = handler;
     if (sigaction(signum, &sa, NULL) < 0)
@@ -71,7 +71,7 @@ void ResetAllSignalHandlers(void) {
     int sig;
 
     for (sig = 1; sig < _NSIG; sig++) {
-        struct sigaction sa = { 0 };
+        struct sigaction sa = {};
         sa.sa_handler = SIG_DFL;
         sa.sa_flags = SA_RESTART;
 

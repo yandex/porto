@@ -927,7 +927,7 @@ static void TestDaemon() {
     cerr << "Make sure portod doesn't have invalid FDs" << endl;
     string path = ("/proc/" + pid + "/fd");
     n = scandir(path.c_str(), &lst, NULL, alphasort);
-    // . .. 0(stdin) 1(stdout) 2(stderr) 3(event pipe) 4(log) 5(rpc socket) 6(ack pipe)
+    // . .. 0(stdin) 1(stdout) 2(stderr) 4(log) 5(rpc socket) 128(event pipe) 129(ack pipe)
     Expect(n == 2 + 7);
 
     cerr << "Make sure portoloop doesn't have zombies" << endl;
@@ -936,8 +936,8 @@ static void TestDaemon() {
     cerr << "Make sure portoloop doesn't have invalid FDs" << endl;
     path = ("/proc/" + pid + "/fd");
     n = scandir(path.c_str(), &lst, NULL, alphasort);
-    // . .. 0(stdin) 1(stdout) 2(stderr) 4(event pipe) 5(ack pipe)
-    Expect(n == 2 + 5);
+    // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 128(event pipe) 129(ack pipe)
+    Expect(n == 2 + 6);
 }
 
 static void TestRecovery(TPortoAPI &api) {
