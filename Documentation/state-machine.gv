@@ -1,0 +1,12 @@
+digraph StateMachine {
+	start [shape=Mdiamond];
+	start -> stopped [label="create()"];
+	stopped -> start [label="destroy()"];
+	stopped -> running [label="start()"];
+	running -> stopped [label="start error",color=red];
+	running -> stopped [label="stop()"];
+	running -> paused [label="pause()"];
+	paused -> running [label="resume()"];
+	running -> dead [label="process exits"];
+	dead -> stopped [label="stop()"];
+}
