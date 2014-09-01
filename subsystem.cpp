@@ -32,7 +32,7 @@ const string& TSubsystem::GetName() const {
 }
 
 // Memory
-TError TMemorySubsystem::Usage(shared_ptr<TCgroup> &cg, uint64_t &value) {
+TError TMemorySubsystem::Usage(shared_ptr<TCgroup> &cg, uint64_t &value) const {
     string s;
     TError error = cg->GetKnobValue("memory.usage_in_bytes", s);
     if (error)
@@ -40,12 +40,12 @@ TError TMemorySubsystem::Usage(shared_ptr<TCgroup> &cg, uint64_t &value) {
     return StringToUint64(s, value);
 }
 
-TError TMemorySubsystem::UseHierarchy(TCgroup &cg) {
+TError TMemorySubsystem::UseHierarchy(TCgroup &cg) const {
     return TError(cg.SetKnobValue("memory.use_hierarchy", "1"));
 }
 
 // Freezer
-TError TFreezerSubsystem::WaitState(TCgroup &cg, const std::string &state) {
+TError TFreezerSubsystem::WaitState(TCgroup &cg, const std::string &state) const {
 
     int ret = RetryFailed(FREEZER_WAIT_TIMEOUT_S * 10, 100, [&]{
         string s;
@@ -64,7 +64,7 @@ TError TFreezerSubsystem::WaitState(TCgroup &cg, const std::string &state) {
     return TError::Success();
 }
 
-TError TFreezerSubsystem::Freeze(TCgroup &cg) {
+TError TFreezerSubsystem::Freeze(TCgroup &cg) const {
     TError error(cg.SetKnobValue("freezer.state", "FROZEN"));
     if (error)
         return error;
@@ -72,7 +72,7 @@ TError TFreezerSubsystem::Freeze(TCgroup &cg) {
     return WaitState(cg, "FROZEN\n");
 }
 
-TError TFreezerSubsystem::Unfreeze(TCgroup &cg) {
+TError TFreezerSubsystem::Unfreeze(TCgroup &cg) const {
     TError error(cg.SetKnobValue("freezer.state", "THAWED"));
     if (error)
         return error;
@@ -84,7 +84,7 @@ TError TFreezerSubsystem::Unfreeze(TCgroup &cg) {
 
 
 // Cpuacct
-TError TCpuacctSubsystem::Usage(shared_ptr<TCgroup> &cg, uint64_t &value) {
+TError TCpuacctSubsystem::Usage(shared_ptr<TCgroup> &cg, uint64_t &value) const {
     string s;
     TError error = cg->GetKnobValue("cpuacct.usage", s);
     if (error)

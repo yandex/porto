@@ -37,26 +37,26 @@ public:
 
     bool IsRoot() const;
 
-    std::string Path();
-    std::string Relpath();
+    std::string Path() const;
+    std::string Relpath() const;
 
     TError Create();
     TError Remove();
 
-    TError Kill(int signal);
+    TError Kill(int signal) const;
 
     TError FindChildren(std::vector<std::shared_ptr<TCgroup>> &cgroups);
 
-    TError GetProcesses(std::vector<pid_t> &processes);
-    TError GetTasks(std::vector<pid_t> &tasks);
-    bool IsEmpty();
+    TError GetProcesses(std::vector<pid_t> &processes) const;
+    TError GetTasks(std::vector<pid_t> &tasks) const;
+    bool IsEmpty() const;
 
-    TError Attach(int pid);
+    TError Attach(int pid) const;
 
-    bool HasKnob(const std::string &knob);
-    TError GetKnobValue(const std::string &knob, std::string &value);
-    TError GetKnobValueAsLines(const std::string &knob, std::vector<std::string> &lines);
-    TError SetKnobValue(const std::string &knob, const std::string &value, bool append = false);
+    bool HasKnob(const std::string &knob) const;
+    TError GetKnobValue(const std::string &knob, std::string &value) const;
+    TError GetKnobValueAsLines(const std::string &knob, std::vector<std::string> &lines) const;
+    TError SetKnobValue(const std::string &knob, const std::string &value, bool append = false) const;
 };
 
 class TCgroupSnapshot {

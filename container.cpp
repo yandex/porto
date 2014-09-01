@@ -138,11 +138,11 @@ TContainer::~TContainer() {
     Stop();
 }
 
-string TContainer::GetName() {
+const string &TContainer::GetName() const {
     return Name;
 }
 
-bool TContainer::IsRoot() {
+bool TContainer::IsRoot() const {
     return Name == ROOT_CONTAINER;
 }
 
@@ -382,7 +382,7 @@ TError TContainer::GetData(const string &name, string &value) {
     return TError::Success();
 }
 
-TError TContainer::GetProperty(const string &property, string &value) {
+TError TContainer::GetProperty(const string &property, string &value) const {
     if (IsRoot())
         return TError(EError::InvalidProperty, "no properties for root container");
 
@@ -409,9 +409,15 @@ TError TContainer::Restore(const kv::TNode &node) {
 
     int pid;
     bool started = true;
-    error = StringToInt(Spec.GetInternal("root_pid"), pid);
-    if (error)
+    string pidStr;
+    error = Spec.GetInternal("root_pid", pidStr);
+    if (error) {
         started = false;
+    } else {
+        error = StringToInt(pidStr, pid);
+        if (error)
+            started = false;
+    }
 
     TLogger::Log(Name + ": restore process " + to_string(pid) + " which " + (started ? "started" : "didn't start"));
 
@@ -500,7 +506,7 @@ TError TContainerHolder::CreateRoot() {
     return TError::Success();
 }
 
-bool TContainerHolder::ValidName(const string &name) {
+bool TContainerHolder::ValidName(const string &name) const {
     if (name == ROOT_CONTAINER)
         return true;
 
@@ -541,7 +547,7 @@ void TContainerHolder::Destroy(const string &name) {
         Containers.erase(name);
 }
 
-vector<string> TContainerHolder::List() {
+vector<string> TContainerHolder::List() const {
     vector<string> ret;
 
     for (auto c : Containers)

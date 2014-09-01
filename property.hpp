@@ -26,16 +26,16 @@ class TContainerSpec {
 
     TError SyncStorage();
     TError AppendStorage(const std::string& key, const std::string& value);
-    bool IsRoot();
+    bool IsRoot() const;
 
 public:
     TContainerSpec(const std::string &name) : Name(name) { }
     ~TContainerSpec();
-    std::string Get(const std::string &property);
+    const std::string &Get(const std::string &property) const;
     TError Set(const std::string &property, const std::string &value);
-    std::string GetInternal(const std::string &property);
+    TError GetInternal(const std::string &property, std::string &value) const;
     TError SetInternal(const std::string &property, const std::string &value);
-    bool IsDynamic(const std::string &property);
+    bool IsDynamic(const std::string &property) const;
     TError Create();
     TError Restore(const kv::TNode &node);
 };

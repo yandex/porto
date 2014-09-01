@@ -88,28 +88,29 @@ std::map<std::string, const TPropertySpec> PropertySpec = {
     {"cpu_priority", { "CPU priority: 0-99", "50", false, ValidCpuPriority }},
 };
 
-string TContainerSpec::Get(const string &property) {
+const string &TContainerSpec::Get(const string &property) const {
     if (Data.find(property) == Data.end())
         return PropertySpec[property].Def;
 
-    return Data[property];
+    return Data.at(property);
 }
 
-bool TContainerSpec::IsRoot() {
+bool TContainerSpec::IsRoot() const {
     return Name == ROOT_CONTAINER;
 }
 
-bool TContainerSpec::IsDynamic(const std::string &property) {
+bool TContainerSpec::IsDynamic(const std::string &property) const {
     if (PropertySpec.find(property) == PropertySpec.end())
         return false;
 
-    return PropertySpec[property].Dynamic;
+    return PropertySpec.at(property).Dynamic;
 }
 
-string TContainerSpec::GetInternal(const string &property) {
+TError TContainerSpec::GetInternal(const string &property, string &value) const {
     if (Data.find(property) == Data.end())
-        return "";
-    return Data[property];
+        return TError(EError::InvalidValue, "Invalid property");
+    value = Data.at(property);
+    return TError::Success();
 }
 
 TError TContainerSpec::SetInternal(const string &property, const string &value) {

@@ -78,7 +78,7 @@ TError TCgroup::FindChildren(std::vector<std::shared_ptr<TCgroup>> &cglist) {
     return TError::Success();
 }
 
-TError TCgroup::GetProcesses(vector<pid_t> &processes) {
+TError TCgroup::GetProcesses(vector<pid_t> &processes) const {
     vector<string> lines;
     TError ret = GetKnobValueAsLines("cgroup.procs", lines);
     if (ret)
@@ -86,7 +86,7 @@ TError TCgroup::GetProcesses(vector<pid_t> &processes) {
     return StringsToIntegers(lines, processes);
 }
 
-TError TCgroup::GetTasks(vector<pid_t> &tasks) {
+TError TCgroup::GetTasks(vector<pid_t> &tasks) const {
     vector<string> lines;
     TError ret = GetKnobValueAsLines("tasks", lines);
     if (ret)
@@ -94,7 +94,7 @@ TError TCgroup::GetTasks(vector<pid_t> &tasks) {
     return StringsToIntegers(lines, tasks);
 }
 
-bool TCgroup::IsEmpty() {
+bool TCgroup::IsEmpty() const {
     vector<pid_t> tasks;
     GetTasks(tasks);
     return tasks.empty();
@@ -104,14 +104,14 @@ bool TCgroup::IsRoot() const {
     return !Parent;
 }
 
-string TCgroup::Path() {
+string TCgroup::Path() const {
     if (IsRoot())
         return Mount->GetMountpoint();
     else
         return Parent->Path() + "/" + Name;
 }
 
-string TCgroup::Relpath() {
+string TCgroup::Relpath() const {
     if (IsRoot())
         return "";
     else
@@ -192,7 +192,7 @@ TError TCgroup::Remove() {
     return TError::Success();
 }
 
-TError TCgroup::Kill(int signal) {
+TError TCgroup::Kill(int signal) const {
     if (!IsRoot()) {
         vector<pid_t> tasks;
         if (!GetTasks(tasks)) {
@@ -205,22 +205,22 @@ TError TCgroup::Kill(int signal) {
     return TError::Success();
 }
 
-bool TCgroup::HasKnob(const std::string &knob) {
+bool TCgroup::HasKnob(const std::string &knob) const {
     TFile f(Path() + "/" + knob);
     return f.Exists();
 }
 
-TError TCgroup::GetKnobValue(const std::string &knob, std::string &value) {
+TError TCgroup::GetKnobValue(const std::string &knob, std::string &value) const {
     TFile f(Path() + "/" + knob);
     return f.AsString(value);
 }
 
-TError TCgroup::GetKnobValueAsLines(const std::string &knob, vector<string> &lines) {
+TError TCgroup::GetKnobValueAsLines(const std::string &knob, vector<string> &lines) const {
     TFile f(Path() + "/" + knob);
     return f.AsLines(lines);
 }
 
-TError TCgroup::SetKnobValue(const std::string &knob, const std::string &value, bool append) {
+TError TCgroup::SetKnobValue(const std::string &knob, const std::string &value, bool append) const {
     TFile f(Path() + "/" + knob);
 
     if (append)
@@ -229,7 +229,7 @@ TError TCgroup::SetKnobValue(const std::string &knob, const std::string &value, 
         return f.WriteStringNoAppend(value);
 }
 
-TError TCgroup::Attach(int pid) {
+TError TCgroup::Attach(int pid) const {
     if (!IsRoot()) {
         TError error = SetKnobValue("cgroup.procs", to_string(pid), true);
         TLogger::LogError(error, "Can't attach " + to_string(pid) + " to " + Name);

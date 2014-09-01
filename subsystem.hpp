@@ -20,7 +20,8 @@ public:
     static std::shared_ptr<TSubsystem> Get(std::string name);
     const std::string& GetName() const;
 
-    TSubsystem(const TSubsystem&) = delete;
+    TSubsystem(const TSubsystem &) = delete;
+    TSubsystem &operator=(const TSubsystem &) = delete;
 
     std::shared_ptr<TCgroup> GetRootCgroup(std::shared_ptr<TMount> mount=nullptr) {
         if (!RootCgroup) {
@@ -34,17 +35,17 @@ public:
 class TMemorySubsystem : public TSubsystem {
 public:
     TMemorySubsystem() : TSubsystem("memory") {}
-    TError Usage(std::shared_ptr<TCgroup> &cg, uint64_t &value);
-    TError UseHierarchy(TCgroup &cg);
+    TError Usage(std::shared_ptr<TCgroup> &cg, uint64_t &value) const;
+    TError UseHierarchy(TCgroup &cg) const;
 };
 
 class TFreezerSubsystem : public TSubsystem {
 public:
     TFreezerSubsystem() : TSubsystem("freezer") {}
 
-    TError WaitState(TCgroup &cg, const std::string &state);
-    TError Freeze(TCgroup &cg);
-    TError Unfreeze(TCgroup &cg);
+    TError WaitState(TCgroup &cg, const std::string &state) const;
+    TError Freeze(TCgroup &cg) const;
+    TError Unfreeze(TCgroup &cg) const;
 };
 
 class TCpuSubsystem : public TSubsystem {
@@ -55,7 +56,7 @@ public:
 class TCpuacctSubsystem : public TSubsystem {
 public:
     TCpuacctSubsystem() : TSubsystem("cpuacct") {}
-    TError Usage(std::shared_ptr<TCgroup> &cg, uint64_t &value);
+    TError Usage(std::shared_ptr<TCgroup> &cg, uint64_t &value) const;
 };
 
 extern std::shared_ptr<TMemorySubsystem> MemorySubsystem;

@@ -51,13 +51,16 @@ class TContainer {
     TError PrepareTask();
     TError KillAll();
 
+    TContainer(const TContainer &) = delete;
+    TContainer &operator=(const TContainer &) = delete;
+
 public:
     TContainer(const std::string &name) : Name(name), State(EContainerState::Stopped), Spec(name) { }
     ~TContainer();
 
-    std::string GetName();
+    const std::string &GetName() const;
 
-    bool IsRoot();
+    bool IsRoot() const;
 
     std::vector<pid_t> Processes();
     bool IsAlive();
@@ -68,7 +71,7 @@ public:
     TError Pause();
     TError Resume();
 
-    TError GetProperty(const std::string &property, std::string &value);
+    TError GetProperty(const std::string &property, std::string &value) const;
     TError SetProperty(const std::string &property, const std::string &value);
 
     TError GetData(const std::string &data, std::string &value);
@@ -83,7 +86,7 @@ public:
 class TContainerHolder {
     std::map <std::string, std::shared_ptr<TContainer>> Containers;
 
-    bool ValidName(const std::string &name);
+    bool ValidName(const std::string &name) const;
 public:
     TError CreateRoot();
     TError Create(const std::string &name);
@@ -93,7 +96,7 @@ public:
     void Destroy(const std::string &name);
     bool DeliverExitStatus(int pid, int status);
 
-    std::vector<std::string> List();
+    std::vector<std::string> List() const;
     void Heartbeat();
 };
 

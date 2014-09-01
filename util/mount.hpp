@@ -26,31 +26,31 @@ public:
             m1.Vfstype == m2.Vfstype;
     }
 
-    const std::string GetMountpoint() {
+    const std::string GetMountpoint() const {
         return Mountpoint;
     }
 
-    const std::string VFSType() {
+    const std::string VFSType() const {
         return Vfstype;
     }
 
-    const std::string ParentFolder() {
+    const std::string ParentFolder() const {
         return Mountpoint.substr(0, Mountpoint.find_last_of("/"));
     }
 
-    std::set<std::string> const GetFlags() {
+    std::set<std::string> const GetFlags() const {
         return Flags;
     }
 
-    TError Mount(bool rdonly = false, bool bind = false, bool remount = false);
-    TError Remount() { return Mount(false, false, true); }
-    TError Bind() { return Mount(false, true); }
-    TError Umount();
+    TError Mount(bool rdonly = false, bool bind = false, bool remount = false)const ;
+    TError Remount() const { return Mount(false, false, true); }
+    TError Bind() const { return Mount(false, true); }
+    TError Umount()const ;
 };
 
 class TMountSnapshot {
 public:
-    TError Mounts(std::set<std::shared_ptr<TMount>> &mounts);
+    TError Mounts(std::set<std::shared_ptr<TMount>> &mounts) const;
 };
 
 #endif

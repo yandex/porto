@@ -18,11 +18,11 @@ TKeyValueStorage::TKeyValueStorage() :
     Tmpfs("tmpfs", KVALUE_ROOT, "tmpfs", {KVALUE_SIZE}) {
 }
 
-string TKeyValueStorage::Path(const string &name) {
+string TKeyValueStorage::Path(const string &name) const {
     return Tmpfs.GetMountpoint() + "/" + name;
 }
 
-void TKeyValueStorage::Merge(kv::TNode &node, kv::TNode &next) {
+void TKeyValueStorage::Merge(kv::TNode &node, kv::TNode &next) const {
     for (int i = 0; i < next.pairs_size(); i++) {
         auto key = next.pairs(i).key();
         auto value = next.pairs(i).val();
@@ -43,8 +43,7 @@ void TKeyValueStorage::Merge(kv::TNode &node, kv::TNode &next) {
     }
 }
 
-TError TKeyValueStorage::LoadNode(const std::string &name, kv::TNode &node)
-{
+TError TKeyValueStorage::LoadNode(const std::string &name, kv::TNode &node) const {
     int fd = open(Path(name).c_str(), O_RDONLY);
     node.Clear();
     TError error;
@@ -65,8 +64,7 @@ TError TKeyValueStorage::LoadNode(const std::string &name, kv::TNode &node)
     return error;
 }
 
-TError TKeyValueStorage::AppendNode(const std::string &name, const kv::TNode &node)
-{
+TError TKeyValueStorage::AppendNode(const std::string &name, const kv::TNode &node) const {
     int fd = open(Path(name).c_str(), O_CREAT | O_WRONLY, 0755);
     TError error;
 
@@ -89,8 +87,7 @@ TError TKeyValueStorage::AppendNode(const std::string &name, const kv::TNode &no
     return error;
 }
 
-TError TKeyValueStorage::SaveNode(const std::string &name, const kv::TNode &node)
-{
+TError TKeyValueStorage::SaveNode(const std::string &name, const kv::TNode &node) const {
     int fd = open(Path(name).c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0755);
     TError error;
     try {
@@ -104,7 +101,7 @@ TError TKeyValueStorage::SaveNode(const std::string &name, const kv::TNode &node
     return error;
 }
 
-TError TKeyValueStorage::RemoveNode(const std::string &name) {
+TError TKeyValueStorage::RemoveNode(const std::string &name) const {
     TFile node(Path(name));
     return node.Remove();
 }
@@ -132,12 +129,12 @@ TError TKeyValueStorage::MountTmpfs() {
     return error;
 }
 
-TError TKeyValueStorage::ListNodes(std::vector<std::string> &list) {
+TError TKeyValueStorage::ListNodes(std::vector<std::string> &list) const {
     TFolder f(Tmpfs.GetMountpoint());
     return f.Items(TFile::Regular, list);
 }
 
-TError TKeyValueStorage::Restore(std::map<std::string, kv::TNode> &map) {
+TError TKeyValueStorage::Restore(std::map<std::string, kv::TNode> &map) const {
     std::vector<std::string> nodes;
 
     TError error = ListNodes(nodes);
@@ -164,7 +161,7 @@ TError TKeyValueStorage::Restore(std::map<std::string, kv::TNode> &map) {
     return TError::Success();
 }
 
-TError TKeyValueStorage::Dump() {
+TError TKeyValueStorage::Dump() const {
     std::vector<std::string> nodes;
 
     TError error = ListNodes(nodes);

@@ -14,7 +14,7 @@ extern "C" {
 
 using namespace std;
 
-TError TMount::Mount(bool rdonly, bool bind, bool remount) {
+TError TMount::Mount(bool rdonly, bool bind, bool remount) const {
     TLogger::Log("mount " + Mountpoint);
     int mountflags = (rdonly ? MS_RDONLY : 0) |
                     (bind ? MS_BIND : 0) |
@@ -31,7 +31,7 @@ TError TMount::Mount(bool rdonly, bool bind, bool remount) {
     return TError::Success();
 }
 
-TError TMount::Umount() {
+TError TMount::Umount() const {
     TLogger::Log("umount " + Mountpoint);
 
     int ret = RetryBusy(10, 100, [&]{ return umount(Mountpoint.c_str()); });
@@ -41,7 +41,7 @@ TError TMount::Umount() {
     return TError::Success();
 }
 
-TError TMountSnapshot::Mounts(std::set<std::shared_ptr<TMount>> &mounts) {
+TError TMountSnapshot::Mounts(std::set<std::shared_ptr<TMount>> &mounts) const {
     FILE* f = setmntent("/proc/self/mounts", "r");
     struct mntent* m;
     while ((m = getmntent(f)) != NULL) {

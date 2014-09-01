@@ -22,17 +22,17 @@ class TTaskEnv {
     std::string Command;
     std::string Cwd;
     std::string Root;
-    std::vector<std::string> Env;
+    std::vector<std::string> EnvVec;
     std::string User;
     std::string Group;
-    std::string Envir;
+    std::string Environ;
     int Uid, Gid;
 
 public:
     TTaskEnv() {};
-    TTaskEnv(const std::string &command, const std::string &cwd, const std::string &root, const std::string &user, const std::string &group, const std::string &envir) : Command(command), Cwd(cwd), Root(root), User(user), Group(group), Envir(envir) { }
+    TTaskEnv(const std::string &command, const std::string &cwd, const std::string &root, const std::string &user, const std::string &group, const std::string &environ) : Command(command), Cwd(cwd), Root(root), User(user), Group(group), Environ(environ) { }
     TError Prepare();
-    const char** GetEnvp();
+    const char** GetEnvp() const;
 };
 
 class TTask {
@@ -47,30 +47,33 @@ class TTask {
     std::string StdoutFile;
     std::string StderrFile;
 
-    int CloseAllFds(int except);
-    void Syslog(const std::string &s);
-    void ReportResultAndExit(int fd, int result);
+    int CloseAllFds(int except) const;
+    void Syslog(const std::string &s) const;
+    void ReportResultAndExit(int fd, int result) const;
 
-    TError RotateFile(const std::string path);
+    TError RotateFile(const std::string path) const;
+
+    TTask(const TTask &) = delete;
+    TTask &operator=(const TTask &) = delete;
 public:
     TTask(TTaskEnv& env, std::vector<std::shared_ptr<TCgroup>> &leafCgroups) : Env(env), LeafCgroups(leafCgroups) {};
     TTask(pid_t pid) : Pid(pid) {};
     ~TTask();
 
     TError Start();
-    int GetPid();
-    bool IsRunning();
-    TExitStatus GetExitStatus();
-    void Kill(int signal);
+    int GetPid() const;
+    bool IsRunning() const;
+    TExitStatus GetExitStatus() const;
+    void Kill(int signal) const;
     void DeliverExitStatus(int status);
 
-    std::string GetStdout();
-    std::string GetStderr();
+    std::string GetStdout() const;
+    std::string GetStderr() const;
 
     int ChildCallback();
     TError Restore(int pid);
-    TError ValidateCgroups();
-    TError Rotate();
+    TError ValidateCgroups() const;
+    TError Rotate() const;
 };
 
 #endif

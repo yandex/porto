@@ -25,20 +25,20 @@ public:
 
     TFile(const std::string &path, const int mode = 0600) : Path(path), Mode(mode) { };
 
-    std::string GetPath();
-    EFileType Type();
+    const std::string &GetPath() const;
+    EFileType Type() const;
 
-    TError Remove();
+    TError Remove()const ;
 
-    TError AsString(std::string &value);
-    TError AsInt(int &value);
-    TError AsLines(std::vector<std::string> &value);
-    TError LastStrings(const size_t size, std::string &value);
-    TError ReadLink(std::string &value);
+    TError AsString(std::string &value) const;
+    TError AsInt(int &value) const;
+    TError AsLines(std::vector<std::string> &value) const;
+    TError LastStrings(const size_t size, std::string &value) const;
+    TError ReadLink(std::string &value) const;
 
-    TError WriteStringNoAppend(const std::string &str);
-    TError AppendString(const std::string &str);
-    bool Exists();
+    TError WriteStringNoAppend(const std::string &str) const;
+    TError AppendString(const std::string &str) const;
+    bool Exists() const;
 };
 
 #endif

@@ -15,7 +15,7 @@ extern "C" {
 
 using namespace std;
 
-TError TFolder::Create(mode_t mode, bool recursive) {
+TError TFolder::Create(mode_t mode, bool recursive) const {
     TLogger::Log("mkdir " + Path);
 
     if (recursive) {
@@ -37,7 +37,7 @@ TError TFolder::Create(mode_t mode, bool recursive) {
     return TError::Success();
 }
 
-TError TFolder::Remove(bool recursive) {
+TError TFolder::Remove(bool recursive) const {
     if (recursive) {
         vector<string> items;
         TError error = Items(TFile::Any, items);
@@ -67,7 +67,7 @@ TError TFolder::Remove(bool recursive) {
     return TError::Success();
 }
 
-bool TFolder::Exists() {
+bool TFolder::Exists() const {
     struct stat st;
 
     int ret = stat(Path.c_str(), &st);
@@ -78,11 +78,11 @@ bool TFolder::Exists() {
         return false;
 }
 
-TError TFolder::Subfolders(std::vector<std::string> &list) {
+TError TFolder::Subfolders(std::vector<std::string> &list) const {
     return Items(TFile::Directory, list);
 }
 
-TError TFolder::Items(const TFile::EFileType type, std::vector<std::string> &list) {
+TError TFolder::Items(const TFile::EFileType type, std::vector<std::string> &list) const {
     DIR *dirp;
     struct dirent dp, *res;
 

@@ -38,15 +38,15 @@ TError TTaskEnv::Prepare() {
     else
         workdir = "/home/" + User;
 
-    Env.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:" + workdir);
+    EnvVec.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:" + workdir);
 
-    if (SplitString(Envir, ';', Env)) {
-        TError error(EError::InvalidValue, errno, "split(" + Envir + ")");
+    if (SplitString(Environ, ';', EnvVec)) {
+        TError error(EError::InvalidValue, errno, "split(" + Environ + ")");
         return error;
     }
 
-    Env.push_back("HOME=" + workdir);
-    Env.push_back("USER=" + User);
+    EnvVec.push_back("HOME=" + workdir);
+    EnvVec.push_back("USER=" + User);
 
     struct passwd *p = getpwnam(User.c_str());
     if (!p) {
@@ -67,17 +67,17 @@ TError TTaskEnv::Prepare() {
     return TError::Success();
 }
 
-const char** TTaskEnv::GetEnvp() {
-    auto envp = new const char* [Env.size() + 1];
-    for (size_t i = 0; i < Env.size(); i++)
-        envp[i] = Env[i].c_str();
-    envp[Env.size()] = NULL;
+const char** TTaskEnv::GetEnvp() const {
+    auto envp = new const char* [EnvVec.size() + 1];
+    for (size_t i = 0; i < EnvVec.size(); i++)
+        envp[i] = EnvVec[i].c_str();
+    envp[EnvVec.size()] = NULL;
 
     return envp;
 }
 
 // TTask
-int TTask::CloseAllFds(int except) {
+int TTask::CloseAllFds(int except) const {
     for (int i = 0; i < getdtablesize(); i++)
         if (i != except)
             close(i);
@@ -85,14 +85,12 @@ int TTask::CloseAllFds(int except) {
     return except;
 }
 
-void TTask::ReportResultAndExit(int fd, int result)
-{
+void TTask::ReportResultAndExit(int fd, int result) const {
     if (write(fd, &result, sizeof(result))) {}
     exit(EXIT_FAILURE);
 }
 
-void TTask::Syslog(const string &s)
-{
+void TTask::Syslog(const string &s) const {
     openlog("portod", LOG_NDELAY, LOG_DAEMON);
     syslog(LOG_ERR, "%s", s.c_str());
     closelog();
@@ -408,15 +406,15 @@ TError TTask::Start() {
     }
 }
 
-int TTask::GetPid() {
+int TTask::GetPid() const {
     return Pid;
 }
 
-bool TTask::IsRunning() {
+bool TTask::IsRunning() const {
     return State == Started;
 }
 
-TExitStatus TTask::GetExitStatus() {
+TExitStatus TTask::GetExitStatus() const {
     return ExitStatus;
 }
 
@@ -426,7 +424,7 @@ void TTask::DeliverExitStatus(int status) {
     State = Stopped;
 }
 
-void TTask::Kill(int signal) {
+void TTask::Kill(int signal) const {
     if (!Pid)
         throw "Tried to kill invalid process!";
 
@@ -439,7 +437,7 @@ void TTask::Kill(int signal) {
     }
 }
 
-std::string TTask::GetStdout() {
+std::string TTask::GetStdout() const {
     string s;
     TFile f(StdoutFile);
     TError e(f.LastStrings(STDOUT_READ_BYTES, s));
@@ -447,7 +445,7 @@ std::string TTask::GetStdout() {
     return s;
 }
 
-std::string TTask::GetStderr() {
+std::string TTask::GetStderr() const {
     string s;
     TFile f(StderrFile);
     TError e(f.LastStrings(STDOUT_READ_BYTES, s));
@@ -494,7 +492,7 @@ TError TTask::Restore(int pid_) {
     return TError::Success();
 }
 
-TError TTask::ValidateCgroups() {
+TError TTask::ValidateCgroups() const {
     TFile f("/proc/" + to_string(Pid) + "/cgroup");
 
     vector<string> lines;
@@ -528,7 +526,7 @@ TError TTask::ValidateCgroups() {
     return TError::Success();
 }
 
-TError TTask::RotateFile(const std::string path) {
+TError TTask::RotateFile(const std::string path) const {
     struct stat st;
 
     if (stat(path.c_str(), &st) < 0)
@@ -541,7 +539,7 @@ TError TTask::RotateFile(const std::string path) {
     return TError::Success();
 }
 
-TError TTask::Rotate() {
+TError TTask::Rotate() const {
     TError error;
 
     error = RotateFile(StdoutFile);
