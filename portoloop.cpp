@@ -3,7 +3,7 @@
 #include <iostream>
 
 #include "porto.hpp"
-#include "log.hpp"
+#include "util/log.hpp"
 #include "util/unix.hpp"
 
 extern "C" {

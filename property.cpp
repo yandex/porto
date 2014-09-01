@@ -2,7 +2,7 @@
 
 #include "subsystem.hpp"
 #include "property.hpp"
-#include "log.hpp"
+#include "util/log.hpp"
 #include "cgroup.hpp"
 #include "util/string.hpp"
 

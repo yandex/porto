@@ -4,7 +4,7 @@
 #include "util/file.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
-#include "log.hpp"
+#include "util/log.hpp"
 
 extern "C" {
 #include <sys/mount.h>
