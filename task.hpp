@@ -22,7 +22,7 @@ class TTaskEnv {
     std::string Command;
     std::string Cwd;
     std::string Root;
-    std::vector<std::string> env;
+    std::vector<std::string> Env;
     std::string User;
     std::string Group;
     std::string Envir;
@@ -36,16 +36,16 @@ public:
 };
 
 class TTask {
-    int rfd, wfd;
-    TTaskEnv env;
-    std::vector<std::shared_ptr<TCgroup>> leaf_cgroups;
+    int Rfd, Wfd;
+    TTaskEnv Env;
+    std::vector<std::shared_ptr<TCgroup>> LeafCgroups;
 
-    enum ETaskState { Stopped, Started } state;
-    TExitStatus exitStatus;
+    enum ETaskState { Stopped, Started } State;
+    TExitStatus ExitStatus;
 
-    pid_t pid;
-    std::string stdoutFile;
-    std::string stderrFile;
+    pid_t Pid;
+    std::string StdoutFile;
+    std::string StderrFile;
 
     int CloseAllFds(int except);
     void Syslog(const std::string &s);
@@ -53,8 +53,8 @@ class TTask {
 
     TError RotateFile(const std::string path);
 public:
-    TTask(TTaskEnv& env, std::vector<std::shared_ptr<TCgroup>> &leaf_cgroups) : env(env), leaf_cgroups(leaf_cgroups) {};
-    TTask(pid_t pid) : pid(pid) {};
+    TTask(TTaskEnv& env, std::vector<std::shared_ptr<TCgroup>> &leafCgroups) : Env(env), LeafCgroups(leafCgroups) {};
+    TTask(pid_t pid) : Pid(pid) {};
     ~TTask();
 
     TError Start();
