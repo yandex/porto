@@ -33,7 +33,7 @@ struct TDataSpec {
     std::set<EContainerState> Valid;
 };
 
-extern std::map<std::string, const TDataSpec> DataSpec;
+extern std::map<std::string, const TDataSpec> dataSpec;
 
 class TContainer {
     const std::string Name;

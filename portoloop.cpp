@@ -41,25 +41,22 @@ static void SendPidStatus(int fd, int pid, int status, size_t queued) {
         Log() << "write(status): " << strerror(errno) << endl;
 }
 
-static pid_t PortoPid;
-static volatile sig_atomic_t Done = false;
-static volatile sig_atomic_t NeedUpdate = false;
-static volatile sig_atomic_t Alarm = false;
+static pid_t portoPid;
+static volatile sig_atomic_t done = false;
+static volatile sig_atomic_t needUpdate = false;
+static volatile sig_atomic_t gotAlarm = false;
 
-static void DoExitAndCleanup(int signum)
-{
-    Done = true;
+static void DoExitAndCleanup(int signum) {
+    done = true;
 }
 
-static void DoUpdate(int signum)
-{
-    NeedUpdate = true;
+static void DoUpdate(int signum) {
+    needUpdate = true;
 }
 
-static void DoAlarm(int signum)
-{
+static void DoAlarm(int signum) {
     // we just need to interrupt poll
-    Alarm = true;
+    gotAlarm = true;
 }
 
 static void ReceiveAcks(int fd, map<int,int> &pidToStatus) {
@@ -107,12 +104,12 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
         return EXIT_FAILURE;
     }
 
-    PortoPid = fork();
-    if (PortoPid < 0) {
+    portoPid = fork();
+    if (portoPid < 0) {
         Log() << "fork(): " << strerror(errno) << endl;
         ret = EXIT_FAILURE;
         goto exit;
-    } else if (PortoPid == 0) {
+    } else if (portoPid == 0) {
         close(evtfd[1]);
         close(ackfd[0]);
 
@@ -124,24 +121,24 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
     close(evtfd[0]);
     close(ackfd[1]);
 
-    Log() << "Spawned portod " << PortoPid << endl;
+    Log() << "Spawned portod " << portoPid << endl;
 
     for (auto &pair : pidToStatus)
         SendPidStatus(evtfd[1], pair.first, pair.second, pidToStatus.size());
 
     SignalMask(SIG_BLOCK);
 
-    while (!Done) {
+    while (!done) {
         int pid;
 
         ReceiveAcks(ackfd[0], pidToStatus);
 
-        if (NeedUpdate) {
+        if (needUpdate) {
             Log() << "Updating" << endl;
 
-            if (kill(PortoPid, SIGKILL) < 0)
+            if (kill(portoPid, SIGKILL) < 0)
                 Log() << "Can't send SIGKILL to portod: " << strerror(errno) << endl;
-            if (waitpid(PortoPid, NULL, 0) != PortoPid)
+            if (waitpid(portoPid, NULL, 0) != portoPid)
                 Log() << "Can't wait for portod exit status: " << strerror(errno) << endl;
 
             close(evtfd[1]);
@@ -160,8 +157,8 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
         pid = wait(&status);
         SignalMask(SIG_BLOCK);
 
-        if (Alarm) {
-            Alarm = false;
+        if (gotAlarm) {
+            gotAlarm = false;
             continue;
         }
 
@@ -169,7 +166,7 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
             Log() << "wait(): " << strerror(errno) << endl;
             continue;
         }
-        if (pid == PortoPid) {
+        if (pid == portoPid) {
             Log() << "portod exited with " << status << endl;
             ret = EXIT_SUCCESS;
             break;
@@ -227,14 +224,14 @@ int main(int argc, char * const argv[])
     int ret = EXIT_SUCCESS;
     map<int,int> pidToStatus;
 
-    while (!Done) {
+    while (!done) {
         ret = SpawnPortod(pidToStatus);
         Log() << "Returned " << ret << endl;
-        if (!Done && ret != EXIT_SUCCESS)
+        if (!done && ret != EXIT_SUCCESS)
             usleep(1000000);
     }
 
-    if (kill(PortoPid, SIGINT) < 0)
+    if (kill(portoPid, SIGINT) < 0)
         Log() << "Can't send SIGINT to portod" << endl;
 
     Log() << "Stopped" << endl;

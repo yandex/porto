@@ -120,7 +120,7 @@ static string GetTmpFile() {
     return path;
 }
 
-static int child_fn(void *arg) {
+static int ChildFn(void *arg) {
     TTask *task = static_cast<TTask*>(arg);
     return task->ChildCallback();
 }
@@ -200,46 +200,46 @@ int TTask::ChildCallback() {
         ReportResultAndExit(Wfd, -errno);
     }
 
-    TMount new_root(Env.Root, Env.Root + "/", "none", {});
-    TMount new_proc("proc", Env.Root + "/proc", "proc", {});
-    TMount new_sys("/sys", Env.Root + "/sys", "none", {});
-    TMount new_dev("/dev", Env.Root + "/dev", "none", {});
-    TMount new_var("/var", Env.Root + "/var", "none", {});
-    TMount new_run("/run", Env.Root + "/run", "none", {});
-    TMount new_tmp("/tmp", Env.Root + "/tmp", "none", {});
+    TMount newRoot(Env.Root, Env.Root + "/", "none", {});
+    TMount newProc("proc", Env.Root + "/proc", "proc", {});
+    TMount newSys("/sys", Env.Root + "/sys", "none", {});
+    TMount newDev("/dev", Env.Root + "/dev", "none", {});
+    TMount newVar("/var", Env.Root + "/var", "none", {});
+    TMount newRun("/run", Env.Root + "/run", "none", {});
+    TMount newTmp("/tmp", Env.Root + "/tmp", "none", {});
 
     if (Env.Root.length()) {
-        if (new_root.Bind()) {
+        if (newRoot.Bind()) {
             Syslog(string("remount /: ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
         }
 
-        if (new_tmp.Bind()) {
+        if (newTmp.Bind()) {
             Syslog(string("remount /tmp: ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
         }
 
-        if (new_sys.Bind()) {
+        if (newSys.Bind()) {
             Syslog(string("remount /sys: ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
         }
 
-        if (new_run.Bind()) {
+        if (newRun.Bind()) {
             Syslog(string("remount /run: ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
         }
 
-        if (new_dev.Bind()) {
+        if (newDev.Bind()) {
             Syslog(string("remount /dev: ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
         }
 
-        if (new_var.Bind()) {
+        if (newVar.Bind()) {
             Syslog(string("remount /var: ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
         }
 
-        if (new_proc.Mount()) {
+        if (newProc.Mount()) {
             Syslog(string("remount /proc: ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
         }
@@ -349,28 +349,28 @@ TError TTask::Start() {
     Rfd = pfd[0];
     Wfd = pfd[1];
 
-    pid_t fork_pid = fork();
-    if (fork_pid < 0) {
+    pid_t forkPid = fork();
+    if (forkPid < 0) {
         TError error(EError::Unknown, errno, "fork()");
         TLogger::LogError(error, "Can't spawn child");
         return error;
-    } else if (fork_pid == 0) {
+    } else if (forkPid == 0) {
         char stack[8192];
 
         (void)setsid();
 
-        pid_t clone_pid = clone(child_fn, stack + sizeof(stack),
-                                SIGCHLD | CLONE_NEWNS | CLONE_NEWPID | CLONE_NEWUTS,
-                                this);
-        if (write(Wfd, &clone_pid, sizeof(clone_pid))) {}
-        if (clone_pid < 0) {
+        pid_t clonePid = clone(ChildFn, stack + sizeof(stack),
+                               SIGCHLD | CLONE_NEWNS | CLONE_NEWPID | CLONE_NEWUTS,
+                               this);
+        if (write(Wfd, &clonePid, sizeof(clonePid))) {}
+        if (clonePid < 0) {
             TError error(EError::Unknown, errno, "clone()");
             TLogger::LogError(error, "Can't spawn child");
             return error;
         }
         exit(EXIT_SUCCESS);
     }
-    (void)waitpid(fork_pid, NULL, 0);
+    (void)waitpid(forkPid, NULL, 0);
 
     close(Wfd);
     int n = read(Rfd, &Pid, sizeof(Pid));

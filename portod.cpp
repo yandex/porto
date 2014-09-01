@@ -66,26 +66,26 @@ static int AcceptClient(int sfd, std::vector<int> &clients) {
     return 0;
 }
 
-static volatile sig_atomic_t Done = false;
-static volatile sig_atomic_t Cleanup = true;
-static volatile sig_atomic_t Hup = false;
-static volatile sig_atomic_t RaiseSignum = 0;
+static volatile sig_atomic_t done = false;
+static volatile sig_atomic_t cleanup = true;
+static volatile sig_atomic_t hup = false;
+static volatile sig_atomic_t raiseSignum = 0;
 
 static void DoExit(int signum) {
-    Done = true;
-    Cleanup = false;
-    RaiseSignum = signum;
+    done = true;
+    cleanup = false;
+    raiseSignum = signum;
     TLogger::CloseLog();
 }
 
 static void DoExitAndCleanup(int signum) {
-    Done = true;
-    Cleanup = true;
-    RaiseSignum = signum;
+    done = true;
+    cleanup = true;
+    raiseSignum = signum;
 }
 
 static void DoHangup(int signum) {
-    Hup = true;
+    hup = true;
 }
 
 static bool AnotherInstanceRunning(const string &path) {
@@ -179,7 +179,7 @@ static int RpcMain(TContainerHolder &cholder) {
     }
 
     int starved = 0;
-    while (!Done) {
+    while (!done) {
         struct pollfd fds[MAX_CONNECTIONS];
         memset(fds, 0, sizeof(fds));
 
@@ -195,7 +195,7 @@ static int RpcMain(TContainerHolder &cholder) {
         if (ret < 0) {
             TLogger::Log(string("poll() error: ") + strerror(errno));
 
-            if (Done)
+            if (done)
                 break;
         }
 
@@ -206,14 +206,14 @@ static int RpcMain(TContainerHolder &cholder) {
             starved--;
         }
 
-        if (Hup) {
+        if (hup) {
             TLogger::CloseLog();
             TLogger::OpenLog(LOG_FILE, LOG_FILE_PERM);
-            Hup = false;
+            hup = false;
         }
 
         ret = ReapSpawner(REAP_EVT_FD, cholder);
-        if (Done)
+        if (done)
             break;
 
         if (fds[PORTOD_MAX_CLIENTS].revents && clients.size() < PORTOD_MAX_CLIENTS) {
@@ -222,7 +222,7 @@ static int RpcMain(TContainerHolder &cholder) {
                 break;
         }
 
-        for (size_t i = 0; i < PORTOD_MAX_CLIENTS && !Done; i++) {
+        for (size_t i = 0; i < PORTOD_MAX_CLIENTS && !done; i++) {
             if (!fds[i].revents)
                 continue;
 
@@ -346,8 +346,8 @@ int main(int argc, char * const argv[])
         }
 
         ret = RpcMain(cholder);
-        if (!Cleanup && RaiseSignum)
-            ReaiseSignal(RaiseSignum);
+        if (!cleanup && raiseSignum)
+            ReaiseSignal(raiseSignum);
     } catch (string s) {
         cout << s << endl;
         ret = EXIT_FAILURE;
@@ -362,8 +362,8 @@ int main(int argc, char * const argv[])
     RemovePidFile(PID_FILE);
     RemoveRpcServer(RPC_SOCK);
 
-    if (RaiseSignum)
-        ReaiseSignal(RaiseSignum);
+    if (raiseSignum)
+        ReaiseSignal(raiseSignum);
 
     return ret;
 }

@@ -17,7 +17,7 @@ struct TPropertySpec {
     std::function<TError (std::string)> Valid;
 };
 
-extern std::map<std::string, const TPropertySpec> PropertySpec;
+extern std::map<std::string, const TPropertySpec> propertySpec;
 
 class TContainerSpec {
     TKeyValueStorage Storage;

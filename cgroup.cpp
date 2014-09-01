@@ -131,16 +131,16 @@ TError TCgroup::Create() {
 
 
         TMount root("cgroup", Tmpfs, "tmpfs", {});
-        bool mount_root = true;
+        bool mountRoot = true;
 
         for (auto m : mounts) {
             if (*m == root)
-                mount_root = false;
+                mountRoot = false;
             if (*m == *Mount)
                 return TError::Success();
         }
 
-        if (mount_root) {
+        if (mountRoot) {
             TError error = root.Mount();
             TLogger::LogError(error, "Can't mount root cgroup");
             if (error)

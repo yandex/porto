@@ -8,21 +8,21 @@
 
 using namespace std;
 
-shared_ptr<TMemorySubsystem> MemorySubsystem(new TMemorySubsystem);
-shared_ptr<TFreezerSubsystem> FreezerSubsystem(new TFreezerSubsystem);
-shared_ptr<TCpuSubsystem> CpuSubsystem(new TCpuSubsystem);
-shared_ptr<TCpuacctSubsystem> CpuacctSubsystem(new TCpuacctSubsystem);
+shared_ptr<TMemorySubsystem> memorySubsystem(new TMemorySubsystem);
+shared_ptr<TFreezerSubsystem> freezerSubsystem(new TFreezerSubsystem);
+shared_ptr<TCpuSubsystem> cpuSubsystem(new TCpuSubsystem);
+shared_ptr<TCpuacctSubsystem> cpuacctSubsystem(new TCpuacctSubsystem);
 
 // TSubsystem
 shared_ptr<TSubsystem> TSubsystem::Get(std::string name) {
     if (name == "memory")
-        return MemorySubsystem;
+        return memorySubsystem;
     else if (name == "freezer")
-        return FreezerSubsystem;
+        return freezerSubsystem;
     else if (name == "cpu")
-        return CpuSubsystem;
+        return cpuSubsystem;
     else if (name == "cpuacct")
-        return CpuacctSubsystem;
+        return cpuacctSubsystem;
 
     return nullptr;
 }

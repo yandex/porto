@@ -75,7 +75,7 @@ struct TData {
     };
 
     static string CpuUsage(TContainer& c) {
-        auto subsys = CpuacctSubsystem;
+        auto subsys = cpuacctSubsystem;
         auto cg = c.GetLeafCgroup(subsys);
         if (!cg) {
             TLogger::LogAction("cpuacct cgroup not found");
@@ -93,7 +93,7 @@ struct TData {
     };
 
     static string MemUsage(TContainer& c) {
-        auto subsys = MemorySubsystem;
+        auto subsys = memorySubsystem;
         auto cg = c.GetLeafCgroup(subsys);
         if (!cg) {
             TLogger::LogAction("memory cgroup not found");
@@ -111,7 +111,7 @@ struct TData {
     };
 };
 
-std::map<std::string, const TDataSpec> DataSpec = {
+std::map<std::string, const TDataSpec> dataSpec = {
     { "state", { "container state", true, TData::State, { EContainerState::Stopped, EContainerState::Dead, EContainerState::Running, EContainerState::Paused } } },
     { "exit_status", { "container exit status", false, TData::ExitStatus, { EContainerState::Dead } } },
     { "start_errno", { "container start error", false, TData::StartErrno, { EContainerState::Stopped } } },
@@ -147,7 +147,7 @@ bool TContainer::IsRoot() const {
 }
 
 vector<pid_t> TContainer::Processes() {
-    auto cg = GetLeafCgroup(FreezerSubsystem);
+    auto cg = GetLeafCgroup(freezerSubsystem);
 
     vector<pid_t> ret;
     cg->GetProcesses(ret);
@@ -159,9 +159,9 @@ bool TContainer::IsAlive() {
 }
 
 TError TContainer::PrepareCgroups() {
-    LeafCgroups[CpuacctSubsystem] = GetLeafCgroup(CpuacctSubsystem);
-    LeafCgroups[MemorySubsystem] = GetLeafCgroup(MemorySubsystem);
-    LeafCgroups[FreezerSubsystem] = GetLeafCgroup(FreezerSubsystem);
+    LeafCgroups[cpuacctSubsystem] = GetLeafCgroup(cpuacctSubsystem);
+    LeafCgroups[memorySubsystem] = GetLeafCgroup(memorySubsystem);
+    LeafCgroups[freezerSubsystem] = GetLeafCgroup(freezerSubsystem);
 
     for (auto cg : LeafCgroups) {
         auto ret = cg.second->Create();
@@ -171,10 +171,10 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
-    auto memroot = MemorySubsystem->GetRootCgroup();
-    auto memcg = GetLeafCgroup(MemorySubsystem);
+    auto memroot = memorySubsystem->GetRootCgroup();
+    auto memcg = GetLeafCgroup(memorySubsystem);
 
-    TError error = MemorySubsystem->UseHierarchy(*memcg);
+    TError error = memorySubsystem->UseHierarchy(*memcg);
     TLogger::LogError(error, "Can't set use_hierarchy for " + memcg->Relpath());
     if (error)
         return error;
@@ -274,7 +274,7 @@ TError TContainer::Start() {
 }
 
 TError TContainer::KillAll() {
-    auto cg = GetLeafCgroup(FreezerSubsystem);
+    auto cg = GetLeafCgroup(freezerSubsystem);
 
     TLogger::Log("killall " + Name);
 
@@ -296,7 +296,7 @@ TError TContainer::KillAll() {
 
     // then kill any task that didn't want to stop via SIGTERM;
     // freeze all container tasks to make sure no one forks and races with us
-    error = FreezerSubsystem->Freeze(*cg);
+    error = freezerSubsystem->Freeze(*cg);
     if (error)
         TLogger::LogError(error, "Can't kill all tasks");
 
@@ -306,7 +306,7 @@ TError TContainer::KillAll() {
         return error;
     }
     cg->Kill(SIGKILL);
-    error = FreezerSubsystem->Unfreeze(*cg);
+    error = freezerSubsystem->Unfreeze(*cg);
     if (error)
         TLogger::LogError(error, "Can't kill all tasks");
 
@@ -341,8 +341,8 @@ TError TContainer::Pause() {
     if (IsRoot() || !CheckState(EContainerState::Running))
         return TError(EError::InvalidValue, "invalid container state " + ContainerStateName(State));
 
-    auto cg = GetLeafCgroup(FreezerSubsystem);
-    TError error(FreezerSubsystem->Freeze(*cg));
+    auto cg = GetLeafCgroup(freezerSubsystem);
+    TError error(freezerSubsystem->Freeze(*cg));
     if (error) {
         TLogger::LogError(error, "Can't pause " + Name);
         return error;
@@ -356,8 +356,8 @@ TError TContainer::Resume() {
     if (!CheckState(EContainerState::Paused))
         return TError(EError::InvalidValue, "invalid container state " + ContainerStateName(State));
 
-    auto cg = GetLeafCgroup(FreezerSubsystem);
-    TError error(FreezerSubsystem->Unfreeze(*cg));
+    auto cg = GetLeafCgroup(freezerSubsystem);
+    TError error(freezerSubsystem->Unfreeze(*cg));
     if (error) {
         TLogger::LogError(error, "Can't resume " + Name);
         return error;
@@ -369,16 +369,16 @@ TError TContainer::Resume() {
 }
 
 TError TContainer::GetData(const string &name, string &value) {
-    if (DataSpec.find(name) == DataSpec.end())
+    if (dataSpec.find(name) == dataSpec.end())
         return TError(EError::InvalidValue, "invalid container data");
 
-    if (IsRoot() && !DataSpec[name].RootValid)
+    if (IsRoot() && !dataSpec[name].RootValid)
         return TError(EError::InvalidData, "invalid data for root container");
 
-    if (DataSpec[name].Valid.find(State) == DataSpec[name].Valid.end())
+    if (dataSpec[name].Valid.find(State) == dataSpec[name].Valid.end())
         return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
 
-    value = DataSpec[name].Handler(*this);
+    value = dataSpec[name].Handler(*this);
     return TError::Success();
 }
 

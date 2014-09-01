@@ -30,7 +30,7 @@ static TError ValidGroup(string group) {
 static TError ValidMemGuarantee(string str) {
     uint64_t val;
 
-    auto memroot = MemorySubsystem->GetRootCgroup();
+    auto memroot = memorySubsystem->GetRootCgroup();
     if (!memroot->HasKnob("memory.low_limit_in_bytes"))
         return TError(EError::NotSupported, "invalid kernel");
 
@@ -75,7 +75,7 @@ static TError ValidCpuPriority(string str) {
     return TError::Success();
 }
 
-std::map<std::string, const TPropertySpec> PropertySpec = {
+std::map<std::string, const TPropertySpec> propertySpec = {
     {"command", { "command executed upon container start", "" }},
     {"user", { "start command with given user", "nobody", false, ValidUser }},
     {"group", { "start command with given group", "nogroup", false, ValidGroup }},
@@ -90,7 +90,7 @@ std::map<std::string, const TPropertySpec> PropertySpec = {
 
 const string &TContainerSpec::Get(const string &property) const {
     if (Data.find(property) == Data.end())
-        return PropertySpec[property].Def;
+        return propertySpec[property].Def;
 
     return Data.at(property);
 }
@@ -100,10 +100,10 @@ bool TContainerSpec::IsRoot() const {
 }
 
 bool TContainerSpec::IsDynamic(const std::string &property) const {
-    if (PropertySpec.find(property) == PropertySpec.end())
+    if (propertySpec.find(property) == propertySpec.end())
         return false;
 
-    return PropertySpec.at(property).Dynamic;
+    return propertySpec.at(property).Dynamic;
 }
 
 TError TContainerSpec::GetInternal(const string &property, string &value) const {
@@ -122,14 +122,14 @@ TError TContainerSpec::SetInternal(const string &property, const string &value) 
 }
 
 TError TContainerSpec::Set(const string &property, const string &value) {
-    if (PropertySpec.find(property) == PropertySpec.end()) {
+    if (propertySpec.find(property) == propertySpec.end()) {
         TError error(EError::InvalidValue, "property not found");
         TLogger::LogError(error, "Can't set property");
         return error;
     }
 
-    if (PropertySpec[property].Valid) {
-        TError error = PropertySpec[property].Valid(value);
+    if (propertySpec[property].Valid) {
+        TError error = propertySpec[property].Valid(value);
         TLogger::LogError(error, "Can't set property");
         if (error)
             return error;

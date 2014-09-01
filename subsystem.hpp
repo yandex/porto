@@ -59,9 +59,9 @@ public:
     TError Usage(std::shared_ptr<TCgroup> &cg, uint64_t &value) const;
 };
 
-extern std::shared_ptr<TMemorySubsystem> MemorySubsystem;
-extern std::shared_ptr<TFreezerSubsystem> FreezerSubsystem;
-extern std::shared_ptr<TCpuSubsystem> CpuSubsystem;
-extern std::shared_ptr<TCpuacctSubsystem> CpuacctSubsystem;
+extern std::shared_ptr<TMemorySubsystem> memorySubsystem;
+extern std::shared_ptr<TFreezerSubsystem> freezerSubsystem;
+extern std::shared_ptr<TCpuSubsystem> cpuSubsystem;
+extern std::shared_ptr<TCpuacctSubsystem> cpuacctSubsystem;
 
 #endif

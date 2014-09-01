@@ -10,32 +10,32 @@ extern "C" {
 #include <fcntl.h>
 }
 
-static std::ofstream File;
+static std::ofstream file;
 
 void TLogger::OpenLog(const std::string &path, const unsigned int mode) {
-    if (File.is_open())
-        File.close();
+    if (file.is_open())
+        file.close();
 
     struct stat st;
-    bool need_create = false;
+    bool needCreate = false;
 
     if (lstat(path.c_str(), &st) == 0) {
         if (st.st_mode != (mode | S_IFREG)) {
             unlink(path.c_str());
-            need_create = true;
+            needCreate = true;
         }
     } else {
-        need_create = true;
+        needCreate = true;
     }
 
-    if (need_create)
+    if (needCreate)
         close(creat(path.c_str(), mode));
 
-    File.open(path, std::ios_base::app);
+    file.open(path, std::ios_base::app);
 }
 
 void TLogger::CloseLog() {
-    File.close();
+    file.close();
 }
 
 static std::string GetTime() {
@@ -55,27 +55,27 @@ void TLogger::Log(const std::string &action) {
     if (!LOG_VEBOSE)
         return;
     
-    File << GetTime() << " " << action << std::endl;
+    file << GetTime() << " " << action << std::endl;
 }
 
 void TLogger::LogAction(const std::string &action, bool error, int errcode) {
     if (!error && LOG_VEBOSE)
-        File << GetTime() << " Ok: " << action << std::endl;
+        file << GetTime() << " Ok: " << action << std::endl;
     else if (error)
-        File << GetTime() << " Error: " << action << ": " << strerror(errcode) << std::endl;
+        file << GetTime() << " Error: " << action << ": " << strerror(errcode) << std::endl;
 }
 
 void TLogger::LogError(const TError &e, const std::string &s) {
     if (!e)
         return;
 
-    File << GetTime() << " Error(" << rpc::EError_Name(e.GetError()) << "): " << s << ": " << e.GetMsg() << std::endl;
+    file << GetTime() << " Error(" << rpc::EError_Name(e.GetError()) << "): " << s << ": " << e.GetMsg() << std::endl;
 }
 
 void TLogger::LogRequest(const std::string &message) {
-    File << GetTime() << " -> " << message << std::endl;
+    file << GetTime() << " -> " << message << std::endl;
 }
 
 void TLogger::LogResponse(const std::string &message) {
-    File << GetTime() << " <- " << message << std::endl;
+    file << GetTime() << " <- " << message << std::endl;
 }

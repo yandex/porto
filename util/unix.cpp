@@ -9,7 +9,7 @@ extern "C" {
 #include <errno.h>
 }
 
-int RetryBusy(int times, int timeo_ms, std::function<int()> handler) {
+int RetryBusy(int times, int timeoMs, std::function<int()> handler) {
     int ret = 0;
 
     if (!times)
@@ -19,14 +19,14 @@ int RetryBusy(int times, int timeo_ms, std::function<int()> handler) {
         ret = handler();
         if (errno != EBUSY)
             return ret;
-        if (usleep(timeo_ms * 1000) < 0)
+        if (usleep(timeoMs * 1000) < 0)
             return -1;
     }
 
     return ret;
 }
 
-int RetryFailed(int times, int timeo_ms, std::function<int()> handler) {
+int RetryFailed(int times, int timeoMs, std::function<int()> handler) {
     int ret = 0;
 
     if (!times)
@@ -37,16 +37,16 @@ int RetryFailed(int times, int timeo_ms, std::function<int()> handler) {
 
         if (ret == 0)
             return ret;
-        if (usleep(timeo_ms * 1000) < 0)
+        if (usleep(timeoMs * 1000) < 0)
             return -1;
     }
 
     return ret;
 }
 
-int SleepWhile(int timeo_ms, std::function<int()> handler) {
+int SleepWhile(int timeoMs, std::function<int()> handler) {
     const int resolution = 5;
-    int times = timeo_ms / resolution;
+    int times = timeoMs / resolution;
 
     if (!times)
         times = 0;
