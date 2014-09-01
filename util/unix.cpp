@@ -1,12 +1,12 @@
 #include <string>
 #include <csignal>
-#include <chrono>
 
 #include "unix.hpp"
 
 extern "C" {
 #include <unistd.h>
 #include <errno.h>
+#include <sys/time.h>
 }
 
 int RetryBusy(int times, int timeoMs, std::function<int()> handler) {
@@ -56,6 +56,12 @@ int SleepWhile(int timeoMs, std::function<int()> handler) {
 
 int GetPid() {
     return getpid();
+}
+
+size_t GetCurrentTime() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_sec;
 }
 
 int RegisterSignal(int signum, void (*handler)(int)) {

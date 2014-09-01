@@ -485,12 +485,17 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
     Task->DeliverExitStatus(status);
     TLogger::Log("Delivered " + to_string(status) + " to " + Name + " with root_pid " + to_string(Task->GetPid()));
     State = EContainerState::Dead;
+    TimeOfDeath = GetCurrentTime();
     return true;
 }
 
 void TContainer::Heartbeat() {
     if (Task)
         Task->Rotate();
+}
+
+bool TContainer::CanRemoveDead() const {
+    return State == EContainerState::Dead && TimeOfDeath + CONTAINER_AGING_TIME <= GetCurrentTime();
 }
 
 // TContainerHolder
@@ -576,6 +581,17 @@ bool TContainerHolder::DeliverExitStatus(int pid, int status) {
 }
 
 void TContainerHolder::Heartbeat() {
-    for (auto c : Containers)
-        c.second->Heartbeat();
+    auto i = Containers.begin();
+
+    while (i != Containers.end()) {
+        auto &name = i->first;
+        auto c = i->second;
+        if (c->CanRemoveDead()) {
+            TLogger::Log("Remove old dead container " + name);
+            i = Containers.erase(i);
+        } else {
+            c->Heartbeat();
+            ++i;
+        }
+    }
 }

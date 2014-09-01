@@ -40,6 +40,7 @@ class TContainer {
     EContainerState State;
     TContainerSpec Spec;
     bool MaybeReturnedOk = false;
+    size_t TimeOfDeath;
     friend TData;
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
@@ -81,6 +82,7 @@ public:
 
     std::shared_ptr<TCgroup> GetLeafCgroup(std::shared_ptr<TSubsystem> subsys);
     void Heartbeat();
+    bool CanRemoveDead() const;
 };
 
 class TContainerHolder {

@@ -11,6 +11,7 @@ const std::string ROOT_CONTAINER = "/";
 const std::string PORTO_ROOT_CGROUP = "porto";
 const std::string CONTAINER_BASEDIR = "/db/porto/";
 const ssize_t CONTAINER_MAX_LOG_SIZE = 10 * 1024 * 1024;
+const size_t CONTAINER_AGING_TIME = 60 * 60 * 24 * 7;
 const std::string KVALUE_ROOT = "/tmp/porto";
 const std::string KVALUE_SIZE = "size=32m";
 const size_t PORTOD_MAX_CLIENTS = 16;

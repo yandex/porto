@@ -1,4 +1,3 @@
-- remember stop timestamp and cleanup dead periodically (every day)
 - after container->Stop() returns, we have zombie process for some time (it will take a while for portoloop to reap it and deliver exit status to portod)
 - remove extern AckExitStatus from container->Stop()
 - porto support auto-respawning containers
