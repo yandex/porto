@@ -120,9 +120,13 @@ TError TKeyValueStorage::MountTmpfs() {
         if (m->GetMountpoint() == Tmpfs.GetMountpoint())
             return TError::Success();
 
-    TFolder mnt(Tmpfs.GetMountpoint());
-    if (!mnt.Exists())
-        mnt.Create();
+    TFolder dir(Tmpfs.GetMountpoint());
+    if (!dir.Exists()) {
+        error = dir.Create();
+        TLogger::LogError(error, "Can't create key-value mount point");
+        if (error)
+            return error;
+    }
 
     error = Tmpfs.Mount();
     TLogger::LogError(error, "Can't mount key-value tmpfs");
