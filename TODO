@@ -2,6 +2,9 @@
 - remove extern AckExitStatus from container->Stop()
 - stresstest: check for zombies, delivery queue overruns, fd leaks
 
+# init mode
+- fix termination - when real init exits we need to exit also
+
 # phase 2
 - porto support auto-respawning containers
 - hierarchical containers

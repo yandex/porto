@@ -75,6 +75,13 @@ static TError ValidCpuPriority(string str) {
     return TError::Success();
 }
 
+static TError ValidBool(string str) {
+    if (str != "true" && str != "false")
+        return TError(EError::InvalidValue, "invalid boolean value");
+
+    return TError::Success();
+}
+
 std::map<std::string, const TPropertySpec> propertySpec = {
     {"command", { "command executed upon container start", "" }},
     {"user", { "start command with given user", "nobody", false, ValidUser }},
@@ -86,6 +93,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
     {"memory_limit", { "memory hard limit", "-1", false, ValidMemLimit }},
     {"cpu_policy", { "CPU policy: rt, normal, idle", "normal", false, ValidCpuPolicy }},
     {"cpu_priority", { "CPU priority: 0-99", "50", false, ValidCpuPriority }},
+    {"subreaper", { "container root tasks reparents orphaned processes", "false", false, ValidBool }},
 };
 
 const string &TContainerSpec::Get(const string &property) const {

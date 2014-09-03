@@ -195,7 +195,7 @@ TError TContainer::PrepareCgroups() {
 }
 
 TError TContainer::PrepareTask() {
-    TTaskEnv taskEnv(Spec.Get("command"), Spec.Get("cwd"), Spec.Get("root"), Spec.Get("user"), Spec.Get("group"), Spec.Get("env"));
+    TTaskEnv taskEnv(Spec.Get("command"), Spec.Get("cwd"), Spec.Get("root"), Spec.Get("user"), Spec.Get("group"), Spec.Get("env"), Spec.Get("subreaper") == "true");
     TError error = taskEnv.Prepare();
     if (error)
         return error;
@@ -506,7 +506,42 @@ TError TContainerHolder::CreateRoot() {
         return error;
 
     auto root = Get(ROOT_CONTAINER);
-    root->Start();
+    error = root->Start();
+    if (error)
+        return error;
+
+    if (getppid() == 1) {
+        // portoloop is global init, we need to start real init
+
+        TError error = Create("system");
+        if (error)
+            return error;
+
+        auto system = Get("system");
+        error = system->SetProperty("command", "/sbin/init");
+        if (error)
+            return error;
+
+        error = system->SetProperty("cwd", "/");
+        if (error)
+            return error;
+
+        error = system->SetProperty("user", "root");
+        if (error)
+            return error;
+
+        error = system->SetProperty("group", "root");
+        if (error)
+            return error;
+
+        error = system->SetProperty("subreaper", "true");
+        if (error)
+            return error;
+
+        error = system->Start();
+        if (error)
+            return error;
+    }
 
     return TError::Success();
 }

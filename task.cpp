@@ -141,6 +141,11 @@ int TTask::ChildCallback() {
         ReportResultAndExit(Wfd, -errno);
     }
 
+    if (Env.Subreaper && prctl(PR_SET_CHILD_SUBREAPER, 1) < 0) {
+        Syslog(string("prctl(PR_SET_CHILD_SUBREAPER): ") + strerror(errno));
+        ReportResultAndExit(Wfd, -errno);
+    }
+
     if (setsid() < 0) {
         Syslog(string("setsid(): ") + strerror(errno));
         ReportResultAndExit(Wfd, -errno);
@@ -176,28 +181,48 @@ int TTask::ChildCallback() {
         ReportResultAndExit(Wfd, -errno);
     }
 
-    ret = open(StdoutFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0700);
-    if (ret < 0) {
-        Syslog(string("open(1): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
+    if (access(StdoutFile.c_str(), W_OK)) {
+        StdoutFile = "";
+        ret = open("/dev/null", O_RDONLY);
+        if (ret < 0) {
+            Syslog(string("open(1): ") + strerror(errno));
+            ReportResultAndExit(Wfd, -errno);
+        }
+    } else {
+        ret = open(StdoutFile.c_str(),
+                   O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0700);
+        if (ret < 0) {
+            Syslog(string("open(1): ") + strerror(errno));
+            ReportResultAndExit(Wfd, -errno);
+        }
+
+        ret = fchown(ret, Env.Uid, Env.Gid);
+        if (ret < 0) {
+            Syslog(string("fchown(1): ") + strerror(errno));
+            ReportResultAndExit(Wfd, -errno);
+        }
     }
 
-    ret = fchown(ret, Env.Uid, Env.Gid);
-    if (ret < 0) {
-        Syslog(string("fchown(1): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
+    if (access(StderrFile.c_str(), W_OK)) {
+        StderrFile = "";
+        ret = open("/dev/null", O_RDONLY);
+        if (ret < 0) {
+            Syslog(string("open(2): ") + strerror(errno));
+            ReportResultAndExit(Wfd, -errno);
+        }
+    } else {
+        ret = open(StderrFile.c_str(),
+                   O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0700);
+        if (ret < 0) {
+            Syslog(string("open(2): ") + strerror(errno));
+            ReportResultAndExit(Wfd, -errno);
+        }
 
-    ret = open(StderrFile.c_str(), O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0700);
-    if (ret < 0) {
-        Syslog(string("open(2): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
-
-    ret = fchown(ret, Env.Uid, Env.Gid);
-    if (ret < 0) {
-        Syslog(string("fchown(2): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
+        ret = fchown(ret, Env.Uid, Env.Gid);
+        if (ret < 0) {
+            Syslog(string("fchown(2): ") + strerror(errno));
+            ReportResultAndExit(Wfd, -errno);
+        }
     }
 
     TMount newRoot(Env.Root, Env.Root + "/", "none", {});
@@ -439,17 +464,21 @@ void TTask::Kill(int signal) const {
 
 std::string TTask::GetStdout() const {
     string s;
-    TFile f(StdoutFile);
-    TError e(f.LastStrings(STDOUT_READ_BYTES, s));
-    TLogger::LogError(e, "Can't read container stdout");
+    if (StdoutFile.length()) {
+        TFile f(StdoutFile);
+        TError e(f.LastStrings(STDOUT_READ_BYTES, s));
+        TLogger::LogError(e, "Can't read container stdout");
+    }
     return s;
 }
 
 std::string TTask::GetStderr() const {
     string s;
-    TFile f(StderrFile);
-    TError e(f.LastStrings(STDOUT_READ_BYTES, s));
-    TLogger::LogError(e, "Can't read container stderr");
+    if (StdoutFile.length()) {
+        TFile f(StderrFile);
+        TError e(f.LastStrings(STDOUT_READ_BYTES, s));
+        TLogger::LogError(e, "Can't read container stderr");
+    }
     return s;
 }
 
@@ -528,6 +557,9 @@ TError TTask::ValidateCgroups() const {
 
 TError TTask::RotateFile(const std::string path) const {
     struct stat st;
+
+    if (!path.length())
+        return TError::Success();
 
     if (stat(path.c_str(), &st) < 0)
         return TError(EError::Unknown, errno, "stat(" + path + ")");

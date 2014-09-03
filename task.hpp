@@ -27,10 +27,11 @@ class TTaskEnv {
     std::string Group;
     std::string Environ;
     int Uid, Gid;
+    bool Subreaper;
 
 public:
     TTaskEnv() {};
-    TTaskEnv(const std::string &command, const std::string &cwd, const std::string &root, const std::string &user, const std::string &group, const std::string &environ) : Command(command), Cwd(cwd), Root(root), User(user), Group(group), Environ(environ) { }
+    TTaskEnv(const std::string &command, const std::string &cwd, const std::string &root, const std::string &user, const std::string &group, const std::string &environ, const bool subreaper) : Command(command), Cwd(cwd), Root(root), User(user), Group(group), Environ(environ), Subreaper(subreaper) { }
     TError Prepare();
     const char** GetEnvp() const;
 };
