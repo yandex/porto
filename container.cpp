@@ -515,7 +515,12 @@ TError TContainerHolder::CreateInit() {
     if (error)
         return error;
 
-    error = system->SetProperty("env", "container=porto");
+    string term;
+    if (getenv("TERM"))
+        term = string(";TERM=") + getenv("TERM");
+
+    // we need to behave like lxc container, otherwise upstart won't run getty
+    error = system->SetProperty("env", "container=lxc" + term);
     if (error)
         return error;
 
