@@ -4,7 +4,9 @@
 - ? semaphore to wait for a container
 
 # init mode
-- fix termination - when real init exits we need to exit also
+- fix termination - unmount all filesystems
+- root_pid invalid
+- ssh/getty starts bash in init container, not root -> need some way to get to the root container ?
 
 # phase 2
 - porto support auto-respawning containers

@@ -16,6 +16,7 @@ extern "C" {
 #include <sys/types.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <sys/reboot.h>
 }
 
 using namespace std;
@@ -491,8 +492,22 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
 }
 
 void TContainer::Heartbeat() {
-    if (Task)
-        Task->Rotate();
+    if (!Task)
+        return;
+
+    Task->Rotate();
+
+    if (Name == INIT_CONTAINER && State == EContainerState::Dead) {
+        // TODO: umount
+
+        sync();
+
+        int status = Task->GetExitStatus().Status;
+        if (WIFSIGNALED(status) && WTERMSIG(status) == SIGINT)
+                reboot(RB_HALT_SYSTEM);
+
+        reboot(RB_AUTOBOOT);
+    }
 }
 
 bool TContainer::CanRemoveDead() const {

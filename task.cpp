@@ -153,7 +153,7 @@ int TTask::ChildCallback() {
 
     // remount proc so PID namespace works
     TMount proc("proc", "/proc", "proc", {});
-    if (proc.Remount()) {
+    if (proc.Mount()) {
         Syslog(string("remount procfs: ") + strerror(errno));
         ReportResultAndExit(Wfd, -errno);
     }
