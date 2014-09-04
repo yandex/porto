@@ -182,7 +182,7 @@ TError TCgroup::Remove() {
                                    return !IsEmpty(); });
 
         if (ret)
-            TLogger::Log("Can't kill all tasks in cgroup " + Path());
+            TLogger::Log() << "Can't kill all tasks in cgroup " << Path() << endl;
     }
 
     TFolder f(Path());

@@ -183,7 +183,7 @@ int TTask::ChildCallback() {
 
     if (access(StdoutFile.c_str(), W_OK)) {
         StdoutFile = "";
-        ret = open("/dev/null", O_RDONLY);
+        ret = open("/dev/null", O_WRONLY);
         if (ret < 0) {
             Syslog(string("open(1): ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
@@ -205,7 +205,7 @@ int TTask::ChildCallback() {
 
     if (access(StderrFile.c_str(), W_OK)) {
         StderrFile = "";
-        ret = open("/dev/null", O_RDONLY);
+        ret = open("/dev/null", O_WRONLY);
         if (ret < 0) {
             Syslog(string("open(2): ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
@@ -384,9 +384,10 @@ TError TTask::Start() {
 
         (void)setsid();
 
-        pid_t clonePid = clone(ChildFn, stack + sizeof(stack),
-                               SIGCHLD | CLONE_NEWNS | CLONE_NEWPID | CLONE_NEWUTS,
-                               this);
+        int cloneFlags = SIGCHLD;
+        cloneFlags |= CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWUTS;
+
+        pid_t clonePid = clone(ChildFn, stack + sizeof(stack), cloneFlags, this);
         if (write(Wfd, &clonePid, sizeof(clonePid))) {}
         if (clonePid < 0) {
             TError error(EError::Unknown, errno, "clone()");
@@ -453,7 +454,7 @@ void TTask::Kill(int signal) const {
     if (!Pid)
         throw "Tried to kill invalid process!";
 
-    TLogger::Log("kill " + to_string(Pid));
+    TLogger::Log() << "kill " << to_string(Pid) << endl;
 
     int ret = kill(Pid, signal);
     if (ret != 0) {

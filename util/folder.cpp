@@ -16,7 +16,7 @@ extern "C" {
 using namespace std;
 
 TError TFolder::Create(mode_t mode, bool recursive) const {
-    TLogger::Log("mkdir " + Path);
+    TLogger::Log() << "mkdir " << Path << endl;
 
     if (recursive) {
         string copy(Path);
@@ -58,7 +58,7 @@ TError TFolder::Remove(bool recursive) const {
         }
     }
 
-    TLogger::Log("rmdir " + Path);
+    TLogger::Log() << "rmdir " << Path << endl;
 
     int ret = RetryBusy(10, 100, [&]{ return rmdir(Path.c_str()); });
     if (ret)

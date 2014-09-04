@@ -136,7 +136,6 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
             close(evtfd[1]);
             close(ackfd[0]);
             execlp(program_invocation_name, program_invocation_short_name, nullptr);
-            TLogger::OpenLog(LOOP_LOG_FILE, LOOP_LOG_FILE_PERM);
             TLogger::Log() << "Can't execlp(" << program_invocation_name << ", " << program_invocation_short_name << ", NULL)" << endl;
             ret = EXIT_FAILURE;
             break;
@@ -193,7 +192,7 @@ int main(int argc, char * const argv[])
         }
     }
 
-    TLogger::OpenLog(LOOP_LOG_FILE, LOOP_LOG_FILE_PERM);
+    TLogger::InitLog(LOOP_LOG_FILE, LOOP_LOG_FILE_PERM);
 
     if (getuid() != 0) {
         TLogger::Log() << "Need root privileges to start" << endl;

@@ -2,6 +2,7 @@
 #include <sstream>
 #include <memory>
 #include <csignal>
+#include <cstdlib>
 
 #include "container.hpp"
 #include "task.hpp"
@@ -208,7 +209,7 @@ TError TContainer::PrepareTask() {
 }
 
 TError TContainer::Create() {
-    TLogger::Log("Create " + Name);
+    TLogger::Log() << "Create " << Name << endl;
     return Spec.Create();
 }
 
@@ -229,7 +230,7 @@ static string ContainerStateName(EContainerState state) {
 
 TError TContainer::Start() {
     if ((State == EContainerState::Running || State == EContainerState::Dead) && MaybeReturnedOk) {
-        TLogger::Log("Maybe running");
+        TLogger::Log() << "Maybe running" << endl;
         MaybeReturnedOk = false;
         return TError::Success();
     }
@@ -265,7 +266,7 @@ TError TContainer::Start() {
         return error;
     }
 
-    TLogger::Log(Name + " started " + to_string(Task->GetPid()));
+    TLogger::Log() << Name << " started " << to_string(Task->GetPid()) << endl;
 
     Spec.SetInternal("root_pid", to_string(Task->GetPid()));
     State = EContainerState::Running;
@@ -276,7 +277,7 @@ TError TContainer::Start() {
 TError TContainer::KillAll() {
     auto cg = GetLeafCgroup(freezerSubsystem);
 
-    TLogger::Log("killall " + Name);
+    TLogger::Log() << "killall " << Name << endl;
 
     vector<pid_t> reap;
     TError error = cg->GetTasks(reap);
@@ -320,7 +321,7 @@ TError TContainer::Stop() {
     if (IsRoot() || !(CheckState(EContainerState::Running) || CheckState(EContainerState::Dead)))
         return TError(EError::InvalidValue, "invalid container state " + ContainerStateName(State));
 
-    TLogger::Log("stop " + Name);
+    TLogger::Log() << "stop " << Name << endl;
 
     int pid = Task->GetPid();
 
@@ -419,7 +420,7 @@ TError TContainer::Restore(const kv::TNode &node) {
             started = false;
     }
 
-    TLogger::Log(Name + ": restore process " + to_string(pid) + " which " + (started ? "started" : "didn't start"));
+    TLogger::Log() << Name << ": restore process " << to_string(pid) << " which " << (started ? "started" : "didn't start") << endl;
 
     State = EContainerState::Stopped;
 
@@ -483,7 +484,7 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
         return false;
 
     Task->DeliverExitStatus(status);
-    TLogger::Log("Delivered " + to_string(status) + " to " + Name + " with root_pid " + to_string(Task->GetPid()));
+    TLogger::Log() << "Delivered " << to_string(status) << " to " << Name << " with root_pid " << to_string(Task->GetPid()) << endl;
     State = EContainerState::Dead;
     TimeOfDeath = GetCurrentTime();
     return true;
@@ -500,6 +501,66 @@ bool TContainer::CanRemoveDead() const {
 
 // TContainerHolder
 
+TError TContainerHolder::CreateInit() {
+    TError error = Create(INIT_CONTAINER);
+    if (error)
+        return error;
+
+    auto system = Get(INIT_CONTAINER);
+    error = system->SetProperty("command", "/sbin/init");
+    if (error)
+        return error;
+
+    error = system->SetProperty("cwd", "/");
+    if (error)
+        return error;
+
+    error = system->SetProperty("env", "container=porto");
+    if (error)
+        return error;
+
+    error = system->SetProperty("user", "root");
+    if (error)
+        return error;
+
+    error = system->SetProperty("group", "root");
+    if (error)
+        return error;
+
+    error = system->SetProperty("subreaper", "true");
+    if (error)
+        return error;
+
+    error = system->Start();
+    if (error)
+        return error;
+
+    TLogger::Log() << "Waiting for sshd to start, then we can mount filesystems" << endl;
+    int ret = RetryFailed(5 * 60, 1000, [] { return std::system("pgrep sshd &>/dev/null"); });
+    if (ret)
+        TLogger::Log() << "Waited for sshd bringup but it didn't start" << endl;
+
+    TLogger::Log() << "Mount all filesystems in porto namespace" << endl;
+
+    TMountSnapshot sysMntSnapshot("/etc/fstab");
+
+    set<shared_ptr<TMount>> sysMnt;
+    error = sysMntSnapshot.Mounts(sysMnt);
+    if (error) {
+        TLogger::LogError(error, "Error while mounting from /etc/fstab");
+    } else {
+        for (auto m : sysMnt) {
+            if (m->VFSType() == "proc" || m->VFSType() == "swap")
+                continue;
+
+            error = m->Remount();
+            TLogger::LogError(error, "Error remounting " + m->GetMountpoint());
+        }
+    }
+
+    return TError::Success();
+}
+
 TError TContainerHolder::CreateRoot() {
     TError error = Create(ROOT_CONTAINER);
     if (error)
@@ -509,39 +570,6 @@ TError TContainerHolder::CreateRoot() {
     error = root->Start();
     if (error)
         return error;
-
-    if (getppid() == 1) {
-        // portoloop is global init, we need to start real init
-
-        TError error = Create("system");
-        if (error)
-            return error;
-
-        auto system = Get("system");
-        error = system->SetProperty("command", "/sbin/init");
-        if (error)
-            return error;
-
-        error = system->SetProperty("cwd", "/");
-        if (error)
-            return error;
-
-        error = system->SetProperty("user", "root");
-        if (error)
-            return error;
-
-        error = system->SetProperty("group", "root");
-        if (error)
-            return error;
-
-        error = system->SetProperty("subreaper", "true");
-        if (error)
-            return error;
-
-        error = system->Start();
-        if (error)
-            return error;
-    }
 
     return TError::Success();
 }
@@ -597,6 +625,9 @@ vector<string> TContainerHolder::List() const {
 }
 
 TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node) {
+    if (name == ROOT_CONTAINER || name == INIT_CONTAINER)
+        return TError::Success();
+
     // TODO: we DO trust data from the persistent storage, do we?
     auto c = make_shared<TContainer>(name);
     auto e = c->Restore(node);
@@ -622,7 +653,7 @@ void TContainerHolder::Heartbeat() {
         auto &name = i->first;
         auto c = i->second;
         if (c->CanRemoveDead()) {
-            TLogger::Log("Remove old dead container " + name);
+            TLogger::Log() << "Remove old dead container " << name << endl;
             i = Containers.erase(i);
         } else {
             c->Heartbeat();

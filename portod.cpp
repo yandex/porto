@@ -56,7 +56,7 @@ static int AcceptClient(int sfd, std::vector<int> &clients) {
         if (errno == EAGAIN)
             return 0;
 
-        TLogger::Log(string("accept() error: ") + strerror(errno));
+        TLogger::Log() << "accept() error: " << strerror(errno) << endl;
         return -1;
     }
 
@@ -73,7 +73,6 @@ static void DoExit(int signum) {
     done = true;
     cleanup = false;
     raiseSignum = signum;
-    TLogger::CloseLog();
 }
 
 static void DoExitAndCleanup(int signum) {
@@ -114,7 +113,7 @@ void AckExitStatus(int pid) {
 
     int ret = write(REAP_ACK_FD, &pid, sizeof(pid));
     if (ret == sizeof(pid)) {
-        TLogger::Log("Acknowledge exit status for " + to_string(pid));
+        TLogger::Log() << "Acknowledge exit status for " << to_string(pid) << endl;
     } else {
         TError error(EError::Unknown, errno, "write(): returned " + to_string(ret));
         TLogger::LogError(error, "Can't acknowledge exit status for " + to_string(pid));
@@ -131,7 +130,7 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
     while (nr--) {
         int ret = poll(fds, 1, 0);
         if (ret < 0) {
-            TLogger::Log(string("poll() error: ") + strerror(errno));
+            TLogger::Log() << "poll() error: " << strerror(errno) << endl;
             return ret;
         }
 
@@ -140,16 +139,16 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
 
         int pid, status;
         if (read(fd, &pid, sizeof(pid)) < 0) {
-            TLogger::Log(string("read(pid): ") + strerror(errno));
+            TLogger::Log() << "read(pid): " << strerror(errno) << endl;
             return 0;
         }
         if (read(fd, &status, sizeof(status)) < 0) {
-            TLogger::Log(string("read(status): ") + strerror(errno));
+            TLogger::Log() << "read(status): " << strerror(errno) << endl;
             return 0;
         }
 
         if (!cholder.DeliverExitStatus(pid, status)) {
-            TLogger::Log("Can't deliver " + to_string(pid) + " exit status " + to_string(status));
+            TLogger::Log() << "Can't deliver " << to_string(pid) << " exit status " << to_string(status) << endl;
             AckExitStatus(pid);
             return 0;
         }
@@ -169,11 +168,11 @@ static int RpcMain(TContainerHolder &cholder) {
     if (g)
         gid = g->gr_gid;
     else
-        TLogger::Log("Can't get gid for " + RPC_SOCK_GROUP + " group");
+        TLogger::Log() << "Can't get gid for " << RPC_SOCK_GROUP << " group" << endl;
 
     TError error = CreateRpcServer(RPC_SOCK, RPC_SOCK_PERM, uid, gid, sfd);
     if (error) {
-        TLogger::Log("Can't create RPC server: " + error.GetMsg());
+        TLogger::Log() << "Can't create RPC server: " << error.GetMsg() << endl;
     }
 
     int starved = 0;
@@ -191,7 +190,7 @@ static int RpcMain(TContainerHolder &cholder) {
 
         ret = poll(fds, MAX_CONNECTIONS, PORTOD_POLL_TIMEOUT_MS);
         if (ret < 0) {
-            TLogger::Log(string("poll() error: ") + strerror(errno));
+            TLogger::Log() << "poll() error: " << strerror(errno) << endl;
 
             if (done)
                 break;
@@ -206,7 +205,6 @@ static int RpcMain(TContainerHolder &cholder) {
 
         if (hup) {
             TLogger::CloseLog();
-            TLogger::OpenLog(LOG_FILE, LOG_FILE_PERM);
             hup = false;
         }
 
@@ -279,17 +277,17 @@ int main(int argc, char * const argv[])
         }
     }
 
-    TLogger::OpenLog(LOG_FILE, LOG_FILE_PERM);
+    TLogger::InitLog(LOG_FILE, LOG_FILE_PERM);
 
     umask(0);
 
     if (fcntl(REAP_EVT_FD, F_SETFD, FD_CLOEXEC) < 0) {
-        TLogger::Log(string("Can't set close-on-exec flag on REAP_EVT_FD: ") + strerror(errno));
+        TLogger::Log() << "Can't set close-on-exec flag on REAP_EVT_FD: " << strerror(errno) << endl;
         return EXIT_FAILURE;
     }
 
     if (fcntl(REAP_ACK_FD, F_SETFD, FD_CLOEXEC) < 0) {
-        TLogger::Log(string("Can't set close-on-exec flag on REAP_ACK_FD: ") + strerror(errno));
+        TLogger::Log() << "Can't set close-on-exec flag on REAP_ACK_FD: " << strerror(errno) << endl;
         return EXIT_FAILURE;
     }
 
@@ -305,41 +303,49 @@ int main(int argc, char * const argv[])
     (void)RegisterSignal(SIGINT, DoExitAndCleanup);
 
     if (AnotherInstanceRunning(RPC_SOCK)) {
-        TLogger::Log("Another instance of portod is running!");
+        TLogger::Log() << "Another instance of portod is running!" << endl;
         return EXIT_FAILURE;
     }
 
     if (CreatePidFile(PID_FILE, PID_FILE_PERM)) {
-        TLogger::Log("Can't create pid file " + PID_FILE + "!");
+        TLogger::Log() << "Can't create pid file " << PID_FILE << "!" << endl;
         return EXIT_FAILURE;
     }
 
-    TLogger::Log("Started");
+    TLogger::Log() << "Started" << endl;
     try {
         TKeyValueStorage storage;
         // don't fail, try to recover anyway
-        (void)storage.MountTmpfs();
+        TError error = storage.MountTmpfs();
+        TLogger::LogError(error, "Couldn't create key-value storage, skipping recovery");
 
         TContainerHolder cholder;
-        TError error = cholder.CreateRoot();
+        error = cholder.CreateRoot();
         if (error)
-            TLogger::Log("Couldn't create root container");
+            TLogger::Log() << "Couldn't create root container" << endl;
+
+        if (getppid() == 1) {
+            // if portoloop is global init, we need to start real init
+            error = cholder.CreateInit();
+            if (error)
+                TLogger::Log() << "Couldn't create init container" << endl;
+        }
 
         {
             TCgroupSnapshot cs;
             TError error = cs.Create();
             if (error)
-                TLogger::Log("Couldn't create cgroup snapshot!");
+                TLogger::Log() << "Couldn't create cgroup snapshot!" << endl;
 
             std::map<std::string, kv::TNode> m;
             error = storage.Restore(m);
             if (error)
-                TLogger::Log("Couldn't restore state!");
+                TLogger::Log() << "Couldn't restore state!" << endl;
 
             for (auto &r : m) {
                 error = cholder.Restore(r.first, r.second);
                 if (error)
-                    TLogger::Log("Couldn't restore " + r.first + " state!");
+                    TLogger::Log() << "Couldn't restore " << r.first << " state!" << endl;
             }
         }
 

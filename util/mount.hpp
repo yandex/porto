@@ -42,14 +42,16 @@ public:
         return Flags;
     }
 
-    TError Mount(bool rdonly = false, bool bind = false, bool remount = false)const ;
+    TError Mount(bool rdonly = false, bool bind = false, bool remount = false) const;
     TError Remount() const { return Mount(false, false, true); }
     TError Bind() const { return Mount(false, true); }
-    TError Umount()const ;
+    TError Umount() const;
 };
 
 class TMountSnapshot {
+    std::string Path;
 public:
+    TMountSnapshot(const std::string &path = "/proc/self/mounts") : Path(path) {}
     TError Mounts(std::set<std::shared_ptr<TMount>> &mounts) const;
 };
 

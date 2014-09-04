@@ -44,7 +44,7 @@ TFile::EFileType TFile::Type() const {
 }
 
 TError TFile::Remove() const {
-    TLogger::Log("unlink " + Path);
+    TLogger::Log() << "unlink " << Path << endl;
 
     int ret = RetryBusy(10, 100, [&]{ return unlink(Path.c_str()); });
 

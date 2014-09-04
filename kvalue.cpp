@@ -122,7 +122,7 @@ TError TKeyValueStorage::MountTmpfs() {
 
     TFolder dir(Tmpfs.GetMountpoint());
     if (!dir.Exists()) {
-        error = dir.Create();
+        error = dir.Create(KVS_PERM, true);
         TLogger::LogError(error, "Can't create key-value mount point");
         if (error)
             return error;
@@ -151,7 +151,7 @@ TError TKeyValueStorage::Restore(std::map<std::string, kv::TNode> &map) const {
         kv::TNode node;
         node.Clear();
 
-        TLogger::Log("Restoring " + name + " from key-value storage");
+        TLogger::Log() << "Restoring " << name << " from key-value storage" << endl;
 
         TError error = LoadNode(name, node);
         if (error) {
@@ -170,7 +170,7 @@ TError TKeyValueStorage::Dump() const {
 
     TError error = ListNodes(nodes);
     if (error) {
-        TLogger::Log("Can't list nodes: " + error.GetMsg());
+        TLogger::Log() << "Can't list nodes: " << error.GetMsg() << endl;
         return error;
     }
 
@@ -183,7 +183,7 @@ TError TKeyValueStorage::Dump() const {
 
         error = LoadNode(name, node);
         if (error) {
-            TLogger::Log("Can't load node: " + error.GetMsg());
+            TLogger::Log() << "Can't load node: " << error.GetMsg() << endl;
             continue;
         }
 

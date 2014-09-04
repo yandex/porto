@@ -1,5 +1,8 @@
+#include <iostream>
+
 #include "porto.hpp"
 #include "log.hpp"
+#include "util/unix.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -8,18 +11,34 @@ extern "C" {
 #include <fcntl.h>
 }
 
-static std::ofstream file;
+static std::ofstream logFile;
+static std::ofstream kmsgFile;
+static std::string logPath;
+static unsigned int logMode;
 
-void TLogger::OpenLog(const std::string &path, const unsigned int mode) {
-    if (file.is_open())
-        file.close();
+void TLogger::InitLog(const std::string &path, const unsigned int mode) {
+    logPath = path;
+    logMode = mode;
+    logFile.close();
+}
+
+void TLogger::OpenLog() {
+    if (logFile.is_open()) {
+        return;
+    }
+
+    if (access(logPath.c_str(), W_OK)) {
+        if (!kmsgFile.is_open())
+            kmsgFile.open("/dev/kmsg", std::ios_base::out);
+        return;
+    }
 
     struct stat st;
     bool needCreate = false;
 
-    if (lstat(path.c_str(), &st) == 0) {
-        if (st.st_mode != (mode | S_IFREG)) {
-            unlink(path.c_str());
+    if (lstat(logPath.c_str(), &st) == 0) {
+        if (st.st_mode != (logMode | S_IFREG)) {
+            unlink(logPath.c_str());
             needCreate = true;
         }
     } else {
@@ -27,13 +46,17 @@ void TLogger::OpenLog(const std::string &path, const unsigned int mode) {
     }
 
     if (needCreate)
-        close(creat(path.c_str(), mode));
+        close(creat(logPath.c_str(), logMode));
 
-    file.open(path, std::ios_base::app);
+    logFile.open(logPath, std::ios_base::app);
+
+    if (logFile.is_open() && kmsgFile.is_open())
+        kmsgFile.close();
 }
 
 void TLogger::CloseLog() {
-    file.close();
+    logFile.close();
+    kmsgFile.close();
 }
 
 static std::string GetTime() {
@@ -50,14 +73,14 @@ static std::string GetTime() {
 }
 
 std::basic_ostream<char> &TLogger::Log() {
-    return file << GetTime() << " ";
-}
+    OpenLog();
 
-void TLogger::Log(const std::string &action) {
-    if (!LOG_VEBOSE)
-        return;
-
-    Log() << " " << action << std::endl;
+    if (logFile.is_open())
+        return logFile << GetTime() << " ";
+    else if (kmsgFile.is_open())
+        return kmsgFile << " " << program_invocation_short_name << ": ";
+    else
+        return std::cerr << GetTime() << " " << program_invocation_short_name << ": ";
 }
 
 void TLogger::LogAction(const std::string &action, bool error, int errcode) {
