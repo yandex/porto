@@ -197,7 +197,7 @@ TError TContainer::PrepareCgroups() {
 }
 
 TError TContainer::PrepareTask() {
-    TTaskEnv taskEnv(Spec.Get("command"), Spec.Get("cwd"), Spec.Get("root"), Spec.Get("user"), Spec.Get("group"), Spec.Get("env"), Spec.Get("subreaper") == "true");
+    TTaskEnv taskEnv(Spec.Get("command"), Spec.Get("cwd"), Spec.Get("root"), Spec.Get("user"), Spec.Get("group"), Spec.Get("env"));
     TError error = taskEnv.Prepare();
     if (error)
         return error;
@@ -496,18 +496,6 @@ void TContainer::Heartbeat() {
         return;
 
     Task->Rotate();
-
-    if (Name == INIT_CONTAINER && State == EContainerState::Dead) {
-        // TODO: umount
-
-        sync();
-
-        int status = Task->GetExitStatus().Status;
-        if (WIFSIGNALED(status) && WTERMSIG(status) == SIGINT)
-                reboot(RB_HALT_SYSTEM);
-
-        reboot(RB_AUTOBOOT);
-    }
 }
 
 bool TContainer::CanRemoveDead() const {
@@ -515,71 +503,6 @@ bool TContainer::CanRemoveDead() const {
 }
 
 // TContainerHolder
-
-TError TContainerHolder::CreateInit() {
-    TError error = Create(INIT_CONTAINER);
-    if (error)
-        return error;
-
-    auto system = Get(INIT_CONTAINER);
-    error = system->SetProperty("command", "/sbin/init");
-    if (error)
-        return error;
-
-    error = system->SetProperty("cwd", "/");
-    if (error)
-        return error;
-
-    string term;
-    if (getenv("TERM"))
-        term = string(";TERM=") + getenv("TERM");
-
-    // we need to behave like lxc container, otherwise upstart won't run getty
-    error = system->SetProperty("env", "container=lxc" + term);
-    if (error)
-        return error;
-
-    error = system->SetProperty("user", "root");
-    if (error)
-        return error;
-
-    error = system->SetProperty("group", "root");
-    if (error)
-        return error;
-
-    error = system->SetProperty("subreaper", "true");
-    if (error)
-        return error;
-
-    error = system->Start();
-    if (error)
-        return error;
-
-    TLogger::Log() << "Waiting for sshd to start, then we can mount filesystems" << endl;
-    int ret = RetryFailed(5 * 60, 1000, [] { return std::system("pgrep sshd &>/dev/null"); });
-    if (ret)
-        TLogger::Log() << "Waited for sshd bringup but it didn't start" << endl;
-
-    TLogger::Log() << "Mount all filesystems in porto namespace" << endl;
-
-    TMountSnapshot sysMntSnapshot("/etc/fstab");
-
-    set<shared_ptr<TMount>> sysMnt;
-    error = sysMntSnapshot.Mounts(sysMnt);
-    if (error) {
-        TLogger::LogError(error, "Error while mounting from /etc/fstab");
-    } else {
-        for (auto m : sysMnt) {
-            if (m->VFSType() == "proc" || m->VFSType() == "swap")
-                continue;
-
-            error = m->Remount();
-            TLogger::LogError(error, "Error remounting " + m->GetMountpoint());
-        }
-    }
-
-    return TError::Success();
-}
 
 TError TContainerHolder::CreateRoot() {
     TError error = Create(ROOT_CONTAINER);
@@ -645,7 +568,7 @@ vector<string> TContainerHolder::List() const {
 }
 
 TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node) {
-    if (name == ROOT_CONTAINER || name == INIT_CONTAINER)
+    if (name == ROOT_CONTAINER)
         return TError::Success();
 
     // TODO: we DO trust data from the persistent storage, do we?

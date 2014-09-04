@@ -90,7 +90,6 @@ class TContainerHolder {
 
     bool ValidName(const std::string &name) const;
 public:
-    TError CreateInit();
     TError CreateRoot();
     TError Create(const std::string &name);
     std::shared_ptr<TContainer> Get(const std::string &name);

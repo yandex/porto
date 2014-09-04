@@ -141,11 +141,6 @@ int TTask::ChildCallback() {
         ReportResultAndExit(Wfd, -errno);
     }
 
-    if (Env.Subreaper && prctl(PR_SET_CHILD_SUBREAPER, 1) < 0) {
-        Syslog(string("prctl(PR_SET_CHILD_SUBREAPER): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
-
     if (setsid() < 0) {
         Syslog(string("setsid(): ") + strerror(errno));
         ReportResultAndExit(Wfd, -errno);

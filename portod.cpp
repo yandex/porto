@@ -324,13 +324,6 @@ int main(int argc, char * const argv[])
         if (error)
             TLogger::Log() << "Couldn't create root container" << endl;
 
-        if (getppid() == 1) {
-            // if portoloop is global init, we need to start real init
-            error = cholder.CreateInit();
-            if (error)
-                TLogger::Log() << "Couldn't create init container" << endl;
-        }
-
         {
             TCgroupSnapshot cs;
             TError error = cs.Create();
