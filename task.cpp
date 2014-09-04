@@ -181,7 +181,7 @@ int TTask::ChildCallback() {
         ReportResultAndExit(Wfd, -errno);
     }
 
-    if (access(StdoutFile.c_str(), W_OK)) {
+    if (access(DirName(StdoutFile).c_str(), W_OK)) {
         StdoutFile = "";
         ret = open("/dev/null", O_WRONLY);
         if (ret < 0) {
@@ -203,7 +203,7 @@ int TTask::ChildCallback() {
         }
     }
 
-    if (access(StderrFile.c_str(), W_OK)) {
+    if (access(DirName(StderrFile).c_str(), W_OK)) {
         StderrFile = "";
         ret = open("/dev/null", O_WRONLY);
         if (ret < 0) {

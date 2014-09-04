@@ -11,5 +11,6 @@ int GetPid();
 size_t GetCurrentTime();
 int RegisterSignal(int signum, void (*handler)(int));
 void ResetAllSignalHandlers(void);
+std::string DirName(const std::string &str);
 
 #endif

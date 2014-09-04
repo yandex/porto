@@ -7,6 +7,8 @@ extern "C" {
 #include <unistd.h>
 #include <errno.h>
 #include <sys/time.h>
+#include <string.h>
+#include <libgen.h>
 }
 
 int RetryBusy(int times, int timeoMs, std::function<int()> handler) {
@@ -86,4 +88,16 @@ void ResetAllSignalHandlers(void) {
 
         (void)sigaction(sig, &sa, NULL);
     }
+}
+
+std::string DirName(const std::string &str) {
+    char *dup = strdup(str.c_str());
+    if (!dup)
+        throw std::bad_alloc();
+
+    char *p = dirname(dup);
+    std::string out(p);
+    free(dup);
+
+    return out;
 }
