@@ -401,6 +401,9 @@ static void TestHolder(TPortoAPI &api) {
     name = "/invalid";
     ExpectFailure(api.Create(name), EError::InvalidValue);
 
+    name = "invalid/";
+    ExpectFailure(api.Create(name), EError::InvalidValue);
+
     name = "i//nvalid";
     ExpectFailure(api.Create(name), EError::InvalidValue);
 
