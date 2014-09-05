@@ -154,9 +154,6 @@ TContainer::~TContainer() {
         Resume();
 
     Stop();
-
-    if (Parent)
-        Parent->Ref--;
 }
 
 const string TContainer::GetName() const {
@@ -554,7 +551,11 @@ bool TContainer::CanRemoveDead() const {
 }
 
 bool TContainer::HasChildren() const {
-    return Ref > 0;
+    // link #1 - this
+    // link #2 - TContainerHolder->Containers
+    // any other link comes from TContainer->Parent and indicates that
+    // current container has children
+    return shared_from_this().use_count() > 2;
 }
 
 // TContainerHolder

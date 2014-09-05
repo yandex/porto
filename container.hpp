@@ -35,14 +35,13 @@ struct TDataSpec {
 
 extern std::map<std::string, const TDataSpec> dataSpec;
 
-class TContainer {
+class TContainer : public std::enable_shared_from_this<TContainer> {
     const std::string Name;
     const std::shared_ptr<TContainer> Parent;
     EContainerState State;
     TContainerSpec Spec;
     bool MaybeReturnedOk = false;
     size_t TimeOfDeath = 0;
-    int Ref = 0;
     friend TData;
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
@@ -62,10 +61,7 @@ class TContainer {
 
 public:
     TContainer(const std::string &name, std::shared_ptr<TContainer> parent) :
-        Name(StripParentName(name)), Parent(parent), State(EContainerState::Stopped), Spec(name) {
-            if (Parent)
-                Parent->Ref++;
-        }
+        Name(StripParentName(name)), Parent(parent), State(EContainerState::Stopped), Spec(name) { }
     ~TContainer();
 
     const std::string GetName() const;
