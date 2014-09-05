@@ -138,6 +138,17 @@ bool TContainer::CheckState(EContainerState expected) {
     return State == expected;
 }
 
+const string TContainer::StripParentName(const string &name) const {
+    if (name == ROOT_CONTAINER)
+        return ROOT_CONTAINER;
+
+    std::string::size_type n = name.rfind('/');
+    if (n == std::string::npos)
+        return name;
+    else
+        return string(name.begin() + n + 1, name.end());
+}
+
 TContainer::~TContainer() {
     if (State == EContainerState::Paused)
         Resume();
@@ -148,8 +159,14 @@ TContainer::~TContainer() {
         Parent->Ref--;
 }
 
-const string &TContainer::GetName() const {
-    return Name;
+const string TContainer::GetName() const {
+    if (!Parent)
+        return Name;
+
+    if (Parent->Name == ROOT_CONTAINER)
+        return Name;
+    else
+        return Parent->Name + "/" + Name;
 }
 
 bool TContainer::IsRoot() const {
@@ -218,7 +235,7 @@ TError TContainer::PrepareTask() {
 }
 
 TError TContainer::Create() {
-    TLogger::Log() << "Create " << Name << endl;
+    TLogger::Log() << "Create " << GetName() << endl;
     return Spec.Create();
 }
 
@@ -275,7 +292,7 @@ TError TContainer::Start() {
         return error;
     }
 
-    TLogger::Log() << Name << " started " << to_string(Task->GetPid()) << endl;
+    TLogger::Log() << GetName() << " started " << to_string(Task->GetPid()) << endl;
 
     Spec.SetInternal("root_pid", to_string(Task->GetPid()));
     State = EContainerState::Running;
@@ -286,7 +303,7 @@ TError TContainer::Start() {
 TError TContainer::KillAll() {
     auto cg = GetLeafCgroup(freezerSubsystem);
 
-    TLogger::Log() << "killall " << Name << endl;
+    TLogger::Log() << "killall " << GetName() << endl;
 
     vector<pid_t> reap;
     TError error = cg->GetTasks(reap);
@@ -330,7 +347,7 @@ TError TContainer::Stop() {
     if (IsRoot() || !(CheckState(EContainerState::Running) || CheckState(EContainerState::Dead)))
         return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
 
-    TLogger::Log() << "stop " << Name << endl;
+    TLogger::Log() << "stop " << GetName() << endl;
 
     int pid = Task->GetPid();
 
@@ -354,7 +371,7 @@ TError TContainer::Pause() {
     auto cg = GetLeafCgroup(freezerSubsystem);
     TError error(freezerSubsystem->Freeze(*cg));
     if (error) {
-        TLogger::LogError(error, "Can't pause " + Name);
+        TLogger::LogError(error, "Can't pause " + GetName());
         return error;
     }
 
@@ -369,7 +386,7 @@ TError TContainer::Resume() {
     auto cg = GetLeafCgroup(freezerSubsystem);
     TError error(freezerSubsystem->Unfreeze(*cg));
     if (error) {
-        TLogger::LogError(error, "Can't resume " + Name);
+        TLogger::LogError(error, "Can't resume " + GetName());
         return error;
     }
 
@@ -429,7 +446,7 @@ TError TContainer::Restore(const kv::TNode &node) {
             started = false;
     }
 
-    TLogger::Log() << Name << ": restore process " << to_string(pid) << " which " << (started ? "started" : "didn't start") << endl;
+    TLogger::Log() << GetName() << ": restore process " << to_string(pid) << " which " << (started ? "started" : "didn't start") << endl;
 
     State = EContainerState::Stopped;
 
@@ -481,8 +498,8 @@ std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys
 
     if (Name == ROOT_CONTAINER)
         return subsys->GetRootCgroup()->GetChild(PORTO_ROOT_CGROUP);
-    else
-        return subsys->GetRootCgroup()->GetChild(PORTO_ROOT_CGROUP)->GetChild(Name);
+
+    return Parent->GetLeafCgroup(subsys)->GetChild(Name);
 }
 
 bool TContainer::DeliverExitStatus(int pid, int status) {
@@ -493,7 +510,7 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
         return false;
 
     Task->DeliverExitStatus(status);
-    TLogger::Log() << "Delivered " << to_string(status) << " to " << Name << " with root_pid " << to_string(Task->GetPid()) << endl;
+    TLogger::Log() << "Delivered " << to_string(status) << " to " << GetName() << " with root_pid " << to_string(Task->GetPid()) << endl;
     State = EContainerState::Dead;
     TimeOfDeath = GetCurrentTime();
     return true;
@@ -546,7 +563,10 @@ bool TContainerHolder::ValidName(const string &name) const {
         if (name[i] == '/' && name[i + 1] == '/')
             return false;
 
-    if (name[0] == '/')
+    if (*name.begin() == '/')
+        return false;
+
+    if (*(name.end()--) == '/')
         return false;
 
     // . (dot) is used for kvstorage, so don't allow it here

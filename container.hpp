@@ -56,16 +56,17 @@ class TContainer {
 
     TContainer(const TContainer &) = delete;
     TContainer &operator=(const TContainer &) = delete;
+    const std::string StripParentName(const std::string &name) const;
 
 public:
     TContainer(const std::string &name, std::shared_ptr<TContainer> parent) :
-        Name(name), Parent(parent), State(EContainerState::Stopped), Spec(name) {
+        Name(StripParentName(name)), Parent(parent), State(EContainerState::Stopped), Spec(name) {
             if (Parent)
                 Parent->Ref++;
         }
     ~TContainer();
 
-    const std::string &GetName() const;
+    const std::string GetName() const;
 
     bool IsRoot() const;
 
