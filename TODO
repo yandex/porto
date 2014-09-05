@@ -4,7 +4,6 @@
 - ? semaphore to wait for a container
 
 # phase 2
-- porto support auto-respawning containers
 - limit checks for hierarchical containers
 - cpu, memory, network qos
 

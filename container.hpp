@@ -41,7 +41,7 @@ class TContainer {
     EContainerState State;
     TContainerSpec Spec;
     bool MaybeReturnedOk = false;
-    size_t TimeOfDeath;
+    size_t TimeOfDeath = 0;
     int Ref = 0;
     friend TData;
 
@@ -57,6 +57,8 @@ class TContainer {
     TContainer(const TContainer &) = delete;
     TContainer &operator=(const TContainer &) = delete;
     const std::string StripParentName(const std::string &name) const;
+    bool NeedRespawn();
+    TError Respawn();
 
 public:
     TContainer(const std::string &name, std::shared_ptr<TContainer> parent) :

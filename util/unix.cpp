@@ -60,10 +60,10 @@ int GetPid() {
     return getpid();
 }
 
-size_t GetCurrentTime() {
+size_t GetCurrentTimeMs() {
     struct timeval tv;
     gettimeofday(&tv, NULL);
-    return tv.tv_sec;
+    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
 }
 
 int RegisterSignal(int signum, void (*handler)(int)) {

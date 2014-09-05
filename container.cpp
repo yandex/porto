@@ -512,11 +512,37 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
     Task->DeliverExitStatus(status);
     TLogger::Log() << "Delivered " << to_string(status) << " to " << GetName() << " with root_pid " << to_string(Task->GetPid()) << endl;
     State = EContainerState::Dead;
-    TimeOfDeath = GetCurrentTime();
+
+    if (NeedRespawn()) {
+        TError error = Respawn();
+        TLogger::LogError(error, "Can't respawn " + GetName());
+    }
+
+    TimeOfDeath = GetCurrentTimeMs();
     return true;
 }
 
+bool TContainer::NeedRespawn() {
+    if (State != EContainerState::Dead)
+        return false;
+
+    return Spec.Get("respawn") == "true" && TimeOfDeath + RESPAWN_DELAY_MS <= GetCurrentTimeMs();
+}
+
+TError TContainer::Respawn() {
+    TError error = Stop();
+    if (error)
+        return error;
+
+    return Start();
+}
+
 void TContainer::Heartbeat() {
+    if (NeedRespawn()) {
+        TError error = Respawn();
+        TLogger::LogError(error, "Can't respawn " + GetName());
+    }
+
     if (State != EContainerState::Running || !Task)
         return;
 
@@ -524,7 +550,7 @@ void TContainer::Heartbeat() {
 }
 
 bool TContainer::CanRemoveDead() const {
-    return State == EContainerState::Dead && TimeOfDeath + CONTAINER_AGING_TIME <= GetCurrentTime();
+    return State == EContainerState::Dead && TimeOfDeath + CONTAINER_AGING_TIME_MS <= GetCurrentTimeMs();
 }
 
 bool TContainer::HasChildren() const {

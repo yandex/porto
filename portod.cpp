@@ -176,6 +176,7 @@ static int RpcMain(TContainerHolder &cholder) {
     }
 
     int starved = 0;
+    size_t heartbeat = 0;
     while (!done) {
         struct pollfd fds[MAX_CONNECTIONS];
         memset(fds, 0, sizeof(fds));
@@ -196,11 +197,9 @@ static int RpcMain(TContainerHolder &cholder) {
                 break;
         }
 
-        if (ret == 0 || starved <= 0) {
-            starved = 1000;
+        if (heartbeat + HEARTBEAT_DELAY_MS <= GetCurrentTimeMs()) {
             cholder.Heartbeat();
-        } else {
-            starved--;
+            heartbeat = GetCurrentTimeMs();
         }
 
         if (hup) {

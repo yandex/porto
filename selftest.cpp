@@ -315,6 +315,8 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     Expect(v == string("normal"));
     ExpectSuccess(api.GetProperty(name, "cpu_priority", v));
     Expect(v == string("50"));
+    ExpectSuccess(api.GetProperty(name, "respawn", v));
+    Expect(v == string("false"));
 }
 
 static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
@@ -704,7 +706,7 @@ static void TestCwd(TPortoAPI &api, const string &name) {
 }
 
 /*
-static void TestRoot(TPortoAPI &api, const string &name) {
+static void TestRootProperty(TPortoAPI &api, const string &name) {
     string pid;
 
     cerr << "Check filesystem isolation" << endl;
@@ -811,7 +813,7 @@ static void TestStateMachine(TPortoAPI &api, const string &name) {
 static void TestRoot(TPortoAPI &api) {
     string v;
     string root = "/";
-    vector<string> properties = { "command", "user", "group", "env", "memory_guarantee", "memory_limit", "cpu_policy", "cpu_priority", "parent" };
+    vector<string> properties = { "command", "user", "group", "env", "memory_guarantee", "memory_limit", "cpu_policy", "cpu_priority", "parent", "respawn" };
 
     cerr << "Check root properties & data" << endl;
     for (auto p : properties)
@@ -935,6 +937,24 @@ static void TestPermissions(TPortoAPI &api, const string &name) {
     Expect(st.st_mode == (0644 | S_IFREG));
 
     ExpectSuccess(api.Stop(name));
+}
+
+static void TestRespawn(TPortoAPI &api, const string &name) {
+    string pid, respawnPid;
+
+    cerr << "Check respawn" << endl;
+
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1"));
+    ExpectSuccess(api.SetProperty(name, "respawn", "true"));
+    ExpectSuccess(api.Start(name));
+
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    WaitExit(api, pid);
+    ExpectSuccess(api.GetData(name, "root_pid", respawnPid));
+    Expect(pid != respawnPid);
+
+    ExpectSuccess(api.Stop(name));
+    ExpectSuccess(api.SetProperty(name, "respawn", "false"));
 }
 
 static void TestLeaks(TPortoAPI &api) {
@@ -1093,9 +1113,10 @@ int Selftest() {
             TestEnvironment(api, "a");
             TestUserGroup(api, "a");
             TestCwd(api, "a");
-            //TestRoot(api, "a");
+            //TestRootProperty(api, "a");
             TestLimits(api, "a");
             TestPermissions(api, "a");
+            TestRespawn(api, "a");
             ExpectSuccess(api.Destroy("a"));
 
             TestLeaks(api);
