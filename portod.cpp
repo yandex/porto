@@ -322,23 +322,23 @@ int main(int argc, char * const argv[])
         TContainerHolder cholder;
         error = cholder.CreateRoot();
         if (error)
-            TLogger::Log() << "Couldn't create root container" << endl;
+            TLogger::LogError(error, "Couldn't create root container!");
 
         {
             TCgroupSnapshot cs;
             TError error = cs.Create();
             if (error)
-                TLogger::Log() << "Couldn't create cgroup snapshot!" << endl;
+                TLogger::LogError(error, "Couldn't create cgroup snapshot!");
 
             std::map<std::string, kv::TNode> m;
             error = storage.Restore(m);
             if (error)
-                TLogger::Log() << "Couldn't restore state!" << endl;
+                TLogger::LogError(error, "Couldn't restore state!");
 
             for (auto &r : m) {
                 error = cholder.Restore(r.first, r.second);
                 if (error)
-                    TLogger::Log() << "Couldn't restore " << r.first << " state!" << endl;
+                    TLogger::LogError(error, string("Couldn't restore ") + r.first + " state!");
             }
         }
 

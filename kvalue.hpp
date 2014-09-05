@@ -10,13 +10,13 @@
 
 class TKeyValueStorage {
     TMount Tmpfs;
+    std::string Name(const std::string &path) const;
     std::string Path(const std::string &name) const;
     void Merge(kv::TNode &node, kv::TNode &next) const;
     TError ListNodes(std::vector<std::string> &list) const;
 
     TKeyValueStorage(const TKeyValueStorage &) = delete;
     TKeyValueStorage &operator=(const TKeyValueStorage &) = delete;
-
 public:
     TError MountTmpfs();
 

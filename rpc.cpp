@@ -22,8 +22,9 @@ static void DestroyContainer(TContainerHolder &cholder,
                              const rpc::TContainerDestroyRequest &req,
                              rpc::TContainerResponse &rsp)
 {
-    cholder.Destroy(req.name());
-    rsp.set_error(EError::Success);
+    TError error(cholder.Destroy(req.name()));
+    rsp.set_error(error.GetError());
+    rsp.set_errormsg(error.GetMsg());
 }
 
 static void StartContainer(TContainerHolder &cholder,

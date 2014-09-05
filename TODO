@@ -5,7 +5,7 @@
 
 # phase 2
 - porto support auto-respawning containers
-- hierarchical containers
+- limit checks for hierarchical containers
 - cpu, memory, network qos
 
 # cleanup

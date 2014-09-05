@@ -39,6 +39,10 @@ struct TData {
         }
     }
 
+    static string Parent(TContainer& c) {
+        return c.Parent->Name;
+    }
+
     static string RootPid(TContainer& c) {
         if (c.Task)
             return to_string(c.Task->GetPid());
@@ -115,6 +119,7 @@ struct TData {
 
 std::map<std::string, const TDataSpec> dataSpec = {
     { "state", { "container state", true, TData::State, { EContainerState::Stopped, EContainerState::Dead, EContainerState::Running, EContainerState::Paused } } },
+    { "parent", { "container parent", false, TData::Parent, { EContainerState::Stopped, EContainerState::Dead, EContainerState::Running, EContainerState::Paused } } },
     { "exit_status", { "container exit status", false, TData::ExitStatus, { EContainerState::Dead } } },
     { "start_errno", { "container start error", false, TData::StartErrno, { EContainerState::Stopped } } },
     { "root_pid", { "root process id", false, TData::RootPid, { EContainerState::Running, EContainerState::Paused } } },
@@ -138,6 +143,9 @@ TContainer::~TContainer() {
         Resume();
 
     Stop();
+
+    if (Parent)
+        Parent->Ref--;
 }
 
 const string &TContainer::GetName() const {
@@ -238,7 +246,7 @@ TError TContainer::Start() {
     MaybeReturnedOk = false;
 
     if (!CheckState(EContainerState::Stopped))
-        return TError(EError::InvalidValue, "invalid container state " + ContainerStateName(State));
+        return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
 
     TError error = PrepareCgroups();
     if (error) {
@@ -320,7 +328,7 @@ extern void AckExitStatus(int pid);
 
 TError TContainer::Stop() {
     if (IsRoot() || !(CheckState(EContainerState::Running) || CheckState(EContainerState::Dead)))
-        return TError(EError::InvalidValue, "invalid container state " + ContainerStateName(State));
+        return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
 
     TLogger::Log() << "stop " << Name << endl;
 
@@ -341,7 +349,7 @@ TError TContainer::Stop() {
 
 TError TContainer::Pause() {
     if (IsRoot() || !CheckState(EContainerState::Running))
-        return TError(EError::InvalidValue, "invalid container state " + ContainerStateName(State));
+        return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
 
     auto cg = GetLeafCgroup(freezerSubsystem);
     TError error(freezerSubsystem->Freeze(*cg));
@@ -356,7 +364,7 @@ TError TContainer::Pause() {
 
 TError TContainer::Resume() {
     if (!CheckState(EContainerState::Paused))
-        return TError(EError::InvalidValue, "invalid container state " + ContainerStateName(State));
+        return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
 
     auto cg = GetLeafCgroup(freezerSubsystem);
     TError error(freezerSubsystem->Unfreeze(*cg));
@@ -492,7 +500,7 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
 }
 
 void TContainer::Heartbeat() {
-    if (!Task)
+    if (State != EContainerState::Running || !Task)
         return;
 
     Task->Rotate();
@@ -502,7 +510,17 @@ bool TContainer::CanRemoveDead() const {
     return State == EContainerState::Dead && TimeOfDeath + CONTAINER_AGING_TIME <= GetCurrentTime();
 }
 
+bool TContainer::HasChildren() const {
+    return Ref > 0;
+}
+
 // TContainerHolder
+
+TContainerHolder::~TContainerHolder() {
+    // we want children to be removed first
+    for (auto i = Containers.rbegin(); i != Containers.rend(); ++i)
+        Containers.erase(i->first);
+}
 
 TError TContainerHolder::CreateRoot() {
     TError error = Create(ROOT_CONTAINER);
@@ -524,26 +542,54 @@ bool TContainerHolder::ValidName(const string &name) const {
     if (name.length() == 0 || name.length() > 128)
         return false;
 
+    for (string::size_type i = 0; i + 1 < name.length(); i++)
+        if (name[i] == '/' && name[i + 1] == '/')
+            return false;
+
+    if (name[0] == '/')
+        return false;
+
+    // . (dot) is used for kvstorage, so don't allow it here
     return find_if(name.begin(), name.end(),
                    [](const char c) -> bool {
-                        return !(isalnum(c) || c == '_');
+                        return !(isalnum(c) || c == '_' || c == '/');
                    }) == name.end();
+}
+
+std::shared_ptr<TContainer> TContainerHolder::GetParent(const std::string &name) const {
+    std::shared_ptr<TContainer> parent;
+
+    string::size_type n = name.rfind('/');
+    if (n == string::npos) {
+        return Containers.at(ROOT_CONTAINER);
+    } else {
+        string parentName = name.substr(0, n);
+
+        if (Containers.find(parentName) == Containers.end())
+            return nullptr;
+
+        return Containers.at(parentName);
+    }
 }
 
 TError TContainerHolder::Create(const string &name) {
     if (!ValidName(name))
         return TError(EError::InvalidValue, "invalid container name " + name);
 
-    if (Containers[name] == nullptr) {
-        auto c = make_shared<TContainer>(name);
-        TError error(c->Create());
-        if (error)
-            return error;
+    if (Containers.find(name) != Containers.end())
+        return TError(EError::ContainerAlreadyExists, "container " + name + " already exists");
 
-        Containers[name] = c;
-        return TError::Success();
-    } else
-        return TError(EError::InvalidValue, "container " + name + " already exists");
+    auto parent = GetParent(name);
+    if (!parent && name != ROOT_CONTAINER)
+        return TError(EError::InvalidValue, "invalid parent container");
+
+    auto c = make_shared<TContainer>(name, parent);
+    TError error(c->Create());
+    if (error)
+        return error;
+
+    Containers[name] = c;
+    return TError::Success();
 }
 
 shared_ptr<TContainer> TContainerHolder::Get(const string &name) {
@@ -553,9 +599,16 @@ shared_ptr<TContainer> TContainerHolder::Get(const string &name) {
     return Containers[name];
 }
 
-void TContainerHolder::Destroy(const string &name) {
-    if (name != ROOT_CONTAINER)
-        Containers.erase(name);
+TError TContainerHolder::Destroy(const string &name) {
+    if (name == ROOT_CONTAINER || Containers.find(name) == Containers.end())
+        return TError(EError::InvalidValue, "invalid container name " + name);
+
+    if (Containers[name]->HasChildren())
+        return TError(EError::InvalidState, "container has children");
+
+    Containers.erase(name);
+
+    return TError::Success();
 }
 
 vector<string> TContainerHolder::List() const {
@@ -572,7 +625,11 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
         return TError::Success();
 
     // TODO: we DO trust data from the persistent storage, do we?
-    auto c = make_shared<TContainer>(name);
+    auto parent = GetParent(name);
+    if (!parent)
+        return TError(EError::InvalidValue, "invalid parent container");
+
+    auto c = make_shared<TContainer>(name, parent);
     auto e = c->Restore(node);
     if (e)
         return e;

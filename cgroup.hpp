@@ -28,7 +28,7 @@ class TCgroup : public std::enable_shared_from_this<TCgroup> {
 public:
     TCgroup(const std::vector<std::shared_ptr<TSubsystem>> controller,
             std::shared_ptr<TMount> mount = nullptr);
-    TCgroup(const std::string &name, std::shared_ptr<TCgroup> parent) :
+    TCgroup(const std::string &name, const std::shared_ptr<TCgroup> parent) :
         Name(name), Parent(parent) {}
 
     ~TCgroup();

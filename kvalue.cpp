@@ -18,8 +18,16 @@ TKeyValueStorage::TKeyValueStorage() :
     Tmpfs("tmpfs", KVALUE_ROOT, "tmpfs", {KVALUE_SIZE}) {
 }
 
+string TKeyValueStorage::Name(const string &path) const {
+    string s = path;
+    replace(s.begin(), s.end(), '.', '/');
+    return s;
+}
+
 string TKeyValueStorage::Path(const string &name) const {
-    return Tmpfs.GetMountpoint() + "/" + name;
+    string fileName = name;
+    replace(fileName.begin(), fileName.end(), '/', '.');
+    return Tmpfs.GetMountpoint() + "/" + fileName;
 }
 
 void TKeyValueStorage::Merge(kv::TNode &node, kv::TNode &next) const {
@@ -134,8 +142,16 @@ TError TKeyValueStorage::MountTmpfs() {
 }
 
 TError TKeyValueStorage::ListNodes(std::vector<std::string> &list) const {
+    vector<string> tmp;
     TFolder f(Tmpfs.GetMountpoint());
-    return f.Items(TFile::Regular, list);
+    TError error = f.Items(TFile::Regular, tmp);
+    if (error)
+        return error;
+
+    for (auto s : tmp)
+        list.push_back(Name(s));
+
+    return TError::Success();
 }
 
 TError TKeyValueStorage::Restore(std::map<std::string, kv::TNode> &map) const {

@@ -279,6 +279,14 @@ static string Pgrep(const string &name) {
     return pid;
 }
 
+static void ExpectCorrectCgroups(const string &pid, const string &name) {
+    auto cgmap = GetCgroups(pid);
+    Expect(cgmap.size() == 3);
+    for (auto kv : cgmap) {
+        Expect(kv.second == "/porto/" + name);
+    }
+}
+
 static void ShouldHaveOnlyRoot(TPortoAPI &api) {
     std::vector<std::string> containers;
 
@@ -322,6 +330,8 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     ExpectFailure(api.GetData(name, "stderr", v), EError::InvalidState);
     ExpectFailure(api.GetData(name, "cpu_usage", v), EError::InvalidState);
     ExpectFailure(api.GetData(name, "memory_usage", v), EError::InvalidState);
+    ExpectSuccess(api.GetData(name, "parent", v));
+    Expect(v == string("/"));
 }
 
 static void TestHolder(TPortoAPI &api) {
@@ -388,12 +398,37 @@ static void TestHolder(TPortoAPI &api) {
     name = "z@";
     ExpectFailure(api.Create(name), EError::InvalidValue);
 
+    name = "/invalid";
+    ExpectFailure(api.Create(name), EError::InvalidValue);
+
+    name = "i//nvalid";
+    ExpectFailure(api.Create(name), EError::InvalidValue);
+
+    name = "invalid//";
+    ExpectFailure(api.Create(name), EError::InvalidValue);
+
+    name = "invali//d";
+    ExpectFailure(api.Create(name), EError::InvalidValue);
+
+    name = string(128, 'a');
+    ExpectSuccess(api.Create(name));
+    ExpectSuccess(api.Destroy(name));
+
     name = string(128, 'z');
     ExpectSuccess(api.Create(name));
     ExpectSuccess(api.Destroy(name));
 
     name = string(129, 'z');
     ExpectFailure(api.Create(name), EError::InvalidValue);
+
+    string parent = "a";
+    string child = "a/b";
+    ExpectFailure(api.Create(child), EError::InvalidValue);
+    ExpectSuccess(api.Create(parent));
+    ExpectSuccess(api.Create(child));
+    ExpectFailure(api.Destroy(parent), EError::InvalidState);
+    ExpectSuccess(api.Destroy(child));
+    ExpectSuccess(api.Destroy(parent));
 
     ShouldHaveOnlyRoot(api);
 }
@@ -520,16 +555,34 @@ static void TestLongRunning(TPortoAPI &api, const string &name) {
         Expect(name.second == "/");
     }
 
-    cgmap = GetCgroups(pid);
-    Expect(cgmap.size() == 3);
-    for (auto kv : cgmap) {
-        Expect(kv.second == "/porto/" + name);
-    }
+    ExpectCorrectCgroups(pid, name);
 
     ExpectSuccess(api.Stop(name));
     //Expect(TaskZombie(api, pid) == true);
     WaitExit(api, pid);
     Expect(TaskRunning(api, pid) == false);
+
+    cerr << "Check that hierarchical task cgroups are correct" << endl;
+
+    string child = name + "/b";
+    ExpectSuccess(api.Create(child));
+
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    ExpectCorrectCgroups(pid, name);
+
+    ExpectSuccess(api.SetProperty(child, "command", "sleep 1000"));
+    ExpectSuccess(api.Start(child));
+    ExpectSuccess(api.GetData(child, "root_pid", pid));
+    ExpectCorrectCgroups(pid, child);
+
+    string parent;
+    ExpectSuccess(api.GetData(child, "parent", parent));
+    Expect(parent == name);
+
+    ExpectSuccess(api.Destroy(child));
+    ExpectSuccess(api.Stop(name));
 }
 
 static void TestIsolation(TPortoAPI &api, const string &name) {
@@ -686,14 +739,14 @@ static void TestStateMachine(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetData(name, "state", v));
     Expect(v == "running");
 
-    ExpectFailure(api.Start(name), EError::InvalidValue);
+    ExpectFailure(api.Start(name), EError::InvalidState);
 
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     WaitExit(api, pid);
     ExpectSuccess(api.GetData(name, "state", v));
     Expect(v == "dead");
 
-    ExpectFailure(api.Start(name), EError::InvalidValue);
+    ExpectFailure(api.Start(name), EError::InvalidState);
 
     ExpectSuccess(api.Stop(name));
     ExpectSuccess(api.GetData(name, "state", v));
@@ -714,12 +767,16 @@ static void TestStateMachine(TPortoAPI &api, const string &name) {
     v = GetState(pid);
     Expect(v == "D");
 
+    ExpectFailure(api.Pause(name), EError::InvalidState);
+
     ExpectSuccess(api.GetData(name, "state", v));
     Expect(v == "paused");
 
     ExpectSuccess(api.Resume(name));
     v = GetState(pid);
     Expect(v == "R");
+
+    ExpectFailure(api.Resume(name), EError::InvalidState);
 
     ExpectSuccess(api.Stop(name));
     //Expect(TaskZombie(api, pid) == true);
@@ -751,7 +808,7 @@ static void TestStateMachine(TPortoAPI &api, const string &name) {
 static void TestRoot(TPortoAPI &api) {
     string v;
     string root = "/";
-    vector<string> properties = { "command", "user", "group", "env", "memory_guarantee", "memory_limit", "cpu_policy", "cpu_priority" };
+    vector<string> properties = { "command", "user", "group", "env", "memory_guarantee", "memory_limit", "cpu_policy", "cpu_priority", "parent" };
 
     cerr << "Check root properties & data" << endl;
     for (auto p : properties)
@@ -764,6 +821,9 @@ static void TestRoot(TPortoAPI &api) {
     ExpectFailure(api.GetData(root, "root_pid", v), EError::InvalidData);
     ExpectFailure(api.GetData(root, "stdout", v), EError::InvalidData);
     ExpectFailure(api.GetData(root, "stderr", v), EError::InvalidData);
+
+    ExpectFailure(api.Stop(root), EError::InvalidState);
+    ExpectFailure(api.Destroy(root), EError::InvalidValue);
 
     cerr << "Check root cpu_usage & memory_usage" << endl;
     ExpectSuccess(api.GetData(root, "cpu_usage", v));
@@ -985,9 +1045,34 @@ static void TestRecovery(TPortoAPI &api) {
     }
 
     ExpectSuccess(api.Destroy(name));
+
+    cerr << "Make sure hierarchical recovery works" << endl;
+
+    string parent = "a";
+    string child = "a/b";
+    ExpectSuccess(api.Create(parent));
+    ExpectSuccess(api.Create(child));
+
+    ExpectSuccess(portod.AsString(portod_pid));
+
+    kill(stoi(portod_pid), SIGKILL);
+    WaitExit(api, portod_pid);
+    WaitPortod(api);
+
+    std::vector<std::string> containers;
+
+    ExpectSuccess(api.List(containers));
+    Expect(containers.size() == 3);
+    Expect(containers[0] == string("/"));
+    Expect(containers[1] == string("a"));
+    Expect(containers[2] == string("a/b"));
+    ExpectSuccess(api.Destroy(child));
+    ExpectSuccess(api.Destroy(parent));
 }
 
 int Selftest() {
+    // TODO: truncate portoloop log and check that we don't have unexpected
+    // respawns
 
     try {
         {

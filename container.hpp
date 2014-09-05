@@ -37,10 +37,12 @@ extern std::map<std::string, const TDataSpec> dataSpec;
 
 class TContainer {
     const std::string Name;
+    const std::shared_ptr<TContainer> Parent;
     EContainerState State;
     TContainerSpec Spec;
     bool MaybeReturnedOk = false;
     size_t TimeOfDeath;
+    int Ref = 0;
     friend TData;
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
@@ -56,7 +58,11 @@ class TContainer {
     TContainer &operator=(const TContainer &) = delete;
 
 public:
-    TContainer(const std::string &name) : Name(name), State(EContainerState::Stopped), Spec(name) { }
+    TContainer(const std::string &name, std::shared_ptr<TContainer> parent) :
+        Name(name), Parent(parent), State(EContainerState::Stopped), Spec(name) {
+            if (Parent)
+                Parent->Ref++;
+        }
     ~TContainer();
 
     const std::string &GetName() const;
@@ -83,6 +89,7 @@ public:
     std::shared_ptr<TCgroup> GetLeafCgroup(std::shared_ptr<TSubsystem> subsys);
     void Heartbeat();
     bool CanRemoveDead() const;
+    bool HasChildren() const;
 };
 
 class TContainerHolder {
@@ -90,12 +97,14 @@ class TContainerHolder {
 
     bool ValidName(const std::string &name) const;
 public:
+    ~TContainerHolder();
+    std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot();
     TError Create(const std::string &name);
     std::shared_ptr<TContainer> Get(const std::string &name);
     TError Restore(const std::string &name, const kv::TNode &node);
 
-    void Destroy(const std::string &name);
+    TError Destroy(const std::string &name);
     bool DeliverExitStatus(int pid, int status);
 
     std::vector<std::string> List() const;
