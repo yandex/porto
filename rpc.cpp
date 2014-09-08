@@ -4,166 +4,129 @@
 
 using namespace std;
 
-static void CreateContainer(TContainerHolder &cholder,
-                            const rpc::TContainerCreateRequest &req,
-                            rpc::TContainerResponse &rsp)
+static TError CreateContainer(TContainerHolder &cholder,
+                              const rpc::TContainerCreateRequest &req,
+                              rpc::TContainerResponse &rsp)
 {
-    auto c = cholder.Get(req.name());
-    if (c) {
-        rsp.set_error(EError::ContainerAlreadyExists);
-        return;
-    }
-    TError error(cholder.Create(req.name()));
-    rsp.set_error(error.GetError());
-    rsp.set_errormsg(error.GetMsg());
+    auto container = cholder.Get(req.name());
+    if (container)
+        return TError(EError::ContainerAlreadyExists, "invalid name");
+
+    return cholder.Create(req.name());
 }
 
-static void DestroyContainer(TContainerHolder &cholder,
-                             const rpc::TContainerDestroyRequest &req,
+static TError DestroyContainer(TContainerHolder &cholder,
+                               const rpc::TContainerDestroyRequest &req,
+                               rpc::TContainerResponse &rsp)
+{
+    return cholder.Destroy(req.name());
+}
+
+static TError StartContainer(TContainerHolder &cholder,
+                             const rpc::TContainerStartRequest &req,
                              rpc::TContainerResponse &rsp)
 {
-    TError error(cholder.Destroy(req.name()));
-    rsp.set_error(error.GetError());
-    rsp.set_errormsg(error.GetMsg());
-}
-
-static void StartContainer(TContainerHolder &cholder,
-                           const rpc::TContainerStartRequest &req,
-                           rpc::TContainerResponse &rsp)
-{
     auto container = cholder.Get(req.name());
-    if (!container) {
-        rsp.set_error(EError::ContainerDoesNotExist);
-        return;
-    }
+    if (!container)
+        return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    TError error(container->Start());
-    rsp.set_error(error.GetError());
-    rsp.set_errormsg(error.GetMsg());
+    return container->Start();
 }
 
-static void StopContainer(TContainerHolder &cholder,
-                          const rpc::TContainerStopRequest &req,
-                          rpc::TContainerResponse &rsp)
-{
-    auto container = cholder.Get(req.name());
-    if (!container) {
-        rsp.set_error(EError::ContainerDoesNotExist);
-        return;
-    }
-
-    TError error(container->Stop());
-    rsp.set_error(error.GetError());
-    rsp.set_errormsg(error.GetMsg());
-}
-
-static void PauseContainer(TContainerHolder &cholder,
-                           const rpc::TContainerPauseRequest &req,
-                           rpc::TContainerResponse &rsp)
-{
-    auto container = cholder.Get(req.name());
-    if (!container) {
-        rsp.set_error(EError::ContainerDoesNotExist);
-        return;
-    }
-
-    TError error(container->Pause());
-    rsp.set_error(error.GetError());
-    rsp.set_errormsg(error.GetMsg());
-}
-
-static void ResumeContainer(TContainerHolder &cholder,
-                            const rpc::TContainerResumeRequest &req,
+static TError StopContainer(TContainerHolder &cholder,
+                            const rpc::TContainerStopRequest &req,
                             rpc::TContainerResponse &rsp)
 {
     auto container = cholder.Get(req.name());
-    if (!container) {
-        rsp.set_error(EError::ContainerDoesNotExist);
-        return;
-    }
+    if (!container)
+        return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    TError error(container->Resume());
-    rsp.set_error(error.GetError());
-    rsp.set_errormsg(error.GetMsg());
+    return container->Stop();
 }
 
-static void ListContainers(TContainerHolder &cholder,
-                           rpc::TContainerResponse &rsp)
+static TError PauseContainer(TContainerHolder &cholder,
+                             const rpc::TContainerPauseRequest &req,
+                             rpc::TContainerResponse &rsp)
+{
+    auto container = cholder.Get(req.name());
+    if (!container)
+        return TError(EError::ContainerDoesNotExist, "invalid name");
+
+    return container->Pause();
+}
+
+static TError ResumeContainer(TContainerHolder &cholder,
+                              const rpc::TContainerResumeRequest &req,
+                              rpc::TContainerResponse &rsp)
+{
+    auto container = cholder.Get(req.name());
+    if (!container)
+        return TError(EError::ContainerDoesNotExist, "invalid name");
+
+    return container->Resume();
+}
+
+static TError ListContainers(TContainerHolder &cholder,
+                             rpc::TContainerResponse &rsp)
 {
     for (auto name : cholder.List())
         rsp.mutable_list()->add_name(name);
 
-    rsp.set_error(EError::Success);
+    return TError::Success();
 }
 
-static void GetContainerProperty(TContainerHolder &cholder,
-                                 const rpc::TContainerGetPropertyRequest &req,
-                                 rpc::TContainerResponse &rsp)
+static TError GetContainerProperty(TContainerHolder &cholder,
+                                   const rpc::TContainerGetPropertyRequest &req,
+                                   rpc::TContainerResponse &rsp)
 {
     auto container = cholder.Get(req.name());
-    if (!container) {
-        rsp.set_error(EError::ContainerDoesNotExist);
-        return;
-    }
+    if (!container)
+        return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    if (propertySpec.find(req.property()) == propertySpec.end()) {
-        rsp.set_error(EError::InvalidProperty);
-        return;
-    }
+    if (propertySpec.find(req.property()) == propertySpec.end())
+        return TError(EError::InvalidProperty, "invalid property");
 
     string value;
     TError error(container->GetProperty(req.property(), value));
-    rsp.set_error(error.GetError());
-    rsp.set_errormsg(error.GetMsg());
     if (!error)
         rsp.mutable_getproperty()->set_value(value);
+    return error;
 }
 
-static void SetContainerProperty(TContainerHolder &cholder,
-                                 const rpc::TContainerSetPropertyRequest &req,
-                                 rpc::TContainerResponse &rsp)
+static TError SetContainerProperty(TContainerHolder &cholder,
+                                   const rpc::TContainerSetPropertyRequest &req,
+                                   rpc::TContainerResponse &rsp)
 {
     auto container = cholder.Get(req.name());
-    if (!container) {
-        rsp.set_error(EError::ContainerDoesNotExist);
-        return;
-    }
+    if (!container)
+        return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    if (propertySpec.find(req.property()) == propertySpec.end()) {
-        rsp.set_error(EError::InvalidProperty);
-        return;
-    }
+    if (propertySpec.find(req.property()) == propertySpec.end())
+        return TError(EError::InvalidProperty, "invalid property");
 
-    TError error(container->SetProperty(req.property(), req.value()));
-    rsp.set_error(error.GetError());
-    rsp.set_errormsg(error.GetMsg());
+    return container->SetProperty(req.property(), req.value());
 }
 
-static void GetContainerData(TContainerHolder &cholder,
-                             const rpc::TContainerGetDataRequest &req,
-                             rpc::TContainerResponse &rsp)
+static TError GetContainerData(TContainerHolder &cholder,
+                               const rpc::TContainerGetDataRequest &req,
+                               rpc::TContainerResponse &rsp)
 {
     auto container = cholder.Get(req.name());
-    if (!container) {
-        rsp.set_error(EError::ContainerDoesNotExist);
-        return;
-    }
+    if (!container)
+        return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    if (dataSpec.find(req.data()) == dataSpec.end()) {
-        rsp.set_error(EError::InvalidData);
-        return;
-    }
+    if (dataSpec.find(req.data()) == dataSpec.end())
+        return TError(EError::InvalidData, "invalid data");
 
     string value;
     TError error(container->GetData(req.data(), value));
-    rsp.set_error(error.GetError());
-    rsp.set_errormsg(error.GetMsg());
     if (!error)
         rsp.mutable_getdata()->set_value(value);
+    return error;
 }
 
-static void ListProperty(TContainerHolder &cholder,
-                         rpc::TContainerResponse &rsp)
+static TError ListProperty(TContainerHolder &cholder,
+                           rpc::TContainerResponse &rsp)
 {
     auto list = rsp.mutable_propertylist();
 
@@ -174,11 +137,11 @@ static void ListProperty(TContainerHolder &cholder,
         entry->set_desc(kv.second.Description);
     }
 
-    rsp.set_error(EError::Success);
+    return TError::Success();
 }
 
-static void ListData(TContainerHolder &cholder,
-                     rpc::TContainerResponse &rsp)
+static TError ListData(TContainerHolder &cholder,
+                       rpc::TContainerResponse &rsp)
 {
     auto list = rsp.mutable_datalist();
 
@@ -189,7 +152,7 @@ static void ListData(TContainerHolder &cholder,
         entry->set_desc(kv.second.Description);
     }
 
-    rsp.set_error(EError::Success);
+    return TError::Success();
 }
 
 rpc::TContainerResponse
@@ -202,37 +165,41 @@ HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req)
 
     rsp.set_error(EError::Unknown);
 
+    TError error;
     try {
         if (req.has_create())
-            CreateContainer(cholder, req.create(), rsp);
+            error = CreateContainer(cholder, req.create(), rsp);
         else if (req.has_destroy())
-            DestroyContainer(cholder, req.destroy(), rsp);
+            error = DestroyContainer(cholder, req.destroy(), rsp);
         else if (req.has_list())
-            ListContainers(cholder, rsp);
+            error = ListContainers(cholder, rsp);
         else if (req.has_getproperty())
-            GetContainerProperty(cholder, req.getproperty(), rsp);
+            error = GetContainerProperty(cholder, req.getproperty(), rsp);
         else if (req.has_setproperty())
-            SetContainerProperty(cholder, req.setproperty(), rsp);
+            error = SetContainerProperty(cholder, req.setproperty(), rsp);
         else if (req.has_getdata())
-            GetContainerData(cholder, req.getdata(), rsp);
+            error = GetContainerData(cholder, req.getdata(), rsp);
         else if (req.has_start())
-            StartContainer(cholder, req.start(), rsp);
+            error = StartContainer(cholder, req.start(), rsp);
         else if (req.has_stop())
-            StopContainer(cholder, req.stop(), rsp);
+            error = StopContainer(cholder, req.stop(), rsp);
         else if (req.has_pause())
-            PauseContainer(cholder, req.pause(), rsp);
+            error = PauseContainer(cholder, req.pause(), rsp);
         else if (req.has_resume())
-            ResumeContainer(cholder, req.resume(), rsp);
+            error = ResumeContainer(cholder, req.resume(), rsp);
         else if (req.has_propertylist())
-            ListProperty(cholder, rsp);
+            error = ListProperty(cholder, rsp);
         else if (req.has_datalist())
-            ListData(cholder, rsp);
+            error = ListData(cholder, rsp);
         else
-            rsp.set_error(EError::InvalidMethod);
+            error = TError(EError::InvalidMethod, "invalid RPC method");
     } catch (...) {
         rsp.Clear();
-        rsp.set_error(EError::Unknown);
+        error = TError(EError::Unknown, "unknown error");
     }
+
+    rsp.set_error(error.GetError());
+    rsp.set_errormsg(error.GetMsg());
 
     TLogger::LogResponse(rsp.ShortDebugString());
 
