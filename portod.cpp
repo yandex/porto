@@ -175,7 +175,6 @@ static int RpcMain(TContainerHolder &cholder) {
         TLogger::Log() << "Can't create RPC server: " << error.GetMsg() << endl;
     }
 
-    int starved = 0;
     size_t heartbeat = 0;
     while (!done) {
         struct pollfd fds[MAX_CONNECTIONS];

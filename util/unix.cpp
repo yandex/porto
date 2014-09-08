@@ -9,6 +9,7 @@ extern "C" {
 #include <sys/time.h>
 #include <string.h>
 #include <libgen.h>
+#include <sys/sysinfo.h>
 }
 
 int RetryBusy(int times, int timeoMs, std::function<int()> handler) {
@@ -100,4 +101,12 @@ std::string DirName(const std::string &str) {
     free(dup);
 
     return out;
+}
+
+size_t GetTotalMemory() {
+    struct sysinfo si;
+    if (sysinfo(&si) < 0)
+        return 0;
+
+    return si.totalram;
 }

@@ -3,7 +3,6 @@
 #include <sstream>
 #include <csignal>
 #include <cstdio>
-#include <cstdio>
 
 #include "rpc.pb.h"
 #include "libporto.hpp"
@@ -308,9 +307,9 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetProperty(name, "env", v));
     Expect(v == string(""));
     ExpectSuccess(api.GetProperty(name, "memory_guarantee", v));
-    Expect(v == string("-1"));
+    Expect(v == string("0"));
     ExpectSuccess(api.GetProperty(name, "memory_limit", v));
-    Expect(v == string("-1"));
+    Expect(v == string("0"));
     ExpectSuccess(api.GetProperty(name, "cpu_policy", v));
     Expect(v == string("normal"));
     ExpectSuccess(api.GetProperty(name, "cpu_priority", v));
@@ -858,7 +857,8 @@ static void TestRoot(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
-static void TestLimits(TPortoAPI &api, const string &name) {
+static bool TestLimits(TPortoAPI &api, const string &name) {
+    bool limitsTested = false;
     string pid;
 
     cerr << "Check default limits" << endl;
@@ -877,8 +877,9 @@ static void TestLimits(TPortoAPI &api, const string &name) {
     Expect(current == to_string(LLONG_MAX) || current == to_string(ULLONG_MAX));
 
     if (HaveCgKnob("memory", name, "memory.low_limit_in_bytes")) {
+        limitsTested = true;
         current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
-        Expect(current == to_string(LLONG_MAX) || current == to_string(ULLONG_MAX));
+        Expect(current == "0");
     }
     ExpectSuccess(api.Stop(name));
 
@@ -913,6 +914,8 @@ static void TestLimits(TPortoAPI &api, const string &name) {
     ExpectFailure(api.SetProperty(name, "cpu_policy", "idle"), EError::NotSupported);
     ExpectSuccess(api.SetProperty(name, "cpu_policy", "normal"));
     // TODO: cpu_policy - check functionality when implemented
+
+    return limitsTested;
 }
 
 static void TestPermissions(TPortoAPI &api, const string &name) {
@@ -1097,6 +1100,8 @@ int Selftest() {
     // TODO: truncate portoloop log and check that we don't have unexpected
     // respawns
 
+    bool limitsTested = false;
+
     try {
         {
             TPortoAPI api;
@@ -1114,7 +1119,7 @@ int Selftest() {
             TestUserGroup(api, "a");
             TestCwd(api, "a");
             //TestRootProperty(api, "a");
-            TestLimits(api, "a");
+            limitsTested = TestLimits(api, "a");
             TestPermissions(api, "a");
             TestRespawn(api, "a");
             ExpectSuccess(api.Destroy("a"));
@@ -1132,6 +1137,8 @@ int Selftest() {
     }
 
     cerr << "All tests successfully passed!" << endl;
+    if (!limitsTested)
+        cerr << "WARNING: Due to missing kernel support, memory_guarantee has not been tested!" << endl;
 
     return 0;
 }

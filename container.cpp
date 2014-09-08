@@ -154,6 +154,20 @@ TContainer::~TContainer() {
         Resume();
 
     Stop();
+
+    if (Parent)
+        for (auto iter = Children.begin(); iter != Children.end();) {
+            if (auto child = iter->lock()) {
+                if (child->GetName() == GetName()) {
+                    iter = Children.erase(iter);
+                    continue;
+                }
+            } else {
+                iter = Children.erase(iter);
+                continue;
+            }
+            iter++;
+        }
 }
 
 const string TContainer::GetName() const {
@@ -168,6 +182,42 @@ const string TContainer::GetName() const {
 
 bool TContainer::IsRoot() const {
     return Name == ROOT_CONTAINER;
+}
+
+std::shared_ptr<const TContainer> TContainer::GetRoot() const {
+    if (Parent)
+        return Parent->GetRoot();
+    else
+        return shared_from_this();
+}
+
+std::shared_ptr<const TContainer> TContainer::GetParent() const {
+    return Parent;
+}
+
+uint64_t TContainer::GetMemGuarantee() const {
+    uint64_t val;
+
+    TError error = StringToUint64(Spec.Get("memory_guarantee"), val);
+    TLogger::LogError(error, "Can't read memory_guarantee from " + GetName());
+    if (error)
+        return 0;
+
+    return val;
+}
+
+uint64_t TContainer::GetTotalMemGuarantee() const {
+    uint64_t val;
+
+    val = GetMemGuarantee();
+    if (val)
+        return val;
+
+    for (auto iter : Children)
+        if (auto child = iter.lock())
+            val += child->GetTotalMemGuarantee();
+
+    return 0;
 }
 
 vector<pid_t> TContainer::Processes() {
@@ -203,17 +253,19 @@ TError TContainer::PrepareCgroups() {
     if (error)
         return error;
 
-    if (memroot->HasKnob("memory.low_limit_in_bytes")) {
+    if (memroot->HasKnob("memory.low_limit_in_bytes") && Spec.GetAsInt("memory_guarantee") != 0) {
         TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", Spec.Get("memory_guarantee"), false);
         TLogger::LogError(error, "Can't set memory_guarantee");
         if (error)
             return error;
     }
 
-    error = memcg->SetKnobValue("memory.limit_in_bytes", Spec.Get("memory_limit"), false);
-    TLogger::LogError(error, "Can't set memory_limit");
-    if (error)
-        return error;
+    if (Spec.GetAsInt("memory_limit") != 0) {
+        error = memcg->SetKnobValue("memory.limit_in_bytes", Spec.Get("memory_limit"), false);
+        TLogger::LogError(error, "Can't set memory_limit");
+        if (error)
+            return error;
+    }
 
     return TError::Success();
 }
@@ -233,7 +285,14 @@ TError TContainer::PrepareTask() {
 
 TError TContainer::Create() {
     TLogger::Log() << "Create " << GetName() << endl;
-    return Spec.Create();
+    TError error = Spec.Create();
+    if (error)
+        return error;
+
+    if (Parent)
+        Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
+
+    return TError::Success();
 }
 
 static string ContainerStateName(EContainerState state) {
@@ -421,7 +480,7 @@ TError TContainer::SetProperty(const string &property, const string &value) {
     if (State != EContainerState::Stopped && !Spec.IsDynamic(property))
         return TError(EError::InvalidValue, "Can't set dynamic property " + property + " for running container");
 
-    return Spec.Set(property, value);
+    return Spec.Set(this, property, value);
 }
 
 TError TContainer::Restore(const kv::TNode &node) {

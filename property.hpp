@@ -9,12 +9,14 @@
 #include "porto.hpp"
 #include "kvalue.hpp"
 
+class TContainer;
+
 struct TPropertySpec {
     std::string Description;
     std::string Def;
     // can be modified in running state
     bool Dynamic;
-    std::function<TError (std::string)> Valid;
+    std::function<TError (const TContainer *, const std::string)> Valid;
 };
 
 extern std::map<std::string, const TPropertySpec> propertySpec;
@@ -32,7 +34,8 @@ public:
     TContainerSpec(const std::string &name) : Name(name) { }
     ~TContainerSpec();
     const std::string &Get(const std::string &property) const;
-    TError Set(const std::string &property, const std::string &value);
+    size_t GetAsInt(const std::string &property) const;
+    TError Set(const TContainer *container, const std::string &property, const std::string &value);
     TError GetInternal(const std::string &property, std::string &value) const;
     TError SetInternal(const std::string &property, const std::string &value);
     bool IsDynamic(const std::string &property) const;

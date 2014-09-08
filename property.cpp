@@ -2,9 +2,11 @@
 
 #include "subsystem.hpp"
 #include "property.hpp"
-#include "util/log.hpp"
 #include "cgroup.hpp"
+#include "container.hpp"
+#include "util/log.hpp"
 #include "util/string.hpp"
+#include "util/unix.hpp"
 
 extern "C" {
 #include <grp.h>
@@ -13,38 +15,43 @@ extern "C" {
 
 using namespace std;
 
-static TError ValidUser(string user) {
+static TError ValidUser(const TContainer *container, const string user) {
     if (getpwnam(user.c_str()) == NULL)
         return TError(EError::InvalidValue, "invalid value");
 
     return TError::Success();
 }
 
-static TError ValidGroup(string group) {
+static TError ValidGroup(const TContainer *container, const string group) {
     if (getgrnam(group.c_str()) == NULL)
         return TError(EError::InvalidValue, "invalid value");
 
     return TError::Success();
 }
 
-static TError ValidMemGuarantee(string str) {
+static TError ValidMemGuarantee(const TContainer *container, const string str) {
     uint64_t val;
 
     auto memroot = memorySubsystem->GetRootCgroup();
     if (!memroot->HasKnob("memory.low_limit_in_bytes"))
         return TError(EError::NotSupported, "invalid kernel");
 
-
     if (StringToUint64(str, val))
         return TError(EError::InvalidValue, "invalid value");
 
-    // TODO: make sure we can really guarantee this amount of memory to
-    // a container
+    auto parent = container->GetParent();
+    if (parent && !parent->IsRoot())
+        if (val > container->GetParent()->GetMemGuarantee())
+            return TError(EError::InvalidValue, "invalid hierarchical value");
+
+    uint64_t current = container->GetRoot()->GetTotalMemGuarantee();
+    if (current + val + MEMORY_GUARANTEE_RESERVE >= GetTotalMemory())
+        return TError(EError::ResourceNotAvailable, "invalid memory guarantee request, current total = " + to_string(current));
 
     return TError::Success();
 }
 
-static TError ValidMemLimit(string str) {
+static TError ValidMemLimit(const TContainer *container, const string str) {
     uint64_t val;
 
     if (StringToUint64(str, val))
@@ -53,7 +60,7 @@ static TError ValidMemLimit(string str) {
     return TError::Success();
 }
 
-static TError ValidCpuPolicy(string str) {
+static TError ValidCpuPolicy(const TContainer *container, const string str) {
     if (str != "normal" && str != "rt" && str != "idle")
         return TError(EError::InvalidValue, "invalid policy");
 
@@ -63,7 +70,7 @@ static TError ValidCpuPolicy(string str) {
     return TError::Success();
 }
 
-static TError ValidCpuPriority(string str) {
+static TError ValidCpuPriority(const TContainer *container, const string str) {
     int val;
 
     if (StringToInt(str, val))
@@ -75,7 +82,7 @@ static TError ValidCpuPriority(string str) {
     return TError::Success();
 }
 
-static TError ValidBool(string str) {
+static TError ValidBool(const TContainer *container, const string str) {
     if (str != "true" && str != "false")
         return TError(EError::InvalidValue, "invalid boolean value");
 
@@ -89,8 +96,8 @@ std::map<std::string, const TPropertySpec> propertySpec = {
     {"env", { "container environment variables" }},
     //{"root", { "container root directory", "" }},
     {"cwd", { "container working directory", "" }},
-    {"memory_guarantee", { "guaranteed amount of memory", "-1", false, ValidMemGuarantee }},
-    {"memory_limit", { "memory hard limit", "-1", false, ValidMemLimit }},
+    {"memory_guarantee", { "guaranteed amount of memory", "0", false, ValidMemGuarantee }},
+    {"memory_limit", { "memory hard limit", "0", false, ValidMemLimit }},
     {"cpu_policy", { "CPU policy: rt, normal, idle", "normal", false, ValidCpuPolicy }},
     {"cpu_priority", { "CPU priority: 0-99", "50", false, ValidCpuPriority }},
     {"respawn", { "automatically respawn dead container", "false", false, ValidBool }},
@@ -101,6 +108,12 @@ const string &TContainerSpec::Get(const string &property) const {
         return propertySpec[property].Def;
 
     return Data.at(property);
+}
+
+size_t TContainerSpec::GetAsInt(const string &property) const {
+    uint64_t val = 0;
+    (void)StringToUint64(Get(property), val);
+    return val;
 }
 
 bool TContainerSpec::IsRoot() const {
@@ -129,7 +142,7 @@ TError TContainerSpec::SetInternal(const string &property, const string &value) 
     return error;
 }
 
-TError TContainerSpec::Set(const string &property, const string &value) {
+TError TContainerSpec::Set(const TContainer *container, const std::string &property, const std::string &value) {
     if (propertySpec.find(property) == propertySpec.end()) {
         TError error(EError::InvalidValue, "property not found");
         TLogger::LogError(error, "Can't set property");
@@ -137,7 +150,7 @@ TError TContainerSpec::Set(const string &property, const string &value) {
     }
 
     if (propertySpec[property].Valid) {
-        TError error = propertySpec[property].Valid(value);
+        TError error = propertySpec[property].Valid(container, value);
         TLogger::LogError(error, "Can't set property");
         if (error)
             return error;

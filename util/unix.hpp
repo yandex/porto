@@ -12,5 +12,6 @@ size_t GetCurrentTimeMs();
 int RegisterSignal(int signum, void (*handler)(int));
 void ResetAllSignalHandlers(void);
 std::string DirName(const std::string &str);
+size_t GetTotalMemory();
 
 #endif

@@ -38,6 +38,7 @@ extern std::map<std::string, const TDataSpec> dataSpec;
 class TContainer : public std::enable_shared_from_this<TContainer> {
     const std::string Name;
     const std::shared_ptr<TContainer> Parent;
+    std::vector<std::weak_ptr<TContainer>> Children;
     EContainerState State;
     TContainerSpec Spec;
     bool MaybeReturnedOk = false;
@@ -67,7 +68,11 @@ public:
     const std::string GetName() const;
 
     bool IsRoot() const;
+    std::shared_ptr<const TContainer> GetRoot() const;
+    std::shared_ptr<const TContainer> GetParent() const;
 
+    uint64_t GetMemGuarantee() const;
+    uint64_t GetTotalMemGuarantee() const;
     std::vector<pid_t> Processes();
     bool IsAlive();
 
