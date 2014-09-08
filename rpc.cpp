@@ -193,6 +193,15 @@ HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req)
             error = ListData(cholder, rsp);
         else
             error = TError(EError::InvalidMethod, "invalid RPC method");
+    } catch (std::bad_alloc exc) {
+        rsp.Clear();
+        error = TError(EError::Unknown, "memory allocation failure");
+    } catch (std::string exc) {
+        rsp.Clear();
+        error = TError(EError::Unknown, exc);
+    } catch (const std::exception &exc) {
+        rsp.Clear();
+        error = TError(EError::Unknown, exc.what());
     } catch (...) {
         rsp.Clear();
         error = TError(EError::Unknown, "unknown error");
