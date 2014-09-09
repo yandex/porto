@@ -195,18 +195,16 @@ std::shared_ptr<const TContainer> TContainer::GetParent() const {
     return Parent;
 }
 
-uint64_t TContainer::GetMemGuarantee() const {
+uint64_t TContainer::GetPropertyUint64(const std::string &property) const {
     uint64_t val;
 
-    TError error = StringToUint64(Spec.Get("memory_guarantee"), val);
-    TLogger::LogError(error, "Can't read memory_guarantee from " + GetName());
-    if (error)
+    if (StringToUint64(Spec.Get(property), val))
         return 0;
 
     return val;
 }
 
-uint64_t TContainer::GetChildrenMemGuarantee(std::shared_ptr<const TContainer> except, uint64_t exceptVal) const {
+uint64_t TContainer::GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except, uint64_t exceptVal) const {
     uint64_t val = 0;
 
     for (auto iter : Children)
@@ -216,13 +214,40 @@ uint64_t TContainer::GetChildrenMemGuarantee(std::shared_ptr<const TContainer> e
                 continue;
             }
 
-            if (child->GetMemGuarantee())
-                val += child->GetMemGuarantee();
+            uint64_t childval = child->GetPropertyUint64(property);
+            if (childval)
+                val += childval;
             else
-                val += child->GetChildrenMemGuarantee(except, exceptVal);
+                val += child->GetChildrenSum(property, except, exceptVal);
         }
 
     return val;
+}
+
+bool TContainer::ValidHierarchicalProperty(const std::string &property, const std::string &value) const {
+    uint64_t newval;
+
+    if (StringToUint64(value, newval))
+        return false;
+
+    uint64_t children = GetChildrenSum(property);
+    if (children && newval < children)
+        return false;
+
+    for (auto c = GetParent(); c; c = c->GetParent()) {
+        uint64_t parent = c->GetPropertyUint64(property);
+        if (parent && newval > parent)
+            return false;
+    }
+
+    if (GetParent()) {
+        uint64_t parent = GetParent()->GetPropertyUint64(property);
+        uint64_t children = GetParent()->GetChildrenSum(property, shared_from_this(), newval);
+        if (parent && children > parent)
+            return false;
+    }
+
+    return true;
 }
 
 vector<pid_t> TContainer::Processes() {

@@ -39,24 +39,10 @@ static TError ValidMemGuarantee(std::shared_ptr<const TContainer> container, con
     if (StringToUint64(str, newval))
         return TError(EError::InvalidValue, "invalid value");
 
-    uint64_t children = container->GetChildrenMemGuarantee();
-    if (children && newval < children)
-        return TError(EError::ResourceNotAvailable, "can't guarantee less than children");
+    if (!container->ValidHierarchicalProperty("memory_guarantee", str))
+        return TError(EError::InvalidValue, "invalid hierarchical value");
 
-    for (auto c = container->GetParent(); c; c = c->GetParent()) {
-        uint64_t parent = c->GetMemGuarantee();
-        if (parent && newval > parent)
-            return TError(EError::ResourceNotAvailable, "can't guarantee more than parent");
-    }
-
-    if (container->GetParent()) {
-        uint64_t parent = container->GetParent()->GetMemGuarantee();
-        uint64_t children = container->GetParent()->GetChildrenMemGuarantee(container, newval);
-        if (parent && children > parent)
-            return TError(EError::ResourceNotAvailable, "can't guarantee more than parent");
-    }
-
-    uint64_t total = container->GetRoot()->GetChildrenMemGuarantee(container, newval);
+    uint64_t total = container->GetRoot()->GetChildrenSum("memory_guarantee", container, newval);
     if (total + MEMORY_GUARANTEE_RESERVE > GetTotalMemory())
         return TError(EError::ResourceNotAvailable, "can't guarantee all available memory");
 
@@ -64,10 +50,13 @@ static TError ValidMemGuarantee(std::shared_ptr<const TContainer> container, con
 }
 
 static TError ValidMemLimit(std::shared_ptr<const TContainer> container, const string str) {
-    uint64_t val;
+    uint64_t newval;
 
-    if (StringToUint64(str, val))
+    if (StringToUint64(str, newval))
         return TError(EError::InvalidValue, "invalid value");
+
+    if (!container->ValidHierarchicalProperty("memory_limit", str))
+        return TError(EError::InvalidValue, "invalid hierarchical value");
 
     return TError::Success();
 }

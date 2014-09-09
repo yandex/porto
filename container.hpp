@@ -59,6 +59,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     const std::string StripParentName(const std::string &name) const;
     bool NeedRespawn();
     TError Respawn();
+    uint64_t GetPropertyUint64(const std::string &property) const;
 
 public:
     TContainer(const std::string &name, std::shared_ptr<TContainer> parent) :
@@ -71,8 +72,8 @@ public:
     std::shared_ptr<const TContainer> GetRoot() const;
     std::shared_ptr<const TContainer> GetParent() const;
 
-    uint64_t GetMemGuarantee() const;
-    uint64_t GetChildrenMemGuarantee(std::shared_ptr<const TContainer> except = nullptr, uint64_t exceptVal = 0) const;
+    uint64_t GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except = nullptr, uint64_t exceptVal = 0) const;
+    bool ValidHierarchicalProperty(const std::string &property, const std::string &value) const;
     std::vector<pid_t> Processes();
     bool IsAlive();
 

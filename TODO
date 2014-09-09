@@ -1,4 +1,3 @@
-- porto -> portoctl
 - after container->Stop() returns, we have zombie process for some time (it will take a while for portoloop to reap it and deliver exit status to portod)
 - remove extern AckExitStatus from container->Stop()
 - stresstest: check for zombies, delivery queue overruns, fd leaks
@@ -7,8 +6,7 @@
 - ? memory_guarantee: do we need to check actual value in the sysfs
 
 # phase 2
-- limit checks for hierarchical containers
-- cpu, memory, network qos
+- cpu, network qos
 
 # cleanup
 - rotate subprocess stdout/stderr

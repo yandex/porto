@@ -947,13 +947,13 @@ static bool TestLimits(TPortoAPI &api, const string &name) {
     return limitsTested;
 }
 
-static void TestMemoryGuarantee(TPortoAPI &api) {
+static void TestLimitsHierarchy(TPortoAPI &api) {
     string pid;
 
     if (!HaveCgKnob("memory", "", "memory.low_limit_in_bytes"))
         return;
 
-    cerr << "Check memory guarantee" << endl;
+    cerr << "Check limits hierarchy" << endl;
 
     //
     // box +-- monitoring
@@ -997,18 +997,25 @@ static void TestMemoryGuarantee(TPortoAPI &api) {
     ExpectSuccess(api.SetProperty(monit, "memory_guarantee", to_string(0)));
     ExpectSuccess(api.SetProperty(system, "memory_guarantee", to_string(0)));
 
-    cerr << "Parent can't have less guarantee than sum of children" << endl;
-    ExpectFailure(api.SetProperty(prod, "memory_guarantee", to_string(chunk)), EError::ResourceNotAvailable);
-    ExpectFailure(api.SetProperty(box, "memory_guarantee", to_string(chunk)), EError::ResourceNotAvailable);
+    auto CheckPropertyHierarhcy = [&](TPortoAPI &api, const std::string &property) {
+        cerr << "Parent can't have less guarantee than sum of children" << endl;
+        ExpectSuccess(api.SetProperty(slot1, property, to_string(chunk)));
+        ExpectSuccess(api.SetProperty(slot2, property, to_string(chunk)));
+        ExpectFailure(api.SetProperty(prod, property, to_string(chunk)), EError::InvalidValue);
+        ExpectFailure(api.SetProperty(box, property, to_string(chunk)), EError::InvalidValue);
 
-    cerr << "Child can't go over parent guarantee" << endl;
-    ExpectSuccess(api.SetProperty(prod, "memory_guarantee", to_string(2 * chunk)));
-    ExpectFailure(api.SetProperty(slot1, "memory_guarantee", to_string(2 * chunk)), EError::ResourceNotAvailable);
+        cerr << "Child can't go over parent guarantee" << endl;
+        ExpectSuccess(api.SetProperty(prod, property, to_string(2 * chunk)));
+        ExpectFailure(api.SetProperty(slot1, property, to_string(2 * chunk)), EError::InvalidValue);
 
-    cerr << "Can lower guarantee if possible" << endl;
-    ExpectFailure(api.SetProperty(prod, "memory_guarantee", to_string(chunk)), EError::ResourceNotAvailable);
-    ExpectSuccess(api.SetProperty(slot2, "memory_guarantee", to_string(0)));
-    ExpectSuccess(api.SetProperty(prod, "memory_guarantee", to_string(chunk)));
+        cerr << "Can lower guarantee if possible" << endl;
+        ExpectFailure(api.SetProperty(prod, property, to_string(chunk)), EError::InvalidValue);
+        ExpectSuccess(api.SetProperty(slot2, property, to_string(0)));
+        ExpectSuccess(api.SetProperty(prod, property, to_string(chunk)));
+    };
+
+    CheckPropertyHierarhcy(api, "memory_guarantee");
+    CheckPropertyHierarhcy(api, "memory_limit");
 
     ExpectSuccess(api.Destroy(monit));
     ExpectSuccess(api.Destroy(system));
@@ -1224,7 +1231,7 @@ int Selftest() {
             TestRespawn(api, "a");
             ExpectSuccess(api.Destroy("a"));
 
-            TestMemoryGuarantee(api);
+            TestLimitsHierarchy(api);
             TestLeaks(api);
         }
         TestDaemon();
