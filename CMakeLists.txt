@@ -21,7 +21,10 @@ PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS rpc.proto kv.proto)
 
 add_custom_target(version.hpp ./GIT-VERSION-GEN WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} VERBATIM)
 
-add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp task.cpp kvalue.cpp subsystem.cpp error.cpp property.cpp util/log.cpp util/protobuf.cpp util/mount.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp
+set_source_files_properties(tags PROPERTIES GENERATED true)
+add_custom_command(OUTPUT tags COMMAND ctags -R --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+add_executable(portod tags portod.cpp cgroup.cpp rpc.cpp container.cpp task.cpp kvalue.cpp subsystem.cpp error.cpp property.cpp util/log.cpp util/protobuf.cpp util/mount.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp
     ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(portod version.hpp)
 target_link_libraries(portod ${PB} pthread)
