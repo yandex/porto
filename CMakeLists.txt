@@ -26,9 +26,9 @@ add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp task.cpp kvalu
 add_dependencies(portod version.hpp)
 target_link_libraries(portod ${PB} pthread)
 
-add_executable(porto porto.cpp error.cpp selftest.cpp stresstest.cpp libporto.cpp util/log.cpp util/protobuf.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
-add_dependencies(porto version.hpp)
-target_link_libraries(porto ${PB} pthread)
+add_executable(portoctl portoctl.cpp error.cpp selftest.cpp stresstest.cpp libporto.cpp util/log.cpp util/protobuf.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
+add_dependencies(portoctl version.hpp)
+target_link_libraries(portoctl ${PB} pthread)
 
 add_executable(portoloop portoloop.cpp util/log.cpp util/unix.cpp)
 target_link_libraries(portoloop)

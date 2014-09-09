@@ -211,7 +211,6 @@ uint64_t TContainer::GetChildrenMemGuarantee(std::shared_ptr<const TContainer> e
 
     for (auto iter : Children)
         if (auto child = iter.lock()) {
-
             if (except && except == child) {
                 val += exceptVal;
                 continue;
