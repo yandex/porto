@@ -177,7 +177,7 @@ const string TContainer::GetName() const {
     if (Parent->Name == ROOT_CONTAINER)
         return Name;
     else
-        return Parent->Name + "/" + Name;
+        return Parent->GetName() + "/" + Name;
 }
 
 bool TContainer::IsRoot() const {
@@ -206,16 +206,12 @@ uint64_t TContainer::GetMemGuarantee() const {
     return val;
 }
 
-uint64_t TContainer::GetTotalMemGuarantee() const {
-    uint64_t val;
-
-    val = GetMemGuarantee();
-    if (val)
-        return val;
+uint64_t TContainer::GetChildrenMemGuarantee() const {
+    uint64_t val = 0;
 
     for (auto iter : Children)
         if (auto child = iter.lock())
-            val += child->GetTotalMemGuarantee();
+            val += child->GetChildrenMemGuarantee();
 
     return 0;
 }
