@@ -15,43 +15,55 @@ extern "C" {
 
 using namespace std;
 
-static TError ValidUser(const TContainer *container, const string user) {
+static TError ValidUser(std::shared_ptr<const TContainer> container, const string user) {
     if (getpwnam(user.c_str()) == NULL)
         return TError(EError::InvalidValue, "invalid value");
 
     return TError::Success();
 }
 
-static TError ValidGroup(const TContainer *container, const string group) {
+static TError ValidGroup(std::shared_ptr<const TContainer> container, const string group) {
     if (getgrnam(group.c_str()) == NULL)
         return TError(EError::InvalidValue, "invalid value");
 
     return TError::Success();
 }
 
-static TError ValidMemGuarantee(const TContainer *container, const string str) {
-    uint64_t val;
+static TError ValidMemGuarantee(std::shared_ptr<const TContainer> container, const string str) {
+    uint64_t newval;
 
     auto memroot = memorySubsystem->GetRootCgroup();
     if (!memroot->HasKnob("memory.low_limit_in_bytes"))
         return TError(EError::NotSupported, "invalid kernel");
 
-    if (StringToUint64(str, val))
+    if (StringToUint64(str, newval))
         return TError(EError::InvalidValue, "invalid value");
 
-    auto parent = container->GetParent();
-    if (parent && !parent->IsRoot())
-        if (val > container->GetParent()->GetMemGuarantee())
-            return TError(EError::InvalidValue, "invalid hierarchical value");
+    uint64_t children = container->GetChildrenMemGuarantee();
+    if (children && newval < children)
+        return TError(EError::ResourceNotAvailable, "can't guarantee less than children");
 
-    uint64_t current = container->GetRoot()->GetTotalMemGuarantee();
-    if (current + val + MEMORY_GUARANTEE_RESERVE >= GetTotalMemory())
-        return TError(EError::ResourceNotAvailable, "invalid memory guarantee request, current total = " + to_string(current));
+    for (auto c = container->GetParent(); c; c = c->GetParent()) {
+        uint64_t parent = c->GetMemGuarantee();
+        if (parent && newval > parent)
+            return TError(EError::ResourceNotAvailable, "can't guarantee more than parent");
+    }
+
+    if (container->GetParent()) {
+        uint64_t parent = container->GetParent()->GetMemGuarantee();
+        uint64_t children = container->GetParent()->GetChildrenMemGuarantee(container, newval);
+        if (parent && children > parent)
+            return TError(EError::ResourceNotAvailable, "can't guarantee more than parent");
+    }
+
+    uint64_t total = container->GetRoot()->GetChildrenMemGuarantee(container, newval);
+    if (total + MEMORY_GUARANTEE_RESERVE > GetTotalMemory())
+        return TError(EError::ResourceNotAvailable, "can't guarantee all available memory");
 
     return TError::Success();
 }
 
-static TError ValidMemLimit(const TContainer *container, const string str) {
+static TError ValidMemLimit(std::shared_ptr<const TContainer> container, const string str) {
     uint64_t val;
 
     if (StringToUint64(str, val))
@@ -60,7 +72,7 @@ static TError ValidMemLimit(const TContainer *container, const string str) {
     return TError::Success();
 }
 
-static TError ValidCpuPolicy(const TContainer *container, const string str) {
+static TError ValidCpuPolicy(std::shared_ptr<const TContainer> container, const string str) {
     if (str != "normal" && str != "rt" && str != "idle")
         return TError(EError::InvalidValue, "invalid policy");
 
@@ -70,7 +82,7 @@ static TError ValidCpuPolicy(const TContainer *container, const string str) {
     return TError::Success();
 }
 
-static TError ValidCpuPriority(const TContainer *container, const string str) {
+static TError ValidCpuPriority(std::shared_ptr<const TContainer> container, const string str) {
     int val;
 
     if (StringToInt(str, val))
@@ -82,7 +94,7 @@ static TError ValidCpuPriority(const TContainer *container, const string str) {
     return TError::Success();
 }
 
-static TError ValidBool(const TContainer *container, const string str) {
+static TError ValidBool(std::shared_ptr<const TContainer> container, const string str) {
     if (str != "true" && str != "false")
         return TError(EError::InvalidValue, "invalid boolean value");
 
@@ -142,7 +154,7 @@ TError TContainerSpec::SetInternal(const string &property, const string &value) 
     return error;
 }
 
-TError TContainerSpec::Set(const TContainer *container, const std::string &property, const std::string &value) {
+TError TContainerSpec::Set(std::shared_ptr<const TContainer> container, const std::string &property, const std::string &value) {
     if (propertySpec.find(property) == propertySpec.end()) {
         TError error(EError::InvalidValue, "property not found");
         TLogger::LogError(error, "Can't set property");

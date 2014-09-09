@@ -206,14 +206,24 @@ uint64_t TContainer::GetMemGuarantee() const {
     return val;
 }
 
-uint64_t TContainer::GetChildrenMemGuarantee() const {
+uint64_t TContainer::GetChildrenMemGuarantee(std::shared_ptr<const TContainer> except, uint64_t exceptVal) const {
     uint64_t val = 0;
 
     for (auto iter : Children)
-        if (auto child = iter.lock())
-            val += child->GetChildrenMemGuarantee();
+        if (auto child = iter.lock()) {
 
-    return 0;
+            if (except && except == child) {
+                val += exceptVal;
+                continue;
+            }
+
+            if (child->GetMemGuarantee())
+                val += child->GetMemGuarantee();
+            else
+                val += child->GetChildrenMemGuarantee(except, exceptVal);
+        }
+
+    return val;
 }
 
 vector<pid_t> TContainer::Processes() {
@@ -476,7 +486,7 @@ TError TContainer::SetProperty(const string &property, const string &value) {
     if (State != EContainerState::Stopped && !Spec.IsDynamic(property))
         return TError(EError::InvalidValue, "Can't set dynamic property " + property + " for running container");
 
-    return Spec.Set(this, property, value);
+    return Spec.Set(shared_from_this(), property, value);
 }
 
 TError TContainer::Restore(const kv::TNode &node) {

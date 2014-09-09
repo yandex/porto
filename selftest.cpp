@@ -8,6 +8,7 @@
 #include "libporto.hpp"
 #include "util/file.hpp"
 #include "util/string.hpp"
+#include "util/unix.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -433,6 +434,35 @@ static void TestHolder(TPortoAPI &api) {
     ExpectFailure(api.Destroy(parent), EError::InvalidState);
     ExpectSuccess(api.Destroy(child));
     ExpectSuccess(api.Destroy(parent));
+
+    cerr << "Test hierarchy" << endl;
+    ExpectSuccess(api.Create("a"));
+    containers.clear();
+    ExpectSuccess(api.List(containers));
+    Expect(containers.size() == 2);
+    Expect(containers[0] == string("/"));
+    Expect(containers[1] == string("a"));
+
+    ExpectSuccess(api.Create("a/b"));
+    containers.clear();
+    ExpectSuccess(api.List(containers));
+    Expect(containers.size() == 3);
+    Expect(containers[0] == string("/"));
+    Expect(containers[1] == string("a"));
+    Expect(containers[2] == string("a/b"));
+
+    ExpectSuccess(api.Create("a/b/c"));
+    containers.clear();
+    ExpectSuccess(api.List(containers));
+    Expect(containers.size() == 4);
+    Expect(containers[0] == string("/"));
+    Expect(containers[1] == string("a"));
+    Expect(containers[2] == string("a/b"));
+    Expect(containers[3] == string("a/b/c"));
+
+    ExpectSuccess(api.Destroy("a/b/c"));
+    ExpectSuccess(api.Destroy("a/b"));
+    ExpectSuccess(api.Destroy("a"));
 
     ShouldHaveOnlyRoot(api);
 }
@@ -907,7 +937,6 @@ static bool TestLimits(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.SetProperty(name, "cpu_priority", "99"));
     // TODO: cpu_priority - check functionality when implemented
 
-
     cerr << "Check cpu_policy" << endl;
     ExpectFailure(api.SetProperty(name, "cpu_policy", "somecrap"), EError::InvalidValue);
     ExpectFailure(api.SetProperty(name, "cpu_policy", "rt"), EError::NotSupported);
@@ -916,6 +945,77 @@ static bool TestLimits(TPortoAPI &api, const string &name) {
     // TODO: cpu_policy - check functionality when implemented
 
     return limitsTested;
+}
+
+static void TestMemoryGuarantee(TPortoAPI &api) {
+    string pid;
+
+    if (!HaveCgKnob("memory", "", "memory.low_limit_in_bytes"))
+        return;
+
+    cerr << "Check memory guarantee" << endl;
+
+    //
+    // box +-- monitoring
+    //     |
+    //     +-- system
+    //     |
+    //     +-- production +-- slot1
+    //                    |
+    //                    +-- slot2
+    //
+
+    string box = "box";
+    string prod = "box/production";
+    string slot1 = "box/production/slot1";
+    string slot2 = "box/production/slot2";
+    string system = "box/system";
+    string monit = "box/monitoring";
+
+    ExpectSuccess(api.Create(box));
+    ExpectSuccess(api.Create(prod));
+    ExpectSuccess(api.Create(slot1));
+    ExpectSuccess(api.Create(slot2));
+    ExpectSuccess(api.Create(system));
+    ExpectSuccess(api.Create(monit));
+
+    size_t total = GetTotalMemory();
+
+    cerr << "Single container can't go over reserve" << endl;
+    ExpectFailure(api.SetProperty(system, "memory_guarantee", to_string(total)), EError::ResourceNotAvailable);
+    ExpectSuccess(api.SetProperty(system, "memory_guarantee", to_string(total - MEMORY_GUARANTEE_RESERVE)));
+
+    cerr << "Distributed guarantee can't go over reserve" << endl;
+    size_t chunk = (total - MEMORY_GUARANTEE_RESERVE) / 4;
+
+    ExpectSuccess(api.SetProperty(system, "memory_guarantee", to_string(chunk)));
+    ExpectSuccess(api.SetProperty(monit, "memory_guarantee", to_string(chunk)));
+    ExpectSuccess(api.SetProperty(slot1, "memory_guarantee", to_string(chunk)));
+    ExpectFailure(api.SetProperty(slot2, "memory_guarantee", to_string(chunk + 1)), EError::ResourceNotAvailable);
+    ExpectSuccess(api.SetProperty(slot2, "memory_guarantee", to_string(chunk)));
+
+    ExpectSuccess(api.SetProperty(monit, "memory_guarantee", to_string(0)));
+    ExpectSuccess(api.SetProperty(system, "memory_guarantee", to_string(0)));
+
+    cerr << "Parent can't have less guarantee than sum of children" << endl;
+    ExpectFailure(api.SetProperty(prod, "memory_guarantee", to_string(chunk)), EError::ResourceNotAvailable);
+    ExpectFailure(api.SetProperty(box, "memory_guarantee", to_string(chunk)), EError::ResourceNotAvailable);
+
+    cerr << "Child can't go over parent guarantee" << endl;
+    ExpectSuccess(api.SetProperty(prod, "memory_guarantee", to_string(2 * chunk)));
+    ExpectFailure(api.SetProperty(slot1, "memory_guarantee", to_string(2 * chunk)), EError::ResourceNotAvailable);
+
+    cerr << "Can lower guarantee if possible" << endl;
+    ExpectFailure(api.SetProperty(prod, "memory_guarantee", to_string(chunk)), EError::ResourceNotAvailable);
+    ExpectSuccess(api.SetProperty(slot2, "memory_guarantee", to_string(0)));
+    ExpectSuccess(api.SetProperty(prod, "memory_guarantee", to_string(chunk)));
+
+    ExpectSuccess(api.Destroy(monit));
+    ExpectSuccess(api.Destroy(system));
+    ExpectSuccess(api.Destroy(slot2));
+    ExpectSuccess(api.Destroy(slot1));
+    ExpectSuccess(api.Destroy(prod));
+    ExpectSuccess(api.Destroy(box));
 }
 
 static void TestPermissions(TPortoAPI &api, const string &name) {
@@ -1124,6 +1224,7 @@ int Selftest() {
             TestRespawn(api, "a");
             ExpectSuccess(api.Destroy("a"));
 
+            TestMemoryGuarantee(api);
             TestLeaks(api);
         }
         TestDaemon();

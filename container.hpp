@@ -72,7 +72,7 @@ public:
     std::shared_ptr<const TContainer> GetParent() const;
 
     uint64_t GetMemGuarantee() const;
-    uint64_t GetTotalMemGuarantee() const;
+    uint64_t GetChildrenMemGuarantee(std::shared_ptr<const TContainer> except = nullptr, uint64_t exceptVal = 0) const;
     std::vector<pid_t> Processes();
     bool IsAlive();
 
