@@ -263,6 +263,7 @@ bool TContainer::IsAlive() {
 }
 
 TError TContainer::PrepareCgroups() {
+    LeafCgroups[cpuSubsystem] = GetLeafCgroup(cpuSubsystem);
     LeafCgroups[cpuacctSubsystem] = GetLeafCgroup(cpuacctSubsystem);
     LeafCgroups[memorySubsystem] = GetLeafCgroup(memorySubsystem);
     LeafCgroups[freezerSubsystem] = GetLeafCgroup(freezerSubsystem);
@@ -276,6 +277,7 @@ TError TContainer::PrepareCgroups() {
     }
 
     auto memroot = memorySubsystem->GetRootCgroup();
+    auto cpuroot = cpuSubsystem->GetRootCgroup();
     auto memcg = GetLeafCgroup(memorySubsystem);
 
     TError error = memorySubsystem->UseHierarchy(*memcg);
@@ -293,6 +295,18 @@ TError TContainer::PrepareCgroups() {
     if (Spec.GetAsInt("memory_limit") != 0) {
         error = memcg->SetKnobValue("memory.limit_in_bytes", Spec.Get("memory_limit"), false);
         TLogger::LogError(error, "Can't set memory_limit");
+        if (error)
+            return error;
+    }
+
+    auto cpucg = GetLeafCgroup(cpuSubsystem);
+    if (cpuroot->HasKnob("cpu.smart")) {
+        if (Spec.Get("cpu_policy") == "rt")
+            error = cpucg->SetKnobValue("cpu.smart", "1", false);
+        else
+            error = cpucg->SetKnobValue("cpu.smart", "0", false);
+
+        TLogger::LogError(error, "Can't enable smart");
         if (error)
             return error;
     }

@@ -65,7 +65,13 @@ static TError ValidCpuPolicy(std::shared_ptr<const TContainer> container, const 
     if (str != "normal" && str != "rt" && str != "idle")
         return TError(EError::InvalidValue, "invalid policy");
 
-    if (str == "rt" || str == "idle")
+    if (str == "rt") {
+        auto cpuroot = cpuSubsystem->GetRootCgroup();
+        if (!cpuroot->HasKnob("cpu.smart"))
+            return TError(EError::NotSupported, "invalid kernel");
+    }
+
+    if (str == "idle")
         return TError(EError::NotSupported, "not implemented");
 
     return TError::Success();

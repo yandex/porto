@@ -281,7 +281,7 @@ static string Pgrep(const string &name) {
 
 static void ExpectCorrectCgroups(const string &pid, const string &name) {
     auto cgmap = GetCgroups(pid);
-    Expect(cgmap.size() == 3);
+    Expect(cgmap.size() == 4);
     for (auto kv : cgmap) {
         Expect(kv.second == "/porto/" + name);
     }
@@ -888,7 +888,7 @@ static void TestRoot(TPortoAPI &api) {
 }
 
 static bool TestLimits(TPortoAPI &api, const string &name) {
-    bool limitsTested = false;
+    bool limitsTested = true;
     string pid;
 
     cerr << "Check default limits" << endl;
@@ -907,9 +907,10 @@ static bool TestLimits(TPortoAPI &api, const string &name) {
     Expect(current == to_string(LLONG_MAX) || current == to_string(ULLONG_MAX));
 
     if (HaveCgKnob("memory", name, "memory.low_limit_in_bytes")) {
-        limitsTested = true;
         current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
         Expect(current == "0");
+    } else {
+        limitsTested = false;
     }
     ExpectSuccess(api.Stop(name));
 
@@ -938,10 +939,26 @@ static bool TestLimits(TPortoAPI &api, const string &name) {
     // TODO: cpu_priority - check functionality when implemented
 
     cerr << "Check cpu_policy" << endl;
+    string smart;
+
     ExpectFailure(api.SetProperty(name, "cpu_policy", "somecrap"), EError::InvalidValue);
-    ExpectFailure(api.SetProperty(name, "cpu_policy", "rt"), EError::NotSupported);
     ExpectFailure(api.SetProperty(name, "cpu_policy", "idle"), EError::NotSupported);
-    ExpectSuccess(api.SetProperty(name, "cpu_policy", "normal"));
+
+    if (HaveCgKnob("cpu", name, "cpu.smart")) {
+        ExpectSuccess(api.SetProperty(name, "cpu_policy", "rt"));
+        ExpectSuccess(api.Start(name));
+        smart = GetCgKnob("cpu", name, "cpu.smart");
+        Expect(smart == "1");
+        ExpectSuccess(api.Stop(name));
+
+        ExpectSuccess(api.SetProperty(name, "cpu_policy", "normal"));
+        ExpectSuccess(api.Start(name));
+        smart = GetCgKnob("cpu", name, "cpu.smart");
+        Expect(smart == "0");
+        ExpectSuccess(api.Stop(name));
+    } else {
+        limitsTested = false;
+    }
     // TODO: cpu_policy - check functionality when implemented
 
     return limitsTested;
@@ -1246,7 +1263,7 @@ int Selftest() {
 
     cerr << "All tests successfully passed!" << endl;
     if (!limitsTested)
-        cerr << "WARNING: Due to missing kernel support, memory_guarantee has not been tested!" << endl;
+        cerr << "WARNING: Due to missing kernel support, memory_guarantee/cpu_policy has not been tested!" << endl;
 
     return 0;
 }
