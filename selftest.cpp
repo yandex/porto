@@ -936,7 +936,6 @@ static bool TestLimits(TPortoAPI &api, const string &name) {
     ExpectFailure(api.SetProperty(name, "cpu_priority", "100"), EError::InvalidValue);
     ExpectSuccess(api.SetProperty(name, "cpu_priority", "0"));
     ExpectSuccess(api.SetProperty(name, "cpu_priority", "99"));
-    // TODO: cpu_priority - check functionality when implemented
 
     cerr << "Check cpu_policy" << endl;
     string smart;
@@ -959,7 +958,26 @@ static bool TestLimits(TPortoAPI &api, const string &name) {
     } else {
         limitsTested = false;
     }
-    // TODO: cpu_policy - check functionality when implemented
+
+    string shares;
+    ExpectSuccess(api.SetProperty(name, "cpu_policy", "normal"));
+    ExpectSuccess(api.SetProperty(name, "cpu_priority", "0"));
+    ExpectSuccess(api.Start(name));
+    shares = GetCgKnob("cpu", name, "cpu.shares");
+    Expect(shares == "2");
+    ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.SetProperty(name, "cpu_priority", "50"));
+    ExpectSuccess(api.Start(name));
+    shares = GetCgKnob("cpu", name, "cpu.shares");
+    Expect(shares == "52");
+    ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.SetProperty(name, "cpu_priority", "99"));
+    ExpectSuccess(api.Start(name));
+    shares = GetCgKnob("cpu", name, "cpu.shares");
+    Expect(shares == "101");
+    ExpectSuccess(api.Stop(name));
 
     return limitsTested;
 }

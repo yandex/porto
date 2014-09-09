@@ -311,6 +311,19 @@ TError TContainer::PrepareCgroups() {
             return error;
     }
 
+    if (Spec.Get("cpu_policy") == "normal") {
+        int cpuPrio;
+        error = StringToInt(Spec.Get("cpu_priority"), cpuPrio);
+        TLogger::LogError(error, "Can't parse cpu_priority");
+        if (error)
+            return error;
+
+        error = cpucg->SetKnobValue("cpu.shares", to_string(cpuPrio + 2), false);
+        TLogger::LogError(error, "Can't set cpu_priority");
+        if (error)
+            return error;
+    }
+
     return TError::Success();
 }
 
