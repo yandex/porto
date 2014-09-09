@@ -27,7 +27,7 @@ void TLogger::OpenLog() {
         return;
     }
 
-    if (access(logPath.c_str(), W_OK)) {
+    if (access(DirName(logPath).c_str(), W_OK)) {
         if (!kmsgFile.is_open())
             kmsgFile.open("/dev/kmsg", std::ios_base::out);
         return;
