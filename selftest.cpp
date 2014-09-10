@@ -464,6 +464,16 @@ static void TestHolder(TPortoAPI &api) {
     Expect(containers[2] == string("a/b"));
     Expect(containers[3] == string("a/b/c"));
 
+    ExpectSuccess(api.SetProperty("a", "command", "sleep 1000"));
+    ExpectSuccess(api.SetProperty("a/b", "command", "sleep 1000"));
+    ExpectSuccess(api.SetProperty("a/b/c", "command", "sleep 1000"));
+    ExpectFailure(api.Start("a/b/c"), EError::InvalidState);
+    ExpectFailure(api.Start("a/b"), EError::InvalidState);
+    ExpectSuccess(api.Start("a"));
+    ExpectFailure(api.Start("a/b/c"), EError::InvalidState);
+    ExpectSuccess(api.Start("a/b"));
+    ExpectSuccess(api.Start("a/b/c"));
+
     ExpectSuccess(api.Destroy("a/b/c"));
     ExpectSuccess(api.Destroy("a/b"));
     ExpectSuccess(api.Destroy("a"));

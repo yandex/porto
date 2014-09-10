@@ -384,6 +384,9 @@ TError TContainer::Start() {
     if (!CheckState(EContainerState::Stopped))
         return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
 
+    if (Parent && !Parent->IsRoot() && Parent->State != EContainerState::Running)
+        return TError(EError::InvalidState, "parent is not running");
+
     TError error = PrepareCgroups();
     if (error) {
         TLogger::LogError(error, "Can't prepare task cgroups");
