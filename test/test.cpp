@@ -62,34 +62,6 @@ std::string Pgrep(const std::string &name) {
     return pid;
 }
 
-void TestDaemon(TPortoAPI &api) {
-    struct dirent **lst;
-    size_t n;
-    std::string pid;
-
-    api.Cleanup();
-
-    Say() << "Make sure portod doesn't have zombies" << std::endl;
-    pid = Pgrep("portod");
-
-    Say() << "Make sure portod doesn't have invalid FDs" << std::endl;
-    std::string path = ("/proc/" + pid + "/fd");
-    n = scandir(path.c_str(), &lst, NULL, alphasort);
-    // . .. 0(stdin) 1(stdout) 2(stderr) 4(log) 5(rpc socket) 128(event pipe) 129(ack pipe)
-    if (n != 2 + 7)
-        throw std::string("Invalid number of fds");
-
-    Say() << "Make sure portoloop doesn't have zombies" << std::endl;
-    pid = Pgrep("portoloop");
-
-    Say() << "Make sure portoloop doesn't have invalid FDs" << std::endl;
-    path = ("/proc/" + pid + "/fd");
-    n = scandir(path.c_str(), &lst, NULL, alphasort);
-    // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 128(event pipe) 129(ack pipe)
-    if (n != 2 + 6)
-        throw std::string("Invalid number of fds");
-}
-
 void WaitExit(TPortoAPI &api, const std::string &pid) {
     Say() << "Waiting for " << pid << " to exit..." << std::endl;
 
@@ -319,4 +291,31 @@ int GetVmRss(const std::string &pid) {
     return std::stoi(size);
 }
 
+void TestDaemon(TPortoAPI &api) {
+    struct dirent **lst;
+    size_t n;
+    std::string pid;
+
+    api.Cleanup();
+
+    Say() << "Make sure portod doesn't have zombies" << std::endl;
+    pid = Pgrep("portod");
+
+    Say() << "Make sure portod doesn't have invalid FDs" << std::endl;
+    std::string path = ("/proc/" + pid + "/fd");
+    n = scandir(path.c_str(), &lst, NULL, alphasort);
+    // . .. 0(stdin) 1(stdout) 2(stderr) 4(log) 5(rpc socket) 128(event pipe) 129(ack pipe)
+    if (n != 2 + 7)
+        throw std::string("Invalid number of fds");
+
+    Say() << "Make sure portoloop doesn't have zombies" << std::endl;
+    pid = Pgrep("portoloop");
+
+    Say() << "Make sure portoloop doesn't have invalid FDs" << std::endl;
+    path = ("/proc/" + pid + "/fd");
+    n = scandir(path.c_str(), &lst, NULL, alphasort);
+    // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 128(event pipe) 129(ack pipe)
+    if (n != 2 + 6)
+        throw std::string("Invalid number of fds");
+}
 }

@@ -7,7 +7,7 @@
 #include "libporto.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
-#include "test.hpp"
+#include "test/test.hpp"
 
 using namespace std;
 
