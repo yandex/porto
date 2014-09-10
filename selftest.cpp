@@ -1,6 +1,5 @@
 #include <iostream>
 #include <iomanip>
-#include <sstream>
 #include <csignal>
 #include <cstdio>
 
@@ -9,279 +8,21 @@
 #include "util/file.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
+#include "test.hpp"
 
 extern "C" {
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <grp.h>
-#include <pwd.h>
-#include <dirent.h>
 }
 
 using namespace std;
 
-#define Expect(ret) _ExpectFailure(ret, true, __LINE__, __func__)
-#define ExpectSuccess(ret) _ExpectFailure(ret, 0, __LINE__, __func__)
-#define ExpectFailure(ret, exp) _ExpectFailure(ret, exp, __LINE__, __func__)
-static void _ExpectFailure(int ret, int exp, int line, const char *func) {
-    if (ret != exp)
-        throw string("Got " + to_string(ret) + ", but expected " + to_string(exp) + " at " + func + ":" + to_string(line));
-}
+namespace Test {
 
-static std::basic_ostream<char> &Say() {
-    return std::cerr << "- ";
-}
-
-static void WaitExit(TPortoAPI &api, const string &pid) {
-    Say() << "Waiting for " << pid << " to exit..." << endl;
-
-    int times = 100;
-    int p = stoi(pid);
-
-    do {
-        if (times-- <= 0)
-            break;
-
-        usleep(100000);
-
-        kill(p, 0);
-    } while (errno != ESRCH);
-
-    if (times <= 0)
-        throw string("Waited too long for task to exit");
-}
-
-static void WaitState(TPortoAPI &api, const string &name, const string &state) {
-    Say() << "Waiting for " << name << " to be in state " << state << endl;
-
-    int times = 100;
-
-    string ret;
-    do {
-        if (times-- <= 0)
-            break;
-
-        usleep(100000);
-
-        (void)api.GetData(name, "state", ret);
-    } while (ret != state);
-
-    if (times <= 0)
-        throw string("Waited too long for task to change state");
-}
-
-static void WaitPortod(TPortoAPI &api) {
-    Say() << "Waiting for portod startup" << endl;
-
-    int times = 10;
-
-    vector<string> clist;
-    do {
-        if (times-- <= 0)
-            break;
-
-        usleep(1000000);
-
-    } while (api.List(clist) != 0);
-
-    if (times <= 0)
-        throw string("Waited too long for portod startup");
-}
-
-static string GetCwd(const string &pid) {
-    string lnk;
-    TFile f("/proc/" + pid + "/cwd");
-    TError error(f.ReadLink(lnk));
-    if (error)
-        return error.GetMsg();
-    return lnk;
-}
-
-static string GetNamespace(const string &pid, const string &ns) {
-    string link;
-    TFile m("/proc/" + pid + "/ns/" + ns);
-    if (m.ReadLink(link))
-        throw string("Can't get ") + ns + " namespace for " + pid;
-    return link;
-}
-
-static map<string, string> GetCgroups(const string &pid) {
-    TFile f("/proc/" + pid + "/cgroup");
-    vector<string> lines;
-    map<string, string> cgmap;
-    if (f.AsLines(lines))
-        throw string("Can't get cgroups");
-
-    vector<string> tokens;
-    for (auto l : lines) {
-        tokens.clear();
-        if (SplitString(l, ':', tokens))
-            throw string("Can't split cgroup string");
-        cgmap[tokens[1]] = tokens[2];
-    }
-
-    return cgmap;
-}
-
-static string GetStatusLine(const string &pid, const string &prefix) {
-    vector<string> st;
-    TFile f("/proc/" + pid + "/status");
-    if (f.AsLines(st))
-        throw string("INVALID PID");
-
-    for (auto &s : st)
-        if (s.substr(0, prefix.length()) == prefix)
-            return s;
-
-    throw string("INVALID PREFIX");
-}
-
-static string GetState(const string &pid) {
-    stringstream ss(GetStatusLine(pid, "State:"));
-
-    string name, state, desc;
-
-    ss>> name;
-    ss>> state;
-    ss>> desc;
-
-    if (name != "State:")
-        throw string("PARSING ERROR");
-
-    return state;
-}
-
-static void GetUidGid(const string &pid, int &uid, int &gid) {
-    string name;
-    string stuid = GetStatusLine(pid, "Uid:");
-    stringstream ssuid(stuid);
-
-    int euid, suid, fsuid;
-    ssuid >> name;
-    ssuid >> uid;
-    ssuid >> euid;
-    ssuid >> suid;
-    ssuid >> fsuid;
-
-    if (name != "Uid:" || uid != euid || euid != suid || suid != fsuid)
-        throw string("Invalid uid");
-
-    string stgid = GetStatusLine(pid, "Gid:");
-    stringstream ssgid(stgid);
-
-    int egid, sgid, fsgid;
-    ssgid >> name;
-    ssgid >> gid;
-    ssgid >> egid;
-    ssgid >> sgid;
-    ssgid >> fsgid;
-
-    if (name != "Gid:" || gid != egid || egid != sgid || sgid != fsgid)
-        throw string("Invalid gid");
-}
-
-static int UserUid(const string &user) {
-    struct passwd *p = getpwnam(user.c_str());
-    if (!p)
-        throw string("Invalid user");
-    else
-        return p->pw_uid;
-}
-
-static int GroupGid(const string &group) {
-    struct group *g = getgrnam(group.c_str());
-    if (!g)
-        throw string("Invalid group");
-    else
-        return g->gr_gid;
-}
-
-static string GetEnv(const string &pid) {
-    string env;
-    TFile f("/proc/" + pid + "/environ");
-    if (f.AsString(env))
-        throw string("Can't get environment");
-
-    return env;
-}
-
-static string CgRoot(const string &subsystem, const string &name) {
-    return "/sys/fs/cgroup/" + subsystem + "/porto/" + name + "/";
-}
-
-static string GetFreezer(const string &name) {
-    string link;
-    TFile m(CgRoot("freezer", name) + "freezer.state");
-    if (m.AsString(link))
-        throw string("Can't get freezer");
-    return link;
-}
-
-static void SetFreezer(const string &name, const string &state) {
-    string link;
-    TFile m(CgRoot("freezer", name) + "freezer.state");
-    if (m.WriteStringNoAppend(state))
-        throw string("Can't set freezer");
-
-    int retries = 1000000;
-    while (retries--)
-        if (GetFreezer(name) == state + "\n")
-            return;
-
-    ExpectSuccess(-1);
-}
-
-static string GetCgKnob(const string &subsys, const string &name, const string &knob) {
-    string val;
-    TFile m(CgRoot(subsys, name) + knob);
-    if (m.AsString(val))
-        throw string("Can't get cgroup knob");
-    val.erase(val.find('\n'));
-    return val;
-}
-
-static bool HaveCgKnob(const string &subsys, const string &name, const string &knob) {
-    string val;
-    TFile m(CgRoot(subsys, name) + knob);
-    return m.Exists();
-}
-
-static int GetVmRss(const string &pid) {
-    stringstream ss(GetStatusLine(pid, "VmRSS:"));
-
-    string name, size, unit;
-
-    ss>> name;
-    ss>> size;
-    ss>> unit;
-
-    if (name != "VmRSS:")
-        throw string("PARSING ERROR");
-
-    return stoi(size);
-}
-
-static string Pgrep(const string &name) {
-    FILE *f = popen(("pgrep -x " + name).c_str(), "r");
-    Expect(f != nullptr);
-
-    char *line = nullptr;
-    size_t n;
-
-    string pid;
-    int instances = 0;
-    while (getline(&line, &n, f) >= 0) {
-        pid.assign(line);
-        pid.erase(pid.find('\n'));
-        instances++;
-    }
-
-    Expect(instances == 1);
-    fclose(f);
-
-    return pid;
-}
+#define Expect(ret) ExpectReturn([&]{ return ret; }, true, 0, __LINE__, __func__)
+#define ExpectSuccess(ret) ExpectReturn([&]{ return ret; }, 0, 0, __LINE__, __func__)
+#define ExpectFailure(ret, exp) ExpectReturn([&]{ return ret; }, exp, 0, __LINE__, __func__)
 
 static void ExpectCorrectCgroups(const string &pid, const string &name) {
     auto cgmap = GetCgroups(pid);
@@ -1262,32 +1003,6 @@ static void TestLeaks(TPortoAPI &api) {
     Expect(now <= prev + slack);
 }
 
-static void TestDaemon(TPortoAPI &api) {
-    struct dirent **lst;
-    size_t n;
-    string pid;
-
-    api.Cleanup();
-
-    Say() << "Make sure portod doesn't have zombies" << endl;
-    pid = Pgrep("portod");
-
-    Say() << "Make sure portod doesn't have invalid FDs" << endl;
-    string path = ("/proc/" + pid + "/fd");
-    n = scandir(path.c_str(), &lst, NULL, alphasort);
-    // . .. 0(stdin) 1(stdout) 2(stderr) 4(log) 5(rpc socket) 128(event pipe) 129(ack pipe)
-    Expect(n == 2 + 7);
-
-    Say() << "Make sure portoloop doesn't have zombies" << endl;
-    pid = Pgrep("portoloop");
-
-    Say() << "Make sure portoloop doesn't have invalid FDs" << endl;
-    path = ("/proc/" + pid + "/fd");
-    n = scandir(path.c_str(), &lst, NULL, alphasort);
-    // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 128(event pipe) 129(ack pipe)
-    Expect(n == 2 + 6);
-}
-
 static void TestRecovery(TPortoAPI &api) {
     string pid, v;
     string name = "a";
@@ -1358,7 +1073,7 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(parent));
 }
 
-int Selftest(string name) {
+int SelfTest(string name) {
     pair<string, function<void(TPortoAPI &)>> tests[] = {
         { "root", TestRoot },
         { "holder", TestHolder },
@@ -1430,4 +1145,5 @@ int Selftest(string name) {
         cerr << "WARNING: Unexpected number of portoloop respawns: " << respawns << "!" << endl;
 
     return 0;
+}
 }

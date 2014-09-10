@@ -7,6 +7,7 @@
 #include "libporto.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
+#include "test.hpp"
 
 using namespace std;
 
@@ -340,7 +341,6 @@ public:
     }
 };
 
-extern int Selftest(string name);
 class TSelftestCmd : public ICmd {
 public:
     TSelftestCmd() : ICmd("selftest", 0, "", "perform selftest") {}
@@ -350,11 +350,10 @@ public:
         string test = "";
         if (argc >= 1)
             test = argv[0];
-        return Selftest(test);
+        return Test::SelfTest(test);
     }
 };
 
-extern int StressTest(int, int, bool);
 class TStressTestCmd : public ICmd {
 public:
     TStressTestCmd() : ICmd("stresstest", 0, "[threads] [iterations] [kill=on/off]", "perform stresstest") {}
@@ -370,7 +369,7 @@ public:
         if (argc >= 3 && strcmp(argv[2], "off") == 0)
             killPorto = false;
         cout << "Threads: " << threads << " Iterations: " << iter << " Kill: " << killPorto << endl;
-        return StressTest(threads, iter, killPorto);
+        return Test::StressTest(threads, iter, killPorto);
     }
 };
 

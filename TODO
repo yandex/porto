@@ -1,18 +1,13 @@
-- after container->Stop() returns, we have zombie process for some time (it will take a while for portoloop to reap it and deliver exit status to portod)
-- remove extern AckExitStatus from container->Stop()
 - stresstest: check for zombies, delivery queue overruns, fd leaks
-- ? semaphore to wait for a container
-- ? do we support apps in non-leaf containers (unified hierarchy doesn't)
-    (if we don't there is no way currently to apply parent limits without
-     starting container)
 - ? memory_guarantee: do we need to check actual value in the sysfs
 
 # phase 2
 - network qos
-
 - rt: create cgroup for non-smart tasks and throttle them
 
 # cleanup
+- remove extern AckExitStatus from container->Stop()
+- after container->Stop() returns, we have zombie process for some time (it will take a while for portoloop to reap it and deliver exit status to portod)
 - rotate subprocess stdout/stderr
 - property:env support ; (via \;)
 - move all 'extern "C"' into one file
