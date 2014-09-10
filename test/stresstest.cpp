@@ -230,6 +230,10 @@ int StressTest(int threads, int iter, bool killPorto) {
         std::cerr << "ERROR: Exception " << e << std::endl;
         return 1;
     }
+
+    TPortoAPI api;
+    TestDaemon(api);
+
     std::cout << "Test completed!" << std::endl;
     return 0;
 }

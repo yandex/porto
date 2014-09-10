@@ -1,4 +1,3 @@
-- stresstest: check for zombies, delivery queue overruns, fd leaks
 - ? memory_guarantee: do we need to check actual value in the sysfs
 
 # phase 2
