@@ -231,6 +231,10 @@ static void TestHolder(TPortoAPI &api) {
 
     ExpectSuccess(api.GetData("a/b/c", "state", state));
     Expect(state == "running");
+    Expect(CgExists("memory", "a") == true);
+    Expect(CgExists("memory", "a/b") == true);
+    Expect(CgExists("memory", "a/b/c") == true);
+
     ExpectSuccess(api.Stop("a/b"));
     ExpectSuccess(api.GetData("a/b/c", "state", state));
     Expect(state == "stopped");
@@ -238,10 +242,16 @@ static void TestHolder(TPortoAPI &api) {
     Expect(state == "stopped");
     ExpectSuccess(api.GetData("a", "state", state));
     Expect(state == "running");
+    Expect(CgExists("memory", "a") == true);
+    Expect(CgExists("memory", "a/b") == false);
+    Expect(CgExists("memory", "a/b/c") == false);
 
     ExpectSuccess(api.SetProperty("a/b", "command", "sleep 1"));
     ExpectSuccess(api.Start("a/b"));
     ExpectSuccess(api.Start("a/b/c"));
+    Expect(CgExists("memory", "a") == true);
+    Expect(CgExists("memory", "a/b") == true);
+    Expect(CgExists("memory", "a/b/c") == true);
     string pid;
     ExpectSuccess(api.GetData("a/b", "root_pid", pid));
     WaitExit(api, pid);
@@ -249,6 +259,9 @@ static void TestHolder(TPortoAPI &api) {
     Expect(state == "dead");
     ExpectSuccess(api.GetData("a/b/c", "state", state));
     Expect(state == "stopped");
+    Expect(CgExists("memory", "a") == true);
+    Expect(CgExists("memory", "a/b") == false);
+    Expect(CgExists("memory", "a/b/c") == false);
 
     ExpectSuccess(api.Destroy("a/b/c"));
     ExpectSuccess(api.Destroy("a/b"));
@@ -324,8 +337,8 @@ static void TestExitStatus(TPortoAPI &api) {
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     kill(stoi(pid), SIGKILL);
-    //Expect(TaskZombie(api, pid) == true);
     WaitState(api, name, "dead");
+    Expect(TaskRunning(api, pid) == false);
     ExpectSuccess(api.GetData(name, "exit_status", ret));
     Expect(ret == string("9"));
     ExpectFailure(api.GetData(name, "start_errno", ret), EError::InvalidState);
@@ -395,8 +408,6 @@ static void TestLongRunning(TPortoAPI &api) {
     ExpectCorrectCgroups(pid, name);
 
     ExpectSuccess(api.Stop(name));
-    //Expect(TaskZombie(api, pid) == true);
-    WaitExit(api, pid);
     Expect(TaskRunning(api, pid) == false);
 
     Say() << "Check that hierarchical task cgroups are correct" << endl;
@@ -641,8 +652,6 @@ static void TestStateMachine(TPortoAPI &api) {
     ExpectFailure(api.Resume(name), EError::InvalidState);
 
     ExpectSuccess(api.Stop(name));
-    //Expect(TaskZombie(api, pid) == true);
-    WaitExit(api, pid);
     Expect(TaskRunning(api, pid) == false);
 
     Say() << "Make sure we can stop unintentionally frozen container " << endl;
@@ -670,7 +679,25 @@ static void TestStateMachine(TPortoAPI &api) {
 static void TestRoot(TPortoAPI &api) {
     string v;
     string root = "/";
-    vector<string> properties = { "command", "user", "group", "env", "cwd", "memory_guarantee", "memory_limit", "cpu_policy", "cpu_priority", "net_guarantee", "net_ceil", "net_priority", "respawn" };
+    vector<string> properties = {
+        "command",
+        "user",
+        "group",
+        "env",
+        "cwd",
+        "memory_guarantee",
+        "memory_limit",
+        "cpu_policy",
+        "cpu_priority",
+        "net_guarantee",
+        "net_ceil",
+        "net_priority",
+        "respawn",
+        "cpu.smart",
+        "memory.limit_in_bytes",
+        "memory.low_limit_in_bytes",
+        "memory.recharge_on_pgfault",
+    };
 
     std::vector<TProperty> plist;
 

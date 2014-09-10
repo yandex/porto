@@ -9,7 +9,6 @@
 
 # cleanup
 - remove extern AckExitStatus from container->Stop()
-- after container->Stop() returns, we have zombie process for some time (it will take a while for portoloop to reap it and deliver exit status to portod)
 - rotate subprocess stdout/stderr
 - property:env support ; (via \;)
 - move all 'extern "C"' into one file

@@ -27,6 +27,7 @@ namespace Test {
     int UserUid(const std::string &user);
     int GroupGid(const std::string &group);
     std::string GetEnv(const std::string &pid);
+    bool CgExists(const std::string &subsystem, const std::string &name);
     std::string CgRoot(const std::string &subsystem, const std::string &name);
     std::string GetFreezer(const std::string &name);
     void SetFreezer(const std::string &name, const std::string &state);

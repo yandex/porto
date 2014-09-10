@@ -332,8 +332,6 @@ TError TContainer::PrepareCgroups() {
         TError error;
         if (Spec.Get("cpu_policy") == "rt")
             error = cpucg->SetKnobValue("cpu.smart", "1", false);
-        else
-            error = cpucg->SetKnobValue("cpu.smart", "0", false);
 
         TLogger::LogError(error, "Can't enable smart");
         if (error)
@@ -448,10 +446,8 @@ TError TContainer::KillAll() {
     cg->Kill(SIGTERM);
 
     int ret = SleepWhile(1000, [&]{ return cg->IsEmpty() == false; });
-    if (ret) {
-        error = TError(EError::Unknown, errno, "sleep()");
-        TLogger::LogError(error, "Error while sleeping");
-    }
+    if (ret)
+        TLogger::Log() << "Error while waiting for child to exit via SIGTERM" << endl;
 
     // then kill any task that didn't want to stop via SIGTERM;
     // freeze all container tasks to make sure no one forks and races with us
@@ -486,6 +482,15 @@ void TContainer::StopChildren() {
     }
 }
 
+void TContainer::FreeResources() {
+    for (auto cg : LeafCgroups) {
+        TError error = cg.second->Remove();
+        TLogger::LogError(error, "Can't remove cgroup");
+    }
+
+    LeafCgroups.clear();
+}
+
 TError TContainer::Stop() {
     if (IsRoot() || !(CheckState(EContainerState::Running) || CheckState(EContainerState::Dead)))
         return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
@@ -498,13 +503,16 @@ TError TContainer::Stop() {
     if (error)
         TLogger::LogError(error, "Can't kill all tasks in container");
 
-    LeafCgroups.clear();
+    int ret = SleepWhile(1000, [&]{ kill(pid, 0); return errno != ESRCH; });
+    if (ret)
+        TLogger::Log() << "Error while waiting for container to stop" << endl;
 
     AckExitStatus(pid);
 
     State = EContainerState::Stopped;
 
     StopChildren();
+    FreeResources();
 
     return TError::Success();
 }
@@ -680,6 +688,7 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
         TLogger::LogError(error, "Can't respawn " + GetName());
     } else {
         StopChildren();
+        FreeResources();
     }
 
     TimeOfDeath = GetCurrentTimeMs();

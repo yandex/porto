@@ -235,6 +235,11 @@ std::string GetEnv(const std::string &pid) {
     return env;
 }
 
+bool CgExists(const std::string &subsystem, const std::string &name) {
+    TFile f(CgRoot(subsystem, name));
+    return f.Exists();
+}
+
 std::string CgRoot(const std::string &subsystem, const std::string &name) {
     return "/sys/fs/cgroup/" + subsystem + "/porto/" + name + "/";
 }
