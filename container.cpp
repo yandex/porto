@@ -262,20 +262,7 @@ bool TContainer::IsAlive() {
     return IsRoot() || !Processes().empty();
 }
 
-TError TContainer::PrepareCgroups() {
-    LeafCgroups[cpuSubsystem] = GetLeafCgroup(cpuSubsystem);
-    LeafCgroups[cpuacctSubsystem] = GetLeafCgroup(cpuacctSubsystem);
-    LeafCgroups[memorySubsystem] = GetLeafCgroup(memorySubsystem);
-    LeafCgroups[freezerSubsystem] = GetLeafCgroup(freezerSubsystem);
-
-    for (auto cg : LeafCgroups) {
-        auto ret = cg.second->Create();
-        if (ret) {
-            LeafCgroups.clear();
-            return ret;
-        }
-    }
-
+TError TContainer::ApplyProperties() {
     auto memroot = memorySubsystem->GetRootCgroup();
     auto cpuroot = cpuSubsystem->GetRootCgroup();
     auto memcg = GetLeafCgroup(memorySubsystem);
@@ -325,6 +312,23 @@ TError TContainer::PrepareCgroups() {
     }
 
     return TError::Success();
+}
+
+TError TContainer::PrepareCgroups() {
+    LeafCgroups[cpuSubsystem] = GetLeafCgroup(cpuSubsystem);
+    LeafCgroups[cpuacctSubsystem] = GetLeafCgroup(cpuacctSubsystem);
+    LeafCgroups[memorySubsystem] = GetLeafCgroup(memorySubsystem);
+    LeafCgroups[freezerSubsystem] = GetLeafCgroup(freezerSubsystem);
+
+    for (auto cg : LeafCgroups) {
+        auto ret = cg.second->Create();
+        if (ret) {
+            LeafCgroups.clear();
+            return ret;
+        }
+    }
+
+    return ApplyProperties();
 }
 
 TError TContainer::PrepareTask() {

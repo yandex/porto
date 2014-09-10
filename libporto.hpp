@@ -54,6 +54,7 @@ public:
 
     int Raw(const std::string &message, std::string &response);
     void GetLastError(int &error, std::string &msg) const;
+    void Cleanup();
 };
 
 #endif

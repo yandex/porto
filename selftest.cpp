@@ -29,8 +29,12 @@ static void _ExpectFailure(int ret, int exp, int line, const char *func) {
         throw string("Got " + to_string(ret) + ", but expected " + to_string(exp) + " at " + func + ":" + to_string(line));
 }
 
+static std::basic_ostream<char> &Say() {
+    return std::cerr << "- ";
+}
+
 static void WaitExit(TPortoAPI &api, const string &pid) {
-    cerr << "Waiting for " << pid << " to exit..." << endl;
+    Say() << "Waiting for " << pid << " to exit..." << endl;
 
     int times = 100;
     int p = stoi(pid);
@@ -49,7 +53,7 @@ static void WaitExit(TPortoAPI &api, const string &pid) {
 }
 
 static void WaitState(TPortoAPI &api, const string &name, const string &state) {
-    cerr << "Waiting for " << name << " to be in state " << state << endl;
+    Say() << "Waiting for " << name << " to be in state " << state << endl;
 
     int times = 100;
 
@@ -68,7 +72,7 @@ static void WaitState(TPortoAPI &api, const string &name, const string &state) {
 }
 
 static void WaitPortod(TPortoAPI &api) {
-    cerr << "Waiting for portod startup" << endl;
+    Say() << "Waiting for portod startup" << endl;
 
     int times = 10;
 
@@ -341,7 +345,7 @@ static void TestHolder(TPortoAPI &api) {
 
     std::vector<std::string> containers;
 
-    cerr << "Create container A" << endl;
+    Say() << "Create container A" << endl;
     ExpectSuccess(api.Create("a"));
     containers.clear();
     ExpectSuccess(api.List(containers));
@@ -351,7 +355,7 @@ static void TestHolder(TPortoAPI &api) {
     ShouldHaveValidProperties(api, "a");
     ShouldHaveValidData(api, "a");
 
-    cerr << "Try to create existing container A" << endl;
+    Say() << "Try to create existing container A" << endl;
     ExpectFailure(api.Create("a"), EError::ContainerAlreadyExists);
     containers.clear();
     ExpectSuccess(api.List(containers));
@@ -361,7 +365,7 @@ static void TestHolder(TPortoAPI &api) {
     ShouldHaveValidProperties(api, "a");
     ShouldHaveValidData(api, "a");
 
-    cerr << "Create container B" << endl;
+    Say() << "Create container B" << endl;
     ExpectSuccess(api.Create("b"));
     containers.clear();
     ExpectSuccess(api.List(containers));
@@ -372,7 +376,7 @@ static void TestHolder(TPortoAPI &api) {
     ShouldHaveValidProperties(api, "b");
     ShouldHaveValidData(api, "b");
 
-    cerr << "Remove container A" << endl;
+    Say() << "Remove container A" << endl;
     ExpectSuccess(api.Destroy("a"));
     containers.clear();
     ExpectSuccess(api.List(containers));
@@ -380,10 +384,10 @@ static void TestHolder(TPortoAPI &api) {
     Expect(containers[0] == string("/"));
     Expect(containers[1] == string("b"));
 
-    cerr << "Remove container B" << endl;
+    Say() << "Remove container B" << endl;
     ExpectSuccess(api.Destroy("b"));
 
-    cerr << "Try to execute operations on invalid container" << endl;
+    Say() << "Try to execute operations on invalid container" << endl;
     ExpectFailure(api.Start("a"), EError::ContainerDoesNotExist);
     ExpectFailure(api.Stop("a"), EError::ContainerDoesNotExist);
     ExpectFailure(api.Pause("a"), EError::ContainerDoesNotExist);
@@ -394,7 +398,7 @@ static void TestHolder(TPortoAPI &api) {
     ExpectFailure(api.SetProperty("a", "command", value), EError::ContainerDoesNotExist);
     ExpectFailure(api.GetData("a", "root_pid", value), EError::ContainerDoesNotExist);
 
-    cerr << "Try to create container with invalid name" << endl;
+    Say() << "Try to create container with invalid name" << endl;
     string name;
 
     name = "z@";
@@ -435,7 +439,7 @@ static void TestHolder(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(child));
     ExpectSuccess(api.Destroy(parent));
 
-    cerr << "Test hierarchy" << endl;
+    Say() << "Test hierarchy" << endl;
     ExpectSuccess(api.Create("a"));
     containers.clear();
     ExpectSuccess(api.List(containers));
@@ -468,7 +472,7 @@ static void TestHolder(TPortoAPI &api) {
 }
 
 static void TestEmpty(TPortoAPI &api) {
-    cerr << "Make sure we can't start empty container" << endl;
+    Say() << "Make sure we can't start empty container" << endl;
     ExpectSuccess(api.Create("b"));
     ExpectFailure(api.Start("b"), EError::InvalidValue);
     ExpectSuccess(api.Destroy("b"));
@@ -483,11 +487,14 @@ static bool TaskZombie(TPortoAPI &api, const string &pid) {
     return GetState(pid) == "Z";
 }
 
-static void TestExitStatus(TPortoAPI &api, const string &name) {
+static void TestExitStatus(TPortoAPI &api) {
     string pid;
     string ret;
 
-    cerr << "Check exit status of 'false'" << endl;
+    string name = "a";
+    ExpectSuccess(api.Create(name));
+
+    Say() << "Check exit status of 'false'" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "false"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
@@ -497,7 +504,7 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     ExpectFailure(api.GetData(name, "start_errno", ret), EError::InvalidState);
     ExpectSuccess(api.Stop(name));
 
-    cerr << "Check exit status of 'true'" << endl;
+    Say() << "Check exit status of 'true'" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "true"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
@@ -507,7 +514,7 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     ExpectFailure(api.GetData(name, "start_errno", ret), EError::InvalidState);
     ExpectSuccess(api.Stop(name));
 
-    cerr << "Check exit status of invalid command" << endl;
+    Say() << "Check exit status of invalid command" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "__invalid_command_name__"));
     ExpectSuccess(api.SetProperty(name, "cwd", "/"));
     ExpectFailure(api.Start(name), EError::Unknown);
@@ -516,7 +523,7 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetData(name, "start_errno", ret));
     Expect(ret == string("2"));
 
-    cerr << "Check exit status of invalid directory" << endl;
+    Say() << "Check exit status of invalid directory" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "true"));
     ExpectSuccess(api.SetProperty(name, "cwd", "/__invalid__dir__"));
     ExpectFailure(api.Start(name), EError::Unknown);
@@ -525,7 +532,7 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetData(name, "start_errno", ret));
     Expect(ret == string("-2"));
 
-    cerr << "Check exit status when killed by signal" << endl;
+    Say() << "Check exit status when killed by signal" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.SetProperty(name, "cwd", ""));
     ExpectSuccess(api.Start(name));
@@ -537,13 +544,18 @@ static void TestExitStatus(TPortoAPI &api, const string &name) {
     Expect(ret == string("9"));
     ExpectFailure(api.GetData(name, "start_errno", ret), EError::InvalidState);
     ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.Destroy(name));
 }
 
-static void TestStreams(TPortoAPI &api, const string &name) {
+static void TestStreams(TPortoAPI &api) {
     string pid;
     string ret;
 
-    cerr << "Make sure stdout works" << endl;
+    string name = "a";
+    ExpectSuccess(api.Create(name));
+
+    Say() << "Make sure stdout works" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "bash -c 'echo out >&1'"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
@@ -554,7 +566,7 @@ static void TestStreams(TPortoAPI &api, const string &name) {
     Expect(ret == string(""));
     ExpectSuccess(api.Stop(name));
 
-    cerr << "Make sure stderr works" << endl;
+    Say() << "Make sure stderr works" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "bash -c 'echo err >&2'"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
@@ -564,18 +576,23 @@ static void TestStreams(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetData(name, "stderr", ret));
     Expect(ret == string("err\n"));
     ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.Destroy(name));
 }
 
-static void TestLongRunning(TPortoAPI &api, const string &name) {
+static void TestLongRunning(TPortoAPI &api) {
     string pid;
 
-    cerr << "Spawn long running task" << endl;
+    string name = "a";
+    ExpectSuccess(api.Create(name));
+
+    Say() << "Spawn long running task" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     Expect(TaskRunning(api, pid) == true);
 
-    cerr << "Check that task namespaces are correct" << endl;
+    Say() << "Check that task namespaces are correct" << endl;
     Expect(GetNamespace("self", "pid") != GetNamespace(pid, "pid"));
     Expect(GetNamespace("self", "mnt") != GetNamespace(pid, "mnt"));
     Expect(GetNamespace("self", "ipc") == GetNamespace(pid, "ipc"));
@@ -583,7 +600,7 @@ static void TestLongRunning(TPortoAPI &api, const string &name) {
     //Expect(GetNamespace("self", "user") == GetNamespace(pid, "user"));
     Expect(GetNamespace("self", "uts") != GetNamespace(pid, "uts"));
 
-    cerr << "Check that task cgroups are correct" << endl;
+    Say() << "Check that task cgroups are correct" << endl;
     auto cgmap = GetCgroups("self");
     for (auto name : cgmap) {
         Expect(name.second == "/");
@@ -596,7 +613,7 @@ static void TestLongRunning(TPortoAPI &api, const string &name) {
     WaitExit(api, pid);
     Expect(TaskRunning(api, pid) == false);
 
-    cerr << "Check that hierarchical task cgroups are correct" << endl;
+    Say() << "Check that hierarchical task cgroups are correct" << endl;
 
     string child = name + "/b";
     ExpectSuccess(api.Create(child));
@@ -617,13 +634,18 @@ static void TestLongRunning(TPortoAPI &api, const string &name) {
 
     ExpectSuccess(api.Destroy(child));
     ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.Destroy(name));
 }
 
-static void TestIsolation(TPortoAPI &api, const string &name) {
+static void TestIsolation(TPortoAPI &api) {
     string ret;
     string pid;
 
-    cerr << "Make sure PID isolation works" << endl;
+    string name = "a";
+    ExpectSuccess(api.Create(name));
+
+    Say() << "Make sure PID isolation works" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "bash -c 'echo $BASHPID'"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
@@ -632,12 +654,17 @@ static void TestIsolation(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetData(name, "stdout", ret));
     Expect(ret == string("1\n"));
     ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.Destroy(name));
 }
 
-static void TestEnvironment(TPortoAPI &api, const string &name) {
+static void TestEnvironment(TPortoAPI &api) {
     string pid;
 
-    cerr << "Check default environment" << endl;
+    string name = "a";
+    ExpectSuccess(api.Create(name));
+
+    Say() << "Check default environment" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
@@ -650,7 +677,7 @@ static void TestEnvironment(TPortoAPI &api, const string &name) {
     Expect(memcmp(empty_env, env.data(), sizeof(empty_env)) == 0);
     ExpectSuccess(api.Stop(name));
 
-    cerr << "Check user-defined environment" << endl;
+    Say() << "Check user-defined environment" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.SetProperty(name, "env", "a=b;c=d;"));
     ExpectSuccess(api.Start(name));
@@ -665,13 +692,18 @@ static void TestEnvironment(TPortoAPI &api, const string &name) {
 
     Expect(memcmp(ab_env, env.data(), sizeof(ab_env)) == 0);
     ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.Destroy(name));
 }
 
-static void TestUserGroup(TPortoAPI &api, const string &name) {
+static void TestUserGroup(TPortoAPI &api) {
     int uid, gid;
     string pid;
 
-    cerr << "Check default user & group" << endl;
+    string name = "a";
+    ExpectSuccess(api.Create(name));
+
+    Say() << "Check default user & group" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
@@ -682,7 +714,7 @@ static void TestUserGroup(TPortoAPI &api, const string &name) {
     Expect(gid == GroupGid("nogroup"));
     ExpectSuccess(api.Stop(name));
 
-    cerr << "Check custom user & group" << endl;
+    Say() << "Check custom user & group" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.SetProperty(name, "user", "daemon"));
     ExpectSuccess(api.SetProperty(name, "group", "bin"));
@@ -694,18 +726,23 @@ static void TestUserGroup(TPortoAPI &api, const string &name) {
     Expect(uid == UserUid("daemon"));
     Expect(gid == GroupGid("bin"));
     ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.Destroy(name));
 }
 
-static void TestCwd(TPortoAPI &api, const string &name) {
+static void TestCwd(TPortoAPI &api) {
     string pid;
     string cwd;
     string portod_pid, portod_cwd;
+
+    string name = "a";
+    ExpectSuccess(api.Create(name));
 
     TFile portod(PID_FILE);
     (void)portod.AsString(portod_pid);
     portod_cwd = GetCwd(portod_pid);
 
-    cerr << "Check default working directory" << endl;
+    Say() << "Check default working directory" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
@@ -716,7 +753,7 @@ static void TestCwd(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.Stop(name));
     Expect(access(portod_cwd.c_str(), F_OK) == 0);
 
-    cerr << "Check user defined working directory" << endl;
+    Say() << "Check user defined working directory" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.SetProperty(name, "cwd", "/tmp"));
     ExpectSuccess(api.Start(name));
@@ -732,13 +769,18 @@ static void TestCwd(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.Stop(name));
     ExpectSuccess(api.SetProperty(name, "cwd", ""));
     Expect(access("/tmp", F_OK) == 0);
+
+    ExpectSuccess(api.Destroy(name));
 }
 
 /*
-static void TestRootProperty(TPortoAPI &api, const string &name) {
+static void TestRootProperty(TPortoAPI &api) {
     string pid;
 
-    cerr << "Check filesystem isolation" << endl;
+    string name = "a";
+    ExpectSuccess(api.Create(name));
+
+    Say() << "Check filesystem isolation" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "pwd"));
     ExpectSuccess(api.SetProperty(name, "cwd", ""));
     ExpectSuccess(api.SetProperty(name, "root", "/root/chroot"));
@@ -755,14 +797,14 @@ static void TestRootProperty(TPortoAPI &api, const string &name) {
     Expect(v == string("/\n"));
 
     // TODO: check /proc/<PID>/root
+    ExpectSuccess(api.Destroy(name));
 }
 */
 
-static void TestStateMachine(TPortoAPI &api, const string &name) {
+static void TestStateMachine(TPortoAPI &api) {
+    string name = "a";
     string pid;
     string v;
-
-    cerr << "Check container state machine" << endl;
 
     ExpectSuccess(api.Create(name));
     ExpectSuccess(api.GetData(name, "state", v));
@@ -817,7 +859,7 @@ static void TestStateMachine(TPortoAPI &api, const string &name) {
     WaitExit(api, pid);
     Expect(TaskRunning(api, pid) == false);
 
-    cerr << "Make sure we can stop unintentionally frozen container " << endl;
+    Say() << "Make sure we can stop unintentionally frozen container " << endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
 
@@ -831,7 +873,7 @@ static void TestStateMachine(TPortoAPI &api, const string &name) {
 
     ExpectSuccess(api.Stop(name));
 
-    cerr << "Make sure we can remove paused container " << endl;
+    Say() << "Make sure we can remove paused container " << endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.Pause(name));
@@ -844,7 +886,7 @@ static void TestRoot(TPortoAPI &api) {
     string root = "/";
     vector<string> properties = { "command", "user", "group", "env", "memory_guarantee", "memory_limit", "cpu_policy", "cpu_priority", "parent", "respawn" };
 
-    cerr << "Check root properties & data" << endl;
+    Say() << "Check root properties & data" << endl;
     for (auto p : properties)
         ExpectFailure(api.GetProperty(root, p, v), EError::InvalidProperty);
 
@@ -859,7 +901,7 @@ static void TestRoot(TPortoAPI &api) {
     ExpectFailure(api.Stop(root), EError::InvalidState);
     ExpectFailure(api.Destroy(root), EError::InvalidValue);
 
-    cerr << "Check root cpu_usage & memory_usage" << endl;
+    Say() << "Check root cpu_usage & memory_usage" << endl;
     ExpectSuccess(api.GetData(root, "cpu_usage", v));
     Expect(v == "0");
     ExpectSuccess(api.GetData(root, "memory_usage", v));
@@ -887,11 +929,23 @@ static void TestRoot(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
-static bool TestLimits(TPortoAPI &api, const string &name) {
-    bool limitsTested = true;
+static bool CanTestLimits() {
+    if (!HaveCgKnob("memory", "", "memory.low_limit_in_bytes"))
+        return false;
+
+    if (!HaveCgKnob("cpu", "", "cpu.smart"))
+        return false;
+
+    return true;
+}
+
+static void TestLimits(TPortoAPI &api) {
     string pid;
 
-    cerr << "Check default limits" << endl;
+    string name = "a";
+    ExpectSuccess(api.Create(name));
+
+    Say() << "Check default limits" << endl;
     string current;
 
     current = GetCgKnob("memory", "", "memory.use_hierarchy");
@@ -909,12 +963,10 @@ static bool TestLimits(TPortoAPI &api, const string &name) {
     if (HaveCgKnob("memory", name, "memory.low_limit_in_bytes")) {
         current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
         Expect(current == "0");
-    } else {
-        limitsTested = false;
     }
     ExpectSuccess(api.Stop(name));
 
-    cerr << "Check custom limits" << endl;
+    Say() << "Check custom limits" << endl;
     string exp_limit = "524288";
     string exp_guar = "16384";
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
@@ -931,13 +983,13 @@ static bool TestLimits(TPortoAPI &api, const string &name) {
         Expect(current == exp_guar);
     }
 
-    cerr << "Check cpu_priority" << endl;
+    Say() << "Check cpu_priority" << endl;
     ExpectFailure(api.SetProperty(name, "cpu_priority", "-1"), EError::InvalidValue);
     ExpectFailure(api.SetProperty(name, "cpu_priority", "100"), EError::InvalidValue);
     ExpectSuccess(api.SetProperty(name, "cpu_priority", "0"));
     ExpectSuccess(api.SetProperty(name, "cpu_priority", "99"));
 
-    cerr << "Check cpu_policy" << endl;
+    Say() << "Check cpu_policy" << endl;
     string smart;
 
     ExpectFailure(api.SetProperty(name, "cpu_policy", "somecrap"), EError::InvalidValue);
@@ -955,8 +1007,6 @@ static bool TestLimits(TPortoAPI &api, const string &name) {
         smart = GetCgKnob("cpu", name, "cpu.smart");
         Expect(smart == "0");
         ExpectSuccess(api.Stop(name));
-    } else {
-        limitsTested = false;
     }
 
     string shares;
@@ -979,7 +1029,7 @@ static bool TestLimits(TPortoAPI &api, const string &name) {
     Expect(shares == "101");
     ExpectSuccess(api.Stop(name));
 
-    return limitsTested;
+    ExpectSuccess(api.Destroy(name));
 }
 
 static void TestLimitsHierarchy(TPortoAPI &api) {
@@ -987,8 +1037,6 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
 
     if (!HaveCgKnob("memory", "", "memory.low_limit_in_bytes"))
         return;
-
-    cerr << "Check limits hierarchy" << endl;
 
     //
     // box +-- monitoring
@@ -1016,11 +1064,11 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
 
     size_t total = GetTotalMemory();
 
-    cerr << "Single container can't go over reserve" << endl;
+    Say() << "Single container can't go over reserve" << endl;
     ExpectFailure(api.SetProperty(system, "memory_guarantee", to_string(total)), EError::ResourceNotAvailable);
     ExpectSuccess(api.SetProperty(system, "memory_guarantee", to_string(total - MEMORY_GUARANTEE_RESERVE)));
 
-    cerr << "Distributed guarantee can't go over reserve" << endl;
+    Say() << "Distributed guarantee can't go over reserve" << endl;
     size_t chunk = (total - MEMORY_GUARANTEE_RESERVE) / 4;
 
     ExpectSuccess(api.SetProperty(system, "memory_guarantee", to_string(chunk)));
@@ -1033,17 +1081,17 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
     ExpectSuccess(api.SetProperty(system, "memory_guarantee", to_string(0)));
 
     auto CheckPropertyHierarhcy = [&](TPortoAPI &api, const std::string &property) {
-        cerr << "Parent can't have less guarantee than sum of children" << endl;
+        Say() << "Parent can't have less guarantee than sum of children" << endl;
         ExpectSuccess(api.SetProperty(slot1, property, to_string(chunk)));
         ExpectSuccess(api.SetProperty(slot2, property, to_string(chunk)));
         ExpectFailure(api.SetProperty(prod, property, to_string(chunk)), EError::InvalidValue);
         ExpectFailure(api.SetProperty(box, property, to_string(chunk)), EError::InvalidValue);
 
-        cerr << "Child can't go over parent guarantee" << endl;
+        Say() << "Child can't go over parent guarantee" << endl;
         ExpectSuccess(api.SetProperty(prod, property, to_string(2 * chunk)));
         ExpectFailure(api.SetProperty(slot1, property, to_string(2 * chunk)), EError::InvalidValue);
 
-        cerr << "Can lower guarantee if possible" << endl;
+        Say() << "Can lower guarantee if possible" << endl;
         ExpectFailure(api.SetProperty(prod, property, to_string(chunk)), EError::InvalidValue);
         ExpectSuccess(api.SetProperty(slot2, property, to_string(0)));
         ExpectSuccess(api.SetProperty(prod, property, to_string(chunk)));
@@ -1060,11 +1108,12 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(box));
 }
 
-static void TestPermissions(TPortoAPI &api, const string &name) {
+static void TestPermissions(TPortoAPI &api) {
     struct stat st;
     string path;
 
-    cerr << "Check permissions" << endl;
+    string name = "a";
+    ExpectSuccess(api.Create(name));
 
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
@@ -1082,12 +1131,15 @@ static void TestPermissions(TPortoAPI &api, const string &name) {
     Expect(st.st_mode == (0644 | S_IFREG));
 
     ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.Destroy(name));
 }
 
-static void TestRespawn(TPortoAPI &api, const string &name) {
+static void TestRespawn(TPortoAPI &api) {
     string pid, respawnPid;
 
-    cerr << "Check respawn" << endl;
+    string name = "a";
+    ExpectSuccess(api.Create(name));
 
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1"));
     ExpectSuccess(api.SetProperty(name, "respawn", "true"));
@@ -1100,6 +1152,8 @@ static void TestRespawn(TPortoAPI &api, const string &name) {
 
     ExpectSuccess(api.Stop(name));
     ExpectSuccess(api.SetProperty(name, "respawn", "false"));
+
+    ExpectSuccess(api.Destroy(name));
 }
 
 static void TestLeaks(TPortoAPI &api) {
@@ -1110,8 +1164,6 @@ static void TestLeaks(TPortoAPI &api) {
 
     TFile f(PID_FILE);
     Expect(f.AsString(pid) == false);
-
-    cerr << "Check daemon leaks" << endl;
 
     for (int i = 0; i < nr; i++) {
         name = "a" + to_string(i);
@@ -1144,24 +1196,26 @@ static void TestLeaks(TPortoAPI &api) {
     Expect(now <= prev + slack);
 }
 
-static void TestDaemon() {
+static void TestDaemon(TPortoAPI &api) {
     struct dirent **lst;
     size_t n;
     string pid;
 
-    cerr << "Make sure portod doesn't have zombies" << endl;
+    api.Cleanup();
+
+    Say() << "Make sure portod doesn't have zombies" << endl;
     pid = Pgrep("portod");
 
-    cerr << "Make sure portod doesn't have invalid FDs" << endl;
+    Say() << "Make sure portod doesn't have invalid FDs" << endl;
     string path = ("/proc/" + pid + "/fd");
     n = scandir(path.c_str(), &lst, NULL, alphasort);
     // . .. 0(stdin) 1(stdout) 2(stderr) 4(log) 5(rpc socket) 128(event pipe) 129(ack pipe)
     Expect(n == 2 + 7);
 
-    cerr << "Make sure portoloop doesn't have zombies" << endl;
+    Say() << "Make sure portoloop doesn't have zombies" << endl;
     pid = Pgrep("portoloop");
 
-    cerr << "Make sure portoloop doesn't have invalid FDs" << endl;
+    Say() << "Make sure portoloop doesn't have invalid FDs" << endl;
     path = ("/proc/" + pid + "/fd");
     n = scandir(path.c_str(), &lst, NULL, alphasort);
     // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 128(event pipe) 129(ack pipe)
@@ -1179,7 +1233,7 @@ static void TestRecovery(TPortoAPI &api) {
         { "env", "a=a;b=b" },
     };
 
-    cerr << "Make sure we don't kill containers when doing recovery" << endl;
+    Say() << "Make sure we don't kill containers when doing recovery" << endl;
     ExpectSuccess(api.Create(name));
 
     for (auto &pair : props)
@@ -1214,7 +1268,7 @@ static void TestRecovery(TPortoAPI &api) {
 
     ExpectSuccess(api.Destroy(name));
 
-    cerr << "Make sure hierarchical recovery works" << endl;
+    Say() << "Make sure hierarchical recovery works" << endl;
 
     string parent = "a";
     string child = "a/b";
@@ -1238,49 +1292,50 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(parent));
 }
 
-int Selftest() {
+int Selftest(string name) {
     // TODO: truncate portoloop log and check that we don't have unexpected
     // respawns
 
-    bool limitsTested = false;
+    pair<string, function<void(TPortoAPI &)>> tests[] = {
+        { "root", TestRoot },
+        { "holder", TestHolder },
+        { "empty", TestEmpty },
+        { "state_machine", TestStateMachine },
+        { "exit_status", TestExitStatus },
+        { "streams", TestStreams },
+        { "long_running", TestLongRunning },
+        { "isolation", TestIsolation },
+        { "environment", TestEnvironment },
+        { "user_group", TestUserGroup },
+        { "cwd", TestCwd },
+        //{ "root", TestRootProperty },
+        { "limits", TestLimits },
+        { "permissions", TestPermissions },
+        { "respawn", TestRespawn },
+        { "hierarchy", TestLimitsHierarchy },
+        { "leaks", TestLeaks },
+
+        { "daemon", TestDaemon },
+        { "recovery", TestRecovery },
+    };
 
     try {
-        {
             TPortoAPI api;
-            TestRoot(api);
-            TestHolder(api);
-            TestEmpty(api);
-            TestStateMachine(api, "a");
 
-            ExpectSuccess(api.Create("a"));
-            TestExitStatus(api, "a");
-            TestStreams(api, "a");
-            TestLongRunning(api, "a");
-            TestIsolation(api, "a");
-            TestEnvironment(api, "a");
-            TestUserGroup(api, "a");
-            TestCwd(api, "a");
-            //TestRootProperty(api, "a");
-            limitsTested = TestLimits(api, "a");
-            TestPermissions(api, "a");
-            TestRespawn(api, "a");
-            ExpectSuccess(api.Destroy("a"));
+            for (auto t : tests) {
+                if (name.length() && name != t.first)
+                    continue;
 
-            TestLimitsHierarchy(api);
-            TestLeaks(api);
-        }
-        TestDaemon();
-        {
-            TPortoAPI api;
-            TestRecovery(api);
-        }
+                cerr << ">>> Executing " << t.first << "..." << endl;
+                t.second(api);
+            }
     } catch (string e) {
         cerr << "EXCEPTION: " << e << endl;
         return 1;
     }
 
-    cerr << "All tests successfully passed!" << endl;
-    if (!limitsTested)
+    cerr << "SUCCESS: All tests successfully passed!" << endl;
+    if (!CanTestLimits())
         cerr << "WARNING: Due to missing kernel support, memory_guarantee/cpu_policy has not been tested!" << endl;
 
     return 0;

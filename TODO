@@ -6,9 +6,15 @@
     (if we don't there is no way currently to apply parent limits without
      starting container)
 - ? memory_guarantee: do we need to check actual value in the sysfs
+- apply property changes if container is running
+- child can't start unless parent is running
+- parent can't update dynamic properties if it's not running but has running
+  children
 
 # phase 2
-- cpu, network qos
+- network qos
+
+- rt: create cgroup for non-smart tasks and throttle them
 
 # cleanup
 - rotate subprocess stdout/stderr

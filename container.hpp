@@ -50,6 +50,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
 
     // data
     bool CheckState(EContainerState expected);
+    TError ApplyProperties();
     TError PrepareCgroups();
     TError PrepareTask();
     TError KillAll();

@@ -26,7 +26,7 @@ TPortoAPI::TPortoAPI() : Fd(-1) {
 }
 
 TPortoAPI::~TPortoAPI() {
-    close(Fd);
+    Cleanup();
 }
 
 int TPortoAPI::Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
@@ -42,10 +42,8 @@ int TPortoAPI::Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
     rsp.Clear();
     int ret = SendReceive(Fd, req, rsp);
     req.Clear();
-    if (ret < 0) {
-        close(Fd);
-        Fd = -1;
-    }
+    if (ret < 0)
+        Cleanup();
     return LastError;
 }
 
@@ -172,4 +170,9 @@ int TPortoAPI::Resume(const string &name) {
 void TPortoAPI::GetLastError(int &error, std::string &msg) const {
     error = LastError;
     msg = LastErrorMsg;
+}
+
+void TPortoAPI::Cleanup() {
+    close(Fd);
+    Fd = -1;
 }

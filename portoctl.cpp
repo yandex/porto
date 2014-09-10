@@ -340,14 +340,17 @@ public:
     }
 };
 
-extern int Selftest();
+extern int Selftest(string name);
 class TSelftestCmd : public ICmd {
 public:
     TSelftestCmd() : ICmd("selftest", 0, "", "perform selftest") {}
 
     int Execute(int argc, char *argv[])
     {
-        return Selftest();
+        string test = "";
+        if (argc >= 1)
+            test = argv[0];
+        return Selftest(test);
     }
 };
 
