@@ -20,9 +20,9 @@ using namespace std;
 
 namespace Test {
 
-#define Expect(ret) ExpectReturn([&]{ return ret; }, true, 0, __LINE__, __func__)
-#define ExpectSuccess(ret) ExpectReturn([&]{ return ret; }, 0, 0, __LINE__, __func__)
-#define ExpectFailure(ret, exp) ExpectReturn([&]{ return ret; }, exp, 0, __LINE__, __func__)
+#define Expect(ret) ExpectReturn([&]{ return ret; }, true, 1, __LINE__, __func__)
+#define ExpectSuccess(ret) ExpectReturn([&]{ return ret; }, 0, 1, __LINE__, __func__)
+#define ExpectFailure(ret, exp) ExpectReturn([&]{ return ret; }, exp, 1, __LINE__, __func__)
 
 static void ExpectCorrectCgroups(const string &pid, const string &name) {
     auto cgmap = GetCgroups(pid);
@@ -60,6 +60,12 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     Expect(v == string("normal"));
     ExpectSuccess(api.GetProperty(name, "cpu_priority", v));
     Expect(v == string("50"));
+    ExpectSuccess(api.GetProperty(name, "net_guarantee", v));
+    Expect(v == string("0"));
+    ExpectSuccess(api.GetProperty(name, "net_ceil", v));
+    Expect(v == string("0"));
+    ExpectSuccess(api.GetProperty(name, "net_priority", v));
+    Expect(v == string("50"));
     ExpectSuccess(api.GetProperty(name, "respawn", v));
     Expect(v == string("false"));
 }
@@ -77,6 +83,8 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     ExpectFailure(api.GetData(name, "stderr", v), EError::InvalidState);
     ExpectFailure(api.GetData(name, "cpu_usage", v), EError::InvalidState);
     ExpectFailure(api.GetData(name, "memory_usage", v), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "net_tx", v), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "net_rx", v), EError::InvalidState);
     ExpectSuccess(api.GetData(name, "parent", v));
     Expect(v == string("/"));
 }
@@ -662,7 +670,12 @@ static void TestStateMachine(TPortoAPI &api) {
 static void TestRoot(TPortoAPI &api) {
     string v;
     string root = "/";
-    vector<string> properties = { "command", "user", "group", "env", "memory_guarantee", "memory_limit", "cpu_policy", "cpu_priority", "parent", "respawn" };
+    vector<string> properties = { "command", "user", "group", "env", "cwd", "memory_guarantee", "memory_limit", "cpu_policy", "cpu_priority", "net_guarantee", "net_ceil", "net_priority", "respawn" };
+
+    std::vector<TProperty> plist;
+
+    ExpectSuccess(api.Plist(plist));
+    Expect(plist.size() == properties.size());
 
     Say() << "Check root properties & data" << endl;
     for (auto p : properties)
@@ -674,6 +687,7 @@ static void TestRoot(TPortoAPI &api) {
     ExpectFailure(api.GetData(root, "start_errno", v), EError::InvalidData);
     ExpectFailure(api.GetData(root, "root_pid", v), EError::InvalidData);
     ExpectFailure(api.GetData(root, "stdout", v), EError::InvalidData);
+    ExpectFailure(api.GetData(root, "parent", v), EError::InvalidData);
     ExpectFailure(api.GetData(root, "stderr", v), EError::InvalidData);
 
     ExpectFailure(api.Stop(root), EError::InvalidState);
@@ -683,6 +697,10 @@ static void TestRoot(TPortoAPI &api) {
     ExpectSuccess(api.GetData(root, "cpu_usage", v));
     Expect(v == "0");
     ExpectSuccess(api.GetData(root, "memory_usage", v));
+    Expect(v == "0");
+    ExpectSuccess(api.GetData(root, "net_tx", v));
+    Expect(v == "0");
+    ExpectSuccess(api.GetData(root, "net_rx", v));
     Expect(v == "0");
 
     string name = "a";
@@ -703,6 +721,8 @@ static void TestRoot(TPortoAPI &api) {
     Expect(v != "0");
     ExpectSuccess(api.GetData(name, "memory_usage", v));
     Expect(v != "0");
+
+    // TODO: net_tx, net_rx
 
     ExpectSuccess(api.Destroy(name));
 }
@@ -806,6 +826,8 @@ static void TestLimits(TPortoAPI &api) {
     shares = GetCgKnob("cpu", name, "cpu.shares");
     Expect(shares == "101");
     ExpectSuccess(api.Stop(name));
+
+    // TODO: net_guarantee, net_ceil, net_priority
 
     ExpectSuccess(api.Destroy(name));
 }

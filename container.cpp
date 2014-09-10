@@ -115,6 +115,14 @@ struct TData {
 
         return to_string(val);
     };
+
+    static string NetTx(TContainer& c) {
+        return "0";
+    };
+
+    static string NetRx(TContainer& c) {
+        return "0";
+    };
 };
 
 std::map<std::string, const TDataSpec> dataSpec = {
@@ -126,6 +134,8 @@ std::map<std::string, const TDataSpec> dataSpec = {
     { "stdout", { "return task stdout", false, TData::Stdout, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
     { "stderr", { "return task stderr", false, TData::Stderr, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
     { "cpu_usage", { "return consumed CPU time in nanoseconds", true, TData::CpuUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "net_tx", { "number of bytes transmitted", true, TData::NetTx, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "net_rx", { "number of bytes received", true, TData::NetRx, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
     { "memory_usage", { "return consumed memory in bytes", true, TData::MemUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
 };
 

@@ -1,6 +1,11 @@
+- emulate some of cgroup knobs
+
 # phase 2
 - network qos
 - rt: create cgroup for non-smart tasks and throttle them
+
+# phase X
+- kernel support for cgroup to limit allowed ports
 
 # cleanup
 - remove extern AckExitStatus from container->Stop()

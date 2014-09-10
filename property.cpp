@@ -89,6 +89,18 @@ static TError ValidCpuPriority(std::shared_ptr<const TContainer> container, cons
     return TError::Success();
 }
 
+static TError ValidNetGuarantee(std::shared_ptr<const TContainer> container, const string str) {
+    return TError(EError::NotSupported, "not implemented");
+}
+
+static TError ValidNetCeil(std::shared_ptr<const TContainer> container, const string str) {
+    return TError(EError::NotSupported, "not implemented");
+}
+
+static TError ValidNetPriority(std::shared_ptr<const TContainer> container, const string str) {
+    return TError(EError::NotSupported, "not implemented");
+}
+
 static TError ValidBool(std::shared_ptr<const TContainer> container, const string str) {
     if (str != "true" && str != "false")
         return TError(EError::InvalidValue, "invalid boolean value");
@@ -103,10 +115,17 @@ std::map<std::string, const TPropertySpec> propertySpec = {
     {"env", { "container environment variables" }},
     //{"root", { "container root directory", "" }},
     {"cwd", { "container working directory", "" }},
+
     {"memory_guarantee", { "guaranteed amount of memory", "0", true, ValidMemGuarantee }},
     {"memory_limit", { "memory hard limit", "0", true, ValidMemLimit }},
+
     {"cpu_policy", { "CPU policy: rt, normal, idle", "normal", false, ValidCpuPolicy }},
     {"cpu_priority", { "CPU priority: 0-99", "50", true, ValidCpuPriority }},
+
+    {"net_guarantee", { "Guaranteed container network bandwidth", "0", false, ValidNetGuarantee }},
+    {"net_ceil", { "Maximum container network bandwidth", "0", false, ValidNetCeil }},
+    {"net_priority", { "Container network priority", "50", false, ValidNetPriority }},
+
     {"respawn", { "automatically respawn dead container", "false", false, ValidBool }},
 };
 
