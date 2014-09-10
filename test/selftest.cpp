@@ -68,6 +68,15 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     Expect(v == string("50"));
     ExpectSuccess(api.GetProperty(name, "respawn", v));
     Expect(v == string("false"));
+    ExpectSuccess(api.GetProperty(name, "cpu.smart", v));
+    Expect(v == string("0"));
+    ExpectSuccess(api.GetProperty(name, "memory.limit_in_bytes", v));
+    Expect(v == string("0"));
+    ExpectSuccess(api.GetProperty(name, "memory.low_limit_in_bytes", v));
+    Expect(v == string("0"));
+    ExpectSuccess(api.GetProperty(name, "memory.recharge_on_pgfault", v));
+    Expect(v == string("0"));
+
 }
 
 static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
@@ -755,10 +764,13 @@ static void TestRoot(TPortoAPI &api) {
 }
 
 static bool CanTestLimits() {
-    if (!HaveCgKnob("memory", "", "memory.low_limit_in_bytes"))
+    if (!HaveCgKnob("memory", "memory.low_limit_in_bytes"))
         return false;
 
-    if (!HaveCgKnob("cpu", "", "cpu.smart"))
+    if (!HaveCgKnob("memory", "memory.recharge_on_pgfault"))
+        return false;
+
+    if (!HaveCgKnob("cpu", "cpu.smart"))
         return false;
 
     return true;
@@ -785,7 +797,7 @@ static void TestLimits(TPortoAPI &api) {
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
     Expect(current == to_string(LLONG_MAX) || current == to_string(ULLONG_MAX));
 
-    if (HaveCgKnob("memory", name, "memory.low_limit_in_bytes")) {
+    if (HaveCgKnob("memory", "memory.low_limit_in_bytes")) {
         current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
         Expect(current == "0");
     }
@@ -796,17 +808,17 @@ static void TestLimits(TPortoAPI &api) {
     string exp_guar = "16384";
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.SetProperty(name, "memory_limit", exp_limit));
-    if (HaveCgKnob("memory", name, "memory.low_limit_in_bytes"))
+    if (HaveCgKnob("memory", "memory.low_limit_in_bytes"))
         ExpectSuccess(api.SetProperty(name, "memory_guarantee", exp_guar));
     ExpectSuccess(api.Start(name));
 
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
     Expect(current == exp_limit);
-    ExpectSuccess(api.Stop(name));
-    if (HaveCgKnob("memory", name, "memory.low_limit_in_bytes")) {
+    if (HaveCgKnob("memory", "memory.low_limit_in_bytes")) {
         current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
         Expect(current == exp_guar);
     }
+    ExpectSuccess(api.Stop(name));
 
     Say() << "Check cpu_priority" << endl;
     ExpectFailure(api.SetProperty(name, "cpu_priority", "-1"), EError::InvalidValue);
@@ -820,7 +832,7 @@ static void TestLimits(TPortoAPI &api) {
     ExpectFailure(api.SetProperty(name, "cpu_policy", "somecrap"), EError::InvalidValue);
     ExpectFailure(api.SetProperty(name, "cpu_policy", "idle"), EError::NotSupported);
 
-    if (HaveCgKnob("cpu", name, "cpu.smart")) {
+    if (HaveCgKnob("cpu", "cpu.smart")) {
         ExpectSuccess(api.SetProperty(name, "cpu_policy", "rt"));
         ExpectSuccess(api.Start(name));
         smart = GetCgKnob("cpu", name, "cpu.smart");
@@ -859,6 +871,68 @@ static void TestLimits(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
+static void TestRawLimits(TPortoAPI &api) {
+    string pid;
+
+    string name = "a";
+    ExpectSuccess(api.Create(name));
+
+    Say() << "Check default limits" << endl;
+    string current;
+
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.Start(name));
+
+    current = GetCgKnob("memory", name, "memory.limit_in_bytes");
+    Expect(current == to_string(LLONG_MAX) || current == to_string(ULLONG_MAX));
+
+    if (HaveCgKnob("memory", "memory.low_limit_in_bytes")) {
+        current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
+        Expect(current == "0");
+    }
+
+    if (HaveCgKnob("memory", "memory.recharge_on_pgfault")) {
+        current = GetCgKnob("memory", name, "memory.recharge_on_pgfault");
+        Expect(current == "0");
+    }
+
+    if (HaveCgKnob("cpu", "cpu.smart")) {
+        current = GetCgKnob("cpu", name, "cpu.smart");
+        Expect(current == "0");
+    }
+    ExpectSuccess(api.Stop(name));
+
+    Say() << "Check custom limits" << endl;
+    string exp_limit = "524288";
+    string exp_guar = "16384";
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.SetProperty(name, "memory.limit_in_bytes", exp_limit));
+    if (HaveCgKnob("memory", "memory.low_limit_in_bytes"))
+        ExpectSuccess(api.SetProperty(name, "memory.low_limit_in_bytes", exp_guar));
+    if (HaveCgKnob("memory", "memory.recharge_on_pgfault"))
+        ExpectSuccess(api.SetProperty(name, "memory.recharge_on_pgfault", "1"));
+    if (HaveCgKnob("cpu", "cpu.smart"))
+        ExpectSuccess(api.SetProperty(name, "cpu.smart", "1"));
+    ExpectSuccess(api.Start(name));
+
+    current = GetCgKnob("memory", name, "memory.limit_in_bytes");
+    Expect(current == exp_limit);
+    if (HaveCgKnob("memory", "memory.low_limit_in_bytes")) {
+        current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
+        Expect(current == exp_guar);
+    }
+    if (HaveCgKnob("memory", "memory.recharge_on_pgfault")) {
+        current = GetCgKnob("memory", name, "memory.recharge_on_pgfault");
+        Expect(current == "1");
+    }
+    if (HaveCgKnob("cpu", "cpu.smart")) {
+        current = GetCgKnob("cpu", name, "cpu.smart");
+        Expect(current == "1");
+    }
+    ExpectSuccess(api.Stop(name));
+    ExpectSuccess(api.Destroy(name));
+}
+
 static void TestDynamic(TPortoAPI &api) {
     string name = "a";
     ExpectSuccess(api.Create(name));
@@ -891,7 +965,7 @@ static void TestDynamic(TPortoAPI &api) {
 static void TestLimitsHierarchy(TPortoAPI &api) {
     string pid;
 
-    if (!HaveCgKnob("memory", "", "memory.low_limit_in_bytes"))
+    if (!HaveCgKnob("memory", "memory.low_limit_in_bytes"))
         return;
 
     //
@@ -1137,6 +1211,7 @@ int SelfTest(string name) {
         { "cwd", TestCwd },
         //{ "root", TestRootProperty },
         { "limits", TestLimits },
+        { "raw", TestRawLimits },
         { "dynamic", TestDynamic },
         { "permissions", TestPermissions },
         { "respawn", TestRespawn },

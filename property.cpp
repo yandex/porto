@@ -128,7 +128,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
 
     {"respawn", { "automatically respawn dead container", "false", false, ValidBool }},
 
-    {"cpu.smart", { "cgroup knob", "0", false, ValidBool }},
+    {"cpu.smart", { "cgroup knob", "0", false }},
     {"memory.limit_in_bytes", { "cgroup knob", "0", false }},
     {"memory.low_limit_in_bytes", { "cgroup knob", "0", false }},
     {"memory.recharge_on_pgfault", { "cgroup knob", "0", false }},

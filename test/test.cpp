@@ -270,14 +270,14 @@ std::string GetCgKnob(const std::string &subsys, const std::string &name, const 
     std::string val;
     TFile m(CgRoot(subsys, name) + knob);
     if (m.AsString(val))
-        throw std::string("Can't get cgroup knob");
+        throw std::string("Can't get cgroup knob " + m.GetPath());
     val.erase(val.find('\n'));
     return val;
 }
 
-bool HaveCgKnob(const std::string &subsys, const std::string &name, const std::string &knob) {
+bool HaveCgKnob(const std::string &subsys, const std::string &knob) {
     std::string val;
-    TFile m(CgRoot(subsys, name) + knob);
+    TFile m(CgRoot(subsys, "") + knob);
     return m.Exists();
 }
 

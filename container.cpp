@@ -330,15 +330,46 @@ TError TContainer::PrepareCgroups() {
     auto cpuroot = cpuSubsystem->GetRootCgroup();
     if (cpuroot->HasKnob("cpu.smart")) {
         TError error;
-        if (Spec.Get("cpu_policy") == "rt")
+        if (Spec.Get("cpu_policy") == "rt") {
             error = cpucg->SetKnobValue("cpu.smart", "1", false);
-
-        TLogger::LogError(error, "Can't enable smart");
-        if (error)
-            return error;
+            TLogger::LogError(error, "Can't enable smart");
+            if (error)
+                return error;
+        }
     }
 
-    return ApplyDynamicProperties();
+    TError error = ApplyDynamicProperties();
+    if (error)
+        return error;
+
+    string cpuRawKnobs[] = {
+        "cpu.smart",
+    };
+
+    string memRawKnobs[] = {
+        "memory.limit_in_bytes",
+        "memory.low_limit_in_bytes",
+        "memory.recharge_on_pgfault",
+    };
+
+    for (auto &knob : cpuRawKnobs)
+        if (Spec.Get(knob) != "0") {
+            error = cpucg->SetKnobValue(knob, Spec.Get(knob), false);
+            TLogger::LogError(error, "Can't set cpu cgroup knob " + knob);
+            if (error)
+                return error;
+        }
+
+    auto memcg = GetLeafCgroup(memorySubsystem);
+    for (auto &knob : memRawKnobs)
+        if (Spec.Get(knob) != "0") {
+            error = memcg->SetKnobValue(knob, Spec.Get(knob), false);
+            TLogger::LogError(error, "Can't set memory cgroup knob " + knob);
+            if (error)
+                return error;
+        }
+
+    return TError::Success();
 }
 
 TError TContainer::PrepareTask() {

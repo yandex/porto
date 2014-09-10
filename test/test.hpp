@@ -32,7 +32,7 @@ namespace Test {
     std::string GetFreezer(const std::string &name);
     void SetFreezer(const std::string &name, const std::string &state);
     std::string GetCgKnob(const std::string &subsys, const std::string &name, const std::string &knob);
-    bool HaveCgKnob(const std::string &subsys, const std::string &name, const std::string &knob);
+    bool HaveCgKnob(const std::string &subsys, const std::string &knob);
     int GetVmRss(const std::string &pid);
 
     void TestDaemon(TPortoAPI &api);
