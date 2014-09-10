@@ -1,5 +1,3 @@
-- ? memory_guarantee: do we need to check actual value in the sysfs
-
 # phase 2
 - network qos
 - rt: create cgroup for non-smart tasks and throttle them

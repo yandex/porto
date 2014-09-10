@@ -20,6 +20,7 @@ extern "C" {
 namespace Test {
 
 static const int retries = 10;
+static std::atomic<int> fail;
 
 #define Expect(ret) ExpectReturn(ret, true, retries, __LINE__, __func__)
 #define ExpectSuccess(ret) ExpectReturn(ret, 0, retries, __LINE__, __func__)
@@ -184,6 +185,7 @@ static void Tasks(int n, int iter) {
     } catch (std::string e) {
         Say() << "ERROR: Exception " << e << std::endl;
         Say() << "ERROR: Stop task" << std::to_string(n) << std::endl;
+        fail++;
         return;
     }
     Say() << "Stop task" << std::to_string(n) << std::endl;
@@ -226,15 +228,16 @@ int StressTest(int threads, int iter, bool killPorto) {
         if (killPorto)
             thrKill.join();
 
+        TPortoAPI api;
+        TestDaemon(api);
     } catch (std::string e) {
         std::cerr << "ERROR: Exception " << e << std::endl;
-        return 1;
+        fail++;
     }
 
-    TPortoAPI api;
-    TestDaemon(api);
+    if (!fail)
+        std::cout << "Test completed!" << std::endl;
 
-    std::cout << "Test completed!" << std::endl;
     return 0;
 }
 }
