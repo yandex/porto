@@ -1293,9 +1293,6 @@ static void TestRecovery(TPortoAPI &api) {
 }
 
 int Selftest(string name) {
-    // TODO: truncate portoloop log and check that we don't have unexpected
-    // respawns
-
     pair<string, function<void(TPortoAPI &)>> tests[] = {
         { "root", TestRoot },
         { "holder", TestHolder },
@@ -1319,16 +1316,41 @@ int Selftest(string name) {
         { "recovery", TestRecovery },
     };
 
+    int respawns = 0;
     try {
-            TPortoAPI api;
+        TPortoAPI api;
 
-            for (auto t : tests) {
-                if (name.length() && name != t.first)
-                    continue;
+        cerr << ">>> Truncating logs and restarting porto..." << endl;
 
-                cerr << ">>> Executing " << t.first << "..." << endl;
-                t.second(api);
-            }
+        (void)truncate(LOG_FILE.c_str(), 0);
+        (void)truncate(LOOP_LOG_FILE.c_str(), 0);
+
+        int pid;
+        if (StringToInt(Pgrep("portoloop"), pid))
+            throw string("Can't find portoloop pid");
+
+        if (kill(pid, SIGHUP))
+            throw string("Can't send SIGHUP to portoloop");
+
+        WaitPortod(api);
+
+        for (auto t : tests) {
+            if (name.length() && name != t.first)
+                continue;
+
+            cerr << ">>> Testing " << t.first << "..." << endl;
+            t.second(api);
+        }
+
+        vector<string> lines;
+        TFile log(LOOP_LOG_FILE);
+        if (log.AsLines(lines))
+            throw string("Can't read portoloop log");
+
+        for (auto s : lines) {
+            if (s.find("Spawned") != string::npos)
+                respawns++;
+        }
     } catch (string e) {
         cerr << "EXCEPTION: " << e << endl;
         return 1;
@@ -1337,6 +1359,8 @@ int Selftest(string name) {
     cerr << "SUCCESS: All tests successfully passed!" << endl;
     if (!CanTestLimits())
         cerr << "WARNING: Due to missing kernel support, memory_guarantee/cpu_policy has not been tested!" << endl;
+    if (respawns != 1 + 2)
+        cerr << "WARNING: Unexpected number of portoloop respawns: " << respawns << "!" << endl;
 
     return 0;
 }
