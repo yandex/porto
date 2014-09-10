@@ -62,6 +62,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     bool ShouldApplyProperty(const std::string &property);
     TError Respawn();
     uint64_t GetPropertyUint64(const std::string &property) const;
+    void StopChildren();
 
 public:
     TContainer(const std::string &name, std::shared_ptr<TContainer> parent) :

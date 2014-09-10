@@ -465,6 +465,17 @@ TError TContainer::KillAll() {
 // TODO: rework this into some kind of notify interface
 extern void AckExitStatus(int pid);
 
+void TContainer::StopChildren() {
+    for (auto iter : Children) {
+        if (auto child = iter.lock()) {
+            if (child->State != EContainerState::Stopped && child->State != EContainerState::Dead)
+                child->Stop();
+        } else {
+            TLogger::Log() << "Can't lock child while stopping" << endl;
+        }
+    }
+}
+
 TError TContainer::Stop() {
     if (IsRoot() || !(CheckState(EContainerState::Running) || CheckState(EContainerState::Dead)))
         return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
@@ -482,6 +493,8 @@ TError TContainer::Stop() {
     AckExitStatus(pid);
 
     State = EContainerState::Stopped;
+
+    StopChildren();
 
     return TError::Success();
 }
@@ -655,6 +668,8 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
     if (NeedRespawn()) {
         TError error = Respawn();
         TLogger::LogError(error, "Can't respawn " + GetName());
+    } else {
+        StopChildren();
     }
 
     TimeOfDeath = GetCurrentTimeMs();

@@ -455,6 +455,8 @@ static void TestHolder(TPortoAPI &api) {
     Expect(containers[1] == string("a"));
     Expect(containers[2] == string("a/b"));
 
+    Say() << "Make sure child can stop only when parent is running" << endl;
+
     ExpectSuccess(api.Create("a/b/c"));
     containers.clear();
     ExpectSuccess(api.List(containers));
@@ -473,6 +475,31 @@ static void TestHolder(TPortoAPI &api) {
     ExpectFailure(api.Start("a/b/c"), EError::InvalidState);
     ExpectSuccess(api.Start("a/b"));
     ExpectSuccess(api.Start("a/b/c"));
+
+    Say() << "Make sure when parent stops/dies children are stopped" << endl;
+
+    string state;
+
+    ExpectSuccess(api.GetData("a/b/c", "state", state));
+    Expect(state == "running");
+    ExpectSuccess(api.Stop("a/b"));
+    ExpectSuccess(api.GetData("a/b/c", "state", state));
+    Expect(state == "stopped");
+    ExpectSuccess(api.GetData("a/b", "state", state));
+    Expect(state == "stopped");
+    ExpectSuccess(api.GetData("a", "state", state));
+    Expect(state == "running");
+
+    ExpectSuccess(api.SetProperty("a/b", "command", "sleep 1"));
+    ExpectSuccess(api.Start("a/b"));
+    ExpectSuccess(api.Start("a/b/c"));
+    string pid;
+    ExpectSuccess(api.GetData("a/b", "root_pid", pid));
+    WaitExit(api, pid);
+    ExpectSuccess(api.GetData("a/b", "state", state));
+    Expect(state == "dead");
+    ExpectSuccess(api.GetData("a/b/c", "state", state));
+    Expect(state == "stopped");
 
     ExpectSuccess(api.Destroy("a/b/c"));
     ExpectSuccess(api.Destroy("a/b"));
