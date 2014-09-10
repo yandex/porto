@@ -103,10 +103,10 @@ std::map<std::string, const TPropertySpec> propertySpec = {
     {"env", { "container environment variables" }},
     //{"root", { "container root directory", "" }},
     {"cwd", { "container working directory", "" }},
-    {"memory_guarantee", { "guaranteed amount of memory", "0", false, ValidMemGuarantee }},
-    {"memory_limit", { "memory hard limit", "0", false, ValidMemLimit }},
+    {"memory_guarantee", { "guaranteed amount of memory", "0", true, ValidMemGuarantee }},
+    {"memory_limit", { "memory hard limit", "0", true, ValidMemLimit }},
     {"cpu_policy", { "CPU policy: rt, normal, idle", "normal", false, ValidCpuPolicy }},
-    {"cpu_priority", { "CPU priority: 0-99", "50", false, ValidCpuPriority }},
+    {"cpu_priority", { "CPU priority: 0-99", "50", true, ValidCpuPriority }},
     {"respawn", { "automatically respawn dead container", "false", false, ValidBool }},
 };
 

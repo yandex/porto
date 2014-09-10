@@ -262,9 +262,7 @@ bool TContainer::IsAlive() {
     return IsRoot() || !Processes().empty();
 }
 
-TError TContainer::ApplyProperties() {
-    auto memroot = memorySubsystem->GetRootCgroup();
-    auto cpuroot = cpuSubsystem->GetRootCgroup();
+TError TContainer::ApplyDynamicProperties() {
     auto memcg = GetLeafCgroup(memorySubsystem);
 
     TError error = memorySubsystem->UseHierarchy(*memcg);
@@ -272,6 +270,7 @@ TError TContainer::ApplyProperties() {
     if (error)
         return error;
 
+    auto memroot = memorySubsystem->GetRootCgroup();
     if (memroot->HasKnob("memory.low_limit_in_bytes") && Spec.GetAsInt("memory_guarantee") != 0) {
         TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", Spec.Get("memory_guarantee"), false);
         TLogger::LogError(error, "Can't set memory_guarantee");
@@ -287,17 +286,6 @@ TError TContainer::ApplyProperties() {
     }
 
     auto cpucg = GetLeafCgroup(cpuSubsystem);
-    if (cpuroot->HasKnob("cpu.smart")) {
-        if (Spec.Get("cpu_policy") == "rt")
-            error = cpucg->SetKnobValue("cpu.smart", "1", false);
-        else
-            error = cpucg->SetKnobValue("cpu.smart", "0", false);
-
-        TLogger::LogError(error, "Can't enable smart");
-        if (error)
-            return error;
-    }
-
     if (Spec.Get("cpu_policy") == "normal") {
         int cpuPrio;
         error = StringToInt(Spec.Get("cpu_priority"), cpuPrio);
@@ -328,7 +316,21 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
-    return ApplyProperties();
+    auto cpucg = GetLeafCgroup(cpuSubsystem);
+    auto cpuroot = cpuSubsystem->GetRootCgroup();
+    if (cpuroot->HasKnob("cpu.smart")) {
+        TError error;
+        if (Spec.Get("cpu_policy") == "rt")
+            error = cpucg->SetKnobValue("cpu.smart", "1", false);
+        else
+            error = cpucg->SetKnobValue("cpu.smart", "0", false);
+
+        TLogger::LogError(error, "Can't enable smart");
+        if (error)
+            return error;
+    }
+
+    return ApplyDynamicProperties();
 }
 
 TError TContainer::PrepareTask() {
@@ -534,6 +536,16 @@ TError TContainer::GetProperty(const string &property, string &value) const {
     return TError::Success();
 }
 
+bool TContainer::ShouldApplyProperty(const std::string &property) {
+    if (!Spec.IsDynamic(property))
+       return false;
+
+    if (State == EContainerState::Dead || State == EContainerState::Stopped)
+        return false;
+
+    return true;
+}
+
 TError TContainer::SetProperty(const string &property, const string &value) {
     if (IsRoot())
         return TError(EError::InvalidValue, "Can't set property for root");
@@ -541,7 +553,14 @@ TError TContainer::SetProperty(const string &property, const string &value) {
     if (State != EContainerState::Stopped && !Spec.IsDynamic(property))
         return TError(EError::InvalidValue, "Can't set dynamic property " + property + " for running container");
 
-    return Spec.Set(shared_from_this(), property, value);
+    TError error = Spec.Set(shared_from_this(), property, value);
+    if (error)
+        return error;
+
+    if (ShouldApplyProperty(property))
+        error = ApplyDynamicProperties();
+
+    return error;
 }
 
 TError TContainer::Restore(const kv::TNode &node) {

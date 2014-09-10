@@ -1032,6 +1032,35 @@ static void TestLimits(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
+static void TestDynamic(TPortoAPI &api) {
+    string name = "a";
+    ExpectSuccess(api.Create(name));
+
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.Start(name));
+
+    string current;
+    current = GetCgKnob("memory", name, "memory.limit_in_bytes");
+    Expect(current == to_string(LLONG_MAX) || current == to_string(ULLONG_MAX));
+
+    string exp_limit = "268435456";
+    ExpectSuccess(api.SetProperty(name, "memory_limit", exp_limit));
+    current = GetCgKnob("memory", name, "memory.limit_in_bytes");
+    Expect(current == exp_limit);
+
+    ExpectSuccess(api.Pause(name));
+
+    exp_limit = "536870912";
+    ExpectSuccess(api.SetProperty(name, "memory_limit", exp_limit));
+    current = GetCgKnob("memory", name, "memory.limit_in_bytes");
+    Expect(current == exp_limit);
+
+    ExpectSuccess(api.Resume(name));
+    ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.Destroy(name));
+}
+
 static void TestLimitsHierarchy(TPortoAPI &api) {
     string pid;
 
@@ -1307,6 +1336,7 @@ int Selftest(string name) {
         { "cwd", TestCwd },
         //{ "root", TestRootProperty },
         { "limits", TestLimits },
+        { "dynamic", TestDynamic },
         { "permissions", TestPermissions },
         { "respawn", TestRespawn },
         { "hierarchy", TestLimitsHierarchy },

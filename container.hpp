@@ -50,7 +50,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
 
     // data
     bool CheckState(EContainerState expected);
-    TError ApplyProperties();
+    TError ApplyDynamicProperties();
     TError PrepareCgroups();
     TError PrepareTask();
     TError KillAll();
@@ -59,6 +59,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     TContainer &operator=(const TContainer &) = delete;
     const std::string StripParentName(const std::string &name) const;
     bool NeedRespawn();
+    bool ShouldApplyProperty(const std::string &property);
     TError Respawn();
     uint64_t GetPropertyUint64(const std::string &property) const;
 
