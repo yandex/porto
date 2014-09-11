@@ -218,10 +218,13 @@ int main(int argc, char * const argv[])
     map<int,int> pidToStatus;
 
     while (!done) {
+        size_t started = GetCurrentTimeMs();
+        size_t next = started + RESPAWN_DELAY_MS;
         ret = SpawnPortod(pidToStatus);
         TLogger::Log() << "Returned " << ret << endl;
-        if (!done && ret != EXIT_SUCCESS)
-            usleep(1000000);
+
+        if (!done && next >= GetCurrentTimeMs())
+            usleep((next - GetCurrentTimeMs()) * 1000);
     }
 
     if (kill(portoPid, SIGINT) < 0)
