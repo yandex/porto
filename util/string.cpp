@@ -37,6 +37,16 @@ TError StringsToIntegers(const std::vector<std::string> &strings,
     return TError::Success();
 }
 
+TError StringToUint32(const std::string &str, uint32_t &value) {
+    try {
+        value = stoul(str);
+    } catch (...) {
+        return TError(EError::Unknown, string(__func__) + ": Bad integer value");
+    }
+
+    return TError::Success();
+}
+
 TError StringToUint64(const std::string &str, uint64_t &value) {
     try {
         value = stoull(str);

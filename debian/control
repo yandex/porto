@@ -2,7 +2,7 @@ Source: yandex-porto
 Section: utils
 Priority: extra
 Maintainer: Eugene Kilimchuk <ekilimchuk@yandex-team.ru>
-Build-Depends: debhelper (>= 8.0.0)
+Build-Depends: debhelper (>= 8.0.0), libnl-3-dev, libnl-route-3-dev
 Standards-Version: 3.9.2
 Homepage: https://wiki.yandex-team.ru/users/klamm/Porto
 #Vcs-Git: kernel1.yandex.ru:/home/klamm/porto 
@@ -11,6 +11,6 @@ Package: yandex-porto
 Section: utils
 Priority: extra
 Architecture: amd64
-Depends: ${shlibs:Depends}, ${utils:DependsI}, logrotate
+Depends: ${shlibs:Depends}, ${utils:DependsI}, logrotate, libnl-route-3-200, libnl-3-200
 Description: Component of Nirvana
  Porto allows to run process in namespace with cgroup.

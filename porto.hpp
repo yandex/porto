@@ -47,4 +47,9 @@ const unsigned int LOOP_WAIT_TIMEOUT_S = 10;
 const int REAP_EVT_FD = 128;
 const int REAP_ACK_FD = 129;
 
+const uint32_t DEF_CLASS_PRIO = 50;
+const uint32_t DEF_CLASS_RATE = 1 * 1024 * 1024 * 1024 * 8U;
+const uint32_t DEF_CLASS_CEIL = 1 * 1024 * 1024 * 1024 * 8U;
+const std::string DEF_CLASS_DEVICE = "eth0";
+
 #endif

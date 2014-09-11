@@ -312,6 +312,33 @@ TError TContainer::ApplyDynamicProperties() {
     return TError::Success();
 }
 
+TError TContainer::PrepareNetwork() {
+    Tclass = make_shared<TTclass>(Parent->Tclass, TcHandle(Parent->Tclass->GetMajor(), Id));
+
+    TError error;
+    uint32_t prio, rate, ceil;
+
+    error = StringToUint32(Spec.Get("net_priority"), prio);
+    if (error)
+        return error;
+
+    error = StringToUint32(Spec.Get("net_guarantee"), rate);
+    if (error)
+        return error;
+
+    error = StringToUint32(Spec.Get("net_ceil"), ceil);
+    if (error)
+        return error;
+
+    error = Tclass->Create(prio, rate, ceil);
+    if (error) {
+        TLogger::LogError(error, "Can't create tclass");
+        return error;
+    }
+
+    return TError::Success();
+}
+
 TError TContainer::PrepareCgroups() {
     LeafCgroups[cpuSubsystem] = GetLeafCgroup(cpuSubsystem);
     LeafCgroups[cpuacctSubsystem] = GetLeafCgroup(cpuacctSubsystem);
@@ -386,13 +413,45 @@ TError TContainer::PrepareTask() {
 }
 
 TError TContainer::Create() {
-    TLogger::Log() << "Create " << GetName() << endl;
+    TLogger::Log() << "Create " << GetName() << " " << Id << endl;
     TError error = Spec.Create();
     if (error)
         return error;
 
     if (Parent)
         Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
+
+    if (IsRoot()) {
+        // 1:0 qdisc
+        // 1:1 root class
+        // 1:2 def class, 1:3 container a, 1:4 container b
+        //                1:5 container a/c
+
+        TLogger::Log() << Id << " " << Id + 1 << endl;
+
+        uint32_t defHandle = TcHandle(Id, Id + 1);
+
+        Qdisc = make_shared<TQdisc>(DEF_CLASS_DEVICE, TcHandle(Id, 0), defHandle);
+        error = Qdisc->Create();
+        if (error) {
+            TLogger::LogError(error, "Can't create root qdisc");
+            return error;
+        }
+
+        Tclass = make_shared<TTclass>(Qdisc, TcHandle(Id, Id));
+        error = Tclass->Create(DEF_CLASS_PRIO, DEF_CLASS_RATE, DEF_CLASS_CEIL);
+        if (error) {
+            TLogger::LogError(error, "Can't create tclass");
+            return error;
+        }
+
+        DefaultTclass = make_shared<TTclass>(Tclass, defHandle);
+        error = DefaultTclass->Create(DEF_CLASS_PRIO, DEF_CLASS_RATE, DEF_CLASS_CEIL);
+        if (error) {
+            TLogger::LogError(error, "Can't create default tclass");
+            return error;
+        }
+    }
 
     return TError::Success();
 }
@@ -426,6 +485,8 @@ TError TContainer::Start() {
     if (Parent && !Parent->IsRoot() && Parent->State != EContainerState::Running)
         return TError(EError::InvalidState, "parent is not running");
 
+    Spec.SetInternal("id", to_string(Id));
+
     TError error = PrepareCgroups();
     if (error) {
         TLogger::LogError(error, "Can't prepare task cgroups");
@@ -435,6 +496,12 @@ TError TContainer::Start() {
     if (IsRoot()) {
         State = EContainerState::Running;
         return TError::Success();
+    }
+
+    error = PrepareNetwork();
+    if (error) {
+        TLogger::LogError(error, "Can't prepare task network");
+        return error;
     }
 
     if (!Spec.Get("command").length())
@@ -629,6 +696,8 @@ TError TContainer::SetProperty(const string &property, const string &value) {
 }
 
 TError TContainer::Restore(const kv::TNode &node) {
+    TLogger::Log() << "Restore " << GetName() << " " << Id << endl;
+
     TError error = Spec.Restore(node);
     if (error) {
         TLogger::LogError(error, "Can't restore task's spec");
@@ -655,6 +724,12 @@ TError TContainer::Restore(const kv::TNode &node) {
         error = PrepareCgroups();
         if (error) {
             TLogger::LogError(error, "Can't restore task cgroups");
+            return error;
+        }
+
+        error = PrepareNetwork();
+        if (error) {
+            TLogger::LogError(error, "Can't prepare task network");
             return error;
         }
 
@@ -765,7 +840,37 @@ bool TContainer::HasChildren() const {
     return shared_from_this().use_count() > 2;
 }
 
+uint16_t TContainer::GetId() {
+    return Id;
+}
+
 // TContainerHolder
+
+TError TContainerHolder::GetId(uint16_t &id) {
+    for (size_t i = 0; i < sizeof(Ids) / sizeof(Ids[0]); i++) {
+        int bit = ffsll(Ids[i]);
+        if (bit == 0)
+            continue;
+
+        bit--;
+        Ids[i] &= ~(1 << bit);
+        id = i * sizeof(Ids[0]) + bit;
+        id++;
+
+        return TError::Success();
+    }
+
+    return TError(EError::ResourceNotAvailable, "Can't create more containers");
+}
+
+void TContainerHolder::PutId(uint16_t id) {
+    id--;
+
+    int bucket = id / sizeof(Ids[0]);
+    int bit = id % sizeof(Ids[0]);
+
+    Ids[bucket] |= 1 << bit;
+}
 
 TContainerHolder::~TContainerHolder() {
     // we want children to be removed first
@@ -777,6 +882,14 @@ TError TContainerHolder::CreateRoot() {
     TError error = Create(ROOT_CONTAINER);
     if (error)
         return error;
+
+    uint16_t id;
+    error = GetId(id);
+    if (error)
+        return error;
+
+    if (id != 2)
+        return TError(EError::Unknown, "Unexpected root container id");
 
     auto root = Get(ROOT_CONTAINER);
     error = root->Start();
@@ -837,8 +950,13 @@ TError TContainerHolder::Create(const string &name) {
     if (!parent && name != ROOT_CONTAINER)
         return TError(EError::InvalidValue, "invalid parent container");
 
-    auto c = make_shared<TContainer>(name, parent);
-    TError error(c->Create());
+    uint16_t id;
+    TError error = GetId(id);
+    if (error)
+        return error;
+
+    auto c = make_shared<TContainer>(name, parent, id);
+    error = c->Create();
     if (error)
         return error;
 
@@ -848,7 +966,7 @@ TError TContainerHolder::Create(const string &name) {
 
 shared_ptr<TContainer> TContainerHolder::Get(const string &name) {
     if (Containers.find(name) == Containers.end())
-        return shared_ptr<TContainer>();
+        return nullptr;
 
     return Containers[name];
 }
@@ -859,6 +977,8 @@ TError TContainerHolder::Destroy(const string &name) {
 
     if (Containers[name]->HasChildren())
         return TError(EError::InvalidState, "container has children");
+
+    PutId(Containers[name]->GetId());
 
     Containers.erase(name);
 
@@ -874,6 +994,31 @@ vector<string> TContainerHolder::List() const {
     return ret;
 }
 
+TError TContainerHolder::RestoreId(const kv::TNode &node, uint16_t &id) {
+    string value = "";
+    for (int i = 0; i < node.pairs_size(); i++) {
+        auto key = node.pairs(i).key();
+
+        if (key == "id")
+            value = node.pairs(i).val();
+    }
+
+    if (value.length() == 0) {
+        TError error = GetId(id);
+        if (error)
+            return error;
+    } else {
+        uint32_t id32;
+        TError error = StringToUint32(value, id32);
+        if (error)
+            return error;
+
+        id = (uint16_t)id32;
+    }
+
+    return TError::Success();
+}
+
 TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node) {
     if (name == ROOT_CONTAINER)
         return TError::Success();
@@ -883,10 +1028,18 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
     if (!parent)
         return TError(EError::InvalidValue, "invalid parent container");
 
-    auto c = make_shared<TContainer>(name, parent);
-    auto e = c->Restore(node);
-    if (e)
-        return e;
+    uint16_t id = 0;
+    TError error = RestoreId(node, id);
+    if (error)
+        return error;
+
+    if (!id)
+        return TError(EError::Unknown, "Couldn't restore container id");
+
+    auto c = make_shared<TContainer>(name, parent, id);
+    error = c->Restore(node);
+    if (error)
+        return error;
 
     Containers[name] = c;
     return TError::Success();

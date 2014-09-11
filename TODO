@@ -3,6 +3,7 @@
 # phase 2
 - network qos
 - rt: create cgroup for non-smart tasks and throttle them
+- use SO_PEERCRED to isolate parent containers from child in portod
 
 # phase X
 - kernel support for cgroup to limit allowed ports

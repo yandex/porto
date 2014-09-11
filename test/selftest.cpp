@@ -61,11 +61,11 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetProperty(name, "cpu_priority", v));
     Expect(v == string("50"));
     ExpectSuccess(api.GetProperty(name, "net_guarantee", v));
-    Expect(v == string("0"));
+    Expect(v == to_string(DEF_CLASS_RATE));
     ExpectSuccess(api.GetProperty(name, "net_ceil", v));
-    Expect(v == string("0"));
+    Expect(v == to_string(DEF_CLASS_CEIL));
     ExpectSuccess(api.GetProperty(name, "net_priority", v));
-    Expect(v == string("50"));
+    Expect(v == to_string(DEF_CLASS_PRIO));
     ExpectSuccess(api.GetProperty(name, "respawn", v));
     Expect(v == string("false"));
     ExpectSuccess(api.GetProperty(name, "cpu.smart", v));

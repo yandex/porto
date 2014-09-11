@@ -122,9 +122,9 @@ std::map<std::string, const TPropertySpec> propertySpec = {
     {"cpu_policy", { "CPU policy: rt, normal, idle", "normal", false, ValidCpuPolicy }},
     {"cpu_priority", { "CPU priority: 0-99", "50", true, ValidCpuPriority }},
 
-    {"net_guarantee", { "Guaranteed container network bandwidth", "0", false, ValidNetGuarantee }},
-    {"net_ceil", { "Maximum container network bandwidth", "0", false, ValidNetCeil }},
-    {"net_priority", { "Container network priority", "50", false, ValidNetPriority }},
+    {"net_guarantee", { "Guaranteed container network bandwidth", to_string(DEF_CLASS_RATE), false, ValidNetGuarantee }},
+    {"net_ceil", { "Maximum container network bandwidth", to_string(DEF_CLASS_CEIL), false, ValidNetCeil }},
+    {"net_priority", { "Container network priority", to_string(DEF_CLASS_PRIO), false, ValidNetPriority }},
 
     {"respawn", { "automatically respawn dead container", "false", false, ValidBool }},
 

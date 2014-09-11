@@ -322,5 +322,8 @@ void TestDaemon(TPortoAPI &api) {
     // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 128(event pipe) 129(ack pipe)
     if (n != 2 + 6)
         throw std::string("Invalid number of fds");
+
+    // TODO: check portoloop queue
+    // TODO: check rtnl classes
 }
 }

@@ -1,103 +1,285 @@
 #include "qdisc.hpp"
+#include "util/log.hpp"
+
+// HTB shaping details:
+// http://luxik.cdi.cz/~devik/qos/htb/manual/userg.htm
 
 extern "C" {
-#include <net/if.h>
-
-#include <libmnl/libmnl.h>
-#include <linux/if_link.h>
-#include <linux/rtnetlink.h>
+#include <netlink/route/qdisc.h>
+#include <netlink/route/qdisc/htb.h>
 }
 
-TError TTclass::Create() {
-	//RTM_NEWTCLASS
+using namespace std;
+
+uint32_t TcHandle(uint16_t maj, uint16_t min) {
+    return TC_HANDLE(maj, min);
+}
+
+TError TNetlink::Open(const std::string &device) {
+    int ret;
+    TError error;
+
+    sock = nl_socket_alloc();
+    if (!sock)
+        return TError(EError::Unknown, string("Unable to allocate netlink socket"));
+
+    ret = nl_connect(sock, NETLINK_ROUTE);
+    if (ret < 0) {
+        error = TError(EError::Unknown, string("Unable to connect netlink socket: ") + nl_geterror(ret));
+        goto free_socket;
+    }
+
+    ret = rtnl_link_alloc_cache(sock, AF_UNSPEC, &cache);
+    if (ret < 0) {
+        error = TError(EError::Unknown, string("Unable to allocate link cache: ") + nl_geterror(ret));
+        goto close_socket;
+    }
+
+    nl_cache_mngt_provide(cache);
+
+    link = rtnl_link_get_by_name(cache, device.c_str());
+    if (!link) {
+        error = TError(EError::Unknown, string("Invalid device ") + device);
+        goto free_cache;
+    }
+
+    return TError::Success();
+
+free_cache:
+    nl_cache_free(cache);
+close_socket:
+    nl_close(sock);
+free_socket:
+    nl_socket_free(sock);
+
+    return error;
+}
+
+void TNetlink::Close() {
+    if (cache)
+        nl_cache_free(cache);
+    if (sock) {
+        nl_close(sock);
+        nl_socket_free(sock);
+    }
+}
+
+void TNetlink::Log(const std::string &prefix, void *obj) {
+    char buf[1024];
+    nl_object_dump_buf(OBJ_CAST(obj), buf, sizeof(buf));
+    TLogger::Log() << "netlink: " << prefix << " " << buf << endl;
+}
+
+TError TNetlink::AddClass(uint32_t parent, uint32_t handle, uint32_t prio, uint32_t rate, uint32_t ceil) {
+    int ret;
+    struct rtnl_class *tclass;
+    TError error = TError::Success();
+
+    tclass = rtnl_class_alloc();
+    if (!tclass)
+        return TError(EError::Unknown, string("Unable to allocate tclass object"));
+
+    rtnl_tc_set_link(TC_CAST(tclass), link);
+    rtnl_tc_set_parent(TC_CAST(tclass), parent);
+    rtnl_tc_set_handle(TC_CAST(tclass), handle);
+
+    rtnl_class_delete(sock, tclass);
+
+    ret = rtnl_tc_set_kind(TC_CAST(tclass), "htb");
+    if (ret < 0) {
+        error = TError(EError::Unknown, string("Unable to set HTB to tclass: ") + nl_geterror(ret));
+        goto free_class;
+    }
+
+    rtnl_htb_set_rate(tclass, rate);
+
+    if (prio)
+        rtnl_htb_set_prio(tclass, prio);
+
+    if (ceil)
+        rtnl_htb_set_ceil(tclass, ceil);
+
+    /*
+       rtnl_htb_set_rbuffer(tclass, burst);
+       rtnl_htb_set_cbuffer(tclass, cburst);
+       */
+
+    Log("add", tclass);
+
+    ret = rtnl_class_add(sock, tclass, NLM_F_CREATE);
+    if (ret < 0)
+        error = TError(EError::Unknown, string("Unable to add tclass: ") + nl_geterror(ret));
+
+free_class:
+    rtnl_class_put(tclass);
+
+    return error;
+}
+
+TError TNetlink::RemoveClass(uint32_t parent, uint32_t handle) {
+    int ret;
+    struct rtnl_class *tclass;
+    TError error = TError::Success();
+
+    tclass = rtnl_class_alloc();
+    if (!tclass)
+        return TError(EError::Unknown, string("Unable to allocate tclass object"));
+
+    rtnl_tc_set_link(TC_CAST(tclass), link);
+    rtnl_tc_set_parent(TC_CAST(tclass), parent);
+    rtnl_tc_set_handle(TC_CAST(tclass), handle);
+
+    ret = rtnl_class_delete(sock, tclass);
+    if (ret < 0)
+        error = TError(EError::Unknown, string("Unable to remove tclass: ") + nl_geterror(ret));
+
+    Log("remove", tclass);
+
+    rtnl_class_put(tclass);
+
+    return error;
+}
+
+TError TNetlink::RemoveHTB(uint32_t parent) {
+    struct rtnl_qdisc *qdisc;
+
+    qdisc = rtnl_qdisc_alloc();
+    if (!qdisc)
+        return TError(EError::Unknown, string("Unable to allocate qdisc object"));
+
+    rtnl_tc_set_link(TC_CAST(qdisc), link);
+    rtnl_tc_set_parent(TC_CAST(qdisc), parent);
+
+    Log("remove", qdisc);
+
+    rtnl_qdisc_delete(sock, qdisc);
+
+    return TError::Success();
+}
+
+TError TNetlink::AddHTB(uint32_t parent, uint32_t handle, uint32_t defaultClass) {
+    int ret;
+    TError error = TError::Success();
+    struct rtnl_qdisc *qdisc;
+
+    qdisc = rtnl_qdisc_alloc();
+    if (!qdisc)
+        return TError(EError::Unknown, string("Unable to allocate qdisc object"));
+
+    rtnl_tc_set_link(TC_CAST(qdisc), link);
+    rtnl_tc_set_parent(TC_CAST(qdisc), parent);
+
+    // delete current qdisc
+    rtnl_qdisc_delete(sock, qdisc);
+
+    rtnl_tc_set_handle(TC_CAST(qdisc), handle);
+
+    ret = rtnl_tc_set_kind(TC_CAST(qdisc), "htb");
+    if (ret < 0) {
+        error = TError(EError::Unknown, string("Unable to set qdisc type: ") + nl_geterror(ret));
+        goto free_qdisc;
+    }
+
+    rtnl_htb_set_defcls(qdisc, TcHandle(1, defaultClass));
+    rtnl_htb_set_rate2quantum(qdisc, 10);
+
+    Log("add", qdisc);
+
+    ret = rtnl_qdisc_add(sock, qdisc, NLM_F_CREATE);
+    if (ret < 0) {
+        error = TError(EError::Unknown, string("Unable to add qdisc: ") + nl_geterror(ret));
+        goto free_qdisc;
+    }
+
+free_qdisc:
+    rtnl_qdisc_put(qdisc);
+
+    return error;
+}
+
+const std::string &TTclass::GetDevice() {
+    if (ParentTclass)
+        return ParentTclass->GetDevice();
+    else
+        return ParentQdisc->GetDevice();
+}
+
+uint16_t TTclass::GetMajor() {
+    return (uint16_t)(Handle >> 16);
+}
+
+TError TTclass::Create(uint32_t prio, uint32_t rate, uint32_t ceil) {
+    uint32_t parent;
+    if (ParentQdisc)
+        parent = ParentQdisc->GetHandle();
+    else
+        parent = ParentTclass->Handle;
+
+    TNetlink nl;
+
+    TError error = nl.Open(GetDevice());
+    if (error)
+        return error;
+
+    error = nl.AddClass(parent, Handle, 10, 100 * 1024 * 1024, 0);
+    if (error)
+        return error;
 
     return TError::Success();
 }
 
 TError TTclass::Remove() {
-	//RTM_DELTCLASS
+    uint32_t parent;
+    if (ParentQdisc)
+        parent = ParentQdisc->GetHandle();
+    else
+        parent = ParentTclass->Handle;
+
+    TNetlink nl;
+
+    TError error = nl.Open(GetDevice());
+    if (error)
+        return error;
+
+    error = nl.RemoveClass(parent, Handle);
+    if (error)
+        return error;
 
     return TError::Success();
 }
 
+uint32_t TQdisc::GetHandle() {
+    return Handle;
+}
+
 TError TQdisc::Create() {
-#if 0
-    auto iface = if_nametoindex(Device.c_str());
-    if (iface < 0)
-        return TError(EError::Unknown, errno, "Can't convert device name to index");
+    TNetlink nl;
 
+    TError error = nl.Open(Device);
+    if (error)
+        return error;
 
-	char buf[MNL_SOCKET_BUFFER_SIZE];
-
-
-
-	struct nlmsghdr *nlh = mnl_nlmsg_put_header(buf);
-	nlh->nlmsg_type	= RTM_NEWQDISC,;
-	nlh->nlmsg_flags = NLM_F_REQUEST | NLM_F_CREATE; // | NLM_F_ACK;
-
-
-    struct tcmsg *tcm = mnl_nlmsg_put_extra_header(nlh, sizeof(*tcm));
-    tcm->tcm_ifindex = iface;
-    tcm->tcm_family = AF_UNSPEC;
-    tcm->tcm_parent = TC_H_ROOT; // TODO: get parent
-
-
-
-
-
-	struct rtmsg *rtm = mnl_nlmsg_put_extra_header(nlh, sizeof(struct rtmsg));
-	rtm->rtm_family = family;
-	rtm->rtm_dst_len = prefix;
-	rtm->rtm_src_len = 0;
-	rtm->rtm_tos = 0;
-	rtm->rtm_protocol = RTPROT_STATIC;
-	rtm->rtm_table = RT_TABLE_MAIN;
-	rtm->rtm_type = RTN_UNICAST;
-	/* is there any gateway? */
-	rtm->rtm_scope = (argc == 4) ? RT_SCOPE_LINK : RT_SCOPE_UNIVERSE;
-	rtm->rtm_flags = 0;
-
-	if (family == AF_INET)
-		mnl_attr_put_u32(nlh, RTA_DST, dst.ip);
-	else
-		mnl_attr_put(nlh, RTA_DST, sizeof(struct in6_addr), &dst);
-
-	mnl_attr_put_u32(nlh, RTA_OIF, iface);
-
-
-	nl = mnl_socket_open(NETLINK_ROUTE);
-	if (nl == NULL) {
-		perror("mnl_socket_open");
-		exit(EXIT_FAILURE);
-	}
-
-	if (mnl_socket_bind(nl, 0, MNL_SOCKET_AUTOPID) < 0) {
-		perror("mnl_socket_bind");
-		exit(EXIT_FAILURE);
-	}
-	portid = mnl_socket_get_portid(nl);
-
-	if (mnl_socket_sendto(nl, nlh, nlh->nlmsg_len) < 0) {
-		perror("mnl_socket_sendto");
-		exit(EXIT_FAILURE);
-	}
-
-	ret = mnl_socket_recvfrom(nl, buf, sizeof(buf));
-	if (ret < 0) {
-		perror("mnl_socket_recvfrom");
-		exit(EXIT_FAILURE);
-	}
-
-    // TODO
-
-	mnl_socket_close(nl);
-#endif
+    error = nl.AddHTB(TC_H_ROOT, Handle, DefClass);
+    if (error)
+        return error;
 
     return TError::Success();
 }
 
 TError TQdisc::Remove() {
-    // RTM_DELQDISC
+    TNetlink nl;
+
+    TError error = nl.Open(Device);
+    if (error)
+        return error;
+
+    error = nl.RemoveHTB(TC_H_ROOT);
+    if (error)
+        return error;
 
     return TError::Success();
+}
+
+const std::string &TQdisc::GetDevice() {
+    return Device;
 }

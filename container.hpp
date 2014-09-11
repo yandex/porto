@@ -8,10 +8,12 @@
 #include <memory>
 #include <functional>
 #include <set>
+#include <climits>
 
 #include "kvalue.hpp"
 #include "property.hpp"
 #include "task.hpp"
+#include "qdisc.hpp"
 
 class TCgroup;
 class TContainerEnv;
@@ -38,11 +40,14 @@ extern std::map<std::string, const TDataSpec> dataSpec;
 class TContainer : public std::enable_shared_from_this<TContainer> {
     const std::string Name;
     const std::shared_ptr<TContainer> Parent;
+    std::shared_ptr<TQdisc> Qdisc;
+    std::shared_ptr<TTclass> Tclass, DefaultTclass;
     std::vector<std::weak_ptr<TContainer>> Children;
     EContainerState State;
     TContainerSpec Spec;
     bool MaybeReturnedOk = false;
     size_t TimeOfDeath = 0;
+    uint16_t Id;
     friend TData;
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
@@ -51,6 +56,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     // data
     bool CheckState(EContainerState expected);
     TError ApplyDynamicProperties();
+    TError PrepareNetwork();
     TError PrepareCgroups();
     TError PrepareTask();
     TError KillAll();
@@ -66,8 +72,8 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     void FreeResources();
 
 public:
-    TContainer(const std::string &name, std::shared_ptr<TContainer> parent) :
-        Name(StripParentName(name)), Parent(parent), State(EContainerState::Stopped), Spec(name) { }
+    TContainer(const std::string &name, std::shared_ptr<TContainer> parent, uint16_t id) :
+        Name(StripParentName(name)), Parent(parent), State(EContainerState::Stopped), Spec(name), Id(id) { }
     ~TContainer();
 
     const std::string GetName() const;
@@ -99,13 +105,19 @@ public:
     void Heartbeat();
     bool CanRemoveDead() const;
     bool HasChildren() const;
+    uint16_t GetId();
 };
 
 class TContainerHolder {
     std::map <std::string, std::shared_ptr<TContainer>> Containers;
+    unsigned long long Ids[UINT16_MAX/sizeof(long long)/8];
 
     bool ValidName(const std::string &name) const;
+    TError GetId(uint16_t &id);
+    void PutId(uint16_t id);
+    TError RestoreId(const kv::TNode &node, uint16_t &id);
 public:
+    TContainerHolder() { for (auto &i : Ids) { i = ULLONG_MAX; } }
     ~TContainerHolder();
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot();
