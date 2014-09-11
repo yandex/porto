@@ -16,3 +16,7 @@
 /CPackSourceConfig.cmake
 /debian-binary
 /install_manifest.txt
+/tags
+/debian/files
+/debian/yandex-porto.debhelper.log
+/debian/yandex-porto/
