@@ -202,7 +202,7 @@ static int RpcMain(TContainerHolder &cholder) {
         }
 
         if (hup) {
-            TLogger::CloseLog();
+            TLogger::TruncateLog();
             hup = false;
         }
 

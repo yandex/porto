@@ -2,6 +2,7 @@
 
 #include "test.hpp"
 #include "util/string.hpp"
+#include "util/netlink.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -294,6 +295,21 @@ int GetVmRss(const std::string &pid) {
         throw std::string("PARSING ERROR");
 
     return std::stoi(size);
+}
+
+bool TcClassExist(const std::string &device, const std::string &handle) {
+    TNetlink nl;
+    uint32_t h;
+
+    TError error = StringToUint32(handle, h);
+    if (error)
+        throw error.GetMsg();
+
+    error = nl.Open(device);
+    if (error)
+        throw error.GetMsg();
+
+    return nl.ClassExists(h);
 }
 
 void TestDaemon(TPortoAPI &api) {

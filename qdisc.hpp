@@ -5,31 +5,7 @@
 #include <string>
 
 #include "error.hpp"
-
-struct nl_sock;
-struct rtnl_link;
-struct nl_cache;
-
-class TNetlink {
-    struct nl_sock *sock;
-    struct rtnl_link *link;
-    struct nl_cache *link_cache;
-
-public:
-    TError Open(const std::string &device);
-    void Close();
-    void LogObj(const std::string &prefix, void *obj);
-    void LogCache(struct nl_cache *cache);
-    TError AddClass(uint32_t parent, uint32_t handle, uint32_t prio, uint32_t rate, uint32_t ceil);
-    TError GetStat(uint32_t handle, int stat, uint64_t &val);
-    TError RemoveClass(uint32_t parent, uint32_t handle);
-    TError AddHTB(uint32_t parent, uint32_t handle, uint32_t defaultClass);
-    TError RemoveHTB(uint32_t parent);
-    ~TNetlink() { Close(); }
-};
-
-uint32_t TcHandle(uint16_t maj, uint16_t min);
-uint16_t TcMajor(uint32_t handle);
+#include "util/netlink.hpp"
 
 class TQdisc {
     const std::string Device;
@@ -44,13 +20,6 @@ public:
     TError Remove();
     uint32_t GetHandle() { return Handle; }
     const std::string &GetDevice();
-};
-
-enum class ETclassStat {
-    Packets,
-    Bytes,
-    Drops,
-    Overlimits
 };
 
 class TTclass {

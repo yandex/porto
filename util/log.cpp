@@ -59,6 +59,11 @@ void TLogger::CloseLog() {
     kmsgFile.close();
 }
 
+void TLogger::TruncateLog() {
+    TLogger::CloseLog();
+    (void)truncate(logPath.c_str(), 0);
+}
+
 static std::string GetTime() {
     char tmstr[256];
     time_t t;

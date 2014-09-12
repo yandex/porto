@@ -34,6 +34,7 @@ namespace Test {
     std::string GetCgKnob(const std::string &subsys, const std::string &name, const std::string &knob);
     bool HaveCgKnob(const std::string &subsys, const std::string &knob);
     int GetVmRss(const std::string &pid);
+    bool TcClassExist(const std::string &device, const std::string &handle);
 
     void TestDaemon(TPortoAPI &api);
 

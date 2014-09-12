@@ -11,6 +11,7 @@
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
+#include "util/netlink.hpp"
 
 extern "C" {
 #include <sys/types.h>
@@ -630,7 +631,8 @@ void TContainer::FreeResources() {
 
     LeafCgroups.clear();
 
-    // TODO: Tclass.Remove();
+    TError error = Tclass->Remove();
+    TLogger::LogError(error, "Can't remove tc classifier");
 }
 
 TError TContainer::Stop() {

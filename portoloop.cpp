@@ -126,6 +126,7 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
         ReceiveAcks(ackfd[0], pidToStatus);
 
         if (needUpdate) {
+            TLogger::TruncateLog();
             TLogger::Log() << "Updating" << endl;
 
             if (kill(portoPid, SIGKILL) < 0)

@@ -425,8 +425,12 @@ static void TestLongRunning(TPortoAPI &api) {
     Expect(leaf_cls != "0");
     Expect(root_cls != leaf_cls);
 
+    Expect(TcClassExist(DEF_CLASS_DEVICE, root_cls) == true);
+    Expect(TcClassExist(DEF_CLASS_DEVICE, leaf_cls) == true);
+
     ExpectSuccess(api.Stop(name));
     Expect(TaskRunning(api, pid) == false);
+    Expect(TcClassExist(DEF_CLASS_DEVICE, leaf_cls) == false);
 
     Say() << "Check that hierarchical task cgroups are correct" << endl;
 
@@ -1135,7 +1139,6 @@ static void TestLeaks(TPortoAPI &api) {
     }
 
     int now = GetVmRss(pid);
-
     Expect(now <= prev + slack);
 }
 
@@ -1240,9 +1243,6 @@ int SelfTest(string name) {
         TPortoAPI api;
 
         cerr << ">>> Truncating logs and restarting porto..." << endl;
-
-        (void)truncate(LOG_FILE.c_str(), 0);
-        (void)truncate(LOOP_LOG_FILE.c_str(), 0);
 
         int pid;
         if (StringToInt(Pgrep("portoloop"), pid))

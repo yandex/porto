@@ -6,6 +6,7 @@
 #include "version.hpp"
 
 const bool LOG_VEBOSE = true;
+const bool DEBUG_NETLINK = false;
 
 const std::string ROOT_CONTAINER = "/";
 const std::string INIT_CONTAINER = "system";
