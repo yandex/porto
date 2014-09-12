@@ -27,6 +27,8 @@ add_custom_target(version.hpp ./GIT-VERSION-GEN WORKING_DIRECTORY ${CMAKE_SOURCE
 
 set_source_files_properties(tags PROPERTIES GENERATED true)
 add_custom_command(OUTPUT tags COMMAND ctags -R --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+set_source_files_properties(TAGS PROPERTIES GENERATED true)
+add_custom_command(OUTPUT TAGS COMMAND ctags -R -e --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_executable(portod tags portod.cpp cgroup.cpp rpc.cpp container.cpp task.cpp kvalue.cpp subsystem.cpp error.cpp property.cpp qdisc.cpp util/netlink.cpp util/log.cpp util/protobuf.cpp util/mount.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp
     ${PROTO_SRCS} ${PROTO_HDRS})
