@@ -7,7 +7,6 @@
 #include "libporto.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
-#include "test/test.hpp"
 
 using namespace std;
 
@@ -341,38 +340,6 @@ public:
     }
 };
 
-class TSelftestCmd : public ICmd {
-public:
-    TSelftestCmd() : ICmd("selftest", 0, "", "perform selftest") {}
-
-    int Execute(int argc, char *argv[])
-    {
-        string test = "";
-        if (argc >= 1)
-            test = argv[0];
-        return Test::SelfTest(test);
-    }
-};
-
-class TStressTestCmd : public ICmd {
-public:
-    TStressTestCmd() : ICmd("stresstest", 0, "[threads] [iterations] [kill=on/off]", "perform stresstest") {}
-
-    int Execute(int argc, char *argv[])
-    {
-        int threads = 1, iter = 1000;
-        bool killPorto = true;
-        if (argc >= 1)
-            StringToInt(argv[0], threads);
-        if (argc >= 2)
-            StringToInt(argv[1], iter);
-        if (argc >= 3 && strcmp(argv[2], "off") == 0)
-            killPorto = false;
-        cout << "Threads: " << threads << " Iterations: " << iter << " Kill: " << killPorto << endl;
-        return Test::StressTest(threads, iter, killPorto);
-    }
-};
-
 class TGetCmd : public ICmd {
 public:
     TGetCmd() : ICmd("get", 1, "<name> <data>", "get container property or data") {}
@@ -487,8 +454,6 @@ int main(int argc, char *argv[])
         new TGetDataCmd(),
         new TGetCmd(),
         new TRawCmd(),
-        new TSelftestCmd(),
-        new TStressTestCmd(),
     };
 
     if (argc <= 1) {

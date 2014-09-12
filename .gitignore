@@ -1,6 +1,7 @@
 /portod
 /portoloop
 /portoctl
+/portotest
 /*.o
 /rpc.pb.cc
 /rpc.pb.h

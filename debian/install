@@ -1,3 +1,4 @@
 portod /usr/sbin
 portoctl /usr/sbin
 portoloop /usr/sbin
+portotest /usr/sbin

@@ -3,7 +3,6 @@
 - add net_tos property via net_prio cgroup
 - selftests
 - debian: add cls_cgroup to /etc/modules upon install
-- ? move tests into another binary -> no need to link libnl with portoctl
 - ? portorecord/portoplay tool to record rcp and then replay
 
 # phase 2
