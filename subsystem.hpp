@@ -59,9 +59,15 @@ public:
     TError Usage(std::shared_ptr<TCgroup> &cg, uint64_t &value) const;
 };
 
+class TNetclsSubsystem : public TSubsystem {
+public:
+    TNetclsSubsystem() : TSubsystem("net_cls") {}
+};
+
 extern std::shared_ptr<TMemorySubsystem> memorySubsystem;
 extern std::shared_ptr<TFreezerSubsystem> freezerSubsystem;
 extern std::shared_ptr<TCpuSubsystem> cpuSubsystem;
 extern std::shared_ptr<TCpuacctSubsystem> cpuacctSubsystem;
+extern std::shared_ptr<TNetclsSubsystem> netclsSubsystem;
 
 #endif

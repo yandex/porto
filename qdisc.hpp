@@ -29,6 +29,7 @@ public:
 };
 
 uint32_t TcHandle(uint16_t maj, uint16_t min);
+uint16_t TcMajor(uint32_t handle);
 
 class TQdisc {
     const std::string Device;
@@ -41,7 +42,7 @@ public:
 
     TError Create();
     TError Remove();
-    uint32_t GetHandle();
+    uint32_t GetHandle() { return Handle; }
     const std::string &GetDevice();
 };
 
@@ -66,7 +67,7 @@ public:
     TError Remove();
     const std::string &GetDevice();
     uint32_t GetParent();
-    uint16_t GetMajor();
+    uint32_t GetHandle() { return Handle; }
     TError GetStat(ETclassStat stat, uint64_t &val);
 };
 

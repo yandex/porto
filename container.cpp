@@ -351,7 +351,10 @@ TError TContainer::ApplyDynamicProperties() {
 }
 
 TError TContainer::PrepareNetwork() {
-    Tclass = make_shared<TTclass>(Parent->Tclass, TcHandle(Parent->Tclass->GetMajor(), Id));
+    if (Parent)
+        Tclass = make_shared<TTclass>(Parent->Tclass, TcHandle(TcMajor(Parent->Tclass->GetHandle()), Id));
+    else
+        Tclass = make_shared<TTclass>(Qdisc, TcHandle(TcMajor(Qdisc->GetHandle()), Id));
 
     TError error;
     uint32_t prio, rate, ceil;
@@ -382,6 +385,7 @@ TError TContainer::PrepareCgroups() {
     LeafCgroups[cpuacctSubsystem] = GetLeafCgroup(cpuacctSubsystem);
     LeafCgroups[memorySubsystem] = GetLeafCgroup(memorySubsystem);
     LeafCgroups[freezerSubsystem] = GetLeafCgroup(freezerSubsystem);
+    LeafCgroups[netclsSubsystem] = GetLeafCgroup(netclsSubsystem);
 
     for (auto cg : LeafCgroups) {
         auto ret = cg.second->Create();
@@ -403,7 +407,16 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
-    TError error = ApplyDynamicProperties();
+    auto netcls = GetLeafCgroup(netclsSubsystem);
+
+    TLogger::Log() << Tclass << " " << DefaultTclass << " " << Qdisc << endl;
+    uint32_t handle = Tclass->GetHandle();
+    TError error = netcls->SetKnobValue("net_cls.classid", to_string(handle), false);
+    TLogger::LogError(error, "Can't set classid");
+    if (error)
+        return error;
+
+    error = ApplyDynamicProperties();
     if (error)
         return error;
 
@@ -474,13 +487,6 @@ TError TContainer::Create() {
             return error;
         }
 
-        Tclass = make_shared<TTclass>(Qdisc, TcHandle(Id, Id));
-        error = Tclass->Create(DEF_CLASS_PRIO, DEF_CLASS_RATE, DEF_CLASS_CEIL);
-        if (error) {
-            TLogger::LogError(error, "Can't create tclass");
-            return error;
-        }
-
         DefaultTclass = make_shared<TTclass>(Qdisc, defHandle);
         error = DefaultTclass->Create(DEF_CLASS_PRIO, DEF_CLASS_RATE, DEF_CLASS_CEIL);
         if (error) {
@@ -523,7 +529,13 @@ TError TContainer::Start() {
 
     Spec.SetInternal("id", to_string(Id));
 
-    TError error = PrepareCgroups();
+    TError error = PrepareNetwork();
+    if (error) {
+        TLogger::LogError(error, "Can't prepare task network");
+        return error;
+    }
+
+    error = PrepareCgroups();
     if (error) {
         TLogger::LogError(error, "Can't prepare task cgroups");
         return error;
@@ -532,12 +544,6 @@ TError TContainer::Start() {
     if (IsRoot()) {
         State = EContainerState::Running;
         return TError::Success();
-    }
-
-    error = PrepareNetwork();
-    if (error) {
-        TLogger::LogError(error, "Can't prepare task network");
-        return error;
     }
 
     if (!Spec.Get("command").length())
@@ -759,15 +765,15 @@ TError TContainer::Restore(const kv::TNode &node) {
     State = EContainerState::Stopped;
 
     if (started) {
-        error = PrepareCgroups();
-        if (error) {
-            TLogger::LogError(error, "Can't restore task cgroups");
-            return error;
-        }
-
         error = PrepareNetwork();
         if (error) {
             TLogger::LogError(error, "Can't prepare task network");
+            return error;
+        }
+
+        error = PrepareCgroups();
+        if (error) {
+            TLogger::LogError(error, "Can't restore task cgroups");
             return error;
         }
 

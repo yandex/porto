@@ -26,7 +26,7 @@ namespace Test {
 
 static void ExpectCorrectCgroups(const string &pid, const string &name) {
     auto cgmap = GetCgroups(pid);
-    Expect(cgmap.size() == 4);
+    Expect(cgmap.size() == 5);
     for (auto kv : cgmap) {
         Expect(kv.second == "/porto/" + name);
     }
@@ -417,6 +417,13 @@ static void TestLongRunning(TPortoAPI &api) {
     }
 
     ExpectCorrectCgroups(pid, name);
+
+    string root_cls = GetCgKnob("net_cls", "/", "net_cls.classid");
+    string leaf_cls = GetCgKnob("net_cls", name, "net_cls.classid");
+
+    Expect(root_cls != "0");
+    Expect(leaf_cls != "0");
+    Expect(root_cls != leaf_cls);
 
     ExpectSuccess(api.Stop(name));
     Expect(TaskRunning(api, pid) == false);

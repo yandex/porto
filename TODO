@@ -1,8 +1,9 @@
 # network
 - add tc filter
-- add net_cls cgroups
 - add net_tos property via net_prio cgroup
+- remove tc class when container stops
 - selftests
+- debian: add cls_cgroup to /etc/modules upon install
 
 # phase 2
 - network qos

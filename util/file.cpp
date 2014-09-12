@@ -153,7 +153,7 @@ TError TFile::WriteStringNoAppend(const string &str) const {
 
     ssize_t ret = write(fd, str.c_str(), str.length());
     if (ret != (ssize_t)str.length())
-        error = TError(EError::Unknown, errno, "write(" + str + ")");
+        error = TError(EError::Unknown, errno, "write(" + Path + ", " + str + ")");
 
     close(fd);
 

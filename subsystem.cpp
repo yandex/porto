@@ -12,6 +12,7 @@ shared_ptr<TMemorySubsystem> memorySubsystem(new TMemorySubsystem);
 shared_ptr<TFreezerSubsystem> freezerSubsystem(new TFreezerSubsystem);
 shared_ptr<TCpuSubsystem> cpuSubsystem(new TCpuSubsystem);
 shared_ptr<TCpuacctSubsystem> cpuacctSubsystem(new TCpuacctSubsystem);
+shared_ptr<TNetclsSubsystem> netclsSubsystem(new TNetclsSubsystem);
 
 // TSubsystem
 shared_ptr<TSubsystem> TSubsystem::Get(std::string name) {
@@ -91,3 +92,5 @@ TError TCpuacctSubsystem::Usage(shared_ptr<TCgroup> &cg, uint64_t &value) const 
         return error;
     return StringToUint64(s, value);
 }
+
+// Netcls

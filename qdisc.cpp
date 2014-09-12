@@ -16,6 +16,10 @@ uint32_t TcHandle(uint16_t maj, uint16_t min) {
     return TC_HANDLE(maj, min);
 }
 
+uint16_t TcMajor(uint32_t handle) {
+    return (uint16_t)(handle >> 16);
+}
+
 TError TNetlink::Open(const std::string &device) {
     int ret;
     TError error;
@@ -95,9 +99,9 @@ void TNetlink::LogCache(struct nl_cache *cache) {
 }
 
 TError TNetlink::AddClass(uint32_t parent, uint32_t handle, uint32_t prio, uint32_t rate, uint32_t ceil) {
+    TError error = TError::Success();
     int ret;
     struct rtnl_class *tclass;
-    TError error = TError::Success();
 
     if (!rate)
         return TError(EError::Unknown, string("tc class rate is not specified"));
@@ -167,9 +171,9 @@ TError TNetlink::GetStat(uint32_t handle, int stat, uint64_t &val) {
 }
 
 TError TNetlink::RemoveClass(uint32_t parent, uint32_t handle) {
+    TError error = TError::Success();
     int ret;
     struct rtnl_class *tclass;
-    TError error = TError::Success();
 
     tclass = rtnl_class_alloc();
     if (!tclass)
@@ -208,8 +212,8 @@ TError TNetlink::RemoveHTB(uint32_t parent) {
 }
 
 TError TNetlink::AddHTB(uint32_t parent, uint32_t handle, uint32_t defaultClass) {
-    int ret;
     TError error = TError::Success();
+    int ret;
     struct rtnl_qdisc *qdisc;
 
     qdisc = rtnl_qdisc_alloc();
@@ -252,10 +256,6 @@ const std::string &TTclass::GetDevice() {
         return ParentTclass->GetDevice();
     else
         return ParentQdisc->GetDevice();
-}
-
-uint16_t TTclass::GetMajor() {
-    return (uint16_t)(Handle >> 16);
 }
 
 TError TTclass::GetStat(ETclassStat stat, uint64_t &val) {
@@ -312,10 +312,6 @@ TError TTclass::Remove() {
         return error;
 
     return TError::Success();
-}
-
-uint32_t TQdisc::GetHandle() {
-    return Handle;
 }
 
 TError TQdisc::Create() {
