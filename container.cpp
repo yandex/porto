@@ -109,19 +109,55 @@ struct TData {
         uint64_t val;
         TError error = subsys->Usage(cg, val);
         if (error) {
-            TLogger::LogError(error, "Can't get CPU usage");
+            TLogger::LogError(error, "Can't get memory usage");
             return "-1";
         }
 
         return to_string(val);
     };
 
-    static string NetTx(TContainer& c) {
-        return "0";
+    static string NetBytes(TContainer& c) {
+        uint64_t val;
+        TError error = c.Tclass->GetStat(ETclassStat::Bytes, val);
+        if (error) {
+            TLogger::LogError(error, "Can't get transmitted bytes");
+            return "-1";
+        }
+
+        return to_string(val);
     };
 
-    static string NetRx(TContainer& c) {
-        return "0";
+    static string NetPackets(TContainer& c) {
+        uint64_t val;
+        TError error = c.Tclass->GetStat(ETclassStat::Packets, val);
+        if (error) {
+            TLogger::LogError(error, "Can't get transmitted packets");
+            return "-1";
+        }
+
+        return to_string(val);
+    };
+
+    static string NetDrops(TContainer& c) {
+        uint64_t val;
+        TError error = c.Tclass->GetStat(ETclassStat::Drops, val);
+        if (error) {
+            TLogger::LogError(error, "Can't get dropped packets");
+            return "-1";
+        }
+
+        return to_string(val);
+    };
+
+    static string NetOverlimits(TContainer& c) {
+        uint64_t val;
+        TError error = c.Tclass->GetStat(ETclassStat::Overlimits, val);
+        if (error) {
+            TLogger::LogError(error, "Can't get number of packets over limit");
+            return "-1";
+        }
+
+        return to_string(val);
     };
 };
 
@@ -134,8 +170,10 @@ std::map<std::string, const TDataSpec> dataSpec = {
     { "stdout", { "return task stdout", false, TData::Stdout, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
     { "stderr", { "return task stderr", false, TData::Stderr, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
     { "cpu_usage", { "return consumed CPU time in nanoseconds", true, TData::CpuUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "net_tx", { "number of bytes transmitted", true, TData::NetTx, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "net_rx", { "number of bytes received", true, TData::NetRx, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "net_bytes", { "number of bytes transmitted", true, TData::NetBytes, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "net_packets", { "number of packets received", true, TData::NetPackets, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "net_drops", { "number of dropped packets", true, TData::NetDrops, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "net_overlimits", { "number of packets that exceeded the limit", true, TData::NetOverlimits, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
     { "memory_usage", { "return consumed memory in bytes", true, TData::MemUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
 };
 
@@ -423,11 +461,9 @@ TError TContainer::Create() {
 
     if (IsRoot()) {
         // 1:0 qdisc
-        // 1:1 root class
-        // 1:2 def class, 1:3 container a, 1:4 container b
-        //                1:5 container a/c
-
-        TLogger::Log() << Id << " " << Id + 1 << endl;
+        // 1:2 default class    1:1 root class
+        // (unclassified        1:3 container a, 1:4 container b
+        //          traffic)    1:5 container a/c
 
         uint32_t defHandle = TcHandle(Id, Id + 1);
 
@@ -445,7 +481,7 @@ TError TContainer::Create() {
             return error;
         }
 
-        DefaultTclass = make_shared<TTclass>(Tclass, defHandle);
+        DefaultTclass = make_shared<TTclass>(Qdisc, defHandle);
         error = DefaultTclass->Create(DEF_CLASS_PRIO, DEF_CLASS_RATE, DEF_CLASS_CEIL);
         if (error) {
             TLogger::LogError(error, "Can't create default tclass");
@@ -587,6 +623,8 @@ void TContainer::FreeResources() {
     }
 
     LeafCgroups.clear();
+
+    // TODO: Tclass.Remove();
 }
 
 TError TContainer::Stop() {

@@ -319,8 +319,10 @@ int main(int argc, char * const argv[])
 
         TContainerHolder cholder;
         error = cholder.CreateRoot();
-        if (error)
+        if (error) {
             TLogger::LogError(error, "Couldn't create root container!");
+            return EXIT_FAILURE;
+        }
 
         {
             TCgroupSnapshot cs;

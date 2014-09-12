@@ -92,8 +92,10 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     ExpectFailure(api.GetData(name, "stderr", v), EError::InvalidState);
     ExpectFailure(api.GetData(name, "cpu_usage", v), EError::InvalidState);
     ExpectFailure(api.GetData(name, "memory_usage", v), EError::InvalidState);
-    ExpectFailure(api.GetData(name, "net_tx", v), EError::InvalidState);
-    ExpectFailure(api.GetData(name, "net_rx", v), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "net_bytes", v), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "net_packets", v), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "net_drops", v), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "net_overlimits", v), EError::InvalidState);
     ExpectSuccess(api.GetData(name, "parent", v));
     Expect(v == string("/"));
 }
@@ -269,7 +271,7 @@ static void TestHolder(TPortoAPI &api) {
     ExpectSuccess(api.GetData("a/b/c", "state", state));
     Expect(state == "stopped");
     Expect(CgExists("memory", "a") == true);
-    Expect(CgExists("memory", "a/b") == false);
+    Expect(CgExists("memory", "a/b") == true);
     Expect(CgExists("memory", "a/b/c") == false);
 
     ExpectSuccess(api.Destroy("a/b/c"));
@@ -734,9 +736,13 @@ static void TestRoot(TPortoAPI &api) {
     Expect(v == "0");
     ExpectSuccess(api.GetData(root, "memory_usage", v));
     Expect(v == "0");
-    ExpectSuccess(api.GetData(root, "net_tx", v));
+    ExpectSuccess(api.GetData(root, "net_bytes", v));
     Expect(v == "0");
-    ExpectSuccess(api.GetData(root, "net_rx", v));
+    ExpectSuccess(api.GetData(root, "net_packets", v));
+    Expect(v == "0");
+    ExpectSuccess(api.GetData(root, "net_drops", v));
+    Expect(v == "0");
+    ExpectSuccess(api.GetData(root, "net_overlimits", v));
     Expect(v == "0");
 
     string name = "a";
