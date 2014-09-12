@@ -794,7 +794,6 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
         TLogger::LogError(error, "Can't respawn " + GetName());
     } else {
         StopChildren();
-        FreeResources();
     }
 
     TimeOfDeath = GetCurrentTimeMs();

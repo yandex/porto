@@ -749,16 +749,16 @@ static void TestRoot(TPortoAPI &api) {
     WaitExit(api, pid);
 
     ExpectSuccess(api.GetData(root, "cpu_usage", v));
-    Expect(v != "0");
+    Expect(v != "0" && v != "-1");
     ExpectSuccess(api.GetData(root, "memory_usage", v));
-    Expect(v != "0");
+    Expect(v != "0" && v != "-1");
 
     ExpectSuccess(api.GetData(name, "cpu_usage", v));
-    Expect(v != "0");
+    Expect(v != "0" && v != "-1");
     ExpectSuccess(api.GetData(name, "memory_usage", v));
-    Expect(v != "0");
+    Expect(v != "0" && v != "-1");
 
-    // TODO: net_tx, net_rx
+    // TODO: net_xxx
 
     ExpectSuccess(api.Destroy(name));
 }
