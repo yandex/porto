@@ -217,6 +217,11 @@ TContainer::~TContainer() {
             }
             iter++;
         }
+
+    if (Filter) {
+        TError error = Filter->Remove();
+        TLogger::LogError(error, "Can't remove tc filter");
+    }
 }
 
 const string TContainer::GetName() const {
@@ -480,11 +485,19 @@ TError TContainer::Create() {
         //          traffic)    1:5 container a/c
 
         uint32_t defHandle = TcHandle(Id, Id + 1);
+        uint32_t rootHandle = TcHandle(Id, 0);
 
-        Qdisc = make_shared<TQdisc>(DEF_CLASS_DEVICE, TcHandle(Id, 0), defHandle);
+        Qdisc = make_shared<TQdisc>(DEF_CLASS_DEVICE, rootHandle, defHandle);
         error = Qdisc->Create();
         if (error) {
             TLogger::LogError(error, "Can't create root qdisc");
+            return error;
+        }
+
+        Filter = make_shared<TFilter>(Qdisc);
+        error = Filter->Create();
+        if (error) {
+            TLogger::LogError(error, "Can't create tc filter");
             return error;
         }
 

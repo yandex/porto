@@ -32,11 +32,7 @@ TError TTclass::Create(uint32_t prio, uint32_t rate, uint32_t ceil) {
     if (error)
         return error;
 
-    error = nl.AddClass(GetParent(), Handle, prio, rate, ceil);
-    if (error)
-        return error;
-
-    return TError::Success();
+    return nl.AddClass(GetParent(), Handle, prio, rate, ceil);
 }
 
 TError TTclass::Remove() {
@@ -46,11 +42,7 @@ TError TTclass::Remove() {
     if (error)
         return error;
 
-    error = nl.RemoveClass(GetParent(), Handle);
-    if (error)
-        return error;
-
-    return TError::Success();
+    return nl.RemoveClass(GetParent(), Handle);
 }
 
 TError TQdisc::Create() {
@@ -60,11 +52,7 @@ TError TQdisc::Create() {
     if (error)
         return error;
 
-    error = nl.AddHTB(TcRootHandle(), Handle, DefClass);
-    if (error)
-        return error;
-
-    return TError::Success();
+    return nl.AddHTB(TcRootHandle(), Handle, DefClass);
 }
 
 TError TQdisc::Remove() {
@@ -74,13 +62,25 @@ TError TQdisc::Remove() {
     if (error)
         return error;
 
-    error = nl.RemoveHTB(TcRootHandle());
+    return nl.RemoveHTB(TcRootHandle());
+}
+
+TError TFilter::Create() {
+    TNetlink nl;
+
+    TError error = nl.Open(Parent->GetDevice());
     if (error)
         return error;
 
-    return TError::Success();
+    return nl.AddCgroupFilter(Parent->GetHandle(), 1);
 }
 
-const std::string &TQdisc::GetDevice() {
-    return Device;
+TError TFilter::Remove() {
+    TNetlink nl;
+
+    TError error = nl.Open(Parent->GetDevice());
+    if (error)
+        return error;
+
+    return nl.RemoveCgroupFilter(Parent->GetHandle(), 1);
 }

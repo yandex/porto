@@ -19,7 +19,8 @@ public:
     TError Create();
     TError Remove();
     uint32_t GetHandle() { return Handle; }
-    const std::string &GetDevice();
+    const std::string &GetDevice() { return Device; }
+
 };
 
 class TTclass {
@@ -38,6 +39,15 @@ public:
     uint32_t GetParent();
     uint32_t GetHandle() { return Handle; }
     TError GetStat(ETclassStat stat, uint64_t &val);
+};
+
+class TFilter {
+    const std::shared_ptr<TQdisc> Parent;
+
+public:
+    TFilter(const std::shared_ptr<TQdisc> parent) : Parent(parent) { }
+    TError Create();
+    TError Remove();
 };
 
 #endif

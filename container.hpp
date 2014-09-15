@@ -42,6 +42,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     const std::shared_ptr<TContainer> Parent;
     std::shared_ptr<TQdisc> Qdisc;
     std::shared_ptr<TTclass> Tclass, DefaultTclass;
+    std::shared_ptr<TFilter> Filter;
     std::vector<std::weak_ptr<TContainer>> Children;
     EContainerState State;
     TContainerSpec Spec;

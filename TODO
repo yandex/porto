@@ -1,5 +1,4 @@
 # network
-- add tc filter
 - add net_tos property via net_prio cgroup
 - selftests
 - debian: add cls_cgroup to /etc/modules upon install

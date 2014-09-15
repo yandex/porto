@@ -6,9 +6,15 @@
 // http://luxik.cdi.cz/~devik/qos/htb/manual/userg.htm
 
 extern "C" {
+#include <linux/if_ether.h>
 #include <netlink/route/classifier.h>
+#include <netlink/route/cls/cgroup.h>
 #include <netlink/route/qdisc.h>
 #include <netlink/route/qdisc/htb.h>
+
+#include <netlink/route/rtnl.h>
+#include <netlink/route/link.h>
+
 }
 
 using namespace std;
@@ -88,7 +94,7 @@ void TNetlink::LogObj(const std::string &prefix, void *obj) {
     auto &str = TLogger::Log();
     handler = [&](struct nl_dump_params *params, char *buf) { str << buf; };
 
-    str << "netlink: ";
+    str << "netlink: " << prefix << " ";
     nl_object_dump(OBJ_CAST(obj), &dp);
     str << endl;
 }
@@ -98,6 +104,7 @@ void TNetlink::LogCache(struct nl_cache *cache) {
 
     struct nl_dump_params dp = {};
     dp.dp_cb = [](struct nl_dump_params *params, char *buf) { handler(params, buf); };
+    dp.dp_type = NL_DUMP_DETAILS;
 
     auto &str = TLogger::Log();
     handler = [&](struct nl_dump_params *params, char *buf) { str << buf; };
@@ -296,4 +303,88 @@ free_qdisc:
     rtnl_qdisc_put(qdisc);
 
     return error;
+}
+
+TError TNetlink::AddCgroupFilter(uint32_t parent, uint32_t handle) {
+    TError error = TError::Success();
+    const int prio = 10;
+    const int proto = ETH_P_IP;
+    const char *ftype = "cgroup";
+    struct nl_msg *msg;
+    int ret;
+	struct tcmsg tchdr;
+
+    tchdr.tcm_family = AF_UNSPEC;
+    tchdr.tcm_ifindex = rtnl_link_get_ifindex(link);
+    tchdr.tcm_handle = handle;
+    tchdr.tcm_parent = parent;
+	tchdr.tcm_info = TC_H_MAKE(prio << 16, htons(proto));
+
+    (void)RemoveCgroupFilter(parent, handle);
+
+	msg = nlmsg_alloc_simple(RTM_NEWTFILTER, NLM_F_CREATE);
+	if (!msg)
+        return TError(EError::Unknown, "Unable to add filter: no memory");
+
+    ret = nlmsg_append(msg, &tchdr, sizeof(tchdr), NLMSG_ALIGNTO);
+    if (ret < 0) {
+        error = TError(EError::Unknown, string("Unable to add filter: ") + nl_geterror(ret));
+		goto free_msg;
+    }
+
+    ret = nla_put(msg, TCA_KIND, strlen(ftype) + 1, ftype);
+    if (ret < 0) {
+        error = TError(EError::Unknown, string("Unable to add filter: ") + nl_geterror(ret));
+		goto free_msg;
+    }
+
+    ret = nla_put(msg, TCA_OPTIONS, 0, NULL);
+    if (ret < 0) {
+        error = TError(EError::Unknown, string("Unable to add filter: ") + nl_geterror(ret));
+		goto free_msg;
+    }
+
+    ret = nl_send_sync(sock, msg);
+    if (ret) {
+        error = TError(EError::Unknown, string("Unable to add filter: ") + nl_geterror(ret));
+        goto free_msg;
+    }
+
+free_msg:
+	nlmsg_free(msg);
+
+    return error;
+}
+
+TError TNetlink::RemoveCgroupFilter(uint32_t parent, uint32_t handle) {
+    TError error = TError::Success();
+    struct rtnl_cls *cls;
+    int ret;
+
+    cls = rtnl_cls_alloc();
+    if (!cls)
+        return TError(EError::Unknown, string("Unable to allocate filter object"));
+
+    rtnl_tc_set_link(TC_CAST(cls), link);
+    rtnl_tc_set_handle(TC_CAST(cls), handle);
+
+    ret = rtnl_tc_set_kind(TC_CAST(cls), "cgroup");
+    if (ret < 0) {
+        error = TError(EError::Unknown, string("Unable to set filter type: ") + nl_geterror(ret));
+        goto free_cls;
+    }
+
+    rtnl_cls_set_prio(cls, 10);
+    rtnl_cls_set_protocol(cls, ETH_P_IP);
+    rtnl_tc_set_parent(TC_CAST(cls), parent);
+
+    LogObj("remove", cls);
+
+    (void)rtnl_cls_delete(sock, cls, 0);
+
+free_cls:
+    rtnl_cls_put(cls);
+
+    return error;
+
 }

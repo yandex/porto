@@ -32,6 +32,8 @@ public:
     TError RemoveClass(uint32_t parent, uint32_t handle);
     TError AddHTB(uint32_t parent, uint32_t handle, uint32_t defaultClass);
     TError RemoveHTB(uint32_t parent);
+    TError AddCgroupFilter(uint32_t parent, uint32_t handle);
+    TError RemoveCgroupFilter(uint32_t parent, uint32_t handle);
     ~TNetlink() { Close(); }
 };
 
