@@ -414,8 +414,6 @@ TError TContainer::PrepareCgroups() {
     }
 
     auto netcls = GetLeafCgroup(netclsSubsystem);
-
-    TLogger::Log() << Tclass << " " << DefaultTclass << " " << Qdisc << endl;
     uint32_t handle = Tclass->GetHandle();
     TError error = netcls->SetKnobValue("net_cls.classid", to_string(handle), false);
     TLogger::LogError(error, "Can't set classid");
