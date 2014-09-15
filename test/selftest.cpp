@@ -472,7 +472,16 @@ static void TestIsolation(TPortoAPI &api) {
 
     ExpectSuccess(api.GetData(name, "stdout", ret));
     Expect(ret == string("1\n"));
+
+    Say() << "Make sure container has correct network class" << endl;
+
+    TNetlink nl;
+    Expect(nl.Open(DEF_CLASS_DEVICE) == TError::Success());
+    string handle = GetCgKnob("net_cls", name, "net_cls.classid");
+    Expect(handle != "0");
+    Expect(nl.ClassExists(stoul(handle)) == true);
     ExpectSuccess(api.Stop(name));
+    Expect(nl.ClassExists(stoul(handle)) == false);
 
     ExpectSuccess(api.Destroy(name));
 }
@@ -755,6 +764,23 @@ static void TestRoot(TPortoAPI &api) {
     Expect(v == "0");
     ExpectSuccess(api.GetData(root, "net_overlimits", v));
     Expect(v == "0");
+
+    uint32_t defClass = TcHandle(1, 2);
+    uint32_t rootClass = TcHandle(1, 1);
+    uint32_t nextClass = TcHandle(1, 3);
+
+    uint32_t rootQdisc = TcHandle(1, 0);
+    uint32_t nextQdisc = TcHandle(2, 0);
+
+    TNetlink nl;
+    Expect(nl.Open(DEF_CLASS_DEVICE) == TError::Success());
+    Expect(nl.QdiscExists(rootQdisc) == true);
+    Expect(nl.QdiscExists(nextQdisc) == false);
+    Expect(nl.ClassExists(defClass) == true);
+    Expect(nl.ClassExists(rootClass) == true);
+    Expect(nl.ClassExists(nextClass) == false);
+    Expect(nl.CgroupFilterExists(rootQdisc, 1) == true);
+    Expect(nl.CgroupFilterExists(rootQdisc, 2) == false);
 }
 
 static void TestStats(TPortoAPI &api) {

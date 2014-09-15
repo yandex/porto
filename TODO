@@ -1,11 +1,9 @@
 # network
 - add net_tos property via net_prio cgroup
-- selftests
 - debian: add cls_cgroup to /etc/modules upon install
 - ? portorecord/portoplay tool to record rcp and then replay
 
 # phase 2
-- network qos
 - rt: create cgroup for non-smart tasks and throttle them
 - ? use SO_PEERCRED to isolate parent containers from child in portod
 

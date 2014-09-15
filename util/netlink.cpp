@@ -14,6 +14,7 @@ extern "C" {
 
 #include <netlink/route/rtnl.h>
 #include <netlink/route/link.h>
+#include <netlink/route/link.h>
 
 }
 
@@ -305,6 +306,26 @@ free_qdisc:
     return error;
 }
 
+bool TNetlink::QdiscExists(uint32_t handle) {
+    int ret;
+    struct nl_cache *qdiscCache;
+    bool exists;
+
+    ret = rtnl_qdisc_alloc_cache(sock, &qdiscCache);
+    if (ret < 0)
+        return TError(EError::Unknown, string("Unable to allocate qdisc cache: ") + nl_geterror(ret));
+
+    if (DEBUG_NETLINK)
+        LogCache(qdiscCache);
+
+    struct rtnl_qdisc *qdisc = rtnl_qdisc_get(qdiscCache, rtnl_link_get_ifindex(link), handle);
+    exists = qdisc != nullptr;
+    rtnl_qdisc_put(qdisc);
+    nl_cache_free(qdiscCache);
+
+    return exists;
+}
+
 TError TNetlink::AddCgroupFilter(uint32_t parent, uint32_t handle) {
     TError error = TError::Success();
     struct nl_msg *msg;
@@ -355,6 +376,34 @@ free_msg:
 	nlmsg_free(msg);
 
     return error;
+}
+
+bool TNetlink::CgroupFilterExists(uint32_t parent, uint32_t handle) {
+    int ret;
+    struct nl_cache *clsCache;
+
+    ret = rtnl_cls_alloc_cache(sock, rtnl_link_get_ifindex(link), parent, &clsCache);
+    if (ret < 0)
+        return TError(EError::Unknown, string("Unable to allocate filter cache: ") + nl_geterror(ret));
+
+    if (DEBUG_NETLINK)
+        LogCache(clsCache);
+
+    struct CgFilterIter {
+        uint32_t parent;
+        uint32_t handle;
+        bool exists;
+    } data = { parent, handle, false };
+    nl_cache_foreach(clsCache, [](struct nl_object *obj, void *data) {
+                     CgFilterIter *p = (CgFilterIter *)data;
+                     if (rtnl_tc_get_handle(TC_CAST(obj)) == p->handle &&
+                         rtnl_tc_get_parent(TC_CAST(obj)) == p->parent)
+                         p->exists = true;
+                     }, &data);
+
+
+    nl_cache_free(clsCache);
+    return data.exists;
 }
 
 TError TNetlink::RemoveCgroupFilter(uint32_t parent, uint32_t handle) {
