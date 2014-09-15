@@ -171,10 +171,10 @@ std::map<std::string, const TDataSpec> dataSpec = {
     { "stdout", { "return task stdout", false, TData::Stdout, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
     { "stderr", { "return task stderr", false, TData::Stderr, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
     { "cpu_usage", { "return consumed CPU time in nanoseconds", true, TData::CpuUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "net_bytes", { "number of bytes transmitted", true, TData::NetBytes, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "net_packets", { "number of packets received", true, TData::NetPackets, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "net_drops", { "number of dropped packets", true, TData::NetDrops, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "net_overlimits", { "number of packets that exceeded the limit", true, TData::NetOverlimits, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "net_bytes", { "number of tx bytes", true, TData::NetBytes, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "net_packets", { "number of tx packets", true, TData::NetPackets, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "net_drops", { "number of dropped tx packets", true, TData::NetDrops, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "net_overlimits", { "number of tx packets that exceeded the limit", true, TData::NetOverlimits, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
     { "memory_usage", { "return consumed memory in bytes", true, TData::MemUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
 };
 

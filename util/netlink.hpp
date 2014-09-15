@@ -17,6 +17,9 @@ enum class ETclassStat {
 };
 
 class TNetlink {
+    const int FilterPrio = 10;
+    const char *FilterType = "cgroup";
+
     struct nl_sock *sock;
     struct rtnl_link *link;
     struct nl_cache *linkCache;

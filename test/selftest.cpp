@@ -755,29 +755,72 @@ static void TestRoot(TPortoAPI &api) {
     Expect(v == "0");
     ExpectSuccess(api.GetData(root, "net_overlimits", v));
     Expect(v == "0");
+}
 
-    string name = "a";
-    ExpectSuccess(api.Create(name));
-    ExpectSuccess(api.SetProperty(name, "command", "true"));
-    ExpectSuccess(api.Start(name));
+static void TestStats(TPortoAPI &api) {
+    // should be executed right after TestRoot because assumes empty statistics
 
     string pid;
-    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    string root = "/";
+    string wget = "a";
+    string noop = "b";
+
+    ExpectSuccess(api.Create(noop));
+    ExpectSuccess(api.SetProperty(noop, "command", "true"));
+    ExpectSuccess(api.Start(noop));
+    ExpectSuccess(api.GetData(noop, "root_pid", pid));
     WaitExit(api, pid);
+
+    ExpectSuccess(api.Create(wget));
+    ExpectSuccess(api.SetProperty(wget, "command", "wget yandex.ru"));
+    ExpectSuccess(api.Start(wget));
+    ExpectSuccess(api.GetData(wget, "root_pid", pid));
+    WaitExit(api, pid);
+
+    string v, rv;
 
     ExpectSuccess(api.GetData(root, "cpu_usage", v));
     Expect(v != "0" && v != "-1");
     ExpectSuccess(api.GetData(root, "memory_usage", v));
     Expect(v != "0" && v != "-1");
 
-    ExpectSuccess(api.GetData(name, "cpu_usage", v));
+    ExpectSuccess(api.GetData(wget, "cpu_usage", v));
     Expect(v != "0" && v != "-1");
-    ExpectSuccess(api.GetData(name, "memory_usage", v));
+    ExpectSuccess(api.GetData(wget, "memory_usage", v));
     Expect(v != "0" && v != "-1");
 
-    // TODO: net_xxx
+    ExpectSuccess(api.GetData(noop, "cpu_usage", v));
+    Expect(v != "0" && v != "-1");
+    ExpectSuccess(api.GetData(noop, "memory_usage", v));
+    Expect(v != "0" && v != "-1");
 
-    ExpectSuccess(api.Destroy(name));
+    ExpectSuccess(api.GetData(root, "net_bytes", rv));
+    Expect(rv != "0" && rv != "-1");
+    ExpectSuccess(api.GetData(wget, "net_bytes", v));
+    Expect(v == rv);
+    ExpectSuccess(api.GetData(noop, "net_bytes", v));
+    Expect(v == "0");
+    ExpectSuccess(api.GetData(root, "net_packets", rv));
+    Expect(rv != "0" && rv != "-1");
+    ExpectSuccess(api.GetData(wget, "net_packets", v));
+    Expect(v == rv);
+    ExpectSuccess(api.GetData(noop, "net_packets", v));
+    Expect(v == "0");
+    ExpectSuccess(api.GetData(root, "net_drops", rv));
+    Expect(rv == "0");
+    ExpectSuccess(api.GetData(wget, "net_drops", v));
+    Expect(v == rv);
+    ExpectSuccess(api.GetData(noop, "net_drops", v));
+    Expect(v == "0");
+    ExpectSuccess(api.GetData(root, "net_overlimits", rv));
+    Expect(rv == "0");
+    ExpectSuccess(api.GetData(wget, "net_overlimits", v));
+    Expect(v == rv);
+    ExpectSuccess(api.GetData(noop, "net_overlimits", v));
+    Expect(v == "0");
+
+    ExpectSuccess(api.Destroy(wget));
+    ExpectSuccess(api.Destroy(noop));
 }
 
 static bool CanTestLimits() {
@@ -1215,6 +1258,7 @@ static void TestRecovery(TPortoAPI &api) {
 int SelfTest(string name) {
     pair<string, function<void(TPortoAPI &)>> tests[] = {
         { "root", TestRoot },
+        { "stats", TestStats },
         { "holder", TestHolder },
         { "empty", TestEmpty },
         { "state_machine", TestStateMachine },

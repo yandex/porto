@@ -307,9 +307,6 @@ free_qdisc:
 
 TError TNetlink::AddCgroupFilter(uint32_t parent, uint32_t handle) {
     TError error = TError::Success();
-    const int prio = 10;
-    const int proto = ETH_P_IP;
-    const char *ftype = "cgroup";
     struct nl_msg *msg;
     int ret;
 	struct tcmsg tchdr;
@@ -318,7 +315,7 @@ TError TNetlink::AddCgroupFilter(uint32_t parent, uint32_t handle) {
     tchdr.tcm_ifindex = rtnl_link_get_ifindex(link);
     tchdr.tcm_handle = handle;
     tchdr.tcm_parent = parent;
-	tchdr.tcm_info = TC_H_MAKE(prio << 16, htons(proto));
+	tchdr.tcm_info = TC_H_MAKE(FilterPrio << 16, htons(ETH_P_IP));
 
     (void)RemoveCgroupFilter(parent, handle);
 
@@ -332,7 +329,7 @@ TError TNetlink::AddCgroupFilter(uint32_t parent, uint32_t handle) {
 		goto free_msg;
     }
 
-    ret = nla_put(msg, TCA_KIND, strlen(ftype) + 1, ftype);
+    ret = nla_put(msg, TCA_KIND, strlen(FilterType) + 1, FilterType);
     if (ret < 0) {
         error = TError(EError::Unknown, string("Unable to add filter: ") + nl_geterror(ret));
 		goto free_msg;
@@ -344,11 +341,15 @@ TError TNetlink::AddCgroupFilter(uint32_t parent, uint32_t handle) {
 		goto free_msg;
     }
 
+    TLogger::Log() << "netlink: create tfilter" << endl;
+
     ret = nl_send_sync(sock, msg);
     if (ret) {
         error = TError(EError::Unknown, string("Unable to add filter: ") + nl_geterror(ret));
         goto free_msg;
     }
+
+    return error;
 
 free_msg:
 	nlmsg_free(msg);
@@ -368,13 +369,13 @@ TError TNetlink::RemoveCgroupFilter(uint32_t parent, uint32_t handle) {
     rtnl_tc_set_link(TC_CAST(cls), link);
     rtnl_tc_set_handle(TC_CAST(cls), handle);
 
-    ret = rtnl_tc_set_kind(TC_CAST(cls), "cgroup");
+    ret = rtnl_tc_set_kind(TC_CAST(cls), FilterType);
     if (ret < 0) {
         error = TError(EError::Unknown, string("Unable to set filter type: ") + nl_geterror(ret));
         goto free_cls;
     }
 
-    rtnl_cls_set_prio(cls, 10);
+    rtnl_cls_set_prio(cls, FilterPrio);
     rtnl_cls_set_protocol(cls, ETH_P_IP);
     rtnl_tc_set_parent(TC_CAST(cls), parent);
 
