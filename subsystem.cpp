@@ -24,6 +24,8 @@ shared_ptr<TSubsystem> TSubsystem::Get(std::string name) {
         return cpuSubsystem;
     else if (name == "cpuacct")
         return cpuacctSubsystem;
+    else if (name == "net_cls")
+        return netclsSubsystem;
 
     return nullptr;
 }
