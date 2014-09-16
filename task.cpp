@@ -28,6 +28,22 @@ extern "C" {
 using namespace std;
 
 // TTaskEnv
+void TTaskEnv::ParseEnv() {
+    stringstream ss;
+    for (auto i = Environ.begin(); i != Environ.end(); i++) {
+        if (*i == '\\' && (i + 1) != Environ.end() && *(i + 1) == ';') {
+            ss << ';';
+            i++;
+        } else if (*i == ';') {
+            if (ss.str().length())
+                EnvVec.push_back(ss.str());
+            ss.str("");
+        } else {
+            ss << *i;
+        }
+    }
+}
+
 TError TTaskEnv::Prepare() {
     if (Command.empty())
         return TError::Success();
@@ -39,12 +55,7 @@ TError TTaskEnv::Prepare() {
         workdir = "/home/" + User;
 
     EnvVec.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:" + workdir);
-
-    if (SplitString(Environ, ';', EnvVec)) {
-        TError error(EError::InvalidValue, errno, "split(" + Environ + ")");
-        return error;
-    }
-
+    ParseEnv();
     EnvVec.push_back("HOME=" + workdir);
     EnvVec.push_back("USER=" + User);
 

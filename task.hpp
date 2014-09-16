@@ -28,6 +28,7 @@ class TTaskEnv {
     std::string Environ;
     int Uid, Gid;
 
+    void ParseEnv();
 public:
     TTaskEnv() {};
     TTaskEnv(const std::string &command, const std::string &cwd, const std::string &root, const std::string &user, const std::string &group, const std::string &environ) : Command(command), Cwd(cwd), Root(root), User(user), Group(group), Environ(environ) { }

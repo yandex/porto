@@ -521,6 +521,29 @@ static void TestEnvironment(TPortoAPI &api) {
     Expect(memcmp(ab_env, env.data(), sizeof(ab_env)) == 0);
     ExpectSuccess(api.Stop(name));
 
+
+    ExpectSuccess(api.SetProperty(name, "env", "a=b;;c=d;"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+
+    env = GetEnv(pid);
+    Expect(memcmp(ab_env, env.data(), sizeof(ab_env)) == 0);
+    ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.SetProperty(name, "env", "a=e\\;b;c=d;"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+
+    env = GetEnv(pid);
+    static const char asb_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/nobody\0"
+        "a=e;b\0"
+        "c=d\0"
+        "HOME=/home/nobody\0"
+        "USER=nobody\0";
+
+    Expect(memcmp(asb_env, env.data(), sizeof(asb_env)) == 0);
+    ExpectSuccess(api.Stop(name));
+
     ExpectSuccess(api.Destroy(name));
 }
 
