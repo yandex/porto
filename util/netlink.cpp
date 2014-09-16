@@ -56,10 +56,10 @@ TError TNetlink::FindDev(std::string &device) {
     return TError::Success();
 }
 
-TError TNetlink::Open(const std::string &device) {
+TError TNetlink::Open() {
     int ret;
     TError error;
-    string dev;
+    string device;
 
     sock = nl_socket_alloc();
     if (!sock)
@@ -80,17 +80,15 @@ TError TNetlink::Open(const std::string &device) {
     if (DEBUG_NETLINK)
         LogCache(linkCache);
 
-    dev = device;
     nl_cache_mngt_provide(linkCache);
-    if (!dev.length()) {
-        error = FindDev(dev);
-        if (error)
-            goto close_socket;
-    }
 
-    link = rtnl_link_get_by_name(linkCache, dev.c_str());
+    error = FindDev(device);
+    if (error)
+        goto close_socket;
+
+    link = rtnl_link_get_by_name(linkCache, device.c_str());
     if (!link) {
-        error = TError(EError::Unknown, string("Invalid device ") + dev);
+        error = TError(EError::Unknown, string("Invalid device ") + device);
         goto free_cache;
     }
 

@@ -8,19 +8,16 @@
 #include "util/netlink.hpp"
 
 class TQdisc {
-    const std::string Device;
     const uint32_t Handle;
     const uint32_t DefClass;
 
 public:
-    TQdisc(const std::string &device, uint32_t handle, uint32_t defClass) : Device(device), Handle(handle), DefClass(defClass) { }
+    TQdisc(uint32_t handle, uint32_t defClass) : Handle(handle), DefClass(defClass) { }
     ~TQdisc() { Remove(); }
 
     TError Create();
     TError Remove();
     uint32_t GetHandle() { return Handle; }
-    const std::string &GetDevice() { return Device; }
-
 };
 
 class TTclass {
@@ -35,7 +32,6 @@ public:
 
     TError Create(uint32_t prio, uint32_t rate, uint32_t ceil);
     TError Remove();
-    const std::string &GetDevice();
     uint32_t GetParent();
     uint32_t GetHandle() { return Handle; }
     TError GetStat(ETclassStat stat, uint64_t &val);

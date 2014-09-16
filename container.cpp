@@ -485,7 +485,7 @@ TError TContainer::Create() {
         uint32_t defHandle = TcHandle(Id, Id + 1);
         uint32_t rootHandle = TcHandle(Id, 0);
 
-        Qdisc = make_shared<TQdisc>(DEF_CLASS_DEVICE, rootHandle, defHandle);
+        Qdisc = make_shared<TQdisc>(rootHandle, defHandle);
         error = Qdisc->Create();
         if (error) {
             TLogger::LogError(error, "Can't create root qdisc");

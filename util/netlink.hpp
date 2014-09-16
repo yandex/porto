@@ -27,7 +27,7 @@ class TNetlink {
     TError FindDev(std::string &device);
 
 public:
-    TError Open(const std::string &device);
+    TError Open();
     void Close();
     void LogObj(const std::string &prefix, void *obj);
     void LogCache(struct nl_cache *cache);

@@ -1,17 +1,10 @@
 #include "qdisc.hpp"
 #include "util/log.hpp"
 
-const std::string &TTclass::GetDevice() {
-    if (ParentTclass)
-        return ParentTclass->GetDevice();
-    else
-        return ParentQdisc->GetDevice();
-}
-
 TError TTclass::GetStat(ETclassStat stat, uint64_t &val) {
     TNetlink nl;
 
-    TError error = nl.Open(GetDevice());
+    TError error = nl.Open();
     if (error)
         return error;
 
@@ -28,7 +21,7 @@ uint32_t TTclass::GetParent() {
 TError TTclass::Create(uint32_t prio, uint32_t rate, uint32_t ceil) {
     TNetlink nl;
 
-    TError error = nl.Open(GetDevice());
+    TError error = nl.Open();
     if (error)
         return error;
 
@@ -38,7 +31,7 @@ TError TTclass::Create(uint32_t prio, uint32_t rate, uint32_t ceil) {
 TError TTclass::Remove() {
     TNetlink nl;
 
-    TError error = nl.Open(GetDevice());
+    TError error = nl.Open();
     if (error)
         return error;
 
@@ -48,7 +41,7 @@ TError TTclass::Remove() {
 TError TQdisc::Create() {
     TNetlink nl;
 
-    TError error = nl.Open(Device);
+    TError error = nl.Open();
     if (error)
         return error;
 
@@ -58,7 +51,7 @@ TError TQdisc::Create() {
 TError TQdisc::Remove() {
     TNetlink nl;
 
-    TError error = nl.Open(Device);
+    TError error = nl.Open();
     if (error)
         return error;
 
@@ -68,7 +61,7 @@ TError TQdisc::Remove() {
 TError TFilter::Create() {
     TNetlink nl;
 
-    TError error = nl.Open(Parent->GetDevice());
+    TError error = nl.Open();
     if (error)
         return error;
 
@@ -78,7 +71,7 @@ TError TFilter::Create() {
 TError TFilter::Remove() {
     TNetlink nl;
 
-    TError error = nl.Open(Parent->GetDevice());
+    TError error = nl.Open();
     if (error)
         return error;
 

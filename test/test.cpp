@@ -297,7 +297,7 @@ int GetVmRss(const std::string &pid) {
     return std::stoi(size);
 }
 
-bool TcClassExist(const std::string &device, const std::string &handle) {
+bool TcClassExist(const std::string &handle) {
     TNetlink nl;
     uint32_t h;
 
@@ -305,7 +305,7 @@ bool TcClassExist(const std::string &device, const std::string &handle) {
     if (error)
         throw error.GetMsg();
 
-    error = nl.Open(device);
+    error = nl.Open();
     if (error)
         throw error.GetMsg();
 

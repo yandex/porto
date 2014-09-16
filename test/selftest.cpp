@@ -425,12 +425,12 @@ static void TestLongRunning(TPortoAPI &api) {
     Expect(leaf_cls != "0");
     Expect(root_cls != leaf_cls);
 
-    Expect(TcClassExist(DEF_CLASS_DEVICE, root_cls) == true);
-    Expect(TcClassExist(DEF_CLASS_DEVICE, leaf_cls) == true);
+    Expect(TcClassExist(root_cls) == true);
+    Expect(TcClassExist(leaf_cls) == true);
 
     ExpectSuccess(api.Stop(name));
     Expect(TaskRunning(api, pid) == false);
-    Expect(TcClassExist(DEF_CLASS_DEVICE, leaf_cls) == false);
+    Expect(TcClassExist(leaf_cls) == false);
 
     Say() << "Check that hierarchical task cgroups are correct" << endl;
 
@@ -476,7 +476,7 @@ static void TestIsolation(TPortoAPI &api) {
     Say() << "Make sure container has correct network class" << endl;
 
     TNetlink nl;
-    Expect(nl.Open(DEF_CLASS_DEVICE) == TError::Success());
+    Expect(nl.Open() == TError::Success());
     string handle = GetCgKnob("net_cls", name, "net_cls.classid");
     Expect(handle != "0");
     Expect(nl.ClassExists(stoul(handle)) == true);
@@ -773,7 +773,7 @@ static void TestRoot(TPortoAPI &api) {
     uint32_t nextQdisc = TcHandle(2, 0);
 
     TNetlink nl;
-    Expect(nl.Open(DEF_CLASS_DEVICE) == TError::Success());
+    Expect(nl.Open() == TError::Success());
     Expect(nl.QdiscExists(rootQdisc) == true);
     Expect(nl.QdiscExists(nextQdisc) == false);
     Expect(nl.ClassExists(defClass) == true);
@@ -963,7 +963,7 @@ static void TestLimits(TPortoAPI &api) {
 
     uint32_t prio, rate, ceil;
     TNetlink nl;
-    Expect(nl.Open(DEF_CLASS_DEVICE) == TError::Success());
+    Expect(nl.Open() == TError::Success());
     string handle = GetCgKnob("net_cls", name, "net_cls.classid");
     ExpectSuccess(nl.GetClassProperties(stoul(handle), prio, rate, ceil));
 
