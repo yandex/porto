@@ -74,10 +74,11 @@ static int AcceptClient(int sfd, std::vector<int> &clients) {
             if (client.AsString(comm))
                 comm = "unknown process";
 
+            comm.erase(remove(comm.begin(), comm.end(), '\n'), comm.end());
             TLogger::Log() << comm
-                           << "(pid " << cr.pid
-                           << "uid " << cr.uid
-                           << "gid " << cr.gid
+                           << " (pid " << cr.pid
+                           << " uid " << cr.uid
+                           << " gid " << cr.gid
                            << ") connected" << endl;
         } else
             TLogger::Log() << "unknown process connected" << endl;
