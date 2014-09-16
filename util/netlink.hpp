@@ -24,6 +24,8 @@ class TNetlink {
     struct rtnl_link *link;
     struct nl_cache *linkCache;
 
+    TError FindDev(std::string &device);
+
 public:
     TError Open(const std::string &device);
     void Close();

@@ -32,9 +32,34 @@ uint16_t TcMajor(uint32_t handle) {
     return (uint16_t)(handle >> 16);
 }
 
+TError TNetlink::FindDev(std::string &device) {
+    struct FindDevIter { string name; } data;
+    nl_cache_foreach(linkCache, [](struct nl_object *obj, void *data) {
+                     FindDevIter *p = (FindDevIter *)data;
+                     struct rtnl_link *l = (struct rtnl_link *)obj;
+                     const vector<string> prefixes = { "eth", "em" };
+
+                     if (p->name.length())
+                        return;
+
+                     for (auto &pref : prefixes)
+                        if (strncmp(rtnl_link_get_name(l), pref.c_str(), pref.length()) == 0)
+                            p->name = rtnl_link_get_name(l);
+
+                     }, &data);
+
+    if (data.name.length() == 0)
+        return TError(EError::Unknown, "Can't find appropriate link");
+
+    device = data.name;
+
+    return TError::Success();
+}
+
 TError TNetlink::Open(const std::string &device) {
     int ret;
     TError error;
+    string dev;
 
     sock = nl_socket_alloc();
     if (!sock)
@@ -55,11 +80,17 @@ TError TNetlink::Open(const std::string &device) {
     if (DEBUG_NETLINK)
         LogCache(linkCache);
 
+    dev = device;
     nl_cache_mngt_provide(linkCache);
+    if (!dev.length()) {
+        error = FindDev(dev);
+        if (error)
+            goto close_socket;
+    }
 
-    link = rtnl_link_get_by_name(linkCache, device.c_str());
+    link = rtnl_link_get_by_name(linkCache, dev.c_str());
     if (!link) {
-        error = TError(EError::Unknown, string("Invalid device ") + device);
+        error = TError(EError::Unknown, string("Invalid device ") + dev);
         goto free_cache;
     }
 
@@ -95,7 +126,7 @@ void TNetlink::LogObj(const std::string &prefix, void *obj) {
     auto &str = TLogger::Log();
     handler = [&](struct nl_dump_params *params, char *buf) { str << buf; };
 
-    str << "netlink: " << prefix << " ";
+    str << "netlink " << rtnl_link_get_name(link) << ": " << prefix << " ";
     nl_object_dump(OBJ_CAST(obj), &dp);
     str << endl;
 }
@@ -110,7 +141,7 @@ void TNetlink::LogCache(struct nl_cache *cache) {
     auto &str = TLogger::Log();
     handler = [&](struct nl_dump_params *params, char *buf) { str << buf; };
 
-    str << "netlink cache: ";
+    str << "netlink " << rtnl_link_get_name(link) << " cache: ";
     nl_cache_dump(cache, &dp);
     str << endl;
 }
@@ -423,7 +454,6 @@ bool TNetlink::CgroupFilterExists(uint32_t parent, uint32_t handle) {
                          rtnl_tc_get_parent(TC_CAST(obj)) == p->parent)
                          p->exists = true;
                      }, &data);
-
 
     nl_cache_free(clsCache);
     return data.exists;

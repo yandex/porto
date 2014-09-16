@@ -51,7 +51,7 @@ const int REAP_ACK_FD = 129;
 const uint32_t DEF_CLASS_PRIO = 50;
 const uint32_t DEF_CLASS_RATE = UINT32_MAX;
 const uint32_t DEF_CLASS_CEIL = UINT32_MAX;
-const std::string DEF_CLASS_DEVICE = "eth0";
+const std::string DEF_CLASS_DEVICE = "";
 const uint32_t DEF_CLASS_NET_PRIO = 3;
 
 #endif
