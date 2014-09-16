@@ -31,6 +31,7 @@ public:
     void LogCache(struct nl_cache *cache);
     TError AddClass(uint32_t parent, uint32_t handle, uint32_t prio, uint32_t rate, uint32_t ceil);
     TError GetStat(uint32_t handle, ETclassStat stat, uint64_t &val);
+    TError GetClassProperties(uint32_t handle, uint32_t &prio, uint32_t &rate, uint32_t &ceil);
     bool ClassExists(uint32_t handle);
     TError RemoveClass(uint32_t parent, uint32_t handle);
     TError AddHTB(uint32_t parent, uint32_t handle, uint32_t defaultClass);

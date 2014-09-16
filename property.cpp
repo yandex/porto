@@ -90,15 +90,33 @@ static TError ValidCpuPriority(std::shared_ptr<const TContainer> container, cons
 }
 
 static TError ValidNetGuarantee(std::shared_ptr<const TContainer> container, const string str) {
-    return TError(EError::NotSupported, "not implemented");
+    uint32_t newval;
+
+    if (StringToUint32(str, newval))
+        return TError(EError::InvalidValue, "invalid value");
+
+    return TError::Success();
 }
 
 static TError ValidNetCeil(std::shared_ptr<const TContainer> container, const string str) {
-    return TError(EError::NotSupported, "not implemented");
+    uint32_t newval;
+
+    if (StringToUint32(str, newval))
+        return TError(EError::InvalidValue, "invalid value");
+
+    return TError::Success();
 }
 
 static TError ValidNetPriority(std::shared_ptr<const TContainer> container, const string str) {
-    return TError(EError::NotSupported, "not implemented");
+    int val;
+
+    if (StringToInt(str, val))
+        return TError(EError::InvalidValue, "invalid value");
+
+    if (val < 0 || val > 7)
+        return TError(EError::InvalidValue, "invalid value");
+
+    return TError::Success();
 }
 
 static TError ValidBool(std::shared_ptr<const TContainer> container, const string str) {
@@ -120,11 +138,11 @@ std::map<std::string, const TPropertySpec> propertySpec = {
     {"memory_limit", { "memory hard limit", "0", true, ValidMemLimit }},
 
     {"cpu_policy", { "CPU policy: rt, normal, idle", "normal", false, ValidCpuPolicy }},
-    {"cpu_priority", { "CPU priority: 0-99", "50", true, ValidCpuPriority }},
+    {"cpu_priority", { "CPU priority: 0-99", to_string(DEF_CLASS_PRIO), true, ValidCpuPriority }},
 
     {"net_guarantee", { "Guaranteed container network bandwidth", to_string(DEF_CLASS_RATE), false, ValidNetGuarantee }},
     {"net_ceil", { "Maximum container network bandwidth", to_string(DEF_CLASS_CEIL), false, ValidNetCeil }},
-    {"net_priority", { "Container network priority", to_string(DEF_CLASS_PRIO), false, ValidNetPriority }},
+    {"net_priority", { "Container network priority: 0-7", to_string(DEF_CLASS_NET_PRIO), false, ValidNetPriority }},
 
     {"respawn", { "automatically respawn dead container", "false", false, ValidBool }},
 

@@ -206,6 +206,29 @@ TError TNetlink::GetStat(uint32_t handle, ETclassStat stat, uint64_t &val) {
     return TError::Success();
 }
 
+TError TNetlink::GetClassProperties(uint32_t handle, uint32_t &prio, uint32_t &rate, uint32_t &ceil) {
+    int ret;
+    struct nl_cache *classCache;
+
+    ret = rtnl_class_alloc_cache(sock, rtnl_link_get_ifindex(link), &classCache);
+    if (ret < 0)
+        return TError(EError::Unknown, string("Unable to allocate class cache: ") + nl_geterror(ret));
+
+    if (DEBUG_NETLINK)
+        LogCache(classCache);
+
+    struct rtnl_class *tclass = rtnl_class_get(classCache, rtnl_link_get_ifindex(link), handle);
+
+    prio = rtnl_htb_get_prio(tclass);
+    rate = rtnl_htb_get_rate(tclass);
+    ceil = rtnl_htb_get_ceil(tclass);
+
+    rtnl_class_put(tclass);
+    nl_cache_free(classCache);
+
+    return TError::Success();
+}
+
 bool TNetlink::ClassExists(uint32_t handle) {
     int ret;
     struct nl_cache *classCache;
@@ -213,7 +236,7 @@ bool TNetlink::ClassExists(uint32_t handle) {
 
     ret = rtnl_class_alloc_cache(sock, rtnl_link_get_ifindex(link), &classCache);
     if (ret < 0)
-        return TError(EError::Unknown, string("Unable to allocate class cache: ") + nl_geterror(ret));
+        return false;
 
     if (DEBUG_NETLINK)
         LogCache(classCache);
@@ -313,7 +336,7 @@ bool TNetlink::QdiscExists(uint32_t handle) {
 
     ret = rtnl_qdisc_alloc_cache(sock, &qdiscCache);
     if (ret < 0)
-        return TError(EError::Unknown, string("Unable to allocate qdisc cache: ") + nl_geterror(ret));
+        return false;
 
     if (DEBUG_NETLINK)
         LogCache(qdiscCache);
@@ -384,7 +407,7 @@ bool TNetlink::CgroupFilterExists(uint32_t parent, uint32_t handle) {
 
     ret = rtnl_cls_alloc_cache(sock, rtnl_link_get_ifindex(link), parent, &clsCache);
     if (ret < 0)
-        return TError(EError::Unknown, string("Unable to allocate filter cache: ") + nl_geterror(ret));
+        return false;
 
     if (DEBUG_NETLINK)
         LogCache(clsCache);

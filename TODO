@@ -1,4 +1,5 @@
 # network
+- ? which device to use for network shaping: use real link - ethX
 - add net_tos property via net_prio cgroup
 - debian: add cls_cgroup to /etc/modules upon install
 - ? portorecord/portoplay tool to record rcp and then replay

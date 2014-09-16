@@ -59,13 +59,13 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetProperty(name, "cpu_policy", v));
     Expect(v == string("normal"));
     ExpectSuccess(api.GetProperty(name, "cpu_priority", v));
-    Expect(v == string("50"));
+    Expect(v == to_string(DEF_CLASS_PRIO));
     ExpectSuccess(api.GetProperty(name, "net_guarantee", v));
     Expect(v == to_string(DEF_CLASS_RATE));
     ExpectSuccess(api.GetProperty(name, "net_ceil", v));
     Expect(v == to_string(DEF_CLASS_CEIL));
     ExpectSuccess(api.GetProperty(name, "net_priority", v));
-    Expect(v == to_string(DEF_CLASS_PRIO));
+    Expect(v == to_string(DEF_CLASS_NET_PRIO));
     ExpectSuccess(api.GetProperty(name, "respawn", v));
     Expect(v == string("false"));
     ExpectSuccess(api.GetProperty(name, "cpu.smart", v));
@@ -952,7 +952,25 @@ static void TestLimits(TPortoAPI &api) {
     Expect(shares == "101");
     ExpectSuccess(api.Stop(name));
 
-    // TODO: net_guarantee, net_ceil, net_priority
+    uint32_t netGuarantee = 100000, netCeil = 200000, netPrio = 4;
+    ExpectSuccess(api.SetProperty(name, "net_guarantee", to_string(netGuarantee)));
+    ExpectSuccess(api.SetProperty(name, "net_ceil", to_string(netCeil)));
+    ExpectFailure(api.SetProperty(name, "net_priority", "-1"), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "net_priority", "8"), EError::InvalidValue);
+    ExpectSuccess(api.SetProperty(name, "net_priority", "0"));
+    ExpectSuccess(api.SetProperty(name, "net_priority", to_string(netPrio)));
+    ExpectSuccess(api.Start(name));
+
+    uint32_t prio, rate, ceil;
+    TNetlink nl;
+    Expect(nl.Open(DEF_CLASS_DEVICE) == TError::Success());
+    string handle = GetCgKnob("net_cls", name, "net_cls.classid");
+    ExpectSuccess(nl.GetClassProperties(stoul(handle), prio, rate, ceil));
+
+    Expect(prio == netPrio);
+    Expect(rate == netGuarantee);
+    Expect(ceil == netCeil);
+    ExpectSuccess(api.Stop(name));
 
     ExpectSuccess(api.Destroy(name));
 }
