@@ -102,11 +102,14 @@ public:
 
     void Usage()
     {
+        const int nameWidth = 32;
+        const int descWidth = 48;
+
         cout << "usage: " << program_invocation_short_name << " <command> [<args>]" << endl;
         cout << endl;
         cout << "list of commands:" << endl;
         for (ICmd *cmd : commands)
-            cout << " " << left << setw(24) << cmd->GetName() << cmd->GetDescription() << endl;
+            cout << " " << left << setw(nameWidth) << cmd->GetName() << cmd->GetDescription() << endl;
 
         int ret;
         cout << endl << "list of properties:" << endl;
@@ -116,8 +119,8 @@ public:
             PrintError("Can't list properties");
         else
             for (auto p : plist)
-                cout << " " << left << setw(24) << p.Name
-                     << setw(40) << p.Description << endl;
+                cout << " " << left << setw(nameWidth) << p.Name
+                     << setw(descWidth) << p.Description << endl;
 
         cout << endl << "list of data:" << endl;
         vector<TData> dlist;
@@ -126,8 +129,8 @@ public:
             PrintError("Can't list data");
         else
             for (auto d : dlist)
-                cout << " " << left << setw(24) << d.Name
-                     << setw(40) << d.Description << endl;
+                cout << " " << left << setw(nameWidth) << d.Name
+                     << setw(descWidth) << d.Description << endl;
     }
 
     int Execute(int argc, char *argv[])
