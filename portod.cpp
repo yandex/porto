@@ -285,8 +285,10 @@ int main(int argc, char * const argv[])
 {
     int ret = EXIT_SUCCESS;
     int opt;
+    bool failsafe = false;
+    bool stdlog = false;
 
-    while ((opt = getopt(argc, argv, "dv")) != -1) {
+    while ((opt = getopt(argc, argv, "dvfs")) != -1) {
         switch (opt) {
         case 'd':
             KvDump();
@@ -294,23 +296,33 @@ int main(int argc, char * const argv[])
         case 'v':
             cout << GIT_TAG << " " << GIT_REVISION <<endl;
             return EXIT_FAILURE;
+        case 'f':
+            failsafe = true;
+            break;
+        case 's':
+            stdlog = true;
+            break;
         default:
             exit(EXIT_FAILURE);
         }
     }
 
     TLogger::InitLog(LOG_FILE, LOG_FILE_PERM);
+    if (stdlog)
+        TLogger::LogToStd();
 
     umask(0);
 
     if (fcntl(REAP_EVT_FD, F_SETFD, FD_CLOEXEC) < 0) {
         TLogger::Log() << "Can't set close-on-exec flag on REAP_EVT_FD: " << strerror(errno) << endl;
-        return EXIT_FAILURE;
+        if (!failsafe)
+            return EXIT_FAILURE;
     }
 
     if (fcntl(REAP_ACK_FD, F_SETFD, FD_CLOEXEC) < 0) {
         TLogger::Log() << "Can't set close-on-exec flag on REAP_ACK_FD: " << strerror(errno) << endl;
-        return EXIT_FAILURE;
+        if (!failsafe)
+            return EXIT_FAILURE;
     }
 
     // in case client closes pipe we are writing to in the protobuf code
@@ -341,6 +353,11 @@ int main(int argc, char * const argv[])
         TError error = storage.MountTmpfs();
         TLogger::LogError(error, "Couldn't create key-value storage, skipping recovery");
 
+        TCgroupSnapshot cs;
+        error = cs.Create();
+        if (error)
+            TLogger::LogError(error, "Couldn't create cgroup snapshot!");
+
         TContainerHolder cholder;
         error = cholder.CreateRoot();
         if (error) {
@@ -349,11 +366,6 @@ int main(int argc, char * const argv[])
         }
 
         {
-            TCgroupSnapshot cs;
-            TError error = cs.Create();
-            if (error)
-                TLogger::LogError(error, "Couldn't create cgroup snapshot!");
-
             std::map<std::string, kv::TNode> m;
             error = storage.Restore(m);
             if (error)
@@ -365,6 +377,8 @@ int main(int argc, char * const argv[])
                     TLogger::LogError(error, string("Couldn't restore ") + r.first + " state!");
             }
         }
+
+        cs.Destroy();
 
         ret = RpcMain(cholder);
         if (!cleanup && raiseSignum)

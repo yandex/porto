@@ -270,3 +270,7 @@ TError TCgroupSnapshot::Create() {
 
     return TError::Success();
 }
+
+void TCgroupSnapshot::Destroy() {
+    Cgroups.clear();
+}

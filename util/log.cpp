@@ -15,11 +15,16 @@ static std::ofstream logFile;
 static std::ofstream kmsgFile;
 static std::string logPath;
 static unsigned int logMode;
+static bool stdlog = false;
 
 void TLogger::InitLog(const std::string &path, const unsigned int mode) {
     logPath = path;
     logMode = mode;
     logFile.close();
+}
+
+void TLogger::LogToStd() {
+    stdlog = true;
 }
 
 void TLogger::OpenLog() {
@@ -78,6 +83,9 @@ static std::string GetTime() {
 }
 
 std::basic_ostream<char> &TLogger::Log() {
+    if (stdlog)
+        return std::cerr << GetTime() << " " << program_invocation_short_name << ": ";
+
     OpenLog();
 
     if (logFile.is_open())

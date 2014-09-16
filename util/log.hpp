@@ -11,6 +11,7 @@ private:
     static void OpenLog();
 public:
     static void InitLog(const std::string &path, const unsigned int mode);
+    static void LogToStd();
     static void CloseLog();
     static void TruncateLog();
     static std::basic_ostream<char> &Log();

@@ -63,6 +63,7 @@ class TCgroupSnapshot {
     std::vector<std::shared_ptr<TCgroup>> Cgroups;
 public:
     TError Create();
+    void Destroy();
 };
 
 #endif
