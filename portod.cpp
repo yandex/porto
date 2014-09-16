@@ -313,6 +313,11 @@ int main(int argc, char * const argv[])
 
     umask(0);
 
+    if (system("modprobe cls_cgroup")) {
+        TLogger::Log() << "Can't load cls_cgroup kernel module: " << strerror(errno) << endl;
+        return EXIT_FAILURE;
+    }
+
     if (fcntl(REAP_EVT_FD, F_SETFD, FD_CLOEXEC) < 0) {
         TLogger::Log() << "Can't set close-on-exec flag on REAP_EVT_FD: " << strerror(errno) << endl;
         if (!failsafe)
