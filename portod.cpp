@@ -1,4 +1,5 @@
 #include <vector>
+#include <string>
 #include <algorithm>
 #include <csignal>
 
@@ -12,12 +13,13 @@
 extern "C" {
 #include <fcntl.h>
 #include <unistd.h>
-#include <sys/socket.h>
 #include <sys/un.h>
 #include <poll.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <grp.h>
+#define GNU_SOURCE
+#include <sys/socket.h>
 }
 
 using namespace std;
@@ -60,7 +62,29 @@ static int AcceptClient(int sfd, std::vector<int> &clients) {
         return -1;
     }
 
+    {
+	/* Identify client */
+        struct ucred cr;
+        socklen_t len = sizeof(cr);
+
+        if (getsockopt(cfd, SOL_SOCKET, SO_PEERCRED, &cr, &len) == 0) {
+            TFile client("/proc/" + to_string(cr.pid) + "/comm");
+            string comm;
+
+            if (client.AsString(comm))
+                comm = "unknown process";
+
+            TLogger::Log() << comm
+                           << "(pid " << cr.pid
+                           << "uid " << cr.uid
+                           << "gid " << cr.gid
+                           << ") connected" << endl;
+        } else
+            TLogger::Log() << "unknown process connected" << endl;
+    }
+
     clients.push_back(cfd);
+
     return 0;
 }
 
