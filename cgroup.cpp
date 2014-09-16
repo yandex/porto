@@ -129,19 +129,19 @@ TError TCgroup::Create() {
             return error;
         }
 
-
-        TMount root("cgroup", Tmpfs, "tmpfs", {});
+        TMount debianRoot("cgroup", Tmpfs, "tmpfs", {});
+        TMount fedoraRoot("tmpfs", Tmpfs, "tmpfs", {});
         bool mountRoot = true;
 
         for (auto m : mounts) {
-            if (*m == root)
+            if (*m == debianRoot || *m == fedoraRoot)
                 mountRoot = false;
             if (*m == *Mount)
                 return TError::Success();
         }
 
         if (mountRoot) {
-            TError error = root.Mount();
+            TError error = debianRoot.Mount();
             TLogger::LogError(error, "Can't mount root cgroup");
             if (error)
                 return error;

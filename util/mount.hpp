@@ -46,6 +46,10 @@ public:
     TError Remount() const { return Mount(false, false, true); }
     TError Bind() const { return Mount(false, true); }
     TError Umount() const;
+
+    friend std::ostream& operator<<(std::ostream& stream, const TMount& mount) {
+        return stream << mount.Device << " " << mount.Mountpoint << " " << mount.Vfstype;
+    }
 };
 
 class TMountSnapshot {
