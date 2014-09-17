@@ -13,5 +13,7 @@ int RegisterSignal(int signum, void (*handler)(int));
 void ResetAllSignalHandlers(void);
 std::string DirName(const std::string &str);
 size_t GetTotalMemory();
+std::string GetDefaultUser();
+std::string GetDefaultGroup();
 
 #endif

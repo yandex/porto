@@ -10,6 +10,8 @@ extern "C" {
 #include <string.h>
 #include <libgen.h>
 #include <sys/sysinfo.h>
+#include <grp.h>
+#include <pwd.h>
 }
 
 int RetryBusy(int times, int timeoMs, std::function<int()> handler) {
@@ -109,4 +111,24 @@ size_t GetTotalMemory() {
         return 0;
 
     return si.totalram;
+}
+
+std::string GetDefaultUser() {
+    std::string users[] = { "nobody" };
+
+    for (auto &u : users)
+        if (getpwnam(u.c_str()) != NULL)
+            return u;
+
+    return "daemon";
+}
+
+std::string GetDefaultGroup() {
+    std::string groups[] = { "nobody", "nogroup" };
+
+    for (auto &g : groups)
+        if (getgrnam(g.c_str()) != NULL)
+            return g;
+
+    return "daemon";
 }
