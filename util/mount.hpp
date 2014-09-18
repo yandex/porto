@@ -8,6 +8,10 @@
 
 #include "error.hpp"
 
+extern "C" {
+#include <sys/mount.h>
+}
+
 class TMount {
     std::string Device;
     std::string Mountpoint;
@@ -42,10 +46,10 @@ public:
         return Flags;
     }
 
-    TError Mount(bool rdonly = false, bool bind = false, bool remount = false, bool priv = false) const;
-    TError Remount() const { return Mount(false, false, true); }
-    TError Bind() const { return Mount(false, true); }
-    TError MountPrivate() { return Mount(false, false, false, true); }
+    TError Mount(unsigned long flags = 0) const;
+    TError Remount() const { return Mount(MS_REMOUNT); }
+    TError Bind() const { return Mount(MS_BIND); }
+    TError MountPrivate() { return Mount(MS_PRIVATE); }
     TError Umount() const;
 
     friend std::ostream& operator<<(std::ostream& stream, const TMount& mount) {

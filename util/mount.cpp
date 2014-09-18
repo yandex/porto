@@ -14,20 +14,16 @@ extern "C" {
 
 using namespace std;
 
-TError TMount::Mount(bool rdonly, bool bind, bool remount, bool priv) const {
+TError TMount::Mount(unsigned long flags) const {
     TLogger::Log() << "mount " << Mountpoint << endl;
-    int mountflags = (rdonly ? MS_RDONLY : 0) |
-                    (bind ? MS_BIND : 0) |
-                    (remount ? MS_REMOUNT : 0) |
-                    (priv ? MS_PRIVATE : 0);
 
     int ret = RetryBusy(10, 100, [&]{ return mount(Device.c_str(),
                                                    Mountpoint.c_str(),
                                                    Vfstype.c_str(),
-                                                   mountflags,
+                                                   flags,
                                                    CommaSeparatedList(Flags).c_str()); });
     if (ret)
-        return TError(EError::Unknown, errno, "mount(" + Device + ", " + Mountpoint + ", " + Vfstype + ", " + to_string(mountflags) + ", " + CommaSeparatedList(Flags) + ")");
+        return TError(EError::Unknown, errno, "mount(" + Device + ", " + Mountpoint + ", " + Vfstype + ", " + to_string(flags) + ", " + CommaSeparatedList(Flags) + ")");
 
     return TError::Success();
 }
