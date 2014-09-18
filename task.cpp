@@ -120,7 +120,7 @@ TTask::~TTask() {
     }
 }
 
-static string GetTmpFile() {
+string TTask::GetTmpFile() {
     char p[] = "/tmp/XXXXXX";
     int fd = mkstemp(p);
     if (fd < 0)
@@ -136,43 +136,7 @@ static int ChildFn(void *arg) {
     return task->ChildCallback();
 }
 
-int TTask::ChildCallback() {
-    close(Rfd);
-    ResetAllSignalHandlers();
-
-    /*
-     * ReportResultAndExit(fd, -errno) means we failed while preparing
-     * to execve, which should never happen (but it will :-)
-     *
-     * ReportResultAndExit(fd, +errno) means execve failed
-     */
-
-    if (prctl(PR_SET_KEEPCAPS, 0, 0, 0, 0) < 0) {
-        Syslog(string("prctl(PR_SET_KEEPCAPS): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
-
-    if (setsid() < 0) {
-        Syslog(string("setsid(): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
-
-    // remount proc so PID namespace works
-    TMount proc("proc", "/proc", "proc", {});
-    if (proc.Mount()) {
-        Syslog(string("remount procfs: ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
-
-    // move to target cgroups
-    for (auto cg : LeafCgroups) {
-        auto error = cg->Attach(getpid());
-        if (error) {
-            Syslog(string("cgroup attach: ") + error.GetMsg());
-            ReportResultAndExit(Wfd, -error.GetError());
-        }
-    }
-
+void TTask::ChildReopenStdio() {
     Wfd = CloseAllFds(Wfd);
     if (Wfd < 0) {
         Syslog(string("close fds: ") + strerror(errno));
@@ -185,6 +149,11 @@ int TTask::ChildCallback() {
     if (ret < 0) {
         Syslog(string("open(0): ") + strerror(errno));
         ReportResultAndExit(Wfd, -errno);
+    }
+
+    if (ret != 0) {
+        Syslog("open(0): unexpected fd");
+        ReportResultAndExit(Wfd, -EINVAL);
     }
 
     if (access(DirName(StdoutFile).c_str(), W_OK)) {
@@ -200,6 +169,11 @@ int TTask::ChildCallback() {
         if (ret < 0) {
             Syslog(string("open(1): ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
+        }
+
+        if (ret != 1) {
+            Syslog("open(1): unexpected fd");
+            ReportResultAndExit(Wfd, -EINVAL);
         }
 
         ret = fchown(ret, Env.Uid, Env.Gid);
@@ -224,13 +198,84 @@ int TTask::ChildCallback() {
             ReportResultAndExit(Wfd, -errno);
         }
 
+        if (ret != 2) {
+            Syslog("open(2): unexpected fd");
+            ReportResultAndExit(Wfd, -EINVAL);
+        }
+
         ret = fchown(ret, Env.Uid, Env.Gid);
         if (ret < 0) {
             Syslog(string("fchown(2): ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
         }
     }
+}
 
+void TTask::ChildDropPriveleges() {
+    if (prctl(PR_SET_KEEPCAPS, 0, 0, 0, 0) < 0) {
+        Syslog(string("prctl(PR_SET_KEEPCAPS): ") + strerror(errno));
+        ReportResultAndExit(Wfd, -errno);
+    }
+
+    if (setgid(Env.Gid) < 0) {
+        Syslog(string("setgid(): ") + strerror(errno));
+        ReportResultAndExit(Wfd, -errno);
+    }
+
+    if (initgroups(Env.User.c_str(), Env.Gid) < 0) {
+        Syslog(string("initgroups(): ") + strerror(errno));
+        ReportResultAndExit(Wfd, -errno);
+    }
+
+    if (setuid(Env.Uid) < 0) {
+        Syslog(string("setuid(): ") + strerror(errno));
+        ReportResultAndExit(Wfd, -errno);
+    }
+
+    umask(0);
+}
+
+void TTask::ChildExec() {
+    clearenv();
+
+	wordexp_t result;
+
+	int ret = wordexp(Env.Command.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
+    switch (ret) {
+    case WRDE_BADCHAR:
+        Syslog(string("wordexp(): illegal occurrence of newline or one of |, &, ;, <, >, (, ), {, }"));
+        ReportResultAndExit(Wfd, -EINVAL);
+    case WRDE_BADVAL:
+        Syslog(string("wordexp(): undefined shell variable was referenced"));
+        ReportResultAndExit(Wfd, -EINVAL);
+    case WRDE_CMDSUB:
+        Syslog(string("wordexp(): command substitution is not supported"));
+        ReportResultAndExit(Wfd, -EINVAL);
+    case WRDE_SYNTAX:
+        Syslog(string("wordexp(): syntax error"));
+        ReportResultAndExit(Wfd, -EINVAL);
+    default:
+    case WRDE_NOSPACE:
+        Syslog(string("wordexp(): error ") + strerror(ret));
+        ReportResultAndExit(Wfd, -EINVAL);
+    case 0:
+        break;
+    }
+
+#ifdef __DEBUG__
+    Syslog(Env.Command.c_str());
+    for (unsigned i = 0; i < result.we_wordc; i++)
+        Syslog(result.we_wordv[i]);
+#endif
+
+    auto envp = Env.GetEnvp();
+    execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
+
+    Syslog(string("execvpe(): ") + strerror(errno));
+    ReportResultAndExit(Wfd, errno);
+}
+
+void TTask::ChildIsolateFs() {
     TMount newRoot(Env.Root, Env.Root + "/", "none", {});
     TMount newProc("proc", Env.Root + "/proc", "proc", {});
     TMount newSys("/sys", Env.Root + "/sys", "none", {});
@@ -289,68 +334,51 @@ int TTask::ChildCallback() {
             Syslog(string("chdir(): ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
         }
-
     }
+}
+
+int TTask::ChildCallback() {
+    close(Rfd);
+    ResetAllSignalHandlers();
+
+    /*
+     * ReportResultAndExit(fd, -errno) means we failed while preparing
+     * to execve, which should never happen (but it will :-)
+     *
+     * ReportResultAndExit(fd, +errno) means execve failed
+     */
+
+    if (setsid() < 0) {
+        Syslog(string("setsid(): ") + strerror(errno));
+        ReportResultAndExit(Wfd, -errno);
+    }
+
+    // remount proc so PID namespace works
+    TMount proc("proc", "/proc", "proc", {});
+    if (proc.Mount()) {
+        Syslog(string("remount procfs: ") + strerror(errno));
+        ReportResultAndExit(Wfd, -errno);
+    }
+
+    // move to target cgroups
+    for (auto cg : LeafCgroups) {
+        auto error = cg->Attach(getpid());
+        if (error) {
+            Syslog(string("cgroup attach: ") + error.GetMsg());
+            ReportResultAndExit(Wfd, -error.GetError());
+        }
+    }
+
+    ChildReopenStdio();
+    ChildIsolateFs();
 
     if (Env.Cwd.length() && chdir(Env.Cwd.c_str()) < 0) {
         Syslog(string("chdir(): ") + strerror(errno));
         ReportResultAndExit(Wfd, -errno);
     }
 
-    // drop privileges
-    if (setgid(Env.Gid) < 0) {
-        Syslog(string("setgid(): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
-
-    if (initgroups(Env.User.c_str(), Env.Gid) < 0) {
-        Syslog(string("initgroups(): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
-
-    if (setuid(Env.Uid) < 0) {
-        Syslog(string("setuid(): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
-
-    umask(0);
-    clearenv();
-
-	wordexp_t result;
-
-	ret = wordexp(Env.Command.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
-    switch (ret) {
-    case WRDE_BADCHAR:
-        Syslog(string("wordexp(): illegal occurrence of newline or one of |, &, ;, <, >, (, ), {, }"));
-        ReportResultAndExit(Wfd, -EINVAL);
-    case WRDE_BADVAL:
-        Syslog(string("wordexp(): undefined shell variable was referenced"));
-        ReportResultAndExit(Wfd, -EINVAL);
-    case WRDE_CMDSUB:
-        Syslog(string("wordexp(): command substitution is not supported"));
-        ReportResultAndExit(Wfd, -EINVAL);
-    case WRDE_SYNTAX:
-        Syslog(string("wordexp(): syntax error"));
-        ReportResultAndExit(Wfd, -EINVAL);
-    default:
-    case WRDE_NOSPACE:
-        Syslog(string("wordexp(): error ") + strerror(ret));
-        ReportResultAndExit(Wfd, -EINVAL);
-    case 0:
-        break;
-    }
-
-#ifdef __DEBUG__
-    Syslog(Env.Command.c_str());
-    for (unsigned i = 0; i < result.we_wordc; i++)
-        Syslog(result.we_wordv[i]);
-#endif
-
-    auto envp = Env.GetEnvp();
-    execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
-
-    Syslog(string("execvpe(): ") + strerror(errno));
-    ReportResultAndExit(Wfd, errno);
+    ChildDropPriveleges();
+    ChildExec();
 
     return 0;
 }

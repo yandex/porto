@@ -53,6 +53,11 @@ class TTask {
     void ReportResultAndExit(int fd, int result) const;
 
     TError RotateFile(const std::string path) const;
+    std::string GetTmpFile();
+    void ChildReopenStdio();
+    void ChildDropPriveleges();
+    void ChildExec();
+    void ChildIsolateFs();
 
     TTask(const TTask &) = delete;
     TTask &operator=(const TTask &) = delete;
