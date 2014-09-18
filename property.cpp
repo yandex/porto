@@ -128,8 +128,8 @@ static TError ValidBool(std::shared_ptr<const TContainer> container, const strin
 
 std::map<std::string, const TPropertySpec> propertySpec = {
     {"command", { "command executed upon container start", "" }},
-    {"user", { "start command with given user", "nobody", false, ValidUser }},
-    {"group", { "start command with given group", "nogroup", false, ValidGroup }},
+    {"user", { "start command with given user", GetDefaultUser(), false, ValidUser }},
+    {"group", { "start command with given group", GetDefaultGroup(), false, ValidGroup }},
     {"env", { "container environment variables" }},
     //{"root", { "container root directory", "" }},
     {"cwd", { "container working directory", "" }},

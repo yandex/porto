@@ -47,9 +47,9 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetProperty(name, "command", v));
     Expect(v == string(""));
     ExpectSuccess(api.GetProperty(name, "user", v));
-    Expect(v == string("nobody"));
+    Expect(v == GetDefaultUser());
     ExpectSuccess(api.GetProperty(name, "group", v));
-    Expect(v == string("nogroup"));
+    Expect(v == GetDefaultGroup());
     ExpectSuccess(api.GetProperty(name, "env", v));
     Expect(v == string(""));
     ExpectSuccess(api.GetProperty(name, "memory_guarantee", v));
@@ -561,8 +561,8 @@ static void TestUserGroup(TPortoAPI &api) {
 
     GetUidGid(pid, uid, gid);
 
-    Expect(uid == UserUid("nobody"));
-    Expect(gid == GroupGid("nogroup"));
+    Expect(uid == UserUid(GetDefaultUser()));
+    Expect(gid == GroupGid(GetDefaultGroup()));
     ExpectSuccess(api.Stop(name));
 
     Say() << "Check custom user & group" << endl;

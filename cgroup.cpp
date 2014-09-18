@@ -57,6 +57,9 @@ TError TCgroup::FindChildren(std::vector<std::shared_ptr<TCgroup>> &cglist) {
     TFolder f(Path());
     vector<string> list;
 
+    // Ignore root cgroups and expect children to hold them if necessary
+    if (!Parent)
+        return TError::Success();
     // Ignore non-porto subtrees
     if (Parent && Parent->IsRoot() && Name != PORTO_ROOT_CGROUP)
         return TError::Success();
