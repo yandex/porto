@@ -3,7 +3,6 @@
 - ? net_prio 0-7 -> 0-99
 - ? portorecord/portoplay tool to record rcp and then replay
 - move raw cgroup knobs from plist
-- find network device once (make sure it's up)
 
 # phase 2
 - rt: create cgroup for non-smart tasks and throttle them

@@ -33,6 +33,13 @@ uint16_t TcMajor(uint32_t handle) {
 }
 
 TError TNetlink::FindDev(std::string &device) {
+    static string dev;
+
+    if (dev.length()) {
+        device = dev;
+        return TError::Success();
+    }
+
     struct FindDevIter { string name; } data;
     nl_cache_foreach(linkCache, [](struct nl_object *obj, void *data) {
                      FindDevIter *p = (FindDevIter *)data;
@@ -43,7 +50,9 @@ TError TNetlink::FindDev(std::string &device) {
                         return;
 
                      for (auto &pref : prefixes)
-                        if (strncmp(rtnl_link_get_name(l), pref.c_str(), pref.length()) == 0)
+                        if (strncmp(rtnl_link_get_name(l), pref.c_str(),
+                                    pref.length()) == 0 &&
+                            rtnl_link_get_flags(l) & IFF_RUNNING)
                             p->name = rtnl_link_get_name(l);
 
                      }, &data);
@@ -51,7 +60,7 @@ TError TNetlink::FindDev(std::string &device) {
     if (data.name.length() == 0)
         return TError(EError::Unknown, "Can't find appropriate link");
 
-    device = data.name;
+    dev = device = data.name;
 
     return TError::Success();
 }
@@ -108,6 +117,7 @@ void TNetlink::Close() {
     if (link)
         rtnl_link_put(link);
     if (linkCache)
+        nl_cache_mngt_unprovide(linkCache);
         nl_cache_free(linkCache);
     if (sock) {
         nl_close(sock);
