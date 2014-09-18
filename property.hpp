@@ -11,11 +11,13 @@
 
 class TContainer;
 
+const unsigned int DYNAMIC_PROPERTY = (1 << 0);
+const unsigned int HIDDEN_PROPERTY = (1 << 1);
+
 struct TPropertySpec {
     std::string Description;
     std::string Def;
-    // can be modified in running state
-    bool Dynamic;
+    unsigned int Flags;
     std::function<TError (std::shared_ptr<const TContainer> container, const std::string)> Valid;
 };
 

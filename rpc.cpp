@@ -131,6 +131,9 @@ static TError ListProperty(TContainerHolder &cholder,
     auto list = rsp.mutable_propertylist();
 
     for (auto kv : propertySpec) {
+        if (kv.second.Flags & HIDDEN_PROPERTY)
+            continue;
+
         auto entry = list->add_list();
 
         entry->set_name(kv.first);

@@ -127,29 +127,29 @@ static TError ValidBool(std::shared_ptr<const TContainer> container, const strin
 }
 
 std::map<std::string, const TPropertySpec> propertySpec = {
-    {"command", { "command executed upon container start", "" }},
-    {"user", { "start command with given user", GetDefaultUser(), false, ValidUser }},
-    {"group", { "start command with given group", GetDefaultGroup(), false, ValidGroup }},
-    {"env", { "container environment variables" }},
-    //{"root", { "container root directory", "" }},
-    {"cwd", { "container working directory", "" }},
+    {"command", { "Command executed upon container start", "" }},
+    {"user", { "Start command with given user", GetDefaultUser(), 0, ValidUser }},
+    {"group", { "Start command with given group", GetDefaultGroup(), 0, ValidGroup }},
+    {"env", { "Container environment variables" }},
+    //{"root", { "Container root directory", "" }},
+    {"cwd", { "Container working directory", "" }},
 
-    {"memory_guarantee", { "guaranteed amount of memory", "0", true, ValidMemGuarantee }},
-    {"memory_limit", { "memory hard limit", "0", true, ValidMemLimit }},
+    {"memory_guarantee", { "Guaranteed amount of memory", "0", DYNAMIC_PROPERTY, ValidMemGuarantee }},
+    {"memory_limit", { "Memory hard limit", "0", true, ValidMemLimit }},
 
-    {"cpu_policy", { "CPU policy: rt, normal, idle", "normal", false, ValidCpuPolicy }},
-    {"cpu_priority", { "CPU priority: 0-99", to_string(DEF_CLASS_PRIO), true, ValidCpuPriority }},
+    {"cpu_policy", { "CPU policy: rt, normal, idle", "normal", 0, ValidCpuPolicy }},
+    {"cpu_priority", { "CPU priority: 0-99", to_string(DEF_CLASS_PRIO), DYNAMIC_PROPERTY, ValidCpuPriority }},
 
-    {"net_guarantee", { "Guaranteed container network bandwidth", to_string(DEF_CLASS_RATE), false, ValidNetGuarantee }},
-    {"net_ceil", { "Maximum container network bandwidth", to_string(DEF_CLASS_CEIL), false, ValidNetCeil }},
-    {"net_priority", { "Container network priority: 0-7", to_string(DEF_CLASS_NET_PRIO), false, ValidNetPriority }},
+    {"net_guarantee", { "Guaranteed container network bandwidth", to_string(DEF_CLASS_RATE), 0, ValidNetGuarantee }},
+    {"net_ceil", { "Maximum container network bandwidth", to_string(DEF_CLASS_CEIL), 0, ValidNetCeil }},
+    {"net_priority", { "Container network priority: 0-7", to_string(DEF_CLASS_NET_PRIO), 0, ValidNetPriority }},
 
-    {"respawn", { "automatically respawn dead container", "false", false, ValidBool }},
+    {"respawn", { "Automatically respawn dead container", "false", 0, ValidBool }},
 
-    {"cpu.smart", { "cgroup knob", "0", false }},
-    {"memory.limit_in_bytes", { "cgroup knob", "0", false }},
-    {"memory.low_limit_in_bytes", { "cgroup knob", "0", false }},
-    {"memory.recharge_on_pgfault", { "cgroup knob", "0", false }},
+    {"cpu.smart", { "Raw cgroup knob", "0", HIDDEN_PROPERTY }},
+    {"memory.limit_in_bytes", { "Raw cgroup knob", "0", HIDDEN_PROPERTY }},
+    {"memory.low_limit_in_bytes", { "Raw cgroup knob", "0", HIDDEN_PROPERTY }},
+    {"memory.recharge_on_pgfault", { "Raw cgroup knob", "0", HIDDEN_PROPERTY }},
 };
 
 const string &TContainerSpec::Get(const string &property) const {
@@ -173,7 +173,7 @@ bool TContainerSpec::IsDynamic(const std::string &property) const {
     if (propertySpec.find(property) == propertySpec.end())
         return false;
 
-    return propertySpec.at(property).Dynamic;
+    return propertySpec.at(property).Flags & DYNAMIC_PROPERTY;
 }
 
 TError TContainerSpec::GetInternal(const string &property, string &value) const {
