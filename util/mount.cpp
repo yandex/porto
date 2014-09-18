@@ -14,11 +14,12 @@ extern "C" {
 
 using namespace std;
 
-TError TMount::Mount(bool rdonly, bool bind, bool remount) const {
+TError TMount::Mount(bool rdonly, bool bind, bool remount, bool priv) const {
     TLogger::Log() << "mount " << Mountpoint << endl;
     int mountflags = (rdonly ? MS_RDONLY : 0) |
                     (bind ? MS_BIND : 0) |
-                    (remount ? MS_REMOUNT : 0);
+                    (remount ? MS_REMOUNT : 0) |
+                    (priv ? MS_PRIVATE : 0);
 
     int ret = RetryBusy(10, 100, [&]{ return mount(Device.c_str(),
                                                    Mountpoint.c_str(),

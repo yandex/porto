@@ -42,9 +42,10 @@ public:
         return Flags;
     }
 
-    TError Mount(bool rdonly = false, bool bind = false, bool remount = false) const;
+    TError Mount(bool rdonly = false, bool bind = false, bool remount = false, bool priv = false) const;
     TError Remount() const { return Mount(false, false, true); }
     TError Bind() const { return Mount(false, true); }
+    TError MountPrivate() { return Mount(false, false, false, true); }
     TError Umount() const;
 
     friend std::ostream& operator<<(std::ostream& stream, const TMount& mount) {
