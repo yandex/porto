@@ -121,17 +121,6 @@ static bool AnotherInstanceRunning(const string &path) {
     return true;
 }
 
-static TError CreatePidFile(const string &path, const int mode) {
-    TFile f(path, mode);
-
-    return f.WriteStringNoAppend(to_string(getpid()));
-}
-
-static void RemovePidFile(const string &path) {
-    TFile f(path);
-    (void)f.Remove();
-}
-
 void AckExitStatus(int pid) {
     if (!pid)
         return;
@@ -282,7 +271,7 @@ static void KvDump() {
     storage.Dump();
 }
 
-int portod_main(bool failsafe, bool stdlog)
+int PortodMain(bool failsafe, bool stdlog)
 {
     int ret = EXIT_SUCCESS;
 
@@ -389,7 +378,7 @@ int portod_main(bool failsafe, bool stdlog)
 
 int main(int argc, char * const argv[])
 {
-    bool portod_mode = false;
+    bool portodMode = false;
     bool failsafe = false;
     bool stdlog = false;
     int argn;
@@ -411,7 +400,7 @@ int main(int argc, char * const argv[])
             return EXIT_SUCCESS;
 
         } else if (arg == "--portod") {
-            portod_mode = true;
+            portodMode = true;
 
         } else if (arg == "--stdlog") {
             stdlog = true;
@@ -421,8 +410,8 @@ int main(int argc, char * const argv[])
         }
     }
 
-    if (portod_mode)
-        return portod_main(failsafe, stdlog);
+    if (portodMode)
+        return PortodMain(failsafe, stdlog);
     else
-        return portoloop_main();
+        return PortoloopMain(stdlog);
 }

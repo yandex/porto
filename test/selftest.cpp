@@ -1371,10 +1371,14 @@ int SelfTest(string name) {
 
         cerr << ">>> Truncating logs and restarting porto..." << endl;
 
-        int pid;
-        if (StringToInt(Pgrep("portoloop"), pid))
-            throw string("Can't find portoloop pid");
+        if (Pgrep("portod") != 2)
+            throw string("Porto is not running");
 
+        int pid = ReadPid(PID_FILE);
+        if (kill(pid, SIGHUP))
+            throw string("Can't send SIGHUP to portod");
+
+        pid = ReadPid(LOOP_PID_FILE);
         if (kill(pid, SIGHUP))
             throw string("Can't send SIGHUP to portoloop");
 

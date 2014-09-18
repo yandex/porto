@@ -1,6 +1,7 @@
 #include <string>
 #include <csignal>
 
+#include "util/file.hpp"
 #include "unix.hpp"
 
 extern "C" {
@@ -131,4 +132,15 @@ std::string GetDefaultGroup() {
             return g;
 
     return "daemon";
+}
+
+int CreatePidFile(const std::string &path, const int mode) {
+    TFile f(path, mode);
+
+    return f.WriteStringNoAppend(std::to_string(getpid()));
+}
+
+void RemovePidFile(const std::string &path) {
+    TFile f(path);
+    (void)f.Remove();
 }

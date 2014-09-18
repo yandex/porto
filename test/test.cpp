@@ -40,7 +40,18 @@ void ExpectReturn(std::function<int()> f, int exp, int retry, int line, const ch
     throw std::string("Got " + std::to_string(ret) + ", but expected " + std::to_string(exp) + " at " + func + ":" + std::to_string(line));
 }
 
-std::string Pgrep(const std::string &name) {
+int ReadPid(const std::string &path) {
+    TFile f(path);
+    int pid = 0;
+
+    TError error = f.AsInt(pid);
+    if (error)
+        throw std::string(error.GetMsg());
+
+    return pid;
+}
+
+int Pgrep(const std::string &name) {
     FILE *f = popen(("pgrep -x " + name).c_str(), "r");
     if (f == nullptr)
         throw std::string("Can't execute pgrep");
@@ -48,19 +59,14 @@ std::string Pgrep(const std::string &name) {
     char *line = nullptr;
     size_t n;
 
-    std::string pid;
     int instances = 0;
     while (getline(&line, &n, f) >= 0) {
-        pid.assign(line);
-        pid.erase(pid.find('\n'));
         instances++;
     }
 
-    if (instances != 1)
-        throw std::string("pgrep returned several instances");
     fclose(f);
 
-    return pid;
+    return instances;
 }
 
 void WaitExit(TPortoAPI &api, const std::string &pid) {
@@ -314,30 +320,29 @@ bool TcClassExist(const std::string &handle) {
 
 void TestDaemon(TPortoAPI &api) {
     struct dirent **lst;
-    size_t n;
-    std::string pid;
+    int pid;
 
     api.Cleanup();
 
     Say() << "Make sure portod doesn't have zombies" << std::endl;
-    pid = Pgrep("portod");
+    pid = ReadPid(PID_FILE);
 
     Say() << "Make sure portod doesn't have invalid FDs" << std::endl;
-    std::string path = ("/proc/" + pid + "/fd");
-    n = scandir(path.c_str(), &lst, NULL, alphasort);
-    // . .. 0(stdin) 1(stdout) 2(stderr) 4(log) 5(rpc socket) 128(event pipe) 129(ack pipe)
-    if (n != 2 + 7)
-        throw std::string("Invalid number of fds");
+
+    std::string path = ("/proc/" + std::to_string(pid) + "/fd");
+
+    // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 4(rpc socket) 128(event pipe) 129(ack pipe)
+    ExpectReturn([&]{ return scandir(path.c_str(), &lst, NULL, alphasort); },
+                 2 + 7, 5, __LINE__, __func__);
 
     Say() << "Make sure portoloop doesn't have zombies" << std::endl;
-    pid = Pgrep("portoloop");
+    pid = ReadPid(LOOP_PID_FILE);
 
     Say() << "Make sure portoloop doesn't have invalid FDs" << std::endl;
-    path = ("/proc/" + pid + "/fd");
-    n = scandir(path.c_str(), &lst, NULL, alphasort);
-    // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 128(event pipe) 129(ack pipe)
-    if (n != 2 + 6)
-        throw std::string("Invalid number of fds");
+    path = ("/proc/" + std::to_string(pid) + "/fd");
+    // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 5(event pipe) 6(ack pipe)
+    ExpectReturn([&]{ return scandir(path.c_str(), &lst, NULL, alphasort); },
+                 2 + 6, 5, __LINE__, __func__);
 
     // TODO: check portoloop queue
     // TODO: check rtnl classes

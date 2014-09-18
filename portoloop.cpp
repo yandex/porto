@@ -105,7 +105,7 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
         close(evtfd[0]);
         close(ackfd[1]);
 
-        return portod_main();
+        return PortodMain(false, false);
     }
 
     close(evtfd[0]);
@@ -180,9 +180,11 @@ exit:
     return ret;
 }
 
-int portoloop_main()
+int PortoloopMain(bool stdlog)
 {
     TLogger::InitLog(LOOP_LOG_FILE, LOOP_LOG_FILE_PERM);
+    if (stdlog)
+        TLogger::LogToStd();
 
     TLogger::Log() << "Started" << endl;
 
@@ -196,6 +198,11 @@ int portoloop_main()
 
     if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0) {
         TLogger::Log() << "Can't set myself as a subreaper" << endl;
+        return EXIT_FAILURE;
+    }
+
+    if (CreatePidFile(LOOP_PID_FILE, LOOP_PID_FILE_PERM)) {
+        TLogger::Log() << "Can't create pid file " << LOOP_PID_FILE << "!" << endl;
         return EXIT_FAILURE;
     }
 
@@ -218,6 +225,8 @@ int portoloop_main()
     TLogger::Log() << "Stopped" << endl;
 
     TLogger::CloseLog();
+
+    RemovePidFile(LOOP_PID_FILE);
 
     return ret;
 }

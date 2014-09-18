@@ -14,7 +14,8 @@ namespace Test {
     std::basic_ostream<char> &Say(std::basic_ostream<char> &stream = std::cout);
     void ExpectReturn(std::function<int()> f, int exp, int retry, int line, const char *func);
 
-    std::string Pgrep(const std::string &name);
+    int ReadPid(const std::string &path);
+    int Pgrep(const std::string &name);
     void WaitExit(TPortoAPI &api, const std::string &pid);
     void WaitState(TPortoAPI &api, const std::string &name, const std::string &state);
     void WaitPortod(TPortoAPI &api);

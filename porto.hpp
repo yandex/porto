@@ -37,6 +37,9 @@ const unsigned int RPC_SOCK_PERM = 0660;
 const std::string PID_FILE = "/run/portod.pid";
 const unsigned int PID_FILE_PERM = 0644;
 
+const std::string LOOP_PID_FILE = "/run/portoloop.pid";
+const unsigned int LOOP_PID_FILE_PERM = 0644;
+
 const std::string LOG_FILE = "/var/log/portod.log";
 const unsigned int LOG_FILE_PERM = 0644;
 
@@ -53,7 +56,7 @@ const uint32_t DEF_CLASS_RATE = UINT32_MAX;
 const uint32_t DEF_CLASS_CEIL = UINT32_MAX;
 const uint32_t DEF_CLASS_NET_PRIO = 3;
 
-int portoloop_main(void);
-int portod_main(bool failsafe = false, bool stdlog = false);
+int PortoloopMain(bool stdlog);
+int PortodMain(bool failsafe, bool stdlog);
 
 #endif
