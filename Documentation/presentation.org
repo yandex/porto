@@ -59,8 +59,6 @@
    изначально закладываем поддержку
 * Дизайн Porto
 
-  portoloop
-     |
   portod <- portoctl (CLI)
          <- ISS (API)
          <- ...
