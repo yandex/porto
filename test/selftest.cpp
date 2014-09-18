@@ -26,10 +26,21 @@ namespace Test {
 
 static void ExpectCorrectCgroups(const string &pid, const string &name) {
     auto cgmap = GetCgroups(pid);
-    Expect(cgmap.size() == 5);
+    string subsystems[] = { "net_cls", "freezer", "memory", "cpu", "cpuacct" };
+    int expected = sizeof(subsystems) / sizeof(subsystems[0]);
+
     for (auto kv : cgmap) {
-        Expect(kv.second == "/porto/" + name);
+        vector<string> cgsubsystems;
+        ExpectSuccess(SplitString(kv.first, ',', cgsubsystems));
+
+        for (auto &subsys : subsystems) {
+            if (std::find(cgsubsystems.begin(), cgsubsystems.end(), subsys) != cgsubsystems.end()) {
+                Expect(kv.second == "/porto/" + name);
+                expected--;
+            }
+        }
     }
+    Expect(expected == 0);
 }
 
 static void ShouldHaveOnlyRoot(TPortoAPI &api) {
@@ -413,6 +424,10 @@ static void TestLongRunning(TPortoAPI &api) {
     Say() << "Check that task cgroups are correct" << endl;
     auto cgmap = GetCgroups("self");
     for (auto name : cgmap) {
+        // skip systemd cgroups
+        if (name.first.find("systemd") != string::npos)
+            continue;
+
         Expect(name.second == "/");
     }
 
@@ -815,7 +830,7 @@ static void TestStats(TPortoAPI &api) {
     string noop = "b";
 
     ExpectSuccess(api.Create(noop));
-    ExpectSuccess(api.SetProperty(noop, "command", "true"));
+    ExpectSuccess(api.SetProperty(noop, "command", "ls"));
     ExpectSuccess(api.Start(noop));
     ExpectSuccess(api.GetData(noop, "root_pid", pid));
     WaitExit(api, pid);
@@ -1249,6 +1264,7 @@ static void TestLeaks(TPortoAPI &api) {
     }
 
     int now = GetVmRss(pid);
+    Say() << "Expected " << now << " < " << prev + slack << endl;
     Expect(now <= prev + slack);
 }
 
