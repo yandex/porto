@@ -53,4 +53,7 @@ const uint32_t DEF_CLASS_RATE = UINT32_MAX;
 const uint32_t DEF_CLASS_CEIL = UINT32_MAX;
 const uint32_t DEF_CLASS_NET_PRIO = 3;
 
+int portoloop_main(void);
+int portod_main(bool failsafe = false, bool stdlog = false);
+
 #endif

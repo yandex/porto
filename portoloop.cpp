@@ -105,9 +105,7 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
         close(evtfd[0]);
         close(ackfd[1]);
 
-        ret = execlp("portod", "portod", nullptr);
-        TLogger::Log() << "execlp(): " << strerror(errno) << endl;
-        goto exit;
+        return portod_main();
     }
 
     close(evtfd[0]);
@@ -182,23 +180,9 @@ exit:
     return ret;
 }
 
-int main(int argc, char * const argv[])
+int portoloop_main()
 {
-    if (argc > 1) {
-        string name(argv[1]);
-
-        if (name == "-v" || name == "--version") {
-            cout << GIT_TAG << " " << GIT_REVISION <<endl;
-            return EXIT_FAILURE;
-        }
-    }
-
     TLogger::InitLog(LOOP_LOG_FILE, LOOP_LOG_FILE_PERM);
-
-    if (getuid() != 0) {
-        TLogger::Log() << "Need root privileges to start" << endl;
-        return EXIT_FAILURE;
-    }
 
     TLogger::Log() << "Started" << endl;
 

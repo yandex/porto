@@ -278,35 +278,13 @@ static void ReaiseSignal(int signum) {
 }
 
 static void KvDump() {
-        TKeyValueStorage storage;
-        storage.Dump();
+    TKeyValueStorage storage;
+    storage.Dump();
 }
 
-int main(int argc, char * const argv[])
+int portod_main(bool failsafe, bool stdlog)
 {
     int ret = EXIT_SUCCESS;
-    int opt;
-    bool failsafe = false;
-    bool stdlog = false;
-
-    while ((opt = getopt(argc, argv, "dvfs")) != -1) {
-        switch (opt) {
-        case 'd':
-            KvDump();
-            return EXIT_SUCCESS;
-        case 'v':
-            cout << GIT_TAG << " " << GIT_REVISION <<endl;
-            return EXIT_FAILURE;
-        case 'f':
-            failsafe = true;
-            break;
-        case 's':
-            stdlog = true;
-            break;
-        default:
-            exit(EXIT_FAILURE);
-        }
-    }
 
     TLogger::InitLog(LOG_FILE, LOG_FILE_PERM);
     if (stdlog)
@@ -407,4 +385,44 @@ int main(int argc, char * const argv[])
         ReaiseSignal(raiseSignum);
 
     return ret;
+}
+
+int main(int argc, char * const argv[])
+{
+    bool portod_mode = false;
+    bool failsafe = false;
+    bool stdlog = false;
+    int argn;
+
+    if (getuid() != 0) {
+        TLogger::Log() << "Need root privileges to start" << endl;
+        return EXIT_FAILURE;
+    }
+
+    for (argn = 1; argn < argc; argn++) {
+        string arg(argv[argn]);
+
+        if (arg == "-v" || arg == "--version") {
+            cout << GIT_TAG << " " << GIT_REVISION <<endl;
+            return EXIT_SUCCESS;
+
+        } else if (arg == "--kv-dump") {
+            KvDump();
+            return EXIT_SUCCESS;
+
+        } else if (arg == "--portod") {
+            portod_mode = true;
+
+        } else if (arg == "--stdlog") {
+            stdlog = true;
+
+        } else if (arg == "--failsafe") {
+            failsafe = false;
+        }
+    }
+
+    if (portod_mode)
+        return portod_main(failsafe, stdlog);
+    else
+        return portoloop_main();
 }
