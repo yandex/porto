@@ -1399,7 +1399,9 @@ int SelfTest(string name) {
         // Truncate slave log
         pid = ReadPid(PID_FILE);
         if (kill(pid, SIGHUP))
-            throw string("Can't send SIGHUP to master");
+            throw string("Can't send SIGHUP to slave");
+
+        WaitPortod(api);
 
         // Truncate master log
         pid = ReadPid(LOOP_PID_FILE);
