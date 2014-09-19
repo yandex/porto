@@ -37,7 +37,7 @@ int TPortoAPI::Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
         TError error = ConnectToRpcServer(RPC_SOCK, Fd);
         if (error) {
             LastErrorMsg = error.GetMsg();
-            LastError = error.GetError();
+            LastError = INT_MIN;
             return INT_MIN;
         }
     }

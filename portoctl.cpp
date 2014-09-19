@@ -73,7 +73,7 @@ public:
         string msg;
         Api.GetLastError(error, msg);
         if (msg.length())
-            cerr << str << ": " << msg << " (" << ErrorName(error) << ")" << endl;
+            cerr << str << ": " << ErrorName(error) << " (" << msg << ")" << endl;
         else
             cerr << str << ": " << ErrorName(error) << endl;
     }
@@ -105,28 +105,28 @@ public:
         const int nameWidth = 32;
         const int descWidth = 48;
 
-        cout << "usage: " << program_invocation_short_name << " <command> [<args>]" << endl;
+        cout << "Usage: " << program_invocation_short_name << " <command> [<args>]" << endl;
         cout << endl;
-        cout << "list of commands:" << endl;
+        cout << "Command list:" << endl;
         for (ICmd *cmd : commands)
             cout << " " << left << setw(nameWidth) << cmd->GetName() << cmd->GetDescription() << endl;
 
         int ret;
-        cout << endl << "list of properties:" << endl;
+        cout << endl << "Property list:" << endl;
         vector<TProperty> plist;
         ret = Api.Plist(plist);
-        if (ret)
-            PrintError("Can't list properties");
-        else
+        if (ret) {
+            PrintError("Unavailable");
+        } else
             for (auto p : plist)
                 cout << " " << left << setw(nameWidth) << p.Name
                      << setw(descWidth) << p.Description << endl;
 
-        cout << endl << "list of data:" << endl;
+        cout << endl << "Data list:" << endl;
         vector<TData> dlist;
         ret = Api.Dlist(dlist);
         if (ret)
-            PrintError("Can't list data");
+            PrintError("Unavailable");
         else
             for (auto d : dlist)
                 cout << " " << left << setw(nameWidth) << d.Name
@@ -143,7 +143,7 @@ public:
         string name(argv[0]);
         for (ICmd *cmd : commands) {
             if (cmd->GetName() == name) {
-                cout << "usage: " << program_invocation_short_name << " " << name << " " << cmd->GetUsage() << endl;
+                cout << "Usage: " << program_invocation_short_name << " " << name << " " << cmd->GetUsage() << endl;
                 cout << endl;
                 cout << cmd->GetDescription() << endl;
 
