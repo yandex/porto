@@ -34,6 +34,7 @@ static volatile sig_atomic_t gotAlarm = false;
 static volatile sig_atomic_t cleanup = true;
 static volatile sig_atomic_t hup = false;
 static volatile sig_atomic_t raiseSignum = 0;
+static bool stdlog = false;
 
 static void DoExit(int signum) {
     done = true;
@@ -84,7 +85,6 @@ static void RegisterSignalHandlers() {
 static int DaemonPrepare(const std::string &procName,
                    const std::string &logPath,
                    unsigned int logMode,
-                   bool stdlog,
                    const std::string &pidPath,
                    unsigned int pidMode) {
     SetProcessName(procName.c_str());
@@ -323,10 +323,10 @@ static void KvDump() {
     storage.Dump();
 }
 
-int PortodMain(bool failsafe, bool stdlog)
+static int PortodMain(bool failsafe)
 {
     int ret = DaemonPrepare("portod-slave",
-                            LOG_FILE, LOG_FILE_PERM, stdlog,
+                            LOG_FILE, LOG_FILE_PERM,
                             PID_FILE, PID_FILE_PERM);
     if (ret)
         return ret;
@@ -478,7 +478,7 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
         close(evtfd[0]);
         close(ackfd[1]);
 
-        return PortodMain(false, false);
+        return PortodMain(false);
     }
 
     close(evtfd[0]);
@@ -553,10 +553,10 @@ exit:
     return ret;
 }
 
-int PortoloopMain(bool stdlog)
+static int PortoloopMain()
 {
     int ret = DaemonPrepare("portod",
-                            LOOP_LOG_FILE, LOOP_LOG_FILE_PERM, stdlog,
+                            LOOP_LOG_FILE, LOOP_LOG_FILE_PERM,
                             LOOP_PID_FILE, LOOP_PID_FILE_PERM);
     if (ret)
         return ret;
@@ -591,7 +591,6 @@ int main(int argc, char * const argv[])
 {
     bool portodMode = false;
     bool failsafe = false;
-    bool stdlog = false;
     int argn;
 
     if (getuid() != 0) {
@@ -618,7 +617,7 @@ int main(int argc, char * const argv[])
     }
 
     if (portodMode)
-        return PortodMain(failsafe, stdlog);
+        return PortodMain(failsafe);
     else
-        return PortoloopMain(stdlog);
+        return PortoloopMain();
 }
