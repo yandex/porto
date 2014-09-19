@@ -43,6 +43,8 @@ public:
     bool CgroupFilterExists(uint32_t parent, uint32_t handle);
     TError RemoveCgroupFilter(uint32_t parent, uint32_t handle);
     ~TNetlink() { Close(); }
+
+    static TError Exec(std::function<TError(TNetlink &nl)> f);
 };
 
 uint32_t TcHandle(uint16_t maj, uint16_t min);

@@ -501,3 +501,13 @@ free_cls:
     return error;
 
 }
+
+TError TNetlink::Exec(std::function<TError(TNetlink &nl)> f) {
+    TNetlink nl;
+
+    TError error = nl.Open();
+    if (error)
+        return error;
+
+    return f(nl);
+}
