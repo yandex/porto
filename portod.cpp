@@ -489,8 +489,8 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
             TLogger::CloseLog();
             close(evtfd[1]);
             close(ackfd[0]);
-            execlp(program_invocation_name, program_invocation_short_name, nullptr);
-            TLogger::Log() << "Can't execlp(" << program_invocation_name << ", " << program_invocation_short_name << ", NULL)" << endl;
+            execlp(program_invocation_name, program_invocation_name, nullptr);
+            TLogger::Log() << "Can't execlp(" << program_invocation_name << ", " << program_invocation_name << ", NULL)" << strerror(errno) << endl;
             ret = EXIT_FAILURE;
             break;
         }
