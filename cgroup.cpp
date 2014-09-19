@@ -57,9 +57,6 @@ TError TCgroup::FindChildren(std::vector<std::shared_ptr<TCgroup>> &cglist) {
     TFolder f(Path());
     vector<string> list;
 
-    // Ignore root cgroups and expect children to hold them if necessary
-    if (!Parent)
-        return TError::Success();
     // Ignore non-porto subtrees
     if (Parent && Parent->IsRoot() && Name != PORTO_ROOT_CGROUP)
         return TError::Success();
@@ -172,10 +169,7 @@ TError TCgroup::Create() {
 
 TError TCgroup::Remove() {
     if (IsRoot()) {
-        TError error = Mount->Umount();
-        TLogger::LogError(error, "Can't umount root cgroup for root container");
-        if (error)
-            return error;
+        return TError::Success();
     } else {
         // at this point we should have gracefully terminated all tasks
         // in the container; if anything is still alive we have no other choice
