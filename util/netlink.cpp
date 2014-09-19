@@ -44,7 +44,7 @@ TError TNetlink::FindDev(std::string &device) {
     nl_cache_foreach(linkCache, [](struct nl_object *obj, void *data) {
                      FindDevIter *p = (FindDevIter *)data;
                      struct rtnl_link *l = (struct rtnl_link *)obj;
-                     const vector<string> prefixes = { "eth", "em" };
+                     const vector<string> prefixes = { "eth", "em", "wlp2s" };
 
                      if (p->name.length())
                         return;
@@ -93,7 +93,7 @@ TError TNetlink::Open() {
 
     error = FindDev(device);
     if (error)
-        goto close_socket;
+        return error;
 
     link = rtnl_link_get_by_name(linkCache, device.c_str());
     if (!link) {
