@@ -1340,7 +1340,7 @@ int WordCount(const std::string &path, const std::string &word) {
     vector<string> lines;
     TFile log(path);
     if (log.AsLines(lines))
-        throw string("Can't read portoloop log");
+        throw "Can't read log " + path;
 
     for (auto s : lines) {
         if (s.find(word) != string::npos)
@@ -1389,13 +1389,22 @@ int SelfTest(string name) {
         if (Pgrep("portod-slave") != 1)
             throw string("Porto slave is not running");
 
+        // Remove porto cgroup to clear statistics
         int pid = ReadPid(PID_FILE);
-        if (kill(pid, SIGHUP))
-            throw string("Can't send SIGHUP to portod");
+        if (kill(pid, SIGINT))
+            throw string("Can't send SIGINT to slave");
 
+        WaitPortod(api);
+
+        // Truncate slave log
+        pid = ReadPid(PID_FILE);
+        if (kill(pid, SIGHUP))
+            throw string("Can't send SIGHUP to master");
+
+        // Truncate master log
         pid = ReadPid(LOOP_PID_FILE);
         if (kill(pid, SIGHUP))
-            throw string("Can't send SIGHUP to portoloop");
+            throw string("Can't send SIGHUP to master");
 
         WaitPortod(api);
 
@@ -1420,7 +1429,7 @@ int SelfTest(string name) {
     if (!CanTestLimits())
         cerr << "WARNING: Due to missing kernel support, memory_guarantee/cpu_policy has not been tested!" << endl;
     if (respawns != 1 + 2)
-        cerr << "WARNING: Unexpected number of portoloop respawns: " << respawns << "!" << endl;
+        cerr << "WARNING: Unexpected number of respawns: " << respawns << "!" << endl;
 
     return 0;
 }

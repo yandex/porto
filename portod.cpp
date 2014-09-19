@@ -71,7 +71,7 @@ static void RaiseSignal(int signum) {
 static void RegisterSignalHandlers() {
     ResetAllSignalHandlers();
 
-    // portod may die while we are writing into communication pipe
+    // we may die while writing into communication pipe
     (void)RegisterSignal(SIGPIPE, SIG_IGN);
     // kill all running containers in case of SIGINT (useful for debugging)
     (void)RegisterSignal(SIGINT, DoExitAndCleanup);
@@ -323,7 +323,7 @@ static void KvDump() {
     storage.Dump();
 }
 
-static int PortodMain(bool failsafe)
+static int SlaveMain(bool failsafe)
 {
     int ret = DaemonPrepare("portod-slave",
                             LOG_FILE, LOG_FILE_PERM,
@@ -478,7 +478,7 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
         close(evtfd[0]);
         close(ackfd[1]);
 
-        return PortodMain(false);
+        exit(SlaveMain(false));
     }
 
     close(evtfd[0]);
@@ -553,7 +553,7 @@ exit:
     return ret;
 }
 
-static int PortoloopMain()
+static int MasterMain()
 {
     int ret = DaemonPrepare("portod",
                             LOOP_LOG_FILE, LOOP_LOG_FILE_PERM,
@@ -580,7 +580,7 @@ static int PortoloopMain()
     }
 
     if (kill(slavePid, SIGINT) < 0)
-        TLogger::Log() << "Can't send SIGINT to portod" << endl;
+        TLogger::Log() << "Can't send SIGINT to slave" << endl;
 
     DaemonShutdown(LOOP_PID_FILE);
 
@@ -589,7 +589,7 @@ static int PortoloopMain()
 
 int main(int argc, char * const argv[])
 {
-    bool portodMode = false;
+    bool slaveMode = false;
     bool failsafe = false;
     int argn;
 
@@ -607,8 +607,8 @@ int main(int argc, char * const argv[])
         } else if (arg == "--kv-dump") {
             KvDump();
             return EXIT_SUCCESS;
-        } else if (arg == "--portod") {
-            portodMode = true;
+        } else if (arg == "--slave") {
+            slaveMode = true;
         } else if (arg == "--stdlog") {
             stdlog = true;
         } else if (arg == "--failsafe") {
@@ -616,8 +616,8 @@ int main(int argc, char * const argv[])
         }
     }
 
-    if (portodMode)
-        return PortodMain(failsafe);
+    if (slaveMode)
+        return SlaveMain(failsafe);
     else
-        return PortoloopMain();
+        return MasterMain();
 }

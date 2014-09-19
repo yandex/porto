@@ -186,6 +186,8 @@ TError TNetlink::AddClass(uint32_t parent, uint32_t handle, uint32_t prio, uint3
     if (ceil)
         rtnl_htb_set_ceil(tclass, ceil);
 
+    rtnl_htb_set_quantum(tclass, 10000);
+
     /*
        rtnl_htb_set_rbuffer(tclass, burst);
        rtnl_htb_set_cbuffer(tclass, cburst);
@@ -394,13 +396,13 @@ TError TNetlink::AddCgroupFilter(uint32_t parent, uint32_t handle) {
     int ret;
 	struct tcmsg tchdr;
 
+    (void)RemoveCgroupFilter(parent, handle);
+
     tchdr.tcm_family = AF_UNSPEC;
     tchdr.tcm_ifindex = rtnl_link_get_ifindex(link);
     tchdr.tcm_handle = handle;
     tchdr.tcm_parent = parent;
 	tchdr.tcm_info = TC_H_MAKE(FilterPrio << 16, htons(ETH_P_IP));
-
-    (void)RemoveCgroupFilter(parent, handle);
 
 	msg = nlmsg_alloc_simple(RTM_NEWTFILTER, NLM_F_CREATE);
 	if (!msg)
@@ -424,7 +426,7 @@ TError TNetlink::AddCgroupFilter(uint32_t parent, uint32_t handle) {
 		goto free_msg;
     }
 
-    TLogger::Log() << "netlink: create tfilter" << endl;
+    TLogger::Log() << "netlink: create tfilter id 0x" << hex << handle << " parent 0x" << parent << dec  << endl;
 
     ret = nl_send_sync(sock, msg);
     if (ret) {
