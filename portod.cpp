@@ -275,6 +275,8 @@ int PortodMain(bool failsafe, bool stdlog)
 {
     int ret = EXIT_SUCCESS;
 
+    SetProcessName("portod-slave");
+
     TLogger::InitLog(LOG_FILE, LOG_FILE_PERM);
     if (stdlog)
         TLogger::LogToStd();

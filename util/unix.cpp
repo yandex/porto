@@ -13,6 +13,7 @@ extern "C" {
 #include <sys/sysinfo.h>
 #include <grp.h>
 #include <pwd.h>
+#include <sys/prctl.h>
 }
 
 int RetryBusy(int times, int timeoMs, std::function<int()> handler) {
@@ -143,4 +144,8 @@ int CreatePidFile(const std::string &path, const int mode) {
 void RemovePidFile(const std::string &path) {
     TFile f(path);
     (void)f.Remove();
+}
+
+void SetProcessName(const std::string &name) {
+    prctl(PR_SET_NAME, (void *)name.c_str());
 }

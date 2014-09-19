@@ -762,10 +762,6 @@ static void TestRoot(TPortoAPI &api) {
         "net_ceil",
         "net_priority",
         "respawn",
-        "cpu.smart",
-        "memory.limit_in_bytes",
-        "memory.low_limit_in_bytes",
-        "memory.recharge_on_pgfault",
     };
 
     std::vector<TProperty> plist;
@@ -1371,8 +1367,11 @@ int SelfTest(string name) {
 
         cerr << ">>> Truncating logs and restarting porto..." << endl;
 
-        if (Pgrep("portod") != 2)
+        if (Pgrep("portod") != 1)
             throw string("Porto is not running");
+
+        if (Pgrep("portod-slave") != 1)
+            throw string("Porto slave is not running");
 
         int pid = ReadPid(PID_FILE);
         if (kill(pid, SIGHUP))

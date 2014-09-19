@@ -17,5 +17,6 @@ std::string GetDefaultUser();
 std::string GetDefaultGroup();
 int CreatePidFile(const std::string &path, const int mode);
 void RemovePidFile(const std::string &path);
+void SetProcessName(const std::string &name);
 
 #endif

@@ -182,6 +182,8 @@ exit:
 
 int PortoloopMain(bool stdlog)
 {
+    SetProcessName("portod");
+
     TLogger::InitLog(LOOP_LOG_FILE, LOOP_LOG_FILE_PERM);
     if (stdlog)
         TLogger::LogToStd();
