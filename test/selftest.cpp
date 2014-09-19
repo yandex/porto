@@ -1334,6 +1334,22 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(parent));
 }
 
+int WordCount(const std::string &path, const std::string &word) {
+    int nr = 0;
+
+    vector<string> lines;
+    TFile log(path);
+    if (log.AsLines(lines))
+        throw string("Can't read portoloop log");
+
+    for (auto s : lines) {
+        if (s.find(word) != string::npos)
+            nr++;
+    }
+
+    return nr;
+}
+
 int SelfTest(string name) {
     pair<string, function<void(TPortoAPI &)>> tests[] = {
         { "root", TestRoot },
@@ -1383,6 +1399,9 @@ int SelfTest(string name) {
 
         WaitPortod(api);
 
+        Expect(WordCount(LOOP_LOG_FILE, "Started") == 1);
+        Expect(WordCount(LOG_FILE, "Started") == 1);
+
         for (auto t : tests) {
             if (name.length() && name != t.first)
                 continue;
@@ -1391,15 +1410,7 @@ int SelfTest(string name) {
             t.second(api);
         }
 
-        vector<string> lines;
-        TFile log(LOOP_LOG_FILE);
-        if (log.AsLines(lines))
-            throw string("Can't read portoloop log");
-
-        for (auto s : lines) {
-            if (s.find("Spawned") != string::npos)
-                respawns++;
-        }
+        respawns = WordCount(LOOP_LOG_FILE, "Spawned");
     } catch (string e) {
         cerr << "EXCEPTION: " << e << endl;
         return 1;

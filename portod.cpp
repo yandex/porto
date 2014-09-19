@@ -28,13 +28,89 @@ using namespace std;
 
 static const size_t MAX_CONNECTIONS = PORTOD_MAX_CLIENTS + 1;
 
-static pid_t portoPid;
+static pid_t slavePid;
 static volatile sig_atomic_t done = false;
-static volatile sig_atomic_t needUpdate = false;
 static volatile sig_atomic_t gotAlarm = false;
 static volatile sig_atomic_t cleanup = true;
 static volatile sig_atomic_t hup = false;
 static volatile sig_atomic_t raiseSignum = 0;
+
+static void DoExit(int signum) {
+    done = true;
+    cleanup = false;
+    raiseSignum = signum;
+}
+
+static void DoExitAndCleanup(int signum) {
+    done = true;
+    cleanup = true;
+    raiseSignum = signum;
+}
+
+static void DoHangup(int signum) {
+    hup = true;
+}
+
+static void DoAlarm(int signum) {
+    // we just need to interrupt poll
+    gotAlarm = true;
+}
+
+static void RaiseSignal(int signum) {
+    struct sigaction sa = {};
+    sa.sa_handler = SIG_DFL;
+
+    (void)sigaction(SIGTERM, &sa, NULL);
+    (void)sigaction(SIGINT, &sa, NULL);
+    (void)sigaction(SIGHUP, &sa, NULL);
+    raise(signum);
+    exit(-signum);
+}
+
+static void RegisterSignalHandlers() {
+    ResetAllSignalHandlers();
+
+    // portod may die while we are writing into communication pipe
+    (void)RegisterSignal(SIGPIPE, SIG_IGN);
+    // kill all running containers in case of SIGINT (useful for debugging)
+    (void)RegisterSignal(SIGINT, DoExitAndCleanup);
+    (void)RegisterSignal(SIGHUP, DoHangup);
+    (void)RegisterSignal(SIGALRM, DoAlarm);
+    // don't stop containers when terminating
+    (void)RegisterSignal(SIGTERM, DoExit);
+    // don't catch SIGQUIT, may be useful to create core dump
+}
+
+static int DaemonPrepare(const std::string &procName,
+                   const std::string &logPath,
+                   unsigned int logMode,
+                   bool stdlog,
+                   const std::string &pidPath,
+                   unsigned int pidMode) {
+    SetProcessName(procName.c_str());
+
+    TLogger::InitLog(logPath, logMode);
+    if (stdlog)
+        TLogger::LogToStd();
+
+    TLogger::Log() << "Started" << endl;
+
+    RegisterSignalHandlers();
+
+    if (CreatePidFile(pidPath, pidMode)) {
+        TLogger::Log() << "Can't create pid file " << pidPath << "!" << endl;
+        return EXIT_FAILURE;
+    }
+
+    return 0;
+}
+
+static void DaemonShutdown(const std::string &pidPath) {
+    TLogger::Log() << "Stopped" << endl;
+
+    TLogger::CloseLog();
+    RemovePidFile(pidPath);
+}
 
 static void RemoveRpcServer(const string &path) {
     TFile f(path);
@@ -56,6 +132,27 @@ static void HandleRequest(TContainerHolder &cholder, int fd) {
     }
 }
 
+static void IdentifyClient(int fd) {
+    struct ucred cr;
+    socklen_t len = sizeof(cr);
+
+    if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cr, &len) == 0) {
+        TFile client("/proc/" + to_string(cr.pid) + "/comm");
+        string comm;
+
+        if (client.AsString(comm))
+            comm = "unknown process";
+
+        comm.erase(remove(comm.begin(), comm.end(), '\n'), comm.end());
+        TLogger::Log() << comm
+            << " (pid " << cr.pid
+            << " uid " << cr.uid
+            << " gid " << cr.gid
+            << ") connected" << endl;
+    } else
+        TLogger::Log() << "unknown process connected" << endl;
+}
+
 static int AcceptClient(int sfd, std::vector<int> &clients) {
     int cfd;
     struct sockaddr_un peer_addr;
@@ -72,47 +169,10 @@ static int AcceptClient(int sfd, std::vector<int> &clients) {
         return -1;
     }
 
-    {
-	/* Identify client */
-        struct ucred cr;
-        socklen_t len = sizeof(cr);
-
-        if (getsockopt(cfd, SOL_SOCKET, SO_PEERCRED, &cr, &len) == 0) {
-            TFile client("/proc/" + to_string(cr.pid) + "/comm");
-            string comm;
-
-            if (client.AsString(comm))
-                comm = "unknown process";
-
-            comm.erase(remove(comm.begin(), comm.end(), '\n'), comm.end());
-            TLogger::Log() << comm
-                           << " (pid " << cr.pid
-                           << " uid " << cr.uid
-                           << " gid " << cr.gid
-                           << ") connected" << endl;
-        } else
-            TLogger::Log() << "unknown process connected" << endl;
-    }
-
+    IdentifyClient(cfd);
     clients.push_back(cfd);
 
     return 0;
-}
-
-static void DoExit(int signum) {
-    done = true;
-    cleanup = false;
-    raiseSignum = signum;
-}
-
-static void DoExitAndCleanup(int signum) {
-    done = true;
-    cleanup = true;
-    raiseSignum = signum;
-}
-
-static void DoHangup(int signum) {
-    hup = true;
 }
 
 static bool AnotherInstanceRunning(const string &path) {
@@ -258,19 +318,6 @@ static int RpcMain(TContainerHolder &cholder) {
     return ret;
 }
 
-static void ReaiseSignal(int signum) {
-    struct sigaction sa = {};
-    sa.sa_handler = SIG_DFL;
-
-    TLogger::CloseLog();
-
-    (void)sigaction(SIGTERM, &sa, NULL);
-    (void)sigaction(SIGINT, &sa, NULL);
-    (void)sigaction(SIGHUP, &sa, NULL);
-    raise(signum);
-    exit(-signum);
-}
-
 static void KvDump() {
     TKeyValueStorage storage;
     storage.Dump();
@@ -278,15 +325,16 @@ static void KvDump() {
 
 int PortodMain(bool failsafe, bool stdlog)
 {
-    int ret = EXIT_SUCCESS;
+    int ret = DaemonPrepare("portod-slave",
+                            LOG_FILE, LOG_FILE_PERM, stdlog,
+                            PID_FILE, PID_FILE_PERM);
+    if (ret)
+        return ret;
 
-    SetProcessName("portod-slave");
-
-    TLogger::InitLog(LOG_FILE, LOG_FILE_PERM);
-    if (stdlog)
-        TLogger::LogToStd();
-
-    umask(0);
+    if (AnotherInstanceRunning(RPC_SOCK)) {
+        TLogger::Log() << "Another instance of portod is running!" << endl;
+        return EXIT_FAILURE;
+    }
 
     if (system("modprobe cls_cgroup")) {
         TLogger::Log() << "Can't load cls_cgroup kernel module: " << strerror(errno) << endl;
@@ -305,28 +353,8 @@ int PortodMain(bool failsafe, bool stdlog)
             return EXIT_FAILURE;
     }
 
-    // in case client closes pipe we are writing to in the protobuf code
-    (void)RegisterSignal(SIGPIPE, SIG_IGN);
+    umask(0);
 
-    // don't stop containers when terminating
-    // don't catch SIGQUIT, may be useful to create core dump
-    (void)RegisterSignal(SIGTERM, DoExit);
-    (void)RegisterSignal(SIGHUP, DoHangup);
-
-    // kill all running containers in case of SIGINT (useful for debugging)
-    (void)RegisterSignal(SIGINT, DoExitAndCleanup);
-
-    if (AnotherInstanceRunning(RPC_SOCK)) {
-        TLogger::Log() << "Another instance of portod is running!" << endl;
-        return EXIT_FAILURE;
-    }
-
-    if (CreatePidFile(PID_FILE, PID_FILE_PERM)) {
-        TLogger::Log() << "Can't create pid file " << PID_FILE << "!" << endl;
-        return EXIT_FAILURE;
-    }
-
-    TLogger::Log() << "Started" << endl;
     try {
         TKeyValueStorage storage;
         // don't fail, try to recover anyway
@@ -362,7 +390,7 @@ int PortodMain(bool failsafe, bool stdlog)
 
         ret = RpcMain(cholder);
         if (!cleanup && raiseSignum)
-            ReaiseSignal(raiseSignum);
+            RaiseSignal(raiseSignum);
     } catch (string s) {
         cout << s << endl;
         ret = EXIT_FAILURE;
@@ -374,11 +402,12 @@ int PortodMain(bool failsafe, bool stdlog)
         ret = EXIT_FAILURE;
     }
 
-    RemovePidFile(PID_FILE);
     RemoveRpcServer(RPC_SOCK);
 
     if (raiseSignum)
-        ReaiseSignal(raiseSignum);
+        RaiseSignal(raiseSignum);
+
+    DaemonShutdown(PID_FILE);
 
     return ret;
 }
@@ -390,15 +419,6 @@ static void SendPidStatus(int fd, int pid, int status, size_t queued) {
         TLogger::Log() << "write(pid): " << strerror(errno) << endl;
     if (write(fd, &status, sizeof(status)) < 0)
         TLogger::Log() << "write(status): " << strerror(errno) << endl;
-}
-
-static void DoUpdate(int signum) {
-    needUpdate = true;
-}
-
-static void DoAlarm(int signum) {
-    // we just need to interrupt poll
-    gotAlarm = true;
 }
 
 static void ReceiveAcks(int fd, map<int,int> &pidToStatus) {
@@ -414,7 +434,6 @@ static void SignalMask(int how) {
     sigset_t mask;
     int sigs[] = { SIGALRM };
 
-
     if (sigemptyset(&mask) < 0) {
         TLogger::Log() << "Can't initialize signal mask: " << strerror(errno) << endl;
         return;
@@ -425,7 +444,6 @@ static void SignalMask(int how) {
             TLogger::Log() << "Can't add signal to mask: " << strerror(errno) << endl;
             return;
         }
-
 
     if (sigprocmask(how, &mask, NULL) < 0)
         TLogger::Log() << "Can't set signal mask: " << strerror(errno) << endl;
@@ -446,12 +464,12 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
         return EXIT_FAILURE;
     }
 
-    portoPid = fork();
-    if (portoPid < 0) {
+    slavePid = fork();
+    if (slavePid < 0) {
         TLogger::Log() << "fork(): " << strerror(errno) << endl;
         ret = EXIT_FAILURE;
         goto exit;
-    } else if (portoPid == 0) {
+    } else if (slavePid == 0) {
         close(evtfd[1]);
         close(ackfd[0]);
         TLogger::CloseLog();
@@ -466,7 +484,7 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
     close(evtfd[0]);
     close(ackfd[1]);
 
-    TLogger::Log() << "Spawned portod " << portoPid << endl;
+    TLogger::Log() << "Spawned slave " << slavePid << endl;
 
     for (auto &pair : pidToStatus)
         SendPidStatus(evtfd[1], pair.first, pair.second, pidToStatus.size());
@@ -478,14 +496,14 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
 
         ReceiveAcks(ackfd[0], pidToStatus);
 
-        if (needUpdate) {
+        if (hup) {
             TLogger::TruncateLog();
             TLogger::Log() << "Updating" << endl;
 
-            if (kill(portoPid, SIGKILL) < 0)
-                TLogger::Log() << "Can't send SIGKILL to portod: " << strerror(errno) << endl;
-            if (waitpid(portoPid, NULL, 0) != portoPid)
-                TLogger::Log() << "Can't wait for portod exit status: " << strerror(errno) << endl;
+            if (kill(slavePid, SIGKILL) < 0)
+                TLogger::Log() << "Can't send SIGKILL to slave: " << strerror(errno) << endl;
+            if (waitpid(slavePid, NULL, 0) != slavePid)
+                TLogger::Log() << "Can't wait for slave exit status: " << strerror(errno) << endl;
             TLogger::CloseLog();
             close(evtfd[1]);
             close(ackfd[0]);
@@ -511,8 +529,8 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
             TLogger::Log() << "wait(): " << strerror(errno) << endl;
             continue;
         }
-        if (pid == portoPid) {
-            TLogger::Log() << "portod exited with " << status << endl;
+        if (pid == slavePid) {
+            TLogger::Log() << "slave exited with " << status << endl;
             ret = EXIT_SUCCESS;
             break;
         }
@@ -537,35 +555,20 @@ exit:
 
 int PortoloopMain(bool stdlog)
 {
-    SetProcessName("portod");
-
-    TLogger::InitLog(LOOP_LOG_FILE, LOOP_LOG_FILE_PERM);
-    if (stdlog)
-        TLogger::LogToStd();
-
-    TLogger::Log() << "Started" << endl;
-
-    // portod may die while we are writing into communication pipe
-    (void)RegisterSignal(SIGPIPE, SIG_IGN);
-    (void)RegisterSignal(SIGINT, DoExitAndCleanup);
-    (void)RegisterSignal(SIGHUP, DoUpdate);
-    (void)RegisterSignal(SIGALRM, DoAlarm);
-
-    SignalMask(SIG_UNBLOCK);
+    int ret = DaemonPrepare("portod",
+                            LOOP_LOG_FILE, LOOP_LOG_FILE_PERM, stdlog,
+                            LOOP_PID_FILE, LOOP_PID_FILE_PERM);
+    if (ret)
+        return ret;
 
     if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0) {
         TLogger::Log() << "Can't set myself as a subreaper" << endl;
         return EXIT_FAILURE;
     }
 
-    if (CreatePidFile(LOOP_PID_FILE, LOOP_PID_FILE_PERM)) {
-        TLogger::Log() << "Can't create pid file " << LOOP_PID_FILE << "!" << endl;
-        return EXIT_FAILURE;
-    }
+    SignalMask(SIG_UNBLOCK);
 
-    int ret = EXIT_SUCCESS;
     map<int,int> pidToStatus;
-
     while (!done) {
         size_t started = GetCurrentTimeMs();
         size_t next = started + RESPAWN_DELAY_MS;
@@ -576,14 +579,10 @@ int PortoloopMain(bool stdlog)
             usleep((next - GetCurrentTimeMs()) * 1000);
     }
 
-    if (kill(portoPid, SIGINT) < 0)
+    if (kill(slavePid, SIGINT) < 0)
         TLogger::Log() << "Can't send SIGINT to portod" << endl;
 
-    TLogger::Log() << "Stopped" << endl;
-
-    TLogger::CloseLog();
-
-    RemovePidFile(LOOP_PID_FILE);
+    DaemonShutdown(LOOP_PID_FILE);
 
     return ret;
 }
@@ -606,19 +605,15 @@ int main(int argc, char * const argv[])
         if (arg == "-v" || arg == "--version") {
             cout << GIT_TAG << " " << GIT_REVISION <<endl;
             return EXIT_SUCCESS;
-
         } else if (arg == "--kv-dump") {
             KvDump();
             return EXIT_SUCCESS;
-
         } else if (arg == "--portod") {
             portodMode = true;
-
         } else if (arg == "--stdlog") {
             stdlog = true;
-
         } else if (arg == "--failsafe") {
-            failsafe = false;
+            failsafe = true;
         }
     }
 
