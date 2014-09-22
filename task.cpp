@@ -408,6 +408,10 @@ TError TTask::Start() {
     Rfd = pfd[0];
     Wfd = pfd[1];
 
+    // we want our child to have portod master as parent, so we
+    // are doing double fork here (fork + clone);
+    // we also need to know child pid so we are using pipe to send it back
+
     pid_t forkPid = fork();
     if (forkPid < 0) {
         TError error(EError::Unknown, errno, "fork()");
