@@ -22,3 +22,4 @@
 /debian/yandex-porto.debhelper.log
 /debian/yandex-porto/
 /TAGS
+/python/rpc_pb2.pyc
