@@ -1,3 +1,16 @@
+- netlink filter creation fails sometimes
+  ? add retry
+- selftest: make sure non-porto cgroups are not removed
+
+# nekt0n
+- add namespaces
+- remove using namespace std; use specific classes instead
+- tfile: get rid of streams
+- ? get rid of globals/static which have class types (http://google-styleguide.googlecode.com/svn/trunk/cppguide.html#Static_and_Global_Variables)
+- ? portoctl: robot output
+- portod: we hand if client doesn't write full message
+  ? send sigalarm to ourselves every second before reading from client?
+
 # network
 - add net_tos property via net_prio cgroup
 - ? net_prio 0-7 -> 0-99

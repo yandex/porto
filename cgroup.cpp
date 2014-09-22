@@ -25,7 +25,7 @@ TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems,
         for (auto c : subsystems)
             flags.insert(c->GetName());
 
-        Mount = make_shared<TMount>("cgroup", Tmpfs + "/" +
+        Mount = make_shared<TMount>("cgroup", SYSFS_CGROOT + "/" +
                                     CommaSeparatedList(flags),
                                     "cgroup", flags);
     }
@@ -57,23 +57,22 @@ TError TCgroup::FindChildren(std::vector<std::shared_ptr<TCgroup>> &cglist) {
     TFolder f(Path());
     vector<string> list;
 
-    // Ignore non-porto subtrees
-    if (Parent && Parent->IsRoot() && Name != PORTO_ROOT_CGROUP)
-        return TError::Success();
-
     TError error = f.Subfolders(list);
     if (error)
         return error;
 
     for (auto s : list) {
+        // Ignore non-porto subtrees
+        if (IsRoot() && s != PORTO_ROOT_CGROUP)
+            continue;
+
         auto cg = GetChild(s);
+        cglist.push_back(cg);
 
         TError error = cg->FindChildren(cglist);
         if (error)
             return error;
     }
-
-    cglist.push_back(shared_from_this());
 
     return TError::Success();
 }
@@ -129,25 +128,25 @@ TError TCgroup::Create() {
             return error;
         }
 
-        TMount debianRoot("cgroup", Tmpfs, "tmpfs", {});
-        TMount fedoraRoot("tmpfs", Tmpfs, "tmpfs", {});
         bool mountRoot = true;
-
         for (auto m : mounts) {
-            if (*m == debianRoot || *m == fedoraRoot)
+            if (m->GetMountpoint() == SYSFS_CGROOT && m->VFSType() == "tmpfs")
                 mountRoot = false;
             if (*m == *Mount)
                 return TError::Success();
         }
 
         if (mountRoot) {
-            TError error = debianRoot.Mount();
+            TMount root("cgroup", SYSFS_CGROOT, "tmpfs", {});
+            TError error = root.Mount();
             TLogger::LogError(error, "Can't mount root cgroup");
             if (error)
                 return error;
         }
     } else
         Parent->Create();
+
+    TLogger::Log() << "Create cgroup " << Path() << endl;
 
     TFolder f(Path());
     if (!f.Exists()) {
@@ -182,6 +181,7 @@ TError TCgroup::Remove() {
             TLogger::Log() << "Can't kill all tasks in cgroup " << Path() << endl;
     }
 
+    TLogger::Log() << "Remove cgroup " << Path() << endl;
     TFolder f(Path());
     TError error = f.Remove();
     TLogger::LogError(error, "Can't remove cgroup directory");
@@ -255,8 +255,6 @@ TError TCgroupSnapshot::Create() {
                  continue;
 
              auto root = subsys->GetRootCgroup(mount);
-             Cgroups.push_back(root);
-
              TError error = root->FindChildren(Cgroups);
              if (error) {
                  TLogger::LogError(error, "Can't find children for " + root->Relpath());

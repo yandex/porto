@@ -20,7 +20,7 @@ class TCgroup : public std::enable_shared_from_this<TCgroup> {
 
     std::shared_ptr<TMount> Mount;
 
-    std::string Tmpfs = "/sys/fs/cgroup";
+    const std::string SYSFS_CGROOT = "/sys/fs/cgroup";
     mode_t Mode = 0755;
     TCgroup(const TCgroup &) = delete;
     TCgroup &operator=(const TCgroup &) = delete;

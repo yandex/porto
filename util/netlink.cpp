@@ -390,13 +390,21 @@ bool TNetlink::QdiscExists(uint32_t handle) {
     return exists;
 }
 
+
+#include <iostream>
+static int ack_wait_handler(struct nl_msg *msg, void *arg)
+{
+    nl_msg_dump(msg, stderr);
+	return NL_STOP;
+}
+
 TError TNetlink::AddCgroupFilter(uint32_t parent, uint32_t handle) {
     TError error = TError::Success();
     struct nl_msg *msg;
     int ret;
 	struct tcmsg tchdr;
 
-    (void)RemoveCgroupFilter(parent, handle);
+//    (void)RemoveCgroupFilter(parent, handle);
 
     tchdr.tcm_family = AF_UNSPEC;
     tchdr.tcm_ifindex = rtnl_link_get_ifindex(link);
@@ -426,13 +434,45 @@ TError TNetlink::AddCgroupFilter(uint32_t parent, uint32_t handle) {
 		goto free_msg;
     }
 
-    TLogger::Log() << "netlink: create tfilter id 0x" << hex << handle << " parent 0x" << parent << dec  << endl;
+    TLogger::Log() << "netlink " << rtnl_link_get_name(link) << ": create tfilter id 0x" << hex << handle << " parent 0x" << parent << dec  << endl;
 
+#if 0
     ret = nl_send_sync(sock, msg);
     if (ret) {
         error = TError(EError::Unknown, string("Unable to add filter: ") + nl_geterror(ret));
         goto free_msg;
     }
+#else
+	nl_complete_msg(sock, msg);
+    nl_msg_dump(msg, stderr);
+
+	int err;
+    err = nl_send(sock, msg);
+    if (err < 0) {
+        std::cerr << "NL SEND ERROR " << nl_geterror(err) << std::endl;
+    } else {
+        nlmsg_free(msg);
+
+        struct nl_cb *sock_cb, *cb;
+
+        sock_cb = nl_socket_get_cb(sock);
+
+        cb = nl_cb_clone(sock_cb);
+        if (cb == NULL)
+            std::cerr << "NL NO MEMORY" << std::endl;
+
+        nl_cb_set(cb, NL_CB_ACK, NL_CB_CUSTOM, ack_wait_handler, NULL);
+        err = nl_recvmsgs(sock, cb);
+        nl_cb_put(cb);
+        nl_cb_put(sock_cb);
+        if (err)
+            std::cerr << "NL RECV ERROR" << std::endl;
+    }
+
+
+
+
+#endif
 
     return error;
 

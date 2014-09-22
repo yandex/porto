@@ -492,7 +492,7 @@ void TTask::Kill(int signal) const {
     if (!Pid)
         throw "Tried to kill invalid process!";
 
-    TLogger::Log() << "kill " << to_string(Pid) << endl;
+    TLogger::Log() << "kill " << signal << " " << Pid << endl;
 
     int ret = kill(Pid, signal);
     if (ret != 0) {
