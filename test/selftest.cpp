@@ -1359,22 +1359,6 @@ static void TestCgroups(TPortoAPI &api) {
     Expect(f.Remove() == false);
 }
 
-int WordCount(const std::string &path, const std::string &word) {
-    int nr = 0;
-
-    vector<string> lines;
-    TFile log(path);
-    if (log.AsLines(lines))
-        throw "Can't read log " + path;
-
-    for (auto s : lines) {
-        if (s.find(word) != string::npos)
-            nr++;
-    }
-
-    return nr;
-}
-
 int SelfTest(string name) {
     pair<string, function<void(TPortoAPI &)>> tests[] = {
         { "root", TestRoot },

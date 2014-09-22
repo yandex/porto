@@ -318,6 +318,22 @@ bool TcClassExist(const std::string &handle) {
     return nl.ClassExists(h);
 }
 
+int WordCount(const std::string &path, const std::string &word) {
+    int nr = 0;
+
+    std::vector<std::string> lines;
+    TFile log(path);
+    if (log.AsLines(lines))
+        throw "Can't read log " + path;
+
+    for (auto s : lines) {
+        if (s.find(word) != std::string::npos)
+            nr++;
+    }
+
+    return nr;
+}
+
 void TestDaemon(TPortoAPI &api) {
     struct dirent **lst;
     int pid;
@@ -331,9 +347,14 @@ void TestDaemon(TPortoAPI &api) {
 
     std::string path = ("/proc/" + std::to_string(pid) + "/fd");
 
+    // when sssd is running getgrnam opens unix socket to read database
+    int sssFd = 0;
+    if (WordCount("/etc/nsswitch.conf", "sss"))
+        sssFd = 1;
+
     // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 4(rpc socket) 128(event pipe) 129(ack pipe)
     ExpectReturn([&]{ return scandir(path.c_str(), &lst, NULL, alphasort); },
-                 2 + 7, 5, __LINE__, __func__);
+                 2 + 7 + sssFd, 5, __LINE__, __func__);
 
     Say() << "Make sure portod-slave doesn't have zombies" << std::endl;
     pid = ReadPid(LOOP_PID_FILE);
@@ -342,7 +363,7 @@ void TestDaemon(TPortoAPI &api) {
     path = ("/proc/" + std::to_string(pid) + "/fd");
     // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 5(event pipe) 6(ack pipe)
     ExpectReturn([&]{ return scandir(path.c_str(), &lst, NULL, alphasort); },
-                 2 + 6, 5, __LINE__, __func__);
+                 2 + 6 + sssFd, 5, __LINE__, __func__);
 
     // TODO: check portoloop queue
     // TODO: check rtnl classes

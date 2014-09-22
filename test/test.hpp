@@ -36,6 +36,7 @@ namespace Test {
     bool HaveCgKnob(const std::string &subsys, const std::string &knob);
     int GetVmRss(const std::string &pid);
     bool TcClassExist(const std::string &handle);
+    int WordCount(const std::string &path, const std::string &word);
 
     void TestDaemon(TPortoAPI &api);
 
