@@ -1335,6 +1335,30 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(parent));
 }
 
+static void TestCgroups(TPortoAPI &api) {
+    string cg = "/sys/fs/cgroup/freezer/qwerty/asdfg";
+
+    TFolder f(cg);
+    if (f.Exists())
+        Expect(f.Remove() == false);
+    Expect(f.Create(0755, true) == false);
+
+    int pid = ReadPid(PID_FILE);
+    if (kill(pid, SIGINT))
+        throw string("Can't send SIGINT to slave");
+
+    WaitPortod(api);
+
+    pid = ReadPid(PID_FILE);
+    if (kill(pid, SIGINT))
+        throw string("Can't send SIGINT to slave");
+
+    WaitPortod(api);
+
+    Expect(f.Exists() == true);
+    Expect(f.Remove() == false);
+}
+
 int WordCount(const std::string &path, const std::string &word) {
     int nr = 0;
 
@@ -1376,6 +1400,7 @@ int SelfTest(string name) {
 
         { "daemon", TestDaemon },
         { "recovery", TestRecovery },
+        { "cgroups", TestCgroups },
     };
 
     int respawns = 0;
@@ -1431,7 +1456,7 @@ int SelfTest(string name) {
     cerr << "SUCCESS: All tests successfully passed!" << endl;
     if (!CanTestLimits())
         cerr << "WARNING: Due to missing kernel support, memory_guarantee/cpu_policy has not been tested!" << endl;
-    if (respawns != 1 + 2)
+    if (respawns != 1 /* start */ + 2 /* TestRecovery */ + 2 /* TestCgroups */)
         cerr << "WARNING: Unexpected number of respawns: " << respawns << "!" << endl;
 
     return 0;

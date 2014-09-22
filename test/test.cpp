@@ -335,10 +335,10 @@ void TestDaemon(TPortoAPI &api) {
     ExpectReturn([&]{ return scandir(path.c_str(), &lst, NULL, alphasort); },
                  2 + 7, 5, __LINE__, __func__);
 
-    Say() << "Make sure portoloop doesn't have zombies" << std::endl;
+    Say() << "Make sure portod-slave doesn't have zombies" << std::endl;
     pid = ReadPid(LOOP_PID_FILE);
 
-    Say() << "Make sure portoloop doesn't have invalid FDs" << std::endl;
+    Say() << "Make sure portod-slave doesn't have invalid FDs" << std::endl;
     path = ("/proc/" + std::to_string(pid) + "/fd");
     // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 5(event pipe) 6(ack pipe)
     ExpectReturn([&]{ return scandir(path.c_str(), &lst, NULL, alphasort); },
