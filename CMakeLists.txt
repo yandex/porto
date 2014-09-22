@@ -33,12 +33,12 @@ add_custom_command(OUTPUT TAGS COMMAND ctags -R -e --c++-kinds=+p --fields=+iaS 
 add_executable(portod tags portod.cpp cgroup.cpp rpc.cpp container.cpp task.cpp kvalue.cpp subsystem.cpp error.cpp property.cpp qdisc.cpp util/netlink.cpp util/log.cpp util/protobuf.cpp util/mount.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp
     ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(portod version.hpp)
-target_link_libraries(portod ${PB} ${RTNL} ${NL} pthread)
+target_link_libraries(portod ${PB} ${RTNL} ${NL} pthread rt)
 
 add_executable(portoctl portoctl.cpp error.cpp libporto.cpp util/log.cpp util/protobuf.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(portoctl version.hpp)
-target_link_libraries(portoctl ${PB} pthread)
+target_link_libraries(portoctl ${PB} pthread rt)
 
 add_executable(portotest portotest.cpp error.cpp test/selftest.cpp test/stresstest.cpp test/test.cpp libporto.cpp util/netlink.cpp util/log.cpp util/protobuf.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(portotest version.hpp)
-target_link_libraries(portotest ${PB} ${RTNL} ${NL} pthread)
+target_link_libraries(portotest ${PB} ${RTNL} ${NL} pthread rt)

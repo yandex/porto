@@ -7,7 +7,7 @@
 extern "C" {
 #include <unistd.h>
 #include <errno.h>
-#include <sys/time.h>
+#include <time.h>
 #include <string.h>
 #include <libgen.h>
 #include <sys/sysinfo.h>
@@ -66,9 +66,9 @@ int GetPid() {
 }
 
 size_t GetCurrentTimeMs() {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return tv.tv_sec * 1000 + tv.tv_usec / 1000;
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
 
 int RegisterSignal(int signum, void (*handler)(int)) {
