@@ -9,6 +9,7 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/prctl.h>
 }
 
 static std::ofstream logFile;
@@ -83,17 +84,22 @@ static std::string GetTime() {
 }
 
 std::basic_ostream<char> &TLogger::Log() {
+    char name[17];
+
+    if (prctl(PR_GET_NAME, (void *)name) < 0)
+        strncpy(name, program_invocation_short_name, sizeof(name));
+
     if (stdlog)
-        return std::cerr << GetTime() << " " << program_invocation_short_name << ": ";
+        return std::cerr << GetTime() << " " << name << ": ";
 
     OpenLog();
 
     if (logFile.is_open())
         return logFile << GetTime() << " ";
     else if (kmsgFile.is_open())
-        return kmsgFile << " " << program_invocation_short_name << ": ";
+        return kmsgFile << " " << name << ": ";
     else
-        return std::cerr << GetTime() << " " << program_invocation_short_name << ": ";
+        return std::cerr << GetTime() << " " << name << ": ";
 }
 
 void TLogger::LogAction(const std::string &action, bool error, int errcode) {
