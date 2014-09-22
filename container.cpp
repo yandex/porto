@@ -377,6 +377,7 @@ TError TContainer::PrepareNetwork() {
     if (error)
         return error;
 
+    (void)Tclass->Remove();
     error = Tclass->Create(prio, rate, ceil);
     if (error) {
         TLogger::LogError(error, "Can't create tclass");
@@ -486,6 +487,7 @@ TError TContainer::Create() {
         uint32_t rootHandle = TcHandle(Id, 0);
 
         Qdisc = make_shared<TQdisc>(rootHandle, defHandle);
+        (void)Qdisc->Remove();
         error = Qdisc->Create();
         if (error) {
             TLogger::LogError(error, "Can't create root qdisc");
@@ -493,6 +495,7 @@ TError TContainer::Create() {
         }
 
         Filter = make_shared<TFilter>(Qdisc);
+        (void)Filter->Remove();
         error = Filter->Create();
         if (error) {
             TLogger::LogError(error, "Can't create tc filter");
@@ -500,6 +503,7 @@ TError TContainer::Create() {
         }
 
         DefaultTclass = make_shared<TTclass>(Qdisc, defHandle);
+        (void)DefaultTclass->Remove();
         error = DefaultTclass->Create(DEF_CLASS_PRIO, DEF_CLASS_RATE, DEF_CLASS_CEIL);
         if (error) {
             TLogger::LogError(error, "Can't create default tclass");

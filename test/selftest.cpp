@@ -813,6 +813,7 @@ static void TestRoot(TPortoAPI &api) {
     Expect(nl.ClassExists(defClass) == true);
     Expect(nl.ClassExists(rootClass) == true);
     Expect(nl.ClassExists(nextClass) == false);
+
     Expect(nl.CgroupFilterExists(rootQdisc, 1) == true);
     Expect(nl.CgroupFilterExists(rootQdisc, 2) == false);
 }

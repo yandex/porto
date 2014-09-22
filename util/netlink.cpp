@@ -15,7 +15,6 @@ extern "C" {
 #include <netlink/route/rtnl.h>
 #include <netlink/route/link.h>
 #include <netlink/route/link.h>
-
 }
 
 using namespace std;
@@ -169,8 +168,6 @@ TError TNetlink::AddClass(uint32_t parent, uint32_t handle, uint32_t prio, uint3
     rtnl_tc_set_link(TC_CAST(tclass), link);
     rtnl_tc_set_parent(TC_CAST(tclass), parent);
     rtnl_tc_set_handle(TC_CAST(tclass), handle);
-
-    rtnl_class_delete(sock, tclass);
 
     ret = rtnl_tc_set_kind(TC_CAST(tclass), "htb");
     if (ret < 0) {
@@ -344,9 +341,6 @@ TError TNetlink::AddHTB(uint32_t parent, uint32_t handle, uint32_t defaultClass)
     rtnl_tc_set_link(TC_CAST(qdisc), link);
     rtnl_tc_set_parent(TC_CAST(qdisc), parent);
 
-    // delete current qdisc
-    rtnl_qdisc_delete(sock, qdisc);
-
     rtnl_tc_set_handle(TC_CAST(qdisc), handle);
 
     ret = rtnl_tc_set_kind(TC_CAST(qdisc), "htb");
@@ -434,6 +428,9 @@ TError TNetlink::AddCgroupFilter(uint32_t parent, uint32_t handle) {
         goto free_msg;
     }
 
+    if (!CgroupFilterExists(parent, handle))
+        error = TError(EError::Unknown, "BUG: created filter doesn't exist");
+
     return error;
 
 free_msg:
@@ -447,8 +444,10 @@ bool TNetlink::CgroupFilterExists(uint32_t parent, uint32_t handle) {
     struct nl_cache *clsCache;
 
     ret = rtnl_cls_alloc_cache(sock, rtnl_link_get_ifindex(link), parent, &clsCache);
-    if (ret < 0)
+    if (ret < 0) {
+        TLogger::Log() << "Can't allocate filter cache: " << nl_geterror(ret) << endl;
         return false;
+    }
 
     if (DEBUG_NETLINK)
         LogCache(clsCache);
@@ -493,7 +492,9 @@ TError TNetlink::RemoveCgroupFilter(uint32_t parent, uint32_t handle) {
 
     LogObj("remove", cls);
 
-    (void)rtnl_cls_delete(sock, cls, 0);
+    ret = rtnl_cls_delete(sock, cls, 0);
+    if (ret < 0)
+        error = TError(EError::Unknown, string("Unable to remove filter: ") + nl_geterror(ret));
 
 free_cls:
     rtnl_cls_put(cls);
