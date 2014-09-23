@@ -419,7 +419,7 @@ static void TestLongRunning(TPortoAPI &api) {
     Expect(GetNamespace("self", "ipc") == GetNamespace(pid, "ipc"));
     Expect(GetNamespace("self", "net") == GetNamespace(pid, "net"));
     //Expect(GetNamespace("self", "user") == GetNamespace(pid, "user"));
-    Expect(GetNamespace("self", "uts") != GetNamespace(pid, "uts"));
+    Expect(GetNamespace("self", "uts") == GetNamespace(pid, "uts"));
 
     Say() << "Check that task cgroups are correct" << endl;
     auto cgmap = GetCgroups("self");
@@ -487,6 +487,16 @@ static void TestIsolation(TPortoAPI &api) {
 
     ExpectSuccess(api.GetData(name, "stdout", ret));
     Expect(ret == string("1\n"));
+
+    ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.SetProperty(name, "command", "ps aux"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    WaitExit(api, pid);
+
+    ExpectSuccess(api.GetData(name, "stdout", ret));
+    Expect(std::count(ret.begin(), ret.end(), '\n') == 2);
 
     Say() << "Make sure container has correct network class" << endl;
 

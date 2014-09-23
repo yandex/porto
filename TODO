@@ -1,8 +1,7 @@
-- selftest: make sure non-porto cgroups are not removed
 - watchdog
 - full dump on sigsegv
 - ? portoctl kill -SIGXYZ <name> to send signal to container root_pid
-- ? portoctl enter <name> to enter container (use nsenter)
+- ? portoctl enter <name> [command] to enter container (use nsenter)
 
 # nekt0n
 - add namespaces

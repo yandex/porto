@@ -355,7 +355,7 @@ int TTask::ChildCallback() {
 
     // remount proc so PID namespace works
     TMount proc("proc", "/proc", "proc", {});
-    if (proc.MountPrivate()) {
+    if (proc.Mount()) {
         Syslog(string("remount procfs: ") + strerror(errno));
         ReportResultAndExit(Wfd, -errno);
     }
@@ -423,7 +423,7 @@ TError TTask::Start() {
         (void)setsid();
 
         int cloneFlags = SIGCHLD;
-        cloneFlags |= CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWUTS;
+        cloneFlags |= CLONE_NEWPID | CLONE_NEWNS;
 
         pid_t clonePid = clone(ChildFn, stack + sizeof(stack), cloneFlags, this);
         if (write(Wfd, &clonePid, sizeof(clonePid))) {}

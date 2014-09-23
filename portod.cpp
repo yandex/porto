@@ -566,6 +566,11 @@ static int MasterMain()
         return EXIT_FAILURE;
     }
 
+    TMountSnapshot ms;
+    TError error = ms.RemountSlave();
+    if (error)
+        TLogger::LogError(error, "Can't remount shared mountpoints");
+
     SignalMask(SIG_UNBLOCK);
 
     map<int,int> pidToStatus;

@@ -62,6 +62,7 @@ class TMountSnapshot {
 public:
     TMountSnapshot(const std::string &path = "/proc/self/mounts") : Path(path) {}
     TError Mounts(std::set<std::shared_ptr<TMount>> &mounts) const;
+    TError RemountSlave();
 };
 
 #endif

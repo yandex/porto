@@ -58,3 +58,21 @@ TError TMountSnapshot::Mounts(std::set<std::shared_ptr<TMount>> &mounts) const {
 
     return TError::Success();
 }
+
+TError TMountSnapshot::RemountSlave() {
+    // systemd mounts / with MS_SHARED so any changes made to it in the container
+    // are propagated back (in particular, mounting new /proc breaks host)
+    set<shared_ptr<TMount>> mounts;
+
+    TError error = Mounts(mounts);
+    if (error)
+        return error;
+
+    for (auto &m : mounts) {
+        error = m->Mount(MS_SLAVE);
+        if (error)
+            TLogger::Log() << "Can't remount " << m->GetMountpoint() << endl;
+    }
+
+    return TError::Success();
+}
