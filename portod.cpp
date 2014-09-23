@@ -118,7 +118,7 @@ static void RemoveRpcServer(const string &path) {
 }
 
 static void HandleRequest(TContainerHolder &cholder, int fd) {
-    google::protobuf::io::FileInputStream pist(fd);
+    NonblockingInputStream pist(fd);
     google::protobuf::io::FileOutputStream post(fd);
 
     rpc::TContainerRequest request;

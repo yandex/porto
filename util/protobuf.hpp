@@ -16,3 +16,22 @@ bool ReadDelimitedFrom(google::protobuf::io::ZeroCopyInputStream* rawInput,
 
 TError ConnectToRpcServer(const std::string& path, int &fd);
 TError CreateRpcServer(const std::string &path, const int mode, const int uid, const int gid, int &fd);
+
+class NonblockingInputStream : public google::protobuf::io::ZeroCopyInputStream {
+    int Fd;
+    int64_t Pos = 0;
+    int64_t Backed = 0;
+    std::vector<uint8_t> buf;
+    const ssize_t CHUNK_SIZE = 1024;
+
+    void ReserveChunk();
+
+public:
+    explicit NonblockingInputStream(int fd);
+    ~NonblockingInputStream();
+
+    bool Next(const void **data, int *size);
+    void BackUp(int count);
+    bool Skip(int count);
+    int64_t ByteCount() const;
+};

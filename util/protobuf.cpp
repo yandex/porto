@@ -9,6 +9,7 @@ extern "C" {
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 }
 
 bool WriteDelimitedTo(
@@ -122,4 +123,66 @@ TError CreateRpcServer(const std::string &path, const int mode, const int uid, c
     }
 
     return TError::Success();
+}
+
+void NonblockingInputStream::ReserveChunk() {
+    if (buf.size() + CHUNK_SIZE > buf.capacity())
+        buf.reserve(buf.size() + CHUNK_SIZE);
+}
+
+NonblockingInputStream::NonblockingInputStream(int fd) : Fd(fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
+        throw "Can't update fd to non-blocking";
+}
+
+NonblockingInputStream::~NonblockingInputStream() {
+}
+
+bool NonblockingInputStream::Next(const void **data, int *size) {
+    int n;
+
+    if (Backed) {
+        *data = &buf[Pos - Backed];
+        *size = Backed;
+        Backed = 0;
+
+        return true;
+    }
+
+    ReserveChunk();
+
+    *data = &buf[Pos];
+    *size = 0;
+    while ((n = read(Fd, &buf[Pos], CHUNK_SIZE)) > 0) {
+        Pos += n;
+        *size += n;
+
+        if (n < CHUNK_SIZE)
+            break;
+
+        ReserveChunk();
+    }
+
+    return *size != 0;
+}
+
+void NonblockingInputStream::BackUp(int count) {
+    Backed = count;
+}
+
+bool NonblockingInputStream::Skip(int count) {
+    while (count) {
+        uint8_t tmp;
+        int n = read(Fd, &tmp, 1);
+        if (n != 1)
+            return false;
+        count--;
+    }
+
+    return true;
+}
+
+int64_t NonblockingInputStream::ByteCount() const {
+    return Pos - Backed;
 }
