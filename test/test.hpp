@@ -40,7 +40,7 @@ namespace Test {
 
     void TestDaemon(TPortoAPI &api);
 
-    int SelfTest(std::string name);
+    int SelfTest(std::string name, int leakNr);
     int StressTest(int threads, int iter, bool killPorto);
 }
 

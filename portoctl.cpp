@@ -8,6 +8,14 @@
 #include "util/string.hpp"
 #include "util/unix.hpp"
 
+extern "C" {
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <fcntl.h>
+#include <wordexp.h>
+}
+
 using namespace std;
 
 static string DataValue(const string &name, const string &val) {
@@ -68,14 +76,22 @@ public:
         return rpc::EError_Name(static_cast<rpc::EError>(err));
     }
 
-    void PrintError(const string &str) {
-        int error;
-        string msg;
-        Api.GetLastError(error, msg);
-        if (msg.length())
-            cerr << str << ": " << ErrorName(error) << " (" << msg << ")" << endl;
+    void PrintError(const TError &error, const string &str) {
+        if (error.GetMsg().length())
+            cerr << str << ": " << ErrorName(error.GetError()) << " (" << error.GetMsg() << ")" << endl;
         else
-            cerr << str << ": " << ErrorName(error) << endl;
+            cerr << str << ": " << ErrorName(error.GetError()) << endl;
+
+    }
+
+    void PrintError(const string &str) {
+        int num;
+        string msg;
+
+        Api.GetLastError(num, msg);
+
+        TError error((EError)num, msg);
+        PrintError(error, str);
     }
 
     bool ValidArgs(int argc, char *argv[]) {
@@ -427,6 +443,113 @@ public:
     }
 };
 
+class TEnterCmd : public ICmd {
+public:
+    TEnterCmd() : ICmd("enter", 1, "<name> [command]", "execute command in container namespace") {}
+
+    void PrintErrno(const string &str) {
+        cerr << str << ": " << strerror(errno) << endl;
+    }
+
+    int OpenFd(int pid, string v) {
+        string path = "/proc/" + to_string(pid) + "/" + v;
+        int fd = open(path.c_str(), O_RDONLY | O_NONBLOCK);
+        if (fd < 0) {
+            PrintErrno("Can't open [" + path + "] " + to_string(fd));
+            throw "";
+        }
+
+        return fd;
+    }
+
+    int Execute(int argc, char *argv[])
+    {
+        string cmd = "";
+        for (int i = 1; i < argc; i++) {
+            cmd += argv[i];
+            cmd += " ";
+        }
+
+        if (!cmd.length())
+            cmd = "/bin/bash";
+
+        // order is important
+        pair<string, int> nameToType[] = {
+            //{ "ns/user", CLONE_NEWUSER },
+            { "ns/ipc", CLONE_NEWIPC },
+            { "ns/uts", CLONE_NEWUTS },
+            { "ns/net", CLONE_NEWNET },
+            { "ns/pid", CLONE_NEWPID },
+            { "ns/mnt", CLONE_NEWNS },
+        };
+
+        string pidStr;
+        int ret = Api.GetData(argv[0], "root_pid", pidStr);
+        if (ret) {
+            PrintError("Can't get container root_pid");
+            return EXIT_FAILURE;
+        }
+
+        int pid;
+        TError error = StringToInt(pidStr, pid);
+        if (error) {
+            PrintError(error, "Can't parse root_pid");
+            return EXIT_FAILURE;
+        }
+
+        int rootFd = OpenFd(pid, "root");
+        int cwdFd = OpenFd(pid, "cwd");
+
+        for (auto &p : nameToType) {
+            int fd = OpenFd(pid, p.first);
+            if (setns(fd, p.second)) {
+                PrintErrno("Can't set namespace");
+                return EXIT_FAILURE;
+            }
+            close(fd);
+        }
+
+        if (fchdir(rootFd) < 0) {
+            PrintErrno("Can't change root directory");
+            return EXIT_FAILURE;
+        }
+
+        if (chroot(".") < 0) {
+            PrintErrno("Can't change root directory");
+            return EXIT_FAILURE;
+        }
+        close(rootFd);
+
+        if (fchdir(cwdFd) < 0) {
+            PrintErrno("Can't change root directory");
+            return EXIT_FAILURE;
+        }
+        close(cwdFd);
+
+        wordexp_t result;
+        ret = wordexp(cmd.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
+        if (ret) {
+            errno = EINVAL;
+            PrintErrno("Can't parse command");
+            return EXIT_FAILURE;
+        }
+
+        int status = EXIT_FAILURE;
+        int child = fork();
+        if (child) {
+            if (waitpid(child, &status, 0) < 0)
+                PrintErrno("Can't wait child");
+        } else if (child < 0) {
+            PrintErrno("Can't fork");
+        } else {
+            execvp(result.we_wordv[0], (char *const *)result.we_wordv);
+            PrintErrno("Can't execute " + string(result.we_wordv[0]));
+        }
+
+        return status;
+    }
+};
+
 void TryExec(int argc, char *argv[]) {
     string name(argv[1]);
 
@@ -457,6 +580,7 @@ int main(int argc, char *argv[])
         new TGetDataCmd(),
         new TGetCmd(),
         new TRawCmd(),
+        new TEnterCmd(),
     };
 
     if (argc <= 1) {
