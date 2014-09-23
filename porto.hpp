@@ -25,6 +25,7 @@ const size_t STDOUT_READ_BYTES = 8 * 1024 * 1024;
 const size_t CONTAINER_AGING_TIME_MS = 60 * 60 * 24 * 7 * 1000;
 const size_t RESPAWN_DELAY_MS = 1000;
 const size_t HEARTBEAT_DELAY_MS = 1000;
+const size_t WATCHDOG_MAX_FAILS = 5;
 
 const size_t MEMORY_GUARANTEE_RESERVE = 2 * 1024 * 1024 * 1024UL;
 
