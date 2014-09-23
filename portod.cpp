@@ -9,6 +9,7 @@
 #include "util/log.hpp"
 #include "util/protobuf.hpp"
 #include "util/unix.hpp"
+#include "util/crash.hpp"
 
 extern "C" {
 #include <fcntl.h>
@@ -80,6 +81,7 @@ static void RegisterSignalHandlers() {
     // don't stop containers when terminating
     (void)RegisterSignal(SIGTERM, DoExit);
     // don't catch SIGQUIT, may be useful to create core dump
+    (void)RegisterSignal(SIGSEGV, SigsegvHandler);
 }
 
 static int DaemonPrepare(const std::string &procName,
@@ -278,6 +280,7 @@ static int RpcMain(TContainerHolder &cholder) {
         if (heartbeat + HEARTBEAT_DELAY_MS <= GetCurrentTimeMs()) {
             cholder.Heartbeat();
             heartbeat = GetCurrentTimeMs();
+            WatchdogStrobe();
         }
 
         if (hup) {
@@ -323,7 +326,7 @@ static void KvDump() {
     storage.Dump();
 }
 
-static int SlaveMain(bool failsafe)
+static int SlaveMain(bool failsafe, bool noWatchdog)
 {
     int ret = DaemonPrepare("portod-slave",
                             LOG_FILE, LOG_FILE_PERM,
@@ -387,6 +390,9 @@ static int SlaveMain(bool failsafe)
         }
 
         cs.Destroy();
+
+        if (!noWatchdog)
+            WatchdogStart();
 
         ret = RpcMain(cholder);
         if (!cleanup && raiseSignum)
@@ -478,7 +484,7 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
         close(evtfd[0]);
         close(ackfd[1]);
 
-        exit(SlaveMain(false));
+        exit(SlaveMain(false, false));
     }
 
     close(evtfd[0]);
@@ -596,6 +602,7 @@ int main(int argc, char * const argv[])
 {
     bool slaveMode = false;
     bool failsafe = false;
+    bool noWatchdog = false;
     int argn;
 
     if (getuid() != 0) {
@@ -618,11 +625,13 @@ int main(int argc, char * const argv[])
             stdlog = true;
         } else if (arg == "--failsafe") {
             failsafe = true;
+        } else if (arg == "--nowatch") {
+            noWatchdog = true;
         }
     }
 
     if (slaveMode)
-        return SlaveMain(failsafe);
+        return SlaveMain(failsafe, noWatchdog);
     else
         return MasterMain();
 }

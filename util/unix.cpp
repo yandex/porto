@@ -75,9 +75,16 @@ int RegisterSignal(int signum, void (*handler)(int)) {
     struct sigaction sa = {};
 
     sa.sa_handler = handler;
-    if (sigaction(signum, &sa, NULL) < 0)
-        return -1;
-    return 0;
+    return sigaction(signum, &sa, NULL);
+}
+
+int RegisterSignal(int signum, void (*handler)(int sig, siginfo_t *si, void *unused)) {
+    struct sigaction sa = {};
+
+    sa.sa_sigaction = handler;
+    sa.sa_flags = SA_SIGINFO;
+
+    return sigaction(signum, &sa, NULL);
 }
 
 void ResetAllSignalHandlers(void) {

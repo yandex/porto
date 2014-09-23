@@ -10,6 +10,7 @@ int SleepWhile(int timeoMs, std::function<int()> handler);
 int GetPid();
 size_t GetCurrentTimeMs();
 int RegisterSignal(int signum, void (*handler)(int));
+int RegisterSignal(int signum, void (*handler)(int sig, siginfo_t *si, void *unused));
 void ResetAllSignalHandlers(void);
 std::string DirName(const std::string &str);
 size_t GetTotalMemory();

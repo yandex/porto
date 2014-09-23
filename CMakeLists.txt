@@ -30,7 +30,7 @@ add_custom_command(OUTPUT tags COMMAND ctags -R --c++-kinds=+p --fields=+iaS --e
 set_source_files_properties(TAGS PROPERTIES GENERATED true)
 add_custom_command(OUTPUT TAGS COMMAND ctags -R -e --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
-add_executable(portod tags portod.cpp cgroup.cpp rpc.cpp container.cpp task.cpp kvalue.cpp subsystem.cpp error.cpp property.cpp qdisc.cpp util/netlink.cpp util/log.cpp util/protobuf.cpp util/mount.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp
+add_executable(portod tags portod.cpp cgroup.cpp rpc.cpp container.cpp task.cpp kvalue.cpp subsystem.cpp error.cpp property.cpp qdisc.cpp util/netlink.cpp util/log.cpp util/protobuf.cpp util/mount.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp util/crash.cpp
     ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(portod version.hpp)
 target_link_libraries(portod ${PB} ${RTNL} ${NL} pthread rt)
