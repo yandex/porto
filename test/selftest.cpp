@@ -1235,37 +1235,37 @@ static void TestRespawn(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
+static int LeakConainersNr;
 static void TestLeaks(TPortoAPI &api) {
     string pid;
     string name;
-    int nr = 1000;
     int slack = 4096;
 
     TFile f(PID_FILE);
     Expect(f.AsString(pid) == false);
 
-    for (int i = 0; i < nr; i++) {
+    for (int i = 0; i < LeakConainersNr; i++) {
         name = "a" + to_string(i);
         ExpectSuccess(api.Create(name));
         ExpectSuccess(api.SetProperty(name, "command", "true"));
         ExpectSuccess(api.Start(name));
     }
 
-    for (int i = 0; i < nr; i++) {
+    for (int i = 0; i < LeakConainersNr; i++) {
         name = "a" + to_string(i);
         ExpectSuccess(api.Destroy(name));
     }
 
     int prev = GetVmRss(pid);
 
-    for (int i = 0; i < nr; i++) {
+    for (int i = 0; i < LeakConainersNr; i++) {
         name = "b" + to_string(i);
         ExpectSuccess(api.Create(name));
         ExpectSuccess(api.SetProperty(name, "command", "true"));
         ExpectSuccess(api.Start(name));
     }
 
-    for (int i = 0; i < nr; i++) {
+    for (int i = 0; i < LeakConainersNr; i++) {
         name = "b" + to_string(i);
         ExpectSuccess(api.Destroy(name));
     }
@@ -1369,7 +1369,7 @@ static void TestCgroups(TPortoAPI &api) {
     Expect(f.Remove() == false);
 }
 
-int SelfTest(string name) {
+int SelfTest(string name, int leakNr) {
     pair<string, function<void(TPortoAPI &)>> tests[] = {
         { "root", TestRoot },
         { "stats", TestStats },
@@ -1396,6 +1396,8 @@ int SelfTest(string name) {
         { "recovery", TestRecovery },
         { "cgroups", TestCgroups },
     };
+
+    LeakConainersNr = leakNr;
 
     int respawns = 0;
     try {

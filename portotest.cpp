@@ -9,9 +9,13 @@ using namespace std;
 
 static int Selftest(int argc, char *argv[]) {
     string test = "";
-    if (argc >= 1)
-        test = argv[0];
-    return Test::SelfTest(test);
+    int leakNr = 1000;
+    if (argc >= 1) {
+        TError error = StringToInt(argv[0], leakNr);
+        if (error)
+            test = argv[0];
+    }
+    return Test::SelfTest(test, leakNr);
 }
 
 static int Stresstest(int argc, char *argv[]) {
