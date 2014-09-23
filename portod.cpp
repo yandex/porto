@@ -95,6 +95,7 @@ static int DaemonPrepare(const std::string &procName,
     if (stdlog)
         TLogger::LogToStd();
 
+    TLogger::Log() << "--------------------------------------------------------------------------------" << endl;
     TLogger::Log() << "Started" << endl;
 
     RegisterSignalHandlers();
