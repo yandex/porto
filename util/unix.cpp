@@ -100,6 +100,12 @@ void ResetAllSignalHandlers(void) {
 
         (void)sigaction(sig, &sa, NULL);
     }
+
+    sigset_t mask;
+    if (sigemptyset(&mask) < 0)
+        return;
+
+    (void)sigprocmask(SIG_SETMASK, &mask, NULL);
 }
 
 std::string DirName(const std::string &str) {
