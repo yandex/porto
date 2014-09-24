@@ -1,0 +1,11 @@
+package init;
+
+message TConfig {
+	required string container = 1;
+
+	message TConfigKeyVal {
+		required string name = 1;
+		required string value = 2;
+	}
+	repeated TConfigKeyVal property = 2;
+}
