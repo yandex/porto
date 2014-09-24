@@ -23,7 +23,7 @@ public:
         if (!e)
             return;
 
-        Log() << " Error(" << e.GetErrorName() << "): " << s << ": " << e.GetMsg() << std::endl;
+        Log() << "Error(" << e.GetErrorName() << "): " << s << ": " << e.GetMsg() << std::endl;
     }
 };
 
