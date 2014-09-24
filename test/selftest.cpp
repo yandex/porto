@@ -1400,6 +1400,7 @@ int SelfTest(string name, int leakNr) {
     LeakConainersNr = leakNr;
 
     int respawns = 0;
+    int errors = 0;
     try {
         TPortoAPI api;
 
@@ -1444,6 +1445,7 @@ int SelfTest(string name, int leakNr) {
         }
 
         respawns = WordCount(LOOP_LOG_FILE, "Spawned");
+        errors = WordCount(LOG_FILE, "Error");
     } catch (string e) {
         cerr << "EXCEPTION: " << e << endl;
         return 1;
@@ -1454,6 +1456,8 @@ int SelfTest(string name, int leakNr) {
         cerr << "WARNING: Due to missing kernel support, memory_guarantee/cpu_policy has not been tested!" << endl;
     if (respawns != 1 /* start */ + 2 /* TestRecovery */ + 2 /* TestCgroups */)
         cerr << "WARNING: Unexpected number of respawns: " << respawns << "!" << endl;
+    if (errors)
+        cerr << "WARNING: Unexpected number of errors: " << errors << "!" << endl;
 
     return 0;
 }
