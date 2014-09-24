@@ -2,6 +2,8 @@ import rpc_pb2
 import socket
 import sys
 
+from porto import exceptions
+
 ################################################################################
 def _VarintEncoder():
   """Return an encoder for a basic varint value (does not include tag)."""
@@ -58,8 +60,7 @@ class PortoAPI:
         try:
             self.sock.connect('/var/run/portod.socket')
         except socket.error, msg:
-            print >>sys.stderr, msg
-            sys.exit(1)
+            raise exceptions.SocketError("Can't open /var/run/portod.socket")
 
     def _rpc(self, request):
         data = request.SerializeToString()

@@ -1,0 +1,2 @@
+class SocketError(Exception):
+    pass
