@@ -32,7 +32,8 @@ TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems,
 }
 
 TCgroup::~TCgroup() {
-    Remove();
+    if (Exists())
+        Remove();
 }
 
 shared_ptr<TCgroup> TCgroup::GetChild(const std::string& name) {
@@ -183,10 +184,17 @@ TError TCgroup::Remove() {
 
     TLogger::Log() << "Remove cgroup " << Path() << endl;
     TFolder f(Path());
+    if (!f.Exists())
+        return TError(EError::Unknown, "Cgroup doesn't exist");
     TError error = f.Remove();
     TLogger::LogError(error, "Can't remove cgroup directory");
 
     return TError::Success();
+}
+
+bool TCgroup::Exists() {
+    TFolder f(Path());
+    return f.Exists();
 }
 
 TError TCgroup::Kill(int signal) const {

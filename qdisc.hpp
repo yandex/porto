@@ -4,16 +4,19 @@
 #include <memory>
 #include <string>
 
+#include "porto.hpp"
 #include "error.hpp"
 #include "util/netlink.hpp"
+
+#include "util/log.hpp"
 
 class TQdisc {
     const uint32_t Handle;
     const uint32_t DefClass;
 
+    NO_COPY_CONSTRUCT(TQdisc);
 public:
     TQdisc(uint32_t handle, uint32_t defClass) : Handle(handle), DefClass(defClass) { }
-    ~TQdisc() { Remove(); }
 
     TError Create();
     TError Remove();
@@ -25,11 +28,12 @@ class TTclass {
     const std::shared_ptr<TTclass> ParentTclass;
     const uint32_t Handle;
 
+    NO_COPY_CONSTRUCT(TTclass);
 public:
     TTclass(const std::shared_ptr<TQdisc> qdisc, uint32_t handle) : ParentQdisc(qdisc), Handle(handle) { }
     TTclass(const std::shared_ptr<TTclass> tclass, uint32_t handle) : ParentTclass(tclass), Handle(handle) { }
-    ~TTclass() { Remove(); }
 
+    bool Exists();
     TError Create(uint32_t prio, uint32_t rate, uint32_t ceil);
     TError Remove();
     uint32_t GetParent();
@@ -40,8 +44,10 @@ public:
 class TFilter {
     const std::shared_ptr<TQdisc> Parent;
 
+    NO_COPY_CONSTRUCT(TFilter);
 public:
     TFilter(const std::shared_ptr<TQdisc> parent) : Parent(parent) { }
+    bool Exists();
     TError Create();
     TError Remove();
 };

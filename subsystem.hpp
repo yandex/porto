@@ -13,15 +13,14 @@ class TSubsystem : public std::enable_shared_from_this<TSubsystem> {
     std::string Name;
     std::shared_ptr<TCgroup> RootCgroup;
 
+    NO_COPY_CONSTRUCT(TSubsystem);
+
 protected:
     TSubsystem(const std::string &name) : Name(name) {}
 
 public:
     static std::shared_ptr<TSubsystem> Get(std::string name);
     const std::string& GetName() const;
-
-    TSubsystem(const TSubsystem &) = delete;
-    TSubsystem &operator=(const TSubsystem &) = delete;
 
     std::shared_ptr<TCgroup> GetRootCgroup(std::shared_ptr<TMount> mount=nullptr) {
         if (!RootCgroup) {

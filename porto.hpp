@@ -57,4 +57,8 @@ const uint32_t DEF_CLASS_RATE = UINT32_MAX;
 const uint32_t DEF_CLASS_CEIL = UINT32_MAX;
 const uint32_t DEF_CLASS_NET_PRIO = 3;
 
+#define NO_COPY_CONSTRUCT(NAME) \
+    NAME(const NAME &) = delete; \
+    NAME &operator=(const NAME &) = delete
+
 #endif

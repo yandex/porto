@@ -62,8 +62,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     TError PrepareTask();
     TError KillAll();
 
-    TContainer(const TContainer &) = delete;
-    TContainer &operator=(const TContainer &) = delete;
+    NO_COPY_CONSTRUCT(TContainer);
     const std::string StripParentName(const std::string &name) const;
     bool NeedRespawn();
     bool ShouldApplyProperty(const std::string &property);
@@ -109,9 +108,10 @@ public:
     uint16_t GetId();
 };
 
+constexpr size_t BITS_PER_LLONG = sizeof(unsigned long long) * 8;
 class TContainerHolder {
     std::map <std::string, std::shared_ptr<TContainer>> Containers;
-    unsigned long long Ids[UINT16_MAX/sizeof(long long)/8];
+    unsigned long long Ids[UINT16_MAX / BITS_PER_LLONG];
 
     bool ValidName(const std::string &name) const;
     TError GetId(uint16_t &id);

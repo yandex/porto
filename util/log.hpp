@@ -6,6 +6,14 @@
 
 #include "error.hpp"
 
+#define PORTO_ASSERT(expr) \
+    do { \
+        if (!(expr)) { \
+            TLogger::Log() << "Assertion failed: " << # expr << std::endl; \
+            abort(); \
+        } \
+    } while (0)
+
 class TLogger {
 private:
     static void OpenLog();

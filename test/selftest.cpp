@@ -111,6 +111,11 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     Expect(v == string("/"));
 }
 
+static void ExpectTclass(string name, bool exp) {
+    string cls = GetCgKnob("net_cls", name, "net_cls.classid");
+    Expect(TcClassExist(cls) == exp);
+}
+
 static void TestHolder(TPortoAPI &api) {
     ShouldHaveOnlyRoot(api);
 
@@ -274,6 +279,11 @@ static void TestHolder(TPortoAPI &api) {
     Expect(CgExists("memory", "a") == true);
     Expect(CgExists("memory", "a/b") == true);
     Expect(CgExists("memory", "a/b/c") == true);
+
+    ExpectTclass("a", true);
+    ExpectTclass("a/b", true);
+    ExpectTclass("a/b/c", true);
+
     string pid;
     ExpectSuccess(api.GetData("a/b", "root_pid", pid));
     WaitExit(api, pid);
@@ -446,6 +456,15 @@ static void TestLongRunning(TPortoAPI &api) {
     ExpectSuccess(api.Stop(name));
     Expect(TaskRunning(api, pid) == false);
     Expect(TcClassExist(leaf_cls) == false);
+
+    Say() << "Check that destroying container removes tclass" << endl;
+    ExpectSuccess(api.Start(name));
+    Expect(TcClassExist(root_cls) == true);
+    Expect(TcClassExist(leaf_cls) == true);
+    ExpectSuccess(api.Destroy(name));
+    Expect(TaskRunning(api, pid) == false);
+    Expect(TcClassExist(leaf_cls) == false);
+    ExpectSuccess(api.Create(name));
 
     Say() << "Check that hierarchical task cgroups are correct" << endl;
 
@@ -1456,7 +1475,7 @@ int SelfTest(string name, int leakNr) {
         cerr << "WARNING: Due to missing kernel support, memory_guarantee/cpu_policy has not been tested!" << endl;
     if (respawns != 1 /* start */ + 2 /* TestRecovery */ + 2 /* TestCgroups */)
         cerr << "WARNING: Unexpected number of respawns: " << respawns << "!" << endl;
-    if (errors)
+    if (errors != 20)
         cerr << "WARNING: Unexpected number of errors: " << errors << "!" << endl;
 
     return 0;

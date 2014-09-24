@@ -270,7 +270,6 @@ TError TNetlink::GetClassProperties(uint32_t handle, uint32_t &prio, uint32_t &r
 bool TNetlink::ClassExists(uint32_t handle) {
     int ret;
     struct nl_cache *classCache;
-    bool exists;
 
     ret = rtnl_class_alloc_cache(sock, rtnl_link_get_ifindex(link), &classCache);
     if (ret < 0)
@@ -280,11 +279,10 @@ bool TNetlink::ClassExists(uint32_t handle) {
         LogCache(classCache);
 
     struct rtnl_class *tclass = rtnl_class_get(classCache, rtnl_link_get_ifindex(link), handle);
-    exists = tclass != nullptr;
     rtnl_class_put(tclass);
     nl_cache_free(classCache);
 
-    return exists;
+    return tclass != nullptr;
 }
 
 TError TNetlink::RemoveClass(uint32_t parent, uint32_t handle) {
@@ -389,8 +387,6 @@ TError TNetlink::AddCgroupFilter(uint32_t parent, uint32_t handle) {
     struct nl_msg *msg;
     int ret;
 	struct tcmsg tchdr;
-
-    (void)RemoveCgroupFilter(parent, handle);
 
     tchdr.tcm_family = AF_UNSPEC;
     tchdr.tcm_ifindex = rtnl_link_get_ifindex(link);

@@ -59,8 +59,7 @@ class TTask {
     void ChildExec();
     void ChildIsolateFs();
 
-    TTask(const TTask &) = delete;
-    TTask &operator=(const TTask &) = delete;
+    NO_COPY_CONSTRUCT(TTask);
 public:
     TTask(TTaskEnv& env, std::vector<std::shared_ptr<TCgroup>> &leafCgroups) : Env(env), LeafCgroups(leafCgroups) {};
     TTask(pid_t pid) : Pid(pid) {};

@@ -218,9 +218,21 @@ TContainer::~TContainer() {
             iter++;
         }
 
+    /*
     if (Filter) {
         TError error = Filter->Remove();
         TLogger::LogError(error, "Can't remove tc filter");
+    }
+    */
+
+    if (DefaultTclass) {
+        TError error = DefaultTclass->Remove();
+        TLogger::LogError(error, "Can't remove default tc class");
+    }
+
+    if (Qdisc) {
+        TError error = Qdisc->Remove();
+        TLogger::LogError(error, "Can't remove tc qdisc");
     }
 }
 
@@ -357,10 +369,16 @@ TError TContainer::ApplyDynamicProperties() {
 }
 
 TError TContainer::PrepareNetwork() {
-    if (Parent)
-        Tclass = make_shared<TTclass>(Parent->Tclass, TcHandle(TcMajor(Parent->Tclass->GetHandle()), Id));
-    else
-        Tclass = make_shared<TTclass>(Qdisc, TcHandle(TcMajor(Qdisc->GetHandle()), Id));
+    PORTO_ASSERT(Tclass == nullptr);
+
+    if (Parent) {
+        uint32_t handle = TcHandle(TcMajor(Parent->Tclass->GetHandle()), Id);
+        auto tclass = Parent->Tclass;
+        Tclass = make_shared<TTclass>(tclass, handle);
+    } else {
+        uint32_t handle = TcHandle(TcMajor(Qdisc->GetHandle()), Id);
+        Tclass = make_shared<TTclass>(Qdisc, handle);
+    }
 
     TError error;
     uint32_t prio, rate, ceil;
@@ -377,7 +395,8 @@ TError TContainer::PrepareNetwork() {
     if (error)
         return error;
 
-    (void)Tclass->Remove();
+    if (Tclass->Exists())
+        (void)Tclass->Remove();
     error = Tclass->Create(prio, rate, ceil);
     if (error) {
         TLogger::LogError(error, "Can't create tclass");
@@ -495,7 +514,7 @@ TError TContainer::Create() {
         }
 
         Filter = make_shared<TFilter>(Qdisc);
-        (void)Filter->Remove();
+        //(void)Filter->Remove();
         error = Filter->Create();
         if (error) {
             TLogger::LogError(error, "Can't create tc filter");
@@ -503,7 +522,8 @@ TError TContainer::Create() {
         }
 
         DefaultTclass = make_shared<TTclass>(Qdisc, defHandle);
-        (void)DefaultTclass->Remove();
+        if (DefaultTclass->Exists())
+            (void)DefaultTclass->Remove();
         error = DefaultTclass->Create(DEF_CLASS_PRIO, DEF_CLASS_RATE, DEF_CLASS_CEIL);
         if (error) {
             TLogger::LogError(error, "Can't create default tclass");
@@ -548,12 +568,14 @@ TError TContainer::Start() {
     TError error = PrepareNetwork();
     if (error) {
         TLogger::LogError(error, "Can't prepare task network");
+        FreeResources();
         return error;
     }
 
     error = PrepareCgroups();
     if (error) {
         TLogger::LogError(error, "Can't prepare task cgroups");
+        FreeResources();
         return error;
     }
 
@@ -562,19 +584,22 @@ TError TContainer::Start() {
         return TError::Success();
     }
 
-    if (!Spec.Get("command").length())
+    if (!Spec.Get("command").length()) {
+        FreeResources();
         return TError(EError::InvalidValue, "container command is empty");
+    }
 
     error = PrepareTask();
     if (error) {
         TLogger::LogError(error, "Can't prepare task");
+        FreeResources();
         return error;
     }
 
     error = Task->Start();
     if (error) {
-        LeafCgroups.clear();
         TLogger::LogError(error, "Can't start task");
+        FreeResources();
         return error;
     }
 
@@ -594,7 +619,7 @@ TError TContainer::KillAll() {
     vector<pid_t> reap;
     TError error = cg->GetTasks(reap);
     if (error) {
-        TLogger::LogError(error, "Can't read tasks list while stopping container");
+        TLogger::LogError(error, "Can't read tasks list while stopping container (SIGTERM)");
         return error;
     }
 
@@ -603,9 +628,9 @@ TError TContainer::KillAll() {
 
     int ret = SleepWhile(1000, [&]{ return cg->IsEmpty() == false; });
     if (ret)
-        TLogger::Log() << "Error while waiting for child to exit via SIGTERM" << endl;
+        TLogger::Log() << "Warning: child didn't exit via SIGTERM, sending SIGKILL" << endl;
 
-    // then kill any task that didn't want to stop via SIGTERM;
+    // then kill any task that didn't want to stop via SIGTERM signal;
     // freeze all container tasks to make sure no one forks and races with us
     error = freezerSubsystem->Freeze(*cg);
     if (error)
@@ -613,7 +638,7 @@ TError TContainer::KillAll() {
 
     error = cg->GetTasks(reap);
     if (error) {
-        TLogger::LogError(error, "Can't read tasks list while stopping container");
+        TLogger::LogError(error, "Can't read tasks list while stopping container (SIGKILL)");
         return error;
     }
     cg->Kill(SIGKILL);
@@ -633,7 +658,7 @@ void TContainer::StopChildren() {
             if (child->State != EContainerState::Stopped && child->State != EContainerState::Dead)
                 child->Stop();
         } else {
-            TLogger::Log() << "Can't lock child while stopping" << endl;
+            TLogger::Log() << "Warning: can't lock child while stopping" << endl;
         }
     }
 }
@@ -647,6 +672,7 @@ void TContainer::FreeResources() {
     LeafCgroups.clear();
 
     TError error = Tclass->Remove();
+    Tclass = nullptr;
     TLogger::LogError(error, "Can't remove tc classifier");
 }
 
@@ -654,7 +680,7 @@ TError TContainer::Stop() {
     if (IsRoot() || !(CheckState(EContainerState::Running) || CheckState(EContainerState::Dead)))
         return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
 
-    TLogger::Log() << "stop " << GetName() << endl;
+    TLogger::Log() << "Stop " << GetName() << " " << Id << endl;
 
     int pid = Task->GetPid();
 
@@ -803,7 +829,10 @@ TError TContainer::Restore(const kv::TNode &node) {
         error = Task->Restore(pid);
         if (error) {
             Task = nullptr;
-            (void)KillAll();
+
+            auto cg = GetLeafCgroup(freezerSubsystem);
+            if (cg->Exists())
+                (void)KillAll();
 
             TLogger::LogError(error, "Can't restore task");
             return error;
@@ -817,12 +846,16 @@ TError TContainer::Restore(const kv::TNode &node) {
             // we started container but died before saving root_pid,
             // state may be inconsistent so restart task
 
-            (void)KillAll();
+            auto cg = GetLeafCgroup(freezerSubsystem);
+            if (cg->Exists())
+                (void)KillAll();
             return Start();
         } else {
             // if we didn't start container, make sure nobody is running
 
-            (void)KillAll();
+            auto cg = GetLeafCgroup(freezerSubsystem);
+            if (cg->Exists())
+                (void)KillAll();
         }
     }
 
@@ -914,7 +947,7 @@ TError TContainerHolder::GetId(uint16_t &id) {
 
         bit--;
         Ids[i] &= ~(1 << bit);
-        id = i * sizeof(Ids[0]) + bit;
+        id = i * BITS_PER_LLONG + bit;
         id++;
 
         return TError::Success();
@@ -926,8 +959,8 @@ TError TContainerHolder::GetId(uint16_t &id) {
 void TContainerHolder::PutId(uint16_t id) {
     id--;
 
-    int bucket = id / sizeof(Ids[0]);
-    int bit = id % sizeof(Ids[0]);
+    int bucket = id / BITS_PER_LLONG;
+    int bit = id % BITS_PER_LLONG;
 
     Ids[bucket] |= 1 << bit;
 }

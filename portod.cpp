@@ -520,11 +520,11 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
             break;
         }
 
-        (void)alarm(LOOP_WAIT_TIMEOUT_S);
-
         SignalMask(SIG_UNBLOCK);
+        (void)alarm(LOOP_WAIT_TIMEOUT_S);
         int status;
         pid = wait(&status);
+        (void)alarm(0);
         SignalMask(SIG_BLOCK);
 
         if (gotAlarm) {

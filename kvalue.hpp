@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "kv.pb.h"
+#include "porto.hpp"
 #include "error.hpp"
 #include "util/mount.hpp"
 
@@ -15,8 +16,7 @@ class TKeyValueStorage {
     void Merge(kv::TNode &node, kv::TNode &next) const;
     TError ListNodes(std::vector<std::string> &list) const;
 
-    TKeyValueStorage(const TKeyValueStorage &) = delete;
-    TKeyValueStorage &operator=(const TKeyValueStorage &) = delete;
+    NO_COPY_CONSTRUCT(TKeyValueStorage);
 public:
     TError MountTmpfs();
 

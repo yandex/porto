@@ -1,4 +1,3 @@
-- watchdog
 - full dump on sigsegv
 - ? portoctl kill -SIGXYZ <name> to send signal to container root_pid
 

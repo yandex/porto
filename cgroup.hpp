@@ -22,8 +22,7 @@ class TCgroup : public std::enable_shared_from_this<TCgroup> {
 
     const std::string SYSFS_CGROOT = "/sys/fs/cgroup";
     mode_t Mode = 0755;
-    TCgroup(const TCgroup &) = delete;
-    TCgroup &operator=(const TCgroup &) = delete;
+    NO_COPY_CONSTRUCT(TCgroup);
 
 public:
     TCgroup(const std::vector<std::shared_ptr<TSubsystem>> controller,
@@ -42,6 +41,7 @@ public:
 
     TError Create();
     TError Remove();
+    bool Exists();
 
     TError Kill(int signal) const;
 
