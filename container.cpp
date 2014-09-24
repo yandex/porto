@@ -234,6 +234,9 @@ TContainer::~TContainer() {
         TError error = Qdisc->Remove();
         TLogger::LogError(error, "Can't remove tc qdisc");
     }
+
+    if (IsRoot())
+        FreeResources();
 }
 
 const string TContainer::GetName() const {
@@ -412,6 +415,13 @@ TError TContainer::PrepareCgroups() {
     LeafCgroups[memorySubsystem] = GetLeafCgroup(memorySubsystem);
     LeafCgroups[freezerSubsystem] = GetLeafCgroup(freezerSubsystem);
     LeafCgroups[netclsSubsystem] = GetLeafCgroup(netclsSubsystem);
+
+    TLogger::Log() <<
+    LeafCgroups[cpuSubsystem] << " " <<
+    LeafCgroups[cpuacctSubsystem] << " " <<
+    LeafCgroups[memorySubsystem] << " " <<
+    LeafCgroups[freezerSubsystem] << " " <<
+    LeafCgroups[netclsSubsystem] << endl;
 
     for (auto cg : LeafCgroups) {
         auto ret = cg.second->Create();
@@ -671,9 +681,11 @@ void TContainer::FreeResources() {
 
     LeafCgroups.clear();
 
-    TError error = Tclass->Remove();
-    Tclass = nullptr;
-    TLogger::LogError(error, "Can't remove tc classifier");
+    if (Tclass) {
+        TError error = Tclass->Remove();
+        Tclass = nullptr;
+        TLogger::LogError(error, "Can't remove tc classifier");
+    }
 }
 
 TError TContainer::Stop() {
@@ -967,8 +979,9 @@ void TContainerHolder::PutId(uint16_t id) {
 
 TContainerHolder::~TContainerHolder() {
     // we want children to be removed first
-    for (auto i = Containers.rbegin(); i != Containers.rend(); ++i)
-        Containers.erase(i->first);
+    while (Containers.begin() != Containers.end()) {
+        Containers.erase(std::prev(Containers.begin()));
+    }
 }
 
 TError TContainerHolder::CreateRoot() {

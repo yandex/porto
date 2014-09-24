@@ -81,7 +81,6 @@ static void RegisterSignalHandlers() {
     // don't stop containers when terminating
     (void)RegisterSignal(SIGTERM, DoExit);
     // don't catch SIGQUIT, may be useful to create core dump
-    (void)RegisterSignal(SIGSEGV, SigsegvHandler);
 }
 
 static int DaemonPrepare(const std::string &procName,

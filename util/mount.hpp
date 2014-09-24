@@ -53,7 +53,12 @@ public:
     TError Umount() const;
 
     friend std::ostream& operator<<(std::ostream& stream, const TMount& mount) {
-        return stream << mount.Device << " " << mount.Mountpoint << " " << mount.Vfstype;
+        stream << mount.Device << " " << mount.Mountpoint << " " << mount.Vfstype << " ";
+
+        for (auto &f : mount.Flags)
+            stream << f << ",";
+
+        return stream;
     }
 };
 

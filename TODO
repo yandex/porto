@@ -1,5 +1,10 @@
 - full dump on sigsegv
-- ? portoctl kill -SIGXYZ <name> to send signal to container root_pid
+- ? non-blocking communication pipes
+- portoctl kill -SIGXYZ <name> to send signal to container root_pid
+- ? remount to MS_SLAVE only if MS_SHARED
+- ? autodestroy property
+- ? portoctl run -f <MANIFEST> | <MANIFEST STRING>
+- ? portoctl inpect to export everything in JSON
 
 # nekt0n
 - add namespaces

@@ -1,5 +1,3 @@
-#include <unordered_map>
-
 #include "cgroup.hpp"
 #include "subsystem.hpp"
 #include "util/log.hpp"
@@ -14,24 +12,50 @@ shared_ptr<TCpuSubsystem> cpuSubsystem(new TCpuSubsystem);
 shared_ptr<TCpuacctSubsystem> cpuacctSubsystem(new TCpuacctSubsystem);
 shared_ptr<TNetclsSubsystem> netclsSubsystem(new TNetclsSubsystem);
 
-// TSubsystem
-shared_ptr<TSubsystem> TSubsystem::Get(std::string name) {
-    if (name == "memory")
-        return memorySubsystem;
-    else if (name == "freezer")
-        return freezerSubsystem;
-    else if (name == "cpu")
-        return cpuSubsystem;
-    else if (name == "cpuacct")
-        return cpuacctSubsystem;
-    else if (name == "net_cls")
-        return netclsSubsystem;
+static const std::map<std::string, std::shared_ptr<TSubsystem>> subsystems = {
+    { "memory", memorySubsystem },
+    { "freezer", freezerSubsystem },
+    { "cpu", cpuSubsystem },
+    { "cpuacct", cpuacctSubsystem },
+    { "net_cls", netclsSubsystem },
+};
 
-    return nullptr;
+// TSubsystem
+shared_ptr<TSubsystem> TSubsystem::Get(const std::string &name) {
+    if (subsystems.find(name) == subsystems.end())
+        return nullptr;
+
+    return subsystems.at(name);
 }
 
 const string& TSubsystem::GetName() const {
     return Name;
+}
+
+std::shared_ptr<TCgroup> TSubsystem::GetRootCgroup(std::shared_ptr<TMount> mount) {
+    if (RootCgroup)
+        return RootCgroup;
+
+    if (mount) {
+        // several controllers may be mounted into one directory
+        for (auto &kv : subsystems) {
+            auto &subsys = kv.second;
+
+            if (!subsys->RootCgroup)
+                continue;
+
+            if (subsys->RootCgroup->GetMount() == mount) {
+                RootCgroup = subsys->RootCgroup;
+                break;
+            }
+        }
+    }
+
+    if (!RootCgroup) {
+        TCgroup *root = new TCgroup({shared_from_this()}, mount);
+        RootCgroup = std::shared_ptr<TCgroup>(root);
+    }
+    return RootCgroup;
 }
 
 // Memory

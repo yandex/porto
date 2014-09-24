@@ -5,6 +5,5 @@ void WatchdogStart();
 void WatchdogStrobe();
 
 void Crash();
-void SigsegvHandler(int sig, siginfo_t *si, void *unused);
 
 #endif

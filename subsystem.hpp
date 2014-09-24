@@ -4,6 +4,7 @@
 #include <ostream>
 #include <string>
 #include <memory>
+#include <map>
 
 #include "cgroup.hpp"
 
@@ -19,16 +20,9 @@ protected:
     TSubsystem(const std::string &name) : Name(name) {}
 
 public:
-    static std::shared_ptr<TSubsystem> Get(std::string name);
+    static std::shared_ptr<TSubsystem> Get(const std::string &name);
     const std::string& GetName() const;
-
-    std::shared_ptr<TCgroup> GetRootCgroup(std::shared_ptr<TMount> mount=nullptr) {
-        if (!RootCgroup) {
-            TCgroup *root = new TCgroup({shared_from_this()}, mount);
-            RootCgroup = std::shared_ptr<TCgroup>(root);
-        }
-        return RootCgroup;
-    }
+    std::shared_ptr<TCgroup> GetRootCgroup(std::shared_ptr<TMount> mount=nullptr);
 };
 
 class TMemorySubsystem : public TSubsystem {

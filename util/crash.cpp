@@ -37,7 +37,7 @@ void Crash()
     exit(-1);
 }
 
-void SigsegvHandler(int sig, siginfo_t *si, void *unused)
+static void SigsegvHandler(int sig, siginfo_t *si, void *unused)
 {
     TLogger::Log() << "SIGSEGV at %p" << si->si_addr;
     Crash();
@@ -78,6 +78,8 @@ static void* WatchdogCheck(void *arg)
 
 void WatchdogStart()
 {
+    (void)RegisterSignal(SIGSEGV, SigsegvHandler);
+
     pthread_t thread;
     pthread_create(&thread, NULL, WatchdogCheck, NULL);
 }

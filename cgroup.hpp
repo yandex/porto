@@ -42,6 +42,7 @@ public:
     TError Create();
     TError Remove();
     bool Exists();
+    std::shared_ptr<TMount> GetMount();
 
     TError Kill(int signal) const;
 

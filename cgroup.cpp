@@ -197,6 +197,10 @@ bool TCgroup::Exists() {
     return f.Exists();
 }
 
+std::shared_ptr<TMount> TCgroup::GetMount() {
+    return Mount;
+}
+
 TError TCgroup::Kill(int signal) const {
     if (!IsRoot()) {
         vector<pid_t> tasks;
