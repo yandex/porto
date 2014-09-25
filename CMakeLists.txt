@@ -23,7 +23,7 @@ include_directories(${PROTOBUF_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS rpc.proto kv.proto)
 add_custom_command(
-	OUTPUT "python/rpc_pb2.py"
+	OUTPUT "python/porto/rpc_pb2.py"
 	COMMAND protoc ARGS --python_out=python/ rpc.proto
 	DEPENDS rpc.proto
 	VERBATIM)
@@ -40,7 +40,7 @@ add_executable(portod tags portod.cpp cgroup.cpp rpc.cpp container.cpp task.cpp 
 add_dependencies(portod version.hpp)
 target_link_libraries(portod ${PB} ${RTNL} ${NL} pthread rt)
 
-add_executable(portoctl python/rpc_pb2.py portoctl.cpp error.cpp libporto.cpp util/log.cpp util/protobuf.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
+add_executable(portoctl python/porto/rpc_pb2.py portoctl.cpp error.cpp libporto.cpp util/log.cpp util/protobuf.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(portoctl version.hpp)
 target_link_libraries(portoctl ${PB} pthread rt)
 
