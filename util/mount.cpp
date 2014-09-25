@@ -69,6 +69,8 @@ TError TMountSnapshot::RemountSlave() {
         return error;
 
     for (auto &m : mounts) {
+        // we are only changing type of the mount from (possibly) MS_SHARED
+        // to MS_SLAVE, nothing is remounted or mounted over
         error = m->Mount(MS_SLAVE);
         if (error)
             TLogger::Log() << "Can't remount " << m->GetMountpoint() << endl;
