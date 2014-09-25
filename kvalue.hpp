@@ -27,6 +27,7 @@ public:
     TError RemoveNode(const std::string &name) const;
     TError Restore(std::map<std::string, kv::TNode> &map) const;
     TError Dump() const;
+    TError Destroy();
 };
 
 #endif

@@ -213,3 +213,7 @@ TError TKeyValueStorage::Dump() const {
 
     return TError::Success();
 }
+
+TError TKeyValueStorage::Destroy() {
+    return Tmpfs.Umount();
+}

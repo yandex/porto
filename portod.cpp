@@ -397,6 +397,9 @@ static int SlaveMain(bool failsafe, bool noWatchdog)
         ret = RpcMain(cholder);
         if (!cleanup && raiseSignum)
             RaiseSignal(raiseSignum);
+
+        error = storage.Destroy();
+        TLogger::LogError(error, "Couldn't destroy key-value storage");
     } catch (string s) {
         cout << s << endl;
         ret = EXIT_FAILURE;
