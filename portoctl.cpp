@@ -119,7 +119,6 @@ public:
     void Usage()
     {
         const int nameWidth = 32;
-        const int descWidth = 48;
 
         cout << "Usage: " << program_invocation_short_name << " <command> [<args>]" << endl;
         cout << endl;
@@ -136,7 +135,7 @@ public:
         } else
             for (auto p : plist)
                 cout << " " << left << setw(nameWidth) << p.Name
-                     << setw(descWidth) << p.Description << endl;
+                     << p.Description << endl;
 
         cout << endl << "Data list:" << endl;
         vector<TData> dlist;
@@ -146,7 +145,7 @@ public:
         else
             for (auto d : dlist)
                 cout << " " << left << setw(nameWidth) << d.Name
-                     << setw(descWidth) << d.Description << endl;
+                     << d.Description << endl;
     }
 
     int Execute(int argc, char *argv[])
