@@ -69,7 +69,7 @@ public:
     int GetPid() const;
     bool IsRunning() const;
     TExitStatus GetExitStatus() const;
-    void Kill(int signal) const;
+    TError Kill(int signal) const;
     void DeliverExitStatus(int status);
 
     std::string GetStdout() const;

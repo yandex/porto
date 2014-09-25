@@ -158,6 +158,17 @@ static TError ListData(TContainerHolder &cholder,
     return TError::Success();
 }
 
+static TError Kill(TContainerHolder &cholder,
+                   const rpc::TContainerKillRequest &req,
+                   rpc::TContainerResponse &rsp)
+{
+    auto container = cholder.Get(req.name());
+    if (!container)
+        return TError(EError::ContainerDoesNotExist, "invalid name");
+
+    return container->Kill(req.sig());
+}
+
 rpc::TContainerResponse
 HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req)
 {
@@ -194,6 +205,8 @@ HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req)
             error = ListProperty(cholder, rsp);
         else if (req.has_datalist())
             error = ListData(cholder, rsp);
+        else if (req.has_kill())
+            error = Kill(cholder, req.kill(), rsp);
         else
             error = TError(EError::InvalidMethod, "invalid RPC method");
     } catch (std::bad_alloc exc) {

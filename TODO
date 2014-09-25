@@ -1,9 +1,7 @@
 - full dump on sigsegv
 - ? non-blocking communication pipes
-- portoctl kill -SIGXYZ <name> to send signal to container root_pid
 - ? autodestroy property
 - ? portoctl run -f <MANIFEST> | <MANIFEST STRING>
-- ? portoctl inpect to export everything in JSON
 - ? cpu_cores property to reserve some cores for a container
 - ? isolate = { none, full } property
 - ? create temporary directory for container if none provided
@@ -12,12 +10,10 @@
 - add namespaces
 - remove using namespace std; use specific classes instead
 - ? get rid of globals/static which have class types (http://google-styleguide.googlecode.com/svn/trunk/cppguide.html#Static_and_Global_Variables)
-- ? portoctl: robot output
+- ? portoctl inpect to export everything in JSON
 
 # network
-- add net_tos property via net_prio cgroup
 - ? net_prio 0-7 -> 0-99
-- ? portorecord/portoplay tool to record rcp and then replay
 
 # phase 2
 - rt: create cgroup for non-smart tasks and throttle them

@@ -201,7 +201,8 @@ TError TCgroup::Kill(int signal) const {
         if (!GetTasks(tasks)) {
             for (auto pid : tasks) {
                 TTask task(pid);
-                task.Kill(signal);
+                TError error = task.Kill(signal);
+                TLogger::LogError(error, "Can't kill child process");
             }
         }
     }

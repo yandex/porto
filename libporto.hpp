@@ -40,6 +40,7 @@ public:
 
     int Start(const std::string &name);
     int Stop(const std::string &name);
+    int Kill(const std::string &name, int sig);
     int Pause(const std::string &name);
     int Resume(const std::string &name);
 

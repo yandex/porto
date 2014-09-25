@@ -489,17 +489,17 @@ void TTask::DeliverExitStatus(int status) {
     State = Stopped;
 }
 
-void TTask::Kill(int signal) const {
+TError TTask::Kill(int signal) const {
     if (!Pid)
         throw "Tried to kill invalid process!";
 
     TLogger::Log() << "kill " << signal << " " << Pid << endl;
 
     int ret = kill(Pid, signal);
-    if (ret != 0) {
-        TError error(EError::Unknown, errno, "kill(" + to_string(Pid) + ")");
-        TLogger::LogError(error, "Can't kill child process");
-    }
+    if (ret != 0)
+        return TError(EError::Unknown, errno, "kill(" + to_string(Pid) + ")");
+
+    return TError::Success();
 }
 
 std::string TTask::GetStdout() const {

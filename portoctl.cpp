@@ -316,6 +316,85 @@ public:
     }
 };
 
+static const map<string, int> sigMap = {
+    { "SIGHUP",     SIGHUP },
+    { "SIGINT",     SIGINT },
+    { "SIGQUIT",    SIGQUIT },
+    { "SIGILL",     SIGILL },
+    { "SIGABRT",    SIGABRT },
+    { "SIGFPE",     SIGFPE },
+    { "SIGKILL",    SIGKILL },
+    { "SIGSEGV",    SIGSEGV },
+    { "SIGPIPE",    SIGPIPE },
+
+    { "SIGALRM",    SIGALRM },
+    { "SIGTERM",    SIGTERM },
+    { "SIGUSR1",    SIGUSR1 },
+    { "SIGUSR2",    SIGUSR2 },
+    { "SIGCHLD",    SIGCHLD },
+    { "SIGCONT",    SIGCONT },
+    { "SIGSTOP",    SIGSTOP },
+    { "SIGTSTP",    SIGTSTP },
+    { "SIGTTIN",    SIGTTIN },
+    { "SIGTTOU",    SIGTTOU },
+
+    { "SIGBUS",     SIGBUS },
+    { "SIGPOLL",    SIGPOLL },
+    { "SIGPROF",    SIGPROF },
+    { "SIGSYS",     SIGSYS },
+    { "SIGTRAP",    SIGTRAP },
+    { "SIGURG",     SIGURG },
+    { "SIGVTALRM",  SIGVTALRM },
+    { "SIGXCPU",    SIGXCPU },
+    { "SIGXFSZ",    SIGXFSZ },
+
+    { "SIGIOT",     SIGIOT },
+#ifdef SIGEMT
+    { "SIGEMT",     SIGEMT },
+#endif
+    { "SIGSTKFLT",  SIGSTKFLT },
+    { "SIGIO",      SIGIO },
+    { "SIGCLD",     SIGCLD },
+    { "SIGPWR",     SIGPWR },
+#ifdef SIGINFO
+    { "SIGINFO",    SIGINFO },
+#endif
+#ifdef SIGLOST
+    { "SIGLOST",    SIGLOST },
+#endif
+    { "SIGWINCH",   SIGWINCH },
+    { "SIGUNUSED",  SIGUNUSED },
+};
+
+class TKillCmd : public ICmd {
+public:
+    TKillCmd() : ICmd("kill", 1, "<name> [signal]", "send signal to container") {}
+
+    int Execute(int argc, char *argv[])
+    {
+        int sig = SIGTERM;
+        if (argc >= 2) {
+            string sigName = argv[1];
+
+            if (sigMap.find(sigName) != sigMap.end()) {
+                sig = sigMap.at(sigName);
+            } else {
+                TError error = StringToInt(sigName, sig);
+                if (error) {
+                    PrintError(error, "Invalid signal");
+                    return EXIT_FAILURE;
+                }
+            }
+        }
+
+        int ret = Api.Kill(argv[0], sig);
+        if (ret)
+            PrintError("Can't send signal to container");
+
+        return ret;
+    }
+};
+
 class TStopCmd : public ICmd {
 public:
     TStopCmd() : ICmd("stop", 1, "<name>", "stop container") {}
@@ -572,6 +651,7 @@ int main(int argc, char *argv[])
         new TListCmd(),
         new TStartCmd(),
         new TStopCmd(),
+        new TKillCmd(),
         new TPauseCmd(),
         new TResumeCmd(),
         new TGetPropertyCmd(),

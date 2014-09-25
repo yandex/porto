@@ -158,6 +158,13 @@ int TPortoAPI::Stop(const string &name) {
     return Rpc(Req, Rsp);
 }
 
+int TPortoAPI::Kill(const std::string &name, int sig) {
+    Req.mutable_kill()->set_name(name);
+    Req.mutable_kill()->set_sig(sig);
+
+    return Rpc(Req, Rsp);
+}
+
 int TPortoAPI::Pause(const string &name) {
     Req.mutable_pause()->set_name(name);
 

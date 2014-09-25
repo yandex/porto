@@ -111,6 +111,13 @@ message TContainerPropertyListRequest {
 message TContainerDataListRequest {
 }
 
+// Послать сигнал контейнеру
+message TContainerKillRequest {
+	required string name = 1;
+	required int32 sig = 2;
+}
+
+
 // Сообщение-запрос
 // В запросе может быть только одно опциональное сообщение, только оно
 // и будет выполнено.
@@ -128,6 +135,7 @@ message TContainerRequest {
 	optional TContainerResumeRequest resume = 10;
 	optional TContainerPropertyListRequest propertyList = 11;
 	optional TContainerDataListRequest dataList = 12;
+	optional TContainerKillRequest kill = 13;
 }
 
 // Ответ на запрос списка контейнеров

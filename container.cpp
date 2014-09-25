@@ -734,6 +734,13 @@ TError TContainer::Resume() {
     return TError::Success();
 }
 
+TError TContainer::Kill(int sig) {
+    if (IsRoot() || !CheckState(EContainerState::Running))
+        return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
+
+    return Task->Kill(sig);
+}
+
 TError TContainer::GetData(const string &name, string &value) {
     if (dataSpec.find(name) == dataSpec.end())
         return TError(EError::InvalidValue, "invalid container data");

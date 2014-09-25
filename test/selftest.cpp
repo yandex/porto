@@ -770,6 +770,28 @@ static void TestStateMachine(TPortoAPI &api) {
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.Pause(name));
+    ExpectSuccess(api.Destroy(name));
+
+    Say() << "Make sure kill works " << endl;
+    ExpectSuccess(api.Create(name));
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.Start(name));
+
+    // if container init process doesn't have custom handler for a signal
+    // it's ignored
+    ExpectSuccess(api.Kill(name, SIGTERM));
+    ExpectSuccess(api.GetData(name, "state", v));
+    Expect(v == "running");
+
+    ExpectSuccess(api.Kill(name, SIGKILL));
+    ExpectSuccess(api.GetData(name, "root_pid", v));
+    WaitExit(api, v);
+    ExpectSuccess(api.GetData(name, "state", v));
+    Expect(v == "dead");
+
+    // we can't kill root or non-running container
+    ExpectFailure(api.Kill(name, SIGKILL), EError::InvalidState);
+    ExpectFailure(api.Kill("/", SIGKILL), EError::InvalidState);
 
     ExpectSuccess(api.Destroy(name));
 }
