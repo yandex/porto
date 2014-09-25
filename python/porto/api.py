@@ -54,25 +54,47 @@ _DecodeVarint32 = _VarintDecoder((1 << 32) - 1)
 ################################################################################
 
 class PortoAPI:
-    def __init__(self):
-        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    def __init__(self, socket_path='/var/run/portod.socket', timeout=5):
+        self.socket_path = socket_path
+        self.timeout = timeout
 
+    def connect(self):
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.sock.settimeout(self.timeout)
         try:
-            self.sock.connect('/var/run/portod.socket')
+            self.sock.connect(self.socket_path)
         except socket.error, msg:
-            raise exceptions.SocketError("Can't open /var/run/portod.socket")
+            raise exceptions.SocketError("Can't open %s for write" % self.socket_path)
+
+    def _send(self, data, flags=0):
+        try:
+            return self.sock.send(data, flags)
+        except socket.timeout:
+            raise exceptions.SocketTimeout("Got timeout %d" % self.timeout)
+
+    def _sendall(self, data, flags=0):
+         try:
+            return self.sock.sendall(data, flags)
+         except socket.timeout:
+            raise exceptions.SocketTimeout("Got timeout %d" % self.timeout)
+   
+    def _recv(self, count, flags=0):
+        try:
+            return self.sock.recv(count, flags)
+        except socket.timeout:
+            raise exceptions.SocketTimeout("Got timeout %d" % self.timeout)
 
     def _rpc(self, request):
         data = request.SerializeToString()
         hdr = bytearray()
         _EncodeVarint(hdr.append, len(data))
-        self.sock.send(hdr)
-        self.sock.sendall(data)
+        self._send(hdr)
+        self._sendall(data)
 
-        buf = self.sock.recv(4)
+        buf = self._recv(4)
         length = _DecodeVarint32(buf, 0)
         resp = rpc_pb2.TContainerResponse()
-        buf += self.sock.recv(length[0])
+        buf += self._recv(length[0])
         resp.ParseFromString(buf[length[1]:])
         return resp
 
