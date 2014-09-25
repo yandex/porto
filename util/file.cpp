@@ -1,5 +1,3 @@
-#include <fstream>
-
 #include "file.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
@@ -55,20 +53,23 @@ TError TFile::Remove() const {
 }
 
 TError TFile::AsString(string &value) const {
-    ifstream in(Path);
-    if (!in.is_open())
-        return TError(EError::Unknown, string(__func__) + ": Cannot open " + Path);
+    int fd = open(Path.c_str(), O_RDONLY);
+    if (fd < 0)
+        return TError(EError::Unknown, errno, "open(" + Path + ")");
 
-    try {
-        in.seekg(0, std::ios::end);
-        value.reserve(in.tellg());
-        in.seekg(0, std::ios::beg);
-    } catch (...) {
-        // for /proc files we can't reserve space because there is no
-        // seek() support
-    }
+    int n;
+    do {
+        char buf[256];
+        n = read(fd, buf, sizeof(buf));
+        if (n < 0) {
+            close(fd);
+            return TError(EError::Unknown, errno, "read(" + Path + ")");
+        }
 
-    value.assign((istreambuf_iterator<char>(in)), istreambuf_iterator<char>());
+        value.append(buf, n);
+    } while (n != 0);
+
+    close(fd);
 
     return TError::Success();
 }
@@ -83,48 +84,51 @@ TError TFile::AsInt(int &value) const {
 }
 
 TError TFile::AsLines(vector<string> &value) const {
-    ifstream in(Path);
-    string line;
+    FILE *f = fopen(Path.c_str(), "r");
+    if (!f)
+        return TError(EError::Unknown, errno, "fopen(" + Path + ")");
 
-    if (!in.is_open())
-        return TError(EError::Unknown, string(__func__) + ": Cannot open " + Path);
+    char *line = nullptr;
+    size_t len;
+    ssize_t n;
+    while ((n = getline(&line, &len, f)) != -1)
+        value.push_back(string(line, n - 1));
 
-    while (getline(in, line))
-        value.push_back(line);
+    fclose(f);
 
     return TError::Success();
 }
 
 TError TFile::LastStrings(const size_t size, std::string &value) const {
-    ifstream f(Path);
-    if (!f.is_open())
-        return TError(EError::Unknown, string(__func__) + ": Cannot open " + Path);
+    int fd = open(Path.c_str(), O_RDONLY);
+    if (fd < 0)
+        return TError(EError::Unknown, errno, "open(" + Path + ")");
 
-    try {
-        size_t end = f.seekg(0, ios_base::end).tellg();
-        size_t copy = end < size ? end : size;
+    size_t end = lseek(fd, 0, SEEK_END);
+    size_t copy = end < size ? end : size;
 
-        f.seekg(-copy, ios_base::end);
+    lseek(fd, -copy, SEEK_END);
 
-        vector<char> s;
-        s.resize(copy);
-        f.read(s.data(), copy);
+    vector<char> s;
+    s.resize(copy);
 
-        if (end > size) {
-            auto iter = s.begin();
+    int n = read(fd, s.data(), copy);
+    close(fd);
+    if (n < 0)
+        return TError(EError::Unknown, errno, "read(" + Path + ")");
 
-            for (; iter != s.end(); iter++)
-                if (*iter == '\n') {
-                    iter++;
-                    break;
-                }
+    if (end > size) {
+        auto iter = s.begin();
 
-            value.assign(iter, s.end());
-        } else {
-            value.assign(s.begin(), s.begin() + copy);
-        }
-    } catch (...) {
-        return TError(EError::Unknown, string(__func__) + ": Uncaught exception");
+        for (; iter != s.end(); iter++)
+            if (*iter == '\n') {
+                iter++;
+                break;
+            }
+
+        value.assign(iter, s.end());
+    } else {
+        value.assign(s.begin(), s.begin() + copy);
     }
 
     return TError::Success();
@@ -144,11 +148,11 @@ TError TFile::ReadLink(std::string &value) const {
     return TError::Success();
 }
 
-TError TFile::WriteStringNoAppend(const string &str) const {
+TError TFile::Write(int flags, const string &str) const {
     TError error = TError::Success();
 
-    int fd = open(Path.c_str(), O_CREAT | O_TRUNC | O_WRONLY, Mode);
-    if (!fd)
+    int fd = open(Path.c_str(), flags, Mode);
+    if (fd < 0)
         return TError(EError::Unknown, errno, "open(" + Path + ")");
 
     ssize_t ret = write(fd, str.c_str(), str.length());
@@ -160,14 +164,12 @@ TError TFile::WriteStringNoAppend(const string &str) const {
     return error;
 }
 
+TError TFile::WriteStringNoAppend(const string &str) const {
+    return Write(O_CREAT | O_TRUNC | O_WRONLY, str);
+}
+
 TError TFile::AppendString(const string &str) const {
-    ofstream out(Path, ofstream::app);
-    if (out.is_open()) {
-        out << str;
-        return TError::Success();
-    } else {
-        return TError(EError::Unknown, errno, "append(" + Path + ", " + str + ")");
-    }
+    return Write(O_APPEND | O_WRONLY, str);
 }
 
 bool TFile::Exists() const {

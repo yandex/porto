@@ -11,7 +11,6 @@
 # nekt0n
 - add namespaces
 - remove using namespace std; use specific classes instead
-- tfile: get rid of streams
 - ? get rid of globals/static which have class types (http://google-styleguide.googlecode.com/svn/trunk/cppguide.html#Static_and_Global_Variables)
 - ? portoctl: robot output
 

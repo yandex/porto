@@ -628,14 +628,14 @@ static void TestUserGroup(TPortoAPI &api) {
 static void TestCwd(TPortoAPI &api) {
     string pid;
     string cwd;
-    string portod_pid, portod_cwd;
+    string portodPid, portodCwd;
 
     string name = "a";
     ExpectSuccess(api.Create(name));
 
     TFile portod(PID_FILE);
-    (void)portod.AsString(portod_pid);
-    portod_cwd = GetCwd(portod_pid);
+    (void)portod.AsString(portodPid);
+    portodCwd = GetCwd(portodPid);
 
     Say() << "Check default working directory" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
@@ -643,10 +643,10 @@ static void TestCwd(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     cwd = GetCwd(pid);
 
-    Expect(cwd == portod_cwd);
-    Expect(access(portod_cwd.c_str(), F_OK) == 0);
+    Expect(cwd == portodCwd);
+    Expect(access(portodCwd.c_str(), F_OK) == 0);
     ExpectSuccess(api.Stop(name));
-    Expect(access(portod_cwd.c_str(), F_OK) == 0);
+    Expect(access(portodCwd.c_str(), F_OK) == 0);
 
     Say() << "Check user defined working directory" << endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
@@ -1316,12 +1316,11 @@ static void TestRecovery(TPortoAPI &api) {
     Expect(TaskRunning(api, pid) == true);
     Expect(TaskZombie(api, pid) == false);
 
-    string portod_pid;
-    TFile portod(PID_FILE);
-    ExpectSuccess(portod.AsString(portod_pid));
+    int portodPid = ReadPid(PID_FILE);
+    if (kill(portodPid, SIGKILL))
+        throw string("Can't send SIGKILL to slave");
 
-    kill(stoi(portod_pid), SIGKILL);
-    WaitExit(api, portod_pid);
+    WaitExit(api, to_string(portodPid));
     WaitPortod(api);
 
     ExpectSuccess(api.GetData(name, "state", v));
@@ -1347,10 +1346,10 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectSuccess(api.Create(parent));
     ExpectSuccess(api.Create(child));
 
-    ExpectSuccess(portod.AsString(portod_pid));
-
-    kill(stoi(portod_pid), SIGKILL);
-    WaitExit(api, portod_pid);
+    portodPid = ReadPid(PID_FILE);
+    if (kill(portodPid, SIGKILL))
+        throw string("Can't send SIGKILL to slave");
+    WaitExit(api, to_string(portodPid));
     WaitPortod(api);
 
     std::vector<std::string> containers;

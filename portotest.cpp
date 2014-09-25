@@ -65,6 +65,8 @@ int main(int argc, char *argv[])
             return Selftest(argc - 1, argv + 1);
     } catch (string err) {
         cerr << "Exception: " << err << endl;
+    } catch (const std::exception &exc) {
+        cerr << "Exception: " << exc.what() << endl;
     } catch (...) {
         cerr << "Unknown exception" << endl;
     }

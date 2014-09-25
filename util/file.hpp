@@ -10,6 +10,8 @@ class TFile {
     const std::string Path;
     const int Mode; // currently used only by WriteStringNoAppend
 
+    TError Write(int flags, const std::string &str) const;
+
 public:
     enum EFileType {
         Regular,
