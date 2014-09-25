@@ -34,12 +34,8 @@ static bool LoadConfig(const std::string &path, init::TConfig &cfg) {
     return true;
 }
 
-
-int main(int argc, char * const argv[]) {
+static int StartContainers() {
     TFolder f(".");
-
-    TLogger::InitLog("", 0);
-    TLogger::LogToStd();
 
     std::vector<std::string> files;
     TError error = f.Items(TFile::Regular, files);
@@ -74,7 +70,76 @@ int main(int argc, char * const argv[]) {
         ExecConfig(cfg);
     }
 
+    return 0;
+}
+
+static void EventLoop() {
+}
+
+static int PrepareSystem() {
+    // TODO:
+    // - setup ttys & console
+    // - setup hostname & locale
+    // - setup kernel modules
+    // - man 5 utmp
+    // - mount filesystems
+    // - trigger udev
+    // - setup network
+
+    return 0;
+}
+
+static void CleanupSystem() {
+    // TODO: undo everything in PrepareSystem
+}
+
+static int StartPorto() {
+    return 0;
+}
+
+static void StopPorto() {
+    // TODO: send SIGINT and wait for exit with timeout
+}
+
+static void Restart() {
+    // man 2 reboot
+}
+
+static void Poweroff() {
+    // man 2 reboot
+}
+
+// ? SIGPWR/SIGTERM
+static bool NeedRestart = false;
+
+int main(int argc, char * const argv[]) {
+    int ret;
+
+    TLogger::InitLog("", 0);
+    TLogger::LogToStd();
+
+    ret = PrepareSystem();
+    if (ret)
+        return ret;
+
+    ret = StartPorto();
+    if (ret)
+        return ret;
+
+    ret = StartContainers();
+    if (ret)
+        return ret;
+
+    EventLoop();
+
+    StopPorto();
     TLogger::CloseLog();
+
+    CleanupSystem();
+
+    if (NeedRestart)
+        Restart();
+    Poweroff();
 
     return EXIT_SUCCESS;
 }

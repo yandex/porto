@@ -2,3 +2,5 @@ CMakeCache.txt
 CMakeFiles/
 Makefile
 cmake_install.cmake
+init.pb.h
+init.pb.cc
