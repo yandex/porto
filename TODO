@@ -5,6 +5,9 @@
 - ? autodestroy property
 - ? portoctl run -f <MANIFEST> | <MANIFEST STRING>
 - ? portoctl inpect to export everything in JSON
+- ? cpu_cores property to reserve some cores for a container
+- ? isolate = { none, full } property
+- ? create temporary directory for container if none provided
 
 # nekt0n
 - add namespaces

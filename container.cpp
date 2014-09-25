@@ -225,6 +225,9 @@ TContainer::~TContainer() {
     }
     */
 
+    if (IsRoot())
+        FreeResources();
+
     if (DefaultTclass) {
         TError error = DefaultTclass->Remove();
         TLogger::LogError(error, "Can't remove default tc class");
@@ -234,9 +237,6 @@ TContainer::~TContainer() {
         TError error = Qdisc->Remove();
         TLogger::LogError(error, "Can't remove tc qdisc");
     }
-
-    if (IsRoot())
-        FreeResources();
 }
 
 const string TContainer::GetName() const {
@@ -416,13 +416,6 @@ TError TContainer::PrepareCgroups() {
     LeafCgroups[freezerSubsystem] = GetLeafCgroup(freezerSubsystem);
     LeafCgroups[netclsSubsystem] = GetLeafCgroup(netclsSubsystem);
 
-    TLogger::Log() <<
-    LeafCgroups[cpuSubsystem] << " " <<
-    LeafCgroups[cpuacctSubsystem] << " " <<
-    LeafCgroups[memorySubsystem] << " " <<
-    LeafCgroups[freezerSubsystem] << " " <<
-    LeafCgroups[netclsSubsystem] << endl;
-
     for (auto cg : LeafCgroups) {
         auto ret = cg.second->Create();
         if (ret) {
@@ -485,7 +478,7 @@ TError TContainer::PrepareCgroups() {
 }
 
 TError TContainer::PrepareTask() {
-    TTaskEnv taskEnv(Spec.Get("command"), Spec.Get("cwd"), Spec.Get("root"), Spec.Get("user"), Spec.Get("group"), Spec.Get("env"));
+    TTaskEnv taskEnv(Spec.Get("command"), Spec.Get("cwd"), /*Spec.Get("root")*/"", Spec.Get("user"), Spec.Get("group"), Spec.Get("env"));
     TError error = taskEnv.Prepare();
     if (error)
         return error;
@@ -674,11 +667,6 @@ void TContainer::StopChildren() {
 }
 
 void TContainer::FreeResources() {
-    for (auto cg : LeafCgroups) {
-        TError error = cg.second->Remove();
-        TLogger::LogError(error, "Can't remove cgroup");
-    }
-
     LeafCgroups.clear();
 
     if (Tclass) {
@@ -705,6 +693,7 @@ TError TContainer::Stop() {
         TLogger::Log() << "Error while waiting for container to stop" << endl;
 
     AckExitStatus(pid);
+    Task->DeliverExitStatus(-1);
 
     State = EContainerState::Stopped;
 
@@ -854,18 +843,17 @@ TError TContainer::Restore(const kv::TNode &node) {
         if (State == EContainerState::Running)
             MaybeReturnedOk = true;
     } else {
+        auto cg = GetLeafCgroup(freezerSubsystem);
         if (IsAlive()) {
             // we started container but died before saving root_pid,
             // state may be inconsistent so restart task
 
-            auto cg = GetLeafCgroup(freezerSubsystem);
             if (cg->Exists())
                 (void)KillAll();
             return Start();
         } else {
             // if we didn't start container, make sure nobody is running
 
-            auto cg = GetLeafCgroup(freezerSubsystem);
             if (cg->Exists())
                 (void)KillAll();
         }

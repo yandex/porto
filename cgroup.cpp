@@ -32,8 +32,8 @@ TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems,
 }
 
 TCgroup::~TCgroup() {
-    if (Exists())
-        Remove();
+    TError error = Remove();
+    TLogger::LogError(error, "Can't remove cgroup directory");
 }
 
 shared_ptr<TCgroup> TCgroup::GetChild(const std::string& name) {
@@ -147,10 +147,10 @@ TError TCgroup::Create() {
     } else
         Parent->Create();
 
-    TLogger::Log() << "Create cgroup " << Path() << endl;
-
     TFolder f(Path());
     if (!f.Exists()) {
+        TLogger::Log() << "Create cgroup " << Path() << endl;
+
         TError error = f.Create(Mode);
         TLogger::LogError(error, "Can't create cgroup directory");
         if (error)
@@ -168,28 +168,22 @@ TError TCgroup::Create() {
 }
 
 TError TCgroup::Remove() {
-    if (IsRoot()) {
+    if (IsRoot())
         return TError::Success();
-    } else {
-        // at this point we should have gracefully terminated all tasks
-        // in the container; if anything is still alive we have no other choice
-        // but to kill it with SIGKILL
-        int ret = RetryFailed(CGROUP_REMOVE_TIMEOUT_S * 10, 100,
-                              [&]{ Kill(SIGKILL);
-                                   return !IsEmpty(); });
 
-        if (ret)
-            TLogger::Log() << "Can't kill all tasks in cgroup " << Path() << endl;
-    }
+    // at this point we should have gracefully terminated all tasks
+    // in the container; if anything is still alive we have no other choice
+    // but to kill it with SIGKILL
+    int ret = RetryFailed(CGROUP_REMOVE_TIMEOUT_S * 10, 100,
+                          [&]{ Kill(SIGKILL);
+                               return !IsEmpty(); });
+
+    if (ret)
+        TLogger::Log() << "Can't kill all tasks in cgroup " << Path() << endl;
 
     TLogger::Log() << "Remove cgroup " << Path() << endl;
     TFolder f(Path());
-    if (!f.Exists())
-        return TError(EError::Unknown, "Cgroup doesn't exist");
-    TError error = f.Remove();
-    TLogger::LogError(error, "Can't remove cgroup directory");
-
-    return TError::Success();
+    return f.Remove();
 }
 
 bool TCgroup::Exists() {

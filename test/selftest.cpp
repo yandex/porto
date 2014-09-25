@@ -1475,7 +1475,12 @@ int SelfTest(string name, int leakNr) {
         cerr << "WARNING: Due to missing kernel support, memory_guarantee/cpu_policy has not been tested!" << endl;
     if (respawns != 1 /* start */ + 2 /* TestRecovery */ + 2 /* TestCgroups */)
         cerr << "WARNING: Unexpected number of respawns: " << respawns << "!" << endl;
-    if (errors != 20)
+    if (errors !=
+        4 + /* Invalid command */
+        6 + /* Invalid property value */
+        2 + /* Memory guarantee */
+        8 + /* Hierarchical properties */
+        3 /* Can't remove cgroups */)
         cerr << "WARNING: Unexpected number of errors: " << errors << "!" << endl;
 
     return 0;

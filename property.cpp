@@ -154,7 +154,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
 
 const string &TContainerSpec::Get(const string &property) const {
     if (Data.find(property) == Data.end())
-        return propertySpec[property].Def;
+        return propertySpec.at(property).Def;
 
     return Data.at(property);
 }
@@ -198,8 +198,8 @@ TError TContainerSpec::Set(std::shared_ptr<const TContainer> container, const st
         return error;
     }
 
-    if (propertySpec[property].Valid) {
-        TError error = propertySpec[property].Valid(container, value);
+    if (propertySpec.at(property).Valid) {
+        TError error = propertySpec.at(property).Valid(container, value);
         TLogger::LogError(error, "Can't set property");
         if (error)
             return error;

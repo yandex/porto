@@ -483,6 +483,7 @@ TExitStatus TTask::GetExitStatus() const {
 }
 
 void TTask::DeliverExitStatus(int status) {
+    LeafCgroups.clear();
     ExitStatus.Error = 0;
     ExitStatus.Status = status;
     State = Stopped;
