@@ -37,11 +37,13 @@ void Crash()
     exit(-1);
 }
 
+/*
 static void SigsegvHandler(int sig, siginfo_t *si, void *unused)
 {
     TLogger::Log() << "SIGSEGV at %p" << si->si_addr;
     Crash();
 }
+*/
 
 static std::atomic<unsigned long> watchdogCounter;
 
@@ -78,7 +80,7 @@ static void* WatchdogCheck(void *arg)
 
 void WatchdogStart()
 {
-    (void)RegisterSignal(SIGSEGV, SigsegvHandler);
+//    (void)RegisterSignal(SIGSEGV, SigsegvHandler);
 
     pthread_t thread;
     pthread_create(&thread, NULL, WatchdogCheck, NULL);
