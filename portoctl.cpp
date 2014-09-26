@@ -121,8 +121,7 @@ class THelpCmd : public ICmd {
 public:
     THelpCmd() : ICmd("help", 1, "[command]", "print help message for command") {}
 
-    void Usage()
-    {
+    void Usage() {
         const int nameWidth = 32;
 
         std::cout << "Usage: " << program_invocation_short_name << " <command> [<args>]" << std::endl;
@@ -153,8 +152,7 @@ public:
                      << d.Description << std::endl;
     }
 
-    int Execute(int argc, char *argv[])
-    {
+    int Execute(int argc, char *argv[]) {
         if (argc == 0) {
             Usage();
             return EXIT_FAILURE;
@@ -205,8 +203,7 @@ class TCreateCmd : public ICmd {
 public:
     TCreateCmd() : ICmd("create", 1, "<name>", "create container") {}
 
-    int Execute(int argc, char *argv[])
-    {
+    int Execute(int argc, char *argv[]) {
         int ret = Api.Create(argv[0]);
         if (ret)
             PrintError("Can't create container");
@@ -219,8 +216,7 @@ class TDestroyCmd : public ICmd {
 public:
     TDestroyCmd() : ICmd("destroy", 1, "<name>", "destroy container") {}
 
-    int Execute(int argc, char *argv[])
-    {
+    int Execute(int argc, char *argv[]) {
         int ret = Api.Destroy(argv[0]);
         if (ret)
             PrintError("Can't destroy container");
@@ -233,8 +229,7 @@ class TListCmd : public ICmd {
 public:
     TListCmd() : ICmd("list", 0, "", "list created containers") {}
 
-    int Execute(int argc, char *argv[])
-    {
+    int Execute(int argc, char *argv[]) {
         vector<string> clist;
         int ret = Api.List(clist);
         if (ret)
@@ -257,8 +252,7 @@ class TGetPropertyCmd : public ICmd {
 public:
     TGetPropertyCmd() : ICmd("pget", 2, "<name> <property>", "get container property") {}
 
-    int Execute(int argc, char *argv[])
-    {
+    int Execute(int argc, char *argv[]) {
         string value;
         int ret = Api.GetProperty(argv[0], argv[1], value);
         if (ret)
@@ -274,8 +268,7 @@ class TSetPropertyCmd : public ICmd {
 public:
     TSetPropertyCmd() : ICmd("set", 3, "<name> <property>", "set container property") {}
 
-    int Execute(int argc, char *argv[])
-    {
+    int Execute(int argc, char *argv[]) {
         string val = argv[2];
         for (int i = 3; i < argc; i++) {
             val += " ";
@@ -294,8 +287,7 @@ class TGetDataCmd : public ICmd {
 public:
     TGetDataCmd() : ICmd("dget", 2, "<name> <data>", "get container data") {}
 
-    int Execute(int argc, char *argv[])
-    {
+    int Execute(int argc, char *argv[]) {
         string value;
         int ret = Api.GetData(argv[0], argv[1], value);
         if (ret)
@@ -311,8 +303,7 @@ class TStartCmd : public ICmd {
 public:
     TStartCmd() : ICmd("start", 1, "<name>", "start container") {}
 
-    int Execute(int argc, char *argv[])
-    {
+    int Execute(int argc, char *argv[]) {
         int ret = Api.Start(argv[0]);
         if (ret)
             PrintError("Can't start container");
@@ -375,8 +366,7 @@ class TKillCmd : public ICmd {
 public:
     TKillCmd() : ICmd("kill", 1, "<name> [signal]", "send signal to container") {}
 
-    int Execute(int argc, char *argv[])
-    {
+    int Execute(int argc, char *argv[]) {
         int sig = SIGTERM;
         if (argc >= 2) {
             string sigName = argv[1];
@@ -404,8 +394,7 @@ class TStopCmd : public ICmd {
 public:
     TStopCmd() : ICmd("stop", 1, "<name>", "stop container") {}
 
-    int Execute(int argc, char *argv[])
-    {
+    int Execute(int argc, char *argv[]) {
         int ret = Api.Stop(argv[0]);
         if (ret)
             PrintError("Can't stop container");
@@ -418,8 +407,7 @@ class TPauseCmd : public ICmd {
 public:
     TPauseCmd() : ICmd("pause", 1, "<name>", "pause container") {}
 
-    int Execute(int argc, char *argv[])
-    {
+    int Execute(int argc, char *argv[]) {
         int ret = Api.Pause(argv[0]);
         if (ret)
             PrintError("Can't pause container");
@@ -432,8 +420,7 @@ class TResumeCmd : public ICmd {
 public:
     TResumeCmd() : ICmd("resume", 1, "<name>", "resume container") {}
 
-    int Execute(int argc, char *argv[])
-    {
+    int Execute(int argc, char *argv[]) {
         int ret = Api.Resume(argv[0]);
         if (ret)
             PrintError("Can't resume container");
@@ -459,8 +446,7 @@ public:
     }
 
 
-    int Execute(int argc, char *argv[])
-    {
+    int Execute(int argc, char *argv[]) {
         string value;
         int ret;
 
@@ -545,8 +531,7 @@ public:
         return fd;
     }
 
-    int Execute(int argc, char *argv[])
-    {
+    int Execute(int argc, char *argv[]) {
         string cmd = "";
         for (int i = 1; i < argc; i++) {
             cmd += argv[i];
@@ -647,8 +632,7 @@ void TryExec(int argc, char *argv[]) {
         }
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     commands = {
         new THelpCmd(),
         new TCreateCmd(),

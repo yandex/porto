@@ -333,8 +333,7 @@ static void KvDump() {
     storage.Dump();
 }
 
-static int SlaveMain(bool failsafe, bool noWatchdog)
-{
+static int SlaveMain(bool failsafe, bool noWatchdog) {
     int ret = DaemonPrepare("portod-slave",
                             LOG_FILE, LOG_FILE_PERM,
                             PID_FILE, PID_FILE_PERM);
@@ -569,8 +568,7 @@ exit:
     return ret;
 }
 
-static int MasterMain()
-{
+static int MasterMain() {
     int ret = DaemonPrepare("portod",
                             LOOP_LOG_FILE, LOOP_LOG_FILE_PERM,
                             LOOP_PID_FILE, LOOP_PID_FILE_PERM);
@@ -608,8 +606,7 @@ static int MasterMain()
     return ret;
 }
 
-int main(int argc, char * const argv[])
-{
+int main(int argc, char * const argv[]) {
     bool slaveMode = false;
     bool failsafe = false;
     bool noWatchdog = false;
