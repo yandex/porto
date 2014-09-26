@@ -103,6 +103,12 @@ class PortoAPI:
         request.stop.name = name
         return self._rpc(request)
 
+    def Kill(self, name, sig):
+        request = rpc_pb2.TContainerRequest()
+        request.kill.name = name
+        request.kill.sig = sig
+        return self._rpc(request)
+
     def Pause(self, name):
         request = rpc_pb2.TContainerRequest()
         request.pause.name = name
