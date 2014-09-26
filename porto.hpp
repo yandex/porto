@@ -53,8 +53,8 @@ const int REAP_EVT_FD = 128;
 const int REAP_ACK_FD = 129;
 
 const uint32_t DEF_CLASS_PRIO = 50;
-const uint32_t DEF_CLASS_RATE = UINT32_MAX;
-const uint32_t DEF_CLASS_CEIL = UINT32_MAX;
+const uint32_t DEF_CLASS_RATE = -1;
+const uint32_t DEF_CLASS_CEIL = -1;
 const uint32_t DEF_CLASS_NET_PRIO = 3;
 
 #define NO_COPY_CONSTRUCT(NAME) \

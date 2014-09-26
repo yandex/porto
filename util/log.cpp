@@ -67,7 +67,7 @@ void TLogger::CloseLog() {
 
 void TLogger::TruncateLog() {
     TLogger::CloseLog();
-    (void)truncate(logPath.c_str(), 0);
+    if (truncate(logPath.c_str(), 0)) {}
 }
 
 static std::string GetTime() {

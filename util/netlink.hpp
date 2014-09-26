@@ -2,6 +2,7 @@
 #define __NETLINK_H__
 
 #include <string>
+#include <functional>
 
 #include "error.hpp"
 

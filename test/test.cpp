@@ -11,6 +11,7 @@ extern "C" {
 #include <grp.h>
 #include <pwd.h>
 #include <dirent.h>
+#include <signal.h>
 }
 
 namespace Test {

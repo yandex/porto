@@ -7,6 +7,7 @@
 
 extern "C" {
 #include <linux/if_ether.h>
+#include <netlink/route/class.h>
 #include <netlink/route/classifier.h>
 #include <netlink/route/cls/cgroup.h>
 #include <netlink/route/qdisc.h>
