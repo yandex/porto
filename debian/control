@@ -2,10 +2,10 @@ Source: yandex-porto
 Section: utils
 Priority: extra
 Maintainer: Eugene Kilimchuk <ekilimchuk@yandex-team.ru>
-Build-Depends: debhelper (>= 8.0.0), libnl-3-dev, libnl-route-3-dev
+Build-Depends: debhelper (>= 8.0.0), libnl-3-dev, libnl-route-3-dev, ctags
 Standards-Version: 3.9.2
-Homepage: https://wiki.yandex-team.ru/users/klamm/Porto
-#Vcs-Git: kernel1.yandex.ru:/home/klamm/porto 
+Homepage: https://wiki.yandex-team.ru/porto
+#Vcs-Git: ssh://git.yandex.ru/search-admin/porto.git
 
 Package: yandex-porto
 Section: utils
