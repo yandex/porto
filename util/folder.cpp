@@ -54,11 +54,12 @@ TError TFolder::Remove(bool recursive) const {
             return error;
 
         for (auto f : items) {
-            TFile child(f);
+            string path = Path + "/" + f;
+            TFile child(path);
             TError error;
 
             if (child.Type() == TFile::Directory)
-                error = TFolder(f).Remove(recursive);
+                error = TFolder(path).Remove(recursive);
             else
                 error = child.Remove();
 
