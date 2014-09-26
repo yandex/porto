@@ -27,6 +27,7 @@ extern "C" {
 
 using std::string;
 using std::map;
+using std::vector;
 
 static const size_t MAX_CONNECTIONS = PORTOD_MAX_CLIENTS + 1;
 
@@ -258,19 +259,24 @@ static int RpcMain(TContainerHolder &cholder) {
     }
 
     size_t heartbeat = 0;
+    vector<struct pollfd> fds;
+
     while (!done) {
-        struct pollfd fds[MAX_CONNECTIONS];
-        memset(fds, 0, sizeof(fds));
+        struct pollfd pfd = {};
+
+        fds.clear();
+
+        pfd.fd = sfd;
+        pfd.events = POLLIN | POLLHUP;
+        fds.push_back(pfd);
 
         for (size_t i = 0; i < clients.size(); i++) {
-            fds[i].fd = clients[i];
-            fds[i].events = POLLIN | POLLHUP;
+            pfd.fd = clients[i];
+            pfd.events = POLLIN | POLLHUP;
+            fds.push_back(pfd);
         }
 
-        fds[PORTOD_MAX_CLIENTS].fd = sfd;
-        fds[PORTOD_MAX_CLIENTS].events = POLLIN | POLLHUP;
-
-        ret = poll(fds, MAX_CONNECTIONS, PORTOD_POLL_TIMEOUT_MS);
+        ret = poll(fds.data(), fds.size(), PORTOD_POLL_TIMEOUT_MS);
         if (ret < 0) {
             TLogger::Log() << "poll() error: " << strerror(errno) << std::endl;
 
@@ -293,13 +299,13 @@ static int RpcMain(TContainerHolder &cholder) {
         if (done)
             break;
 
-        if (fds[PORTOD_MAX_CLIENTS].revents && clients.size() < PORTOD_MAX_CLIENTS) {
+        if (fds[0].revents && clients.size() < PORTOD_MAX_CLIENTS) {
             ret = AcceptClient(sfd, clients);
             if (ret < 0)
                 break;
         }
 
-        for (size_t i = 0; i < PORTOD_MAX_CLIENTS && !done; i++) {
+        for (size_t i = 1; i < fds.size() && !done; i++) {
             if (!fds[i].revents)
                 continue;
 
