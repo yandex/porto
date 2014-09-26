@@ -20,14 +20,18 @@ TKeyValueStorage::TKeyValueStorage() :
 
 string TKeyValueStorage::Name(const string &path) const {
     string s = path;
-    replace(s.begin(), s.end(), '.', '/');
+    for (string::size_type i = 0; i < s.length(); i++)
+        if (s[i] == '.')
+            s[i] = '/';
     return s;
 }
 
 string TKeyValueStorage::Path(const string &name) const {
-    string fileName = name;
-    replace(fileName.begin(), fileName.end(), '/', '.');
-    return Tmpfs.GetMountpoint() + "/" + fileName;
+    string s = name;
+    for (string::size_type i = 0; i < s.length(); i++)
+        if (s[i] == '.')
+            s[i] = '/';
+    return Tmpfs.GetMountpoint() + "/" + s;
 }
 
 void TKeyValueStorage::Merge(kv::TNode &node, kv::TNode &next) const {
