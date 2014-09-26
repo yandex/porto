@@ -18,7 +18,8 @@ extern "C" {
 #include <netlink/route/link.h>
 }
 
-using namespace std;
+using std::string;
+using std::vector;
 
 uint32_t TcHandle(uint16_t maj, uint16_t min) {
     return TC_HANDLE(maj, min);
@@ -126,7 +127,7 @@ void TNetlink::Close() {
 }
 
 void TNetlink::LogObj(const std::string &prefix, void *obj) {
-    static function<void(struct nl_dump_params *, char *)> handler;
+    static std::function<void(struct nl_dump_params *, char *)> handler;
 
     struct nl_dump_params dp = {};
     dp.dp_cb = [](struct nl_dump_params *params, char *buf) { handler(params, buf); };
@@ -136,11 +137,11 @@ void TNetlink::LogObj(const std::string &prefix, void *obj) {
 
     str << "netlink " << rtnl_link_get_name(link) << ": " << prefix << " ";
     nl_object_dump(OBJ_CAST(obj), &dp);
-    str << endl;
+    str << std::endl;
 }
 
 void TNetlink::LogCache(struct nl_cache *cache) {
-    static function<void(struct nl_dump_params *, char *)> handler;
+    static std::function<void(struct nl_dump_params *, char *)> handler;
 
     struct nl_dump_params dp = {};
     dp.dp_cb = [](struct nl_dump_params *params, char *buf) { handler(params, buf); };
@@ -151,7 +152,7 @@ void TNetlink::LogCache(struct nl_cache *cache) {
 
     str << "netlink " << rtnl_link_get_name(link) << " cache: ";
     nl_cache_dump(cache, &dp);
-    str << endl;
+    str << std::endl;
 }
 
 TError TNetlink::AddClass(uint32_t parent, uint32_t handle, uint32_t prio, uint32_t rate, uint32_t ceil) {
@@ -417,7 +418,7 @@ TError TNetlink::AddCgroupFilter(uint32_t parent, uint32_t handle) {
 		goto free_msg;
     }
 
-    TLogger::Log() << "netlink " << rtnl_link_get_name(link) << ": create tfilter id 0x" << hex << handle << " parent 0x" << parent << dec  << endl;
+    TLogger::Log() << "netlink " << rtnl_link_get_name(link) << ": create tfilter id 0x" << std::hex << handle << " parent 0x" << parent << std::dec  << std::endl;
 
     ret = nl_send_sync(sock, msg);
     if (ret) {
@@ -442,7 +443,7 @@ bool TNetlink::CgroupFilterExists(uint32_t parent, uint32_t handle) {
 
     ret = rtnl_cls_alloc_cache(sock, rtnl_link_get_ifindex(link), parent, &clsCache);
     if (ret < 0) {
-        TLogger::Log() << "Can't allocate filter cache: " << nl_geterror(ret) << endl;
+        TLogger::Log() << "Can't allocate filter cache: " << nl_geterror(ret) << std::endl;
         return false;
     }
 

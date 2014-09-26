@@ -2,8 +2,6 @@
 
 #include "protobuf.hpp"
 
-using namespace std;
-
 extern "C" {
 #include <unistd.h>
 #include <sys/socket.h>
@@ -103,7 +101,7 @@ TError CreateRpcServer(const std::string &path, const int mode, const int uid, c
     (void)unlink(path.c_str());
     if (fchmod(fd, mode) < 0) {
         close(fd);
-        return TError(EError::Unknown, errno, "fchmod(" + path + ", " + to_string(mode) + ")");
+        return TError(EError::Unknown, errno, "fchmod(" + path + ", " + std::to_string(mode) + ")");
     }
 
     if (::bind(fd, (struct sockaddr *) &my_addr,
@@ -114,7 +112,7 @@ TError CreateRpcServer(const std::string &path, const int mode, const int uid, c
 
     if (chown(path.c_str(), uid, gid) < 0) {
         close(fd);
-        return TError(EError::Unknown, errno, "chown(" + path + ", " + to_string(uid) + ", " + to_string(gid) + ")");
+        return TError(EError::Unknown, errno, "chown(" + path + ", " + std::to_string(uid) + ", " + std::to_string(gid) + ")");
     }
 
     if (listen(fd, 0) < 0) {

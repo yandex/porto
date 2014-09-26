@@ -5,7 +5,7 @@
 #include "util/string.hpp"
 #include "test/test.hpp"
 
-using namespace std;
+using std::string;
 
 static int Selftest(int argc, char *argv[]) {
     string test = "";
@@ -27,13 +27,13 @@ static int Stresstest(int argc, char *argv[]) {
         StringToInt(argv[1], iter);
     if (argc >= 3 && strcmp(argv[2], "off") == 0)
         killPorto = false;
-    cout << "Threads: " << threads << " Iterations: " << iter << " Kill: " << killPorto << endl;
+    std::cout << "Threads: " << threads << " Iterations: " << iter << " Kill: " << killPorto << std::endl;
     return Test::StressTest(threads, iter, killPorto);
 }
 
 static void Usage() {
-    cout << "usage: " << program_invocation_short_name << " [selftest name]" << endl;
-    cout << "       " << program_invocation_short_name << " stress [threads] [iterations] [kill=on/off]" << endl;
+    std::cout << "usage: " << program_invocation_short_name << " [selftest name]" << std::endl;
+    std::cout << "       " << program_invocation_short_name << " stress [threads] [iterations] [kill=on/off]" << std::endl;
 }
 
 int main(int argc, char *argv[])
@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
         }
 
         if (name == "-v" || name == "--version") {
-            cout << GIT_TAG << " " << GIT_REVISION <<endl;
+            std::cout << GIT_TAG << " " << GIT_REVISION <<std::endl;
             return EXIT_FAILURE;
         }
     }
@@ -64,11 +64,11 @@ int main(int argc, char *argv[])
         else
             return Selftest(argc - 1, argv + 1);
     } catch (string err) {
-        cerr << "Exception: " << err << endl;
+        std::cerr << "Exception: " << err << std::endl;
     } catch (const std::exception &exc) {
-        cerr << "Exception: " << exc.what() << endl;
+        std::cerr << "Exception: " << exc.what() << std::endl;
     } catch (...) {
-        cerr << "Unknown exception" << endl;
+        std::cerr << "Unknown exception" << std::endl;
     }
 
     return EXIT_FAILURE;

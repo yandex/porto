@@ -10,7 +10,11 @@
 #include "util/string.hpp"
 #include "util/unix.hpp"
 
-using namespace std;
+using std::string;
+using std::vector;
+using std::shared_ptr;
+using std::weak_ptr;
+using std::set;
 
 // TCgroup
 TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems,
@@ -25,9 +29,9 @@ TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems,
         for (auto c : subsystems)
             flags.insert(c->GetName());
 
-        Mount = make_shared<TMount>("cgroup", SYSFS_CGROOT + "/" +
-                                    CommaSeparatedList(flags),
-                                    "cgroup", flags);
+        Mount = std::make_shared<TMount>("cgroup", SYSFS_CGROOT + "/" +
+                                         CommaSeparatedList(flags),
+                                         "cgroup", flags);
     }
 }
 
@@ -49,7 +53,7 @@ shared_ptr<TCgroup> TCgroup::GetChild(const std::string& name) {
         iter++;
     }
 
-    auto child = make_shared<TCgroup>(name, shared_from_this());
+    auto child = std::make_shared<TCgroup>(name, shared_from_this());
     Children.push_back(weak_ptr<TCgroup>(child));
     return child;
 }
@@ -149,7 +153,7 @@ TError TCgroup::Create() {
 
     TFolder f(Path());
     if (!f.Exists()) {
-        TLogger::Log() << "Create cgroup " << Path() << endl;
+        TLogger::Log() << "Create cgroup " << Path() << std::endl;
 
         TError error = f.Create(Mode);
         TLogger::LogError(error, "Can't create cgroup directory");
@@ -179,9 +183,9 @@ TError TCgroup::Remove() {
                                return !IsEmpty(); });
 
     if (ret)
-        TLogger::Log() << "Can't kill all tasks in cgroup " << Path() << endl;
+        TLogger::Log() << "Can't kill all tasks in cgroup " << Path() << std::endl;
 
-    TLogger::Log() << "Remove cgroup " << Path() << endl;
+    TLogger::Log() << "Remove cgroup " << Path() << std::endl;
     TFolder f(Path());
     return f.Remove();
 }
@@ -227,7 +231,7 @@ TError TCgroup::GetKnobValueAsLines(const std::string &knob, vector<string> &lin
 TError TCgroup::SetKnobValue(const std::string &knob, const std::string &value, bool append) const {
     TFile f(Path() + "/" + knob);
 
-    //TLogger::Log() << f.GetPath() << " = " << value << endl;
+    //TLogger::Log() << f.GetPath() << " = " << value << std::endl;
 
     if (append)
         return f.AppendString(value);
@@ -237,8 +241,8 @@ TError TCgroup::SetKnobValue(const std::string &knob, const std::string &value, 
 
 TError TCgroup::Attach(int pid) const {
     if (!IsRoot()) {
-        TError error = SetKnobValue("cgroup.procs", to_string(pid), true);
-        TLogger::LogError(error, "Can't attach " + to_string(pid) + " to " + Name);
+        TError error = SetKnobValue("cgroup.procs", std::to_string(pid), true);
+        TLogger::LogError(error, "Can't attach " + std::to_string(pid) + " to " + Name);
     }
 
     return TError::Success();

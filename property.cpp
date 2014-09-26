@@ -13,7 +13,7 @@ extern "C" {
 #include <pwd.h>
 }
 
-using namespace std;
+using std::string;
 
 static TError ValidUser(std::shared_ptr<const TContainer> container, const string user) {
     if (getpwnam(user.c_str()) == NULL)
@@ -138,11 +138,11 @@ std::map<std::string, const TPropertySpec> propertySpec = {
     {"memory_limit", { "Memory hard limit", "0", true, ValidMemLimit }},
 
     {"cpu_policy", { "CPU policy: rt, normal, idle", "normal", 0, ValidCpuPolicy }},
-    {"cpu_priority", { "CPU priority: 0-99", to_string(DEF_CLASS_PRIO), DYNAMIC_PROPERTY, ValidCpuPriority }},
+    {"cpu_priority", { "CPU priority: 0-99", std::to_string(DEF_CLASS_PRIO), DYNAMIC_PROPERTY, ValidCpuPriority }},
 
-    {"net_guarantee", { "Guaranteed container network bandwidth", to_string(DEF_CLASS_RATE), 0, ValidNetGuarantee }},
-    {"net_ceil", { "Maximum container network bandwidth", to_string(DEF_CLASS_CEIL), 0, ValidNetCeil }},
-    {"net_priority", { "Container network priority: 0-7", to_string(DEF_CLASS_NET_PRIO), 0, ValidNetPriority }},
+    {"net_guarantee", { "Guaranteed container network bandwidth", std::to_string(DEF_CLASS_RATE), 0, ValidNetGuarantee }},
+    {"net_ceil", { "Maximum container network bandwidth", std::to_string(DEF_CLASS_CEIL), 0, ValidNetCeil }},
+    {"net_priority", { "Container network priority: 0-7", std::to_string(DEF_CLASS_NET_PRIO), 0, ValidNetPriority }},
 
     {"respawn", { "Automatically respawn dead container", "false", 0, ValidBool }},
 

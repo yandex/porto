@@ -15,7 +15,9 @@ extern "C" {
 #include <grp.h>
 }
 
-using namespace std;
+using std::string;
+using std::vector;
+using std::unordered_map;
 
 TFolder::~TFolder() {
     if (Tmp) {
@@ -25,7 +27,7 @@ TFolder::~TFolder() {
 }
 
 TError TFolder::Create(mode_t mode, bool recursive) const {
-    TLogger::Log() << "mkdir " << Path << endl;
+    TLogger::Log() << "mkdir " << Path << std::endl;
 
     if (recursive) {
         string copy(Path);
@@ -41,7 +43,7 @@ TError TFolder::Create(mode_t mode, bool recursive) const {
     }
 
     if (mkdir(Path.c_str(), mode) < 0)
-        return TError(EError::Unknown, errno, "mkdir(" + Path + ", " + to_string(mode) + ")");
+        return TError(EError::Unknown, errno, "mkdir(" + Path + ", " + std::to_string(mode) + ")");
 
     return TError::Success();
 }
@@ -68,7 +70,7 @@ TError TFolder::Remove(bool recursive) const {
         }
     }
 
-    TLogger::Log() << "rmdir " << Path << endl;
+    TLogger::Log() << "rmdir " << Path << std::endl;
 
     int ret = RetryBusy(10, 100, [&]{ return rmdir(Path.c_str()); });
     if (ret)

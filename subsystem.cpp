@@ -4,7 +4,8 @@
 #include "util/string.hpp"
 #include "util/unix.hpp"
 
-using namespace std;
+using std::string;
+using std::shared_ptr;
 
 shared_ptr<TMemorySubsystem> memorySubsystem(new TMemorySubsystem);
 shared_ptr<TFreezerSubsystem> freezerSubsystem(new TFreezerSubsystem);

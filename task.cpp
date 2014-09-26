@@ -25,7 +25,10 @@ extern "C" {
 #include <wordexp.h>
 }
 
-using namespace std;
+using std::stringstream;
+using std::string;
+using std::vector;
+using std::map;
 
 // TTaskEnv
 void TTaskEnv::ParseEnv() {
@@ -385,7 +388,7 @@ TError TTask::CreateCwd() {
         return TError(EError::Unknown, errno, "mkdtemp(" + string(p) + ")");
 
     Env.Cwd = d;
-    Cwd = make_shared<TFolder>(d, true);
+    Cwd = std::make_shared<TFolder>(d, true);
     return Cwd->Chown(Env.User, Env.Group);
 }
 
@@ -399,7 +402,7 @@ TError TTask::Start() {
         return error;
     }
 
-    TLogger::Log() << "DIR=" << Env.Cwd << endl;
+    TLogger::Log() << "DIR=" << Env.Cwd << std::endl;
     ExitStatus = 0;
 
     StdoutFile = Env.Cwd + "/stdout";
@@ -497,11 +500,11 @@ TError TTask::Kill(int signal) const {
     if (!Pid)
         throw "Tried to kill invalid process!";
 
-    TLogger::Log() << "kill " << signal << " " << Pid << endl;
+    TLogger::Log() << "kill " << signal << " " << Pid << std::endl;
 
     int ret = kill(Pid, signal);
     if (ret != 0)
-        return TError(EError::Unknown, errno, "kill(" + to_string(Pid) + ")");
+        return TError(EError::Unknown, errno, "kill(" + std::to_string(Pid) + ")");
 
     return TError::Success();
 }
@@ -543,13 +546,13 @@ TError TTask::Restore(int pid_) {
     // away under us any time, so don't fail if we can't recover
     // something.
 
-    TFile stdoutLink("/proc/" + to_string(pid_) + "/fd/1");
+    TFile stdoutLink("/proc/" + std::to_string(pid_) + "/fd/1");
     TError error = stdoutLink.ReadLink(StdoutFile);
     if (error)
         StdoutFile = Env.Cwd + "/stdout";
     TLogger::LogError(error, "Restore stdout");
 
-    TFile stderrLink("/proc/" + to_string(pid_) + "/fd/2");
+    TFile stderrLink("/proc/" + std::to_string(pid_) + "/fd/2");
     error = stderrLink.ReadLink(StderrFile);
     if (error)
         StderrFile = Env.Cwd + "/stderr";
@@ -565,7 +568,7 @@ TError TTask::Restore(int pid_) {
 }
 
 TError TTask::ValidateCgroups() const {
-    TFile f("/proc/" + to_string(Pid) + "/cgroup");
+    TFile f("/proc/" + std::to_string(Pid) + "/cgroup");
 
     vector<string> lines;
     map<string, string> cgmap;

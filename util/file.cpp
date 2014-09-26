@@ -11,7 +11,8 @@ extern "C" {
 #include <linux/limits.h>
 }
 
-using namespace std;
+using std::string;
+using std::vector;
 
 const string &TFile::GetPath() const {
     return Path;
@@ -42,7 +43,7 @@ TFile::EFileType TFile::Type() const {
 }
 
 TError TFile::Remove() const {
-    TLogger::Log() << "unlink " << Path << endl;
+    TLogger::Log() << "unlink " << Path << std::endl;
 
     int ret = RetryBusy(10, 100, [&]{ return unlink(Path.c_str()); });
 

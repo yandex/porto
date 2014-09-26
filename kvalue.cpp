@@ -12,7 +12,10 @@ extern "C" {
 #include <unistd.h>
 }
 
-using namespace std;
+using std::string;
+using std::set;
+using std::shared_ptr;
+using std::vector;
 
 TKeyValueStorage::TKeyValueStorage() :
     Tmpfs("tmpfs", KVALUE_ROOT, "tmpfs", {KVALUE_SIZE}) {
@@ -171,7 +174,7 @@ TError TKeyValueStorage::Restore(std::map<std::string, kv::TNode> &map) const {
         kv::TNode node;
         node.Clear();
 
-        TLogger::Log() << "Restoring " << name << " from key-value storage" << endl;
+        TLogger::Log() << "Restoring " << name << " from key-value storage" << std::endl;
 
         TError error = LoadNode(name, node);
         if (error) {
@@ -190,7 +193,7 @@ TError TKeyValueStorage::Dump() const {
 
     TError error = ListNodes(nodes);
     if (error) {
-        TLogger::Log() << "Can't list nodes: " << error.GetMsg() << endl;
+        TLogger::Log() << "Can't list nodes: " << error.GetMsg() << std::endl;
         return error;
     }
 
@@ -199,11 +202,11 @@ TError TKeyValueStorage::Dump() const {
         kv::TNode node;
         node.Clear();
 
-        cout << name << ":" << endl;
+        std::cout << name << ":" << std::endl;
 
         error = LoadNode(name, node);
         if (error) {
-            TLogger::Log() << "Can't load node: " << error.GetMsg() << endl;
+            TLogger::Log() << "Can't load node: " << error.GetMsg() << std::endl;
             continue;
         }
 
@@ -211,7 +214,7 @@ TError TKeyValueStorage::Dump() const {
             auto key = node.pairs(i).key();
             auto value = node.pairs(i).val();
 
-            cout << " " << key << " = " << value << endl;
+            std::cout << " " << key << " = " << value << std::endl;
         }
     }
 

@@ -25,7 +25,8 @@ extern "C" {
 #include <sys/socket.h>
 }
 
-using namespace std;
+using std::string;
+using std::map;
 
 static const size_t MAX_CONNECTIONS = PORTOD_MAX_CLIENTS + 1;
 
@@ -94,13 +95,13 @@ static int DaemonPrepare(const std::string &procName,
     if (stdlog)
         TLogger::LogToStd();
 
-    TLogger::Log() << "--------------------------------------------------------------------------------" << endl;
-    TLogger::Log() << "Started" << endl;
+    TLogger::Log() << "--------------------------------------------------------------------------------" << std::endl;
+    TLogger::Log() << "Started" << std::endl;
 
     RegisterSignalHandlers();
 
     if (CreatePidFile(pidPath, pidMode)) {
-        TLogger::Log() << "Can't create pid file " << pidPath << "!" << endl;
+        TLogger::Log() << "Can't create pid file " << pidPath << "!" << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -108,7 +109,7 @@ static int DaemonPrepare(const std::string &procName,
 }
 
 static void DaemonShutdown(const std::string &pidPath) {
-    TLogger::Log() << "Stopped" << endl;
+    TLogger::Log() << "Stopped" << std::endl;
 
     TLogger::CloseLog();
     RemovePidFile(pidPath);
@@ -139,7 +140,7 @@ static void IdentifyClient(int fd) {
     socklen_t len = sizeof(cr);
 
     if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cr, &len) == 0) {
-        TFile client("/proc/" + to_string(cr.pid) + "/comm");
+        TFile client("/proc/" + std::to_string(cr.pid) + "/comm");
         string comm;
 
         if (client.AsString(comm))
@@ -150,9 +151,9 @@ static void IdentifyClient(int fd) {
             << " (pid " << cr.pid
             << " uid " << cr.uid
             << " gid " << cr.gid
-            << ") connected" << endl;
+            << ") connected" << std::endl;
     } else
-        TLogger::Log() << "unknown process connected" << endl;
+        TLogger::Log() << "unknown process connected" << std::endl;
 }
 
 static int AcceptClient(int sfd, std::vector<int> &clients) {
@@ -167,7 +168,7 @@ static int AcceptClient(int sfd, std::vector<int> &clients) {
         if (errno == EAGAIN)
             return 0;
 
-        TLogger::Log() << "accept() error: " << strerror(errno) << endl;
+        TLogger::Log() << "accept() error: " << strerror(errno) << std::endl;
         return -1;
     }
 
@@ -194,10 +195,10 @@ void AckExitStatus(int pid) {
 
     int ret = write(REAP_ACK_FD, &pid, sizeof(pid));
     if (ret == sizeof(pid)) {
-        TLogger::Log() << "Acknowledge exit status for " << to_string(pid) << endl;
+        TLogger::Log() << "Acknowledge exit status for " << std::to_string(pid) << std::endl;
     } else {
-        TError error(EError::Unknown, errno, "write(): returned " + to_string(ret));
-        TLogger::LogError(error, "Can't acknowledge exit status for " + to_string(pid));
+        TError error(EError::Unknown, errno, "write(): returned " + std::to_string(ret));
+        TLogger::LogError(error, "Can't acknowledge exit status for " + std::to_string(pid));
     }
 }
 
@@ -211,7 +212,7 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
     while (nr--) {
         int ret = poll(fds, 1, 0);
         if (ret < 0) {
-            TLogger::Log() << "poll() error: " << strerror(errno) << endl;
+            TLogger::Log() << "poll() error: " << strerror(errno) << std::endl;
             return ret;
         }
 
@@ -220,16 +221,16 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
 
         int pid, status;
         if (read(fd, &pid, sizeof(pid)) < 0) {
-            TLogger::Log() << "read(pid): " << strerror(errno) << endl;
+            TLogger::Log() << "read(pid): " << strerror(errno) << std::endl;
             return 0;
         }
         if (read(fd, &status, sizeof(status)) < 0) {
-            TLogger::Log() << "read(status): " << strerror(errno) << endl;
+            TLogger::Log() << "read(status): " << strerror(errno) << std::endl;
             return 0;
         }
 
         if (!cholder.DeliverExitStatus(pid, status)) {
-            TLogger::Log() << "Can't deliver " << to_string(pid) << " exit status " << to_string(status) << endl;
+            TLogger::Log() << "Can't deliver " << std::to_string(pid) << " exit status " << std::to_string(status) << std::endl;
             AckExitStatus(pid);
             return 0;
         }
@@ -249,11 +250,11 @@ static int RpcMain(TContainerHolder &cholder) {
     if (g)
         gid = g->gr_gid;
     else
-        TLogger::Log() << "Can't get gid for " << RPC_SOCK_GROUP << " group" << endl;
+        TLogger::Log() << "Can't get gid for " << RPC_SOCK_GROUP << " group" << std::endl;
 
     TError error = CreateRpcServer(RPC_SOCK, RPC_SOCK_PERM, uid, gid, sfd);
     if (error) {
-        TLogger::Log() << "Can't create RPC server: " << error.GetMsg() << endl;
+        TLogger::Log() << "Can't create RPC server: " << error.GetMsg() << std::endl;
     }
 
     size_t heartbeat = 0;
@@ -271,7 +272,7 @@ static int RpcMain(TContainerHolder &cholder) {
 
         ret = poll(fds, MAX_CONNECTIONS, PORTOD_POLL_TIMEOUT_MS);
         if (ret < 0) {
-            TLogger::Log() << "poll() error: " << strerror(errno) << endl;
+            TLogger::Log() << "poll() error: " << strerror(errno) << std::endl;
 
             if (done)
                 break;
@@ -335,23 +336,23 @@ static int SlaveMain(bool failsafe, bool noWatchdog)
         return ret;
 
     if (AnotherInstanceRunning(RPC_SOCK)) {
-        TLogger::Log() << "Another instance of portod is running!" << endl;
+        TLogger::Log() << "Another instance of portod is running!" << std::endl;
         return EXIT_FAILURE;
     }
 
     if (system("modprobe cls_cgroup")) {
-        TLogger::Log() << "Can't load cls_cgroup kernel module: " << strerror(errno) << endl;
+        TLogger::Log() << "Can't load cls_cgroup kernel module: " << strerror(errno) << std::endl;
         return EXIT_FAILURE;
     }
 
     if (fcntl(REAP_EVT_FD, F_SETFD, FD_CLOEXEC) < 0) {
-        TLogger::Log() << "Can't set close-on-exec flag on REAP_EVT_FD: " << strerror(errno) << endl;
+        TLogger::Log() << "Can't set close-on-exec flag on REAP_EVT_FD: " << strerror(errno) << std::endl;
         if (!failsafe)
             return EXIT_FAILURE;
     }
 
     if (fcntl(REAP_ACK_FD, F_SETFD, FD_CLOEXEC) < 0) {
-        TLogger::Log() << "Can't set close-on-exec flag on REAP_ACK_FD: " << strerror(errno) << endl;
+        TLogger::Log() << "Can't set close-on-exec flag on REAP_ACK_FD: " << strerror(errno) << std::endl;
         if (!failsafe)
             return EXIT_FAILURE;
     }
@@ -401,13 +402,13 @@ static int SlaveMain(bool failsafe, bool noWatchdog)
         error = storage.Destroy();
         TLogger::LogError(error, "Couldn't destroy key-value storage");
     } catch (string s) {
-        cout << s << endl;
+        std::cout << s << std::endl;
         ret = EXIT_FAILURE;
     } catch (const char *s) {
-        cout << s << endl;
+        std::cout << s << std::endl;
         ret = EXIT_FAILURE;
     } catch (...) {
-        cout << "Uncaught exception!" << endl;
+        std::cout << "Uncaught exception!" << std::endl;
         ret = EXIT_FAILURE;
     }
 
@@ -422,19 +423,19 @@ static int SlaveMain(bool failsafe, bool noWatchdog)
 }
 
 static void SendPidStatus(int fd, int pid, int status, size_t queued) {
-    TLogger::Log() << "Deliver " << pid << " status " << status << " (" + to_string(queued) + " queued)" << endl;
+    TLogger::Log() << "Deliver " << pid << " status " << status << " (" + std::to_string(queued) + " queued)" << std::endl;
 
     if (write(fd, &pid, sizeof(pid)) < 0)
-        TLogger::Log() << "write(pid): " << strerror(errno) << endl;
+        TLogger::Log() << "write(pid): " << strerror(errno) << std::endl;
     if (write(fd, &status, sizeof(status)) < 0)
-        TLogger::Log() << "write(status): " << strerror(errno) << endl;
+        TLogger::Log() << "write(status): " << strerror(errno) << std::endl;
 }
 
 static void ReceiveAcks(int fd, map<int,int> &pidToStatus) {
     int pid;
 
     while (read(fd, &pid, sizeof(pid)) == sizeof(pid)) {
-        TLogger::Log() << "Got acknowledge for " << pid << endl;
+        TLogger::Log() << "Got acknowledge for " << pid << std::endl;
         pidToStatus.erase(pid);
     }
 }
@@ -444,18 +445,18 @@ static void SignalMask(int how) {
     int sigs[] = { SIGALRM };
 
     if (sigemptyset(&mask) < 0) {
-        TLogger::Log() << "Can't initialize signal mask: " << strerror(errno) << endl;
+        TLogger::Log() << "Can't initialize signal mask: " << strerror(errno) << std::endl;
         return;
     }
 
     for (auto sig: sigs)
         if (sigaddset(&mask, sig) < 0) {
-            TLogger::Log() << "Can't add signal to mask: " << strerror(errno) << endl;
+            TLogger::Log() << "Can't add signal to mask: " << strerror(errno) << std::endl;
             return;
         }
 
     if (sigprocmask(how, &mask, NULL) < 0)
-        TLogger::Log() << "Can't set signal mask: " << strerror(errno) << endl;
+        TLogger::Log() << "Can't set signal mask: " << strerror(errno) << std::endl;
 }
 
 static int SpawnPortod(map<int,int> &pidToStatus) {
@@ -464,18 +465,18 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
     int ret = EXIT_FAILURE;
 
     if (pipe(evtfd) < 0) {
-        TLogger::Log() << "pipe(): " << strerror(errno) << endl;
+        TLogger::Log() << "pipe(): " << strerror(errno) << std::endl;
         return EXIT_FAILURE;
     }
 
     if (pipe2(ackfd, O_NONBLOCK) < 0) {
-        TLogger::Log() << "pipe(): " << strerror(errno) << endl;
+        TLogger::Log() << "pipe(): " << strerror(errno) << std::endl;
         return EXIT_FAILURE;
     }
 
     slavePid = fork();
     if (slavePid < 0) {
-        TLogger::Log() << "fork(): " << strerror(errno) << endl;
+        TLogger::Log() << "fork(): " << strerror(errno) << std::endl;
         ret = EXIT_FAILURE;
         goto exit;
     } else if (slavePid == 0) {
@@ -493,7 +494,7 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
     close(evtfd[0]);
     close(ackfd[1]);
 
-    TLogger::Log() << "Spawned slave " << slavePid << endl;
+    TLogger::Log() << "Spawned slave " << slavePid << std::endl;
 
     for (auto &pair : pidToStatus)
         SendPidStatus(evtfd[1], pair.first, pair.second, pidToStatus.size());
@@ -507,17 +508,17 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
 
         if (hup) {
             TLogger::TruncateLog();
-            TLogger::Log() << "Updating" << endl;
+            TLogger::Log() << "Updating" << std::endl;
 
             if (kill(slavePid, SIGKILL) < 0)
-                TLogger::Log() << "Can't send SIGKILL to slave: " << strerror(errno) << endl;
+                TLogger::Log() << "Can't send SIGKILL to slave: " << strerror(errno) << std::endl;
             if (waitpid(slavePid, NULL, 0) != slavePid)
-                TLogger::Log() << "Can't wait for slave exit status: " << strerror(errno) << endl;
+                TLogger::Log() << "Can't wait for slave exit status: " << strerror(errno) << std::endl;
             TLogger::CloseLog();
             close(evtfd[1]);
             close(ackfd[0]);
             execlp(program_invocation_name, program_invocation_name, nullptr);
-            TLogger::Log() << "Can't execlp(" << program_invocation_name << ", " << program_invocation_name << ", NULL)" << strerror(errno) << endl;
+            TLogger::Log() << "Can't execlp(" << program_invocation_name << ", " << program_invocation_name << ", NULL)" << strerror(errno) << std::endl;
             ret = EXIT_FAILURE;
             break;
         }
@@ -535,11 +536,11 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
         }
 
         if (errno == EINTR) {
-            TLogger::Log() << "wait(): " << strerror(errno) << endl;
+            TLogger::Log() << "wait(): " << strerror(errno) << std::endl;
             continue;
         }
         if (pid == slavePid) {
-            TLogger::Log() << "slave exited with " << status << endl;
+            TLogger::Log() << "slave exited with " << status << std::endl;
             ret = EXIT_SUCCESS;
             break;
         }
@@ -571,7 +572,7 @@ static int MasterMain()
         return ret;
 
     if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0) {
-        TLogger::Log() << "Can't set myself as a subreaper" << endl;
+        TLogger::Log() << "Can't set myself as a subreaper" << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -587,14 +588,14 @@ static int MasterMain()
         size_t started = GetCurrentTimeMs();
         size_t next = started + RESPAWN_DELAY_MS;
         ret = SpawnPortod(pidToStatus);
-        TLogger::Log() << "Returned " << ret << endl;
+        TLogger::Log() << "Returned " << ret << std::endl;
 
         if (!done && next >= GetCurrentTimeMs())
             usleep((next - GetCurrentTimeMs()) * 1000);
     }
 
     if (kill(slavePid, SIGINT) < 0)
-        TLogger::Log() << "Can't send SIGINT to slave" << endl;
+        TLogger::Log() << "Can't send SIGINT to slave" << std::endl;
 
     DaemonShutdown(LOOP_PID_FILE);
 
@@ -609,7 +610,7 @@ int main(int argc, char * const argv[])
     int argn;
 
     if (getuid() != 0) {
-        TLogger::Log() << "Need root privileges to start" << endl;
+        TLogger::Log() << "Need root privileges to start" << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -617,7 +618,7 @@ int main(int argc, char * const argv[])
         string arg(argv[argn]);
 
         if (arg == "-v" || arg == "--version") {
-            cout << GIT_TAG << " " << GIT_REVISION <<endl;
+            std::cout << GIT_TAG << " " << GIT_REVISION <<std::endl;
             return EXIT_SUCCESS;
         } else if (arg == "--kv-dump") {
             KvDump();

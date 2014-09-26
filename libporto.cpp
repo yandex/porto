@@ -1,6 +1,7 @@
 #include "libporto.hpp"
 
-using namespace std;
+using std::string;
+using std::vector;
 
 extern "C" {
 #include <unistd.h>

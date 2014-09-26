@@ -17,7 +17,10 @@ extern "C" {
 #include <sys/stat.h>
 }
 
-using namespace std;
+using std::string;
+using std::vector;
+using std::map;
+using std::pair;
 
 namespace Test {
 
@@ -71,13 +74,13 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetProperty(name, "cpu_policy", v));
     Expect(v == string("normal"));
     ExpectSuccess(api.GetProperty(name, "cpu_priority", v));
-    Expect(v == to_string(DEF_CLASS_PRIO));
+    Expect(v == std::to_string(DEF_CLASS_PRIO));
     ExpectSuccess(api.GetProperty(name, "net_guarantee", v));
-    Expect(v == to_string(DEF_CLASS_RATE));
+    Expect(v == std::to_string(DEF_CLASS_RATE));
     ExpectSuccess(api.GetProperty(name, "net_ceil", v));
-    Expect(v == to_string(DEF_CLASS_CEIL));
+    Expect(v == std::to_string(DEF_CLASS_CEIL));
     ExpectSuccess(api.GetProperty(name, "net_priority", v));
-    Expect(v == to_string(DEF_CLASS_NET_PRIO));
+    Expect(v == std::to_string(DEF_CLASS_NET_PRIO));
     ExpectSuccess(api.GetProperty(name, "respawn", v));
     Expect(v == string("false"));
     ExpectSuccess(api.GetProperty(name, "cpu.smart", v));
@@ -122,7 +125,7 @@ static void TestHolder(TPortoAPI &api) {
 
     std::vector<std::string> containers;
 
-    Say() << "Create container A" << endl;
+    Say() << "Create container A" << std::endl;
     ExpectSuccess(api.Create("a"));
     containers.clear();
     ExpectSuccess(api.List(containers));
@@ -132,7 +135,7 @@ static void TestHolder(TPortoAPI &api) {
     ShouldHaveValidProperties(api, "a");
     ShouldHaveValidData(api, "a");
 
-    Say() << "Try to create existing container A" << endl;
+    Say() << "Try to create existing container A" << std::endl;
     ExpectFailure(api.Create("a"), EError::ContainerAlreadyExists);
     containers.clear();
     ExpectSuccess(api.List(containers));
@@ -142,7 +145,7 @@ static void TestHolder(TPortoAPI &api) {
     ShouldHaveValidProperties(api, "a");
     ShouldHaveValidData(api, "a");
 
-    Say() << "Create container B" << endl;
+    Say() << "Create container B" << std::endl;
     ExpectSuccess(api.Create("b"));
     containers.clear();
     ExpectSuccess(api.List(containers));
@@ -153,7 +156,7 @@ static void TestHolder(TPortoAPI &api) {
     ShouldHaveValidProperties(api, "b");
     ShouldHaveValidData(api, "b");
 
-    Say() << "Remove container A" << endl;
+    Say() << "Remove container A" << std::endl;
     ExpectSuccess(api.Destroy("a"));
     containers.clear();
     ExpectSuccess(api.List(containers));
@@ -161,10 +164,10 @@ static void TestHolder(TPortoAPI &api) {
     Expect(containers[0] == string("/"));
     Expect(containers[1] == string("b"));
 
-    Say() << "Remove container B" << endl;
+    Say() << "Remove container B" << std::endl;
     ExpectSuccess(api.Destroy("b"));
 
-    Say() << "Try to execute operations on invalid container" << endl;
+    Say() << "Try to execute operations on invalid container" << std::endl;
     ExpectFailure(api.Start("a"), EError::ContainerDoesNotExist);
     ExpectFailure(api.Stop("a"), EError::ContainerDoesNotExist);
     ExpectFailure(api.Pause("a"), EError::ContainerDoesNotExist);
@@ -175,7 +178,7 @@ static void TestHolder(TPortoAPI &api) {
     ExpectFailure(api.SetProperty("a", "command", value), EError::ContainerDoesNotExist);
     ExpectFailure(api.GetData("a", "root_pid", value), EError::ContainerDoesNotExist);
 
-    Say() << "Try to create container with invalid name" << endl;
+    Say() << "Try to create container with invalid name" << std::endl;
     string name;
 
     name = "z@";
@@ -216,7 +219,7 @@ static void TestHolder(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(child));
     ExpectSuccess(api.Destroy(parent));
 
-    Say() << "Test hierarchy" << endl;
+    Say() << "Test hierarchy" << std::endl;
     ExpectSuccess(api.Create("a"));
     containers.clear();
     ExpectSuccess(api.List(containers));
@@ -232,7 +235,7 @@ static void TestHolder(TPortoAPI &api) {
     Expect(containers[1] == string("a"));
     Expect(containers[2] == string("a/b"));
 
-    Say() << "Make sure child can stop only when parent is running" << endl;
+    Say() << "Make sure child can stop only when parent is running" << std::endl;
 
     ExpectSuccess(api.Create("a/b/c"));
     containers.clear();
@@ -253,7 +256,7 @@ static void TestHolder(TPortoAPI &api) {
     ExpectSuccess(api.Start("a/b"));
     ExpectSuccess(api.Start("a/b/c"));
 
-    Say() << "Make sure when parent stops/dies children are stopped" << endl;
+    Say() << "Make sure when parent stops/dies children are stopped" << std::endl;
 
     string state;
 
@@ -304,7 +307,7 @@ static void TestHolder(TPortoAPI &api) {
 }
 
 static void TestEmpty(TPortoAPI &api) {
-    Say() << "Make sure we can't start empty container" << endl;
+    Say() << "Make sure we can't start empty container" << std::endl;
     ExpectSuccess(api.Create("b"));
     ExpectFailure(api.Start("b"), EError::InvalidValue);
     ExpectSuccess(api.Destroy("b"));
@@ -326,7 +329,7 @@ static void TestExitStatus(TPortoAPI &api) {
     string name = "a";
     ExpectSuccess(api.Create(name));
 
-    Say() << "Check exit status of 'false'" << endl;
+    Say() << "Check exit status of 'false'" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "false"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
@@ -336,7 +339,7 @@ static void TestExitStatus(TPortoAPI &api) {
     ExpectFailure(api.GetData(name, "start_errno", ret), EError::InvalidState);
     ExpectSuccess(api.Stop(name));
 
-    Say() << "Check exit status of 'true'" << endl;
+    Say() << "Check exit status of 'true'" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "true"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
@@ -346,7 +349,7 @@ static void TestExitStatus(TPortoAPI &api) {
     ExpectFailure(api.GetData(name, "start_errno", ret), EError::InvalidState);
     ExpectSuccess(api.Stop(name));
 
-    Say() << "Check exit status of invalid command" << endl;
+    Say() << "Check exit status of invalid command" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "__invalid_command_name__"));
     ExpectSuccess(api.SetProperty(name, "cwd", "/"));
     ExpectFailure(api.Start(name), EError::Unknown);
@@ -355,7 +358,7 @@ static void TestExitStatus(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "start_errno", ret));
     Expect(ret == string("2"));
 
-    Say() << "Check exit status of invalid directory" << endl;
+    Say() << "Check exit status of invalid directory" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "true"));
     ExpectSuccess(api.SetProperty(name, "cwd", "/__invalid__dir__"));
     ExpectFailure(api.Start(name), EError::Unknown);
@@ -364,7 +367,7 @@ static void TestExitStatus(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "start_errno", ret));
     Expect(ret == string("-2"));
 
-    Say() << "Check exit status when killed by signal" << endl;
+    Say() << "Check exit status when killed by signal" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.SetProperty(name, "cwd", ""));
     ExpectSuccess(api.Start(name));
@@ -387,7 +390,7 @@ static void TestStreams(TPortoAPI &api) {
     string name = "a";
     ExpectSuccess(api.Create(name));
 
-    Say() << "Make sure stdout works" << endl;
+    Say() << "Make sure stdout works" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "bash -c 'echo out >&1'"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
@@ -398,7 +401,7 @@ static void TestStreams(TPortoAPI &api) {
     Expect(ret == string(""));
     ExpectSuccess(api.Stop(name));
 
-    Say() << "Make sure stderr works" << endl;
+    Say() << "Make sure stderr works" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "bash -c 'echo err >&2'"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
@@ -418,13 +421,13 @@ static void TestLongRunning(TPortoAPI &api) {
     string name = "a";
     ExpectSuccess(api.Create(name));
 
-    Say() << "Spawn long running task" << endl;
+    Say() << "Spawn long running task" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     Expect(TaskRunning(api, pid) == true);
 
-    Say() << "Check that task namespaces are correct" << endl;
+    Say() << "Check that task namespaces are correct" << std::endl;
     Expect(GetNamespace("self", "pid") != GetNamespace(pid, "pid"));
     Expect(GetNamespace("self", "mnt") != GetNamespace(pid, "mnt"));
     Expect(GetNamespace("self", "ipc") == GetNamespace(pid, "ipc"));
@@ -432,7 +435,7 @@ static void TestLongRunning(TPortoAPI &api) {
     //Expect(GetNamespace("self", "user") == GetNamespace(pid, "user"));
     Expect(GetNamespace("self", "uts") == GetNamespace(pid, "uts"));
 
-    Say() << "Check that task cgroups are correct" << endl;
+    Say() << "Check that task cgroups are correct" << std::endl;
     auto cgmap = GetCgroups("self");
     for (auto name : cgmap) {
         // skip systemd cgroups
@@ -458,7 +461,7 @@ static void TestLongRunning(TPortoAPI &api) {
     Expect(TaskRunning(api, pid) == false);
     Expect(TcClassExist(leaf_cls) == false);
 
-    Say() << "Check that destroying container removes tclass" << endl;
+    Say() << "Check that destroying container removes tclass" << std::endl;
     ExpectSuccess(api.Start(name));
     Expect(TcClassExist(root_cls) == true);
     Expect(TcClassExist(leaf_cls) == true);
@@ -467,7 +470,7 @@ static void TestLongRunning(TPortoAPI &api) {
     Expect(TcClassExist(leaf_cls) == false);
     ExpectSuccess(api.Create(name));
 
-    Say() << "Check that hierarchical task cgroups are correct" << endl;
+    Say() << "Check that hierarchical task cgroups are correct" << std::endl;
 
     string child = name + "/b";
     ExpectSuccess(api.Create(child));
@@ -499,7 +502,7 @@ static void TestIsolation(TPortoAPI &api) {
     string name = "a";
     ExpectSuccess(api.Create(name));
 
-    Say() << "Make sure PID isolation works" << endl;
+    Say() << "Make sure PID isolation works" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "bash -c 'echo $BASHPID'"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
@@ -518,7 +521,7 @@ static void TestIsolation(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "stdout", ret));
     Expect(std::count(ret.begin(), ret.end(), '\n') == 2);
 
-    Say() << "Make sure container has correct network class" << endl;
+    Say() << "Make sure container has correct network class" << std::endl;
 
     TNetlink nl;
     Expect(nl.Open() == TError::Success());
@@ -537,7 +540,7 @@ static void TestEnvironment(TPortoAPI &api) {
     string name = "a";
     ExpectSuccess(api.Create(name));
 
-    Say() << "Check default environment" << endl;
+    Say() << "Check default environment" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
@@ -550,7 +553,7 @@ static void TestEnvironment(TPortoAPI &api) {
     Expect(memcmp(empty_env, env.data(), sizeof(empty_env)) == 0);
     ExpectSuccess(api.Stop(name));
 
-    Say() << "Check user-defined environment" << endl;
+    Say() << "Check user-defined environment" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.SetProperty(name, "env", "a=b;c=d;"));
     ExpectSuccess(api.Start(name));
@@ -599,7 +602,7 @@ static void TestUserGroup(TPortoAPI &api) {
     string name = "a";
     ExpectSuccess(api.Create(name));
 
-    Say() << "Check default user & group" << endl;
+    Say() << "Check default user & group" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
@@ -610,7 +613,7 @@ static void TestUserGroup(TPortoAPI &api) {
     Expect(gid == GroupGid(GetDefaultGroup()));
     ExpectSuccess(api.Stop(name));
 
-    Say() << "Check custom user & group" << endl;
+    Say() << "Check custom user & group" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.SetProperty(name, "user", "daemon"));
     ExpectSuccess(api.SetProperty(name, "group", "bin"));
@@ -638,7 +641,7 @@ static void TestCwd(TPortoAPI &api) {
     (void)portod.AsString(portodPid);
     portodCwd = GetCwd(portodPid);
 
-    Say() << "Check default working directory" << endl;
+    Say() << "Check default working directory" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
@@ -667,7 +670,7 @@ static void TestCwd(TPortoAPI &api) {
     Expect(bcwd.substr(0, prefix.length()) == prefix);
     Expect(bcwd != cwd);
 
-    Say() << "Check user defined working directory" << endl;
+    Say() << "Check user defined working directory" << std::endl;
     ExpectSuccess(api.Create(name));
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.SetProperty(name, "cwd", "/tmp"));
@@ -695,7 +698,7 @@ static void TestRootProperty(TPortoAPI &api) {
     string name = "a";
     ExpectSuccess(api.Create(name));
 
-    Say() << "Check filesystem isolation" << endl;
+    Say() << "Check filesystem isolation" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "pwd"));
     ExpectSuccess(api.SetProperty(name, "cwd", ""));
     ExpectSuccess(api.SetProperty(name, "root", "/root/chroot"));
@@ -772,7 +775,7 @@ static void TestStateMachine(TPortoAPI &api) {
     ExpectSuccess(api.Stop(name));
     Expect(TaskRunning(api, pid) == false);
 
-    Say() << "Make sure we can stop unintentionally frozen container " << endl;
+    Say() << "Make sure we can stop unintentionally frozen container " << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
 
@@ -786,13 +789,13 @@ static void TestStateMachine(TPortoAPI &api) {
 
     ExpectSuccess(api.Stop(name));
 
-    Say() << "Make sure we can remove paused container " << endl;
+    Say() << "Make sure we can remove paused container " << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.Pause(name));
     ExpectSuccess(api.Destroy(name));
 
-    Say() << "Make sure kill works " << endl;
+    Say() << "Make sure kill works " << std::endl;
     ExpectSuccess(api.Create(name));
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
@@ -840,7 +843,7 @@ static void TestRoot(TPortoAPI &api) {
     ExpectSuccess(api.Plist(plist));
     Expect(plist.size() == properties.size());
 
-    Say() << "Check root properties & data" << endl;
+    Say() << "Check root properties & data" << std::endl;
     for (auto p : properties)
         ExpectFailure(api.GetProperty(root, p, v), EError::InvalidProperty);
 
@@ -856,7 +859,7 @@ static void TestRoot(TPortoAPI &api) {
     ExpectFailure(api.Stop(root), EError::InvalidState);
     ExpectFailure(api.Destroy(root), EError::InvalidValue);
 
-    Say() << "Check root cpu_usage & memory_usage" << endl;
+    Say() << "Check root cpu_usage & memory_usage" << std::endl;
     ExpectSuccess(api.GetData(root, "cpu_usage", v));
     Expect(v == "0");
     ExpectSuccess(api.GetData(root, "memory_usage", v));
@@ -974,7 +977,7 @@ static void TestLimits(TPortoAPI &api) {
     string name = "a";
     ExpectSuccess(api.Create(name));
 
-    Say() << "Check default limits" << endl;
+    Say() << "Check default limits" << std::endl;
     string current;
 
     current = GetCgKnob("memory", "", "memory.use_hierarchy");
@@ -987,7 +990,7 @@ static void TestLimits(TPortoAPI &api) {
     Expect(current == "1");
 
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
-    Expect(current == to_string(LLONG_MAX) || current == to_string(ULLONG_MAX));
+    Expect(current == std::to_string(LLONG_MAX) || current == std::to_string(ULLONG_MAX));
 
     if (HaveCgKnob("memory", "memory.low_limit_in_bytes")) {
         current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
@@ -995,7 +998,7 @@ static void TestLimits(TPortoAPI &api) {
     }
     ExpectSuccess(api.Stop(name));
 
-    Say() << "Check custom limits" << endl;
+    Say() << "Check custom limits" << std::endl;
     string exp_limit = "524288";
     string exp_guar = "16384";
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
@@ -1012,13 +1015,13 @@ static void TestLimits(TPortoAPI &api) {
     }
     ExpectSuccess(api.Stop(name));
 
-    Say() << "Check cpu_priority" << endl;
+    Say() << "Check cpu_priority" << std::endl;
     ExpectFailure(api.SetProperty(name, "cpu_priority", "-1"), EError::InvalidValue);
     ExpectFailure(api.SetProperty(name, "cpu_priority", "100"), EError::InvalidValue);
     ExpectSuccess(api.SetProperty(name, "cpu_priority", "0"));
     ExpectSuccess(api.SetProperty(name, "cpu_priority", "99"));
 
-    Say() << "Check cpu_policy" << endl;
+    Say() << "Check cpu_policy" << std::endl;
     string smart;
 
     ExpectFailure(api.SetProperty(name, "cpu_policy", "somecrap"), EError::InvalidValue);
@@ -1059,12 +1062,12 @@ static void TestLimits(TPortoAPI &api) {
     ExpectSuccess(api.Stop(name));
 
     uint32_t netGuarantee = 100000, netCeil = 200000, netPrio = 4;
-    ExpectSuccess(api.SetProperty(name, "net_guarantee", to_string(netGuarantee)));
-    ExpectSuccess(api.SetProperty(name, "net_ceil", to_string(netCeil)));
+    ExpectSuccess(api.SetProperty(name, "net_guarantee", std::to_string(netGuarantee)));
+    ExpectSuccess(api.SetProperty(name, "net_ceil", std::to_string(netCeil)));
     ExpectFailure(api.SetProperty(name, "net_priority", "-1"), EError::InvalidValue);
     ExpectFailure(api.SetProperty(name, "net_priority", "8"), EError::InvalidValue);
     ExpectSuccess(api.SetProperty(name, "net_priority", "0"));
-    ExpectSuccess(api.SetProperty(name, "net_priority", to_string(netPrio)));
+    ExpectSuccess(api.SetProperty(name, "net_priority", std::to_string(netPrio)));
     ExpectSuccess(api.Start(name));
 
     uint32_t prio, rate, ceil;
@@ -1087,14 +1090,14 @@ static void TestRawLimits(TPortoAPI &api) {
     string name = "a";
     ExpectSuccess(api.Create(name));
 
-    Say() << "Check default limits" << endl;
+    Say() << "Check default limits" << std::endl;
     string current;
 
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
 
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
-    Expect(current == to_string(LLONG_MAX) || current == to_string(ULLONG_MAX));
+    Expect(current == std::to_string(LLONG_MAX) || current == std::to_string(ULLONG_MAX));
 
     if (HaveCgKnob("memory", "memory.low_limit_in_bytes")) {
         current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
@@ -1112,7 +1115,7 @@ static void TestRawLimits(TPortoAPI &api) {
     }
     ExpectSuccess(api.Stop(name));
 
-    Say() << "Check custom limits" << endl;
+    Say() << "Check custom limits" << std::endl;
     string exp_limit = "524288";
     string exp_guar = "16384";
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
@@ -1152,7 +1155,7 @@ static void TestDynamic(TPortoAPI &api) {
 
     string current;
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
-    Expect(current == to_string(LLONG_MAX) || current == to_string(ULLONG_MAX));
+    Expect(current == std::to_string(LLONG_MAX) || current == std::to_string(ULLONG_MAX));
 
     string exp_limit = "268435456";
     ExpectSuccess(api.SetProperty(name, "memory_limit", exp_limit));
@@ -1204,37 +1207,37 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
 
     size_t total = GetTotalMemory();
 
-    Say() << "Single container can't go over reserve" << endl;
-    ExpectFailure(api.SetProperty(system, "memory_guarantee", to_string(total)), EError::ResourceNotAvailable);
-    ExpectSuccess(api.SetProperty(system, "memory_guarantee", to_string(total - MEMORY_GUARANTEE_RESERVE)));
+    Say() << "Single container can't go over reserve" << std::endl;
+    ExpectFailure(api.SetProperty(system, "memory_guarantee", std::to_string(total)), EError::ResourceNotAvailable);
+    ExpectSuccess(api.SetProperty(system, "memory_guarantee", std::to_string(total - MEMORY_GUARANTEE_RESERVE)));
 
-    Say() << "Distributed guarantee can't go over reserve" << endl;
+    Say() << "Distributed guarantee can't go over reserve" << std::endl;
     size_t chunk = (total - MEMORY_GUARANTEE_RESERVE) / 4;
 
-    ExpectSuccess(api.SetProperty(system, "memory_guarantee", to_string(chunk)));
-    ExpectSuccess(api.SetProperty(monit, "memory_guarantee", to_string(chunk)));
-    ExpectSuccess(api.SetProperty(slot1, "memory_guarantee", to_string(chunk)));
-    ExpectFailure(api.SetProperty(slot2, "memory_guarantee", to_string(chunk + 1)), EError::ResourceNotAvailable);
-    ExpectSuccess(api.SetProperty(slot2, "memory_guarantee", to_string(chunk)));
+    ExpectSuccess(api.SetProperty(system, "memory_guarantee", std::to_string(chunk)));
+    ExpectSuccess(api.SetProperty(monit, "memory_guarantee", std::to_string(chunk)));
+    ExpectSuccess(api.SetProperty(slot1, "memory_guarantee", std::to_string(chunk)));
+    ExpectFailure(api.SetProperty(slot2, "memory_guarantee", std::to_string(chunk + 1)), EError::ResourceNotAvailable);
+    ExpectSuccess(api.SetProperty(slot2, "memory_guarantee", std::to_string(chunk)));
 
-    ExpectSuccess(api.SetProperty(monit, "memory_guarantee", to_string(0)));
-    ExpectSuccess(api.SetProperty(system, "memory_guarantee", to_string(0)));
+    ExpectSuccess(api.SetProperty(monit, "memory_guarantee", std::to_string(0)));
+    ExpectSuccess(api.SetProperty(system, "memory_guarantee", std::to_string(0)));
 
     auto CheckPropertyHierarhcy = [&](TPortoAPI &api, const std::string &property) {
-        Say() << "Parent can't have less guarantee than sum of children" << endl;
-        ExpectSuccess(api.SetProperty(slot1, property, to_string(chunk)));
-        ExpectSuccess(api.SetProperty(slot2, property, to_string(chunk)));
-        ExpectFailure(api.SetProperty(prod, property, to_string(chunk)), EError::InvalidValue);
-        ExpectFailure(api.SetProperty(box, property, to_string(chunk)), EError::InvalidValue);
+        Say() << "Parent can't have less guarantee than sum of children" << std::endl;
+        ExpectSuccess(api.SetProperty(slot1, property, std::to_string(chunk)));
+        ExpectSuccess(api.SetProperty(slot2, property, std::to_string(chunk)));
+        ExpectFailure(api.SetProperty(prod, property, std::to_string(chunk)), EError::InvalidValue);
+        ExpectFailure(api.SetProperty(box, property, std::to_string(chunk)), EError::InvalidValue);
 
-        Say() << "Child can't go over parent guarantee" << endl;
-        ExpectSuccess(api.SetProperty(prod, property, to_string(2 * chunk)));
-        ExpectFailure(api.SetProperty(slot1, property, to_string(2 * chunk)), EError::InvalidValue);
+        Say() << "Child can't go over parent guarantee" << std::endl;
+        ExpectSuccess(api.SetProperty(prod, property, std::to_string(2 * chunk)));
+        ExpectFailure(api.SetProperty(slot1, property, std::to_string(2 * chunk)), EError::InvalidValue);
 
-        Say() << "Can lower guarantee if possible" << endl;
-        ExpectFailure(api.SetProperty(prod, property, to_string(chunk)), EError::InvalidValue);
-        ExpectSuccess(api.SetProperty(slot2, property, to_string(0)));
-        ExpectSuccess(api.SetProperty(prod, property, to_string(chunk)));
+        Say() << "Can lower guarantee if possible" << std::endl;
+        ExpectFailure(api.SetProperty(prod, property, std::to_string(chunk)), EError::InvalidValue);
+        ExpectSuccess(api.SetProperty(slot2, property, std::to_string(0)));
+        ExpectSuccess(api.SetProperty(prod, property, std::to_string(chunk)));
     };
 
     CheckPropertyHierarhcy(api, "memory_guarantee");
@@ -1306,33 +1309,33 @@ static void TestLeaks(TPortoAPI &api) {
     Expect(f.AsString(pid) == false);
 
     for (int i = 0; i < LeakConainersNr; i++) {
-        name = "a" + to_string(i);
+        name = "a" + std::to_string(i);
         ExpectSuccess(api.Create(name));
         ExpectSuccess(api.SetProperty(name, "command", "true"));
         ExpectSuccess(api.Start(name));
     }
 
     for (int i = 0; i < LeakConainersNr; i++) {
-        name = "a" + to_string(i);
+        name = "a" + std::to_string(i);
         ExpectSuccess(api.Destroy(name));
     }
 
     int prev = GetVmRss(pid);
 
     for (int i = 0; i < LeakConainersNr; i++) {
-        name = "b" + to_string(i);
+        name = "b" + std::to_string(i);
         ExpectSuccess(api.Create(name));
         ExpectSuccess(api.SetProperty(name, "command", "true"));
         ExpectSuccess(api.Start(name));
     }
 
     for (int i = 0; i < LeakConainersNr; i++) {
-        name = "b" + to_string(i);
+        name = "b" + std::to_string(i);
         ExpectSuccess(api.Destroy(name));
     }
 
     int now = GetVmRss(pid);
-    Say() << "Expected " << now << " < " << prev + slack << endl;
+    Say() << "Expected " << now << " < " << prev + slack << std::endl;
     Expect(now <= prev + slack);
 }
 
@@ -1347,7 +1350,7 @@ static void TestRecovery(TPortoAPI &api) {
         { "env", "a=a;b=b" },
     };
 
-    Say() << "Make sure we don't kill containers when doing recovery" << endl;
+    Say() << "Make sure we don't kill containers when doing recovery" << std::endl;
     ExpectSuccess(api.Create(name));
 
     for (auto &pair : props)
@@ -1362,7 +1365,7 @@ static void TestRecovery(TPortoAPI &api) {
     if (kill(portodPid, SIGKILL))
         throw string("Can't send SIGKILL to slave");
 
-    WaitExit(api, to_string(portodPid));
+    WaitExit(api, std::to_string(portodPid));
     WaitPortod(api);
 
     ExpectSuccess(api.GetData(name, "state", v));
@@ -1381,7 +1384,7 @@ static void TestRecovery(TPortoAPI &api) {
 
     ExpectSuccess(api.Destroy(name));
 
-    Say() << "Make sure hierarchical recovery works" << endl;
+    Say() << "Make sure hierarchical recovery works" << std::endl;
 
     string parent = "a";
     string child = "a/b";
@@ -1391,7 +1394,7 @@ static void TestRecovery(TPortoAPI &api) {
     portodPid = ReadPid(PID_FILE);
     if (kill(portodPid, SIGKILL))
         throw string("Can't send SIGKILL to slave");
-    WaitExit(api, to_string(portodPid));
+    WaitExit(api, std::to_string(portodPid));
     WaitPortod(api);
 
     std::vector<std::string> containers;
@@ -1430,7 +1433,7 @@ static void TestCgroups(TPortoAPI &api) {
 }
 
 int SelfTest(string name, int leakNr) {
-    pair<string, function<void(TPortoAPI &)>> tests[] = {
+    pair<string, std::function<void(TPortoAPI &)>> tests[] = {
         { "root", TestRoot },
         { "stats", TestStats },
         { "holder", TestHolder },
@@ -1464,7 +1467,7 @@ int SelfTest(string name, int leakNr) {
     try {
         TPortoAPI api;
 
-        cerr << ">>> Truncating logs and restarting porto..." << endl;
+        std::cerr << ">>> Truncating logs and restarting porto..." << std::endl;
 
         if (Pgrep("portod") != 1)
             throw string("Porto is not running");
@@ -1500,29 +1503,29 @@ int SelfTest(string name, int leakNr) {
             if (name.length() && name != t.first)
                 continue;
 
-            cerr << ">>> Testing " << t.first << "..." << endl;
+            std::cerr << ">>> Testing " << t.first << "..." << std::endl;
             t.second(api);
         }
 
         respawns = WordCount(LOOP_LOG_FILE, "Spawned");
         errors = WordCount(LOG_FILE, "Error");
     } catch (string e) {
-        cerr << "EXCEPTION: " << e << endl;
+        std::cerr << "EXCEPTION: " << e << std::endl;
         return 1;
     }
 
-    cerr << "SUCCESS: All tests successfully passed!" << endl;
+    std::cerr << "SUCCESS: All tests successfully passed!" << std::endl;
     if (!CanTestLimits())
-        cerr << "WARNING: Due to missing kernel support, memory_guarantee/cpu_policy has not been tested!" << endl;
+        std::cerr << "WARNING: Due to missing kernel support, memory_guarantee/cpu_policy has not been tested!" << std::endl;
     if (respawns != 1 /* start */ + 2 /* TestRecovery */ + 2 /* TestCgroups */)
-        cerr << "WARNING: Unexpected number of respawns: " << respawns << "!" << endl;
+        std::cerr << "WARNING: Unexpected number of respawns: " << respawns << "!" << std::endl;
     if (errors !=
         4 + /* Invalid command */
         6 + /* Invalid property value */
         2 + /* Memory guarantee */
         8 + /* Hierarchical properties */
         3 /* Can't remove cgroups */)
-        cerr << "WARNING: Unexpected number of errors: " << errors << "!" << endl;
+        std::cerr << "WARNING: Unexpected number of errors: " << errors << "!" << std::endl;
 
     return 0;
 }

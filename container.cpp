@@ -20,7 +20,10 @@ extern "C" {
 #include <sys/reboot.h>
 }
 
-using namespace std;
+using std::string;
+using std::vector;
+using std::shared_ptr;
+using std::unique_ptr;
 
 // Data
 
@@ -46,20 +49,20 @@ struct TData {
 
     static string RootPid(TContainer& c) {
         if (c.Task)
-            return to_string(c.Task->GetPid());
+            return std::to_string(c.Task->GetPid());
         else
             return "-1";
     };
 
     static string ExitStatus(TContainer& c) {
         if (c.Task && !c.Task->IsRunning())
-            return to_string(c.Task->GetExitStatus());
+            return std::to_string(c.Task->GetExitStatus());
         else
             return "-1";
     };
 
     static string StartErrno(TContainer& c) {
-        return to_string(c.TaskStartErrno);
+        return std::to_string(c.TaskStartErrno);
     };
 
     static string Stdout(TContainer& c) {
@@ -89,7 +92,7 @@ struct TData {
             return "-1";
         }
 
-        return to_string(val);
+        return std::to_string(val);
     };
 
     static string MemUsage(TContainer& c) {
@@ -107,7 +110,7 @@ struct TData {
             return "-1";
         }
 
-        return to_string(val);
+        return std::to_string(val);
     };
 
     static string NetBytes(TContainer& c) {
@@ -118,7 +121,7 @@ struct TData {
             return "-1";
         }
 
-        return to_string(val);
+        return std::to_string(val);
     };
 
     static string NetPackets(TContainer& c) {
@@ -129,7 +132,7 @@ struct TData {
             return "-1";
         }
 
-        return to_string(val);
+        return std::to_string(val);
     };
 
     static string NetDrops(TContainer& c) {
@@ -140,7 +143,7 @@ struct TData {
             return "-1";
         }
 
-        return to_string(val);
+        return std::to_string(val);
     };
 
     static string NetOverlimits(TContainer& c) {
@@ -151,7 +154,7 @@ struct TData {
             return "-1";
         }
 
-        return to_string(val);
+        return std::to_string(val);
     };
 };
 
@@ -355,7 +358,7 @@ TError TContainer::ApplyDynamicProperties() {
         if (error)
             return error;
 
-        error = cpucg->SetKnobValue("cpu.shares", to_string(cpuPrio + 2), false);
+        error = cpucg->SetKnobValue("cpu.shares", std::to_string(cpuPrio + 2), false);
         TLogger::LogError(error, "Can't set cpu_priority");
         if (error)
             return error;
@@ -370,10 +373,10 @@ TError TContainer::PrepareNetwork() {
     if (Parent) {
         uint32_t handle = TcHandle(TcMajor(Parent->Tclass->GetHandle()), Id);
         auto tclass = Parent->Tclass;
-        Tclass = make_shared<TTclass>(tclass, handle);
+        Tclass = std::make_shared<TTclass>(tclass, handle);
     } else {
         uint32_t handle = TcHandle(TcMajor(Qdisc->GetHandle()), Id);
-        Tclass = make_shared<TTclass>(Qdisc, handle);
+        Tclass = std::make_shared<TTclass>(Qdisc, handle);
     }
 
     TError error;
@@ -431,7 +434,7 @@ TError TContainer::PrepareCgroups() {
 
     auto netcls = GetLeafCgroup(netclsSubsystem);
     uint32_t handle = Tclass->GetHandle();
-    TError error = netcls->SetKnobValue("net_cls.classid", to_string(handle), false);
+    TError error = netcls->SetKnobValue("net_cls.classid", std::to_string(handle), false);
     TLogger::LogError(error, "Can't set classid");
     if (error)
         return error;
@@ -484,7 +487,7 @@ TError TContainer::PrepareTask() {
 }
 
 TError TContainer::Create() {
-    TLogger::Log() << "Create " << GetName() << " " << Id << endl;
+    TLogger::Log() << "Create " << GetName() << " " << Id << std::endl;
     TError error = Spec.Create();
     if (error)
         return error;
@@ -501,7 +504,7 @@ TError TContainer::Create() {
         uint32_t defHandle = TcHandle(Id, Id + 1);
         uint32_t rootHandle = TcHandle(Id, 0);
 
-        Qdisc = make_shared<TQdisc>(rootHandle, defHandle);
+        Qdisc = std::make_shared<TQdisc>(rootHandle, defHandle);
         (void)Qdisc->Remove();
         error = Qdisc->Create();
         if (error) {
@@ -509,7 +512,7 @@ TError TContainer::Create() {
             return error;
         }
 
-        Filter = make_shared<TFilter>(Qdisc);
+        Filter = std::make_shared<TFilter>(Qdisc);
         //(void)Filter->Remove();
         error = Filter->Create();
         if (error) {
@@ -517,7 +520,7 @@ TError TContainer::Create() {
             return error;
         }
 
-        DefaultTclass = make_shared<TTclass>(Qdisc, defHandle);
+        DefaultTclass = std::make_shared<TTclass>(Qdisc, defHandle);
         if (DefaultTclass->Exists())
             (void)DefaultTclass->Remove();
         error = DefaultTclass->Create(DEF_CLASS_PRIO, DEF_CLASS_RATE, DEF_CLASS_CEIL);
@@ -547,7 +550,7 @@ static string ContainerStateName(EContainerState state) {
 
 TError TContainer::Start() {
     if ((State == EContainerState::Running || State == EContainerState::Dead) && MaybeReturnedOk) {
-        TLogger::Log() << "Maybe running" << endl;
+        TLogger::Log() << "Maybe running" << std::endl;
         MaybeReturnedOk = false;
         return TError::Success();
     }
@@ -559,7 +562,7 @@ TError TContainer::Start() {
     if (Parent && !Parent->IsRoot() && Parent->State != EContainerState::Running)
         return TError(EError::InvalidState, "parent is not running");
 
-    Spec.SetInternal("id", to_string(Id));
+    Spec.SetInternal("id", std::to_string(Id));
 
     TError error = PrepareNetwork();
     if (error) {
@@ -601,9 +604,9 @@ TError TContainer::Start() {
     }
     TaskStartErrno = -1;
 
-    TLogger::Log() << GetName() << " started " << to_string(Task->GetPid()) << endl;
+    TLogger::Log() << GetName() << " started " << std::to_string(Task->GetPid()) << std::endl;
 
-    Spec.SetInternal("root_pid", to_string(Task->GetPid()));
+    Spec.SetInternal("root_pid", std::to_string(Task->GetPid()));
     State = EContainerState::Running;
 
     return TError::Success();
@@ -612,7 +615,7 @@ TError TContainer::Start() {
 TError TContainer::KillAll() {
     auto cg = GetLeafCgroup(freezerSubsystem);
 
-    TLogger::Log() << "killall " << GetName() << endl;
+    TLogger::Log() << "killall " << GetName() << std::endl;
 
     vector<pid_t> reap;
     TError error = cg->GetTasks(reap);
@@ -626,7 +629,7 @@ TError TContainer::KillAll() {
 
     int ret = SleepWhile(1000, [&]{ return cg->IsEmpty() == false; });
     if (ret)
-        TLogger::Log() << "Warning: child didn't exit via SIGTERM, sending SIGKILL" << endl;
+        TLogger::Log() << "Warning: child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
 
     // then kill any task that didn't want to stop via SIGTERM signal;
     // freeze all container tasks to make sure no one forks and races with us
@@ -656,7 +659,7 @@ void TContainer::StopChildren() {
             if (child->State != EContainerState::Stopped && child->State != EContainerState::Dead)
                 child->Stop();
         } else {
-            TLogger::Log() << "Warning: can't lock child while stopping" << endl;
+            TLogger::Log() << "Warning: can't lock child while stopping" << std::endl;
         }
     }
 }
@@ -678,7 +681,7 @@ TError TContainer::Stop() {
     if (IsRoot() || !(CheckState(EContainerState::Running) || CheckState(EContainerState::Dead)))
         return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
 
-    TLogger::Log() << "Stop " << GetName() << " " << Id << endl;
+    TLogger::Log() << "Stop " << GetName() << " " << Id << std::endl;
 
     int pid = Task->GetPid();
 
@@ -688,7 +691,7 @@ TError TContainer::Stop() {
 
     int ret = SleepWhile(1000, [&]{ kill(pid, 0); return errno != ESRCH; });
     if (ret)
-        TLogger::Log() << "Error while waiting for container to stop" << endl;
+        TLogger::Log() << "Error while waiting for container to stop" << std::endl;
 
     AckExitStatus(pid);
     Task->DeliverExitStatus(-1);
@@ -789,7 +792,7 @@ TError TContainer::SetProperty(const string &property, const string &value) {
 }
 
 TError TContainer::Restore(const kv::TNode &node) {
-    TLogger::Log() << "Restore " << GetName() << " " << Id << endl;
+    TLogger::Log() << "Restore " << GetName() << " " << Id << std::endl;
 
     TError error = Spec.Restore(node);
     if (error) {
@@ -809,7 +812,7 @@ TError TContainer::Restore(const kv::TNode &node) {
             started = false;
     }
 
-    TLogger::Log() << GetName() << ": restore process " << to_string(pid) << " which " << (started ? "started" : "didn't start") << endl;
+    TLogger::Log() << GetName() << ": restore process " << std::to_string(pid) << " which " << (started ? "started" : "didn't start") << std::endl;
 
     State = EContainerState::Stopped;
 
@@ -885,7 +888,7 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
         return false;
 
     Task->DeliverExitStatus(status);
-    TLogger::Log() << "Delivered " << to_string(status) << " to " << GetName() << " with root_pid " << to_string(Task->GetPid()) << endl;
+    TLogger::Log() << "Delivered " << std::to_string(status) << " to " << GetName() << " with root_pid " << std::to_string(Task->GetPid()) << std::endl;
     State = EContainerState::Dead;
 
     if (NeedRespawn()) {
@@ -1054,7 +1057,7 @@ TError TContainerHolder::Create(const string &name) {
     if (error)
         return error;
 
-    auto c = make_shared<TContainer>(name, parent, id);
+    auto c = std::make_shared<TContainer>(name, parent, id);
     error = c->Create();
     if (error)
         return error;
@@ -1135,7 +1138,7 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
     if (!id)
         return TError(EError::Unknown, "Couldn't restore container id");
 
-    auto c = make_shared<TContainer>(name, parent, id);
+    auto c = std::make_shared<TContainer>(name, parent, id);
     error = c->Restore(node);
     if (error)
         return error;
@@ -1159,7 +1162,7 @@ void TContainerHolder::Heartbeat() {
         auto &name = i->first;
         auto c = i->second;
         if (c->CanRemoveDead()) {
-            TLogger::Log() << "Remove old dead container " << name << endl;
+            TLogger::Log() << "Remove old dead container " << name << std::endl;
             i = Containers.erase(i);
         } else {
             c->Heartbeat();

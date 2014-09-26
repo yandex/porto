@@ -16,7 +16,12 @@ extern "C" {
 #include <wordexp.h>
 }
 
-using namespace std;
+using std::string;
+using std::vector;
+using std::stringstream;
+using std::ostream_iterator;
+using std::map;
+using std::pair;
 
 static string DataValue(const string &name, const string &val) {
     if (name == "exit_status") {
@@ -27,9 +32,9 @@ static string DataValue(const string &name, const string &val) {
         string ret;
 
         if (WIFEXITED(status))
-            ret = "Container exited with " + to_string(WEXITSTATUS(status));
+            ret = "Container exited with " + std::to_string(WEXITSTATUS(status));
         else if (WIFSIGNALED(status))
-            ret = "Container killed by signal " + to_string(WTERMSIG(status));
+            ret = "Container killed by signal " + std::to_string(WTERMSIG(status));
         else if (status == 0)
             ret = "Success";
 
@@ -78,9 +83,9 @@ public:
 
     void PrintError(const TError &error, const string &str) {
         if (error.GetMsg().length())
-            cerr << str << ": " << ErrorName(error.GetError()) << " (" << error.GetMsg() << ")" << endl;
+            std::cerr << str << ": " << ErrorName(error.GetError()) << " (" << error.GetMsg() << ")" << std::endl;
         else
-            cerr << str << ": " << ErrorName(error.GetError()) << endl;
+            std::cerr << str << ": " << ErrorName(error.GetError()) << std::endl;
 
     }
 
@@ -120,32 +125,32 @@ public:
     {
         const int nameWidth = 32;
 
-        cout << "Usage: " << program_invocation_short_name << " <command> [<args>]" << endl;
-        cout << endl;
-        cout << "Command list:" << endl;
+        std::cout << "Usage: " << program_invocation_short_name << " <command> [<args>]" << std::endl;
+        std::cout << std::endl;
+        std::cout << "Command list:" << std::endl;
         for (ICmd *cmd : commands)
-            cout << " " << left << setw(nameWidth) << cmd->GetName() << cmd->GetDescription() << endl;
+            std::cout << " " << std::left << std::setw(nameWidth) << cmd->GetName() << cmd->GetDescription() << std::endl;
 
         int ret;
-        cout << endl << "Property list:" << endl;
+        std::cout << std::endl << "Property list:" << std::endl;
         vector<TProperty> plist;
         ret = Api.Plist(plist);
         if (ret) {
             PrintError("Unavailable");
         } else
             for (auto p : plist)
-                cout << " " << left << setw(nameWidth) << p.Name
-                     << p.Description << endl;
+                std::cout << " " << std::left << std::setw(nameWidth) << p.Name
+                     << p.Description << std::endl;
 
-        cout << endl << "Data list:" << endl;
+        std::cout << std::endl << "Data list:" << std::endl;
         vector<TData> dlist;
         ret = Api.Dlist(dlist);
         if (ret)
             PrintError("Unavailable");
         else
             for (auto d : dlist)
-                cout << " " << left << setw(nameWidth) << d.Name
-                     << d.Description << endl;
+                std::cout << " " << std::left << std::setw(nameWidth) << d.Name
+                     << d.Description << std::endl;
     }
 
     int Execute(int argc, char *argv[])
@@ -158,9 +163,9 @@ public:
         string name(argv[0]);
         for (ICmd *cmd : commands) {
             if (cmd->GetName() == name) {
-                cout << "Usage: " << program_invocation_short_name << " " << name << " " << cmd->GetUsage() << endl;
-                cout << endl;
-                cout << cmd->GetDescription() << endl;
+                std::cout << "Usage: " << program_invocation_short_name << " " << name << " " << cmd->GetUsage() << std::endl;
+                std::cout << std::endl;
+                std::cout << cmd->GetDescription() << std::endl;
 
                 return EXIT_SUCCESS;
             }
@@ -190,7 +195,7 @@ public:
 
         string resp;
         if (!Api.Raw(msg.str(), resp))
-            cout << resp << endl;
+            std::cout << resp << std::endl;
 
         return 0;
     }
@@ -240,8 +245,8 @@ public:
                 ret = Api.GetData(c, "state", s);
                 if (ret)
                     PrintError("Can't get container state");
-                cout << left << setw(40) << c
-                     << setw(40) << s << endl;
+                std::cout << std::left << std::setw(40) << c
+                     << std::setw(40) << s << std::endl;
             }
 
         return ret;
@@ -259,7 +264,7 @@ public:
         if (ret)
             PrintError("Can't get property");
         else
-            cout << value << endl;
+            std::cout << value << std::endl;
 
         return ret;
     }
@@ -296,7 +301,7 @@ public:
         if (ret)
             PrintError("Can't get data");
         else
-            cout << value << endl;
+            std::cout << value << std::endl;
 
         return ret;
     }
@@ -480,7 +485,7 @@ public:
 
                 ret = Api.GetProperty(argv[0], p.Name, value);
                 if (!ret)
-                    cout << p.Name << " = " << value << endl;
+                    std::cout << p.Name << " = " << value << std::endl;
             }
 
             for (auto d : dlist) {
@@ -489,7 +494,7 @@ public:
 
                 ret = Api.GetData(argv[0], d.Name, value);
                 if (!ret)
-                    cout << d.Name << " = " << DataValue(d.Name, value) << endl;
+                    std::cout << d.Name << " = " << DataValue(d.Name, value) << std::endl;
             }
 
             return 0;
@@ -501,7 +506,7 @@ public:
         if (validData) {
             ret = Api.GetData(argv[0], argv[1], value);
             if (!ret)
-                cout << DataValue(argv[1], value) << endl;
+                std::cout << DataValue(argv[1], value) << std::endl;
             else if (ret != EError::InvalidData)
                 PrintError("Can't get data");
         }
@@ -509,13 +514,13 @@ public:
         if (validProperty) {
             ret = Api.GetProperty(argv[0], argv[1], value);
             if (!ret)
-                cout << value << endl;
+                std::cout << value << std::endl;
             else if (ret != EError::InvalidProperty)
                 PrintError("Can't get data");
         }
 
         if (!validProperty && !validData)
-            cerr << "Invalid property or data" << endl;
+            std::cerr << "Invalid property or data" << std::endl;
 
         return 1;
     }
@@ -526,14 +531,14 @@ public:
     TEnterCmd() : ICmd("enter", 1, "<name> [command]", "execute command in container namespace") {}
 
     void PrintErrno(const string &str) {
-        cerr << str << ": " << strerror(errno) << endl;
+        std::cerr << str << ": " << strerror(errno) << std::endl;
     }
 
     int OpenFd(int pid, string v) {
-        string path = "/proc/" + to_string(pid) + "/" + v;
+        string path = "/proc/" + std::to_string(pid) + "/" + v;
         int fd = open(path.c_str(), O_RDONLY | O_NONBLOCK);
         if (fd < 0) {
-            PrintErrno("Can't open [" + path + "] " + to_string(fd));
+            PrintErrno("Can't open [" + path + "] " + std::to_string(fd));
             throw "";
         }
 
@@ -674,7 +679,7 @@ int main(int argc, char *argv[])
     }
 
     if (name == "-v" || name == "--version") {
-        cout << GIT_TAG << " " << GIT_REVISION <<endl;
+        std::cout << GIT_TAG << " " << GIT_REVISION << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -696,9 +701,9 @@ int main(int argc, char *argv[])
         }
 #endif
 
-        cerr << "Invalid command " << name << "!" << endl;
+        std::cerr << "Invalid command " << name << "!" << std::endl;
     } catch (string err) {
-        cerr << err << endl;
+        std::cerr << err << std::endl;
     }
 
     return EXIT_FAILURE;

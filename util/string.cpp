@@ -2,7 +2,10 @@
 
 #include "util/string.hpp"
 
-using namespace std;
+using std::string;
+using std::vector;
+using std::set;
+using std::istringstream;
 
 string CommaSeparatedList(const vector<string> &list) {
     string ret;

@@ -12,10 +12,13 @@ extern "C" {
 #include <mntent.h>
 }
 
-using namespace std;
+using std::string;
+using std::vector;
+using std::set;
+using std::shared_ptr;
 
 TError TMount::Mount(unsigned long flags) const {
-    TLogger::Log() << "mount " << Mountpoint << endl;
+    TLogger::Log() << "mount " << Mountpoint << std::endl;
 
     int ret = RetryBusy(10, 100, [&]{ return mount(Device.c_str(),
                                                    Mountpoint.c_str(),
@@ -23,13 +26,13 @@ TError TMount::Mount(unsigned long flags) const {
                                                    flags,
                                                    CommaSeparatedList(Flags).c_str()); });
     if (ret)
-        return TError(EError::Unknown, errno, "mount(" + Device + ", " + Mountpoint + ", " + Vfstype + ", " + to_string(flags) + ", " + CommaSeparatedList(Flags) + ")");
+        return TError(EError::Unknown, errno, "mount(" + Device + ", " + Mountpoint + ", " + Vfstype + ", " + std::to_string(flags) + ", " + CommaSeparatedList(Flags) + ")");
 
     return TError::Success();
 }
 
 TError TMount::Umount() const {
-    TLogger::Log() << "umount " << Mountpoint << endl;
+    TLogger::Log() << "umount " << Mountpoint << std::endl;
 
     int ret = RetryBusy(10, 100, [&]{ return umount(Mountpoint.c_str()); });
     if (ret)
@@ -52,7 +55,7 @@ TError TMountSnapshot::Mounts(std::set<std::shared_ptr<TMount>> &mounts) const {
            for (auto kv : vflags)
                flags.insert(kv);
 
-        mounts.insert(make_shared<TMount>(m->mnt_fsname, m->mnt_dir, m->mnt_type, flags));
+        mounts.insert(std::make_shared<TMount>(m->mnt_fsname, m->mnt_dir, m->mnt_type, flags));
     }
     endmntent(f);
 
@@ -73,7 +76,7 @@ TError TMountSnapshot::RemountSlave() {
         // to MS_SLAVE, nothing is remounted or mounted over
         error = m->Mount(MS_SLAVE);
         if (error)
-            TLogger::Log() << "Can't remount " << m->GetMountpoint() << endl;
+            TLogger::Log() << "Can't remount " << m->GetMountpoint() << std::endl;
     }
 
     return TError::Success();

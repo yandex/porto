@@ -2,7 +2,7 @@
 #include "util/log.hpp"
 #include "util/protobuf.hpp"
 
-using namespace std;
+using std::string;
 
 static TError CreateContainer(TContainerHolder &cholder,
                               const rpc::TContainerCreateRequest &req,
