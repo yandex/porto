@@ -22,7 +22,7 @@ using std::vector;
 using std::map;
 using std::pair;
 
-namespace Test {
+namespace test {
 
 #define Expect(ret) ExpectReturn([&]{ return ret; }, true, 1, __LINE__, __func__)
 #define ExpectSuccess(ret) ExpectReturn([&]{ return ret; }, 0, 1, __LINE__, __func__)

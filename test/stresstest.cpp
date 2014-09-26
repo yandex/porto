@@ -17,7 +17,7 @@ extern "C" {
 #include <sys/types.h>
 }
 
-namespace Test {
+namespace test {
 
 static const int retries = 10;
 static std::atomic<int> fail;

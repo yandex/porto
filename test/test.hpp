@@ -7,7 +7,7 @@
 
 #include "libporto.hpp"
 
-namespace Test {
+namespace test {
     extern __thread int tid;
     extern std::atomic<int> done;
 

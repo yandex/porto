@@ -14,7 +14,7 @@ extern "C" {
 #include <signal.h>
 }
 
-namespace Test {
+namespace test {
 
 __thread int tid;
 std::atomic<int> done;

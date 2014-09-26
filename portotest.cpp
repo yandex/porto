@@ -15,7 +15,7 @@ static int Selftest(int argc, char *argv[]) {
         if (error)
             test = argv[0];
     }
-    return Test::SelfTest(test, leakNr);
+    return test::SelfTest(test, leakNr);
 }
 
 static int Stresstest(int argc, char *argv[]) {
@@ -28,7 +28,7 @@ static int Stresstest(int argc, char *argv[]) {
     if (argc >= 3 && strcmp(argv[2], "off") == 0)
         killPorto = false;
     std::cout << "Threads: " << threads << " Iterations: " << iter << " Kill: " << killPorto << std::endl;
-    return Test::StressTest(threads, iter, killPorto);
+    return test::StressTest(threads, iter, killPorto);
 }
 
 static void Usage() {
