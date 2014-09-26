@@ -29,8 +29,8 @@ string TKeyValueStorage::Name(const string &path) const {
 string TKeyValueStorage::Path(const string &name) const {
     string s = name;
     for (string::size_type i = 0; i < s.length(); i++)
-        if (s[i] == '.')
-            s[i] = '/';
+        if (s[i] == '/')
+            s[i] = '.';
     return Tmpfs.GetMountpoint() + "/" + s;
 }
 

@@ -12,7 +12,7 @@ TError::TError(EError e, std::string description) :
 }
 
 TError::TError(EError e, int eno, std::string description) :
-    Error(e), Description(std::string(strerror(eno)) + ": " + description) {
+    Error(e), Description(std::string(strerror(eno)) + ": " + description), Errno(eno) {
 }
 
 TError::operator bool() const {
@@ -29,4 +29,8 @@ std::string TError::GetErrorName() const {
 
 const std::string &TError::GetMsg() const {
     return Description;
+}
+
+const int &TError::GetErrno() const {
+    return Errno;
 }

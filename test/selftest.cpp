@@ -644,12 +644,31 @@ static void TestCwd(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     cwd = GetCwd(pid);
 
-    Expect(cwd == portodCwd);
-    Expect(access(portodCwd.c_str(), F_OK) == 0);
+    string prefix = CONTAINER_TMP_DIR;
+
+    Expect(cwd != portodCwd);
+    Expect(cwd.length() == prefix.length() + 7);
+    Expect(cwd.substr(0, prefix.length()) == prefix);
+
+    Expect(access(cwd.c_str(), F_OK) == 0);
     ExpectSuccess(api.Stop(name));
-    Expect(access(portodCwd.c_str(), F_OK) == 0);
+    Expect(access(cwd.c_str(), F_OK) != 0);
+    ExpectSuccess(api.Destroy(name));
+
+    ExpectSuccess(api.Create("b"));
+    ExpectSuccess(api.SetProperty("b", "command", "sleep 1000"));
+    ExpectSuccess(api.Start("b"));
+    ExpectSuccess(api.GetData("b", "root_pid", pid));
+    string bcwd = GetCwd(pid);
+    ExpectSuccess(api.Destroy("b"));
+
+    Expect(bcwd != portodCwd);
+    Expect(bcwd.length() == prefix.length() + 7);
+    Expect(bcwd.substr(0, prefix.length()) == prefix);
+    Expect(bcwd != cwd);
 
     Say() << "Check user defined working directory" << endl;
+    ExpectSuccess(api.Create(name));
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.SetProperty(name, "cwd", "/tmp"));
     ExpectSuccess(api.Start(name));
@@ -879,7 +898,7 @@ static void TestStats(TPortoAPI &api) {
     string noop = "b";
 
     ExpectSuccess(api.Create(noop));
-    ExpectSuccess(api.SetProperty(noop, "command", "ls"));
+    ExpectSuccess(api.SetProperty(noop, "command", "ls -la /bin"));
     ExpectSuccess(api.Start(noop));
     ExpectSuccess(api.GetData(noop, "root_pid", pid));
     WaitExit(api, pid);

@@ -42,18 +42,19 @@ class TTask {
     std::vector<std::shared_ptr<TCgroup>> LeafCgroups;
 
     enum ETaskState { Stopped, Started } State;
-    TExitStatus ExitStatus;
+    int ExitStatus;
 
     pid_t Pid;
     std::string StdoutFile;
     std::string StderrFile;
+    std::shared_ptr<TFolder> Cwd;
 
     int CloseAllFds(int except) const;
     void Syslog(const std::string &s) const;
     void ReportResultAndExit(int fd, int result) const;
 
     TError RotateFile(const std::string path) const;
-    std::string GetTmpFile();
+    TError CreateCwd();
     void ChildReopenStdio();
     void ChildDropPriveleges();
     void ChildExec();
@@ -68,7 +69,7 @@ public:
     TError Start();
     int GetPid() const;
     bool IsRunning() const;
-    TExitStatus GetExitStatus() const;
+    int GetExitStatus() const;
     TError Kill(int signal) const;
     void DeliverExitStatus(int status);
 

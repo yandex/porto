@@ -49,6 +49,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     bool MaybeReturnedOk = false;
     size_t TimeOfDeath = 0;
     uint16_t Id;
+    int TaskStartErrno = -1;
     friend TData;
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;

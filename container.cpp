@@ -52,21 +52,14 @@ struct TData {
     };
 
     static string ExitStatus(TContainer& c) {
-        if (c.Task && !c.Task->IsRunning()) {
-            TExitStatus status = c.Task->GetExitStatus();
-            return to_string(status.Status);
-        }
+        if (c.Task && !c.Task->IsRunning())
+            return to_string(c.Task->GetExitStatus());
         else
             return "-1";
     };
 
     static string StartErrno(TContainer& c) {
-        if (c.Task && !c.Task->IsRunning()) {
-            TExitStatus status = c.Task->GetExitStatus();
-            return to_string(status.Error);
-        }
-        else
-            return "-1";
+        return to_string(c.TaskStartErrno);
     };
 
     static string Stdout(TContainer& c) {
@@ -603,8 +596,10 @@ TError TContainer::Start() {
     if (error) {
         TLogger::LogError(error, "Can't start task");
         FreeResources();
+        TaskStartErrno = error.GetErrno();
         return error;
     }
+    TaskStartErrno = -1;
 
     TLogger::Log() << GetName() << " started " << to_string(Task->GetPid()) << endl;
 
@@ -674,6 +669,9 @@ void TContainer::FreeResources() {
         Tclass = nullptr;
         TLogger::LogError(error, "Can't remove tc classifier");
     }
+
+    Task = nullptr;
+    TaskStartErrno = -1;
 }
 
 TError TContainer::Stop() {

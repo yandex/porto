@@ -4,7 +4,7 @@
 - ? portoctl run -f <MANIFEST> | <MANIFEST STRING>
 - ? cpu_cores property to reserve some cores for a container
 - ? isolate = { none, full } property
-- ? create temporary directory for container if none provided
+- report whether container was killed due to oom
 
 # nekt0n
 - add namespaces

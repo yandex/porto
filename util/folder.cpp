@@ -11,9 +11,18 @@ extern "C" {
 #include <dirent.h>
 #include <unistd.h>
 #include <libgen.h>
+#include <pwd.h>
+#include <grp.h>
 }
 
 using namespace std;
+
+TFolder::~TFolder() {
+    if (Tmp) {
+        TError error = Remove(true);
+        TLogger::LogError(error, "Can't remove " + Path);
+    }
+}
 
 TError TFolder::Create(mode_t mode, bool recursive) const {
     TLogger::Log() << "mkdir " << Path << endl;
@@ -109,5 +118,27 @@ TError TFolder::Items(const TFile::EFileType type, std::vector<std::string> &lis
     }
 
     closedir(dirp);
+    return TError::Success();
+}
+
+TError TFolder::Chown(const std::string &user, const std::string &group) const {
+    int uid, gid;
+
+    struct passwd *p = getpwnam(user.c_str());
+    if (!p)
+        return TError(EError::InvalidValue, EINVAL, "getpwnam(" + user + ")");
+
+    uid = p->pw_uid;
+
+    struct group *g = getgrnam(group.c_str());
+    if (!g)
+        return TError(EError::InvalidValue, EINVAL, "getgrnam(" + group + ")");
+
+    gid = g->gr_gid;
+
+    int ret = chown(Path.c_str(), uid, gid);
+    if (ret)
+        return TError(EError::Unknown, errno, "chown(" + Path + ", " + user + ", " + group + ")");
+
     return TError::Success();
 }

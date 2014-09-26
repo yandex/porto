@@ -9,6 +9,10 @@
 using ::rpc::EError;
 
 class TError {
+    EError Error;
+    std::string Description;
+    int Errno = 0;
+
 public:
     TError();
     TError(EError e, std::string description);
@@ -20,6 +24,7 @@ public:
     EError GetError() const;
     std::string GetErrorName() const;
     const std::string &GetMsg() const;
+    const int &GetErrno() const;
 
     static const TError& Success() {
         static TError e;
@@ -30,10 +35,6 @@ public:
         os << err.Error << " (" << err.Description << ")";
         return os;
     }
-
-private:
-    EError Error;
-    std::string Description;
 };
 
 #endif

@@ -60,20 +60,16 @@ TError TTaskEnv::Prepare() {
     EnvVec.push_back("USER=" + User);
 
     struct passwd *p = getpwnam(User.c_str());
-    if (!p) {
-        TError error(EError::InvalidValue, EINVAL, "getpwnam(" + User + ")");
-        return error;
-    } else {
+    if (!p)
+        return TError(EError::InvalidValue, EINVAL, "getpwnam(" + User + ")");
+    else
         Uid = p->pw_uid;
-    }
 
     struct group *g = getgrnam(Group.c_str());
-    if (!g) {
-        TError error(EError::InvalidValue, EINVAL, "getgrnam(" + Group + ")");
-        return error;
-    } else {
+    if (!g)
+        return TError(EError::InvalidValue, EINVAL, "getgrnam(" + Group + ")");
+    else
         Gid = g->gr_gid;
-    }
 
     return TError::Success();
 }
@@ -118,17 +114,6 @@ TTask::~TTask() {
         TError e = f.Remove();
         TLogger::LogError(e, "Can't remove task stderr " + StdoutFile);
     }
-}
-
-string TTask::GetTmpFile() {
-    char p[] = "/tmp/XXXXXX";
-    int fd = mkstemp(p);
-    if (fd < 0)
-        return "";
-
-    string path(p);
-    close(fd);
-    return path;
 }
 
 static int ChildFn(void *arg) {
@@ -383,20 +368,42 @@ int TTask::ChildCallback() {
     return 0;
 }
 
+TError TTask::CreateCwd() {
+    if (Env.Cwd.length())
+        return TError::Success();
+
+    TFolder f(CONTAINER_TMP_DIR);
+    if (!f.Exists()) {
+        TError error = f.Create(0755, true);
+        if (error)
+            return error;
+    }
+
+    char p[] = CONTAINER_TMP_DIR "/XXXXXX";
+    char *d = mkdtemp(p);
+    if (!d)
+        return TError(EError::Unknown, errno, "mkdtemp(" + string(p) + ")");
+
+    Env.Cwd = d;
+    Cwd = make_shared<TFolder>(d, true);
+    return Cwd->Chown(Env.User, Env.Group);
+}
+
 TError TTask::Start() {
     int ret;
     int pfd[2];
 
-    ExitStatus.Error = 0;
-    ExitStatus.Status = 0;
-
-    if (Env.Cwd.length()) {
-        StdoutFile = Env.Cwd + "/stdout";
-        StderrFile = Env.Cwd + "/stderr";
-    } else {
-        StdoutFile = GetTmpFile();
-        StderrFile = GetTmpFile();
+    TError error = CreateCwd();
+    if (error) {
+        TLogger::LogError(error, "Can't create temporary cwd");
+        return error;
     }
+
+    TLogger::Log() << "DIR=" << Env.Cwd << endl;
+    ExitStatus = 0;
+
+    StdoutFile = Env.Cwd + "/stdout";
+    StderrFile = Env.Cwd + "/stderr";
 
     ret = pipe2(pfd, O_CLOEXEC);
     if (ret) {
@@ -456,15 +463,13 @@ TError TTask::Start() {
         return TError::Success();
     } else {
         Pid = 0;
-
-        ExitStatus.Error = ret;
-        ExitStatus.Status = -1;
+        ExitStatus = -1;
 
         TError error;
         if (ret < 0)
-            error = TError(EError::Unknown, string("child prepare: ") + strerror(-ret));
+            error = TError(EError::Unknown, ret, string("child prepare: ") + strerror(-ret));
         else
-            error = TError(EError::Unknown, string("child exec: ") + strerror(ret));
+            error = TError(EError::Unknown, ret, string("child exec: ") + strerror(ret));
         TLogger::LogError(error, "Child process couldn't exec");
         return error;
     }
@@ -478,14 +483,13 @@ bool TTask::IsRunning() const {
     return State == Started;
 }
 
-TExitStatus TTask::GetExitStatus() const {
+int TTask::GetExitStatus() const {
     return ExitStatus;
 }
 
 void TTask::DeliverExitStatus(int status) {
     LeafCgroups.clear();
-    ExitStatus.Error = 0;
-    ExitStatus.Status = status;
+    ExitStatus = status;
     State = Stopped;
 }
 
@@ -523,8 +527,7 @@ std::string TTask::GetStderr() const {
 }
 
 TError TTask::Restore(int pid_) {
-    ExitStatus.Error = 0;
-    ExitStatus.Status = 0;
+    ExitStatus = 0;
 
     // There are to possibilities here:
     // 1. We died and loop reaped container, so it will deliver
