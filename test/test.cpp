@@ -28,18 +28,9 @@ std::basic_ostream<char> &Say(std::basic_ostream<char> &stream) {
         return std::cerr << "- ";
 }
 
-void ExpectReturn(std::function<int()> f, int exp, int retry, int line, const char *func) {
-    int ret;
-    while (retry--) {
-        if (done)
-            throw std::string("stop thread.");
-        ret = f();
-        if (ret == exp)
-            return;
-        usleep(1000000);
-        Say(std::cerr) << "Retry " << func << ":" << line << " Ret=" << ret << " " << std::endl;
-    }
-    done++;
+void ExpectReturn(int ret, int exp, int line, const char *func) {
+    if (ret == exp)
+        return;
     throw std::string("Got " + std::to_string(ret) + ", but expected " + std::to_string(exp) + " at " + func + ":" + std::to_string(line));
 }
 
@@ -387,8 +378,7 @@ void TestDaemon(TPortoAPI &api) {
         sssFd = 1;
 
     // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 4(rpc socket) 128(event pipe) 129(ack pipe)
-    ExpectReturn([&]{ return scandir(path.c_str(), &lst, NULL, alphasort); },
-                 2 + 7 + sssFd, 5, __LINE__, __func__);
+    Expect(scandir(path.c_str(), &lst, NULL, alphasort) == 2 + 7 + sssFd);
 
     Say() << "Make sure portod-slave doesn't have zombies" << std::endl;
     pid = ReadPid(LOOP_PID_FILE);
@@ -396,8 +386,7 @@ void TestDaemon(TPortoAPI &api) {
     Say() << "Make sure portod-slave doesn't have invalid FDs" << std::endl;
     path = ("/proc/" + std::to_string(pid) + "/fd");
     // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 5(event pipe) 6(ack pipe)
-    ExpectReturn([&]{ return scandir(path.c_str(), &lst, NULL, alphasort); },
-                 2 + 6 + sssFd, 5, __LINE__, __func__);
+    Expect(scandir(path.c_str(), &lst, NULL, alphasort) == 2 + 6 + sssFd);
 
     // TODO: check portoloop queue
     // TODO: check rtnl classes

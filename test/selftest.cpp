@@ -24,10 +24,6 @@ using std::pair;
 
 namespace test {
 
-#define Expect(ret) ExpectReturn([&]{ return ret; }, true, 1, __LINE__, __func__)
-#define ExpectSuccess(ret) ExpectReturn([&]{ return ret; }, 0, 1, __LINE__, __func__)
-#define ExpectFailure(ret, exp) ExpectReturn([&]{ return ret; }, exp, 1, __LINE__, __func__)
-
 static void ExpectCorrectCgroups(const string &pid, const string &name) {
     auto cgmap = GetCgroups(pid);
     string subsystems[] = { "net_cls", "freezer", "memory", "cpu", "cpuacct" };

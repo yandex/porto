@@ -22,10 +22,6 @@ namespace test {
 static const int retries = 10;
 static std::atomic<int> fail;
 
-#define Expect(ret) ExpectReturn(ret, true, 1, __LINE__, __func__)
-#define ExpectSuccess(ret) ExpectReturn(ret, 0, 1, __LINE__, __func__)
-#define ExpectFailure(ret, exp) ExpectReturn(ret, exp, 1, __LINE__, __func__)
-
 static std::vector<std::map<std::string, std::string>> vtasks =
 {
     {
@@ -68,13 +64,20 @@ static void Create(const std::string &name, const std::string &cwd) {
 
     Say() << "Create container: " << name << std::endl;
 
-    Expect([&]{ containers.clear(); api.List(containers); return std::find(containers.begin(),containers.end(),name) == containers.end();});
-    Expect([&]{ auto ret = api.Create(name); return ret == EError::Success || ret == EError::ContainerAlreadyExists; });
-    Expect([&]{ containers.clear(); api.List(containers); return std::find(containers.begin(),containers.end(),name) != containers.end();});
+    containers.clear();
+    api.List(containers);
+    Expect(std::find(containers.begin(),containers.end(),name) == containers.end());
+    auto ret = api.Create(name);
+    Expect(ret == EError::Success || ret == EError::ContainerAlreadyExists);
+    containers.clear();
+    api.List(containers);
+    Expect(std::find(containers.begin(),containers.end(),name) != containers.end());
 
     TFolder f(cwd);
-    if (!f.Exists())
-        Expect([&]{ TError error = f.Create(0755, true); return error == false; });
+    if (!f.Exists()) {
+        TError error = f.Create(0755, true);
+        Expect(error == false);
+    }
 }
 
 static void SetProperty(std::string name, std::string type, std::string value) {
@@ -83,9 +86,9 @@ static void SetProperty(std::string name, std::string type, std::string value) {
 
     Say() << "SetProperty container: " << name << std::endl;
 
-    ExpectSuccess([&]{ return api.SetProperty(name, type, value); });
-    ExpectSuccess([&]{ return api.GetProperty(name, type, res_value); });
-    Expect([&]{ return res_value == value; });
+    ExpectSuccess(api.SetProperty(name, type, value));
+    ExpectSuccess(api.GetProperty(name, type, res_value));
+    Expect(res_value == value);
 }
 
 static void Start(std::string name) {
@@ -95,8 +98,9 @@ static void Start(std::string name) {
 
     Say() << "Start container: " << name << std::endl;
 
-    ExpectSuccess([&]{ return api.Start(name); });
-    Expect([&]{ api.GetData(name, "state", ret); return ret == "dead" || ret == "running"; });
+    ExpectSuccess(api.Start(name));
+    api.GetData(name, "state", ret);
+    Expect(ret == "dead" || ret == "running");
 }
 
 static void CheckRuning(std::string name, std::string timeout) {
@@ -125,7 +129,8 @@ static void CheckStdout(std::string name, std::string stream) {
 
     Say() << "CheckStdout container: " << name << std::endl;
 
-    Expect([&]{ api.GetData(name, "stdout", ret); return ret == stream; });
+    api.GetData(name, "stdout", ret);
+    Expect(ret == stream);
 }
 
 static void CheckStderr(std::string name, std::string stream) {
@@ -134,14 +139,16 @@ static void CheckStderr(std::string name, std::string stream) {
 
     Say() << "CheckStderr container: " << name << std::endl;
 
-    Expect([&]{ api.GetData(name, "stderr", ret); return ret == stream; });
+    api.GetData(name, "stderr", ret);
+    Expect(ret == stream);
 }
 
 static void CheckExit(std::string name, std::string stream) {
     TPortoAPI api(retries);
     std::string ret;
     Say() << "CheckExit container: " << name << std::endl;
-    Expect([&]{ api.GetData(name, "exit_status", ret); return ret == stream; });
+    api.GetData(name, "exit_status", ret);
+    Expect(ret == stream);
 }
 
 static void Destroy(const std::string &name, const std::string &cwd) {
@@ -150,12 +157,12 @@ static void Destroy(const std::string &name, const std::string &cwd) {
 
     Say() << "Destroy container: " << name << std::endl;
 
-    ExpectSuccess([&]{ return api.List(containers); });
-    Expect([&]{ return std::find(containers.begin(),containers.end(),name) != containers.end(); });
-    ExpectSuccess([&]{ return api.Destroy(name); });
+    ExpectSuccess(api.List(containers));
+    Expect(std::find(containers.begin(),containers.end(),name) != containers.end());
+    ExpectSuccess(api.Destroy(name));
     containers.clear();
-    ExpectSuccess([&]{ return api.List(containers); });
-    Expect([&]{ return std::find(containers.begin(),containers.end(),name) == containers.end(); });
+    ExpectSuccess(api.List(containers));
+    Expect(std::find(containers.begin(),containers.end(),name) == containers.end());
     TFolder f(cwd);
     f.Remove(true);
 }

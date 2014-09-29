@@ -12,7 +12,7 @@ namespace test {
     extern std::atomic<int> done;
 
     std::basic_ostream<char> &Say(std::basic_ostream<char> &stream = std::cout);
-    void ExpectReturn(std::function<int()> f, int exp, int retry, int line, const char *func);
+    void ExpectReturn(int ret, int exp, int line, const char *func);
 
     int ReadPid(const std::string &path);
     int Pgrep(const std::string &name);
@@ -44,5 +44,9 @@ namespace test {
     int SelfTest(std::string name, int leakNr);
     int StressTest(int threads, int iter, bool killPorto);
 }
+
+#define Expect(ret) ExpectReturn(ret, true, __LINE__, __func__)
+#define ExpectSuccess(ret) ExpectReturn(ret, 0, __LINE__, __func__)
+#define ExpectFailure(ret, exp) ExpectReturn(ret, exp, __LINE__, __func__)
 
 #endif
