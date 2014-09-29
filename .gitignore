@@ -20,6 +20,7 @@
 /tags
 /debian/files
 /debian/yandex-porto.debhelper.log
+/debian/yandex-porto.substvars
 /debian/yandex-porto/
 /TAGS
 /python/rpc_pb2.pyc
