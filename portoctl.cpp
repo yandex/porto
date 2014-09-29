@@ -431,7 +431,7 @@ public:
 
 class TGetCmd : public ICmd {
 public:
-    TGetCmd() : ICmd("get", 1, "<name> <data>", "get container property or data") {}
+    TGetCmd() : ICmd("get", 1, "<name> [data]", "get container property or data") {}
 
     bool ValidProperty(const vector<TProperty> &plist, const string &name) {
         return find_if(plist.begin(), plist.end(),
@@ -465,13 +465,17 @@ public:
         }
 
         if (argc <= 1) {
+            int printed = 0;
+
             for (auto p : plist) {
                 if (!ValidProperty(plist, p.Name))
                     continue;
 
                 ret = Api.GetProperty(argv[0], p.Name, value);
-                if (!ret)
+                if (!ret) {
                     std::cout << p.Name << " = " << value << std::endl;
+                    printed++;
+                }
             }
 
             for (auto d : dlist) {
@@ -479,9 +483,14 @@ public:
                     continue;
 
                 ret = Api.GetData(argv[0], d.Name, value);
-                if (!ret)
+                if (!ret) {
                     std::cout << d.Name << " = " << DataValue(d.Name, value) << std::endl;
+                    printed++;
+                }
             }
+
+            if (!printed)
+                    std::cerr << "Invalid container name" << std::endl;
 
             return 0;
         }
