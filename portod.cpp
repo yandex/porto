@@ -85,6 +85,25 @@ static void RegisterSignalHandlers() {
     // don't catch SIGQUIT, may be useful to create core dump
 }
 
+static void SignalMask(int how) {
+    sigset_t mask;
+    int sigs[] = { SIGALRM };
+
+    if (sigemptyset(&mask) < 0) {
+        TLogger::Log() << "Can't initialize signal mask: " << strerror(errno) << std::endl;
+        return;
+    }
+
+    for (auto sig: sigs)
+        if (sigaddset(&mask, sig) < 0) {
+            TLogger::Log() << "Can't add signal to mask: " << strerror(errno) << std::endl;
+            return;
+        }
+
+    if (sigprocmask(how, &mask, NULL) < 0)
+        TLogger::Log() << "Can't set signal mask: " << strerror(errno) << std::endl;
+}
+
 static int DaemonPrepare(const std::string &procName,
                    const std::string &logPath,
                    unsigned int logMode,
@@ -122,11 +141,18 @@ static void RemoveRpcServer(const string &path) {
 }
 
 static void HandleRequest(TContainerHolder &cholder, int fd) {
-    NonblockingInputStream pist(fd);
+    InterruptibleInputStream pist(fd);
     google::protobuf::io::FileOutputStream post(fd);
 
     rpc::TContainerRequest request;
-    if (ReadDelimitedFrom(&pist, &request)) {
+
+    (void)alarm(READ_WAIT_TIMEOUT_S);
+    SignalMask(SIG_UNBLOCK);
+    bool haveData = ReadDelimitedFrom(&pist, &request);
+    SignalMask(SIG_BLOCK);
+    (void)alarm(0);
+
+    if (haveData) {
         auto rsp = HandleRpcRequest(cholder, request);
 
         if (rsp.IsInitialized()) {
@@ -245,6 +271,8 @@ static int RpcMain(TContainerHolder &cholder) {
     int sfd;
     std::vector<int> clients;
 
+    SignalMask(SIG_BLOCK);
+
     uid_t uid = getuid();
     gid_t gid = getgid();
     struct group *g = getgrnam(RPC_SOCK_GROUP.c_str());
@@ -324,6 +352,8 @@ static int RpcMain(TContainerHolder &cholder) {
         close(clients[i]);
 
     close(sfd);
+
+    SignalMask(SIG_UNBLOCK);
 
     return ret;
 }
@@ -445,25 +475,6 @@ static void ReceiveAcks(int fd, map<int,int> &pidToStatus) {
     }
 }
 
-static void SignalMask(int how) {
-    sigset_t mask;
-    int sigs[] = { SIGALRM };
-
-    if (sigemptyset(&mask) < 0) {
-        TLogger::Log() << "Can't initialize signal mask: " << strerror(errno) << std::endl;
-        return;
-    }
-
-    for (auto sig: sigs)
-        if (sigaddset(&mask, sig) < 0) {
-            TLogger::Log() << "Can't add signal to mask: " << strerror(errno) << std::endl;
-            return;
-        }
-
-    if (sigprocmask(how, &mask, NULL) < 0)
-        TLogger::Log() << "Can't set signal mask: " << strerror(errno) << std::endl;
-}
-
 static int SpawnPortod(map<int,int> &pidToStatus) {
     int evtfd[2];
     int ackfd[2];
@@ -528,12 +539,12 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
             break;
         }
 
-        SignalMask(SIG_UNBLOCK);
         (void)alarm(LOOP_WAIT_TIMEOUT_S);
+        SignalMask(SIG_UNBLOCK);
         int status;
         pid = wait(&status);
-        (void)alarm(0);
         SignalMask(SIG_BLOCK);
+        (void)alarm(0);
 
         if (gotAlarm) {
             gotAlarm = false;

@@ -123,21 +123,18 @@ TError CreateRpcServer(const std::string &path, const int mode, const int uid, c
     return TError::Success();
 }
 
-void NonblockingInputStream::ReserveChunk() {
+void InterruptibleInputStream::ReserveChunk() {
     if (buf.size() + CHUNK_SIZE > buf.capacity())
         buf.reserve(buf.size() + CHUNK_SIZE);
 }
 
-NonblockingInputStream::NonblockingInputStream(int fd) : Fd(fd) {
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0)
-        throw "Can't update fd to non-blocking";
+InterruptibleInputStream::InterruptibleInputStream(int fd) : Fd(fd) {
 }
 
-NonblockingInputStream::~NonblockingInputStream() {
+InterruptibleInputStream::~InterruptibleInputStream() {
 }
 
-bool NonblockingInputStream::Next(const void **data, int *size) {
+bool InterruptibleInputStream::Next(const void **data, int *size) {
     int n;
 
     if (Backed) {
@@ -165,11 +162,11 @@ bool NonblockingInputStream::Next(const void **data, int *size) {
     return *size != 0;
 }
 
-void NonblockingInputStream::BackUp(int count) {
+void InterruptibleInputStream::BackUp(int count) {
     Backed = count;
 }
 
-bool NonblockingInputStream::Skip(int count) {
+bool InterruptibleInputStream::Skip(int count) {
     while (count) {
         uint8_t tmp;
         int n = read(Fd, &tmp, 1);
@@ -181,6 +178,6 @@ bool NonblockingInputStream::Skip(int count) {
     return true;
 }
 
-int64_t NonblockingInputStream::ByteCount() const {
+int64_t InterruptibleInputStream::ByteCount() const {
     return Pos - Backed;
 }
