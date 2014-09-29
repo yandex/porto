@@ -2,76 +2,136 @@
 #include <map>
 #include <string>
 
+#include "libporto.hpp"
+
 using namespace std;
 
-static map<string, string> properties;
+class ICmd {
+protected:
+    int NeedArgs;
+    TPortoAPI Api;
 
-static int Run(string container_name,  map<string, string> &properties)
-{
-    cout << container_name << endl;
-    for (auto iter: properties)
-    {
-      cout << iter.first << "=" << iter.second << endl;
-    }
-    return 0;
-}
+public:
+    ICmd(int args) : NeedArgs(args) {}
 
-static int Destroy(string container_name)
-{
-    cout << container_name << endl;
-    return 0;
-}
-
-static int Help()
-{
-    cout << "portoexec - run command throw portod" << endl;
-    cout << endl;
-    cout << "SYNOPSYS" << endl;
-    cout << "\tportoexec run <container_name> <properties>" << endl;
-    cout << "\tportoexec destroy <container_name>" << endl;
-    return 1;
-}
-
-static void Parcer (string property, string &property_key, string &property_value)
-{
-    string::size_type n;
-    n = property.find('=');
-    if (n == string::npos)
-        throw property;
-    property_key = property.substr(0, n);
-    property_value = property.substr(n+1, property.size());
-    if (property_key == "" || property_value == "")
-        throw property;
-}
-
-int main(int argc, char * const argv[])
-{
-    int result;
-    string property_key, property_value;
-
-    if (argc <= 1) {
-            result = Help();
-            return result;
+    bool ValidArgs(int argc) {
+        if (argc < NeedArgs)
+            return false;
+        return true;
     }
 
-    string method = argv[1];
+    string GetMsg() {
+        string msg;
+        int err;
+        Api.GetLastError(err, msg);
+        return msg;
+    }
 
-    if (argc >= 4 && method == "run") {
-        for (int i = 3; i<argc; i++) {
-            try {
-                Parcer(argv[i], property_key, property_value);
-                properties[property_key] = property_value;
-            } catch (string s) {
-                cerr << "Wrong argument: " << s << '\n';
-                return EXIT_FAILURE;
+    virtual int Execute(int argc, char *argv[]) = 0;
+};
+
+static map<string, ICmd *> commands;
+
+class TRunCmd : public ICmd {
+public:
+    TRunCmd() : ICmd(2) {}
+
+    int Parser(string property, map<string, string> &properties) {
+        string propertyKey, propertyValue;
+        string::size_type n;
+        n = property.find('=');
+        if (n == string::npos) {
+            cerr << "Can't parse property: " << property << endl;
+            return EXIT_FAILURE;
+        }
+        propertyKey = property.substr(0, n);
+        propertyValue = property.substr(n+1, property.size());
+        if (propertyKey == "" || propertyValue == "") {
+            cerr << "Can't parse property: " << property << endl;
+            return EXIT_FAILURE;
+        }
+        properties[propertyKey] = propertyValue;
+        return EXIT_SUCCESS;
+    }
+
+    int Execute(int argc, char *argv[]) {
+        string containerName = argv[0];
+        map<string, string> properties;
+        int ret;
+
+        for (int i = 1; i < argc; i++) {
+            ret = Parser(argv[i], properties);
+            if (ret)
+                return ret;
+        }
+
+        ret = Api.Create(containerName);
+        if (ret) {
+            cerr << "Can't create container: " << GetMsg() << endl;
+            return EXIT_FAILURE;
+        }
+        for (auto iter: properties) {
+            ret = Api.SetProperty(containerName, iter.first, iter.second);
+            if (ret) {
+                 cerr << "Can't set property: "  << GetMsg() << endl;
+                 (void)Api.Destroy(containerName);
+                 return EXIT_FAILURE;
             }
         }
-        result = Run(argv[2], properties);
-    } else if (argc > 2 && string(argv[1]) == "destroy") {
-        result = Destroy(argv[2]);
-    } else {
-        result = Help();
+        ret = Api.Start(containerName);
+        if (ret) {
+            cerr << "Can't start container: " << GetMsg() << endl;
+            (void)Api.Destroy(containerName);
+            return EXIT_FAILURE;
+        }
+        return EXIT_SUCCESS;
     }
+};
 
-    return result;
+class TDestroyCmd : public ICmd {
+public:
+    TDestroyCmd() : ICmd(1) {}
+    int Execute(int argc, char *argv[]) {
+        string container_name = argv[0];
+        int ret = Api.Destroy(container_name);
+        if (ret) {
+            cerr << "Can't destroy container" << GetMsg() << endl;
+            return EXIT_FAILURE;
+        }
+        return EXIT_SUCCESS;
+    }
+};
+
+class THelpCmd : public ICmd {
+public:
+    THelpCmd() : ICmd(0) {}
+    int Execute(int argc, char *argv[]) {
+        cout << "portoexec - run command throw portod" << endl;
+        cout << endl;
+        cout << "SYNOPSYS" << endl;
+        cout << "\tportoexec run <container_name> <properties>" << endl;
+        cout << "\tportoexec destroy <container_name>" << endl;
+        return EXIT_FAILURE;
+    }
+};
+
+
+int main(int argc, char *argv[]) {
+    commands = {
+        { "run", new TRunCmd() },
+        { "destroy", new TDestroyCmd() },
+        { "help", new THelpCmd() },
+    };
+
+    if (argc <= 1)
+        return commands["help"]->Execute(0, NULL);
+
+    string commandName = argv[1];
+    if (commands.find(commandName) == commands.end())
+        return commands["help"]->Execute(0, NULL);
+
+    if (!commands[commandName]->ValidArgs(argc - 2))
+        return commands["help"]->Execute(0, NULL);
+
+    return commands[commandName]->Execute(argc - 2, argv + 2);
 }
