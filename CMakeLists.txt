@@ -24,7 +24,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS rpc.proto kv.proto)
 add_custom_command(
 	OUTPUT "python/porto/rpc_pb2.py"
-	COMMAND protoc ARGS --python_out=python/ rpc.proto
+	COMMAND protoc ARGS --python_out=python/porto/ rpc.proto
 	DEPENDS rpc.proto
 	VERBATIM)
 

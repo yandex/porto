@@ -23,4 +23,4 @@
 /debian/yandex-porto.substvars
 /debian/yandex-porto/
 /TAGS
-/python/rpc_pb2.pyc
+/python/porto/rpc_pb2.py*
