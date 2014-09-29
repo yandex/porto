@@ -4,6 +4,8 @@
 #include "util/string.hpp"
 #include "util/netlink.hpp"
 
+using std::string;
+
 extern "C" {
 #include <unistd.h>
 #include <sys/types.h>
@@ -333,6 +335,37 @@ int WordCount(const std::string &path, const std::string &word) {
     }
 
     return nr;
+}
+
+void RestartDaemon(TPortoAPI &api) {
+    std::cerr << ">>> Truncating logs and restarting porto..." << std::endl;
+
+    if (Pgrep("portod") != 1)
+        throw string("Porto is not running");
+
+    if (Pgrep("portod-slave") != 1)
+        throw string("Porto slave is not running");
+
+    // Remove porto cgroup to clear statistics
+    int pid = ReadPid(PID_FILE);
+    if (kill(pid, SIGINT))
+        throw string("Can't send SIGINT to slave");
+
+    WaitPortod(api);
+
+    // Truncate slave log
+    pid = ReadPid(PID_FILE);
+    if (kill(pid, SIGHUP))
+        throw string("Can't send SIGHUP to slave");
+
+    WaitPortod(api);
+
+    // Truncate master log
+    pid = ReadPid(LOOP_PID_FILE);
+    if (kill(pid, SIGHUP))
+        throw string("Can't send SIGHUP to master");
+
+    WaitPortod(api);
 }
 
 void TestDaemon(TPortoAPI &api) {

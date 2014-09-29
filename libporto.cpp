@@ -23,7 +23,7 @@ int TPortoAPI::SendReceive(int fd, rpc::TContainerRequest &req, rpc::TContainerR
     }
 }
 
-TPortoAPI::TPortoAPI() : Fd(-1) {
+TPortoAPI::TPortoAPI(int retries) : Fd(-1), Retries(retries) {
 }
 
 TPortoAPI::~TPortoAPI() {
@@ -31,23 +31,36 @@ TPortoAPI::~TPortoAPI() {
 }
 
 int TPortoAPI::Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
+    int ret;
+    int retries = Retries;
     LastErrorMsg = "";
     LastError = (int)EError::Unknown;
 
+retry:
     if (Fd < 0) {
         TError error = ConnectToRpcServer(RPC_SOCK, Fd);
         if (error) {
             LastErrorMsg = error.GetMsg();
             LastError = INT_MIN;
-            return INT_MIN;
+
+            goto exit_or_retry;
         }
     }
 
     rsp.Clear();
-    int ret = SendReceive(Fd, req, rsp);
-    req.Clear();
-    if (ret < 0)
+    ret = SendReceive(Fd, req, rsp);
+    if (ret < 0) {
         Cleanup();
+
+exit_or_retry:
+        if (retries--) {
+            usleep(RetryDelayUs);
+            goto retry;
+        }
+    }
+
+    req.Clear();
+
     return LastError;
 }
 

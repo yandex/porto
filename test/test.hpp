@@ -38,6 +38,7 @@ namespace test {
     bool TcClassExist(const std::string &handle);
     int WordCount(const std::string &path, const std::string &word);
 
+    void RestartDaemon(TPortoAPI &api);
     void TestDaemon(TPortoAPI &api);
 
     int SelfTest(std::string name, int leakNr);

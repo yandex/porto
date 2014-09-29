@@ -1473,34 +1473,7 @@ int SelfTest(string name, int leakNr) {
     try {
         TPortoAPI api;
 
-        std::cerr << ">>> Truncating logs and restarting porto..." << std::endl;
-
-        if (Pgrep("portod") != 1)
-            throw string("Porto is not running");
-
-        if (Pgrep("portod-slave") != 1)
-            throw string("Porto slave is not running");
-
-        // Remove porto cgroup to clear statistics
-        int pid = ReadPid(PID_FILE);
-        if (kill(pid, SIGINT))
-            throw string("Can't send SIGINT to slave");
-
-        WaitPortod(api);
-
-        // Truncate slave log
-        pid = ReadPid(PID_FILE);
-        if (kill(pid, SIGHUP))
-            throw string("Can't send SIGHUP to slave");
-
-        WaitPortod(api);
-
-        // Truncate master log
-        pid = ReadPid(LOOP_PID_FILE);
-        if (kill(pid, SIGHUP))
-            throw string("Can't send SIGHUP to master");
-
-        WaitPortod(api);
+        RestartDaemon(api);
 
         Expect(WordCount(LOOP_LOG_FILE, "Started") == 1);
         Expect(WordCount(LOG_FILE, "Started") == 1);

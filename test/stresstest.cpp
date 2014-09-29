@@ -22,9 +22,9 @@ namespace test {
 static const int retries = 10;
 static std::atomic<int> fail;
 
-#define Expect(ret) ExpectReturn(ret, true, retries, __LINE__, __func__)
-#define ExpectSuccess(ret) ExpectReturn(ret, 0, retries, __LINE__, __func__)
-#define ExpectFailure(ret, exp) ExpectReturn(ret, exp, retries, __LINE__, __func__)
+#define Expect(ret) ExpectReturn(ret, true, 1, __LINE__, __func__)
+#define ExpectSuccess(ret) ExpectReturn(ret, 0, 1, __LINE__, __func__)
+#define ExpectFailure(ret, exp) ExpectReturn(ret, exp, 1, __LINE__, __func__)
 
 static std::vector<std::map<std::string, std::string>> vtasks =
 {
@@ -63,7 +63,7 @@ static std::vector<std::map<std::string, std::string>> vtasks =
 };
 
 static void Create(const std::string &name, const std::string &cwd) {
-    TPortoAPI api;
+    TPortoAPI api(retries);
     std::vector<std::string> containers;
 
     Say() << "Create container: " << name << std::endl;
@@ -78,7 +78,7 @@ static void Create(const std::string &name, const std::string &cwd) {
 }
 
 static void SetProperty(std::string name, std::string type, std::string value) {
-    TPortoAPI api;
+    TPortoAPI api(retries);
     std::string res_value;
 
     Say() << "SetProperty container: " << name << std::endl;
@@ -89,7 +89,7 @@ static void SetProperty(std::string name, std::string type, std::string value) {
 }
 
 static void Start(std::string name) {
-    TPortoAPI api;
+    TPortoAPI api(retries);
     std::string pid;
     std::string ret;
 
@@ -100,7 +100,7 @@ static void Start(std::string name) {
 }
 
 static void CheckRuning(std::string name, std::string timeout) {
-    TPortoAPI api;
+    TPortoAPI api(retries);
     std::string pid;
     std::string ret;
     int t;
@@ -120,7 +120,7 @@ static void CheckRuning(std::string name, std::string timeout) {
 }
 
 static void CheckStdout(std::string name, std::string stream) {
-    TPortoAPI api;
+    TPortoAPI api(retries);
     std::string ret;
 
     Say() << "CheckStdout container: " << name << std::endl;
@@ -129,7 +129,7 @@ static void CheckStdout(std::string name, std::string stream) {
 }
 
 static void CheckStderr(std::string name, std::string stream) {
-    TPortoAPI api;
+    TPortoAPI api(retries);
     std::string ret;
 
     Say() << "CheckStderr container: " << name << std::endl;
@@ -138,14 +138,14 @@ static void CheckStderr(std::string name, std::string stream) {
 }
 
 static void CheckExit(std::string name, std::string stream) {
-    TPortoAPI api;
+    TPortoAPI api(retries);
     std::string ret;
     Say() << "CheckExit container: " << name << std::endl;
     Expect([&]{ api.GetData(name, "exit_status", ret); return ret == stream; });
 }
 
 static void Destroy(const std::string &name, const std::string &cwd) {
-    TPortoAPI api;
+    TPortoAPI api(retries);
     std::vector<std::string> containers;
 
     Say() << "Destroy container: " << name << std::endl;
@@ -165,7 +165,7 @@ static void Tasks(int n, int iter) {
     Say() << "Run task" << std::to_string(n) << std::endl;
     usleep(10000 * n);
     try {
-        TPortoAPI api;
+        TPortoAPI api(retries);
         while (iter--) {
             for (unsigned int t = 0; t < vtasks.size(); t++) {
                 std::string name = "stresstest" + std::to_string(n) + "_" + std::to_string(t);
@@ -192,7 +192,7 @@ static void Tasks(int n, int iter) {
 }
 
 static void StressKill() {
-    TPortoAPI api;
+    TPortoAPI api(retries);
     std::cout << "Run kill" << std::endl;
     while (!done) {
         usleep(1000000);
@@ -218,6 +218,10 @@ int StressTest(int threads, int iter, bool killPorto) {
 
     try {
         (void)signal(SIGPIPE, SIG_IGN);
+
+        TPortoAPI api(retries);
+        RestartDaemon(api);
+
         for (i = 1; i <= threads; i++)
             thrTasks.push_back(std::thread(Tasks, i, iter));
         if (killPorto)
@@ -228,7 +232,6 @@ int StressTest(int threads, int iter, bool killPorto) {
         if (killPorto)
             thrKill.join();
 
-        TPortoAPI api;
         TestDaemon(api);
     } catch (std::string e) {
         std::cerr << "ERROR: Exception " << e << std::endl;

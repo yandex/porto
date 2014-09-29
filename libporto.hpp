@@ -23,6 +23,8 @@ struct TData {
 
 class TPortoAPI {
     int Fd;
+    const int Retries;
+    const int RetryDelayUs = 1000000;
     rpc::TContainerRequest Req;
     rpc::TContainerResponse Rsp;
     int LastError;
@@ -33,7 +35,7 @@ class TPortoAPI {
     int Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp);
 
 public:
-    TPortoAPI();
+    TPortoAPI(int retries = 5);
     ~TPortoAPI();
     int Create(const std::string &name);
     int Destroy(const std::string &name);
