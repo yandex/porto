@@ -592,6 +592,12 @@ static void TestEnvironment(TPortoAPI &api) {
     Expect(memcmp(asb_env, env.data(), sizeof(asb_env)) == 0);
     ExpectSuccess(api.Stop(name));
 
+
+    ExpectSuccess(api.SetProperty(name, "command", "sleep $N"));
+    ExpectSuccess(api.SetProperty(name, "env", "N=1"));
+    ExpectSuccess(api.Start(name));
+
+
     ExpectSuccess(api.Destroy(name));
 }
 

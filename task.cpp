@@ -45,6 +45,9 @@ void TTaskEnv::ParseEnv() {
             ss << *i;
         }
     }
+
+    if (ss.str().length())
+        EnvVec.push_back(ss.str());
 }
 
 TError TTaskEnv::Prepare() {
@@ -225,6 +228,11 @@ void TTask::ChildDropPriveleges() {
 
 void TTask::ChildExec() {
     clearenv();
+
+    for (auto &s : Env.EnvVec) {
+        char *d = strdup(s.c_str());
+        putenv(d);
+    }
 
 	wordexp_t result;
 
