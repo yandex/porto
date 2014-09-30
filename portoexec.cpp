@@ -115,7 +115,6 @@ public:
     }
 };
 
-
 int main(int argc, char *argv[]) {
     commands = {
         { "run", new TRunCmd() },
@@ -127,6 +126,12 @@ int main(int argc, char *argv[]) {
         return commands["help"]->Execute(0, NULL);
 
     string commandName = argv[1];
+
+    if (commandName == "-v" || commandName == "--version") {
+        std::cout << GIT_TAG << " " << GIT_REVISION << std::endl;
+        return EXIT_FAILURE;
+    }
+
     if (commands.find(commandName) == commands.end())
         return commands["help"]->Execute(0, NULL);
 
