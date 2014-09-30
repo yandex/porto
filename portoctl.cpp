@@ -91,42 +91,6 @@ public:
     }
 };
 
-class TDestroyCmd : public ICmd {
-public:
-    TDestroyCmd() : ICmd("destroy", 1, "<name>", "destroy container") {}
-
-    int Execute(int argc, char *argv[]) {
-        int ret = Api.Destroy(argv[0]);
-        if (ret)
-            PrintError("Can't destroy container");
-
-        return ret;
-    }
-};
-
-class TListCmd : public ICmd {
-public:
-    TListCmd() : ICmd("list", 0, "", "list created containers") {}
-
-    int Execute(int argc, char *argv[]) {
-        vector<string> clist;
-        int ret = Api.List(clist);
-        if (ret)
-            PrintError("Can't list containers");
-        else
-            for (auto c : clist) {
-                string s;
-                ret = Api.GetData(c, "state", s);
-                if (ret)
-                    PrintError("Can't get container state");
-                std::cout << std::left << std::setw(40) << c
-                     << std::setw(40) << s << std::endl;
-            }
-
-        return ret;
-    }
-};
-
 class TGetPropertyCmd : public ICmd {
 public:
     TGetPropertyCmd() : ICmd("pget", 2, "<name> <property>", "get container property") {}

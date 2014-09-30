@@ -5,7 +5,8 @@
 #include "libporto.hpp"
 #include "cli.hpp"
 
-using namespace std;
+using std::string;
+using std::map;
 
 class TRunCmd : public ICmd {
 public:
@@ -65,23 +66,10 @@ public:
     }
 };
 
-class TDestroyCmd : public ICmd {
-public:
-    TDestroyCmd() : ICmd("destroy", 1, "<container>", "stop and destroy container") {}
-    int Execute(int argc, char *argv[]) {
-        string container_name = argv[0];
-        int ret = Api.Destroy(container_name);
-        if (ret) {
-            PrintError("Can't destroy property");
-            return EXIT_FAILURE;
-        }
-        return EXIT_SUCCESS;
-    }
-};
-
 int main(int argc, char *argv[]) {
     RegisterCommand(new THelpCmd(false));
     RegisterCommand(new TDestroyCmd());
+    RegisterCommand(new TListCmd());
     RegisterCommand(new TRunCmd());
 
     return HandleCommand(argc, argv);
