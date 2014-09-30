@@ -107,6 +107,7 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     ExpectFailure(api.GetData(name, "net_packets", v), EError::InvalidState);
     ExpectFailure(api.GetData(name, "net_drops", v), EError::InvalidState);
     ExpectFailure(api.GetData(name, "net_overlimits", v), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "oom_killed", v), EError::InvalidState);
     ExpectSuccess(api.GetData(name, "parent", v));
     Expect(v == string("/"));
 }
@@ -332,6 +333,8 @@ static void TestExitStatus(TPortoAPI &api) {
     WaitExit(api, pid);
     ExpectSuccess(api.GetData(name, "exit_status", ret));
     Expect(ret == string("256"));
+    ExpectSuccess(api.GetData(name, "oom_killed", ret));
+    Expect(ret == string("false"));
     ExpectFailure(api.GetData(name, "start_errno", ret), EError::InvalidState);
     ExpectSuccess(api.Stop(name));
 
@@ -342,6 +345,8 @@ static void TestExitStatus(TPortoAPI &api) {
     WaitExit(api, pid);
     ExpectSuccess(api.GetData(name, "exit_status", ret));
     Expect(ret == string("0"));
+    ExpectSuccess(api.GetData(name, "oom_killed", ret));
+    Expect(ret == string("false"));
     ExpectFailure(api.GetData(name, "start_errno", ret), EError::InvalidState);
     ExpectSuccess(api.Stop(name));
 
@@ -351,6 +356,7 @@ static void TestExitStatus(TPortoAPI &api) {
     ExpectFailure(api.Start(name), EError::Unknown);
     ExpectFailure(api.GetData(name, "root_pid", ret), EError::InvalidState);
     ExpectFailure(api.GetData(name, "exit_status", ret), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "oom_killed", ret), EError::InvalidState);
     ExpectSuccess(api.GetData(name, "start_errno", ret));
     Expect(ret == string("2"));
 
@@ -360,6 +366,7 @@ static void TestExitStatus(TPortoAPI &api) {
     ExpectFailure(api.Start(name), EError::Unknown);
     ExpectFailure(api.GetData(name, "root_pid", ret), EError::InvalidState);
     ExpectFailure(api.GetData(name, "exit_status", ret), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "oom_killed", ret), EError::InvalidState);
     ExpectSuccess(api.GetData(name, "start_errno", ret));
     Expect(ret == string("-2"));
 
@@ -373,8 +380,21 @@ static void TestExitStatus(TPortoAPI &api) {
     Expect(TaskRunning(api, pid) == false);
     ExpectSuccess(api.GetData(name, "exit_status", ret));
     Expect(ret == string("9"));
+    ExpectSuccess(api.GetData(name, "oom_killed", ret));
+    Expect(ret == string("false"));
     ExpectFailure(api.GetData(name, "start_errno", ret), EError::InvalidState);
     ExpectSuccess(api.Stop(name));
+
+    Say() << "Check oom_killed property" << std::endl;
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.SetProperty(name, "cwd", ""));
+    ExpectSuccess(api.SetProperty(name, "memory_limit", "10"));
+    ExpectSuccess(api.Start(name));
+    WaitState(api, name, "dead");
+    ExpectSuccess(api.GetData(name, "exit_status", ret));
+    Expect(ret == string("9"));
+    ExpectSuccess(api.GetData(name, "oom_killed", ret));
+    Expect(ret == string("true"));
 
     ExpectSuccess(api.Destroy(name));
 }

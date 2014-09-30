@@ -1,10 +1,11 @@
+- respawn_count property
+- isolate = { true, false } property
 - full dump on sigsegv
 - ? non-blocking communication pipes
 - ? autodestroy property
 - ? portoctl run -f <MANIFEST> | <MANIFEST STRING>
 - ? cpu_cores property to reserve some cores for a container
-- ? isolate = { none, full } property
-- report whether container was killed due to oom
+- ? report whether container was killed due to oom: add recovery support
 
 # nekt0n
 - add namespaces

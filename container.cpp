@@ -10,7 +10,6 @@
 #include "subsystem.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
-#include "util/unix.hpp"
 #include "util/netlink.hpp"
 
 extern "C" {
@@ -18,6 +17,8 @@ extern "C" {
 #include <unistd.h>
 #include <sys/time.h>
 #include <sys/reboot.h>
+#include <fcntl.h>
+#include <sys/eventfd.h>
 }
 
 using std::string;
@@ -41,6 +42,13 @@ struct TData {
         default:
             return "unknown";
         }
+    }
+
+    static string OomKilled(TContainer& c) {
+        if (c.OomKilled)
+            return "true";
+        else
+            return "false";
     }
 
     static string Parent(TContainer& c) {
@@ -160,6 +168,7 @@ struct TData {
 
 std::map<std::string, const TDataSpec> dataSpec = {
     { "state", { "container state", true, TData::State, { EContainerState::Stopped, EContainerState::Dead, EContainerState::Running, EContainerState::Paused } } },
+    { "oom_killed", { "indicates whether container has been killed by OOM", false, TData::OomKilled, { EContainerState::Dead } } },
     { "parent", { "container parent", false, TData::Parent, { EContainerState::Stopped, EContainerState::Dead, EContainerState::Running, EContainerState::Paused } } },
     { "exit_status", { "container exit status", false, TData::ExitStatus, { EContainerState::Dead } } },
     { "start_errno", { "container start error", false, TData::StartErrno, { EContainerState::Stopped } } },
@@ -405,6 +414,29 @@ TError TContainer::PrepareNetwork() {
     return TError::Success();
 }
 
+TError TContainer::PrepareOomMonitor() {
+    auto memcg = GetLeafCgroup(memorySubsystem);
+
+    Efd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+    if (Efd.GetFd() < 0) {
+        TError error(EError::Unknown, errno, "Can't create eventfd");
+        TLogger::LogError(error, "Can't update OOM settings");
+        return error;
+    }
+
+    string cfdPath = memcg->Path() + "/memory.oom_control";
+    TScopedFd cfd(open(cfdPath.c_str(), O_RDONLY | O_CLOEXEC));
+    if (cfd.GetFd() < 0) {
+        TError error(EError::Unknown, errno, "Can't open " + memcg->Path());
+        TLogger::LogError(error, "Can't update OOM settings");
+        return error;
+    }
+
+    TFile f(memcg->Path() + "/cgroup.event_control");
+    string s = std::to_string(Efd.GetFd()) + " " + std::to_string(cfd.GetFd());
+    return f.WriteStringNoAppend(s);
+}
+
 TError TContainer::PrepareCgroups() {
     LeafCgroups[cpuSubsystem] = GetLeafCgroup(cpuSubsystem);
     LeafCgroups[cpuacctSubsystem] = GetLeafCgroup(cpuacctSubsystem);
@@ -469,6 +501,13 @@ TError TContainer::PrepareCgroups() {
             if (error)
                 return error;
         }
+
+    if (!IsRoot()) {
+        error = PrepareOomMonitor();
+        TLogger::LogError(error, "Can't prepare OOM monitoring");
+        if (error)
+            return error;
+    }
 
     return TError::Success();
 }
@@ -563,6 +602,7 @@ TError TContainer::Start() {
         return TError(EError::InvalidState, "parent is not running");
 
     Spec.SetInternal("id", std::to_string(Id));
+    OomKilled = false;
 
     TError error = PrepareNetwork();
     if (error) {
@@ -675,6 +715,7 @@ void TContainer::FreeResources() {
 
     Task = nullptr;
     TaskStartErrno = -1;
+    Efd = -1;
 }
 
 TError TContainer::Stop() {
@@ -945,6 +986,31 @@ uint16_t TContainer::GetId() {
     return Id;
 }
 
+int TContainer::GetOomFd() {
+    return Efd.GetFd();
+}
+
+void TContainer::DeliverOom() {
+    if (IsRoot() || !(CheckState(EContainerState::Running) || CheckState(EContainerState::Dead))) {
+        TError error(EError::InvalidState, "invalid container state " + ContainerStateName(State));
+        TLogger::LogError(error, "Can't deliver OOM");
+    }
+
+    int pid = Task->GetPid();
+
+    TError error = KillAll();
+    if (error)
+        TLogger::LogError(error, "Can't kill all tasks in container");
+
+    AckExitStatus(pid);
+    Task->DeliverExitStatus(SIGKILL);
+    State = EContainerState::Dead;;
+
+    StopChildren();
+    OomKilled = true;
+    Efd = -1;
+}
+
 // TContainerHolder
 
 TError TContainerHolder::GetId(uint16_t &id) {
@@ -1169,4 +1235,27 @@ void TContainerHolder::Heartbeat() {
             ++i;
         }
     }
+}
+
+void TContainerHolder::PushOomFds(vector<int> &fds) {
+    for (auto c : Containers) {
+        int fd = c.second->GetOomFd();
+
+        if (fd < 0)
+            continue;
+
+        fds.push_back(fd);
+    }
+}
+
+void TContainerHolder::DeliverOom(int fd) {
+    for (auto c : Containers) {
+        if (fd != c.second->GetOomFd())
+            continue;
+
+        c.second->DeliverOom();
+        return;
+    }
+
+    TLogger::Log() << "Couldn't deliver OOM notification to " << fd << std::endl;
 }

@@ -288,6 +288,7 @@ static int RpcMain(TContainerHolder &cholder) {
 
     size_t heartbeat = 0;
     vector<struct pollfd> fds;
+    vector<int> oomFds;
 
     while (!done) {
         struct pollfd pfd = {};
@@ -300,6 +301,14 @@ static int RpcMain(TContainerHolder &cholder) {
 
         for (size_t i = 0; i < clients.size(); i++) {
             pfd.fd = clients[i];
+            pfd.events = POLLIN | POLLHUP;
+            fds.push_back(pfd);
+        }
+
+        oomFds.clear();
+        cholder.PushOomFds(oomFds);
+        for (auto &fd : oomFds) {
+            pfd.fd = fd;
             pfd.events = POLLIN | POLLHUP;
             fds.push_back(pfd);
         }
@@ -326,6 +335,10 @@ static int RpcMain(TContainerHolder &cholder) {
         ret = ReapSpawner(REAP_EVT_FD, cholder);
         if (done)
             break;
+
+        for (size_t i = 1 + clients.size(); i < fds.size(); i++)
+            if (fds[i].revents & POLLIN)
+                cholder.DeliverOom(fds[i].fd);
 
         if (fds[0].revents && clients.size() < PORTOD_MAX_CLIENTS) {
             ret = AcceptClient(sfd, clients);

@@ -14,6 +14,7 @@
 #include "property.hpp"
 #include "task.hpp"
 #include "qdisc.hpp"
+#include "util/unix.hpp"
 
 class TCgroup;
 class TContainerEnv;
@@ -50,6 +51,8 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     size_t TimeOfDeath = 0;
     uint16_t Id;
     int TaskStartErrno = -1;
+    TScopedFd Efd;
+    bool OomKilled = false;
     friend TData;
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
@@ -59,6 +62,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     bool CheckState(EContainerState expected);
     TError ApplyDynamicProperties();
     TError PrepareNetwork();
+    TError PrepareOomMonitor();
     TError PrepareCgroups();
     TError PrepareTask();
     TError KillAll();
@@ -108,6 +112,8 @@ public:
     bool CanRemoveDead() const;
     bool HasChildren() const;
     uint16_t GetId();
+    int GetOomFd();
+    void DeliverOom();
 };
 
 constexpr size_t BITS_PER_LLONG = sizeof(unsigned long long) * 8;
@@ -133,6 +139,8 @@ public:
 
     std::vector<std::string> List() const;
     void Heartbeat();
+    void PushOomFds(std::vector<int> &fds);
+    void DeliverOom(int fd);
 };
 
 #endif
