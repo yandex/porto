@@ -22,7 +22,7 @@ public:
             return EXIT_FAILURE;
         }
         propertyKey = property.substr(0, n);
-        propertyValue = property.substr(n+1, property.size());
+        propertyValue = property.substr(n + 1, property.size());
         if (propertyKey == "" || propertyValue == "") {
             TError error(EError::InvalidValue, "Invalid value");
             PrintError(error, "Can't parse property: " + property);
@@ -51,9 +51,9 @@ public:
         for (auto iter: properties) {
             ret = Api.SetProperty(containerName, iter.first, iter.second);
             if (ret) {
-                 PrintError("Can't set property");
-                 (void)Api.Destroy(containerName);
-                 return EXIT_FAILURE;
+                PrintError("Can't set property");
+                (void)Api.Destroy(containerName);
+                return EXIT_FAILURE;
             }
         }
         ret = Api.Start(containerName);
