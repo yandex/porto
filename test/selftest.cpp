@@ -286,9 +286,7 @@ static void TestHolder(TPortoAPI &api) {
     ExpectTclass("a/b", true);
     ExpectTclass("a/b/c", true);
 
-    string pid;
-    ExpectSuccess(api.GetData("a/b", "root_pid", pid));
-    WaitExit(api, pid);
+    WaitState(api, "a/b", "dead");
     ExpectSuccess(api.GetData("a/b", "state", state));
     Expect(state == "dead");
     ExpectSuccess(api.GetData("a/b/c", "state", state));
@@ -330,8 +328,7 @@ static void TestExitStatus(TPortoAPI &api) {
     Say() << "Check exit status of 'false'" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "false"));
     ExpectSuccess(api.Start(name));
-    ExpectSuccess(api.GetData(name, "root_pid", pid));
-    WaitExit(api, pid);
+    WaitState(api, name, "dead");
     ExpectSuccess(api.GetData(name, "exit_status", ret));
     Expect(ret == string("256"));
     ExpectSuccess(api.GetData(name, "oom_killed", ret));
@@ -342,8 +339,7 @@ static void TestExitStatus(TPortoAPI &api) {
     Say() << "Check exit status of 'true'" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "true"));
     ExpectSuccess(api.Start(name));
-    ExpectSuccess(api.GetData(name, "root_pid", pid));
-    WaitExit(api, pid);
+    WaitState(api, name, "dead");
     ExpectSuccess(api.GetData(name, "exit_status", ret));
     Expect(ret == string("0"));
     ExpectSuccess(api.GetData(name, "oom_killed", ret));
@@ -401,7 +397,6 @@ static void TestExitStatus(TPortoAPI &api) {
 }
 
 static void TestStreams(TPortoAPI &api) {
-    string pid;
     string ret;
 
     string name = "a";
@@ -410,8 +405,7 @@ static void TestStreams(TPortoAPI &api) {
     Say() << "Make sure stdout works" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "bash -c 'echo out >&1'"));
     ExpectSuccess(api.Start(name));
-    ExpectSuccess(api.GetData(name, "root_pid", pid));
-    WaitExit(api, pid);
+    WaitState(api, name, "dead");
     ExpectSuccess(api.GetData(name, "stdout", ret));
     Expect(ret == string("out\n"));
     ExpectSuccess(api.GetData(name, "stderr", ret));
@@ -421,8 +415,7 @@ static void TestStreams(TPortoAPI &api) {
     Say() << "Make sure stderr works" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "bash -c 'echo err >&2'"));
     ExpectSuccess(api.Start(name));
-    ExpectSuccess(api.GetData(name, "root_pid", pid));
-    WaitExit(api, pid);
+    WaitState(api, name, "dead");
     ExpectSuccess(api.GetData(name, "stdout", ret));
     Expect(ret == string(""));
     ExpectSuccess(api.GetData(name, "stderr", ret));
@@ -930,7 +923,6 @@ static void TestRoot(TPortoAPI &api) {
 static void TestStats(TPortoAPI &api) {
     // should be executed right after TestRoot because assumes empty statistics
 
-    string pid;
     string root = "/";
     string wget = "a";
     string noop = "b";
@@ -938,14 +930,12 @@ static void TestStats(TPortoAPI &api) {
     ExpectSuccess(api.Create(noop));
     ExpectSuccess(api.SetProperty(noop, "command", "ls -la /bin"));
     ExpectSuccess(api.Start(noop));
-    ExpectSuccess(api.GetData(noop, "root_pid", pid));
-    WaitExit(api, pid);
+    WaitState(api, noop, "dead");
 
     ExpectSuccess(api.Create(wget));
     ExpectSuccess(api.SetProperty(wget, "command", "wget yandex.ru"));
     ExpectSuccess(api.Start(wget));
-    ExpectSuccess(api.GetData(wget, "root_pid", pid));
-    WaitExit(api, pid);
+    WaitState(api, wget, "dead");
 
     string v, rv;
 
@@ -1007,8 +997,6 @@ static bool CanTestLimits() {
 }
 
 static void TestLimits(TPortoAPI &api) {
-    string pid;
-
     string name = "a";
     ExpectSuccess(api.Create(name));
 
@@ -1120,8 +1108,6 @@ static void TestLimits(TPortoAPI &api) {
 }
 
 static void TestRawLimits(TPortoAPI &api) {
-    string pid;
-
     string name = "a";
     ExpectSuccess(api.Create(name));
 
@@ -1211,8 +1197,6 @@ static void TestDynamic(TPortoAPI &api) {
 }
 
 static void TestLimitsHierarchy(TPortoAPI &api) {
-    string pid;
-
     if (!HaveCgKnob("memory", "memory.low_limit_in_bytes"))
         return;
 
