@@ -53,6 +53,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     int TaskStartErrno = -1;
     TScopedFd Efd;
     bool OomKilled = false;
+    size_t RespawnCount;
     friend TData;
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;

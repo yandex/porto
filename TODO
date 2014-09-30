@@ -1,4 +1,3 @@
-- respawn_count property
 - isolate = { true, false } property
 - full dump on sigsegv
 - ? non-blocking communication pipes

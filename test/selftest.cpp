@@ -108,6 +108,7 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     ExpectFailure(api.GetData(name, "net_drops", v), EError::InvalidState);
     ExpectFailure(api.GetData(name, "net_overlimits", v), EError::InvalidState);
     ExpectFailure(api.GetData(name, "oom_killed", v), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "respawn_count", v), EError::InvalidState);
     ExpectSuccess(api.GetData(name, "parent", v));
     Expect(v == string("/"));
 }
@@ -1302,11 +1303,22 @@ static void TestPermissions(TPortoAPI &api) {
 
 static void TestRespawn(TPortoAPI &api) {
     string pid, respawnPid;
+    string ret;
 
     string name = "a";
     ExpectSuccess(api.Create(name));
 
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1"));
+
+    ExpectSuccess(api.SetProperty(name, "respawn", "false"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "respawn_count", ret));
+    Expect(ret == string("0"));
+    WaitState(api, name, "dead");
+    ExpectSuccess(api.GetData(name, "respawn_count", ret));
+    Expect(ret == string("0"));
+    ExpectSuccess(api.Stop(name));
+
     ExpectSuccess(api.SetProperty(name, "respawn", "true"));
     ExpectSuccess(api.Start(name));
 
@@ -1314,6 +1326,8 @@ static void TestRespawn(TPortoAPI &api) {
     WaitExit(api, pid);
     ExpectSuccess(api.GetData(name, "root_pid", respawnPid));
     Expect(pid != respawnPid);
+    ExpectSuccess(api.GetData(name, "respawn_count", ret));
+    Expect(ret != "0" && ret != "");
 
     ExpectSuccess(api.Stop(name));
     ExpectSuccess(api.SetProperty(name, "respawn", "false"));

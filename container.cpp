@@ -55,6 +55,10 @@ struct TData {
         return c.Parent->Name;
     }
 
+    static string RespawnCount(TContainer& c) {
+        return std::to_string(c.RespawnCount);
+    }
+
     static string RootPid(TContainer& c) {
         if (c.Task)
             return std::to_string(c.Task->GetPid());
@@ -170,6 +174,7 @@ std::map<std::string, const TDataSpec> dataSpec = {
     { "state", { "container state", true, TData::State, { EContainerState::Stopped, EContainerState::Dead, EContainerState::Running, EContainerState::Paused } } },
     { "oom_killed", { "indicates whether container has been killed by OOM", false, TData::OomKilled, { EContainerState::Dead } } },
     { "parent", { "container parent", false, TData::Parent, { EContainerState::Stopped, EContainerState::Dead, EContainerState::Running, EContainerState::Paused } } },
+    { "respawn_count", { "how many time container was automatically respawned", false, TData::RespawnCount, { EContainerState::Running, EContainerState::Dead } } },
     { "exit_status", { "container exit status", false, TData::ExitStatus, { EContainerState::Dead } } },
     { "start_errno", { "container start error", false, TData::StartErrno, { EContainerState::Stopped } } },
     { "root_pid", { "root process id", false, TData::RootPid, { EContainerState::Running, EContainerState::Paused } } },
@@ -594,6 +599,7 @@ TError TContainer::Start() {
         return TError::Success();
     }
     MaybeReturnedOk = false;
+    RespawnCount = 0;
 
     if (!CheckState(EContainerState::Stopped))
         return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
@@ -955,7 +961,13 @@ TError TContainer::Respawn() {
     if (error)
         return error;
 
-    return Start();
+    size_t tmp = RespawnCount;
+    error = Start();
+    RespawnCount = tmp + 1;
+    if (error)
+        return error;
+
+    return TError::Success();
 }
 
 void TContainer::Heartbeat() {
