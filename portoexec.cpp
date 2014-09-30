@@ -3,51 +3,28 @@
 #include <string>
 
 #include "libporto.hpp"
+#include "cli.hpp"
 
 using namespace std;
 
-class ICmd {
-protected:
-    int NeedArgs;
-    TPortoAPI Api;
-
-public:
-    ICmd(int args) : NeedArgs(args) {}
-
-    bool ValidArgs(int argc) {
-        if (argc < NeedArgs)
-            return false;
-        return true;
-    }
-
-    string GetMsg() {
-        string msg;
-        int err;
-        Api.GetLastError(err, msg);
-        return msg;
-    }
-
-    virtual int Execute(int argc, char *argv[]) = 0;
-};
-
-static map<string, ICmd *> commands;
-
 class TRunCmd : public ICmd {
 public:
-    TRunCmd() : ICmd(2) {}
+    TRunCmd() : ICmd("run", 2, "<container> [properties]", "create and start container with given properties") {}
 
     int Parser(string property, map<string, string> &properties) {
         string propertyKey, propertyValue;
         string::size_type n;
         n = property.find('=');
         if (n == string::npos) {
-            cerr << "Can't parse property: " << property << endl;
+            TError error(EError::InvalidValue, "Invalid value");
+            PrintError(error, "Can't parse property: " + property);
             return EXIT_FAILURE;
         }
         propertyKey = property.substr(0, n);
         propertyValue = property.substr(n+1, property.size());
         if (propertyKey == "" || propertyValue == "") {
-            cerr << "Can't parse property: " << property << endl;
+            TError error(EError::InvalidValue, "Invalid value");
+            PrintError(error, "Can't parse property: " + property);
             return EXIT_FAILURE;
         }
         properties[propertyKey] = propertyValue;
@@ -67,20 +44,20 @@ public:
 
         ret = Api.Create(containerName);
         if (ret) {
-            cerr << "Can't create container: " << GetMsg() << endl;
+            PrintError("Can't create container");
             return EXIT_FAILURE;
         }
         for (auto iter: properties) {
             ret = Api.SetProperty(containerName, iter.first, iter.second);
             if (ret) {
-                 cerr << "Can't set property: "  << GetMsg() << endl;
+                 PrintError("Can't set property");
                  (void)Api.Destroy(containerName);
                  return EXIT_FAILURE;
             }
         }
         ret = Api.Start(containerName);
         if (ret) {
-            cerr << "Can't start container: " << GetMsg() << endl;
+            PrintError("Can't start property");
             (void)Api.Destroy(containerName);
             return EXIT_FAILURE;
         }
@@ -90,53 +67,22 @@ public:
 
 class TDestroyCmd : public ICmd {
 public:
-    TDestroyCmd() : ICmd(1) {}
+    TDestroyCmd() : ICmd("destroy", 1, "<container>", "stop and destroy container") {}
     int Execute(int argc, char *argv[]) {
         string container_name = argv[0];
         int ret = Api.Destroy(container_name);
         if (ret) {
-            cerr << "Can't destroy container" << GetMsg() << endl;
+            PrintError("Can't destroy property");
             return EXIT_FAILURE;
         }
         return EXIT_SUCCESS;
     }
 };
 
-class THelpCmd : public ICmd {
-public:
-    THelpCmd() : ICmd(0) {}
-    int Execute(int argc, char *argv[]) {
-        cout << "portoexec - run command throw portod" << endl;
-        cout << endl;
-        cout << "SYNOPSYS" << endl;
-        cout << "\tportoexec run <container_name> <properties>" << endl;
-        cout << "\tportoexec destroy <container_name>" << endl;
-        return EXIT_FAILURE;
-    }
-};
-
 int main(int argc, char *argv[]) {
-    commands = {
-        { "run", new TRunCmd() },
-        { "destroy", new TDestroyCmd() },
-        { "help", new THelpCmd() },
-    };
+    RegisterCommand(new THelpCmd(false));
+    RegisterCommand(new TDestroyCmd());
+    RegisterCommand(new TRunCmd());
 
-    if (argc <= 1)
-        return commands["help"]->Execute(0, NULL);
-
-    string commandName = argv[1];
-
-    if (commandName == "-v" || commandName == "--version") {
-        std::cout << GIT_TAG << " " << GIT_REVISION << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    if (commands.find(commandName) == commands.end())
-        return commands["help"]->Execute(0, NULL);
-
-    if (!commands[commandName]->ValidArgs(argc - 2))
-        return commands["help"]->Execute(0, NULL);
-
-    return commands[commandName]->Execute(argc - 2, argv + 2);
-}
+    return HandleCommand(argc, argv);
+};
