@@ -42,11 +42,11 @@ target_link_libraries(portod ${PB} ${RTNL} ${NL} pthread rt)
 
 add_executable(portoctl python/porto/rpc_pb2.py portoctl.cpp error.cpp libporto.cpp util/log.cpp util/protobuf.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(portoctl version.hpp)
-target_link_libraries(portoctl ${PB} pthread rt)
+target_link_libraries(portoctl ${PB} rt)
 
 add_executable(portoexec portoexec.cpp error.cpp libporto.cpp util/log.cpp util/protobuf.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(portoexec version.hpp)
-target_link_libraries(portoexec ${PB} pthread rt)
+target_link_libraries(portoexec ${PB} rt)
 
 add_executable(portotest portotest.cpp error.cpp test/selftest.cpp test/stresstest.cpp test/test.cpp libporto.cpp util/netlink.cpp util/log.cpp util/protobuf.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(portotest version.hpp)
