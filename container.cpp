@@ -518,7 +518,7 @@ TError TContainer::PrepareCgroups() {
 }
 
 TError TContainer::PrepareTask() {
-    TTaskEnv taskEnv(Spec.Get("command"), Spec.Get("cwd"), /*Spec.Get("root")*/"", Spec.Get("user"), Spec.Get("group"), Spec.Get("env"));
+    TTaskEnv taskEnv(Spec.Get("command"), Spec.Get("cwd"), /*Spec.Get("root")*/"", Spec.Get("user"), Spec.Get("group"), Spec.Get("env"), Spec.Get("isolate") == "true");
     TError error = taskEnv.Prepare();
     if (error)
         return error;

@@ -145,6 +145,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
     {"net_priority", { "Container network priority: 0-7", std::to_string(DEF_CLASS_NET_PRIO), 0, ValidNetPriority }},
 
     {"respawn", { "Automatically respawn dead container", "false", 0, ValidBool }},
+    {"isolate", { "Isolate container from others", "true", HIDDEN_PROPERTY, ValidBool }},
 
     {"cpu.smart", { "Raw cgroup knob", "0", HIDDEN_PROPERTY }},
     {"memory.limit_in_bytes", { "Raw cgroup knob", "0", HIDDEN_PROPERTY }},

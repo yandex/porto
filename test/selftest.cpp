@@ -514,27 +514,39 @@ static void TestLongRunning(TPortoAPI &api) {
 
 static void TestIsolation(TPortoAPI &api) {
     string ret;
-    string pid;
 
     string name = "a";
     ExpectSuccess(api.Create(name));
 
     Say() << "Make sure PID isolation works" << std::endl;
+    ExpectSuccess(api.SetProperty(name, "isolate", "false"));
+
     ExpectSuccess(api.SetProperty(name, "command", "bash -c 'echo $BASHPID'"));
     ExpectSuccess(api.Start(name));
-    ExpectSuccess(api.GetData(name, "root_pid", pid));
-    WaitExit(api, pid);
-
+    WaitState(api, name, "dead");
     ExpectSuccess(api.GetData(name, "stdout", ret));
-    Expect(ret == string("1\n"));
-
+    Expect(ret != string("1\n"));
     ExpectSuccess(api.Stop(name));
 
     ExpectSuccess(api.SetProperty(name, "command", "ps aux"));
     ExpectSuccess(api.Start(name));
-    ExpectSuccess(api.GetData(name, "root_pid", pid));
-    WaitExit(api, pid);
+    WaitState(api, name, "dead");
+    ExpectSuccess(api.GetData(name, "stdout", ret));
+    Expect(std::count(ret.begin(), ret.end(), '\n') != 2);
+    ExpectSuccess(api.Stop(name));
 
+
+    ExpectSuccess(api.SetProperty(name, "isolate", "true"));
+    ExpectSuccess(api.SetProperty(name, "command", "bash -c 'echo $BASHPID'"));
+    ExpectSuccess(api.Start(name));
+    WaitState(api, name, "dead");
+    ExpectSuccess(api.GetData(name, "stdout", ret));
+    Expect(ret == string("1\n"));
+    ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.SetProperty(name, "command", "ps aux"));
+    ExpectSuccess(api.Start(name));
+    WaitState(api, name, "dead");
     ExpectSuccess(api.GetData(name, "stdout", ret));
     Expect(std::count(ret.begin(), ret.end(), '\n') == 2);
 

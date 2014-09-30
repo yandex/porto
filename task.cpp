@@ -349,11 +349,13 @@ int TTask::ChildCallback() {
         ReportResultAndExit(Wfd, -errno);
     }
 
-    // remount proc so PID namespace works
-    TMount proc("proc", "/proc", "proc", {});
-    if (proc.Mount()) {
-        Syslog(string("remount procfs: ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
+    if (Env.Isolate) {
+        // remount proc so PID namespace works
+        TMount proc("proc", "/proc", "proc", {});
+        if (proc.Mount()) {
+            Syslog(string("remount procfs: ") + strerror(errno));
+            ReportResultAndExit(Wfd, -errno);
+        }
     }
 
     // move to target cgroups
@@ -441,7 +443,9 @@ TError TTask::Start() {
         (void)setsid();
 
         int cloneFlags = SIGCHLD;
-        cloneFlags |= CLONE_NEWPID | CLONE_NEWNS;
+
+        if (Env.Isolate)
+            cloneFlags |= CLONE_NEWPID | CLONE_NEWNS;
 
         pid_t clonePid = clone(ChildFn, stack + sizeof(stack), cloneFlags, this);
         if (write(Wfd, &clonePid, sizeof(clonePid))) {}
