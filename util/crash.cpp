@@ -72,7 +72,7 @@ static void* WatchdogCheck(void *arg)
             Crash();
         }
 
-        sleep(1);
+        sleep(WATCHDOG_DELAY_MS);
     }
 
     return NULL;
