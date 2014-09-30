@@ -20,4 +20,13 @@ int CreatePidFile(const std::string &path, const int mode);
 void RemovePidFile(const std::string &path);
 void SetProcessName(const std::string &name);
 
+class TScopedFd {
+    int Fd;
+public:
+    TScopedFd(int fd = -1);
+    ~TScopedFd();
+    int GetFd();
+    TScopedFd &operator=(int fd);
+};
+
 #endif

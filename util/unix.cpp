@@ -162,3 +162,24 @@ void RemovePidFile(const std::string &path) {
 void SetProcessName(const std::string &name) {
     prctl(PR_SET_NAME, (void *)name.c_str());
 }
+
+TScopedFd::TScopedFd(int fd) : Fd(fd) {
+}
+
+TScopedFd::~TScopedFd() {
+    if (Fd >= 0)
+        close(Fd);
+}
+
+int TScopedFd::GetFd() {
+    return Fd;
+}
+
+TScopedFd &TScopedFd::operator=(int fd) {
+    if (Fd >= 0)
+        close(Fd);
+
+    Fd = fd;
+
+    return *this;
+}
