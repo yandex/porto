@@ -1,9 +1,7 @@
 - full dump on sigsegv
-- ? non-blocking communication pipes
 - ? autodestroy property
 - ? portoctl run -f <MANIFEST> | <MANIFEST STRING>
 - ? cpu_cores property to reserve some cores for a container
-- ? report whether container was killed due to oom: add recovery support
 
 # nekt0n
 - add namespaces

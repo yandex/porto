@@ -412,7 +412,6 @@ TError TTask::Start() {
         return error;
     }
 
-    TLogger::Log() << "DIR=" << Env.Cwd << std::endl;
     ExitStatus = 0;
 
     StdoutFile = Env.Cwd + "/stdout";
