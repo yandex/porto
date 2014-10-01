@@ -9,7 +9,6 @@ const bool LOG_VEBOSE = true;
 const bool DEBUG_NETLINK = false;
 
 const std::string ROOT_CONTAINER = "/";
-const std::string INIT_CONTAINER = "system";
 
 const std::string PORTO_ROOT_CGROUP = "porto";
 const ssize_t CONTAINER_MAX_LOG_SIZE = 10 * 1024 * 1024;
