@@ -305,7 +305,7 @@ bool TcClassExist(const std::string &handle) {
     if (error)
         throw error.GetMsg();
 
-    error = nl.Open();
+    error = nl.Open(config().network().device());
     if (error)
         throw error.GetMsg();
 

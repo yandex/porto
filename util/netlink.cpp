@@ -68,10 +68,9 @@ TError TNetlink::FindDev(std::string &device) {
     return TError::Success();
 }
 
-TError TNetlink::Open() {
+TError TNetlink::Open(std::string device) {
     int ret;
     TError error;
-    string device;
 
     sock = nl_socket_alloc();
     if (!sock)
@@ -94,9 +93,11 @@ TError TNetlink::Open() {
 
     nl_cache_mngt_provide(linkCache);
 
-    error = FindDev(device);
-    if (error)
-        return error;
+    if (!device.length()) {
+        error = FindDev(device);
+        if (error)
+            return error;
+    }
 
     link = rtnl_link_get_by_name(linkCache, device.c_str());
     if (!link) {
@@ -507,10 +508,10 @@ void TNetlink::EnableDebug(bool enable) {
     debug = enable;
 }
 
-TError TNetlink::Exec(std::function<TError(TNetlink &nl)> f) {
+TError TNetlink::Exec(std::string device, std::function<TError(TNetlink &nl)> f) {
     TNetlink nl;
 
-    TError error = nl.Open();
+    TError error = nl.Open(device);
     if (error)
         return error;
 

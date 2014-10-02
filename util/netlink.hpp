@@ -28,7 +28,7 @@ class TNetlink {
     TError FindDev(std::string &device);
 
 public:
-    TError Open();
+    TError Open(const std::string device);
     void Close();
     void LogObj(const std::string &prefix, void *obj);
     void LogCache(struct nl_cache *cache);
@@ -46,7 +46,7 @@ public:
     ~TNetlink() { Close(); }
 
     static void EnableDebug(bool enable);
-    static TError Exec(std::function<TError(TNetlink &nl)> f);
+    static TError Exec(std::string device, std::function<TError(TNetlink &nl)> f);
 };
 
 uint32_t TcHandle(uint16_t maj, uint16_t min);

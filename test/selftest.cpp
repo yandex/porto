@@ -546,7 +546,7 @@ static void TestIsolation(TPortoAPI &api) {
     Say() << "Make sure container has correct network class" << std::endl;
 
     TNetlink nl;
-    Expect(nl.Open() == TError::Success());
+    Expect(nl.Open(config().network().device()) == TError::Success());
     string handle = GetCgKnob("net_cls", name, "net_cls.classid");
     Expect(handle != "0");
     Expect(nl.ClassExists(stoul(handle)) == true);
@@ -910,7 +910,7 @@ static void TestRoot(TPortoAPI &api) {
     uint32_t nextQdisc = TcHandle(2, 0);
 
     TNetlink nl;
-    Expect(nl.Open() == TError::Success());
+    Expect(nl.Open(config().network().device()) == TError::Success());
     Expect(nl.QdiscExists(rootQdisc) == true);
     Expect(nl.QdiscExists(nextQdisc) == false);
     Expect(nl.ClassExists(defClass) == true);
@@ -1096,7 +1096,7 @@ static void TestLimits(TPortoAPI &api) {
 
     uint32_t prio, rate, ceil;
     TNetlink nl;
-    Expect(nl.Open() == TError::Success());
+    Expect(nl.Open(config().network().device()) == TError::Success());
     string handle = GetCgKnob("net_cls", name, "net_cls.classid");
     ExpectSuccess(nl.GetClassProperties(stoul(handle), prio, rate, ceil));
 
