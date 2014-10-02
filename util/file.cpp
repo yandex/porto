@@ -170,7 +170,7 @@ TError TFile::WriteStringNoAppend(const string &str) const {
 }
 
 TError TFile::AppendString(const string &str) const {
-    return Write(O_APPEND | O_WRONLY, str);
+    return Write(O_CREAT | O_APPEND | O_WRONLY, str);
 }
 
 bool TFile::Exists() const {

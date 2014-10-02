@@ -37,6 +37,7 @@ message TCfg {
 		optional uint32 cgroup_remove_timeout_s = 8;
 		optional uint32 freezer_wait_timeout_s = 9;
 		optional uint64 memory_guarantee_reserve = 10;
+		optional TFileCfg pidmap = 11;
 	}
 
 	message TContainerCfg {

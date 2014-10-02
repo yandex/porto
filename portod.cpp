@@ -10,6 +10,7 @@
 #include "util/log.hpp"
 #include "util/protobuf.hpp"
 #include "util/unix.hpp"
+#include "util/string.hpp"
 #include "util/crash.hpp"
 
 extern "C" {
@@ -530,6 +531,64 @@ static void ReceiveAcks(int fd, map<int,int> &pidToStatus) {
     }
 }
 
+static void SavePidMap(map<int, int> &pidToStatus) {
+    TFile f(config().daemon().pidmap().path());
+    if (f.Exists()) {
+        TError error = f.Remove();
+        if (error) {
+            TLogger::LogError(error, "Can't save pid map");
+            return;
+        }
+    }
+
+    for (auto &kv : pidToStatus) {
+        TError error = f.AppendString(std::to_string(kv.first) + " " + std::to_string(kv.second) + "\n");
+        TLogger::LogError(error, "Can't save pid map");
+    }
+}
+
+static void RestorePidMap(map<int, int> &pidToStatus) {
+    TFile f(config().daemon().pidmap().path());
+    if (!f.Exists())
+        return;
+
+    vector<string> lines;
+    TError error = f.AsLines(lines);
+    if (error) {
+        TLogger::LogError(error, "Can't restore pid map");
+        return;
+    }
+
+    for (auto &line : lines) {
+        vector<string> tokens;
+        error = SplitString(line, ' ', tokens);
+        if (error) {
+            TLogger::LogError(error, "Can't restore pid map");
+            continue;
+        }
+
+        if (tokens.size() != 2) {
+            continue;
+        }
+
+        int pid, status;
+
+        error = StringToInt(tokens[0], pid);
+        if (error) {
+            TLogger::LogError(error, "Can't restore pid map");
+            continue;
+        }
+
+        error = StringToInt(tokens[0], status);
+        if (error) {
+            TLogger::LogError(error, "Can't restore pid map");
+            continue;
+        }
+
+        pidToStatus[pid] = status;
+    }
+}
+
 static int SpawnPortod(map<int,int> &pidToStatus) {
     int evtfd[2];
     int ackfd[2];
@@ -583,6 +642,8 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
                 return ret;
             hup = false;
             TLogger::Log() << "Updating" << std::endl;
+
+            SavePidMap(pidToStatus);
 
             if (kill(slavePid, SIGKILL) < 0)
                 TLogger::Log() << "Can't send SIGKILL to slave: " << strerror(errno) << std::endl;
@@ -655,6 +716,8 @@ static int MasterMain() {
     SignalMask(SIG_UNBLOCK);
 
     map<int,int> pidToStatus;
+    RestorePidMap(pidToStatus);
+
     while (!done) {
         size_t started = GetCurrentTimeMs();
         size_t next = started + config().container().respawn_delay_ms();

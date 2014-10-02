@@ -47,6 +47,7 @@ void TConfig::LoadDefaults() {
     config().mutable_daemon()->set_cgroup_remove_timeout_s(1);
     config().mutable_daemon()->set_freezer_wait_timeout_s(1);
     config().mutable_daemon()->set_memory_guarantee_reserve(2 * 1024 * 1024 * 1024UL);
+    config().mutable_daemon()->mutable_pidmap()->set_path("/tmp/portod.pidmap");
 
     config().mutable_container()->set_max_log_size(10 * 1024 * 1024);
     config().mutable_container()->set_tmp_dir("/place/porto");

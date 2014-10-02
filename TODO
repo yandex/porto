@@ -5,7 +5,6 @@
 - ? portoctl top - sort containers by used resources
 - ? some kind of io usage data (iops/bytes)
 - portoctl enter should enter cgroups (with optional key to disable it)
-- ? update porto master when not all pids are acked (save and restore them)
 
 # nekt0n
 - add namespaces

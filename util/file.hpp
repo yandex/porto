@@ -30,7 +30,7 @@ public:
     const std::string &GetPath() const;
     EFileType Type() const;
 
-    TError Remove()const ;
+    TError Remove() const;
 
     TError AsString(std::string &value) const;
     TError AsInt(int &value) const;
