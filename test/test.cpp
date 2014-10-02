@@ -137,19 +137,10 @@ std::string GetNamespace(const std::string &pid, const std::string &ns) {
 }
 
 std::map<std::string, std::string> GetCgroups(const std::string &pid) {
-    TFile f("/proc/" + pid + "/cgroup");
-    std::vector<std::string> lines;
     std::map<std::string, std::string> cgmap;
-    if (f.AsLines(lines))
+    TError error = GetTaskCgroups(stoi(pid), cgmap);
+    if (error)
         throw std::string("Can't get cgroups");
-
-    std::vector<std::string> tokens;
-    for (auto l : lines) {
-        tokens.clear();
-        if (SplitString(l, ':', tokens))
-            throw std::string("Can't split cgroup string");
-        cgmap[tokens[1]] = tokens[2];
-    }
 
     return cgmap;
 }

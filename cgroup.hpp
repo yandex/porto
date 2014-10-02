@@ -20,7 +20,6 @@ class TCgroup : public std::enable_shared_from_this<TCgroup> {
 
     std::shared_ptr<TMount> Mount;
 
-    const std::string SYSFS_CGROOT = "/sys/fs/cgroup";
     mode_t Mode = 0755;
     NO_COPY_CONSTRUCT(TCgroup);
 

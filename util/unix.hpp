@@ -4,6 +4,8 @@
 #include <csignal>
 #include <functional>
 
+#include "error.hpp"
+
 int RetryBusy(int times, int timeoMs, std::function<int()> handler);
 int RetryFailed(int times, int timeoMs, std::function<int()> handler);
 int SleepWhile(int timeoMs, std::function<int()> handler);
@@ -19,6 +21,7 @@ std::string GetDefaultGroup();
 int CreatePidFile(const std::string &path, const int mode);
 void RemovePidFile(const std::string &path);
 void SetProcessName(const std::string &name);
+TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap);
 
 class TScopedFd {
     int Fd;

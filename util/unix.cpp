@@ -2,6 +2,7 @@
 #include <csignal>
 
 #include "util/file.hpp"
+#include "util/string.hpp"
 #include "unix.hpp"
 
 extern "C" {
@@ -161,6 +162,25 @@ void RemovePidFile(const std::string &path) {
 
 void SetProcessName(const std::string &name) {
     prctl(PR_SET_NAME, (void *)name.c_str());
+}
+
+TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap) {
+    TFile f("/proc/" + std::to_string(pid) + "/cgroup");
+    std::vector<std::string> lines;
+    TError error = f.AsLines(lines);
+    if (error)
+        return error;
+
+    std::vector<std::string> tokens;
+    for (auto l : lines) {
+        tokens.clear();
+        error = SplitString(l, ':', tokens);
+        if (error)
+            return error;
+        cgmap[tokens[1]] = tokens[2];
+    }
+
+    return TError::Success();
 }
 
 TScopedFd::TScopedFd(int fd) : Fd(fd) {

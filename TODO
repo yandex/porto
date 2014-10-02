@@ -4,7 +4,6 @@
 - ? cpu_cores property to reserve some cores for a container
 - ? portoctl top - sort containers by used resources
 - ? some kind of io usage data (iops/bytes)
-- portoctl enter should enter cgroups (with optional key to disable it)
 
 # nekt0n
 - add namespaces

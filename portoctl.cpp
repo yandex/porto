@@ -366,7 +366,7 @@ public:
 
 class TEnterCmd : public ICmd {
 public:
-    TEnterCmd() : ICmd("enter", 1, "<name> [command]", "execute command in container namespace") {}
+    TEnterCmd() : ICmd("enter", 1, "<name> [-C] [command]", "execute command in container namespace") {}
 
     void PrintErrno(const string &str) {
         std::cerr << str << ": " << strerror(errno) << std::endl;
@@ -385,7 +385,17 @@ public:
 
     int Execute(int argc, char *argv[]) {
         string cmd = "";
-        for (int i = 1; i < argc; i++) {
+        int start = 1;
+        bool enterCgroups = true;
+
+        if (argc >= 2) {
+            if (argv[1] == string("-C"))
+                enterCgroups = false;
+
+            start++;
+        }
+
+        for (int i = start; i < argc; i++) {
             cmd += argv[i];
             cmd += " ";
         }
@@ -419,6 +429,25 @@ public:
 
         int rootFd = OpenFd(pid, "root");
         int cwdFd = OpenFd(pid, "cwd");
+
+        if (enterCgroups) {
+            map<string, string> cgmap;
+            TError error = GetTaskCgroups(pid, cgmap);
+            if (error) {
+                PrintError(error, "Can't get task cgroups");
+                return EXIT_FAILURE;
+
+            }
+
+            for (auto &cg : cgmap) {
+                TFile f(SYSFS_CGROOT + "/" + cg.first + cg.second + "/cgroup.procs");
+                TError error = f.AppendString(std::to_string(GetPid()));
+                if (error) {
+                    PrintError(error, "Can't get task cgroups");
+                    return EXIT_FAILURE;
+                }
+            }
+        }
 
         for (auto &p : nameToType) {
             int fd = OpenFd(pid, p.first);

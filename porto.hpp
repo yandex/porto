@@ -15,6 +15,8 @@ const uint32_t DEF_CLASS_RATE = -1;
 const uint32_t DEF_CLASS_CEIL = -1;
 const uint32_t DEF_CLASS_NET_PRIO = 3;
 
+const std::string SYSFS_CGROOT = "/sys/fs/cgroup";
+
 #define NO_COPY_CONSTRUCT(NAME) \
     NAME(const NAME &) = delete; \
     NAME &operator=(const NAME &) = delete
