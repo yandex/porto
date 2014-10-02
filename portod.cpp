@@ -657,7 +657,7 @@ static int MasterMain() {
     map<int,int> pidToStatus;
     while (!done) {
         size_t started = GetCurrentTimeMs();
-        size_t next = started + RESPAWN_DELAY_MS;
+        size_t next = started + config().container().respawn_delay_ms();
         ret = SpawnPortod(pidToStatus);
         TLogger::Log() << "Returned " << ret << std::endl;
 

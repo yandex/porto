@@ -46,6 +46,12 @@ void TConfig::LoadDefaults() {
     config().mutable_daemon()->set_cgroup_remove_timeout_s(1);
     config().mutable_daemon()->set_freezer_wait_timeout_s(1);
     config().mutable_daemon()->set_memory_guarantee_reserve(2 * 1024 * 1024 * 1024UL);
+
+    config().mutable_container()->set_max_log_size(10 * 1024 * 1024);
+    config().mutable_container()->set_tmp_dir("/place/porto");
+    config().mutable_container()->set_aging_time_ms(60 * 60 * 24 * 7 * 1000);
+    config().mutable_container()->set_respawn_delay_ms(1000);
+    config().mutable_container()->set_stdout_read_bytes(8 * 1024 * 1024);
 }
 
 bool TConfig::LoadFile(const std::string &path, bool silent) {

@@ -38,17 +38,14 @@ message TCfg {
 		optional uint64 memory_guarantee_reserve = 10;
 	}
 
-	/*
 	message TContainerCfg {
-		optional string maxLogSize = 1;
-		optional string tmpDir = 2;
-		optional uint32 agingTimeMs = 3;
-		optional uint32 respawnDelayMs = 4;
-		optional uint32 stdoutReadBytes = 5;
+		optional uint32 max_log_size = 1;
+		optional string tmp_dir = 2;
+		optional uint32 aging_time_ms = 3;
+		optional uint32 respawn_delay_ms = 4;
+		optional uint32 stdout_read_bytes = 5;
 	}
 
-	optional TContainerCfg container;
-	*/
 	optional TNetworkCfg network = 1;
 	optional TFileCfg master_pid = 2;
 	optional TFileCfg slave_pid = 3;
@@ -58,4 +55,5 @@ message TCfg {
 	optional TLogCfg log = 7;
 	optional TKeyvalCfg keyval = 8;
 	optional TDaemonCfg daemon = 9;
+	optional TContainerCfg container = 10;
 }

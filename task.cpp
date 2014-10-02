@@ -385,20 +385,31 @@ TError TTask::CreateCwd() {
     if (Env.Cwd.length())
         return TError::Success();
 
-    TFolder f(CONTAINER_TMP_DIR);
+    TFolder f(config().container().tmp_dir());
     if (!f.Exists()) {
         TError error = f.Create(0755, true);
         if (error)
             return error;
     }
 
-    char p[] = CONTAINER_TMP_DIR "/XXXXXX";
+    const string suffix = "/XXXXXX";
+    char *p = (char *)malloc(f.GetPath().length() + suffix.length() + 1);
+    if (!p)
+        return TError(EError::Unknown, errno, "malloc()");
+
+    *p = '\0';
+    strcat(p, f.GetPath().c_str());
+    strcat(p, suffix.c_str());
+
     char *d = mkdtemp(p);
-    if (!d)
+    if (!d) {
+        free(p);
         return TError(EError::Unknown, errno, "mkdtemp(" + string(p) + ")");
+    }
 
     Env.Cwd = d;
     Cwd = std::make_shared<TFolder>(d, true);
+    free(p);
     return Cwd->Chown(Env.User, Env.Group);
 }
 
@@ -524,7 +535,7 @@ std::string TTask::GetStdout() const {
     string s;
     if (StdoutFile.length()) {
         TFile f(StdoutFile);
-        TError e(f.LastStrings(STDOUT_READ_BYTES, s));
+        TError e(f.LastStrings(config().container().stdout_read_bytes(), s));
         TLogger::LogError(e, "Can't read container stdout");
     }
     return s;
@@ -534,7 +545,7 @@ std::string TTask::GetStderr() const {
     string s;
     if (StdoutFile.length()) {
         TFile f(StderrFile);
-        TError e(f.LastStrings(STDOUT_READ_BYTES, s));
+        TError e(f.LastStrings(config().container().stdout_read_bytes(), s));
         TLogger::LogError(e, "Can't read container stderr");
     }
     return s;
@@ -621,7 +632,7 @@ TError TTask::RotateFile(const std::string path) const {
     if (stat(path.c_str(), &st) < 0)
         return TError(EError::Unknown, errno, "stat(" + path + ")");
 
-    if (st.st_size > CONTAINER_MAX_LOG_SIZE)
+    if (st.st_size > config().container().max_log_size())
         if (truncate(path.c_str(), 0) < 0)
             return TError(EError::Unknown, errno, "truncate(" + path + ")");
 

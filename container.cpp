@@ -956,7 +956,7 @@ bool TContainer::NeedRespawn() {
     if (State != EContainerState::Dead)
         return false;
 
-    return Spec.Get("respawn") == "true" && TimeOfDeath + RESPAWN_DELAY_MS <= GetCurrentTimeMs();
+    return Spec.Get("respawn") == "true" && TimeOfDeath + config().container().respawn_delay_ms() <= GetCurrentTimeMs();
 }
 
 TError TContainer::Respawn() {
@@ -986,7 +986,7 @@ void TContainer::Heartbeat() {
 }
 
 bool TContainer::CanRemoveDead() const {
-    return State == EContainerState::Dead && TimeOfDeath + CONTAINER_AGING_TIME_MS <= GetCurrentTimeMs();
+    return State == EContainerState::Dead && TimeOfDeath + config().container().aging_time_ms() <= GetCurrentTimeMs();
 }
 
 bool TContainer::HasChildren() const {

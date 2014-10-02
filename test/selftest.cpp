@@ -675,7 +675,7 @@ static void TestCwd(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     cwd = GetCwd(pid);
 
-    string prefix = CONTAINER_TMP_DIR;
+    string prefix = config().container().tmp_dir();
 
     Expect(cwd != portodCwd);
     Expect(cwd.length() == prefix.length() + 7);

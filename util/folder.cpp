@@ -79,6 +79,10 @@ TError TFolder::Remove(bool recursive) const {
     return TError::Success();
 }
 
+const string &TFolder::GetPath() const {
+    return Path;
+}
+
 bool TFolder::Exists() const {
     struct stat st;
 

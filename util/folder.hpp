@@ -15,6 +15,7 @@ public:
     TFolder(TFile file, bool tmp = false) : Path(file.GetPath()), Tmp(tmp) {}
     ~TFolder();
 
+    const std::string &GetPath() const;
     bool Exists() const;
     TError Create(mode_t mode = 0755, bool recursive = false) const;
     TError Remove(bool recursive = false) const;
