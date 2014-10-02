@@ -14,9 +14,9 @@ class TConfig {
     cfg::TCfg Cfg;
 
     void LoadDefaults();
-    bool LoadFile(const std::string &path);
+    bool LoadFile(const std::string &path, bool silent);
 public:
-    void Load();
+    void Load(bool silent = false);
     cfg::TCfg &operator()();
 };
 

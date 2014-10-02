@@ -40,14 +40,14 @@ add_executable(portod tags portod.cpp cgroup.cpp rpc.cpp container.cpp task.cpp 
 add_dependencies(portod version.hpp)
 target_link_libraries(portod ${PB} ${RTNL} ${NL} pthread rt)
 
-add_executable(portoctl python/porto/rpc_pb2.py portoctl.cpp cli.cpp error.cpp libporto.cpp util/log.cpp util/protobuf.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
+add_executable(portoctl python/porto/rpc_pb2.py portoctl.cpp cli.cpp error.cpp libporto.cpp config.cpp util/log.cpp util/protobuf.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(portoctl version.hpp)
 target_link_libraries(portoctl ${PB} rt)
 
-add_executable(portoexec portoexec.cpp cli.cpp error.cpp libporto.cpp util/log.cpp util/protobuf.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
+add_executable(portoexec portoexec.cpp cli.cpp error.cpp libporto.cpp config.cpp util/log.cpp util/protobuf.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(portoexec version.hpp)
 target_link_libraries(portoexec ${PB} rt)
 
-add_executable(portotest portotest.cpp error.cpp config.cpp test/selftest.cpp test/stresstest.cpp test/test.cpp libporto.cpp util/netlink.cpp util/log.cpp util/protobuf.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
+add_executable(portotest portotest.cpp error.cpp config.cpp test/selftest.cpp test/stresstest.cpp test/test.cpp libporto.cpp config.cpp util/netlink.cpp util/log.cpp util/protobuf.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(portotest version.hpp)
 target_link_libraries(portotest ${PB} ${RTNL} ${NL} pthread rt)

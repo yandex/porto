@@ -10,6 +10,11 @@ message TCfg {
 		optional uint32 perm = 2;
 	}
 
+	message TRpcSockCfg {
+		optional TFileCfg file = 1;
+		optional string group = 2;
+	}
+
 	/*
 	message TLogCfg {
 		optional bool verbose = 1;
@@ -42,20 +47,15 @@ message TCfg {
 		optional uint32 memoryGuaranteeReserve = 10;
 	}
 
-	message TRpcSockCfg {
-		optional TFileCfg file = 1;
-		optional string group = 2;
-	}
-
 	optional TLogCfg log;
 	optional TContainerCfg container;
 	optional TKeyvalCfg keyval;
 	optional TDaemonCfg daemon;
-	optional TRpcSockCfg rpcSock;
 	*/
 	optional TNetworkCfg network = 1;
 	optional TFileCfg masterPid = 2;
 	optional TFileCfg slavePid = 3;
 	optional TFileCfg masterLog = 4;
 	optional TFileCfg slaveLog = 5;
+	optional TRpcSockCfg rpcSock = 6;
 }

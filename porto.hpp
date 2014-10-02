@@ -9,8 +9,8 @@ const bool LOG_VEBOSE = true;
 const bool DEBUG_NETLINK = false;
 
 const std::string ROOT_CONTAINER = "/";
-
 const std::string PORTO_ROOT_CGROUP = "porto";
+
 const ssize_t CONTAINER_MAX_LOG_SIZE = 10 * 1024 * 1024;
 const std::string KVALUE_ROOT = "/run/porto/kvs";
 #define CONTAINER_TMP_DIR "/place/porto"
@@ -30,10 +30,6 @@ const size_t WATCHDOG_DELAY_MS = 5 * 1000;
 const size_t MEMORY_GUARANTEE_RESERVE = 2 * 1024 * 1024 * 1024UL;
 
 const unsigned int KVS_PERM = 0600;
-
-const std::string RPC_SOCK = "/run/portod.socket";
-const std::string RPC_SOCK_GROUP = "porto";
-const unsigned int RPC_SOCK_PERM = 0660;
 
 const unsigned int LOOP_WAIT_TIMEOUT_S = 10;
 const unsigned int READ_WAIT_TIMEOUT_S = 5;

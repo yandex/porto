@@ -309,13 +309,15 @@ static int RpcMain(TContainerHolder &cholder) {
 
     uid_t uid = getuid();
     gid_t gid = getgid();
-    struct group *g = getgrnam(RPC_SOCK_GROUP.c_str());
+    struct group *g = getgrnam(config().rpcsock().group().c_str());
     if (g)
         gid = g->gr_gid;
     else
-        TLogger::Log() << "Can't get gid for " << RPC_SOCK_GROUP << " group" << std::endl;
+        TLogger::Log() << "Can't get gid for " << config().rpcsock().group() << " group" << std::endl;
 
-    TError error = CreateRpcServer(RPC_SOCK, RPC_SOCK_PERM, uid, gid, sfd);
+    TError error = CreateRpcServer(config().rpcsock().file().path(),
+                                   config().rpcsock().file().perm(),
+                                   uid, gid, sfd);
     if (error) {
         TLogger::Log() << "Can't create RPC server: " << error.GetMsg() << std::endl;
     }
@@ -362,9 +364,22 @@ static int RpcMain(TContainerHolder &cholder) {
         }
 
         if (hup) {
+            close(sfd);
+            RemoveRpcServer(config().rpcsock().file().path());
+
             int ret = DaemonHangup(false);
             if (ret)
                 return ret;
+
+            TError error = CreateRpcServer(config().rpcsock().file().path(),
+                                           config().rpcsock().file().perm(),
+                                           uid, gid, sfd);
+            fds[0].revents = 0;
+            if (error) {
+                TLogger::Log() << "Can't create RPC server: " << error.GetMsg() << std::endl;
+                return EXIT_FAILURE;
+            }
+
             hup = false;
         }
 
@@ -417,7 +432,7 @@ static int SlaveMain(bool failsafe, bool noWatchdog) {
     if (ret)
         return ret;
 
-    if (AnotherInstanceRunning(RPC_SOCK)) {
+    if (AnotherInstanceRunning(config().rpcsock().file().path())) {
         TLogger::Log() << "Another instance of portod is running!" << std::endl;
         return EXIT_FAILURE;
     }
@@ -494,7 +509,7 @@ static int SlaveMain(bool failsafe, bool noWatchdog) {
         ret = EXIT_FAILURE;
     }
 
-    RemoveRpcServer(RPC_SOCK);
+    RemoveRpcServer(config().rpcsock().file().path());
 
     if (raiseSignum)
         RaiseSignal(raiseSignum);

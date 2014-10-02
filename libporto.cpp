@@ -24,6 +24,7 @@ int TPortoAPI::SendReceive(int fd, rpc::TContainerRequest &req, rpc::TContainerR
 }
 
 TPortoAPI::TPortoAPI(int retries) : Fd(-1), Retries(retries) {
+    config.Load(true);
 }
 
 TPortoAPI::~TPortoAPI() {
@@ -38,7 +39,7 @@ int TPortoAPI::Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
 
 retry:
     if (Fd < 0) {
-        TError error = ConnectToRpcServer(RPC_SOCK, Fd);
+        TError error = ConnectToRpcServer(config().rpcsock().file().path(), Fd);
         if (error) {
             LastErrorMsg = error.GetMsg();
             LastError = INT_MIN;
