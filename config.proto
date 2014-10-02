@@ -20,6 +20,11 @@ message TCfg {
 		optional bool verbose = 1;
 	}
 
+	message TKeyvalCfg {
+		optional TFileCfg file = 1;
+		optional string size = 2;
+	}
+
 	/*
 	message TContainerCfg {
 		optional string maxLogSize = 1;
@@ -27,11 +32,6 @@ message TCfg {
 		optional uint32 agingTimeMs = 3;
 		optional uint32 respawnDelayMs = 4;
 		optional uint32 stdoutReadBytes = 5;
-	}
-
-	message TKeyvalCfg {
-		optional TFileCfg file = 1;
-		optional string size = 2;
 	}
 
 	message TDaemonCfg {
@@ -48,7 +48,6 @@ message TCfg {
 	}
 
 	optional TContainerCfg container;
-	optional TKeyvalCfg keyval;
 	optional TDaemonCfg daemon;
 	*/
 	optional TNetworkCfg network = 1;
@@ -58,4 +57,5 @@ message TCfg {
 	optional TFileCfg slaveLog = 5;
 	optional TRpcSockCfg rpcSock = 6;
 	optional TLogCfg log = 7;
+	optional TKeyvalCfg keyval = 8;
 }

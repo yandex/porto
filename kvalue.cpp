@@ -18,7 +18,8 @@ using std::shared_ptr;
 using std::vector;
 
 TKeyValueStorage::TKeyValueStorage() :
-    Tmpfs("tmpfs", KVALUE_ROOT, "tmpfs", {KVALUE_SIZE}) {
+    Tmpfs("tmpfs", config().keyval().file().path(), "tmpfs",
+          { config().keyval().size() }) {
 }
 
 string TKeyValueStorage::Name(const string &path) const {
@@ -137,7 +138,7 @@ TError TKeyValueStorage::MountTmpfs() {
 
     TFolder dir(Tmpfs.GetMountpoint());
     if (!dir.Exists()) {
-        error = dir.Create(KVS_PERM, true);
+        error = dir.Create(config().keyval().file().perm(), true);
         TLogger::LogError(error, "Can't create key-value mount point");
         if (error)
             return error;

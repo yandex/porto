@@ -31,6 +31,10 @@ void TConfig::LoadDefaults() {
     config().mutable_rpcsock()->set_group("porto");
 
     config().mutable_log()->set_verbose(false);
+
+    config().mutable_keyval()->mutable_file()->set_path("/run/porto/kvs");
+    config().mutable_keyval()->mutable_file()->set_perm(0644);
+    config().mutable_keyval()->set_size("size=32m");
 }
 
 bool TConfig::LoadFile(const std::string &path, bool silent) {
