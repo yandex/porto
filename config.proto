@@ -1,0 +1,61 @@
+package cfg;
+
+message TCfg {
+	message TNetworkCfg {
+		optional bool enabled = 1;
+	}
+
+	/*
+	message TFileCfg {
+		optional string path = 1;
+		optional uint32 perm = 2;
+	}
+
+	message TLogCfg {
+		optional bool verbose = 1;
+		optional bool netlink = 2;
+	}
+
+	message TContainerCfg {
+		optional string maxLogSize = 1;
+		optional string tmpDir = 2;
+		optional uint32 agingTimeMs = 3;
+		optional uint32 respawnDelayMs = 4;
+		optional uint32 stdoutReadBytes = 5;
+	}
+
+	message TKeyvalCfg {
+		optional TFileCfg file = 1;
+		optional string size = 2;
+	}
+
+	message TDaemonCfg {
+		optional uint32 maxClients = 1;
+		optional uint32 pollTimeoutMs = 2;
+		optional uint32 heartbeadDelayMs = 3;
+		optional uint32 watchdogMaxFails = 4;
+		optional uint32 watchdogDelayMs = 5;
+		optional uint32 waitTimeoutMs = 6;
+		optional uint32 readTimeoutMs = 7;
+		optional uint32 cgroupRemoveTimeoutS = 8;
+		optional uint32 freezerWaitTimeoutS = 9;
+		optional uint32 memoryGuaranteeReserve = 10;
+	}
+
+	message TRpcSockCfg {
+		optional TFileCfg file = 1;
+		optional string group = 2;
+	}
+
+	optional TLogCfg log;
+	optional TContainerCfg container;
+	optional TKeyvalCfg keyval;
+	optional TDaemonCfg daemon;
+	optional TRpcSockCfg rpcSock;
+	optional TFileCfg masterPid;
+	optional TFileCfg slavePid;
+	optional TFileCfg masterLog;
+	optional TFileCfg slaveLog;
+	*/
+	optional TNetworkCfg network = 1;
+}

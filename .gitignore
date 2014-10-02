@@ -3,10 +3,8 @@
 /portoctl
 /portotest
 /*.o
-/rpc.pb.cc
-/rpc.pb.h
-/kv.pb.cc
-/kv.pb.h
+/*.pb.cc
+/*.pb.h
 /CMakeCache.txt
 /CMakeFiles/
 /cmake_install.cmake

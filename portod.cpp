@@ -6,6 +6,7 @@
 #include "porto.hpp"
 #include "rpc.hpp"
 #include "cgroup.hpp"
+#include "config.hpp"
 #include "util/log.hpp"
 #include "util/protobuf.hpp"
 #include "util/unix.hpp"
@@ -124,6 +125,8 @@ static int DaemonPrepare(const std::string &procName,
         TLogger::Log() << "Can't create pid file " << pidPath << "!" << std::endl;
         return EXIT_FAILURE;
     }
+
+    config.Load();
 
     return 0;
 }
@@ -329,6 +332,7 @@ static int RpcMain(TContainerHolder &cholder) {
 
         if (hup) {
             TLogger::TruncateLog();
+            config.Load();
             hup = false;
         }
 
@@ -537,6 +541,7 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
 
         if (hup) {
             TLogger::TruncateLog();
+            config.Load();
             TLogger::Log() << "Updating" << std::endl;
 
             if (kill(slavePid, SIGKILL) < 0)
@@ -637,7 +642,7 @@ int main(int argc, char * const argv[]) {
     int argn;
 
     if (getuid() != 0) {
-        TLogger::Log() << "Need root privileges to start" << std::endl;
+        std::cerr << "Need root privileges to start" << std::endl;
         return EXIT_FAILURE;
     }
 

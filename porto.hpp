@@ -62,4 +62,6 @@ const uint32_t DEF_CLASS_NET_PRIO = 3;
     NAME(const NAME &) = delete; \
     NAME &operator=(const NAME &) = delete
 
+#include "config.hpp"
+
 #endif
