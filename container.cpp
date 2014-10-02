@@ -938,6 +938,9 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
     TLogger::Log() << "Delivered " << std::to_string(status) << " to " << GetName() << " with root_pid " << std::to_string(Task->GetPid()) << std::endl;
     State = EContainerState::Dead;
 
+    if (Spec.Get("isolate") == "false")
+        (void)KillAll();
+
     if (NeedRespawn()) {
         TError error = Respawn();
         TLogger::LogError(error, "Can't respawn " + GetName());

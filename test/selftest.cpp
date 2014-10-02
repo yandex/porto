@@ -864,6 +864,7 @@ static void TestRoot(TPortoAPI &api) {
         "net_ceil",
         "net_priority",
         "respawn",
+        "isolate",
     };
 
     std::vector<TProperty> plist;
