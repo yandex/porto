@@ -14,6 +14,7 @@ TConfig config;
 
 void TConfig::LoadDefaults() {
     config().mutable_network()->set_enabled(true);
+    config().mutable_network()->set_debug(false);
 
     config().mutable_slavepid()->set_path("/run/portod.pid");
     config().mutable_slavepid()->set_perm(0644);
@@ -28,6 +29,8 @@ void TConfig::LoadDefaults() {
     config().mutable_rpcsock()->mutable_file()->set_path("/run/portod.socket");
     config().mutable_rpcsock()->mutable_file()->set_perm(0644);
     config().mutable_rpcsock()->set_group("porto");
+
+    config().mutable_log()->set_verbose(false);
 }
 
 bool TConfig::LoadFile(const std::string &path, bool silent) {

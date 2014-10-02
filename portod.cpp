@@ -105,49 +105,22 @@ static void SignalMask(int how) {
         TLogger::Log() << "Can't set signal mask: " << strerror(errno) << std::endl;
 }
 
-static int DaemonPrepare(bool master) {
-    config.Load();
-
-    const string procName = master ? "portod" : "portod-slave";
-    const auto &log = master ? config().masterlog() : config().slavelog();
-    const auto &pid = master ? config().masterpid() : config().slavepid();
-
-    SetProcessName(procName.c_str());
-
-    TLogger::InitLog(log.path(), log.perm());
-    if (stdlog)
-        TLogger::LogToStd();
-
-    TLogger::Log() << string(80, '-') << std::endl;
-    TLogger::Log() << "Started" << std::endl;
-    TLogger::Log() << config().DebugString() << std::endl;
-
-    RegisterSignalHandlers();
-
-    if (CreatePidFile(pid.path(), pid.perm())) {
-        TLogger::Log() << "Can't create pid file " <<
-            pid.path() << "!" << std::endl;
-        return EXIT_FAILURE;
+static int DaemonSyncConfig(bool master, bool trunc) {
+    if (trunc) {
+        const auto &oldPid = master ? config().masterpid() : config().slavepid();
+        TLogger::CloseLog();
+        TLogger::TruncateLog();
+        RemovePidFile(oldPid.path());
+        TLogger::Log() << "Truncated log" << std::endl;
     }
 
-    return EXIT_SUCCESS;
-}
-
-static int DaemonHangup(bool master) {
-    TLogger::Log() << "Syncing config" << std::endl;
-
-    const auto &oldPid = master ? config().masterpid() : config().slavepid();
-
-    TLogger::CloseLog();
-    TLogger::TruncateLog();
-    RemovePidFile(oldPid.path());
-
     config.Load();
+    TNetlink::EnableDebug(config().network().debug());
 
     const auto &log = master ? config().masterlog() : config().slavelog();
     const auto &pid = master ? config().masterpid() : config().slavepid();
 
-    TLogger::InitLog(log.path(), log.perm());
+    TLogger::InitLog(log.path(), log.perm(), config().log().verbose());
     if (stdlog)
         TLogger::LogToStd();
 
@@ -156,6 +129,24 @@ static int DaemonHangup(bool master) {
             pid.path() << "!" << std::endl;
         return EXIT_FAILURE;
     }
+
+    return EXIT_SUCCESS;
+}
+
+static int DaemonPrepare(bool master) {
+    const string procName = master ? "portod" : "portod-slave";
+
+    SetProcessName(procName.c_str());
+
+    int ret = DaemonSyncConfig(master, false);
+    if (ret)
+        return ret;
+
+    TLogger::Log() << string(80, '-') << std::endl;
+    TLogger::Log() << "Started" << std::endl;
+    TLogger::Log() << config().DebugString() << std::endl;
+
+    RegisterSignalHandlers();
 
     return EXIT_SUCCESS;
 }
@@ -367,9 +358,11 @@ static int RpcMain(TContainerHolder &cholder) {
             close(sfd);
             RemoveRpcServer(config().rpcsock().file().path());
 
-            int ret = DaemonHangup(false);
+            int ret = DaemonSyncConfig(false, true);
             if (ret)
                 return ret;
+            hup = false;
+            TLogger::Log() << "Syncing config" << std::endl;
 
             TError error = CreateRpcServer(config().rpcsock().file().path(),
                                            config().rpcsock().file().perm(),
@@ -379,8 +372,6 @@ static int RpcMain(TContainerHolder &cholder) {
                 TLogger::Log() << "Can't create RPC server: " << error.GetMsg() << std::endl;
                 return EXIT_FAILURE;
             }
-
-            hup = false;
         }
 
         ret = ReapSpawner(REAP_EVT_FD, cholder);
@@ -585,7 +576,7 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
         ReceiveAcks(ackfd[0], pidToStatus);
 
         if (hup) {
-            int ret = DaemonHangup(true);
+            int ret = DaemonSyncConfig(true, true);
             if (ret)
                 return ret;
             hup = false;

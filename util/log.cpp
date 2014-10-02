@@ -17,11 +17,13 @@ static std::ofstream kmsgFile;
 static std::string logPath;
 static unsigned int logMode;
 static bool stdlog = false;
+static bool verbose;
 
-void TLogger::InitLog(const std::string &path, const unsigned int mode) {
+void TLogger::InitLog(const std::string &path, const unsigned int mode, const bool verb) {
     logPath = path;
     logMode = mode;
     logFile.close();
+    verbose = verb;
 }
 
 void TLogger::LogToStd() {
@@ -103,7 +105,7 @@ std::basic_ostream<char> &TLogger::Log() {
 }
 
 void TLogger::LogAction(const std::string &action, bool error, int errcode) {
-    if (!error && LOG_VEBOSE)
+    if (!error && verbose)
         Log() << " Ok: " << action << std::endl;
     else if (error)
         Log() << " Error: " << action << ": " << strerror(errcode) << std::endl;

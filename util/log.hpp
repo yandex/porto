@@ -18,7 +18,7 @@ class TLogger {
 private:
     static void OpenLog();
 public:
-    static void InitLog(const std::string &path, const unsigned int mode);
+    static void InitLog(const std::string &path, const unsigned int mode, const bool verbose);
     static void LogToStd();
     static void CloseLog();
     static void TruncateLog();

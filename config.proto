@@ -3,6 +3,7 @@ package cfg;
 message TCfg {
 	message TNetworkCfg {
 		optional bool enabled = 1;
+		optional bool debug = 2;
 	}
 
 	message TFileCfg {
@@ -15,12 +16,11 @@ message TCfg {
 		optional string group = 2;
 	}
 
-	/*
 	message TLogCfg {
 		optional bool verbose = 1;
-		optional bool netlink = 2;
 	}
 
+	/*
 	message TContainerCfg {
 		optional string maxLogSize = 1;
 		optional string tmpDir = 2;
@@ -47,7 +47,6 @@ message TCfg {
 		optional uint32 memoryGuaranteeReserve = 10;
 	}
 
-	optional TLogCfg log;
 	optional TContainerCfg container;
 	optional TKeyvalCfg keyval;
 	optional TDaemonCfg daemon;
@@ -58,4 +57,5 @@ message TCfg {
 	optional TFileCfg masterLog = 4;
 	optional TFileCfg slaveLog = 5;
 	optional TRpcSockCfg rpcSock = 6;
+	optional TLogCfg log = 7;
 }

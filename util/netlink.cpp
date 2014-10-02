@@ -21,6 +21,8 @@ extern "C" {
 using std::string;
 using std::vector;
 
+static bool debug = false;
+
 uint32_t TcHandle(uint16_t maj, uint16_t min) {
     return TC_HANDLE(maj, min);
 }
@@ -87,7 +89,7 @@ TError TNetlink::Open() {
         goto close_socket;
     }
 
-    if (DEBUG_NETLINK)
+    if (debug)
         LogCache(linkCache);
 
     nl_cache_mngt_provide(linkCache);
@@ -230,7 +232,7 @@ TError TNetlink::GetStat(uint32_t handle, ETclassStat stat, uint64_t &val) {
     if (ret < 0)
         return TError(EError::Unknown, string("Unable to allocate class cache: ") + nl_geterror(ret));
 
-    if (DEBUG_NETLINK)
+    if (debug)
         LogCache(classCache);
 
     struct rtnl_class *tclass = rtnl_class_get(classCache, rtnl_link_get_ifindex(link), handle);
@@ -254,7 +256,7 @@ TError TNetlink::GetClassProperties(uint32_t handle, uint32_t &prio, uint32_t &r
     if (ret < 0)
         return TError(EError::Unknown, string("Unable to allocate class cache: ") + nl_geterror(ret));
 
-    if (DEBUG_NETLINK)
+    if (debug)
         LogCache(classCache);
 
     struct rtnl_class *tclass = rtnl_class_get(classCache, rtnl_link_get_ifindex(link), handle);
@@ -277,7 +279,7 @@ bool TNetlink::ClassExists(uint32_t handle) {
     if (ret < 0)
         return false;
 
-    if (DEBUG_NETLINK)
+    if (debug)
         LogCache(classCache);
 
     struct rtnl_class *tclass = rtnl_class_get(classCache, rtnl_link_get_ifindex(link), handle);
@@ -373,7 +375,7 @@ bool TNetlink::QdiscExists(uint32_t handle) {
     if (ret < 0)
         return false;
 
-    if (DEBUG_NETLINK)
+    if (debug)
         LogCache(qdiscCache);
 
     struct rtnl_qdisc *qdisc = rtnl_qdisc_get(qdiscCache, rtnl_link_get_ifindex(link), handle);
@@ -447,7 +449,7 @@ bool TNetlink::CgroupFilterExists(uint32_t parent, uint32_t handle) {
         return false;
     }
 
-    if (DEBUG_NETLINK)
+    if (debug)
         LogCache(clsCache);
 
     struct CgFilterIter {
@@ -499,6 +501,10 @@ free_cls:
 
     return error;
 
+}
+
+void TNetlink::EnableDebug(bool enable) {
+    debug = enable;
 }
 
 TError TNetlink::Exec(std::function<TError(TNetlink &nl)> f) {

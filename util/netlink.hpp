@@ -45,6 +45,7 @@ public:
     TError RemoveCgroupFilter(uint32_t parent, uint32_t handle);
     ~TNetlink() { Close(); }
 
+    static void EnableDebug(bool enable);
     static TError Exec(std::function<TError(TNetlink &nl)> f);
 };
 
