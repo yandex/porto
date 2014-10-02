@@ -447,7 +447,8 @@ TError TContainer::PrepareCgroups() {
     LeafCgroups[cpuacctSubsystem] = GetLeafCgroup(cpuacctSubsystem);
     LeafCgroups[memorySubsystem] = GetLeafCgroup(memorySubsystem);
     LeafCgroups[freezerSubsystem] = GetLeafCgroup(freezerSubsystem);
-    LeafCgroups[netclsSubsystem] = GetLeafCgroup(netclsSubsystem);
+    if (config().network().enabled())
+        LeafCgroups[netclsSubsystem] = GetLeafCgroup(netclsSubsystem);
 
     for (auto cg : LeafCgroups) {
         auto ret = cg.second->Create();
@@ -469,12 +470,14 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
-    auto netcls = GetLeafCgroup(netclsSubsystem);
-    uint32_t handle = Tclass->GetHandle();
-    TError error = netcls->SetKnobValue("net_cls.classid", std::to_string(handle), false);
-    TLogger::LogError(error, "Can't set classid");
-    if (error)
-        return error;
+    if (config().network().enabled()) {
+        auto netcls = GetLeafCgroup(netclsSubsystem);
+        uint32_t handle = Tclass->GetHandle();
+        TError error = netcls->SetKnobValue("net_cls.classid", std::to_string(handle), false);
+        TLogger::LogError(error, "Can't set classid");
+        if (error)
+            return error;
+    }
 
     error = ApplyDynamicProperties();
     if (error)
