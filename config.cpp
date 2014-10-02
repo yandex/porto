@@ -35,6 +35,17 @@ void TConfig::LoadDefaults() {
     config().mutable_keyval()->mutable_file()->set_path("/run/porto/kvs");
     config().mutable_keyval()->mutable_file()->set_perm(0644);
     config().mutable_keyval()->set_size("size=32m");
+
+    config().mutable_daemon()->set_max_clients(16);
+    config().mutable_daemon()->set_poll_timeout_ms(10 * 1000);
+    config().mutable_daemon()->set_heartbead_delay_ms(5 * 1000);
+    config().mutable_daemon()->set_watchdog_max_fails(5);
+    config().mutable_daemon()->set_watchdog_delay_s(5);
+    config().mutable_daemon()->set_wait_timeout_s(10);
+    config().mutable_daemon()->set_read_timeout_s(5);
+    config().mutable_daemon()->set_cgroup_remove_timeout_s(1);
+    config().mutable_daemon()->set_freezer_wait_timeout_s(1);
+    config().mutable_daemon()->set_memory_guarantee_reserve(2 * 1024 * 1024 * 1024UL);
 }
 
 bool TConfig::LoadFile(const std::string &path, bool silent) {

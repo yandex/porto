@@ -178,7 +178,7 @@ TError TCgroup::Remove() {
     // at this point we should have gracefully terminated all tasks
     // in the container; if anything is still alive we have no other choice
     // but to kill it with SIGKILL
-    int ret = RetryFailed(CGROUP_REMOVE_TIMEOUT_S * 10, 100,
+    int ret = RetryFailed(config().daemon().cgroup_remove_timeout_s() * 10, 100,
                           [&]{ Kill(SIGKILL);
                                return !IsEmpty(); });
 

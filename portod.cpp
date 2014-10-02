@@ -30,8 +30,6 @@ using std::string;
 using std::map;
 using std::vector;
 
-static const size_t MAX_CONNECTIONS = PORTOD_MAX_CLIENTS + 1;
-
 static pid_t slavePid;
 static volatile sig_atomic_t done = false;
 static volatile sig_atomic_t gotAlarm = false;
@@ -171,7 +169,7 @@ static void HandleRequest(TContainerHolder &cholder, int fd) {
 
     rpc::TContainerRequest request;
 
-    (void)alarm(READ_WAIT_TIMEOUT_S);
+    (void)alarm(config().daemon().read_timeout_s());
     SignalMask(SIG_UNBLOCK);
     bool haveData = ReadDelimitedFrom(&pist, &request);
     SignalMask(SIG_BLOCK);
@@ -340,7 +338,7 @@ static int RpcMain(TContainerHolder &cholder) {
             fds.push_back(pfd);
         }
 
-        ret = poll(fds.data(), fds.size(), PORTOD_POLL_TIMEOUT_MS);
+        ret = poll(fds.data(), fds.size(), config().daemon().poll_timeout_ms());
         if (ret < 0) {
             TLogger::Log() << "poll() error: " << strerror(errno) << std::endl;
 
@@ -348,12 +346,15 @@ static int RpcMain(TContainerHolder &cholder) {
                 break;
         }
 
-        if (heartbeat + HEARTBEAT_DELAY_MS <= GetCurrentTimeMs()) {
+        if (heartbeat + config().daemon().heartbead_delay_ms()
+            <= GetCurrentTimeMs()) {
             cholder.Heartbeat();
             heartbeat = GetCurrentTimeMs();
             WatchdogStrobe();
         }
 
+
+        int maxClients = config().daemon().max_clients();
         if (hup) {
             close(sfd);
             RemoveRpcServer(config().rpcsock().file().path());
@@ -382,7 +383,7 @@ static int RpcMain(TContainerHolder &cholder) {
             if (fds[i].revents & POLLIN)
                 cholder.DeliverOom(fds[i].fd);
 
-        if (fds[0].revents && clients.size() < PORTOD_MAX_CLIENTS) {
+        if (fds[0].revents && clients.size() < maxClients) {
             ret = AcceptClient(sfd, clients);
             if (ret < 0)
                 break;
@@ -481,7 +482,8 @@ static int SlaveMain(bool failsafe, bool noWatchdog) {
         cs.Destroy();
 
         if (!noWatchdog)
-            WatchdogStart();
+            WatchdogStart(config().daemon().watchdog_max_fails(),
+                          config().daemon().watchdog_delay_s());
 
         ret = RpcMain(cholder);
         if (!cleanup && raiseSignum)
@@ -595,7 +597,7 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
             break;
         }
 
-        (void)alarm(LOOP_WAIT_TIMEOUT_S);
+        (void)alarm(config().daemon().wait_timeout_s());
         SignalMask(SIG_UNBLOCK);
         int status;
         pid = wait(&status);

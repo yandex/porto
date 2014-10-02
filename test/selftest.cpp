@@ -1229,10 +1229,10 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
 
     Say() << "Single container can't go over reserve" << std::endl;
     ExpectFailure(api.SetProperty(system, "memory_guarantee", std::to_string(total)), EError::ResourceNotAvailable);
-    ExpectSuccess(api.SetProperty(system, "memory_guarantee", std::to_string(total - MEMORY_GUARANTEE_RESERVE)));
+    ExpectSuccess(api.SetProperty(system, "memory_guarantee", std::to_string(total - config().daemon().memory_guarantee_reserve())));
 
     Say() << "Distributed guarantee can't go over reserve" << std::endl;
-    size_t chunk = (total - MEMORY_GUARANTEE_RESERVE) / 4;
+    size_t chunk = (total - config().daemon().memory_guarantee_reserve()) / 4;
 
     ExpectSuccess(api.SetProperty(system, "memory_guarantee", std::to_string(chunk)));
     ExpectSuccess(api.SetProperty(monit, "memory_guarantee", std::to_string(chunk)));

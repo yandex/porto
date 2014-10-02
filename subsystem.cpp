@@ -75,7 +75,7 @@ TError TMemorySubsystem::UseHierarchy(TCgroup &cg) const {
 // Freezer
 TError TFreezerSubsystem::WaitState(TCgroup &cg, const std::string &state) const {
 
-    int ret = RetryFailed(FREEZER_WAIT_TIMEOUT_S * 10, 100, [&]{
+    int ret = RetryFailed(config().daemon().freezer_wait_timeout_s() * 10, 100, [&]{
         string s;
         TError error = cg.GetKnobValue("freezer.state", s);
         if (error)

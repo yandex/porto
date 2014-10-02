@@ -46,6 +46,7 @@ static void SigsegvHandler(int sig, siginfo_t *si, void *unused)
 */
 
 static std::atomic<unsigned long> watchdogCounter;
+static unsigned int maxFails, delayS;
 
 void WatchdogStrobe()
 {
@@ -67,21 +68,23 @@ static void* WatchdogCheck(void *arg)
 
         prevValue = watchdogCounter;
 
-        if (fails > WATCHDOG_MAX_FAILS) {
+        if (fails > maxFails) {
             TLogger::Log() << "Watchdog stalled" << std::endl;
             Crash();
         }
 
-        sleep(WATCHDOG_DELAY_MS);
+        sleep(delayS);
     }
 
     return NULL;
 }
 
-void WatchdogStart()
+void WatchdogStart(int maxFailsArg, int delaySArg)
 {
 //    (void)RegisterSignal(SIGSEGV, SigsegvHandler);
 
+    maxFails = maxFailsArg;
+    delayS = delaySArg;
     pthread_t thread;
     pthread_create(&thread, NULL, WatchdogCheck, NULL);
 }

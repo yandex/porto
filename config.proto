@@ -25,6 +25,19 @@ message TCfg {
 		optional string size = 2;
 	}
 
+	message TDaemonCfg {
+		optional uint32 max_clients = 1;
+		optional uint32 poll_timeout_ms = 2;
+		optional uint32 heartbead_delay_ms = 3;
+		optional uint32 watchdog_max_fails = 4;
+		optional uint32 watchdog_delay_s = 5;
+		optional uint32 wait_timeout_s = 6;
+		optional uint32 read_timeout_s = 7;
+		optional uint32 cgroup_remove_timeout_s = 8;
+		optional uint32 freezer_wait_timeout_s = 9;
+		optional uint64 memory_guarantee_reserve = 10;
+	}
+
 	/*
 	message TContainerCfg {
 		optional string maxLogSize = 1;
@@ -34,21 +47,7 @@ message TCfg {
 		optional uint32 stdoutReadBytes = 5;
 	}
 
-	message TDaemonCfg {
-		optional uint32 maxClients = 1;
-		optional uint32 pollTimeoutMs = 2;
-		optional uint32 heartbeadDelayMs = 3;
-		optional uint32 watchdogMaxFails = 4;
-		optional uint32 watchdogDelayMs = 5;
-		optional uint32 waitTimeoutMs = 6;
-		optional uint32 readTimeoutMs = 7;
-		optional uint32 cgroupRemoveTimeoutS = 8;
-		optional uint32 freezerWaitTimeoutS = 9;
-		optional uint32 memoryGuaranteeReserve = 10;
-	}
-
 	optional TContainerCfg container;
-	optional TDaemonCfg daemon;
 	*/
 	optional TNetworkCfg network = 1;
 	optional TFileCfg masterPid = 2;
@@ -58,4 +57,5 @@ message TCfg {
 	optional TRpcSockCfg rpcSock = 6;
 	optional TLogCfg log = 7;
 	optional TKeyvalCfg keyval = 8;
+	optional TDaemonCfg daemon = 9;
 }

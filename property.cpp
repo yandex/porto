@@ -43,7 +43,7 @@ static TError ValidMemGuarantee(std::shared_ptr<const TContainer> container, con
         return TError(EError::InvalidValue, "invalid hierarchical value");
 
     uint64_t total = container->GetRoot()->GetChildrenSum("memory_guarantee", container, newval);
-    if (total + MEMORY_GUARANTEE_RESERVE > GetTotalMemory())
+    if (total + config().daemon().memory_guarantee_reserve() > GetTotalMemory())
         return TError(EError::ResourceNotAvailable, "can't guarantee all available memory");
 
     return TError::Success();
