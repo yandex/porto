@@ -39,7 +39,7 @@ int TPortoAPI::Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
 
 retry:
     if (Fd < 0) {
-        TError error = ConnectToRpcServer(config().rpcsock().file().path(), Fd);
+        TError error = ConnectToRpcServer(config().rpc_sock().file().path(), Fd);
         if (error) {
             LastErrorMsg = error.GetMsg();
             LastError = INT_MIN;

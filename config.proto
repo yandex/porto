@@ -50,11 +50,11 @@ message TCfg {
 	optional TContainerCfg container;
 	*/
 	optional TNetworkCfg network = 1;
-	optional TFileCfg masterPid = 2;
-	optional TFileCfg slavePid = 3;
-	optional TFileCfg masterLog = 4;
-	optional TFileCfg slaveLog = 5;
-	optional TRpcSockCfg rpcSock = 6;
+	optional TFileCfg master_pid = 2;
+	optional TFileCfg slave_pid = 3;
+	optional TFileCfg master_log = 4;
+	optional TFileCfg slave_log = 5;
+	optional TRpcSockCfg rpc_sock = 6;
 	optional TLogCfg log = 7;
 	optional TKeyvalCfg keyval = 8;
 	optional TDaemonCfg daemon = 9;

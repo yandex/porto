@@ -105,7 +105,7 @@ static void SignalMask(int how) {
 
 static int DaemonSyncConfig(bool master, bool trunc) {
     if (trunc) {
-        const auto &oldPid = master ? config().masterpid() : config().slavepid();
+        const auto &oldPid = master ? config().master_pid() : config().slave_pid();
         TLogger::CloseLog();
         TLogger::TruncateLog();
         RemovePidFile(oldPid.path());
@@ -115,8 +115,8 @@ static int DaemonSyncConfig(bool master, bool trunc) {
     config.Load();
     TNetlink::EnableDebug(config().network().debug());
 
-    const auto &log = master ? config().masterlog() : config().slavelog();
-    const auto &pid = master ? config().masterpid() : config().slavepid();
+    const auto &log = master ? config().master_log() : config().slave_log();
+    const auto &pid = master ? config().master_pid() : config().slave_pid();
 
     TLogger::InitLog(log.path(), log.perm(), config().log().verbose());
     if (stdlog)
@@ -150,7 +150,7 @@ static int DaemonPrepare(bool master) {
 }
 
 static void DaemonShutdown(bool master) {
-    const auto &pid = master ? config().masterpid() : config().slavepid();
+    const auto &pid = master ? config().master_pid() : config().slave_pid();
 
     TLogger::Log() << "Stopped" << std::endl;
 
@@ -298,14 +298,14 @@ static int RpcMain(TContainerHolder &cholder) {
 
     uid_t uid = getuid();
     gid_t gid = getgid();
-    struct group *g = getgrnam(config().rpcsock().group().c_str());
+    struct group *g = getgrnam(config().rpc_sock().group().c_str());
     if (g)
         gid = g->gr_gid;
     else
-        TLogger::Log() << "Can't get gid for " << config().rpcsock().group() << " group" << std::endl;
+        TLogger::Log() << "Can't get gid for " << config().rpc_sock().group() << " group" << std::endl;
 
-    TError error = CreateRpcServer(config().rpcsock().file().path(),
-                                   config().rpcsock().file().perm(),
+    TError error = CreateRpcServer(config().rpc_sock().file().path(),
+                                   config().rpc_sock().file().perm(),
                                    uid, gid, sfd);
     if (error) {
         TLogger::Log() << "Can't create RPC server: " << error.GetMsg() << std::endl;
@@ -354,10 +354,10 @@ static int RpcMain(TContainerHolder &cholder) {
         }
 
 
-        int maxClients = config().daemon().max_clients();
+        size_t maxClients = config().daemon().max_clients();
         if (hup) {
             close(sfd);
-            RemoveRpcServer(config().rpcsock().file().path());
+            RemoveRpcServer(config().rpc_sock().file().path());
 
             int ret = DaemonSyncConfig(false, true);
             if (ret)
@@ -365,8 +365,8 @@ static int RpcMain(TContainerHolder &cholder) {
             hup = false;
             TLogger::Log() << "Syncing config" << std::endl;
 
-            TError error = CreateRpcServer(config().rpcsock().file().path(),
-                                           config().rpcsock().file().perm(),
+            TError error = CreateRpcServer(config().rpc_sock().file().path(),
+                                           config().rpc_sock().file().perm(),
                                            uid, gid, sfd);
             fds[0].revents = 0;
             if (error) {
@@ -424,7 +424,7 @@ static int SlaveMain(bool failsafe, bool noWatchdog) {
     if (ret)
         return ret;
 
-    if (AnotherInstanceRunning(config().rpcsock().file().path())) {
+    if (AnotherInstanceRunning(config().rpc_sock().file().path())) {
         TLogger::Log() << "Another instance of portod is running!" << std::endl;
         return EXIT_FAILURE;
     }
@@ -502,7 +502,7 @@ static int SlaveMain(bool failsafe, bool noWatchdog) {
         ret = EXIT_FAILURE;
     }
 
-    RemoveRpcServer(config().rpcsock().file().path());
+    RemoveRpcServer(config().rpc_sock().file().path());
 
     if (raiseSignum)
         RaiseSignal(raiseSignum);
