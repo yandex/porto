@@ -4,7 +4,12 @@
         rotate 7
         compress
         notifempty
-    nocreate
+	nocreate
+
+	postrotate
+		[ -f /run/portod.pid ] && kill -HUP `cat /run/portod.pid`
+	endscript
+
 }
 
 /var/log/portoloop.log {
@@ -13,5 +18,9 @@
         rotate 7
         compress
         notifempty
-    nocreate
+	nocreate
+
+	postrotate
+		[ -f /run/portod.pid ] && kill -HUP `cat /run/portod.pid`
+	endscript
 }
