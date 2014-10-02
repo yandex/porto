@@ -48,6 +48,6 @@ add_executable(portoexec portoexec.cpp cli.cpp error.cpp libporto.cpp util/log.c
 add_dependencies(portoexec version.hpp)
 target_link_libraries(portoexec ${PB} rt)
 
-add_executable(portotest portotest.cpp error.cpp test/selftest.cpp test/stresstest.cpp test/test.cpp libporto.cpp util/netlink.cpp util/log.cpp util/protobuf.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
+add_executable(portotest portotest.cpp error.cpp config.cpp test/selftest.cpp test/stresstest.cpp test/test.cpp libporto.cpp util/netlink.cpp util/log.cpp util/protobuf.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(portotest version.hpp)
 target_link_libraries(portotest ${PB} ${RTNL} ${NL} pthread rt)

@@ -203,13 +203,13 @@ static void StressKill() {
     std::cout << "Run kill" << std::endl;
     while (!done) {
         usleep(1000000);
-        TFile f(PID_FILE);
+        TFile f(config().slavepid().path());
         int pid;
         std::vector<std::string> containers;
         if (api.List(containers) != 0)
             continue;
         if (f.AsInt(pid))
-            Say(std::cerr) << "ERROR: Don't open " << PID_FILE << std::endl;
+            Say(std::cerr) << "ERROR: Don't open " << config().slavepid().path() << std::endl;
         if (kill(pid, SIGKILL)) {
             Say(std::cerr) << "ERROR: Don't send kill to " << pid << std::endl;
         } else {

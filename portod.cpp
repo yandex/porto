@@ -105,37 +105,68 @@ static void SignalMask(int how) {
         TLogger::Log() << "Can't set signal mask: " << strerror(errno) << std::endl;
 }
 
-static int DaemonPrepare(const std::string &procName,
-                   const std::string &logPath,
-                   unsigned int logMode,
-                   const std::string &pidPath,
-                   unsigned int pidMode) {
+static int DaemonPrepare(bool master) {
+    config.Load();
+
+    const string procName = master ? "portod" : "portod-slave";
+    const auto &log = master ? config().masterlog() : config().slavelog();
+    const auto &pid = master ? config().masterpid() : config().slavepid();
+
     SetProcessName(procName.c_str());
 
-    TLogger::InitLog(logPath, logMode);
+    TLogger::InitLog(log.path(), log.perm());
     if (stdlog)
         TLogger::LogToStd();
 
-    TLogger::Log() << "--------------------------------------------------------------------------------" << std::endl;
+    TLogger::Log() << string(80, '-') << std::endl;
     TLogger::Log() << "Started" << std::endl;
+    TLogger::Log() << config().DebugString() << std::endl;
 
     RegisterSignalHandlers();
 
-    if (CreatePidFile(pidPath, pidMode)) {
-        TLogger::Log() << "Can't create pid file " << pidPath << "!" << std::endl;
+    if (CreatePidFile(pid.path(), pid.perm())) {
+        TLogger::Log() << "Can't create pid file " <<
+            pid.path() << "!" << std::endl;
         return EXIT_FAILURE;
     }
 
-    config.Load();
-
-    return 0;
+    return EXIT_SUCCESS;
 }
 
-static void DaemonShutdown(const std::string &pidPath) {
+static int DaemonHangup(bool master) {
+    TLogger::Log() << "Syncing config" << std::endl;
+
+    const auto &oldPid = master ? config().masterpid() : config().slavepid();
+
+    TLogger::CloseLog();
+    TLogger::TruncateLog();
+    RemovePidFile(oldPid.path());
+
+    config.Load();
+
+    const auto &log = master ? config().masterlog() : config().slavelog();
+    const auto &pid = master ? config().masterpid() : config().slavepid();
+
+    TLogger::InitLog(log.path(), log.perm());
+    if (stdlog)
+        TLogger::LogToStd();
+
+    if (CreatePidFile(pid.path(), log.perm())) {
+        TLogger::Log() << "Can't create pid file " <<
+            pid.path() << "!" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    return EXIT_SUCCESS;
+}
+
+static void DaemonShutdown(bool master) {
+    const auto &pid = master ? config().masterpid() : config().slavepid();
+
     TLogger::Log() << "Stopped" << std::endl;
 
     TLogger::CloseLog();
-    RemovePidFile(pidPath);
+    RemovePidFile(pid.path());
 }
 
 static void RemoveRpcServer(const string &path) {
@@ -331,8 +362,9 @@ static int RpcMain(TContainerHolder &cholder) {
         }
 
         if (hup) {
-            TLogger::TruncateLog();
-            config.Load();
+            int ret = DaemonHangup(false);
+            if (ret)
+                return ret;
             hup = false;
         }
 
@@ -381,9 +413,7 @@ static void KvDump() {
 }
 
 static int SlaveMain(bool failsafe, bool noWatchdog) {
-    int ret = DaemonPrepare("portod-slave",
-                            LOG_FILE, LOG_FILE_PERM,
-                            PID_FILE, PID_FILE_PERM);
+    int ret = DaemonPrepare(false);
     if (ret)
         return ret;
 
@@ -469,7 +499,7 @@ static int SlaveMain(bool failsafe, bool noWatchdog) {
     if (raiseSignum)
         RaiseSignal(raiseSignum);
 
-    DaemonShutdown(PID_FILE);
+    DaemonShutdown(false);
 
     return ret;
 }
@@ -540,8 +570,10 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
         ReceiveAcks(ackfd[0], pidToStatus);
 
         if (hup) {
-            TLogger::TruncateLog();
-            config.Load();
+            int ret = DaemonHangup(true);
+            if (ret)
+                return ret;
+            hup = false;
             TLogger::Log() << "Updating" << std::endl;
 
             if (kill(slavePid, SIGKILL) < 0)
@@ -598,9 +630,7 @@ exit:
 }
 
 static int MasterMain() {
-    int ret = DaemonPrepare("portod",
-                            LOOP_LOG_FILE, LOOP_LOG_FILE_PERM,
-                            LOOP_PID_FILE, LOOP_PID_FILE_PERM);
+    int ret = DaemonPrepare(true);
     if (ret)
         return ret;
 
@@ -630,7 +660,7 @@ static int MasterMain() {
     if (kill(slavePid, SIGINT) < 0)
         TLogger::Log() << "Can't send SIGINT to slave" << std::endl;
 
-    DaemonShutdown(LOOP_PID_FILE);
+    DaemonShutdown(true);
 
     return ret;
 }

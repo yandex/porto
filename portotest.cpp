@@ -55,6 +55,8 @@ int main(int argc, char *argv[])
     }
 
     try {
+        config.Load();
+
         string what = "";
         if (argc >= 2)
             what = argv[1];

@@ -5,12 +5,12 @@ message TCfg {
 		optional bool enabled = 1;
 	}
 
-	/*
 	message TFileCfg {
 		optional string path = 1;
 		optional uint32 perm = 2;
 	}
 
+	/*
 	message TLogCfg {
 		optional bool verbose = 1;
 		optional bool netlink = 2;
@@ -52,10 +52,10 @@ message TCfg {
 	optional TKeyvalCfg keyval;
 	optional TDaemonCfg daemon;
 	optional TRpcSockCfg rpcSock;
-	optional TFileCfg masterPid;
-	optional TFileCfg slavePid;
-	optional TFileCfg masterLog;
-	optional TFileCfg slaveLog;
 	*/
 	optional TNetworkCfg network = 1;
+	optional TFileCfg masterPid = 2;
+	optional TFileCfg slavePid = 3;
+	optional TFileCfg masterLog = 4;
+	optional TFileCfg slaveLog = 5;
 }

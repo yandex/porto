@@ -665,7 +665,7 @@ static void TestCwd(TPortoAPI &api) {
     string name = "a";
     ExpectSuccess(api.Create(name));
 
-    TFile portod(PID_FILE);
+    TFile portod(config().slavepid().path());
     (void)portod.AsString(portodPid);
     portodCwd = GetCwd(portodPid);
 
@@ -1338,7 +1338,7 @@ static void TestLeaks(TPortoAPI &api) {
     string name;
     int slack = 4096;
 
-    TFile f(PID_FILE);
+    TFile f(config().slavepid().path());
     Expect(f.AsString(pid) == false);
 
     for (int i = 0; i < LeakConainersNr; i++) {
@@ -1394,7 +1394,7 @@ static void TestRecovery(TPortoAPI &api) {
     Expect(TaskRunning(api, pid) == true);
     Expect(TaskZombie(api, pid) == false);
 
-    int portodPid = ReadPid(PID_FILE);
+    int portodPid = ReadPid(config().slavepid().path());
     if (kill(portodPid, SIGKILL))
         throw string("Can't send SIGKILL to slave");
 
@@ -1424,7 +1424,7 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectSuccess(api.Create(parent));
     ExpectSuccess(api.Create(child));
 
-    portodPid = ReadPid(PID_FILE);
+    portodPid = ReadPid(config().slavepid().path());
     if (kill(portodPid, SIGKILL))
         throw string("Can't send SIGKILL to slave");
     WaitExit(api, std::to_string(portodPid));
@@ -1449,13 +1449,13 @@ static void TestCgroups(TPortoAPI &api) {
         Expect(f.Remove() == false);
     Expect(f.Create(0755, true) == false);
 
-    int pid = ReadPid(PID_FILE);
+    int pid = ReadPid(config().slavepid().path());
     if (kill(pid, SIGINT))
         throw string("Can't send SIGINT to slave");
 
     WaitPortod(api);
 
-    pid = ReadPid(PID_FILE);
+    pid = ReadPid(config().slavepid().path());
     if (kill(pid, SIGINT))
         throw string("Can't send SIGINT to slave");
 
@@ -1502,8 +1502,8 @@ int SelfTest(string name, int leakNr) {
 
         RestartDaemon(api);
 
-        Expect(WordCount(LOOP_LOG_FILE, "Started") == 1);
-        Expect(WordCount(LOG_FILE, "Started") == 1);
+        Expect(WordCount(config().masterlog().path(), "Started") == 1);
+        Expect(WordCount(config().slavelog().path(), "Started") == 1);
 
         for (auto t : tests) {
             if (name.length() && name != t.first)
@@ -1513,8 +1513,8 @@ int SelfTest(string name, int leakNr) {
             t.second(api);
         }
 
-        respawns = WordCount(LOOP_LOG_FILE, "Spawned");
-        errors = WordCount(LOG_FILE, "Error");
+        respawns = WordCount(config().masterlog().path(), "Spawned");
+        errors = WordCount(config().slavelog().path(), "Error");
     } catch (string e) {
         std::cerr << "EXCEPTION: " << e << std::endl;
         return 1;

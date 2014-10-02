@@ -35,18 +35,6 @@ const std::string RPC_SOCK = "/run/portod.socket";
 const std::string RPC_SOCK_GROUP = "porto";
 const unsigned int RPC_SOCK_PERM = 0660;
 
-const std::string PID_FILE = "/run/portod.pid";
-const unsigned int PID_FILE_PERM = 0644;
-
-const std::string LOOP_PID_FILE = "/run/portoloop.pid";
-const unsigned int LOOP_PID_FILE_PERM = 0644;
-
-const std::string LOG_FILE = "/var/log/portod.log";
-const unsigned int LOG_FILE_PERM = 0644;
-
-const std::string LOOP_LOG_FILE = "/var/log/portoloop.log";
-const unsigned int LOOP_LOG_FILE_PERM = 0644;
-
 const unsigned int LOOP_WAIT_TIMEOUT_S = 10;
 const unsigned int READ_WAIT_TIMEOUT_S = 5;
 

@@ -1,5 +1,6 @@
+#include <iostream>
+
 #include "config.hpp"
-#include "util/log.hpp"
 #include "util/protobuf.hpp"
 #include "util/unix.hpp"
 
@@ -14,7 +15,15 @@ TConfig config;
 void TConfig::LoadDefaults() {
     config().mutable_network()->set_enabled(true);
 
-    TLogger::Log() << "Load default config: " << config().DebugString() << std::endl;
+    config().mutable_slavepid()->set_path("/run/portod.pid");
+    config().mutable_slavepid()->set_perm(0644);
+    config().mutable_slavelog()->set_path("/var/log/portod.log");
+    config().mutable_slavelog()->set_perm(0644);
+
+    config().mutable_masterpid()->set_path("/run/portoloop.pid");
+    config().mutable_masterpid()->set_perm(0644);
+    config().mutable_masterlog()->set_path("/var/log/portoloop.log");
+    config().mutable_masterlog()->set_perm(0644);
 }
 
 bool TConfig::LoadFile(const std::string &path) {
@@ -24,22 +33,24 @@ bool TConfig::LoadFile(const std::string &path) {
 
     google::protobuf::io::FileInputStream pist(fd.GetFd());
 
-    Cfg.Clear();
     if (!google::protobuf::TextFormat::Merge(&pist, &Cfg) ||
         !Cfg.IsInitialized()) {
         return false;
     }
 
-    TLogger::Log() << "Using config " << path << std::endl;
+    std::cerr << "Using config " << path << std::endl;
 
     return true;
 }
+
 void TConfig::Load() {
     LoadDefaults();
 
     if (LoadFile("/etc/portod.conf"))
         return;
-    LoadFile("/etc/default/portod.conf");
+    if (LoadFile("/etc/default/portod.conf"))
+        return;
+    std::cerr << "Using default config" << std::endl;
 }
 
 cfg::TCfg &TConfig::operator()() {

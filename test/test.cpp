@@ -338,21 +338,21 @@ void RestartDaemon(TPortoAPI &api) {
         throw string("Porto slave is not running");
 
     // Remove porto cgroup to clear statistics
-    int pid = ReadPid(PID_FILE);
+    int pid = ReadPid(config().slavepid().path());
     if (kill(pid, SIGINT))
         throw string("Can't send SIGINT to slave");
 
     WaitPortod(api);
 
     // Truncate slave log
-    pid = ReadPid(PID_FILE);
+    pid = ReadPid(config().slavepid().path());
     if (kill(pid, SIGHUP))
         throw string("Can't send SIGHUP to slave");
 
     WaitPortod(api);
 
     // Truncate master log
-    pid = ReadPid(LOOP_PID_FILE);
+    pid = ReadPid(config().masterpid().path());
     if (kill(pid, SIGHUP))
         throw string("Can't send SIGHUP to master");
 
@@ -366,7 +366,7 @@ void TestDaemon(TPortoAPI &api) {
     api.Cleanup();
 
     Say() << "Make sure portod doesn't have zombies" << std::endl;
-    pid = ReadPid(PID_FILE);
+    pid = ReadPid(config().slavepid().path());
 
     Say() << "Make sure portod doesn't have invalid FDs" << std::endl;
 
@@ -381,7 +381,7 @@ void TestDaemon(TPortoAPI &api) {
     Expect(scandir(path.c_str(), &lst, NULL, alphasort) == 2 + 7 + sssFd);
 
     Say() << "Make sure portod-slave doesn't have zombies" << std::endl;
-    pid = ReadPid(LOOP_PID_FILE);
+    pid = ReadPid(config().masterpid().path());
 
     Say() << "Make sure portod-slave doesn't have invalid FDs" << std::endl;
     path = ("/proc/" + std::to_string(pid) + "/fd");
