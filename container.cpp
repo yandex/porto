@@ -479,7 +479,7 @@ TError TContainer::PrepareCgroups() {
             return error;
     }
 
-    error = ApplyDynamicProperties();
+    TError error = ApplyDynamicProperties();
     if (error)
         return error;
 
