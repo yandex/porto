@@ -32,19 +32,6 @@ public:
     int Execute(int argc, char *argv[]);
 };
 
-class TDestroyCmd : public ICmd {
-public:
-    TDestroyCmd();
-    int Execute(int argc, char *argv[]);
-};
-
-class TListCmd : public ICmd {
-public:
-    TListCmd();
-
-    int Execute(int argc, char *argv[]);
-};
-
 void RegisterCommand(ICmd *cmd);
 int HandleCommand(int argc, char *argv[]);
 
