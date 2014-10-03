@@ -1,13 +1,11 @@
-- debian: add group porto to loadbase
-- debian: chown root:porto /usr/sbin/portoexec
 - full dump on sigsegv
 - ? autodestroy property
 - ? portoctl run -f <MANIFEST> | <MANIFEST STRING>
 - ? cpu_cores property to reserve some cores for a container
 - ? portoctl top - sort containers by used resources
 - ? some kind of io usage data (iops/bytes)
-- portoctl enter should search for /sys/fs/cgroup mount point instead of
-  using predefined path
+- loop.py: specify limits via properties, more fine grained settings for respawn,
+  coredump settings
 
 # nekt0n
 - add namespaces
@@ -23,7 +21,7 @@
 - ? isolate ipc property
 - ? when to enable user namespace
 - hostname property + isolate uts
-- net:<none?|host|bridge> - create veth pair and setup routing + masquerading + generate random ip/mask or use provided
+- net:<none?|host|<dev>|bridge> - create veth pair and setup routing + masquerading + generate random ip/mask or use provided
 - net_map: map host port to container when bridge used
 - ? mount proc proc proc nodev,noexec,nosuid 0 0; run run tmpfs nodev,noexec,nosuid,relatime,size=1m,mode=0755 0 0; shm dev/shm tmpfs nodev,nosuid,noexec 0 0
   we can prepare everything when fs is isolated
