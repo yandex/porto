@@ -76,6 +76,8 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     uint64_t GetPropertyUint64(const std::string &property) const;
     void StopChildren();
     void FreeResources();
+    void PropertyToAlias(const std::string &property, std::string &value) const;
+    TError AliasToProperty(std::string &property, std::string &value);
 
 public:
     TContainer(const std::string &name, std::shared_ptr<TContainer> parent, uint16_t id) :

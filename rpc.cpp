@@ -83,9 +83,6 @@ static TError GetContainerProperty(TContainerHolder &cholder,
     if (!container)
         return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    if (propertySpec.find(req.property()) == propertySpec.end())
-        return TError(EError::InvalidProperty, "invalid property");
-
     string value;
     TError error(container->GetProperty(req.property(), value));
     if (!error)
@@ -100,9 +97,6 @@ static TError SetContainerProperty(TContainerHolder &cholder,
     auto container = cholder.Get(req.name());
     if (!container)
         return TError(EError::ContainerDoesNotExist, "invalid name");
-
-    if (propertySpec.find(req.property()) == propertySpec.end())
-        return TError(EError::InvalidProperty, "invalid property");
 
     return container->SetProperty(req.property(), req.value());
 }

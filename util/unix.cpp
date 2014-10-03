@@ -183,6 +183,18 @@ TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap) 
     return TError::Success();
 }
 
+int BlockAllSignals() {
+    sigset_t mask;
+
+    if (sigfillset(&mask) < 0)
+        return -1;
+
+    if (sigprocmask(SIG_BLOCK, &mask, NULL) < 0)
+        return -1;
+
+    return 0;
+}
+
 TScopedFd::TScopedFd(int fd) : Fd(fd) {
 }
 

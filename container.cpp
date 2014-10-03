@@ -364,6 +364,14 @@ TError TContainer::ApplyDynamicProperties() {
             return error;
     }
 
+    if (memroot->HasKnob("memory.recharge_on_pgfault")) {
+        string value = Spec.Get("recharge_on_pgfault") == "true" ? "1" : "0";
+        error = memcg->SetKnobValue("memory.recharge_on_pgfault", value, false);
+        TLogger::LogError(error, "Can't set recharge_on_pgfault");
+        if (error)
+            return error;
+    }
+
     auto cpucg = GetLeafCgroup(cpuSubsystem);
     if (Spec.Get("cpu_policy") == "normal") {
         int cpuPrio;
@@ -482,33 +490,6 @@ TError TContainer::PrepareCgroups() {
     TError error = ApplyDynamicProperties();
     if (error)
         return error;
-
-    string cpuRawKnobs[] = {
-        "cpu.smart",
-    };
-
-    string memRawKnobs[] = {
-        "memory.limit_in_bytes",
-        "memory.low_limit_in_bytes",
-        "memory.recharge_on_pgfault",
-    };
-
-    for (auto &knob : cpuRawKnobs)
-        if (Spec.Get(knob) != "0") {
-            error = cpucg->SetKnobValue(knob, Spec.Get(knob), false);
-            TLogger::LogError(error, "Can't set cpu cgroup knob " + knob);
-            if (error)
-                return error;
-        }
-
-    auto memcg = GetLeafCgroup(memorySubsystem);
-    for (auto &knob : memRawKnobs)
-        if (Spec.Get(knob) != "0") {
-            error = memcg->SetKnobValue(knob, Spec.Get(knob), false);
-            TLogger::LogError(error, "Can't set memory cgroup knob " + knob);
-            if (error)
-                return error;
-        }
 
     if (!IsRoot()) {
         error = PrepareOomMonitor();
@@ -806,11 +787,73 @@ TError TContainer::GetData(const string &name, string &value) {
     return TError::Success();
 }
 
-TError TContainer::GetProperty(const string &property, string &value) const {
+void TContainer::PropertyToAlias(const string &property, string &value) const {
+        if (property == "cpu.smart") {
+            if (value == "rt")
+                value = "1";
+            else
+                value = "0";
+        } else if (property == "memory.recharge_on_pgfault") {
+            value = value == "true" ? "1" : "0";
+        }
+}
+
+TError TContainer::AliasToProperty(string &property, string &value) {
+        if (property == "cpu.smart") {
+            if (value == "0") {
+                property = "cpu_policy";
+                value = "normal";
+            } else {
+                property = "cpu_policy";
+                value = "rt";
+            }
+        } else if (property == "memory.limit_in_bytes") {
+            property = "memory_limit";
+            uint64_t n;
+
+            TError error = StringWithUnitToUint64(value, n);
+            if (error)
+                return error;
+
+            value = std::to_string(n);
+        } else if (property == "memory.low_limit_in_bytes") {
+            property = "memory_guarantee";
+            uint64_t n;
+
+            TError error = StringWithUnitToUint64(value, n);
+            if (error)
+                return error;
+
+            value = std::to_string(n);
+        } else if (property == "memory.recharge_on_pgfault") {
+            property = "recharge_on_pgfault";
+            value = value == "0" ? "false" : "true";
+        }
+
+        return TError::Success();
+}
+
+static std::map<std::string, std::string> alias = {
+    { "cpu.smart", "cpu_policy" },
+    { "memory.limit_in_bytes", "memory_limit" },
+    { "memory.low_limit_in_bytes", "memory_guarantee" },
+    { "memory.recharge_on_pgfault", "recharge_on_pgfault" },
+};
+
+TError TContainer::GetProperty(const string &origProperty, string &value) const {
     if (IsRoot())
         return TError(EError::InvalidProperty, "no properties for root container");
 
+    string property = origProperty;
+    if (alias.find(origProperty) != alias.end())
+        property = alias.at(origProperty);
+
+    if (propertySpec.find(property) == propertySpec.end())
+        return TError(EError::InvalidProperty, "invalid property");
+
     value = Spec.Get(property);
+    PropertyToAlias(origProperty, value);
+
     return TError::Success();
 }
 
@@ -824,14 +867,24 @@ bool TContainer::ShouldApplyProperty(const std::string &property) {
     return true;
 }
 
-TError TContainer::SetProperty(const string &property, const string &value) {
+TError TContainer::SetProperty(const string &origProperty, const string &origValue) {
     if (IsRoot())
         return TError(EError::InvalidValue, "Can't set property for root");
+
+    string property = origProperty;
+    string value = origValue;
+
+    TError error = AliasToProperty(property, value);
+    if (error)
+        return error;
+
+    if (propertySpec.find(property) == propertySpec.end())
+        return TError(EError::InvalidProperty, "invalid property");
 
     if (State != EContainerState::Stopped && !Spec.IsDynamic(property))
         return TError(EError::InvalidValue, "Can't set dynamic property " + property + " for running container");
 
-    TError error = Spec.Set(shared_from_this(), property, value);
+    error = Spec.Set(shared_from_this(), property, value);
     if (error)
         return error;
 

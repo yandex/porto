@@ -23,6 +23,8 @@ using std::stringstream;
 using std::ostream_iterator;
 using std::map;
 using std::pair;
+using std::set;
+using std::shared_ptr;
 
 static string DataValue(const string &name, const string &val) {
     if (name == "exit_status") {
@@ -383,6 +385,36 @@ public:
         return fd;
     }
 
+    TError GetCgMount(const string &subsys, string &root) {
+        vector<string> subsystems;
+        TError error = SplitString(subsys, ',', subsystems);
+        if (error)
+            return error;
+
+        TMountSnapshot ms;
+        set<shared_ptr<TMount>> mounts;
+        error = ms.Mounts(mounts);
+        if (error)
+            return error;
+
+        for (auto &mount : mounts) {
+            set<string> flags = mount->GetFlags();
+            bool found = true;
+            for (auto &ss : subsystems)
+                if (flags.find(ss) == flags.end()) {
+                    found = false;
+                    break;
+                }
+
+            if (found) {
+                root = mount->GetMountpoint();
+                return TError::Success();
+            }
+        }
+
+        return TError(EError::Unknown, "Can't find root for " + subsys);
+    }
+
     int Execute(int argc, char *argv[]) {
         string cmd = "";
         int start = 1;
@@ -440,8 +472,15 @@ public:
             }
 
             for (auto &cg : cgmap) {
-                TFile f(SYSFS_CGROOT + "/" + cg.first + cg.second + "/cgroup.procs");
-                TError error = f.AppendString(std::to_string(GetPid()));
+                string root;
+                TError error = GetCgMount(cg.first, root);
+                if (error) {
+                    PrintError(error, "Can't get task cgroups");
+                    return EXIT_FAILURE;
+                }
+
+                TFile f(root + cg.second + "/cgroup.procs");
+                error = f.AppendString(std::to_string(GetPid()));
                 if (error) {
                     PrintError(error, "Can't get task cgroups");
                     return EXIT_FAILURE;

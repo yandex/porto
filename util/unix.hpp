@@ -22,6 +22,7 @@ int CreatePidFile(const std::string &path, const int mode);
 void RemovePidFile(const std::string &path);
 void SetProcessName(const std::string &name);
 TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap);
+int BlockAllSignals();
 
 class TScopedFd {
     int Fd;
