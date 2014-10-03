@@ -15,6 +15,13 @@ extern "C" {
 
 using std::string;
 
+static TError ValidBool(std::shared_ptr<const TContainer> container, const string str) {
+    if (str != "true" && str != "false")
+        return TError(EError::InvalidValue, "invalid boolean value");
+
+    return TError::Success();
+}
+
 static TError ValidUser(std::shared_ptr<const TContainer> container, const string user) {
     if (getpwnam(user.c_str()) == NULL)
         return TError(EError::InvalidValue, "invalid value");
@@ -47,6 +54,14 @@ static TError ValidMemGuarantee(std::shared_ptr<const TContainer> container, con
         return TError(EError::ResourceNotAvailable, "can't guarantee all available memory");
 
     return TError::Success();
+}
+
+static TError ValidRecharge(std::shared_ptr<const TContainer> container, const string str) {
+    auto memroot = memorySubsystem->GetRootCgroup();
+    if (!memroot->HasKnob("memory.recharge_on_pgfault"))
+        return TError(EError::NotSupported, "invalid kernel");
+
+    return ValidBool(container, str);
 }
 
 static TError ValidMemLimit(std::shared_ptr<const TContainer> container, const string str) {
@@ -119,13 +134,6 @@ static TError ValidNetPriority(std::shared_ptr<const TContainer> container, cons
     return TError::Success();
 }
 
-static TError ValidBool(std::shared_ptr<const TContainer> container, const string str) {
-    if (str != "true" && str != "false")
-        return TError(EError::InvalidValue, "invalid boolean value");
-
-    return TError::Success();
-}
-
 std::map<std::string, const TPropertySpec> propertySpec = {
     {"command", { "Command executed upon container start", "" }},
     {"user", { "Start command with given user", GetDefaultUser(), 0, ValidUser }},
@@ -135,7 +143,8 @@ std::map<std::string, const TPropertySpec> propertySpec = {
     {"cwd", { "Container working directory", "" }},
 
     {"memory_guarantee", { "Guaranteed amount of memory", "0", DYNAMIC_PROPERTY, ValidMemGuarantee }},
-    {"memory_limit", { "Memory hard limit", "0", true, ValidMemLimit }},
+    {"memory_limit", { "Memory hard limit", "0", DYNAMIC_PROPERTY, ValidMemLimit }},
+    {"recharge_on_pgfault", { "Recharge memory on page fault", "false", DYNAMIC_PROPERTY, ValidRecharge }},
 
     {"cpu_policy", { "CPU policy: rt, normal, idle", "normal", 0, ValidCpuPolicy }},
     {"cpu_priority", { "CPU priority: 0-99", std::to_string(DEF_CLASS_PRIO), DYNAMIC_PROPERTY, ValidCpuPriority }},
@@ -146,11 +155,6 @@ std::map<std::string, const TPropertySpec> propertySpec = {
 
     {"respawn", { "Automatically respawn dead container", "false", 0, ValidBool }},
     {"isolate", { "Isolate container from others", "true", 0, ValidBool }},
-
-    {"cpu.smart", { "Raw cgroup knob", "0", HIDDEN_PROPERTY }},
-    {"memory.limit_in_bytes", { "Raw cgroup knob", "0", HIDDEN_PROPERTY }},
-    {"memory.low_limit_in_bytes", { "Raw cgroup knob", "0", HIDDEN_PROPERTY }},
-    {"memory.recharge_on_pgfault", { "Raw cgroup knob", "0", HIDDEN_PROPERTY }},
 };
 
 const string &TContainerSpec::Get(const string &property) const {

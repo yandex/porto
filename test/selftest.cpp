@@ -858,6 +858,7 @@ static void TestRoot(TPortoAPI &api) {
         "cwd",
         "memory_guarantee",
         "memory_limit",
+        "recharge_on_pgfault",
         "cpu_policy",
         "cpu_priority",
         "net_guarantee",
@@ -1108,62 +1109,101 @@ static void TestLimits(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
-static void TestRawLimits(TPortoAPI &api) {
+static void TestAlias(TPortoAPI &api) {
     string name = "a";
     ExpectSuccess(api.Create(name));
 
+    if (!HaveCgKnob("memory", "memory.low_limit_in_bytes"))
+        return;
+    if (!HaveCgKnob("memory", "memory.recharge_on_pgfault"))
+        return;
+    if (!HaveCgKnob("cpu", "cpu.smart"))
+        return;
+
     Say() << "Check default limits" << std::endl;
     string current;
+    string alias, real;
 
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.GetProperty(name, "memory.limit_in_bytes", alias));
+    ExpectSuccess(api.GetProperty(name, "memory_limit", real));
+    Expect(alias == real);
+    ExpectSuccess(api.GetProperty(name, "memory.low_limit_in_bytes", alias));
+    ExpectSuccess(api.GetProperty(name, "memory_guarantee", real));
+    Expect(alias == real);
+    ExpectSuccess(api.GetProperty(name, "memory.recharge_on_pgfault", alias));
+    ExpectSuccess(api.GetProperty(name, "recharge_on_pgfault", real));
+    Expect(alias == "0");
+    Expect(real == "false");
+    ExpectSuccess(api.GetProperty(name, "cpu.smart", alias));
+    ExpectSuccess(api.GetProperty(name, "cpu_policy", real));
+    Expect(alias == "0");
+    Expect(real == "normal");
     ExpectSuccess(api.Start(name));
 
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
     Expect(current == std::to_string(LLONG_MAX) || current == std::to_string(ULLONG_MAX));
 
-    if (HaveCgKnob("memory", "memory.low_limit_in_bytes")) {
-        current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
-        Expect(current == "0");
-    }
+    current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
+    Expect(current == "0");
 
-    if (HaveCgKnob("memory", "memory.recharge_on_pgfault")) {
-        current = GetCgKnob("memory", name, "memory.recharge_on_pgfault");
-        Expect(current == "0");
-    }
+    current = GetCgKnob("memory", name, "memory.recharge_on_pgfault");
+    Expect(current == "0");
 
-    if (HaveCgKnob("cpu", "cpu.smart")) {
-        current = GetCgKnob("cpu", name, "cpu.smart");
-        Expect(current == "0");
-    }
+    current = GetCgKnob("cpu", name, "cpu.smart");
+    Expect(current == "0");
     ExpectSuccess(api.Stop(name));
 
     Say() << "Check custom limits" << std::endl;
     string exp_limit = "524288";
     string exp_guar = "16384";
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+
+    ExpectSuccess(api.SetProperty(name, "memory.limit_in_bytes", "1"));
+    ExpectSuccess(api.GetProperty(name, "memory.limit_in_bytes", alias));
+    Expect(alias == "1");
+    ExpectSuccess(api.SetProperty(name, "memory.limit_in_bytes", "1k"));
+    ExpectSuccess(api.GetProperty(name, "memory.limit_in_bytes", alias));
+    Expect(alias == "1024");
+    ExpectSuccess(api.SetProperty(name, "memory.limit_in_bytes", "12m"));
+    ExpectSuccess(api.GetProperty(name, "memory.limit_in_bytes", alias));
+    Expect(alias == "12582912");
+    ExpectSuccess(api.SetProperty(name, "memory.limit_in_bytes", "123g"));
+    ExpectSuccess(api.GetProperty(name, "memory.limit_in_bytes", alias));
+    Expect(alias == "132070244352");
+
     ExpectSuccess(api.SetProperty(name, "memory.limit_in_bytes", exp_limit));
-    if (HaveCgKnob("memory", "memory.low_limit_in_bytes"))
-        ExpectSuccess(api.SetProperty(name, "memory.low_limit_in_bytes", exp_guar));
-    if (HaveCgKnob("memory", "memory.recharge_on_pgfault"))
-        ExpectSuccess(api.SetProperty(name, "memory.recharge_on_pgfault", "1"));
-    if (HaveCgKnob("cpu", "cpu.smart"))
-        ExpectSuccess(api.SetProperty(name, "cpu.smart", "1"));
+    ExpectSuccess(api.SetProperty(name, "memory.low_limit_in_bytes", exp_guar));
+    ExpectSuccess(api.SetProperty(name, "memory.recharge_on_pgfault", "1"));
+    ExpectSuccess(api.SetProperty(name, "cpu.smart", "1"));
+
+    ExpectSuccess(api.GetProperty(name, "memory.limit_in_bytes", alias));
+    ExpectSuccess(api.GetProperty(name, "memory_limit", real));
+    Expect(alias == real);
+    ExpectSuccess(api.GetProperty(name, "memory.low_limit_in_bytes", alias));
+    ExpectSuccess(api.GetProperty(name, "memory_guarantee", real));
+    Expect(alias == real);
+    ExpectSuccess(api.GetProperty(name, "memory.recharge_on_pgfault", alias));
+    ExpectSuccess(api.GetProperty(name, "recharge_on_pgfault", real));
+    Expect(alias == "1");
+    Expect(real == "true");
+    ExpectSuccess(api.GetProperty(name, "cpu.smart", alias));
+    ExpectSuccess(api.GetProperty(name, "cpu_policy", real));
+    Expect(alias == "1");
+    Expect(real == "rt");
+
     ExpectSuccess(api.Start(name));
 
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
     Expect(current == exp_limit);
-    if (HaveCgKnob("memory", "memory.low_limit_in_bytes")) {
-        current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
-        Expect(current == exp_guar);
-    }
-    if (HaveCgKnob("memory", "memory.recharge_on_pgfault")) {
-        current = GetCgKnob("memory", name, "memory.recharge_on_pgfault");
-        Expect(current == "1");
-    }
-    if (HaveCgKnob("cpu", "cpu.smart")) {
-        current = GetCgKnob("cpu", name, "cpu.smart");
-        Expect(current == "1");
-    }
+    current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
+    Expect(current == exp_guar);
+
+    current = GetCgKnob("memory", name, "memory.recharge_on_pgfault");
+    Expect(current == "1");
+
+    current = GetCgKnob("cpu", name, "cpu.smart");
+    Expect(current == "1");
     ExpectSuccess(api.Stop(name));
     ExpectSuccess(api.Destroy(name));
 }
@@ -1481,7 +1521,7 @@ int SelfTest(string name, int leakNr) {
         { "cwd", TestCwd },
         //{ "root", TestRootProperty },
         { "limits", TestLimits },
-        { "raw", TestRawLimits },
+        { "alias", TestAlias },
         { "dynamic", TestDynamic },
         { "permissions", TestPermissions },
         { "respawn", TestRespawn },

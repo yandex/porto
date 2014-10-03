@@ -70,6 +70,32 @@ TError StringToInt(const std::string &str, int &value) {
     return TError::Success();
 }
 
+TError StringWithUnitToUint64(const std::string &str, uint64_t &value) {
+    try {
+        size_t pos = 0;
+        value = stoull(str, &pos);
+        if (pos > 0 && pos < str.length()) {
+            switch (str[pos]) {
+            case 'G':
+            case 'g':
+                value <<= 10;
+            case 'M':
+            case 'm':
+                value <<= 10;
+            case 'K':
+            case 'k':
+                value <<= 10;
+            default:
+                break;
+            }
+        }
+    } catch (...) {
+        return TError(EError::Unknown, string(__func__) + ": Bad integer value");
+    }
+
+    return TError::Success();
+}
+
 TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens) {
     try {
         istringstream ss(s);
