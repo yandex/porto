@@ -58,7 +58,10 @@ static void* WatchdogCheck(void *arg)
     unsigned long prevValue = 0;
     unsigned long fails = 0;
 
-    prctl(PR_SET_NAME, "watchdog");
+    prctl(PR_SET_NAME, "portod-watchdog");
+
+    if (BlockAllSignals())
+        TLogger::Log() << "Error: can't block all signals" << std::endl;
 
     while (1) {
         if (watchdogCounter > prevValue)
