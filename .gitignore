@@ -1,6 +1,7 @@
 /portod
 /portoctl
 /portotest
+/api/cpp/libporto.a
 /*.o
 /*.pb.cc
 /*.pb.h
@@ -20,4 +21,4 @@
 /debian/yandex-porto.substvars
 /debian/yandex-porto/
 /TAGS
-/python/porto/rpc_pb2.py*
+/api/python/porto/rpc_pb2.py*
