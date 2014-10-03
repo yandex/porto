@@ -5,18 +5,16 @@
 
 #include "config.pb.h"
 
-/*
-/etc/portod.conf
-/etc/default/portod.conf
-*/
-
 class TConfig {
     cfg::TCfg Cfg;
+
+    const std::vector<std::string> ConfigFiles = { "/etc/portod.conf", "/etc/default/portod.conf" };
 
     void LoadDefaults();
     bool LoadFile(const std::string &path, bool silent);
 public:
     void Load(bool silent = false);
+    int Test(const std::string &path);
     cfg::TCfg &operator()();
 };
 

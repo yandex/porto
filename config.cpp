@@ -6,6 +6,7 @@
 
 extern "C" {
 #include <fcntl.h>
+#include <unistd.h>
 }
 
 using std::string;
@@ -28,13 +29,13 @@ void TConfig::LoadDefaults() {
     config().mutable_master_log()->set_perm(0644);
 
     config().mutable_rpc_sock()->mutable_file()->set_path("/run/portod.socket");
-    config().mutable_rpc_sock()->mutable_file()->set_perm(0644);
+    config().mutable_rpc_sock()->mutable_file()->set_perm(0660);
     config().mutable_rpc_sock()->set_group("porto");
 
     config().mutable_log()->set_verbose(false);
 
     config().mutable_keyval()->mutable_file()->set_path("/run/porto/kvs");
-    config().mutable_keyval()->mutable_file()->set_perm(0644);
+    config().mutable_keyval()->mutable_file()->set_perm(0640);
     config().mutable_keyval()->set_size("size=32m");
 
     config().mutable_daemon()->set_max_clients(16);
@@ -77,13 +78,33 @@ bool TConfig::LoadFile(const std::string &path, bool silent) {
 void TConfig::Load(bool silent) {
     LoadDefaults();
 
-    if (LoadFile("/etc/portod.conf", silent))
-        return;
-    if (LoadFile("/etc/default/portod.conf", silent))
-        return;
+    for (auto &path : ConfigFiles)
+        if (LoadFile(path, silent))
+            return;
 
     if (!silent)
         std::cerr << "Using default config" << std::endl;
+}
+
+int TConfig::Test(const std::string &path) {
+    if (access(path.c_str(), F_OK)) {
+        std::cerr << "Config " << path << " doesn't exist" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    TScopedFd fd = open(path.c_str(), O_RDONLY);
+    if (fd.GetFd() < 0) {
+        std::cerr << "Can't open " << path << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    google::protobuf::io::FileInputStream pist(fd.GetFd());
+
+    cfg::TCfg cfg;
+    if (!google::protobuf::TextFormat::Merge(&pist, &cfg))
+        return EXIT_FAILURE;
+
+    return EXIT_SUCCESS;
 }
 
 cfg::TCfg &TConfig::operator()() {

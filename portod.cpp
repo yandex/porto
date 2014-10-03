@@ -764,6 +764,10 @@ int main(int argc, char * const argv[]) {
             failsafe = true;
         } else if (arg == "--nowatch") {
             noWatchdog = true;
+        } else if (arg == "-t") {
+            if (argn + 1 >= argc)
+                return EXIT_FAILURE;
+            return config.Test(argv[argn + 1]);
         }
     }
 

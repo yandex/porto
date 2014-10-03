@@ -1,9 +1,12 @@
+- debian: add group porto to loadbase
+- debian: chown root:porto /usr/sbin/portoexec
 - full dump on sigsegv
 - ? autodestroy property
 - ? portoctl run -f <MANIFEST> | <MANIFEST STRING>
 - ? cpu_cores property to reserve some cores for a container
 - ? portoctl top - sort containers by used resources
 - ? some kind of io usage data (iops/bytes)
+- block all signals in watchdog thread
 
 # nekt0n
 - add namespaces
@@ -41,8 +44,3 @@
 - remove extern AckExitStatus from container->Stop()
 - rotate subprocess stdout/stderr
 - move all 'extern "C"' into one file
-
-# debug
-- porto debug
-- porto debug set container_kill_timeout 100000
-- ? porto config
