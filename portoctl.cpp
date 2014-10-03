@@ -26,42 +26,6 @@ using std::pair;
 using std::set;
 using std::shared_ptr;
 
-static string DataValue(const string &name, const string &val) {
-    if (name == "exit_status") {
-        int status;
-        if (StringToInt(val, status))
-            return val;
-
-        string ret;
-
-        if (WIFEXITED(status))
-            ret = "Container exited with " + std::to_string(WEXITSTATUS(status));
-        else if (WIFSIGNALED(status))
-            ret = "Container killed by signal " + std::to_string(WTERMSIG(status));
-        else if (status == 0)
-            ret = "Success";
-
-        return ret;
-    } else if (name == "errno") {
-        int status;
-        if (StringToInt(val, status))
-            return val;
-
-        string ret;
-
-        if (status < 0)
-            ret = "Prepare failed: " + string(strerror(-status));
-        else if (status > 0)
-            ret = "Exec failed: " + string(strerror(status));
-        else if (status == 0)
-            ret = "Success";
-
-        return ret + " (" + val + ")";
-    } else {
-        return val;
-    }
-}
-
 class TRawCmd : public ICmd {
 public:
     TRawCmd() : ICmd("raw", 2, "<message>", "send raw protobuf message") {}
@@ -290,6 +254,102 @@ public:
             != dlist.end();
     }
 
+    string HumanTime(const string &val) {
+        double n = stod(val);
+        string suf = "ns";
+        if (n > 1024) {
+            n /= 1024;
+            suf = "us";
+        }
+        if (n > 1024) {
+            n /= 1024;
+            suf = "ms";
+        }
+        if (n > 1024) {
+            n /= 1024;
+            suf = "s";
+        }
+
+        std::stringstream str;
+        str << n << suf;
+        return str.str();
+    }
+
+    string HumanSize(const string &val) {
+        double n = stod(val);
+        string suf = "";
+        if (n > 1024) {
+            n /= 1024;
+            suf = "K";
+        }
+        if (n > 1024) {
+            n /= 1024;
+            suf = "M";
+        }
+        if (n > 1024) {
+            n /= 1024;
+            suf = "G";
+        }
+
+        std::stringstream str;
+        str << n << suf;
+        return str.str();
+    }
+
+    string PropertyValue(const string &name, const string &val) {
+        if (name == "memory_guarantee" ||
+            name == "memory_limit" ||
+            name == "net_ceil" ||
+            name == "net_guarantee") {
+            return HumanSize(val);
+        } else {
+            return val;
+        }
+    }
+
+    string DataValue(const string &name, const string &val) {
+        if (name == "exit_status") {
+            int status;
+            if (StringToInt(val, status))
+                return val;
+
+            string ret;
+
+            if (WIFEXITED(status))
+                ret = "Container exited with " + std::to_string(WEXITSTATUS(status));
+            else if (WIFSIGNALED(status))
+                ret = "Container killed by signal " + std::to_string(WTERMSIG(status));
+            else if (status == 0)
+                ret = "Success";
+
+            return ret;
+        } else if (name == "errno") {
+            int status;
+            if (StringToInt(val, status))
+                return val;
+
+            string ret;
+
+            if (status < 0)
+                ret = "Prepare failed: " + string(strerror(-status));
+            else if (status > 0)
+                ret = "Exec failed: " + string(strerror(status));
+            else if (status == 0)
+                ret = "Success";
+
+            return ret + " (" + val + ")";
+        } else if (name == "memory_usage" ||
+                   name == "net_drops" ||
+                   name == "net_overlimits" ||
+                   name == "net_packets" ||
+                   name == "net_bytes") {
+            return HumanSize(val);
+        } else if (name == "cpu_usage") {
+            return HumanTime(val);
+        } else {
+            return val;
+        }
+    }
 
     int Execute(int argc, char *argv[]) {
         string value;
@@ -318,7 +378,7 @@ public:
 
                 ret = Api.GetProperty(argv[0], p.Name, value);
                 if (!ret) {
-                    std::cout << p.Name << " = " << value << std::endl;
+                    std::cout << p.Name << " = " << PropertyValue(p.Name, value) << std::endl;
                     printed++;
                 }
             }
@@ -354,7 +414,7 @@ public:
         if (validProperty) {
             ret = Api.GetProperty(argv[0], argv[1], value);
             if (!ret)
-                std::cout << value << std::endl;
+                std::cout << PropertyValue(argv[1], value) << std::endl;
             else if (ret != EError::InvalidProperty)
                 PrintError("Can't get data");
         }
