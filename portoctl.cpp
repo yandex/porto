@@ -624,8 +624,7 @@ public:
                 ret = Api.GetData(c, "state", s);
                 if (ret)
                     PrintError("Can't get container state");
-                std::cout << std::left << std::setw(40) << c
-                    << std::setw(40) << s << std::endl;
+                std::cout << std::left << std::setw(70) << c << s << std::endl;
             }
 
         return ret;

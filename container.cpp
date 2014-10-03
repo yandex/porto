@@ -1158,7 +1158,7 @@ bool TContainerHolder::ValidName(const string &name) const {
     // . (dot) is used for kvstorage, so don't allow it here
     return find_if(name.begin(), name.end(),
                    [](const char c) -> bool {
-                        return !(isalnum(c) || c == '_' || c == '/');
+                        return !(isalnum(c) || c == '_' || c == '/' || c == '-');
                    }) == name.end();
 }
 
