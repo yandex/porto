@@ -35,7 +35,7 @@ add_custom_command(OUTPUT tags COMMAND ctags -R --c++-kinds=+p --fields=+iaS --e
 set_source_files_properties(TAGS PROPERTIES GENERATED true)
 add_custom_command(OUTPUT TAGS COMMAND ctags -R -e --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
-link_directories(${yandex-porto_BINARY_DIR}/api/cpp)
+link_directories(${yandex-porto_BINARY_DIR})
 include_directories(${yandex-porto_BINARY_DIR}/api/cpp)
 add_library(porto api/cpp/libporto.cpp error.cpp util/protobuf.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 

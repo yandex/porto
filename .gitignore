@@ -1,7 +1,7 @@
 /portod
 /portoctl
 /portotest
-/api/cpp/libporto.a
+/libporto.a
 /*.o
 /*.pb.cc
 /*.pb.h
