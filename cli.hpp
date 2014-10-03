@@ -6,12 +6,12 @@
 
 class ICmd {
 protected:
+    TPortoAPI *Api;
     std::string Name, Usage, Desc;
     int NeedArgs;
-    TPortoAPI Api;
 
 public:
-    ICmd(const std::string& name, int args, const std::string& usage, const std::string& desc);
+    ICmd(TPortoAPI *api, const std::string& name, int args, const std::string& usage, const std::string& desc);
     std::string &GetName();
     std::string &GetUsage();
     std::string &GetDescription();
@@ -26,7 +26,7 @@ public:
 class THelpCmd : public ICmd {
     bool UsagePrintData;
 public:
-    THelpCmd(bool usagePrintData);
+    THelpCmd(TPortoAPI *api, bool usagePrintData);
 
     void Usage();
     int Execute(int argc, char *argv[]);

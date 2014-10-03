@@ -1538,7 +1538,8 @@ int SelfTest(string name, int leakNr) {
     int respawns = 0;
     int errors = 0;
     try {
-        TPortoAPI api;
+        config.Load();
+        TPortoAPI api(config().rpc_sock().file().path());
 
         RestartDaemon(api);
 

@@ -8,8 +8,8 @@ using std::string;
 using std::map;
 using std::vector;
 
-ICmd::ICmd(const string& name, int args, const string& usage, const string& desc) :
-    Name(name), Usage(usage), Desc(desc), NeedArgs(args) {}
+ICmd::ICmd(TPortoAPI *api, const string& name, int args, const string& usage, const string& desc) :
+    Api(api), Name(name), Usage(usage), Desc(desc), NeedArgs(args) {}
 
     string& ICmd::GetName() { return Name; }
     string& ICmd::GetUsage() { return Usage; }
@@ -35,7 +35,7 @@ void ICmd::PrintError(const string &str) {
     int num;
     string msg;
 
-    Api.GetLastError(num, msg);
+    Api->GetLastError(num, msg);
 
     TError error((EError)num, msg);
     PrintError(error, str);
@@ -56,7 +56,7 @@ bool ICmd::ValidArgs(int argc, char *argv[]) {
 
 static map<string, ICmd *> commands;
 
-THelpCmd::THelpCmd(bool usagePrintData) : ICmd("help", 1, "[command]", "print help message for command"), UsagePrintData(usagePrintData) {}
+THelpCmd::THelpCmd(TPortoAPI *api, bool usagePrintData) : ICmd(api, "help", 1, "[command]", "print help message for command"), UsagePrintData(usagePrintData) {}
 
 void THelpCmd::Usage() {
     const int nameWidth = 32;
@@ -70,7 +70,7 @@ void THelpCmd::Usage() {
     int ret;
     std::cout << std::endl << "Property list:" << std::endl;
     vector<TProperty> plist;
-    ret = Api.Plist(plist);
+    ret = Api->Plist(plist);
     if (ret) {
         PrintError("Unavailable");
     } else
@@ -83,7 +83,7 @@ void THelpCmd::Usage() {
 
     std::cout << std::endl << "Data list:" << std::endl;
     vector<TData> dlist;
-    ret = Api.Dlist(dlist);
+    ret = Api->Dlist(dlist);
     if (ret)
         PrintError("Unavailable");
     else
@@ -158,6 +158,8 @@ int HandleCommand(int argc, char *argv[]) {
 
     // in case client closes pipe we are writing to in the protobuf code
     (void)RegisterSignal(SIGPIPE, SIG_IGN);
+
+    config.Load();
 
     try {
         // porto <command> <arg2> <arg2>

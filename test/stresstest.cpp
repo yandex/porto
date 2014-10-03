@@ -58,8 +58,7 @@ static std::vector<std::map<std::string, std::string>> vtasks =
     }
 };
 
-static void Create(const std::string &name, const std::string &cwd) {
-    TPortoAPI api(retries);
+static void Create(TPortoAPI &api, const std::string &name, const std::string &cwd) {
     std::vector<std::string> containers;
 
     Say() << "Create container: " << name << std::endl;
@@ -80,8 +79,7 @@ static void Create(const std::string &name, const std::string &cwd) {
     }
 }
 
-static void SetProperty(std::string name, std::string type, std::string value) {
-    TPortoAPI api(retries);
+static void SetProperty(TPortoAPI &api, std::string name, std::string type, std::string value) {
     std::string res_value;
 
     Say() << "SetProperty container: " << name << std::endl;
@@ -91,8 +89,7 @@ static void SetProperty(std::string name, std::string type, std::string value) {
     Expect(res_value == value);
 }
 
-static void Start(std::string name) {
-    TPortoAPI api(retries);
+static void Start(TPortoAPI &api, std::string name) {
     std::string pid;
     std::string ret;
 
@@ -103,8 +100,7 @@ static void Start(std::string name) {
     Expect(ret == "dead" || ret == "running");
 }
 
-static void CheckRuning(std::string name, std::string timeout) {
-    TPortoAPI api(retries);
+static void CheckRuning(TPortoAPI &api, std::string name, std::string timeout) {
     std::string pid;
     std::string ret;
     int t;
@@ -123,8 +119,7 @@ static void CheckRuning(std::string name, std::string timeout) {
     throw std::string("Timeout");
 }
 
-static void CheckStdout(std::string name, std::string stream) {
-    TPortoAPI api(retries);
+static void CheckStdout(TPortoAPI &api, std::string name, std::string stream) {
     std::string ret;
 
     Say() << "CheckStdout container: " << name << std::endl;
@@ -133,8 +128,7 @@ static void CheckStdout(std::string name, std::string stream) {
     Expect(ret == stream);
 }
 
-static void CheckStderr(std::string name, std::string stream) {
-    TPortoAPI api(retries);
+static void CheckStderr(TPortoAPI &api, std::string name, std::string stream) {
     std::string ret;
 
     Say() << "CheckStderr container: " << name << std::endl;
@@ -143,16 +137,14 @@ static void CheckStderr(std::string name, std::string stream) {
     Expect(ret == stream);
 }
 
-static void CheckExit(std::string name, std::string stream) {
-    TPortoAPI api(retries);
+static void CheckExit(TPortoAPI &api, std::string name, std::string stream) {
     std::string ret;
     Say() << "CheckExit container: " << name << std::endl;
     api.GetData(name, "exit_status", ret);
     Expect(ret == stream);
 }
 
-static void Destroy(const std::string &name, const std::string &cwd) {
-    TPortoAPI api(retries);
+static void Destroy(TPortoAPI &api, const std::string &name, const std::string &cwd) {
     std::vector<std::string> containers;
 
     Say() << "Destroy container: " << name << std::endl;
@@ -172,21 +164,21 @@ static void Tasks(int n, int iter) {
     Say() << "Run task" << std::to_string(n) << std::endl;
     usleep(10000 * n);
     try {
-        TPortoAPI api(retries);
+        TPortoAPI api(config().rpc_sock().file().path(), retries);
         while (iter--) {
             for (unsigned int t = 0; t < vtasks.size(); t++) {
                 std::string name = "stresstest" + std::to_string(n) + "_" + std::to_string(t);
                 std::string cwd = "/tmp/stresstest/" + name;
-                Create(name, cwd);
-                SetProperty(name, "env", vtasks[t]["env"]);
-                SetProperty(name, "command", vtasks[t]["command"]);
-                SetProperty(name, "cwd", cwd);
-                Start(name);
-                CheckRuning(name, vtasks[t]["timeout"]);
-                CheckExit(name, vtasks[t]["exit_status"]);
-                CheckStdout(name, vtasks[t]["stdout"]);
-                CheckStderr(name, vtasks[t]["stderr"]);
-                Destroy(name, cwd);
+                Create(api, name, cwd);
+                SetProperty(api, name, "env", vtasks[t]["env"]);
+                SetProperty(api, name, "command", vtasks[t]["command"]);
+                SetProperty(api, name, "cwd", cwd);
+                Start(api, name);
+                CheckRuning(api, name, vtasks[t]["timeout"]);
+                CheckExit(api, name, vtasks[t]["exit_status"]);
+                CheckStdout(api, name, vtasks[t]["stdout"]);
+                CheckStderr(api, name, vtasks[t]["stderr"]);
+                Destroy(api, name, cwd);
             }
         }
     } catch (std::string e) {
@@ -199,7 +191,7 @@ static void Tasks(int n, int iter) {
 }
 
 static void StressKill() {
-    TPortoAPI api(retries);
+    TPortoAPI api(config().rpc_sock().file().path(), retries);
     std::cout << "Run kill" << std::endl;
     while (!done) {
         usleep(1000000);
@@ -226,7 +218,8 @@ int StressTest(int threads, int iter, bool killPorto) {
     try {
         (void)signal(SIGPIPE, SIG_IGN);
 
-        TPortoAPI api(retries);
+        config.Load();
+        TPortoAPI api(config().rpc_sock().file().path(), retries);
         RestartDaemon(api);
 
         for (i = 1; i <= threads; i++)

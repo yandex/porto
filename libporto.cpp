@@ -23,8 +23,7 @@ int TPortoAPI::SendReceive(int fd, rpc::TContainerRequest &req, rpc::TContainerR
     }
 }
 
-TPortoAPI::TPortoAPI(int retries) : Fd(-1), Retries(retries) {
-    config.Load(true);
+TPortoAPI::TPortoAPI(const std::string &path, int retries) : Fd(-1), Retries(retries), RpcSocketPath(path) {
 }
 
 TPortoAPI::~TPortoAPI() {
@@ -39,7 +38,7 @@ int TPortoAPI::Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
 
 retry:
     if (Fd < 0) {
-        TError error = ConnectToRpcServer(config().rpc_sock().file().path(), Fd);
+        TError error = ConnectToRpcServer(RpcSocketPath, Fd);
         if (error) {
             LastErrorMsg = error.GetMsg();
             LastError = INT_MIN;

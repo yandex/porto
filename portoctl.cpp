@@ -28,7 +28,7 @@ using std::shared_ptr;
 
 class TRawCmd : public ICmd {
 public:
-    TRawCmd() : ICmd("raw", 2, "<message>", "send raw protobuf message") {}
+    TRawCmd(TPortoAPI *api) : ICmd(api, "raw", 2, "<message>", "send raw protobuf message") {}
 
     int Execute(int argc, char *argv[]) {
         stringstream msg;
@@ -37,7 +37,7 @@ public:
         copy(args.begin(), args.end(), ostream_iterator<string>(msg, " "));
 
         string resp;
-        if (!Api.Raw(msg.str(), resp))
+        if (!Api->Raw(msg.str(), resp))
             std::cout << resp << std::endl;
 
         return 0;
@@ -46,10 +46,10 @@ public:
 
 class TCreateCmd : public ICmd {
 public:
-    TCreateCmd() : ICmd("create", 1, "<name>", "create container") {}
+    TCreateCmd(TPortoAPI *api) : ICmd(api, "create", 1, "<name>", "create container") {}
 
     int Execute(int argc, char *argv[]) {
-        int ret = Api.Create(argv[0]);
+        int ret = Api->Create(argv[0]);
         if (ret)
             PrintError("Can't create container");
 
@@ -59,11 +59,11 @@ public:
 
 class TGetPropertyCmd : public ICmd {
 public:
-    TGetPropertyCmd() : ICmd("pget", 2, "<name> <property>", "get container property") {}
+    TGetPropertyCmd(TPortoAPI *api) : ICmd(api, "pget", 2, "<name> <property>", "get container property") {}
 
     int Execute(int argc, char *argv[]) {
         string value;
-        int ret = Api.GetProperty(argv[0], argv[1], value);
+        int ret = Api->GetProperty(argv[0], argv[1], value);
         if (ret)
             PrintError("Can't get property");
         else
@@ -75,7 +75,7 @@ public:
 
 class TSetPropertyCmd : public ICmd {
 public:
-    TSetPropertyCmd() : ICmd("set", 3, "<name> <property>", "set container property") {}
+    TSetPropertyCmd(TPortoAPI *api) : ICmd(api, "set", 3, "<name> <property>", "set container property") {}
 
     int Execute(int argc, char *argv[]) {
         string val = argv[2];
@@ -84,7 +84,7 @@ public:
             val += argv[i];
         }
 
-        int ret = Api.SetProperty(argv[0], argv[1], val);
+        int ret = Api->SetProperty(argv[0], argv[1], val);
         if (ret)
             PrintError("Can't set property");
 
@@ -94,11 +94,11 @@ public:
 
 class TGetDataCmd : public ICmd {
 public:
-    TGetDataCmd() : ICmd("dget", 2, "<name> <data>", "get container data") {}
+    TGetDataCmd(TPortoAPI *api) : ICmd(api, "dget", 2, "<name> <data>", "get container data") {}
 
     int Execute(int argc, char *argv[]) {
         string value;
-        int ret = Api.GetData(argv[0], argv[1], value);
+        int ret = Api->GetData(argv[0], argv[1], value);
         if (ret)
             PrintError("Can't get data");
         else
@@ -110,10 +110,10 @@ public:
 
 class TStartCmd : public ICmd {
 public:
-    TStartCmd() : ICmd("start", 1, "<name>", "start container") {}
+    TStartCmd(TPortoAPI *api) : ICmd(api, "start", 1, "<name>", "start container") {}
 
     int Execute(int argc, char *argv[]) {
-        int ret = Api.Start(argv[0]);
+        int ret = Api->Start(argv[0]);
         if (ret)
             PrintError("Can't start container");
 
@@ -173,7 +173,7 @@ static const map<string, int> sigMap = {
 
 class TKillCmd : public ICmd {
 public:
-    TKillCmd() : ICmd("kill", 1, "<name> [signal]", "send signal to container") {}
+    TKillCmd(TPortoAPI *api) : ICmd(api, "kill", 1, "<name> [signal]", "send signal to container") {}
 
     int Execute(int argc, char *argv[]) {
         int sig = SIGTERM;
@@ -191,7 +191,7 @@ public:
             }
         }
 
-        int ret = Api.Kill(argv[0], sig);
+        int ret = Api->Kill(argv[0], sig);
         if (ret)
             PrintError("Can't send signal to container");
 
@@ -201,10 +201,10 @@ public:
 
 class TStopCmd : public ICmd {
 public:
-    TStopCmd() : ICmd("stop", 1, "<name>", "stop container") {}
+    TStopCmd(TPortoAPI *api) : ICmd(api, "stop", 1, "<name>", "stop container") {}
 
     int Execute(int argc, char *argv[]) {
-        int ret = Api.Stop(argv[0]);
+        int ret = Api->Stop(argv[0]);
         if (ret)
             PrintError("Can't stop container");
 
@@ -214,10 +214,10 @@ public:
 
 class TPauseCmd : public ICmd {
 public:
-    TPauseCmd() : ICmd("pause", 1, "<name>", "pause container") {}
+    TPauseCmd(TPortoAPI *api) : ICmd(api, "pause", 1, "<name>", "pause container") {}
 
     int Execute(int argc, char *argv[]) {
-        int ret = Api.Pause(argv[0]);
+        int ret = Api->Pause(argv[0]);
         if (ret)
             PrintError("Can't pause container");
 
@@ -227,10 +227,10 @@ public:
 
 class TResumeCmd : public ICmd {
 public:
-    TResumeCmd() : ICmd("resume", 1, "<name>", "resume container") {}
+    TResumeCmd(TPortoAPI *api) : ICmd(api, "resume", 1, "<name>", "resume container") {}
 
     int Execute(int argc, char *argv[]) {
-        int ret = Api.Resume(argv[0]);
+        int ret = Api->Resume(argv[0]);
         if (ret)
             PrintError("Can't resume container");
 
@@ -240,7 +240,7 @@ public:
 
 class TGetCmd : public ICmd {
 public:
-    TGetCmd() : ICmd("get", 1, "<name> [data]", "get container property or data") {}
+    TGetCmd(TPortoAPI *api) : ICmd(api, "get", 1, "<name> [data]", "get container property or data") {}
 
     bool ValidProperty(const vector<TProperty> &plist, const string &name) {
         return find_if(plist.begin(), plist.end(),
@@ -356,14 +356,14 @@ public:
         int ret;
 
         vector<TProperty> plist;
-        ret = Api.Plist(plist);
+        ret = Api->Plist(plist);
         if (ret) {
             PrintError("Can't list properties");
             return 1;
         }
 
         vector<TData> dlist;
-        ret = Api.Dlist(dlist);
+        ret = Api->Dlist(dlist);
         if (ret) {
             PrintError("Can't list data");
             return 1;
@@ -376,7 +376,7 @@ public:
                 if (!ValidProperty(plist, p.Name))
                     continue;
 
-                ret = Api.GetProperty(argv[0], p.Name, value);
+                ret = Api->GetProperty(argv[0], p.Name, value);
                 if (!ret) {
                     std::cout << p.Name << " = " << PropertyValue(p.Name, value) << std::endl;
                     printed++;
@@ -387,7 +387,7 @@ public:
                 if (!ValidData(dlist, d.Name))
                     continue;
 
-                ret = Api.GetData(argv[0], d.Name, value);
+                ret = Api->GetData(argv[0], d.Name, value);
                 if (!ret) {
                     std::cout << d.Name << " = " << DataValue(d.Name, value) << std::endl;
                     printed++;
@@ -404,7 +404,7 @@ public:
         bool validData = ValidData(dlist, argv[1]);
 
         if (validData) {
-            ret = Api.GetData(argv[0], argv[1], value);
+            ret = Api->GetData(argv[0], argv[1], value);
             if (!ret)
                 std::cout << DataValue(argv[1], value) << std::endl;
             else if (ret != EError::InvalidData)
@@ -412,7 +412,7 @@ public:
         }
 
         if (validProperty) {
-            ret = Api.GetProperty(argv[0], argv[1], value);
+            ret = Api->GetProperty(argv[0], argv[1], value);
             if (!ret)
                 std::cout << PropertyValue(argv[1], value) << std::endl;
             else if (ret != EError::InvalidProperty)
@@ -428,7 +428,7 @@ public:
 
 class TEnterCmd : public ICmd {
 public:
-    TEnterCmd() : ICmd("enter", 1, "<name> [-C] [command]", "execute command in container namespace") {}
+    TEnterCmd(TPortoAPI *api) : ICmd(api, "enter", 1, "<name> [-C] [command]", "execute command in container namespace") {}
 
     void PrintErrno(const string &str) {
         std::cerr << str << ": " << strerror(errno) << std::endl;
@@ -506,7 +506,7 @@ public:
         };
 
         string pidStr;
-        int ret = Api.GetData(argv[0], "root_pid", pidStr);
+        int ret = Api->GetData(argv[0], "root_pid", pidStr);
         if (ret) {
             PrintError("Can't get container root_pid");
             return EXIT_FAILURE;
@@ -600,7 +600,7 @@ public:
 
 class TRunCmd : public ICmd {
 public:
-    TRunCmd() : ICmd("run", 2, "<container> [properties]", "create and start container with given properties") {}
+    TRunCmd(TPortoAPI *api) : ICmd(api, "run", 2, "<container> [properties]", "create and start container with given properties") {}
 
     int Parser(string property, map<string, string> &properties) {
         string propertyKey, propertyValue;
@@ -633,23 +633,23 @@ public:
                 return ret;
         }
 
-        ret = Api.Create(containerName);
+        ret = Api->Create(containerName);
         if (ret) {
             PrintError("Can't create container");
             return EXIT_FAILURE;
         }
         for (auto iter: properties) {
-            ret = Api.SetProperty(containerName, iter.first, iter.second);
+            ret = Api->SetProperty(containerName, iter.first, iter.second);
             if (ret) {
                 PrintError("Can't set property");
-                (void)Api.Destroy(containerName);
+                (void)Api->Destroy(containerName);
                 return EXIT_FAILURE;
             }
         }
-        ret = Api.Start(containerName);
+        ret = Api->Start(containerName);
         if (ret) {
             PrintError("Can't start property");
-            (void)Api.Destroy(containerName);
+            (void)Api->Destroy(containerName);
             return EXIT_FAILURE;
         }
         return EXIT_SUCCESS;
@@ -658,10 +658,10 @@ public:
 
 class TDestroyCmd : public ICmd {
 public:
-    TDestroyCmd() : ICmd("destroy", 1, "<name>", "destroy container") {}
+    TDestroyCmd(TPortoAPI *api) : ICmd(api, "destroy", 1, "<name>", "destroy container") {}
 
     int Execute(int argc, char *argv[]) {
-        int ret = Api.Destroy(argv[0]);
+        int ret = Api->Destroy(argv[0]);
         if (ret)
             PrintError("Can't destroy container");
 
@@ -671,17 +671,17 @@ public:
 
 class TListCmd : public ICmd {
 public:
-    TListCmd() : ICmd("list", 0, "", "list created containers") {}
+    TListCmd(TPortoAPI *api) : ICmd(api, "list", 0, "", "list created containers") {}
 
     int Execute(int argc, char *argv[]) {
         vector<string> clist;
-        int ret = Api.List(clist);
+        int ret = Api->List(clist);
         if (ret)
             PrintError("Can't list containers");
         else
             for (auto c : clist) {
                 string s;
-                ret = Api.GetData(c, "state", s);
+                ret = Api->GetData(c, "state", s);
                 if (ret)
                     PrintError("Can't get container state");
                 std::cout << std::left << std::setw(70) << c << s << std::endl;
@@ -692,22 +692,25 @@ public:
 };
 
 int main(int argc, char *argv[]) {
-    RegisterCommand(new THelpCmd(true));
-    RegisterCommand(new TCreateCmd());
-    RegisterCommand(new TDestroyCmd());
-    RegisterCommand(new TListCmd());
-    RegisterCommand(new TStartCmd());
-    RegisterCommand(new TStopCmd());
-    RegisterCommand(new TKillCmd());
-    RegisterCommand(new TPauseCmd());
-    RegisterCommand(new TResumeCmd());
-    RegisterCommand(new TGetPropertyCmd());
-    RegisterCommand(new TSetPropertyCmd());
-    RegisterCommand(new TGetDataCmd());
-    RegisterCommand(new TGetCmd());
-    RegisterCommand(new TRawCmd());
-    RegisterCommand(new TEnterCmd());
-    RegisterCommand(new TRunCmd());
+    config.Load();
+    TPortoAPI api(config().rpc_sock().file().path());
+
+    RegisterCommand(new THelpCmd(&api, true));
+    RegisterCommand(new TCreateCmd(&api));
+    RegisterCommand(new TDestroyCmd(&api));
+    RegisterCommand(new TListCmd(&api));
+    RegisterCommand(new TStartCmd(&api));
+    RegisterCommand(new TStopCmd(&api));
+    RegisterCommand(new TKillCmd(&api));
+    RegisterCommand(new TPauseCmd(&api));
+    RegisterCommand(new TResumeCmd(&api));
+    RegisterCommand(new TGetPropertyCmd(&api));
+    RegisterCommand(new TSetPropertyCmd(&api));
+    RegisterCommand(new TGetDataCmd(&api));
+    RegisterCommand(new TGetCmd(&api));
+    RegisterCommand(new TRawCmd(&api));
+    RegisterCommand(new TEnterCmd(&api));
+    RegisterCommand(new TRunCmd(&api));
 
     return HandleCommand(argc, argv);
 };

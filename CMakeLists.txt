@@ -35,15 +35,17 @@ add_custom_command(OUTPUT tags COMMAND ctags -R --c++-kinds=+p --fields=+iaS --e
 set_source_files_properties(TAGS PROPERTIES GENERATED true)
 add_custom_command(OUTPUT TAGS COMMAND ctags -R -e --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
-add_executable(portod tags portod.cpp cgroup.cpp rpc.cpp container.cpp task.cpp kvalue.cpp subsystem.cpp config.cpp error.cpp property.cpp qdisc.cpp util/netlink.cpp util/log.cpp util/protobuf.cpp util/mount.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp util/crash.cpp
-    ${PROTO_SRCS} ${PROTO_HDRS})
+link_directories(${yandex-porto_BINARY_DIR})
+add_library(porto libporto.cpp error.cpp util/protobuf.cpp ${PROTO_SRCS} ${PROTO_HDRS})
+
+add_executable(portod tags portod.cpp cgroup.cpp rpc.cpp container.cpp task.cpp kvalue.cpp subsystem.cpp config.cpp property.cpp qdisc.cpp util/netlink.cpp util/log.cpp util/mount.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp util/crash.cpp)
 add_dependencies(portod version.hpp)
-target_link_libraries(portod ${PB} ${RTNL} ${NL} pthread rt)
+target_link_libraries(portod porto ${PB} ${RTNL} ${NL} pthread rt)
 
-add_executable(portoctl python/porto/rpc_pb2.py portoctl.cpp cli.cpp error.cpp libporto.cpp config.cpp util/log.cpp util/mount.cpp util/protobuf.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
+add_executable(portoctl python/porto/rpc_pb2.py portoctl.cpp cli.cpp libporto.cpp config.cpp util/log.cpp util/mount.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp)
 add_dependencies(portoctl version.hpp)
-target_link_libraries(portoctl ${PB} rt)
+target_link_libraries(portoctl porto ${PB} rt)
 
-add_executable(portotest portotest.cpp error.cpp config.cpp test/selftest.cpp test/stresstest.cpp test/test.cpp libporto.cpp config.cpp util/netlink.cpp util/log.cpp util/protobuf.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp ${PROTO_SRCS} ${PROTO_HDRS})
+add_executable(portotest portotest.cpp config.cpp test/selftest.cpp test/stresstest.cpp test/test.cpp libporto.cpp config.cpp util/netlink.cpp util/log.cpp util/file.cpp util/folder.cpp util/unix.cpp util/string.cpp)
 add_dependencies(portotest version.hpp)
-target_link_libraries(portotest ${PB} ${RTNL} ${NL} pthread rt)
+target_link_libraries(portotest porto ${PB} ${RTNL} ${NL} pthread rt)
