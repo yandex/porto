@@ -31,6 +31,10 @@ class TTaskEnv {
 
     void ParseEnv();
 public:
+    std::string StdinPath;
+    std::string StdoutPath;
+    std::string StderrPath;
+
     TTaskEnv() : Isolate(false) {};
     TTaskEnv(const std::string &command, const std::string &cwd, const std::string &root, const std::string &user, const std::string &group, const std::string &environ, const bool isolate) : Command(command), Cwd(cwd), Root(root), User(user), Group(group), Environ(environ), Isolate(isolate) { }
     TError Prepare();
@@ -46,8 +50,6 @@ class TTask {
     int ExitStatus;
 
     pid_t Pid;
-    std::string StdoutFile;
-    std::string StderrFile;
     std::shared_ptr<TFolder> Cwd;
 
     int CloseAllFds(int except) const;

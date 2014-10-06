@@ -21,20 +21,24 @@
 - ? net_prio 0-7 -> 0-99
 
 # phase 3
+## disk
 - root property to isolate fs (loop if file chroot if dir)
 - ? readonly_root
-- ? isolate ipc property
-- ? when to enable user namespace
-- hostname property + isolate uts
-- net:<none?|host|<dev>|bridge> - create veth pair and setup routing + masquerading + generate random ip/mask or use provided
-- net_map: map host port to container when bridge used
 - ? mount proc proc proc nodev,noexec,nosuid 0 0; run run tmpfs nodev,noexec,nosuid,relatime,size=1m,mode=0755 0 0; shm dev/shm tmpfs nodev,nosuid,noexec 0 0
   we can prepare everything when fs is isolated
 - bind <host path> <container path>;
-- ? devices c 1:3 rwm; c 1:5 rwm; c 1:9 rwm; c 1:8 rwm; c 136:* rwm; c 5:2 rwm
-- ? tty - create pty slave and use it as console inside of container
 - restrict_sys - remount to readonly /proc/sys, /sys and mask over sysrq-trigger + /proc/irq and /proc/bus
 - ? remount /sys (as we do with /proc) to hide things like /sys/class/net
+## ipc
+- ? isolate ipc property
+## other
+- ? when to enable user namespace
+- hostname property + isolate uts
+- ? devices c 1:3 rwm; c 1:5 rwm; c 1:9 rwm; c 1:8 rwm; c 136:* rwm; c 5:2 rwm
+- ? tty - create pty slave and use it as console inside of container
+## net
+- net:<none?|host|<dev>|bridge> - create veth pair and setup routing + masquerading + generate random ip/mask or use provided
+- net_map: map host port to container when bridge used
 - more on net: docker/docs/sources/articles/networking.md
 
 # phase 2

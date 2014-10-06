@@ -110,15 +110,15 @@ void TTask::Syslog(const string &s) const {
 }
 
 TTask::~TTask() {
-    if (StdoutFile.length()) {
-        TFile f(StdoutFile);
+    if (Env.StdoutPath.length()) {
+        TFile f(Env.StdoutPath);
         TError e = f.Remove();
-        TLogger::LogError(e, "Can't remove task stdout " + StdoutFile);
+        TLogger::LogError(e, "Can't remove task stdout " + Env.StdoutPath);
     }
-    if (StderrFile.length()) {
-        TFile f(StderrFile);
+    if (Env.StderrPath.length()) {
+        TFile f(Env.StderrPath);
         TError e = f.Remove();
-        TLogger::LogError(e, "Can't remove task stderr " + StdoutFile);
+        TLogger::LogError(e, "Can't remove task stderr " + Env.StderrPath);
     }
 }
 
@@ -136,27 +136,35 @@ void TTask::ChildReopenStdio() {
         exit(0xAA);
     }
 
-    int ret = open("/dev/null", O_RDONLY);
-    if (ret < 0) {
-        Syslog(string("open(0): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
+    int ret;
+    if (!Env.StdinPath.length()) {
+        ret = open("/dev/null", O_RDONLY);
+        if (ret < 0) {
+            Syslog(string("open(0): ") + strerror(errno));
+            ReportResultAndExit(Wfd, -errno);
+        }
+    } else {
+        ret = open(Env.StdinPath.c_str(), O_CREAT | O_RDONLY);
+        if (ret < 0) {
+            Syslog(string("open(0): ") + strerror(errno));
+            ReportResultAndExit(Wfd, -errno);
+        }
+
+        if (ret != 0) {
+            Syslog("open(0): unexpected fd");
+            ReportResultAndExit(Wfd, -EINVAL);
+        }
     }
 
-    if (ret != 0) {
-        Syslog("open(0): unexpected fd");
-        ReportResultAndExit(Wfd, -EINVAL);
-    }
-
-    if (access(DirName(StdoutFile).c_str(), W_OK)) {
-        StdoutFile = "";
+    if (!Env.StdoutPath.length()) {
         ret = open("/dev/null", O_WRONLY);
         if (ret < 0) {
             Syslog(string("open(1): ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
         }
     } else {
-        ret = open(StdoutFile.c_str(),
-                   O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0700);
+        ret = open(Env.StdoutPath.c_str(),
+                   O_CREAT | O_WRONLY | O_APPEND, 0700);
         if (ret < 0) {
             Syslog(string("open(1): ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
@@ -174,16 +182,15 @@ void TTask::ChildReopenStdio() {
         }
     }
 
-    if (access(DirName(StderrFile).c_str(), W_OK)) {
-        StderrFile = "";
+    if (!Env.StderrPath.length()) {
         ret = open("/dev/null", O_WRONLY);
         if (ret < 0) {
             Syslog(string("open(2): ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
         }
     } else {
-        ret = open(StderrFile.c_str(),
-                   O_WRONLY | O_CREAT | O_TRUNC | O_APPEND, 0700);
+        ret = open(Env.StderrPath.c_str(),
+                   O_CREAT | O_WRONLY | O_APPEND, 0700);
         if (ret < 0) {
             Syslog(string("open(2): ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
@@ -425,8 +432,11 @@ TError TTask::Start() {
 
     ExitStatus = 0;
 
-    StdoutFile = Env.Cwd + "/stdout";
-    StderrFile = Env.Cwd + "/stderr";
+    if (!Env.StdoutPath.length())
+        Env.StdoutPath = Env.Cwd + "/stdout";
+
+    if (!Env.StderrPath.length())
+        Env.StderrPath = Env.Cwd + "/stderr";
 
     ret = pipe2(pfd, O_CLOEXEC);
     if (ret) {
@@ -533,8 +543,8 @@ TError TTask::Kill(int signal) const {
 
 std::string TTask::GetStdout() const {
     string s;
-    if (StdoutFile.length()) {
-        TFile f(StdoutFile);
+    if (Env.StdoutPath.length()) {
+        TFile f(Env.StdoutPath);
         TError e(f.LastStrings(config().container().stdout_read_bytes(), s));
         TLogger::LogError(e, "Can't read container stdout");
     }
@@ -543,8 +553,8 @@ std::string TTask::GetStdout() const {
 
 std::string TTask::GetStderr() const {
     string s;
-    if (StdoutFile.length()) {
-        TFile f(StderrFile);
+    if (Env.StderrPath.length()) {
+        TFile f(Env.StderrPath);
         TError e(f.LastStrings(config().container().stdout_read_bytes(), s));
         TLogger::LogError(e, "Can't read container stderr");
     }
@@ -568,16 +578,22 @@ TError TTask::Restore(int pid_) {
     // away under us any time, so don't fail if we can't recover
     // something.
 
-    TFile stdoutLink("/proc/" + std::to_string(pid_) + "/fd/1");
-    TError error = stdoutLink.ReadLink(StdoutFile);
+    TFile stdinLink("/proc/" + std::to_string(pid_) + "/fd/0");
+    TError error = stdinLink.ReadLink(Env.StdinPath);
     if (error)
-        StdoutFile = Env.Cwd + "/stdout";
+        Env.StdinPath = "";
+    TLogger::LogError(error, "Restore stdin");
+
+    TFile stdoutLink("/proc/" + std::to_string(pid_) + "/fd/1");
+    error = stdoutLink.ReadLink(Env.StdoutPath);
+    if (error)
+        Env.StdoutPath = Env.Cwd + "/stdout";
     TLogger::LogError(error, "Restore stdout");
 
     TFile stderrLink("/proc/" + std::to_string(pid_) + "/fd/2");
-    error = stderrLink.ReadLink(StderrFile);
+    error = stderrLink.ReadLink(Env.StderrPath);
     if (error)
-        StderrFile = Env.Cwd + "/stderr";
+        Env.StderrPath = Env.Cwd + "/stderr";
     TLogger::LogError(error, "Restore stderr");
 
     Pid = pid_;
@@ -632,6 +648,9 @@ TError TTask::RotateFile(const std::string path) const {
     if (stat(path.c_str(), &st) < 0)
         return TError(EError::Unknown, errno, "stat(" + path + ")");
 
+    if (!S_ISREG(st.st_mode))
+        return TError::Success();
+
     if (st.st_size > config().container().max_log_size())
         if (truncate(path.c_str(), 0) < 0)
             return TError(EError::Unknown, errno, "truncate(" + path + ")");
@@ -642,11 +661,11 @@ TError TTask::RotateFile(const std::string path) const {
 TError TTask::Rotate() const {
     TError error;
 
-    error = RotateFile(StdoutFile);
+    error = RotateFile(Env.StdoutPath);
     if (error)
         return error;
 
-    error = RotateFile(StderrFile);
+    error = RotateFile(Env.StderrPath);
     if (error)
         return error;
 

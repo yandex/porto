@@ -142,6 +142,10 @@ std::map<std::string, const TPropertySpec> propertySpec = {
     //{"root", { "Container root directory", "" }},
     {"cwd", { "Container working directory", "" }},
 
+    {"stdin_path", { "Container standard input path", "" }},
+    {"stdout_path", { "Container standard output path", "" }},
+    {"stderr_path", { "Container standard error path", "" }},
+
     {"memory_guarantee", { "Guaranteed amount of memory", "0", DYNAMIC_PROPERTY, ValidMemGuarantee }},
     {"memory_limit", { "Memory hard limit", "0", DYNAMIC_PROPERTY, ValidMemLimit }},
     {"recharge_on_pgfault", { "Recharge memory on page fault", "false", DYNAMIC_PROPERTY, ValidRecharge }},

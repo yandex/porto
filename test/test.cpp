@@ -330,6 +330,22 @@ int WordCount(const std::string &path, const std::string &word) {
     return nr;
 }
 
+std::string ReadLink(const std::string &path) {
+    std::string link;
+
+    TFile f(path);
+    TError error = f.ReadLink(link);
+    if (error)
+        throw error.GetMsg();
+
+    return link;
+}
+
+bool FileExists(const std::string &path) {
+    TFile f(path);
+    return f.Exists();
+}
+
 void RestartDaemon(TPortoAPI &api) {
     std::cerr << ">>> Truncating logs and restarting porto..." << std::endl;
 

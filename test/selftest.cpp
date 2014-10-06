@@ -87,7 +87,12 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     Expect(v == string("0"));
     ExpectSuccess(api.GetProperty(name, "memory.recharge_on_pgfault", v));
     Expect(v == string("0"));
-
+    ExpectSuccess(api.GetProperty(name, "stdin_path", v));
+    Expect(v == string(""));
+    ExpectSuccess(api.GetProperty(name, "stdout_path", v));
+    Expect(v == string(""));
+    ExpectSuccess(api.GetProperty(name, "stderr_path", v));
+    Expect(v == string(""));
 }
 
 static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
@@ -719,6 +724,64 @@ static void TestCwd(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
+static void TestStd(TPortoAPI &api) {
+    string pid;
+    string name = "a";
+    ExpectSuccess(api.Create(name));
+
+    Say() << "Check default stdin/stdout/stderr" << std::endl;
+    Expect(!FileExists("/tmp/stdout"));
+    Expect(!FileExists("/tmp/stderr"));
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.SetProperty(name, "cwd", "/tmp"));
+    ExpectSuccess(api.Start(name));
+    Expect(FileExists("/tmp/stdout"));
+    Expect(FileExists("/tmp/stderr"));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    Expect(ReadLink("/proc/" + pid + "/fd/0") == "/dev/null");
+    Expect(ReadLink("/proc/" + pid + "/fd/1") == "/tmp/stdout");
+    Expect(ReadLink("/proc/" + pid + "/fd/2") == "/tmp/stderr");
+    ExpectSuccess(api.Stop(name));
+    Expect(!FileExists("/tmp/stdout"));
+    Expect(!FileExists("/tmp/stderr"));
+
+
+    Say() << "Check custom stdin/stdout/stderr" << std::endl;
+    TFile f("/tmp/a_stdin");
+    TError error = f.WriteStringNoAppend("hi");
+    if (error)
+        throw error.GetMsg();
+
+    Expect(!FileExists("/tmp/a_stdout"));
+    Expect(!FileExists("/tmp/a_stderr"));
+    ExpectSuccess(api.SetProperty(name, "stdin_path", "/tmp/a_stdin"));
+    ExpectSuccess(api.SetProperty(name, "stdout_path", "/tmp/a_stdout"));
+    ExpectSuccess(api.SetProperty(name, "stderr_path", "/tmp/a_stderr"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    Expect(FileExists("/tmp/a_stdout"));
+    Expect(FileExists("/tmp/a_stderr"));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    Expect(ReadLink("/proc/" + pid + "/fd/0") == "/tmp/a_stdin");
+    Expect(ReadLink("/proc/" + pid + "/fd/1") == "/tmp/a_stdout");
+    Expect(ReadLink("/proc/" + pid + "/fd/2") == "/tmp/a_stderr");
+    ExpectSuccess(api.Stop(name));
+    Expect(FileExists("/tmp/a_stdin"));
+    Expect(!FileExists("/tmp/a_stdout"));
+    Expect(!FileExists("/tmp/a_stderr"));
+
+
+    Say() << "Make sure custom stdin is not removed" << std::endl;
+    string ret;
+    ExpectSuccess(api.SetProperty(name, "command", "cat"));
+    ExpectSuccess(api.Start(name));
+    WaitState(api, name, "dead");
+    ExpectSuccess(api.GetData(name, "stdout", ret));
+    Expect(ret == string("hi"));
+
+    ExpectSuccess(api.Destroy(name));
+}
+
 /*
 static void TestRootProperty(TPortoAPI &api) {
     string pid;
@@ -866,6 +929,9 @@ static void TestRoot(TPortoAPI &api) {
         "net_priority",
         "respawn",
         "isolate",
+        "stdin_path",
+        "stdout_path",
+        "stderr_path",
     };
 
     std::vector<TProperty> plist;
@@ -1519,6 +1585,7 @@ int SelfTest(string name, int leakNr) {
         { "environment", TestEnvironment },
         { "user_group", TestUserGroup },
         { "cwd", TestCwd },
+        { "std", TestStd },
         //{ "root", TestRootProperty },
         { "limits", TestLimits },
         { "alias", TestAlias },

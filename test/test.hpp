@@ -37,6 +37,8 @@ namespace test {
     int GetVmRss(const std::string &pid);
     bool TcClassExist(const std::string &handle);
     int WordCount(const std::string &path, const std::string &word);
+    std::string ReadLink(const std::string &path);
+    bool FileExists(const std::string &path);
 
     void RestartDaemon(TPortoAPI &api);
     void TestDaemon(TPortoAPI &api);
