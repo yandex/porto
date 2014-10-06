@@ -12,6 +12,9 @@
 - ? umask
 - ? rlimit_as, rlimit_core, rlimit_cpu, rlimit_data, rlimit_fsize, rlimit_locks, rlimit_memlock, rlimit_msgqueue, rlimit_nice, rlimit_nofile, rlimit_nproc, rlimit_rss, rlimit_rtprio, rlimit_rttime, rlimit_sigpending, rlimit_stack
 
+# data
+- ? rusage
+
 # nekt0n
 - add namespaces
 - ? get rid of globals/static which have class types (http://google-styleguide.googlecode.com/svn/trunk/cppguide.html#Static_and_Global_Variables)

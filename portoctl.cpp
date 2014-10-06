@@ -26,7 +26,7 @@ using std::pair;
 using std::set;
 using std::shared_ptr;
 
-string HumanTime(const string &val) {
+string HumanNsec(const string &val) {
     double n = stod(val);
     string suf = "ns";
     if (n > 1024) {
@@ -44,6 +44,27 @@ string HumanTime(const string &val) {
 
     std::stringstream str;
     str << n << suf;
+    return str.str();
+}
+
+string HumanSec(int64_t n) {
+    int64_t h = 0, m = 0, s = n;
+
+    if (s > 60) {
+        m = s / 60;
+        s %= 60;
+    }
+
+    if (m > 60) {
+        h = m / 60;
+        m %= 60;
+    }
+
+    std::stringstream str;
+    if (h)
+        str << std::setfill('0') << std::setw(2) << h << ":";
+    str << std::setfill('0') << std::setw(2) << m << ":";
+    str << std::setfill('0') << std::setw(2) << s;
     return str.str();
 }
 
@@ -117,7 +138,7 @@ string DataValue(const string &name, const string &val) {
                name == "net_bytes") {
         return HumanSize(val);
     } else if (name == "cpu_usage") {
-        return HumanTime(val);
+        return HumanNsec(val);
     } else {
         return val;
     }
@@ -683,8 +704,61 @@ public:
 };
 
 class TListCmd : public ICmd {
+    int64_t BootTime = 0;
 public:
     TListCmd(TPortoAPI *api) : ICmd(api, "list", 0, "", "list created containers") {}
+
+    int64_t GetBootTime() {
+        vector<string> lines;
+        TFile f("/proc/stat");
+        if (f.AsLines(lines))
+            return 0;
+
+        for (auto &line : lines) {
+            vector<string> cols;
+            if (SplitString(line, ' ', cols))
+                return 0;
+
+            if (cols[0] == "btime") {
+                int64_t val;
+                if (StringToInt64(cols[1], val))
+                    return 0;
+                return val;
+            }
+        }
+
+        return 0;
+    }
+
+    int64_t GetStartTime(const std::string container) {
+            string pid;
+            if (Api->GetData(container, "root_pid", pid))
+                return 0;
+
+            string line;
+            TFile f("/proc/" + pid + "/stat");
+            if (f.AsString(line))
+                return 0;
+
+            vector<string> cols;
+            if (SplitString(line, ' ', cols))
+                return 0;
+
+            if (cols.size() <= 21)
+                return 0;
+
+            int64_t started;
+            if (StringToInt64(cols[21], started))
+                return 0;
+
+            if (!BootTime)
+                BootTime = GetBootTime();
+
+            started /= sysconf(_SC_CLK_TCK);
+            started += BootTime;
+
+            return time(nullptr) - started;
+    }
 
     int Execute(int argc, char *argv[]) {
         vector<string> clist;
@@ -694,13 +768,27 @@ public:
             return ret;
         }
 
+        vector<string> states = { "running", "dead", "stopped", "paused" };
+        size_t stateLen = CalculateFieldLength(states);
         size_t nameLen = CalculateFieldLength(clist);
+        size_t timeLen = 10;
         for (auto c : clist) {
             string s;
             ret = Api->GetData(c, "state", s);
             if (ret)
                 PrintError("Can't get container state");
-            std::cout << std::left << std::setw(nameLen) << c << s << std::endl;
+
+            std::cout << std::left << std::setw(nameLen) << c
+                      << std::right << std::setw(stateLen) << s;
+
+            if (s == "running") {
+                int64_t started = GetStartTime(c);
+                if (started)
+                    std::cout << std::right << std::setw(timeLen)
+                        << HumanSec(GetStartTime(c));
+            }
+
+            std::cout << std::endl;
         }
 
         return EXIT_SUCCESS;
