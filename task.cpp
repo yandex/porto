@@ -144,7 +144,7 @@ void TTask::ChildReopenStdio() {
             ReportResultAndExit(Wfd, -errno);
         }
     } else {
-        ret = open(Env.StdinPath.c_str(), O_CREAT | O_RDONLY);
+        ret = open(Env.StdinPath.c_str(), O_CREAT | O_RDONLY, 0700);
         if (ret < 0) {
             Syslog(string("open(0): ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
