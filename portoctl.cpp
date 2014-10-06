@@ -746,8 +746,6 @@ public:
 
         if (config().network().enabled()) {
             showData.push_back("net_packets");
-            showData.push_back("net_drops");
-            showData.push_back("net_overlimits");
         }
 
         size_t nameLen = CalculateFieldLength(clist, strlen("container"));
