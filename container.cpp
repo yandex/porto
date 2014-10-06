@@ -168,24 +168,46 @@ struct TData {
 
         return std::to_string(val);
     };
+
+    static string MinorFaults(TContainer& c) {
+        uint64_t val;
+        auto cg = c.GetLeafCgroup(memorySubsystem);
+        TError error = memorySubsystem->Statistics(cg, "pgfault", val);
+        if (error)
+            return "-1";
+
+        return std::to_string(val);
+    };
+
+    static string MajorFaults(TContainer& c) {
+        uint64_t val;
+        auto cg = c.GetLeafCgroup(memorySubsystem);
+        TError error = memorySubsystem->Statistics(cg, "pgmajfault", val);
+        if (error)
+            return "-1";
+
+        return std::to_string(val);
+    };
 };
 
 std::map<std::string, const TDataSpec> dataSpec = {
-    { "state", { "container state", true, TData::State, { EContainerState::Stopped, EContainerState::Dead, EContainerState::Running, EContainerState::Paused } } },
-    { "oom_killed", { "indicates whether container has been killed by OOM", false, TData::OomKilled, { EContainerState::Dead } } },
-    { "parent", { "container parent", false, TData::Parent, { EContainerState::Stopped, EContainerState::Dead, EContainerState::Running, EContainerState::Paused } } },
-    { "respawn_count", { "how many time container was automatically respawned", false, TData::RespawnCount, { EContainerState::Running, EContainerState::Dead } } },
-    { "exit_status", { "container exit status", false, TData::ExitStatus, { EContainerState::Dead } } },
-    { "start_errno", { "container start error", false, TData::StartErrno, { EContainerState::Stopped } } },
-    { "root_pid", { "root process id", false, TData::RootPid, { EContainerState::Running, EContainerState::Paused } } },
-    { "stdout", { "return task stdout", false, TData::Stdout, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "stderr", { "return task stderr", false, TData::Stderr, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "cpu_usage", { "return consumed CPU time in nanoseconds", true, TData::CpuUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "net_bytes", { "number of tx bytes", true, TData::NetBytes, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "net_packets", { "number of tx packets", true, TData::NetPackets, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "net_drops", { "number of dropped tx packets", true, TData::NetDrops, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "net_overlimits", { "number of tx packets that exceeded the limit", true, TData::NetOverlimits, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "memory_usage", { "return consumed memory in bytes", true, TData::MemUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "state", { "container state", ROOT_DATA, TData::State, { EContainerState::Stopped, EContainerState::Dead, EContainerState::Running, EContainerState::Paused } } },
+    { "oom_killed", { "indicates whether container has been killed by OOM", 0, TData::OomKilled, { EContainerState::Dead } } },
+    { "parent", { "container parent", 0, TData::Parent, { EContainerState::Stopped, EContainerState::Dead, EContainerState::Running, EContainerState::Paused } } },
+    { "respawn_count", { "how many time container was automatically respawned", 0, TData::RespawnCount, { EContainerState::Running, EContainerState::Dead } } },
+    { "exit_status", { "container exit status", 0, TData::ExitStatus, { EContainerState::Dead } } },
+    { "start_errno", { "container start error", 0, TData::StartErrno, { EContainerState::Stopped } } },
+    { "root_pid", { "root process id", 0, TData::RootPid, { EContainerState::Running, EContainerState::Paused } } },
+    { "stdout", { "return task stdout", 0, TData::Stdout, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "stderr", { "return task stderr", 0, TData::Stderr, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "cpu_usage", { "return consumed CPU time in nanoseconds", ROOT_DATA, TData::CpuUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "net_bytes", { "number of tx bytes", ROOT_DATA, TData::NetBytes, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "net_packets", { "number of tx packets", ROOT_DATA, TData::NetPackets, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "net_drops", { "number of dropped tx packets", ROOT_DATA, TData::NetDrops, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "net_overlimits", { "number of tx packets that exceeded the limit", ROOT_DATA, TData::NetOverlimits, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "memory_usage", { "return consumed memory in bytes", ROOT_DATA, TData::MemUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "minor_faults", { "return number of minor page faults", ROOT_DATA | HIDDEN_DATA, TData::MinorFaults, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "major_faults", { "return number of major page faults", ROOT_DATA | HIDDEN_DATA, TData::MajorFaults, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
 };
 
 // TContainer
@@ -777,7 +799,7 @@ TError TContainer::GetData(const string &name, string &value) {
     if (dataSpec.find(name) == dataSpec.end())
         return TError(EError::InvalidValue, "invalid container data");
 
-    if (IsRoot() && !dataSpec[name].RootValid)
+    if (IsRoot() && !(dataSpec[name].Flags & ROOT_DATA))
         return TError(EError::InvalidData, "invalid data for root container");
 
     if (dataSpec[name].Valid.find(State) == dataSpec[name].Valid.end())

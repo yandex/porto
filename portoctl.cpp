@@ -741,6 +741,7 @@ public:
         vector<string> showData = {
             "cpu_usage",
             "memory_usage",
+            "major_faults",
         };
 
         if (config().network().enabled()) {

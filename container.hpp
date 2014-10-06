@@ -29,9 +29,12 @@ enum class EContainerState {
     Paused
 };
 
+const unsigned int ROOT_DATA = (1 << 0);
+const unsigned int HIDDEN_DATA = (1 << 1);
+
 struct TDataSpec {
     std::string Description;
-    bool RootValid;
+    unsigned int Flags;
     std::function<std::string(TContainer& c)> Handler;
     std::set<EContainerState> Valid;
 };

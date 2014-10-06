@@ -6,6 +6,7 @@
 
 using std::string;
 using std::shared_ptr;
+using std::vector;
 
 shared_ptr<TMemorySubsystem> memorySubsystem(new TMemorySubsystem);
 shared_ptr<TFreezerSubsystem> freezerSubsystem(new TFreezerSubsystem);
@@ -66,6 +67,28 @@ TError TMemorySubsystem::Usage(shared_ptr<TCgroup> &cg, uint64_t &value) const {
     if (error)
         return error;
     return StringToUint64(s, value);
+}
+
+TError TMemorySubsystem::Statistics(std::shared_ptr<TCgroup> &cg, const std::string &name, uint64_t &val) const {
+    vector<string> lines;
+    TError error = cg->GetKnobValueAsLines("memory.stat", lines);
+    if (error)
+        return error;
+
+    for (auto &line : lines) {
+        vector<string> tokens;
+        error = SplitString(line, ' ', tokens);
+        if (error)
+            return error;
+
+        if (tokens.size() != 2)
+            continue;
+
+        if (tokens[0] == name)
+            return StringToUint64(tokens[1], val);
+    }
+
+    return TError(EError::InvalidValue, "Invalid memory cgroup stat: " + name);
 }
 
 TError TMemorySubsystem::UseHierarchy(TCgroup &cg) const {

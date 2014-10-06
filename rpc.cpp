@@ -143,6 +143,9 @@ static TError ListData(TContainerHolder &cholder,
     auto list = rsp.mutable_datalist();
 
     for (auto kv : dataSpec) {
+        if (kv.second.Flags & HIDDEN_DATA)
+            continue;
+
         auto entry = list->add_list();
 
         entry->set_name(kv.first);
