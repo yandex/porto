@@ -159,8 +159,6 @@ int HandleCommand(int argc, char *argv[]) {
     // in case client closes pipe we are writing to in the protobuf code
     (void)RegisterSignal(SIGPIPE, SIG_IGN);
 
-    config.Load();
-
     try {
         // porto <command> <arg2> <arg2>
         TryExec(argc, argv);

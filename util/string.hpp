@@ -15,6 +15,7 @@ TError StringsToIntegers(const std::vector<std::string> &strings,
                          std::vector<int> &integers);
 TError StringToUint32(const std::string &str, uint32_t &value);
 TError StringToUint64(const std::string &string, uint64_t &value);
+TError StringToInt64(const std::string &str, int64_t &value);
 TError StringToInt(const std::string &string, int &value);
 TError StringWithUnitToUint64(const std::string &str, uint64_t &value);
 

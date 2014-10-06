@@ -26,6 +26,112 @@ using std::pair;
 using std::set;
 using std::shared_ptr;
 
+string HumanTime(const string &val) {
+    double n = stod(val);
+    string suf = "ns";
+    if (n > 1024) {
+        n /= 1024;
+        suf = "us";
+    }
+    if (n > 1024) {
+        n /= 1024;
+        suf = "ms";
+    }
+    if (n > 1024) {
+        n /= 1024;
+        suf = "s";
+    }
+
+    std::stringstream str;
+    str << n << suf;
+    return str.str();
+}
+
+string HumanSize(const string &val) {
+    double n = stod(val);
+    string suf = "";
+    if (n > 1024) {
+        n /= 1024;
+        suf = "K";
+    }
+    if (n > 1024) {
+        n /= 1024;
+        suf = "M";
+    }
+    if (n > 1024) {
+        n /= 1024;
+        suf = "G";
+    }
+
+    std::stringstream str;
+    str << n << suf;
+    return str.str();
+}
+
+string PropertyValue(const string &name, const string &val) {
+    if (name == "memory_guarantee" ||
+        name == "memory_limit" ||
+        name == "net_ceil" ||
+        name == "net_guarantee") {
+        return HumanSize(val);
+    } else {
+        return val;
+    }
+}
+
+string DataValue(const string &name, const string &val) {
+    if (name == "exit_status") {
+        int status;
+        if (StringToInt(val, status))
+            return val;
+
+        string ret;
+
+        if (WIFEXITED(status))
+            ret = "Container exited with " + std::to_string(WEXITSTATUS(status));
+        else if (WIFSIGNALED(status))
+            ret = "Container killed by signal " + std::to_string(WTERMSIG(status));
+        else if (status == 0)
+            ret = "Success";
+
+        return ret;
+    } else if (name == "errno") {
+        int status;
+        if (StringToInt(val, status))
+            return val;
+
+        string ret;
+
+        if (status < 0)
+            ret = "Prepare failed: " + string(strerror(-status));
+        else if (status > 0)
+            ret = "Exec failed: " + string(strerror(status));
+        else if (status == 0)
+            ret = "Success";
+
+        return ret + " (" + val + ")";
+    } else if (name == "memory_usage" ||
+               name == "net_drops" ||
+               name == "net_overlimits" ||
+               name == "net_packets" ||
+               name == "net_bytes") {
+        return HumanSize(val);
+    } else if (name == "cpu_usage") {
+        return HumanTime(val);
+    } else {
+        return val;
+    }
+}
+
+size_t CalculateFieldLength(vector<string> &vec, size_t min = 8) {
+    size_t len = 0;
+    for (auto &i : vec)
+        if (i.length() + 1 > len)
+            len  = i.length() + 1;
+
+    return len > min ? len : min;
+}
+
 class TRawCmd : public ICmd {
 public:
     TRawCmd(TPortoAPI *api) : ICmd(api, "raw", 2, "<message>", "send raw protobuf message") {}
@@ -252,103 +358,6 @@ public:
         return find_if(dlist.begin(), dlist.end(),
                        [&](const TData &i)->bool { return i.Name == name; })
             != dlist.end();
-    }
-
-    string HumanTime(const string &val) {
-        double n = stod(val);
-        string suf = "ns";
-        if (n > 1024) {
-            n /= 1024;
-            suf = "us";
-        }
-        if (n > 1024) {
-            n /= 1024;
-            suf = "ms";
-        }
-        if (n > 1024) {
-            n /= 1024;
-            suf = "s";
-        }
-
-        std::stringstream str;
-        str << n << suf;
-        return str.str();
-    }
-
-    string HumanSize(const string &val) {
-        double n = stod(val);
-        string suf = "";
-        if (n > 1024) {
-            n /= 1024;
-            suf = "K";
-        }
-        if (n > 1024) {
-            n /= 1024;
-            suf = "M";
-        }
-        if (n > 1024) {
-            n /= 1024;
-            suf = "G";
-        }
-
-        std::stringstream str;
-        str << n << suf;
-        return str.str();
-    }
-
-    string PropertyValue(const string &name, const string &val) {
-        if (name == "memory_guarantee" ||
-            name == "memory_limit" ||
-            name == "net_ceil" ||
-            name == "net_guarantee") {
-            return HumanSize(val);
-        } else {
-            return val;
-        }
-    }
-
-    string DataValue(const string &name, const string &val) {
-        if (name == "exit_status") {
-            int status;
-            if (StringToInt(val, status))
-                return val;
-
-            string ret;
-
-            if (WIFEXITED(status))
-                ret = "Container exited with " + std::to_string(WEXITSTATUS(status));
-            else if (WIFSIGNALED(status))
-                ret = "Container killed by signal " + std::to_string(WTERMSIG(status));
-            else if (status == 0)
-                ret = "Success";
-
-            return ret;
-        } else if (name == "errno") {
-            int status;
-            if (StringToInt(val, status))
-                return val;
-
-            string ret;
-
-            if (status < 0)
-                ret = "Prepare failed: " + string(strerror(-status));
-            else if (status > 0)
-                ret = "Exec failed: " + string(strerror(status));
-            else if (status == 0)
-                ret = "Success";
-
-            return ret + " (" + val + ")";
-        } else if (name == "memory_usage" ||
-                   name == "net_drops" ||
-                   name == "net_overlimits" ||
-                   name == "net_packets" ||
-                   name == "net_bytes") {
-            return HumanSize(val);
-        } else if (name == "cpu_usage") {
-            return HumanTime(val);
-        } else {
-            return val;
-        }
     }
 
     int Execute(int argc, char *argv[]) {
@@ -676,29 +685,140 @@ public:
     int Execute(int argc, char *argv[]) {
         vector<string> clist;
         int ret = Api->List(clist);
-        if (ret)
+        if (ret) {
             PrintError("Can't list containers");
-        else
-            for (auto c : clist) {
-                string s;
-                ret = Api->GetData(c, "state", s);
-                if (ret)
-                    PrintError("Can't get container state");
-                std::cout << std::left << std::setw(70) << c << s << std::endl;
+            return ret;
+        }
+
+        size_t nameLen = CalculateFieldLength(clist);
+        for (auto c : clist) {
+            string s;
+            ret = Api->GetData(c, "state", s);
+            if (ret)
+                PrintError("Can't get container state");
+            std::cout << std::left << std::setw(nameLen) << c << s << std::endl;
+        }
+
+        return EXIT_SUCCESS;
+    }
+};
+
+class TTopCmd : public ICmd {
+public:
+    TTopCmd(TPortoAPI *api) : ICmd(api, "top", 0, "[sort-by]", "print containers sorted by resource usage") {}
+
+    int GetUintData(const std::string &container,
+                    const std::string &data, int64_t &val) {
+        string s;
+        int ret = Api->GetData(container, data, s);
+        if (ret) {
+            PrintError("Can't get container data " + data);
+            return EXIT_FAILURE;
+        }
+
+        TError error = StringToInt64(s, val);
+        if (error) {
+            PrintError("Can't parse container data " + data);
+            return EXIT_FAILURE;
+        }
+
+        return EXIT_SUCCESS;
+    }
+
+    int Execute(int argc, char *argv[]) {
+        vector<string> clist;
+        int ret = Api->List(clist);
+        if (ret) {
+            PrintError("Can't list containers");
+            return EXIT_FAILURE;
+        }
+
+        vector<pair<string, map<string, int64_t>>> containerData;
+        vector<string> showData = {
+            "cpu_usage",
+            "memory_usage",
+        };
+
+        if (config().network().enabled()) {
+            showData.push_back("net_packets");
+            showData.push_back("net_drops");
+            showData.push_back("net_overlimits");
+        }
+
+        size_t nameLen = CalculateFieldLength(clist, strlen("container"));
+        size_t dataLen = CalculateFieldLength(showData);
+
+        string sortBy = "cpu_usage";
+        if (argc >= 1) {
+            string arg = argv[0];
+
+            if (std::find(showData.begin(), showData.end(), arg)
+                == showData.end()) {
+                TError error(EError::InvalidValue, "Invalid value");
+
+                PrintError(error, "Can't parse argument");
+                return EXIT_FAILURE;
             }
+
+            sortBy = arg;
+        }
+
+        for (auto container : clist) {
+            string state;
+            ret = Api->GetData(container, "state", state);
+            if (ret) {
+                PrintError("Can't get container state");
+                return EXIT_FAILURE;
+            }
+
+            if (state != "running")
+                continue;
+
+            map<string, int64_t> dataVal;
+            for (auto data : showData) {
+                int64_t val;
+                if (GetUintData(container, data, val))
+                    return EXIT_FAILURE;
+
+                dataVal[data] = val;
+            }
+
+            containerData.push_back(make_pair(container, dataVal));
+        }
+
+        std::sort(containerData.begin(), containerData.end(),
+                  [&](pair<string, map<string, int64_t>> a,
+                     pair<string, map<string, int64_t>> b) {
+                  return a.second[sortBy] > b.second[sortBy];
+                  });
+
+        std::cout << std::left << std::setw(nameLen) << "container";
+        for (auto &data : showData)
+            std::cout << std::right << std::setw(dataLen) << data;
+        std::cout << std::endl;
+
+        for (auto &pair : containerData) {
+            std::cout << std::left << std::setw(nameLen) << pair.first;
+
+            for (auto &data : showData)
+                std::cout << std::right << std::setw(dataLen) <<
+                    DataValue(data, std::to_string(pair.second[data]));
+            std::cout << std::endl;
+        }
 
         return ret;
     }
 };
 
 int main(int argc, char *argv[]) {
-    config.Load();
+    config.Load(true);
     TPortoAPI api(config().rpc_sock().file().path());
 
     RegisterCommand(new THelpCmd(&api, true));
     RegisterCommand(new TCreateCmd(&api));
     RegisterCommand(new TDestroyCmd(&api));
     RegisterCommand(new TListCmd(&api));
+    RegisterCommand(new TTopCmd(&api));
     RegisterCommand(new TStartCmd(&api));
     RegisterCommand(new TStopCmd(&api));
     RegisterCommand(new TKillCmd(&api));

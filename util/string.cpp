@@ -60,6 +60,16 @@ TError StringToUint64(const std::string &str, uint64_t &value) {
     return TError::Success();
 }
 
+TError StringToInt64(const std::string &str, int64_t &value) {
+    try {
+        value = stoll(str);
+    } catch (...) {
+        return TError(EError::Unknown, string(__func__) + ": Bad integer value");
+    }
+
+    return TError::Success();
+}
+
 TError StringToInt(const std::string &str, int &value) {
     try {
         value = stoi(str);
