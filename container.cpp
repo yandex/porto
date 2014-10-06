@@ -206,8 +206,8 @@ std::map<std::string, const TDataSpec> dataSpec = {
     { "net_drops", { "number of dropped tx packets", ROOT_DATA, TData::NetDrops, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
     { "net_overlimits", { "number of tx packets that exceeded the limit", ROOT_DATA, TData::NetOverlimits, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
     { "memory_usage", { "return consumed memory in bytes", ROOT_DATA, TData::MemUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "minor_faults", { "return number of minor page faults", ROOT_DATA | HIDDEN_DATA, TData::MinorFaults, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "major_faults", { "return number of major page faults", ROOT_DATA | HIDDEN_DATA, TData::MajorFaults, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "minor_faults", { "return number of minor page faults", ROOT_DATA, TData::MinorFaults, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "major_faults", { "return number of major page faults", ROOT_DATA, TData::MajorFaults, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
 };
 
 // TContainer

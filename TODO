@@ -1,4 +1,5 @@
 - full dump on sigsegv
+- ? autorespawn max number and delay
 - ? autodestroy property
 - ? portoctl run -f <MANIFEST> | <MANIFEST STRING>
 - ? cpu_cores property to reserve some cores for a container
