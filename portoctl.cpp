@@ -132,6 +132,12 @@ size_t CalculateFieldLength(vector<string> &vec, size_t min = 8) {
     return len > min ? len : min;
 }
 
+bool ValidData(const vector<TData> &dlist, const string &name) {
+    return find_if(dlist.begin(), dlist.end(),
+                   [&](const TData &i)->bool { return i.Name == name; })
+        != dlist.end();
+}
+
 class TRawCmd : public ICmd {
 public:
     TRawCmd(TPortoAPI *api) : ICmd(api, "raw", 2, "<message>", "send raw protobuf message") {}
@@ -352,12 +358,6 @@ public:
         return find_if(plist.begin(), plist.end(),
                        [&](const TProperty &i)->bool { return i.Name == name; })
             != plist.end();
-    }
-
-    bool ValidData(const vector<TData> &dlist, const string &name) {
-        return find_if(dlist.begin(), dlist.end(),
-                       [&](const TData &i)->bool { return i.Name == name; })
-            != dlist.end();
     }
 
     int Execute(int argc, char *argv[]) {
@@ -738,33 +738,40 @@ public:
         }
 
         vector<pair<string, map<string, int64_t>>> containerData;
-        vector<string> showData = {
-            "cpu_usage",
-            "memory_usage",
-            "major_faults",
-        };
+        vector<string> showData;
 
-        if (config().network().enabled()) {
-            showData.push_back("net_packets");
-        }
+        if (argc == 0) {
+            showData.push_back("cpu_usage");
+            showData.push_back("memory_usage");
+            showData.push_back("major_faults");
+            showData.push_back("minor_faults");
 
-        size_t nameLen = CalculateFieldLength(clist, strlen("container"));
-        size_t dataLen = CalculateFieldLength(showData);
-
-        string sortBy = "cpu_usage";
-        if (argc >= 1) {
-            string arg = argv[0];
-
-            if (std::find(showData.begin(), showData.end(), arg)
-                == showData.end()) {
-                TError error(EError::InvalidValue, "Invalid value");
-
-                PrintError(error, "Can't parse argument");
+            if (config().network().enabled())
+                showData.push_back("net_packets");
+        } else {
+            vector<TData> dlist;
+            ret = Api->Dlist(dlist);
+            if (ret) {
+                PrintError("Can't list data");
                 return EXIT_FAILURE;
             }
 
-            sortBy = arg;
+            for (int i = 0; i < argc; i++) {
+                string arg = argv[i];
+
+                if (!ValidData(dlist, arg)) {
+                    TError error(EError::InvalidValue, "Invalid value");
+                    PrintError(error, "Can't parse argument");
+                    return EXIT_FAILURE;
+                }
+
+                showData.push_back(arg);
+            }
         }
+
+        string sortBy = showData[0];
+        size_t nameLen = CalculateFieldLength(clist, strlen("container"));
+        size_t dataLen = CalculateFieldLength(showData);
 
         for (auto container : clist) {
             string state;
