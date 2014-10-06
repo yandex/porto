@@ -368,14 +368,14 @@ public:
         ret = Api->Plist(plist);
         if (ret) {
             PrintError("Can't list properties");
-            return 1;
+            return EXIT_FAILURE;
         }
 
         vector<TData> dlist;
         ret = Api->Dlist(dlist);
         if (ret) {
             PrintError("Can't list data");
-            return 1;
+            return EXIT_FAILURE;
         }
 
         if (argc <= 1) {
@@ -422,16 +422,20 @@ public:
 
         if (validProperty) {
             ret = Api->GetProperty(argv[0], argv[1], value);
-            if (!ret)
+            if (!ret) {
                 std::cout << PropertyValue(argv[1], value) << std::endl;
-            else if (ret != EError::InvalidProperty)
+            } else if (ret != EError::InvalidProperty) {
                 PrintError("Can't get data");
+                return EXIT_FAILURE;
+            }
         }
 
-        if (!validProperty && !validData)
+        if (!validProperty && !validData) {
             std::cerr << "Invalid property or data" << std::endl;
+            return EXIT_FAILURE;
+        }
 
-        return 1;
+        return EXIT_SUCCESS;
     }
 };
 
