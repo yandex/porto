@@ -13,6 +13,7 @@ case "$1" in
         if [ -e "/etc/init/yandex-porto.conf" ]; then
             start yandex-porto
         fi
+        chown root:porto /usr/sbin/portoctl || exit 2
     ;;
     install|upgrade|abort-upgrade)
     ;;

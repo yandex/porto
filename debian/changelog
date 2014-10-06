@@ -1,3 +1,9 @@
+yandex-porto (0.6) stable; urgency=low
+
+  * Merge portoexec to portoctl and fixed chown for portoctl. 
+
+ -- Eugene Kilimchuk <ekilimchuk@yandex-team.ru>  Mon, 06 Oct 2014 21:21:50 +0400
+
 yandex-porto (0.5) stable; urgency=low
 
   * Added portoexec. 
