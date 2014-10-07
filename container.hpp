@@ -57,6 +57,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     TScopedFd Efd;
     bool OomKilled = false;
     size_t RespawnCount;
+    int Uid, Gid;
     friend TData;
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
@@ -98,7 +99,7 @@ public:
     std::vector<pid_t> Processes();
     bool IsAlive();
 
-    TError Create();
+    TError Create(int uid, int gid);
     TError Start();
     TError Stop();
     TError Pause();
@@ -120,6 +121,7 @@ public:
     uint16_t GetId();
     int GetOomFd();
     void DeliverOom();
+    void GetPerm(int &uid, int &gid) { uid = Uid; gid = Gid; }
 };
 
 constexpr size_t BITS_PER_LLONG = sizeof(unsigned long long) * 8;
@@ -136,10 +138,10 @@ public:
     ~TContainerHolder();
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot();
-    TError Create(const std::string &name);
+    TError Create(const std::string &name, int uid, int gid);
     std::shared_ptr<TContainer> Get(const std::string &name);
     TError Restore(const std::string &name, const kv::TNode &node);
-
+    TError CheckPermission(std::shared_ptr<TContainer> container, int uid, int gid);
     TError Destroy(const std::string &name);
     bool DeliverExitStatus(int pid, int status);
 

@@ -8,6 +8,7 @@
   coredump settings
 - ? fix permissions
 - ? different log levels (error, normal, verbose)
+- ? show default property value instead of empty string
 
 # properties
 - ? capabilities

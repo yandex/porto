@@ -1,5 +1,6 @@
 #include "pwd.hpp"
 #include "util/string.hpp"
+#include "util/log.hpp"
 
 extern "C" {
 #include <grp.h>
@@ -17,7 +18,7 @@ int TUserEntry::GetId() {
 TError TUser::Load() {
     struct passwd *p;
 
-    if (Id) {
+    if (Id >= 0) {
         p = getpwuid(Id);
         if (p) {
             Id = p->pw_uid;
@@ -25,35 +26,37 @@ TError TUser::Load() {
             return TError::Success();
         }
 
-        return TError(EError::InvalidValue, EINVAL, "Invalid uid");
+        return TError(EError::InvalidValue, "Invalid uid: " + std::to_string(Id));
     }
 
-    p = getpwnam(Name.c_str());
-    if (p) {
-        Id = p->pw_uid;
-        Name = p->pw_name;
-        return TError::Success();
+    if (Name.length()) {
+        p = getpwnam(Name.c_str());
+        if (p) {
+            Id = p->pw_uid;
+            Name = p->pw_name;
+            return TError::Success();
+        }
+
+        int uid;
+        TError error = StringToInt(Name, uid);
+        if (error)
+            return TError(EError::InvalidValue, "Invalid user: " + Name);
+
+        p = getpwuid(uid);
+        if (p) {
+            Id = p->pw_uid;
+            Name = p->pw_name;
+            return TError::Success();
+        }
     }
 
-    int uid;
-    TError error = StringToInt(Name, uid);
-    if (error)
-        return error;
-
-    p = getpwuid(uid);
-    if (p) {
-        Id = p->pw_uid;
-        Name = p->pw_name;
-        return TError::Success();
-    }
-
-    return TError(EError::InvalidValue, EINVAL, "Invalid user");
+    return TError(EError::InvalidValue, "Invalid user");
 }
 
 TError TGroup::Load() {
     struct group *g;
 
-    if (Id) {
+    if (Id >= 0) {
         g = getgrgid(Id);
         if (g) {
             Id = g->gr_gid;
@@ -61,27 +64,29 @@ TError TGroup::Load() {
             return TError::Success();
         }
 
-        return TError(EError::InvalidValue, EINVAL, "Invalid uid");
+        return TError(EError::InvalidValue, "Invalid gid: " + std::to_string(Id));
     }
 
-    g = getgrnam(Name.c_str());
-    if (g) {
-        Id = g->gr_gid;
-        Name = g->gr_name;
-        return TError::Success();
+    if (Name.length()) {
+        g = getgrnam(Name.c_str());
+        if (g) {
+            Id = g->gr_gid;
+            Name = g->gr_name;
+            return TError::Success();
+        }
+
+        int uid;
+        TError error = StringToInt(Name, uid);
+        if (error)
+            return TError(EError::InvalidValue, "Invalid group: " + Name);
+
+        g = getgrgid(uid);
+        if (g) {
+            Id = g->gr_gid;
+            Name = g->gr_name;
+            return TError::Success();
+        }
     }
 
-    int uid;
-    TError error = StringToInt(Name, uid);
-    if (error)
-        return error;
-
-    g = getgrgid(uid);
-    if (g) {
-        Id = g->gr_gid;
-        Name = g->gr_name;
-        return TError::Success();
-    }
-
-    return TError(EError::InvalidValue, EINVAL, "Invalid group");
+    return TError(EError::InvalidValue, "Invalid group");
 }

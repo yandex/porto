@@ -128,8 +128,8 @@ static TError ValidNetPriority(std::shared_ptr<const TContainer> container, cons
 
 std::map<std::string, const TPropertySpec> propertySpec = {
     {"command", { "Command executed upon container start", "" }},
-    {"user", { "Start command with given user", GetDefaultUser(), 0, ValidUser }},
-    {"group", { "Start command with given group", GetDefaultGroup(), 0, ValidGroup }},
+    {"user", { "Start command with given user", "", 0, ValidUser }},
+    {"group", { "Start command with given group", "", 0, ValidGroup }},
     {"env", { "Container environment variables" }},
     //{"root", { "Container root directory", "" }},
     {"cwd", { "Container working directory", "" }},

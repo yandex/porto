@@ -3,20 +3,23 @@
 
 #include <string>
 
+#include "porto.hpp"
 #include "error.hpp"
 
 class TUserEntry {
 protected:
     std::string Name;
     int Id;
+    NO_COPY_CONSTRUCT(TUserEntry);
 public:
-    TUserEntry(const std::string &name) : Name(name), Id(0) {}
+    TUserEntry(const std::string &name) : Name(name), Id(-1) {}
     TUserEntry(const int id) : Name(""), Id(id) {}
     std::string GetName();
     int GetId();
 };
 
 class TUser : public TUserEntry {
+    NO_COPY_CONSTRUCT(TUser);
 public:
     TUser(const std::string &name) : TUserEntry(name) {}
     TUser(const int id) : TUserEntry(id) {}
@@ -24,6 +27,7 @@ public:
 };
 
 class TGroup : public TUserEntry {
+    NO_COPY_CONSTRUCT(TGroup);
 public:
     TGroup(const std::string &name) : TUserEntry(name) {}
     TGroup(const int id) : TUserEntry(id) {}

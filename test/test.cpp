@@ -347,6 +347,16 @@ bool FileExists(const std::string &path) {
     return f.Exists();
 }
 
+void AsUser(TPortoAPI &api, TUser &user, TGroup &group) {
+    api.Cleanup();
+
+    seteuid(0);
+    setegid(0);
+
+    Expect(setregid(0, group.GetId()) == 0);
+    Expect(setreuid(0, user.GetId()) == 0);
+}
+
 void RestartDaemon(TPortoAPI &api) {
     std::cerr << ">>> Truncating logs and restarting porto..." << std::endl;
 
@@ -384,10 +394,10 @@ void TestDaemon(TPortoAPI &api) {
 
     api.Cleanup();
 
-    Say() << "Make sure portod doesn't have zombies" << std::endl;
+    Say() << "Make sure portod-slave doesn't have zombies" << std::endl;
     pid = ReadPid(config().slave_pid().path());
 
-    Say() << "Make sure portod doesn't have invalid FDs" << std::endl;
+    Say() << "Make sure portod-slave doesn't have invalid FDs" << std::endl;
 
     std::string path = ("/proc/" + std::to_string(pid) + "/fd");
 
@@ -399,13 +409,13 @@ void TestDaemon(TPortoAPI &api) {
     // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 4(rpc socket) 128(event pipe) 129(ack pipe)
     Expect(scandir(path.c_str(), &lst, NULL, alphasort) == 2 + 7 + sssFd);
 
-    Say() << "Make sure portod-slave doesn't have zombies" << std::endl;
+    Say() << "Make sure portod-master doesn't have zombies" << std::endl;
     pid = ReadPid(config().master_pid().path());
 
-    Say() << "Make sure portod-slave doesn't have invalid FDs" << std::endl;
+    Say() << "Make sure portod-master doesn't have invalid FDs" << std::endl;
     path = ("/proc/" + std::to_string(pid) + "/fd");
     // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 5(event pipe) 6(ack pipe)
-    Expect(scandir(path.c_str(), &lst, NULL, alphasort) == 2 + 6 + sssFd);
+    Expect(scandir(path.c_str(), &lst, NULL, alphasort) == 2 + 6);
 
     // TODO: check portoloop queue
     // TODO: check rtnl classes

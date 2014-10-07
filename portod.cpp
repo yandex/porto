@@ -165,7 +165,14 @@ static void RemoveRpcServer(const string &path) {
     (void)f.Remove();
 }
 
-static void HandleRequest(TContainerHolder &cholder, int fd) {
+struct ClientInfo {
+    int Pid;
+    int Uid;
+    int Gid;
+};
+
+static void HandleRequest(TContainerHolder &cholder, const int fd,
+                          const int uid, const int gid) {
     InterruptibleInputStream pist(fd);
     google::protobuf::io::FileOutputStream post(fd);
 
@@ -178,7 +185,7 @@ static void HandleRequest(TContainerHolder &cholder, int fd) {
     (void)alarm(0);
 
     if (haveData) {
-        auto rsp = HandleRpcRequest(cholder, request);
+        auto rsp = HandleRpcRequest(cholder, request, uid, gid);
 
         if (rsp.IsInitialized()) {
             WriteDelimitedTo(rsp, &post);
@@ -187,7 +194,7 @@ static void HandleRequest(TContainerHolder &cholder, int fd) {
     }
 }
 
-static void IdentifyClient(int fd) {
+static int IdentifyClient(int fd, ClientInfo &ci) {
     struct ucred cr;
     socklen_t len = sizeof(cr);
 
@@ -204,11 +211,19 @@ static void IdentifyClient(int fd) {
             << " uid " << cr.uid
             << " gid " << cr.gid
             << ") connected" << std::endl;
-    } else
+
+        ci.Pid = cr.pid;
+        ci.Uid = cr.uid;
+        ci.Gid = cr.gid;
+
+        return 0;
+    } else {
         TLogger::Log() << "unknown process connected" << std::endl;
+        return EXIT_FAILURE;
+    }
 }
 
-static int AcceptClient(int sfd, std::vector<int> &clients) {
+static int AcceptClient(int sfd, std::map<int,ClientInfo> &clients) {
     int cfd;
     struct sockaddr_un peer_addr;
     socklen_t peer_addr_size;
@@ -224,10 +239,22 @@ static int AcceptClient(int sfd, std::vector<int> &clients) {
         return -1;
     }
 
-    IdentifyClient(cfd);
-    clients.push_back(cfd);
+    ClientInfo ci;
+    int ret = IdentifyClient(cfd, ci);
+    if (ret)
+        return ret;
 
+    clients[cfd] = ci;
     return 0;
+}
+
+static void CloseClient(int cfd, std::map<int,ClientInfo> &clients) {
+    ClientInfo ci = clients.at(cfd);
+
+    TLogger::Log() << ci.Pid << " disconnected" << std::endl;
+
+    close(cfd);
+    clients.erase(cfd);
 }
 
 static bool AnotherInstanceRunning(const string &path) {
@@ -294,7 +321,7 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
 static int RpcMain(TContainerHolder &cholder) {
     int ret = 0;
     int sfd;
-    std::vector<int> clients;
+    std::map<int,ClientInfo> clients;
 
     SignalMask(SIG_BLOCK);
 
@@ -328,8 +355,8 @@ static int RpcMain(TContainerHolder &cholder) {
         pfd.events = POLLIN | POLLHUP;
         fds.push_back(pfd);
 
-        for (size_t i = 0; i < clients.size(); i++) {
-            pfd.fd = clients[i];
+        for (auto pair : clients) {
+            pfd.fd = pair.first;
             pfd.events = POLLIN | POLLHUP;
             fds.push_back(pfd);
         }
@@ -357,7 +384,6 @@ static int RpcMain(TContainerHolder &cholder) {
             WatchdogStrobe();
         }
 
-
         size_t maxClients = config().daemon().max_clients();
         if (hup) {
             close(sfd);
@@ -383,33 +409,32 @@ static int RpcMain(TContainerHolder &cholder) {
         if (done)
             break;
 
-        for (size_t i = 1 + clients.size(); i < fds.size(); i++)
-            if (fds[i].revents & POLLIN)
-                cholder.DeliverOom(fds[i].fd);
-
         if (fds[0].revents && clients.size() < maxClients) {
             ret = AcceptClient(sfd, clients);
             if (ret < 0)
                 break;
         }
 
-        for (size_t i = 1; i < fds.size() && !done; i++) {
-            if (!fds[i].revents)
+        for (size_t i = 1; i < fds.size(); i++) {
+            if (!(fds[i].revents & (POLLIN | POLLHUP)))
                 continue;
 
-            if (fds[i].revents & POLLIN)
-                HandleRequest(cholder, fds[i].fd);
+            if (clients.find(fds[i].fd) != clients.end()) {
+                auto &ci = clients.at(fds[i].fd);
 
-            if (fds[i].revents & POLLHUP) {
-                close(fds[i].fd);
-                clients.erase(std::remove(clients.begin(), clients.end(),
-                                          fds[i].fd));
+                if (fds[i].revents & POLLIN)
+                    HandleRequest(cholder, fds[i].fd, ci.Uid, ci.Gid);
+
+                if (fds[i].revents & POLLHUP)
+                    CloseClient(fds[i].fd, clients);
+            } else {
+                cholder.DeliverOom(fds[i].fd);
             }
         }
     }
 
-    for (size_t i = 0; i < clients.size(); i++)
-        close(clients[i]);
+    for (auto pair : clients)
+        close(pair.first);
 
     close(sfd);
 

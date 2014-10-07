@@ -5,6 +5,7 @@
 #include "container.hpp"
 
 rpc::TContainerResponse
-HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req);
+HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req,
+                 int uid, int gid);
 
 #endif

@@ -6,6 +6,7 @@
 #include <atomic>
 
 #include "libporto.hpp"
+#include "util/pwd.hpp"
 
 namespace test {
     extern __thread int tid;
@@ -39,6 +40,7 @@ namespace test {
     int WordCount(const std::string &path, const std::string &word);
     std::string ReadLink(const std::string &path);
     bool FileExists(const std::string &path);
+    void AsUser(TPortoAPI &api, TUser &user, TGroup &group);
 
     void RestartDaemon(TPortoAPI &api);
     void TestDaemon(TPortoAPI &api);

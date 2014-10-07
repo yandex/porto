@@ -9,12 +9,14 @@
 #include "util/file.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
+#include "util/pwd.hpp"
 #include "test.hpp"
 
 extern "C" {
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <grp.h>
 }
 
 using std::string;
@@ -1418,6 +1420,74 @@ static void TestPermissions(TPortoAPI &api) {
     Expect(st.st_mode == (0644 | S_IFREG));
 
     ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.Destroy(name));
+
+    Say() << "Only user that created container can start/stop/destroy/etc it" << std::endl;
+
+    TUser daemonUser("daemon");
+    TError error = daemonUser.Load();
+    if (error)
+        throw error.GetMsg();
+
+    TGroup daemonGroup("daemon");
+    error = daemonGroup.Load();
+    if (error)
+        throw error.GetMsg();
+
+    TUser binUser("bin");
+    error = binUser.Load();
+    if (error)
+        throw error.GetMsg();
+
+    TGroup binGroup("bin");
+    error = binGroup.Load();
+    if (error)
+        throw error.GetMsg();
+
+    TGroup portoGroup("porto");
+    error = portoGroup.Load();
+    if (error)
+        throw error.GetMsg();
+
+    gid_t portoGid = portoGroup.GetId();
+
+    string s;
+
+    Expect(setgroups(1, &portoGid) == 0);
+
+    AsUser(api, daemonUser, daemonGroup);
+           ExpectSuccess(api.Create(name));
+
+    AsUser(api, binUser, binGroup);
+           ExpectFailure(api.Start(name), EError::Permission);
+           ExpectFailure(api.Destroy(name), EError::Permission);
+           ExpectFailure(api.SetProperty(name, "command", "sleep 1000"), EError::Permission);
+           ExpectFailure(api.GetProperty(name, "command", s), EError::Permission);
+
+    AsUser(api, daemonUser, daemonGroup);
+        ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+        ExpectSuccess(api.SetProperty(name, "user", "mail"));
+        ExpectSuccess(api.SetProperty(name, "group", "mail"));
+        ExpectSuccess(api.GetProperty(name, "command", s));
+        ExpectSuccess(api.Start(name));
+        ExpectSuccess(api.GetData(name, "root_pid", s));
+
+    AsUser(api, binUser, binGroup);
+        ExpectFailure(api.GetData(name, "root_pid", s), EError::Permission);
+        ExpectFailure(api.Stop(name), EError::Permission);
+        ExpectFailure(api.Pause(name), EError::Permission);
+
+    AsUser(api, daemonUser, daemonGroup);
+        ExpectSuccess(api.Pause(name));
+
+    AsUser(api, binUser, binGroup);
+        ExpectFailure(api.Destroy(name), EError::Permission);
+        ExpectFailure(api.Resume(name), EError::Permission);
+
+    api.Cleanup();
+    seteuid(0);
+    setegid(0);
 
     ExpectSuccess(api.Destroy(name));
 }

@@ -11,6 +11,7 @@
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/netlink.hpp"
+#include "util/pwd.hpp"
 
 extern "C" {
 #include <sys/types.h>
@@ -634,12 +635,33 @@ TError TContainer::PrepareTask() {
     return TError::Success();
 }
 
-TError TContainer::Create() {
+TError TContainer::Create(int uid, int gid) {
     TLogger::Log() << "Create " << GetName() << " " << Id << std::endl;
+
+    Uid = uid;
+    Gid = gid;
 
     TError error = Spec.Create();
     if (error)
         return error;
+
+    if (Uid >= 0) {
+        TUser u(Uid);
+        error = u.Load();
+        if (error)
+            return error;
+        //Spec.SetInternal("user", u.GetName());
+    }
+    Spec.SetInternal("user", GetDefaultUser());
+
+    if (Gid >= 0) {
+        TUser g(Gid);
+        error = g.Load();
+        if (error)
+            return error;
+        //Spec.SetInternal("group", g.GetName());
+    }
+    Spec.SetInternal("group", GetDefaultGroup());
 
     if (Parent)
         Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
@@ -1242,7 +1264,7 @@ TContainerHolder::~TContainerHolder() {
 TError TContainerHolder::CreateRoot() {
     BootTime = GetBootTime();
 
-    TError error = Create(ROOT_CONTAINER);
+    TError error = Create(ROOT_CONTAINER, -1, -1);
     if (error)
         return error;
 
@@ -1302,7 +1324,7 @@ std::shared_ptr<TContainer> TContainerHolder::GetParent(const std::string &name)
     }
 }
 
-TError TContainerHolder::Create(const string &name) {
+TError TContainerHolder::Create(const string &name, int uid, int gid) {
     if (!ValidName(name))
         return TError(EError::InvalidValue, "invalid container name " + name);
 
@@ -1319,7 +1341,7 @@ TError TContainerHolder::Create(const string &name) {
         return error;
 
     auto c = std::make_shared<TContainer>(name, parent, id);
-    error = c->Create();
+    error = c->Create(uid, gid);
     if (error)
         return error;
 
@@ -1332,6 +1354,24 @@ shared_ptr<TContainer> TContainerHolder::Get(const string &name) {
         return nullptr;
 
     return Containers[name];
+}
+
+TError TContainerHolder::CheckPermission(shared_ptr<TContainer> container,
+                                         int uid, int gid) {
+    int containerUid, containerGid;
+
+    if (uid == 0 || gid == 0)
+        return TError::Success();
+
+    container->GetPerm(containerUid, containerGid);
+
+    if (containerUid < 0 || containerGid < 0)
+        return TError::Success();
+
+    if (containerUid == uid || containerGid == gid)
+        return TError::Success();
+
+    return TError(EError::Permission, "Permission error");
 }
 
 TError TContainerHolder::Destroy(const string &name) {
