@@ -446,6 +446,7 @@ static void TestLongRunning(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     Expect(TaskRunning(api, pid) == true);
 
+    AsRoot(api);
     Say() << "Check that task namespaces are correct" << std::endl;
     Expect(GetNamespace("self", "pid") != GetNamespace(pid, "pid"));
     Expect(GetNamespace("self", "mnt") != GetNamespace(pid, "mnt"));
@@ -465,6 +466,7 @@ static void TestLongRunning(TPortoAPI &api) {
     }
 
     ExpectCorrectCgroups(pid, name);
+    AsNobody(api);
 
     string root_cls = GetCgKnob("net_cls", "/", "net_cls.classid");
     string leaf_cls = GetCgKnob("net_cls", name, "net_cls.classid");
@@ -571,6 +573,8 @@ static void TestEnvironment(TPortoAPI &api) {
     string name = "a";
     ExpectSuccess(api.Create(name));
 
+    AsRoot(api);
+
     Say() << "Check default environment" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.Start(name));
@@ -623,6 +627,7 @@ static void TestEnvironment(TPortoAPI &api) {
     Expect(memcmp(asb_env, env.data(), sizeof(asb_env)) == 0);
     ExpectSuccess(api.Stop(name));
 
+    AsNobody(api);
 
     ExpectSuccess(api.SetProperty(name, "command", "sleep $N"));
     ExpectSuccess(api.SetProperty(name, "env", "N=1"));
@@ -651,9 +656,22 @@ static void TestUserGroup(TPortoAPI &api) {
     ExpectSuccess(api.Stop(name));
 
     Say() << "Check custom user & group" << std::endl;
+
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+
+    ExpectFailure(api.SetProperty(name, "user", "daemon"), EError::Permission);
+    ExpectFailure(api.SetProperty(name, "group", "bin"), EError::Permission);
+
+    AsRoot(api);
     ExpectSuccess(api.SetProperty(name, "user", "daemon"));
     ExpectSuccess(api.SetProperty(name, "group", "bin"));
+    AsNobody(api);
+
+    /* TODO
+    ExpectFailure(api.Start(name), EError::Permission);
+
+    AsRoot(api);
+    */
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
 
@@ -664,12 +682,15 @@ static void TestUserGroup(TPortoAPI &api) {
     ExpectSuccess(api.Stop(name));
 
     ExpectSuccess(api.Destroy(name));
+    AsNobody(api);
 }
 
 static void TestCwd(TPortoAPI &api) {
     string pid;
     string cwd;
     string portodPid, portodCwd;
+
+    AsRoot(api);
 
     string name = "a";
     ExpectSuccess(api.Create(name));
@@ -726,11 +747,16 @@ static void TestCwd(TPortoAPI &api) {
     Expect(access("/tmp", F_OK) == 0);
 
     ExpectSuccess(api.Destroy(name));
+
+    AsNobody(api);
 }
 
 static void TestStd(TPortoAPI &api) {
     string pid;
     string name = "a";
+
+    AsRoot(api);
+
     ExpectSuccess(api.Create(name));
 
     Say() << "Check default stdin/stdout/stderr" << std::endl;
@@ -784,6 +810,8 @@ static void TestStd(TPortoAPI &api) {
     Expect(ret == string("hi"));
 
     ExpectSuccess(api.Destroy(name));
+
+    AsNobody(api);
 }
 
 /*
@@ -877,7 +905,9 @@ static void TestStateMachine(TPortoAPI &api) {
     v = GetFreezer(name);
     Expect(v == "THAWED\n");
 
+    AsRoot(api);
     SetFreezer(name, "FROZEN");
+    AsNobody(api);
 
     v = GetFreezer(name);
     Expect(v == "FROZEN\n");
@@ -1445,16 +1475,7 @@ static void TestPermissions(TPortoAPI &api) {
     if (error)
         throw error.GetMsg();
 
-    TGroup portoGroup("porto");
-    error = portoGroup.Load();
-    if (error)
-        throw error.GetMsg();
-
-    gid_t portoGid = portoGroup.GetId();
-
     string s;
-
-    Expect(setgroups(1, &portoGid) == 0);
 
     AsUser(api, daemonUser, daemonGroup);
            ExpectSuccess(api.Create(name));
@@ -1467,8 +1488,8 @@ static void TestPermissions(TPortoAPI &api) {
 
     AsUser(api, daemonUser, daemonGroup);
         ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
-        ExpectSuccess(api.SetProperty(name, "user", "mail"));
-        ExpectSuccess(api.SetProperty(name, "group", "mail"));
+        ExpectFailure(api.SetProperty(name, "user", "mail"), EError::Permission);
+        ExpectFailure(api.SetProperty(name, "group", "mail"), EError::Permission);
         ExpectSuccess(api.GetProperty(name, "command", s));
         ExpectSuccess(api.Start(name));
         ExpectSuccess(api.GetData(name, "root_pid", s));
@@ -1485,11 +1506,9 @@ static void TestPermissions(TPortoAPI &api) {
         ExpectFailure(api.Destroy(name), EError::Permission);
         ExpectFailure(api.Resume(name), EError::Permission);
 
-    api.Cleanup();
-    seteuid(0);
-    setegid(0);
-
+    AsRoot(api);
     ExpectSuccess(api.Destroy(name));
+    AsNobody(api);
 }
 
 static void TestRespawn(TPortoAPI &api) {
@@ -1578,6 +1597,8 @@ static void TestRecovery(TPortoAPI &api) {
     };
 
     Say() << "Make sure we don't kill containers when doing recovery" << std::endl;
+
+    AsRoot(api);
     ExpectSuccess(api.Create(name));
 
     for (auto &pair : props)
@@ -1610,6 +1631,7 @@ static void TestRecovery(TPortoAPI &api) {
     }
 
     ExpectSuccess(api.Destroy(name));
+    AsNobody(api);
 
     Say() << "Make sure hierarchical recovery works" << std::endl;
 
@@ -1619,10 +1641,12 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectSuccess(api.Create(child));
 
     portodPid = ReadPid(config().slave_pid().path());
+    AsRoot(api);
     if (kill(portodPid, SIGKILL))
         throw string("Can't send SIGKILL to slave");
     WaitExit(api, std::to_string(portodPid));
     WaitPortod(api);
+    AsNobody(api);
 
     std::vector<std::string> containers;
 
@@ -1637,6 +1661,8 @@ static void TestRecovery(TPortoAPI &api) {
 
 static void TestCgroups(TPortoAPI &api) {
     string cg = "/sys/fs/cgroup/freezer/qwerty/asdfg";
+
+    AsRoot(api);
 
     TFolder f(cg);
     if (f.Exists())
@@ -1701,11 +1727,21 @@ int SelfTest(string name, int leakNr) {
         Expect(WordCount(config().master_log().path(), "Started") == 1);
         Expect(WordCount(config().slave_log().path(), "Started") == 1);
 
+        TGroup portoGroup("porto");
+        TError error = portoGroup.Load();
+        if (error)
+            throw error.GetMsg();
+
+        gid_t portoGid = portoGroup.GetId();
+        Expect(setgroups(1, &portoGid) == 0);
+
         for (auto t : tests) {
             if (name.length() && name != t.first)
                 continue;
 
             std::cerr << ">>> Testing " << t.first << "..." << std::endl;
+            AsNobody(api);
+
             t.second(api);
         }
 

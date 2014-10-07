@@ -128,8 +128,8 @@ static TError ValidNetPriority(std::shared_ptr<const TContainer> container, cons
 
 std::map<std::string, const TPropertySpec> propertySpec = {
     {"command", { "Command executed upon container start", "" }},
-    {"user", { "Start command with given user", "", 0, ValidUser }},
-    {"group", { "Start command with given group", "", 0, ValidGroup }},
+    {"user", { "Start command with given user", "", SUPERUSER_PROPERTY, ValidUser }},
+    {"group", { "Start command with given group", "", SUPERUSER_PROPERTY, ValidGroup }},
     {"env", { "Container environment variables" }},
     //{"root", { "Container root directory", "" }},
     {"cwd", { "Container working directory", "" }},
@@ -170,11 +170,11 @@ bool TContainerSpec::IsRoot() const {
     return Name == ROOT_CONTAINER;
 }
 
-bool TContainerSpec::IsDynamic(const std::string &property) const {
+unsigned int TContainerSpec::GetFlags(const std::string &property) const {
     if (propertySpec.find(property) == propertySpec.end())
         return false;
 
-    return propertySpec.at(property).Flags & DYNAMIC_PROPERTY;
+    return propertySpec.at(property).Flags;
 }
 
 TError TContainerSpec::GetInternal(const string &property, string &value) const {

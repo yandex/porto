@@ -123,7 +123,7 @@ std::string GetCwd(const std::string &pid) {
     TFile f("/proc/" + pid + "/cwd");
     TError error(f.ReadLink(lnk));
     if (error)
-        return error.GetMsg();
+        throw error.GetMsg();
     return lnk;
 }
 
@@ -348,13 +348,57 @@ bool FileExists(const std::string &path) {
 }
 
 void AsUser(TPortoAPI &api, TUser &user, TGroup &group) {
+    AsRoot(api);
+
+    Expect(setregid(0, group.GetId()) == 0);
+    Expect(setreuid(0, user.GetId()) == 0);
+}
+
+void AsRoot(TPortoAPI &api) {
     api.Cleanup();
 
     seteuid(0);
     setegid(0);
+}
 
-    Expect(setregid(0, group.GetId()) == 0);
-    Expect(setreuid(0, user.GetId()) == 0);
+void AsNobody(TPortoAPI &api) {
+    TUser nobody(GetDefaultUser());
+    TError error = nobody.Load();
+    if (error)
+        throw error.GetMsg();
+
+    TGroup nogroup(GetDefaultGroup());
+    error = nogroup.Load();
+    if (error)
+        throw error.GetMsg();
+
+    AsUser(api, nobody, nogroup);
+}
+
+std::string GetDefaultUser() {
+    std::string users[] = { "nobody" };
+
+    for (auto &user : users) {
+        TUser u(user);
+        TError error = u.Load();
+        if (!error)
+            return u.GetName();
+    }
+
+    return "daemon";
+}
+
+std::string GetDefaultGroup() {
+    std::string groups[] = { "nobody", "nogroup" };
+
+    for (auto &group : groups) {
+        TGroup g(group);
+        TError error = g.Load();
+        if (!error)
+            return g.GetName();
+    }
+
+    return "daemon";
 }
 
 void RestartDaemon(TPortoAPI &api) {
@@ -392,6 +436,8 @@ void TestDaemon(TPortoAPI &api) {
     struct dirent **lst;
     int pid;
 
+    AsRoot(api);
+
     api.Cleanup();
 
     Say() << "Make sure portod-slave doesn't have zombies" << std::endl;
@@ -407,7 +453,8 @@ void TestDaemon(TPortoAPI &api) {
         sssFd = 1;
 
     // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 4(rpc socket) 128(event pipe) 129(ack pipe)
-    Expect(scandir(path.c_str(), &lst, NULL, alphasort) == 2 + 7 + sssFd);
+    int nr = scandir(path.c_str(), &lst, NULL, alphasort);
+    Expect(nr >= 2 + 7 && nr <= 2 + 7 + sssFd);
 
     Say() << "Make sure portod-master doesn't have zombies" << std::endl;
     pid = ReadPid(config().master_pid().path());

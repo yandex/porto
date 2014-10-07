@@ -41,6 +41,10 @@ namespace test {
     std::string ReadLink(const std::string &path);
     bool FileExists(const std::string &path);
     void AsUser(TPortoAPI &api, TUser &user, TGroup &group);
+    void AsRoot(TPortoAPI &api);
+    void AsNobody(TPortoAPI &api);
+    std::string GetDefaultUser();
+    std::string GetDefaultGroup();
 
     void RestartDaemon(TPortoAPI &api);
     void TestDaemon(TPortoAPI &api);

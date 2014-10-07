@@ -128,32 +128,6 @@ size_t GetTotalMemory() {
     return si.totalram;
 }
 
-std::string GetDefaultUser() {
-    std::string users[] = { "nobody" };
-
-    for (auto &user : users) {
-        TUser u(user);
-        TError error = u.Load();
-        if (!error)
-            return u.GetName();
-    }
-
-    return "daemon";
-}
-
-std::string GetDefaultGroup() {
-    std::string groups[] = { "nobody", "nogroup" };
-
-    for (auto &group : groups) {
-        TGroup g(group);
-        TError error = g.Load();
-        if (!error)
-            return g.GetName();
-    }
-
-    return "daemon";
-}
-
 int CreatePidFile(const std::string &path, const int mode) {
     TFile f(path, mode);
 

@@ -16,8 +16,6 @@ int RegisterSignal(int signum, void (*handler)(int sig, siginfo_t *si, void *unu
 void ResetAllSignalHandlers(void);
 std::string DirName(const std::string &str);
 size_t GetTotalMemory();
-std::string GetDefaultUser();
-std::string GetDefaultGroup();
 int CreatePidFile(const std::string &path, const int mode);
 void RemovePidFile(const std::string &path);
 void SetProcessName(const std::string &name);

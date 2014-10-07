@@ -6,7 +6,6 @@
 - ? cpu_cores property to reserve some cores for a container
 - loop.py: specify limits via properties, more fine grained settings for respawn,
   coredump settings
-- ? fix permissions
 - ? different log levels (error, normal, verbose)
 - ? show default property value instead of empty string
 

@@ -650,18 +650,19 @@ TError TContainer::Create(int uid, int gid) {
         error = u.Load();
         if (error)
             return error;
-        //Spec.SetInternal("user", u.GetName());
+        Spec.SetInternal("user", u.GetName());
     }
-    Spec.SetInternal("user", GetDefaultUser());
 
     if (Gid >= 0) {
-        TUser g(Gid);
+        TGroup g(Gid);
         error = g.Load();
         if (error)
             return error;
-        //Spec.SetInternal("group", g.GetName());
+        Spec.SetInternal("group", g.GetName());
     }
-    Spec.SetInternal("group", GetDefaultGroup());
+
+    Spec.SetInternal("uid", std::to_string(Uid));
+    Spec.SetInternal("gid", std::to_string(Gid));
 
     if (Parent)
         Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
@@ -1001,7 +1002,7 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
 }
 
 bool TContainer::ShouldApplyProperty(const std::string &property) {
-    if (!Spec.IsDynamic(property))
+    if (!(Spec.GetFlags(property) & DYNAMIC_PROPERTY))
        return false;
 
     if (State == EContainerState::Dead || State == EContainerState::Stopped)
@@ -1010,7 +1011,7 @@ bool TContainer::ShouldApplyProperty(const std::string &property) {
     return true;
 }
 
-TError TContainer::SetProperty(const string &origProperty, const string &origValue) {
+TError TContainer::SetProperty(const string &origProperty, const string &origValue, bool superuser) {
     if (IsRoot())
         return TError(EError::InvalidValue, "Can't set property for root");
 
@@ -1024,7 +1025,10 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
     if (propertySpec.find(property) == propertySpec.end())
         return TError(EError::InvalidProperty, "invalid property");
 
-    if (State != EContainerState::Stopped && !Spec.IsDynamic(property))
+    if ((Spec.GetFlags(property) & SUPERUSER_PROPERTY) && !superuser)
+        return TError(EError::Permission, "Only root can change this property");
+
+    if (State != EContainerState::Stopped && !(Spec.GetFlags(property) & DYNAMIC_PROPERTY))
         return TError(EError::InvalidValue, "Can't set dynamic property " + property + " for running container");
 
     error = Spec.Set(shared_from_this(), property, value);
@@ -1059,6 +1063,21 @@ TError TContainer::Restore(const kv::TNode &node) {
     }
 
     TLogger::Log() << GetName() << ": restore process " << std::to_string(pid) << " which " << (started ? "started" : "didn't start") << std::endl;
+
+    string s;
+    error = Spec.GetInternal("uid", s);
+    TLogger::LogError(error, "Can't restore uid");
+    if (!error) {
+        error = StringToInt(s, Uid);
+        TLogger::LogError(error, "Can't parse uid");
+    }
+
+    error = Spec.GetInternal("gid", s);
+    TLogger::LogError(error, "Can't restore gid");
+    if (!error) {
+        error = StringToInt(s, Gid);
+        TLogger::LogError(error, "Can't parse gid");
+    }
 
     State = EContainerState::Stopped;
 

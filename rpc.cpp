@@ -131,7 +131,7 @@ static TError SetContainerProperty(TContainerHolder &cholder,
     if (error)
         return error;
 
-    return container->SetProperty(req.property(), req.value());
+    return container->SetProperty(req.property(), req.value(), uid == 0 || gid == 0);
 }
 
 static TError GetContainerData(TContainerHolder &cholder,

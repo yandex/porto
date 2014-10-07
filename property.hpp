@@ -13,6 +13,7 @@ class TContainer;
 
 const unsigned int DYNAMIC_PROPERTY = (1 << 0);
 const unsigned int HIDDEN_PROPERTY = (1 << 1);
+const unsigned int SUPERUSER_PROPERTY = (1 << 2);
 
 struct TPropertySpec {
     std::string Description;
@@ -40,7 +41,7 @@ public:
     TError Set(std::shared_ptr<const TContainer> container, const std::string &property, const std::string &value);
     TError GetInternal(const std::string &property, std::string &value) const;
     TError SetInternal(const std::string &property, const std::string &value);
-    bool IsDynamic(const std::string &property) const;
+    unsigned int GetFlags(const std::string &property) const;
     TError Create();
     TError Restore(const kv::TNode &node);
 };
