@@ -57,12 +57,14 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     TScopedFd Efd;
     bool OomKilled = false;
     size_t RespawnCount;
+    int64_t BootTime = 0;
     friend TData;
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
     std::unique_ptr<TTask> Task;
 
     // data
+    int64_t GetBootTime();
     bool CheckState(EContainerState expected);
     TError ApplyDynamicProperties();
     TError PrepareNetwork();

@@ -224,6 +224,33 @@ struct TData {
 
         return str.str();
     };
+
+    static string RunningTime(TContainer& c) {
+        if (!c.Task || !c.Task->IsRunning())
+            return "0";
+
+        int pid = c.Task->GetPid();
+        TFile f("/proc/" + std::to_string(pid) + "/stat");
+        string line;
+        if (f.AsString(line))
+            return "0";
+
+        vector<string> cols;
+        if (SplitString(line, ' ', cols))
+            return "0";
+
+        if (cols.size() <= 21)
+            return "0";
+
+        int64_t started;
+        if (StringToInt64(cols[21], started))
+            return "0";
+
+        started /= sysconf(_SC_CLK_TCK);
+        started += c.BootTime;
+
+        return std::to_string(time(nullptr) - started);
+    };
 };
 
 std::map<std::string, const TDataSpec> dataSpec = {
@@ -247,9 +274,33 @@ std::map<std::string, const TDataSpec> dataSpec = {
 
     { "io_read", { "return number of bytes read from disk", ROOT_DATA | HIDDEN_DATA, TData::IoRead, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
     { "io_write", { "return number of bytes written to disk", ROOT_DATA | HIDDEN_DATA, TData::IoWrite, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+
+    { "time", { "return running time of container", 0, TData::RunningTime, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
 };
 
 // TContainer
+
+int64_t TContainer::GetBootTime() {
+    vector<string> lines;
+    TFile f("/proc/stat");
+    if (f.AsLines(lines))
+        return 0;
+
+    for (auto &line : lines) {
+        vector<string> cols;
+        if (SplitString(line, ' ', cols))
+            return 0;
+
+        if (cols[0] == "btime") {
+            int64_t val;
+            if (StringToInt64(cols[1], val))
+                return 0;
+            return val;
+        }
+    }
+
+    return 0;
+}
 
 bool TContainer::CheckState(EContainerState expected) {
     if (State == EContainerState::Running && (!Task || !Task->IsRunning()))
@@ -583,6 +634,10 @@ TError TContainer::PrepareTask() {
 
 TError TContainer::Create() {
     TLogger::Log() << "Create " << GetName() << " " << Id << std::endl;
+
+    if (!BootTime)
+        BootTime = GetBootTime();
+
     TError error = Spec.Create();
     if (error)
         return error;

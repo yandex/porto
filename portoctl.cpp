@@ -47,7 +47,8 @@ string HumanNsec(const string &val) {
     return str.str();
 }
 
-string HumanSec(int64_t n) {
+string HumanSec(const string &val) {
+    int64_t n = stoll(val);
     int64_t h = 0, m = 0, s = n;
 
     if (s > 60) {
@@ -101,6 +102,9 @@ string PropertyValue(const string &name, const string &val) {
 }
 
 string DataValue(const string &name, const string &val) {
+    if (val == "")
+        return val;
+
     if (name == "exit_status") {
         int status;
         if (StringToInt(val, status))
@@ -139,6 +143,8 @@ string DataValue(const string &name, const string &val) {
         return HumanSize(val);
     } else if (name == "cpu_usage") {
         return HumanNsec(val);
+    } else if (name == "time") {
+        return HumanSec(val);
     } else {
         return val;
     }
@@ -704,61 +710,8 @@ public:
 };
 
 class TListCmd : public ICmd {
-    int64_t BootTime = 0;
 public:
     TListCmd(TPortoAPI *api) : ICmd(api, "list", 0, "", "list created containers") {}
-
-    int64_t GetBootTime() {
-        vector<string> lines;
-        TFile f("/proc/stat");
-        if (f.AsLines(lines))
-            return 0;
-
-        for (auto &line : lines) {
-            vector<string> cols;
-            if (SplitString(line, ' ', cols))
-                return 0;
-
-            if (cols[0] == "btime") {
-                int64_t val;
-                if (StringToInt64(cols[1], val))
-                    return 0;
-                return val;
-            }
-        }
-
-        return 0;
-    }
-
-    int64_t GetStartTime(const std::string container) {
-            string pid;
-            if (Api->GetData(container, "root_pid", pid))
-                return 0;
-
-            string line;
-            TFile f("/proc/" + pid + "/stat");
-            if (f.AsString(line))
-                return 0;
-
-            vector<string> cols;
-            if (SplitString(line, ' ', cols))
-                return 0;
-
-            if (cols.size() <= 21)
-                return 0;
-
-            int64_t started;
-            if (StringToInt64(cols[21], started))
-                return 0;
-
-            if (!BootTime)
-                BootTime = GetBootTime();
-
-            started /= sysconf(_SC_CLK_TCK);
-            started += BootTime;
-
-            return time(nullptr) - started;
-    }
 
     int Execute(int argc, char *argv[]) {
         vector<string> clist;
@@ -782,10 +735,11 @@ public:
                       << std::right << std::setw(stateLen) << s;
 
             if (s == "running") {
-                int64_t started = GetStartTime(c);
-                if (started)
-                    std::cout << std::right << std::setw(timeLen)
-                        << HumanSec(GetStartTime(c));
+                string tm;
+                ret = Api->GetData(c, "time", tm);
+                if (!ret)
+                        std::cout << std::right << std::setw(timeLen)
+                            << DataValue("time", tm);
             }
 
             std::cout << std::endl;
@@ -856,12 +810,7 @@ public:
             map<string, string> dataVal;
             for (auto data : showData) {
                 string val;
-                int ret = Api->GetData(container, data, val);
-                if (ret) {
-                    PrintError("Can't get container data " + data);
-                    return EXIT_FAILURE;
-                }
-
+                (void)Api->GetData(container, data, val);
                 dataVal[data] = val;
             }
 
@@ -871,12 +820,19 @@ public:
         std::sort(containerData.begin(), containerData.end(),
                   [&](pair<string, map<string, string>> a,
                      pair<string, map<string, string>> b) {
+                  string as, bs;
                   int64_t an, bn;
 
-                  TError aError = StringToInt64(a.second[sortBy], an);
-                  TError bError = StringToInt64(b.second[sortBy], bn);
+                  if (a.second.find(sortBy) == a.second.end())
+                      as = a.second[sortBy];
+
+                  if (b.second.find(sortBy) == b.second.end())
+                      bs = b.second[sortBy];
+
+                  TError aError = StringToInt64(as, an);
+                  TError bError = StringToInt64(bs, bn);
                   if (aError || bError)
-                      return a.second[sortBy] > b.second[sortBy];
+                      return as > bs;
 
                   return an > bn;
                   });
@@ -900,9 +856,10 @@ public:
         for (auto &pair : containerData) {
             std::cout << std::left << std::setw(nameLen) << pair.first;
 
-            for (size_t i = 0; i < showData.size(); i++)
-                std::cout << std::right << std::setw(fieldLen[i]) <<
-                    DataValue(showData[i], pair.second[showData[i]]);
+            for (size_t i = 0; i < showData.size(); i++) {
+                std::cout << std::right << std::setw(fieldLen[i]);
+                std::cout << DataValue(showData[i], pair.second[showData[i]]);
+            }
             std::cout << std::endl;
         }
 
