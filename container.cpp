@@ -1113,7 +1113,7 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
         return false;
 
     Task->DeliverExitStatus(status);
-    TLogger::Log() << "Delivered " << std::to_string(status) << " to " << GetName() << " with root_pid " << std::to_string(Task->GetPid()) << std::endl;
+    TLogger::Log() << "Delivered " << status << " to " << GetName() << " with root_pid " << Task->GetPid() << std::endl;
     State = EContainerState::Dead;
 
     if (Spec.Get("isolate") == "false")
@@ -1190,6 +1190,7 @@ void TContainer::DeliverOom() {
     }
 
     int pid = Task->GetPid();
+    TLogger::Log() << "Delivered OOM to " << GetName() << " with root_pid " << pid << std::endl;
 
     TError error = KillAll();
     if (error)

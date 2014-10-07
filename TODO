@@ -5,7 +5,6 @@
 - ? cpu_cores property to reserve some cores for a container
 - loop.py: specify limits via properties, more fine grained settings for respawn,
   coredump settings
-- add killed-by-oom indication to the log
 - TUser & TGroup classes + support numbers in properties
 - ? fix permissions
 
