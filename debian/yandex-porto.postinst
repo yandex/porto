@@ -4,7 +4,7 @@
 case "$1" in
     configure)
         if ! getent group porto >/dev/null; then
-            groupadd -g 333 porto 2>/dev/null
+            groupadd -g 1333 porto 2>/dev/null
             if [ $? -ne 0 ]; then
                 echo "Group 'porto' does not create!" >&2
             fi
