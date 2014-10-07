@@ -3,9 +3,11 @@
 - ? autodestroy property
 - ? portoctl run -f <MANIFEST> | <MANIFEST STRING>
 - ? cpu_cores property to reserve some cores for a container
-- ? some kind of io usage data (iops/bytes)
 - loop.py: specify limits via properties, more fine grained settings for respawn,
   coredump settings
+- add killed-by-oom indication to the log
+- TUser & TGroup classes + support numbers in properties
+- ? fix permissions
 
 # properties
 - ? capabilities

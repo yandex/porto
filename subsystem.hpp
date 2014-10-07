@@ -58,10 +58,31 @@ public:
     TNetclsSubsystem() : TSubsystem("net_cls") {}
 };
 
+struct BlkioStat {
+    std::string Device;
+    uint64_t Read;
+    uint64_t Write;
+    uint64_t Sync;
+    uint64_t Async;
+};
+
+class TBlkioSubsystem : public TSubsystem {
+    TError GetStatLine(const std::vector<std::string> &lines,
+                       const size_t i,
+                       const std::string &name,
+                       uint64_t &val) const;
+    TError GetDevice(const std::string &majmin,
+                     std::string &device) const;
+public:
+    TBlkioSubsystem() : TSubsystem("blkio") {}
+    TError Statistics(std::shared_ptr<TCgroup> &cg, const std::string &file, std::vector<BlkioStat> &stat) const;
+};
+
 extern std::shared_ptr<TMemorySubsystem> memorySubsystem;
 extern std::shared_ptr<TFreezerSubsystem> freezerSubsystem;
 extern std::shared_ptr<TCpuSubsystem> cpuSubsystem;
 extern std::shared_ptr<TCpuacctSubsystem> cpuacctSubsystem;
 extern std::shared_ptr<TNetclsSubsystem> netclsSubsystem;
+extern std::shared_ptr<TBlkioSubsystem> blkioSubsystem;
 
 #endif

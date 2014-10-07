@@ -13,6 +13,7 @@ shared_ptr<TFreezerSubsystem> freezerSubsystem(new TFreezerSubsystem);
 shared_ptr<TCpuSubsystem> cpuSubsystem(new TCpuSubsystem);
 shared_ptr<TCpuacctSubsystem> cpuacctSubsystem(new TCpuacctSubsystem);
 shared_ptr<TNetclsSubsystem> netclsSubsystem(new TNetclsSubsystem);
+shared_ptr<TBlkioSubsystem> blkioSubsystem(new TBlkioSubsystem);
 
 static const std::map<std::string, std::shared_ptr<TSubsystem>> subsystems = {
     { "memory", memorySubsystem },
@@ -20,6 +21,7 @@ static const std::map<std::string, std::shared_ptr<TSubsystem>> subsystems = {
     { "cpu", cpuSubsystem },
     { "cpuacct", cpuacctSubsystem },
     { "net_cls", netclsSubsystem },
+    { "blkio", blkioSubsystem },
 };
 
 // TSubsystem
@@ -144,3 +146,86 @@ TError TCpuacctSubsystem::Usage(shared_ptr<TCgroup> &cg, uint64_t &value) const 
 }
 
 // Netcls
+
+// Blkio
+
+TError TBlkioSubsystem::GetStatLine(const vector<string> &lines,
+                                    const size_t i,
+                                    const std::string &name,
+                                    uint64_t &val) const {
+    vector<string> tokens;
+    TError error = SplitString(lines[i], ' ', tokens);
+    if (error)
+        return error;
+
+    if (tokens.size() < 3 || tokens[1] != name)
+        return TError(EError::Unknown, "Unexpected field in blkio statistics");
+
+    return StringToUint64(tokens[2], val);
+}
+
+TError TBlkioSubsystem::GetDevice(const std::string &majmin,
+                                  std::string &device) const {
+    TFile f("/sys/dev/block/" + majmin + "/uevent");
+    vector<string> lines;
+    TError error = f.AsLines(lines);
+    if (error)
+        return error;
+
+    for (auto &line : lines) {
+        vector<string> tokens;
+        error = SplitString(line, '=', tokens);
+        if (error)
+            return error;
+
+        if (tokens.size() != 2)
+            continue;
+
+        if (tokens[0] == "DEVNAME") {
+            device = tokens[1];
+            return TError::Success();
+        }
+    }
+
+    return TError(EError::Unknown, "Unable to convert device maj+min to name");
+}
+
+TError TBlkioSubsystem::Statistics(std::shared_ptr<TCgroup> &cg, const std::string &file, std::vector<BlkioStat> &stat) const {
+    vector<string> lines;
+    TError error = cg->GetKnobValueAsLines(file, lines);
+    if (error)
+        return error;
+
+    BlkioStat s;
+    for (size_t i = 0; i < lines.size(); i += 5) {
+        vector<string> tokens;
+        error = SplitString(lines[i], ' ', tokens);
+        if (error)
+            return error;
+
+        if (tokens.size() == 3) {
+            error = GetDevice(tokens[0], s.Device);
+            if (error)
+                return error;
+        } else {
+            continue; /* Total */
+        }
+
+        error = GetStatLine(lines, i + 0, "Read", s.Read);
+        if (error)
+            return error;
+        error = GetStatLine(lines, i + 1, "Write", s.Write);
+        if (error)
+            return error;
+        error = GetStatLine(lines, i + 2, "Sync", s.Sync);
+        if (error)
+            return error;
+        error = GetStatLine(lines, i + 3, "Async", s.Async);
+        if (error)
+            return error;
+
+        stat.push_back(s);
+    }
+
+    return TError::Success();
+}

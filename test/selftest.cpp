@@ -115,6 +115,8 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     ExpectFailure(api.GetData(name, "oom_killed", v), EError::InvalidState);
     ExpectFailure(api.GetData(name, "respawn_count", v), EError::InvalidState);
     ExpectSuccess(api.GetData(name, "parent", v));
+    ExpectFailure(api.GetData(name, "io_read", v), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "io_write", v), EError::InvalidState);
     Expect(v == string("/"));
 }
 
@@ -968,6 +970,10 @@ static void TestRoot(TPortoAPI &api) {
     Expect(v == "0");
     ExpectSuccess(api.GetData(root, "net_overlimits", v));
     Expect(v == "0");
+    ExpectSuccess(api.GetData(root, "io_read", v));
+    Expect(v == "");
+    ExpectSuccess(api.GetData(root, "io_write", v));
+    Expect(v == "");
 
     uint32_t defClass = TcHandle(1, 2);
     uint32_t rootClass = TcHandle(1, 1);
@@ -1001,7 +1007,7 @@ static void TestStats(TPortoAPI &api) {
     WaitState(api, noop, "dead");
 
     ExpectSuccess(api.Create(wget));
-    ExpectSuccess(api.SetProperty(wget, "command", "wget yandex.ru"));
+    ExpectSuccess(api.SetProperty(wget, "command", "bash -c 'wget yandex.ru && sync'"));
     ExpectSuccess(api.Start(wget));
     WaitState(api, wget, "dead");
 
@@ -1011,16 +1017,28 @@ static void TestStats(TPortoAPI &api) {
     Expect(v != "0" && v != "-1");
     ExpectSuccess(api.GetData(root, "memory_usage", v));
     Expect(v != "0" && v != "-1");
+    ExpectSuccess(api.GetData(root, "io_write", v));
+    Expect(v != "");
+    ExpectSuccess(api.GetData(root, "io_read", v));
+    Expect(v != "");
 
     ExpectSuccess(api.GetData(wget, "cpu_usage", v));
     Expect(v != "0" && v != "-1");
     ExpectSuccess(api.GetData(wget, "memory_usage", v));
     Expect(v != "0" && v != "-1");
+    ExpectSuccess(api.GetData(wget, "io_write", v));
+    Expect(v != "");
+    ExpectSuccess(api.GetData(wget, "io_read", v));
+    Expect(v != "");
 
     ExpectSuccess(api.GetData(noop, "cpu_usage", v));
     Expect(v != "0" && v != "-1");
     ExpectSuccess(api.GetData(noop, "memory_usage", v));
     Expect(v != "0" && v != "-1");
+    ExpectSuccess(api.GetData(noop, "io_write", v));
+    Expect(v == "");
+    ExpectSuccess(api.GetData(noop, "io_read", v));
+    Expect(v == "");
 
     ExpectSuccess(api.GetData(root, "net_bytes", rv));
     Expect(rv != "0" && rv != "-1");

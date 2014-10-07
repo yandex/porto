@@ -188,6 +188,42 @@ struct TData {
 
         return std::to_string(val);
     };
+
+    static string IoRead(TContainer& c) {
+        auto cg = c.GetLeafCgroup(blkioSubsystem);
+
+        vector<BlkioStat> stat;
+        TError error = blkioSubsystem->Statistics(cg, "blkio.io_service_bytes_recursive", stat);
+        if (error)
+            return "-1";
+
+        std::stringstream str;
+        for (auto &s : stat) {
+            if (str.str().length())
+                str << " ";
+            str << s.Device << ":" << s.Read;
+        }
+
+        return str.str();
+    };
+
+    static string IoWrite(TContainer& c) {
+        auto cg = c.GetLeafCgroup(blkioSubsystem);
+
+        vector<BlkioStat> stat;
+        TError error = blkioSubsystem->Statistics(cg, "blkio.io_service_bytes_recursive", stat);
+        if (error)
+            return "-1";
+
+        std::stringstream str;
+        for (auto &s : stat) {
+            if (str.str().length())
+                str << " ";
+            str << s.Device << ":" << s.Write;
+        }
+
+        return str.str();
+    };
 };
 
 std::map<std::string, const TDataSpec> dataSpec = {
@@ -208,6 +244,9 @@ std::map<std::string, const TDataSpec> dataSpec = {
     { "memory_usage", { "return consumed memory in bytes", ROOT_DATA, TData::MemUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
     { "minor_faults", { "return number of minor page faults", ROOT_DATA, TData::MinorFaults, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
     { "major_faults", { "return number of major page faults", ROOT_DATA, TData::MajorFaults, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+
+    { "io_read", { "return number of bytes read from disk", ROOT_DATA | HIDDEN_DATA, TData::IoRead, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "io_write", { "return number of bytes written to disk", ROOT_DATA | HIDDEN_DATA, TData::IoWrite, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
 };
 
 // TContainer
@@ -477,6 +516,7 @@ TError TContainer::PrepareCgroups() {
     LeafCgroups[cpuacctSubsystem] = GetLeafCgroup(cpuacctSubsystem);
     LeafCgroups[memorySubsystem] = GetLeafCgroup(memorySubsystem);
     LeafCgroups[freezerSubsystem] = GetLeafCgroup(freezerSubsystem);
+    LeafCgroups[blkioSubsystem] = GetLeafCgroup(blkioSubsystem);
     if (config().network().enabled())
         LeafCgroups[netclsSubsystem] = GetLeafCgroup(netclsSubsystem);
 

@@ -147,10 +147,10 @@ string DataValue(const string &name, const string &val) {
 size_t CalculateFieldLength(vector<string> &vec, size_t min = 8) {
     size_t len = 0;
     for (auto &i : vec)
-        if (i.length() + 1 > len)
-            len  = i.length() + 1;
+        if (i.length() > len)
+            len  = i.length();
 
-    return len > min ? len : min;
+    return (len > min ? len : min) + 1;
 }
 
 bool ValidData(const vector<TData> &dlist, const string &name) {
@@ -799,24 +799,6 @@ class TTopCmd : public ICmd {
 public:
     TTopCmd(TPortoAPI *api) : ICmd(api, "top", 0, "[sort-by]", "print containers sorted by resource usage") {}
 
-    int GetUintData(const std::string &container,
-                    const std::string &data, int64_t &val) {
-        string s;
-        int ret = Api->GetData(container, data, s);
-        if (ret) {
-            PrintError("Can't get container data " + data);
-            return EXIT_FAILURE;
-        }
-
-        TError error = StringToInt64(s, val);
-        if (error) {
-            PrintError("Can't parse container data " + data);
-            return EXIT_FAILURE;
-        }
-
-        return EXIT_SUCCESS;
-    }
-
     int Execute(int argc, char *argv[]) {
         vector<string> clist;
         int ret = Api->List(clist);
@@ -825,7 +807,7 @@ public:
             return EXIT_FAILURE;
         }
 
-        vector<pair<string, map<string, int64_t>>> containerData;
+        vector<pair<string, map<string, string>>> containerData;
         vector<string> showData;
 
         if (argc == 0) {
@@ -859,7 +841,6 @@ public:
 
         string sortBy = showData[0];
         size_t nameLen = CalculateFieldLength(clist, strlen("container"));
-        size_t dataLen = CalculateFieldLength(showData);
 
         for (auto container : clist) {
             string state;
@@ -872,11 +853,14 @@ public:
             if (state != "running")
                 continue;
 
-            map<string, int64_t> dataVal;
+            map<string, string> dataVal;
             for (auto data : showData) {
-                int64_t val;
-                if (GetUintData(container, data, val))
+                string val;
+                int ret = Api->GetData(container, data, val);
+                if (ret) {
+                    PrintError("Can't get container data " + data);
                     return EXIT_FAILURE;
+                }
 
                 dataVal[data] = val;
             }
@@ -885,22 +869,40 @@ public:
         }
 
         std::sort(containerData.begin(), containerData.end(),
-                  [&](pair<string, map<string, int64_t>> a,
-                     pair<string, map<string, int64_t>> b) {
-                  return a.second[sortBy] > b.second[sortBy];
+                  [&](pair<string, map<string, string>> a,
+                     pair<string, map<string, string>> b) {
+                  int64_t an, bn;
+
+                  TError aError = StringToInt64(a.second[sortBy], an);
+                  TError bError = StringToInt64(b.second[sortBy], bn);
+                  if (aError || bError)
+                      return a.second[sortBy] > b.second[sortBy];
+
+                  return an > bn;
                   });
 
+        vector<size_t> fieldLen;
+        for (auto &data : showData) {
+            vector<string> tmp;
+            tmp.push_back(data);
+
+            for (auto &pair : containerData)
+                tmp.push_back(DataValue(data, pair.second[data]));
+
+            fieldLen.push_back(CalculateFieldLength(tmp));
+        }
+
         std::cout << std::left << std::setw(nameLen) << "container";
-        for (auto &data : showData)
-            std::cout << std::right << std::setw(dataLen) << data;
+        for (size_t i = 0; i < showData.size(); i++)
+            std::cout << std::right << std::setw(fieldLen[i]) << showData[i];
         std::cout << std::endl;
 
         for (auto &pair : containerData) {
             std::cout << std::left << std::setw(nameLen) << pair.first;
 
-            for (auto &data : showData)
-                std::cout << std::right << std::setw(dataLen) <<
-                    DataValue(data, std::to_string(pair.second[data]));
+            for (size_t i = 0; i < showData.size(); i++)
+                std::cout << std::right << std::setw(fieldLen[i]) <<
+                    DataValue(showData[i], pair.second[showData[i]]);
             std::cout << std::endl;
         }
 
