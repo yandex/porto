@@ -3,12 +3,6 @@
 
 case "$1" in
     configure)
-        if ! getent group porto >/dev/null; then
-            groupadd -g 1333 porto 2>/dev/null
-            if [ $? -ne 0 ]; then
-                echo "Group 'porto' does not create!" >&2
-            fi
-        fi
         update-rc.d yandex-porto start 90 2 3 4 5 .
         if [ -e "/etc/init/yandex-porto.conf" ]; then
             start yandex-porto
