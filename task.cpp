@@ -9,6 +9,7 @@
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
+#include "util/pwd.hpp"
 
 extern "C" {
 #include <string.h>
@@ -19,10 +20,9 @@ extern "C" {
 #include <sys/syscall.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <grp.h>
-#include <pwd.h>
 #include <syslog.h>
 #include <wordexp.h>
+#include <grp.h>
 }
 
 using std::stringstream;
@@ -65,17 +65,19 @@ TError TTaskEnv::Prepare() {
     EnvVec.push_back("HOME=" + workdir);
     EnvVec.push_back("USER=" + User);
 
-    struct passwd *p = getpwnam(User.c_str());
-    if (!p)
-        return TError(EError::InvalidValue, EINVAL, "getpwnam(" + User + ")");
-    else
-        Uid = p->pw_uid;
+    TUser u(User);
+    TError error = u.Load();
+    if (error)
+        return error;
 
-    struct group *g = getgrnam(Group.c_str());
-    if (!g)
-        return TError(EError::InvalidValue, EINVAL, "getgrnam(" + Group + ")");
-    else
-        Gid = g->gr_gid;
+    Uid = u.GetId();
+
+    TGroup g(Group);
+    error = g.Load();
+    if (error)
+        return error;
+
+    Gid = g.GetId();
 
     return TError::Success();
 }

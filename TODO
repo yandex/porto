@@ -1,12 +1,13 @@
 - full dump on sigsegv
-- ? autorespawn max number and delay
+- autorespawn max number and delay + cron syntax
+- isolate = parent as nsenter for API
 - ? autodestroy property
 - ? portoctl run -f <MANIFEST> | <MANIFEST STRING>
 - ? cpu_cores property to reserve some cores for a container
 - loop.py: specify limits via properties, more fine grained settings for respawn,
   coredump settings
-- TUser & TGroup classes + support numbers in properties
 - ? fix permissions
+- ? different log levels (error, normal, verbose)
 
 # properties
 - ? capabilities

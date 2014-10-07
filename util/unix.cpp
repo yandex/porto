@@ -3,6 +3,7 @@
 
 #include "util/file.hpp"
 #include "util/string.hpp"
+#include "util/pwd.hpp"
 #include "unix.hpp"
 
 extern "C" {
@@ -12,8 +13,6 @@ extern "C" {
 #include <string.h>
 #include <libgen.h>
 #include <sys/sysinfo.h>
-#include <grp.h>
-#include <pwd.h>
 #include <sys/prctl.h>
 }
 
@@ -132,9 +131,12 @@ size_t GetTotalMemory() {
 std::string GetDefaultUser() {
     std::string users[] = { "nobody" };
 
-    for (auto &u : users)
-        if (getpwnam(u.c_str()) != NULL)
-            return u;
+    for (auto &user : users) {
+        TUser u(user);
+        TError error = u.Load();
+        if (!error)
+            return u.GetName();
+    }
 
     return "daemon";
 }
@@ -142,9 +144,12 @@ std::string GetDefaultUser() {
 std::string GetDefaultGroup() {
     std::string groups[] = { "nobody", "nogroup" };
 
-    for (auto &g : groups)
-        if (getgrnam(g.c_str()) != NULL)
-            return g;
+    for (auto &group : groups) {
+        TGroup g(group);
+        TError error = g.Load();
+        if (!error)
+            return g.GetName();
+    }
 
     return "daemon";
 }

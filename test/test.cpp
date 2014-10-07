@@ -3,6 +3,7 @@
 #include "test.hpp"
 #include "util/string.hpp"
 #include "util/netlink.hpp"
+#include "util/pwd.hpp"
 
 using std::string;
 
@@ -10,8 +11,6 @@ extern "C" {
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <grp.h>
-#include <pwd.h>
 #include <dirent.h>
 #include <signal.h>
 }
@@ -214,19 +213,21 @@ void GetUidGid(const std::string &pid, int &uid, int &gid) {
 }
 
 int UserUid(const std::string &user) {
-    struct passwd *p = getpwnam(user.c_str());
-    if (!p)
-        throw std::string("Invalid user");
-    else
-        return p->pw_uid;
+    TUser u(user);
+    TError error = u.Load();
+    if (error)
+        throw error.GetMsg();
+
+    return u.GetId();
 }
 
 int GroupGid(const std::string &group) {
-    struct group *g = getgrnam(group.c_str());
-    if (!g)
-        throw std::string("Invalid group");
-    else
-        return g->gr_gid;
+    TGroup g(group);
+    TError error = g.Load();
+    if (error)
+        throw error.GetMsg();
+
+    return g.GetId();
 }
 
 std::string GetEnv(const std::string &pid) {

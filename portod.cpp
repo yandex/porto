@@ -12,6 +12,7 @@
 #include "util/unix.hpp"
 #include "util/string.hpp"
 #include "util/crash.hpp"
+#include "util/pwd.hpp"
 
 extern "C" {
 #include <fcntl.h>
@@ -299,15 +300,17 @@ static int RpcMain(TContainerHolder &cholder) {
 
     uid_t uid = getuid();
     gid_t gid = getgid();
-    struct group *g = getgrnam(config().rpc_sock().group().c_str());
-    if (g)
-        gid = g->gr_gid;
-    else
-        TLogger::Log() << "Can't get gid for " << config().rpc_sock().group() << " group" << std::endl;
 
-    TError error = CreateRpcServer(config().rpc_sock().file().path(),
-                                   config().rpc_sock().file().perm(),
-                                   uid, gid, sfd);
+    TGroup g(config().rpc_sock().group().c_str());
+    TError error = g.Load();
+    TLogger::LogError(error, "Can't get gid for " + config().rpc_sock().group() + " group");
+
+    if (!error)
+        gid = g.GetId();
+
+    error = CreateRpcServer(config().rpc_sock().file().path(),
+                            config().rpc_sock().file().perm(),
+                            uid, gid, sfd);
     if (error) {
         TLogger::Log() << "Can't create RPC server: " << error.GetMsg() << std::endl;
     }

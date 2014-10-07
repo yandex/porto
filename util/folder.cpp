@@ -3,6 +3,7 @@
 #include "util/log.hpp"
 #include "util/unix.hpp"
 #include "util/folder.hpp"
+#include "util/pwd.hpp"
 
 extern "C" {
 #include <sys/stat.h>
@@ -11,8 +12,6 @@ extern "C" {
 #include <dirent.h>
 #include <unistd.h>
 #include <libgen.h>
-#include <pwd.h>
-#include <grp.h>
 }
 
 using std::string;
@@ -131,17 +130,19 @@ TError TFolder::Items(const TFile::EFileType type, std::vector<std::string> &lis
 TError TFolder::Chown(const std::string &user, const std::string &group) const {
     int uid, gid;
 
-    struct passwd *p = getpwnam(user.c_str());
-    if (!p)
-        return TError(EError::InvalidValue, EINVAL, "getpwnam(" + user + ")");
+    TUser u(user);
+    TError error = u.Load();
+    if (error)
+        return error;
 
-    uid = p->pw_uid;
+    uid = u.GetId();
 
-    struct group *g = getgrnam(group.c_str());
-    if (!g)
-        return TError(EError::InvalidValue, EINVAL, "getgrnam(" + group + ")");
+    TGroup g(group);
+    error = g.Load();
+    if (error)
+        return error;
 
-    gid = g->gr_gid;
+    gid = g.GetId();
 
     int ret = chown(Path.c_str(), uid, gid);
     if (ret)

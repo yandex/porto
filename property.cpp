@@ -7,11 +7,7 @@
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
-
-extern "C" {
-#include <grp.h>
-#include <pwd.h>
-}
+#include "util/pwd.hpp"
 
 using std::string;
 
@@ -23,17 +19,13 @@ static TError ValidBool(std::shared_ptr<const TContainer> container, const strin
 }
 
 static TError ValidUser(std::shared_ptr<const TContainer> container, const string user) {
-    if (getpwnam(user.c_str()) == NULL)
-        return TError(EError::InvalidValue, "invalid value");
-
-    return TError::Success();
+    TUser u(user);
+    return u.Load();
 }
 
 static TError ValidGroup(std::shared_ptr<const TContainer> container, const string group) {
-    if (getgrnam(group.c_str()) == NULL)
-        return TError(EError::InvalidValue, "invalid value");
-
-    return TError::Success();
+    TGroup g(group);
+    return g.Load();
 }
 
 static TError ValidMemGuarantee(std::shared_ptr<const TContainer> container, const string str) {

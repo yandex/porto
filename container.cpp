@@ -28,6 +28,30 @@ using std::unique_ptr;
 
 // Data
 
+static int64_t GetBootTime() {
+    vector<string> lines;
+    TFile f("/proc/stat");
+    if (f.AsLines(lines))
+        return 0;
+
+    for (auto &line : lines) {
+        vector<string> cols;
+        if (SplitString(line, ' ', cols))
+            return 0;
+
+        if (cols[0] == "btime") {
+            int64_t val;
+            if (StringToInt64(cols[1], val))
+                return 0;
+            return val;
+        }
+    }
+
+    return 0;
+}
+
+static int64_t BootTime = 0;
+
 struct TData {
     static string State(TContainer& c) {
         switch (c.State) {
@@ -247,7 +271,7 @@ struct TData {
             return "0";
 
         started /= sysconf(_SC_CLK_TCK);
-        started += c.BootTime;
+        started += BootTime;
 
         return std::to_string(time(nullptr) - started);
     };
@@ -279,28 +303,6 @@ std::map<std::string, const TDataSpec> dataSpec = {
 };
 
 // TContainer
-
-int64_t TContainer::GetBootTime() {
-    vector<string> lines;
-    TFile f("/proc/stat");
-    if (f.AsLines(lines))
-        return 0;
-
-    for (auto &line : lines) {
-        vector<string> cols;
-        if (SplitString(line, ' ', cols))
-            return 0;
-
-        if (cols[0] == "btime") {
-            int64_t val;
-            if (StringToInt64(cols[1], val))
-                return 0;
-            return val;
-        }
-    }
-
-    return 0;
-}
 
 bool TContainer::CheckState(EContainerState expected) {
     if (State == EContainerState::Running && (!Task || !Task->IsRunning()))
@@ -634,9 +636,6 @@ TError TContainer::PrepareTask() {
 
 TError TContainer::Create() {
     TLogger::Log() << "Create " << GetName() << " " << Id << std::endl;
-
-    if (!BootTime)
-        BootTime = GetBootTime();
 
     TError error = Spec.Create();
     if (error)
@@ -1241,6 +1240,8 @@ TContainerHolder::~TContainerHolder() {
 }
 
 TError TContainerHolder::CreateRoot() {
+    BootTime = GetBootTime();
+
     TError error = Create(ROOT_CONTAINER);
     if (error)
         return error;
