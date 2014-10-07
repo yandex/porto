@@ -6,6 +6,14 @@ extern "C" {
 #include <pwd.h>
 }
 
+std::string TUserEntry::GetName() {
+    return Name;
+}
+
+int TUserEntry::GetId() {
+    return Id;
+}
+
 TError TUser::Load() {
     struct passwd *p;
 
@@ -42,14 +50,6 @@ TError TUser::Load() {
     return TError(EError::InvalidValue, EINVAL, "Invalid user");
 }
 
-std::string TUser::GetName() {
-    return Name;
-}
-
-int TUser::GetId() {
-    return Id;
-}
-
 TError TGroup::Load() {
     struct group *g;
 
@@ -84,12 +84,4 @@ TError TGroup::Load() {
     }
 
     return TError(EError::InvalidValue, EINVAL, "Invalid group");
-}
-
-std::string TGroup::GetName() {
-    return Name;
-}
-
-int TGroup::GetId() {
-    return Id;
 }

@@ -5,26 +5,29 @@
 
 #include "error.hpp"
 
-class TUser {
+class TUserEntry {
+protected:
     std::string Name;
     int Id;
 public:
-    TUser(const std::string &name) : Name(name), Id(0) {}
-    TUser(const int id) : Name(""), Id(id) {}
-    TError Load();
+    TUserEntry(const std::string &name) : Name(name), Id(0) {}
+    TUserEntry(const int id) : Name(""), Id(id) {}
     std::string GetName();
     int GetId();
 };
 
-class TGroup {
-    std::string Name;
-    int Id;
+class TUser : public TUserEntry {
 public:
-    TGroup(const std::string &name) : Name(name), Id(0) {}
-    TGroup(const int id) : Name(""), Id(id) {}
+    TUser(const std::string &name) : TUserEntry(name) {}
+    TUser(const int id) : TUserEntry(id) {}
     TError Load();
-    std::string GetName();
-    int GetId();
+};
+
+class TGroup : public TUserEntry {
+public:
+    TGroup(const std::string &name) : TUserEntry(name) {}
+    TGroup(const int id) : TUserEntry(id) {}
+    TError Load();
 };
 
 #endif
