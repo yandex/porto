@@ -734,7 +734,8 @@ static int MasterMain() {
         return ret;
 
     if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0) {
-        TLogger::Log() << "Can't set myself as a subreaper" << std::endl;
+        TError error(EError::Unknown, errno, "prctl(PR_SET_CHILD_SUBREAPER,)");
+        TLogger::LogError(error, "Can't set myself as a subreaper");
         return EXIT_FAILURE;
     }
 
