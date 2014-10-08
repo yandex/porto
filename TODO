@@ -9,9 +9,7 @@
 - loop.py: specify limits via properties, more fine grained settings for respawn,
   coredump settings
 - ? different log levels (error, normal, verbose)
-- ? show default property value instead of empty string
 - ? portoctl cp
-- allow setting user/group to current value (don't die with permission)
 
 # properties
 - ? capabilities

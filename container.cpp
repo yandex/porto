@@ -1045,7 +1045,8 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
         return TError(EError::InvalidProperty, "invalid property");
 
     if ((Spec.GetFlags(property) & SUPERUSER_PROPERTY) && !superuser)
-        return TError(EError::Permission, "Only root can change this property");
+        if (GetPropertyStr(property) != value)
+            return TError(EError::Permission, "Only root can change this property");
 
     if (State != EContainerState::Stopped && !(Spec.GetFlags(property) & DYNAMIC_PROPERTY))
         return TError(EError::InvalidValue, "Can't set dynamic property " + property + " for running container");

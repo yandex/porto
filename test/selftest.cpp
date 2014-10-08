@@ -678,6 +678,12 @@ static void TestUserGroup(TPortoAPI &api) {
     ExpectFailure(api.SetProperty(name, "user", "daemon"), EError::Permission);
     ExpectFailure(api.SetProperty(name, "group", "bin"), EError::Permission);
 
+    string user, group;
+    ExpectSuccess(api.GetProperty(name, "user", user));
+    ExpectSuccess(api.GetProperty(name, "group", group));
+    ExpectSuccess(api.SetProperty(name, "user", user));
+    ExpectSuccess(api.SetProperty(name, "group", group));
+
     AsRoot(api);
     ExpectSuccess(api.SetProperty(name, "user", "daemon"));
     ExpectSuccess(api.SetProperty(name, "group", "bin"));
