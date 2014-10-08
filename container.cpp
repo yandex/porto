@@ -671,7 +671,6 @@ TError TContainer::Create(int uid, int gid) {
         error = u.Load();
         if (error)
             return error;
-        Spec.SetRaw("user", u.GetName());
     }
 
     if (Gid >= 0) {
@@ -679,7 +678,6 @@ TError TContainer::Create(int uid, int gid) {
         error = g.Load();
         if (error)
             return error;
-        Spec.SetRaw("group", g.GetName());
     }
 
     Spec.SetRaw("uid", std::to_string(Uid));

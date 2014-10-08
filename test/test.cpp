@@ -432,6 +432,18 @@ void RestartDaemon(TPortoAPI &api) {
     WaitPortod(api);
 }
 
+static void PrintFds(const std::string &path, struct dirent **lst, int nr) {
+    for (int i = 0; i < nr; i++) {
+        if (lst[i]->d_name == string(".") ||
+            lst[i]->d_name == string("..")) {
+            Say() << "[" << i << "] " << lst[i]->d_name << std::endl;
+        } else {
+            Say() << "[" << i << "] " << lst[i]->d_name
+                << " -> " << ReadLink(path + "/" + lst[i]->d_name) << std::endl;
+        }
+    }
+}
+
 void TestDaemon(TPortoAPI &api) {
     struct dirent **lst;
     int pid;
@@ -439,6 +451,7 @@ void TestDaemon(TPortoAPI &api) {
     AsRoot(api);
 
     api.Cleanup();
+    sleep(1);
 
     Say() << "Make sure portod-slave doesn't have zombies" << std::endl;
     pid = ReadPid(config().slave_pid().path());
@@ -454,15 +467,20 @@ void TestDaemon(TPortoAPI &api) {
 
     // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 4(rpc socket) 128(event pipe) 129(ack pipe)
     int nr = scandir(path.c_str(), &lst, NULL, alphasort);
+    PrintFds(path, lst, nr);
     Expect(nr >= 2 + 7 && nr <= 2 + 7 + sssFd);
 
     Say() << "Make sure portod-master doesn't have zombies" << std::endl;
     pid = ReadPid(config().master_pid().path());
 
     Say() << "Make sure portod-master doesn't have invalid FDs" << std::endl;
+    Say() << "Number of portod-master fds=" << nr << std::endl;
     path = ("/proc/" + std::to_string(pid) + "/fd");
+
     // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 5(event pipe) 6(ack pipe)
-    Expect(scandir(path.c_str(), &lst, NULL, alphasort) == 2 + 6);
+    nr = scandir(path.c_str(), &lst, NULL, alphasort);
+    PrintFds(path, lst, nr);
+    Expect(nr == 2 + 6);
 
     // TODO: check portoloop queue
     // TODO: check rtnl classes

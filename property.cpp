@@ -145,7 +145,15 @@ std::map<std::string, const TPropertySpec> propertySpec = {
     { "user",
         {
             "Start command with given user",
-            DEFSTR(""),
+            [](std::shared_ptr<const TContainer> c)->std::string {
+                int uid, gid;
+                c->GetPerm(uid, gid);
+                TUser u(uid);
+                if (u.Load())
+                    return std::to_string(uid);
+                else
+                    return u.GetName();
+            },
             CGNSREQ_PROPERTY | SUPERUSER_PROPERTY,
             ValidUser
         }
@@ -153,7 +161,15 @@ std::map<std::string, const TPropertySpec> propertySpec = {
     { "group",
         {
             "Start command with given group",
-            DEFSTR(""),
+            [](std::shared_ptr<const TContainer> c)->std::string {
+                int uid, gid;
+                c->GetPerm(uid, gid);
+                TGroup g(gid);
+                if (g.Load())
+                    return std::to_string(gid);
+                else
+                    return g.GetName();
+            },
             CGNSREQ_PROPERTY | SUPERUSER_PROPERTY,
             ValidGroup
         }

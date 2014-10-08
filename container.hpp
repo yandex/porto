@@ -123,7 +123,7 @@ public:
     uint16_t GetId();
     int GetOomFd();
     void DeliverOom();
-    void GetPerm(int &uid, int &gid) { uid = Uid; gid = Gid; }
+    void GetPerm(int &uid, int &gid) const { uid = Uid; gid = Gid; }
 };
 
 constexpr size_t BITS_PER_LLONG = sizeof(unsigned long long) * 8;
