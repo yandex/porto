@@ -1,3 +1,9 @@
+yandex-porto (0.7) precise; urgency=low
+
+  * Fix permission 
+
+ -- Eugene Kilimchuk <ekilimchuk@yandex-team.ru>  Wed, 08 Oct 2014 18:03:06 +0400
+
 yandex-porto (0.6) stable; urgency=low
 
   * Merge portoexec to portoctl and fixed chown for portoctl. 
