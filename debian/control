@@ -12,6 +12,6 @@ Section: utils
 Priority: extra
 Architecture: amd64
 Pre-Depends: yandex-search-group-porto
-Depends: ${shlibs:Depends}, ${utils:DependsI}, logrotate, libnl-route-3-200, libnl-3-200
+Depends: ${shlibs:Depends}, ${utils:DependsI}, logrotate, libnl-route-3-200, libnl-3-200, linux-image-server (>= 3.4.0) | linux-image-generic (>= 3.4.0)
 Description: Component of Nirvana
  Porto allows to run process in namespace with cgroup.
