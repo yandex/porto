@@ -458,9 +458,11 @@ static int SlaveMain(bool failsafe, bool noWatchdog) {
         return EXIT_FAILURE;
     }
 
-    if (system("modprobe cls_cgroup")) {
-        TLogger::Log() << "Can't load cls_cgroup kernel module: " << strerror(errno) << std::endl;
-        return EXIT_FAILURE;
+    if (config().network().enabled()) {
+        if (system("modprobe cls_cgroup")) {
+            TLogger::Log() << "Can't load cls_cgroup kernel module: " << strerror(errno) << std::endl;
+            return EXIT_FAILURE;
+        }
     }
 
     if (fcntl(REAP_EVT_FD, F_SETFD, FD_CLOEXEC) < 0) {
