@@ -389,10 +389,23 @@ std::shared_ptr<const TContainer> TContainer::GetParent() const {
     return Parent;
 }
 
+std::string TContainer::GetPropertyStr(const std::string &property) const {
+    return Spec.Get(shared_from_this(), property);
+}
+
+int TContainer::GetPropertyInt(const std::string &property) const {
+    int val;
+
+    if (StringToInt(GetPropertyStr(property), val))
+        return 0;
+
+    return val;
+}
+
 uint64_t TContainer::GetPropertyUint64(const std::string &property) const {
     uint64_t val;
 
-    if (StringToUint64(Spec.Get(property), val))
+    if (StringToUint64(GetPropertyStr(property), val))
         return 0;
 
     return val;
@@ -465,22 +478,22 @@ TError TContainer::ApplyDynamicProperties() {
         return error;
 
     auto memroot = memorySubsystem->GetRootCgroup();
-    if (memroot->HasKnob("memory.low_limit_in_bytes") && Spec.GetAsInt("memory_guarantee") != 0) {
-        TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", Spec.Get("memory_guarantee"), false);
+    if (memroot->HasKnob("memory.low_limit_in_bytes") && GetPropertyInt("memory_guarantee") != 0) {
+        TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", GetPropertyStr("memory_guarantee"), false);
         TLogger::LogError(error, "Can't set memory_guarantee");
         if (error)
             return error;
     }
 
-    if (Spec.GetAsInt("memory_limit") != 0) {
-        error = memcg->SetKnobValue("memory.limit_in_bytes", Spec.Get("memory_limit"), false);
+    if (GetPropertyInt("memory_limit") != 0) {
+        error = memcg->SetKnobValue("memory.limit_in_bytes", GetPropertyStr("memory_limit"), false);
         TLogger::LogError(error, "Can't set memory_limit");
         if (error)
             return error;
     }
 
     if (memroot->HasKnob("memory.recharge_on_pgfault")) {
-        string value = Spec.Get("recharge_on_pgfault") == "true" ? "1" : "0";
+        string value = GetPropertyStr("recharge_on_pgfault") == "true" ? "1" : "0";
         error = memcg->SetKnobValue("memory.recharge_on_pgfault", value, false);
         TLogger::LogError(error, "Can't set recharge_on_pgfault");
         if (error)
@@ -488,9 +501,9 @@ TError TContainer::ApplyDynamicProperties() {
     }
 
     auto cpucg = GetLeafCgroup(cpuSubsystem);
-    if (Spec.Get("cpu_policy") == "normal") {
+    if (GetPropertyStr("cpu_policy") == "normal") {
         int cpuPrio;
-        error = StringToInt(Spec.Get("cpu_priority"), cpuPrio);
+        error = StringToInt(GetPropertyStr("cpu_priority"), cpuPrio);
         TLogger::LogError(error, "Can't parse cpu_priority");
         if (error)
             return error;
@@ -519,15 +532,15 @@ TError TContainer::PrepareNetwork() {
     TError error;
     uint32_t prio, rate, ceil;
 
-    error = StringToUint32(Spec.Get("net_priority"), prio);
+    error = StringToUint32(GetPropertyStr("net_priority"), prio);
     if (error)
         return error;
 
-    error = StringToUint32(Spec.Get("net_guarantee"), rate);
+    error = StringToUint32(GetPropertyStr("net_guarantee"), rate);
     if (error)
         return error;
 
-    error = StringToUint32(Spec.Get("net_ceil"), ceil);
+    error = StringToUint32(GetPropertyStr("net_ceil"), ceil);
     if (error)
         return error;
 
@@ -586,7 +599,7 @@ TError TContainer::PrepareCgroups() {
     auto cpuroot = cpuSubsystem->GetRootCgroup();
     if (cpuroot->HasKnob("cpu.smart")) {
         TError error;
-        if (Spec.Get("cpu_policy") == "rt") {
+        if (GetPropertyStr("cpu_policy") == "rt") {
             error = cpucg->SetKnobValue("cpu.smart", "1", false);
             TLogger::LogError(error, "Can't enable smart");
             if (error)
@@ -618,11 +631,11 @@ TError TContainer::PrepareCgroups() {
 }
 
 TError TContainer::PrepareTask() {
-    TTaskEnv taskEnv(Spec.Get("command"), Spec.Get("cwd"), /*Spec.Get("root")*/"", Spec.Get("user"), Spec.Get("group"), Spec.Get("env"), Spec.Get("isolate") == "true");
+    TTaskEnv taskEnv(GetPropertyStr("command"), GetPropertyStr("cwd"), /*GetPropertyStr("root")*/"", GetPropertyStr("user"), GetPropertyStr("group"), GetPropertyStr("env"), GetPropertyStr("isolate") == "true");
 
-    taskEnv.StdinPath = Spec.Get("stdin_path");
-    taskEnv.StdoutPath = Spec.Get("stdout_path");
-    taskEnv.StderrPath = Spec.Get("stderr_path");
+    taskEnv.StdinPath = GetPropertyStr("stdin_path");
+    taskEnv.StdoutPath = GetPropertyStr("stdout_path");
+    taskEnv.StderrPath = GetPropertyStr("stderr_path");
 
     TError error = taskEnv.Prepare();
     if (error)
@@ -650,7 +663,7 @@ TError TContainer::Create(int uid, int gid) {
         error = u.Load();
         if (error)
             return error;
-        Spec.SetInternal("user", u.GetName());
+        Spec.SetRaw("user", u.GetName());
     }
 
     if (Gid >= 0) {
@@ -658,11 +671,11 @@ TError TContainer::Create(int uid, int gid) {
         error = g.Load();
         if (error)
             return error;
-        Spec.SetInternal("group", g.GetName());
+        Spec.SetRaw("group", g.GetName());
     }
 
-    Spec.SetInternal("uid", std::to_string(Uid));
-    Spec.SetInternal("gid", std::to_string(Gid));
+    Spec.SetRaw("uid", std::to_string(Uid));
+    Spec.SetRaw("gid", std::to_string(Gid));
 
     if (Parent)
         Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
@@ -735,7 +748,7 @@ TError TContainer::Start() {
     if (Parent && !Parent->IsRoot() && Parent->State != EContainerState::Running)
         return TError(EError::InvalidState, "parent is not running");
 
-    Spec.SetInternal("id", std::to_string(Id));
+    Spec.SetRaw("id", std::to_string(Id));
     OomKilled = false;
 
     TError error = PrepareNetwork();
@@ -757,7 +770,7 @@ TError TContainer::Start() {
         return TError::Success();
     }
 
-    if (!Spec.Get("command").length()) {
+    if (!GetPropertyStr("command").length()) {
         FreeResources();
         return TError(EError::InvalidValue, "container command is empty");
     }
@@ -780,7 +793,7 @@ TError TContainer::Start() {
 
     TLogger::Log() << GetName() << " started " << std::to_string(Task->GetPid()) << std::endl;
 
-    Spec.SetInternal("root_pid", std::to_string(Task->GetPid()));
+    Spec.SetRaw("root_pid", std::to_string(Task->GetPid()));
     State = EContainerState::Running;
 
     return TError::Success();
@@ -995,7 +1008,7 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
     if (propertySpec.find(property) == propertySpec.end())
         return TError(EError::InvalidProperty, "invalid property");
 
-    value = Spec.Get(property);
+    value = GetPropertyStr(property);
     PropertyToAlias(origProperty, value);
 
     return TError::Success();
@@ -1053,7 +1066,7 @@ TError TContainer::Restore(const kv::TNode &node) {
     int pid = 0;
     bool started = true;
     string pidStr;
-    error = Spec.GetInternal("root_pid", pidStr);
+    error = Spec.GetRaw("root_pid", pidStr);
     if (error) {
         started = false;
     } else {
@@ -1065,14 +1078,14 @@ TError TContainer::Restore(const kv::TNode &node) {
     TLogger::Log() << GetName() << ": restore process " << std::to_string(pid) << " which " << (started ? "started" : "didn't start") << std::endl;
 
     string s;
-    error = Spec.GetInternal("uid", s);
+    error = Spec.GetRaw("uid", s);
     TLogger::LogError(error, "Can't restore uid");
     if (!error) {
         error = StringToInt(s, Uid);
         TLogger::LogError(error, "Can't parse uid");
     }
 
-    error = Spec.GetInternal("gid", s);
+    error = Spec.GetRaw("gid", s);
     TLogger::LogError(error, "Can't restore gid");
     if (!error) {
         error = StringToInt(s, Gid);
@@ -1156,7 +1169,7 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
     TLogger::Log() << "Delivered " << status << " to " << GetName() << " with root_pid " << Task->GetPid() << std::endl;
     State = EContainerState::Dead;
 
-    if (Spec.Get("isolate") == "false")
+    if (GetPropertyStr("isolate") == "false")
         (void)KillAll();
 
     if (NeedRespawn()) {
@@ -1174,7 +1187,7 @@ bool TContainer::NeedRespawn() {
     if (State != EContainerState::Dead)
         return false;
 
-    return Spec.Get("respawn") == "true" && TimeOfDeath + config().container().respawn_delay_ms() <= GetCurrentTimeMs();
+    return GetPropertyStr("respawn") == "true" && TimeOfDeath + config().container().respawn_delay_ms() <= GetCurrentTimeMs();
 }
 
 TError TContainer::Respawn() {

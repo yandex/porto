@@ -22,9 +22,9 @@ const unsigned int CGNSREQ_PROPERTY = (1 << 3);
 
 struct TPropertySpec {
     std::string Description;
-    std::string Def;
+    std::function<std::string(std::shared_ptr<const TContainer>)> Default;
     unsigned int Flags;
-    std::function<TError (std::shared_ptr<const TContainer> container, const std::string)> Valid;
+    std::function<TError(std::shared_ptr<const TContainer> container, const std::string)> Valid;
 };
 
 extern std::map<std::string, const TPropertySpec> propertySpec;
@@ -41,11 +41,10 @@ class TContainerSpec {
 public:
     TContainerSpec(const std::string &name) : Name(name) { }
     ~TContainerSpec();
-    const std::string &Get(const std::string &property) const;
-    size_t GetAsInt(const std::string &property) const;
+    std::string Get(std::shared_ptr<const TContainer> container, const std::string &property) const;
     TError Set(std::shared_ptr<const TContainer> container, const std::string &property, const std::string &value);
-    TError GetInternal(const std::string &property, std::string &value) const;
-    TError SetInternal(const std::string &property, const std::string &value);
+    TError GetRaw(const std::string &property, std::string &value) const;
+    TError SetRaw(const std::string &property, const std::string &value);
     unsigned int GetFlags(const std::string &property) const;
     TError Create();
     TError Restore(const kv::TNode &node);

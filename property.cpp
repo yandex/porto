@@ -133,44 +133,170 @@ static TError ValidIsolate(std::shared_ptr<const TContainer> container, const st
     return TError::Success();
 }
 
+#define DEFSTR(S) [](std::shared_ptr<const TContainer> container)->std::string { return S; }
+
 std::map<std::string, const TPropertySpec> propertySpec = {
-    {"command", { "Command executed upon container start", "" }},
-    {"user", { "Start command with given user", "", CGNSREQ_PROPERTY | SUPERUSER_PROPERTY, ValidUser }},
-    {"group", { "Start command with given group", "", CGNSREQ_PROPERTY | SUPERUSER_PROPERTY, ValidGroup }},
-    {"env", { "Container environment variables" }},
-    //{"root", { "Container root directory", "" }},
-    {"cwd", { "Container working directory", "", CGNSREQ_PROPERTY }},
-
-    {"stdin_path", { "Container standard input path", "" }},
-    {"stdout_path", { "Container standard output path", "" }},
-    {"stderr_path", { "Container standard error path", "" }},
-
-    {"memory_guarantee", { "Guaranteed amount of memory", "0", CGNSREQ_PROPERTY | DYNAMIC_PROPERTY, ValidMemGuarantee }},
-    {"memory_limit", { "Memory hard limit", "0", CGNSREQ_PROPERTY | DYNAMIC_PROPERTY, ValidMemLimit }},
-    {"recharge_on_pgfault", { "Recharge memory on page fault", "false", CGNSREQ_PROPERTY | DYNAMIC_PROPERTY, ValidRecharge }},
-
-    {"cpu_policy", { "CPU policy: rt, normal, idle", "normal", CGNSREQ_PROPERTY, ValidCpuPolicy }},
-    {"cpu_priority", { "CPU priority: 0-99", std::to_string(DEF_CLASS_PRIO), CGNSREQ_PROPERTY | DYNAMIC_PROPERTY, ValidCpuPriority }},
-
-    {"net_guarantee", { "Guaranteed container network bandwidth", std::to_string(DEF_CLASS_RATE), CGNSREQ_PROPERTY, ValidNetGuarantee }},
-    {"net_ceil", { "Maximum container network bandwidth", std::to_string(DEF_CLASS_CEIL), CGNSREQ_PROPERTY, ValidNetCeil }},
-    {"net_priority", { "Container network priority: 0-7", std::to_string(DEF_CLASS_NET_PRIO), CGNSREQ_PROPERTY, ValidNetPriority }},
-
-    {"respawn", { "Automatically respawn dead container", "false", 0, ValidBool }},
-    {"isolate", { "Isolate container from others", "true", 0, ValidIsolate }},
+    { "command",
+        {
+            "Command executed upon container start",
+            DEFSTR("")
+        }
+    },
+    { "user",
+        {
+            "Start command with given user",
+            DEFSTR(""),
+            CGNSREQ_PROPERTY | SUPERUSER_PROPERTY,
+            ValidUser
+        }
+    },
+    { "group",
+        {
+            "Start command with given group",
+            DEFSTR(""),
+            CGNSREQ_PROPERTY | SUPERUSER_PROPERTY,
+            ValidGroup
+        }
+    },
+    { "env",
+        {
+            "Container environment variables",
+            DEFSTR("")
+        }
+    },
+    /*
+    { "root",
+        {
+            "Container root directory",
+            DEFSTR("/")
+        }
+    },
+    */
+    { "cwd",
+        {
+            "Container working directory",
+            DEFSTR(""),
+            CGNSREQ_PROPERTY
+        }
+    },
+    {
+        "stdin_path",
+        {
+            "Container standard input path",
+            DEFSTR("")
+        }
+    },
+    {
+        "stdout_path",
+        {
+            "Container standard output path",
+            DEFSTR("")
+        }
+    },
+    {
+        "stderr_path",
+        {
+            "Container standard error path",
+            DEFSTR("")
+        }
+    },
+    {
+        "memory_guarantee",
+        {
+            "Guaranteed amount of memory",
+            DEFSTR("0"),
+            CGNSREQ_PROPERTY | DYNAMIC_PROPERTY,
+            ValidMemGuarantee
+        }
+    },
+    {
+        "memory_limit",
+        {
+            "Memory hard limit",
+            DEFSTR("0"),
+            CGNSREQ_PROPERTY | DYNAMIC_PROPERTY,
+            ValidMemLimit
+        }
+    },
+    {
+        "recharge_on_pgfault",
+        {
+            "Recharge memory on page fault",
+            DEFSTR("false"),
+            CGNSREQ_PROPERTY | DYNAMIC_PROPERTY,
+            ValidRecharge
+        }
+    },
+    {
+        "cpu_policy",
+        {
+            "CPU policy: rt, normal, idle",
+            DEFSTR("normal"),
+            CGNSREQ_PROPERTY,
+            ValidCpuPolicy
+        }
+    },
+    {
+        "cpu_priority",
+        {
+            "CPU priority: 0-99",
+            DEFSTR(std::to_string(DEF_CLASS_PRIO)),
+            CGNSREQ_PROPERTY | DYNAMIC_PROPERTY,
+            ValidCpuPriority
+        }
+    },
+    {
+        "net_guarantee",
+        {
+            "Guaranteed container network bandwidth",
+            DEFSTR(std::to_string(DEF_CLASS_RATE)),
+            CGNSREQ_PROPERTY,
+            ValidNetGuarantee
+        }
+    },
+    {
+        "net_ceil",
+        {
+            "Maximum container network bandwidth",
+            DEFSTR(std::to_string(DEF_CLASS_CEIL)),
+            CGNSREQ_PROPERTY,
+            ValidNetCeil
+        }
+    },
+    {
+        "net_priority",
+        {
+            "Container network priority: 0-7",
+            DEFSTR(std::to_string(DEF_CLASS_NET_PRIO)),
+            CGNSREQ_PROPERTY,
+            ValidNetPriority
+        }
+    },
+    {
+        "respawn",
+        {
+            "Automatically respawn dead container",
+            DEFSTR("false"),
+            0,
+            ValidBool
+        }
+    },
+    {
+        "isolate",
+        {
+            "Isolate container from others",
+            DEFSTR("true"),
+            0,
+            ValidIsolate
+        }
+    },
 };
 
-const string &TContainerSpec::Get(const string &property) const {
+string TContainerSpec::Get(std::shared_ptr<const TContainer> container, const string &property) const {
     if (Data.find(property) == Data.end())
-        return propertySpec.at(property).Def;
+        return propertySpec.at(property).Default(container);
 
     return Data.at(property);
-}
-
-size_t TContainerSpec::GetAsInt(const string &property) const {
-    uint64_t val = 0;
-    (void)StringToUint64(Get(property), val);
-    return val;
 }
 
 bool TContainerSpec::IsRoot() const {
@@ -184,14 +310,14 @@ unsigned int TContainerSpec::GetFlags(const std::string &property) const {
     return propertySpec.at(property).Flags;
 }
 
-TError TContainerSpec::GetInternal(const string &property, string &value) const {
+TError TContainerSpec::GetRaw(const string &property, string &value) const {
     if (Data.find(property) == Data.end())
         return TError(EError::InvalidValue, "Invalid property");
     value = Data.at(property);
     return TError::Success();
 }
 
-TError TContainerSpec::SetInternal(const string &property, const string &value) {
+TError TContainerSpec::SetRaw(const string &property, const string &value) {
     Data[property] = value;
     TError error(AppendStorage(property, value));
     if (error)
@@ -213,7 +339,7 @@ TError TContainerSpec::Set(std::shared_ptr<const TContainer> container, const st
             return error;
     }
 
-    return SetInternal(property, value);
+    return SetRaw(property, value);
 }
 
 TError TContainerSpec::Create() {

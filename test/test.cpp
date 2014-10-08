@@ -450,7 +450,7 @@ void TestDaemon(TPortoAPI &api) {
     // when sssd is running getgrnam opens unix socket to read database
     int sssFd = 0;
     if (WordCount("/etc/nsswitch.conf", "sss"))
-        sssFd = 1;
+        sssFd = 2;
 
     // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 4(rpc socket) 128(event pipe) 129(ack pipe)
     int nr = scandir(path.c_str(), &lst, NULL, alphasort);
