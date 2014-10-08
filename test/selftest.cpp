@@ -106,11 +106,11 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetProperty(name, "memory.recharge_on_pgfault", v));
     Expect(v == string("0"));
     ExpectSuccess(api.GetProperty(name, "stdin_path", v));
-    Expect(v == string(""));
+    Expect(v == string("/dev/null"));
     ExpectSuccess(api.GetProperty(name, "stdout_path", v));
-    Expect(v == string(""));
+    Expect(v == config().container().tmp_dir() + "/" + name + "/stdout");
     ExpectSuccess(api.GetProperty(name, "stderr_path", v));
-    Expect(v == string(""));
+    Expect(v == config().container().tmp_dir() + "/" + name + "/stderr");
 }
 
 static void ShouldHaveValidData(TPortoAPI &api, const string &name) {

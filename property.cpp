@@ -133,6 +133,19 @@ static TError ValidIsolate(std::shared_ptr<const TContainer> container, const st
     return TError::Success();
 }
 
+static TError ValidPath(std::shared_ptr<const TContainer> container, const string &str) {
+    if (!str.length() || str[0] != '/')
+        return TError(EError::InvalidValue, "invalid directory");
+    return TError::Success();
+}
+
+static TError ExistingFile(std::shared_ptr<const TContainer> container, const string &str) {
+    TFile f(str);
+    if (!f.Exists())
+        return TError(EError::InvalidValue, "file doesn't exist");
+    return TError::Success();
+}
+
 #define DEFSTR(S) [](std::shared_ptr<const TContainer> container)->std::string { return S; }
 
 std::map<std::string, const TPropertySpec> propertySpec = {
@@ -195,36 +208,48 @@ std::map<std::string, const TPropertySpec> propertySpec = {
                 return config().container().tmp_dir() + "/" + c->GetName();
             },
             CGNSREQ_PROPERTY,
-            [](std::shared_ptr<const TContainer> c, const string &s) {
-                if (!s.length() || s[0] != '/')
-                    return TError(EError::InvalidValue, "invalid directory");
-                return TError::Success();
-            }
+            ValidPath,
         }
     },
-    {
-        "stdin_path",
+    { "stdin_path",
         {
             "Container standard input path",
-            DEFSTR("")
+            DEFSTR("/dev/null"),
+            0,
+            ExistingFile
         }
     },
-    {
-        "stdout_path",
+    { "stdout_path",
         {
             "Container standard output path",
-            DEFSTR("")
+            [](std::shared_ptr<const TContainer> c)->std::string {
+                string cwd;
+                TError error = c->GetProperty("cwd", cwd);
+                if (error)
+                    return "";
+
+                return cwd + "/stdout";
+            },
+            0,
+            ValidPath
         }
     },
-    {
-        "stderr_path",
+    { "stderr_path",
         {
             "Container standard error path",
-            DEFSTR("")
+            [](std::shared_ptr<const TContainer> c)->std::string {
+                string cwd;
+                TError error = c->GetProperty("cwd", cwd);
+                if (error)
+                    return "";
+
+                return cwd + "/stderr";
+            },
+            0,
+            ValidPath
         }
     },
-    {
-        "memory_guarantee",
+    { "memory_guarantee",
         {
             "Guaranteed amount of memory",
             DEFSTR("0"),
@@ -232,8 +257,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
             ValidMemGuarantee
         }
     },
-    {
-        "memory_limit",
+    { "memory_limit",
         {
             "Memory hard limit",
             DEFSTR("0"),
@@ -241,8 +265,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
             ValidMemLimit
         }
     },
-    {
-        "recharge_on_pgfault",
+    { "recharge_on_pgfault",
         {
             "Recharge memory on page fault",
             DEFSTR("false"),
@@ -250,8 +273,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
             ValidRecharge
         }
     },
-    {
-        "cpu_policy",
+    { "cpu_policy",
         {
             "CPU policy: rt, normal, idle",
             DEFSTR("normal"),
@@ -259,8 +281,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
             ValidCpuPolicy
         }
     },
-    {
-        "cpu_priority",
+    { "cpu_priority",
         {
             "CPU priority: 0-99",
             DEFSTR(std::to_string(DEF_CLASS_PRIO)),
@@ -268,8 +289,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
             ValidCpuPriority
         }
     },
-    {
-        "net_guarantee",
+    { "net_guarantee",
         {
             "Guaranteed container network bandwidth",
             DEFSTR(std::to_string(DEF_CLASS_RATE)),
@@ -277,8 +297,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
             ValidNetGuarantee
         }
     },
-    {
-        "net_ceil",
+    { "net_ceil",
         {
             "Maximum container network bandwidth",
             DEFSTR(std::to_string(DEF_CLASS_CEIL)),
@@ -286,8 +305,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
             ValidNetCeil
         }
     },
-    {
-        "net_priority",
+    { "net_priority",
         {
             "Container network priority: 0-7",
             DEFSTR(std::to_string(DEF_CLASS_NET_PRIO)),
@@ -295,8 +313,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
             ValidNetPriority
         }
     },
-    {
-        "respawn",
+    { "respawn",
         {
             "Automatically respawn dead container",
             DEFSTR("false"),
@@ -304,8 +321,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
             ValidBool
         }
     },
-    {
-        "isolate",
+    { "isolate",
         {
             "Isolate container from others",
             DEFSTR("true"),

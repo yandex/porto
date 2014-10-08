@@ -54,15 +54,9 @@ TError TTaskEnv::Prepare() {
     if (Command.empty())
         return TError::Success();
 
-    string workdir;
-    if (Cwd.length())
-        workdir = Cwd;
-    else
-        workdir = "/home/" + User;
-
-    EnvVec.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:" + workdir);
+    EnvVec.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:" + Cwd);
     ParseEnv();
-    EnvVec.push_back("HOME=" + workdir);
+    EnvVec.push_back("HOME=" + Cwd);
     EnvVec.push_back("USER=" + User);
 
     TUser u(User);
@@ -112,21 +106,35 @@ void TTask::Syslog(const string &s) const {
 }
 
 TTask::~TTask() {
-    if (Env.StdoutPath.length()) {
-        TFile f(Env.StdoutPath);
-        TError e = f.Remove();
-        TLogger::LogError(e, "Can't remove task stdout " + Env.StdoutPath);
-    }
-    if (Env.StderrPath.length()) {
-        TFile f(Env.StderrPath);
-        TError e = f.Remove();
-        TLogger::LogError(e, "Can't remove task stderr " + Env.StderrPath);
-    }
+    TFile out(Env.StdoutPath);
+    TError e = out.Remove();
+    TLogger::LogError(e, "Can't remove task stdout " + Env.StdoutPath);
+
+    TFile err(Env.StderrPath);
+    e = err.Remove();
+    TLogger::LogError(e, "Can't remove task stderr " + Env.StderrPath);
 }
 
 static int ChildFn(void *arg) {
     TTask *task = static_cast<TTask*>(arg);
     return task->ChildCallback();
+}
+
+void TTask::OpenStdFile(const std::string &path, int expected) {
+    int ret = open(path.c_str(), O_CREAT | O_WRONLY | O_APPEND, 0700);
+    if (ret < 0) {
+        Syslog(string("open(" + std::to_string(expected) + "): ") + strerror(errno));
+        ReportResultAndExit(Wfd, -errno);
+    }
+    if (ret != expected) {
+        Syslog("open(" + std::to_string(expected) + "): unexpected fd");
+        ReportResultAndExit(Wfd, -EINVAL);
+    }
+    ret = fchown(ret, Env.Uid, Env.Gid);
+    if (ret < 0) {
+        Syslog(string("fchown(" + std::to_string(expected) + "): ") + strerror(errno));
+        ReportResultAndExit(Wfd, -errno);
+    }
 }
 
 void TTask::ChildReopenStdio() {
@@ -138,77 +146,18 @@ void TTask::ChildReopenStdio() {
         exit(0xAA);
     }
 
-    int ret;
-    if (!Env.StdinPath.length()) {
-        ret = open("/dev/null", O_RDONLY);
-        if (ret < 0) {
-            Syslog(string("open(0): ") + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
-        }
-    } else {
-        ret = open(Env.StdinPath.c_str(), O_CREAT | O_RDONLY, 0700);
-        if (ret < 0) {
-            Syslog(string("open(0): ") + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
-        }
-
-        if (ret != 0) {
-            Syslog("open(0): unexpected fd");
-            ReportResultAndExit(Wfd, -EINVAL);
-        }
+    int ret = open(Env.StdinPath.c_str(), O_CREAT | O_RDONLY, 0700);
+    if (ret < 0) {
+        Syslog(string("open(0): ") + strerror(errno));
+        ReportResultAndExit(Wfd, -errno);
+    }
+    if (ret != 0) {
+        Syslog("open(0): unexpected fd");
+        ReportResultAndExit(Wfd, -EINVAL);
     }
 
-    if (!Env.StdoutPath.length()) {
-        ret = open("/dev/null", O_WRONLY);
-        if (ret < 0) {
-            Syslog(string("open(1): ") + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
-        }
-    } else {
-        ret = open(Env.StdoutPath.c_str(),
-                   O_CREAT | O_WRONLY | O_APPEND, 0700);
-        if (ret < 0) {
-            Syslog(string("open(1): ") + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
-        }
-
-        if (ret != 1) {
-            Syslog("open(1): unexpected fd");
-            ReportResultAndExit(Wfd, -EINVAL);
-        }
-
-        ret = fchown(ret, Env.Uid, Env.Gid);
-        if (ret < 0) {
-            Syslog(string("fchown(1): ") + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
-        }
-    }
-
-    if (!Env.StderrPath.length()) {
-        ret = open("/dev/null", O_WRONLY);
-        if (ret < 0) {
-            Syslog(string("open(2): ") + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
-        }
-    } else {
-        ret = open(Env.StderrPath.c_str(),
-                   O_CREAT | O_WRONLY | O_APPEND, 0700);
-        if (ret < 0) {
-            Syslog(string("open(2): ") + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
-        }
-
-        if (ret != 2) {
-            Syslog("open(2): unexpected fd");
-            ReportResultAndExit(Wfd, -EINVAL);
-        }
-
-        ret = fchown(ret, Env.Uid, Env.Gid);
-        if (ret < 0) {
-            Syslog(string("fchown(2): ") + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
-        }
-    }
+    OpenStdFile(Env.StdoutPath, 1);
+    OpenStdFile(Env.StderrPath, 2);
 }
 
 void TTask::ChildDropPriveleges() {
@@ -415,12 +364,6 @@ TError TTask::Start() {
 
     ExitStatus = 0;
 
-    if (!Env.StdoutPath.length())
-        Env.StdoutPath = Env.Cwd + "/stdout";
-
-    if (!Env.StderrPath.length())
-        Env.StderrPath = Env.Cwd + "/stderr";
-
     ret = pipe2(pfd, O_CLOEXEC);
     if (ret) {
         TError error(EError::Unknown, errno, "pipe2(pdf)");
@@ -526,21 +469,17 @@ TError TTask::Kill(int signal) const {
 
 std::string TTask::GetStdout() const {
     string s;
-    if (Env.StdoutPath.length()) {
-        TFile f(Env.StdoutPath);
-        TError e(f.LastStrings(config().container().stdout_read_bytes(), s));
-        TLogger::LogError(e, "Can't read container stdout");
-    }
+    TFile f(Env.StdoutPath);
+    TError e(f.LastStrings(config().container().stdout_read_bytes(), s));
+    TLogger::LogError(e, "Can't read container stdout");
     return s;
 }
 
 std::string TTask::GetStderr() const {
     string s;
-    if (Env.StderrPath.length()) {
-        TFile f(Env.StderrPath);
-        TError e(f.LastStrings(config().container().stdout_read_bytes(), s));
-        TLogger::LogError(e, "Can't read container stderr");
-    }
+    TFile f(Env.StderrPath);
+    TError e(f.LastStrings(config().container().stdout_read_bytes(), s));
+    TLogger::LogError(e, "Can't read container stderr");
     return s;
 }
 

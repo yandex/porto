@@ -57,6 +57,7 @@ class TTask {
 
     TError RotateFile(const std::string path) const;
     TError CreateCwd();
+    void OpenStdFile(const std::string &path, int expected);
     void ChildReopenStdio();
     void ChildDropPriveleges();
     void ChildExec();
