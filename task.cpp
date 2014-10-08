@@ -379,7 +379,7 @@ int TTask::ChildCallback() {
     ChildReopenStdio();
     ChildIsolateFs();
 
-    if (Env.Cwd.length() && chdir(Env.Cwd.c_str()) < 0) {
+    if (chdir(Env.Cwd.c_str()) < 0) {
         Syslog(string("chdir(): ") + strerror(errno));
         ReportResultAndExit(Wfd, -errno);
     }
@@ -391,34 +391,15 @@ int TTask::ChildCallback() {
 }
 
 TError TTask::CreateCwd() {
-    if (Env.Cwd.length())
+    if (!Env.CreateCwd)
         return TError::Success();
 
-    TFolder f(config().container().tmp_dir());
-    if (!f.Exists()) {
-        TError error = f.Create(0755, true);
+    Cwd = std::make_shared<TFolder>(Env.Cwd, true);
+    if (!Cwd->Exists()) {
+        TError error = Cwd->Create(0755, true);
         if (error)
             return error;
     }
-
-    const string suffix = "/XXXXXX";
-    char *p = (char *)malloc(f.GetPath().length() + suffix.length() + 1);
-    if (!p)
-        return TError(EError::Unknown, errno, "malloc()");
-
-    *p = '\0';
-    strcat(p, f.GetPath().c_str());
-    strcat(p, suffix.c_str());
-
-    char *d = mkdtemp(p);
-    if (!d) {
-        free(p);
-        return TError(EError::Unknown, errno, "mkdtemp(" + string(p) + ")");
-    }
-
-    Env.Cwd = d;
-    Cwd = std::make_shared<TFolder>(d, true);
-    free(p);
     return Cwd->Chown(Env.User, Env.Group);
 }
 

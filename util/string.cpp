@@ -119,3 +119,10 @@ TError SplitString(const std::string &s, const char sep, std::vector<std::string
 
     return TError::Success();
 }
+
+std::string StringTrim(const std::string& s)
+{
+    std::size_t first = s.find_first_not_of(' ');
+    std::size_t last  = s.find_last_not_of(' ');
+    return s.substr(first, last - first + 1);
+}

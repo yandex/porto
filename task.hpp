@@ -26,6 +26,7 @@ class TTaskEnv {
 public:
     std::string Command;
     std::string Cwd;
+    bool CreateCwd;
     std::string Root;
     std::string User;
     std::string Group;

@@ -73,6 +73,8 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
 
     ExpectSuccess(api.GetProperty(name, "command", v));
     Expect(v == string(""));
+    ExpectSuccess(api.GetProperty(name, "cwd", v));
+    Expect(v == config().container().tmp_dir() + "/" + name);
     ExpectSuccess(api.GetProperty(name, "user", v));
     Expect(v == GetDefaultUser());
     ExpectSuccess(api.GetProperty(name, "group", v));
@@ -381,7 +383,7 @@ static void TestExitStatus(TPortoAPI &api) {
     Expect(ret == string("2"));
 
     Say() << "Check exit status of invalid directory" << std::endl;
-    ExpectSuccess(api.SetProperty(name, "command", "true"));
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectSuccess(api.SetProperty(name, "cwd", "/__invalid__dir__"));
     ExpectFailure(api.Start(name), EError::Unknown);
     ExpectFailure(api.GetData(name, "root_pid", ret), EError::InvalidState);
@@ -391,8 +393,9 @@ static void TestExitStatus(TPortoAPI &api) {
     Expect(ret == string("-2"));
 
     Say() << "Check exit status when killed by signal" << std::endl;
+    ExpectSuccess(api.Destroy(name));
+    ExpectSuccess(api.Create(name));
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
-    ExpectSuccess(api.SetProperty(name, "cwd", ""));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     kill(stoi(pid), SIGKILL);
@@ -407,7 +410,6 @@ static void TestExitStatus(TPortoAPI &api) {
 
     Say() << "Check oom_killed property" << std::endl;
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
-    ExpectSuccess(api.SetProperty(name, "cwd", ""));
     ExpectSuccess(api.SetProperty(name, "memory_limit", "10"));
     ExpectSuccess(api.Start(name));
     WaitState(api, name, "dead");
@@ -595,8 +597,8 @@ static void TestEnvironment(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "root_pid", pid));
 
     string env = GetEnv(pid);
-    static const char empty_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/nobody\0"
-        "HOME=/home/nobody\0"
+    static const char empty_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/place/porto/a\0"
+        "HOME=/place/porto/a\0"
         "USER=nobody\0";
 
     Expect(memcmp(empty_env, env.data(), sizeof(empty_env)) == 0);
@@ -609,10 +611,10 @@ static void TestEnvironment(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "root_pid", pid));
 
     env = GetEnv(pid);
-    static const char ab_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/nobody\0"
+    static const char ab_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/place/porto/a\0"
         "a=b\0"
         "c=d\0"
-        "HOME=/home/nobody\0"
+        "HOME=/place/porto/a\0"
         "USER=nobody\0";
 
     Expect(memcmp(ab_env, env.data(), sizeof(ab_env)) == 0);
@@ -632,10 +634,10 @@ static void TestEnvironment(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "root_pid", pid));
 
     env = GetEnv(pid);
-    static const char asb_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/home/nobody\0"
+    static const char asb_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/place/porto/a\0"
         "a=e;b\0"
         "c=d\0"
-        "HOME=/home/nobody\0"
+        "HOME=/place/porto/a\0"
         "USER=nobody\0";
 
     Expect(memcmp(asb_env, env.data(), sizeof(asb_env)) == 0);
@@ -722,8 +724,7 @@ static void TestCwd(TPortoAPI &api) {
     string prefix = config().container().tmp_dir();
 
     Expect(cwd != portodCwd);
-    Expect(cwd.length() == prefix.length() + 7);
-    Expect(cwd.substr(0, prefix.length()) == prefix);
+    Expect(cwd == prefix + "/" + name);
 
     Expect(access(cwd.c_str(), F_OK) == 0);
     ExpectSuccess(api.Stop(name));
@@ -738,8 +739,7 @@ static void TestCwd(TPortoAPI &api) {
     ExpectSuccess(api.Destroy("b"));
 
     Expect(bcwd != portodCwd);
-    Expect(bcwd.length() == prefix.length() + 7);
-    Expect(bcwd.substr(0, prefix.length()) == prefix);
+    Expect(bcwd == prefix + "/b");
     Expect(bcwd != cwd);
 
     Say() << "Check user defined working directory" << std::endl;
@@ -757,7 +757,6 @@ static void TestCwd(TPortoAPI &api) {
     Expect(cwd == "/tmp");
     Expect(access("/tmp", F_OK) == 0);
     ExpectSuccess(api.Stop(name));
-    ExpectSuccess(api.SetProperty(name, "cwd", ""));
     Expect(access("/tmp", F_OK) == 0);
 
     ExpectSuccess(api.Destroy(name));
@@ -1044,10 +1043,12 @@ static void TestStats(TPortoAPI &api) {
     // should be executed right after TestRoot because assumes empty statistics
 
     string root = "/";
-    string wget = "a";
-    string noop = "b";
+    string wget = "wget";
+    string noop = "noop";
 
     ExpectSuccess(api.Create(noop));
+    system("ls -la /bin >/dev/null"); // this will cause io read and noop
+                                       // will not have io_read
     ExpectSuccess(api.SetProperty(noop, "command", "ls -la /bin"));
     ExpectSuccess(api.Start(noop));
     WaitState(api, noop, "dead");

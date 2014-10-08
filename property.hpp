@@ -24,7 +24,7 @@ struct TPropertySpec {
     std::string Description;
     std::function<std::string(std::shared_ptr<const TContainer>)> Default;
     unsigned int Flags;
-    std::function<TError(std::shared_ptr<const TContainer> container, const std::string)> Valid;
+    std::function<TError(std::shared_ptr<const TContainer> container, const std::string&)> Valid;
 };
 
 extern std::map<std::string, const TPropertySpec> propertySpec;
@@ -41,6 +41,7 @@ class TContainerSpec {
 public:
     TContainerSpec(const std::string &name) : Name(name) { }
     ~TContainerSpec();
+    bool IsDefault(std::shared_ptr<const TContainer> container, const std::string &property) const;
     std::string Get(std::shared_ptr<const TContainer> container, const std::string &property) const;
     TError Set(std::shared_ptr<const TContainer> container, const std::string &property, const std::string &value);
     TError GetRaw(const std::string &property, std::string &value) const;

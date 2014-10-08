@@ -635,6 +635,7 @@ TError TContainer::PrepareTask() {
 
     taskEnv.Command = GetPropertyStr("command");
     taskEnv.Cwd = GetPropertyStr("cwd");
+    taskEnv.CreateCwd = Spec.IsDefault(shared_from_this(), "cwd");
     //taskEnv.Root = GetPropertyStr("root");
     taskEnv.User = GetPropertyStr("user");
     taskEnv.Group = GetPropertyStr("group");
@@ -1036,7 +1037,7 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
         return TError(EError::InvalidValue, "Can't set property for root");
 
     string property = origProperty;
-    string value = origValue;
+    string value = StringTrim(origValue);
 
     TError error = AliasToProperty(property, value);
     if (error)

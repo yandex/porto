@@ -11,24 +11,24 @@
 
 using std::string;
 
-static TError ValidBool(std::shared_ptr<const TContainer> container, const string str) {
+static TError ValidBool(std::shared_ptr<const TContainer> container, const string &str) {
     if (str != "true" && str != "false")
         return TError(EError::InvalidValue, "invalid boolean value");
 
     return TError::Success();
 }
 
-static TError ValidUser(std::shared_ptr<const TContainer> container, const string user) {
+static TError ValidUser(std::shared_ptr<const TContainer> container, const string &user) {
     TUser u(user);
     return u.Load();
 }
 
-static TError ValidGroup(std::shared_ptr<const TContainer> container, const string group) {
+static TError ValidGroup(std::shared_ptr<const TContainer> container, const string &group) {
     TGroup g(group);
     return g.Load();
 }
 
-static TError ValidMemGuarantee(std::shared_ptr<const TContainer> container, const string str) {
+static TError ValidMemGuarantee(std::shared_ptr<const TContainer> container, const string &str) {
     uint64_t newval;
 
     auto memroot = memorySubsystem->GetRootCgroup();
@@ -48,7 +48,7 @@ static TError ValidMemGuarantee(std::shared_ptr<const TContainer> container, con
     return TError::Success();
 }
 
-static TError ValidRecharge(std::shared_ptr<const TContainer> container, const string str) {
+static TError ValidRecharge(std::shared_ptr<const TContainer> container, const string &str) {
     auto memroot = memorySubsystem->GetRootCgroup();
     if (!memroot->HasKnob("memory.recharge_on_pgfault"))
         return TError(EError::NotSupported, "invalid kernel");
@@ -56,7 +56,7 @@ static TError ValidRecharge(std::shared_ptr<const TContainer> container, const s
     return ValidBool(container, str);
 }
 
-static TError ValidMemLimit(std::shared_ptr<const TContainer> container, const string str) {
+static TError ValidMemLimit(std::shared_ptr<const TContainer> container, const string &str) {
     uint64_t newval;
 
     if (StringToUint64(str, newval))
@@ -68,7 +68,7 @@ static TError ValidMemLimit(std::shared_ptr<const TContainer> container, const s
     return TError::Success();
 }
 
-static TError ValidCpuPolicy(std::shared_ptr<const TContainer> container, const string str) {
+static TError ValidCpuPolicy(std::shared_ptr<const TContainer> container, const string &str) {
     if (str != "normal" && str != "rt" && str != "idle")
         return TError(EError::InvalidValue, "invalid policy");
 
@@ -84,7 +84,7 @@ static TError ValidCpuPolicy(std::shared_ptr<const TContainer> container, const 
     return TError::Success();
 }
 
-static TError ValidCpuPriority(std::shared_ptr<const TContainer> container, const string str) {
+static TError ValidCpuPriority(std::shared_ptr<const TContainer> container, const string &str) {
     int val;
 
     if (StringToInt(str, val))
@@ -96,7 +96,7 @@ static TError ValidCpuPriority(std::shared_ptr<const TContainer> container, cons
     return TError::Success();
 }
 
-static TError ValidNetGuarantee(std::shared_ptr<const TContainer> container, const string str) {
+static TError ValidNetGuarantee(std::shared_ptr<const TContainer> container, const string &str) {
     uint32_t newval;
 
     if (StringToUint32(str, newval))
@@ -105,7 +105,7 @@ static TError ValidNetGuarantee(std::shared_ptr<const TContainer> container, con
     return TError::Success();
 }
 
-static TError ValidNetCeil(std::shared_ptr<const TContainer> container, const string str) {
+static TError ValidNetCeil(std::shared_ptr<const TContainer> container, const string &str) {
     uint32_t newval;
 
     if (StringToUint32(str, newval))
@@ -114,7 +114,7 @@ static TError ValidNetCeil(std::shared_ptr<const TContainer> container, const st
     return TError::Success();
 }
 
-static TError ValidNetPriority(std::shared_ptr<const TContainer> container, const string str) {
+static TError ValidNetPriority(std::shared_ptr<const TContainer> container, const string &str) {
     int val;
 
     if (StringToInt(str, val))
@@ -126,7 +126,7 @@ static TError ValidNetPriority(std::shared_ptr<const TContainer> container, cons
     return TError::Success();
 }
 
-static TError ValidIsolate(std::shared_ptr<const TContainer> container, const string str) {
+static TError ValidIsolate(std::shared_ptr<const TContainer> container, const string &str) {
     if (str != "true" && str != "false" && str != "parent")
         return TError(EError::InvalidValue, "invalid isolate value");
 
@@ -175,8 +175,15 @@ std::map<std::string, const TPropertySpec> propertySpec = {
     { "cwd",
         {
             "Container working directory",
-            DEFSTR(""),
-            CGNSREQ_PROPERTY
+            [](std::shared_ptr<const TContainer> c)->std::string {
+                return config().container().tmp_dir() + "/" + c->GetName();
+            },
+            CGNSREQ_PROPERTY,
+            [](std::shared_ptr<const TContainer> c, const string &s) {
+                if (!s.length() || s[0] != '/')
+                    return TError(EError::InvalidValue, "invalid directory");
+                return TError::Success();
+            }
         }
     },
     {
@@ -291,6 +298,13 @@ std::map<std::string, const TPropertySpec> propertySpec = {
         }
     },
 };
+
+bool TContainerSpec::IsDefault(std::shared_ptr<const TContainer> container, const std::string &property) const {
+    if (Data.find(property) == Data.end())
+        return true;
+
+    return propertySpec.at(property).Default(container) == Data.at(property);
+}
 
 string TContainerSpec::Get(std::shared_ptr<const TContainer> container, const string &property) const {
     if (Data.find(property) == Data.end())
