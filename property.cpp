@@ -126,31 +126,38 @@ static TError ValidNetPriority(std::shared_ptr<const TContainer> container, cons
     return TError::Success();
 }
 
+static TError ValidIsolate(std::shared_ptr<const TContainer> container, const string str) {
+    if (str != "true" && str != "false" && str != "parent")
+        return TError(EError::InvalidValue, "invalid isolate value");
+
+    return TError::Success();
+}
+
 std::map<std::string, const TPropertySpec> propertySpec = {
     {"command", { "Command executed upon container start", "" }},
-    {"user", { "Start command with given user", "", SUPERUSER_PROPERTY, ValidUser }},
-    {"group", { "Start command with given group", "", SUPERUSER_PROPERTY, ValidGroup }},
+    {"user", { "Start command with given user", "", CGNSREQ_PROPERTY | SUPERUSER_PROPERTY, ValidUser }},
+    {"group", { "Start command with given group", "", CGNSREQ_PROPERTY | SUPERUSER_PROPERTY, ValidGroup }},
     {"env", { "Container environment variables" }},
     //{"root", { "Container root directory", "" }},
-    {"cwd", { "Container working directory", "" }},
+    {"cwd", { "Container working directory", "", CGNSREQ_PROPERTY }},
 
     {"stdin_path", { "Container standard input path", "" }},
     {"stdout_path", { "Container standard output path", "" }},
     {"stderr_path", { "Container standard error path", "" }},
 
-    {"memory_guarantee", { "Guaranteed amount of memory", "0", DYNAMIC_PROPERTY, ValidMemGuarantee }},
-    {"memory_limit", { "Memory hard limit", "0", DYNAMIC_PROPERTY, ValidMemLimit }},
-    {"recharge_on_pgfault", { "Recharge memory on page fault", "false", DYNAMIC_PROPERTY, ValidRecharge }},
+    {"memory_guarantee", { "Guaranteed amount of memory", "0", CGNSREQ_PROPERTY | DYNAMIC_PROPERTY, ValidMemGuarantee }},
+    {"memory_limit", { "Memory hard limit", "0", CGNSREQ_PROPERTY | DYNAMIC_PROPERTY, ValidMemLimit }},
+    {"recharge_on_pgfault", { "Recharge memory on page fault", "false", CGNSREQ_PROPERTY | DYNAMIC_PROPERTY, ValidRecharge }},
 
-    {"cpu_policy", { "CPU policy: rt, normal, idle", "normal", 0, ValidCpuPolicy }},
-    {"cpu_priority", { "CPU priority: 0-99", std::to_string(DEF_CLASS_PRIO), DYNAMIC_PROPERTY, ValidCpuPriority }},
+    {"cpu_policy", { "CPU policy: rt, normal, idle", "normal", CGNSREQ_PROPERTY, ValidCpuPolicy }},
+    {"cpu_priority", { "CPU priority: 0-99", std::to_string(DEF_CLASS_PRIO), CGNSREQ_PROPERTY | DYNAMIC_PROPERTY, ValidCpuPriority }},
 
-    {"net_guarantee", { "Guaranteed container network bandwidth", std::to_string(DEF_CLASS_RATE), 0, ValidNetGuarantee }},
-    {"net_ceil", { "Maximum container network bandwidth", std::to_string(DEF_CLASS_CEIL), 0, ValidNetCeil }},
-    {"net_priority", { "Container network priority: 0-7", std::to_string(DEF_CLASS_NET_PRIO), 0, ValidNetPriority }},
+    {"net_guarantee", { "Guaranteed container network bandwidth", std::to_string(DEF_CLASS_RATE), CGNSREQ_PROPERTY, ValidNetGuarantee }},
+    {"net_ceil", { "Maximum container network bandwidth", std::to_string(DEF_CLASS_CEIL), CGNSREQ_PROPERTY, ValidNetCeil }},
+    {"net_priority", { "Container network priority: 0-7", std::to_string(DEF_CLASS_NET_PRIO), CGNSREQ_PROPERTY, ValidNetPriority }},
 
     {"respawn", { "Automatically respawn dead container", "false", 0, ValidBool }},
-    {"isolate", { "Isolate container from others", "true", 0, ValidBool }},
+    {"isolate", { "Isolate container from others", "true", 0, ValidIsolate }},
 };
 
 const string &TContainerSpec::Get(const string &property) const {

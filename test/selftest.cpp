@@ -26,9 +26,9 @@ using std::pair;
 
 namespace test {
 
+static string subsystems[] = { "net_cls", "freezer", "memory", "cpu", "cpuacct" };
 static void ExpectCorrectCgroups(const string &pid, const string &name) {
     auto cgmap = GetCgroups(pid);
-    string subsystems[] = { "net_cls", "freezer", "memory", "cpu", "cpuacct" };
     int expected = sizeof(subsystems) / sizeof(subsystems[0]);
 
     for (auto kv : cgmap) {
@@ -44,6 +44,20 @@ static void ExpectCorrectCgroups(const string &pid, const string &name) {
     }
     Expect(expected == 0);
 }
+
+#if 0
+static void ExpectEqualCgroups(const string &pidA, const string &pidB) {
+    auto cgmapA = GetCgroups(pidA);
+    auto cgmapB = GetCgroups(pidB);
+
+    for (auto pair : cgmapA) {
+        if (std::find(subsystems.begin(), subsystems.end(), kv.first) == subsystems.end())
+            continue;
+
+        Expect(pair.second == cgmapB[pair.first]);
+    }
+}
+#endif
 
 static void ShouldHaveOnlyRoot(TPortoAPI &api) {
     std::vector<std::string> containers;
@@ -1425,6 +1439,33 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(slot1));
     ExpectSuccess(api.Destroy(prod));
     ExpectSuccess(api.Destroy(box));
+
+#if 0
+    Say() << "Test child-parent sharing works" << std::endl;
+
+    string parent = "parent";
+    string child = "parent/child";
+
+    ExpectSuccess(api.Create(parent));
+    ExpectSuccess(api.SetProperty(parent, "command", "sleep 1000"));
+    ExpectSuccess(api.Start(parent));
+
+    ExpectSuccess(api.Create(child));
+    ExpectSuccess(api.SetProperty(child, "isolate", "parent"));
+    ExpectSuccess(api.SetProperty(child, "command", "sleep 1000"));
+    ExpectFailure(api.SetProperty(child, "cwd", "/tmp"), EError::InvalidValue);
+    ExpectSuccess(api.SetProperty(child, "respawn", "true"));
+
+    ExpectSuccess(api.Start(child));
+
+    ExpectEqualCgroups(parentPid, childPid);
+    Expect(GetCwd(parentPid) == GetCwd(childPid));
+
+    vector<string> namespaces[] = { "pid", "mnt", "ipc", "net", /*"user", */"uts" };
+
+    for (auto &ns : namespaces)
+        Expect(GetNamespace(parentPid, ns) == GetNamespace(childPid, ns));
+#endif
 }
 
 static void TestPermissions(TPortoAPI &api) {

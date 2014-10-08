@@ -11,9 +11,14 @@
 
 class TContainer;
 
+// Property can be changed while container is running
 const unsigned int DYNAMIC_PROPERTY = (1 << 0);
+// Property is not shown in the property list
 const unsigned int HIDDEN_PROPERTY = (1 << 1);
+// Property can be changed only by super user
 const unsigned int SUPERUSER_PROPERTY = (1 << 2);
+// Property required cgroups and/or namespaces
+const unsigned int CGNSREQ_PROPERTY = (1 << 3);
 
 struct TPropertySpec {
     std::string Description;

@@ -1,6 +1,8 @@
 - full dump on sigsegv
 - autorespawn max number and delay + cron syntax
 - isolate = parent as nsenter for API
+- build on clean distro (+ script to build on several clean distros)
+- tags property; list should allow to list only by given tags
 - ? autodestroy property
 - ? portoctl run -f <MANIFEST> | <MANIFEST STRING>
 - ? cpu_cores property to reserve some cores for a container
@@ -8,6 +10,7 @@
   coredump settings
 - ? different log levels (error, normal, verbose)
 - ? show default property value instead of empty string
+- ? portoctl cp
 
 # properties
 - ? capabilities
