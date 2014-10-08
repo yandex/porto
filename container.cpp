@@ -631,8 +631,15 @@ TError TContainer::PrepareCgroups() {
 }
 
 TError TContainer::PrepareTask() {
-    TTaskEnv taskEnv(GetPropertyStr("command"), GetPropertyStr("cwd"), /*GetPropertyStr("root")*/"", GetPropertyStr("user"), GetPropertyStr("group"), GetPropertyStr("env"), GetPropertyStr("isolate") == "true");
+    TTaskEnv taskEnv;
 
+    taskEnv.Command = GetPropertyStr("command");
+    taskEnv.Cwd = GetPropertyStr("cwd");
+    //taskEnv.Root = GetPropertyStr("root");
+    taskEnv.User = GetPropertyStr("user");
+    taskEnv.Group = GetPropertyStr("group");
+    taskEnv.Environ = GetPropertyStr("env");
+    taskEnv.Isolate = GetPropertyStr("isolate") == "true";
     taskEnv.StdinPath = GetPropertyStr("stdin_path");
     taskEnv.StdoutPath = GetPropertyStr("stdout_path");
     taskEnv.StderrPath = GetPropertyStr("stderr_path");

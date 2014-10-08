@@ -19,24 +19,22 @@ struct TExitStatus {
 
 class TTaskEnv {
     friend TTask;
-    const std::string Command;
-    std::string Cwd;
-    const std::string Root;
     std::vector<std::string> EnvVec;
-    const std::string User;
-    const std::string Group;
-    const std::string Environ;
     int Uid, Gid;
-    const bool Isolate;
 
     void ParseEnv();
 public:
+    std::string Command;
+    std::string Cwd;
+    std::string Root;
+    std::string User;
+    std::string Group;
+    std::string Environ;
+    bool Isolate = false;
     std::string StdinPath;
     std::string StdoutPath;
     std::string StderrPath;
 
-    TTaskEnv() : Isolate(false) {};
-    TTaskEnv(const std::string &command, const std::string &cwd, const std::string &root, const std::string &user, const std::string &group, const std::string &environ, const bool isolate) : Command(command), Cwd(cwd), Root(root), User(user), Group(group), Environ(environ), Isolate(isolate) { }
     TError Prepare();
     const char** GetEnvp() const;
 };
