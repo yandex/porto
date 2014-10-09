@@ -524,7 +524,7 @@ bool TContainer::UseParentNamespace() const {
     string value;
     TError error = Spec.GetRaw("isolate", value);
 
-    return Parent && !Parent->IsRoot() && !error && value == "parent";
+    return Parent && !Parent->IsRoot() && !error && value == "false";
 }
 
 TError TContainer::PrepareNetwork() {
@@ -662,10 +662,8 @@ TError TContainer::PrepareTask() {
     taskEnv->StderrPath = GetPropertyStr("stderr_path");
 
     if (UseParentNamespace()) {
-        if (Parent->IsRoot())
-            return TError(EError::InvalidValue, "Can't share parent container with root");
-
         int pid = Parent->Task->GetPid();
+
         TError error = taskEnv->Ns.Create(pid);
         if (error)
             return error;

@@ -1435,7 +1435,7 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(prod));
     ExpectSuccess(api.Destroy(box));
 
-    Say() << "Test child-parent sharing works" << std::endl;
+    Say() << "Test child-parent isolation" << std::endl;
 
     string parent = "parent";
     string child = "parent/child";
@@ -1445,7 +1445,7 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
     ExpectSuccess(api.Start(parent));
 
     ExpectSuccess(api.Create(child));
-    ExpectSuccess(api.SetProperty(child, "isolate", "parent"));
+    ExpectSuccess(api.SetProperty(child, "isolate", "false"));
     ExpectSuccess(api.SetProperty(child, "command", "sleep 1000"));
 
     string exp_limit = "268435456";

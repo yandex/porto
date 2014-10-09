@@ -126,16 +126,6 @@ static TError ValidNetPriority(std::shared_ptr<const TContainer> container, cons
     return TError::Success();
 }
 
-static TError ValidIsolate(std::shared_ptr<const TContainer> container, const string &str) {
-    if (str != "true" && str != "false" && str != "parent")
-        return TError(EError::InvalidValue, "invalid isolate value");
-
-    if (str == "parent" && container->GetParent()->IsRoot())
-        return TError(EError::InvalidValue, "can't share container with root");
-
-    return TError::Success();
-}
-
 static TError ValidPath(std::shared_ptr<const TContainer> container, const string &str) {
     if (!str.length() || str[0] != '/')
         return TError(EError::InvalidValue, "invalid directory");
@@ -336,10 +326,10 @@ std::map<std::string, const TPropertySpec> propertySpec = {
     },
     { "isolate",
         {
-            "Isolate container from others",
+            "Isolate container from parent",
             DEFSTR("true"),
             0,
-            ValidIsolate
+            ValidBool
         }
     },
 };
