@@ -475,18 +475,18 @@ TError TTask::Kill(int signal) const {
     return TError::Success();
 }
 
-std::string TTask::GetStdout() const {
+std::string TTask::GetStdout(size_t limit) const {
     string s;
     TFile f(Env->StdoutPath);
-    TError e(f.LastStrings(config().container().stdout_read_bytes(), s));
+    TError e(f.LastStrings(limit, s));
     TLogger::LogError(e, "Can't read container stdout");
     return s;
 }
 
-std::string TTask::GetStderr() const {
+std::string TTask::GetStderr(size_t limit) const {
     string s;
     TFile f(Env->StderrPath);
-    TError e(f.LastStrings(config().container().stdout_read_bytes(), s));
+    TError e(f.LastStrings(limit, s));
     TLogger::LogError(e, "Can't read container stderr");
     return s;
 }

@@ -80,8 +80,8 @@ public:
     TError Kill(int signal) const;
     void DeliverExitStatus(int status);
 
-    std::string GetStdout() const;
-    std::string GetStderr() const;
+    std::string GetStdout(size_t limit) const;
+    std::string GetStderr(size_t limit) const;
 
     int ChildCallback();
     TError Restore(int pid);

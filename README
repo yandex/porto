@@ -3,6 +3,8 @@ cmake .
 make
 
 # Build stable version of package
-dch -i
+git checkout v0.7
 debuild
-debrelease
+
+# Release new version
+./release

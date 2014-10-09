@@ -228,12 +228,34 @@ std::map<std::string, const TPropertySpec> propertySpec = {
             ExistingFile
         }
     },
+    { "stdout_limit",
+        {
+            "Return no more than given number of bytes from standard output/error",
+            [](std::shared_ptr<const TContainer> c)->std::string {
+                return std::to_string(config().container().stdout_limit());
+            },
+            0,
+            [](std::shared_ptr<const TContainer> c, const string &s)->TError {
+                uint32_t val;
+                uint32_t max = config().container().stdout_limit();
+
+                TError error = StringToUint32(s, val);
+                if (error)
+                    return error;
+
+                if (val > max)
+                    return TError(EError::InvalidValue,
+                                  "Maximum number of bytes: " +
+                                  std::to_string(max));
+
+                return TError::Success();
+            }
+        }
+    },
     { "stdout_path",
         {
             "Container standard output path",
             [](std::shared_ptr<const TContainer> c)->std::string {
-                TLogger::Log() << "GET DEFAULT FOR " << c->GetName() << " " << DefaultStdFile(c, "stdout");
-
                 return DefaultStdFile(c, "stdout");
             },
             0,
@@ -244,8 +266,6 @@ std::map<std::string, const TPropertySpec> propertySpec = {
         {
             "Container standard error path",
             [](std::shared_ptr<const TContainer> c)->std::string {
-                TLogger::Log() << "GET DEFAULT FOR " << c->GetName() << " " << DefaultStdFile(c, "stderr");
-
                 return DefaultStdFile(c, "stderr");
             },
             0,
@@ -336,6 +356,16 @@ std::map<std::string, const TPropertySpec> propertySpec = {
         {
             "User-defined property",
             DEFSTR(""),
+            0,
+            [](std::shared_ptr<const TContainer> c, const string &s)->TError {
+                uint32_t max = config().container().private_max();
+
+                if (s.length() > max)
+                    return TError(EError::InvalidValue, "Value is too long");
+
+                return TError::Success();
+            }
+
         }
     },
 };

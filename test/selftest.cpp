@@ -973,6 +973,8 @@ static void TestRoot(TPortoAPI &api) {
         "stdin_path",
         "stdout_path",
         "stderr_path",
+        "stdout_limit",
+        "private",
     };
 
     std::vector<TProperty> plist;

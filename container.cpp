@@ -104,13 +104,13 @@ struct TData {
 
     static string Stdout(TContainer& c) {
         if (c.Task)
-            return c.Task->GetStdout();
+            return c.Task->GetStdout(c.GetPropertyUint64("stdout_limit"));
         return "";
     };
 
     static string Stderr(TContainer& c) {
         if (c.Task)
-            return c.Task->GetStderr();
+            return c.Task->GetStderr(c.GetPropertyUint64("stdout_limit"));
         return "";
     };
 

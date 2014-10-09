@@ -231,8 +231,6 @@ TError TCgroup::GetKnobValueAsLines(const std::string &knob, vector<string> &lin
 TError TCgroup::SetKnobValue(const std::string &knob, const std::string &value, bool append) const {
     TFile f(Path() + "/" + knob);
 
-    //TLogger::Log() << f.GetPath() << " = " << value << std::endl;
-
     if (append)
         return f.AppendString(value);
     else

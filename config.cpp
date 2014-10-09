@@ -54,7 +54,8 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_tmp_dir("/place/porto");
     config().mutable_container()->set_aging_time_ms(60 * 60 * 24 * 7 * 1000);
     config().mutable_container()->set_respawn_delay_ms(1000);
-    config().mutable_container()->set_stdout_read_bytes(8 * 1024 * 1024);
+    config().mutable_container()->set_stdout_limit(8 * 1024 * 1024);
+    config().mutable_container()->set_private_max(1024);
 }
 
 bool TConfig::LoadFile(const std::string &path, bool silent) {

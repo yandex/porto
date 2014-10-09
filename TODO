@@ -1,5 +1,4 @@
 - full dump on sigsegv
-- property to limit returned stdout/stderr size
 - autorespawn max number and cron syntax
 - build on clean distro (+ script to build on several clean distros)
 - ? autodestroy property

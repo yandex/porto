@@ -45,7 +45,8 @@ message TCfg {
 		optional string tmp_dir = 2;
 		optional uint32 aging_time_ms = 3;
 		optional uint32 respawn_delay_ms = 4;
-		optional uint32 stdout_read_bytes = 5;
+		optional uint32 stdout_limit = 5;
+		optional uint32 private_max = 6;
 	}
 
 	optional TNetworkCfg network = 1;
