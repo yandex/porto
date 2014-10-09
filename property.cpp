@@ -332,6 +332,12 @@ std::map<std::string, const TPropertySpec> propertySpec = {
             ValidBool
         }
     },
+    { "private",
+        {
+            "User-defined property",
+            DEFSTR(""),
+        }
+    },
 };
 
 bool TContainerSpec::IsDefault(std::shared_ptr<const TContainer> container, const std::string &property) const {

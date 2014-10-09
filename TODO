@@ -2,7 +2,6 @@
 - property to limit returned stdout/stderr size
 - autorespawn max number and cron syntax
 - build on clean distro (+ script to build on several clean distros)
-- tags property; list should allow to list only by given tags
 - ? autodestroy property
 - ? portoctl run -f <MANIFEST> | <MANIFEST STRING>
 - ? cpu_cores property to reserve some cores for a container
