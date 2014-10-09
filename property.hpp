@@ -17,8 +17,10 @@ const unsigned int DYNAMIC_PROPERTY = (1 << 0);
 const unsigned int HIDDEN_PROPERTY = (1 << 1);
 // Property can be changed only by super user
 const unsigned int SUPERUSER_PROPERTY = (1 << 2);
-// Property required cgroups and/or namespaces
-const unsigned int CGNSREQ_PROPERTY = (1 << 3);
+// Property should return parent value as default
+const unsigned int PARENT_DEF_PROPERTY = (1 << 3);
+// When child container is shared with parent these properties can't be changed
+const unsigned int PARENT_RO_PROPERTY = (1 << 4);
 
 struct TPropertySpec {
     std::string Description;
@@ -30,6 +32,7 @@ struct TPropertySpec {
 extern std::map<std::string, const TPropertySpec> propertySpec;
 
 class TContainerSpec {
+    NO_COPY_CONSTRUCT(TContainerSpec);
     TKeyValueStorage Storage;
     std::string Name;
     std::map<std::string, std::string> Data;
@@ -42,6 +45,7 @@ public:
     TContainerSpec(const std::string &name) : Name(name) { }
     ~TContainerSpec();
     bool IsDefault(std::shared_ptr<const TContainer> container, const std::string &property) const;
+    std::string GetDefault(std::shared_ptr<const TContainer> container, const std::string &property) const;
     std::string Get(std::shared_ptr<const TContainer> container, const std::string &property) const;
     TError Set(std::shared_ptr<const TContainer> container, const std::string &property, const std::string &value);
     TError GetRaw(const std::string &property, std::string &value) const;

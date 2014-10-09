@@ -7,10 +7,10 @@
 #include "error.hpp"
 
 class TUserEntry {
+    NO_COPY_CONSTRUCT(TUserEntry);
 protected:
     std::string Name;
     int Id;
-    NO_COPY_CONSTRUCT(TUserEntry);
 public:
     TUserEntry(const std::string &name) : Name(name), Id(-1) {}
     TUserEntry(const int id) : Name(""), Id(id) {}

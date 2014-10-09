@@ -58,7 +58,7 @@ void TConfig::LoadDefaults() {
 }
 
 bool TConfig::LoadFile(const std::string &path, bool silent) {
-    TScopedFd fd = open(path.c_str(), O_RDONLY);
+    TScopedFd fd(open(path.c_str(), O_RDONLY));
     if (fd.GetFd() < 0)
         return false;
 
@@ -92,7 +92,7 @@ int TConfig::Test(const std::string &path) {
         return EXIT_FAILURE;
     }
 
-    TScopedFd fd = open(path.c_str(), O_RDONLY);
+    TScopedFd fd(open(path.c_str(), O_RDONLY));
     if (fd.GetFd() < 0) {
         std::cerr << "Can't open " << path << std::endl;
         return EXIT_FAILURE;

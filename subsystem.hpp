@@ -11,10 +11,9 @@
 class TCgroup;
 
 class TSubsystem : public std::enable_shared_from_this<TSubsystem> {
+    NO_COPY_CONSTRUCT(TSubsystem);
     std::string Name;
     std::shared_ptr<TCgroup> RootCgroup;
-
-    NO_COPY_CONSTRUCT(TSubsystem);
 
 protected:
     TSubsystem(const std::string &name) : Name(name) {}

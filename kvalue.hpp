@@ -10,13 +10,13 @@
 #include "util/mount.hpp"
 
 class TKeyValueStorage {
+    NO_COPY_CONSTRUCT(TKeyValueStorage);
     TMount Tmpfs;
     std::string Name(const std::string &path) const;
     std::string Path(const std::string &name) const;
     void Merge(kv::TNode &node, kv::TNode &next) const;
     TError ListNodes(std::vector<std::string> &list) const;
 
-    NO_COPY_CONSTRUCT(TKeyValueStorage);
 public:
     TError MountTmpfs();
 

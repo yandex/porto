@@ -4,6 +4,7 @@
 #include <csignal>
 #include <functional>
 
+#include "porto.hpp"
 #include "error.hpp"
 
 int RetryBusy(int times, int timeoMs, std::function<int()> handler);
@@ -23,6 +24,7 @@ TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap);
 int BlockAllSignals();
 
 class TScopedFd {
+    NO_COPY_CONSTRUCT(TScopedFd);
     int Fd;
 public:
     TScopedFd(int fd = -1);

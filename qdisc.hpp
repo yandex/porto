@@ -11,10 +11,10 @@
 #include "util/log.hpp"
 
 class TQdisc {
+    NO_COPY_CONSTRUCT(TQdisc);
     const uint32_t Handle;
     const uint32_t DefClass;
 
-    NO_COPY_CONSTRUCT(TQdisc);
 public:
     TQdisc(uint32_t handle, uint32_t defClass) : Handle(handle), DefClass(defClass) { }
 
@@ -24,11 +24,11 @@ public:
 };
 
 class TTclass {
+    NO_COPY_CONSTRUCT(TTclass);
     const std::shared_ptr<TQdisc> ParentQdisc;
     const std::shared_ptr<TTclass> ParentTclass;
     const uint32_t Handle;
 
-    NO_COPY_CONSTRUCT(TTclass);
 public:
     TTclass(const std::shared_ptr<TQdisc> qdisc, uint32_t handle) : ParentQdisc(qdisc), Handle(handle) { }
     TTclass(const std::shared_ptr<TTclass> tclass, uint32_t handle) : ParentTclass(tclass), Handle(handle) { }
@@ -42,9 +42,9 @@ public:
 };
 
 class TFilter {
+    NO_COPY_CONSTRUCT(TFilter);
     const std::shared_ptr<TQdisc> Parent;
 
-    NO_COPY_CONSTRUCT(TFilter);
 public:
     TFilter(const std::shared_ptr<TQdisc> parent) : Parent(parent) { }
     bool Exists();

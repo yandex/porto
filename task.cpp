@@ -106,13 +106,16 @@ void TTask::Syslog(const string &s) const {
 }
 
 TTask::~TTask() {
-    TFile out(Env.StdoutPath);
-    TError e = out.Remove();
-    TLogger::LogError(e, "Can't remove task stdout " + Env.StdoutPath);
+    if (!Env)
+        return;
 
-    TFile err(Env.StderrPath);
+    TFile out(Env->StdoutPath);
+    TError e = out.Remove();
+    TLogger::LogError(e, "Can't remove task stdout " + Env->StdoutPath);
+
+    TFile err(Env->StderrPath);
     e = err.Remove();
-    TLogger::LogError(e, "Can't remove task stderr " + Env.StderrPath);
+    TLogger::LogError(e, "Can't remove task stderr " + Env->StderrPath);
 }
 
 static int ChildFn(void *arg) {
@@ -123,16 +126,16 @@ static int ChildFn(void *arg) {
 void TTask::OpenStdFile(const std::string &path, int expected) {
     int ret = open(path.c_str(), O_CREAT | O_WRONLY | O_APPEND, 0700);
     if (ret < 0) {
-        Syslog(string("open(" + std::to_string(expected) + "): ") + strerror(errno));
+        Syslog(string("open(" + path + ") -> " + std::to_string(expected) + ": ") + strerror(errno));
         ReportResultAndExit(Wfd, -errno);
     }
     if (ret != expected) {
-        Syslog("open(" + std::to_string(expected) + "): unexpected fd");
+        Syslog("open(" + path + ") -> " + std::to_string(expected) + ": unexpected fd");
         ReportResultAndExit(Wfd, -EINVAL);
     }
-    ret = fchown(ret, Env.Uid, Env.Gid);
+    ret = fchown(ret, Env->Uid, Env->Gid);
     if (ret < 0) {
-        Syslog(string("fchown(" + std::to_string(expected) + "): ") + strerror(errno));
+        Syslog(string("fchown(" + path + ") -> " + std::to_string(expected) + ": ") + strerror(errno));
         ReportResultAndExit(Wfd, -errno);
     }
 }
@@ -146,7 +149,7 @@ void TTask::ChildReopenStdio() {
         exit(0xAA);
     }
 
-    int ret = open(Env.StdinPath.c_str(), O_CREAT | O_RDONLY, 0700);
+    int ret = open(Env->StdinPath.c_str(), O_CREAT | O_RDONLY, 0700);
     if (ret < 0) {
         Syslog(string("open(0): ") + strerror(errno));
         ReportResultAndExit(Wfd, -errno);
@@ -156,8 +159,8 @@ void TTask::ChildReopenStdio() {
         ReportResultAndExit(Wfd, -EINVAL);
     }
 
-    OpenStdFile(Env.StdoutPath, 1);
-    OpenStdFile(Env.StderrPath, 2);
+    OpenStdFile(Env->StdoutPath, 1);
+    OpenStdFile(Env->StderrPath, 2);
 }
 
 void TTask::ChildDropPriveleges() {
@@ -166,17 +169,17 @@ void TTask::ChildDropPriveleges() {
         ReportResultAndExit(Wfd, -errno);
     }
 
-    if (setgid(Env.Gid) < 0) {
+    if (setgid(Env->Gid) < 0) {
         Syslog(string("setgid(): ") + strerror(errno));
         ReportResultAndExit(Wfd, -errno);
     }
 
-    if (initgroups(Env.User.c_str(), Env.Gid) < 0) {
+    if (initgroups(Env->User.c_str(), Env->Gid) < 0) {
         Syslog(string("initgroups(): ") + strerror(errno));
         ReportResultAndExit(Wfd, -errno);
     }
 
-    if (setuid(Env.Uid) < 0) {
+    if (setuid(Env->Uid) < 0) {
         Syslog(string("setuid(): ") + strerror(errno));
         ReportResultAndExit(Wfd, -errno);
     }
@@ -187,14 +190,14 @@ void TTask::ChildDropPriveleges() {
 void TTask::ChildExec() {
     clearenv();
 
-    for (auto &s : Env.EnvVec) {
+    for (auto &s : Env->EnvVec) {
         char *d = strdup(s.c_str());
         putenv(d);
     }
 
 	wordexp_t result;
 
-	int ret = wordexp(Env.Command.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
+	int ret = wordexp(Env->Command.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
     switch (ret) {
     case WRDE_BADCHAR:
         Syslog(string("wordexp(): illegal occurrence of newline or one of |, &, ;, <, >, (, ), {, }"));
@@ -217,12 +220,12 @@ void TTask::ChildExec() {
     }
 
 #ifdef __DEBUG__
-    Syslog(Env.Command.c_str());
+    Syslog(Env->Command.c_str());
     for (unsigned i = 0; i < result.we_wordc; i++)
         Syslog(result.we_wordv[i]);
 #endif
 
-    auto envp = Env.GetEnvp();
+    auto envp = Env->GetEnvp();
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
 
     Syslog(string("execvpe(): ") + strerror(errno));
@@ -230,15 +233,15 @@ void TTask::ChildExec() {
 }
 
 void TTask::ChildIsolateFs() {
-    TMount newRoot(Env.Root, Env.Root + "/", "none", {});
-    TMount newProc("proc", Env.Root + "/proc", "proc", {});
-    TMount newSys("/sys", Env.Root + "/sys", "none", {});
-    TMount newDev("/dev", Env.Root + "/dev", "none", {});
-    TMount newVar("/var", Env.Root + "/var", "none", {});
-    TMount newRun("/run", Env.Root + "/run", "none", {});
-    TMount newTmp("/tmp", Env.Root + "/tmp", "none", {});
+    TMount newRoot(Env->Root, Env->Root + "/", "none", {});
+    TMount newProc("proc", Env->Root + "/proc", "proc", {});
+    TMount newSys("/sys", Env->Root + "/sys", "none", {});
+    TMount newDev("/dev", Env->Root + "/dev", "none", {});
+    TMount newVar("/var", Env->Root + "/var", "none", {});
+    TMount newRun("/run", Env->Root + "/run", "none", {});
+    TMount newTmp("/tmp", Env->Root + "/tmp", "none", {});
 
-    if (Env.Root.length()) {
+    if (Env->Root.length()) {
         if (newRoot.Bind()) {
             Syslog(string("remount /: ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
@@ -274,12 +277,12 @@ void TTask::ChildIsolateFs() {
             ReportResultAndExit(Wfd, -errno);
         }
 
-        if (chdir(Env.Root.c_str()) < 0) {
+        if (chdir(Env->Root.c_str()) < 0) {
             Syslog(string("chdir(): ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
         }
 
-        if (chroot(Env.Root.c_str()) < 0) {
+        if (chroot(Env->Root.c_str()) < 0) {
             Syslog(string("chroot(): ") + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
         }
@@ -307,7 +310,7 @@ int TTask::ChildCallback() {
         ReportResultAndExit(Wfd, -errno);
     }
 
-    if (Env.Isolate) {
+    if (Env->Isolate) {
         // remount proc so PID namespace works
         TMount proc("proc", "/proc", "proc", {});
         if (proc.Mount()) {
@@ -328,7 +331,7 @@ int TTask::ChildCallback() {
     ChildReopenStdio();
     ChildIsolateFs();
 
-    if (chdir(Env.Cwd.c_str()) < 0) {
+    if (chdir(Env->Cwd.c_str()) < 0) {
         Syslog(string("chdir(): ") + strerror(errno));
         ReportResultAndExit(Wfd, -errno);
     }
@@ -340,16 +343,16 @@ int TTask::ChildCallback() {
 }
 
 TError TTask::CreateCwd() {
-    if (!Env.CreateCwd)
+    if (!Env->CreateCwd)
         return TError::Success();
 
-    Cwd = std::make_shared<TFolder>(Env.Cwd, true);
+    Cwd = std::make_shared<TFolder>(Env->Cwd, true);
     if (!Cwd->Exists()) {
         TError error = Cwd->Create(0755, true);
         if (error)
             return error;
     }
-    return Cwd->Chown(Env.User, Env.Group);
+    return Cwd->Chown(Env->User, Env->Group);
 }
 
 TError TTask::Start() {
@@ -388,9 +391,14 @@ TError TTask::Start() {
 
         (void)setsid();
 
+        TError error = Env->Ns.Attach();
+        TLogger::LogError(error, "Can't spawn child");
+        if (error)
+            return error;
+
         int cloneFlags = SIGCHLD;
 
-        if (Env.Isolate)
+        if (Env->Isolate)
             cloneFlags |= CLONE_NEWPID | CLONE_NEWNS;
 
         pid_t clonePid = clone(ChildFn, stack + sizeof(stack), cloneFlags, this);
@@ -469,7 +477,7 @@ TError TTask::Kill(int signal) const {
 
 std::string TTask::GetStdout() const {
     string s;
-    TFile f(Env.StdoutPath);
+    TFile f(Env->StdoutPath);
     TError e(f.LastStrings(config().container().stdout_read_bytes(), s));
     TLogger::LogError(e, "Can't read container stdout");
     return s;
@@ -477,7 +485,7 @@ std::string TTask::GetStdout() const {
 
 std::string TTask::GetStderr() const {
     string s;
-    TFile f(Env.StderrPath);
+    TFile f(Env->StderrPath);
     TError e(f.LastStrings(config().container().stdout_read_bytes(), s));
     TLogger::LogError(e, "Can't read container stderr");
     return s;
@@ -501,21 +509,21 @@ TError TTask::Restore(int pid_) {
     // something.
 
     TFile stdinLink("/proc/" + std::to_string(pid_) + "/fd/0");
-    TError error = stdinLink.ReadLink(Env.StdinPath);
+    TError error = stdinLink.ReadLink(Env->StdinPath);
     if (error)
-        Env.StdinPath = "";
+        Env->StdinPath = "";
     TLogger::LogError(error, "Restore stdin");
 
     TFile stdoutLink("/proc/" + std::to_string(pid_) + "/fd/1");
-    error = stdoutLink.ReadLink(Env.StdoutPath);
+    error = stdoutLink.ReadLink(Env->StdoutPath);
     if (error)
-        Env.StdoutPath = Env.Cwd + "/stdout";
+        Env->StdoutPath = Env->Cwd + "/stdout";
     TLogger::LogError(error, "Restore stdout");
 
     TFile stderrLink("/proc/" + std::to_string(pid_) + "/fd/2");
-    error = stderrLink.ReadLink(Env.StderrPath);
+    error = stderrLink.ReadLink(Env->StderrPath);
     if (error)
-        Env.StderrPath = Env.Cwd + "/stderr";
+        Env->StderrPath = Env->Cwd + "/stderr";
     TLogger::LogError(error, "Restore stderr");
 
     Pid = pid_;
@@ -583,11 +591,11 @@ TError TTask::RotateFile(const std::string path) const {
 TError TTask::Rotate() const {
     TError error;
 
-    error = RotateFile(Env.StdoutPath);
+    error = RotateFile(Env->StdoutPath);
     if (error)
         return error;
 
-    error = RotateFile(Env.StderrPath);
+    error = RotateFile(Env->StderrPath);
     if (error)
         return error;
 

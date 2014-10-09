@@ -7,6 +7,7 @@
 #include "libporto.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
+#include "util/namespace.hpp"
 #include "cli.hpp"
 
 extern "C" {
@@ -535,16 +536,6 @@ public:
         if (!cmd.length())
             cmd = "/bin/bash";
 
-        // order is important
-        pair<string, int> nameToType[] = {
-            //{ "ns/user", CLONE_NEWUSER },
-            { "ns/ipc", CLONE_NEWIPC },
-            { "ns/uts", CLONE_NEWUTS },
-            { "ns/net", CLONE_NEWNET },
-            { "ns/pid", CLONE_NEWPID },
-            { "ns/mnt", CLONE_NEWNS },
-        };
-
         string pidStr;
         int ret = Api->GetData(argv[0], "root_pid", pidStr);
         if (ret) {
@@ -588,13 +579,17 @@ public:
             }
         }
 
-        for (auto &p : nameToType) {
-            int fd = OpenFd(pid, p.first);
-            if (setns(fd, p.second)) {
-                PrintErrno("Can't set namespace");
-                return EXIT_FAILURE;
-            }
-            close(fd);
+        TNamespaceSnapshot ns;
+        error = ns.Create(pid);
+        if (error) {
+            PrintError(error, "Can't create namespace snapshot");
+            return EXIT_FAILURE;
+        }
+
+        error = ns.Attach();
+        if (error) {
+            PrintError(error, "Can't create namespace snapshot");
+            return EXIT_FAILURE;
         }
 
         if (fchdir(rootFd) < 0) {

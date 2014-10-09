@@ -6,6 +6,7 @@
 #include <cstdint>
 
 #include "cgroup.hpp"
+#include "util/namespace.hpp"
 
 class TTask;
 class TContainerEnv;
@@ -18,12 +19,14 @@ struct TExitStatus {
 };
 
 class TTaskEnv {
+    NO_COPY_CONSTRUCT(TTaskEnv);
     friend TTask;
     std::vector<std::string> EnvVec;
     int Uid, Gid;
 
     void ParseEnv();
 public:
+    TTaskEnv() {}
     std::string Command;
     std::string Cwd;
     bool CreateCwd;
@@ -35,14 +38,16 @@ public:
     std::string StdinPath;
     std::string StdoutPath;
     std::string StderrPath;
+    TNamespaceSnapshot Ns;
 
     TError Prepare();
     const char** GetEnvp() const;
 };
 
 class TTask {
+    NO_COPY_CONSTRUCT(TTask);
     int Rfd, Wfd;
-    TTaskEnv Env;
+    std::shared_ptr<TTaskEnv> Env;
     std::vector<std::shared_ptr<TCgroup>> LeafCgroups;
 
     enum ETaskState { Stopped, Started } State;
@@ -63,9 +68,8 @@ class TTask {
     void ChildExec();
     void ChildIsolateFs();
 
-    NO_COPY_CONSTRUCT(TTask);
 public:
-    TTask(TTaskEnv& env, std::vector<std::shared_ptr<TCgroup>> &leafCgroups) : Env(env), LeafCgroups(leafCgroups) {};
+    TTask(std::shared_ptr<TTaskEnv> env, std::vector<std::shared_ptr<TCgroup>> &leafCgroups) : Env(env), LeafCgroups(leafCgroups) {};
     TTask(pid_t pid) : Pid(pid) {};
     ~TTask();
 

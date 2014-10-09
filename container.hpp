@@ -42,6 +42,7 @@ struct TDataSpec {
 extern std::map<std::string, const TDataSpec> dataSpec;
 
 class TContainer : public std::enable_shared_from_this<TContainer> {
+    NO_COPY_CONSTRUCT(TContainer);
     const std::string Name;
     const std::shared_ptr<TContainer> Parent;
     std::shared_ptr<TQdisc> Qdisc;
@@ -72,7 +73,6 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     TError PrepareTask();
     TError KillAll();
 
-    NO_COPY_CONSTRUCT(TContainer);
     const std::string StripParentName(const std::string &name) const;
     bool NeedRespawn();
     bool ShouldApplyProperty(const std::string &property);
@@ -90,7 +90,7 @@ public:
         Name(StripParentName(name)), Parent(parent), State(EContainerState::Stopped), Spec(name), Id(id) { }
     ~TContainer();
 
-    const std::string GetName() const;
+    const std::string GetName(bool recursive = true) const;
 
     bool IsRoot() const;
     std::shared_ptr<const TContainer> GetRoot() const;
@@ -124,10 +124,12 @@ public:
     int GetOomFd();
     void DeliverOom();
     void GetPerm(int &uid, int &gid) const { uid = Uid; gid = Gid; }
+    bool UseParentNamespace() const;
 };
 
 constexpr size_t BITS_PER_LLONG = sizeof(unsigned long long) * 8;
 class TContainerHolder {
+    NO_COPY_CONSTRUCT(TContainerHolder);
     std::map <std::string, std::shared_ptr<TContainer>> Containers;
     unsigned long long Ids[UINT16_MAX / BITS_PER_LLONG];
 

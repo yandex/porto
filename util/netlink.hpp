@@ -18,6 +18,7 @@ enum class ETclassStat {
 };
 
 class TNetlink {
+    NO_COPY_CONSTRUCT(TNetlink);
     const int FilterPrio = 10;
     const char *FilterType = "cgroup";
 
@@ -28,6 +29,7 @@ class TNetlink {
     TError FindDev(std::string &device);
 
 public:
+    TNetlink() {}
     TError Open(const std::string device);
     void Close();
     void LogObj(const std::string &prefix, void *obj);

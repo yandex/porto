@@ -130,6 +130,9 @@ static TError ValidIsolate(std::shared_ptr<const TContainer> container, const st
     if (str != "true" && str != "false" && str != "parent")
         return TError(EError::InvalidValue, "invalid isolate value");
 
+    if (str == "parent" && container->GetParent()->IsRoot())
+        return TError(EError::InvalidValue, "can't share container with root");
+
     return TError::Success();
 }
 
@@ -147,6 +150,20 @@ static TError ExistingFile(std::shared_ptr<const TContainer> container, const st
 }
 
 #define DEFSTR(S) [](std::shared_ptr<const TContainer> container)->std::string { return S; }
+
+static std::string DefaultStdFile(std::shared_ptr<const TContainer> c,
+                                  const std::string &name) {
+    string cwd;
+    TError error = c->GetProperty("cwd", cwd);
+    if (error)
+        return "";
+
+    string prefix;
+    if (c->UseParentNamespace())
+        prefix = c->GetName(false) + ".";
+
+    return cwd + "/" + prefix + name;
+}
 
 std::map<std::string, const TPropertySpec> propertySpec = {
     { "command",
@@ -167,7 +184,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
                 else
                     return u.GetName();
             },
-            CGNSREQ_PROPERTY | SUPERUSER_PROPERTY,
+            SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY,
             ValidUser
         }
     },
@@ -183,21 +200,23 @@ std::map<std::string, const TPropertySpec> propertySpec = {
                 else
                     return g.GetName();
             },
-            CGNSREQ_PROPERTY | SUPERUSER_PROPERTY,
+            SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY,
             ValidGroup
         }
     },
     { "env",
         {
             "Container environment variables",
-            DEFSTR("")
+            DEFSTR(""),
+            PARENT_DEF_PROPERTY
         }
     },
     /*
     { "root",
         {
             "Container root directory",
-            DEFSTR("/")
+            DEFSTR("/"),
+            PARENT_DEF_PROPERTY
         }
     },
     */
@@ -207,7 +226,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
             [](std::shared_ptr<const TContainer> c)->std::string {
                 return config().container().tmp_dir() + "/" + c->GetName();
             },
-            CGNSREQ_PROPERTY,
+            PARENT_DEF_PROPERTY,
             ValidPath,
         }
     },
@@ -223,12 +242,9 @@ std::map<std::string, const TPropertySpec> propertySpec = {
         {
             "Container standard output path",
             [](std::shared_ptr<const TContainer> c)->std::string {
-                string cwd;
-                TError error = c->GetProperty("cwd", cwd);
-                if (error)
-                    return "";
+                TLogger::Log() << "GET DEFAULT FOR " << c->GetName() << " " << DefaultStdFile(c, "stdout");
 
-                return cwd + "/stdout";
+                return DefaultStdFile(c, "stdout");
             },
             0,
             ValidPath
@@ -238,12 +254,9 @@ std::map<std::string, const TPropertySpec> propertySpec = {
         {
             "Container standard error path",
             [](std::shared_ptr<const TContainer> c)->std::string {
-                string cwd;
-                TError error = c->GetProperty("cwd", cwd);
-                if (error)
-                    return "";
+                TLogger::Log() << "GET DEFAULT FOR " << c->GetName() << " " << DefaultStdFile(c, "stderr");
 
-                return cwd + "/stderr";
+                return DefaultStdFile(c, "stderr");
             },
             0,
             ValidPath
@@ -253,7 +266,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
         {
             "Guaranteed amount of memory",
             DEFSTR("0"),
-            CGNSREQ_PROPERTY | DYNAMIC_PROPERTY,
+            DYNAMIC_PROPERTY | PARENT_RO_PROPERTY,
             ValidMemGuarantee
         }
     },
@@ -261,7 +274,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
         {
             "Memory hard limit",
             DEFSTR("0"),
-            CGNSREQ_PROPERTY | DYNAMIC_PROPERTY,
+            DYNAMIC_PROPERTY,
             ValidMemLimit
         }
     },
@@ -269,7 +282,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
         {
             "Recharge memory on page fault",
             DEFSTR("false"),
-            CGNSREQ_PROPERTY | DYNAMIC_PROPERTY,
+            DYNAMIC_PROPERTY | PARENT_RO_PROPERTY,
             ValidRecharge
         }
     },
@@ -277,7 +290,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
         {
             "CPU policy: rt, normal, idle",
             DEFSTR("normal"),
-            CGNSREQ_PROPERTY,
+            PARENT_RO_PROPERTY,
             ValidCpuPolicy
         }
     },
@@ -285,7 +298,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
         {
             "CPU priority: 0-99",
             DEFSTR(std::to_string(DEF_CLASS_PRIO)),
-            CGNSREQ_PROPERTY | DYNAMIC_PROPERTY,
+            DYNAMIC_PROPERTY | PARENT_RO_PROPERTY,
             ValidCpuPriority
         }
     },
@@ -293,7 +306,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
         {
             "Guaranteed container network bandwidth",
             DEFSTR(std::to_string(DEF_CLASS_RATE)),
-            CGNSREQ_PROPERTY,
+            PARENT_RO_PROPERTY,
             ValidNetGuarantee
         }
     },
@@ -301,7 +314,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
         {
             "Maximum container network bandwidth",
             DEFSTR(std::to_string(DEF_CLASS_CEIL)),
-            CGNSREQ_PROPERTY,
+            PARENT_RO_PROPERTY,
             ValidNetCeil
         }
     },
@@ -309,7 +322,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
         {
             "Container network priority: 0-7",
             DEFSTR(std::to_string(DEF_CLASS_NET_PRIO)),
-            CGNSREQ_PROPERTY,
+            PARENT_RO_PROPERTY,
             ValidNetPriority
         }
     },
@@ -335,12 +348,25 @@ bool TContainerSpec::IsDefault(std::shared_ptr<const TContainer> container, cons
     if (Data.find(property) == Data.end())
         return true;
 
-    return propertySpec.at(property).Default(container) == Data.at(property);
+    return GetDefault(container, property) == Data.at(property);
+}
+
+string TContainerSpec::GetDefault(std::shared_ptr<const TContainer> container, const string &property) const {
+    if (container->UseParentNamespace() &&
+        (propertySpec.at(property).Flags & PARENT_DEF_PROPERTY)) {
+        string value;
+        TError error = container->GetParent()->GetProperty(property, value);
+        TLogger::LogError(error, "Can't get default property from parent");
+        if (!error)
+            return value;
+    }
+
+    return propertySpec.at(property).Default(container);
 }
 
 string TContainerSpec::Get(std::shared_ptr<const TContainer> container, const string &property) const {
     if (Data.find(property) == Data.end())
-        return propertySpec.at(property).Default(container);
+        return GetDefault(container, property);
 
     return Data.at(property);
 }

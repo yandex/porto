@@ -14,6 +14,7 @@
 class TSubsystem;
 
 class TCgroup : public std::enable_shared_from_this<TCgroup> {
+    NO_COPY_CONSTRUCT(TCgroup);
     const std::string Name;
     const std::shared_ptr<TCgroup> Parent;
     std::vector<std::weak_ptr<TCgroup>> Children;
@@ -21,7 +22,6 @@ class TCgroup : public std::enable_shared_from_this<TCgroup> {
     std::shared_ptr<TMount> Mount;
 
     mode_t Mode = 0755;
-    NO_COPY_CONSTRUCT(TCgroup);
 
 public:
     TCgroup(const std::vector<std::shared_ptr<TSubsystem>> controller,
@@ -60,8 +60,10 @@ public:
 };
 
 class TCgroupSnapshot {
+    NO_COPY_CONSTRUCT(TCgroupSnapshot);
     std::vector<std::shared_ptr<TCgroup>> Cgroups;
 public:
+    TCgroupSnapshot() {}
     TError Create();
     void Destroy();
 };

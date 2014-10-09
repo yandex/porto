@@ -364,7 +364,10 @@ TContainer::~TContainer() {
     }
 }
 
-const string TContainer::GetName() const {
+const string TContainer::GetName(bool recursive) const {
+    if (!recursive)
+        return Name;
+
     if (!Parent)
         return Name;
 
@@ -517,8 +520,18 @@ TError TContainer::ApplyDynamicProperties() {
     return TError::Success();
 }
 
+bool TContainer::UseParentNamespace() const {
+    string value;
+    TError error = Spec.GetRaw("isolate", value);
+
+    return Parent && !Parent->IsRoot() && !error && value == "parent";
+}
+
 TError TContainer::PrepareNetwork() {
     PORTO_ASSERT(Tclass == nullptr);
+
+    if (UseParentNamespace())
+        return TError::Success();
 
     if (Parent) {
         uint32_t handle = TcHandle(TcMajor(Parent->Tclass->GetHandle()), Id);
@@ -556,6 +569,9 @@ TError TContainer::PrepareNetwork() {
 }
 
 TError TContainer::PrepareOomMonitor() {
+    if (UseParentNamespace())
+        return TError::Success();
+
     auto memcg = GetLeafCgroup(memorySubsystem);
 
     Efd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
@@ -607,7 +623,7 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
-    if (config().network().enabled()) {
+    if (config().network().enabled() && !UseParentNamespace()) {
         auto netcls = GetLeafCgroup(netclsSubsystem);
         uint32_t handle = Tclass->GetHandle();
         TError error = netcls->SetKnobValue("net_cls.classid", std::to_string(handle), false);
@@ -631,21 +647,31 @@ TError TContainer::PrepareCgroups() {
 }
 
 TError TContainer::PrepareTask() {
-    TTaskEnv taskEnv;
+    auto taskEnv = std::make_shared<TTaskEnv>();
 
-    taskEnv.Command = GetPropertyStr("command");
-    taskEnv.Cwd = GetPropertyStr("cwd");
-    taskEnv.CreateCwd = Spec.IsDefault(shared_from_this(), "cwd");
-    //taskEnv.Root = GetPropertyStr("root");
-    taskEnv.User = GetPropertyStr("user");
-    taskEnv.Group = GetPropertyStr("group");
-    taskEnv.Environ = GetPropertyStr("env");
-    taskEnv.Isolate = GetPropertyStr("isolate") == "true";
-    taskEnv.StdinPath = GetPropertyStr("stdin_path");
-    taskEnv.StdoutPath = GetPropertyStr("stdout_path");
-    taskEnv.StderrPath = GetPropertyStr("stderr_path");
+    taskEnv->Command = GetPropertyStr("command");
+    taskEnv->Cwd = GetPropertyStr("cwd");
+    taskEnv->CreateCwd = Spec.IsDefault(shared_from_this(), "cwd") && !UseParentNamespace();
+    //taskEnv->Root = GetPropertyStr("root");
+    taskEnv->User = GetPropertyStr("user");
+    taskEnv->Group = GetPropertyStr("group");
+    taskEnv->Environ = GetPropertyStr("env");
+    taskEnv->Isolate = GetPropertyStr("isolate") == "true";
+    taskEnv->StdinPath = GetPropertyStr("stdin_path");
+    taskEnv->StdoutPath = GetPropertyStr("stdout_path");
+    taskEnv->StderrPath = GetPropertyStr("stderr_path");
 
-    TError error = taskEnv.Prepare();
+    if (UseParentNamespace()) {
+        if (Parent->IsRoot())
+            return TError(EError::InvalidValue, "Can't share parent container with root");
+
+        int pid = Parent->Task->GetPid();
+        TError error = taskEnv->Ns.Create(pid);
+        if (error)
+            return error;
+    }
+
+    TError error = taskEnv->Prepare();
     if (error)
         return error;
 
@@ -1051,6 +1077,10 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
     if (State != EContainerState::Stopped && !(Spec.GetFlags(property) & DYNAMIC_PROPERTY))
         return TError(EError::InvalidValue, "Can't set dynamic property " + property + " for running container");
 
+
+    if (UseParentNamespace() && (Spec.GetFlags(property) & PARENT_RO_PROPERTY))
+        return TError(EError::NotSupported, "Can't set " + property + " for child container");
+
     error = Spec.Set(shared_from_this(), property, value);
     if (error)
         return error;
@@ -1162,6 +1192,11 @@ std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys
     if (Name == ROOT_CONTAINER)
         return subsys->GetRootCgroup()->GetChild(PORTO_ROOT_CGROUP);
 
+    if (UseParentNamespace() &&
+        subsys != freezerSubsystem &&
+        subsys != memorySubsystem)
+        return Parent->GetLeafCgroup(subsys);
+
     return Parent->GetLeafCgroup(subsys)->GetChild(Name);
 }
 
@@ -1176,7 +1211,7 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
     TLogger::Log() << "Delivered " << status << " to " << GetName() << " with root_pid " << Task->GetPid() << std::endl;
     State = EContainerState::Dead;
 
-    if (GetPropertyStr("isolate") == "false")
+    if (GetPropertyStr("isolate") != "true")
         (void)KillAll();
 
     if (NeedRespawn()) {

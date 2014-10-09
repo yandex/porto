@@ -26,10 +26,12 @@ using std::pair;
 
 namespace test {
 
-static string subsystems[] = { "net_cls", "freezer", "memory", "cpu", "cpuacct" };
+static vector<string> subsystems = { "net_cls", "freezer", "memory", "cpu", "cpuacct" };
+static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"uts" };
+
 static void ExpectCorrectCgroups(const string &pid, const string &name) {
     auto cgmap = GetCgroups(pid);
-    int expected = sizeof(subsystems) / sizeof(subsystems[0]);
+    int expected = subsystems.size();
 
     for (auto kv : cgmap) {
         vector<string> cgsubsystems;
@@ -44,20 +46,6 @@ static void ExpectCorrectCgroups(const string &pid, const string &name) {
     }
     Expect(expected == 0);
 }
-
-#if 0
-static void ExpectEqualCgroups(const string &pidA, const string &pidB) {
-    auto cgmapA = GetCgroups(pidA);
-    auto cgmapB = GetCgroups(pidB);
-
-    for (auto pair : cgmapA) {
-        if (std::find(subsystems.begin(), subsystems.end(), kv.first) == subsystems.end())
-            continue;
-
-        Expect(pair.second == cgmapB[pair.first]);
-    }
-}
-#endif
 
 static void ShouldHaveOnlyRoot(TPortoAPI &api) {
     std::vector<std::string> containers;
@@ -204,7 +192,7 @@ static void TestHolder(TPortoAPI &api) {
     Say() << "Try to create container with invalid name" << std::endl;
     string name;
 
-    name = "z@";
+    name = "z$";
     ExpectFailure(api.Create(name), EError::InvalidValue);
 
     name = "/invalid";
@@ -1447,7 +1435,6 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(prod));
     ExpectSuccess(api.Destroy(box));
 
-#if 0
     Say() << "Test child-parent sharing works" << std::endl;
 
     string parent = "parent";
@@ -1460,19 +1447,49 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
     ExpectSuccess(api.Create(child));
     ExpectSuccess(api.SetProperty(child, "isolate", "parent"));
     ExpectSuccess(api.SetProperty(child, "command", "sleep 1000"));
-    ExpectFailure(api.SetProperty(child, "cwd", "/tmp"), EError::InvalidValue);
+
+    string exp_limit = "268435456";
+    ExpectSuccess(api.SetProperty(child, "memory_limit", exp_limit));
+    ExpectFailure(api.SetProperty(child, "memory_guarantee", "10000"), EError::NotSupported);
     ExpectSuccess(api.SetProperty(child, "respawn", "true"));
 
     ExpectSuccess(api.Start(child));
 
-    ExpectEqualCgroups(parentPid, childPid);
-    Expect(GetCwd(parentPid) == GetCwd(childPid));
+    string current = GetCgKnob("memory", child, "memory.limit_in_bytes");
+    Expect(current == exp_limit);
 
-    vector<string> namespaces[] = { "pid", "mnt", "ipc", "net", /*"user", */"uts" };
+    string parentProperty, childProperty;
+    ExpectSuccess(api.GetProperty(parent, "stdout_path", parentProperty));
+    ExpectSuccess(api.GetProperty(child, "stdout_path", childProperty));
+    Expect(parentProperty != childProperty);
+    ExpectSuccess(api.GetProperty(parent, "stderr_path", parentProperty));
+    ExpectSuccess(api.GetProperty(child, "stderr_path", childProperty));
+    Expect(parentProperty != childProperty);
+
+    string parentPid, childPid;
+
+    ExpectSuccess(api.GetData(parent, "root_pid", parentPid));
+    ExpectSuccess(api.GetData(child, "root_pid", childPid));
+
+    AsRoot(api);
+
+    auto parentCgmap = GetCgroups(parentPid);
+    auto childCgmap = GetCgroups(childPid);
+
+    Expect(parentCgmap["freezer"] != childCgmap["freezer"]);
+    Expect(parentCgmap["memory"] != childCgmap["memory"]);
+
+    Expect(parentCgmap["net_cls"] == childCgmap["net_cls"]);
+    Expect(parentCgmap["cpu"] == childCgmap["cpu"]);
+    Expect(parentCgmap["cpuact"] == childCgmap["cpuact"]);
+
+    Expect(GetCwd(parentPid) == GetCwd(childPid));
 
     for (auto &ns : namespaces)
         Expect(GetNamespace(parentPid, ns) == GetNamespace(childPid, ns));
-#endif
+
+    ExpectSuccess(api.Destroy(child));
+    ExpectSuccess(api.Destroy(parent));
 }
 
 static void TestPermissions(TPortoAPI &api) {
