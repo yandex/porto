@@ -823,10 +823,10 @@ public:
                   string as, bs;
                   int64_t an, bn;
 
-                  if (a.second.find(sortBy) == a.second.end())
+                  if (a.second.find(sortBy) != a.second.end())
                       as = a.second[sortBy];
 
-                  if (b.second.find(sortBy) == b.second.end())
+                  if (b.second.find(sortBy) != b.second.end())
                       bs = b.second[sortBy];
 
                   TError aError = StringToInt64(as, an);
