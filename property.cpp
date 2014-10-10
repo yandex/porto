@@ -201,19 +201,20 @@ std::map<std::string, const TPropertySpec> propertySpec = {
             PARENT_DEF_PROPERTY
         }
     },
-    /*
     { "root",
         {
             "Container root directory",
             DEFSTR("/"),
-            PARENT_DEF_PROPERTY
+            HIDDEN_PROPERTY | PARENT_DEF_PROPERTY
         }
     },
-    */
     { "cwd",
         {
             "Container working directory",
             [](std::shared_ptr<const TContainer> c)->std::string {
+                if (!c->IsDefaultProperty("root"))
+                    return "/";
+
                 return config().container().tmp_dir() + "/" + c->GetName();
             },
             PARENT_DEF_PROPERTY,

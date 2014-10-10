@@ -120,6 +120,18 @@ std::string DirName(const std::string &str) {
     return out;
 }
 
+std::string BaseName(const std::string &str) {
+    char *dup = strdup(str.c_str());
+    if (!dup)
+        throw std::bad_alloc();
+
+    char *p = basename(dup);
+    std::string out(p);
+    free(dup);
+
+    return out;
+}
+
 size_t GetTotalMemory() {
     struct sysinfo si;
     if (sysinfo(&si) < 0)

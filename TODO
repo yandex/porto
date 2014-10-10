@@ -8,6 +8,7 @@
   coredump settings
 - ? different log levels (error, normal, verbose)
 - ? portoctl cp
+- ? move DirName/BaseName into TFile/TFolder? + add chdir/chown/chown/etc
 
 # properties
 - ? capabilities

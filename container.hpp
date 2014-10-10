@@ -109,6 +109,7 @@ public:
     TError Kill(int sig);
 
     TError GetProperty(const std::string &property, std::string &value) const;
+    bool IsDefaultProperty(const std::string &property) const;
     TError SetProperty(const std::string &property, const std::string &value, bool superuser);
 
     TError GetData(const std::string &data, std::string &value);

@@ -16,11 +16,13 @@ namespace test {
     void ExpectReturn(int ret, int exp, int line, const char *func);
 
     int ReadPid(const std::string &path);
+    std::vector<std::string> Popen(const std::string &cmd);
     int Pgrep(const std::string &name);
     void WaitExit(TPortoAPI &api, const std::string &pid);
     void WaitState(TPortoAPI &api, const std::string &name, const std::string &state);
     void WaitPortod(TPortoAPI &api);
     std::string GetCwd(const std::string &pid);
+    std::string GetRoot(const std::string &pid);
     std::string GetNamespace(const std::string &pid, const std::string &ns);
     std::map<std::string, std::string> GetCgroups(const std::string &pid);
     std::string GetStatusLine(const std::string &pid, const std::string &prefix);
@@ -45,6 +47,7 @@ namespace test {
     void AsNobody(TPortoAPI &api);
     std::string GetDefaultUser();
     std::string GetDefaultGroup();
+    void BootstrapCommand(const std::string &cmd, const std::string &path);
 
     void RestartDaemon(TPortoAPI &api);
     void TestDaemon(TPortoAPI &api);

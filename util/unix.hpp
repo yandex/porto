@@ -16,6 +16,7 @@ int RegisterSignal(int signum, void (*handler)(int));
 int RegisterSignal(int signum, void (*handler)(int sig, siginfo_t *si, void *unused));
 void ResetAllSignalHandlers(void);
 std::string DirName(const std::string &str);
+std::string BaseName(const std::string &str);
 size_t GetTotalMemory();
 int CreatePidFile(const std::string &path, const int mode);
 void RemovePidFile(const std::string &path);

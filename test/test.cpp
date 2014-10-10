@@ -6,6 +6,7 @@
 #include "util/pwd.hpp"
 
 using std::string;
+using std::vector;
 
 extern "C" {
 #include <unistd.h>
@@ -44,22 +45,27 @@ int ReadPid(const std::string &path) {
     return pid;
 }
 
-int Pgrep(const std::string &name) {
-    FILE *f = popen(("pgrep -x " + name).c_str(), "r");
+vector<string> Popen(const std::string &cmd) {
+    vector<string> lines;
+    FILE *f = popen(cmd.c_str(), "r");
     if (f == nullptr)
-        throw std::string("Can't execute pgrep");
+        throw std::string("Can't execute ") + cmd;
 
     char *line = nullptr;
     size_t n;
 
-    int instances = 0;
     while (getline(&line, &n, f) >= 0) {
-        instances++;
+        lines.push_back(line);
     }
 
     fclose(f);
 
-    return instances;
+    return lines;
+}
+
+int Pgrep(const std::string &name) {
+    vector<string> lines = Popen("pgrep -x " + name);
+    return lines.size();
 }
 
 void WaitExit(TPortoAPI &api, const std::string &pid) {
@@ -121,6 +127,15 @@ void WaitPortod(TPortoAPI &api) {
 std::string GetCwd(const std::string &pid) {
     std::string lnk;
     TFile f("/proc/" + pid + "/cwd");
+    TError error(f.ReadLink(lnk));
+    if (error)
+        throw error.GetMsg();
+    return lnk;
+}
+
+std::string GetRoot(const std::string &pid) {
+    std::string lnk;
+    TFile f("/proc/" + pid + "/root");
     TError error(f.ReadLink(lnk));
     if (error)
         throw error.GetMsg();
@@ -399,6 +414,45 @@ std::string GetDefaultGroup() {
     }
 
     return "daemon";
+}
+
+void BootstrapCommand(const std::string &cmd, const std::string &path) {
+    TFolder d(path);
+    (void)d.Remove(true);
+
+    vector<string> lines = Popen("ldd " + cmd);
+
+    for (auto &line : lines) {
+        vector<string> tokens;
+        TError error = SplitString(line, ' ', tokens);
+        if (error)
+            throw error.GetMsg();
+
+        string from;
+        string name;
+        if (tokens.size() == 2) {
+            from = StringTrim(tokens[0]);
+            name = BaseName(tokens[0]);
+        } else if (tokens.size() == 4) {
+            if (tokens[2] == "")
+                continue;
+
+            from = StringTrim(tokens[2]);
+            name = StringTrim(tokens[0]);
+        } else {
+            continue;
+        }
+
+        TFolder dest(path + "/" + DirName(from));
+        if (!dest.Exists()) {
+            error = dest.Create(0755, true);
+            if (error)
+                throw error.GetMsg();
+        }
+
+        Expect(system(("cp " + from + " " + dest.GetPath() + "/" + name).c_str()) == 0);
+    }
+    Expect(system(("cp " + cmd + " " + path).c_str()) == 0);
 }
 
 void RestartDaemon(TPortoAPI &api) {

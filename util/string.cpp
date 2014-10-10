@@ -122,8 +122,8 @@ TError SplitString(const std::string &s, const char sep, std::vector<std::string
 
 std::string StringTrim(const std::string& s)
 {
-    std::size_t first = s.find_first_not_of(' ');
-    std::size_t last  = s.find_last_not_of(' ');
+    std::size_t first = s.find_first_not_of(" \t");
+    std::size_t last  = s.find_last_not_of(" \t");
 
     if (first == string::npos || last == string::npos)
         return "";

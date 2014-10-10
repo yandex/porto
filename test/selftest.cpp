@@ -63,6 +63,8 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     Expect(v == string(""));
     ExpectSuccess(api.GetProperty(name, "cwd", v));
     Expect(v == config().container().tmp_dir() + "/" + name);
+    ExpectSuccess(api.GetProperty(name, "root", v));
+    Expect(v == "/");
     ExpectSuccess(api.GetProperty(name, "user", v));
     Expect(v == GetDefaultUser());
     ExpectSuccess(api.GetProperty(name, "group", v));
@@ -571,6 +573,51 @@ static void TestIsolation(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
+static void TestProperty(TPortoAPI &api) {
+    string val;
+    string name = "a";
+    ExpectSuccess(api.Create(name));
+
+    Say() << "Check property trimming" << std::endl;
+    ExpectSuccess(api.SetProperty(name, "env", ""));
+    ExpectSuccess(api.GetProperty(name, "env", val));
+    Expect(val == "");
+
+    ExpectSuccess(api.SetProperty(name, "env", " "));
+    ExpectSuccess(api.GetProperty(name, "env", val));
+    Expect(val == "");
+
+    ExpectSuccess(api.SetProperty(name, "env", "    "));
+    ExpectSuccess(api.GetProperty(name, "env", val));
+    Expect(val == "");
+
+    ExpectSuccess(api.SetProperty(name, "env", " a"));
+    ExpectSuccess(api.GetProperty(name, "env", val));
+    Expect(val == "a");
+
+    ExpectSuccess(api.SetProperty(name, "env", "b "));
+    ExpectSuccess(api.GetProperty(name, "env", val));
+    Expect(val == "b");
+
+    ExpectSuccess(api.SetProperty(name, "env", " c "));
+    ExpectSuccess(api.GetProperty(name, "env", val));
+    Expect(val == "c");
+
+    ExpectSuccess(api.SetProperty(name, "env", "     d     "));
+    ExpectSuccess(api.GetProperty(name, "env", val));
+    Expect(val == "d");
+
+    ExpectSuccess(api.SetProperty(name, "env", "    e"));
+    ExpectSuccess(api.GetProperty(name, "env", val));
+    Expect(val == "e");
+
+    ExpectSuccess(api.SetProperty(name, "env", "f    "));
+    ExpectSuccess(api.GetProperty(name, "env", val));
+    Expect(val == "f");
+
+    ExpectSuccess(api.Destroy(name));
+}
+
 static void TestEnvironment(TPortoAPI &api) {
     string pid;
 
@@ -636,7 +683,6 @@ static void TestEnvironment(TPortoAPI &api) {
     ExpectSuccess(api.SetProperty(name, "command", "sleep $N"));
     ExpectSuccess(api.SetProperty(name, "env", "N=1"));
     ExpectSuccess(api.Start(name));
-
 
     ExpectSuccess(api.Destroy(name));
 }
@@ -821,33 +867,41 @@ static void TestStd(TPortoAPI &api) {
     AsNobody(api);
 }
 
-/*
 static void TestRootProperty(TPortoAPI &api) {
     string pid;
 
     string name = "a";
+    string path = config().container().tmp_dir() + "/" + name;
     ExpectSuccess(api.Create(name));
 
     Say() << "Check filesystem isolation" << std::endl;
+
+    AsRoot(api);
+    BootstrapCommand("/bin/pwd", path);
+
     ExpectSuccess(api.SetProperty(name, "command", "pwd"));
-    ExpectSuccess(api.SetProperty(name, "cwd", ""));
-    ExpectSuccess(api.SetProperty(name, "root", "/root/chroot"));
+    ExpectSuccess(api.SetProperty(name, "root", path));
+
+    string cwd;
+    ExpectSuccess(api.GetProperty(name, "cwd", cwd));
+    Expect(cwd == "/");
+
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
 
-    string cwd = GetCwd(pid);
+    cwd = GetCwd(pid);
+    string root = GetRoot(pid);
     WaitExit(api, pid);
 
-    Expect(cwd == "/root/chroot");
+    Expect(cwd == path);
+    Expect(root == path);
 
     string v;
     ExpectSuccess(api.GetData(name, "stdout", v));
     Expect(v == string("/\n"));
 
-    // TODO: check /proc/<PID>/root
     ExpectSuccess(api.Destroy(name));
 }
-*/
 
 static void TestStateMachine(TPortoAPI &api) {
     string name = "a";
@@ -1459,6 +1513,8 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
 
     string current = GetCgKnob("memory", child, "memory.limit_in_bytes");
     Expect(current == exp_limit);
+    current = GetCgKnob("memory", parent, "memory.limit_in_bytes");
+    Expect(current != exp_limit);
 
     string parentProperty, childProperty;
     ExpectSuccess(api.GetProperty(parent, "stdout_path", parentProperty));
@@ -1480,7 +1536,6 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
 
     Expect(parentCgmap["freezer"] != childCgmap["freezer"]);
     Expect(parentCgmap["memory"] != childCgmap["memory"]);
-
     Expect(parentCgmap["net_cls"] == childCgmap["net_cls"]);
     Expect(parentCgmap["cpu"] == childCgmap["cpu"]);
     Expect(parentCgmap["cpuact"] == childCgmap["cpuact"]);
@@ -1763,11 +1818,12 @@ int SelfTest(string name, int leakNr) {
         { "streams", TestStreams },
         { "long_running", TestLongRunning },
         { "isolation", TestIsolation },
+        { "property", TestProperty },
         { "environment", TestEnvironment },
         { "user_group", TestUserGroup },
         { "cwd", TestCwd },
         { "std", TestStd },
-        //{ "root", TestRootProperty },
+        { "root_property", TestRootProperty },
         { "limits", TestLimits },
         { "alias", TestAlias },
         { "dynamic", TestDynamic },

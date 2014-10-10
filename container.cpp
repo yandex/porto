@@ -651,8 +651,8 @@ TError TContainer::PrepareTask() {
 
     taskEnv->Command = GetPropertyStr("command");
     taskEnv->Cwd = GetPropertyStr("cwd");
-    taskEnv->CreateCwd = Spec.IsDefault(shared_from_this(), "cwd") && !UseParentNamespace();
-    //taskEnv->Root = GetPropertyStr("root");
+    taskEnv->Root = GetPropertyStr("root");
+    taskEnv->CreateCwd = IsDefaultProperty("root") && IsDefaultProperty("cwd") && !UseParentNamespace();
     taskEnv->User = GetPropertyStr("user");
     taskEnv->Group = GetPropertyStr("group");
     taskEnv->Environ = GetPropertyStr("env");
@@ -1042,6 +1042,13 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
     PropertyToAlias(origProperty, value);
 
     return TError::Success();
+}
+
+bool TContainer::IsDefaultProperty(const string &property) const {
+    if (propertySpec.find(property) == propertySpec.end())
+        return true;
+
+    return Spec.IsDefault(shared_from_this(), property);
 }
 
 bool TContainer::ShouldApplyProperty(const std::string &property) {

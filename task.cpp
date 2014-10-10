@@ -233,64 +233,58 @@ void TTask::ChildExec() {
 }
 
 void TTask::ChildIsolateFs() {
-    TMount newRoot(Env->Root, Env->Root + "/", "none", {});
-    TMount newProc("proc", Env->Root + "/proc", "proc", {});
-    TMount newSys("/sys", Env->Root + "/sys", "none", {});
-    TMount newDev("/dev", Env->Root + "/dev", "none", {});
-    TMount newVar("/var", Env->Root + "/var", "none", {});
-    TMount newRun("/run", Env->Root + "/run", "none", {});
-    TMount newTmp("/tmp", Env->Root + "/tmp", "none", {});
+    if (Env->Root == "/")
+        return;
 
-    if (Env->Root.length()) {
-        if (newRoot.Bind()) {
-            Syslog(string("remount /: ") + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
+    vector<string> bind = { "/", "/sys", "/dev", "/run" };
+
+    for (auto &path : bind) {
+        TFolder dir(Env->Root + path);
+        if (path != "/" && !dir.Exists()) {
+            TError error = dir.Create();
+            if (error) {
+                Syslog(error.GetMsg());
+                ReportResultAndExit(Wfd, -error.GetError());
+            }
         }
 
-        if (newTmp.Bind()) {
-            Syslog(string("remount /tmp: ") + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
-        }
+        TMount mnt(path, dir.GetPath(), "none", {});
 
-        if (newSys.Bind()) {
-            Syslog(string("remount /sys: ") + strerror(errno));
+        if (mnt.Bind()) {
+            Syslog("bind " + path + ": " + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
         }
+    }
 
-        if (newRun.Bind()) {
-            Syslog(string("remount /run: ") + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
+    TFolder procDir(Env->Root + "/proc");
+    if (!procDir.Exists()) {
+        TError error = procDir.Create();
+        if (error) {
+            Syslog(error.GetMsg());
+            ReportResultAndExit(Wfd, -error.GetError());
         }
+    }
 
-        if (newDev.Bind()) {
-            Syslog(string("remount /dev: ") + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
-        }
+    TMount newProc("proc", procDir.GetPath(), "proc", {});
+    TError error = newProc.Mount();
+    if (error) {
+        Syslog(error.GetMsg());
+        ReportResultAndExit(Wfd, -errno);
+    }
 
-        if (newVar.Bind()) {
-            Syslog(string("remount /var: ") + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
-        }
+    if (chdir(Env->Root.c_str()) < 0) {
+        Syslog(string("chdir(): ") + strerror(errno));
+        ReportResultAndExit(Wfd, -errno);
+    }
 
-        if (newProc.Mount()) {
-            Syslog(string("remount /proc: ") + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
-        }
+    if (chroot(Env->Root.c_str()) < 0) {
+        Syslog(string("chroot(): ") + strerror(errno));
+        ReportResultAndExit(Wfd, -errno);
+    }
 
-        if (chdir(Env->Root.c_str()) < 0) {
-            Syslog(string("chdir(): ") + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
-        }
-
-        if (chroot(Env->Root.c_str()) < 0) {
-            Syslog(string("chroot(): ") + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
-        }
-
-        if (chdir("/") < 0) {
-            Syslog(string("chdir(): ") + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
-        }
+    if (chdir(".") < 0) {
+        Syslog(string("chdir(): ") + strerror(errno));
+        ReportResultAndExit(Wfd, -errno);
     }
 }
 
