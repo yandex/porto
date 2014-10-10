@@ -19,7 +19,7 @@ TError StringToInt64(const std::string &str, int64_t &value);
 TError StringToInt(const std::string &string, int &value);
 TError StringWithUnitToUint64(const std::string &str, uint64_t &value);
 
-TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens);
+TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens, size_t maxFields = -1);
 std::string StringTrim(const std::string& s);
 
 #endif

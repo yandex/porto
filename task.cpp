@@ -530,23 +530,14 @@ TError TTask::Restore(int pid_) {
 }
 
 TError TTask::ValidateCgroups() const {
-    TFile f("/proc/" + std::to_string(Pid) + "/cgroup");
-
-    vector<string> lines;
     map<string, string> cgmap;
-    TError error = f.AsLines(lines);
+    TError error = GetTaskCgroups(Pid, cgmap);
     if (error)
         return error;
 
-    vector<string> tokens;
-    for (auto l : lines) {
-        tokens.clear();
-        error = SplitString(l, ':', tokens);
-        if (error)
-            return error;
-
-        const string &subsys = tokens[1];
-        const string &path = tokens[2];
+    for (auto pair : cgmap) {
+        auto &subsys = pair.first;
+        auto &path = pair.second;
 
         bool valid = false;
         for (auto cg : LeafCgroups) {

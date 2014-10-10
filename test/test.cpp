@@ -161,7 +161,7 @@ std::map<std::string, std::string> GetCgroups(const std::string &pid) {
     std::vector<std::string> tokens;
     for (auto l : lines) {
         tokens.clear();
-        error = SplitString(l, ':', tokens);
+        error = SplitString(l, ':', tokens, 3);
         if (error)
             throw std::string("Can't get cgroups: " + error.GetMsg());
         cgmap[tokens[1]] = tokens[2];

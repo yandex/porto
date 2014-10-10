@@ -1709,7 +1709,7 @@ static void TestLeaks(TPortoAPI &api) {
 
 static void TestRecovery(TPortoAPI &api) {
     string pid, v;
-    string name = "a";
+    string name = "a:b";
 
     map<string,string> props = {
         { "command", "sleep 1000" },
@@ -1876,6 +1876,8 @@ int SelfTest(string name, int leakNr) {
     }
 
     std::cerr << "SUCCESS: All tests successfully passed!" << std::endl;
+    if (WordCount(config().slave_log().path(), "Task belongs to invalid subsystem"))
+        std::cerr << "WARNING: Some task belongs to invalid subsystem!" << std::endl;
     if (!CanTestLimits())
         std::cerr << "WARNING: Due to missing kernel support, memory_guarantee/cpu_policy has not been tested!" << std::endl;
     if (respawns != 1 /* start */ + 2 /* TestRecovery */ + 2 /* TestCgroups */)

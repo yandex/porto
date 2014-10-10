@@ -106,13 +106,26 @@ TError StringWithUnitToUint64(const std::string &str, uint64_t &value) {
     return TError::Success();
 }
 
-TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens) {
+TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens, size_t maxFields) {
+    if (!maxFields)
+        return TError(EError::Unknown, string(__func__) + ": invalid argument");
+
     try {
         istringstream ss(s);
         string tok;
 
-        while(std::getline(ss, tok, sep))
+        while(std::getline(ss, tok, sep)) {
+            if (!--maxFields) {
+                string rem;
+                std::getline(ss, rem);
+                if (rem.length()) {
+                    tok += sep;
+                    tok += rem;
+                }
+            }
+
             tokens.push_back(tok);
+        }
     } catch (...) {
         return TError(EError::Unknown, string(__func__) + ": Can't split string");
     }
