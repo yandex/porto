@@ -13,25 +13,25 @@ extern "C" {
 }
 
 class TMount {
-    std::string Device;
-    std::string Mountpoint;
+    std::string Source;
+    std::string Target;
     std::string Vfstype;
     std::set<std::string> Flags;
 
 public:
-    TMount(const std::string &device, const std::string &mountpoint, const std::string &vfstype,
+    TMount(const std::string &source, const std::string &target, const std::string &vfstype,
            std::set<std::string> flags) :
-        Device(device), Mountpoint(mountpoint), Vfstype(vfstype),
+        Source(source), Target(target), Vfstype(vfstype),
         Flags(flags) {}
 
     friend bool operator==(const TMount& m1, const TMount& m2) {
-        return m1.Device == m2.Device &&
-            m1.Mountpoint == m2.Mountpoint &&
+        return m1.Source == m2.Source &&
+            m1.Target == m2.Target &&
             m1.Vfstype == m2.Vfstype;
     }
 
     const std::string GetMountpoint() const {
-        return Mountpoint;
+        return Target;
     }
 
     const std::string VFSType() const {
@@ -39,7 +39,7 @@ public:
     }
 
     const std::string ParentFolder() const {
-        return Mountpoint.substr(0, Mountpoint.find_last_of("/"));
+        return Target.substr(0, Target.find_last_of("/"));
     }
 
     std::set<std::string> const GetFlags() const {
@@ -53,7 +53,7 @@ public:
     TError Umount() const;
 
     friend std::ostream& operator<<(std::ostream& stream, const TMount& mount) {
-        stream << mount.Device << " " << mount.Mountpoint << " " << mount.Vfstype << " ";
+        stream << mount.Source << " " << mount.Target << " " << mount.Vfstype << " ";
 
         for (auto &f : mount.Flags)
             stream << f << ",";
