@@ -1,3 +1,16 @@
+yandex-porto (0.8) precise; urgency=low
+
+  * Fix sorting in portoctl top
+  * Add missing log rotate for portoloop.log
+  * Remove cmake from build requirements
+  * Rework isolate=false for child containers (now share namespace with parent)
+  * Add private property so users can attach application specific data to containers
+  * Add stdout_limit property to limit number of bytes returned from stdout/stderr data
+  * When client disconnects print it's pid, gid and uid in the log
+  * Fix bug which prevents setting empty string to properties
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Fri, 10 Oct 2014 16:45:26 +0400
+
 yandex-porto (0.7) precise; urgency=low
 
   * Fix permission 
