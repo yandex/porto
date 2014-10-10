@@ -124,5 +124,9 @@ std::string StringTrim(const std::string& s)
 {
     std::size_t first = s.find_first_not_of(' ');
     std::size_t last  = s.find_last_not_of(' ');
+
+    if (first == string::npos || last == string::npos)
+        return "";
+
     return s.substr(first, last - first + 1);
 }
