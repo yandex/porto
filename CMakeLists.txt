@@ -38,6 +38,7 @@ add_custom_target(TAGS COMMAND ctags -R -e --c++-kinds=+p --fields=+iaS --extra=
 link_directories(${yandex-porto_BINARY_DIR})
 include_directories(${yandex-porto_BINARY_DIR}/api/cpp)
 add_library(porto api/cpp/libporto.cpp error.cpp util/protobuf.cpp ${PROTO_SRCS} ${PROTO_HDRS})
+add_dependencies(porto version.hpp)
 
 add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp task.cpp kvalue.cpp subsystem.cpp config.cpp property.cpp qdisc.cpp util/namespace.cpp util/netlink.cpp util/log.cpp util/mount.cpp util/file.cpp util/folder.cpp util/unix.cpp util/pwd.cpp util/string.cpp util/crash.cpp)
 add_dependencies(portod version.hpp)
