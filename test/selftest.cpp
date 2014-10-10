@@ -1097,8 +1097,8 @@ static void TestStats(TPortoAPI &api) {
     string noop = "noop";
 
     ExpectSuccess(api.Create(noop));
-    system("ls -la /bin >/dev/null"); // this will cause io read and noop
-                                       // will not have io_read
+    // this will cause io read and noop will not have io_read
+    Expect(system("ls -la /bin >/dev/null") == 0);
     ExpectSuccess(api.SetProperty(noop, "command", "ls -la /bin"));
     ExpectSuccess(api.Start(noop));
     WaitState(api, noop, "dead");
