@@ -1,3 +1,9 @@
+yandex-porto (0.9) precise; urgency=low
+
+  * Fix recovery for containers with colon in name
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Fri, 10 Oct 2014 18:09:47 +0400
+
 yandex-porto (0.8) precise; urgency=low
 
   * Fix sorting in portoctl top
