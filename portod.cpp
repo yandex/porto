@@ -251,7 +251,10 @@ static int AcceptClient(int sfd, std::map<int,ClientInfo> &clients) {
 static void CloseClient(int cfd, std::map<int,ClientInfo> &clients) {
     ClientInfo ci = clients.at(cfd);
 
-    TLogger::Log() << ci.Pid << " disconnected" << std::endl;
+    TLogger::Log() << "pid " << ci.Pid
+        << " uid " << ci.Uid
+        << " gid " << ci.Gid
+        << " disconnected" << std::endl;
 
     close(cfd);
     clients.erase(cfd);
