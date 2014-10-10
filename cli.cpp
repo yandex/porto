@@ -124,6 +124,8 @@ void RegisterCommand(ICmd *cmd) {
     commands[cmd->GetName()] = cmd;
 }
 
+ICmd *currentCmd;
+
 static void TryExec(int argc, char *argv[]) {
     string name(argv[1]);
 
@@ -136,7 +138,14 @@ static void TryExec(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
 
+    currentCmd = cmd;
     exit(cmd->Execute(argc - 2, argv + 2));
+}
+
+void SigInt(int sig) {
+    (void)RegisterSignal(sig, SIG_DFL);
+    currentCmd->Signal(sig);
+    raise(sig);
 }
 
 int HandleCommand(int argc, char *argv[]) {
@@ -158,6 +167,7 @@ int HandleCommand(int argc, char *argv[]) {
 
     // in case client closes pipe we are writing to in the protobuf code
     (void)RegisterSignal(SIGPIPE, SIG_IGN);
+    (void)RegisterSignal(SIGINT, SigInt);
 
     try {
         // porto <command> <arg2> <arg2>
