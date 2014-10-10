@@ -2,7 +2,7 @@
 
 set -e
 
-if [ -z "$@" ]; then
+if [ $# -eq 0 ]; then
 	echo "Please specify tag message!"
 	exit 1
 fi
