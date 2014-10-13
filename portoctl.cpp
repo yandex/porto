@@ -733,7 +733,8 @@ public:
 
         ret = read(from, buf, sizeof(buf));
         if (ret > 0)
-            write(to, buf, ret);
+            if (write(to, buf, ret) != ret)
+                std::cerr << "Partial write to " << to << std::endl;
     }
 
     int Execute(int argc, char *argv[]) {
