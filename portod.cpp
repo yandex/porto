@@ -39,6 +39,7 @@ static volatile sig_atomic_t cleanup = true;
 static volatile sig_atomic_t hup = false;
 static volatile sig_atomic_t raiseSignum = 0;
 static bool stdlog = false;
+static bool failsafe = false;
 
 static void DoExit(int signum) {
     done = true;
@@ -451,7 +452,7 @@ static void KvDump() {
     storage.Dump();
 }
 
-static int SlaveMain(bool failsafe, bool noWatchdog) {
+static int SlaveMain(bool noWatchdog) {
     int ret = DaemonPrepare(false);
     if (ret)
         return ret;
@@ -464,7 +465,10 @@ static int SlaveMain(bool failsafe, bool noWatchdog) {
     if (config().network().enabled()) {
         if (system("modprobe cls_cgroup")) {
             TLogger::Log() << "Can't load cls_cgroup kernel module: " << strerror(errno) << std::endl;
-            return EXIT_FAILURE;
+            if (!failsafe)
+                return EXIT_FAILURE;
+
+            config().mutable_network()->set_enabled(false);
         }
     }
 
@@ -651,7 +655,7 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
         close(evtfd[0]);
         close(ackfd[1]);
 
-        exit(SlaveMain(false, false));
+        exit(SlaveMain(false));
     }
 
     close(evtfd[0]);
@@ -772,7 +776,6 @@ static int MasterMain() {
 
 int main(int argc, char * const argv[]) {
     bool slaveMode = false;
-    bool failsafe = false;
     bool noWatchdog = false;
     int argn;
 
@@ -806,7 +809,7 @@ int main(int argc, char * const argv[]) {
     }
 
     if (slaveMode)
-        return SlaveMain(failsafe, noWatchdog);
+        return SlaveMain(noWatchdog);
     else
         return MasterMain();
 }
