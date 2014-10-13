@@ -68,6 +68,13 @@ int Pgrep(const std::string &name) {
     return lines.size();
 }
 
+string GetRlimit(const std::string &pid, const std::string &type, const bool soft) {
+    string kind = soft ? "SOFT" : "HARD";
+    string cmd = "prlimit --pid " + pid + " --" + type + " -o " + kind + " --noheading";
+    vector<string> lines = Popen(cmd);
+    return StringTrim(lines[0]);
+}
+
 void WaitExit(TPortoAPI &api, const std::string &pid) {
     Say() << "Waiting for " << pid << " to exit..." << std::endl;
 

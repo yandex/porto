@@ -18,6 +18,7 @@ namespace test {
     int ReadPid(const std::string &path);
     std::vector<std::string> Popen(const std::string &cmd);
     int Pgrep(const std::string &name);
+    std::string GetRlimit(const std::string &pid, const std::string &type, const bool soft);
     void WaitExit(TPortoAPI &api, const std::string &pid);
     void WaitState(TPortoAPI &api, const std::string &name, const std::string &state);
     void WaitPortod(TPortoAPI &api);

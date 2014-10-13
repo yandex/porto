@@ -10,6 +10,7 @@
 #include "util/pwd.hpp"
 
 using std::string;
+using std::map;
 
 static TError ValidBool(std::shared_ptr<const TContainer> container, const string &str) {
     if (str != "true" && str != "false")
@@ -137,6 +138,11 @@ static TError ExistingFile(std::shared_ptr<const TContainer> container, const st
     if (!f.Exists())
         return TError(EError::InvalidValue, "file doesn't exist");
     return TError::Success();
+}
+
+static TError ValidUlimit(std::shared_ptr<const TContainer> container, const string &str) {
+    map<int,struct rlimit> rlim;
+    return ParseRlimit(str, rlim);
 }
 
 #define DEFSTR(S) [](std::shared_ptr<const TContainer> container)->std::string { return S; }
@@ -374,6 +380,14 @@ std::map<std::string, const TPropertySpec> propertySpec = {
                 return TError::Success();
             }
 
+        }
+    },
+    { "ulimit",
+        {
+            "Specify container resource limits",
+            DEFSTR(""),
+            0,
+            ValidUlimit
         }
     },
 };

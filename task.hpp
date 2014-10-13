@@ -8,6 +8,10 @@
 #include "cgroup.hpp"
 #include "util/namespace.hpp"
 
+extern "C" {
+#include <sys/resource.h>
+}
+
 class TTask;
 class TContainerEnv;
 
@@ -39,6 +43,7 @@ public:
     std::string StdoutPath;
     std::string StderrPath;
     TNamespaceSnapshot Ns;
+    std::map<int,struct rlimit> Rlimit;
 
     TError Prepare();
     const char** GetEnvp() const;
@@ -84,6 +89,7 @@ public:
     std::string GetStdout(size_t limit) const;
     std::string GetStderr(size_t limit) const;
 
+    void ApplyLimits();
     int ChildCallback();
     TError Restore(int pid);
     TError ValidateCgroups() const;

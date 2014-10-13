@@ -1029,6 +1029,7 @@ static void TestRoot(TPortoAPI &api) {
         "stderr_path",
         "stdout_limit",
         "private",
+        "ulimit",
     };
 
     std::vector<TProperty> plist;
@@ -1286,6 +1287,55 @@ static void TestLimits(TPortoAPI &api) {
     Expect(rate == netGuarantee);
     Expect(ceil == netCeil);
     ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.Destroy(name));
+}
+
+static void TestRlimits(TPortoAPI &api) {
+    string name = "a";
+    ExpectSuccess(api.Create(name));
+
+    Say() << "Check rlimits parsing" << std::endl;
+
+    ExpectSuccess(api.SetProperty(name, "ulimit", ""));
+    ExpectFailure(api.SetProperty(name, "ulimit", "qwe"), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "ulimit", "qwe: 123"), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "ulimit", "qwe: 123 456"), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "ulimit", "as: 123"), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "ulimit", "as 123 456"), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "ulimit", "as: 123 456 789"), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "ulimit", "as: 123 :456"), EError::InvalidValue);
+
+    Say() << "Check rlimits" << std::endl;
+
+    map<string, pair<string, string>> rlim = {
+        { "nproc", { "20480", "30720" } },
+        { "nofile", { "819200", "1024000" } },
+        { "data", { "8388608000", "10485760000" } },
+        { "memlock", { "41943040000", "41943040000" } },
+    };
+
+    string ulimit;
+    for (auto &lim : rlim) {
+        if (ulimit.length())
+            ulimit += "; ";
+
+        ulimit += lim.first + ": " + lim.second.first + " " + lim.second.second;
+    }
+
+    ExpectSuccess(api.SetProperty(name, "ulimit", ulimit));
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.Start(name));
+
+    string pid;
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+
+    AsRoot(api);
+
+    for (auto &lim : rlim) {
+        Expect(GetRlimit(pid, lim.first, true) == lim.second.first);
+        Expect(GetRlimit(pid, lim.first, false) == lim.second.second);
+    }
 
     ExpectSuccess(api.Destroy(name));
 }
@@ -1825,6 +1875,7 @@ int SelfTest(string name, int leakNr) {
         { "std", TestStd },
         { "root_property", TestRootProperty },
         { "limits", TestLimits },
+        { "rlimits", TestRlimits },
         { "alias", TestAlias },
         { "dynamic", TestDynamic },
         { "permissions", TestPermissions },
@@ -1887,6 +1938,7 @@ int SelfTest(string name, int leakNr) {
         6 + /* Invalid property value */
         2 + /* Memory guarantee */
         8 + /* Hierarchical properties */
+        7 + /* Rlimits */
         3 /* Can't remove cgroups */)
         std::cerr << "WARNING: Unexpected number of errors: " << errors << "!" << std::endl;
 

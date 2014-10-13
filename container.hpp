@@ -156,4 +156,6 @@ public:
     void DeliverOom(int fd);
 };
 
+TError ParseRlimit(const std::string &s, std::map<int,struct rlimit> &rlim);
+
 #endif

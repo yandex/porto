@@ -314,9 +314,20 @@ void TTask::ChildIsolateFs() {
     }
 }
 
+void TTask::ApplyLimits() {
+    for (auto pair : Env->Rlimit) {
+        int ret = setrlimit(pair.first, &pair.second);
+        if (ret < 0) {
+            Syslog("setrlimit(" + std::to_string(pair.first) + ", " + std::to_string(pair.second.rlim_cur) + ":" + std::to_string(pair.second.rlim_max) + "): " + strerror(errno));
+            ReportResultAndExit(Wfd, -errno);
+        }
+    }
+}
+
 int TTask::ChildCallback() {
     close(Rfd);
     ResetAllSignalHandlers();
+    ApplyLimits();
 
     /*
      * ReportResultAndExit(fd, -errno) means we failed while preparing
@@ -412,9 +423,9 @@ TError TTask::Start() {
         (void)setsid();
 
         TError error = Env->Ns.Attach();
-        TLogger::LogError(error, "Can't spawn child");
+        TLogger::LogError(error, "Can't spawn child: can't attach to namespace");
         if (error)
-            return error;
+            exit(EXIT_FAILURE);
 
         int cloneFlags = SIGCHLD;
 
