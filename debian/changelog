@@ -1,3 +1,10 @@
+yandex-porto (0.10) precise; urgency=low
+
+  * Add ulimit property
+  * Add portoctl exec command
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 13 Oct 2014 19:24:04 +0400
+
 yandex-porto (0.9) precise; urgency=low
 
   * Fix recovery for containers with colon in name
