@@ -794,9 +794,6 @@ public:
             args.push_back(env.c_str());
         }
 
-        for (int i = 0; i < argc; i++)
-            std::cerr << args[i] << std::endl;
-
         auto *run = new TRunCmd(Api);
         int ret = run->Execute(args.size(), (char **)args.data());
         if (ret)
