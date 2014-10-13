@@ -54,7 +54,7 @@ TError TTaskEnv::Prepare() {
     if (Command.empty())
         return TError::Success();
 
-    EnvVec.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:" + Cwd);
+    EnvVec.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
     ParseEnv();
     EnvVec.push_back("HOME=" + Cwd);
     EnvVec.push_back("USER=" + User);

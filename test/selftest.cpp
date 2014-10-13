@@ -632,7 +632,7 @@ static void TestEnvironment(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "root_pid", pid));
 
     string env = GetEnv(pid);
-    static const char empty_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/place/porto/a\0"
+    static const char empty_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
         "HOME=/place/porto/a\0"
         "USER=nobody\0";
 
@@ -646,7 +646,7 @@ static void TestEnvironment(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "root_pid", pid));
 
     env = GetEnv(pid);
-    static const char ab_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/place/porto/a\0"
+    static const char ab_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
         "a=b\0"
         "c=d\0"
         "HOME=/place/porto/a\0"
@@ -669,7 +669,7 @@ static void TestEnvironment(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "root_pid", pid));
 
     env = GetEnv(pid);
-    static const char asb_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/place/porto/a\0"
+    static const char asb_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
         "a=e;b\0"
         "c=d\0"
         "HOME=/place/porto/a\0"
@@ -879,7 +879,7 @@ static void TestRootProperty(TPortoAPI &api) {
     AsRoot(api);
     BootstrapCommand("/bin/pwd", path);
 
-    ExpectSuccess(api.SetProperty(name, "command", "pwd"));
+    ExpectSuccess(api.SetProperty(name, "command", "/pwd"));
     ExpectSuccess(api.SetProperty(name, "root", path));
 
     string cwd;
