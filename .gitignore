@@ -22,3 +22,7 @@
 /debian/yandex-porto/
 /TAGS
 /api/python/porto/rpc_pb2.py*
+/dist/*.img
+/dist/fedora/
+/dist/trusty/
+/dist/yandex/

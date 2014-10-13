@@ -1,0 +1,57 @@
+#!/bin/sh
+
+set -e
+
+CONFIG() {
+	if [ -z "$1" ]; then
+		echo 'Please specify name'
+		exit 1
+	fi
+
+	NAME="$1"
+	REPO=$(cd $(dirname $0)/../ && pwd)
+	DIST=$REPO/dist
+	USER=stfomichev
+	ROOT=$DIST/$NAME
+
+	pctl() { sudo $REPO/portoctl "$@"; }
+	pexec() { pctl exec $NAME root="$ROOT" cwd="/src" command="$*"; }
+
+	bootstrap() {
+		tar="$DIST/${NAME}.img"
+		[ -f $tar ] || (cd $DIST && curl -L $URL > $tar)
+		[ -d $ROOT ] || (mkdir -p $ROOT && cd $ROOT && sudo tar xf $tar && sudo chown $USER:$USER $ROOT && sudo chmod 0755 $ROOT)
+	}
+
+	clone() {
+		[ -d $1 ] || {
+			mkdir -p $1
+			cd $1 && git clone $REPO .
+		}
+	}
+
+	GET() {
+		URL=$1
+
+		bootstrap
+		clone $ROOT/src
+	}
+
+	RUN() {
+		pexec "$@"
+	}
+
+	DEBUILD() {
+		stty sane
+		pctl exec $NAME command="debuild -i -us -uc -b $*" root="${ROOT}" cwd="/src"
+	}
+
+	SELFTEST() {
+		pctl exec porto command="./portod --stdlog --failsafe" root="${ROOT}" cwd="/src"
+	#	pctl run porto command="./portod" root="${ROOT}" cwd="/src"
+	#	pctl exec porto/selftest command="./portotest" root="${ROOT}" cwd="/src"
+	#	pctl destroy porto
+	}
+}
+
+. $1
