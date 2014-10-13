@@ -143,8 +143,14 @@ static TError ExistingFile(std::shared_ptr<const TContainer> container, const st
 
 static std::string DefaultStdFile(std::shared_ptr<const TContainer> c,
                                   const std::string &name) {
-    string cwd;
+    string cwd, root;
     TError error = c->GetProperty("cwd", cwd);
+    TLogger::LogError(error, "Can't get cwd for std file");
+    if (error)
+        return "";
+
+    error = c->GetProperty("root", root);
+    TLogger::LogError(error, "Can't get root for std file");
     if (error)
         return "";
 
@@ -152,7 +158,8 @@ static std::string DefaultStdFile(std::shared_ptr<const TContainer> c,
     if (c->UseParentNamespace())
         prefix = c->GetName(false) + ".";
 
-    return cwd + "/" + prefix + name;
+    string path = ReplaceMultiple(root + "/" + cwd, '/');
+    return path + "/" + prefix + name;
 }
 
 std::map<std::string, const TPropertySpec> propertySpec = {

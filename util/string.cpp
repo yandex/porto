@@ -6,6 +6,7 @@ using std::string;
 using std::vector;
 using std::set;
 using std::istringstream;
+using std::stringstream;
 
 string CommaSeparatedList(const vector<string> &list) {
     string ret;
@@ -142,4 +143,25 @@ std::string StringTrim(const std::string& s)
         return "";
 
     return s.substr(first, last - first + 1);
+}
+
+std::string ReplaceMultiple(const std::string &str, const char rc) {
+    stringstream s;
+
+    bool foundChar = false;
+    for (auto c : str) {
+        if (c == '/') {
+            foundChar = true;
+        } else {
+            if (foundChar)
+                s << rc;
+            foundChar = false;
+            s << c;
+        }
+    }
+
+    if (foundChar)
+        s << rc;
+
+    return s.str();
 }

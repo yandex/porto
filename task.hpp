@@ -66,6 +66,7 @@ class TTask {
     void ChildReopenStdio();
     void ChildDropPriveleges();
     void ChildExec();
+    void BindDns();
     void ChildIsolateFs();
 
 public:

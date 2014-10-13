@@ -16,6 +16,8 @@ extern "C" {
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <wordexp.h>
+#include <termios.h>
+#include <poll.h>
 }
 
 using std::string;
@@ -691,6 +693,180 @@ public:
     }
 };
 
+static struct termios savedAttrs;
+static string destroyContainerName;
+static void resetInputMode(void) {
+  tcsetattr (STDIN_FILENO, TCSANOW, &savedAttrs);
+}
+static void destroyContainer(void) {
+    if (destroyContainerName != "") {
+        TPortoAPI api(config().rpc_sock().file().path());
+        (void)api.Destroy(destroyContainerName);
+    }
+}
+
+class TExecCmd : public ICmd {
+    string containerName;
+public:
+    TExecCmd(TPortoAPI *api) : ICmd(api, "exec", 2, "<container> [properties]", "execute and wait for command in container") {}
+
+    int SwithToNonCanonical(int fd) {
+        if (!isatty(fd))
+            return 0;
+
+        if (tcgetattr(fd, &savedAttrs) < 0)
+            return -1;
+        atexit(resetInputMode);
+
+        static struct termios t = savedAttrs;
+        t.c_lflag &= ~(ICANON | ISIG | IEXTEN | ECHO);
+        t.c_iflag &= ~(BRKINT | ICRNL | IGNBRK | IGNCR | INLCR |
+                       INPCK | ISTRIP | IXON | PARMRK);
+        t.c_cc[VMIN] = 1;
+        t.c_cc[VTIME] = 0;
+        return tcsetattr(fd, TCSAFLUSH, &t);
+    }
+
+    void MoveData(int from, int to) {
+        char buf[256];
+        int ret;
+
+        ret = read(from, buf, sizeof(buf));
+        if (ret > 0)
+            write(to, buf, ret);
+    }
+
+    int Execute(int argc, char *argv[]) {
+        containerName = argv[0];
+        bool needEnv = isatty(STDIN_FILENO);
+        bool haveEnv = false;
+        string env;
+
+        vector<const char *> args;
+        for (int i = 0; i < argc; i++) {
+            if (needEnv && strncmp(argv[i], "env=", 4) == 0) {
+                env = string(argv[i]) + ";TERM=" + getenv("TERM");
+                args.push_back(env.c_str());
+                haveEnv = true;
+            } else {
+                args.push_back(argv[i]);
+            }
+        }
+
+        int ptm = posix_openpt(O_RDWR);
+        if (ptm < 0) {
+            TError error(EError::Unknown, errno, "posix_openpt()");
+            PrintError(error, "Can't open pseudoterminal");
+            return EXIT_FAILURE;
+        }
+
+        if (grantpt(ptm) < 0) {
+            TError error(EError::Unknown, errno, "grantpt()");
+            PrintError(error, "Can't open pseudoterminal");
+            return EXIT_FAILURE;
+        }
+
+        if (unlockpt(ptm) < 0) {
+            TError error(EError::Unknown, errno, "unlockpt()");
+            PrintError(error, "Can't open pseudoterminal");
+            return EXIT_FAILURE;
+        }
+
+        char *slavept = ptsname(ptm);
+
+        if (SwithToNonCanonical(STDIN_FILENO) < 0) {
+            TError error(EError::Unknown, errno, "SwithToNonCanonical()");
+            PrintError(error, "Can't open pseudoterminal");
+            return EXIT_FAILURE;
+        }
+
+        string stdinPath = string("stdin_path=") + slavept;
+        string stdoutPath = string("stdout_path=") + slavept;
+        string stderrPath = string("stderr_path=") + slavept;
+
+        args.push_back(stdinPath.c_str());
+        args.push_back(stdoutPath.c_str());
+        args.push_back(stderrPath.c_str());
+
+        if (needEnv && !haveEnv) {
+            env = string("env=TERM=") + getenv("TERM");
+            args.push_back(env.c_str());
+        }
+
+        for (int i = 0; i < argc; i++)
+            std::cerr << args[i] << std::endl;
+
+        auto *run = new TRunCmd(Api);
+        int ret = run->Execute(args.size(), (char **)args.data());
+        if (ret)
+            return ret;
+
+        destroyContainerName = containerName;
+        atexit(destroyContainer);
+
+        vector<struct pollfd> fds;
+
+        bool hangup = false;
+        while (!hangup) {
+            struct pollfd pfd = {};
+            fds.clear();
+
+            pfd.fd = STDIN_FILENO;
+            pfd.events = POLLIN | POLLHUP;
+            fds.push_back(pfd);
+
+            pfd.fd = ptm;
+            pfd.events = POLLIN | POLLHUP;
+            fds.push_back(pfd);
+
+            ret = poll(fds.data(), fds.size(), -1);
+            if (ret < 0)
+                break;
+
+            for (size_t i = 0; i < fds.size(); i++) {
+                if (fds[i].revents & POLLHUP)
+                    hangup = true;
+
+                if (!(fds[i].revents & POLLIN))
+                    continue;
+
+                if (fds[i].fd == STDIN_FILENO)
+                    MoveData(STDIN_FILENO, ptm);
+                else if (fds[i].fd == ptm)
+                    MoveData(ptm, STDOUT_FILENO);
+            }
+        }
+
+        string state;
+        int loop = 1000;
+        do {
+            ret = Api->GetData(containerName, "state", state);
+            if (ret) {
+                PrintError("Can't get state");
+                return EXIT_FAILURE;
+            }
+        } while (loop-- && state == "running");
+
+        string s;
+        ret = Api->GetData(containerName, "exit_status", s);
+        if (ret) {
+            PrintError("Can't get exit_status");
+            return EXIT_FAILURE;
+        }
+
+        int status = stoi(s);
+        if (WIFEXITED(status)) {
+            exit(WEXITSTATUS(status));
+        } else {
+            ResetAllSignalHandlers();
+            raise(WTERMSIG(status));
+            exit(EXIT_FAILURE);
+        }
+
+        return EXIT_SUCCESS;
+    }
+};
+
 class TDestroyCmd : public ICmd {
 public:
     TDestroyCmd(TPortoAPI *api) : ICmd(api, "destroy", 1, "<name>", "destroy container") {}
@@ -883,6 +1059,7 @@ int main(int argc, char *argv[]) {
     RegisterCommand(new TRawCmd(&api));
     RegisterCommand(new TEnterCmd(&api));
     RegisterCommand(new TRunCmd(&api));
+    RegisterCommand(new TExecCmd(&api));
 
     return HandleCommand(argc, argv);
 };

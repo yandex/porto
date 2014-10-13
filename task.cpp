@@ -228,19 +228,44 @@ void TTask::ChildExec() {
     auto envp = Env->GetEnvp();
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
 
-    Syslog(string("execvpe(): ") + strerror(errno));
+    Syslog(string("execvpe(") + result.we_wordv[0] + "): " + strerror(errno));
     ReportResultAndExit(Wfd, errno);
+}
+
+void TTask::BindDns() {
+    vector<string> files = { "/etc/hosts", "/etc/resolv.conf" };
+
+    for (auto &path : files) {
+        TFile file(Env->Root + path);
+        if (!file.Exists())
+            return;
+    }
+
+    for (auto &path : files) {
+        TFile file(Env->Root + path);
+
+        if (file.Type() == TFile::Link) {
+            // TODO: ?can't mount over link
+        }
+
+        TMount mnt(path, file.GetPath(), "none", {});
+        if (mnt.Bind()) {
+            Syslog("bind " + file.GetPath() + " -> " + path + ": " + strerror(errno));
+            ReportResultAndExit(Wfd, -errno);
+        }
+    }
 }
 
 void TTask::ChildIsolateFs() {
     if (Env->Root == "/")
         return;
 
-    vector<string> bind = { "/", "/sys", "/dev", "/run" };
+    vector<string> bindDir = { "/sys", "/dev" };
 
-    for (auto &path : bind) {
+    for (auto &path : bindDir) {
+        TFile file(path);
         TFolder dir(Env->Root + path);
-        if (path != "/" && !dir.Exists()) {
+        if (!dir.Exists()) {
             TError error = dir.Create();
             if (error) {
                 Syslog(error.GetMsg());
@@ -249,9 +274,8 @@ void TTask::ChildIsolateFs() {
         }
 
         TMount mnt(path, dir.GetPath(), "none", {});
-
         if (mnt.Bind()) {
-            Syslog("bind " + path + ": " + strerror(errno));
+            Syslog("bind " + dir.GetPath() + " -> " + path + ": " + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
         }
     }
@@ -272,6 +296,8 @@ void TTask::ChildIsolateFs() {
         ReportResultAndExit(Wfd, -errno);
     }
 
+    BindDns();
+
     if (chdir(Env->Root.c_str()) < 0) {
         Syslog(string("chdir(): ") + strerror(errno));
         ReportResultAndExit(Wfd, -errno);
@@ -282,7 +308,7 @@ void TTask::ChildIsolateFs() {
         ReportResultAndExit(Wfd, -errno);
     }
 
-    if (chdir(".") < 0) {
+    if (chdir("/") < 0) {
         Syslog(string("chdir(): ") + strerror(errno));
         ReportResultAndExit(Wfd, -errno);
     }

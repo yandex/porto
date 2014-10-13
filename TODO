@@ -9,6 +9,8 @@
 - ? different log levels (error, normal, verbose)
 - ? portoctl cp
 - ? move DirName/BaseName into TFile/TFolder? + add chdir/chown/chown/etc
+- TPath
+- TContainerEvent
 
 # properties
 - ? capabilities
@@ -29,6 +31,7 @@
 
 # phase 3
 ## disk
+- update utmp
 - root property to isolate fs (loop if file chroot if dir)
 - ? readonly_root
 - ? mount proc proc proc nodev,noexec,nosuid 0 0; run run tmpfs nodev,noexec,nosuid,relatime,size=1m,mode=0755 0 0; shm dev/shm tmpfs nodev,nosuid,noexec 0 0
