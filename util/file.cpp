@@ -42,6 +42,18 @@ TFile::EFileType TFile::Type() const {
         return Unknown;
 }
 
+TError TFile::Touch() const {
+    TLogger::Log() << "touch " << Path << std::endl;
+
+    int fd = open(Path.c_str(), O_CREAT | O_WRONLY, Mode);
+    if (fd < 0)
+        return TError(EError::Unknown, errno, "open(" + Path + ")");
+
+    close(fd);
+
+    return TError::Success();
+}
+
 TError TFile::Remove() const {
     TLogger::Log() << "unlink " << Path << std::endl;
 

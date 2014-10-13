@@ -11,6 +11,7 @@
 - ? move DirName/BaseName into TFile/TFolder? + add chdir/chown/chown/etc
 - TPath
 - TContainerEvent
+- ? return start errno and message via pipe
 
 # properties
 - ? capabilities

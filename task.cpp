@@ -235,14 +235,25 @@ void TTask::ChildExec() {
 void TTask::BindDns() {
     vector<string> files = { "/etc/hosts", "/etc/resolv.conf" };
 
-    for (auto &path : files) {
-        TFile file(Env->Root + path);
-        if (!file.Exists())
-            return;
-    }
+    bool filesNr = false;
 
     for (auto &path : files) {
         TFile file(Env->Root + path);
+        if (file.Exists())
+            filesNr++;
+    }
+
+    if (!filesNr)
+        return;
+
+    for (auto &path : files) {
+        TFile file(Env->Root + path);
+
+        TError error = file.Touch();
+        if (error) {
+            Syslog("touch(" + file.GetPath() + "): "+ error.GetMsg());
+            ReportResultAndExit(Wfd, -error.GetErrno());
+        }
 
         if (file.Type() == TFile::Link) {
             // TODO: ?can't mount over link
@@ -250,7 +261,7 @@ void TTask::BindDns() {
 
         TMount mnt(path, file.GetPath(), "none", {});
         if (mnt.Bind()) {
-            Syslog("bind " + file.GetPath() + " -> " + path + ": " + strerror(errno));
+            Syslog("bind(" + file.GetPath() + " -> " + path + "): " + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
         }
     }
@@ -275,7 +286,7 @@ void TTask::ChildIsolateFs() {
 
         TMount mnt(path, dir.GetPath(), "none", {});
         if (mnt.Bind()) {
-            Syslog("bind " + dir.GetPath() + " -> " + path + ": " + strerror(errno));
+            Syslog("bind(" + dir.GetPath() + " -> " + path + "): " + strerror(errno));
             ReportResultAndExit(Wfd, -errno);
         }
     }
