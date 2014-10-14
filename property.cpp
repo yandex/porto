@@ -220,7 +220,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
         {
             "Container root directory",
             DEFSTR("/"),
-            HIDDEN_PROPERTY | PARENT_DEF_PROPERTY
+            PARENT_DEF_PROPERTY
         }
     },
     { "cwd",
@@ -388,7 +388,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
         {
             "Container resource limits",
             DEFSTR(""),
-            0,
+            PARENT_DEF_PROPERTY,
             ValidUlimit
         }
     },

@@ -104,7 +104,7 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectSuccess(api.GetProperty(name, "ulimit", v));
     Expect(v == "");
     ExpectSuccess(api.GetProperty(name, "hostname", v));
-    Expect(v == name);
+    Expect(v == "");
 }
 
 static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
@@ -1115,6 +1115,7 @@ static void TestRoot(TPortoAPI &api) {
         "private",
         "ulimit",
         "hostname",
+        "root",
     };
 
     std::vector<TProperty> plist;
