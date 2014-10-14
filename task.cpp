@@ -94,11 +94,6 @@ int TTask::CloseAllFds(int except) const {
     return except;
 }
 
-void TTask::ReportResultAndExit(int fd, int result) const {
-    if (write(fd, &result, sizeof(result))) {}
-    exit(EXIT_FAILURE);
-}
-
 void TTask::Syslog(const string &s) const {
     openlog("portod", LOG_NDELAY, LOG_DAEMON);
     syslog(LOG_ERR, "%s", s.c_str());
@@ -118,6 +113,30 @@ TTask::~TTask() {
     TLogger::LogError(e, "Can't remove task stderr " + Env->StderrPath);
 }
 
+void TTask::ReportPid(int pid) const {
+    if (write(Wfd, &pid, sizeof(pid)) != sizeof(pid)) {
+        Syslog("partial write of pid: " + std::to_string(pid));
+    }
+}
+
+void TTask::Abort(int result, const string &msg) const {
+    if (write(Wfd, &result, sizeof(result)) != sizeof(result)) {
+        Syslog("partial write of result: " + std::to_string(result));
+    } else {
+        if (write(Wfd, msg.data(), msg.length()) != (ssize_t)msg.length())
+            Syslog("partial write of message: " + msg);
+    }
+
+    exit(EXIT_FAILURE);
+}
+
+void TTask::Abort(const TError &error, const std::string &msg) const {
+    if (msg == "")
+        Abort(error.GetErrno(), error.GetMsg());
+    else
+        Abort(error.GetErrno(), msg);
+}
+
 static int ChildFn(void *arg) {
     TTask *task = static_cast<TTask*>(arg);
     return task->ChildCallback();
@@ -125,19 +144,17 @@ static int ChildFn(void *arg) {
 
 void TTask::OpenStdFile(const std::string &path, int expected) {
     int ret = open(path.c_str(), O_CREAT | O_WRONLY | O_APPEND, 0700);
-    if (ret < 0) {
-        Syslog(string("open(" + path + ") -> " + std::to_string(expected) + ": ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
-    if (ret != expected) {
-        Syslog("open(" + path + ") -> " + std::to_string(expected) + ": unexpected fd");
-        ReportResultAndExit(Wfd, -EINVAL);
-    }
+    if (ret < 0)
+        Abort(errno, "open(" + path + ") -> " + std::to_string(expected));
+
+    if (ret != expected)
+        Abort(EINVAL, "open(" + path + ") -> " +
+              std::to_string(expected) + ": unexpected fd");
+
     ret = fchown(ret, Env->Uid, Env->Gid);
-    if (ret < 0) {
-        Syslog(string("fchown(" + path + ") -> " + std::to_string(expected) + ": ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
+    if (ret < 0)
+        Abort(errno, "fchown(" + path + ") -> " +
+              std::to_string(expected));
 }
 
 void TTask::ChildReopenStdio() {
@@ -150,39 +167,28 @@ void TTask::ChildReopenStdio() {
     }
 
     int ret = open(Env->StdinPath.c_str(), O_CREAT | O_RDONLY, 0700);
-    if (ret < 0) {
-        Syslog(string("open(0): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
-    if (ret != 0) {
-        Syslog("open(0): unexpected fd");
-        ReportResultAndExit(Wfd, -EINVAL);
-    }
+    if (ret < 0)
+        Abort(errno, "open(0)");
+
+    if (ret != 0)
+        Abort(EINVAL, "open(0): unexpected fd");
 
     OpenStdFile(Env->StdoutPath, 1);
     OpenStdFile(Env->StderrPath, 2);
 }
 
 void TTask::ChildDropPriveleges() {
-    if (prctl(PR_SET_KEEPCAPS, 0, 0, 0, 0) < 0) {
-        Syslog(string("prctl(PR_SET_KEEPCAPS): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
+    if (prctl(PR_SET_KEEPCAPS, 0, 0, 0, 0) < 0)
+        Abort(errno, "prctl(PR_SET_KEEPCAPS)");
 
-    if (setgid(Env->Gid) < 0) {
-        Syslog(string("setgid(): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
+    if (setgid(Env->Gid) < 0)
+        Abort(errno, "setgid()");
 
-    if (initgroups(Env->User.c_str(), Env->Gid) < 0) {
-        Syslog(string("initgroups(): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
+    if (initgroups(Env->User.c_str(), Env->Gid) < 0)
+        Abort(errno, "initgroups()");
 
-    if (setuid(Env->Uid) < 0) {
-        Syslog(string("setuid(): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
+    if (setuid(Env->Uid) < 0)
+        Abort(errno, "setuid()");
 
     umask(0);
 }
@@ -200,36 +206,30 @@ void TTask::ChildExec() {
 	int ret = wordexp(Env->Command.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
     switch (ret) {
     case WRDE_BADCHAR:
-        Syslog(string("wordexp(): illegal occurrence of newline or one of |, &, ;, <, >, (, ), {, }"));
-        ReportResultAndExit(Wfd, -EINVAL);
+        Abort(EINVAL, "wordexp(): illegal occurrence of newline or one of |, &, ;, <, >, (, ), {, }");
     case WRDE_BADVAL:
-        Syslog(string("wordexp(): undefined shell variable was referenced"));
-        ReportResultAndExit(Wfd, -EINVAL);
+        Abort(EINVAL, "wordexp(): undefined shell variable was referenced");
     case WRDE_CMDSUB:
-        Syslog(string("wordexp(): command substitution is not supported"));
-        ReportResultAndExit(Wfd, -EINVAL);
+        Abort(EINVAL, "wordexp(): command substitution is not supported");
     case WRDE_SYNTAX:
-        Syslog(string("wordexp(): syntax error"));
-        ReportResultAndExit(Wfd, -EINVAL);
+        Abort(EINVAL, "wordexp(): syntax error");
     default:
     case WRDE_NOSPACE:
-        Syslog(string("wordexp(): error ") + strerror(ret));
-        ReportResultAndExit(Wfd, -EINVAL);
+        Abort(EINVAL, "wordexp(): error " + std::to_string(ret));
     case 0:
         break;
     }
 
-#ifdef __DEBUG__
-    Syslog(Env->Command.c_str());
-    for (unsigned i = 0; i < result.we_wordc; i++)
-        Syslog(result.we_wordv[i]);
-#endif
+    if (config().log().verbose()) {
+        Syslog(Env->Command.c_str());
+        for (unsigned i = 0; i < result.we_wordc; i++)
+            Syslog(result.we_wordv[i]);
+    }
 
     auto envp = Env->GetEnvp();
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
 
-    Syslog(string("execvpe(") + result.we_wordv[0] + "): " + strerror(errno));
-    ReportResultAndExit(Wfd, errno);
+    Abort(errno, string("execvpe(") + result.we_wordv[0] + ")");
 }
 
 void TTask::BindDns() {
@@ -250,20 +250,16 @@ void TTask::BindDns() {
         TFile file(Env->Root + path);
 
         TError error = file.Touch();
-        if (error) {
-            Syslog("touch(" + file.GetPath() + "): "+ error.GetMsg());
-            ReportResultAndExit(Wfd, -error.GetErrno());
-        }
+        if (error)
+            Abort(error, "touch(" + file.GetPath() + ")");
 
         if (file.Type() == TFile::Link) {
             // TODO: ?can't mount over link
         }
 
         TMount mnt(path, file.GetPath(), "none", {});
-        if (mnt.Bind()) {
-            Syslog("bind(" + file.GetPath() + " -> " + path + "): " + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
-        }
+        if (mnt.Bind())
+            Abort(errno, "bind(" + file.GetPath() + " -> " + path + ")");
     }
 }
 
@@ -278,60 +274,44 @@ void TTask::ChildIsolateFs() {
         TFolder dir(Env->Root + path);
         if (!dir.Exists()) {
             TError error = dir.Create();
-            if (error) {
-                Syslog(error.GetMsg());
-                ReportResultAndExit(Wfd, -error.GetError());
-            }
+            if (error)
+                Abort(error);
         }
 
         TMount mnt(path, dir.GetPath(), "none", {});
-        if (mnt.Bind()) {
-            Syslog("bind(" + dir.GetPath() + " -> " + path + "): " + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
-        }
+        if (mnt.Bind())
+            Abort(errno, "bind(" + dir.GetPath() + " -> " + path + ")");
     }
 
     TFolder procDir(Env->Root + "/proc");
     if (!procDir.Exists()) {
         TError error = procDir.Create();
-        if (error) {
-            Syslog(error.GetMsg());
-            ReportResultAndExit(Wfd, -error.GetError());
-        }
+        if (error)
+            Abort(error);
     }
 
     TMount newProc("proc", procDir.GetPath(), "proc", {});
     TError error = newProc.Mount();
-    if (error) {
-        Syslog(error.GetMsg());
-        ReportResultAndExit(Wfd, -errno);
-    }
+    if (error)
+        Abort(error);
 
     BindDns();
 
-    if (chdir(Env->Root.c_str()) < 0) {
-        Syslog(string("chdir(): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
+    if (chdir(Env->Root.c_str()) < 0)
+        Abort(errno, "chdir()");
 
-    if (chroot(Env->Root.c_str()) < 0) {
-        Syslog(string("chroot(): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
+    if (chroot(Env->Root.c_str()) < 0)
+        Abort(errno, "chroot()");
 
-    if (chdir("/") < 0) {
-        Syslog(string("chdir(): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
+    if (chdir("/") < 0)
+        Abort(errno, "chdir()");
 }
 
 void TTask::ApplyLimits() {
     for (auto pair : Env->Rlimit) {
         int ret = setrlimit(pair.first, &pair.second);
-        if (ret < 0) {
-            Syslog("setrlimit(" + std::to_string(pair.first) + ", " + std::to_string(pair.second.rlim_cur) + ":" + std::to_string(pair.second.rlim_max) + "): " + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
-        }
+        if (ret < 0)
+            Abort(errno, "setrlimit(" + std::to_string(pair.first) + ", " + std::to_string(pair.second.rlim_cur) + ":" + std::to_string(pair.second.rlim_max) + ")");
     }
 }
 
@@ -340,43 +320,28 @@ int TTask::ChildCallback() {
     ResetAllSignalHandlers();
     ApplyLimits();
 
-    /*
-     * ReportResultAndExit(fd, -errno) means we failed while preparing
-     * to execve, which should never happen (but it will :-)
-     *
-     * ReportResultAndExit(fd, +errno) means execve failed
-     */
-
-    if (setsid() < 0) {
-        Syslog(string("setsid(): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
+    if (setsid() < 0)
+        Abort(errno, "setsid()");
 
     if (Env->Isolate) {
         // remount proc so PID namespace works
         TMount proc("proc", "/proc", "proc", {});
-        if (proc.Mount()) {
-            Syslog(string("remount procfs: ") + strerror(errno));
-            ReportResultAndExit(Wfd, -errno);
-        }
+        if (proc.Mount())
+            Abort(errno, "remount procfs");
     }
 
     // move to target cgroups
     for (auto cg : LeafCgroups) {
         auto error = cg->Attach(getpid());
-        if (error) {
-            Syslog(string("cgroup attach: ") + error.GetMsg());
-            ReportResultAndExit(Wfd, -error.GetError());
-        }
+        if (error)
+            Abort(error, "cgroup attach");
     }
 
     ChildReopenStdio();
     ChildIsolateFs();
 
-    if (chdir(Env->Cwd.c_str()) < 0) {
-        Syslog(string("chdir(): ") + strerror(errno));
-        ReportResultAndExit(Wfd, -errno);
-    }
+    if (chdir(Env->Cwd.c_str()) < 0)
+        Abort(errno, "chdir()");
 
     ChildDropPriveleges();
     ChildExec();
@@ -434,22 +399,25 @@ TError TTask::Start() {
         (void)setsid();
 
         TError error = Env->Ns.Attach();
-        TLogger::LogError(error, "Can't spawn child: can't attach to namespace");
-        if (error)
-            exit(EXIT_FAILURE);
+        if (error) {
+            TLogger::LogError(error, "Can't spawn child");
+            ReportPid(-1);
+            Abort(error);
+        }
 
         int cloneFlags = SIGCHLD;
-
         if (Env->Isolate)
             cloneFlags |= CLONE_NEWPID | CLONE_NEWNS;
 
         pid_t clonePid = clone(ChildFn, stack + sizeof(stack), cloneFlags, this);
-        if (write(Wfd, &clonePid, sizeof(clonePid))) {}
         if (clonePid < 0) {
             TError error(EError::Unknown, errno, "clone()");
             TLogger::LogError(error, "Can't spawn child");
-            return error;
+            ReportPid(-1);
+            Abort(error);
         }
+
+        ReportPid(clonePid);
         exit(EXIT_SUCCESS);
     }
     (void)waitpid(forkPid, NULL, 0);
@@ -463,7 +431,13 @@ TError TTask::Start() {
     }
 
     n = read(Rfd, &ret, sizeof(ret));
+    char buf[1024];
+    string msg;
+    ssize_t len = read(Rfd, buf, sizeof(buf));
+    if (len > 0)
+        msg = string(buf, len) + ": ";
     close(Rfd);
+
     if (n < 0) {
         Pid = 0;
         TError error(EError::Unknown, errno, "read(Rfd)");
@@ -476,12 +450,8 @@ TError TTask::Start() {
         Pid = 0;
         ExitStatus = -1;
 
-        TError error;
-        if (ret < 0)
-            error = TError(EError::Unknown, ret, string("child prepare: ") + strerror(-ret));
-        else
-            error = TError(EError::Unknown, ret, string("child exec: ") + strerror(ret));
-        TLogger::LogError(error, "Child process couldn't exec");
+        TError error(EError::Unknown, ret, msg);
+        TLogger::LogError(error, "Child process couldn't start");
         return error;
     }
 }

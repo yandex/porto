@@ -7,7 +7,6 @@
 - ? different log levels (error, normal, verbose)
 - ? portoctl cp
 - TPath: move DirName/BaseName into TFile/TFolder? + add chdir/chown/chown/etc
-- ? return start errno and message via pipe
 - ? start portod in container -> need to parse mountinfo, not mounts (because mountinfo skips mounts outside of chroot)
 
 # properties

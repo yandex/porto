@@ -380,7 +380,7 @@ static void TestExitStatus(TPortoAPI &api) {
     ExpectFailure(api.GetData(name, "exit_status", ret), EError::InvalidState);
     ExpectFailure(api.GetData(name, "oom_killed", ret), EError::InvalidState);
     ExpectSuccess(api.GetData(name, "start_errno", ret));
-    Expect(ret == string("-2"));
+    Expect(ret == string("2"));
 
     Say() << "Check exit status when killed by signal" << std::endl;
     ExpectSuccess(api.Destroy(name));

@@ -63,7 +63,9 @@ class TTask {
 
     int CloseAllFds(int except) const;
     void Syslog(const std::string &s) const;
-    void ReportResultAndExit(int fd, int result) const;
+    void ReportPid(int pid) const;
+    void Abort(int result, const std::string &msg) const;
+    void Abort(const TError &error, const std::string &msg = "") const;
 
     TError RotateFile(const std::string path) const;
     TError CreateCwd();
