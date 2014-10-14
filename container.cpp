@@ -675,6 +675,7 @@ TError TContainer::PrepareTask() {
     taskEnv->StdinPath = GetPropertyStr("stdin_path");
     taskEnv->StdoutPath = GetPropertyStr("stdout_path");
     taskEnv->StderrPath = GetPropertyStr("stderr_path");
+    taskEnv->Hostname = GetPropertyStr("hostname");
 
     TError error = ParseRlimit(GetPropertyStr("ulimit"), taskEnv->Rlimit);
     if (error)

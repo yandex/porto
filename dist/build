@@ -14,8 +14,11 @@ CONFIG() {
 	USER=stfomichev
 	ROOT=$DIST/$NAME
 
-	pctl() { sudo $REPO/portoctl "$@"; }
-	pexec() { pctl exec $NAME root="$ROOT" cwd="/src" command="$*"; }
+	pctl() {
+		echo portoctl "$@"
+		sudo $REPO/portoctl "$@"
+	}
+	pexec() { pctl exec $NAME root="$ROOT" cwd="/src" hostname="$NAME" command="$*"; }
 
 	bootstrap() {
 		tar="$DIST/${NAME}.img"
@@ -33,7 +36,11 @@ CONFIG() {
 	GET() {
 		URL=$1
 
+		sudo rm -rf $ROOT
+
+		echo "Downloading image..."
 		bootstrap
+		echo "Preparing repository..."
 		clone $ROOT/src
 	}
 
@@ -42,6 +49,7 @@ CONFIG() {
 	}
 
 	DEBUILD() {
+		echo "Packaging..."
 		stty sane
 		pctl exec $NAME command="debuild -i -us -uc -b $*" root="${ROOT}" cwd="/src"
 	}

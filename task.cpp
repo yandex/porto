@@ -312,7 +312,7 @@ void TTask::ChildIsolateFs() {
         Abort(error);
 }
 
-void TTask::ApplyLimits() {
+void TTask::ChildApplyLimits() {
     for (auto pair : Env->Rlimit) {
         int ret = setrlimit(pair.first, &pair.second);
         if (ret < 0)
@@ -320,10 +320,26 @@ void TTask::ApplyLimits() {
     }
 }
 
+void TTask::ChildSetHostname() {
+    if (Env->Hostname == "")
+        return;
+
+    TFile f(Env->Root + "/etc/hostname");
+    if (f.Exists()) {
+        string host = Env->Hostname + "\n";
+        TError error = f.WriteStringNoAppend(host);
+        if (error)
+            Abort(error, "write(/etc/hostname)");
+    }
+
+    if (sethostname(Env->Hostname.c_str(), Env->Hostname.length()) < 0)
+        Abort(errno, "sethostname()");
+}
+
 int TTask::ChildCallback() {
     close(Rfd);
     ResetAllSignalHandlers();
-    ApplyLimits();
+    ChildApplyLimits();
 
     if (setsid() < 0)
         Abort(errno, "setsid()");
@@ -349,6 +365,7 @@ int TTask::ChildCallback() {
     if (error)
         Abort(error);
 
+    ChildSetHostname();
     ChildDropPriveleges();
     ChildExec();
 
@@ -414,6 +431,9 @@ TError TTask::Start() {
         int cloneFlags = SIGCHLD;
         if (Env->Isolate)
             cloneFlags |= CLONE_NEWPID | CLONE_NEWNS;
+
+        if (Env->Hostname != "")
+            cloneFlags |= CLONE_NEWUTS;
 
         pid_t clonePid = clone(ChildFn, stack + sizeof(stack), cloneFlags, this);
         if (clonePid < 0) {

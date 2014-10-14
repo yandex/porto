@@ -101,6 +101,10 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     Expect(v == config().container().tmp_dir() + "/" + name + "/stdout");
     ExpectSuccess(api.GetProperty(name, "stderr_path", v));
     Expect(v == config().container().tmp_dir() + "/" + name + "/stderr");
+    ExpectSuccess(api.GetProperty(name, "ulimit", v));
+    Expect(v == "");
+    ExpectSuccess(api.GetProperty(name, "hostname", v));
+    Expect(v == name);
 }
 
 static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
@@ -903,6 +907,86 @@ static void TestRootProperty(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
+static string GetHostname() {
+    char buf[1024];
+    Expect(gethostname(buf, sizeof(buf)) == 0);
+    return buf;
+}
+
+static void TestHostnameProperty(TPortoAPI &api) {
+    string pid, v;
+    string name = "a";
+    string host = "porto_" + name;
+    string path = config().container().tmp_dir() + "/" + name;
+    ExpectSuccess(api.Create(name));
+
+    AsRoot(api);
+    BootstrapCommand("/bin/hostname", path);
+    BootstrapCommand("/bin/sleep", path, false);
+    AsNobody(api);
+    ExpectSuccess(api.SetProperty(name, "root", path));
+
+    Say() << "Check default hostname" << std::endl;
+    ExpectSuccess(api.SetProperty(name, "command", "/sleep 1000"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    AsRoot(api);
+    Expect(GetNamespace("self", "uts") == GetNamespace(pid, "uts"));
+    AsNobody(api);
+    ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.SetProperty(name, "command", "/hostname"));
+    ExpectSuccess(api.Start(name));
+    WaitState(api, name, "dead");
+    ExpectSuccess(api.GetData(name, "stdout", v));
+    Expect(v == GetHostname() + "\n");
+    ExpectSuccess(api.Stop(name));
+
+    Say() << "Check custom hostname" << std::endl;
+    ExpectSuccess(api.SetProperty(name, "hostname", host));
+
+    ExpectSuccess(api.SetProperty(name, "command", "/sleep 1000"));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    AsRoot(api);
+    Expect(GetNamespace("self", "uts") != GetNamespace(pid, "uts"));
+    AsNobody(api);
+    ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.SetProperty(name, "command", "/hostname"));
+    ExpectSuccess(api.Start(name));
+    WaitState(api, name, "dead");
+    ExpectSuccess(api.GetData(name, "stdout", v));
+    Expect(v != GetHostname() + "\n");
+    std::cerr << v << std::endl;
+    std::cerr << host + "\n" << std::endl;
+    Expect(v == host + "\n");
+    ExpectSuccess(api.Stop(name));
+
+    Say() << "Check /etc/hostname" << std::endl;
+    TFolder d(path + "/etc");
+    TFile f(path + "/etc/hostname");
+    AsRoot(api);
+    (void)d.Remove();
+    Expect(d.Exists() == false);
+    ExpectSuccess(d.Create());
+    ExpectSuccess(f.Touch());
+    AsNobody(api);
+
+    ExpectSuccess(api.SetProperty(name, "command", "/hostname"));
+    ExpectSuccess(api.Start(name));
+    WaitState(api, name, "dead");
+    AsRoot(api);
+    ExpectSuccess(f.AsString(v));
+    AsNobody(api);
+    Expect(v == host + "\n");
+    AsRoot(api);
+    ExpectSuccess(d.Remove(true));
+    AsNobody(api);
+
+    ExpectSuccess(api.Destroy(name));
+}
+
 static void TestStateMachine(TPortoAPI &api) {
     string name = "a";
     string pid;
@@ -1030,6 +1114,7 @@ static void TestRoot(TPortoAPI &api) {
         "stdout_limit",
         "private",
         "ulimit",
+        "hostname",
     };
 
     std::vector<TProperty> plist;
@@ -1874,6 +1959,7 @@ int SelfTest(string name, int leakNr) {
         { "cwd", TestCwd },
         { "std", TestStd },
         { "root_property", TestRootProperty },
+        { "hostname_property", TestHostnameProperty },
         { "limits", TestLimits },
         { "rlimits", TestRlimits },
         { "alias", TestAlias },

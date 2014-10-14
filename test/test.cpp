@@ -409,9 +409,10 @@ std::string GetDefaultGroup() {
     return "daemon";
 }
 
-void BootstrapCommand(const std::string &cmd, const std::string &path) {
+void BootstrapCommand(const std::string &cmd, const std::string &path, bool remove) {
     TFolder d(path);
-    (void)d.Remove(true);
+    if (remove)
+        (void)d.Remove(true);
 
     vector<string> lines = Popen("ldd " + cmd);
 

@@ -1,9 +1,4 @@
 - full dump on sigsegv
-- ? autorespawn max number and cron syntax
-- ? autodestroy property
-- ? portoctl run -f <MANIFEST> | <MANIFEST STRING>
-- ? cpu_cores property to reserve some cores for a container
-- loop.py: specify limits via properties, more fine grained settings for respawn, coredump settings
 - ? different log levels (error, normal, verbose)
 - ? portoctl cp
 - ? start portod in container -> need to parse mountinfo, not mounts (because mountinfo skips mounts outside of chroot)
@@ -12,9 +7,12 @@
 - ? capabilities
 - ? supplementary_groups
 - ? umask
+- ? autodestroy
+- ? max_respawns
+- ? cpu_cores - reserve some cores for a container
 
-# data
-- ? rusage
+# portoinit
+- ? portoctl run -f <MANIFEST> | <MANIFEST STRING>
 
 # nekt0n
 - add namespaces
@@ -39,9 +37,7 @@
 - ? isolate ipc property
 ## other
 - ? when to enable user namespace
-- hostname property + isolate uts
 - ? devices c 1:3 rwm; c 1:5 rwm; c 1:9 rwm; c 1:8 rwm; c 136:* rwm; c 5:2 rwm
-- ? tty - create pty slave and use it as console inside of container
 ## net
 - net:<none?|host|<dev>|bridge> - create veth pair and setup routing + masquerading + generate random ip/mask or use provided
 - net_map: map host port to container when bridge used

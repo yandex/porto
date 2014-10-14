@@ -45,6 +45,7 @@ public:
     TPath StderrPath;
     TNamespaceSnapshot Ns;
     std::map<int,struct rlimit> Rlimit;
+    std::string Hostname;
 
     TError Prepare();
     const char** GetEnvp() const;
@@ -92,7 +93,8 @@ public:
     std::string GetStdout(size_t limit) const;
     std::string GetStderr(size_t limit) const;
 
-    void ApplyLimits();
+    void ChildApplyLimits();
+    void ChildSetHostname();
     int ChildCallback();
     TError Restore(int pid);
     TError ValidateCgroups() const;

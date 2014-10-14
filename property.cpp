@@ -372,7 +372,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
         {
             "User-defined property",
             DEFSTR(""),
-            0,
+            DYNAMIC_PROPERTY,
             [](std::shared_ptr<const TContainer> c, const string &s)->TError {
                 uint32_t max = config().container().private_max();
 
@@ -386,10 +386,17 @@ std::map<std::string, const TPropertySpec> propertySpec = {
     },
     { "ulimit",
         {
-            "Specify container resource limits",
+            "Container resource limits",
             DEFSTR(""),
             0,
             ValidUlimit
+        }
+    },
+    { "hostname",
+        {
+            "Container hostname",
+            DEFSTR(""),
+            0,
         }
     },
 };

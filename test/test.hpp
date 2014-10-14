@@ -48,7 +48,7 @@ namespace test {
     void AsNobody(TPortoAPI &api);
     std::string GetDefaultUser();
     std::string GetDefaultGroup();
-    void BootstrapCommand(const std::string &cmd, const std::string &path);
+    void BootstrapCommand(const std::string &cmd, const std::string &path, bool remove = true);
 
     void RestartDaemon(TPortoAPI &api);
     void TestDaemon(TPortoAPI &api);
