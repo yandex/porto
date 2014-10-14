@@ -1,5 +1,5 @@
 - full dump on sigsegv
-- autorespawn max number and cron syntax
+- ? autorespawn max number and cron syntax
 - ? autodestroy property
 - ? portoctl run -f <MANIFEST> | <MANIFEST STRING>
 - ? cpu_cores property to reserve some cores for a container
@@ -26,6 +26,7 @@
 
 # phase 3
 ## disk
+- ? bind_dns property
 - update utmp
 - root property to isolate fs (loop if file chroot if dir)
 - ? readonly_root

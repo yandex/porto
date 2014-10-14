@@ -41,24 +41,26 @@ struct TDataSpec {
 
 extern std::map<std::string, const TDataSpec> dataSpec;
 
+enum class EContainerEventType {
+    Exit,
+    OOM,
+};
+
 class TContainerEvent {
 public:
-    const enum {
-        Exit,
-        OOM,
-    } type;
+    EContainerEventType Type;
 
     struct {
-        int pid;
-        int status;
-    } exit;
+        int Pid;
+        int Status;
+    } Exit;
 
     struct {
-        int fd;
-    } oom;
+        int Fd;
+    } Oom;
 
-    TContainerEvent(int fd) : type(OOM) { oom.fd = fd; }
-    TContainerEvent(int pid, int status) : type(Exit) { exit.pid = pid; exit.status = status; }
+    TContainerEvent(int fd) : Type(EContainerEventType::OOM) { Oom.Fd = fd; }
+    TContainerEvent(int pid, int status) : Type(EContainerEventType::Exit) { Exit.Pid = pid; Exit.Status = status; }
 
     std::string GetMsg() const;
 };

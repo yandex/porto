@@ -307,12 +307,12 @@ std::map<std::string, const TDataSpec> dataSpec = {
 // TContainerEvent
 
 std::string TContainerEvent::GetMsg() const {
-    switch (type) {
-        case Exit:
-            return "exit status " + std::to_string(exit.status)
-                + " for pid " + std::to_string(exit.pid);
-        case OOM:
-            return "oom for fd " + std::to_string(oom.fd);
+    switch (Type) {
+        case EContainerEventType::Exit:
+            return "exit status " + std::to_string(Exit.Status)
+                + " for pid " + std::to_string(Exit.Pid);
+        case EContainerEventType::OOM:
+            return "oom for fd " + std::to_string(Oom.Fd);
         default:
             return "unknown event";
     }
@@ -1319,11 +1319,11 @@ bool TContainer::DeliverOom(int fd) {
 }
 
 bool TContainer::DeliverEvent(const TContainerEvent &event) {
-    switch (event.type) {
-        case TContainerEvent::Exit:
-            return DeliverExitStatus(event.exit.pid, event.exit.status);
-        case TContainerEvent::OOM:
-            return DeliverOom(event.oom.fd);
+    switch (event.Type) {
+        case EContainerEventType::Exit:
+            return DeliverExitStatus(event.Exit.Pid, event.Exit.Status);
+        case EContainerEventType::OOM:
+            return DeliverOom(event.Oom.Fd);
         default:
             return false;
     }
