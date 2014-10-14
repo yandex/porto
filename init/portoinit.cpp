@@ -1,5 +1,6 @@
 #include <vector>
 #include <string>
+#include <algorithm>
 
 #include "init.pb.h"
 
@@ -38,7 +39,7 @@ static int StartContainers() {
     TFolder f(".");
 
     std::vector<std::string> files;
-    TError error = f.Items(TFile::Regular, files);
+    TError error = f.Items(EFileType::Regular, files);
     if (error) {
         TLogger::LogError(error, "Can't read config directory");
         return EXIT_FAILURE;
@@ -47,6 +48,7 @@ static int StartContainers() {
     std::vector<std::string> configs;
     std::string suffix = ".conf";
     for (auto &f : files) {
+            TLogger::Log() << f << std::endl;
         if (suffix.length() >= f.length())
             continue;
 
@@ -115,7 +117,7 @@ static bool NeedRestart = false;
 int main(int argc, char * const argv[]) {
     int ret;
 
-    TLogger::InitLog("", 0);
+    TLogger::InitLog("", 0, false);
     TLogger::LogToStd();
 
     ret = PrepareSystem();
