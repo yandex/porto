@@ -40,6 +40,7 @@ static volatile sig_atomic_t hup = false;
 static volatile sig_atomic_t raiseSignum = 0;
 static bool stdlog = false;
 static bool failsafe = false;
+static bool noNetwork = false;
 
 static void DoExit(int signum) {
     done = true;
@@ -116,6 +117,8 @@ static int DaemonSyncConfig(bool master, bool trunc) {
     }
 
     config.Load();
+    if (noNetwork)
+        config().mutable_network()->set_enabled(false);
     TNetlink::EnableDebug(config().network().debug());
 
     const auto &log = master ? config().master_log() : config().slave_log();
@@ -802,6 +805,8 @@ int main(int argc, char * const argv[]) {
             failsafe = true;
         } else if (arg == "--nowatch") {
             noWatchdog = true;
+        } else if (arg == "--nonet") {
+            noNetwork = true;
         } else if (arg == "-t") {
             if (argn + 1 >= argc)
                 return EXIT_FAILURE;

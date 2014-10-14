@@ -32,6 +32,7 @@
 - bind <host path> <container path>;
 - restrict_sys - remount to readonly /proc/sys, /sys and mask over sysrq-trigger + /proc/irq and /proc/bus
 - ? remount /sys (as we do with /proc) to hide things like /sys/class/net
+- pty as container console
 ## ipc
 - ? isolate ipc property
 ## other
