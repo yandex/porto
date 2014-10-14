@@ -18,25 +18,25 @@ using std::set;
 using std::shared_ptr;
 
 TError TMount::Mount(unsigned long flags) const {
-    TLogger::Log() << "mount " << Target << std::endl;
+    TLogger::Log() << "mount " << Target.ToString() << std::endl;
 
-    int ret = RetryBusy(10, 100, [&]{ return mount(Source.c_str(),
-                                                   Target.c_str(),
+    int ret = RetryBusy(10, 100, [&]{ return mount(Source.ToString().c_str(),
+                                                   Target.ToString().c_str(),
                                                    Vfstype.c_str(),
                                                    flags,
                                                    CommaSeparatedList(Flags).c_str()); });
     if (ret)
-        return TError(EError::Unknown, errno, "mount(" + Source + ", " + Target + ", " + Vfstype + ", " + std::to_string(flags) + ", " + CommaSeparatedList(Flags) + ")");
+        return TError(EError::Unknown, errno, "mount(" + Source.ToString() + ", " + Target.ToString() + ", " + Vfstype + ", " + std::to_string(flags) + ", " + CommaSeparatedList(Flags) + ")");
 
     return TError::Success();
 }
 
 TError TMount::Umount() const {
-    TLogger::Log() << "umount " << Target << std::endl;
+    TLogger::Log() << "umount " << Target.ToString() << std::endl;
 
-    int ret = RetryBusy(10, 100, [&]{ return umount(Target.c_str()); });
+    int ret = RetryBusy(10, 100, [&]{ return umount(Target.ToString().c_str()); });
     if (ret)
-        return TError(EError::Unknown, errno, "umount(" + Target + ")");
+        return TError(EError::Unknown, errno, "umount(" + Target.ToString() + ")");
 
     return TError::Success();
 }

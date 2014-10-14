@@ -150,7 +150,7 @@ std::string ReplaceMultiple(const std::string &str, const char rc) {
 
     bool foundChar = false;
     for (auto c : str) {
-        if (c == '/') {
+        if (c == rc) {
             foundChar = true;
         } else {
             if (foundChar)

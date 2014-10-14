@@ -8,46 +8,17 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <linux/limits.h>
 }
 
 using std::string;
 using std::vector;
 
-const string &TFile::GetPath() const {
-    return Path;
-}
-
-TFile::EFileType TFile::Type() const {
-    struct stat st;
-
-    if (lstat(Path.c_str(), &st))
-        return Unknown;
-
-    if (S_ISREG(st.st_mode))
-        return Regular;
-    else if (S_ISDIR(st.st_mode))
-        return Directory;
-    else if (S_ISCHR(st.st_mode))
-        return Character;
-    else if (S_ISBLK(st.st_mode))
-        return Block;
-    else if (S_ISFIFO(st.st_mode))
-        return Fifo;
-    else if (S_ISLNK(st.st_mode))
-        return Link;
-    else if (S_ISSOCK(st.st_mode))
-        return Socket;
-    else
-        return Unknown;
-}
-
 TError TFile::Touch() const {
-    TLogger::Log() << "touch " << Path << std::endl;
+    TLogger::Log() << "touch " << Path.ToString() << std::endl;
 
-    int fd = open(Path.c_str(), O_CREAT | O_WRONLY, Mode);
+    int fd = open(Path.ToString().c_str(), O_CREAT | O_WRONLY, Mode);
     if (fd < 0)
-        return TError(EError::Unknown, errno, "open(" + Path + ")");
+        return TError(EError::Unknown, errno, "open(" + Path.ToString() + ")");
 
     close(fd);
 
@@ -55,20 +26,20 @@ TError TFile::Touch() const {
 }
 
 TError TFile::Remove() const {
-    TLogger::Log() << "unlink " << Path << std::endl;
+    TLogger::Log() << "unlink " << Path.ToString() << std::endl;
 
-    int ret = RetryBusy(10, 100, [&]{ return unlink(Path.c_str()); });
+    int ret = RetryBusy(10, 100, [&]{ return unlink(Path.ToString().c_str()); });
 
     if (ret && (errno != ENOENT))
-        return TError(EError::Unknown, errno, "unlink(" + Path + ")");
+        return TError(EError::Unknown, errno, "unlink(" + Path.ToString() + ")");
 
     return TError::Success();
 }
 
 TError TFile::AsString(string &value) const {
-    int fd = open(Path.c_str(), O_RDONLY);
+    int fd = open(Path.ToString().c_str(), O_RDONLY);
     if (fd < 0)
-        return TError(EError::Unknown, errno, "open(" + Path + ")");
+        return TError(EError::Unknown, errno, "open(" + Path.ToString() + ")");
 
     int n;
     do {
@@ -76,7 +47,7 @@ TError TFile::AsString(string &value) const {
         n = read(fd, buf, sizeof(buf));
         if (n < 0) {
             close(fd);
-            return TError(EError::Unknown, errno, "read(" + Path + ")");
+            return TError(EError::Unknown, errno, "read(" + Path.ToString() + ")");
         }
 
         value.append(buf, n);
@@ -97,9 +68,9 @@ TError TFile::AsInt(int &value) const {
 }
 
 TError TFile::AsLines(vector<string> &value) const {
-    FILE *f = fopen(Path.c_str(), "r");
+    FILE *f = fopen(Path.ToString().c_str(), "r");
     if (!f)
-        return TError(EError::Unknown, errno, "fopen(" + Path + ")");
+        return TError(EError::Unknown, errno, "fopen(" + Path.ToString() + ")");
 
     char *line = nullptr;
     size_t len;
@@ -113,9 +84,9 @@ TError TFile::AsLines(vector<string> &value) const {
 }
 
 TError TFile::LastStrings(const size_t size, std::string &value) const {
-    int fd = open(Path.c_str(), O_RDONLY);
+    int fd = open(Path.ToString().c_str(), O_RDONLY);
     if (fd < 0)
-        return TError(EError::Unknown, errno, "open(" + Path + ")");
+        return TError(EError::Unknown, errno, "open(" + Path.ToString() + ")");
 
     size_t end = lseek(fd, 0, SEEK_END);
     size_t copy = end < size ? end : size;
@@ -128,7 +99,7 @@ TError TFile::LastStrings(const size_t size, std::string &value) const {
     int n = read(fd, s.data(), copy);
     close(fd);
     if (n < 0)
-        return TError(EError::Unknown, errno, "read(" + Path + ")");
+        return TError(EError::Unknown, errno, "read(" + Path.ToString() + ")");
 
     if (end > size) {
         auto iter = s.begin();
@@ -147,30 +118,16 @@ TError TFile::LastStrings(const size_t size, std::string &value) const {
     return TError::Success();
 }
 
-TError TFile::ReadLink(std::string &value) const {
-    char buf[PATH_MAX];
-    ssize_t len;
-
-    len = readlink(Path.c_str(), buf, sizeof(buf) - 1);
-    if (len < 0)
-        return TError(EError::Unknown, errno, "readlink(" + Path + ")");
-
-    buf[len] = '\0';
-
-    value.assign(buf);
-    return TError::Success();
-}
-
 TError TFile::Write(int flags, const string &str) const {
     TError error = TError::Success();
 
-    int fd = open(Path.c_str(), flags, Mode);
+    int fd = open(Path.ToString().c_str(), flags, Mode);
     if (fd < 0)
-        return TError(EError::Unknown, errno, "open(" + Path + ")");
+        return TError(EError::Unknown, errno, "open(" + Path.ToString() + ")");
 
     ssize_t ret = write(fd, str.c_str(), str.length());
     if (ret != (ssize_t)str.length())
-        error = TError(EError::Unknown, errno, "write(" + Path + ", " + str + ")");
+        error = TError(EError::Unknown, errno, "write(" + Path.ToString() + ", " + str + ")");
 
     close(fd);
 
@@ -185,6 +142,18 @@ TError TFile::AppendString(const string &str) const {
     return Write(O_CREAT | O_APPEND | O_WRONLY, str);
 }
 
-bool TFile::Exists() const {
-    return access(Path.c_str(), F_OK) == 0;
+TError TFile::Truncate(size_t size) const {
+    if (truncate(Path.ToString().c_str(), size) < 0)
+        return TError(EError::Unknown, errno, "truncate(" + Path.ToString() + ")");
+
+    return TError::Success();
+}
+
+size_t TFile::GetSize() const {
+    struct stat st;
+
+    if (lstat(Path.ToString().c_str(), &st))
+        return -1;
+
+    return st.st_size;
 }

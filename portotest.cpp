@@ -40,6 +40,7 @@ int main(int argc, char *argv[])
 {
     // in case client closes pipe we are writing to in the protobuf code
     (void)RegisterSignal(SIGPIPE, SIG_IGN);
+    TLogger::LogToStd();
 
     if (argc >= 2) {
         string name(argv[1]);

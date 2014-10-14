@@ -7,20 +7,20 @@
 #include <set>
 
 #include "error.hpp"
+#include "util/path.hpp"
 
 extern "C" {
 #include <sys/mount.h>
 }
 
 class TMount {
-    std::string Source;
-    std::string Target;
+    TPath Source;
+    TPath Target;
     std::string Vfstype;
     std::set<std::string> Flags;
 
 public:
-    TMount(const std::string &source, const std::string &target, const std::string &vfstype,
-           std::set<std::string> flags) :
+    TMount(const TPath &source, const TPath &target, const std::string &vfstype, std::set<std::string> flags) :
         Source(source), Target(target), Vfstype(vfstype),
         Flags(flags) {}
 
@@ -31,15 +31,11 @@ public:
     }
 
     const std::string GetMountpoint() const {
-        return Target;
+        return Target.ToString();
     }
 
     const std::string VFSType() const {
         return Vfstype;
-    }
-
-    const std::string ParentFolder() const {
-        return Target.substr(0, Target.find_last_of("/"));
     }
 
     std::set<std::string> const GetFlags() const {
@@ -53,7 +49,7 @@ public:
     TError Umount() const;
 
     friend std::ostream& operator<<(std::ostream& stream, const TMount& mount) {
-        stream << mount.Source << " " << mount.Target << " " << mount.Vfstype << " ";
+        stream << mount.Source.ToString() << " " << mount.Target.ToString() << " " << mount.Vfstype << " ";
 
         for (auto &f : mount.Flags)
             stream << f << ",";

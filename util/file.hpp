@@ -5,30 +5,19 @@
 #include <vector>
 
 #include "error.hpp"
+#include "util/path.hpp"
 
 class TFile {
-    const std::string Path;
+    const TPath Path;
     const int Mode; // currently used only by WriteStringNoAppend
 
     TError Write(int flags, const std::string &str) const;
 
 public:
-    enum EFileType {
-        Regular,
-        Directory,
-        Block,
-        Character,
-        Fifo,
-        Link,
-        Socket,
-        Unknown,
-        Any
-    };
+    TFile(const TPath &path, const int mode = 0600) : Path(path), Mode(mode) { };
 
-    TFile(const std::string &path, const int mode = 0600) : Path(path), Mode(mode) { };
-
-    const std::string &GetPath() const;
-    EFileType Type() const;
+    const TPath &GetPath() const { return Path; }
+    bool Exists() const { return Path.Exists(); }
 
     TError Touch() const;
     TError Remove() const;
@@ -37,11 +26,11 @@ public:
     TError AsInt(int &value) const;
     TError AsLines(std::vector<std::string> &value) const;
     TError LastStrings(const size_t size, std::string &value) const;
-    TError ReadLink(std::string &value) const;
 
     TError WriteStringNoAppend(const std::string &str) const;
     TError AppendString(const std::string &str) const;
-    bool Exists() const;
+    TError Truncate(size_t size) const;
+    size_t GetSize() const;
 };
 
 #endif

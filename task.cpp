@@ -56,7 +56,7 @@ TError TTaskEnv::Prepare() {
 
     EnvVec.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
     ParseEnv();
-    EnvVec.push_back("HOME=" + Cwd);
+    EnvVec.push_back("HOME=" + Cwd.ToString());
     EnvVec.push_back("USER=" + User);
 
     TUser u(User);
@@ -106,11 +106,11 @@ TTask::~TTask() {
 
     TFile out(Env->StdoutPath);
     TError e = out.Remove();
-    TLogger::LogError(e, "Can't remove task stdout " + Env->StdoutPath);
+    TLogger::LogError(e, "Can't remove task stdout " + Env->StdoutPath.ToString());
 
     TFile err(Env->StderrPath);
     e = err.Remove();
-    TLogger::LogError(e, "Can't remove task stderr " + Env->StderrPath);
+    TLogger::LogError(e, "Can't remove task stderr " + Env->StderrPath.ToString());
 }
 
 void TTask::ReportPid(int pid) const {
@@ -142,18 +142,18 @@ static int ChildFn(void *arg) {
     return task->ChildCallback();
 }
 
-void TTask::OpenStdFile(const std::string &path, int expected) {
-    int ret = open(path.c_str(), O_CREAT | O_WRONLY | O_APPEND, 0700);
+void TTask::OpenStdFile(const TPath &path, int expected) {
+    int ret = open(path.ToString().c_str(), O_CREAT | O_WRONLY | O_APPEND, 0700);
     if (ret < 0)
-        Abort(errno, "open(" + path + ") -> " + std::to_string(expected));
+        Abort(errno, "open(" + path.ToString() + ") -> " + std::to_string(expected));
 
     if (ret != expected)
-        Abort(EINVAL, "open(" + path + ") -> " +
+        Abort(EINVAL, "open(" + path.ToString() + ") -> " +
               std::to_string(expected) + ": unexpected fd");
 
     ret = fchown(ret, Env->Uid, Env->Gid);
     if (ret < 0)
-        Abort(errno, "fchown(" + path + ") -> " +
+        Abort(errno, "fchown(" + path.ToString() + ") -> " +
               std::to_string(expected));
 }
 
@@ -166,7 +166,7 @@ void TTask::ChildReopenStdio() {
         exit(0xAA);
     }
 
-    int ret = open(Env->StdinPath.c_str(), O_CREAT | O_RDONLY, 0700);
+    int ret = open(Env->StdinPath.ToString().c_str(), O_CREAT | O_RDONLY, 0700);
     if (ret < 0)
         Abort(errno, "open(0)");
 
@@ -237,34 +237,35 @@ void TTask::BindDns() {
 
     bool filesNr = false;
 
-    for (auto &path : files) {
-        TFile file(Env->Root + path);
-        if (file.Exists())
+    for (auto &file : files) {
+        TFile f(Env->Root + file);
+        if (f.Exists())
             filesNr++;
     }
 
     if (!filesNr)
         return;
 
-    for (auto &path : files) {
-        TFile file(Env->Root + path);
+    for (auto &file : files) {
+        TPath p(Env->Root + file);
+        TFile f(p);
 
-        TError error = file.Touch();
+        TError error = f.Touch();
         if (error)
-            Abort(error, "touch(" + file.GetPath() + ")");
+            Abort(error, "touch(" + p.ToString() + ")");
 
-        if (file.Type() == TFile::Link) {
+        if (p.GetType() == EFileType::Link) {
             // TODO: ?can't mount over link
         }
 
-        TMount mnt(path, file.GetPath(), "none", {});
+        TMount mnt(file, p.ToString(), "none", {});
         if (mnt.Bind())
-            Abort(errno, "bind(" + file.GetPath() + " -> " + path + ")");
+            Abort(errno, "bind(" + p.ToString() + " -> " + file + ")");
     }
 }
 
 void TTask::ChildIsolateFs() {
-    if (Env->Root == "/")
+    if (Env->Root.ToString() == "/")
         return;
 
     vector<string> bindDir = { "/sys", "/dev" };
@@ -280,7 +281,7 @@ void TTask::ChildIsolateFs() {
 
         TMount mnt(path, dir.GetPath(), "none", {});
         if (mnt.Bind())
-            Abort(errno, "bind(" + dir.GetPath() + " -> " + path + ")");
+            Abort(errno, "bind(" + dir.GetPath().ToString() + " -> " + path + ")");
     }
 
     TFolder procDir(Env->Root + "/proc");
@@ -297,14 +298,18 @@ void TTask::ChildIsolateFs() {
 
     BindDns();
 
-    if (chdir(Env->Root.c_str()) < 0)
-        Abort(errno, "chdir()");
+    error = Env->Root.Chdir();
+    if (error)
+        Abort(error);
 
-    if (chroot(Env->Root.c_str()) < 0)
-        Abort(errno, "chroot()");
+    error = Env->Root.Chroot();
+    if (error)
+        Abort(error);
 
-    if (chdir("/") < 0)
-        Abort(errno, "chdir()");
+    TPath newRoot("/");
+    error = newRoot.Chdir();
+    if (error)
+        Abort(error);
 }
 
 void TTask::ApplyLimits() {
@@ -340,8 +345,9 @@ int TTask::ChildCallback() {
     ChildReopenStdio();
     ChildIsolateFs();
 
-    if (chdir(Env->Cwd.c_str()) < 0)
-        Abort(errno, "chdir()");
+    TError error = Env->Cwd.Chdir();
+    if (error)
+        Abort(error);
 
     ChildDropPriveleges();
     ChildExec();
@@ -359,7 +365,7 @@ TError TTask::CreateCwd() {
         if (error)
             return error;
     }
-    return Cwd->Chown(Env->User, Env->Group);
+    return Env->Cwd.Chown(Env->User, Env->Group);
 }
 
 TError TTask::Start() {
@@ -520,19 +526,19 @@ TError TTask::Restore(int pid_) {
     // away under us any time, so don't fail if we can't recover
     // something.
 
-    TFile stdinLink("/proc/" + std::to_string(pid_) + "/fd/0");
+    TPath stdinLink("/proc/" + std::to_string(pid_) + "/fd/0");
     TError error = stdinLink.ReadLink(Env->StdinPath);
     if (error)
         Env->StdinPath = "";
     TLogger::LogError(error, "Restore stdin");
 
-    TFile stdoutLink("/proc/" + std::to_string(pid_) + "/fd/1");
+    TPath stdoutLink("/proc/" + std::to_string(pid_) + "/fd/1");
     error = stdoutLink.ReadLink(Env->StdoutPath);
     if (error)
         Env->StdoutPath = Env->Cwd + "/stdout";
     TLogger::LogError(error, "Restore stdout");
 
-    TFile stderrLink("/proc/" + std::to_string(pid_) + "/fd/2");
+    TPath stderrLink("/proc/" + std::to_string(pid_) + "/fd/2");
     error = stderrLink.ReadLink(Env->StderrPath);
     if (error)
         Env->StderrPath = Env->Cwd + "/stderr";
@@ -572,21 +578,19 @@ TError TTask::ValidateCgroups() const {
     return TError::Success();
 }
 
-TError TTask::RotateFile(const std::string path) const {
-    struct stat st;
-
-    if (!path.length())
+TError TTask::RotateFile(const TPath &path) const {
+    if (!path.ToString().length())
         return TError::Success();
 
-    if (stat(path.c_str(), &st) < 0)
-        return TError(EError::Unknown, errno, "stat(" + path + ")");
-
-    if (!S_ISREG(st.st_mode))
+    if (path.GetType() != EFileType::Regular)
         return TError::Success();
 
-    if (st.st_size > config().container().max_log_size())
-        if (truncate(path.c_str(), 0) < 0)
-            return TError(EError::Unknown, errno, "truncate(" + path + ")");
+    TFile f(path);
+    if (f.GetSize() > config().container().max_log_size()) {
+        TError error = f.Truncate(0);
+        if (error)
+            return error;
+    }
 
     return TError::Success();
 }

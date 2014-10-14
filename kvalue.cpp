@@ -152,7 +152,7 @@ TError TKeyValueStorage::MountTmpfs() {
 TError TKeyValueStorage::ListNodes(std::vector<std::string> &list) const {
     vector<string> tmp;
     TFolder f(Tmpfs.GetMountpoint());
-    TError error = f.Items(TFile::Regular, tmp);
+    TError error = f.Items(EFileType::Regular, tmp);
     if (error)
         return error;
 

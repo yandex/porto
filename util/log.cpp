@@ -3,18 +3,12 @@
 #include "porto.hpp"
 #include "log.hpp"
 #include "util/unix.hpp"
-
-extern "C" {
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <sys/prctl.h>
-}
+#include "util/path.hpp"
+#include "util/file.hpp"
 
 static std::ofstream logFile;
 static std::ofstream kmsgFile;
-static std::string logPath;
+static TPath logPath;
 static unsigned int logMode;
 static bool stdlog = false;
 static bool verbose;
@@ -31,32 +25,35 @@ void TLogger::LogToStd() {
 }
 
 void TLogger::OpenLog() {
-    if (logFile.is_open()) {
+    if (logFile.is_open())
         return;
-    }
 
-    if (access(DirName(logPath).c_str(), W_OK)) {
+    if (!logPath.DirName().AccessOk(EFileAccess::Write)) {
         if (!kmsgFile.is_open())
             kmsgFile.open("/dev/kmsg", std::ios_base::out);
         return;
     }
 
-    struct stat st;
     bool needCreate = false;
 
-    if (lstat(logPath.c_str(), &st) == 0) {
-        if (st.st_mode != (logMode | S_IFREG)) {
-            unlink(logPath.c_str());
+    if (logPath.Exists()) {
+        if (logPath.GetType() != EFileType::Regular ||
+            logPath.GetMode() != logMode) {
+
+            TFile f(logPath);
+            (void)f.Remove();
             needCreate = true;
         }
     } else {
         needCreate = true;
     }
 
-    if (needCreate)
-        close(creat(logPath.c_str(), logMode));
+    if (needCreate) {
+        TFile f(logPath);
+        (void)f.Touch();
+    }
 
-    logFile.open(logPath, std::ios_base::app);
+    logFile.open(logPath.ToString(), std::ios_base::app);
 
     if (logFile.is_open() && kmsgFile.is_open())
         kmsgFile.close();
@@ -69,7 +66,9 @@ void TLogger::CloseLog() {
 
 void TLogger::TruncateLog() {
     TLogger::CloseLog();
-    if (truncate(logPath.c_str(), 0)) {}
+
+    TFile f(logPath);
+    (void)f.Truncate(0);
 }
 
 static std::string GetTime() {
@@ -86,22 +85,19 @@ static std::string GetTime() {
 }
 
 std::basic_ostream<char> &TLogger::Log() {
-    char name[17];
+    std::string name = GetProcessName();
+    if (stdlog) {
+        return  std::cerr << GetTime() << " " << name << ": ";
+    } else {
+        OpenLog();
 
-    if (prctl(PR_GET_NAME, (void *)name) < 0)
-        strncpy(name, program_invocation_short_name, sizeof(name));
-
-    if (stdlog)
-        return std::cerr << GetTime() << " " << name << ": ";
-
-    OpenLog();
-
-    if (logFile.is_open())
-        return logFile << GetTime() << " ";
-    else if (kmsgFile.is_open())
-        return kmsgFile << " " << name << ": ";
-    else
-        return std::cerr << GetTime() << " " << name << ": ";
+        if (logFile.is_open())
+            return logFile << GetTime() << " ";
+        else if (kmsgFile.is_open())
+            return kmsgFile << " " << name << ": ";
+        else
+            return std::cerr << GetTime() << " " << name << ": ";
+    }
 }
 
 void TLogger::LogAction(const std::string &action, bool error, int errcode) {

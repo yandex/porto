@@ -7,6 +7,7 @@
 
 #include "cgroup.hpp"
 #include "util/namespace.hpp"
+#include "util/path.hpp"
 
 extern "C" {
 #include <sys/resource.h>
@@ -32,16 +33,16 @@ class TTaskEnv {
 public:
     TTaskEnv() {}
     std::string Command;
-    std::string Cwd;
+    TPath Cwd;
     bool CreateCwd;
-    std::string Root;
+    TPath Root;
     std::string User;
     std::string Group;
     std::string Environ;
     bool Isolate = false;
-    std::string StdinPath;
-    std::string StdoutPath;
-    std::string StderrPath;
+    TPath StdinPath;
+    TPath StdoutPath;
+    TPath StderrPath;
     TNamespaceSnapshot Ns;
     std::map<int,struct rlimit> Rlimit;
 
@@ -67,9 +68,9 @@ class TTask {
     void Abort(int result, const std::string &msg) const;
     void Abort(const TError &error, const std::string &msg = "") const;
 
-    TError RotateFile(const std::string path) const;
+    TError RotateFile(const TPath &path) const;
     TError CreateCwd();
-    void OpenStdFile(const std::string &path, int expected);
+    void OpenStdFile(const TPath &path, int expected);
     void ChildReopenStdio();
     void ChildDropPriveleges();
     void ChildExec();

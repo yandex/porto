@@ -131,30 +131,27 @@ void WaitPortod(TPortoAPI &api) {
         throw std::string("Waited too long for portod startup");
 }
 
-std::string GetCwd(const std::string &pid) {
-    std::string lnk;
-    TFile f("/proc/" + pid + "/cwd");
-    TError error(f.ReadLink(lnk));
+std::string ReadLink(const std::string &path) {
+    TPath link;
+
+    TPath f(path);
+    TError error = f.ReadLink(link);
     if (error)
         throw error.GetMsg();
-    return lnk;
+
+    return link.ToString();
+}
+
+std::string GetCwd(const std::string &pid) {
+    return ReadLink("/proc/" + pid + "/cwd");
 }
 
 std::string GetRoot(const std::string &pid) {
-    std::string lnk;
-    TFile f("/proc/" + pid + "/root");
-    TError error(f.ReadLink(lnk));
-    if (error)
-        throw error.GetMsg();
-    return lnk;
+    return ReadLink("/proc/" + pid + "/root");
 }
 
 std::string GetNamespace(const std::string &pid, const std::string &ns) {
-    std::string link;
-    TFile m("/proc/" + pid + "/ns/" + ns);
-    if (m.ReadLink(link))
-        throw std::string("Can't get ") + ns + " namespace for " + pid;
-    return link;
+    return ReadLink("/proc/" + pid + "/ns/" + ns);
 }
 
 std::map<std::string, std::string> GetCgroups(const std::string &pid) {
@@ -296,7 +293,7 @@ std::string GetCgKnob(const std::string &subsys, const std::string &name, const 
     std::string val;
     TFile m(CgRoot(subsys, name) + knob);
     if (m.AsString(val))
-        throw std::string("Can't get cgroup knob " + m.GetPath());
+        throw std::string("Can't get cgroup knob " + m.GetPath().ToString());
     val.erase(val.find('\n'));
     return val;
 }
@@ -351,17 +348,6 @@ int WordCount(const std::string &path, const std::string &word) {
     }
 
     return nr;
-}
-
-std::string ReadLink(const std::string &path) {
-    std::string link;
-
-    TFile f(path);
-    TError error = f.ReadLink(link);
-    if (error)
-        throw error.GetMsg();
-
-    return link;
 }
 
 bool FileExists(const std::string &path) {
@@ -435,11 +421,12 @@ void BootstrapCommand(const std::string &cmd, const std::string &path) {
         if (error)
             throw error.GetMsg();
 
-        string from;
+        TPath from;
         string name;
         if (tokens.size() == 2) {
             from = StringTrim(tokens[0]);
-            name = BaseName(tokens[0]);
+            TPath p(tokens[0]);
+            name = p.BaseName();
         } else if (tokens.size() == 4) {
             if (tokens[2] == "")
                 continue;
@@ -450,14 +437,14 @@ void BootstrapCommand(const std::string &cmd, const std::string &path) {
             continue;
         }
 
-        TFolder dest(path + "/" + DirName(from));
+        TFolder dest(path + "/" + from.DirName().ToString());
         if (!dest.Exists()) {
             error = dest.Create(0755, true);
             if (error)
                 throw error.GetMsg();
         }
 
-        Expect(system(("cp " + from + " " + dest.GetPath() + "/" + name).c_str()) == 0);
+        Expect(system(("cp " + from.ToString() + " " + dest.GetPath().ToString() + "/" + name).c_str()) == 0);
     }
     Expect(system(("cp " + cmd + " " + path).c_str()) == 0);
 }

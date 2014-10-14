@@ -164,8 +164,10 @@ static std::string DefaultStdFile(std::shared_ptr<const TContainer> c,
     if (c->UseParentNamespace())
         prefix = c->GetName(false) + ".";
 
-    string path = ReplaceMultiple(root + "/" + cwd, '/');
-    return path + "/" + prefix + name;
+    TPath path = root;
+    path.AddComponent(cwd);
+    path.AddComponent(prefix + name);
+    return path.ToString();
 }
 
 std::map<std::string, const TPropertySpec> propertySpec = {

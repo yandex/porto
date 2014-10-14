@@ -3,7 +3,6 @@
 #include "util/log.hpp"
 #include "util/unix.hpp"
 #include "util/folder.hpp"
-#include "util/pwd.hpp"
 
 extern "C" {
 #include <sys/stat.h>
@@ -21,15 +20,15 @@ using std::unordered_map;
 TFolder::~TFolder() {
     if (Tmp) {
         TError error = Remove(true);
-        TLogger::LogError(error, "Can't remove " + Path);
+        TLogger::LogError(error, "Can't remove " + Path.ToString());
     }
 }
 
 TError TFolder::Create(mode_t mode, bool recursive) const {
-    TLogger::Log() << "mkdir " << Path << std::endl;
+    TLogger::Log() << "mkdir " << Path.ToString() << std::endl;
 
     if (recursive) {
-        string copy(Path);
+        string copy(Path.ToString());
         char *dup = strdup(copy.c_str());
         char *p = dirname(dup);
         TFolder f(p);
@@ -41,8 +40,8 @@ TError TFolder::Create(mode_t mode, bool recursive) const {
         }
     }
 
-    if (mkdir(Path.c_str(), mode) < 0)
-        return TError(EError::Unknown, errno, "mkdir(" + Path + ", " + std::to_string(mode) + ")");
+    if (mkdir(Path.ToString().c_str(), mode) < 0)
+        return TError(EError::Unknown, errno, "mkdir(" + Path.ToString() + ", " + std::to_string(mode) + ")");
 
     return TError::Success();
 }
@@ -50,17 +49,18 @@ TError TFolder::Create(mode_t mode, bool recursive) const {
 TError TFolder::Remove(bool recursive) const {
     if (recursive) {
         vector<string> items;
-        TError error = Items(TFile::Any, items);
+        TError error = Items(EFileType::Any, items);
         if (error)
             return error;
 
         for (auto f : items) {
-            string path = Path + "/" + f;
-            TFile child(path);
+            TPath p(Path);
+            p.AddComponent(f);
+            TFile child(p);
             TError error;
 
-            if (child.Type() == TFile::Directory)
-                error = TFolder(path).Remove(recursive);
+            if (p.GetType() == EFileType::Directory)
+                error = TFolder(p).Remove(recursive);
             else
                 error = child.Remove();
 
@@ -69,84 +69,45 @@ TError TFolder::Remove(bool recursive) const {
         }
     }
 
-    TLogger::Log() << "rmdir " << Path << std::endl;
+    TLogger::Log() << "rmdir " << Path.ToString() << std::endl;
 
-    int ret = RetryBusy(10, 100, [&]{ return rmdir(Path.c_str()); });
+    int ret = RetryBusy(10, 100, [&]{ return rmdir(Path.ToString().c_str()); });
     if (ret)
-        return TError(EError::Unknown, errno, "rmdir(" + Path + ")");
+        return TError(EError::Unknown, errno, "rmdir(" + Path.ToString() + ")");
 
     return TError::Success();
 }
 
-const string &TFolder::GetPath() const {
-    return Path;
-}
-
-bool TFolder::Exists() const {
-    struct stat st;
-
-    int ret = stat(Path.c_str(), &st);
-
-    if (ret == 0 && S_ISDIR(st.st_mode))
-        return true;
-    else
-        return false;
-}
-
 TError TFolder::Subfolders(std::vector<std::string> &list) const {
-    return Items(TFile::Directory, list);
+    return Items(EFileType::Directory, list);
 }
 
-TError TFolder::Items(const TFile::EFileType type, std::vector<std::string> &list) const {
+TError TFolder::Items(const EFileType type, std::vector<std::string> &list) const {
     DIR *dirp;
     struct dirent dp, *res;
 
-    dirp = opendir(Path.c_str());
+    dirp = opendir(Path.ToString().c_str());
     if (!dirp)
-        return TError(EError::Unknown, "Cannot open directory " + Path);
+        return TError(EError::Unknown, "Cannot open directory " + Path.ToString());
 
     while (!readdir_r(dirp, &dp, &res) && res != nullptr) {
         if (string(".") == res->d_name || string("..") == res->d_name)
             continue;
 
-        static unordered_map<unsigned char, TFile::EFileType> d_type_to_type =
-            {{DT_UNKNOWN, TFile::Unknown},
-             {DT_FIFO, TFile::Fifo},
-             {DT_CHR, TFile::Character},
-             {DT_DIR, TFile::Directory},
-             {DT_BLK, TFile::Block},
-             {DT_REG, TFile::Regular},
-             {DT_LNK, TFile::Link},
-             {DT_SOCK, TFile::Socket}};
+        static unordered_map<unsigned char, EFileType> d_type_to_type =
+            {{DT_UNKNOWN, EFileType::Unknown},
+             {DT_FIFO, EFileType::Fifo},
+             {DT_CHR, EFileType::Character},
+             {DT_DIR, EFileType::Directory},
+             {DT_BLK, EFileType::Block},
+             {DT_REG, EFileType::Regular},
+             {DT_LNK, EFileType::Link},
+             {DT_SOCK, EFileType::Socket}};
 
-        if (type == TFile::Any || type == d_type_to_type[res->d_type])
+        if (type == EFileType::Any || type == d_type_to_type[res->d_type])
             list.push_back(string(res->d_name));
     }
 
     closedir(dirp);
-    return TError::Success();
-}
-
-TError TFolder::Chown(const std::string &user, const std::string &group) const {
-    int uid, gid;
-
-    TUser u(user);
-    TError error = u.Load();
-    if (error)
-        return error;
-
-    uid = u.GetId();
-
-    TGroup g(group);
-    error = g.Load();
-    if (error)
-        return error;
-
-    gid = g.GetId();
-
-    int ret = chown(Path.c_str(), uid, gid);
-    if (ret)
-        return TError(EError::Unknown, errno, "chown(" + Path + ", " + user + ", " + group + ")");
-
     return TError::Success();
 }

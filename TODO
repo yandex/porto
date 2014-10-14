@@ -6,7 +6,6 @@
 - loop.py: specify limits via properties, more fine grained settings for respawn, coredump settings
 - ? different log levels (error, normal, verbose)
 - ? portoctl cp
-- TPath: move DirName/BaseName into TFile/TFolder? + add chdir/chown/chown/etc
 - ? start portod in container -> need to parse mountinfo, not mounts (because mountinfo skips mounts outside of chroot)
 
 # properties

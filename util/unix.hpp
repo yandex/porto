@@ -15,12 +15,11 @@ size_t GetCurrentTimeMs();
 int RegisterSignal(int signum, void (*handler)(int));
 int RegisterSignal(int signum, void (*handler)(int sig, siginfo_t *si, void *unused));
 void ResetAllSignalHandlers(void);
-std::string DirName(const std::string &str);
-std::string BaseName(const std::string &str);
 size_t GetTotalMemory();
 int CreatePidFile(const std::string &path, const int mode);
 void RemovePidFile(const std::string &path);
 void SetProcessName(const std::string &name);
+std::string GetProcessName();
 TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap);
 int BlockAllSignals();
 
