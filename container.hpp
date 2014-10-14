@@ -41,6 +41,28 @@ struct TDataSpec {
 
 extern std::map<std::string, const TDataSpec> dataSpec;
 
+class TContainerEvent {
+public:
+    const enum {
+        Exit,
+        OOM,
+    } type;
+
+    struct {
+        int pid;
+        int status;
+    } exit;
+
+    struct {
+        int fd;
+    } oom;
+
+    TContainerEvent(int fd) : type(OOM) { oom.fd = fd; }
+    TContainerEvent(int pid, int status) : type(Exit) { exit.pid = pid; exit.status = status; }
+
+    std::string GetMsg() const;
+};
+
 class TContainer : public std::enable_shared_from_this<TContainer> {
     NO_COPY_CONSTRUCT(TContainer);
     const std::string Name;
@@ -85,6 +107,9 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     void PropertyToAlias(const std::string &property, std::string &value) const;
     TError AliasToProperty(std::string &property, std::string &value);
 
+    bool DeliverExitStatus(int pid, int status);
+    bool DeliverOom(int fd);
+
 public:
     TContainer(const std::string &name, std::shared_ptr<TContainer> parent, uint16_t id) :
         Name(StripParentName(name)), Parent(parent), State(EContainerState::Stopped), Spec(name), Id(id) { }
@@ -115,17 +140,15 @@ public:
     TError GetData(const std::string &data, std::string &value);
     TError Restore(const kv::TNode &node);
 
-    bool DeliverExitStatus(int pid, int status);
-
     std::shared_ptr<TCgroup> GetLeafCgroup(std::shared_ptr<TSubsystem> subsys);
     void Heartbeat();
     bool CanRemoveDead() const;
     bool HasChildren() const;
-    uint16_t GetId();
-    int GetOomFd();
-    void DeliverOom();
+    uint16_t GetId() { return Id; }
+    int GetOomFd() { return Efd.GetFd(); }
     void GetPerm(int &uid, int &gid) const { uid = Uid; gid = Gid; }
     bool UseParentNamespace() const;
+    bool DeliverEvent(const TContainerEvent &event);
 };
 
 constexpr size_t BITS_PER_LLONG = sizeof(unsigned long long) * 8;
@@ -148,12 +171,12 @@ public:
     TError Restore(const std::string &name, const kv::TNode &node);
     TError CheckPermission(std::shared_ptr<TContainer> container, int uid, int gid);
     TError Destroy(const std::string &name);
-    bool DeliverExitStatus(int pid, int status);
 
     std::vector<std::string> List() const;
     void Heartbeat();
     void PushOomFds(std::vector<int> &fds);
-    void DeliverOom(int fd);
+
+    bool DeliverEvent(const TContainerEvent &event);
 };
 
 TError ParseRlimit(const std::string &s, std::map<int,struct rlimit> &rlim);

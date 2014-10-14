@@ -1,17 +1,14 @@
 - full dump on sigsegv
 - autorespawn max number and cron syntax
-- build on clean distro (+ script to build on several clean distros)
 - ? autodestroy property
 - ? portoctl run -f <MANIFEST> | <MANIFEST STRING>
 - ? cpu_cores property to reserve some cores for a container
-- loop.py: specify limits via properties, more fine grained settings for respawn,
-  coredump settings
+- loop.py: specify limits via properties, more fine grained settings for respawn, coredump settings
 - ? different log levels (error, normal, verbose)
 - ? portoctl cp
-- ? move DirName/BaseName into TFile/TFolder? + add chdir/chown/chown/etc
-- TPath
-- TContainerEvent
+- TPath: move DirName/BaseName into TFile/TFolder? + add chdir/chown/chown/etc
 - ? return start errno and message via pipe
+- ? start portod in container -> need to parse mountinfo, not mounts (because mountinfo skips mounts outside of chroot)
 
 # properties
 - ? capabilities

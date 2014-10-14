@@ -304,6 +304,20 @@ std::map<std::string, const TDataSpec> dataSpec = {
     { "time", { "return running time of container", 0, TData::RunningTime, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
 };
 
+// TContainerEvent
+
+std::string TContainerEvent::GetMsg() const {
+    switch (type) {
+        case Exit:
+            return "exit status " + std::to_string(exit.status)
+                + " for pid " + std::to_string(exit.pid);
+        case OOM:
+            return "oom for fd " + std::to_string(oom.fd);
+        default:
+            return "unknown event";
+    }
+}
+
 // TContainer
 
 bool TContainer::CheckState(EContainerState expected) {
@@ -1280,19 +1294,12 @@ bool TContainer::HasChildren() const {
     return shared_from_this().use_count() > 2;
 }
 
-uint16_t TContainer::GetId() {
-    return Id;
-}
+bool TContainer::DeliverOom(int fd) {
+    if (IsRoot() || !(CheckState(EContainerState::Running) || CheckState(EContainerState::Dead)))
+        return false;
 
-int TContainer::GetOomFd() {
-    return Efd.GetFd();
-}
-
-void TContainer::DeliverOom() {
-    if (IsRoot() || !(CheckState(EContainerState::Running) || CheckState(EContainerState::Dead))) {
-        TError error(EError::InvalidState, "invalid container state " + ContainerStateName(State));
-        TLogger::LogError(error, "Can't deliver OOM");
-    }
+    if (Efd.GetFd() != fd)
+        return false;
 
     int pid = Task->GetPid();
     TLogger::Log() << "Delivered OOM to " << GetName() << " with root_pid " << pid << std::endl;
@@ -1308,6 +1315,18 @@ void TContainer::DeliverOom() {
     StopChildren();
     OomKilled = true;
     Efd = -1;
+    return true;
+}
+
+bool TContainer::DeliverEvent(const TContainerEvent &event) {
+    switch (event.type) {
+        case TContainerEvent::Exit:
+            return DeliverExitStatus(event.exit.pid, event.exit.status);
+        case TContainerEvent::OOM:
+            return DeliverOom(event.oom.fd);
+        default:
+            return false;
+    }
 }
 
 // TContainerHolder
@@ -1532,14 +1551,6 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
     return TError::Success();
 }
 
-bool TContainerHolder::DeliverExitStatus(int pid, int status) {
-    for (auto c : Containers)
-        if (c.second->DeliverExitStatus(pid, status))
-            return true;
-
-    return false;
-}
-
 void TContainerHolder::Heartbeat() {
     auto i = Containers.begin();
 
@@ -1567,16 +1578,13 @@ void TContainerHolder::PushOomFds(vector<int> &fds) {
     }
 }
 
-void TContainerHolder::DeliverOom(int fd) {
-    for (auto c : Containers) {
-        if (fd != c.second->GetOomFd())
-            continue;
+bool TContainerHolder::DeliverEvent(const TContainerEvent &event) {
+    for (auto c : Containers)
+        if (c.second->DeliverEvent(event))
+            return true;
 
-        c.second->DeliverOom();
-        return;
-    }
-
-    TLogger::Log() << "Couldn't deliver OOM notification to " << fd << std::endl;
+    TLogger::Log() << "Couldn't deliver " << event.GetMsg() << std::endl;
+    return false;
 }
 
 TError ParseRlimit(const std::string &s, map<int,struct rlimit> &rlim) {
@@ -1644,3 +1652,4 @@ TError ParseRlimit(const std::string &s, map<int,struct rlimit> &rlim) {
 
     return TError::Success();
 }
+

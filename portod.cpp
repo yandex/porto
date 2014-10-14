@@ -312,8 +312,8 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
             return 0;
         }
 
-        if (!cholder.DeliverExitStatus(pid, status)) {
-            TLogger::Log() << "Can't deliver " << std::to_string(pid) << " exit status " << std::to_string(status) << std::endl;
+        TContainerEvent event(pid, status);
+        if (!cholder.DeliverEvent(event)) {
             AckExitStatus(pid);
             return 0;
         }
@@ -432,7 +432,8 @@ static int RpcMain(TContainerHolder &cholder) {
                 if (fds[i].revents & POLLHUP)
                     CloseClient(fds[i].fd, clients);
             } else {
-                cholder.DeliverOom(fds[i].fd);
+                TContainerEvent event(fds[i].fd);
+                (void)cholder.DeliverEvent(event);
             }
         }
     }
