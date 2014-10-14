@@ -18,7 +18,7 @@ CONFIG() {
 		echo portoctl "$@"
 		sudo $REPO/portoctl "$@"
 	}
-	pexec() { pctl exec $NAME root="$ROOT" cwd="/src" hostname="$NAME" command="$*"; }
+	pexec() { pctl exec $NAME env="container=lxc" root="$ROOT" cwd="/src" hostname="$NAME" command="$*"; }
 
 	bootstrap() {
 		tar="$DIST/${NAME}.img"

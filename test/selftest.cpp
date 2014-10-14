@@ -105,6 +105,8 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     Expect(v == "");
     ExpectSuccess(api.GetProperty(name, "hostname", v));
     Expect(v == "");
+    ExpectSuccess(api.GetProperty(name, "bind_dns", v));
+    Expect(v == "false");
 }
 
 static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
@@ -884,11 +886,19 @@ static void TestRootProperty(TPortoAPI &api) {
     BootstrapCommand("/bin/pwd", path);
 
     ExpectSuccess(api.SetProperty(name, "command", "/pwd"));
+    string bindDns;
+
+    ExpectSuccess(api.GetProperty(name, "bind_dns", bindDns));
+    Expect(bindDns == "false");
+
     ExpectSuccess(api.SetProperty(name, "root", path));
 
     string cwd;
     ExpectSuccess(api.GetProperty(name, "cwd", cwd));
     Expect(cwd == "/");
+
+    ExpectSuccess(api.GetProperty(name, "bind_dns", bindDns));
+    Expect(bindDns == "true");
 
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
@@ -967,9 +977,8 @@ static void TestHostnameProperty(TPortoAPI &api) {
     TFolder d(path + "/etc");
     TFile f(path + "/etc/hostname");
     AsRoot(api);
-    (void)d.Remove();
-    Expect(d.Exists() == false);
-    ExpectSuccess(d.Create());
+    if (!d.Exists())
+        ExpectSuccess(d.Create());
     ExpectSuccess(f.Touch());
     AsNobody(api);
 
@@ -1116,6 +1125,7 @@ static void TestRoot(TPortoAPI &api) {
         "ulimit",
         "hostname",
         "root",
+        "bind_dns",
     };
 
     std::vector<TProperty> plist;

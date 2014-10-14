@@ -235,20 +235,16 @@ void TTask::ChildExec() {
 void TTask::BindDns() {
     vector<string> files = { "/etc/hosts", "/etc/resolv.conf" };
 
-    bool filesNr = false;
-
-    for (auto &file : files) {
-        TFile f(Env->Root + file);
-        if (f.Exists())
-            filesNr++;
-    }
-
-    if (!filesNr)
-        return;
-
     for (auto &file : files) {
         TPath p(Env->Root + file);
         TFile f(p);
+
+        TFolder d(p.DirName());
+        if (!d.Exists()) {
+            TError error = d.Create(0755, true);
+            if (error)
+                Abort(error);
+        }
 
         TError error = f.Touch();
         if (error)
@@ -296,7 +292,8 @@ void TTask::ChildIsolateFs() {
     if (error)
         Abort(error);
 
-    BindDns();
+    if (Env->BindDns)
+        BindDns();
 
     error = Env->Root.Chdir();
     if (error)

@@ -399,6 +399,19 @@ std::map<std::string, const TPropertySpec> propertySpec = {
             0,
         }
     },
+    { "bind_dns",
+        {
+            "Bind /etc/resolv.conf and /etc/hosts of host to container",
+            [](std::shared_ptr<const TContainer> c)->std::string {
+                if (c->IsDefaultProperty("root"))
+                    return "false";
+                else
+                    return "true";
+            },
+            0,
+            ValidBool
+        }
+    },
 };
 
 bool TContainerSpec::IsDefault(std::shared_ptr<const TContainer> container, const std::string &property) const {

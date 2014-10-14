@@ -46,6 +46,7 @@ public:
     TNamespaceSnapshot Ns;
     std::map<int,struct rlimit> Rlimit;
     std::string Hostname;
+    bool BindDns;
 
     TError Prepare();
     const char** GetEnvp() const;

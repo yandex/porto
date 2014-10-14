@@ -676,6 +676,7 @@ TError TContainer::PrepareTask() {
     taskEnv->StdoutPath = GetPropertyStr("stdout_path");
     taskEnv->StderrPath = GetPropertyStr("stderr_path");
     taskEnv->Hostname = GetPropertyStr("hostname");
+    taskEnv->BindDns = GetPropertyStr("bind_dns") == "true";
 
     TError error = ParseRlimit(GetPropertyStr("ulimit"), taskEnv->Rlimit);
     if (error)
