@@ -75,7 +75,8 @@ class TTask {
     TError CreateNode(const TPath &path, unsigned int mode, unsigned int dev);
     TError CreateAndMount(const TPath &source, const TPath &path,
                           const std::string &device,
-                          const std::set<std::string> &flags);
+                          const unsigned long flags,
+                          const std::set<std::string> &data);
     void ChildOpenStdFile(const TPath &path, int expected);
     void ChildReopenStdio();
     void ChildDropPriveleges();

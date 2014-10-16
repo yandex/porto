@@ -26,8 +26,6 @@
 # phase 3
 - ? write dom0 hostname into come file on container or pass via ENV
 ## disk
-- check mount flags for sys/dev/etc
-- ? update utmp
 - ? root property: support loop if file
 - ? readonly_root
 - ? mount proc proc proc nodev,noexec,nosuid 0 0; run run tmpfs nodev,noexec,nosuid,relatime,size=1m,mode=0755 0 0; shm dev/shm tmpfs nodev,nosuid,noexec 0 0

@@ -22,11 +22,11 @@ TError TMount::Mount(unsigned long flags) const {
 
     int ret = RetryBusy(10, 100, [&]{ return mount(Source.ToString().c_str(),
                                                    Target.ToString().c_str(),
-                                                   Vfstype.c_str(),
+                                                   Type.c_str(),
                                                    flags,
-                                                   CommaSeparatedList(Flags).c_str()); });
+                                                   CommaSeparatedList(Data).c_str()); });
     if (ret)
-        return TError(EError::Unknown, errno, "mount(" + Source.ToString() + ", " + Target.ToString() + ", " + Vfstype + ", " + std::to_string(flags) + ", " + CommaSeparatedList(Flags) + ")");
+        return TError(EError::Unknown, errno, "mount(" + Source.ToString() + ", " + Target.ToString() + ", " + Type + ", " + std::to_string(flags) + ", " + CommaSeparatedList(Data) + ")");
 
     return TError::Success();
 }

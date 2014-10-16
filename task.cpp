@@ -265,7 +265,8 @@ TError TTask::ChildBindDns() {
 
 TError TTask::CreateAndMount(const TPath &source, const TPath &path,
                              const std::string &device,
-                             const std::set<std::string> &flags) {
+                             const unsigned long flags,
+                             const std::set<std::string> &data) {
     TFolder dir(path);
     if (!dir.Exists()) {
         TError error = dir.Create();
@@ -273,8 +274,8 @@ TError TTask::CreateAndMount(const TPath &source, const TPath &path,
             return error;
     }
 
-    TMount mnt(source, path, device, flags);
-    return mnt.Mount();
+    TMount mnt(source, path, device, data);
+    return mnt.Mount(flags);
 }
 
 TError TTask::CreateNode(const TPath &path, unsigned int mode, unsigned int dev) {
@@ -298,12 +299,14 @@ TError TTask::ChildMountDev() {
         { "/dev/random",  0666 | S_IFCHR, MKDEV(1, 8) },
     };
 
-    TError error = CreateAndMount("tmpfs", Env->Root + "/dev",
-                                  "tmpfs", { "mode=755" });
+    TError error = CreateAndMount("tmpfs", Env->Root + "/dev", "tmpfs",
+                                  MS_NOSUID | MS_STRICTATIME,
+                                  { "mode=755" });
     if (error)
         return error;
 
     error = CreateAndMount("devpts", Env->Root + "/dev/pts", "devpts",
+                           MS_NOSUID | MS_NOEXEC,
                            { "newinstance", "ptmxmode=0666",
                            "mode=620" ,"gid=5" });
     if (error)
@@ -328,15 +331,15 @@ void TTask::ChildIsolateFs() {
     if (Env->Root.ToString() == "/")
         return;
 
-    TError error = CreateAndMount("sysfs", Env->Root + "/sys", "sysfs", {});
+    unsigned long defaultFlags = MS_NOEXEC | MS_NOSUID | MS_NODEV;
+
+    TError error = CreateAndMount("sysfs", Env->Root + "/sys", "sysfs",
+                                  defaultFlags, {});
     if (error)
         Abort(error);
 
-    error = CreateAndMount("proc", Env->Root + "/proc", "proc", {});
-    if (error)
-        Abort(error);
-
-    error = CreateAndMount("tmpfs", Env->Root + "/tmp", "tmpfs", {});
+    error = CreateAndMount("proc", Env->Root + "/proc", "proc",
+                           defaultFlags, {});
     if (error)
         Abort(error);
 
@@ -345,6 +348,7 @@ void TTask::ChildIsolateFs() {
         Abort(error);
 
     error = CreateAndMount("shm", Env->Root + "/dev/shm", "tmpfs",
+                           defaultFlags,
                            { "mode=1777", "size=65536k" });
     if (error)
         Abort(error);
