@@ -20,6 +20,7 @@ binary:
 	dh_installinit --noscripts
 	dh_installlogrotate
 	dh_installchangelogs
+	dh_shlibdeps
 	dh_installdeb
 	dh_gencontrol
 	dh_md5sums
