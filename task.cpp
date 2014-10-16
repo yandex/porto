@@ -106,12 +106,16 @@ TTask::~TTask() {
         return;
 
     TFile out(Env->StdoutPath);
-    TError e = out.Remove();
-    TLogger::LogError(e, "Can't remove task stdout " + Env->StdoutPath.ToString());
+    if (Env->StdoutPath.GetType() != EFileType::Character) {
+        TError e = out.Remove();
+        TLogger::LogError(e, "Can't remove task stdout " + Env->StdoutPath.ToString());
+    }
 
-    TFile err(Env->StderrPath);
-    e = err.Remove();
-    TLogger::LogError(e, "Can't remove task stderr " + Env->StderrPath.ToString());
+    if (Env->StderrPath.GetType() != EFileType::Character) {
+        TFile err(Env->StderrPath);
+        TError e = err.Remove();
+        TLogger::LogError(e, "Can't remove task stderr " + Env->StderrPath.ToString());
+    }
 }
 
 void TTask::ReportPid(int pid) const {

@@ -11,7 +11,7 @@ debuild
 
 # Run fedora
 yum -y --installroot=/home/stfomichev/src/porto/dist/fedora20 --releasever=20 --nogpg install systemd passwd yum fedora-release vim-minimal openssh-server procps-ng iproute net-tools dhclient
-sudo ./portoctl exec fedora20 command="/sbin/init" root=/home/stfomichev/src/porto/dist/fedora20 env="container=lxc" hostname="fedora20"
+sudo ./portoctl exec fedora20 command="/sbin/init" root=/home/stfomichev/src/porto/dist/fedora20_stfomichev env="container=lxc" hostname="fedora20"
 sudo ./portoctl exec fedora20 command="/bin/bash" root=/home/stfomichev/src/porto/dist/fedora20 env="container=lxc" user="$USER" group="$USER" hostname="fedora20"
 sudo ./portoctl enter fedora20
 

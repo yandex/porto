@@ -30,7 +30,7 @@
 - ? root property: support loop if file
 - ? readonly_root
 - bind <host path> <container path>;
-- pty as container console
+- ? pty as container /dev/console
 ## ipc
 - ? isolate ipc property
 ## other
