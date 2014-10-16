@@ -43,7 +43,7 @@ TError TNetlink::FindDev(std::string &device) {
         return TError::Success();
     }
 
-    struct FindDevIter { string name; } data;
+    struct FindDevIter { string name; string running; } data;
     nl_cache_foreach(linkCache, [](struct nl_object *obj, void *data) {
                      FindDevIter *p = (FindDevIter *)data;
                      struct rtnl_link *l = (struct rtnl_link *)obj;
@@ -58,12 +58,25 @@ TError TNetlink::FindDev(std::string &device) {
                             rtnl_link_get_flags(l) & IFF_RUNNING)
                             p->name = rtnl_link_get_name(l);
 
+                     if (p->running.length())
+                        return;
+
+                     if ((rtnl_link_get_flags(l) & IFF_RUNNING) &&
+                        !(rtnl_link_get_flags(l) & IFF_LOOPBACK))
+                        p->running = rtnl_link_get_name(l);
                      }, &data);
 
-    if (data.name.length() == 0)
-        return TError(EError::Unknown, "Can't find appropriate link");
+    if (data.name.length()) {
+        dev = device = data.name;
+    } else {
+        if (data.running.length()) {
+            dev = device = data.running;
 
-    dev = device = data.name;
+            TLogger::Log() << "Can't find predefined link, using " << dev << std::endl;
+        } else {
+            return TError(EError::Unknown, "Can't find appropriate link");
+        }
+    }
 
     return TError::Success();
 }
