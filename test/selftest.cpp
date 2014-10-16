@@ -971,8 +971,6 @@ static void TestHostnameProperty(TPortoAPI &api) {
     WaitState(api, name, "dead");
     ExpectSuccess(api.GetData(name, "stdout", v));
     Expect(v != GetHostname() + "\n");
-    std::cerr << v << std::endl;
-    std::cerr << host + "\n" << std::endl;
     Expect(v == host + "\n");
     ExpectSuccess(api.Stop(name));
 
