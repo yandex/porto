@@ -170,6 +170,13 @@ static std::string DefaultStdFile(std::shared_ptr<const TContainer> c,
     return path.ToString();
 }
 
+static std::string TrueWithRoot(std::shared_ptr<const TContainer> c) {
+    if (c->IsDefaultProperty("root"))
+        return "false";
+    else
+        return "true";
+}
+
 std::map<std::string, const TPropertySpec> propertySpec = {
     { "command",
         {
@@ -402,12 +409,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
     { "bind_dns",
         {
             "Bind /etc/resolv.conf and /etc/hosts of host to container",
-            [](std::shared_ptr<const TContainer> c)->std::string {
-                if (c->IsDefaultProperty("root"))
-                    return "false";
-                else
-                    return "true";
-            },
+            TrueWithRoot,
             0,
             ValidBool
         }

@@ -190,8 +190,6 @@ void TTask::ChildDropPriveleges() {
 
     if (setuid(Env->Uid) < 0)
         Abort(errno, "setuid()");
-
-    umask(0);
 }
 
 void TTask::ChildExec() {
@@ -237,50 +235,37 @@ TError TTask::ChildBindDns() {
     vector<string> files = { "/etc/hosts", "/etc/resolv.conf" };
 
     for (auto &file : files) {
-        TPath p(Env->Root + file);
-        TFile f(p);
-
-        TFolder d(p.DirName());
-        if (!d.Exists()) {
-            TError error = d.Create(0755, true);
-            if (error)
-                return error;
-        }
-
-        TError error = f.Touch();
+        TMount mnt(file, Env->Root + file, "none", {});
+        TError error = mnt.BindRdonlyFile();
         if (error)
-            return error;
-
-        if (p.GetType() == EFileType::Link) {
-            // TODO: ?can't mount over link
-        }
-
-        TMount mnt(file, p.ToString(), "none", {});
-        if (mnt.Bind())
             return error;
     }
 
     return TError::Success();
 }
 
-TError TTask::CreateAndMount(const TPath &source, const TPath &path,
-                             const std::string &device,
-                             const unsigned long flags,
-                             const std::set<std::string> &data) {
-    TFolder dir(path);
-    if (!dir.Exists()) {
-        TError error = dir.Create();
+TError TTask::CreateNode(const TPath &path, unsigned int mode, unsigned int dev) {
+    if (mknod(path.ToString().c_str(), mode, dev) < 0)
+        return TError(EError::Unknown, errno, "mknod(" + path.ToString() + ")");
+
+    return TError::Success();
+}
+
+TError TTask::RestrictProc() {
+    vector<string> dirs = { "/proc/sys", "/proc/sysrq-trigger",
+        "/proc/irq", "/proc/bus" };
+
+    for (auto &path : dirs) {
+        TMount mnt(Env->Root + path, Env->Root + path, "none", {});
+        TError error = mnt.BindRdonlyFile();
         if (error)
             return error;
     }
 
-    TMount mnt(source, path, device, data);
-    return mnt.Mount(flags);
-}
-
-TError TTask::CreateNode(const TPath &path, unsigned int mode, unsigned int dev) {
-    if (mknod(path.ToString().c_str(), mode, dev) < 0)
-        return TError(EError::Unknown, errno, "mknod(" + path.ToString() + ")");
+    TMount mnt("/dev/null", Env->Root + "/proc/kcore", "", {});
+    TError error = mnt.Bind();
+    if (error)
+        return error;
 
     return TError::Success();
 }
@@ -299,16 +284,14 @@ TError TTask::ChildMountDev() {
         { "/dev/random",  0666 | S_IFCHR, MKDEV(1, 8) },
     };
 
-    TError error = CreateAndMount("tmpfs", Env->Root + "/dev", "tmpfs",
-                                  MS_NOSUID | MS_STRICTATIME,
-                                  { "mode=755" });
+    TMount dev("tmpfs", Env->Root + "/dev", "tmpfs", { "mode=755" });
+    TError error = dev.MountDir(MS_NOSUID | MS_STRICTATIME);
     if (error)
         return error;
 
-    error = CreateAndMount("devpts", Env->Root + "/dev/pts", "devpts",
-                           MS_NOSUID | MS_NOEXEC,
-                           { "newinstance", "ptmxmode=0666",
-                           "mode=620" ,"gid=5" });
+    TMount devpts("devpts", Env->Root + "/dev/pts", "devpts",
+                  { "newinstance", "ptmxmode=0666", "mode=620" ,"gid=5" });
+    error = devpts.MountDir(MS_NOSUID | MS_NOEXEC);
     if (error)
         return error;
 
@@ -327,50 +310,57 @@ TError TTask::ChildMountDev() {
     return TError::Success();
 }
 
-void TTask::ChildIsolateFs() {
+TError TTask::ChildIsolateFs(bool priveleged) {
     if (Env->Root.ToString() == "/")
-        return;
+        return TError::Success();
 
     unsigned long defaultFlags = MS_NOEXEC | MS_NOSUID | MS_NODEV;
+    unsigned long sysfsFlags = defaultFlags;
+    if (!priveleged)
+        sysfsFlags |= MS_RDONLY;
 
-    TError error = CreateAndMount("sysfs", Env->Root + "/sys", "sysfs",
-                                  defaultFlags, {});
+    TMount sysfs("sysfs", Env->Root + "/sys", "sysfs", {});
+    TError error = sysfs.MountDir(sysfsFlags);
     if (error)
-        Abort(error);
+        return error;
 
-    error = CreateAndMount("proc", Env->Root + "/proc", "proc",
-                           defaultFlags, {});
+    TMount proc("proc", Env->Root + "/proc", "proc", {});
+    error = proc.MountDir(defaultFlags);
     if (error)
-        Abort(error);
+        return error;
+
+    if (!priveleged) {
+        error = RestrictProc();
+        if (error)
+            return error;
+    }
 
     error = ChildMountDev();
     if (error)
-        Abort(error);
+        return error;
 
-    error = CreateAndMount("shm", Env->Root + "/dev/shm", "tmpfs",
-                           defaultFlags,
-                           { "mode=1777", "size=65536k" });
+    TMount shm("shm", Env->Root + "/dev/shm", "tmpfs",
+               { "mode=1777", "size=65536k" });
+    error = shm.MountDir(defaultFlags);
     if (error)
-        Abort(error);
+        return error;
 
     if (Env->BindDns) {
         error = ChildBindDns();
         if (error)
-            Abort(error);
+            return error;
     }
 
     error = Env->Root.Chdir();
     if (error)
-        Abort(error);
+        return error;
 
     error = Env->Root.Chroot();
     if (error)
-        Abort(error);
+        return error;
 
     TPath newRoot("/");
-    error = newRoot.Chdir();
-    if (error)
-        Abort(error);
+    return newRoot.Chdir();
 }
 
 void TTask::ChildApplyLimits() {
@@ -405,10 +395,12 @@ int TTask::ChildCallback() {
     if (setsid() < 0)
         Abort(errno, "setsid()");
 
+    umask(0);
+
     if (Env->Isolate) {
         // remount proc so PID namespace works
         TMount proc("proc", "/proc", "proc", {});
-        if (proc.Mount())
+        if (proc.MountDir())
             Abort(errno, "remount procfs");
     }
 
@@ -419,15 +411,20 @@ int TTask::ChildCallback() {
             Abort(error, "cgroup attach");
     }
 
-    ChildReopenStdio();
-    ChildIsolateFs();
+    bool priveleged = Env->Gid == 0 || Env->Uid == 0;
 
-    TError error = Env->Cwd.Chdir();
+    ChildReopenStdio();
+    TError error = ChildIsolateFs(priveleged);
+    if (error)
+        Abort(error);
+
+    error = Env->Cwd.Chdir();
     if (error)
         Abort(error);
 
     ChildSetHostname();
-    ChildDropPriveleges();
+    if (!priveleged)
+        ChildDropPriveleges();
     ChildExec();
 
     return 0;

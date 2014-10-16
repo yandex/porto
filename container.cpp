@@ -411,6 +411,10 @@ std::string TContainer::GetPropertyStr(const std::string &property) const {
     return Spec.Get(shared_from_this(), property);
 }
 
+bool TContainer::GetPropertyBool(const std::string &property) const {
+    return GetPropertyStr(property) == "true";
+}
+
 int TContainer::GetPropertyInt(const std::string &property) const {
     int val;
 
@@ -511,7 +515,7 @@ TError TContainer::ApplyDynamicProperties() {
     }
 
     if (memroot->HasKnob("memory.recharge_on_pgfault")) {
-        string value = GetPropertyStr("recharge_on_pgfault") == "true" ? "1" : "0";
+        string value = GetPropertyBool("recharge_on_pgfault") ? "1" : "0";
         error = memcg->SetKnobValue("memory.recharge_on_pgfault", value, false);
         TLogger::LogError(error, "Can't set recharge_on_pgfault");
         if (error)
@@ -671,12 +675,12 @@ TError TContainer::PrepareTask() {
     taskEnv->User = GetPropertyStr("user");
     taskEnv->Group = GetPropertyStr("group");
     taskEnv->Environ = GetPropertyStr("env");
-    taskEnv->Isolate = GetPropertyStr("isolate") == "true";
+    taskEnv->Isolate = GetPropertyBool("isolate");
     taskEnv->StdinPath = GetPropertyStr("stdin_path");
     taskEnv->StdoutPath = GetPropertyStr("stdout_path");
     taskEnv->StderrPath = GetPropertyStr("stderr_path");
     taskEnv->Hostname = GetPropertyStr("hostname");
-    taskEnv->BindDns = GetPropertyStr("bind_dns") == "true";
+    taskEnv->BindDns = GetPropertyBool("bind_dns");
 
     TError error = ParseRlimit(GetPropertyStr("ulimit"), taskEnv->Rlimit);
     if (error)
@@ -1237,7 +1241,7 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
     TLogger::Log() << "Delivered " << status << " to " << GetName() << " with root_pid " << Task->GetPid() << std::endl;
     State = EContainerState::Dead;
 
-    if (GetPropertyStr("isolate") != "true")
+    if (!GetPropertyBool("isolate"))
         (void)KillAll();
 
     if (NeedRespawn()) {
@@ -1255,7 +1259,7 @@ bool TContainer::NeedRespawn() {
     if (State != EContainerState::Dead)
         return false;
 
-    return GetPropertyStr("respawn") == "true" && TimeOfDeath + config().container().respawn_delay_ms() <= GetCurrentTimeMs();
+    return GetPropertyBool("respawn") && TimeOfDeath + config().container().respawn_delay_ms() <= GetCurrentTimeMs();
 }
 
 TError TContainer::Respawn() {

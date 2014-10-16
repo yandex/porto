@@ -914,6 +914,9 @@ static void TestRootProperty(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "stdout", v));
     Expect(v == string("/\n"));
 
+    // TODO: make sure we have correct mounts and nodes in /dev
+    // TODO: check /sys restrictions
+
     ExpectSuccess(api.Destroy(name));
 }
 
@@ -1971,6 +1974,7 @@ int SelfTest(string name, int leakNr) {
         { "std", TestStd },
         { "root_property", TestRootProperty },
         { "hostname_property", TestHostnameProperty },
+        //{ "bind_dns_property", TestBindDnsProperty },
         { "limits", TestLimits },
         { "rlimits", TestRlimits },
         { "alias", TestAlias },

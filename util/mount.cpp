@@ -2,6 +2,7 @@
 
 #include "util/mount.hpp"
 #include "util/file.hpp"
+#include "util/folder.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
 #include "util/log.hpp"
@@ -39,6 +40,45 @@ TError TMount::Umount() const {
         return TError(EError::Unknown, errno, "umount(" + Target.ToString() + ")");
 
     return TError::Success();
+}
+
+TError TMount::BindRdonlyFile() const {
+    TPath p(Target);
+    TFile f(p);
+
+    if (!f.Exists()) {
+        TFolder d(p.DirName());
+        if (!d.Exists()) {
+            TError error = d.Create(0755, true);
+            if (error)
+                return error;
+        }
+
+        TError error = f.Touch();
+        if (error)
+            return error;
+    }
+
+    if (p.GetType() == EFileType::Link) {
+        // TODO: ?can't mount over link
+    }
+
+    TError error = Mount(MS_BIND);
+    if (error)
+        return error;
+
+    return Mount(MS_BIND | MS_REMOUNT | MS_RDONLY);
+}
+
+TError TMount::MountDir(unsigned long flags) const {
+    TFolder dir(Target);
+    if (!dir.Exists()) {
+        TError error = dir.Create();
+        if (error)
+            return error;
+    }
+
+    return Mount(flags);
 }
 
 TError TMountSnapshot::Mounts(std::set<std::shared_ptr<TMount>> &mounts) const {

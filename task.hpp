@@ -73,17 +73,14 @@ class TTask {
     TError RotateFile(const TPath &path) const;
     TError CreateCwd();
     TError CreateNode(const TPath &path, unsigned int mode, unsigned int dev);
-    TError CreateAndMount(const TPath &source, const TPath &path,
-                          const std::string &device,
-                          const unsigned long flags,
-                          const std::set<std::string> &data);
     void ChildOpenStdFile(const TPath &path, int expected);
     void ChildReopenStdio();
     void ChildDropPriveleges();
     void ChildExec();
     TError ChildBindDns();
+    TError RestrictProc();
     TError ChildMountDev();
-    void ChildIsolateFs();
+    TError ChildIsolateFs(bool priveleged);
 
 public:
     TTask(std::shared_ptr<TTaskEnv> env, std::vector<std::shared_ptr<TCgroup>> &leafCgroups) : Env(env), LeafCgroups(leafCgroups) {};

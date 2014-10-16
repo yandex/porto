@@ -102,6 +102,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     bool ShouldApplyProperty(const std::string &property);
     TError Respawn();
     std::string GetPropertyStr(const std::string &property) const;
+    bool GetPropertyBool(const std::string &property) const;
     int GetPropertyInt(const std::string &property) const;
     uint64_t GetPropertyUint64(const std::string &property) const;
     void StopChildren();
