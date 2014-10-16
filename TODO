@@ -1,3 +1,4 @@
+- portod can't start without /var/log/portoloop.log
 - full dump on sigsegv
 - ? different log levels (error, normal, verbose)
 - ? portoctl cp
@@ -23,14 +24,16 @@
 - ? net_prio 0-7 -> 0-99
 
 # phase 3
+- ? write dom0 hostname into come file on container or pass via ENV
 ## disk
+- check mount flags for sys/dev/etc
 - ? update utmp
 - ? root property: support loop if file
 - ? readonly_root
 - ? mount proc proc proc nodev,noexec,nosuid 0 0; run run tmpfs nodev,noexec,nosuid,relatime,size=1m,mode=0755 0 0; shm dev/shm tmpfs nodev,nosuid,noexec 0 0
   we can prepare everything when fs is isolated
 - bind <host path> <container path>;
-- restrict_sys - remount to readonly /proc/sys, /sys and mask over sysrq-trigger + /proc/irq and /proc/bus
+- restrict_sys - remount to readonly /proc/sys, /proc/sysrq-trigger, /proc/irq, /proc/bus
 - ? remount /sys (as we do with /proc) to hide things like /sys/class/net
 - pty as container console
 ## ipc

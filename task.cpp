@@ -23,6 +23,7 @@ extern "C" {
 #include <syslog.h>
 #include <wordexp.h>
 #include <grp.h>
+#include <linux/kdev_t.h>
 }
 
 using std::stringstream;
@@ -142,7 +143,7 @@ static int ChildFn(void *arg) {
     return task->ChildCallback();
 }
 
-void TTask::OpenStdFile(const TPath &path, int expected) {
+void TTask::ChildOpenStdFile(const TPath &path, int expected) {
     int ret = open(path.ToString().c_str(), O_CREAT | O_WRONLY | O_APPEND, 0700);
     if (ret < 0)
         Abort(errno, "open(" + path.ToString() + ") -> " + std::to_string(expected));
@@ -173,8 +174,8 @@ void TTask::ChildReopenStdio() {
     if (ret != 0)
         Abort(EINVAL, "open(0): unexpected fd");
 
-    OpenStdFile(Env->StdoutPath, 1);
-    OpenStdFile(Env->StderrPath, 2);
+    ChildOpenStdFile(Env->StdoutPath, 1);
+    ChildOpenStdFile(Env->StderrPath, 2);
 }
 
 void TTask::ChildDropPriveleges() {
@@ -232,7 +233,7 @@ void TTask::ChildExec() {
     Abort(errno, string("execvpe(") + result.we_wordv[0] + ")");
 }
 
-void TTask::BindDns() {
+TError TTask::ChildBindDns() {
     vector<string> files = { "/etc/hosts", "/etc/resolv.conf" };
 
     for (auto &file : files) {
@@ -243,12 +244,12 @@ void TTask::BindDns() {
         if (!d.Exists()) {
             TError error = d.Create(0755, true);
             if (error)
-                Abort(error);
+                return error;
         }
 
         TError error = f.Touch();
         if (error)
-            Abort(error, "touch(" + p.ToString() + ")");
+            return error;
 
         if (p.GetType() == EFileType::Link) {
             // TODO: ?can't mount over link
@@ -256,44 +257,103 @@ void TTask::BindDns() {
 
         TMount mnt(file, p.ToString(), "none", {});
         if (mnt.Bind())
-            Abort(errno, "bind(" + p.ToString() + " -> " + file + ")");
+            return error;
     }
+
+    return TError::Success();
+}
+
+TError TTask::CreateAndMount(const TPath &source, const TPath &path,
+                             const std::string &device,
+                             const std::set<std::string> &flags) {
+    TFolder dir(path);
+    if (!dir.Exists()) {
+        TError error = dir.Create();
+        if (error)
+            return error;
+    }
+
+    TMount mnt(source, path, device, flags);
+    return mnt.Mount();
+}
+
+TError TTask::CreateNode(const TPath &path, unsigned int mode, unsigned int dev) {
+    if (mknod(path.ToString().c_str(), mode, dev) < 0)
+        return TError(EError::Unknown, errno, "mknod(" + path.ToString() + ")");
+
+    return TError::Success();
+}
+
+TError TTask::ChildMountDev() {
+    struct {
+        const std::string path;
+        unsigned int mode;
+        unsigned int dev;
+    } node[] = {
+        { "/dev/null",    0666 | S_IFCHR, MKDEV(1, 3) },
+        { "/dev/zero",    0666 | S_IFCHR, MKDEV(1, 5) },
+        { "/dev/full",    0666 | S_IFCHR, MKDEV(1, 7) },
+        { "/dev/tty",     0666 | S_IFCHR, MKDEV(5, 0) },
+        { "/dev/urandom", 0666 | S_IFCHR, MKDEV(1, 9) },
+        { "/dev/random",  0666 | S_IFCHR, MKDEV(1, 8) },
+    };
+
+    TError error = CreateAndMount("tmpfs", Env->Root + "/dev",
+                                  "tmpfs", { "mode=755" });
+    if (error)
+        return error;
+
+    error = CreateAndMount("devpts", Env->Root + "/dev/pts", "devpts",
+                           { "newinstance", "ptmxmode=0666",
+                           "mode=620" ,"gid=5" });
+    if (error)
+        return error;
+
+    for (size_t i = 0; i < sizeof(node) / sizeof(node[0]); i++) {
+        error = CreateNode(Env->Root + node[i].path,
+                           node[i].mode, node[i].dev);
+        if (error)
+            return error;
+    }
+
+    TPath ptmx = Env->Root + "/dev/ptmx";
+
+    if (symlink("pts/ptmx", ptmx.ToString().c_str()) < 0)
+        return TError(EError::Unknown, errno, "symlink(pts/ptmx)");
+
+    return TError::Success();
 }
 
 void TTask::ChildIsolateFs() {
     if (Env->Root.ToString() == "/")
         return;
 
-    vector<string> bindDir = { "/sys", "/dev" };
-
-    for (auto &path : bindDir) {
-        TFile file(path);
-        TFolder dir(Env->Root + path);
-        if (!dir.Exists()) {
-            TError error = dir.Create();
-            if (error)
-                Abort(error);
-        }
-
-        TMount mnt(path, dir.GetPath(), "none", {});
-        if (mnt.Bind())
-            Abort(errno, "bind(" + dir.GetPath().ToString() + " -> " + path + ")");
-    }
-
-    TFolder procDir(Env->Root + "/proc");
-    if (!procDir.Exists()) {
-        TError error = procDir.Create();
-        if (error)
-            Abort(error);
-    }
-
-    TMount newProc("proc", procDir.GetPath(), "proc", {});
-    TError error = newProc.Mount();
+    TError error = CreateAndMount("sysfs", Env->Root + "/sys", "sysfs", {});
     if (error)
         Abort(error);
 
-    if (Env->BindDns)
-        BindDns();
+    error = CreateAndMount("proc", Env->Root + "/proc", "proc", {});
+    if (error)
+        Abort(error);
+
+    error = CreateAndMount("tmpfs", Env->Root + "/tmp", "tmpfs", {});
+    if (error)
+        Abort(error);
+
+    error = ChildMountDev();
+    if (error)
+        Abort(error);
+
+    error = CreateAndMount("shm", Env->Root + "/dev/shm", "tmpfs",
+                           { "mode=1777", "size=65536k" });
+    if (error)
+        Abort(error);
+
+    if (Env->BindDns) {
+        error = ChildBindDns();
+        if (error)
+            Abort(error);
+    }
 
     error = Env->Root.Chdir();
     if (error)

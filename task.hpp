@@ -72,11 +72,16 @@ class TTask {
 
     TError RotateFile(const TPath &path) const;
     TError CreateCwd();
-    void OpenStdFile(const TPath &path, int expected);
+    TError CreateNode(const TPath &path, unsigned int mode, unsigned int dev);
+    TError CreateAndMount(const TPath &source, const TPath &path,
+                          const std::string &device,
+                          const std::set<std::string> &flags);
+    void ChildOpenStdFile(const TPath &path, int expected);
     void ChildReopenStdio();
     void ChildDropPriveleges();
     void ChildExec();
-    void BindDns();
+    TError ChildBindDns();
+    TError ChildMountDev();
     void ChildIsolateFs();
 
 public:
