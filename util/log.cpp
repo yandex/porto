@@ -85,11 +85,18 @@ static std::string GetTime() {
 }
 
 std::basic_ostream<char> &TLogger::Log() {
+    static int openlog;
+
     std::string name = GetProcessName();
     if (stdlog) {
         return  std::cerr << GetTime() << " " << name << ": ";
     } else {
+        if (openlog)
+            return  std::cerr << GetTime() << " " << name << ": ";
+
+        openlog++;
         OpenLog();
+        openlog--;
 
         if (logFile.is_open())
             return logFile << GetTime() << " ";
