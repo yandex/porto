@@ -29,7 +29,7 @@ message TCfg {
 	message TDaemonCfg {
 		optional uint32 max_clients = 1;
 		optional uint32 poll_timeout_ms = 2;
-		optional uint32 heartbead_delay_ms = 3;
+		optional uint32 heartbeat_delay_ms = 3;
 		optional uint32 watchdog_max_fails = 4;
 		optional uint32 watchdog_delay_s = 5;
 		optional uint32 wait_timeout_s = 6;

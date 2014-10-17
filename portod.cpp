@@ -385,7 +385,7 @@ static int RpcMain(TContainerHolder &cholder) {
                 break;
         }
 
-        if (heartbeat + config().daemon().heartbead_delay_ms()
+        if (heartbeat + config().daemon().heartbeat_delay_ms()
             <= GetCurrentTimeMs()) {
             cholder.Heartbeat();
             heartbeat = GetCurrentTimeMs();

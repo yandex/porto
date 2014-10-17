@@ -40,7 +40,7 @@ void TConfig::LoadDefaults() {
 
     config().mutable_daemon()->set_max_clients(16);
     config().mutable_daemon()->set_poll_timeout_ms(10 * 1000);
-    config().mutable_daemon()->set_heartbead_delay_ms(5 * 1000);
+    config().mutable_daemon()->set_heartbeat_delay_ms(5 * 1000);
     config().mutable_daemon()->set_watchdog_max_fails(5);
     config().mutable_daemon()->set_watchdog_delay_s(5);
     config().mutable_daemon()->set_wait_timeout_s(10);

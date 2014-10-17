@@ -2021,7 +2021,7 @@ static void TestRespawn(TPortoAPI &api) {
     ExpectSuccess(api.Start(name));
 
     for(int i = 0; i < maxTries; i++) {
-        sleep(config().daemon().heartbead_delay_ms() / 1000);
+        sleep(config().daemon().heartbeat_delay_ms() / 1000);
         api.GetData(name, "respawn_count", realRespawns);
         if (realRespawns == maxRespawns)
             successRespawns++;
