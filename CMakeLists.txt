@@ -11,6 +11,9 @@ if(EXISTS "/usr/bin/g++-4.7")
     set(CMAKE_CXX_COMPILER "g++-4.7")
 endif()
 
+include_directories(${CMAKE_CURRENT_SOURCE_DIR})
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/api/cpp)
+
 find_library(NL NAMES nl-3)
 find_library (RTNL nl-route-3)
 find_path(NL_INCLUDE_DIR NAMES netlink/netlink.h PATH_SUFFIXES libnl3)
@@ -51,3 +54,9 @@ target_link_libraries(portoctl porto ${PB} rt)
 add_executable(portotest portotest.cpp config.cpp test/selftest.cpp test/stresstest.cpp test/test.cpp config.cpp util/netlink.cpp util/log.cpp util/path.cpp util/file.cpp util/folder.cpp util/unix.cpp util/pwd.cpp util/string.cpp)
 add_dependencies(portotest version.hpp)
 target_link_libraries(portotest porto ${PB} ${RTNL} ${NL} pthread rt)
+
+install(
+    TARGETS portod portoctl portotest
+    RUNTIME DESTINATION sbin
+    LIBRARY DESTINATION lib
+    )
