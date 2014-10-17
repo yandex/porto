@@ -1,59 +1,63 @@
-import rpc_pb2
 import socket
-import sys
 
-from porto import exceptions
+import rpc_pb2
+import exceptions
+
 
 ################################################################################
 def _VarintEncoder():
-  """Return an encoder for a basic varint value (does not include tag)."""
+    """Return an encoder for a basic varint value (does not include tag)."""
 
-  local_chr = chr
-  def EncodeVarint(write, value):
-    bits = value & 0x7f
-    value >>= 7
-    while value:
-      write(local_chr(0x80|bits))
-      bits = value & 0x7f
-      value >>= 7
-    return write(local_chr(bits))
+    local_chr = chr
 
-  return EncodeVarint
+    def EncodeVarint(write, value):
+        bits = value & 0x7f
+        value >>= 7
+        while value:
+            write(local_chr(0x80 | bits))
+            bits = value & 0x7f
+            value >>= 7
+        return write(local_chr(bits))
+
+    return EncodeVarint
 
 _EncodeVarint = _VarintEncoder()
 
+
 def _VarintDecoder(mask):
-  """Return an encoder for a basic varint value (does not include tag).
+    """Return an encoder for a basic varint value (does not include tag).
 
-  Decoded values will be bitwise-anded with the given mask before being
-  returned, e.g. to limit them to 32 bits.  The returned decoder does not
-  take the usual "end" parameter -- the caller is expected to do bounds checking
-  after the fact (often the caller can defer such checking until later).  The
-  decoder returns a (value, new_pos) pair.
-  """
+    Decoded values will be bitwise-anded with the given mask before being
+    returned, e.g. to limit them to 32 bits.  The returned decoder does not
+    take the usual "end" parameter -- the caller is expected to do bounds checking
+    after the fact (often the caller can defer such checking until later).  The
+    decoder returns a (value, new_pos) pair.
+    """
 
-  local_ord = ord
-  def DecodeVarint(buffer, pos):
-    result = 0
-    shift = 0
-    while 1:
-      b = local_ord(buffer[pos])
-      result |= ((b & 0x7f) << shift)
-      pos += 1
-      if not (b & 0x80):
-        result &= mask
-        return (result, pos)
-      shift += 7
-      if shift >= 64:
-        raise IOError('Too many bytes when decoding varint.')
-  return DecodeVarint
+    local_ord = ord
+
+    def DecodeVarint(buffer, pos):
+        result = 0
+        shift = 0
+        while 1:
+            b = local_ord(buffer[pos])
+            result |= ((b & 0x7f) << shift)
+            pos += 1
+            if not (b & 0x80):
+                result &= mask
+                return (result, pos)
+            shift += 7
+            if shift >= 64:
+                raise IOError('Too many bytes when decoding varint.')
+    return DecodeVarint
 
 _DecodeVarint = _VarintDecoder((1 << 64) - 1)
 _DecodeVarint32 = _VarintDecoder((1 << 32) - 1)
 
 ################################################################################
 
-class PortoAPI:
+
+class PortoAPI(object):
     def __init__(self, socket_path='/var/run/portod.socket', timeout=5):
         self.socket_path = socket_path
         self.timeout = timeout
@@ -63,7 +67,7 @@ class PortoAPI:
         self.sock.settimeout(self.timeout)
         try:
             self.sock.connect(self.socket_path)
-        except socket.error, msg:
+        except socket.error:
             raise exceptions.SocketError("Can't open %s for write" % self.socket_path)
 
     def _send(self, data, flags=0):
@@ -73,11 +77,11 @@ class PortoAPI:
             raise exceptions.SocketTimeout("Got timeout %d" % self.timeout)
 
     def _sendall(self, data, flags=0):
-         try:
+        try:
             return self.sock.sendall(data, flags)
-         except socket.timeout:
+        except socket.timeout:
             raise exceptions.SocketTimeout("Got timeout %d" % self.timeout)
-   
+
     def _recv(self, count, flags=0):
         try:
             return self.sock.recv(count, flags)
@@ -173,6 +177,7 @@ class PortoAPI:
 
 # Example:
 # rpc = PortoAPI()
+# rpc.connect()
 # print rpc.Create('test')
 # print rpc.Plist()
 # print rpc.Dlist()
