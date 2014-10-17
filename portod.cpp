@@ -347,6 +347,7 @@ static int RpcMain(TContainerHolder &cholder) {
                             uid, gid, sfd);
     if (error) {
         TLogger::Log() << "Can't create RPC server: " << error.GetMsg() << std::endl;
+        return EXIT_FAILURE;
     }
 
     size_t heartbeat = 0;
