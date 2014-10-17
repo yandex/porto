@@ -2,10 +2,6 @@
 # postrm script
 case "$1" in
     purge)
-        groupdel porto
-        if [ $? -ne 0 ]; then
-            echo "Group 'porto' does not remove!"
-        fi
         update-rc.d -f yandex-porto remove >/dev/null || exit $?
     ;;
     upgrade)
