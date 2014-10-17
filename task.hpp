@@ -23,13 +23,18 @@ struct TExitStatus {
     int Status;
 };
 
+struct TBindMap {
+    TPath Source;
+    TPath Dest;
+    bool Rdonly;
+};
+
 class TTaskEnv {
     NO_COPY_CONSTRUCT(TTaskEnv);
     friend TTask;
     std::vector<std::string> EnvVec;
     int Uid, Gid;
 
-    void ParseEnv();
 public:
     TTaskEnv() {}
     std::string Command;
@@ -47,6 +52,7 @@ public:
     std::map<int,struct rlimit> Rlimit;
     std::string Hostname;
     bool BindDns;
+    std::vector<TBindMap> BindMap;
 
     TError Prepare();
     const char** GetEnvp() const;
@@ -78,6 +84,7 @@ class TTask {
     void ChildDropPriveleges();
     void ChildExec();
     TError ChildBindDns();
+    TError ChildBindDirectores();
     TError RestrictProc();
     TError ChildMountDev();
     TError ChildIsolateFs(bool priveleged);

@@ -20,6 +20,7 @@ TError StringToInt(const std::string &string, int &value);
 TError StringWithUnitToUint64(const std::string &str, uint64_t &value);
 
 TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens, size_t maxFields = -1);
+TError SplitEscapedString(const std::string &s, const char sep, std::vector<std::string> &tokens);
 std::string StringTrim(const std::string& s);
 
 std::string ReplaceMultiple(const std::string &str, const char rc);

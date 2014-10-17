@@ -33,8 +33,8 @@ public:
     TPath(const char *path) : Path(path) {}
     TPath() : Path("") {}
 
-    TPath operator+(const std::string &component) {
-        return TPath(Path + component);
+    TPath operator+(const TPath &p) const {
+        return TPath(Path + p.ToString());
     }
 
     friend bool operator==(const TPath& a, const TPath& b) {

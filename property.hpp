@@ -10,6 +10,7 @@
 #include "kvalue.hpp"
 
 class TContainer;
+class TBindMap;
 
 // Property can be changed while container is running
 const unsigned int DYNAMIC_PROPERTY = (1 << 0);
@@ -54,5 +55,8 @@ public:
     TError Create();
     TError Restore(const kv::TNode &node);
 };
+
+TError ParseRlimit(const std::string &s, std::map<int,struct rlimit> &rlim);
+TError ParseBind(const std::string &s, std::vector<TBindMap> &dirs);
 
 #endif

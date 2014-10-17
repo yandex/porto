@@ -32,36 +32,20 @@ using std::vector;
 using std::map;
 
 // TTaskEnv
-void TTaskEnv::ParseEnv() {
-    stringstream ss;
-    for (auto i = Environ.begin(); i != Environ.end(); i++) {
-        if (*i == '\\' && (i + 1) != Environ.end() && *(i + 1) == ';') {
-            ss << ';';
-            i++;
-        } else if (*i == ';') {
-            if (ss.str().length())
-                EnvVec.push_back(ss.str());
-            ss.str("");
-        } else {
-            ss << *i;
-        }
-    }
-
-    if (ss.str().length())
-        EnvVec.push_back(ss.str());
-}
 
 TError TTaskEnv::Prepare() {
     if (Command.empty())
         return TError::Success();
 
     EnvVec.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
-    ParseEnv();
+    TError error = SplitEscapedString(Environ, ';', EnvVec);
+    if (error)
+        return error;
     EnvVec.push_back("HOME=" + Cwd.ToString());
     EnvVec.push_back("USER=" + User);
 
     TUser u(User);
-    TError error = u.Load();
+    error = u.Load();
     if (error)
         return error;
 
@@ -240,7 +224,24 @@ TError TTask::ChildBindDns() {
 
     for (auto &file : files) {
         TMount mnt(file, Env->Root + file, "none", {});
-        TError error = mnt.BindRdonlyFile();
+        TError error = mnt.BindFile(true);
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
+}
+
+TError TTask::ChildBindDirectores() {
+    for (TBindMap &bindMap : Env->BindMap) {
+        TMount mnt(bindMap.Source, Env->Root + Env->Cwd + bindMap.Dest,
+                   "none", {});
+
+        TError error;
+        if (bindMap.Source.GetType() == EFileType::Regular)
+            error = mnt.BindFile(bindMap.Rdonly);
+        else
+            error = mnt.BindDir(bindMap.Rdonly);
         if (error)
             return error;
     }
@@ -261,13 +262,13 @@ TError TTask::RestrictProc() {
 
     for (auto &path : dirs) {
         TMount mnt(Env->Root + path, Env->Root + path, "none", {});
-        TError error = mnt.BindRdonlyFile();
+        TError error = mnt.BindFile(true);
         if (error)
             return error;
     }
 
     TMount mnt("/dev/null", Env->Root + "/proc/kcore", "", {});
-    TError error = mnt.Bind();
+    TError error = mnt.Bind(false);
     if (error)
         return error;
 
@@ -418,7 +419,12 @@ int TTask::ChildCallback() {
     bool priveleged = Env->Gid == 0 || Env->Uid == 0;
 
     ChildReopenStdio();
-    TError error = ChildIsolateFs(priveleged);
+
+    TError error = ChildBindDirectores();
+    if (error)
+        return error;
+
+    error = ChildIsolateFs(priveleged);
     if (error)
         Abort(error);
 

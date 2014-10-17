@@ -686,6 +686,10 @@ TError TContainer::PrepareTask() {
     if (error)
         return error;
 
+    error = ParseBind(GetPropertyStr("bind"), taskEnv->BindMap);
+    if (error)
+        return error;
+
     if (UseParentNamespace()) {
         int pid = Parent->Task->GetPid();
 
@@ -1594,70 +1598,4 @@ bool TContainerHolder::DeliverEvent(const TContainerEvent &event) {
 
     TLogger::Log() << "Couldn't deliver " << event.GetMsg() << std::endl;
     return false;
-}
-
-TError ParseRlimit(const std::string &s, map<int,struct rlimit> &rlim) {
-    static const map<string,int> nameToIdx = {
-        { "as", RLIMIT_AS },
-        { "core", RLIMIT_CORE },
-        { "cpu", RLIMIT_CPU },
-        { "data", RLIMIT_DATA },
-        { "fsize", RLIMIT_FSIZE },
-        { "locks", RLIMIT_LOCKS },
-        { "memlock", RLIMIT_MEMLOCK },
-        { "msgqueue", RLIMIT_MSGQUEUE },
-        { "nice", RLIMIT_NICE },
-        { "nofile", RLIMIT_NOFILE },
-        { "nproc", RLIMIT_NPROC },
-        { "rss", RLIMIT_RSS },
-        { "rtprio", RLIMIT_RTPRIO },
-        { "rttime", RLIMIT_RTTIME },
-        { "sigpending", RLIMIT_SIGPENDING },
-        { "stask", RLIMIT_STACK },
-    };
-
-    vector<string> limits;
-    TError error = SplitString(s, ';', limits);
-    if (error)
-        return error;
-
-    for (auto &limit : limits) {
-        vector<string> nameval;
-
-        (void)SplitString(limit, ':', nameval);
-        if (nameval.size() != 2)
-            return TError(EError::InvalidValue, "Invalid limits format");
-
-        string name = StringTrim(nameval[0]);
-        if (nameToIdx.find(name) == nameToIdx.end())
-            return TError(EError::InvalidValue, "Invalid limit " + name);
-        int idx = nameToIdx.at(name);
-
-        vector<string> softhard;
-        (void)SplitString(StringTrim(nameval[1]), ' ', softhard);
-        if (softhard.size() != 2)
-            return TError(EError::InvalidValue, "Invalid limits number for " + name);
-
-        rlim_t soft, hard;
-        if (softhard[0] == "unlim" || softhard[0] == "unliminted") {
-            soft = RLIM_INFINITY;
-        } else {
-            error = StringToUint64(softhard[0], soft);
-            if (error)
-                return TError(EError::InvalidValue, "Invalid soft limit for " + name);
-        }
-
-        if (softhard[1] == "unlim" || softhard[1] == "unliminted") {
-            hard = RLIM_INFINITY;
-        } else {
-            error = StringToUint64(softhard[1], hard);
-            if (error)
-                return TError(EError::InvalidValue, "Invalid hard limit for " + name);
-        }
-
-        rlim[idx].rlim_cur = soft;
-        rlim[idx].rlim_max = hard;
-    }
-
-    return TError::Success();
 }

@@ -1,3 +1,4 @@
+- selftest: test statistics only when cfq enabled
 - full dump on sigsegv
 - ? different log levels (error, normal, verbose)
 - ? portoctl cp
@@ -27,7 +28,6 @@
 ## disk
 - ? root property: support loop if file
 - ? readonly_root
-- bind <host path> <container path>;
 - ? pty as container /dev/console
 ## ipc
 - ? isolate ipc property
@@ -35,9 +35,7 @@
 - ? when to enable user namespace
 - ? devices c 1:3 rwm; c 1:5 rwm; c 1:9 rwm; c 1:8 rwm; c 136:* rwm; c 5:2 rwm
 ## net
-- net:<none?|host|<dev>|bridge> - create veth pair and setup routing + masquerading + generate random ip/mask or use provided
-- net_map: map host port to container when bridge used
-- more on net: docker/docs/sources/articles/networking.md
+- net:<none|host|host:<dev>|macvlan: <host> <name> [type=bridge] [hw=auto]>
 
 # phase 2
 - rt: create cgroup for non-smart tasks and throttle them

@@ -44,8 +44,9 @@ public:
 
     TError Mount(unsigned long flags = 0) const;
     TError Remount() const { return Mount(MS_REMOUNT); }
-    TError Bind() const { return Mount(MS_BIND); }
-    TError BindRdonlyFile() const;
+    TError Bind(bool Rdonly) const;
+    TError BindFile(bool Rdonly) const;
+    TError BindDir(bool Rdonly) const;
     TError MountDir(unsigned long flags = 0) const;
     TError MountPrivate() { return Mount(MS_PRIVATE); }
     TError Umount() const;

@@ -1085,6 +1085,57 @@ static void TestHostnameProperty(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
+static void TestBindProperty(TPortoAPI &api) {
+    string name = "a";
+    ExpectSuccess(api.Create(name));
+
+    Say() << "Check bind parsing" << std::endl;
+    ExpectFailure(api.SetProperty(name, "bind", "/tmp"), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "bind", "qwerty /tmp"), EError::InvalidValue);
+    ExpectSuccess(api.SetProperty(name, "bind", "/tmp /bin"));
+    ExpectFailure(api.SetProperty(name, "bind", "/tmp /bin xyz"), EError::InvalidValue);
+    ExpectSuccess(api.SetProperty(name, "bind", "/tmp /bin ro"));
+    ExpectSuccess(api.SetProperty(name, "bind", "/tmp /bin rw"));
+    ExpectFailure(api.SetProperty(name, "bind", "/tmp /bin ro; q"), EError::InvalidValue);
+    ExpectSuccess(api.SetProperty(name, "bind", "/tmp /bin ro; /bin /sbin"));
+
+    Say() << "Check bind without root isolation" << std::endl;
+    string path = config().container().tmp_dir() + "/" + name;
+
+    TFolder tmp("/tmp/27389");
+    if (tmp.Exists())
+        ExpectSuccess(tmp.Remove(true));
+    ExpectSuccess(tmp.Create(0755, true));
+
+    TFile f(tmp.GetPath() + "/porto");
+    ExpectSuccess(f.Touch());
+
+    ExpectSuccess(api.SetProperty(name, "command", "cat /proc/self/mountinfo"));
+    ExpectSuccess(api.SetProperty(name, "bind", "/bin /bin ro; /tmp/27389 /tmp"));
+    string v = StartWaitAndGetData(api, name, "stdout");
+    ExpectSuccess(api.Stop(name));
+
+    auto m = ParseMountinfo(v);
+    Expect(m[path + "/bin"] == "ro,relatime");
+    Expect(m[path + "/tmp"] == "rw,relatime");
+
+    AsRoot(api);
+    BootstrapCommand("/bin/cat", path);
+    AsNobody(api);
+
+    ExpectSuccess(api.SetProperty(name, "command", "/cat /proc/self/mountinfo"));
+    ExpectSuccess(api.SetProperty(name, "root", path));
+    ExpectSuccess(api.SetProperty(name, "bind", "/bin /bin ro; /tmp/27389 /tmp"));
+    v = StartWaitAndGetData(api, name, "stdout");
+    ExpectSuccess(api.Stop(name));
+
+    m = ParseMountinfo(v);
+    Expect(m["/bin"] == "ro,relatime");
+    Expect(m["/tmp"] == "rw,relatime");
+
+    ExpectSuccess(api.Destroy(name));
+}
+
 static void TestStateMachine(TPortoAPI &api) {
     string name = "a";
     string pid;
@@ -1216,6 +1267,7 @@ static void TestRoot(TPortoAPI &api) {
         "root",
         "bind_dns",
         "max_respawns"
+        "bind",
     };
 
     std::vector<TProperty> plist;
@@ -2082,6 +2134,7 @@ int SelfTest(string name, int leakNr) {
         { "std", TestStd },
         { "root_property", TestRootProperty },
         { "hostname_property", TestHostnameProperty },
+        { "bind_property", TestBindProperty },
         { "limits", TestLimits },
         { "rlimits", TestRlimits },
         { "alias", TestAlias },
@@ -2147,6 +2200,7 @@ int SelfTest(string name, int leakNr) {
         2 + /* Memory guarantee */
         8 + /* Hierarchical properties */
         7 + /* Rlimits */
+        4 + /* bind */
         3 /* Can't remove cgroups */)
         std::cerr << "WARNING: Unexpected number of errors: " << errors << "!" << std::endl;
 

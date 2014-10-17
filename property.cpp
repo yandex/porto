@@ -11,6 +11,7 @@
 
 using std::string;
 using std::map;
+using std::vector;
 
 static TError ValidUint(std::shared_ptr<const TContainer> container, const string &str) {
     uint32_t val;
@@ -151,6 +152,11 @@ static TError ExistingFile(std::shared_ptr<const TContainer> container, const st
 static TError ValidUlimit(std::shared_ptr<const TContainer> container, const string &str) {
     map<int,struct rlimit> rlim;
     return ParseRlimit(str, rlim);
+}
+
+static TError ValidBind(std::shared_ptr<const TContainer> container, const string &str) {
+    vector<TBindMap> dirs;
+    return ParseBind(str, dirs);
 }
 
 #define DEFSTR(S) [](std::shared_ptr<const TContainer> container)->std::string { return S; }
@@ -430,6 +436,14 @@ std::map<std::string, const TPropertySpec> propertySpec = {
             ValidBool
         }
     },
+    { "bind",
+        {
+            "Share host directories with container",
+            DEFSTR(""),
+            0,
+            ValidBind
+        }
+    },
 };
 
 bool TContainerSpec::IsDefault(std::shared_ptr<const TContainer> container, const std::string &property) const {
@@ -551,4 +565,110 @@ TError TContainerSpec::AppendStorage(const string& key, const string& value) {
     pair->set_val(value);
 
     return Storage.AppendNode(Name, node);
+}
+
+TError ParseRlimit(const std::string &s, map<int,struct rlimit> &rlim) {
+    static const map<string,int> nameToIdx = {
+        { "as", RLIMIT_AS },
+        { "core", RLIMIT_CORE },
+        { "cpu", RLIMIT_CPU },
+        { "data", RLIMIT_DATA },
+        { "fsize", RLIMIT_FSIZE },
+        { "locks", RLIMIT_LOCKS },
+        { "memlock", RLIMIT_MEMLOCK },
+        { "msgqueue", RLIMIT_MSGQUEUE },
+        { "nice", RLIMIT_NICE },
+        { "nofile", RLIMIT_NOFILE },
+        { "nproc", RLIMIT_NPROC },
+        { "rss", RLIMIT_RSS },
+        { "rtprio", RLIMIT_RTPRIO },
+        { "rttime", RLIMIT_RTTIME },
+        { "sigpending", RLIMIT_SIGPENDING },
+        { "stask", RLIMIT_STACK },
+    };
+
+    vector<string> limits;
+    TError error = SplitString(s, ';', limits);
+    if (error)
+        return error;
+
+    for (auto &limit : limits) {
+        vector<string> nameval;
+
+        (void)SplitString(limit, ':', nameval);
+        if (nameval.size() != 2)
+            return TError(EError::InvalidValue, "Invalid limits format");
+
+        string name = StringTrim(nameval[0]);
+        if (nameToIdx.find(name) == nameToIdx.end())
+            return TError(EError::InvalidValue, "Invalid limit " + name);
+        int idx = nameToIdx.at(name);
+
+        vector<string> softhard;
+        (void)SplitString(StringTrim(nameval[1]), ' ', softhard);
+        if (softhard.size() != 2)
+            return TError(EError::InvalidValue, "Invalid limits number for " + name);
+
+        rlim_t soft, hard;
+        if (softhard[0] == "unlim" || softhard[0] == "unliminted") {
+            soft = RLIM_INFINITY;
+        } else {
+            error = StringToUint64(softhard[0], soft);
+            if (error)
+                return TError(EError::InvalidValue, "Invalid soft limit for " + name);
+        }
+
+        if (softhard[1] == "unlim" || softhard[1] == "unliminted") {
+            hard = RLIM_INFINITY;
+        } else {
+            error = StringToUint64(softhard[1], hard);
+            if (error)
+                return TError(EError::InvalidValue, "Invalid hard limit for " + name);
+        }
+
+        rlim[idx].rlim_cur = soft;
+        rlim[idx].rlim_max = hard;
+    }
+
+    return TError::Success();
+}
+
+TError ParseBind(const std::string &s, vector<TBindMap> &dirs) {
+    vector<string> lines;
+
+    TError error = SplitEscapedString(s, ';', lines);
+    if (error)
+        return error;
+
+    for (auto &line : lines) {
+        vector<string> tok;
+        TBindMap bindMap;
+
+        error = SplitEscapedString(line, ' ', tok);
+        if (error)
+            return error;
+
+        if (tok.size() != 2 && tok.size() != 3)
+            return TError(EError::InvalidValue, "Invalid bind in: " + line);
+
+        bindMap.Source = tok[0];
+        bindMap.Dest = tok[1];
+        bindMap.Rdonly = false;
+
+        if (tok.size() == 3) {
+            if (tok[2] == "ro")
+                bindMap.Rdonly = true;
+            else if (tok[2] == "rw")
+                bindMap.Rdonly = false;
+            else
+                return TError(EError::InvalidValue, "Invalid bind type in: " + line);
+        }
+
+        if (!bindMap.Source.Exists())
+            return TError(EError::InvalidValue, "Source bind " + bindMap.Source.ToString() + " doesn't exist");
+
+        dirs.push_back(bindMap);
+    }
+
+    return TError::Success();
 }

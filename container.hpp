@@ -182,6 +182,4 @@ public:
     bool DeliverEvent(const TContainerEvent &event);
 };
 
-TError ParseRlimit(const std::string &s, std::map<int,struct rlimit> &rlim);
-
 #endif

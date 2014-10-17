@@ -134,6 +134,27 @@ TError SplitString(const std::string &s, const char sep, std::vector<std::string
     return TError::Success();
 }
 
+TError SplitEscapedString(const std::string &s, const char sep, std::vector<std::string> &tokens) {
+    stringstream ss;
+    for (auto i = s.begin(); i != s.end(); i++) {
+        if (*i == '\\' && (i + 1) != s.end() && *(i + 1) == sep) {
+            ss << sep;
+            i++;
+        } else if (*i == sep) {
+            if (ss.str().length())
+                tokens.push_back(ss.str());
+            ss.str("");
+        } else {
+            ss << *i;
+        }
+    }
+
+    if (ss.str().length())
+        tokens.push_back(ss.str());
+
+    return TError::Success();
+}
+
 std::string StringTrim(const std::string& s)
 {
     std::size_t first = s.find_first_not_of(" \t\n");

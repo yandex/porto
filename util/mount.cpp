@@ -42,7 +42,18 @@ TError TMount::Umount() const {
     return TError::Success();
 }
 
-TError TMount::BindRdonlyFile() const {
+TError TMount::Bind(bool Rdonly) const {
+    TError error = Mount(MS_BIND);
+    if (error)
+        return error;
+
+    if (!Rdonly)
+        return TError::Success();
+
+    return Mount(MS_BIND | MS_REMOUNT | MS_RDONLY);
+}
+
+TError TMount::BindFile(bool Rdonly) const {
     TPath p(Target);
     TFile f(p);
 
@@ -63,11 +74,20 @@ TError TMount::BindRdonlyFile() const {
         // TODO: ?can't mount over link
     }
 
-    TError error = Mount(MS_BIND);
-    if (error)
-        return error;
+    return Bind(Rdonly);
+}
 
-    return Mount(MS_BIND | MS_REMOUNT | MS_RDONLY);
+TError TMount::BindDir(bool Rdonly) const {
+    TPath p(Target);
+    TFolder d(p);
+
+    if (!d.Exists()) {
+        TError error = d.Create(0755, true);
+        if (error)
+            return error;
+    }
+
+    return Bind(Rdonly);
 }
 
 TError TMount::MountDir(unsigned long flags) const {
