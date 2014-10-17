@@ -26,3 +26,4 @@
 /dist/fedora/
 /dist/trusty/
 /dist/yandex/
+*.py[oc]
