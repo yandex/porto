@@ -503,6 +503,9 @@ TError TTask::Start() {
         if (Env->Hostname != "")
             cloneFlags |= CLONE_NEWUTS;
 
+        if (!Env->NetCfg.Host.size())
+            cloneFlags |= CLONE_NEWNET;
+
         pid_t clonePid = clone(ChildFn, stack + sizeof(stack), cloneFlags, this);
         if (clonePid < 0) {
             TError error(EError::Unknown, errno, "clone()");

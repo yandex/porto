@@ -1,4 +1,7 @@
 - selftest: test statistics only when cfq enabled
+- heartbead -> heartbeat
+- make sure double spaces work as expected in bind and other properties
+- up loopback in network namespace
 - full dump on sigsegv
 - ? different log levels (error, normal, verbose)
 - ? portoctl cp

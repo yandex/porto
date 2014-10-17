@@ -690,6 +690,10 @@ TError TContainer::PrepareTask() {
     if (error)
         return error;
 
+    error = ParseNet(GetPropertyStr("net"), taskEnv->NetCfg);
+    if (error)
+        return error;
+
     if (UseParentNamespace()) {
         int pid = Parent->Task->GetPid();
 

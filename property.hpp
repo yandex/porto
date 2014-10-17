@@ -11,6 +11,7 @@
 
 class TContainer;
 class TBindMap;
+class TNetCfg;
 
 // Property can be changed while container is running
 const unsigned int DYNAMIC_PROPERTY = (1 << 0);
@@ -58,5 +59,6 @@ public:
 
 TError ParseRlimit(const std::string &s, std::map<int,struct rlimit> &rlim);
 TError ParseBind(const std::string &s, std::vector<TBindMap> &dirs);
+TError ParseNet(const std::string &s, TNetCfg &net);
 
 #endif

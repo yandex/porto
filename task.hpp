@@ -29,6 +29,22 @@ struct TBindMap {
     bool Rdonly;
 };
 
+struct THostNetCfg {
+    std::string Dev;
+};
+
+struct TMacVlanNetCfg {
+    std::string HostDev;
+    std::string ContDev;
+    std::string Type;
+    std::string Hw;
+};
+
+struct TNetCfg {
+    std::vector<THostNetCfg> Host;
+    std::vector<TMacVlanNetCfg> MacVlan;
+};
+
 class TTaskEnv {
     NO_COPY_CONSTRUCT(TTaskEnv);
     friend TTask;
@@ -53,6 +69,7 @@ public:
     std::string Hostname;
     bool BindDns;
     std::vector<TBindMap> BindMap;
+    TNetCfg NetCfg;
 
     TError Prepare();
     const char** GetEnvp() const;

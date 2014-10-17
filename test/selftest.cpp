@@ -962,7 +962,7 @@ static void TestRootProperty(TPortoAPI &api) {
     vector<string> tokens;
     TError error = SplitString(v, '\n', tokens);
     if (error)
-        throw error;
+        throw error.GetMsg();
 
     Expect(devs.size() + other.size() == tokens.size());
     for (auto &dev : devs)
@@ -1136,6 +1136,63 @@ static void TestBindProperty(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
+static vector<string> StringToVec(const std::string &s) {
+    vector<string> lines;
+
+    TError error = SplitString(s, '\n', lines);
+    if (error)
+        throw error.GetMsg();
+    return lines;
+}
+
+static void TestNetProperty(TPortoAPI &api) {
+    const size_t linesPerDev = 2;
+    string name = "a";
+    string path = config().container().tmp_dir() + "/" + name;
+    ExpectSuccess(api.Create(name));
+
+    vector<string> hostLink = Popen("ip link show");
+
+    Say() << "Check net parsing" << std::endl;
+    ExpectFailure(api.SetProperty(name, "net", "qwerty"), EError::InvalidValue);
+    ExpectSuccess(api.SetProperty(name, "net", "host"));
+    ExpectSuccess(api.SetProperty(name, "net", "none"));
+    //ExpectSuccess(api.SetProperty(name, "net", "host; macvlan X Y"));
+    ExpectFailure(api.SetProperty(name, "net", "host; host"), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "net", "host; none"), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "net", "none; host"), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "net", "macvlan"), EError::NotSupported);
+    ExpectFailure(api.SetProperty(name, "net", "host: veth0"), EError::NotSupported);
+
+    Say() << "Check net=none" << std::endl;
+    AsRoot(api);
+    BootstrapCommand("/bin/ip", path);
+    AsNobody(api);
+    ExpectSuccess(api.SetProperty(name, "root", path));
+    ExpectSuccess(api.SetProperty(name, "net", "none"));
+    ExpectSuccess(api.SetProperty(name, "command", "/ip link show"));
+    string s = StartWaitAndGetData(api, name, "stdout");
+    auto v = StringToVec(s);
+    ExpectSuccess(api.Stop(name));
+
+    Expect(v.size() == 1 * linesPerDev);
+    Expect(v.size() != hostLink.size());
+
+    Say() << "Check net=host" << std::endl;
+    ExpectSuccess(api.SetProperty(name, "net", "host"));
+    s = StartWaitAndGetData(api, name, "stdout");
+    v = StringToVec(s);
+    ExpectSuccess(api.Stop(name));
+
+    Expect(v.size() == hostLink.size());
+
+    Say() << "Check net=host:veth0" << std::endl;
+
+    // TODO: create veth and pass it to network
+
+    ExpectSuccess(api.Destroy(name));
+}
+
 static void TestStateMachine(TPortoAPI &api) {
     string name = "a";
     string pid;
@@ -1268,6 +1325,7 @@ static void TestRoot(TPortoAPI &api) {
         "bind_dns",
         "max_respawns"
         "bind",
+        "net",
     };
 
     std::vector<TProperty> plist;
@@ -2135,6 +2193,7 @@ int SelfTest(string name, int leakNr) {
         { "root_property", TestRootProperty },
         { "hostname_property", TestHostnameProperty },
         { "bind_property", TestBindProperty },
+        { "net_property", TestNetProperty },
         { "limits", TestLimits },
         { "rlimits", TestRlimits },
         { "alias", TestAlias },
@@ -2199,8 +2258,9 @@ int SelfTest(string name, int leakNr) {
         6 + /* Invalid property value */
         2 + /* Memory guarantee */
         8 + /* Hierarchical properties */
-        7 + /* Rlimits */
+        7 + /* ulimit */
         4 + /* bind */
+        6 + /* net */
         3 /* Can't remove cgroups */)
         std::cerr << "WARNING: Unexpected number of errors: " << errors << "!" << std::endl;
 

@@ -159,6 +159,11 @@ static TError ValidBind(std::shared_ptr<const TContainer> container, const strin
     return ParseBind(str, dirs);
 }
 
+static TError ValidNet(std::shared_ptr<const TContainer> container, const string &str) {
+    TNetCfg net;
+    return ParseNet(str, net);
+}
+
 #define DEFSTR(S) [](std::shared_ptr<const TContainer> container)->std::string { return S; }
 
 static std::string DefaultStdFile(std::shared_ptr<const TContainer> c,
@@ -444,6 +449,14 @@ std::map<std::string, const TPropertySpec> propertySpec = {
             ValidBind
         }
     },
+    { "net",
+        {
+            "Container network settings",
+            DEFSTR("host"),
+            0,
+            ValidNet
+        }
+    },
 };
 
 bool TContainerSpec::IsDefault(std::shared_ptr<const TContainer> container, const std::string &property) const {
@@ -669,6 +682,62 @@ TError ParseBind(const std::string &s, vector<TBindMap> &dirs) {
 
         dirs.push_back(bindMap);
     }
+
+    return TError::Success();
+}
+
+TError ParseNet(const std::string &s, TNetCfg &net) {
+    vector<string> lines;
+    bool none = false;
+    bool host = false;
+
+    TError error = SplitEscapedString(s, ';', lines);
+    if (error)
+        return error;
+
+    for (auto &line : lines) {
+        vector<string> tok;
+
+        error = SplitEscapedString(line, ':', tok);
+        if (error)
+            return error;
+
+        if (tok.size() == 0)
+            return TError(EError::InvalidValue, "Invalid net in: " + line);
+
+        string type = StringTrim(tok[0]);
+
+        if (type == "none") {
+            none = true;
+        } else if (type == "host") {
+            THostNetCfg hnet;
+
+            if (host)
+                return TError(EError::InvalidValue,
+                              "host can't be mixed with other hosts");
+
+            if (tok.size() > 2)
+                return TError(EError::InvalidValue, "Invalid net in: " + line);
+
+            if (tok.size() == 1) {
+                host = true;
+            } else {
+                hnet.Dev = StringTrim(tok[1]);
+                // TODO: make sure device exists
+                return TError(EError::NotSupported, "Not supported yet");
+            }
+
+            net.Host.push_back(hnet);
+        } else if (type == "macvlan") {
+            return TError(EError::NotSupported, "Not supported yet");
+        } else {
+            return TError(EError::InvalidValue, "Invalid net type " + type);
+        }
+    }
+
+    if (none == true && (net.Host.size() || net.MacVlan.size()))
+        return TError(EError::InvalidValue,
+                      "none can't be mixed with other types");
 
     return TError::Success();
 }
