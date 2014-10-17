@@ -2258,6 +2258,7 @@ int SelfTest(string name, int leakNr) {
         6 + /* Invalid property value */
         2 + /* Memory guarantee */
         8 + /* Hierarchical properties */
+        1 + /* respawn */
         7 + /* ulimit */
         4 + /* bind */
         6 + /* net */
