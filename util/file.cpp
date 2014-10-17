@@ -20,7 +20,8 @@ TError TFile::Touch() const {
     if (fd < 0)
         return TError(EError::Unknown, errno, "open(" + Path.ToString() + ")");
 
-    close(fd);
+    if (close(fd) < 0)
+        return TError(EError::Unknown, errno, "close(" + Path.ToString() + ")");
 
     return TError::Success();
 }
@@ -53,7 +54,9 @@ TError TFile::AsString(string &value) const {
         value.append(buf, n);
     } while (n != 0);
 
-    close(fd);
+    if (close(fd) < 0)
+        return TError(EError::Unknown, errno, "close(" + Path.ToString() + ")");
+
 
     return TError::Success();
 }
@@ -97,7 +100,8 @@ TError TFile::LastStrings(const size_t size, std::string &value) const {
     s.resize(copy);
 
     int n = read(fd, s.data(), copy);
-    close(fd);
+    if (close(fd) < 0)
+        return TError(EError::Unknown, errno, "close(" + Path.ToString() + ")");
     if (n < 0)
         return TError(EError::Unknown, errno, "read(" + Path.ToString() + ")");
 
@@ -129,7 +133,8 @@ TError TFile::Write(int flags, const string &str) const {
     if (ret != (ssize_t)str.length())
         error = TError(EError::Unknown, errno, "write(" + Path.ToString() + ", " + str + ")");
 
-    close(fd);
+    if (close(fd) < 0)
+        return TError(EError::Unknown, errno, "close(" + Path.ToString() + ")");
 
     return error;
 }

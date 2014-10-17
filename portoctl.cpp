@@ -501,10 +501,10 @@ public:
             return error;
 
         for (auto &mount : mounts) {
-            set<string> flags = mount->GetFlags();
+            set<string> data = mount->GetData();
             bool found = true;
             for (auto &ss : subsystems)
-                if (flags.find(ss) == flags.end()) {
+                if (data.find(ss) == data.end()) {
                     found = false;
                     break;
                 }

@@ -16,42 +16,44 @@ extern "C" {
 class TMount {
     TPath Source;
     TPath Target;
-    std::string Vfstype;
-    std::set<std::string> Flags;
+    std::string Type;
+    std::set<std::string> Data;
 
 public:
-    TMount(const TPath &source, const TPath &target, const std::string &vfstype, std::set<std::string> flags) :
-        Source(source), Target(target), Vfstype(vfstype),
-        Flags(flags) {}
+    TMount(const TPath &source, const TPath &target, const std::string &type, std::set<std::string> data) :
+        Source(source), Target(target), Type(type),
+        Data(data) {}
 
     friend bool operator==(const TMount& m1, const TMount& m2) {
         return m1.Source == m2.Source &&
             m1.Target == m2.Target &&
-            m1.Vfstype == m2.Vfstype;
+            m1.Type == m2.Type;
     }
 
     const std::string GetMountpoint() const {
         return Target.ToString();
     }
 
-    const std::string VFSType() const {
-        return Vfstype;
+    const std::string GetType() const {
+        return Type;
     }
 
-    std::set<std::string> const GetFlags() const {
-        return Flags;
+    std::set<std::string> const GetData() const {
+        return Data;
     }
 
     TError Mount(unsigned long flags = 0) const;
     TError Remount() const { return Mount(MS_REMOUNT); }
     TError Bind() const { return Mount(MS_BIND); }
+    TError BindRdonlyFile() const;
+    TError MountDir(unsigned long flags = 0) const;
     TError MountPrivate() { return Mount(MS_PRIVATE); }
     TError Umount() const;
 
     friend std::ostream& operator<<(std::ostream& stream, const TMount& mount) {
-        stream << mount.Source.ToString() << " " << mount.Target.ToString() << " " << mount.Vfstype << " ";
+        stream << mount.Source.ToString() << " " << mount.Target.ToString() << " " << mount.Type << " ";
 
-        for (auto &f : mount.Flags)
+        for (auto &f : mount.Data)
             stream << f << ",";
 
         return stream;

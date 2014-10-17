@@ -135,7 +135,7 @@ TError TCgroup::Create() {
 
         bool mountRoot = true;
         for (auto m : mounts) {
-            if (m->GetMountpoint() == SYSFS_CGROOT && m->VFSType() == "tmpfs")
+            if (m->GetMountpoint() == SYSFS_CGROOT && m->GetType() == "tmpfs")
                 mountRoot = false;
             if (*m == *Mount)
                 return TError::Success();
@@ -258,7 +258,7 @@ TError TCgroupSnapshot::Create() {
      }
 
      for (auto mount : mounts) {
-         for (auto name : mount->GetFlags()) {
+         for (auto name : mount->GetData()) {
              auto subsys = TSubsystem::Get(name);
              if (!subsys)
                  continue;
