@@ -58,7 +58,7 @@ _DecodeVarint32 = _VarintDecoder((1 << 32) - 1)
 
 
 class PortoAPI(object):
-    def __init__(self, socket_path='/var/run/portod.socket', timeout=5):
+    def __init__(self, socket_path='/run/portod.socket', timeout=5):
         self.socket_path = socket_path
         self.timeout = timeout
 
