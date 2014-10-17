@@ -1270,7 +1270,7 @@ bool TContainer::NeedRespawn() {
     if (GetPropertyStr("respawn") == "false")
         return false;
     size_t startTime = TimeOfDeath + config().container().respawn_delay_ms();
-    return startTime <= GetCurrentTimeMs() && (GetPropertyInt("max_respawns") < 0 || RespawnCount < GetPropertyInt("max_respawns"));
+    return startTime <= GetCurrentTimeMs() && (GetPropertyInt("max_respawns") < 0 || RespawnCount < GetPropertyUint64("max_respawns"));
 }
 
 TError TContainer::Respawn() {

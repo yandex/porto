@@ -1323,7 +1323,7 @@ static void TestRoot(TPortoAPI &api) {
         "hostname",
         "root",
         "bind_dns",
-        "max_respawns"
+        "max_respawns",
         "bind",
         "net",
     };
