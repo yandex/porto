@@ -1215,6 +1215,7 @@ static void TestRoot(TPortoAPI &api) {
         "hostname",
         "root",
         "bind_dns",
+        "max_respawns"
     };
 
     std::vector<TProperty> plist;
@@ -1874,6 +1875,7 @@ static void TestRespawn(TPortoAPI &api) {
 
     string name = "a";
     ExpectSuccess(api.Create(name));
+    ExpectFailure(api.SetProperty(name, "max_respawns", "true"), EError::InvalidValue);
 
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1"));
 
@@ -1897,7 +1899,27 @@ static void TestRespawn(TPortoAPI &api) {
     Expect(ret != "0" && ret != "");
 
     ExpectSuccess(api.Stop(name));
-    ExpectSuccess(api.SetProperty(name, "respawn", "false"));
+
+    string realRespawns;
+    string maxRespawns = "3";
+    int successRespawns = 0;
+    int maxTries = 10;
+
+    ExpectSuccess(api.SetProperty(name, "respawn", "true"));
+    ExpectSuccess(api.SetProperty(name, "max_respawns", maxRespawns));
+    ExpectSuccess(api.SetProperty(name, "command", "echo test"));
+    ExpectSuccess(api.Start(name));
+
+    for(int i = 0; i < maxTries; i++) {
+        sleep(config().daemon().heartbead_delay_ms() / 1000);
+        api.GetData(name, "respawn_count", realRespawns);
+        if (realRespawns == maxRespawns)
+            successRespawns++;
+        if (successRespawns == 2)
+            break;
+        Say() << "Respawned " << i << " times" << std::endl;
+    }
+    Expect(maxRespawns == realRespawns);
 
     ExpectSuccess(api.Destroy(name));
 }

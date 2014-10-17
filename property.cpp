@@ -12,6 +12,14 @@
 using std::string;
 using std::map;
 
+static TError ValidUint(std::shared_ptr<const TContainer> container, const string &str) {
+    uint32_t val;
+    if (StringToUint32(str, val))
+        return TError(EError::InvalidValue, "invalid numeric value");
+
+    return TError::Success();
+}
+
 static TError ValidBool(std::shared_ptr<const TContainer> container, const string &str) {
     if (str != "true" && str != "false")
         return TError(EError::InvalidValue, "invalid boolean value");
@@ -365,6 +373,14 @@ std::map<std::string, const TPropertySpec> propertySpec = {
             DEFSTR("false"),
             0,
             ValidBool
+        }
+    },
+    { "max_respawns",
+        {
+            "Limit respawn count for specific container",
+            DEFSTR("-1"),
+            0,
+            ValidUint
         }
     },
     { "isolate",
