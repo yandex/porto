@@ -1,17 +1,8 @@
 #!/bin/sh
-# prerm script
-case "$1" in
-    purge|remove)
-    if [ -e "/etc/init/yandex-porto.conf" ]; then
-        stop yandex-porto
-    fi
-    ;;
-    upgrade|failed-upgrade|abort-install|abort-upgrade|disappear)
-    ;;
-    *)
-        echo "prerm called with unknown argument \`$1'" >&2
-        exit 1
-    ;;
-esac
 
-exit 0
+##DEBHELPER##
+
+if ([ -x "/etc/init.d/yandex-porto" ] || [ -e "/etc/init/yandex-porto.conf" ]) && \
+    [ "$1" = "upgrade" ]; then
+invoke-rc.d yandex-porto reload || exit $?
+fi
