@@ -873,6 +873,34 @@ static void TestStd(TPortoAPI &api) {
     AsNobody(api);
 }
 
+static std::string StartWaitAndGetData(TPortoAPI &api, const std::string &name, const std::string &data) {
+    string v;
+    ExpectSuccess(api.Start(name));
+    WaitState(api, name, "dead");
+    ExpectSuccess(api.GetData(name, data, v));
+    return v;
+}
+
+static map<string, string> ParseMountinfo(string s) {
+    map<string, string> m;
+    vector<string> lines;
+
+    TError error = SplitString(s, '\n', lines);
+    if (error)
+        throw error.GetMsg();
+
+    for (auto &line : lines) {
+        vector<string> tok;
+        TError error = SplitString(line, ' ', tok);
+        if (error)
+            throw error.GetMsg();
+
+        m[tok[4]] = tok[5];
+    }
+
+    return m;
+}
+
 static void TestRootProperty(TPortoAPI &api) {
     string pid;
 
@@ -883,9 +911,12 @@ static void TestRootProperty(TPortoAPI &api) {
     Say() << "Check filesystem isolation" << std::endl;
 
     AsRoot(api);
-    BootstrapCommand("/bin/pwd", path);
+    BootstrapCommand("/bin/sleep", path);
+    BootstrapCommand("/bin/pwd", path, false);
+    BootstrapCommand("/bin/ls", path, false);
+    AsNobody(api);
 
-    ExpectSuccess(api.SetProperty(name, "command", "/pwd"));
+    ExpectSuccess(api.SetProperty(name, "command", "/sleep 1000"));
     string bindDns;
 
     ExpectSuccess(api.GetProperty(name, "bind_dns", bindDns));
@@ -903,19 +934,76 @@ static void TestRootProperty(TPortoAPI &api) {
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
 
+    AsRoot(api);
     cwd = GetCwd(pid);
     string root = GetRoot(pid);
-    WaitExit(api, pid);
+    AsNobody(api);
+    ExpectSuccess(api.Stop(name));
 
     Expect(cwd == path);
     Expect(root == path);
 
+    ExpectSuccess(api.SetProperty(name, "command", "/pwd"));
+    ExpectSuccess(api.Start(name));
+    WaitState(api, name, "dead");
+
     string v;
     ExpectSuccess(api.GetData(name, "stdout", v));
     Expect(v == string("/\n"));
+    ExpectSuccess(api.Stop(name));
 
-    // TODO: make sure we have correct mounts and nodes in /dev
-    // TODO: check /sys restrictions
+    Say() << "Check /dev layout" << std::endl;
+
+    ExpectSuccess(api.SetProperty(name, "command", "/ls -1 /dev"));
+    v = StartWaitAndGetData(api, name, "stdout");
+
+    vector<string> devs = { "null", "zero", "full", "tty", "urandom", "random" };
+    vector<string> other = { "ptmx", "pts", "shm" };
+    vector<string> tokens;
+    TError error = SplitString(v, '\n', tokens);
+    if (error)
+        throw error;
+
+    Expect(devs.size() + other.size() == tokens.size());
+    for (auto &dev : devs)
+        Expect(std::find(tokens.begin(), tokens.end(), dev) != tokens.end());
+
+    ExpectSuccess(api.Stop(name));
+
+    Say() << "Check /proc restrictions" << std::endl;
+
+    AsRoot(api);
+    BootstrapCommand("/bin/cat", path);
+    AsNobody(api);
+
+    ExpectSuccess(api.SetProperty(name, "command", "/cat /proc/self/mountinfo"));
+    v = StartWaitAndGetData(api, name, "stdout");
+
+    auto m = ParseMountinfo(v);
+    Expect(m["/etc/resolv.conf"] == "ro,relatime");
+    Expect(m["/etc/hosts"] == "ro,relatime");
+    Expect(m["/sys"] == "ro,nosuid,nodev,noexec,relatime");
+    Expect(m["/proc/sys"] == "ro,relatime");
+    Expect(m["/proc/sysrq-trigger"] == "ro,relatime");
+    Expect(m["/proc/irq"] == "ro,relatime");
+    Expect(m["/proc/bus"] == "ro,relatime");
+
+    ExpectSuccess(api.Stop(name));
+
+    Say() << "Make sure /dev /sys /proc are not mounted when root is not isolated " << std::endl;
+
+    TFolder f(path);
+    AsRoot(api);
+    error = f.Remove(true);
+    if (error)
+        throw error.GetMsg();
+    AsNobody(api);
+
+    ExpectSuccess(api.SetProperty(name, "root", "/"));
+    ExpectSuccess(api.SetProperty(name, "command", "ls -1 " + cwd));
+
+    v = StartWaitAndGetData(api, name, "stdout");
+    Expect(v == "stderr\nstdout\n");
 
     ExpectSuccess(api.Destroy(name));
 }
@@ -1972,7 +2060,6 @@ int SelfTest(string name, int leakNr) {
         { "std", TestStd },
         { "root_property", TestRootProperty },
         { "hostname_property", TestHostnameProperty },
-        //{ "bind_dns_property", TestBindDnsProperty },
         { "limits", TestLimits },
         { "rlimits", TestRlimits },
         { "alias", TestAlias },
