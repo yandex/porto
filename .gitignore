@@ -5,6 +5,7 @@
 /*.o
 /*.pb.cc
 /*.pb.h
+/obj-*-linux-gnu/
 /CMakeCache.txt
 /CMakeFiles/
 /cmake_install.cmake
@@ -17,6 +18,7 @@
 /install_manifest.txt
 /tags
 /debian/files
+/debian/yandex-porto.*.debhelper
 /debian/yandex-porto.debhelper.log
 /debian/yandex-porto.substvars
 /debian/yandex-porto/
