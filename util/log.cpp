@@ -49,7 +49,7 @@ void TLogger::OpenLog() {
     }
 
     if (needCreate) {
-        TFile f(logPath);
+        TFile f(logPath, logMode);
         (void)f.Touch();
     }
 
