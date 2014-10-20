@@ -155,9 +155,23 @@ class PortoAPI(object):
         request = rpc_pb2.TContainerRequest()
         request.getProperty.name = name
         request.getProperty.property = property
-        return self._rpc(request).getProperty.value
+        res = self._rpc(request).getProperty.value
+        if res == 'false':
+            return False
+        elif res == 'true':
+            return True
+        return res
 
     def SetProperty(self, name, property, value):
+        if value is False:
+            value = 'false'
+        elif value is True:
+            value = 'true'
+        elif value is None:
+            value = ''
+        elif isinstance(value, (int, long)):
+            value = str(value)
+
         request = rpc_pb2.TContainerRequest()
         request.setProperty.name = name
         request.setProperty.property = property
@@ -168,7 +182,12 @@ class PortoAPI(object):
         request = rpc_pb2.TContainerRequest()
         request.getData.name = name
         request.getData.data = data
-        return self._rpc(request).getData.value
+        res = self._rpc(request).getData.value
+        if res == 'false':
+            return False
+        elif res == 'true':
+            return True
+        return res
 
     def Plist(self):
         request = rpc_pb2.TContainerRequest()
