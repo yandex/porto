@@ -41,6 +41,7 @@ static volatile sig_atomic_t raiseSignum = 0;
 static bool stdlog = false;
 static bool failsafe = false;
 static bool noNetwork = false;
+static bool noWatchdog = false;
 
 static void DoExit(int signum) {
     done = true;
@@ -457,7 +458,7 @@ static void KvDump() {
     storage.Dump();
 }
 
-static int SlaveMain(bool noWatchdog) {
+static int SlaveMain() {
     int ret = DaemonPrepare(false);
     if (ret)
         return ret;
@@ -660,7 +661,7 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
         close(evtfd[0]);
         close(ackfd[1]);
 
-        exit(SlaveMain(false));
+        exit(SlaveMain());
     }
 
     close(evtfd[0]);
@@ -781,7 +782,6 @@ static int MasterMain() {
 
 int main(int argc, char * const argv[]) {
     bool slaveMode = false;
-    bool noWatchdog = false;
     int argn;
 
     if (getuid() != 0) {
@@ -816,7 +816,7 @@ int main(int argc, char * const argv[]) {
     }
 
     if (slaveMode)
-        return SlaveMain(noWatchdog);
+        return SlaveMain();
     else
         return MasterMain();
 }

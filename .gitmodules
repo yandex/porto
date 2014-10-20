@@ -1,0 +1,3 @@
+[submodule "libnl"]
+	path = libnl
+	url = git://git.infradead.org/users/tgr/libnl.git
