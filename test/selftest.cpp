@@ -624,76 +624,62 @@ static void TestProperty(TPortoAPI &api) {
     string longProperty = string(10 * 1024, 'x');
     ExpectSuccess(api.SetProperty(name, "env", longProperty));
     ExpectSuccess(api.GetProperty(name, "env", val));
-    Expect(val == "f");
 
     ExpectSuccess(api.Destroy(name));
 }
 
-static void TestEnvironment(TPortoAPI &api) {
+static void ExpectEnv(TPortoAPI &api,
+                      const std::string &name,
+                      const std::string &env,
+                      const char expected[],
+                      size_t expectedLen) {
     string pid;
 
+    ExpectSuccess(api.SetProperty(name, "env", env));
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+
+    string ret = GetEnv(pid);
+
+    Expect(memcmp(expected, ret.data(), expectedLen) == 0);
+    ExpectSuccess(api.Stop(name));
+}
+
+static void TestEnvironment(TPortoAPI &api) {
     string name = "a";
     ExpectSuccess(api.Create(name));
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
 
     AsRoot(api);
 
     Say() << "Check default environment" << std::endl;
-    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
-    ExpectSuccess(api.Start(name));
-    ExpectSuccess(api.GetData(name, "root_pid", pid));
 
-    string env = GetEnv(pid);
     static const char empty_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
         "HOME=/place/porto/a\0"
         "USER=nobody\0";
-
-    Expect(memcmp(empty_env, env.data(), sizeof(empty_env)) == 0);
-    ExpectSuccess(api.Stop(name));
+    ExpectEnv(api, name, "", empty_env, sizeof(empty_env));
 
     Say() << "Check user-defined environment" << std::endl;
-    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
-    ExpectSuccess(api.SetProperty(name, "env", "a=b;c=d;"));
-    ExpectSuccess(api.Start(name));
-    ExpectSuccess(api.GetData(name, "root_pid", pid));
-
-    env = GetEnv(pid);
     static const char ab_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
         "a=b\0"
         "c=d\0"
         "HOME=/place/porto/a\0"
         "USER=nobody\0";
 
-    Expect(memcmp(ab_env, env.data(), sizeof(ab_env)) == 0);
-    ExpectSuccess(api.Stop(name));
+    ExpectEnv(api, name, "a=b;c=d;", ab_env, sizeof(ab_env));
+    ExpectEnv(api, name, "a=b;;c=d;", ab_env, sizeof(ab_env));
 
-
-    ExpectSuccess(api.SetProperty(name, "env", "a=b;;c=d;"));
-    ExpectSuccess(api.Start(name));
-    ExpectSuccess(api.GetData(name, "root_pid", pid));
-
-    env = GetEnv(pid);
-    Expect(memcmp(ab_env, env.data(), sizeof(ab_env)) == 0);
-    ExpectSuccess(api.Stop(name));
-
-    ExpectSuccess(api.SetProperty(name, "env", "a=e\\;b;c=d;"));
-    ExpectSuccess(api.Start(name));
-    ExpectSuccess(api.GetData(name, "root_pid", pid));
-
-    env = GetEnv(pid);
     static const char asb_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
         "a=e;b\0"
         "c=d\0"
         "HOME=/place/porto/a\0"
         "USER=nobody\0";
-
-    Expect(memcmp(asb_env, env.data(), sizeof(asb_env)) == 0);
-    ExpectSuccess(api.Stop(name));
-
-    AsNobody(api);
+    ExpectEnv(api, name, "a=e\\;b;c=d;", asb_env, sizeof(asb_env));
 
     ExpectSuccess(api.SetProperty(name, "command", "sleep $N"));
     ExpectSuccess(api.SetProperty(name, "env", "N=1"));
     ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.Stop(name));
 
     ExpectSuccess(api.Destroy(name));
 }
