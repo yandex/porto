@@ -3,14 +3,13 @@ PortoPy
 
 To initiate connection, simply do(portod must be started)::
 
-    >>> from porto import PortoAPI
-    >>> rpc = PortoAPI()
+    >>> from porto import Connection
+    >>> rpc = Connection()
     >>> rpc.connect()
-
 
 To create container *test*::
 
-    >>> print rpc.Create('test')
+    >>> container = rpc.Create('test')
 
 List all properties::
 
@@ -23,6 +22,11 @@ List data::
 Get *command* property of container *test*::
 
     >>> print rpc.GetProperty('test', 'command')
+    >>> print container.GetProperty('command')  # the same
+
+Get all properties of container::
+
+    >>> print container.GetProperties()
 
 List containers::
 
@@ -30,7 +34,7 @@ List containers::
 
 Destroy container *test*::
 
-    >>> print rpc.Destroy('test')
+    >>> rpc.Destroy('test')
 
 Close connection::
 

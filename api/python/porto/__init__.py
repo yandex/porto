@@ -1,2 +1,2 @@
 from . import exceptions
-from .api import PortoAPI
+from .api import Connection
