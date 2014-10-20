@@ -100,6 +100,10 @@ class PortoAPI(object):
         resp = rpc_pb2.TContainerResponse()
         buf += self._recv(length[0])
         resp.ParseFromString(buf[length[1]:])
+
+        if resp.error != rpc_pb2.Success:
+            raise exceptions.EError.Create(resp.error, resp.errorMsg)
+
         return resp
 
     def Close(self):
@@ -113,67 +117,71 @@ class PortoAPI(object):
     def Create(self, name):
         request = rpc_pb2.TContainerRequest()
         request.create.name = name
-        return self._rpc(request)
+        self._rpc(request)
+        # TODO return container
 
     def Destroy(self, name):
         request = rpc_pb2.TContainerRequest()
         request.destroy.name = name
-        return self._rpc(request)
+        self._rpc(request)
 
     def Start(self, name):
         request = rpc_pb2.TContainerRequest()
         request.start.name = name
-        return self._rpc(request)
+        self._rpc(request)
 
     def Stop(self, name):
         request = rpc_pb2.TContainerRequest()
         request.stop.name = name
-        return self._rpc(request)
+        self._rpc(request)
 
     def Kill(self, name, sig):
         request = rpc_pb2.TContainerRequest()
         request.kill.name = name
         request.kill.sig = sig
-        return self._rpc(request)
+        self._rpc(request)
 
     def Pause(self, name):
         request = rpc_pb2.TContainerRequest()
         request.pause.name = name
-        return self._rpc(request)
+        self._rpc(request)
 
     def Resume(self, name):
         request = rpc_pb2.TContainerRequest()
         request.resume.name = name
-        return self._rpc(request)
+        self._rpc(request)
 
     def GetProperty(self, name, property):
         request = rpc_pb2.TContainerRequest()
         request.getProperty.name = name
         request.getProperty.property = property
-        return self._rpc(request)
+        return self._rpc(request).getProperty.value
 
     def SetProperty(self, name, property, value):
         request = rpc_pb2.TContainerRequest()
         request.setProperty.name = name
         request.setProperty.property = property
         request.setProperty.value = value
-        return self._rpc(request)
+        self._rpc(request)
 
     def GetData(self, name, data):
         request = rpc_pb2.TContainerRequest()
         request.getData.name = name
         request.getData.data = data
-        return self._rpc(request)
+        return self._rpc(request).getData.value
 
     def Plist(self):
         request = rpc_pb2.TContainerRequest()
         request.propertyList.CopyFrom(rpc_pb2.TContainerPropertyListRequest())
-        return self._rpc(request)
+        for item in self._rpc(request).propertyList.list:
+            yield item.name
 
     def Dlist(self):
         request = rpc_pb2.TContainerRequest()
         request.dataList.CopyFrom(rpc_pb2.TContainerDataListRequest())
-        return self._rpc(request)
+        for item in self._rpc(request).dataList.list:
+            yield item.name
+
 
 # Example:
 # rpc = PortoAPI()
