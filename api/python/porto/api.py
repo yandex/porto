@@ -275,7 +275,7 @@ class Connection(object):
         self.rpc.Start(name)
 
     def Stop(self, name):
-        self.rpc.stop(name)
+        self.rpc.Stop(name)
 
     def Kill(self, name, sig):
         self.rpc.Kill(name, sig)
