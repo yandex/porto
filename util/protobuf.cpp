@@ -124,21 +124,25 @@ TError CreateRpcServer(const std::string &path, const int mode, const int uid, c
 }
 
 void InterruptibleInputStream::ReserveChunk() {
-    if (buf.size() + CHUNK_SIZE > buf.capacity())
-        buf.reserve(buf.size() + CHUNK_SIZE);
+    if (Pos + CHUNK_SIZE > BufSize) {
+        Buf = (uint8_t *)realloc(Buf, Pos + CHUNK_SIZE);
+        if (!Buf)
+            throw std::bad_alloc();
+    }
 }
 
 InterruptibleInputStream::InterruptibleInputStream(int fd) : Fd(fd) {
 }
 
 InterruptibleInputStream::~InterruptibleInputStream() {
+    free(Buf);
 }
 
 bool InterruptibleInputStream::Next(const void **data, int *size) {
     int n;
 
     if (Backed) {
-        *data = &buf[Pos - Backed];
+        *data = &Buf[Pos - Backed];
         *size = Backed;
         Backed = 0;
 
@@ -147,18 +151,20 @@ bool InterruptibleInputStream::Next(const void **data, int *size) {
 
     ReserveChunk();
 
-    *data = &buf[Pos];
-    *size = 0;
-    while ((n = read(Fd, &buf[Pos], CHUNK_SIZE)) > 0) {
+    int64_t startPos = Pos;
+    int sz = 0;
+    while ((n = read(Fd, &Buf[Pos], CHUNK_SIZE)) > 0) {
         Pos += n;
-        *size += n;
+        sz += n;
 
-        if (n < CHUNK_SIZE)
+        if ((size_t)n < CHUNK_SIZE)
             break;
 
         ReserveChunk();
     }
 
+    *data = &Buf[startPos];
+    *size = sz;
     return *size != 0;
 }
 

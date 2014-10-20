@@ -621,6 +621,11 @@ static void TestProperty(TPortoAPI &api) {
     ExpectSuccess(api.GetProperty(name, "env", val));
     Expect(val == "f");
 
+    string longProperty = string(10 * 1024, 'x');
+    ExpectSuccess(api.SetProperty(name, "env", longProperty));
+    ExpectSuccess(api.GetProperty(name, "env", val));
+    Expect(val == "f");
+
     ExpectSuccess(api.Destroy(name));
 }
 

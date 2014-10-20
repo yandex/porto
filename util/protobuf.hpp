@@ -19,10 +19,11 @@ TError CreateRpcServer(const std::string &path, const int mode, const int uid, c
 
 class InterruptibleInputStream : public google::protobuf::io::ZeroCopyInputStream {
     int Fd;
-    int64_t Pos = 0;
+    size_t Pos = 0;
     int64_t Backed = 0;
-    std::vector<uint8_t> buf;
-    const ssize_t CHUNK_SIZE = 1024;
+    uint8_t *Buf = nullptr;
+    size_t BufSize = 0;
+    const size_t CHUNK_SIZE = 1024;
 
     void ReserveChunk();
 
