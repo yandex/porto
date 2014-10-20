@@ -1,7 +1,7 @@
 import socket
 
-import rpc_pb2
-import exceptions
+from . import rpc_pb2
+from . import exceptions
 
 
 ################################################################################
@@ -70,6 +70,9 @@ class PortoAPI(object):
         except socket.error:
             raise exceptions.SocketError("Can't open %s for write" % self.socket_path)
 
+    def disconnect(self):
+        self.sock.close()
+
     def _send(self, data, flags=0):
         try:
             return self.sock.send(data, flags)
@@ -105,9 +108,6 @@ class PortoAPI(object):
             raise exceptions.EError.Create(resp.error, resp.errorMsg)
 
         return resp
-
-    def Close(self):
-        self.sock.close()
 
     def List(self):
         request = rpc_pb2.TContainerRequest()
@@ -193,4 +193,4 @@ class PortoAPI(object):
 # print rpc.GetData('/', 'state')
 # print rpc.List()
 # print rpc.Destroy('test')
-# rpc.Close()
+# rpc.disconnect()

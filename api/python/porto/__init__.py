@@ -1,2 +1,2 @@
-import exceptions
-from api import PortoAPI
+from . import exceptions
+from .api import PortoAPI

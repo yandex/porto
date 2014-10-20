@@ -34,5 +34,4 @@ Destroy container *test*::
 
 Close connection::
 
-    >>> rpc.Close()
-
+    >>> rpc.disconnect()
