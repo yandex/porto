@@ -1629,15 +1629,15 @@ static void TestRlimits(TPortoAPI &api) {
 }
 
 static void TestAlias(TPortoAPI &api) {
-    string name = "a";
-    ExpectSuccess(api.Create(name));
-
     if (!HaveCgKnob("memory", "memory.low_limit_in_bytes"))
         return;
     if (!HaveCgKnob("memory", "memory.recharge_on_pgfault"))
         return;
     if (!HaveCgKnob("cpu", "cpu.smart"))
         return;
+
+    string name = "a";
+    ExpectSuccess(api.Create(name));
 
     Say() << "Check default limits" << std::endl;
     string current;
