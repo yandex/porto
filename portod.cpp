@@ -211,7 +211,7 @@ static bool HandleRequest(TContainerHolder &cholder, const int fd,
     return false;
 }
 
-static int IdentifyClient(int fd, ClientInfo &ci) {
+static int IdentifyClient(int fd, ClientInfo &ci, int total) {
     struct ucred cr;
     socklen_t len = sizeof(cr);
 
@@ -227,7 +227,7 @@ static int IdentifyClient(int fd, ClientInfo &ci) {
             << " (pid " << cr.pid
             << " uid " << cr.uid
             << " gid " << cr.gid
-            << ") connected" << std::endl;
+            << ") connected (total " << total + 1 << ")" << std::endl;
 
         ci.Pid = cr.pid;
         ci.Uid = cr.uid;
@@ -257,7 +257,7 @@ static int AcceptClient(int sfd, std::map<int,ClientInfo> &clients) {
     }
 
     ClientInfo ci;
-    int ret = IdentifyClient(cfd, ci);
+    int ret = IdentifyClient(cfd, ci, clients.size());
     if (ret)
         return ret;
 
@@ -267,14 +267,13 @@ static int AcceptClient(int sfd, std::map<int,ClientInfo> &clients) {
 
 static void CloseClient(int cfd, std::map<int,ClientInfo> &clients) {
     ClientInfo ci = clients.at(cfd);
+    close(cfd);
+    clients.erase(cfd);
 
     TLogger::Log() << "pid " << ci.Pid
         << " uid " << ci.Uid
         << " gid " << ci.Gid
-        << " disconnected" << std::endl;
-
-    close(cfd);
-    clients.erase(cfd);
+        << " disconnected (total " << clients.size() << ")" << std::endl;
 }
 
 static bool AnotherInstanceRunning(const string &path) {
