@@ -38,7 +38,7 @@ void TConfig::LoadDefaults() {
     config().mutable_keyval()->mutable_file()->set_perm(0640);
     config().mutable_keyval()->set_size("size=32m");
 
-    config().mutable_daemon()->set_max_clients(16);
+    config().mutable_daemon()->set_max_clients(128);
     config().mutable_daemon()->set_poll_timeout_ms(10 * 1000);
     config().mutable_daemon()->set_heartbeat_delay_ms(5 * 1000);
     config().mutable_daemon()->set_watchdog_max_fails(5);
