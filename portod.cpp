@@ -404,7 +404,6 @@ static int RpcMain(TContainerHolder &cholder) {
             WatchdogStrobe();
         }
 
-        size_t maxClients = config().daemon().max_clients();
         if (hup) {
             close(sfd);
             RemoveRpcServer(config().rpc_sock().file().path());
@@ -429,10 +428,14 @@ static int RpcMain(TContainerHolder &cholder) {
         if (done)
             break;
 
-        if (fds[0].revents && clients.size() < maxClients) {
-            ret = AcceptClient(sfd, clients);
-            if (ret < 0)
-                break;
+        if (fds[0].revents) {
+            if (clients.size() <= config().daemon().max_clients()) {
+                ret = AcceptClient(sfd, clients);
+                if (ret < 0)
+                    break;
+            } else {
+                TLogger::Log() << "Skip connection attempt" << std::endl;
+            }
         }
 
         for (size_t i = 1; i < fds.size(); i++) {
