@@ -534,4 +534,35 @@ void TestDaemon(TPortoAPI &api) {
     // TODO: check portoloop queue
     // TODO: check rtnl classes
 }
+
+bool IsCfqActive() {
+    TFolder f("/sys/block");
+    std::vector<std::string> items;
+    (void)f.Items(EFileType::Any, items);
+    for (auto d : items) {
+        if ( (d.find(std::string("loop")) != std::string::npos) || (d.find(std::string("ram")) != std::string::npos) )
+            continue;
+        TFile f(std::string("/sys/block/" + d + "/queue/scheduler"));
+        std::string data;
+        std::vector<std::string> tokens;
+
+        TError error = f.AsString(data);
+        if (error)
+            throw error.GetMsg();
+        error = SplitString(data, ' ', tokens);
+        if (error)
+            throw error.GetMsg();
+        bool cfqEnabled = false;
+        for (auto t : tokens) {
+            if (t == std::string("[cfq]"))
+                cfqEnabled = true;
+        }
+        if (!cfqEnabled) {
+            return false;
+        }
+    }
+    return true;
 }
+}
+
+

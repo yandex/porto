@@ -1397,16 +1397,17 @@ static void TestStats(TPortoAPI &api) {
     WaitState(api, wget, "dead");
 
     string v, rv;
-
     ExpectSuccess(api.GetData(root, "cpu_usage", v));
     Expect(v != "0" && v != "-1");
     ExpectSuccess(api.GetData(root, "memory_usage", v));
     Expect(v != "0" && v != "-1");
-    ExpectSuccess(api.GetData(root, "io_write", v));
-    Expect(v != "");
-    ExpectSuccess(api.GetData(root, "io_read", v));
-    Expect(v != "");
 
+    if(IsCfqActive()) {
+        ExpectSuccess(api.GetData(root, "io_write", v));
+        Expect(v != "");
+        ExpectSuccess(api.GetData(root, "io_read", v));
+        Expect(v != "");
+    }
     ExpectSuccess(api.GetData(wget, "cpu_usage", v));
     Expect(v != "0" && v != "-1");
     ExpectSuccess(api.GetData(wget, "memory_usage", v));
@@ -2255,6 +2256,9 @@ int SelfTest(string name, int leakNr) {
         6 + /* net */
         3 /* Can't remove cgroups */)
         std::cerr << "WARNING: Unexpected number of errors: " << errors << "!" << std::endl;
+
+    if (!IsCfqActive())
+        std::cerr << "WARNING: CFQ is not enabled for one of your block devices, skipping io_read and io_write tests" << std::endl;
 
     return 0;
 }

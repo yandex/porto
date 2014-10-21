@@ -55,6 +55,8 @@ namespace test {
 
     int SelfTest(std::string name, int leakNr);
     int StressTest(int threads, int iter, bool killPorto);
+
+    bool IsCfqActive();
 }
 
 #define Expect(ret) ExpectReturn(ret, true, __LINE__, __func__)
