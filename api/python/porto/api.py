@@ -1,4 +1,5 @@
 import socket
+import threading
 
 from . import rpc_pb2
 from . import exceptions
@@ -61,6 +62,7 @@ _DecodeVarint32 = _VarintDecoder((1 << 32) - 1)
 
 class _RPC(object):
     def __init__(self, socket_path, timeout):
+        self.lock = threading.Lock()
         self.socket_path = socket_path
         self.timeout = timeout
 
@@ -69,17 +71,11 @@ class _RPC(object):
         self.sock.settimeout(self.timeout)
         try:
             self.sock.connect(self.socket_path)
-        except socket.error:
-            raise exceptions.SocketError("Can't open %s for write" % self.socket_path)
+        except socket.error as e:
+            raise exceptions.SocketError("Can't open {} for write: {}".format(self.socket_path, e))
 
     def disconnect(self):
         self.sock.close()
-
-    def _send(self, data, flags=0):
-        try:
-            return self.sock.send(data, flags)
-        except socket.timeout:
-            raise exceptions.SocketTimeout("Got timeout %d" % self.timeout)
 
     def _sendall(self, data, flags=0):
         try:
@@ -97,13 +93,16 @@ class _RPC(object):
         data = request.SerializeToString()
         hdr = bytearray()
         _EncodeVarint(hdr.append, len(data))
-        self._send(hdr)
-        self._sendall(data)
 
-        buf = self._recv(4)
-        length = _DecodeVarint32(buf, 0)
-        resp = rpc_pb2.TContainerResponse()
-        buf += self._recv(length[0])
+        with self.lock:
+            self._sendall(hdr)
+            self._sendall(data)
+
+            buf = self._recv(4)
+            length = _DecodeVarint32(buf, 0)
+            resp = rpc_pb2.TContainerResponse()
+            buf += self._recv(length[0])
+
         resp.ParseFromString(buf[length[1]:])
 
         if resp.error != rpc_pb2.Success:
