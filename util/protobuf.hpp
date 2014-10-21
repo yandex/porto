@@ -24,6 +24,7 @@ class InterruptibleInputStream : public google::protobuf::io::ZeroCopyInputStrea
     uint8_t *Buf = nullptr;
     size_t BufSize = 0;
     const size_t CHUNK_SIZE = 1024;
+    int interrupted = false;
 
     void ReserveChunk();
 
@@ -35,4 +36,5 @@ public:
     void BackUp(int count);
     bool Skip(int count);
     int64_t ByteCount() const;
+    int Interrupted();
 };

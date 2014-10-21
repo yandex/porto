@@ -19,6 +19,8 @@ bool WriteDelimitedTo(
     // Write the size.
     const int size = message.ByteSize();
     output.WriteVarint32(size);
+    if (output.HadError())
+        return false;
 
     uint8_t* buffer = output.GetDirectBufferForNBytesAndAdvance(size);
     if (buffer != NULL) {
@@ -28,7 +30,8 @@ bool WriteDelimitedTo(
     } else {
         // Slightly-slower path when the message is multiple buffers.
         message.SerializeWithCachedSizes(&output);
-        if (output.HadError()) return false;
+        if (output.HadError())
+            return false;
     }
 
     return true;
@@ -162,6 +165,8 @@ bool InterruptibleInputStream::Next(const void **data, int *size) {
 
         ReserveChunk();
     }
+    if (n < 0 && errno == EINTR)
+        interrupted ++;
 
     *data = &Buf[startPos];
     *size = sz;
@@ -186,4 +191,8 @@ bool InterruptibleInputStream::Skip(int count) {
 
 int64_t InterruptibleInputStream::ByteCount() const {
     return Pos - Backed;
+}
+
+int InterruptibleInputStream::Interrupted() {
+    return interrupted;
 }

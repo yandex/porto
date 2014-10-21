@@ -42,6 +42,7 @@ static bool stdlog = false;
 static bool failsafe = false;
 static bool noNetwork = false;
 static bool noWatchdog = false;
+static bool noWait = false;
 
 static void DoExit(int signum) {
     done = true;
@@ -176,7 +177,7 @@ struct ClientInfo {
     int Gid;
 };
 
-static void HandleRequest(TContainerHolder &cholder, const int fd,
+static bool HandleRequest(TContainerHolder &cholder, const int fd,
                           const int uid, const int gid) {
     InterruptibleInputStream pist(fd);
     google::protobuf::io::FileOutputStream post(fd);
@@ -189,14 +190,25 @@ static void HandleRequest(TContainerHolder &cholder, const int fd,
     SignalMask(SIG_BLOCK);
     (void)alarm(0);
 
+    if (pist.Interrupted()) {
+        TLogger::Log() << "Interrupted read from " << fd << std:: endl;
+        return true;
+    }
+
     if (haveData) {
         auto rsp = HandleRpcRequest(cholder, request, uid, gid);
 
         if (rsp.IsInitialized()) {
-            WriteDelimitedTo(rsp, &post);
+            if (!WriteDelimitedTo(rsp, &post))
+                TLogger::Log() << "Write error for " << fd << std:: endl;
             post.Flush();
         }
+    } else {
+        TLogger::Log() << "Read nothing from " << fd << std:: endl;
+        return true;
     }
+
+    return false;
 }
 
 static int IdentifyClient(int fd, ClientInfo &ci) {
@@ -430,11 +442,12 @@ static int RpcMain(TContainerHolder &cholder) {
 
             if (clients.find(fds[i].fd) != clients.end()) {
                 auto &ci = clients.at(fds[i].fd);
+                bool needClose = false;
 
                 if (fds[i].revents & POLLIN)
-                    HandleRequest(cholder, fds[i].fd, ci.Uid, ci.Gid);
+                    needClose = HandleRequest(cholder, fds[i].fd, ci.Uid, ci.Gid);
 
-                if (fds[i].revents & POLLHUP)
+                if ((fds[i].revents & POLLHUP) || needClose)
                     CloseClient(fds[i].fd, clients);
             } else {
                 TContainerEvent event(fds[i].fd);
@@ -701,12 +714,17 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
             break;
         }
 
-        (void)alarm(config().daemon().wait_timeout_s());
-        SignalMask(SIG_UNBLOCK);
         int status;
-        pid = wait(&status);
-        SignalMask(SIG_BLOCK);
-        (void)alarm(0);
+        if (noWait) {
+            sleep(config().daemon().wait_timeout_s());
+            continue;
+        } else {
+            (void)alarm(config().daemon().wait_timeout_s());
+            SignalMask(SIG_UNBLOCK);
+            pid = wait(&status);
+            SignalMask(SIG_BLOCK);
+            (void)alarm(0);
+        }
 
         if (gotAlarm) {
             gotAlarm = false;
@@ -808,6 +826,8 @@ int main(int argc, char * const argv[]) {
             noWatchdog = true;
         } else if (arg == "--nonet") {
             noNetwork = true;
+        } else if (arg == "--nowait") {
+            noWait = true;
         } else if (arg == "-t") {
             if (argn + 1 >= argc)
                 return EXIT_FAILURE;
