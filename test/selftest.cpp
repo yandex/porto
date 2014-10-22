@@ -1136,50 +1136,140 @@ static vector<string> StringToVec(const std::string &s) {
     return lines;
 }
 
+static map<string, string> IfHw(const vector<string> &iplines) {
+    map<string, string> ret;
+    for (auto &ipline : iplines) {
+        vector<string> lines;
+        TError error = SplitString(ipline, '\\', lines);
+        if (error)
+            throw error.GetMsg();
+        if (lines.size() < 2)
+            throw "Invalid interface: " + ipline;
+
+        vector<string> tokens;
+        error = SplitString(lines[0], ':', tokens);
+        if (error)
+            throw error.GetMsg();
+        if (tokens.size() < 2)
+            throw "Invalid line 1: " + lines[0];
+
+        string fulliface = StringTrim(tokens[1]);
+
+        tokens.clear();
+        error = SplitString(fulliface, '@', tokens);
+        if (error)
+            throw error.GetMsg();
+
+        string iface = StringTrim(tokens[0]);
+
+        tokens.clear();
+        error = SplitString(StringTrim(lines[1]), ' ', tokens);
+        if (error)
+            throw error.GetMsg();
+        if (tokens.size() < 2)
+            throw "Invalid line 2: " + lines[1];
+
+        string hw = StringTrim(tokens[1]);
+
+        std::cerr << iface << "=" << hw << std::endl;
+
+        ret[iface] = hw;
+    }
+
+    return ret;
+}
+
+static bool ShareMacAddress(const vector<string> &a, const vector<string> &b) {
+    map<string, string> ahw = IfHw(a);
+    map<string, string> bhw = IfHw(b);
+
+    for (auto apair : ahw) {
+        if (apair.second == "00:00:00:00:00:00")
+            continue;
+
+        for (auto bpair : bhw) {
+            if (apair.second == bpair.second)
+                return true;
+        }
+    }
+
+    return false;
+}
+
 static void TestNetProperty(TPortoAPI &api) {
-    const size_t linesPerDev = 2;
     string name = "a";
-    string path = config().container().tmp_dir() + "/" + name;
     ExpectSuccess(api.Create(name));
 
-    vector<string> hostLink = Popen("ip link show");
+    vector<string> hostLink = Popen("ip -o -d link show");
+
+    TNetlink nl;
+    string dev;
+    TError error = TNetlink::Exec(config().network().device(), [&](TNetlink &nl) {
+                                  return nl.FindDev(dev); });
+    if (error)
+        throw error.GetMsg();
 
     Say() << "Check net parsing" << std::endl;
     ExpectFailure(api.SetProperty(name, "net", "qwerty"), EError::InvalidValue);
     ExpectSuccess(api.SetProperty(name, "net", "host"));
     ExpectSuccess(api.SetProperty(name, "net", "none"));
-    //ExpectSuccess(api.SetProperty(name, "net", "host; macvlan X Y"));
+    ExpectSuccess(api.SetProperty(name, "net", "host; macvlan " + dev + " eth0"));
+    ExpectFailure(api.SetProperty(name, "net", "host; macvlan invalid eth0"), EError::InvalidValue);
     ExpectFailure(api.SetProperty(name, "net", "host; host"), EError::InvalidValue);
     ExpectFailure(api.SetProperty(name, "net", "host; none"), EError::InvalidValue);
     ExpectFailure(api.SetProperty(name, "net", "none; host"), EError::InvalidValue);
-    ExpectFailure(api.SetProperty(name, "net", "macvlan"), EError::NotSupported);
-    ExpectFailure(api.SetProperty(name, "net", "host: veth0"), EError::NotSupported);
+    ExpectFailure(api.SetProperty(name, "net", "host veth0"), EError::NotSupported);
 
     Say() << "Check net=none" << std::endl;
-    AsRoot(api);
-    BootstrapCommand("/bin/ip", path);
-    AsNobody(api);
-    ExpectSuccess(api.SetProperty(name, "root", path));
-    ExpectSuccess(api.SetProperty(name, "net", "none"));
-    ExpectSuccess(api.SetProperty(name, "command", "/ip link show"));
-    string s = StartWaitAndGetData(api, name, "stdout");
-    auto v = StringToVec(s);
-    ExpectSuccess(api.Stop(name));
 
-    Expect(v.size() == 1 * linesPerDev);
-    Expect(v.size() != hostLink.size());
+    ExpectSuccess(api.SetProperty(name, "net", "none"));
+    ExpectSuccess(api.SetProperty(name, "command", "ip -o -d link show"));
+    string s = StartWaitAndGetData(api, name, "stdout");
+    auto containerLink = StringToVec(s);
+    Expect(containerLink.size() == 1);
+    Expect(containerLink.size() != hostLink.size());
+    Expect(ShareMacAddress(hostLink, containerLink) == false);
+    ExpectSuccess(api.Stop(name));
 
     Say() << "Check net=host" << std::endl;
     ExpectSuccess(api.SetProperty(name, "net", "host"));
     s = StartWaitAndGetData(api, name, "stdout");
-    v = StringToVec(s);
+    containerLink = StringToVec(s);
+    Expect(containerLink.size() == hostLink.size());
+    Expect(ShareMacAddress(hostLink, containerLink) == true);
     ExpectSuccess(api.Stop(name));
 
-    Expect(v.size() == hostLink.size());
-
     Say() << "Check net=host:veth0" << std::endl;
-
+    ExpectFailure(api.SetProperty(name, "net", "host veth0"), EError::NotSupported);
     // TODO: create veth and pass it to network
+
+    Say() << "Check net=macvlan" << std::endl;
+    ExpectFailure(api.SetProperty(name, "net", "macvlan"), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "net", "macvlan " + dev), EError::InvalidValue);
+    ExpectSuccess(api.SetProperty(name, "net", "macvlan " + dev + " " + dev));
+    ExpectSuccess(api.SetProperty(name, "command", "ip -o -d link show"));
+    s = StartWaitAndGetData(api, name, "stdout");
+    containerLink = StringToVec(s);
+    Expect(containerLink.size() == 2);
+    Expect(containerLink.size() != hostLink.size());
+    Expect(ShareMacAddress(hostLink, containerLink) == false);
+    auto linkMap = IfHw(containerLink);
+    Expect(linkMap.find("lo") != linkMap.end());
+    Expect(linkMap.find("eth0") != linkMap.end());
+    ExpectSuccess(api.Stop(name));
+
+    string hw = "00:11:22:33:44:55";
+    ExpectSuccess(api.SetProperty(name, "net", "macvlan " + dev + " eth10 bridge " + hw));
+    s = StartWaitAndGetData(api, name, "stdout");
+    containerLink = StringToVec(s);
+    Expect(containerLink.size() == 2);
+    Expect(containerLink.size() != hostLink.size());
+    Expect(ShareMacAddress(hostLink, containerLink) == false);
+    linkMap = IfHw(containerLink);
+    Expect(linkMap.find("lo") != linkMap.end());
+    Expect(linkMap.find("eth10") != linkMap.end());
+    Expect(linkMap.at("eth10") == hw);
+    ExpectSuccess(api.Stop(name));
 
     ExpectSuccess(api.Destroy(name));
 }
@@ -2202,16 +2292,19 @@ int SelfTest(string name, int leakNr) {
 
     LeakConainersNr = leakNr;
 
+    bool needDaemonChecks = getenv("NOCHECK") == nullptr;
     int respawns = 0;
     int errors = 0;
     try {
         config.Load();
         TPortoAPI api(config().rpc_sock().file().path());
 
-        RestartDaemon(api);
+        if (needDaemonChecks) {
+            RestartDaemon(api);
 
-        Expect(WordCount(config().master_log().path(), "Started") == 1);
-        Expect(WordCount(config().slave_log().path(), "Started") == 1);
+            Expect(WordCount(config().master_log().path(), "Started") == 1);
+            Expect(WordCount(config().slave_log().path(), "Started") == 1);
+        }
 
         TGroup portoGroup("porto");
         TError error = portoGroup.Load();
@@ -2231,11 +2324,14 @@ int SelfTest(string name, int leakNr) {
             t.second(api);
         }
 
+        if (!needDaemonChecks)
+            return EXIT_SUCCESS;
+
         respawns = WordCount(config().master_log().path(), "Spawned");
         errors = WordCount(config().slave_log().path(), "Error");
     } catch (string e) {
         std::cerr << "EXCEPTION: " << e << std::endl;
-        return 1;
+        return EXIT_FAILURE;
     }
 
     std::cerr << "SUCCESS: All tests successfully passed!" << std::endl;
@@ -2253,13 +2349,13 @@ int SelfTest(string name, int leakNr) {
         1 + /* respawn */
         7 + /* ulimit */
         4 + /* bind */
-        6 + /* net */
+        9 + /* net */
         3 /* Can't remove cgroups */)
         std::cerr << "WARNING: Unexpected number of errors: " << errors << "!" << std::endl;
 
     if (!IsCfqActive())
         std::cerr << "WARNING: CFQ is not enabled for one of your block devices, skipping io_read and io_write tests" << std::endl;
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 }

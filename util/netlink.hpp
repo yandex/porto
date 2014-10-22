@@ -26,9 +26,9 @@ class TNetlink {
     struct rtnl_link *link = nullptr;
     struct nl_cache *linkCache = nullptr;
 
+public:
     TError FindDev(std::string &device);
 
-public:
     TNetlink() {}
     TError Open(const std::string device);
     void Close();
@@ -46,6 +46,18 @@ public:
     bool CgroupFilterExists(uint32_t parent, uint32_t handle);
     TError RemoveCgroupFilter(uint32_t parent, uint32_t handle);
     ~TNetlink() { Close(); }
+    int GetLinkIndex(const std::string &device);
+    TError AddMacVlan(const std::string &name, const std::string &master,
+                      const std::string &type, const std::string &hw);
+    TError RemoveLink(const std::string &name);
+    TError LinkUp(const std::string &name);
+    TError ChangeLinkNs(const std::string &name, const std::string &newName,
+                        int pid);
+    TError AddMacVlan(const std::string &name, const std::string &master,
+                      const std::string &type, const std::string &hw,
+                      int nsPid);
+    static bool ValidMacVlanType(const std::string &type);
+    static bool ValidMacAddr(const std::string &hw);
 
     static void EnableDebug(bool enable);
     static TError Exec(std::string device, std::function<TError(TNetlink &nl)> f);

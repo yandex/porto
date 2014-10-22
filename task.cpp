@@ -10,6 +10,7 @@
 #include "util/string.hpp"
 #include "util/unix.hpp"
 #include "util/pwd.hpp"
+#include "util/netlink.hpp"
 
 extern "C" {
 #include <string.h>
@@ -368,6 +369,30 @@ TError TTask::ChildIsolateFs(bool priveleged) {
     return newRoot.Chdir();
 }
 
+TError TTask::IsolateNet(int childPid) {
+    if (!config().network().enabled())
+        return TError(EError::Unknown, "Network support is disabled");
+
+    for (auto &host : Env->NetCfg.Host) {
+        // TODO: move host interfaces
+    }
+
+    for (auto &mvlan : Env->NetCfg.MacVlan) {
+        TError error = TNetlink::Exec(config().network().device(),
+            [&](TNetlink &nl) {
+                return nl.AddMacVlan(mvlan.Name, mvlan.Master,
+                                     mvlan.Type, mvlan.Hw, childPid);
+            });
+        if (error)
+            return error;
+    }
+
+    // TODO: up loopback
+    //TError error = LinkUp("lo");
+
+    return TError::Success();
+}
+
 void TTask::ChildApplyLimits() {
     for (auto pair : Env->Rlimit) {
         int ret = setrlimit(pair.first, &pair.second);
@@ -393,6 +418,10 @@ void TTask::ChildSetHostname() {
 }
 
 int TTask::ChildCallback() {
+    int ret;
+    if (read(WaitParentRfd, &ret, sizeof(ret)) != sizeof(ret))
+        Abort(errno, "partial read from child sync pipe");
+
     close(Rfd);
     ResetAllSignalHandlers();
     ChildApplyLimits();
@@ -455,7 +484,7 @@ TError TTask::CreateCwd() {
 
 TError TTask::Start() {
     int ret;
-    int pfd[2];
+    int pfd[2], syncfd[2];
 
     TError error = CreateCwd();
     if (error) {
@@ -506,6 +535,17 @@ TError TTask::Start() {
         if (!Env->NetCfg.Host.size())
             cloneFlags |= CLONE_NEWNET;
 
+        int ret = pipe2(syncfd, O_CLOEXEC);
+        if (ret) {
+            TError error(EError::Unknown, errno, "pipe2(pdf)");
+            TLogger::LogError(error, "Can't create sync pipe for child");
+            ReportPid(-1);
+            Abort(error);
+        }
+
+        WaitParentRfd = syncfd[0];
+        WaitParentWfd = syncfd[1];
+
         pid_t clonePid = clone(ChildFn, stack + sizeof(stack), cloneFlags, this);
         if (clonePid < 0) {
             TError error(EError::Unknown, errno, "clone()");
@@ -515,6 +555,21 @@ TError TTask::Start() {
         }
 
         ReportPid(clonePid);
+
+        if (config().network().enabled()) {
+            error = IsolateNet(clonePid);
+            if (error) {
+                TLogger::LogError(error, "Can't spawn child: " + error.GetMsg());
+                ReportPid(-1);
+                Abort(error);
+            }
+        }
+
+        int result = 0;
+        if (write(WaitParentWfd, &result, sizeof(result)) != sizeof(result)) {
+            Syslog("partial write to child sync pipe");
+        }
+
         exit(EXIT_SUCCESS);
     }
     (void)waitpid(forkPid, NULL, 0);

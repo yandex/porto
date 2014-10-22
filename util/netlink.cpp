@@ -7,6 +7,7 @@
 
 extern "C" {
 #include <linux/if_ether.h>
+#include <netinet/ether.h>
 #include <netlink/route/class.h>
 #include <netlink/route/classifier.h>
 #include <netlink/route/cls/cgroup.h>
@@ -15,7 +16,7 @@ extern "C" {
 
 #include <netlink/route/rtnl.h>
 #include <netlink/route/link.h>
-#include <netlink/route/link.h>
+#include <netlink/route/link/macvlan.h>
 }
 
 using std::string;
@@ -101,8 +102,7 @@ TError TNetlink::Open(std::string device) {
         goto close_socket;
     }
 
-    if (debug)
-        LogCache(linkCache);
+    LogCache(linkCache);
 
     nl_cache_mngt_provide(linkCache);
 
@@ -157,6 +157,9 @@ void TNetlink::LogObj(const std::string &prefix, void *obj) {
 }
 
 void TNetlink::LogCache(struct nl_cache *cache) {
+    if (!debug)
+        return;
+
     static std::function<void(struct nl_dump_params *, char *)> handler;
 
     struct nl_dump_params dp = {};
@@ -246,8 +249,7 @@ TError TNetlink::GetStat(uint32_t handle, ETclassStat stat, uint64_t &val) {
     if (ret < 0)
         return TError(EError::Unknown, string("Unable to allocate class cache: ") + nl_geterror(ret));
 
-    if (debug)
-        LogCache(classCache);
+    LogCache(classCache);
 
     struct rtnl_class *tclass = rtnl_class_get(classCache, rtnl_link_get_ifindex(link), handle);
     if (!tclass) {
@@ -270,8 +272,7 @@ TError TNetlink::GetClassProperties(uint32_t handle, uint32_t &prio, uint32_t &r
     if (ret < 0)
         return TError(EError::Unknown, string("Unable to allocate class cache: ") + nl_geterror(ret));
 
-    if (debug)
-        LogCache(classCache);
+    LogCache(classCache);
 
     struct rtnl_class *tclass = rtnl_class_get(classCache, rtnl_link_get_ifindex(link), handle);
 
@@ -293,8 +294,7 @@ bool TNetlink::ClassExists(uint32_t handle) {
     if (ret < 0)
         return false;
 
-    if (debug)
-        LogCache(classCache);
+    LogCache(classCache);
 
     struct rtnl_class *tclass = rtnl_class_get(classCache, rtnl_link_get_ifindex(link), handle);
     rtnl_class_put(tclass);
@@ -389,8 +389,7 @@ bool TNetlink::QdiscExists(uint32_t handle) {
     if (ret < 0)
         return false;
 
-    if (debug)
-        LogCache(qdiscCache);
+    LogCache(qdiscCache);
 
     struct rtnl_qdisc *qdisc = rtnl_qdisc_get(qdiscCache, rtnl_link_get_ifindex(link), handle);
     exists = qdisc != nullptr;
@@ -463,8 +462,7 @@ bool TNetlink::CgroupFilterExists(uint32_t parent, uint32_t handle) {
         return false;
     }
 
-    if (debug)
-        LogCache(clsCache);
+    LogCache(clsCache);
 
     struct CgFilterIter {
         uint32_t parent;
@@ -515,6 +513,184 @@ free_cls:
 
     return error;
 
+}
+
+int TNetlink::GetLinkIndex(const std::string &device) {
+    struct Iter { string name; int idx; } data = { device, -1 };
+    nl_cache_foreach(linkCache, [](struct nl_object *obj, void *data) {
+                     Iter *p = (Iter *)data;
+                     struct rtnl_link *l = (struct rtnl_link *)obj;
+
+                     if (p->idx >= 0)
+                         return;
+
+                     if (strncmp(rtnl_link_get_name(l), p->name.c_str(),
+                                 p->name.length()) == 0 &&
+                         rtnl_link_get_flags(l) & IFF_RUNNING)
+
+                         p->idx = rtnl_link_get_ifindex(l);
+                     }, &data);
+    return data.idx;
+}
+
+TError TNetlink::AddMacVlan(const std::string &name, const std::string &master,
+                            const std::string &type, const std::string &hw) {
+    TError error = TError::Success();
+    struct rtnl_link *hostLink = rtnl_link_macvlan_alloc();
+    int mode = rtnl_link_macvlan_str2mode(type.c_str());
+    if (mode < 0)
+        return TError(EError::Unknown, "Invalid MAC VLAN type " + type);
+
+    struct ether_addr *ea = nullptr;
+    if (hw.length()) {
+        ea = ether_aton(hw.c_str());
+        if (!ea)
+            return TError(EError::Unknown, "Invalid MAC VLAN mac address " + hw);
+    }
+
+    int ret;
+    int masterIdx = GetLinkIndex(master);
+
+    rtnl_link_set_link(hostLink, masterIdx);
+    rtnl_link_set_name(hostLink, name.c_str());
+
+    if (ea) {
+        struct nl_addr *addr = nl_addr_build(AF_LLC, ea, ETH_ALEN);
+        rtnl_link_set_addr(hostLink, addr);
+        nl_addr_put(addr);
+    }
+
+    rtnl_link_macvlan_set_mode(hostLink, mode);
+
+    LogObj("add", hostLink);
+
+    ret = rtnl_link_add(sock, hostLink, NLM_F_CREATE);
+    if (ret < 0)
+        error = TError(EError::Unknown, string("Unable to add macvlan: ") + nl_geterror(ret));
+
+    rtnl_link_put(hostLink);
+
+    /* our link cache is invalid now, refill */
+    ret = nl_cache_refill(sock, linkCache);
+    if (ret < 0) {
+        error = TError(EError::Unknown, string("Unable to add macvlan: ") + nl_geterror(ret));
+        TLogger::LogError(error, "Can't refill cache");
+    } else {
+        LogCache(linkCache);
+    }
+
+    return error;
+}
+
+TError TNetlink::RemoveLink(const std::string &name) {
+    TError error = TError::Success();
+    struct rtnl_link *hostLink = rtnl_link_alloc();
+    rtnl_link_set_name(hostLink, name.c_str());
+    LogObj("remove", hostLink);
+    int ret = rtnl_link_delete(sock, hostLink);
+    if (ret < 0)
+        error = TError(EError::Unknown, string("Unable to remove macvlan: ") + nl_geterror(ret));
+    rtnl_link_put(hostLink);
+
+    return error;
+}
+
+TError TNetlink::LinkUp(const std::string &name) {
+    int ret;
+    struct rtnl_link *oldLink = rtnl_link_alloc();
+    if (!oldLink)
+        return TError(EError::Unknown, "Unable to allocate link");
+    struct rtnl_link *newLink = rtnl_link_alloc();
+    if (!newLink) {
+        rtnl_link_put(oldLink);
+        return TError(EError::Unknown, "Unable to allocate link");
+    }
+
+    rtnl_link_set_name(oldLink, name.c_str());
+    rtnl_link_set_flags(newLink, IFF_UP);
+
+    LogObj("up old", oldLink);
+    LogObj("up new", oldLink);
+
+    ret = rtnl_link_change(sock, oldLink, newLink, 0);
+    if (ret < 0) {
+        rtnl_link_put(oldLink);
+        rtnl_link_put(newLink);
+        return TError(EError::Unknown, string("Unable to change link namespace: ") + nl_geterror(ret));
+    }
+
+    rtnl_link_put(newLink);
+    rtnl_link_put(oldLink);
+
+    return TError::Success();
+}
+
+TError TNetlink::ChangeLinkNs(const std::string &name,
+                              const std::string &newName, int pid) {
+    int ret;
+    struct rtnl_link *newLink;
+    struct rtnl_link *oldLink = rtnl_link_get_by_name(linkCache, name.c_str());
+    if (!oldLink)
+        return TError(EError::Unknown, "Invalid link " + name);
+
+    newLink = rtnl_link_alloc();
+    if (!newLink) {
+        rtnl_link_put(oldLink);
+        return TError(EError::Unknown, "Can't allocate link");
+    }
+
+    rtnl_link_set_ifindex(newLink, rtnl_link_get_ifindex(oldLink));
+    rtnl_link_set_name(newLink, newName.c_str());
+    rtnl_link_set_ns_pid(newLink, pid);
+
+    LogObj("change old", oldLink);
+    LogObj("change new", newLink);
+
+    ret = rtnl_link_change(sock, oldLink, newLink, 0);
+    if (ret < 0) {
+        rtnl_link_put(oldLink);
+        rtnl_link_put(newLink);
+        return TError(EError::Unknown, string("Unable to change link namespace: ") + nl_geterror(ret));
+    }
+
+    rtnl_link_put(newLink);
+    rtnl_link_put(oldLink);
+
+    return TError::Success();
+}
+
+TError TNetlink::AddMacVlan(const std::string &name, const std::string &master,
+                            const std::string &type, const std::string &hw,
+                            int nsPid) {
+    string tmpName = "portotmp0";
+
+    /* remove any leftover temporary device */
+
+    (void)RemoveLink(tmpName);
+
+    /* create device with fixed name in current namespace */
+
+    TError error = AddMacVlan(tmpName, master, type, hw);
+    if (error)
+        return error;
+
+    /* move device into target namespace and change name */
+
+    error = ChangeLinkNs(tmpName, name, nsPid);
+    if (error) {
+        (void)RemoveLink(tmpName);
+        return error;
+    }
+
+    return TError::Success();
+}
+
+bool TNetlink::ValidMacVlanType(const std::string &type) {
+    return rtnl_link_macvlan_str2mode(type.c_str()) >= 0;
+}
+
+bool TNetlink::ValidMacAddr(const std::string &hw) {
+    return ether_aton(hw.c_str()) != nullptr;
 }
 
 void TNetlink::EnableDebug(bool enable) {

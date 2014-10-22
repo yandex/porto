@@ -691,21 +691,24 @@ TError ParseNet(const std::string &s, TNetCfg &net) {
     bool none = false;
     bool host = false;
 
+    if (!config().network().enabled())
+        return TError(EError::Unknown, "Network support is disabled");
+
     TError error = SplitEscapedString(s, ';', lines);
     if (error)
         return error;
 
     for (auto &line : lines) {
-        vector<string> tok;
+        vector<string> settings;
 
-        error = SplitEscapedString(line, ':', tok);
+        error = SplitEscapedString(line, ' ', settings);
         if (error)
             return error;
 
-        if (tok.size() == 0)
+        if (settings.size() == 0)
             return TError(EError::InvalidValue, "Invalid net in: " + line);
 
-        string type = StringTrim(tok[0]);
+        string type = StringTrim(settings[0]);
 
         if (type == "none") {
             none = true;
@@ -716,20 +719,56 @@ TError ParseNet(const std::string &s, TNetCfg &net) {
                 return TError(EError::InvalidValue,
                               "host can't be mixed with other hosts");
 
-            if (tok.size() > 2)
+            if (settings.size() > 2)
                 return TError(EError::InvalidValue, "Invalid net in: " + line);
 
-            if (tok.size() == 1) {
+            if (settings.size() == 1) {
                 host = true;
             } else {
-                hnet.Dev = StringTrim(tok[1]);
+                hnet.Dev = StringTrim(settings[1]);
                 // TODO: make sure device exists
-                return TError(EError::NotSupported, "Not supported yet");
+                return TError(EError::NotSupported, "Selective devise is not supported yet");
             }
 
             net.Host.push_back(hnet);
         } else if (type == "macvlan") {
-            return TError(EError::NotSupported, "Not supported yet");
+            if (settings.size() < 3)
+                return TError(EError::InvalidValue, "Invalid macvlan in: " + line);
+
+            string master = StringTrim(settings[1]);
+            string name = StringTrim(settings[2]);
+            string type = "bridge";
+            string hw = "";
+
+            if (settings.size() > 3) {
+                type = StringTrim(settings[3]);
+                if (!TNetlink::ValidMacVlanType(type))
+                    return TError(EError::InvalidValue,
+                                  "Invalid macvlan type " + type);
+            }
+            if (settings.size() > 4) {
+                hw = StringTrim(settings[4]);
+                if (!TNetlink::ValidMacAddr(hw))
+                    return TError(EError::InvalidValue,
+                                  "Invalid macvlan address " + hw);
+            }
+
+            int idx = -1;
+            TError error = TNetlink::Exec(config().network().device(),
+            [&](TNetlink &nl) {
+                idx = nl.GetLinkIndex(master);
+                return TError::Success(); });
+
+            if (idx < 0)
+                return TError(EError::InvalidValue, "Interface " + master + " doesn't exist or not in running state");
+
+            TMacVlanNetCfg mvlan;
+            mvlan.Master = master;
+            mvlan.Name = name;
+            mvlan.Type = type;
+            mvlan.Hw = hw;
+
+            net.MacVlan.push_back(mvlan);
         } else {
             return TError(EError::InvalidValue, "Invalid net type " + type);
         }

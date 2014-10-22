@@ -34,8 +34,8 @@ struct THostNetCfg {
 };
 
 struct TMacVlanNetCfg {
-    std::string HostDev;
-    std::string ContDev;
+    std::string Master;
+    std::string Name;
     std::string Type;
     std::string Hw;
 };
@@ -78,6 +78,7 @@ public:
 class TTask {
     NO_COPY_CONSTRUCT(TTask);
     int Rfd, Wfd;
+    int WaitParentRfd, WaitParentWfd;
     std::shared_ptr<TTaskEnv> Env;
     std::vector<std::shared_ptr<TCgroup>> LeafCgroups;
 
@@ -105,6 +106,7 @@ class TTask {
     TError RestrictProc();
     TError ChildMountDev();
     TError ChildIsolateFs(bool priveleged);
+    TError IsolateNet(int childPid);
 
 public:
     TTask(std::shared_ptr<TTaskEnv> env, std::vector<std::shared_ptr<TCgroup>> &leafCgroups) : Env(env), LeafCgroups(leafCgroups) {};
