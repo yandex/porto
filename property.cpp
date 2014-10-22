@@ -687,18 +687,25 @@ TError ParseBind(const std::string &s, vector<TBindMap> &dirs) {
 }
 
 TError ParseNet(const std::string &s, TNetCfg &net) {
-    vector<string> lines;
-    bool none = false;
-    bool host = false;
-
     if (!config().network().enabled())
         return TError(EError::Unknown, "Network support is disabled");
+
+    vector<string> lines;
+    bool none = false;
+    net.Share = false;
 
     TError error = SplitEscapedString(s, ';', lines);
     if (error)
         return error;
 
+    if (lines.size() == 0)
+        return TError(EError::InvalidValue, "Configuration is not specified");
+
     for (auto &line : lines) {
+        if (none)
+            return TError(EError::InvalidValue,
+                          "none can't be mixed with other types");
+
         vector<string> settings;
 
         error = SplitEscapedString(line, ' ', settings);
@@ -710,27 +717,29 @@ TError ParseNet(const std::string &s, TNetCfg &net) {
 
         string type = StringTrim(settings[0]);
 
+        if (net.Share)
+            return TError(EError::InvalidValue,
+                          "host can't be mixed with other settings");
+
         if (type == "none") {
             none = true;
         } else if (type == "host") {
             THostNetCfg hnet;
 
-            if (host)
-                return TError(EError::InvalidValue,
-                              "host can't be mixed with other hosts");
-
             if (settings.size() > 2)
                 return TError(EError::InvalidValue, "Invalid net in: " + line);
 
             if (settings.size() == 1) {
-                host = true;
+                net.Share = true;
             } else {
                 hnet.Dev = StringTrim(settings[1]);
-                // TODO: make sure device exists
-                return TError(EError::NotSupported, "Selective devise is not supported yet");
-            }
 
-            net.Host.push_back(hnet);
+                if (!ValidLink(hnet.Dev))
+                    return TError(EError::InvalidValue,
+                                  "Invalid host interface " + hnet.Dev);
+
+                net.Host.push_back(hnet);
+            }
         } else if (type == "macvlan") {
             if (settings.size() < 3)
                 return TError(EError::InvalidValue, "Invalid macvlan in: " + line);
@@ -739,6 +748,11 @@ TError ParseNet(const std::string &s, TNetCfg &net) {
             string name = StringTrim(settings[2]);
             string type = "bridge";
             string hw = "";
+
+            if (!ValidLink(master))
+                return TError(EError::InvalidValue,
+                              "Invalid macvlan master " + master);
+
 
             if (settings.size() > 3) {
                 type = StringTrim(settings[3]);
@@ -770,13 +784,9 @@ TError ParseNet(const std::string &s, TNetCfg &net) {
 
             net.MacVlan.push_back(mvlan);
         } else {
-            return TError(EError::InvalidValue, "Invalid net type " + type);
+            return TError(EError::InvalidValue, "Configuration is not specified");
         }
     }
-
-    if (none == true && (net.Host.size() || net.MacVlan.size()))
-        return TError(EError::InvalidValue,
-                      "none can't be mixed with other types");
 
     return TError::Success();
 }

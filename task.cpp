@@ -370,11 +370,13 @@ TError TTask::ChildIsolateFs(bool priveleged) {
 }
 
 TError TTask::IsolateNet(int childPid) {
-    if (!config().network().enabled())
-        return TError(EError::Unknown, "Network support is disabled");
-
     for (auto &host : Env->NetCfg.Host) {
-        // TODO: move host interfaces
+        TError error = TNetlink::Exec(config().network().device(),
+            [&](TNetlink &nl) {
+                return nl.ChangeLinkNs(host.Dev, host.Dev, childPid);
+            });
+        if (error)
+            return error;
     }
 
     for (auto &mvlan : Env->NetCfg.MacVlan) {
@@ -532,7 +534,7 @@ TError TTask::Start() {
         if (Env->Hostname != "")
             cloneFlags |= CLONE_NEWUTS;
 
-        if (!Env->NetCfg.Host.size())
+        if (!Env->NetCfg.Share)
             cloneFlags |= CLONE_NEWNET;
 
         int ret = pipe2(syncfd, O_CLOEXEC);

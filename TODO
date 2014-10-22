@@ -1,10 +1,6 @@
-- selftest: test statistics only when cfq enabled
-- make sure double spaces work as expected in bind and other properties
 - up loopback in network namespace
-- full dump on sigsegv
-- ? different log levels (error, normal, verbose)
+- shaping with macvlan or non-default interface?
 - ? portoctl cp
-- ? start portod in container -> need to parse mountinfo, not mounts (because mountinfo skips mounts outside of chroot)
 
 # properties
 - ? capabilities
@@ -21,9 +17,6 @@
 - ? get rid of globals/static which have class types (http://google-styleguide.googlecode.com/svn/trunk/cppguide.html#Static_and_Global_Variables)
 - ? portoctl inpect to export everything in JSON
 
-# network
-- ? net_prio 0-7 -> 0-99
-
 # phase 3
 - ? write dom0 hostname into come file on container or pass via ENV
 ## disk
@@ -36,7 +29,7 @@
 - ? when to enable user namespace
 - ? devices c 1:3 rwm; c 1:5 rwm; c 1:9 rwm; c 1:8 rwm; c 136:* rwm; c 5:2 rwm
 ## net
-- net:<none|host|host:<dev>|macvlan: <host> <name> [type=bridge] [hw=auto]>
+- ? net_prio 0-7 -> 0-99
 
 # phase 2
 - rt: create cgroup for non-smart tasks and throttle them
@@ -45,8 +38,11 @@
 # phase X
 - ? kernel support for cgroup to limit allowed ports
 - ? kernel support for cgroup coredump path
+- ? full dump on sigsegv
+- ? start portod in container -> need to parse mountinfo, not mounts (because mountinfo skips mounts outside of chroot)
 
 # cleanup
 - remove extern AckExitStatus from container->Stop()
 - rotate subprocess stdout/stderr
 - move all 'extern "C"' into one file
+- different log levels (error, normal, verbose)

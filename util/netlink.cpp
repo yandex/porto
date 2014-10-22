@@ -693,6 +693,13 @@ bool TNetlink::ValidMacAddr(const std::string &hw) {
     return ether_aton(hw.c_str()) != nullptr;
 }
 
+bool TNetlink::ValidLink(const std::string &name) {
+    struct rtnl_link *l = rtnl_link_get_by_name(linkCache, name.c_str());
+    rtnl_link_put(l);
+
+    return l != nullptr;
+}
+
 void TNetlink::EnableDebug(bool enable) {
     debug = enable;
 }

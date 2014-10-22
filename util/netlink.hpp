@@ -56,6 +56,8 @@ public:
     TError AddMacVlan(const std::string &name, const std::string &master,
                       const std::string &type, const std::string &hw,
                       int nsPid);
+    bool ValidLink(const std::string &name);
+
     static bool ValidMacVlanType(const std::string &type);
     static bool ValidMacAddr(const std::string &hw);
 
@@ -66,5 +68,17 @@ public:
 uint32_t TcHandle(uint16_t maj, uint16_t min);
 uint32_t TcRootHandle();
 uint16_t TcMajor(uint32_t handle);
+
+static inline bool ValidLink(const std::string &name) {
+    TError error = TNetlink::Exec(config().network().device(),
+        [&](TNetlink &nl) {
+            if (nl.ValidLink(name))
+                return TError::Success();
+            else
+                return TError(EError::Unknown, "");
+        });
+
+    return error == TError::Success();
+}
 
 #endif

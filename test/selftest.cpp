@@ -1171,8 +1171,6 @@ static map<string, string> IfHw(const vector<string> &iplines) {
 
         string hw = StringTrim(tokens[1]);
 
-        std::cerr << iface << "=" << hw << std::endl;
-
         ret[iface] = hw;
     }
 
@@ -1202,6 +1200,8 @@ static void TestNetProperty(TPortoAPI &api) {
 
     vector<string> hostLink = Popen("ip -o -d link show");
 
+    // TODO: make sure lo is UP in isolated and non-isolated cases
+
     TNetlink nl;
     string dev;
     TError error = TNetlink::Exec(config().network().device(), [&](TNetlink &nl) {
@@ -1211,14 +1211,13 @@ static void TestNetProperty(TPortoAPI &api) {
 
     Say() << "Check net parsing" << std::endl;
     ExpectFailure(api.SetProperty(name, "net", "qwerty"), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "net", ""), EError::InvalidValue);
     ExpectSuccess(api.SetProperty(name, "net", "host"));
     ExpectSuccess(api.SetProperty(name, "net", "none"));
-    ExpectSuccess(api.SetProperty(name, "net", "host; macvlan " + dev + " eth0"));
-    ExpectFailure(api.SetProperty(name, "net", "host; macvlan invalid eth0"), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "net", "host; macvlan " + dev + " " + dev), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "net", "host; host veth0"), EError::InvalidValue);
     ExpectFailure(api.SetProperty(name, "net", "host; host"), EError::InvalidValue);
     ExpectFailure(api.SetProperty(name, "net", "host; none"), EError::InvalidValue);
-    ExpectFailure(api.SetProperty(name, "net", "none; host"), EError::InvalidValue);
-    ExpectFailure(api.SetProperty(name, "net", "host veth0"), EError::NotSupported);
 
     Say() << "Check net=none" << std::endl;
 
@@ -1239,21 +1238,38 @@ static void TestNetProperty(TPortoAPI &api) {
     Expect(ShareMacAddress(hostLink, containerLink) == true);
     ExpectSuccess(api.Stop(name));
 
-    Say() << "Check net=host:veth0" << std::endl;
-    ExpectFailure(api.SetProperty(name, "net", "host veth0"), EError::NotSupported);
-    // TODO: create veth and pass it to network
-
-    Say() << "Check net=macvlan" << std::endl;
-    ExpectFailure(api.SetProperty(name, "net", "macvlan"), EError::InvalidValue);
-    ExpectFailure(api.SetProperty(name, "net", "macvlan " + dev), EError::InvalidValue);
-    ExpectSuccess(api.SetProperty(name, "net", "macvlan " + dev + " " + dev));
     ExpectSuccess(api.SetProperty(name, "command", "ip -o -d link show"));
+
+    Say() << "Check net=host:veth0" << std::endl;
+
+    AsRoot(api);
+    (void)system("ip link delete veth0");
+    Expect(system("ip link add veth0 type veth peer name veth1") == 0);
+    AsNobody(api);
+
+    ExpectFailure(api.SetProperty(name, "net", "host invalid"), EError::InvalidValue);
+    ExpectSuccess(api.SetProperty(name, "net", "host veth0"));
     s = StartWaitAndGetData(api, name, "stdout");
     containerLink = StringToVec(s);
     Expect(containerLink.size() == 2);
     Expect(containerLink.size() != hostLink.size());
     Expect(ShareMacAddress(hostLink, containerLink) == false);
     auto linkMap = IfHw(containerLink);
+    Expect(linkMap.find("lo") != linkMap.end());
+    Expect(linkMap.find("veth0") != linkMap.end());
+    ExpectSuccess(api.Stop(name));
+
+    Say() << "Check net=macvlan" << std::endl;
+    ExpectFailure(api.SetProperty(name, "net", "macvlan"), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "net", "macvlan invalid " + dev), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "net", "macvlan " + dev), EError::InvalidValue);
+    ExpectSuccess(api.SetProperty(name, "net", "macvlan " + dev + " " + dev));
+    s = StartWaitAndGetData(api, name, "stdout");
+    containerLink = StringToVec(s);
+    Expect(containerLink.size() == 2);
+    Expect(containerLink.size() != hostLink.size());
+    Expect(ShareMacAddress(hostLink, containerLink) == false);
+    linkMap = IfHw(containerLink);
     Expect(linkMap.find("lo") != linkMap.end());
     Expect(linkMap.find("eth0") != linkMap.end());
     ExpectSuccess(api.Stop(name));
@@ -2349,7 +2365,7 @@ int SelfTest(string name, int leakNr) {
         1 + /* respawn */
         7 + /* ulimit */
         4 + /* bind */
-        9 + /* net */
+        10 + /* net */
         3 /* Can't remove cgroups */)
         std::cerr << "WARNING: Unexpected number of errors: " << errors << "!" << std::endl;
 

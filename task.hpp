@@ -41,6 +41,7 @@ struct TMacVlanNetCfg {
 };
 
 struct TNetCfg {
+    bool Share;
     std::vector<THostNetCfg> Host;
     std::vector<TMacVlanNetCfg> MacVlan;
 };
