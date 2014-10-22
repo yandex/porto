@@ -1136,8 +1136,13 @@ static vector<string> StringToVec(const std::string &s) {
     return lines;
 }
 
-static map<string, string> IfHw(const vector<string> &iplines) {
-    map<string, string> ret;
+struct LinkInfo {
+    std::string hw;
+    bool up;
+};
+
+static map<string, LinkInfo> IfHw(const vector<string> &iplines) {
+    map<string, LinkInfo> ret;
     for (auto &ipline : iplines) {
         vector<string> lines;
         TError error = SplitString(ipline, '\\', lines);
@@ -1154,6 +1159,9 @@ static map<string, string> IfHw(const vector<string> &iplines) {
             throw "Invalid line 1: " + lines[0];
 
         string fulliface = StringTrim(tokens[1]);
+        string flags = StringTrim(tokens[2]);
+
+        bool up = flags.find("DOWN") == std::string::npos;
 
         tokens.clear();
         error = SplitString(fulliface, '@', tokens);
@@ -1171,22 +1179,23 @@ static map<string, string> IfHw(const vector<string> &iplines) {
 
         string hw = StringTrim(tokens[1]);
 
-        ret[iface] = hw;
+        struct LinkInfo li = { hw, up };
+        ret[iface] = li;
     }
 
     return ret;
 }
 
 static bool ShareMacAddress(const vector<string> &a, const vector<string> &b) {
-    map<string, string> ahw = IfHw(a);
-    map<string, string> bhw = IfHw(b);
+    auto ahw = IfHw(a);
+    auto bhw = IfHw(b);
 
     for (auto apair : ahw) {
-        if (apair.second == "00:00:00:00:00:00")
+        if (apair.second.hw == "00:00:00:00:00:00")
             continue;
 
         for (auto bpair : bhw) {
-            if (apair.second == bpair.second)
+            if (apair.second.hw == bpair.second.hw)
                 return true;
         }
     }
@@ -1199,8 +1208,6 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectSuccess(api.Create(name));
 
     vector<string> hostLink = Popen("ip -o -d link show");
-
-    // TODO: make sure lo is UP in isolated and non-isolated cases
 
     TNetlink nl;
     string dev;
@@ -1228,6 +1235,9 @@ static void TestNetProperty(TPortoAPI &api) {
     Expect(containerLink.size() == 1);
     Expect(containerLink.size() != hostLink.size());
     Expect(ShareMacAddress(hostLink, containerLink) == false);
+    auto linkMap = IfHw(containerLink);
+    Expect(linkMap.find("lo") != linkMap.end());
+    Expect(linkMap.at("lo").up == true);
     ExpectSuccess(api.Stop(name));
 
     Say() << "Check net=host" << std::endl;
@@ -1236,6 +1246,9 @@ static void TestNetProperty(TPortoAPI &api) {
     containerLink = StringToVec(s);
     Expect(containerLink.size() == hostLink.size());
     Expect(ShareMacAddress(hostLink, containerLink) == true);
+    linkMap = IfHw(containerLink);
+    Expect(linkMap.find("lo") != linkMap.end());
+    Expect(linkMap.at("lo").up == true);
     ExpectSuccess(api.Stop(name));
 
     ExpectSuccess(api.SetProperty(name, "command", "ip -o -d link show"));
@@ -1254,8 +1267,9 @@ static void TestNetProperty(TPortoAPI &api) {
     Expect(containerLink.size() == 2);
     Expect(containerLink.size() != hostLink.size());
     Expect(ShareMacAddress(hostLink, containerLink) == false);
-    auto linkMap = IfHw(containerLink);
+    linkMap = IfHw(containerLink);
     Expect(linkMap.find("lo") != linkMap.end());
+    Expect(linkMap.at("lo").up == true);
     Expect(linkMap.find("veth0") != linkMap.end());
     ExpectSuccess(api.Stop(name));
 
@@ -1271,6 +1285,7 @@ static void TestNetProperty(TPortoAPI &api) {
     Expect(ShareMacAddress(hostLink, containerLink) == false);
     linkMap = IfHw(containerLink);
     Expect(linkMap.find("lo") != linkMap.end());
+    Expect(linkMap.at("lo").up == true);
     Expect(linkMap.find("eth0") != linkMap.end());
     ExpectSuccess(api.Stop(name));
 
@@ -1283,8 +1298,9 @@ static void TestNetProperty(TPortoAPI &api) {
     Expect(ShareMacAddress(hostLink, containerLink) == false);
     linkMap = IfHw(containerLink);
     Expect(linkMap.find("lo") != linkMap.end());
+    Expect(linkMap.at("lo").up == true);
     Expect(linkMap.find("eth10") != linkMap.end());
-    Expect(linkMap.at("eth10") == hw);
+    Expect(linkMap.at("eth10").hw == hw);
     ExpectSuccess(api.Stop(name));
 
     ExpectSuccess(api.Destroy(name));

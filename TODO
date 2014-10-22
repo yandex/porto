@@ -1,5 +1,6 @@
-- up loopback in network namespace
+- refactor netlink into TNetlink and TXyz
 - shaping with macvlan or non-default interface?
+- set hierarchy for blkio
 - ? portoctl cp
 
 # properties

@@ -107,6 +107,7 @@ class TTask {
     TError RestrictProc();
     TError ChildMountDev();
     TError ChildIsolateFs(bool priveleged);
+    TError EnableNet();
     TError IsolateNet(int childPid);
 
 public:

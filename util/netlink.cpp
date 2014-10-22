@@ -82,7 +82,21 @@ TError TNetlink::FindDev(std::string &device) {
     return TError::Success();
 }
 
-TError TNetlink::Open(std::string device) {
+std::vector<std::string> TNetlink::FindDev(int flags) {
+    struct Iter { int flags; vector<string> devices; } data;
+    data.flags = flags;
+    nl_cache_foreach(linkCache, [](struct nl_object *obj, void *data) {
+                     Iter *p = (Iter *)data;
+                     struct rtnl_link *l = (struct rtnl_link *)obj;
+
+                     if (rtnl_link_get_flags(l) & p->flags)
+                        p->devices.push_back(rtnl_link_get_name(l));
+                     }, &data);
+
+    return data.devices;
+}
+
+TError TNetlink::Open(std::string device, bool getLink) {
     int ret;
     TError error;
 
@@ -106,16 +120,18 @@ TError TNetlink::Open(std::string device) {
 
     nl_cache_mngt_provide(linkCache);
 
-    if (!device.length()) {
-        error = FindDev(device);
-        if (error)
-            return error;
-    }
+    if (getLink) {
+        if (!device.length()) {
+            error = FindDev(device);
+            if (error)
+                return error;
+        }
 
-    link = rtnl_link_get_by_name(linkCache, device.c_str());
-    if (!link) {
-        error = TError(EError::Unknown, string("Invalid device ") + device);
-        goto free_cache;
+        link = rtnl_link_get_by_name(linkCache, device.c_str());
+        if (!link) {
+            error = TError(EError::Unknown, string("Invalid device ") + device);
+            goto free_cache;
+        }
     }
 
     return TError::Success();
@@ -151,7 +167,10 @@ void TNetlink::LogObj(const std::string &prefix, void *obj) {
     auto &str = TLogger::Log();
     handler = [&](struct nl_dump_params *params, char *buf) { str << buf; };
 
-    str << "netlink " << rtnl_link_get_name(link) << ": " << prefix << " ";
+    if (link)
+        str << "netlink " << rtnl_link_get_name(link) << ": " << prefix << " ";
+    else
+        str << "netlink: " << prefix << " ";
     nl_object_dump(OBJ_CAST(obj), &dp);
     str << std::endl;
 }
@@ -169,7 +188,10 @@ void TNetlink::LogCache(struct nl_cache *cache) {
     auto &str = TLogger::Log();
     handler = [&](struct nl_dump_params *params, char *buf) { str << buf; };
 
-    str << "netlink " << rtnl_link_get_name(link) << " cache: ";
+    if (link)
+        str << "netlink " << rtnl_link_get_name(link) << " cache: ";
+    else
+        str << "netlink cache: ";
     nl_cache_dump(cache, &dp);
     str << std::endl;
 }
@@ -607,16 +629,16 @@ TError TNetlink::LinkUp(const std::string &name) {
     }
 
     rtnl_link_set_name(oldLink, name.c_str());
+    rtnl_link_set_name(newLink, name.c_str());
     rtnl_link_set_flags(newLink, IFF_UP);
 
-    LogObj("up old", oldLink);
-    LogObj("up new", oldLink);
+    LogObj("up", newLink);
 
     ret = rtnl_link_change(sock, oldLink, newLink, 0);
     if (ret < 0) {
         rtnl_link_put(oldLink);
         rtnl_link_put(newLink);
-        return TError(EError::Unknown, string("Unable to change link namespace: ") + nl_geterror(ret));
+        return TError(EError::Unknown, "Unable to change " + name + " status: " + nl_geterror(ret));
     }
 
     rtnl_link_put(newLink);
@@ -650,7 +672,7 @@ TError TNetlink::ChangeLinkNs(const std::string &name,
     if (ret < 0) {
         rtnl_link_put(oldLink);
         rtnl_link_put(newLink);
-        return TError(EError::Unknown, string("Unable to change link namespace: ") + nl_geterror(ret));
+        return TError(EError::Unknown, "Unable to change " + name + " namespace: " + nl_geterror(ret));
     }
 
     rtnl_link_put(newLink);
@@ -704,10 +726,10 @@ void TNetlink::EnableDebug(bool enable) {
     debug = enable;
 }
 
-TError TNetlink::Exec(std::string device, std::function<TError(TNetlink &nl)> f) {
+TError TNetlink::Exec(std::string device, std::function<TError(TNetlink &nl)> f, bool getLink) {
     TNetlink nl;
 
-    TError error = nl.Open(device);
+    TError error = nl.Open(device, getLink);
     if (error)
         return error;
 

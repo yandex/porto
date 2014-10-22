@@ -25,6 +25,7 @@ extern "C" {
 #include <wordexp.h>
 #include <grp.h>
 #include <linux/kdev_t.h>
+#include <net/if.h>
 }
 
 using std::stringstream;
@@ -369,6 +370,22 @@ TError TTask::ChildIsolateFs(bool priveleged) {
     return newRoot.Chdir();
 }
 
+TError TTask::EnableNet() {
+    std::vector<std::string> lo;
+    TNetlink::Exec(config().network().device(),
+        [&](TNetlink &nl) { lo = nl.FindDev(IFF_LOOPBACK);
+                            return TError::Success(); }, false);
+
+    for (auto &dev : lo) {
+        TError error = TNetlink::Exec(config().network().device(),
+            [&](TNetlink &nl) { return nl.LinkUp(dev); }, false);
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
+}
+
 TError TTask::IsolateNet(int childPid) {
     for (auto &host : Env->NetCfg.Host) {
         TError error = TNetlink::Exec(config().network().device(),
@@ -388,9 +405,6 @@ TError TTask::IsolateNet(int childPid) {
         if (error)
             return error;
     }
-
-    // TODO: up loopback
-    //TError error = LinkUp("lo");
 
     return TError::Success();
 }
@@ -458,6 +472,12 @@ int TTask::ChildCallback() {
     error = ChildIsolateFs(priveleged);
     if (error)
         Abort(error);
+
+    if (!Env->NetCfg.Share) {
+        error = EnableNet();
+        if (error)
+            Abort(error);
+    }
 
     error = Env->Cwd.Chdir();
     if (error)
