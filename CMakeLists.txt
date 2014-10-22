@@ -14,10 +14,15 @@ endif()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/api/cpp)
 
-find_library(NL NAMES nl-3)
-find_library (RTNL nl-route-3)
-find_path(NL_INCLUDE_DIR NAMES netlink/netlink.h PATH_SUFFIXES libnl3)
-include_directories(${NL_INCLUDE_DIR})
+include(ExternalProject)
+ExternalProject_Add(libnl
+	SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/contrib/libnl
+	UPDATE_COMMAND autoreconf -fi
+	CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --disable-cli --disable-pthreads
+	BUILD_COMMAND ${MAKE})
+
+ExternalProject_Get_Property(libnl INSTALL_DIR)
+include_directories(${INSTALL_DIR}/include/libnl3)
 
 find_library(PB NAMES libprotobuf.a)
 find_package(Protobuf REQUIRED)
@@ -45,7 +50,7 @@ add_dependencies(porto version.hpp)
 
 add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp task.cpp kvalue.cpp subsystem.cpp config.cpp property.cpp qdisc.cpp util/namespace.cpp util/netlink.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/unix.cpp util/pwd.cpp util/string.cpp util/crash.cpp)
 add_dependencies(portod version.hpp)
-target_link_libraries(portod porto ${PB} ${RTNL} ${NL} pthread rt)
+target_link_libraries(portod porto ${PB} ${INSTALL_DIR}/lib/libnl-3.a ${INSTALL_DIR}/lib/libnl-route-3.a pthread rt)
 
 add_executable(portoctl api/python/porto/rpc_pb2.py portoctl.cpp cli.cpp config.cpp util/namespace.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/unix.cpp util/pwd.cpp util/string.cpp)
 add_dependencies(portoctl version.hpp)
@@ -53,7 +58,7 @@ target_link_libraries(portoctl porto ${PB} rt)
 
 add_executable(portotest portotest.cpp config.cpp test/selftest.cpp test/stresstest.cpp test/test.cpp config.cpp util/netlink.cpp util/log.cpp util/path.cpp util/file.cpp util/folder.cpp util/unix.cpp util/pwd.cpp util/string.cpp)
 add_dependencies(portotest version.hpp)
-target_link_libraries(portotest porto ${PB} ${RTNL} ${NL} pthread rt)
+target_link_libraries(portotest porto ${PB} ${INSTALL_DIR}/lib/libnl-3.a ${INSTALL_DIR}/lib/libnl-route-3.a pthread rt)
 
 install(
     TARGETS portod portoctl portotest

@@ -2,7 +2,7 @@ Source: yandex-porto
 Section: utils
 Priority: extra
 Maintainer: Eugene Kilimchuk <ekilimchuk@yandex-team.ru>
-Build-Depends: debhelper (>= 8.0.0), libnl-3-dev, libnl-route-3-dev
+Build-Depends: debhelper (>= 8.0.0)
 Standards-Version: 3.9.2
 Homepage: https://wiki.yandex-team.ru/porto
 #Vcs-Git: ssh://git.yandex.ru/search-admin/porto.git
@@ -12,6 +12,6 @@ Section: utils
 Priority: extra
 Architecture: amd64
 Pre-Depends: yandex-search-group-porto
-Depends: ${shlibs:Depends}, logrotate, libnl-route-3-200, libnl-3-200, linux-image-server (>= 3.4.0) | linux-image-generic (>= 3.4.0)
+Depends: ${shlibs:Depends}, logrotate, linux-image-server (>= 3.4.0) | linux-image-generic (>= 3.4.0)
 Description: Component of Nirvana
  Porto allows to run process in namespace with cgroup.
