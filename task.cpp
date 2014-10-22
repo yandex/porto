@@ -371,14 +371,19 @@ TError TTask::ChildIsolateFs(bool priveleged) {
 }
 
 TError TTask::EnableNet() {
-    std::vector<std::string> lo;
-    TNetlink::Exec(config().network().device(),
-        [&](TNetlink &nl) { lo = nl.FindDev(IFF_LOOPBACK);
-                            return TError::Success(); }, false);
+    auto nl = std::make_shared<TNl>();
+    if (!nl)
+        throw std::bad_alloc();
+
+    TError error = nl->Connect();
+    if (error)
+        return error;
+
+    std::vector<std::string> lo = nl->FindLink(IFF_LOOPBACK);
 
     for (auto &dev : lo) {
-        TError error = TNetlink::Exec(config().network().device(),
-            [&](TNetlink &nl) { return nl.LinkUp(dev); }, false);
+        auto link = std::make_shared<TNlLink>(nl, dev);
+        TError error = link->Up();
         if (error)
             return error;
     }
@@ -387,21 +392,32 @@ TError TTask::EnableNet() {
 }
 
 TError TTask::IsolateNet(int childPid) {
+    auto nl = std::make_shared<TNl>();
+    if (!nl)
+        throw std::bad_alloc();
+
+    TError error = nl->Connect();
+    if (error)
+        return error;
+
+
     for (auto &host : Env->NetCfg.Host) {
-        TError error = TNetlink::Exec(config().network().device(),
-            [&](TNetlink &nl) {
-                return nl.ChangeLinkNs(host.Dev, host.Dev, childPid);
-            });
+        auto link = std::make_shared<TNlLink>(nl, host.Dev);
+        TError error = link->ChangeNs(host.Dev, childPid);
         if (error)
             return error;
     }
 
     for (auto &mvlan : Env->NetCfg.MacVlan) {
-        TError error = TNetlink::Exec(config().network().device(),
-            [&](TNetlink &nl) {
-                return nl.AddMacVlan(mvlan.Name, mvlan.Master,
-                                     mvlan.Type, mvlan.Hw, childPid);
-            });
+        auto link = std::make_shared<TNlLink>(nl, "portomv0");
+
+        (void)link->Remove();
+
+        TError error = link->AddMacVlan(mvlan.Master, mvlan.Type, mvlan.Hw);
+        if (error)
+            return error;
+
+        error = link->ChangeNs(mvlan.Name, childPid);
         if (error)
             return error;
     }

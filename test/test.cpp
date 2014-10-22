@@ -319,19 +319,37 @@ int GetVmRss(const std::string &pid) {
     return std::stoi(size);
 }
 
-bool TcClassExist(const std::string &handle) {
-    TNetlink nl;
-    uint32_t h;
+bool TcClassExist(uint32_t handle) {
+    return TNlLink::Exec(config().network().device(),
+        [&](std::shared_ptr<TNlLink> link) {
+            TNlClass tclass(link, -1, handle);
+            if (tclass.Exists())
+                return TError::Success();
+            else
+                return TError(EError::Unknown, "");
+        }) == TError::Success();
+}
 
-    TError error = StringToUint32(handle, h);
-    if (error)
-        throw error.GetMsg();
+bool TcQdiscExist(uint32_t handle) {
+    return TNlLink::Exec(config().network().device(),
+        [&](std::shared_ptr<TNlLink> link) {
+            TNlHtb qdisc(link, -1, handle);
+            if (qdisc.Exists())
+                return TError::Success();
+            else
+                return TError(EError::Unknown, "");
+        }) == TError::Success();
+}
 
-    error = nl.Open(config().network().device());
-    if (error)
-        throw error.GetMsg();
-
-    return nl.ClassExists(h);
+bool TcCgFilterExist(uint32_t parent, uint32_t handle) {
+    return TNlLink::Exec(config().network().device(),
+        [&](std::shared_ptr<TNlLink> link) {
+            TNlCgFilter filter(link, parent, handle);
+            if (filter.Exists())
+                return TError::Success();
+            else
+                return TError(EError::Unknown, "");
+        }) == TError::Success();
 }
 
 int WordCount(const std::string &path, const std::string &word) {

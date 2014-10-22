@@ -136,7 +136,7 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
 
 static void ExpectTclass(string name, bool exp) {
     string cls = GetCgKnob("net_cls", name, "net_cls.classid");
-    Expect(TcClassExist(cls) == exp);
+    Expect(TcClassExist(stoul(cls)) == exp);
 }
 
 static void TestHolder(TPortoAPI &api) {
@@ -487,20 +487,20 @@ static void TestLongRunning(TPortoAPI &api) {
     Expect(leaf_cls != "0");
     Expect(root_cls != leaf_cls);
 
-    Expect(TcClassExist(root_cls) == true);
-    Expect(TcClassExist(leaf_cls) == true);
+    Expect(TcClassExist(stoul(root_cls)) == true);
+    Expect(TcClassExist(stoul(leaf_cls)) == true);
 
     ExpectSuccess(api.Stop(name));
     Expect(TaskRunning(api, pid) == false);
-    Expect(TcClassExist(leaf_cls) == false);
+    Expect(TcClassExist(stoul(leaf_cls)) == false);
 
     Say() << "Check that destroying container removes tclass" << std::endl;
     ExpectSuccess(api.Start(name));
-    Expect(TcClassExist(root_cls) == true);
-    Expect(TcClassExist(leaf_cls) == true);
+    Expect(TcClassExist(stoul(root_cls)) == true);
+    Expect(TcClassExist(stoul(leaf_cls)) == true);
     ExpectSuccess(api.Destroy(name));
     Expect(TaskRunning(api, pid) == false);
-    Expect(TcClassExist(leaf_cls) == false);
+    Expect(TcClassExist(stoul(leaf_cls)) == false);
     ExpectSuccess(api.Create(name));
 
     Say() << "Check that hierarchical task cgroups are correct" << std::endl;
@@ -568,13 +568,12 @@ static void TestIsolation(TPortoAPI &api) {
 
     Say() << "Make sure container has correct network class" << std::endl;
 
-    TNetlink nl;
-    Expect(nl.Open(config().network().device()) == TError::Success());
     string handle = GetCgKnob("net_cls", name, "net_cls.classid");
     Expect(handle != "0");
-    Expect(nl.ClassExists(stoul(handle)) == true);
+
+    Expect(TcClassExist(stoul(handle)) == true);
     ExpectSuccess(api.Stop(name));
-    Expect(nl.ClassExists(stoul(handle)) == false);
+    Expect(TcClassExist(stoul(handle)) == false);
 
     ExpectSuccess(api.Destroy(name));
 }
@@ -1209,12 +1208,16 @@ static void TestNetProperty(TPortoAPI &api) {
 
     vector<string> hostLink = Popen("ip -o -d link show");
 
-    TNetlink nl;
     string dev;
-    TError error = TNetlink::Exec(config().network().device(), [&](TNetlink &nl) {
-                                  return nl.FindDev(dev); });
-    if (error)
-        throw error.GetMsg();
+
+    ExpectSuccess(TNlLink::Exec(config().network().device(),
+        [&](std::shared_ptr<TNlLink> link) {
+            dev = link->GetName();
+            return TError::Success();
+        }));
+
+    if (!dev.length())
+        throw "Invalid network device";
 
     Say() << "Check net parsing" << std::endl;
     ExpectFailure(api.SetProperty(name, "net", "qwerty"), EError::InvalidValue);
@@ -1487,16 +1490,13 @@ static void TestRoot(TPortoAPI &api) {
     uint32_t rootQdisc = TcHandle(1, 0);
     uint32_t nextQdisc = TcHandle(2, 0);
 
-    TNetlink nl;
-    Expect(nl.Open(config().network().device()) == TError::Success());
-    Expect(nl.QdiscExists(rootQdisc) == true);
-    Expect(nl.QdiscExists(nextQdisc) == false);
-    Expect(nl.ClassExists(defClass) == true);
-    Expect(nl.ClassExists(rootClass) == true);
-    Expect(nl.ClassExists(nextClass) == false);
-
-    Expect(nl.CgroupFilterExists(rootQdisc, 1) == true);
-    Expect(nl.CgroupFilterExists(rootQdisc, 2) == false);
+    Expect(TcQdiscExist(rootQdisc) == true);
+    Expect(TcQdiscExist(nextQdisc) == false);
+    Expect(TcClassExist(defClass) == true);
+    Expect(TcClassExist(rootClass) == true);
+    Expect(TcClassExist(nextClass) == false);
+    Expect(TcCgFilterExist(rootQdisc, 1) == true);
+    Expect(TcCgFilterExist(rootQdisc, 2) == false);
 }
 
 static void TestStats(TPortoAPI &api) {
@@ -1688,10 +1688,13 @@ static void TestLimits(TPortoAPI &api) {
     ExpectSuccess(api.Start(name));
 
     uint32_t prio, rate, ceil;
-    TNetlink nl;
-    Expect(nl.Open(config().network().device()) == TError::Success());
+
     string handle = GetCgKnob("net_cls", name, "net_cls.classid");
-    ExpectSuccess(nl.GetClassProperties(stoul(handle), prio, rate, ceil));
+    ExpectSuccess(TNlLink::Exec(config().network().device(),
+        [&](std::shared_ptr<TNlLink> link) {
+            TNlClass tclass(link, -1, stoul(handle));
+            return tclass.GetProperties(prio, rate, ceil);
+        }));
 
     Expect(prio == netPrio);
     Expect(rate == netGuarantee);

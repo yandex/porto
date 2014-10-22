@@ -39,7 +39,9 @@ namespace test {
     std::string GetCgKnob(const std::string &subsys, const std::string &name, const std::string &knob);
     bool HaveCgKnob(const std::string &subsys, const std::string &knob);
     int GetVmRss(const std::string &pid);
-    bool TcClassExist(const std::string &handle);
+    bool TcClassExist(uint32_t handle);
+    bool TcQdiscExist(uint32_t handle);
+    bool TcCgFilterExist(uint32_t parent, uint32_t handle);
     int WordCount(const std::string &path, const std::string &word);
     std::string ReadLink(const std::string &path);
     bool FileExists(const std::string &path);

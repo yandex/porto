@@ -1,6 +1,6 @@
-- refactor netlink into TNetlink and TXyz
 - shaping with macvlan or non-default interface?
 - set hierarchy for blkio
+- ? track config device changes
 - ? portoctl cp
 
 # properties

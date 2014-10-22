@@ -121,7 +121,7 @@ static int DaemonSyncConfig(bool master, bool trunc) {
     config.Load();
     if (noNetwork)
         config().mutable_network()->set_enabled(false);
-    TNetlink::EnableDebug(config().network().debug());
+    TNl::EnableDebug(config().network().debug());
 
     const auto &log = master ? config().master_log() : config().slave_log();
     const auto &pid = master ? config().master_pid() : config().slave_pid();

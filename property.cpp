@@ -756,22 +756,23 @@ TError ParseNet(const std::string &s, TNetCfg &net) {
 
             if (settings.size() > 3) {
                 type = StringTrim(settings[3]);
-                if (!TNetlink::ValidMacVlanType(type))
+                if (!TNlLink::ValidMacVlanType(type))
                     return TError(EError::InvalidValue,
                                   "Invalid macvlan type " + type);
             }
             if (settings.size() > 4) {
                 hw = StringTrim(settings[4]);
-                if (!TNetlink::ValidMacAddr(hw))
+                if (!TNlLink::ValidMacAddr(hw))
                     return TError(EError::InvalidValue,
                                   "Invalid macvlan address " + hw);
             }
 
             int idx = -1;
-            TError error = TNetlink::Exec(config().network().device(),
-            [&](TNetlink &nl) {
-                idx = nl.GetLinkIndex(master);
-                return TError::Success(); });
+            TError error = TNlLink::Exec(config().network().device(),
+                [&](std::shared_ptr<TNlLink> link) {
+                    idx = link->FindIndex(master);
+                    return TError::Success();
+                });
 
             if (idx < 0)
                 return TError(EError::InvalidValue, "Interface " + master + " doesn't exist or not in running state");
