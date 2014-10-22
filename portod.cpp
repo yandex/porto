@@ -110,7 +110,7 @@ static void SignalMask(int how) {
 }
 
 static int DaemonSyncConfig(bool master, bool trunc) {
-    if (trunc) {
+    if (trunc && !stdlog) {
         const auto &oldPid = master ? config().master_pid() : config().slave_pid();
         TLogger::CloseLog();
         TLogger::TruncateLog();
@@ -525,6 +525,7 @@ static int SlaveMain() {
             return EXIT_FAILURE;
         }
 
+        bool restored = false;
         {
             std::map<std::string, kv::TNode> m;
             error = storage.Restore(m);
@@ -532,6 +533,7 @@ static int SlaveMain() {
                 TLogger::LogError(error, "Couldn't restore state!");
 
             for (auto &r : m) {
+                restored = true;
                 error = cholder.Restore(r.first, r.second);
                 if (error)
                     TLogger::LogError(error, string("Couldn't restore ") + r.first + " state!");
@@ -539,6 +541,17 @@ static int SlaveMain() {
         }
 
         cs.Destroy();
+
+        if (!restored) {
+            // Remove any container leftovers from previous run
+            string path = config().container().tmp_dir();
+            TFolder dir(path);
+            if (dir.Exists()) {
+                TLogger::Log() << "Removing container leftovers from " << path << std::endl;
+                TError error = dir.Remove(true);
+                TLogger::LogError(error, "Error while removing" + path);
+            }
+        }
 
         if (!noWatchdog)
             WatchdogStart(config().daemon().watchdog_max_fails(),
@@ -701,6 +714,10 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
             hup = false;
             TLogger::Log() << "Updating" << std::endl;
 
+            const char *stdlogArg = nullptr;
+            if (stdlog)
+                stdlogArg = "--stdlog";
+
             SavePidMap(pidToStatus);
 
             if (kill(slavePid, SIGKILL) < 0)
@@ -710,7 +727,7 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
             TLogger::CloseLog();
             close(evtfd[1]);
             close(ackfd[0]);
-            execlp(program_invocation_name, program_invocation_name, nullptr);
+            execlp(program_invocation_name, program_invocation_name, stdlogArg, nullptr);
             TLogger::Log() << "Can't execlp(" << program_invocation_name << ", " << program_invocation_name << ", NULL)" << strerror(errno) << std::endl;
             ret = EXIT_FAILURE;
             break;
