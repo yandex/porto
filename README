@@ -1,5 +1,6 @@
 # Build
 git clone ssh://git.yandex.ru/search-admin/porto.git
+sudo apt-get install build-essential libtool autoconf§ pkg-config flex bison
 cd porto
 git submodule init
 git submodule update
