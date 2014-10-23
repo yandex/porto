@@ -86,7 +86,7 @@ std::vector<std::string> TNl::FindLink(int flags) {
                      Iter *p = (Iter *)data;
                      struct rtnl_link *l = (struct rtnl_link *)obj;
 
-                     if (rtnl_link_get_flags(l) & p->flags)
+                     if (!p->flags || (rtnl_link_get_flags(l) & p->flags))
                         p->devices.push_back(rtnl_link_get_name(l));
                      }, &data);
 

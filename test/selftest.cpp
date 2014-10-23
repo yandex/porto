@@ -1290,6 +1290,7 @@ static void TestNetProperty(TPortoAPI &api) {
     Expect(linkMap.find("lo") != linkMap.end());
     Expect(linkMap.at("lo").up == true);
     Expect(linkMap.find("eth0") != linkMap.end());
+    Expect(linkMap.at("eth0").up == true);
     ExpectSuccess(api.Stop(name));
 
     string hw = "00:11:22:33:44:55";
@@ -1304,6 +1305,7 @@ static void TestNetProperty(TPortoAPI &api) {
     Expect(linkMap.at("lo").up == true);
     Expect(linkMap.find("eth10") != linkMap.end());
     Expect(linkMap.at("eth10").hw == hw);
+    Expect(linkMap.at("eth10").up == true);
     ExpectSuccess(api.Stop(name));
 
     ExpectSuccess(api.Destroy(name));

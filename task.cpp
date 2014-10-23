@@ -379,9 +379,8 @@ TError TTask::EnableNet() {
     if (error)
         return error;
 
-    std::vector<std::string> lo = nl->FindLink(IFF_LOOPBACK);
-
-    for (auto &dev : lo) {
+    std::vector<std::string> devices = nl->FindLink(0);
+    for (auto &dev : devices) {
         auto link = std::make_shared<TNlLink>(nl, dev);
         TError error = link->Up();
         if (error)
