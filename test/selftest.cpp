@@ -1105,11 +1105,11 @@ static void TestBindProperty(TPortoAPI &api) {
     ExpectSuccess(api.SetProperty(name, "command", "cat /proc/self/mountinfo"));
     ExpectSuccess(api.SetProperty(name, "bind", "/bin /bin ro; /tmp/27389 /tmp"));
     string v = StartWaitAndGetData(api, name, "stdout");
-    ExpectSuccess(api.Stop(name));
-
     auto m = ParseMountinfo(v);
+
     Expect(m[path + "/bin"] == "ro,relatime");
-    Expect(m[path + "/tmp"] == "rw,relatime");
+    Expect(m[path + "/tmp"] == "rw,relatime" || m["/tmp"] == "rw");
+    ExpectSuccess(api.Stop(name));
 
     AsRoot(api);
     BootstrapCommand("/bin/cat", path);
@@ -1119,11 +1119,10 @@ static void TestBindProperty(TPortoAPI &api) {
     ExpectSuccess(api.SetProperty(name, "root", path));
     ExpectSuccess(api.SetProperty(name, "bind", "/bin /bin ro; /tmp/27389 /tmp"));
     v = StartWaitAndGetData(api, name, "stdout");
-    ExpectSuccess(api.Stop(name));
-
     m = ParseMountinfo(v);
     Expect(m["/bin"] == "ro,relatime");
-    Expect(m["/tmp"] == "rw,relatime");
+    Expect(m["/tmp"] == "rw,relatime" || m["/tmp"] == "rw");
+    ExpectSuccess(api.Stop(name));
 
     ExpectSuccess(api.Destroy(name));
 }
@@ -1291,8 +1290,8 @@ static void TestNetProperty(TPortoAPI &api) {
     linkMap = IfHw(containerLink);
     Expect(linkMap.find("lo") != linkMap.end());
     Expect(linkMap.at("lo").up == true);
-    Expect(linkMap.find("eth0") != linkMap.end());
-    Expect(linkMap.at("eth0").up == true);
+    Expect(linkMap.find(dev) != linkMap.end());
+    Expect(linkMap.at(dev).up == true);
     ExpectSuccess(api.Stop(name));
 
     string hw = "00:11:22:33:44:55";

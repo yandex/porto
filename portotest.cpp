@@ -7,6 +7,11 @@
 
 using std::string;
 
+extern "C" {
+#include <sys/types.h>
+#include <sys/stat.h>
+}
+
 static int Selftest(int argc, char *argv[]) {
     string test = "";
     int leakNr = 1000;
@@ -41,6 +46,8 @@ int main(int argc, char *argv[])
     // in case client closes pipe we are writing to in the protobuf code
     (void)RegisterSignal(SIGPIPE, SIG_IGN);
     TLogger::LogToStd();
+
+    umask(0);
 
     if (argc >= 2) {
         string name(argv[1]);

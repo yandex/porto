@@ -581,5 +581,3 @@ bool IsCfqActive() {
     return true;
 }
 }
-
-
