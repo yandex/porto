@@ -94,7 +94,7 @@ bool TPath::AccessOk(EFileAccess type) const {
 }
 
 std::string TPath::ToString() const {
-    return ReplaceMultiple(Path, '/');
+    return StringRemoveRepeating(Path, '/');
 }
 
 void TPath::AddComponent(const std::string &component) {

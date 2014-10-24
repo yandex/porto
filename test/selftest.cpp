@@ -26,7 +26,7 @@ using std::pair;
 
 namespace test {
 
-static vector<string> subsystems = { "net_cls", "freezer", "memory", "cpu", "cpuacct" };
+static vector<string> subsystems = { "net_cls", "freezer", "memory", "cpu", "cpuacct", "devices" };
 static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"uts" };
 
 static void ExpectCorrectCgroups(const string &pid, const string &name) {
@@ -107,6 +107,8 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     Expect(v == "");
     ExpectSuccess(api.GetProperty(name, "bind_dns", v));
     Expect(v == "false");
+    ExpectSuccess(api.GetProperty(name, "allowed_devices", v));
+    Expect(v == "a *:* rwm");
 }
 
 static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
@@ -947,7 +949,7 @@ static void TestRootProperty(TPortoAPI &api) {
     ExpectSuccess(api.SetProperty(name, "command", "/ls -1 /dev"));
     v = StartWaitAndGetData(api, name, "stdout");
 
-    vector<string> devs = { "null", "zero", "full", "tty", "urandom", "random" };
+    vector<string> devs = { "null", "zero", "full", "urandom", "random" };
     vector<string> other = { "ptmx", "pts", "shm" };
     vector<string> tokens;
     TError error = SplitString(v, '\n', tokens);
@@ -1311,6 +1313,27 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
+static void TestAllowedDevicesProperty(TPortoAPI &api) {
+    string name = "a";
+    ExpectSuccess(api.Create(name));
+
+    Say() << "Checking default allowed_devices" << std::endl;
+
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.Start(name));
+    Expect(GetCgKnob("devices", name, "devices.list") == "a *:* rwm");
+    ExpectSuccess(api.Stop(name));
+
+    Say() << "Checking custom allowed_devices" << std::endl;
+
+    ExpectSuccess(api.SetProperty(name, "allowed_devices", "c 1:3 rwm; c 1:5 rwm"));
+    ExpectSuccess(api.Start(name));
+    Expect(GetCgKnob("devices", name, "devices.list") == "c 1:3 rwm\nc 1:5 rwm");
+    ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.Destroy(name));
+}
+
 static void TestStateMachine(TPortoAPI &api) {
     string name = "a";
     string pid;
@@ -1444,6 +1467,7 @@ static void TestRoot(TPortoAPI &api) {
         "max_respawns",
         "bind",
         "net",
+        "allowed_devices",
     };
 
     std::vector<TProperty> plist;
@@ -2313,6 +2337,7 @@ int SelfTest(string name, int leakNr) {
         { "hostname_property", TestHostnameProperty },
         { "bind_property", TestBindProperty },
         { "net_property", TestNetProperty },
+        { "allowed_devices_property", TestAllowedDevicesProperty },
         { "limits", TestLimits },
         { "rlimits", TestRlimits },
         { "alias", TestAlias },

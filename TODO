@@ -1,3 +1,4 @@
+- selftest for maximun number of macvlans
 - shaping with macvlan or non-default interface?
 - ? track config device changes (or at least cache device and don't try to find it every time)
 - ? portoctl cp
@@ -27,7 +28,6 @@
 - ? isolate ipc property
 ## other
 - ? when to enable user namespace
-- ? devices c 1:3 rwm; c 1:5 rwm; c 1:9 rwm; c 1:8 rwm; c 136:* rwm; c 5:2 rwm
 ## net
 - ? net_prio 0-7 -> 0-99
 

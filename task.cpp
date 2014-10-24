@@ -286,9 +286,8 @@ TError TTask::ChildMountDev() {
         { "/dev/null",    0666 | S_IFCHR, MKDEV(1, 3) },
         { "/dev/zero",    0666 | S_IFCHR, MKDEV(1, 5) },
         { "/dev/full",    0666 | S_IFCHR, MKDEV(1, 7) },
-        { "/dev/tty",     0666 | S_IFCHR, MKDEV(5, 0) },
-        { "/dev/urandom", 0666 | S_IFCHR, MKDEV(1, 9) },
         { "/dev/random",  0666 | S_IFCHR, MKDEV(1, 8) },
+        { "/dev/urandom", 0666 | S_IFCHR, MKDEV(1, 9) },
     };
 
     TMount dev("tmpfs", Env->Root + "/dev", "tmpfs", { "mode=755" });

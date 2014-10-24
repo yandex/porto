@@ -14,6 +14,7 @@ shared_ptr<TCpuSubsystem> cpuSubsystem(new TCpuSubsystem);
 shared_ptr<TCpuacctSubsystem> cpuacctSubsystem(new TCpuacctSubsystem);
 shared_ptr<TNetclsSubsystem> netclsSubsystem(new TNetclsSubsystem);
 shared_ptr<TBlkioSubsystem> blkioSubsystem(new TBlkioSubsystem);
+shared_ptr<TDevicesSubsystem> devicesSubsystem(new TDevicesSubsystem);
 
 static const std::map<std::string, std::shared_ptr<TSubsystem>> subsystems = {
     { "memory", memorySubsystem },
@@ -22,6 +23,7 @@ static const std::map<std::string, std::shared_ptr<TSubsystem>> subsystems = {
     { "cpuacct", cpuacctSubsystem },
     { "net_cls", netclsSubsystem },
     { "blkio", blkioSubsystem },
+    { "devices", devicesSubsystem },
 };
 
 // TSubsystem
@@ -226,6 +228,51 @@ TError TBlkioSubsystem::Statistics(std::shared_ptr<TCgroup> &cg, const std::stri
 
         stat.push_back(s);
     }
+
+    return TError::Success();
+}
+
+// Devices
+
+TError TDevicesSubsystem::AllowDevices(std::shared_ptr<TCgroup> &cg, const std::string &s) {
+    vector<string> allowed;
+    TError error = SplitString(s, ';', allowed);
+    if (error)
+        return error;
+
+    vector<string> lines;
+
+    error = cg->GetKnobValueAsLines("devices.list", lines);
+    if (error)
+        return error;
+
+    bool needUpdate = lines.size() != allowed.size();
+    if (!needUpdate) {
+        for (auto &line : lines) {
+            for (auto &dev : allowed) {
+                if (StringTrim(line) != StringTrim(dev)) {
+                    needUpdate = true;
+                    break;
+                }
+            }
+            if (needUpdate)
+                break;
+        }
+
+        if (!needUpdate)
+            return TError::Success();
+    }
+
+    error = cg->SetKnobValue("devices.deny", "a", false);
+    if (error)
+        return error;
+
+    for (auto &dev : allowed) {
+        error = cg->SetKnobValue("devices.allow", dev, false);
+        if (error)
+            return error;
+    }
+
 
     return TError::Success();
 }

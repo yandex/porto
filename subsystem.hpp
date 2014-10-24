@@ -77,11 +77,18 @@ public:
     TError Statistics(std::shared_ptr<TCgroup> &cg, const std::string &file, std::vector<BlkioStat> &stat) const;
 };
 
+class TDevicesSubsystem : public TSubsystem {
+public:
+    TDevicesSubsystem() : TSubsystem("devices") {}
+    TError AllowDevices(std::shared_ptr<TCgroup> &cg, const std::string &s);
+};
+
 extern std::shared_ptr<TMemorySubsystem> memorySubsystem;
 extern std::shared_ptr<TFreezerSubsystem> freezerSubsystem;
 extern std::shared_ptr<TCpuSubsystem> cpuSubsystem;
 extern std::shared_ptr<TCpuacctSubsystem> cpuacctSubsystem;
 extern std::shared_ptr<TNetclsSubsystem> netclsSubsystem;
 extern std::shared_ptr<TBlkioSubsystem> blkioSubsystem;
+extern std::shared_ptr<TDevicesSubsystem> devicesSubsystem;
 
 #endif

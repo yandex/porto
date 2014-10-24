@@ -165,7 +165,7 @@ std::string StringTrim(const std::string& s, const std::string &what) {
     return s.substr(first, last - first + 1);
 }
 
-std::string ReplaceMultiple(const std::string &str, const char rc) {
+std::string StringRemoveRepeating(const std::string &str, const char rc) {
     stringstream s;
 
     bool foundChar = false;

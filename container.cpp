@@ -621,6 +621,7 @@ TError TContainer::PrepareCgroups() {
     LeafCgroups[blkioSubsystem] = GetLeafCgroup(blkioSubsystem);
     if (config().network().enabled())
         LeafCgroups[netclsSubsystem] = GetLeafCgroup(netclsSubsystem);
+    LeafCgroups[devicesSubsystem] = GetLeafCgroup(devicesSubsystem);
 
     for (auto cg : LeafCgroups) {
         auto ret = cg.second->Create();
@@ -660,6 +661,14 @@ TError TContainer::PrepareCgroups() {
         TLogger::LogError(error, "Can't prepare OOM monitoring");
         if (error)
             return error;
+    }
+
+    auto devices = GetLeafCgroup(devicesSubsystem);
+    error = devicesSubsystem->AllowDevices(devices,
+                                           GetPropertyStr("allowed_devices"));
+    if (error) {
+        TLogger::LogError(error, "Can't set allowed_devices");
+        return error;
     }
 
     return TError::Success();

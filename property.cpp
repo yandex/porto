@@ -457,6 +457,13 @@ std::map<std::string, const TPropertySpec> propertySpec = {
             ValidNet
         }
     },
+    { "allowed_devices",
+        {
+            "Devices that container can create/read/write",
+            DEFSTR("a *:* rwm"),
+            0,
+        }
+    },
 };
 
 bool TContainerSpec::IsDefault(std::shared_ptr<const TContainer> container, const std::string &property) const {

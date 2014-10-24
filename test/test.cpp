@@ -294,8 +294,7 @@ std::string GetCgKnob(const std::string &subsys, const std::string &name, const 
     TFile m(CgRoot(subsys, name) + knob);
     if (m.AsString(val))
         throw std::string("Can't get cgroup knob " + m.GetPath().ToString());
-    val.erase(val.find('\n'));
-    return val;
+    return StringTrim(val, "\n");
 }
 
 bool HaveCgKnob(const std::string &subsys, const std::string &knob) {
