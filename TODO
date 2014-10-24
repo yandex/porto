@@ -1,5 +1,4 @@
 - shaping with macvlan or non-default interface?
-- ? track config device changes (or at least cache device and don't try to find it every time)
 - ? portoctl cp
 
 # properties

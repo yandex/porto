@@ -78,6 +78,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     bool MaybeReturnedOk = false;
     size_t TimeOfDeath = 0;
     uint16_t Id;
+    const std::string Link;
     int TaskStartErrno = -1;
     TScopedFd Efd;
     bool OomKilled = false;
@@ -114,8 +115,8 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     bool DeliverOom(int fd);
 
 public:
-    TContainer(const std::string &name, std::shared_ptr<TContainer> parent, uint16_t id) :
-        Name(StripParentName(name)), Parent(parent), State(EContainerState::Stopped), Spec(name), Id(id) { }
+    TContainer(const std::string &name, std::shared_ptr<TContainer> parent, uint16_t id, const std::string &link) :
+        Name(StripParentName(name)), Parent(parent), State(EContainerState::Stopped), Spec(name), Id(id), Link(link) { }
     ~TContainer();
 
     const std::string GetName(bool recursive = true) const;
@@ -123,6 +124,7 @@ public:
     bool IsRoot() const;
     std::shared_ptr<const TContainer> GetRoot() const;
     std::shared_ptr<const TContainer> GetParent() const;
+    const std::string &GetLink() const { return Link; }
 
     uint64_t GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except = nullptr, uint64_t exceptVal = 0) const;
     bool ValidHierarchicalProperty(const std::string &property, const std::string &value) const;
@@ -157,6 +159,7 @@ public:
 constexpr size_t BITS_PER_LLONG = sizeof(unsigned long long) * 8;
 class TContainerHolder {
     NO_COPY_CONSTRUCT(TContainerHolder);
+    const std::string Link;
     std::map <std::string, std::shared_ptr<TContainer>> Containers;
     unsigned long long Ids[UINT16_MAX / BITS_PER_LLONG];
 
@@ -165,7 +168,9 @@ class TContainerHolder {
     void PutId(uint16_t id);
     TError RestoreId(const kv::TNode &node, uint16_t &id);
 public:
-    TContainerHolder() { for (auto &i : Ids) { i = ULLONG_MAX; } }
+    TContainerHolder(const std::string &link) : Link(link) {
+        for (auto &i : Ids) { i = ULLONG_MAX; }
+    }
     ~TContainerHolder();
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot();

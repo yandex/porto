@@ -11,6 +11,7 @@
 namespace test {
     extern __thread int tid;
     extern std::atomic<int> done;
+    extern std::string link;
 
     std::basic_ostream<char> &Say(std::basic_ostream<char> &stream = std::cout);
     void ExpectReturn(int ret, int exp, int line, const char *func);

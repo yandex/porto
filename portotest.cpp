@@ -65,6 +65,15 @@ int main(int argc, char *argv[])
     try {
         config.Load();
 
+        std::string link = config().network().device();
+        if (!link.length()) {
+            TError error = TNl::FindDefaultLink(link);
+            TLogger::LogError(error, "Couldn't find default network interface!");
+            if (error)
+                return EXIT_FAILURE;
+        }
+        test::link = link;
+
         string what = "";
         if (argc >= 2)
             what = argv[1];

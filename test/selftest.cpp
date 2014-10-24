@@ -1209,23 +1209,12 @@ static void TestNetProperty(TPortoAPI &api) {
 
     vector<string> hostLink = Popen("ip -o -d link show");
 
-    string dev;
-
-    ExpectSuccess(TNlLink::Exec(config().network().device(),
-        [&](std::shared_ptr<TNlLink> link) {
-            dev = link->GetName();
-            return TError::Success();
-        }));
-
-    if (!dev.length())
-        throw "Invalid network device";
-
     Say() << "Check net parsing" << std::endl;
     ExpectFailure(api.SetProperty(name, "net", "qwerty"), EError::InvalidValue);
     ExpectFailure(api.SetProperty(name, "net", ""), EError::InvalidValue);
     ExpectSuccess(api.SetProperty(name, "net", "host"));
     ExpectSuccess(api.SetProperty(name, "net", "none"));
-    ExpectFailure(api.SetProperty(name, "net", "host; macvlan " + dev + " " + dev), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "net", "host; macvlan " + link + " " + link), EError::InvalidValue);
     ExpectFailure(api.SetProperty(name, "net", "host; host veth0"), EError::InvalidValue);
     ExpectFailure(api.SetProperty(name, "net", "host; host"), EError::InvalidValue);
     ExpectFailure(api.SetProperty(name, "net", "host; none"), EError::InvalidValue);
@@ -1279,9 +1268,9 @@ static void TestNetProperty(TPortoAPI &api) {
 
     Say() << "Check net=macvlan" << std::endl;
     ExpectFailure(api.SetProperty(name, "net", "macvlan"), EError::InvalidValue);
-    ExpectFailure(api.SetProperty(name, "net", "macvlan invalid " + dev), EError::InvalidValue);
-    ExpectFailure(api.SetProperty(name, "net", "macvlan " + dev), EError::InvalidValue);
-    ExpectSuccess(api.SetProperty(name, "net", "macvlan " + dev + " " + dev));
+    ExpectFailure(api.SetProperty(name, "net", "macvlan invalid " + link), EError::InvalidValue);
+    ExpectFailure(api.SetProperty(name, "net", "macvlan " + link), EError::InvalidValue);
+    ExpectSuccess(api.SetProperty(name, "net", "macvlan " + link + " " + link));
     s = StartWaitAndGetData(api, name, "stdout");
     containerLink = StringToVec(s);
     Expect(containerLink.size() == 2);
@@ -1290,12 +1279,12 @@ static void TestNetProperty(TPortoAPI &api) {
     linkMap = IfHw(containerLink);
     Expect(linkMap.find("lo") != linkMap.end());
     Expect(linkMap.at("lo").up == true);
-    Expect(linkMap.find(dev) != linkMap.end());
-    Expect(linkMap.at(dev).up == true);
+    Expect(linkMap.find(link) != linkMap.end());
+    Expect(linkMap.at(link).up == true);
     ExpectSuccess(api.Stop(name));
 
     string hw = "00:11:22:33:44:55";
-    ExpectSuccess(api.SetProperty(name, "net", "macvlan " + dev + " eth10 bridge " + hw));
+    ExpectSuccess(api.SetProperty(name, "net", "macvlan " + link + " eth10 bridge " + hw));
     s = StartWaitAndGetData(api, name, "stdout");
     containerLink = StringToVec(s);
     Expect(containerLink.size() == 2);
@@ -1715,7 +1704,7 @@ static void TestLimits(TPortoAPI &api) {
     uint32_t prio, rate, ceil;
 
     string handle = GetCgKnob("net_cls", name, "net_cls.classid");
-    ExpectSuccess(TNlLink::Exec(config().network().device(),
+    ExpectSuccess(TNlLink::Exec(link,
         [&](std::shared_ptr<TNlLink> link) {
             TNlClass tclass(link, -1, stoul(handle));
             return tclass.GetProperties(prio, rate, ceil);

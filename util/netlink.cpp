@@ -97,18 +97,9 @@ void TNl::EnableDebug(bool enable) {
     debug = enable;
 }
 
-TNlLink::~TNlLink() {
-    if (Link)
-        rtnl_link_put(Link);
-}
-
-TError TNlLink::Find() {
-    if (Name.length()) {
-        return TError::Success();
-    }
-
+TError TNl::GetDefaultLink(std::string &link) {
     struct FindDevIter { string name; string running; } data;
-    nl_cache_foreach(Nl->GetCache(), [](struct nl_object *obj, void *data) {
+    nl_cache_foreach(GetCache(), [](struct nl_object *obj, void *data) {
                      FindDevIter *p = (FindDevIter *)data;
                      struct rtnl_link *l = (struct rtnl_link *)obj;
                      const vector<string> prefixes = { "eth", "em", "wlp2s" };
@@ -131,18 +122,35 @@ TError TNlLink::Find() {
                      }, &data);
 
     if (data.name.length()) {
-        Name = data.name;
+        link = data.name;
     } else {
         if (data.running.length()) {
-            Name = data.running;
+            link = data.running;
 
-            TLogger::Log() << "Can't find predefined link, using " << Name << std::endl;
+            TLogger::Log() << "Can't find predefined link, using " << link << std::endl;
         } else {
             return TError(EError::Unknown, "Can't find appropriate link");
         }
     }
 
     return TError::Success();
+}
+
+TError TNl::FindDefaultLink(std::string &link) {
+    auto nl = std::make_shared<TNl>();
+    if (!nl)
+        throw std::bad_alloc();
+
+    TError error = nl->Connect();
+    if (error)
+        return error;
+
+    return nl->GetDefaultLink(link);
+}
+
+TNlLink::~TNlLink() {
+    if (Link)
+        rtnl_link_put(Link);
 }
 
 TError TNlLink::Remove() {
@@ -308,10 +316,6 @@ bool TNlLink::ValidMacAddr(const std::string &hw) {
 }
 
 TError TNlLink::Load() {
-    TError error = Find();
-    if (error)
-        return error;
-
     LogCache(Nl->GetCache());
 
     Link = rtnl_link_get_by_name(Nl->GetCache(), Name.c_str());

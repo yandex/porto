@@ -20,6 +20,7 @@ namespace test {
 
 __thread int tid;
 std::atomic<int> done;
+std::string link;
 
 std::basic_ostream<char> &Say(std::basic_ostream<char> &stream) {
     if (tid)
@@ -319,7 +320,7 @@ int GetVmRss(const std::string &pid) {
 }
 
 bool TcClassExist(uint32_t handle) {
-    return TNlLink::Exec(config().network().device(),
+    return TNlLink::Exec(link,
         [&](std::shared_ptr<TNlLink> link) {
             TNlClass tclass(link, -1, handle);
             if (tclass.Exists())
@@ -330,7 +331,7 @@ bool TcClassExist(uint32_t handle) {
 }
 
 bool TcQdiscExist(uint32_t handle) {
-    return TNlLink::Exec(config().network().device(),
+    return TNlLink::Exec(link,
         [&](std::shared_ptr<TNlLink> link) {
             TNlHtb qdisc(link, -1, handle);
             if (qdisc.Exists())
@@ -341,7 +342,7 @@ bool TcQdiscExist(uint32_t handle) {
 }
 
 bool TcCgFilterExist(uint32_t parent, uint32_t handle) {
-    return TNlLink::Exec(config().network().device(),
+    return TNlLink::Exec(link,
         [&](std::shared_ptr<TNlLink> link) {
             TNlCgFilter filter(link, parent, handle);
             if (filter.Exists())

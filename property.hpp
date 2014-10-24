@@ -59,6 +59,6 @@ public:
 
 TError ParseRlimit(const std::string &s, std::map<int,struct rlimit> &rlim);
 TError ParseBind(const std::string &s, std::vector<TBindMap> &dirs);
-TError ParseNet(const std::string &s, TNetCfg &net);
+TError ParseNet(std::shared_ptr<const TContainer> container, const std::string &s, TNetCfg &net);
 
 #endif

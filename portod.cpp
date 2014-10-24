@@ -518,7 +518,17 @@ static int SlaveMain() {
         if (error)
             TLogger::LogError(error, "Couldn't create cgroup snapshot!");
 
-        TContainerHolder cholder;
+        std::string link = config().network().device();
+        if (!link.length()) {
+            error = TNl::FindDefaultLink(link);
+            TLogger::LogError(error, "Couldn't find default network interface!");
+            if (error)
+                return EXIT_FAILURE;
+        }
+
+        TLogger::Log() << "Using " << link << " interface" << std::endl;
+
+        TContainerHolder cholder(link);
         error = cholder.CreateRoot();
         if (error) {
             TLogger::LogError(error, "Couldn't create root container!");

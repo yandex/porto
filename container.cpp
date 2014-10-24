@@ -699,7 +699,7 @@ TError TContainer::PrepareTask() {
     if (error)
         return error;
 
-    error = ParseNet(GetPropertyStr("net"), taskEnv->NetCfg);
+    error = ParseNet(shared_from_this(), GetPropertyStr("net"), taskEnv->NetCfg);
     if (error)
         return error;
 
@@ -761,7 +761,7 @@ TError TContainer::Create(int uid, int gid) {
         uint32_t defHandle = TcHandle(Id, Id + 1);
         uint32_t rootHandle = TcHandle(Id, 0);
 
-        Qdisc = std::make_shared<TQdisc>(rootHandle, defHandle);
+        Qdisc = std::make_shared<TQdisc>(Link, rootHandle, defHandle);
         (void)Qdisc->Remove();
         error = Qdisc->Create();
         if (error) {
@@ -1469,7 +1469,7 @@ TError TContainerHolder::Create(const string &name, int uid, int gid) {
     if (error)
         return error;
 
-    auto c = std::make_shared<TContainer>(name, parent, id);
+    auto c = std::make_shared<TContainer>(name, parent, id, Link);
     error = c->Create(uid, gid);
     if (error)
         return error;
@@ -1568,7 +1568,7 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
     if (!id)
         return TError(EError::Unknown, "Couldn't restore container id");
 
-    auto c = std::make_shared<TContainer>(name, parent, id);
+    auto c = std::make_shared<TContainer>(name, parent, id, Link);
     error = c->Restore(node);
     if (error)
         return error;

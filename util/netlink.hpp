@@ -41,6 +41,9 @@ public:
 
     struct nl_sock *GetSock() { return Sock; }
     struct nl_cache *GetCache() { return LinkCache; }
+
+    TError GetDefaultLink(std::string &link);
+    static TError FindDefaultLink(std::string &link);
 };
 
 class TNlLink {
@@ -48,8 +51,6 @@ class TNlLink {
 
     std::shared_ptr<TNl> Nl;
     std::string Name;
-
-    TError Find();
 
 public:
     struct rtnl_link *Link = nullptr;
@@ -68,7 +69,6 @@ public:
     TError AddMacVlan(const std::string &master,
                       const std::string &type, const std::string &hw,
                       int nsPid);
-    const std::string &GetName() { (void)Find(); return Name; }
 
     static bool ValidMacVlanType(const std::string &type);
     static bool ValidMacAddr(const std::string &hw);

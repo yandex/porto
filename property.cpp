@@ -161,7 +161,7 @@ static TError ValidBind(std::shared_ptr<const TContainer> container, const strin
 
 static TError ValidNet(std::shared_ptr<const TContainer> container, const string &str) {
     TNetCfg net;
-    return ParseNet(str, net);
+    return ParseNet(container, str, net);
 }
 
 #define DEFSTR(S) [](std::shared_ptr<const TContainer> container)->std::string { return S; }
@@ -693,7 +693,7 @@ TError ParseBind(const std::string &s, vector<TBindMap> &dirs) {
     return TError::Success();
 }
 
-TError ParseNet(const std::string &s, TNetCfg &net) {
+TError ParseNet(std::shared_ptr<const TContainer> container, const std::string &s, TNetCfg &net) {
     if (!config().network().enabled())
         return TError(EError::Unknown, "Network support is disabled");
 
@@ -775,7 +775,7 @@ TError ParseNet(const std::string &s, TNetCfg &net) {
             }
 
             int idx = -1;
-            TError error = TNlLink::Exec(config().network().device(),
+            TError error = TNlLink::Exec(container->GetLink(),
                 [&](std::shared_ptr<TNlLink> link) {
                     idx = link->FindIndex(master);
                     return TError::Success();
