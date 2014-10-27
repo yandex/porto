@@ -198,7 +198,7 @@ struct TData {
     static string MinorFaults(TContainer& c) {
         uint64_t val;
         auto cg = c.GetLeafCgroup(memorySubsystem);
-        TError error = memorySubsystem->Statistics(cg, "pgfault", val);
+        TError error = memorySubsystem->Statistics(cg, "total_pgfault", val);
         if (error)
             return "-1";
 
@@ -208,7 +208,7 @@ struct TData {
     static string MajorFaults(TContainer& c) {
         uint64_t val;
         auto cg = c.GetLeafCgroup(memorySubsystem);
-        TError error = memorySubsystem->Statistics(cg, "pgmajfault", val);
+        TError error = memorySubsystem->Statistics(cg, "total_pgmajfault", val);
         if (error)
             return "-1";
 
