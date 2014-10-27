@@ -1468,13 +1468,14 @@ static void TestRoot(TPortoAPI &api) {
         ExpectFailure(api.GetProperty(root, p, v), EError::InvalidProperty);
 
     ExpectSuccess(api.GetData(root, "state", v));
-    Expect(v == string("running"));
-    ExpectFailure(api.GetData(root, "exit_status", v), EError::InvalidData);
-    ExpectFailure(api.GetData(root, "start_errno", v), EError::InvalidData);
-    ExpectFailure(api.GetData(root, "root_pid", v), EError::InvalidData);
-    ExpectFailure(api.GetData(root, "stdout", v), EError::InvalidData);
-    ExpectFailure(api.GetData(root, "parent", v), EError::InvalidData);
-    ExpectFailure(api.GetData(root, "stderr", v), EError::InvalidData);
+    Expect(v == string("meta"));
+    ExpectFailure(api.GetData(root, "exit_status", v), EError::InvalidState);
+    ExpectFailure(api.GetData(root, "start_errno", v), EError::InvalidState);
+    ExpectFailure(api.GetData(root, "root_pid", v), EError::InvalidState);
+    ExpectFailure(api.GetData(root, "stdout", v), EError::InvalidState);
+    ExpectSuccess(api.GetData(root, "parent", v));
+    Expect(v == "");
+    ExpectFailure(api.GetData(root, "stderr", v), EError::InvalidState);
 
     ExpectFailure(api.Stop(root), EError::InvalidState);
     ExpectFailure(api.Destroy(root), EError::InvalidValue);

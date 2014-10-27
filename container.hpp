@@ -26,11 +26,11 @@ enum class EContainerState {
     Stopped,
     Dead,
     Running,
-    Paused
+    Paused,
+    Meta
 };
 
-const unsigned int ROOT_DATA = (1 << 0);
-const unsigned int HIDDEN_DATA = (1 << 1);
+const unsigned int HIDDEN_DATA = (1 << 0);
 
 struct TDataSpec {
     std::string Description;
@@ -90,7 +90,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     std::unique_ptr<TTask> Task;
 
     // data
-    bool CheckState(EContainerState expected);
+    EContainerState GetState();
     TError ApplyDynamicProperties();
     TError PrepareNetwork();
     TError PrepareOomMonitor();
@@ -122,6 +122,7 @@ public:
     const std::string GetName(bool recursive = true) const;
 
     bool IsRoot() const;
+    bool IsMeta() const;
     std::shared_ptr<const TContainer> GetRoot() const;
     std::shared_ptr<const TContainer> GetParent() const;
     const std::string &GetLink() const { return Link; }

@@ -56,7 +56,7 @@ static int64_t BootTime = 0;
 
 struct TData {
     static string State(TContainer& c) {
-        switch (c.State) {
+        switch (c.GetState()) {
         case EContainerState::Stopped:
             return "stopped";
         case EContainerState::Dead:
@@ -65,6 +65,8 @@ struct TData {
             return "running";
         case EContainerState::Paused:
             return "paused";
+        case EContainerState::Meta:
+            return "meta";
         default:
             return "unknown";
         }
@@ -78,7 +80,7 @@ struct TData {
     }
 
     static string Parent(TContainer& c) {
-        return c.Parent->Name;
+        return c.Parent ? c.Parent->Name : "";
     }
 
     static string RespawnCount(TContainer& c) {
@@ -280,28 +282,254 @@ struct TData {
 };
 
 std::map<std::string, const TDataSpec> dataSpec = {
-    { "state", { "container state", ROOT_DATA, TData::State, { EContainerState::Stopped, EContainerState::Dead, EContainerState::Running, EContainerState::Paused } } },
-    { "oom_killed", { "indicates whether container has been killed by OOM", 0, TData::OomKilled, { EContainerState::Dead } } },
-    { "parent", { "container parent", 0, TData::Parent, { EContainerState::Stopped, EContainerState::Dead, EContainerState::Running, EContainerState::Paused } } },
-    { "respawn_count", { "how many time container was automatically respawned", 0, TData::RespawnCount, { EContainerState::Running, EContainerState::Dead } } },
-    { "exit_status", { "container exit status", 0, TData::ExitStatus, { EContainerState::Dead } } },
-    { "start_errno", { "container start error", 0, TData::StartErrno, { EContainerState::Stopped } } },
-    { "root_pid", { "root process id", 0, TData::RootPid, { EContainerState::Running, EContainerState::Paused } } },
-    { "stdout", { "return task stdout", 0, TData::Stdout, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "stderr", { "return task stderr", 0, TData::Stderr, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "cpu_usage", { "return consumed CPU time in nanoseconds", ROOT_DATA, TData::CpuUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "net_bytes", { "number of tx bytes", ROOT_DATA, TData::NetBytes, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "net_packets", { "number of tx packets", ROOT_DATA, TData::NetPackets, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "net_drops", { "number of dropped tx packets", ROOT_DATA, TData::NetDrops, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "net_overlimits", { "number of tx packets that exceeded the limit", ROOT_DATA, TData::NetOverlimits, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "memory_usage", { "return consumed memory in bytes", ROOT_DATA, TData::MemUsage, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "minor_faults", { "return number of minor page faults", ROOT_DATA, TData::MinorFaults, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "major_faults", { "return number of major page faults", ROOT_DATA, TData::MajorFaults, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "state",
+        {
+            "container state",
+            0,
+            TData::State,
+            {
+                EContainerState::Stopped,
+                EContainerState::Dead,
+                EContainerState::Running,
+                EContainerState::Paused,
+                EContainerState::Meta,
+            }
+        }
+    },
+    { "oom_killed",
+        {
+            "indicates whether container has been killed by OOM",
+            0,
+            TData::OomKilled,
+            {
+                EContainerState::Dead,
+            }
+        }
+    },
+    { "parent",
+        {
+            "container parent",
+            0,
+            TData::Parent,
+            {
+                EContainerState::Stopped,
+                EContainerState::Dead,
+                EContainerState::Running,
+                EContainerState::Paused,
+                EContainerState::Meta,
+            }
+        }
+    },
+    { "respawn_count",
+        {
+            "how many time container was automatically respawned",
+            0,
+            TData::RespawnCount,
+            {
+                EContainerState::Running,
+                EContainerState::Dead,
+            }
+        }
+    },
+    { "exit_status",
+        {
+            "container exit status",
+            0,
+            TData::ExitStatus,
+            {
+                EContainerState::Dead,
+            }
+        }
+    },
+    { "start_errno",
+        {
+            "container start error",
+            0,
+            TData::StartErrno,
+            {
+                EContainerState::Stopped,
+            }
+        }
+    },
+    { "root_pid",
+        {
+            "root process id",
+            0,
+            TData::RootPid,
+            {
+                EContainerState::Running,
+                EContainerState::Paused,
+            }
+        }
+    },
+    { "stdout",
+        {
+            "return task stdout",
+            0,
+            TData::Stdout,
+            {
+                EContainerState::Running,
+                EContainerState::Paused,
+                EContainerState::Dead,
+            }
+        }
+    },
+    { "stderr",
+        {
+            "return task stderr",
+            0,
+            TData::Stderr,
+            {
+                EContainerState::Running,
+                EContainerState::Paused,
+                EContainerState::Dead,
+            }
+        }
+    },
+    { "cpu_usage",
+        {
+            "return consumed CPU time in nanoseconds",
+            0,
+            TData::CpuUsage,
+            {
+                EContainerState::Running,
+                EContainerState::Paused,
+                EContainerState::Dead,
+                EContainerState::Meta,
+            }
+        }
+    },
+    { "net_bytes",
+        {
+            "number of tx bytes",
+            0,
+            TData::NetBytes,
+            {
+                EContainerState::Running,
+                EContainerState::Paused,
+                EContainerState::Dead,
+                EContainerState::Meta,
+            }
+        }
+    },
+    { "net_packets",
+        {
+            "number of tx packets",
+            0,
+            TData::NetPackets,
+            {
+                EContainerState::Running,
+                EContainerState::Paused,
+                EContainerState::Dead,
+                EContainerState::Meta,
+            }
+        }
+    },
+    { "net_drops",
+        {
+            "number of dropped tx packets",
+            0,
+            TData::NetDrops,
+            {
+                EContainerState::Running,
+                EContainerState::Paused,
+                EContainerState::Dead,
+                EContainerState::Meta,
+            }
+        }
+    },
+    { "net_overlimits",
+        {
+            "number of tx packets that exceeded the limit",
+            0,
+            TData::NetOverlimits,
+            {
+                EContainerState::Running,
+                EContainerState::Paused,
+                EContainerState::Dead,
+                EContainerState::Meta,
+            }
+        }
+    },
+    { "memory_usage",
+        {
+            "return consumed memory in bytes",
+            0,
+            TData::MemUsage,
+            {
+                EContainerState::Running,
+                EContainerState::Paused,
+                EContainerState::Dead,
+                EContainerState::Meta,
+            }
+        }
+    },
+    { "minor_faults",
+        {
+            "return number of minor page faults",
+            0,
+            TData::MinorFaults,
+            {
+                EContainerState::Running,
+                EContainerState::Paused,
+                EContainerState::Dead,
+                EContainerState::Meta,
+            }
+        }
+    },
+    { "major_faults",
+        {
+            "return number of major page faults",
+            0,
+            TData::MajorFaults,
+            {
+                EContainerState::Running,
+                EContainerState::Paused,
+                EContainerState::Dead,
+                EContainerState::Meta,
+            }
+        }
+    },
 
-    { "io_read", { "return number of bytes read from disk", ROOT_DATA | HIDDEN_DATA, TData::IoRead, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
-    { "io_write", { "return number of bytes written to disk", ROOT_DATA | HIDDEN_DATA, TData::IoWrite, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "io_read",
+        {
+            "return number of bytes read from disk",
+            HIDDEN_DATA,
+            TData::IoRead,
+            {
+                EContainerState::Running,
+                EContainerState::Paused,
+                EContainerState::Dead,
+                EContainerState::Meta,
+            }
+        }
+    },
+    { "io_write",
+        {
+            "return number of bytes written to disk",
+            HIDDEN_DATA,
+            TData::IoWrite,
+            {
+                EContainerState::Running,
+                EContainerState::Paused,
+                EContainerState::Dead,
+                EContainerState::Meta,
+            }
+        }
+    },
 
-    { "time", { "return running time of container", 0, TData::RunningTime, { EContainerState::Running, EContainerState::Paused, EContainerState::Dead } } },
+    { "time",
+        {
+            "return running time of container",
+            0,
+            TData::RunningTime,
+            {
+                EContainerState::Running,
+                EContainerState::Paused,
+                EContainerState::Dead,
+            }
+        }
+    },
 };
 
 // TContainerEvent
@@ -320,11 +548,11 @@ std::string TContainerEvent::GetMsg() const {
 
 // TContainer
 
-bool TContainer::CheckState(EContainerState expected) {
+EContainerState TContainer::GetState() {
     if (State == EContainerState::Running && (!Task || !Task->IsRunning()))
         State = EContainerState::Stopped;
 
-    return State == expected;
+    return State;
 }
 
 const string TContainer::StripParentName(const string &name) const {
@@ -339,7 +567,7 @@ const string TContainer::StripParentName(const string &name) const {
 }
 
 TContainer::~TContainer() {
-    if (State == EContainerState::Paused)
+    if (GetState() == EContainerState::Paused)
         Resume();
 
     Stop();
@@ -394,6 +622,10 @@ const string TContainer::GetName(bool recursive) const {
 
 bool TContainer::IsRoot() const {
     return Name == ROOT_CONTAINER;
+}
+
+bool TContainer::IsMeta() const {
+    return State == EContainerState::Meta;
 }
 
 std::shared_ptr<const TContainer> TContainer::GetRoot() const {
@@ -488,7 +720,7 @@ vector<pid_t> TContainer::Processes() {
 }
 
 bool TContainer::IsAlive() {
-    return IsRoot() || !Processes().empty();
+    return IsMeta() || !Processes().empty();
 }
 
 TError TContainer::ApplyDynamicProperties() {
@@ -543,7 +775,7 @@ bool TContainer::UseParentNamespace() const {
     string value;
     TError error = Spec.GetRaw("isolate", value);
 
-    return Parent && !Parent->IsRoot() && !error && value == "false";
+    return Parent && !Parent->IsMeta() && !error && value == "false";
 }
 
 TError TContainer::PrepareNetwork() {
@@ -806,18 +1038,18 @@ static string ContainerStateName(EContainerState state) {
 }
 
 TError TContainer::Start() {
-    if ((State == EContainerState::Running || State == EContainerState::Dead) && MaybeReturnedOk) {
-        TLogger::Log() << "Maybe running" << std::endl;
+    auto state = GetState();
+    if ((state == EContainerState::Running || state == EContainerState::Dead) && MaybeReturnedOk) {
         MaybeReturnedOk = false;
         return TError::Success();
     }
     MaybeReturnedOk = false;
     RespawnCount = 0;
 
-    if (!CheckState(EContainerState::Stopped))
-        return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
+    if (state != EContainerState::Stopped)
+        return TError(EError::InvalidState, "invalid container state " + ContainerStateName(state));
 
-    if (Parent && !Parent->IsRoot() && Parent->State != EContainerState::Running)
+    if (Parent && !Parent->IsRoot() && Parent->GetState() != EContainerState::Running)
         return TError(EError::InvalidState, "parent is not running");
 
     Spec.SetRaw("id", std::to_string(Id));
@@ -838,7 +1070,7 @@ TError TContainer::Start() {
     }
 
     if (IsRoot()) {
-        State = EContainerState::Running;
+        State = EContainerState::Meta;
         return TError::Success();
     }
 
@@ -915,7 +1147,7 @@ extern void AckExitStatus(int pid);
 void TContainer::StopChildren() {
     for (auto iter : Children) {
         if (auto child = iter.lock()) {
-            if (child->State != EContainerState::Stopped && child->State != EContainerState::Dead)
+            if (child->GetState() != EContainerState::Stopped && child->GetState() != EContainerState::Dead)
                 child->Stop();
         } else {
             TLogger::Log() << "Warning: can't lock child while stopping" << std::endl;
@@ -938,8 +1170,10 @@ void TContainer::FreeResources() {
 }
 
 TError TContainer::Stop() {
-    if (IsRoot() || !(CheckState(EContainerState::Running) || CheckState(EContainerState::Dead)))
-        return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
+    auto state = GetState();
+    if (IsMeta() || !(state == EContainerState::Running ||
+                      state == EContainerState::Dead))
+        return TError(EError::InvalidState, "invalid container state " + ContainerStateName(state));
 
     TLogger::Log() << "Stop " << GetName() << " " << Id << std::endl;
 
@@ -965,7 +1199,7 @@ TError TContainer::Stop() {
 }
 
 TError TContainer::Pause() {
-    if (IsRoot() || !CheckState(EContainerState::Running))
+    if (IsMeta() || GetState() != EContainerState::Running)
         return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
 
     auto cg = GetLeafCgroup(freezerSubsystem);
@@ -980,7 +1214,7 @@ TError TContainer::Pause() {
 }
 
 TError TContainer::Resume() {
-    if (!CheckState(EContainerState::Paused))
+    if (GetState() != EContainerState::Paused)
         return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
 
     auto cg = GetLeafCgroup(freezerSubsystem);
@@ -996,7 +1230,7 @@ TError TContainer::Resume() {
 }
 
 TError TContainer::Kill(int sig) {
-    if (IsRoot() || !CheckState(EContainerState::Running))
+    if (IsMeta() || GetState() != EContainerState::Running)
         return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
 
     return Task->Kill(sig);
@@ -1006,10 +1240,7 @@ TError TContainer::GetData(const string &name, string &value) {
     if (dataSpec.find(name) == dataSpec.end())
         return TError(EError::InvalidValue, "invalid container data");
 
-    if (IsRoot() && !(dataSpec[name].Flags & ROOT_DATA))
-        return TError(EError::InvalidData, "invalid data for root container");
-
-    if (dataSpec[name].Valid.find(State) == dataSpec[name].Valid.end())
+    if (dataSpec[name].Valid.find(GetState()) == dataSpec[name].Valid.end())
         return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
 
     value = dataSpec[name].Handler(*this);
@@ -1070,8 +1301,8 @@ static std::map<std::string, std::string> alias = {
 };
 
 TError TContainer::GetProperty(const string &origProperty, string &value) const {
-    if (IsRoot())
-        return TError(EError::InvalidProperty, "no properties for root container");
+    if (IsMeta())
+        return TError(EError::InvalidProperty, "no properties for meta containers");
 
     string property = origProperty;
     if (alias.find(origProperty) != alias.end())
@@ -1097,15 +1328,16 @@ bool TContainer::ShouldApplyProperty(const std::string &property) {
     if (!(Spec.GetFlags(property) & DYNAMIC_PROPERTY))
        return false;
 
-    if (State == EContainerState::Dead || State == EContainerState::Stopped)
+    auto state = GetState();
+    if (state == EContainerState::Dead || state == EContainerState::Stopped)
         return false;
 
     return true;
 }
 
 TError TContainer::SetProperty(const string &origProperty, const string &origValue, bool superuser) {
-    if (IsRoot())
-        return TError(EError::InvalidValue, "Can't set property for root");
+    if (IsMeta())
+        return TError(EError::InvalidValue, "Can't set property for meta containers");
 
     string property = origProperty;
     string value = StringTrim(origValue);
@@ -1121,7 +1353,7 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
         if (GetPropertyStr(property) != value)
             return TError(EError::Permission, "Only root can change this property");
 
-    if (State != EContainerState::Stopped && !(Spec.GetFlags(property) & DYNAMIC_PROPERTY))
+    if (GetState() != EContainerState::Stopped && !(Spec.GetFlags(property) & DYNAMIC_PROPERTY))
         return TError(EError::InvalidValue, "Can't set dynamic property " + property + " for running container");
 
 
@@ -1248,7 +1480,7 @@ std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys
 }
 
 bool TContainer::DeliverExitStatus(int pid, int status) {
-    if (State != EContainerState::Running || !Task)
+    if (GetState() != EContainerState::Running || !Task)
         return false;
 
     if (Task->GetPid() != pid)
@@ -1273,7 +1505,7 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
 }
 
 bool TContainer::NeedRespawn() {
-    if (State != EContainerState::Dead)
+    if (GetState() != EContainerState::Dead)
         return false;
 
     if (GetPropertyStr("respawn") == "false")
@@ -1302,7 +1534,7 @@ void TContainer::Heartbeat() {
         TLogger::LogError(error, "Can't respawn " + GetName());
     }
 
-    if (State != EContainerState::Running || !Task)
+    if (GetState() != EContainerState::Running || !Task)
         return;
 
     Task->Rotate();
@@ -1321,7 +1553,9 @@ bool TContainer::HasChildren() const {
 }
 
 bool TContainer::DeliverOom(int fd) {
-    if (IsRoot() || !(CheckState(EContainerState::Running) || CheckState(EContainerState::Dead)))
+    auto state = GetState();
+    if (IsMeta() || !(state == EContainerState::Running ||
+                      state == EContainerState::Dead))
         return false;
 
     if (Efd.GetFd() != fd)
@@ -1336,7 +1570,7 @@ bool TContainer::DeliverOom(int fd) {
 
     AckExitStatus(pid);
     Task->DeliverExitStatus(SIGKILL);
-    State = EContainerState::Dead;;
+    State = EContainerState::Dead;
 
     StopChildren();
     OomKilled = true;
