@@ -169,8 +169,10 @@ void TTask::ChildReopenStdio() {
 }
 
 void TTask::ChildDropPriveleges() {
-    if (prctl(PR_SET_KEEPCAPS, 0, 0, 0, 0) < 0)
-        Abort(errno, "prctl(PR_SET_KEEPCAPS)");
+    if (Env->Uid || Env->Gid) {
+        if (prctl(PR_SET_KEEPCAPS, 0, 0, 0, 0) < 0)
+            Abort(errno, "prctl(PR_SET_KEEPCAPS)");
+    }
 
     if (setgid(Env->Gid) < 0)
         Abort(errno, "setgid()");
@@ -498,8 +500,7 @@ int TTask::ChildCallback() {
         Abort(error);
 
     ChildSetHostname();
-    if (!priveleged)
-        ChildDropPriveleges();
+    ChildDropPriveleges();
     ChildExec();
 
     return 0;
