@@ -43,6 +43,9 @@ retry:
             LastErrorMsg = error.GetMsg();
             LastError = INT_MIN;
 
+            if (error.GetErrno() == EACCES)
+                goto exit;
+
             goto exit_or_retry;
         }
     }
@@ -59,6 +62,7 @@ exit_or_retry:
         }
     }
 
+exit:
     req.Clear();
 
     return LastError;
