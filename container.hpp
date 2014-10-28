@@ -90,7 +90,10 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     std::unique_ptr<TTask> Task;
 
     // data
+    bool HaveRunningChildren();
     EContainerState GetState();
+    void SetState(EContainerState newState);
+
     TError ApplyDynamicProperties();
     TError PrepareNetwork();
     TError PrepareOomMonitor();
@@ -124,7 +127,6 @@ public:
     const std::string GetName(bool recursive = true) const;
 
     bool IsRoot() const;
-    bool IsMeta() const;
     std::shared_ptr<const TContainer> GetRoot() const;
     std::shared_ptr<const TContainer> GetParent() const;
     const std::string &GetLink() const { return Link; }

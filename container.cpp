@@ -552,11 +552,52 @@ std::string TContainerEvent::GetMsg() const {
 
 // TContainer
 
+bool TContainer::HaveRunningChildren() {
+    for (auto iter : Children)
+        if (auto child = iter.lock()) {
+            TLogger::Log() << "CHECK " << child->GetName() << " " << ContainerStateName(child->State) << std::endl;
+            if (child->State == EContainerState::Running ||
+                child->State == EContainerState::Dead) {
+                return true;
+            } else if (child->State == EContainerState::Meta) {
+                if (child->HaveRunningChildren())
+                    return true;
+            }
+        }
+
+    return false;
+}
+
 EContainerState TContainer::GetState() {
+    static bool rec = false;
+
+    if (rec)
+        return State;
+
+    rec = true;
+
     if (State == EContainerState::Running && (!Task || !Task->IsRunning()))
-        State = EContainerState::Stopped;
+        SetState(EContainerState::Stopped);
+
+    // TODO: use some kind of reference count for accounting running children
+    if (State == EContainerState::Meta && !IsRoot()) {
+        if (!HaveRunningChildren()) {
+            TLogger::Log() << GetName() << ": no running children" << std::endl;
+            Stop();
+        }
+    }
+
+    rec = false;
 
     return State;
+}
+
+void TContainer::SetState(EContainerState newState) {
+    if (State == newState)
+        return;
+
+    TLogger::Log() << GetName() << ": change state " << ContainerStateName(State) << " -> " << ContainerStateName(newState) << std::endl;
+    State = newState;
 }
 
 const string TContainer::StripParentName(const string &name) const {
@@ -623,10 +664,6 @@ const string TContainer::GetName(bool recursive) const {
 
 bool TContainer::IsRoot() const {
     return Name == ROOT_CONTAINER;
-}
-
-bool TContainer::IsMeta() const {
-    return State == EContainerState::Meta;
 }
 
 std::shared_ptr<const TContainer> TContainer::GetRoot() const {
@@ -772,7 +809,7 @@ bool TContainer::UseParentNamespace() const {
     string value;
     TError error = Spec.GetRaw("isolate", value);
 
-    return Parent && !Parent->IsMeta() && !error && value == "false";
+    return Parent && !Parent->IsRoot() && !error && value == "false";
 }
 
 TError TContainer::PrepareNetwork() {
@@ -1030,7 +1067,7 @@ TError TContainer::PrepareMetaParent() {
 
     auto parentState = GetState();
     if (parentState == EContainerState::Stopped) {
-        State = EContainerState::Meta;
+        SetState(EContainerState::Meta);
 
         TError error = PrepareNetwork();
         if (error) {
@@ -1053,14 +1090,10 @@ TError TContainer::PrepareMetaParent() {
 }
 
 TError TContainer::Start() {
-    if (GetState() == EContainerState::Meta) {
-        TError error = Stop();
-        if (error)
-            return error;
-    }
-
     auto state = GetState();
-    if ((state == EContainerState::Running || state == EContainerState::Dead) && MaybeReturnedOk) {
+
+    if ((state == EContainerState::Running ||
+         state == EContainerState::Dead) && MaybeReturnedOk) {
         MaybeReturnedOk = false;
         return TError::Success();
     }
@@ -1068,7 +1101,8 @@ TError TContainer::Start() {
     RespawnCount = 0;
 
     if (state != EContainerState::Stopped)
-        return TError(EError::InvalidState, "invalid container state " + ContainerStateName(state));
+        return TError(EError::InvalidState, "invalid container state " +
+                      ContainerStateName(state));
 
     if (!IsRoot() && !GetPropertyStr("command").length()) {
         FreeResources();
@@ -1083,7 +1117,7 @@ TError TContainer::Start() {
         return error;
 
     if (IsRoot()) {
-        State = EContainerState::Meta;
+        SetState(EContainerState::Meta);
         return TError::Success();
     }
 
@@ -1106,7 +1140,7 @@ TError TContainer::Start() {
     TLogger::Log() << GetName() << " started " << std::to_string(Task->GetPid()) << std::endl;
 
     Spec.SetRaw("root_pid", std::to_string(Task->GetPid()));
-    State = EContainerState::Running;
+    SetState(EContainerState::Running);
 
     return TError::Success();
 }
@@ -1170,6 +1204,12 @@ TError TContainer::PrepareResources() {
             TLogger::LogError(error, "Can't prepare parent");
             return error;
         }
+
+        if (!GetPropertyBool("isolate") &&
+            Parent->State == EContainerState::Meta &&
+            !Parent->IsRoot())
+            return TError(EError::InvalidValue,
+                          "Can't share container with meta parent");
     }
 
     TError error = PrepareNetwork();
@@ -1229,7 +1269,7 @@ TError TContainer::Stop() {
     }
 
     if (!IsRoot())
-        State = EContainerState::Stopped;
+        SetState(EContainerState::Stopped);
     StopChildren();
     if (!IsRoot())
         FreeResources();
@@ -1238,8 +1278,10 @@ TError TContainer::Stop() {
 }
 
 TError TContainer::Pause() {
-    if (IsMeta() || GetState() != EContainerState::Running)
-        return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
+    auto state = GetState();
+    if (state != EContainerState::Running)
+        return TError(EError::InvalidState, "invalid container state " +
+                      ContainerStateName(state));
 
     auto cg = GetLeafCgroup(freezerSubsystem);
     TError error(freezerSubsystem->Freeze(*cg));
@@ -1248,13 +1290,15 @@ TError TContainer::Pause() {
         return error;
     }
 
-    State = EContainerState::Paused;
+    SetState(EContainerState::Paused);
     return TError::Success();
 }
 
 TError TContainer::Resume() {
-    if (GetState() != EContainerState::Paused)
-        return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
+    auto state = GetState();
+    if (state != EContainerState::Paused)
+        return TError(EError::InvalidState, "invalid container state " +
+                      ContainerStateName(state));
 
     auto cg = GetLeafCgroup(freezerSubsystem);
     TError error(freezerSubsystem->Unfreeze(*cg));
@@ -1263,13 +1307,15 @@ TError TContainer::Resume() {
         return error;
     }
 
-    State = EContainerState::Running;
+    SetState(EContainerState::Running);
     return TError::Success();
 }
 
 TError TContainer::Kill(int sig) {
-    if (IsMeta() || GetState() != EContainerState::Running)
-        return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
+    auto state = GetState();
+    if (state != EContainerState::Running)
+        return TError(EError::InvalidState, "invalid container state " +
+                      ContainerStateName(state));
 
     return Task->Kill(sig);
 }
@@ -1279,7 +1325,7 @@ TError TContainer::GetData(const string &name, string &value) {
         return TError(EError::InvalidValue, "invalid container data");
 
     if (dataSpec[name].Valid.find(GetState()) == dataSpec[name].Valid.end())
-        return TError(EError::InvalidState, "invalid container state " + ContainerStateName(State));
+        return TError(EError::InvalidState, "invalid container state");
 
     value = dataSpec[name].Handler(*this);
     return TError::Success();
@@ -1339,8 +1385,8 @@ static std::map<std::string, std::string> alias = {
 };
 
 TError TContainer::GetProperty(const string &origProperty, string &value) const {
-    if (IsMeta())
-        return TError(EError::InvalidProperty, "no properties for meta containers");
+    if (IsRoot())
+        return TError(EError::InvalidProperty, "no properties for root container");
 
     string property = origProperty;
     if (alias.find(origProperty) != alias.end())
@@ -1374,8 +1420,8 @@ bool TContainer::ShouldApplyProperty(const std::string &property) {
 }
 
 TError TContainer::SetProperty(const string &origProperty, const string &origValue, bool superuser) {
-    if (IsMeta())
-        return TError(EError::InvalidValue, "Can't set property for meta containers");
+    if (IsRoot())
+        return TError(EError::InvalidValue, "Can't set property for root containers");
 
     string property = origProperty;
     string value = StringTrim(origValue);
@@ -1391,8 +1437,9 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
         if (GetPropertyStr(property) != value)
             return TError(EError::Permission, "Only root can change this property");
 
-    if (GetState() != EContainerState::Stopped && !(Spec.GetFlags(property) & DYNAMIC_PROPERTY))
-        return TError(EError::InvalidValue, "Can't set dynamic property " + property + " for running container");
+    if (GetState() != EContainerState::Stopped &&
+        !(Spec.GetFlags(property) & DYNAMIC_PROPERTY))
+        return TError(EError::InvalidState, "Can't set dynamic property " + property + " for running container");
 
 
     if (UseParentNamespace() && (Spec.GetFlags(property) & PARENT_RO_PROPERTY))
@@ -1446,7 +1493,10 @@ TError TContainer::Restore(const kv::TNode &node) {
         TLogger::LogError(error, "Can't parse gid");
     }
 
-    State = EContainerState::Stopped;
+    SetState(EContainerState::Stopped);
+
+    if (Parent)
+        Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
 
     if (started) {
         TError error = PrepareResources();
@@ -1471,8 +1521,9 @@ TError TContainer::Restore(const kv::TNode &node) {
             return error;
         }
 
-        State = Task->IsRunning() ? EContainerState::Running : EContainerState::Stopped;
-        if (State == EContainerState::Running)
+        SetState(Task->IsRunning() ?
+                 EContainerState::Running : EContainerState::Stopped);
+        if (GetState() == EContainerState::Running)
             MaybeReturnedOk = true;
     } else {
         auto cg = GetLeafCgroup(freezerSubsystem);
@@ -1518,7 +1569,7 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
 
     Task->DeliverExitStatus(status);
     TLogger::Log() << "Delivered " << status << " to " << GetName() << " with root_pid " << Task->GetPid() << std::endl;
-    State = EContainerState::Dead;
+    SetState(EContainerState::Dead);
 
     if (!GetPropertyBool("isolate"))
         (void)KillAll();
@@ -1571,7 +1622,8 @@ void TContainer::Heartbeat() {
 }
 
 bool TContainer::CanRemoveDead() const {
-    return State == EContainerState::Dead && TimeOfDeath + config().container().aging_time_ms() <= GetCurrentTimeMs();
+    return State == EContainerState::Dead &&
+        TimeOfDeath + config().container().aging_time_ms() <= GetCurrentTimeMs();
 }
 
 bool TContainer::HasChildren() const {
@@ -1584,8 +1636,8 @@ bool TContainer::HasChildren() const {
 
 bool TContainer::DeliverOom(int fd) {
     auto state = GetState();
-    if (IsMeta() || !(state == EContainerState::Running ||
-                      state == EContainerState::Dead))
+    if (!(state == EContainerState::Running ||
+          state == EContainerState::Dead))
         return false;
 
     if (Efd.GetFd() != fd)
@@ -1600,7 +1652,7 @@ bool TContainer::DeliverOom(int fd) {
 
     AckExitStatus(pid);
     Task->DeliverExitStatus(SIGKILL);
-    State = EContainerState::Dead;
+    SetState(EContainerState::Dead);
 
     StopChildren();
     OomKilled = true;

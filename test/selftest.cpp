@@ -281,7 +281,6 @@ static void TestHolder(TPortoAPI &api) {
     Expect(v == "meta");
     ExpectSuccess(api.Stop("a/b/c"));
 
-    ExpectSuccess(api.Start("a/b/c"));
     ExpectSuccess(api.Start("a/b"));
     ExpectSuccess(api.GetData("a/b/c", "state", v));
     Expect(v == "stopped");
@@ -605,6 +604,19 @@ static void TestIsolation(TPortoAPI &api) {
     Expect(TcClassExist(stoul(handle)) == false);
 
     ExpectSuccess(api.Destroy(name));
+
+    Say() << "Make sure child can't share container with meta parent" << std::endl;
+    ExpectSuccess(api.Create("meta"));
+    ExpectSuccess(api.Create("meta/test"));
+    ExpectSuccess(api.SetProperty("meta/test", "isolate", "false"));
+    ExpectSuccess(api.SetProperty("meta/test", "command", "sleep 1000"));
+    ExpectFailure(api.Start("meta/test"), EError::InvalidValue);
+    ExpectSuccess(api.GetData("meta/test", "state", ret));
+    Expect(ret == "stopped");
+    ExpectSuccess(api.GetData("meta", "state", ret));
+    Expect(ret == "stopped");
+    ExpectSuccess(api.Destroy("meta/test"));
+    ExpectSuccess(api.Destroy("meta"));
 }
 
 static void TestProperty(TPortoAPI &api) {
@@ -2330,6 +2342,10 @@ static void TestRecovery(TPortoAPI &api) {
     Expect(containers[2] == string("a/b"));
     ExpectSuccess(api.GetData(parent, "state", v));
     Expect(v == "meta");
+
+    ExpectSuccess(api.SetProperty(parent, "recharge_on_pgfault", "true"));
+    ExpectFailure(api.SetProperty(parent, "cpu_policy", "rt"), EError::InvalidState);
+
     ExpectSuccess(api.GetData(child, "state", v));
     Expect(v == "running");
     ExpectSuccess(api.Destroy(child));

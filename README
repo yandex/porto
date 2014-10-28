@@ -23,3 +23,7 @@ sudo ./portoctl enter fedora20
 # Run debian
 sudo ./portoctl exec trusty command="/sbin/init" root=/home/stfomichev/src/porto/dist/trusty env="container=lxc"
 TODO - fix SELinux:  Could not open policy file <= /etc/selinux/targeted/policy/policy.29:  No such file or directory
+
+# Profile
+~stfomichev/perf record -e cycles:u -g -- portod
+~stfomichev/perf report --stdio
