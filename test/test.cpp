@@ -532,10 +532,10 @@ void TestDaemon(TPortoAPI &api) {
     if (WordCount("/etc/nsswitch.conf", "sss"))
         sssFd = 2;
 
-    // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 4(rpc socket) 128(event pipe) 129(ack pipe)
+    // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 4(rpc socket) 5(netlink socket) 128(event pipe) 129(ack pipe)
     int nr = scandir(path.c_str(), &lst, NULL, alphasort);
     PrintFds(path, lst, nr);
-    Expect(nr >= 2 + 7 && nr <= 2 + 7 + sssFd);
+    Expect(nr >= 2 + 8 && nr <= 2 + 8 + sssFd);
 
     Say() << "Make sure portod-master doesn't have zombies" << std::endl;
     pid = ReadPid(config().master_pid().path());

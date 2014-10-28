@@ -473,6 +473,40 @@ static void KvDump() {
     storage.Dump();
 }
 
+static std::shared_ptr<TNlLink> OpenLink(const std::string &link) {
+    auto name = link;
+
+    auto nl = std::make_shared<TNl>();
+    if (!nl)
+        throw std::bad_alloc();
+
+    TError error = nl->Connect();
+    if (error) {
+        TLogger::LogError(error, "Couldn't open link!");
+        return nullptr;
+    }
+
+    if (!name.length()) {
+        error = nl->GetDefaultLink(name);
+        if (error) {
+            TLogger::LogError(error, "Couldn't open link!");
+            return nullptr;
+        }
+    }
+
+    auto l = std::make_shared<TNlLink>(nl, name);
+    if (!l)
+        throw std::bad_alloc();
+
+    error = l->Load();
+    if (error) {
+        TLogger::LogError(error, "Couldn't open link!");
+        return nullptr;
+    }
+
+    return l;
+}
+
 static int SlaveMain() {
     int ret = DaemonPrepare(false);
     if (ret)
@@ -518,15 +552,8 @@ static int SlaveMain() {
         if (error)
             TLogger::LogError(error, "Couldn't create cgroup snapshot!");
 
-        std::string link = config().network().device();
-        if (!link.length()) {
-            error = TNl::FindDefaultLink(link);
-            TLogger::LogError(error, "Couldn't find default network interface!");
-            if (error)
-                return EXIT_FAILURE;
-        }
-
-        TLogger::Log() << "Using " << link << " interface" << std::endl;
+        auto link = OpenLink(config().network().device());
+        TLogger::Log() << "Using " << link->GetName() << " interface" << std::endl;
 
         TContainerHolder cholder(link);
         error = cholder.CreateRoot();

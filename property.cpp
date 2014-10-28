@@ -774,13 +774,7 @@ TError ParseNet(std::shared_ptr<const TContainer> container, const std::string &
                                   "Invalid macvlan address " + hw);
             }
 
-            int idx = -1;
-            TError error = TNlLink::Exec(container->GetLink(),
-                [&](std::shared_ptr<TNlLink> link) {
-                    idx = link->FindIndex(master);
-                    return TError::Success();
-                });
-
+            int idx = container->GetLink()->FindIndex(master);
             if (idx < 0)
                 return TError(EError::InvalidValue, "Interface " + master + " doesn't exist or not in running state");
 

@@ -1,6 +1,4 @@
-- share single netlink instance
 - shaping with macvlan or non-default interface?
-- do net_xyz properties work for nested containers?
 - ? portoctl cp
 - ? remove start_errno data
 

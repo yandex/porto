@@ -69,6 +69,7 @@ public:
     TError AddMacVlan(const std::string &master,
                       const std::string &type, const std::string &hw,
                       int nsPid);
+    const std::string &GetName() { return Name; }
 
     static bool ValidMacVlanType(const std::string &type);
     static bool ValidMacAddr(const std::string &hw);

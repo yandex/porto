@@ -12,17 +12,17 @@
 
 class TQdisc {
     NO_COPY_CONSTRUCT(TQdisc);
-    const std::string Link;
+    std::shared_ptr<TNlLink> Link;
     const uint32_t Handle;
     const uint32_t DefClass;
 
 public:
-    TQdisc(const std::string &link, uint32_t handle, uint32_t defClass) : Link(link), Handle(handle), DefClass(defClass) { }
+    TQdisc(std::shared_ptr<TNlLink> link, uint32_t handle, uint32_t defClass) : Link(link), Handle(handle), DefClass(defClass) { }
 
     TError Create();
     TError Remove();
     uint32_t GetHandle() { return Handle; }
-    const std::string &GetLink() { return Link; }
+    std::shared_ptr<TNlLink> GetLink() { return Link; }
 };
 
 class TTclass {
@@ -30,7 +30,7 @@ class TTclass {
     const std::shared_ptr<TQdisc> ParentQdisc;
     const std::shared_ptr<TTclass> ParentTclass;
     const uint32_t Handle;
-    const std::string Link;
+    std::shared_ptr<TNlLink> Link;
 
 public:
     TTclass(const std::shared_ptr<TQdisc> qdisc, uint32_t handle) : ParentQdisc(qdisc), Handle(handle), Link(qdisc->GetLink()) { }
@@ -47,7 +47,7 @@ public:
 class TFilter {
     NO_COPY_CONSTRUCT(TFilter);
     const std::shared_ptr<TQdisc> Parent;
-    const std::string Link;
+    std::shared_ptr<TNlLink> Link;
 
 public:
     TFilter(const std::shared_ptr<TQdisc> parent) : Parent(parent), Link(parent->GetLink()) { }
