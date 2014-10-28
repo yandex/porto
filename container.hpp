@@ -156,6 +156,7 @@ public:
     uint16_t GetId() { return Id; }
     int GetOomFd() { return Efd.GetFd(); }
     void GetPerm(int &uid, int &gid) const { uid = Uid; gid = Gid; }
+    std::shared_ptr<TContainer> FindRunningParent() const;
     bool UseParentNamespace() const;
     bool DeliverEvent(const TContainerEvent &event);
 };

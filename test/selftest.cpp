@@ -605,18 +605,61 @@ static void TestIsolation(TPortoAPI &api) {
 
     ExpectSuccess(api.Destroy(name));
 
-    Say() << "Make sure child can't share container with meta parent" << std::endl;
+    Say() << "Make sure isolate works correctly with meta parent" << std::endl;
+    string pid;
+
     ExpectSuccess(api.Create("meta"));
     ExpectSuccess(api.Create("meta/test"));
+
     ExpectSuccess(api.SetProperty("meta/test", "isolate", "false"));
     ExpectSuccess(api.SetProperty("meta/test", "command", "sleep 1000"));
-    ExpectFailure(api.Start("meta/test"), EError::InvalidValue);
-    ExpectSuccess(api.GetData("meta/test", "state", ret));
-    Expect(ret == "stopped");
-    ExpectSuccess(api.GetData("meta", "state", ret));
-    Expect(ret == "stopped");
+    ExpectSuccess(api.Start("meta/test"));
+    ExpectSuccess(api.GetData("meta/test", "root_pid", pid));
+    AsRoot(api);
+    Expect(GetNamespace("self", "pid") == GetNamespace(pid, "pid"));
+    AsNobody(api);
+    ExpectSuccess(api.Stop("meta/test"));
+
+    ExpectSuccess(api.SetProperty("meta/test", "isolate", "true"));
+    ExpectSuccess(api.SetProperty("meta/test", "command", "ps aux"));
+    ExpectSuccess(api.Start("meta/test"));
+    ExpectSuccess(api.GetData("meta/test", "root_pid", pid));
+    AsRoot(api);
+    Expect(GetNamespace("self", "pid") != GetNamespace(pid, "pid"));
+    AsNobody(api);
+    ExpectSuccess(api.Stop("meta/test"));
+
     ExpectSuccess(api.Destroy("meta/test"));
     ExpectSuccess(api.Destroy("meta"));
+
+    ExpectSuccess(api.Create("test"));
+    ExpectSuccess(api.Create("test/meta"));
+    ExpectSuccess(api.Create("test/meta/test"));
+
+    ExpectSuccess(api.SetProperty("test", "command", "sleep 1000"));
+    ExpectSuccess(api.Start("test"));
+
+    ExpectSuccess(api.SetProperty("test/meta/test", "command", "sleep 1000"));
+    ExpectSuccess(api.Start("test/meta/test"));
+    ExpectSuccess(api.GetData("test", "root_pid", pid));
+    ExpectSuccess(api.GetData("test/meta/test", "root_pid", ret));
+    AsRoot(api);
+    Expect(GetNamespace(ret, "pid") != GetNamespace(pid, "pid"));
+    AsNobody(api);
+    ExpectSuccess(api.Stop("test/meta/test"));
+
+    ExpectSuccess(api.SetProperty("test/meta/test", "isolate", "false"));
+    ExpectSuccess(api.Start("test/meta/test"));
+    ExpectSuccess(api.GetData("test", "root_pid", pid));
+    ExpectSuccess(api.GetData("test/meta/test", "root_pid", ret));
+    AsRoot(api);
+    Expect(GetNamespace(ret, "pid") == GetNamespace(pid, "pid"));
+    AsNobody(api);
+    ExpectSuccess(api.Stop("test/meta/test"));
+
+    ExpectSuccess(api.Destroy("test/meta/test"));
+    ExpectSuccess(api.Destroy("test/meta"));
+    ExpectSuccess(api.Destroy("test"));
 }
 
 static void TestProperty(TPortoAPI &api) {

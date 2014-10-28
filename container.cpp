@@ -555,7 +555,6 @@ std::string TContainerEvent::GetMsg() const {
 bool TContainer::HaveRunningChildren() {
     for (auto iter : Children)
         if (auto child = iter.lock()) {
-            TLogger::Log() << "CHECK " << child->GetName() << " " << ContainerStateName(child->State) << std::endl;
             if (child->State == EContainerState::Running ||
                 child->State == EContainerState::Dead) {
                 return true;
@@ -581,10 +580,8 @@ EContainerState TContainer::GetState() {
 
     // TODO: use some kind of reference count for accounting running children
     if (State == EContainerState::Meta && !IsRoot()) {
-        if (!HaveRunningChildren()) {
-            TLogger::Log() << GetName() << ": no running children" << std::endl;
+        if (!HaveRunningChildren())
             Stop();
-        }
     }
 
     rec = false;
@@ -805,11 +802,27 @@ TError TContainer::ApplyDynamicProperties() {
     return TError::Success();
 }
 
+std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
+    auto p = Parent;
+    while (p) {
+        if (p->State == EContainerState::Running)
+            return p;
+        p = p->Parent;
+    }
+
+    return nullptr;
+}
+
 bool TContainer::UseParentNamespace() const {
     string value;
     TError error = Spec.GetRaw("isolate", value);
+    if (error)
+        return false;
 
-    return Parent && !Parent->IsRoot() && !error && value == "false";
+    if (value == "true")
+        return false;
+
+    return FindRunningParent() != nullptr;
 }
 
 TError TContainer::PrepareNetwork() {
@@ -972,9 +985,11 @@ TError TContainer::PrepareTask() {
         return error;
 
     if (UseParentNamespace()) {
-        int pid = Parent->Task->GetPid();
+        auto p = FindRunningParent();
+        if (!p)
+            return TError(EError::Unknown, "Couldn't find running parent");
 
-        TError error = taskEnv->Ns.Create(pid);
+        TError error = taskEnv->Ns.Create(p->Task->GetPid());
         if (error)
             return error;
     }
@@ -1204,12 +1219,6 @@ TError TContainer::PrepareResources() {
             TLogger::LogError(error, "Can't prepare parent");
             return error;
         }
-
-        if (!GetPropertyBool("isolate") &&
-            Parent->State == EContainerState::Meta &&
-            !Parent->IsRoot())
-            return TError(EError::InvalidValue,
-                          "Can't share container with meta parent");
     }
 
     TError error = PrepareNetwork();
