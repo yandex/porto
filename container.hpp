@@ -97,6 +97,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     TError PrepareCgroups();
     TError PrepareTask();
     TError KillAll();
+    TError PrepareMetaParent();
 
     const std::string StripParentName(const std::string &name) const;
     bool NeedRespawn();
@@ -107,6 +108,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     int GetPropertyInt(const std::string &property) const;
     uint64_t GetPropertyUint64(const std::string &property) const;
     void StopChildren();
+    TError PrepareResources();
     void FreeResources();
     void PropertyToAlias(const std::string &property, std::string &value) const;
     TError AliasToProperty(std::string &property, std::string &value);
@@ -130,7 +132,6 @@ public:
     uint64_t GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except = nullptr, uint64_t exceptVal = 0) const;
     bool ValidHierarchicalProperty(const std::string &property, const std::string &value) const;
     std::vector<pid_t> Processes();
-    bool IsAlive();
 
     TError Create(int uid, int gid);
     TError Start();

@@ -54,22 +54,26 @@ static int64_t GetBootTime() {
 
 static int64_t BootTime = 0;
 
+static string ContainerStateName(EContainerState state) {
+    switch (state) {
+    case EContainerState::Stopped:
+        return "stopped";
+    case EContainerState::Dead:
+        return "dead";
+    case EContainerState::Running:
+        return "running";
+    case EContainerState::Paused:
+        return "paused";
+    case EContainerState::Meta:
+        return "meta";
+    default:
+        return "unknown";
+    }
+}
+
 struct TData {
     static string State(TContainer& c) {
-        switch (c.GetState()) {
-        case EContainerState::Stopped:
-            return "stopped";
-        case EContainerState::Dead:
-            return "dead";
-        case EContainerState::Running:
-            return "running";
-        case EContainerState::Paused:
-            return "paused";
-        case EContainerState::Meta:
-            return "meta";
-        default:
-            return "unknown";
-        }
+        return ContainerStateName(c.GetState());
     }
 
     static string OomKilled(TContainer& c) {
@@ -593,9 +597,6 @@ TContainer::~TContainer() {
     }
     */
 
-    if (IsRoot())
-        FreeResources();
-
     if (DefaultTclass) {
         TError error = DefaultTclass->Remove();
         TLogger::LogError(error, "Can't remove default tc class");
@@ -719,10 +720,6 @@ vector<pid_t> TContainer::Processes() {
     return ret;
 }
 
-bool TContainer::IsAlive() {
-    return IsMeta() || !Processes().empty();
-}
-
 TError TContainer::ApplyDynamicProperties() {
     auto memcg = GetLeafCgroup(memorySubsystem);
 
@@ -785,8 +782,10 @@ TError TContainer::PrepareNetwork() {
         return TError::Success();
 
     if (Parent) {
-        uint32_t handle = TcHandle(TcMajor(Parent->Tclass->GetHandle()), Id);
+        PORTO_ASSERT(Parent->Tclass != nullptr);
+
         auto tclass = Parent->Tclass;
+        uint32_t handle = TcHandle(TcMajor(tclass->GetHandle()), Id);
         Tclass = std::make_shared<TTclass>(tclass, handle);
     } else {
         uint32_t handle = TcHandle(TcMajor(Qdisc->GetHandle()), Id);
@@ -1022,22 +1021,44 @@ TError TContainer::Create(int uid, int gid) {
     return TError::Success();
 }
 
-static string ContainerStateName(EContainerState state) {
-    switch (state) {
-    case EContainerState::Stopped:
-        return "stopped";
-    case EContainerState::Dead:
-        return "dead";
-    case EContainerState::Running:
-        return "running";
-    case EContainerState::Paused:
-        return "paused";
-    default:
-        return "?";
+TError TContainer::PrepareMetaParent() {
+    if (Parent && Parent->GetState() != EContainerState::Meta) {
+        TError error = Parent->PrepareMetaParent();
+        if (error)
+            return error;
     }
+
+    auto parentState = GetState();
+    if (parentState == EContainerState::Stopped) {
+        State = EContainerState::Meta;
+
+        TError error = PrepareNetwork();
+        if (error) {
+            FreeResources();
+            return error;
+        }
+
+        error = PrepareCgroups();
+        if (error) {
+            FreeResources();
+            return error;
+        }
+    } else if (parentState == EContainerState::Meta) {
+        return TError::Success();
+    } else if (parentState != EContainerState::Running) {
+        return TError(EError::InvalidState, "invalid parent state");
+    }
+
+    return TError::Success();
 }
 
 TError TContainer::Start() {
+    if (GetState() == EContainerState::Meta) {
+        TError error = Stop();
+        if (error)
+            return error;
+    }
+
     auto state = GetState();
     if ((state == EContainerState::Running || state == EContainerState::Dead) && MaybeReturnedOk) {
         MaybeReturnedOk = false;
@@ -1049,34 +1070,21 @@ TError TContainer::Start() {
     if (state != EContainerState::Stopped)
         return TError(EError::InvalidState, "invalid container state " + ContainerStateName(state));
 
-    if (Parent && !Parent->IsRoot() && Parent->GetState() != EContainerState::Running)
-        return TError(EError::InvalidState, "parent is not running");
+    if (!IsRoot() && !GetPropertyStr("command").length()) {
+        FreeResources();
+        return TError(EError::InvalidValue, "container command is empty");
+    }
 
     Spec.SetRaw("id", std::to_string(Id));
     OomKilled = false;
 
-    TError error = PrepareNetwork();
-    if (error) {
-        TLogger::LogError(error, "Can't prepare task network");
-        FreeResources();
+    TError error = PrepareResources();
+    if (error)
         return error;
-    }
-
-    error = PrepareCgroups();
-    if (error) {
-        TLogger::LogError(error, "Can't prepare task cgroups");
-        FreeResources();
-        return error;
-    }
 
     if (IsRoot()) {
         State = EContainerState::Meta;
         return TError::Success();
-    }
-
-    if (!GetPropertyStr("command").length()) {
-        FreeResources();
-        return TError(EError::InvalidValue, "container command is empty");
     }
 
     error = PrepareTask();
@@ -1155,6 +1163,32 @@ void TContainer::StopChildren() {
     }
 }
 
+TError TContainer::PrepareResources() {
+    if (Parent) {
+        TError error = Parent->PrepareMetaParent();
+        if (error) {
+            TLogger::LogError(error, "Can't prepare parent");
+            return error;
+        }
+    }
+
+    TError error = PrepareNetwork();
+    if (error) {
+        TLogger::LogError(error, "Can't prepare task network");
+        FreeResources();
+        return error;
+    }
+
+    error = PrepareCgroups();
+    if (error) {
+        TLogger::LogError(error, "Can't prepare task cgroups");
+        FreeResources();
+        return error;
+    }
+
+    return TError::Success();
+}
+
 void TContainer::FreeResources() {
     LeafCgroups.clear();
 
@@ -1171,29 +1205,34 @@ void TContainer::FreeResources() {
 
 TError TContainer::Stop() {
     auto state = GetState();
-    if (IsMeta() || !(state == EContainerState::Running ||
-                      state == EContainerState::Dead))
+
+    if (state == EContainerState::Stopped ||
+        state == EContainerState::Paused)
         return TError(EError::InvalidState, "invalid container state " + ContainerStateName(state));
 
     TLogger::Log() << "Stop " << GetName() << " " << Id << std::endl;
 
-    int pid = Task->GetPid();
+    if (state == EContainerState::Running || state == EContainerState::Dead) {
 
-    TError error = KillAll();
-    if (error)
-        TLogger::LogError(error, "Can't kill all tasks in container");
+        int pid = Task->GetPid();
 
-    int ret = SleepWhile(1000, [&]{ kill(pid, 0); return errno != ESRCH; });
-    if (ret)
-        TLogger::Log() << "Error while waiting for container to stop" << std::endl;
+        TError error = KillAll();
+        if (error)
+            TLogger::LogError(error, "Can't kill all tasks in container");
 
-    AckExitStatus(pid);
-    Task->DeliverExitStatus(-1);
+        int ret = SleepWhile(1000, [&]{ kill(pid, 0); return errno != ESRCH; });
+        if (ret)
+            TLogger::Log() << "Error while waiting for container to stop" << std::endl;
 
-    State = EContainerState::Stopped;
+        AckExitStatus(pid);
+        Task->DeliverExitStatus(-1);
+    }
 
+    if (!IsRoot())
+        State = EContainerState::Stopped;
     StopChildren();
-    FreeResources();
+    if (!IsRoot())
+        FreeResources();
 
     return TError::Success();
 }
@@ -1223,7 +1262,6 @@ TError TContainer::Resume() {
         TLogger::LogError(error, "Can't resume " + GetName());
         return error;
     }
-
 
     State = EContainerState::Running;
     return TError::Success();
@@ -1411,17 +1449,9 @@ TError TContainer::Restore(const kv::TNode &node) {
     State = EContainerState::Stopped;
 
     if (started) {
-        error = PrepareNetwork();
-        if (error) {
-            TLogger::LogError(error, "Can't prepare task network");
+        TError error = PrepareResources();
+        if (error)
             return error;
-        }
-
-        error = PrepareCgroups();
-        if (error) {
-            TLogger::LogError(error, "Can't restore task cgroups");
-            return error;
-        }
 
         error = PrepareTask();
         if (error) {
@@ -1446,7 +1476,7 @@ TError TContainer::Restore(const kv::TNode &node) {
             MaybeReturnedOk = true;
     } else {
         auto cg = GetLeafCgroup(freezerSubsystem);
-        if (IsAlive()) {
+        if (!Processes().empty()) {
             // we started container but died before saving root_pid,
             // state may be inconsistent so restart task
 

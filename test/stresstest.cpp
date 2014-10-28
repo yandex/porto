@@ -41,6 +41,9 @@ static std::vector<std::map<std::string, std::string>> vtasks =
         { "timeout", "5" },
     },
     {
+        { "parent", "meta" },
+        { "name", "meta/test" },
+
         { "command", "bash -ec 'echo $A && false'" },
         { "env", "A=qwerty" },
         { "stdout", "qwerty\n" },
@@ -72,10 +75,12 @@ static void Create(TPortoAPI &api, const std::string &name, const std::string &c
     api.List(containers);
     Expect(std::find(containers.begin(),containers.end(),name) != containers.end());
 
-    TFolder f(cwd);
-    if (!f.Exists()) {
-        TError error = f.Create(0755, true);
-        Expect(error == false);
+    if (cwd.length()) {
+        TFolder f(cwd);
+        if (!f.Exists()) {
+            TError error = f.Create(0755, true);
+            Expect(error == false);
+        }
     }
 }
 
@@ -155,8 +160,11 @@ static void Destroy(TPortoAPI &api, const std::string &name, const std::string &
     containers.clear();
     ExpectSuccess(api.List(containers));
     Expect(std::find(containers.begin(),containers.end(),name) == containers.end());
-    TFolder f(cwd);
-    f.Remove(true);
+
+    if (cwd.length()) {
+        TFolder f(cwd);
+        f.Remove(true);
+    }
 }
 
 static void Tasks(int n, int iter) {
@@ -168,6 +176,12 @@ static void Tasks(int n, int iter) {
         while (iter--) {
             for (unsigned int t = 0; t < vtasks.size(); t++) {
                 std::string name = "stresstest" + std::to_string(n) + "_" + std::to_string(t);
+                if (vtasks[t].find("name") != vtasks[t].end())
+                    name = vtasks[t]["name"];
+
+                if (vtasks[t].find("parent") != vtasks[t].end())
+                    Create(api, vtasks[t]["parent"], "");
+
                 std::string cwd = "/tmp/stresstest/" + name;
                 Create(api, name, cwd);
                 SetProperty(api, name, "env", vtasks[t]["env"]);
@@ -179,6 +193,9 @@ static void Tasks(int n, int iter) {
                 CheckStdout(api, name, vtasks[t]["stdout"]);
                 CheckStderr(api, name, vtasks[t]["stderr"]);
                 Destroy(api, name, cwd);
+
+                if (vtasks[t].find("parent") != vtasks[t].end())
+                    Destroy(api, vtasks[t]["parent"], "");
             }
         }
     } catch (std::string e) {
