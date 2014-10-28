@@ -149,7 +149,7 @@ static int DaemonPrepare(bool master) {
         return ret;
 
     TLogger::Log() << string(80, '-') << std::endl;
-    TLogger::Log() << "Started" << std::endl;
+    TLogger::Log() << "Started " << GIT_TAG << " " << GIT_REVISION << std::endl;
     TLogger::Log() << config().DebugString() << std::endl;
 
     RegisterSignalHandlers();
@@ -604,13 +604,16 @@ static int SlaveMain() {
         error = storage.Destroy();
         TLogger::LogError(error, "Couldn't destroy key-value storage");
     } catch (string s) {
-        std::cout << s << std::endl;
+        std::cerr << s << std::endl;
         ret = EXIT_FAILURE;
     } catch (const char *s) {
-        std::cout << s << std::endl;
+        std::cerr << s << std::endl;
+        ret = EXIT_FAILURE;
+    } catch (const std::exception &exc) {
+        std::cerr << exc.what() << std::endl;
         ret = EXIT_FAILURE;
     } catch (...) {
-        std::cout << "Uncaught exception!" << std::endl;
+        std::cerr << "Uncaught exception!" << std::endl;
         ret = EXIT_FAILURE;
     }
 
