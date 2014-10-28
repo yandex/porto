@@ -209,7 +209,7 @@ public:
         if (ret)
             PrintError("Can't get property");
         else
-            std::cout << value << std::endl;
+            Print(value);
 
         return ret;
     }
@@ -244,7 +244,7 @@ public:
         if (ret)
             PrintError("Can't get data");
         else
-            std::cout << value << std::endl;
+            Print(value);
 
         return ret;
     }
@@ -417,7 +417,7 @@ public:
 
                 ret = Api->GetProperty(argv[0], p.Name, value);
                 if (!ret) {
-                    std::cout << p.Name << " = " << PropertyValue(p.Name, value) << std::endl;
+                    Print(p.Name + " = " + PropertyValue(p.Name, value));
                     printed++;
                 }
             }
@@ -428,7 +428,7 @@ public:
 
                 ret = Api->GetData(argv[0], d.Name, value);
                 if (!ret) {
-                    std::cout << d.Name << " = " << DataValue(d.Name, value) << std::endl;
+                    Print(d.Name + " = " + DataValue(d.Name, value));
                     printed++;
                 }
             }
@@ -445,7 +445,7 @@ public:
         if (validData) {
             ret = Api->GetData(argv[0], argv[1], value);
             if (!ret)
-                std::cout << DataValue(argv[1], value) << std::endl;
+                Print(DataValue(argv[1], value));
             else if (ret != EError::InvalidData)
                 PrintError("Can't get data");
         }
@@ -453,7 +453,7 @@ public:
         if (validProperty) {
             ret = Api->GetProperty(argv[0], argv[1], value);
             if (!ret) {
-                std::cout << PropertyValue(argv[1], value) << std::endl;
+                Print(PropertyValue(argv[1], value));
             } else if (ret != EError::InvalidProperty) {
                 PrintError("Can't get data");
                 return EXIT_FAILURE;

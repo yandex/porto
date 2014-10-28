@@ -23,6 +23,13 @@ ICmd::ICmd(TPortoAPI *api, const string& name, int args, const string& usage, co
         return rpc::EError_Name(static_cast<rpc::EError>(err));
     }
 
+void ICmd::Print(const std::string &val) {
+    std::cout << val;
+
+    if (!val.length() || val[val.length() - 1] != '\n')
+        std::cout << std::endl;
+}
+
 void ICmd::PrintError(const TError &error, const string &str) {
     if (error.GetMsg().length())
         std::cerr << str << ": " << ErrorName(error.GetError()) << " (" << error.GetMsg() << ")" << std::endl;

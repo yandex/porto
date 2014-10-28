@@ -17,6 +17,7 @@ public:
     std::string &GetDescription();
 
     const std::string &ErrorName(int err);
+    void Print(const std::string &val);
     void PrintError(const TError &error, const std::string &str);
     void PrintError(const std::string &str);
     bool ValidArgs(int argc, char *argv[]);
