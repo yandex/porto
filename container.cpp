@@ -826,6 +826,9 @@ bool TContainer::UseParentNamespace() const {
 }
 
 TError TContainer::PrepareNetwork() {
+    if (!config().network().enabled())
+        return TError::Success();
+
     PORTO_ASSERT(Tclass == nullptr);
 
     if (UseParentNamespace())
@@ -980,9 +983,11 @@ TError TContainer::PrepareTask() {
     if (error)
         return error;
 
-    error = ParseNet(shared_from_this(), GetPropertyStr("net"), taskEnv->NetCfg);
-    if (error)
-        return error;
+    if (config().network().enabled()) {
+        error = ParseNet(shared_from_this(), GetPropertyStr("net"), taskEnv->NetCfg);
+        if (error)
+            return error;
+    }
 
     if (UseParentNamespace()) {
         auto p = FindRunningParent();
@@ -1080,8 +1085,8 @@ TError TContainer::PrepareMetaParent() {
             return error;
     }
 
-    auto parentState = GetState();
-    if (parentState == EContainerState::Stopped) {
+    auto state = GetState();
+    if (state == EContainerState::Stopped) {
         SetState(EContainerState::Meta);
 
         TError error = PrepareNetwork();
@@ -1095,9 +1100,9 @@ TError TContainer::PrepareMetaParent() {
             FreeResources();
             return error;
         }
-    } else if (parentState == EContainerState::Meta) {
+    } else if (state == EContainerState::Meta) {
         return TError::Success();
-    } else if (parentState != EContainerState::Running) {
+    } else if (state != EContainerState::Running) {
         return TError(EError::InvalidState, "invalid parent state");
     }
 

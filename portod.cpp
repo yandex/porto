@@ -552,8 +552,11 @@ static int SlaveMain() {
         if (error)
             TLogger::LogError(error, "Couldn't create cgroup snapshot!");
 
-        auto link = OpenLink(config().network().device());
-        TLogger::Log() << "Using " << link->GetName() << " interface" << std::endl;
+        std::shared_ptr<TNlLink> link = nullptr;
+        if (config().network().enabled()) {
+            link = OpenLink(config().network().device());
+            TLogger::Log() << "Using " << link->GetName() << " interface" << std::endl;
+        }
 
         TContainerHolder cholder(link);
         error = cholder.CreateRoot();
