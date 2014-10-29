@@ -8,8 +8,9 @@
 
 #include "porto.hpp"
 #include "kvalue.hpp"
+#include "value.hpp"
+#include "container.hpp"
 
-class TContainer;
 class TBindMap;
 class TNetCfg;
 
@@ -24,38 +25,43 @@ const unsigned int PARENT_DEF_PROPERTY = (1 << 3);
 // When child container is shared with parent these properties can't be changed
 const unsigned int PARENT_RO_PROPERTY = (1 << 4);
 
-struct TPropertySpec {
-    std::string Description;
-    std::function<std::string(std::shared_ptr<const TContainer>)> Default;
-    unsigned int Flags;
-    std::function<TError(std::shared_ptr<const TContainer> container, const std::string&)> Valid;
-};
+extern std::map<std::string, TValueDef *> propSpec;
 
-extern std::map<std::string, const TPropertySpec> propertySpec;
-
-class TContainerSpec {
-    NO_COPY_CONSTRUCT(TContainerSpec);
+class TPropertyHolder {
+    NO_COPY_CONSTRUCT(TPropertyHolder);
     TKeyValueStorage Storage;
-    std::string Name;
-    std::map<std::string, std::string> Data;
+    std::map<std::string, std::shared_ptr<TValueState>> State;
+    std::weak_ptr<TContainer> Container;
+    const std::string Name;
 
+    bool IsRoot();
     TError SyncStorage();
     TError AppendStorage(const std::string& key, const std::string& value);
-    bool IsRoot() const;
+    TError GetSharedContainer(std::shared_ptr<TContainer> *c);
 
 public:
-    TContainerSpec(const std::string &name) : Name(name) { }
-    ~TContainerSpec();
-    bool IsDefault(std::shared_ptr<const TContainer> container, const std::string &property) const;
-    std::string GetDefault(std::shared_ptr<const TContainer> container, const std::string &property) const;
-    std::string Get(std::shared_ptr<const TContainer> container, const std::string &property) const;
-    TError Set(std::shared_ptr<const TContainer> container, const std::string &property, const std::string &value);
-    TError GetRaw(const std::string &property, std::string &value) const;
-    TError SetRaw(const std::string &property, const std::string &value);
-    unsigned int GetFlags(const std::string &property) const;
+    TPropertyHolder(std::shared_ptr<TContainer> c) : Container(c), Name(c->GetName()) {}
+    ~TPropertyHolder();
+
+    bool IsDefault(const std::string &property);
+    std::string Get(const std::string &property);
+    bool GetBool(const std::string &property);
+    int GetInt(const std::string &property);
+    uint64_t GetUint(const std::string &property);
+    TError GetRaw(const std::string &property, std::string &value);
+    std::string GetDefault(const std::string &property);
+
+    void SetRaw(const std::string &property, const std::string &value);
+    TError Set(const std::string &property, const std::string &value);
+
+    bool HasFlags(const std::string &property, int flags);
+
     TError Create();
     TError Restore(const kv::TNode &node);
+    TError PropertyExists(const std::string &property);
 };
+
+TError RegisterProperties();
 
 TError ParseRlimit(const std::string &s, std::map<int,struct rlimit> &rlim);
 TError ParseBind(const std::string &s, std::vector<TBindMap> &dirs);

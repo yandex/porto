@@ -1,6 +1,8 @@
+- test restarting (check version)
 - shaping with macvlan or non-default interface?
 - ? portoctl cp
 - ? remove start_errno data
+- ? move property apply code into property method
 
 # properties
 - ? capabilities

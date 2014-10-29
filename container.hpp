@@ -11,7 +11,6 @@
 #include <climits>
 
 #include "kvalue.hpp"
-#include "property.hpp"
 #include "task.hpp"
 #include "qdisc.hpp"
 #include "util/unix.hpp"
@@ -21,6 +20,7 @@ class TContainerEnv;
 struct TData;
 class TContainer;
 class TSubsystem;
+class TPropertyHolder;
 
 enum class EContainerState {
     Stopped,
@@ -74,7 +74,6 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     std::shared_ptr<TFilter> Filter;
     std::vector<std::weak_ptr<TContainer>> Children;
     EContainerState State;
-    TContainerSpec Spec;
     bool MaybeReturnedOk = false;
     size_t TimeOfDeath = 0;
     uint16_t Id;
@@ -106,10 +105,6 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     bool NeedRespawn();
     bool ShouldApplyProperty(const std::string &property);
     TError Respawn();
-    std::string GetPropertyStr(const std::string &property) const;
-    bool GetPropertyBool(const std::string &property) const;
-    int GetPropertyInt(const std::string &property) const;
-    uint64_t GetPropertyUint64(const std::string &property) const;
     void StopChildren();
     TError PrepareResources();
     void FreeResources();
@@ -120,8 +115,10 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     bool DeliverOom(int fd);
 
 public:
+    std::shared_ptr<TPropertyHolder> Prop;
+
     TContainer(const std::string &name, std::shared_ptr<TContainer> parent, uint16_t id, std::shared_ptr<TNlLink> link) :
-        Name(StripParentName(name)), Parent(parent), State(EContainerState::Stopped), Spec(name), Id(id), Link(link) { }
+        Name(StripParentName(name)), Parent(parent), State(EContainerState::Stopped), Id(id), Link(link) { }
     ~TContainer();
 
     const std::string GetName(bool recursive = true) const;
@@ -143,7 +140,6 @@ public:
     TError Kill(int sig);
 
     TError GetProperty(const std::string &property, std::string &value) const;
-    bool IsDefaultProperty(const std::string &property) const;
     TError SetProperty(const std::string &property, const std::string &value, bool superuser);
 
     TError GetData(const std::string &data, std::string &value);

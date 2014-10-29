@@ -8,6 +8,7 @@
 #include "task.hpp"
 #include "cgroup.hpp"
 #include "subsystem.hpp"
+#include "property.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/netlink.hpp"
@@ -111,13 +112,13 @@ struct TData {
 
     static string Stdout(TContainer& c) {
         if (c.Task)
-            return c.Task->GetStdout(c.GetPropertyUint64("stdout_limit"));
+            return c.Task->GetStdout(c.Prop->GetUint("stdout_limit"));
         return "";
     };
 
     static string Stderr(TContainer& c) {
         if (c.Task)
-            return c.Task->GetStderr(c.GetPropertyUint64("stdout_limit"));
+            return c.Task->GetStderr(c.Prop->GetUint("stdout_limit"));
         return "";
     };
 
@@ -674,32 +675,6 @@ std::shared_ptr<const TContainer> TContainer::GetParent() const {
     return Parent;
 }
 
-std::string TContainer::GetPropertyStr(const std::string &property) const {
-    return Spec.Get(shared_from_this(), property);
-}
-
-bool TContainer::GetPropertyBool(const std::string &property) const {
-    return GetPropertyStr(property) == "true";
-}
-
-int TContainer::GetPropertyInt(const std::string &property) const {
-    int val;
-
-    if (StringToInt(GetPropertyStr(property), val))
-        return 0;
-
-    return val;
-}
-
-uint64_t TContainer::GetPropertyUint64(const std::string &property) const {
-    uint64_t val;
-
-    if (StringToUint64(GetPropertyStr(property), val))
-        return 0;
-
-    return val;
-}
-
 uint64_t TContainer::GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except, uint64_t exceptVal) const {
     uint64_t val = 0;
 
@@ -710,7 +685,7 @@ uint64_t TContainer::GetChildrenSum(const std::string &property, std::shared_ptr
                 continue;
             }
 
-            uint64_t childval = child->GetPropertyUint64(property);
+            uint64_t childval = child->Prop->GetUint(property);
             if (childval)
                 val += childval;
             else
@@ -731,13 +706,13 @@ bool TContainer::ValidHierarchicalProperty(const std::string &property, const st
         return false;
 
     for (auto c = GetParent(); c; c = c->GetParent()) {
-        uint64_t parent = c->GetPropertyUint64(property);
+        uint64_t parent = c->Prop->GetUint(property);
         if (parent && newval > parent)
             return false;
     }
 
     if (GetParent()) {
-        uint64_t parent = GetParent()->GetPropertyUint64(property);
+        uint64_t parent = GetParent()->Prop->GetUint(property);
         uint64_t children = GetParent()->GetChildrenSum(property, shared_from_this(), newval);
         if (parent && children > parent)
             return false;
@@ -763,22 +738,22 @@ TError TContainer::ApplyDynamicProperties() {
         return error;
 
     auto memroot = memorySubsystem->GetRootCgroup();
-    if (memroot->HasKnob("memory.low_limit_in_bytes") && GetPropertyInt("memory_guarantee") != 0) {
-        TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", GetPropertyStr("memory_guarantee"), false);
+    if (memroot->HasKnob("memory.low_limit_in_bytes") && Prop->GetUint("memory_guarantee") != 0) {
+        TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", Prop->Get("memory_guarantee"), false);
         TLogger::LogError(error, "Can't set memory_guarantee");
         if (error)
             return error;
     }
 
-    if (GetPropertyInt("memory_limit") != 0) {
-        error = memcg->SetKnobValue("memory.limit_in_bytes", GetPropertyStr("memory_limit"), false);
+    if (Prop->GetUint("memory_limit") != 0) {
+        error = memcg->SetKnobValue("memory.limit_in_bytes", Prop->Get("memory_limit"), false);
         TLogger::LogError(error, "Can't set memory_limit");
         if (error)
             return error;
     }
 
     if (memroot->HasKnob("memory.recharge_on_pgfault")) {
-        string value = GetPropertyBool("recharge_on_pgfault") ? "1" : "0";
+        string value = Prop->GetBool("recharge_on_pgfault") ? "1" : "0";
         error = memcg->SetKnobValue("memory.recharge_on_pgfault", value, false);
         TLogger::LogError(error, "Can't set recharge_on_pgfault");
         if (error)
@@ -786,13 +761,8 @@ TError TContainer::ApplyDynamicProperties() {
     }
 
     auto cpucg = GetLeafCgroup(cpuSubsystem);
-    if (GetPropertyStr("cpu_policy") == "normal") {
-        int cpuPrio;
-        error = StringToInt(GetPropertyStr("cpu_priority"), cpuPrio);
-        TLogger::LogError(error, "Can't parse cpu_priority");
-        if (error)
-            return error;
-
+    if (Prop->Get("cpu_policy") == "normal") {
+        int cpuPrio = Prop->GetUint("cpu_priority");
         error = cpucg->SetKnobValue("cpu.shares", std::to_string(cpuPrio + 2), false);
         TLogger::LogError(error, "Can't set cpu_priority");
         if (error)
@@ -815,7 +785,7 @@ std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
 
 bool TContainer::UseParentNamespace() const {
     string value;
-    TError error = Spec.GetRaw("isolate", value);
+    TError error = Prop->GetRaw("isolate", value);
     if (error)
         return false;
 
@@ -848,17 +818,9 @@ TError TContainer::PrepareNetwork() {
     TError error;
     uint32_t prio, rate, ceil;
 
-    error = StringToUint32(GetPropertyStr("net_priority"), prio);
-    if (error)
-        return error;
-
-    error = StringToUint32(GetPropertyStr("net_guarantee"), rate);
-    if (error)
-        return error;
-
-    error = StringToUint32(GetPropertyStr("net_ceil"), ceil);
-    if (error)
-        return error;
+    prio = Prop->GetUint("net_priority");
+    rate = Prop->GetUint("net_guarantee");
+    ceil = Prop->GetUint("net_ceil");
 
     if (Tclass->Exists())
         (void)Tclass->Remove();
@@ -919,7 +881,7 @@ TError TContainer::PrepareCgroups() {
     auto cpuroot = cpuSubsystem->GetRootCgroup();
     if (cpuroot->HasKnob("cpu.smart")) {
         TError error;
-        if (GetPropertyStr("cpu_policy") == "rt") {
+        if (Prop->Get("cpu_policy") == "rt") {
             error = cpucg->SetKnobValue("cpu.smart", "1", false);
             TLogger::LogError(error, "Can't enable smart");
             if (error)
@@ -949,7 +911,7 @@ TError TContainer::PrepareCgroups() {
 
     auto devices = GetLeafCgroup(devicesSubsystem);
     error = devicesSubsystem->AllowDevices(devices,
-                                           GetPropertyStr("allowed_devices"));
+                                           Prop->Get("allowed_devices"));
     if (error) {
         TLogger::LogError(error, "Can't set allowed_devices");
         return error;
@@ -961,30 +923,30 @@ TError TContainer::PrepareCgroups() {
 TError TContainer::PrepareTask() {
     auto taskEnv = std::make_shared<TTaskEnv>();
 
-    taskEnv->Command = GetPropertyStr("command");
-    taskEnv->Cwd = GetPropertyStr("cwd");
-    taskEnv->Root = GetPropertyStr("root");
-    taskEnv->CreateCwd = IsDefaultProperty("root") && IsDefaultProperty("cwd") && !UseParentNamespace();
-    taskEnv->User = GetPropertyStr("user");
-    taskEnv->Group = GetPropertyStr("group");
-    taskEnv->Environ = GetPropertyStr("env");
-    taskEnv->Isolate = GetPropertyBool("isolate");
-    taskEnv->StdinPath = GetPropertyStr("stdin_path");
-    taskEnv->StdoutPath = GetPropertyStr("stdout_path");
-    taskEnv->StderrPath = GetPropertyStr("stderr_path");
-    taskEnv->Hostname = GetPropertyStr("hostname");
-    taskEnv->BindDns = GetPropertyBool("bind_dns");
+    taskEnv->Command = Prop->Get("command");
+    taskEnv->Cwd = Prop->Get("cwd");
+    taskEnv->Root = Prop->Get("root");
+    taskEnv->CreateCwd = Prop->IsDefault("root") && Prop->IsDefault("cwd") && !UseParentNamespace();
+    taskEnv->User = Prop->Get("user");
+    taskEnv->Group = Prop->Get("group");
+    taskEnv->Environ = Prop->Get("env");
+    taskEnv->Isolate = Prop->GetBool("isolate");
+    taskEnv->StdinPath = Prop->Get("stdin_path");
+    taskEnv->StdoutPath = Prop->Get("stdout_path");
+    taskEnv->StderrPath = Prop->Get("stderr_path");
+    taskEnv->Hostname = Prop->Get("hostname");
+    taskEnv->BindDns = Prop->GetBool("bind_dns");
 
-    TError error = ParseRlimit(GetPropertyStr("ulimit"), taskEnv->Rlimit);
+    TError error = ParseRlimit(Prop->Get("ulimit"), taskEnv->Rlimit);
     if (error)
         return error;
 
-    error = ParseBind(GetPropertyStr("bind"), taskEnv->BindMap);
+    error = ParseBind(Prop->Get("bind"), taskEnv->BindMap);
     if (error)
         return error;
 
     if (config().network().enabled()) {
-        error = ParseNet(shared_from_this(), GetPropertyStr("net"), taskEnv->NetCfg);
+        error = ParseNet(shared_from_this(), Prop->Get("net"), taskEnv->NetCfg);
         if (error)
             return error;
     }
@@ -1016,7 +978,9 @@ TError TContainer::Create(int uid, int gid) {
     Uid = uid;
     Gid = gid;
 
-    TError error = Spec.Create();
+    Prop = std::make_shared<TPropertyHolder>(shared_from_this());
+
+    TError error = Prop->Create();
     if (error)
         return error;
 
@@ -1034,8 +998,8 @@ TError TContainer::Create(int uid, int gid) {
             return error;
     }
 
-    Spec.SetRaw("uid", std::to_string(Uid));
-    Spec.SetRaw("gid", std::to_string(Gid));
+    Prop->SetRaw("uid", std::to_string(Uid));
+    Prop->SetRaw("gid", std::to_string(Gid));
 
     if (Parent)
         Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
@@ -1124,12 +1088,12 @@ TError TContainer::Start() {
         return TError(EError::InvalidState, "invalid container state " +
                       ContainerStateName(state));
 
-    if (!IsRoot() && !GetPropertyStr("command").length()) {
+    if (!IsRoot() && !Prop->Get("command").length()) {
         FreeResources();
         return TError(EError::InvalidValue, "container command is empty");
     }
 
-    Spec.SetRaw("id", std::to_string(Id));
+    Prop->SetRaw("id", std::to_string(Id));
     OomKilled = false;
 
     TError error = PrepareResources();
@@ -1159,7 +1123,7 @@ TError TContainer::Start() {
 
     TLogger::Log() << GetName() << " started " << std::to_string(Task->GetPid()) << std::endl;
 
-    Spec.SetRaw("root_pid", std::to_string(Task->GetPid()));
+    Prop->SetRaw("root_pid", std::to_string(Task->GetPid()));
     SetState(EContainerState::Running);
 
     return TError::Success();
@@ -1406,24 +1370,18 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
     if (alias.find(origProperty) != alias.end())
         property = alias.at(origProperty);
 
-    if (propertySpec.find(property) == propertySpec.end())
-        return TError(EError::InvalidProperty, "invalid property");
+    TError error = Prop->PropertyExists(property);
+    if (error)
+        return error;
 
-    value = GetPropertyStr(property);
+    value = Prop->Get(property);
     PropertyToAlias(origProperty, value);
 
     return TError::Success();
 }
 
-bool TContainer::IsDefaultProperty(const string &property) const {
-    if (propertySpec.find(property) == propertySpec.end())
-        return true;
-
-    return Spec.IsDefault(shared_from_this(), property);
-}
-
 bool TContainer::ShouldApplyProperty(const std::string &property) {
-    if (!(Spec.GetFlags(property) & DYNAMIC_PROPERTY))
+    if (!Prop->HasFlags(property, DYNAMIC_PROPERTY))
        return false;
 
     auto state = GetState();
@@ -1444,22 +1402,23 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
     if (error)
         return error;
 
-    if (propertySpec.find(property) == propertySpec.end())
-        return TError(EError::InvalidProperty, "invalid property");
+    error = Prop->PropertyExists(property);
+    if (error)
+        return error;
 
-    if ((Spec.GetFlags(property) & SUPERUSER_PROPERTY) && !superuser)
-        if (GetPropertyStr(property) != value)
+    if (Prop->HasFlags(property, SUPERUSER_PROPERTY) && !superuser)
+        if (Prop->Get(property) != value)
             return TError(EError::Permission, "Only root can change this property");
 
     if (GetState() != EContainerState::Stopped &&
-        !(Spec.GetFlags(property) & DYNAMIC_PROPERTY))
+        !Prop->HasFlags(property, DYNAMIC_PROPERTY))
         return TError(EError::InvalidState, "Can't set dynamic property " + property + " for running container");
 
 
-    if (UseParentNamespace() && (Spec.GetFlags(property) & PARENT_RO_PROPERTY))
+    if (UseParentNamespace() && Prop->HasFlags(property, PARENT_RO_PROPERTY))
         return TError(EError::NotSupported, "Can't set " + property + " for child container");
 
-    error = Spec.Set(shared_from_this(), property, value);
+    error = Prop->Set(property, value);
     if (error)
         return error;
 
@@ -1472,16 +1431,18 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
 TError TContainer::Restore(const kv::TNode &node) {
     TLogger::Log() << "Restore " << GetName() << " " << Id << std::endl;
 
-    TError error = Spec.Restore(node);
+    Prop = std::make_shared<TPropertyHolder>(shared_from_this());
+
+    TError error = Prop->Restore(node);
     if (error) {
-        TLogger::LogError(error, "Can't restore task's spec");
+        TLogger::LogError(error, "Can't restore task's properties");
         return error;
     }
 
     int pid = 0;
     bool started = true;
     string pidStr;
-    error = Spec.GetRaw("root_pid", pidStr);
+    error = Prop->GetRaw("root_pid", pidStr);
     if (error) {
         started = false;
     } else {
@@ -1493,14 +1454,14 @@ TError TContainer::Restore(const kv::TNode &node) {
     TLogger::Log() << GetName() << ": restore process " << std::to_string(pid) << " which " << (started ? "started" : "didn't start") << std::endl;
 
     string s;
-    error = Spec.GetRaw("uid", s);
+    error = Prop->GetRaw("uid", s);
     TLogger::LogError(error, "Can't restore uid");
     if (!error) {
         error = StringToInt(s, Uid);
         TLogger::LogError(error, "Can't parse uid");
     }
 
-    error = Spec.GetRaw("gid", s);
+    error = Prop->GetRaw("gid", s);
     TLogger::LogError(error, "Can't restore gid");
     if (!error) {
         error = StringToInt(s, Gid);
@@ -1585,7 +1546,7 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
     TLogger::Log() << "Delivered " << status << " to " << GetName() << " with root_pid " << Task->GetPid() << std::endl;
     SetState(EContainerState::Dead);
 
-    if (!GetPropertyBool("isolate"))
+    if (!Prop->GetBool("isolate"))
         (void)KillAll();
 
     if (NeedRespawn()) {
@@ -1603,10 +1564,11 @@ bool TContainer::NeedRespawn() {
     if (GetState() != EContainerState::Dead)
         return false;
 
-    if (GetPropertyStr("respawn") == "false")
+    if (!Prop->GetBool("respawn"))
         return false;
+
     size_t startTime = TimeOfDeath + config().container().respawn_delay_ms();
-    return startTime <= GetCurrentTimeMs() && (GetPropertyInt("max_respawns") < 0 || RespawnCount < GetPropertyUint64("max_respawns"));
+    return startTime <= GetCurrentTimeMs() && (Prop->GetInt("max_respawns") < 0 || RespawnCount < Prop->GetUint("max_respawns"));
 }
 
 TError TContainer::Respawn() {
@@ -1721,9 +1683,13 @@ TContainerHolder::~TContainerHolder() {
 }
 
 TError TContainerHolder::CreateRoot() {
+    TError error = RegisterProperties();
+    if (error)
+        return error;
+
     BootTime = GetBootTime();
 
-    TError error = Create(ROOT_CONTAINER, -1, -1);
+    error = Create(ROOT_CONTAINER, -1, -1);
     if (error)
         return error;
 

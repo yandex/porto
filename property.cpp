@@ -9,572 +9,181 @@
 #include "util/unix.hpp"
 #include "util/pwd.hpp"
 
-using std::string;
-using std::map;
-using std::vector;
+std::map<std::string, TValueDef *> propSpec;
 
-static TError ValidUint(std::shared_ptr<const TContainer> container, const string &str) {
-    uint32_t val;
-    if (StringToUint32(str, val))
-        return TError(EError::InvalidValue, "invalid numeric value");
-
-    return TError::Success();
-}
-
-static TError ValidBool(std::shared_ptr<const TContainer> container, const string &str) {
-    if (str != "true" && str != "false")
-        return TError(EError::InvalidValue, "invalid boolean value");
-
-    return TError::Success();
-}
-
-static TError ValidUser(std::shared_ptr<const TContainer> container, const string &user) {
-    TUser u(user);
-    return u.Load();
-}
-
-static TError ValidGroup(std::shared_ptr<const TContainer> container, const string &group) {
-    TGroup g(group);
-    return g.Load();
-}
-
-static TError ValidMemGuarantee(std::shared_ptr<const TContainer> container, const string &str) {
-    uint64_t newval;
-
-    auto memroot = memorySubsystem->GetRootCgroup();
-    if (!memroot->HasKnob("memory.low_limit_in_bytes"))
-        return TError(EError::NotSupported, "invalid kernel");
-
-    if (StringToUint64(str, newval))
-        return TError(EError::InvalidValue, "invalid value");
-
-    if (!container->ValidHierarchicalProperty("memory_guarantee", str))
-        return TError(EError::InvalidValue, "invalid hierarchical value");
-
-    uint64_t total = container->GetRoot()->GetChildrenSum("memory_guarantee", container, newval);
-    if (total + config().daemon().memory_guarantee_reserve() > GetTotalMemory())
-        return TError(EError::ResourceNotAvailable, "can't guarantee all available memory");
-
-    return TError::Success();
-}
-
-static TError ValidRecharge(std::shared_ptr<const TContainer> container, const string &str) {
-    auto memroot = memorySubsystem->GetRootCgroup();
-    if (!memroot->HasKnob("memory.recharge_on_pgfault"))
-        return TError(EError::NotSupported, "invalid kernel");
-
-    return ValidBool(container, str);
-}
-
-static TError ValidMemLimit(std::shared_ptr<const TContainer> container, const string &str) {
-    uint64_t newval;
-
-    if (StringToUint64(str, newval))
-        return TError(EError::InvalidValue, "invalid value");
-
-    if (!container->ValidHierarchicalProperty("memory_limit", str))
-        return TError(EError::InvalidValue, "invalid hierarchical value");
-
-    return TError::Success();
-}
-
-static TError ValidCpuPolicy(std::shared_ptr<const TContainer> container, const string &str) {
-    if (str != "normal" && str != "rt" && str != "idle")
-        return TError(EError::InvalidValue, "invalid policy");
-
-    if (str == "rt") {
-        auto cpuroot = cpuSubsystem->GetRootCgroup();
-        if (!cpuroot->HasKnob("cpu.smart"))
-            return TError(EError::NotSupported, "invalid kernel");
+std::string TPropertyHolder::GetDefault(const std::string &property) {
+    std::shared_ptr<TContainer> c;
+    TError error = GetSharedContainer(&c);
+    if (error) {
+        TLogger::LogError(error, "Can't get default for " + property);
+        return "";
     }
 
-    if (str == "idle")
-        return TError(EError::NotSupported, "not implemented");
+    if (c->UseParentNamespace() &&
+        HasFlags(property, PARENT_DEF_PROPERTY)) {
+#if 1
+        return c->GetParent()->Prop->Get(property);
+#else
+        string val;
+        TError error = c->GetParent()->GetProperty(property, val);
+        if (error) {
+            TLogger::LogError(error, "Can't get parent property for default");
+            return "";
+        }
+        return val;
+#endif
+    }
 
-    return TError::Success();
+    return propSpec.at(property)->GetDefault(c);
 }
 
-static TError ValidCpuPriority(std::shared_ptr<const TContainer> container, const string &str) {
-    int val;
-
-    if (StringToInt(str, val))
-        return TError(EError::InvalidValue, "invalid value");
-
-    if (val < 0 || val > 99)
-        return TError(EError::InvalidValue, "invalid value");
-
-    return TError::Success();
-}
-
-static TError ValidNetGuarantee(std::shared_ptr<const TContainer> container, const string &str) {
-    uint32_t newval;
-
-    if (StringToUint32(str, newval))
-        return TError(EError::InvalidValue, "invalid value");
-
-    return TError::Success();
-}
-
-static TError ValidNetCeil(std::shared_ptr<const TContainer> container, const string &str) {
-    uint32_t newval;
-
-    if (StringToUint32(str, newval))
-        return TError(EError::InvalidValue, "invalid value");
-
-    return TError::Success();
-}
-
-static TError ValidNetPriority(std::shared_ptr<const TContainer> container, const string &str) {
-    int val;
-
-    if (StringToInt(str, val))
-        return TError(EError::InvalidValue, "invalid value");
-
-    if (val < 0 || val > 7)
-        return TError(EError::InvalidValue, "invalid value");
-
-    return TError::Success();
-}
-
-static TError ValidPath(std::shared_ptr<const TContainer> container, const string &str) {
-    if (!str.length() || str[0] != '/')
-        return TError(EError::InvalidValue, "invalid directory");
-    return TError::Success();
-}
-
-static TError ExistingFile(std::shared_ptr<const TContainer> container, const string &str) {
-    TFile f(str);
-    if (!f.Exists())
-        return TError(EError::InvalidValue, "file doesn't exist");
-    return TError::Success();
-}
-
-static TError ValidUlimit(std::shared_ptr<const TContainer> container, const string &str) {
-    map<int,struct rlimit> rlim;
-    return ParseRlimit(str, rlim);
-}
-
-static TError ValidBind(std::shared_ptr<const TContainer> container, const string &str) {
-    vector<TBindMap> dirs;
-    return ParseBind(str, dirs);
-}
-
-static TError ValidNet(std::shared_ptr<const TContainer> container, const string &str) {
-    TNetCfg net;
-    return ParseNet(container, str, net);
-}
-
-#define DEFSTR(S) [](std::shared_ptr<const TContainer> container)->std::string { return S; }
-
-static std::string DefaultStdFile(std::shared_ptr<const TContainer> c,
-                                  const std::string &name) {
-    string cwd, root;
-    TError error = c->GetProperty("cwd", cwd);
-    TLogger::LogError(error, "Can't get cwd for std file");
-    if (error)
-        return "";
-
-    error = c->GetProperty("root", root);
-    TLogger::LogError(error, "Can't get root for std file");
-    if (error)
-        return "";
-
-    string prefix;
-    if (c->UseParentNamespace())
-        prefix = c->GetName(false) + ".";
-
-    TPath path = root;
-    path.AddComponent(cwd);
-    path.AddComponent(prefix + name);
-    return path.ToString();
-}
-
-static std::string TrueWithRoot(std::shared_ptr<const TContainer> c) {
-    if (c->IsDefaultProperty("root"))
-        return "false";
-    else
-        return "true";
-}
-
-std::map<std::string, const TPropertySpec> propertySpec = {
-    { "command",
-        {
-            "Command executed upon container start",
-            DEFSTR("")
-        }
-    },
-    { "user",
-        {
-            "Start command with given user",
-            [](std::shared_ptr<const TContainer> c)->std::string {
-                int uid, gid;
-                c->GetPerm(uid, gid);
-                TUser u(uid);
-                if (u.Load())
-                    return std::to_string(uid);
-                else
-                    return u.GetName();
-            },
-            SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY,
-            ValidUser
-        }
-    },
-    { "group",
-        {
-            "Start command with given group",
-            [](std::shared_ptr<const TContainer> c)->std::string {
-                int uid, gid;
-                c->GetPerm(uid, gid);
-                TGroup g(gid);
-                if (g.Load())
-                    return std::to_string(gid);
-                else
-                    return g.GetName();
-            },
-            SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY,
-            ValidGroup
-        }
-    },
-    { "env",
-        {
-            "Container environment variables",
-            DEFSTR(""),
-            PARENT_DEF_PROPERTY
-        }
-    },
-    { "root",
-        {
-            "Container root directory",
-            DEFSTR("/"),
-            PARENT_DEF_PROPERTY
-        }
-    },
-    { "cwd",
-        {
-            "Container working directory",
-            [](std::shared_ptr<const TContainer> c)->std::string {
-                if (!c->IsDefaultProperty("root"))
-                    return "/";
-
-                return config().container().tmp_dir() + "/" + c->GetName();
-            },
-            PARENT_DEF_PROPERTY,
-            ValidPath,
-        }
-    },
-    { "stdin_path",
-        {
-            "Container standard input path",
-            DEFSTR("/dev/null"),
-            0,
-            ExistingFile
-        }
-    },
-    { "stdout_limit",
-        {
-            "Return no more than given number of bytes from standard output/error",
-            [](std::shared_ptr<const TContainer> c)->std::string {
-                return std::to_string(config().container().stdout_limit());
-            },
-            0,
-            [](std::shared_ptr<const TContainer> c, const string &s)->TError {
-                uint32_t val;
-                uint32_t max = config().container().stdout_limit();
-
-                TError error = StringToUint32(s, val);
-                if (error)
-                    return error;
-
-                if (val > max)
-                    return TError(EError::InvalidValue,
-                                  "Maximum number of bytes: " +
-                                  std::to_string(max));
-
-                return TError::Success();
-            }
-        }
-    },
-    { "stdout_path",
-        {
-            "Container standard output path",
-            [](std::shared_ptr<const TContainer> c)->std::string {
-                return DefaultStdFile(c, "stdout");
-            },
-            0,
-            ValidPath
-        }
-    },
-    { "stderr_path",
-        {
-            "Container standard error path",
-            [](std::shared_ptr<const TContainer> c)->std::string {
-                return DefaultStdFile(c, "stderr");
-            },
-            0,
-            ValidPath
-        }
-    },
-    { "memory_guarantee",
-        {
-            "Guaranteed amount of memory",
-            DEFSTR("0"),
-            DYNAMIC_PROPERTY | PARENT_RO_PROPERTY,
-            ValidMemGuarantee
-        }
-    },
-    { "memory_limit",
-        {
-            "Memory hard limit",
-            DEFSTR("0"),
-            DYNAMIC_PROPERTY,
-            ValidMemLimit
-        }
-    },
-    { "recharge_on_pgfault",
-        {
-            "Recharge memory on page fault",
-            DEFSTR("false"),
-            DYNAMIC_PROPERTY | PARENT_RO_PROPERTY,
-            ValidRecharge
-        }
-    },
-    { "cpu_policy",
-        {
-            "CPU policy: rt, normal, idle",
-            DEFSTR("normal"),
-            PARENT_RO_PROPERTY,
-            ValidCpuPolicy
-        }
-    },
-    { "cpu_priority",
-        {
-            "CPU priority: 0-99",
-            DEFSTR(std::to_string(DEF_CLASS_PRIO)),
-            DYNAMIC_PROPERTY | PARENT_RO_PROPERTY,
-            ValidCpuPriority
-        }
-    },
-    { "net_guarantee",
-        {
-            "Guaranteed container network bandwidth",
-            DEFSTR(std::to_string(DEF_CLASS_RATE)),
-            PARENT_RO_PROPERTY,
-            ValidNetGuarantee
-        }
-    },
-    { "net_ceil",
-        {
-            "Maximum container network bandwidth",
-            DEFSTR(std::to_string(DEF_CLASS_CEIL)),
-            PARENT_RO_PROPERTY,
-            ValidNetCeil
-        }
-    },
-    { "net_priority",
-        {
-            "Container network priority: 0-7",
-            DEFSTR(std::to_string(DEF_CLASS_NET_PRIO)),
-            PARENT_RO_PROPERTY,
-            ValidNetPriority
-        }
-    },
-    { "respawn",
-        {
-            "Automatically respawn dead container",
-            DEFSTR("false"),
-            0,
-            ValidBool
-        }
-    },
-    { "max_respawns",
-        {
-            "Limit respawn count for specific container",
-            DEFSTR("-1"),
-            0,
-            ValidUint
-        }
-    },
-    { "isolate",
-        {
-            "Isolate container from parent",
-            DEFSTR("true"),
-            0,
-            ValidBool
-        }
-    },
-    { "private",
-        {
-            "User-defined property",
-            DEFSTR(""),
-            DYNAMIC_PROPERTY,
-            [](std::shared_ptr<const TContainer> c, const string &s)->TError {
-                uint32_t max = config().container().private_max();
-
-                if (s.length() > max)
-                    return TError(EError::InvalidValue, "Value is too long");
-
-                return TError::Success();
-            }
-
-        }
-    },
-    { "ulimit",
-        {
-            "Container resource limits",
-            DEFSTR(""),
-            PARENT_DEF_PROPERTY,
-            ValidUlimit
-        }
-    },
-    { "hostname",
-        {
-            "Container hostname",
-            DEFSTR(""),
-            0,
-        }
-    },
-    { "bind_dns",
-        {
-            "Bind /etc/resolv.conf and /etc/hosts of host to container",
-            TrueWithRoot,
-            0,
-            ValidBool
-        }
-    },
-    { "bind",
-        {
-            "Share host directories with container",
-            DEFSTR(""),
-            0,
-            ValidBind
-        }
-    },
-    { "net",
-        {
-            "Container network settings",
-            DEFSTR("host"),
-            0,
-            ValidNet
-        }
-    },
-    { "allowed_devices",
-        {
-            "Devices that container can create/read/write",
-            DEFSTR("a *:* rwm"),
-            0,
-        }
-    },
-};
-
-bool TContainerSpec::IsDefault(std::shared_ptr<const TContainer> container, const std::string &property) const {
-    if (Data.find(property) == Data.end())
+bool TPropertyHolder::IsDefault(const std::string &property) {
+    if (State.find(property) == State.end())
         return true;
 
-    return GetDefault(container, property) == Data.at(property);
+    return GetDefault(property) == State.at(property)->Get();
 }
 
-string TContainerSpec::GetDefault(std::shared_ptr<const TContainer> container, const string &property) const {
-    if (container->UseParentNamespace() &&
-        (propertySpec.at(property).Flags & PARENT_DEF_PROPERTY)) {
-        string value;
-        TError error = container->GetParent()->GetProperty(property, value);
-        TLogger::LogError(error, "Can't get default property from parent");
-        if (!error)
-            return value;
-    }
-
-    return propertySpec.at(property).Default(container);
+std::string TPropertyHolder::Get(const std::string &property) {
+    if (State.find(property) == State.end())
+        return GetDefault(property);
+    return State.at(property)->Get();
 }
 
-string TContainerSpec::Get(std::shared_ptr<const TContainer> container, const string &property) const {
-    if (Data.find(property) == Data.end())
-        return GetDefault(container, property);
-
-    return Data.at(property);
+bool TPropertyHolder::GetBool(const std::string &property) {
+    return Get(property) == "true";
 }
 
-bool TContainerSpec::IsRoot() const {
-    return Name == ROOT_CONTAINER;
+int TPropertyHolder::GetInt(const std::string &property) {
+    int val;
+
+    if (StringToInt(Get(property), val))
+        return 0;
+
+    return val;
 }
 
-unsigned int TContainerSpec::GetFlags(const std::string &property) const {
-    if (propertySpec.find(property) == propertySpec.end())
-        return false;
+uint64_t TPropertyHolder::GetUint(const std::string &property) {
+    uint64_t val;
 
-    return propertySpec.at(property).Flags;
+    if (StringToUint64(Get(property), val))
+        return 0;
+
+    return val;
 }
 
-TError TContainerSpec::GetRaw(const string &property, string &value) const {
-    if (Data.find(property) == Data.end())
+TError TPropertyHolder::GetRaw(const std::string &property, std::string &value) {
+    if (State.find(property) == State.end())
+        // TODO: InvalidProperty
         return TError(EError::InvalidValue, "Invalid property");
-    value = Data.at(property);
+    value = State.at(property)->Get();
     return TError::Success();
 }
 
-TError TContainerSpec::SetRaw(const string &property, const string &value) {
-    Data[property] = value;
+void TPropertyHolder::SetRaw(const std::string &property,
+                             const std::string &value) {
+    TValueDef *p = nullptr;
+    if (propSpec.find(property) != propSpec.end())
+        p = propSpec.at(property);
+
+    State[property] = std::make_shared<TValueState>(p, value);
+    //
     TError error(AppendStorage(property, value));
     if (error)
         TLogger::LogError(error, "Can't append property to key-value store");
-    return error;
 }
 
-TError TContainerSpec::Set(std::shared_ptr<const TContainer> container, const std::string &property, const std::string &value) {
-    if (propertySpec.find(property) == propertySpec.end()) {
+TError TPropertyHolder::Set(const std::string &property,
+                            const std::string &value) {
+    if (propSpec.find(property) == propSpec.end()) {
+        // TODO: use InvalidProperty
         TError error(EError::InvalidValue, "property not found");
         TLogger::LogError(error, "Can't set property");
         return error;
     }
 
-    if (propertySpec.at(property).Valid) {
-        TError error = propertySpec.at(property).Valid(container, value);
+    std::shared_ptr<TContainer> c;
+    TError error = GetSharedContainer(&c);
+    if (error)
+        return error;
+
+    TValueDef *p = propSpec.at(property);
+    error = p->IsValid(c, value);
+    if (error) {
         TLogger::LogError(error, "Can't set property");
         if (error)
             return error;
     }
 
-    return SetRaw(property, value);
+    SetRaw(property, value);
+
+    return TError::Success();
 }
 
-TError TContainerSpec::Create() {
+bool TPropertyHolder::HasFlags(const std::string &property, int flags) {
+    if (propSpec.find(property) == propSpec.end())
+        return false;
+
+    return propSpec.at(property)->Flags & flags;
+}
+
+bool TPropertyHolder::IsRoot() {
+    return Name == ROOT_CONTAINER;
+}
+
+TError TPropertyHolder::Create() {
     kv::TNode node;
     return Storage.SaveNode(Name, node);
 }
 
-TError TContainerSpec::Restore(const kv::TNode &node) {
+TError TPropertyHolder::Restore(const kv::TNode &node) {
     for (int i = 0; i < node.pairs_size(); i++) {
         auto key = node.pairs(i).key();
         auto value = node.pairs(i).val();
 
-        Data[key] = value;
+        SetRaw(key, value);
     }
 
     return SyncStorage();
 }
 
-TContainerSpec::~TContainerSpec() {
+TError TPropertyHolder::PropertyExists(const std::string &property) {
+    if (propSpec.find(property) == propSpec.end())
+        return TError(EError::InvalidProperty, "invalid property");
+    return TError::Success();
+}
+
+TPropertyHolder::~TPropertyHolder() {
     if (!IsRoot()) {
         TError error = Storage.RemoveNode(Name);
         TLogger::LogError(error, "Can't remove key-value node " + Name);
     }
 }
 
-TError TContainerSpec::SyncStorage() {
+TError TPropertyHolder::SyncStorage() {
     if (IsRoot())
         return TError::Success();
 
     kv::TNode node;
 
-    for (auto &kv : Data) {
+    for (auto &kv : State) {
         auto pair = node.add_pairs();
         pair->set_key(kv.first);
-        pair->set_val(kv.second);
+        pair->set_val(kv.second->Get());
     }
 
     return Storage.SaveNode(Name, node);
 }
 
-TError TContainerSpec::AppendStorage(const string& key, const string& value) {
+TError TPropertyHolder::GetSharedContainer(std::shared_ptr<TContainer> *c) {
+    *c = Container.lock();
+    if (!*c)
+        return TError(EError::Unknown, "Can't convert weak container reference");
+
+    return TError::Success();
+}
+
+TError TPropertyHolder::AppendStorage(const std::string& key, const std::string& value) {
     if (IsRoot())
         return TError::Success();
 
@@ -587,8 +196,646 @@ TError TContainerSpec::AppendStorage(const string& key, const string& value) {
     return Storage.AppendNode(Name, node);
 }
 
-TError ParseRlimit(const std::string &s, map<int,struct rlimit> &rlim) {
-    static const map<string,int> nameToIdx = {
+static TError ValidUint(std::shared_ptr<TContainer> container, const std::string &str) {
+    uint32_t val;
+    if (StringToUint32(str, val))
+        return TError(EError::InvalidValue, "invalid numeric value");
+
+    return TError::Success();
+}
+
+static TError ValidBool(std::shared_ptr<TContainer> c, const std::string &str) {
+    if (str != "true" && str != "false")
+        return TError(EError::InvalidValue, "invalid boolean value");
+
+    return TError::Success();
+}
+
+static TError ValidPath(std::shared_ptr<TContainer> c, const std::string &str) {
+    if (!str.length() || str[0] != '/')
+        return TError(EError::InvalidValue, "invalid directory");
+    return TError::Success();
+}
+
+static TError ExistingFile(std::shared_ptr<TContainer> c, const std::string &str) {
+    TFile f(str);
+    if (!f.Exists())
+        return TError(EError::InvalidValue, "file doesn't exist");
+    return TError::Success();
+}
+
+static std::string DefaultStdFile(std::shared_ptr<TContainer> c,
+                                  const std::string &name) {
+    std::string cwd, root;
+    TError error = c->GetProperty("cwd", cwd);
+    TLogger::LogError(error, "Can't get cwd for std file");
+    if (error)
+        return "";
+
+    error = c->GetProperty("root", root);
+    TLogger::LogError(error, "Can't get root for std file");
+    if (error)
+        return "";
+
+    std::string prefix;
+    if (c->UseParentNamespace())
+        prefix = c->GetName(false) + ".";
+
+    TPath path = root;
+    path.AddComponent(cwd);
+    path.AddComponent(prefix + name);
+    return path.ToString();
+}
+
+class TCommandProperty : public TValueDef {
+public:
+    TCommandProperty() : TValueDef("command",
+                                   EValueType::String,
+                                   "Command executed upon container start") {}
+};
+
+class TUserProperty : public TValueDef {
+public:
+    TUserProperty() : TValueDef("user",
+                                EValueType::String,
+                                "Start command with given user",
+                                SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        int uid, gid;
+        c->GetPerm(uid, gid);
+        TUser u(uid);
+        if (u.Load())
+            return std::to_string(uid);
+        else
+            return u.GetName();
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        TUser u(value);
+        return u.Load();
+    }
+};
+
+class TGroupProperty : public TValueDef {
+public:
+    TGroupProperty() : TValueDef("group",
+                                EValueType::String,
+                                "Start command with given group",
+                                SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        int uid, gid;
+        c->GetPerm(uid, gid);
+        TGroup g(gid);
+        if (g.Load())
+            return std::to_string(gid);
+        else
+            return g.GetName();
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        TGroup g(value);
+        return g.Load();
+    }
+};
+
+class TEnvProperty : public TValueDef {
+public:
+    TEnvProperty() : TValueDef("env",
+                               // TODO: EValueType::List,
+                               EValueType::String,
+                               "Container environment variables",
+                               PARENT_DEF_PROPERTY) {}
+};
+
+class TRootProperty : public TValueDef {
+public:
+    TRootProperty() : TValueDef("root",
+                               EValueType::String,
+                               "Container root directory",
+                               PARENT_DEF_PROPERTY) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return "/";
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        return ValidPath(c, value);
+    }
+};
+
+class TCwdProperty : public TValueDef {
+public:
+    TCwdProperty() : TValueDef("cwd",
+                               EValueType::String,
+                               "Container working directory",
+                               PARENT_DEF_PROPERTY) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        if (!c->Prop->IsDefault("root"))
+            return "/";
+
+        return config().container().tmp_dir() + "/" + c->GetName();
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        return ValidPath(c, value);
+    }
+};
+
+class TStdinPathProperty : public TValueDef {
+public:
+    TStdinPathProperty() : TValueDef("stdin_path",
+                                     EValueType::String,
+                                     "Container standard input path") {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return "/dev/null";
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        return ExistingFile(c, value);
+    }
+};
+
+class TStdoutPathProperty : public TValueDef {
+public:
+    TStdoutPathProperty() : TValueDef("stdout_path",
+                                      EValueType::String,
+                                      "Container standard input path") {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return DefaultStdFile(c, "stdout");
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        return ValidPath(c, value);
+    }
+};
+
+class TStderrPathProperty : public TValueDef {
+public:
+    TStderrPathProperty() : TValueDef("stderr_path",
+                                      EValueType::String,
+                                      "Container standard error path") {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return DefaultStdFile(c, "stderr");
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        return ValidPath(c, value);
+    }
+};
+
+class TStdoutLimitProperty : public TValueDef {
+public:
+    TStdoutLimitProperty() : TValueDef("stdout_limit",
+                                      EValueType::String,
+                                      "Return no more than given number of bytes from standard output/error") {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return std::to_string(config().container().stdout_limit());
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        uint32_t num;
+        uint32_t max = config().container().stdout_limit();
+
+        TError error = StringToUint32(value, num);
+        if (error)
+            return error;
+
+        if (num > max)
+            return TError(EError::InvalidValue,
+                          "Maximum number of bytes: " +
+                          std::to_string(max));
+
+        return TError::Success();
+    }
+};
+
+class TMemoryGuaranteeProperty : public TValueDef {
+public:
+    TMemoryGuaranteeProperty() : TValueDef("memory_guarantee",
+                                           EValueType::String,
+                                           "Guaranteed amount of memory",
+                                           DYNAMIC_PROPERTY |
+                                           PARENT_RO_PROPERTY) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return "0";
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        uint64_t num;
+
+        auto memroot = memorySubsystem->GetRootCgroup();
+        if (!memroot->HasKnob("memory.low_limit_in_bytes"))
+            return TError(EError::NotSupported, "invalid kernel");
+
+        if (StringToUint64(value, num))
+            return TError(EError::InvalidValue, "invalid value");
+
+        if (!c->ValidHierarchicalProperty("memory_guarantee", value))
+            return TError(EError::InvalidValue, "invalid hierarchical value");
+
+        uint64_t total = c->GetRoot()->GetChildrenSum("memory_guarantee", c, num);
+        if (total + config().daemon().memory_guarantee_reserve() > GetTotalMemory())
+            return TError(EError::ResourceNotAvailable, "can't guarantee all available memory");
+
+        return TError::Success();
+    }
+};
+
+class TMemoryLimitProperty : public TValueDef {
+public:
+    TMemoryLimitProperty() : TValueDef("memory_limit",
+                                       EValueType::String,
+                                       "Memory hard limit",
+                                       DYNAMIC_PROPERTY) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return "0";
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        uint64_t num;
+
+        if (StringToUint64(value, num))
+            return TError(EError::InvalidValue, "invalid value");
+
+        if (!c->ValidHierarchicalProperty("memory_limit", value))
+            return TError(EError::InvalidValue, "invalid hierarchical value");
+
+        return TError::Success();
+    }
+};
+
+class TRechargeOnPgfaultProperty : public TValueDef {
+public:
+    TRechargeOnPgfaultProperty() : TValueDef("recharge_on_pgfault",
+                                             //TODO: bool
+                                       EValueType::String,
+                                       "Recharge memory on page fault",
+                                       DYNAMIC_PROPERTY |
+                                       PARENT_RO_PROPERTY) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return "false";
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        auto memroot = memorySubsystem->GetRootCgroup();
+        if (!memroot->HasKnob("memory.recharge_on_pgfault"))
+            return TError(EError::NotSupported, "invalid kernel");
+
+        return ValidBool(c, value);
+    }
+};
+
+class TCpuPolicyProperty : public TValueDef {
+public:
+    TCpuPolicyProperty() : TValueDef("cpu_policy",
+                                       EValueType::String,
+                                       "CPU policy: rt, normal, idle",
+                                       PARENT_RO_PROPERTY) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return "normal";
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        if (value != "normal" && value != "rt" && value != "idle")
+            return TError(EError::InvalidValue, "invalid policy");
+
+        if (value == "rt") {
+            auto cpuroot = cpuSubsystem->GetRootCgroup();
+            if (!cpuroot->HasKnob("cpu.smart"))
+                return TError(EError::NotSupported, "invalid kernel");
+        }
+
+        if (value == "idle")
+            return TError(EError::NotSupported, "not implemented");
+
+        return TError::Success();
+    }
+};
+
+class TCpuPriorityProperty : public TValueDef {
+public:
+    TCpuPriorityProperty() : TValueDef("cpu_priority",
+                                       EValueType::String,
+                                       "CPU priority: 0-99",
+                                       DYNAMIC_PROPERTY |
+                                       PARENT_RO_PROPERTY) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return std::to_string(DEF_CLASS_PRIO);
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        int num;
+
+        if (StringToInt(value, num))
+            return TError(EError::InvalidValue, "invalid value");
+
+        if (num < 0 || num > 99)
+            return TError(EError::InvalidValue, "invalid value");
+
+        return TError::Success();
+    }
+};
+
+class TNetGuaranteeProperty : public TValueDef {
+public:
+    TNetGuaranteeProperty() : TValueDef("net_guarantee",
+                                       EValueType::String,
+                                       "Guaranteed container network bandwidth",
+                                       PARENT_RO_PROPERTY) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return std::to_string(DEF_CLASS_RATE);
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        return ValidUint(c, value);
+    }
+};
+
+class TNetCeilProperty : public TValueDef {
+public:
+    TNetCeilProperty() : TValueDef("net_ceil",
+                                       EValueType::String,
+                                       "Maximum container network bandwidth",
+                                       PARENT_RO_PROPERTY) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return std::to_string(DEF_CLASS_CEIL);
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        return ValidUint(c, value);
+    }
+};
+
+class TNetPriorityProperty : public TValueDef {
+public:
+    TNetPriorityProperty() : TValueDef("net_priority",
+                                       EValueType::String,
+                                       "Container network priority: 0-7",
+                                       PARENT_RO_PROPERTY) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return std::to_string(DEF_CLASS_NET_PRIO);
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        int num;
+
+        if (StringToInt(value, num))
+            return TError(EError::InvalidValue, "invalid value");
+
+        if (num < 0 || num > 7)
+            return TError(EError::InvalidValue, "invalid value");
+
+        return TError::Success();
+    }
+};
+
+class TRespawnProperty : public TValueDef {
+public:
+    TRespawnProperty() : TValueDef("respawn",
+                                   //TODO: bool
+                                       EValueType::String,
+                                       "Automatically respawn dead container") {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return "false";
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        return ValidBool(c, value);
+    }
+};
+
+class TMaxRespawnsProperty : public TValueDef {
+public:
+    TMaxRespawnsProperty() : TValueDef("max_respawns",
+                                       EValueType::String,
+                                       "Limit respawn count for specific container") {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return "-1";
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        return ValidUint(c, value);
+    }
+};
+
+class TIsolateProperty : public TValueDef {
+public:
+    TIsolateProperty() : TValueDef("isolate",
+                                   //TODO: bool
+                                       EValueType::String,
+                                       "Isolate container from parent") {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return "true";
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        return ValidBool(c, value);
+    }
+};
+
+class TPrivateProperty : public TValueDef {
+public:
+    TPrivateProperty() : TValueDef("private",
+                                   EValueType::String,
+                                   "User-defined property",
+                                   DYNAMIC_PROPERTY) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return "";
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        uint32_t max = config().container().private_max();
+
+        if (value.length() > max)
+            return TError(EError::InvalidValue, "Value is too long");
+
+        return TError::Success();
+    }
+};
+
+class TUlimitProperty : public TValueDef {
+public:
+    TUlimitProperty() : TValueDef("ulimit",
+                                  //TODO: MAP
+                                   EValueType::String,
+                                   "Container resource limits",
+                                   PARENT_DEF_PROPERTY) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return "";
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        std::map<int, struct rlimit> rlim;
+        return ParseRlimit(value, rlim);
+    }
+};
+
+class THostnameProperty : public TValueDef {
+public:
+    THostnameProperty() : TValueDef("hostname",
+                                   EValueType::String,
+                                   "Container hostname") {}
+};
+
+class TBindDnsProperty : public TValueDef {
+public:
+    TBindDnsProperty() : TValueDef("bind_dns",
+                                   //TODO: bool
+                                       EValueType::String,
+                                       "Bind /etc/resolv.conf and /etc/hosts of host to container") {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        if (c->Prop->IsDefault("root"))
+            return "false";
+        else
+            return "true";
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        return ValidBool(c, value);
+    }
+};
+
+class TBindProperty : public TValueDef {
+public:
+    TBindProperty() : TValueDef("bind",
+                                // TODO: list or map
+                                       EValueType::String,
+                                       "Share host directories with container") {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return "";
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        std::vector<TBindMap> dirs;
+        return ParseBind(value, dirs);
+    }
+};
+
+class TNetProperty : public TValueDef {
+public:
+    TNetProperty() : TValueDef("net",
+                                // TODO: list or map
+                                       EValueType::String,
+                                       "Container network settings") {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return "host";
+    }
+
+    TError IsValidString(std::shared_ptr<TContainer> c,
+                       const std::string &value) {
+        TNetCfg net;
+        return ParseNet(c, value, net);
+    }
+};
+
+class TAllowedDevicesProperty : public TValueDef {
+public:
+    TAllowedDevicesProperty() : TValueDef("allowed_devices",
+                                          // TODO: list
+                                   EValueType::String,
+                                   "Devices that container can create/read/write") {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+        return "a *:* rwm";
+    }
+};
+
+static TError RegisterProperty(TValueDef *p) {
+    if (propSpec.find(p->Name) != propSpec.end())
+        return TError(EError::Unknown, "Invalid property " + p->Name + " definition");
+    propSpec[p->Name] = p;
+    return TError::Success();
+}
+
+TError RegisterProperties() {
+    std::vector<TValueDef *> properties = {
+        new TCommandProperty,
+        new TUserProperty,
+        new TGroupProperty,
+        new TEnvProperty,
+        new TRootProperty,
+        new TCwdProperty,
+        new TStdinPathProperty,
+        new TStdoutPathProperty,
+        new TStderrPathProperty,
+        new TStdoutLimitProperty,
+        new TMemoryGuaranteeProperty,
+        new TMemoryLimitProperty,
+        new TRechargeOnPgfaultProperty,
+        new TCpuPolicyProperty,
+        new TCpuPriorityProperty,
+        new TNetGuaranteeProperty,
+        new TNetCeilProperty,
+        new TNetPriorityProperty,
+        new TRespawnProperty,
+        new TMaxRespawnsProperty,
+        new TIsolateProperty,
+        new TPrivateProperty,
+        new TUlimitProperty,
+        new THostnameProperty,
+        new TBindDnsProperty,
+        new TBindProperty,
+        new TNetProperty,
+        new TAllowedDevicesProperty,
+    };
+
+    for (auto &p : properties) {
+        TError error = RegisterProperty(p);
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
+}
+
+TError ParseRlimit(const std::string &s, std::map<int,struct rlimit> &rlim) {
+    static const std::map<std::string,int> nameToIdx = {
         { "as", RLIMIT_AS },
         { "core", RLIMIT_CORE },
         { "cpu", RLIMIT_CPU },
@@ -607,24 +854,24 @@ TError ParseRlimit(const std::string &s, map<int,struct rlimit> &rlim) {
         { "stask", RLIMIT_STACK },
     };
 
-    vector<string> limits;
+    std::vector<std::string> limits;
     TError error = SplitString(s, ';', limits);
     if (error)
         return error;
 
     for (auto &limit : limits) {
-        vector<string> nameval;
+        std::vector<std::string> nameval;
 
         (void)SplitString(limit, ':', nameval);
         if (nameval.size() != 2)
             return TError(EError::InvalidValue, "Invalid limits format");
 
-        string name = StringTrim(nameval[0]);
+        std::string name = StringTrim(nameval[0]);
         if (nameToIdx.find(name) == nameToIdx.end())
             return TError(EError::InvalidValue, "Invalid limit " + name);
         int idx = nameToIdx.at(name);
 
-        vector<string> softhard;
+        std::vector<std::string> softhard;
         (void)SplitString(StringTrim(nameval[1]), ' ', softhard);
         if (softhard.size() != 2)
             return TError(EError::InvalidValue, "Invalid limits number for " + name);
@@ -653,15 +900,15 @@ TError ParseRlimit(const std::string &s, map<int,struct rlimit> &rlim) {
     return TError::Success();
 }
 
-TError ParseBind(const std::string &s, vector<TBindMap> &dirs) {
-    vector<string> lines;
+TError ParseBind(const std::string &s, std::vector<TBindMap> &dirs) {
+    std::vector<std::string> lines;
 
     TError error = SplitEscapedString(s, ';', lines);
     if (error)
         return error;
 
     for (auto &line : lines) {
-        vector<string> tok;
+        std::vector<std::string> tok;
         TBindMap bindMap;
 
         error = SplitEscapedString(line, ' ', tok);
@@ -697,7 +944,7 @@ TError ParseNet(std::shared_ptr<const TContainer> container, const std::string &
     if (!config().network().enabled())
         return TError(EError::Unknown, "Network support is disabled");
 
-    vector<string> lines;
+    std::vector<std::string> lines;
     bool none = false;
     net.Share = false;
 
@@ -713,7 +960,7 @@ TError ParseNet(std::shared_ptr<const TContainer> container, const std::string &
             return TError(EError::InvalidValue,
                           "none can't be mixed with other types");
 
-        vector<string> settings;
+        std::vector<std::string> settings;
 
         error = SplitEscapedString(line, ' ', settings);
         if (error)
@@ -722,7 +969,7 @@ TError ParseNet(std::shared_ptr<const TContainer> container, const std::string &
         if (settings.size() == 0)
             return TError(EError::InvalidValue, "Invalid net in: " + line);
 
-        string type = StringTrim(settings[0]);
+        std::string type = StringTrim(settings[0]);
 
         if (net.Share)
             return TError(EError::InvalidValue,
@@ -751,10 +998,10 @@ TError ParseNet(std::shared_ptr<const TContainer> container, const std::string &
             if (settings.size() < 3)
                 return TError(EError::InvalidValue, "Invalid macvlan in: " + line);
 
-            string master = StringTrim(settings[1]);
-            string name = StringTrim(settings[2]);
-            string type = "bridge";
-            string hw = "";
+            std::string master = StringTrim(settings[1]);
+            std::string name = StringTrim(settings[2]);
+            std::string type = "bridge";
+            std::string hw = "";
 
             if (!ValidLink(master))
                 return TError(EError::InvalidValue,

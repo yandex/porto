@@ -1,4 +1,5 @@
 #include "rpc.hpp"
+#include "property.hpp"
 #include "util/log.hpp"
 #include "util/protobuf.hpp"
 
@@ -160,14 +161,14 @@ static TError ListProperty(TContainerHolder &cholder,
                            rpc::TContainerResponse &rsp) {
     auto list = rsp.mutable_propertylist();
 
-    for (auto kv : propertySpec) {
-        if (kv.second.Flags & HIDDEN_PROPERTY)
+    for (auto kv : propSpec) {
+        if (kv.second->Flags & HIDDEN_PROPERTY)
             continue;
 
         auto entry = list->add_list();
 
         entry->set_name(kv.first);
-        entry->set_desc(kv.second.Description);
+        entry->set_desc(kv.second->Desc);
     }
 
     return TError::Success();
