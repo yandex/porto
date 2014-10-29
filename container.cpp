@@ -787,6 +787,16 @@ TError TContainer::ApplyDynamicProperties() {
 
     auto cpucg = GetLeafCgroup(cpuSubsystem);
     if (GetPropertyStr("cpu_policy") == "normal") {
+        string smart;
+
+        error = cpucg->GetKnobValue("cpu.smart", smart);
+        if (!error && smart == "1") {
+            error = cpucg->SetKnobValue("cpu.smart", "0", false);
+            TLogger::LogError(error, "Can't disable smart");
+            if (error)
+                return error;
+        }
+
         int cpuPrio;
         error = StringToInt(GetPropertyStr("cpu_priority"), cpuPrio);
         TLogger::LogError(error, "Can't parse cpu_priority");
@@ -797,6 +807,17 @@ TError TContainer::ApplyDynamicProperties() {
         TLogger::LogError(error, "Can't set cpu_priority");
         if (error)
             return error;
+
+    } else if (GetPropertyStr("cpu_policy") == "rt") {
+        string smart;
+
+        error = cpucg->GetKnobValue("cpu.smart", smart);
+        if (!error && smart == "0") {
+            error = cpucg->SetKnobValue("cpu.smart", "1", false);
+            TLogger::LogError(error, "Can't enable smart");
+            if (error)
+                return error;
+        }
     }
 
     return TError::Success();

@@ -342,7 +342,7 @@ std::map<std::string, const TPropertySpec> propertySpec = {
         {
             "CPU policy: rt, normal, idle",
             DEFSTR("normal"),
-            PARENT_RO_PROPERTY,
+            DYNAMIC_PROPERTY | PARENT_RO_PROPERTY,
             ValidCpuPolicy
         }
     },
