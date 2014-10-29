@@ -1451,10 +1451,8 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
         if (GetPropertyStr(property) != value)
             return TError(EError::Permission, "Only root can change this property");
 
-    if (GetState() != EContainerState::Stopped &&
-        !(Spec.GetFlags(property) & DYNAMIC_PROPERTY))
-        return TError(EError::InvalidState, "Can't set dynamic property " + property + " for running container");
-
+    if (GetState() != EContainerState::Stopped && !(Spec.GetFlags(property) & DYNAMIC_PROPERTY))
+        return TError(EError::InvalidState, "Can't set property " + property + " for running container");
 
     if (UseParentNamespace() && (Spec.GetFlags(property) & PARENT_RO_PROPERTY))
         return TError(EError::NotSupported, "Can't set " + property + " for child container");
