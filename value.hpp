@@ -74,18 +74,21 @@ public:
                        const std::string &value);
 };
 
-/*
 class TValueSpec {
-        TError RegisterProperty(TValueDef *p);
+    std::map<std::string, TValueDef *> Spec;
+public:
+    TError Register(TValueDef *p);
+    bool Valid(const std::string &name);
+    TValueDef *Get(const std::string &name);
+    std::vector<std::string> GetNames();
 };
-*/
 
 class TValueState : public std::enable_shared_from_this<TValueState> {
     NO_COPY_CONSTRUCT(TValueState);
 
     friend TValueDef;
 
-    TValueDef *Property;
+    TValueDef *Def;
     std::weak_ptr<TContainer> Container;
     std::string StringVal = "";
     bool BoolVal = false;
@@ -108,16 +111,15 @@ public:
 
 class TValueHolder {
     NO_COPY_CONSTRUCT(TValueHolder);
+    TValueSpec *Spec;
     std::weak_ptr<TContainer> Container;
 
 public:
     std::map<std::string, std::shared_ptr<TValueState>> State;
 
-    // TODO: pass propSpec as argument
-    TValueHolder(std::weak_ptr<TContainer> c) : Container(c) {}
-    // TODO: use method and return error
-    std::shared_ptr<TValueState> operator[](const std::string &property);
-    bool IsDefault(const std::string &property);
+    TValueHolder(TValueSpec *spec, std::weak_ptr<TContainer> c) : Spec(spec), Container(c) {}
+    TError Get(const std::string &name, std::shared_ptr<TValueState> &s);
+    bool IsDefault(const std::string &name);
 };
 
 #endif

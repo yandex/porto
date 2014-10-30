@@ -9,7 +9,7 @@
 #include "util/unix.hpp"
 #include "util/pwd.hpp"
 
-std::map<std::string, TValueDef *> propSpec;
+TValueSpec propertySpec;
 
 bool TPropertyHolder::ParentDefault(std::shared_ptr<TContainer> &c,
                                     const std::string &property) {
@@ -34,7 +34,9 @@ std::string TPropertyHolder::Get(const std::string &property) {
     }
 
     // TODO: check if valid property
-    auto s = Holder[property];
+    std::shared_ptr<TValueState> s;
+    TError error = Holder.Get(property, s);
+    TLogger::LogError(error, "Can't get property " + property);
     return s->GetStr();
 }
 
@@ -46,7 +48,9 @@ bool TPropertyHolder::GetBool(const std::string &property) {
     }
 
     // TODO: check if valid property
-    auto s = Holder[property];
+    std::shared_ptr<TValueState> s;
+    TError error = Holder.Get(property, s);
+    TLogger::LogError(error, "Can't get property " + property);
     return s->GetBool();
 }
 
@@ -83,30 +87,42 @@ uint64_t TPropertyHolder::GetUint(const std::string &property) {
 }
 
 TError TPropertyHolder::GetRaw(const std::string &property, std::string &value) {
-    value = Holder[property]->GetStr();
+    std::shared_ptr<TValueState> s;
+    TError error = Holder.Get(property, s);
+    if (error)
+        return error;
+    value = s->GetStr();
     return TError::Success();
 }
 
 // TODO: return TError
 void TPropertyHolder::SetRaw(const std::string &property,
                              const std::string &value) {
-    Holder[property]->SetRawStr(value);
-    TError error(AppendStorage(property, value));
+    std::shared_ptr<TValueState> s;
+    TError error = Holder.Get(property, s);
+    if (error)
+        TLogger::LogError(error, "Can't set raw property " + property);
+
+    s->SetRawStr(value);
+    error = AppendStorage(property, value);
     if (error)
         TLogger::LogError(error, "Can't append property to key-value store");
 }
 
 TError TPropertyHolder::Set(const std::string &property,
                             const std::string &value) {
-    if (propSpec.find(property) == propSpec.end()) {
-        // TODO: use InvalidProperty
+    if (!propertySpec.Valid(property)) {
         TError error(EError::InvalidValue, "property not found");
         TLogger::LogError(error, "Can't set property");
         return error;
     }
 
-    TError error = Holder[property]->SetStr(value);
-    TLogger::LogError(error, "Can't set property");
+    std::shared_ptr<TValueState> s;
+    TError error = Holder.Get(property, s);
+    if (error)
+        return error;
+
+    error = s->SetStr(value);
     if (error)
         return error;
 
@@ -119,10 +135,10 @@ TError TPropertyHolder::Set(const std::string &property,
 
 bool TPropertyHolder::HasFlags(const std::string &property, int flags) {
     // TODO: Log error
-    if (propSpec.find(property) == propSpec.end())
+    if (!propertySpec.Valid(property))
         return false;
 
-    return propSpec.at(property)->Flags & flags;
+    return propertySpec.Get(property)->Flags & flags;
 }
 
 bool TPropertyHolder::IsRoot() {
@@ -146,7 +162,7 @@ TError TPropertyHolder::Restore(const kv::TNode &node) {
 }
 
 TError TPropertyHolder::PropertyExists(const std::string &property) {
-    if (propSpec.find(property) == propSpec.end())
+    if (!propertySpec.Valid(property))
         return TError(EError::InvalidProperty, "invalid property");
     return TError::Success();
 }
@@ -811,13 +827,6 @@ public:
                                    RAW_PROPERTY | HIDDEN_PROPERTY) {}
 };
 
-static TError RegisterProperty(TValueDef *p) {
-    if (propSpec.find(p->Name) != propSpec.end())
-        return TError(EError::Unknown, "Invalid property " + p->Name + " definition");
-    propSpec[p->Name] = p;
-    return TError::Success();
-}
-
 TError RegisterProperties() {
     std::vector<TValueDef *> properties = {
         new TCommandProperty,
@@ -856,7 +865,7 @@ TError RegisterProperties() {
     };
 
     for (auto &p : properties) {
-        TError error = RegisterProperty(p);
+        TError error = propertySpec.Register(p);
         if (error)
             return error;
     }

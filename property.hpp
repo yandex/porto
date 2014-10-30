@@ -28,7 +28,7 @@ const unsigned int PARENT_RO_PROPERTY = (1 << 4);
 // TODO: add checks! cant set/list via api
 const unsigned int RAW_PROPERTY = (1 << 5);
 
-extern std::map<std::string, TValueDef *> propSpec;
+extern TValueSpec propertySpec;
 
 class TPropertyHolder {
     NO_COPY_CONSTRUCT(TPropertyHolder);
@@ -43,7 +43,7 @@ class TPropertyHolder {
     TError GetSharedContainer(std::shared_ptr<TContainer> &c);
 
 public:
-    TPropertyHolder(std::shared_ptr<TContainer> c) : Container(c), Name(c->GetName()), Holder(c) {}
+    TPropertyHolder(std::shared_ptr<TContainer> c) : Container(c), Name(c->GetName()), Holder(&propertySpec, c) {}
     ~TPropertyHolder();
 
     bool IsDefault(const std::string &property);

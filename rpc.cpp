@@ -161,14 +161,15 @@ static TError ListProperty(TContainerHolder &cholder,
                            rpc::TContainerResponse &rsp) {
     auto list = rsp.mutable_propertylist();
 
-    for (auto kv : propSpec) {
-        if (kv.second->Flags & HIDDEN_PROPERTY)
+    for (auto property : propertySpec.GetNames()) {
+        auto p = propertySpec.Get(property);
+        if (p->Flags & HIDDEN_PROPERTY)
             continue;
 
         auto entry = list->add_list();
 
-        entry->set_name(kv.first);
-        entry->set_desc(kv.second->Desc);
+        entry->set_name(property);
+        entry->set_desc(p->Desc);
     }
 
     return TError::Success();

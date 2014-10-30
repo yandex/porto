@@ -112,31 +112,26 @@ TError TValueDef::Set(std::shared_ptr<TContainer> c,
         return SetList(c, s, value);
 #endif
     default:
-        return TError(EError::Unknown, "Invalid property");
+        return TError(EError::Unknown, "Invalid value name");
     };
 }
 
-TValueState::TValueState(std::shared_ptr<TContainer> c, TValueDef *p) : Property(p), Container(c) { }
+TValueState::TValueState(std::shared_ptr<TContainer> c, TValueDef *p) : Def(p), Container(c) { }
 
 std::string TValueState::GetStr() {
-    /*
-    if (!Property)
-        return StringVal;
-        */
-
     if (!Initialized) {
         auto c = Container.lock();
         PORTO_ASSERT(c);
-        switch (Property->Type) {
+        switch (Def->Type) {
         case EValueType::String:
-            return Property->GetDefaultString(c);
+            return Def->GetDefaultString(c);
         case EValueType::Bool:
-            return BoolToStr(Property->GetDefaultBool(c));
+            return BoolToStr(Def->GetDefaultBool(c));
         }
         // TODO: ^^^ allow only str
     }
 
-    switch (Property->Type) {
+    switch (Def->Type) {
     case EValueType::String:
         return StringVal;
     case EValueType::Bool:
@@ -159,7 +154,7 @@ TError TValueState::SetStr(const std::string &v) {
     if (!c)
         return TError(EError::Unknown, "Can't convert weak container reference");
 
-    TError error = Property->Set(c, shared_from_this(), v);
+    TError error = Def->Set(c, shared_from_this(), v);
     if (error)
         return error;
     SetRawStr(v);
@@ -174,12 +169,12 @@ void TValueState::SetRawStr(const std::string &v) {
 }
 
 bool TValueState::GetBool() {
-    PORTO_ASSERT(Property->Type == EValueType::Bool);
+    PORTO_ASSERT(Def->Type == EValueType::Bool);
 
     if (!Initialized) {
         auto c = Container.lock();
         PORTO_ASSERT(c);
-        return Property->GetDefaultBool(c);
+        return Def->GetDefaultBool(c);
     }
 
     return BoolVal;
@@ -192,46 +187,62 @@ bool TValueState::IsDefault() {
     auto c = Container.lock();
     if (!c) {
         TError error(EError::Unknown, "Can't convert weak container reference");
-        TLogger::LogError(error, "Can't check whether property is default");
+        TLogger::LogError(error, "Can't check whether value is default");
         return false;
     }
 
-    switch (Property->Type) {
+    switch (Def->Type) {
     case EValueType::String:
-        return StringVal == Property->GetDefaultString(c);
+        return StringVal == Def->GetDefaultString(c);
     case EValueType::Bool:
-        return BoolVal == Property->GetDefaultBool(c);
+        return BoolVal == Def->GetDefaultBool(c);
     default:
         return false;
     };
 }
 
-extern std::map<std::string, TValueDef *> propSpec;
-std::shared_ptr<TValueState> TValueHolder::operator[](const std::string &property) {
+TError TValueHolder::Get(const std::string &name, std::shared_ptr<TValueState> &s) {
     auto c = Container.lock();
-    if (!c) {
-        TError error(EError::Unknown, "Can't convert weak container reference");
-        TLogger::LogError(error, "Can't get property " + property);
-        return nullptr;
-    }
+    if (!c)
+        return TError(EError::Unknown, "Can't convert weak container reference");
 
-    if (State.find(property) == State.end()) {
+    if (State.find(name) == State.end()) {
         TValueDef *p = nullptr;
-        if (propSpec.find(property) == propSpec.end()) {
-            TLogger::Log() << "Error: invalid property " << property << std::endl;
-            return nullptr;
-        }
-        PORTO_ASSERT(propSpec.find(property) != propSpec.end());
-        p = propSpec.at(property);
-        State[property] = std::make_shared<TValueState>(c, p);
+        if (!Spec->Valid(name))
+            return TError(EError::Unknown, "Invalid value " + name);
+        p = Spec->Get(name);
+        State[name] = std::make_shared<TValueState>(c, p);
     }
 
-    return State.at(property);
+    s = State.at(name);
+    return TError::Success();
 }
 
-bool TValueHolder::IsDefault(const std::string &property) {
-    if (State.find(property) == State.end())
+bool TValueHolder::IsDefault(const std::string &name) {
+    if (State.find(name) == State.end())
         return true;
 
-    return State.at(property)->IsDefault();
+    return State.at(name)->IsDefault();
+}
+
+TError TValueSpec::Register(TValueDef *p) {
+    if (Spec.find(p->Name) != Spec.end())
+        return TError(EError::Unknown, "Invalid name " + p->Name + " definition");
+    Spec[p->Name] = p;
+    return TError::Success();
+}
+
+bool TValueSpec::Valid(const std::string &name) {
+    return Spec.find(name) != Spec.end();
+}
+
+TValueDef *TValueSpec::Get(const std::string &name) {
+    return Spec[name];
+}
+
+std::vector<std::string> TValueSpec::GetNames() {
+    std::vector<std::string> v;
+    for (auto kv: Spec)
+        v.push_back(kv.first);
+    return v;
 }

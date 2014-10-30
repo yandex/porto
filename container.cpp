@@ -1419,8 +1419,10 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
         return TError(EError::NotSupported, "Can't set " + property + " for child container");
 
     error = Prop->Set(property, value);
-    if (error)
+    if (error) {
+        TLogger::LogError(error, "Can't set property");
         return error;
+    }
 
     if (ShouldApplyProperty(property))
         error = ApplyDynamicProperties();
