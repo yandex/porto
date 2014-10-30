@@ -738,6 +738,8 @@ static void TestEnvironment(TPortoAPI &api) {
     Say() << "Check default environment" << std::endl;
 
     static const char empty_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
+        "container=lxc\0"
+        "PORTO_NAME=a\0"
         "HOME=/place/porto/a\0"
         "USER=nobody\0";
     ExpectEnv(api, name, "", empty_env, sizeof(empty_env));
@@ -746,6 +748,8 @@ static void TestEnvironment(TPortoAPI &api) {
     static const char ab_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
         "a=b\0"
         "c=d\0"
+        "container=lxc\0"
+        "PORTO_NAME=a\0"
         "HOME=/place/porto/a\0"
         "USER=nobody\0";
 
@@ -755,6 +759,8 @@ static void TestEnvironment(TPortoAPI &api) {
     static const char asb_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
         "a=e;b\0"
         "c=d\0"
+        "container=lxc\0"
+        "PORTO_NAME=a\0"
         "HOME=/place/porto/a\0"
         "USER=nobody\0";
     ExpectEnv(api, name, "a=e\\;b;c=d;", asb_env, sizeof(asb_env));

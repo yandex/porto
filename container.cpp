@@ -465,7 +465,7 @@ TError TContainer::PrepareTask() {
     taskEnv->CreateCwd = Prop->IsDefault("root") && Prop->IsDefault("cwd") && !UseParentNamespace();
     taskEnv->User = Prop->Get("user");
     taskEnv->Group = Prop->Get("group");
-    taskEnv->Environ = Prop->Get("env");
+    taskEnv->Environ = Prop->Get("env") + ";container=lxc;PORTO_NAME=" + GetName();
     taskEnv->Isolate = Prop->GetBool("isolate");
     taskEnv->StdinPath = Prop->Get("stdin_path");
     taskEnv->StdoutPath = Prop->Get("stdout_path");
