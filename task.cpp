@@ -319,6 +319,17 @@ TError TTask::ChildMountDev() {
 }
 
 TError TTask::ChildIsolateFs(bool priveleged) {
+    if (Env->Root.ToString() != "/") {
+        TMount root(Env->Root, Env->Root, "none", {});
+        TError error = root.BindDir(false);
+        if (error)
+            return error;
+    }
+
+    TError error = ChildBindDirectores();
+    if (error)
+        return error;
+
     if (Env->Root.ToString() == "/")
         return TError::Success();
 
@@ -328,7 +339,7 @@ TError TTask::ChildIsolateFs(bool priveleged) {
         sysfsFlags |= MS_RDONLY;
 
     TMount sysfs("sysfs", Env->Root + "/sys", "sysfs", {});
-    TError error = sysfs.MountDir(sysfsFlags);
+    error = sysfs.MountDir(sysfsFlags);
     if (error)
         return error;
 
@@ -481,11 +492,7 @@ int TTask::ChildCallback() {
 
     ChildReopenStdio();
 
-    TError error = ChildBindDirectores();
-    if (error)
-        return error;
-
-    error = ChildIsolateFs(priveleged);
+    TError error = ChildIsolateFs(priveleged);
     if (error)
         Abort(error);
 

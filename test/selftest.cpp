@@ -1202,6 +1202,7 @@ static void TestBindProperty(TPortoAPI &api) {
     ExpectSuccess(api.SetProperty(name, "bind", "/bin /bin ro; /tmp/27389 /tmp"));
     v = StartWaitAndGetData(api, name, "stdout");
     m = ParseMountinfo(v);
+    Expect(m["/"] == "rw,relatime");
     Expect(m["/bin"] == "ro,relatime");
     Expect(m["/tmp"] == "rw,relatime" || m["/tmp"] == "rw");
     ExpectSuccess(api.Stop(name));

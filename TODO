@@ -1,4 +1,4 @@
-- mount root in container so precise works
+- add container=lxc;PORTO_NAME=<container name> to env
 - test restarting (check version)
 - shaping with macvlan or non-default interface?
 - ? portoctl cp
