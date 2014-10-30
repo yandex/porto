@@ -9,6 +9,12 @@
 #include "error.hpp"
 #include "porto.hpp"
 
+// TValueDef -> TValue
+// TValueSpec -> TValueSet
+//
+// TValueState -> TValueState
+// TValueHolder -> TValueStateSet
+
 class TContainer;
 enum class EContainerState;
 
@@ -30,6 +36,8 @@ enum class EValueType {
 
 // Don't return default value, call get handler
 const unsigned int NODEF_VALUE = (1 << 31);
+// Value is not shown in the property/data list
+const unsigned int HIDDEN_VALUE = (1 << 30);
 
 class TValueState;
 
@@ -40,8 +48,8 @@ public:
     TValueDef(const std::string &name,
               const EValueType type,
               const std::string &desc,
-              const int flags = 0,
-              const std::set<EContainerState> &state = {}) :
+              const int flags,
+              const std::set<EContainerState> &state) :
         Name(name), Type(type), Desc(desc), Flags(flags), State(state) {}
 
     const std::string Name;

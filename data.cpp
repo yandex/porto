@@ -382,7 +382,7 @@ public:
                               // TODO: map
                               EValueType::String,
                               "return number of bytes read from disk",
-                              NODEF_VALUE | HIDDEN_DATA,
+                              NODEF_VALUE | HIDDEN_VALUE,
                               rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
@@ -411,7 +411,7 @@ public:
                                // TODO: map
                                EValueType::String,
                                "return number of bytes written to disk",
-                               NODEF_VALUE | HIDDEN_DATA,
+                               NODEF_VALUE | HIDDEN_VALUE,
                                rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,

@@ -3,9 +3,6 @@
 
 #include "value.hpp"
 
-// Data is not shown in the data list
-const unsigned int HIDDEN_DATA = (1 << 0);
-
 extern TValueSpec dataSpec;
 TError RegisterData();
 

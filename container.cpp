@@ -924,7 +924,7 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
 }
 
 bool TContainer::ShouldApplyProperty(const std::string &property) {
-    if (!Prop->HasFlags(property, DYNAMIC_PROPERTY))
+    if (!Prop->HasState(property, EContainerState::Running))
        return false;
 
     auto state = GetState();
@@ -953,8 +953,7 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
         if (Prop->Get(property) != value)
             return TError(EError::Permission, "Only root can change this property");
 
-    if (GetState() != EContainerState::Stopped &&
-        !Prop->HasFlags(property, DYNAMIC_PROPERTY))
+    if (!Prop->HasState(property, GetState()))
         return TError(EError::InvalidState, "Can't set dynamic property " + property + " for running container");
 
 

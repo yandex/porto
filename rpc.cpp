@@ -161,7 +161,7 @@ static TError ListProperty(TContainerHolder &cholder,
 
     for (auto property : propertySpec.GetNames()) {
         auto p = propertySpec.Get(property);
-        if (p->Flags & HIDDEN_PROPERTY)
+        if (p->Flags & HIDDEN_VALUE)
             continue;
 
         auto entry = list->add_list();
@@ -179,7 +179,7 @@ static TError ListData(TContainerHolder &cholder,
 
     for (auto data : dataSpec.GetNames()) {
         auto d = dataSpec.Get(data);
-        if (d->Flags & HIDDEN_DATA)
+        if (d->Flags & HIDDEN_VALUE)
             continue;
 
         auto entry = list->add_list();

@@ -14,19 +14,12 @@
 class TBindMap;
 class TNetCfg;
 
-// Property can be changed while container is running
-const unsigned int DYNAMIC_PROPERTY = (1 << 0);
 // Property is not shown in the property list
-const unsigned int HIDDEN_PROPERTY = (1 << 1);
-// Property can be changed only by super user
-const unsigned int SUPERUSER_PROPERTY = (1 << 2);
+const unsigned int SUPERUSER_PROPERTY = (1 << 0);
 // Property should return parent value as default
-const unsigned int PARENT_DEF_PROPERTY = (1 << 3);
+const unsigned int PARENT_DEF_PROPERTY = (1 << 1);
 // When child container is shared with parent these properties can't be changed
-const unsigned int PARENT_RO_PROPERTY = (1 << 4);
-// Raw property used only for recovery
-// TODO: add checks! cant set/list via api
-const unsigned int RAW_PROPERTY = (1 << 5);
+const unsigned int PARENT_RO_PROPERTY = (1 << 2);
 
 extern TValueSpec propertySpec;
 
@@ -62,6 +55,7 @@ public:
     TError Set(const std::string &property, const std::string &value);
 
     bool HasFlags(const std::string &property, int flags);
+    bool HasState(const std::string &property, EContainerState state);
 
     TError Create();
     TError Restore(const kv::TNode &node);

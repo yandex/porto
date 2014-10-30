@@ -97,7 +97,10 @@ TError TValueDef::Set(std::shared_ptr<TContainer> c,
         if (error)
             return error;
 
-        // TODO SetStr
+        error = SetString(c, s, value);
+        if (error)
+            return error;
+
         s->StringVal = value;
         return TError::Success();
 
