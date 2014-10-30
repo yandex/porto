@@ -21,6 +21,10 @@ struct TData;
 class TContainer;
 class TSubsystem;
 class TPropertyHolder;
+class TValueHolder;
+enum class ETclassStat;
+
+extern int64_t BootTime;
 
 enum class EContainerState {
     Stopped,
@@ -30,7 +34,7 @@ enum class EContainerState {
     Meta
 };
 
-const unsigned int HIDDEN_DATA = (1 << 0);
+std::string ContainerStateName(EContainerState state);
 
 struct TDataSpec {
     std::string Description;
@@ -38,8 +42,6 @@ struct TDataSpec {
     std::function<std::string(TContainer& c)> Handler;
     std::set<EContainerState> Valid;
 };
-
-extern std::map<std::string, const TDataSpec> dataSpec;
 
 enum class EContainerEventType {
     Exit,
@@ -83,14 +85,11 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     bool OomKilled = false;
     size_t RespawnCount;
     int Uid, Gid;
-    friend TData;
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
-    std::unique_ptr<TTask> Task;
 
     // data
     bool HaveRunningChildren();
-    EContainerState GetState();
     void SetState(EContainerState newState);
 
     TError ApplyDynamicProperties();
@@ -115,7 +114,16 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     bool DeliverOom(int fd);
 
 public:
+    // TODO: make private
+    std::unique_ptr<TTask> Task;
     std::shared_ptr<TPropertyHolder> Prop;
+    std::shared_ptr<TValueHolder> Data;
+
+    EContainerState GetState();
+    bool IsOomKilled() { return OomKilled; }
+    size_t GetRespawnCount() { return RespawnCount; }
+    int GetTaskStartErrno() { return TaskStartErrno; }
+    TError GetStat(ETclassStat stat, uint64_t &val) { return Tclass->GetStat(stat, val); }
 
     TContainer(const std::string &name, std::shared_ptr<TContainer> parent, uint16_t id, std::shared_ptr<TNlLink> link) :
         Name(StripParentName(name)), Parent(parent), State(EContainerState::Stopped), Id(id), Link(link) { }

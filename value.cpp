@@ -18,6 +18,11 @@ TError TValueDef::SetString(std::shared_ptr<TContainer> c,
     return TError::Success();
 }
 
+std::string TValueDef::GetString(std::shared_ptr<TContainer> c,
+                                 std::shared_ptr<TValueState> s) {
+    return s->StringVal;
+}
+
 bool TValueDef::GetDefaultBool(std::shared_ptr<TContainer> c) {
     return false;
 }
@@ -28,6 +33,10 @@ TError TValueDef::SetBool(std::shared_ptr<TContainer> c,
     return TError::Success();
 }
 
+bool TValueDef::GetBool(std::shared_ptr<TContainer> c,
+                        std::shared_ptr<TValueState> s) {
+    return s->BoolVal;
+}
 #if 0
 std::map<std::string, std::string>
 TValueDef::GetDefaultMap(std::shared_ptr<TContainer> c,
@@ -118,10 +127,18 @@ TError TValueDef::Set(std::shared_ptr<TContainer> c,
 
 TValueState::TValueState(std::shared_ptr<TContainer> c, TValueDef *p) : Def(p), Container(c) { }
 
+bool TValueState::ReturnDefault() {
+    if (Def->Flags & NODEF_VALUE)
+        return false;
+
+    return !Initialized;
+}
+
 std::string TValueState::GetStr() {
-    if (!Initialized) {
-        auto c = Container.lock();
-        PORTO_ASSERT(c);
+    auto c = Container.lock();
+    PORTO_ASSERT(c);
+
+    if (ReturnDefault()) {
         switch (Def->Type) {
         case EValueType::String:
             return Def->GetDefaultString(c);
@@ -133,9 +150,9 @@ std::string TValueState::GetStr() {
 
     switch (Def->Type) {
     case EValueType::String:
-        return StringVal;
+        return Def->GetString(c, shared_from_this());
     case EValueType::Bool:
-        return BoolToStr(GetBool());
+        return BoolToStr(Def->GetBool(c, shared_from_this()));
 #if 0
     case EValueType::Map:
         // TODO:
@@ -171,17 +188,17 @@ void TValueState::SetRawStr(const std::string &v) {
 bool TValueState::GetBool() {
     PORTO_ASSERT(Def->Type == EValueType::Bool);
 
-    if (!Initialized) {
-        auto c = Container.lock();
-        PORTO_ASSERT(c);
-        return Def->GetDefaultBool(c);
-    }
+    auto c = Container.lock();
+    PORTO_ASSERT(c);
 
-    return BoolVal;
+    if (ReturnDefault())
+        return Def->GetDefaultBool(c);
+
+    return Def->GetBool(c, shared_from_this());
 }
 
 bool TValueState::IsDefault() {
-    if (!Initialized)
+    if (ReturnDefault())
         return true;
 
     auto c = Container.lock();
@@ -193,9 +210,9 @@ bool TValueState::IsDefault() {
 
     switch (Def->Type) {
     case EValueType::String:
-        return StringVal == Def->GetDefaultString(c);
+        return Def->GetString(c, shared_from_this()) == Def->GetDefaultString(c);
     case EValueType::Bool:
-        return BoolVal == Def->GetDefaultBool(c);
+        return Def->GetBool(c, shared_from_this()) == Def->GetDefaultBool(c);
     default:
         return false;
     };
@@ -227,8 +244,17 @@ bool TValueHolder::IsDefault(const std::string &name) {
 
 TError TValueSpec::Register(TValueDef *p) {
     if (Spec.find(p->Name) != Spec.end())
-        return TError(EError::Unknown, "Invalid name " + p->Name + " definition");
+        return TError(EError::Unknown, "Invalid " + p->Name + " definition");
     Spec[p->Name] = p;
+    return TError::Success();
+}
+
+TError TValueSpec::Register(const std::vector<TValueDef *> &v) {
+    for (auto &p : v) {
+        TError error = Register(p);
+        if (error)
+            return error;
+    }
     return TError::Success();
 }
 

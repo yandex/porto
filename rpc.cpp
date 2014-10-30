@@ -1,5 +1,6 @@
 #include "rpc.hpp"
 #include "property.hpp"
+#include "data.hpp"
 #include "util/log.hpp"
 #include "util/protobuf.hpp"
 
@@ -147,9 +148,6 @@ static TError GetContainerData(TContainerHolder &cholder,
     if (error)
         return error;
 
-    if (dataSpec.find(req.data()) == dataSpec.end())
-        return TError(EError::InvalidData, "invalid data");
-
     string value;
     error = container->GetData(req.data(), value);
     if (!error)
@@ -179,14 +177,15 @@ static TError ListData(TContainerHolder &cholder,
                        rpc::TContainerResponse &rsp) {
     auto list = rsp.mutable_datalist();
 
-    for (auto kv : dataSpec) {
-        if (kv.second.Flags & HIDDEN_DATA)
+    for (auto data : dataSpec.GetNames()) {
+        auto d = dataSpec.Get(data);
+        if (d->Flags & HIDDEN_DATA)
             continue;
 
         auto entry = list->add_list();
 
-        entry->set_name(kv.first);
-        entry->set_desc(kv.second.Description);
+        entry->set_name(data);
+        entry->set_desc(d->Desc);
     }
 
     return TError::Success();

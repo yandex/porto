@@ -9,6 +9,7 @@
 #include "cgroup.hpp"
 #include "subsystem.hpp"
 #include "property.hpp"
+#include "data.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/netlink.hpp"
@@ -53,9 +54,9 @@ static int64_t GetBootTime() {
     return 0;
 }
 
-static int64_t BootTime = 0;
+int64_t BootTime = 0;
 
-static string ContainerStateName(EContainerState state) {
+std::string ContainerStateName(EContainerState state) {
     switch (state) {
     case EContainerState::Stopped:
         return "stopped";
@@ -71,471 +72,6 @@ static string ContainerStateName(EContainerState state) {
         return "unknown";
     }
 }
-
-struct TData {
-    static string State(TContainer& c) {
-        return ContainerStateName(c.GetState());
-    }
-
-    static string OomKilled(TContainer& c) {
-        if (c.OomKilled)
-            return "true";
-        else
-            return "false";
-    }
-
-    static string Parent(TContainer& c) {
-        return c.Parent ? c.Parent->Name : "";
-    }
-
-    static string RespawnCount(TContainer& c) {
-        return std::to_string(c.RespawnCount);
-    }
-
-    static string RootPid(TContainer& c) {
-        if (c.Task)
-            return std::to_string(c.Task->GetPid());
-        else
-            return "-1";
-    };
-
-    static string ExitStatus(TContainer& c) {
-        if (c.Task && !c.Task->IsRunning())
-            return std::to_string(c.Task->GetExitStatus());
-        else
-            return "-1";
-    };
-
-    static string StartErrno(TContainer& c) {
-        return std::to_string(c.TaskStartErrno);
-    };
-
-    static string Stdout(TContainer& c) {
-        if (c.Task)
-            return c.Task->GetStdout(c.Prop->GetUint("stdout_limit"));
-        return "";
-    };
-
-    static string Stderr(TContainer& c) {
-        if (c.Task)
-            return c.Task->GetStderr(c.Prop->GetUint("stdout_limit"));
-        return "";
-    };
-
-    static string CpuUsage(TContainer& c) {
-        auto subsys = cpuacctSubsystem;
-        auto cg = c.GetLeafCgroup(subsys);
-        if (!cg) {
-            TLogger::LogAction("cpuacct cgroup not found");
-            return "-1";
-        }
-
-        uint64_t val;
-        TError error = subsys->Usage(cg, val);
-        if (error) {
-            TLogger::LogError(error, "Can't get CPU usage");
-            return "-1";
-        }
-
-        return std::to_string(val);
-    };
-
-    static string MemUsage(TContainer& c) {
-        auto subsys = memorySubsystem;
-        auto cg = c.GetLeafCgroup(subsys);
-        if (!cg) {
-            TLogger::LogAction("memory cgroup not found");
-            return "-1";
-        }
-
-        uint64_t val;
-        TError error = subsys->Usage(cg, val);
-        if (error) {
-            TLogger::LogError(error, "Can't get memory usage");
-            return "-1";
-        }
-
-        return std::to_string(val);
-    };
-
-    static string NetBytes(TContainer& c) {
-        uint64_t val;
-        TError error = c.Tclass->GetStat(ETclassStat::Bytes, val);
-        if (error) {
-            TLogger::LogError(error, "Can't get transmitted bytes");
-            return "-1";
-        }
-
-        return std::to_string(val);
-    };
-
-    static string NetPackets(TContainer& c) {
-        uint64_t val;
-        TError error = c.Tclass->GetStat(ETclassStat::Packets, val);
-        if (error) {
-            TLogger::LogError(error, "Can't get transmitted packets");
-            return "-1";
-        }
-
-        return std::to_string(val);
-    };
-
-    static string NetDrops(TContainer& c) {
-        uint64_t val;
-        TError error = c.Tclass->GetStat(ETclassStat::Drops, val);
-        if (error) {
-            TLogger::LogError(error, "Can't get dropped packets");
-            return "-1";
-        }
-
-        return std::to_string(val);
-    };
-
-    static string NetOverlimits(TContainer& c) {
-        uint64_t val;
-        TError error = c.Tclass->GetStat(ETclassStat::Overlimits, val);
-        if (error) {
-            TLogger::LogError(error, "Can't get number of packets over limit");
-            return "-1";
-        }
-
-        return std::to_string(val);
-    };
-
-    static string MinorFaults(TContainer& c) {
-        uint64_t val;
-        auto cg = c.GetLeafCgroup(memorySubsystem);
-        TError error = memorySubsystem->Statistics(cg, "total_pgfault", val);
-        if (error)
-            return "-1";
-
-        return std::to_string(val);
-    };
-
-    static string MajorFaults(TContainer& c) {
-        uint64_t val;
-        auto cg = c.GetLeafCgroup(memorySubsystem);
-        TError error = memorySubsystem->Statistics(cg, "total_pgmajfault", val);
-        if (error)
-            return "-1";
-
-        return std::to_string(val);
-    };
-
-    static string IoRead(TContainer& c) {
-        auto cg = c.GetLeafCgroup(blkioSubsystem);
-
-        vector<BlkioStat> stat;
-        TError error = blkioSubsystem->Statistics(cg, "blkio.io_service_bytes_recursive", stat);
-        if (error)
-            return "-1";
-
-        std::stringstream str;
-        for (auto &s : stat) {
-            if (str.str().length())
-                str << " ";
-            str << s.Device << ":" << s.Read;
-        }
-
-        return str.str();
-    };
-
-    static string IoWrite(TContainer& c) {
-        auto cg = c.GetLeafCgroup(blkioSubsystem);
-
-        vector<BlkioStat> stat;
-        TError error = blkioSubsystem->Statistics(cg, "blkio.io_service_bytes_recursive", stat);
-        if (error)
-            return "-1";
-
-        std::stringstream str;
-        for (auto &s : stat) {
-            if (str.str().length())
-                str << " ";
-            str << s.Device << ":" << s.Write;
-        }
-
-        return str.str();
-    };
-
-    static string RunningTime(TContainer& c) {
-        if (!c.Task || !c.Task->IsRunning())
-            return "0";
-
-        int pid = c.Task->GetPid();
-        TFile f("/proc/" + std::to_string(pid) + "/stat");
-        string line;
-        if (f.AsString(line))
-            return "0";
-
-        vector<string> cols;
-        if (SplitString(line, ' ', cols))
-            return "0";
-
-        if (cols.size() <= 21)
-            return "0";
-
-        int64_t started;
-        if (StringToInt64(cols[21], started))
-            return "0";
-
-        started /= sysconf(_SC_CLK_TCK);
-        started += BootTime;
-
-        return std::to_string(time(nullptr) - started);
-    };
-};
-
-std::map<std::string, const TDataSpec> dataSpec = {
-    { "state",
-        {
-            "container state",
-            0,
-            TData::State,
-            {
-                EContainerState::Stopped,
-                EContainerState::Dead,
-                EContainerState::Running,
-                EContainerState::Paused,
-                EContainerState::Meta,
-            }
-        }
-    },
-    { "oom_killed",
-        {
-            "indicates whether container has been killed by OOM",
-            0,
-            TData::OomKilled,
-            {
-                EContainerState::Dead,
-            }
-        }
-    },
-    { "parent",
-        {
-            "container parent",
-            0,
-            TData::Parent,
-            {
-                EContainerState::Stopped,
-                EContainerState::Dead,
-                EContainerState::Running,
-                EContainerState::Paused,
-                EContainerState::Meta,
-            }
-        }
-    },
-    { "respawn_count",
-        {
-            "how many time container was automatically respawned",
-            0,
-            TData::RespawnCount,
-            {
-                EContainerState::Running,
-                EContainerState::Dead,
-            }
-        }
-    },
-    { "exit_status",
-        {
-            "container exit status",
-            0,
-            TData::ExitStatus,
-            {
-                EContainerState::Dead,
-            }
-        }
-    },
-    { "start_errno",
-        {
-            "container start error",
-            0,
-            TData::StartErrno,
-            {
-                EContainerState::Stopped,
-            }
-        }
-    },
-    { "root_pid",
-        {
-            "root process id",
-            0,
-            TData::RootPid,
-            {
-                EContainerState::Running,
-                EContainerState::Paused,
-            }
-        }
-    },
-    { "stdout",
-        {
-            "return task stdout",
-            0,
-            TData::Stdout,
-            {
-                EContainerState::Running,
-                EContainerState::Paused,
-                EContainerState::Dead,
-            }
-        }
-    },
-    { "stderr",
-        {
-            "return task stderr",
-            0,
-            TData::Stderr,
-            {
-                EContainerState::Running,
-                EContainerState::Paused,
-                EContainerState::Dead,
-            }
-        }
-    },
-    { "cpu_usage",
-        {
-            "return consumed CPU time in nanoseconds",
-            0,
-            TData::CpuUsage,
-            {
-                EContainerState::Running,
-                EContainerState::Paused,
-                EContainerState::Dead,
-                EContainerState::Meta,
-            }
-        }
-    },
-    { "net_bytes",
-        {
-            "number of tx bytes",
-            0,
-            TData::NetBytes,
-            {
-                EContainerState::Running,
-                EContainerState::Paused,
-                EContainerState::Dead,
-                EContainerState::Meta,
-            }
-        }
-    },
-    { "net_packets",
-        {
-            "number of tx packets",
-            0,
-            TData::NetPackets,
-            {
-                EContainerState::Running,
-                EContainerState::Paused,
-                EContainerState::Dead,
-                EContainerState::Meta,
-            }
-        }
-    },
-    { "net_drops",
-        {
-            "number of dropped tx packets",
-            0,
-            TData::NetDrops,
-            {
-                EContainerState::Running,
-                EContainerState::Paused,
-                EContainerState::Dead,
-                EContainerState::Meta,
-            }
-        }
-    },
-    { "net_overlimits",
-        {
-            "number of tx packets that exceeded the limit",
-            0,
-            TData::NetOverlimits,
-            {
-                EContainerState::Running,
-                EContainerState::Paused,
-                EContainerState::Dead,
-                EContainerState::Meta,
-            }
-        }
-    },
-    { "memory_usage",
-        {
-            "return consumed memory in bytes",
-            0,
-            TData::MemUsage,
-            {
-                EContainerState::Running,
-                EContainerState::Paused,
-                EContainerState::Dead,
-                EContainerState::Meta,
-            }
-        }
-    },
-    { "minor_faults",
-        {
-            "return number of minor page faults",
-            0,
-            TData::MinorFaults,
-            {
-                EContainerState::Running,
-                EContainerState::Paused,
-                EContainerState::Dead,
-                EContainerState::Meta,
-            }
-        }
-    },
-    { "major_faults",
-        {
-            "return number of major page faults",
-            0,
-            TData::MajorFaults,
-            {
-                EContainerState::Running,
-                EContainerState::Paused,
-                EContainerState::Dead,
-                EContainerState::Meta,
-            }
-        }
-    },
-
-    { "io_read",
-        {
-            "return number of bytes read from disk",
-            HIDDEN_DATA,
-            TData::IoRead,
-            {
-                EContainerState::Running,
-                EContainerState::Paused,
-                EContainerState::Dead,
-                EContainerState::Meta,
-            }
-        }
-    },
-    { "io_write",
-        {
-            "return number of bytes written to disk",
-            HIDDEN_DATA,
-            TData::IoWrite,
-            {
-                EContainerState::Running,
-                EContainerState::Paused,
-                EContainerState::Dead,
-                EContainerState::Meta,
-            }
-        }
-    },
-
-    { "time",
-        {
-            "return running time of container",
-            0,
-            TData::RunningTime,
-            {
-                EContainerState::Running,
-                EContainerState::Paused,
-                EContainerState::Dead,
-            }
-        }
-    },
-};
 
 // TContainerEvent
 
@@ -979,6 +515,7 @@ TError TContainer::Create(int uid, int gid) {
     Gid = gid;
 
     Prop = std::make_shared<TPropertyHolder>(shared_from_this());
+    Data = std::make_shared<TValueHolder>(&dataSpec, shared_from_this());
 
     TError error = Prop->Create();
     if (error)
@@ -1299,13 +836,19 @@ TError TContainer::Kill(int sig) {
 }
 
 TError TContainer::GetData(const string &name, string &value) {
-    if (dataSpec.find(name) == dataSpec.end())
+    // TODO: InvalidData
+    if (!dataSpec.Valid(name))
         return TError(EError::InvalidValue, "invalid container data");
 
-    if (dataSpec[name].Valid.find(GetState()) == dataSpec[name].Valid.end())
+    auto d = dataSpec.Get(name);
+    if (d->State.find(GetState()) == d->State.end())
         return TError(EError::InvalidState, "invalid container state");
 
-    value = dataSpec[name].Handler(*this);
+    std::shared_ptr<TValueState> s;
+    TError error = Data->Get(name, s);
+    if (error)
+        return error;
+    value = s->GetStr();
     return TError::Success();
 }
 
@@ -1434,6 +977,7 @@ TError TContainer::Restore(const kv::TNode &node) {
     TLogger::Log() << "Restore " << GetName() << " " << Id << std::endl;
 
     Prop = std::make_shared<TPropertyHolder>(shared_from_this());
+    Data = std::make_shared<TValueHolder>(&dataSpec, shared_from_this());
 
     TError error = Prop->Restore(node);
     if (error) {
@@ -1686,6 +1230,10 @@ TContainerHolder::~TContainerHolder() {
 
 TError TContainerHolder::CreateRoot() {
     TError error = RegisterProperties();
+    if (error)
+        return error;
+
+    error = RegisterData();
     if (error)
         return error;
 

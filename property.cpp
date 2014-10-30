@@ -1,5 +1,3 @@
-#include <map>
-
 #include "subsystem.hpp"
 #include "property.hpp"
 #include "cgroup.hpp"
@@ -8,8 +6,6 @@
 #include "util/string.hpp"
 #include "util/unix.hpp"
 #include "util/pwd.hpp"
-
-TValueSpec propertySpec;
 
 bool TPropertyHolder::ParentDefault(std::shared_ptr<TContainer> &c,
                                     const std::string &property) {
@@ -827,6 +823,7 @@ public:
                                    RAW_PROPERTY | HIDDEN_PROPERTY) {}
 };
 
+TValueSpec propertySpec;
 TError RegisterProperties() {
     std::vector<TValueDef *> properties = {
         new TCommandProperty,
@@ -864,13 +861,7 @@ TError RegisterProperties() {
         new TRootPidProperty,
     };
 
-    for (auto &p : properties) {
-        TError error = propertySpec.Register(p);
-        if (error)
-            return error;
-    }
-
-    return TError::Success();
+    return propertySpec.Register(properties);
 }
 
 TError ParseRlimit(const std::string &s, std::map<int,struct rlimit> &rlim) {

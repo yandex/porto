@@ -4,11 +4,13 @@
 #include <string>
 #include <map>
 #include <memory>
+#include <set>
 
 #include "error.hpp"
 #include "porto.hpp"
 
 class TContainer;
+enum class EContainerState;
 
 enum class EValueType {
     String,
@@ -26,6 +28,9 @@ enum class EValueType {
 #endif
 };
 
+// Don't return default value, call get handler
+const unsigned int NODEF_VALUE = (1 << 31);
+
 class TValueState;
 
 class TValueDef {
@@ -35,22 +40,29 @@ public:
     TValueDef(const std::string &name,
               const EValueType type,
               const std::string &desc,
-              int flags = 0) : Name(name), Type(type), Desc(desc), Flags(flags) {}
+              const int flags = 0,
+              const std::set<EContainerState> &state = {}) :
+        Name(name), Type(type), Desc(desc), Flags(flags), State(state) {}
 
     const std::string Name;
     const EValueType Type;
     const std::string Desc;
     const int Flags;
+    const std::set<EContainerState> State;
 
     virtual std::string GetDefaultString(std::shared_ptr<TContainer> c);
     virtual TError SetString(std::shared_ptr<TContainer> c,
                              std::shared_ptr<TValueState> s,
                              const std::string &value);
+    virtual std::string GetString(std::shared_ptr<TContainer> c,
+                                  std::shared_ptr<TValueState> s);
 
     virtual bool GetDefaultBool(std::shared_ptr<TContainer> c);
     virtual TError SetBool(std::shared_ptr<TContainer> c,
                            std::shared_ptr<TValueState> s,
                            const bool value);
+    virtual bool GetBool(std::shared_ptr<TContainer> c,
+                         std::shared_ptr<TValueState> s);
 
 #if 0
     virtual std::map<std::string, std::string>
@@ -68,16 +80,20 @@ public:
                                const std::vector<std::string> &value);
 #endif
 
-    virtual std::string GetDefault(std::shared_ptr<TContainer> c);
-    virtual TError Set(std::shared_ptr<TContainer> c,
-                       std::shared_ptr<TValueState> s,
-                       const std::string &value);
+    std::string GetDefault(std::shared_ptr<TContainer> c);
+    TError Set(std::shared_ptr<TContainer> c,
+               std::shared_ptr<TValueState> s,
+               const std::string &value);
+    TError Get(std::shared_ptr<TContainer> c,
+               std::shared_ptr<TValueState> s,
+               const std::string &value);
 };
 
 class TValueSpec {
     std::map<std::string, TValueDef *> Spec;
 public:
     TError Register(TValueDef *p);
+    TError Register(const std::vector<TValueDef *> &v);
     bool Valid(const std::string &name);
     TValueDef *Get(const std::string &name);
     std::vector<std::string> GetNames();
@@ -96,6 +112,7 @@ class TValueState : public std::enable_shared_from_this<TValueState> {
 //    std::vector<std::string> ListVal;
 
     bool Initialized = false;
+    bool ReturnDefault();
 
 public:
     TValueState(std::shared_ptr<TContainer> c, TValueDef *p);
