@@ -11,21 +11,22 @@
 class TContainer;
 
 enum class EValueType {
-    // any string
     String,
+    Bool,
+
+#if 0
     // key: val; key: val
     Map,
     // key; key; key
     List,
 
-#if 0
     // TODO: ?string encoded int
     Int,
     UInt,
-    // TODO: ?bool
-    Bool
 #endif
 };
+
+class TValueState;
 
 class TValueDef {
     NO_COPY_CONSTRUCT(TValueDef);
@@ -42,37 +43,81 @@ public:
     const int Flags;
 
     virtual std::string GetDefaultString(std::shared_ptr<TContainer> c);
-    virtual TError IsValidString(std::shared_ptr<TContainer> c,
-                                 const std::string &value);
+    virtual TError SetString(std::shared_ptr<TContainer> c,
+                             std::shared_ptr<TValueState> s,
+                             const std::string &value);
 
+    virtual bool GetDefaultBool(std::shared_ptr<TContainer> c);
+    virtual TError SetBool(std::shared_ptr<TContainer> c,
+                           std::shared_ptr<TValueState> s,
+                           const bool value);
+
+#if 0
     virtual std::map<std::string, std::string>
-        GetDefaultMap(std::shared_ptr<TContainer> c);
-    virtual TError IsValidMap(std::shared_ptr<TContainer> c,
+        GetDefaultMap(std::shared_ptr<TContainer> c,
+                      std::shared_ptr<TValueState> s);
+    virtual TError SetMap(std::shared_ptr<TContainer> c,
+                              std::shared_ptr<TValueState> s,
                               const std::map<std::string, std::string> &value);
 
     virtual std::vector<std::string>
-        GetDefaultList(std::shared_ptr<TContainer> c);
-    virtual TError IsValidList(std::shared_ptr<TContainer> c,
+        GetDefaultList(std::shared_ptr<TContainer> c,
+                       std::shared_ptr<TValueState> s);
+    virtual TError SetList(std::shared_ptr<TContainer> c,
+                               std::shared_ptr<TValueState> s,
                                const std::vector<std::string> &value);
-
+#endif
 
     virtual std::string GetDefault(std::shared_ptr<TContainer> c);
-    virtual TError IsValid(std::shared_ptr<TContainer> c,
-                           const std::string &value);
+    virtual TError Set(std::shared_ptr<TContainer> c,
+                       std::shared_ptr<TValueState> s,
+                       const std::string &value);
 };
 
-class TValueState {
+/*
+class TValueSpec {
+        TError RegisterProperty(TValueDef *p);
+};
+*/
+
+class TValueState : public std::enable_shared_from_this<TValueState> {
     NO_COPY_CONSTRUCT(TValueState);
 
+    friend TValueDef;
+
     TValueDef *Property;
-    std::string StringVal;
-    std::map<std::string, std::string> MapVal;
-    std::vector<std::string> ListVal;
-//    bool BoolVal;
+    std::weak_ptr<TContainer> Container;
+    std::string StringVal = "";
+    bool BoolVal = false;
+//    std::map<std::string, std::string> MapVal;
+//    std::vector<std::string> ListVal;
+
+    bool Initialized = false;
 
 public:
-    TValueState(TValueDef *p, const std::string &v) : Property(p), StringVal(v) {}
-    std::string Get();
+    TValueState(std::shared_ptr<TContainer> c, TValueDef *p);
+    bool IsDefault();
+    std::string GetStr();
+    TError SetStr(const std::string &v);
+    void SetRawStr(const std::string &v);
+    bool GetBool();
+
+
+    // TODO: add Get/Set which converts everything to string
+};
+
+class TValueHolder {
+    NO_COPY_CONSTRUCT(TValueHolder);
+    std::weak_ptr<TContainer> Container;
+
+public:
+    std::map<std::string, std::shared_ptr<TValueState>> State;
+
+    // TODO: pass propSpec as argument
+    TValueHolder(std::weak_ptr<TContainer> c) : Container(c) {}
+    // TODO: use method and return error
+    std::shared_ptr<TValueState> operator[](const std::string &property);
+    bool IsDefault(const std::string &property);
 };
 
 #endif

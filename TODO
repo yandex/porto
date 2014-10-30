@@ -1,3 +1,4 @@
+- mount root in container so precise works
 - test restarting (check version)
 - shaping with macvlan or non-default interface?
 - ? portoctl cp

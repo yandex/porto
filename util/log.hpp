@@ -9,7 +9,7 @@
 #define PORTO_ASSERT(expr) \
     do { \
         if (!(expr)) { \
-            TLogger::Log() << "Assertion failed: " << # expr << std::endl; \
+            TLogger::Log() << "Assertion failed: " << # expr << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
             abort(); \
         } \
     } while (0)

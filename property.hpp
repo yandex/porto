@@ -24,23 +24,26 @@ const unsigned int SUPERUSER_PROPERTY = (1 << 2);
 const unsigned int PARENT_DEF_PROPERTY = (1 << 3);
 // When child container is shared with parent these properties can't be changed
 const unsigned int PARENT_RO_PROPERTY = (1 << 4);
+// Raw property used only for recovery
+// TODO: add checks! cant set/list via api
+const unsigned int RAW_PROPERTY = (1 << 5);
 
 extern std::map<std::string, TValueDef *> propSpec;
 
 class TPropertyHolder {
     NO_COPY_CONSTRUCT(TPropertyHolder);
     TKeyValueStorage Storage;
-    std::map<std::string, std::shared_ptr<TValueState>> State;
     std::weak_ptr<TContainer> Container;
     const std::string Name;
+    TValueHolder Holder;
 
     bool IsRoot();
     TError SyncStorage();
     TError AppendStorage(const std::string& key, const std::string& value);
-    TError GetSharedContainer(std::shared_ptr<TContainer> *c);
+    TError GetSharedContainer(std::shared_ptr<TContainer> &c);
 
 public:
-    TPropertyHolder(std::shared_ptr<TContainer> c) : Container(c), Name(c->GetName()) {}
+    TPropertyHolder(std::shared_ptr<TContainer> c) : Container(c), Name(c->GetName()), Holder(c) {}
     ~TPropertyHolder();
 
     bool IsDefault(const std::string &property);
@@ -49,6 +52,10 @@ public:
     int GetInt(const std::string &property);
     uint64_t GetUint(const std::string &property);
     TError GetRaw(const std::string &property, std::string &value);
+    TError GetRawBool(const std::string &property, bool &value);
+
+    bool ParentDefault(std::shared_ptr<TContainer> &c,
+                       const std::string &property);
     std::string GetDefault(const std::string &property);
 
     void SetRaw(const std::string &property, const std::string &value);
