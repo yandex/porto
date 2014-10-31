@@ -19,37 +19,11 @@ bool TPropertyHolder::ParentDefault(std::shared_ptr<TContainer> &c,
 }
 
 bool TPropertyHolder::IsDefault(const std::string &property) {
-    return Holder.IsDefault(property);
-}
-
-std::string TPropertyHolder::Get(const std::string &property) {
-    if (Holder.IsDefault(property)) {
-        std::shared_ptr<TContainer> c;
-        if (ParentDefault(c, property))
-            return c->GetParent()->Prop->Get(property);
-    }
-
-    std::shared_ptr<TValueState> s;
-    TError error = Holder.Get(property, s);
-    TLogger::LogError(error, "Can't get property " + property);
-    return s->Get();
-}
-
-bool TPropertyHolder::GetBool(const std::string &property) {
-    if (Holder.IsDefault(property)) {
-        std::shared_ptr<TContainer> c;
-        if (ParentDefault(c, property))
-            return c->GetParent()->Prop->GetBool(property);
-    }
-
-    std::shared_ptr<TValueState> s;
-    TError error = Holder.Get(property, s);
-    TLogger::LogError(error, "Can't get property " + property);
-    return s->GetBool();
+    return VariantSet.IsDefault(property);
 }
 
 int TPropertyHolder::GetInt(const std::string &property) {
-    if (Holder.IsDefault(property)) {
+    if (VariantSet.IsDefault(property)) {
         std::shared_ptr<TContainer> c;
         if (ParentDefault(c, property))
             return c->GetParent()->Prop->GetInt(property);
@@ -57,14 +31,14 @@ int TPropertyHolder::GetInt(const std::string &property) {
 
     int val;
 
-    if (StringToInt(Get(property), val))
+    if (StringToInt(GetString(property), val))
         return 0;
 
     return val;
 }
 
 uint64_t TPropertyHolder::GetUint(const std::string &property) {
-    if (Holder.IsDefault(property)) {
+    if (VariantSet.IsDefault(property)) {
         std::shared_ptr<TContainer> c;
         if (ParentDefault(c, property))
             return c->GetParent()->Prop->GetUint(property);
@@ -72,49 +46,49 @@ uint64_t TPropertyHolder::GetUint(const std::string &property) {
 
     uint64_t val;
 
-    if (StringToUint64(Get(property), val))
+    if (StringToUint64(GetString(property), val))
         return 0;
 
     return val;
 }
 
 TError TPropertyHolder::GetRaw(const std::string &property, std::string &value) {
-    std::shared_ptr<TValueState> s;
-    TError error = Holder.Get(property, s);
-    if (error)
-        return error;
-    value = s->Get();
-    return TError::Success();
+    return VariantSet.GetString(property, value);
 }
 
 // TODO: return TError
-void TPropertyHolder::SetRaw(const std::string &property,
-                             const std::string &value) {
-    std::shared_ptr<TValueState> s;
-    TError error = Holder.Get(property, s);
-    if (error)
-        TLogger::LogError(error, "Can't set raw property " + property);
+TError TPropertyHolder::SetRaw(const std::string &property,
+                               const std::string &value) {
 
-    s->SetRaw(value);
+    TValue *p = nullptr;
+    std::shared_ptr<TContainer> c;
+    std::shared_ptr<TVariant> v;
+    TError error = VariantSet.Get(property, c, &p, v);
+    TLogger::LogError(error, "Can't set raw property " + property);
+    if (error)
+        return error;
+
+    error = v->Set<std::string>(EValueType::String, value);
+    TLogger::LogError(error, "Can't set raw property " + property);
+    if (error)
+        return error;
+
     error = AppendStorage(property, value);
     if (error)
-        TLogger::LogError(error, "Can't append property to key-value store");
+        return error;
+
+    return error;
 }
 
 TError TPropertyHolder::Set(const std::string &property,
                             const std::string &value) {
-    if (!propertySpec.Valid(property)) {
+    if (!propertySet.Valid(property)) {
         TError error(EError::InvalidValue, "property not found");
         TLogger::LogError(error, "Can't set property");
         return error;
     }
 
-    std::shared_ptr<TValueState> s;
-    TError error = Holder.Get(property, s);
-    if (error)
-        return error;
-
-    error = s->Set(value);
+    TError error = VariantSet.SetString(property, value);
     if (error)
         return error;
 
@@ -127,16 +101,16 @@ TError TPropertyHolder::Set(const std::string &property,
 
 bool TPropertyHolder::HasFlags(const std::string &property, int flags) {
     // TODO: Log error
-    if (!propertySpec.Valid(property))
+    if (!propertySet.Valid(property))
         return false;
 
-    return propertySpec.Get(property)->Flags & flags;
+    return propertySet.Get(property)->Flags & flags;
 }
 bool TPropertyHolder::HasState(const std::string &property, EContainerState state) {
     // TODO: Log error
-    if (!propertySpec.Valid(property))
+    if (!propertySet.Valid(property))
         return false;
-    auto p = propertySpec.Get(property);
+    auto p = propertySet.Get(property);
 
     return p->State.find(state) != p->State.end();
 }
@@ -162,7 +136,7 @@ TError TPropertyHolder::Restore(const kv::TNode &node) {
 }
 
 TError TPropertyHolder::PropertyExists(const std::string &property) {
-    if (!propertySpec.Valid(property))
+    if (!propertySet.Valid(property))
         return TError(EError::InvalidProperty, "invalid property");
     return TError::Success();
 }
@@ -180,10 +154,10 @@ TError TPropertyHolder::SyncStorage() {
 
     kv::TNode node;
 
-    for (auto &kv : Holder.State) {
+    for (auto &kv : VariantSet.Variant) {
         auto pair = node.add_pairs();
         pair->set_key(kv.first);
-        pair->set_val(kv.second->Get());
+        pair->set_val(kv.second->Get<std::string>(EValueType::String));
     }
 
     return Storage.SaveNode(Name, node);
@@ -293,10 +267,13 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
         TUser u(value);
-        return u.Load();
+        TError error = u.Load();
+        if (error)
+            return error;
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -319,10 +296,13 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
         TGroup g(value);
-        return g.Load();
+        TError error = g.Load();
+        if (error)
+            return error;
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -348,9 +328,12 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
-        return ValidPath(c, value);
+        TError error = ValidPath(c, value);
+        if (error)
+            return error;
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -370,9 +353,12 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
-        return ValidPath(c, value);
+        TError error = ValidPath(c, value);
+        if (error)
+            return error;
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -389,9 +375,12 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
-        return ExistingFile(c, value);
+        TError error = ExistingFile(c, value);
+        if (error)
+            return error;
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -408,9 +397,12 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
-        return ValidPath(c, value);
+        TError error = ValidPath(c, value);
+        if (error)
+            return error;
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -427,9 +419,12 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
-        return ValidPath(c, value);
+        TError error = ValidPath(c, value);
+        if (error)
+            return error;
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -446,7 +441,7 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
         uint32_t num;
         uint32_t max = config().container().stdout_limit();
@@ -460,7 +455,7 @@ public:
                           "Maximum number of bytes: " +
                           std::to_string(max));
 
-        return TError::Success();
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -477,7 +472,7 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
         uint64_t num;
 
@@ -495,7 +490,7 @@ public:
         if (total + config().daemon().memory_guarantee_reserve() > GetTotalMemory())
             return TError(EError::ResourceNotAvailable, "can't guarantee all available memory");
 
-        return TError::Success();
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -512,7 +507,7 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
         uint64_t num;
 
@@ -522,7 +517,7 @@ public:
         if (!c->ValidHierarchicalProperty("memory_limit", value))
             return TError(EError::InvalidValue, "invalid hierarchical value");
 
-        return TError::Success();
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -539,13 +534,13 @@ public:
     }
 
     TError SetBool(std::shared_ptr<TContainer> c,
-                   std::shared_ptr<TValueState> s,
+                   std::shared_ptr<TVariant> v,
                    const bool value) {
         auto memroot = memorySubsystem->GetRootCgroup();
         if (!memroot->HasKnob("memory.recharge_on_pgfault"))
             return TError(EError::NotSupported, "invalid kernel");
 
-        return TError::Success();
+        return v->Set(EValueType::Bool, value);
     }
 };
 
@@ -562,7 +557,7 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
         if (value != "normal" && value != "rt" && value != "idle")
             return TError(EError::InvalidValue, "invalid policy");
@@ -576,7 +571,7 @@ public:
         if (value == "idle")
             return TError(EError::NotSupported, "not implemented");
 
-        return TError::Success();
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -593,7 +588,7 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
         int num;
 
@@ -603,7 +598,7 @@ public:
         if (num < 0 || num > 99)
             return TError(EError::InvalidValue, "invalid value");
 
-        return TError::Success();
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -620,9 +615,12 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
-        return ValidUint(c, value);
+        TError error = ValidUint(c, value);
+        if (error)
+            return error;
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -639,9 +637,12 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
-        return ValidUint(c, value);
+        TError error = ValidUint(c, value);
+        if (error)
+            return error;
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -658,7 +659,7 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
         int num;
 
@@ -668,7 +669,7 @@ public:
         if (num < 0 || num > 7)
             return TError(EError::InvalidValue, "invalid value");
 
-        return TError::Success();
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -698,9 +699,12 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
-        return ValidUint(c, value);
+        TError error = ValidUint(c, value);
+        if (error)
+            return error;
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -730,14 +734,14 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
         uint32_t max = config().container().private_max();
 
         if (value.length() > max)
             return TError(EError::InvalidValue, "Value is too long");
 
-        return TError::Success();
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -754,10 +758,13 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
         std::map<int, struct rlimit> rlim;
-        return ParseRlimit(value, rlim);
+        TError error = ParseRlimit(value, rlim);
+        if (error)
+            return error;
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -799,10 +806,13 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
         std::vector<TBindMap> dirs;
-        return ParseBind(value, dirs);
+        TError error = ParseBind(value, dirs);
+        if (error)
+            return error;
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -819,10 +829,13 @@ public:
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TValueState> s,
+                     std::shared_ptr<TVariant> v,
                      const std::string &value) {
         TNetCfg net;
-        return ParseNet(c, value, net);
+        TError error = ParseNet(c, value, net);
+        if (error)
+            return error;
+        return v->Set(EValueType::String, value);
     }
 };
 
@@ -859,9 +872,9 @@ public:
     TRootPidProperty() : TStringValue("root_pid", "", HIDDEN_VALUE, {}) {}
 };
 
-TValueSpec propertySpec;
+TValueSet propertySet;
 TError RegisterProperties() {
-    std::vector<TValueDef *> properties = {
+    std::vector<TValue *> properties = {
         new TCommandProperty,
         new TUserProperty,
         new TGroupProperty,
@@ -897,7 +910,7 @@ TError RegisterProperties() {
         new TRootPidProperty,
     };
 
-    return propertySpec.Register(properties);
+    return propertySet.Register(properties);
 }
 
 TError ParseRlimit(const std::string &s, std::map<int,struct rlimit> &rlim) {

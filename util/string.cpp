@@ -34,7 +34,7 @@ TError StringsToIntegers(const std::vector<std::string> &strings,
         try {
             integers.push_back(stoi(l));
         } catch (...) {
-            return TError(EError::Unknown, string(__func__) + ": Bad integer value");
+            return TError(EError::Unknown, string(__func__) + ": Bad integer value " + l);
         }
     }
 
@@ -45,7 +45,7 @@ TError StringToUint32(const std::string &str, uint32_t &value) {
     try {
         value = stoul(str);
     } catch (...) {
-        return TError(EError::Unknown, string(__func__) + ": Bad integer value");
+        return TError(EError::Unknown, string(__func__) + ": Bad integer value " + str);
     }
 
     return TError::Success();
@@ -55,7 +55,7 @@ TError StringToUint64(const std::string &str, uint64_t &value) {
     try {
         value = stoull(str);
     } catch (...) {
-        return TError(EError::Unknown, string(__func__) + ": Bad integer value");
+        return TError(EError::Unknown, string(__func__) + ": Bad integer value " + str);
     }
 
     return TError::Success();
@@ -65,7 +65,7 @@ TError StringToInt64(const std::string &str, int64_t &value) {
     try {
         value = stoll(str);
     } catch (...) {
-        return TError(EError::Unknown, string(__func__) + ": Bad integer value");
+        return TError(EError::Unknown, string(__func__) + ": Bad integer value " + str);
     }
 
     return TError::Success();
@@ -75,7 +75,7 @@ TError StringToInt(const std::string &str, int &value) {
     try {
         value = stoi(str);
     } catch (...) {
-        return TError(EError::Unknown, string(__func__) + ": Bad integer value");
+        return TError(EError::Unknown, string(__func__) + ": Bad integer value " + str);
     }
 
     return TError::Success();
@@ -101,7 +101,7 @@ TError StringWithUnitToUint64(const std::string &str, uint64_t &value) {
             }
         }
     } catch (...) {
-        return TError(EError::Unknown, string(__func__) + ": Bad integer value");
+        return TError(EError::Unknown, string(__func__) + ": Bad integer value " + str);
     }
 
     return TError::Success();

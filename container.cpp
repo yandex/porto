@@ -105,11 +105,7 @@ bool TContainer::HaveRunningChildren() {
 }
 
 TError TContainer::SetOomKilled(bool v) {
-    std::shared_ptr<TValueState> oomKilled;
-    TError error = Data->Get(D_OOM_KILLED, oomKilled);
-    if (error)
-        return error;
-    return oomKilled->SetBool(v);
+    return Data->SetBool(D_OOM_KILLED, v);
 }
 
 EContainerState TContainer::GetState() {
@@ -283,14 +279,14 @@ TError TContainer::ApplyDynamicProperties() {
 
     auto memroot = memorySubsystem->GetRootCgroup();
     if (memroot->HasKnob("memory.low_limit_in_bytes") && Prop->GetUint("memory_guarantee") != 0) {
-        TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", Prop->Get("memory_guarantee"), false);
+        TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", Prop->GetString("memory_guarantee"), false);
         TLogger::LogError(error, "Can't set memory_guarantee");
         if (error)
             return error;
     }
 
     if (Prop->GetUint("memory_limit") != 0) {
-        error = memcg->SetKnobValue("memory.limit_in_bytes", Prop->Get("memory_limit"), false);
+        error = memcg->SetKnobValue("memory.limit_in_bytes", Prop->GetString("memory_limit"), false);
         TLogger::LogError(error, "Can't set memory_limit");
         if (error)
             return error;
@@ -305,7 +301,7 @@ TError TContainer::ApplyDynamicProperties() {
     }
 
     auto cpucg = GetLeafCgroup(cpuSubsystem);
-    if (Prop->Get("cpu_policy") == "normal") {
+    if (Prop->GetString("cpu_policy") == "normal") {
         int cpuPrio = Prop->GetUint("cpu_priority");
         error = cpucg->SetKnobValue("cpu.shares", std::to_string(cpuPrio + 2), false);
         TLogger::LogError(error, "Can't set cpu_priority");
@@ -425,7 +421,7 @@ TError TContainer::PrepareCgroups() {
     auto cpuroot = cpuSubsystem->GetRootCgroup();
     if (cpuroot->HasKnob("cpu.smart")) {
         TError error;
-        if (Prop->Get("cpu_policy") == "rt") {
+        if (Prop->GetString("cpu_policy") == "rt") {
             error = cpucg->SetKnobValue("cpu.smart", "1", false);
             TLogger::LogError(error, "Can't enable smart");
             if (error)
@@ -455,7 +451,7 @@ TError TContainer::PrepareCgroups() {
 
     auto devices = GetLeafCgroup(devicesSubsystem);
     error = devicesSubsystem->AllowDevices(devices,
-                                           Prop->Get("allowed_devices"));
+                                           Prop->GetString("allowed_devices"));
     if (error) {
         TLogger::LogError(error, "Can't set allowed_devices");
         return error;
@@ -467,30 +463,30 @@ TError TContainer::PrepareCgroups() {
 TError TContainer::PrepareTask() {
     auto taskEnv = std::make_shared<TTaskEnv>();
 
-    taskEnv->Command = Prop->Get("command");
-    taskEnv->Cwd = Prop->Get("cwd");
-    taskEnv->Root = Prop->Get("root");
+    taskEnv->Command = Prop->GetString("command");
+    taskEnv->Cwd = Prop->GetString("cwd");
+    taskEnv->Root = Prop->GetString("root");
     taskEnv->CreateCwd = Prop->IsDefault("root") && Prop->IsDefault("cwd") && !UseParentNamespace();
-    taskEnv->User = Prop->Get("user");
-    taskEnv->Group = Prop->Get("group");
-    taskEnv->Environ = Prop->Get("env") + ";container=lxc;PORTO_NAME=" + GetName();
+    taskEnv->User = Prop->GetString("user");
+    taskEnv->Group = Prop->GetString("group");
+    taskEnv->Environ = Prop->GetString("env") + ";container=lxc;PORTO_NAME=" + GetName();
     taskEnv->Isolate = Prop->GetBool("isolate");
-    taskEnv->StdinPath = Prop->Get("stdin_path");
-    taskEnv->StdoutPath = Prop->Get("stdout_path");
-    taskEnv->StderrPath = Prop->Get("stderr_path");
-    taskEnv->Hostname = Prop->Get("hostname");
+    taskEnv->StdinPath = Prop->GetString("stdin_path");
+    taskEnv->StdoutPath = Prop->GetString("stdout_path");
+    taskEnv->StderrPath = Prop->GetString("stderr_path");
+    taskEnv->Hostname = Prop->GetString("hostname");
     taskEnv->BindDns = Prop->GetBool("bind_dns");
 
-    TError error = ParseRlimit(Prop->Get("ulimit"), taskEnv->Rlimit);
+    TError error = ParseRlimit(Prop->GetString("ulimit"), taskEnv->Rlimit);
     if (error)
         return error;
 
-    error = ParseBind(Prop->Get("bind"), taskEnv->BindMap);
+    error = ParseBind(Prop->GetString("bind"), taskEnv->BindMap);
     if (error)
         return error;
 
     if (config().network().enabled()) {
-        error = ParseNet(shared_from_this(), Prop->Get("net"), taskEnv->NetCfg);
+        error = ParseNet(shared_from_this(), Prop->GetString("net"), taskEnv->NetCfg);
         if (error)
             return error;
     }
@@ -523,7 +519,7 @@ TError TContainer::Create(int uid, int gid) {
     Gid = gid;
 
     Prop = std::make_shared<TPropertyHolder>(shared_from_this());
-    Data = std::make_shared<TValueHolder>(&dataSpec, shared_from_this());
+    Data = std::make_shared<TVariantSet>(&dataSet, shared_from_this());
 
     TError error = Prop->Create();
     if (error)
@@ -633,7 +629,7 @@ TError TContainer::Start() {
         return TError(EError::InvalidState, "invalid container state " +
                       ContainerStateName(state));
 
-    if (!IsRoot() && !Prop->Get("command").length()) {
+    if (!IsRoot() && !Prop->GetString("command").length()) {
         FreeResources();
         return TError(EError::InvalidValue, "container command is empty");
     }
@@ -848,19 +844,14 @@ TError TContainer::Kill(int sig) {
 
 TError TContainer::GetData(const string &name, string &value) {
     // TODO: InvalidData
-    if (!dataSpec.Valid(name))
+    if (!dataSet.Valid(name))
         return TError(EError::InvalidValue, "invalid container data");
 
-    auto d = dataSpec.Get(name);
+    auto d = dataSet.Get(name);
     if (d->State.find(GetState()) == d->State.end())
         return TError(EError::InvalidState, "invalid container state");
 
-    std::shared_ptr<TValueState> s;
-    TError error = Data->Get(name, s);
-    if (error)
-        return error;
-    value = s->Get();
-    return TError::Success();
+    return Data->GetString(name, value);
 }
 
 void TContainer::PropertyToAlias(const string &property, string &value) const {
@@ -928,7 +919,7 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
     if (error)
         return error;
 
-    value = Prop->Get(property);
+    value = Prop->GetString(property);
     PropertyToAlias(origProperty, value);
 
     return TError::Success();
@@ -961,7 +952,7 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
         return error;
 
     if (Prop->HasFlags(property, SUPERUSER_PROPERTY) && !superuser)
-        if (Prop->Get(property) != value)
+        if (Prop->GetString(property) != value)
             return TError(EError::Permission, "Only root can change this property");
 
     if (!Prop->HasState(property, GetState()))
@@ -971,7 +962,7 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
     if (UseParentNamespace() && Prop->HasFlags(property, PARENT_RO_PROPERTY))
         return TError(EError::NotSupported, "Can't set " + property + " for child container");
 
-    error = Prop->Set(property, value);
+    error = Prop->SetString(property, value);
     if (error) {
         TLogger::LogError(error, "Can't set property");
         return error;
@@ -987,7 +978,7 @@ TError TContainer::Restore(const kv::TNode &node) {
     TLogger::Log() << "Restore " << GetName() << " " << Id << std::endl;
 
     Prop = std::make_shared<TPropertyHolder>(shared_from_this());
-    Data = std::make_shared<TValueHolder>(&dataSpec, shared_from_this());
+    Data = std::make_shared<TVariantSet>(&dataSet, shared_from_this());
 
     TError error = Prop->Restore(node);
     if (error) {

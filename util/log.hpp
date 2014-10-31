@@ -5,13 +5,20 @@
 #include <string>
 
 #include "error.hpp"
+#include "util/crash.hpp"
 
-#define PORTO_ASSERT(expr) \
+#define PORTO_ASSERT(EXPR) \
     do { \
-        if (!(expr)) { \
-            TLogger::Log() << "Assertion failed: " << # expr << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
-            abort(); \
+        if (!(EXPR)) { \
+            TLogger::Log() << "Assertion failed: " << # EXPR << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+            Crash(); \
         } \
+    } while (0)
+
+#define PORTO_RUNTIME_ERROR(MSG) \
+    do { \
+        TLogger::Log() << "Runtime error: " << (MSG) << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+        Crash(); \
     } while (0)
 
 class TLogger {

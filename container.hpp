@@ -21,7 +21,7 @@ struct TData;
 class TContainer;
 class TSubsystem;
 class TPropertyHolder;
-class TValueHolder;
+class TVariantSet;
 enum class ETclassStat;
 
 extern int64_t BootTime;
@@ -116,7 +116,7 @@ public:
     // TODO: make private
     std::unique_ptr<TTask> Task;
     std::shared_ptr<TPropertyHolder> Prop;
-    std::shared_ptr<TValueHolder> Data;
+    std::shared_ptr<TVariantSet> Data;
 
     TError SetOomKilled(bool v);
 

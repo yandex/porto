@@ -57,7 +57,7 @@ public:
                                 anyState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TValueState> s) {
+                          std::shared_ptr<TVariant> v) {
         return ContainerStateName(c->GetState());    }
 };
 
@@ -77,7 +77,7 @@ public:
                                  anyState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TValueState> s) {
+                          std::shared_ptr<TVariant> v) {
         return c->GetParent() ? c->GetParent()->GetName() : "";
     }
 };
@@ -90,7 +90,7 @@ public:
                                        rdState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TValueState> s) {
+                          std::shared_ptr<TVariant> v) {
         return std::to_string(c->GetRespawnCount());
     }
 };
@@ -103,7 +103,7 @@ public:
                                   rpState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TValueState> s) {
+                          std::shared_ptr<TVariant> v) {
         if (c->Task)
             return std::to_string(c->Task->GetPid());
         else
@@ -119,7 +119,7 @@ public:
                                      dState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TValueState> s) {
+                          std::shared_ptr<TVariant> v) {
         if (c->Task && !c->Task->IsRunning())
             return std::to_string(c->Task->GetExitStatus());
         else
@@ -135,7 +135,7 @@ public:
                                      sState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TValueState> s) {
+                          std::shared_ptr<TVariant> v) {
         return std::to_string(c->GetTaskStartErrno());
     }
 };
@@ -148,7 +148,7 @@ public:
                                  rpdState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TValueState> s) {
+                          std::shared_ptr<TVariant> v) {
         if (c->Task)
             return c->Task->GetStdout(c->Prop->GetUint("stdout_limit"));
         return "";
@@ -163,7 +163,7 @@ public:
                                  rpdState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TValueState> s) {
+                          std::shared_ptr<TVariant> v) {
         if (c->Task)
             return c->Task->GetStderr(c->Prop->GetUint("stdout_limit"));
         return "";
@@ -178,7 +178,7 @@ public:
                                    rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TValueState> s) {
+                          std::shared_ptr<TVariant> v) {
         auto subsys = cpuacctSubsystem;
         auto cg = c->GetLeafCgroup(subsys);
         if (!cg) {
@@ -205,7 +205,7 @@ public:
                                    rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TValueState> s) {
+                          std::shared_ptr<TVariant> v) {
         auto subsys = memorySubsystem;
         auto cg = c->GetLeafCgroup(subsys);
         if (!cg) {
@@ -232,7 +232,7 @@ public:
                                    rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TValueState> s) {
+                          std::shared_ptr<TVariant> v) {
         uint64_t val;
         TError error = c->GetStat(ETclassStat::Bytes, val);
         if (error) {
@@ -252,7 +252,7 @@ public:
                                      rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TValueState> s) {
+                          std::shared_ptr<TVariant> v) {
         uint64_t val;
         TError error = c->GetStat(ETclassStat::Packets, val);
         if (error) {
@@ -272,7 +272,7 @@ public:
                                    rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TValueState> s) {
+                          std::shared_ptr<TVariant> v) {
         uint64_t val;
         TError error = c->GetStat(ETclassStat::Drops, val);
         if (error) {
@@ -292,7 +292,7 @@ public:
                                         rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TValueState> s) {
+                          std::shared_ptr<TVariant> v) {
         uint64_t val;
         TError error = c->GetStat(ETclassStat::Overlimits, val);
         if (error) {
@@ -312,7 +312,7 @@ public:
                                       rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TValueState> s) {
+                          std::shared_ptr<TVariant> v) {
         uint64_t val;
         auto cg = c->GetLeafCgroup(memorySubsystem);
         TError error = memorySubsystem->Statistics(cg, "total_pgfault", val);
@@ -331,7 +331,7 @@ public:
                                       rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TValueState> s) {
+                          std::shared_ptr<TVariant> v) {
         uint64_t val;
         auto cg = c->GetLeafCgroup(memorySubsystem);
         TError error = memorySubsystem->Statistics(cg, "total_pgmajfault", val);
@@ -350,7 +350,7 @@ public:
                                  rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TValueState> s) {
+                          std::shared_ptr<TVariant> v) {
         auto cg = c->GetLeafCgroup(blkioSubsystem);
 
         std::vector<BlkioStat> stat;
@@ -377,7 +377,7 @@ public:
                                   rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TValueState> s) {
+                          std::shared_ptr<TVariant> v) {
         auto cg = c->GetLeafCgroup(blkioSubsystem);
 
         std::vector<BlkioStat> stat;
@@ -404,7 +404,7 @@ public:
                                rpdState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TValueState> s) {
+                          std::shared_ptr<TVariant> v) {
         if (!c->Task || !c->Task->IsRunning())
             return "0";
 
@@ -432,9 +432,9 @@ public:
     }
 };
 
-TValueSpec dataSpec;
+TValueSet dataSet;
 TError RegisterData() {
-    std::vector<TValueDef *> dat = {
+    std::vector<TValue *> dat = {
         new TStateData,
         new TOomKilledData,
         new TParentData,
@@ -456,5 +456,5 @@ TError RegisterData() {
         new TIoWriteData,
     };
 
-    return dataSpec.Register(dat);
+    return dataSet.Register(dat);
 }

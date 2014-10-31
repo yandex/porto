@@ -159,8 +159,8 @@ static TError ListProperty(TContainerHolder &cholder,
                            rpc::TContainerResponse &rsp) {
     auto list = rsp.mutable_propertylist();
 
-    for (auto property : propertySpec.GetNames()) {
-        auto p = propertySpec.Get(property);
+    for (auto property : propertySet.GetNames()) {
+        auto p = propertySet.Get(property);
         if (p->Flags & HIDDEN_VALUE)
             continue;
 
@@ -177,8 +177,8 @@ static TError ListData(TContainerHolder &cholder,
                        rpc::TContainerResponse &rsp) {
     auto list = rsp.mutable_datalist();
 
-    for (auto data : dataSpec.GetNames()) {
-        auto d = dataSpec.Get(data);
+    for (auto data : dataSet.GetNames()) {
+        auto d = dataSet.Get(data);
         if (d->Flags & HIDDEN_VALUE)
             continue;
 

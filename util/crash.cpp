@@ -13,8 +13,7 @@ extern "C" {
 #include <stdlib.h>
 }
 
-void PrintTrace (void)
-{
+static void PrintTrace() {
     void *array[20];
     size_t size;
     char **strings;
@@ -30,16 +29,14 @@ void PrintTrace (void)
     free (strings);
 }
 
-void Crash()
-{
+void Crash() {
     TLogger::Log() << "Crashed" << std::endl;
     PrintTrace();
     exit(-1);
 }
 
 /*
-static void SigsegvHandler(int sig, siginfo_t *si, void *unused)
-{
+static void SigsegvHandler(int sig, siginfo_t *si, void *unused) {
     TLogger::Log() << "SIGSEGV at %p" << si->si_addr;
     Crash();
 }
@@ -48,13 +45,11 @@ static void SigsegvHandler(int sig, siginfo_t *si, void *unused)
 static std::atomic<unsigned long> watchdogCounter;
 static unsigned int maxFails, delayS;
 
-void WatchdogStrobe()
-{
+void WatchdogStrobe() {
     watchdogCounter++;
 }
 
-static void* WatchdogCheck(void *arg)
-{
+static void* WatchdogCheck(void *arg) {
     unsigned long prevValue = 0;
     unsigned long fails = 0;
 
@@ -82,8 +77,7 @@ static void* WatchdogCheck(void *arg)
     return NULL;
 }
 
-void WatchdogStart(int maxFailsArg, int delaySArg)
-{
+void WatchdogStart(int maxFailsArg, int delaySArg) {
 //    (void)RegisterSignal(SIGSEGV, SigsegvHandler);
 
     maxFails = maxFailsArg;

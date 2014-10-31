@@ -5,7 +5,7 @@
 
 const std::string D_OOM_KILLED = "oom_killed";
 
-extern TValueSpec dataSpec;
+extern TValueSet dataSet;
 TError RegisterData();
 
 #endif

@@ -21,14 +21,28 @@ const unsigned int PARENT_DEF_PROPERTY = (1 << 1);
 // When child container is shared with parent these properties can't be changed
 const unsigned int PARENT_RO_PROPERTY = (1 << 2);
 
-extern TValueSpec propertySpec;
+extern TValueSet propertySet;
+
+#define SYNTHESIZE_ACCESSOR(NAME, TYPE) \
+    TYPE Get ## NAME(const std::string &property) { \
+        if (VariantSet.IsDefault(property)) { \
+            std::shared_ptr<TContainer> c; \
+            if (ParentDefault(c, property)) \
+                return c->GetParent()->Prop->Get ## NAME(property); \
+        } \
+        TYPE value{}; \
+        TError error = VariantSet.Get ## NAME(property, value); \
+        if (error) \
+            TLogger::LogError(error, "Can't get property " + property); \
+        return value; \
+    }
 
 class TPropertyHolder {
     NO_COPY_CONSTRUCT(TPropertyHolder);
     TKeyValueStorage Storage;
     std::weak_ptr<TContainer> Container;
     const std::string Name;
-    TValueHolder Holder;
+    TVariantSet VariantSet;
 
     bool IsRoot();
     TError SyncStorage();
@@ -36,21 +50,21 @@ class TPropertyHolder {
     TError GetSharedContainer(std::shared_ptr<TContainer> &c);
 
 public:
-    TPropertyHolder(std::shared_ptr<TContainer> c) : Container(c), Name(c->GetName()), Holder(&propertySpec, c) {}
+    TPropertyHolder(std::shared_ptr<TContainer> c) : Container(c), Name(c->GetName()), VariantSet(&propertySet, c) {}
     ~TPropertyHolder();
 
-    bool IsDefault(const std::string &property);
-    std::string Get(const std::string &property);
-    bool GetBool(const std::string &property);
+    SYNTHESIZE_ACCESSOR(String, std::string);
+    SYNTHESIZE_ACCESSOR(Bool, bool);
+    // TODO: use defines to generate this copy-pasted crap
     int GetInt(const std::string &property);
     uint64_t GetUint(const std::string &property);
-    TError GetRaw(const std::string &property, std::string &value);
 
+    bool IsDefault(const std::string &property);
     bool ParentDefault(std::shared_ptr<TContainer> &c,
                        const std::string &property);
     std::string GetDefault(const std::string &property);
-
-    void SetRaw(const std::string &property, const std::string &value);
+    TError GetRaw(const std::string &property, std::string &value);
+    TError SetRaw(const std::string &property, const std::string &value);
     TError Set(const std::string &property, const std::string &value);
 
     bool HasFlags(const std::string &property, int flags);
@@ -60,6 +74,8 @@ public:
     TError Restore(const kv::TNode &node);
     TError PropertyExists(const std::string &property);
 };
+
+#undef SYNTHESIZE_ACCESSOR
 
 TError RegisterProperties();
 
