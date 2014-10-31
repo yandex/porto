@@ -320,9 +320,9 @@ std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
 }
 
 bool TContainer::UseParentNamespace() const {
-    bool value = false;
-    TError error = Prop->GetRawBool("isolate", value);
-    if (error || value == true)
+    bool isolate;
+    TError error = Prop->GetRawBool("isolate", isolate);
+    if (error || isolate)
         return false;
 
     return FindRunningParent() != nullptr;
@@ -511,7 +511,7 @@ TError TContainer::Create(int uid, int gid) {
     Uid = uid;
     Gid = gid;
 
-    Prop = std::make_shared<TPropertyHolder>(shared_from_this());
+    Prop = std::make_shared<TPropertySet>(shared_from_this());
     Data = std::make_shared<TVariantSet>(&dataSet, shared_from_this());
 
     TError error = Prop->Create();
@@ -536,8 +536,12 @@ TError TContainer::Create(int uid, int gid) {
     if (error)
         return error;
 
-    Prop->SetInt("uid", Uid);
-    Prop->SetInt("gid", Gid);
+    error = Prop->SetInt(P_RAW_UID, Uid);
+    if (error)
+        return error;
+    error = Prop->SetInt(P_RAW_GID, Gid);
+    if (error)
+        return error;
 
     if (Parent)
         Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
@@ -632,9 +636,11 @@ TError TContainer::Start() {
         return TError(EError::InvalidValue, "container command is empty");
     }
 
-    Prop->SetInt("id", (int)Id);
+    TError error = Prop->SetInt(P_RAW_ID, (int)Id);
+    if (error)
+        return error;
 
-    TError error = Data->SetBool(D_OOM_KILLED, false);
+    error = Data->SetBool(D_OOM_KILLED, false);
     if (error)
         return error;
 
@@ -669,7 +675,9 @@ TError TContainer::Start() {
 
     TLogger::Log() << GetName() << " started " << std::to_string(Task->GetPid()) << std::endl;
 
-    Prop->SetInt(P_ROOT_PID, Task->GetPid());
+    error = Prop->SetInt(P_RAW_ROOT_PID, Task->GetPid());
+    if (error)
+        return error;
     SetState(EContainerState::Running);
 
     return TError::Success();
@@ -978,7 +986,7 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
 TError TContainer::Restore(const kv::TNode &node) {
     TLogger::Log() << "Restore " << GetName() << " " << Id << std::endl;
 
-    Prop = std::make_shared<TPropertyHolder>(shared_from_this());
+    Prop = std::make_shared<TPropertySet>(shared_from_this());
     Data = std::make_shared<TVariantSet>(&dataSet, shared_from_this());
 
     TError error = Prop->Restore(node);
@@ -987,21 +995,15 @@ TError TContainer::Restore(const kv::TNode &node) {
         return error;
     }
 
-    int pid = 0;
     bool started = true;
-    error = Prop->GetRawInt(P_ROOT_PID, pid);
-    if (error || pid == 0)
+    int pid = Prop->GetInt(P_RAW_ROOT_PID);
+    if (pid == 0)
         started = false;
 
     TLogger::Log() << GetName() << ": restore process " << std::to_string(pid) << " which " << (started ? "started" : "didn't start") << std::endl;
 
-    Uid = 0;
-    error = Prop->GetRawInt("uid", Uid);
-    TLogger::LogError(error, "Can't restore uid");
-
-    Gid = 0;
-    error = Prop->GetRawInt("gid", Gid);
-    TLogger::LogError(error, "Can't restore gid");
+    Uid = Prop->GetInt(P_RAW_UID);
+    Gid = Prop->GetInt(P_RAW_GID);
 
     SetState(EContainerState::Stopped);
 
@@ -1366,7 +1368,7 @@ TError TContainerHolder::RestoreId(const kv::TNode &node, uint16_t &id) {
     for (int i = 0; i < node.pairs_size(); i++) {
         auto key = node.pairs(i).key();
 
-        if (key == "id")
+        if (key == P_RAW_ID)
             value = node.pairs(i).val();
     }
 

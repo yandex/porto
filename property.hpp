@@ -11,7 +11,10 @@
 #include "value.hpp"
 #include "container.hpp"
 
-const std::string P_ROOT_PID = "root_pid";
+const std::string P_RAW_ROOT_PID = "root_pid";
+const std::string P_RAW_UID = "uid";
+const std::string P_RAW_GID = "gid";
+const std::string P_RAW_ID = "id";
 
 class TBindMap;
 class TNetCfg;
@@ -61,8 +64,8 @@ namespace std {
         return VariantSet.Get ## NAME(property, value); \
     }
 
-class TPropertyHolder {
-    NO_COPY_CONSTRUCT(TPropertyHolder);
+class TPropertySet {
+    NO_COPY_CONSTRUCT(TPropertySet);
     TKeyValueStorage Storage;
     std::weak_ptr<TContainer> Container;
     const std::string Name;
@@ -74,8 +77,8 @@ class TPropertyHolder {
     TError GetSharedContainer(std::shared_ptr<TContainer> &c);
 
 public:
-    TPropertyHolder(std::shared_ptr<TContainer> c) : Container(c), Name(c->GetName()), VariantSet(&propertySet, c) {}
-    ~TPropertyHolder();
+    TPropertySet(std::shared_ptr<TContainer> c) : Container(c), Name(c->GetName()), VariantSet(&propertySet, c) {}
+    ~TPropertySet();
 
     SYNTHESIZE_ACCESSOR(String, std::string);
     SYNTHESIZE_ACCESSOR(Bool, bool);

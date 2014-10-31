@@ -20,7 +20,7 @@ class TContainerEnv;
 struct TData;
 class TContainer;
 class TSubsystem;
-class TPropertyHolder;
+class TPropertySet;
 class TVariantSet;
 enum class ETclassStat;
 
@@ -115,7 +115,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
 public:
     // TODO: make private
     std::unique_ptr<TTask> Task;
-    std::shared_ptr<TPropertyHolder> Prop;
+    std::shared_ptr<TPropertySet> Prop;
     std::shared_ptr<TVariantSet> Data;
 
     EContainerState GetState();

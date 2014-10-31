@@ -11,7 +11,7 @@ namespace std {
     const string &to_string(const string &s) { return s; }
 }
 
-bool TPropertyHolder::ParentDefault(std::shared_ptr<TContainer> &c,
+bool TPropertySet::ParentDefault(std::shared_ptr<TContainer> &c,
                                     const std::string &property) {
     TError error = GetSharedContainer(c);
     if (error) {
@@ -22,11 +22,11 @@ bool TPropertyHolder::ParentDefault(std::shared_ptr<TContainer> &c,
     return c->UseParentNamespace() && HasFlags(property, PARENT_DEF_PROPERTY);
 }
 
-bool TPropertyHolder::IsDefault(const std::string &property) {
+bool TPropertySet::IsDefault(const std::string &property) {
     return VariantSet.IsDefault(property);
 }
 
-uint64_t TPropertyHolder::GetUint(const std::string &property) {
+uint64_t TPropertySet::GetUint(const std::string &property) {
     if (VariantSet.IsDefault(property)) {
         std::shared_ptr<TContainer> c;
         if (ParentDefault(c, property))
@@ -41,14 +41,14 @@ uint64_t TPropertyHolder::GetUint(const std::string &property) {
     return val;
 }
 
-bool TPropertyHolder::HasFlags(const std::string &property, int flags) {
+bool TPropertySet::HasFlags(const std::string &property, int flags) {
     // TODO: Log error
     if (!propertySet.Valid(property))
         return false;
 
     return propertySet.Get(property)->Flags & flags;
 }
-bool TPropertyHolder::HasState(const std::string &property, EContainerState state) {
+bool TPropertySet::HasState(const std::string &property, EContainerState state) {
     // TODO: Log error
     if (!propertySet.Valid(property))
         return false;
@@ -57,16 +57,16 @@ bool TPropertyHolder::HasState(const std::string &property, EContainerState stat
     return p->State.find(state) != p->State.end();
 }
 
-bool TPropertyHolder::IsRoot() {
+bool TPropertySet::IsRoot() {
     return Name == ROOT_CONTAINER;
 }
 
-TError TPropertyHolder::Create() {
+TError TPropertySet::Create() {
     kv::TNode node;
     return Storage.SaveNode(Name, node);
 }
 
-TError TPropertyHolder::Restore(const kv::TNode &node) {
+TError TPropertySet::Restore(const kv::TNode &node) {
     for (int i = 0; i < node.pairs_size(); i++) {
         auto key = node.pairs(i).key();
         auto value = node.pairs(i).val();
@@ -79,20 +79,20 @@ TError TPropertyHolder::Restore(const kv::TNode &node) {
     return SyncStorage();
 }
 
-TError TPropertyHolder::PropertyExists(const std::string &property) {
+TError TPropertySet::PropertyExists(const std::string &property) {
     if (!propertySet.Valid(property))
         return TError(EError::InvalidProperty, "invalid property");
     return TError::Success();
 }
 
-TPropertyHolder::~TPropertyHolder() {
+TPropertySet::~TPropertySet() {
     if (!IsRoot()) {
         TError error = Storage.RemoveNode(Name);
         TLogger::LogError(error, "Can't remove key-value node " + Name);
     }
 }
 
-TError TPropertyHolder::SyncStorage() {
+TError TPropertySet::SyncStorage() {
     if (IsRoot())
         return TError::Success();
 
@@ -113,7 +113,7 @@ TError TPropertyHolder::SyncStorage() {
     return Storage.SaveNode(Name, node);
 }
 
-TError TPropertyHolder::GetSharedContainer(std::shared_ptr<TContainer> &c) {
+TError TPropertySet::GetSharedContainer(std::shared_ptr<TContainer> &c) {
     c = Container.lock();
     if (!c)
         return TError(EError::Unknown, "Can't convert weak container reference");
@@ -121,7 +121,7 @@ TError TPropertyHolder::GetSharedContainer(std::shared_ptr<TContainer> &c) {
     return TError::Success();
 }
 
-TError TPropertyHolder::AppendStorage(const std::string& key, const std::string& value) {
+TError TPropertySet::AppendStorage(const std::string& key, const std::string& value) {
     if (IsRoot())
         return TError::Success();
 
@@ -795,22 +795,22 @@ public:
 
 class TUidProperty : public TIntValue {
 public:
-    TUidProperty() : TIntValue("uid", "", HIDDEN_VALUE, {}) {}
+    TUidProperty() : TIntValue(P_RAW_UID, "", HIDDEN_VALUE, {}) {}
 };
 
 class TGidProperty : public TIntValue {
 public:
-    TGidProperty() : TIntValue("gid", "", HIDDEN_VALUE, {}) {}
+    TGidProperty() : TIntValue(P_RAW_GID, "", HIDDEN_VALUE, {}) {}
 };
 
 class TIdProperty : public TIntValue {
 public:
-    TIdProperty() : TIntValue("id", "", HIDDEN_VALUE, {}) {}
+    TIdProperty() : TIntValue(P_RAW_ID, "", HIDDEN_VALUE, {}) {}
 };
 
 class TRootPidProperty : public TIntValue {
 public:
-    TRootPidProperty() : TIntValue(P_ROOT_PID, "", HIDDEN_VALUE, {}) {}
+    TRootPidProperty() : TIntValue(P_RAW_ROOT_PID, "", HIDDEN_VALUE, {}) {}
 };
 
 TValueSet propertySet;
