@@ -104,6 +104,14 @@ bool TContainer::HaveRunningChildren() {
     return false;
 }
 
+TError TContainer::SetOomKilled(bool v) {
+    std::shared_ptr<TValueState> oomKilled;
+    TError error = Data->Get(D_OOM_KILLED, oomKilled);
+    if (error)
+        return error;
+    return oomKilled->SetBool(v);
+}
+
 EContainerState TContainer::GetState() {
     static bool rec = false;
 
@@ -631,9 +639,12 @@ TError TContainer::Start() {
     }
 
     Prop->SetRaw("id", std::to_string(Id));
-    OomKilled = false;
 
-    TError error = PrepareResources();
+    TError error = SetOomKilled(false);
+    if (error)
+        return error;
+
+    error = PrepareResources();
     if (error)
         return error;
 
@@ -1168,15 +1179,15 @@ bool TContainer::DeliverOom(int fd) {
     TLogger::Log() << "Delivered OOM to " << GetName() << " with root_pid " << pid << std::endl;
 
     TError error = KillAll();
-    if (error)
-        TLogger::LogError(error, "Can't kill all tasks in container");
+    TLogger::LogError(error, "Can't kill all tasks in container");
 
     AckExitStatus(pid);
     Task->DeliverExitStatus(SIGKILL);
     SetState(EContainerState::Dead);
 
     StopChildren();
-    OomKilled = true;
+    error = SetOomKilled(true);
+    TLogger::LogError(error, "Can't indicate whether container is killed by OOM");
     Efd = -1;
     return true;
 }

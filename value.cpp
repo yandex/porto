@@ -67,6 +67,8 @@ TError TStringValue::Set(std::shared_ptr<TContainer> c,
         return error;
 
     s->StringVal = value;
+    s->Initialized = true;
+
     return TError::Success();
 }
 
@@ -92,6 +94,8 @@ TError TBoolValue::Set(std::shared_ptr<TContainer> c,
         return error;
 
     s->BoolVal = tmp;
+    s->Initialized = true;
+
     return TError::Success();
 }
 
@@ -99,8 +103,6 @@ std::string TBoolValue::Get(std::shared_ptr<TContainer> c,
                             std::shared_ptr<TValueState> s) {
     return BoolToStr(GetBool(c, s));
 }
-
-TValueState::TValueState(std::shared_ptr<TContainer> c, TValueDef *p) : Def(p), Container(c) { }
 
 bool TValueState::ReturnDefault() {
     if (Def->Flags & NODEF_VALUE)
@@ -133,13 +135,12 @@ TError TValueState::Set(const std::string &v) {
     if (error)
         return error;
 
-    Initialized = true;
-
     return TError::Success();
 }
 
 TError TValueState::SetString(const std::string &v) {
     PORTO_ASSERT(Def->Type == EValueType::String);
+    SetRaw(v);
     return Set(v);
 }
 
@@ -171,6 +172,7 @@ TError TValueState::SetBool(const bool &v) {
     if (error)
         return error;
 
+    BoolVal = v;
     Initialized = true;
 
     return TError::Success();

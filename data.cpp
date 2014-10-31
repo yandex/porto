@@ -63,15 +63,10 @@ public:
 
 class TOomKilledData : public TBoolValue {
 public:
-    TOomKilledData() : TBoolValue("oom_killed",
+    TOomKilledData() : TBoolValue(D_OOM_KILLED,
                                   "indicates whether container has been killed by OOM",
                                   NODEF_VALUE,
                                   dState) {}
-
-    bool GetBool(std::shared_ptr<TContainer> c,
-                 std::shared_ptr<TValueState> s) {
-        return c->IsOomKilled();
-    }
 };
 
 class TParentData : public TStringValue {

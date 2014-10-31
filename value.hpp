@@ -139,7 +139,7 @@ public:
     bool Initialized = false;
     bool ReturnDefault();
 
-    TValueState(std::shared_ptr<TContainer> c, TValueDef *p);
+    TValueState(std::shared_ptr<TContainer> c, TValueDef *p) : Def(p), Container(c) { }
     bool IsDefault();
 
     std::string Get();

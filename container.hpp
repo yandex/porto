@@ -82,7 +82,6 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     std::shared_ptr<TNlLink> Link;
     int TaskStartErrno = -1;
     TScopedFd Efd;
-    bool OomKilled = false;
     size_t RespawnCount;
     int Uid, Gid;
 
@@ -119,8 +118,9 @@ public:
     std::shared_ptr<TPropertyHolder> Prop;
     std::shared_ptr<TValueHolder> Data;
 
+    TError SetOomKilled(bool v);
+
     EContainerState GetState();
-    bool IsOomKilled() { return OomKilled; }
     size_t GetRespawnCount() { return RespawnCount; }
     int GetTaskStartErrno() { return TaskStartErrno; }
     TError GetStat(ETclassStat stat, uint64_t &val) { return Tclass->GetStat(stat, val); }

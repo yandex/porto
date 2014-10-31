@@ -1,5 +1,6 @@
+- isolate ipc property
 - debian Build-depends protobuf-compiler g++-4.7 | g++-4.8
-- save actual data in TValue for oomKilled, respawnCount, startErrno
+- save actual data in TValue for respawnCount, startErrno
 - test restarting (check version)
 - shaping with macvlan or non-default interface?
 - ? portoctl cp
@@ -27,8 +28,6 @@
 - ? root property: support loop if file
 - ? readonly_root
 - ? pty as container /dev/console
-## ipc
-- ? isolate ipc property
 ## other
 - ? when to enable user namespace
 ## net
