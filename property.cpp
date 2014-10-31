@@ -500,7 +500,7 @@ public:
         TStringValue("cpu_policy",
                      "CPU policy: rt, normal, idle",
                      PARENT_RO_PROPERTY,
-                     staticProperty) {}
+                     dynamicProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         return "normal";

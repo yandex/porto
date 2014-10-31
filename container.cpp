@@ -298,11 +298,32 @@ TError TContainer::ApplyDynamicProperties() {
 
     auto cpucg = GetLeafCgroup(cpuSubsystem);
     if (Prop->GetString("cpu_policy") == "normal") {
+        string smart;
+
+        error = cpucg->GetKnobValue("cpu.smart", smart);
+        if (!error && smart == "1") {
+            error = cpucg->SetKnobValue("cpu.smart", "0", false);
+            TLogger::LogError(error, "Can't disable smart");
+            if (error)
+                return error;
+        }
+
         int cpuPrio = Prop->GetUint("cpu_priority");
         error = cpucg->SetKnobValue("cpu.shares", std::to_string(cpuPrio + 2), false);
         TLogger::LogError(error, "Can't set cpu_priority");
         if (error)
             return error;
+
+    } else if (GetPropertyStr("cpu_policy") == "rt") {
+        string smart;
+
+        error = cpucg->GetKnobValue("cpu.smart", smart);
+        if (!error && smart == "0") {
+            error = cpucg->SetKnobValue("cpu.smart", "1", false);
+            TLogger::LogError(error, "Can't enable smart");
+            if (error)
+                return error;
+        }
     }
 
     return TError::Success();
@@ -966,7 +987,6 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
 
     if (!Prop->HasState(property, GetState()))
         return TError(EError::InvalidState, "Can't set dynamic property " + property + " for running container");
-
 
     if (UseParentNamespace() && Prop->HasFlags(property, PARENT_RO_PROPERTY))
         return TError(EError::NotSupported, "Can't set " + property + " for child container");
