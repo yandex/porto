@@ -2394,7 +2394,7 @@ static void TestRecovery(TPortoAPI &api) {
     Expect(v == "meta");
 
     ExpectSuccess(api.SetProperty(parent, "recharge_on_pgfault", "true"));
-    ExpectFailure(api.SetProperty(parent, "cpu_policy", "rt"), EError::InvalidState);
+    ExpectFailure(api.SetProperty(parent, "env", "a=b"), EError::InvalidState);
 
     ExpectSuccess(api.GetData(child, "state", v));
     Expect(v == "running");

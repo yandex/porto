@@ -314,7 +314,7 @@ TError TContainer::ApplyDynamicProperties() {
         if (error)
             return error;
 
-    } else if (GetPropertyStr("cpu_policy") == "rt") {
+    } else if (Prop->GetString("cpu_policy") == "rt") {
         string smart;
 
         error = cpucg->GetKnobValue("cpu.smart", smart);
@@ -341,7 +341,7 @@ std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
 }
 
 bool TContainer::UseParentNamespace() const {
-    bool isolate;
+    bool isolate = false;
     TError error = Prop->GetRawBool("isolate", isolate);
     if (error || isolate)
         return false;
