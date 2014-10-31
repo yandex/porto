@@ -1,5 +1,6 @@
 #include "value.hpp"
 #include "util/log.hpp"
+#include "util/string.hpp"
 
 void TValue::ExpectType(EValueType type) {
     if (type != Type)
@@ -11,6 +12,7 @@ void TValue::ExpectType(EValueType type) {
 std::string TValue::GetDefaultString(std::shared_ptr<TContainer> c) {
     return "";
 }
+
 TError TValue::SetString(std::shared_ptr<TContainer> c,
                          std::shared_ptr<TVariant> v,
                          const std::string &value) {
@@ -29,12 +31,14 @@ bool TValue::GetDefaultBool(std::shared_ptr<TContainer> c) {
     ExpectType(EValueType::Bool);
     return false;
 }
+
 TError TValue::SetBool(std::shared_ptr<TContainer> c,
                        std::shared_ptr<TVariant> v,
                        const bool value) {
     ExpectType(EValueType::Bool);
     return v->Set(Type, value);
 }
+
 bool TValue::GetBool(std::shared_ptr<TContainer> c,
                      std::shared_ptr<TVariant> v) {
     ExpectType(EValueType::Bool);
@@ -42,6 +46,27 @@ bool TValue::GetBool(std::shared_ptr<TContainer> c,
         return GetDefaultBool(c);
 
     return v->Get<bool>(Type);
+}
+
+bool TValue::GetDefaultInt(std::shared_ptr<TContainer> c) {
+    ExpectType(EValueType::Int);
+    return 0;
+}
+
+TError TValue::SetInt(std::shared_ptr<TContainer> c,
+                      std::shared_ptr<TVariant> v,
+                      const int value) {
+    ExpectType(EValueType::Int);
+    return v->Set(Type, value);
+}
+
+int TValue::GetInt(std::shared_ptr<TContainer> c,
+                   std::shared_ptr<TVariant> v) {
+    ExpectType(EValueType::Int);
+    if (!v->HasValue())
+        return GetDefaultInt(c);
+
+    return v->Get<int>(Type);
 }
 
 std::string TBoolValue::BoolToStr(bool v) {
@@ -75,6 +100,32 @@ std::string TBoolValue::GetString(std::shared_ptr<TContainer> c,
         value = GetBool(c, v);
 
     return BoolToStr(value);
+}
+
+std::string TIntValue::GetDefaultString(std::shared_ptr<TContainer> c) {
+    return std::to_string(GetDefaultInt(c));
+}
+
+TError TIntValue::SetString(std::shared_ptr<TContainer> c,
+                            std::shared_ptr<TVariant> v,
+                            const std::string &value) {
+    int tmp;
+    TError error = StringToInt(value, tmp);
+    if (error)
+        return error;
+
+    return SetInt(c, v, tmp);
+}
+std::string TIntValue::GetString(std::shared_ptr<TContainer> c,
+                                 std::shared_ptr<TVariant> v) {
+    int value;
+
+    if (!v->HasValue())
+        value = GetDefaultInt(c);
+    else
+        value = GetInt(c, v);
+
+    return std::to_string(value);
 }
 
 TError TValueSet::Register(TValue *p) {

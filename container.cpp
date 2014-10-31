@@ -962,7 +962,7 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
     if (UseParentNamespace() && Prop->HasFlags(property, PARENT_RO_PROPERTY))
         return TError(EError::NotSupported, "Can't set " + property + " for child container");
 
-    error = Prop->SetString(property, value);
+    error = Prop->Set(property, value);
     if (error) {
         TLogger::LogError(error, "Can't set property");
         return error;

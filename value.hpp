@@ -16,6 +16,7 @@ enum class EContainerState;
 enum class EValueType {
     String,
     Bool,
+    Int
 
 #if 0
     Int,
@@ -117,6 +118,13 @@ public:
                            const bool value);
     virtual bool GetBool(std::shared_ptr<TContainer> c,
                          std::shared_ptr<TVariant> v);
+
+    virtual bool GetDefaultInt(std::shared_ptr<TContainer> c);
+    virtual TError SetInt(std::shared_ptr<TContainer> c,
+                          std::shared_ptr<TVariant> v,
+                          const int value);
+    virtual int GetInt(std::shared_ptr<TContainer> c,
+                       std::shared_ptr<TVariant> v);
 };
 
 #define SYNTHESIZE_DEFAULT(NAME, TYPE) \
@@ -158,6 +166,26 @@ public:
                                   std::shared_ptr<TVariant> v);
 
     SYNTHESIZE_DEFAULT(Bool, bool)
+};
+
+class TIntValue : public TValue {
+    NO_COPY_CONSTRUCT(TIntValue);
+
+public:
+    TIntValue(const std::string &name,
+               const std::string &desc,
+               const int flags,
+               const std::set<EContainerState> &state) :
+        TValue(name, EValueType::Int, desc, flags, state) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c);
+    TError SetString(std::shared_ptr<TContainer> c,
+                             std::shared_ptr<TVariant> v,
+                             const std::string &value);
+    std::string GetString(std::shared_ptr<TContainer> c,
+                                  std::shared_ptr<TVariant> v);
+
+    SYNTHESIZE_DEFAULT(Int, int)
 };
 
 #undef SYNTHESIZE_DEFAULT
@@ -210,6 +238,7 @@ public:
 
     SYNTHESIZE_ACCESSOR(String, std::string)
     SYNTHESIZE_ACCESSOR(Bool, bool)
+    SYNTHESIZE_ACCESSOR(Int, int)
 
     bool IsDefault(const std::string &name);
 };
