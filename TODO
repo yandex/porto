@@ -1,3 +1,5 @@
+- debian Build-depends protobuf-compiler g++-4.7 | g++-4.8
+- save actual data in TValue for oomKilled, respawnCount, startErrno
 - test restarting (check version)
 - shaping with macvlan or non-default interface?
 - ? portoctl cp

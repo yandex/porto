@@ -45,7 +45,6 @@ public:
     int GetInt(const std::string &property);
     uint64_t GetUint(const std::string &property);
     TError GetRaw(const std::string &property, std::string &value);
-    TError GetRawBool(const std::string &property, bool &value);
 
     bool ParentDefault(std::shared_ptr<TContainer> &c,
                        const std::string &property);

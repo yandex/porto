@@ -29,11 +29,10 @@ std::string TPropertyHolder::Get(const std::string &property) {
             return c->GetParent()->Prop->Get(property);
     }
 
-    // TODO: check if valid property
     std::shared_ptr<TValueState> s;
     TError error = Holder.Get(property, s);
     TLogger::LogError(error, "Can't get property " + property);
-    return s->GetStr();
+    return s->Get();
 }
 
 bool TPropertyHolder::GetBool(const std::string &property) {
@@ -43,7 +42,6 @@ bool TPropertyHolder::GetBool(const std::string &property) {
             return c->GetParent()->Prop->GetBool(property);
     }
 
-    // TODO: check if valid property
     std::shared_ptr<TValueState> s;
     TError error = Holder.Get(property, s);
     TLogger::LogError(error, "Can't get property " + property);
@@ -57,7 +55,6 @@ int TPropertyHolder::GetInt(const std::string &property) {
             return c->GetParent()->Prop->GetInt(property);
     }
 
-    // TODO: check if valid property
     int val;
 
     if (StringToInt(Get(property), val))
@@ -73,7 +70,6 @@ uint64_t TPropertyHolder::GetUint(const std::string &property) {
             return c->GetParent()->Prop->GetUint(property);
     }
 
-    // TODO: check if valid property
     uint64_t val;
 
     if (StringToUint64(Get(property), val))
@@ -87,7 +83,7 @@ TError TPropertyHolder::GetRaw(const std::string &property, std::string &value) 
     TError error = Holder.Get(property, s);
     if (error)
         return error;
-    value = s->GetStr();
+    value = s->Get();
     return TError::Success();
 }
 
@@ -99,7 +95,7 @@ void TPropertyHolder::SetRaw(const std::string &property,
     if (error)
         TLogger::LogError(error, "Can't set raw property " + property);
 
-    s->SetRawStr(value);
+    s->SetRaw(value);
     error = AppendStorage(property, value);
     if (error)
         TLogger::LogError(error, "Can't append property to key-value store");
@@ -118,7 +114,7 @@ TError TPropertyHolder::Set(const std::string &property,
     if (error)
         return error;
 
-    error = s->SetStr(value);
+    error = s->Set(value);
     if (error)
         return error;
 
@@ -187,7 +183,7 @@ TError TPropertyHolder::SyncStorage() {
     for (auto &kv : Holder.State) {
         auto pair = node.add_pairs();
         pair->set_key(kv.first);
-        pair->set_val(kv.second->GetStr());
+        pair->set_val(kv.second->Get());
     }
 
     return Storage.SaveNode(Name, node);
@@ -269,22 +265,22 @@ static std::set<EContainerState> dynamicProperty = {
     EContainerState::Meta,
 };
 
-class TCommandProperty : public TValueDef {
+class TCommandProperty : public TStringValue {
 public:
-    TCommandProperty() : TValueDef("command",
-                                   EValueType::String,
-                                   "Command executed upon container start",
-                                   0,
-                                   staticProperty) {}
+    TCommandProperty() :
+        TStringValue("command",
+                     "Command executed upon container start",
+                     0,
+                     staticProperty) {}
 };
 
-class TUserProperty : public TValueDef {
+class TUserProperty : public TStringValue {
 public:
-    TUserProperty() : TValueDef("user",
-                                EValueType::String,
-                                "Start command with given user",
-                                SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY,
-                                staticProperty) {}
+    TUserProperty() :
+        TStringValue("user",
+                     "Start command with given user",
+                     SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY,
+                     staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         int uid, gid;
@@ -304,13 +300,13 @@ public:
     }
 };
 
-class TGroupProperty : public TValueDef {
+class TGroupProperty : public TStringValue {
 public:
-    TGroupProperty() : TValueDef("group",
-                                EValueType::String,
-                                "Start command with given group",
-                                SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY,
-                                staticProperty) {}
+    TGroupProperty() :
+        TStringValue("group",
+                     "Start command with given group",
+                     SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY,
+                     staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         int uid, gid;
@@ -330,23 +326,22 @@ public:
     }
 };
 
-class TEnvProperty : public TValueDef {
+class TEnvProperty : public TStringValue { // TODO: EValueType::List,
 public:
-    TEnvProperty() : TValueDef("env",
-                               // TODO: EValueType::List,
-                               EValueType::String,
-                               "Container environment variables",
-                               PARENT_DEF_PROPERTY,
-                               staticProperty) {}
+    TEnvProperty() :
+        TStringValue("env",
+                     "Container environment variables",
+                     PARENT_DEF_PROPERTY,
+                     staticProperty) {}
 };
 
-class TRootProperty : public TValueDef {
+class TRootProperty : public TStringValue {
 public:
-    TRootProperty() : TValueDef("root",
-                               EValueType::String,
-                               "Container root directory",
-                               PARENT_DEF_PROPERTY,
-                               staticProperty) {}
+    TRootProperty() :
+        TStringValue("root",
+                     "Container root directory",
+                     PARENT_DEF_PROPERTY,
+                     staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         return "/";
@@ -359,13 +354,13 @@ public:
     }
 };
 
-class TCwdProperty : public TValueDef {
+class TCwdProperty : public TStringValue {
 public:
-    TCwdProperty() : TValueDef("cwd",
-                               EValueType::String,
-                               "Container working directory",
-                               PARENT_DEF_PROPERTY,
-                               staticProperty) {}
+    TCwdProperty() :
+        TStringValue("cwd",
+                     "Container working directory",
+                     PARENT_DEF_PROPERTY,
+                     staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         if (!c->Prop->IsDefault("root"))
@@ -381,13 +376,13 @@ public:
     }
 };
 
-class TStdinPathProperty : public TValueDef {
+class TStdinPathProperty : public TStringValue {
 public:
-    TStdinPathProperty() : TValueDef("stdin_path",
-                                     EValueType::String,
-                                     "Container standard input path",
-                                     0,
-                                     staticProperty) {}
+    TStdinPathProperty() :
+        TStringValue("stdin_path",
+                     "Container standard input path",
+                     0,
+                     staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         return "/dev/null";
@@ -400,13 +395,13 @@ public:
     }
 };
 
-class TStdoutPathProperty : public TValueDef {
+class TStdoutPathProperty : public TStringValue {
 public:
-    TStdoutPathProperty() : TValueDef("stdout_path",
-                                      EValueType::String,
-                                      "Container standard input path",
-                                      0,
-                                      staticProperty) {}
+    TStdoutPathProperty() :
+        TStringValue("stdout_path",
+                     "Container standard input path",
+                     0,
+                     staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         return DefaultStdFile(c, "stdout");
@@ -419,13 +414,13 @@ public:
     }
 };
 
-class TStderrPathProperty : public TValueDef {
+class TStderrPathProperty : public TStringValue {
 public:
-    TStderrPathProperty() : TValueDef("stderr_path",
-                                      EValueType::String,
-                                      "Container standard error path",
-                                      0,
-                                      staticProperty) {}
+    TStderrPathProperty() :
+        TStringValue("stderr_path",
+                     "Container standard error path",
+                     0,
+                     staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         return DefaultStdFile(c, "stderr");
@@ -438,13 +433,13 @@ public:
     }
 };
 
-class TStdoutLimitProperty : public TValueDef {
+class TStdoutLimitProperty : public TStringValue {
 public:
-    TStdoutLimitProperty() : TValueDef("stdout_limit",
-                                      EValueType::String,
-                                      "Return no more than given number of bytes from standard output/error",
-                                      0,
-                                      staticProperty) {}
+    TStdoutLimitProperty() :
+        TStringValue("stdout_limit",
+                     "Return no more than given number of bytes from standard output/error",
+                     0,
+                     staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         return std::to_string(config().container().stdout_limit());
@@ -469,13 +464,13 @@ public:
     }
 };
 
-class TMemoryGuaranteeProperty : public TValueDef {
+class TMemoryGuaranteeProperty : public TStringValue {
 public:
-    TMemoryGuaranteeProperty() : TValueDef("memory_guarantee",
-                                           EValueType::String,
-                                           "Guaranteed amount of memory",
-                                           PARENT_RO_PROPERTY,
-                                           dynamicProperty) {}
+    TMemoryGuaranteeProperty() :
+        TStringValue("memory_guarantee",
+                     "Guaranteed amount of memory",
+                     PARENT_RO_PROPERTY,
+                     dynamicProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         return "0";
@@ -504,13 +499,13 @@ public:
     }
 };
 
-class TMemoryLimitProperty : public TValueDef {
+class TMemoryLimitProperty : public TStringValue { // TODO: Uint
 public:
-    TMemoryLimitProperty() : TValueDef("memory_limit",
-                                       EValueType::String,
-                                       "Memory hard limit",
-                                       0,
-                                       dynamicProperty) {}
+    TMemoryLimitProperty() :
+        TStringValue("memory_limit",
+                     "Memory hard limit",
+                     0,
+                     dynamicProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         return "0";
@@ -531,13 +526,13 @@ public:
     }
 };
 
-class TRechargeOnPgfaultProperty : public TValueDef {
+class TRechargeOnPgfaultProperty : public TBoolValue {
 public:
-    TRechargeOnPgfaultProperty() : TValueDef("recharge_on_pgfault",
-                                             EValueType::Bool,
-                                             "Recharge memory on page fault",
-                                             PARENT_RO_PROPERTY,
-                                             dynamicProperty) {}
+    TRechargeOnPgfaultProperty() :
+        TBoolValue("recharge_on_pgfault",
+                   "Recharge memory on page fault",
+                   PARENT_RO_PROPERTY,
+                   dynamicProperty) {}
 
     bool GetDefaultBool(std::shared_ptr<TContainer> c) {
         return false;
@@ -554,13 +549,13 @@ public:
     }
 };
 
-class TCpuPolicyProperty : public TValueDef {
+class TCpuPolicyProperty : public TStringValue {
 public:
-    TCpuPolicyProperty() : TValueDef("cpu_policy",
-                                       EValueType::String,
-                                       "CPU policy: rt, normal, idle",
-                                       PARENT_RO_PROPERTY,
-                                       staticProperty) {}
+    TCpuPolicyProperty() :
+        TStringValue("cpu_policy",
+                     "CPU policy: rt, normal, idle",
+                     PARENT_RO_PROPERTY,
+                     staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         return "normal";
@@ -585,13 +580,13 @@ public:
     }
 };
 
-class TCpuPriorityProperty : public TValueDef {
+class TCpuPriorityProperty : public TStringValue {
 public:
-    TCpuPriorityProperty() : TValueDef("cpu_priority",
-                                       EValueType::String,
-                                       "CPU priority: 0-99",
-                                       PARENT_RO_PROPERTY,
-                                       dynamicProperty) {}
+    TCpuPriorityProperty() :
+        TStringValue("cpu_priority",
+                     "CPU priority: 0-99",
+                     PARENT_RO_PROPERTY,
+                     dynamicProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         return std::to_string(DEF_CLASS_PRIO);
@@ -612,13 +607,13 @@ public:
     }
 };
 
-class TNetGuaranteeProperty : public TValueDef {
+class TNetGuaranteeProperty : public TStringValue {
 public:
-    TNetGuaranteeProperty() : TValueDef("net_guarantee",
-                                       EValueType::String,
-                                       "Guaranteed container network bandwidth",
-                                       PARENT_RO_PROPERTY,
-                                       staticProperty) {}
+    TNetGuaranteeProperty() :
+        TStringValue("net_guarantee",
+                     "Guaranteed container network bandwidth",
+                     PARENT_RO_PROPERTY,
+                     staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         return std::to_string(DEF_CLASS_RATE);
@@ -631,13 +626,13 @@ public:
     }
 };
 
-class TNetCeilProperty : public TValueDef {
+class TNetCeilProperty : public TStringValue {
 public:
-    TNetCeilProperty() : TValueDef("net_ceil",
-                                       EValueType::String,
-                                       "Maximum container network bandwidth",
-                                       PARENT_RO_PROPERTY,
-                                       staticProperty) {}
+    TNetCeilProperty() :
+        TStringValue("net_ceil",
+                     "Maximum container network bandwidth",
+                     PARENT_RO_PROPERTY,
+                     staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         return std::to_string(DEF_CLASS_CEIL);
@@ -650,13 +645,13 @@ public:
     }
 };
 
-class TNetPriorityProperty : public TValueDef {
+class TNetPriorityProperty : public TStringValue {
 public:
-    TNetPriorityProperty() : TValueDef("net_priority",
-                                       EValueType::String,
-                                       "Container network priority: 0-7",
-                                       PARENT_RO_PROPERTY,
-                                       staticProperty) {}
+    TNetPriorityProperty() :
+        TStringValue("net_priority",
+                     "Container network priority: 0-7",
+                     PARENT_RO_PROPERTY,
+                     staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         return std::to_string(DEF_CLASS_NET_PRIO);
@@ -677,26 +672,26 @@ public:
     }
 };
 
-class TRespawnProperty : public TValueDef {
+class TRespawnProperty : public TBoolValue {
 public:
-    TRespawnProperty() : TValueDef("respawn",
-                                   EValueType::Bool,
-                                   "Automatically respawn dead container",
-                                   0,
-                                   staticProperty) {}
+    TRespawnProperty() :
+        TBoolValue("respawn",
+                   "Automatically respawn dead container",
+                   0,
+                   staticProperty) {}
 
     bool GetDefaultBool(std::shared_ptr<TContainer> c) {
         return false;
     }
 };
 
-class TMaxRespawnsProperty : public TValueDef {
+class TMaxRespawnsProperty : public TStringValue {
 public:
-    TMaxRespawnsProperty() : TValueDef("max_respawns",
-                                       EValueType::String,
-                                       "Limit respawn count for specific container",
-                                       0,
-                                       staticProperty) {}
+    TMaxRespawnsProperty() :
+        TStringValue("max_respawns",
+                     "Limit respawn count for specific container",
+                     0,
+                     staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         return "-1";
@@ -709,26 +704,26 @@ public:
     }
 };
 
-class TIsolateProperty : public TValueDef {
+class TIsolateProperty : public TBoolValue {
 public:
-    TIsolateProperty() : TValueDef("isolate",
-                                   EValueType::Bool,
-                                   "Isolate container from parent",
-                                   0,
-                                   staticProperty) {}
+    TIsolateProperty() :
+        TBoolValue("isolate",
+                   "Isolate container from parent",
+                   0,
+                   staticProperty) {}
 
     bool GetDefaultBool(std::shared_ptr<TContainer> c) {
         return true;
     }
 };
 
-class TPrivateProperty : public TValueDef {
+class TPrivateProperty : public TStringValue {
 public:
-    TPrivateProperty() : TValueDef("private",
-                                   EValueType::String,
-                                   "User-defined property",
-                                   0,
-                                   dynamicProperty) {}
+    TPrivateProperty() :
+        TStringValue("private",
+                     "User-defined property",
+                     0,
+                     dynamicProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         return "";
@@ -746,14 +741,13 @@ public:
     }
 };
 
-class TUlimitProperty : public TValueDef {
+class TUlimitProperty : public TStringValue { //TODO: MAP
 public:
-    TUlimitProperty() : TValueDef("ulimit",
-                                  //TODO: MAP
-                                   EValueType::String,
-                                   "Container resource limits",
-                                   PARENT_DEF_PROPERTY,
-                                   staticProperty) {}
+    TUlimitProperty() :
+        TStringValue("ulimit",
+                     "Container resource limits",
+                     PARENT_DEF_PROPERTY,
+                     staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         return "";
@@ -767,22 +761,22 @@ public:
     }
 };
 
-class THostnameProperty : public TValueDef {
+class THostnameProperty : public TStringValue {
 public:
-    THostnameProperty() : TValueDef("hostname",
-                                   EValueType::String,
-                                   "Container hostname",
-                                   0,
-                                   staticProperty) {}
+    THostnameProperty() :
+        TStringValue("hostname",
+                     "Container hostname",
+                     0,
+                     staticProperty) {}
 };
 
-class TBindDnsProperty : public TValueDef {
+class TBindDnsProperty : public TBoolValue {
 public:
-    TBindDnsProperty() : TValueDef("bind_dns",
-                                   EValueType::Bool,
-                                   "Bind /etc/resolv.conf and /etc/hosts of host to container",
-                                   0,
-                                   staticProperty) {}
+    TBindDnsProperty() :
+        TBoolValue("bind_dns",
+                   "Bind /etc/resolv.conf and /etc/hosts of host to container",
+                   0,
+                   staticProperty) {}
 
     bool GetDefaultBool(std::shared_ptr<TContainer> c) {
         if (c->Prop->IsDefault("root"))
@@ -792,14 +786,13 @@ public:
     }
 };
 
-class TBindProperty : public TValueDef {
+class TBindProperty : public TStringValue { // TODO: list or map
 public:
-    TBindProperty() : TValueDef("bind",
-                                // TODO: list or map
-                                EValueType::String,
-                                "Share host directories with container",
-                                0,
-                                staticProperty) {}
+    TBindProperty() :
+        TStringValue("bind",
+                     "Share host directories with container",
+                     0,
+                     staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         return "";
@@ -813,14 +806,13 @@ public:
     }
 };
 
-class TNetProperty : public TValueDef {
+class TNetProperty : public TStringValue { // TODO: list or map
 public:
-    TNetProperty() : TValueDef("net",
-                               // TODO: list or map
-                               EValueType::String,
-                               "Container network settings",
-                               0,
-                               staticProperty) {}
+    TNetProperty() :
+        TStringValue("net",
+                     "Container network settings",
+                     0,
+                     staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         return "host";
@@ -834,54 +826,37 @@ public:
     }
 };
 
-class TAllowedDevicesProperty : public TValueDef {
+class TAllowedDevicesProperty : public TStringValue { // TODO: list
 public:
-    TAllowedDevicesProperty() : TValueDef("allowed_devices",
-                                          // TODO: list
-                                          EValueType::String,
-                                          "Devices that container can create/read/write",
-                                          0,
-                                          staticProperty) {}
+    TAllowedDevicesProperty() :
+        TStringValue("allowed_devices",
+                     "Devices that container can create/read/write",
+                     0,
+                     staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) {
         return "a *:* rwm";
     }
 };
 
-class TUidProperty : public TValueDef {
+class TUidProperty : public TStringValue { // TODO: int
 public:
-    TUidProperty() : TValueDef("uid",
-                               // TODO: int
-                               EValueType::String, "",
-                               HIDDEN_VALUE,
-                               {}) {}
+    TUidProperty() : TStringValue("uid", "", HIDDEN_VALUE, {}) {}
 };
 
-class TGidProperty : public TValueDef {
+class TGidProperty : public TStringValue { // TODO: int
 public:
-    TGidProperty() : TValueDef("gid",
-                               // TODO: int
-                               EValueType::String, "",
-                               HIDDEN_VALUE,
-                               {}) {}
+    TGidProperty() : TStringValue("gid", "", HIDDEN_VALUE, {}) {}
 };
 
-class TIdProperty : public TValueDef {
+class TIdProperty : public TStringValue { // TODO: int
 public:
-    TIdProperty() : TValueDef("id",
-                              // TODO: int
-                              EValueType::String, "",
-                              HIDDEN_VALUE,
-                              {}) {}
+    TIdProperty() : TStringValue("id", "", HIDDEN_VALUE, {}) {}
 };
 
-class TRootPidProperty : public TValueDef {
+class TRootPidProperty : public TStringValue { // TODO: int
 public:
-    TRootPidProperty() : TValueDef("root_pid",
-                                   // TODO: int
-                                   EValueType::String, "",
-                                   HIDDEN_VALUE,
-                                   {}) {}
+    TRootPidProperty() : TStringValue("root_pid", "", HIDDEN_VALUE, {}) {}
 };
 
 TValueSpec propertySpec;

@@ -49,26 +49,24 @@ static std::set<EContainerState> sState = {
     EContainerState::Stopped,
 };
 
-class TStateData : public TValueDef {
+class TStateData : public TStringValue {
 public:
-    TStateData() : TValueDef("state",
-                             EValueType::String,
-                             "container state",
-                             NODEF_VALUE,
-                             anyState) {}
+    TStateData() : TStringValue("state",
+                                "container state",
+                                NODEF_VALUE,
+                                anyState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TValueState> s) {
         return ContainerStateName(c->GetState());    }
 };
 
-class TOomKilledData : public TValueDef {
+class TOomKilledData : public TBoolValue {
 public:
-    TOomKilledData() : TValueDef("oom_killed",
-                                 EValueType::Bool,
-                                 "indicates whether container has been killed by OOM",
-                                 NODEF_VALUE,
-                                 dState) {}
+    TOomKilledData() : TBoolValue("oom_killed",
+                                  "indicates whether container has been killed by OOM",
+                                  NODEF_VALUE,
+                                  dState) {}
 
     bool GetBool(std::shared_ptr<TContainer> c,
                  std::shared_ptr<TValueState> s) {
@@ -76,13 +74,12 @@ public:
     }
 };
 
-class TParentData : public TValueDef {
+class TParentData : public TStringValue {
 public:
-    TParentData() : TValueDef("parent",
-                              EValueType::String,
-                              "container parent",
-                              NODEF_VALUE,
-                              anyState) {}
+    TParentData() : TStringValue("parent",
+                                 "container parent",
+                                 NODEF_VALUE,
+                                 anyState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TValueState> s) {
@@ -90,14 +87,12 @@ public:
     }
 };
 
-class TRespawnCountData : public TValueDef {
+class TRespawnCountData : public TStringValue { // TODO: int
 public:
-    TRespawnCountData() : TValueDef("respawn_count",
-                                    // TODO: int
-                                    EValueType::String,
-                                    "how many time container was automatically respawned",
-                                    NODEF_VALUE,
-                                    rdState) {}
+    TRespawnCountData() : TStringValue("respawn_count",
+                                       "how many time container was automatically respawned",
+                                       NODEF_VALUE,
+                                       rdState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TValueState> s) {
@@ -105,14 +100,12 @@ public:
     }
 };
 
-class TRootPidData : public TValueDef {
+class TRootPidData : public TStringValue { // TODO: int
 public:
-    TRootPidData() : TValueDef("root_pid",
-                               // TODO: int
-                               EValueType::String,
-                               "root process id",
-                               NODEF_VALUE,
-                               rpState) {}
+    TRootPidData() : TStringValue("root_pid",
+                                  "root process id",
+                                  NODEF_VALUE,
+                                  rpState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TValueState> s) {
@@ -123,14 +116,12 @@ public:
     }
 };
 
-class TExitStatusData : public TValueDef {
+class TExitStatusData : public TStringValue { // TODO: int
 public:
-    TExitStatusData() : TValueDef("exit_status",
-                                  // TODO: int
-                                  EValueType::String,
-                                  "container exit status",
-                                  NODEF_VALUE,
-                                  dState) {}
+    TExitStatusData() : TStringValue("exit_status",
+                                     "container exit status",
+                                     NODEF_VALUE,
+                                     dState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TValueState> s) {
@@ -141,14 +132,12 @@ public:
     }
 };
 
-class TStartErrnoData : public TValueDef {
+class TStartErrnoData : public TStringValue { // TODO: int
 public:
-    TStartErrnoData() : TValueDef("start_errno",
-                                  // TODO: int
-                                  EValueType::String,
-                                  "container start error",
-                                  NODEF_VALUE,
-                                  sState) {}
+    TStartErrnoData() : TStringValue("start_errno",
+                                     "container start error",
+                                     NODEF_VALUE,
+                                     sState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TValueState> s) {
@@ -156,13 +145,12 @@ public:
     }
 };
 
-class TStdoutData : public TValueDef {
+class TStdoutData : public TStringValue {
 public:
-    TStdoutData() : TValueDef("stdout",
-                              EValueType::String,
-                              "return task stdout",
-                              NODEF_VALUE,
-                              rpdState) {}
+    TStdoutData() : TStringValue("stdout",
+                                 "return task stdout",
+                                 NODEF_VALUE,
+                                 rpdState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TValueState> s) {
@@ -172,13 +160,12 @@ public:
     }
 };
 
-class TStderrData : public TValueDef {
+class TStderrData : public TStringValue {
 public:
-    TStderrData() : TValueDef("stderr",
-                              EValueType::String,
-                              "return task stderr",
-                              NODEF_VALUE,
-                              rpdState) {}
+    TStderrData() : TStringValue("stderr",
+                                 "return task stderr",
+                                 NODEF_VALUE,
+                                 rpdState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TValueState> s) {
@@ -188,14 +175,12 @@ public:
     }
 };
 
-class TCpuUsageData : public TValueDef {
+class TCpuUsageData : public TStringValue { // TODO: int
 public:
-    TCpuUsageData() : TValueDef("cpu_usage",
-                                // TODO: int
-                                EValueType::String,
-                                "return consumed CPU time in nanoseconds",
-                                NODEF_VALUE,
-                                rpdmState) {}
+    TCpuUsageData() : TStringValue("cpu_usage",
+                                   "return consumed CPU time in nanoseconds",
+                                   NODEF_VALUE,
+                                   rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TValueState> s) {
@@ -217,14 +202,12 @@ public:
     }
 };
 
-class TMemUsageData : public TValueDef {
+class TMemUsageData : public TStringValue { // TODO: int
 public:
-    TMemUsageData() : TValueDef("memory_usage",
-                                // TODO: int
-                                EValueType::String,
-                                "return consumed memory in bytes",
-                                NODEF_VALUE,
-                                rpdmState) {}
+    TMemUsageData() : TStringValue("memory_usage",
+                                   "return consumed memory in bytes",
+                                   NODEF_VALUE,
+                                   rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TValueState> s) {
@@ -246,14 +229,12 @@ public:
     }
 };
 
-class TNetBytesData : public TValueDef {
+class TNetBytesData : public TStringValue { // TODO: map
 public:
-    TNetBytesData() : TValueDef("net_bytes",
-                                // TODO: map
-                                EValueType::String,
-                                "number of tx bytes",
-                                NODEF_VALUE,
-                                rpdmState) {}
+    TNetBytesData() : TStringValue("net_bytes",
+                                   "number of tx bytes",
+                                   NODEF_VALUE,
+                                   rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TValueState> s) {
@@ -268,14 +249,12 @@ public:
     }
 };
 
-class TNetPacketsData : public TValueDef {
+class TNetPacketsData : public TStringValue { // TODO: map
 public:
-    TNetPacketsData() : TValueDef("net_packets",
-                                  // TODO: map
-                                  EValueType::String,
-                                  "number of tx packets",
-                                  NODEF_VALUE,
-                                  rpdmState) {}
+    TNetPacketsData() : TStringValue("net_packets",
+                                     "number of tx packets",
+                                     NODEF_VALUE,
+                                     rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TValueState> s) {
@@ -290,14 +269,12 @@ public:
     }
 };
 
-class TNetDropsData : public TValueDef {
+class TNetDropsData : public TStringValue { // TODO: map
 public:
-    TNetDropsData() : TValueDef("net_drops",
-                                // TODO: map
-                                EValueType::String,
-                                "number of dropped tx packets",
-                                NODEF_VALUE,
-                                rpdmState) {}
+    TNetDropsData() : TStringValue("net_drops",
+                                   "number of dropped tx packets",
+                                   NODEF_VALUE,
+                                   rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TValueState> s) {
@@ -312,14 +289,12 @@ public:
     }
 };
 
-class TNetOverlimitsData : public TValueDef {
+class TNetOverlimitsData : public TStringValue { // TODO: map
 public:
-    TNetOverlimitsData() : TValueDef("net_overlimits",
-                                     // TODO: map
-                                     EValueType::String,
-                                     "number of tx packets that exceeded the limit",
-                                     NODEF_VALUE,
-                                     rpdmState) {}
+    TNetOverlimitsData() : TStringValue("net_overlimits",
+                                        "number of tx packets that exceeded the limit",
+                                        NODEF_VALUE,
+                                        rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TValueState> s) {
@@ -334,14 +309,12 @@ public:
     }
 };
 
-class TMinorFaultsData : public TValueDef {
+class TMinorFaultsData : public TStringValue { // TODO: int
 public:
-    TMinorFaultsData() : TValueDef("minor_faults",
-                                   // TODO: int
-                                   EValueType::String,
-                                   "return number of minor page faults",
-                                   NODEF_VALUE,
-                                   rpdmState) {}
+    TMinorFaultsData() : TStringValue("minor_faults",
+                                      "return number of minor page faults",
+                                      NODEF_VALUE,
+                                      rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TValueState> s) {
@@ -355,14 +328,12 @@ public:
     }
 };
 
-class TMajorFaultsData : public TValueDef {
+class TMajorFaultsData : public TStringValue { // TODO: int
 public:
-    TMajorFaultsData() : TValueDef("major_faults",
-                                   // TODO: int
-                                   EValueType::String,
-                                   "return number of major page faults",
-                                   NODEF_VALUE,
-                                   rpdmState) {}
+    TMajorFaultsData() : TStringValue("major_faults",
+                                      "return number of major page faults",
+                                      NODEF_VALUE,
+                                      rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TValueState> s) {
@@ -376,14 +347,12 @@ public:
     }
 };
 
-class TIoReadData : public TValueDef {
+class TIoReadData : public TStringValue { // TODO: map
 public:
-    TIoReadData() : TValueDef("io_read",
-                              // TODO: map
-                              EValueType::String,
-                              "return number of bytes read from disk",
-                              NODEF_VALUE | HIDDEN_VALUE,
-                              rpdmState) {}
+    TIoReadData() : TStringValue("io_read",
+                                 "return number of bytes read from disk",
+                                 NODEF_VALUE | HIDDEN_VALUE,
+                                 rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TValueState> s) {
@@ -405,14 +374,12 @@ public:
     }
 };
 
-class TIoWriteData : public TValueDef {
+class TIoWriteData : public TStringValue { // TODO: map
 public:
-    TIoWriteData() : TValueDef("io_write",
-                               // TODO: map
-                               EValueType::String,
-                               "return number of bytes written to disk",
-                               NODEF_VALUE | HIDDEN_VALUE,
-                               rpdmState) {}
+    TIoWriteData() : TStringValue("io_write",
+                                  "return number of bytes written to disk",
+                                  NODEF_VALUE | HIDDEN_VALUE,
+                                  rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TValueState> s) {
@@ -434,14 +401,12 @@ public:
     }
 };
 
-class TTimeData : public TValueDef {
+class TTimeData : public TStringValue { // TODO: int
 public:
-    TTimeData() : TValueDef("minor_faults",
-                            // TODO: int
-                            EValueType::String,
-                            "return running time of container",
-                            NODEF_VALUE,
-                            rpdState) {}
+    TTimeData() : TStringValue("minor_faults",
+                               "return running time of container",
+                               NODEF_VALUE,
+                               rpdState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TValueState> s) {

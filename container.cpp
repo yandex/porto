@@ -848,7 +848,7 @@ TError TContainer::GetData(const string &name, string &value) {
     TError error = Data->Get(name, s);
     if (error)
         return error;
-    value = s->GetStr();
+    value = s->Get();
     return TError::Success();
 }
 
