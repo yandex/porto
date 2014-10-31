@@ -82,7 +82,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     std::shared_ptr<TNlLink> Link;
     int TaskStartErrno = -1;
     TScopedFd Efd;
-    size_t RespawnCount;
+    ssize_t RespawnCount;
     int Uid, Gid;
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
@@ -118,11 +118,8 @@ public:
     std::shared_ptr<TPropertyHolder> Prop;
     std::shared_ptr<TVariantSet> Data;
 
-    TError SetOomKilled(bool v);
-
     EContainerState GetState();
     size_t GetRespawnCount() { return RespawnCount; }
-    int GetTaskStartErrno() { return TaskStartErrno; }
     TError GetStat(ETclassStat stat, uint64_t &val) { return Tclass->GetStat(stat, val); }
 
     TContainer(const std::string &name, std::shared_ptr<TContainer> parent, uint16_t id, std::shared_ptr<TNlLink> link) :

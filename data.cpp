@@ -82,7 +82,7 @@ public:
     }
 };
 
-class TRespawnCountData : public TStringValue { // TODO: int
+class TRespawnCountData : public TStringValue { // TODO: uint
 public:
     TRespawnCountData() : TStringValue("respawn_count",
                                        "how many time container was automatically respawned",
@@ -95,49 +95,43 @@ public:
     }
 };
 
-class TRootPidData : public TStringValue { // TODO: int
+class TRootPidData : public TIntValue {
 public:
-    TRootPidData() : TStringValue("root_pid",
-                                  "root process id",
+    TRootPidData() : TIntValue(D_ROOT_PID,
+                               "root process id",
+                               NODEF_VALUE,
+                               rpState) {}
+
+    int GetInt(std::shared_ptr<TContainer> c,
+               std::shared_ptr<TVariant> v) {
+        if (!c->Task)
+            return -1;
+        return c->Task->GetPid();
+    }
+};
+
+class TExitStatusData : public TIntValue {
+public:
+    TExitStatusData() : TIntValue(D_EXIT_STATUS,
+                                  "container exit status",
                                   NODEF_VALUE,
-                                  rpState) {}
+                                  dState) {}
 
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) {
-        if (c->Task)
-            return std::to_string(c->Task->GetPid());
-        else
-            return "-1";
-    }
-};
-
-class TExitStatusData : public TStringValue { // TODO: int
-public:
-    TExitStatusData() : TStringValue("exit_status",
-                                     "container exit status",
-                                     NODEF_VALUE,
-                                     dState) {}
-
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) {
+    int GetInt(std::shared_ptr<TContainer> c,
+               std::shared_ptr<TVariant> v) {
         if (c->Task && !c->Task->IsRunning())
-            return std::to_string(c->Task->GetExitStatus());
+            return c->Task->GetExitStatus();
         else
-            return "-1";
+            return -1;
     }
 };
 
-class TStartErrnoData : public TStringValue { // TODO: int
+class TStartErrnoData : public TIntValue {
 public:
-    TStartErrnoData() : TStringValue("start_errno",
-                                     "container start error",
-                                     NODEF_VALUE,
-                                     sState) {}
-
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) {
-        return std::to_string(c->GetTaskStartErrno());
-    }
+    TStartErrnoData() : TIntValue(D_START_ERRNO,
+                                  "container start error",
+                                  NODEF_VALUE,
+                                  sState) {}
 };
 
 class TStdoutData : public TStringValue {
@@ -170,7 +164,7 @@ public:
     }
 };
 
-class TCpuUsageData : public TStringValue { // TODO: int
+class TCpuUsageData : public TStringValue { // TODO: uint
 public:
     TCpuUsageData() : TStringValue("cpu_usage",
                                    "return consumed CPU time in nanoseconds",
@@ -197,7 +191,7 @@ public:
     }
 };
 
-class TMemUsageData : public TStringValue { // TODO: int
+class TMemUsageData : public TStringValue { // TODO: uint
 public:
     TMemUsageData() : TStringValue("memory_usage",
                                    "return consumed memory in bytes",
@@ -304,7 +298,7 @@ public:
     }
 };
 
-class TMinorFaultsData : public TStringValue { // TODO: int
+class TMinorFaultsData : public TStringValue { // TODO: uint
 public:
     TMinorFaultsData() : TStringValue("minor_faults",
                                       "return number of minor page faults",
@@ -323,7 +317,7 @@ public:
     }
 };
 
-class TMajorFaultsData : public TStringValue { // TODO: int
+class TMajorFaultsData : public TStringValue { // TODO: uint
 public:
     TMajorFaultsData() : TStringValue("major_faults",
                                       "return number of major page faults",
@@ -396,7 +390,7 @@ public:
     }
 };
 
-class TTimeData : public TStringValue { // TODO: int
+class TTimeData : public TStringValue { // TODO: uint
 public:
     TTimeData() : TStringValue("minor_faults",
                                "return running time of container",

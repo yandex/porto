@@ -88,6 +88,7 @@ class TValue {
 
 protected:
     void ExpectType(EValueType type);
+    bool NeedDefault();
 public:
     TValue(const std::string &name,
            const EValueType type,
@@ -119,7 +120,7 @@ public:
     virtual bool GetBool(std::shared_ptr<TContainer> c,
                          std::shared_ptr<TVariant> v);
 
-    virtual bool GetDefaultInt(std::shared_ptr<TContainer> c);
+    virtual int GetDefaultInt(std::shared_ptr<TContainer> c);
     virtual TError SetInt(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TVariant> v,
                           const int value);
@@ -130,6 +131,8 @@ public:
 #define SYNTHESIZE_DEFAULT(NAME, TYPE) \
     bool IsDefault(std::shared_ptr<TContainer> c, \
                    std::shared_ptr<TVariant> v) { \
+        if (!NeedDefault()) \
+            return false; \
         if (!v->HasValue()) \
             return true; \
         return v->Get<TYPE>(EValueType::NAME) == GetDefault ## NAME(c); \
@@ -225,13 +228,11 @@ class TVariantSet {
     NO_COPY_CONSTRUCT(TVariantSet);
     TValueSet *ValueSet;
     std::weak_ptr<TContainer> Container;
+    std::map<std::string, std::shared_ptr<TVariant>> Variant;
 
 public:
     TError Get(const std::string &name, std::shared_ptr<TContainer> &c,
                TValue **p, std::shared_ptr<TVariant> &v);
-
-    // TODO: make Variant private
-    std::map<std::string, std::shared_ptr<TVariant>> Variant;
 
     TVariantSet(TValueSet *v, std::weak_ptr<TContainer> c) :
         ValueSet(v), Container(c) {}
@@ -240,6 +241,7 @@ public:
     SYNTHESIZE_ACCESSOR(Bool, bool)
     SYNTHESIZE_ACCESSOR(Int, int)
 
+    std::vector<std::string> List();
     bool IsDefault(const std::string &name);
 };
 

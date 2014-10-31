@@ -104,10 +104,6 @@ bool TContainer::HaveRunningChildren() {
     return false;
 }
 
-TError TContainer::SetOomKilled(bool v) {
-    return Data->SetBool(D_OOM_KILLED, v);
-}
-
 EContainerState TContainer::GetState() {
     static bool rec = false;
 
@@ -324,12 +320,9 @@ std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
 }
 
 bool TContainer::UseParentNamespace() const {
-    string value;
-    TError error = Prop->GetRaw("isolate", value);
-    if (error)
-        return false;
-
-    if (value == "true")
+    bool value = false;
+    TError error = Prop->GetRawBool("isolate", value);
+    if (error || value == true)
         return false;
 
     return FindRunningParent() != nullptr;
@@ -539,8 +532,12 @@ TError TContainer::Create(int uid, int gid) {
             return error;
     }
 
-    Prop->SetRaw("uid", std::to_string(Uid));
-    Prop->SetRaw("gid", std::to_string(Gid));
+    error = Data->SetInt(D_START_ERRNO, -1);
+    if (error)
+        return error;
+
+    Prop->SetInt("uid", Uid);
+    Prop->SetInt("gid", Gid);
 
     if (Parent)
         Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
@@ -551,6 +548,7 @@ TError TContainer::Create(int uid, int gid) {
         // (unclassified        1:3 container a, 1:4 container b
         //          traffic)    1:5 container a/c
 
+        PORTO_ASSERT(Id == 1);
         uint32_t defHandle = TcHandle(Id, Id + 1);
         uint32_t rootHandle = TcHandle(Id, 0);
 
@@ -634,9 +632,9 @@ TError TContainer::Start() {
         return TError(EError::InvalidValue, "container command is empty");
     }
 
-    Prop->SetRaw("id", std::to_string(Id));
+    Prop->SetInt("id", (int)Id);
 
-    TError error = SetOomKilled(false);
+    TError error = Data->SetBool(D_OOM_KILLED, false);
     if (error)
         return error;
 
@@ -660,14 +658,18 @@ TError TContainer::Start() {
     if (error) {
         TLogger::LogError(error, "Can't start task");
         FreeResources();
-        TaskStartErrno = error.GetErrno();
+        TError e = Data->SetInt(D_START_ERRNO, error.GetErrno());
+        TLogger::LogError(e, "Can't set start_errno");
         return error;
     }
-    TaskStartErrno = -1;
+
+    error = Data->SetInt(D_START_ERRNO, -1);
+    if (error)
+        return error;
 
     TLogger::Log() << GetName() << " started " << std::to_string(Task->GetPid()) << std::endl;
 
-    Prop->SetRaw("root_pid", std::to_string(Task->GetPid()));
+    Prop->SetInt(P_ROOT_PID, Task->GetPid());
     SetState(EContainerState::Running);
 
     return TError::Success();
@@ -761,7 +763,6 @@ void TContainer::FreeResources() {
     }
 
     Task = nullptr;
-    TaskStartErrno = -1;
     Efd = -1;
 }
 
@@ -962,7 +963,7 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
     if (UseParentNamespace() && Prop->HasFlags(property, PARENT_RO_PROPERTY))
         return TError(EError::NotSupported, "Can't set " + property + " for child container");
 
-    error = Prop->Set(property, value);
+    error = Prop->SetString(property, value);
     if (error) {
         TLogger::LogError(error, "Can't set property");
         return error;
@@ -988,32 +989,19 @@ TError TContainer::Restore(const kv::TNode &node) {
 
     int pid = 0;
     bool started = true;
-    string pidStr;
-    error = Prop->GetRaw("root_pid", pidStr);
-    if (error) {
+    error = Prop->GetRawInt(P_ROOT_PID, pid);
+    if (error || pid == 0)
         started = false;
-    } else {
-        error = StringToInt(pidStr, pid);
-        if (error)
-            started = false;
-    }
 
     TLogger::Log() << GetName() << ": restore process " << std::to_string(pid) << " which " << (started ? "started" : "didn't start") << std::endl;
 
-    string s;
-    error = Prop->GetRaw("uid", s);
+    Uid = 0;
+    error = Prop->GetRawInt("uid", Uid);
     TLogger::LogError(error, "Can't restore uid");
-    if (!error) {
-        error = StringToInt(s, Uid);
-        TLogger::LogError(error, "Can't parse uid");
-    }
 
-    error = Prop->GetRaw("gid", s);
+    Gid = 0;
+    error = Prop->GetRawInt("gid", Gid);
     TLogger::LogError(error, "Can't restore gid");
-    if (!error) {
-        error = StringToInt(s, Gid);
-        TLogger::LogError(error, "Can't parse gid");
-    }
 
     SetState(EContainerState::Stopped);
 
@@ -1115,7 +1103,7 @@ bool TContainer::NeedRespawn() {
         return false;
 
     size_t startTime = TimeOfDeath + config().container().respawn_delay_ms();
-    return startTime <= GetCurrentTimeMs() && (Prop->GetInt("max_respawns") < 0 || RespawnCount < Prop->GetUint("max_respawns"));
+    return startTime <= GetCurrentTimeMs() && (Prop->GetInt("max_respawns") < 0 || RespawnCount < Prop->GetInt("max_respawns"));
 }
 
 TError TContainer::Respawn() {
@@ -1123,7 +1111,7 @@ TError TContainer::Respawn() {
     if (error)
         return error;
 
-    size_t tmp = RespawnCount;
+    ssize_t tmp = RespawnCount;
     error = Start();
     RespawnCount = tmp + 1;
     if (error)
@@ -1177,7 +1165,7 @@ bool TContainer::DeliverOom(int fd) {
     SetState(EContainerState::Dead);
 
     StopChildren();
-    error = SetOomKilled(true);
+    error = Data->SetBool(D_OOM_KILLED, true);
     TLogger::LogError(error, "Can't indicate whether container is killed by OOM");
     Efd = -1;
     return true;

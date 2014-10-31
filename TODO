@@ -1,6 +1,6 @@
-- isolate ipc property
+- add TUintValue and save actual data in TValue for respawnCount
 - debian Build-depends protobuf-compiler g++-4.7 | g++-4.8
-- save actual data in TValue for respawnCount, startErrno
+- isolate ipc property
 - test restarting (check version)
 - shaping with macvlan or non-default interface?
 - ? portoctl cp

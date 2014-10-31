@@ -7,6 +7,10 @@
 #include "util/unix.hpp"
 #include "util/pwd.hpp"
 
+namespace std {
+    const string &to_string(const string &s) { return s; }
+}
+
 bool TPropertyHolder::ParentDefault(std::shared_ptr<TContainer> &c,
                                     const std::string &property) {
     TError error = GetSharedContainer(c);
@@ -22,21 +26,6 @@ bool TPropertyHolder::IsDefault(const std::string &property) {
     return VariantSet.IsDefault(property);
 }
 
-int TPropertyHolder::GetInt(const std::string &property) {
-    if (VariantSet.IsDefault(property)) {
-        std::shared_ptr<TContainer> c;
-        if (ParentDefault(c, property))
-            return c->GetParent()->Prop->GetInt(property);
-    }
-
-    int val;
-
-    if (StringToInt(GetString(property), val))
-        return 0;
-
-    return val;
-}
-
 uint64_t TPropertyHolder::GetUint(const std::string &property) {
     if (VariantSet.IsDefault(property)) {
         std::shared_ptr<TContainer> c;
@@ -50,53 +39,6 @@ uint64_t TPropertyHolder::GetUint(const std::string &property) {
         return 0;
 
     return val;
-}
-
-TError TPropertyHolder::GetRaw(const std::string &property, std::string &value) {
-    return VariantSet.GetString(property, value);
-}
-
-// TODO: return TError
-TError TPropertyHolder::SetRaw(const std::string &property,
-                               const std::string &value) {
-
-    TValue *p = nullptr;
-    std::shared_ptr<TContainer> c;
-    std::shared_ptr<TVariant> v;
-    TError error = VariantSet.Get(property, c, &p, v);
-    TLogger::LogError(error, "Can't set raw property " + property);
-    if (error)
-        return error;
-
-    error = v->Set<std::string>(EValueType::String, value);
-    TLogger::LogError(error, "Can't set raw property " + property);
-    if (error)
-        return error;
-
-    error = AppendStorage(property, value);
-    if (error)
-        return error;
-
-    return error;
-}
-
-TError TPropertyHolder::Set(const std::string &property,
-                            const std::string &value) {
-    if (!propertySet.Valid(property)) {
-        TError error(EError::InvalidValue, "property not found");
-        TLogger::LogError(error, "Can't set property");
-        return error;
-    }
-
-    TError error = VariantSet.SetString(property, value);
-    if (error)
-        return error;
-
-    error = AppendStorage(property, value);
-    if (error)
-        return error;
-
-    return TError::Success();
 }
 
 bool TPropertyHolder::HasFlags(const std::string &property, int flags) {
@@ -129,7 +71,9 @@ TError TPropertyHolder::Restore(const kv::TNode &node) {
         auto key = node.pairs(i).key();
         auto value = node.pairs(i).val();
 
-        SetRaw(key, value);
+        TError error = SetString(key, value);
+        if (error)
+            return error;
     }
 
     return SyncStorage();
@@ -154,10 +98,16 @@ TError TPropertyHolder::SyncStorage() {
 
     kv::TNode node;
 
-    for (auto &kv : VariantSet.Variant) {
+    for (auto &name : VariantSet.List()) {
         auto pair = node.add_pairs();
-        pair->set_key(kv.first);
-        pair->set_val(kv.second->Get<std::string>(EValueType::String));
+        pair->set_key(name);
+
+        std::string value;
+        TError error = VariantSet.GetString(name, value);
+        if (error)
+            return error;
+
+        pair->set_val(value);
     }
 
     return Storage.SaveNode(Name, node);
@@ -459,7 +409,7 @@ public:
     }
 };
 
-class TMemoryGuaranteeProperty : public TStringValue {
+class TMemoryGuaranteeProperty : public TStringValue { // TODO: Uint
 public:
     TMemoryGuaranteeProperty() :
         TStringValue("memory_guarantee",
@@ -575,7 +525,7 @@ public:
     }
 };
 
-class TCpuPriorityProperty : public TStringValue {
+class TCpuPriorityProperty : public TStringValue { // TODO: Uint
 public:
     TCpuPriorityProperty() :
         TStringValue("cpu_priority",
@@ -602,7 +552,7 @@ public:
     }
 };
 
-class TNetGuaranteeProperty : public TStringValue {
+class TNetGuaranteeProperty : public TStringValue { // TODO: Uint
 public:
     TNetGuaranteeProperty() :
         TStringValue("net_guarantee",
@@ -624,7 +574,7 @@ public:
     }
 };
 
-class TNetCeilProperty : public TStringValue {
+class TNetCeilProperty : public TStringValue { // TODO: Uint
 public:
     TNetCeilProperty() :
         TStringValue("net_ceil",
@@ -646,7 +596,7 @@ public:
     }
 };
 
-class TNetPriorityProperty : public TStringValue {
+class TNetPriorityProperty : public TStringValue { // TODO: Uint
 public:
     TNetPriorityProperty() :
         TStringValue("net_priority",
@@ -686,25 +636,16 @@ public:
     }
 };
 
-class TMaxRespawnsProperty : public TStringValue {
+class TMaxRespawnsProperty : public TIntValue {
 public:
     TMaxRespawnsProperty() :
-        TStringValue("max_respawns",
-                     "Limit respawn count for specific container",
-                     0,
-                     staticProperty) {}
+        TIntValue("max_respawns",
+                  "Limit respawn count for specific container",
+                  0,
+                  staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
-        return "-1";
-    }
-
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value) {
-        TError error = ValidUint(c, value);
-        if (error)
-            return error;
-        return v->Set(EValueType::String, value);
+    int GetDefaultInt(std::shared_ptr<TContainer> c) {
+        return -1;
     }
 };
 
@@ -852,24 +793,24 @@ public:
     }
 };
 
-class TUidProperty : public TStringValue { // TODO: int
+class TUidProperty : public TIntValue {
 public:
-    TUidProperty() : TStringValue("uid", "", HIDDEN_VALUE, {}) {}
+    TUidProperty() : TIntValue("uid", "", HIDDEN_VALUE, {}) {}
 };
 
-class TGidProperty : public TStringValue { // TODO: int
+class TGidProperty : public TIntValue {
 public:
-    TGidProperty() : TStringValue("gid", "", HIDDEN_VALUE, {}) {}
+    TGidProperty() : TIntValue("gid", "", HIDDEN_VALUE, {}) {}
 };
 
-class TIdProperty : public TStringValue { // TODO: int
+class TIdProperty : public TIntValue {
 public:
-    TIdProperty() : TStringValue("id", "", HIDDEN_VALUE, {}) {}
+    TIdProperty() : TIntValue("id", "", HIDDEN_VALUE, {}) {}
 };
 
-class TRootPidProperty : public TStringValue { // TODO: int
+class TRootPidProperty : public TIntValue {
 public:
-    TRootPidProperty() : TStringValue("root_pid", "", HIDDEN_VALUE, {}) {}
+    TRootPidProperty() : TIntValue(P_ROOT_PID, "", HIDDEN_VALUE, {}) {}
 };
 
 TValueSet propertySet;
