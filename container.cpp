@@ -869,7 +869,21 @@ TError TContainer::Kill(int sig) {
     return Task->Kill(sig);
 }
 
-TError TContainer::GetData(const string &name, string &value) {
+void TContainer::ParseName(std::string &name, std::string &idx) {
+    std::vector<std::string> tokens;
+    TError error = SplitString(name, '[', tokens);
+    if (error || tokens.size() != 2)
+        return;
+
+    name = tokens[0];
+    idx = StringTrim(tokens[1], " \t\n]");
+}
+
+TError TContainer::GetData(const string &origName, string &value) {
+    std::string name = origName;
+    std::string idx;
+    ParseName(name, idx);
+
     // TODO: InvalidData
     if (!dataSet.Valid(name))
         return TError(EError::InvalidValue, "invalid container data");
@@ -885,7 +899,16 @@ TError TContainer::GetData(const string &name, string &value) {
     if (error)
         return error;
 
-    value = p->GetString(c, v);
+    if (idx.length()) {
+        TUintMap m = p->GetMap(c, v);
+        if (m.find(idx) == m.end())
+            return TError(EError::InvalidValue, "invalid index " + idx);
+
+        value = std::to_string(m.at(idx));
+    } else {
+        value = p->GetString(c, v);
+    }
+
     return TError::Success();
 }
 
@@ -950,7 +973,7 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
     if (alias.find(origProperty) != alias.end())
         property = alias.at(origProperty);
 
-    TError error = Prop->PropertyExists(property);
+    TError error = Prop->Valid(property);
     if (error)
         return error;
 
@@ -982,7 +1005,7 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
     if (error)
         return error;
 
-    error = Prop->PropertyExists(property);
+    error = Prop->Valid(property);
     if (error)
         return error;
 

@@ -22,6 +22,7 @@ class TContainer;
 class TSubsystem;
 class TPropertySet;
 class TVariantSet;
+class TValueSet;
 enum class ETclassStat;
 
 extern int64_t BootTime;
@@ -110,6 +111,8 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
 
     bool DeliverExitStatus(int pid, int status);
     bool DeliverOom(int fd);
+
+    void ParseName(std::string &name, std::string &idx);
 
 public:
     // TODO: make private

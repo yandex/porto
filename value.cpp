@@ -1,3 +1,5 @@
+#include <sstream>
+
 #include "value.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
@@ -74,6 +76,26 @@ uint64_t TValue::GetUint(std::shared_ptr<TContainer> c,
         return GetDefaultUint(c);
 
     return v->Get<uint64_t>(Type);
+}
+
+TUintMap TValue::GetDefaultMap(std::shared_ptr<TContainer> c) {
+    return TUintMap();
+}
+
+TError TValue::SetMap(std::shared_ptr<TContainer> c,
+                      std::shared_ptr<TVariant> v,
+                      const TUintMap &value) {
+    ExpectType(EValueType::Map);
+    return v->Set(EValueType::Map, value);
+}
+
+TUintMap TValue::GetMap(std::shared_ptr<TContainer> c,
+                        std::shared_ptr<TVariant> v) {
+    ExpectType(EValueType::Map);
+    if (!v->HasValue() && NeedDefault())
+        return GetDefaultMap(c);
+
+    return v->Get<TUintMap>(Type);
 }
 
 std::string TStringValue::GetDefaultString(std::shared_ptr<TContainer> c) {
@@ -177,6 +199,61 @@ std::string TUintValue::GetString(std::shared_ptr<TContainer> c,
         value = GetUint(c, v);
 
     return std::to_string(value);
+}
+
+static std::string MapToString(const TUintMap &m) {
+    std::stringstream str;
+
+    for (auto &kv : m) {
+        if (str.str().length())
+            str << "; ";
+        str << kv.first << ": " << kv.second;
+    }
+
+    return str.str();
+}
+
+std::string TMapValue::GetDefaultString(std::shared_ptr<TContainer> c) {
+    return MapToString(GetDefaultMap(c));
+}
+
+TError TMapValue::SetString(std::shared_ptr<TContainer> c,
+                            std::shared_ptr<TVariant> v,
+                            const std::string &value) {
+    TUintMap m;
+    std::vector<std::string> lines;
+    TError error = SplitString(value, ';', lines);
+    if (error)
+        return error;
+
+    // TODO: do we need to check that keys are valid?
+
+    for (auto &line : lines) {
+        std::vector<std::string> nameval;
+
+        (void)SplitString(line, ':', nameval);
+        if (nameval.size() != 2)
+            return TError(EError::InvalidValue, "Invalid format");
+
+        std::string key = StringTrim(nameval[0]);
+        uint64_t val;
+
+        error = StringToUint64(nameval[1], val);
+        if (error)
+            return TError(EError::InvalidValue, "Invalid value " + nameval[1]);
+
+        m[key] = val;
+    }
+
+    return v->Set(EValueType::Map, m);
+}
+
+std::string TMapValue::GetString(std::shared_ptr<TContainer> c,
+                                 std::shared_ptr<TVariant> v) {
+    if (!v->HasValue() && NeedDefault())
+        return MapToString(GetDefaultMap(c));
+    else
+        return MapToString(GetMap(c, v));
 }
 
 TError TValueSet::Register(TValue *p) {

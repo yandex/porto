@@ -18,6 +18,7 @@ enum class EValueType {
     Bool,
     Int,
     Uint,
+    Map,
 
 #if 0
     // key: val; key: val
@@ -82,6 +83,8 @@ public:
     };
 };
 
+typedef std::map<std::string, uint64_t> TUintMap;
+
 class TValue {
     NO_COPY_CONSTRUCT(TValue);
 
@@ -132,6 +135,13 @@ public:
                            const uint64_t value);
     virtual uint64_t GetUint(std::shared_ptr<TContainer> c,
                              std::shared_ptr<TVariant> v);
+
+    virtual TUintMap GetDefaultMap(std::shared_ptr<TContainer> c);
+    virtual TError SetMap(std::shared_ptr<TContainer> c,
+                          std::shared_ptr<TVariant> v,
+                          const TUintMap &value);
+    virtual TUintMap GetMap(std::shared_ptr<TContainer> c,
+                            std::shared_ptr<TVariant> v);
 };
 
 #define SYNTHESIZE_DEFAULT(NAME, TYPE) \
@@ -222,6 +232,26 @@ public:
                           std::shared_ptr<TVariant> v);
 
     SYNTHESIZE_DEFAULT(Uint, uint64_t)
+};
+
+class TMapValue : public TValue {
+    NO_COPY_CONSTRUCT(TMapValue);
+
+public:
+    TMapValue(const std::string &name,
+               const std::string &desc,
+               const int flags,
+               const std::set<EContainerState> &state) :
+        TValue(name, EValueType::Map, desc, flags, state) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c);
+    TError SetString(std::shared_ptr<TContainer> c,
+                     std::shared_ptr<TVariant> v,
+                     const std::string &value);
+    std::string GetString(std::shared_ptr<TContainer> c,
+                          std::shared_ptr<TVariant> v);
+
+    SYNTHESIZE_DEFAULT(Map, TUintMap)
 };
 
 #undef SYNTHESIZE_DEFAULT

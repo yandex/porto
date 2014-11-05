@@ -131,8 +131,10 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     ExpectFailure(api.GetData(name, "oom_killed", v), EError::InvalidState);
     ExpectFailure(api.GetData(name, "respawn_count", v), EError::InvalidState);
     ExpectSuccess(api.GetData(name, "parent", v));
-    ExpectFailure(api.GetData(name, "io_read", v), EError::InvalidState);
-    ExpectFailure(api.GetData(name, "io_write", v), EError::InvalidState);
+    if(IsCfqActive()) {
+        ExpectFailure(api.GetData(name, "io_read", v), EError::InvalidState);
+        ExpectFailure(api.GetData(name, "io_write", v), EError::InvalidState);
+    }
     Expect(v == string("/"));
 }
 
@@ -1565,10 +1567,12 @@ static void TestRoot(TPortoAPI &api) {
     Expect(v == "0");
     ExpectSuccess(api.GetData(root, "net_overlimits", v));
     Expect(v == "0");
-    ExpectSuccess(api.GetData(root, "io_read", v));
-    Expect(v == "");
-    ExpectSuccess(api.GetData(root, "io_write", v));
-    Expect(v == "");
+    if(IsCfqActive()) {
+        ExpectSuccess(api.GetData(root, "io_read", v));
+        Expect(v == "");
+        ExpectSuccess(api.GetData(root, "io_write", v));
+        Expect(v == "");
+    }
 
     uint32_t defClass = TcHandle(1, 2);
     uint32_t rootClass = TcHandle(1, 1);
@@ -1620,6 +1624,27 @@ static void TestRoot(TPortoAPI &api) {
     ExpectSuccess(api.Destroy("b"));
 }
 
+static void TestDataMap(TPortoAPI &api, const std::string &name, const std::string &data) {
+    std::string full;
+    vector<string> lines;
+
+    ExpectSuccess(api.GetData(name, data, full));
+    Expect(full != "");
+    ExpectSuccess(SplitString(full, ';', lines));
+
+    Expect(lines.size() != 0);
+    for (auto line: lines) {
+        string tmp;
+        vector<string> tokens;
+
+        ExpectSuccess(SplitString(full, ':', tokens));
+        ExpectSuccess(api.GetData(name, data + "[" + StringTrim(tokens[0]) + "]", tmp));
+        Expect(tmp == StringTrim(tokens[1]));
+    }
+
+    ExpectFailure(api.GetData(name, data + "[invalid]", full), EError::InvalidValue);
+}
+
 static void TestStats(TPortoAPI &api) {
     // should be executed right after TestRoot because assumes empty statistics
 
@@ -1648,26 +1673,32 @@ static void TestStats(TPortoAPI &api) {
     if(IsCfqActive()) {
         ExpectSuccess(api.GetData(root, "io_write", v));
         Expect(v != "");
+        TestDataMap(api, root, "io_write");
         ExpectSuccess(api.GetData(root, "io_read", v));
         Expect(v != "");
+        TestDataMap(api, root, "io_read");
     }
     ExpectSuccess(api.GetData(wget, "cpu_usage", v));
     Expect(v != "0" && v != "-1");
     ExpectSuccess(api.GetData(wget, "memory_usage", v));
     Expect(v != "0" && v != "-1");
-    ExpectSuccess(api.GetData(wget, "io_write", v));
-    Expect(v != "");
-    ExpectSuccess(api.GetData(wget, "io_read", v));
-    Expect(v != "");
+    if(IsCfqActive()) {
+        ExpectSuccess(api.GetData(wget, "io_write", v));
+        Expect(v != "");
+        ExpectSuccess(api.GetData(wget, "io_read", v));
+        Expect(v != "");
+    }
 
     ExpectSuccess(api.GetData(noop, "cpu_usage", v));
     Expect(v != "0" && v != "-1");
     ExpectSuccess(api.GetData(noop, "memory_usage", v));
     Expect(v != "0" && v != "-1");
-    ExpectSuccess(api.GetData(noop, "io_write", v));
-    Expect(v == "");
-    ExpectSuccess(api.GetData(noop, "io_read", v));
-    Expect(v == "");
+    if(IsCfqActive()) {
+        ExpectSuccess(api.GetData(noop, "io_write", v));
+        Expect(v == "");
+        ExpectSuccess(api.GetData(noop, "io_read", v));
+        Expect(v == "");
+    }
 
     ExpectSuccess(api.GetData(root, "net_bytes", rv));
     Expect(rv != "0" && rv != "-1");

@@ -64,7 +64,7 @@ TError TPropertySet::Restore(const kv::TNode &node) {
     return SyncStorage();
 }
 
-TError TPropertySet::PropertyExists(const std::string &property) {
+TError TPropertySet::Valid(const std::string &property) {
     if (!propertySet.Valid(property))
         return TError(EError::InvalidProperty, "invalid property");
     return TError::Success();

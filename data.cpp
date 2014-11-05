@@ -348,59 +348,53 @@ public:
     }
 };
 
-class TIoReadData : public TStringValue { // TODO: map
+class TIoReadData : public TMapValue {
 public:
     TIoReadData() :
-        TStringValue("io_read",
-                     "return number of bytes read from disk",
-                     NODEF_VALUE | HIDDEN_VALUE,
-                     rpdmState) {}
+        TMapValue("io_read",
+                  "return number of bytes read from disk",
+                  NODEF_VALUE | HIDDEN_VALUE,
+                  rpdmState) {}
 
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) {
+    TUintMap GetMap(std::shared_ptr<TContainer> c,
+                    std::shared_ptr<TVariant> v) {
+        TUintMap m;
         auto cg = c->GetLeafCgroup(blkioSubsystem);
 
         std::vector<BlkioStat> stat;
         TError error = blkioSubsystem->Statistics(cg, "blkio.io_service_bytes_recursive", stat);
         if (error)
-            return "-1";
+            return m;
 
-        std::stringstream str;
-        for (auto &s : stat) {
-            if (str.str().length())
-                str << " ";
-            str << s.Device << ":" << s.Read;
-        }
+        for (auto &s : stat)
+            m[s.Device] = s.Read;
 
-        return str.str();
+        return m;
     }
 };
 
-class TIoWriteData : public TStringValue { // TODO: map
+class TIoWriteData : public TMapValue {
 public:
     TIoWriteData() :
-        TStringValue("io_write",
-                     "return number of bytes written to disk",
-                     NODEF_VALUE | HIDDEN_VALUE,
-                     rpdmState) {}
+        TMapValue("io_write",
+                  "return number of bytes written to disk",
+                  NODEF_VALUE | HIDDEN_VALUE,
+                  rpdmState) {}
 
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) {
+    TUintMap GetMap(std::shared_ptr<TContainer> c,
+                    std::shared_ptr<TVariant> v) {
+        TUintMap m;
         auto cg = c->GetLeafCgroup(blkioSubsystem);
 
         std::vector<BlkioStat> stat;
         TError error = blkioSubsystem->Statistics(cg, "blkio.io_service_bytes_recursive", stat);
         if (error)
-            return "-1";
+            return m;
 
-        std::stringstream str;
-        for (auto &s : stat) {
-            if (str.str().length())
-                str << " ";
-            str << s.Device << ":" << s.Write;
-        }
+        for (auto &s : stat)
+            m[s.Device] = s.Write;
 
-        return str.str();
+        return m;
     }
 };
 

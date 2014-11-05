@@ -119,7 +119,7 @@ public:
 
     TError Create();
     TError Restore(const kv::TNode &node);
-    TError PropertyExists(const std::string &property);
+    TError Valid(const std::string &property);
 };
 
 #undef SYNTHESIZE_ACCESSOR
