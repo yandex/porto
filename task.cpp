@@ -571,7 +571,7 @@ TError TTask::Start() {
 
         int cloneFlags = SIGCHLD;
         if (Env->Isolate)
-            cloneFlags |= CLONE_NEWPID | CLONE_NEWNS;
+            cloneFlags |= CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC;
 
         if (Env->Hostname != "")
             cloneFlags |= CLONE_NEWUTS;

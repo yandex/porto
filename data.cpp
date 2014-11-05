@@ -147,7 +147,7 @@ public:
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TVariant> v) {
         if (c->Task)
-            return c->Task->GetStdout(c->Prop->GetUint("stdout_limit"));
+            return c->Task->GetStdout(c->Prop->GetUint(P_STDOUT_LIMIT));
         return "";
     }
 };
@@ -163,7 +163,7 @@ public:
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TVariant> v) {
         if (c->Task)
-            return c->Task->GetStderr(c->Prop->GetUint("stdout_limit"));
+            return c->Task->GetStderr(c->Prop->GetUint(P_STDOUT_LIMIT));
         return "";
     }
 };

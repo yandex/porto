@@ -269,30 +269,30 @@ TError TContainer::ApplyDynamicProperties() {
         return error;
 
     auto memroot = memorySubsystem->GetRootCgroup();
-    if (memroot->HasKnob("memory.low_limit_in_bytes") && Prop->GetUint("memory_guarantee") != 0) {
-        TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", Prop->GetString("memory_guarantee"), false);
-        TLogger::LogError(error, "Can't set memory_guarantee");
+    if (memroot->HasKnob("memory.low_limit_in_bytes") && Prop->GetUint(P_MEM_GUARANTEE) != 0) {
+        TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", Prop->GetString(P_MEM_GUARANTEE), false);
+        TLogger::LogError(error, "Can't set " + std::to_string(P_MEM_GUARANTEE));
         if (error)
             return error;
     }
 
-    if (Prop->GetUint("memory_limit") != 0) {
-        error = memcg->SetKnobValue("memory.limit_in_bytes", Prop->GetString("memory_limit"), false);
-        TLogger::LogError(error, "Can't set memory_limit");
+    if (Prop->GetUint(P_MEM_LIMIT) != 0) {
+        error = memcg->SetKnobValue("memory.limit_in_bytes", Prop->GetString(P_MEM_LIMIT), false);
+        TLogger::LogError(error, "Can't set " + std::to_string(P_MEM_LIMIT));
         if (error)
             return error;
     }
 
     if (memroot->HasKnob("memory.recharge_on_pgfault")) {
-        string value = Prop->GetBool("recharge_on_pgfault") ? "1" : "0";
+        string value = Prop->GetBool(P_RECHARGE_ON_PGFAULT) ? "1" : "0";
         error = memcg->SetKnobValue("memory.recharge_on_pgfault", value, false);
-        TLogger::LogError(error, "Can't set recharge_on_pgfault");
+        TLogger::LogError(error, "Can't set " + std::to_string(P_RECHARGE_ON_PGFAULT));
         if (error)
             return error;
     }
 
     auto cpucg = GetLeafCgroup(cpuSubsystem);
-    if (Prop->GetString("cpu_policy") == "normal") {
+    if (Prop->GetString(P_CPU_POLICY) == "normal") {
         string smart;
 
         error = cpucg->GetKnobValue("cpu.smart", smart);
@@ -303,13 +303,13 @@ TError TContainer::ApplyDynamicProperties() {
                 return error;
         }
 
-        int cpuPrio = Prop->GetUint("cpu_priority");
+        int cpuPrio = Prop->GetUint(P_CPU_PRIO);
         error = cpucg->SetKnobValue("cpu.shares", std::to_string(cpuPrio + 2), false);
-        TLogger::LogError(error, "Can't set cpu_priority");
+        TLogger::LogError(error, "Can't set " + std::to_string(P_CPU_PRIO));
         if (error)
             return error;
 
-    } else if (Prop->GetString("cpu_policy") == "rt") {
+    } else if (Prop->GetString(P_CPU_POLICY) == "rt") {
         string smart;
 
         error = cpucg->GetKnobValue("cpu.smart", smart);
@@ -336,7 +336,7 @@ std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
 }
 
 bool TContainer::UseParentNamespace() const {
-    bool isolate = Prop->GetRawBool("isolate");
+    bool isolate = Prop->GetRawBool(P_ISOLATE);
     if (isolate)
         return false;
 
@@ -366,9 +366,9 @@ TError TContainer::PrepareNetwork() {
     TError error;
     uint32_t prio, rate, ceil;
 
-    prio = Prop->GetUint("net_priority");
-    rate = Prop->GetUint("net_guarantee");
-    ceil = Prop->GetUint("net_ceil");
+    prio = Prop->GetUint(P_NET_PRIO);
+    rate = Prop->GetUint(P_NET_GUARANTEE);
+    ceil = Prop->GetUint(P_NET_CEIL);
 
     if (Tclass->Exists())
         (void)Tclass->Remove();
@@ -429,7 +429,7 @@ TError TContainer::PrepareCgroups() {
     auto cpuroot = cpuSubsystem->GetRootCgroup();
     if (cpuroot->HasKnob("cpu.smart")) {
         TError error;
-        if (Prop->GetString("cpu_policy") == "rt") {
+        if (Prop->GetString(P_CPU_POLICY) == "rt") {
             error = cpucg->SetKnobValue("cpu.smart", "1", false);
             TLogger::LogError(error, "Can't enable smart");
             if (error)
@@ -459,9 +459,9 @@ TError TContainer::PrepareCgroups() {
 
     auto devices = GetLeafCgroup(devicesSubsystem);
     error = devicesSubsystem->AllowDevices(devices,
-                                           Prop->GetString("allowed_devices"));
+                                           Prop->GetString(P_ALLOWED_DEVICES));
     if (error) {
-        TLogger::LogError(error, "Can't set allowed_devices");
+        TLogger::LogError(error, "Can't set " + std::to_string(P_ALLOWED_DEVICES));
         return error;
     }
 
@@ -471,30 +471,30 @@ TError TContainer::PrepareCgroups() {
 TError TContainer::PrepareTask() {
     auto taskEnv = std::make_shared<TTaskEnv>();
 
-    taskEnv->Command = Prop->GetString("command");
-    taskEnv->Cwd = Prop->GetString("cwd");
-    taskEnv->Root = Prop->GetString("root");
-    taskEnv->CreateCwd = Prop->IsDefault("root") && Prop->IsDefault("cwd") && !UseParentNamespace();
-    taskEnv->User = Prop->GetString("user");
-    taskEnv->Group = Prop->GetString("group");
-    taskEnv->Environ = Prop->GetString("env") + ";container=lxc;PORTO_NAME=" + GetName();
-    taskEnv->Isolate = Prop->GetBool("isolate");
-    taskEnv->StdinPath = Prop->GetString("stdin_path");
-    taskEnv->StdoutPath = Prop->GetString("stdout_path");
-    taskEnv->StderrPath = Prop->GetString("stderr_path");
-    taskEnv->Hostname = Prop->GetString("hostname");
-    taskEnv->BindDns = Prop->GetBool("bind_dns");
+    taskEnv->Command = Prop->GetString(P_COMMAND);
+    taskEnv->Cwd = Prop->GetString(P_CWD);
+    taskEnv->Root = Prop->GetString(P_ROOT);
+    taskEnv->CreateCwd = Prop->IsDefault(P_ROOT) && Prop->IsDefault(P_CWD) && !UseParentNamespace();
+    taskEnv->User = Prop->GetString(P_USER);
+    taskEnv->Group = Prop->GetString(P_GROUP);
+    taskEnv->Environ = Prop->GetString(P_ENV) + ";container=lxc;PORTO_NAME=" + GetName();
+    taskEnv->Isolate = Prop->GetBool(P_ISOLATE);
+    taskEnv->StdinPath = Prop->GetString(P_STDIN_PATH);
+    taskEnv->StdoutPath = Prop->GetString(P_STDOUT_PATH);
+    taskEnv->StderrPath = Prop->GetString(P_STDERR_PATH);
+    taskEnv->Hostname = Prop->GetString(P_HOSTNAME);
+    taskEnv->BindDns = Prop->GetBool(P_BIND_DNS);
 
-    TError error = ParseRlimit(Prop->GetString("ulimit"), taskEnv->Rlimit);
+    TError error = ParseRlimit(Prop->GetString(P_ULIMIT), taskEnv->Rlimit);
     if (error)
         return error;
 
-    error = ParseBind(Prop->GetString("bind"), taskEnv->BindMap);
+    error = ParseBind(Prop->GetString(P_BIND), taskEnv->BindMap);
     if (error)
         return error;
 
     if (config().network().enabled()) {
-        error = ParseNet(shared_from_this(), Prop->GetString("net"), taskEnv->NetCfg);
+        error = ParseNet(shared_from_this(), Prop->GetString(P_NET), taskEnv->NetCfg);
         if (error)
             return error;
     }
@@ -649,7 +649,7 @@ TError TContainer::Start() {
         return TError(EError::InvalidState, "invalid container state " +
                       ContainerStateName(state));
 
-    if (!IsRoot() && !Prop->GetString("command").length()) {
+    if (!IsRoot() && !Prop->GetString(P_COMMAND).length()) {
         FreeResources();
         return TError(EError::InvalidValue, "container command is empty");
     }
@@ -903,14 +903,14 @@ void TContainer::PropertyToAlias(const string &property, string &value) const {
 TError TContainer::AliasToProperty(string &property, string &value) {
         if (property == "cpu.smart") {
             if (value == "0") {
-                property = "cpu_policy";
+                property = P_CPU_POLICY;
                 value = "normal";
             } else {
-                property = "cpu_policy";
+                property = P_CPU_POLICY;
                 value = "rt";
             }
         } else if (property == "memory.limit_in_bytes") {
-            property = "memory_limit";
+            property = P_MEM_LIMIT;
             uint64_t n;
 
             TError error = StringWithUnitToUint64(value, n);
@@ -919,7 +919,7 @@ TError TContainer::AliasToProperty(string &property, string &value) {
 
             value = std::to_string(n);
         } else if (property == "memory.low_limit_in_bytes") {
-            property = "memory_guarantee";
+            property = P_MEM_GUARANTEE;
             uint64_t n;
 
             TError error = StringWithUnitToUint64(value, n);
@@ -928,7 +928,7 @@ TError TContainer::AliasToProperty(string &property, string &value) {
 
             value = std::to_string(n);
         } else if (property == "memory.recharge_on_pgfault") {
-            property = "recharge_on_pgfault";
+            property = P_RECHARGE_ON_PGFAULT;
             value = value == "0" ? "false" : "true";
         }
 
@@ -936,10 +936,10 @@ TError TContainer::AliasToProperty(string &property, string &value) {
 }
 
 static std::map<std::string, std::string> alias = {
-    { "cpu.smart", "cpu_policy" },
-    { "memory.limit_in_bytes", "memory_limit" },
-    { "memory.low_limit_in_bytes", "memory_guarantee" },
-    { "memory.recharge_on_pgfault", "recharge_on_pgfault" },
+    { "cpu.smart", P_CPU_POLICY },
+    { "memory.limit_in_bytes", P_MEM_LIMIT },
+    { "memory.low_limit_in_bytes", P_MEM_GUARANTEE },
+    { "memory.recharge_on_pgfault", P_RECHARGE_ON_PGFAULT },
 };
 
 TError TContainer::GetProperty(const string &origProperty, string &value) const {
@@ -1108,7 +1108,7 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
     TLogger::Log() << "Delivered " << status << " to " << GetName() << " with root_pid " << Task->GetPid() << std::endl;
     SetState(EContainerState::Dead);
 
-    if (!Prop->GetBool("isolate"))
+    if (!Prop->GetBool(P_ISOLATE))
         (void)KillAll();
 
     if (NeedRespawn()) {
@@ -1126,12 +1126,12 @@ bool TContainer::NeedRespawn() {
     if (GetState() != EContainerState::Dead)
         return false;
 
-    if (!Prop->GetBool("respawn"))
+    if (!Prop->GetBool(P_RESPAWN))
         return false;
 
     size_t startTime = TimeOfDeath + config().container().respawn_delay_ms();
 
-    return startTime <= GetCurrentTimeMs() && (Prop->GetInt("max_respawns") < 0 || Data->GetUint(D_RESPAWN_COUNT) < (uint64_t)Prop->GetInt("max_respawns"));
+    return startTime <= GetCurrentTimeMs() && (Prop->GetInt(P_MAX_RESPAWNS) < 0 || Data->GetUint(D_RESPAWN_COUNT) < (uint64_t)Prop->GetInt(P_MAX_RESPAWNS));
 }
 
 TError TContainer::Respawn() {

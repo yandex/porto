@@ -163,7 +163,7 @@ static std::set<EContainerState> dynamicProperty = {
 class TCommandProperty : public TStringValue {
 public:
     TCommandProperty() :
-        TStringValue("command",
+        TStringValue(P_COMMAND,
                      "Command executed upon container start",
                      0,
                      staticProperty) {}
@@ -172,7 +172,7 @@ public:
 class TUserProperty : public TStringValue {
 public:
     TUserProperty() :
-        TStringValue("user",
+        TStringValue(P_USER,
                      "Start command with given user",
                      SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY,
                      staticProperty) {}
@@ -201,7 +201,7 @@ public:
 class TGroupProperty : public TStringValue {
 public:
     TGroupProperty() :
-        TStringValue("group",
+        TStringValue(P_GROUP,
                      "Start command with given group",
                      SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY,
                      staticProperty) {}
@@ -230,7 +230,7 @@ public:
 class TEnvProperty : public TStringValue { // TODO: EValueType::List,
 public:
     TEnvProperty() :
-        TStringValue("env",
+        TStringValue(P_ENV,
                      "Container environment variables",
                      PARENT_DEF_PROPERTY,
                      staticProperty) {}
@@ -239,7 +239,7 @@ public:
 class TRootProperty : public TStringValue {
 public:
     TRootProperty() :
-        TStringValue("root",
+        TStringValue(P_ROOT,
                      "Container root directory",
                      PARENT_DEF_PROPERTY,
                      staticProperty) {}
@@ -261,7 +261,7 @@ public:
 class TCwdProperty : public TStringValue {
 public:
     TCwdProperty() :
-        TStringValue("cwd",
+        TStringValue(P_CWD,
                      "Container working directory",
                      PARENT_DEF_PROPERTY,
                      staticProperty) {}
@@ -286,7 +286,7 @@ public:
 class TStdinPathProperty : public TStringValue {
 public:
     TStdinPathProperty() :
-        TStringValue("stdin_path",
+        TStringValue(P_STDIN_PATH,
                      "Container standard input path",
                      0,
                      staticProperty) {}
@@ -308,7 +308,7 @@ public:
 class TStdoutPathProperty : public TStringValue {
 public:
     TStdoutPathProperty() :
-        TStringValue("stdout_path",
+        TStringValue(P_STDOUT_PATH,
                      "Container standard input path",
                      0,
                      staticProperty) {}
@@ -330,7 +330,7 @@ public:
 class TStderrPathProperty : public TStringValue {
 public:
     TStderrPathProperty() :
-        TStringValue("stderr_path",
+        TStringValue(P_STDERR_PATH,
                      "Container standard error path",
                      0,
                      staticProperty) {}
@@ -352,7 +352,7 @@ public:
 class TStdoutLimitProperty : public TUintValue {
 public:
     TStdoutLimitProperty() :
-        TUintValue("stdout_limit",
+        TUintValue(P_STDOUT_LIMIT,
                    "Return no more than given number of bytes from standard output/error",
                    0,
                    staticProperty) {}
@@ -378,7 +378,7 @@ public:
 class TMemoryGuaranteeProperty : public TUintValue {
 public:
     TMemoryGuaranteeProperty() :
-        TUintValue("memory_guarantee",
+        TUintValue(P_MEM_GUARANTEE,
                    "Guaranteed amount of memory",
                    PARENT_RO_PROPERTY,
                    dynamicProperty) {}
@@ -390,10 +390,10 @@ public:
         if (!memroot->HasKnob("memory.low_limit_in_bytes"))
             return TError(EError::NotSupported, "invalid kernel");
 
-        if (!c->ValidHierarchicalProperty("memory_guarantee", value))
+        if (!c->ValidHierarchicalProperty(P_MEM_GUARANTEE, value))
             return TError(EError::InvalidValue, "invalid hierarchical value");
 
-        uint64_t total = c->GetRoot()->GetChildrenSum("memory_guarantee", c, value);
+        uint64_t total = c->GetRoot()->GetChildrenSum(P_MEM_GUARANTEE, c, value);
         if (total + config().daemon().memory_guarantee_reserve() >
             GetTotalMemory())
             return TError(EError::ResourceNotAvailable,
@@ -406,7 +406,7 @@ public:
 class TMemoryLimitProperty : public TUintValue {
 public:
     TMemoryLimitProperty() :
-        TUintValue("memory_limit",
+        TUintValue(P_MEM_LIMIT,
                    "Memory hard limit",
                    0,
                    dynamicProperty) {}
@@ -414,7 +414,7 @@ public:
     TError SetUint(std::shared_ptr<TContainer> c,
                    std::shared_ptr<TVariant> v,
                    const uint64_t value) {
-        if (!c->ValidHierarchicalProperty("memory_limit", value))
+        if (!c->ValidHierarchicalProperty(P_MEM_LIMIT, value))
             return TError(EError::InvalidValue, "invalid hierarchical value");
 
         return v->Set(EValueType::Uint, value);
@@ -424,7 +424,7 @@ public:
 class TRechargeOnPgfaultProperty : public TBoolValue {
 public:
     TRechargeOnPgfaultProperty() :
-        TBoolValue("recharge_on_pgfault",
+        TBoolValue(P_RECHARGE_ON_PGFAULT,
                    "Recharge memory on page fault",
                    PARENT_RO_PROPERTY,
                    dynamicProperty) {}
@@ -447,7 +447,7 @@ public:
 class TCpuPolicyProperty : public TStringValue {
 public:
     TCpuPolicyProperty() :
-        TStringValue("cpu_policy",
+        TStringValue(P_CPU_POLICY,
                      "CPU policy: rt, normal, idle",
                      PARENT_RO_PROPERTY,
                      dynamicProperty) {}
@@ -478,7 +478,7 @@ public:
 class TCpuPriorityProperty : public TUintValue {
 public:
     TCpuPriorityProperty() :
-        TUintValue("cpu_priority",
+        TUintValue(P_CPU_PRIO,
                    "CPU priority: 0-99",
                    PARENT_RO_PROPERTY,
                    dynamicProperty) {}
@@ -500,7 +500,7 @@ public:
 class TNetGuaranteeProperty : public TUintValue {
 public:
     TNetGuaranteeProperty() :
-        TUintValue("net_guarantee",
+        TUintValue(P_NET_GUARANTEE,
                    "Guaranteed container network bandwidth",
                    PARENT_RO_PROPERTY,
                    staticProperty) {}
@@ -513,7 +513,7 @@ public:
 class TNetCeilProperty : public TUintValue {
 public:
     TNetCeilProperty() :
-        TUintValue("net_ceil",
+        TUintValue(P_NET_CEIL,
                    "Maximum container network bandwidth",
                    PARENT_RO_PROPERTY,
                    staticProperty) {}
@@ -526,7 +526,7 @@ public:
 class TNetPriorityProperty : public TUintValue {
 public:
     TNetPriorityProperty() :
-        TUintValue("net_priority",
+        TUintValue(P_NET_PRIO,
                    "Container network priority: 0-7",
                    PARENT_RO_PROPERTY,
                    staticProperty) {}
@@ -548,7 +548,7 @@ public:
 class TRespawnProperty : public TBoolValue {
 public:
     TRespawnProperty() :
-        TBoolValue("respawn",
+        TBoolValue(P_RESPAWN,
                    "Automatically respawn dead container",
                    0,
                    staticProperty) {}
@@ -561,7 +561,7 @@ public:
 class TMaxRespawnsProperty : public TIntValue {
 public:
     TMaxRespawnsProperty() :
-        TIntValue("max_respawns",
+        TIntValue(P_MAX_RESPAWNS,
                   "Limit respawn count for specific container",
                   0,
                   staticProperty) {}
@@ -574,7 +574,7 @@ public:
 class TIsolateProperty : public TBoolValue {
 public:
     TIsolateProperty() :
-        TBoolValue("isolate",
+        TBoolValue(P_ISOLATE,
                    "Isolate container from parent",
                    0,
                    staticProperty) {}
@@ -587,7 +587,7 @@ public:
 class TPrivateProperty : public TStringValue {
 public:
     TPrivateProperty() :
-        TStringValue("private",
+        TStringValue(P_PRIVATE,
                      "User-defined property",
                      0,
                      dynamicProperty) {}
@@ -611,7 +611,7 @@ public:
 class TUlimitProperty : public TStringValue { //TODO: MAP or list
 public:
     TUlimitProperty() :
-        TStringValue("ulimit",
+        TStringValue(P_ULIMIT,
                      "Container resource limits",
                      PARENT_DEF_PROPERTY,
                      staticProperty) {}
@@ -634,7 +634,7 @@ public:
 class THostnameProperty : public TStringValue {
 public:
     THostnameProperty() :
-        TStringValue("hostname",
+        TStringValue(P_HOSTNAME,
                      "Container hostname",
                      0,
                      staticProperty) {}
@@ -643,7 +643,7 @@ public:
 class TBindDnsProperty : public TBoolValue {
 public:
     TBindDnsProperty() :
-        TBoolValue("bind_dns",
+        TBoolValue(P_BIND_DNS,
                    "Bind /etc/resolv.conf and /etc/hosts of host to container",
                    0,
                    staticProperty) {}
@@ -659,7 +659,7 @@ public:
 class TBindProperty : public TStringValue { // TODO: list or map
 public:
     TBindProperty() :
-        TStringValue("bind",
+        TStringValue(P_BIND,
                      "Share host directories with container",
                      0,
                      staticProperty) {}
@@ -682,7 +682,7 @@ public:
 class TNetProperty : public TStringValue { // TODO: list or map
 public:
     TNetProperty() :
-        TStringValue("net",
+        TStringValue(P_NET,
                      "Container network settings",
                      0,
                      staticProperty) {}
@@ -705,7 +705,7 @@ public:
 class TAllowedDevicesProperty : public TStringValue { // TODO: list
 public:
     TAllowedDevicesProperty() :
-        TStringValue("allowed_devices",
+        TStringValue(P_ALLOWED_DEVICES,
                      "Devices that container can create/read/write",
                      0,
                      staticProperty) {}

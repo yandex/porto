@@ -1,4 +1,3 @@
-- isolate ipc property
 - test restarting (check version)
 - shaping with macvlan or non-default interface?
 - ? portoctl cp

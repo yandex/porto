@@ -490,7 +490,7 @@ static void TestLongRunning(TPortoAPI &api) {
     Say() << "Check that task namespaces are correct" << std::endl;
     Expect(GetNamespace("self", "pid") != GetNamespace(pid, "pid"));
     Expect(GetNamespace("self", "mnt") != GetNamespace(pid, "mnt"));
-    Expect(GetNamespace("self", "ipc") == GetNamespace(pid, "ipc"));
+    Expect(GetNamespace("self", "ipc") != GetNamespace(pid, "ipc"));
     Expect(GetNamespace("self", "net") == GetNamespace(pid, "net"));
     //Expect(GetNamespace("self", "user") == GetNamespace(pid, "user"));
     Expect(GetNamespace("self", "uts") == GetNamespace(pid, "uts"));
