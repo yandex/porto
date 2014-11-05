@@ -2,6 +2,23 @@
 
 set -e
 
+set -- `getopt c $*`
+[ ! $? -eq 0 ] && { exit 1; }
+
+NEED_CLEAR=0
+while [ ! "$1" = "--" ]; do
+	case "$1" in
+	-c)
+		NEED_CLEAR=1
+		;;
+	*)
+		"Invalid argument $1"
+		;;
+	esac
+	shift
+done
+shift
+
 CONFIG() {
 	if [ -z "$1" ]; then
 		echo 'Please specify name'
@@ -29,14 +46,18 @@ CONFIG() {
 	clone() {
 		[ -d $1 ] || {
 			mkdir -p $1
-			cd $1 && git clone $REPO .
+			(cd $1 && git clone $REPO . && git submodule init && git submodule update)
 		}
+	}
+
+	CLEAR() {
+		[ $NEED_CLEAR -eq 1 ] && sudo rm -rf $ROOT
 	}
 
 	GET() {
 		URL=$1
 
-		sudo rm -rf $ROOT
+		CLEAR
 
 		echo "Downloading image..."
 		bootstrap
@@ -62,4 +83,14 @@ CONFIG() {
 	}
 }
 
-. $1
+if [ $# -ge 1 ]; then
+	for conf in "$@"; do
+		. $conf
+	done
+else
+	for conf in ./*.conf; do
+		echo "Using config $conf"
+		. $conf
+		CLEAR
+	done
+fi
