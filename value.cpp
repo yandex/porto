@@ -13,24 +13,6 @@ bool TValue::NeedDefault() {
     return !(Flags & NODEF_VALUE);
 }
 
-std::string TValue::GetDefaultString(std::shared_ptr<TContainer> c) {
-    return "";
-}
-
-TError TValue::SetString(std::shared_ptr<TContainer> c,
-                         std::shared_ptr<TVariant> v,
-                         const std::string &value) {
-    return v->Set(Type, value);
-}
-
-std::string TValue::GetString(std::shared_ptr<TContainer> c,
-                              std::shared_ptr<TVariant> v) {
-    if (!v->HasValue() && NeedDefault())
-        return GetDefaultString(c);
-
-    return v->Get<std::string>(Type);
-}
-
 bool TValue::GetDefaultBool(std::shared_ptr<TContainer> c) {
     ExpectType(EValueType::Bool);
     return false;
@@ -71,6 +53,24 @@ int TValue::GetInt(std::shared_ptr<TContainer> c,
         return GetDefaultInt(c);
 
     return v->Get<int>(Type);
+}
+
+std::string TStringValue::GetDefaultString(std::shared_ptr<TContainer> c) {
+    return "";
+}
+
+TError TStringValue::SetString(std::shared_ptr<TContainer> c,
+                               std::shared_ptr<TVariant> v,
+                               const std::string &value) {
+    return v->Set(Type, value);
+}
+
+std::string TStringValue::GetString(std::shared_ptr<TContainer> c,
+                                    std::shared_ptr<TVariant> v) {
+    if (!v->HasValue() && NeedDefault())
+        return GetDefaultString(c);
+
+    return v->Get<std::string>(Type);
 }
 
 std::string TBoolValue::BoolToStr(bool v) {

@@ -106,12 +106,12 @@ public:
     virtual bool IsDefault(std::shared_ptr<TContainer> c,
                            std::shared_ptr<TVariant> v) = 0;
 
-    virtual std::string GetDefaultString(std::shared_ptr<TContainer> c);
+    virtual std::string GetDefaultString(std::shared_ptr<TContainer> c) = 0;
     virtual TError SetString(std::shared_ptr<TContainer> c,
                              std::shared_ptr<TVariant> v,
-                             const std::string &value);
+                             const std::string &value) = 0;
     virtual std::string GetString(std::shared_ptr<TContainer> c,
-                                  std::shared_ptr<TVariant> v);
+                                  std::shared_ptr<TVariant> v) = 0;
 
     virtual bool GetDefaultBool(std::shared_ptr<TContainer> c);
     virtual TError SetBool(std::shared_ptr<TContainer> c,
@@ -145,6 +145,13 @@ public:
                  const int flags,
                  const std::set<EContainerState> &state) :
         TValue(name, EValueType::String, desc, flags, state) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c);
+    TError SetString(std::shared_ptr<TContainer> c,
+                     std::shared_ptr<TVariant> v,
+                     const std::string &value);
+    std::string GetString(std::shared_ptr<TContainer> c,
+                          std::shared_ptr<TVariant> v);
 
     SYNTHESIZE_DEFAULT(String, std::string)
 };
