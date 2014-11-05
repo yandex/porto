@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 
 PROJECT(yandex-porto)
 
+set(CMAKE_INSTALL_PREFIX /usr)
 set(CMAKE_CXX_FLAGS "-O2 -Wall -std=c++11 -g")
 set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc")
 #set(CMAKE_CXX_FLAGS "-O0 -Wall -std=c++11 -g -fprofile-arcs -ftest-coverage")
@@ -32,7 +33,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS rpc.proto kv.proto config.proto)
 add_custom_command(
 	OUTPUT "api/python/porto/rpc_pb2.py"
-	COMMAND protoc ARGS --python_out=api/python/porto/ rpc.proto
+	COMMAND protoc ARGS --python_out=${CMAKE_CURRENT_SOURCE_DIR}/api/python/porto/ --proto_path=${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/rpc.proto
 	DEPENDS rpc.proto
 	VERBATIM)
 
