@@ -39,11 +39,7 @@ namespace std {
             if (ParentDefault(c, property)) \
                 return c->GetParent()->Prop->Get ## NAME(property); \
         } \
-        TYPE value{}; \
-        TError error = VariantSet.Get ## NAME(property, value); \
-        if (error) \
-            TLogger::LogError(error, "Can't get property " + property); \
-        return value; \
+        return VariantSet.Get ## NAME(property); \
     } \
     TError Set ## NAME(const std::string &property, \
                        const TYPE &value) { \
@@ -60,8 +56,8 @@ namespace std {
             return error; \
         return TError::Success(); \
     } \
-    TError GetRaw ## NAME(const std::string &property, TYPE &value) { \
-        return VariantSet.Get ## NAME(property, value); \
+    TYPE GetRaw ## NAME(const std::string &property) { \
+        return VariantSet.Get ## NAME(property); \
     }
 
 class TPropertySet {
@@ -83,8 +79,7 @@ public:
     SYNTHESIZE_ACCESSOR(String, std::string);
     SYNTHESIZE_ACCESSOR(Bool, bool);
     SYNTHESIZE_ACCESSOR(Int, int);
-    // TODO: use defines to generate this copy-pasted crap
-    uint64_t GetUint(const std::string &property);
+    SYNTHESIZE_ACCESSOR(Uint, uint64_t);
 
     bool IsDefault(const std::string &property);
     bool ParentDefault(std::shared_ptr<TContainer> &c,

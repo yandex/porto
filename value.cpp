@@ -55,6 +55,27 @@ int TValue::GetInt(std::shared_ptr<TContainer> c,
     return v->Get<int>(Type);
 }
 
+uint64_t TValue::GetDefaultUint(std::shared_ptr<TContainer> c) {
+    ExpectType(EValueType::Uint);
+    return 0;
+}
+
+TError TValue::SetUint(std::shared_ptr<TContainer> c,
+                       std::shared_ptr<TVariant> v,
+                       const uint64_t value) {
+    ExpectType(EValueType::Uint);
+    return v->Set(Type, value);
+}
+
+uint64_t TValue::GetUint(std::shared_ptr<TContainer> c,
+                         std::shared_ptr<TVariant> v) {
+    ExpectType(EValueType::Uint);
+    if (!v->HasValue() && NeedDefault())
+        return GetDefaultUint(c);
+
+    return v->Get<uint64_t>(Type);
+}
+
 std::string TStringValue::GetDefaultString(std::shared_ptr<TContainer> c) {
     return "";
 }
@@ -128,6 +149,32 @@ std::string TIntValue::GetString(std::shared_ptr<TContainer> c,
         value = GetDefaultInt(c);
     else
         value = GetInt(c, v);
+
+    return std::to_string(value);
+}
+
+std::string TUintValue::GetDefaultString(std::shared_ptr<TContainer> c) {
+    return std::to_string(GetDefaultUint(c));
+}
+
+TError TUintValue::SetString(std::shared_ptr<TContainer> c,
+                             std::shared_ptr<TVariant> v,
+                             const std::string &value) {
+    uint64_t tmp;
+    TError error = StringToUint64(value, tmp);
+    if (error)
+        return TError(EError::InvalidValue, "Invalid unsigned integer value " + value);
+
+    return SetUint(c, v, tmp);
+}
+std::string TUintValue::GetString(std::shared_ptr<TContainer> c,
+                                  std::shared_ptr<TVariant> v) {
+    uint64_t value;
+
+    if (!v->HasValue() && NeedDefault())
+        value = GetDefaultUint(c);
+    else
+        value = GetUint(c, v);
 
     return std::to_string(value);
 }

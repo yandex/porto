@@ -231,25 +231,20 @@ uint64_t TContainer::GetChildrenSum(const std::string &property, std::shared_ptr
     return val;
 }
 
-bool TContainer::ValidHierarchicalProperty(const std::string &property, const std::string &value) const {
-    uint64_t newval;
-
-    if (StringToUint64(value, newval))
-        return false;
-
+bool TContainer::ValidHierarchicalProperty(const std::string &property, const uint64_t value) const {
     uint64_t children = GetChildrenSum(property);
-    if (children && newval < children)
+    if (children && value < children)
         return false;
 
     for (auto c = GetParent(); c; c = c->GetParent()) {
         uint64_t parent = c->Prop->GetUint(property);
-        if (parent && newval > parent)
+        if (parent && value > parent)
             return false;
     }
 
     if (GetParent()) {
         uint64_t parent = GetParent()->Prop->GetUint(property);
-        uint64_t children = GetParent()->GetChildrenSum(property, shared_from_this(), newval);
+        uint64_t children = GetParent()->GetChildrenSum(property, shared_from_this(), value);
         if (parent && children > parent)
             return false;
     }
@@ -341,9 +336,8 @@ std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
 }
 
 bool TContainer::UseParentNamespace() const {
-    bool isolate = false;
-    TError error = Prop->GetRawBool("isolate", isolate);
-    if (error || isolate)
+    bool isolate = Prop->GetRawBool("isolate");
+    if (isolate)
         return false;
 
     return FindRunningParent() != nullptr;
@@ -646,7 +640,10 @@ TError TContainer::Start() {
         return TError::Success();
     }
     MaybeReturnedOk = false;
-    RespawnCount = 0;
+
+    TError error = Data->SetUint(D_RESPAWN_COUNT, 0);
+    if (error)
+        return error;
 
     if (state != EContainerState::Stopped)
         return TError(EError::InvalidState, "invalid container state " +
@@ -657,7 +654,7 @@ TError TContainer::Start() {
         return TError(EError::InvalidValue, "container command is empty");
     }
 
-    TError error = Prop->SetInt(P_RAW_ID, (int)Id);
+    error = Prop->SetInt(P_RAW_ID, (int)Id);
     if (error)
         return error;
 
@@ -881,7 +878,15 @@ TError TContainer::GetData(const string &name, string &value) {
     if (d->State.find(GetState()) == d->State.end())
         return TError(EError::InvalidState, "invalid container state");
 
-    return Data->GetString(name, value);
+    TValue *p = nullptr;
+    std::shared_ptr<TContainer> c;
+    std::shared_ptr<TVariant> v;
+    TError error = Data->Get(name, c, &p, v);
+    if (error)
+        return error;
+
+    value = p->GetString(c, v);
+    return TError::Success();
 }
 
 void TContainer::PropertyToAlias(const string &property, string &value) const {
@@ -1125,7 +1130,8 @@ bool TContainer::NeedRespawn() {
         return false;
 
     size_t startTime = TimeOfDeath + config().container().respawn_delay_ms();
-    return startTime <= GetCurrentTimeMs() && (Prop->GetInt("max_respawns") < 0 || RespawnCount < Prop->GetInt("max_respawns"));
+
+    return startTime <= GetCurrentTimeMs() && (Prop->GetInt("max_respawns") < 0 || Data->GetUint(D_RESPAWN_COUNT) < (uint64_t)Prop->GetInt("max_respawns"));
 }
 
 TError TContainer::Respawn() {
@@ -1133,9 +1139,9 @@ TError TContainer::Respawn() {
     if (error)
         return error;
 
-    ssize_t tmp = RespawnCount;
+    uint64_t tmp = Data->GetUint(D_RESPAWN_COUNT);
     error = Start();
-    RespawnCount = tmp + 1;
+    Data->SetUint(D_RESPAWN_COUNT, tmp + 1);
     if (error)
         return error;
 

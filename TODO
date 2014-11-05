@@ -1,4 +1,3 @@
-- add TUintValue and save actual data in TValue for respawnCount
 - debian Build-depends protobuf-compiler g++-4.7 | g++-4.8
 - isolate ipc property
 - test restarting (check version)

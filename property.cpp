@@ -26,21 +26,6 @@ bool TPropertySet::IsDefault(const std::string &property) {
     return VariantSet.IsDefault(property);
 }
 
-uint64_t TPropertySet::GetUint(const std::string &property) {
-    if (VariantSet.IsDefault(property)) {
-        std::shared_ptr<TContainer> c;
-        if (ParentDefault(c, property))
-            return c->GetParent()->Prop->GetUint(property);
-    }
-
-    uint64_t val;
-
-    if (StringToUint64(GetString(property), val))
-        return 0;
-
-    return val;
-}
-
 bool TPropertySet::HasFlags(const std::string &property, int flags) {
     // TODO: Log error
     if (!propertySet.Valid(property))
@@ -101,13 +86,7 @@ TError TPropertySet::SyncStorage() {
     for (auto &name : VariantSet.List()) {
         auto pair = node.add_pairs();
         pair->set_key(name);
-
-        std::string value;
-        TError error = VariantSet.GetString(name, value);
-        if (error)
-            return error;
-
-        pair->set_val(value);
+        pair->set_val(VariantSet.GetString(name));
     }
 
     return Storage.SaveNode(Name, node);
@@ -132,14 +111,6 @@ TError TPropertySet::AppendStorage(const std::string& key, const std::string& va
     pair->set_val(value);
 
     return Storage.AppendNode(Name, node);
-}
-
-static TError ValidUint(std::shared_ptr<TContainer> container, const std::string &str) {
-    uint32_t val;
-    if (StringToUint32(str, val))
-        return TError(EError::InvalidValue, "invalid numeric value");
-
-    return TError::Success();
 }
 
 static TError ValidPath(std::shared_ptr<TContainer> c, const std::string &str) {
@@ -378,96 +349,75 @@ public:
     }
 };
 
-class TStdoutLimitProperty : public TStringValue {
+class TStdoutLimitProperty : public TUintValue {
 public:
     TStdoutLimitProperty() :
-        TStringValue("stdout_limit",
-                     "Return no more than given number of bytes from standard output/error",
-                     0,
-                     staticProperty) {}
+        TUintValue("stdout_limit",
+                   "Return no more than given number of bytes from standard output/error",
+                   0,
+                   staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
-        return std::to_string(config().container().stdout_limit());
+    uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) {
+        return config().container().stdout_limit();
     }
 
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value) {
-        uint32_t num;
+    TError SetUint(std::shared_ptr<TContainer> c,
+                   std::shared_ptr<TVariant> v,
+                   const uint64_t value) {
         uint32_t max = config().container().stdout_limit();
 
-        TError error = StringToUint32(value, num);
-        if (error)
-            return error;
-
-        if (num > max)
+        if (value > max)
             return TError(EError::InvalidValue,
                           "Maximum number of bytes: " +
                           std::to_string(max));
 
-        return v->Set(EValueType::String, value);
+        return v->Set(EValueType::Uint, value);
     }
 };
 
-class TMemoryGuaranteeProperty : public TStringValue { // TODO: Uint
+class TMemoryGuaranteeProperty : public TUintValue {
 public:
     TMemoryGuaranteeProperty() :
-        TStringValue("memory_guarantee",
-                     "Guaranteed amount of memory",
-                     PARENT_RO_PROPERTY,
-                     dynamicProperty) {}
+        TUintValue("memory_guarantee",
+                   "Guaranteed amount of memory",
+                   PARENT_RO_PROPERTY,
+                   dynamicProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
-        return "0";
-    }
-
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value) {
-        uint64_t num;
-
+    TError SetUint(std::shared_ptr<TContainer> c,
+                   std::shared_ptr<TVariant> v,
+                   const uint64_t value) {
         auto memroot = memorySubsystem->GetRootCgroup();
         if (!memroot->HasKnob("memory.low_limit_in_bytes"))
             return TError(EError::NotSupported, "invalid kernel");
 
-        if (StringToUint64(value, num))
-            return TError(EError::InvalidValue, "invalid value");
-
         if (!c->ValidHierarchicalProperty("memory_guarantee", value))
             return TError(EError::InvalidValue, "invalid hierarchical value");
 
-        uint64_t total = c->GetRoot()->GetChildrenSum("memory_guarantee", c, num);
-        if (total + config().daemon().memory_guarantee_reserve() > GetTotalMemory())
-            return TError(EError::ResourceNotAvailable, "can't guarantee all available memory");
+        uint64_t total = c->GetRoot()->GetChildrenSum("memory_guarantee", c, value);
+        if (total + config().daemon().memory_guarantee_reserve() >
+            GetTotalMemory())
+            return TError(EError::ResourceNotAvailable,
+                          "can't guarantee all available memory");
 
-        return v->Set(EValueType::String, value);
+        return v->Set(EValueType::Uint, value);
     }
 };
 
-class TMemoryLimitProperty : public TStringValue { // TODO: Uint
+class TMemoryLimitProperty : public TUintValue {
 public:
     TMemoryLimitProperty() :
-        TStringValue("memory_limit",
-                     "Memory hard limit",
-                     0,
-                     dynamicProperty) {}
+        TUintValue("memory_limit",
+                   "Memory hard limit",
+                   0,
+                   dynamicProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
-        return "0";
-    }
-
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value) {
-        uint64_t num;
-
-        if (StringToUint64(value, num))
-            return TError(EError::InvalidValue, "invalid value");
-
+    TError SetUint(std::shared_ptr<TContainer> c,
+                   std::shared_ptr<TVariant> v,
+                   const uint64_t value) {
         if (!c->ValidHierarchicalProperty("memory_limit", value))
             return TError(EError::InvalidValue, "invalid hierarchical value");
 
-        return v->Set(EValueType::String, value);
+        return v->Set(EValueType::Uint, value);
     }
 };
 
@@ -525,101 +475,73 @@ public:
     }
 };
 
-class TCpuPriorityProperty : public TStringValue { // TODO: Uint
+class TCpuPriorityProperty : public TUintValue {
 public:
     TCpuPriorityProperty() :
-        TStringValue("cpu_priority",
-                     "CPU priority: 0-99",
-                     PARENT_RO_PROPERTY,
-                     dynamicProperty) {}
+        TUintValue("cpu_priority",
+                   "CPU priority: 0-99",
+                   PARENT_RO_PROPERTY,
+                   dynamicProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
-        return std::to_string(DEF_CLASS_PRIO);
+    uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) {
+        return DEF_CLASS_PRIO;
     }
 
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value) {
-        int num;
-
-        if (StringToInt(value, num))
+    TError SetUint(std::shared_ptr<TContainer> c,
+                   std::shared_ptr<TVariant> v,
+                   const uint64_t value) {
+        if (value < 0 || value > 99)
             return TError(EError::InvalidValue, "invalid value");
 
-        if (num < 0 || num > 99)
-            return TError(EError::InvalidValue, "invalid value");
-
-        return v->Set(EValueType::String, value);
+        return v->Set(EValueType::Uint, value);
     }
 };
 
-class TNetGuaranteeProperty : public TStringValue { // TODO: Uint
+class TNetGuaranteeProperty : public TUintValue {
 public:
     TNetGuaranteeProperty() :
-        TStringValue("net_guarantee",
-                     "Guaranteed container network bandwidth",
-                     PARENT_RO_PROPERTY,
-                     staticProperty) {}
+        TUintValue("net_guarantee",
+                   "Guaranteed container network bandwidth",
+                   PARENT_RO_PROPERTY,
+                   staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
-        return std::to_string(DEF_CLASS_RATE);
-    }
-
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value) {
-        TError error = ValidUint(c, value);
-        if (error)
-            return error;
-        return v->Set(EValueType::String, value);
+    uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) {
+        return DEF_CLASS_RATE;
     }
 };
 
-class TNetCeilProperty : public TStringValue { // TODO: Uint
+class TNetCeilProperty : public TUintValue {
 public:
     TNetCeilProperty() :
-        TStringValue("net_ceil",
-                     "Maximum container network bandwidth",
-                     PARENT_RO_PROPERTY,
-                     staticProperty) {}
+        TUintValue("net_ceil",
+                   "Maximum container network bandwidth",
+                   PARENT_RO_PROPERTY,
+                   staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
-        return std::to_string(DEF_CLASS_CEIL);
-    }
-
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value) {
-        TError error = ValidUint(c, value);
-        if (error)
-            return error;
-        return v->Set(EValueType::String, value);
+    uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) {
+        return DEF_CLASS_CEIL;
     }
 };
 
-class TNetPriorityProperty : public TStringValue { // TODO: Uint
+class TNetPriorityProperty : public TUintValue {
 public:
     TNetPriorityProperty() :
-        TStringValue("net_priority",
-                     "Container network priority: 0-7",
-                     PARENT_RO_PROPERTY,
-                     staticProperty) {}
+        TUintValue("net_priority",
+                   "Container network priority: 0-7",
+                   PARENT_RO_PROPERTY,
+                   staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
-        return std::to_string(DEF_CLASS_NET_PRIO);
+    uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) {
+        return DEF_CLASS_NET_PRIO;
     }
 
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value) {
-        int num;
-
-        if (StringToInt(value, num))
+    TError SetUint(std::shared_ptr<TContainer> c,
+                   std::shared_ptr<TVariant> v,
+                   uint64_t value) {
+        if (value < 0 || value > 7)
             return TError(EError::InvalidValue, "invalid value");
 
-        if (num < 0 || num > 7)
-            return TError(EError::InvalidValue, "invalid value");
-
-        return v->Set(EValueType::String, value);
+        return v->Set(EValueType::Uint, value);
     }
 };
 
@@ -686,7 +608,7 @@ public:
     }
 };
 
-class TUlimitProperty : public TStringValue { //TODO: MAP
+class TUlimitProperty : public TStringValue { //TODO: MAP or list
 public:
     TUlimitProperty() :
         TStringValue("ulimit",

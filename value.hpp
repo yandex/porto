@@ -16,11 +16,10 @@ enum class EContainerState;
 enum class EValueType {
     String,
     Bool,
-    Int
+    Int,
+    Uint,
 
 #if 0
-    Int,
-    UInt,
     // key: val; key: val
     Map,
     // key; key; key
@@ -126,6 +125,13 @@ public:
                           const int value);
     virtual int GetInt(std::shared_ptr<TContainer> c,
                        std::shared_ptr<TVariant> v);
+
+    virtual uint64_t GetDefaultUint(std::shared_ptr<TContainer> c);
+    virtual TError SetUint(std::shared_ptr<TContainer> c,
+                           std::shared_ptr<TVariant> v,
+                           const uint64_t value);
+    virtual uint64_t GetUint(std::shared_ptr<TContainer> c,
+                             std::shared_ptr<TVariant> v);
 };
 
 #define SYNTHESIZE_DEFAULT(NAME, TYPE) \
@@ -198,6 +204,26 @@ public:
     SYNTHESIZE_DEFAULT(Int, int)
 };
 
+class TUintValue : public TValue {
+    NO_COPY_CONSTRUCT(TUintValue);
+
+public:
+    TUintValue(const std::string &name,
+               const std::string &desc,
+               const int flags,
+               const std::set<EContainerState> &state) :
+        TValue(name, EValueType::Uint, desc, flags, state) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c);
+    TError SetString(std::shared_ptr<TContainer> c,
+                     std::shared_ptr<TVariant> v,
+                     const std::string &value);
+    std::string GetString(std::shared_ptr<TContainer> c,
+                          std::shared_ptr<TVariant> v);
+
+    SYNTHESIZE_DEFAULT(Uint, uint64_t)
+};
+
 #undef SYNTHESIZE_DEFAULT
 
 class TValueSet {
@@ -211,15 +237,14 @@ public:
 };
 
 #define SYNTHESIZE_ACCESSOR(NAME, TYPE) \
-    TError Get ## NAME(const std::string &name, TYPE &value) { \
+    TYPE Get ## NAME(const std::string &name) { \
         TValue *p = nullptr; \
         std::shared_ptr<TContainer> c; \
         std::shared_ptr<TVariant> v; \
         TError error = Get(name, c, &p, v); \
         if (error) \
-            return error; \
-        value = p->Get ## NAME(c, v); \
-        return TError::Success(); \
+            TLogger::LogError(error, "Can't get value " + name); \
+        return p->Get ## NAME(c, v); \
     } \
     TError Set ## NAME(const std::string &name, const TYPE &value) { \
         TValue *p = nullptr; \
@@ -247,6 +272,7 @@ public:
     SYNTHESIZE_ACCESSOR(String, std::string)
     SYNTHESIZE_ACCESSOR(Bool, bool)
     SYNTHESIZE_ACCESSOR(Int, int)
+    SYNTHESIZE_ACCESSOR(Uint, uint64_t)
 
     std::vector<std::string> List();
     bool IsDefault(const std::string &name);

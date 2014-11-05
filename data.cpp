@@ -51,10 +51,11 @@ static std::set<EContainerState> sState = {
 
 class TStateData : public TStringValue {
 public:
-    TStateData() : TStringValue("state",
-                                "container state",
-                                NODEF_VALUE,
-                                anyState) {}
+    TStateData() :
+        TStringValue("state",
+                     "container state",
+                     NODEF_VALUE,
+                     anyState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TVariant> v) {
@@ -63,18 +64,20 @@ public:
 
 class TOomKilledData : public TBoolValue {
 public:
-    TOomKilledData() : TBoolValue(D_OOM_KILLED,
-                                  "indicates whether container has been killed by OOM",
-                                  NODEF_VALUE,
-                                  dState) {}
+    TOomKilledData() :
+        TBoolValue(D_OOM_KILLED,
+                   "indicates whether container has been killed by OOM",
+                   NODEF_VALUE,
+                   dState) {}
 };
 
 class TParentData : public TStringValue {
 public:
-    TParentData() : TStringValue("parent",
-                                 "container parent",
-                                 NODEF_VALUE,
-                                 anyState) {}
+    TParentData() :
+        TStringValue("parent",
+                     "container parent",
+                     NODEF_VALUE,
+                     anyState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TVariant> v) {
@@ -82,25 +85,22 @@ public:
     }
 };
 
-class TRespawnCountData : public TStringValue { // TODO: uint
+class TRespawnCountData : public TUintValue {
 public:
-    TRespawnCountData() : TStringValue("respawn_count",
-                                       "how many time container was automatically respawned",
-                                       NODEF_VALUE,
-                                       rdState) {}
-
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) {
-        return std::to_string(c->GetRespawnCount());
-    }
+    TRespawnCountData() :
+        TUintValue(D_RESPAWN_COUNT,
+                   "how many time container was automatically respawned",
+                   NODEF_VALUE,
+                   rdState) {}
 };
 
 class TRootPidData : public TIntValue {
 public:
-    TRootPidData() : TIntValue(D_ROOT_PID,
-                               "root process id",
-                               NODEF_VALUE,
-                               rpState) {}
+    TRootPidData() :
+        TIntValue(D_ROOT_PID,
+                  "root process id",
+                  NODEF_VALUE,
+                  rpState) {}
 
     int GetInt(std::shared_ptr<TContainer> c,
                std::shared_ptr<TVariant> v) {
@@ -112,10 +112,11 @@ public:
 
 class TExitStatusData : public TIntValue {
 public:
-    TExitStatusData() : TIntValue(D_EXIT_STATUS,
-                                  "container exit status",
-                                  NODEF_VALUE,
-                                  dState) {}
+    TExitStatusData() :
+        TIntValue(D_EXIT_STATUS,
+                  "container exit status",
+                  NODEF_VALUE,
+                  dState) {}
 
     int GetInt(std::shared_ptr<TContainer> c,
                std::shared_ptr<TVariant> v) {
@@ -128,18 +129,20 @@ public:
 
 class TStartErrnoData : public TIntValue {
 public:
-    TStartErrnoData() : TIntValue(D_START_ERRNO,
-                                  "container start error",
-                                  NODEF_VALUE,
-                                  sState) {}
+    TStartErrnoData() :
+        TIntValue(D_START_ERRNO,
+                  "container start error",
+                  NODEF_VALUE,
+                  sState) {}
 };
 
 class TStdoutData : public TStringValue {
 public:
-    TStdoutData() : TStringValue("stdout",
-                                 "return task stdout",
-                                 NODEF_VALUE,
-                                 rpdState) {}
+    TStdoutData() :
+        TStringValue("stdout",
+                     "return task stdout",
+                     NODEF_VALUE,
+                     rpdState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TVariant> v) {
@@ -151,10 +154,11 @@ public:
 
 class TStderrData : public TStringValue {
 public:
-    TStderrData() : TStringValue("stderr",
-                                 "return task stderr",
-                                 NODEF_VALUE,
-                                 rpdState) {}
+    TStderrData() :
+        TStringValue("stderr",
+                     "return task stderr",
+                     NODEF_VALUE,
+                     rpdState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TVariant> v) {
@@ -164,66 +168,69 @@ public:
     }
 };
 
-class TCpuUsageData : public TStringValue { // TODO: uint
+class TCpuUsageData : public TUintValue {
 public:
-    TCpuUsageData() : TStringValue("cpu_usage",
-                                   "return consumed CPU time in nanoseconds",
-                                   NODEF_VALUE,
-                                   rpdmState) {}
+    TCpuUsageData() :
+        TUintValue("cpu_usage",
+                   "return consumed CPU time in nanoseconds",
+                   NODEF_VALUE,
+                   rpdmState) {}
 
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) {
+    uint64_t GetUint(std::shared_ptr<TContainer> c,
+                     std::shared_ptr<TVariant> v) {
         auto subsys = cpuacctSubsystem;
         auto cg = c->GetLeafCgroup(subsys);
         if (!cg) {
             TLogger::LogAction("cpuacct cgroup not found");
-            return "-1";
+            return -1;
         }
 
         uint64_t val;
         TError error = subsys->Usage(cg, val);
         if (error) {
             TLogger::LogError(error, "Can't get CPU usage");
-            return "-1";
+            return -1;
         }
 
-        return std::to_string(val);
+        return val;
     }
 };
 
-class TMemUsageData : public TStringValue { // TODO: uint
+class TMemUsageData : public TUintValue {
 public:
-    TMemUsageData() : TStringValue("memory_usage",
-                                   "return consumed memory in bytes",
-                                   NODEF_VALUE,
-                                   rpdmState) {}
+    TMemUsageData() :
+        TUintValue("memory_usage",
+                     "return consumed memory in bytes",
+                     NODEF_VALUE,
+                     rpdmState) {}
 
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) {
+    uint64_t GetUint(std::shared_ptr<TContainer> c,
+                     std::shared_ptr<TVariant> v) {
         auto subsys = memorySubsystem;
         auto cg = c->GetLeafCgroup(subsys);
         if (!cg) {
             TLogger::LogAction("memory cgroup not found");
-            return "-1";
+            return -1;
         }
 
         uint64_t val;
         TError error = subsys->Usage(cg, val);
         if (error) {
             TLogger::LogError(error, "Can't get memory usage");
-            return "-1";
+            return -1;
         }
 
-        return std::to_string(val);
+        return val;
     }
 };
 
 class TNetBytesData : public TStringValue { // TODO: map
 public:
-    TNetBytesData() : TStringValue("net_bytes",
-                                   "number of tx bytes",
-                                   NODEF_VALUE,
-                                   rpdmState) {}
+    TNetBytesData() :
+        TStringValue("net_bytes",
+                     "number of tx bytes",
+                     NODEF_VALUE,
+                     rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TVariant> v) {
@@ -240,10 +247,11 @@ public:
 
 class TNetPacketsData : public TStringValue { // TODO: map
 public:
-    TNetPacketsData() : TStringValue("net_packets",
-                                     "number of tx packets",
-                                     NODEF_VALUE,
-                                     rpdmState) {}
+    TNetPacketsData() :
+        TStringValue("net_packets",
+                     "number of tx packets",
+                     NODEF_VALUE,
+                     rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TVariant> v) {
@@ -260,10 +268,11 @@ public:
 
 class TNetDropsData : public TStringValue { // TODO: map
 public:
-    TNetDropsData() : TStringValue("net_drops",
-                                   "number of dropped tx packets",
-                                   NODEF_VALUE,
-                                   rpdmState) {}
+    TNetDropsData() :
+        TStringValue("net_drops",
+                     "number of dropped tx packets",
+                     NODEF_VALUE,
+                     rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TVariant> v) {
@@ -280,10 +289,11 @@ public:
 
 class TNetOverlimitsData : public TStringValue { // TODO: map
 public:
-    TNetOverlimitsData() : TStringValue("net_overlimits",
-                                        "number of tx packets that exceeded the limit",
-                                        NODEF_VALUE,
-                                        rpdmState) {}
+    TNetOverlimitsData() :
+        TStringValue("net_overlimits",
+                     "number of tx packets that exceeded the limit",
+                     NODEF_VALUE,
+                     rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TVariant> v) {
@@ -298,50 +308,53 @@ public:
     }
 };
 
-class TMinorFaultsData : public TStringValue { // TODO: uint
+class TMinorFaultsData : public TUintValue {
 public:
-    TMinorFaultsData() : TStringValue("minor_faults",
-                                      "return number of minor page faults",
-                                      NODEF_VALUE,
-                                      rpdmState) {}
+    TMinorFaultsData() :
+        TUintValue("minor_faults",
+                   "return number of minor page faults",
+                   NODEF_VALUE,
+                   rpdmState) {}
 
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) {
+    uint64_t GetUint(std::shared_ptr<TContainer> c,
+                     std::shared_ptr<TVariant> v) {
         uint64_t val;
         auto cg = c->GetLeafCgroup(memorySubsystem);
         TError error = memorySubsystem->Statistics(cg, "total_pgfault", val);
         if (error)
-            return "-1";
+            return -1;
 
-        return std::to_string(val);
+        return val;
     }
 };
 
-class TMajorFaultsData : public TStringValue { // TODO: uint
+class TMajorFaultsData : public TUintValue {
 public:
-    TMajorFaultsData() : TStringValue("major_faults",
-                                      "return number of major page faults",
-                                      NODEF_VALUE,
-                                      rpdmState) {}
+    TMajorFaultsData() :
+        TUintValue("major_faults",
+                     "return number of major page faults",
+                     NODEF_VALUE,
+                     rpdmState) {}
 
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) {
+    uint64_t GetUint(std::shared_ptr<TContainer> c,
+                     std::shared_ptr<TVariant> v) {
         uint64_t val;
         auto cg = c->GetLeafCgroup(memorySubsystem);
         TError error = memorySubsystem->Statistics(cg, "total_pgmajfault", val);
         if (error)
-            return "-1";
+            return -1;
 
-        return std::to_string(val);
+        return val;
     }
 };
 
 class TIoReadData : public TStringValue { // TODO: map
 public:
-    TIoReadData() : TStringValue("io_read",
-                                 "return number of bytes read from disk",
-                                 NODEF_VALUE | HIDDEN_VALUE,
-                                 rpdmState) {}
+    TIoReadData() :
+        TStringValue("io_read",
+                     "return number of bytes read from disk",
+                     NODEF_VALUE | HIDDEN_VALUE,
+                     rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TVariant> v) {
@@ -365,10 +378,11 @@ public:
 
 class TIoWriteData : public TStringValue { // TODO: map
 public:
-    TIoWriteData() : TStringValue("io_write",
-                                  "return number of bytes written to disk",
-                                  NODEF_VALUE | HIDDEN_VALUE,
-                                  rpdmState) {}
+    TIoWriteData() :
+        TStringValue("io_write",
+                     "return number of bytes written to disk",
+                     NODEF_VALUE | HIDDEN_VALUE,
+                     rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TVariant> v) {
@@ -390,39 +404,40 @@ public:
     }
 };
 
-class TTimeData : public TStringValue { // TODO: uint
+class TTimeData : public TUintValue {
 public:
-    TTimeData() : TStringValue("minor_faults",
-                               "return running time of container",
-                               NODEF_VALUE,
-                               rpdState) {}
+    TTimeData() :
+        TUintValue("minor_faults",
+                   "return running time of container",
+                   NODEF_VALUE,
+                   rpdState) {}
 
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) {
+    uint64_t GetUint(std::shared_ptr<TContainer> c,
+                     std::shared_ptr<TVariant> v) {
         if (!c->Task || !c->Task->IsRunning())
-            return "0";
+            return 0;
 
         int pid = c->Task->GetPid();
         TFile f("/proc/" + std::to_string(pid) + "/stat");
         std::string line;
         if (f.AsString(line))
-            return "0";
+            return 0;
 
         std::vector<std::string> cols;
         if (SplitString(line, ' ', cols))
-            return "0";
+            return 0;
 
         if (cols.size() <= 21)
-            return "0";
+            return 0;
 
         int64_t started;
         if (StringToInt64(cols[21], started))
-            return "0";
+            return 0;
 
         started /= sysconf(_SC_CLK_TCK);
         started += BootTime;
 
-        return std::to_string(time(nullptr) - started);
+        return time(nullptr) - started;
     }
 };
 

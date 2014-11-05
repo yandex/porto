@@ -82,7 +82,6 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     std::shared_ptr<TNlLink> Link;
     int TaskStartErrno = -1;
     TScopedFd Efd;
-    ssize_t RespawnCount;
     int Uid, Gid;
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
@@ -119,7 +118,6 @@ public:
     std::shared_ptr<TVariantSet> Data;
 
     EContainerState GetState();
-    size_t GetRespawnCount() { return RespawnCount; }
     TError GetStat(ETclassStat stat, uint64_t &val) { return Tclass->GetStat(stat, val); }
 
     TContainer(const std::string &name, std::shared_ptr<TContainer> parent, uint16_t id, std::shared_ptr<TNlLink> link) :
@@ -134,7 +132,7 @@ public:
     std::shared_ptr<TNlLink> GetLink() const { return Link; }
 
     uint64_t GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except = nullptr, uint64_t exceptVal = 0) const;
-    bool ValidHierarchicalProperty(const std::string &property, const std::string &value) const;
+    bool ValidHierarchicalProperty(const std::string &property, const uint64_t value) const;
     std::vector<pid_t> Processes();
 
     TError Create(int uid, int gid);
