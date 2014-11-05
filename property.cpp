@@ -177,7 +177,7 @@ public:
                      SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY,
                      staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
         int uid, gid;
         c->GetPerm(uid, gid);
         TUser u(uid);
@@ -189,7 +189,7 @@ public:
 
     TError SetString(std::shared_ptr<TContainer> c,
                      std::shared_ptr<TVariant> v,
-                     const std::string &value) {
+                     const std::string &value) override {
         TUser u(value);
         TError error = u.Load();
         if (error)
@@ -206,7 +206,7 @@ public:
                      SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY,
                      staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
         int uid, gid;
         c->GetPerm(uid, gid);
         TGroup g(gid);
@@ -218,7 +218,7 @@ public:
 
     TError SetString(std::shared_ptr<TContainer> c,
                      std::shared_ptr<TVariant> v,
-                     const std::string &value) {
+                     const std::string &value) override {
         TGroup g(value);
         TError error = g.Load();
         if (error)
@@ -244,13 +244,13 @@ public:
                      PARENT_DEF_PROPERTY,
                      staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
         return "/";
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
                      std::shared_ptr<TVariant> v,
-                     const std::string &value) {
+                     const std::string &value) override {
         TError error = ValidPath(c, value);
         if (error)
             return error;
@@ -266,7 +266,7 @@ public:
                      PARENT_DEF_PROPERTY,
                      staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
         if (!c->Prop->IsDefault("root"))
             return "/";
 
@@ -275,7 +275,7 @@ public:
 
     TError SetString(std::shared_ptr<TContainer> c,
                      std::shared_ptr<TVariant> v,
-                     const std::string &value) {
+                     const std::string &value) override {
         TError error = ValidPath(c, value);
         if (error)
             return error;
@@ -291,13 +291,13 @@ public:
                      0,
                      staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
         return "/dev/null";
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
                      std::shared_ptr<TVariant> v,
-                     const std::string &value) {
+                     const std::string &value) override {
         TError error = ExistingFile(c, value);
         if (error)
             return error;
@@ -313,13 +313,13 @@ public:
                      0,
                      staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
         return DefaultStdFile(c, "stdout");
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
                      std::shared_ptr<TVariant> v,
-                     const std::string &value) {
+                     const std::string &value) override {
         TError error = ValidPath(c, value);
         if (error)
             return error;
@@ -335,13 +335,13 @@ public:
                      0,
                      staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
         return DefaultStdFile(c, "stderr");
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
                      std::shared_ptr<TVariant> v,
-                     const std::string &value) {
+                     const std::string &value) override {
         TError error = ValidPath(c, value);
         if (error)
             return error;
@@ -357,13 +357,13 @@ public:
                    0,
                    staticProperty) {}
 
-    uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) {
+    uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) override {
         return config().container().stdout_limit();
     }
 
     TError SetUint(std::shared_ptr<TContainer> c,
                    std::shared_ptr<TVariant> v,
-                   const uint64_t value) {
+                   const uint64_t &value) override {
         uint32_t max = config().container().stdout_limit();
 
         if (value > max)
@@ -385,7 +385,7 @@ public:
 
     TError SetUint(std::shared_ptr<TContainer> c,
                    std::shared_ptr<TVariant> v,
-                   const uint64_t value) {
+                   const uint64_t &value) override {
         auto memroot = memorySubsystem->GetRootCgroup();
         if (!memroot->HasKnob("memory.low_limit_in_bytes"))
             return TError(EError::NotSupported, "invalid kernel");
@@ -413,7 +413,7 @@ public:
 
     TError SetUint(std::shared_ptr<TContainer> c,
                    std::shared_ptr<TVariant> v,
-                   const uint64_t value) {
+                   const uint64_t &value) override {
         if (!c->ValidHierarchicalProperty(P_MEM_LIMIT, value))
             return TError(EError::InvalidValue, "invalid hierarchical value");
 
@@ -429,13 +429,13 @@ public:
                    PARENT_RO_PROPERTY,
                    dynamicProperty) {}
 
-    bool GetDefaultBool(std::shared_ptr<TContainer> c) {
+    bool GetDefaultBool(std::shared_ptr<TContainer> c) override {
         return false;
     }
 
     TError SetBool(std::shared_ptr<TContainer> c,
                    std::shared_ptr<TVariant> v,
-                   const bool value) {
+                   const bool &value) override {
         auto memroot = memorySubsystem->GetRootCgroup();
         if (!memroot->HasKnob("memory.recharge_on_pgfault"))
             return TError(EError::NotSupported, "invalid kernel");
@@ -452,13 +452,13 @@ public:
                      PARENT_RO_PROPERTY,
                      dynamicProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
         return "normal";
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
                      std::shared_ptr<TVariant> v,
-                     const std::string &value) {
+                     const std::string &value) override {
         if (value != "normal" && value != "rt" && value != "idle")
             return TError(EError::InvalidValue, "invalid policy");
 
@@ -483,13 +483,13 @@ public:
                    PARENT_RO_PROPERTY,
                    dynamicProperty) {}
 
-    uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) {
+    uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) override {
         return DEF_CLASS_PRIO;
     }
 
     TError SetUint(std::shared_ptr<TContainer> c,
                    std::shared_ptr<TVariant> v,
-                   const uint64_t value) {
+                   const uint64_t &value) override {
         if (value < 0 || value > 99)
             return TError(EError::InvalidValue, "invalid value");
 
@@ -505,7 +505,7 @@ public:
                    PARENT_RO_PROPERTY,
                    staticProperty) {}
 
-    uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) {
+    uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) override {
         return DEF_CLASS_RATE;
     }
 };
@@ -518,7 +518,7 @@ public:
                    PARENT_RO_PROPERTY,
                    staticProperty) {}
 
-    uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) {
+    uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) override {
         return DEF_CLASS_CEIL;
     }
 };
@@ -531,13 +531,13 @@ public:
                    PARENT_RO_PROPERTY,
                    staticProperty) {}
 
-    uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) {
+    uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) override {
         return DEF_CLASS_NET_PRIO;
     }
 
     TError SetUint(std::shared_ptr<TContainer> c,
                    std::shared_ptr<TVariant> v,
-                   uint64_t value) {
+                   const uint64_t &value) override {
         if (value < 0 || value > 7)
             return TError(EError::InvalidValue, "invalid value");
 
@@ -553,7 +553,7 @@ public:
                    0,
                    staticProperty) {}
 
-    bool GetDefaultBool(std::shared_ptr<TContainer> c) {
+    bool GetDefaultBool(std::shared_ptr<TContainer> c) override {
         return false;
     }
 };
@@ -566,7 +566,7 @@ public:
                   0,
                   staticProperty) {}
 
-    int GetDefaultInt(std::shared_ptr<TContainer> c) {
+    int GetDefaultInt(std::shared_ptr<TContainer> c) override {
         return -1;
     }
 };
@@ -579,7 +579,7 @@ public:
                    0,
                    staticProperty) {}
 
-    bool GetDefaultBool(std::shared_ptr<TContainer> c) {
+    bool GetDefaultBool(std::shared_ptr<TContainer> c) override {
         return true;
     }
 };
@@ -592,13 +592,13 @@ public:
                      0,
                      dynamicProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
         return "";
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
                      std::shared_ptr<TVariant> v,
-                     const std::string &value) {
+                     const std::string &value) override {
         uint32_t max = config().container().private_max();
 
         if (value.length() > max)
@@ -616,13 +616,13 @@ public:
                      PARENT_DEF_PROPERTY,
                      staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
         return "";
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
                      std::shared_ptr<TVariant> v,
-                     const std::string &value) {
+                     const std::string &value) override {
         std::map<int, struct rlimit> rlim;
         TError error = ParseRlimit(value, rlim);
         if (error)
@@ -648,7 +648,7 @@ public:
                    0,
                    staticProperty) {}
 
-    bool GetDefaultBool(std::shared_ptr<TContainer> c) {
+    bool GetDefaultBool(std::shared_ptr<TContainer> c) override {
         if (c->Prop->IsDefault("root"))
             return false;
         else
@@ -664,13 +664,13 @@ public:
                      0,
                      staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
         return "";
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
                      std::shared_ptr<TVariant> v,
-                     const std::string &value) {
+                     const std::string &value) override {
         std::vector<TBindMap> dirs;
         TError error = ParseBind(value, dirs);
         if (error)
@@ -687,13 +687,13 @@ public:
                      0,
                      staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
         return "host";
     }
 
     TError SetString(std::shared_ptr<TContainer> c,
                      std::shared_ptr<TVariant> v,
-                     const std::string &value) {
+                     const std::string &value) override {
         TNetCfg net;
         TError error = ParseNet(c, value, net);
         if (error)
@@ -710,7 +710,7 @@ public:
                      0,
                      staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) {
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
         return "a *:* rwm";
     }
 };

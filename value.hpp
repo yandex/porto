@@ -19,13 +19,7 @@ enum class EValueType {
     Int,
     Uint,
     Map,
-
-#if 0
-    // key: val; key: val
-    Map,
-    // key; key; key
     List,
-#endif
 };
 
 // Don't return default value, call get handler
@@ -84,6 +78,25 @@ public:
 };
 
 typedef std::map<std::string, uint64_t> TUintMap;
+typedef std::vector<std::string> TStrList;
+
+#define DEFINE_TVALUE(NAME, TYPE) \
+virtual TYPE GetDefault ## NAME(std::shared_ptr<TContainer> c) { \
+    return TYPE{}; \
+} \
+virtual TError Set ## NAME(std::shared_ptr<TContainer> c, \
+                           std::shared_ptr<TVariant> v, \
+                           const TYPE &value) { \
+    ExpectType(EValueType::NAME); \
+    return v->Set(EValueType::NAME, value); \
+} \
+virtual TYPE Get ## NAME(std::shared_ptr<TContainer> c, \
+                         std::shared_ptr<TVariant> v) { \
+    ExpectType(EValueType::NAME); \
+    if (!v->HasValue() && NeedDefault()) \
+        return GetDefault ## NAME(c); \
+    return v->Get<TYPE>(Type); \
+}
 
 class TValue {
     NO_COPY_CONSTRUCT(TValue);
@@ -115,36 +128,29 @@ public:
     virtual std::string GetString(std::shared_ptr<TContainer> c,
                                   std::shared_ptr<TVariant> v) = 0;
 
-    virtual bool GetDefaultBool(std::shared_ptr<TContainer> c);
-    virtual TError SetBool(std::shared_ptr<TContainer> c,
-                           std::shared_ptr<TVariant> v,
-                           const bool value);
-    virtual bool GetBool(std::shared_ptr<TContainer> c,
-                         std::shared_ptr<TVariant> v);
-
-    virtual int GetDefaultInt(std::shared_ptr<TContainer> c);
-    virtual TError SetInt(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v,
-                          const int value);
-    virtual int GetInt(std::shared_ptr<TContainer> c,
-                       std::shared_ptr<TVariant> v);
-
-    virtual uint64_t GetDefaultUint(std::shared_ptr<TContainer> c);
-    virtual TError SetUint(std::shared_ptr<TContainer> c,
-                           std::shared_ptr<TVariant> v,
-                           const uint64_t value);
-    virtual uint64_t GetUint(std::shared_ptr<TContainer> c,
-                             std::shared_ptr<TVariant> v);
-
-    virtual TUintMap GetDefaultMap(std::shared_ptr<TContainer> c);
-    virtual TError SetMap(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v,
-                          const TUintMap &value);
-    virtual TUintMap GetMap(std::shared_ptr<TContainer> c,
-                            std::shared_ptr<TVariant> v);
+    DEFINE_TVALUE(Bool, bool)
+    DEFINE_TVALUE(Int, int)
+    DEFINE_TVALUE(Uint, uint64_t)
+    DEFINE_TVALUE(Map, TUintMap)
+    DEFINE_TVALUE(List, TStrList)
 };
 
-#define SYNTHESIZE_DEFAULT(NAME, TYPE) \
+#undef DEFINE_TVALUE
+
+#define VALUE_CLASS(NAME, TYPE) \
+class T ## NAME ## Value : public TValue { \
+public: \
+    T ## NAME ## Value(const std::string &name, \
+                 const std::string &desc, \
+                 const int flags, \
+                 const std::set<EContainerState> &state) : \
+        TValue(name, EValueType::NAME, desc, flags, state) {} \
+    std::string GetDefaultString(std::shared_ptr<TContainer> c); \
+    TError SetString(std::shared_ptr<TContainer> c, \
+                     std::shared_ptr<TVariant> v, \
+                     const std::string &value); \
+    std::string GetString(std::shared_ptr<TContainer> c, \
+                          std::shared_ptr<TVariant> v); \
     bool IsDefault(std::shared_ptr<TContainer> c, \
                    std::shared_ptr<TVariant> v) { \
         if (!NeedDefault()) \
@@ -152,109 +158,17 @@ public:
         if (!v->HasValue()) \
             return true; \
         return v->Get<TYPE>(EValueType::NAME) == GetDefault ## NAME(c); \
-    }
+    } \
+}
 
-class TStringValue : public TValue {
-public:
-    TStringValue(const std::string &name,
-                 const std::string &desc,
-                 const int flags,
-                 const std::set<EContainerState> &state) :
-        TValue(name, EValueType::String, desc, flags, state) {}
+VALUE_CLASS(String, std::string);
+VALUE_CLASS(Bool, bool);
+VALUE_CLASS(Int, int);
+VALUE_CLASS(Uint, uint64_t);
+VALUE_CLASS(Map, TUintMap);
+VALUE_CLASS(List, TStrList);
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c);
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value);
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v);
-
-    SYNTHESIZE_DEFAULT(String, std::string)
-};
-
-class TBoolValue : public TValue {
-    NO_COPY_CONSTRUCT(TBoolValue);
-
-    std::string BoolToStr(bool v);
-
-public:
-    TBoolValue(const std::string &name,
-               const std::string &desc,
-               const int flags,
-               const std::set<EContainerState> &state) :
-        TValue(name, EValueType::Bool, desc, flags, state) {}
-
-    std::string GetDefaultString(std::shared_ptr<TContainer> c);
-    TError SetString(std::shared_ptr<TContainer> c,
-                             std::shared_ptr<TVariant> v,
-                             const std::string &value);
-    std::string GetString(std::shared_ptr<TContainer> c,
-                                  std::shared_ptr<TVariant> v);
-
-    SYNTHESIZE_DEFAULT(Bool, bool)
-};
-
-class TIntValue : public TValue {
-    NO_COPY_CONSTRUCT(TIntValue);
-
-public:
-    TIntValue(const std::string &name,
-               const std::string &desc,
-               const int flags,
-               const std::set<EContainerState> &state) :
-        TValue(name, EValueType::Int, desc, flags, state) {}
-
-    std::string GetDefaultString(std::shared_ptr<TContainer> c);
-    TError SetString(std::shared_ptr<TContainer> c,
-                             std::shared_ptr<TVariant> v,
-                             const std::string &value);
-    std::string GetString(std::shared_ptr<TContainer> c,
-                                  std::shared_ptr<TVariant> v);
-
-    SYNTHESIZE_DEFAULT(Int, int)
-};
-
-class TUintValue : public TValue {
-    NO_COPY_CONSTRUCT(TUintValue);
-
-public:
-    TUintValue(const std::string &name,
-               const std::string &desc,
-               const int flags,
-               const std::set<EContainerState> &state) :
-        TValue(name, EValueType::Uint, desc, flags, state) {}
-
-    std::string GetDefaultString(std::shared_ptr<TContainer> c);
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value);
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v);
-
-    SYNTHESIZE_DEFAULT(Uint, uint64_t)
-};
-
-class TMapValue : public TValue {
-    NO_COPY_CONSTRUCT(TMapValue);
-
-public:
-    TMapValue(const std::string &name,
-               const std::string &desc,
-               const int flags,
-               const std::set<EContainerState> &state) :
-        TValue(name, EValueType::Map, desc, flags, state) {}
-
-    std::string GetDefaultString(std::shared_ptr<TContainer> c);
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value);
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v);
-
-    SYNTHESIZE_DEFAULT(Map, TUintMap)
-};
-
-#undef SYNTHESIZE_DEFAULT
+#undef VALUE_CLASS
 
 class TValueSet {
     std::map<std::string, TValue *> Value;

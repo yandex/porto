@@ -15,89 +15,6 @@ bool TValue::NeedDefault() {
     return !(Flags & NODEF_VALUE);
 }
 
-bool TValue::GetDefaultBool(std::shared_ptr<TContainer> c) {
-    ExpectType(EValueType::Bool);
-    return false;
-}
-
-TError TValue::SetBool(std::shared_ptr<TContainer> c,
-                       std::shared_ptr<TVariant> v,
-                       const bool value) {
-    ExpectType(EValueType::Bool);
-    return v->Set(Type, value);
-}
-
-bool TValue::GetBool(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v) {
-    ExpectType(EValueType::Bool);
-    if (!v->HasValue() && NeedDefault())
-        return GetDefaultBool(c);
-
-    return v->Get<bool>(Type);
-}
-
-int TValue::GetDefaultInt(std::shared_ptr<TContainer> c) {
-    ExpectType(EValueType::Int);
-    return 0;
-}
-
-TError TValue::SetInt(std::shared_ptr<TContainer> c,
-                      std::shared_ptr<TVariant> v,
-                      const int value) {
-    ExpectType(EValueType::Int);
-    return v->Set(Type, value);
-}
-
-int TValue::GetInt(std::shared_ptr<TContainer> c,
-                   std::shared_ptr<TVariant> v) {
-    ExpectType(EValueType::Int);
-    if (!v->HasValue() && NeedDefault())
-        return GetDefaultInt(c);
-
-    return v->Get<int>(Type);
-}
-
-uint64_t TValue::GetDefaultUint(std::shared_ptr<TContainer> c) {
-    ExpectType(EValueType::Uint);
-    return 0;
-}
-
-TError TValue::SetUint(std::shared_ptr<TContainer> c,
-                       std::shared_ptr<TVariant> v,
-                       const uint64_t value) {
-    ExpectType(EValueType::Uint);
-    return v->Set(Type, value);
-}
-
-uint64_t TValue::GetUint(std::shared_ptr<TContainer> c,
-                         std::shared_ptr<TVariant> v) {
-    ExpectType(EValueType::Uint);
-    if (!v->HasValue() && NeedDefault())
-        return GetDefaultUint(c);
-
-    return v->Get<uint64_t>(Type);
-}
-
-TUintMap TValue::GetDefaultMap(std::shared_ptr<TContainer> c) {
-    return TUintMap();
-}
-
-TError TValue::SetMap(std::shared_ptr<TContainer> c,
-                      std::shared_ptr<TVariant> v,
-                      const TUintMap &value) {
-    ExpectType(EValueType::Map);
-    return v->Set(EValueType::Map, value);
-}
-
-TUintMap TValue::GetMap(std::shared_ptr<TContainer> c,
-                        std::shared_ptr<TVariant> v) {
-    ExpectType(EValueType::Map);
-    if (!v->HasValue() && NeedDefault())
-        return GetDefaultMap(c);
-
-    return v->Get<TUintMap>(Type);
-}
-
 std::string TStringValue::GetDefaultString(std::shared_ptr<TContainer> c) {
     return "";
 }
@@ -116,7 +33,7 @@ std::string TStringValue::GetString(std::shared_ptr<TContainer> c,
     return v->Get<std::string>(Type);
 }
 
-std::string TBoolValue::BoolToStr(bool v) {
+static std::string BoolToStr(bool v) {
     if (v)
         return "true";
     else

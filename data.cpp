@@ -58,8 +58,9 @@ public:
                      anyState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) {
-        return ContainerStateName(c->GetState());    }
+                          std::shared_ptr<TVariant> v) override {
+        return ContainerStateName(c->GetState());
+    }
 };
 
 class TOomKilledData : public TBoolValue {
@@ -80,7 +81,7 @@ public:
                      anyState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) {
+                          std::shared_ptr<TVariant> v) override {
         return c->GetParent() ? c->GetParent()->GetName() : "";
     }
 };
@@ -103,7 +104,7 @@ public:
                   rpState) {}
 
     int GetInt(std::shared_ptr<TContainer> c,
-               std::shared_ptr<TVariant> v) {
+               std::shared_ptr<TVariant> v) override {
         if (!c->Task)
             return -1;
         return c->Task->GetPid();
@@ -119,7 +120,7 @@ public:
                   dState) {}
 
     int GetInt(std::shared_ptr<TContainer> c,
-               std::shared_ptr<TVariant> v) {
+               std::shared_ptr<TVariant> v) override {
         if (c->Task && !c->Task->IsRunning())
             return c->Task->GetExitStatus();
         else
@@ -145,7 +146,7 @@ public:
                      rpdState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) {
+                          std::shared_ptr<TVariant> v) override {
         if (c->Task)
             return c->Task->GetStdout(c->Prop->GetUint(P_STDOUT_LIMIT));
         return "";
@@ -161,7 +162,7 @@ public:
                      rpdState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) {
+                          std::shared_ptr<TVariant> v) override {
         if (c->Task)
             return c->Task->GetStderr(c->Prop->GetUint(P_STDOUT_LIMIT));
         return "";
@@ -177,7 +178,7 @@ public:
                    rpdmState) {}
 
     uint64_t GetUint(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v) {
+                     std::shared_ptr<TVariant> v) override {
         auto subsys = cpuacctSubsystem;
         auto cg = c->GetLeafCgroup(subsys);
         if (!cg) {
@@ -205,7 +206,7 @@ public:
                      rpdmState) {}
 
     uint64_t GetUint(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v) {
+                     std::shared_ptr<TVariant> v) override {
         auto subsys = memorySubsystem;
         auto cg = c->GetLeafCgroup(subsys);
         if (!cg) {
@@ -233,7 +234,7 @@ public:
                      rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) {
+                          std::shared_ptr<TVariant> v) override {
         uint64_t val;
         TError error = c->GetStat(ETclassStat::Bytes, val);
         if (error) {
@@ -254,7 +255,7 @@ public:
                      rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) {
+                          std::shared_ptr<TVariant> v) override {
         uint64_t val;
         TError error = c->GetStat(ETclassStat::Packets, val);
         if (error) {
@@ -275,7 +276,7 @@ public:
                      rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) {
+                          std::shared_ptr<TVariant> v) override {
         uint64_t val;
         TError error = c->GetStat(ETclassStat::Drops, val);
         if (error) {
@@ -296,7 +297,7 @@ public:
                      rpdmState) {}
 
     std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) {
+                          std::shared_ptr<TVariant> v) override {
         uint64_t val;
         TError error = c->GetStat(ETclassStat::Overlimits, val);
         if (error) {
@@ -317,7 +318,7 @@ public:
                    rpdmState) {}
 
     uint64_t GetUint(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v) {
+                     std::shared_ptr<TVariant> v) override {
         uint64_t val;
         auto cg = c->GetLeafCgroup(memorySubsystem);
         TError error = memorySubsystem->Statistics(cg, "total_pgfault", val);
@@ -337,7 +338,7 @@ public:
                      rpdmState) {}
 
     uint64_t GetUint(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v) {
+                     std::shared_ptr<TVariant> v) override {
         uint64_t val;
         auto cg = c->GetLeafCgroup(memorySubsystem);
         TError error = memorySubsystem->Statistics(cg, "total_pgmajfault", val);
@@ -357,7 +358,7 @@ public:
                   rpdmState) {}
 
     TUintMap GetMap(std::shared_ptr<TContainer> c,
-                    std::shared_ptr<TVariant> v) {
+                    std::shared_ptr<TVariant> v) override {
         TUintMap m;
         auto cg = c->GetLeafCgroup(blkioSubsystem);
 
@@ -382,7 +383,7 @@ public:
                   rpdmState) {}
 
     TUintMap GetMap(std::shared_ptr<TContainer> c,
-                    std::shared_ptr<TVariant> v) {
+                    std::shared_ptr<TVariant> v) override {
         TUintMap m;
         auto cg = c->GetLeafCgroup(blkioSubsystem);
 
@@ -407,7 +408,7 @@ public:
                    rpdState) {}
 
     uint64_t GetUint(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v) {
+                     std::shared_ptr<TVariant> v) override {
         if (!c->Task || !c->Task->IsRunning())
             return 0;
 
