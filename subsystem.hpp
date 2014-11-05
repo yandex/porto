@@ -80,7 +80,7 @@ public:
 class TDevicesSubsystem : public TSubsystem {
 public:
     TDevicesSubsystem() : TSubsystem("devices") {}
-    TError AllowDevices(std::shared_ptr<TCgroup> &cg, const std::string &s);
+    TError AllowDevices(std::shared_ptr<TCgroup> &cg, const std::vector<std::string> &allowed);
 };
 
 extern std::shared_ptr<TMemorySubsystem> memorySubsystem;

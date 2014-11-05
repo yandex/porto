@@ -39,15 +39,8 @@ TError TTaskEnv::Prepare() {
     if (Command.empty())
         return TError::Success();
 
-    EnvVec.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
-    TError error = SplitEscapedString(Environ, ';', EnvVec);
-    if (error)
-        return error;
-    EnvVec.push_back("HOME=" + Cwd.ToString());
-    EnvVec.push_back("USER=" + User);
-
     TUser u(User);
-    error = u.Load();
+    TError error = u.Load();
     if (error)
         return error;
 
@@ -64,10 +57,10 @@ TError TTaskEnv::Prepare() {
 }
 
 const char** TTaskEnv::GetEnvp() const {
-    auto envp = new const char* [EnvVec.size() + 1];
-    for (size_t i = 0; i < EnvVec.size(); i++)
-        envp[i] = EnvVec[i].c_str();
-    envp[EnvVec.size()] = NULL;
+    auto envp = new const char* [Environ.size() + 1];
+    for (size_t i = 0; i < Environ.size(); i++)
+        envp[i] = Environ[i].c_str();
+    envp[Environ.size()] = NULL;
 
     return envp;
 }
@@ -187,7 +180,7 @@ void TTask::ChildDropPriveleges() {
 void TTask::ChildExec() {
     clearenv();
 
-    for (auto &s : Env->EnvVec) {
+    for (auto &s : Env->Environ) {
         char *d = strdup(s.c_str());
         putenv(d);
     }

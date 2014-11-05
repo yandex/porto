@@ -234,15 +234,10 @@ TError TBlkioSubsystem::Statistics(std::shared_ptr<TCgroup> &cg, const std::stri
 
 // Devices
 
-TError TDevicesSubsystem::AllowDevices(std::shared_ptr<TCgroup> &cg, const std::string &s) {
-    vector<string> allowed;
-    TError error = SplitString(s, ';', allowed);
-    if (error)
-        return error;
-
+TError TDevicesSubsystem::AllowDevices(std::shared_ptr<TCgroup> &cg, const std::vector<std::string> &allowed) {
     vector<string> lines;
 
-    error = cg->GetKnobValueAsLines("devices.list", lines);
+    TError error = cg->GetKnobValueAsLines("devices.list", lines);
     if (error)
         return error;
 

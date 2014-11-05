@@ -1,3 +1,4 @@
+- make ParseRlimit, ParseBind, ParseNet part of property class
 - test restarting (check version)
 - shaping with macvlan or non-default interface?
 - ? portoctl cp

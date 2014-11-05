@@ -271,14 +271,14 @@ TError TContainer::ApplyDynamicProperties() {
     auto memroot = memorySubsystem->GetRootCgroup();
     if (memroot->HasKnob("memory.low_limit_in_bytes") && Prop->GetUint(P_MEM_GUARANTEE) != 0) {
         TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", Prop->GetString(P_MEM_GUARANTEE), false);
-        TLogger::LogError(error, "Can't set " + std::to_string(P_MEM_GUARANTEE));
+        TLogger::LogError(error, "Can't set " + std::string(P_MEM_GUARANTEE));
         if (error)
             return error;
     }
 
     if (Prop->GetUint(P_MEM_LIMIT) != 0) {
         error = memcg->SetKnobValue("memory.limit_in_bytes", Prop->GetString(P_MEM_LIMIT), false);
-        TLogger::LogError(error, "Can't set " + std::to_string(P_MEM_LIMIT));
+        TLogger::LogError(error, "Can't set " + std::string(P_MEM_LIMIT));
         if (error)
             return error;
     }
@@ -286,7 +286,7 @@ TError TContainer::ApplyDynamicProperties() {
     if (memroot->HasKnob("memory.recharge_on_pgfault")) {
         string value = Prop->GetBool(P_RECHARGE_ON_PGFAULT) ? "1" : "0";
         error = memcg->SetKnobValue("memory.recharge_on_pgfault", value, false);
-        TLogger::LogError(error, "Can't set " + std::to_string(P_RECHARGE_ON_PGFAULT));
+        TLogger::LogError(error, "Can't set " + std::string(P_RECHARGE_ON_PGFAULT));
         if (error)
             return error;
     }
@@ -305,7 +305,7 @@ TError TContainer::ApplyDynamicProperties() {
 
         int cpuPrio = Prop->GetUint(P_CPU_PRIO);
         error = cpucg->SetKnobValue("cpu.shares", std::to_string(cpuPrio + 2), false);
-        TLogger::LogError(error, "Can't set " + std::to_string(P_CPU_PRIO));
+        TLogger::LogError(error, "Can't set " + std::string(P_CPU_PRIO));
         if (error)
             return error;
 
@@ -459,9 +459,9 @@ TError TContainer::PrepareCgroups() {
 
     auto devices = GetLeafCgroup(devicesSubsystem);
     error = devicesSubsystem->AllowDevices(devices,
-                                           Prop->GetString(P_ALLOWED_DEVICES));
+                                           Prop->GetList(P_ALLOWED_DEVICES));
     if (error) {
-        TLogger::LogError(error, "Can't set " + std::to_string(P_ALLOWED_DEVICES));
+        TLogger::LogError(error, "Can't set " + std::string(P_ALLOWED_DEVICES));
         return error;
     }
 
@@ -477,7 +477,15 @@ TError TContainer::PrepareTask() {
     taskEnv->CreateCwd = Prop->IsDefault(P_ROOT) && Prop->IsDefault(P_CWD) && !UseParentNamespace();
     taskEnv->User = Prop->GetString(P_USER);
     taskEnv->Group = Prop->GetString(P_GROUP);
-    taskEnv->Environ = Prop->GetString(P_ENV) + ";container=lxc;PORTO_NAME=" + GetName();
+
+    taskEnv->Environ.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
+    auto env = Prop->GetList(P_ENV);
+    taskEnv->Environ.insert(taskEnv->Environ.end(), env.begin(), env.end());
+    taskEnv->Environ.push_back("container=lxc");
+    taskEnv->Environ.push_back("PORTO_NAME=" + GetName());
+    taskEnv->Environ.push_back("HOME=" + Prop->GetString(P_CWD));
+    taskEnv->Environ.push_back("USER=" + Prop->GetString(P_USER));
+
     taskEnv->Isolate = Prop->GetBool(P_ISOLATE);
     taskEnv->StdinPath = Prop->GetString(P_STDIN_PATH);
     taskEnv->StdoutPath = Prop->GetString(P_STDOUT_PATH);
@@ -485,16 +493,16 @@ TError TContainer::PrepareTask() {
     taskEnv->Hostname = Prop->GetString(P_HOSTNAME);
     taskEnv->BindDns = Prop->GetBool(P_BIND_DNS);
 
-    TError error = ParseRlimit(Prop->GetString(P_ULIMIT), taskEnv->Rlimit);
+    TError error = ParseRlimit(Prop->GetList(P_ULIMIT), taskEnv->Rlimit);
     if (error)
         return error;
 
-    error = ParseBind(Prop->GetString(P_BIND), taskEnv->BindMap);
+    error = ParseBind(Prop->GetList(P_BIND), taskEnv->BindMap);
     if (error)
         return error;
 
     if (config().network().enabled()) {
-        error = ParseNet(shared_from_this(), Prop->GetString(P_NET), taskEnv->NetCfg);
+        error = ParseNet(shared_from_this(), Prop->GetList(P_NET), taskEnv->NetCfg);
         if (error)
             return error;
     }

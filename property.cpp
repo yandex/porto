@@ -7,10 +7,6 @@
 #include "util/unix.hpp"
 #include "util/pwd.hpp"
 
-namespace std {
-    const string &to_string(const string &s) { return s; }
-}
-
 bool TPropertySet::ParentDefault(std::shared_ptr<TContainer> &c,
                                     const std::string &property) {
     TError error = GetSharedContainer(c);
@@ -227,13 +223,13 @@ public:
     }
 };
 
-class TEnvProperty : public TStringValue { // TODO: EValueType::List,
+class TEnvProperty : public TListValue {
 public:
     TEnvProperty() :
-        TStringValue(P_ENV,
-                     "Container environment variables",
-                     PARENT_DEF_PROPERTY,
-                     staticProperty) {}
+        TListValue(P_ENV,
+                   "Container environment variables",
+                   PARENT_DEF_PROPERTY,
+                   staticProperty) {}
 };
 
 class TRootProperty : public TStringValue {
@@ -608,26 +604,22 @@ public:
     }
 };
 
-class TUlimitProperty : public TStringValue { //TODO: MAP or list
+class TUlimitProperty : public TListValue {
 public:
     TUlimitProperty() :
-        TStringValue(P_ULIMIT,
-                     "Container resource limits",
-                     PARENT_DEF_PROPERTY,
-                     staticProperty) {}
+        TListValue(P_ULIMIT,
+                   "Container resource limits",
+                   PARENT_DEF_PROPERTY,
+                   staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
-        return "";
-    }
-
-    TError SetString(std::shared_ptr<TContainer> c,
+    TError SetList(std::shared_ptr<TContainer> c,
                      std::shared_ptr<TVariant> v,
-                     const std::string &value) override {
+                     const std::vector<std::string> &value) override {
         std::map<int, struct rlimit> rlim;
         TError error = ParseRlimit(value, rlim);
         if (error)
             return error;
-        return v->Set(EValueType::String, value);
+        return v->Set(EValueType::List, value);
     }
 };
 
@@ -656,62 +648,59 @@ public:
     }
 };
 
-class TBindProperty : public TStringValue { // TODO: list or map
+class TBindProperty : public TListValue {
 public:
     TBindProperty() :
-        TStringValue(P_BIND,
-                     "Share host directories with container",
-                     0,
-                     staticProperty) {}
+        TListValue(P_BIND,
+                   "Share host directories with container",
+                   0,
+                   staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
-        return "";
-    }
-
-    TError SetString(std::shared_ptr<TContainer> c,
+    TError SetList(std::shared_ptr<TContainer> c,
                      std::shared_ptr<TVariant> v,
-                     const std::string &value) override {
+                     const TStrList &value) override {
+        TLogger::Log() << "SET BIND TO " << ListToString(value) << std::endl;
         std::vector<TBindMap> dirs;
         TError error = ParseBind(value, dirs);
         if (error)
             return error;
-        return v->Set(EValueType::String, value);
+        return v->Set(EValueType::List, value);
     }
 };
 
-class TNetProperty : public TStringValue { // TODO: list or map
+class TNetProperty : public TListValue {
 public:
     TNetProperty() :
-        TStringValue(P_NET,
-                     "Container network settings",
-                     0,
-                     staticProperty) {}
+        TListValue(P_NET,
+                   "Container network settings",
+                   0,
+                   staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
-        return "host";
+    TStrList GetDefaultList(std::shared_ptr<TContainer> c) override {
+        return TStrList{ "host" };
     }
 
-    TError SetString(std::shared_ptr<TContainer> c,
+    TError SetList(std::shared_ptr<TContainer> c,
                      std::shared_ptr<TVariant> v,
-                     const std::string &value) override {
+                     const TStrList &value) override {
         TNetCfg net;
         TError error = ParseNet(c, value, net);
         if (error)
             return error;
-        return v->Set(EValueType::String, value);
+        return v->Set(EValueType::List, value);
     }
 };
 
-class TAllowedDevicesProperty : public TStringValue { // TODO: list
+class TAllowedDevicesProperty : public TListValue {
 public:
     TAllowedDevicesProperty() :
-        TStringValue(P_ALLOWED_DEVICES,
-                     "Devices that container can create/read/write",
-                     0,
-                     staticProperty) {}
+        TListValue(P_ALLOWED_DEVICES,
+                   "Devices that container can create/read/write",
+                   0,
+                   staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
-        return "a *:* rwm";
+    TStrList GetDefaultList(std::shared_ptr<TContainer> c) override {
+        return TStrList{ "a *:* rwm" };
     }
 };
 
@@ -776,7 +765,7 @@ TError RegisterProperties() {
     return propertySet.Register(properties);
 }
 
-TError ParseRlimit(const std::string &s, std::map<int,struct rlimit> &rlim) {
+TError ParseRlimit(const std::vector<std::string> &limits, std::map<int,struct rlimit> &rlim) {
     static const std::map<std::string,int> nameToIdx = {
         { "as", RLIMIT_AS },
         { "core", RLIMIT_CORE },
@@ -795,11 +784,6 @@ TError ParseRlimit(const std::string &s, std::map<int,struct rlimit> &rlim) {
         { "sigpending", RLIMIT_SIGPENDING },
         { "stask", RLIMIT_STACK },
     };
-
-    std::vector<std::string> limits;
-    TError error = SplitString(s, ';', limits);
-    if (error)
-        return error;
 
     for (auto &limit : limits) {
         std::vector<std::string> nameval;
@@ -822,7 +806,7 @@ TError ParseRlimit(const std::string &s, std::map<int,struct rlimit> &rlim) {
         if (softhard[0] == "unlim" || softhard[0] == "unliminted") {
             soft = RLIM_INFINITY;
         } else {
-            error = StringToUint64(softhard[0], soft);
+            TError error = StringToUint64(softhard[0], soft);
             if (error)
                 return TError(EError::InvalidValue, "Invalid soft limit for " + name);
         }
@@ -830,7 +814,7 @@ TError ParseRlimit(const std::string &s, std::map<int,struct rlimit> &rlim) {
         if (softhard[1] == "unlim" || softhard[1] == "unliminted") {
             hard = RLIM_INFINITY;
         } else {
-            error = StringToUint64(softhard[1], hard);
+            TError error = StringToUint64(softhard[1], hard);
             if (error)
                 return TError(EError::InvalidValue, "Invalid hard limit for " + name);
         }
@@ -842,18 +826,12 @@ TError ParseRlimit(const std::string &s, std::map<int,struct rlimit> &rlim) {
     return TError::Success();
 }
 
-TError ParseBind(const std::string &s, std::vector<TBindMap> &dirs) {
-    std::vector<std::string> lines;
-
-    TError error = SplitEscapedString(s, ';', lines);
-    if (error)
-        return error;
-
+TError ParseBind(const std::vector<std::string> &lines, std::vector<TBindMap> &dirs) {
     for (auto &line : lines) {
         std::vector<std::string> tok;
         TBindMap bindMap;
 
-        error = SplitEscapedString(line, ' ', tok);
+        TError error = SplitEscapedString(line, ' ', tok);
         if (error)
             return error;
 
@@ -882,17 +860,12 @@ TError ParseBind(const std::string &s, std::vector<TBindMap> &dirs) {
     return TError::Success();
 }
 
-TError ParseNet(std::shared_ptr<const TContainer> container, const std::string &s, TNetCfg &net) {
+TError ParseNet(std::shared_ptr<const TContainer> container, const std::vector<std::string> &lines, TNetCfg &net) {
     if (!config().network().enabled())
         return TError(EError::Unknown, "Network support is disabled");
 
-    std::vector<std::string> lines;
     bool none = false;
     net.Share = false;
-
-    TError error = SplitEscapedString(s, ';', lines);
-    if (error)
-        return error;
 
     if (lines.size() == 0)
         return TError(EError::InvalidValue, "Configuration is not specified");
@@ -904,7 +877,7 @@ TError ParseNet(std::shared_ptr<const TContainer> container, const std::string &
 
         std::vector<std::string> settings;
 
-        error = SplitEscapedString(line, ' ', settings);
+        TError error = SplitEscapedString(line, ' ', settings);
         if (error)
             return error;
 

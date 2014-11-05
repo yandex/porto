@@ -56,10 +56,6 @@ const unsigned int PARENT_RO_PROPERTY = (1 << 2);
 
 extern TValueSet propertySet;
 
-namespace std {
-    const string &to_string(const string &s);
-}
-
 #define SYNTHESIZE_ACCESSOR(NAME, TYPE) \
     TYPE Get ## NAME(const std::string &property) { \
         if (VariantSet.IsDefault(property)) { \
@@ -79,7 +75,7 @@ namespace std {
         TError error = VariantSet.Set ## NAME(property, value); \
         if (error) \
             return error; \
-        error = AppendStorage(property, std::to_string(value)); \
+        error = AppendStorage(property, NAME ## ToString(value)); \
         if (error) \
             return error; \
         return TError::Success(); \
@@ -108,6 +104,7 @@ public:
     SYNTHESIZE_ACCESSOR(Bool, bool);
     SYNTHESIZE_ACCESSOR(Int, int);
     SYNTHESIZE_ACCESSOR(Uint, uint64_t);
+    SYNTHESIZE_ACCESSOR(List, TStrList);
 
     bool IsDefault(const std::string &property);
     bool ParentDefault(std::shared_ptr<TContainer> &c,
@@ -126,8 +123,8 @@ public:
 
 TError RegisterProperties();
 
-TError ParseRlimit(const std::string &s, std::map<int,struct rlimit> &rlim);
-TError ParseBind(const std::string &s, std::vector<TBindMap> &dirs);
-TError ParseNet(std::shared_ptr<const TContainer> container, const std::string &s, TNetCfg &net);
+TError ParseRlimit(const std::vector<std::string> &limits, std::map<int,struct rlimit> &rlim);
+TError ParseBind(const std::vector<std::string> &s, std::vector<TBindMap> &dirs);
+TError ParseNet(std::shared_ptr<const TContainer> container, const std::vector<std::string> &s, TNetCfg &net);
 
 #endif

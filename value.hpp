@@ -138,6 +138,7 @@ public:
 #undef DEFINE_TVALUE
 
 #define VALUE_CLASS(NAME, TYPE) \
+std::string NAME ## ToString(const TYPE &v); \
 class T ## NAME ## Value : public TValue { \
 public: \
     T ## NAME ## Value(const std::string &name, \
@@ -150,7 +151,7 @@ public: \
                      std::shared_ptr<TVariant> v, \
                      const std::string &value); \
     std::string GetString(std::shared_ptr<TContainer> c, \
-                          std::shared_ptr<TVariant> v); \
+                                     std::shared_ptr<TVariant> v); \
     bool IsDefault(std::shared_ptr<TContainer> c, \
                    std::shared_ptr<TVariant> v) { \
         if (!NeedDefault()) \
@@ -217,6 +218,7 @@ public:
     SYNTHESIZE_ACCESSOR(Bool, bool)
     SYNTHESIZE_ACCESSOR(Int, int)
     SYNTHESIZE_ACCESSOR(Uint, uint64_t)
+    SYNTHESIZE_ACCESSOR(List, TStrList)
 
     std::vector<std::string> List();
     bool IsDefault(const std::string &name);

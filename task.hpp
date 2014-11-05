@@ -49,7 +49,6 @@ struct TNetCfg {
 class TTaskEnv {
     NO_COPY_CONSTRUCT(TTaskEnv);
     friend TTask;
-    std::vector<std::string> EnvVec;
     int Uid, Gid;
 
 public:
@@ -60,7 +59,7 @@ public:
     TPath Root;
     std::string User;
     std::string Group;
-    std::string Environ;
+    std::vector<std::string> Environ;
     bool Isolate = false;
     TPath StdinPath;
     TPath StdoutPath;

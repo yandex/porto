@@ -15,6 +15,10 @@ bool TValue::NeedDefault() {
     return !(Flags & NODEF_VALUE);
 }
 
+std::string StringToString(const std::string &v) {
+    return v;
+}
+
 std::string TStringValue::GetDefaultString(std::shared_ptr<TContainer> c) {
     return "";
 }
@@ -33,15 +37,25 @@ std::string TStringValue::GetString(std::shared_ptr<TContainer> c,
     return v->Get<std::string>(Type);
 }
 
-static std::string BoolToStr(bool v) {
+#define DEFINE_VALUE_GETTER(NAME, TYPE) \
+    std::string T ## NAME ## Value::GetDefaultString(std::shared_ptr<TContainer> c) { \
+        return NAME ## ToString(GetDefault ## NAME(c)); \
+    } \
+    std::string T ## NAME ## Value:: GetString(std::shared_ptr<TContainer> c, \
+                                               std::shared_ptr<TVariant> v) { \
+        if (!v->HasValue() && NeedDefault()) \
+            return NAME ## ToString(GetDefault ## NAME(c)); \
+        else \
+            return NAME ## ToString(Get ## NAME(c, v)); \
+    }
+
+DEFINE_VALUE_GETTER(Bool, bool)
+
+std::string BoolToString(const bool &v) {
     if (v)
         return "true";
     else
         return "false";
-}
-
-std::string TBoolValue::GetDefaultString(std::shared_ptr<TContainer> c) {
-    return BoolToStr(GetDefaultBool(c));
 }
 
 TError TBoolValue::SetString(std::shared_ptr<TContainer> c,
@@ -54,20 +68,11 @@ TError TBoolValue::SetString(std::shared_ptr<TContainer> c,
 
     return SetBool(c, v, tmp);
 }
-std::string TBoolValue::GetString(std::shared_ptr<TContainer> c,
-                              std::shared_ptr<TVariant> v) {
-    bool value;
 
-    if (!v->HasValue() && NeedDefault())
-        value = GetDefaultBool(c);
-    else
-        value = GetBool(c, v);
+DEFINE_VALUE_GETTER(Int, int)
 
-    return BoolToStr(value);
-}
-
-std::string TIntValue::GetDefaultString(std::shared_ptr<TContainer> c) {
-    return std::to_string(GetDefaultInt(c));
+std::string IntToString(const int &v) {
+    return std::to_string(v);
 }
 
 TError TIntValue::SetString(std::shared_ptr<TContainer> c,
@@ -80,20 +85,11 @@ TError TIntValue::SetString(std::shared_ptr<TContainer> c,
 
     return SetInt(c, v, tmp);
 }
-std::string TIntValue::GetString(std::shared_ptr<TContainer> c,
-                                 std::shared_ptr<TVariant> v) {
-    int value;
 
-    if (!v->HasValue() && NeedDefault())
-        value = GetDefaultInt(c);
-    else
-        value = GetInt(c, v);
+DEFINE_VALUE_GETTER(Uint, uint64_t)
 
-    return std::to_string(value);
-}
-
-std::string TUintValue::GetDefaultString(std::shared_ptr<TContainer> c) {
-    return std::to_string(GetDefaultUint(c));
+std::string UintToString(const uint64_t &v) {
+    return std::to_string(v);
 }
 
 TError TUintValue::SetString(std::shared_ptr<TContainer> c,
@@ -106,22 +102,13 @@ TError TUintValue::SetString(std::shared_ptr<TContainer> c,
 
     return SetUint(c, v, tmp);
 }
-std::string TUintValue::GetString(std::shared_ptr<TContainer> c,
-                                  std::shared_ptr<TVariant> v) {
-    uint64_t value;
 
-    if (!v->HasValue() && NeedDefault())
-        value = GetDefaultUint(c);
-    else
-        value = GetUint(c, v);
+DEFINE_VALUE_GETTER(Map, TUintMap)
 
-    return std::to_string(value);
-}
-
-static std::string MapToString(const TUintMap &m) {
+std::string MapToString(const TUintMap &v) {
     std::stringstream str;
 
-    for (auto &kv : m) {
+    for (auto &kv : v) {
         if (str.str().length())
             str << "; ";
         str << kv.first << ": " << kv.second;
@@ -130,16 +117,12 @@ static std::string MapToString(const TUintMap &m) {
     return str.str();
 }
 
-std::string TMapValue::GetDefaultString(std::shared_ptr<TContainer> c) {
-    return MapToString(GetDefaultMap(c));
-}
-
 TError TMapValue::SetString(std::shared_ptr<TContainer> c,
                             std::shared_ptr<TVariant> v,
                             const std::string &value) {
     TUintMap m;
     std::vector<std::string> lines;
-    TError error = SplitString(value, ';', lines);
+    TError error = SplitEscapedString(value, ';', lines);
     if (error)
         return error;
 
@@ -148,7 +131,7 @@ TError TMapValue::SetString(std::shared_ptr<TContainer> c,
     for (auto &line : lines) {
         std::vector<std::string> nameval;
 
-        (void)SplitString(line, ':', nameval);
+        (void)SplitEscapedString(line, ':', nameval);
         if (nameval.size() != 2)
             return TError(EError::InvalidValue, "Invalid format");
 
@@ -162,15 +145,40 @@ TError TMapValue::SetString(std::shared_ptr<TContainer> c,
         m[key] = val;
     }
 
-    return v->Set(EValueType::Map, m);
+    return SetMap(c, v, m);
 }
 
-std::string TMapValue::GetString(std::shared_ptr<TContainer> c,
-                                 std::shared_ptr<TVariant> v) {
-    if (!v->HasValue() && NeedDefault())
-        return MapToString(GetDefaultMap(c));
-    else
-        return MapToString(GetMap(c, v));
+DEFINE_VALUE_GETTER(List, TStrList)
+
+std::string ListToString(const TStrList &v) {
+    std::stringstream str;
+
+    for (auto &val : v) {
+        if (str.str().length())
+            str << "; ";
+        str << val;
+    }
+
+    return str.str();
+}
+
+TError TListValue::SetString(std::shared_ptr<TContainer> c,
+                             std::shared_ptr<TVariant> v,
+                             const std::string &value) {
+    std::vector<std::string> vec;
+    TStrList m;
+    TError error = SplitEscapedString(value, ';', vec);
+    if (error)
+        return error;
+
+    for (auto &val : vec) {
+        std::string tmp = StringTrim(val);
+        if (!tmp.length())
+            continue;
+        m.push_back(tmp);
+    }
+
+    return SetList(c, v, m);
 }
 
 TError TValueSet::Register(TValue *p) {
