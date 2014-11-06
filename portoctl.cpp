@@ -32,16 +32,16 @@ using std::shared_ptr;
 string HumanNsec(const string &val) {
     double n = stod(val);
     string suf = "ns";
-    if (n > 1024) {
-        n /= 1024;
+    if (n > 1000) {
+        n /= 1000;
         suf = "us";
     }
-    if (n > 1024) {
-        n /= 1024;
+    if (n > 1000) {
+        n /= 1000;
         suf = "ms";
     }
-    if (n > 1024) {
-        n /= 1024;
+    if (n > 1000) {
+        n /= 1000;
         suf = "s";
     }
 
