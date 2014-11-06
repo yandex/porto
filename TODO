@@ -1,5 +1,7 @@
 - make ParseRlimit, ParseBind, ParseNet part of property class
+- don't check permissions on GetData/GetProperty
 - test restarting (check version)
+- convert net_xyz properties to map
 - shaping with macvlan or non-default interface?
 - ? portoctl cp
 - ? remove start_errno data

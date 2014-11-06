@@ -112,41 +112,21 @@ void TNl::EnableDebug(bool enable) {
     debug = enable;
 }
 
-TError TNl::GetDefaultLink(std::string &link) {
-    struct FindDevIter { string name; string running; } data;
+TError TNl::GetDefaultLink(std::vector<std::string> &links) {
+    struct FindDevIter { string name; vector<string> ifaces; } data;
     nl_cache_foreach(GetCache(), [](struct nl_object *obj, void *data) {
                      FindDevIter *p = (FindDevIter *)data;
                      struct rtnl_link *l = (struct rtnl_link *)obj;
-                     const vector<string> prefixes = { "eth", "em", "wlp2s" };
-
-                     if (p->name.length())
-                        return;
-
-                     for (auto &pref : prefixes)
-                        if (strncmp(rtnl_link_get_name(l), pref.c_str(),
-                                    pref.length()) == 0 &&
-                            rtnl_link_get_flags(l) & IFF_RUNNING)
-                            p->name = rtnl_link_get_name(l);
-
-                     if (p->running.length())
-                        return;
 
                      if ((rtnl_link_get_flags(l) & IFF_RUNNING) &&
                         !(rtnl_link_get_flags(l) & IFF_LOOPBACK))
-                        p->running = rtnl_link_get_name(l);
+                        p->ifaces.push_back(rtnl_link_get_name(l));
                      }, &data);
 
-    if (data.name.length()) {
-        link = data.name;
-    } else {
-        if (data.running.length()) {
-            link = data.running;
+    if (!data.ifaces.size())
+        return TError(EError::Unknown, "Can't find appropriate link");
 
-            TLogger::Log() << "Can't find predefined link, using " << link << std::endl;
-        } else {
-            return TError(EError::Unknown, "Can't find appropriate link");
-        }
-    }
+    links = data.ifaces;
 
     return TError::Success();
 }
@@ -491,6 +471,10 @@ TError TNlClass::GetProperties(uint32_t &prio, uint32_t &rate, uint32_t &ceil) {
     Link->LogCache(classCache);
 
     struct rtnl_class *tclass = rtnl_class_get(classCache, Link->GetIndex(), Handle);
+    if (!tclass) {
+        nl_cache_free(classCache);
+        return TError(EError::Unknown, "Can't find tc cass");
+    }
 
     prio = rtnl_htb_get_prio(tclass);
     rate = rtnl_htb_get_rate(tclass);

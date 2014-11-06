@@ -1397,7 +1397,6 @@ static void TestNetProperty(TPortoAPI &api) {
     Expect(linkMap.at("eth10").up == true);
     ExpectSuccess(api.Stop(name));
 
-#if 0
     Say() << "Check net=macvlan statistics" << std::endl;
     // create macvlan on default interface and ping ya.ru
     string uniq = "123";
@@ -1423,9 +1422,8 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectSuccess(api.Start(name));
     AsNobody(api);
     WaitState(api, name, "dead", 60);
-    ExpectSuccess(api.GetData(name, "net_bytes" + dev + "]", s));
+    ExpectSuccess(api.GetData(name, "net_bytes[" + dev + "]", s));
     Expect(s != "0");
-#endif
 
     ExpectSuccess(api.Destroy(name));
 }
@@ -1688,14 +1686,11 @@ static void TestDataMap(TPortoAPI &api, const std::string &name, const std::stri
 
 static void ExpectNonZeroLink(TPortoAPI &api, const std::string &name,
                               const std::string &data) {
-    int n = 0;
     for (auto &link : links) {
         string v;
         ExpectSuccess(api.GetData(name, data + "[" + link->GetName() + "]", v));
-        if (v != "0" && v != "-1")
-            n++;
+        Expect(v != "0" && v != "-1");
     }
-    Expect(n == 1);
 }
 
 static void ExpectRootLink(TPortoAPI &api, const std::string &name,
@@ -1716,7 +1711,6 @@ static void ExpectZeroLink(TPortoAPI &api, const std::string &name,
         Expect(v == "0");
     }
 }
-
 
 static void TestStats(TPortoAPI &api) {
     // should be executed right after TestRoot because assumes empty statistics
@@ -1912,7 +1906,6 @@ static void TestLimits(TPortoAPI &api) {
         Expect(prio == netPrio);
         Expect(rate == netGuarantee);
         Expect(ceil == netCeil);
-        ExpectSuccess(api.Stop(name));
     }
 
     ExpectSuccess(api.Destroy(name));

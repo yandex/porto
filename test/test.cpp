@@ -319,33 +319,33 @@ int GetVmRss(const std::string &pid) {
 }
 
 bool TcClassExist(uint32_t handle) {
-    bool exists = true;
+    size_t nr = 0;
     for (auto &link : links) {
         TNlClass tclass(link, -1, handle);
-        if (!tclass.Exists())
-            exists = false;
+        if (tclass.Exists())
+            nr++;
     }
-    return exists;
+    return nr == links.size();
 }
 
 bool TcQdiscExist(uint32_t handle) {
-    bool exists = true;
+    size_t nr = 0;
     for (auto &link : links) {
         TNlHtb qdisc(link, -1, handle);
-        if (!qdisc.Exists())
-            exists = false;
+        if (qdisc.Exists())
+            nr++;
     }
-    return exists;
+    return nr == links.size();
 }
 
 bool TcCgFilterExist(uint32_t parent, uint32_t handle) {
-    bool exists = true;
+    size_t nr = 0;
     for (auto &link : links) {
         TNlCgFilter filter(link, parent, handle);
-        if (!filter.Exists())
-            exists = false;
+        if (filter.Exists())
+            nr++;
     }
-    return exists;
+    return nr == links.size();
 }
 
 int WordCount(const std::string &path, const std::string &word) {

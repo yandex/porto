@@ -161,16 +161,11 @@ std::vector<std::shared_ptr<TNlLink>> OpenLinks() {
     }
 
     if (!devices.size()) {
-        std::string name;
-
-        // TODO: should return multiple interfaces
-        error = nl->GetDefaultLink(name);
+        error = nl->GetDefaultLink(devices);
         if (error) {
             TLogger::LogError(error, "Couldn't open link!");
             return linkVec;
         }
-
-        devices.push_back(name);
     }
 
     for (auto &name : devices) {

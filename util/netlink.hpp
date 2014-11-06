@@ -43,7 +43,7 @@ public:
     struct nl_sock *GetSock() { return Sock; }
     struct nl_cache *GetCache() { return LinkCache; }
 
-    TError GetDefaultLink(std::string &link);
+    TError GetDefaultLink(std::vector<std::string> &links);
 };
 
 class TNlLink {

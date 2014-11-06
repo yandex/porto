@@ -521,8 +521,10 @@ static int SlaveMain() {
         std::vector<std::shared_ptr<TNlLink>> links;
         if (config().network().enabled()) {
             links = OpenLinks();
-            if (links.size() == 0)
-                TLogger::Log() << "WARNING: couldn't find suitable network interface" << std::endl;
+            if (links.size() == 0) {
+                TLogger::Log() << "Error: couldn't find suitable network interface" << std::endl;
+                return EXIT_FAILURE;
+            }
 
             for (auto &link : links)
                 TLogger::Log() << "Using " << link->GetName() << " interface" << std::endl;
