@@ -110,12 +110,8 @@ static TError GetContainerProperty(TContainerHolder &cholder,
     if (!container)
         return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    TError error = cholder.CheckPermission(container, uid, gid);
-    if (error)
-        return error;
-
     string value;
-    error = container->GetProperty(req.property(), value);
+    TError error = container->GetProperty(req.property(), value);
     if (!error)
         rsp.mutable_getproperty()->set_value(value);
     return error;
@@ -144,12 +140,8 @@ static TError GetContainerData(TContainerHolder &cholder,
     if (!container)
         return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    TError error = cholder.CheckPermission(container, uid, gid);
-    if (error)
-        return error;
-
     string value;
-    error = container->GetData(req.data(), value);
+    TError error = container->GetData(req.data(), value);
     if (!error)
         rsp.mutable_getdata()->set_value(value);
     return error;
