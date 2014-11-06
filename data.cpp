@@ -235,14 +235,16 @@ public:
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TVariant> v) override {
-        uint64_t val;
-        TError error = c->GetStat(ETclassStat::Bytes, val);
+        std::map<std::string, uint64_t> m;
+        TError error = c->GetStat(ETclassStat::Bytes, m);
         if (error) {
             TLogger::LogError(error, "Can't get transmitted bytes");
             return "-1";
         }
 
-        return std::to_string(val);
+        // TODO
+        PORTO_ASSERT(m.size() == 1);
+        return std::to_string((*m.begin()).second);
     }
 };
 
@@ -256,14 +258,16 @@ public:
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TVariant> v) override {
-        uint64_t val;
-        TError error = c->GetStat(ETclassStat::Packets, val);
+        std::map<std::string, uint64_t> m;
+        TError error = c->GetStat(ETclassStat::Packets, m);
         if (error) {
             TLogger::LogError(error, "Can't get transmitted packets");
             return "-1";
         }
 
-        return std::to_string(val);
+        // TODO
+        PORTO_ASSERT(m.size() == 1);
+        return std::to_string((*m.begin()).second);
     }
 };
 
@@ -277,14 +281,16 @@ public:
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TVariant> v) override {
-        uint64_t val;
-        TError error = c->GetStat(ETclassStat::Drops, val);
+        std::map<std::string, uint64_t> m;
+        TError error = c->GetStat(ETclassStat::Drops, m);
         if (error) {
             TLogger::LogError(error, "Can't get dropped packets");
             return "-1";
         }
 
-        return std::to_string(val);
+        // TODO
+        PORTO_ASSERT(m.size() == 1);
+        return std::to_string((*m.begin()).second);
     }
 };
 
@@ -298,14 +304,16 @@ public:
 
     std::string GetString(std::shared_ptr<TContainer> c,
                           std::shared_ptr<TVariant> v) override {
-        uint64_t val;
-        TError error = c->GetStat(ETclassStat::Overlimits, val);
+        std::map<std::string, uint64_t> m;
+        TError error = c->GetStat(ETclassStat::Overlimits, m);
         if (error) {
             TLogger::LogError(error, "Can't get number of packets over limit");
             return "-1";
         }
 
-        return std::to_string(val);
+        // TODO
+        PORTO_ASSERT(m.size() == 1);
+        return std::to_string((*m.begin()).second);
     }
 };
 

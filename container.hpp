@@ -121,7 +121,7 @@ public:
     std::shared_ptr<TVariantSet> Data;
 
     EContainerState GetState();
-    TError GetStat(ETclassStat stat, uint64_t &val) { return Tclass->GetStat(stat, val); }
+    TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) { return Tclass->GetStat(stat, m); }
 
     TContainer(const std::string &name, std::shared_ptr<TContainer> parent, uint16_t id, std::shared_ptr<TNlLink> link) :
         Name(StripParentName(name)), Parent(parent), State(EContainerState::Stopped), Id(id), Link(link) { }

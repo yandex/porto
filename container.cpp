@@ -165,13 +165,6 @@ TContainer::~TContainer() {
             iter++;
         }
 
-    /*
-    if (Filter) {
-        TError error = Filter->Remove();
-        TLogger::LogError(error, "Can't remove tc filter");
-    }
-    */
-
     if (DefaultTclass) {
         TError error = DefaultTclass->Remove();
         TLogger::LogError(error, "Can't remove default tc class");
@@ -370,8 +363,7 @@ TError TContainer::PrepareNetwork() {
     rate = Prop->GetUint(P_NET_GUARANTEE);
     ceil = Prop->GetUint(P_NET_CEIL);
 
-    if (Tclass->Exists())
-        (void)Tclass->Remove();
+    (void)Tclass->Remove();
     error = Tclass->Create(prio, rate, ceil);
     if (error) {
         TLogger::LogError(error, "Can't create tclass");
@@ -579,7 +571,8 @@ TError TContainer::Create(int uid, int gid) {
         uint32_t defHandle = TcHandle(Id, Id + 1);
         uint32_t rootHandle = TcHandle(Id, 0);
 
-        Qdisc = std::make_shared<TQdisc>(Link, rootHandle, defHandle);
+        std::vector<std::shared_ptr<TNlLink>> links = { Link };
+        Qdisc = std::make_shared<TQdisc>(links, rootHandle, defHandle);
         (void)Qdisc->Remove();
         error = Qdisc->Create();
         if (error) {
@@ -588,7 +581,7 @@ TError TContainer::Create(int uid, int gid) {
         }
 
         Filter = std::make_shared<TFilter>(Qdisc);
-        //(void)Filter->Remove();
+        (void)Filter->Remove();
         error = Filter->Create();
         if (error) {
             TLogger::LogError(error, "Can't create tc filter");
@@ -596,8 +589,7 @@ TError TContainer::Create(int uid, int gid) {
         }
 
         DefaultTclass = std::make_shared<TTclass>(Qdisc, defHandle);
-        if (DefaultTclass->Exists())
-            (void)DefaultTclass->Remove();
+        (void)DefaultTclass->Remove();
         error = DefaultTclass->Create(DEF_CLASS_PRIO, DEF_CLASS_RATE, DEF_CLASS_CEIL);
         if (error) {
             TLogger::LogError(error, "Can't create default tclass");

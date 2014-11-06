@@ -12,17 +12,17 @@
 
 class TQdisc {
     NO_COPY_CONSTRUCT(TQdisc);
-    std::shared_ptr<TNlLink> Link;
+    std::vector<std::shared_ptr<TNlLink>> Link;
     const uint32_t Handle;
     const uint32_t DefClass;
 
 public:
-    TQdisc(std::shared_ptr<TNlLink> link, uint32_t handle, uint32_t defClass) : Link(link), Handle(handle), DefClass(defClass) { }
+    TQdisc(const std::vector<std::shared_ptr<TNlLink>> &link, uint32_t handle, uint32_t defClass) : Link(link), Handle(handle), DefClass(defClass) { }
 
     TError Create();
     TError Remove();
     uint32_t GetHandle() { return Handle; }
-    std::shared_ptr<TNlLink> GetLink() { return Link; }
+    std::vector<std::shared_ptr<TNlLink>> GetLink();
 };
 
 class TTclass {
@@ -30,28 +30,28 @@ class TTclass {
     const std::shared_ptr<TQdisc> ParentQdisc;
     const std::shared_ptr<TTclass> ParentTclass;
     const uint32_t Handle;
-    std::shared_ptr<TNlLink> Link;
+    std::vector<std::shared_ptr<TNlLink>> GetLink();
+    bool Exists(std::shared_ptr<TNlLink> Link);
 
 public:
-    TTclass(const std::shared_ptr<TQdisc> qdisc, uint32_t handle) : ParentQdisc(qdisc), Handle(handle), Link(qdisc->GetLink()) { }
-    TTclass(const std::shared_ptr<TTclass> tclass, uint32_t handle) : ParentTclass(tclass), Handle(handle), Link(tclass->Link) { }
+    TTclass(const std::shared_ptr<TQdisc> qdisc, uint32_t handle) : ParentQdisc(qdisc), Handle(handle) { }
+    TTclass(const std::shared_ptr<TTclass> tclass, uint32_t handle) : ParentTclass(tclass), Handle(handle) { }
 
-    bool Exists();
     TError Create(uint32_t prio, uint32_t rate, uint32_t ceil);
     TError Remove();
     uint32_t GetParent();
     uint32_t GetHandle() { return Handle; }
-    TError GetStat(ETclassStat stat, uint64_t &val);
+    TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);
 };
 
 class TFilter {
     NO_COPY_CONSTRUCT(TFilter);
     const std::shared_ptr<TQdisc> Parent;
-    std::shared_ptr<TNlLink> Link;
+    std::vector<std::shared_ptr<TNlLink>> GetLink();
+    bool Exists(std::shared_ptr<TNlLink> Link);
 
 public:
-    TFilter(const std::shared_ptr<TQdisc> parent) : Parent(parent), Link(parent->GetLink()) { }
-    bool Exists();
+    TFilter(const std::shared_ptr<TQdisc> parent) : Parent(parent) { }
     TError Create();
     TError Remove();
 };
