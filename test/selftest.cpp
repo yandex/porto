@@ -1294,6 +1294,12 @@ static bool ShareMacAddress(const vector<string> &a, const vector<string> &b) {
     return false;
 }
 
+static string System(const std::string &cmd) {
+    vector<string> lines = Popen(cmd);
+    Expect(lines.size() == 1);
+    return StringTrim(lines[0]);
+}
+
 static void TestNetProperty(TPortoAPI &api) {
     string name = "a";
     ExpectSuccess(api.Create(name));
@@ -1388,6 +1394,36 @@ static void TestNetProperty(TPortoAPI &api) {
     Expect(linkMap.at("eth10").hw == hw);
     Expect(linkMap.at("eth10").up == true);
     ExpectSuccess(api.Stop(name));
+
+#if 0
+    Say() << "Check net=macvlan statistics" << std::endl;
+    // create macvlan on default interface and ping ya.ru
+    string uniq = "123";
+    string gw = System("ip -o route | grep default | cut -d' ' -f3");
+    string dev = System("ip -o route get " + gw + " | awk '{print $3}'");
+    string addr = System("ip -o addr show " + dev + " | grep -w inet | awk '{print $4}'");
+    string ip = System("echo " + addr + " | sed -e 's@\\([0-9]*\\.[0-9]*\\.[0-9]*\\.\\)[0-9]*\\(.*\\)@\\1" + uniq + "\\2@'");
+
+    Say() << "Using device " << dev << " gateway " << gw << " ip " << addr << " -> " << ip << std::endl;
+    ExpectSuccess(api.SetProperty(name, "net", "macvlan " + dev + " " + dev));
+    ExpectSuccess(api.SetProperty(name, "command", "false"));
+    ExpectSuccess(api.Start(name));
+    WaitState(api, name, "dead");
+    ExpectSuccess(api.GetData(name, "net_bytes", s));
+    Expect(s == "0");
+
+    ExpectSuccess(api.Stop(name));
+    ExpectSuccess(api.SetProperty(name, "command", "bash -c 'ip addr add " + ip + " dev " + dev + " && ip route add default via " + gw + " && ping ya.ru -c 1 -w 1'"));
+    AsRoot(api);
+    ExpectSuccess(api.SetProperty(name, "user", "root"));
+    ExpectSuccess(api.SetProperty(name, "group", "root"));
+
+    ExpectSuccess(api.Start(name));
+    AsNobody(api);
+    WaitState(api, name, "dead", 60);
+    ExpectSuccess(api.GetData(name, "net_bytes", s));
+    Expect(s != "0");
+#endif
 
     ExpectSuccess(api.Destroy(name));
 }
@@ -2357,7 +2393,7 @@ static void TestRecovery(TPortoAPI &api) {
         { "command", "sleep 1000" },
         { "user", "bin" },
         { "group", "daemon" },
-        { "env", "a=a;b=b" },
+        { "env", "a=a; b=b" },
     };
 
     Say() << "Make sure we don't kill containers when doing recovery" << std::endl;

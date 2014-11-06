@@ -95,10 +95,10 @@ void WaitExit(TPortoAPI &api, const std::string &pid) {
         throw std::string("Waited too long for task to exit");
 }
 
-void WaitState(TPortoAPI &api, const std::string &name, const std::string &state) {
+void WaitState(TPortoAPI &api, const std::string &name, const std::string &state, int sec) {
     Say() << "Waiting for " << name << " to be in state " << state << std::endl;
 
-    int times = 100;
+    int times = sec * 10;
 
     std::string ret;
     do {

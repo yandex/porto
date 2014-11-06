@@ -51,7 +51,7 @@ CONFIG() {
 	}
 
 	CLEAR() {
-		[ $NEED_CLEAR -eq 1 ] && sudo rm -rf $ROOT
+		[ $NEED_CLEAR -eq 1 ] && sudo rm -rf $ROOT || :
 	}
 
 	GET() {

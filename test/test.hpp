@@ -21,7 +21,7 @@ namespace test {
     int Pgrep(const std::string &name);
     std::string GetRlimit(const std::string &pid, const std::string &type, const bool soft);
     void WaitExit(TPortoAPI &api, const std::string &pid);
-    void WaitState(TPortoAPI &api, const std::string &name, const std::string &state);
+    void WaitState(TPortoAPI &api, const std::string &name, const std::string &state, int sec = 10);
     void WaitPortod(TPortoAPI &api);
     std::string GetCwd(const std::string &pid);
     std::string GetRoot(const std::string &pid);
