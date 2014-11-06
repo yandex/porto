@@ -225,95 +225,71 @@ public:
     }
 };
 
-class TNetBytesData : public TStringValue { // TODO: map
+class TNetBytesData : public TMapValue {
 public:
     TNetBytesData() :
-        TStringValue("net_bytes",
-                     "number of tx bytes",
-                     NODEF_VALUE,
-                     rpdmState) {}
+        TMapValue("net_bytes",
+                  "number of tx bytes",
+                  NODEF_VALUE,
+                  rpdmState) {}
 
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) override {
-        std::map<std::string, uint64_t> m;
+    TUintMap GetMap(std::shared_ptr<TContainer> c,
+                    std::shared_ptr<TVariant> v) override {
+        TUintMap m;
         TError error = c->GetStat(ETclassStat::Bytes, m);
-        if (error) {
-            TLogger::LogError(error, "Can't get transmitted bytes");
-            return "-1";
-        }
-
-        // TODO
-        PORTO_ASSERT(m.size() == 1);
-        return std::to_string((*m.begin()).second);
+        TLogger::LogError(error, "Can't get transmitted bytes");
+        return m;
     }
 };
 
-class TNetPacketsData : public TStringValue { // TODO: map
+class TNetPacketsData : public TMapValue {
 public:
     TNetPacketsData() :
-        TStringValue("net_packets",
-                     "number of tx packets",
-                     NODEF_VALUE,
-                     rpdmState) {}
+        TMapValue("net_packets",
+                  "number of tx packets",
+                  NODEF_VALUE,
+                  rpdmState) {}
 
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) override {
-        std::map<std::string, uint64_t> m;
+    TUintMap GetMap(std::shared_ptr<TContainer> c,
+                    std::shared_ptr<TVariant> v) override {
+        TUintMap m;
         TError error = c->GetStat(ETclassStat::Packets, m);
-        if (error) {
-            TLogger::LogError(error, "Can't get transmitted packets");
-            return "-1";
-        }
-
-        // TODO
-        PORTO_ASSERT(m.size() == 1);
-        return std::to_string((*m.begin()).second);
+        TLogger::LogError(error, "Can't get transmitted packets");
+        return m;
     }
 };
 
-class TNetDropsData : public TStringValue { // TODO: map
+class TNetDropsData : public TMapValue {
 public:
     TNetDropsData() :
-        TStringValue("net_drops",
-                     "number of dropped tx packets",
-                     NODEF_VALUE,
-                     rpdmState) {}
+        TMapValue("net_drops",
+                  "number of dropped tx packets",
+                  NODEF_VALUE,
+                  rpdmState) {}
 
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) override {
-        std::map<std::string, uint64_t> m;
+    TUintMap GetMap(std::shared_ptr<TContainer> c,
+                    std::shared_ptr<TVariant> v) override {
+        TUintMap m;
         TError error = c->GetStat(ETclassStat::Drops, m);
-        if (error) {
-            TLogger::LogError(error, "Can't get dropped packets");
-            return "-1";
-        }
-
-        // TODO
-        PORTO_ASSERT(m.size() == 1);
-        return std::to_string((*m.begin()).second);
+        TLogger::LogError(error, "Can't get dropped packets");
+        return m;
     }
 };
 
-class TNetOverlimitsData : public TStringValue { // TODO: map
+class TNetOverlimitsData : public TMapValue {
 public:
     TNetOverlimitsData() :
-        TStringValue("net_overlimits",
-                     "number of tx packets that exceeded the limit",
-                     NODEF_VALUE,
-                     rpdmState) {}
+        TMapValue("net_overlimits",
+                  "number of tx packets that exceeded the limit",
+                  NODEF_VALUE,
+                  rpdmState) {}
 
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) override {
-        std::map<std::string, uint64_t> m;
+    TUintMap GetMap(std::shared_ptr<TContainer> c,
+                    std::shared_ptr<TVariant> v) override {
+        TUintMap m;
         TError error = c->GetStat(ETclassStat::Overlimits, m);
-        if (error) {
-            TLogger::LogError(error, "Can't get number of packets over limit");
-            return "-1";
-        }
-
-        // TODO
-        PORTO_ASSERT(m.size() == 1);
-        return std::to_string((*m.begin()).second);
+        TLogger::LogError(error, "Can't get number of packets over limit");
+        return m;
     }
 };
 
@@ -372,6 +348,7 @@ public:
 
         std::vector<BlkioStat> stat;
         TError error = blkioSubsystem->Statistics(cg, "blkio.io_service_bytes_recursive", stat);
+        TLogger::LogError(error, "Can't get blkio statistics");
         if (error)
             return m;
 
@@ -397,6 +374,7 @@ public:
 
         std::vector<BlkioStat> stat;
         TError error = blkioSubsystem->Statistics(cg, "blkio.io_service_bytes_recursive", stat);
+        TLogger::LogError(error, "Can't get blkio statistics");
         if (error)
             return m;
 

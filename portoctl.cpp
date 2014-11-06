@@ -95,9 +95,7 @@ string HumanSize(const string &val) {
 
 string PropertyValue(const string &name, const string &val) {
     if (name == "memory_guarantee" ||
-        name == "memory_limit" ||
-        name == "net_ceil" ||
-        name == "net_guarantee") {
+        name == "memory_limit") {
         return HumanSize(val);
     } else {
         return val;
@@ -138,11 +136,7 @@ string DataValue(const string &name, const string &val) {
             ret = "Success";
 
         return ret + " (" + val + ")";
-    } else if (name == "memory_usage" ||
-               name == "net_drops" ||
-               name == "net_overlimits" ||
-               name == "net_packets" ||
-               name == "net_bytes") {
+    } else if (name == "memory_usage") {
         return HumanSize(val);
     } else if (name == "cpu_usage") {
         return HumanNsec(val);

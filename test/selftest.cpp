@@ -1409,7 +1409,7 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectSuccess(api.SetProperty(name, "command", "false"));
     ExpectSuccess(api.Start(name));
     WaitState(api, name, "dead");
-    ExpectSuccess(api.GetData(name, "net_bytes", s));
+    ExpectSuccess(api.GetData(name, "net_bytes[" + dev + "]", s));
     Expect(s == "0");
 
     ExpectSuccess(api.Stop(name));
@@ -1421,7 +1421,7 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectSuccess(api.Start(name));
     AsNobody(api);
     WaitState(api, name, "dead", 60);
-    ExpectSuccess(api.GetData(name, "net_bytes", s));
+    ExpectSuccess(api.GetData(name, "net_bytes" + dev + "]", s));
     Expect(s != "0");
 #endif
 
@@ -1595,13 +1595,13 @@ static void TestRoot(TPortoAPI &api) {
     Expect(v == "0");
     ExpectSuccess(api.GetData(root, "memory_usage", v));
     Expect(v == "0");
-    ExpectSuccess(api.GetData(root, "net_bytes", v));
+    ExpectSuccess(api.GetData(root, "net_bytes[" + link + "]", v));
     Expect(v == "0");
-    ExpectSuccess(api.GetData(root, "net_packets", v));
+    ExpectSuccess(api.GetData(root, "net_packets[" + link + "]", v));
     Expect(v == "0");
-    ExpectSuccess(api.GetData(root, "net_drops", v));
+    ExpectSuccess(api.GetData(root, "net_drops[" + link + "]", v));
     Expect(v == "0");
-    ExpectSuccess(api.GetData(root, "net_overlimits", v));
+    ExpectSuccess(api.GetData(root, "net_overlimits[" + link + "]", v));
     Expect(v == "0");
     if(IsCfqActive()) {
         ExpectSuccess(api.GetData(root, "io_read", v));
@@ -1736,29 +1736,29 @@ static void TestStats(TPortoAPI &api) {
         Expect(v == "");
     }
 
-    ExpectSuccess(api.GetData(root, "net_bytes", rv));
+    ExpectSuccess(api.GetData(root, "net_bytes[" + link + "]", rv));
     Expect(rv != "0" && rv != "-1");
-    ExpectSuccess(api.GetData(wget, "net_bytes", v));
+    ExpectSuccess(api.GetData(wget, "net_bytes[" + link + "]", v));
     Expect(v == rv);
-    ExpectSuccess(api.GetData(noop, "net_bytes", v));
+    ExpectSuccess(api.GetData(noop, "net_bytes[" + link + "]", v));
     Expect(v == "0");
-    ExpectSuccess(api.GetData(root, "net_packets", rv));
+    ExpectSuccess(api.GetData(root, "net_packets[" + link + "]", rv));
     Expect(rv != "0" && rv != "-1");
-    ExpectSuccess(api.GetData(wget, "net_packets", v));
+    ExpectSuccess(api.GetData(wget, "net_packets[" + link + "]", v));
     Expect(v == rv);
-    ExpectSuccess(api.GetData(noop, "net_packets", v));
+    ExpectSuccess(api.GetData(noop, "net_packets[" + link + "]", v));
     Expect(v == "0");
-    ExpectSuccess(api.GetData(root, "net_drops", rv));
+    ExpectSuccess(api.GetData(root, "net_drops[" + link + "]", rv));
     Expect(rv == "0");
-    ExpectSuccess(api.GetData(wget, "net_drops", v));
+    ExpectSuccess(api.GetData(wget, "net_drops[" + link + "]", v));
     Expect(v == rv);
-    ExpectSuccess(api.GetData(noop, "net_drops", v));
+    ExpectSuccess(api.GetData(noop, "net_drops[" + link + "]", v));
     Expect(v == "0");
-    ExpectSuccess(api.GetData(root, "net_overlimits", rv));
+    ExpectSuccess(api.GetData(root, "net_overlimits[" + link + "]", rv));
     Expect(rv == "0");
-    ExpectSuccess(api.GetData(wget, "net_overlimits", v));
+    ExpectSuccess(api.GetData(wget, "net_overlimits[" + link + "]", v));
     Expect(v == rv);
-    ExpectSuccess(api.GetData(noop, "net_overlimits", v));
+    ExpectSuccess(api.GetData(noop, "net_overlimits[" + link + "]", v));
     Expect(v == "0");
 
     ExpectSuccess(api.Destroy(wget));
