@@ -20,7 +20,7 @@ namespace test {
 
 __thread int tid;
 std::atomic<int> done;
-std::string link;
+std::vector<std::shared_ptr<TNlLink>> links;
 
 std::basic_ostream<char> &Say(std::basic_ostream<char> &stream) {
     if (tid)
@@ -133,14 +133,14 @@ void WaitPortod(TPortoAPI &api) {
 }
 
 std::string ReadLink(const std::string &path) {
-    TPath link;
+    TPath lnk;
 
     TPath f(path);
-    TError error = f.ReadLink(link);
+    TError error = f.ReadLink(lnk);
     if (error)
         throw error.GetMsg();
 
-    return link.ToString();
+    return lnk.ToString();
 }
 
 std::string GetCwd(const std::string &pid) {
@@ -269,15 +269,14 @@ std::string CgRoot(const std::string &subsystem, const std::string &name) {
 }
 
 std::string GetFreezer(const std::string &name) {
-    std::string link;
+    std::string state;
     TFile m(CgRoot("freezer", name) + "freezer.state");
-    if (m.AsString(link))
+    if (m.AsString(state))
         throw std::string("Can't get freezer");
-    return link;
+    return state;
 }
 
 void SetFreezer(const std::string &name, const std::string &state) {
-    std::string link;
     TFile m(CgRoot("freezer", name) + "freezer.state");
     if (m.WriteStringNoAppend(state))
         throw std::string("Can't set freezer");
@@ -320,36 +319,33 @@ int GetVmRss(const std::string &pid) {
 }
 
 bool TcClassExist(uint32_t handle) {
-    return TNlLink::Exec(link,
-        [&](std::shared_ptr<TNlLink> link) {
-            TNlClass tclass(link, -1, handle);
-            if (tclass.Exists())
-                return TError::Success();
-            else
-                return TError(EError::Unknown, "");
-        }) == TError::Success();
+    bool exists = true;
+    for (auto &link : links) {
+        TNlClass tclass(link, -1, handle);
+        if (!tclass.Exists())
+            exists = false;
+    }
+    return exists;
 }
 
 bool TcQdiscExist(uint32_t handle) {
-    return TNlLink::Exec(link,
-        [&](std::shared_ptr<TNlLink> link) {
-            TNlHtb qdisc(link, -1, handle);
-            if (qdisc.Exists())
-                return TError::Success();
-            else
-                return TError(EError::Unknown, "");
-        }) == TError::Success();
+    bool exists = true;
+    for (auto &link : links) {
+        TNlHtb qdisc(link, -1, handle);
+        if (!qdisc.Exists())
+            exists = false;
+    }
+    return exists;
 }
 
 bool TcCgFilterExist(uint32_t parent, uint32_t handle) {
-    return TNlLink::Exec(link,
-        [&](std::shared_ptr<TNlLink> link) {
-            TNlCgFilter filter(link, parent, handle);
-            if (filter.Exists())
-                return TError::Success();
-            else
-                return TError(EError::Unknown, "");
-        }) == TError::Success();
+    bool exists = true;
+    for (auto &link : links) {
+        TNlCgFilter filter(link, parent, handle);
+        if (!filter.Exists())
+            exists = false;
+    }
+    return exists;
 }
 
 int WordCount(const std::string &path, const std::string &word) {

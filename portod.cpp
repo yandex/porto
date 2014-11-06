@@ -473,40 +473,6 @@ static void KvDump() {
     storage.Dump();
 }
 
-static std::shared_ptr<TNlLink> OpenLink(const std::string &link) {
-    auto name = link;
-
-    auto nl = std::make_shared<TNl>();
-    if (!nl)
-        throw std::bad_alloc();
-
-    TError error = nl->Connect();
-    if (error) {
-        TLogger::LogError(error, "Couldn't open link!");
-        return nullptr;
-    }
-
-    if (!name.length()) {
-        error = nl->GetDefaultLink(name);
-        if (error) {
-            TLogger::LogError(error, "Couldn't open link!");
-            return nullptr;
-        }
-    }
-
-    auto l = std::make_shared<TNlLink>(nl, name);
-    if (!l)
-        throw std::bad_alloc();
-
-    error = l->Load();
-    if (error) {
-        TLogger::LogError(error, "Couldn't open link!");
-        return nullptr;
-    }
-
-    return l;
-}
-
 static int SlaveMain() {
     int ret = DaemonPrepare(false);
     if (ret)
@@ -552,13 +518,17 @@ static int SlaveMain() {
         if (error)
             TLogger::LogError(error, "Couldn't create cgroup snapshot!");
 
-        std::shared_ptr<TNlLink> link = nullptr;
+        std::vector<std::shared_ptr<TNlLink>> links;
         if (config().network().enabled()) {
-            link = OpenLink(config().network().device());
-            TLogger::Log() << "Using " << link->GetName() << " interface" << std::endl;
+            links = OpenLinks();
+            if (links.size() == 0)
+                TLogger::Log() << "WARNING: couldn't find suitable network interface" << std::endl;
+
+            for (auto &link : links)
+                TLogger::Log() << "Using " << link->GetName() << " interface" << std::endl;
         }
 
-        TContainerHolder cholder(link);
+        TContainerHolder cholder(links);
         error = cholder.CreateRoot();
         if (error) {
             TLogger::LogError(error, "Couldn't create root container!");

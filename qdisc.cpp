@@ -142,3 +142,50 @@ TError TFilter::Remove() {
 
     return TError::Success();
 }
+
+std::vector<std::shared_ptr<TNlLink>> OpenLinks() {
+    std::vector<std::string> devices;
+    for (auto &device : config().network().devices())
+        devices.push_back(device);
+
+    std::vector<std::shared_ptr<TNlLink>> linkVec;
+
+    auto nl = std::make_shared<TNl>();
+    if (!nl)
+        throw std::bad_alloc();
+
+    TError error = nl->Connect();
+    if (error) {
+        TLogger::LogError(error, "Couldn't open link!");
+        return linkVec;
+    }
+
+    if (!devices.size()) {
+        std::string name;
+
+        // TODO: should return multiple interfaces
+        error = nl->GetDefaultLink(name);
+        if (error) {
+            TLogger::LogError(error, "Couldn't open link!");
+            return linkVec;
+        }
+
+        devices.push_back(name);
+    }
+
+    for (auto &name : devices) {
+        auto l = std::make_shared<TNlLink>(nl, name);
+        if (!l)
+            throw std::bad_alloc();
+
+        error = l->Load();
+        if (error) {
+            TLogger::LogError(error, "Couldn't open link!");
+            return linkVec;
+        }
+
+        linkVec.push_back(l);
+    }
+
+    return linkVec;
+}

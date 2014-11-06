@@ -80,7 +80,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     bool MaybeReturnedOk = false;
     size_t TimeOfDeath = 0;
     uint16_t Id;
-    std::shared_ptr<TNlLink> Link;
+    std::vector<std::shared_ptr<TNlLink>> Link;
     int TaskStartErrno = -1;
     TScopedFd Efd;
     int Uid, Gid;
@@ -123,7 +123,7 @@ public:
     EContainerState GetState();
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) { return Tclass->GetStat(stat, m); }
 
-    TContainer(const std::string &name, std::shared_ptr<TContainer> parent, uint16_t id, std::shared_ptr<TNlLink> link) :
+    TContainer(const std::string &name, std::shared_ptr<TContainer> parent, uint16_t id, const std::vector<std::shared_ptr<TNlLink>> &link) :
         Name(StripParentName(name)), Parent(parent), State(EContainerState::Stopped), Id(id), Link(link) { }
     ~TContainer();
 
@@ -132,7 +132,8 @@ public:
     bool IsRoot() const;
     std::shared_ptr<const TContainer> GetRoot() const;
     std::shared_ptr<const TContainer> GetParent() const;
-    std::shared_ptr<TNlLink> GetLink() const { return Link; }
+    bool ValidLink(const std::string &name) const;
+    std::shared_ptr<TNlLink> GetLink(const std::string &name) const;
 
     uint64_t GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except = nullptr, uint64_t exceptVal = 0) const;
     bool ValidHierarchicalProperty(const std::string &property, const uint64_t value) const;
@@ -166,7 +167,7 @@ public:
 constexpr size_t BITS_PER_LLONG = sizeof(unsigned long long) * 8;
 class TContainerHolder {
     NO_COPY_CONSTRUCT(TContainerHolder);
-    std::shared_ptr<TNlLink> Link;
+    std::vector<std::shared_ptr<TNlLink>> Link;
     std::map <std::string, std::shared_ptr<TContainer>> Containers;
     unsigned long long Ids[UINT16_MAX / BITS_PER_LLONG];
 
@@ -175,7 +176,7 @@ class TContainerHolder {
     void PutId(uint16_t id);
     TError RestoreId(const kv::TNode &node, uint16_t &id);
 public:
-    TContainerHolder(std::shared_ptr<TNlLink> link) : Link(link) {
+    TContainerHolder(const std::vector<std::shared_ptr<TNlLink>> &link) : Link(link) {
         for (auto &i : Ids) { i = ULLONG_MAX; }
     }
     ~TContainerHolder();

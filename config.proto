@@ -4,7 +4,7 @@ message TCfg {
 	message TNetworkCfg {
 		optional bool enabled = 1;
 		optional bool debug = 2;
-		optional string device = 3;
+		repeated string devices = 3;
 	}
 
 	message TFileCfg {

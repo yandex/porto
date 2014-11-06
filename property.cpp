@@ -903,7 +903,8 @@ TError ParseNet(std::shared_ptr<const TContainer> container, const std::vector<s
             } else {
                 hnet.Dev = StringTrim(settings[1]);
 
-                if (!ValidLink(hnet.Dev))
+                auto link = container->ValidLink(hnet.Dev);
+                if (!link)
                     return TError(EError::InvalidValue,
                                   "Invalid host interface " + hnet.Dev);
 
@@ -918,10 +919,10 @@ TError ParseNet(std::shared_ptr<const TContainer> container, const std::vector<s
             std::string type = "bridge";
             std::string hw = "";
 
-            if (!ValidLink(master))
+            auto link = container->GetLink(master);
+            if (!link)
                 return TError(EError::InvalidValue,
                               "Invalid macvlan master " + master);
-
 
             if (settings.size() > 3) {
                 type = StringTrim(settings[3]);
@@ -936,7 +937,7 @@ TError ParseNet(std::shared_ptr<const TContainer> container, const std::vector<s
                                   "Invalid macvlan address " + hw);
             }
 
-            int idx = container->GetLink()->FindIndex(master);
+            int idx = link->FindIndex(master);
             if (idx < 0)
                 return TError(EError::InvalidValue, "Interface " + master + " doesn't exist or not in running state");
 

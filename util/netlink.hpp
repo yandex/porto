@@ -36,6 +36,7 @@ public:
     TError Connect();
     void Disconnect();
     std::vector<std::string> FindLink(int flags);
+    bool ValidLink(const std::string &name);
 
     static void EnableDebug(bool enable);
 
@@ -43,7 +44,6 @@ public:
     struct nl_cache *GetCache() { return LinkCache; }
 
     TError GetDefaultLink(std::string &link);
-    static TError FindDefaultLink(std::string &link);
 };
 
 class TNlLink {
@@ -77,11 +77,10 @@ public:
     int GetIndex();
     struct rtnl_link *GetLink() { return Link; }
     struct nl_sock *GetSock() { return Nl->GetSock(); }
+    std::shared_ptr<TNl> GetNl() { return Nl; };
 
     void LogObj(const std::string &prefix, void *obj);
     void LogCache(struct nl_cache *cache);
-
-    static TError Exec(std::string name, std::function<TError(std::shared_ptr<TNlLink> Link)> f);
 };
 
 class TNlClass {
@@ -128,15 +127,5 @@ public:
     bool Exists();
     TError Remove();
 };
-
-static inline bool ValidLink(const std::string &name) {
-    return TNlLink::Exec(name,
-        [&](std::shared_ptr<TNlLink> link) {
-            if (link->Valid())
-                return TError::Success();
-            else
-                return TError(EError::Unknown, "");
-        }) == TError::Success();
-}
 
 #endif

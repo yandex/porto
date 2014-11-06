@@ -93,6 +93,21 @@ std::vector<std::string> TNl::FindLink(int flags) {
     return data.devices;
 }
 
+bool TNl::ValidLink(const std::string &name) {
+    (void)nl_cache_refill(Sock, LinkCache);
+
+    struct Iter { const std::string name; bool found; } data = { name, false };
+    nl_cache_foreach(LinkCache, [](struct nl_object *obj, void *data) {
+                     Iter *p = (Iter *)data;
+                     struct rtnl_link *l = (struct rtnl_link *)obj;
+
+                     if (rtnl_link_get_name(l) == p->name)
+                        p->found = true;
+                     }, &data);
+
+    return data.found;
+}
+
 void TNl::EnableDebug(bool enable) {
     debug = enable;
 }
@@ -134,18 +149,6 @@ TError TNl::GetDefaultLink(std::string &link) {
     }
 
     return TError::Success();
-}
-
-TError TNl::FindDefaultLink(std::string &link) {
-    auto nl = std::make_shared<TNl>();
-    if (!nl)
-        throw std::bad_alloc();
-
-    TError error = nl->Connect();
-    if (error)
-        return error;
-
-    return nl->GetDefaultLink(link);
 }
 
 TNlLink::~TNlLink() {
@@ -361,23 +364,6 @@ void TNlLink::LogCache(struct nl_cache *cache) {
         str << "netlink cache: ";
     nl_cache_dump(cache, &dp);
     str << std::endl;
-}
-
-TError TNlLink::Exec(std::string name, std::function<TError(std::shared_ptr<TNlLink> Link)> f) {
-    auto nl = std::make_shared<TNl>();
-    if (!nl)
-        throw std::bad_alloc();
-
-    TError error = nl->Connect();
-    if (error)
-        return error;
-
-    auto link = std::make_shared<TNlLink>(nl, name);
-    error = link->Load();
-    if (error)
-        return error;
-
-    return f(link);
 }
 
 TError TNlClass::Create(uint32_t prio, uint32_t rate, uint32_t ceil) {

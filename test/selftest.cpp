@@ -131,7 +131,7 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     ExpectFailure(api.GetData(name, "oom_killed", v), EError::InvalidState);
     ExpectFailure(api.GetData(name, "respawn_count", v), EError::InvalidState);
     ExpectSuccess(api.GetData(name, "parent", v));
-    if(IsCfqActive()) {
+    if (IsCfqActive()) {
         ExpectFailure(api.GetData(name, "io_read", v), EError::InvalidState);
         ExpectFailure(api.GetData(name, "io_write", v), EError::InvalidState);
     }
@@ -1306,6 +1306,8 @@ static void TestNetProperty(TPortoAPI &api) {
 
     vector<string> hostLink = Popen("ip -o -d link show");
 
+    string link = links[0]->GetName();
+
     Say() << "Check net parsing" << std::endl;
     ExpectFailure(api.SetProperty(name, "net", "qwerty"), EError::InvalidValue);
     ExpectFailure(api.SetProperty(name, "net", ""), EError::InvalidValue);
@@ -1595,15 +1597,18 @@ static void TestRoot(TPortoAPI &api) {
     Expect(v == "0");
     ExpectSuccess(api.GetData(root, "memory_usage", v));
     Expect(v == "0");
-    ExpectSuccess(api.GetData(root, "net_bytes[" + link + "]", v));
-    Expect(v == "0");
-    ExpectSuccess(api.GetData(root, "net_packets[" + link + "]", v));
-    Expect(v == "0");
-    ExpectSuccess(api.GetData(root, "net_drops[" + link + "]", v));
-    Expect(v == "0");
-    ExpectSuccess(api.GetData(root, "net_overlimits[" + link + "]", v));
-    Expect(v == "0");
-    if(IsCfqActive()) {
+
+    for (auto &link : links) {
+        ExpectSuccess(api.GetData(root, "net_bytes[" + link->GetName() + "]", v));
+        Expect(v == "0");
+        ExpectSuccess(api.GetData(root, "net_packets[" + link->GetName() + "]", v));
+        Expect(v == "0");
+        ExpectSuccess(api.GetData(root, "net_drops[" + link->GetName() + "]", v));
+        Expect(v == "0");
+        ExpectSuccess(api.GetData(root, "net_overlimits[" + link->GetName() + "]", v));
+        Expect(v == "0");
+    }
+    if (IsCfqActive()) {
         ExpectSuccess(api.GetData(root, "io_read", v));
         Expect(v == "");
         ExpectSuccess(api.GetData(root, "io_write", v));
@@ -1681,6 +1686,38 @@ static void TestDataMap(TPortoAPI &api, const std::string &name, const std::stri
     ExpectFailure(api.GetData(name, data + "[invalid]", full), EError::InvalidValue);
 }
 
+static void ExpectNonZeroLink(TPortoAPI &api, const std::string &name,
+                              const std::string &data) {
+    int n = 0;
+    for (auto &link : links) {
+        string v;
+        ExpectSuccess(api.GetData(name, data + "[" + link->GetName() + "]", v));
+        if (v != "0" && v != "-1")
+            n++;
+    }
+    Expect(n == 1);
+}
+
+static void ExpectRootLink(TPortoAPI &api, const std::string &name,
+                           const std::string &data) {
+    for (auto &link : links) {
+        string v, rv;
+        ExpectSuccess(api.GetData(name, data + "[" + link->GetName() + "]", v));
+        ExpectSuccess(api.GetData("/", data + "[" + link->GetName() + "]", rv));
+        Expect(v == rv);
+    }
+}
+
+static void ExpectZeroLink(TPortoAPI &api, const std::string &name,
+                           const std::string &data) {
+    for (auto &link : links) {
+        string v;
+        ExpectSuccess(api.GetData(name, data + "[" + link->GetName() + "]", v));
+        Expect(v == "0");
+    }
+}
+
+
 static void TestStats(TPortoAPI &api) {
     // should be executed right after TestRoot because assumes empty statistics
 
@@ -1706,7 +1743,7 @@ static void TestStats(TPortoAPI &api) {
     ExpectSuccess(api.GetData(root, "memory_usage", v));
     Expect(v != "0" && v != "-1");
 
-    if(IsCfqActive()) {
+    if (IsCfqActive()) {
         ExpectSuccess(api.GetData(root, "io_write", v));
         Expect(v != "");
         TestDataMap(api, root, "io_write");
@@ -1718,7 +1755,7 @@ static void TestStats(TPortoAPI &api) {
     Expect(v != "0" && v != "-1");
     ExpectSuccess(api.GetData(wget, "memory_usage", v));
     Expect(v != "0" && v != "-1");
-    if(IsCfqActive()) {
+    if (IsCfqActive()) {
         ExpectSuccess(api.GetData(wget, "io_write", v));
         Expect(v != "");
         ExpectSuccess(api.GetData(wget, "io_read", v));
@@ -1729,37 +1766,28 @@ static void TestStats(TPortoAPI &api) {
     Expect(v != "0" && v != "-1");
     ExpectSuccess(api.GetData(noop, "memory_usage", v));
     Expect(v != "0" && v != "-1");
-    if(IsCfqActive()) {
+    if (IsCfqActive()) {
         ExpectSuccess(api.GetData(noop, "io_write", v));
         Expect(v == "");
         ExpectSuccess(api.GetData(noop, "io_read", v));
         Expect(v == "");
     }
 
-    ExpectSuccess(api.GetData(root, "net_bytes[" + link + "]", rv));
-    Expect(rv != "0" && rv != "-1");
-    ExpectSuccess(api.GetData(wget, "net_bytes[" + link + "]", v));
-    Expect(v == rv);
-    ExpectSuccess(api.GetData(noop, "net_bytes[" + link + "]", v));
-    Expect(v == "0");
-    ExpectSuccess(api.GetData(root, "net_packets[" + link + "]", rv));
-    Expect(rv != "0" && rv != "-1");
-    ExpectSuccess(api.GetData(wget, "net_packets[" + link + "]", v));
-    Expect(v == rv);
-    ExpectSuccess(api.GetData(noop, "net_packets[" + link + "]", v));
-    Expect(v == "0");
-    ExpectSuccess(api.GetData(root, "net_drops[" + link + "]", rv));
-    Expect(rv == "0");
-    ExpectSuccess(api.GetData(wget, "net_drops[" + link + "]", v));
-    Expect(v == rv);
-    ExpectSuccess(api.GetData(noop, "net_drops[" + link + "]", v));
-    Expect(v == "0");
-    ExpectSuccess(api.GetData(root, "net_overlimits[" + link + "]", rv));
-    Expect(rv == "0");
-    ExpectSuccess(api.GetData(wget, "net_overlimits[" + link + "]", v));
-    Expect(v == rv);
-    ExpectSuccess(api.GetData(noop, "net_overlimits[" + link + "]", v));
-    Expect(v == "0");
+    ExpectNonZeroLink(api, root, "net_bytes");
+    ExpectRootLink(api, wget, "net_bytes");
+    ExpectZeroLink(api, noop, "net_bytes");
+
+    ExpectNonZeroLink(api, root, "net_packets");
+    ExpectRootLink(api, wget, "net_packets");
+    ExpectZeroLink(api, noop, "net_packets");
+
+    ExpectZeroLink(api, root, "net_drops");
+    ExpectZeroLink(api, wget, "net_drops");
+    ExpectZeroLink(api, noop, "net_drops");
+
+    ExpectZeroLink(api, root, "net_overlimits");
+    ExpectZeroLink(api, wget, "net_overlimits");
+    ExpectZeroLink(api, noop, "net_overlimits");
 
     ExpectSuccess(api.Destroy(wget));
     ExpectSuccess(api.Destroy(noop));
@@ -1875,19 +1903,17 @@ static void TestLimits(TPortoAPI &api) {
     ExpectSuccess(api.SetProperty(name, "net_priority", std::to_string(netPrio)));
     ExpectSuccess(api.Start(name));
 
-    uint32_t prio, rate, ceil;
-
     string handle = GetCgKnob("net_cls", name, "net_cls.classid");
-    ExpectSuccess(TNlLink::Exec(link,
-        [&](std::shared_ptr<TNlLink> link) {
-            TNlClass tclass(link, -1, stoul(handle));
-            return tclass.GetProperties(prio, rate, ceil);
-        }));
 
-    Expect(prio == netPrio);
-    Expect(rate == netGuarantee);
-    Expect(ceil == netCeil);
-    ExpectSuccess(api.Stop(name));
+    for (auto &link : links) {
+        uint32_t prio, rate, ceil;
+        TNlClass tclass(link, -1, stoul(handle));
+        ExpectSuccess(tclass.GetProperties(prio, rate, ceil));
+        Expect(prio == netPrio);
+        Expect(rate == netGuarantee);
+        Expect(ceil == netCeil);
+        ExpectSuccess(api.Stop(name));
+    }
 
     ExpectSuccess(api.Destroy(name));
 }

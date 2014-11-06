@@ -204,6 +204,22 @@ std::shared_ptr<const TContainer> TContainer::GetParent() const {
     return Parent;
 }
 
+bool TContainer::ValidLink(const std::string &name) const {
+    if (Link.size() == 0)
+        return false;
+
+    std::shared_ptr<TNl> nl = Link[0]->GetNl();
+    return nl->ValidLink(name);
+}
+
+std::shared_ptr<TNlLink> TContainer::GetLink(const std::string &name) const {
+    for (auto &link : Link)
+        if (link->GetName() == name)
+            return link;
+
+    return nullptr;
+}
+
 uint64_t TContainer::GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except, uint64_t exceptVal) const {
     uint64_t val = 0;
 
@@ -571,8 +587,7 @@ TError TContainer::Create(int uid, int gid) {
         uint32_t defHandle = TcHandle(Id, Id + 1);
         uint32_t rootHandle = TcHandle(Id, 0);
 
-        std::vector<std::shared_ptr<TNlLink>> links = { Link };
-        Qdisc = std::make_shared<TQdisc>(links, rootHandle, defHandle);
+        Qdisc = std::make_shared<TQdisc>(Link, rootHandle, defHandle);
         (void)Qdisc->Remove();
         error = Qdisc->Create();
         if (error) {

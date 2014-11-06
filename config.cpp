@@ -16,7 +16,6 @@ TConfig config;
 void TConfig::LoadDefaults() {
     config().mutable_network()->set_enabled(true);
     config().mutable_network()->set_debug(false);
-    config().mutable_network()->set_device("");
 
     config().mutable_slave_pid()->set_path("/run/portod.pid");
     config().mutable_slave_pid()->set_perm(0644);

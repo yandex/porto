@@ -56,4 +56,6 @@ public:
     TError Remove();
 };
 
+std::vector<std::shared_ptr<TNlLink>> OpenLinks();
+
 #endif
