@@ -338,7 +338,7 @@ public:
     TIoReadData() :
         TMapValue("io_read",
                   "return number of bytes read from disk",
-                  NODEF_VALUE | HIDDEN_VALUE,
+                  NODEF_VALUE,
                   rpdmState) {}
 
     TUintMap GetMap(std::shared_ptr<TContainer> c,
@@ -364,7 +364,7 @@ public:
     TIoWriteData() :
         TMapValue("io_write",
                   "return number of bytes written to disk",
-                  NODEF_VALUE | HIDDEN_VALUE,
+                  NODEF_VALUE,
                   rpdmState) {}
 
     TUintMap GetMap(std::shared_ptr<TContainer> c,
