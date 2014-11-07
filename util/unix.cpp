@@ -171,6 +171,23 @@ int BlockAllSignals() {
     return 0;
 }
 
+std::string GetHostName() {
+    char buf[256];
+    int ret = gethostname(buf, sizeof(buf));
+    if (ret < 0)
+        return "";
+    buf[sizeof(buf) - 1] = '\0';
+    return buf;
+}
+
+TError SetHostName(const std::string &name) {
+    int ret = sethostname(name.c_str(), name.length());
+    if (ret < 0)
+        return TError(EError::Unknown, errno, "sethostname(" + name + ")");
+
+    return TError::Success();
+}
+
 TScopedFd::TScopedFd(int fd) : Fd(fd) {
 }
 

@@ -489,6 +489,7 @@ TError TContainer::PrepareTask() {
     taskEnv->Environ.insert(taskEnv->Environ.end(), env.begin(), env.end());
     taskEnv->Environ.push_back("container=lxc");
     taskEnv->Environ.push_back("PORTO_NAME=" + GetName());
+    taskEnv->Environ.push_back("PORTO_HOST=" + GetHostName());
     taskEnv->Environ.push_back("HOME=" + Prop->GetString(P_CWD));
     taskEnv->Environ.push_back("USER=" + Prop->GetString(P_USER));
 

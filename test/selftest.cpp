@@ -12,6 +12,8 @@
 #include "util/pwd.hpp"
 #include "test.hpp"
 
+#define HOSTNAME "portotest"
+
 extern "C" {
 #include <unistd.h>
 #include <sys/types.h>
@@ -760,6 +762,7 @@ static void TestEnvironment(TPortoAPI &api) {
     static const char empty_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
         "container=lxc\0"
         "PORTO_NAME=a\0"
+        "PORTO_HOST=" HOSTNAME "\0"
         "HOME=/place/porto/a\0"
         "USER=nobody\0";
     ExpectEnv(api, name, "", empty_env, sizeof(empty_env));
@@ -770,6 +773,7 @@ static void TestEnvironment(TPortoAPI &api) {
         "c=d\0"
         "container=lxc\0"
         "PORTO_NAME=a\0"
+        "PORTO_HOST=" HOSTNAME "\0"
         "HOME=/place/porto/a\0"
         "USER=nobody\0";
 
@@ -781,6 +785,7 @@ static void TestEnvironment(TPortoAPI &api) {
         "c=d\0"
         "container=lxc\0"
         "PORTO_NAME=a\0"
+        "PORTO_HOST=" HOSTNAME "\0"
         "HOME=/place/porto/a\0"
         "USER=nobody\0";
     ExpectEnv(api, name, "a=e\\;b;c=d;", asb_env, sizeof(asb_env));
@@ -2588,6 +2593,9 @@ int SelfTest(string name, int leakNr) {
         { "cgroups", TestCgroups },
     };
 
+    ExpectSuccess(SetHostName(HOSTNAME));
+
+#define HOSTNAME "portotest"
     if (NetworkEnabled())
         subsystems.push_back("net_cls");
 

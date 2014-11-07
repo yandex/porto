@@ -22,6 +22,8 @@ void SetProcessName(const std::string &name);
 std::string GetProcessName();
 TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap);
 int BlockAllSignals();
+std::string GetHostName();
+TError SetHostName(const std::string &name);
 
 class TScopedFd {
     NO_COPY_CONSTRUCT(TScopedFd);
