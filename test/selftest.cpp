@@ -29,6 +29,10 @@ namespace test {
 static vector<string> subsystems = { "net_cls", "freezer", "memory", "cpu", "cpuacct", "devices" };
 static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"uts" };
 
+static bool NetworkEnabled() {
+    return links.size() != 0;
+}
+
 static void ExpectCorrectCgroups(const string &pid, const string &name) {
     auto cgmap = GetCgroups(pid);
     int expected = subsystems.size();
@@ -79,12 +83,16 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     Expect(v == string("normal"));
     ExpectSuccess(api.GetProperty(name, "cpu_priority", v));
     Expect(v == std::to_string(DEF_CLASS_PRIO));
-    ExpectSuccess(api.GetProperty(name, "net_guarantee", v));
-    Expect(v == std::to_string(DEF_CLASS_RATE));
-    ExpectSuccess(api.GetProperty(name, "net_ceil", v));
-    Expect(v == std::to_string(DEF_CLASS_CEIL));
-    ExpectSuccess(api.GetProperty(name, "net_priority", v));
-    Expect(v == std::to_string(DEF_CLASS_NET_PRIO));
+
+    for (auto &link : links) {
+        ExpectSuccess(api.GetProperty(name, "net_guarantee[" + link->GetName() + "]", v));
+        Expect(v == std::to_string(DEF_CLASS_RATE));
+        ExpectSuccess(api.GetProperty(name, "net_ceil[" + link->GetName() + "]", v));
+        Expect(v == std::to_string(DEF_CLASS_CEIL));
+        ExpectSuccess(api.GetProperty(name, "net_priority[" + link->GetName() + "]", v));
+        Expect(v == std::to_string(DEF_CLASS_NET_PRIO));
+    }
+
     ExpectSuccess(api.GetProperty(name, "respawn", v));
     Expect(v == string("false"));
     ExpectSuccess(api.GetProperty(name, "cpu.smart", v));
@@ -124,10 +132,14 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     ExpectFailure(api.GetData(name, "stderr", v), EError::InvalidState);
     ExpectFailure(api.GetData(name, "cpu_usage", v), EError::InvalidState);
     ExpectFailure(api.GetData(name, "memory_usage", v), EError::InvalidState);
-    ExpectFailure(api.GetData(name, "net_bytes", v), EError::InvalidState);
-    ExpectFailure(api.GetData(name, "net_packets", v), EError::InvalidState);
-    ExpectFailure(api.GetData(name, "net_drops", v), EError::InvalidState);
-    ExpectFailure(api.GetData(name, "net_overlimits", v), EError::InvalidState);
+
+    if (NetworkEnabled()) {
+        ExpectFailure(api.GetData(name, "net_bytes", v), EError::InvalidState);
+        ExpectFailure(api.GetData(name, "net_packets", v), EError::InvalidState);
+        ExpectFailure(api.GetData(name, "net_drops", v), EError::InvalidState);
+        ExpectFailure(api.GetData(name, "net_overlimits", v), EError::InvalidState);
+    }
+
     ExpectFailure(api.GetData(name, "oom_killed", v), EError::InvalidState);
     ExpectFailure(api.GetData(name, "respawn_count", v), EError::InvalidState);
     ExpectSuccess(api.GetData(name, "parent", v));
@@ -1606,6 +1618,7 @@ static void TestRoot(TPortoAPI &api) {
         ExpectSuccess(api.GetData(root, "net_overlimits[" + link->GetName() + "]", v));
         Expect(v == "0");
     }
+
     if (IsCfqActive()) {
         ExpectSuccess(api.GetData(root, "io_read", v));
         Expect(v == "");
@@ -1727,7 +1740,10 @@ static void TestStats(TPortoAPI &api) {
     WaitState(api, noop, "dead");
 
     ExpectSuccess(api.Create(wget));
-    ExpectSuccess(api.SetProperty(wget, "command", "bash -c 'wget yandex.ru && sync'"));
+    if (NetworkEnabled())
+        ExpectSuccess(api.SetProperty(wget, "command", "bash -c 'wget yandex.ru && sync'"));
+    else
+        ExpectSuccess(api.SetProperty(wget, "command", "bash -c 'dd if=/dev/random bs=4M count=10 of=/tmp/porto.tmp && sync'"));
     ExpectSuccess(api.Start(wget));
     WaitState(api, wget, "dead");
 
@@ -1767,21 +1783,23 @@ static void TestStats(TPortoAPI &api) {
         Expect(v == "");
     }
 
-    ExpectNonZeroLink(api, root, "net_bytes");
-    ExpectRootLink(api, wget, "net_bytes");
-    ExpectZeroLink(api, noop, "net_bytes");
+    if (NetworkEnabled()) {
+        ExpectNonZeroLink(api, root, "net_bytes");
+        ExpectRootLink(api, wget, "net_bytes");
+        ExpectZeroLink(api, noop, "net_bytes");
 
-    ExpectNonZeroLink(api, root, "net_packets");
-    ExpectRootLink(api, wget, "net_packets");
-    ExpectZeroLink(api, noop, "net_packets");
+        ExpectNonZeroLink(api, root, "net_packets");
+        ExpectRootLink(api, wget, "net_packets");
+        ExpectZeroLink(api, noop, "net_packets");
 
-    ExpectZeroLink(api, root, "net_drops");
-    ExpectZeroLink(api, wget, "net_drops");
-    ExpectZeroLink(api, noop, "net_drops");
+        ExpectZeroLink(api, root, "net_drops");
+        ExpectZeroLink(api, wget, "net_drops");
+        ExpectZeroLink(api, noop, "net_drops");
 
-    ExpectZeroLink(api, root, "net_overlimits");
-    ExpectZeroLink(api, wget, "net_overlimits");
-    ExpectZeroLink(api, noop, "net_overlimits");
+        ExpectZeroLink(api, root, "net_overlimits");
+        ExpectZeroLink(api, wget, "net_overlimits");
+        ExpectZeroLink(api, noop, "net_overlimits");
+    }
 
     ExpectSuccess(api.Destroy(wget));
     ExpectSuccess(api.Destroy(noop));
@@ -1889,23 +1907,31 @@ static void TestLimits(TPortoAPI &api) {
     ExpectSuccess(api.Stop(name));
 
     uint32_t netGuarantee = 100000, netCeil = 200000, netPrio = 4;
-    ExpectSuccess(api.SetProperty(name, "net_guarantee", std::to_string(netGuarantee)));
-    ExpectSuccess(api.SetProperty(name, "net_ceil", std::to_string(netCeil)));
-    ExpectFailure(api.SetProperty(name, "net_priority", "-1"), EError::InvalidValue);
-    ExpectFailure(api.SetProperty(name, "net_priority", "8"), EError::InvalidValue);
-    ExpectSuccess(api.SetProperty(name, "net_priority", "0"));
-    ExpectSuccess(api.SetProperty(name, "net_priority", std::to_string(netPrio)));
+
+    uint32_t i = 0;
+    for (auto &link : links) {
+        ExpectSuccess(api.SetProperty(name, "net_guarantee[" + link->GetName() + "]", std::to_string(netGuarantee + i)));
+        ExpectSuccess(api.SetProperty(name, "net_ceil[" + link->GetName() + "]", std::to_string(netCeil + i)));
+        ExpectFailure(api.SetProperty(name, "net_priority[" + link->GetName() + "]", "-1"), EError::InvalidValue);
+        ExpectFailure(api.SetProperty(name, "net_priority[" + link->GetName() + "]", "8"), EError::InvalidValue);
+        ExpectSuccess(api.SetProperty(name, "net_priority[" + link->GetName() + "]", "0"));
+        ExpectSuccess(api.SetProperty(name, "net_priority[" + link->GetName() + "]", std::to_string(netPrio + i)));
+        i++;
+    }
     ExpectSuccess(api.Start(name));
 
     string handle = GetCgKnob("net_cls", name, "net_cls.classid");
 
+    i = 0;
     for (auto &link : links) {
         uint32_t prio, rate, ceil;
         TNlClass tclass(link, -1, stoul(handle));
         ExpectSuccess(tclass.GetProperties(prio, rate, ceil));
-        Expect(prio == netPrio);
-        Expect(rate == netGuarantee);
-        Expect(ceil == netCeil);
+        Expect(prio == netPrio + i);
+        Expect(rate == netGuarantee + i);
+        Expect(ceil == netCeil + i);
+
+        i++;
     }
 
     ExpectSuccess(api.Destroy(name));
@@ -2282,7 +2308,7 @@ static void TestPermissions(TPortoAPI &api) {
            ExpectFailure(api.Start(name), EError::Permission);
            ExpectFailure(api.Destroy(name), EError::Permission);
            ExpectFailure(api.SetProperty(name, "command", "sleep 1000"), EError::Permission);
-           ExpectFailure(api.GetProperty(name, "command", s), EError::Permission);
+           ExpectSuccess(api.GetProperty(name, "command", s));
 
     AsUser(api, daemonUser, daemonGroup);
         ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
@@ -2293,7 +2319,7 @@ static void TestPermissions(TPortoAPI &api) {
         ExpectSuccess(api.GetData(name, "root_pid", s));
 
     AsUser(api, binUser, binGroup);
-        ExpectFailure(api.GetData(name, "root_pid", s), EError::Permission);
+        ExpectSuccess(api.GetData(name, "root_pid", s));
         ExpectFailure(api.Stop(name), EError::Permission);
         ExpectFailure(api.Pause(name), EError::Permission);
 
@@ -2600,21 +2626,14 @@ int SelfTest(string name, int leakNr) {
         std::cerr << "WARNING: Due to missing kernel support, memory_guarantee/cpu_policy has not been tested!" << std::endl;
     if (respawns != 1 /* start */ + 2 /* TestRecovery */ + 2 /* TestCgroups */)
         std::cerr << "WARNING: Unexpected number of respawns: " << respawns << "!" << std::endl;
-    if (errors !=
-        4 + /* command */
-        4 + /* bind */
-        10 + /* net */
-        4 + /* cpu */
-        2 + /* net_priority */
-        7 + /* ulimit */
-        1 + /* respawn */
-        2 + /* memory_guarantee */
-        8 + /* hierarchical properties */
-        0)
+    if (errors != 0)
         std::cerr << "WARNING: Unexpected number of errors: " << errors << "!" << std::endl;
-
     if (!IsCfqActive())
         std::cerr << "WARNING: CFQ is not enabled for one of your block devices, skipping io_read and io_write tests" << std::endl;
+    if (!NetworkEnabled())
+        std::cerr << "WARNING: Network support is not tested" << std::endl;
+    if (links.size() == 1)
+        std::cerr << "WARNING: Multiple network support is not tested" << std::endl;
 
     return EXIT_SUCCESS;
 }

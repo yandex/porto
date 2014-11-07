@@ -65,7 +65,8 @@ int main(int argc, char *argv[])
     try {
         config.Load();
 
-        test::links = OpenLinks();
+        if (config().network().enabled())
+            test::links = OpenLinks();
 
         string what = "";
         if (argc >= 2)

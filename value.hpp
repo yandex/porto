@@ -219,6 +219,7 @@ public:
     SYNTHESIZE_ACCESSOR(Int, int)
     SYNTHESIZE_ACCESSOR(Uint, uint64_t)
     SYNTHESIZE_ACCESSOR(List, TStrList)
+    SYNTHESIZE_ACCESSOR(Map, TUintMap)
 
     std::vector<std::string> List();
     bool IsDefault(const std::string &name);

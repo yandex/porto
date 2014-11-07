@@ -37,7 +37,7 @@ public:
     TTclass(const std::shared_ptr<TQdisc> qdisc, uint32_t handle) : ParentQdisc(qdisc), Handle(handle) { }
     TTclass(const std::shared_ptr<TTclass> tclass, uint32_t handle) : ParentTclass(tclass), Handle(handle) { }
 
-    TError Create(uint32_t prio, uint32_t rate, uint32_t ceil);
+    TError Create(std::map<std::string, uint64_t> prio, std::map<std::string, uint64_t> rate, std::map<std::string, uint64_t> ceil);
     TError Remove();
     uint32_t GetParent();
     uint32_t GetHandle() { return Handle; }

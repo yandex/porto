@@ -493,51 +493,94 @@ public:
     }
 };
 
-class TNetGuaranteeProperty : public TUintValue {
+class TNetMapValue : public TMapValue {
+    uint64_t Def;
+protected:
+    TError CheckNetMap(const TUintMap &m,
+                       std::shared_ptr<TContainer> c) {
+        std::set<std::string> validKey;
+
+        for (auto &link : c->Links)
+            validKey.insert(link->GetName());
+
+        for (auto &kv : m)
+            if (validKey.find(kv.first) == validKey.end())
+                return TError(EError::InvalidValue,
+                              "invalid interface " + kv.first);
+
+        return TError::Success();
+    }
+
+public:
+    TNetMapValue(const std::string &name,
+                 const std::string &desc,
+                 const uint64_t def) :
+        TMapValue(name, desc,
+                  PARENT_RO_PROPERTY,
+                  staticProperty), Def(def) {}
+
+    TUintMap GetDefaultMap(std::shared_ptr<TContainer> c) override {
+        TUintMap m;
+        for (auto &link : c->Links)
+            m[link->GetName()] = Def;
+        return m;
+    }
+
+    TError SetMap(std::shared_ptr<TContainer> c,
+                  std::shared_ptr<TVariant> v,
+                  const TUintMap &value) override {
+        TError error = CheckNetMap(value, c);
+        if (error)
+            return error;
+
+        TUintMap m = GetMap(c, v);
+        for (auto &kv : value)
+            m[kv.first] = kv.second;
+
+        return TMapValue::SetMap(c, v, m);
+    }
+};
+
+class TNetGuaranteeProperty : public TNetMapValue {
 public:
     TNetGuaranteeProperty() :
-        TUintValue(P_NET_GUARANTEE,
-                   "Guaranteed container network bandwidth",
-                   PARENT_RO_PROPERTY,
-                   staticProperty) {}
-
-    uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) override {
-        return DEF_CLASS_RATE;
-    }
+        TNetMapValue(P_NET_GUARANTEE,
+                     "Guaranteed container network bandwidth",
+                     DEF_CLASS_RATE) {}
 };
 
-class TNetCeilProperty : public TUintValue {
+class TNetCeilProperty : public TNetMapValue {
 public:
     TNetCeilProperty() :
-        TUintValue(P_NET_CEIL,
-                   "Maximum container network bandwidth",
-                   PARENT_RO_PROPERTY,
-                   staticProperty) {}
-
-    uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) override {
-        return DEF_CLASS_CEIL;
-    }
+        TNetMapValue(P_NET_CEIL,
+                     "Maximum container network bandwidth",
+                     DEF_CLASS_CEIL) {}
 };
 
-class TNetPriorityProperty : public TUintValue {
+class TNetPriorityProperty : public TNetMapValue {
 public:
     TNetPriorityProperty() :
-        TUintValue(P_NET_PRIO,
-                   "Container network priority: 0-7",
-                   PARENT_RO_PROPERTY,
-                   staticProperty) {}
+        TNetMapValue(P_NET_PRIO,
+                  "Container network priority: 0-7",
+                  DEF_CLASS_NET_PRIO) {}
 
-    uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) override {
-        return DEF_CLASS_NET_PRIO;
-    }
+    TError SetMap(std::shared_ptr<TContainer> c,
+                  std::shared_ptr<TVariant> v,
+                  const TUintMap &value) override {
 
-    TError SetUint(std::shared_ptr<TContainer> c,
-                   std::shared_ptr<TVariant> v,
-                   const uint64_t &value) override {
-        if (value < 0 || value > 7)
-            return TError(EError::InvalidValue, "invalid value");
+        TError error = CheckNetMap(value, c);
+        if (error)
+            return error;
 
-        return v->Set(EValueType::Uint, value);
+        TUintMap m = GetMap(c, v);
+        for (auto &kv : value) {
+            m[kv.first] = kv.second;
+
+            if (kv.second > 7)
+                return TError(EError::InvalidValue, "invalid value");
+        }
+
+        return TMapValue::SetMap(c, v, m);
     }
 };
 

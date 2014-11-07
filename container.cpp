@@ -205,15 +205,15 @@ std::shared_ptr<const TContainer> TContainer::GetParent() const {
 }
 
 bool TContainer::ValidLink(const std::string &name) const {
-    if (Link.size() == 0)
+    if (Links.size() == 0)
         return false;
 
-    std::shared_ptr<TNl> nl = Link[0]->GetNl();
+    std::shared_ptr<TNl> nl = Links[0]->GetNl();
     return nl->ValidLink(name);
 }
 
 std::shared_ptr<TNlLink> TContainer::GetLink(const std::string &name) const {
-    for (auto &link : Link)
+    for (auto &link : Links)
         if (link->GetName() == name)
             return link;
 
@@ -372,15 +372,13 @@ TError TContainer::PrepareNetwork() {
         Tclass = std::make_shared<TTclass>(Qdisc, handle);
     }
 
-    TError error;
-    uint32_t prio, rate, ceil;
-
-    prio = Prop->GetUint(P_NET_PRIO);
-    rate = Prop->GetUint(P_NET_GUARANTEE);
-    ceil = Prop->GetUint(P_NET_CEIL);
+    TUintMap prio, rate, ceil;
+    prio = Prop->GetMap(P_NET_PRIO);
+    rate = Prop->GetMap(P_NET_GUARANTEE);
+    ceil = Prop->GetMap(P_NET_CEIL);
 
     (void)Tclass->Remove();
-    error = Tclass->Create(prio, rate, ceil);
+    TError error = Tclass->Create(prio, rate, ceil);
     if (error) {
         TLogger::LogError(error, "Can't create tclass");
         return error;
@@ -587,7 +585,7 @@ TError TContainer::Create(int uid, int gid) {
         uint32_t defHandle = TcHandle(Id, Id + 1);
         uint32_t rootHandle = TcHandle(Id, 0);
 
-        Qdisc = std::make_shared<TQdisc>(Link, rootHandle, defHandle);
+        Qdisc = std::make_shared<TQdisc>(Links, rootHandle, defHandle);
         (void)Qdisc->Remove();
         error = Qdisc->Create();
         if (error) {
@@ -605,7 +603,15 @@ TError TContainer::Create(int uid, int gid) {
 
         DefaultTclass = std::make_shared<TTclass>(Qdisc, defHandle);
         (void)DefaultTclass->Remove();
-        error = DefaultTclass->Create(DEF_CLASS_PRIO, DEF_CLASS_RATE, DEF_CLASS_CEIL);
+
+        TUintMap prio, rate, ceil;
+        for (auto &link : Links) {
+            prio[link->GetName()] = DEF_CLASS_PRIO;
+            rate[link->GetName()] = DEF_CLASS_RATE;
+            ceil[link->GetName()] = DEF_CLASS_CEIL;
+        }
+
+        error = DefaultTclass->Create(prio, rate, ceil);
         if (error) {
             TLogger::LogError(error, "Can't create default tclass");
             return error;
@@ -695,10 +701,8 @@ TError TContainer::Start() {
 
     error = Task->Start();
     if (error) {
-        TLogger::LogError(error, "Can't start task");
         FreeResources();
-        TError e = Data->SetInt(D_START_ERRNO, error.GetErrno());
-        TLogger::LogError(e, "Can't set start_errno");
+        TLogger::LogError(Data->SetInt(D_START_ERRNO, error.GetErrno()), "Can't set start_errno");
         return error;
     }
 
@@ -884,7 +888,7 @@ TError TContainer::Kill(int sig) {
     return Task->Kill(sig);
 }
 
-void TContainer::ParseName(std::string &name, std::string &idx) {
+void TContainer::ParseName(std::string &name, std::string &idx) const {
     std::vector<std::string> tokens;
     TError error = SplitString(name, '[', tokens);
     if (error || tokens.size() != 2)
@@ -914,6 +918,7 @@ TError TContainer::GetData(const string &origName, string &value) {
     if (error)
         return error;
 
+    // TODO: share with GetProperty
     if (idx.length()) {
         TUintMap m = p->GetMap(c, v);
         if (m.find(idx) == m.end())
@@ -985,6 +990,9 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
         return TError(EError::InvalidProperty, "no properties for root container");
 
     string property = origProperty;
+    std::string idx;
+    ParseName(property, idx);
+
     if (alias.find(origProperty) != alias.end())
         property = alias.at(origProperty);
 
@@ -992,7 +1000,15 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
     if (error)
         return error;
 
-    value = Prop->GetString(property);
+    if (idx.length()) {
+        TUintMap m = Prop->GetMap(property);
+        if (m.find(idx) == m.end())
+            return TError(EError::InvalidValue, "invalid index " + idx);
+
+        value = std::to_string(m.at(idx));
+    } else {
+        value = Prop->GetString(property);
+    }
     PropertyToAlias(origProperty, value);
 
     return TError::Success();
@@ -1014,6 +1030,8 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
         return TError(EError::InvalidValue, "Can't set property for root containers");
 
     string property = origProperty;
+    std::string idx;
+    ParseName(property, idx);
     string value = StringTrim(origValue);
 
     TError error = AliasToProperty(property, value);
@@ -1034,11 +1052,25 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
     if (UseParentNamespace() && Prop->HasFlags(property, PARENT_RO_PROPERTY))
         return TError(EError::NotSupported, "Can't set " + property + " for child container");
 
-    error = Prop->SetString(property, value);
-    if (error) {
-        TLogger::LogError(error, "Can't set property");
-        return error;
+    if (idx.length()) {
+        TUintMap m = Prop->GetMap(property);
+        if (m.find(idx) == m.end()) {
+            return TError(EError::InvalidValue, "invalid index " + idx);
+        } else {
+            std::stringstream str;
+            for (auto kv: m) {
+                if (kv.first == idx)
+                    str << kv.first << ":" << value << ";";
+                else
+                    str << kv.first << ":" << kv.second << ";";
+            }
+            value = str.str();
+        }
     }
+
+    error = Prop->SetString(property, value);
+    if (error)
+        return error;
 
     if (ShouldApplyProperty(property))
         error = ApplyDynamicProperties();
@@ -1370,7 +1402,7 @@ TError TContainerHolder::Create(const string &name, int uid, int gid) {
     if (error)
         return error;
 
-    auto c = std::make_shared<TContainer>(name, parent, id, Link);
+    auto c = std::make_shared<TContainer>(name, parent, id, Links);
     error = c->Create(uid, gid);
     if (error)
         return error;
@@ -1469,7 +1501,7 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
     if (!id)
         return TError(EError::Unknown, "Couldn't restore container id");
 
-    auto c = std::make_shared<TContainer>(name, parent, id, Link);
+    auto c = std::make_shared<TContainer>(name, parent, id, Links);
     error = c->Restore(node);
     if (error)
         return error;

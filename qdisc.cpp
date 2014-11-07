@@ -40,13 +40,24 @@ uint32_t TTclass::GetParent() {
         return ParentTclass->Handle;
 }
 
-TError TTclass::Create(uint32_t prio, uint32_t rate, uint32_t ceil) {
+TError TTclass::Create(std::map<std::string, uint64_t> prio, std::map<std::string, uint64_t> rate, std::map<std::string, uint64_t> ceil) {
     if (!config().network().enabled())
         return TError::Success();
 
     for (auto &link : GetLink()) {
+        if (prio.find(link->GetName()) == prio.end())
+            return TError(EError::Unknown, "Unknown interface in net_priority");
+
+        if (rate.find(link->GetName()) == rate.end())
+            return TError(EError::Unknown, "Unknown interface in net_guarantee");
+
+        if (ceil.find(link->GetName()) == ceil.end())
+            return TError(EError::Unknown, "Unknown interface in net_limit");
+
         TNlClass tclass(link, GetParent(), Handle);
-        TError error = tclass.Create(prio, rate, ceil);
+        TError error = tclass.Create(prio[link->GetName()],
+                                     rate[link->GetName()],
+                                     ceil[link->GetName()]);
         if (error)
             return error;
     }

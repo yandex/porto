@@ -639,9 +639,7 @@ TError TTask::Start() {
         Pid = 0;
         ExitStatus = -1;
 
-        TError error(EError::Unknown, ret, msg);
-        TLogger::LogError(error, "Child process couldn't start");
-        return error;
+        return TError(EError::Unknown, ret, msg);
     }
 }
 

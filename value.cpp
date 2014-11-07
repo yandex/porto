@@ -126,8 +126,6 @@ TError TMapValue::SetString(std::shared_ptr<TContainer> c,
     if (error)
         return error;
 
-    // TODO: do we need to check that keys are valid?
-
     for (auto &line : lines) {
         std::vector<std::string> nameval;
 
