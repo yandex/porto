@@ -26,12 +26,8 @@ using std::pair;
 
 namespace test {
 
-static vector<string> subsystems = { "net_cls", "freezer", "memory", "cpu", "cpuacct", "devices" };
+static vector<string> subsystems = { "freezer", "memory", "cpu", "cpuacct", "devices" };
 static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"uts" };
-
-static bool NetworkEnabled() {
-    return links.size() != 0;
-}
 
 static void ExpectCorrectCgroups(const string &pid, const string &name) {
     auto cgmap = GetCgroups(pid);
@@ -345,9 +341,11 @@ static void TestHolder(TPortoAPI &api) {
     Expect(CgExists("memory", "a/b") == true);
     Expect(CgExists("memory", "a/b/c") == true);
 
-    ExpectTclass("a", true);
-    ExpectTclass("a/b", true);
-    ExpectTclass("a/b/c", true);
+    if (NetworkEnabled()) {
+        ExpectTclass("a", true);
+        ExpectTclass("a/b", true);
+        ExpectTclass("a/b/c", true);
+    }
 
     WaitState(api, "a/b", "dead");
     ExpectSuccess(api.GetData("a/b", "state", state));
@@ -522,28 +520,35 @@ static void TestLongRunning(TPortoAPI &api) {
     ExpectCorrectCgroups(pid, name);
     AsNobody(api);
 
-    string root_cls = GetCgKnob("net_cls", "/", "net_cls.classid");
-    string leaf_cls = GetCgKnob("net_cls", name, "net_cls.classid");
+    string root_cls;
+    string leaf_cls;
+    if (NetworkEnabled()) {
+        root_cls = GetCgKnob("net_cls", "/", "net_cls.classid");
+        leaf_cls = GetCgKnob("net_cls", name, "net_cls.classid");
 
-    Expect(root_cls != "0");
-    Expect(leaf_cls != "0");
-    Expect(root_cls != leaf_cls);
+        Expect(root_cls != "0");
+        Expect(leaf_cls != "0");
+        Expect(root_cls != leaf_cls);
 
-    Expect(TcClassExist(stoul(root_cls)) == true);
-    Expect(TcClassExist(stoul(leaf_cls)) == true);
+        Expect(TcClassExist(stoul(root_cls)) == true);
+        Expect(TcClassExist(stoul(leaf_cls)) == true);
+    }
 
     ExpectSuccess(api.Stop(name));
     Expect(TaskRunning(api, pid) == false);
-    Expect(TcClassExist(stoul(leaf_cls)) == false);
 
-    Say() << "Check that destroying container removes tclass" << std::endl;
-    ExpectSuccess(api.Start(name));
-    Expect(TcClassExist(stoul(root_cls)) == true);
-    Expect(TcClassExist(stoul(leaf_cls)) == true);
-    ExpectSuccess(api.Destroy(name));
-    Expect(TaskRunning(api, pid) == false);
-    Expect(TcClassExist(stoul(leaf_cls)) == false);
-    ExpectSuccess(api.Create(name));
+    if (NetworkEnabled()) {
+        Expect(TcClassExist(stoul(leaf_cls)) == false);
+
+        Say() << "Check that destroying container removes tclass" << std::endl;
+        ExpectSuccess(api.Start(name));
+        Expect(TcClassExist(stoul(root_cls)) == true);
+        Expect(TcClassExist(stoul(leaf_cls)) == true);
+        ExpectSuccess(api.Destroy(name));
+        Expect(TaskRunning(api, pid) == false);
+        Expect(TcClassExist(stoul(leaf_cls)) == false);
+        ExpectSuccess(api.Create(name));
+    }
 
     Say() << "Check that hierarchical task cgroups are correct" << std::endl;
 
@@ -608,15 +613,16 @@ static void TestIsolation(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "stdout", ret));
     Expect(std::count(ret.begin(), ret.end(), '\n') == 2);
 
-    Say() << "Make sure container has correct network class" << std::endl;
+    if (NetworkEnabled()) {
+        Say() << "Make sure container has correct network class" << std::endl;
 
-    string handle = GetCgKnob("net_cls", name, "net_cls.classid");
-    Expect(handle != "0");
+        string handle = GetCgKnob("net_cls", name, "net_cls.classid");
+        Expect(handle != "0");
 
-    Expect(TcClassExist(stoul(handle)) == true);
-    ExpectSuccess(api.Stop(name));
-    Expect(TcClassExist(stoul(handle)) == false);
-
+        Expect(TcClassExist(stoul(handle)) == true);
+        ExpectSuccess(api.Stop(name));
+        Expect(TcClassExist(stoul(handle)) == false);
+    }
     ExpectSuccess(api.Destroy(name));
 
     Say() << "Make sure isolate works correctly with meta parent" << std::endl;
@@ -1313,6 +1319,9 @@ static string System(const std::string &cmd) {
 }
 
 static void TestNetProperty(TPortoAPI &api) {
+    if (!NetworkEnabled())
+        return;
+
     string name = "a";
     ExpectSuccess(api.Create(name));
 
@@ -1626,20 +1635,22 @@ static void TestRoot(TPortoAPI &api) {
         Expect(v == "");
     }
 
-    uint32_t defClass = TcHandle(1, 2);
-    uint32_t rootClass = TcHandle(1, 1);
-    uint32_t nextClass = TcHandle(1, 3);
+    if (NetworkEnabled()) {
+        uint32_t defClass = TcHandle(1, 2);
+        uint32_t rootClass = TcHandle(1, 1);
+        uint32_t nextClass = TcHandle(1, 3);
 
-    uint32_t rootQdisc = TcHandle(1, 0);
-    uint32_t nextQdisc = TcHandle(2, 0);
+        uint32_t rootQdisc = TcHandle(1, 0);
+        uint32_t nextQdisc = TcHandle(2, 0);
 
-    Expect(TcQdiscExist(rootQdisc) == true);
-    Expect(TcQdiscExist(nextQdisc) == false);
-    Expect(TcClassExist(defClass) == true);
-    Expect(TcClassExist(rootClass) == true);
-    Expect(TcClassExist(nextClass) == false);
-    Expect(TcCgFilterExist(rootQdisc, 1) == true);
-    Expect(TcCgFilterExist(rootQdisc, 2) == false);
+        Expect(TcQdiscExist(rootQdisc) == true);
+        Expect(TcQdiscExist(nextQdisc) == false);
+        Expect(TcClassExist(defClass) == true);
+        Expect(TcClassExist(rootClass) == true);
+        Expect(TcClassExist(nextClass) == false);
+        Expect(TcCgFilterExist(rootQdisc, 1) == true);
+        Expect(TcCgFilterExist(rootQdisc, 2) == false);
+    }
 
     Say() << "Check root properties & data" << std::endl;
     for (auto p : properties)
@@ -1743,7 +1754,7 @@ static void TestStats(TPortoAPI &api) {
     if (NetworkEnabled())
         ExpectSuccess(api.SetProperty(wget, "command", "bash -c 'wget yandex.ru && sync'"));
     else
-        ExpectSuccess(api.SetProperty(wget, "command", "bash -c 'dd if=/dev/random bs=4M count=10 of=/tmp/porto.tmp && sync'"));
+        ExpectSuccess(api.SetProperty(wget, "command", "bash -c 'dd if=/dev/random bs=4M count=1 of=/tmp/porto.tmp && sync'"));
     ExpectSuccess(api.Start(wget));
     WaitState(api, wget, "dead");
 
@@ -1920,18 +1931,20 @@ static void TestLimits(TPortoAPI &api) {
     }
     ExpectSuccess(api.Start(name));
 
-    string handle = GetCgKnob("net_cls", name, "net_cls.classid");
+    if (NetworkEnabled()) {
+        string handle = GetCgKnob("net_cls", name, "net_cls.classid");
 
-    i = 0;
-    for (auto &link : links) {
-        uint32_t prio, rate, ceil;
-        TNlClass tclass(link, -1, stoul(handle));
-        ExpectSuccess(tclass.GetProperties(prio, rate, ceil));
-        Expect(prio == netPrio + i);
-        Expect(rate == netGuarantee + i);
-        Expect(ceil == netCeil + i);
+        i = 0;
+        for (auto &link : links) {
+            uint32_t prio, rate, ceil;
+            TNlClass tclass(link, -1, stoul(handle));
+            ExpectSuccess(tclass.GetProperties(prio, rate, ceil));
+            Expect(prio == netPrio + i);
+            Expect(rate == netGuarantee + i);
+            Expect(ceil == netCeil + i);
 
-        i++;
+            i++;
+        }
     }
 
     ExpectSuccess(api.Destroy(name));
@@ -2574,6 +2587,9 @@ int SelfTest(string name, int leakNr) {
         { "recovery", TestRecovery },
         { "cgroups", TestCgroups },
     };
+
+    if (NetworkEnabled())
+        subsystems.push_back("net_cls");
 
     LeakConainersNr = leakNr;
 

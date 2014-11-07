@@ -563,8 +563,13 @@ TError TTask::Start() {
         }
 
         int cloneFlags = SIGCHLD;
-        if (Env->Isolate)
+        if (Env->Isolate) {
             cloneFlags |= CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC;
+        } else {
+            Env->NetCfg.Share = true;
+            Env->NetCfg.Host.clear();
+            Env->NetCfg.MacVlan.clear();
+        }
 
         if (Env->Hostname != "")
             cloneFlags |= CLONE_NEWUTS;

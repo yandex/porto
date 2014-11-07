@@ -54,6 +54,7 @@ namespace test {
     void BootstrapCommand(const std::string &cmd, const std::string &path, bool remove = true);
 
     void RestartDaemon(TPortoAPI &api);
+    bool NetworkEnabled();
     void TestDaemon(TPortoAPI &api);
 
     int SelfTest(std::string name, int leakNr);

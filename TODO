@@ -1,3 +1,4 @@
+- change default net_guarantee to 0
 - ? add python bindings to the package
 - make ParseRlimit, ParseBind, ParseNet part of property class
 - test restarting (check version)
@@ -23,9 +24,7 @@
 # phase 3
 - ? write dom0 hostname into come file on container or pass via ENV
 ## disk
-- ? root property: support loop if file
 - ? readonly_root
-- ? pty as container /dev/console
 ## other
 - ? when to enable user namespace
 ## net
