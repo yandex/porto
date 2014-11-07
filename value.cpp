@@ -19,6 +19,13 @@ std::string StringToString(const std::string &v) {
     return v;
 }
 
+
+TError TValue::PrepareTaskEnv(std::shared_ptr<TContainer> container,
+                              std::shared_ptr<TTaskEnv> taskEnv) {
+    PORTO_RUNTIME_ERROR(std::string(__func__) + " is not defined for " + Name);
+    return TError(EError::Unknown, "");
+}
+
 std::string TStringValue::GetDefaultString(std::shared_ptr<TContainer> c) {
     return "";
 }
@@ -26,7 +33,10 @@ std::string TStringValue::GetDefaultString(std::shared_ptr<TContainer> c) {
 TError TStringValue::SetString(std::shared_ptr<TContainer> c,
                                std::shared_ptr<TVariant> v,
                                const std::string &value) {
-    return v->Set(Type, value);
+    TError error = ParseString(c, value); \
+    if (error) \
+        return error; \
+    return v->Set(EValueType::String, value); \
 }
 
 std::string TStringValue::GetString(std::shared_ptr<TContainer> c,

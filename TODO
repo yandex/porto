@@ -1,8 +1,5 @@
-- ? add python bindings to the package
-- make ParseRlimit, ParseBind, ParseNet part of property class
 - test restarting (check version)
-- ? portoctl cp
-- ? remove start_errno data
+- ? add python bindings to the package
 - ? move property apply code into property method
 
 # properties
@@ -18,7 +15,7 @@
 # nekt0n
 - add namespaces
 - ? get rid of globals/static which have class types (http://google-styleguide.googlecode.com/svn/trunk/cppguide.html#Static_and_Global_Variables)
-- ? portoctl inpect to export everything in JSON
+- ? portoctl inspect to export everything in JSON
 
 # phase 3
 ## disk
@@ -44,3 +41,4 @@
 - move all 'extern "C"' into one file
 - different log levels (error, normal, verbose)
 - use some kind of reference count for accounting running children
+- ? remove start_errno data

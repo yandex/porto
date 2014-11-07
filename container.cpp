@@ -500,16 +500,16 @@ TError TContainer::PrepareTask() {
     taskEnv->Hostname = Prop->GetString(P_HOSTNAME);
     taskEnv->BindDns = Prop->GetBool(P_BIND_DNS);
 
-    TError error = ParseRlimit(Prop->GetList(P_ULIMIT), taskEnv->Rlimit);
+    TError error = Prop->PrepareTaskEnv(P_ULIMIT, taskEnv);
     if (error)
         return error;
 
-    error = ParseBind(Prop->GetList(P_BIND), taskEnv->BindMap);
+    error = Prop->PrepareTaskEnv(P_BIND, taskEnv);
     if (error)
         return error;
 
     if (config().network().enabled()) {
-        error = ParseNet(shared_from_this(), Prop->GetList(P_NET), taskEnv->NetCfg);
+        error = Prop->PrepareTaskEnv(P_NET, taskEnv);
         if (error)
             return error;
     }

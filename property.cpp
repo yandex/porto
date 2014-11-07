@@ -8,7 +8,7 @@
 #include "util/pwd.hpp"
 
 bool TPropertySet::ParentDefault(std::shared_ptr<TContainer> &c,
-                                    const std::string &property) {
+                                 const std::string &property) {
     TError error = GetSharedContainer(c);
     if (error) {
         TLogger::LogError(error, "Can't get default for " + property);
@@ -64,6 +64,25 @@ TError TPropertySet::Valid(const std::string &property) {
     if (!propertySet.Valid(property))
         return TError(EError::InvalidProperty, "invalid property");
     return TError::Success();
+}
+
+TError TPropertySet::PrepareTaskEnv(const std::string &property,
+                                    std::shared_ptr<TTaskEnv> taskEnv) {
+    std::shared_ptr<TContainer> c;
+    TValue *p;
+    std::shared_ptr<TVariant> v;
+
+    TError error = VariantSet.Get(property, c, &p, v);
+    if (error)
+        return error;
+
+    if (IsDefault(property)) {
+        TError error = p->ParseDefault(c);
+        if (error)
+            return error;
+    }
+
+    return p->PrepareTaskEnv(c, taskEnv);
 }
 
 TPropertySet::~TPropertySet() {
@@ -183,14 +202,10 @@ public:
             return u.GetName();
     }
 
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value) override {
+    TError ParseString(std::shared_ptr<TContainer> container,
+                       const std::string &value) override {
         TUser u(value);
-        TError error = u.Load();
-        if (error)
-            return error;
-        return v->Set(EValueType::String, value);
+        return u.Load();
     }
 };
 
@@ -212,14 +227,10 @@ public:
             return g.GetName();
     }
 
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value) override {
+    TError ParseString(std::shared_ptr<TContainer> c,
+                       const std::string &value) override {
         TGroup g(value);
-        TError error = g.Load();
-        if (error)
-            return error;
-        return v->Set(EValueType::String, value);
+        return g.Load();
     }
 };
 
@@ -244,13 +255,9 @@ public:
         return "/";
     }
 
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value) override {
-        TError error = ValidPath(c, value);
-        if (error)
-            return error;
-        return v->Set(EValueType::String, value);
+    TError ParseString(std::shared_ptr<TContainer> c,
+                       const std::string &value) override {
+        return ValidPath(c, value);
     }
 };
 
@@ -269,13 +276,9 @@ public:
         return config().container().tmp_dir() + "/" + c->GetName();
     }
 
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value) override {
-        TError error = ValidPath(c, value);
-        if (error)
-            return error;
-        return v->Set(EValueType::String, value);
+    TError ParseString(std::shared_ptr<TContainer> c,
+                       const std::string &value) override {
+        return ValidPath(c, value);
     }
 };
 
@@ -291,13 +294,9 @@ public:
         return "/dev/null";
     }
 
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value) override {
-        TError error = ExistingFile(c, value);
-        if (error)
-            return error;
-        return v->Set(EValueType::String, value);
+    TError ParseString(std::shared_ptr<TContainer> c,
+                       const std::string &value) override {
+        return ExistingFile(c, value);
     }
 };
 
@@ -313,13 +312,9 @@ public:
         return DefaultStdFile(c, "stdout");
     }
 
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value) override {
-        TError error = ValidPath(c, value);
-        if (error)
-            return error;
-        return v->Set(EValueType::String, value);
+    TError ParseString(std::shared_ptr<TContainer> c,
+                       const std::string &value) override {
+        return ValidPath(c, value);
     }
 };
 
@@ -335,13 +330,9 @@ public:
         return DefaultStdFile(c, "stderr");
     }
 
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value) override {
-        TError error = ValidPath(c, value);
-        if (error)
-            return error;
-        return v->Set(EValueType::String, value);
+    TError ParseString(std::shared_ptr<TContainer> c,
+                       const std::string &value) override {
+        return ValidPath(c, value);
     }
 };
 
@@ -357,9 +348,8 @@ public:
         return config().container().stdout_limit();
     }
 
-    TError SetUint(std::shared_ptr<TContainer> c,
-                   std::shared_ptr<TVariant> v,
-                   const uint64_t &value) override {
+    TError ParseUint(std::shared_ptr<TContainer> c,
+                     const uint64_t &value) override {
         uint32_t max = config().container().stdout_limit();
 
         if (value > max)
@@ -367,7 +357,7 @@ public:
                           "Maximum number of bytes: " +
                           std::to_string(max));
 
-        return v->Set(EValueType::Uint, value);
+        return TError::Success();
     }
 };
 
@@ -379,9 +369,8 @@ public:
                    PARENT_RO_PROPERTY,
                    dynamicProperty) {}
 
-    TError SetUint(std::shared_ptr<TContainer> c,
-                   std::shared_ptr<TVariant> v,
-                   const uint64_t &value) override {
+    TError ParseUint(std::shared_ptr<TContainer> c,
+                     const uint64_t &value) override {
         auto memroot = memorySubsystem->GetRootCgroup();
         if (!memroot->HasKnob("memory.low_limit_in_bytes"))
             return TError(EError::NotSupported, "invalid kernel");
@@ -395,7 +384,7 @@ public:
             return TError(EError::ResourceNotAvailable,
                           "can't guarantee all available memory");
 
-        return v->Set(EValueType::Uint, value);
+        return TError::Success();
     }
 };
 
@@ -407,13 +396,12 @@ public:
                    0,
                    dynamicProperty) {}
 
-    TError SetUint(std::shared_ptr<TContainer> c,
-                   std::shared_ptr<TVariant> v,
-                   const uint64_t &value) override {
+    TError ParseUint(std::shared_ptr<TContainer> c,
+                     const uint64_t &value) override {
         if (!c->ValidHierarchicalProperty(P_MEM_LIMIT, value))
             return TError(EError::InvalidValue, "invalid hierarchical value");
 
-        return v->Set(EValueType::Uint, value);
+        return TError::Success();
     }
 };
 
@@ -429,14 +417,13 @@ public:
         return false;
     }
 
-    TError SetBool(std::shared_ptr<TContainer> c,
-                   std::shared_ptr<TVariant> v,
-                   const bool &value) override {
+    TError ParseBool(std::shared_ptr<TContainer> c,
+                     const bool &value) override {
         auto memroot = memorySubsystem->GetRootCgroup();
         if (!memroot->HasKnob("memory.recharge_on_pgfault"))
             return TError(EError::NotSupported, "invalid kernel");
 
-        return v->Set(EValueType::Bool, value);
+        return TError::Success();
     }
 };
 
@@ -452,9 +439,8 @@ public:
         return "normal";
     }
 
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value) override {
+    TError ParseString(std::shared_ptr<TContainer> c,
+                       const std::string &value) override {
         if (value != "normal" && value != "rt" && value != "idle")
             return TError(EError::InvalidValue, "invalid policy");
 
@@ -467,7 +453,7 @@ public:
         if (value == "idle")
             return TError(EError::NotSupported, "not implemented");
 
-        return v->Set(EValueType::String, value);
+        return TError::Success();
     }
 };
 
@@ -483,13 +469,12 @@ public:
         return DEF_CLASS_PRIO;
     }
 
-    TError SetUint(std::shared_ptr<TContainer> c,
-                   std::shared_ptr<TVariant> v,
-                   const uint64_t &value) override {
+    TError ParseUint(std::shared_ptr<TContainer> c,
+                     const uint64_t &value) override {
         if (value < 0 || value > 99)
             return TError(EError::InvalidValue, "invalid value");
 
-        return v->Set(EValueType::Uint, value);
+        return TError::Success();
     }
 };
 
@@ -638,19 +623,20 @@ public:
         return "";
     }
 
-    TError SetString(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::string &value) override {
+    TError ParseString(std::shared_ptr<TContainer> c,
+                       const std::string &value) override {
         uint32_t max = config().container().private_max();
 
         if (value.length() > max)
             return TError(EError::InvalidValue, "Value is too long");
 
-        return v->Set(EValueType::String, value);
+        return TError::Success();
     }
 };
 
 class TUlimitProperty : public TListValue {
+    std::map<int,struct rlimit> Rlimit;
+
 public:
     TUlimitProperty() :
         TListValue(P_ULIMIT,
@@ -658,14 +644,74 @@ public:
                    PARENT_DEF_PROPERTY,
                    staticProperty) {}
 
-    TError SetList(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const std::vector<std::string> &value) override {
-        std::map<int, struct rlimit> rlim;
-        TError error = ParseRlimit(value, rlim);
-        if (error)
-            return error;
-        return v->Set(EValueType::List, value);
+    TError ParseList(std::shared_ptr<TContainer> container,
+                     const std::vector<std::string> &lines) override {
+        Rlimit.clear();
+
+        static const std::map<std::string,int> nameToIdx = {
+            { "as", RLIMIT_AS },
+            { "core", RLIMIT_CORE },
+            { "cpu", RLIMIT_CPU },
+            { "data", RLIMIT_DATA },
+            { "fsize", RLIMIT_FSIZE },
+            { "locks", RLIMIT_LOCKS },
+            { "memlock", RLIMIT_MEMLOCK },
+            { "msgqueue", RLIMIT_MSGQUEUE },
+            { "nice", RLIMIT_NICE },
+            { "nofile", RLIMIT_NOFILE },
+            { "nproc", RLIMIT_NPROC },
+            { "rss", RLIMIT_RSS },
+            { "rtprio", RLIMIT_RTPRIO },
+            { "rttime", RLIMIT_RTTIME },
+            { "sigpending", RLIMIT_SIGPENDING },
+            { "stask", RLIMIT_STACK },
+        };
+
+        for (auto &limit : lines) {
+            std::vector<std::string> nameval;
+
+            (void)SplitString(limit, ':', nameval);
+            if (nameval.size() != 2)
+                return TError(EError::InvalidValue, "Invalid limits format");
+
+            std::string name = StringTrim(nameval[0]);
+            if (nameToIdx.find(name) == nameToIdx.end())
+                return TError(EError::InvalidValue, "Invalid limit " + name);
+            int idx = nameToIdx.at(name);
+
+            std::vector<std::string> softhard;
+            (void)SplitString(StringTrim(nameval[1]), ' ', softhard);
+            if (softhard.size() != 2)
+                return TError(EError::InvalidValue, "Invalid limits number for " + name);
+
+            rlim_t soft, hard;
+            if (softhard[0] == "unlim" || softhard[0] == "unliminted") {
+                soft = RLIM_INFINITY;
+            } else {
+                TError error = StringToUint64(softhard[0], soft);
+                if (error)
+                    return TError(EError::InvalidValue, "Invalid soft limit for " + name);
+            }
+
+            if (softhard[1] == "unlim" || softhard[1] == "unliminted") {
+                hard = RLIM_INFINITY;
+            } else {
+                TError error = StringToUint64(softhard[1], hard);
+                if (error)
+                    return TError(EError::InvalidValue, "Invalid hard limit for " + name);
+            }
+
+            Rlimit[idx].rlim_cur = soft;
+            Rlimit[idx].rlim_max = hard;
+        }
+
+        return TError::Success();
+    }
+
+    TError PrepareTaskEnv(std::shared_ptr<TContainer> container,
+                          std::shared_ptr<TTaskEnv> taskEnv) override {
+        taskEnv->Rlimit = Rlimit;
+        return TError::Success();
     }
 };
 
@@ -695,6 +741,8 @@ public:
 };
 
 class TBindProperty : public TListValue {
+    std::vector<TBindMap> BindMap;
+
 public:
     TBindProperty() :
         TListValue(P_BIND,
@@ -702,19 +750,53 @@ public:
                    0,
                    staticProperty) {}
 
-    TError SetList(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const TStrList &value) override {
-        TLogger::Log() << "SET BIND TO " << ListToString(value) << std::endl;
-        std::vector<TBindMap> dirs;
-        TError error = ParseBind(value, dirs);
-        if (error)
-            return error;
-        return v->Set(EValueType::List, value);
+    TError ParseList(std::shared_ptr<TContainer> container,
+                     const std::vector<std::string> &lines) override {
+        BindMap.clear();
+
+        for (auto &line : lines) {
+            std::vector<std::string> tok;
+            TBindMap m;
+
+            TError error = SplitEscapedString(line, ' ', tok);
+            if (error)
+                return error;
+
+            if (tok.size() != 2 && tok.size() != 3)
+                return TError(EError::InvalidValue, "Invalid bind in: " + line);
+
+            m.Source = tok[0];
+            m.Dest = tok[1];
+            m.Rdonly = false;
+
+            if (tok.size() == 3) {
+                if (tok[2] == "ro")
+                    m.Rdonly = true;
+                else if (tok[2] == "rw")
+                    m.Rdonly = false;
+                else
+                    return TError(EError::InvalidValue, "Invalid bind type in: " + line);
+            }
+
+            if (!m.Source.Exists())
+                return TError(EError::InvalidValue, "Source bind " + m.Source.ToString() + " doesn't exist");
+
+            BindMap.push_back(m);
+        }
+
+        return TError::Success();
+    }
+
+    TError PrepareTaskEnv(std::shared_ptr<TContainer> container,
+                          std::shared_ptr<TTaskEnv> taskEnv) override {
+        taskEnv->BindMap = BindMap;
+        return TError::Success();
     }
 };
 
 class TNetProperty : public TListValue {
+    TNetCfg NetCfg;
+
 public:
     TNetProperty() :
         TListValue(P_NET,
@@ -726,14 +808,109 @@ public:
         return TStrList{ "host" };
     }
 
-    TError SetList(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v,
-                     const TStrList &value) override {
-        TNetCfg net;
-        TError error = ParseNet(c, value, net);
-        if (error)
-            return error;
-        return v->Set(EValueType::List, value);
+    TError ParseList(std::shared_ptr<TContainer> container,
+                     const std::vector<std::string> &lines) override {
+        if (!config().network().enabled())
+            return TError(EError::Unknown, "Network support is disabled");
+
+        bool none = false;
+        NetCfg.Share = false;
+        NetCfg.Host.clear();
+        NetCfg.MacVlan.clear();
+
+        if (lines.size() == 0)
+            return TError(EError::InvalidValue, "Configuration is not specified");
+
+        for (auto &line : lines) {
+            if (none)
+                return TError(EError::InvalidValue,
+                              "none can't be mixed with other types");
+
+            std::vector<std::string> settings;
+
+            TError error = SplitEscapedString(line, ' ', settings);
+            if (error)
+                return error;
+
+            if (settings.size() == 0)
+                return TError(EError::InvalidValue, "Invalid net in: " + line);
+
+            std::string type = StringTrim(settings[0]);
+
+            if (NetCfg.Share)
+                return TError(EError::InvalidValue,
+                              "host can't be mixed with other settings");
+
+            if (type == "none") {
+                none = true;
+            } else if (type == "host") {
+                THostNetCfg hnet;
+
+                if (settings.size() > 2)
+                    return TError(EError::InvalidValue, "Invalid net in: " + line);
+
+                if (settings.size() == 1) {
+                    NetCfg.Share = true;
+                } else {
+                    hnet.Dev = StringTrim(settings[1]);
+
+                    auto link = container->ValidLink(hnet.Dev);
+                    if (!link)
+                        return TError(EError::InvalidValue,
+                                      "Invalid host interface " + hnet.Dev);
+
+                    NetCfg.Host.push_back(hnet);
+                }
+            } else if (type == "macvlan") {
+                if (settings.size() < 3)
+                    return TError(EError::InvalidValue, "Invalid macvlan in: " + line);
+
+                std::string master = StringTrim(settings[1]);
+                std::string name = StringTrim(settings[2]);
+                std::string type = "bridge";
+                std::string hw = "";
+
+                auto link = container->GetLink(master);
+                if (!link)
+                    return TError(EError::InvalidValue,
+                                  "Invalid macvlan master " + master);
+
+                if (settings.size() > 3) {
+                    type = StringTrim(settings[3]);
+                    if (!TNlLink::ValidMacVlanType(type))
+                        return TError(EError::InvalidValue,
+                                      "Invalid macvlan type " + type);
+                }
+                if (settings.size() > 4) {
+                    hw = StringTrim(settings[4]);
+                    if (!TNlLink::ValidMacAddr(hw))
+                        return TError(EError::InvalidValue,
+                                      "Invalid macvlan address " + hw);
+                }
+
+                int idx = link->FindIndex(master);
+                if (idx < 0)
+                    return TError(EError::InvalidValue, "Interface " + master + " doesn't exist or not in running state");
+
+                TMacVlanNetCfg mvlan;
+                mvlan.Master = master;
+                mvlan.Name = name;
+                mvlan.Type = type;
+                mvlan.Hw = hw;
+
+                NetCfg.MacVlan.push_back(mvlan);
+            } else {
+                return TError(EError::InvalidValue, "Configuration is not specified");
+            }
+        }
+
+        return TError::Success();
+    }
+
+    TError PrepareTaskEnv(std::shared_ptr<TContainer> container,
+                          std::shared_ptr<TTaskEnv> taskEnv) override {
+        taskEnv->NetCfg = NetCfg;
+        return TError::Success();
     }
 };
 
@@ -809,195 +986,4 @@ TError RegisterProperties() {
     };
 
     return propertySet.Register(properties);
-}
-
-TError ParseRlimit(const std::vector<std::string> &limits, std::map<int,struct rlimit> &rlim) {
-    static const std::map<std::string,int> nameToIdx = {
-        { "as", RLIMIT_AS },
-        { "core", RLIMIT_CORE },
-        { "cpu", RLIMIT_CPU },
-        { "data", RLIMIT_DATA },
-        { "fsize", RLIMIT_FSIZE },
-        { "locks", RLIMIT_LOCKS },
-        { "memlock", RLIMIT_MEMLOCK },
-        { "msgqueue", RLIMIT_MSGQUEUE },
-        { "nice", RLIMIT_NICE },
-        { "nofile", RLIMIT_NOFILE },
-        { "nproc", RLIMIT_NPROC },
-        { "rss", RLIMIT_RSS },
-        { "rtprio", RLIMIT_RTPRIO },
-        { "rttime", RLIMIT_RTTIME },
-        { "sigpending", RLIMIT_SIGPENDING },
-        { "stask", RLIMIT_STACK },
-    };
-
-    for (auto &limit : limits) {
-        std::vector<std::string> nameval;
-
-        (void)SplitString(limit, ':', nameval);
-        if (nameval.size() != 2)
-            return TError(EError::InvalidValue, "Invalid limits format");
-
-        std::string name = StringTrim(nameval[0]);
-        if (nameToIdx.find(name) == nameToIdx.end())
-            return TError(EError::InvalidValue, "Invalid limit " + name);
-        int idx = nameToIdx.at(name);
-
-        std::vector<std::string> softhard;
-        (void)SplitString(StringTrim(nameval[1]), ' ', softhard);
-        if (softhard.size() != 2)
-            return TError(EError::InvalidValue, "Invalid limits number for " + name);
-
-        rlim_t soft, hard;
-        if (softhard[0] == "unlim" || softhard[0] == "unliminted") {
-            soft = RLIM_INFINITY;
-        } else {
-            TError error = StringToUint64(softhard[0], soft);
-            if (error)
-                return TError(EError::InvalidValue, "Invalid soft limit for " + name);
-        }
-
-        if (softhard[1] == "unlim" || softhard[1] == "unliminted") {
-            hard = RLIM_INFINITY;
-        } else {
-            TError error = StringToUint64(softhard[1], hard);
-            if (error)
-                return TError(EError::InvalidValue, "Invalid hard limit for " + name);
-        }
-
-        rlim[idx].rlim_cur = soft;
-        rlim[idx].rlim_max = hard;
-    }
-
-    return TError::Success();
-}
-
-TError ParseBind(const std::vector<std::string> &lines, std::vector<TBindMap> &dirs) {
-    for (auto &line : lines) {
-        std::vector<std::string> tok;
-        TBindMap bindMap;
-
-        TError error = SplitEscapedString(line, ' ', tok);
-        if (error)
-            return error;
-
-        if (tok.size() != 2 && tok.size() != 3)
-            return TError(EError::InvalidValue, "Invalid bind in: " + line);
-
-        bindMap.Source = tok[0];
-        bindMap.Dest = tok[1];
-        bindMap.Rdonly = false;
-
-        if (tok.size() == 3) {
-            if (tok[2] == "ro")
-                bindMap.Rdonly = true;
-            else if (tok[2] == "rw")
-                bindMap.Rdonly = false;
-            else
-                return TError(EError::InvalidValue, "Invalid bind type in: " + line);
-        }
-
-        if (!bindMap.Source.Exists())
-            return TError(EError::InvalidValue, "Source bind " + bindMap.Source.ToString() + " doesn't exist");
-
-        dirs.push_back(bindMap);
-    }
-
-    return TError::Success();
-}
-
-TError ParseNet(std::shared_ptr<const TContainer> container, const std::vector<std::string> &lines, TNetCfg &net) {
-    if (!config().network().enabled())
-        return TError(EError::Unknown, "Network support is disabled");
-
-    bool none = false;
-    net.Share = false;
-
-    if (lines.size() == 0)
-        return TError(EError::InvalidValue, "Configuration is not specified");
-
-    for (auto &line : lines) {
-        if (none)
-            return TError(EError::InvalidValue,
-                          "none can't be mixed with other types");
-
-        std::vector<std::string> settings;
-
-        TError error = SplitEscapedString(line, ' ', settings);
-        if (error)
-            return error;
-
-        if (settings.size() == 0)
-            return TError(EError::InvalidValue, "Invalid net in: " + line);
-
-        std::string type = StringTrim(settings[0]);
-
-        if (net.Share)
-            return TError(EError::InvalidValue,
-                          "host can't be mixed with other settings");
-
-        if (type == "none") {
-            none = true;
-        } else if (type == "host") {
-            THostNetCfg hnet;
-
-            if (settings.size() > 2)
-                return TError(EError::InvalidValue, "Invalid net in: " + line);
-
-            if (settings.size() == 1) {
-                net.Share = true;
-            } else {
-                hnet.Dev = StringTrim(settings[1]);
-
-                auto link = container->ValidLink(hnet.Dev);
-                if (!link)
-                    return TError(EError::InvalidValue,
-                                  "Invalid host interface " + hnet.Dev);
-
-                net.Host.push_back(hnet);
-            }
-        } else if (type == "macvlan") {
-            if (settings.size() < 3)
-                return TError(EError::InvalidValue, "Invalid macvlan in: " + line);
-
-            std::string master = StringTrim(settings[1]);
-            std::string name = StringTrim(settings[2]);
-            std::string type = "bridge";
-            std::string hw = "";
-
-            auto link = container->GetLink(master);
-            if (!link)
-                return TError(EError::InvalidValue,
-                              "Invalid macvlan master " + master);
-
-            if (settings.size() > 3) {
-                type = StringTrim(settings[3]);
-                if (!TNlLink::ValidMacVlanType(type))
-                    return TError(EError::InvalidValue,
-                                  "Invalid macvlan type " + type);
-            }
-            if (settings.size() > 4) {
-                hw = StringTrim(settings[4]);
-                if (!TNlLink::ValidMacAddr(hw))
-                    return TError(EError::InvalidValue,
-                                  "Invalid macvlan address " + hw);
-            }
-
-            int idx = link->FindIndex(master);
-            if (idx < 0)
-                return TError(EError::InvalidValue, "Interface " + master + " doesn't exist or not in running state");
-
-            TMacVlanNetCfg mvlan;
-            mvlan.Master = master;
-            mvlan.Name = name;
-            mvlan.Type = type;
-            mvlan.Hw = hw;
-
-            net.MacVlan.push_back(mvlan);
-        } else {
-            return TError(EError::InvalidValue, "Configuration is not specified");
-        }
-    }
-
-    return TError::Success();
 }

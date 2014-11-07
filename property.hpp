@@ -46,6 +46,7 @@ constexpr const char *P_ALLOWED_DEVICES = "allowed_devices";
 
 class TBindMap;
 class TNetCfg;
+class TTaskEnv;
 
 // Property is not shown in the property list
 const unsigned int SUPERUSER_PROPERTY = (1 << 0);
@@ -110,7 +111,6 @@ public:
     bool IsDefault(const std::string &property);
     bool ParentDefault(std::shared_ptr<TContainer> &c,
                        const std::string &property);
-    std::string GetDefault(const std::string &property);
 
     bool HasFlags(const std::string &property, int flags);
     bool HasState(const std::string &property, EContainerState state);
@@ -118,14 +118,13 @@ public:
     TError Create();
     TError Restore(const kv::TNode &node);
     TError Valid(const std::string &property);
+
+    TError PrepareTaskEnv(const std::string &property,
+                          std::shared_ptr<TTaskEnv> taskEnv);
 };
 
 #undef SYNTHESIZE_ACCESSOR
 
 TError RegisterProperties();
-
-TError ParseRlimit(const std::vector<std::string> &limits, std::map<int,struct rlimit> &rlim);
-TError ParseBind(const std::vector<std::string> &s, std::vector<TBindMap> &dirs);
-TError ParseNet(std::shared_ptr<const TContainer> container, const std::vector<std::string> &s, TNetCfg &net);
 
 #endif

@@ -12,6 +12,7 @@
 
 class TContainer;
 enum class EContainerState;
+class TTaskEnv;
 
 enum class EValueType {
     String,
@@ -84,10 +85,18 @@ typedef std::vector<std::string> TStrList;
 virtual TYPE GetDefault ## NAME(std::shared_ptr<TContainer> c) { \
     return TYPE{}; \
 } \
+virtual TError Parse ## NAME(std::shared_ptr<TContainer> c,\
+                             const TYPE &value) { \
+    ExpectType(EValueType::NAME); \
+    return TError::Success(); \
+} \
 virtual TError Set ## NAME(std::shared_ptr<TContainer> c, \
                            std::shared_ptr<TVariant> v, \
                            const TYPE &value) { \
     ExpectType(EValueType::NAME); \
+    TError error = Parse ## NAME(c, value); \
+    if (error) \
+        return error; \
     return v->Set(EValueType::NAME, value); \
 } \
 virtual TYPE Get ## NAME(std::shared_ptr<TContainer> c, \
@@ -127,12 +136,20 @@ public:
                              const std::string &value) = 0;
     virtual std::string GetString(std::shared_ptr<TContainer> c,
                                   std::shared_ptr<TVariant> v) = 0;
+    virtual TError ParseString(std::shared_ptr<TContainer> c,
+                               const std::string &value) {
+        return TError::Success();
+    }
+    virtual TError ParseDefault(std::shared_ptr<TContainer> c) = 0;
 
     DEFINE_TVALUE(Bool, bool)
     DEFINE_TVALUE(Int, int)
     DEFINE_TVALUE(Uint, uint64_t)
     DEFINE_TVALUE(Map, TUintMap)
     DEFINE_TVALUE(List, TStrList)
+
+    virtual TError PrepareTaskEnv(std::shared_ptr<TContainer> container,
+                                  std::shared_ptr<TTaskEnv> taskEnv);
 };
 
 #undef DEFINE_TVALUE
@@ -151,7 +168,7 @@ public: \
                      std::shared_ptr<TVariant> v, \
                      const std::string &value); \
     std::string GetString(std::shared_ptr<TContainer> c, \
-                                     std::shared_ptr<TVariant> v); \
+                          std::shared_ptr<TVariant> v); \
     bool IsDefault(std::shared_ptr<TContainer> c, \
                    std::shared_ptr<TVariant> v) { \
         if (!NeedDefault()) \
@@ -159,6 +176,9 @@ public: \
         if (!v->HasValue()) \
             return true; \
         return v->Get<TYPE>(EValueType::NAME) == GetDefault ## NAME(c); \
+    } \
+    virtual TError ParseDefault(std::shared_ptr<TContainer> c) { \
+        return Parse ## NAME(c, GetDefault ## NAME (c)); \
     } \
 }
 
