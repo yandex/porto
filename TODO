@@ -1,4 +1,3 @@
-- change default net_guarantee to 0
 - ? add python bindings to the package
 - make ParseRlimit, ParseBind, ParseNet part of property class
 - test restarting (check version)
@@ -22,7 +21,6 @@
 - ? portoctl inpect to export everything in JSON
 
 # phase 3
-- ? write dom0 hostname into come file on container or pass via ENV
 ## disk
 - ? readonly_root
 ## other

@@ -11,8 +11,9 @@ const int REAP_EVT_FD = 128;
 const int REAP_ACK_FD = 129;
 
 const uint32_t DEF_CLASS_PRIO = 50;
-const uint32_t DEF_CLASS_RATE = -1;
-const uint32_t DEF_CLASS_CEIL = -1;
+const uint32_t DEF_CLASS_MAX_RATE = -1;
+const uint32_t DEF_CLASS_RATE = 10 * 1000 * 1000 / 8 /* 10Mbit */;
+const uint32_t DEF_CLASS_CEIL = DEF_CLASS_MAX_RATE;
 const uint32_t DEF_CLASS_NET_PRIO = 3;
 
 const std::string SYSFS_CGROOT = "/sys/fs/cgroup";

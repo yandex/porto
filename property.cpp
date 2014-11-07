@@ -494,7 +494,7 @@ public:
 };
 
 class TNetMapValue : public TMapValue {
-    uint64_t Def;
+    uint64_t Def, RootDef;
 protected:
     TError CheckNetMap(const TUintMap &m,
                        std::shared_ptr<TContainer> c) {
@@ -514,15 +514,18 @@ protected:
 public:
     TNetMapValue(const std::string &name,
                  const std::string &desc,
-                 const uint64_t def) :
+                 const uint64_t def,
+                 const uint64_t rootDef) :
         TMapValue(name, desc,
                   PARENT_RO_PROPERTY,
-                  staticProperty), Def(def) {}
+                  staticProperty), Def(def), RootDef(rootDef) {}
 
     TUintMap GetDefaultMap(std::shared_ptr<TContainer> c) override {
+        uint64_t def =  c->IsRoot() ? RootDef : Def;
+
         TUintMap m;
         for (auto &link : c->Links)
-            m[link->GetName()] = Def;
+            m[link->GetName()] = def;
         return m;
     }
 
@@ -546,7 +549,7 @@ public:
     TNetGuaranteeProperty() :
         TNetMapValue(P_NET_GUARANTEE,
                      "Guaranteed container network bandwidth",
-                     DEF_CLASS_RATE) {}
+                     DEF_CLASS_RATE, DEF_CLASS_MAX_RATE) {}
 };
 
 class TNetCeilProperty : public TNetMapValue {
@@ -554,7 +557,7 @@ public:
     TNetCeilProperty() :
         TNetMapValue(P_NET_CEIL,
                      "Maximum container network bandwidth",
-                     DEF_CLASS_CEIL) {}
+                     DEF_CLASS_CEIL, DEF_CLASS_MAX_RATE) {}
 };
 
 class TNetPriorityProperty : public TNetMapValue {
@@ -562,7 +565,7 @@ public:
     TNetPriorityProperty() :
         TNetMapValue(P_NET_PRIO,
                   "Container network priority: 0-7",
-                  DEF_CLASS_NET_PRIO) {}
+                  DEF_CLASS_NET_PRIO, DEF_CLASS_NET_PRIO) {}
 
     TError SetMap(std::shared_ptr<TContainer> c,
                   std::shared_ptr<TVariant> v,
