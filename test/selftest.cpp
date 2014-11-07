@@ -120,6 +120,8 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
 static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     string v;
 
+    ExpectFailure(api.GetData(name, "__invalid_data__", v), EError::InvalidData);
+
     ExpectSuccess(api.GetData(name, "state", v));
     Expect(v == string("stopped"));
     ExpectFailure(api.GetData(name, "exit_status", v), EError::InvalidState);

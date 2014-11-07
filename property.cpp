@@ -23,16 +23,20 @@ bool TPropertySet::IsDefault(const std::string &property) {
 }
 
 bool TPropertySet::HasFlags(const std::string &property, int flags) {
-    // TODO: Log error
-    if (!propertySet.Valid(property))
+    if (!propertySet.Valid(property)) {
+        TError error(EError::Unknown, "Invalid property " + property);
+        TLogger::LogError(error, "Can't test property flags");
         return false;
+    }
 
     return propertySet.Get(property)->Flags & flags;
 }
 bool TPropertySet::HasState(const std::string &property, EContainerState state) {
-    // TODO: Log error
-    if (!propertySet.Valid(property))
+    if (!propertySet.Valid(property)) {
+        TError error(EError::Unknown, "Invalid property " + property);
+        TLogger::LogError(error, "Can't test property state");
         return false;
+    }
     auto p = propertySet.Get(property);
 
     return p->State.find(state) != p->State.end();

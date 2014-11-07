@@ -904,9 +904,8 @@ TError TContainer::GetData(const string &origName, string &value) {
     std::string idx;
     ParseName(name, idx);
 
-    // TODO: InvalidData
     if (!dataSet.Valid(name))
-        return TError(EError::InvalidValue, "invalid container data");
+        return TError(EError::InvalidData, "invalid container data");
 
     auto d = dataSet.Get(name);
     if (d->State.find(GetState()) == d->State.end())
