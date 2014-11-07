@@ -438,7 +438,7 @@ void TTask::ChildApplyLimits() {
 }
 
 void TTask::ChildSetHostname() {
-    if (Env->Hostname == "")
+    if (Env->Hostname == "" || Env->Root.ToString() == "/")
         return;
 
     TFile f(Env->Root + "/etc/hostname");
