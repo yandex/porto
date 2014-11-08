@@ -1008,6 +1008,42 @@ static map<string, string> ParseMountinfo(string s) {
     return m;
 }
 
+static void TestRootRdOnlyProperty(TPortoAPI &api) {
+    string name = "a";
+    TPath path(config().container().tmp_dir() + "/" + name);
+    string ROnly;
+    string ret;
+
+    Say() << "Check root read only property" << std::endl;
+    ExpectSuccess(api.Create(name));
+
+    ExpectSuccess(api.GetProperty(name, "root_readonly", ROnly));
+    Expect(ROnly == "false");
+
+    ExpectSuccess(api.SetProperty(name, "root", path.ToString()));
+    AsRoot(api);
+    BootstrapCommand("/usr/bin/touch", path.ToString());
+    path.Chown("nobody", "nogroup");
+    AsNobody(api);
+
+    ExpectSuccess(api.SetProperty(name, "command", "/touch test"));
+    ExpectSuccess(api.Start(name));
+    WaitState(api, name, "dead");
+    ExpectSuccess(api.GetData(name, "exit_status", ret));
+    Expect(ret == string("0"));
+    ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.SetProperty(name, "root_readonly", "true"));
+    ExpectSuccess(api.SetProperty(name, "command", "/touch test2"));
+    ExpectSuccess(api.Start(name));
+    WaitState(api, name, "dead");
+    ExpectSuccess(api.GetData(name, "exit_status", ret));
+    Expect(ret != string("0"));
+    ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.Destroy(name));
+};
+
 static void TestRootProperty(TPortoAPI &api) {
     string pid;
 
@@ -2577,6 +2613,7 @@ int SelfTest(string name, int leakNr) {
         { "cwd", TestCwd },
         { "std", TestStd },
         { "root_property", TestRootProperty },
+        { "root_readonly", TestRootRdOnlyProperty },
         { "hostname_property", TestHostnameProperty },
         { "bind_property", TestBindProperty },
         { "net_property", TestNetProperty },

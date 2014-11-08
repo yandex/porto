@@ -363,6 +363,13 @@ TError TTask::ChildIsolateFs(bool priveleged) {
             return error;
     }
 
+    if (Env->RootRdOnly == true) {
+        TMount root(Env->Root, Env->Root, "none", {});
+        TError error = root.Mount(MS_BIND | MS_REMOUNT | MS_RDONLY);
+        if (error)
+            return error;
+    }
+ 
     error = Env->Root.Chdir();
     if (error)
         return error;
