@@ -27,36 +27,3 @@ TODO - fix SELinux:  Could not open policy file <= /etc/selinux/targeted/policy/
 # Profile
 ~stfomichev/perf record -e cycles:u -g -- portod
 ~stfomichev/perf report --stdio
-
-# Next release notes
-* Phase 3 beta release which contains support for LXC-like isolation
-
-* New features:
- - Multiple networks support: network data and properties are now per-device
- - New privilege mode: only root can create and start containers with custom user/group
- - New allowed_devices property
- - New net property to isolate container network and create macvlans
- - New bind property to bind host directories into container
- - New max_respawns property to limit total number of container respawns
- - New python api with OOP
- - New root property to isolate container filesystem
- - New hostname property to change container hostname and isolate UTS
- - New bind_dns property which binds host /etc/hosts and /etc/resolv.conf into container
- - New io_read/io_write data which container per device IO statistics
- - Set PORTO_HOST environment variable which contains host name
- - Set PORTO_NAME environment variable which contains container name
- - New meta containers as a way to limit resources for children containers
-
-* Fixes:
- - Don't depend on system libnl version, build and use our own
- - Containers basedir is removed upon portod startup (when no containers restored)
- - Default number of clients changed to 128
- - Fix libporto crash on long protobuf messages
- - Start() error message is now returned via API (not via syslog)
- - Don't add container cwd to $PATH
- - Minor/major_faults now include children
- - Default net_guarantee is changed to 10Mbit
- - IPC is now isolated when isolate property is true
- - Cpu_priority property is now dynamic
- - Portoctl: don't add extra newline for get
- - Fix libporto hang when client doesn't have permissions to connect to socket

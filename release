@@ -7,7 +7,9 @@ if [ $# -eq 0 ]; then
 	exit 1
 fi
 
-dch -i
+changelog_modified() { test "$(git diff --name-only debian/changelog)" = "debian/changelog"; }
+
+changelog_modified || dch -i
 version=v$(head -n1 debian/changelog | sed -e 's/[^(]*(\([^)]*\).*/\1/')
 git commit -am "debian: release $version"
 git tag -a $version -m "$*"
