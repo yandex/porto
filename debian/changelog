@@ -1,3 +1,9 @@
+yandex-porto (0.14) precise; urgency=low
+
+  * Fix package upgrade
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 10 Nov 2014 22:18:00 +0400
+
 yandex-porto (0.13) precise; urgency=low
 
   * Fix invalid task cgroups upon recovery
