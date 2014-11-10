@@ -379,8 +379,8 @@ void AsUser(TPortoAPI &api, TUser &user, TGroup &group) {
 void AsRoot(TPortoAPI &api) {
     api.Cleanup();
 
-    seteuid(0);
-    setegid(0);
+    Expect(seteuid(0) == 0);
+    Expect(setegid(0) == 0);
 }
 
 void AsNobody(TPortoAPI &api) {
