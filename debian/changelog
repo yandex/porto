@@ -1,3 +1,9 @@
+yandex-porto (0.11) precise; urgency=low
+
+  * added new package python-portopy (python API for porto)
+
+ -- Stas Ivanichkin <sivanichkin@yandex-team.ru>  Mon, 10 Nov 2014 14:17:07 +0300
+
 yandex-porto (0.10) precise; urgency=low
 
   * Add ulimit property

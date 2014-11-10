@@ -15,3 +15,13 @@ Pre-Depends: yandex-search-group-porto
 Depends: ${shlibs:Depends}, logrotate, linux-image-server (>= 3.4.0) | linux-image-generic (>= 3.4.0)
 Description: Component of Nirvana
  Porto allows to run process in namespace with cgroup.
+
+Package: python-portopy
+Section: utils
+Priority: extra
+Architecture: all
+Depends: python (>= 2.6), python-central, python-protobuf, yandex-porto
+XS-Python-Version: >= 2.6
+XB-Python-Version: >= 2.6
+Description: Python API for porto
+ Porto allows to run process in namespace with cgroup.
