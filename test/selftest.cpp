@@ -1647,6 +1647,7 @@ static void TestRoot(TPortoAPI &api) {
         "bind",
         "net",
         "allowed_devices",
+        "root_readonly",
     };
 
     std::vector<TProperty> plist;
