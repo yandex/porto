@@ -1,3 +1,9 @@
+yandex-porto (0.16) precise; urgency=low
+
+  * Another attempt to fix package upgrade :-(
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 10 Nov 2014 23:13:00 +0400
+
 yandex-porto (0.15) precise; urgency=low
 
   * Fix package upgrade spelling
