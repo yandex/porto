@@ -480,6 +480,7 @@ TError TContainer::PrepareTask() {
     taskEnv->Command = Prop->GetString(P_COMMAND);
     taskEnv->Cwd = Prop->GetString(P_CWD);
     taskEnv->Root = Prop->GetString(P_ROOT);
+    taskEnv->RootRdOnly = Prop->GetBool(P_ROOT_RDONLY);
     taskEnv->CreateCwd = Prop->IsDefault(P_ROOT) && Prop->IsDefault(P_CWD) && !UseParentNamespace();
     taskEnv->User = Prop->GetString(P_USER);
     taskEnv->Group = Prop->GetString(P_GROUP);

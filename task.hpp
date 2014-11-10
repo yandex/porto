@@ -57,6 +57,7 @@ public:
     TPath Cwd;
     bool CreateCwd;
     TPath Root;
+    bool RootRdOnly;
     std::string User;
     std::string Group;
     std::vector<std::string> Environ;

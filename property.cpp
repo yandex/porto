@@ -265,6 +265,19 @@ public:
     }
 };
 
+class TRootRdOnlyProperty : public TBoolValue {
+public:
+    TRootRdOnlyProperty() :
+        TBoolValue(P_ROOT_RDONLY,
+                     "Mount root directory in read-only mode",
+                     0,
+                     staticProperty) {}
+
+    bool GetDefaultBool(std::shared_ptr<TContainer> c) override {
+        return false;
+    }
+};
+
 class TCwdProperty : public TStringValue {
 public:
     TCwdProperty() :
@@ -959,6 +972,7 @@ TError RegisterProperties() {
         new TGroupProperty,
         new TEnvProperty,
         new TRootProperty,
+        new TRootRdOnlyProperty,
         new TCwdProperty,
         new TStdinPathProperty,
         new TStdoutPathProperty,
