@@ -1,0 +1,3 @@
+usr/sbin/portoctl usr/sbin
+usr/sbin/portod usr/sbin
+usr/sbin/portotest usr/sbin
