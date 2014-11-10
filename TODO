@@ -1,5 +1,4 @@
 - test restarting (check version)
-- ? add python bindings to the package
 - ? move property apply code into property method
 
 # properties
@@ -18,8 +17,6 @@
 - ? portoctl inspect to export everything in JSON
 
 # phase 3
-## disk
-- ? readonly_root
 ## other
 - ? when to enable user namespace
 ## net
