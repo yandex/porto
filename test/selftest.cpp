@@ -28,6 +28,9 @@ using std::pair;
 
 namespace test {
 
+static int expectedErrors;
+static int expectedRespawns;
+
 static vector<string> subsystems = { "freezer", "memory", "cpu", "cpuacct", "devices" };
 static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"uts" };
 
@@ -2487,6 +2490,15 @@ static void TestLeaks(TPortoAPI &api) {
     Expect(now <= prev + slack);
 }
 
+static void KillPorto(TPortoAPI &api, int sig) {
+    int portodPid = ReadPid(config().slave_pid().path());
+    if (kill(portodPid, sig))
+        throw "Can't send " + std::to_string(sig) + " to slave";
+    WaitExit(api, std::to_string(portodPid));
+    WaitPortod(api);
+    expectedRespawns++;
+}
+
 static void TestRecovery(TPortoAPI &api) {
     string pid, v;
     string name = "a:b";
@@ -2511,12 +2523,7 @@ static void TestRecovery(TPortoAPI &api) {
     Expect(TaskRunning(api, pid) == true);
     Expect(TaskZombie(api, pid) == false);
 
-    int portodPid = ReadPid(config().slave_pid().path());
-    if (kill(portodPid, SIGKILL))
-        throw string("Can't send SIGKILL to slave");
-
-    WaitExit(api, std::to_string(portodPid));
-    WaitPortod(api);
+    KillPorto(api, SIGKILL);
 
     ExpectSuccess(api.GetData(name, "state", v));
     Expect(v == "running");
@@ -2544,12 +2551,8 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectSuccess(api.SetProperty(child, "command", "sleep 1000"));
     ExpectSuccess(api.Start(child));
 
-    portodPid = ReadPid(config().slave_pid().path());
     AsRoot(api);
-    if (kill(portodPid, SIGKILL))
-        throw string("Can't send SIGKILL to slave");
-    WaitExit(api, std::to_string(portodPid));
-    WaitPortod(api);
+    KillPorto(api, SIGKILL);
     AsNobody(api);
 
     std::vector<std::string> containers;
@@ -2569,6 +2572,27 @@ static void TestRecovery(TPortoAPI &api) {
     Expect(v == "running");
     ExpectSuccess(api.Destroy(child));
     ExpectSuccess(api.Destroy(parent));
+
+    Say() << "Make sure task is moved to correct cgroup on recovery" << std::endl;
+    ExpectSuccess(api.Create(name));
+
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.Start(name));
+
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+
+    AsRoot(api);
+    TFile f("/sys/fs/cgroup/memory/porto/cgroup.procs");
+    ExpectSuccess(f.AppendString(pid));
+    auto cgmap = GetCgroups(pid);
+    Expect(cgmap["memory"] == "/porto");
+    KillPorto(api, SIGKILL);
+    AsNobody(api);
+    expectedErrors++; // Task belongs to invalid subsystem
+
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    ExpectCorrectCgroups(pid, name);
+    ExpectSuccess(api.Destroy(name));
 }
 
 static void TestCgroups(TPortoAPI &api) {
@@ -2581,17 +2605,7 @@ static void TestCgroups(TPortoAPI &api) {
         Expect(f.Remove() == false);
     Expect(f.Create(0755, true) == false);
 
-    int pid = ReadPid(config().slave_pid().path());
-    if (kill(pid, SIGINT))
-        throw string("Can't send SIGINT to slave");
-
-    WaitPortod(api);
-
-    pid = ReadPid(config().slave_pid().path());
-    if (kill(pid, SIGINT))
-        throw string("Can't send SIGINT to slave");
-
-    WaitPortod(api);
+    KillPorto(api, SIGINT);
 
     Expect(f.Exists() == true);
     Expect(f.Remove() == false);
@@ -2676,7 +2690,7 @@ int SelfTest(string name, int leakNr) {
         if (!needDaemonChecks)
             return EXIT_SUCCESS;
 
-        respawns = WordCount(config().master_log().path(), "Spawned");
+        respawns = WordCount(config().master_log().path(), "Spawned") - 1;
         errors = WordCount(config().slave_log().path(), "Error");
     } catch (string e) {
         std::cerr << "EXCEPTION: " << e << std::endl;
@@ -2684,13 +2698,13 @@ int SelfTest(string name, int leakNr) {
     }
 
     std::cerr << "SUCCESS: All tests successfully passed!" << std::endl;
-    if (WordCount(config().slave_log().path(), "Task belongs to invalid subsystem"))
+    if (WordCount(config().slave_log().path(), "Task belongs to invalid subsystem") != 1)
         std::cerr << "WARNING: Some task belongs to invalid subsystem!" << std::endl;
     if (!CanTestLimits())
         std::cerr << "WARNING: Due to missing kernel support, memory_guarantee/cpu_policy has not been tested!" << std::endl;
-    if (respawns != 1 /* start */ + 2 /* TestRecovery */ + 2 /* TestCgroups */)
+    if (respawns != expectedRespawns)
         std::cerr << "WARNING: Unexpected number of respawns: " << respawns << "!" << std::endl;
-    if (errors != 0)
+    if (errors != expectedErrors)
         std::cerr << "WARNING: Unexpected number of errors: " << errors << "!" << std::endl;
     if (!IsCfqActive())
         std::cerr << "WARNING: CFQ is not enabled for one of your block devices, skipping io_read and io_write tests" << std::endl;

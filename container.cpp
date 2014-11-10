@@ -529,10 +529,7 @@ TError TContainer::PrepareTask() {
     if (error)
         return error;
 
-    vector<shared_ptr<TCgroup>> cgroups;
-    for (auto cg : LeafCgroups)
-        cgroups.push_back(cg.second);
-    Task = unique_ptr<TTask>(new TTask(taskEnv, cgroups));
+    Task = unique_ptr<TTask>(new TTask(taskEnv, LeafCgroups));
     return TError::Success();
 }
 
@@ -1454,8 +1451,10 @@ TError TContainerHolder::Destroy(const string &name) {
 vector<string> TContainerHolder::List() const {
     vector<string> ret;
 
-    for (auto c : Containers)
-        ret.push_back(c.second->GetName());
+    for (auto c : Containers) {
+        PORTO_ASSERT(c.first == c.second->GetName());
+        ret.push_back(c.first);
+    }
 
     return ret;
 }

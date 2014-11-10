@@ -6,6 +6,7 @@
 #include "porto.hpp"
 #include "task.hpp"
 #include "cgroup.hpp"
+#include "subsystem.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
@@ -483,7 +484,7 @@ int TTask::ChildCallback() {
 
     // move to target cgroups
     for (auto cg : LeafCgroups) {
-        auto error = cg->Attach(getpid());
+        auto error = cg.second->Attach(getpid());
         if (error)
             Abort(error, "cgroup attach");
     }
@@ -740,32 +741,37 @@ TError TTask::Restore(int pid_) {
     Pid = pid_;
     State = Started;
 
-    error = ValidateCgroups();
-    TLogger::LogError(error, "Can't validate cgroups");
+    error = FixCgroups();
+    TLogger::LogError(error, "Can't fix cgroups");
 
     return TError::Success();
 }
 
-TError TTask::ValidateCgroups() const {
+TError TTask::FixCgroups() const {
     map<string, string> cgmap;
     TError error = GetTaskCgroups(Pid, cgmap);
     if (error)
         return error;
 
     for (auto pair : cgmap) {
-        auto &subsys = pair.first;
+        auto subsys = TSubsystem::Get(pair.first);
         auto &path = pair.second;
 
-        bool valid = false;
-        for (auto cg : LeafCgroups) {
-            if (cg->Relpath() == path) {
-                valid = true;
-                break;
-            }
+        if (!subsys || LeafCgroups.find(subsys) == LeafCgroups.end()) {
+            error = TError(EError::Unknown, "Task belongs to unknown subsystem " + pair.first);
+            TLogger::LogError(error, "Skip");
+            continue;
         }
 
-        if (!valid)
-            return TError(EError::Unknown, "Task belongs to invalid subsystem " + subsys + ":" + path);
+        auto cg = LeafCgroups.at(subsys);
+        if (cg->Relpath() != path) {
+            error = TError(EError::Unknown, "Task belongs to invalid subsystem " + subsys->GetName() + ":" + path);
+            TLogger::LogError(error, "Fix");
+
+            error = cg->Attach(Pid);
+            if (error)
+            TLogger::LogError(error, "Can't fix");
+        }
     }
 
     return TError::Success();

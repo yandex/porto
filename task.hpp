@@ -81,7 +81,7 @@ class TTask {
     int Rfd, Wfd;
     int WaitParentRfd, WaitParentWfd;
     std::shared_ptr<TTaskEnv> Env;
-    std::vector<std::shared_ptr<TCgroup>> LeafCgroups;
+    std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
 
     enum ETaskState { Stopped, Started } State;
     int ExitStatus;
@@ -111,7 +111,8 @@ class TTask {
     TError IsolateNet(int childPid);
 
 public:
-    TTask(std::shared_ptr<TTaskEnv> env, std::vector<std::shared_ptr<TCgroup>> &leafCgroups) : Env(env), LeafCgroups(leafCgroups) {};
+    TTask(std::shared_ptr<TTaskEnv> env,
+          const std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> &leafCgroups) : Env(env), LeafCgroups(leafCgroups) {};
     TTask(pid_t pid) : Pid(pid) {};
     ~TTask();
 
@@ -129,7 +130,7 @@ public:
     void ChildSetHostname();
     int ChildCallback();
     TError Restore(int pid);
-    TError ValidateCgroups() const;
+    TError FixCgroups() const;
     TError Rotate() const;
 };
 

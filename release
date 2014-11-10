@@ -13,3 +13,4 @@ changelog_modified || dch -i
 version=v$(head -n1 debian/changelog | sed -e 's/[^(]*(\([^)]*\).*/\1/')
 git commit -am "debian: release $version"
 git tag -a $version -m "$*"
+git push --tags
