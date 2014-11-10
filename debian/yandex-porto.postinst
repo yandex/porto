@@ -7,7 +7,7 @@ case "$1" in
     configure)
         chown root:porto /usr/sbin/portoctl || exit 2
     ;;
-    upgrage)
+    upgrade)
 	invoke-rc.d yandex-porto reload || exit $?
     ;;
 esac
