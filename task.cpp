@@ -758,6 +758,9 @@ TError TTask::FixCgroups() const {
         auto &path = pair.second;
 
         if (!subsys || LeafCgroups.find(subsys) == LeafCgroups.end()) {
+            if (pair.first.find(',') != std::string::npos)
+                continue;
+
             error = TError(EError::Unknown, "Task belongs to unknown subsystem " + pair.first);
             TLogger::LogError(error, "Skip");
             continue;

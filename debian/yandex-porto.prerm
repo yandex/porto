@@ -1,8 +1,0 @@
-#!/bin/sh
-
-##DEBHELPER##
-
-if ([ -x "/etc/init.d/yandex-porto" ] || [ -e "/etc/init/yandex-porto.conf" ]) && \
-    [ "$1" = "upgrade" ]; then
-invoke-rc.d yandex-porto reload || exit $?
-fi
