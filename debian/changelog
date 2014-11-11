@@ -1,3 +1,9 @@
+yandex-porto (0.17) precise; urgency=low
+
+  * Fix network sharing when network support is disabled
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 11 Nov 2014 14:30:00 +0400
+
 yandex-porto (0.16) precise; urgency=low
 
   * Another attempt to fix package upgrade :-(
