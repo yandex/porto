@@ -1,3 +1,10 @@
+yandex-porto (0.17ubuntu1) precise; urgency=low
+
+  * added new packege yandex-search-group-porto
+  * added new package yandex-search-porto
+
+ -- Stas Ivanichkin <sivanichkin@yandex-team.ru>  Tue, 11 Nov 2014 22:18:56 +0300
+
 yandex-porto (0.17) precise; urgency=low
 
   * Fix network sharing when network support is disabled
