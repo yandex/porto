@@ -1,3 +1,9 @@
+yandex-porto (0.18) precise; urgency=low
+
+  * fix release version
+
+ -- Stas Ivanichkin <sivanichkin@yandex-team.ru>  Tue, 11 Nov 2014 23:13:06 +0300
+
 yandex-porto (0.17ubuntu1) precise; urgency=low
 
   * added new packege yandex-search-group-porto
