@@ -1432,7 +1432,20 @@ static void TestNetProperty(TPortoAPI &api) {
     Expect(linkMap.find("veth0") != linkMap.end());
     ExpectSuccess(api.Stop(name));
 
+    Say() << "Make sure net=host:veth0 doesn't preserve L3 address" << std::endl;
+    AsRoot(api);
+    Expect(system("ip link add veth0 type veth peer name veth1") == 0);
+    Expect(system("ip addr add dev veth0 1.2.3.4") == 0);
+    AsNobody(api);
+
+    ExpectSuccess(api.SetProperty(name, "command", "ip -o -d addr show dev veth0 to 1.2.3.4"));
+    ExpectSuccess(api.SetProperty(name, "net", "host veth0"));
+    s = StartWaitAndGetData(api, name, "stdout");
+    Expect(s == "");
+    ExpectSuccess(api.Stop(name));
+
     Say() << "Check net=macvlan" << std::endl;
+    ExpectSuccess(api.SetProperty(name, "command", "ip -o -d link show"));
     ExpectFailure(api.SetProperty(name, "net", "macvlan"), EError::InvalidValue);
     ExpectFailure(api.SetProperty(name, "net", "macvlan invalid " + link), EError::InvalidValue);
     ExpectFailure(api.SetProperty(name, "net", "macvlan " + link), EError::InvalidValue);

@@ -1,5 +1,5 @@
-- test restarting (check version)
 - ? move property apply code into property method
+- get property should work in any state
 
 # properties
 - ? capabilities
