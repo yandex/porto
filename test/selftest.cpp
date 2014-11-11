@@ -1365,8 +1365,27 @@ static string System(const std::string &cmd) {
 }
 
 static void TestNetProperty(TPortoAPI &api) {
-    if (!NetworkEnabled())
+    if (!NetworkEnabled()) {
+        Say() << "Make sure network namespace is shared when network disabled" << std::endl;
+
+        string pid;
+
+        string name = "a";
+        ExpectSuccess(api.Create(name));
+
+        Say() << "Spawn long running task" << std::endl;
+        ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+        ExpectSuccess(api.Start(name));
+        ExpectSuccess(api.GetData(name, "root_pid", pid));
+        Expect(TaskRunning(api, pid) == true);
+
+        AsRoot(api);
+        Expect(GetNamespace("self", "net") == GetNamespace(pid, "net"));
+
+        ExpectSuccess(api.Destroy(name));
+
         return;
+    }
 
     string name = "a";
     ExpectSuccess(api.Create(name));

@@ -513,6 +513,10 @@ TError TContainer::PrepareTask() {
         error = Prop->PrepareTaskEnv(P_NET, taskEnv);
         if (error)
             return error;
+    } else {
+        taskEnv->NetCfg.Share = true;
+        taskEnv->NetCfg.Host.clear();
+        taskEnv->NetCfg.MacVlan.clear();
     }
 
     if (UseParentNamespace()) {
