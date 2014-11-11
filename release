@@ -1,17 +1,29 @@
 #!/bin/sh
-
-set -e
-
-if [ $# -eq 0 ]; then
-	echo "Please specify tag message!"
-	exit 1
-fi
+set -xe
 
 changelog_modified() { test "$(git diff --name-only debian/changelog)" = "debian/changelog"; }
 
-changelog_modified || dch -i
-version=v$(head -n1 debian/changelog | sed -e 's/[^(]*(\([^)]*\).*/\1/')
-git commit -am "debian: release $version"
-git tag -a $version -m "$*"
-git push
-git push --tags
+commit() {
+    changelog_modified || dch -i
+    version=v$(head -n1 debian/changelog | sed -e 's/[^(]*(\([^)]*\).*/\1/')
+    git commit -am "debian: release $version"
+    git tag -a $version -m "$version"
+}
+
+push() {
+    git push
+    git push --tags
+}
+
+upload() {
+    debuild
+    debrelease -t search-precise
+}
+
+if [ $# -eq 0 ]; then
+    set commit push upload
+fi
+
+for i in "$@"; do
+    eval $i
+done

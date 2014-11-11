@@ -1,0 +1,15 @@
+package config;
+
+$cfg{'search'} = {
+    fqdn => "search.dist.yandex.ru",
+    method => "scpb",
+    incoming => "/repo/common/mini-dinstall/incoming/",
+    dinstall_runs => 0,
+};
+
+$cfg{'search-precise'} = {
+    fqdn => "search-precise.dist.yandex.ru",
+    method => "scpb",
+    incoming => "/repo/search-precise/mini-dinstall/incoming/",
+    dinstall_runs => 0,
+};
