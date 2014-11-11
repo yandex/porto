@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    purge)
+        groupdel porto
+    ;;
+esac
+
+exit 0

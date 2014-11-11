@@ -1,27 +1,44 @@
 Source: yandex-porto
-Section: utils
-Priority: extra
+#Section: utils
+#Priority: extra
 Maintainer: Eugene Kilimchuk <ekilimchuk@yandex-team.ru>
 Build-Depends: debhelper (>= 8.0.0), bison, flex, pkg-config, autoconf, libtool, protobuf-compiler, libprotobuf-dev, g++-4.7 | g++-4.8
 Standards-Version: 3.9.2
 Homepage: https://wiki.yandex-team.ru/porto
-#Vcs-Git: ssh://git.yandex.ru/search-admin/porto.git
+Vcs-Git: git://git.yandex.ru/search-admin/porto.git
 
 Package: yandex-porto
 Section: utils
 Priority: extra
 Architecture: amd64
-Pre-Depends: yandex-search-group-porto
 Depends: ${shlibs:Depends}, logrotate, linux-image-server (>= 3.4.0) | linux-image-generic (>= 3.4.0)
-Description: Component of Nirvana
- Porto allows to run process in namespace with cgroup.
+Description: Porto allows to run processes in containers
 
 Package: python-portopy
-Section: utils
-Priority: extra
+Section: python
+Priority: optional
 Architecture: all
-Depends: python (>= 2.6), python-central, python-protobuf, yandex-porto
+Depends: python (>= 2.6), python-central, python-protobuf, yandex-porto (= ${binary:Version})
 XS-Python-Version: >= 2.6
 XB-Python-Version: >= 2.6
 Description: Python API for porto
- Porto allows to run process in namespace with cgroup.
+
+Package: yandex-search-porto-config
+Section: misc
+Priority: optional
+Architecture: all
+Description: Runtime config for yandex-porto
+
+Package: yandex-search-group-porto
+Section: misc
+Priority: optional
+Architecture: all
+Description: Package creates porto group
+
+Package: yandex-search-porto
+Section: misc
+Priority: optional
+Architecture: all
+Pre-Depends: yandex-search-group-porto (= ${binary:Version}), yandex-search-porto-config (= ${binary:Version}), yandex-search-user-skynet, yandex-search-user-loadbase
+Depends: yandex-porto (= ${binary:Version}), python-portopy (= ${binary:Version})
+Description: Metapackage for porto
