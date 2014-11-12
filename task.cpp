@@ -313,6 +313,13 @@ TError TTask::ChildMountDev() {
 }
 
 TError TTask::ChildIsolateFs(bool priveleged) {
+    if (Env->Loop.Exists()) {
+        TLoopMount m(Env->Loop, Env->Root, "ext4");
+        TError error = m.Mount();
+        if (error)
+            return error;
+    }
+
     if (Env->Root.ToString() != "/") {
         TMount root(Env->Root, Env->Root, "none", {});
         TError error = root.BindDir(false);
@@ -461,6 +468,19 @@ void TTask::ChildSetHostname() {
         Abort(errno, "sethostname()");
 }
 
+TError TTask::ChildPrepareLoop() {
+    if (Env->Loop.Exists()) {
+        TFolder f(Env->Root);
+        if (!f.Exists()) {
+            TError error = f.Create(0755, true);
+            if (error)
+                return error;
+        }
+    }
+
+    return TError::Success();
+}
+
 int TTask::ChildCallback() {
     int ret;
     if (read(WaitParentRfd, &ret, sizeof(ret)) != sizeof(ret))
@@ -491,9 +511,13 @@ int TTask::ChildCallback() {
 
     bool priveleged = Env->Gid == 0 || Env->Uid == 0;
 
+    TError error = ChildPrepareLoop();
+    if (error)
+        Abort(error);
+
     ChildReopenStdio();
 
-    TError error = ChildIsolateFs(priveleged);
+    error = ChildIsolateFs(priveleged);
     if (error)
         Abort(error);
 

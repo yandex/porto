@@ -102,6 +102,10 @@ bool TContainer::HaveRunningChildren() {
     return false;
 }
 
+std::string TContainer::GetTmpDir() const {
+    return config().container().tmp_dir() + "/" + std::to_string(Id);
+}
+
 EContainerState TContainer::GetState() {
     static bool rec = false;
 
@@ -478,7 +482,15 @@ TError TContainer::PrepareTask() {
 
     taskEnv->Command = Prop->GetString(P_COMMAND);
     taskEnv->Cwd = Prop->GetString(P_CWD);
-    taskEnv->Root = Prop->GetString(P_ROOT);
+
+    TPath root(Prop->GetString(P_ROOT));
+    if (root.GetType() == EFileType::Directory) {
+        taskEnv->Root = Prop->GetString(P_ROOT);
+    } else {
+        taskEnv->Root = GetTmpDir();
+        taskEnv->Loop = Prop->GetString(P_ROOT);
+    }
+
     taskEnv->RootRdOnly = Prop->GetBool(P_ROOT_RDONLY);
     taskEnv->CreateCwd = Prop->IsDefault(P_ROOT) && Prop->IsDefault(P_CWD) && !UseParentNamespace();
     taskEnv->User = Prop->GetString(P_USER);

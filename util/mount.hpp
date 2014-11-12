@@ -69,4 +69,15 @@ public:
     TError RemountSlave();
 };
 
+class TLoopMount {
+    TPath Source, Target;
+    std::string Type;
+    std::string LoopDev = "";
+    TError FindDev();
+public:
+    TLoopMount(const TPath &source, const TPath &target, const std::string &type) : Source(source), Target(target), Type(type) {}
+    TError Mount();
+    TError Umount();
+};
+
 #endif

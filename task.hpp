@@ -71,6 +71,7 @@ public:
     bool BindDns;
     std::vector<TBindMap> BindMap;
     TNetCfg NetCfg;
+    TPath Loop;
 
     TError Prepare();
     const char** GetEnvp() const;
@@ -128,6 +129,7 @@ public:
 
     void ChildApplyLimits();
     void ChildSetHostname();
+    TError ChildPrepareLoop();
     int ChildCallback();
     TError Restore(int pid);
     TError FixCgroups() const;

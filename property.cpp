@@ -125,8 +125,14 @@ static std::string DefaultStdFile(std::shared_ptr<TContainer> c,
     if (c->UseParentNamespace())
         prefix = c->GetName(false) + ".";
 
-    TPath path = root;
-    path.AddComponent(cwd);
+    TPath path;
+    if (path.GetType() == EFileType::Directory) {
+        path = root;
+        path.AddComponent(cwd);
+    } else {
+        path = c->GetTmpDir();
+    }
+
     path.AddComponent(prefix + name);
     return path.ToString();
 }

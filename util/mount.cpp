@@ -11,6 +11,12 @@ extern "C" {
 #include <sys/mount.h>
 #include <stdio.h>
 #include <mntent.h>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/fcntl.h>
+#include <linux/loop.h>
+#include <unistd.h>
 }
 
 using std::string;
@@ -140,4 +146,55 @@ TError TMountSnapshot::RemountSlave() {
     }
 
     return TError::Success();
+}
+
+TError TLoopMount::FindDev() {
+    int cfd = open("/dev/loop-control", O_RDWR);
+    if (cfd < 0)
+        return TError(EError::Unknown, errno, "open(/dev/loop-control)");
+
+    TScopedFd fd;
+    fd = ioctl(cfd, LOOP_CTL_GET_FREE);
+    if (fd.GetFd() < 0)
+        return TError(EError::Unknown, errno, "ioctl(LOOP_CTL_GET_FREE)");
+
+    LoopDev = "/dev/loop" + std::to_string(fd.GetFd());
+
+    return TError::Success();
+}
+
+TError TLoopMount::Mount() {
+    TError error = FindDev();
+    if (error)
+        return error;
+
+    TScopedFd ffd, dfd;
+    ffd = open(Source.ToString().c_str(), O_RDWR);
+    if (ffd.GetFd() < 0)
+        return TError(EError::Unknown, errno, "open(" + Source.ToString() + ")");
+
+    dfd = open(LoopDev.c_str(), O_RDWR);
+    if (dfd.GetFd() < 0)
+        return TError(EError::Unknown, errno, "open(" + LoopDev + ")");
+
+    if (ioctl(dfd.GetFd(), LOOP_SET_FD, ffd.GetFd()) < 0)
+        return TError(EError::Unknown, errno, "ioctl(LOOP_SET_FD)");
+
+    TMount m(LoopDev, Target, Type, {});
+    return m.Mount();
+}
+
+TError TLoopMount::Umount() {
+    TMount m(LoopDev, Target, Type, {});
+    TError error = m.Umount();
+    if (error)
+        return error;
+
+    TScopedFd fd;
+    fd = open(LoopDev.c_str(), O_RDWR);
+    if (ioctl(fd.GetFd(), LOOP_CLR_FD, 0) < 0)
+        return TError(EError::Unknown, errno, "ioctl(LOOP_CLR_FD)");
+
+    TFolder f(Target);
+    return f.Remove(true);
 }

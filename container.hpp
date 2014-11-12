@@ -116,6 +116,7 @@ public:
     std::shared_ptr<TVariantSet> Data;
     std::vector<std::shared_ptr<TNlLink>> Links;
 
+    std::string GetTmpDir() const;
     EContainerState GetState();
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) { return Tclass->GetStat(stat, m); }
 
@@ -124,6 +125,7 @@ public:
     ~TContainer();
 
     const std::string GetName(bool recursive = true) const;
+    const uint16_t GetId() const { return Id; }
 
     bool IsRoot() const;
     std::shared_ptr<const TContainer> GetRoot() const;

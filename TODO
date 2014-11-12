@@ -1,5 +1,5 @@
+- ? do periodic persistence checks
 - ? move property apply code into property method
-- get property should work in any state
 
 # properties
 - ? capabilities
@@ -15,6 +15,13 @@
 - add namespaces
 - ? get rid of globals/static which have class types (http://google-styleguide.googlecode.com/svn/trunk/cppguide.html#Static_and_Global_Variables)
 - ? portoctl inspect to export everything in JSON
+
+# phase 4
+##
+- ro+rw images for container distribution
+- ? some tool to convert docker registry images to porto
+## net
+- L3 configuration via properties (ip/mask/broarcast/routes)
 
 # phase 3
 ## other
@@ -39,3 +46,4 @@
 - different log levels (error, normal, verbose)
 - use some kind of reference count for accounting running children
 - ? remove start_errno data
+- add some kind of event queue and use it to rotate logs and respawn containers
