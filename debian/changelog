@@ -1,3 +1,9 @@
+yandex-porto (0.19) precise; urgency=low
+
+  * Fix recovery
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Wed, 12 Nov 2014 19:23:00 +0400
+
 yandex-porto (0.18) precise; urgency=low
 
   * fix release version
