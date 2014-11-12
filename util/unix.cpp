@@ -194,7 +194,7 @@ bool FdHasEvent(int fd) {
     pfd.fd = fd;
     pfd.events = POLLIN;
 
-    int ret = poll(&pfd, 1, 0);
+    (void)poll(&pfd, 1, 0);
     return pfd.revents != 0;
 }
 
