@@ -1,6 +1,7 @@
 #include <sstream>
 
 #include "value.hpp"
+#include "container.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
 
@@ -205,6 +206,15 @@ TError TValueSet::Register(const std::vector<TValue *> &v) {
     return TError::Success();
 }
 
+std::string TValueSet::Overlap(TValueSet &other) {
+    for (auto &a : Value)
+        for (auto &b : other.Value)
+            if (a.first == b.first)
+                return a.first;
+
+    return "";
+}
+
 bool TValueSet::Valid(const std::string &name) {
     return Value.find(name) != Value.end();
 }
@@ -219,6 +229,64 @@ std::vector<std::string> TValueSet::GetNames() {
         v.push_back(kv.first);
     return v;
 }
+
+TVariantSet::~TVariantSet() {
+    if (!IsRoot()) {
+        TError error = Storage->RemoveNode(Name);
+        TLogger::LogError(error, "Can't remove key-value node " + Name);
+    }
+}
+
+bool TVariantSet::IsRoot() {
+    return Name == ROOT_CONTAINER;
+}
+
+TVariantSet::TVariantSet(std::shared_ptr<TKeyValueStorage> storage,
+                         TValueSet *v, std::shared_ptr<TContainer> c) :
+    Storage(storage), ValueSet(v), Container(c), Name(c->GetName()) {
+}
+
+TError TVariantSet::Create() {
+    kv::TNode node;
+    return Storage->SaveNode(Name, node);
+}
+
+TError TVariantSet::AppendStorage(const std::string& key, const std::string& value) {
+    if (IsRoot())
+        return TError::Success();
+
+    kv::TNode node;
+
+    auto pair = node.add_pairs();
+    pair->set_key(key);
+    pair->set_val(value);
+
+    return Storage->AppendNode(Name, node);
+}
+
+TError TVariantSet::Restore(const kv::TNode &node) {
+    for (int i = 0; i < node.pairs_size(); i++) {
+        auto key = node.pairs(i).key();
+        auto value = node.pairs(i).val();
+
+        if (!ValueSet->Valid(key))
+            continue;
+
+        TValue *v = ValueSet->Get(key);
+        if (!(v->Flags & PERSISTENT_VALUE))
+            continue;
+
+        if (config().log().verbose())
+            TLogger::Log() << "Restoring " << key << " = " << value << std::endl;
+
+        TError error = SetString(key, value);
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
+}
+
 
 TError TVariantSet::Get(const std::string &name,
                         std::shared_ptr<TContainer> &c, TValue **p,
@@ -262,4 +330,52 @@ bool TVariantSet::IsDefault(const std::string &name) {
     }
 
     return p->IsDefault(c, v);
+}
+
+bool TVariantSet::HasValue(const std::string &name) {
+    if (Variant.find(name) == Variant.end())
+        return false;
+
+    TValue *p = nullptr;
+    std::shared_ptr<TContainer> c;
+    std::shared_ptr<TVariant> v;
+    TError error = Get(name, c, &p, v);
+    if (error) {
+        TLogger::LogError(error, "Can't check whether " + name + " has value");
+        return false;
+    }
+
+    return v->HasValue();
+}
+
+TError TVariantSet::Flush() {
+    kv::TNode node;
+    return Storage->SaveNode(Name, node);
+}
+
+TError TVariantSet::Sync() {
+    if (IsRoot())
+        return TError::Success();
+
+    kv::TNode node;
+
+    for (auto &keyval : Variant) {
+        std::string name = keyval.first;
+
+        TValue *v = ValueSet->Get(name);
+        if (!(v->Flags & PERSISTENT_VALUE))
+            continue;
+
+        if (IsDefault(name))
+            continue;
+
+        auto pair = node.add_pairs();
+        pair->set_key(name);
+        pair->set_val(GetString(name));
+
+        if (config().log().verbose())
+            TLogger::Log() << "Sync " << name << " = " << GetString(name) << std::endl;
+    }
+
+    return Storage->AppendNode(Name, node);
 }

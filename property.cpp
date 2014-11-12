@@ -42,32 +42,30 @@ bool TPropertySet::HasState(const std::string &property, EContainerState state) 
     return p->State.find(state) != p->State.end();
 }
 
-bool TPropertySet::IsRoot() {
-    return Name == ROOT_CONTAINER;
-}
-
-TError TPropertySet::Create() {
-    kv::TNode node;
-    return Storage.SaveNode(Name, node);
-}
-
-TError TPropertySet::Restore(const kv::TNode &node) {
-    for (int i = 0; i < node.pairs_size(); i++) {
-        auto key = node.pairs(i).key();
-        auto value = node.pairs(i).val();
-
-        TError error = SetString(key, value);
-        if (error)
-            return error;
-    }
-
-    return SyncStorage();
-}
-
 TError TPropertySet::Valid(const std::string &property) {
     if (!propertySet.Valid(property))
         return TError(EError::InvalidProperty, "invalid property");
     return TError::Success();
+}
+
+TError TPropertySet::Create() {
+    return VariantSet.Create();
+}
+
+TError TPropertySet::Restore(const kv::TNode &node) {
+    return VariantSet.Restore(node);
+}
+
+bool TPropertySet::HasValue(const std::string &name) {
+    return VariantSet.HasValue(name);
+}
+
+TError TPropertySet::Flush() {
+    return VariantSet.Flush();
+}
+
+TError TPropertySet::Sync() {
+    return VariantSet.Sync();
 }
 
 TError TPropertySet::PrepareTaskEnv(const std::string &property,
@@ -89,47 +87,12 @@ TError TPropertySet::PrepareTaskEnv(const std::string &property,
     return p->PrepareTaskEnv(c, taskEnv);
 }
 
-TPropertySet::~TPropertySet() {
-    if (!IsRoot()) {
-        TError error = Storage.RemoveNode(Name);
-        TLogger::LogError(error, "Can't remove key-value node " + Name);
-    }
-}
-
-TError TPropertySet::SyncStorage() {
-    if (IsRoot())
-        return TError::Success();
-
-    kv::TNode node;
-
-    for (auto &name : VariantSet.List()) {
-        auto pair = node.add_pairs();
-        pair->set_key(name);
-        pair->set_val(VariantSet.GetString(name));
-    }
-
-    return Storage.SaveNode(Name, node);
-}
-
 TError TPropertySet::GetSharedContainer(std::shared_ptr<TContainer> &c) {
     c = Container.lock();
     if (!c)
         return TError(EError::Unknown, "Can't convert weak container reference");
 
     return TError::Success();
-}
-
-TError TPropertySet::AppendStorage(const std::string& key, const std::string& value) {
-    if (IsRoot())
-        return TError::Success();
-
-    kv::TNode node;
-
-    auto pair = node.add_pairs();
-    pair->set_key(key);
-    pair->set_val(value);
-
-    return Storage.AppendNode(Name, node);
 }
 
 static TError ValidPath(std::shared_ptr<TContainer> c, const std::string &str) {
@@ -184,7 +147,7 @@ public:
     TCommandProperty() :
         TStringValue(P_COMMAND,
                      "Command executed upon container start",
-                     0,
+                     PERSISTENT_VALUE,
                      staticProperty) {}
 };
 
@@ -193,23 +156,19 @@ public:
     TUserProperty() :
         TStringValue(P_USER,
                      "Start command with given user",
-                     SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY,
+                     NODEF_VALUE | SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY | PERSISTENT_VALUE,
                      staticProperty) {}
 
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
-        int uid, gid;
-        c->GetPerm(uid, gid);
-        TUser u(uid);
-        if (u.Load())
-            return std::to_string(uid);
-        else
-            return u.GetName();
-    }
-
-    TError ParseString(std::shared_ptr<TContainer> container,
+    TError ParseString(std::shared_ptr<TContainer> c,
                        const std::string &value) override {
         TUser u(value);
-        return u.Load();
+        TError error = u.Load();
+        if (error)
+            return error;
+
+        c->Uid = u.GetId();
+
+        return TError::Success();
     }
 };
 
@@ -218,23 +177,19 @@ public:
     TGroupProperty() :
         TStringValue(P_GROUP,
                      "Start command with given group",
-                     SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY,
+                     NODEF_VALUE | SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY | PERSISTENT_VALUE,
                      staticProperty) {}
-
-    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
-        int uid, gid;
-        c->GetPerm(uid, gid);
-        TGroup g(gid);
-        if (g.Load())
-            return std::to_string(gid);
-        else
-            return g.GetName();
-    }
 
     TError ParseString(std::shared_ptr<TContainer> c,
                        const std::string &value) override {
         TGroup g(value);
-        return g.Load();
+        TError error = g.Load();
+        if (error)
+            return error;
+
+        c->Gid = g.GetId();
+
+        return TError::Success();
     }
 };
 
@@ -243,7 +198,7 @@ public:
     TEnvProperty() :
         TListValue(P_ENV,
                    "Container environment variables",
-                   PARENT_DEF_PROPERTY,
+                   PARENT_DEF_PROPERTY | PERSISTENT_VALUE,
                    staticProperty) {}
 };
 
@@ -252,7 +207,7 @@ public:
     TRootProperty() :
         TStringValue(P_ROOT,
                      "Container root directory",
-                     PARENT_DEF_PROPERTY,
+                     PARENT_DEF_PROPERTY | PERSISTENT_VALUE,
                      staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
@@ -269,9 +224,9 @@ class TRootRdOnlyProperty : public TBoolValue {
 public:
     TRootRdOnlyProperty() :
         TBoolValue(P_ROOT_RDONLY,
-                     "Mount root directory in read-only mode",
-                     0,
-                     staticProperty) {}
+                   "Mount root directory in read-only mode",
+                   PERSISTENT_VALUE,
+                   staticProperty) {}
 
     bool GetDefaultBool(std::shared_ptr<TContainer> c) override {
         return false;
@@ -283,7 +238,7 @@ public:
     TCwdProperty() :
         TStringValue(P_CWD,
                      "Container working directory",
-                     PARENT_DEF_PROPERTY,
+                     PARENT_DEF_PROPERTY | PERSISTENT_VALUE,
                      staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
@@ -304,7 +259,7 @@ public:
     TStdinPathProperty() :
         TStringValue(P_STDIN_PATH,
                      "Container standard input path",
-                     0,
+                     PERSISTENT_VALUE,
                      staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
@@ -322,7 +277,7 @@ public:
     TStdoutPathProperty() :
         TStringValue(P_STDOUT_PATH,
                      "Container standard input path",
-                     0,
+                     PERSISTENT_VALUE,
                      staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
@@ -340,7 +295,7 @@ public:
     TStderrPathProperty() :
         TStringValue(P_STDERR_PATH,
                      "Container standard error path",
-                     0,
+                     PERSISTENT_VALUE,
                      staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
@@ -358,7 +313,7 @@ public:
     TStdoutLimitProperty() :
         TUintValue(P_STDOUT_LIMIT,
                    "Return no more than given number of bytes from standard output/error",
-                   0,
+                   PERSISTENT_VALUE,
                    staticProperty) {}
 
     uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) override {
@@ -383,7 +338,7 @@ public:
     TMemoryGuaranteeProperty() :
         TUintValue(P_MEM_GUARANTEE,
                    "Guaranteed amount of memory",
-                   PARENT_RO_PROPERTY,
+                   PARENT_RO_PROPERTY | PERSISTENT_VALUE,
                    dynamicProperty) {}
 
     TError ParseUint(std::shared_ptr<TContainer> c,
@@ -410,7 +365,7 @@ public:
     TMemoryLimitProperty() :
         TUintValue(P_MEM_LIMIT,
                    "Memory hard limit",
-                   0,
+                   PERSISTENT_VALUE,
                    dynamicProperty) {}
 
     TError ParseUint(std::shared_ptr<TContainer> c,
@@ -427,7 +382,7 @@ public:
     TRechargeOnPgfaultProperty() :
         TBoolValue(P_RECHARGE_ON_PGFAULT,
                    "Recharge memory on page fault",
-                   PARENT_RO_PROPERTY,
+                   PARENT_RO_PROPERTY | PERSISTENT_VALUE,
                    dynamicProperty) {}
 
     bool GetDefaultBool(std::shared_ptr<TContainer> c) override {
@@ -449,7 +404,7 @@ public:
     TCpuPolicyProperty() :
         TStringValue(P_CPU_POLICY,
                      "CPU policy: rt, normal, idle",
-                     PARENT_RO_PROPERTY,
+                     PARENT_RO_PROPERTY | PERSISTENT_VALUE,
                      dynamicProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
@@ -479,7 +434,7 @@ public:
     TCpuPriorityProperty() :
         TUintValue(P_CPU_PRIO,
                    "CPU priority: 0-99",
-                   PARENT_RO_PROPERTY,
+                   PARENT_RO_PROPERTY | PERSISTENT_VALUE,
                    dynamicProperty) {}
 
     uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) override {
@@ -594,7 +549,7 @@ public:
     TRespawnProperty() :
         TBoolValue(P_RESPAWN,
                    "Automatically respawn dead container",
-                   0,
+                   PERSISTENT_VALUE,
                    staticProperty) {}
 
     bool GetDefaultBool(std::shared_ptr<TContainer> c) override {
@@ -607,7 +562,7 @@ public:
     TMaxRespawnsProperty() :
         TIntValue(P_MAX_RESPAWNS,
                   "Limit respawn count for specific container",
-                  0,
+                  PERSISTENT_VALUE,
                   staticProperty) {}
 
     int GetDefaultInt(std::shared_ptr<TContainer> c) override {
@@ -620,7 +575,7 @@ public:
     TIsolateProperty() :
         TBoolValue(P_ISOLATE,
                    "Isolate container from parent",
-                   0,
+                   PERSISTENT_VALUE,
                    staticProperty) {}
 
     bool GetDefaultBool(std::shared_ptr<TContainer> c) override {
@@ -633,7 +588,7 @@ public:
     TPrivateProperty() :
         TStringValue(P_PRIVATE,
                      "User-defined property",
-                     0,
+                     PERSISTENT_VALUE,
                      dynamicProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
@@ -658,7 +613,7 @@ public:
     TUlimitProperty() :
         TListValue(P_ULIMIT,
                    "Container resource limits",
-                   PARENT_DEF_PROPERTY,
+                   PARENT_DEF_PROPERTY | PERSISTENT_VALUE,
                    staticProperty) {}
 
     TError ParseList(std::shared_ptr<TContainer> container,
@@ -737,7 +692,7 @@ public:
     THostnameProperty() :
         TStringValue(P_HOSTNAME,
                      "Container hostname",
-                     0,
+                     PERSISTENT_VALUE,
                      staticProperty) {}
 };
 
@@ -746,7 +701,7 @@ public:
     TBindDnsProperty() :
         TBoolValue(P_BIND_DNS,
                    "Bind /etc/resolv.conf and /etc/hosts of host to container",
-                   0,
+                   PERSISTENT_VALUE,
                    staticProperty) {}
 
     bool GetDefaultBool(std::shared_ptr<TContainer> c) override {
@@ -764,7 +719,7 @@ public:
     TBindProperty() :
         TListValue(P_BIND,
                    "Share host directories with container",
-                   0,
+                   PERSISTENT_VALUE,
                    staticProperty) {}
 
     TError ParseList(std::shared_ptr<TContainer> container,
@@ -818,7 +773,7 @@ public:
     TNetProperty() :
         TListValue(P_NET,
                    "Container network settings",
-                   0,
+                   PERSISTENT_VALUE,
                    staticProperty) {}
 
     TStrList GetDefaultList(std::shared_ptr<TContainer> c) override {
@@ -936,7 +891,7 @@ public:
     TAllowedDevicesProperty() :
         TListValue(P_ALLOWED_DEVICES,
                    "Devices that container can create/read/write",
-                   0,
+                   PERSISTENT_VALUE,
                    staticProperty) {}
 
     TStrList GetDefaultList(std::shared_ptr<TContainer> c) override {
@@ -944,24 +899,14 @@ public:
     }
 };
 
-class TUidProperty : public TIntValue {
-public:
-    TUidProperty() : TIntValue(P_RAW_UID, "", HIDDEN_VALUE, {}) {}
-};
-
-class TGidProperty : public TIntValue {
-public:
-    TGidProperty() : TIntValue(P_RAW_GID, "", HIDDEN_VALUE, {}) {}
-};
-
 class TIdProperty : public TIntValue {
 public:
-    TIdProperty() : TIntValue(P_RAW_ID, "", HIDDEN_VALUE, {}) {}
+    TIdProperty() : TIntValue(P_RAW_ID, "", HIDDEN_VALUE | PERSISTENT_VALUE, {}) {}
 };
 
 class TRootPidProperty : public TIntValue {
 public:
-    TRootPidProperty() : TIntValue(P_RAW_ROOT_PID, "", HIDDEN_VALUE, {}) {}
+    TRootPidProperty() : TIntValue(P_RAW_ROOT_PID, "", HIDDEN_VALUE | PERSISTENT_VALUE, {}) {}
 };
 
 TValueSet propertySet;
@@ -997,8 +942,6 @@ TError RegisterProperties() {
         new TNetProperty,
         new TAllowedDevicesProperty,
 
-        new TUidProperty,
-        new TGidProperty,
         new TIdProperty,
         new TRootPidProperty,
     };

@@ -705,44 +705,49 @@ std::string TTask::GetStderr(size_t limit) const {
 
 TError TTask::Restore(int pid_) {
     ExitStatus = 0;
+    Pid = pid_;
+    State = Started;
 
-    // There are to possibilities here:
+    bool running = kill(Pid, 0) == 0;
+
+    // There are several possibilities here:
     // 1. We died and loop reaped container, so it will deliver
     // exit_status later;
     // 2. In previous session we died right after we reaped exit_status
-    // but didn't change persistent store.
+    // but didn't save it to persistent store.
+    // 3. We died in consistent dead state.
+    // 4. We died in consistent stopped state.
     //
     // Thus, we need to be in Started state so we can possibly receive
     // exit_status from (1); if it was really case (2) we will indicate
     // error when user tries to get task state in Reap() from waitpit().
     //
+    // For 3/4 case we rely on the saved state.
+    //
     // Moreover, if task didn't die, but we are restoring, it can go
     // away under us any time, so don't fail if we can't recover
     // something.
 
-    TPath stdinLink("/proc/" + std::to_string(pid_) + "/fd/0");
-    TError error = stdinLink.ReadLink(Env->StdinPath);
-    if (error)
-        Env->StdinPath = "";
-    TLogger::LogError(error, "Restore stdin");
+    Env->StdinPath = "";
+    Env->StdoutPath = Env->Cwd + "/stdout";
+    Env->StderrPath = Env->Cwd + "/stderr";
 
-    TPath stdoutLink("/proc/" + std::to_string(pid_) + "/fd/1");
-    error = stdoutLink.ReadLink(Env->StdoutPath);
-    if (error)
-        Env->StdoutPath = Env->Cwd + "/stdout";
-    TLogger::LogError(error, "Restore stdout");
+    if (running) {
+        TPath stdinLink("/proc/" + std::to_string(Pid) + "/fd/0");
+        TError error = stdinLink.ReadLink(Env->StdinPath);
+        TLogger::LogError(error, "Restore stdin");
 
-    TPath stderrLink("/proc/" + std::to_string(pid_) + "/fd/2");
-    error = stderrLink.ReadLink(Env->StderrPath);
-    if (error)
-        Env->StderrPath = Env->Cwd + "/stderr";
-    TLogger::LogError(error, "Restore stderr");
+        TPath stdoutLink("/proc/" + std::to_string(Pid) + "/fd/1");
+        error = stdoutLink.ReadLink(Env->StdoutPath);
+        TLogger::LogError(error, "Restore stdout");
 
-    Pid = pid_;
-    State = Started;
+        TPath stderrLink("/proc/" + std::to_string(Pid) + "/fd/2");
+        error = stderrLink.ReadLink(Env->StderrPath);
+        TLogger::LogError(error, "Restore stderr");
 
-    error = FixCgroups();
-    TLogger::LogError(error, "Can't fix cgroups");
+        error = FixCgroups();
+        TLogger::LogError(error, "Can't fix cgroups");
+    }
 
     return TError::Success();
 }

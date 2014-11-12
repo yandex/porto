@@ -28,14 +28,13 @@ enum class ETclassStat;
 extern int64_t BootTime;
 
 enum class EContainerState {
+    Unknown,
     Stopped,
     Dead,
     Running,
     Paused,
     Meta
 };
-
-std::string ContainerStateName(EContainerState state);
 
 struct TDataSpec {
     std::string Description;
@@ -46,7 +45,6 @@ struct TDataSpec {
 
 enum class EContainerEventType {
     Exit,
-    OOM,
 };
 
 class TContainerEvent {
@@ -58,11 +56,6 @@ public:
         int Status;
     } Exit;
 
-    struct {
-        int Fd;
-    } Oom;
-
-    TContainerEvent(int fd) : Type(EContainerEventType::OOM) { Oom.Fd = fd; }
     TContainerEvent(int pid, int status) : Type(EContainerEventType::Exit) { Exit.Pid = pid; Exit.Status = status; }
 
     std::string GetMsg() const;
@@ -76,19 +69,20 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     std::shared_ptr<TTclass> Tclass, DefaultTclass;
     std::shared_ptr<TFilter> Filter;
     std::vector<std::weak_ptr<TContainer>> Children;
-    EContainerState State;
+    std::shared_ptr<TKeyValueStorage> Storage;
+    EContainerState State = EContainerState::Unknown;
     bool MaybeReturnedOk = false;
     size_t TimeOfDeath = 0;
     uint16_t Id;
     int TaskStartErrno = -1;
     TScopedFd Efd;
-    int Uid, Gid;
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
 
     // data
     bool HaveRunningChildren();
     void SetState(EContainerState newState);
+    std::string ContainerStateName(EContainerState state);
 
     TError ApplyDynamicProperties();
     TError PrepareNetwork();
@@ -109,11 +103,13 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     TError AliasToProperty(std::string &property, std::string &value);
 
     bool DeliverExitStatus(int pid, int status);
-    bool DeliverOom(int fd);
 
     void ParseName(std::string &name, std::string &idx) const;
+    TError Prepare();
 
 public:
+    int Uid, Gid;
+
     // TODO: make private
     std::unique_ptr<TTask> Task;
     std::shared_ptr<TPropertySet> Prop;
@@ -124,7 +120,7 @@ public:
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) { return Tclass->GetStat(stat, m); }
 
     TContainer(const std::string &name, std::shared_ptr<TContainer> parent, uint16_t id, const std::vector<std::shared_ptr<TNlLink>> &links) :
-        Name(StripParentName(name)), Parent(parent), State(EContainerState::Stopped), Id(id), Links(links) { }
+        Name(StripParentName(name)), Parent(parent), Id(id), Links(links) { }
     ~TContainer();
 
     const std::string GetName(bool recursive = true) const;
@@ -157,8 +153,6 @@ public:
     bool CanRemoveDead() const;
     bool HasChildren() const;
     uint16_t GetId() { return Id; }
-    int GetOomFd() { return Efd.GetFd(); }
-    void GetPerm(int &uid, int &gid) const { uid = Uid; gid = Gid; }
     std::shared_ptr<TContainer> FindRunningParent() const;
     bool UseParentNamespace() const;
     bool DeliverEvent(const TContainerEvent &event);
@@ -190,7 +184,6 @@ public:
 
     std::vector<std::string> List() const;
     void Heartbeat();
-    void PushOomFds(std::vector<int> &fds);
 
     bool DeliverEvent(const TContainerEvent &event);
 };

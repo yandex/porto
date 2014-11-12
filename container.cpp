@@ -56,7 +56,21 @@ static int64_t GetBootTime() {
 
 int64_t BootTime = 0;
 
-std::string ContainerStateName(EContainerState state) {
+// TContainerEvent
+
+std::string TContainerEvent::GetMsg() const {
+    switch (Type) {
+        case EContainerEventType::Exit:
+            return "exit status " + std::to_string(Exit.Status)
+                + " for pid " + std::to_string(Exit.Pid);
+        default:
+            return "unknown event";
+    }
+}
+
+// TContainer
+
+std::string TContainer::ContainerStateName(EContainerState state) {
     switch (state) {
     case EContainerState::Stopped:
         return "stopped";
@@ -72,22 +86,6 @@ std::string ContainerStateName(EContainerState state) {
         return "unknown";
     }
 }
-
-// TContainerEvent
-
-std::string TContainerEvent::GetMsg() const {
-    switch (Type) {
-        case EContainerEventType::Exit:
-            return "exit status " + std::to_string(Exit.Status)
-                + " for pid " + std::to_string(Exit.Pid);
-        case EContainerEventType::OOM:
-            return "oom for fd " + std::to_string(Oom.Fd);
-        default:
-            return "unknown event";
-    }
-}
-
-// TContainer
 
 bool TContainer::HaveRunningChildren() {
     for (auto iter : Children)
@@ -112,7 +110,7 @@ EContainerState TContainer::GetState() {
 
     rec = true;
 
-    if (State == EContainerState::Running && (!Task || !Task->IsRunning()))
+    if (State == EContainerState::Running && (!Task || Processes().empty()))
         SetState(EContainerState::Stopped);
 
     // TODO: use some kind of reference count for accounting running children
@@ -132,6 +130,7 @@ void TContainer::SetState(EContainerState newState) {
 
     TLogger::Log() << GetName() << ": change state " << ContainerStateName(State) << " -> " << ContainerStateName(newState) << std::endl;
     State = newState;
+    Data->SetString(D_STATE, ContainerStateName(State));
 }
 
 const string TContainer::StripParentName(const string &name) const {
@@ -538,40 +537,31 @@ TError TContainer::PrepareTask() {
 }
 
 TError TContainer::Create(int uid, int gid) {
-    TLogger::Log() << "Create " << GetName() << " " << Id << std::endl;
+    TLogger::Log() << "Create " << GetName() << " " << Id << " " << uid << " " << gid << std::endl;
 
-    Uid = uid;
-    Gid = gid;
+    TError error = Prepare();
+    if (error) {
+        TLogger::LogError(error, "Can't prepare container");
+        return error;
+    }
 
-    Prop = std::make_shared<TPropertySet>(shared_from_this());
-    Data = std::make_shared<TVariantSet>(&dataSet, shared_from_this());
-
-    TError error = Prop->Create();
+    TUser u(uid);
+    if (u.Load())
+        error = Prop->SetString(P_USER, std::to_string(uid));
+    else
+        error = Prop->SetString(P_USER, u.GetName());
     if (error)
         return error;
 
-    if (Uid >= 0) {
-        TUser u(Uid);
-        error = u.Load();
-        if (error)
-            return error;
-    }
-
-    if (Gid >= 0) {
-        TGroup g(Gid);
-        error = g.Load();
-        if (error)
-            return error;
-    }
+    TGroup g(gid);
+    if (g.Load())
+        error = Prop->SetString(P_GROUP, std::to_string(gid));
+    else
+        error = Prop->SetString(P_GROUP, g.GetName());
+    if (error)
+        return error;
 
     error = Data->SetInt(D_START_ERRNO, -1);
-    if (error)
-        return error;
-
-    error = Prop->SetInt(P_RAW_UID, Uid);
-    if (error)
-        return error;
-    error = Prop->SetInt(P_RAW_GID, Gid);
     if (error)
         return error;
 
@@ -620,6 +610,8 @@ TError TContainer::Create(int uid, int gid) {
             return error;
         }
     }
+
+    SetState(EContainerState::Stopped);
 
     return TError::Success();
 }
@@ -1080,43 +1072,86 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
     return error;
 }
 
+TError TContainer::Prepare() {
+    Storage = std::make_shared<TKeyValueStorage>();
+    if (!Storage)
+        throw std::bad_alloc();
+
+    Prop = std::make_shared<TPropertySet>(Storage, shared_from_this());
+    Data = std::make_shared<TVariantSet>(Storage, &dataSet, shared_from_this());
+    if (!Prop || !Data)
+        throw std::bad_alloc();
+
+    TError error = Prop->Create();
+    if (error)
+        return error;
+
+    return Data->Create();
+}
+
 TError TContainer::Restore(const kv::TNode &node) {
     TLogger::Log() << "Restore " << GetName() << " " << Id << std::endl;
 
-    Prop = std::make_shared<TPropertySet>(shared_from_this());
-    Data = std::make_shared<TVariantSet>(&dataSet, shared_from_this());
-
-    TError error = Prop->Restore(node);
-    if (error) {
-        TLogger::LogError(error, "Can't restore task's properties");
+    TError error = Prepare();
+    if (error)
         return error;
-    }
 
-    bool started = true;
-    int pid = Prop->GetInt(P_RAW_ROOT_PID);
-    if (pid == 0)
-        started = false;
+    error = Prop->Restore(node);
+    if (error)
+        return error;
 
-    TLogger::Log() << GetName() << ": restore process " << std::to_string(pid) << " which " << (started ? "started" : "didn't start") << std::endl;
+    error = Data->Restore(node);
+    if (error)
+        return error;
 
-    Uid = Prop->GetInt(P_RAW_UID);
-    Gid = Prop->GetInt(P_RAW_GID);
+    error = Prop->Flush();
+    if (error)
+        return error;
 
-    SetState(EContainerState::Stopped);
+    error = Data->Flush();
+    if (error)
+        return error;
 
-    if (Parent)
-        Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
+    error = Prop->Sync();
+    if (error)
+        return error;
 
+    error = Data->Sync();
+    if (error)
+        return error;
+
+    // There are several points where we save value to the persistent store
+    // which we may use as indication for events like:
+    // - Container create failed
+    // - Container create succeed
+    // - Container start failed
+    // - Container start succeed
+    //
+    // -> Create
+    // { SET user, group
+    // } SET state -> stopped
+    //
+    // -> Start
+    // { SET respawn_count, oom_killed, start_errno
+    // } SET state -> running
+
+    bool created = Data->HasValue(D_STATE);
+    if (!created)
+        return TError(EError::Unknown, "Container has not been created");
+
+    bool started = Prop->HasValue(P_RAW_ROOT_PID);
     if (started) {
+        int pid = Prop->GetInt(P_RAW_ROOT_PID);
+
+        TLogger::Log() << GetName() << ": restore started container " << pid << std::endl;
+
         TError error = PrepareResources();
         if (error)
             return error;
 
         error = PrepareTask();
-        if (error) {
-            TLogger::LogError(error, "Can't prepare task");
+        if (error)
             return error;
-        }
 
         error = Task->Restore(pid);
         if (error) {
@@ -1126,30 +1161,37 @@ TError TContainer::Restore(const kv::TNode &node) {
             if (cg->Exists())
                 (void)KillAll();
 
-            TLogger::LogError(error, "Can't restore task");
             return error;
         }
 
-        SetState(Task->IsRunning() ?
-                 EContainerState::Running : EContainerState::Stopped);
+        auto state = Data->GetString(D_STATE);
+        if (state == ContainerStateName(EContainerState::Dead))
+            SetState(EContainerState::Dead);
+        else
+            SetState(EContainerState::Running);
+
         if (GetState() == EContainerState::Running)
             MaybeReturnedOk = true;
     } else {
+        TLogger::Log() << GetName() << ": restore created container " << std::endl;
+
+        // we didn't report to user that we started container,
+        // make sure nobody is running
+
         auto cg = GetLeafCgroup(freezerSubsystem);
-        if (!Processes().empty()) {
-            // we started container but died before saving root_pid,
-            // state may be inconsistent so restart task
 
-            if (cg->Exists())
-                (void)KillAll();
-            return Start();
-        } else {
-            // if we didn't start container, make sure nobody is running
+        if (cg->Exists())
+            (void)KillAll();
 
-            if (cg->Exists())
-                (void)KillAll();
-        }
+        auto state = Data->GetString(D_STATE);
+        if (state == ContainerStateName(EContainerState::Dead))
+            SetState(EContainerState::Dead);
+        else
+            SetState(EContainerState::Stopped);
     }
+
+    if (Parent)
+        Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
 
     return TError::Success();
 }
@@ -1170,7 +1212,7 @@ std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys
 }
 
 bool TContainer::DeliverExitStatus(int pid, int status) {
-    if (GetState() != EContainerState::Running || !Task)
+    if (!Task)
         return false;
 
     if (Task->GetPid() != pid)
@@ -1180,8 +1222,20 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
     TLogger::Log() << "Delivered " << status << " to " << GetName() << " with root_pid " << Task->GetPid() << std::endl;
     SetState(EContainerState::Dead);
 
-    if (!Prop->GetBool(P_ISOLATE))
-        (void)KillAll();
+    if (FdHasEvent(Efd.GetFd())) {
+        TLogger::Log() << Task->GetPid() << " killed by OOM" << std::endl;
+
+        TError error = Data->SetBool(D_OOM_KILLED, true);
+        TLogger::LogError(error, "Can't set " + D_OOM_KILLED);
+
+        error = KillAll();
+        TLogger::LogError(error, "Can't kill all tasks in container");
+    }
+
+    if (!Prop->GetBool(P_ISOLATE)) {
+        TError error = KillAll();
+        TLogger::LogError(error, "Can't kill all tasks in container");
+    }
 
     if (NeedRespawn()) {
         TError error = Respawn();
@@ -1245,38 +1299,10 @@ bool TContainer::HasChildren() const {
     return shared_from_this().use_count() > 2;
 }
 
-bool TContainer::DeliverOom(int fd) {
-    auto state = GetState();
-    if (!(state == EContainerState::Running ||
-          state == EContainerState::Dead))
-        return false;
-
-    if (Efd.GetFd() != fd)
-        return false;
-
-    int pid = Task->GetPid();
-    TLogger::Log() << "Delivered OOM to " << GetName() << " with root_pid " << pid << std::endl;
-
-    TError error = KillAll();
-    TLogger::LogError(error, "Can't kill all tasks in container");
-
-    AckExitStatus(pid);
-    Task->DeliverExitStatus(SIGKILL);
-    SetState(EContainerState::Dead);
-
-    StopChildren();
-    error = Data->SetBool(D_OOM_KILLED, true);
-    TLogger::LogError(error, "Can't indicate whether container is killed by OOM");
-    Efd = -1;
-    return true;
-}
-
 bool TContainer::DeliverEvent(const TContainerEvent &event) {
     switch (event.Type) {
         case EContainerEventType::Exit:
             return DeliverExitStatus(event.Exit.Pid, event.Exit.Status);
-        case EContainerEventType::OOM:
-            return DeliverOom(event.Oom.Fd);
         default:
             return false;
     }
@@ -1326,9 +1352,15 @@ TError TContainerHolder::CreateRoot() {
     if (error)
         return error;
 
+    // we are using single kvalue store for both properties and data
+    // so make sure names don't clash
+    std::string overlap = propertySet.Overlap(dataSet);
+    if (overlap.length())
+        return TError(EError::Unknown, "Data and property names conflict: " + overlap);
+
     BootTime = GetBootTime();
 
-    error = Create(ROOT_CONTAINER, -1, -1);
+    error = Create(ROOT_CONTAINER, 0, 0);
     if (error)
         return error;
 
@@ -1422,17 +1454,15 @@ shared_ptr<TContainer> TContainerHolder::Get(const string &name) {
 
 TError TContainerHolder::CheckPermission(shared_ptr<TContainer> container,
                                          int uid, int gid) {
-    int containerUid, containerGid;
-
     if (uid == 0 || gid == 0)
         return TError::Success();
 
-    container->GetPerm(containerUid, containerGid);
-
-    if (containerUid < 0 || containerGid < 0)
+    // for root we report more meaningful errors from handlers, so don't
+    // check permissions here
+    if (container->IsRoot())
         return TError::Success();
 
-    if (containerUid == uid || containerGid == gid)
+    if (container->Uid == uid || container->Gid == gid)
         return TError::Success();
 
     return TError(EError::Permission, "Permission error");
@@ -1507,8 +1537,10 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
 
     auto c = std::make_shared<TContainer>(name, parent, id, Links);
     error = c->Restore(node);
-    if (error)
+    if (error) {
+        TLogger::LogError(error, "Can't restore container " + name);
         return error;
+    }
 
     Containers[name] = c;
     return TError::Success();
@@ -1527,17 +1559,6 @@ void TContainerHolder::Heartbeat() {
             c->Heartbeat();
             ++i;
         }
-    }
-}
-
-void TContainerHolder::PushOomFds(vector<int> &fds) {
-    for (auto c : Containers) {
-        int fd = c.second->GetOomFd();
-
-        if (fd < 0)
-            continue;
-
-        fds.push_back(fd);
     }
 }
 

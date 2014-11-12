@@ -52,15 +52,10 @@ static std::set<EContainerState> sState = {
 class TStateData : public TStringValue {
 public:
     TStateData() :
-        TStringValue("state",
+        TStringValue(D_STATE,
                      "container state",
-                     NODEF_VALUE,
+                     NODEF_VALUE | PERSISTENT_VALUE,
                      anyState) {}
-
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) override {
-        return ContainerStateName(c->GetState());
-    }
 };
 
 class TOomKilledData : public TBoolValue {
@@ -68,7 +63,7 @@ public:
     TOomKilledData() :
         TBoolValue(D_OOM_KILLED,
                    "indicates whether container has been killed by OOM",
-                   NODEF_VALUE,
+                   NODEF_VALUE | PERSISTENT_VALUE,
                    dState) {}
 };
 
@@ -91,7 +86,7 @@ public:
     TRespawnCountData() :
         TUintValue(D_RESPAWN_COUNT,
                    "how many time container was automatically respawned",
-                   NODEF_VALUE,
+                   NODEF_VALUE | PERSISTENT_VALUE,
                    rdState) {}
 };
 
@@ -116,7 +111,7 @@ public:
     TExitStatusData() :
         TIntValue(D_EXIT_STATUS,
                   "container exit status",
-                  NODEF_VALUE,
+                  NODEF_VALUE | PERSISTENT_VALUE,
                   dState) {}
 
     int GetInt(std::shared_ptr<TContainer> c,

@@ -11,10 +11,8 @@
 #include "value.hpp"
 #include "container.hpp"
 
-constexpr const char *P_RAW_ROOT_PID = "root_pid";
-constexpr const char *P_RAW_UID = "uid";
-constexpr const char *P_RAW_GID = "gid";
-constexpr const char *P_RAW_ID = "id";
+constexpr const char *P_RAW_ROOT_PID = "_root_pid";
+constexpr const char *P_RAW_ID = "_id";
 constexpr const char *P_COMMAND = "command";
 constexpr const char *P_USER = "user";
 constexpr const char *P_GROUP = "group";
@@ -74,13 +72,7 @@ extern TValueSet propertySet;
             TLogger::LogError(error, "Can't set property " + property); \
             return error; \
         } \
-        TError error = VariantSet.Set ## NAME(property, value); \
-        if (error) \
-            return error; \
-        error = AppendStorage(property, NAME ## ToString(value)); \
-        if (error) \
-            return error; \
-        return TError::Success(); \
+        return VariantSet.Set ## NAME(property, value); \
     } \
     TYPE GetRaw ## NAME(const std::string &property) { \
         return VariantSet.Get ## NAME(property); \
@@ -88,19 +80,16 @@ extern TValueSet propertySet;
 
 class TPropertySet {
     NO_COPY_CONSTRUCT(TPropertySet);
-    TKeyValueStorage Storage;
     std::weak_ptr<TContainer> Container;
     const std::string Name;
     TVariantSet VariantSet;
 
-    bool IsRoot();
-    TError SyncStorage();
-    TError AppendStorage(const std::string& key, const std::string& value);
     TError GetSharedContainer(std::shared_ptr<TContainer> &c);
 
 public:
-    TPropertySet(std::shared_ptr<TContainer> c) : Container(c), Name(c->GetName()), VariantSet(&propertySet, c) {}
-    ~TPropertySet();
+    TPropertySet(std::shared_ptr<TKeyValueStorage> storage,
+                 std::shared_ptr<TContainer> c) :
+        Container(c), Name(c->GetName()), VariantSet(storage, &propertySet, c) {}
 
     SYNTHESIZE_ACCESSOR(String, std::string);
     SYNTHESIZE_ACCESSOR(Bool, bool);
@@ -116,9 +105,14 @@ public:
     bool HasFlags(const std::string &property, int flags);
     bool HasState(const std::string &property, EContainerState state);
 
+    TError Valid(const std::string &property);
+
     TError Create();
     TError Restore(const kv::TNode &node);
-    TError Valid(const std::string &property);
+
+    bool HasValue(const std::string &name);
+    TError Flush();
+    TError Sync();
 
     TError PrepareTaskEnv(const std::string &property,
                           std::shared_ptr<TTaskEnv> taskEnv);

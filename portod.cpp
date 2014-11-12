@@ -364,7 +364,6 @@ static int RpcMain(TContainerHolder &cholder) {
 
     size_t heartbeat = 0;
     vector<struct pollfd> fds;
-    vector<int> oomFds;
 
     while (!done) {
         struct pollfd pfd = {};
@@ -377,14 +376,6 @@ static int RpcMain(TContainerHolder &cholder) {
 
         for (auto pair : clients) {
             pfd.fd = pair.first;
-            pfd.events = POLLIN | POLLHUP;
-            fds.push_back(pfd);
-        }
-
-        oomFds.clear();
-        cholder.PushOomFds(oomFds);
-        for (auto &fd : oomFds) {
-            pfd.fd = fd;
             pfd.events = POLLIN | POLLHUP;
             fds.push_back(pfd);
         }
@@ -452,8 +443,7 @@ static int RpcMain(TContainerHolder &cholder) {
                 if ((fds[i].revents & POLLHUP) || needClose)
                     CloseClient(fds[i].fd, clients);
             } else {
-                TContainerEvent event(fds[i].fd);
-                (void)cholder.DeliverEvent(event);
+                TLogger::Log() << "Invalid event for " << fds[i].fd << std::endl;
             }
         }
     }

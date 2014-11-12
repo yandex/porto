@@ -839,11 +839,9 @@ static void TestUserGroup(TPortoAPI &api) {
     ExpectSuccess(api.SetProperty(name, "group", "bin"));
     AsNobody(api);
 
-    /* TODO
     ExpectFailure(api.Start(name), EError::Permission);
 
     AsRoot(api);
-    */
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
 
@@ -1524,6 +1522,7 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "net_bytes[" + dev + "]", s));
     Expect(s != "0");
 
+    AsRoot(api);
     ExpectSuccess(api.Destroy(name));
 }
 
@@ -2427,6 +2426,21 @@ static void TestPermissions(TPortoAPI &api) {
     AsNobody(api);
 }
 
+static void WaitRespawn(TPortoAPI &api, const std::string &name, int maxTries, int expected) {
+    std::string respawnCount;
+    int successRespawns = 0;
+    for(int i = 0; i < maxTries; i++) {
+        sleep(config().daemon().heartbeat_delay_ms() / 1000);
+        api.GetData(name, "respawn_count", respawnCount);
+        if (respawnCount == std::to_string(expected))
+            successRespawns++;
+        if (successRespawns == 2)
+            break;
+        Say() << "Respawned " << i << " times" << std::endl;
+    }
+    Expect(std::to_string(expected) == respawnCount);
+}
+
 static void TestRespawn(TPortoAPI &api) {
     string pid, respawnPid;
     string ret;
@@ -2458,26 +2472,13 @@ static void TestRespawn(TPortoAPI &api) {
 
     ExpectSuccess(api.Stop(name));
 
-    string realRespawns;
-    string maxRespawns = "3";
-    int successRespawns = 0;
-    int maxTries = 10;
-
+    int expected = 3;
     ExpectSuccess(api.SetProperty(name, "respawn", "true"));
-    ExpectSuccess(api.SetProperty(name, "max_respawns", maxRespawns));
+    ExpectSuccess(api.SetProperty(name, "max_respawns", std::to_string(expected)));
     ExpectSuccess(api.SetProperty(name, "command", "echo test"));
     ExpectSuccess(api.Start(name));
 
-    for(int i = 0; i < maxTries; i++) {
-        sleep(config().daemon().heartbeat_delay_ms() / 1000);
-        api.GetData(name, "respawn_count", realRespawns);
-        if (realRespawns == maxRespawns)
-            successRespawns++;
-        if (successRespawns == 2)
-            break;
-        Say() << "Respawned " << i << " times" << std::endl;
-    }
-    Expect(maxRespawns == realRespawns);
+    WaitRespawn(api, name, 10, expected);
 
     ExpectSuccess(api.Destroy(name));
 }
@@ -2625,6 +2626,38 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     ExpectCorrectCgroups(pid, name);
     ExpectSuccess(api.Destroy(name));
+
+    Say() << "Make sure some data is persistent" << std::endl;
+    ExpectSuccess(api.Create(name));
+
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.SetProperty(name, "memory_limit", "10"));
+    ExpectSuccess(api.Start(name));
+    WaitState(api, name, "dead");
+    ExpectSuccess(api.GetData(name, "exit_status", v));
+    Expect(v == string("9"));
+    ExpectSuccess(api.GetData(name, "oom_killed", v));
+    Expect(v == string("true"));
+    KillPorto(api, SIGKILL);
+    ExpectSuccess(api.GetData(name, "exit_status", v));
+    Expect(v == string("9"));
+    ExpectSuccess(api.GetData(name, "oom_killed", v));
+    Expect(v == string("true"));
+    ExpectSuccess(api.Stop(name));
+
+    int expected = 1;
+    ExpectSuccess(api.SetProperty(name, "command", "false"));
+    ExpectSuccess(api.SetProperty(name, "memory_limit", "0"));
+    ExpectSuccess(api.SetProperty(name, "respawn", "true"));
+    ExpectSuccess(api.SetProperty(name, "max_respawns", std::to_string(expected)));
+    ExpectSuccess(api.Start(name));
+    WaitState(api, name, "dead");
+    KillPorto(api, SIGKILL);
+    WaitRespawn(api, name, 10, expected);
+    ExpectSuccess(api.GetData(name, "respawn_count", v));
+    Expect(v == std::to_string(expected));
+
+    ExpectSuccess(api.Destroy(name));
 }
 
 static void TestCgroups(TPortoAPI &api) {
@@ -2729,15 +2762,23 @@ int SelfTest(string name, int leakNr) {
         return EXIT_FAILURE;
     }
 
+    if (WordCount(config().slave_log().path(),
+                  "Task belongs to invalid subsystem") != 1) {
+        std::cerr << "ERROR: Some task belongs to invalid subsystem!" << std::endl;
+        return EXIT_FAILURE;
+    }
+    if (respawns != expectedRespawns) {
+        std::cerr << "ERROR: Unexpected number of respawns: " << respawns << "!" << std::endl;
+        return EXIT_FAILURE;
+    }
+    if (errors != expectedErrors) {
+        std::cerr << "ERROR: Unexpected number of errors: " << errors << "!" << std::endl;
+        return EXIT_FAILURE;
+    }
+
     std::cerr << "SUCCESS: All tests successfully passed!" << std::endl;
-    if (WordCount(config().slave_log().path(), "Task belongs to invalid subsystem") != 1)
-        std::cerr << "WARNING: Some task belongs to invalid subsystem!" << std::endl;
     if (!CanTestLimits())
         std::cerr << "WARNING: Due to missing kernel support, memory_guarantee/cpu_policy has not been tested!" << std::endl;
-    if (respawns != expectedRespawns)
-        std::cerr << "WARNING: Unexpected number of respawns: " << respawns << "!" << std::endl;
-    if (errors != expectedErrors)
-        std::cerr << "WARNING: Unexpected number of errors: " << errors << "!" << std::endl;
     if (!IsCfqActive())
         std::cerr << "WARNING: CFQ is not enabled for one of your block devices, skipping io_read and io_write tests" << std::endl;
     if (!NetworkEnabled())

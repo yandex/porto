@@ -14,6 +14,7 @@ extern "C" {
 #include <libgen.h>
 #include <sys/sysinfo.h>
 #include <sys/prctl.h>
+#include <poll.h>
 }
 
 int RetryBusy(int times, int timeoMs, std::function<int()> handler) {
@@ -186,6 +187,15 @@ TError SetHostName(const std::string &name) {
         return TError(EError::Unknown, errno, "sethostname(" + name + ")");
 
     return TError::Success();
+}
+
+bool FdHasEvent(int fd) {
+    struct pollfd pfd = {};
+    pfd.fd = fd;
+    pfd.events = POLLIN;
+
+    int ret = poll(&pfd, 1, 0);
+    return pfd.revents != 0;
 }
 
 TScopedFd::TScopedFd(int fd) : Fd(fd) {

@@ -8,6 +8,7 @@
 
 #include "error.hpp"
 #include "porto.hpp"
+#include "kvalue.hpp"
 #include "util/log.hpp"
 
 class TContainer;
@@ -27,6 +28,8 @@ enum class EValueType {
 const unsigned int NODEF_VALUE = (1 << 31);
 // Value is not shown in the property/data list
 const unsigned int HIDDEN_VALUE = (1 << 30);
+// Value should be preserved upon recovery
+const unsigned int PERSISTENT_VALUE = (1 << 29);
 
 class TVariant {
     NO_COPY_CONSTRUCT(TVariant);
@@ -199,6 +202,7 @@ public:
     bool Valid(const std::string &name);
     TValue *Get(const std::string &name);
     std::vector<std::string> GetNames();
+    std::string Overlap(TValueSet &other);
 };
 
 #define SYNTHESIZE_ACCESSOR(NAME, TYPE) \
@@ -218,21 +222,35 @@ public:
         TError error = Get(name, c, &p, v); \
         if (error) \
             return error; \
+        if (p->Flags & PERSISTENT_VALUE) { \
+            error = AppendStorage(name, NAME ## ToString(value)); \
+            if (error) \
+                return error; \
+        } \
         return p->Set ## NAME(c, v, value); \
     }
 
 class TVariantSet {
     NO_COPY_CONSTRUCT(TVariantSet);
+    std::shared_ptr<TKeyValueStorage> Storage;
     TValueSet *ValueSet;
     std::weak_ptr<TContainer> Container;
+    std::string Name;
     std::map<std::string, std::shared_ptr<TVariant>> Variant;
+
+    TError AppendStorage(const std::string& key, const std::string& value);
+    bool IsRoot();
 
 public:
     TError Get(const std::string &name, std::shared_ptr<TContainer> &c,
                TValue **p, std::shared_ptr<TVariant> &v);
 
-    TVariantSet(TValueSet *v, std::weak_ptr<TContainer> c) :
-        ValueSet(v), Container(c) {}
+    TVariantSet(std::shared_ptr<TKeyValueStorage> storage,
+                TValueSet *v, std::shared_ptr<TContainer> c);
+    ~TVariantSet();
+
+    TError Create();
+    TError Restore(const kv::TNode &node);
 
     SYNTHESIZE_ACCESSOR(String, std::string)
     SYNTHESIZE_ACCESSOR(Bool, bool)
@@ -243,6 +261,10 @@ public:
 
     std::vector<std::string> List();
     bool IsDefault(const std::string &name);
+    bool HasValue(const std::string &name);
+
+    TError Flush();
+    TError Sync();
 };
 
 #undef SYNTHESIZE_ACCESSOR

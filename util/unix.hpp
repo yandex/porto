@@ -24,6 +24,7 @@ TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap);
 int BlockAllSignals();
 std::string GetHostName();
 TError SetHostName(const std::string &name);
+bool FdHasEvent(int fd);
 
 class TScopedFd {
     NO_COPY_CONSTRUCT(TScopedFd);
