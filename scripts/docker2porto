@@ -81,7 +81,6 @@ def generate_conf(script, name, rootfs, meta, capabilities)
   config["env"] = ""
   env.each { |s| config["env"] += "#{escape_env(s)};" }
 
-  config["hostname"] = id
   config["cwd"] = "/#{meta["Config"]["WorkingDir"]}"
   config["root"] = "$DIR/#{rootfs}"
 
@@ -89,7 +88,7 @@ def generate_conf(script, name, rootfs, meta, capabilities)
   config["group"] = "root"
   config["capabilities"] = capabilities
 
-  portoctl = "exec $PORTOCTL exec #{name}"
+  portoctl = "exec $PORTOCTL exec #{name} hostname=\"$HOSTNAME\""
   config.each { |k, v| portoctl += " #{k}=\"#{escape_arg(v)}\""}
 
   text = <<END
@@ -97,6 +96,7 @@ def generate_conf(script, name, rootfs, meta, capabilities)
 
 DIR="#{Dir.pwd}"
 PORTOCTL="portoctl"
+HOSTNAME="#{name}"
 
 [ -f "../portoctl" ] && PORTOCTL="../portoctl"
 
