@@ -359,7 +359,7 @@ TError TTask::ChildMountDev() {
     return TError::Success();
 }
 
-TError TTask::ChildIsolateFs(bool priveleged) {
+TError TTask::ChildIsolateFs() {
     if (Env->Loop.Exists()) {
         TLoopMount m(Env->Loop, Env->Root, "ext4");
         TError error = m.Mount();
@@ -382,9 +382,7 @@ TError TTask::ChildIsolateFs(bool priveleged) {
         return TError::Success();
 
     unsigned long defaultFlags = MS_NOEXEC | MS_NOSUID | MS_NODEV;
-    unsigned long sysfsFlags = defaultFlags;
-    if (!priveleged)
-        sysfsFlags |= MS_RDONLY;
+    unsigned long sysfsFlags = defaultFlags | MS_RDONLY;
 
     TMount sysfs("sysfs", Env->Root + "/sys", "sysfs", {});
     error = sysfs.MountDir(sysfsFlags);
@@ -396,11 +394,9 @@ TError TTask::ChildIsolateFs(bool priveleged) {
     if (error)
         return error;
 
-    if (!priveleged) {
-        error = RestrictProc();
-        if (error)
-            return error;
-    }
+    error = RestrictProc();
+    if (error)
+        return error;
 
     error = ChildMountDev();
     if (error)
@@ -565,8 +561,6 @@ TError TTask::ChildCallback() {
             return TError(EError::Unknown, error, "cgroup attach");
     }
 
-    bool priveleged = Env->Gid == 0 || Env->Uid == 0;
-
     error = ChildPrepareLoop();
     if (error)
         return error;
@@ -575,7 +569,7 @@ TError TTask::ChildCallback() {
     if (error)
         return error;
 
-    error = ChildIsolateFs(priveleged);
+    error = ChildIsolateFs();
     if (error)
         return error;
 
