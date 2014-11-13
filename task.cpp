@@ -374,18 +374,19 @@ TError TTask::ChildIsolateFs() {
             return error;
     }
 
-    TError error = ChildBindDirectores();
-    if (error)
-        return error;
+    if (Env->Root.ToString() == "/") {
+        TError error = ChildBindDirectores();
+        if (error)
+            return error;
 
-    if (Env->Root.ToString() == "/")
         return TError::Success();
+    }
 
     unsigned long defaultFlags = MS_NOEXEC | MS_NOSUID | MS_NODEV;
     unsigned long sysfsFlags = defaultFlags | MS_RDONLY;
 
     TMount sysfs("sysfs", Env->Root + "/sys", "sysfs", {});
-    error = sysfs.MountDir(sysfsFlags);
+    TError error = sysfs.MountDir(sysfsFlags);
     if (error)
         return error;
 
@@ -413,6 +414,10 @@ TError TTask::ChildIsolateFs() {
         if (error)
             return error;
     }
+
+    error = ChildBindDirectores();
+    if (error)
+        return error;
 
     if (Env->RootRdOnly == true) {
         TMount root(Env->Root, Env->Root, "none", {});
