@@ -712,6 +712,9 @@ TError TTask::Kill(int signal) const {
 }
 
 std::string TTask::GetStdout(size_t limit) const {
+    if (Env->StdoutPath.GetType() != EFileType::Regular)
+        return "";
+
     string s;
     TFile f(Env->StdoutPath);
     TError e(f.LastStrings(limit, s));
@@ -720,6 +723,9 @@ std::string TTask::GetStdout(size_t limit) const {
 }
 
 std::string TTask::GetStderr(size_t limit) const {
+    if (Env->StderrPath.GetType() != EFileType::Regular)
+        return "";
+
     string s;
     TFile f(Env->StderrPath);
     TError e(f.LastStrings(limit, s));

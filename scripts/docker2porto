@@ -1,0 +1,114 @@
+#!/usr/bin/env ruby
+
+# TODO:
+# - permissions
+# - remove free space reservation when (and if) porto adds support for overlay
+#
+# https://docs.docker.com/reference/run/#overriding-dockerfile-image-defaults
+
+reserve = 128 * 1024 * 1024 # TODO: FREE SPACE
+
+require 'json'
+require 'fileutils'
+
+def docker_snapshot(image, data, metadata)
+  name = "docker2porto"
+  system "docker pull #{image}" or abort "Docker can't pull image #{image}"
+  system "docker stop #{name}"
+  system "docker rm #{name}"
+  system "docker run --name #{name} -d #{image}" or abort "Docker can't start container #{name}"
+  system "docker stop #{name}" or abort "Docker can't stop container #{name}"
+  system "docker inspect #{name} > #{metadata}" or abort "Docker can't export #{name} metadata"
+  system "docker export #{name} > #{data}" or abort "Docker can't export #{name} data"
+  system "docker rm #{name}"
+end
+
+def cleanup(data, metadata)
+  FileUtils.rm([ data, metadata ])
+end
+
+def generate_loop(tar, rootfs, reserve)
+  size = File.size(tar)
+  size += 32 * 1024 * 1024 # filesystem metadata
+  size += reserve
+  system "sudo umount tmp"
+  system "dd if=/dev/zero of=#{rootfs} bs=1 count=0 seek=#{size}" or abort "Can't create image file"
+  system "mkfs.ext4 -F #{rootfs}" or abort "Can't create filesystem"
+  FileUtils.mkdir_p('tmp') or abort "Can't create temporary directory"
+  system "sudo mount -o loop #{rootfs} tmp" or abort "Can't mount loop device"
+  system "sudo tar xf #{tar} -C tmp" or abort "Can't untar snapshot"
+  system "sudo umount tmp"
+  FileUtils.rmdir('tmp')
+end
+
+def escape_arg(s)
+  s.gsub('"'){'\\"'}
+end
+
+def escape_env(s)
+  s.gsub(';'){'\\;'}
+end
+
+def generate_conf(name, rootfs, meta)
+  #puts JSON.pretty_generate(meta)
+
+  config = {}
+
+  cmd = []
+  cmd += meta["Config"]["Entrypoint"] if meta["Config"]["Entrypoint"]
+  cmd += meta["Config"]["Cmd"]
+
+  env = meta["Config"]["Env"]
+  #env << "MYSQL_ROOT_PASSWORD=123"
+
+  config["command"] = cmd.shift
+  cmd.each { |s| config["command"] += " \"#{escape_arg(s)}\"" }
+
+  config["env"] = ""
+  env.each { |s| config["env"] += "#{escape_env(s)};" }
+
+  config["hostname"] = meta["Config"]["Hostname"]
+  config["cwd"] = "/#{meta["Config"]["WorkingDir"]}"
+  config["root"] = "#{Dir.pwd}/#{rootfs}"
+
+  # TODO: uid_map = 0 nobody 1
+  config["user"] = "root"
+  config["group"] = "root"
+  #config["user"] = "999"
+  #config["group"] = "999"
+
+  portoctl = "sudo ../portoctl exec #{name}"
+  config.each { |k, v| portoctl += " #{k}='#{v}'"}
+
+  return "#!/bin/sh -x\n#{portoctl}"
+end
+
+tmp_data = "data.tar"
+tmp_meta = "meta.json"
+
+image = ARGV.shift
+
+if not image
+  #image = "ubuntu:14.04"
+  image = "ubuntu:12.04"
+  #image = "postgres"
+  #image = "redis"
+  #image = "mysql"
+  #image = "mongo"
+  #image = "nginx"
+  #abort "Please specify docker image!"
+end
+
+rootfs = "#{image}.loop"
+script = "#{image}"
+
+puts ">>> Create docker container snapshot..."
+docker_snapshot(image, tmp_data, tmp_meta)
+json = JSON.parse(File.read(tmp_meta))[0]
+puts ">>> Generate root filesystem..."
+generate_loop(tmp_data, rootfs, reserve)
+puts ">>> Generate config..."
+File.write(script, generate_conf(image, rootfs, json))
+puts ">>> Cleanup..."
+FileUtils.chmod "+x", script
+#cleanup(tmp_data, tmp_meta)
