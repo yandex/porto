@@ -72,6 +72,7 @@ public:
     std::vector<TBindMap> BindMap;
     TNetCfg NetCfg;
     TPath Loop;
+    uint64_t Caps;
 
     TError Prepare();
     const char** GetEnvp() const;
@@ -94,15 +95,15 @@ class TTask {
     void Syslog(const std::string &s) const;
     void ReportPid(int pid) const;
     void Abort(int result, const std::string &msg) const;
-    void Abort(const TError &error, const std::string &msg = "") const;
 
     TError RotateFile(const TPath &path) const;
     TError CreateCwd();
     TError CreateNode(const TPath &path, unsigned int mode, unsigned int dev);
-    void ChildOpenStdFile(const TPath &path, int expected);
-    void ChildReopenStdio();
-    void ChildDropPriveleges();
-    void ChildExec();
+    TError ChildOpenStdFile(const TPath &path, int expected);
+    TError ChildReopenStdio();
+    TError ChildApplyCapabilities();
+    TError ChildDropPriveleges();
+    TError ChildExec();
     TError ChildBindDns();
     TError ChildBindDirectores();
     TError RestrictProc();
@@ -127,13 +128,16 @@ public:
     std::string GetStdout(size_t limit) const;
     std::string GetStderr(size_t limit) const;
 
-    void ChildApplyLimits();
-    void ChildSetHostname();
+    TError ChildApplyLimits();
+    TError ChildSetHostname();
     TError ChildPrepareLoop();
-    int ChildCallback();
+    TError ChildCallback();
     TError Restore(int pid);
     TError FixCgroups() const;
     TError Rotate() const;
+    void Abort(const TError &error, const std::string &msg = "") const;
 };
+
+TError TaskGetLastCap();
 
 #endif

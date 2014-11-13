@@ -2,7 +2,6 @@
 - ? move property apply code into property method
 
 # properties
-- ? capabilities
 - ? supplementary_groups
 - ? umask
 - ? autodestroy
@@ -19,9 +18,10 @@
 # phase 4
 ##
 - ro+rw images for container distribution
-- ? some tool to convert docker registry images to porto
 ## net
 - L3 configuration via properties (ip/mask/broarcast/routes)
+- net: bridge to create veth pair, then add side A to the specified bridge and
+  side B to the container
 
 # phase 3
 ## other

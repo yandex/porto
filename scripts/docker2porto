@@ -7,6 +7,7 @@
 # https://docs.docker.com/reference/run/#overriding-dockerfile-image-defaults
 
 reserve = 128 * 1024 * 1024 # TODO: FREE SPACE
+capabilities = [ "CHOWN", "DAC_OVERRIDE", "FSETID", "FOWNER", "MKNOD", "NET_RAW", "SETGID", "SETUID", "SETFCAP", "SETPCAP", "NET_BIND_SERVICE", "SYS_CHROOT", "KILL", "AUDIT_WRITE" ].join ";"
 
 require 'json'
 require 'fileutils'
@@ -17,6 +18,8 @@ def docker_snapshot(image, data, metadata)
   system "docker stop #{name}"
   system "docker rm #{name}"
   system "docker run --name #{name} -d #{image}" or abort "Docker can't start container #{name}"
+  #need new docker:
+  #system "docker create --name #{name} #{image}" or abort "Docker can't create container #{name}"
   system "docker stop #{name}" or abort "Docker can't stop container #{name}"
   system "docker inspect #{name} > #{metadata}" or abort "Docker can't export #{name} metadata"
   system "docker export #{name} > #{data}" or abort "Docker can't export #{name} data"
@@ -49,7 +52,7 @@ def escape_env(s)
   s.gsub(';'){'\\;'}
 end
 
-def generate_conf(name, rootfs, meta)
+def generate_conf(name, rootfs, meta, capabilities)
   #puts JSON.pretty_generate(meta)
 
   config = {}
@@ -71,11 +74,9 @@ def generate_conf(name, rootfs, meta)
   config["cwd"] = "/#{meta["Config"]["WorkingDir"]}"
   config["root"] = "#{Dir.pwd}/#{rootfs}"
 
-  # TODO: uid_map = 0 nobody 1
   config["user"] = "root"
   config["group"] = "root"
-  #config["user"] = "999"
-  #config["group"] = "999"
+  config["capabilities"] = capabilities
 
   portoctl = "sudo ../portoctl exec #{name}"
   config.each { |k, v| portoctl += " #{k}='#{v}'"}
@@ -108,7 +109,7 @@ json = JSON.parse(File.read(tmp_meta))[0]
 puts ">>> Generate root filesystem..."
 generate_loop(tmp_data, rootfs, reserve)
 puts ">>> Generate config..."
-File.write(script, generate_conf(image, rootfs, json))
+File.write(script, generate_conf(image, rootfs, json, capabilities))
 puts ">>> Cleanup..."
 FileUtils.chmod "+x", script
 #cleanup(tmp_data, tmp_meta)

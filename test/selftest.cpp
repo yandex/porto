@@ -19,6 +19,7 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <grp.h>
+#include <linux/capability.h>
 }
 
 using std::string;
@@ -118,6 +119,8 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     Expect(v == "false");
     ExpectSuccess(api.GetProperty(name, "allowed_devices", v));
     Expect(v == "a *:* rwm");
+    ExpectSuccess(api.GetProperty(name, "capabilities", v));
+    Expect(v == "");
 }
 
 static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
@@ -1547,6 +1550,83 @@ static void TestAllowedDevicesProperty(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
+static void TestCapabilitiesProperty(TPortoAPI &api) {
+    string pid;
+    string name = "a";
+
+    int lastCap;
+    TFile f("/proc/sys/kernel/cap_last_cap");
+    TError error = f.AsInt(lastCap);
+    if (error)
+        throw error.GetMsg();
+
+    uint64_t defaultCap = 0;
+    for (int i = 0; i <= lastCap; i++)
+        defaultCap |= (1ULL << i);
+
+    uint64_t customCap = (1ULL << CAP_CHOWN) |
+        (1ULL << CAP_DAC_OVERRIDE) |
+        (1ULL << CAP_FSETID) |
+        (1ULL << CAP_FOWNER) |
+        (1ULL << CAP_MKNOD) |
+        (1ULL << CAP_NET_RAW) |
+        (1ULL << CAP_SETGID) |
+        (1ULL << CAP_SETUID) |
+        (1ULL << CAP_SETFCAP) |
+        (1ULL << CAP_SETPCAP) |
+        (1ULL << CAP_NET_BIND_SERVICE) |
+        (1ULL << CAP_SYS_CHROOT) |
+        (1ULL << CAP_KILL) |
+        (1ULL << CAP_AUDIT_WRITE);
+
+    ExpectSuccess(api.Create(name));
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+
+    Say() << "Make sure capabilities don't work for non-root container" << std::endl;
+
+    ExpectFailure(api.SetProperty(name, "capabilities", "CHOWN"), EError::Permission);
+
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    Expect(GetCap(pid, "CapInh") == 0);
+    Expect(GetCap(pid, "CapPrm") == 0);
+    Expect(GetCap(pid, "CapEff") == 0);
+    Expect(GetCap(pid, "CapBnd") == defaultCap);
+    ExpectSuccess(api.Stop(name));
+
+
+    AsRoot(api);
+    ExpectSuccess(api.SetProperty(name, "user", "root"));
+    ExpectSuccess(api.SetProperty(name, "group", "root"));
+
+    Say() << "Checking default capabilities" << std::endl;
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+
+    Expect(GetCap(pid, "CapInh") == defaultCap);
+    Expect(GetCap(pid, "CapPrm") == defaultCap);
+    Expect(GetCap(pid, "CapEff") == defaultCap);
+    Expect(GetCap(pid, "CapBnd") == defaultCap);
+
+    ExpectSuccess(api.Stop(name));
+
+    Say() << "Checking custom capabilities" << std::endl;
+    ExpectFailure(api.SetProperty(name, "capabilities", "CHOWN; INVALID"), EError::InvalidValue);
+    ExpectSuccess(api.SetProperty(name, "capabilities", "CHOWN; DAC_OVERRIDE; FSETID; FOWNER; MKNOD; NET_RAW; SETGID; SETUID; SETFCAP; SETPCAP; NET_BIND_SERVICE; SYS_CHROOT; KILL; AUDIT_WRITE"));
+
+    ExpectSuccess(api.Start(name));
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+
+    Expect(GetCap(pid, "CapInh") == customCap);
+    Expect(GetCap(pid, "CapPrm") == customCap);
+    Expect(GetCap(pid, "CapEff") == customCap);
+    Expect(GetCap(pid, "CapBnd") == customCap);
+
+    ExpectSuccess(api.Stop(name));
+
+    ExpectSuccess(api.Destroy(name));
+}
+
 static void TestStateMachine(TPortoAPI &api) {
     string name = "a";
     string pid;
@@ -1682,6 +1762,7 @@ static void TestRoot(TPortoAPI &api) {
         "net",
         "allowed_devices",
         "root_readonly",
+        "capabilities",
     };
 
     std::vector<TProperty> plist;
@@ -2657,6 +2738,13 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "respawn_count", v));
     Expect(v == std::to_string(expected));
 
+    Say() << "Make sure stopped state is persistent" << std::endl;
+    ExpectSuccess(api.Destroy(name));
+    ExpectSuccess(api.Create(name));
+    KillPorto(api, SIGKILL);
+    ExpectSuccess(api.GetData(name, "state", v));
+    Expect(v == "stopped");
+
     ExpectSuccess(api.Destroy(name));
 }
 
@@ -2698,6 +2786,7 @@ int SelfTest(string name, int leakNr) {
         { "bind_property", TestBindProperty },
         { "net_property", TestNetProperty },
         { "allowed_devices_property", TestAllowedDevicesProperty },
+        { "capabilities_property", TestCapabilitiesProperty },
         { "limits", TestLimits },
         { "rlimits", TestRlimits },
         { "alias", TestAlias },

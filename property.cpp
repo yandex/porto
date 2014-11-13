@@ -7,6 +7,10 @@
 #include "util/unix.hpp"
 #include "util/pwd.hpp"
 
+extern "C" {
+#include <linux/capability.h>
+}
+
 bool TPropertySet::ParentDefault(std::shared_ptr<TContainer> &c,
                                  const std::string &property) {
     TError error = GetSharedContainer(c);
@@ -125,9 +129,8 @@ static std::string DefaultStdFile(std::shared_ptr<TContainer> c,
     if (c->UseParentNamespace())
         prefix = c->GetName(false) + ".";
 
-    TPath path;
+    TPath path = root;
     if (path.GetType() == EFileType::Directory) {
-        path = root;
         path.AddComponent(cwd);
     } else {
         path = c->GetTmpDir();
@@ -905,6 +908,96 @@ public:
     }
 };
 
+class TCapabilitiesProperty : public TListValue {
+    uint64_t Caps;
+    const std::map<std::string, uint64_t> supported = {
+        { "CHOWN", CAP_CHOWN },
+        { "DAC_OVERRIDE", CAP_DAC_OVERRIDE },
+        { "DAC_READ_SEARCH", CAP_DAC_READ_SEARCH },
+        { "FOWNER", CAP_FOWNER },
+        { "FSETID", CAP_FSETID },
+        { "KILL", CAP_KILL },
+        { "SETGID", CAP_SETGID },
+        { "SETUID", CAP_SETUID },
+        { "SETPCAP", CAP_SETPCAP },
+        { "LINUX_IMMUTABLE", CAP_LINUX_IMMUTABLE },
+        { "NET_BIND_SERVICE", CAP_NET_BIND_SERVICE },
+        { "NET_BROADCAST", CAP_NET_BROADCAST },
+        { "NET_ADMIN", CAP_NET_ADMIN },
+        { "NET_RAW", CAP_NET_RAW },
+        { "IPC_LOCK", CAP_IPC_LOCK },
+        { "IPC_OWNER", CAP_IPC_OWNER },
+        { "SYS_MODULE", CAP_SYS_MODULE },
+        { "SYS_RAWIO", CAP_SYS_RAWIO },
+        { "SYS_CHROOT", CAP_SYS_CHROOT },
+        { "SYS_PTRACE", CAP_SYS_PTRACE },
+        { "SYS_PACCT", CAP_SYS_PACCT },
+        { "SYS_ADMIN", CAP_SYS_ADMIN },
+        { "SYS_BOOT", CAP_SYS_BOOT },
+        { "SYS_NICE", CAP_SYS_NICE },
+        { "SYS_RESOURCE", CAP_SYS_RESOURCE },
+        { "SYS_TIME", CAP_SYS_TIME },
+        { "SYS_TTY_CONFIG", CAP_SYS_TTY_CONFIG },
+        { "MKNOD", CAP_MKNOD },
+        { "LEASE", CAP_LEASE },
+        { "AUDIT_WRITE", CAP_AUDIT_WRITE },
+        { "AUDIT_CONTROL", CAP_AUDIT_CONTROL },
+        { "SETFCAP", CAP_SETFCAP },
+        { "MAC_OVERRIDE", CAP_MAC_OVERRIDE },
+        { "MAC_ADMIN", CAP_MAC_ADMIN },
+        { "SYSLOG", CAP_SYSLOG },
+        { "WAKE_ALARM", CAP_WAKE_ALARM },
+        { "BLOCK_SUSPEND", CAP_BLOCK_SUSPEND },
+    };
+
+public:
+    TCapabilitiesProperty() :
+        TListValue(P_CAPABILITIES,
+                   "Limit process capabilities",
+                   PERSISTENT_VALUE,
+                   staticProperty) {}
+
+    TStrList GetDefaultList(std::shared_ptr<TContainer> c) override {
+        TStrList v;
+        if (c->Uid == 0 || c->Gid == 0)
+            for (auto kv : supported)
+                v.push_back(kv.first);
+        return v;
+    }
+
+    TError SetList(std::shared_ptr<TContainer> c,
+                   std::shared_ptr<TVariant> v,
+                   const std::vector<std::string> &lines) override {
+        if (c->Uid != 0 && c->Gid != 0)
+            return TError(EError::Permission, "Permission denied");
+
+        return TListValue::SetList(c, v, lines);
+    }
+
+    TError ParseList(std::shared_ptr<TContainer> c,
+                     const std::vector<std::string> &lines) override {
+        uint64_t allowed = 0;
+
+        for (auto &line: lines) {
+            if (supported.find(line) == supported.end())
+                return TError(EError::InvalidValue,
+                              "Unsupported capability " + line);
+
+            allowed |= (1ULL << supported.at(line));
+        }
+
+        Caps = allowed;
+
+        return TError::Success();
+    }
+
+    TError PrepareTaskEnv(std::shared_ptr<TContainer> c,
+                          std::shared_ptr<TTaskEnv> taskEnv) override {
+        taskEnv->Caps = Caps;
+        return TError::Success();
+    }
+};
+
 class TIdProperty : public TIntValue {
 public:
     TIdProperty() : TIntValue(P_RAW_ID, "", HIDDEN_VALUE | PERSISTENT_VALUE, {}) {}
@@ -947,6 +1040,7 @@ TError RegisterProperties() {
         new TBindProperty,
         new TNetProperty,
         new TAllowedDevicesProperty,
+        new TCapabilitiesProperty,
 
         new TIdProperty,
         new TRootPidProperty,

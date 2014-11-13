@@ -29,6 +29,7 @@ namespace test {
     std::map<std::string, std::string> GetCgroups(const std::string &pid);
     std::string GetStatusLine(const std::string &pid, const std::string &prefix);
     std::string GetState(const std::string &pid);
+    uint64_t GetCap(const std::string &pid, const std::string &type);
     void GetUidGid(const std::string &pid, int &uid, int &gid);
     int UserUid(const std::string &user);
     int GroupGid(const std::string &group);

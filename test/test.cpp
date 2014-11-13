@@ -203,6 +203,20 @@ std::string GetState(const std::string &pid) {
     return state;
 }
 
+uint64_t GetCap(const std::string &pid, const std::string &type) {
+    std::stringstream ss(GetStatusLine(pid, type + ":"));
+
+    std::string name, val;
+
+    ss>> name;
+    ss>> val;
+
+    if (name != type + ":")
+        throw std::string("PARSING ERROR");
+
+    return stoull(val, nullptr, 16);
+}
+
 void GetUidGid(const std::string &pid, int &uid, int &gid) {
     std::string name;
     std::string stuid = GetStatusLine(pid, "Uid:");

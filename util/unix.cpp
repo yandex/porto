@@ -15,6 +15,8 @@ extern "C" {
 #include <sys/sysinfo.h>
 #include <sys/prctl.h>
 #include <poll.h>
+#include <linux/capability.h>
+#include <sys/syscall.h>
 }
 
 int RetryBusy(int times, int timeoMs, std::function<int()> handler) {
@@ -196,6 +198,45 @@ bool FdHasEvent(int fd) {
 
     (void)poll(&pfd, 1, 0);
     return pfd.revents != 0;
+}
+
+TError DropBoundedCap(int cap) {
+    if (prctl(PR_CAPBSET_DROP, cap, 0, 0, 0) < 0)
+        return TError(EError::Unknown, errno,
+                      "prctl(PR_CAPBSET_DROP, " + std::to_string(cap) + ")");
+
+    return TError::Success();
+}
+
+TError SetCap(uint64_t effective, uint64_t permitted, uint64_t inheritable) {
+    cap_user_header_t hdrp = (cap_user_header_t)malloc(sizeof(*hdrp));
+    cap_user_data_t datap = (cap_user_data_t)malloc(sizeof(*datap) * 2);
+    if (!hdrp || !datap)
+        throw std::bad_alloc();
+
+    hdrp->version = _LINUX_CAPABILITY_VERSION_3;
+    hdrp->pid = getpid();
+    datap[0].effective = (uint32_t)effective;
+    datap[1].effective = (uint32_t)(effective >> 32);
+    datap[0].permitted = (uint32_t)permitted;
+    datap[1].permitted = (uint32_t)(permitted >> 32);
+    datap[0].inheritable = (uint32_t)inheritable;
+    datap[1].inheritable = (uint32_t)(inheritable >> 32);
+
+    if (syscall(SYS_capset, hdrp, datap) < 0) {
+        int err = errno;
+        free(hdrp);
+        free(datap);
+        return TError(EError::Unknown, err, "capset(" +
+                      std::to_string(effective) + ", " +
+                      std::to_string(permitted) + ", " +
+                      std::to_string(inheritable) + ")");
+    }
+
+    free(hdrp);
+    free(datap);
+
+    return TError::Success();
 }
 
 TScopedFd::TScopedFd(int fd) : Fd(fd) {

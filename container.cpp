@@ -520,6 +520,10 @@ TError TContainer::PrepareTask() {
     if (error)
         return error;
 
+    error = Prop->PrepareTaskEnv(P_CAPABILITIES, taskEnv);
+    if (error)
+        return error;
+
     if (config().network().enabled()) {
         error = Prop->PrepareTaskEnv(P_NET, taskEnv);
         if (error)
@@ -1190,10 +1194,13 @@ TError TContainer::Restore(const kv::TNode &node) {
         // we didn't report to user that we started container,
         // make sure nobody is running
 
-        auto cg = GetLeafCgroup(freezerSubsystem);
-
-        if (cg->Exists())
-            (void)KillAll();
+        TError error = PrepareResources();
+        if (!error) {
+            auto cg = GetLeafCgroup(freezerSubsystem);
+            if (cg->Exists())
+                (void)KillAll();
+            (void)FreeResources();
+        }
 
         auto state = Data->GetString(D_STATE);
         if (state == ContainerStateName(EContainerState::Dead))
@@ -1361,6 +1368,10 @@ TError TContainerHolder::CreateRoot() {
         return error;
 
     error = RegisterData();
+    if (error)
+        return error;
+
+    error = TaskGetLastCap();
     if (error)
         return error;
 

@@ -27,12 +27,15 @@ extern "C" {
 #include <grp.h>
 #include <linux/kdev_t.h>
 #include <net/if.h>
+#include <linux/capability.h>
 }
 
 using std::stringstream;
 using std::string;
 using std::vector;
 using std::map;
+
+static int lastCap;
 
 // TTaskEnv
 
@@ -124,25 +127,33 @@ void TTask::Abort(const TError &error, const std::string &msg) const {
 
 static int ChildFn(void *arg) {
     TTask *task = static_cast<TTask*>(arg);
-    return task->ChildCallback();
+    TError error = task->ChildCallback();
+    task->Abort(error);
+    return EXIT_FAILURE;
 }
 
-void TTask::ChildOpenStdFile(const TPath &path, int expected) {
+TError TTask::ChildOpenStdFile(const TPath &path, int expected) {
     int ret = open(path.ToString().c_str(), O_CREAT | O_WRONLY | O_APPEND, 0700);
     if (ret < 0)
-        Abort(errno, "open(" + path.ToString() + ") -> " + std::to_string(expected));
+        return TError(EError::Unknown, errno,
+                      "open(" + path.ToString() + ") -> " +
+                      std::to_string(expected));
 
     if (ret != expected)
-        Abort(EINVAL, "open(" + path.ToString() + ") -> " +
-              std::to_string(expected) + ": unexpected fd");
+        return TError(EError::Unknown, EINVAL,
+                      "open(" + path.ToString() + ") -> " +
+                      std::to_string(expected) + ": unexpected fd");
 
     ret = fchown(ret, Env->Uid, Env->Gid);
     if (ret < 0)
-        Abort(errno, "fchown(" + path.ToString() + ") -> " +
-              std::to_string(expected));
+        return TError(EError::Unknown, errno,
+                      "fchown(" + path.ToString() + ") -> " +
+                      std::to_string(expected));
+
+    return TError::Success();
 }
 
-void TTask::ChildReopenStdio() {
+TError TTask::ChildReopenStdio() {
     Wfd = CloseAllFds(Wfd);
     if (Wfd < 0) {
         Syslog(string("close fds: ") + strerror(errno));
@@ -153,32 +164,68 @@ void TTask::ChildReopenStdio() {
 
     int ret = open(Env->StdinPath.ToString().c_str(), O_CREAT | O_RDONLY, 0700);
     if (ret < 0)
-        Abort(errno, "open(0)");
+        return TError(EError::Unknown, errno, "open(0)");
 
     if (ret != 0)
-        Abort(EINVAL, "open(0): unexpected fd");
+        return TError(EError::Unknown, EINVAL, "open(0): unexpected fd");
 
-    ChildOpenStdFile(Env->StdoutPath, 1);
-    ChildOpenStdFile(Env->StderrPath, 2);
+    TError error = ChildOpenStdFile(Env->StdoutPath, 1);
+    if (error)
+        return error;
+    error = ChildOpenStdFile(Env->StderrPath, 2);
+    if (error)
+        return error;
+
+    return TError::Success();
 }
 
-void TTask::ChildDropPriveleges() {
-    if (Env->Uid || Env->Gid) {
-        if (prctl(PR_SET_KEEPCAPS, 0, 0, 0, 0) < 0)
-            Abort(errno, "prctl(PR_SET_KEEPCAPS)");
+TError TTask::ChildApplyCapabilities() {
+    uint64_t effective, permitted, inheritable;
+
+    if (Env->Uid && Env->Gid)
+        return TError::Success();
+
+    PORTO_ASSERT(lastCap != 0);
+
+    effective = permitted = -1;
+    inheritable = Env->Caps;
+
+    TError error = SetCap(effective, permitted, inheritable);
+    if (error)
+        return error;
+
+    for (int i = 0; i <= lastCap; i++) {
+        if (!(Env->Caps & (1ULL << i)) && i != CAP_SETPCAP) {
+            TError error = DropBoundedCap(i);
+            if (error)
+                return error;
+
+        }
     }
 
-    if (setgid(Env->Gid) < 0)
-        Abort(errno, "setgid()");
+    if (!(Env->Caps & (1ULL << CAP_SETPCAP))) {
+        TError error = DropBoundedCap(CAP_SETPCAP);
+        if (error)
+            return error;
+    }
 
-    if (initgroups(Env->User.c_str(), Env->Gid) < 0)
-        Abort(errno, "initgroups()");
-
-    if (setuid(Env->Uid) < 0)
-        Abort(errno, "setuid()");
+    return TError::Success();
 }
 
-void TTask::ChildExec() {
+TError TTask::ChildDropPriveleges() {
+    if (setgid(Env->Gid) < 0)
+        return TError(EError::Unknown, errno, "setgid()");
+
+    if (initgroups(Env->User.c_str(), Env->Gid) < 0)
+        return TError(EError::Unknown, errno, "initgroups()");
+
+    if (setuid(Env->Uid) < 0)
+        return TError(EError::Unknown, errno, "setuid()");
+
+    return TError::Success();
+}
+
+TError TTask::ChildExec() {
     clearenv();
 
     for (auto &s : Env->Environ) {
@@ -191,16 +238,16 @@ void TTask::ChildExec() {
 	int ret = wordexp(Env->Command.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
     switch (ret) {
     case WRDE_BADCHAR:
-        Abort(EINVAL, "wordexp(): illegal occurrence of newline or one of |, &, ;, <, >, (, ), {, }");
+        return TError(EError::Unknown, EINVAL, "wordexp(): illegal occurrence of newline or one of |, &, ;, <, >, (, ), {, }");
     case WRDE_BADVAL:
-        Abort(EINVAL, "wordexp(): undefined shell variable was referenced");
+        return TError(EError::Unknown, EINVAL, "wordexp(): undefined shell variable was referenced");
     case WRDE_CMDSUB:
-        Abort(EINVAL, "wordexp(): command substitution is not supported");
+        return TError(EError::Unknown, EINVAL, "wordexp(): command substitution is not supported");
     case WRDE_SYNTAX:
-        Abort(EINVAL, "wordexp(): syntax error");
+        return TError(EError::Unknown, EINVAL, "wordexp(): syntax error");
     default:
     case WRDE_NOSPACE:
-        Abort(EINVAL, "wordexp(): error " + std::to_string(ret));
+        return TError(EError::Unknown, EINVAL, "wordexp(): error " + std::to_string(ret));
     case 0:
         break;
     }
@@ -214,7 +261,7 @@ void TTask::ChildExec() {
     auto envp = Env->GetEnvp();
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
 
-    Abort(errno, string("execvpe(") + result.we_wordv[0] + ")");
+    return TError(EError::Unknown, errno, string("execvpe(") + result.we_wordv[0] + ")");
 }
 
 TError TTask::ChildBindDns() {
@@ -377,7 +424,7 @@ TError TTask::ChildIsolateFs(bool priveleged) {
         if (error)
             return error;
     }
- 
+
     error = Env->Root.Chdir();
     if (error)
         return error;
@@ -444,28 +491,35 @@ TError TTask::IsolateNet(int childPid) {
     return TError::Success();
 }
 
-void TTask::ChildApplyLimits() {
+TError TTask::ChildApplyLimits() {
     for (auto pair : Env->Rlimit) {
         int ret = setrlimit(pair.first, &pair.second);
         if (ret < 0)
-            Abort(errno, "setrlimit(" + std::to_string(pair.first) + ", " + std::to_string(pair.second.rlim_cur) + ":" + std::to_string(pair.second.rlim_max) + ")");
+            return TError(EError::Unknown, errno,
+                          "setrlimit(" + std::to_string(pair.first) +
+                          ", " + std::to_string(pair.second.rlim_cur) +
+                          ":" + std::to_string(pair.second.rlim_max) + ")");
     }
+
+    return TError::Success();
 }
 
-void TTask::ChildSetHostname() {
+TError TTask::ChildSetHostname() {
     if (Env->Hostname == "" || Env->Root.ToString() == "/")
-        return;
+        return TError::Success();
 
     TFile f(Env->Root + "/etc/hostname");
     if (f.Exists()) {
         string host = Env->Hostname + "\n";
         TError error = f.WriteStringNoAppend(host);
         if (error)
-            Abort(error, "write(/etc/hostname)");
+            return TError(EError::Unknown, error, "write(/etc/hostname)");
     }
 
     if (sethostname(Env->Hostname.c_str(), Env->Hostname.length()) < 0)
-        Abort(errno, "sethostname()");
+        return TError(EError::Unknown, errno, "sethostname()");
+
+    return TError::Success();
 }
 
 TError TTask::ChildPrepareLoop() {
@@ -481,17 +535,19 @@ TError TTask::ChildPrepareLoop() {
     return TError::Success();
 }
 
-int TTask::ChildCallback() {
+TError TTask::ChildCallback() {
     int ret;
     if (read(WaitParentRfd, &ret, sizeof(ret)) != sizeof(ret))
-        Abort(errno, "partial read from child sync pipe");
+        return TError(EError::Unknown, errno, "partial read from child sync pipe");
 
     close(Rfd);
     ResetAllSignalHandlers();
-    ChildApplyLimits();
+    TError error = ChildApplyLimits();
+    if (error)
+        return error;
 
     if (setsid() < 0)
-        Abort(errno, "setsid()");
+        return TError(EError::Unknown, errno, "setsid()");
 
     umask(0);
 
@@ -499,43 +555,53 @@ int TTask::ChildCallback() {
         // remount proc so PID namespace works
         TMount proc("proc", "/proc", "proc", {});
         if (proc.MountDir())
-            Abort(errno, "remount procfs");
+            return TError(EError::Unknown, errno, "remount procfs");
     }
 
     // move to target cgroups
     for (auto cg : LeafCgroups) {
         auto error = cg.second->Attach(getpid());
         if (error)
-            Abort(error, "cgroup attach");
+            return TError(EError::Unknown, error, "cgroup attach");
     }
 
     bool priveleged = Env->Gid == 0 || Env->Uid == 0;
 
-    TError error = ChildPrepareLoop();
+    error = ChildPrepareLoop();
     if (error)
-        Abort(error);
+        return error;
 
-    ChildReopenStdio();
+    error = ChildReopenStdio();
+    if (error)
+        return error;
 
     error = ChildIsolateFs(priveleged);
     if (error)
-        Abort(error);
+        return error;
 
     if (!Env->NetCfg.Share) {
         error = EnableNet();
         if (error)
-            Abort(error);
+            return error;
     }
 
     error = Env->Cwd.Chdir();
     if (error)
-        Abort(error);
+        return error;
 
-    ChildSetHostname();
-    ChildDropPriveleges();
-    ChildExec();
+    error = ChildSetHostname();
+    if (error)
+        return error;
 
-    return 0;
+    error = ChildApplyCapabilities();
+    if (error)
+        return error;
+
+    error = ChildDropPriveleges();
+    if (error)
+        return error;
+
+    return ChildExec();
 }
 
 TError TTask::CreateCwd() {
@@ -846,4 +912,9 @@ TError TTask::Rotate() const {
         return error;
 
     return TError::Success();
+}
+
+TError TaskGetLastCap() {
+    TFile f("/proc/sys/kernel/cap_last_cap");
+    return f.AsInt(lastCap);
 }
