@@ -1,16 +1,28 @@
 #!/usr/bin/env ruby
 
-# TODO:
-# - permissions
-# - remove free space reservation when (and if) porto adds support for overlay
-#
-# https://docs.docker.com/reference/run/#overriding-dockerfile-image-defaults
-
-reserve = 128 * 1024 * 1024 # TODO: FREE SPACE
-capabilities = [ "CHOWN", "DAC_OVERRIDE", "FSETID", "FOWNER", "MKNOD", "NET_RAW", "SETGID", "SETUID", "SETFCAP", "SETPCAP", "NET_BIND_SERVICE", "SYS_CHROOT", "KILL", "AUDIT_WRITE" ].join ";"
-
 require 'json'
 require 'fileutils'
+require 'optparse'
+
+options = {
+  reserve: 128 * 1024 * 1024
+}
+
+OptionParser.new do |opts|
+  opts.banner = <<END
+Usage: docker2porto [options] <image>
+
+Options:
+END
+
+  opts.on("-r", "--reserve [BYTES]",
+          Integer,
+          "Reserve given amount of free space on the image") do |v|
+    options[:reserve] = v
+  end
+end.parse!
+
+capabilities = [ "CHOWN", "DAC_OVERRIDE", "FSETID", "FOWNER", "MKNOD", "NET_RAW", "SETGID", "SETUID", "SETFCAP", "SETPCAP", "NET_BIND_SERVICE", "SYS_CHROOT", "KILL", "AUDIT_WRITE" ].join ";"
 
 def docker_snapshot(image, data, metadata)
   name = "docker2porto"
@@ -34,13 +46,13 @@ def generate_loop(tar, rootfs, reserve)
   size = File.size(tar)
   size += 32 * 1024 * 1024 # filesystem metadata
   size += reserve
-  system "sudo umount tmp"
+  system "umount tmp"
   system "dd if=/dev/zero of=#{rootfs} bs=1 count=0 seek=#{size}" or abort "Can't create image file"
   system "mkfs.ext4 -F #{rootfs}" or abort "Can't create filesystem"
   FileUtils.mkdir_p('tmp') or abort "Can't create temporary directory"
-  system "sudo mount -o loop #{rootfs} tmp" or abort "Can't mount loop device"
-  system "sudo tar xf #{tar} -C tmp" or abort "Can't untar snapshot"
-  system "sudo umount tmp"
+  system "mount -o loop #{rootfs} tmp" or abort "Can't mount loop device"
+  system "tar xf #{tar} -C tmp" or abort "Can't untar snapshot"
+  system "umount tmp"
   FileUtils.rmdir('tmp')
 end
 
@@ -52,17 +64,16 @@ def escape_env(s)
   s.gsub(';'){'\\;'}
 end
 
-def generate_conf(name, rootfs, meta, capabilities)
-  #puts JSON.pretty_generate(meta)
-
+def generate_conf(script, name, rootfs, meta, capabilities)
   config = {}
+
+  id = meta["Id"]
 
   cmd = []
   cmd += meta["Config"]["Entrypoint"] if meta["Config"]["Entrypoint"]
   cmd += meta["Config"]["Cmd"]
 
   env = meta["Config"]["Env"]
-  #env << "MYSQL_ROOT_PASSWORD=123"
 
   config["command"] = cmd.shift
   cmd.each { |s| config["command"] += " \"#{escape_arg(s)}\"" }
@@ -70,46 +81,49 @@ def generate_conf(name, rootfs, meta, capabilities)
   config["env"] = ""
   env.each { |s| config["env"] += "#{escape_env(s)};" }
 
-  config["hostname"] = meta["Config"]["Hostname"]
+  config["hostname"] = id
   config["cwd"] = "/#{meta["Config"]["WorkingDir"]}"
-  config["root"] = "#{Dir.pwd}/#{rootfs}"
+  config["root"] = "$DIR/#{rootfs}"
 
   config["user"] = "root"
   config["group"] = "root"
   config["capabilities"] = capabilities
 
-  portoctl = "sudo ../portoctl exec #{name}"
-  config.each { |k, v| portoctl += " #{k}='#{v}'"}
+  portoctl = "exec $PORTOCTL exec #{name}"
+  config.each { |k, v| portoctl += " #{k}=\"#{escape_arg(v)}\""}
 
-  return "#!/bin/sh -x\n#{portoctl}"
+  text = <<END
+#!/bin/sh -x
+
+DIR="#{Dir.pwd}"
+PORTOCTL="portoctl"
+
+[ -f "../portoctl" ] && PORTOCTL="../portoctl"
+
+#{portoctl}
+END
+
+  File.write(script, text)
 end
 
 tmp_data = "data.tar"
 tmp_meta = "meta.json"
 
 image = ARGV.shift
+abort "Please specify docker image!" if not image
 
-if not image
-  #image = "ubuntu:14.04"
-  image = "ubuntu:12.04"
-  #image = "postgres"
-  #image = "redis"
-  #image = "mysql"
-  #image = "mongo"
-  #image = "nginx"
-  #abort "Please specify docker image!"
-end
-
-rootfs = "#{image}.loop"
 script = "#{image}"
+
+abort "Need root privileges" if Process.uid != 0
 
 puts ">>> Create docker container snapshot..."
 docker_snapshot(image, tmp_data, tmp_meta)
 json = JSON.parse(File.read(tmp_meta))[0]
 puts ">>> Generate root filesystem..."
-generate_loop(tmp_data, rootfs, reserve)
+rootfs = "#{json["Image"]}"
+generate_loop(tmp_data, rootfs, options[:reserve])
 puts ">>> Generate config..."
-File.write(script, generate_conf(image, rootfs, json, capabilities))
+generate_conf(script, image, rootfs, json, capabilities)
 puts ">>> Cleanup..."
 FileUtils.chmod "+x", script
-#cleanup(tmp_data, tmp_meta)
+cleanup(tmp_data, tmp_meta)
