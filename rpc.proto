@@ -119,6 +119,10 @@ message TContainerKillRequest {
 	required int32 sig = 2;
 }
 
+// Запросить версию демона
+message TVersionRequest {
+}
+
 
 // Сообщение-запрос
 // В запросе может быть только одно опциональное сообщение, только оно
@@ -138,6 +142,7 @@ message TContainerRequest {
 	optional TContainerPropertyListRequest propertyList = 11;
 	optional TContainerDataListRequest dataList = 12;
 	optional TContainerKillRequest kill = 13;
+	optional TVersionRequest version = 14;
 }
 
 // Ответ на запрос списка контейнеров
@@ -180,6 +185,14 @@ message TContainerDataListResponse {
 	repeated TContainerDataListEntry list = 1;
 }
 
+// Ответ на запрос версии
+message TVersionResponse {
+	// Тег версии
+	required string tag = 1;
+	// Ревизия версии
+	required string revision = 2;
+}
+
 // Сообщение-ответ
 // В ответе будет присутствовать статус запроса (ошибка) и соответствующей
 // запросу результат.
@@ -193,4 +206,5 @@ message TContainerResponse {
 	optional TContainerGetDataResponse getData = 5;
 	optional TContainerPropertyListResponse propertyList = 6;
 	optional TContainerDataListResponse dataList = 7;
+	optional TVersionResponse version = 8;
 }

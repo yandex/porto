@@ -155,7 +155,7 @@ void SigInt(int sig) {
     raise(sig);
 }
 
-int HandleCommand(int argc, char *argv[]) {
+int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
     if (argc <= 1) {
         Usage(NULL);
         return EXIT_FAILURE;
@@ -168,7 +168,13 @@ int HandleCommand(int argc, char *argv[]) {
     }
 
     if (name == "-v" || name == "--version") {
-        std::cout << GIT_TAG << " " << GIT_REVISION << std::endl;
+        std::string tag, revision;
+        int ret = api->GetVersion(tag, revision);
+
+        std::cout << "client: " << GIT_TAG << " " << GIT_REVISION << std::endl;
+        if (!ret)
+            std::cout << "server: " << tag << " " << revision << std::endl;
+
         return EXIT_FAILURE;
     }
 

@@ -35,6 +35,6 @@ public:
 };
 
 void RegisterCommand(ICmd *cmd);
-int HandleCommand(int argc, char *argv[]);
+int HandleCommand(TPortoAPI *api, int argc, char *argv[]);
 
 #endif

@@ -164,6 +164,18 @@ int TPortoAPI::GetData(const string &name, const string &data, string &value) {
     return ret;
 }
 
+int TPortoAPI::GetVersion(std::string &tag, std::string &revision) {
+    Req.mutable_version();
+
+    int ret = Rpc(Req, Rsp);
+    if (!ret) {
+        tag = Rsp.version().tag();
+        revision = Rsp.version().revision();
+    }
+
+    return ret;
+}
+
 int TPortoAPI::Start(const string &name) {
     Req.mutable_start()->set_name(name);
 

@@ -198,6 +198,16 @@ static TError Kill(TContainerHolder &cholder,
     return container->Kill(req.sig());
 }
 
+static TError Version(TContainerHolder &cholder,
+                      rpc::TContainerResponse &rsp) {
+    auto ver = rsp.mutable_version();
+
+    ver->set_tag(GIT_TAG);
+    ver->set_revision(GIT_REVISION);
+
+    return TError::Success();
+}
+
 rpc::TContainerResponse
 HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req,
                  int uid, int gid) {
@@ -236,6 +246,8 @@ HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req,
             error = ListData(cholder, rsp);
         else if (req.has_kill())
             error = Kill(cholder, req.kill(), rsp, uid, gid);
+        else if (req.has_version())
+            error = Version(cholder, rsp);
         else
             error = TError(EError::InvalidMethod, "invalid RPC method");
     } catch (std::bad_alloc exc) {

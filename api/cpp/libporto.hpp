@@ -55,6 +55,7 @@ public:
     int SetProperty(const std::string &name, const std::string &property, std::string value);
 
     int GetData(const std::string &name, const std::string &data, std::string &value);
+    int GetVersion(std::string &tag, std::string &revision);
 
     int Raw(const std::string &message, std::string &response);
     void GetLastError(int &error, std::string &msg) const;

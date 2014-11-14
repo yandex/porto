@@ -1053,5 +1053,5 @@ int main(int argc, char *argv[]) {
     RegisterCommand(new TRunCmd(&api));
     RegisterCommand(new TExecCmd(&api));
 
-    return HandleCommand(argc, argv);
+    return HandleCommand(&api, argc, argv);
 };
