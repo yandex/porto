@@ -380,7 +380,6 @@ TError TContainer::PrepareNetwork() {
     rate = Prop->GetMap(P_NET_GUARANTEE);
     ceil = Prop->GetMap(P_NET_CEIL);
 
-    (void)Tclass->Remove();
     TError error = Tclass->Create(prio, rate, ceil);
     if (error) {
         TLogger::LogError(error, "Can't create tclass");
@@ -591,7 +590,6 @@ TError TContainer::Create(int uid, int gid) {
         uint32_t rootHandle = TcHandle(Id, 0);
 
         Qdisc = std::make_shared<TQdisc>(Links, rootHandle, defHandle);
-        (void)Qdisc->Remove();
         error = Qdisc->Create();
         if (error) {
             TLogger::LogError(error, "Can't create root qdisc");
@@ -599,7 +597,6 @@ TError TContainer::Create(int uid, int gid) {
         }
 
         Filter = std::make_shared<TFilter>(Qdisc);
-        (void)Filter->Remove();
         error = Filter->Create();
         if (error) {
             TLogger::LogError(error, "Can't create tc filter");
@@ -607,7 +604,6 @@ TError TContainer::Create(int uid, int gid) {
         }
 
         DefaultTclass = std::make_shared<TTclass>(Qdisc, defHandle);
-        (void)DefaultTclass->Remove();
 
         TUintMap prio, rate, ceil;
         for (auto &link : Links) {
@@ -1198,13 +1194,10 @@ TError TContainer::Restore(const kv::TNode &node) {
         // we didn't report to user that we started container,
         // make sure nobody is running
 
-        TError error = PrepareResources();
-        if (!error) {
-            auto cg = GetLeafCgroup(freezerSubsystem);
-            if (cg->Exists())
-                (void)KillAll();
-            (void)FreeResources();
-        }
+        auto cg = GetLeafCgroup(freezerSubsystem);
+        TError error = cg->Create();
+        if (error)
+            (void)KillAll();
 
         auto state = Data->GetString(D_STATE);
         if (state == ContainerStateName(EContainerState::Dead))

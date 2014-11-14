@@ -395,6 +395,7 @@ free_class:
     return error;
 }
 
+#include <unistd.h>
 TError TNlClass::Remove() {
     TError error = TError::Success();
     int ret;
@@ -576,6 +577,39 @@ bool TNlHtb::Exists() {
     nl_cache_free(qdiscCache);
 
     return exists;
+}
+
+bool TNlHtb::Valid(uint32_t defaultClass) {
+    int ret;
+    struct nl_cache *qdiscCache;
+    bool valid = true;
+
+    ret = rtnl_qdisc_alloc_cache(Link->GetSock(), &qdiscCache);
+    if (ret < 0)
+        return false;
+
+    Link->LogCache(qdiscCache);
+
+    struct rtnl_qdisc *qdisc = rtnl_qdisc_get(qdiscCache, Link->GetIndex(), Handle);
+    if (qdisc) {
+        if (rtnl_tc_get_link(TC_CAST(qdisc)) != Link->GetLink())
+            valid = false;
+        else if (rtnl_tc_get_parent(TC_CAST(qdisc)) != Parent)
+            valid = false;
+        else if (rtnl_tc_get_handle(TC_CAST(qdisc)) != Handle)
+            valid = false;
+        else if (rtnl_tc_get_kind(TC_CAST(qdisc)) != string("htb"))
+            valid = false;
+        else if (rtnl_htb_get_defcls(qdisc) != defaultClass)
+            valid = false;
+    } else {
+        valid = false;
+    }
+
+    rtnl_qdisc_put(qdisc);
+    nl_cache_free(qdiscCache);
+
+    return valid;
 }
 
 TError TNlCgFilter::Create() {

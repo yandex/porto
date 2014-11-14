@@ -53,7 +53,6 @@ class TFilter {
 public:
     TFilter(const std::shared_ptr<TQdisc> parent) : Parent(parent) { }
     TError Create();
-    TError Remove();
 };
 
 std::vector<std::shared_ptr<TNlLink>> OpenLinks();

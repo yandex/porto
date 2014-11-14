@@ -92,6 +92,10 @@ TError TQdisc::Create() {
 
     for (auto &link : GetLink()) {
         TNlHtb qdisc(link, TcRootHandle(), Handle);
+
+        if (qdisc.Valid(DefClass))
+            continue;
+
         TError error = qdisc.Create(DefClass);
         if (error)
             return error;
@@ -130,23 +134,6 @@ TError TFilter::Create() {
     for (auto &link : GetLink()) {
         TNlCgFilter filter(link, Parent->GetHandle(), 1);
         TError error = filter.Create();
-        if (error)
-            return error;
-    }
-
-    return TError::Success();
-}
-
-TError TFilter::Remove() {
-    if (!config().network().enabled())
-        return TError::Success();
-
-    for (auto &link : GetLink()) {
-        if (!Exists(link))
-            return TError::Success();
-
-        TNlCgFilter filter(link, Parent->GetHandle(), 1);
-        TError error = filter.Remove();
         if (error)
             return error;
     }

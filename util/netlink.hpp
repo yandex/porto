@@ -110,6 +110,7 @@ public:
     TError Create(uint32_t defaultClass);
     TError Remove();
     bool Exists();
+    bool Valid(uint32_t defaultClass);
 };
 
 class TNlCgFilter {
