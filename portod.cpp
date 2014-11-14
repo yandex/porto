@@ -586,7 +586,7 @@ static int SlaveMain() {
 }
 
 static void SendPidStatus(int fd, int pid, int status, size_t queued) {
-    TLogger::Log() << "Deliver " << pid << " status " << status << " (" + std::to_string(queued) + " queued)" << std::endl;
+    TLogger::Log() << "Deliver " << pid << " status " << status << " (" << queued << " queued)" << std::endl;
 
     if (write(fd, &pid, sizeof(pid)) < 0)
         TLogger::Log() << "write(pid): " << strerror(errno) << std::endl;
@@ -623,7 +623,7 @@ static void ReceiveAcks(int fd, map<int,int> &pidToStatus) {
             return;
 
         pidToStatus.erase(pid);
-        TLogger::Log() << "Got acknowledge for " << pid << " (" + std::to_string(queued) + " queued)" << std::endl;
+        TLogger::Log() << "Got acknowledge for " << pid << " (" << pidToStatus.size() << " queued)" << std::endl;
     }
 }
 

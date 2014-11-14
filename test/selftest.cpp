@@ -555,7 +555,7 @@ static void TestStreams(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
-static void TestLongRunning(TPortoAPI &api) {
+static void TestNsCgTc(TPortoAPI &api) {
     string pid;
 
     string name = "a";
@@ -644,7 +644,7 @@ static void TestLongRunning(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
-static void TestIsolation(TPortoAPI &api) {
+static void TestIsolateProperty(TPortoAPI &api) {
     string ret;
 
     string name = "a";
@@ -751,7 +751,7 @@ static void TestIsolation(TPortoAPI &api) {
     ExpectSuccess(api.Destroy("test"));
 }
 
-static void TestProperty(TPortoAPI &api) {
+static void TestEnvTrim(TPortoAPI &api) {
     string val;
     string name = "a";
     ExpectSuccess(api.Create(name));
@@ -817,7 +817,7 @@ static void ExpectEnv(TPortoAPI &api,
     ExpectSuccess(api.Stop(name));
 }
 
-static void TestEnvironment(TPortoAPI &api) {
+static void TestEnvProperty(TPortoAPI &api) {
     string name = "a";
     ExpectSuccess(api.Create(name));
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
@@ -865,7 +865,7 @@ static void TestEnvironment(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
-static void TestUserGroup(TPortoAPI &api) {
+static void TestUserGroupProperty(TPortoAPI &api) {
     int uid, gid;
     string pid;
 
@@ -917,7 +917,7 @@ static void TestUserGroup(TPortoAPI &api) {
     AsNobody(api);
 }
 
-static void TestCwd(TPortoAPI &api) {
+static void TestCwdProperty(TPortoAPI &api) {
     string pid;
     string cwd;
     string portodPid, portodCwd;
@@ -980,7 +980,7 @@ static void TestCwd(TPortoAPI &api) {
     AsNobody(api);
 }
 
-static void TestStd(TPortoAPI &api) {
+static void TestStdPathProperty(TPortoAPI &api) {
     string pid;
     string name = "a";
 
@@ -1837,7 +1837,7 @@ static void TestRoot(TPortoAPI &api) {
         "cpu_usage",
         "memory_usage",
         "net_bytes",
-        "net_packates",
+        "net_packets",
         "net_drops",
         "net_overlimits",
         "minor_faults",
@@ -1851,10 +1851,16 @@ static void TestRoot(TPortoAPI &api) {
     ExpectSuccess(api.Plist(plist));
     Expect(plist.size() == properties.size());
 
+    for (auto p: plist)
+        Expect(std::find(properties.begin(), properties.end(), p.Name) != properties.end());
+
     std::vector<TData> dlist;
 
     ExpectSuccess(api.Dlist(dlist));
     Expect(dlist.size() == data.size());
+
+    for (auto d: dlist)
+        Expect(std::find(data.begin(), data.end(), d.Name) != data.end());
 
     Say() << "Check root cpu_usage & memory_usage" << std::endl;
     ExpectSuccess(api.GetData(root, "cpu_usage", v));
@@ -1910,6 +1916,8 @@ static void TestRoot(TPortoAPI &api) {
     ExpectSuccess(api.GetData(root, "parent", v));
     Expect(v == "");
     ExpectFailure(api.GetData(root, "stderr", v), EError::InvalidState);
+
+    Say() << "Check that stop on root stops all children" << std::endl;
 
     ExpectSuccess(api.Create("a"));
     ExpectSuccess(api.Create("b"));
@@ -1981,7 +1989,7 @@ static void ExpectZeroLink(TPortoAPI &api, const std::string &name,
     }
 }
 
-static void TestStats(TPortoAPI &api) {
+static void TestData(TPortoAPI &api) {
     // should be executed right after TestRoot because assumes empty statistics
 
     string root = "/";
@@ -2195,7 +2203,7 @@ static void TestLimits(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
-static void TestRlimits(TPortoAPI &api) {
+static void TestUlimitProperty(TPortoAPI &api) {
     string name = "a";
     ExpectSuccess(api.Create(name));
 
@@ -2608,7 +2616,7 @@ static void WaitRespawn(TPortoAPI &api, const std::string &name, int expected, i
     Expect(std::to_string(expected) == respawnCount);
 }
 
-static void TestRespawn(TPortoAPI &api) {
+static void TestRespawnProperty(TPortoAPI &api) {
     string pid, respawnPid;
     string ret;
 
@@ -2909,22 +2917,30 @@ static void TestCgroups(TPortoAPI &api) {
     Expect(f.Remove() == false);
 }
 
+static void TestVersion(TPortoAPI &api) {
+    string tag, revision;
+    ExpectSuccess(api.GetVersion(tag, revision));
+
+    Expect(tag == GIT_TAG);
+    Expect(revision == GIT_REVISION);
+}
+
 int SelfTest(string name, int leakNr) {
     pair<string, std::function<void(TPortoAPI &)>> tests[] = {
         { "root", TestRoot },
-        { "stats", TestStats },
+        { "data", TestData },
         { "holder", TestHolder },
         { "empty", TestEmpty },
         { "state_machine", TestStateMachine },
         { "exit_status", TestExitStatus },
         { "streams", TestStreams },
-        { "long_running", TestLongRunning },
-        { "isolation", TestIsolation },
-        { "property", TestProperty },
-        { "environment", TestEnvironment },
-        { "user_group", TestUserGroup },
-        { "cwd", TestCwd },
-        { "std", TestStd },
+        { "ns_cg_tc", TestNsCgTc },
+        { "isolate_property", TestIsolateProperty },
+        { "env_trim", TestEnvTrim },
+        { "env_property", TestEnvProperty },
+        { "user_group_property", TestUserGroupProperty },
+        { "cwd_property", TestCwdProperty },
+        { "stdpath_property", TestStdPathProperty },
         { "root_property", TestRootProperty },
         { "root_readonly", TestRootRdOnlyProperty },
         { "hostname_property", TestHostnameProperty },
@@ -2933,17 +2949,18 @@ int SelfTest(string name, int leakNr) {
         { "allowed_devices_property", TestAllowedDevicesProperty },
         { "capabilities_property", TestCapabilitiesProperty },
         { "limits", TestLimits },
-        { "rlimits", TestRlimits },
+        { "ulimit_property", TestUlimitProperty },
         { "alias", TestAlias },
         { "dynamic", TestDynamic },
         { "permissions", TestPermissions },
-        { "respawn", TestRespawn },
+        { "respawn_property", TestRespawnProperty },
         { "hierarchy", TestLimitsHierarchy },
         { "leaks", TestLeaks },
 
         { "daemon", TestDaemon },
         { "recovery", TestRecovery },
         { "cgroups", TestCgroups },
+        { "version", TestVersion },
     };
 
     ExpectSuccess(SetHostName(HOSTNAME));

@@ -909,7 +909,6 @@ TError TContainer::GetData(const string &origName, string &value) {
     if (error)
         return error;
 
-    // TODO: share with GetProperty
     if (idx.length()) {
         TUintMap m = p->GetMap(c, v);
         if (m.find(idx) == m.end())
@@ -1541,7 +1540,6 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
     if (name == ROOT_CONTAINER)
         return TError::Success();
 
-    // TODO: we DO trust data from the persistent storage, do we?
     auto parent = GetParent(name);
     if (!parent)
         return TError(EError::InvalidValue, "invalid parent container");

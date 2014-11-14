@@ -46,4 +46,3 @@
 - different log levels (error, normal, verbose)
 - use some kind of reference count for accounting running children
 - ? remove start_errno data
-- add some kind of event queue and use it to rotate logs and respawn containers
