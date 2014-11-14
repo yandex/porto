@@ -24,6 +24,8 @@ class TPropertySet;
 class TVariantSet;
 class TValueSet;
 enum class ETclassStat;
+class TEventQueue;
+class TEvent;
 
 extern int64_t BootTime;
 
@@ -43,26 +45,9 @@ struct TDataSpec {
     std::set<EContainerState> Valid;
 };
 
-enum class EContainerEventType {
-    Exit,
-};
-
-class TContainerEvent {
-public:
-    EContainerEventType Type;
-
-    struct {
-        int Pid;
-        int Status;
-    } Exit;
-
-    TContainerEvent(int pid, int status) : Type(EContainerEventType::Exit) { Exit.Pid = pid; Exit.Status = status; }
-
-    std::string GetMsg() const;
-};
-
 class TContainer : public std::enable_shared_from_this<TContainer> {
     NO_COPY_CONSTRUCT(TContainer);
+    std::shared_ptr<TEventQueue> Queue;
     const std::string Name;
     const std::shared_ptr<TContainer> Parent;
     std::shared_ptr<TQdisc> Qdisc;
@@ -120,8 +105,11 @@ public:
     EContainerState GetState();
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) { return Tclass->GetStat(stat, m); }
 
-    TContainer(const std::string &name, std::shared_ptr<TContainer> parent, uint16_t id, const std::vector<std::shared_ptr<TNlLink>> &links) :
-        Name(StripParentName(name)), Parent(parent), Id(id), Links(links) { }
+    TContainer(std::shared_ptr<TEventQueue> queue,
+               const std::string &name, std::shared_ptr<TContainer> parent,
+               uint16_t id, const std::vector<std::shared_ptr<TNlLink>> &links) :
+        Queue(queue), Name(StripParentName(name)), Parent(parent), Id(id),
+        Links(links) { }
     ~TContainer();
 
     const std::string GetName(bool recursive = true) const;
@@ -157,12 +145,13 @@ public:
     uint16_t GetId() { return Id; }
     std::shared_ptr<TContainer> FindRunningParent() const;
     bool UseParentNamespace() const;
-    bool DeliverEvent(const TContainerEvent &event);
+    bool DeliverEvent(const TEvent &event);
 };
 
 constexpr size_t BITS_PER_LLONG = sizeof(unsigned long long) * 8;
 class TContainerHolder {
     NO_COPY_CONSTRUCT(TContainerHolder);
+    std::shared_ptr<TEventQueue> Queue;
     std::vector<std::shared_ptr<TNlLink>> Links;
     std::map <std::string, std::shared_ptr<TContainer>> Containers;
     unsigned long long Ids[UINT16_MAX / BITS_PER_LLONG];
@@ -172,7 +161,9 @@ class TContainerHolder {
     void PutId(uint16_t id);
     TError RestoreId(const kv::TNode &node, uint16_t &id);
 public:
-    TContainerHolder(const std::vector<std::shared_ptr<TNlLink>> &links) : Links(links) {
+    TContainerHolder(std::shared_ptr<TEventQueue> queue,
+                     const std::vector<std::shared_ptr<TNlLink>> &links) :
+        Queue(queue), Links(links) {
         for (auto &i : Ids) { i = ULLONG_MAX; }
     }
     ~TContainerHolder();
@@ -187,7 +178,7 @@ public:
     std::vector<std::string> List() const;
     void Heartbeat();
 
-    bool DeliverEvent(const TContainerEvent &event);
+    bool DeliverEvent(const TEvent &event);
 };
 
 #endif

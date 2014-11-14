@@ -10,6 +10,7 @@
 #include "subsystem.hpp"
 #include "property.hpp"
 #include "data.hpp"
+#include "event.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/netlink.hpp"
@@ -55,18 +56,6 @@ static int64_t GetBootTime() {
 }
 
 int64_t BootTime = 0;
-
-// TContainerEvent
-
-std::string TContainerEvent::GetMsg() const {
-    switch (Type) {
-        case EContainerEventType::Exit:
-            return "exit status " + std::to_string(Exit.Status)
-                + " for pid " + std::to_string(Exit.Pid);
-        default:
-            return "unknown event";
-    }
-}
 
 // TContainer
 
@@ -1315,9 +1304,9 @@ bool TContainer::HasChildren() const {
     return shared_from_this().use_count() > 2;
 }
 
-bool TContainer::DeliverEvent(const TContainerEvent &event) {
+bool TContainer::DeliverEvent(const TEvent &event) {
     switch (event.Type) {
-        case EContainerEventType::Exit:
+        case EEventType::Exit:
             return DeliverExitStatus(event.Exit.Pid, event.Exit.Status);
         default:
             return false;
@@ -1456,7 +1445,7 @@ TError TContainerHolder::Create(const string &name, int uid, int gid) {
     if (error)
         return error;
 
-    auto c = std::make_shared<TContainer>(name, parent, id, Links);
+    auto c = std::make_shared<TContainer>(Queue, name, parent, id, Links);
     error = c->Create(uid, gid);
     if (error)
         return error;
@@ -1555,7 +1544,7 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
     if (!id)
         return TError(EError::Unknown, "Couldn't restore container id");
 
-    auto c = std::make_shared<TContainer>(name, parent, id, Links);
+    auto c = std::make_shared<TContainer>(Queue, name, parent, id, Links);
     error = c->Restore(node);
     if (error) {
         TLogger::LogError(error, "Can't restore container " + name);
@@ -1582,7 +1571,7 @@ void TContainerHolder::Heartbeat() {
     }
 }
 
-bool TContainerHolder::DeliverEvent(const TContainerEvent &event) {
+bool TContainerHolder::DeliverEvent(const TEvent &event) {
     for (auto c : Containers)
         if (c.second->DeliverEvent(event))
             return true;

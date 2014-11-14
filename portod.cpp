@@ -7,6 +7,7 @@
 #include "rpc.hpp"
 #include "cgroup.hpp"
 #include "config.hpp"
+#include "event.hpp"
 #include "util/log.hpp"
 #include "util/protobuf.hpp"
 #include "util/unix.hpp"
@@ -327,7 +328,7 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
             return 0;
         }
 
-        TContainerEvent event(pid, status);
+        TEvent event(pid, status);
         if (!cholder.DeliverEvent(event)) {
             AckExitStatus(pid);
             return 0;
@@ -337,7 +338,7 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
     return 0;
 }
 
-static int RpcMain(TContainerHolder &cholder) {
+static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder) {
     int ret = 0;
     int sfd;
     std::map<int,ClientInfo> clients;
@@ -380,7 +381,7 @@ static int RpcMain(TContainerHolder &cholder) {
             fds.push_back(pfd);
         }
 
-        ret = poll(fds.data(), fds.size(), config().daemon().poll_timeout_ms());
+        ret = poll(fds.data(), fds.size(), queue->GetNextTimeout());
         if (ret < 0) {
             TLogger::Log() << "poll() error: " << strerror(errno) << std::endl;
 
@@ -520,7 +521,8 @@ static int SlaveMain() {
                 TLogger::Log() << "Using " << link->GetName() << " interface" << std::endl;
         }
 
-        TContainerHolder cholder(links);
+        auto queue = std::make_shared<TEventQueue>();
+        TContainerHolder cholder(queue, links);
         error = cholder.CreateRoot();
         if (error) {
             TLogger::LogError(error, "Couldn't create root container!");
@@ -559,7 +561,7 @@ static int SlaveMain() {
             WatchdogStart(config().daemon().watchdog_max_fails(),
                           config().daemon().watchdog_delay_s());
 
-        ret = RpcMain(cholder);
+        ret = RpcMain(queue, cholder);
         if (!cleanup && raiseSignum)
             RaiseSignal(raiseSignum);
 
