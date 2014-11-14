@@ -42,7 +42,6 @@ static volatile sig_atomic_t raiseSignum = 0;
 static bool stdlog = false;
 static bool failsafe = false;
 static bool noNetwork = false;
-static bool noWatchdog = false;
 static bool noWait = false;
 
 static void DoExit(int signum) {
@@ -185,7 +184,7 @@ static bool HandleRequest(TContainerHolder &cholder, const int fd,
 
     rpc::TContainerRequest request;
 
-    (void)alarm(config().daemon().read_timeout_s());
+    (void)alarm(config().daemon().slave_read_timeout_s());
     SignalMask(SIG_UNBLOCK);
     bool haveData = ReadDelimitedFrom(&pist, &request);
     SignalMask(SIG_BLOCK);
@@ -363,7 +362,6 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
         return EXIT_FAILURE;
     }
 
-    size_t heartbeat = 0;
     vector<struct pollfd> fds;
 
     while (!done) {
@@ -372,6 +370,10 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
         fds.clear();
 
         pfd.fd = sfd;
+        pfd.events = POLLIN | POLLHUP;
+        fds.push_back(pfd);
+
+        pfd.fd = REAP_EVT_FD;
         pfd.events = POLLIN | POLLHUP;
         fds.push_back(pfd);
 
@@ -389,12 +391,7 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
                 break;
         }
 
-        if (heartbeat + config().daemon().heartbeat_delay_ms()
-            <= GetCurrentTimeMs()) {
-            cholder.Heartbeat();
-            heartbeat = GetCurrentTimeMs();
-            WatchdogStrobe();
-        }
+        queue->DeliverEvents(cholder);
 
         if (hup) {
             close(sfd);
@@ -416,10 +413,6 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
             }
         }
 
-        ret = ReapSpawner(REAP_EVT_FD, cholder);
-        if (done)
-            break;
-
         if (fds[0].revents) {
             if (clients.size() <= config().daemon().max_clients()) {
                 ret = AcceptClient(sfd, clients);
@@ -430,7 +423,13 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
             }
         }
 
-        for (size_t i = 1; i < fds.size(); i++) {
+        if (fds[1].revents && !failsafe) {
+            ret = ReapSpawner(REAP_EVT_FD, cholder);
+            if (done)
+                break;
+        }
+
+        for (size_t i = 2; i < fds.size(); i++) {
             if (!(fds[i].revents & (POLLIN | POLLHUP)))
                 continue;
 
@@ -556,10 +555,6 @@ static int SlaveMain() {
                 TLogger::LogError(error, "Error while removing" + path);
             }
         }
-
-        if (!noWatchdog)
-            WatchdogStart(config().daemon().watchdog_max_fails(),
-                          config().daemon().watchdog_delay_s());
 
         ret = RpcMain(queue, cholder);
         if (!cleanup && raiseSignum)
@@ -742,10 +737,10 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
 
         int status;
         if (noWait) {
-            sleep(config().daemon().wait_timeout_s());
+            sleep(config().daemon().master_wait_timeout_s());
             continue;
         } else {
-            (void)alarm(config().daemon().wait_timeout_s());
+            (void)alarm(config().daemon().master_wait_timeout_s());
             SignalMask(SIG_UNBLOCK);
             pid = wait(&status);
             SignalMask(SIG_BLOCK);
@@ -848,8 +843,6 @@ int main(int argc, char * const argv[]) {
             stdlog = true;
         } else if (arg == "--failsafe") {
             failsafe = true;
-        } else if (arg == "--nowatch") {
-            noWatchdog = true;
         } else if (arg == "--nonet") {
             noNetwork = true;
         } else if (arg == "--nowait") {

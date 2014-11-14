@@ -38,16 +38,13 @@ void TConfig::LoadDefaults() {
     config().mutable_keyval()->set_size("size=32m");
 
     config().mutable_daemon()->set_max_clients(128);
-    config().mutable_daemon()->set_poll_timeout_ms(10 * 1000);
-    config().mutable_daemon()->set_heartbeat_delay_ms(5 * 1000);
-    config().mutable_daemon()->set_watchdog_max_fails(5);
-    config().mutable_daemon()->set_watchdog_delay_s(5);
-    config().mutable_daemon()->set_wait_timeout_s(10);
-    config().mutable_daemon()->set_read_timeout_s(5);
+    config().mutable_daemon()->set_master_wait_timeout_s(60);
+    config().mutable_daemon()->set_slave_read_timeout_s(5);
     config().mutable_daemon()->set_cgroup_remove_timeout_s(1);
     config().mutable_daemon()->set_freezer_wait_timeout_s(1);
     config().mutable_daemon()->set_memory_guarantee_reserve(2 * 1024 * 1024 * 1024UL);
     config().mutable_daemon()->mutable_pidmap()->set_path("/tmp/portod.pidmap");
+    config().mutable_daemon()->set_rotate_logs_timeout_s(60);
 
     config().mutable_container()->set_max_log_size(10 * 1024 * 1024);
     config().mutable_container()->set_tmp_dir("/place/porto");

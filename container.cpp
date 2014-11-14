@@ -1177,6 +1177,9 @@ TError TContainer::Restore(const kv::TNode &node) {
 
         if (GetState() == EContainerState::Running)
             MaybeReturnedOk = true;
+
+        if (MayRespawn())
+            ScheduleRespawn();
     } else {
         TLogger::Log() << GetName() << ": restore created container " << std::endl;
 
@@ -1242,27 +1245,28 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
         TLogger::LogError(error, "Can't kill all tasks in container");
     }
 
-    if (NeedRespawn()) {
-        TError error = Respawn();
-        TLogger::LogError(error, "Can't respawn " + GetName());
-    } else {
+    if (MayRespawn())
+        ScheduleRespawn();
+    else
         StopChildren();
-    }
 
     TimeOfDeath = GetCurrentTimeMs();
     return true;
 }
 
-bool TContainer::NeedRespawn() {
+bool TContainer::MayRespawn() {
     if (GetState() != EContainerState::Dead)
         return false;
 
     if (!Prop->GetBool(P_RESPAWN))
         return false;
 
-    size_t startTime = TimeOfDeath + config().container().respawn_delay_ms();
+    return Prop->GetInt(P_MAX_RESPAWNS) < 0 || Data->GetUint(D_RESPAWN_COUNT) < (uint64_t)Prop->GetInt(P_MAX_RESPAWNS);
+}
 
-    return startTime <= GetCurrentTimeMs() && (Prop->GetInt(P_MAX_RESPAWNS) < 0 || Data->GetUint(D_RESPAWN_COUNT) < (uint64_t)Prop->GetInt(P_MAX_RESPAWNS));
+void TContainer::ScheduleRespawn() {
+    TEvent e(shared_from_this());
+    Queue->Add(config().container().respawn_delay_ms(), e);
 }
 
 TError TContainer::Respawn() {
@@ -1279,18 +1283,6 @@ TError TContainer::Respawn() {
     return TError::Success();
 }
 
-void TContainer::Heartbeat() {
-    if (NeedRespawn()) {
-        TError error = Respawn();
-        TLogger::LogError(error, "Can't respawn " + GetName());
-    }
-
-    if (GetState() != EContainerState::Running || !Task)
-        return;
-
-    Task->Rotate();
-}
-
 bool TContainer::CanRemoveDead() const {
     return State == EContainerState::Dead &&
         TimeOfDeath + config().container().aging_time_ms() <= GetCurrentTimeMs();
@@ -1305,9 +1297,25 @@ bool TContainer::HasChildren() const {
 }
 
 bool TContainer::DeliverEvent(const TEvent &event) {
+    TError error;
     switch (event.Type) {
         case EEventType::Exit:
             return DeliverExitStatus(event.Exit.Pid, event.Exit.Status);
+        case EEventType::RotateLogs:
+            if (GetState() == EContainerState::Running && !Task) {
+                error = Task->Rotate();
+                TLogger::LogError(error, "Can't rotate logs");
+            }
+            return false;
+        case EEventType::Respawn:
+            if (MayRespawn()) {
+                error = Respawn();
+                TLogger::LogError(error, "Can't respawn container");
+                if (!error)
+                    TLogger::Log() << "Respawned " << GetName() << std::endl;
+                return true;
+            }
+            return false;
         default:
             return false;
     }
@@ -1385,6 +1393,8 @@ TError TContainerHolder::CreateRoot() {
     error = root->Start();
     if (error)
         return error;
+
+    ScheduleLogRotatation();
 
     return TError::Success();
 }
@@ -1555,27 +1565,32 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
     return TError::Success();
 }
 
-void TContainerHolder::Heartbeat() {
-    auto i = Containers.begin();
-
-    while (i != Containers.end()) {
-        auto &name = i->first;
-        auto c = i->second;
-        if (c->CanRemoveDead()) {
-            TLogger::Log() << "Remove old dead container " << name << std::endl;
-            i = Containers.erase(i);
-        } else {
-            c->Heartbeat();
-            ++i;
-        }
-    }
+void TContainerHolder::ScheduleLogRotatation() {
+    Queue->Add(config().daemon().rotate_logs_timeout_s() * 1000, TEvent());
 }
 
 bool TContainerHolder::DeliverEvent(const TEvent &event) {
-    for (auto c : Containers)
-        if (c.second->DeliverEvent(event))
-            return true;
+    if (config().log().verbose())
+        TLogger::Log() << "Deliver event " << event.GetMsg() << std::endl;
 
-    TLogger::Log() << "Couldn't deliver " << event.GetMsg() << std::endl;
-    return false;
+    if (event.Type == EEventType::Respawn) {
+            auto c = event.Respawn.Container.lock();
+            if (!c)
+                return false;
+
+            return c->DeliverEvent(event);
+    } else {
+        for (auto c : Containers)
+            if (c.second->DeliverEvent(event))
+                return true;
+    }
+
+    if (event.Type == EEventType::RotateLogs) {
+        TLogger::Log() << "Rotated logs " << std::endl;
+        ScheduleLogRotatation();
+        return true;
+    } else {
+        TLogger::Log() << "Couldn't deliver " << event.GetMsg() << std::endl;
+        return false;
+    }
 }

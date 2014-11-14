@@ -2597,7 +2597,7 @@ static void WaitRespawn(TPortoAPI &api, const std::string &name, int expected, i
     std::string respawnCount;
     int successRespawns = 0;
     for(int i = 0; i < maxTries; i++) {
-        sleep(config().daemon().heartbeat_delay_ms() / 1000);
+        sleep(config().container().respawn_delay_ms() / 1000);
         ExpectSuccess(api.GetData(name, "respawn_count", respawnCount));
         if (respawnCount == std::to_string(expected))
             successRespawns++;
@@ -2616,27 +2616,27 @@ static void TestRespawn(TPortoAPI &api) {
     ExpectSuccess(api.Create(name));
     ExpectFailure(api.SetProperty(name, "max_respawns", "true"), EError::InvalidValue);
 
-    ExpectSuccess(api.SetProperty(name, "command", "sleep 1"));
+    ExpectSuccess(api.SetProperty(name, "command", "true"));
 
     ExpectSuccess(api.SetProperty(name, "respawn", "false"));
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "respawn_count", ret));
     Expect(ret == string("0"));
     WaitState(api, name, "dead");
+    sleep(config().container().respawn_delay_ms() / 1000);
     ExpectSuccess(api.GetData(name, "respawn_count", ret));
     Expect(ret == string("0"));
     ExpectSuccess(api.Stop(name));
 
     ExpectSuccess(api.SetProperty(name, "respawn", "true"));
     ExpectSuccess(api.Start(name));
-
     ExpectSuccess(api.GetData(name, "root_pid", pid));
-    WaitExit(api, pid);
+    WaitState(api, name, "dead");
+    WaitState(api, name, "running");
     ExpectSuccess(api.GetData(name, "root_pid", respawnPid));
     Expect(pid != respawnPid);
     ExpectSuccess(api.GetData(name, "respawn_count", ret));
     Expect(ret != "0" && ret != "");
-
     ExpectSuccess(api.Stop(name));
 
     int expected = 3;
@@ -2703,7 +2703,7 @@ static bool RespawnTicks(TPortoAPI &api, const std::string &name, int maxTries =
     std::string respawnCount, v;
     ExpectSuccess(api.GetData(name, "respawn_count", respawnCount));
     for(int i = 0; i < maxTries; i++) {
-        sleep(config().daemon().heartbeat_delay_ms() / 1000);
+        sleep(config().container().respawn_delay_ms() / 1000);
         ExpectSuccess(api.GetData(name, "respawn_count", v));
 
         if (v != respawnCount)
@@ -2997,7 +2997,7 @@ int SelfTest(string name, int leakNr) {
     }
 
     if (WordCount(config().slave_log().path(),
-                  "Task belongs to invalid subsystem") != 1) {
+                  "Task belongs to invalid subsystem") > 1) {
         std::cerr << "ERROR: Some task belongs to invalid subsystem!" << std::endl;
         return EXIT_FAILURE;
     }

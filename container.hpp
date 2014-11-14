@@ -78,7 +78,8 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     TError PrepareMetaParent();
 
     const std::string StripParentName(const std::string &name) const;
-    bool NeedRespawn();
+    void ScheduleRespawn();
+    bool MayRespawn();
     bool ShouldApplyProperty(const std::string &property);
     TError Respawn();
     void StopChildren();
@@ -139,7 +140,6 @@ public:
     TError Restore(const kv::TNode &node);
 
     std::shared_ptr<TCgroup> GetLeafCgroup(std::shared_ptr<TSubsystem> subsys);
-    void Heartbeat();
     bool CanRemoveDead() const;
     bool HasChildren() const;
     uint16_t GetId() { return Id; }
@@ -160,6 +160,7 @@ class TContainerHolder {
     TError GetId(uint16_t &id);
     void PutId(uint16_t id);
     TError RestoreId(const kv::TNode &node, uint16_t &id);
+    void ScheduleLogRotatation();
 public:
     TContainerHolder(std::shared_ptr<TEventQueue> queue,
                      const std::vector<std::shared_ptr<TNlLink>> &links) :
@@ -176,7 +177,6 @@ public:
     TError Destroy(const std::string &name);
 
     std::vector<std::string> List() const;
-    void Heartbeat();
 
     bool DeliverEvent(const TEvent &event);
 };

@@ -6,6 +6,7 @@
 #include <queue>
 
 class TContainer;
+class TContainerHolder;
 
 enum class EEventType {
     Exit,
@@ -26,7 +27,7 @@ public:
         std::weak_ptr<TContainer> Container;
     } Respawn;
 
-    int TimeoutMs = 0;
+    size_t DueMs = 0;
 
     TEvent(int pid, int status) : Type(EEventType::Exit) {
         Exit.Pid = pid; Exit.Status = status;
@@ -49,7 +50,8 @@ class TEventQueue {
 public:
     TEventQueue() {}
 
-    void Add(size_t timeoutMs, TEvent &e);
+    void Add(size_t timeoutMs, const TEvent &e);
+    void DeliverEvents(TContainerHolder &cholder);
     int GetNextTimeout();
 };
 
