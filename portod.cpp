@@ -35,14 +35,12 @@ using std::vector;
 
 static pid_t slavePid;
 static volatile sig_atomic_t done = false;
-static volatile sig_atomic_t gotAlarm = false;
 static volatile sig_atomic_t cleanup = true;
 static volatile sig_atomic_t hup = false;
 static volatile sig_atomic_t raiseSignum = 0;
 static bool stdlog = false;
 static bool failsafe = false;
 static bool noNetwork = false;
-static bool noWait = false;
 
 static void DoExit(int signum) {
     done = true;
@@ -60,9 +58,7 @@ static void DoHangup(int signum) {
     hup = true;
 }
 
-static void DoAlarm(int signum) {
-    // we just need to interrupt poll
-    gotAlarm = true;
+static void DoNothing(int signum) {
 }
 
 static void RaiseSignal(int signum) {
@@ -84,7 +80,7 @@ static void RegisterSignalHandlers() {
     // kill all running containers in case of SIGINT (useful for debugging)
     (void)RegisterSignal(SIGINT, DoExitAndCleanup);
     (void)RegisterSignal(SIGHUP, DoHangup);
-    (void)RegisterSignal(SIGALRM, DoAlarm);
+    (void)RegisterSignal(SIGALRM, DoNothing);
     // don't stop containers when terminating
     (void)RegisterSignal(SIGTERM, DoExit);
     // don't catch SIGQUIT, may be useful to create core dump
@@ -92,7 +88,7 @@ static void RegisterSignalHandlers() {
 
 static void SignalMask(int how) {
     sigset_t mask;
-    int sigs[] = { SIGALRM };
+    int sigs[] = { SIGALRM, SIGCHLD };
 
     if (sigemptyset(&mask) < 0) {
         TLogger::Log() << "Can't initialize signal mask: " << strerror(errno) << std::endl;
@@ -153,6 +149,9 @@ static int DaemonPrepare(bool master) {
     TLogger::Log() << config().DebugString() << std::endl;
 
     RegisterSignalHandlers();
+
+    if (master)
+        (void)RegisterSignal(SIGCHLD, DoNothing);
 
     return EXIT_SUCCESS;
 }
@@ -595,12 +594,36 @@ static void SendPidStatus(int fd, int pid, int status, size_t queued) {
         TLogger::Log() << "write(status): " << strerror(errno) << std::endl;
 }
 
+static int SendPids(int fd, map<int,int> &pidToStatus, int slavePid, int &slaveStatus) {
+    int status;
+    int pid;
+
+    while (true) {
+        pid = waitpid(-1, &status, WNOHANG);
+        if (pid <= 0)
+            return 0;
+
+        if (pid == slavePid) {
+            slaveStatus = status;
+            return -1;
+        }
+
+        SendPidStatus(fd, pid, status, pidToStatus.size());
+        pidToStatus[pid] = status;
+    }
+
+    return -1;
+}
+
 static void ReceiveAcks(int fd, map<int,int> &pidToStatus) {
     int pid;
 
     while (read(fd, &pid, sizeof(pid)) == sizeof(pid)) {
-        TLogger::Log() << "Got acknowledge for " << pid << std::endl;
+        if (errno == EINTR)
+            return;
+
         pidToStatus.erase(pid);
+        TLogger::Log() << "Got acknowledge for " << pid << " (" + std::to_string(queued) + " queued)" << std::endl;
     }
 }
 
@@ -666,6 +689,7 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
     int evtfd[2];
     int ackfd[2];
     int ret = EXIT_FAILURE;
+    int flags;
 
     if (pipe(evtfd) < 0) {
         TLogger::Log() << "pipe(): " << strerror(errno) << std::endl;
@@ -697,18 +721,20 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
     close(evtfd[0]);
     close(ackfd[1]);
 
+    flags = fcntl(ackfd[0], F_GETFL, 0);
+    if (flags < 0 || fcntl(ackfd[0], F_SETFL, flags & (~O_NONBLOCK)) < 0) {
+        TLogger::Log() << "Can't clear O_NONBLOCK flag from ackfd: " << strerror(errno) << std::endl;
+        return EXIT_FAILURE;
+    }
+
     TLogger::Log() << "Spawned slave " << slavePid << std::endl;
+
+    SignalMask(SIG_BLOCK);
 
     for (auto &pair : pidToStatus)
         SendPidStatus(evtfd[1], pair.first, pair.second, pidToStatus.size());
 
-    SignalMask(SIG_BLOCK);
-
     while (!done) {
-        int pid;
-
-        ReceiveAcks(ackfd[0], pidToStatus);
-
         if (hup) {
             int ret = DaemonSyncConfig(true, true);
             if (ret)
@@ -735,40 +761,17 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
             break;
         }
 
+        SignalMask(SIG_UNBLOCK);
+        ReceiveAcks(ackfd[0], pidToStatus);
+        SignalMask(SIG_BLOCK);
+
         int status;
-        if (noWait) {
-            sleep(config().daemon().master_wait_timeout_s());
-            continue;
-        } else {
-            (void)alarm(config().daemon().master_wait_timeout_s());
-            SignalMask(SIG_UNBLOCK);
-            pid = wait(&status);
-            SignalMask(SIG_BLOCK);
-            (void)alarm(0);
-        }
-
-        if (gotAlarm) {
-            gotAlarm = false;
-            continue;
-        }
-
-        if (errno == EINTR) {
-            TLogger::Log() << "wait(): " << strerror(errno) << std::endl;
-            continue;
-        }
-        if (pid == slavePid) {
+        if (SendPids(evtfd[1], pidToStatus, slavePid, status)) {
             TLogger::Log() << "slave exited with " << status << std::endl;
             ret = EXIT_SUCCESS;
             break;
         }
-
-        SendPidStatus(evtfd[1], pid, status, pidToStatus.size());
-        pidToStatus[pid] = status;
     }
-
-    SignalMask(SIG_UNBLOCK);
-
-    ReceiveAcks(ackfd[0], pidToStatus);
 
 exit:
     close(evtfd[0]);
@@ -776,6 +779,8 @@ exit:
 
     close(ackfd[0]);
     close(ackfd[1]);
+
+    SignalMask(SIG_UNBLOCK);
 
     return ret;
 }
@@ -845,8 +850,6 @@ int main(int argc, char * const argv[]) {
             failsafe = true;
         } else if (arg == "--nonet") {
             noNetwork = true;
-        } else if (arg == "--nowait") {
-            noWait = true;
         } else if (arg == "-t") {
             if (argn + 1 >= argc)
                 return EXIT_FAILURE;

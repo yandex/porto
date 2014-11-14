@@ -28,13 +28,12 @@ message TCfg {
 
 	message TDaemonCfg {
 		optional uint32 max_clients = 1;
-		optional uint32 master_wait_timeout_s = 2;
-		optional uint32 slave_read_timeout_s = 3;
-		optional uint32 cgroup_remove_timeout_s = 4;
-		optional uint32 freezer_wait_timeout_s = 5;
-		optional uint64 memory_guarantee_reserve = 6;
-		optional TFileCfg pidmap = 7;
-		optional uint64 rotate_logs_timeout_s = 8;
+		optional uint32 slave_read_timeout_s = 2;
+		optional uint32 cgroup_remove_timeout_s = 3;
+		optional uint32 freezer_wait_timeout_s = 4;
+		optional uint64 memory_guarantee_reserve = 5;
+		optional TFileCfg pidmap = 6;
+		optional uint64 rotate_logs_timeout_s = 7;
 	}
 
 	message TContainerCfg {

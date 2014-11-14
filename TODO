@@ -1,6 +1,5 @@
 - ? do periodic persistence checks
 - ? move property apply code into property method
-- portod: remove waitpid alert, use poll on communication pipe and handle SIGCHLD
 
 # properties
 - ? supplementary_groups
