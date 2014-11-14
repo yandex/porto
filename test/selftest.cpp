@@ -2854,8 +2854,23 @@ static void TestRecovery(TPortoAPI &api) {
     ShouldHaveValidRunningData(api, name);
     v = GetState(pid);
     Expect(v == "S");
-
     ExpectSuccess(api.Destroy(name));
+
+    if (NetworkEnabled()) {
+        Say() << "Make sure network counters are persistent" << std::endl;
+        ExpectSuccess(api.Create(name));
+        ExpectZeroLink(api, name, "net_bytes");
+
+        ExpectSuccess(api.SetProperty(name, "command", "bash -c 'wget yandex.ru && sync'"));
+        ExpectSuccess(api.Start(name));
+        WaitState(api, name, "dead");
+
+        ExpectNonZeroLink(api, name, "net_bytes");
+        KillPorto(api, SIGKILL);
+        ExpectNonZeroLink(api, name, "net_bytes");
+
+        ExpectSuccess(api.Destroy(name));
+    }
 }
 
 static void TestCgroups(TPortoAPI &api) {
