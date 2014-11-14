@@ -34,6 +34,13 @@ public:
     static void LogRequest(const std::string &message);
     static void LogResponse(const std::string &message);
 
+    static void LogWarning(const TError &e, const std::string &s) {
+        if (!e)
+            return;
+
+        Log() << "Warning(" << e.GetErrorName() << "): " << s << ": " << e.GetMsg() << std::endl;
+    }
+
     static void LogError(const TError &e, const std::string &s) {
         if (!e)
             return;

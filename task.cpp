@@ -830,15 +830,15 @@ TError TTask::Restore(int pid_) {
     if (running) {
         TPath stdinLink("/proc/" + std::to_string(Pid) + "/fd/0");
         TError error = stdinLink.ReadLink(Env->StdinPath);
-        TLogger::LogError(error, "Restore stdin");
+        TLogger::LogWarning(error, "Restore stdin");
 
         TPath stdoutLink("/proc/" + std::to_string(Pid) + "/fd/1");
         error = stdoutLink.ReadLink(Env->StdoutPath);
-        TLogger::LogError(error, "Restore stdout");
+        TLogger::LogWarning(error, "Restore stdout");
 
         TPath stderrLink("/proc/" + std::to_string(Pid) + "/fd/2");
         error = stderrLink.ReadLink(Env->StderrPath);
-        TLogger::LogError(error, "Restore stderr");
+        TLogger::LogWarning(error, "Restore stderr");
 
         error = FixCgroups();
         TLogger::LogError(error, "Can't fix cgroups");

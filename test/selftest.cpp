@@ -2593,12 +2593,12 @@ static void TestPermissions(TPortoAPI &api) {
     AsNobody(api);
 }
 
-static void WaitRespawn(TPortoAPI &api, const std::string &name, int maxTries, int expected) {
+static void WaitRespawn(TPortoAPI &api, const std::string &name, int expected, int maxTries = 10) {
     std::string respawnCount;
     int successRespawns = 0;
     for(int i = 0; i < maxTries; i++) {
         sleep(config().daemon().heartbeat_delay_ms() / 1000);
-        api.GetData(name, "respawn_count", respawnCount);
+        ExpectSuccess(api.GetData(name, "respawn_count", respawnCount));
         if (respawnCount == std::to_string(expected))
             successRespawns++;
         if (successRespawns == 2)
@@ -2645,7 +2645,7 @@ static void TestRespawn(TPortoAPI &api) {
     ExpectSuccess(api.SetProperty(name, "command", "echo test"));
     ExpectSuccess(api.Start(name));
 
-    WaitRespawn(api, name, 10, expected);
+    WaitRespawn(api, name, expected);
 
     ExpectSuccess(api.Destroy(name));
 }
@@ -2697,6 +2697,19 @@ static void KillPorto(TPortoAPI &api, int sig) {
     WaitExit(api, std::to_string(portodPid));
     WaitPortod(api);
     expectedRespawns++;
+}
+
+static bool RespawnTicks(TPortoAPI &api, const std::string &name, int maxTries = 3) {
+    std::string respawnCount, v;
+    ExpectSuccess(api.GetData(name, "respawn_count", respawnCount));
+    for(int i = 0; i < maxTries; i++) {
+        sleep(config().daemon().heartbeat_delay_ms() / 1000);
+        ExpectSuccess(api.GetData(name, "respawn_count", v));
+
+        if (v != respawnCount)
+            return true;
+    }
+    return false;
 }
 
 static void TestRecovery(TPortoAPI &api) {
@@ -2820,7 +2833,7 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectSuccess(api.Start(name));
     WaitState(api, name, "dead");
     KillPorto(api, SIGKILL);
-    WaitRespawn(api, name, 10, expected);
+    WaitRespawn(api, name, expected);
     ExpectSuccess(api.GetData(name, "respawn_count", v));
     Expect(v == std::to_string(expected));
 
@@ -2871,6 +2884,16 @@ static void TestRecovery(TPortoAPI &api) {
 
         ExpectSuccess(api.Destroy(name));
     }
+
+    Say() << "Make sure respawn_count ticks after recovery " << std::endl;
+    ExpectSuccess(api.Create(name));
+    ExpectSuccess(api.SetProperty(name, "command", "true"));
+    ExpectSuccess(api.SetProperty(name, "respawn", "true"));
+    ExpectSuccess(api.Start(name));
+    Expect(RespawnTicks(api, name) == true);
+    KillPorto(api, SIGKILL);
+    Expect(RespawnTicks(api, name) == true);
+    ExpectSuccess(api.Destroy(name));
 }
 
 static void TestCgroups(TPortoAPI &api) {
