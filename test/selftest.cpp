@@ -93,6 +93,8 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
         Expect(v == std::to_string(DEF_CLASS_CEIL));
         ExpectSuccess(api.GetProperty(name, "net_priority[" + link->GetName() + "]", v));
         Expect(v == std::to_string(DEF_CLASS_NET_PRIO));
+        ExpectSuccess(api.GetProperty(name, "net", v));
+        Expect(v == "host");
     }
 
     ExpectSuccess(api.GetProperty(name, "respawn", v));
@@ -121,6 +123,58 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     Expect(v == "a *:* rwm");
     ExpectSuccess(api.GetProperty(name, "capabilities", v));
     Expect(v == "");
+    ExpectSuccess(api.GetProperty(name, "recharge_on_pgfault", v));
+    Expect(v == "false");
+    ExpectSuccess(api.GetProperty(name, "isolate", v));
+    Expect(v == "true");
+    ExpectSuccess(api.GetProperty(name, "stdout_limit", v));
+    Expect(v == std::to_string(config().container().stdout_limit()));
+    ExpectSuccess(api.GetProperty(name, "private", v));
+    Expect(v == "");
+    ExpectSuccess(api.GetProperty(name, "bind", v));
+    Expect(v == "");
+    ExpectSuccess(api.GetProperty(name, "root_readonly", v));
+    Expect(v == "false");
+}
+
+static void ShouldHaveValidRunningData(TPortoAPI &api, const string &name) {
+    string v;
+
+    ExpectFailure(api.GetData(name, "__invalid_data__", v), EError::InvalidData);
+
+    ExpectSuccess(api.GetData(name, "state", v));
+    Expect(v == string("running"));
+    ExpectFailure(api.GetData(name, "exit_status", v), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "start_errno", v), EError::InvalidState);
+
+    ExpectSuccess(api.GetData(name, "root_pid", v));
+    Expect(v != "" && v != "-1" && v != "0");
+
+    ExpectSuccess(api.GetData(name, "stdout", v));
+    ExpectSuccess(api.GetData(name, "stderr", v));
+    ExpectSuccess(api.GetData(name, "cpu_usage", v));
+    ExpectSuccess(api.GetData(name, "memory_usage", v));
+
+    if (NetworkEnabled()) {
+        ExpectSuccess(api.GetData(name, "net_bytes", v));
+        ExpectSuccess(api.GetData(name, "net_packets", v));
+        ExpectSuccess(api.GetData(name, "net_drops", v));
+        ExpectSuccess(api.GetData(name, "net_overlimits", v));
+    }
+    ExpectSuccess(api.GetData(name, "minor_faults", v));
+    ExpectSuccess(api.GetData(name, "major_faults", v));
+
+    ExpectFailure(api.GetData(name, "oom_killed", v), EError::InvalidState);
+    ExpectSuccess(api.GetData(name, "respawn_count", v));
+    Expect(v == string("0"));
+    ExpectSuccess(api.GetData(name, "parent", v));
+    Expect(v == string("/"));
+    if (IsCfqActive()) {
+        ExpectSuccess(api.GetData(name, "io_read", v));
+        ExpectSuccess(api.GetData(name, "io_write", v));
+    }
+    ExpectSuccess(api.GetProperty(name, "max_respawns", v));
+    Expect(v == "-1");
 }
 
 static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
@@ -145,15 +199,19 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
         ExpectFailure(api.GetData(name, "net_drops", v), EError::InvalidState);
         ExpectFailure(api.GetData(name, "net_overlimits", v), EError::InvalidState);
     }
+    ExpectFailure(api.GetData(name, "minor_faults", v), EError::InvalidState);
+    ExpectFailure(api.GetData(name, "major_faults", v), EError::InvalidState);
 
     ExpectFailure(api.GetData(name, "oom_killed", v), EError::InvalidState);
     ExpectFailure(api.GetData(name, "respawn_count", v), EError::InvalidState);
     ExpectSuccess(api.GetData(name, "parent", v));
+    Expect(v == string("/"));
     if (IsCfqActive()) {
         ExpectFailure(api.GetData(name, "io_read", v), EError::InvalidState);
         ExpectFailure(api.GetData(name, "io_write", v), EError::InvalidState);
     }
-    Expect(v == string("/"));
+    ExpectSuccess(api.GetProperty(name, "max_respawns", v));
+    Expect(v == "-1");
 }
 
 static void ExpectTclass(string name, bool exp) {
@@ -317,6 +375,7 @@ static void TestHolder(TPortoAPI &api) {
     Expect(v == "stopped");
     ExpectSuccess(api.GetData("a", "state", v));
     Expect(v == "running");
+    ShouldHaveValidRunningData(api, "a");
     ExpectSuccess(api.Stop("a"));
 
     Say() << "Make sure when parent stops/dies children are stopped" << std::endl;
@@ -1765,10 +1824,37 @@ static void TestRoot(TPortoAPI &api) {
         "capabilities",
     };
 
+    vector<string> data = {
+        "state",
+        "oom_killed",
+        "parent",
+        "respawn_count",
+        "root_pid",
+        "exit_status",
+        "start_errno",
+        "stdout",
+        "stderr",
+        "cpu_usage",
+        "memory_usage",
+        "net_bytes",
+        "net_packates",
+        "net_drops",
+        "net_overlimits",
+        "minor_faults",
+        "major_faults",
+        "io_read",
+        "io_write",
+    };
+
     std::vector<TProperty> plist;
 
     ExpectSuccess(api.Plist(plist));
     Expect(plist.size() == properties.size());
+
+    std::vector<TData> dlist;
+
+    ExpectSuccess(api.Dlist(dlist));
+    Expect(dlist.size() == data.size());
 
     Say() << "Check root cpu_usage & memory_usage" << std::endl;
     ExpectSuccess(api.GetData(root, "cpu_usage", v));
@@ -2741,9 +2827,33 @@ static void TestRecovery(TPortoAPI &api) {
     Say() << "Make sure stopped state is persistent" << std::endl;
     ExpectSuccess(api.Destroy(name));
     ExpectSuccess(api.Create(name));
+    ShouldHaveValidProperties(api, name);
+    ShouldHaveValidData(api, name);
     KillPorto(api, SIGKILL);
     ExpectSuccess(api.GetData(name, "state", v));
     Expect(v == "stopped");
+    ShouldHaveValidProperties(api, name);
+    ShouldHaveValidData(api, name);
+
+    Say() << "Make sure paused state is persistent" << std::endl;
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectSuccess(api.Start(name));
+    ShouldHaveValidRunningData(api, name);
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    sleep(1);
+    v = GetState(pid);
+    Expect(v == "S");
+    ExpectSuccess(api.Pause(name));
+    v = GetState(pid);
+    Expect(v == "D");
+    KillPorto(api, SIGKILL);
+    ExpectSuccess(api.GetData(name, "root_pid", pid));
+    v = GetState(pid);
+    Expect(v == "D");
+    ExpectSuccess(api.Resume(name));
+    ShouldHaveValidRunningData(api, name);
+    v = GetState(pid);
+    Expect(v == "S");
 
     ExpectSuccess(api.Destroy(name));
 }

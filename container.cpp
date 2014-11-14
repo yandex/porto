@@ -577,10 +577,6 @@ TError TContainer::Create(int uid, int gid) {
     if (error)
         return error;
 
-    error = Data->SetInt(D_START_ERRNO, -1);
-    if (error)
-        return error;
-
     if (Parent)
         Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
 
@@ -1102,6 +1098,12 @@ TError TContainer::Prepare() {
     if (error)
         return error;
 
+    if (!Data->HasValue(D_START_ERRNO)) {
+        error = Data->SetInt(D_START_ERRNO, -1);
+        if (error)
+            return error;
+    }
+
     return Data->Create();
 }
 
@@ -1183,6 +1185,8 @@ TError TContainer::Restore(const kv::TNode &node) {
         auto state = Data->GetString(D_STATE);
         if (state == ContainerStateName(EContainerState::Dead))
             SetState(EContainerState::Dead);
+        else if (state == ContainerStateName(EContainerState::Paused))
+            SetState(EContainerState::Paused);
         else
             SetState(EContainerState::Running);
 
