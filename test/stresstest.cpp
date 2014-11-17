@@ -20,7 +20,6 @@ extern "C" {
 namespace test {
 
 static const int retries = 10;
-static std::atomic<int> fail;
 
 static std::vector<std::map<std::string, std::string>> vtasks =
 {
@@ -67,12 +66,12 @@ static void Create(TPortoAPI &api, const std::string &name, const std::string &c
     Say() << "Create container: " << name << std::endl;
 
     containers.clear();
-    api.List(containers);
+    ExpectSuccess(api.List(containers));
     Expect(std::find(containers.begin(),containers.end(),name) == containers.end());
     auto ret = api.Create(name);
     Expect(ret == EError::Success || ret == EError::ContainerAlreadyExists);
     containers.clear();
-    api.List(containers);
+    ExpectSuccess(api.List(containers));
     Expect(std::find(containers.begin(),containers.end(),name) != containers.end());
 
     if (cwd.length()) {
@@ -101,23 +100,47 @@ static void Start(TPortoAPI &api, std::string name) {
     Say() << "Start container: " << name << std::endl;
 
     ExpectSuccess(api.Start(name));
-    api.GetData(name, "state", ret);
+    ExpectSuccess(api.GetData(name, "state", ret));
     Expect(ret == "dead" || ret == "running");
 }
 
-static void CheckRuning(TPortoAPI &api, std::string name, std::string timeout) {
+static void PauseResume(TPortoAPI &api, const std::string &name) {
+    Say() << "PauseResume container: " << name << std::endl;
+
+    std::string ret;
+    int err = api.Pause(name);
+    if (err) {
+        ExpectSuccess(api.GetData(name, "state", ret));
+        if (ret == "dead")
+            return;
+        else if (ret != "paused")
+            throw "Can't pause, invalid state " + ret;
+    }
+    usleep(1000000);
+    err = api.Resume(name);
+    if (err) {
+        ExpectSuccess(api.GetData(name, "state", ret));
+        if (ret == "dead")
+            return;
+        else
+            throw "Can't resume, invalid state " + ret;
+    }
+}
+
+static void WaitDead(TPortoAPI &api, std::string name, std::string timeout) {
     std::string pid;
     std::string ret;
     int t;
 
-    Say() << "CheckRuning container: " << name << std::endl;
+    Say() << "WaitDead container: " << name << std::endl;
 
     StringToInt(timeout, t);
     while (t--) {
-        api.GetData(name, "state", ret);
+        ExpectSuccess(api.GetData(name, "state", ret));
         Say() << "Poll " << name << ": "<< ret << std::endl;
         if (ret == "dead")
             return;
+        PauseResume(api, name);
         usleep(1000000);
     }
     done++;
@@ -145,7 +168,7 @@ static void CheckStderr(TPortoAPI &api, std::string name, std::string stream) {
 static void CheckExit(TPortoAPI &api, std::string name, std::string stream) {
     std::string ret;
     Say() << "CheckExit container: " << name << std::endl;
-    api.GetData(name, "exit_status", ret);
+    ExpectSuccess(api.GetData(name, "exit_status", ret));
     Expect(ret == stream);
 }
 
@@ -188,7 +211,7 @@ static void Tasks(int n, int iter) {
                 SetProperty(api, name, "command", vtasks[t]["command"]);
                 SetProperty(api, name, "cwd", cwd);
                 Start(api, name);
-                CheckRuning(api, name, vtasks[t]["timeout"]);
+                WaitDead(api, name, vtasks[t]["timeout"]);
                 CheckExit(api, name, vtasks[t]["exit_status"]);
                 CheckStdout(api, name, vtasks[t]["stdout"]);
                 CheckStderr(api, name, vtasks[t]["stderr"]);
@@ -201,8 +224,7 @@ static void Tasks(int n, int iter) {
     } catch (std::string e) {
         Say() << "ERROR: Exception " << e << std::endl;
         Say() << "ERROR: Stop task" << std::to_string(n) << std::endl;
-        fail++;
-        return;
+        abort();
     }
     Say() << "Stop task" << std::to_string(n) << std::endl;
 }
@@ -222,7 +244,7 @@ static void StressKill() {
         if (kill(pid, SIGKILL)) {
             Say(std::cerr) << "ERROR: Don't send kill to " << pid << std::endl;
         } else {
-            std::cout << "Killed " << pid << std::endl;
+            std::cout << "[-] Killed " << pid << std::endl;
         }
     }
 }
@@ -231,6 +253,9 @@ int StressTest(int threads, int iter, bool killPorto) {
     int i;
     std::vector<std::thread> thrTasks;
     std::thread thrKill;
+
+    if (threads < 0)
+        threads = vtasks.size();
 
     try {
         (void)signal(SIGPIPE, SIG_IGN);
@@ -252,11 +277,10 @@ int StressTest(int threads, int iter, bool killPorto) {
         TestDaemon(api);
     } catch (std::string e) {
         std::cerr << "ERROR: Exception " << e << std::endl;
-        fail++;
+        abort();
     }
 
-    if (!fail)
-        std::cout << "Test completed!" << std::endl;
+    std::cout << "Test completed!" << std::endl;
 
     return 0;
 }
