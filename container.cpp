@@ -138,6 +138,8 @@ const string TContainer::StripParentName(const string &name) const {
 }
 
 TContainer::~TContainer() {
+    TLogger::Log() << "Destroy " << GetName() << " " << Id << std::endl;
+
     if (GetState() == EContainerState::Paused)
         Resume();
 
@@ -715,7 +717,7 @@ TError TContainer::Start() {
 TError TContainer::KillAll() {
     auto cg = GetLeafCgroup(freezerSubsystem);
 
-    TLogger::Log() << "killall " << GetName() << std::endl;
+    TLogger::Log() << "Kill all " << GetName() << std::endl;
 
     vector<pid_t> reap;
     TError error = cg->GetTasks(reap);
@@ -734,8 +736,7 @@ TError TContainer::KillAll() {
     // then kill any task that didn't want to stop via SIGTERM signal;
     // freeze all container tasks to make sure no one forks and races with us
     error = freezerSubsystem->Freeze(*cg);
-    if (error)
-        TLogger::LogError(error, "Can't kill all tasks");
+    TLogger::LogError(error, "Can't freeze container");
 
     error = cg->GetTasks(reap);
     if (error) {
@@ -744,8 +745,7 @@ TError TContainer::KillAll() {
     }
     cg->Kill(SIGKILL);
     error = freezerSubsystem->Unfreeze(*cg);
-    if (error)
-        TLogger::LogError(error, "Can't kill all tasks");
+    TLogger::LogError(error, "Can't unfreeze container");
 
     return TError::Success();
 }
@@ -1156,15 +1156,7 @@ TError TContainer::Restore(const kv::TNode &node) {
             return error;
 
         error = Task->Restore(pid);
-        if (error) {
-            Task = nullptr;
-
-            auto cg = GetLeafCgroup(freezerSubsystem);
-            if (cg->Exists())
-                (void)KillAll();
-
-            return error;
-        }
+        TLogger::LogError(error, "Can't restore task");
 
         auto state = Data->GetString(D_STATE);
         if (state == ContainerStateName(EContainerState::Dead))

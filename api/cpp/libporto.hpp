@@ -1,7 +1,6 @@
 #ifndef __LIBPORTO_HPP__
 #define __LIBPORTO_HPP__
 
-#include "porto.hpp"
 #include "rpc.hpp"
 #include "util/protobuf.hpp"
 
