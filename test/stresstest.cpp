@@ -41,7 +41,7 @@ static std::vector<std::map<std::string, std::string>> vtasks =
     },
     {
         { "parent", "meta" },
-        { "name", "meta/test" },
+        { "name", "test" },
 
         { "command", "bash -ec 'echo $A && false'" },
         { "env", "A=qwerty" },
@@ -202,8 +202,14 @@ static void Tasks(int n, int iter) {
                 if (vtasks[t].find("name") != vtasks[t].end())
                     name = vtasks[t]["name"];
 
-                if (vtasks[t].find("parent") != vtasks[t].end())
-                    Create(api, vtasks[t]["parent"], "");
+                std::string parent;
+                if (vtasks[t].find("parent") != vtasks[t].end()) {
+                    parent = vtasks[t]["parent"] + std::to_string(n) + "_" + std::to_string(t);
+                    name = parent + "/" + name;
+                }
+
+                if (parent.length())
+                    Create(api, parent, "");
 
                 std::string cwd = "/tmp/stresstest/" + name;
                 Create(api, name, cwd);
@@ -217,8 +223,8 @@ static void Tasks(int n, int iter) {
                 CheckStderr(api, name, vtasks[t]["stderr"]);
                 Destroy(api, name, cwd);
 
-                if (vtasks[t].find("parent") != vtasks[t].end())
-                    Destroy(api, vtasks[t]["parent"], "");
+                if (parent.length())
+                    Destroy(api, parent, "");
             }
         }
     } catch (std::string e) {
