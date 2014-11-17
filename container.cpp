@@ -649,13 +649,6 @@ TError TContainer::PrepareMetaParent() {
 TError TContainer::Start() {
     auto state = GetState();
 
-    if ((state == EContainerState::Running ||
-         state == EContainerState::Dead) && MaybeReturnedOk) {
-        MaybeReturnedOk = false;
-        return TError::Success();
-    }
-    MaybeReturnedOk = false;
-
     TError error = Data->SetUint(D_RESPAWN_COUNT, 0);
     if (error)
         return error;
@@ -1168,8 +1161,7 @@ TError TContainer::Restore(const kv::TNode &node) {
         if (freezerSubsystem->IsFreezed(*cg))
             SetState(EContainerState::Paused);
 
-        if (GetState() == EContainerState::Running)
-            MaybeReturnedOk = true;
+        (void)GetState();
 
         if (MayRespawn())
             ScheduleRespawn();

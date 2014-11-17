@@ -56,7 +56,6 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     std::vector<std::weak_ptr<TContainer>> Children;
     std::shared_ptr<TKeyValueStorage> Storage;
     EContainerState State = EContainerState::Unknown;
-    bool MaybeReturnedOk = false;
     size_t TimeOfDeath = 0;
     uint16_t Id;
     int TaskStartErrno = -1;

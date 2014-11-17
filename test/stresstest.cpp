@@ -99,7 +99,7 @@ static void Start(TPortoAPI &api, std::string name) {
 
     Say() << "Start container: " << name << std::endl;
 
-    ExpectSuccess(api.Start(name));
+    (void)api.Start(name);
     ExpectSuccess(api.GetData(name, "state", ret));
     Expect(ret == "dead" || ret == "running");
 }
@@ -120,7 +120,7 @@ static void PauseResume(TPortoAPI &api, const std::string &name) {
     err = api.Resume(name);
     if (err) {
         ExpectSuccess(api.GetData(name, "state", ret));
-        if (ret == "dead")
+        if (ret == "dead" || ret == "running")
             return;
         else
             throw "Can't resume, invalid state " + ret;
