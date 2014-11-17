@@ -24,7 +24,7 @@ static int Selftest(int argc, char *argv[]) {
 }
 
 static int Stresstest(int argc, char *argv[]) {
-    int threads = 1, iter = 1000;
+    int threads = -1, iter = 1000;
     bool killPorto = true;
     if (argc >= 1)
         StringToInt(argv[0], threads);
@@ -45,7 +45,8 @@ int main(int argc, char *argv[])
 {
     // in case client closes pipe we are writing to in the protobuf code
     (void)RegisterSignal(SIGPIPE, SIG_IGN);
-    TLogger::LogToStd();
+
+    TLogger::InitLog("/dev/null", 0666, false);
 
     umask(0);
 
