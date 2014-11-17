@@ -196,7 +196,9 @@ static void Tasks(int n, int iter) {
     usleep(10000 * n);
     try {
         TPortoAPI api(config().rpc_sock().file().path(), retries);
-        while (iter--) {
+        for (; iter; iter--) {
+            if (iter % 10 == 0)
+                Say() << std::to_string(iter) << " iterations left" << std::endl;
             for (unsigned int t = 0; t < vtasks.size(); t++) {
                 std::string name = "stresstest" + std::to_string(n) + "_" + std::to_string(t);
                 if (vtasks[t].find("name") != vtasks[t].end())
