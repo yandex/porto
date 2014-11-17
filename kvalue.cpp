@@ -22,10 +22,13 @@ TKeyValueStorage::TKeyValueStorage() :
           { config().keyval().size() }) {
 }
 
+// use some forbidden character to represent slash in container name
+const char SLASH_SUBST = '+';
+
 string TKeyValueStorage::Name(const string &path) const {
     string s = path;
     for (string::size_type i = 0; i < s.length(); i++)
-        if (s[i] == '.')
+        if (s[i] == SLASH_SUBST)
             s[i] = '/';
     return s;
 }
@@ -34,7 +37,7 @@ string TKeyValueStorage::Path(const string &name) const {
     string s = name;
     for (string::size_type i = 0; i < s.length(); i++)
         if (s[i] == '/')
-            s[i] = '.';
+            s[i] = SLASH_SUBST;
     return Tmpfs.GetMountpoint() + "/" + s;
 }
 
