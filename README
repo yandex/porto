@@ -25,5 +25,5 @@ sudo ./portoctl exec trusty command="/sbin/init" root=/home/stfomichev/src/porto
 TODO - fix SELinux:  Could not open policy file <= /etc/selinux/targeted/policy/policy.29:  No such file or directory
 
 # Profile
-~stfomichev/perf record -e cycles:u -g -- portod
+~stfomichev/perf record -e cycles:u -g -F100 -- portod
 ~stfomichev/perf report --stdio

@@ -4,7 +4,7 @@ PROJECT(yandex-porto)
 
 set(CMAKE_CXX_FLAGS "-O2 -Wall -std=c++11 -g")
 set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc")
-#set(CMAKE_CXX_FLAGS "-O0 -Wall -std=c++11 -g -fprofile-arcs -ftest-coverage")
+#set(CMAKE_CXX_FLAGS "-O0 -Wall -std=c++11 -g -fno-omit-frame-pointer -fprofile-arcs -ftest-coverage")
 #set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc -fprofile-arcs -ftest-coverage")
 
 if(EXISTS "/usr/bin/g++-4.7")
@@ -50,7 +50,7 @@ add_dependencies(porto version.hpp)
 
 add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp event.cpp task.cpp kvalue.cpp subsystem.cpp config.cpp value.cpp data.cpp property.cpp qdisc.cpp util/namespace.cpp util/netlink.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/unix.cpp util/pwd.cpp util/string.cpp util/crash.cpp)
 add_dependencies(portod version.hpp)
-target_link_libraries(portod porto ${PB} ${INSTALL_DIR}/lib/libnl-3.a ${INSTALL_DIR}/lib/libnl-route-3.a pthread rt)
+target_link_libraries(portod porto ${PB} ${INSTALL_DIR}/lib/libnl-3.a ${INSTALL_DIR}/lib/libnl-route-3.a rt)
 
 add_executable(portoctl api/python/porto/rpc_pb2.py portoctl.cpp cli.cpp config.cpp util/namespace.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/unix.cpp util/pwd.cpp util/string.cpp)
 add_dependencies(portoctl version.hpp)
