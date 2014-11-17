@@ -22,23 +22,3 @@ Depends: python (>= 2.6), python-central, python-protobuf, yandex-porto (= ${bin
 XS-Python-Version: >= 2.6
 XB-Python-Version: >= 2.6
 Description: Python API for porto
-
-Package: yandex-search-porto-config
-Section: misc
-Priority: optional
-Architecture: all
-Description: Runtime config for yandex-porto
-
-Package: yandex-search-group-porto
-Section: misc
-Priority: optional
-Architecture: all
-Description: Package creates porto group
-
-Package: yandex-search-porto
-Section: misc
-Priority: optional
-Architecture: all
-Pre-Depends: yandex-search-group-porto (= ${binary:Version}), yandex-search-porto-config (= ${binary:Version}), yandex-search-user-skynet, yandex-search-user-loadbase
-Depends: yandex-porto (= ${binary:Version}), python-portopy (= ${binary:Version})
-Description: Metapackage for porto
