@@ -2901,20 +2901,58 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
-static void TestCgroups(TPortoAPI &api) {
-    string cg = "/sys/fs/cgroup/freezer/qwerty/asdfg";
-
-    AsRoot(api);
-
-    TFolder f(cg);
+static void mkdir_p(const std::string &path) {
+    TFolder f(path);
     if (f.Exists())
         Expect(f.Remove() == false);
     Expect(f.Create(0755, true) == false);
+}
+
+static void TestCgroups(TPortoAPI &api) {
+    AsRoot(api);
+
+    Say() << "Make sure we don't remove non-porto cgroups" << std::endl;
+
+    string freezerCg = "/sys/fs/cgroup/freezer/qwerty/asdfg";
+
+    mkdir_p(freezerCg);
 
     KillPorto(api, SIGINT);
 
-    Expect(f.Exists() == true);
-    Expect(f.Remove() == false);
+    TFolder qwerty(freezerCg);
+    Expect(qwerty.Exists() == true);
+    Expect(qwerty.Remove() == false);
+
+    Say() << "Make sure we can remove freezed cgroups" << std::endl;
+
+    freezerCg = "/sys/fs/cgroup/freezer/porto/asdf";
+    string memoryCg = "/sys/fs/cgroup/memory/porto/asdf";
+    string cpuCg = "/sys/fs/cgroup/cpu/porto/asdf";
+
+    mkdir_p(freezerCg);
+    mkdir_p(memoryCg);
+    mkdir_p(cpuCg);
+
+    int pid = fork();
+    if (pid == 0) {
+        TFile freezer(freezerCg + "/cgroup.procs");
+        ExpectSuccess(freezer.AppendString(std::to_string(getpid())));
+        TFile memory(memoryCg + "/cgroup.procs");
+        ExpectSuccess(memory.AppendString(std::to_string(getpid())));
+        TFile cpu(cpuCg + "/cgroup.procs");
+        ExpectSuccess(cpu.AppendString(std::to_string(getpid())));
+        execlp("sleep", "sleep", "1000", nullptr);
+        abort();
+    }
+
+    KillPorto(api, SIGKILL);
+
+    TFolder freezer(freezerCg);
+    Expect(freezer.Exists() == false);
+    TFolder memory(memoryCg);
+    Expect(memory.Exists() == false);
+    TFolder cpu(cpuCg);
+    Expect(cpu.Exists() == false);
 }
 
 static void TestVersion(TPortoAPI &api) {
