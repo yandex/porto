@@ -278,8 +278,13 @@ TError TCgroupSnapshot::Create() {
 }
 
 void TCgroupSnapshot::Destroy() {
-    for (auto cg: Cgroups)
+    for (auto cg: Cgroups) {
+        // Thaw cgroups that we will definitely remove
+        if (cg.use_count() > 2)
+            continue;
+
         (void)freezerSubsystem->Unfreeze(*cg);
+    }
 
     Cgroups.clear();
 }
