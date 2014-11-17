@@ -1,5 +1,8 @@
 #!/bin/sh
+
 set -xe
+
+rootdir=$(cd $(dirname $0)/../ && pwd)
 
 changelog_modified() { test "$(git diff --name-only debian/changelog)" = "debian/changelog"; }
 
@@ -23,6 +26,8 @@ upload() {
 if [ $# -eq 0 ]; then
     set commit push upload
 fi
+
+cd $rootdir
 
 for i in "$@"; do
     eval $i

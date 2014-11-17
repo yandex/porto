@@ -12,7 +12,7 @@ git checkout v0.7
 debuild
 
 # Release new version
-./release
+scripts/release
 
 # Run fedora
 yum -y --installroot=/home/stfomichev/src/porto/dist/fedora20 --releasever=20 --nogpg install systemd passwd yum fedora-release vim-minimal openssh-server procps-ng iproute net-tools dhclient
