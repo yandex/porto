@@ -296,6 +296,8 @@ void AckExitStatus(int pid) {
     } else {
         TError error(EError::Unknown, errno, "write(): returned " + std::to_string(ret));
         TLogger::LogError(error, "Can't acknowledge exit status for " + std::to_string(pid));
+        if (ret < 0)
+            Crash();
     }
 }
 
