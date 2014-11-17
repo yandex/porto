@@ -276,5 +276,8 @@ TError TCgroupSnapshot::Create() {
 }
 
 void TCgroupSnapshot::Destroy() {
+    for (auto cg: Cgroups)
+        (void)freezerSubsystem->Unfreeze(*cg);
+
     Cgroups.clear();
 }

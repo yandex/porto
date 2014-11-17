@@ -24,8 +24,8 @@ class TCgroup : public std::enable_shared_from_this<TCgroup> {
     mode_t Mode = 0755;
 
 public:
-    TCgroup(const std::vector<std::shared_ptr<TSubsystem>> controller,
-            std::shared_ptr<TMount> mount = nullptr);
+    TCgroup(const std::vector<std::shared_ptr<TSubsystem>> subsystems,
+            std::shared_ptr<TMount> m = nullptr);
     TCgroup(const std::string &name, const std::shared_ptr<TCgroup> parent) :
         Name(name), Parent(parent) {}
 
