@@ -108,7 +108,7 @@ TError TFreezerSubsystem::WaitState(TCgroup &cg, const std::string &state) const
         if (error)
             TLogger::LogError(error, "Can't freeze cgroup");
 
-        return s != state;
+        return StringTrim(s) != state;
     });
 
     if (ret) {
@@ -124,7 +124,7 @@ TError TFreezerSubsystem::Freeze(TCgroup &cg) const {
     if (error)
         return error;
 
-    return WaitState(cg, "FROZEN\n");
+    return WaitState(cg, "FROZEN");
 }
 
 TError TFreezerSubsystem::Unfreeze(TCgroup &cg) const {
@@ -132,7 +132,14 @@ TError TFreezerSubsystem::Unfreeze(TCgroup &cg) const {
     if (error)
         return error;
 
-    return WaitState(cg, "THAWED\n");
+    return WaitState(cg, "THAWED");
+}
+
+bool TFreezerSubsystem::IsFreezed(TCgroup &cg) const {
+    string s;
+    TError error = cg.GetKnobValue("freezer.state", s);
+    TLogger::LogError(error, "Can't get freezer status");
+    return StringTrim(s) != "THAWED";
 }
 
 // Cpu

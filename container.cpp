@@ -1169,10 +1169,12 @@ TError TContainer::Restore(const kv::TNode &node) {
         auto state = Data->GetString(D_STATE);
         if (state == ContainerStateName(EContainerState::Dead))
             SetState(EContainerState::Dead);
-        else if (state == ContainerStateName(EContainerState::Paused))
-            SetState(EContainerState::Paused);
         else
             SetState(EContainerState::Running);
+
+        auto cg = GetLeafCgroup(freezerSubsystem);
+        if (freezerSubsystem->IsFreezed(*cg))
+            SetState(EContainerState::Paused);
 
         if (GetState() == EContainerState::Running)
             MaybeReturnedOk = true;

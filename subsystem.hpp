@@ -39,6 +39,7 @@ public:
     TError WaitState(TCgroup &cg, const std::string &state) const;
     TError Freeze(TCgroup &cg) const;
     TError Unfreeze(TCgroup &cg) const;
+    bool IsFreezed(TCgroup &cg) const;
 };
 
 class TCpuSubsystem : public TSubsystem {
