@@ -1,3 +1,20 @@
+yandex-porto (0.20) precise; urgency=low
+
+  * Allow . (dot) in container name
+  * Support ext4 formatted file as rootfs (loop mounted)
+  * Don't read stdout/stderr in case of device/pipe/socket
+  * Add capabilities property
+  * Always restrict /proc and /sys
+  * Fix bind property to support binding into container /sys subdirectory
+  * Add daemon version request to RPC
+  * Fix network data persistence
+  * Fix paused state recovery
+  * Fix portod socket removal upon shutdown
+  * Adjust portod OOM score
+  * libporto: Don't retry RPC if socket doesn't exist
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 18 Nov 2014 18:46:00 +0400
+
 yandex-porto (0.19) precise; urgency=low
 
   * Fix recovery
