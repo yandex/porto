@@ -135,6 +135,8 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     Expect(v == "");
     ExpectSuccess(api.GetProperty(name, "root_readonly", v));
     Expect(v == "false");
+    ExpectSuccess(api.GetProperty(name, "max_respawns", v));
+    Expect(v == "-1");
 }
 
 static void ShouldHaveValidRunningData(TPortoAPI &api, const string &name) {
@@ -173,8 +175,6 @@ static void ShouldHaveValidRunningData(TPortoAPI &api, const string &name) {
         ExpectSuccess(api.GetData(name, "io_read", v));
         ExpectSuccess(api.GetData(name, "io_write", v));
     }
-    ExpectSuccess(api.GetProperty(name, "max_respawns", v));
-    Expect(v == "-1");
 }
 
 static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
@@ -2706,6 +2706,10 @@ static void KillPorto(TPortoAPI &api, int sig) {
     WaitExit(api, std::to_string(portodPid));
     WaitPortod(api);
     expectedRespawns++;
+
+    std::string v;
+    ExpectSuccess(api.GetData("/", "porto_stat[spawned]", v));
+    Expect(v == std::to_string(expectedRespawns + 1));
 }
 
 static bool RespawnTicks(TPortoAPI &api, const std::string &name, int maxTries = 3) {
@@ -2875,6 +2879,8 @@ static void TestRecovery(TPortoAPI &api) {
     ShouldHaveValidRunningData(api, name);
     v = GetState(pid);
     Expect(v == "S" || v == "R");
+    ExpectSuccess(api.GetData(name, "time", v));
+    Expect(v != "0");
     ExpectSuccess(api.Destroy(name));
 
     if (NetworkEnabled()) {
@@ -2964,6 +2970,24 @@ static void TestVersion(TPortoAPI &api) {
     Expect(revision == GIT_REVISION);
 }
 
+static void TestPackage(TPortoAPI &api) {
+    AsRoot(api);
+
+    Expect(FileExists(config().master_log().path()));
+    Expect(FileExists(config().slave_log().path()));
+    Expect(FileExists(config().rpc_sock().file().path()));
+
+    Expect(system("stop yandex-porto") == 0);
+
+    Expect(FileExists(config().master_log().path()));
+    Expect(FileExists(config().slave_log().path()));
+    Expect(FileExists(config().rpc_sock().file().path()) == false);
+
+    system("start yandex-porto");
+    expectedRespawns++;
+    WaitPortod(api);
+}
+
 int SelfTest(string name, int leakNr) {
     pair<string, std::function<void(TPortoAPI &)>> tests[] = {
         { "root", TestRoot },
@@ -3000,6 +3024,7 @@ int SelfTest(string name, int leakNr) {
         { "recovery", TestRecovery },
         { "cgroups", TestCgroups },
         { "version", TestVersion },
+        { "package", TestPackage },
     };
 
     ExpectSuccess(SetHostName(HOSTNAME));
