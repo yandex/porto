@@ -38,4 +38,6 @@ public:
     TScopedFd &operator=(int fd);
 };
 
+TError SetOomScoreAdj(int value);
+
 #endif

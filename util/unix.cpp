@@ -259,3 +259,8 @@ TScopedFd &TScopedFd::operator=(int fd) {
 
     return *this;
 }
+
+TError SetOomScoreAdj(int value) {
+    TFile f("/proc/self/oom_score_adj");
+    return f.WriteStringNoAppend(std::to_string(value));
+}

@@ -117,6 +117,7 @@ static int DaemonSyncConfig(bool master, bool trunc) {
     if (trunc) {
         StatReset(PORTO_STAT_SPAWNED);
         StatReset(PORTO_STAT_ERRORS);
+        StatReset(PORTO_STAT_WARNS);
     }
 
     config.Load();
@@ -504,6 +505,9 @@ static int SlaveMain() {
 
     umask(0);
 
+    TError error = SetOomScoreAdj(0);
+    TLogger::LogError(error, "Can't adjust OOM score");
+
     try {
         TKeyValueStorage storage;
         // don't fail, try to recover anyway
@@ -817,8 +821,10 @@ static int MasterMain() {
 
     TMountSnapshot ms;
     TError error = ms.RemountSlave();
-    if (error)
-        TLogger::LogError(error, "Can't remount shared mountpoints");
+    TLogger::LogError(error, "Can't remount shared mountpoints");
+
+    error = SetOomScoreAdj(-1000);
+    TLogger::LogError(error, "Can't adjust OOM score");
 
     SignalMask(SIG_UNBLOCK);
 

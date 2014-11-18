@@ -431,6 +431,7 @@ public:
 
         m["spawned"] = StatGet(PORTO_STAT_SPAWNED);
         m["errors"] = StatGet(PORTO_STAT_ERRORS);
+        m["warnings"] = StatGet(PORTO_STAT_WARNS);
 
         return m;
     }

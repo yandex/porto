@@ -42,6 +42,9 @@ public:
             return;
 
         Log() << "Warning(" << e.GetErrorName() << "): " << s << ": " << e.GetMsg() << std::endl;
+#ifdef PORTOD
+        StatInc(PORTO_STAT_WARNS);
+#endif
     }
 
     static void LogError(const TError &e, const std::string &s) {

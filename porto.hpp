@@ -20,6 +20,7 @@ const std::string SYSFS_CGROOT = "/sys/fs/cgroup";
 
 const std::string PORTO_STAT_SPAWNED = "/porto_spawned";
 const std::string PORTO_STAT_ERRORS = "/porto_errors";
+const std::string PORTO_STAT_WARNS = "/porto_warns";
 
 #define NO_COPY_CONSTRUCT(NAME) \
     NAME(const NAME &) = delete; \
