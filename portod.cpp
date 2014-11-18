@@ -167,7 +167,8 @@ static void DaemonShutdown(bool master) {
 
 static void RemoveRpcServer(const string &path) {
     TFile f(path);
-    (void)f.Remove();
+    TError error = f.Remove();
+    TLogger::LogError(error, "Can't remove socket file");
 }
 
 struct ClientInfo {
@@ -558,6 +559,10 @@ static int SlaveMain() {
         }
 
         ret = RpcMain(queue, cholder);
+        TLogger::Log() << "Shutting down..." << std::endl;
+
+        RemoveRpcServer(config().rpc_sock().file().path());
+
         if (!cleanup && raiseSignum)
             RaiseSignal(raiseSignum);
 
@@ -577,12 +582,10 @@ static int SlaveMain() {
         ret = EXIT_FAILURE;
     }
 
-    RemoveRpcServer(config().rpc_sock().file().path());
+    DaemonShutdown(false);
 
     if (raiseSignum)
         RaiseSignal(raiseSignum);
-
-    DaemonShutdown(false);
 
     return ret;
 }
@@ -775,6 +778,14 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
         }
     }
 
+    if (done) {
+        if (kill(slavePid, SIGINT) < 0)
+            TLogger::Log() << "Can't send SIGINT to slave" << std::endl;
+
+        TLogger::Log() << "Waiting for slave to exit..." << std::endl;
+        (void)waitpid(slavePid, nullptr, 0);
+    }
+
 exit:
     close(evtfd[0]);
     close(evtfd[1]);
@@ -817,9 +828,6 @@ static int MasterMain() {
         if (!done && next >= GetCurrentTimeMs())
             usleep((next - GetCurrentTimeMs()) * 1000);
     }
-
-    if (kill(slavePid, SIGINT) < 0)
-        TLogger::Log() << "Can't send SIGINT to slave" << std::endl;
 
     DaemonShutdown(true);
 

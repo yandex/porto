@@ -1,3 +1,4 @@
+- hidden data porto_stats
 - ? do periodic persistence checks
 - ? move property apply code into property method
 
