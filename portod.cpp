@@ -114,6 +114,11 @@ static int DaemonSyncConfig(bool master, bool trunc) {
         TLogger::Log() << "Truncated log" << std::endl;
     }
 
+    if (trunc) {
+        StatReset(PORTO_STAT_SPAWNED);
+        StatReset(PORTO_STAT_ERRORS);
+    }
+
     config.Load();
     if (noNetwork)
         config().mutable_network()->set_enabled(false);
@@ -733,6 +738,7 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
     }
 
     TLogger::Log() << "Spawned slave " << slavePid << std::endl;
+    StatInc(PORTO_STAT_SPAWNED);
 
     SignalMask(SIG_BLOCK);
 

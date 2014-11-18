@@ -48,9 +48,10 @@ include_directories(${yandex-porto_BINARY_DIR}/api/cpp)
 add_library(porto api/cpp/libporto.cpp error.cpp util/protobuf.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(porto version.hpp)
 
-add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp event.cpp task.cpp kvalue.cpp subsystem.cpp config.cpp value.cpp data.cpp property.cpp qdisc.cpp util/namespace.cpp util/netlink.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/unix.cpp util/pwd.cpp util/string.cpp util/crash.cpp)
+add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp event.cpp task.cpp kvalue.cpp subsystem.cpp config.cpp value.cpp data.cpp property.cpp qdisc.cpp util/stat.cpp util/namespace.cpp util/netlink.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/unix.cpp util/pwd.cpp util/string.cpp util/crash.cpp)
+set_target_properties(portod PROPERTIES COMPILE_DEFINITIONS "PORTOD=1")
 add_dependencies(portod version.hpp)
-target_link_libraries(portod porto ${PB} ${INSTALL_DIR}/lib/libnl-3.a ${INSTALL_DIR}/lib/libnl-route-3.a rt)
+target_link_libraries(portod porto ${PB} ${INSTALL_DIR}/lib/libnl-3.a ${INSTALL_DIR}/lib/libnl-route-3.a pthread rt)
 
 add_executable(portoctl api/python/porto/rpc_pb2.py portoctl.cpp cli.cpp config.cpp util/namespace.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/unix.cpp util/pwd.cpp util/string.cpp)
 add_dependencies(portoctl version.hpp)

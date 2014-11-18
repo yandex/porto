@@ -1844,6 +1844,7 @@ static void TestRoot(TPortoAPI &api) {
         "major_faults",
         "io_read",
         "io_write",
+        "time",
     };
 
     std::vector<TProperty> plist;
@@ -3044,8 +3045,15 @@ int SelfTest(string name, int leakNr) {
         if (!needDaemonChecks)
             return EXIT_SUCCESS;
 
-        respawns = WordCount(config().master_log().path(), "Spawned") - 1;
+        respawns = WordCount(config().master_log().path(), "Spawned");
         errors = WordCount(config().slave_log().path(), "Error");
+
+        std::string v;
+        ExpectSuccess(api.GetData("/", "porto_stat[spawned]", v));
+        Expect(v == std::to_string(respawns));
+
+        ExpectSuccess(api.GetData("/", "porto_stat[errors]", v));
+        Expect(v == std::to_string(errors));
     } catch (string e) {
         std::cerr << "EXCEPTION: " << e << std::endl;
         return EXIT_FAILURE;
@@ -3056,7 +3064,7 @@ int SelfTest(string name, int leakNr) {
         std::cerr << "ERROR: Some task belongs to invalid subsystem!" << std::endl;
         return EXIT_FAILURE;
     }
-    if (respawns != expectedRespawns) {
+    if (respawns - 1 != expectedRespawns) {
         std::cerr << "ERROR: Unexpected number of respawns: " << respawns << "!" << std::endl;
         return EXIT_FAILURE;
     }

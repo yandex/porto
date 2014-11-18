@@ -1,4 +1,4 @@
-- hidden data porto_stats
+- adjust master oom score
 - ? do periodic persistence checks
 - ? move property apply code into property method
 

@@ -383,7 +383,7 @@ public:
 class TTimeData : public TUintValue {
 public:
     TTimeData() :
-        TUintValue("minor_faults",
+        TUintValue("time",
                    "return running time of container",
                    NODEF_VALUE,
                    rpdState) {}
@@ -417,6 +417,25 @@ public:
     }
 };
 
+class TPortoStatData : public TMapValue {
+public:
+    TPortoStatData() :
+        TMapValue("porto_stat",
+                  "",
+                  NODEF_VALUE | HIDDEN_VALUE,
+                  anyState) {}
+
+    TUintMap GetMap(std::shared_ptr<TContainer> c,
+                    std::shared_ptr<TVariant> v) override {
+        TUintMap m;
+
+        m["spawned"] = StatGet(PORTO_STAT_SPAWNED);
+        m["errors"] = StatGet(PORTO_STAT_ERRORS);
+
+        return m;
+    }
+};
+
 TValueSet dataSet;
 TError RegisterData() {
     std::vector<TValue *> dat = {
@@ -439,6 +458,8 @@ TError RegisterData() {
         new TMajorFaultsData,
         new TIoReadData,
         new TIoWriteData,
+        new TTimeData,
+        new TPortoStatData,
     };
 
     return dataSet.Register(dat);

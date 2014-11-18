@@ -6,6 +6,9 @@
 
 #include "error.hpp"
 #include "util/crash.hpp"
+#ifdef PORTOD
+#include "util/stat.hpp"
+#endif
 
 #define PORTO_ASSERT(EXPR) \
     do { \
@@ -46,6 +49,9 @@ public:
             return;
 
         Log() << "Error(" << e.GetErrorName() << "): " << s << ": " << e.GetMsg() << std::endl;
+#ifdef PORTOD
+        StatInc(PORTO_STAT_ERRORS);
+#endif
     }
 };
 

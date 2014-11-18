@@ -18,6 +18,9 @@ const uint32_t DEF_CLASS_NET_PRIO = 3;
 
 const std::string SYSFS_CGROOT = "/sys/fs/cgroup";
 
+const std::string PORTO_STAT_SPAWNED = "/porto_spawned";
+const std::string PORTO_STAT_ERRORS = "/porto_errors";
+
 #define NO_COPY_CONSTRUCT(NAME) \
     NAME(const NAME &) = delete; \
     NAME &operator=(const NAME &) = delete
