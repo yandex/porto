@@ -43,7 +43,7 @@ retry:
             LastErrorMsg = error.GetMsg();
             LastError = INT_MIN;
 
-            if (error.GetErrno() == EACCES)
+            if (error.GetErrno() == EACCES || error.GetErrno() == ENOENT)
                 goto exit;
 
             goto exit_or_retry;
