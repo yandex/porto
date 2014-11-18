@@ -862,6 +862,7 @@ int main(int argc, char * const argv[]) {
             std::cout << GIT_TAG << " " << GIT_REVISION <<std::endl;
             return EXIT_SUCCESS;
         } else if (arg == "--kv-dump") {
+            config.Load();
             KvDump();
             return EXIT_SUCCESS;
         } else if (arg == "--slave") {
