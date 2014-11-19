@@ -22,6 +22,13 @@ extern "C" {
 #include <linux/capability.h>
 }
 
+const uint32_t DEF_CLASS_PRIO = 50;
+
+const uint32_t DEF_CLASS_MAX_RATE = -1;
+const uint32_t DEF_CLASS_RATE = 10 * 1000 * 1000 / 8 /* 10Mbit */;
+const uint32_t DEF_CLASS_CEIL = DEF_CLASS_MAX_RATE;
+const uint32_t DEF_CLASS_NET_PRIO = 3;
+
 using std::string;
 using std::vector;
 using std::map;

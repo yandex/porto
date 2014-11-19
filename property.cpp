@@ -447,7 +447,7 @@ public:
                    dynamicProperty) {}
 
     uint64_t GetDefaultUint(std::shared_ptr<TContainer> c) override {
-        return DEF_CLASS_PRIO;
+        return config().container().default_cpu_prio();
     }
 
     TError ParseUint(std::shared_ptr<TContainer> c,
@@ -479,15 +479,16 @@ protected:
 
 public:
     TNetMapValue(const std::string &name,
-                 const std::string &desc,
-                 const uint64_t def,
-                 const uint64_t rootDef) :
+                 const std::string &desc) :
         TMapValue(name, desc,
                   PARENT_RO_PROPERTY,
-                  staticProperty), Def(def), RootDef(rootDef) {}
+                  staticProperty) {}
+
+    virtual uint32_t GetDefault() { return 0; }
+    virtual uint32_t GetRootDefault() { return 0; }
 
     TUintMap GetDefaultMap(std::shared_ptr<TContainer> c) override {
-        uint64_t def =  c->IsRoot() ? RootDef : Def;
+        uint64_t def =  c->IsRoot() ? GetRootDefault() : GetDefault();
 
         TUintMap m;
         for (auto &link : c->Links)
@@ -514,24 +515,27 @@ class TNetGuaranteeProperty : public TNetMapValue {
 public:
     TNetGuaranteeProperty() :
         TNetMapValue(P_NET_GUARANTEE,
-                     "Guaranteed container network bandwidth",
-                     DEF_CLASS_RATE, DEF_CLASS_MAX_RATE) {}
+                     "Guaranteed container network bandwidth") {}
+    uint32_t GetDefault() override { return config().network().default_guarantee(); }
+    uint32_t GetRootDefault() override { return config().network().default_max_guarantee(); }
 };
 
 class TNetCeilProperty : public TNetMapValue {
 public:
     TNetCeilProperty() :
         TNetMapValue(P_NET_CEIL,
-                     "Maximum container network bandwidth",
-                     DEF_CLASS_CEIL, DEF_CLASS_MAX_RATE) {}
+                     "Maximum container network bandwidth") {}
+    uint32_t GetDefault() override { return config().network().default_limit(); }
+    uint32_t GetRootDefault() override { return config().network().default_max_guarantee(); }
 };
 
 class TNetPriorityProperty : public TNetMapValue {
 public:
     TNetPriorityProperty() :
         TNetMapValue(P_NET_PRIO,
-                  "Container network priority: 0-7",
-                  DEF_CLASS_NET_PRIO, DEF_CLASS_NET_PRIO) {}
+                     "Container network priority: 0-7") {}
+    uint32_t GetDefault() override { return config().network().default_prio(); }
+    uint32_t GetRootDefault() override { return config().network().default_prio(); }
 
     TError SetMap(std::shared_ptr<TContainer> c,
                   std::shared_ptr<TVariant> v,

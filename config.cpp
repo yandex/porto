@@ -16,6 +16,12 @@ TConfig config;
 void TConfig::LoadDefaults() {
     config().mutable_network()->set_enabled(true);
     config().mutable_network()->set_debug(false);
+    config().mutable_network()->set_debug(false);
+    config().mutable_network()->set_default_prio(3);
+    config().mutable_network()->set_default_max_guarantee(-1);
+    /* 10Mbit */;
+    config().mutable_network()->set_default_guarantee(10 * 1000 * 1000 / 8);
+    config().mutable_network()->set_default_limit(-1);
 
     config().mutable_slave_pid()->set_path("/run/portod.pid");
     config().mutable_slave_pid()->set_perm(0644);
@@ -51,6 +57,7 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_respawn_delay_ms(1000);
     config().mutable_container()->set_stdout_limit(8 * 1024 * 1024);
     config().mutable_container()->set_private_max(1024);
+    config().mutable_container()->set_default_cpu_prio(50);
 }
 
 bool TConfig::LoadFile(const std::string &path, bool silent) {

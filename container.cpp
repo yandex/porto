@@ -598,9 +598,9 @@ TError TContainer::Create(int uid, int gid) {
 
         TUintMap prio, rate, ceil;
         for (auto &link : Links) {
-            prio[link->GetName()] = DEF_CLASS_PRIO;
-            rate[link->GetName()] = DEF_CLASS_RATE;
-            ceil[link->GetName()] = DEF_CLASS_CEIL;
+            prio[link->GetName()] = config().container().default_cpu_prio();
+            rate[link->GetName()] = config().network().default_guarantee();
+            ceil[link->GetName()] = config().network().default_limit();
         }
 
         error = DefaultTclass->Create(prio, rate, ceil);
