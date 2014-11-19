@@ -40,4 +40,7 @@ public:
 
 TError SetOomScoreAdj(int value);
 
+TError EpollCreate(int &epfd);
+TError EpollAdd(int &epfd, int fd);
+
 #endif

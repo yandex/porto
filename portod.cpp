@@ -19,6 +19,7 @@ extern "C" {
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/un.h>
+#include <sys/epoll.h>
 #include <poll.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -246,7 +247,7 @@ static int IdentifyClient(int fd, ClientInfo &ci, int total) {
     }
 }
 
-static int AcceptClient(int sfd, std::map<int,ClientInfo> &clients) {
+static int AcceptClient(int sfd, std::map<int,ClientInfo> &clients, int &fd) {
     int cfd;
     struct sockaddr_un peer_addr;
     socklen_t peer_addr_size;
@@ -267,13 +268,13 @@ static int AcceptClient(int sfd, std::map<int,ClientInfo> &clients) {
     if (ret)
         return ret;
 
+    fd = cfd;
     clients[cfd] = ci;
     return 0;
 }
 
-static void CloseClient(int cfd, std::map<int,ClientInfo> &clients) {
+static void RemoveClient(int cfd, std::map<int,ClientInfo> &clients) {
     ClientInfo ci = clients.at(cfd);
-    close(cfd);
     clients.erase(cfd);
 
     TLogger::Log() << "pid " << ci.Pid
@@ -370,30 +371,32 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
         return EXIT_FAILURE;
     }
 
-    vector<struct pollfd> fds;
+    int epfd;
+    error = EpollCreate(epfd);
+    if (error) {
+        TLogger::LogError(error, "Can't create epoll fd");
+        return EXIT_FAILURE;
+    }
+
+    error = EpollAdd(epfd, sfd);
+    if (error) {
+        TLogger::LogError(error, "Can't add RPC server fd to epoll");
+        return EXIT_FAILURE;
+    }
+
+    error = EpollAdd(epfd, REAP_EVT_FD);
+    if (error) {
+        TLogger::LogError(error, "Can't add master fd to epoll");
+        return EXIT_FAILURE;
+    }
+
+#define MAX_EVENTS 32
+    struct epoll_event ev[MAX_EVENTS];
 
     while (!done) {
-        struct pollfd pfd = {};
-
-        fds.clear();
-
-        pfd.fd = sfd;
-        pfd.events = POLLIN | POLLHUP;
-        fds.push_back(pfd);
-
-        pfd.fd = REAP_EVT_FD;
-        pfd.events = POLLIN | POLLHUP;
-        fds.push_back(pfd);
-
-        for (auto pair : clients) {
-            pfd.fd = pair.first;
-            pfd.events = POLLIN | POLLHUP;
-            fds.push_back(pfd);
-        }
-
-        ret = poll(fds.data(), fds.size(), queue->GetNextTimeout());
-        if (ret < 0) {
-            TLogger::Log() << "poll() error: " << strerror(errno) << std::endl;
+        int nr = epoll_wait(epfd, ev, MAX_EVENTS, queue->GetNextTimeout());
+        if (nr < 0) {
+            TLogger::Log() << "epoll() error: " << strerror(errno) << std::endl;
 
             if (done)
                 break;
@@ -403,6 +406,7 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
 
         if (hup) {
             close(sfd);
+
             RemoveRpcServer(config().rpc_sock().file().path());
 
             int ret = DaemonSyncConfig(false, true);
@@ -414,44 +418,58 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
             TError error = CreateRpcServer(config().rpc_sock().file().path(),
                                            config().rpc_sock().file().perm(),
                                            uid, gid, sfd);
-            fds[0].revents = 0;
             if (error) {
                 TLogger::Log() << "Can't create RPC server: " << error.GetMsg() << std::endl;
                 return EXIT_FAILURE;
             }
+
+            error = EpollAdd(epfd, sfd);
+            if (error) {
+                TLogger::LogError(error, "Can't add RPC server fd to epoll");
+                return EXIT_FAILURE;
+            }
+
+            continue;
         }
 
-        if (fds[0].revents) {
-            if (clients.size() <= config().daemon().max_clients()) {
-                ret = AcceptClient(sfd, clients);
+        for (int i = 0; i < nr; i++) {
+            if (ev[i].data.fd == sfd) {
+                if (clients.size() > config().daemon().max_clients()) {
+                    TLogger::Log() << "Skip connection attempt" << std::endl;
+                    continue;
+                }
+
+                int fd = -1;
+                ret = AcceptClient(sfd, clients, fd);
                 if (ret < 0)
                     break;
-            } else {
-                TLogger::Log() << "Skip connection attempt" << std::endl;
-            }
-        }
 
-        if (fds[1].revents && !failsafe) {
-            ret = ReapSpawner(REAP_EVT_FD, cholder);
-            if (done)
-                break;
-        }
+                error = EpollAdd(epfd, fd);
+                if (error) {
+                    TLogger::LogError(error, "Can't add client fd to epoll");
+                    return EXIT_FAILURE;
+                }
+            } else if (ev[i].data.fd == REAP_EVT_FD) {
+                if (failsafe)
+                    continue;
 
-        for (size_t i = 2; i < fds.size(); i++) {
-            if (!(fds[i].revents & (POLLIN | POLLHUP)))
-                continue;
-
-            if (clients.find(fds[i].fd) != clients.end()) {
-                auto &ci = clients.at(fds[i].fd);
+                ret = ReapSpawner(REAP_EVT_FD, cholder);
+                if (done)
+                    break;
+            } else if (clients.find(ev[i].data.fd) != clients.end()) {
+                auto &ci = clients.at(ev[i].data.fd);
                 bool needClose = false;
 
-                if (fds[i].revents & POLLIN)
-                    needClose = HandleRequest(cholder, fds[i].fd, ci.Uid, ci.Gid);
+                if (ev[i].events & EPOLLIN)
+                    needClose = HandleRequest(cholder, ev[i].data.fd,
+                                              ci.Uid, ci.Gid);
 
-                if ((fds[i].revents & POLLHUP) || needClose)
-                    CloseClient(fds[i].fd, clients);
+                if ((ev[i].events & EPOLLHUP) || needClose) {
+                    close(ev[i].data.fd);
+                    RemoveClient(ev[i].data.fd, clients);
+                }
             } else {
-                TLogger::Log() << "Invalid event for " << fds[i].fd << std::endl;
+                TLogger::Log() << "Invalid event for " << ev[i].data.fd << std::endl;
             }
         }
     }

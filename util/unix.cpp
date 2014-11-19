@@ -17,6 +17,7 @@ extern "C" {
 #include <poll.h>
 #include <linux/capability.h>
 #include <sys/syscall.h>
+#include <sys/epoll.h>
 }
 
 int RetryBusy(int times, int timeoMs, std::function<int()> handler) {
@@ -263,4 +264,20 @@ TScopedFd &TScopedFd::operator=(int fd) {
 TError SetOomScoreAdj(int value) {
     TFile f("/proc/self/oom_score_adj");
     return f.WriteStringNoAppend(std::to_string(value));
+}
+
+TError EpollCreate(int &epfd) {
+    epfd = epoll_create1(EPOLL_CLOEXEC);
+    if (epfd < 0)
+        return TError(EError::Unknown, errno, "epoll_create1()");
+    return TError::Success();
+}
+
+TError EpollAdd(int &epfd, int fd) {
+    struct epoll_event ev;
+    ev.events = EPOLLIN | EPOLLHUP;
+    ev.data.fd = fd;
+    if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) < 0)
+        return TError(EError::Unknown, errno, "epoll_add(" + std::to_string(fd) + ")");
+    return TError::Success();
 }
