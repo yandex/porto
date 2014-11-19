@@ -1223,15 +1223,15 @@ bool TContainer::Exit(int status, bool oomKilled) {
         TError error = Data->SetBool(D_OOM_KILLED, true);
         TLogger::LogError(error, "Can't set " + D_OOM_KILLED);
 
-        error = KillAll();
-        TLogger::LogError(error, "Can't kill all tasks in container");
+        KillAll();
+        TLogger::LogWarn(error, "Can't kill all tasks in container");
 
         Efd = -1;
     }
 
     if (!Prop->GetBool(P_ISOLATE)) {
         TError error = KillAll();
-        TLogger::LogError(error, "Can't kill all tasks in container");
+        TLogger::LogWarn(error, "Can't kill all tasks in container");
     }
 
     StopChildren();
@@ -1612,7 +1612,6 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     }
 
     if (event.Type == EEventType::RotateLogs) {
-        TLogger::Log() << "Rotated logs " << std::endl;
         ScheduleLogRotatation();
         return true;
     } else {

@@ -112,7 +112,10 @@ TError TFreezerSubsystem::WaitState(TCgroup &cg, const std::string &state) const
     });
 
     if (ret) {
-        TError error(EError::Unknown, "Can't wait for freezer state " + state);
+        string s = "?";
+        (void)cg.GetKnobValue("freezer.state", s);
+
+        TError error(EError::Unknown, "Can't wait for freezer state " + state + ", current state is " + s);
         TLogger::LogError(error, cg.Relpath());
         return error;
     }
