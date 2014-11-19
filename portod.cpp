@@ -371,20 +371,13 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
         return EXIT_FAILURE;
     }
 
-    int epfd;
-    error = EpollCreate(epfd);
-    if (error) {
-        TLogger::LogError(error, "Can't create epoll fd");
-        return EXIT_FAILURE;
-    }
-
-    error = EpollAdd(epfd, sfd);
+    error = EpollAdd(cholder.Epfd, sfd);
     if (error) {
         TLogger::LogError(error, "Can't add RPC server fd to epoll");
         return EXIT_FAILURE;
     }
 
-    error = EpollAdd(epfd, REAP_EVT_FD);
+    error = EpollAdd(cholder.Epfd, REAP_EVT_FD);
     if (error) {
         TLogger::LogError(error, "Can't add master fd to epoll");
         return EXIT_FAILURE;
@@ -394,7 +387,7 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
     struct epoll_event ev[MAX_EVENTS];
 
     while (!done) {
-        int nr = epoll_wait(epfd, ev, MAX_EVENTS, queue->GetNextTimeout());
+        int nr = epoll_wait(cholder.Epfd, ev, MAX_EVENTS, queue->GetNextTimeout());
         if (nr < 0) {
             TLogger::Log() << "epoll() error: " << strerror(errno) << std::endl;
 
@@ -423,7 +416,7 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
                 return EXIT_FAILURE;
             }
 
-            error = EpollAdd(epfd, sfd);
+            error = EpollAdd(cholder.Epfd, sfd);
             if (error) {
                 TLogger::LogError(error, "Can't add RPC server fd to epoll");
                 return EXIT_FAILURE;
@@ -444,7 +437,7 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
                 if (ret < 0)
                     break;
 
-                error = EpollAdd(epfd, fd);
+                error = EpollAdd(cholder.Epfd, fd);
                 if (error) {
                     TLogger::LogError(error, "Can't add client fd to epoll");
                     return EXIT_FAILURE;

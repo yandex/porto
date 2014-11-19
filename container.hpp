@@ -161,6 +161,8 @@ class TContainerHolder {
     TError RestoreId(const kv::TNode &node, uint16_t &id);
     void ScheduleLogRotatation();
 public:
+    int Epfd;
+
     TContainerHolder(std::shared_ptr<TEventQueue> queue,
                      const std::vector<std::shared_ptr<TNlLink>> &links) :
         Queue(queue), Links(links) {

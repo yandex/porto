@@ -1342,7 +1342,11 @@ TContainerHolder::~TContainerHolder() {
 }
 
 TError TContainerHolder::CreateRoot() {
-    TError error = RegisterProperties();
+    TError error = EpollCreate(Epfd);
+    if (error)
+        return error;
+
+    error = RegisterProperties();
     if (error)
         return error;
 
