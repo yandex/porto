@@ -6,6 +6,10 @@
 #include "util/path.hpp"
 #include "util/file.hpp"
 
+#ifdef PORTOD
+#include "util/stat.hpp"
+#endif
+
 static std::ofstream logFile;
 static std::ofstream kmsgFile;
 static TPath logPath;
@@ -84,26 +88,34 @@ static std::string GetTime() {
     return std::string();
 }
 
-std::basic_ostream<char> &TLogger::Log() {
+std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
     static int openlog;
+    static const std::string prefix[] = { "", "Warning! ", "Error! " };
+
+#ifdef PORTOD
+    if (level == LOG_WARN)
+        StatInc(PORTO_STAT_WARNS);
+    else if (level == LOG_ERROR)
+        StatInc(PORTO_STAT_ERRORS);
+#endif
 
     std::string name = GetProcessName();
     if (stdlog) {
-        return  std::cerr << GetTime() << " " << name << ": ";
+        return  std::cerr << GetTime() << " " << name << ": " << prefix[level];
     } else {
         if (openlog)
-            return  std::cerr << GetTime() << " " << name << ": ";
+            return  std::cerr << GetTime() << " " << name << ": " << prefix[level];
 
         openlog++;
         OpenLog();
         openlog--;
 
         if (logFile.is_open())
-            return logFile << GetTime() << " ";
+            return logFile << GetTime() << " " << prefix[level];
         else if (kmsgFile.is_open())
-            return kmsgFile << " " << name << ": ";
+            return kmsgFile << " " << name << ": " << prefix[level];
         else
-            return std::cerr << GetTime() << " " << name << ": ";
+            return std::cerr << GetTime() << " " << name << ": " << prefix[level];
     }
 }
 

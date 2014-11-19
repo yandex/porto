@@ -175,7 +175,8 @@ static void DaemonShutdown(bool master) {
 static void RemoveRpcServer(const string &path) {
     TFile f(path);
     TError error = f.Remove();
-    TLogger::LogError(error, "Can't remove socket file");
+    if (error)
+        TLogger::Log(LOG_ERROR) << "Can't remove socket file: " << error << std::endl;
 }
 
 struct ClientInfo {
@@ -303,7 +304,8 @@ void AckExitStatus(int pid) {
         TLogger::Log() << "Acknowledge exit status for " << std::to_string(pid) << std::endl;
     } else {
         TError error(EError::Unknown, errno, "write(): returned " + std::to_string(ret));
-        TLogger::LogError(error, "Can't acknowledge exit status for " + std::to_string(pid));
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't acknowledge exit status for " << pid << ": " << error << std::endl;
         if (ret < 0)
             Crash();
     }
@@ -358,7 +360,8 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
 
     TGroup g(config().rpc_sock().group().c_str());
     TError error = g.Load();
-    TLogger::LogError(error, "Can't get gid for " + config().rpc_sock().group() + " group");
+    if (error)
+        TLogger::Log(LOG_ERROR) << "Can't get gid for " << config().rpc_sock().group() << ": " << error << std::endl;
 
     if (!error)
         gid = g.GetId();
@@ -373,13 +376,13 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
 
     error = EpollAdd(cholder.Epfd, sfd);
     if (error) {
-        TLogger::LogError(error, "Can't add RPC server fd to epoll");
+        TLogger::Log(LOG_ERROR) << "Can't add RPC server fd to epoll: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
     error = EpollAdd(cholder.Epfd, REAP_EVT_FD);
     if (error) {
-        TLogger::LogError(error, "Can't add master fd to epoll");
+        TLogger::Log(LOG_ERROR) << "Can't add master fd to epoll: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -418,7 +421,7 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
 
             error = EpollAdd(cholder.Epfd, sfd);
             if (error) {
-                TLogger::LogError(error, "Can't add RPC server fd to epoll");
+                TLogger::Log(LOG_ERROR) << "Can't add RPC server fd to epoll: " << error << std::endl;
                 return EXIT_FAILURE;
             }
 
@@ -439,7 +442,7 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
 
                 error = EpollAdd(cholder.Epfd, fd);
                 if (error) {
-                    TLogger::LogError(error, "Can't add client fd to epoll");
+                    TLogger::Log(LOG_ERROR) << "Can't add client fd to epoll: " << error << std::endl;
                     return EXIT_FAILURE;
                 }
             } else if (ev[i].data.fd == REAP_EVT_FD) {
@@ -518,18 +521,20 @@ static int SlaveMain() {
     umask(0);
 
     TError error = SetOomScoreAdj(0);
-    TLogger::LogError(error, "Can't adjust OOM score");
+    if (error)
+        TLogger::Log(LOG_ERROR) << "Can't adjust OOM score: " << error << std::endl;
 
     try {
         TKeyValueStorage storage;
         // don't fail, try to recover anyway
         TError error = storage.MountTmpfs();
-        TLogger::LogError(error, "Couldn't create key-value storage, skipping recovery");
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't create key-value storage, skipping recovery: " << error << std::endl;
 
         TCgroupSnapshot cs;
         error = cs.Create();
         if (error)
-            TLogger::LogError(error, "Couldn't create cgroup snapshot!");
+            TLogger::Log(LOG_ERROR) << "Can't create cgroup snapshot: " << error << std::endl;
 
         std::vector<std::shared_ptr<TNlLink>> links;
         if (config().network().enabled()) {
@@ -547,7 +552,7 @@ static int SlaveMain() {
         TContainerHolder cholder(queue, links);
         error = cholder.CreateRoot();
         if (error) {
-            TLogger::LogError(error, "Couldn't create root container!");
+            TLogger::Log(LOG_ERROR) << "Can't create root container: " << error << std::endl;
             return EXIT_FAILURE;
         }
 
@@ -556,13 +561,13 @@ static int SlaveMain() {
             std::map<std::string, kv::TNode> m;
             error = storage.Restore(m);
             if (error)
-                TLogger::LogError(error, "Couldn't restore state!");
+                TLogger::Log(LOG_ERROR) << "Can't restore state: " << error << std::endl;
 
             for (auto &r : m) {
                 restored = true;
                 error = cholder.Restore(r.first, r.second);
                 if (error)
-                    TLogger::LogError(error, string("Couldn't restore ") + r.first + " state!");
+                    TLogger::Log(LOG_ERROR) << "Can't restore " << r.first << "state : " << error << std::endl;
             }
         }
 
@@ -575,7 +580,8 @@ static int SlaveMain() {
             if (dir.Exists()) {
                 TLogger::Log() << "Removing container leftovers from " << path << std::endl;
                 TError error = dir.Remove(true);
-                TLogger::LogError(error, "Error while removing" + path);
+                if (error)
+                    TLogger::Log(LOG_ERROR) << "Error while removing " << path << " : " << error << std::endl;
             }
         }
 
@@ -588,7 +594,8 @@ static int SlaveMain() {
             RaiseSignal(raiseSignum);
 
         error = storage.Destroy();
-        TLogger::LogError(error, "Couldn't destroy key-value storage");
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't destroy key-value storage: " << error << std::endl;
     } catch (string s) {
         std::cerr << s << std::endl;
         ret = EXIT_FAILURE;
@@ -658,14 +665,14 @@ static void SavePidMap(map<int, int> &pidToStatus) {
     if (f.Exists()) {
         TError error = f.Remove();
         if (error) {
-            TLogger::LogError(error, "Can't save pid map");
+            TLogger::Log(LOG_ERROR) << "Can't save pid map: " << error << std::endl;
             return;
         }
     }
 
     for (auto &kv : pidToStatus) {
         TError error = f.AppendString(std::to_string(kv.first) + " " + std::to_string(kv.second) + "\n");
-        TLogger::LogError(error, "Can't save pid map");
+        TLogger::Log(LOG_ERROR) << "Can't save pid map: " << error << std::endl;
     }
 }
 
@@ -677,7 +684,7 @@ static void RestorePidMap(map<int, int> &pidToStatus) {
     vector<string> lines;
     TError error = f.AsLines(lines);
     if (error) {
-        TLogger::LogError(error, "Can't restore pid map");
+        TLogger::Log(LOG_ERROR) << "Can't restore pid map: " << error << std::endl;
         return;
     }
 
@@ -685,7 +692,7 @@ static void RestorePidMap(map<int, int> &pidToStatus) {
         vector<string> tokens;
         error = SplitString(line, ' ', tokens);
         if (error) {
-            TLogger::LogError(error, "Can't restore pid map");
+            TLogger::Log(LOG_ERROR) << "Can't restore pid map: " << error << std::endl;
             continue;
         }
 
@@ -697,13 +704,13 @@ static void RestorePidMap(map<int, int> &pidToStatus) {
 
         error = StringToInt(tokens[0], pid);
         if (error) {
-            TLogger::LogError(error, "Can't restore pid map");
+            TLogger::Log(LOG_ERROR) << "Can't restore pid map: " << error << std::endl;
             continue;
         }
 
         error = StringToInt(tokens[0], status);
         if (error) {
-            TLogger::LogError(error, "Can't restore pid map");
+            TLogger::Log(LOG_ERROR) << "Can't restore pid map: " << error << std::endl;
             continue;
         }
 
@@ -827,16 +834,18 @@ static int MasterMain() {
 
     if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0) {
         TError error(EError::Unknown, errno, "prctl(PR_SET_CHILD_SUBREAPER,)");
-        TLogger::LogError(error, "Can't set myself as a subreaper");
+        TLogger::Log(LOG_ERROR) << "Can't set myself as a subreaper: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
     TMountSnapshot ms;
     TError error = ms.RemountSlave();
-    TLogger::LogError(error, "Can't remount shared mountpoints");
+    if (error)
+        TLogger::Log(LOG_ERROR) << "Can't remount shared mountpoints: " << error << std::endl;
 
     error = SetOomScoreAdj(-1000);
-    TLogger::LogError(error, "Can't adjust OOM score");
+    if (error)
+        TLogger::Log(LOG_ERROR) << "Can't adjust OOM score: " << error << std::endl;
 
     SignalMask(SIG_UNBLOCK);
 

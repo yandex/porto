@@ -41,6 +41,5 @@
 - remove extern AckExitStatus from container->Stop()
 - rotate subprocess stdout/stderr
 - move all 'extern "C"' into one file
-- different log levels (error, normal, verbose)
 - use some kind of reference count for accounting running children
 - ? remove start_errno data or make it hidden?

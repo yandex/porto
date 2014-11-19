@@ -32,7 +32,7 @@ public:
     }
 
     friend std::ostream& operator<<(std::ostream& os, const TError& err) {
-        os << err.Error << " (" << err.Description << ")";
+        os << err.GetErrorName() << " (" << err.GetMsg() << ")";
         return os;
     }
 };

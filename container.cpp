@@ -161,12 +161,14 @@ TContainer::~TContainer() {
 
     if (DefaultTclass) {
         TError error = DefaultTclass->Remove();
-        TLogger::LogError(error, "Can't remove default tc class");
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't remove default tc class: " << error << std::endl;
     }
 
     if (Qdisc) {
         TError error = Qdisc->Remove();
-        TLogger::LogError(error, "Can't remove tc qdisc");
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't remove tc qdisc: " << error << std::endl;
     }
 }
 
@@ -267,31 +269,35 @@ TError TContainer::ApplyDynamicProperties() {
     auto memcg = GetLeafCgroup(memorySubsystem);
 
     TError error = memorySubsystem->UseHierarchy(*memcg);
-    TLogger::LogError(error, "Can't set use_hierarchy for " + memcg->Relpath());
-    if (error)
+    if (error) {
+        TLogger::Log(LOG_ERROR) << "Can't set use_hierarchy for " << memcg->Relpath() << ": " << error << std::endl;
         return error;
+    }
 
     auto memroot = memorySubsystem->GetRootCgroup();
     if (memroot->HasKnob("memory.low_limit_in_bytes") && Prop->GetUint(P_MEM_GUARANTEE) != 0) {
         TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", Prop->GetString(P_MEM_GUARANTEE), false);
-        TLogger::LogError(error, "Can't set " + std::string(P_MEM_GUARANTEE));
-        if (error)
+        if (error) {
+            TLogger::Log(LOG_ERROR) << "Can't set " << P_MEM_GUARANTEE << ": " << error << std::endl;
             return error;
+        }
     }
 
     if (Prop->GetUint(P_MEM_LIMIT) != 0) {
         error = memcg->SetKnobValue("memory.limit_in_bytes", Prop->GetString(P_MEM_LIMIT), false);
-        TLogger::LogError(error, "Can't set " + std::string(P_MEM_LIMIT));
-        if (error)
+        if (error) {
+            TLogger::Log(LOG_ERROR) << "Can't set " << P_MEM_LIMIT << ": " << error << std::endl;
             return error;
+        }
     }
 
     if (memroot->HasKnob("memory.recharge_on_pgfault")) {
         string value = Prop->GetBool(P_RECHARGE_ON_PGFAULT) ? "1" : "0";
         error = memcg->SetKnobValue("memory.recharge_on_pgfault", value, false);
-        TLogger::LogError(error, "Can't set " + std::string(P_RECHARGE_ON_PGFAULT));
-        if (error)
+        if (error) {
+            TLogger::Log(LOG_ERROR) << "Can't set " << P_RECHARGE_ON_PGFAULT << ": " << error << std::endl;
             return error;
+        }
     }
 
     auto cpucg = GetLeafCgroup(cpuSubsystem);
@@ -301,16 +307,18 @@ TError TContainer::ApplyDynamicProperties() {
         error = cpucg->GetKnobValue("cpu.smart", smart);
         if (!error && smart == "1") {
             error = cpucg->SetKnobValue("cpu.smart", "0", false);
-            TLogger::LogError(error, "Can't disable smart");
-            if (error)
+            if (error) {
+                TLogger::Log(LOG_ERROR) << "Can't disable smart: " << error << std::endl;
                 return error;
+            }
         }
 
         int cpuPrio = Prop->GetUint(P_CPU_PRIO);
         error = cpucg->SetKnobValue("cpu.shares", std::to_string(cpuPrio + 2), false);
-        TLogger::LogError(error, "Can't set " + std::string(P_CPU_PRIO));
-        if (error)
+        if (error) {
+            TLogger::Log(LOG_ERROR) << "Can't set " << P_CPU_PRIO << ": " << error << std::endl;
             return error;
+        }
 
     } else if (Prop->GetString(P_CPU_POLICY) == "rt") {
         string smart;
@@ -318,9 +326,10 @@ TError TContainer::ApplyDynamicProperties() {
         error = cpucg->GetKnobValue("cpu.smart", smart);
         if (!error && smart == "0") {
             error = cpucg->SetKnobValue("cpu.smart", "1", false);
-            TLogger::LogError(error, "Can't enable smart");
-            if (error)
+            if (error) {
+                TLogger::Log(LOG_ERROR) << "Can't set enable smart: " << error << std::endl;
                 return error;
+            }
         }
     }
 
@@ -373,7 +382,7 @@ TError TContainer::PrepareNetwork() {
 
     TError error = Tclass->Create(prio, rate, ceil);
     if (error) {
-        TLogger::LogError(error, "Can't create tclass");
+        TLogger::Log(LOG_ERROR) << "Can't create tclass: " << error << std::endl;
         return error;
     }
 
@@ -389,7 +398,7 @@ TError TContainer::PrepareOomMonitor() {
     Efd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
     if (Efd.GetFd() < 0) {
         TError error(EError::Unknown, errno, "Can't create eventfd");
-        TLogger::LogError(error, "Can't update OOM settings");
+        TLogger::Log(LOG_ERROR) << "Can't update OOM settings: " << error << std::endl;
         return error;
     }
 
@@ -401,7 +410,7 @@ TError TContainer::PrepareOomMonitor() {
     TScopedFd cfd(open(cfdPath.c_str(), O_RDONLY | O_CLOEXEC));
     if (cfd.GetFd() < 0) {
         TError error(EError::Unknown, errno, "Can't open " + memcg->Path());
-        TLogger::LogError(error, "Can't update OOM settings");
+        TLogger::Log(LOG_ERROR) << "Can't update OOM settings: " << error << std::endl;
         return error;
     }
 
@@ -434,9 +443,10 @@ TError TContainer::PrepareCgroups() {
         TError error;
         if (Prop->GetString(P_CPU_POLICY) == "rt") {
             error = cpucg->SetKnobValue("cpu.smart", "1", false);
-            TLogger::LogError(error, "Can't enable smart");
-            if (error)
+            if (error) {
+                TLogger::Log(LOG_ERROR) << "Can't enable smart: " << error << std::endl;
                 return error;
+            }
         }
     }
 
@@ -444,9 +454,10 @@ TError TContainer::PrepareCgroups() {
         auto netcls = GetLeafCgroup(netclsSubsystem);
         uint32_t handle = Tclass->GetHandle();
         TError error = netcls->SetKnobValue("net_cls.classid", std::to_string(handle), false);
-        TLogger::LogError(error, "Can't set classid");
-        if (error)
+        if (error) {
+            TLogger::Log(LOG_ERROR) << "Can't set classid: " << error << std::endl;
             return error;
+        }
     }
 
     TError error = ApplyDynamicProperties();
@@ -455,16 +466,17 @@ TError TContainer::PrepareCgroups() {
 
     if (!IsRoot()) {
         error = PrepareOomMonitor();
-        TLogger::LogError(error, "Can't prepare OOM monitoring");
-        if (error)
+        if (error) {
+            TLogger::Log(LOG_ERROR) << "Can't prepare OOM monitoring: " << error << std::endl;
             return error;
+        }
     }
 
     auto devices = GetLeafCgroup(devicesSubsystem);
     error = devicesSubsystem->AllowDevices(devices,
                                            Prop->GetList(P_ALLOWED_DEVICES));
     if (error) {
-        TLogger::LogError(error, "Can't set " + std::string(P_ALLOWED_DEVICES));
+        TLogger::Log(LOG_ERROR) << "Can't set " << P_ALLOWED_DEVICES << ": " << error << std::endl;
         return error;
     }
 
@@ -551,7 +563,7 @@ TError TContainer::Create(int uid, int gid) {
 
     TError error = Prepare();
     if (error) {
-        TLogger::LogError(error, "Can't prepare container");
+        TLogger::Log(LOG_ERROR) << "Can't prepare container: " << error << std::endl;
         return error;
     }
 
@@ -587,14 +599,14 @@ TError TContainer::Create(int uid, int gid) {
         Qdisc = std::make_shared<TQdisc>(Links, rootHandle, defHandle);
         error = Qdisc->Create();
         if (error) {
-            TLogger::LogError(error, "Can't create root qdisc");
+            TLogger::Log(LOG_ERROR) << "Can't create root qdisc: " << error << std::endl;
             return error;
         }
 
         Filter = std::make_shared<TFilter>(Qdisc);
         error = Filter->Create();
         if (error) {
-            TLogger::LogError(error, "Can't create tc filter");
+            TLogger::Log(LOG_ERROR) << "Can't create tc filter: " << error << std::endl;
             return error;
         }
 
@@ -609,7 +621,7 @@ TError TContainer::Create(int uid, int gid) {
 
         error = DefaultTclass->Create(prio, rate, ceil);
         if (error) {
-            TLogger::LogError(error, "Can't create default tclass");
+            TLogger::Log(LOG_ERROR) << "Can't create default tclass: " << error << std::endl;
             return error;
         }
     }
@@ -689,15 +701,17 @@ TError TContainer::Start() {
 
     error = PrepareTask();
     if (error) {
-        TLogger::LogError(error, "Can't prepare task");
+        TLogger::Log(LOG_ERROR) << "Can't prepare task: " << error << std::endl;
         FreeResources();
         return error;
     }
 
     error = Task->Start();
     if (error) {
+        TError e = Data->SetInt(D_START_ERRNO, error.GetErrno());
+        if (e)
+            TLogger::Log(LOG_ERROR) << "Can't set start_errno: " << e << std::endl;
         FreeResources();
-        TLogger::LogError(Data->SetInt(D_START_ERRNO, error.GetErrno()), "Can't set start_errno");
         return error;
     }
 
@@ -723,7 +737,7 @@ TError TContainer::KillAll() {
     vector<pid_t> reap;
     TError error = cg->GetTasks(reap);
     if (error) {
-        TLogger::LogError(error, "Can't read tasks list while stopping container (SIGTERM)");
+        TLogger::Log(LOG_ERROR) << "Can't read tasks list while stopping container (SIGTERM): " << error << std::endl;
         return error;
     }
 
@@ -732,21 +746,23 @@ TError TContainer::KillAll() {
 
     int ret = SleepWhile(1000, [&]{ return cg->IsEmpty() == false; });
     if (ret)
-        TLogger::Log() << "Warning: child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
+        TLogger::Log(LOG_WARN) << "Child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
 
     // then kill any task that didn't want to stop via SIGTERM signal;
     // freeze all container tasks to make sure no one forks and races with us
     error = freezerSubsystem->Freeze(*cg);
-    TLogger::LogError(error, "Can't freeze container");
+    if (error)
+        TLogger::Log(LOG_ERROR) << "Can't freeze container: " << error << std::endl;
 
     error = cg->GetTasks(reap);
     if (error) {
-        TLogger::LogError(error, "Can't read tasks list while stopping container (SIGKILL)");
+        TLogger::Log(LOG_ERROR) << "Can't read tasks list while stopping container (SIGKILL): " << error << std::endl;
         return error;
     }
     cg->Kill(SIGKILL);
     error = freezerSubsystem->Unfreeze(*cg);
-    TLogger::LogError(error, "Can't unfreeze container");
+    if (error)
+        TLogger::Log(LOG_ERROR) << "Can't unfreeze container: " << error << std::endl;
 
     return TError::Success();
 }
@@ -760,7 +776,7 @@ void TContainer::StopChildren() {
             if (child->GetState() != EContainerState::Stopped && child->GetState() != EContainerState::Dead)
                 child->Stop();
         } else {
-            TLogger::Log() << "Warning: can't lock child while stopping" << std::endl;
+            TLogger::Log(LOG_WARN) << "Can't lock child while stopping" << std::endl;
         }
     }
 }
@@ -769,21 +785,21 @@ TError TContainer::PrepareResources() {
     if (Parent) {
         TError error = Parent->PrepareMetaParent();
         if (error) {
-            TLogger::LogError(error, "Can't prepare parent");
+            TLogger::Log(LOG_ERROR) << "Can't prepare parent: " << error << std::endl;
             return error;
         }
     }
 
     TError error = PrepareNetwork();
     if (error) {
-        TLogger::LogError(error, "Can't prepare task network");
+        TLogger::Log(LOG_ERROR) << "Can't prepare task network: " << error << std::endl;
         FreeResources();
         return error;
     }
 
     error = PrepareCgroups();
     if (error) {
-        TLogger::LogError(error, "Can't prepare task cgroups");
+        TLogger::Log(LOG_ERROR) << "Can't prepare task cgroups: " << error << std::endl;
         FreeResources();
         return error;
     }
@@ -797,7 +813,8 @@ void TContainer::FreeResources() {
     if (Tclass) {
         TError error = Tclass->Remove();
         Tclass = nullptr;
-        TLogger::LogError(error, "Can't remove tc classifier");
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't remove tc classifier: " << error << std::endl;
     }
 
     Task = nullptr;
@@ -819,7 +836,7 @@ TError TContainer::Stop() {
 
         TError error = KillAll();
         if (error)
-            TLogger::LogError(error, "Can't kill all tasks in container");
+            TLogger::Log(LOG_ERROR) << "Can't kill all tasks in container: " << error << std::endl;
 
         int ret = SleepWhile(1000, [&]{ kill(pid, 0); return errno != ESRCH; });
         if (ret)
@@ -847,7 +864,7 @@ TError TContainer::Pause() {
     auto cg = GetLeafCgroup(freezerSubsystem);
     TError error(freezerSubsystem->Freeze(*cg));
     if (error) {
-        TLogger::LogError(error, "Can't pause " + GetName());
+        TLogger::Log(LOG_ERROR) << "Can't pause " << GetName() << ": " << error << std::endl;
         return error;
     }
 
@@ -864,7 +881,7 @@ TError TContainer::Resume() {
     auto cg = GetLeafCgroup(freezerSubsystem);
     TError error(freezerSubsystem->Unfreeze(*cg));
     if (error) {
-        TLogger::LogError(error, "Can't resume " + GetName());
+        TLogger::Log(LOG_ERROR) << "Can't resume " << GetName() << ": " << error << std::endl;
         return error;
     }
 
@@ -1157,7 +1174,8 @@ TError TContainer::Restore(const kv::TNode &node) {
             return error;
 
         error = Task->Restore(pid);
-        TLogger::LogError(error, "Can't restore task");
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't restore task: " << error << std::endl;
 
         auto state = Data->GetString(D_STATE);
         if (state == ContainerStateName(EContainerState::Dead))
@@ -1221,17 +1239,20 @@ bool TContainer::Exit(int status, bool oomKilled) {
         TLogger::Log() << Task->GetPid() << " killed by OOM" << std::endl;
 
         TError error = Data->SetBool(D_OOM_KILLED, true);
-        TLogger::LogError(error, "Can't set " + D_OOM_KILLED);
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't set " << D_OOM_KILLED << ": " << error << std::endl;
 
-        KillAll();
-        TLogger::LogWarn(error, "Can't kill all tasks in container");
+        error = KillAll();
+        if (error)
+            TLogger::Log(LOG_WARN) << "Can't kill all tasks in container" << error << std::endl;
 
         Efd = -1;
     }
 
     if (!Prop->GetBool(P_ISOLATE)) {
         TError error = KillAll();
-        TLogger::LogWarn(error, "Can't kill all tasks in container");
+        if (error)
+            TLogger::Log(LOG_WARN) << "Can't kill all tasks in container" << error << std::endl;
     }
 
     StopChildren();
@@ -1240,7 +1261,8 @@ bool TContainer::Exit(int status, bool oomKilled) {
         ScheduleRespawn();
 
     TError error = Data->SetInt(D_EXIT_STATUS, status);
-    TLogger::LogError(error, "Can't set task exit status");
+    if (error)
+        TLogger::Log(LOG_ERROR) << "Can't set " << D_EXIT_STATUS << ": " << error << std::endl;
 
     TimeOfDeath = GetCurrentTimeMs();
     return true;
@@ -1325,14 +1347,16 @@ bool TContainer::DeliverEvent(const TEvent &event) {
         case EEventType::RotateLogs:
             if (GetState() == EContainerState::Running && !Task) {
                 error = Task->Rotate();
-                TLogger::LogError(error, "Can't rotate logs");
+                if (error)
+                    TLogger::Log(LOG_ERROR) << "Can't rotate logs: " << error << std::endl;
             }
             return false;
         case EEventType::Respawn:
             if (MayRespawn()) {
                 error = Respawn();
-                TLogger::LogError(error, "Can't respawn container");
-                if (!error)
+                if (error)
+                    TLogger::Log(LOG_ERROR) << "Can't respawn container: " << error << std::endl;
+                else
                     TLogger::Log() << "Respawned " << GetName() << std::endl;
                 return true;
             }
@@ -1583,7 +1607,7 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
     auto c = std::make_shared<TContainer>(this, name, parent, id, Links);
     error = c->Restore(node);
     if (error) {
-        TLogger::LogError(error, "Can't restore container " + name);
+        TLogger::Log(LOG_ERROR) << "Can't restore container " << name << ": " << error << std::endl;
         return error;
     }
 

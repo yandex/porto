@@ -41,7 +41,7 @@ static int StartContainers() {
     std::vector<std::string> files;
     TError error = f.Items(EFileType::Regular, files);
     if (error) {
-        TLogger::LogError(error, "Can't read config directory");
+        TLogger::Log(LOG_ERROR) << "Can't read config directory: " << error << std::endl;
         return EXIT_FAILURE;
     }
 

@@ -69,8 +69,8 @@ extern TValueSet propertySet;
     TError Set ## NAME(const std::string &property, \
                        const TYPE &value) { \
         if (!propertySet.Valid(property)) { \
-            TError error(EError::InvalidValue, "property not found"); \
-            TLogger::LogError(error, "Can't set property " + property); \
+            TError error(EError::InvalidValue, property + " not found"); \
+            TLogger::Log(LOG_ERROR) << "Can't set property: " << error << std::endl; \
             return error; \
         } \
         return VariantSet.Set ## NAME(property, value); \

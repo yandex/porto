@@ -4,7 +4,6 @@
 #include <fstream>
 #include <string>
 
-#include "error.hpp"
 #include "util/crash.hpp"
 #ifdef PORTOD
 #include "util/stat.hpp"
@@ -13,16 +12,22 @@
 #define PORTO_ASSERT(EXPR) \
     do { \
         if (!(EXPR)) { \
-            TLogger::Log() << "Assertion failed: " << # EXPR << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+            TLogger::Log(LOG_ERROR) << "Assertion failed: " << # EXPR << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
             Crash(); \
         } \
     } while (0)
 
 #define PORTO_RUNTIME_ERROR(MSG) \
     do { \
-        TLogger::Log() << "Runtime error: " << (MSG) << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+        TLogger::Log(LOG_ERROR) << "Runtime error: " << (MSG) << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
         Crash(); \
     } while (0)
+
+enum ELogLevel {
+    LOG_NOTICE = 0,
+    LOG_WARN = 1,
+    LOG_ERROR = 2
+};
 
 class TLogger {
 private:
@@ -32,30 +37,10 @@ public:
     static void LogToStd();
     static void CloseLog();
     static void TruncateLog();
-    static std::basic_ostream<char> &Log();
+    static std::basic_ostream<char> &Log(ELogLevel level = LOG_NOTICE);
     static void LogAction(const std::string &action, bool error = false, int errcode = 0);
     static void LogRequest(const std::string &message);
     static void LogResponse(const std::string &message);
-
-    static void LogWarning(const TError &e, const std::string &s) {
-        if (!e)
-            return;
-
-        Log() << "Warning(" << e.GetErrorName() << "): " << s << ": " << e.GetMsg() << std::endl;
-#ifdef PORTOD
-        StatInc(PORTO_STAT_WARNS);
-#endif
-    }
-
-    static void LogError(const TError &e, const std::string &s) {
-        if (!e)
-            return;
-
-        Log() << "Error(" << e.GetErrorName() << "): " << s << ": " << e.GetMsg() << std::endl;
-#ifdef PORTOD
-        StatInc(PORTO_STAT_ERRORS);
-#endif
-    }
 };
 
 #endif /* __LOG_HPP__ */

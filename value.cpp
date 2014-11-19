@@ -233,7 +233,8 @@ std::vector<std::string> TValueSet::GetNames() {
 TVariantSet::~TVariantSet() {
     if (!IsRoot()) {
         TError error = Storage->RemoveNode(Name);
-        TLogger::LogError(error, "Can't remove key-value node " + Name);
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't remove key-value node " << Name << ": " << error << std::endl;
     }
 }
 
@@ -325,7 +326,7 @@ bool TVariantSet::IsDefault(const std::string &name) {
     std::shared_ptr<TVariant> v;
     TError error = Get(name, c, &p, v);
     if (error) {
-        TLogger::LogError(error, "Can't check whether " + name + " is default");
+        TLogger::Log(LOG_ERROR) << "Can't check whether " << name << " is default: " << error << std::endl;
         return false;
     }
 
@@ -341,7 +342,7 @@ bool TVariantSet::HasValue(const std::string &name) {
     std::shared_ptr<TVariant> v;
     TError error = Get(name, c, &p, v);
     if (error) {
-        TLogger::LogError(error, "Can't check whether " + name + " has value");
+        TLogger::Log(LOG_ERROR) << "Can't check whether " << name << " has value: " << error << std::endl;
         return false;
     }
 

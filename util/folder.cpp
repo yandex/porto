@@ -20,7 +20,8 @@ using std::unordered_map;
 TFolder::~TFolder() {
     if (Tmp) {
         TError error = Remove(true);
-        TLogger::LogError(error, "Can't remove " + Path.ToString());
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't remove " << Path.ToString() << ": " << error << std::endl;
     }
 }
 

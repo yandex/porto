@@ -90,14 +90,16 @@ TTask::~TTask() {
 
     TFile out(Env->StdoutPath);
     if (Env->StdoutPath.GetType() != EFileType::Character) {
-        TError e = out.Remove();
-        TLogger::LogError(e, "Can't remove task stdout " + Env->StdoutPath.ToString());
+        TError error = out.Remove();
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't remove task stdout " << Env->StdoutPath.ToString() << ": " << error << std::endl;
     }
 
     if (Env->StderrPath.GetType() != EFileType::Character) {
         TFile err(Env->StderrPath);
-        TError e = err.Remove();
-        TLogger::LogError(e, "Can't remove task stderr " + Env->StderrPath.ToString());
+        TError error = err.Remove();
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't remove task stderr " << Env->StderrPath.ToString() << ": " << error << std::endl;
     }
 }
 
@@ -622,7 +624,7 @@ TError TTask::Start() {
 
     TError error = CreateCwd();
     if (error) {
-        TLogger::LogError(error, "Can't create temporary cwd");
+        TLogger::Log(LOG_ERROR) << "Can't create temporary cwd: " << error << std::endl;
         return error;
     }
 
@@ -631,7 +633,7 @@ TError TTask::Start() {
     ret = pipe2(pfd, O_CLOEXEC);
     if (ret) {
         TError error(EError::Unknown, errno, "pipe2(pdf)");
-        TLogger::LogError(error, "Can't create communication pipe for child");
+        TLogger::Log(LOG_ERROR) << "Can't create communication pipe for child: " << error << std::endl;
         return error;
     }
 
@@ -645,7 +647,7 @@ TError TTask::Start() {
     pid_t forkPid = fork();
     if (forkPid < 0) {
         TError error(EError::Unknown, errno, "fork()");
-        TLogger::LogError(error, "Can't spawn child");
+        TLogger::Log(LOG_ERROR) << "Can't spawn child: " << error << std::endl;
         return error;
     } else if (forkPid == 0) {
         char stack[8192];
@@ -654,7 +656,7 @@ TError TTask::Start() {
 
         TError error = Env->Ns.Attach();
         if (error) {
-            TLogger::LogError(error, "Can't spawn child");
+            TLogger::Log(LOG_ERROR) << "Can't spawn child: " << error << std::endl;
             ReportPid(-1);
             Abort(error);
         }
@@ -677,7 +679,7 @@ TError TTask::Start() {
         int ret = pipe2(syncfd, O_CLOEXEC);
         if (ret) {
             TError error(EError::Unknown, errno, "pipe2(pdf)");
-            TLogger::LogError(error, "Can't create sync pipe for child");
+            TLogger::Log(LOG_ERROR) << "Can't create sync pipe for child: " << error << std::endl;
             ReportPid(-1);
             Abort(error);
         }
@@ -688,7 +690,7 @@ TError TTask::Start() {
         pid_t clonePid = clone(ChildFn, stack + sizeof(stack), cloneFlags, this);
         if (clonePid < 0) {
             TError error(EError::Unknown, errno, "clone()");
-            TLogger::LogError(error, "Can't spawn child");
+            TLogger::Log(LOG_ERROR) << "Can't spawn child: " << error << std::endl;
             ReportPid(-1);
             Abort(error);
         }
@@ -698,7 +700,7 @@ TError TTask::Start() {
         if (config().network().enabled()) {
             error = IsolateNet(clonePid);
             if (error) {
-                TLogger::LogError(error, "Can't spawn child: " + error.GetMsg());
+                TLogger::Log(LOG_ERROR) << "Can't spawn child: " << error << std::endl;
                 ReportPid(-1);
                 Abort(error);
             }
@@ -717,7 +719,7 @@ TError TTask::Start() {
     int n = read(Rfd, &Pid, sizeof(Pid));
     if (n <= 0) {
         TError error(EError::Unknown, errno, "read(Rfd)");
-        TLogger::LogError(error, "Can't read pid from the child");
+        TLogger::Log(LOG_ERROR) << "Can't read pid from the child: " << error << std::endl;
         return error;
     }
 
@@ -732,7 +734,7 @@ TError TTask::Start() {
     if (n < 0) {
         Pid = 0;
         TError error(EError::Unknown, errno, "read(Rfd)");
-        TLogger::LogError(error, "Can't read result from the child");
+        TLogger::Log(LOG_ERROR) << "Can't read result from the child: " << error << std::endl;
         return error;
     } else if (n == 0) {
         State = Started;
@@ -782,8 +784,9 @@ std::string TTask::GetStdout(size_t limit) const {
 
     string s;
     TFile f(Env->StdoutPath);
-    TError e(f.LastStrings(limit, s));
-    TLogger::LogError(e, "Can't read container stdout");
+    TError error(f.LastStrings(limit, s));
+    if (error)
+        TLogger::Log(LOG_ERROR) << "Can't read container stdout: " << error << std::endl;
     return s;
 }
 
@@ -793,8 +796,9 @@ std::string TTask::GetStderr(size_t limit) const {
 
     string s;
     TFile f(Env->StderrPath);
-    TError e(f.LastStrings(limit, s));
-    TLogger::LogError(e, "Can't read container stderr");
+    TError error(f.LastStrings(limit, s));
+    if (error)
+        TLogger::Log(LOG_ERROR) << "Can't read container stderr: " << error << std::endl;
     return s;
 }
 
@@ -830,18 +834,22 @@ TError TTask::Restore(int pid_) {
     if (running) {
         TPath stdinLink("/proc/" + std::to_string(Pid) + "/fd/0");
         TError error = stdinLink.ReadLink(Env->StdinPath);
-        TLogger::LogWarning(error, "Restore stdin");
+        if (error)
+            TLogger::Log(LOG_WARN) << "Can't restore stdin: " << error << std::endl;
 
         TPath stdoutLink("/proc/" + std::to_string(Pid) + "/fd/1");
         error = stdoutLink.ReadLink(Env->StdoutPath);
-        TLogger::LogWarning(error, "Restore stdout");
+        if (error)
+            TLogger::Log(LOG_WARN) << "Can't restore stdout: " << error << std::endl;
 
         TPath stderrLink("/proc/" + std::to_string(Pid) + "/fd/2");
         error = stderrLink.ReadLink(Env->StderrPath);
-        TLogger::LogWarning(error, "Restore stderr");
+        if (error)
+            TLogger::Log(LOG_WARN) << "Can't restore stderr: " << error << std::endl;
 
         error = FixCgroups();
-        TLogger::LogError(error, "Can't fix cgroups");
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't fx cgroups: " << error << std::endl;
     }
 
     return TError::Success();
@@ -864,18 +872,17 @@ TError TTask::FixCgroups() const {
                 continue;
 
             error = TError(EError::Unknown, "Task belongs to unknown subsystem " + pair.first);
-            TLogger::LogError(error, "Skip");
+            TLogger::Log(LOG_WARN) << "Skip " << pair.first << ": " << error << std::endl;
             continue;
         }
 
         auto cg = LeafCgroups.at(subsys);
         if (cg->Relpath() != path) {
-            error = TError(EError::Unknown, "Task belongs to invalid subsystem " + subsys->GetName() + ":" + path);
-            TLogger::LogError(error, "Fix");
+            TLogger::Log(LOG_ERROR) << "Fixed invalid task subsystem for " << subsys->GetName() << ":" << path << std::endl;
 
             error = cg->Attach(Pid);
             if (error)
-            TLogger::LogError(error, "Can't fix");
+                TLogger::Log(LOG_ERROR) << "Can't fix: " << error << std::endl;
         }
     }
 

@@ -90,7 +90,7 @@ TError TKeyValueStorage::AppendNode(const std::string &name, const kv::TNode &no
     if (lseek(fd, 0, SEEK_END) < 0) {
         close(fd);
         TError error(EError::Unknown, errno, "TKeyValueStorage open(" + Path(name) + ")");
-        TLogger::LogError(error, "Can't append key-value node");
+        TLogger::Log(LOG_ERROR) << "Can't append key-value node: " << error << std::endl;
         return error;
     }
     try {
@@ -102,7 +102,7 @@ TError TKeyValueStorage::AppendNode(const std::string &name, const kv::TNode &no
     }
     close(fd);
     if (error)
-        TLogger::LogError(error, "Can't append key-value node");
+        TLogger::Log(LOG_ERROR) << "Can't append key-value node: " << error << std::endl;
     return error;
 }
 
@@ -131,7 +131,7 @@ TError TKeyValueStorage::MountTmpfs() {
     set<shared_ptr<TMount>> mounts;
     TError error = ms.Mounts(mounts);
     if (error) {
-        TLogger::LogError(error, "Can't create mount snapshot");
+        TLogger::Log(LOG_ERROR) << "Can't create mount snapshot: " << error << std::endl;
         return error;
     }
 
@@ -142,13 +142,15 @@ TError TKeyValueStorage::MountTmpfs() {
     TFolder dir(Tmpfs.GetMountpoint());
     if (!dir.Exists()) {
         error = dir.Create(config().keyval().file().perm(), true);
-        TLogger::LogError(error, "Can't create key-value mount point");
-        if (error)
+        if (error) {
+            TLogger::Log(LOG_ERROR) << "Can't create key-value mount point: " << error << std::endl;
             return error;
+        }
     }
 
     error = Tmpfs.Mount();
-    TLogger::LogError(error, "Can't mount key-value tmpfs");
+    if (error)
+        TLogger::Log(LOG_ERROR) << "Can't mount key-value tmpfs: " << error << std::endl;
     return error;
 }
 
@@ -170,7 +172,7 @@ TError TKeyValueStorage::Restore(std::map<std::string, kv::TNode> &map) const {
 
     TError error = ListNodes(nodes);
     if (error) {
-        TLogger::LogError(error, "Can't list key-value nodes");
+        TLogger::Log(LOG_ERROR) << "Can't list key-value nodes: " << error << std::endl;
         return error;
     }
 
@@ -182,7 +184,7 @@ TError TKeyValueStorage::Restore(std::map<std::string, kv::TNode> &map) const {
 
         TError error = LoadNode(name, node);
         if (error) {
-            TLogger::LogError(error, "Can't load key-value node");
+            TLogger::Log(LOG_ERROR) << "Can't load key-value nodes: " << error << std::endl;
             return error;
         }
 

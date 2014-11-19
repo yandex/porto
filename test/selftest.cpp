@@ -38,6 +38,7 @@ namespace test {
 
 static int expectedErrors;
 static int expectedRespawns;
+static int expectedWarns;
 
 static vector<string> subsystems = { "freezer", "memory", "cpu", "cpuacct", "devices" };
 static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"uts" };
@@ -3045,6 +3046,7 @@ int SelfTest(string name, int leakNr) {
     bool needDaemonChecks = getenv("NOCHECK") == nullptr;
     int respawns = 0;
     int errors = 0;
+    int warns = 0;
     try {
         config.Load();
         TPortoAPI api(config().rpc_sock().file().path(), 0);
@@ -3079,6 +3081,7 @@ int SelfTest(string name, int leakNr) {
 
         respawns = WordCount(config().master_log().path(), "Spawned");
         errors = WordCount(config().slave_log().path(), "Error");
+        warns = WordCount(config().slave_log().path(), "Warning");
 
         std::string v;
         ExpectSuccess(api.GetData("/", "porto_stat[spawned]", v));
@@ -3086,6 +3089,9 @@ int SelfTest(string name, int leakNr) {
 
         ExpectSuccess(api.GetData("/", "porto_stat[errors]", v));
         Expect(v == std::to_string(errors));
+
+        ExpectSuccess(api.GetData("/", "porto_stat[warning]", v));
+        Expect(v == std::to_string(warns));
     } catch (string e) {
         std::cerr << "EXCEPTION: " << e << std::endl;
         return EXIT_FAILURE;
@@ -3102,6 +3108,10 @@ int SelfTest(string name, int leakNr) {
     }
     if (errors != expectedErrors) {
         std::cerr << "ERROR: Unexpected number of errors: " << errors << "!" << std::endl;
+        return EXIT_FAILURE;
+    }
+    if (warns != expectedWarns) {
+        std::cerr << "ERROR: Unexpected number of warnings: " << warns << "!" << std::endl;
         return EXIT_FAILURE;
     }
 

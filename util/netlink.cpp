@@ -282,7 +282,7 @@ TError TNlLink::AddMacVlan(const std::string &master,
     ret = nl_cache_refill(GetSock(), Nl->GetCache());
     if (ret < 0) {
         error = TError(EError::Unknown, string("Unable to add macvlan: ") + nl_geterror(ret));
-        TLogger::LogError(error, "Can't refill cache");
+        TLogger::Log(LOG_ERROR) << "Can't refill cache: " << error << std::endl;
     } else {
         LogCache(Nl->GetCache());
     }

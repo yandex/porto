@@ -176,7 +176,7 @@ public:
         uint64_t val;
         TError error = subsys->Usage(cg, val);
         if (error) {
-            TLogger::LogError(error, "Can't get CPU usage");
+            TLogger::Log(LOG_ERROR) << "Can't get CPU usage: " << error << std::endl;
             return -1;
         }
 
@@ -204,7 +204,7 @@ public:
         uint64_t val;
         TError error = subsys->Usage(cg, val);
         if (error) {
-            TLogger::LogError(error, "Can't get memory usage");
+            TLogger::Log(LOG_ERROR) << "Can't get memory usage: " << error << std::endl;
             return -1;
         }
 
@@ -224,7 +224,8 @@ public:
                     std::shared_ptr<TVariant> v) override {
         TUintMap m;
         TError error = c->GetStat(ETclassStat::Bytes, m);
-        TLogger::LogError(error, "Can't get transmitted bytes");
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't get transmitted bytes: " << error << std::endl;
         return m;
     }
 };
@@ -241,7 +242,8 @@ public:
                     std::shared_ptr<TVariant> v) override {
         TUintMap m;
         TError error = c->GetStat(ETclassStat::Packets, m);
-        TLogger::LogError(error, "Can't get transmitted packets");
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't get transmitted packets: " << error << std::endl;
         return m;
     }
 };
@@ -258,7 +260,8 @@ public:
                     std::shared_ptr<TVariant> v) override {
         TUintMap m;
         TError error = c->GetStat(ETclassStat::Drops, m);
-        TLogger::LogError(error, "Can't get dropped packets");
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't get dropped packets: " << error << std::endl;
         return m;
     }
 };
@@ -275,7 +278,8 @@ public:
                     std::shared_ptr<TVariant> v) override {
         TUintMap m;
         TError error = c->GetStat(ETclassStat::Overlimits, m);
-        TLogger::LogError(error, "Can't get number of packets over limit");
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't get number of packets over limit: " << error << std::endl;
         return m;
     }
 };
@@ -335,7 +339,8 @@ public:
 
         std::vector<BlkioStat> stat;
         TError error = blkioSubsystem->Statistics(cg, "blkio.io_service_bytes_recursive", stat);
-        TLogger::LogError(error, "Can't get blkio statistics");
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't get blkio statistics: " << error << std::endl;
         if (error)
             return m;
 
@@ -361,7 +366,8 @@ public:
 
         std::vector<BlkioStat> stat;
         TError error = blkioSubsystem->Statistics(cg, "blkio.io_service_bytes_recursive", stat);
-        TLogger::LogError(error, "Can't get blkio statistics");
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't get blkio statistics: " << error << std::endl;
         if (error)
             return m;
 
