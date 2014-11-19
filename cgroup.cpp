@@ -29,7 +29,7 @@ TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems,
         for (auto c : subsystems)
             flags.insert(c->GetName());
 
-        Mount = std::make_shared<TMount>("cgroup", SYSFS_CGROOT + "/" +
+        Mount = std::make_shared<TMount>("cgroup", config().daemon().sysfs_root() + "/" +
                                          CommaSeparatedList(flags),
                                          "cgroup", flags);
     }
@@ -135,14 +135,14 @@ TError TCgroup::Create() {
 
         bool mountRoot = true;
         for (auto m : mounts) {
-            if (m->GetMountpoint() == SYSFS_CGROOT && m->GetType() == "tmpfs")
+            if (m->GetMountpoint() == config().daemon().sysfs_root() && m->GetType() == "tmpfs")
                 mountRoot = false;
             if (*m == *Mount)
                 return TError::Success();
         }
 
         if (mountRoot) {
-            TMount root("cgroup", SYSFS_CGROOT, "tmpfs", {});
+            TMount root("cgroup", config().daemon().sysfs_root(), "tmpfs", {});
             TError error = root.Mount();
             TLogger::LogError(error, "Can't mount root cgroup");
             if (error)
