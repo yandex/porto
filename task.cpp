@@ -878,7 +878,7 @@ TError TTask::FixCgroups() const {
 
         auto cg = LeafCgroups.at(subsys);
         if (cg->Relpath() != path) {
-            TLogger::Log(LOG_ERROR) << "Fixed invalid task subsystem for " << subsys->GetName() << ":" << path << std::endl;
+            TLogger::Log(LOG_WARN) << "Fixed invalid task subsystem for " << subsys->GetName() << ":" << path << std::endl;
 
             error = cg->Attach(Pid);
             if (error)

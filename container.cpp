@@ -746,7 +746,7 @@ TError TContainer::KillAll() {
 
     int ret = SleepWhile(1000, [&]{ return cg->IsEmpty() == false; });
     if (ret)
-        TLogger::Log(LOG_WARN) << "Child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
+        TLogger::Log() << "Child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
 
     // then kill any task that didn't want to stop via SIGTERM signal;
     // freeze all container tasks to make sure no one forks and races with us
@@ -775,8 +775,6 @@ void TContainer::StopChildren() {
         if (auto child = iter.lock()) {
             if (child->GetState() != EContainerState::Stopped && child->GetState() != EContainerState::Dead)
                 child->Stop();
-        } else {
-            TLogger::Log(LOG_WARN) << "Can't lock child while stopping" << std::endl;
         }
     }
 }

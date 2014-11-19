@@ -2822,7 +2822,7 @@ static void TestRecovery(TPortoAPI &api) {
     Expect(cgmap["memory"] == "/porto");
     KillPorto(api, SIGKILL);
     AsNobody(api);
-    expectedErrors++; // Task belongs to invalid subsystem
+    expectedWarns++; // Task belongs to invalid subsystem
 
     ExpectSuccess(api.GetData(name, "root_pid", pid));
     ExpectCorrectCgroups(pid, name);
@@ -3090,7 +3090,7 @@ int SelfTest(string name, int leakNr) {
         ExpectSuccess(api.GetData("/", "porto_stat[errors]", v));
         Expect(v == std::to_string(errors));
 
-        ExpectSuccess(api.GetData("/", "porto_stat[warning]", v));
+        ExpectSuccess(api.GetData("/", "porto_stat[warnings]", v));
         Expect(v == std::to_string(warns));
     } catch (string e) {
         std::cerr << "EXCEPTION: " << e << std::endl;
