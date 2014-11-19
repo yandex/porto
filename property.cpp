@@ -957,7 +957,7 @@ class TCapabilitiesProperty : public TListValue {
 public:
     TCapabilitiesProperty() :
         TListValue(P_CAPABILITIES,
-                   "Limit process capabilities",
+                   "Limit container capabilities",
                    PERSISTENT_VALUE,
                    staticProperty) {}
 

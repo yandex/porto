@@ -1,5 +1,6 @@
 - ? do periodic persistence checks
 - ? move property apply code into property method
+- ? use chrt instead of cpu.smart so we don't depend on smart kernels + set rt prio
 
 # properties
 - ? supplementary_groups
@@ -42,4 +43,4 @@
 - move all 'extern "C"' into one file
 - different log levels (error, normal, verbose)
 - use some kind of reference count for accounting running children
-- ? remove start_errno data
+- ? remove start_errno data or make it hidden?

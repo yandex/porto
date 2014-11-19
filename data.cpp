@@ -1,4 +1,4 @@
-#include <sstream>
+create pty, #include <sstream>
 
 #include "data.hpp"
 #include "container.hpp"
@@ -71,7 +71,7 @@ class TParentData : public TStringValue {
 public:
     TParentData() :
         TStringValue("parent",
-                     "container parent",
+                     "parent container",
                      NODEF_VALUE,
                      anyState) {}
 
@@ -85,7 +85,7 @@ class TRespawnCountData : public TUintValue {
 public:
     TRespawnCountData() :
         TUintValue(D_RESPAWN_COUNT,
-                   "how many time container was automatically respawned",
+                   "how many times container was automatically respawned",
                    NODEF_VALUE | PERSISTENT_VALUE,
                    rdState) {}
 };
@@ -384,7 +384,7 @@ class TTimeData : public TUintValue {
 public:
     TTimeData() :
         TUintValue("time",
-                   "return running time of container",
+                   "root process running time",
                    NODEF_VALUE,
                    rpdState) {}
 

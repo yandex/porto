@@ -195,7 +195,7 @@ public:
 
 class TGetPropertyCmd : public ICmd {
 public:
-    TGetPropertyCmd(TPortoAPI *api) : ICmd(api, "pget", 2, "<name> <property>", "get container property") {}
+    TGetPropertyCmd(TPortoAPI *api) : ICmd(api, "pget", 2, "<name> <property>", "get raw container property") {}
 
     int Execute(int argc, char *argv[]) {
         string value;
@@ -230,7 +230,7 @@ public:
 
 class TGetDataCmd : public ICmd {
 public:
-    TGetDataCmd(TPortoAPI *api) : ICmd(api, "dget", 2, "<name> <data>", "get container data") {}
+    TGetDataCmd(TPortoAPI *api) : ICmd(api, "dget", 2, "<name> <data>", "get raw container data") {}
 
     int Execute(int argc, char *argv[]) {
         string value;
@@ -702,7 +702,7 @@ static void destroyContainer(void) {
 class TExecCmd : public ICmd {
     string containerName;
 public:
-    TExecCmd(TPortoAPI *api) : ICmd(api, "exec", 2, "<container> [properties]", "execute and wait for command in container") {}
+    TExecCmd(TPortoAPI *api) : ICmd(api, "exec", 2, "<container> [properties]", "create pty, execute and wait for command in container") {}
 
     int SwithToNonCanonical(int fd) {
         if (!isatty(fd))
