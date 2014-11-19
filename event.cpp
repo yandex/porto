@@ -11,6 +11,8 @@ std::string TEvent::GetMsg() const {
             return "rotate logs";
         case EEventType::Respawn:
             return "respawn";
+        case EEventType::OOM:
+            return "OOM killed with fd " + std::to_string(OOM.Fd);
         default:
             return "unknown event";
     }

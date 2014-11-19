@@ -393,6 +393,10 @@ TError TContainer::PrepareOomMonitor() {
         return error;
     }
 
+    TError error = EpollAdd(Holder->Epfd, Efd.GetFd());
+    if (error)
+        return error;
+
     string cfdPath = memcg->Path() + "/memory.oom_control";
     TScopedFd cfd(open(cfdPath.c_str(), O_RDONLY | O_CLOEXEC));
     if (cfd.GetFd() < 0) {
@@ -650,6 +654,10 @@ TError TContainer::Start() {
     auto state = GetState();
 
     TError error = Data->SetUint(D_RESPAWN_COUNT, 0);
+    if (error)
+        return error;
+
+    error = Data->SetInt(D_EXIT_STATUS, -1);
     if (error)
         return error;
 
@@ -1204,18 +1212,12 @@ std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys
     return Parent->GetLeafCgroup(subsys)->GetChild(Name);
 }
 
-bool TContainer::DeliverExitStatus(int pid, int status) {
-    if (!Task)
-        return false;
-
-    if (Task->GetPid() != pid)
-        return false;
-
+bool TContainer::Exit(int status, bool oomKilled) {
     Task->DeliverExitStatus(status);
     TLogger::Log() << "Delivered " << status << " to " << GetName() << " with root_pid " << Task->GetPid() << std::endl;
     SetState(EContainerState::Dead);
 
-    if (FdHasEvent(Efd.GetFd())) {
+    if (oomKilled) {
         TLogger::Log() << Task->GetPid() << " killed by OOM" << std::endl;
 
         TError error = Data->SetBool(D_OOM_KILLED, true);
@@ -1223,6 +1225,8 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
 
         error = KillAll();
         TLogger::LogError(error, "Can't kill all tasks in container");
+
+        Efd = -1;
     }
 
     if (!Prop->GetBool(P_ISOLATE)) {
@@ -1230,13 +1234,30 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
         TLogger::LogError(error, "Can't kill all tasks in container");
     }
 
+    StopChildren();
+
     if (MayRespawn())
         ScheduleRespawn();
-    else
-        StopChildren();
+
+    TError error = Data->SetInt(D_EXIT_STATUS, status);
+    TLogger::LogError(error, "Can't set task exit status");
 
     TimeOfDeath = GetCurrentTimeMs();
     return true;
+
+}
+
+bool TContainer::DeliverExitStatus(int pid, int status) {
+    if (!Task)
+        return false;
+
+    if (Task->GetPid() != pid)
+        return false;
+
+    if (GetState() == EContainerState::Dead)
+        return true;
+
+    return Exit(status, FdHasEvent(Efd.GetFd()));
 }
 
 bool TContainer::MayRespawn() {
@@ -1251,7 +1272,7 @@ bool TContainer::MayRespawn() {
 
 void TContainer::ScheduleRespawn() {
     TEvent e(shared_from_this());
-    Queue->Add(config().container().respawn_delay_ms(), e);
+    Holder->Queue->Add(config().container().respawn_delay_ms(), e);
 }
 
 TError TContainer::Respawn() {
@@ -1281,6 +1302,21 @@ bool TContainer::HasChildren() const {
     return shared_from_this().use_count() > 2;
 }
 
+bool TContainer::DeliverOom(int fd) {
+    if (Efd.GetFd() != fd)
+        return false;
+
+    if (!Task)
+        return false;
+
+    Efd = -1;
+
+    if (GetState() == EContainerState::Dead)
+        return true;
+
+    return Exit(SIGKILL, true);
+}
+
 bool TContainer::DeliverEvent(const TEvent &event) {
     TError error;
     switch (event.Type) {
@@ -1301,6 +1337,8 @@ bool TContainer::DeliverEvent(const TEvent &event) {
                 return true;
             }
             return false;
+        case EEventType::OOM:
+            return DeliverOom(event.OOM.Fd);
         default:
             return false;
     }
@@ -1444,7 +1482,7 @@ TError TContainerHolder::Create(const string &name, int uid, int gid) {
     if (error)
         return error;
 
-    auto c = std::make_shared<TContainer>(Queue, name, parent, id, Links);
+    auto c = std::make_shared<TContainer>(this, name, parent, id, Links);
     error = c->Create(uid, gid);
     if (error)
         return error;
@@ -1542,7 +1580,7 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
     if (!id)
         return TError(EError::Unknown, "Couldn't restore container id");
 
-    auto c = std::make_shared<TContainer>(Queue, name, parent, id, Links);
+    auto c = std::make_shared<TContainer>(this, name, parent, id, Links);
     error = c->Restore(node);
     if (error) {
         TLogger::LogError(error, "Can't restore container " + name);

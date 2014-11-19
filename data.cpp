@@ -113,14 +113,6 @@ public:
                   "container exit status",
                   NODEF_VALUE | PERSISTENT_VALUE,
                   dState) {}
-
-    int GetInt(std::shared_ptr<TContainer> c,
-               std::shared_ptr<TVariant> v) override {
-        if (c->Task && !c->Task->IsRunning())
-            return c->Task->GetExitStatus();
-        else
-            return -1;
-    }
 };
 
 class TStartErrnoData : public TIntValue {

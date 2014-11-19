@@ -462,7 +462,8 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
                     RemoveClient(ev[i].data.fd, clients);
                 }
             } else {
-                TLogger::Log() << "Invalid event for " << ev[i].data.fd << std::endl;
+                TEvent e(ev[i].data.fd);
+                cholder.DeliverEvent(e);
             }
         }
     }

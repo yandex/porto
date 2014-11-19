@@ -26,6 +26,7 @@ class TValueSet;
 enum class ETclassStat;
 class TEventQueue;
 class TEvent;
+class TContainerHolder;
 
 extern int64_t BootTime;
 
@@ -47,7 +48,7 @@ struct TDataSpec {
 
 class TContainer : public std::enable_shared_from_this<TContainer> {
     NO_COPY_CONSTRUCT(TContainer);
-    std::shared_ptr<TEventQueue> Queue;
+    TContainerHolder *Holder;
     const std::string Name;
     const std::shared_ptr<TContainer> Parent;
     std::shared_ptr<TQdisc> Qdisc;
@@ -87,7 +88,9 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     void PropertyToAlias(const std::string &property, std::string &value) const;
     TError AliasToProperty(std::string &property, std::string &value);
 
+    bool Exit(int status, bool oomKilled);
     bool DeliverExitStatus(int pid, int status);
+    bool DeliverOom(int fd);
 
     void ParseName(std::string &name, std::string &idx) const;
     TError Prepare();
@@ -105,10 +108,10 @@ public:
     EContainerState GetState();
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) { return Tclass->GetStat(stat, m); }
 
-    TContainer(std::shared_ptr<TEventQueue> queue,
+    TContainer(TContainerHolder *holder,
                const std::string &name, std::shared_ptr<TContainer> parent,
                uint16_t id, const std::vector<std::shared_ptr<TNlLink>> &links) :
-        Queue(queue), Name(StripParentName(name)), Parent(parent), Id(id),
+        Holder(holder), Name(StripParentName(name)), Parent(parent), Id(id),
         Links(links) { }
     ~TContainer();
 
@@ -150,7 +153,6 @@ public:
 constexpr size_t BITS_PER_LLONG = sizeof(unsigned long long) * 8;
 class TContainerHolder {
     NO_COPY_CONSTRUCT(TContainerHolder);
-    std::shared_ptr<TEventQueue> Queue;
     std::vector<std::shared_ptr<TNlLink>> Links;
     std::map <std::string, std::shared_ptr<TContainer>> Containers;
     unsigned long long Ids[UINT16_MAX / BITS_PER_LLONG];
@@ -161,11 +163,12 @@ class TContainerHolder {
     TError RestoreId(const kv::TNode &node, uint16_t &id);
     void ScheduleLogRotatation();
 public:
+    std::shared_ptr<TEventQueue> Queue;
     int Epfd;
 
     TContainerHolder(std::shared_ptr<TEventQueue> queue,
                      const std::vector<std::shared_ptr<TNlLink>> &links) :
-        Queue(queue), Links(links) {
+        Links(links), Queue(queue) {
         for (auto &i : Ids) { i = ULLONG_MAX; }
     }
     ~TContainerHolder();
