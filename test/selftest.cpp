@@ -2022,6 +2022,8 @@ static void TestData(TPortoAPI &api) {
     WaitState(api, wget, "dead");
 
     string v, rv;
+    ExpectSuccess(api.GetData(wget, "exit_status", v));
+    Expect(v == string("0"));
     ExpectSuccess(api.GetData(root, "cpu_usage", v));
     Expect(v != "0" && v != "-1");
     ExpectSuccess(api.GetData(root, "memory_usage", v));
