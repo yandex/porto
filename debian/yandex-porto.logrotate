@@ -7,7 +7,7 @@
 	nocreate
 
 	postrotate
-		[ -f /run/portod.pid ] && kill -HUP `cat /run/portod.pid`
+		[ -f /run/portod.pid ] && kill -USR1 `cat /run/portod.pid`
 	endscript
 
 }
@@ -21,6 +21,6 @@
 	nocreate
 
 	postrotate
-		[ -f /run/portoloop.pid ] && kill -HUP `cat /run/portoloop.pid`
+		[ -f /run/portoloop.pid ] && kill -USR1 `cat /run/portoloop.pid`
 	endscript
 }

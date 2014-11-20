@@ -11,6 +11,5 @@ expect fork
 respawn
 
 kill signal SIGINT
-reload signal SIGUSR1
 
 exec portod &

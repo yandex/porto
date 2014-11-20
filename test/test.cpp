@@ -495,16 +495,29 @@ void RestartDaemon(TPortoAPI &api) {
     WaitPortod(api);
 
     // Truncate slave log
+    TFile slaveLog(config().slave_log().path());
+    (void)slaveLog.Remove();
+
     pid = ReadPid(config().slave_pid().path());
-    if (kill(pid, SIGHUP))
+    if (kill(pid, SIGUSR1))
         throw string("Can't send SIGUSR1 to slave");
 
     WaitPortod(api);
 
     // Truncate master log
+    TFile masterLog(config().master_log().path());
+    (void)masterLog.Remove();
+
     pid = ReadPid(config().master_pid().path());
     if (kill(pid, SIGUSR1))
         throw string("Can't send SIGUSR1 to master");
+
+    WaitPortod(api);
+
+    // Clean statistics
+    pid = ReadPid(config().master_pid().path());
+    if (kill(pid, SIGHUP))
+        throw string("Can't send SIGHUP to master");
 
     WaitPortod(api);
 }

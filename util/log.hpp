@@ -36,7 +36,6 @@ public:
     static void InitLog(const std::string &path, const unsigned int mode, const bool verbose);
     static void LogToStd();
     static void CloseLog();
-    static void TruncateLog();
     static std::basic_ostream<char> &Log(ELogLevel level = LOG_NOTICE);
     static void LogAction(const std::string &action, bool error = false, int errcode = 0);
     static void LogRequest(const std::string &message);

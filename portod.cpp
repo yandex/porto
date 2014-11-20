@@ -37,12 +37,15 @@ using std::vector;
 static pid_t slavePid;
 static volatile sig_atomic_t done = false;
 static volatile sig_atomic_t cleanup = true;
-static volatile sig_atomic_t hup = false;
-static volatile sig_atomic_t usr1 = false;
+static volatile sig_atomic_t rotate = false;
+static volatile sig_atomic_t update = false;
 static volatile sig_atomic_t raiseSignum = 0;
 static bool stdlog = false;
 static bool failsafe = false;
 static bool noNetwork = false;
+
+const int updateSignal = SIGHUP;
+const int rotateSignal = SIGUSR1;
 
 static void DoExit(int signum) {
     done = true;
@@ -56,12 +59,12 @@ static void DoExitAndCleanup(int signum) {
     raiseSignum = signum;
 }
 
-static void DoHangup(int signum) {
-    hup = true;
+static void DoUpdate(int signum) {
+    update = true;
 }
 
-static void DoSigusr1(int signum) {
-    usr1 = true;
+static void DoRotate(int signum) {
+    rotate = true;
 }
 
 static void DoNothing(int signum) {
@@ -85,12 +88,12 @@ static void RegisterSignalHandlers() {
     (void)RegisterSignal(SIGPIPE, SIG_IGN);
     // kill all running containers in case of SIGINT (useful for debugging)
     (void)RegisterSignal(SIGINT, DoExitAndCleanup);
-    (void)RegisterSignal(SIGHUP, DoHangup);
+    (void)RegisterSignal(updateSignal, DoUpdate);
     (void)RegisterSignal(SIGALRM, DoNothing);
     // don't stop containers when terminating
     (void)RegisterSignal(SIGTERM, DoExit);
     // don't catch SIGQUIT, may be useful to create core dump
-    (void)RegisterSignal(SIGUSR1, DoSigusr1);
+    (void)RegisterSignal(rotateSignal, DoRotate);
 }
 
 static void SignalMask(int how) {
@@ -112,22 +115,16 @@ static void SignalMask(int how) {
         TLogger::Log() << "Can't set signal mask: " << strerror(errno) << std::endl;
 }
 
-static void DaemonTruncLog() {
-    if (!stdlog) {
+static void DaemonRotateLog() {
+    if (!stdlog)
         TLogger::CloseLog();
-        TLogger::TruncateLog();
-        TLogger::Log() << "Truncated log" << std::endl;
-    }
 }
 
-static int DaemonSyncConfig(bool master, bool trunc, bool reset) {
+static int DaemonSyncConfig(bool master) {
     const auto &oldPid = master ? config().master_pid() : config().slave_pid();
     RemovePidFile(oldPid.path());
 
-    if (trunc)
-        DaemonTruncLog();
-
-    if (reset) {
+    if (master) {
         StatReset(PORTO_STAT_SPAWNED);
         StatReset(PORTO_STAT_ERRORS);
         StatReset(PORTO_STAT_WARNS);
@@ -159,7 +156,7 @@ static int DaemonPrepare(bool master) {
 
     SetProcessName(procName.c_str());
 
-    int ret = DaemonSyncConfig(master, false, master);
+    int ret = DaemonSyncConfig(master);
     if (ret)
         return ret;
 
@@ -410,42 +407,21 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
                 break;
         }
 
-        if (hup) {
-            close(sfd);
-
-            RemoveRpcServer(config().rpc_sock().file().path());
-
-            int ret = DaemonSyncConfig(false, true, false);
-            if (ret)
-                return ret;
-            hup = false;
-            TLogger::Log() << "Syncing config" << std::endl;
-
-            TError error = CreateRpcServer(config().rpc_sock().file().path(),
-                                           config().rpc_sock().file().perm(),
-                                           uid, gid, sfd);
-            if (error) {
-                TLogger::Log() << "Can't create RPC server: " << error.GetMsg() << std::endl;
-                return EXIT_FAILURE;
-            }
-
-            error = EpollAdd(cholder.Epfd, sfd);
-            if (error) {
-                TLogger::Log(LOG_ERROR) << "Can't add RPC server fd to epoll: " << error << std::endl;
-                return EXIT_FAILURE;
-            }
-
+        if (rotate) {
+            rotate = false;
+            DaemonRotateLog();
             continue;
         }
 
-        if (usr1) {
-            DaemonTruncLog();
+        if (update) {
+            update = false;
 
             TLogger::Log() << "Updating" << std::endl;
+            TLogger::CloseLog();
 
             done = true;
             cleanup = false;
-            raiseSignum = SIGUSR1;
+            raiseSignum = updateSignal;
             continue;
         }
 
@@ -695,7 +671,8 @@ static void SavePidMap(map<int, int> &pidToStatus) {
 
     for (auto &kv : pidToStatus) {
         TError error = f.AppendString(std::to_string(kv.first) + " " + std::to_string(kv.second) + "\n");
-        TLogger::Log(LOG_ERROR) << "Can't save pid map: " << error << std::endl;
+        if (error)
+            TLogger::Log(LOG_ERROR) << "Can't save pid map: " << error << std::endl;
     }
 }
 
@@ -792,9 +769,16 @@ static int SpawnSlave(map<int,int> &pidToStatus) {
         SendPidStatus(evtfd[1], pair.first, pair.second, pidToStatus.size());
 
     while (!done) {
-        if (usr1) {
-            usr1 = false;
-            int ret = DaemonSyncConfig(true, true, true);
+        if (rotate) {
+            rotate = false;
+            DaemonRotateLog();
+            continue;
+        }
+
+        if (update) {
+            update = false;
+
+            int ret = DaemonSyncConfig(true);
             if (ret)
                 return ret;
 
@@ -806,10 +790,12 @@ static int SpawnSlave(map<int,int> &pidToStatus) {
 
             SavePidMap(pidToStatus);
 
-            if (kill(slavePid, SIGUSR1) < 0)
-                TLogger::Log() << "Can't send SIGUSR1 to slave: " << strerror(errno) << std::endl;
-            if (waitpid(slavePid, NULL, 0) != slavePid)
-                TLogger::Log() << "Can't wait for slave exit status: " << strerror(errno) << std::endl;
+            if (kill(slavePid, updateSignal) < 0) {
+                TLogger::Log() << "Can't send " << updateSignal << " to slave: " << strerror(errno) << std::endl;
+            } else {
+                if (waitpid(slavePid, NULL, 0) != slavePid)
+                    TLogger::Log() << "Can't wait for slave exit status: " << strerror(errno) << std::endl;
+            }
             TLogger::CloseLog();
             close(evtfd[1]);
             close(ackfd[0]);
@@ -817,15 +803,6 @@ static int SpawnSlave(map<int,int> &pidToStatus) {
             TLogger::Log() << "Can't execlp(" << program_invocation_name << ", " << program_invocation_name << ", NULL)" << strerror(errno) << std::endl;
             ret = EXIT_FAILURE;
             break;
-        }
-
-        if (hup) {
-            hup = false;
-            int ret = DaemonSyncConfig(true, true, false);
-            if (ret) {
-                TLogger::Log(LOG_ERROR) << "Can't sync config" << std::endl;
-                return ret;
-            }
         }
 
         SignalMask(SIG_UNBLOCK);

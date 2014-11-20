@@ -128,7 +128,8 @@ int CreatePidFile(const std::string &path, const int mode) {
 
 void RemovePidFile(const std::string &path) {
     TFile f(path);
-    (void)f.Remove();
+    if (f.Exists())
+        (void)f.Remove();
 }
 
 void SetProcessName(const std::string &name) {
