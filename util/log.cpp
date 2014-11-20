@@ -120,9 +120,9 @@ void TLogger::LogAction(const std::string &action, bool error, int errcode) {
 }
 
 void TLogger::LogRequest(const std::string &message) {
-    Log() << " -> " << message << std::endl;
+    Log() << "-> " << message << std::endl;
 }
 
 void TLogger::LogResponse(const std::string &message) {
-    Log() << " <- " << message << std::endl;
+    Log() << "<- " << message << std::endl;
 }
