@@ -39,6 +39,7 @@ namespace test {
 static int expectedErrors;
 static int expectedRespawns;
 static int expectedWarns;
+static bool needDaemonChecks;
 
 static vector<string> subsystems = { "freezer", "memory", "cpu", "cpuacct", "devices" };
 static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"uts" };
@@ -2978,7 +2979,44 @@ static void TestVersion(TPortoAPI &api) {
     Expect(revision == GIT_REVISION);
 }
 
+static void TestStats(TPortoAPI &api) {
+    if (!needDaemonChecks)
+        return;
+
+    AsRoot(api);
+
+    int respawns = WordCount(config().master_log().path(), "Spawned");
+    int errors = WordCount(config().slave_log().path(), "Error");
+    int warns = WordCount(config().slave_log().path(), "Warning");
+
+    std::string v;
+    ExpectSuccess(api.GetData("/", "porto_stat[spawned]", v));
+    Expect(v == std::to_string(respawns));
+
+    ExpectSuccess(api.GetData("/", "porto_stat[errors]", v));
+    Expect(v == std::to_string(errors));
+
+    ExpectSuccess(api.GetData("/", "porto_stat[warnings]", v));
+    Expect(v == std::to_string(warns));
+
+    if (WordCount(config().slave_log().path(),
+                  "Task belongs to invalid subsystem") > 1)
+        throw string("ERROR: Some task belongs to invalid subsystem!");
+
+    if (respawns - 1 != expectedRespawns)
+        throw string("ERROR: Unexpected number of respawns: " + std::to_string(respawns));
+
+    if (errors != expectedErrors)
+        throw string("ERROR: Unexpected number of errors: " + std::to_string(errors));
+
+    if (warns != expectedWarns)
+        throw string("ERROR: Unexpected number of warnings: " + std::to_string(warns));
+}
+
 static void TestPackage(TPortoAPI &api) {
+    if (!needDaemonChecks)
+        return;
+
     AsRoot(api);
 
     Expect(FileExists(config().master_log().path()));
@@ -2992,7 +3030,6 @@ static void TestPackage(TPortoAPI &api) {
     Expect(FileExists(config().rpc_sock().file().path()) == false);
 
     system("start yandex-porto");
-    expectedRespawns++;
     WaitPortod(api);
 }
 
@@ -3032,21 +3069,18 @@ int SelfTest(string name, int leakNr) {
         { "recovery", TestRecovery },
         { "cgroups", TestCgroups },
         { "version", TestVersion },
+        { "stats", TestStats },
         { "package", TestPackage },
     };
 
     ExpectSuccess(SetHostName(HOSTNAME));
 
-#define HOSTNAME "portotest"
     if (NetworkEnabled())
         subsystems.push_back("net_cls");
 
     LeakConainersNr = leakNr;
 
-    bool needDaemonChecks = getenv("NOCHECK") == nullptr;
-    int respawns = 0;
-    int errors = 0;
-    int warns = 0;
+    needDaemonChecks = getenv("NOCHECK") == nullptr;
     try {
         config.Load();
         TPortoAPI api(config().rpc_sock().file().path(), 0);
@@ -3076,42 +3110,12 @@ int SelfTest(string name, int leakNr) {
             t.second(api);
         }
 
+        AsRoot(api);
+
         if (!needDaemonChecks)
             return EXIT_SUCCESS;
-
-        respawns = WordCount(config().master_log().path(), "Spawned");
-        errors = WordCount(config().slave_log().path(), "Error");
-        warns = WordCount(config().slave_log().path(), "Warning");
-
-        std::string v;
-        ExpectSuccess(api.GetData("/", "porto_stat[spawned]", v));
-        Expect(v == std::to_string(respawns));
-
-        ExpectSuccess(api.GetData("/", "porto_stat[errors]", v));
-        Expect(v == std::to_string(errors));
-
-        ExpectSuccess(api.GetData("/", "porto_stat[warnings]", v));
-        Expect(v == std::to_string(warns));
     } catch (string e) {
         std::cerr << "EXCEPTION: " << e << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    if (WordCount(config().slave_log().path(),
-                  "Task belongs to invalid subsystem") > 1) {
-        std::cerr << "ERROR: Some task belongs to invalid subsystem!" << std::endl;
-        return EXIT_FAILURE;
-    }
-    if (respawns - 1 != expectedRespawns) {
-        std::cerr << "ERROR: Unexpected number of respawns: " << respawns << "!" << std::endl;
-        return EXIT_FAILURE;
-    }
-    if (errors != expectedErrors) {
-        std::cerr << "ERROR: Unexpected number of errors: " << errors << "!" << std::endl;
-        return EXIT_FAILURE;
-    }
-    if (warns != expectedWarns) {
-        std::cerr << "ERROR: Unexpected number of warnings: " << warns << "!" << std::endl;
         return EXIT_FAILURE;
     }
 

@@ -497,14 +497,14 @@ void RestartDaemon(TPortoAPI &api) {
     // Truncate slave log
     pid = ReadPid(config().slave_pid().path());
     if (kill(pid, SIGHUP))
-        throw string("Can't send SIGHUP to slave");
+        throw string("Can't send SIGUSR1 to slave");
 
     WaitPortod(api);
 
     // Truncate master log
     pid = ReadPid(config().master_pid().path());
-    if (kill(pid, SIGHUP))
-        throw string("Can't send SIGHUP to master");
+    if (kill(pid, SIGUSR1))
+        throw string("Can't send SIGUSR1 to master");
 
     WaitPortod(api);
 }

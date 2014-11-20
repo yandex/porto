@@ -11,7 +11,6 @@
 # nekt0n
 - add namespaces
 - ? get rid of globals/static which have class types (http://google-styleguide.googlecode.com/svn/trunk/cppguide.html#Static_and_Global_Variables)
-- ? portoctl inspect to export everything in JSON
 
 # phase 4
 ##
@@ -34,7 +33,6 @@
 # phase X
 - ? kernel support for cgroup to limit allowed ports
 - ? kernel support for cgroup coredump path
-- ? full dump on sigsegv
 - ? start portod in container -> need to parse mountinfo, not mounts (because mountinfo skips mounts outside of chroot)
 
 # cleanup

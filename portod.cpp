@@ -38,6 +38,7 @@ static pid_t slavePid;
 static volatile sig_atomic_t done = false;
 static volatile sig_atomic_t cleanup = true;
 static volatile sig_atomic_t hup = false;
+static volatile sig_atomic_t usr1 = false;
 static volatile sig_atomic_t raiseSignum = 0;
 static bool stdlog = false;
 static bool failsafe = false;
@@ -57,6 +58,10 @@ static void DoExitAndCleanup(int signum) {
 
 static void DoHangup(int signum) {
     hup = true;
+}
+
+static void DoSigusr1(int signum) {
+    usr1 = true;
 }
 
 static void DoNothing(int signum) {
@@ -106,16 +111,17 @@ static void SignalMask(int how) {
         TLogger::Log() << "Can't set signal mask: " << strerror(errno) << std::endl;
 }
 
-static int DaemonSyncConfig(bool master, bool trunc) {
+static int DaemonSyncConfig(bool master, bool trunc, bool reset) {
+    const auto &oldPid = master ? config().master_pid() : config().slave_pid();
+    RemovePidFile(oldPid.path());
+
     if (trunc && !stdlog) {
-        const auto &oldPid = master ? config().master_pid() : config().slave_pid();
         TLogger::CloseLog();
         TLogger::TruncateLog();
-        RemovePidFile(oldPid.path());
         TLogger::Log() << "Truncated log" << std::endl;
     }
 
-    if (trunc) {
+    if (reset) {
         StatReset(PORTO_STAT_SPAWNED);
         StatReset(PORTO_STAT_ERRORS);
         StatReset(PORTO_STAT_WARNS);
@@ -147,7 +153,7 @@ static int DaemonPrepare(bool master) {
 
     SetProcessName(procName.c_str());
 
-    int ret = DaemonSyncConfig(master, false);
+    int ret = DaemonSyncConfig(master, false, master);
     if (ret)
         return ret;
 
@@ -157,8 +163,10 @@ static int DaemonPrepare(bool master) {
 
     RegisterSignalHandlers();
 
-    if (master)
+    if (master) {
         (void)RegisterSignal(SIGCHLD, DoNothing);
+        (void)RegisterSignal(SIGUSR1, DoSigusr1);
+    }
 
     return EXIT_SUCCESS;
 }
@@ -405,7 +413,7 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
 
             RemoveRpcServer(config().rpc_sock().file().path());
 
-            int ret = DaemonSyncConfig(false, true);
+            int ret = DaemonSyncConfig(false, true, false);
             if (ret)
                 return ret;
             hup = false;
@@ -718,7 +726,7 @@ static void RestorePidMap(map<int, int> &pidToStatus) {
     }
 }
 
-static int SpawnPortod(map<int,int> &pidToStatus) {
+static int SpawnSlave(map<int,int> &pidToStatus) {
     int evtfd[2];
     int ackfd[2];
     int ret = EXIT_FAILURE;
@@ -769,11 +777,12 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
         SendPidStatus(evtfd[1], pair.first, pair.second, pidToStatus.size());
 
     while (!done) {
-        if (hup) {
-            int ret = DaemonSyncConfig(true, true);
+        if (usr1) {
+            usr1 = false;
+            int ret = DaemonSyncConfig(true, true, true);
             if (ret)
                 return ret;
-            hup = false;
+
             TLogger::Log() << "Updating" << std::endl;
 
             const char *stdlogArg = nullptr;
@@ -793,6 +802,15 @@ static int SpawnPortod(map<int,int> &pidToStatus) {
             TLogger::Log() << "Can't execlp(" << program_invocation_name << ", " << program_invocation_name << ", NULL)" << strerror(errno) << std::endl;
             ret = EXIT_FAILURE;
             break;
+        }
+
+        if (hup) {
+            hup = false;
+            int ret = DaemonSyncConfig(true, true, false);
+            if (ret) {
+                TLogger::Log(LOG_ERROR) << "Can't sync config" << std::endl;
+                return ret;
+            }
         }
 
         SignalMask(SIG_UNBLOCK);
@@ -855,7 +873,7 @@ static int MasterMain() {
     while (!done) {
         size_t started = GetCurrentTimeMs();
         size_t next = started + config().container().respawn_delay_ms();
-        ret = SpawnPortod(pidToStatus);
+        ret = SpawnSlave(pidToStatus);
         TLogger::Log() << "Returned " << ret << std::endl;
 
         if (!done && next >= GetCurrentTimeMs())
