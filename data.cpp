@@ -430,6 +430,8 @@ public:
         m["spawned"] = StatGet(PORTO_STAT_SPAWNED);
         m["errors"] = StatGet(PORTO_STAT_ERRORS);
         m["warnings"] = StatGet(PORTO_STAT_WARNS);
+        m["uptime_master"] = (GetCurrentTimeMs() - MasterStarted) / 1000;
+        m["uptime_slave"] = (GetCurrentTimeMs() - SlaveStarted) / 1000;
 
         return m;
     }

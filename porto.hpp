@@ -18,6 +18,9 @@ const std::string PORTO_STAT_WARNS = "/porto_warns";
     NAME(const NAME &) = delete; \
     NAME &operator=(const NAME &) = delete
 
+extern size_t MasterStarted;
+extern size_t SlaveStarted;
+
 #include "config.hpp"
 
 #endif

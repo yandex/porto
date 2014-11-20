@@ -46,6 +46,8 @@ static bool noNetwork = false;
 
 const int updateSignal = SIGHUP;
 const int rotateSignal = SIGUSR1;
+size_t SlaveStarted = 0;
+size_t MasterStarted = 0;
 
 static void DoExit(int signum) {
     done = true;
@@ -486,6 +488,8 @@ static void KvDump() {
 }
 
 static int SlaveMain() {
+    SlaveStarted = GetCurrentTimeMs();
+
     int ret = DaemonPrepare(false);
     if (ret)
         return ret;
@@ -838,6 +842,8 @@ exit:
 }
 
 static int MasterMain() {
+    MasterStarted = GetCurrentTimeMs();
+
     int ret = DaemonPrepare(true);
     if (ret)
         return ret;
