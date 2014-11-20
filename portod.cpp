@@ -494,11 +494,6 @@ static int SlaveMain() {
     if (ret)
         return ret;
 
-    if (AnotherInstanceRunning(config().rpc_sock().file().path())) {
-        TLogger::Log() << "Another instance of portod is running!" << std::endl;
-        return EXIT_FAILURE;
-    }
-
     if (config().network().enabled()) {
         if (system("modprobe cls_cgroup")) {
             TLogger::Log() << "Can't load cls_cgroup kernel module: " << strerror(errno) << std::endl;
@@ -915,6 +910,11 @@ int main(int argc, char * const argv[]) {
                 return EXIT_FAILURE;
             return config.Test(argv[argn + 1]);
         }
+    }
+
+    if (AnotherInstanceRunning(config().rpc_sock().file().path())) {
+        TLogger::Log() << "Another instance of portod is running!" << std::endl;
+        return EXIT_FAILURE;
     }
 
     if (slaveMode)
