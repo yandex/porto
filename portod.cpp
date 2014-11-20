@@ -90,6 +90,7 @@ static void RegisterSignalHandlers() {
     // don't stop containers when terminating
     (void)RegisterSignal(SIGTERM, DoExit);
     // don't catch SIGQUIT, may be useful to create core dump
+    (void)RegisterSignal(SIGUSR1, DoSigusr1);
 }
 
 static void SignalMask(int how) {
@@ -111,15 +112,20 @@ static void SignalMask(int how) {
         TLogger::Log() << "Can't set signal mask: " << strerror(errno) << std::endl;
 }
 
-static int DaemonSyncConfig(bool master, bool trunc, bool reset) {
-    const auto &oldPid = master ? config().master_pid() : config().slave_pid();
-    RemovePidFile(oldPid.path());
-
-    if (trunc && !stdlog) {
+static void DaemonTruncLog() {
+    if (!stdlog) {
         TLogger::CloseLog();
         TLogger::TruncateLog();
         TLogger::Log() << "Truncated log" << std::endl;
     }
+}
+
+static int DaemonSyncConfig(bool master, bool trunc, bool reset) {
+    const auto &oldPid = master ? config().master_pid() : config().slave_pid();
+    RemovePidFile(oldPid.path());
+
+    if (trunc)
+        DaemonTruncLog();
 
     if (reset) {
         StatReset(PORTO_STAT_SPAWNED);
@@ -163,10 +169,8 @@ static int DaemonPrepare(bool master) {
 
     RegisterSignalHandlers();
 
-    if (master) {
+    if (master)
         (void)RegisterSignal(SIGCHLD, DoNothing);
-        (void)RegisterSignal(SIGUSR1, DoSigusr1);
-    }
 
     return EXIT_SUCCESS;
 }
@@ -389,7 +393,7 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
     }
 
     error = EpollAdd(cholder.Epfd, REAP_EVT_FD);
-    if (error) {
+    if (error && !failsafe) {
         TLogger::Log(LOG_ERROR) << "Can't add master fd to epoll: " << error << std::endl;
         return EXIT_FAILURE;
     }
@@ -405,8 +409,6 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
             if (done)
                 break;
         }
-
-        queue->DeliverEvents(cholder);
 
         if (hup) {
             close(sfd);
@@ -435,6 +437,19 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
 
             continue;
         }
+
+        if (usr1) {
+            DaemonTruncLog();
+
+            TLogger::Log() << "Updating" << std::endl;
+
+            done = true;
+            cleanup = false;
+            raiseSignum = SIGUSR1;
+            continue;
+        }
+
+        queue->DeliverEvents(cholder);
 
         for (int i = 0; i < nr; i++) {
             if (ev[i].data.fd == sfd) {
@@ -791,8 +806,8 @@ static int SpawnSlave(map<int,int> &pidToStatus) {
 
             SavePidMap(pidToStatus);
 
-            if (kill(slavePid, SIGKILL) < 0)
-                TLogger::Log() << "Can't send SIGKILL to slave: " << strerror(errno) << std::endl;
+            if (kill(slavePid, SIGUSR1) < 0)
+                TLogger::Log() << "Can't send SIGUSR1 to slave: " << strerror(errno) << std::endl;
             if (waitpid(slavePid, NULL, 0) != slavePid)
                 TLogger::Log() << "Can't wait for slave exit status: " << strerror(errno) << std::endl;
             TLogger::CloseLog();
