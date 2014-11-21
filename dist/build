@@ -86,7 +86,8 @@ CONFIG() {
 
 		RUN apt-get install -y --force-yes linux-image-server linux-image-3.10.59-19 linux-firmware wireless-crda crda libnl-3-200 libnl-genl-3-200 wireless-regdb linux-tools linux-headers-3.10.59-19 kexec-tools anacron makedumpfile libdw1
 
-		RUN apt-get install -y --force-yes logrotate yandex-search-group-porto
+		RUN apt-get install -y --force-yes logrotate
+		RUN groupadd porto || :
 		RUN dpkg -i /yandex-porto_*_amd64.deb
 		RUN apt-get install -y --force-yes python-central python-protobuf
 		RUN dpkg -i /python-portopy_*_all.deb
