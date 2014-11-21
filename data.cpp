@@ -169,7 +169,7 @@ public:
         auto subsys = cpuacctSubsystem;
         auto cg = c->GetLeafCgroup(subsys);
         if (!cg) {
-            TLogger::LogAction("cpuacct cgroup not found");
+            TLogger::Log(LOG_ERROR) << "Can't find cpuacct cgroup" << std::endl;
             return -1;
         }
 
@@ -197,7 +197,7 @@ public:
         auto subsys = memorySubsystem;
         auto cg = c->GetLeafCgroup(subsys);
         if (!cg) {
-            TLogger::LogAction("memory cgroup not found");
+            TLogger::Log(LOG_ERROR) << "Can't find memory cgroup" << std::endl;
             return -1;
         }
 

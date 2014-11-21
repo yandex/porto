@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
     // in case client closes pipe we are writing to in the protobuf code
     (void)RegisterSignal(SIGPIPE, SIG_IGN);
 
-    TLogger::InitLog("/dev/null", 0666, false);
+    TLogger::InitLog("/dev/null", 0666);
 
     umask(0);
 

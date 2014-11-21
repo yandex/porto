@@ -16,7 +16,6 @@ TConfig config;
 void TConfig::LoadDefaults() {
     config().mutable_network()->set_enabled(true);
     config().mutable_network()->set_debug(false);
-    config().mutable_network()->set_debug(false);
     config().mutable_network()->set_default_prio(3);
     config().mutable_network()->set_default_max_guarantee(-1);
     config().mutable_network()->set_default_guarantee(-1);

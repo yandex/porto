@@ -141,7 +141,7 @@ static int DaemonSyncConfig(bool master) {
     const auto &log = master ? config().master_log() : config().slave_log();
     const auto &pid = master ? config().master_pid() : config().slave_pid();
 
-    TLogger::InitLog(log.path(), log.perm(), config().log().verbose());
+    TLogger::InitLog(log.path(), log.perm());
     if (stdlog)
         TLogger::LogToStd();
 
