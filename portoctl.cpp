@@ -156,9 +156,16 @@ size_t CalculateFieldLength(vector<string> &vec, size_t min = 8) {
     return (len > min ? len : min) + 1;
 }
 
+const std::string StripIdx(const std::string &name) {
+    if (name.find('[') != std::string::npos)
+        return std::string(name.c_str(), name.find('['));
+    else
+        return name;
+}
+
 bool ValidData(const vector<TData> &dlist, const string &name) {
     return find_if(dlist.begin(), dlist.end(),
-                   [&](const TData &i)->bool { return i.Name == name; })
+                   [&](const TData &i)->bool { return i.Name == StripIdx(name); })
         != dlist.end();
 }
 
@@ -380,7 +387,7 @@ public:
 
     bool ValidProperty(const vector<TProperty> &plist, const string &name) {
         return find_if(plist.begin(), plist.end(),
-                       [&](const TProperty &i)->bool { return i.Name == name; })
+                       [&](const TProperty &i)->bool { return i.Name == StripIdx(name); })
             != plist.end();
     }
 
