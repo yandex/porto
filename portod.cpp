@@ -349,8 +349,10 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
             return 0;
         }
 
-        TEvent event(pid, status);
-        if (!cholder.DeliverEvent(event)) {
+        TEvent e(EEventType::Exit);
+        e.Exit.Pid = pid;
+        e.Exit.Status = status;
+        if (!cholder.DeliverEvent(e)) {
             AckExitStatus(pid);
             return 0;
         }
@@ -466,7 +468,8 @@ static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder
                     RemoveClient(ev[i].data.fd, clients);
                 }
             } else {
-                TEvent e(ev[i].data.fd);
+                TEvent e(EEventType::OOM);
+                e.OOM.Fd = ev[i].data.fd;
                 cholder.DeliverEvent(e);
             }
         }

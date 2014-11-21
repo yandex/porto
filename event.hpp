@@ -18,6 +18,7 @@ enum class EEventType {
 class TEvent {
 public:
     EEventType Type;
+    std::weak_ptr<TContainer> Container;
 
     struct {
         int Pid;
@@ -25,27 +26,12 @@ public:
     } Exit;
 
     struct {
-        std::weak_ptr<TContainer> Container;
-    } Respawn;
-
-    struct {
         int Fd;
     } OOM;
 
     size_t DueMs = 0;
 
-    TEvent(int pid, int status) : Type(EEventType::Exit) {
-        Exit.Pid = pid; Exit.Status = status;
-    }
-    TEvent() : Type(EEventType::RotateLogs) {
-    }
-    TEvent(const std::shared_ptr<TContainer> c) :
-        Type(EEventType::Respawn) {
-        Respawn.Container = c;
-    }
-    TEvent(int fd) : Type(EEventType::OOM) {
-        OOM.Fd = fd;
-    }
+    TEvent(EEventType type) : Type(type) {}
 
     bool operator<(const TEvent& rhs) const;
 

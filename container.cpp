@@ -103,8 +103,18 @@ EContainerState TContainer::GetState() {
 
     rec = true;
 
-    if (State == EContainerState::Running && (!Task || Processes().empty()))
-        SetState(EContainerState::Stopped);
+    if (State == EContainerState::Running && (!Task || Processes().empty())) {
+        // We can't just change our state to Dead if we see container
+        // with empty cgroup because we may race with event signaling
+        // process death. Use small delay here to let actual event be
+        // delivered and only then assume that something got wrong
+        // and simulate container death.
+        if (!CgroupEmptySince)
+            CgroupEmptySince = GetCurrentTimeMs();
+
+        if (CgroupEmptySince >= GetCurrentTimeMs() + 1000)
+            Exit(-1, false);
+    }
 
     // TODO: use some kind of reference count for accounting running children
     if (State == EContainerState::Meta && !IsRoot()) {
@@ -665,6 +675,13 @@ TError TContainer::PrepareMetaParent() {
 TError TContainer::Start() {
     auto state = GetState();
 
+    if (state != EContainerState::Stopped)
+        return TError(EError::InvalidState, "invalid container state " +
+                      ContainerStateName(state));
+
+    if (!IsRoot() && !Prop->GetString(P_COMMAND).length())
+        return TError(EError::InvalidValue, "container command is empty");
+
     TError error = Data->SetUint(D_RESPAWN_COUNT, 0);
     if (error)
         return error;
@@ -672,15 +689,6 @@ TError TContainer::Start() {
     error = Data->SetInt(D_EXIT_STATUS, -1);
     if (error)
         return error;
-
-    if (state != EContainerState::Stopped)
-        return TError(EError::InvalidState, "invalid container state " +
-                      ContainerStateName(state));
-
-    if (!IsRoot() && !Prop->GetString(P_COMMAND).length()) {
-        FreeResources();
-        return TError(EError::InvalidValue, "container command is empty");
-    }
 
     error = Prop->SetInt(P_RAW_ID, (int)Id);
     if (error)
@@ -724,6 +732,8 @@ TError TContainer::Start() {
     error = Prop->SetInt(P_RAW_ROOT_PID, Task->GetPid());
     if (error)
         return error;
+
+    CgroupEmptySince = 0;
     SetState(EContainerState::Running);
 
     return TError::Success();
@@ -1291,7 +1301,8 @@ bool TContainer::MayRespawn() {
 }
 
 void TContainer::ScheduleRespawn() {
-    TEvent e(shared_from_this());
+    TEvent e(EEventType::Respawn);
+    e.Container = shared_from_this();
     Holder->Queue->Add(config().container().respawn_delay_ms(), e);
 }
 
@@ -1341,7 +1352,10 @@ bool TContainer::DeliverEvent(const TEvent &event) {
     TError error;
     switch (event.Type) {
         case EEventType::Exit:
-            return DeliverExitStatus(event.Exit.Pid, event.Exit.Status);
+            if (event.Exit.Pid < 0 && GetState() == EContainerState::Running)
+                return Exit(event.Exit.Status, false);
+            else
+                return DeliverExitStatus(event.Exit.Pid, event.Exit.Status);
         case EEventType::RotateLogs:
             if (GetState() == EContainerState::Running && !Task) {
                 error = Task->Rotate();
@@ -1614,19 +1628,17 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
 }
 
 void TContainerHolder::ScheduleLogRotatation() {
-    Queue->Add(config().daemon().rotate_logs_timeout_s() * 1000, TEvent());
+    TEvent e(EEventType::RotateLogs);
+    Queue->Add(config().daemon().rotate_logs_timeout_s() * 1000, e);
 }
 
 bool TContainerHolder::DeliverEvent(const TEvent &event) {
     if (config().log().verbose())
         TLogger::Log() << "Deliver event " << event.GetMsg() << std::endl;
 
-    if (event.Type == EEventType::Respawn) {
-            auto c = event.Respawn.Container.lock();
-            if (!c)
-                return false;
-
-            return c->DeliverEvent(event);
+    auto c = event.Container.lock();
+    if (c) {
+        return c->DeliverEvent(event);
     } else {
         for (auto c : Containers)
             if (c.second->DeliverEvent(event))
