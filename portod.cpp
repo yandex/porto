@@ -198,16 +198,21 @@ struct ClientInfo {
 
 static bool HandleRequest(TContainerHolder &cholder, const int fd,
                           const int uid, const int gid) {
+    uint32_t slaveReadTimeout = config().daemon().slave_read_timeout_s();
     InterruptibleInputStream pist(fd);
     google::protobuf::io::FileOutputStream post(fd);
 
     rpc::TContainerRequest request;
 
-    (void)alarm(config().daemon().slave_read_timeout_s());
+    if (slaveReadTimeout)
+        (void)alarm(slaveReadTimeout);
+
     SignalMask(SIG_UNBLOCK);
     bool haveData = ReadDelimitedFrom(&pist, &request);
     SignalMask(SIG_BLOCK);
-    (void)alarm(0);
+
+    if (slaveReadTimeout)
+        (void)alarm(0);
 
     if (pist.Interrupted()) {
         TLogger::Log() << "Interrupted read from " << fd << std:: endl;
@@ -216,7 +221,6 @@ static bool HandleRequest(TContainerHolder &cholder, const int fd,
 
     if (haveData) {
         auto rsp = HandleRpcRequest(cholder, request, uid, gid);
-
         if (rsp.IsInitialized()) {
             if (!WriteDelimitedTo(rsp, &post))
                 TLogger::Log() << "Write error for " << fd << std:: endl;
@@ -361,7 +365,8 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
     return 0;
 }
 
-static int RpcMain(std::shared_ptr<TEventQueue> queue, TContainerHolder &cholder) {
+static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
+                    TContainerHolder &cholder) {
     int ret = 0;
     int sfd;
     std::map<int,ClientInfo> clients;
@@ -586,7 +591,7 @@ static int SlaveMain() {
             }
         }
 
-        ret = RpcMain(queue, cholder);
+        ret = SlaveRpc(queue, cholder);
         TLogger::Log() << "Shutting down..." << std::endl;
 
         RemoveRpcServer(config().rpc_sock().file().path());
