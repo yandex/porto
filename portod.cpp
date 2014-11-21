@@ -78,7 +78,8 @@ static void RaiseSignal(int signum) {
 
     (void)sigaction(SIGTERM, &sa, NULL);
     (void)sigaction(SIGINT, &sa, NULL);
-    (void)sigaction(SIGHUP, &sa, NULL);
+    (void)sigaction(rotateSignal, &sa, NULL);
+    (void)sigaction(updateSignal, &sa, NULL);
     raise(signum);
     exit(-signum);
 }
