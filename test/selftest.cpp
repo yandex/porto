@@ -2713,12 +2713,14 @@ static void TestRespawnProperty(TPortoAPI &api) {
 
 static int LeakConainersNr;
 static void TestLeaks(TPortoAPI &api) {
-    string pid;
+    string slavePid, masterPid;
     string name;
     int slack = 4096;
 
-    TFile f(config().slave_pid().path());
-    Expect(f.AsString(pid) == false);
+    TFile slaveFile(config().slave_pid().path());
+    ExpectSuccess(slaveFile.AsString(slavePid));
+    TFile masterFile(config().master_pid().path());
+    ExpectSuccess(masterFile.AsString(masterPid));
 
     for (int i = 0; i < LeakConainersNr; i++) {
         name = "a" + std::to_string(i);
@@ -2732,7 +2734,8 @@ static void TestLeaks(TPortoAPI &api) {
         ExpectSuccess(api.Destroy(name));
     }
 
-    int prev = GetVmRss(pid);
+    int prevSlave = GetVmRss(slavePid);
+    int prevMaster = GetVmRss(masterPid);
 
     for (int i = 0; i < LeakConainersNr; i++) {
         name = "b" + std::to_string(i);
@@ -2746,9 +2749,14 @@ static void TestLeaks(TPortoAPI &api) {
         ExpectSuccess(api.Destroy(name));
     }
 
-    int now = GetVmRss(pid);
-    Say() << "Expected " << now << " < " << prev + slack << std::endl;
-    Expect(now <= prev + slack);
+    int nowSlave = GetVmRss(slavePid);
+    int nowMaster = GetVmRss(masterPid);
+
+    Say() << "Expected slave " << nowSlave << " < " << prevSlave + slack << std::endl;
+    Expect(nowSlave <= prevSlave + slack);
+
+    Say() << "Expected master " << nowMaster << " < " << prevMaster + slack << std::endl;
+    Expect(nowMaster <= prevMaster + slack);
 }
 
 static void KillPorto(TPortoAPI &api, int sig) {

@@ -578,12 +578,14 @@ void TestDaemon(TPortoAPI &api) {
     PrintFds(path, lst, nr);
     Expect(nr == 2 + 6);
 
-    /*
     Say() << "Check portod-master queue size" << std::endl;
     std::string v;
     ExpectSuccess(api.GetData("/", "porto_stat[master_queue_size]", v));
     Expect(v == std::to_string(0));
-    */
+
+    Say() << "Check portod-slave queue size" << std::endl;
+    ExpectSuccess(api.GetData("/", "porto_stat[slave_queue_size]", v));
+    Expect(v == std::to_string(1)); // RotateLogs
 
     // TODO: check rtnl classes
 }

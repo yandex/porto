@@ -649,7 +649,7 @@ static int SendPids(int fd, map<int,int> &pidToStatus, int slavePid, int &slaveS
     while (true) {
         pid = waitpid(-1, &status, WNOHANG);
         if (pid <= 0)
-            return 0;
+            break;
 
         if (pid == slavePid) {
             slaveStatus = status;
@@ -660,17 +660,16 @@ static int SendPids(int fd, map<int,int> &pidToStatus, int slavePid, int &slaveS
         SendPidStatus(fd, pid, status, pidToStatus.size());
     }
 
-    return -1;
+    DaemonStat->MasterQueueSize = pidToStatus.size();
+    return 0;
 }
 
 static void ReceiveAcks(int fd, map<int,int> &pidToStatus) {
     int pid;
 
     while (read(fd, &pid, sizeof(pid)) == sizeof(pid)) {
-        if (errno == EINTR)
-            return;
-
         pidToStatus.erase(pid);
+        DaemonStat->MasterQueueSize = pidToStatus.size();
         L() << "Got acknowledge for " << pid << " (" << pidToStatus.size() << " queued)" << std::endl;
     }
 }
@@ -831,8 +830,6 @@ static int SpawnSlave(map<int,int> &pidToStatus) {
             ret = EXIT_SUCCESS;
             break;
         }
-
-        DaemonStat->MasterQueueSize = pidToStatus.size();
     }
 
     if (done) {
