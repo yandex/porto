@@ -70,7 +70,7 @@ extern TValueSet propertySet;
                        const TYPE &value) { \
         if (!propertySet.Valid(property)) { \
             TError error(EError::InvalidValue, property + " not found"); \
-            TLogger::Log(LOG_ERROR) << "Can't set property: " << error << std::endl; \
+            L_ERR() << "Can't set property: " << error << std::endl; \
             return error; \
         } \
         return VariantSet.Set ## NAME(property, value); \

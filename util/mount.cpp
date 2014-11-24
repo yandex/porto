@@ -25,7 +25,7 @@ using std::set;
 using std::shared_ptr;
 
 TError TMount::Mount(unsigned long flags) const {
-    TLogger::Log() << "mount " << Target.ToString() << std::endl;
+    L() << "mount " << Target.ToString() << std::endl;
 
     int ret = RetryBusy(10, 100, [&]{ return mount(Source.ToString().c_str(),
                                                    Target.ToString().c_str(),
@@ -39,7 +39,7 @@ TError TMount::Mount(unsigned long flags) const {
 }
 
 TError TMount::Umount() const {
-    TLogger::Log() << "umount " << Target.ToString() << std::endl;
+    L() << "umount " << Target.ToString() << std::endl;
 
     int ret = RetryBusy(10, 100, [&]{ return umount(Target.ToString().c_str()); });
     if (ret)
@@ -142,7 +142,7 @@ TError TMountSnapshot::RemountSlave() {
         // to MS_SLAVE, nothing is remounted or mounted over
         error = m->Mount(MS_SLAVE);
         if (error)
-            TLogger::Log() << "Can't remount " << m->GetMountpoint() << std::endl;
+            L() << "Can't remount " << m->GetMountpoint() << std::endl;
     }
 
     return TError::Success();

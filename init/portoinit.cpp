@@ -15,7 +15,7 @@ extern "C" {
 
 static bool ExecConfig(const init::TConfig &cfg) {
     // TODO
-    TLogger::Log() << cfg.DebugString();
+    L() << cfg.DebugString();
 
     return true;
 }
@@ -41,14 +41,14 @@ static int StartContainers() {
     std::vector<std::string> files;
     TError error = f.Items(EFileType::Regular, files);
     if (error) {
-        TLogger::Log(LOG_ERROR) << "Can't read config directory: " << error << std::endl;
+        L_ERR() << "Can't read config directory: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
     std::vector<std::string> configs;
     std::string suffix = ".conf";
     for (auto &f : files) {
-            TLogger::Log() << f << std::endl;
+            L() << f << std::endl;
         if (suffix.length() >= f.length())
             continue;
 
@@ -61,11 +61,11 @@ static int StartContainers() {
     std::sort(configs.begin(), configs.end());
 
     for (auto &path : configs) {
-        TLogger::Log() << "Loading " << path << std::endl;
+        L() << "Loading " << path << std::endl;
 
         init::TConfig cfg;
         if (!LoadConfig(path, cfg)) {
-            TLogger::Log() << "Failed" << std::endl;
+            L() << "Failed" << std::endl;
             continue;
         }
 

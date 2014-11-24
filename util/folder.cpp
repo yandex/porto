@@ -21,12 +21,12 @@ TFolder::~TFolder() {
     if (Tmp) {
         TError error = Remove(true);
         if (error)
-            TLogger::Log(LOG_ERROR) << "Can't remove " << Path.ToString() << ": " << error << std::endl;
+            L_ERR() << "Can't remove " << Path.ToString() << ": " << error << std::endl;
     }
 }
 
 TError TFolder::Create(mode_t mode, bool recursive) const {
-    TLogger::Log() << "mkdir " << Path.ToString() << std::endl;
+    L() << "mkdir " << Path.ToString() << std::endl;
 
     if (recursive) {
         string copy(Path.ToString());
@@ -70,7 +70,7 @@ TError TFolder::Remove(bool recursive) const {
         }
     }
 
-    TLogger::Log() << "rmdir " << Path.ToString() << std::endl;
+    L() << "rmdir " << Path.ToString() << std::endl;
 
     int ret = RetryBusy(10, 100, [&]{ return rmdir(Path.ToString().c_str()); });
     if (ret)

@@ -12,14 +12,14 @@
 #define PORTO_ASSERT(EXPR) \
     do { \
         if (!(EXPR)) { \
-            TLogger::Log(LOG_ERROR) << "Assertion failed: " << # EXPR << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+            L_ERR() << "Assertion failed: " << # EXPR << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
             Crash(); \
         } \
     } while (0)
 
 #define PORTO_RUNTIME_ERROR(MSG) \
     do { \
-        TLogger::Log(LOG_ERROR) << "Runtime error: " << (MSG) << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
+        L_ERR() << "Runtime error: " << (MSG) << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
         Crash(); \
     } while (0)
 
@@ -40,5 +40,9 @@ public:
     static void LogRequest(const std::string &message);
     static void LogResponse(const std::string &message);
 };
+
+static inline std::basic_ostream<char> &L() { return TLogger::Log(); }
+static inline std::basic_ostream<char> &L_ERR() { return TLogger::Log(LOG_ERROR); }
+static inline std::basic_ostream<char> &L_WRN() { return TLogger::Log(LOG_WARN); }
 
 #endif /* __LOG_HPP__ */

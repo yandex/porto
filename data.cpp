@@ -169,14 +169,14 @@ public:
         auto subsys = cpuacctSubsystem;
         auto cg = c->GetLeafCgroup(subsys);
         if (!cg) {
-            TLogger::Log(LOG_ERROR) << "Can't find cpuacct cgroup" << std::endl;
+            L_ERR() << "Can't find cpuacct cgroup" << std::endl;
             return -1;
         }
 
         uint64_t val;
         TError error = subsys->Usage(cg, val);
         if (error) {
-            TLogger::Log(LOG_ERROR) << "Can't get CPU usage: " << error << std::endl;
+            L_ERR() << "Can't get CPU usage: " << error << std::endl;
             return -1;
         }
 
@@ -197,14 +197,14 @@ public:
         auto subsys = memorySubsystem;
         auto cg = c->GetLeafCgroup(subsys);
         if (!cg) {
-            TLogger::Log(LOG_ERROR) << "Can't find memory cgroup" << std::endl;
+            L_ERR() << "Can't find memory cgroup" << std::endl;
             return -1;
         }
 
         uint64_t val;
         TError error = subsys->Usage(cg, val);
         if (error) {
-            TLogger::Log(LOG_ERROR) << "Can't get memory usage: " << error << std::endl;
+            L_ERR() << "Can't get memory usage: " << error << std::endl;
             return -1;
         }
 
@@ -225,7 +225,7 @@ public:
         TUintMap m;
         TError error = c->GetStat(ETclassStat::Bytes, m);
         if (error)
-            TLogger::Log(LOG_ERROR) << "Can't get transmitted bytes: " << error << std::endl;
+            L_ERR() << "Can't get transmitted bytes: " << error << std::endl;
         return m;
     }
 };
@@ -243,7 +243,7 @@ public:
         TUintMap m;
         TError error = c->GetStat(ETclassStat::Packets, m);
         if (error)
-            TLogger::Log(LOG_ERROR) << "Can't get transmitted packets: " << error << std::endl;
+            L_ERR() << "Can't get transmitted packets: " << error << std::endl;
         return m;
     }
 };
@@ -261,7 +261,7 @@ public:
         TUintMap m;
         TError error = c->GetStat(ETclassStat::Drops, m);
         if (error)
-            TLogger::Log(LOG_ERROR) << "Can't get dropped packets: " << error << std::endl;
+            L_ERR() << "Can't get dropped packets: " << error << std::endl;
         return m;
     }
 };
@@ -279,7 +279,7 @@ public:
         TUintMap m;
         TError error = c->GetStat(ETclassStat::Overlimits, m);
         if (error)
-            TLogger::Log(LOG_ERROR) << "Can't get number of packets over limit: " << error << std::endl;
+            L_ERR() << "Can't get number of packets over limit: " << error << std::endl;
         return m;
     }
 };
@@ -340,7 +340,7 @@ public:
         std::vector<BlkioStat> stat;
         TError error = blkioSubsystem->Statistics(cg, "blkio.io_service_bytes_recursive", stat);
         if (error)
-            TLogger::Log(LOG_ERROR) << "Can't get blkio statistics: " << error << std::endl;
+            L_ERR() << "Can't get blkio statistics: " << error << std::endl;
         if (error)
             return m;
 
@@ -367,7 +367,7 @@ public:
         std::vector<BlkioStat> stat;
         TError error = blkioSubsystem->Statistics(cg, "blkio.io_service_bytes_recursive", stat);
         if (error)
-            TLogger::Log(LOG_ERROR) << "Can't get blkio statistics: " << error << std::endl;
+            L_ERR() << "Can't get blkio statistics: " << error << std::endl;
         if (error)
             return m;
 

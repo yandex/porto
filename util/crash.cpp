@@ -22,15 +22,15 @@ static void PrintTrace() {
     size = backtrace (array, 20);
     strings = backtrace_symbols (array, size);
 
-    TLogger::Log() << "Backtrace:" << std::endl;
+    L() << "Backtrace:" << std::endl;
     for (i = 0; i < size; i++)
-        TLogger::Log() << strings[i] << std::endl;
+        L() << strings[i] << std::endl;
 
     free (strings);
 }
 
 void Crash() {
-    TLogger::Log() << "Crashed" << std::endl;
+    L() << "Crashed" << std::endl;
     PrintTrace();
     exit(-1);
 }

@@ -38,7 +38,7 @@ TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems,
 TCgroup::~TCgroup() {
     TError error = Remove();
     if (error)
-        TLogger::Log(LOG_ERROR) << "Can't remove cgroup directory: " << error << std::endl;
+        L_ERR() << "Can't remove cgroup directory: " << error << std::endl;
 }
 
 shared_ptr<TCgroup> TCgroup::GetChild(const std::string& name) {
@@ -130,7 +130,7 @@ TError TCgroup::Create() {
         set<shared_ptr<TMount>> mounts;
         TError error = ms.Mounts(mounts);
         if (error) {
-            TLogger::Log(LOG_ERROR) << "Can't create mount snapshot: " << error << std::endl;
+            L_ERR() << "Can't create mount snapshot: " << error << std::endl;
             return error;
         }
 
@@ -146,7 +146,7 @@ TError TCgroup::Create() {
             TMount root("cgroup", config().daemon().sysfs_root(), "tmpfs", {});
             TError error = root.Mount();
             if (error) {
-                TLogger::Log(LOG_ERROR) << "Can't mount root cgroup: " << error << std::endl;
+                L_ERR() << "Can't mount root cgroup: " << error << std::endl;
                 return error;
             }
         }
@@ -155,11 +155,11 @@ TError TCgroup::Create() {
 
     TFolder f(Path());
     if (!f.Exists()) {
-        TLogger::Log() << "Create cgroup " << Path() << std::endl;
+        L() << "Create cgroup " << Path() << std::endl;
 
         TError error = f.Create(Mode);
         if (error) {
-            TLogger::Log(LOG_ERROR) << "Can't create cgroup directory: " << error << std::endl;
+            L_ERR() << "Can't create cgroup directory: " << error << std::endl;
             return error;
         }
     }
@@ -167,7 +167,7 @@ TError TCgroup::Create() {
     if (IsRoot()) {
         TError error = Mount->Mount();
         if (error) {
-            TLogger::Log(LOG_ERROR) << "Can't mount root cgroup for root container: " << error << std::endl;
+            L_ERR() << "Can't mount root cgroup for root container: " << error << std::endl;
             return error;
         }
     }
@@ -187,9 +187,9 @@ TError TCgroup::Remove() {
                                return !IsEmpty(); });
 
     if (ret)
-        TLogger::Log() << "Can't kill all tasks in cgroup " << Path() << std::endl;
+        L() << "Can't kill all tasks in cgroup " << Path() << std::endl;
 
-    TLogger::Log() << "Remove cgroup " << Path() << std::endl;
+    L() << "Remove cgroup " << Path() << std::endl;
     TFolder f(Path());
     return f.Remove();
 }
@@ -211,7 +211,7 @@ TError TCgroup::Kill(int signal) const {
                 TTask task(pid);
                 TError error = task.Kill(signal);
                 if (error)
-                    TLogger::Log(LOG_ERROR) << "Can't kill child process: " << error << std::endl;
+                    L_ERR() << "Can't kill child process: " << error << std::endl;
             }
         }
     }
@@ -236,7 +236,7 @@ TError TCgroup::GetKnobValueAsLines(const std::string &knob, vector<string> &lin
 TError TCgroup::SetKnobValue(const std::string &knob, const std::string &value, bool append) const {
     TFile f(Path() + "/" + knob);
 
-    TLogger::Log() << "Set " << Path() << "/" << knob << " = " << value << std::endl;
+    L() << "Set " << Path() << "/" << knob << " = " << value << std::endl;
 
     if (append)
         return f.AppendString(value);
@@ -248,7 +248,7 @@ TError TCgroup::Attach(int pid) const {
     if (!IsRoot()) {
         TError error = SetKnobValue("cgroup.procs", std::to_string(pid), true);
         if (error)
-            TLogger::Log(LOG_ERROR) << "Can't attach " << pid << " to " << Name << ": " << error << std::endl;
+            L_ERR() << "Can't attach " << pid << " to " << Name << ": " << error << std::endl;
     }
 
     return TError::Success();
@@ -261,7 +261,7 @@ TError TCgroupSnapshot::Create() {
      set<shared_ptr<TMount>> mounts;
      TError error = ms.Mounts(mounts);
      if (error) {
-         TLogger::Log(LOG_ERROR) << "Can't create mount snapshot: " << error << std::endl;
+         L_ERR() << "Can't create mount snapshot: " << error << std::endl;
          return error;
      }
 
@@ -274,7 +274,7 @@ TError TCgroupSnapshot::Create() {
              auto root = subsys->GetRootCgroup(mount);
              TError error = root->FindChildren(Cgroups);
              if (error) {
-                 TLogger::Log(LOG_ERROR) << "Can't find children for " << root->Relpath() << ": " << error << std::endl;
+                 L_ERR() << "Can't find children for " << root->Relpath() << ": " << error << std::endl;
                  return error;
              }
          }

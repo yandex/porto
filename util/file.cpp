@@ -14,7 +14,7 @@ using std::string;
 using std::vector;
 
 TError TFile::Touch() const {
-    TLogger::Log() << "touch " << Path.ToString() << std::endl;
+    L() << "touch " << Path.ToString() << std::endl;
 
     int fd = open(Path.ToString().c_str(), O_CREAT | O_WRONLY, Mode);
     if (fd < 0)
@@ -27,7 +27,7 @@ TError TFile::Touch() const {
 }
 
 TError TFile::Remove() const {
-    TLogger::Log() << "unlink " << Path.ToString() << std::endl;
+    L() << "unlink " << Path.ToString() << std::endl;
 
     int ret = RetryBusy(10, 100, [&]{ return unlink(Path.ToString().c_str()); });
 

@@ -154,14 +154,14 @@ std::vector<std::shared_ptr<TNlLink>> OpenLinks() {
 
     TError error = nl->Connect();
     if (error) {
-        TLogger::Log(LOG_ERROR) << "Can't open link: " << error << std::endl;
+        L_ERR() << "Can't open link: " << error << std::endl;
         return linkVec;
     }
 
     if (!devices.size()) {
         error = nl->GetDefaultLink(devices);
         if (error) {
-            TLogger::Log(LOG_ERROR) << "Can't open link: " << error << std::endl;
+            L_ERR() << "Can't open link: " << error << std::endl;
             return linkVec;
         }
     }
@@ -173,7 +173,7 @@ std::vector<std::shared_ptr<TNlLink>> OpenLinks() {
 
         error = l->Load();
         if (error) {
-            TLogger::Log(LOG_ERROR) << "Can't open link: " << error << std::endl;
+            L_ERR() << "Can't open link: " << error << std::endl;
             return linkVec;
         }
 

@@ -282,7 +282,7 @@ TError TNlLink::AddMacVlan(const std::string &master,
     ret = nl_cache_refill(GetSock(), Nl->GetCache());
     if (ret < 0) {
         error = TError(EError::Unknown, string("Unable to add macvlan: ") + nl_geterror(ret));
-        TLogger::Log(LOG_ERROR) << "Can't refill cache: " << error << std::endl;
+        L_ERR() << "Can't refill cache: " << error << std::endl;
     } else {
         LogCache(Nl->GetCache());
     }
@@ -314,7 +314,7 @@ void TNlLink::LogObj(const std::string &prefix, void *obj) {
     struct nl_dump_params dp = {};
     dp.dp_cb = [](struct nl_dump_params *params, char *buf) { handler(params, buf); };
 
-    auto &str = TLogger::Log();
+    auto &str = L();
     handler = [&](struct nl_dump_params *params, char *buf) { str << buf; };
 
     if (Link)
@@ -335,7 +335,7 @@ void TNlLink::LogCache(struct nl_cache *cache) {
     dp.dp_cb = [](struct nl_dump_params *params, char *buf) { handler(params, buf); };
     dp.dp_type = NL_DUMP_DETAILS;
 
-    auto &str = TLogger::Log();
+    auto &str = L();
     handler = [&](struct nl_dump_params *params, char *buf) { str << buf; };
 
     if (Link)
@@ -646,7 +646,7 @@ TError TNlCgFilter::Create() {
 		goto free_msg;
     }
 
-    TLogger::Log() << "netlink " << rtnl_link_get_name(Link->GetLink()) << ": create tfilter id 0x" << std::hex << Handle << " parent 0x" << Parent << std::dec  << std::endl;
+    L() << "netlink " << rtnl_link_get_name(Link->GetLink()) << ": create tfilter id 0x" << std::hex << Handle << " parent 0x" << Parent << std::dec  << std::endl;
 
     ret = nl_send_sync(Link->GetSock(), msg);
     if (ret) {
@@ -671,7 +671,7 @@ bool TNlCgFilter::Exists() {
 
     ret = rtnl_cls_alloc_cache(Link->GetSock(), Link->GetIndex(), Parent, &clsCache);
     if (ret < 0) {
-        TLogger::Log() << "Can't allocate filter cache: " << nl_geterror(ret) << std::endl;
+        L() << "Can't allocate filter cache: " << nl_geterror(ret) << std::endl;
         return false;
     }
 

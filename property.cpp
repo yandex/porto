@@ -15,7 +15,7 @@ bool TPropertySet::ParentDefault(std::shared_ptr<TContainer> &c,
                                  const std::string &property) {
     TError error = GetSharedContainer(c);
     if (error) {
-        TLogger::Log(LOG_ERROR) << "Can't get default for " << property << ": " << error << std::endl;
+        L_ERR() << "Can't get default for " << property << ": " << error << std::endl;
         return "";
     }
 
@@ -29,7 +29,7 @@ bool TPropertySet::IsDefault(const std::string &property) {
 bool TPropertySet::HasFlags(const std::string &property, int flags) {
     if (!propertySet.Valid(property)) {
         TError error(EError::Unknown, "Invalid property " + property);
-        TLogger::Log(LOG_ERROR) << "Invalid property: " << error << std::endl;
+        L_ERR() << "Invalid property: " << error << std::endl;
         return false;
     }
 
@@ -38,7 +38,7 @@ bool TPropertySet::HasFlags(const std::string &property, int flags) {
 bool TPropertySet::HasState(const std::string &property, EContainerState state) {
     if (!propertySet.Valid(property)) {
         TError error(EError::Unknown, "Invalid property " + property);
-        TLogger::Log(LOG_ERROR) << "Can't test property state: " << error << std::endl;
+        L_ERR() << "Can't test property state: " << error << std::endl;
         return false;
     }
     auto p = propertySet.Get(property);
@@ -117,13 +117,13 @@ static std::string DefaultStdFile(std::shared_ptr<TContainer> c,
     std::string cwd, root;
     TError error = c->GetProperty("cwd", cwd);
     if (error)
-        TLogger::Log(LOG_ERROR) << "Can't get cwd for std file: " << error << std::endl;
+        L_ERR() << "Can't get cwd for std file: " << error << std::endl;
     if (error)
         return "";
 
     error = c->GetProperty("root", root);
     if (error)
-        TLogger::Log(LOG_ERROR) << "Can't get root for std file: " << error << std::endl;
+        L_ERR() << "Can't get root for std file: " << error << std::endl;
     if (error)
         return "";
 

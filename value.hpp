@@ -212,7 +212,7 @@ public:
         std::shared_ptr<TVariant> v; \
         TError error = Get(name, c, &p, v); \
         if (error) \
-            TLogger::Log(LOG_ERROR) << "Can't get value " << name << ": " << error << std::endl; \
+            L_ERR() << "Can't get value " << name << ": " << error << std::endl; \
         return p->Get ## NAME(c, v); \
     } \
     TError Set ## NAME(const std::string &name, const TYPE &value) { \

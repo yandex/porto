@@ -234,7 +234,7 @@ TVariantSet::~TVariantSet() {
     if (!IsRoot()) {
         TError error = Storage->RemoveNode(Name);
         if (error)
-            TLogger::Log(LOG_ERROR) << "Can't remove key-value node " << Name << ": " << error << std::endl;
+            L_ERR() << "Can't remove key-value node " << Name << ": " << error << std::endl;
     }
 }
 
@@ -278,7 +278,7 @@ TError TVariantSet::Restore(const kv::TNode &node) {
             continue;
 
         if (config().log().verbose())
-            TLogger::Log() << "Restoring " << key << " = " << value << std::endl;
+            L() << "Restoring " << key << " = " << value << std::endl;
 
         TError error = SetString(key, value);
         if (error)
@@ -326,7 +326,7 @@ bool TVariantSet::IsDefault(const std::string &name) {
     std::shared_ptr<TVariant> v;
     TError error = Get(name, c, &p, v);
     if (error) {
-        TLogger::Log(LOG_ERROR) << "Can't check whether " << name << " is default: " << error << std::endl;
+        L_ERR() << "Can't check whether " << name << " is default: " << error << std::endl;
         return false;
     }
 
@@ -342,7 +342,7 @@ bool TVariantSet::HasValue(const std::string &name) {
     std::shared_ptr<TVariant> v;
     TError error = Get(name, c, &p, v);
     if (error) {
-        TLogger::Log(LOG_ERROR) << "Can't check whether " << name << " has value: " << error << std::endl;
+        L_ERR() << "Can't check whether " << name << " has value: " << error << std::endl;
         return false;
     }
 
@@ -375,7 +375,7 @@ TError TVariantSet::Sync() {
         pair->set_val(GetString(name));
 
         if (config().log().verbose())
-            TLogger::Log() << "Sync " << name << " = " << GetString(name) << std::endl;
+            L() << "Sync " << name << " = " << GetString(name) << std::endl;
     }
 
     return Storage->AppendNode(Name, node);

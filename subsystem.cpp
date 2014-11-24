@@ -106,7 +106,7 @@ TError TFreezerSubsystem::WaitState(TCgroup &cg, const std::string &state) const
         string s;
         TError error = cg.GetKnobValue("freezer.state", s);
         if (error)
-            TLogger::Log(LOG_ERROR) << "Can't freeze cgroup: " << error << std::endl;
+            L_ERR() << "Can't freeze cgroup: " << error << std::endl;
 
         return StringTrim(s) != state;
     });
@@ -117,7 +117,7 @@ TError TFreezerSubsystem::WaitState(TCgroup &cg, const std::string &state) const
 
         TError error(EError::Unknown, "Can't wait for freezer state " + state + ", current state is " + s);
         if (error)
-            TLogger::Log(LOG_ERROR) << cg.Relpath() << ": " << error << std::endl;
+            L_ERR() << cg.Relpath() << ": " << error << std::endl;
         return error;
     }
     return TError::Success();
@@ -143,7 +143,7 @@ bool TFreezerSubsystem::IsFreezed(TCgroup &cg) const {
     string s;
     TError error = cg.GetKnobValue("freezer.state", s);
     if (error)
-        TLogger::Log(LOG_ERROR) << "Can't get freezer status: " << error << std::endl;
+        L_ERR() << "Can't get freezer status: " << error << std::endl;
     return StringTrim(s) != "THAWED";
 }
 

@@ -14,7 +14,7 @@ void StatInc(const std::string &name) {
     sem_t *sem = sem_open(name.c_str(), O_CREAT, 0755, 0);
     if (!sem) {
         TError error(EError::Unknown, errno, "sem_open(" + name + ")");
-        TLogger::Log(LOG_ERROR) << "Can't increase statistics: " << error << std::endl;
+        L_ERR() << "Can't increase statistics: " << error << std::endl;
         return;
     }
 
