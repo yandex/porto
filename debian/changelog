@@ -1,3 +1,17 @@
+yandex-porto (0.22) precise; urgency=low
+
+  * Add network defaults into config
+  * Fix oom_killed data when non-root process is killed
+  * Convert some errors to warnings
+  * Rotate logs on SIGUSR1
+  * Change default net_guarantee
+  * Fix possible error when container changes state to stopped, not dead
+  * portoctl: support index in properties\data
+  * Fix std files path when root doesn't exist
+  * Fix error message format when task can't start
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 24 Nov 2014 18:51:00 +0400
+
 yandex-porto (0.21) precise; urgency=low
 
   * Fix version generation
