@@ -648,8 +648,8 @@ static int SendPids(int fd, map<int,int> &pidToStatus, int slavePid, int &slaveS
             return -1;
         }
 
-        SendPidStatus(fd, pid, status, pidToStatus.size());
         pidToStatus[pid] = status;
+        SendPidStatus(fd, pid, status, pidToStatus.size());
     }
 
     return -1;
