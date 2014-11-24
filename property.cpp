@@ -116,23 +116,23 @@ static std::string DefaultStdFile(std::shared_ptr<TContainer> c,
                                   const std::string &name) {
     std::string cwd, root;
     TError error = c->GetProperty("cwd", cwd);
-    if (error)
+    if (error) {
         L_ERR() << "Can't get cwd for std file: " << error << std::endl;
-    if (error)
         return "";
+    }
 
     error = c->GetProperty("root", root);
-    if (error)
+    if (error) {
         L_ERR() << "Can't get root for std file: " << error << std::endl;
-    if (error)
         return "";
+    }
 
     std::string prefix;
     if (c->UseParentNamespace())
         prefix = c->GetName(false) + ".";
 
     TPath path = root;
-    if (path.GetType() == EFileType::Directory) {
+    if (!path.Exists() || path.GetType() == EFileType::Directory) {
         path.AddComponent(cwd);
     } else {
         path = c->GetTmpDir();

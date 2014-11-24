@@ -13,6 +13,7 @@
 #include "test.hpp"
 
 #define HOSTNAME "portotest"
+const std::string TMPDIR = "/tmp/porto/selftest";
 
 extern "C" {
 #include <unistd.h>
@@ -43,6 +44,13 @@ static bool needDaemonChecks;
 
 static vector<string> subsystems = { "freezer", "memory", "cpu", "cpuacct", "devices" };
 static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"uts" };
+
+static void RemakeDir(const TPath &path) {
+    TFolder f(path);
+    if (f.Exists())
+        Expect(f.Remove() == false);
+    Expect(f.Create(0755, true) == false);
+}
 
 static void ExpectCorrectCgroups(const string &pid, const string &name) {
     auto cgmap = GetCgroups(pid);
@@ -1082,9 +1090,11 @@ static map<string, string> ParseMountinfo(string s) {
 
 static void TestRootRdOnlyProperty(TPortoAPI &api) {
     string name = "a";
-    TPath path(config().container().tmp_dir() + "/" + name);
+    TPath path(TMPDIR + "/" + name);
     string ROnly;
     string ret;
+
+    RemakeDir(path);
 
     Say() << "Check root read only property" << std::endl;
     ExpectSuccess(api.Create(name));
@@ -1118,12 +1128,30 @@ static void TestRootRdOnlyProperty(TPortoAPI &api) {
 
 static void TestRootProperty(TPortoAPI &api) {
     string pid;
+    string v;
 
     string name = "a";
-    string path = config().container().tmp_dir() + "/" + name;
+    string path = TMPDIR + "/" + name;
+
+    Say() << "Make sure root is empty" << std::endl;
+
     ExpectSuccess(api.Create(name));
 
+    ExpectSuccess(api.SetProperty(name, "command", "ls"));
+    ExpectSuccess(api.SetProperty(name, "root", path));
+
+    ExpectFailure(api.Start(name), EError::Unknown);
+    ExpectSuccess(api.GetData(name, "start_errno", v));
+    Expect(v == string("2"));
+
+
+    ExpectSuccess(api.Destroy(name));
+
     Say() << "Check filesystem isolation" << std::endl;
+
+    ExpectSuccess(api.Create(name));
+
+    RemakeDir(path);
 
     AsRoot(api);
     BootstrapCommand("/bin/sleep", path);
@@ -1162,7 +1190,6 @@ static void TestRootProperty(TPortoAPI &api) {
     ExpectSuccess(api.Start(name));
     WaitState(api, name, "dead");
 
-    string v;
     ExpectSuccess(api.GetData(name, "stdout", v));
     Expect(v == string("/\n"));
     ExpectSuccess(api.Stop(name));
@@ -1207,7 +1234,9 @@ static void TestRootProperty(TPortoAPI &api) {
 
     Say() << "Make sure /dev /sys /proc are not mounted when root is not isolated " << std::endl;
 
-    TFolder f(path);
+    cwd = config().container().tmp_dir() + "/" + name;
+
+    TFolder f(cwd);
     AsRoot(api);
     error = f.Remove(true);
     if (error)
@@ -1233,7 +1262,10 @@ static void TestHostnameProperty(TPortoAPI &api) {
     string pid, v;
     string name = "a";
     string host = "porto_" + name;
-    string path = config().container().tmp_dir() + "/" + name;
+    string path = TMPDIR + "/" + name;
+
+    RemakeDir(path);
+
     ExpectSuccess(api.Create(name));
 
     AsRoot(api);
@@ -1333,6 +1365,9 @@ static void TestBindProperty(TPortoAPI &api) {
     Expect(m[path + "/bin"] == "ro,relatime");
     Expect(m[path + "/tmp"] == "rw,relatime" || m["/tmp"] == "rw");
     ExpectSuccess(api.Stop(name));
+
+    path = TMPDIR + "/" + name;
+    RemakeDir(path);
 
     AsRoot(api);
     BootstrapCommand("/bin/cat", path);
@@ -2919,13 +2954,6 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
-static void mkdir_p(const std::string &path) {
-    TFolder f(path);
-    if (f.Exists())
-        Expect(f.Remove() == false);
-    Expect(f.Create(0755, true) == false);
-}
-
 static void TestCgroups(TPortoAPI &api) {
     AsRoot(api);
 
@@ -2933,7 +2961,7 @@ static void TestCgroups(TPortoAPI &api) {
 
     string freezerCg = "/sys/fs/cgroup/freezer/qwerty/asdfg";
 
-    mkdir_p(freezerCg);
+    RemakeDir(freezerCg);
 
     KillPorto(api, SIGINT);
 
@@ -2947,9 +2975,9 @@ static void TestCgroups(TPortoAPI &api) {
     string memoryCg = "/sys/fs/cgroup/memory/porto/asdf";
     string cpuCg = "/sys/fs/cgroup/cpu/porto/asdf";
 
-    mkdir_p(freezerCg);
-    mkdir_p(memoryCg);
-    mkdir_p(cpuCg);
+    RemakeDir(freezerCg);
+    RemakeDir(memoryCg);
+    RemakeDir(cpuCg);
 
     int pid = fork();
     if (pid == 0) {
