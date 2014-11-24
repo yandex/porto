@@ -7,8 +7,8 @@ extern "C" {
 TError::TError() : Error(EError::Success) {
 }
 
-TError::TError(EError e, std::string description) :
-    Error(e), Description(description) {
+TError::TError(EError e, std::string description, int eno) :
+    Error(e), Description(description), Errno(eno) {
 }
 
 TError::TError(EError e, int eno, std::string description) :

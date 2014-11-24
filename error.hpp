@@ -15,7 +15,7 @@ class TError {
 
 public:
     TError();
-    TError(EError e, std::string description);
+    TError(EError e, std::string description, int eno = 0);
     TError(EError e, int eno, std::string description);
 
     // return true if non-successful

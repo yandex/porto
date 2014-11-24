@@ -728,7 +728,7 @@ TError TTask::Start() {
     string msg;
     ssize_t len = read(Rfd, buf, sizeof(buf));
     if (len > 0)
-        msg = string(buf, len) + ": ";
+        msg = string(buf, len);
     close(Rfd);
 
     if (n < 0) {
@@ -743,7 +743,7 @@ TError TTask::Start() {
         Pid = 0;
         ExitStatus = -1;
 
-        return TError(EError::Unknown, ret, msg);
+        return TError(EError::Unknown, msg, ret);
     }
 }
 
