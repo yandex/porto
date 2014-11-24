@@ -3015,6 +3015,41 @@ static void TestVersion(TPortoAPI &api) {
     Expect(revision == GIT_REVISION);
 }
 
+static void TestRemoveDead(TPortoAPI &api) {
+    int seconds = 4;
+    bool remove;
+
+    AsRoot(api);
+
+    config().mutable_container()->set_aging_time_ms(seconds * 1000);
+    TFile f("/etc/portod.conf");
+    remove = !f.Exists();
+    ExpectSuccess(f.WriteStringNoAppend(config().ShortDebugString()));
+
+    KillPorto(api, SIGTERM);
+
+    std::string name = "dead";
+    ExpectSuccess(api.Create(name));
+    ExpectSuccess(api.SetProperty(name, "command", "true"));
+    ExpectSuccess(api.Start(name));
+    WaitState(api, name, "dead");
+
+    usleep(seconds / 2 * 1000 * 1000);
+    std::string state;
+    ExpectSuccess(api.GetData(name, "state", state));
+    Expect(state == "dead");
+
+    usleep(seconds / 2 * 1000 * 1000);
+    ExpectFailure(api.GetData(name, "state", state), EError::ContainerDoesNotExist);
+
+    if (remove) {
+        ExpectSuccess(f.Remove());
+    } else {
+        config().mutable_container()->set_aging_time_ms(60 * 60 * 24 * 7 * 1000);
+        ExpectSuccess(f.WriteStringNoAppend(config().ShortDebugString()));
+    }
+}
+
 static void TestStats(TPortoAPI &api) {
     if (!needDaemonChecks)
         return;
@@ -3105,6 +3140,7 @@ int SelfTest(string name, int leakNr) {
         { "recovery", TestRecovery },
         { "cgroups", TestCgroups },
         { "version", TestVersion },
+        { "remove_dead", TestRemoveDead },
         { "stats", TestStats },
         { "package", TestPackage },
     };

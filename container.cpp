@@ -1186,10 +1186,12 @@ TError TContainer::Restore(const kv::TNode &node) {
             L_ERR() << "Can't restore task: " << error << std::endl;
 
         auto state = Data->GetString(D_STATE);
-        if (state == ContainerStateName(EContainerState::Dead))
+        if (state == ContainerStateName(EContainerState::Dead)) {
             SetState(EContainerState::Dead);
-        else
+            TimeOfDeath = GetCurrentTimeMs();
+        } else {
             SetState(EContainerState::Running);
+        }
 
         auto cg = GetLeafCgroup(freezerSubsystem);
         if (freezerSubsystem->IsFreezed(*cg))
@@ -1273,8 +1275,11 @@ bool TContainer::Exit(int status, bool oomKilled) {
         L_ERR() << "Can't set " << D_EXIT_STATUS << ": " << error << std::endl;
 
     TimeOfDeath = GetCurrentTimeMs();
-    return true;
 
+    TEvent e(EEventType::RemoveDead, shared_from_this());
+    Holder->Queue->Add(config().container().aging_time_ms(), e);
+
+    return true;
 }
 
 bool TContainer::DeliverExitStatus(int pid, int status) {
@@ -1301,8 +1306,7 @@ bool TContainer::MayRespawn() {
 }
 
 void TContainer::ScheduleRespawn() {
-    TEvent e(EEventType::Respawn);
-    e.Container = shared_from_this();
+    TEvent e(EEventType::Respawn, shared_from_this());
     Holder->Queue->Add(config().container().respawn_delay_ms(), e);
 }
 
@@ -1558,7 +1562,6 @@ TError TContainerHolder::Destroy(const string &name) {
         return TError(EError::InvalidState, "container has children");
 
     PutId(Containers[name]->GetId());
-
     Containers.erase(name);
 
     return TError::Success();
@@ -1636,9 +1639,27 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     if (config().log().verbose())
         L() << "Deliver event " << event.GetMsg() << std::endl;
 
-    auto c = event.Container.lock();
-    if (c) {
-        return c->DeliverEvent(event);
+    if (event.Targeted) {
+        auto c = event.Container.lock();
+        if (c) {
+            if (event.Type == EEventType::RemoveDead) {
+                if (c->CanRemoveDead()) {
+                    std::string name = c->GetName();
+                    L() << "Remove " << name << " dead since " << c->GetTimeOfDeath() << ", timeout " << config().container().aging_time_ms() << ", now " << GetCurrentTimeMs() << std::endl;
+                    c.reset();
+
+                    TError error = Destroy(name);
+                    if (error)
+                        L_ERR() << "Can't destroy " << name << std::endl;
+                }
+
+                return true;
+            } else {
+                return c->DeliverEvent(event);
+            }
+        } else {
+            return false;
+        }
     } else {
         for (auto c : Containers)
             if (c.second->DeliverEvent(event))

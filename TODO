@@ -1,3 +1,4 @@
+- ? portod: flush master ack queue periodically
 - ? do periodic persistence checks
 - ? move property apply code into property method
 - ? use chrt instead of cpu.smart so we don't depend on smart kernels + set rt prio

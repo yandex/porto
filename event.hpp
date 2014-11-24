@@ -11,6 +11,7 @@ class TContainerHolder;
 enum class EEventType {
     Exit,
     RotateLogs,
+    RemoveDead,
     Respawn,
     OOM,
 };
@@ -19,6 +20,7 @@ class TEvent {
 public:
     EEventType Type;
     std::weak_ptr<TContainer> Container;
+    bool Targeted;
 
     struct {
         int Pid;
@@ -31,7 +33,8 @@ public:
 
     size_t DueMs = 0;
 
-    TEvent(EEventType type) : Type(type) {}
+    TEvent(EEventType type, std::shared_ptr<TContainer> container = nullptr) :
+        Type(type), Container(container), Targeted(container != nullptr) {}
 
     bool operator<(const TEvent& rhs) const;
 

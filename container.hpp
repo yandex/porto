@@ -149,6 +149,7 @@ public:
     std::shared_ptr<TContainer> FindRunningParent() const;
     bool UseParentNamespace() const;
     bool DeliverEvent(const TEvent &event);
+    size_t GetTimeOfDeath() { return TimeOfDeath; }
 };
 
 constexpr size_t BITS_PER_LLONG = sizeof(unsigned long long) * 8;
