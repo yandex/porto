@@ -2,6 +2,7 @@
 #define __PORTO_HPP__
 
 #include <string>
+#include <atomic>
 
 #include "version.hpp"
 
@@ -10,9 +11,18 @@ const std::string PORTO_ROOT_CGROUP = "porto";
 const int REAP_EVT_FD = 128;
 const int REAP_ACK_FD = 129;
 
-const std::string PORTO_STAT_SPAWNED = "/porto_spawned";
-const std::string PORTO_STAT_ERRORS = "/porto_errors";
-const std::string PORTO_STAT_WARNS = "/porto_warns";
+struct TDaemonStat {
+    std::atomic<uint64_t> Spawned;
+    std::atomic<uint64_t> Errors;
+    std::atomic<uint64_t> Warns;
+    std::atomic<uint64_t> MasterStarted;
+    std::atomic<uint64_t> SlaveStarted;
+    std::atomic<uint64_t> MasterQueueSize;
+    std::atomic<uint64_t> SlaveQueueSize;
+    std::atomic<uint64_t> Created;
+};
+
+extern TDaemonStat *DaemonStat;
 
 #define NO_COPY_CONSTRUCT(NAME) \
     NAME(const NAME &) = delete; \

@@ -1,0 +1,11 @@
+digraph Packets {
+	"yandex-porto";
+	"python-portopy" -> "yandex-porto";
+
+	"yandex-search-porto-config";
+	"yandex-search-group-porto";
+	"yandex-search-porto" -> "yandex-search-porto-config" [label="Pre-Depends"];
+	"yandex-search-porto" -> "yandex-search-group-porto" [label="Pre-Depends"];
+	"yandex-search-porto" -> "yandex-porto";
+	"yandex-search-porto" -> "python-portopy";
+}

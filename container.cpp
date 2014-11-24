@@ -1526,6 +1526,7 @@ TError TContainerHolder::Create(const string &name, int uid, int gid) {
         return error;
 
     Containers[name] = c;
+    DaemonStat->Created++;
     return TError::Success();
 }
 
@@ -1561,6 +1562,7 @@ TError TContainerHolder::Destroy(const string &name) {
 
     PutId(Containers[name]->GetId());
     Containers.erase(name);
+    DaemonStat->Created--;
 
     return TError::Success();
 }

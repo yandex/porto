@@ -6,10 +6,6 @@
 #include "util/path.hpp"
 #include "util/file.hpp"
 
-#ifdef PORTOD
-#include "util/stat.hpp"
-#endif
-
 static std::ofstream logFile;
 static std::ofstream kmsgFile;
 static TPath logPath;
@@ -85,9 +81,9 @@ std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
 
 #ifdef PORTOD
     if (level == LOG_WARN)
-        StatInc(PORTO_STAT_WARNS);
+        DaemonStat->Warns++;
     else if (level == LOG_ERROR)
-        StatInc(PORTO_STAT_ERRORS);
+        DaemonStat->Errors++;
 #endif
 
     std::string name = GetProcessName();

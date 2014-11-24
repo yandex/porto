@@ -3040,7 +3040,7 @@ static void TestRemoveDead(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "state", state));
     Expect(state == "dead");
 
-    usleep(seconds / 2 * 1000 * 1000);
+    usleep((seconds / 2 + 1) * 1000 * 1000);
     ExpectFailure(api.GetData(name, "state", state), EError::ContainerDoesNotExist);
 
     if (remove) {

@@ -1,0 +1,383 @@
+=== Основы ===
+
+Для запуска контейнера, достаточно указать команду, которую надо выполнить:
+%%
+# Создать контейнер, указать команду и запустить
+$ portoctl run uname command="uname -a"
+# Получить текущее состояние контейнера, к этому моменту он должен завершиться
+$ portoctl get uname state
+dead
+# Получить вывод контейнера
+$ portoctl get uname stdout
+Linux ya 3.16.4-200.fc20.x86_64 #1 SMP Mon Oct 6 12:57:00 UTC 2014 x86_64 x86_64 x86_64 GNU/Linux
+# Удалить контейнер
+$ portoctl destroy uname
+%%
+
+По умолчанию контейнер запускается в изолированном пространстве процессов (то есть PID процесса в контейнере равен 1 и никаких других процессов вокруг нет):
+%%
+$ portoctl run ps command="ps aux"
+$ portoctl get ps stdout
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+stfomic+     1  0.0  0.0  17644  1068 ?        Rs   18:45   0:00 ps aux
+$ portoctl destroy ps
+%%
+
+Контейнер видит все сетевые интерфейсы хоста:
+%%
+$ portoctl run ip command="ip link show"
+$ portoctl get ip stdout
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN mode DEFAULT group default
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: em1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc htb state UP mode DEFAULT group default qlen 1000
+    link/ether ec:f4:bb:53:1e:ed brd ff:ff:ff:ff:ff:ff
+$ portoctl destroy ip
+%%
+
+У контейнера не изолирована дисковая подсистема:
+%%
+$ portoctl run ls command="ls /"
+$ portoctl get ls stdout
+bin
+boot
+dev
+etc
+home
+lib
+lib64
+lost+found
+media
+mnt
+opt
+place
+proc
+root
+run
+sbin
+srv
+sys
+tmp
+usr
+var
+$ portoctl destroy ls
+%%
+
+Контейнер запускается от того пользователя и группы, который его создал и запустил:
+%%
+$ id
+uid=1000(stfomichev) gid=1000(stfomichev) groups=1000(stfomichev),1001(porto) context=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023
+
+# Создать контейнер
+$ portoctl create id
+# Установить команду запуска
+$ portoctl set id command id
+# Убедиться, что контейнер запустится от правильного пользователя и группы
+$ portoctl get id user
+stfomichev
+$ portoctl get id group
+stfomichev
+# Запустить контейнер
+$ portoctl start id
+$ portoctl get id stdout
+uid=1000(stfomichev) gid=1000(stfomichev) groups=1000(stfomichev),987(docker),1001(porto) context=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023
+$ portoctl destroy id
+
+Только пользователь root может запускать контейнеры от других пользователей:
+$ portoctl run id command="id" user="daemon"
+Can't set property: Permission (Only root can change this property)
+$ sudo portoctl run id command="id" user="daemon" group="daemon"
+$ portoctl get id stdout
+uid=2(daemon) gid=2(daemon) groups=2(daemon) context=unconfined_u:unconfined_r:unconfined_t:s0-s0:c0.c1023
+$ portoctl destroy id
+Can't destroy container: Permission (Permission error)
+$ sudo portoctl destroy id
+%%
+
+=== Базовые параметры контейнера ===
+
+Контейнер может находиться в одном из нескольких состояний:
+* Stopped: в это состояние контейнер попадает после вызовов Create() или Stop() и в нем можно изменять свойства контейнера;
+* Running: в это состояние контейнер попадает после вызова Start() или Resume() и в нем можно изменять ограниченный набор свойств и считывать статистику;
+* Dead: в это состояние контейнер переходит после завершения основного процесса и в нем можно считывать stdout/stderr и exit_status;
+* Paused: в это состояние контейнер переходит после вызова Pause(); в этот момент контейнер заморожен и не выполняется.
+
+Если по какой-то причине контейнер не запускаться, то porto возвращает сообщение обшибке. Через start_errno можно также получить errno системного вызова, из-за которого запуск не смог произойти:
+%%
+$ portoctl create invalid
+$ portoctl set invalid command __invalid_command__
+$ portoctl start invalid
+Can't start container: Unknown (No such file or directory: execvpe(__invalid_command__))
+$ portoctl get invalid start_errno
+2
+%%
+
+Код возврата контейнера можно получить через exit_code (формат такой же, как и у системного вызова wait, man 2 wait), portoctl get показывает человеко-читаемый статус:
+%%
+$ portoctl run true command="true"
+$ portoctl run false command="false"
+$ portoctl get true exit_status
+Container exited with 0
+$ portoctl get false exit_status
+Container exited with 1
+$ portoctl run sleep command="sleep 1000"
+$ kill -9 $(portoctl get sleep root_pid)
+$ portoctl get sleep exit_status
+Container killed by signal 9
+%%
+
+С помощью команды dget можно получить значение без дополнительной обработки:
+%%
+$ portoctl dget sleep exit_status
+9
+$ portoctl dget true exit_status
+0
+$ portoctl dget false exit_status
+256
+%%
+
+Porto также умеет показывать, был ли контейнер убит OOM killer'ом:
+%%
+$ portoctl get false oom_killed
+false
+%%
+
+Porto позволяет устанавливать рабочую директорию и environment запускаемого процесса, а также лимиты (man 2 setrlimit):
+%%
+$ portoctl run env command="bash -c 'env | grep TEST_PORTO'" env="TEST_PORTO1=1; TEST_PORTO2=2"
+$ portoctl get env stdout
+TEST_PORTO2=2
+TEST_PORTO1=1
+
+$ portoctl run cwd command="pwd" cwd="/tmp"
+$ portoctl get cwd stdout
+/tmp
+
+$ portoctl run ulimit command="bash -c 'builtin ulimit -a'" ulimit = "nproc: 20480 30720; nofile: 819200 1024000"
+$ portoctl get ulimit stdout
+core file size          (blocks, -c) 0
+data seg size           (kbytes, -d) unlimited
+scheduling priority             (-e) 0
+file size               (blocks, -f) unlimited
+pending signals                 (-i) 31490
+max locked memory       (kbytes, -l) 64
+max memory size         (kbytes, -m) unlimited
+open files                      (-n) 819200
+pipe size            (512 bytes, -p) 8
+POSIX message queues     (bytes, -q) 819200
+real-time priority              (-r) 0
+stack size              (kbytes, -s) 8192
+cpu time               (seconds, -t) unlimited
+max user processes              (-u) 20480
+virtual memory          (kbytes, -v) unlimited
+%%
+
+PID главного процесса контейнера можно получить через root_pid:
+%%
+$ portoctl run sleep command="sleep 1000"
+$ portoctl get sleep root_pid
+9354
+$ ls -la /proc/9354/exe
+lrwxrwxrwx. 1 stfomichev stfomichev 0 ноя 21 19:34 /proc/9354/exe -> /usr/bin/sleep
+%%
+
+При запуске контейнера автоматически создаются временные файлы, в которые porto записывает stdout/stderr. В случае, если на стандартный ввод контейнеру нужно передать какой-то файл или стандартный вывод контейнера нужно перенаправить в пайп, можно использовать свойства stdout_path, stdin_path, stderr_path.
+
+=== Изоляция ===
+
+Porto позволяет гибко управлять изоляцией процесса в контейнере. По умолчанию, все процессы контейнера изолируются, файловая система и сеть не изолируются.
+
+Если надо запустить контейнер без изоляции процессов, то можно использовать свойство isolate:
+%%
+$ portoctl run ps command="bash -c 'ps aux | wc -l'" isolate=false
+$ portoctl get ps stdout
+334
+$ portoctl destroy ps
+%%
+
+Чтобы изолировать файловую систему контейнера, достаточно указать свойство root:
+%%
+$ mkdir /tmp/porto
+$ portoctl run root command=ls root=/tmp/porto
+Can't start property: Unknown (No such file or directory: execvpe(ls))
+$ cat /tmp/bringup
+CMD=$1
+PREF=$2
+
+link() { local d=$(dirname $1); mkdir -p $PREF/$d; cp $1 $PREF/$1; }
+ldd $CMD | while read line; do
+	f=$(echo $line | cut -d ' ' -f 3);
+	if [ -e "$f" ]; then link $f; fi;
+	f=$(echo $line | cut -d ' ' -f 1);
+	if [ -e "$f" ]; then link $f; fi;
+done
+link $CMD
+$ bash /tmp/bringup /bin/ls /tmp/porto/
+$ ./portoctl run root command=ls root=/tmp/porto
+$ ./portoctl get root stdout
+bin
+dev
+etc
+lib64
+proc
+stderr
+stdout
+sys
+%%
+
+Свойство root_readonly позволяет сделать изолированную файловую систему доступной только на чтение:
+%%
+$ bash /tmp/bringup /bin/touch /tmp/porto/
+$ portoctl run root command="touch a" root=/tmp/porto
+$ portoctl get root exit_status
+Container exited with 0
+$ portoctl destroy root
+$ portoctl run root command="touch a" root=/tmp/porto root_readonly=true
+$ portoctl get root exit_status
+Container exited with 1
+%%
+
+Если у контейнера изолированная файловая система, но ему все-же нужно читать какие-то файлы, недоступные ему, можно использовать свойство bind:
+%%
+$ bash /tmp/bringup /bin/cat /tmp/porto/
+$ mkdir /tmp/porto2
+$ echo hello > /tmp/porto2/hello
+$ portoctl run bind command="cat /binded/hello" root=/tmp/porto bind="/tmp/porto2 /binded"
+$ portoctl get bind stdout
+hello
+%%
+
+По умолчанию, porto прокидывает настройки dns в контейнер (/etc/hosts /etc/resolv.conf), если изолируется файловая система. Если это не нужно, то можно выключить через свойство bind_dns.
+
+При запуске полноценных LXC-like контейнеров, можно использовать свойства, ограничивающие возможности root'а и доступ к устройствам: allowed_devices и capabilities.
+
+Существует возможность установить hostname (изоляция UTS) для контейнера:
+%%
+$ bash /tmp/bringup /bin/hostname /tmp/porto/
+$ portoctl run hostname command=hostname hostname=porto root=/tmp/porto
+$ portoctl get hostname stdout
+porto
+%%
+
+=== Установка лимитов ===
+
+Porto позволяет ограничивать выделение ресурсов контейнеру с помощью следующих свойств:
+- memory_guarantee - количество памяти, которое гарантированно будет выделено контейнеру (аналогично тому, как сейчас работает memory.low_limit_in_bytes);
+- memory_limit - лимит памяти для контейнера (аналогично memory.limit_in_bytes);
+- cpu_policy - CPU политика контейнера: rt (SMART realtime) или normal.
+- cpu_priority - CPU приоритет контейнера: 0-99, пока имеет смысл только для normal политики;
+- ulimit  - лимиты ресурсов контейнера (man 2 setrlimit) в формате: <limit> <soft> <hard>;
+- net_guarantee - гарантированная сетевая пропускная способность;
+- net_ceil - сетевой лимит;
+- net_prio - так как porto не отслеживает общие сетевые гарантии, может получиться так, что у двух контейнеров общая гарантия больше, чем доступная пропускная способность сети; в этом случае, bandwith выделяется пропорционально приоритету.
+
+Временно мы поддерживаем raw cgroup ручки, которые прозрачно конвертируются в свойства porto:
+- memory.limit_in_bytes -> memory_limit
+- memory.low_limit_in_bytes -> memory_guarantee
+- cpu.smart -> cpu_policy
+- memory.recharge_on_pgfault -> recharge_on_pgfault
+
+=== Иерархические контейнеры ===
+Porto ограниченно поддерживает иерархические контейнеры в двух режимах (для создания дочернего контейнера используется /):
+1. Когда родительский контейнер стартует первым, а дочерние контейнеры периодически создаются и завершаются. В этом случае родительский контейнер всегда работает, а в случае его завершения останавливаются все дочерние контейнеры:
+%%
+$ portoctl run parent command="sleep 1000"
+$ portoctl run parent/child command="sleep 100" isolate=false
+$ portoctl run parent/ps command="ps aux" isolate=false
+$ portoctl get parent state
+running
+$ portoctl get parent/child state
+running
+$ portoctl get parent/ps state
+dead
+$ portoctl get parent/ps stdout
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+stfomic+     1  0.0  0.0   4308   684 ?        Ss   16:27   0:00 sleep 1000
+stfomic+     2  0.0  0.0   4308   608 ?        Ss   16:27   0:00 sleep 100
+stfomic+     3  0.0  0.0  19744  1968 ?        Rs   16:27   0:00 ps aux
+$ portoctl stop parent
+$ portoctl get parent/child state
+stopped
+%%
+
+Так же в этом режиме для дочернего контейнера можно указать свойство isolate=false. В этом случае контейнер запустится в том же пространстве (процессов, фс, сети), что и родительский контейнер.
+
+2. Когда родительский контейнер используется для ограничения ресурсов для группы дочерних контейнеров. В этом случае родительский контейнер никогда не запускается и является meta контейнером:
+%%
+$ portoctl create meta
+$ portoctl set meta memory_limit 1073741824
+$ portoctl run meta/child1 command="sleep 1000"
+$ portoctl run meta/child2 command="sleep 1000"
+$ portoctl get meta state
+meta
+$ portoctl get meta/child1 state
+running
+$ portoctl get meta/child2 state
+running
+$ portoctl stop meta
+$ portoctl get meta/child1 state
+stopped
+$ portoctl get meta/child2 state
+stopped
+%%
+
+Для meta контейнеров общее ограничение пока поддерживается только для memory_limit.
+
+=== Автоматический перезапуск контейнеров ===
+
+По умолчанию porto не перезапускает завершившиеся контейнеры. Можно включить автомачитеский перезапуск с помощью свойства respawn. Так же можно указать максимальное число перезапусков через свойство max_respawn.
+Количество перезапусков контейнера можно получить через статистику respawn_count.
+
+=== Статистика ===
+Для каждого контейнера считается статистика:
+- cpu_usage - сколько процессорного времени контейнер использовал (аккумулированные наносекунды);
+- memory_usage - сколько памяти контейнер использует;
+- io_read/io_write - скользко контейнер записал\прочитал байт с каждого диска;
+- net_packets/net_bytes - сколько контейнер послал пакетов\байт с каждого сетевого интерфейса;
+- net_drops - сколько TX пакетов было дропнуто;
+- minor_faults/major_faults - сколько минорных\мажорных page fault'ов произошло в контейнере;
+- time - время работы контейнера.
+
+
+portoctl top позволяет просматривать статистику по всем контейнерам:
+%%
+container    cpu_usage memory_usage major_faults minor_faults net_packets
+meta/child1  1.41732ms         220K            0           82      em1: 0
+meta/child2  1.05066ms         208K            0           83      em1: 0
+%%
+
+Можно отсортировать и вывести только нужные поля (сортируется всегда по первому полю):
+%%
+container    memory_usage minor_faults
+meta/child1          220K           82
+meta/child2          208K           83
+%%
+
+=== Python API ===
+
+!!portoctl нельзя использовать в скриптах, так как он может поменяться!!!
+Вместо этого, предлагается удобный ((https://git.yandex.ru/gitweb/search-admin/porto.git?a=blob;f=api/python/porto/api.py;h=27efcb27f6d793ebc8870cd82551a4e1c4f8a8f8;hb=HEAD Python API)) для автоматизации (устанавливается вместе с пакетом python-portopy):
+%%
+root@sas1-3704:~# python
+Python 2.7.3 (default, Feb 27 2014, 19:58:35)
+[GCC 4.6.3] on linux2
+Type "help", "copyright", "credits" or "license" for more information.
+>>> import porto
+>>> c = porto.Connection()
+>>> c.connect()
+>>> print c.List()
+[u'/', u'parallel_afisha-1416479350:17061', u'parallel_antiwizard-1416479354:17120', u'parallel_arcnews_new_mmeta-1416780006:17055', u'parallel_autofacts-1416479363:17318', u'parallel_encyc-1416479370:17071', u'parallel_mininewsp-1416479458:17050', u'parallel_music-1416579645:17310', u'parallel_news_turkish-1409654015:17047', u'parallel_newsp_links-1416479465:17049', u'parallel_newsp_turkish-1409654015:17048', u'parallel_personal_history_mmeta-1416322156:17324', u'parallel_picassoc-1416481283:8148', u'parallel_poetry-1416481286:17501', u'parallel_rlsfacts-1416477892:17319', u'parallel_slave_newsd_tur-1416481300:17604', u'parallel_tv-1416836298:17309', u'parallel_verdict-1416320569:17313', u'parallel_wikifacts-1415794516:17316', u'parallel_wikifacts_tr-1415821339:17327', u'parallel_wikifacts_ua-1415821363:17325', u'parallel_yaca-1416813329:17305', u'parallel_yaca_mmeta-1416315371:17056', u'parallel_ymusic-1416766125:17314', u'prestable_yasmagent-1416579001:11004', u'production_barnav-1416807052:9200', u'production_clickdaemon-1416499872:18100', u'production_hilitedaemon-1416835207:9100']
+%%
+
+=== Обновление ===
+
+Porto состоит из двух процессов: portod (master) и portod-slave (slave):
+%%
+$ pgrep -l porto
+14885 portod
+14886 portod-slave
+%%
+
+Master состоит из нескольких сот строчек кода и предполагается, что он никогда не падает (но даже в случае падения porto не потеряет контейнеры, потеряет только exit status'ы контейнеров). Родительским процессом для всех контейнеров является master, он же делает waitpid на контейнеры (благодаря этому slave может безболезненно падать и контейнеры не будут reparented на init).
+В slave процессе находится основная логика porto. Slave процесс, может падать из-за внутренних ошибок или перезапускаться при обновлении, и он всегда должен корректно восстановить состояние до перезапуска.
+
+При обновлении пакета slave завершается, а master делает execv в новую версию.

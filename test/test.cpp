@@ -578,7 +578,13 @@ void TestDaemon(TPortoAPI &api) {
     PrintFds(path, lst, nr);
     Expect(nr == 2 + 6);
 
-    // TODO: check portoloop queue
+    /*
+    Say() << "Check portod-master queue size" << std::endl;
+    std::string v;
+    ExpectSuccess(api.GetData("/", "porto_stat[master_queue_size]", v));
+    Expect(v == std::to_string(0));
+    */
+
     // TODO: check rtnl classes
 }
 

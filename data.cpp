@@ -427,11 +427,14 @@ public:
                     std::shared_ptr<TVariant> v) override {
         TUintMap m;
 
-        m["spawned"] = StatGet(PORTO_STAT_SPAWNED);
-        m["errors"] = StatGet(PORTO_STAT_ERRORS);
-        m["warnings"] = StatGet(PORTO_STAT_WARNS);
-        m["uptime_master"] = (GetCurrentTimeMs() - MasterStarted) / 1000;
-        m["uptime_slave"] = (GetCurrentTimeMs() - SlaveStarted) / 1000;
+        m["spawned"] = DaemonStat->Spawned;
+        m["errors"] = DaemonStat->Errors;
+        m["warnings"] = DaemonStat->Warns;
+        m["master_uptime"] = (GetCurrentTimeMs() - DaemonStat->MasterStarted) / 1000;
+        m["slave_uptime"] = (GetCurrentTimeMs() - DaemonStat->SlaveStarted) / 1000;
+        m["master_queue_size"] = DaemonStat->MasterQueueSize;
+        m["slave_queue_size"] = DaemonStat->SlaveQueueSize;
+        m["created"] = DaemonStat->Created;
 
         return m;
     }

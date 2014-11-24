@@ -25,6 +25,7 @@ extern "C" {
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/prctl.h>
+#include <sys/mman.h>
 #include <grp.h>
 #define GNU_SOURCE
 #include <sys/socket.h>
@@ -118,6 +119,15 @@ static void SignalMask(int how) {
         L() << "Can't set signal mask: " << strerror(errno) << std::endl;
 }
 
+TDaemonStat *DaemonStat;
+static void AllocDaemonStat() {
+    DaemonStat = (TDaemonStat *)mmap(nullptr, sizeof(*DaemonStat),
+                                     PROT_READ | PROT_WRITE,
+                                     MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    if (!DaemonStat)
+        throw std::bad_alloc();
+}
+
 static void DaemonRotateLog() {
     if (!stdlog)
         TLogger::CloseLog();
@@ -126,12 +136,6 @@ static void DaemonRotateLog() {
 static int DaemonSyncConfig(bool master) {
     const auto &oldPid = master ? config().master_pid() : config().slave_pid();
     RemovePidFile(oldPid.path());
-
-    if (master) {
-        StatReset(PORTO_STAT_SPAWNED);
-        StatReset(PORTO_STAT_ERRORS);
-        StatReset(PORTO_STAT_WARNS);
-    }
 
     config.Load();
     if (noNetwork)
@@ -497,6 +501,10 @@ static void KvDump() {
 }
 
 static int SlaveMain() {
+    if (failsafe)
+        AllocDaemonStat();
+
+    DaemonStat->SlaveStarted = GetCurrentTimeMs();
     SlaveStarted = GetCurrentTimeMs();
 
     int ret = DaemonPrepare(false);
@@ -769,7 +777,7 @@ static int SpawnSlave(map<int,int> &pidToStatus) {
     }
 
     L() << "Spawned slave " << slavePid << std::endl;
-    StatInc(PORTO_STAT_SPAWNED);
+    DaemonStat->Spawned++;
 
     SignalMask(SIG_BLOCK);
 
@@ -823,6 +831,8 @@ static int SpawnSlave(map<int,int> &pidToStatus) {
             ret = EXIT_SUCCESS;
             break;
         }
+
+        DaemonStat->MasterQueueSize = pidToStatus.size();
     }
 
     if (done) {
@@ -846,6 +856,9 @@ exit:
 }
 
 static int MasterMain() {
+    AllocDaemonStat();
+    DaemonStat->MasterStarted = GetCurrentTimeMs();
+
     MasterStarted = GetCurrentTimeMs();
 
     int ret = DaemonPrepare(true);

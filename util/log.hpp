@@ -5,9 +5,6 @@
 #include <string>
 
 #include "util/crash.hpp"
-#ifdef PORTOD
-#include "util/stat.hpp"
-#endif
 
 #define PORTO_ASSERT(EXPR) \
     do { \
