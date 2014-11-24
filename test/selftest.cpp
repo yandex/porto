@@ -45,11 +45,16 @@ static bool needDaemonChecks;
 static vector<string> subsystems = { "freezer", "memory", "cpu", "cpuacct", "devices" };
 static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"uts" };
 
-static void RemakeDir(const TPath &path) {
+static void RemakeDir(TPortoAPI &api, const TPath &path) {
+    bool drop = geteuid() != 0;
     TFolder f(path);
+    if (drop)
+        AsRoot(api);
     if (f.Exists())
-        Expect(f.Remove() == false);
-    Expect(f.Create(0755, true) == false);
+        ExpectSuccess(f.Remove(true));
+    if (drop)
+        AsNobody(api);
+    ExpectSuccess(f.Create(0755, true));
 }
 
 static void ExpectCorrectCgroups(const string &pid, const string &name) {
@@ -1094,7 +1099,7 @@ static void TestRootRdOnlyProperty(TPortoAPI &api) {
     string ROnly;
     string ret;
 
-    RemakeDir(path);
+    RemakeDir(api, path);
 
     Say() << "Check root read only property" << std::endl;
     ExpectSuccess(api.Create(name));
@@ -1144,14 +1149,13 @@ static void TestRootProperty(TPortoAPI &api) {
     ExpectSuccess(api.GetData(name, "start_errno", v));
     Expect(v == string("2"));
 
-
     ExpectSuccess(api.Destroy(name));
 
     Say() << "Check filesystem isolation" << std::endl;
 
     ExpectSuccess(api.Create(name));
 
-    RemakeDir(path);
+    RemakeDir(api, path);
 
     AsRoot(api);
     BootstrapCommand("/bin/sleep", path);
@@ -1238,9 +1242,11 @@ static void TestRootProperty(TPortoAPI &api) {
 
     TFolder f(cwd);
     AsRoot(api);
-    error = f.Remove(true);
-    if (error)
-        throw error.GetMsg();
+    if (f.Exists()) {
+        error = f.Remove(true);
+        if (error)
+            throw error.GetMsg();
+    }
     AsNobody(api);
 
     ExpectSuccess(api.SetProperty(name, "root", "/"));
@@ -1264,7 +1270,7 @@ static void TestHostnameProperty(TPortoAPI &api) {
     string host = "porto_" + name;
     string path = TMPDIR + "/" + name;
 
-    RemakeDir(path);
+    RemakeDir(api, path);
 
     ExpectSuccess(api.Create(name));
 
@@ -1367,7 +1373,7 @@ static void TestBindProperty(TPortoAPI &api) {
     ExpectSuccess(api.Stop(name));
 
     path = TMPDIR + "/" + name;
-    RemakeDir(path);
+    RemakeDir(api, path);
 
     AsRoot(api);
     BootstrapCommand("/bin/cat", path);
@@ -2961,7 +2967,7 @@ static void TestCgroups(TPortoAPI &api) {
 
     string freezerCg = "/sys/fs/cgroup/freezer/qwerty/asdfg";
 
-    RemakeDir(freezerCg);
+    RemakeDir(api, freezerCg);
 
     KillPorto(api, SIGINT);
 
@@ -2975,9 +2981,9 @@ static void TestCgroups(TPortoAPI &api) {
     string memoryCg = "/sys/fs/cgroup/memory/porto/asdf";
     string cpuCg = "/sys/fs/cgroup/cpu/porto/asdf";
 
-    RemakeDir(freezerCg);
-    RemakeDir(memoryCg);
-    RemakeDir(cpuCg);
+    RemakeDir(api, freezerCg);
+    RemakeDir(api, memoryCg);
+    RemakeDir(api, cpuCg);
 
     int pid = fork();
     if (pid == 0) {
