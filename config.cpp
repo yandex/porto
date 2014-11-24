@@ -52,7 +52,7 @@ void TConfig::LoadDefaults() {
 
     config().mutable_container()->set_max_log_size(10 * 1024 * 1024);
     config().mutable_container()->set_tmp_dir("/place/porto");
-    config().mutable_container()->set_aging_time_ms(60 * 60 * 24 * 7 * 1000);
+    config().mutable_container()->set_aging_time_s(60 * 60 * 24 * 7);
     config().mutable_container()->set_respawn_delay_ms(1000);
     config().mutable_container()->set_stdout_limit(8 * 1024 * 1024);
     config().mutable_container()->set_private_max(1024);
@@ -86,6 +86,12 @@ void TConfig::Load(bool silent) {
 
     if (!silent)
         std::cerr << "Using default config" << std::endl;
+
+    if (config().container().aging_time_s() <
+        config().daemon().rotate_logs_timeout_s()) {
+        std::cerr << "aging_time_s should be greater than rotate_logs_timeout_s" << std::endl;
+        throw string("Invalid configuration");
+    }
 }
 
 int TConfig::Test(const std::string &path) {

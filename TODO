@@ -1,3 +1,4 @@
+- ? create cgroup for portod/portod-slave
 - ? portod: flush master ack queue periodically
 - ? do periodic persistence checks
 - ? move property apply code into property method

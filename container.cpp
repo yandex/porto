@@ -1276,9 +1276,6 @@ bool TContainer::Exit(int status, bool oomKilled) {
 
     TimeOfDeath = GetCurrentTimeMs();
 
-    TEvent e(EEventType::RemoveDead, shared_from_this());
-    Holder->Queue->Add(config().container().aging_time_ms(), e);
-
     return true;
 }
 
@@ -1326,7 +1323,8 @@ TError TContainer::Respawn() {
 
 bool TContainer::CanRemoveDead() const {
     return State == EContainerState::Dead &&
-        TimeOfDeath + config().container().aging_time_ms() <= GetCurrentTimeMs();
+        TimeOfDeath / 1000 + config().container().aging_time_s() <=
+        GetCurrentTimeMs() / 1000;
 }
 
 bool TContainer::HasChildren() const {
@@ -1641,29 +1639,26 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
 
     if (event.Targeted) {
         auto c = event.Container.lock();
-        if (c) {
-            if (event.Type == EEventType::RemoveDead) {
-                if (c->CanRemoveDead()) {
-                    std::string name = c->GetName();
-                    L() << "Remove " << name << " dead since " << c->GetTimeOfDeath() << ", timeout " << config().container().aging_time_ms() << ", now " << GetCurrentTimeMs() << std::endl;
-                    c.reset();
-
-                    TError error = Destroy(name);
-                    if (error)
-                        L_ERR() << "Can't destroy " << name << std::endl;
-                }
-
-                return true;
-            } else {
-                return c->DeliverEvent(event);
-            }
-        } else {
-            return false;
-        }
+        if (c)
+            return c->DeliverEvent(event);
+        return false;
     } else {
-        for (auto c : Containers)
+        std::vector<std::string> remove;
+        for (auto c : Containers) {
+            if (event.Type == EEventType::RotateLogs)
+                if (c.second->CanRemoveDead())
+                    remove.push_back(c.second->GetName());
+
             if (c.second->DeliverEvent(event))
                 return true;
+        }
+
+        for (auto name : remove) {
+            L() << "Remove old dead " << name << std::endl;
+            TError error = Destroy(name);
+            if (error)
+                L_ERR() << "Can't destroy " << name << ": " << error << std::endl;
+        }
     }
 
     if (event.Type == EEventType::RotateLogs) {

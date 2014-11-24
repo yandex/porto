@@ -9,8 +9,6 @@ std::string TEvent::GetMsg() const {
                 + " for pid " + std::to_string(Exit.Pid);
         case EEventType::RotateLogs:
             return "rotate logs";
-        case EEventType::RemoveDead:
-            return "remove dead";
         case EEventType::Respawn:
             return "respawn";
         case EEventType::OOM:

@@ -11,7 +11,6 @@ class TContainerHolder;
 enum class EEventType {
     Exit,
     RotateLogs,
-    RemoveDead,
     Respawn,
     OOM,
 };
@@ -22,14 +21,16 @@ public:
     std::weak_ptr<TContainer> Container;
     bool Targeted;
 
-    struct {
-        int Pid;
-        int Status;
-    } Exit;
+    union {
+        struct {
+            int Pid;
+            int Status;
+        } Exit;
 
-    struct {
-        int Fd;
-    } OOM;
+        struct {
+            int Fd;
+        } OOM;
+    };
 
     size_t DueMs = 0;
 

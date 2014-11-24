@@ -3021,7 +3021,8 @@ static void TestRemoveDead(TPortoAPI &api) {
 
     AsRoot(api);
 
-    config().mutable_container()->set_aging_time_ms(seconds * 1000);
+    config().mutable_container()->set_aging_time_s(seconds);
+    config().mutable_daemon()->set_rotate_logs_timeout_s(1);
     TFile f("/etc/portod.conf");
     remove = !f.Exists();
     ExpectSuccess(f.WriteStringNoAppend(config().ShortDebugString()));
@@ -3045,7 +3046,8 @@ static void TestRemoveDead(TPortoAPI &api) {
     if (remove) {
         ExpectSuccess(f.Remove());
     } else {
-        config().mutable_container()->set_aging_time_ms(60 * 60 * 24 * 7 * 1000);
+        config().mutable_container()->set_aging_time_s(60 * 60 * 24 * 7);
+        config().mutable_daemon()->set_rotate_logs_timeout_s(60);
         ExpectSuccess(f.WriteStringNoAppend(config().ShortDebugString()));
     }
 }
