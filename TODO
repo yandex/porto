@@ -1,3 +1,4 @@
+- apply network enable/disable without restarting all containers
 - ? create cgroup for portod/portod-slave
 - ? portod: flush master ack queue periodically
 - ? do periodic persistence checks

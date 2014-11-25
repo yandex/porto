@@ -517,7 +517,7 @@ class TNetGuaranteeProperty : public TNetMapValue {
 public:
     TNetGuaranteeProperty() :
         TNetMapValue(P_NET_GUARANTEE,
-                     "Guaranteed container network bandwidth") {}
+                     "Guaranteed container network bandwidth [bytes/s] (max 32Gbps)") {}
     uint32_t GetDefault() override { return config().network().default_guarantee(); }
     uint32_t GetRootDefault() override { return config().network().default_max_guarantee(); }
 };
@@ -526,7 +526,7 @@ class TNetCeilProperty : public TNetMapValue {
 public:
     TNetCeilProperty() :
         TNetMapValue(P_NET_CEIL,
-                     "Maximum container network bandwidth") {}
+                     "Maximum container network bandwidth [bytes/s] (max 32Gbps)") {}
     uint32_t GetDefault() override { return config().network().default_limit(); }
     uint32_t GetRootDefault() override { return config().network().default_max_guarantee(); }
 };
