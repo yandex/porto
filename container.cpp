@@ -894,6 +894,8 @@ TError TContainer::Resume() {
 }
 
 TError TContainer::Kill(int sig) {
+    L() << "Kill " << GetName() << " " << Id << std::endl;
+
     auto state = GetState();
     if (state != EContainerState::Running)
         return TError(EError::InvalidState, "invalid container state " +

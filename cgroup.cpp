@@ -245,11 +245,9 @@ TError TCgroup::SetKnobValue(const std::string &knob, const std::string &value, 
 }
 
 TError TCgroup::Attach(int pid) const {
-    if (!IsRoot()) {
-        TError error = SetKnobValue("cgroup.procs", std::to_string(pid), true);
-        if (error)
-            L_ERR() << "Can't attach " << pid << " to " << Name << ": " << error << std::endl;
-    }
+    TError error = SetKnobValue("cgroup.procs", std::to_string(pid), true);
+    if (error)
+        L_ERR() << "Can't attach " << pid << " to " << Name << ": " << error << std::endl;
 
     return TError::Success();
 }

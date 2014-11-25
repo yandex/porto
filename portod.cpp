@@ -590,6 +590,8 @@ static int SlaveMain() {
             }
         }
 
+        L() << "Done restoring" << std::endl;
+
         cs.Destroy();
 
         if (!restored) {

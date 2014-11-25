@@ -868,8 +868,18 @@ TError TTask::FixCgroups() const {
         if (!subsys || LeafCgroups.find(subsys) == LeafCgroups.end()) {
             if (pair.first.find(',') != std::string::npos)
                 continue;
-            if (pair.first == "net_cls" && !config().network().enabled())
+            if (pair.first == "net_cls" && !config().network().enabled()) {
+                if (path == "/")
+                    continue;
+
+                L_WRN() << "No network, disabled " << subsys->GetName() << ":" << path << std::endl;
+
+                auto cg = subsys->GetRootCgroup();
+                error = cg->Attach(Pid);
+                if (error)
+                    L_ERR() << "Can't reattach to root: " << error << std::endl;
                 continue;
+            }
 
             error = TError(EError::Unknown, "Task belongs to unknown subsystem " + pair.first);
             L_WRN() << "Skip " << pair.first << ": " << error << std::endl;
