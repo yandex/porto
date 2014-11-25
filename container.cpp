@@ -1460,6 +1460,10 @@ TError TContainerHolder::CreateRoot() {
         return error;
 
     ScheduleLogRotatation();
+    DaemonStat->Created = 0;
+    DaemonStat->RestoreFailed = 0;
+    DaemonStat->RemoveDead = 0;
+    DaemonStat->Rotated = 0;
 
     return TError::Success();
 }
@@ -1627,6 +1631,7 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
     }
 
     Containers[name] = c;
+    DaemonStat->Created++;
     return TError::Success();
 }
 
