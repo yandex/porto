@@ -1660,11 +1660,13 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
             TError error = Destroy(name);
             if (error)
                 L_ERR() << "Can't destroy " << name << ": " << error << std::endl;
+            DaemonStat->RemoveDead++;
         }
     }
 
     if (event.Type == EEventType::RotateLogs) {
         ScheduleLogRotatation();
+        DaemonStat->Rotated++;
         return true;
     } else {
         L() << "Couldn't deliver " << event.GetMsg() << std::endl;

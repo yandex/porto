@@ -413,7 +413,9 @@ static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
     struct epoll_event ev[MAX_EVENTS];
 
     while (!done) {
-        int nr = epoll_wait(cholder.Epfd, ev, MAX_EVENTS, queue->GetNextTimeout());
+        int timeout = queue->GetNextTimeout();
+        DaemonStat->SlaveTimeoutMs = timeout;
+        int nr = epoll_wait(cholder.Epfd, ev, MAX_EVENTS, timeout);
         if (nr < 0) {
             L() << "epoll() error: " << strerror(errno) << std::endl;
 
@@ -480,7 +482,7 @@ static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
             } else {
                 TEvent e(EEventType::OOM);
                 e.OOM.Fd = ev[i].data.fd;
-                cholder.DeliverEvent(e);
+                (void)cholder.DeliverEvent(e);
             }
         }
     }
@@ -581,8 +583,10 @@ static int SlaveMain() {
             for (auto &r : m) {
                 restored = true;
                 error = cholder.Restore(r.first, r.second);
-                if (error)
+                if (error) {
                     L_ERR() << "Can't restore " << r.first << "state : " << error << std::endl;
+                    DaemonStat->RestoreFailed++;
+                }
             }
         }
 

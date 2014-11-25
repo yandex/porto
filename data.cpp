@@ -435,6 +435,10 @@ public:
         m["master_queue_size"] = DaemonStat->MasterQueueSize;
         m["slave_queue_size"] = DaemonStat->SlaveQueueSize;
         m["created"] = DaemonStat->Created;
+        m["remove_dead"] = DaemonStat->RemoveDead;
+        m["slave_timeout_ms"] = DaemonStat->SlaveTimeoutMs;
+        m["rotated"] = DaemonStat->Rotated;
+        m["restore_failed"] = DaemonStat->RestoreFailed;
 
         return m;
     }

@@ -3027,6 +3027,10 @@ static void TestRemoveDead(TPortoAPI &api) {
     int seconds = 4;
     bool remove;
 
+    std::string v;
+    ExpectSuccess(api.GetData("/", "porto_stat[remove_dead]", v));
+    Expect(v == std::to_string(0));
+
     AsRoot(api);
 
     config().mutable_container()->set_aging_time_s(seconds);
@@ -3050,6 +3054,9 @@ static void TestRemoveDead(TPortoAPI &api) {
 
     usleep((seconds / 2 + 1) * 1000 * 1000);
     ExpectFailure(api.GetData(name, "state", state), EError::ContainerDoesNotExist);
+
+    ExpectSuccess(api.GetData("/", "porto_stat[remove_dead]", v));
+    Expect(v == std::to_string(1));
 
     if (remove) {
         ExpectSuccess(f.Remove());

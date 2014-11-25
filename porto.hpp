@@ -20,6 +20,10 @@ struct TDaemonStat {
     std::atomic<uint64_t> MasterQueueSize;
     std::atomic<uint64_t> SlaveQueueSize;
     std::atomic<uint64_t> Created;
+    std::atomic<uint64_t> RemoveDead;
+    std::atomic<int> SlaveTimeoutMs;
+    std::atomic<uint64_t> Rotated;
+    std::atomic<uint64_t> RestoreFailed;
 };
 
 extern TDaemonStat *DaemonStat;
