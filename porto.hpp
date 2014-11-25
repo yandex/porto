@@ -17,8 +17,8 @@ struct TDaemonStat {
     std::atomic<uint64_t> Warns;
     std::atomic<uint64_t> MasterStarted;
     std::atomic<uint64_t> SlaveStarted;
-    std::atomic<uint64_t> MasterQueueSize;
-    std::atomic<uint64_t> SlaveQueueSize;
+    std::atomic<uint64_t> QueuedStatuses;
+    std::atomic<uint64_t> QueuedEvents;
     std::atomic<uint64_t> Created;
     std::atomic<uint64_t> RemoveDead;
     std::atomic<int> SlaveTimeoutMs;
@@ -32,8 +32,8 @@ extern TDaemonStat *DaemonStat;
     NAME(const NAME &) = delete; \
     NAME &operator=(const NAME &) = delete
 
-extern size_t MasterStarted;
-extern size_t SlaveStarted;
+// TODO: rework this into some kind of notify interface
+extern void AckExitStatus(int pid);
 
 #include "config.hpp"
 

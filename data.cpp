@@ -432,8 +432,8 @@ public:
         m["warnings"] = DaemonStat->Warns;
         m["master_uptime"] = (GetCurrentTimeMs() - DaemonStat->MasterStarted) / 1000;
         m["slave_uptime"] = (GetCurrentTimeMs() - DaemonStat->SlaveStarted) / 1000;
-        m["master_queue_size"] = DaemonStat->MasterQueueSize;
-        m["slave_queue_size"] = DaemonStat->SlaveQueueSize;
+        m["queued_statuses"] = DaemonStat->QueuedStatuses;
+        m["queued_events"] = DaemonStat->QueuedEvents;
         m["created"] = DaemonStat->Created;
         m["remove_dead"] = DaemonStat->RemoveDead;
         m["slave_timeout_ms"] = DaemonStat->SlaveTimeoutMs;

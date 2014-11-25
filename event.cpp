@@ -39,7 +39,7 @@ void TEventQueue::DeliverEvents(TContainerHolder &cholder) {
         Queue.pop();
     }
 
-    DaemonStat->SlaveQueueSize = Queue.size();
+    DaemonStat->QueuedEvents = Queue.size();
 }
 
 int TEventQueue::GetNextTimeout() {

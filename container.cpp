@@ -777,9 +777,6 @@ TError TContainer::KillAll() {
     return TError::Success();
 }
 
-// TODO: rework this into some kind of notify interface
-extern void AckExitStatus(int pid);
-
 void TContainer::StopChildren() {
     for (auto iter : Children) {
         if (auto child = iter.lock()) {
@@ -839,8 +836,8 @@ TError TContainer::Stop() {
     L() << "Stop " << GetName() << " " << Id << std::endl;
 
     if (state == EContainerState::Running || state == EContainerState::Dead) {
-
         int pid = Task->GetPid();
+        AckExitStatus(pid);
 
         TError error = KillAll();
         if (error)
@@ -850,7 +847,6 @@ TError TContainer::Stop() {
         if (ret)
             L() << "Error while waiting for container to stop" << std::endl;
 
-        AckExitStatus(pid);
         Task->DeliverExitStatus(-1);
     }
 

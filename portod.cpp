@@ -637,7 +637,7 @@ static int SlaveMain() {
     return ret;
 }
 
-static void SendPidStatus(int fd, int pid, int status, size_t queued) {
+static void DeliverPidStatus(int fd, int pid, int status, size_t queued) {
     L() << "Deliver " << pid << " status " << status << " (" << queued << " queued)" << std::endl;
 
     if (write(fd, &pid, sizeof(pid)) < 0)
@@ -646,7 +646,7 @@ static void SendPidStatus(int fd, int pid, int status, size_t queued) {
         L() << "write(status): " << strerror(errno) << std::endl;
 }
 
-static int SendPids(int fd, map<int,int> &pidToStatus, int slavePid, int &slaveStatus) {
+static int ReapDead(int fd, map<int,int> &exited, int slavePid, int &slaveStatus, std::set<int> &acked) {
     int status;
     int pid;
 
@@ -660,25 +660,38 @@ static int SendPids(int fd, map<int,int> &pidToStatus, int slavePid, int &slaveS
             return -1;
         }
 
-        pidToStatus[pid] = status;
-        SendPidStatus(fd, pid, status, pidToStatus.size());
+        if (acked.find(pid) != acked.end()) {
+            acked.erase(pid);
+            continue;
+        }
+
+        exited[pid] = status;
+        DeliverPidStatus(fd, pid, status, exited.size());
+        DaemonStat->QueuedStatuses = exited.size();
     }
 
-    DaemonStat->MasterQueueSize = pidToStatus.size();
     return 0;
 }
 
-static void ReceiveAcks(int fd, map<int,int> &pidToStatus) {
+static void ReceiveAcks(int fd, std::map<int,int> &exited,
+                        std::set<int> &acked) {
     int pid;
 
     while (read(fd, &pid, sizeof(pid)) == sizeof(pid)) {
-        pidToStatus.erase(pid);
-        DaemonStat->MasterQueueSize = pidToStatus.size();
-        L() << "Got acknowledge for " << pid << " (" << pidToStatus.size() << " queued)" << std::endl;
+        if (pid <= 0)
+            continue;
+
+        if (exited.find(pid) == exited.end())
+            acked.insert(pid);
+        else
+            exited.erase(pid);
+
+        DaemonStat->QueuedStatuses = exited.size();
+        L() << "Got acknowledge for " << pid << " (" << exited.size() << " queued)" << std::endl;
     }
 }
 
-static void SavePidMap(map<int, int> &pidToStatus) {
+static void SaveStatuses(map<int, int> &exited) {
     TFile f(config().daemon().pidmap().path());
     if (f.Exists()) {
         TError error = f.Remove();
@@ -688,14 +701,14 @@ static void SavePidMap(map<int, int> &pidToStatus) {
         }
     }
 
-    for (auto &kv : pidToStatus) {
+    for (auto &kv : exited) {
         TError error = f.AppendString(std::to_string(kv.first) + " " + std::to_string(kv.second) + "\n");
         if (error)
             L_ERR() << "Can't save pid map: " << error << std::endl;
     }
 }
 
-static void RestorePidMap(map<int, int> &pidToStatus) {
+static void RestoreStatuses(map<int, int> &exited) {
     TFile f(config().daemon().pidmap().path());
     if (!f.Exists())
         return;
@@ -733,11 +746,11 @@ static void RestorePidMap(map<int, int> &pidToStatus) {
             continue;
         }
 
-        pidToStatus[pid] = status;
+        exited[pid] = status;
     }
 }
 
-static int SpawnSlave(map<int,int> &pidToStatus) {
+static int SpawnSlave(map<int,int> &exited) {
     int evtfd[2];
     int ackfd[2];
     int ret = EXIT_FAILURE;
@@ -784,8 +797,8 @@ static int SpawnSlave(map<int,int> &pidToStatus) {
 
     SignalMask(SIG_BLOCK);
 
-    for (auto &pair : pidToStatus)
-        SendPidStatus(evtfd[1], pair.first, pair.second, pidToStatus.size());
+    for (auto &pair : exited)
+        DeliverPidStatus(evtfd[1], pair.first, pair.second, exited.size());
 
     while (!done) {
         if (rotate) {
@@ -807,7 +820,7 @@ static int SpawnSlave(map<int,int> &pidToStatus) {
             if (stdlog)
                 stdlogArg = "--stdlog";
 
-            SavePidMap(pidToStatus);
+            SaveStatuses(exited);
 
             if (kill(slavePid, updateSignal) < 0) {
                 L() << "Can't send " << updateSignal << " to slave: " << strerror(errno) << std::endl;
@@ -824,12 +837,13 @@ static int SpawnSlave(map<int,int> &pidToStatus) {
             break;
         }
 
+        std::set<int> acked;
         SignalMask(SIG_UNBLOCK);
-        ReceiveAcks(ackfd[0], pidToStatus);
+        ReceiveAcks(ackfd[0], exited, acked);
         SignalMask(SIG_BLOCK);
 
         int status;
-        if (SendPids(evtfd[1], pidToStatus, slavePid, status)) {
+        if (ReapDead(evtfd[1], exited, slavePid, status, acked)) {
             L() << "slave exited with " << status << std::endl;
             ret = EXIT_SUCCESS;
             break;
@@ -883,13 +897,13 @@ static int MasterMain() {
 
     SignalMask(SIG_UNBLOCK);
 
-    map<int,int> pidToStatus;
-    RestorePidMap(pidToStatus);
+    map<int,int> exited;
+    RestoreStatuses(exited);
 
     while (!done) {
         size_t started = GetCurrentTimeMs();
         size_t next = started + config().container().respawn_delay_ms();
-        ret = SpawnSlave(pidToStatus);
+        ret = SpawnSlave(exited);
         L() << "Returned " << ret << std::endl;
 
         if (!done && next >= GetCurrentTimeMs())
