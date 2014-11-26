@@ -4,6 +4,8 @@
 #include "container.hpp"
 #include "property.hpp"
 #include "subsystem.hpp"
+#include "qdisc.hpp"
+#include "util/file.hpp"
 #include "util/string.hpp"
 
 extern "C" {

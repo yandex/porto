@@ -12,7 +12,9 @@
 #include "data.hpp"
 #include "event.hpp"
 #include "holder.hpp"
+#include "qdisc.hpp"
 #include "util/log.hpp"
+#include "util/file.hpp"
 #include "util/string.hpp"
 #include "util/netlink.hpp"
 #include "util/pwd.hpp"
@@ -101,6 +103,10 @@ EContainerState TContainer::GetState() {
     rec = false;
 
     return State;
+}
+
+TError TContainer::GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) {
+    return Tclass->GetStat(stat, m);
 }
 
 void TContainer::SetState(EContainerState newState) {

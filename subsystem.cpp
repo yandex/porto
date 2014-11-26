@@ -1,6 +1,7 @@
 #include "cgroup.hpp"
 #include "subsystem.hpp"
 #include "util/log.hpp"
+#include "util/file.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
 

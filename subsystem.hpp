@@ -6,9 +6,11 @@
 #include <memory>
 #include <map>
 
-#include "cgroup.hpp"
+#include "porto.hpp"
+#include "error.hpp"
 
 class TCgroup;
+class TMount;
 
 class TSubsystem : public std::enable_shared_from_this<TSubsystem> {
     NO_COPY_CONSTRUCT(TSubsystem);

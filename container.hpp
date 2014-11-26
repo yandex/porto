@@ -11,7 +11,6 @@
 
 #include "kvalue.hpp"
 #include "task.hpp"
-#include "qdisc.hpp"
 #include "util/unix.hpp"
 
 class TCgroup;
@@ -21,6 +20,11 @@ class TVariantSet;
 enum class ETclassStat;
 class TEvent;
 class TContainerHolder;
+class TNlLink;
+class TQdisc;
+class TTclass;
+class TFilter;
+class TTask;
 
 extern int64_t BootTime;
 
@@ -94,7 +98,7 @@ public:
 
     std::string GetTmpDir() const;
     EContainerState GetState();
-    TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) { return Tclass->GetStat(stat, m); }
+    TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);
 
     TContainer(TContainerHolder *holder,
                const std::string &name, std::shared_ptr<TContainer> parent,

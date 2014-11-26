@@ -11,6 +11,8 @@
 #include "holder.hpp"
 #include "qdisc.hpp"
 #include "util/log.hpp"
+#include "util/file.hpp"
+#include "util/folder.hpp"
 #include "util/protobuf.hpp"
 #include "util/unix.hpp"
 #include "util/string.hpp"

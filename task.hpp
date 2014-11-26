@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 #include <cstdint>
+#include <memory>
 
-#include "cgroup.hpp"
 #include "util/namespace.hpp"
 #include "util/path.hpp"
 
@@ -15,6 +15,9 @@ extern "C" {
 
 class TTask;
 class TContainerEnv;
+class TFolder;
+class TCgroup;
+class TSubsystem;
 
 struct TExitStatus {
     // Task was not started due to the following error

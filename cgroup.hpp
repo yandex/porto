@@ -8,10 +8,9 @@
 
 #include "porto.hpp"
 #include "error.hpp"
-#include "util/mount.hpp"
-#include "util/folder.hpp"
 
 class TSubsystem;
+class TMount;
 
 class TCgroup : public std::enable_shared_from_this<TCgroup> {
     NO_COPY_CONSTRUCT(TCgroup);

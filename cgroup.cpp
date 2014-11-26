@@ -9,6 +9,8 @@
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
+#include "util/mount.hpp"
+#include "util/folder.hpp"
 
 using std::string;
 using std::vector;
