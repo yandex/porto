@@ -1,3 +1,13 @@
+yandex-porto (0.23) precise; urgency=low
+
+  * Bring back functionality which removes old dead containers
+  * Fix master leak (status queue always grows and never shrinks)
+  * Convert daemon statistics to shared mmap and add more data
+  * Add small ack queue to master to remove unneeded events
+  * Don't kill container when network is switched off on update
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Wed, 26 Nov 2014 13:36:00 +0400
+
 yandex-porto (0.22) precise; urgency=low
 
   * Add network defaults into config
