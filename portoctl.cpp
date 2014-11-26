@@ -896,6 +896,9 @@ public:
         size_t nameLen = CalculateFieldLength(clist);
         size_t timeLen = 10;
         for (auto c : clist) {
+            if (c == "/")
+                continue;
+
             string s;
             ret = Api->GetData(c, "state", s);
             if (ret)
