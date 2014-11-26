@@ -1,7 +1,5 @@
 - ? create cgroup for portod/portod-slave
-- ? portod: flush master ack queue periodically
 - ? do periodic persistence checks
-- ? move property apply code into property method
 - ? use chrt instead of cpu.smart so we don't depend on smart kernels + set rt prio
 
 # properties
@@ -10,36 +8,28 @@
 - ? oneshot
 - ? cpu_cores - reserve some cores for a container
 
-# nekt0n
-- add namespaces
-- ? get rid of globals/static which have class types (http://google-styleguide.googlecode.com/svn/trunk/cppguide.html#Static_and_Global_Variables)
-
 # phase 4
 ##
 - ? ro+rw images for container distribution
+- ? enable user namespace
 ## net
 - L3 configuration via properties (ip/mask/broadcast/routes)
 - net: bridge to create veth pair, then add side A to the specified bridge and
   side B to the container
-
-# phase 3
-## other
-- ? when to enable user namespace
-## net
 - ? net_prio 0-7 -> 0-99
-
-# phase 2
+## cpu
 - rt: create cgroup for non-smart tasks and throttle them
-- ? use SO_PEERCRED to isolate parent containers from child in portod
-
-# phase X
+## kernel
 - ? kernel support for cgroup to limit allowed ports
 - ? kernel support for cgroup coredump path
+## other
 - ? start portod in container -> need to parse mountinfo, not mounts (because mountinfo skips mounts outside of chroot)
-
-# cleanup
+- ? use SO_PEERCRED to isolate parent containers from child in portod
+## cleanup
 - remove extern AckExitStatus from container->Stop()
-- rotate subprocess stdout/stderr
+- ? rotate (instead of truncating) subprocess stdout/stderr
 - move all 'extern "C"' into one file
 - use some kind of reference count for accounting running children
-- ? remove start_errno data or make it hidden?
+## nekt0n
+- add namespaces
+- ? get rid of globals/static which have class types (http://google-styleguide.googlecode.com/svn/trunk/cppguide.html#Static_and_Global_Variables)
