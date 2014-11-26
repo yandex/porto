@@ -8,12 +8,12 @@
 #include <memory>
 #include <functional>
 #include <set>
-#include <climits>
 
 #include "kvalue.hpp"
 #include "task.hpp"
 #include "qdisc.hpp"
 #include "util/unix.hpp"
+#include "util/idmap.hpp"
 
 class TCgroup;
 class TContainerEnv;
@@ -37,13 +37,6 @@ enum class EContainerState {
     Running,
     Paused,
     Meta
-};
-
-struct TDataSpec {
-    std::string Description;
-    unsigned int Flags;
-    std::function<std::string(TContainer& c)> Handler;
-    std::set<EContainerState> Valid;
 };
 
 class TContainer : public std::enable_shared_from_this<TContainer> {
@@ -145,23 +138,19 @@ public:
     std::shared_ptr<TCgroup> GetLeafCgroup(std::shared_ptr<TSubsystem> subsys);
     bool CanRemoveDead() const;
     bool HasChildren() const;
-    uint16_t GetId() { return Id; }
     std::shared_ptr<TContainer> FindRunningParent() const;
     bool UseParentNamespace() const;
     bool DeliverEvent(const TEvent &event);
     size_t GetTimeOfDeath() { return TimeOfDeath; }
 };
 
-constexpr size_t BITS_PER_LLONG = sizeof(unsigned long long) * 8;
 class TContainerHolder {
     NO_COPY_CONSTRUCT(TContainerHolder);
     std::vector<std::shared_ptr<TNlLink>> Links;
     std::map <std::string, std::shared_ptr<TContainer>> Containers;
-    unsigned long long Ids[UINT16_MAX / BITS_PER_LLONG];
+    TIdMap IdMap;
 
     bool ValidName(const std::string &name) const;
-    TError GetId(uint16_t &id);
-    void PutId(uint16_t id);
     TError RestoreId(const kv::TNode &node, uint16_t &id);
     void ScheduleLogRotatation();
 public:
@@ -170,9 +159,7 @@ public:
 
     TContainerHolder(std::shared_ptr<TEventQueue> queue,
                      const std::vector<std::shared_ptr<TNlLink>> &links) :
-        Links(links), Queue(queue) {
-        for (auto &i : Ids) { i = ULLONG_MAX; }
-    }
+        Links(links), Queue(queue) { }
     ~TContainerHolder();
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot();

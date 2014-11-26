@@ -282,3 +282,25 @@ TError EpollAdd(int &epfd, int fd) {
         return TError(EError::Unknown, errno, "epoll_add(" + std::to_string(fd) + ")");
     return TError::Success();
 }
+
+int64_t GetBootTime() {
+    std::vector<std::string> lines;
+    TFile f("/proc/stat");
+    if (f.AsLines(lines))
+        return 0;
+
+    for (auto &line : lines) {
+        std::vector<std::string> cols;
+        if (SplitString(line, ' ', cols))
+            return 0;
+
+        if (cols[0] == "btime") {
+            int64_t val;
+            if (StringToInt64(cols[1], val))
+                return 0;
+            return val;
+        }
+    }
+
+    return 0;
+}

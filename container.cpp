@@ -15,6 +15,7 @@
 #include "util/string.hpp"
 #include "util/netlink.hpp"
 #include "util/pwd.hpp"
+#include "util/unix.hpp"
 
 extern "C" {
 #include <sys/types.h>
@@ -30,30 +31,6 @@ using std::vector;
 using std::shared_ptr;
 using std::unique_ptr;
 using std::map;
-
-// Data
-
-static int64_t GetBootTime() {
-    vector<string> lines;
-    TFile f("/proc/stat");
-    if (f.AsLines(lines))
-        return 0;
-
-    for (auto &line : lines) {
-        vector<string> cols;
-        if (SplitString(line, ' ', cols))
-            return 0;
-
-        if (cols[0] == "btime") {
-            int64_t val;
-            if (StringToInt64(cols[1], val))
-                return 0;
-            return val;
-        }
-    }
-
-    return 0;
-}
 
 int64_t BootTime = 0;
 
@@ -1382,32 +1359,6 @@ bool TContainer::DeliverEvent(const TEvent &event) {
 
 // TContainerHolder
 
-TError TContainerHolder::GetId(uint16_t &id) {
-    for (size_t i = 0; i < sizeof(Ids) / sizeof(Ids[0]); i++) {
-        int bit = ffsll(Ids[i]);
-        if (bit == 0)
-            continue;
-
-        bit--;
-        Ids[i] &= ~(1 << bit);
-        id = i * BITS_PER_LLONG + bit;
-        id++;
-
-        return TError::Success();
-    }
-
-    return TError(EError::ResourceNotAvailable, "Can't create more containers");
-}
-
-void TContainerHolder::PutId(uint16_t id) {
-    id--;
-
-    int bucket = id / BITS_PER_LLONG;
-    int bit = id % BITS_PER_LLONG;
-
-    Ids[bucket] |= 1 << bit;
-}
-
 TContainerHolder::~TContainerHolder() {
     // we want children to be removed first
     while (Containers.begin() != Containers.end()) {
@@ -1445,7 +1396,7 @@ TError TContainerHolder::CreateRoot() {
         return error;
 
     uint16_t id;
-    error = GetId(id);
+    error = IdMap.Get(id);
     if (error)
         return error;
 
@@ -1518,7 +1469,7 @@ TError TContainerHolder::Create(const string &name, int uid, int gid) {
         return TError(EError::InvalidValue, "invalid parent container");
 
     uint16_t id;
-    TError error = GetId(id);
+    TError error = IdMap.Get(id);
     if (error)
         return error;
 
@@ -1562,7 +1513,7 @@ TError TContainerHolder::Destroy(const string &name) {
     if (Containers[name]->HasChildren())
         return TError(EError::InvalidState, "container has children");
 
-    PutId(Containers[name]->GetId());
+    IdMap.Put(Containers[name]->GetId());
     Containers.erase(name);
     DaemonStat->Created--;
 
@@ -1590,7 +1541,7 @@ TError TContainerHolder::RestoreId(const kv::TNode &node, uint16_t &id) {
     }
 
     if (value.length() == 0) {
-        TError error = GetId(id);
+        TError error = IdMap.Get(id);
         if (error)
             return error;
     } else {
