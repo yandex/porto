@@ -8,6 +8,8 @@
 #include "cgroup.hpp"
 #include "config.hpp"
 #include "event.hpp"
+#include "holder.hpp"
+#include "qdisc.hpp"
 #include "util/log.hpp"
 #include "util/protobuf.hpp"
 #include "util/unix.hpp"

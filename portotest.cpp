@@ -1,8 +1,10 @@
 #include <iostream>
 #include <csignal>
 
+#include "qdisc.hpp"
 #include "util/unix.hpp"
 #include "util/string.hpp"
+#include "util/log.hpp"
 #include "test/test.hpp"
 
 using std::string;

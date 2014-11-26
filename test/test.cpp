@@ -1,6 +1,8 @@
 #include <sstream>
 
 #include "test.hpp"
+#include "util/file.hpp"
+#include "util/folder.hpp"
 #include "util/string.hpp"
 #include "util/netlink.hpp"
 #include "util/pwd.hpp"

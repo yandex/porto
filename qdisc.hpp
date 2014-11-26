@@ -8,8 +8,6 @@
 #include "error.hpp"
 #include "util/netlink.hpp"
 
-#include "util/log.hpp"
-
 class TQdisc {
     NO_COPY_CONSTRUCT(TQdisc);
     std::vector<std::shared_ptr<TNlLink>> Link;

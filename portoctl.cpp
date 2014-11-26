@@ -8,6 +8,7 @@
 #include "util/string.hpp"
 #include "util/unix.hpp"
 #include "util/namespace.hpp"
+#include "util/file.hpp"
 #include "cli.hpp"
 
 extern "C" {

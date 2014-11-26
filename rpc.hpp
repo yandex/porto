@@ -2,7 +2,7 @@
 #define __RPC_HPP__
 
 #include "rpc.pb.h"
-#include "container.hpp"
+#include "holder.hpp"
 
 rpc::TContainerResponse
 HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req,
