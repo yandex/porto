@@ -4,6 +4,7 @@
 #include <csignal>
 
 #include "cgroup.hpp"
+#include "config.hpp"
 #include "subsystem.hpp"
 #include "task.hpp"
 #include "util/log.hpp"

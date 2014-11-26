@@ -1,4 +1,5 @@
 #include "qdisc.hpp"
+#include "config.hpp"
 #include "util/log.hpp"
 
 std::vector<std::shared_ptr<TNlLink>> TTclass::GetLink() {

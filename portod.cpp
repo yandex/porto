@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <csignal>
 
-#include "porto.hpp"
+#include "portod.hpp"
 #include "rpc.hpp"
 #include "cgroup.hpp"
 #include "config.hpp"
@@ -123,12 +123,12 @@ static void SignalMask(int how) {
         L() << "Can't set signal mask: " << strerror(errno) << std::endl;
 }
 
-TDaemonStat *DaemonStat;
-static void AllocDaemonStat() {
-    DaemonStat = (TDaemonStat *)mmap(nullptr, sizeof(*DaemonStat),
+TStatistics *Statistics;
+static void AllocStatistics() {
+    Statistics = (TStatistics *)mmap(nullptr, sizeof(*Statistics),
                                      PROT_READ | PROT_WRITE,
                                      MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    if (!DaemonStat)
+    if (!Statistics)
         throw std::bad_alloc();
 }
 
@@ -418,7 +418,7 @@ static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
 
     while (!done) {
         int timeout = queue->GetNextTimeout();
-        DaemonStat->SlaveTimeoutMs = timeout;
+        Statistics->SlaveTimeoutMs = timeout;
         int nr = epoll_wait(cholder.Epfd, ev, MAX_EVENTS, timeout);
         if (nr < 0) {
             L() << "epoll() error: " << strerror(errno) << std::endl;
@@ -508,9 +508,9 @@ static void KvDump() {
 
 static int SlaveMain() {
     if (failsafe)
-        AllocDaemonStat();
+        AllocStatistics();
 
-    DaemonStat->SlaveStarted = GetCurrentTimeMs();
+    Statistics->SlaveStarted = GetCurrentTimeMs();
     SlaveStarted = GetCurrentTimeMs();
 
     int ret = DaemonPrepare(false);
@@ -589,7 +589,7 @@ static int SlaveMain() {
                 error = cholder.Restore(r.first, r.second);
                 if (error) {
                     L_ERR() << "Can't restore " << r.first << "state : " << error << std::endl;
-                    DaemonStat->RestoreFailed++;
+                    Statistics->RestoreFailed++;
                 }
             }
         }
@@ -673,7 +673,7 @@ static int ReapDead(int fd, map<int,int> &exited, int slavePid, int &slaveStatus
 
         exited[pid] = status;
         DeliverPidStatus(fd, pid, status, exited.size());
-        DaemonStat->QueuedStatuses = exited.size();
+        Statistics->QueuedStatuses = exited.size();
     }
 
     return 0;
@@ -692,7 +692,7 @@ static void ReceiveAcks(int fd, std::map<int,int> &exited,
         else
             exited.erase(pid);
 
-        DaemonStat->QueuedStatuses = exited.size();
+        Statistics->QueuedStatuses = exited.size();
         L() << "Got acknowledge for " << pid << " (" << exited.size() << " queued)" << std::endl;
     }
 }
@@ -799,7 +799,7 @@ static int SpawnSlave(map<int,int> &exited) {
     }
 
     L() << "Spawned slave " << slavePid << std::endl;
-    DaemonStat->Spawned++;
+    Statistics->Spawned++;
 
     SignalMask(SIG_BLOCK);
 
@@ -877,8 +877,8 @@ exit:
 }
 
 static int MasterMain() {
-    AllocDaemonStat();
-    DaemonStat->MasterStarted = GetCurrentTimeMs();
+    AllocStatistics();
+    Statistics->MasterStarted = GetCurrentTimeMs();
 
     MasterStarted = GetCurrentTimeMs();
 

@@ -1,17 +1,19 @@
-#ifndef __PORTO_HPP__
-#define __PORTO_HPP__
+#ifndef __COMMON_HPP__
+#define __COMMON_HPP__
 
-#include <string>
+#define NO_COPY_CONSTRUCT(NAME) \
+    NAME(const NAME &) = delete; \
+    NAME &operator=(const NAME &) = delete
+
 #include <atomic>
 
+#include "error.hpp"
 #include "version.hpp"
 
 const std::string ROOT_CONTAINER = "/";
 const std::string PORTO_ROOT_CGROUP = "porto";
-const int REAP_EVT_FD = 128;
-const int REAP_ACK_FD = 129;
 
-struct TDaemonStat {
+struct TStatistics {
     std::atomic<uint64_t> Spawned;
     std::atomic<uint64_t> Errors;
     std::atomic<uint64_t> Warns;
@@ -26,15 +28,6 @@ struct TDaemonStat {
     std::atomic<uint64_t> RestoreFailed;
 };
 
-extern TDaemonStat *DaemonStat;
-
-#define NO_COPY_CONSTRUCT(NAME) \
-    NAME(const NAME &) = delete; \
-    NAME &operator=(const NAME &) = delete
-
-// TODO: rework this into some kind of notify interface
-extern void AckExitStatus(int pid);
-
-#include "config.hpp"
+extern TStatistics *Statistics;
 
 #endif

@@ -6,6 +6,7 @@
 
 #include "rpc.pb.h"
 #include "libporto.hpp"
+#include "config.hpp"
 #include "util/netlink.hpp"
 #include "util/file.hpp"
 #include "util/folder.hpp"

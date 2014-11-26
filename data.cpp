@@ -429,18 +429,18 @@ public:
                     std::shared_ptr<TVariant> v) override {
         TUintMap m;
 
-        m["spawned"] = DaemonStat->Spawned;
-        m["errors"] = DaemonStat->Errors;
-        m["warnings"] = DaemonStat->Warns;
-        m["master_uptime"] = (GetCurrentTimeMs() - DaemonStat->MasterStarted) / 1000;
-        m["slave_uptime"] = (GetCurrentTimeMs() - DaemonStat->SlaveStarted) / 1000;
-        m["queued_statuses"] = DaemonStat->QueuedStatuses;
-        m["queued_events"] = DaemonStat->QueuedEvents;
-        m["created"] = DaemonStat->Created;
-        m["remove_dead"] = DaemonStat->RemoveDead;
-        m["slave_timeout_ms"] = DaemonStat->SlaveTimeoutMs;
-        m["rotated"] = DaemonStat->Rotated;
-        m["restore_failed"] = DaemonStat->RestoreFailed;
+        m["spawned"] = Statistics->Spawned;
+        m["errors"] = Statistics->Errors;
+        m["warnings"] = Statistics->Warns;
+        m["master_uptime"] = (GetCurrentTimeMs() - Statistics->MasterStarted) / 1000;
+        m["slave_uptime"] = (GetCurrentTimeMs() - Statistics->SlaveStarted) / 1000;
+        m["queued_statuses"] = Statistics->QueuedStatuses;
+        m["queued_events"] = Statistics->QueuedEvents;
+        m["created"] = Statistics->Created;
+        m["remove_dead"] = Statistics->RemoveDead;
+        m["slave_timeout_ms"] = Statistics->SlaveTimeoutMs;
+        m["rotated"] = Statistics->Rotated;
+        m["restore_failed"] = Statistics->RestoreFailed;
 
         return m;
     }

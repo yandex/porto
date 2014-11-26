@@ -5,7 +5,7 @@
 #include <functional>
 #include <memory>
 
-#include "error.hpp"
+#include "common.hpp"
 
 struct nl_sock;
 struct rtnl_link;

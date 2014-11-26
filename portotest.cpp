@@ -1,6 +1,7 @@
 #include <iostream>
 #include <csignal>
 
+#include "config.hpp"
 #include "qdisc.hpp"
 #include "util/unix.hpp"
 #include "util/string.hpp"

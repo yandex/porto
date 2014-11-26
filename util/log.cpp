@@ -1,6 +1,5 @@
 #include <iostream>
 
-#include "porto.hpp"
 #include "log.hpp"
 #include "util/unix.hpp"
 #include "util/path.hpp"
@@ -81,9 +80,9 @@ std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
 
 #ifdef PORTOD
     if (level == LOG_WARN)
-        DaemonStat->Warns++;
+        Statistics->Warns++;
     else if (level == LOG_ERROR)
-        DaemonStat->Errors++;
+        Statistics->Errors++;
 #endif
 
     std::string name = GetProcessName();

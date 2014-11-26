@@ -4,8 +4,7 @@
 #include <csignal>
 #include <functional>
 
-#include "porto.hpp"
-#include "error.hpp"
+#include "common.hpp"
 
 int RetryBusy(int times, int timeoMs, std::function<int()> handler);
 int RetryFailed(int times, int timeoMs, std::function<int()> handler);

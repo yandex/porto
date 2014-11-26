@@ -6,8 +6,7 @@
 #include <memory>
 #include <map>
 
-#include "porto.hpp"
-#include "error.hpp"
+#include "common.hpp"
 
 class TCgroup;
 class TMount;

@@ -1,6 +1,5 @@
 #include <atomic>
 
-#include "porto.hpp"
 #include "util/log.hpp"
 #include "util/unix.hpp"
 

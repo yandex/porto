@@ -1,4 +1,7 @@
+#include <algorithm>
+
 #include "holder.hpp"
+#include "config.hpp"
 #include "container.hpp"
 #include "property.hpp"
 #include "data.hpp"
@@ -55,10 +58,10 @@ TError TContainerHolder::CreateRoot() {
         return error;
 
     ScheduleLogRotatation();
-    DaemonStat->Created = 0;
-    DaemonStat->RestoreFailed = 0;
-    DaemonStat->RemoveDead = 0;
-    DaemonStat->Rotated = 0;
+    Statistics->Created = 0;
+    Statistics->RestoreFailed = 0;
+    Statistics->RemoveDead = 0;
+    Statistics->Rotated = 0;
 
     return TError::Success();
 }
@@ -125,7 +128,7 @@ TError TContainerHolder::Create(const std::string &name, int uid, int gid) {
         return error;
 
     Containers[name] = c;
-    DaemonStat->Created++;
+    Statistics->Created++;
     return TError::Success();
 }
 
@@ -161,7 +164,7 @@ TError TContainerHolder::Destroy(const std::string &name) {
 
     IdMap.Put(Containers[name]->GetId());
     Containers.erase(name);
-    DaemonStat->Created--;
+    Statistics->Created--;
 
     return TError::Success();
 }
@@ -226,7 +229,7 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
     }
 
     Containers[name] = c;
-    DaemonStat->Created++;
+    Statistics->Created++;
     return TError::Success();
 }
 
@@ -260,13 +263,13 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
             TError error = Destroy(name);
             if (error)
                 L_ERR() << "Can't destroy " << name << ": " << error << std::endl;
-            DaemonStat->RemoveDead++;
+            Statistics->RemoveDead++;
         }
     }
 
     if (event.Type == EEventType::RotateLogs) {
         ScheduleLogRotatation();
-        DaemonStat->Rotated++;
+        Statistics->Rotated++;
         return true;
     } else {
         L() << "Couldn't deliver " << event.GetMsg() << std::endl;

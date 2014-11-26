@@ -6,8 +6,7 @@
 #include <list>
 #include <memory>
 
-#include "porto.hpp"
-#include "error.hpp"
+#include "common.hpp"
 
 class TSubsystem;
 class TMount;
