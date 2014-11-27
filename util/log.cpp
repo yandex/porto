@@ -68,7 +68,7 @@ static std::string GetTime() {
     t = time(NULL);
     tmp = localtime(&t);
 
-    if (tmp && strftime(tmstr, sizeof(tmstr), "%c", tmp))
+    if (tmp && strftime(tmstr, sizeof(tmstr), "%F %T", tmp))
         return std::string(tmstr);
 
     return std::string();
