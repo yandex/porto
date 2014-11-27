@@ -472,7 +472,7 @@ protected:
         std::set<std::string> validKey;
 
         for (auto &link : c->Links)
-            validKey.insert(link->GetName());
+            validKey.insert(link->GetAlias());
 
         for (auto &kv : m)
             if (validKey.find(kv.first) == validKey.end())
@@ -497,7 +497,7 @@ public:
 
         TUintMap m;
         for (auto &link : c->Links)
-            m[link->GetName()] = def;
+            m[link->GetAlias()] = def;
         return m;
     }
 

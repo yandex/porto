@@ -204,7 +204,7 @@ bool TContainer::ValidLink(const std::string &name) const {
 
 std::shared_ptr<TNlLink> TContainer::GetLink(const std::string &name) const {
     for (auto &link : Links)
-        if (link->GetName() == name)
+        if (link->GetAlias() == name)
             return link;
 
     return nullptr;
@@ -608,9 +608,9 @@ TError TContainer::Create(int uid, int gid) {
 
         TUintMap prio, rate, ceil;
         for (auto &link : Links) {
-            prio[link->GetName()] = config().container().default_cpu_prio();
-            rate[link->GetName()] = config().network().default_guarantee();
-            ceil[link->GetName()] = config().network().default_limit();
+            prio[link->GetAlias()] = config().container().default_cpu_prio();
+            rate[link->GetAlias()] = config().network().default_guarantee();
+            ceil[link->GetAlias()] = config().network().default_limit();
         }
 
         error = DefaultTclass->Create(prio, rate, ceil);

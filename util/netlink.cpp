@@ -289,6 +289,13 @@ TError TNlLink::AddMacVlan(const std::string &master,
     return error;
 }
 
+const std::string &TNlLink::GetAlias() {
+    if (Alias.length())
+        return Alias;
+    else
+        return Name;
+}
+
 bool TNlLink::ValidMacVlanType(const std::string &type) {
     return rtnl_link_macvlan_str2mode(type.c_str()) >= 0;
 }

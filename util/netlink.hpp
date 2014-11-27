@@ -51,6 +51,7 @@ class TNlLink {
 
     std::shared_ptr<TNl> Nl;
     std::string Name;
+    std::string Alias;
 
 public:
     struct rtnl_link *Link = nullptr;
@@ -69,7 +70,8 @@ public:
     TError AddMacVlan(const std::string &master,
                       const std::string &type, const std::string &hw,
                       int nsPid);
-    const std::string &GetName() { return Name; }
+    const std::string &GetAlias();
+    void SetAlias(const std::string &alias) { Alias = alias; }
 
     static bool ValidMacVlanType(const std::string &type);
     static bool ValidMacAddr(const std::string &hw);

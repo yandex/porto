@@ -566,7 +566,7 @@ static int SlaveMain() {
             }
 
             for (auto &link : links)
-                L() << "Using " << link->GetName() << " interface" << std::endl;
+                L() << "Using " << link->GetAlias() << " interface" << std::endl;
         }
 
         auto queue = std::make_shared<TEventQueue>();

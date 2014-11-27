@@ -25,7 +25,7 @@ TError TTclass::GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) {
         if (error)
             return error;
 
-        m[link->GetName()] = val;
+        m[link->GetAlias()] = val;
     }
 
     return TError::Success();
@@ -46,19 +46,19 @@ TError TTclass::Create(std::map<std::string, uint64_t> prio, std::map<std::strin
         return TError::Success();
 
     for (auto &link : GetLink()) {
-        if (prio.find(link->GetName()) == prio.end())
+        if (prio.find(link->GetAlias()) == prio.end())
             return TError(EError::Unknown, "Unknown interface in net_priority");
 
-        if (rate.find(link->GetName()) == rate.end())
+        if (rate.find(link->GetAlias()) == rate.end())
             return TError(EError::Unknown, "Unknown interface in net_guarantee");
 
-        if (ceil.find(link->GetName()) == ceil.end())
+        if (ceil.find(link->GetAlias()) == ceil.end())
             return TError(EError::Unknown, "Unknown interface in net_limit");
 
         TNlClass tclass(link, GetParent(), Handle);
-        TError error = tclass.Create(prio[link->GetName()],
-                                     rate[link->GetName()],
-                                     ceil[link->GetName()]);
+        TError error = tclass.Create(prio[link->GetAlias()],
+                                     rate[link->GetAlias()],
+                                     ceil[link->GetAlias()]);
         if (error)
             return error;
     }
@@ -167,6 +167,10 @@ std::vector<std::shared_ptr<TNlLink>> OpenLinks() {
         }
     }
 
+    std::map<std::string, std::string> aliasMap;
+    for (auto &alias : config().network().alias())
+        aliasMap[alias.iface()] = alias.name();
+
     for (auto &name : devices) {
         auto l = std::make_shared<TNlLink>(nl, name);
         if (!l)
@@ -177,6 +181,9 @@ std::vector<std::shared_ptr<TNlLink>> OpenLinks() {
             L_ERR() << "Can't open link: " << error << std::endl;
             return linkVec;
         }
+
+        if (aliasMap.find(name) != aliasMap.end())
+            l->SetAlias(aliasMap.at(name));
 
         linkVec.push_back(l);
     }

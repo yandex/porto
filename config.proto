@@ -9,6 +9,11 @@ message TCfg {
 		optional uint32 default_max_guarantee = 5;
 		optional uint32 default_guarantee = 6;
 		optional uint32 default_limit = 7;
+		message TNetworkAlias {
+			required string iface = 1;
+			required string name = 2;
+		}
+		repeated TNetworkAlias alias = 8;
 	}
 
 	message TFileCfg {
