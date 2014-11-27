@@ -236,7 +236,6 @@ static bool HandleRequest(TContainerHolder &cholder, const int fd,
             post.Flush();
         }
     } else {
-        L() << "Read nothing from " << fd << std:: endl;
         return true;
     }
 
