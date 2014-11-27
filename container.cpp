@@ -137,6 +137,7 @@ TContainer::~TContainer() {
     if (GetState() == EContainerState::Paused)
         Resume();
 
+    Kill(SIGKILL);
     Stop();
 
     if (Parent)
