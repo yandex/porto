@@ -48,6 +48,8 @@ static bool needDaemonChecks;
 static vector<string> subsystems = { "freezer", "memory", "cpu", "cpuacct", "devices" };
 static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"uts" };
 
+static int LeakConainersNr;
+
 static void RemakeDir(TPortoAPI &api, const TPath &path) {
     bool drop = geteuid() != 0;
     TFolder f(path);
@@ -2714,7 +2716,6 @@ static void TestRespawnProperty(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
-static int LeakConainersNr;
 static void TestLeaks(TPortoAPI &api) {
     string slavePid, masterPid;
     string name;
@@ -2760,6 +2761,41 @@ static void TestLeaks(TPortoAPI &api) {
 
     Say() << "Expected master " << nowMaster << " < " << prevMaster + slack << std::endl;
     Expect(nowMaster <= prevMaster + slack);
+}
+
+static void TestPerf(TPortoAPI &api) {
+    std::string name, v;
+    size_t begin, ms;
+    const int nr = 1000;
+
+    begin = GetCurrentTimeMs();
+    for (int i = 0; i < nr; i++) {
+        name = "perf" + std::to_string(i);
+        ExpectSuccess(api.Create(name));
+        ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+        ExpectSuccess(api.Start(name));
+    }
+    ms = GetCurrentTimeMs() - begin;
+    Say() << "Create " << nr << " containers took " << ms / 1000.0 << "s" << std::endl;
+    Expect(ms < 10 * 1000);
+
+    begin = GetCurrentTimeMs();
+    for (int i = 0; i < nr; i++) {
+        name = "perf" + std::to_string(i);
+        ExpectSuccess(api.GetData(name, "state", v));
+    }
+    ms = GetCurrentTimeMs() - begin;
+    Say() << "Get state " << nr << " containers took " << ms / 1000.0 << "s" << std::endl;
+    Expect(ms < 100);
+
+    begin = GetCurrentTimeMs();
+    for (int i = 0; i < nr; i++) {
+        name = "perf" + std::to_string(i);
+        ExpectSuccess(api.Destroy(name));
+    }
+    ms = GetCurrentTimeMs() - begin;
+    Say() << "Destroy " << nr << " containers took " << ms / 1000.0 << "s" << std::endl;
+    Expect(ms < 60 * 1000);
 }
 
 static void KillPorto(TPortoAPI &api, int sig) {
@@ -3155,6 +3191,7 @@ int SelfTest(string name, int leakNr) {
         { "respawn_property", TestRespawnProperty },
         { "hierarchy", TestLimitsHierarchy },
         { "leaks", TestLeaks },
+        { "perf", TestPerf },
 
         { "daemon", TestDaemon },
         { "recovery", TestRecovery },
