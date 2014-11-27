@@ -736,9 +736,10 @@ TError TContainer::KillAll() {
     }
 
     // try to stop all tasks gracefully
-    cg->Kill(SIGTERM);
+    (void)cg->Kill(SIGTERM);
 
-    int ret = SleepWhile(1000, [&]{ return cg->IsEmpty() == false; });
+    int ret = SleepWhile(config().container().kill_timeout_ms(),
+                         [&]{ return cg->IsEmpty() == false; });
     if (ret)
         L() << "Child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
 
@@ -827,7 +828,8 @@ TError TContainer::Stop() {
         if (error)
             L_ERR() << "Can't kill all tasks in container: " << error << std::endl;
 
-        int ret = SleepWhile(1000, [&]{ kill(pid, 0); return errno != ESRCH; });
+        int ret = SleepWhile(config().container().stop_timeout_ms(),
+                             [&]{ kill(pid, 0); return errno != ESRCH; });
         if (ret)
             L() << "Error while waiting for container to stop" << std::endl;
 
