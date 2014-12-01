@@ -1,3 +1,14 @@
+yandex-porto (0.24) precise; urgency=low
+
+  * TEMPORARY: set use_hierarchy to 0 by default
+  * Don't show root in portoctl list
+  * Add network interface aliases
+  * Make kill timeout configurable
+  * Change date formate in log
+  * Send SIGKILL in destroy
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 01 Dec 2014 21:28:00 +0400
+
 yandex-porto (0.23) precise; urgency=low
 
   * Bring back functionality which removes old dead containers
