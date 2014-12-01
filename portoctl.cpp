@@ -171,6 +171,12 @@ bool ValidData(const vector<TData> &dlist, const string &name) {
         != dlist.end();
 }
 
+bool ValidProperty(const vector<TProperty> &plist, const string &name) {
+    return find_if(plist.begin(), plist.end(),
+                   [&](const TProperty &i)->bool { return i.Name == StripIdx(name); })
+        != plist.end();
+}
+
 class TRawCmd : public ICmd {
 public:
     TRawCmd(TPortoAPI *api) : ICmd(api, "raw", 2, "<message>", "send raw protobuf message") {}
@@ -386,12 +392,6 @@ public:
 class TGetCmd : public ICmd {
 public:
     TGetCmd(TPortoAPI *api) : ICmd(api, "get", 1, "<name> [data]", "get container property or data") {}
-
-    bool ValidProperty(const vector<TProperty> &plist, const string &name) {
-        return find_if(plist.begin(), plist.end(),
-                       [&](const TProperty &i)->bool { return i.Name == StripIdx(name); })
-            != plist.end();
-    }
 
     int Execute(int argc, char *argv[]) {
         string value;
@@ -957,10 +957,17 @@ public:
                 return EXIT_FAILURE;
             }
 
+            vector<TProperty> plist;
+            ret = Api->Plist(plist);
+            if (ret) {
+                PrintError("Can't list properties");
+                return EXIT_FAILURE;
+            }
+
             for (int i = 0; i < argc; i++) {
                 string arg = argv[i];
 
-                if (!ValidData(dlist, arg)) {
+                if (!ValidData(dlist, arg) && !ValidProperty(plist, arg)) {
                     TError error(EError::InvalidValue, "Invalid value");
                     PrintError(error, "Can't parse argument");
                     return EXIT_FAILURE;
@@ -987,7 +994,8 @@ public:
             map<string, string> dataVal;
             for (auto data : showData) {
                 string val;
-                (void)Api->GetData(container, data, val);
+                if (Api->GetData(container, data, val))
+                    (void)Api->GetProperty(container, data, val);
                 dataVal[data] = val;
             }
 
