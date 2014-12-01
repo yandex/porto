@@ -391,7 +391,7 @@ public:
 
 class TGetCmd : public ICmd {
 public:
-    TGetCmd(TPortoAPI *api) : ICmd(api, "get", 1, "<name> [data]", "get container property or data") {}
+    TGetCmd(TPortoAPI *api) : ICmd(api, "get", 1, "<name> [data...]", "get container property or data") {}
 
     int Execute(int argc, char *argv[]) {
         string value;
@@ -442,30 +442,32 @@ public:
             return 0;
         }
 
-        bool validProperty = ValidProperty(plist, argv[1]);
-        bool validData = ValidData(dlist, argv[1]);
+        for (int i = 1; i < argc; i++) {
+            bool validProperty = ValidProperty(plist, argv[i]);
+            bool validData = ValidData(dlist, argv[i]);
 
-        if (validData) {
-            ret = Api->GetData(argv[0], argv[1], value);
-            if (!ret)
-                Print(DataValue(argv[1], value));
-            else if (ret != EError::InvalidData)
-                PrintError("Can't get data");
-        }
+            if (validData) {
+                ret = Api->GetData(argv[0], argv[i], value);
+                if (!ret)
+                    Print(DataValue(argv[i], value));
+                else if (ret != EError::InvalidData)
+                    PrintError("Can't get data");
+            }
 
-        if (validProperty) {
-            ret = Api->GetProperty(argv[0], argv[1], value);
-            if (!ret) {
-                Print(PropertyValue(argv[1], value));
-            } else if (ret != EError::InvalidProperty) {
-                PrintError("Can't get data");
+            if (validProperty) {
+                ret = Api->GetProperty(argv[0], argv[i], value);
+                if (!ret) {
+                    Print(PropertyValue(argv[i], value));
+                } else if (ret != EError::InvalidProperty) {
+                    PrintError("Can't get data");
+                    return EXIT_FAILURE;
+                }
+            }
+
+            if (!validProperty && !validData) {
+                std::cerr << "Invalid property or data" << std::endl;
                 return EXIT_FAILURE;
             }
-        }
-
-        if (!validProperty && !validData) {
-            std::cerr << "Invalid property or data" << std::endl;
-            return EXIT_FAILURE;
         }
 
         return EXIT_SUCCESS;
