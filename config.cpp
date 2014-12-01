@@ -59,6 +59,7 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_default_cpu_prio(50);
     config().mutable_container()->set_kill_timeout_ms(1000);
     config().mutable_container()->set_stop_timeout_ms(1000);
+    config().mutable_container()->set_use_hierarchy(false);
 }
 
 bool TConfig::LoadFile(const std::string &path, bool silent) {

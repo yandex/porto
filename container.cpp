@@ -263,10 +263,12 @@ vector<pid_t> TContainer::Processes() {
 TError TContainer::ApplyDynamicProperties() {
     auto memcg = GetLeafCgroup(memorySubsystem);
 
-    TError error = memorySubsystem->UseHierarchy(*memcg);
+    TError error = memorySubsystem->UseHierarchy(*memcg, config().container().use_hierarchy());
     if (error) {
         L_ERR() << "Can't set use_hierarchy for " << memcg->Relpath() << ": " << error << std::endl;
-        return error;
+        // we don't want to get this error endlessly when user switches config
+        // so be tolerant
+        //return error;
     }
 
     auto memroot = memorySubsystem->GetRootCgroup();

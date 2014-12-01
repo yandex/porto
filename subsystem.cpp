@@ -97,8 +97,8 @@ TError TMemorySubsystem::Statistics(std::shared_ptr<TCgroup> &cg, const std::str
     return TError(EError::InvalidValue, "Invalid memory cgroup stat: " + name);
 }
 
-TError TMemorySubsystem::UseHierarchy(TCgroup &cg) const {
-    return TError(cg.SetKnobValue("memory.use_hierarchy", "1"));
+TError TMemorySubsystem::UseHierarchy(TCgroup &cg, bool enable) const {
+    return TError(cg.SetKnobValue("memory.use_hierarchy", enable ? "1" : "0"));
 }
 
 // Freezer

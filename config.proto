@@ -56,6 +56,7 @@ message TCfg {
 		optional uint32 default_cpu_prio = 7;
 		optional uint32 kill_timeout_ms = 8;
 		optional uint32 stop_timeout_ms = 9;
+		optional bool use_hierarchy = 10;
 	}
 
 	optional TNetworkCfg network = 1;

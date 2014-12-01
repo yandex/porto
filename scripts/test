@@ -8,11 +8,11 @@ run() { ssh -t "$HOST" sudo -i "bash -c \"$@\""; }
 say() { tput setaf 3; echo "$@"; tput sgr0; }
 
 say "Network: disabled"
-run "echo 'network { enabled: false }' > /etc/portod.conf"
+run "echo 'network { enabled: false } container { use_hierarchy: true }' > /etc/portod.conf"
 run portotest
 
 say "Network: enabled"
-run "echo 'network { enabled: true }' > /etc/portod.conf"
+run "echo 'network { enabled: true } container { use_hierarchy: true }' > /etc/portod.conf"
 run portotest
 
 say "Stress"
