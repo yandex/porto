@@ -268,6 +268,9 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     }
 
     if (event.Type == EEventType::RotateLogs) {
+        if (config().log().verbose())
+            TLogger::Log() << "Rotated logs " << std::endl;
+
         ScheduleLogRotatation();
         Statistics->Rotated++;
         return true;
