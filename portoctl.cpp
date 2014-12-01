@@ -947,6 +947,8 @@ public:
 
             if (config().network().enabled())
                 showData.push_back("net_packets");
+
+            showData.push_back("state");
         } else {
             vector<TData> dlist;
             ret = Api->Dlist(dlist);
@@ -979,7 +981,7 @@ public:
                 return EXIT_FAILURE;
             }
 
-            if (state != "running")
+            if (state != "running" && state != "dead")
                 continue;
 
             map<string, string> dataVal;
