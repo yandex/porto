@@ -909,7 +909,7 @@ public:
             std::cout << std::left << std::setw(nameLen) << c
                       << std::right << std::setw(stateLen) << s;
 
-            if (s == "running") {
+            if (s == "running" || s == "dead") {
                 string tm;
                 ret = Api->GetData(c, "time", tm);
                 if (!ret)

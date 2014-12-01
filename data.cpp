@@ -390,6 +390,9 @@ public:
 
     uint64_t GetUint(std::shared_ptr<TContainer> c,
                      std::shared_ptr<TVariant> v) override {
+        if (c->GetState() == EContainerState::Dead)
+            return (GetCurrentTimeMs() - c->GetTimeOfDeath()) / 1000;
+
         if (!c->Task || !c->Task->IsRunning())
             return 0;
 
