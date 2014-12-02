@@ -43,6 +43,7 @@ TError TFile::AsString(string &value) const {
         return TError(EError::Unknown, errno, "open(" + Path.ToString() + ")");
 
     int n;
+    value.clear();
     do {
         char buf[256];
         n = read(fd, buf, sizeof(buf));
