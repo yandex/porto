@@ -516,7 +516,7 @@ TError TTask::ChildSetHostname() {
     if (Env->Hostname == "" || Env->Root.ToString() == "/")
         return TError::Success();
 
-    TFile f(Env->Root + "/etc/hostname");
+    TFile f("/etc/hostname");
     if (f.Exists()) {
         string host = Env->Hostname + "\n";
         TError error = f.WriteStringNoAppend(host);
