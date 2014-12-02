@@ -197,30 +197,37 @@ public:
 
 class TCreateCmd : public ICmd {
 public:
-    TCreateCmd(TPortoAPI *api) : ICmd(api, "create", 1, "<name>", "create container") {}
+    TCreateCmd(TPortoAPI *api) : ICmd(api, "create", 1, "<name> [name...]", "create container") {}
 
     int Execute(int argc, char *argv[]) {
-        int ret = Api->Create(argv[0]);
-        if (ret)
-            PrintError("Can't create container");
+        for (int i = 0; i < argc; i++) {
+            int ret = Api->Create(argv[i]);
+            if (ret) {
+                PrintError("Can't create container");
+                return ret;
+            }
+        }
 
-        return ret;
+        return 0;
     }
 };
 
 class TGetPropertyCmd : public ICmd {
 public:
-    TGetPropertyCmd(TPortoAPI *api) : ICmd(api, "pget", 2, "<name> <property>", "get raw container property") {}
+    TGetPropertyCmd(TPortoAPI *api) : ICmd(api, "pget", 2, "<name> <property> [property...]", "get raw container property") {}
 
     int Execute(int argc, char *argv[]) {
-        string value;
-        int ret = Api->GetProperty(argv[0], argv[1], value);
-        if (ret)
-            PrintError("Can't get property");
-        else
+        for (int i = 1; i < argc; i++) {
+            string value;
+            int ret = Api->GetProperty(argv[0], argv[i], value);
+            if (ret) {
+                PrintError("Can't get property");
+                return ret;
+            }
             Print(value);
+        }
 
-        return ret;
+        return 0;
     }
 };
 
@@ -245,30 +252,37 @@ public:
 
 class TGetDataCmd : public ICmd {
 public:
-    TGetDataCmd(TPortoAPI *api) : ICmd(api, "dget", 2, "<name> <data>", "get raw container data") {}
+    TGetDataCmd(TPortoAPI *api) : ICmd(api, "dget", 2, "<name> <data> [data...]", "get raw container data") {}
 
     int Execute(int argc, char *argv[]) {
-        string value;
-        int ret = Api->GetData(argv[0], argv[1], value);
-        if (ret)
-            PrintError("Can't get data");
-        else
+        for (int i = 1; i < argc; i++) {
+            string value;
+            int ret = Api->GetData(argv[0], argv[i], value);
+            if (ret) {
+                PrintError("Can't get data");
+                return ret;
+            }
             Print(value);
+        }
 
-        return ret;
+        return 0;
     }
 };
 
 class TStartCmd : public ICmd {
 public:
-    TStartCmd(TPortoAPI *api) : ICmd(api, "start", 1, "<name>", "start container") {}
+    TStartCmd(TPortoAPI *api) : ICmd(api, "start", 1, "<name> [name...]", "start container") {}
 
     int Execute(int argc, char *argv[]) {
-        int ret = Api->Start(argv[0]);
-        if (ret)
-            PrintError("Can't start container");
+        for (int i = 0; i < argc; i++) {
+            int ret = Api->Start(argv[i]);
+            if (ret) {
+                PrintError("Can't start container");
+                return ret;
+            }
+        }
 
-        return ret;
+        return 0;
     }
 };
 
@@ -352,46 +366,58 @@ public:
 
 class TStopCmd : public ICmd {
 public:
-    TStopCmd(TPortoAPI *api) : ICmd(api, "stop", 1, "<name>", "stop container") {}
+    TStopCmd(TPortoAPI *api) : ICmd(api, "stop", 1, "<name> [name...]", "stop container") {}
 
     int Execute(int argc, char *argv[]) {
-        int ret = Api->Stop(argv[0]);
-        if (ret)
-            PrintError("Can't stop container");
+        for (int i = 0; i < argc; i++) {
+            int ret = Api->Stop(argv[0]);
+            if (ret) {
+                PrintError("Can't stop container");
+                return ret;
+            }
+        }
 
-        return ret;
+        return 0;
     }
 };
 
 class TPauseCmd : public ICmd {
 public:
-    TPauseCmd(TPortoAPI *api) : ICmd(api, "pause", 1, "<name>", "pause container") {}
+    TPauseCmd(TPortoAPI *api) : ICmd(api, "pause", 1, "<name> [name...]", "pause container") {}
 
     int Execute(int argc, char *argv[]) {
-        int ret = Api->Pause(argv[0]);
-        if (ret)
-            PrintError("Can't pause container");
+        for (int i = 0; i < argc; i++) {
+            int ret = Api->Pause(argv[0]);
+            if (ret) {
+                PrintError("Can't pause container");
+                return ret;
+            }
+        }
 
-        return ret;
+        return 0;
     }
 };
 
 class TResumeCmd : public ICmd {
 public:
-    TResumeCmd(TPortoAPI *api) : ICmd(api, "resume", 1, "<name>", "resume container") {}
+    TResumeCmd(TPortoAPI *api) : ICmd(api, "resume", 1, "<name> [name...]", "resume container") {}
 
     int Execute(int argc, char *argv[]) {
-        int ret = Api->Resume(argv[0]);
-        if (ret)
-            PrintError("Can't resume container");
+        for (int i = 0; i < argc; i++) {
+            int ret = Api->Resume(argv[0]);
+            if (ret) {
+                PrintError("Can't resume container");
+                return ret;
+            }
+        }
 
-        return ret;
+        return 0;
     }
 };
 
 class TGetCmd : public ICmd {
 public:
-    TGetCmd(TPortoAPI *api) : ICmd(api, "get", 1, "<name> [data...]", "get container property or data") {}
+    TGetCmd(TPortoAPI *api) : ICmd(api, "get", 1, "<name> <variable> [variable...]", "get container property or data") {}
 
     int Execute(int argc, char *argv[]) {
         string value;
@@ -872,14 +898,18 @@ public:
 
 class TDestroyCmd : public ICmd {
 public:
-    TDestroyCmd(TPortoAPI *api) : ICmd(api, "destroy", 1, "<name>", "destroy container") {}
+    TDestroyCmd(TPortoAPI *api) : ICmd(api, "destroy", 1, "<name> [name...]", "destroy container") {}
 
     int Execute(int argc, char *argv[]) {
-        int ret = Api->Destroy(argv[0]);
-        if (ret)
-            PrintError("Can't destroy container");
+        for (int i = 0; i < argc; i++) {
+            int ret = Api->Destroy(argv[i]);
+            if (ret) {
+                PrintError("Can't destroy container");
+                return ret;
+            }
+        }
 
-        return ret;
+        return 0;
     }
 };
 
