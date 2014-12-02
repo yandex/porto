@@ -33,6 +33,7 @@ extern "C" {
 #include <grp.h>
 #define GNU_SOURCE
 #include <sys/socket.h>
+#include <sys/resource.h>
 }
 
 using std::string;
@@ -505,6 +506,22 @@ static void KvDump() {
     storage.Dump();
 }
 
+static int TuneLimits() {
+    struct rlimit rlim;
+
+    // we need FD for each container to monitor OOM event, plus some spare ones
+    int maxFd = config().container().max_total() + 100;
+
+    rlim.rlim_max = maxFd;
+    rlim.rlim_cur = maxFd;
+
+    int ret = setrlimit(RLIMIT_NOFILE, &rlim);
+    if (ret)
+        return ret;
+
+    return 0;
+}
+
 static int SlaveMain() {
     if (failsafe)
         AllocStatistics();
@@ -515,6 +532,12 @@ static int SlaveMain() {
     int ret = DaemonPrepare(false);
     if (ret)
         return ret;
+
+    ret = TuneLimits();
+    if (ret) {
+        L() << "Can't set correct limits: " << strerror(errno) << std::endl;
+        return ret;
+    }
 
     if (config().network().enabled()) {
         if (system("modprobe cls_cgroup")) {

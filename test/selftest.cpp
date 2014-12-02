@@ -1209,7 +1209,7 @@ static void TestRootProperty(TPortoAPI &api) {
     v = StartWaitAndGetData(api, name, "stdout");
 
     vector<string> devs = { "null", "zero", "full", "urandom", "random" };
-    vector<string> other = { "ptmx", "pts", "shm" };
+    vector<string> other = { "ptmx", "pts", "shm", "fd" };
     vector<string> tokens;
     TError error = SplitString(v, '\n', tokens);
     if (error)
@@ -1321,20 +1321,24 @@ static void TestHostnameProperty(TPortoAPI &api) {
     ExpectSuccess(api.Stop(name));
 
     Say() << "Check /etc/hostname" << std::endl;
+    AsRoot(api);
+    BootstrapCommand("/bin/cat", path);
+    AsNobody(api);
+
     TFolder d(path + "/etc");
     TFile f(path + "/etc/hostname");
     AsRoot(api);
     if (!d.Exists())
         ExpectSuccess(d.Create());
     ExpectSuccess(f.Touch());
+    ExpectSuccess(f.GetPath().Chown(GetDefaultUser(), GetDefaultGroup()));
     AsNobody(api);
 
-    ExpectSuccess(api.SetProperty(name, "command", "/hostname"));
+    ExpectSuccess(api.SetProperty(name, "command", "/cat /etc/hostname"));
     ExpectSuccess(api.Start(name));
     WaitState(api, name, "dead");
-    AsRoot(api);
-    ExpectSuccess(f.AsString(v));
-    AsNobody(api);
+    ExpectSuccess(api.GetData(name, "stdout", v));
+    Expect(v != GetHostname() + "\n");
     Expect(v == host + "\n");
     AsRoot(api);
     ExpectSuccess(d.Remove(true));
@@ -2798,12 +2802,12 @@ static void TestPerf(TPortoAPI &api) {
     Expect(ms < 60 * 1000);
 }
 
-static void KillPorto(TPortoAPI &api, int sig) {
+static void KillPorto(TPortoAPI &api, int sig, int times = 10) {
     int portodPid = ReadPid(config().slave_pid().path());
     if (kill(portodPid, sig))
         throw "Can't send " + std::to_string(sig) + " to slave";
     WaitExit(api, std::to_string(portodPid));
-    WaitPortod(api);
+    WaitPortod(api, times);
     expectedRespawns++;
 
     std::string v;
@@ -3005,6 +3009,33 @@ static void TestRecovery(TPortoAPI &api) {
     KillPorto(api, SIGKILL);
     Expect(RespawnTicks(api, name) == true);
     ExpectSuccess(api.Destroy(name));
+
+    Say() << "Make sure we can recover huge number of containers " << std::endl;
+    const size_t nr = config().container().max_total() - 1;
+
+    for (size_t i = 0; i < nr; i++) {
+        name = "recover" + std::to_string(i);
+        ExpectSuccess(api.Create(name));
+        ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+        ExpectSuccess(api.Start(name));
+    }
+
+    ExpectFailure(api.Create("max_plus_one"), EError::ResourceNotAvailable);
+
+    KillPorto(api, SIGKILL, 100);
+
+    containers.clear();
+    ExpectSuccess(api.List(containers));
+    Expect(containers.size() == nr + 1);
+
+    for (size_t i = 0; i < nr; i++) {
+        name = "recover" + std::to_string(i);
+        ExpectSuccess(api.Kill(name, SIGKILL));
+    }
+    for (size_t i = 0; i < nr; i++) {
+        name = "recover" + std::to_string(i);
+        ExpectSuccess(api.Destroy(name));
+    }
 }
 
 static void TestCgroups(TPortoAPI &api) {

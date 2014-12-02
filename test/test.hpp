@@ -22,7 +22,7 @@ namespace test {
     std::string GetRlimit(const std::string &pid, const std::string &type, const bool soft);
     void WaitExit(TPortoAPI &api, const std::string &pid);
     void WaitState(TPortoAPI &api, const std::string &name, const std::string &state, int sec = 10);
-    void WaitPortod(TPortoAPI &api);
+    void WaitPortod(TPortoAPI &api, int times = 10);
     std::string GetCwd(const std::string &pid);
     std::string GetRoot(const std::string &pid);
     std::string GetNamespace(const std::string &pid, const std::string &ns);

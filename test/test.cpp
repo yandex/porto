@@ -117,10 +117,8 @@ void WaitState(TPortoAPI &api, const std::string &name, const std::string &state
         throw std::string("Waited too long for task to change state");
 }
 
-void WaitPortod(TPortoAPI &api) {
+void WaitPortod(TPortoAPI &api, int times) {
     Say() << "Waiting for portod startup" << std::endl;
-
-    int times = 10;
 
     std::vector<std::string> clist;
     do {

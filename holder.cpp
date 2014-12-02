@@ -113,6 +113,9 @@ TError TContainerHolder::Create(const std::string &name, int uid, int gid) {
     if (Containers.find(name) != Containers.end())
         return TError(EError::ContainerAlreadyExists, "container " + name + " already exists");
 
+    if (Containers.size() + 1 > config().container().max_total())
+        return TError(EError::ResourceNotAvailable, "number of created containers exceeds limit");
+
     auto parent = GetParent(name);
     if (!parent && name != ROOT_CONTAINER)
         return TError(EError::InvalidValue, "invalid parent container");
