@@ -356,9 +356,12 @@ TError TTask::ChildMountDev() {
     }
 
     TPath ptmx = Env->Root + "/dev/ptmx";
-
     if (symlink("pts/ptmx", ptmx.ToString().c_str()) < 0)
-        return TError(EError::Unknown, errno, "symlink(pts/ptmx)");
+        return TError(EError::Unknown, errno, "symlink(/dev/pts/ptmx)");
+
+    TPath fd = Env->Root + "/dev/fd";
+    if (symlink("/proc/self/fd", fd.ToString().c_str()) < 0)
+        return TError(EError::Unknown, errno, "symlink(/dev/fd)");
 
     return TError::Success();
 }
