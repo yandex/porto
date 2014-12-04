@@ -65,11 +65,11 @@ public:
     TError ChangeNs(const std::string &newName, int pid);
     bool Valid();
     int FindIndex(const std::string &device);
+    TError RefillCache();
     TError AddMacVlan(const std::string &master,
                       const std::string &type, const std::string &hw);
-    TError AddMacVlan(const std::string &master,
-                      const std::string &type, const std::string &hw,
-                      int nsPid);
+    TError Enslave(const std::string &name);
+    TError AddVeth(const std::string &name, const std::string &peerName, const std::string &hw, int nsPid);
     const std::string &GetAlias();
     void SetAlias(const std::string &alias) { Alias = alias; }
 

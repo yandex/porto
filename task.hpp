@@ -43,10 +43,18 @@ struct TMacVlanNetCfg {
     std::string Hw;
 };
 
+struct TVethNetCfg {
+    std::string Bridge;
+    std::string Name;
+    std::string Hw;
+    std::string Peer;
+};
+
 struct TNetCfg {
     bool Share;
     std::vector<THostNetCfg> Host;
     std::vector<TMacVlanNetCfg> MacVlan;
+    std::vector<TVethNetCfg> Veth;
 };
 
 class TTaskEnv {

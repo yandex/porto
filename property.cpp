@@ -807,6 +807,8 @@ public:
         NetCfg.Share = false;
         NetCfg.Host.clear();
         NetCfg.MacVlan.clear();
+        NetCfg.Veth.clear();
+        int idx = 0;
 
         if (lines.size() == 0)
             return TError(EError::InvalidValue, "Configuration is not specified");
@@ -852,6 +854,8 @@ public:
                     NetCfg.Host.push_back(hnet);
                 }
             } else if (type == "macvlan") {
+                // macvlan <master> <name> [type] [hw]
+
                 if (settings.size() < 3)
                     return TError(EError::InvalidValue, "Invalid macvlan in: " + line);
 
@@ -889,6 +893,32 @@ public:
                 mvlan.Hw = hw;
 
                 NetCfg.MacVlan.push_back(mvlan);
+            } else if (type == "veth") {
+                // veth <name> <bridge> [hw]
+
+                if (settings.size() < 3)
+                    return TError(EError::InvalidValue, "Invalid veth in: " + line);
+                std::string name = StringTrim(settings[1]);
+                std::string bridge = StringTrim(settings[2]);
+                std::string hw = "";
+
+                if (settings.size() > 3) {
+                    hw = StringTrim(settings[3]);
+                    if (!TNlLink::ValidMacAddr(hw))
+                        return TError(EError::InvalidValue,
+                                      "Invalid veth address " + hw);
+                }
+
+                if (!container->ValidLink(bridge))
+                    return TError(EError::InvalidValue, "Interface " + bridge + " doesn't exist or not in running state");
+
+                TVethNetCfg veth;
+                veth.Bridge = bridge;
+                veth.Name = name;
+                veth.Hw = hw;
+                veth.Peer = "portove-" + std::to_string(container->GetId()) + "-" + std::to_string(idx++);
+
+                NetCfg.Veth.push_back(veth);
             } else {
                 return TError(EError::InvalidValue, "Configuration is not specified");
             }

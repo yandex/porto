@@ -1412,6 +1412,7 @@ static vector<string> StringToVec(const std::string &s) {
 
 struct LinkInfo {
     std::string hw;
+    std::string master;
     bool up;
 };
 
@@ -1436,6 +1437,14 @@ static map<string, LinkInfo> IfHw(const vector<string> &iplines) {
         string flags = StringTrim(tokens[2]);
 
         bool up = flags.find("DOWN") == std::string::npos;
+        string master = "";
+
+        auto pos = flags.find("master");
+        if (pos != std::string::npos) {
+            auto begin = pos + strlen("master ");
+            auto end = flags.find(" ", begin);
+            master = string(flags, begin, end - begin);
+        }
 
         tokens.clear();
         error = SplitString(fulliface, '@', tokens);
@@ -1453,7 +1462,7 @@ static map<string, LinkInfo> IfHw(const vector<string> &iplines) {
 
         string hw = StringTrim(tokens[1]);
 
-        struct LinkInfo li = { hw, up };
+        struct LinkInfo li = { hw, master, up };
         ret[iface] = li;
     }
 
@@ -1642,6 +1651,44 @@ static void TestNetProperty(TPortoAPI &api) {
     WaitState(api, name, "dead", 60);
     ExpectSuccess(api.GetData(name, "net_bytes[" + dev + "]", s));
     Expect(s != "0");
+
+    Say() << "Check net=veth" << std::endl;
+    AsRoot(api);
+    ExpectSuccess(api.Destroy(name));
+    (void)system("ip link delete portobr0");
+    Expect(system("ip link add portobr0 type bridge") == 0);
+    Expect(system("ip link set portobr0 up") == 0);
+    AsNobody(api);
+
+    ExpectSuccess(api.Create(name));
+    ExpectFailure(api.SetProperty(name, "net", "veth eth0 invalid"), EError::InvalidValue);
+    ExpectSuccess(api.SetProperty(name, "net", "veth eth0 portobr0"));
+    ExpectSuccess(api.SetProperty(name, "command", "bash -c 'sleep 1 && ip -o -d link show'"));
+
+    auto pre = IfHw(Popen("ip -o -d link show"));
+    ExpectSuccess(api.Start(name));
+    auto post = IfHw(Popen("ip -o -d link show"));
+    Expect(pre.size() + 1 == post.size());
+    for (auto kv : pre)
+        post.erase(kv.first);
+    Expect(post.size() == 1);
+    auto portove = post.begin()->first;
+    Expect(post[portove].master == "portobr0");
+
+    WaitState(api, name, "dead");
+    ExpectSuccess(api.GetData(name, "stdout", s));
+    containerLink = StringToVec(s);
+    Expect(containerLink.size() == 2);
+    Expect(containerLink.size() != hostLink.size());
+    Expect(ShareMacAddress(hostLink, containerLink) == false);
+    linkMap = IfHw(containerLink);
+    Expect(linkMap.find("lo") != linkMap.end());
+    Expect(linkMap.at("lo").up == true);
+    Expect(linkMap.find("eth0") != linkMap.end());
+    ExpectSuccess(api.Stop(name));
+
+    post = IfHw(Popen("ip -o -d link show"));
+    Expect(post.find(portove) == post.end());
 
     AsRoot(api);
     ExpectSuccess(api.Destroy(name));

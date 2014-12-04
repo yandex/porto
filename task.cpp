@@ -130,6 +130,8 @@ void TTask::Abort(const TError &error, const std::string &msg) const {
 }
 
 static int ChildFn(void *arg) {
+    SetProcessName("portod-spawn-c");
+
     TTask *task = static_cast<TTask*>(arg);
     TError error = task->ChildCallback();
     task->Abort(error);
@@ -496,6 +498,18 @@ TError TTask::IsolateNet(int childPid) {
             return error;
     }
 
+    for (auto &veth : Env->NetCfg.Veth) {
+        auto bridge = std::make_shared<TNlLink>(nl, veth.Bridge);
+        TError error = bridge->Load();
+        if (error)
+            return error;
+
+        std::string name;
+        error = bridge->AddVeth(veth.Name, veth.Peer, veth.Hw, childPid);
+        if (error)
+            return error;
+    }
+
     return TError::Success();
 }
 
@@ -655,6 +669,8 @@ TError TTask::Start() {
         L_ERR() << "Can't spawn child: " << error << std::endl;
         return error;
     } else if (forkPid == 0) {
+        SetProcessName("portod-spawn-p");
+
         char stack[8192];
 
         (void)setsid();
