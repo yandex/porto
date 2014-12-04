@@ -784,6 +784,8 @@ static int SpawnSlave(map<int,int> &exited) {
     int ret = EXIT_FAILURE;
     int flags;
 
+    slavePid = 0;
+
     if (pipe(evtfd) < 0) {
         L() << "pipe(): " << strerror(errno) << std::endl;
         return EXIT_FAILURE;
@@ -933,6 +935,8 @@ static int MasterMain() {
         size_t next = started + config().container().respawn_delay_ms();
         ret = SpawnSlave(exited);
         L() << "Returned " << ret << std::endl;
+        if (slavePid)
+            (void)kill(slavePid, SIGTERM);
 
         if (!done && next >= GetCurrentTimeMs())
             usleep((next - GetCurrentTimeMs()) * 1000);
