@@ -700,11 +700,10 @@ TError TTask::Start() {
             Abort(error);
         }
 
-        ReportPid(clonePid);
-
         if (config().network().enabled()) {
             error = IsolateNet(clonePid);
             if (error) {
+                (void)kill(clonePid, SIGKILL);
                 L_ERR() << "Can't spawn child: " << error << std::endl;
                 ReportPid(-1);
                 Abort(error);
@@ -713,9 +712,14 @@ TError TTask::Start() {
 
         int result = 0;
         if (write(WaitParentWfd, &result, sizeof(result)) != sizeof(result)) {
-            Syslog("partial write to child sync pipe");
+            TError error(EError::Unknown, "Partial write to child sync pipe");
+            (void)kill(clonePid, SIGKILL);
+            L_ERR() << "Can't spawn child: " << error << std::endl;
+            ReportPid(-1);
+            Abort(error);
         }
 
+        ReportPid(clonePid);
         exit(EXIT_SUCCESS);
     }
     (void)waitpid(forkPid, NULL, 0);
