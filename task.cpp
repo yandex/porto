@@ -286,8 +286,11 @@ TError TTask::ChildBindDns() {
 
 TError TTask::ChildBindDirectores() {
     for (TBindMap &bindMap : Env->BindMap) {
-        TMount mnt(bindMap.Source, Env->Root + Env->Cwd + bindMap.Dest,
-                   "none", {});
+        TPath dest = Env->Root + bindMap.Dest;
+        if (Env->Root == "/")
+            dest = Env->Cwd + bindMap.Dest;
+
+        TMount mnt(bindMap.Source, dest, "none", {});
 
         TError error;
         if (bindMap.Source.GetType() == EFileType::Regular)
