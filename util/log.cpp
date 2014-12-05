@@ -56,6 +56,10 @@ void TLogger::OpenLog() {
         kmsgFile.close();
 }
 
+void TLogger::DisableLog() {
+    logFile.setstate(std::ios_base::failbit);
+}
+
 void TLogger::CloseLog() {
     logFile.close();
     kmsgFile.close();

@@ -9,6 +9,7 @@
 #include "util/string.hpp"
 #include "util/unix.hpp"
 #include "util/pwd.hpp"
+#include "util/netlink.hpp"
 
 extern "C" {
 #include <linux/capability.h>
@@ -784,6 +785,75 @@ public:
     }
 };
 
+class TDefaultGwProperty : public TStringValue {
+    struct TNlAddr Addr;
+public:
+    TDefaultGwProperty() :
+        TStringValue(P_DEFAULT_GW,
+                     "Default gateway",
+                     PERSISTENT_VALUE | HIDDEN_VALUE,
+                     staticProperty) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
+        return "0.0.0.0";
+    }
+
+    TError ParseString(std::shared_ptr<TContainer> c,
+                       const std::string &value) override {
+        return Addr.Parse(value);
+    }
+
+    TError PrepareTaskEnv(std::shared_ptr<TContainer> container,
+                          std::shared_ptr<TTaskEnv> taskEnv) override {
+        taskEnv->DefaultGw = Addr;
+        return TError::Success();
+    }
+};
+
+class TIpProperty : public TListValue {
+    std::map<std::string, TIpMap> IpMap;
+
+public:
+    TIpProperty() :
+        TListValue(P_IP,
+                   "IP configuration",
+                   PERSISTENT_VALUE | HIDDEN_VALUE,
+                   staticProperty) {}
+
+    TStrList GetDefaultList(std::shared_ptr<TContainer> c) override {
+        return TStrList{ "- 0.0.0.0/0" };
+    }
+
+    TError ParseList(std::shared_ptr<TContainer> container,
+                     const std::vector<std::string> &lines) override {
+        IpMap.clear();
+        for (auto &line : lines) {
+            std::vector<std::string> settings;
+            TError error = SplitEscapedString(line, ' ', settings);
+            if (error)
+                return error;
+
+            if (settings.size() != 2)
+                return TError(EError::InvalidValue, "Invalid address/prefix in: " + line);
+
+            TIpMap ip;
+            error = ParseIpPrefix(settings[1], ip.Addr, ip.Prefix);
+            if (error)
+                return error;
+
+            IpMap[settings[0]] = ip;
+        }
+
+        return TError::Success();
+    }
+
+    TError PrepareTaskEnv(std::shared_ptr<TContainer> container,
+                          std::shared_ptr<TTaskEnv> taskEnv) override {
+        taskEnv->IpMap = IpMap;
+        return TError::Success();
+    }
+};
+
 class TNetProperty : public TListValue {
     TNetCfg NetCfg;
 
@@ -1080,6 +1150,8 @@ TError RegisterProperties() {
         new TNetProperty,
         new TAllowedDevicesProperty,
         new TCapabilitiesProperty,
+        new TIpProperty,
+        new TDefaultGwProperty,
 
         new TIdProperty,
         new TRootPidProperty,

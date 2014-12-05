@@ -528,6 +528,14 @@ TError TContainer::PrepareTask() {
         return error;
 
     if (config().network().enabled()) {
+        error = Prop->PrepareTaskEnv(P_IP, taskEnv);
+        if (error)
+            return error;
+
+        error = Prop->PrepareTaskEnv(P_DEFAULT_GW, taskEnv);
+        if (error)
+            return error;
+
         error = Prop->PrepareTaskEnv(P_NET, taskEnv);
         if (error)
             return error;

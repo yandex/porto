@@ -6,10 +6,26 @@
 #include <memory>
 
 #include "common.hpp"
+extern "C" {
+#include <arpa/inet.h>
+}
 
 struct nl_sock;
 struct rtnl_link;
 struct nl_cache;
+struct nl_addr;
+
+class TNlAddr {
+    struct nl_addr *Addr = nullptr;
+public:
+    TNlAddr() {}
+    TNlAddr(const TNlAddr &other);
+    TNlAddr &operator=(const TNlAddr &other);
+    ~TNlAddr();
+    TError Parse(const std::string &s);
+    struct nl_addr *GetAddr() const { return Addr; }
+    bool IsEmpty();
+};
 
 enum class ETclassStat {
     Packets,
@@ -76,6 +92,10 @@ public:
     static bool ValidMacVlanType(const std::string &type);
     static bool ValidMacAddr(const std::string &hw);
 
+    TError SetDefaultGw(const TNlAddr &addr);
+    TError SetIpAddr(const TNlAddr &addr, const int prefix);
+    bool IsLoopback();
+
     int GetIndex();
     struct rtnl_link *GetLink() { return Link; }
     struct nl_sock *GetSock() { return Nl->GetSock(); }
@@ -130,5 +150,7 @@ public:
     bool Exists();
     TError Remove();
 };
+
+TError ParseIpPrefix(const std::string &s, TNlAddr &addr, int &prefix);
 
 #endif

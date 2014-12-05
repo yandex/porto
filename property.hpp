@@ -43,6 +43,8 @@ constexpr const char *P_BIND = "bind";
 constexpr const char *P_NET = "net";
 constexpr const char *P_ALLOWED_DEVICES = "allowed_devices";
 constexpr const char *P_CAPABILITIES = "capabilities";
+constexpr const char *P_IP = "ip";
+constexpr const char *P_DEFAULT_GW = "default_gw";
 
 class TBindMap;
 class TNetCfg;

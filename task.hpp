@@ -8,6 +8,7 @@
 
 #include "util/namespace.hpp"
 #include "util/path.hpp"
+#include "util/netlink.hpp"
 
 extern "C" {
 #include <sys/resource.h>
@@ -41,6 +42,11 @@ struct TMacVlanNetCfg {
     std::string Name;
     std::string Type;
     std::string Hw;
+};
+
+struct TIpMap {
+    TNlAddr Addr;
+    int Prefix;
 };
 
 struct TVethNetCfg {
@@ -84,6 +90,8 @@ public:
     TNetCfg NetCfg;
     TPath Loop;
     uint64_t Caps;
+    TNlAddr DefaultGw;
+    std::map<std::string, TIpMap> IpMap;
 
     TError Prepare();
     const char** GetEnvp() const;

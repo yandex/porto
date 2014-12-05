@@ -1,5 +1,6 @@
 #include "netlink.hpp"
 #include "util/log.hpp"
+#include "util/string.hpp"
 
 // HTB shaping details:
 // http://luxik.cdi.cz/~devik/qos/htb/manual/userg.htm
@@ -17,6 +18,9 @@ extern "C" {
 #include <netlink/route/link.h>
 #include <netlink/route/link/macvlan.h>
 #include <netlink/route/link/veth.h>
+
+#include <netlink/route/route.h>
+#include <netlink/route/addr.h>
 }
 
 using std::string;
@@ -134,6 +138,80 @@ TError TNl::GetDefaultLink(std::vector<std::string> &links) {
 TNlLink::~TNlLink() {
     if (Link)
         rtnl_link_put(Link);
+}
+
+TError TNlLink::SetDefaultGw(const TNlAddr &addr) {
+    struct rtnl_route *route;
+    struct rtnl_nexthop *nh;
+    int ret;
+
+    struct nl_addr *a;
+
+    route = rtnl_route_alloc();
+    if (!route)
+        return TError(EError::Unknown, "Unable to allocate route");
+
+    ret = nl_addr_parse("default", rtnl_route_get_family(route), &a);
+    if (ret < 0) {
+        rtnl_route_put(route);
+        return TError(EError::Unknown, string("Unable to parse default address: ") + nl_geterror(ret));
+    }
+
+    ret = rtnl_route_set_dst(route, a);
+    nl_addr_put(a);
+    if (ret < 0) {
+        rtnl_route_put(route);
+        return TError(EError::Unknown, string("Unable to set route destination: ") + nl_geterror(ret));
+    }
+
+    nh = rtnl_route_nh_alloc();
+    if (!route) {
+        rtnl_route_put(route);
+        return TError(EError::Unknown, "Unable to allocate next hop");
+    }
+
+    rtnl_route_nh_set_gateway(nh, addr.GetAddr());
+    rtnl_route_nh_set_ifindex(nh, GetIndex());
+    rtnl_route_add_nexthop(route, nh);
+
+    ret = rtnl_route_add(GetSock(), route, NLM_F_MATCH);
+    rtnl_route_put(route);
+    if (ret < 0) {
+        return TError(EError::Unknown, string("Unable to set default gateway: ") + nl_geterror(ret) + string(" ") + std::to_string(ret));
+    }
+
+    return TError::Success();
+}
+
+bool TNlLink::IsLoopback() {
+    return rtnl_link_get_flags(Link) & IFF_LOOPBACK;
+}
+
+TError TNlLink::SetIpAddr(const TNlAddr &addr, const int prefix) {
+    int ret;
+    struct rtnl_addr *a = rtnl_addr_alloc();
+    if (!a)
+        return TError(EError::Unknown, "Unable to allocate address");
+
+    rtnl_addr_set_link(a, Link);
+    rtnl_addr_set_family(a, nl_addr_get_family(addr.GetAddr()));
+
+    ret = rtnl_addr_set_local(a, addr.GetAddr());
+    if (ret < 0) {
+        rtnl_addr_put(a);
+        return TError(EError::Unknown, string("Unable to set local address: ") + nl_geterror(ret));
+    }
+    rtnl_addr_set_prefixlen(a, prefix);
+
+    ret = rtnl_addr_add(GetSock(), a, 0);
+    if (ret < 0) {
+        rtnl_addr_put(a);
+        return TError(EError::Unknown, string("Unable to add address: ") + nl_geterror(ret) + string(" ") + std::to_string(prefix));
+    }
+
+    rtnl_addr_put(a);
+
+    return TError::Success();
 }
 
 TError TNlLink::Remove() {
@@ -794,4 +872,55 @@ free_cls:
     rtnl_cls_put(cls);
 
     return error;
+}
+
+TNlAddr::TNlAddr(const TNlAddr &other) {
+    Addr = nl_addr_clone(other.Addr);
+}
+
+TNlAddr &TNlAddr::operator=(const TNlAddr &other) {
+    if (this != &other) {
+        nl_addr_put(Addr);
+        Addr = nl_addr_clone(other.Addr);
+    }
+    return *this;
+}
+
+TNlAddr::~TNlAddr() {
+    nl_addr_put(Addr);
+}
+
+bool TNlAddr::IsEmpty() {
+    return !Addr || nl_addr_iszero(Addr);
+}
+
+TError TNlAddr::Parse(const std::string &s) {
+    nl_addr_put(Addr);
+    Addr = nullptr;
+
+    int ret = nl_addr_parse(s.c_str(), AF_UNSPEC, &Addr);
+    if (ret)
+        return TError(EError::InvalidValue, "Unable to parse IP address " + s);
+
+    return TError::Success();
+}
+
+TError ParseIpPrefix(const std::string &s, TNlAddr &addr, int &prefix) {
+    std::vector<std::string> lines;
+    TError error = SplitString(s, '/', lines);
+    if (error)
+        return error;
+
+    if (lines.size() != 2)
+        return TError(EError::InvalidValue, "Invalid IP address/prefix " + s);
+
+    error = addr.Parse(lines[0]);
+    if (error)
+        return error;
+
+    error = StringToInt(lines[1], prefix);
+    if (error)
+        return TError(EError::InvalidValue, "Invalid IP address/prefix " + s);
+
+    return TError::Success();
 }

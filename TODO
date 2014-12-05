@@ -1,3 +1,5 @@
+- remove kvs/map in init script
+- mtu
 - ? create cgroup for portod/portod-slave
 - ? do periodic persistence checks
 - ? use chrt instead of cpu.smart so we don't depend on smart kernels + set rt prio

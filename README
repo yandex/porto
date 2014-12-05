@@ -28,3 +28,6 @@ TODO - fix SELinux:  Could not open policy file <= /etc/selinux/targeted/policy/
 Compile with -O0
 ~stfomichev/perf record -e cycles:u -g -F1000 -- portod
 ~stfomichev/perf report --stdio -n -G
+
+# Debug netlink
+NLDBG=10 NLCB=debug portod

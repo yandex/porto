@@ -132,6 +132,7 @@ void TTask::Abort(const TError &error, const std::string &msg) const {
 static int ChildFn(void *arg) {
     SetProcessName("portod-spawn-c");
 
+    TLogger::DisableLog();
     TTask *task = static_cast<TTask*>(arg);
     TError error = task->ChildCallback();
     task->Abort(error);
@@ -457,9 +458,34 @@ TError TTask::EnableNet() {
         return error;
 
     std::vector<std::string> devices = nl->FindLink(0);
+    std::shared_ptr<TNlLink> gw = nullptr;
     for (auto &dev : devices) {
         auto link = std::make_shared<TNlLink>(nl, dev);
-        TError error = link->Up();
+
+        TError error = link->Load();
+        if (error)
+            return error;
+
+        if (Env->IpMap.find(dev) != Env->IpMap.end()) {
+            auto ip = Env->IpMap[dev];
+
+            if (!ip.Addr.IsEmpty()) {
+                TError error = link->SetIpAddr(ip.Addr, ip.Prefix);
+                if (error)
+                    return error;
+            }
+        }
+
+        error = link->Up();
+        if (error)
+            return error;
+
+        if (!gw && !link->IsLoopback())
+            gw = link;
+    }
+
+    if (!Env->DefaultGw.IsEmpty() && gw) {
+        error = gw->SetDefaultGw(Env->DefaultGw);
         if (error)
             return error;
     }
@@ -591,6 +617,12 @@ TError TTask::ChildCallback() {
     if (error)
         return error;
 
+    if (!Env->NetCfg.Share) {
+        error = EnableNet();
+        if (error)
+            return error;
+    }
+
     error = ChildReopenStdio();
     if (error)
         return error;
@@ -598,12 +630,6 @@ TError TTask::ChildCallback() {
     error = ChildIsolateFs();
     if (error)
         return error;
-
-    if (!Env->NetCfg.Share) {
-        error = EnableNet();
-        if (error)
-            return error;
-    }
 
     error = Env->Cwd.Chdir();
     if (error)
