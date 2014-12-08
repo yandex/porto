@@ -1,3 +1,21 @@
+yandex-porto (0.25) precise; urgency=low
+
+  * upstart: fix possible race with cgroup-bin
+  * Use either root or cwd as bind prefix but not both
+  * Change freeze timeout to 2 sec
+  * Make sure child is dead before respawning
+  * Fix broken daemon when spawning with network error
+  * Tune RLIMIT_NOFILE limit in portod
+  * Add limit for total container number
+  * Fix empty /etc/hostname
+  * Create /dev/fd link to /proc/self/fd when root is isolated
+  * portoctl: support multiple containers in create/get/pget/dget/start/stop/pause/resume/destroy
+  * portoctl: support properties in top
+  * portoctl: show dead containers in top
+  * portoctl: show time since container death in list
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 08 Dec 2014 17:32:00 +0400
+
 yandex-porto (0.24) precise; urgency=low
 
   * TEMPORARY: set use_hierarchy to 0 by default
