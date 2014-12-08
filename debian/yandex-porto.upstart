@@ -1,6 +1,6 @@
 # yandex-porto - Porto is component of Nirvana.
 #
-# The Porto allows run processes with use linux namespaces.
+# Porto is a service which allows to run processes in isolated namespaces.
 
 description	"Porto"
 author "Eugene Kilimchuk <ekilimchuk@yandex-team.ru>"
@@ -11,5 +11,19 @@ expect fork
 respawn
 
 kill signal SIGINT
+
+pre-start script
+	# if there is cgroup-bin installed, we need to wait while it mounts
+	# sysfs and creates controllers
+	timeout=10
+	if [ -f /usr/sbin/cgrulesengd ]; then
+		for i in `seq $timeout`; do
+			if status cgred | grep -q "^cgred start/running" > /dev/null; then
+				break
+			fi
+			sleep 1
+		done
+	fi
+end script
 
 exec portod &
