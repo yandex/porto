@@ -1618,6 +1618,21 @@ static void TestNetProperty(TPortoAPI &api) {
     Expect(linkMap.at(link).up == true);
     ExpectSuccess(api.Stop(name));
 
+    string mtu = "1400";
+    ExpectSuccess(api.SetProperty(name, "net", "macvlan " + link + " eth10 bridge " + mtu));
+    s = StartWaitAndGetData(api, name, "stdout");
+    containerLink = StringToVec(s);
+    Expect(containerLink.size() == 2);
+    Expect(containerLink.size() != hostLink.size());
+    Expect(ShareMacAddress(hostLink, containerLink) == false);
+    linkMap = IfHw(containerLink);
+    Expect(linkMap.find("lo") != linkMap.end());
+    Expect(linkMap.at("lo").up == true);
+    Expect(linkMap.find("eth10") != linkMap.end());
+    Expect(linkMap.at("eth10").mtu == mtu);
+    Expect(linkMap.at("eth10").up == true);
+    ExpectSuccess(api.Stop(name));
+
     string hw = "00:11:22:33:44:55";
     ExpectSuccess(api.SetProperty(name, "net", "macvlan " + link + " eth10 bridge -1 " + hw));
     s = StartWaitAndGetData(api, name, "stdout");
@@ -1630,21 +1645,6 @@ static void TestNetProperty(TPortoAPI &api) {
     Expect(linkMap.at("lo").up == true);
     Expect(linkMap.find("eth10") != linkMap.end());
     Expect(linkMap.at("eth10").hw == hw);
-    Expect(linkMap.at("eth10").up == true);
-    ExpectSuccess(api.Stop(name));
-
-    string mtu = "1000";
-    ExpectSuccess(api.SetProperty(name, "net", "macvlan " + link + " eth10 bridge " + mtu));
-    s = StartWaitAndGetData(api, name, "stdout");
-    containerLink = StringToVec(s);
-    Expect(containerLink.size() == 2);
-    Expect(containerLink.size() != hostLink.size());
-    Expect(ShareMacAddress(hostLink, containerLink) == false);
-    linkMap = IfHw(containerLink);
-    Expect(linkMap.find("lo") != linkMap.end());
-    Expect(linkMap.at("lo").up == true);
-    Expect(linkMap.find("eth10") != linkMap.end());
-    Expect(linkMap.at("eth10").mtu == mtu);
     Expect(linkMap.at("eth10").up == true);
     ExpectSuccess(api.Stop(name));
 
@@ -2138,7 +2138,7 @@ static void TestData(TPortoAPI &api) {
     if (NetworkEnabled())
         ExpectSuccess(api.SetProperty(wget, "command", "bash -c 'wget yandex.ru && sync'"));
     else
-        ExpectSuccess(api.SetProperty(wget, "command", "bash -c 'dd if=/dev/random bs=4M count=1 of=/tmp/porto.tmp && sync'"));
+        ExpectSuccess(api.SetProperty(wget, "command", "bash -c 'dd if=/dev/urandom bs=4M count=1 of=/tmp/porto.tmp && sync'"));
     ExpectSuccess(api.Start(wget));
     WaitState(api, wget, "dead");
 

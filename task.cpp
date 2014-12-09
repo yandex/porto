@@ -14,6 +14,7 @@
 #include "util/unix.hpp"
 #include "util/pwd.hpp"
 #include "util/netlink.hpp"
+#include "util/crc32.hpp"
 
 extern "C" {
 #include <string.h>
@@ -496,6 +497,22 @@ TError TTask::EnableNet() {
     return TError::Success();
 }
 
+static std::string GenerateHw(const std::string &virtHost, const std::string &realHost) {
+    uint32_t real = Crc32(realHost);
+    uint32_t virt = Crc32(virtHost);
+
+    char buf[32];
+
+    sprintf(buf, "02:%02x:%02x:%02x:%02x:%02x",
+            (real & 0x000000FF) >> 0,
+            (virt & 0xFF000000) >> 24,
+            (virt & 0x00FF0000) >> 16,
+            (virt & 0x0000FF00) >> 8,
+            (virt & 0x000000FF) >> 0);
+
+    return std::string(buf);
+}
+
 TError TTask::IsolateNet(int childPid) {
     auto nl = std::make_shared<TNl>();
     if (!nl)
@@ -513,12 +530,18 @@ TError TTask::IsolateNet(int childPid) {
             return error;
     }
 
+    std::string hostname = GetHostName();
+
     for (auto &mvlan : Env->NetCfg.MacVlan) {
         auto link = std::make_shared<TNlLink>(nl, "portomv0");
 
         (void)link->Remove();
 
-        TError error = link->AddMacVlan(mvlan.Master, mvlan.Type, mvlan.Hw, mvlan.Mtu);
+        string hw = mvlan.Hw;
+        if (hw == "" && Env->Hostname != "")
+            hw = GenerateHw(Env->Hostname, hostname);
+
+        TError error = link->AddMacVlan(mvlan.Master, mvlan.Type, hw, mvlan.Mtu);
         if (error)
             return error;
 
@@ -533,8 +556,12 @@ TError TTask::IsolateNet(int childPid) {
         if (error)
             return error;
 
+        string hw = veth.Hw;
+        if (hw == "" && Env->Hostname != "")
+            hw = GenerateHw(Env->Hostname, hostname);
+
         std::string name;
-        error = bridge->AddVeth(veth.Name, veth.Peer, veth.Hw, veth.Mtu, childPid);
+        error = bridge->AddVeth(veth.Name, veth.Peer, hw, veth.Mtu, childPid);
         if (error)
             return error;
     }
