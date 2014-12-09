@@ -42,6 +42,7 @@ struct TMacVlanNetCfg {
     std::string Name;
     std::string Type;
     std::string Hw;
+    int Mtu;
 };
 
 struct TIpMap {
@@ -54,6 +55,7 @@ struct TVethNetCfg {
     std::string Name;
     std::string Hw;
     std::string Peer;
+    int Mtu;
 };
 
 struct TNetCfg {

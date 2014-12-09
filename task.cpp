@@ -518,7 +518,7 @@ TError TTask::IsolateNet(int childPid) {
 
         (void)link->Remove();
 
-        TError error = link->AddMacVlan(mvlan.Master, mvlan.Type, mvlan.Hw);
+        TError error = link->AddMacVlan(mvlan.Master, mvlan.Type, mvlan.Hw, mvlan.Mtu);
         if (error)
             return error;
 
@@ -534,7 +534,7 @@ TError TTask::IsolateNet(int childPid) {
             return error;
 
         std::string name;
-        error = bridge->AddVeth(veth.Name, veth.Peer, veth.Hw, childPid);
+        error = bridge->AddVeth(veth.Name, veth.Peer, veth.Hw, veth.Mtu, childPid);
         if (error)
             return error;
     }

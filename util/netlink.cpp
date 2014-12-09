@@ -334,7 +334,8 @@ TError TNlLink::RefillCache() {
 }
 
 TError TNlLink::AddMacVlan(const std::string &master,
-                           const std::string &type, const std::string &hw) {
+                           const std::string &type, const std::string &hw,
+                           int mtu) {
     TError error = TError::Success();
     struct rtnl_link *hostLink = rtnl_link_macvlan_alloc();
     int mode = rtnl_link_macvlan_str2mode(type.c_str());
@@ -353,6 +354,9 @@ TError TNlLink::AddMacVlan(const std::string &master,
 
     rtnl_link_set_link(hostLink, masterIdx);
     rtnl_link_set_name(hostLink, Name.c_str());
+
+    if (mtu > 0)
+        rtnl_link_set_mtu(hostLink, (unsigned int)mtu);
 
     if (ea) {
         struct nl_addr *addr = nl_addr_build(AF_LLC, ea, ETH_ALEN);
@@ -390,7 +394,7 @@ TError TNlLink::Enslave(const std::string &name) {
     return TError::Success();
 }
 
-TError TNlLink::AddVeth(const std::string &name, const std::string &peerName, const std::string &hw, int nsPid) {
+TError TNlLink::AddVeth(const std::string &name, const std::string &peerName, const std::string &hw, int mtu, int nsPid) {
 	struct rtnl_link *veth, *peer;
     int ret;
     TError error;
@@ -411,6 +415,11 @@ TError TNlLink::AddVeth(const std::string &name, const std::string &peerName, co
     rtnl_link_set_name(peer, name.c_str());
     rtnl_link_set_ns_pid(peer, nsPid);
     rtnl_link_set_name(veth, peerName.c_str());
+
+    if (mtu > 0) {
+        rtnl_link_set_mtu(peer, (unsigned int)mtu);
+        rtnl_link_set_mtu(veth, (unsigned int)mtu);
+    }
 
     if (ea) {
         struct nl_addr *addr = nl_addr_build(AF_LLC, ea, ETH_ALEN);

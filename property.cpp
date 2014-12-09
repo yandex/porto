@@ -924,7 +924,7 @@ public:
                     NetCfg.Host.push_back(hnet);
                 }
             } else if (type == "macvlan") {
-                // macvlan <master> <name> [type] [hw]
+                // macvlan <master> <name> [type] [mtu] [hw]
 
                 if (settings.size() < 3)
                     return TError(EError::InvalidValue, "Invalid macvlan in: " + line);
@@ -933,6 +933,7 @@ public:
                 std::string name = StringTrim(settings[2]);
                 std::string type = "bridge";
                 std::string hw = "";
+                int mtu = -1;
 
                 auto link = container->GetLink(master);
                 if (!link)
@@ -945,8 +946,16 @@ public:
                         return TError(EError::InvalidValue,
                                       "Invalid macvlan type " + type);
                 }
+
                 if (settings.size() > 4) {
-                    hw = StringTrim(settings[4]);
+                    TError error = StringToInt(settings[4], mtu);
+                    if (error)
+                        return TError(EError::InvalidValue,
+                                      "Invalid macvlan mtu " + settings[4]);
+                }
+
+                if (settings.size() > 5) {
+                    hw = StringTrim(settings[5]);
                     if (!TNlLink::ValidMacAddr(hw))
                         return TError(EError::InvalidValue,
                                       "Invalid macvlan address " + hw);
@@ -961,19 +970,28 @@ public:
                 mvlan.Name = name;
                 mvlan.Type = type;
                 mvlan.Hw = hw;
+                mvlan.Mtu = mtu;
 
                 NetCfg.MacVlan.push_back(mvlan);
             } else if (type == "veth") {
-                // veth <name> <bridge> [hw]
+                // veth <name> <bridge> [mtu] [hw]
 
                 if (settings.size() < 3)
                     return TError(EError::InvalidValue, "Invalid veth in: " + line);
                 std::string name = StringTrim(settings[1]);
                 std::string bridge = StringTrim(settings[2]);
                 std::string hw = "";
+                int mtu = -1;
 
                 if (settings.size() > 3) {
-                    hw = StringTrim(settings[3]);
+                    TError error = StringToInt(settings[3], mtu);
+                    if (error)
+                        return TError(EError::InvalidValue,
+                                      "Invalid veth mtu " + settings[3]);
+                }
+
+                if (settings.size() > 4) {
+                    hw = StringTrim(settings[4]);
                     if (!TNlLink::ValidMacAddr(hw))
                         return TError(EError::InvalidValue,
                                       "Invalid veth address " + hw);
@@ -986,6 +1004,7 @@ public:
                 veth.Bridge = bridge;
                 veth.Name = name;
                 veth.Hw = hw;
+                veth.Mtu = mtu;
                 veth.Peer = "portove-" + std::to_string(container->GetId()) + "-" + std::to_string(idx++);
 
                 NetCfg.Veth.push_back(veth);

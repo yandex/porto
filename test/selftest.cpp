@@ -1413,6 +1413,7 @@ static vector<string> StringToVec(const std::string &s) {
 struct LinkInfo {
     std::string hw;
     std::string master;
+    std::string mtu;
     bool up;
 };
 
@@ -1438,12 +1439,20 @@ static map<string, LinkInfo> IfHw(const vector<string> &iplines) {
 
         bool up = flags.find("DOWN") == std::string::npos;
         string master = "";
+        string mtu = "";
 
         auto pos = flags.find("master");
         if (pos != std::string::npos) {
             auto begin = pos + strlen("master ");
             auto end = flags.find(" ", begin);
             master = string(flags, begin, end - begin);
+        }
+
+        pos = ipline.find("mtu");
+        if (pos != std::string::npos) {
+            auto begin = pos + strlen("mtu ");
+            auto end = ipline.find(" ", begin);
+            mtu = string(ipline, begin, end - begin);
         }
 
         tokens.clear();
@@ -1462,7 +1471,7 @@ static map<string, LinkInfo> IfHw(const vector<string> &iplines) {
 
         string hw = StringTrim(tokens[1]);
 
-        struct LinkInfo li = { hw, master, up };
+        struct LinkInfo li = { hw, master, mtu, up };
         ret[iface] = li;
     }
 
@@ -1610,7 +1619,7 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectSuccess(api.Stop(name));
 
     string hw = "00:11:22:33:44:55";
-    ExpectSuccess(api.SetProperty(name, "net", "macvlan " + link + " eth10 bridge " + hw));
+    ExpectSuccess(api.SetProperty(name, "net", "macvlan " + link + " eth10 bridge -1 " + hw));
     s = StartWaitAndGetData(api, name, "stdout");
     containerLink = StringToVec(s);
     Expect(containerLink.size() == 2);
@@ -1621,6 +1630,21 @@ static void TestNetProperty(TPortoAPI &api) {
     Expect(linkMap.at("lo").up == true);
     Expect(linkMap.find("eth10") != linkMap.end());
     Expect(linkMap.at("eth10").hw == hw);
+    Expect(linkMap.at("eth10").up == true);
+    ExpectSuccess(api.Stop(name));
+
+    string mtu = "1000";
+    ExpectSuccess(api.SetProperty(name, "net", "macvlan " + link + " eth10 bridge " + mtu));
+    s = StartWaitAndGetData(api, name, "stdout");
+    containerLink = StringToVec(s);
+    Expect(containerLink.size() == 2);
+    Expect(containerLink.size() != hostLink.size());
+    Expect(ShareMacAddress(hostLink, containerLink) == false);
+    linkMap = IfHw(containerLink);
+    Expect(linkMap.find("lo") != linkMap.end());
+    Expect(linkMap.at("lo").up == true);
+    Expect(linkMap.find("eth10") != linkMap.end());
+    Expect(linkMap.at("eth10").mtu == mtu);
     Expect(linkMap.at("eth10").up == true);
     ExpectSuccess(api.Stop(name));
 
