@@ -395,7 +395,12 @@ TError TNlLink::AddVeth(const std::string &name, const std::string &peerName, co
     int ret;
     TError error;
 
-    // TODO: HW
+    struct ether_addr *ea = nullptr;
+    if (hw.length()) {
+        ea = ether_aton(hw.c_str());
+        if (!ea)
+            return TError(EError::Unknown, "Invalid VETH mac address " + hw);
+    }
 
 	veth = rtnl_link_veth_alloc();
     if (!veth)
@@ -406,6 +411,13 @@ TError TNlLink::AddVeth(const std::string &name, const std::string &peerName, co
     rtnl_link_set_name(peer, name.c_str());
     rtnl_link_set_ns_pid(peer, nsPid);
     rtnl_link_set_name(veth, peerName.c_str());
+
+    if (ea) {
+        struct nl_addr *addr = nl_addr_build(AF_LLC, ea, ETH_ALEN);
+        rtnl_link_set_addr(peer, addr);
+        rtnl_link_set_addr(veth, addr);
+        nl_addr_put(addr);
+    }
 
 	ret = rtnl_link_add(GetSock(), veth, NLM_F_CREATE | NLM_F_EXCL);
     if (ret < 0) {
