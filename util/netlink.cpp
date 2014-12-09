@@ -896,7 +896,10 @@ free_cls:
 }
 
 TNlAddr::TNlAddr(const TNlAddr &other) {
-    Addr = nl_addr_clone(other.Addr);
+    if (other.Addr)
+        Addr = nl_addr_clone(other.Addr);
+    else
+        Addr = nullptr;
 }
 
 TNlAddr &TNlAddr::operator=(const TNlAddr &other) {
