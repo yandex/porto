@@ -293,10 +293,10 @@ TError TTask::ChildBindDirectores() {
         TMount mnt(bindMap.Source, dest, "none", {});
 
         TError error;
-        if (bindMap.Source.GetType() == EFileType::Regular)
-            error = mnt.BindFile(bindMap.Rdonly);
-        else
+        if (bindMap.Source.GetType() == EFileType::Directory)
             error = mnt.BindDir(bindMap.Rdonly);
+        else
+            error = mnt.BindFile(bindMap.Rdonly);
         if (error)
             return error;
     }
