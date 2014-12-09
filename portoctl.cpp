@@ -177,6 +177,10 @@ bool ValidProperty(const vector<TProperty> &plist, const string &name) {
         != plist.end();
 }
 
+string HumanValue(const string &name, const string &val) {
+    return DataValue(name, PropertyValue(name, val));
+}
+
 class TRawCmd : public ICmd {
 public:
     TRawCmd(TPortoAPI *api) : ICmd(api, "raw", 2, "<message>", "send raw protobuf message") {}
@@ -1060,7 +1064,7 @@ public:
             tmp.push_back(data);
 
             for (auto &pair : containerData)
-                tmp.push_back(DataValue(data, pair.second[data]));
+                tmp.push_back(HumanValue(data, pair.second[data]));
 
             fieldLen.push_back(CalculateFieldLength(tmp));
         }
@@ -1075,7 +1079,7 @@ public:
 
             for (size_t i = 0; i < showData.size(); i++) {
                 std::cout << std::right << std::setw(fieldLen[i]);
-                std::cout << DataValue(showData[i], pair.second[showData[i]]);
+                std::cout << HumanValue(showData[i], pair.second[showData[i]]);
             }
             std::cout << std::endl;
         }
