@@ -541,6 +541,9 @@ TError TTask::IsolateNet(int childPid) {
         if (hw == "" && Env->Hostname != "")
             hw = GenerateHw(Env->Hostname, mvlan.Master + mvlan.Name);
 
+        if (config().network().debug())
+            L() << "Using " << hw << " for " << mvlan.Master << " -> " << mvlan.Name << std::endl;
+
         TError error = link->AddMacVlan(mvlan.Master, mvlan.Type, hw, mvlan.Mtu);
         if (error)
             return error;
@@ -559,6 +562,9 @@ TError TTask::IsolateNet(int childPid) {
         string hw = veth.Hw;
         if (hw == "" && Env->Hostname != "")
             hw = GenerateHw(Env->Hostname, veth.Name + veth.Peer);
+
+        if (config().network().debug())
+            L() << "Using " << hw << " for " << veth.Name << " -> " << veth.Peer << std::endl;
 
         error = bridge->AddVeth(veth.Name, veth.Peer, hw, veth.Mtu, childPid);
         if (error)
