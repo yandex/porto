@@ -127,7 +127,7 @@ class TTask {
     TError ChildExec();
     TError ChildBindDns();
     TError ChildBindDirectores();
-    TError RestrictProc();
+    TError RestrictProc(bool restrictProcSys);
     TError ChildMountDev();
     TError ChildIsolateFs();
     TError EnableNet();

@@ -312,9 +312,11 @@ TError TTask::CreateNode(const TPath &path, unsigned int mode, unsigned int dev)
     return TError::Success();
 }
 
-TError TTask::RestrictProc() {
-    vector<string> dirs = { "/proc/sys", "/proc/sysrq-trigger",
-        "/proc/irq", "/proc/bus" };
+TError TTask::RestrictProc(bool restrictProcSys) {
+    vector<string> dirs = { "/proc/sysrq-trigger", "/proc/irq", "/proc/bus" };
+
+    if (restrictProcSys)
+        dirs.push_back("/proc/sys");
 
     for (auto &path : dirs) {
         TMount mnt(Env->Root + path, Env->Root + path, "none", {});
@@ -409,7 +411,8 @@ TError TTask::ChildIsolateFs() {
     if (error)
         return error;
 
-    error = RestrictProc();
+    bool privileged = Env->Gid == 0 || Env->Uid == 0;
+    error = RestrictProc(!privileged);
     if (error)
         return error;
 
