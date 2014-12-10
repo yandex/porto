@@ -2,15 +2,15 @@
 #include "config.hpp"
 #include "util/log.hpp"
 
-std::vector<std::shared_ptr<TNlLink>> TTclass::GetLink() {
+std::vector<std::shared_ptr<TNlLink>> TTclass::GetLinks() {
     if (ParentQdisc)
-        return ParentQdisc->GetLink();
+        return ParentQdisc->GetLinks();
     else
-        return ParentTclass->GetLink();
+        return ParentTclass->GetLinks();
 }
 
-bool TTclass::Exists(std::shared_ptr<TNlLink> Link) {
-    TNlClass tclass(Link, GetParent(), Handle);
+bool TTclass::Exists(std::shared_ptr<TNlLink> link) {
+    TNlClass tclass(link, GetParent(), Handle);
     return tclass.Exists();
 }
 
@@ -18,7 +18,7 @@ TError TTclass::GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) {
     if (!config().network().enabled())
         return TError(EError::Unknown, "Network support is disabled");
 
-    for (auto &link : GetLink()) {
+    for (auto &link : GetLinks()) {
         uint64_t val;
         TNlClass tclass(link, GetParent(), Handle);
         TError error = tclass.GetStat(stat, val);
@@ -45,7 +45,7 @@ TError TTclass::Create(std::map<std::string, uint64_t> prio, std::map<std::strin
     if (!config().network().enabled())
         return TError::Success();
 
-    for (auto &link : GetLink()) {
+    for (auto &link : GetLinks()) {
         if (prio.find(link->GetAlias()) == prio.end())
             return TError(EError::Unknown, "Unknown interface in net_priority");
 
@@ -70,9 +70,9 @@ TError TTclass::Remove() {
     if (!config().network().enabled())
         return TError::Success();
 
-    for (auto &link : GetLink()) {
+    for (auto &link : GetLinks()) {
         if (!Exists(link))
-            return TError::Success();
+            continue;
 
         TNlClass tclass(link, GetParent(), Handle);
         TError error = tclass.Remove();
@@ -83,15 +83,15 @@ TError TTclass::Remove() {
     return TError::Success();
 }
 
-std::vector<std::shared_ptr<TNlLink>> TQdisc::GetLink() {
-    return Link;
+std::vector<std::shared_ptr<TNlLink>> TQdisc::GetLinks() {
+    return Links;
 }
 
 TError TQdisc::Create() {
     if (!config().network().enabled())
         return TError::Success();
 
-    for (auto &link : GetLink()) {
+    for (auto &link : GetLinks()) {
         TNlHtb qdisc(link, TcRootHandle(), Handle);
 
         if (qdisc.Valid(DefClass))
@@ -109,7 +109,7 @@ TError TQdisc::Remove() {
     if (!config().network().enabled())
         return TError::Success();
 
-    for (auto &link : GetLink()) {
+    for (auto &link : GetLinks()) {
         TNlHtb qdisc(link, TcRootHandle(), Handle);
         TError error = qdisc.Remove();
         if (error)
@@ -119,12 +119,12 @@ TError TQdisc::Remove() {
     return TError::Success();
 }
 
-std::vector<std::shared_ptr<TNlLink>> TFilter::GetLink() {
-    return Parent->GetLink();
+std::vector<std::shared_ptr<TNlLink>> TFilter::GetLinks() {
+    return Parent->GetLinks();
 }
 
-bool TFilter::Exists(std::shared_ptr<TNlLink> Link) {
-    TNlCgFilter filter(Link, Parent->GetHandle(), 1);
+bool TFilter::Exists(std::shared_ptr<TNlLink> link) {
+    TNlCgFilter filter(link, Parent->GetHandle(), 1);
     return filter.Exists();
 }
 
@@ -132,7 +132,7 @@ TError TFilter::Create() {
     if (!config().network().enabled())
         return TError::Success();
 
-    for (auto &link : GetLink()) {
+    for (auto &link : GetLinks()) {
         TNlCgFilter filter(link, Parent->GetHandle(), 1);
         TError error = filter.Create();
         if (error)
