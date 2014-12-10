@@ -5,7 +5,7 @@
 description	"Porto"
 author "Eugene Kilimchuk <ekilimchuk@yandex-team.ru>"
 
-start on runlevel [2345]
+start on yandex-networking-started
 
 expect fork
 respawn
@@ -24,6 +24,12 @@ pre-start script
 			sleep 1
 		done
 	fi
+end script
+
+post-stop script
+	# make sure we remove any daemon state leftovers when something
+	# goes wrong
+	rm -rf /run/porto/kvs /tmp/portod.pidmap
 end script
 
 exec portod &
