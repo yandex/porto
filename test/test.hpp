@@ -8,6 +8,8 @@
 #include "libporto.hpp"
 #include "util/pwd.hpp"
 
+class TNlLink;
+
 namespace test {
     extern __thread int tid;
     extern std::atomic<int> done;

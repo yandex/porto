@@ -7,6 +7,8 @@
 #include "common.hpp"
 #include "util/netlink.hpp"
 
+// TODO: Links -> Net
+
 class TQdisc {
     NO_COPY_CONSTRUCT(TQdisc);
     std::vector<std::shared_ptr<TNlLink>> Links;
@@ -52,6 +54,30 @@ public:
     TError Create();
 };
 
-std::vector<std::shared_ptr<TNlLink>> OpenLinks();
+class TNetwork {
+    NO_COPY_CONSTRUCT(TNetwork);
+
+    std::shared_ptr<TNl> Nl;
+    std::vector<std::shared_ptr<TNlLink>> Links;
+    std::shared_ptr<TQdisc> Qdisc;
+    std::shared_ptr<TTclass> Tclass;
+    std::shared_ptr<TFilter> Filter;
+
+    TError PrepareTc();
+
+public:
+    TNetwork();
+    ~TNetwork();
+    TError Prepare();
+    TError Update();
+    TError OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links);
+
+    std::shared_ptr<TNl> GetNl() { return Nl; }
+    std::vector<std::shared_ptr<TNlLink>> GetLinks() { return Links; }
+    std::shared_ptr<TQdisc> GetQdisc() { return Qdisc; }
+    std::shared_ptr<TTclass> GetTclass() { return Tclass; }
+    std::shared_ptr<TFilter> GetFilter() { return Filter; }
+    bool Empty() { return Links.size() == 0; }
+};
 
 #endif

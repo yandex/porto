@@ -579,20 +579,24 @@ static int SlaveMain() {
         if (error)
             L_ERR() << "Can't create cgroup snapshot: " << error << std::endl;
 
-        std::vector<std::shared_ptr<TNlLink>> links;
+        std::shared_ptr<TNetwork> net = std::make_shared<TNetwork>();
         if (config().network().enabled()) {
-            links = OpenLinks();
-            if (links.size() == 0) {
+            TError error = net->Prepare();
+            if (error)
+                L_ERR() << "Can't prepare network: " << error << std::endl;
+
+
+            if (net->Empty()) {
                 L() << "Error: couldn't find suitable network interface" << std::endl;
                 return EXIT_FAILURE;
             }
 
-            for (auto &link : links)
+            for (auto &link : net->GetLinks())
                 L() << "Using " << link->GetAlias() << " interface" << std::endl;
         }
 
         auto queue = std::make_shared<TEventQueue>();
-        TContainerHolder cholder(queue, links);
+        TContainerHolder cholder(queue, net);
         error = cholder.CreateRoot();
         if (error) {
             L_ERR() << "Can't create root container: " << error << std::endl;

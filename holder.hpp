@@ -9,7 +9,7 @@
 #include "kvalue.hpp"
 #include "util/idmap.hpp"
 
-class TNlLink;
+class TNetwork;
 class TContainer;
 class TIdMap;
 class TEventQueue;
@@ -17,7 +17,7 @@ class TEvent;
 
 class TContainerHolder {
     NO_COPY_CONSTRUCT(TContainerHolder);
-    std::vector<std::shared_ptr<TNlLink>> Links;
+    std::shared_ptr<TNetwork> Net;
     std::map <std::string, std::shared_ptr<TContainer>> Containers;
     TIdMap IdMap;
 
@@ -29,8 +29,8 @@ public:
     int Epfd;
 
     TContainerHolder(std::shared_ptr<TEventQueue> queue,
-                     const std::vector<std::shared_ptr<TNlLink>> &links) :
-        Links(links), Queue(queue) { }
+                     std::shared_ptr<TNetwork> net) :
+        Net(net), Queue(queue) { }
     ~TContainerHolder();
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot();

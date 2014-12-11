@@ -472,7 +472,7 @@ protected:
                        std::shared_ptr<TContainer> c) {
         std::set<std::string> validKey;
 
-        for (auto &link : c->Links)
+        for (auto &link : c->Net->GetLinks())
             validKey.insert(link->GetAlias());
 
         for (auto &kv : m)
@@ -497,7 +497,7 @@ public:
         uint64_t def =  c->IsRoot() ? GetRootDefault() : GetDefault();
 
         TUintMap m;
-        for (auto &link : c->Links)
+        for (auto &link : c->Net->GetLinks())
             m[link->GetAlias()] = def;
         return m;
     }
@@ -883,9 +883,11 @@ public:
         if (lines.size() == 0)
             return TError(EError::InvalidValue, "Configuration is not specified");
 
+        /*
         TError error = container->UpdateLinkCache();
         if (error)
             return error;
+            */
 
         for (auto &line : lines) {
             if (none)

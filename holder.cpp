@@ -125,7 +125,7 @@ TError TContainerHolder::Create(const std::string &name, int uid, int gid) {
     if (error)
         return error;
 
-    auto c = std::make_shared<TContainer>(this, name, parent, id, Links);
+    auto c = std::make_shared<TContainer>(this, name, parent, id, Net);
     error = c->Create(uid, gid);
     if (error)
         return error;
@@ -224,7 +224,7 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
     if (!id)
         return TError(EError::Unknown, "Couldn't restore container id");
 
-    auto c = std::make_shared<TContainer>(this, name, parent, id, Links);
+    auto c = std::make_shared<TContainer>(this, name, parent, id, Net);
     error = c->Restore(node);
     if (error) {
         L_ERR() << "Can't restore container " << name << ": " << error << std::endl;

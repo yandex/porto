@@ -69,8 +69,12 @@ int main(int argc, char *argv[])
     try {
         config.Load();
 
-        if (config().network().enabled())
-            test::links = OpenLinks();
+        auto net = std::make_shared<TNetwork>();
+        if (config().network().enabled()) {
+            TError error = net->OpenLinks(test::links);
+            if (error)
+                throw error.GetMsg();
+        }
 
         string what = "";
         if (argc >= 2)

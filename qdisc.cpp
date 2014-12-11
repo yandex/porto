@@ -97,6 +97,8 @@ TError TQdisc::Create() {
         if (qdisc.Valid(DefClass))
             continue;
 
+        (void)qdisc.Remove();
+
         TError error = qdisc.Create(DefClass);
         if (error)
             return error;
@@ -142,28 +144,105 @@ TError TFilter::Create() {
     return TError::Success();
 }
 
-std::vector<std::shared_ptr<TNlLink>> OpenLinks() {
+TNetwork::TNetwork() {
+}
+
+TNetwork::~TNetwork() {
+    if (Tclass) {
+        TError error = Tclass->Remove();
+        if (error)
+            L_ERR() << "Can't remove default tc class: " << error << std::endl;
+    }
+
+    if (Qdisc) {
+        TError error = Qdisc->Remove();
+        if (error)
+            L_ERR() << "Can't remove tc qdisc: " << error << std::endl;
+    }
+}
+
+TError TNetwork::Prepare() {
+    Links.clear();
+    Qdisc = nullptr;
+    Tclass = nullptr;
+    Filter = nullptr;
+
+    TError error = OpenLinks(Links);
+    if (error)
+        return error;
+
+    return PrepareTc();
+}
+
+TError TNetwork::Update() {
+    // TODO:
+
+    return TError::Success();
+}
+
+TError TNetwork::PrepareTc() {
+    // 1:0 qdisc
+    // 1:2 default class    1:1 root class
+    // (unclassified        1:3 container a, 1:4 container b
+    //          traffic)    1:5 container a/c
+
+    uint32_t defHandle = TcHandle(1, 2);
+    uint32_t rootHandle = TcHandle(1, 0);
+
+    Qdisc = std::make_shared<TQdisc>(Links, rootHandle, defHandle);
+    TError error = Qdisc->Create();
+    if (error) {
+        L_ERR() << "Can't create root qdisc: " << error << std::endl;
+        return error;
+    }
+
+    Filter = std::make_shared<TFilter>(Qdisc);
+    error = Filter->Create();
+    if (error) {
+        L_ERR() << "Can't create tc filter: " << error << std::endl;
+        return error;
+    }
+
+    Tclass = std::make_shared<TTclass>(Qdisc, defHandle);
+
+    std::map<std::string, uint64_t> prio, rate, ceil;
+    for (auto &link : Links) {
+        prio[link->GetAlias()] = config().container().default_cpu_prio();
+        rate[link->GetAlias()] = config().network().default_guarantee();
+        ceil[link->GetAlias()] = config().network().default_limit();
+    }
+
+    error = Tclass->Create(prio, rate, ceil);
+    if (error) {
+        L_ERR() << "Can't create default tclass: " << error << std::endl;
+        return error;
+    }
+
+    return TError::Success();
+}
+
+TError TNetwork::OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links) {
     std::vector<std::string> devices;
     for (auto &device : config().network().devices())
         devices.push_back(device);
 
-    std::vector<std::shared_ptr<TNlLink>> linkVec;
+    if (!Nl) {
+        Nl = std::make_shared<TNl>();
+        if (!Nl)
+            throw std::bad_alloc();
+    }
 
-    auto nl = std::make_shared<TNl>();
-    if (!nl)
-        throw std::bad_alloc();
-
-    TError error = nl->Connect();
+    TError error = Nl->Connect();
     if (error) {
         L_ERR() << "Can't open link: " << error << std::endl;
-        return linkVec;
+        return error;
     }
 
     if (!devices.size()) {
-        error = nl->GetDefaultLink(devices);
+        error = Nl->GetDefaultLink(devices);
         if (error) {
             L_ERR() << "Can't open link: " << error << std::endl;
-            return linkVec;
+            return error;
         }
     }
 
@@ -172,21 +251,21 @@ std::vector<std::shared_ptr<TNlLink>> OpenLinks() {
         aliasMap[alias.iface()] = alias.name();
 
     for (auto &name : devices) {
-        auto l = std::make_shared<TNlLink>(nl, name);
+        auto l = std::make_shared<TNlLink>(Nl, name);
         if (!l)
             throw std::bad_alloc();
 
         error = l->Load();
         if (error) {
             L_ERR() << "Can't open link: " << error << std::endl;
-            return linkVec;
+            return error;
         }
 
         if (aliasMap.find(name) != aliasMap.end())
             l->SetAlias(aliasMap.at(name));
 
-        linkVec.push_back(l);
+        links.push_back(l);
     }
 
-    return linkVec;
+    return TError::Success();
 }

@@ -20,10 +20,8 @@ class TVariantSet;
 enum class ETclassStat;
 class TEvent;
 class TContainerHolder;
-class TNlLink;
-class TQdisc;
+class TNetwork;
 class TTclass;
-class TFilter;
 class TTask;
 
 extern int64_t BootTime;
@@ -42,9 +40,7 @@ class TContainer : public std::enable_shared_from_this<TContainer> {
     TContainerHolder *Holder;
     const std::string Name;
     const std::shared_ptr<TContainer> Parent;
-    std::shared_ptr<TQdisc> Qdisc;
-    std::shared_ptr<TTclass> Tclass, DefaultTclass;
-    std::shared_ptr<TFilter> Filter;
+    std::shared_ptr<TTclass> Tclass;
     std::vector<std::weak_ptr<TContainer>> Children;
     std::shared_ptr<TKeyValueStorage> Storage;
     EContainerState State = EContainerState::Unknown;
@@ -94,7 +90,7 @@ public:
     std::unique_ptr<TTask> Task;
     std::shared_ptr<TPropertySet> Prop;
     std::shared_ptr<TVariantSet> Data;
-    std::vector<std::shared_ptr<TNlLink>> Links;
+    std::shared_ptr<TNetwork> Net;
 
     std::string GetTmpDir() const;
     EContainerState GetState();
@@ -102,9 +98,9 @@ public:
 
     TContainer(TContainerHolder *holder,
                const std::string &name, std::shared_ptr<TContainer> parent,
-               uint16_t id, const std::vector<std::shared_ptr<TNlLink>> &links) :
+               uint16_t id, std::shared_ptr<TNetwork> net) :
         Holder(holder), Name(StripParentName(name)), Parent(parent), Id(id),
-        Links(links) { }
+        Net(net) { }
     ~TContainer();
 
     const std::string GetName(bool recursive = true) const;

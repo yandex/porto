@@ -153,18 +153,6 @@ TContainer::~TContainer() {
             }
             iter++;
         }
-
-    if (DefaultTclass) {
-        TError error = DefaultTclass->Remove();
-        if (error)
-            L_ERR() << "Can't remove default tc class: " << error << std::endl;
-    }
-
-    if (Qdisc) {
-        TError error = Qdisc->Remove();
-        if (error)
-            L_ERR() << "Can't remove tc qdisc: " << error << std::endl;
-    }
 }
 
 const string TContainer::GetName(bool recursive) const {
@@ -196,24 +184,19 @@ std::shared_ptr<const TContainer> TContainer::GetParent() const {
 }
 
 bool TContainer::ValidLink(const std::string &name) const {
-    if (Links.size() == 0)
+    if (Net->Empty())
         return false;
 
-    std::shared_ptr<TNl> nl = Links[0]->GetNl();
+    std::shared_ptr<TNl> nl = Net->GetNl();
     return nl->ValidLink(name);
 }
 
 TError TContainer::UpdateLinkCache() {
-    for (auto link : Links) {
-        TError error = link->RefillCache();
-        if (error)
-            return error;
-    }
-    return TError::Success();
+    return Net->Update();
 }
 
 std::shared_ptr<TNlLink> TContainer::GetLink(const std::string &name) const {
-    for (auto &link : Links)
+    for (auto &link : Net->GetLinks())
         if (link->GetAlias() == name)
             return link;
 
@@ -377,8 +360,8 @@ TError TContainer::PrepareNetwork() {
         uint32_t handle = TcHandle(TcMajor(tclass->GetHandle()), Id);
         Tclass = std::make_shared<TTclass>(tclass, handle);
     } else {
-        uint32_t handle = TcHandle(TcMajor(Qdisc->GetHandle()), Id);
-        Tclass = std::make_shared<TTclass>(Qdisc, handle);
+        uint32_t handle = TcHandle(TcMajor(Net->GetQdisc()->GetHandle()), Id);
+        Tclass = std::make_shared<TTclass>(Net->GetQdisc(), handle);
     }
 
     TUintMap prio, rate, ceil;
@@ -599,46 +582,6 @@ TError TContainer::Create(int uid, int gid) {
 
     if (Parent)
         Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
-
-    if (IsRoot()) {
-        // 1:0 qdisc
-        // 1:2 default class    1:1 root class
-        // (unclassified        1:3 container a, 1:4 container b
-        //          traffic)    1:5 container a/c
-
-        PORTO_ASSERT(Id == 1);
-        uint32_t defHandle = TcHandle(Id, Id + 1);
-        uint32_t rootHandle = TcHandle(Id, 0);
-
-        Qdisc = std::make_shared<TQdisc>(Links, rootHandle, defHandle);
-        error = Qdisc->Create();
-        if (error) {
-            L_ERR() << "Can't create root qdisc: " << error << std::endl;
-            return error;
-        }
-
-        Filter = std::make_shared<TFilter>(Qdisc);
-        error = Filter->Create();
-        if (error) {
-            L_ERR() << "Can't create tc filter: " << error << std::endl;
-            return error;
-        }
-
-        DefaultTclass = std::make_shared<TTclass>(Qdisc, defHandle);
-
-        TUintMap prio, rate, ceil;
-        for (auto &link : Links) {
-            prio[link->GetAlias()] = config().container().default_cpu_prio();
-            rate[link->GetAlias()] = config().network().default_guarantee();
-            ceil[link->GetAlias()] = config().network().default_limit();
-        }
-
-        error = DefaultTclass->Create(prio, rate, ceil);
-        if (error) {
-            L_ERR() << "Can't create default tclass: " << error << std::endl;
-            return error;
-        }
-    }
 
     SetState(EContainerState::Stopped);
 
