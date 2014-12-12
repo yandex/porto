@@ -20,12 +20,6 @@ done
 shift
 
 CONFIG() {
-	if [ -z "$1" ]; then
-		echo 'Please specify name'
-		exit 1
-	fi
-
-	NAME="$1"
 	REPO=$(cd $(dirname $0)/../ && pwd)
 	DIST=$REPO/dist
 	USER=stfomichev
@@ -108,6 +102,13 @@ CONFIG() {
 
 if [ $# -ge 1 ]; then
 	for conf in "$@"; do
+		NAME=$(echo $(basename $conf) | sed -e 's/.conf$//')
+		if [ -z "$conf" ]; then
+			echo "Invalid config name: $NAME ($conf)"
+			exit 1
+		fi
+		CONFIG $NAME
+
 		. $conf
 	done
 else
