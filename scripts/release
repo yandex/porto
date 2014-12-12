@@ -6,6 +6,10 @@ rootdir=$(cd $(dirname $0)/../ && pwd)
 
 changelog_modified() { test "$(git diff --name-only debian/changelog)" = "debian/changelog"; }
 
+test() {
+	(cd $rootdir/dist && ./build -c)
+}
+
 commit() {
     changelog_modified || dch -i
     version=v$(head -n1 debian/changelog | sed -e 's/[^(]*(\([^)]*\).*/\1/')
@@ -24,7 +28,7 @@ upload() {
 }
 
 if [ $# -eq 0 ]; then
-    set commit push upload
+    set test commit push upload
 fi
 
 cd $rootdir

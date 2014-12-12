@@ -31,7 +31,7 @@ CONFIG() {
 	}
 
 	bootstrap() {
-		tar="$DIST/${NAME}.img"
+		local tar="$DIST/${NAME}.img"
 		[ -f $tar ] || (cd $DIST && curl -L $URL > $tar)
 		[ -d $ROOT ] || (mkdir -p $ROOT && cd $ROOT && sudo tar xf $tar && sudo chown $USER:$USER $ROOT && sudo chmod 0755 $ROOT)
 	}
@@ -98,6 +98,34 @@ CONFIG() {
 	#	pctl exec porto/selftest command="./portotest" root="${ROOT}" cwd="/src"
 	#	pctl destroy porto
 	}
+}
+
+CP() {
+	pctl exec $NAME root="$ROOT" hostname="$NAME" command="cp /tmp/__copy_me__ '$2'" bind="$1 /tmp/__copy_me__ ro"
+}
+
+ECHO() {
+	local file="$1"
+	local tmp="$(mktemp)"
+	cat > $tmp
+	CP $tmp $file
+	rm $tmp
+}
+
+REPO() {
+	local file="$1"
+	shift
+	local url="$1"
+	shift
+
+	local tmp="$(mktemp)"
+	echo > $tmp
+	for repo in "$@"; do
+		echo "deb $url $repo" >> $tmp
+	done
+
+	CP $tmp /etc/apt/sources.list.d/$file
+	rm $tmp
 }
 
 if [ $# -ge 1 ]; then
