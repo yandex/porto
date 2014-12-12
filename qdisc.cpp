@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "qdisc.hpp"
 #include "config.hpp"
 #include "util/log.hpp"
