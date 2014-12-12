@@ -1,0 +1,47 @@
+#!/bin/sh
+
+set -e
+
+if [ $# -ne 3 ]; then
+	echo "Usage: $(basename $0) <SIZE> <IMAGE> <SCRIPT>"
+	exit 1
+fi
+
+SIZE=$1
+IMAGE=$(realpath $2)
+SCRIPT=$(realpath $3)
+
+chmod +x $SCRIPT
+
+CONTAINER=mkimg
+
+allocate_image() {
+	local image=$1
+	local size=$2
+
+	fallocate -l $size $image
+	mkfs.ext4 -F -F $image
+}
+
+bootstrap() {
+	local image=$1
+	local script=$2
+	local tmpdir=$(mktemp -d)
+	portoctl exec $CONTAINER command="bash -c 'mount $image $tmpdir && $script bootstrap $tmpdir'" user=root group=root #root_readonly=true debootsrap chroot fails
+	rmdir $tmpdir
+}
+
+prepare() {
+	local image=$1
+	local script=$2
+	portoctl run $CONTAINER command="/sbin/init" root="$image" hostname="$CONTAINER" user=root group=root bind="$script /tmp/script ro" bind_dns=false
+	sudo portoctl enter $CONTAINER /bin/bash /tmp/script prepare
+	sudo portoctl enter $CONTAINER /bin/sync
+	portoctl destroy $CONTAINER
+}
+
+portoctl destroy $CONTAINER ||:
+allocate_image $IMAGE $SIZE
+bootstrap $IMAGE $SCRIPT
+prepare $IMAGE $SCRIPT
+tar cSf ${IMAGE}.tar $IMAGE
