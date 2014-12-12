@@ -229,7 +229,7 @@ TError TNetwork::Update() {
                                  return i->GetAlias() == link->GetAlias();
                               });
 
-        if (i == newLinks.end()) {
+        if (i == Links.end()) {
             TError error = PrepareLink(link);
             if (error)
                 return error;
