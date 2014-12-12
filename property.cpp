@@ -883,11 +883,9 @@ public:
         if (lines.size() == 0)
             return TError(EError::InvalidValue, "Configuration is not specified");
 
-        /*
         TError error = container->UpdateLinkCache();
         if (error)
             return error;
-            */
 
         for (auto &line : lines) {
             if (none)

@@ -68,7 +68,8 @@ TError TTclass::Create(bool fallback) {
                 return TError(EError::Unknown, "Unknown interface in net_limit");
         }
 
-        if (ParentTclass && !ParentTclass->Exists(link)) {
+        if (config().network().dynamic_ifaces() &&
+            ParentTclass && !ParentTclass->Exists(link)) {
             TError error = ParentTclass->Create(true);
             if (error) {
                 L_ERR() << "Can't create parent tc class: " << error << std::endl;
@@ -211,6 +212,9 @@ TError TNetwork::Prepare() {
 }
 
 TError TNetwork::Update() {
+    if (!config().network().dynamic_ifaces())
+        return TError::Success();
+
     std::vector<std::shared_ptr<TNlLink>> newLinks;
 
     TError error = OpenLinks(newLinks);

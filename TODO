@@ -1,7 +1,4 @@
-- privileged users to config
-- update networks when running
 - porto returns running when no cgroup exists
-- portoctl exec fix wrong console size
 - fix: container creates tty on the host
 - ? create cgroup for portod/portod-slave
 - ? do periodic persistence checks

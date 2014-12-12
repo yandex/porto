@@ -14,6 +14,7 @@ message TCfg {
 			required string name = 2;
 		}
 		repeated TNetworkAlias alias = 8;
+		optional bool dynamic_ifaces = 9;
 	}
 
 	message TFileCfg {
