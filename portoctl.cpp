@@ -742,6 +742,7 @@ static void destroyContainer(void) {
 
 class TExecCmd : public ICmd {
     string containerName;
+    sig_atomic_t Interrupted = 0;
 public:
     TExecCmd(TPortoAPI *api) : ICmd(api, "exec", 2, "<container> [properties]", "create pty, execute and wait for command in container") {}
 
@@ -873,10 +874,17 @@ public:
         string state;
         int loop = 1000;
         do {
+            usleep(1000 * 1000);
             ret = Api->GetData(containerName, "state", state);
             if (ret) {
                 PrintError("Can't get state");
                 return EXIT_FAILURE;
+            }
+
+            if (Interrupted) {
+                ResetAllSignalHandlers();
+                raise(InterruptedSignal);
+                exit(EXIT_FAILURE);
             }
         } while (loop-- && state == "running");
 

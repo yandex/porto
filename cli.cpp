@@ -152,7 +152,6 @@ static void TryExec(int argc, char *argv[]) {
 void SigInt(int sig) {
     (void)RegisterSignal(sig, SIG_DFL);
     currentCmd->Signal(sig);
-    raise(sig);
 }
 
 int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
