@@ -395,6 +395,13 @@ TError TTask::ChildIsolateFs() {
         if (error)
             return error;
 
+        if (Env->RootRdOnly) {
+            TMount root("/", "/", "none", {});
+            TError error = root.BindDir(true);
+            if (error)
+                return error;
+        }
+
         return TError::Success();
     }
 
