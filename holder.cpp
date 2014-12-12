@@ -7,6 +7,7 @@
 #include "data.hpp"
 #include "event.hpp"
 #include "util/string.hpp"
+#include "util/pwd.hpp"
 
 TContainerHolder::~TContainerHolder() {
     // we want children to be removed first
@@ -31,6 +32,24 @@ TError TContainerHolder::CreateRoot() {
     error = TaskGetLastCap();
     if (error)
         return error;
+
+    for (auto &priv : config().privileges().root_user()) {
+        TUser u(priv);
+        TError error = u.Load();
+        if (error)
+            return error;
+
+        PrivilegedUid.insert(u.GetId());
+    }
+
+    for (auto &priv : config().privileges().root_group()) {
+        TGroup g(priv);
+        TError error = g.Load();
+        if (error)
+            return error;
+
+        PrivilegedGid.insert(g.GetId());
+    }
 
     // we are using single kvalue store for both properties and data
     // so make sure names don't clash
@@ -142,9 +161,22 @@ std::shared_ptr<TContainer> TContainerHolder::Get(const std::string &name) {
     return Containers[name];
 }
 
+bool TContainerHolder::PrivilegedUser(int uid, int gid) {
+    if (uid == 0 || gid == 0)
+        return true;
+
+    if (PrivilegedUid.find(uid) != PrivilegedUid.end())
+        return true;
+
+    if (PrivilegedGid.find(gid) != PrivilegedGid.end())
+        return true;
+
+    return false;
+}
+
 TError TContainerHolder::CheckPermission(std::shared_ptr<TContainer> container,
                                          int uid, int gid) {
-    if (uid == 0 || gid == 0)
+    if (PrivilegedUser(uid, gid))
         return TError::Success();
 
     // for root we report more meaningful errors from handlers, so don't
