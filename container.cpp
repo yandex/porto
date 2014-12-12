@@ -358,10 +358,10 @@ TError TContainer::PrepareNetwork() {
 
         auto tclass = Parent->Tclass;
         uint32_t handle = TcHandle(TcMajor(tclass->GetHandle()), Id);
-        Tclass = std::make_shared<TTclass>(tclass, handle);
+        Tclass = std::make_shared<TTclass>(Net, tclass, handle);
     } else {
         uint32_t handle = TcHandle(TcMajor(Net->GetQdisc()->GetHandle()), Id);
-        Tclass = std::make_shared<TTclass>(Net->GetQdisc(), handle);
+        Tclass = std::make_shared<TTclass>(Net, Net->GetQdisc(), handle);
     }
 
     TUintMap prio, rate, ceil;
@@ -369,7 +369,9 @@ TError TContainer::PrepareNetwork() {
     rate = Prop->GetMap(P_NET_GUARANTEE);
     ceil = Prop->GetMap(P_NET_CEIL);
 
-    TError error = Tclass->Create(prio, rate, ceil);
+    Tclass->Prepare(prio, rate, ceil);
+
+    TError error = Tclass->Create();
     if (error) {
         L_ERR() << "Can't create tclass: " << error << std::endl;
         return error;

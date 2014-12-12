@@ -2094,11 +2094,24 @@ static void TestDataMap(TPortoAPI &api, const std::string &name, const std::stri
 
 static void ExpectNonZeroLink(TPortoAPI &api, const std::string &name,
                               const std::string &data) {
+#if 0
+    int nonzero = 0;
+
+    for (auto &link : links) {
+        string v;
+        ExpectSuccess(api.GetData(name, data + "[" + link->GetAlias() + "]", v));
+
+        if (v != "0" && v != "-1")
+            nonzero++;
+    }
+    Expect(nonzero != 0);
+#else
     for (auto &link : links) {
         string v;
         ExpectSuccess(api.GetData(name, data + "[" + link->GetAlias() + "]", v));
         Expect(v != "0" && v != "-1");
     }
+#endif
 }
 
 static void ExpectRootLink(TPortoAPI &api, const std::string &name,

@@ -491,7 +491,6 @@ void TNlLink::LogObj(const std::string &prefix, void *obj) {
     else
         str << "netlink: " << prefix << " ";
     nl_object_dump(OBJ_CAST(obj), &dp);
-    str << std::endl;
 }
 
 void TNlLink::LogCache(struct nl_cache *cache) {
@@ -512,7 +511,6 @@ void TNlLink::LogCache(struct nl_cache *cache) {
     else
         str << "netlink cache: ";
     nl_cache_dump(cache, &dp);
-    str << std::endl;
 }
 
 TError TNlClass::Create(uint32_t prio, uint32_t rate, uint32_t ceil) {

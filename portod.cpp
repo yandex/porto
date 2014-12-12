@@ -647,6 +647,10 @@ static int SlaveMain() {
         error = storage.Destroy();
         if (error)
             L_ERR() << "Can't destroy key-value storage: " << error << std::endl;
+
+        error = net->Destroy();
+        if (error)
+            L_ERR() << "Can't destroy network: " << error << std::endl;
     } catch (string s) {
         std::cerr << s << std::endl;
         ret = EXIT_FAILURE;
