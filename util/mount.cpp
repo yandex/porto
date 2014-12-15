@@ -48,18 +48,18 @@ TError TMount::Umount() const {
     return TError::Success();
 }
 
-TError TMount::Bind(bool Rdonly) const {
-    TError error = Mount(MS_BIND);
+TError TMount::Bind(bool rdonly, unsigned long flags) const {
+    TError error = Mount(MS_BIND | flags);
     if (error)
         return error;
 
-    if (!Rdonly)
+    if (!rdonly)
         return TError::Success();
 
-    return Mount(MS_BIND | MS_REMOUNT | MS_RDONLY);
+    return Mount(MS_BIND | MS_REMOUNT | MS_RDONLY | flags);
 }
 
-TError TMount::BindFile(bool Rdonly) const {
+TError TMount::BindFile(bool rdonly, unsigned long flags) const {
     TPath p(Target);
     TFile f(p);
 
@@ -80,10 +80,10 @@ TError TMount::BindFile(bool Rdonly) const {
         // TODO: ?can't mount over link
     }
 
-    return Bind(Rdonly);
+    return Bind(rdonly, flags);
 }
 
-TError TMount::BindDir(bool Rdonly) const {
+TError TMount::BindDir(bool rdonly, unsigned long flags) const {
     TPath p(Target);
     TFolder d(p);
 
@@ -93,7 +93,7 @@ TError TMount::BindDir(bool Rdonly) const {
             return error;
     }
 
-    return Bind(Rdonly);
+    return Bind(rdonly, flags);
 }
 
 TError TMount::MountDir(unsigned long flags) const {
@@ -149,14 +149,17 @@ TError TMountSnapshot::RemountSlave() {
 }
 
 TError TLoopMount::FindDev() {
-    int cfd = open("/dev/loop-control", O_RDWR);
+    int cfd = open("/dev/loop-control", O_RDWR | O_CLOEXEC);
     if (cfd < 0)
         return TError(EError::Unknown, errno, "open(/dev/loop-control)");
 
     TScopedFd fd;
     fd = ioctl(cfd, LOOP_CTL_GET_FREE);
-    if (fd.GetFd() < 0)
+    if (fd.GetFd() < 0) {
+        close(cfd);
         return TError(EError::Unknown, errno, "ioctl(LOOP_CTL_GET_FREE)");
+    }
+    close(cfd);
 
     LoopDev = "/dev/loop" + std::to_string(fd.GetFd());
 
@@ -169,7 +172,7 @@ TError TLoopMount::Mount() {
         return error;
 
     TScopedFd ffd, dfd;
-    ffd = open(Source.ToString().c_str(), O_RDWR);
+    ffd = open(Source.ToString().c_str(), O_RDWR | O_CLOEXEC);
     if (ffd.GetFd() < 0)
         return TError(EError::Unknown, errno, "open(" + Source.ToString() + ")");
 
