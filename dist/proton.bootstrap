@@ -13,12 +13,14 @@ nameserver 2a02:6b8:0:3400::1
 nameserver 2a02:6b8::1:1
 options timeout:1 attempts:1
 EOF
+
 	echo "deb http://mirror.yandex.ru/ubuntu precise main restricted universe multiverse" > $root/etc/apt/sources.list
 
 	cat > $root/etc/apt/sources.list.d/yandex-search-precise.list <<EOF
 deb http://search-precise.dist.yandex.ru/search-precise stable/all/
 deb http://search-precise.dist.yandex.ru/search-precise stable/amd64/
 EOF
+
 	cat > $root/etc/apt/sources.list.d/yandex-search.list <<EOF
 deb http://search.dist.yandex.ru/search stable/all/
 deb http://search.dist.yandex.ru/search stable/amd64/

@@ -2,29 +2,61 @@
 
 set -e
 
-if [ $# -ne 3 ]; then
-	echo "Usage: $(basename $0) <SIZE> <IMAGE> <SCRIPT>"
+BINARY=$(basename $0)
+usage() {
+	echo "Usage: $BINARY [-v] <size> <image> <config>"
+	echo "Options:"
+	echo -e "\t-T\tDon't create tar archive"
+	echo -e "\t-c\tExecute check hook"
+	echo -e "\t-d\tRemove image after build (dry-run)"
+	echo -e "\t-v\tShow underlying portoctl commands"
 	exit 1
-fi
+	exit 1
+}
 
+set -- `getopt c:dTvh $*`
+[ ! $? -eq 0 ] && usage
+
+CHECK=
+TAR=1
+VERBOSE=0
+CLEANUP=0
+while [ ! "$1" = "--" ]; do
+	case "$1" in
+	-c)
+		CHECK=$2
+		shift
+		;;
+	-d)
+		CLEANUP=1
+		;;
+	-T)
+		TAR=0
+		;;
+	-v)
+		VERBOSE=1
+		;;
+	*)
+		usage
+		;;
+	esac
+	shift
+done
+shift
+
+[ $# -eq 3 ] || usage
 SIZE=$1
 IMAGE=$(realpath $2)
-SCRIPT=$(realpath $3)
-VERBOSE=1
-ALLOCATE=1
-CHECK=1
+CONF=$(realpath $3)
+CONTAINER=$BINARY
 
-chmod +x $SCRIPT
-
-CONTAINER=mkimg
+chmod +x $CONF
 
 say() { tput setaf 3; echo "$@"; tput sgr0; }
 
 pctl() {
-	if [ $VERBOSE -eq 1 ]; then say portoctl "$@"; fi
+	[ $VERBOSE -eq 0 ] || say portoctl "$@"
 	portoctl "$@"
-
-	## TODO: ask user to enter if fails
 }
 
 allocate_image() {
@@ -37,27 +69,40 @@ allocate_image() {
 
 bootstrap() {
 	local image=$1
-	local script=$2
+	local conf=$2
+
 	local tmpdir=$(mktemp -d)
-	pctl exec $CONTAINER command="bash -c 'mount $image $tmpdir && $script bootstrap $tmpdir'" user=root group=root #root_readonly=true debootsrap chroot fails
+	pctl exec $CONTAINER command="bash -c 'mount $image $tmpdir && $conf bootstrap $tmpdir'" user=root group=root bind_dns=false #root_readonly=true debootsrap chroot fails
 	rmdir $tmpdir
+}
+
+check() {
+	pctl exec ${CONTAINER}/check command="/bin/bash -c 'mkdir /src && git clone /host_porto /src && cd /src && git submodule init && git submodule update && /config check'" isolate="false" user=root group=root
 }
 
 prepare() {
 	local image=$1
-	local script=$2
-	pctl run $CONTAINER command="/sbin/init" root="$image" hostname="$CONTAINER" user=root group=root bind="$script /script ro" bind_dns=false
-	pctl exec ${CONTAINER}/prepare command="bash -c '/script prepare'" isolate=false user=root group=root
+	local conf=$2
+	local porto=$3
+
+	local bind_selinux=""
+	[ ! -d /sys/fs/selinux ] || bind_selinux="/sys/fs/selinux /sys/fs/selinux ro"
+	local bind_porto=""
+	[ ! -d $porto ] || bind_porto="$porto /host_porto ro"
+
+	pctl run $CONTAINER command="/sbin/init" root="$image" hostname="$CONTAINER" user=root group=root bind="$conf /config ro; $bind_selinux; $bind_porto" bind_dns=false
+
+	pctl exec ${CONTAINER}/prepare command="bash -c '/config prepare'" isolate=false user=root group=root
 	pctl exec ${CONTAINER}/sync command="bash -c 'sync'" isolate="false" user=root group=root
 
-	#[ $CHECK -eq 0 ] || pctl exec ${CONTAINER}/check command="/bin/bash -c '/tmp/script check'" isolate="false" user=root group=root
+	[ -z "$CHECK" ] || check
 
-	#sudo pctl enter $CONTAINER /bin/bash /tmp/script prepare
-	#sudo pctl enter $CONTAINER /bin/sync
 	pctl destroy $CONTAINER
 }
 
-pctl destroy $CONTAINER ||:
-[ $ALLOCATE -eq 0 ] || { allocate_image $IMAGE $SIZE && bootstrap $IMAGE $SCRIPT; }
-prepare $IMAGE $SCRIPT
-tar cSf ${IMAGE}.tar $IMAGE
+pctl destroy $CONTAINER || :
+allocate_image $IMAGE $SIZE
+bootstrap $IMAGE $CONF
+prepare $IMAGE $CONF $CHECK
+[ $TAR -eq 0 ] || tar cSf ${IMAGE}.tar $IMAGE
+[ $CLEANUP -eq 0 ] || rm $IMAGE

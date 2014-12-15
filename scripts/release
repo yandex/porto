@@ -6,8 +6,10 @@ rootdir=$(cd $(dirname $0)/../ && pwd)
 
 changelog_modified() { test "$(git diff --name-only debian/changelog)" = "debian/changelog"; }
 
-test() {
-	(cd $rootdir/dist && ./build -c)
+selftest() {
+	for f in $rootdir/dist/*.bootstrap; do
+		$rootdir/mkimg $f -vTd -c $(realpath $rootdir)
+	done
 }
 
 commit() {
@@ -28,7 +30,7 @@ upload() {
 }
 
 if [ $# -eq 0 ]; then
-    set test commit push upload
+    set selftest commit push upload
 fi
 
 cd $rootdir
