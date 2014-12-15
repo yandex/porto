@@ -21,6 +21,15 @@ static pair<string, int> nameToType[] = {
     { "ns/mnt", CLONE_NEWNS },
 };
 
+TError TNamespaceSnapshot::OpenFd(int pid, string v, TScopedFd &fd) {
+    std::string path = "/proc/" + std::to_string(pid) + "/" + v;
+    fd = open(path.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+    if (fd.GetFd() < 0)
+        return TError(EError::Unknown, errno, "Can't open " + path);
+
+    return TError::Success();
+}
+
 TError TNamespaceSnapshot::Create(int pid) {
     Destroy();
 
@@ -45,6 +54,33 @@ TError TNamespaceSnapshot::Create(int pid) {
         Destroy();
         return TError(EError::Unknown, "Can't find any namespace");
     }
+
+    TError error = OpenFd(pid, "root", Root);
+    if (error) {
+        Destroy();
+        return error;
+    }
+
+    error = OpenFd(pid, "cwd", Cwd);
+    if (error) {
+        Destroy();
+        return error;
+    }
+
+    return TError::Success();
+}
+
+TError TNamespaceSnapshot::Chroot() {
+    if (fchdir(Root.GetFd()) < 0)
+        return TError(EError::Unknown, errno, "Can't change root directory: fchdir(" + std::to_string(Root.GetFd()) + ")");
+
+    if (chroot(".") < 0)
+        return TError(EError::Unknown, errno, "Can't change root directory chroot(" + std::to_string(Root.GetFd()) + ")");
+    Root = -1;
+
+    if (fchdir(Cwd.GetFd()) < 0)
+        return TError(EError::Unknown, errno, "Can't change working directory fchdir(" + std::to_string(Cwd.GetFd()) + ")");
+    Root = -1;
 
     return TError::Success();
 }

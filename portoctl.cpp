@@ -512,17 +512,6 @@ public:
         std::cerr << str << ": " << strerror(errno) << std::endl;
     }
 
-    int OpenFd(int pid, string v) {
-        string path = "/proc/" + std::to_string(pid) + "/" + v;
-        int fd = open(path.c_str(), O_RDONLY | O_NONBLOCK);
-        if (fd < 0) {
-            PrintErrno("Can't open [" + path + "] " + std::to_string(fd));
-            throw "";
-        }
-
-        return fd;
-    }
-
     TError GetCgMount(const string &subsys, string &root) {
         vector<string> subsystems;
         TError error = SplitString(subsys, ',', subsystems);
@@ -587,8 +576,12 @@ public:
             return EXIT_FAILURE;
         }
 
-        int rootFd = OpenFd(pid, "root");
-        int cwdFd = OpenFd(pid, "cwd");
+        TNamespaceSnapshot ns;
+        error = ns.Create(pid);
+        if (error) {
+            PrintError(error, "Can't create namespace snapshot");
+            return EXIT_FAILURE;
+        }
 
         if (enterCgroups) {
             map<string, string> cgmap;
@@ -616,35 +609,17 @@ public:
             }
         }
 
-        TNamespaceSnapshot ns;
-        error = ns.Create(pid);
-        if (error) {
-            PrintError(error, "Can't create namespace snapshot");
-            return EXIT_FAILURE;
-        }
-
         error = ns.Attach();
         if (error) {
             PrintError(error, "Can't create namespace snapshot");
             return EXIT_FAILURE;
         }
 
-        if (fchdir(rootFd) < 0) {
-            PrintErrno("Can't change root directory");
+        error = ns.Chroot();
+        if (error) {
+            PrintError(error, "Can't change root directory");
             return EXIT_FAILURE;
         }
-
-        if (chroot(".") < 0) {
-            PrintErrno("Can't change root directory");
-            return EXIT_FAILURE;
-        }
-        close(rootFd);
-
-        if (fchdir(cwdFd) < 0) {
-            PrintErrno("Can't change root directory");
-            return EXIT_FAILURE;
-        }
-        close(cwdFd);
 
         wordexp_t result;
         ret = wordexp(cmd.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
@@ -720,7 +695,7 @@ public:
         }
         ret = Api->Start(containerName);
         if (ret) {
-            PrintError("Can't start property");
+            PrintError("Can't start container");
             (void)Api->Destroy(containerName);
             return EXIT_FAILURE;
         }
