@@ -775,26 +775,32 @@ public:
 
     int Execute(int argc, char *argv[]) {
         containerName = argv[0];
-        bool needEnv = isatty(STDIN_FILENO);
-        bool haveEnv = false;
-        string env;
-
+        bool hasTty = isatty(STDIN_FILENO);
         vector<const char *> args;
-        for (int i = 0; i < argc; i++) {
-            if (needEnv && strncmp(argv[i], "env=", 4) == 0) {
-                env = string(argv[i]) + ";TERM=" + getenv("TERM");
-                args.push_back(env.c_str());
-                haveEnv = true;
-            } else {
+        std::string env;
+
+        if (hasTty)
+            env = std::string("TERM=") + getenv("TERM");
+
+        for (int i = 0; i < argc; i++)
+            if (strncmp(argv[i], "env=", 4) == 0)
+                env = env + "; " + std::string(argv[i] + 4);
+            else
                 args.push_back(argv[i]);
-            }
-        }
 
         int ptm = posix_openpt(O_RDWR);
         if (ptm < 0) {
             TError error(EError::Unknown, errno, "posix_openpt()");
             PrintError(error, "Can't open pseudoterminal");
             return EXIT_FAILURE;
+        }
+
+        if (hasTty) {
+            struct winsize ws;
+            if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) < 0)
+                memset(&ws, 0, sizeof(ws));
+
+            (void)ioctl(ptm, TIOCSWINSZ, &ws);
         }
 
         if (grantpt(ptm) < 0) {
@@ -824,11 +830,8 @@ public:
         args.push_back(stdinPath.c_str());
         args.push_back(stdoutPath.c_str());
         args.push_back(stderrPath.c_str());
-
-        if (needEnv && !haveEnv) {
-            env = string("env=TERM=") + getenv("TERM");
-            args.push_back(env.c_str());
-        }
+        if (env.length())
+            args.push_back(("env=" + env).c_str());
 
         auto *run = new TRunCmd(Api);
         int ret = run->Execute(args.size(), (char **)args.data());
