@@ -20,6 +20,7 @@ public:
     TError Chroot();
     TError Attach();
     void Destroy();
+    bool Valid();
 };
 
 #endif

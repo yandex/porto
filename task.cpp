@@ -674,7 +674,11 @@ TError TTask::ChildCallback() {
     if (error)
         return error;
 
-    if (Env->Isolate) {
+    if (Env->Ns.Valid()) {
+        error = Env->Ns.Chroot();
+        if (error)
+            return error;
+    } else {
         error = ChildIsolateFs();
         if (error)
             return error;
@@ -684,10 +688,6 @@ TError TTask::ChildCallback() {
             return error;
 
         error = ChildSetHostname();
-        if (error)
-            return error;
-    } else {
-        error = Env->Ns.Chroot();
         if (error)
             return error;
     }

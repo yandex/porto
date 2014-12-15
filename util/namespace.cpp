@@ -99,3 +99,8 @@ TError TNamespaceSnapshot::Attach() {
 
     return TError::Success();
 }
+
+bool TNamespaceSnapshot::Valid() {
+    return Root.GetFd() >= 0 && Cwd.GetFd() >= 0;
+
+}
