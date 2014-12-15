@@ -63,7 +63,7 @@ void TKeyValueStorage::Merge(kv::TNode &node, kv::TNode &next) const {
 }
 
 TError TKeyValueStorage::LoadNode(const std::string &name, kv::TNode &node) const {
-    int fd = open(Path(name).c_str(), O_RDONLY);
+    int fd = open(Path(name).c_str(), O_RDONLY | O_CLOEXEC);
     node.Clear();
     TError error;
     try {
@@ -84,7 +84,7 @@ TError TKeyValueStorage::LoadNode(const std::string &name, kv::TNode &node) cons
 }
 
 TError TKeyValueStorage::AppendNode(const std::string &name, const kv::TNode &node) const {
-    int fd = open(Path(name).c_str(), O_CREAT | O_WRONLY, 0755);
+    int fd = open(Path(name).c_str(), O_CREAT | O_WRONLY | O_CLOEXEC, 0755);
     TError error;
 
     if (lseek(fd, 0, SEEK_END) < 0) {
@@ -107,7 +107,7 @@ TError TKeyValueStorage::AppendNode(const std::string &name, const kv::TNode &no
 }
 
 TError TKeyValueStorage::SaveNode(const std::string &name, const kv::TNode &node) const {
-    int fd = open(Path(name).c_str(), O_CREAT | O_WRONLY | O_TRUNC, 0755);
+    int fd = open(Path(name).c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0755);
     TError error;
     try {
         google::protobuf::io::FileOutputStream post(fd);

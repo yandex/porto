@@ -10,10 +10,22 @@ fi
 SIZE=$1
 IMAGE=$(realpath $2)
 SCRIPT=$(realpath $3)
+VERBOSE=1
+ALLOCATE=1
+CHECK=1
 
 chmod +x $SCRIPT
 
 CONTAINER=mkimg
+
+say() { tput setaf 3; echo "$@"; tput sgr0; }
+
+pctl() {
+	if [ $VERBOSE -eq 1 ]; then say portoctl "$@"; fi
+	portoctl "$@"
+
+	## TODO: ask user to enter if fails
+}
 
 allocate_image() {
 	local image=$1
@@ -27,21 +39,25 @@ bootstrap() {
 	local image=$1
 	local script=$2
 	local tmpdir=$(mktemp -d)
-	portoctl exec $CONTAINER command="bash -c 'mount $image $tmpdir && $script bootstrap $tmpdir'" user=root group=root #root_readonly=true debootsrap chroot fails
+	pctl exec $CONTAINER command="bash -c 'mount $image $tmpdir && $script bootstrap $tmpdir'" user=root group=root #root_readonly=true debootsrap chroot fails
 	rmdir $tmpdir
 }
 
 prepare() {
 	local image=$1
 	local script=$2
-	portoctl run $CONTAINER command="/sbin/init" root="$image" hostname="$CONTAINER" user=root group=root bind="$script /tmp/script ro" bind_dns=false
-	sudo portoctl enter $CONTAINER /bin/bash /tmp/script prepare
-	sudo portoctl enter $CONTAINER /bin/sync
-	portoctl destroy $CONTAINER
+	pctl run $CONTAINER command="/sbin/init" root="$image" hostname="$CONTAINER" user=root group=root bind="$script /script ro" bind_dns=false
+	pctl exec ${CONTAINER}/prepare command="bash -c '/script prepare'" isolate=false user=root group=root
+	pctl exec ${CONTAINER}/sync command="bash -c 'sync'" isolate="false" user=root group=root
+
+	#[ $CHECK -eq 0 ] || pctl exec ${CONTAINER}/check command="/bin/bash -c '/tmp/script check'" isolate="false" user=root group=root
+
+	#sudo pctl enter $CONTAINER /bin/bash /tmp/script prepare
+	#sudo pctl enter $CONTAINER /bin/sync
+	pctl destroy $CONTAINER
 }
 
-portoctl destroy $CONTAINER ||:
-allocate_image $IMAGE $SIZE
-bootstrap $IMAGE $SCRIPT
+pctl destroy $CONTAINER ||:
+[ $ALLOCATE -eq 0 ] || { allocate_image $IMAGE $SIZE && bootstrap $IMAGE $SCRIPT; }
 prepare $IMAGE $SCRIPT
 tar cSf ${IMAGE}.tar $IMAGE

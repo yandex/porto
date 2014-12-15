@@ -54,7 +54,7 @@ CONFIG() {
 		if [ $VERBOSE -eq 1 ]; then say portoctl "$@"; fi
 		$REPO/portoctl "$@"
 
-		## TODO: ask use to exec if fails
+		## TODO: ask user to enter if fails
 	}
 
 	download_image() {

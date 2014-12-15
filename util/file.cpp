@@ -58,7 +58,6 @@ TError TFile::AsString(string &value) const {
     if (close(fd) < 0)
         return TError(EError::Unknown, errno, "close(" + Path.ToString() + ")");
 
-
     return TError::Success();
 }
 

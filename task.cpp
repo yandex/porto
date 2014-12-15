@@ -74,7 +74,7 @@ const char** TTaskEnv::GetEnvp() const {
 
 // TTask
 int TTask::CloseAllFds(int except) const {
-    for (int i = 0; i < getdtablesize(); i++)
+    for (int i = 0; i < 3; i++)
         if (i != except)
             close(i);
 
@@ -385,7 +385,7 @@ TError TTask::ChildIsolateFs() {
 
     if (Env->Root.ToString() != "/") {
         TMount root(Env->Root, Env->Root, "none", {});
-        TError error = root.BindDir(false);
+        TError error = root.BindDir(false, MS_SHARED);
         if (error)
             return error;
     }
@@ -658,9 +658,11 @@ TError TTask::ChildCallback() {
             return TError(EError::Unknown, error, "cgroup attach");
     }
 
-    error = ChildPrepareLoop();
-    if (error)
-        return error;
+    if (Env->Isolate) {
+        error = ChildPrepareLoop();
+        if (error)
+            return error;
+    }
 
     if (!Env->NetCfg.Share) {
         error = EnableNet();
@@ -672,17 +674,23 @@ TError TTask::ChildCallback() {
     if (error)
         return error;
 
-    error = ChildIsolateFs();
-    if (error)
-        return error;
+    if (Env->Isolate) {
+        error = ChildIsolateFs();
+        if (error)
+            return error;
 
-    error = Env->Cwd.Chdir();
-    if (error)
-        return error;
+        error = Env->Cwd.Chdir();
+        if (error)
+            return error;
 
-    error = ChildSetHostname();
-    if (error)
-        return error;
+        error = ChildSetHostname();
+        if (error)
+            return error;
+    } else {
+        error = Env->Ns.Chroot();
+        if (error)
+            return error;
+    }
 
     error = ChildApplyCapabilities();
     if (error)
