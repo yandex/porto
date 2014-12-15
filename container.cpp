@@ -682,7 +682,6 @@ TError TContainer::Start() {
     if (error)
         return error;
 
-    CgroupEmptySince = 0;
     SetState(EContainerState::Running);
 
     return TError::Success();
@@ -1062,6 +1061,8 @@ TError TContainer::Prepare() {
         if (error)
             return error;
     }
+
+    CgroupEmptySince = 0;
 
     return Data->Create();
 }

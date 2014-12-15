@@ -282,6 +282,5 @@ TError TDevicesSubsystem::AllowDevices(std::shared_ptr<TCgroup> &cg, const std::
             return error;
     }
 
-
     return TError::Success();
 }

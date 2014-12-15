@@ -1,7 +1,6 @@
 - fix stresstest
 - chroot -> pivot_root (to remove all mounts from container)
-- porto returns running when no cgroup exists
-- fix: container creates tty on the host
+- ? porto returns running when no cgroup exists
 - ? create cgroup for portod/portod-slave
 - ? do periodic persistence checks
 - ? use chrt instead of cpu.smart so we don't depend on smart kernels + set rt prio
