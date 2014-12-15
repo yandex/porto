@@ -6,5 +6,8 @@ SBINDIR=$(DESTDIR)/usr/sbin
 override_dh_installinit:
 	dh_installinit --no-restart-on-upgrade
 
+override_dh_shlibdeps:
+	dh_shlibdeps --dpkg-shlibdeps-params=--ignore-missing-info
+
 %:
 	dh $@
