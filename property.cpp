@@ -222,7 +222,7 @@ public:
     TRootProperty() :
         TStringValue(P_ROOT,
                      "Container root directory",
-                     PARENT_DEF_PROPERTY | PERSISTENT_VALUE,
+                     PARENT_RO_PROPERTY | PERSISTENT_VALUE,
                      staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
@@ -240,7 +240,7 @@ public:
     TRootRdOnlyProperty() :
         TBoolValue(P_ROOT_RDONLY,
                    "Mount root directory in read-only mode",
-                   PERSISTENT_VALUE,
+                   PARENT_RO_PROPERTY | PERSISTENT_VALUE,
                    staticProperty) {}
 
     bool GetDefaultBool(std::shared_ptr<TContainer> c) override {
@@ -711,7 +711,7 @@ public:
     THostnameProperty() :
         TStringValue(P_HOSTNAME,
                      "Container hostname",
-                     PERSISTENT_VALUE,
+                     PARENT_RO_PROPERTY | PERSISTENT_VALUE,
                      staticProperty) {}
 };
 
@@ -720,11 +720,13 @@ public:
     TBindDnsProperty() :
         TBoolValue(P_BIND_DNS,
                    "Bind /etc/resolv.conf and /etc/hosts of host to container",
-                   PERSISTENT_VALUE,
+                   PARENT_RO_PROPERTY | PERSISTENT_VALUE,
                    staticProperty) {}
 
     bool GetDefaultBool(std::shared_ptr<TContainer> c) override {
-        if (c->Prop->IsDefault("root"))
+        if (!c->Prop->GetBool("isolate"))
+            return false;
+        else if (c->Prop->IsDefault("root"))
             return false;
         else
             return true;
@@ -738,7 +740,7 @@ public:
     TBindProperty() :
         TListValue(P_BIND,
                    "Share host directories with container",
-                   PERSISTENT_VALUE,
+                   PARENT_RO_PROPERTY | PERSISTENT_VALUE,
                    staticProperty) {}
 
     TError ParseList(std::shared_ptr<TContainer> container,
@@ -791,7 +793,7 @@ public:
     TDefaultGwProperty() :
         TStringValue(P_DEFAULT_GW,
                      "Default gateway",
-                     PERSISTENT_VALUE | HIDDEN_VALUE,
+                     PARENT_RO_PROPERTY | PERSISTENT_VALUE | HIDDEN_VALUE,
                      staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
@@ -817,7 +819,7 @@ public:
     TIpProperty() :
         TListValue(P_IP,
                    "IP configuration",
-                   PERSISTENT_VALUE | HIDDEN_VALUE,
+                   PARENT_RO_PROPERTY | PERSISTENT_VALUE | HIDDEN_VALUE,
                    staticProperty) {}
 
     TStrList GetDefaultList(std::shared_ptr<TContainer> c) override {
@@ -861,7 +863,7 @@ public:
     TNetProperty() :
         TListValue(P_NET,
                    "Container network settings",
-                   PERSISTENT_VALUE,
+                   PARENT_RO_PROPERTY | PERSISTENT_VALUE,
                    staticProperty) {}
 
     TStrList GetDefaultList(std::shared_ptr<TContainer> c) override {
@@ -1032,7 +1034,7 @@ public:
     TAllowedDevicesProperty() :
         TListValue(P_ALLOWED_DEVICES,
                    "Devices that container can create/read/write",
-                   PERSISTENT_VALUE,
+                   PARENT_RO_PROPERTY | PERSISTENT_VALUE,
                    staticProperty) {}
 
     TStrList GetDefaultList(std::shared_ptr<TContainer> c) override {

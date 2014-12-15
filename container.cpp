@@ -475,6 +475,13 @@ TError TContainer::PrepareCgroups() {
 }
 
 TError TContainer::PrepareTask() {
+    if (!Prop->GetBool(P_ISOLATE))
+        for (auto property : propertySet.GetNames())
+            if (propertySet.Get(property)->Flags & PARENT_RO_PROPERTY)
+                if (!Prop->IsDefault(property))
+                    return TError(EError::InvalidValue, "Can't use custom " + property + " with " + P_ISOLATE + " == false");
+
+
     auto taskEnv = std::make_shared<TTaskEnv>();
 
     taskEnv->Command = Prop->GetString(P_COMMAND);
