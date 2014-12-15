@@ -1,4 +1,5 @@
 #include <iostream>
+#include <sstream>
 
 #include "log.hpp"
 #include "util/unix.hpp"
@@ -10,6 +11,8 @@ static std::ofstream kmsgFile;
 static TPath logPath;
 static unsigned int logMode;
 static bool stdlog = false;
+static bool disabled = false;
+static std::ostringstream disabledStream;
 
 void TLogger::InitLog(const std::string &path, const unsigned int mode) {
     logPath = path;
@@ -57,7 +60,9 @@ void TLogger::OpenLog() {
 }
 
 void TLogger::DisableLog() {
-    logFile.setstate(std::ios_base::failbit);
+    TLogger::CloseLog();
+    disabled = true;
+    stdlog = true;
 }
 
 void TLogger::CloseLog() {
@@ -90,7 +95,10 @@ std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
 #endif
 
     std::string name = GetProcessName();
-    if (stdlog) {
+    if (disabled) {
+        disabledStream.str("");
+        return disabledStream;
+    } else if (stdlog) {
         return  std::cerr << GetTime() << " " << name << ": " << prefix[level];
     } else {
         if (openlog)
