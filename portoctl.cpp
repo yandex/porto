@@ -680,14 +680,14 @@ public:
         n = property.find('=');
         if (n == string::npos) {
             TError error(EError::InvalidValue, "Invalid value");
-            PrintError(error, "Can't parse property: " + property);
+            PrintError(error, "Can't parse property (no value): " + property);
             return EXIT_FAILURE;
         }
         propertyKey = property.substr(0, n);
         propertyValue = property.substr(n + 1, property.size());
         if (propertyKey == "" || propertyValue == "") {
             TError error(EError::InvalidValue, "Invalid value");
-            PrintError(error, "Can't parse property: " + property);
+            PrintError(error, "Can't parse property (key or value is nil): " + property);
             return EXIT_FAILURE;
         }
         properties[propertyKey] = propertyValue;
@@ -830,8 +830,9 @@ public:
         args.push_back(stdinPath.c_str());
         args.push_back(stdoutPath.c_str());
         args.push_back(stderrPath.c_str());
+        env = "env=" + env;
         if (env.length())
-            args.push_back(("env=" + env).c_str());
+            args.push_back(env.c_str());
 
         auto *run = new TRunCmd(Api);
         int ret = run->Execute(args.size(), (char **)args.data());
