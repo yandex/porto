@@ -7,8 +7,8 @@ rootdir=$(cd $(dirname $0)/../ && pwd)
 changelog_modified() { test "$(git diff --name-only debian/changelog)" = "debian/changelog"; }
 
 selftest() {
-	for f in $rootdir/dist/*.bootstrap; do
-		$rootdir/mkimg $f -vTd -c $(realpath $rootdir)
+	for f in $rootdir/dist/*.conf; do
+		$rootdir/scripts/mkimg 15G ${f}.img $f -vTd -c $(realpath $rootdir)
 	done
 }
 
