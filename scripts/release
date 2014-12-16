@@ -8,7 +8,7 @@ changelog_modified() { test "$(git diff --name-only debian/changelog)" = "debian
 
 selftest() {
 	for f in $rootdir/dist/*.conf; do
-		$rootdir/scripts/mkimg 15G ${f}.img $f -vTd -c $(realpath $rootdir)
+		$rootdir/scripts/mkimg 5G ${f}.img $f -vTd -c $(realpath $rootdir)
 	done
 }
 
