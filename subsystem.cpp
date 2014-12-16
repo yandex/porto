@@ -268,8 +268,10 @@ TError TDevicesSubsystem::AllowDevices(std::shared_ptr<TCgroup> &cg, const std::
                 break;
         }
 
-        if (!needUpdate)
+        if (!needUpdate) {
+            L() << "Don't update allowed devices" << std::endl;
             return TError::Success();
+        }
     }
 
     error = cg->SetKnobValue("devices.deny", "a", false);

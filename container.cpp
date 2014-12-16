@@ -264,7 +264,7 @@ TError TContainer::ApplyDynamicProperties() {
     }
 
     auto memroot = memorySubsystem->GetRootCgroup();
-    if (memroot->HasKnob("memory.low_limit_in_bytes") && Prop->GetUint(P_MEM_GUARANTEE) != 0) {
+    if (memroot->HasKnob("memory.low_limit_in_bytes") && Prop->GetUint(P_MEM_GUARANTEE) != 0 && !UseParentNamespace()) {
         TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", Prop->GetString(P_MEM_GUARANTEE), false);
         if (error) {
             L_ERR() << "Can't set " << P_MEM_GUARANTEE << ": " << error << std::endl;
@@ -280,7 +280,7 @@ TError TContainer::ApplyDynamicProperties() {
         }
     }
 
-    if (memroot->HasKnob("memory.recharge_on_pgfault")) {
+    if (memroot->HasKnob("memory.recharge_on_pgfault") && !UseParentNamespace()) {
         string value = Prop->GetBool(P_RECHARGE_ON_PGFAULT) ? "1" : "0";
         error = memcg->SetKnobValue("memory.recharge_on_pgfault", value, false);
         if (error) {
@@ -288,6 +288,9 @@ TError TContainer::ApplyDynamicProperties() {
             return error;
         }
     }
+
+    if (UseParentNamespace())
+        return TError::Success();
 
     auto cpucg = GetLeafCgroup(cpuSubsystem);
     if (Prop->GetString(P_CPU_POLICY) == "normal") {
@@ -430,7 +433,7 @@ TError TContainer::PrepareCgroups() {
 
     auto cpucg = GetLeafCgroup(cpuSubsystem);
     auto cpuroot = cpuSubsystem->GetRootCgroup();
-    if (cpuroot->HasKnob("cpu.smart")) {
+    if (cpuroot->HasKnob("cpu.smart") && !UseParentNamespace()) {
         TError error;
         if (Prop->GetString(P_CPU_POLICY) == "rt") {
             error = cpucg->SetKnobValue("cpu.smart", "1", false);
@@ -463,12 +466,14 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
-    auto devices = GetLeafCgroup(devicesSubsystem);
-    error = devicesSubsystem->AllowDevices(devices,
-                                           Prop->GetList(P_ALLOWED_DEVICES));
-    if (error) {
-        L_ERR() << "Can't set " << P_ALLOWED_DEVICES << ": " << error << std::endl;
-        return error;
+    if (!UseParentNamespace()) {
+        auto devices = GetLeafCgroup(devicesSubsystem);
+        error = devicesSubsystem->AllowDevices(devices,
+                                               Prop->GetList(P_ALLOWED_DEVICES));
+        if (error) {
+            L_ERR() << "Can't set " << P_ALLOWED_DEVICES << ": " << error << std::endl;
+            return error;
+        }
     }
 
     return TError::Success();
