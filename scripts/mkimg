@@ -73,7 +73,7 @@ bootstrap() {
 	local conf=$2
 
 	local tmpdir=$(mktemp -d)
-	pctl exec $CONTAINER command="bash -c 'mount $image $tmpdir && $conf bootstrap $tmpdir'" user=root group=root bind_dns=false #root_readonly=true debootsrap chroot fails
+	pctl exec $CONTAINER command="bash -c 'mount $image $tmpdir && $conf bootstrap $tmpdir; ret=$?; umount $image; exit $ret'" user=root group=root bind_dns=false #root_readonly=true debootsrap chroot fails
 	rmdir $tmpdir
 }
 
@@ -89,7 +89,7 @@ prepare() {
 	local bind_selinux=""
 	[ ! -d /sys/fs/selinux ] || bind_selinux="/sys/fs/selinux /sys/fs/selinux ro"
 	local bind_porto=""
-	[ ! -d $porto ] || bind_porto="$porto /host_porto ro"
+	[ -z "$porto" ] || bind_porto="$porto /host_porto ro"
 
 	pctl run $CONTAINER command="/sbin/init" root="$image" hostname="$CONTAINER" user=root group=root bind="$conf /config ro; $bind_selinux; $bind_porto" bind_dns=false allowed_devices="$ALLOWED_DEVICES"
 

@@ -1,4 +1,5 @@
 - fix stresstest
+- dynamic_ifaces should use netlink for ifup/ifdown events
 - chroot -> pivot_root (to remove all mounts from container)
 - ? porto returns running when no cgroup exists
 - ? create cgroup for portod/portod-slave
