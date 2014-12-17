@@ -46,7 +46,7 @@ shift
 
 [ $# -eq 3 ] || usage
 SIZE=$1
-IMAGE=$(realpath $2)
+IMAGE=$2
 CONF=$(realpath $3)
 CONTAINER=$BINARY
 ALLOWED_DEVICES="c 1:3 rwm; c 1:5 rwm; c 1:7 rwm; c 1:9 rwm; c 1:8 rwm; c 136:* rw; c 5:2 rwm; c 254:0 rm; c 10:237 rmw; b 7:* rmw"
@@ -103,6 +103,7 @@ prepare() {
 
 pctl destroy $CONTAINER || :
 allocate_image $IMAGE $SIZE
+IMAGE=$(realpath $IMAGE)
 bootstrap $IMAGE $CONF
 prepare $IMAGE $CONF $CHECK
 [ $TAR -eq 0 ] || tar cSf ${IMAGE}.tar $IMAGE
