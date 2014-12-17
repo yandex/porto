@@ -68,34 +68,34 @@ THelpCmd::THelpCmd(TPortoAPI *api, bool usagePrintData) : ICmd(api, "help", 1, "
 void THelpCmd::Usage() {
     const int nameWidth = 32;
 
-    std::cout << "Usage: " << program_invocation_short_name << " <command> [<args>]" << std::endl;
-    std::cout << std::endl;
-    std::cout << "Command list:" << std::endl;
+    std::cerr << "Usage: " << program_invocation_short_name << " <command> [<args>]" << std::endl;
+    std::cerr << std::endl;
+    std::cerr << "Command list:" << std::endl;
     for (auto i : commands)
-        std::cout << " " << std::left << std::setw(nameWidth) << i.second->GetName() << i.second->GetDescription() << std::endl;
+        std::cerr << " " << std::left << std::setw(nameWidth) << i.second->GetName() << i.second->GetDescription() << std::endl;
 
     int ret;
-    std::cout << std::endl << "Property list:" << std::endl;
+    std::cerr << std::endl << "Property list:" << std::endl;
     vector<TProperty> plist;
     ret = Api->Plist(plist);
     if (ret) {
         PrintError("Unavailable");
     } else
         for (auto p : plist)
-            std::cout << " " << std::left << std::setw(nameWidth) << p.Name
+            std::cerr << " " << std::left << std::setw(nameWidth) << p.Name
                 << p.Description << std::endl;
 
     if (!UsagePrintData)
         return;
 
-    std::cout << std::endl << "Data list:" << std::endl;
+    std::cerr << std::endl << "Data list:" << std::endl;
     vector<TData> dlist;
     ret = Api->Dlist(dlist);
     if (ret)
         PrintError("Unavailable");
     else
         for (auto d : dlist)
-            std::cout << " " << std::left << std::setw(nameWidth) << d.Name
+            std::cerr << " " << std::left << std::setw(nameWidth) << d.Name
                 << d.Description << std::endl;
 }
 
@@ -108,9 +108,9 @@ int THelpCmd::Execute(int argc, char *argv[]) {
     string name(argv[0]);
     for (auto i : commands) {
         if (i.second->GetName() == name) {
-            std::cout << "Usage: " << program_invocation_short_name << " " << name << " " << i.second->GetUsage() << std::endl;
-            std::cout << std::endl;
-            std::cout << i.second->GetDescription() << std::endl;
+            std::cerr << "Usage: " << program_invocation_short_name << " " << name << " " << i.second->GetUsage() << std::endl;
+            std::cerr << std::endl;
+            std::cerr << i.second->GetDescription() << std::endl;
 
             return EXIT_SUCCESS;
         }
@@ -170,9 +170,9 @@ int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
         std::string tag, revision;
         int ret = api->GetVersion(tag, revision);
 
-        std::cout << "client: " << GIT_TAG << " " << GIT_REVISION << std::endl;
+        std::cerr << "client: " << GIT_TAG << " " << GIT_REVISION << std::endl;
         if (!ret)
-            std::cout << "server: " << tag << " " << revision << std::endl;
+            std::cerr << "server: " << tag << " " << revision << std::endl;
 
         return EXIT_FAILURE;
     }
