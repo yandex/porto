@@ -377,7 +377,7 @@ TError TTask::ChildMountDev() {
 
 TError TTask::ChildIsolateFs() {
     if (Env->Loop.Exists()) {
-        TLoopMount m(Env->Loop, Env->Root, "ext4");
+        TLoopMount m(Env->Loop, Env->Root, "ext4", Env->LoopDev);
         TError error = m.Mount();
         if (error)
             return error;

@@ -25,6 +25,7 @@ class TContainerHolder {
     bool ValidName(const std::string &name) const;
     TError RestoreId(const kv::TNode &node, uint16_t &id);
     void ScheduleLogRotatation();
+    TError _Destroy(const std::string &name);
 public:
     std::shared_ptr<TEventQueue> Queue;
     int Epfd;

@@ -148,53 +148,78 @@ TError TMountSnapshot::RemountSlave() {
     return TError::Success();
 }
 
-TError TLoopMount::FindDev() {
+TError GetLoopDev(int &nr) {
     int cfd = open("/dev/loop-control", O_RDWR | O_CLOEXEC);
     if (cfd < 0)
         return TError(EError::Unknown, errno, "open(/dev/loop-control)");
 
-    TScopedFd fd;
-    fd = ioctl(cfd, LOOP_CTL_GET_FREE);
-    if (fd.GetFd() < 0) {
+    nr = ioctl(cfd, LOOP_CTL_GET_FREE);
+    if (nr < 0) {
         close(cfd);
         return TError(EError::Unknown, errno, "ioctl(LOOP_CTL_GET_FREE)");
     }
     close(cfd);
 
-    LoopDev = "/dev/loop" + std::to_string(fd.GetFd());
+    return TError::Success();
+}
+
+TError PutLoopDev(const int nr) {
+    TScopedFd cfd, dfd;
+    TError error = TError::Success();
+
+    if (nr < 0)
+        return TError::Success();
+
+    std::string dev = "/dev/loop" + std::to_string(nr);
+
+    cfd = open("/dev/loop-control", O_RDWR | O_CLOEXEC);
+    if (cfd.GetFd() < 0)
+        return TError(EError::Unknown, errno, "open(/dev/loop-control)");
+
+    int ret = ioctl(cfd.GetFd(), LOOP_CTL_REMOVE, nr);
+    if (ret < 0)
+        error = TError(EError::Unknown, errno, "ioctl(/dev/loop-control, LOOP_CTL_GET_FREE)");
+
+    dfd = open(dev.c_str(), O_RDWR);
+    if (dfd.GetFd() >= 0)
+        error = TError(EError::Unknown, errno, "open(" + dev + ")");
+
+    ret = ioctl(dfd.GetFd(), LOOP_CLR_FD, 0);
+    if (ret < 0)
+        error = TError(EError::Unknown, errno, "ioctl(" + std::to_string(dfd.GetFd()) + ", LOOP_CLR_FD)");
 
     return TError::Success();
 }
 
 TError TLoopMount::Mount() {
-    TError error = FindDev();
-    if (error)
-        return error;
+    std::string dev = "/dev/loop" + std::to_string(LoopNr);
 
     TScopedFd ffd, dfd;
     ffd = open(Source.ToString().c_str(), O_RDWR | O_CLOEXEC);
     if (ffd.GetFd() < 0)
         return TError(EError::Unknown, errno, "open(" + Source.ToString() + ")");
 
-    dfd = open(LoopDev.c_str(), O_RDWR);
+    dfd = open(dev.c_str(), O_RDWR);
     if (dfd.GetFd() < 0)
-        return TError(EError::Unknown, errno, "open(" + LoopDev + ")");
+        return TError(EError::Unknown, errno, "open(" + dev + ")");
 
     if (ioctl(dfd.GetFd(), LOOP_SET_FD, ffd.GetFd()) < 0)
         return TError(EError::Unknown, errno, "ioctl(LOOP_SET_FD)");
 
-    TMount m(LoopDev, Target, Type, {});
+    TMount m(dev, Target, Type, {});
     return m.Mount();
 }
 
 TError TLoopMount::Umount() {
-    TMount m(LoopDev, Target, Type, {});
+    std::string dev = "/dev/loop" + std::to_string(LoopNr);
+
+    TMount m(dev, Target, Type, {});
     TError error = m.Umount();
     if (error)
         return error;
 
     TScopedFd fd;
-    fd = open(LoopDev.c_str(), O_RDWR);
+    fd = open(dev.c_str(), O_RDWR);
     if (ioctl(fd.GetFd(), LOOP_CLR_FD, 0) < 0)
         return TError(EError::Unknown, errno, "ioctl(LOOP_CLR_FD)");
 

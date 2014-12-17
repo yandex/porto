@@ -70,12 +70,14 @@ public:
 class TLoopMount {
     TPath Source, Target;
     std::string Type;
-    std::string LoopDev = "";
-    TError FindDev();
+    int LoopNr;
 public:
-    TLoopMount(const TPath &source, const TPath &target, const std::string &type) : Source(source), Target(target), Type(type) {}
+    TLoopMount(const TPath &source, const TPath &target, const std::string &type, const int loopNr) : Source(source), Target(target), Type(type), LoopNr(loopNr) {}
     TError Mount();
     TError Umount();
 };
+
+TError GetLoopDev(int &nr);
+TError PutLoopDev(const int nr);
 
 #endif

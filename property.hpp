@@ -13,6 +13,7 @@
 
 constexpr const char *P_RAW_ROOT_PID = "_root_pid";
 constexpr const char *P_RAW_ID = "_id";
+constexpr const char *P_RAW_LOOP_DEV = "_loop_dev";
 constexpr const char *P_COMMAND = "command";
 constexpr const char *P_USER = "user";
 constexpr const char *P_GROUP = "group";

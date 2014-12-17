@@ -1142,6 +1142,12 @@ public:
     TRootPidProperty() : TIntValue(P_RAW_ROOT_PID, "", HIDDEN_VALUE | PERSISTENT_VALUE, {}) {}
 };
 
+class TLoopDevProperty : public TIntValue {
+public:
+    TLoopDevProperty() : TIntValue(P_RAW_LOOP_DEV, "", HIDDEN_VALUE | PERSISTENT_VALUE, {}) {}
+    int GetDefaultInt(std::shared_ptr<TContainer> c) override { return -1; }
+};
+
 TValueSet propertySet;
 TError RegisterProperties() {
     std::vector<TValue *> properties = {
@@ -1180,6 +1186,7 @@ TError RegisterProperties() {
 
         new TIdProperty,
         new TRootPidProperty,
+        new TLoopDevProperty,
     };
 
     return propertySet.Register(properties);

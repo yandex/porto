@@ -91,6 +91,7 @@ public:
     std::vector<TBindMap> BindMap;
     TNetCfg NetCfg;
     TPath Loop;
+    int LoopDev;
     uint64_t Caps;
     TNlAddr DefaultGw;
     std::map<std::string, TIpMap> IpMap;

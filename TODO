@@ -1,3 +1,4 @@
+- allow to destroy container with children
 - fix stresstest
 - dynamic_ifaces should use netlink for ifup/ifdown events
 - chroot -> pivot_root (to remove all mounts from container)

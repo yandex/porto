@@ -12,7 +12,10 @@
 TContainerHolder::~TContainerHolder() {
     // we want children to be removed first
     while (Containers.begin() != Containers.end()) {
-        Containers.erase(std::prev(Containers.begin()));
+        auto name = Containers.begin()->first;
+        TError error = _Destroy(name);
+        if (error)
+            L_ERR() << "Can't destroy container " << name << ": " << error << std::endl;
     }
 }
 
@@ -190,18 +193,23 @@ TError TContainerHolder::CheckPermission(std::shared_ptr<TContainer> container,
     return TError(EError::Permission, "Permission error");
 }
 
-TError TContainerHolder::Destroy(const std::string &name) {
-    if (name == ROOT_CONTAINER || Containers.find(name) == Containers.end())
-        return TError(EError::InvalidValue, "invalid container name " + name);
-
+TError TContainerHolder::_Destroy(const std::string &name) {
     if (Containers[name]->HasChildren())
         return TError(EError::InvalidState, "container has children");
 
     IdMap.Put(Containers[name]->GetId());
+    Containers[name]->Destroy();
     Containers.erase(name);
     Statistics->Created--;
 
     return TError::Success();
+}
+
+TError TContainerHolder::Destroy(const std::string &name) {
+    if (name == ROOT_CONTAINER || Containers.find(name) == Containers.end())
+        return TError(EError::InvalidValue, "invalid container name " + name);
+
+    return _Destroy(name);
 }
 
 std::vector<std::string> TContainerHolder::List() const {

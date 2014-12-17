@@ -131,7 +131,7 @@ const string TContainer::StripParentName(const string &name) const {
         return string(name.begin() + n + 1, name.end());
 }
 
-TContainer::~TContainer() {
+void TContainer::Destroy() {
     L() << "Destroy " << GetName() << " " << Id << std::endl;
 
     if (GetState() == EContainerState::Paused)
@@ -498,6 +498,7 @@ TError TContainer::PrepareTask() {
     } else {
         taskEnv->Root = GetTmpDir();
         taskEnv->Loop = Prop->GetString(P_ROOT);
+        taskEnv->LoopDev = Prop->GetInt(P_RAW_LOOP_DEV);
     }
 
     taskEnv->RootRdOnly = Prop->GetBool(P_ROOT_RDONLY);
@@ -668,6 +669,22 @@ TError TContainer::Start() {
         return TError::Success();
     }
 
+    TPath root(Prop->GetString(P_ROOT));
+    int loopNr = -1;
+    if (root.GetType() != EFileType::Directory) {
+        error = GetLoopDev(loopNr);
+        if (error)
+            return error;
+    }
+
+    error = Prop->SetInt(P_RAW_LOOP_DEV, loopNr);
+    if (error) {
+        error = PutLoopDev(loopNr);
+        if (error)
+            L_ERR() << "Can't put loop device: " << error << std::endl;
+        return error;
+    }
+
     error = PrepareTask();
     if (error) {
         L_ERR() << "Can't prepare task: " << error << std::endl;
@@ -785,6 +802,15 @@ void TContainer::FreeResources() {
 
     Task = nullptr;
     Efd = -1;
+
+    int loopNr = Prop->GetInt(P_RAW_LOOP_DEV);
+    TError error = Prop->SetInt(P_RAW_LOOP_DEV, -1);
+    if (error)
+        L_ERR() << "Can't set " << P_RAW_LOOP_DEV << ": " << error << std::endl;
+
+    error = PutLoopDev(loopNr);
+    if (error)
+        L_ERR() << "Can't put loop device: " << error << std::endl;
 }
 
 TError TContainer::Stop() {

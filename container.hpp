@@ -101,7 +101,6 @@ public:
                uint16_t id, std::shared_ptr<TNetwork> net) :
         Holder(holder), Name(StripParentName(name)), Parent(parent), Id(id),
         Net(net) { }
-    ~TContainer();
 
     const std::string GetName(bool recursive = true) const;
     const uint16_t GetId() const { return Id; }
@@ -118,6 +117,7 @@ public:
     std::vector<pid_t> Processes();
 
     TError Create(int uid, int gid);
+    void Destroy();
     TError Start();
     TError Stop();
     TError Pause();
