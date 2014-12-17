@@ -60,6 +60,9 @@ public:
     struct nl_cache *GetCache() { return LinkCache; }
 
     TError GetDefaultLink(std::vector<std::string> &links);
+    int GetFd();
+    TError SubscribeToLinkUpdates();
+    void FlushEvents();
 };
 
 class TNlLink {

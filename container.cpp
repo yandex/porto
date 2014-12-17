@@ -191,10 +191,6 @@ bool TContainer::ValidLink(const std::string &name) const {
     return nl->ValidLink(name);
 }
 
-TError TContainer::UpdateLinkCache() {
-    return Net->Update();
-}
-
 std::shared_ptr<TNlLink> TContainer::GetLink(const std::string &name) const {
     for (auto &link : Net->GetLinks())
         if (link->GetAlias() == name)

@@ -375,7 +375,9 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
 }
 
 static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
-                    TContainerHolder &cholder) {
+                    TContainerHolder &cholder,
+                    std::shared_ptr<TNetwork> net,
+                    std::shared_ptr<TNl> netEvt) {
     int ret = 0;
     int sfd;
     std::map<int,ClientInfo> clients;
@@ -411,6 +413,14 @@ static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
     if (error && !failsafe) {
         L_ERR() << "Can't add master fd to epoll: " << error << std::endl;
         return EXIT_FAILURE;
+    }
+
+    if (netEvt) {
+        error = EpollAdd(cholder.Epfd, netEvt->GetFd());
+        if (error) {
+            L_ERR() << "Can't add netlink events fd to epoll: " << error << std::endl;
+            return EXIT_FAILURE;
+        }
     }
 
 #define MAX_EVENTS 32
@@ -471,6 +481,15 @@ static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
                 ret = ReapSpawner(REAP_EVT_FD, cholder);
                 if (done)
                     break;
+            } else if (netEvt && netEvt->GetFd() == ev[i].data.fd) {
+                L() << "Refresh list of available network interfaces" << std::endl;
+                netEvt->FlushEvents();
+
+                TError error = net->Update();
+                if (error) {
+                    L() << "Can't refresh list of network interfaces: " << error << std::endl;
+                    break;
+                }
             } else if (clients.find(ev[i].data.fd) != clients.end()) {
                 auto &ci = clients.at(ev[i].data.fd);
                 bool needClose = false;
@@ -580,7 +599,23 @@ static int SlaveMain() {
             L_ERR() << "Can't create cgroup snapshot: " << error << std::endl;
 
         std::shared_ptr<TNetwork> net = std::make_shared<TNetwork>();
+        std::shared_ptr<TNl> netEvt;
         if (config().network().enabled()) {
+            if (config().network().dynamic_ifaces()) {
+                netEvt = std::make_shared<TNl>();
+                error = netEvt->Connect();
+                if (error) {
+                    L_ERR() << "Can't connect netlink events socket: " << error << std::endl;
+                    return EXIT_FAILURE;
+                }
+
+                error = netEvt->SubscribeToLinkUpdates();
+                if (error) {
+                    L_ERR() << "Can't subscribe netlink socket to events: " << error << std::endl;
+                    return EXIT_FAILURE;
+                }
+            }
+
             TError error = net->Prepare();
             if (error)
                 L_ERR() << "Can't prepare network: " << error << std::endl;
@@ -636,8 +671,11 @@ static int SlaveMain() {
             }
         }
 
-        ret = SlaveRpc(queue, cholder);
+        ret = SlaveRpc(queue, cholder, net, netEvt);
         L() << "Shutting down..." << std::endl;
+
+        if (netEvt)
+            netEvt->Disconnect();
 
         RemoveRpcServer(config().rpc_sock().file().path());
 
@@ -943,11 +981,11 @@ static int MasterMain() {
         size_t next = started + config().container().respawn_delay_ms();
         ret = SpawnSlave(exited);
         L() << "Returned " << ret << std::endl;
-        if (slavePid)
-            (void)kill(slavePid, SIGTERM);
-
         if (!done && next >= GetCurrentTimeMs())
             usleep((next - GetCurrentTimeMs()) * 1000);
+
+        if (slavePid)
+            (void)kill(slavePid, SIGKILL);
     }
 
     DaemonShutdown(true);

@@ -109,7 +109,6 @@ public:
     std::shared_ptr<const TContainer> GetRoot() const;
     std::shared_ptr<const TContainer> GetParent() const;
     bool ValidLink(const std::string &name) const;
-    TError UpdateLinkCache();
     std::shared_ptr<TNlLink> GetLink(const std::string &name) const;
 
     uint64_t GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except = nullptr, uint64_t exceptVal = 0) const;

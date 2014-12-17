@@ -135,6 +135,22 @@ TError TNl::GetDefaultLink(std::vector<std::string> &links) {
     return TError::Success();
 }
 
+int TNl::GetFd() {
+    return nl_socket_get_fd(Sock);
+}
+
+TError TNl::SubscribeToLinkUpdates() {
+    int ret = nl_socket_add_membership(Sock, RTNLGRP_LINK);
+    if (ret < 0)
+        return TError(EError::Unknown, string("Unable to set subscribe to group: ") + nl_geterror(ret));
+
+    return TError::Success();
+}
+
+void TNl::FlushEvents() {
+    nl_recvmsgs_default(Sock);
+}
+
 TNlLink::~TNlLink() {
     if (Link)
         rtnl_link_put(Link);

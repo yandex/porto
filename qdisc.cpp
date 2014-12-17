@@ -230,9 +230,12 @@ TError TNetwork::Update() {
                               });
 
         if (i == Links.end()) {
+            L() << "Found new link: " << link->GetAlias() << std::endl;
             TError error = PrepareLink(link);
             if (error)
                 return error;
+        } else {
+            L() << "Found existing link: " << link->GetAlias() << std::endl;
         }
     }
 
