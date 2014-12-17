@@ -194,11 +194,12 @@ TError TContainerHolder::CheckPermission(std::shared_ptr<TContainer> container,
 }
 
 TError TContainerHolder::_Destroy(const std::string &name) {
-    if (Containers[name]->HasChildren())
-        return TError(EError::InvalidState, "container has children");
+    auto c = Containers[name];
+    for (auto child: c->GetChildren())
+        _Destroy(child);
 
-    IdMap.Put(Containers[name]->GetId());
-    Containers[name]->Destroy();
+    IdMap.Put(c->GetId());
+    c->Destroy();
     Containers.erase(name);
     Statistics->Created--;
 

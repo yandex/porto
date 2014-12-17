@@ -341,9 +341,10 @@ static void TestHolder(TPortoAPI &api) {
     ExpectFailure(api.Create(child), EError::InvalidValue);
     ExpectSuccess(api.Create(parent));
     ExpectSuccess(api.Create(child));
-    ExpectFailure(api.Destroy(parent), EError::InvalidState);
-    ExpectSuccess(api.Destroy(child));
     ExpectSuccess(api.Destroy(parent));
+    string v;
+    ExpectFailure(api.GetData(child, "state", v), EError::ContainerDoesNotExist);
+    ExpectFailure(api.GetData(parent, "state", v), EError::ContainerDoesNotExist);
 
     Say() << "Test hierarchy" << std::endl;
     ExpectSuccess(api.Create("a"));
@@ -377,7 +378,6 @@ static void TestHolder(TPortoAPI &api) {
     ExpectSuccess(api.SetProperty("a/b/c", "command", "sleep 1000"));
 
     ExpectSuccess(api.Start("a/b/c"));
-    string v;
     ExpectSuccess(api.GetData("a/b/c", "state", v));
     Expect(v == "running");
     ExpectSuccess(api.GetData("a/b", "state", v));

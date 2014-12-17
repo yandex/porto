@@ -132,6 +132,7 @@ public:
 
     std::shared_ptr<TCgroup> GetLeafCgroup(std::shared_ptr<TSubsystem> subsys);
     bool CanRemoveDead() const;
+    std::vector<std::string> GetChildren();
     bool HasChildren() const;
     std::shared_ptr<TContainer> FindRunningParent() const;
     bool UseParentNamespace() const;

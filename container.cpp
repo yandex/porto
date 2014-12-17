@@ -1323,6 +1323,16 @@ bool TContainer::HasChildren() const {
     return shared_from_this().use_count() > 2;
 }
 
+std::vector<std::string> TContainer::GetChildren() {
+    std::vector<std::string> vec;
+
+    for (auto weakChild : Children)
+        if (auto child = weakChild.lock())
+            vec.push_back(child->GetName());
+
+    return vec;
+}
+
 bool TContainer::DeliverOom(int fd) {
     if (Efd.GetFd() != fd)
         return false;
