@@ -29,6 +29,8 @@ const unsigned int NODEF_VALUE = (1 << 31);
 const unsigned int HIDDEN_VALUE = (1 << 30);
 // Value should be preserved upon recovery
 const unsigned int PERSISTENT_VALUE = (1 << 29);
+// Uint value can include options G/M/K suffix
+const unsigned int UINT_UNIT_VALUE = (1 << 28);
 
 class TVariant {
     NO_COPY_CONSTRUCT(TVariant);

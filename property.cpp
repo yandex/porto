@@ -353,7 +353,7 @@ public:
     TMemoryGuaranteeProperty() :
         TUintValue(P_MEM_GUARANTEE,
                    "Guaranteed amount of memory",
-                   PARENT_RO_PROPERTY | PERSISTENT_VALUE,
+                   PARENT_RO_PROPERTY | PERSISTENT_VALUE | UINT_UNIT_VALUE,
                    dynamicProperty) {}
 
     TError ParseUint(std::shared_ptr<TContainer> c,
@@ -380,7 +380,7 @@ public:
     TMemoryLimitProperty() :
         TUintValue(P_MEM_LIMIT,
                    "Memory hard limit",
-                   PERSISTENT_VALUE,
+                   PERSISTENT_VALUE | UINT_UNIT_VALUE,
                    dynamicProperty) {}
 
     TError ParseUint(std::shared_ptr<TContainer> c,

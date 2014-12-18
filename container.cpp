@@ -952,22 +952,8 @@ TError TContainer::AliasToProperty(string &property, string &value) {
             }
         } else if (property == "memory.limit_in_bytes") {
             property = P_MEM_LIMIT;
-            uint64_t n;
-
-            TError error = StringWithUnitToUint64(value, n);
-            if (error)
-                return error;
-
-            value = std::to_string(n);
         } else if (property == "memory.low_limit_in_bytes") {
             property = P_MEM_GUARANTEE;
-            uint64_t n;
-
-            TError error = StringWithUnitToUint64(value, n);
-            if (error)
-                return error;
-
-            value = std::to_string(n);
         } else if (property == "memory.recharge_on_pgfault") {
             property = P_RECHARGE_ON_PGFAULT;
             value = value == "0" ? "false" : "true";

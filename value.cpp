@@ -108,7 +108,12 @@ TError TUintValue::SetString(std::shared_ptr<TContainer> c,
                              std::shared_ptr<TVariant> v,
                              const std::string &value) {
     uint64_t tmp;
-    TError error = StringToUint64(value, tmp);
+    TError error;
+
+    if (Flags & UINT_UNIT_VALUE)
+        error = StringWithUnitToUint64(value, tmp);
+    else
+        error = StringToUint64(value, tmp);
     if (error)
         return TError(EError::InvalidValue, "Invalid unsigned integer value " + value);
 

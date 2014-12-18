@@ -1,4 +1,4 @@
-- memory_limit accept M, G
+- remove net_guarantee/net_limit
 - chroot -> pivot_root (to remove all mounts from container)
 - ? porto returns running when no cgroup exists
 - ? create cgroup for portod/portod-slave
@@ -16,10 +16,6 @@
 - ? ro+rw images for container distribution
 - ? enable user namespace
 ## net
-- L3 configuration via properties (ip/mask/broadcast/routes)
-  net_default_gw = <gateway>
-- net: bridge to create veth pair, then add side A to the specified bridge and
-  side B to the container net: veth <name in container> <bridge> <addr>/<prefix>
 - ? net_prio 0-7 -> 0-99
 ## cpu
 - rt: create cgroup for non-smart tasks and throttle them

@@ -2257,6 +2257,11 @@ static void TestLimits(TPortoAPI &api) {
     string exp_limit = "524288";
     string exp_guar = "16384";
     ExpectSuccess(api.SetProperty(name, "command", "sleep 1000"));
+
+    ExpectSuccess(api.SetProperty(name, "memory_limit", "1g"));
+    ExpectSuccess(api.GetProperty(name, "memory_limit", current));
+    Expect(current == "1073741824");
+
     ExpectSuccess(api.SetProperty(name, "memory_limit", exp_limit));
     if (HaveCgKnob("memory", "memory.low_limit_in_bytes"))
         ExpectSuccess(api.SetProperty(name, "memory_guarantee", exp_guar));
