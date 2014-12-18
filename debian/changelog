@@ -1,3 +1,9 @@
+yandex-porto (0.27) precise; urgency=low
+
+  * Fix version
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Thu, 18 Dec 2014 21:03:00 +0400
+
 yandex-porto (0.26) precise; urgency=low
 
   * Destroy child containers when parent is destroyed
