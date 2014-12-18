@@ -101,10 +101,14 @@ prepare() {
 	pctl destroy $CONTAINER
 }
 
+mktar() {
+	(cd $(dirname ${IMAGE}) && ln ${IMAGE} image.img && tar cSf ${IMAGE}.tar image.img; rm image.img)
+}
+
 pctl destroy $CONTAINER || :
 allocate_image $IMAGE $SIZE
 IMAGE=$(realpath $IMAGE)
 bootstrap $IMAGE $CONF
 prepare $IMAGE $CONF $CHECK
-[ $TAR -eq 0 ] || (cd $(dirname ${IMAGE}) && tar cSf ${IMAGE}.tar $(basename $IMAGE))
+[ $TAR -eq 0 ] || mktar $IMAGE
 [ $CLEANUP -eq 0 ] || rm $IMAGE
