@@ -1,3 +1,4 @@
+- memory_limit accept M, G
 - chroot -> pivot_root (to remove all mounts from container)
 - ? porto returns running when no cgroup exists
 - ? create cgroup for portod/portod-slave

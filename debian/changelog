@@ -1,3 +1,24 @@
+yandex-porto (0.26) precise; urgency=low
+
+  * Destroy child containers when parent is destroyed
+  * Fix child mounts when isolate=false
+  * Fix possible invalid state detection after recovery
+  * Make root_readonly work even if root is not specified
+  * Support dynamic network interfaces (off by default)
+  * Support privileged users in config
+  * Don't restrict /proc/sys for privileged containers
+  * Fix bind for sockets/devices/etc
+  * debian: start after yandex-network is configured
+  * net: generate default mac based on hostname
+  * net: add mtu support
+  * net: veth support mac address
+  * portoctl: fix wrong terminal size when doing exec
+  * portoctl: humanify properties in top
+  * portoctl: handle signals in portoctl exec
+  * portoctl: print help to stderr
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Thu, 18 Dec 2014 20:39:00 +0400
+
 yandex-porto (0.25) precise; urgency=low
 
   * upstart: fix possible race with cgroup-bin
