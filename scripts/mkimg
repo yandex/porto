@@ -106,5 +106,5 @@ allocate_image $IMAGE $SIZE
 IMAGE=$(realpath $IMAGE)
 bootstrap $IMAGE $CONF
 prepare $IMAGE $CONF $CHECK
-[ $TAR -eq 0 ] || tar cSf ${IMAGE}.tar $IMAGE
+[ $TAR -eq 0 ] || (cd $(dirname ${IMAGE}) && tar cSf ${IMAGE}.tar $(basename $IMAGE))
 [ $CLEANUP -eq 0 ] || rm $IMAGE
