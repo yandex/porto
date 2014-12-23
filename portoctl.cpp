@@ -11,10 +11,13 @@
 #include "util/unix.hpp"
 #include "util/namespace.hpp"
 #include "util/file.hpp"
+#include "util/folder.hpp"
+#include "util/log.hpp"
 
 extern "C" {
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <wordexp.h>
@@ -708,11 +711,17 @@ static string destroyContainerName;
 static void resetInputMode(void) {
   tcsetattr (STDIN_FILENO, TCSANOW, &savedAttrs);
 }
+
 static void destroyContainer(void) {
     if (destroyContainerName != "") {
         TPortoAPI api(config().rpc_sock().file().path());
         (void)api.Destroy(destroyContainerName);
     }
+}
+
+static void removeTempDir(int status, void *p) {
+    TFolder f((char *)p);
+    (void)f.Remove(true);
 }
 
 class TExecCmd : public ICmd {
@@ -748,6 +757,26 @@ public:
                 std::cerr << "Partial write to " << to << std::endl;
     }
 
+    int MakeFifo(const std::string &path) {
+        if (mkfifo(path.c_str(), 0755) < 0) {
+            TError error(EError::Unknown, errno, "mkfifo()");
+            PrintError(error, "Can't create temporary file " + path);
+            return EXIT_FAILURE;
+        }
+
+        return EXIT_SUCCESS;
+    }
+
+    int OpenTemp(const std::string &path, int flags) {
+        int fd = open(path.c_str(), flags);
+        if (fd < 0) {
+            TError error(EError::Unknown, errno, "open()");
+            PrintError(error, "Can't open temporary file " + path);
+        }
+
+        return fd;
+    }
+
     int Execute(int argc, char *argv[]) {
         containerName = argv[0];
         bool hasTty = isatty(STDIN_FILENO);
@@ -763,46 +792,105 @@ public:
             else
                 args.push_back(argv[i]);
 
-        int ptm = posix_openpt(O_RDWR);
-        if (ptm < 0) {
-            TError error(EError::Unknown, errno, "posix_openpt()");
-            PrintError(error, "Can't open pseudoterminal");
-            return EXIT_FAILURE;
-        }
+        vector<struct pollfd> fds;
+
+        struct pollfd pfd = {};
+        pfd.fd = STDIN_FILENO;
+        pfd.events = POLLIN;
+        fds.push_back(pfd);
+
+        string stdinPath, stdoutPath, stderrPath;
+        int stdinFd, stdoutFd, stderrFd;
 
         if (hasTty) {
+            int ptm = posix_openpt(O_RDWR);
+            if (ptm < 0) {
+                TError error(EError::Unknown, errno, "posix_openpt()");
+                PrintError(error, "Can't open pseudoterminal");
+                return EXIT_FAILURE;
+            }
+
             struct winsize ws;
             if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) == 0)
                 (void)ioctl(ptm, TIOCSWINSZ, &ws);
+
+            if (grantpt(ptm) < 0) {
+                TError error(EError::Unknown, errno, "grantpt()");
+                PrintError(error, "Can't open pseudoterminal");
+                return EXIT_FAILURE;
+            }
+
+            if (unlockpt(ptm) < 0) {
+                TError error(EError::Unknown, errno, "unlockpt()");
+                PrintError(error, "Can't open pseudoterminal");
+                return EXIT_FAILURE;
+            }
+
+            char *slavept = ptsname(ptm);
+
+            if (SwithToNonCanonical(STDIN_FILENO) < 0) {
+                TError error(EError::Unknown, errno, "SwithToNonCanonical()");
+                PrintError(error, "Can't open pseudoterminal");
+                return EXIT_FAILURE;
+            }
+
+            pfd.fd = ptm;
+            pfd.events = POLLIN | POLLHUP;
+            fds.push_back(pfd);
+
+            stdinPath = slavept;
+            stdoutPath = slavept;
+            stderrPath = slavept;
+
+            stdinFd = ptm;
+            stdoutFd = ptm;
+            stderrFd = ptm;
+        } else {
+            char *dir = mkdtemp(strdup("/tmp/portoctl-XXXXXX"));
+            if (!dir) {
+                TError error(EError::Unknown, errno, "mkdtemp()");
+                PrintError(error, "Can't create temporary directory");
+                return EXIT_FAILURE;
+            }
+
+            on_exit(removeTempDir, dir);
+
+            stdinPath = string(dir) + "/stdin";
+            if (MakeFifo(stdinPath))
+                return EXIT_FAILURE;
+
+            stdoutPath = string(dir) + "/stdout";
+            if (MakeFifo(stdoutPath))
+                return EXIT_FAILURE;
+
+            stderrPath = string(dir) + "/stderr";
+            if (MakeFifo(stderrPath))
+                return EXIT_FAILURE;
+
+            stdinFd = OpenTemp(stdinPath, O_RDWR | O_NONBLOCK);
+            if (stdinFd < 0)
+                return EXIT_FAILURE;
+
+            stdoutFd = OpenTemp(stdoutPath, O_RDONLY | O_NONBLOCK);
+            if (stdoutFd < 0)
+                return EXIT_FAILURE;
+
+            stderrFd = OpenTemp(stderrPath, O_RDONLY | O_NONBLOCK);
+            if (stderrFd < 0)
+                return EXIT_FAILURE;
+
+            pfd.fd = stdoutFd;
+            pfd.events = POLLIN | POLLHUP;
+            fds.push_back(pfd);
+
+            pfd.fd = stderrFd;
+            pfd.events = POLLIN | POLLHUP;
+            fds.push_back(pfd);
         }
 
-        if (grantpt(ptm) < 0) {
-            TError error(EError::Unknown, errno, "grantpt()");
-            PrintError(error, "Can't open pseudoterminal");
-            return EXIT_FAILURE;
-        }
-
-        if (unlockpt(ptm) < 0) {
-            TError error(EError::Unknown, errno, "unlockpt()");
-            PrintError(error, "Can't open pseudoterminal");
-            return EXIT_FAILURE;
-        }
-
-        char *slavept = ptsname(ptm);
-
-        if (SwithToNonCanonical(STDIN_FILENO) < 0) {
-            TError error(EError::Unknown, errno, "SwithToNonCanonical()");
-            PrintError(error, "Can't open pseudoterminal");
-            return EXIT_FAILURE;
-        }
-
-        string stdinPath = string("stdin_path=") + slavept;
-        string stdoutPath = string("stdout_path=") + slavept;
-        string stderrPath = string("stderr_path=") + slavept;
-
-        args.push_back(stdinPath.c_str());
-        args.push_back(stdoutPath.c_str());
-        args.push_back(stderrPath.c_str());
+        args.push_back(strdup(("stdin_path=" + stdinPath).c_str()));
+        args.push_back(strdup(("stdout_path=" + stdoutPath).c_str()));
+        args.push_back(strdup(("stderr_path=" + stderrPath).c_str()));
         if (env.length()) {
             env = "env=" + env;
             args.push_back(env.c_str());
@@ -816,21 +904,8 @@ public:
         destroyContainerName = containerName;
         atexit(destroyContainer);
 
-        vector<struct pollfd> fds;
-
         bool hangup = false;
         while (!hangup) {
-            struct pollfd pfd = {};
-            fds.clear();
-
-            pfd.fd = STDIN_FILENO;
-            pfd.events = POLLIN | POLLHUP;
-            fds.push_back(pfd);
-
-            pfd.fd = ptm;
-            pfd.events = POLLIN | POLLHUP;
-            fds.push_back(pfd);
-
             ret = poll(fds.data(), fds.size(), -1);
             if (ret < 0)
                 break;
@@ -842,10 +917,12 @@ public:
                 if (!(fds[i].revents & POLLIN))
                     continue;
 
-                if (fds[i].fd == STDIN_FILENO)
-                    MoveData(STDIN_FILENO, ptm);
-                else if (fds[i].fd == ptm)
-                    MoveData(ptm, STDOUT_FILENO);
+                if (i == 0)
+                    MoveData(STDIN_FILENO, stdinFd);
+                else if (i == 1)
+                    MoveData(stdoutFd, STDOUT_FILENO);
+                else if (i == 2)
+                    MoveData(stderrFd, STDERR_FILENO);
             }
         }
 
@@ -1096,6 +1173,8 @@ int main(int argc, char *argv[]) {
     RegisterCommand(new TEnterCmd(&api));
     RegisterCommand(new TRunCmd(&api));
     RegisterCommand(new TExecCmd(&api));
+
+    TLogger::DisableLog();
 
     return HandleCommand(&api, argc, argv);
 };
