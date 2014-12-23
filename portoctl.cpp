@@ -772,10 +772,8 @@ public:
 
         if (hasTty) {
             struct winsize ws;
-            if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) < 0)
-                memset(&ws, 0, sizeof(ws));
-
-            (void)ioctl(ptm, TIOCSWINSZ, &ws);
+            if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) == 0)
+                (void)ioctl(ptm, TIOCSWINSZ, &ws);
         }
 
         if (grantpt(ptm) < 0) {
