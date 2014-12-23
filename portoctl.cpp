@@ -805,9 +805,10 @@ public:
         args.push_back(stdinPath.c_str());
         args.push_back(stdoutPath.c_str());
         args.push_back(stderrPath.c_str());
-        env = "env=" + env;
-        if (env.length())
+        if (env.length()) {
+            env = "env=" + env;
             args.push_back(env.c_str());
+        }
 
         auto *run = new TRunCmd(Api);
         int ret = run->Execute(args.size(), (char **)args.data());
