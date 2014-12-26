@@ -135,11 +135,22 @@ TError TKeyValueStorage::MountTmpfs() {
         return error;
     }
 
-    for (auto m : mounts)
-        if (m->GetMountpoint() == Tmpfs.GetMountpoint())
-            return TError::Success();
-
     TFolder dir(Tmpfs.GetMountpoint());
+    for (auto m : mounts)
+        if (m->GetMountpoint() == Tmpfs.GetMountpoint()) {
+            // FIXME: remove when all users are updated to this version
+            // make sure permissions of existing directory are correct
+            error = dir.GetPath().Chmod(config().keyval().file().perm());
+            if (!error && dir.GetPath() == "/run/porto/kvs") {
+                TFolder dir("/run/porto");
+                error = dir.GetPath().Chmod(config().keyval().file().perm());
+            }
+            if (error)
+                L_ERR() << error << ": can't change permissions of " << dir.GetPath().ToString() << std::endl;
+
+            return TError::Success();
+        }
+
     if (!dir.Exists()) {
         error = dir.Create(config().keyval().file().perm(), true);
         if (error) {

@@ -39,7 +39,7 @@ void TConfig::LoadDefaults() {
     config().mutable_log()->set_verbose(false);
 
     config().mutable_keyval()->mutable_file()->set_path("/run/porto/kvs");
-    config().mutable_keyval()->mutable_file()->set_perm(0640);
+    config().mutable_keyval()->mutable_file()->set_perm(0755);
     config().mutable_keyval()->set_size("size=32m");
 
     config().mutable_daemon()->set_max_clients(128);
