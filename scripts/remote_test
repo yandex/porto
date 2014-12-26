@@ -1,0 +1,17 @@
+#!/bin/sh
+
+set -e
+set -x
+
+ROOTDIR=$(cd $(dirname $0)/../ && pwd)
+HOST=${HOST:-lxc-test0}
+
+run() { ssh -t "$HOST" sudo -i "bash -c \"$@\""; }
+
+rsync -av $ROOTDIR ${HOST}:src
+run "ln -sf /home/$USER/src/porto/portod /usr/sbin"
+run "ln -sf /home/$USER/src/porto/portoctl /usr/sbin"
+run "ln -sf /home/$USER/src/porto/portotest /usr/sbin"
+run "reload yandex-porto"
+sleep 5
+run "/home/$USER/src/porto/scripts/test $@"
