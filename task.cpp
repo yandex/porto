@@ -480,6 +480,10 @@ TError TTask::EnableNet() {
         if (error)
             return error;
 
+        error = link->Up();
+        if (error)
+            return error;
+
         if (Env->IpMap.find(dev) != Env->IpMap.end()) {
             auto ip = Env->IpMap[dev];
 
@@ -489,10 +493,6 @@ TError TTask::EnableNet() {
                     return error;
             }
         }
-
-        error = link->Up();
-        if (error)
-            return error;
 
         if (!gw && !link->IsLoopback())
             gw = link;
