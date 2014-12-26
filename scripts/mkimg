@@ -4,22 +4,25 @@ set -e
 
 BINARY=$(basename $0)
 usage() {
-	echo "Usage: $BINARY [-v] <size> <image> <config>"
+	echo "Usage: $BINARY [options] <size> <image> <config>"
 	echo "Options:"
 	echo -e "\t-T\tDon't create tar archive"
 	echo -e "\t-c\tExecute check hook"
 	echo -e "\t-d\tRemove image after build (dry-run)"
 	echo -e "\t-v\tShow underlying portoctl commands"
+	echo -e "\t-C\tDon't destroy porto containers on failure (for debugging)"
 	exit 1
 	exit 1
 }
 
-set -- `getopt c:dTvh $*`
-[ ! $? -eq 0 ] && usage
+OPTS="c:dCTvh"
+getopt -Qq $OPTS $* || usage
+set -- $(getopt $OPTS $*)
 
 CHECK=
 TAR=1
 VERBOSE=0
+DRYRUN=0
 CLEANUP=0
 while [ ! "$1" = "--" ]; do
 	case "$1" in
@@ -27,8 +30,11 @@ while [ ! "$1" = "--" ]; do
 		CHECK=$2
 		shift
 		;;
-	-d)
+	-C)
 		CLEANUP=1
+		;;
+	-d)
+		DRYRUN=1
 		;;
 	-T)
 		TAR=0
@@ -53,7 +59,18 @@ ALLOWED_DEVICES="c 1:3 rwm; c 1:5 rwm; c 1:7 rwm; c 1:9 rwm; c 1:8 rwm; c 136:* 
 
 chmod +x $CONF
 
+IFACE=eth1
+
 say() { tput setaf 3; echo "$@"; tput sgr0; }
+
+TMPDIR=$(mktemp -d)
+cleanup() {
+	#sudo iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE || :
+	[ ! -d $TMPDIR ] || { umount $TMPDIR || :; rmdir $TMPDIR ||:; }
+	[ $CLEANUP -eq 0 ] && pctl destroy $CONTAINER || :
+}
+
+trap cleanup EXIT
 
 pctl() {
 	[ $VERBOSE -eq 0 ] || say portoctl "$@"
@@ -64,7 +81,7 @@ allocate_image() {
 	local image=$1
 	local size=$2
 
-	fallocate -l $size $image
+	fallocate -l $size $image || dd if=/dev/zero of=$image bs=1 count=1 seek=$size
 	mkfs.ext4 -F -F $image
 }
 
@@ -72,13 +89,11 @@ bootstrap() {
 	local image=$1
 	local conf=$2
 
-	local tmpdir=$(mktemp -d)
-	pctl exec $CONTAINER command="bash -c 'mount $image $tmpdir && $conf bootstrap $tmpdir; ret=\$?; umount $image; exit \$ret'" user=root group=root bind_dns=false env="DEBIAN_FRONTEND=noninteractive" #root_readonly=true debootsrap chroot fails
-	rmdir $tmpdir
+	pctl exec $CONTAINER command="bash -c 'mount $image $TMPDIR && $conf bootstrap $TMPDIR'" user=root group=root bind_dns=false env="DEBIAN_FRONTEND=noninteractive" #root_readonly=true debootsrap chroot fails
 }
 
 check() {
-	pctl exec ${CONTAINER}/check command="/bin/bash -c 'mkdir /src && /config check /host_porto /src'" isolate="false" user=root group=root
+	pctl exec ${CONTAINER}/check command="/bin/bash -c 'mkdir /src && /config check /host_porto /src'" isolate="false" user=root group=root env="DEBIAN_FRONTEND=noninteractive"
 }
 
 prepare() {
@@ -91,14 +106,21 @@ prepare() {
 	local bind_porto=""
 	[ -z "$porto" ] || bind_porto="$porto /host_porto ro"
 
-	pctl run $CONTAINER command="/sbin/init" root="$image" hostname="$CONTAINER" user=root group=root bind="$conf /config ro; $bind_selinux; $bind_porto" bind_dns=false allowed_devices="$ALLOWED_DEVICES"
+	sudo sysctl net.ipv4.ip_forward=1
+	sudo ip link delete veth0 || :
+	sudo ip link add veth0 type veth peer name veth1
+	# TODO DODODOOD FIXME
+	sudo ifconfig veth0 192.168.1.2/24 up
+
+	sudo iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE || :
+	sudo iptables -t nat -A POSTROUTING -o $IFACE -j MASQUERADE
+
+	pctl run $CONTAINER command="/sbin/init" root="$image" hostname="$CONTAINER" user=root group=root bind="$conf /config ro; $bind_selinux; $bind_porto; /sys/fs/cgroup /sys/fs/cgroup ro" bind_dns=false allowed_devices="$ALLOWED_DEVICES" net="host veth1" default_gw="192.168.1.2" ip="veth1 192.168.1.1/24"
 
 	pctl exec ${CONTAINER}/prepare command="bash -c '/config prepare'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
 	pctl exec ${CONTAINER}/sync command="bash -c 'sync'" isolate="false" user=root group=root env=" DEBIAN_FRONTEND=noninteractive"
 
 	[ -z "$CHECK" ] || check
-
-	pctl destroy $CONTAINER
 }
 
 pctl destroy $CONTAINER || :
@@ -107,4 +129,4 @@ IMAGE=$(realpath $IMAGE)
 bootstrap $IMAGE $CONF
 prepare $IMAGE $CONF $CHECK
 [ $TAR -eq 0 ] || (cd $(dirname ${IMAGE}) && tar cSf ${IMAGE}.tar $(basename $IMAGE))
-[ $CLEANUP -eq 0 ] || rm $IMAGE
+[ $DRYRUN -eq 0 ] || rm $IMAGE

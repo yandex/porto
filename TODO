@@ -1,3 +1,5 @@
+- make sure mkimg prints details in sandbox
+- portoctl lxc
 - remove net_guarantee/net_limit
 - chroot -> pivot_root (to remove all mounts from container)
 - ? porto returns running when no cgroup exists

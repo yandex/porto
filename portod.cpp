@@ -649,7 +649,7 @@ static int SlaveMain() {
                 restored = true;
                 error = cholder.Restore(r.first, r.second);
                 if (error) {
-                    L_ERR() << "Can't restore " << r.first << "state : " << error << std::endl;
+                    L_ERR() << "Can't restore " << r.first << " state : " << error << std::endl;
                     Statistics->RestoreFailed++;
                 }
             }

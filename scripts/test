@@ -2,29 +2,37 @@
 
 set -e
 
-HOST=vm
+ROOTDIR=$(cd $(dirname $0)/../ && pwd)
 
-run() { ssh -t "$HOST" sudo -i "bash -c \"$@\""; }
 say() { tput setaf 3; echo "$@"; tput sgr0; }
 
 selftest() {
 	say "Network: $1"
-	run "echo 'network { enabled: $1 dynamic_ifaces: false } container { use_hierarchy: true }' > /etc/portod.conf"
-	run portotest
+	echo "network { enabled: $1 dynamic_ifaces: false } container { use_hierarchy: true }" > /etc/portod.conf
+	portotest
 }
 
 stresstest() {
 	say "Stress"
-	run portotest stress
+	portotest stress
+}
+
+pkgtest() {
+	for f in $ROOTDIR/dist/*.conf; do
+		$ROOTDIR/scripts/mkimg 5G ${f}.img $f -vT -c $ROOTDIR -C
+	done
 }
 
 tests="$@"
 if [ -z "$tests" ]; then
-	tests="false true"
+	tests="false true stress pkg"
 fi
 
 for t in $tests; do
-	selftest $t
+	case $t in
+		true|false) selftest $t ;;
+		stress) stresstest ;;
+		pkg) pkgtest ;;
+		*) say "Invalid test $t"; exit 1 ;;
+	esac
 done
-
-stresstest
