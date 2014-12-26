@@ -140,6 +140,14 @@ TError TPath::Chown(const std::string &user, const std::string &group) const {
     return TError::Success();
 }
 
+TError TPath::Chmod(const int mode) const {
+    int ret = chmod(Path.c_str(), mode);
+    if (ret)
+        return TError(EError::Unknown, errno, "chmod(" + Path + ", " + std::to_string(mode) + ")");
+
+    return TError::Success();
+}
+
 TError TPath::ReadLink(TPath &value) const {
     char buf[PATH_MAX];
     ssize_t len;
@@ -153,4 +161,3 @@ TError TPath::ReadLink(TPath &value) const {
     value = TPath(buf);
     return TError::Success();
 }
-

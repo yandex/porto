@@ -53,6 +53,7 @@ public:
     TError Chdir() const;
     TError Chroot() const;
     TError Chown(const std::string &user, const std::string &group) const;
+    TError Chmod(const int mode) const;
     TError ReadLink(TPath &value) const;
 };
 
