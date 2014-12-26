@@ -1231,13 +1231,13 @@ static void TestRootProperty(TPortoAPI &api) {
     v = StartWaitAndGetData(api, name, "stdout");
 
     auto m = ParseMountinfo(v);
-    Expect(m["/etc/resolv.conf"] == "ro,relatime");
-    Expect(m["/etc/hosts"] == "ro,relatime");
-    Expect(m["/sys"] == "ro,nosuid,nodev,noexec,relatime");
-    Expect(m["/proc/sys"] == "ro,relatime");
-    Expect(m["/proc/sysrq-trigger"] == "ro,relatime");
-    Expect(m["/proc/irq"] == "ro,relatime");
-    Expect(m["/proc/bus"] == "ro,relatime");
+    Expect(m["/etc/resolv.conf"].find("ro,") != string::npos);
+    Expect(m["/etc/hosts"].find("ro,") != string::npos);
+    Expect(m["/sys"].find("ro,") != string::npos);
+    Expect(m["/proc/sys"].find("ro,") != string::npos);
+    Expect(m["/proc/sysrq-trigger"].find("ro,") != string::npos);
+    Expect(m["/proc/irq"].find("ro,") != string::npos);
+    Expect(m["/proc/bus"].find("ro,") != string::npos);
 
     ExpectSuccess(api.Stop(name));
 
@@ -1377,8 +1377,8 @@ static void TestBindProperty(TPortoAPI &api) {
     string v = StartWaitAndGetData(api, name, "stdout");
     auto m = ParseMountinfo(v);
 
-    Expect(m[path + "/bin"] == "ro,relatime");
-    Expect(m[path + "/tmp"] == "rw,relatime" || m["/tmp"] == "rw");
+    Expect(m[path + "/bin"].find("ro,") != string::npos);
+    Expect(m[path + "/tmp"].find("rw,") != string::npos);
     ExpectSuccess(api.Stop(name));
 
     path = TMPDIR + "/" + name;
@@ -1393,9 +1393,9 @@ static void TestBindProperty(TPortoAPI &api) {
     ExpectSuccess(api.SetProperty(name, "bind", "/bin /bin ro; /tmp/27389 /tmp"));
     v = StartWaitAndGetData(api, name, "stdout");
     m = ParseMountinfo(v);
-    Expect(m["/"] == "rw,relatime");
-    Expect(m["/bin"] == "ro,relatime");
-    Expect(m["/tmp"] == "rw,relatime" || m["/tmp"] == "rw");
+    Expect(m["/"].find("rw,") != string::npos);
+    Expect(m["/bin"].find("ro,") != string::npos);
+    Expect(m["/tmp"].find("rw,") != string::npos);
     ExpectSuccess(api.Stop(name));
 
     ExpectSuccess(api.Destroy(name));
