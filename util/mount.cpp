@@ -160,6 +160,8 @@ TError GetLoopDev(int &nr) {
     }
     close(cfd);
 
+    L() << "Loop device allocate " << nr << std::endl;
+
     return TError::Success();
 }
 
@@ -187,6 +189,8 @@ TError PutLoopDev(const int nr) {
     ret = ioctl(dfd.GetFd(), LOOP_CLR_FD, 0);
     if (ret < 0)
         error = TError(EError::Unknown, errno, "ioctl(" + std::to_string(dfd.GetFd()) + ", LOOP_CLR_FD)");
+
+    L() << "Loop device free " << nr << std::endl;
 
     return TError::Success();
 }
