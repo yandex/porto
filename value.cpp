@@ -288,7 +288,7 @@ TError TVariantSet::Restore(const kv::TNode &node) {
 
         TError error = SetString(key, value);
         if (error)
-            return error;
+            L_ERR() << error << ": Can't restore " << key << ", skipped" << std::endl;
     }
 
     return TError::Success();
