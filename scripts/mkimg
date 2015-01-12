@@ -130,7 +130,6 @@ prepare() {
 	[ -z "$custom" ] || pctl exec ${CONTAINER}/prepare command="bash -c '/custom_config'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
 	pctl exec ${CONTAINER}/prepare command="bash -c '/config cleanup'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
 	pctl exec ${CONTAINER}/sync command="bash -c 'sync'" isolate="false" user=root group=root env=" DEBIAN_FRONTEND=noninteractive"
-
 }
 
 pctl destroy $CONTAINER || :

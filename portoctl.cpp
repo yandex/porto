@@ -835,7 +835,7 @@ public:
             }
 
             pfd.fd = ptm;
-            pfd.events = POLLIN | POLLHUP;
+            pfd.events = POLLIN;
             fds.push_back(pfd);
 
             stdinPath = slavept;
@@ -880,11 +880,11 @@ public:
                 return EXIT_FAILURE;
 
             pfd.fd = stdoutFd;
-            pfd.events = POLLIN | POLLHUP;
+            pfd.events = POLLIN;
             fds.push_back(pfd);
 
             pfd.fd = stderrFd;
-            pfd.events = POLLIN | POLLHUP;
+            pfd.events = POLLIN;
             fds.push_back(pfd);
         }
 
@@ -911,7 +911,7 @@ public:
                 break;
 
             for (size_t i = 0; i < fds.size(); i++) {
-                if (fds[i].revents & POLLHUP)
+                if (fds[i].fd != STDIN_FILENO && fds[i].revents & POLLHUP)
                     hangup = true;
 
                 if (!(fds[i].revents & POLLIN))
