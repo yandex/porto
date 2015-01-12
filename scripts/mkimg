@@ -81,7 +81,7 @@ pctl() {
 	portoctl "$@"
 }
 
-pexec() { pctl exec $CONTAINER command="/bin/bash -c '$*'" user="root" group="root"; }
+pexec() { pctl exec ${CONTAINER}-sudo command="/bin/bash -c '$*'" user="root" group="root"; }
 
 allocate_image() {
 	local image=$1
@@ -116,8 +116,8 @@ prepare() {
 	pexec sysctl net.ipv4.ip_forward=1
 	pexec ip link delete veth0 || :
 	pexec ip link add veth0 type veth peer name veth1
-	# TODO DODODOOD FIXME
-	pexec ifconfig veth0 192.168.1.2/24 up
+	pexec ip link set veth0 up
+	pexec ip addr add 192.168.1.2/24 dev veth0
 
 	pexec iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE || :
 	pexec iptables -t nat -A POSTROUTING -o $IFACE -j MASQUERADE
