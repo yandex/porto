@@ -69,7 +69,7 @@ say() { tput setaf 3; echo "$@"; tput sgr0; }
 
 TMPDIR=$(mktemp -d)
 cleanup() {
-	sudo iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE || :
+	pexec iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE || :
 	[ ! -d $TMPDIR ] || { umount $TMPDIR || :; rmdir $TMPDIR ||:; }
 	[ $CLEANUP -eq 0 ] && pctl destroy $CONTAINER || :
 }
@@ -80,6 +80,8 @@ pctl() {
 	[ $VERBOSE -eq 0 ] || say portoctl "$@"
 	portoctl "$@"
 }
+
+pexec() { pctl exec $CONTAINER command="/bin/bash -c '$*'" user="root" group="root"; }
 
 allocate_image() {
 	local image=$1
@@ -111,15 +113,14 @@ prepare() {
 	local conf=$2
 	local custom=$3
 
-	# TODO remove sudo
-	sudo sysctl net.ipv4.ip_forward=1
-	sudo ip link delete veth0 || :
-	sudo ip link add veth0 type veth peer name veth1
+	pexec sysctl net.ipv4.ip_forward=1
+	pexec ip link delete veth0 || :
+	pexec ip link add veth0 type veth peer name veth1
 	# TODO DODODOOD FIXME
-	sudo ifconfig veth0 192.168.1.2/24 up
+	pexec ifconfig veth0 192.168.1.2/24 up
 
-	sudo iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE || :
-	sudo iptables -t nat -A POSTROUTING -o $IFACE -j MASQUERADE
+	pexec iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE || :
+	pexec iptables -t nat -A POSTROUTING -o $IFACE -j MASQUERADE
 
 	pctl run $CONTAINER command="/sbin/init" root="$image" hostname="$CONTAINER" user=root group=root bind="$conf /config ro; $BIND_PROPERTY; /sys/fs/cgroup /sys/fs/cgroup ro" bind_dns=false allowed_devices="$ALLOWED_DEVICES" net="host veth1" default_gw="192.168.1.2" ip="veth1 192.168.1.1/24"
 
