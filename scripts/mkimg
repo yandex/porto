@@ -63,7 +63,7 @@ echo "$CONF $CUSTOM"
 chmod +x $CONF
 [ -z "$CUSTOM" ] || chmod +x $CUSTOM
 
-IFACE=$(ip link | grep '[^@]eth[0-9]' | grep UP | cut -d: -f2 | tr -d ' ')
+IFACE=$(ip link | grep '[^@]eth[0-9]' | grep -w UP | cut -d: -f2 | tr -d ' ')
 
 say() { tput setaf 3; echo "$@"; tput sgr0; }
 
