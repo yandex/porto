@@ -61,7 +61,8 @@ ALLOWED_DEVICES="c 1:3 rwm; c 1:5 rwm; c 1:7 rwm; c 1:9 rwm; c 1:8 rwm; c 136:* 
 chmod +x $CONF
 [ -z "$CUSTOM" ] || chmod +x $CUSTOM
 
-IFACE=$(ip link | grep '[^@]eth[0-9]' | grep -w UP | cut -d: -f2 | tr -d ' ')
+IFACE=$(ip link | grep '[^@v]eth[0-9]' | grep -w UP | cut -d: -f2 | tr -d ' ')
+[ $(echo "$IFACE" | wc -l) -eq 1 ] || { echo "Can't find suitable network interface: $IFACE"; exit 1; }
 
 say() {
 	[ ! -t 1 ] || tput setaf 3
@@ -72,6 +73,7 @@ say() {
 TMPDIR=$(mktemp -d)
 cleanup() {
 	pexec iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE || :
+	pexec ip link delete veth0 || :
 	[ ! -d $TMPDIR ] || { umount $TMPDIR || :; rmdir $TMPDIR ||:; }
 	[ $CLEANUP -eq 0 ] && pctl destroy $CONTAINER || :
 }
@@ -109,12 +111,7 @@ BIND_PROPERTY=""
 [ -z "$CHECK" ] || BIND_PROPERTY="${BIND_PROPERTY}; $CHECK /host_porto ro"
 [ -z "$CUSTOM" ] || BIND_PROPERTY="${BIND_PROPERTY}; $CUSTOM /custom_config ro"
 
-
-prepare() {
-	local image=$1
-	local conf=$2
-	local custom=$3
-
+initnet() {
 	pexec sysctl net.ipv4.ip_forward=1
 	pexec ip link delete veth0 || :
 	pexec ip link add veth0 type veth peer name veth1
@@ -123,6 +120,12 @@ prepare() {
 
 	pexec iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE || :
 	pexec iptables -t nat -A POSTROUTING -o $IFACE -j MASQUERADE
+}
+
+prepare() {
+	local image=$1
+	local conf=$2
+	local custom=$3
 
 	pctl run $CONTAINER command="/sbin/init" root="$image" hostname="$CONTAINER" user=root group=root bind="$conf /config ro; $BIND_PROPERTY; /sys/fs/cgroup /sys/fs/cgroup ro" bind_dns=false allowed_devices="$ALLOWED_DEVICES" net="host veth1" default_gw="192.168.1.2" ip="veth1 192.168.1.1/24"
 
@@ -134,6 +137,7 @@ prepare() {
 
 pctl destroy $CONTAINER || :
 allocate_image $IMAGE $SIZE
+initnet
 IMAGE=$(realpath $IMAGE)
 bootstrap $IMAGE $CONF
 prepare $IMAGE $CONF $CUSTOM
