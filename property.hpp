@@ -82,8 +82,7 @@ extern TValueSet propertySet;
         return VariantSet.Get ## NAME(property); \
     }
 
-class TPropertySet {
-    NO_COPY_CONSTRUCT(TPropertySet);
+class TPropertySet : public TNonCopyable {
     std::weak_ptr<TContainer> Container;
     const std::string Name;
     TVariantSet VariantSet;

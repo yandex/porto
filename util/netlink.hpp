@@ -38,9 +38,7 @@ uint32_t TcHandle(uint16_t maj, uint16_t min);
 uint32_t TcRootHandle();
 uint16_t TcMajor(uint32_t handle);
 
-class TNl {
-    NO_COPY_CONSTRUCT(TNl);
-
+class TNl : public TNonCopyable {
     struct nl_sock *Sock = nullptr;
     struct nl_cache *LinkCache = nullptr;
 
@@ -65,9 +63,7 @@ public:
     void FlushEvents();
 };
 
-class TNlLink {
-    NO_COPY_CONSTRUCT(TNlLink);
-
+class TNlLink : public TNonCopyable {
     std::shared_ptr<TNl> Nl;
     std::string Name;
     std::string Alias;
@@ -109,9 +105,7 @@ public:
     void LogCache(struct nl_cache *cache);
 };
 
-class TNlClass {
-    NO_COPY_CONSTRUCT(TNlClass);
-
+class TNlClass : public TNonCopyable {
     std::shared_ptr<TNlLink> Link;
     const uint32_t Parent, Handle;
 
@@ -125,9 +119,7 @@ public:
     bool Exists();
 };
 
-class TNlHtb {
-    NO_COPY_CONSTRUCT(TNlHtb);
-
+class TNlHtb : public TNonCopyable {
     std::shared_ptr<TNlLink> Link;
     const uint32_t Parent, Handle;
 
@@ -139,9 +131,7 @@ public:
     bool Valid(uint32_t defaultClass);
 };
 
-class TNlCgFilter {
-    NO_COPY_CONSTRUCT(TNlCgFilter);
-
+class TNlCgFilter : public TNonCopyable {
     const int FilterPrio = 10;
     const char *FilterType = "cgroup";
 

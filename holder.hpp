@@ -15,8 +15,7 @@ class TIdMap;
 class TEventQueue;
 class TEvent;
 
-class TContainerHolder {
-    NO_COPY_CONSTRUCT(TContainerHolder);
+class TContainerHolder : public TNonCopyable {
     std::shared_ptr<TNetwork> Net;
     std::map<std::string, std::shared_ptr<TContainer>> Containers;
     TIdMap IdMap;

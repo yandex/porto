@@ -11,8 +11,8 @@
 class TCgroup;
 class TMount;
 
-class TSubsystem : public std::enable_shared_from_this<TSubsystem> {
-    NO_COPY_CONSTRUCT(TSubsystem);
+class TSubsystem : public std::enable_shared_from_this<TSubsystem>,
+                   public TNonCopyable {
     std::string Name;
     std::shared_ptr<TCgroup> RootCgroup;
 

@@ -7,8 +7,7 @@
 
 constexpr size_t BITS_PER_LLONG = sizeof(unsigned long long) * 8;
 
-class TIdMap {
-    NO_COPY_CONSTRUCT(TIdMap);
+class TIdMap : public TNonCopyable {
     unsigned long long Ids[UINT16_MAX / BITS_PER_LLONG];
 
 public:

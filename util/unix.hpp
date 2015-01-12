@@ -27,8 +27,7 @@ bool FdHasEvent(int fd);
 TError DropBoundedCap(int cap);
 TError SetCap(uint64_t effective, uint64_t permitted, uint64_t inheritable);
 
-class TScopedFd {
-    NO_COPY_CONSTRUCT(TScopedFd);
+class TScopedFd : public TNonCopyable {
     int Fd;
 public:
     TScopedFd(int fd = -1);

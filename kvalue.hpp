@@ -8,8 +8,7 @@
 #include "kv.pb.h"
 #include "util/mount.hpp"
 
-class TKeyValueStorage {
-    NO_COPY_CONSTRUCT(TKeyValueStorage);
+class TKeyValueStorage : public TNonCopyable {
     TMount Tmpfs;
     std::string Name(const std::string &path) const;
     std::string Path(const std::string &name) const;

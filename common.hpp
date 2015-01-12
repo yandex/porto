@@ -1,14 +1,19 @@
 #ifndef __COMMON_HPP__
 #define __COMMON_HPP__
 
-#define NO_COPY_CONSTRUCT(NAME) \
-    NAME(const NAME &) = delete; \
-    NAME &operator=(const NAME &) = delete
-
 #include <atomic>
 
 #include "error.hpp"
 #include "version.hpp"
+
+class TNonCopyable {
+protected:
+    TNonCopyable() = default;
+    ~TNonCopyable() = default;
+private:
+    TNonCopyable(TNonCopyable const&) = delete;
+    TNonCopyable& operator= (TNonCopyable const&) = delete;
+};
 
 const std::string ROOT_CONTAINER = "/";
 const std::string PORTO_ROOT_CGROUP = "porto";

@@ -35,8 +35,8 @@ enum class EContainerState {
     Meta
 };
 
-class TContainer : public std::enable_shared_from_this<TContainer> {
-    NO_COPY_CONSTRUCT(TContainer);
+class TContainer : public std::enable_shared_from_this<TContainer>,
+                   public TNonCopyable {
     TContainerHolder *Holder;
     const std::string Name;
     const std::shared_ptr<TContainer> Parent;

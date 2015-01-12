@@ -32,9 +32,7 @@ const unsigned int PERSISTENT_VALUE = (1 << 29);
 // Uint value can include options G/M/K suffix
 const unsigned int UINT_UNIT_VALUE = (1 << 28);
 
-class TVariant {
-    NO_COPY_CONSTRUCT(TVariant);
-
+class TVariant : public TNonCopyable {
     struct TValueAbstractImpl {
         virtual ~TValueAbstractImpl() {}
     };
@@ -111,9 +109,7 @@ virtual TYPE Get ## NAME(std::shared_ptr<TContainer> c, \
     return v->Get<TYPE>(Type); \
 }
 
-class TValue {
-    NO_COPY_CONSTRUCT(TValue);
-
+class TValue : public TNonCopyable {
 protected:
     void ExpectType(EValueType type);
     bool NeedDefault();
@@ -231,8 +227,7 @@ public:
         return p->Set ## NAME(c, v, value); \
     }
 
-class TVariantSet {
-    NO_COPY_CONSTRUCT(TVariantSet);
+class TVariantSet : public TNonCopyable {
     std::shared_ptr<TKeyValueStorage> Storage;
     TValueSet *ValueSet;
     std::weak_ptr<TContainer> Container;

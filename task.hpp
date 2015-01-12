@@ -65,8 +65,7 @@ struct TNetCfg {
     std::vector<TVethNetCfg> Veth;
 };
 
-class TTaskEnv {
-    NO_COPY_CONSTRUCT(TTaskEnv);
+class TTaskEnv : public TNonCopyable {
     friend TTask;
     int Uid, Gid;
 
@@ -100,8 +99,7 @@ public:
     const char** GetEnvp() const;
 };
 
-class TTask {
-    NO_COPY_CONSTRUCT(TTask);
+class TTask: public TNonCopyable {
     int Rfd, Wfd;
     int WaitParentRfd, WaitParentWfd;
     std::shared_ptr<TTaskEnv> Env;

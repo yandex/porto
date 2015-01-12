@@ -5,8 +5,7 @@
 
 #include "common.hpp"
 
-class TUserEntry {
-    NO_COPY_CONSTRUCT(TUserEntry);
+class TUserEntry : public TNonCopyable {
 protected:
     std::string Name;
     int Id;
@@ -18,7 +17,6 @@ public:
 };
 
 class TUser : public TUserEntry {
-    NO_COPY_CONSTRUCT(TUser);
 public:
     TUser(const std::string &name) : TUserEntry(name) {}
     TUser(const int id) : TUserEntry(id) {}
@@ -26,7 +24,6 @@ public:
 };
 
 class TGroup : public TUserEntry {
-    NO_COPY_CONSTRUCT(TGroup);
 public:
     TGroup(const std::string &name) : TUserEntry(name) {}
     TGroup(const int id) : TUserEntry(id) {}

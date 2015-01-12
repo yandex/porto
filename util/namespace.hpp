@@ -7,8 +7,7 @@
 #include "common.hpp"
 #include "util/unix.hpp"
 
-class TNamespaceSnapshot {
-    NO_COPY_CONSTRUCT(TNamespaceSnapshot);
+class TNamespaceSnapshot : public TNonCopyable {
     std::map<int,int> nsToFd;
     TScopedFd Root, Cwd;
     TError OpenFd(int pid, std::string v, TScopedFd &fd);

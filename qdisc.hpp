@@ -9,8 +9,7 @@
 
 class TNetwork;
 
-class TQdisc {
-    NO_COPY_CONSTRUCT(TQdisc);
+class TQdisc : public TNonCopyable {
     std::shared_ptr<TNetwork> Net;
     const uint32_t Handle;
     const uint32_t DefClass;
@@ -24,8 +23,7 @@ public:
     std::shared_ptr<TNetwork> GetNet();
 };
 
-class TTclass {
-    NO_COPY_CONSTRUCT(TTclass);
+class TTclass : public TNonCopyable {
     std::shared_ptr<TNetwork> Net;
     const std::shared_ptr<TQdisc> ParentQdisc;
     const std::shared_ptr<TTclass> ParentTclass;
@@ -48,8 +46,7 @@ public:
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);
 };
 
-class TFilter {
-    NO_COPY_CONSTRUCT(TFilter);
+class TFilter : public TNonCopyable {
     std::shared_ptr<TNetwork> Net;
     const std::shared_ptr<TQdisc> Parent;
     bool Exists(std::shared_ptr<TNlLink> link);
@@ -59,9 +56,8 @@ public:
     TError Create();
 };
 
-class TNetwork : public std::enable_shared_from_this<TNetwork> {
-    NO_COPY_CONSTRUCT(TNetwork);
-
+class TNetwork : public std::enable_shared_from_this<TNetwork>,
+                 public TNonCopyable {
     std::shared_ptr<TNl> Nl;
     std::vector<std::shared_ptr<TNlLink>> Links;
     std::shared_ptr<TQdisc> Qdisc;

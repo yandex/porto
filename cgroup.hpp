@@ -11,8 +11,8 @@
 class TSubsystem;
 class TMount;
 
-class TCgroup : public std::enable_shared_from_this<TCgroup> {
-    NO_COPY_CONSTRUCT(TCgroup);
+class TCgroup : public std::enable_shared_from_this<TCgroup>,
+                public TNonCopyable {
     const std::string Name;
     const std::shared_ptr<TCgroup> Parent;
     std::vector<std::weak_ptr<TCgroup>> Children;
@@ -57,8 +57,7 @@ public:
     TError SetKnobValue(const std::string &knob, const std::string &value, bool append = false) const;
 };
 
-class TCgroupSnapshot {
-    NO_COPY_CONSTRUCT(TCgroupSnapshot);
+class TCgroupSnapshot : public TNonCopyable {
     std::vector<std::shared_ptr<TCgroup>> Cgroups;
 public:
     TCgroupSnapshot() {}

@@ -6,9 +6,7 @@
 #include "common.hpp"
 #include "config.pb.h"
 
-class TConfig {
-    NO_COPY_CONSTRUCT(TConfig);
-
+class TConfig : public TNonCopyable {
     cfg::TCfg Cfg;
 
     const std::vector<std::string> ConfigFiles = { "/etc/portod.conf", "/etc/default/portod.conf" };
