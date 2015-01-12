@@ -54,11 +54,9 @@ shift
 SIZE=$1
 IMAGE=$2
 CONF=$(realpath $3)
-CUSTOM=$(realpath $4)
+[ ! -z "$4" ] && CUSTOM=$(realpath $4) || CUSTOM=
 CONTAINER=$BINARY
 ALLOWED_DEVICES="c 1:3 rwm; c 1:5 rwm; c 1:7 rwm; c 1:9 rwm; c 1:8 rwm; c 136:* rw; c 5:2 rwm; c 254:0 rm; c 10:237 rmw; b 7:* rmw"
-
-echo "$CONF $CUSTOM"
 
 chmod +x $CONF
 [ -z "$CUSTOM" ] || chmod +x $CUSTOM
