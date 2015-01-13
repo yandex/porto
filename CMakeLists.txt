@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 
 PROJECT(yandex-porto)
 
+set(CMAKE_INSTALL_PREFIX /usr)
 set(CMAKE_CXX_FLAGS "-O2 -Wall -std=c++11 -g")
 set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc")
 #set(CMAKE_CXX_FLAGS "-O0 -Wall -std=c++11 -g -fno-omit-frame-pointer -fprofile-arcs -ftest-coverage")
