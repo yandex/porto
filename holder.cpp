@@ -39,8 +39,10 @@ TError TContainerHolder::CreateRoot() {
     for (auto &priv : config().privileges().root_user()) {
         TUser u(priv);
         TError error = u.Load();
-        if (error)
-            return error;
+        if (error) {
+            L_WRN() << "Can't add privileged user: " << error << std::endl;
+            continue;
+        }
 
         PrivilegedUid.insert(u.GetId());
     }
