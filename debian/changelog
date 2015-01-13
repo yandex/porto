@@ -1,3 +1,24 @@
+yandex-porto (0.28) precise; urgency=low
+
+  * Add loop allocation debug printouts
+  * Don't fail on error when restoring
+  * Set ip address after interface is up
+  * Change default /run/porto/kvs permission
+  * Support G/M/K suffix for memory_limit/memory_guarantee
+  * portoctl: don't create tty in exec when STDIN is not a tty
+  * portoctl: fix exec environment parsing
+  * portoctl: don't handle stdin POLLHUP in exec
+  * mkimg: make sure we find only one network interface
+  * mkimg: don't use colors when stdout is file
+  * mkimg: remove ifconfig
+  * mkimg: remove sudo
+  * mkimg: fix link UP check
+  * mkimg: support customization script
+  * mkimg: use NAT for networking inside container
+  * mkimg: use non-interactive debconf frontend
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 13 Jan 2015 16:50:00 +0400
+
 yandex-porto (0.27) precise; urgency=low
 
   * Fix version
