@@ -135,13 +135,18 @@ prepare() {
 	pctl exec ${CONTAINER}/sync command="bash -c 'sync'" isolate="false" user=root group=root env=" DEBIAN_FRONTEND=noninteractive"
 }
 
+create_tar() {
+	tar cSf $TARIMAGE -C $(dirname ${IMAGE}) $(basename $IMAGE)
+}
+
 pctl destroy $CONTAINER || :
 allocate_image $IMAGE $SIZE
 initnet
 IMAGE=$(realpath $IMAGE)
+TARIMAGE=${TARIMAGE:-${IMAGE}.tar}
 bootstrap $IMAGE $CONF
 prepare $IMAGE $CONF $CUSTOM
 [ -z "$CHECK" ] || check
 cleanup
-[ $TAR -eq 0 ] || (cd $(dirname ${IMAGE}) && tar cSf ${IMAGE}.tar $(basename $IMAGE))
+[ $TAR -eq 0 ] || create_tar
 [ $DRYRUN -eq 0 ] || rm $IMAGE
