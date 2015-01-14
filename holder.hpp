@@ -27,7 +27,7 @@ public:
     TError CheckPermission(std::shared_ptr<TContainer> container, const TCred &cred);
 };
 
-class TContainerHolder : public TCredAdmin {
+class THolder : public TCredAdmin {
     std::shared_ptr<TNetwork> Net;
     std::map<std::string, std::shared_ptr<TContainer>> Containers;
     TIdMap IdMap;
@@ -40,10 +40,10 @@ public:
     std::shared_ptr<TEventQueue> Queue;
     int Epfd;
 
-    TContainerHolder(std::shared_ptr<TEventQueue> queue,
+    THolder(std::shared_ptr<TEventQueue> queue,
                      std::shared_ptr<TNetwork> net) :
         Net(net), Queue(queue) { }
-    ~TContainerHolder();
+    ~THolder();
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot();
     TError Create(const std::string &name, const TCred &cred);

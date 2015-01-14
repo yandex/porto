@@ -19,7 +19,7 @@ class TPropertySet;
 class TVariantSet;
 enum class ETclassStat;
 class TEvent;
-class TContainerHolder;
+class THolder;
 class TNetwork;
 class TTclass;
 class TTask;
@@ -37,7 +37,7 @@ enum class EContainerState {
 
 class TContainer : public std::enable_shared_from_this<TContainer>,
                    public TNonCopyable {
-    TContainerHolder *Holder;
+    THolder *Holder;
     const std::string Name;
     const std::shared_ptr<TContainer> Parent;
     std::shared_ptr<TTclass> Tclass;
@@ -96,7 +96,7 @@ public:
     EContainerState GetState();
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);
 
-    TContainer(TContainerHolder *holder,
+    TContainer(THolder *holder,
                const std::string &name, std::shared_ptr<TContainer> parent,
                uint16_t id, std::shared_ptr<TNetwork> net) :
         Holder(holder), Name(StripParentName(name)), Parent(parent), Id(id),

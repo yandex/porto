@@ -87,7 +87,7 @@ TError TCredAdmin::CheckPermission(std::shared_ptr<TContainer> container,
     return TError(EError::Permission, "Permission error");
 }
 
-TContainerHolder::~TContainerHolder() {
+THolder::~THolder() {
     // we want children to be removed first
     while (Containers.begin() != Containers.end()) {
         auto name = Containers.begin()->first;
@@ -97,7 +97,7 @@ TContainerHolder::~TContainerHolder() {
     }
 }
 
-TError TContainerHolder::CreateRoot() {
+TError THolder::CreateRoot() {
     TError error = EpollCreate(Epfd);
     if (error)
         return error;
@@ -152,7 +152,7 @@ TError TContainerHolder::CreateRoot() {
     return TError::Success();
 }
 
-bool TContainerHolder::ValidName(const std::string &name) const {
+bool THolder::ValidName(const std::string &name) const {
     if (name == ROOT_CONTAINER)
         return true;
 
@@ -176,7 +176,7 @@ bool TContainerHolder::ValidName(const std::string &name) const {
                    }) == name.end();
 }
 
-std::shared_ptr<TContainer> TContainerHolder::GetParent(const std::string &name) const {
+std::shared_ptr<TContainer> THolder::GetParent(const std::string &name) const {
     std::shared_ptr<TContainer> parent;
 
     std::string::size_type n = name.rfind('/');
@@ -192,7 +192,7 @@ std::shared_ptr<TContainer> TContainerHolder::GetParent(const std::string &name)
     }
 }
 
-TError TContainerHolder::Create(const std::string &name, const TCred &cred) {
+TError THolder::Create(const std::string &name, const TCred &cred) {
     if (!ValidName(name))
         return TError(EError::InvalidValue, "invalid container name " + name);
 
@@ -221,14 +221,14 @@ TError TContainerHolder::Create(const std::string &name, const TCred &cred) {
     return TError::Success();
 }
 
-std::shared_ptr<TContainer> TContainerHolder::Get(const std::string &name) {
+std::shared_ptr<TContainer> THolder::Get(const std::string &name) {
     if (Containers.find(name) == Containers.end())
         return nullptr;
 
     return Containers[name];
 }
 
-TError TContainerHolder::_Destroy(const std::string &name) {
+TError THolder::_Destroy(const std::string &name) {
     auto c = Containers[name];
     for (auto child: c->GetChildren())
         _Destroy(child);
@@ -241,14 +241,14 @@ TError TContainerHolder::_Destroy(const std::string &name) {
     return TError::Success();
 }
 
-TError TContainerHolder::Destroy(const std::string &name) {
+TError THolder::Destroy(const std::string &name) {
     if (name == ROOT_CONTAINER || Containers.find(name) == Containers.end())
         return TError(EError::InvalidValue, "invalid container name " + name);
 
     return _Destroy(name);
 }
 
-std::vector<std::string> TContainerHolder::List() const {
+std::vector<std::string> THolder::List() const {
     std::vector<std::string> ret;
 
     for (auto c : Containers) {
@@ -259,7 +259,7 @@ std::vector<std::string> TContainerHolder::List() const {
     return ret;
 }
 
-TError TContainerHolder::RestoreId(const kv::TNode &node, uint16_t &id) {
+TError THolder::RestoreId(const kv::TNode &node, uint16_t &id) {
     std::string value = "";
     for (int i = 0; i < node.pairs_size(); i++) {
         auto key = node.pairs(i).key();
@@ -284,7 +284,7 @@ TError TContainerHolder::RestoreId(const kv::TNode &node, uint16_t &id) {
     return TError::Success();
 }
 
-TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node) {
+TError THolder::Restore(const std::string &name, const kv::TNode &node) {
     if (name == ROOT_CONTAINER)
         return TError::Success();
 
@@ -312,12 +312,12 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
     return TError::Success();
 }
 
-void TContainerHolder::ScheduleLogRotatation() {
+void THolder::ScheduleLogRotatation() {
     TEvent e(EEventType::RotateLogs);
     Queue->Add(config().daemon().rotate_logs_timeout_s() * 1000, e);
 }
 
-bool TContainerHolder::DeliverEvent(const TEvent &event) {
+bool THolder::DeliverEvent(const TEvent &event) {
     if (config().log().verbose())
         L() << "Deliver event " << event.GetMsg() << std::endl;
 

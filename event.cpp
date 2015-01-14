@@ -34,7 +34,7 @@ void TEventQueue::Add(size_t timeoutMs, const TEvent &e) {
     Queue.push(copy);
 }
 
-void TEventQueue::DeliverEvents(TContainerHolder &cholder) {
+void TEventQueue::DeliverEvents(THolder &cholder) {
     size_t now = GetCurrentTimeMs();
     while (!Queue.empty() && Queue.top().DueMs <= now) {
         (void)cholder.DeliverEvent(Queue.top());

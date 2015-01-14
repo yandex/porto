@@ -6,7 +6,7 @@
 #include <queue>
 
 class TContainer;
-class TContainerHolder;
+class THolder;
 
 enum class EEventType {
     Exit,
@@ -49,7 +49,7 @@ public:
     TEventQueue() {}
 
     void Add(size_t timeoutMs, const TEvent &e);
-    void DeliverEvents(TContainerHolder &cholder);
+    void DeliverEvents(THolder &cholder);
     int GetNextTimeout();
 };
 

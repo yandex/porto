@@ -1324,7 +1324,7 @@ bool TContainer::CanRemoveDead() const {
 
 bool TContainer::HasChildren() const {
     // link #1 - this
-    // link #2 - TContainerHolder->Containers
+    // link #2 - THolder->Containers
     // any other link comes from TContainer->Parent and indicates that
     // current container has children
     return shared_from_this().use_count() > 2;

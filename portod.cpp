@@ -206,7 +206,7 @@ struct ClientInfo {
     int Gid;
 };
 
-static bool HandleRequest(TContainerHolder &cholder, const int fd,
+static bool HandleRequest(THolder &cholder, const int fd,
                           const TCred &cred) {
     uint32_t slaveReadTimeout = config().daemon().slave_read_timeout_s();
     InterruptibleInputStream pist(fd);
@@ -335,7 +335,7 @@ void AckExitStatus(int pid) {
     }
 }
 
-static int ReapSpawner(int fd, TContainerHolder &cholder) {
+static int ReapSpawner(int fd, THolder &cholder) {
     struct pollfd fds[1];
     int nr = 1000;
 
@@ -375,7 +375,7 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
 }
 
 static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
-                    TContainerHolder &cholder,
+                    THolder &cholder,
                     std::shared_ptr<TNetwork> net,
                     std::shared_ptr<TNl> netEvt) {
     int ret = 0;
@@ -630,7 +630,7 @@ static int SlaveMain() {
         }
 
         auto queue = std::make_shared<TEventQueue>();
-        TContainerHolder cholder(queue, net);
+        THolder cholder(queue, net);
         error = cholder.CreateRoot();
         if (error) {
             L_ERR() << "Can't create root container: " << error << std::endl;
