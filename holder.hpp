@@ -16,12 +16,21 @@ class TIdMap;
 class TEventQueue;
 class TEvent;
 
-class TContainerHolder : public TNonCopyable {
+class TCredAdmin : public TNonCopyable {
+private:
+    std::set<int> PrivilegedUid, PrivilegedGid;
+    std::set<int> RestrictedRootUid, RestrictedRootGid;
+public:
+    TError Initialize();
+    bool PrivilegedUser(const TCred &cred);
+    bool RestrictedUser(const TCred &cred);
+    TError CheckPermission(std::shared_ptr<TContainer> container, const TCred &cred);
+};
+
+class TContainerHolder : public TCredAdmin {
     std::shared_ptr<TNetwork> Net;
     std::map<std::string, std::shared_ptr<TContainer>> Containers;
     TIdMap IdMap;
-    std::set<int> PrivilegedUid, PrivilegedGid;
-    std::set<int> RestrictedRootUid, RestrictedRootGid;
 
     bool ValidName(const std::string &name) const;
     TError RestoreId(const kv::TNode &node, uint16_t &id);
@@ -40,9 +49,6 @@ public:
     TError Create(const std::string &name, const TCred &cred);
     std::shared_ptr<TContainer> Get(const std::string &name);
     TError Restore(const std::string &name, const kv::TNode &node);
-    bool PrivilegedUser(int uid, int gid);
-    bool RestrictedUser(int uid, int gid);
-    TError CheckPermission(std::shared_ptr<TContainer> container, int uid, int gid);
     TError Destroy(const std::string &name);
 
     std::vector<std::string> List() const;

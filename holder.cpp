@@ -10,16 +10,6 @@
 #include "util/pwd.hpp"
 #include "util/cred.hpp"
 
-TContainerHolder::~TContainerHolder() {
-    // we want children to be removed first
-    while (Containers.begin() != Containers.end()) {
-        auto name = Containers.begin()->first;
-        TError error = _Destroy(name);
-        if (error)
-            L_ERR() << "Can't destroy container " << name << ": " << error << std::endl;
-    }
-}
-
 static void ParseUserConf(const ::google::protobuf::RepeatedPtrField<std::string> &source,
                           std::set<int> &target) {
     for (auto &val : source) {
@@ -48,6 +38,65 @@ static void ParseGroupConf(const ::google::protobuf::RepeatedPtrField<std::strin
     }
 }
 
+TError TCredAdmin::Initialize() {
+    ParseUserConf(config().privileges().root_user(), PrivilegedUid);
+    ParseGroupConf(config().privileges().root_group(), PrivilegedGid);
+
+    ParseUserConf(config().privileges().restricted_root_user(), RestrictedRootUid);
+    ParseGroupConf(config().privileges().restricted_root_group(), RestrictedRootGid);
+
+    return TError::Success();
+}
+
+bool TCredAdmin::PrivilegedUser(const TCred &cred) {
+    if (cred.IsRoot())
+        return true;
+
+    if (PrivilegedUid.find(cred.Uid) != PrivilegedUid.end())
+        return true;
+
+    if (PrivilegedGid.find(cred.Gid) != PrivilegedGid.end())
+        return true;
+
+    return false;
+}
+
+bool TCredAdmin::RestrictedUser(const TCred &cred) {
+    if (RestrictedRootUid.find(cred.Uid) != RestrictedRootUid.end())
+        return true;
+
+    if (RestrictedRootGid.find(cred.Gid) != RestrictedRootGid.end())
+        return true;
+
+    return false;
+}
+
+TError TCredAdmin::CheckPermission(std::shared_ptr<TContainer> container,
+                                   const TCred &cred) {
+    if (PrivilegedUser(cred))
+        return TError::Success();
+
+    // for root we report more meaningful errors from handlers, so don't
+    // check permissions here
+    if (container->IsRoot())
+        return TError::Success();
+
+    if (container->Cred == cred)
+        return TError::Success();
+
+    return TError(EError::Permission, "Permission error");
+}
+
+TContainerHolder::~TContainerHolder() {
+    // we want children to be removed first
+    while (Containers.begin() != Containers.end()) {
+        auto name = Containers.begin()->first;
+        TError error = _Destroy(name);
+        if (error)
+            L_ERR() << "Can't destroy container " << name << ": " << error << std::endl;
+    }
+}
+
 TError TContainerHolder::CreateRoot() {
     TError error = EpollCreate(Epfd);
     if (error)
@@ -65,11 +114,9 @@ TError TContainerHolder::CreateRoot() {
     if (error)
         return error;
 
-    ParseUserConf(config().privileges().root_user(), PrivilegedUid);
-    ParseGroupConf(config().privileges().root_group(), PrivilegedGid);
-
-    ParseUserConf(config().privileges().restricted_root_user(), RestrictedRootUid);
-    ParseGroupConf(config().privileges().restricted_root_group(), RestrictedRootGid);
+    error = Initialize();
+    if (error)
+        return error;
 
     // we are using single kvalue store for both properties and data
     // so make sure names don't clash
@@ -179,45 +226,6 @@ std::shared_ptr<TContainer> TContainerHolder::Get(const std::string &name) {
         return nullptr;
 
     return Containers[name];
-}
-
-bool TContainerHolder::PrivilegedUser(int uid, int gid) {
-    if (uid == 0 || gid == 0)
-        return true;
-
-    if (PrivilegedUid.find(uid) != PrivilegedUid.end())
-        return true;
-
-    if (PrivilegedGid.find(gid) != PrivilegedGid.end())
-        return true;
-
-    return false;
-}
-
-bool TContainerHolder::RestrictedUser(int uid, int gid) {
-    if (RestrictedRootUid.find(uid) != RestrictedRootUid.end())
-        return true;
-
-    if (RestrictedRootGid.find(gid) != RestrictedRootGid.end())
-        return true;
-
-    return false;
-}
-
-TError TContainerHolder::CheckPermission(std::shared_ptr<TContainer> container,
-                                         int uid, int gid) {
-    if (PrivilegedUser(uid, gid))
-        return TError::Success();
-
-    // for root we report more meaningful errors from handlers, so don't
-    // check permissions here
-    if (container->IsRoot())
-        return TError::Success();
-
-    if (container->Uid == uid || container->Gid == gid)
-        return TError::Success();
-
-    return TError(EError::Permission, "Permission error");
 }
 
 TError TContainerHolder::_Destroy(const std::string &name) {

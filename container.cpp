@@ -1052,7 +1052,7 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
         if (Prop->GetString(property) != value)
             return TError(EError::Permission, "Only root can change this property");
 
-    if (Prop->HasFlags(property, RESTROOT_PROPERTY) && !Holder->RestrictedUser(Uid, Gid))
+    if (Prop->HasFlags(property, RESTROOT_PROPERTY) && !RestrictedUser(Cred))
         return TError(EError::Permission, "Only restricted root can change this property");
 
     if (!Prop->HasState(property, GetState()))
