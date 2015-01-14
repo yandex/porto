@@ -66,7 +66,7 @@ IFACE=$(ip link | grep '[^@v]eth[0-9]' | grep -w UP | cut -d: -f2 | tr -d ' ')
 
 say() {
 	[ ! -t 1 ] || tput setaf 3
-	echo "$@"
+	[ $VERBOSE -eq 0 ] || echo "$@"
 	[ ! -t 1 ] || tput sgr0
 }
 
@@ -84,15 +84,15 @@ cleanup() {
 trap cleanup EXIT
 
 pctl() {
-	[ $VERBOSE -eq 0 ] || say portoctl "$@"
+	say portoctl "$@"
 	portoctl "$@"
 }
 
 pexec() { pctl exec ${CONTAINER}-sudo command="/bin/bash -c '$*'" user="root" group="root"; }
 
 allocate_image() {
-	fallocate -l $SIZE $IMAGE || dd if=/dev/zero of=$IMAGE bs=1 count=1 seek=$SIZE
-	mkfs.ext4 -F -F $IMAGE
+	run fallocate -l $SIZE $IMAGE || run dd if=/dev/zero of=$IMAGE bs=1 count=1 seek=$SIZE
+	run mkfs.ext4 -F -F $IMAGE
 }
 
 bootstrap() {
