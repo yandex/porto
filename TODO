@@ -1,4 +1,4 @@
-- make sure mkimg prints details in sandbox
+- bind fails when source is link
 - portoctl lxc
 - remove net_guarantee/net_limit
 - chroot -> pivot_root (to remove all mounts from container)

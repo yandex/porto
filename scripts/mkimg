@@ -55,7 +55,7 @@ SIZE=$1
 IMAGE=$2
 CONF=$(realpath $3)
 [ ! -z "$4" ] && CUSTOM=$(realpath $4) || CUSTOM=
-CONTAINER=$BINARY
+CONTAINER=${BINARY}-$(cat /dev/urandom | tr -dc _A-Z-a-z-0-9 | head -c8)
 ALLOWED_DEVICES="c 1:3 rwm; c 1:5 rwm; c 1:7 rwm; c 1:9 rwm; c 1:8 rwm; c 136:* rw; c 5:2 rwm; c 254:0 rm; c 10:237 rmw; b 7:* rmw"
 
 chmod +x $CONF
@@ -70,12 +70,15 @@ say() {
 	[ ! -t 1 ] || tput sgr0
 }
 
+run() { say "$@"; eval "$@"; }
+
 TMPDIR=$(mktemp -d)
 cleanup() {
-	pexec iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE || :
-	pexec ip link delete veth0 || :
-	[ ! -d $TMPDIR ] || { umount $TMPDIR || :; rmdir $TMPDIR ||:; }
-	[ $CLEANUP -eq 0 ] && pctl destroy $CONTAINER || :
+	set +e
+	pexec iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE
+	pexec ip link delete veth0
+	[ -d $TMPDIR ] && rmdir $TMPDIR
+	[ $CLEANUP -eq 0 ] && pctl destroy $CONTAINER
 }
 
 trap cleanup EXIT
@@ -88,18 +91,19 @@ pctl() {
 pexec() { pctl exec ${CONTAINER}-sudo command="/bin/bash -c '$*'" user="root" group="root"; }
 
 allocate_image() {
-	local image=$1
-	local size=$2
-
-	fallocate -l $size $image || dd if=/dev/zero of=$image bs=1 count=1 seek=$size
-	mkfs.ext4 -F -F $image
+	fallocate -l $SIZE $IMAGE || dd if=/dev/zero of=$IMAGE bs=1 count=1 seek=$SIZE
+	mkfs.ext4 -F -F $IMAGE
 }
 
 bootstrap() {
-	local image=$1
-	local conf=$2
+	local ro=""
+	for file in $(find / -maxdepth 1 -mindepth 1); do
+		if [ "$file" = "/tmp" ]; then continue; fi
+		if [ -L "$file" ]; then continue; fi
+		ro="$file $file ro; $ro"
+	done
 
-	pctl exec $CONTAINER command="bash -c 'mount $image $TMPDIR && $conf bootstrap $TMPDIR'" user=root group=root bind_dns=false env="DEBIAN_FRONTEND=noninteractive" #root_readonly=true debootsrap chroot fails
+	pctl exec $CONTAINER command="bash -c 'mount $IMAGE $TMPDIR && $CONF bootstrap $TMPDIR'" user=root group=root bind_dns=false env="DEBIAN_FRONTEND=noninteractive" bind="$ro" #root_readonly=true debootsrap chroot fails
 }
 
 check() {
@@ -123,30 +127,26 @@ initnet() {
 }
 
 prepare() {
-	local image=$1
-	local conf=$2
-	local custom=$3
+	pctl run $CONTAINER command="/sbin/init" root="$IMAGE" hostname="$CONTAINER" user=root group=root bind="$CONF /config ro; $BIND_PROPERTY; /sys/fs/cgroup /sys/fs/cgroup ro" bind_dns=false allowed_devices="$ALLOWED_DEVICES" net="host veth1" default_gw="192.168.1.2" ip="veth1 192.168.1.1/24"
 
-	pctl run $CONTAINER command="/sbin/init" root="$image" hostname="$CONTAINER" user=root group=root bind="$conf /config ro; $BIND_PROPERTY; /sys/fs/cgroup /sys/fs/cgroup ro" bind_dns=false allowed_devices="$ALLOWED_DEVICES" net="host veth1" default_gw="192.168.1.2" ip="veth1 192.168.1.1/24"
-
-	pctl exec ${CONTAINER}/prepare command="bash -c '/config prepare'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
-	[ -z "$custom" ] || pctl exec ${CONTAINER}/prepare command="bash -c '/custom_config'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
-	pctl exec ${CONTAINER}/prepare command="bash -c '/config cleanup'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
-	pctl exec ${CONTAINER}/sync command="bash -c 'sync'" isolate="false" user=root group=root env=" DEBIAN_FRONTEND=noninteractive"
+	pctl exec $CONTAINER/prepare command="bash -c '/config prepare'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
+	[ -z "$CUSTOM" ] || pctl exec $CONTAINER/prepare command="bash -c '/custom_config'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
+	pctl exec $CONTAINER/prepare command="bash -c '/config cleanup'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
+	pctl exec $CONTAINER/sync command="bash -c 'sync'" isolate="false" user=root group=root env=" DEBIAN_FRONTEND=noninteractive"
 }
 
 create_tar() {
-	tar cSf $TARIMAGE -C $(dirname ${IMAGE}) $(basename $IMAGE)
+	run tar cSf $TARIMAGE -C $(dirname ${IMAGE}) $(basename $IMAGE)
 }
 
-pctl destroy $CONTAINER || :
-allocate_image $IMAGE $SIZE
+allocate_image
 initnet
 IMAGE=$(realpath $IMAGE)
 TARIMAGE=${TARIMAGE:-${IMAGE}.tar}
-bootstrap $IMAGE $CONF
-prepare $IMAGE $CONF $CUSTOM
+bootstrap
+prepare
 [ -z "$CHECK" ] || check
 cleanup
+trap - EXIT
 [ $TAR -eq 0 ] || create_tar
 [ $DRYRUN -eq 0 ] || rm $IMAGE
