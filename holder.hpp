@@ -8,6 +8,7 @@
 #include "common.hpp"
 #include "kvalue.hpp"
 #include "util/idmap.hpp"
+#include "util/cred.hpp"
 
 class TNetwork;
 class TContainer;
@@ -36,7 +37,7 @@ public:
     ~TContainerHolder();
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot();
-    TError Create(const std::string &name, int uid, int gid);
+    TError Create(const std::string &name, const TCred &cred);
     std::shared_ptr<TContainer> Get(const std::string &name);
     TError Restore(const std::string &name, const kv::TNode &node);
     bool PrivilegedUser(int uid, int gid);

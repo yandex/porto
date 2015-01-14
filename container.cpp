@@ -572,8 +572,8 @@ TError TContainer::PrepareTask() {
     return TError::Success();
 }
 
-TError TContainer::Create(int uid, int gid) {
-    L() << "Create " << GetName() << " " << Id << " " << uid << " " << gid << std::endl;
+TError TContainer::Create(const TCred &cred) {
+    L() << "Create " << GetName() << " " << Id << " " << cred.Uid << " " << cred.Gid << std::endl;
 
     TError error = Prepare();
     if (error) {
@@ -581,17 +581,17 @@ TError TContainer::Create(int uid, int gid) {
         return error;
     }
 
-    TUser u(uid);
+    TUser u(cred.Uid);
     if (u.Load())
-        error = Prop->SetString(P_USER, std::to_string(uid));
+        error = Prop->SetString(P_USER, std::to_string(cred.Uid));
     else
         error = Prop->SetString(P_USER, u.GetName());
     if (error)
         return error;
 
-    TGroup g(gid);
+    TGroup g(cred.Gid);
     if (g.Load())
-        error = Prop->SetString(P_GROUP, std::to_string(gid));
+        error = Prop->SetString(P_GROUP, std::to_string(cred.Gid));
     else
         error = Prop->SetString(P_GROUP, g.GetName());
     if (error)

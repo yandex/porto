@@ -9,6 +9,7 @@
 #include "util/namespace.hpp"
 #include "util/path.hpp"
 #include "util/netlink.hpp"
+#include "util/cred.hpp"
 
 extern "C" {
 #include <sys/resource.h>
@@ -67,7 +68,7 @@ struct TNetCfg {
 
 class TTaskEnv : public TNonCopyable {
     friend TTask;
-    int Uid, Gid;
+    TCred Cred;
 
 public:
     TTaskEnv() {}

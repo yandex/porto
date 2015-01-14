@@ -3,9 +3,10 @@
 
 #include "rpc.pb.h"
 #include "holder.hpp"
+#include "util/cred.hpp"
 
 rpc::TContainerResponse
 HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req,
-                 int uid, int gid);
+                 const TCred &cred);
 
 #endif

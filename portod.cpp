@@ -207,7 +207,7 @@ struct ClientInfo {
 };
 
 static bool HandleRequest(TContainerHolder &cholder, const int fd,
-                          const int uid, const int gid) {
+                          const TCred &cred) {
     uint32_t slaveReadTimeout = config().daemon().slave_read_timeout_s();
     InterruptibleInputStream pist(fd);
     google::protobuf::io::FileOutputStream post(fd);
@@ -230,7 +230,7 @@ static bool HandleRequest(TContainerHolder &cholder, const int fd,
     }
 
     if (haveData) {
-        auto rsp = HandleRpcRequest(cholder, request, uid, gid);
+        auto rsp = HandleRpcRequest(cholder, request, cred);
         if (rsp.IsInitialized()) {
             if (!WriteDelimitedTo(rsp, &post))
                 L() << "Write error for " << fd << std:: endl;
@@ -384,8 +384,7 @@ static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
 
     SignalMask(SIG_BLOCK);
 
-    uid_t uid = getuid();
-    gid_t gid = getgid();
+    TCred cred(getuid(), getgid());
 
     TGroup g(config().rpc_sock().group().c_str());
     TError error = g.Load();
@@ -393,11 +392,11 @@ static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
         L_ERR() << "Can't get gid for " << config().rpc_sock().group() << ": " << error << std::endl;
 
     if (!error)
-        gid = g.GetId();
+        cred.Gid = g.GetId();
 
     error = CreateRpcServer(config().rpc_sock().file().path(),
                             config().rpc_sock().file().perm(),
-                            uid, gid, sfd);
+                            cred, sfd);
     if (error) {
         L() << "Can't create RPC server: " << error.GetMsg() << std::endl;
         return EXIT_FAILURE;
@@ -496,7 +495,7 @@ static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
 
                 if (ev[i].events & EPOLLIN)
                     needClose = HandleRequest(cholder, ev[i].data.fd,
-                                              ci.Uid, ci.Gid);
+                                              TCred(ci.Uid, ci.Gid));
 
                 if ((ev[i].events & EPOLLHUP) || needClose) {
                     close(ev[i].data.fd);

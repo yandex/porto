@@ -8,6 +8,7 @@
 #include "event.hpp"
 #include "util/string.hpp"
 #include "util/pwd.hpp"
+#include "util/cred.hpp"
 
 TContainerHolder::~TContainerHolder() {
     // we want children to be removed first
@@ -78,7 +79,7 @@ TError TContainerHolder::CreateRoot() {
 
     BootTime = GetBootTime();
 
-    error = Create(ROOT_CONTAINER, 0, 0);
+    error = Create(ROOT_CONTAINER, TCred(0, 0));
     if (error)
         return error;
 
@@ -144,7 +145,7 @@ std::shared_ptr<TContainer> TContainerHolder::GetParent(const std::string &name)
     }
 }
 
-TError TContainerHolder::Create(const std::string &name, int uid, int gid) {
+TError TContainerHolder::Create(const std::string &name, const TCred &cred) {
     if (!ValidName(name))
         return TError(EError::InvalidValue, "invalid container name " + name);
 
@@ -164,7 +165,7 @@ TError TContainerHolder::Create(const std::string &name, int uid, int gid) {
         return error;
 
     auto c = std::make_shared<TContainer>(this, name, parent, id, Net);
-    error = c->Create(uid, gid);
+    error = c->Create(cred);
     if (error)
         return error;
 

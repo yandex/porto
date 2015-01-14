@@ -84,7 +84,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError Prepare();
 
 public:
-    int Uid, Gid;
+    TCred Cred;
 
     // TODO: make private
     std::unique_ptr<TTask> Task;
@@ -115,7 +115,7 @@ public:
     bool ValidHierarchicalProperty(const std::string &property, const uint64_t value) const;
     std::vector<pid_t> Processes();
 
-    TError Create(int uid, int gid);
+    TError Create(const TCred &cred);
     void Destroy();
     TError Start();
     TError Stop();
