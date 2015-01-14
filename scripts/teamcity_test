@@ -2,8 +2,15 @@
 
 set -e
 
-version=$(git describe)
+version=$(git describe | sed -e 's/^v//')
 dch --newversion $version "teamcity build"
 debuild -i -us -uc -b
-dpkg -i ../yandex-porto_${version}_amd64.deb
-exec scripts/test
+sudo dpkg -i ../yandex-porto_${version}_amd64.deb
+
+client=$(portoctl -v | grep client | awk '{print $2}')
+server=$(portoctl -v | grep server | awk '{print $2}')
+
+[ "$version" = "$server" ] || { echo "Invalid server version!"; exit 1; }
+[ "$version" = "$client" ] || { echo "Invalid client version!"; exit 1; }
+
+sudo scripts/test
