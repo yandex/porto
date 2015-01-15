@@ -2,15 +2,32 @@
 
 set -e
 
-version=$(git describe | sed -e 's/^v//')
-dch --newversion $version "teamcity build"
-debuild -i -us -uc -b
-sudo dpkg -i ../yandex-porto_${version}_amd64.deb
+export PATH="/usr/sbin:$PATH"
 
-client=$(portoctl -v | grep client | awk '{print $2}')
-server=$(portoctl -v | grep server | awk '{print $2}')
+build() {
+	version=$(git describe | sed -e 's/^v//')
+	dch --newversion $version "teamcity build"
+	debuild -i -us -uc -b
+	sudo dpkg -i ../yandex-porto_${version}_amd64.deb
 
-[ "$version" = "$server" ] || { echo "Invalid server version!"; exit 1; }
-[ "$version" = "$client" ] || { echo "Invalid client version!"; exit 1; }
+	client=$(portoctl -v | grep client | awk '{print $2}')
+	server=$(portoctl -v | grep server | awk '{print $2}')
 
-sudo scripts/test
+	[ "$version" = "$server" ] || { echo "Invalid server version!"; exit 1; }
+	[ "$version" = "$client" ] || { echo "Invalid client version!"; exit 1; }
+}
+
+selftest() {
+	sudo scripts/test false true
+}
+
+pkgtest() {
+	sudo scripts/test pkg
+}
+
+stresstest() {
+	sudo scripts/test stress
+}
+
+[ ! $# -eq 0 ] || set -- "build selftest pkgtest stresstest"
+for f in "$@"; do eval $f; done
