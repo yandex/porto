@@ -1314,14 +1314,6 @@ bool TContainer::CanRemoveDead() const {
         GetCurrentTimeMs() / 1000;
 }
 
-bool TContainer::HasChildren() const {
-    // link #1 - this
-    // link #2 - THolder->Containers
-    // any other link comes from TContainer->Parent and indicates that
-    // current container has children
-    return shared_from_this().use_count() > 2;
-}
-
 std::vector<std::string> TContainer::GetChildren() {
     std::vector<std::string> vec;
 
