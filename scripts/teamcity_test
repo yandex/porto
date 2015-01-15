@@ -39,7 +39,7 @@ print_logs() {
 	prlog /var/log/portod
 }
 
-for cg in /sys/fs/cgroup/*; do echo $$ > $cg/cgroup.procs; done
+for cg in /sys/fs/cgroup/*; do echo $$ | sudo tee $cg/cgroup.procs; done
 
 [ ! $# -eq 0 ] || set -- build selftest pkgtest stresstest
 trap print_logs EXIT
