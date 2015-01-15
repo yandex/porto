@@ -4,31 +4,28 @@ set -e
 
 ROOTDIR=$(cd $(dirname $0)/../ && pwd)
 
-say() { tput setaf 3; echo "$@"; tput sgr0; }
+say() { [ ! -t 1 ] || tput setaf 3; echo "$@"; [ ! -t 1 ] || tput sgr0; }
 
 selftest() {
-	say "Network: $1"
+	say "Self test with network=$1"
 	echo "network { enabled: $1 dynamic_ifaces: false } container { use_hierarchy: true } privileges { root_user: \"$USER\" }" > /etc/portod.conf
 	portotest
 }
 
 stresstest() {
-	say "Stress"
+	say "Stress test"
 	portotest stress
 }
 
 pkgtest() {
+	say "Package test"
 	for f in $ROOTDIR/dist/*.conf; do
 		$ROOTDIR/scripts/mkimg 5G ${f}.img $f -vT -c $ROOTDIR -C
 	done
 }
 
-tests="$@"
-if [ -z "$tests" ]; then
-	tests="false true pkg stress"
-fi
-
-for t in $tests; do
+[ ! $# -eq 0 ] || set -- false true pkg stress
+for t in "$@"; do
 	case $t in
 		true|false) selftest $t ;;
 		stress) stresstest ;;

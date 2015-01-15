@@ -1,4 +1,5 @@
 - bind fails when source is link
+- selftest: make sure we don't leak fds into child processes
 - portoctl lxc
 - remove net_guarantee/net_limit
 - chroot -> pivot_root (to remove all mounts from container)

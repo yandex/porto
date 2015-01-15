@@ -269,7 +269,7 @@ TError TTask::ChildExec() {
     auto envp = Env->GetEnvp();
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
 
-    return TError(EError::Unknown, errno, string("execvpe(") + result.we_wordv[0] + ") " + std::to_string(result.we_wordc) + "/" + std::to_string(Env->Environ.size()));
+    return TError(EError::Unknown, errno, string("execvpe(") + result.we_wordv[0] + ", " + std::to_string(result.we_wordc) + ", " + std::to_string(Env->Environ.size()) + ")");
 }
 
 TError TTask::ChildBindDns() {

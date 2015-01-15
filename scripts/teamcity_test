@@ -39,7 +39,21 @@ print_logs() {
 	prlog /var/log/portod.log
 }
 
-for cg in /sys/fs/cgroup/*; do echo $$ | sudo tee $cg/cgroup.procs &>/dev/null; done
+preparenet() {
+	# we need multiple network interfaces for selftest
+	ip l del eth9 || :
+	ip l add eth9 type dummy
+}
+
+fixcg() {
+	# make current task belongs to root cgroups
+	for cg in /sys/fs/cgroup/*; do
+		echo $$ | sudo tee $cg/cgroup.procs &>/dev/null;
+	done
+}
+
+preparenet
+fixcg
 
 [ ! $# -eq 0 ] || set -- build selftest pkgtest stresstest
 trap print_logs EXIT
