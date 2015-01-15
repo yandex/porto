@@ -284,7 +284,7 @@ int StressTest(int threads, int iter, bool killPorto) {
 
         TestDaemon(api);
     } catch (std::string e) {
-        std::cerr << "ERROR: Exception " << e << std::endl;
+        std::cerr << "ERROR: " << e << std::endl;
         abort();
     }
 

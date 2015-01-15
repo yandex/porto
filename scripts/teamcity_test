@@ -4,6 +4,8 @@ set -e
 
 export PATH="/usr/sbin:$PATH"
 
+DUMMY_ETH=eth9
+
 getver() { portoctl -v 2>&1 | grep $1 | awk '{print $2}'; }
 checkver() { [ "$2" = "$3" ] || { echo "Invalid $1 version ($2 != $3)"; }; }
 
@@ -20,7 +22,7 @@ build() {
 
 selftest() {
 	netup
-	#sudo scripts/test false true
+	sudo scripts/test false true
 	sudo scripts/test true
 	netdown
 }
@@ -39,20 +41,23 @@ prlog() {
 }
 
 print_logs() {
+	set +e
+
 	prlog /var/log/portoloop.log
 	prlog /var/log/portod.log
+	netdown
 }
 
 netup() {
 	# we need multiple network interfaces for selftest
-	sudo ip link del eth9 || :
-	sudo ip link add eth9 type dummy
-	sudo ip link set dev eth9 up
-	sudo ip addr add 192.168.2.2/16 dev eth9
+	sudo ip link del $DUMMY_ETH || :
+	sudo ip link add $DUMMY_ETH type dummy
+	sudo ip link set dev $DUMMY_ETH up
+	sudo ip addr add 192.168.2.2/16 dev $DUMMY_ETH
 }
 
 netdown() {
-	sudo ip link del eth9
+	sudo ip link del $DUMMY_ETH
 	# TODO: enable dynamic_ifaces?
 	sudo reload yandex-porto
 }

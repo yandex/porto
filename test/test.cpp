@@ -483,7 +483,7 @@ void RestartDaemon(TPortoAPI &api) {
     std::cerr << ">>> Truncating logs and restarting porto..." << std::endl;
 
     if (Pgrep("portod") != 1)
-        throw string("Porto is not running");
+        throw string("Porto is not running (or multiple portod processes)");
 
     if (Pgrep("portod-slave") != 1)
         throw string("Porto slave is not running");

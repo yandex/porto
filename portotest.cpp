@@ -27,7 +27,7 @@ static int Selftest(int argc, char *argv[]) {
 }
 
 static int Stresstest(int argc, char *argv[]) {
-    int threads = -1, iter = 300;
+    int threads = -1, iter = 50;
     bool killPorto = true;
     if (argc >= 1)
         StringToInt(argv[0], threads);

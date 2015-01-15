@@ -20,7 +20,7 @@ stresstest() {
 pkgtest() {
 	say "Package test"
 	for f in $ROOTDIR/dist/*.conf; do
-		$ROOTDIR/scripts/mkimg 5G ${f}.img $f -vT -c $ROOTDIR -C
+		$ROOTDIR/scripts/mkimg 5G ${f}.img $f -vT -c $ROOTDIR
 	done
 }
 
