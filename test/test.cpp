@@ -493,7 +493,9 @@ void RestartDaemon(TPortoAPI &api) {
     if (kill(pid, SIGINT))
         throw string("Can't send SIGINT to slave");
 
-    WaitPortod(api);
+    // We need to wait longer because porto may need to remove huge number of
+    // containers
+    WaitPortod(api, 2 * 60);
 
     // Truncate slave log
     TFile slaveLog(config().slave_log().path());

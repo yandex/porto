@@ -2084,7 +2084,7 @@ static void TestDataMap(TPortoAPI &api, const std::string &name, const std::stri
         string tmp;
         vector<string> tokens;
 
-        ExpectSuccess(SplitString(full, ':', tokens));
+        ExpectSuccess(SplitString(line, ':', tokens));
         ExpectSuccess(api.GetData(name, data + "[" + StringTrim(tokens[0]) + "]", tmp));
         Expect(tmp == StringTrim(tokens[1]));
     }
@@ -2164,12 +2164,12 @@ static void TestData(TPortoAPI &api) {
     Expect(v != "0" && v != "-1");
 
     if (IsCfqActive()) {
-        Say() << "- Make sure io_write counters are valid" << std::endl;
+        Say() << "Make sure io_write counters are valid" << std::endl;
         ExpectSuccess(api.GetData(root, "io_write", v));
         Expect(v != "");
         TestDataMap(api, root, "io_write");
 
-        Say() << "- Make sure io_read counters are valid" << std::endl;
+        Say() << "Make sure io_read counters are valid" << std::endl;
         ExpectSuccess(api.GetData(root, "io_read", v));
         Expect(v != "");
         TestDataMap(api, root, "io_read");
@@ -2882,7 +2882,7 @@ static void TestPerf(TPortoAPI &api) {
     }
     ms = GetCurrentTimeMs() - begin;
     Say() << "Get state " << nr << " containers took " << ms / 1000.0 << "s" << std::endl;
-    Expect(ms < 100);
+    Expect(ms < 1000);
 
     begin = GetCurrentTimeMs();
     for (int i = 0; i < nr; i++) {

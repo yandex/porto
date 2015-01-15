@@ -29,5 +29,19 @@ stresstest() {
 	sudo scripts/test stress
 }
 
+prlog() {
+	echo "$1:"
+	tail -n 40 $1
+}
+
+print_logs() {
+	prlog /var/log/portoloop.log
+	prlog /var/log/portod
+}
+
+for cg in /sys/fs/cgroup/*; do echo $$ > $cg/cgroup.procs; done
+
 [ ! $# -eq 0 ] || set -- build selftest pkgtest stresstest
+trap print_logs EXIT
 for f in "$@"; do eval $f; done
+trap - EXIT
