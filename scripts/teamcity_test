@@ -13,8 +13,8 @@ build() {
 	client=$(portoctl -v | grep client | awk '{print $2}')
 	server=$(portoctl -v | grep server | awk '{print $2}')
 
-	[ "$version" = "$server" ] || { echo "Invalid server version!"; exit 1; }
-	[ "$version" = "$client" ] || { echo "Invalid client version!"; exit 1; }
+	[ "v$version" = "$server" ] || { echo "Invalid server version ($server)!"; exit 1; }
+	[ "v$version" = "$client" ] || { echo "Invalid client version ($client)!"; exit 1; }
 }
 
 selftest() {
