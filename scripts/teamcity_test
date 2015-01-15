@@ -36,10 +36,10 @@ prlog() {
 
 print_logs() {
 	prlog /var/log/portoloop.log
-	prlog /var/log/portod
+	prlog /var/log/portod.log
 }
 
-for cg in /sys/fs/cgroup/*; do echo $$ | sudo tee $cg/cgroup.procs; done
+for cg in /sys/fs/cgroup/*; do echo $$ | sudo tee $cg/cgroup.procs &>/dev/null; done
 
 [ ! $# -eq 0 ] || set -- build selftest pkgtest stresstest
 trap print_logs EXIT
