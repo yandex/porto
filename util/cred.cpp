@@ -1,6 +1,6 @@
-#include "pwd.hpp"
 #include "util/string.hpp"
 #include "util/log.hpp"
+#include "util/cred.hpp"
 
 extern "C" {
 #include <grp.h>

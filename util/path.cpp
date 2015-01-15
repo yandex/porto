@@ -1,6 +1,6 @@
 #include "path.hpp"
 #include "util/string.hpp"
-#include "util/pwd.hpp"
+#include "util/cred.hpp"
 
 extern "C" {
 #include <unistd.h>

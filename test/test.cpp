@@ -6,7 +6,7 @@
 #include "util/folder.hpp"
 #include "util/string.hpp"
 #include "util/netlink.hpp"
-#include "util/pwd.hpp"
+#include "util/cred.hpp"
 
 using std::string;
 using std::vector;

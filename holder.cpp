@@ -7,7 +7,6 @@
 #include "data.hpp"
 #include "event.hpp"
 #include "util/string.hpp"
-#include "util/pwd.hpp"
 #include "util/cred.hpp"
 
 static void ParseUserConf(const ::google::protobuf::RepeatedPtrField<std::string> &source,

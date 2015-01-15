@@ -8,7 +8,7 @@
 #include "util/file.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
-#include "util/pwd.hpp"
+#include "util/cred.hpp"
 #include "util/netlink.hpp"
 
 extern "C" {

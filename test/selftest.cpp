@@ -12,7 +12,7 @@
 #include "util/folder.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
-#include "util/pwd.hpp"
+#include "util/cred.hpp"
 #include "test.hpp"
 
 #define HOSTNAME "portotest"

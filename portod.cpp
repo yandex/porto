@@ -17,7 +17,7 @@
 #include "util/unix.hpp"
 #include "util/string.hpp"
 #include "util/crash.hpp"
-#include "util/pwd.hpp"
+#include "util/cred.hpp"
 
 extern "C" {
 #include <fcntl.h>
