@@ -2094,7 +2094,7 @@ static void TestDataMap(TPortoAPI &api, const std::string &name, const std::stri
 
 static void ExpectNonZeroLink(TPortoAPI &api, const std::string &name,
                               const std::string &data) {
-#if 0
+#if 1
     int nonzero = 0;
 
     for (auto &link : links) {
@@ -2197,18 +2197,22 @@ static void TestData(TPortoAPI &api) {
     }
 
     if (NetworkEnabled()) {
+        Say() << "Make sure net_bytes counters are valid" << std::endl;
         ExpectNonZeroLink(api, root, "net_bytes");
         ExpectRootLink(api, wget, "net_bytes");
         ExpectZeroLink(api, noop, "net_bytes");
 
+        Say() << "Make sure net_packets counters are valid" << std::endl;
         ExpectNonZeroLink(api, root, "net_packets");
         ExpectRootLink(api, wget, "net_packets");
         ExpectZeroLink(api, noop, "net_packets");
 
+        Say() << "Make sure net_drops counters are valid" << std::endl;
         ExpectZeroLink(api, root, "net_drops");
         ExpectZeroLink(api, wget, "net_drops");
         ExpectZeroLink(api, noop, "net_drops");
 
+        Say() << "Make sure net_overlimits counters are valid" << std::endl;
         ExpectZeroLink(api, root, "net_overlimits");
         ExpectZeroLink(api, wget, "net_overlimits");
         ExpectZeroLink(api, noop, "net_overlimits");
