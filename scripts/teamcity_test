@@ -41,8 +41,8 @@ print_logs() {
 
 preparenet() {
 	# we need multiple network interfaces for selftest
-	ip l del eth9 || :
-	ip l add eth9 type dummy
+	sudo ip link del eth9 || :
+	sudo ip link add eth9 type dummy
 }
 
 fixcg() {
