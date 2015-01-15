@@ -90,3 +90,38 @@ TError TGroup::Load() {
 
     return TError(EError::InvalidValue, "Invalid group");
 }
+
+std::string TCred::UserAsString() const {
+    TUser u(Uid);
+
+    if (u.Load())
+        return std::to_string(Uid);
+    else
+        return u.GetName();
+}
+
+std::string TCred::GroupAsString() const {
+    TGroup g(Gid);
+
+    if (g.Load())
+        return std::to_string(Gid);
+    else
+        return g.GetName();
+};
+
+TError parseCred(TCred &cred, const std::string &user, const std::string &group) {
+    TUser u(user);
+    TError error = u.Load();
+    if (error)
+        return error;
+
+    TGroup g(group);
+    error = g.Load();
+    if (error)
+        return error;
+
+    cred.Uid = u.GetId();
+    cred.Gid = g.GetId();
+
+    return TError::Success();
+}

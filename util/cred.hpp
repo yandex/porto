@@ -49,6 +49,11 @@ public:
     bool operator!= (const TCred &cred) const {
         return (cred.Uid != Uid && cred.Gid != Gid);
     }
+
+    std::string UserAsString() const;
+    std::string GroupAsString() const;
 };
+
+TError parseCred(TCred &cred, const std::string &user, const std::string &group);
 
 #endif /* __CRED_H__ */

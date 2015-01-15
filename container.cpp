@@ -581,19 +581,11 @@ TError TContainer::Create(const TCred &cred) {
         return error;
     }
 
-    TUser u(cred.Uid);
-    if (u.Load())
-        error = Prop->SetString(P_USER, std::to_string(cred.Uid));
-    else
-        error = Prop->SetString(P_USER, u.GetName());
+    error = Prop->SetString(P_USER, cred.UserAsString());
     if (error)
         return error;
 
-    TGroup g(cred.Gid);
-    if (g.Load())
-        error = Prop->SetString(P_GROUP, std::to_string(cred.Gid));
-    else
-        error = Prop->SetString(P_GROUP, g.GetName());
+    error = Prop->SetString(P_GROUP, cred.GroupAsString());
     if (error)
         return error;
 

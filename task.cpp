@@ -46,19 +46,9 @@ TError TTaskEnv::Prepare() {
     if (Command.empty())
         return TError::Success();
 
-    TUser u(User);
-    TError error = u.Load();
+    TError error = parseCred(Cred, User, Group);
     if (error)
         return error;
-
-    Cred.Uid = u.GetId();
-
-    TGroup g(Group);
-    error = g.Load();
-    if (error)
-        return error;
-
-    Cred.Gid = g.GetId();
 
     return TError::Success();
 }

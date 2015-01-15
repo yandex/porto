@@ -117,23 +117,13 @@ TError TPath::Chroot() const {
 }
 
 TError TPath::Chown(const std::string &user, const std::string &group) const {
-    int uid, gid;
+    TCred cred;
 
-    TUser u(user);
-    TError error = u.Load();
+    TError error = parseCred(cred, user, group);
     if (error)
         return error;
 
-    uid = u.GetId();
-
-    TGroup g(group);
-    error = g.Load();
-    if (error)
-        return error;
-
-    gid = g.GetId();
-
-    int ret = chown(Path.c_str(), uid, gid);
+    int ret = chown(Path.c_str(), cred.Uid, cred.Gid);
     if (ret)
         return TError(EError::Unknown, errno, "chown(" + Path + ", " + user + ", " + group + ")");
 
