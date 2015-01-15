@@ -43,9 +43,8 @@ print_logs() {
 preparenet() {
 	# we need multiple network interfaces for selftest
 	sudo ip link del eth9 || :
-	sudo ip link add eth8 type veth peer name eth9
+	sudo ip link add eth9 type dummy
 	sudo ip link set dev eth9 up
-	sudo ip addr add 192.168.2.1/16 dev eth8
 	sudo ip addr add 192.168.2.2/16 dev eth9
 }
 
