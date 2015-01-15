@@ -53,6 +53,8 @@ netup() {
 
 netdown() {
 	sudo ip link del eth9
+	# TODO: enable dynamic_ifaces?
+	sudo reload yandex-porto
 }
 
 fixcg() {
