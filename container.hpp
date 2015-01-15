@@ -137,6 +137,8 @@ public:
     bool UseParentNamespace() const;
     bool DeliverEvent(const TEvent &event);
     size_t GetTimeOfDeath() { return TimeOfDeath; }
+
+    TError CheckPermission(const TCred &ucred);
 };
 
 #endif

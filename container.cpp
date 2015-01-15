@@ -1386,3 +1386,18 @@ bool TContainer::DeliverEvent(const TEvent &event) {
             return false;
     }
 }
+
+TError TContainer::CheckPermission(const TCred &ucred) {
+    if (Holder->PrivilegedUser(ucred))
+        return TError::Success();
+
+    // for root we report more meaningful errors from handlers, so don't
+    // check permissions here
+    if (IsRoot())
+        return TError::Success();
+
+    if (Cred == ucred)
+        return TError::Success();
+
+    return TError(EError::Permission, "Permission error");
+}

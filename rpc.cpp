@@ -25,7 +25,7 @@ static TError DestroyContainer(THolder &cholder,
       // might think that it has some parent that holds it
         auto container = cholder.Get(req.name());
         if (container) {
-            TError error = cholder.CheckPermission(container, cred);
+            TError error = container->CheckPermission(cred);
             if (error)
                 return error;
         }
@@ -42,7 +42,7 @@ static TError StartContainer(THolder &cholder,
     if (!container)
         return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    TError error = cholder.CheckPermission(container, cred);
+    TError error = container->CheckPermission(cred);
     if (error)
         return error;
 
@@ -57,7 +57,7 @@ static TError StopContainer(THolder &cholder,
     if (!container)
         return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    TError error = cholder.CheckPermission(container, cred);
+    TError error = container->CheckPermission(cred);
     if (error)
         return error;
 
@@ -72,7 +72,7 @@ static TError PauseContainer(THolder &cholder,
     if (!container)
         return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    TError error = cholder.CheckPermission(container, cred);
+    TError error = container->CheckPermission(cred);
     if (error)
         return error;
 
@@ -87,7 +87,7 @@ static TError ResumeContainer(THolder &cholder,
     if (!container)
         return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    TError error = cholder.CheckPermission(container, cred);
+    TError error = container->CheckPermission(cred);
     if (error)
         return error;
 
@@ -125,7 +125,7 @@ static TError SetContainerProperty(THolder &cholder,
     if (!container)
         return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    TError error = cholder.CheckPermission(container, cred);
+    TError error = container->CheckPermission(cred);
     if (error)
         return error;
 
@@ -191,7 +191,7 @@ static TError Kill(THolder &cholder,
     if (!container)
         return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    TError error = cholder.CheckPermission(container, cred);
+    TError error = container->CheckPermission(cred);
     if (error)
         return error;
 

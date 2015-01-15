@@ -71,22 +71,6 @@ bool TCredAdmin::RestrictedUser(const TCred &cred) {
     return false;
 }
 
-TError TCredAdmin::CheckPermission(std::shared_ptr<TContainer> container,
-                                   const TCred &cred) {
-    if (PrivilegedUser(cred))
-        return TError::Success();
-
-    // for root we report more meaningful errors from handlers, so don't
-    // check permissions here
-    if (container->IsRoot())
-        return TError::Success();
-
-    if (container->Cred == cred)
-        return TError::Success();
-
-    return TError(EError::Permission, "Permission error");
-}
-
 THolder::~THolder() {
     // we want children to be removed first
     while (Containers.begin() != Containers.end()) {

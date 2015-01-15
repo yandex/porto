@@ -24,7 +24,6 @@ public:
     TError Initialize();
     bool PrivilegedUser(const TCred &cred);
     bool RestrictedUser(const TCred &cred);
-    TError CheckPermission(std::shared_ptr<TContainer> container, const TCred &cred);
 };
 
 class THolder : public TCredAdmin {
