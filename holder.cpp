@@ -9,67 +9,6 @@
 #include "util/string.hpp"
 #include "util/cred.hpp"
 
-static void ParseUserConf(const ::google::protobuf::RepeatedPtrField<std::string> &source,
-                          std::set<int> &target) {
-    for (auto &val : source) {
-        TUser u(val);
-        TError error = u.Load();
-        if (error) {
-            L_WRN() << "Can't add privileged user: " << error << std::endl;
-            continue;
-        }
-
-        target.insert(u.GetId());
-    }
-}
-
-static void ParseGroupConf(const ::google::protobuf::RepeatedPtrField<std::string> &source,
-                          std::set<int> &target) {
-    for (auto &val : source) {
-        TGroup g(val);
-        TError error = g.Load();
-        if (error) {
-            L_WRN() << "Can't add privileged group: " << error << std::endl;
-            continue;
-        }
-
-        target.insert(g.GetId());
-    }
-}
-
-TError TCredAdmin::Initialize() {
-    ParseUserConf(config().privileges().root_user(), PrivilegedUid);
-    ParseGroupConf(config().privileges().root_group(), PrivilegedGid);
-
-    ParseUserConf(config().privileges().restricted_root_user(), RestrictedRootUid);
-    ParseGroupConf(config().privileges().restricted_root_group(), RestrictedRootGid);
-
-    return TError::Success();
-}
-
-bool TCredAdmin::PrivilegedUser(const TCred &cred) {
-    if (cred.IsRoot())
-        return true;
-
-    if (PrivilegedUid.find(cred.Uid) != PrivilegedUid.end())
-        return true;
-
-    if (PrivilegedGid.find(cred.Gid) != PrivilegedGid.end())
-        return true;
-
-    return false;
-}
-
-bool TCredAdmin::RestrictedUser(const TCred &cred) {
-    if (RestrictedRootUid.find(cred.Uid) != RestrictedRootUid.end())
-        return true;
-
-    if (RestrictedRootGid.find(cred.Gid) != RestrictedRootGid.end())
-        return true;
-
-    return false;
-}
-
 THolder::~THolder() {
     // we want children to be removed first
     while (Containers.begin() != Containers.end()) {
@@ -94,10 +33,6 @@ TError THolder::CreateRoot() {
         return error;
 
     error = TaskGetLastCap();
-    if (error)
-        return error;
-
-    error = Initialize();
     if (error)
         return error;
 

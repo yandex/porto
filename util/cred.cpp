@@ -2,10 +2,24 @@
 #include "util/log.hpp"
 #include "util/cred.hpp"
 
+#include "config.hpp"
+
 extern "C" {
 #include <grp.h>
 #include <pwd.h>
 }
+
+class TCredAdmin : public TNonCopyable {
+private:
+    std::set<int> PrivilegedUid, PrivilegedGid;
+    std::set<int> RestrictedRootUid, RestrictedRootGid;
+    bool initialized = false;
+public:
+    TError Initialize();
+    bool PrivilegedUser(const TCred &cred);
+};
+
+static TCredAdmin credadmin;
 
 std::string TUserEntry::GetName() {
     return Name;
@@ -91,6 +105,13 @@ TError TGroup::Load() {
     return TError(EError::InvalidValue, "Invalid group");
 }
 
+bool TCred::IsPrivileged() const {
+    if (IsRoot())
+        return true;
+
+    return credadmin.PrivilegedUser(*this);
+}
+
 std::string TCred::UserAsString() const {
     TUser u(Uid);
 
@@ -124,4 +145,67 @@ TError parseCred(TCred &cred, const std::string &user, const std::string &group)
     cred.Gid = g.GetId();
 
     return TError::Success();
+}
+
+static void ParseUserConf(const ::google::protobuf::RepeatedPtrField<std::string> &source,
+                          std::set<int> &target) {
+    for (auto &val : source) {
+        TUser u(val);
+        TError error = u.Load();
+        if (error) {
+            L_WRN() << "Can't add privileged user: " << error << std::endl;
+            continue;
+        }
+
+        target.insert(u.GetId());
+    }
+}
+
+static void ParseGroupConf(const ::google::protobuf::RepeatedPtrField<std::string> &source,
+                          std::set<int> &target) {
+    for (auto &val : source) {
+        TGroup g(val);
+        TError error = g.Load();
+        if (error) {
+            L_WRN() << "Can't add privileged group: " << error << std::endl;
+            continue;
+        }
+
+        target.insert(g.GetId());
+    }
+}
+
+TError TCredAdmin::Initialize() {
+    ParseUserConf(config().privileges().root_user(), PrivilegedUid);
+    ParseGroupConf(config().privileges().root_group(), PrivilegedGid);
+
+    ParseUserConf(config().privileges().restricted_root_user(), RestrictedRootUid);
+    ParseGroupConf(config().privileges().restricted_root_group(), RestrictedRootGid);
+
+    return TError::Success();
+}
+
+bool TCredAdmin::PrivilegedUser(const TCred &cred) {
+    if (!initialized) {
+        if (!Initialize())
+            initialized = true;
+    }
+
+    if (PrivilegedUid.find(cred.Uid) != PrivilegedUid.end())
+        return true;
+
+    if (PrivilegedGid.find(cred.Gid) != PrivilegedGid.end())
+        return true;
+
+    return false;
+}
+
+bool TCredAdmin::RestrictedUser(const TCred &cred) {
+    if (RestrictedRootUid.find(cred.Uid) != RestrictedRootUid.end())
+        return true;
+
+    if (RestrictedRootGid.find(cred.Gid) != RestrictedRootGid.end())
+        return true;
+
+    return false;
 }

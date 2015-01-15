@@ -129,7 +129,7 @@ static TError SetContainerProperty(THolder &cholder,
     if (error)
         return error;
 
-    return container->SetProperty(req.property(), req.value(), cholder.PrivilegedUser(cred));
+    return container->SetProperty(req.property(), req.value(), cred.IsPrivileged());
 }
 
 static TError GetContainerData(THolder &cholder,

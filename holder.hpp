@@ -16,17 +16,7 @@ class TIdMap;
 class TEventQueue;
 class TEvent;
 
-class TCredAdmin : public TNonCopyable {
-private:
-    std::set<int> PrivilegedUid, PrivilegedGid;
-    std::set<int> RestrictedRootUid, RestrictedRootGid;
-public:
-    TError Initialize();
-    bool PrivilegedUser(const TCred &cred);
-    bool RestrictedUser(const TCred &cred);
-};
-
-class THolder : public TCredAdmin {
+class THolder {
     std::shared_ptr<TNetwork> Net;
     std::map<std::string, std::shared_ptr<TContainer>> Containers;
     TIdMap IdMap;

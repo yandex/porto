@@ -2,6 +2,7 @@
 #define __CRED_H__
 
 #include <string>
+#include <set>
 
 #include "common.hpp"
 
@@ -38,10 +39,6 @@ public:
     TCred(uid_t uid, gid_t gid) : Uid(uid), Gid(gid) {}
     TCred() : Uid(0), Gid(0) {}
 
-    bool IsRoot() const {
-        return Uid == 0 || Gid == 0;
-    }
-
     bool operator== (const TCred &cred) const {
         return (cred.Uid == Uid || cred.Gid == Gid);
     }
@@ -52,6 +49,12 @@ public:
 
     std::string UserAsString() const;
     std::string GroupAsString() const;
+
+    bool IsRoot() const {
+        return Uid == 0 || Gid == 0;
+    }
+
+    bool IsPrivileged() const;
 };
 
 TError parseCred(TCred &cred, const std::string &user, const std::string &group);
