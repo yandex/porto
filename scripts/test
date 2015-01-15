@@ -8,7 +8,7 @@ say() { [ ! -t 1 ] || tput setaf 3; echo "$@"; [ ! -t 1 ] || tput sgr0; }
 
 selftest() {
 	say "Self test with network=$1"
-	echo "network { enabled: $1 dynamic_ifaces: false } container { use_hierarchy: true } privileges { root_user: \"$USER\" }" > /etc/portod.conf
+	echo "log { verbose: true} network { enabled: $1 dynamic_ifaces: false } container { use_hierarchy: true } privileges { root_user: \"$USER\" }" > /etc/portod.conf
 	portotest
 }
 
