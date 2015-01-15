@@ -19,8 +19,10 @@ build() {
 }
 
 selftest() {
+	netup
 	#sudo scripts/test false true
 	sudo scripts/test true
+	netdown
 }
 
 pkgtest() {
@@ -41,12 +43,16 @@ print_logs() {
 	prlog /var/log/portod.log
 }
 
-preparenet() {
+netup() {
 	# we need multiple network interfaces for selftest
 	sudo ip link del eth9 || :
 	sudo ip link add eth9 type dummy
 	sudo ip link set dev eth9 up
 	sudo ip addr add 192.168.2.2/16 dev eth9
+}
+
+netdown() {
+	sudo ip link del eth9
 }
 
 fixcg() {
@@ -56,7 +62,6 @@ fixcg() {
 	done
 }
 
-preparenet
 fixcg
 
 [ ! $# -eq 0 ] || set -- build selftest pkgtest stresstest
