@@ -2164,9 +2164,12 @@ static void TestData(TPortoAPI &api) {
     Expect(v != "0" && v != "-1");
 
     if (IsCfqActive()) {
+        Say() << "- Make sure io_write counters are valid" << std::endl;
         ExpectSuccess(api.GetData(root, "io_write", v));
         Expect(v != "");
         TestDataMap(api, root, "io_write");
+
+        Say() << "- Make sure io_read counters are valid" << std::endl;
         ExpectSuccess(api.GetData(root, "io_read", v));
         Expect(v != "");
         TestDataMap(api, root, "io_read");
