@@ -2873,7 +2873,7 @@ static void TestPerf(TPortoAPI &api) {
     }
     ms = GetCurrentTimeMs() - begin;
     Say() << "Create " << nr << " containers took " << ms / 1000.0 << "s" << std::endl;
-    Expect(ms < 10 * 1000);
+    Expect(ms < 20 * 1000);
 
     begin = GetCurrentTimeMs();
     for (int i = 0; i < nr; i++) {
