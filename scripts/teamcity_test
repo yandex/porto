@@ -10,8 +10,8 @@ build() {
 	debuild -i -us -uc -b
 	sudo dpkg -i ../yandex-porto_${version}_amd64.deb
 
-	client=$(portoctl -v | grep client | awk '{print $2}')
-	server=$(portoctl -v | grep server | awk '{print $2}')
+	client=$(portoctl -v 2>&1 | grep client | awk '{print $2}')
+	server=$(portoctl -v 2>&1 | grep server | awk '{print $2}')
 
 	[ "v$version" = "$server" ] || { echo "Invalid server version ($server)!"; exit 1; }
 	[ "v$version" = "$client" ] || { echo "Invalid client version ($client)!"; exit 1; }
@@ -29,5 +29,5 @@ stresstest() {
 	sudo scripts/test stress
 }
 
-[ ! $# -eq 0 ] || set -- "build selftest pkgtest stresstest"
+[ ! $# -eq 0 ] || set -- build selftest pkgtest stresstest
 for f in "$@"; do eval $f; done
