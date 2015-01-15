@@ -19,7 +19,8 @@ build() {
 }
 
 selftest() {
-	sudo scripts/test false true
+	#sudo scripts/test false true
+	sudo scripts/test true
 }
 
 pkgtest() {
