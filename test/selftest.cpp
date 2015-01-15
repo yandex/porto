@@ -2891,7 +2891,7 @@ static void TestPerf(TPortoAPI &api) {
     }
     ms = GetCurrentTimeMs() - begin;
     Say() << "Destroy " << nr << " containers took " << ms / 1000.0 << "s" << std::endl;
-    Expect(ms < 60 * 1000);
+    Expect(ms < 120 * 1000);
 }
 
 static void KillPorto(TPortoAPI &api, int sig, int times = 10) {
