@@ -15,7 +15,7 @@ private:
     std::set<int> RestrictedRootUid, RestrictedRootGid;
     bool initialized = false;
 public:
-    TError Initialize();
+    void Initialize();
     bool PrivilegedUser(const TCred &cred);
 };
 
@@ -187,8 +187,8 @@ TError TCredAdmin::Initialize() {
 
 bool TCredAdmin::PrivilegedUser(const TCred &cred) {
     if (!initialized) {
-        if (!Initialize())
-            initialized = true;
+        Initialize();
+        initialized = true;
     }
 
     if (PrivilegedUid.find(cred.Uid) != PrivilegedUid.end())
