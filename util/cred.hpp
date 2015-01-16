@@ -59,4 +59,15 @@ public:
     TError Parse(const std::string &user, const std::string &group);
 };
 
+class TCredConf : public TNonCopyable {
+private:
+    std::set<int> PrivilegedUid, PrivilegedGid;
+    std::set<int> RestrictedRootUid, RestrictedRootGid;
+public:
+    void Load();
+    bool PrivilegedUser(const TCred &cred);
+};
+
+extern TCredConf CredConf;
+
 #endif /* __CRED_H__ */

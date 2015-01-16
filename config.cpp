@@ -97,6 +97,8 @@ void TConfig::Load(bool silent) {
         std::cerr << "aging_time_s should be greater than rotate_logs_timeout_s" << std::endl;
         throw string("Invalid configuration");
     }
+
+    CredConf.Load();
 }
 
 int TConfig::Test(const std::string &path) {

@@ -9,18 +9,6 @@ extern "C" {
 #include <pwd.h>
 }
 
-class TCredAdmin : public TNonCopyable {
-private:
-    std::set<int> PrivilegedUid, PrivilegedGid;
-    std::set<int> RestrictedRootUid, RestrictedRootGid;
-    bool initialized = false;
-public:
-    void Initialize();
-    bool PrivilegedUser(const TCred &cred);
-};
-
-static TCredAdmin credadmin;
-
 std::string TUserEntry::GetName() {
     return Name;
 }
@@ -109,7 +97,7 @@ bool TCred::IsPrivileged() const {
     if (IsRoot())
         return true;
 
-    return credadmin.PrivilegedUser(*this);
+    return CredConf.PrivilegedUser(*this);
 }
 
 std::string TCred::UserAsString() const {
@@ -175,22 +163,15 @@ static void ParseGroupConf(const ::google::protobuf::RepeatedPtrField<std::strin
     }
 }
 
-TError TCredAdmin::Initialize() {
+void TCredAdmin::Load() {
     ParseUserConf(config().privileges().root_user(), PrivilegedUid);
     ParseGroupConf(config().privileges().root_group(), PrivilegedGid);
 
     ParseUserConf(config().privileges().restricted_root_user(), RestrictedRootUid);
     ParseGroupConf(config().privileges().restricted_root_group(), RestrictedRootGid);
-
-    return TError::Success();
 }
 
 bool TCredAdmin::PrivilegedUser(const TCred &cred) {
-    if (!initialized) {
-        Initialize();
-        initialized = true;
-    }
-
     if (PrivilegedUid.find(cred.Uid) != PrivilegedUid.end())
         return true;
 
