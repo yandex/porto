@@ -130,7 +130,7 @@ std::string TCred::GroupAsString() const {
         return g.GetName();
 };
 
-TError parseCred(TCred &cred, const std::string &user, const std::string &group) {
+TError TCred::Parse(const std::string &user, const std::string &group) {
     TUser u(user);
     TError error = u.Load();
     if (error)
@@ -141,8 +141,8 @@ TError parseCred(TCred &cred, const std::string &user, const std::string &group)
     if (error)
         return error;
 
-    cred.Uid = u.GetId();
-    cred.Gid = g.GetId();
+    Uid = u.GetId();
+    Gid = g.GetId();
 
     return TError::Success();
 }

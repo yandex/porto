@@ -119,7 +119,7 @@ TError TPath::Chroot() const {
 TError TPath::Chown(const std::string &user, const std::string &group) const {
     TCred cred;
 
-    TError error = parseCred(cred, user, group);
+    TError error = cred.Parse(user, group);
     if (error)
         return error;
 

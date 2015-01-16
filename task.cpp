@@ -46,7 +46,7 @@ TError TTaskEnv::Prepare() {
     if (Command.empty())
         return TError::Success();
 
-    TError error = parseCred(Cred, User, Group);
+    TError error = Cred.Parse(User, Group);
     if (error)
         return error;
 

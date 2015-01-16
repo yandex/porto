@@ -55,8 +55,8 @@ public:
     }
 
     bool IsPrivileged() const;
-};
 
-TError parseCred(TCred &cred, const std::string &user, const std::string &group);
+    TError Parse(const std::string &user, const std::string &group);
+};
 
 #endif /* __CRED_H__ */
