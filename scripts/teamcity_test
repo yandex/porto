@@ -23,7 +23,6 @@ build() {
 selftest() {
 	netup
 	sudo scripts/test false true
-	sudo scripts/test true
 	netdown
 }
 
