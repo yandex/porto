@@ -1,4 +1,5 @@
-- bind fails when source is link
+- root_readonly: remount root instead of binding into itself with ro
+  - bind fails when source is link
 - selftest: make sure we don't leak fds into child processes
 - portoctl lxc
 - remove net_guarantee/net_limit

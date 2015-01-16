@@ -832,7 +832,7 @@ static int SpawnSlave(map<int,int> &exited) {
 
     slavePid = 0;
 
-    if (pipe(evtfd) < 0) {
+    if (pipe2(evtfd, O_NONBLOCK) < 0) {
         L() << "pipe(): " << strerror(errno) << std::endl;
         return EXIT_FAILURE;
     }
