@@ -54,6 +54,7 @@ public:
     }
 
     TError Initialize();
+    TError Destroy();
 };
 
 TError TContext::Initialize() {
@@ -99,6 +100,23 @@ TError TContext::Initialize() {
         L_ERR() << "Can't create root container: " << error << std::endl;
         return error;
     }
+
+    return TError::Success();
+}
+
+TError TContext::Destroy() {
+    TError error;
+
+    if (NetEvt)
+        NetEvt->Disconnect();
+
+    error = Storage->Destroy();
+    if (error)
+        L_ERR() << "Can't destroy key-value storage: " << error << std::endl;
+
+    error = Net->Destroy();
+    if (error)
+        L_ERR() << "Can't destroy network: " << error << std::endl;
 
     return TError::Success();
 }
@@ -697,21 +715,12 @@ static int SlaveMain() {
         ret = SlaveRpc(context);
         L() << "Shutting down..." << std::endl;
 
-        if (context.NetEvt)
-            context.NetEvt->Disconnect();
-
         RemoveRpcServer(config().rpc_sock().file().path());
 
         if (!cleanup && raiseSignum)
             RaiseSignal(raiseSignum);
 
-        error = context.Storage->Destroy();
-        if (error)
-            L_ERR() << "Can't destroy key-value storage: " << error << std::endl;
-
-        error = context.Net->Destroy();
-        if (error)
-            L_ERR() << "Can't destroy network: " << error << std::endl;
+        context.Destroy();
     } catch (string s) {
         std::cerr << s << std::endl;
         ret = EXIT_FAILURE;
