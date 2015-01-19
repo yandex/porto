@@ -1,6 +1,4 @@
-- virt_mode=os limit capabilities
 - fix netfilter bug with >3.10
-- add restricted_root config option
 - mount root loop in root namespace (to better diagnose possible problems)
 - root_readonly: remount root instead of binding into itself with ro
   - bind fails when source is link

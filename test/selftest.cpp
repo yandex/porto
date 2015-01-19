@@ -1208,7 +1208,7 @@ static void TestRootProperty(TPortoAPI &api) {
     ExpectSuccess(api.SetProperty(name, "command", "/ls -1 /dev"));
     v = StartWaitAndGetData(api, name, "stdout");
 
-    vector<string> devs = { "null", "zero", "full", "urandom", "random" };
+    vector<string> devs = { "null", "zero", "full", "urandom", "random", "console" };
     vector<string> other = { "ptmx", "pts", "shm", "fd" };
     vector<string> tokens;
     TError error = SplitString(v, '\n', tokens);
@@ -1952,6 +1952,7 @@ static void TestRoot(TPortoAPI &api) {
         "allowed_devices",
         "root_readonly",
         "capabilities",
+        "virt_mode",
     };
 
     vector<string> data = {
@@ -2431,8 +2432,7 @@ static void TestVirtModeProperty(TPortoAPI &api) {
         { "bind", "" },
         { "cwd", "/" },
         { "allowed_devices", "c 1:3 rwm; c 1:5 rwm; c 1:7 rwm; c 1:9 rwm; c 1:8 rwm; c 136:* rw; c 5:2 rwm; c 254:0 rm; c 254:0 rm; c 10:237 rmw; b 7:* rmw" },
-
-        // TODO: capabilities
+        { "capabilities", "CHOWN; DAC_OVERRIDE; FOWNER; FSETID; KILL; NET_ADMIN; NET_BIND_SERVICE; NET_RAW; SETGID; SETUID; SYS_CHROOT" },
     };
     std::string s;
 
@@ -3381,11 +3381,6 @@ static void TestPackage(TPortoAPI &api) {
     WaitPortod(api);
 }
 
-static std::string origHostname;
-void RevertHostname() {
-    SetHostName(origHostname);
-}
-
 int SelfTest(string name, int leakNr) {
     pair<string, std::function<void(TPortoAPI &)>> tests[] = {
         { "root", TestRoot },
@@ -3429,9 +3424,9 @@ int SelfTest(string name, int leakNr) {
         { "package", TestPackage },
     };
 
-    origHostname = GetHostname();
+    int ret = EXIT_SUCCESS;
+    std::string origHostname = GetHostname();
     ExpectSuccess(SetHostName(HOSTNAME));
-    atexit(RevertHostname);
 
     if (NetworkEnabled())
         subsystems.push_back("net_cls");
@@ -3439,10 +3434,11 @@ int SelfTest(string name, int leakNr) {
     LeakConainersNr = leakNr;
 
     needDaemonChecks = getenv("NOCHECK") == nullptr;
-    try {
-        config.Load();
-        TPortoAPI api(config().rpc_sock().file().path(), 0);
 
+    config.Load();
+    TPortoAPI api(config().rpc_sock().file().path(), 0);
+
+    try {
         if (needDaemonChecks) {
             RestartDaemon(api);
 
@@ -3471,10 +3467,11 @@ int SelfTest(string name, int leakNr) {
         AsRoot(api);
 
         if (!needDaemonChecks)
-            return EXIT_SUCCESS;
+            goto exit;
     } catch (string e) {
         std::cerr << "EXCEPTION: " << e << std::endl;
-        return EXIT_FAILURE;
+        ret = EXIT_FAILURE;
+        goto exit;
     }
 
     std::cerr << "SUCCESS: All tests successfully passed!" << std::endl;
@@ -3487,6 +3484,9 @@ int SelfTest(string name, int leakNr) {
     if (links.size() == 1)
         std::cerr << "WARNING: Multiple network support is not tested" << std::endl;
 
-    return EXIT_SUCCESS;
+exit:
+    AsRoot(api);
+    SetHostName(origHostname);
+    return ret;
 }
 }

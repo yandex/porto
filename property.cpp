@@ -1069,65 +1069,71 @@ public:
     }
 };
 
+struct TCapDesc {
+    uint64_t id;
+    int flags;
+};
+
+#define RESTRICTED_CAP 1
+
 class TCapabilitiesProperty : public TListValue {
     uint64_t Caps;
-    const std::map<std::string, uint64_t> supported = {
-        { "CHOWN", CAP_CHOWN },
-        { "DAC_OVERRIDE", CAP_DAC_OVERRIDE },
-        { "DAC_READ_SEARCH", CAP_DAC_READ_SEARCH },
-        { "FOWNER", CAP_FOWNER },
-        { "FSETID", CAP_FSETID },
-        { "KILL", CAP_KILL },
-        { "SETGID", CAP_SETGID },
-        { "SETUID", CAP_SETUID },
-        { "SETPCAP", CAP_SETPCAP },
-        { "LINUX_IMMUTABLE", CAP_LINUX_IMMUTABLE },
-        { "NET_BIND_SERVICE", CAP_NET_BIND_SERVICE },
-        { "NET_BROADCAST", CAP_NET_BROADCAST },
-        { "NET_ADMIN", CAP_NET_ADMIN },
-        { "NET_RAW", CAP_NET_RAW },
-        { "IPC_LOCK", CAP_IPC_LOCK },
-        { "IPC_OWNER", CAP_IPC_OWNER },
-        { "SYS_MODULE", CAP_SYS_MODULE },
-        { "SYS_RAWIO", CAP_SYS_RAWIO },
-        { "SYS_CHROOT", CAP_SYS_CHROOT },
-        { "SYS_PTRACE", CAP_SYS_PTRACE },
-        { "SYS_PACCT", CAP_SYS_PACCT },
-        { "SYS_ADMIN", CAP_SYS_ADMIN },
-        { "SYS_BOOT", CAP_SYS_BOOT },
-        { "SYS_NICE", CAP_SYS_NICE },
-        { "SYS_RESOURCE", CAP_SYS_RESOURCE },
-        { "SYS_TIME", CAP_SYS_TIME },
-        { "SYS_TTY_CONFIG", CAP_SYS_TTY_CONFIG },
-        { "MKNOD", CAP_MKNOD },
-        { "LEASE", CAP_LEASE },
-        { "AUDIT_WRITE", CAP_AUDIT_WRITE },
-        { "AUDIT_CONTROL", CAP_AUDIT_CONTROL },
-        { "SETFCAP", CAP_SETFCAP },
-        { "MAC_OVERRIDE", CAP_MAC_OVERRIDE },
-        { "MAC_ADMIN", CAP_MAC_ADMIN },
-        { "SYSLOG", CAP_SYSLOG },
-        { "WAKE_ALARM", CAP_WAKE_ALARM },
-        { "BLOCK_SUSPEND", CAP_BLOCK_SUSPEND },
+    const std::map<std::string, TCapDesc> supported = {
+        { "CHOWN",              { CAP_CHOWN, RESTRICTED_CAP } },
+        { "DAC_OVERRIDE",       { CAP_DAC_OVERRIDE, RESTRICTED_CAP } },
+        { "DAC_READ_SEARCH",    { CAP_DAC_READ_SEARCH, 0 } },
+        { "FOWNER",             { CAP_FOWNER, RESTRICTED_CAP } },
+        { "FSETID",             { CAP_FSETID, RESTRICTED_CAP } },
+        { "KILL",               { CAP_KILL, RESTRICTED_CAP } },
+        { "SETGID",             { CAP_SETGID, RESTRICTED_CAP } },
+        { "SETUID",             { CAP_SETUID, RESTRICTED_CAP } },
+        { "SETPCAP",            { CAP_SETPCAP, 0 } },
+        { "LINUX_IMMUTABLE",    { CAP_LINUX_IMMUTABLE, 0 } },
+        { "NET_BIND_SERVICE",   { CAP_NET_BIND_SERVICE, RESTRICTED_CAP } },
+        { "NET_BROADCAST",      { CAP_NET_BROADCAST, 0 } },
+        { "NET_ADMIN",          { CAP_NET_ADMIN, RESTRICTED_CAP } },
+        { "NET_RAW",            { CAP_NET_RAW, RESTRICTED_CAP } },
+        { "IPC_LOCK",           { CAP_IPC_LOCK, 0 } },
+        { "IPC_OWNER",          { CAP_IPC_OWNER, 0 } },
+        { "SYS_MODULE",         { CAP_SYS_MODULE, 0 } },
+        { "SYS_RAWIO",          { CAP_SYS_RAWIO, 0 } },
+        { "SYS_CHROOT",         { CAP_SYS_CHROOT, RESTRICTED_CAP } },
+        { "SYS_PTRACE",         { CAP_SYS_PTRACE, 0 } },
+        { "SYS_PACCT",          { CAP_SYS_PACCT, 0 } },
+        { "SYS_ADMIN",          { CAP_SYS_ADMIN, 0 } },
+        { "SYS_BOOT",           { CAP_SYS_BOOT, 0 } },
+        { "SYS_NICE",           { CAP_SYS_NICE, 0 } },
+        { "SYS_RESOURCE",       { CAP_SYS_RESOURCE, 0 } },
+        { "SYS_TIME",           { CAP_SYS_TIME, 0 } },
+        { "SYS_TTY_CONFIG",     { CAP_SYS_TTY_CONFIG, 0 } },
+        { "MKNOD",              { CAP_MKNOD, 0 } },
+        { "LEASE",              { CAP_LEASE, 0 } },
+        { "AUDIT_WRITE",        { CAP_AUDIT_WRITE, 0 } },
+        { "AUDIT_CONTROL",      { CAP_AUDIT_CONTROL, 0 } },
+        { "SETFCAP",            { CAP_SETFCAP, 0 } },
+        { "MAC_OVERRIDE",       { CAP_MAC_OVERRIDE, 0 } },
+        { "MAC_ADMIN",          { CAP_MAC_ADMIN, 0 } },
+        { "SYSLOG",             { CAP_SYSLOG, 0 } },
+        { "WAKE_ALARM",         { CAP_WAKE_ALARM, 0 } },
+        { "BLOCK_SUSPEND",      { CAP_BLOCK_SUSPEND, 0 } },
     };
 
 public:
     TCapabilitiesProperty() :
         TListValue(P_CAPABILITIES,
                    "Limit container capabilities",
-                   PERSISTENT_VALUE,
+                   PERSISTENT_VALUE | OS_MODE_PROPERTY,
                    staticProperty) {}
 
     TStrList GetDefaultList(std::shared_ptr<TContainer> c) override {
         TStrList v;
 
-        if (c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS) {
-            // TODO: ADD REQUIRED CAPABILITIES
-        } else {
-            if (c->Uid == 0 || c->Gid == 0)
-                for (auto kv : supported)
-                    v.push_back(kv.first);
-        }
+        bool root = c->Uid == 0 || c->Gid == 0;
+        bool restricted = c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS;
+
+        for (auto kv : supported)
+            if (root || (restricted && kv.second.flags & RESTRICTED_CAP))
+                v.push_back(kv.first);
         return v;
     }
 
@@ -1149,7 +1155,7 @@ public:
                 return TError(EError::InvalidValue,
                               "Unsupported capability " + line);
 
-            allowed |= (1ULL << supported.at(line));
+            allowed |= (1ULL << supported.at(line).id);
         }
 
         Caps = allowed;

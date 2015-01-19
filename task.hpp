@@ -128,6 +128,7 @@ class TTask: public TNonCopyable {
     TError ChildBindDirectores();
     TError RestrictProc(bool restrictProcSys);
     TError ChildMountDev();
+    TError ChildMountRun();
     TError ChildIsolateFs();
     TError EnableNet();
     TError IsolateNet(int childPid);

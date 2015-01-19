@@ -335,6 +335,23 @@ TError TTask::RestrictProc(bool restrictProcSys) {
     return TError::Success();
 }
 
+TError TTask::ChildMountRun() {
+    TPath run = Env->Root + "/run";
+    TFolder dir(run);
+    if (!dir.Exists()) {
+        TError error = dir.Create();
+        if (error)
+            return error;
+    }
+
+    TMount dev("tmpfs", run, "tmpfs", { "mode=755", "size=32m" });
+    TError error = dev.MountDir(MS_NOSUID | MS_STRICTATIME);
+    if (error)
+        return error;
+
+    return TError::Success();
+}
+
 TError TTask::ChildMountDev() {
     struct {
         const std::string path;
@@ -348,7 +365,7 @@ TError TTask::ChildMountDev() {
         { "/dev/urandom", 0666 | S_IFCHR, MKDEV(1, 9) },
     };
 
-    TMount dev("tmpfs", Env->Root + "/dev", "tmpfs", { "mode=755" });
+    TMount dev("tmpfs", Env->Root + "/dev", "tmpfs", { "mode=755", "size=32m" });
     TError error = dev.MountDir(MS_NOSUID | MS_STRICTATIME);
     if (error)
         return error;
@@ -373,6 +390,9 @@ TError TTask::ChildMountDev() {
     TPath fd = Env->Root + "/dev/fd";
     if (symlink("/proc/self/fd", fd.ToString().c_str()) < 0)
         return TError(EError::Unknown, errno, "symlink(/dev/fd)");
+
+    TFile f(Env->Root + "/dev/console", 0755);
+    (void)f.Touch();
 
     return TError::Success();
 }
@@ -428,6 +448,12 @@ TError TTask::ChildIsolateFs() {
     error = ChildMountDev();
     if (error)
         return error;
+
+    if (Env->Loop.Exists()) {
+        error = ChildMountRun();
+        if (error)
+            return error;
+    }
 
     TMount shm("shm", Env->Root + "/dev/shm", "tmpfs",
                { "mode=1777", "size=65536k" });
