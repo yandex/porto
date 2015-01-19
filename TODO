@@ -1,5 +1,4 @@
 - virt_mode=os limit capabilities
-- fix corrupted /etc/hostname
 - fix netfilter bug with >3.10
 - add restricted_root config option
 - mount root loop in root namespace (to better diagnose possible problems)

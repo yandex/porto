@@ -3381,6 +3381,11 @@ static void TestPackage(TPortoAPI &api) {
     WaitPortod(api);
 }
 
+static std::string origHostname;
+void RevertHostname() {
+    SetHostName(origHostname);
+}
+
 int SelfTest(string name, int leakNr) {
     pair<string, std::function<void(TPortoAPI &)>> tests[] = {
         { "root", TestRoot },
@@ -3424,7 +3429,9 @@ int SelfTest(string name, int leakNr) {
         { "package", TestPackage },
     };
 
+    origHostname = GetHostname();
     ExpectSuccess(SetHostName(HOSTNAME));
+    atexit(RevertHostname);
 
     if (NetworkEnabled())
         subsystems.push_back("net_cls");
