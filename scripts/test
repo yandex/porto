@@ -8,8 +8,9 @@ say() { [ ! -t 1 ] || tput setaf 3; echo "$@"; [ ! -t 1 ] || tput sgr0; }
 
 selftest() {
 	say "Self test with network=$1"
-	echo "log { verbose: true} network { enabled: $1 dynamic_ifaces: false } container { use_hierarchy: true } privileges { root_user: \"$USER\" }" > /etc/portod.conf
-	portotest
+	echo "log { verbose: true } network { enabled: $1 dynamic_ifaces: false } container { use_hierarchy: true } privileges { root_user: \"$USER\" restricted_root_user: \"daemon\" }" > /etc/portod.conf
+	shift
+	portotest "$@"
 }
 
 stresstest() {
@@ -24,9 +25,19 @@ pkgtest() {
 	done
 }
 
+fixcg() {
+	# make current task belongs to root cgroups
+	for cg in /sys/fs/cgroup/*; do
+		echo $$ | sudo tee $cg/cgroup.procs &>/dev/null;
+	done
+}
+
+fixcg
+
 [ ! $# -eq 0 ] || set -- false true pkg stress
 for t in "$@"; do
 	case $t in
+		self) shift; selftest true "$@"; exit ;;
 		true|false) selftest $t ;;
 		stress) stresstest ;;
 		pkg) pkgtest ;;

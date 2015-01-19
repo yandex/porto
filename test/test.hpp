@@ -52,6 +52,7 @@ namespace test {
     void AsUser(TPortoAPI &api, TUser &user, TGroup &group);
     void AsRoot(TPortoAPI &api);
     void AsNobody(TPortoAPI &api);
+    void AsDaemon(TPortoAPI &api);
     std::string GetDefaultUser();
     std::string GetDefaultGroup();
     void BootstrapCommand(const std::string &cmd, const std::string &path, bool remove = true);

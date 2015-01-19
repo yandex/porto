@@ -46,17 +46,26 @@ constexpr const char *P_ALLOWED_DEVICES = "allowed_devices";
 constexpr const char *P_CAPABILITIES = "capabilities";
 constexpr const char *P_IP = "ip";
 constexpr const char *P_DEFAULT_GW = "default_gw";
+constexpr const char *P_VIRT_MODE = "virt_mode";
+
+constexpr int VIRT_MODE_APP = 1;
+constexpr int VIRT_MODE_OS = 2;
 
 class TBindMap;
 class TNetCfg;
 class TTaskEnv;
 
-// Property is not shown in the property list
+// Property can be modified only by privileged user
 const unsigned int SUPERUSER_PROPERTY = (1 << 0);
 // Property should return parent value as default
 const unsigned int PARENT_DEF_PROPERTY = (1 << 1);
 // When child container is shared with parent these properties can't be changed
 const unsigned int PARENT_RO_PROPERTY = (1 << 2);
+// Property can be modified only by restricted root
+const unsigned int RESTROOT_PROPERTY = (1 << 3);
+// Properties marked with this flag are reverted to default upon container
+// start with virt_mode==os
+const unsigned int OS_MODE_PROPERTY = (1 << 4);
 
 extern TValueSet propertySet;
 
@@ -112,6 +121,7 @@ public:
 
     TError Create();
     TError Restore(const kv::TNode &node);
+    void Reset(const std::string &name);
 
     bool HasValue(const std::string &name);
     TError Flush();

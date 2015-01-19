@@ -2410,6 +2410,100 @@ static void TestUlimitProperty(TPortoAPI &api) {
     ExpectSuccess(api.Destroy(name));
 }
 
+static void TestVirtModeProperty(TPortoAPI &api) {
+    std::string name = "lxc";
+
+    Say() << "Check permissions " << std::endl;
+
+    ExpectSuccess(api.Create(name));
+    ExpectFailure(api.SetProperty(name, "virt_mode", "os"), EError::Permission);
+    ExpectSuccess(api.Destroy(name));
+
+    Say() << "Check that we can't start without loop" << std::endl;
+
+    std::map<std::string, std::string> expected = {
+        { "command", "/sbin/init" },
+        { "stdin_path", "/dev/null" },
+        { "stdout_path", "/dev/null" },
+        { "stderr_path", "/dev/null" },
+        { "isolate", "true" },
+        { "bind_dns", "false" },
+        { "bind", "" },
+        { "cwd", "/" },
+        { "allowed_devices", "c 1:3 rwm; c 1:5 rwm; c 1:7 rwm; c 1:9 rwm; c 1:8 rwm; c 136:* rw; c 5:2 rwm; c 254:0 rm; c 254:0 rm; c 10:237 rmw; b 7:* rmw" },
+
+        // TODO: capabilities
+    };
+    std::string s;
+
+    AsDaemon(api);
+    ExpectSuccess(api.Create(name));
+    ExpectSuccess(api.SetProperty(name, "virt_mode", "os"));
+
+    for (auto kv : expected) {
+        ExpectSuccess(api.GetProperty(name, kv.first, s));
+        Expect(s == kv.second);
+    }
+
+    ExpectSuccess(api.SetProperty(name, "root", "/tmp"));
+    ExpectFailure(api.Start(name), EError::Permission);
+
+    Say() << "Check credentials and default roolback" << std::endl;
+
+    TPath tmpdir = "/tmp/portotest.dir";
+    TPath tmpimg = "/tmp/portotest.img";
+
+    std::string cmd = std::string("dd if=/dev/zero of=") + tmpimg.ToString() + " bs=1 count=1 seek=128M && mkfs.ext4 -F -F " + tmpimg.ToString();
+
+    Expect(system(cmd.c_str()) == 0);
+
+    TFolder dir(tmpdir, true);
+    dir.Remove(true);
+    ExpectSuccess(dir.Create(0755, false));
+
+    int nr;
+    AsRoot(api);
+    TError error = GetLoopDev(nr);
+    if (error)
+        throw error.GetMsg();
+    TLoopMount m(tmpimg, tmpdir, "ext4", nr);
+    AsDaemon(api);
+
+    try {
+        AsRoot(api);
+        ExpectSuccess(m.Mount());
+        AsDaemon(api);
+
+        ExpectSuccess(api.SetProperty(name, "isolate", "false"));
+        ExpectSuccess(api.SetProperty(name, "root", tmpimg.ToString()));
+
+        AsRoot(api);
+        BootstrapCommand("/usr/bin/id", tmpdir.ToString());
+        cmd = std::string("mkdir ") + tmpdir.ToString() + "/sbin";
+        Expect(system(cmd.c_str()) == 0);
+        cmd = std::string("mv ") + tmpdir.ToString() + "/id " + tmpdir.ToString() + "/sbin/init";
+        Expect(system(cmd.c_str()) == 0);
+        (void)m.Umount();
+        (void)PutLoopDev(nr);
+        AsDaemon(api);
+    } catch (...) {
+        AsRoot(api);
+        (void)m.Umount();
+        (void)PutLoopDev(nr);
+        ExpectSuccess(api.Destroy(name));
+        throw;
+    }
+
+    ExpectSuccess(api.Start(name));
+    WaitState(api, name, "dead");
+
+    for (auto kv : expected) {
+        ExpectSuccess(api.GetProperty(name, kv.first, s));
+        Expect(s == kv.second);
+    }
+    ExpectSuccess(api.Destroy(name));
+}
+
 static void TestAlias(TPortoAPI &api) {
     if (!HaveCgKnob("memory", "memory.low_limit_in_bytes"))
         return;
@@ -3312,6 +3406,7 @@ int SelfTest(string name, int leakNr) {
         { "capabilities_property", TestCapabilitiesProperty },
         { "limits", TestLimits },
         { "ulimit_property", TestUlimitProperty },
+        { "virt_mode_property", TestVirtModeProperty },
         { "alias", TestAlias },
         { "dynamic", TestDynamic },
         { "permissions", TestPermissions },

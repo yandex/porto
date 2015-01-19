@@ -64,6 +64,10 @@ TError TPropertySet::Restore(const kv::TNode &node) {
     return VariantSet.Restore(node);
 }
 
+void TPropertySet::Reset(const std::string &name) {
+    VariantSet.Reset(name);
+}
+
 bool TPropertySet::HasValue(const std::string &name) {
     return VariantSet.HasValue(name);
 }
@@ -162,8 +166,16 @@ public:
     TCommandProperty() :
         TStringValue(P_COMMAND,
                      "Command executed upon container start",
-                     PERSISTENT_VALUE,
+                     PERSISTENT_VALUE | OS_MODE_PROPERTY,
                      staticProperty) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
+        if (c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS)
+            return "/sbin/init";
+
+        return "";
+    }
+
 };
 
 class TUserProperty : public TStringValue {
@@ -253,10 +265,13 @@ public:
     TCwdProperty() :
         TStringValue(P_CWD,
                      "Container working directory",
-                     PARENT_DEF_PROPERTY | PERSISTENT_VALUE,
+                     PARENT_DEF_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY,
                      staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
+        if (c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS)
+            return "/";
+
         if (!c->Prop->IsDefault("root"))
             return "/";
 
@@ -274,7 +289,7 @@ public:
     TStdinPathProperty() :
         TStringValue(P_STDIN_PATH,
                      "Container standard input path",
-                     PERSISTENT_VALUE,
+                     PERSISTENT_VALUE | OS_MODE_PROPERTY,
                      staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
@@ -292,10 +307,13 @@ public:
     TStdoutPathProperty() :
         TStringValue(P_STDOUT_PATH,
                      "Container standard input path",
-                     PERSISTENT_VALUE,
+                     PERSISTENT_VALUE | OS_MODE_PROPERTY,
                      staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
+        if (c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS)
+            return "/dev/null";
+
         return DefaultStdFile(c, "stdout");
     }
 
@@ -310,10 +328,13 @@ public:
     TStderrPathProperty() :
         TStringValue(P_STDERR_PATH,
                      "Container standard error path",
-                     PERSISTENT_VALUE,
+                     PERSISTENT_VALUE | OS_MODE_PROPERTY,
                      staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
+        if (c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS)
+            return "/dev/null";
+
         return DefaultStdFile(c, "stderr");
     }
 
@@ -594,7 +615,7 @@ public:
     TIsolateProperty() :
         TBoolValue(P_ISOLATE,
                    "Isolate container from parent",
-                   PERSISTENT_VALUE,
+                   PERSISTENT_VALUE | OS_MODE_PROPERTY,
                    staticProperty) {}
 
     bool GetDefaultBool(std::shared_ptr<TContainer> c) override {
@@ -720,10 +741,13 @@ public:
     TBindDnsProperty() :
         TBoolValue(P_BIND_DNS,
                    "Bind /etc/resolv.conf and /etc/hosts of host to container",
-                   PARENT_RO_PROPERTY | PERSISTENT_VALUE,
+                   PARENT_RO_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY,
                    staticProperty) {}
 
     bool GetDefaultBool(std::shared_ptr<TContainer> c) override {
+        if (c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS)
+            return false;
+
         if (!c->Prop->GetBool("isolate"))
             return false;
         else if (c->Prop->IsDefault("root"))
@@ -740,7 +764,7 @@ public:
     TBindProperty() :
         TListValue(P_BIND,
                    "Share host directories with container",
-                   PARENT_RO_PROPERTY | PERSISTENT_VALUE,
+                   PARENT_RO_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY,
                    staticProperty) {}
 
     TError ParseList(std::shared_ptr<TContainer> container,
@@ -1030,10 +1054,17 @@ public:
     TAllowedDevicesProperty() :
         TListValue(P_ALLOWED_DEVICES,
                    "Devices that container can create/read/write",
-                   PARENT_RO_PROPERTY | PERSISTENT_VALUE,
+                   PARENT_RO_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY,
                    staticProperty) {}
 
     TStrList GetDefaultList(std::shared_ptr<TContainer> c) override {
+        if (c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS)
+            return TStrList{
+                "c 1:3 rwm", "c 1:5 rwm", "c 1:7 rwm", "c 1:9 rwm",
+                "c 1:8 rwm", "c 136:* rw", "c 5:2 rwm", "c 254:0 rm",
+                "c 254:0 rm", "c 10:237 rmw", "b 7:* rmw"
+            };
+
         return TStrList{ "a *:* rwm" };
     }
 };
@@ -1089,9 +1120,14 @@ public:
 
     TStrList GetDefaultList(std::shared_ptr<TContainer> c) override {
         TStrList v;
-        if (c->Uid == 0 || c->Gid == 0)
-            for (auto kv : supported)
-                v.push_back(kv.first);
+
+        if (c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS) {
+            // TODO: ADD REQUIRED CAPABILITIES
+        } else {
+            if (c->Uid == 0 || c->Gid == 0)
+                for (auto kv : supported)
+                    v.push_back(kv.first);
+        }
         return v;
     }
 
@@ -1125,6 +1161,34 @@ public:
                           std::shared_ptr<TTaskEnv> taskEnv) override {
         taskEnv->Caps = Caps;
         return TError::Success();
+    }
+};
+
+class TVirtModeProperty : public TIntValue {
+public:
+    TVirtModeProperty() :
+        TIntValue(P_VIRT_MODE,
+                  "Virtualization mode: os or app",
+                  PERSISTENT_VALUE | RESTROOT_PROPERTY,
+                  staticProperty) {}
+
+    TError ParseInt(std::shared_ptr<TContainer> c,
+                    const int &value) override {
+        if (value != VIRT_MODE_APP && value != VIRT_MODE_OS)
+            return TError(EError::InvalidValue, std::string("Unsupported ") + P_VIRT_MODE);
+
+        return TError::Success();
+    }
+
+    TError SetString(std::shared_ptr<TContainer> c,
+                     std::shared_ptr<TVariant> v,
+                     const std::string &value) override {
+        if (value == "os")
+            return v->Set(EValueType::Int, VIRT_MODE_OS);
+        else if (value == "app")
+            return v->Set(EValueType::Int, VIRT_MODE_APP);
+        else
+            return TError(EError::InvalidValue, std::string("Unsupported ") + P_VIRT_MODE + ": " + value);
     }
 };
 
@@ -1179,6 +1243,7 @@ TError RegisterProperties() {
         new TCapabilitiesProperty,
         new TIpProperty,
         new TDefaultGwProperty,
+        new TVirtModeProperty,
 
         new TIdProperty,
         new TRootPidProperty,

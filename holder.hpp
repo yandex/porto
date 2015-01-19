@@ -20,6 +20,7 @@ class TContainerHolder : public TNonCopyable {
     std::map<std::string, std::shared_ptr<TContainer>> Containers;
     TIdMap IdMap;
     std::set<int> PrivilegedUid, PrivilegedGid;
+    std::set<int> RestrictedRootUid, RestrictedRootGid;
 
     bool ValidName(const std::string &name) const;
     TError RestoreId(const kv::TNode &node, uint16_t &id);
@@ -39,6 +40,7 @@ public:
     std::shared_ptr<TContainer> Get(const std::string &name);
     TError Restore(const std::string &name, const kv::TNode &node);
     bool PrivilegedUser(int uid, int gid);
+    bool RestrictedUser(int uid, int gid);
     TError CheckPermission(std::shared_ptr<TContainer> container, int uid, int gid);
     TError Destroy(const std::string &name);
 

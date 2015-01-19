@@ -258,6 +258,7 @@ public:
     std::vector<std::string> List();
     bool IsDefault(const std::string &name);
     bool HasValue(const std::string &name);
+    void Reset(const std::string &name);
 
     TError Flush();
     TError Sync();

@@ -412,6 +412,20 @@ void AsNobody(TPortoAPI &api) {
     AsUser(api, nobody, nogroup);
 }
 
+void AsDaemon(TPortoAPI &api) {
+    TUser daemonUser("daemon");
+    TError error = daemonUser.Load();
+    if (error)
+        throw error.GetMsg();
+
+    TGroup daemonGroup("daemon");
+    error = daemonGroup.Load();
+    if (error)
+        throw error.GetMsg();
+
+    AsUser(api, daemonUser, daemonGroup);
+}
+
 std::string GetDefaultUser() {
     std::string users[] = { "nobody" };
 
