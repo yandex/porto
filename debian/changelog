@@ -1,3 +1,10 @@
+yandex-porto (0.29) precise; urgency=low
+
+  * Add restricted_root support
+  * portod: make evtfd O_NONBLOCK
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 19 Jan 2015 22:04:00 +0400
+
 yandex-porto (0.28) precise; urgency=low
 
   * Add loop allocation debug printouts
