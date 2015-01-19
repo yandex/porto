@@ -4,9 +4,10 @@
 #include "rpc.pb.h"
 #include "holder.hpp"
 #include "util/cred.hpp"
+#include "context.hpp"
 
 rpc::TContainerResponse
-HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req,
+HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
                  const TCred &cred);
 
 #endif

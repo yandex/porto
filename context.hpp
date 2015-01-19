@@ -1,5 +1,5 @@
 #ifndef __CONTEXT_H__
-#define __CONTEXT_H_
+#define __CONTEXT_H__
 
 #include "event.hpp"
 #include "holder.hpp"

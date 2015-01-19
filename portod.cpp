@@ -206,7 +206,7 @@ struct ClientInfo {
     int Gid;
 };
 
-static bool HandleRequest(TContainerHolder &cholder, const int fd,
+static bool HandleRequest(TContext &context, const int fd,
                           const TCred &cred) {
     uint32_t slaveReadTimeout = config().daemon().slave_read_timeout_s();
     InterruptibleInputStream pist(fd);
@@ -230,7 +230,7 @@ static bool HandleRequest(TContainerHolder &cholder, const int fd,
     }
 
     if (haveData) {
-        auto rsp = HandleRpcRequest(cholder, request, cred);
+        auto rsp = HandleRpcRequest(context, request, cred);
         if (rsp.IsInitialized()) {
             if (!WriteDelimitedTo(rsp, &post))
                 L() << "Write error for " << fd << std:: endl;
@@ -492,7 +492,7 @@ static int SlaveRpc(TContext &context) {
                 bool needClose = false;
 
                 if (ev[i].events & EPOLLIN)
-                    needClose = HandleRequest(cholder, ev[i].data.fd,
+                    needClose = HandleRequest(context, ev[i].data.fd,
                                               TCred(ci.Uid, ci.Gid));
 
                 if ((ev[i].events & EPOLLHUP) || needClose) {
