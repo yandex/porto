@@ -6,7 +6,7 @@
 #include "util/cred.hpp"
 
 rpc::TContainerResponse
-HandleRpcRequest(THolder &cholder, const rpc::TContainerRequest &req,
+HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req,
                  const TCred &cred);
 
 #endif

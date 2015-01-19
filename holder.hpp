@@ -16,7 +16,7 @@ class TIdMap;
 class TEventQueue;
 class TEvent;
 
-class THolder {
+class TContainerHolder {
     std::shared_ptr<TNetwork> Net;
     std::map<std::string, std::shared_ptr<TContainer>> Containers;
     TIdMap IdMap;
@@ -29,10 +29,10 @@ public:
     std::shared_ptr<TEventQueue> Queue;
     int Epfd;
 
-    THolder(std::shared_ptr<TEventQueue> queue,
+    TContainerHolder(std::shared_ptr<TEventQueue> queue,
                      std::shared_ptr<TNetwork> net) :
         Net(net), Queue(queue) { }
-    ~THolder();
+    ~TContainerHolder();
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot();
     TError Create(const std::string &name, const TCred &cred);

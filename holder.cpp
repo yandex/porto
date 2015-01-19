@@ -9,7 +9,7 @@
 #include "util/string.hpp"
 #include "util/cred.hpp"
 
-THolder::~THolder() {
+TContainerHolder::~TContainerHolder() {
     // we want children to be removed first
     while (Containers.begin() != Containers.end()) {
         auto name = Containers.begin()->first;
@@ -19,7 +19,7 @@ THolder::~THolder() {
     }
 }
 
-TError THolder::CreateRoot() {
+TError TContainerHolder::CreateRoot() {
     TError error = EpollCreate(Epfd);
     if (error)
         return error;
@@ -70,7 +70,7 @@ TError THolder::CreateRoot() {
     return TError::Success();
 }
 
-bool THolder::ValidName(const std::string &name) const {
+bool TContainerHolder::ValidName(const std::string &name) const {
     if (name == ROOT_CONTAINER)
         return true;
 
@@ -94,7 +94,7 @@ bool THolder::ValidName(const std::string &name) const {
                    }) == name.end();
 }
 
-std::shared_ptr<TContainer> THolder::GetParent(const std::string &name) const {
+std::shared_ptr<TContainer> TContainerHolder::GetParent(const std::string &name) const {
     std::shared_ptr<TContainer> parent;
 
     std::string::size_type n = name.rfind('/');
@@ -110,7 +110,7 @@ std::shared_ptr<TContainer> THolder::GetParent(const std::string &name) const {
     }
 }
 
-TError THolder::Create(const std::string &name, const TCred &cred) {
+TError TContainerHolder::Create(const std::string &name, const TCred &cred) {
     if (!ValidName(name))
         return TError(EError::InvalidValue, "invalid container name " + name);
 
@@ -139,14 +139,14 @@ TError THolder::Create(const std::string &name, const TCred &cred) {
     return TError::Success();
 }
 
-std::shared_ptr<TContainer> THolder::Get(const std::string &name) {
+std::shared_ptr<TContainer> TContainerHolder::Get(const std::string &name) {
     if (Containers.find(name) == Containers.end())
         return nullptr;
 
     return Containers[name];
 }
 
-TError THolder::_Destroy(const std::string &name) {
+TError TContainerHolder::_Destroy(const std::string &name) {
     auto c = Containers[name];
     for (auto child: c->GetChildren())
         _Destroy(child);
@@ -159,14 +159,14 @@ TError THolder::_Destroy(const std::string &name) {
     return TError::Success();
 }
 
-TError THolder::Destroy(const std::string &name) {
+TError TContainerHolder::Destroy(const std::string &name) {
     if (name == ROOT_CONTAINER || Containers.find(name) == Containers.end())
         return TError(EError::InvalidValue, "invalid container name " + name);
 
     return _Destroy(name);
 }
 
-std::vector<std::string> THolder::List() const {
+std::vector<std::string> TContainerHolder::List() const {
     std::vector<std::string> ret;
 
     for (auto c : Containers) {
@@ -177,7 +177,7 @@ std::vector<std::string> THolder::List() const {
     return ret;
 }
 
-TError THolder::RestoreId(const kv::TNode &node, uint16_t &id) {
+TError TContainerHolder::RestoreId(const kv::TNode &node, uint16_t &id) {
     std::string value = "";
     for (int i = 0; i < node.pairs_size(); i++) {
         auto key = node.pairs(i).key();
@@ -202,7 +202,7 @@ TError THolder::RestoreId(const kv::TNode &node, uint16_t &id) {
     return TError::Success();
 }
 
-TError THolder::Restore(const std::string &name, const kv::TNode &node) {
+TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node) {
     if (name == ROOT_CONTAINER)
         return TError::Success();
 
@@ -230,12 +230,12 @@ TError THolder::Restore(const std::string &name, const kv::TNode &node) {
     return TError::Success();
 }
 
-void THolder::ScheduleLogRotatation() {
+void TContainerHolder::ScheduleLogRotatation() {
     TEvent e(EEventType::RotateLogs);
     Queue->Add(config().daemon().rotate_logs_timeout_s() * 1000, e);
 }
 
-bool THolder::DeliverEvent(const TEvent &event) {
+bool TContainerHolder::DeliverEvent(const TEvent &event) {
     if (config().log().verbose())
         L() << "Deliver event " << event.GetMsg() << std::endl;
 

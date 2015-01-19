@@ -6,7 +6,7 @@
 
 using std::string;
 
-static TError CreateContainer(THolder &cholder,
+static TError CreateContainer(TContainerHolder &cholder,
                               const rpc::TContainerCreateRequest &req,
                               rpc::TContainerResponse &rsp,
                               const TCred &cred) {
@@ -17,7 +17,7 @@ static TError CreateContainer(THolder &cholder,
     return cholder.Create(req.name(), cred);
 }
 
-static TError DestroyContainer(THolder &cholder,
+static TError DestroyContainer(TContainerHolder &cholder,
                                const rpc::TContainerDestroyRequest &req,
                                rpc::TContainerResponse &rsp,
                                const TCred &cred) {
@@ -34,7 +34,7 @@ static TError DestroyContainer(THolder &cholder,
     return cholder.Destroy(req.name());
 }
 
-static TError StartContainer(THolder &cholder,
+static TError StartContainer(TContainerHolder &cholder,
                              const rpc::TContainerStartRequest &req,
                              rpc::TContainerResponse &rsp,
                              const TCred &cred) {
@@ -49,7 +49,7 @@ static TError StartContainer(THolder &cholder,
     return container->Start();
 }
 
-static TError StopContainer(THolder &cholder,
+static TError StopContainer(TContainerHolder &cholder,
                             const rpc::TContainerStopRequest &req,
                             rpc::TContainerResponse &rsp,
                             const TCred &cred) {
@@ -64,7 +64,7 @@ static TError StopContainer(THolder &cholder,
     return container->Stop();
 }
 
-static TError PauseContainer(THolder &cholder,
+static TError PauseContainer(TContainerHolder &cholder,
                              const rpc::TContainerPauseRequest &req,
                              rpc::TContainerResponse &rsp,
                              const TCred &cred) {
@@ -79,7 +79,7 @@ static TError PauseContainer(THolder &cholder,
     return container->Pause();
 }
 
-static TError ResumeContainer(THolder &cholder,
+static TError ResumeContainer(TContainerHolder &cholder,
                               const rpc::TContainerResumeRequest &req,
                               rpc::TContainerResponse &rsp,
                               const TCred &cred) {
@@ -94,7 +94,7 @@ static TError ResumeContainer(THolder &cholder,
     return container->Resume();
 }
 
-static TError ListContainers(THolder &cholder,
+static TError ListContainers(TContainerHolder &cholder,
                              rpc::TContainerResponse &rsp) {
     for (auto name : cholder.List())
         rsp.mutable_list()->add_name(name);
@@ -102,7 +102,7 @@ static TError ListContainers(THolder &cholder,
     return TError::Success();
 }
 
-static TError GetContainerProperty(THolder &cholder,
+static TError GetContainerProperty(TContainerHolder &cholder,
                                    const rpc::TContainerGetPropertyRequest &req,
                                    rpc::TContainerResponse &rsp,
                                    const TCred &cred) {
@@ -117,7 +117,7 @@ static TError GetContainerProperty(THolder &cholder,
     return error;
 }
 
-static TError SetContainerProperty(THolder &cholder,
+static TError SetContainerProperty(TContainerHolder &cholder,
                                    const rpc::TContainerSetPropertyRequest &req,
                                    rpc::TContainerResponse &rsp,
                                    const TCred &cred) {
@@ -132,7 +132,7 @@ static TError SetContainerProperty(THolder &cholder,
     return container->SetProperty(req.property(), req.value(), cred.IsPrivileged());
 }
 
-static TError GetContainerData(THolder &cholder,
+static TError GetContainerData(TContainerHolder &cholder,
                                const rpc::TContainerGetDataRequest &req,
                                rpc::TContainerResponse &rsp,
                                const TCred &cred) {
@@ -147,7 +147,7 @@ static TError GetContainerData(THolder &cholder,
     return error;
 }
 
-static TError ListProperty(THolder &cholder,
+static TError ListProperty(TContainerHolder &cholder,
                            rpc::TContainerResponse &rsp) {
     auto list = rsp.mutable_propertylist();
 
@@ -165,7 +165,7 @@ static TError ListProperty(THolder &cholder,
     return TError::Success();
 }
 
-static TError ListData(THolder &cholder,
+static TError ListData(TContainerHolder &cholder,
                        rpc::TContainerResponse &rsp) {
     auto list = rsp.mutable_datalist();
 
@@ -183,7 +183,7 @@ static TError ListData(THolder &cholder,
     return TError::Success();
 }
 
-static TError Kill(THolder &cholder,
+static TError Kill(TContainerHolder &cholder,
                    const rpc::TContainerKillRequest &req,
                    rpc::TContainerResponse &rsp,
                    const TCred &cred) {
@@ -198,7 +198,7 @@ static TError Kill(THolder &cholder,
     return container->Kill(req.sig());
 }
 
-static TError Version(THolder &cholder,
+static TError Version(TContainerHolder &cholder,
                       rpc::TContainerResponse &rsp) {
     auto ver = rsp.mutable_version();
 
@@ -209,7 +209,7 @@ static TError Version(THolder &cholder,
 }
 
 rpc::TContainerResponse
-HandleRpcRequest(THolder &cholder, const rpc::TContainerRequest &req,
+HandleRpcRequest(TContainerHolder &cholder, const rpc::TContainerRequest &req,
                  const TCred &cred) {
     rpc::TContainerResponse rsp;
     string str;
