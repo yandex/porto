@@ -36,6 +36,73 @@ extern "C" {
 #include <sys/resource.h>
 }
 
+class TContext {
+public:
+    std::shared_ptr<TEventQueue> Queue() { return _Queue; }
+    std::shared_ptr<TNetwork> Net() {return _Net; }
+    std::shared_ptr<TNl> NetEvt() {return _NetEvt; }
+    std::shared_ptr<TContainerHolder> Cholder() {return _Cholder; }
+    std::shared_ptr<TVolumeHolder> Vholder() {return _Vholder; }
+
+    TContext() {
+        _Queue = std::make_shared<TEventQueue>();
+        _Net = std::make_shared<TNetwork>();
+        _Cholder = std::make_shared<TContainerHolder>(Queue(), Net());
+        _Vholder = std::make_shared<TVolumeHolder>();
+    }
+
+    TError Initialize();
+
+private:
+    std::shared_ptr<TEventQueue> _Queue;
+    std::shared_ptr<TNetwork> _Net;
+    std::shared_ptr<TNl> _NetEvt;
+    std::shared_ptr<TContainerHolder> _Cholder;
+    std::shared_ptr<TVolumeHolder> _Vholder;
+};
+
+TError TContext::Initialize() {
+    TError error;
+
+    if (config().network().enabled()) {
+        if (config().network().dynamic_ifaces()) {
+            _NetEvt = std::make_shared<TNl>();
+            error = NetEvt()->Connect();
+            if (error) {
+                L_ERR() << "Can't connect netlink events socket: " << error << std::endl;
+                return error;
+            }
+
+            error = NetEvt()->SubscribeToLinkUpdates();
+            if (error) {
+                L_ERR() << "Can't subscribe netlink socket to events: " << error << std::endl;
+                return error;
+            }
+        }
+
+        TError error = Net()->Prepare();
+        if (error)
+            L_ERR() << "Can't prepare network: " << error << std::endl;
+
+
+        if (Net()->Empty()) {
+            L() << "Error: couldn't find suitable network interface" << std::endl;
+            return error;
+        }
+
+        for (auto &link : Net()->GetLinks())
+            L() << "Using " << link->GetAlias() << " interface" << std::endl;
+    }
+
+    error = Cholder()->CreateRoot();
+    if (error) {
+        L_ERR() << "Can't create root container: " << error << std::endl;
+        return error;
+    }
+
+    return TError::Success();
+}
+
 using std::string;
 using std::map;
 using std::vector;
@@ -374,13 +441,11 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
     return 0;
 }
 
-static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
-                    TContainerHolder &cholder,
-                    std::shared_ptr<TNetwork> net,
-                    std::shared_ptr<TNl> netEvt) {
+static int SlaveRpc(TContext &context) {
     int ret = 0;
     int sfd;
     std::map<int,ClientInfo> clients;
+    TContainerHolder &cholder = *context.Cholder();
 
     SignalMask(SIG_BLOCK);
 
@@ -414,8 +479,8 @@ static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
         return EXIT_FAILURE;
     }
 
-    if (netEvt) {
-        error = EpollAdd(cholder.Epfd, netEvt->GetFd());
+    if (context.NetEvt()) {
+        error = EpollAdd(cholder.Epfd, context.NetEvt()->GetFd());
         if (error) {
             L_ERR() << "Can't add netlink events fd to epoll: " << error << std::endl;
             return EXIT_FAILURE;
@@ -426,7 +491,7 @@ static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
     struct epoll_event ev[MAX_EVENTS];
 
     while (!done) {
-        int timeout = queue->GetNextTimeout();
+        int timeout = context.Queue()->GetNextTimeout();
         Statistics->SlaveTimeoutMs = timeout;
         int nr = epoll_wait(cholder.Epfd, ev, MAX_EVENTS, timeout);
         if (nr < 0) {
@@ -454,7 +519,7 @@ static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
             continue;
         }
 
-        queue->DeliverEvents(cholder);
+        context.Queue()->DeliverEvents(*context.Cholder());
 
         for (int i = 0; i < nr; i++) {
             if (ev[i].data.fd == sfd) {
@@ -477,14 +542,14 @@ static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
                 if (failsafe)
                     continue;
 
-                ret = ReapSpawner(REAP_EVT_FD, cholder);
+                ret = ReapSpawner(REAP_EVT_FD, *context.Cholder());
                 if (done)
                     break;
-            } else if (netEvt && netEvt->GetFd() == ev[i].data.fd) {
+            } else if (context.NetEvt() && context.NetEvt()->GetFd() == ev[i].data.fd) {
                 L() << "Refresh list of available network interfaces" << std::endl;
-                netEvt->FlushEvents();
+                context.NetEvt()->FlushEvents();
 
-                TError error = net->Update();
+                TError error = context.Net()->Update();
                 if (error) {
                     L() << "Can't refresh list of network interfaces: " << error << std::endl;
                     break;
@@ -597,45 +662,10 @@ static int SlaveMain() {
         if (error)
             L_ERR() << "Can't create cgroup snapshot: " << error << std::endl;
 
-        std::shared_ptr<TNetwork> net = std::make_shared<TNetwork>();
-        std::shared_ptr<TNl> netEvt;
-        if (config().network().enabled()) {
-            if (config().network().dynamic_ifaces()) {
-                netEvt = std::make_shared<TNl>();
-                error = netEvt->Connect();
-                if (error) {
-                    L_ERR() << "Can't connect netlink events socket: " << error << std::endl;
-                    return EXIT_FAILURE;
-                }
-
-                error = netEvt->SubscribeToLinkUpdates();
-                if (error) {
-                    L_ERR() << "Can't subscribe netlink socket to events: " << error << std::endl;
-                    return EXIT_FAILURE;
-                }
-            }
-
-            TError error = net->Prepare();
-            if (error)
-                L_ERR() << "Can't prepare network: " << error << std::endl;
-
-
-            if (net->Empty()) {
-                L() << "Error: couldn't find suitable network interface" << std::endl;
-                return EXIT_FAILURE;
-            }
-
-            for (auto &link : net->GetLinks())
-                L() << "Using " << link->GetAlias() << " interface" << std::endl;
-        }
-
-        auto queue = std::make_shared<TEventQueue>();
-        TContainerHolder cholder(queue, net);
-        error = cholder.CreateRoot();
-        if (error) {
-            L_ERR() << "Can't create root container: " << error << std::endl;
+        TContext context;
+        error = context.Initialize();
+        if (error)
             return EXIT_FAILURE;
-        }
 
         bool restored = false;
         {
@@ -646,7 +676,7 @@ static int SlaveMain() {
 
             for (auto &r : m) {
                 restored = true;
-                error = cholder.Restore(r.first, r.second);
+                error = context.Cholder()->Restore(r.first, r.second);
                 if (error) {
                     L_ERR() << "Can't restore " << r.first << " state : " << error << std::endl;
                     Statistics->RestoreFailed++;
@@ -670,11 +700,11 @@ static int SlaveMain() {
             }
         }
 
-        ret = SlaveRpc(queue, cholder, net, netEvt);
+        ret = SlaveRpc(context);
         L() << "Shutting down..." << std::endl;
 
-        if (netEvt)
-            netEvt->Disconnect();
+        if (context.NetEvt())
+            context.NetEvt()->Disconnect();
 
         RemoveRpcServer(config().rpc_sock().file().path());
 
@@ -685,7 +715,7 @@ static int SlaveMain() {
         if (error)
             L_ERR() << "Can't destroy key-value storage: " << error << std::endl;
 
-        error = net->Destroy();
+        error = context.Net()->Destroy();
         if (error)
             L_ERR() << "Can't destroy network: " << error << std::endl;
     } catch (string s) {
