@@ -19,7 +19,7 @@ TContainerHolder::~TContainerHolder() {
     }
 }
 
-static void ParseUserConf(const ::google::protobuf::RepeatedPtrField<::std::string>& source,
+static void ParseUserConf(const ::google::protobuf::RepeatedPtrField<std::string> &source,
                           std::set<int> &target) {
     for (auto &val : source) {
         TUser u(val);
@@ -33,7 +33,7 @@ static void ParseUserConf(const ::google::protobuf::RepeatedPtrField<::std::stri
     }
 }
 
-static void ParseGroupConf(const ::google::protobuf::RepeatedPtrField<::std::string>& source,
+static void ParseGroupConf(const ::google::protobuf::RepeatedPtrField<std::string> &source,
                           std::set<int> &target) {
     for (auto &val : source) {
         TGroup g(val);
