@@ -1,3 +1,9 @@
+yandex-porto (0.30) precise; urgency=low
+
+  * Poppulate /run on tmpfs
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 20 Jan 2015 13:53:00 +0400
+
 yandex-porto (0.29) precise; urgency=low
 
   * Add restricted_root support
