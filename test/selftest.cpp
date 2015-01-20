@@ -1801,7 +1801,7 @@ static void TestCapabilitiesProperty(TPortoAPI &api) {
 
     Say() << "Checking custom capabilities" << std::endl;
     ExpectFailure(api.SetProperty(name, "capabilities", "CHOWN; INVALID"), EError::InvalidValue);
-    ExpectSuccess(api.SetProperty(name, "capabilities", "CHOWN; DAC_OVERRIDE; FSETID; FOWNER; MKNOD; NET_RAW; SETGID; SETUID; SETFCAP; SETPCAP; NET_BIND_SERVICE; SYS_CHROOT; KILL; AUDIT_WRITE"));
+    ExpectSuccess(api.SetProperty(name, "capabilities", "CHOWN; DAC_OVERRIDE; FSETID; FOWNER; MKNOD; NET_RAW; SETGID; SETUID; SETFCAP; SETPCAP; NET_BIND_SERVICE; IPC_LOCK; SYS_CHROOT; SYS_RESOURCE; KILL; AUDIT_WRITE"));
 
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));

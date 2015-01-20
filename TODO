@@ -1,3 +1,4 @@
+- run some kind of init process in meta container
 - fix netfilter bug with >3.10
 - mount root loop in root namespace (to better diagnose possible problems)
 - root_readonly: remount root instead of binding into itself with ro
