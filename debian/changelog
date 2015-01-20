@@ -1,3 +1,9 @@
+yandex-porto (0.31) precise; urgency=low
+
+  * Add SYS_RESOURCE to restricted_root
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 20 Jan 2015 20:57:00 +0400
+
 yandex-porto (0.30) precise; urgency=low
 
   * Poppulate /run on tmpfs
