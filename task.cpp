@@ -337,9 +337,14 @@ TError TTask::RestrictProc(bool restrictProcSys) {
 
 TError TTask::ChildMountRun() {
     TPath run = Env->Root + "/run";
+    std::vector<std::string> subdirs;
     TFolder dir(run);
     if (!dir.Exists()) {
         TError error = dir.Create();
+        if (error)
+            return error;
+    } else {
+        TError error = dir.Items(EFileType::Directory, subdirs);
         if (error)
             return error;
     }
@@ -348,6 +353,13 @@ TError TTask::ChildMountRun() {
     TError error = dev.MountDir(MS_NOSUID | MS_STRICTATIME);
     if (error)
         return error;
+
+    for (auto name : subdirs) {
+        TFolder d(run + "/" + name);
+        TError error = d.Create();
+        if (error)
+            return error;
+    }
 
     return TError::Success();
 }
