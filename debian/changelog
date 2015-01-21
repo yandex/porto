@@ -1,3 +1,22 @@
+yandex-porto (0.31) precise; urgency=low
+
+  * Add SYS_RESOURCE to restricted_root
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 20 Jan 2015 20:57:00 +0400
+
+yandex-porto (0.30) precise; urgency=low
+
+  * Poppulate /run on tmpfs
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 20 Jan 2015 13:53:00 +0400
+
+yandex-porto (0.29) precise; urgency=low
+
+  * Add restricted_root support
+  * portod: make evtfd O_NONBLOCK
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 19 Jan 2015 22:04:00 +0400
+
 yandex-porto (0.28) precise; urgency=low
 
   * Add loop allocation debug printouts

@@ -64,6 +64,8 @@ message TCfg {
 	message TPrivilegesCfg {
 		repeated string root_user = 1;
 		repeated string root_group = 2;
+		repeated string restricted_root_user = 3;
+		repeated string restricted_root_group = 4;
 	}
 
 	optional TNetworkCfg network = 1;

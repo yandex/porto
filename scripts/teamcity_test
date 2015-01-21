@@ -61,15 +61,6 @@ netdown() {
 	sudo reload yandex-porto
 }
 
-fixcg() {
-	# make current task belongs to root cgroups
-	for cg in /sys/fs/cgroup/*; do
-		echo $$ | sudo tee $cg/cgroup.procs &>/dev/null;
-	done
-}
-
-fixcg
-
 [ ! $# -eq 0 ] || set -- build selftest pkgtest stresstest
 trap print_logs EXIT
 for f in "$@"; do eval $f; done

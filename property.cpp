@@ -64,6 +64,10 @@ TError TPropertySet::Restore(const kv::TNode &node) {
     return VariantSet.Restore(node);
 }
 
+void TPropertySet::Reset(const std::string &name) {
+    VariantSet.Reset(name);
+}
+
 bool TPropertySet::HasValue(const std::string &name) {
     return VariantSet.HasValue(name);
 }
@@ -162,8 +166,16 @@ public:
     TCommandProperty() :
         TStringValue(P_COMMAND,
                      "Command executed upon container start",
-                     PERSISTENT_VALUE,
+                     PERSISTENT_VALUE | OS_MODE_PROPERTY,
                      staticProperty) {}
+
+    std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
+        if (c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS)
+            return "/sbin/init";
+
+        return "";
+    }
+
 };
 
 class TUserProperty : public TStringValue {
@@ -253,10 +265,13 @@ public:
     TCwdProperty() :
         TStringValue(P_CWD,
                      "Container working directory",
-                     PARENT_DEF_PROPERTY | PERSISTENT_VALUE,
+                     PARENT_DEF_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY,
                      staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
+        if (c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS)
+            return "/";
+
         if (!c->Prop->IsDefault("root"))
             return "/";
 
@@ -274,7 +289,7 @@ public:
     TStdinPathProperty() :
         TStringValue(P_STDIN_PATH,
                      "Container standard input path",
-                     PERSISTENT_VALUE,
+                     PERSISTENT_VALUE | OS_MODE_PROPERTY,
                      staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
@@ -292,10 +307,13 @@ public:
     TStdoutPathProperty() :
         TStringValue(P_STDOUT_PATH,
                      "Container standard input path",
-                     PERSISTENT_VALUE,
+                     PERSISTENT_VALUE | OS_MODE_PROPERTY,
                      staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
+        if (c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS)
+            return "/dev/null";
+
         return DefaultStdFile(c, "stdout");
     }
 
@@ -310,10 +328,13 @@ public:
     TStderrPathProperty() :
         TStringValue(P_STDERR_PATH,
                      "Container standard error path",
-                     PERSISTENT_VALUE,
+                     PERSISTENT_VALUE | OS_MODE_PROPERTY,
                      staticProperty) {}
 
     std::string GetDefaultString(std::shared_ptr<TContainer> c) override {
+        if (c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS)
+            return "/dev/null";
+
         return DefaultStdFile(c, "stderr");
     }
 
@@ -594,7 +615,7 @@ public:
     TIsolateProperty() :
         TBoolValue(P_ISOLATE,
                    "Isolate container from parent",
-                   PERSISTENT_VALUE,
+                   PERSISTENT_VALUE | OS_MODE_PROPERTY,
                    staticProperty) {}
 
     bool GetDefaultBool(std::shared_ptr<TContainer> c) override {
@@ -720,10 +741,13 @@ public:
     TBindDnsProperty() :
         TBoolValue(P_BIND_DNS,
                    "Bind /etc/resolv.conf and /etc/hosts of host to container",
-                   PARENT_RO_PROPERTY | PERSISTENT_VALUE,
+                   PARENT_RO_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY,
                    staticProperty) {}
 
     bool GetDefaultBool(std::shared_ptr<TContainer> c) override {
+        if (c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS)
+            return false;
+
         if (!c->Prop->GetBool("isolate"))
             return false;
         else if (c->Prop->IsDefault("root"))
@@ -740,7 +764,7 @@ public:
     TBindProperty() :
         TListValue(P_BIND,
                    "Share host directories with container",
-                   PARENT_RO_PROPERTY | PERSISTENT_VALUE,
+                   PARENT_RO_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY,
                    staticProperty) {}
 
     TError ParseList(std::shared_ptr<TContainer> container,
@@ -1030,67 +1054,85 @@ public:
     TAllowedDevicesProperty() :
         TListValue(P_ALLOWED_DEVICES,
                    "Devices that container can create/read/write",
-                   PARENT_RO_PROPERTY | PERSISTENT_VALUE,
+                   PARENT_RO_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY,
                    staticProperty) {}
 
     TStrList GetDefaultList(std::shared_ptr<TContainer> c) override {
+        if (c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS)
+            return TStrList{
+                "c 1:3 rwm", "c 1:5 rwm", "c 1:7 rwm", "c 1:9 rwm",
+                "c 1:8 rwm", "c 136:* rw", "c 5:2 rwm", "c 254:0 rm",
+                "c 254:0 rm", "c 10:237 rmw", "b 7:* rmw"
+            };
+
         return TStrList{ "a *:* rwm" };
     }
 };
 
+struct TCapDesc {
+    uint64_t id;
+    int flags;
+};
+
+#define RESTRICTED_CAP 1
+
 class TCapabilitiesProperty : public TListValue {
     uint64_t Caps;
-    const std::map<std::string, uint64_t> supported = {
-        { "CHOWN", CAP_CHOWN },
-        { "DAC_OVERRIDE", CAP_DAC_OVERRIDE },
-        { "DAC_READ_SEARCH", CAP_DAC_READ_SEARCH },
-        { "FOWNER", CAP_FOWNER },
-        { "FSETID", CAP_FSETID },
-        { "KILL", CAP_KILL },
-        { "SETGID", CAP_SETGID },
-        { "SETUID", CAP_SETUID },
-        { "SETPCAP", CAP_SETPCAP },
-        { "LINUX_IMMUTABLE", CAP_LINUX_IMMUTABLE },
-        { "NET_BIND_SERVICE", CAP_NET_BIND_SERVICE },
-        { "NET_BROADCAST", CAP_NET_BROADCAST },
-        { "NET_ADMIN", CAP_NET_ADMIN },
-        { "NET_RAW", CAP_NET_RAW },
-        { "IPC_LOCK", CAP_IPC_LOCK },
-        { "IPC_OWNER", CAP_IPC_OWNER },
-        { "SYS_MODULE", CAP_SYS_MODULE },
-        { "SYS_RAWIO", CAP_SYS_RAWIO },
-        { "SYS_CHROOT", CAP_SYS_CHROOT },
-        { "SYS_PTRACE", CAP_SYS_PTRACE },
-        { "SYS_PACCT", CAP_SYS_PACCT },
-        { "SYS_ADMIN", CAP_SYS_ADMIN },
-        { "SYS_BOOT", CAP_SYS_BOOT },
-        { "SYS_NICE", CAP_SYS_NICE },
-        { "SYS_RESOURCE", CAP_SYS_RESOURCE },
-        { "SYS_TIME", CAP_SYS_TIME },
-        { "SYS_TTY_CONFIG", CAP_SYS_TTY_CONFIG },
-        { "MKNOD", CAP_MKNOD },
-        { "LEASE", CAP_LEASE },
-        { "AUDIT_WRITE", CAP_AUDIT_WRITE },
-        { "AUDIT_CONTROL", CAP_AUDIT_CONTROL },
-        { "SETFCAP", CAP_SETFCAP },
-        { "MAC_OVERRIDE", CAP_MAC_OVERRIDE },
-        { "MAC_ADMIN", CAP_MAC_ADMIN },
-        { "SYSLOG", CAP_SYSLOG },
-        { "WAKE_ALARM", CAP_WAKE_ALARM },
-        { "BLOCK_SUSPEND", CAP_BLOCK_SUSPEND },
+    const std::map<std::string, TCapDesc> supported = {
+        { "CHOWN",              { CAP_CHOWN, RESTRICTED_CAP } },
+        { "DAC_OVERRIDE",       { CAP_DAC_OVERRIDE, RESTRICTED_CAP } },
+        { "DAC_READ_SEARCH",    { CAP_DAC_READ_SEARCH, 0 } },
+        { "FOWNER",             { CAP_FOWNER, RESTRICTED_CAP } },
+        { "FSETID",             { CAP_FSETID, RESTRICTED_CAP } },
+        { "KILL",               { CAP_KILL, RESTRICTED_CAP } },
+        { "SETGID",             { CAP_SETGID, RESTRICTED_CAP } },
+        { "SETUID",             { CAP_SETUID, RESTRICTED_CAP } },
+        { "SETPCAP",            { CAP_SETPCAP, 0 } },
+        { "LINUX_IMMUTABLE",    { CAP_LINUX_IMMUTABLE, 0 } },
+        { "NET_BIND_SERVICE",   { CAP_NET_BIND_SERVICE, RESTRICTED_CAP } },
+        { "NET_BROADCAST",      { CAP_NET_BROADCAST, 0 } },
+        { "NET_ADMIN",          { CAP_NET_ADMIN, RESTRICTED_CAP } },
+        { "NET_RAW",            { CAP_NET_RAW, RESTRICTED_CAP } },
+        { "IPC_LOCK",           { CAP_IPC_LOCK, RESTRICTED_CAP } },
+        { "IPC_OWNER",          { CAP_IPC_OWNER, 0 } },
+        { "SYS_MODULE",         { CAP_SYS_MODULE, 0 } },
+        { "SYS_RAWIO",          { CAP_SYS_RAWIO, 0 } },
+        { "SYS_CHROOT",         { CAP_SYS_CHROOT, RESTRICTED_CAP } },
+        { "SYS_PTRACE",         { CAP_SYS_PTRACE, 0 } },
+        { "SYS_PACCT",          { CAP_SYS_PACCT, 0 } },
+        { "SYS_ADMIN",          { CAP_SYS_ADMIN, 0 } },
+        { "SYS_BOOT",           { CAP_SYS_BOOT, 0 } },
+        { "SYS_NICE",           { CAP_SYS_NICE, 0 } },
+        { "SYS_RESOURCE",       { CAP_SYS_RESOURCE, RESTRICTED_CAP } },
+        { "SYS_TIME",           { CAP_SYS_TIME, 0 } },
+        { "SYS_TTY_CONFIG",     { CAP_SYS_TTY_CONFIG, 0 } },
+        { "MKNOD",              { CAP_MKNOD, 0 } },
+        { "LEASE",              { CAP_LEASE, 0 } },
+        { "AUDIT_WRITE",        { CAP_AUDIT_WRITE, 0 } },
+        { "AUDIT_CONTROL",      { CAP_AUDIT_CONTROL, 0 } },
+        { "SETFCAP",            { CAP_SETFCAP, 0 } },
+        { "MAC_OVERRIDE",       { CAP_MAC_OVERRIDE, 0 } },
+        { "MAC_ADMIN",          { CAP_MAC_ADMIN, 0 } },
+        { "SYSLOG",             { CAP_SYSLOG, 0 } },
+        { "WAKE_ALARM",         { CAP_WAKE_ALARM, 0 } },
+        { "BLOCK_SUSPEND",      { CAP_BLOCK_SUSPEND, 0 } },
     };
 
 public:
     TCapabilitiesProperty() :
         TListValue(P_CAPABILITIES,
                    "Limit container capabilities",
-                   PERSISTENT_VALUE,
+                   PERSISTENT_VALUE | OS_MODE_PROPERTY,
                    staticProperty) {}
 
     TStrList GetDefaultList(std::shared_ptr<TContainer> c) override {
         TStrList v;
-        if (c->Uid == 0 || c->Gid == 0)
-            for (auto kv : supported)
+
+        bool root = c->Uid == 0 || c->Gid == 0;
+        bool restricted = c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS;
+
+        for (auto kv : supported)
+            if (root || (restricted && kv.second.flags & RESTRICTED_CAP))
                 v.push_back(kv.first);
         return v;
     }
@@ -1113,7 +1155,7 @@ public:
                 return TError(EError::InvalidValue,
                               "Unsupported capability " + line);
 
-            allowed |= (1ULL << supported.at(line));
+            allowed |= (1ULL << supported.at(line).id);
         }
 
         Caps = allowed;
@@ -1125,6 +1167,34 @@ public:
                           std::shared_ptr<TTaskEnv> taskEnv) override {
         taskEnv->Caps = Caps;
         return TError::Success();
+    }
+};
+
+class TVirtModeProperty : public TIntValue {
+public:
+    TVirtModeProperty() :
+        TIntValue(P_VIRT_MODE,
+                  "Virtualization mode: os or app",
+                  PERSISTENT_VALUE | RESTROOT_PROPERTY,
+                  staticProperty) {}
+
+    TError ParseInt(std::shared_ptr<TContainer> c,
+                    const int &value) override {
+        if (value != VIRT_MODE_APP && value != VIRT_MODE_OS)
+            return TError(EError::InvalidValue, std::string("Unsupported ") + P_VIRT_MODE);
+
+        return TError::Success();
+    }
+
+    TError SetString(std::shared_ptr<TContainer> c,
+                     std::shared_ptr<TVariant> v,
+                     const std::string &value) override {
+        if (value == "os")
+            return v->Set(EValueType::Int, VIRT_MODE_OS);
+        else if (value == "app")
+            return v->Set(EValueType::Int, VIRT_MODE_APP);
+        else
+            return TError(EError::InvalidValue, std::string("Unsupported ") + P_VIRT_MODE + ": " + value);
     }
 };
 
@@ -1179,6 +1249,7 @@ TError RegisterProperties() {
         new TCapabilitiesProperty,
         new TIpProperty,
         new TDefaultGwProperty,
+        new TVirtModeProperty,
 
         new TIdProperty,
         new TRootPidProperty,

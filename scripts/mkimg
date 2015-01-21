@@ -75,8 +75,8 @@ run() { say "$@"; eval "$@"; }
 TMPDIR=$(mktemp -d)
 cleanup() {
 	set +e
-	pexec iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE
-	pexec ip link delete veth0
+	[ $CLEANUP -eq 0 ] && pexec iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE
+	[ $CLEANUP -eq 0 ] && pexec ip link delete veth0
 	[ -d $TMPDIR ] && rmdir $TMPDIR
 	[ $CLEANUP -eq 0 ] && pctl destroy $CONTAINER
 }

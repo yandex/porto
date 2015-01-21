@@ -499,8 +499,14 @@ TError TContainer::PrepareTask() {
 
     taskEnv->RootRdOnly = Prop->GetBool(P_ROOT_RDONLY);
     taskEnv->CreateCwd = Prop->IsDefault(P_ROOT) && Prop->IsDefault(P_CWD) && !UseParentNamespace();
-    taskEnv->User = Prop->GetString(P_USER);
-    taskEnv->Group = Prop->GetString(P_GROUP);
+
+    if (Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS) {
+        taskEnv->User = "root";
+        taskEnv->Group = "root";
+    } else {
+        taskEnv->User = Prop->GetString(P_USER);
+        taskEnv->Group = Prop->GetString(P_GROUP);
+    }
 
     taskEnv->Environ.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
     auto env = Prop->GetList(P_ENV);
@@ -637,6 +643,13 @@ TError TContainer::Start() {
         return TError(EError::InvalidState, "invalid container state " +
                       ContainerStateName(state));
 
+    if (Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS &&
+        !Holder->PrivilegedUser(Uid, Gid)) {
+        for (auto property : propertySet.GetNames())
+            if (propertySet.Get(property)->Flags & OS_MODE_PROPERTY)
+                Prop->Reset(property);
+    }
+
     if (!IsRoot() && !Prop->GetString(P_COMMAND).length())
         return TError(EError::InvalidValue, "container command is empty");
 
@@ -669,15 +682,24 @@ TError TContainer::Start() {
     int loopNr = -1;
     if (root.GetType() != EFileType::Directory) {
         error = GetLoopDev(loopNr);
-        if (error)
+        if (error) {
             return error;
+            FreeResources();
+        }
+    } else {
+        if (Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS) {
+            FreeResources();
+            return TError(EError::Permission, "Can't start OS container on non-loop backed root");
+        }
     }
 
     error = Prop->SetInt(P_RAW_LOOP_DEV, loopNr);
     if (error) {
         error = PutLoopDev(loopNr);
-        if (error)
+        if (error) {
             L_ERR() << "Can't put loop device: " << error << std::endl;
+            FreeResources();
+        }
         return error;
     }
 
@@ -1029,6 +1051,9 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
     if (Prop->HasFlags(property, SUPERUSER_PROPERTY) && !superuser)
         if (Prop->GetString(property) != value)
             return TError(EError::Permission, "Only root can change this property");
+
+    if (Prop->HasFlags(property, RESTROOT_PROPERTY) && !Holder->RestrictedUser(Uid, Gid))
+        return TError(EError::Permission, "Only restricted root can change this property");
 
     if (!Prop->HasState(property, GetState()))
         return TError(EError::InvalidState, "Can't set dynamic property " + property + " for running container");

@@ -19,6 +19,34 @@ TContainerHolder::~TContainerHolder() {
     }
 }
 
+static void ParseUserConf(const ::google::protobuf::RepeatedPtrField<std::string> &source,
+                          std::set<int> &target) {
+    for (auto &val : source) {
+        TUser u(val);
+        TError error = u.Load();
+        if (error) {
+            L_WRN() << "Can't add privileged user: " << error << std::endl;
+            continue;
+        }
+
+        target.insert(u.GetId());
+    }
+}
+
+static void ParseGroupConf(const ::google::protobuf::RepeatedPtrField<std::string> &source,
+                          std::set<int> &target) {
+    for (auto &val : source) {
+        TGroup g(val);
+        TError error = g.Load();
+        if (error) {
+            L_WRN() << "Can't add privileged group: " << error << std::endl;
+            continue;
+        }
+
+        target.insert(g.GetId());
+    }
+}
+
 TError TContainerHolder::CreateRoot() {
     TError error = EpollCreate(Epfd);
     if (error)
@@ -36,25 +64,11 @@ TError TContainerHolder::CreateRoot() {
     if (error)
         return error;
 
-    for (auto &priv : config().privileges().root_user()) {
-        TUser u(priv);
-        TError error = u.Load();
-        if (error) {
-            L_WRN() << "Can't add privileged user: " << error << std::endl;
-            continue;
-        }
+    ParseUserConf(config().privileges().root_user(), PrivilegedUid);
+    ParseGroupConf(config().privileges().root_group(), PrivilegedGid);
 
-        PrivilegedUid.insert(u.GetId());
-    }
-
-    for (auto &priv : config().privileges().root_group()) {
-        TGroup g(priv);
-        TError error = g.Load();
-        if (error)
-            return error;
-
-        PrivilegedGid.insert(g.GetId());
-    }
+    ParseUserConf(config().privileges().restricted_root_user(), RestrictedRootUid);
+    ParseGroupConf(config().privileges().restricted_root_group(), RestrictedRootGid);
 
     // we are using single kvalue store for both properties and data
     // so make sure names don't clash
@@ -174,6 +188,16 @@ bool TContainerHolder::PrivilegedUser(int uid, int gid) {
         return true;
 
     if (PrivilegedGid.find(gid) != PrivilegedGid.end())
+        return true;
+
+    return false;
+}
+
+bool TContainerHolder::RestrictedUser(int uid, int gid) {
+    if (RestrictedRootUid.find(uid) != RestrictedRootUid.end())
+        return true;
+
+    if (RestrictedRootGid.find(gid) != RestrictedRootGid.end())
         return true;
 
     return false;

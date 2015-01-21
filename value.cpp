@@ -355,6 +355,10 @@ bool TVariantSet::HasValue(const std::string &name) {
     return v->HasValue();
 }
 
+void TVariantSet::Reset(const std::string &name) {
+    Variant.erase(name);
+}
+
 TError TVariantSet::Flush() {
     kv::TNode node;
     return Storage->SaveNode(Name, node);
