@@ -14,6 +14,6 @@ include_directories(${PROTOBUF_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS init.proto)
 
-add_executable(portoinit portoinit.cpp init.pb.cc ../error.cpp ../rpc.pb.cc ../util/string.cpp ../util/protobuf.cpp ../util/unix.cpp ../util/file.cpp ../util/folder.cpp ../util/path.cpp ../util/log.cpp ../util/pwd.cpp
+add_executable(portoinit portoinit.cpp init.pb.cc ../error.cpp ../rpc.pb.cc ../util/string.cpp ../util/protobuf.cpp ../util/unix.cpp ../util/file.cpp ../util/folder.cpp ../util/file.hpp ../util/path.cpp ../util/log.cpp ../util/pwd.cpp
     ${PROTO_SRCS} ${PROTO_HDRS})
 target_link_libraries(portoinit ${PB} pthread rt)
