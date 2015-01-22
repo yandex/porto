@@ -2,6 +2,13 @@
 #include "util/log.hpp"
 #include "config.hpp"
 
+TContext::TContext() {
+    Storage = std::make_shared<TKeyValueStorage>();
+    Queue = std::make_shared<TEventQueue>();
+    Net = std::make_shared<TNetwork>();
+    Cholder = std::make_shared<TContainerHolder>(Queue, Net);
+}
+
 TError TContext::Initialize() {
     TError error;
 

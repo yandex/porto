@@ -636,7 +636,7 @@ TError TContainer::Start() {
                       ContainerStateName(state));
 
     if (Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS &&
-        !Holder->PrivilegedUser(Uid, Gid)) {
+        !CredConf.PrivilegedUser(Cred)) {
         for (auto property : propertySet.GetNames())
             if (propertySet.Get(property)->Flags & OS_MODE_PROPERTY)
                 Prop->Reset(property);
@@ -1044,7 +1044,7 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
         if (Prop->GetString(property) != value)
             return TError(EError::Permission, "Only root can change this property");
 
-    if (Prop->HasFlags(property, RESTROOT_PROPERTY) && !RestrictedUser(Cred))
+    if (Prop->HasFlags(property, RESTROOT_PROPERTY) && !CredConf.RestrictedUser(Cred))
         return TError(EError::Permission, "Only restricted root can change this property");
 
     if (!Prop->HasState(property, GetState()))

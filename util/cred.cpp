@@ -163,7 +163,7 @@ static void ParseGroupConf(const ::google::protobuf::RepeatedPtrField<std::strin
     }
 }
 
-void TCredAdmin::Load() {
+void TCredConf::Load() {
     ParseUserConf(config().privileges().root_user(), PrivilegedUid);
     ParseGroupConf(config().privileges().root_group(), PrivilegedGid);
 
@@ -171,7 +171,7 @@ void TCredAdmin::Load() {
     ParseGroupConf(config().privileges().restricted_root_group(), RestrictedRootGid);
 }
 
-bool TCredAdmin::PrivilegedUser(const TCred &cred) {
+bool TCredConf::PrivilegedUser(const TCred &cred) {
     if (PrivilegedUid.find(cred.Uid) != PrivilegedUid.end())
         return true;
 
@@ -181,7 +181,7 @@ bool TCredAdmin::PrivilegedUser(const TCred &cred) {
     return false;
 }
 
-bool TCredAdmin::RestrictedUser(const TCred &cred) {
+bool TCredConf::RestrictedUser(const TCred &cred) {
     if (RestrictedRootUid.find(cred.Uid) != RestrictedRootUid.end())
         return true;
 
@@ -190,3 +190,5 @@ bool TCredAdmin::RestrictedUser(const TCred &cred) {
 
     return false;
 }
+
+TCredConf CredConf;

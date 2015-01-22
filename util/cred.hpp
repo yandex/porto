@@ -66,6 +66,7 @@ private:
 public:
     void Load();
     bool PrivilegedUser(const TCred &cred);
+    bool RestrictedUser(const TCred &cred);
 };
 
 extern TCredConf CredConf;
