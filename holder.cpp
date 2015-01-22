@@ -9,7 +9,7 @@
 #include "util/string.hpp"
 #include "util/cred.hpp"
 
-TContainerHolder::~TContainerHolder() {
+void TContainerHolder::DestroyRoot() {
     // we want children to be removed first
     while (Containers.begin() != Containers.end()) {
         auto name = Containers.begin()->first;
