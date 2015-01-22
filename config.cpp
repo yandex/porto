@@ -93,7 +93,7 @@ void TConfig::Load(bool silent) {
 
     for (auto &path : ConfigFiles)
         if (LoadFile(path, silent))
-            return;
+            goto load_cred;
 
     if (!silent)
         std::cerr << "Using default config" << std::endl;
@@ -104,6 +104,7 @@ void TConfig::Load(bool silent) {
         throw string("Invalid configuration");
     }
 
+load_cred:
     CredConf.Load();
 }
 
