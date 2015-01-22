@@ -16,7 +16,7 @@ class TIdMap;
 class TEventQueue;
 class TEvent;
 
-class TContainerHolder {
+class TContainerHolder : public std::enable_shared_from_this<TContainerHolder> {
     std::shared_ptr<TNetwork> Net;
     std::map<std::string, std::shared_ptr<TContainer>> Containers;
     TIdMap IdMap;
@@ -25,13 +25,16 @@ class TContainerHolder {
     TError RestoreId(const kv::TNode &node, uint16_t &id);
     void ScheduleLogRotatation();
     TError _Destroy(const std::string &name);
+    std::shared_ptr<TKeyValueStorage> Storage;
+
 public:
     std::shared_ptr<TEventQueue> Queue;
     int Epfd;
 
     TContainerHolder(std::shared_ptr<TEventQueue> queue,
-                     std::shared_ptr<TNetwork> net) :
-        Net(net), Queue(queue) { }
+                     std::shared_ptr<TNetwork> net,
+                     std::shared_ptr<TKeyValueStorage> storage) :
+        Net(net), Storage(storage), Queue(queue) { }
     ~TContainerHolder();
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot();

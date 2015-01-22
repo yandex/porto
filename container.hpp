@@ -37,7 +37,7 @@ enum class EContainerState {
 
 class TContainer : public std::enable_shared_from_this<TContainer>,
                    public TNonCopyable {
-    TContainerHolder *Holder;
+    std::shared_ptr<TContainerHolder> Holder;
     const std::string Name;
     const std::shared_ptr<TContainer> Parent;
     std::shared_ptr<TTclass> Tclass;
@@ -96,11 +96,12 @@ public:
     EContainerState GetState();
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);
 
-    TContainer(TContainerHolder *holder,
+    TContainer(std::shared_ptr<TContainerHolder> holder,
+               std::shared_ptr<TKeyValueStorage> storage,
                const std::string &name, std::shared_ptr<TContainer> parent,
                uint16_t id, std::shared_ptr<TNetwork> net) :
-        Holder(holder), Name(StripParentName(name)), Parent(parent), Id(id),
-        Net(net) { }
+        Holder(holder), Name(StripParentName(name)), Parent(parent),
+        Storage(storage), Id(id), Net(net) { }
 
     const std::string GetName(bool recursive = true) const;
     const uint16_t GetId() const { return Id; }

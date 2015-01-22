@@ -3,10 +3,10 @@
 #include "config.hpp"
 
 TContext::TContext() {
-    Storage = std::make_shared<TKeyValueStorage>();
+    Storage = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().keyval().file().path(), "tmpfs", { config().keyval().size() }));
     Queue = std::make_shared<TEventQueue>();
     Net = std::make_shared<TNetwork>();
-    Cholder = std::make_shared<TContainerHolder>(Queue, Net);
+    Cholder = std::make_shared<TContainerHolder>(Queue, Net, Storage);
 }
 
 TError TContext::Initialize() {

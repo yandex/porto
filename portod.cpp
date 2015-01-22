@@ -518,8 +518,12 @@ static int SlaveRpc(TContext &context) {
 }
 
 static void KvDump() {
-    TKeyValueStorage storage;
-    storage.Dump();
+    TKeyValueStorage storage(TMount("tmpfs", config().keyval().file().path(), "tmpfs", { config().keyval().size() }));
+    TError error = storage.MountTmpfs();
+    if (error)
+        L_ERR() << "Can't mount key-value storage: " << error << std::endl;
+    else
+        storage.Dump();
 }
 
 static int TuneLimits() {

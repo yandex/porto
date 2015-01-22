@@ -1080,10 +1080,6 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
 }
 
 TError TContainer::Prepare() {
-    Storage = std::make_shared<TKeyValueStorage>();
-    if (!Storage)
-        throw std::bad_alloc();
-
     Prop = std::make_shared<TPropertySet>(Storage, shared_from_this());
     Data = std::make_shared<TVariantSet>(Storage, &dataSet, shared_from_this());
     if (!Prop || !Data)
