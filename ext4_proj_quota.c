@@ -7,12 +7,13 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <limits.h>
-#include <linux/quota.h>
 #include <sys/quota.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
+
+#include "ext4_proj_quota.h"
 
 #ifndef PRJQUOTA
 #define PRJQUOTA 2
@@ -110,7 +111,7 @@ found:
 	return 0;
 }
 
-static int init_project_quota(const char *quota_path)
+int init_project_quota(const char *quota_path)
 {
 	FILE *quota_file;
 	struct {
@@ -142,7 +143,7 @@ static int init_project_quota(const char *quota_path)
 	return 0;
 }
 
-static void project_quota_on(const char *path)
+void project_quota_on(const char *path)
 {
 	char *device, *fstype ,*root_path, *quota_path;
 
@@ -169,7 +170,7 @@ static void project_quota_on(const char *path)
 	free(quota_path);
 }
 
-static void project_quota_off(const char *path)
+void project_quota_off(const char *path)
 {
 	char *device, *fstype ,*root_path;
 
@@ -190,7 +191,7 @@ static void project_quota_off(const char *path)
 	free(root_path);
 }
 
-static int get_project_id(const char *path, unsigned *project_id)
+int get_project_id(const char *path, unsigned *project_id)
 {
 	struct fsxattr fsx;
 	int dir_fd, ret;
@@ -205,7 +206,7 @@ static int get_project_id(const char *path, unsigned *project_id)
 	return ret;
 }
 
-static int set_project_id(const char *path, unsigned project_id)
+int set_project_id(const char *path, unsigned project_id)
 {
 	struct fsxattr fsx;
 	int dir_fd, ret;
@@ -224,7 +225,7 @@ static int set_project_id(const char *path, unsigned project_id)
 	return ret;
 }
 
-static void get_project_quota(const char *path, struct if_dqblk *quota)
+void get_project_quota(const char *path, struct if_dqblk *quota)
 {
 	char *root_path, *fstype, *device;
 	unsigned project_id;
@@ -251,7 +252,7 @@ static void get_project_quota(const char *path, struct if_dqblk *quota)
 	free(device);
 }
 
-static void set_project_quota(const char *path, struct if_dqblk *quota)
+void set_project_quota(const char *path, struct if_dqblk *quota)
 {
 	char *root_path, *fstype, *device;
 	unsigned project_id;
@@ -277,63 +278,62 @@ static void set_project_quota(const char *path, struct if_dqblk *quota)
 	free(fstype);
 	free(device);
 }
+/* int main (int argc, char **argv) { */
+/* 	struct if_dqblk quota; */
+/* 	unsigned project_id; */
 
-int main (int argc, char **argv) {
-	struct if_dqblk quota;
-	unsigned project_id;
+/* 	if (argc < 2) */
+/* 		goto usage; */
 
-	if (argc < 2)
-		goto usage;
+/* 	if (!strcmp(argv[1], "on")) { */
+/* 		if (argc < 3) */
+/* 			goto usage; */
+/* 		project_quota_on(argv[2]); */
+/* 	} else if (!strcmp(argv[1], "off")) { */
+/* 		if (argc < 3) */
+/* 			goto usage; */
+/* 		project_quota_off(argv[2]); */
+/* 	} else if (!strcmp(argv[1], "project")) { */
+/* 		if (argc < 4) */
+/* 			goto usage; */
+/* 		set_project_id(argv[2], atoi(argv[3])); */
+/* 	} else if (!strcmp(argv[1], "limit")) { */
+/* 		if (argc < 4) */
+/* 			goto usage; */
+/* 		quota.dqb_bhardlimit = atoll(argv[3]) / QIF_DQBLKSIZE; */
+/* 		quota.dqb_bsoftlimit = quota.dqb_bhardlimit; */
+/* 		quota.dqb_valid |= QIF_BLIMITS; */
+/* 		set_project_quota(argv[2], &quota); */
+/* 	} else if (!strcmp(argv[1], "ilimit")) { */
+/* 		if (argc < 4) */
+/* 			goto usage; */
+/* 		quota.dqb_ihardlimit = atoll(argv[3]); */
+/* 		quota.dqb_isoftlimit = quota.dqb_bhardlimit; */
+/* 		quota.dqb_valid |= QIF_ILIMITS; */
+/* 		set_project_quota(argv[2], &quota); */
+/* 	} else if (!strcmp(argv[1], "info")) { */
+/* 		if (argc < 3) */
+/* 			goto usage; */
+/* 		get_project_id(argv[2], &project_id); */
+/* 		get_project_quota(argv[2], &quota); */
+/* 		printf("project   %u\n", project_id); */
+/* 		printf("space     %llu\n", quota.dqb_curspace); */
+/* 		printf("limit     %llu\n", quota.dqb_bhardlimit * QIF_DQBLKSIZE); */
+/* 		printf("inodes    %llu\n", quota.dqb_curinodes); */
+/* 		printf("ilimit    %llu\n", quota.dqb_ihardlimit); */
+/* 	} */
 
-	if (!strcmp(argv[1], "on")) {
-		if (argc < 3)
-			goto usage;
-		project_quota_on(argv[2]);
-	} else if (!strcmp(argv[1], "off")) {
-		if (argc < 3)
-			goto usage;
-		project_quota_off(argv[2]);
-	} else if (!strcmp(argv[1], "project")) {
-		if (argc < 4)
-			goto usage;
-		set_project_id(argv[2], atoi(argv[3]));
-	} else if (!strcmp(argv[1], "limit")) {
-		if (argc < 4)
-			goto usage;
-		quota.dqb_bhardlimit = atoll(argv[3]) / QIF_DQBLKSIZE;
-		quota.dqb_bsoftlimit = quota.dqb_bhardlimit;
-		quota.dqb_valid |= QIF_BLIMITS;
-		set_project_quota(argv[2], &quota);
-	} else if (!strcmp(argv[1], "ilimit")) {
-		if (argc < 4)
-			goto usage;
-		quota.dqb_ihardlimit = atoll(argv[3]);
-		quota.dqb_isoftlimit = quota.dqb_bhardlimit;
-		quota.dqb_valid |= QIF_ILIMITS;
-		set_project_quota(argv[2], &quota);
-	} else if (!strcmp(argv[1], "info")) {
-		if (argc < 3)
-			goto usage;
-		get_project_id(argv[2], &project_id);
-		get_project_quota(argv[2], &quota);
-		printf("project   %u\n", project_id);
-		printf("space     %llu\n", quota.dqb_curspace);
-		printf("limit     %llu\n", quota.dqb_bhardlimit * QIF_DQBLKSIZE);
-		printf("inodes    %llu\n", quota.dqb_curinodes);
-		printf("ilimit    %llu\n", quota.dqb_ihardlimit);
-	}
+/* 	return 0; */
 
-	return 0;
-
-usage:
-	fprintf(stderr, "Usage: %s <command> <path> [args]...\n"
-			"Commands: \n"
-			"  on      <path>                turn on\n"
-			"  off     <path>                turn off\n"
-			"  info    <path>                print usage and limits\n"
-			"  project <path> <id>           set project id\n"
-			"  limit   <path> <bytes>        set space limit\n"
-			"  ilimit  <path> <inodes>       set inodes limit\n",
-			argv[0]);
-	return 2;
-}
+/* usage: */
+/* 	fprintf(stderr, "Usage: %s <command> <path> [args]...\n" */
+/* 			"Commands: \n" */
+/* 			"  on      <path>                turn on\n" */
+/* 			"  off     <path>                turn off\n" */
+/* 			"  info    <path>                print usage and limits\n" */
+/* 			"  project <path> <id>           set project id\n" */
+/* 			"  limit   <path> <bytes>        set space limit\n" */
+/* 			"  ilimit  <path> <inodes>       set inodes limit\n", */
+/* 			argv[0]); */
+/* 	return 2; */
+/* } */
