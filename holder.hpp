@@ -35,13 +35,13 @@ public:
                      std::shared_ptr<TNetwork> net,
                      std::shared_ptr<TKeyValueStorage> storage) :
         Net(net), Storage(storage), Queue(queue) { }
-    ~TContainerHolder();
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot();
     TError Create(const std::string &name, const TCred &cred);
     std::shared_ptr<TContainer> Get(const std::string &name);
     TError Restore(const std::string &name, const kv::TNode &node);
     TError Destroy(const std::string &name);
+    void DestroyRoot();
 
     std::vector<std::string> List() const;
 
