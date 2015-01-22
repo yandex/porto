@@ -1,4 +1,3 @@
-- portoctl restart
 - run some kind of init process in meta container
 - fix netfilter bug with >3.10
 - mount root loop in root namespace (to better diagnose possible problems)

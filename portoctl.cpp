@@ -388,6 +388,29 @@ public:
     }
 };
 
+class TRestartCmd : public ICmd {
+public:
+    TRestartCmd(TPortoAPI *api) : ICmd(api, "restart", 1, "<name> [name...]", "restart container") {}
+
+    int Execute(int argc, char *argv[]) {
+        for (int i = 0; i < argc; i++) {
+            int ret = Api->Stop(argv[0]);
+            if (ret) {
+                PrintError("Can't stop container");
+                return ret;
+            }
+
+            ret = Api->Start(argv[0]);
+            if (ret) {
+                PrintError("Can't start container");
+                return ret;
+            }
+        }
+
+        return 0;
+    }
+};
+
 class TPauseCmd : public ICmd {
 public:
     TPauseCmd(TPortoAPI *api) : ICmd(api, "pause", 1, "<name> [name...]", "pause container") {}
@@ -1162,6 +1185,7 @@ int main(int argc, char *argv[]) {
     RegisterCommand(new TTopCmd(&api));
     RegisterCommand(new TStartCmd(&api));
     RegisterCommand(new TStopCmd(&api));
+    RegisterCommand(new TRestartCmd(&api));
     RegisterCommand(new TKillCmd(&api));
     RegisterCommand(new TPauseCmd(&api));
     RegisterCommand(new TResumeCmd(&api));
