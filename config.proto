@@ -68,6 +68,11 @@ message TCfg {
 		repeated string restricted_root_group = 4;
 	}
 
+	message TVolumesCfg {
+		optional TKeyvalCfg keyval = 1;
+		optional string tmp_dir = 2;
+	}
+
 	optional TNetworkCfg network = 1;
 	optional TFileCfg master_pid = 2;
 	optional TFileCfg slave_pid = 3;
@@ -79,4 +84,5 @@ message TCfg {
 	optional TDaemonCfg daemon = 9;
 	optional TContainerCfg container = 10;
 	optional TPrivilegesCfg privileges = 11;
+	optional TVolumesCfg volumes = 12;
 }

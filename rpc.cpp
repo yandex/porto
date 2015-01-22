@@ -208,6 +208,52 @@ static TError Version(TContext &context,
     return TError::Success();
 }
 
+static TError CreateVolume(TContext &context,
+                           const rpc::TVolumeCreateRequest &req,
+                           rpc::TContainerResponse &rsp,
+                           const TCred &cred) {
+
+    std::shared_ptr<TVolume> volume;
+    volume = std::make_shared<TVolume>(context.VolumeStorage, context.Vholder,
+                                       req.name(), req.source(),
+                                       req.quota(), req.flags(), cred);
+    TError err = volume->Create();
+    if (err)
+        return err;
+
+    return TError::Success();
+}
+
+static TError DestroyVolume(TContext &context,
+                            const rpc::TVolumeDestroyRequest &req,
+                            rpc::TContainerResponse &rsp,
+                            const TCred &cred) {
+    auto volume = context.Vholder->Get(req.name());
+    if (volume) {
+        TError error = volume->CheckPermission(cred);
+        if (error)
+            return error;
+        return volume->Destroy();
+    }
+
+    return TError(EError::VolumeDoesNotExist, "volume " + volume->GetName() +
+                  "doesn't exist");
+}
+
+static TError ListVolumes(TContext &context,
+                          rpc::TContainerResponse &rsp) {
+    for (auto name : context.Vholder->List()) {
+        auto desc = rsp.mutable_volumelist()->add_list();
+        auto vol = context.Vholder->Get(name);
+        desc->set_name(vol->GetName());
+        desc->set_source(vol->GetSource());
+        desc->set_quota(vol->GetQuota());
+        desc->set_flags(vol->GetFlags());
+    }
+
+    return TError::Success();
+}
+
 rpc::TContainerResponse
 HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
                  const TCred &cred) {
@@ -248,6 +294,12 @@ HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
             error = Kill(context, req.kill(), rsp, cred);
         else if (req.has_version())
             error = Version(context, rsp);
+        else if (req.has_createvolume())
+            error = CreateVolume(context, req.createvolume(), rsp, cred);
+        else if (req.has_destroyvolume())
+            error = DestroyVolume(context, req.destroyvolume(), rsp, cred);
+        else if (req.has_listvolumes())
+            error = ListVolumes(context, rsp);
         else
             error = TError(EError::InvalidMethod, "invalid RPC method");
     } catch (std::bad_alloc exc) {

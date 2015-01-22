@@ -20,6 +20,17 @@ struct TData {
         Name(name), Description(description) {}
 };
 
+struct TVolumeDescription {
+    std::string Name;
+    std::string Source;
+    std::string Quota;
+    std::string Flags;
+
+    TVolumeDescription(const std::string &name, const std::string &source,
+                       const std::string &quota, const std::string &flags) :
+        Name(name), Source(source), Quota(quota), Flags(flags) {}
+};
+
 class TPortoAPI {
     int Fd;
     const int Retries;
@@ -59,6 +70,12 @@ public:
     int Raw(const std::string &message, std::string &response);
     void GetLastError(int &error, std::string &msg) const;
     void Cleanup();
+
+    // VolumeAPI
+    int CreateVolume(const std::string &name, const std::string &source,
+                     const std::string &quota, const std::string &flags);
+    int DestroyVolume(const std::string &name);
+    int ListVolumes(std::vector<TVolumeDescription> &vlist);
 };
 
 #endif

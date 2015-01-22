@@ -615,6 +615,8 @@ static int SlaveMain() {
             }
         }
 
+        context.Vholder->RestoreFromStorage();
+
         L() << "Done restoring" << std::endl;
 
         cs.Destroy();

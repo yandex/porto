@@ -216,3 +216,36 @@ void TPortoAPI::Cleanup() {
     close(Fd);
     Fd = -1;
 }
+
+int TPortoAPI::CreateVolume(const std::string &name, const std::string &source,
+                            const std::string &quota, const std::string &flags) {
+    Req.mutable_createvolume()->set_name(name);
+    Req.mutable_createvolume()->set_source(source);
+    Req.mutable_createvolume()->set_quota(quota);
+    Req.mutable_createvolume()->set_flags(flags);
+
+    return Rpc(Req, Rsp);
+}
+
+int TPortoAPI::DestroyVolume(const std::string &name) {
+    Req.mutable_destroyvolume()->set_name(name);
+
+    return Rpc(Req, Rsp);
+}
+
+int TPortoAPI::ListVolumes(std::vector<TVolumeDescription> &vlist) {
+    Req.mutable_listvolumes();
+
+    int ret = Rpc(Req, Rsp);
+    if (!ret) {
+        auto list = Rsp.volumelist();
+
+        for (int i = 0; i < list.list_size(); i++)
+            vlist.push_back(TVolumeDescription(list.list(i).name(),
+                                               list.list(i).source(),
+                                               list.list(i).quota(),
+                                               list.list(i).flags()));
+    }
+
+    return ret;
+}

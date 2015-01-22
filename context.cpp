@@ -4,9 +4,11 @@
 
 TContext::TContext() {
     Storage = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().keyval().file().path(), "tmpfs", { config().keyval().size() }));
+    VolumeStorage = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().volumes().keyval().file().path(), "tmpfs", { config().volumes().keyval().size() }));
     Queue = std::make_shared<TEventQueue>();
     Net = std::make_shared<TNetwork>();
     Cholder = std::make_shared<TContainerHolder>(Queue, Net, Storage);
+    Vholder = std::make_shared<TVolumeHolder>(VolumeStorage);
 }
 
 TError TContext::Initialize() {
@@ -14,6 +16,9 @@ TError TContext::Initialize() {
 
     // don't fail, try to recover anyway
     error = Storage->MountTmpfs();
+    if (error)
+        L_ERR() << "Can't create key-value storage, skipping recovery: " << error << std::endl;
+    error = VolumeStorage->MountTmpfs();
     if (error)
         L_ERR() << "Can't create key-value storage, skipping recovery: " << error << std::endl;
 

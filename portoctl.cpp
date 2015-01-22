@@ -1174,6 +1174,64 @@ public:
     }
 };
 
+class TCreateVolumeCmd : public ICmd {
+public:
+    TCreateVolumeCmd(TPortoAPI *api) : ICmd(api, "vcreate", 2,
+                                            "<name> <source> [quota] [flags...]", "create volume") {}
+
+    int Execute(int argc, char *argv[]) {
+        std::string flags = (argc == 4 ? argv[3] : "");
+        std::string quota = (argc >= 3 ? argv[2] : "0");
+        int ret = Api->CreateVolume(argv[0], argv[1], quota, flags);
+        if (ret) {
+            PrintError("Can't create volume");
+            return ret;
+        }
+
+        return 0;
+    }
+};
+
+class TDestroyVolumeCmd : public ICmd {
+public:
+    TDestroyVolumeCmd(TPortoAPI *api) : ICmd(api, "vdestroy", 1, "<name> [name...]", "destroy volume") {}
+
+    int Execute(int argc, char *argv[]) {
+        for (int i = 0; i < argc; i++) {
+            int ret = Api->DestroyVolume(argv[i]);
+            if (ret) {
+                PrintError("Can't destroy volume");
+                return ret;
+            }
+        }
+
+        return 0;
+    }
+};
+
+class TListVolumesCmd : public ICmd {
+public:
+    TListVolumesCmd(TPortoAPI *api) : ICmd(api, "vlist", 0, "", "list created volumes") {}
+
+    int Execute(int argc, char *argv[]) {
+        vector<TVolumeDescription> vlist;
+        int ret = Api->ListVolumes(vlist);
+        if (ret) {
+            PrintError("Can't list volumes");
+            return ret;
+        }
+
+        for (auto v : vlist)
+            std::cout << v.Name << " "
+                      << v.Quota << " "
+                      << v.Flags << " "
+                      << v.Source << " "
+                      << std::endl;
+
+        return EXIT_SUCCESS;
+    }
+};
+
 int main(int argc, char *argv[]) {
     config.Load(true);
     TPortoAPI api(config().rpc_sock().file().path());
@@ -1197,6 +1255,10 @@ int main(int argc, char *argv[]) {
     RegisterCommand(new TEnterCmd(&api));
     RegisterCommand(new TRunCmd(&api));
     RegisterCommand(new TExecCmd(&api));
+
+    RegisterCommand(new TCreateVolumeCmd(&api));
+    RegisterCommand(new TDestroyVolumeCmd(&api));
+    RegisterCommand(new TListVolumesCmd(&api));
 
     TLogger::DisableLog();
 

@@ -6,6 +6,8 @@ package rpc;
 
 // Возможная ошибка в ответе
 enum EError {
+	option allow_alias = true;
+
 	// Запрос выполнен без ошибок
 	Success = 0;
 	// Неизвестная критическая ошибка
@@ -31,6 +33,10 @@ enum EError {
 	ResourceNotAvailable = 10;
 	// Недостаточно прав для выполнения операции
 	Permission = 11;
+
+	//
+	VolumeAlreadyExists = 3;
+	VolumeDoesNotExist = 4;
 }
 
 // Запрос на создание контейнера
@@ -143,6 +149,10 @@ message TContainerRequest {
 	optional TContainerDataListRequest dataList = 12;
 	optional TContainerKillRequest kill = 13;
 	optional TVersionRequest version = 14;
+
+	optional TVolumeCreateRequest createVolume = 100;
+	optional TVolumeDestroyRequest destroyVolume = 101;
+	optional TVolumeListRequest listVolumes = 102;
 }
 
 // Ответ на запрос списка контейнеров
@@ -207,4 +217,36 @@ message TContainerResponse {
 	optional TContainerPropertyListResponse propertyList = 6;
 	optional TContainerDataListResponse dataList = 7;
 	optional TVersionResponse version = 8;
+
+	optional TVolumeListResponse volumeList = 9;
+}
+
+// VolumeAPI
+
+//Запрос на создание тома
+message TVolumeCreateRequest {
+	required string name = 1;
+	required string source = 2;
+	required string quota = 3;
+	optional string flags = 4;
+}
+
+// Запрос на уничтожение тома
+message TVolumeDestroyRequest {
+	required string name = 1;
+}
+
+// Запрос на получение списка томов
+message TVolumeListRequest {
+}
+
+// Список томов с описанием
+message TVolumeListResponse {
+	message TVolumeDescription {
+		required string name = 1;
+		required string source = 2;
+		required string quota = 3;
+		optional string flags = 4;
+	}
+	repeated TVolumeDescription list = 1;
 }
