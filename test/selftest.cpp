@@ -1801,7 +1801,7 @@ static void TestCapabilitiesProperty(TPortoAPI &api) {
 
     Say() << "Checking custom capabilities" << std::endl;
     ExpectFailure(api.SetProperty(name, "capabilities", "CHOWN; INVALID"), EError::InvalidValue);
-    ExpectSuccess(api.SetProperty(name, "capabilities", "CHOWN; DAC_OVERRIDE; FSETID; FOWNER; MKNOD; NET_RAW; SETGID; SETUID; SETFCAP; SETPCAP; NET_BIND_SERVICE; IPC_LOCK; SYS_CHROOT; SYS_RESOURCE; KILL; AUDIT_WRITE"));
+    ExpectSuccess(api.SetProperty(name, "capabilities", "CHOWN; DAC_OVERRIDE; FSETID; FOWNER; MKNOD; NET_RAW; SETGID; SETUID; SETFCAP; SETPCAP; NET_BIND_SERVICE; SYS_CHROOT; KILL; AUDIT_WRITE"));
 
     ExpectSuccess(api.Start(name));
     ExpectSuccess(api.GetData(name, "root_pid", pid));
@@ -2432,7 +2432,7 @@ static void TestVirtModeProperty(TPortoAPI &api) {
         { "bind", "" },
         { "cwd", "/" },
         { "allowed_devices", "c 1:3 rwm; c 1:5 rwm; c 1:7 rwm; c 1:9 rwm; c 1:8 rwm; c 136:* rw; c 5:2 rwm; c 254:0 rm; c 254:0 rm; c 10:237 rmw; b 7:* rmw" },
-        { "capabilities", "CHOWN; DAC_OVERRIDE; FOWNER; FSETID; KILL; NET_ADMIN; NET_BIND_SERVICE; NET_RAW; SETGID; SETUID; SYS_CHROOT" },
+        { "capabilities", "CHOWN; DAC_OVERRIDE; FSETID; FOWNER; MKNOD; NET_RAW; SETGID; SETUID; SETFCAP; SETPCAP; NET_BIND_SERVICE; IPC_LOCK; SYS_CHROOT; SYS_RESOURCE; KILL; AUDIT_WRITE" },
     };
     std::string s;
 
