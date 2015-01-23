@@ -18,6 +18,8 @@ public:
     std::shared_ptr<TContainerHolder> Cholder;
     std::shared_ptr<TVolumeHolder> Vholder;
 
+    int Epfd;
+
     TContext();
     TError Initialize();
     TError Destroy();

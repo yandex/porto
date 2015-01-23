@@ -20,11 +20,7 @@ void TContainerHolder::DestroyRoot() {
 }
 
 TError TContainerHolder::CreateRoot() {
-    TError error = EpollCreate(Epfd);
-    if (error)
-        return error;
-
-    error = RegisterProperties();
+    TError error = RegisterProperties();
     if (error)
         return error;
 

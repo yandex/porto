@@ -1,5 +1,6 @@
 #include "context.hpp"
 #include "util/log.hpp"
+#include "util/unix.hpp"
 #include "config.hpp"
 
 TContext::TContext() {
@@ -51,6 +52,11 @@ TError TContext::Initialize() {
         for (auto &link : Net->GetLinks())
             L() << "Using " << link->GetAlias() << " interface" << std::endl;
     }
+
+    error = EpollCreate(Epfd);
+    if (error)
+        return error;
+    Cholder->Epfd = Epfd;
 
     error = Cholder->CreateRoot();
     if (error) {

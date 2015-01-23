@@ -388,20 +388,20 @@ static int SlaveRpc(TContext &context) {
         return EXIT_FAILURE;
     }
 
-    error = EpollAdd(cholder.Epfd, sfd);
+    error = EpollAdd(context.Epfd, sfd);
     if (error) {
         L_ERR() << "Can't add RPC server fd to epoll: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
-    error = EpollAdd(cholder.Epfd, REAP_EVT_FD);
+    error = EpollAdd(context.Epfd, REAP_EVT_FD);
     if (error && !failsafe) {
         L_ERR() << "Can't add master fd to epoll: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
     if (context.NetEvt) {
-        error = EpollAdd(cholder.Epfd, context.NetEvt->GetFd());
+        error = EpollAdd(context.Epfd, context.NetEvt->GetFd());
         if (error) {
             L_ERR() << "Can't add netlink events fd to epoll: " << error << std::endl;
             return EXIT_FAILURE;
@@ -414,7 +414,7 @@ static int SlaveRpc(TContext &context) {
     while (!done) {
         int timeout = context.Queue->GetNextTimeout();
         Statistics->SlaveTimeoutMs = timeout;
-        int nr = epoll_wait(cholder.Epfd, ev, MAX_EVENTS, timeout);
+        int nr = epoll_wait(context.Epfd, ev, MAX_EVENTS, timeout);
         if (nr < 0) {
             L() << "epoll() error: " << strerror(errno) << std::endl;
 
@@ -454,7 +454,7 @@ static int SlaveRpc(TContext &context) {
                 if (ret < 0)
                     break;
 
-                error = EpollAdd(cholder.Epfd, fd);
+                error = EpollAdd(context.Epfd, fd);
                 if (error) {
                     L_ERR() << "Can't add client fd to epoll: " << error << std::endl;
                     return EXIT_FAILURE;
