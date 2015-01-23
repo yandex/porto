@@ -5,16 +5,20 @@
 
 #include "init.pb.h"
 
-#include "util/protobuf.hpp"
+//#include "util/protobuf.hpp"
+#include "config.hpp"
 #include "util/log.hpp"
 #include "util/folder.hpp"
 #include "util/file.hpp"
+#include "api/cpp/libporto.hpp"
+#include "util/unix.hpp"
 
 extern "C" {
 #include <fcntl.h>
 #include <unistd.h>
 }
 
+static volatile sig_atomic_t reloadConfigs = true;
 static std::string CONFIG_DIR = "/etc/portoinit";
 static std::string extension = ".conf";
 static std::vector<std::string> configs;
@@ -39,16 +43,80 @@ static bool GetContainerProperty(std::string &f, std::string &parameterName, std
     return false;
 }
 
-static int StartContainers (std::map<std::string, std::map<std::string, std::string>> &containers) {
+static void StartContainers (std::map<std::string, std::map<std::string, std::string>> &containers, TPortoAPI &api) {
+    int ret, error;
+    std::string msg;
     TLogger::Log() << "Run!!!!" << std::endl;
     for (auto iter: containers) {
-        TLogger::Log() <<  iter.first << std::endl;
+        std::string s, containerName = "portoinit@" + iter.first;
+
+        TLogger::Log() << containerName << std::endl;
+// create container
+        ret = api.GetData(containerName, "state", s);
+        if (ret) {
+            api.GetLastError(error, msg);
+            L_ERR() << "Can't get container state" << std::endl;
+            L_ERR() << msg << std::endl;
+        }
+
+        if (s == "dead") {
+            TLogger::Log() << "Destroy and reload: " << containerName << std::endl;
+            ret = api.Destroy(containerName);
+            if (ret) {
+                api.GetLastError(error, msg);
+                L_ERR() << msg << std::endl;
+            }
+        }
+        if (s != "running" and s != "stopped") {
+            ret = api.Create(containerName);
+            if (ret) {
+                api.GetLastError(error, msg);
+                L_ERR() << "Can't create container: " << containerName << std::endl;
+                L_ERR() << msg << std::endl;
+                continue;
+            }
+        }
+// set container property
         for (auto i: iter.second) {
-            TLogger::Log() << i.first << " " << i.second << std::endl;
+            std::string p;
+
+            ret = api.GetProperty(containerName, i.first, p);
+            if (ret) {
+                api.GetLastError(error, msg);
+                L_ERR() << "Can't get container property" << std::endl;
+                L_ERR() << msg << std::endl;
+            }
+            if (p != i.second) {
+                TLogger::Log() << i.first << " " << i.second << std::endl;
+                ret = api.SetProperty(containerName, i.first, i.second);
+                if (ret) {
+                    api.GetLastError(error, msg);
+                    if (error == 8) {
+                        ret = api.Stop(containerName);
+                        if (ret) {
+                            L_ERR() << msg << " " << error << std::endl;
+                        } else {
+                            ret = api.SetProperty(containerName, i.first, i.second);
+                            if (ret)
+                                L_ERR() << msg << " " << error << std::endl;
+                        }
+                    } else {
+                        L_ERR() << "Can't set property to " << containerName << ": " <<  i.first << "=" << i.second << std::endl;
+                        L_ERR() << msg << " " << error << std::endl;
+                    }
+                }
+            }
+        }
+// start container
+        if (s != "running") {
+            ret = api.Start(containerName);
+            if (ret) {
+                api.GetLastError(error, msg);
+                L_ERR() << "Can't start container: " << containerName << std::endl;
+                L_ERR() << msg << std::endl;
+            }
         }
     }
-
-    return 0;
 }
 
 static bool LoadConfig(const std::string path, std::map<std::string, std::map<std::string, std::string>> &containers) {
@@ -168,6 +236,11 @@ static void Poweroff() {
     // man 2 reboot
 }
 
+static void ReloadConfigs(int signum)
+{
+    reloadConfigs = true;
+}
+
 // ? SIGPWR/SIGTERM
 static bool NeedRestart = false;
 
@@ -185,9 +258,20 @@ int main(int argc, char * const argv[]) {
     if (ret)
         return ret;
 
-    GetConfigs(configs);
-    LoadConfigs(configs, containers);
-    StartContainers(containers);
+    (void)RegisterSignal(SIGHUP, ReloadConfigs);
+
+    config.Load(true);
+    TPortoAPI api(config().rpc_sock().file().path());
+
+    for (;;) {
+        if (reloadConfigs) {
+            GetConfigs(configs);
+            LoadConfigs(configs, containers);
+            reloadConfigs = false;
+        }
+        StartContainers(containers, api);
+        usleep(5000000);
+    }
 
     EventLoop();
 
