@@ -17,12 +17,8 @@ extern "C" {
 
 static std::string CONFIG_DIR = "/etc/portoinit";
 static std::string extension = ".conf";
-
+static std::vector<std::string> configs;
 static std::map<std::string, std::map<std::string, std::string>> containers;
-
-static bool ExecConfig(const init::TConfig &cfg) {
-    return true;
-}
 
 static bool GetContainerName(std::string &f, std::string &containerNameTmp) {
     if (*f.begin() == '[' and *f.rbegin() == ']' and f.size() > 4) {
@@ -43,24 +39,40 @@ static bool GetContainerProperty(std::string &f, std::string &parameterName, std
     return false;
 }
 
-static bool LoadConfig(const std::string &path, init::TConfig &cfg, std::map<std::string, std::map<std::string, std::string>> &containers) {
+static int StartContainers (std::map<std::string, std::map<std::string, std::string>> &containers) {
+    TLogger::Log() << "Run!!!!" << std::endl;
+    for (auto iter: containers) {
+        TLogger::Log() <<  iter.first << std::endl;
+        for (auto i: iter.second) {
+            TLogger::Log() << i.first << " " << i.second << std::endl;
+        }
+    }
+
+    return 0;
+}
+
+static bool LoadConfig(const std::string path, std::map<std::string, std::map<std::string, std::string>> &containers) {
     std::vector<std::string> config;
     std::string containerNameTmp, containerName, parameterName, parameterValue;
     std::map<std::string, std::map<std::string, std::string>> container;
 
     TFile f(path);
-    f.AsLines(config);
+    TError error = f.AsLines(config);
+    if (error) {
+        L_ERR() << "Can't read config directory: " << error << std::endl;
+        return false;
+    }
     for(auto &f: config){
         if (f == "") {
             continue;
         }
         if (GetContainerProperty(f, parameterName, parameterValue)) {
             if(containerName == "") {
-                TLogger::Log() << "Missing container name in " << path << std::endl;
+                L_ERR() << "Missing container name in " << path << std::endl;
                 return false;
             }
             if (parameterName == "" and parameterValue == "") {
-                TLogger::Log() << "Incorrect container parameter in " << path << ": " << f << std::endl;
+                L_ERR() << "Incorrect container parameter in " << path << ": " << f << std::endl;
                 return false;
             } else {
                 container[containerName][parameterName] = parameterValue;
@@ -69,7 +81,7 @@ static bool LoadConfig(const std::string &path, init::TConfig &cfg, std::map<std
             if (GetContainerName(f, containerNameTmp)) {
                 containerName = containerNameTmp;
             } else {
-                TLogger::Log() << "Incorrect container parametr in " << path << ": " << f << std::endl;
+                L_ERR() << "Incorrect container parametr in " << path << ": " << f << std::endl;
                 return false;
             }
         }
@@ -81,18 +93,32 @@ static bool LoadConfig(const std::string &path, init::TConfig &cfg, std::map<std
     return true;
 }
 
-// TODO: rename method name
-static int StartContainers() {
+static void LoadConfigs (std::vector<std::string> &configs, std::map<std::string, std::map<std::string, std::string>> &containers)
+{
+    for (auto &config : configs) {
+        std::string filePath = CONFIG_DIR + "/" + config;
+
+        TLogger::Log() << "Loading: " << filePath << std::endl;
+
+        if (!LoadConfig(filePath, containers)) {
+            L_ERR() << "Failed: " << filePath << std::endl;
+            continue;
+        } else {
+             TLogger::Log() << "Loaded: " << filePath << std::endl;
+        }
+    }
+}
+
+static void GetConfigs (std::vector<std::string> &configs)
+{
     TFolder f(CONFIG_DIR);
 
     std::vector<std::string> files;
     TError error = f.Items(EFileType::Regular, files);
     if (error) {
         L_ERR() << "Can't read config directory: " << error << std::endl;
-        return EXIT_FAILURE;
     }
 
-    std::vector<std::string> configs;
     for (auto &f : files) {
         if (extension.length() >= f.length())
             continue;
@@ -104,32 +130,6 @@ static int StartContainers() {
     }
 
     std::sort(configs.begin(), configs.end());
-
-    for (auto &config : configs) {
-        std::string filePath = CONFIG_DIR + "/" + config;
-
-        TLogger::Log() << "Loading " << filePath << std::endl;
-        init::TConfig cfg;
-        if (!LoadConfig(filePath, cfg, containers)) {
-            TLogger::Log() << "Failed" << std::endl;
-            continue;
-        } else {
-             TLogger::Log() << "Loaded" << std::endl;
-        }
-
-        ExecConfig(cfg);
-    }
-
-
-    TLogger::Log() << "Run!!!!" << std::endl;
-    for (auto iter: containers) {
-        TLogger::Log() <<  iter.first << std::endl;
-        for (auto i: iter.second) {
-            TLogger::Log() << i.first << " " << i.second << std::endl;
-        }
-    }
-
-    return 0;
 }
 
 static void EventLoop() {
@@ -185,9 +185,9 @@ int main(int argc, char * const argv[]) {
     if (ret)
         return ret;
 
-    ret = StartContainers();
-    if (ret)
-        return ret;
+    GetConfigs(configs);
+    LoadConfigs(configs, containers);
+    StartContainers(containers);
 
     EventLoop();
 
