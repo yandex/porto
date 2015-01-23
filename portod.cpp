@@ -10,6 +10,7 @@
 #include "event.hpp"
 #include "qdisc.hpp"
 #include "context.hpp"
+#include "client.hpp"
 #include "util/log.hpp"
 #include "util/file.hpp"
 #include "util/folder.hpp"
@@ -200,17 +201,10 @@ static void RemoveRpcServer(const string &path) {
         L_ERR() << "Can't remove socket file: " << error << std::endl;
 }
 
-struct ClientInfo {
-    int Pid;
-    int Uid;
-    int Gid;
-};
-
-static bool HandleRequest(TContext &context, const int fd,
-                          const TCred &cred) {
+static bool HandleRequest(TContext &context, const TClient &client) {
     uint32_t slaveReadTimeout = config().daemon().slave_read_timeout_s();
-    InterruptibleInputStream pist(fd);
-    google::protobuf::io::FileOutputStream post(fd);
+    InterruptibleInputStream pist(client.Fd);
+    google::protobuf::io::FileOutputStream post(client.Fd);
 
     rpc::TContainerRequest request;
     rpc::TContainerResponse response;
@@ -226,24 +220,24 @@ static bool HandleRequest(TContext &context, const int fd,
         (void)alarm(0);
 
     if (pist.Interrupted()) {
-        L() << "Interrupted read from " << fd << std:: endl;
+        L() << "Interrupted read from " << client.Fd << std:: endl;
         return true;
     }
 
     if (!haveData)
         return true;
 
-    if (HandleRpcRequest(context, request, response, cred) &&
+    if (HandleRpcRequest(context, request, response, client.Cred) &&
         response.IsInitialized()) {
         if (!WriteDelimitedTo(response, &post))
-            L() << "Write error for " << fd << std:: endl;
+            L() << "Write error for " << client.Fd << std:: endl;
         post.Flush();
     }
 
     return false;
 }
 
-static int IdentifyClient(int fd, ClientInfo &ci, int total) {
+static int IdentifyClient(int fd, TClient &ci, int total) {
     struct ucred cr;
     socklen_t len = sizeof(cr);
 
@@ -262,8 +256,8 @@ static int IdentifyClient(int fd, ClientInfo &ci, int total) {
             << ") connected (total " << total + 1 << ")" << std::endl;
 
         ci.Pid = cr.pid;
-        ci.Uid = cr.uid;
-        ci.Gid = cr.gid;
+        ci.Cred.Uid = cr.uid;
+        ci.Cred.Gid = cr.gid;
 
         return 0;
     } else {
@@ -272,7 +266,7 @@ static int IdentifyClient(int fd, ClientInfo &ci, int total) {
     }
 }
 
-static int AcceptClient(int sfd, std::map<int,ClientInfo> &clients, int &fd) {
+static int AcceptClient(int sfd, std::map<int, std::shared_ptr<TClient>> &clients, int &fd) {
     int cfd;
     struct sockaddr_un peer_addr;
     socklen_t peer_addr_size;
@@ -288,8 +282,8 @@ static int AcceptClient(int sfd, std::map<int,ClientInfo> &clients, int &fd) {
         return -1;
     }
 
-    ClientInfo ci;
-    int ret = IdentifyClient(cfd, ci, clients.size());
+    auto ci = std::make_shared<TClient>(fd);
+    int ret = IdentifyClient(cfd, *ci, clients.size());
     if (ret)
         return ret;
 
@@ -298,14 +292,8 @@ static int AcceptClient(int sfd, std::map<int,ClientInfo> &clients, int &fd) {
     return 0;
 }
 
-static void RemoveClient(int cfd, std::map<int,ClientInfo> &clients) {
-    ClientInfo ci = clients.at(cfd);
+static void RemoveClient(int cfd, std::map<int, std::shared_ptr<TClient>> &clients) {
     clients.erase(cfd);
-
-    L() << "pid " << ci.Pid
-        << " uid " << ci.Uid
-        << " gid " << ci.Gid
-        << " disconnected (total " << clients.size() << ")" << std::endl;
 }
 
 static bool AnotherInstanceRunning(const string &path) {
@@ -377,7 +365,7 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
 static int SlaveRpc(TContext &context) {
     int ret = 0;
     int sfd;
-    std::map<int,ClientInfo> clients;
+    std::map<int, std::shared_ptr<TClient>> clients;
     TContainerHolder &cholder = *context.Cholder;
 
     SignalMask(SIG_BLOCK);
@@ -488,15 +476,13 @@ static int SlaveRpc(TContext &context) {
                     break;
                 }
             } else if (clients.find(ev[i].data.fd) != clients.end()) {
-                auto &ci = clients.at(ev[i].data.fd);
+                auto &ci = clients[ev[i].data.fd];
                 bool needClose = false;
 
                 if (ev[i].events & EPOLLIN)
-                    needClose = HandleRequest(context, ev[i].data.fd,
-                                              TCred(ci.Uid, ci.Gid));
+                    needClose = HandleRequest(context, *ci);
 
                 if ((ev[i].events & EPOLLHUP) || needClose) {
-                    close(ev[i].data.fd);
                     RemoveClient(ev[i].data.fd, clients);
                 }
             } else {
