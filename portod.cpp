@@ -213,6 +213,7 @@ static bool HandleRequest(TContext &context, const int fd,
     google::protobuf::io::FileOutputStream post(fd);
 
     rpc::TContainerRequest request;
+    rpc::TContainerResponse response;
 
     if (slaveReadTimeout)
         (void)alarm(slaveReadTimeout);
@@ -229,15 +230,14 @@ static bool HandleRequest(TContext &context, const int fd,
         return true;
     }
 
-    if (haveData) {
-        auto rsp = HandleRpcRequest(context, request, cred);
-        if (rsp.IsInitialized()) {
-            if (!WriteDelimitedTo(rsp, &post))
-                L() << "Write error for " << fd << std:: endl;
-            post.Flush();
-        }
-    } else {
+    if (!haveData)
         return true;
+
+    if (HandleRpcRequest(context, request, response, cred) &&
+        response.IsInitialized()) {
+        if (!WriteDelimitedTo(response, &post))
+            L() << "Write error for " << fd << std:: endl;
+        post.Flush();
     }
 
     return false;

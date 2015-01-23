@@ -6,8 +6,6 @@
 #include "util/cred.hpp"
 #include "context.hpp"
 
-rpc::TContainerResponse
-HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
-                 const TCred &cred);
-
+bool HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
+                      rpc::TContainerResponse &rsp, const TCred &cred);
 #endif

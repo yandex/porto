@@ -254,11 +254,10 @@ static TError ListVolumes(TContext &context,
     return TError::Success();
 }
 
-rpc::TContainerResponse
-HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
-                 const TCred &cred) {
-    rpc::TContainerResponse rsp;
+bool HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
+                      rpc::TContainerResponse &rsp, const TCred &cred) {
     string str;
+    bool send_reply = true;
 
     TLogger::LogRequest(req.ShortDebugString());
 
@@ -294,11 +293,15 @@ HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
             error = Kill(context, req.kill(), rsp, cred);
         else if (req.has_version())
             error = Version(context, rsp);
-        else if (req.has_createvolume())
+        else if (req.has_createvolume()) {
             error = CreateVolume(context, req.createvolume(), rsp, cred);
-        else if (req.has_destroyvolume())
+            if (!error)
+                send_reply = false;
+        } else if (req.has_destroyvolume()) {
             error = DestroyVolume(context, req.destroyvolume(), rsp, cred);
-        else if (req.has_listvolumes())
+            if (!error)
+                send_reply = false;
+        } else if (req.has_listvolumes())
             error = ListVolumes(context, rsp);
         else
             error = TError(EError::InvalidMethod, "invalid RPC method");
@@ -319,7 +322,8 @@ HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
     rsp.set_error(error.GetError());
     rsp.set_errormsg(error.GetMsg());
 
-    TLogger::LogResponse(rsp.ShortDebugString());
+    if (send_reply)
+        TLogger::LogResponse(rsp.ShortDebugString());
 
-    return rsp;
+    return send_reply;
 }
