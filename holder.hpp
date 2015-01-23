@@ -8,6 +8,7 @@
 #include "common.hpp"
 #include "kvalue.hpp"
 #include "util/idmap.hpp"
+#include "util/cred.hpp"
 
 class TNetwork;
 class TContainer;
@@ -15,34 +16,32 @@ class TIdMap;
 class TEventQueue;
 class TEvent;
 
-class TContainerHolder : public TNonCopyable {
+class TContainerHolder : public std::enable_shared_from_this<TContainerHolder> {
     std::shared_ptr<TNetwork> Net;
     std::map<std::string, std::shared_ptr<TContainer>> Containers;
     TIdMap IdMap;
-    std::set<int> PrivilegedUid, PrivilegedGid;
-    std::set<int> RestrictedRootUid, RestrictedRootGid;
 
     bool ValidName(const std::string &name) const;
     TError RestoreId(const kv::TNode &node, uint16_t &id);
     void ScheduleLogRotatation();
     TError _Destroy(const std::string &name);
+    std::shared_ptr<TKeyValueStorage> Storage;
+
 public:
     std::shared_ptr<TEventQueue> Queue;
     int Epfd;
 
     TContainerHolder(std::shared_ptr<TEventQueue> queue,
-                     std::shared_ptr<TNetwork> net) :
-        Net(net), Queue(queue) { }
-    ~TContainerHolder();
+                     std::shared_ptr<TNetwork> net,
+                     std::shared_ptr<TKeyValueStorage> storage) :
+        Net(net), Storage(storage), Queue(queue) { }
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot();
-    TError Create(const std::string &name, int uid, int gid);
+    TError Create(const std::string &name, const TCred &cred);
     std::shared_ptr<TContainer> Get(const std::string &name);
     TError Restore(const std::string &name, const kv::TNode &node);
-    bool PrivilegedUser(int uid, int gid);
-    bool RestrictedUser(int uid, int gid);
-    TError CheckPermission(std::shared_ptr<TContainer> container, int uid, int gid);
     TError Destroy(const std::string &name);
+    void DestroyRoot();
 
     std::vector<std::string> List() const;
 

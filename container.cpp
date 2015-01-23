@@ -17,7 +17,7 @@
 #include "util/file.hpp"
 #include "util/string.hpp"
 #include "util/netlink.hpp"
-#include "util/pwd.hpp"
+#include "util/cred.hpp"
 #include "util/unix.hpp"
 
 #include "portod.hpp"
@@ -572,8 +572,8 @@ TError TContainer::PrepareTask() {
     return TError::Success();
 }
 
-TError TContainer::Create(int uid, int gid) {
-    L() << "Create " << GetName() << " " << Id << " " << uid << " " << gid << std::endl;
+TError TContainer::Create(const TCred &cred) {
+    L() << "Create " << GetName() << " " << Id << " " << cred.Uid << " " << cred.Gid << std::endl;
 
     TError error = Prepare();
     if (error) {
@@ -581,19 +581,11 @@ TError TContainer::Create(int uid, int gid) {
         return error;
     }
 
-    TUser u(uid);
-    if (u.Load())
-        error = Prop->SetString(P_USER, std::to_string(uid));
-    else
-        error = Prop->SetString(P_USER, u.GetName());
+    error = Prop->SetString(P_USER, cred.UserAsString());
     if (error)
         return error;
 
-    TGroup g(gid);
-    if (g.Load())
-        error = Prop->SetString(P_GROUP, std::to_string(gid));
-    else
-        error = Prop->SetString(P_GROUP, g.GetName());
+    error = Prop->SetString(P_GROUP, cred.GroupAsString());
     if (error)
         return error;
 
@@ -644,7 +636,7 @@ TError TContainer::Start() {
                       ContainerStateName(state));
 
     if (Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS &&
-        !Holder->PrivilegedUser(Uid, Gid)) {
+        !CredConf.PrivilegedUser(Cred)) {
         for (auto property : propertySet.GetNames())
             if (propertySet.Get(property)->Flags & OS_MODE_PROPERTY)
                 Prop->Reset(property);
@@ -1052,7 +1044,7 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
         if (Prop->GetString(property) != value)
             return TError(EError::Permission, "Only root can change this property");
 
-    if (Prop->HasFlags(property, RESTROOT_PROPERTY) && !Holder->RestrictedUser(Uid, Gid))
+    if (Prop->HasFlags(property, RESTROOT_PROPERTY) && !CredConf.RestrictedUser(Cred))
         return TError(EError::Permission, "Only restricted root can change this property");
 
     if (!Prop->HasState(property, GetState()))
@@ -1088,10 +1080,6 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
 }
 
 TError TContainer::Prepare() {
-    Storage = std::make_shared<TKeyValueStorage>();
-    if (!Storage)
-        throw std::bad_alloc();
-
     Prop = std::make_shared<TPropertySet>(Storage, shared_from_this());
     Data = std::make_shared<TVariantSet>(Storage, &dataSet, shared_from_this());
     if (!Prop || !Data)
@@ -1322,14 +1310,6 @@ bool TContainer::CanRemoveDead() const {
         GetCurrentTimeMs() / 1000;
 }
 
-bool TContainer::HasChildren() const {
-    // link #1 - this
-    // link #2 - TContainerHolder->Containers
-    // any other link comes from TContainer->Parent and indicates that
-    // current container has children
-    return shared_from_this().use_count() > 2;
-}
-
 std::vector<std::string> TContainer::GetChildren() {
     std::vector<std::string> vec;
 
@@ -1385,4 +1365,19 @@ bool TContainer::DeliverEvent(const TEvent &event) {
         default:
             return false;
     }
+}
+
+TError TContainer::CheckPermission(const TCred &ucred) {
+    if (ucred.IsPrivileged())
+        return TError::Success();
+
+    // for root we report more meaningful errors from handlers, so don't
+    // check permissions here
+    if (IsRoot())
+        return TError::Success();
+
+    if (Cred == ucred)
+        return TError::Success();
+
+    return TError(EError::Permission, "Permission error");
 }

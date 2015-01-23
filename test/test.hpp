@@ -6,7 +6,7 @@
 #include <atomic>
 
 #include "libporto.hpp"
-#include "util/pwd.hpp"
+#include "util/cred.hpp"
 
 class TNlLink;
 

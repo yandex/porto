@@ -17,9 +17,8 @@ using std::set;
 using std::shared_ptr;
 using std::vector;
 
-TKeyValueStorage::TKeyValueStorage() :
-    Tmpfs("tmpfs", config().keyval().file().path(), "tmpfs",
-          { config().keyval().size() }) {
+TKeyValueStorage::TKeyValueStorage(const TMount &mount) :
+    Tmpfs(mount) {
 }
 
 // use some forbidden character to represent slash in container name

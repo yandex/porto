@@ -8,8 +8,8 @@
 #include "cgroup.hpp"
 #include "config.hpp"
 #include "event.hpp"
-#include "holder.hpp"
 #include "qdisc.hpp"
+#include "context.hpp"
 #include "util/log.hpp"
 #include "util/file.hpp"
 #include "util/folder.hpp"
@@ -17,7 +17,7 @@
 #include "util/unix.hpp"
 #include "util/string.hpp"
 #include "util/crash.hpp"
-#include "util/pwd.hpp"
+#include "util/cred.hpp"
 
 extern "C" {
 #include <fcntl.h>
@@ -206,8 +206,8 @@ struct ClientInfo {
     int Gid;
 };
 
-static bool HandleRequest(TContainerHolder &cholder, const int fd,
-                          const int uid, const int gid) {
+static bool HandleRequest(TContext &context, const int fd,
+                          const TCred &cred) {
     uint32_t slaveReadTimeout = config().daemon().slave_read_timeout_s();
     InterruptibleInputStream pist(fd);
     google::protobuf::io::FileOutputStream post(fd);
@@ -230,7 +230,7 @@ static bool HandleRequest(TContainerHolder &cholder, const int fd,
     }
 
     if (haveData) {
-        auto rsp = HandleRpcRequest(cholder, request, uid, gid);
+        auto rsp = HandleRpcRequest(context, request, cred);
         if (rsp.IsInitialized()) {
             if (!WriteDelimitedTo(rsp, &post))
                 L() << "Write error for " << fd << std:: endl;
@@ -374,18 +374,15 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
     return 0;
 }
 
-static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
-                    TContainerHolder &cholder,
-                    std::shared_ptr<TNetwork> net,
-                    std::shared_ptr<TNl> netEvt) {
+static int SlaveRpc(TContext &context) {
     int ret = 0;
     int sfd;
     std::map<int,ClientInfo> clients;
+    TContainerHolder &cholder = *context.Cholder;
 
     SignalMask(SIG_BLOCK);
 
-    uid_t uid = getuid();
-    gid_t gid = getgid();
+    TCred cred(getuid(), getgid());
 
     TGroup g(config().rpc_sock().group().c_str());
     TError error = g.Load();
@@ -393,11 +390,11 @@ static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
         L_ERR() << "Can't get gid for " << config().rpc_sock().group() << ": " << error << std::endl;
 
     if (!error)
-        gid = g.GetId();
+        cred.Gid = g.GetId();
 
     error = CreateRpcServer(config().rpc_sock().file().path(),
                             config().rpc_sock().file().perm(),
-                            uid, gid, sfd);
+                            cred, sfd);
     if (error) {
         L() << "Can't create RPC server: " << error.GetMsg() << std::endl;
         return EXIT_FAILURE;
@@ -415,8 +412,8 @@ static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
         return EXIT_FAILURE;
     }
 
-    if (netEvt) {
-        error = EpollAdd(cholder.Epfd, netEvt->GetFd());
+    if (context.NetEvt) {
+        error = EpollAdd(cholder.Epfd, context.NetEvt->GetFd());
         if (error) {
             L_ERR() << "Can't add netlink events fd to epoll: " << error << std::endl;
             return EXIT_FAILURE;
@@ -427,7 +424,7 @@ static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
     struct epoll_event ev[MAX_EVENTS];
 
     while (!done) {
-        int timeout = queue->GetNextTimeout();
+        int timeout = context.Queue->GetNextTimeout();
         Statistics->SlaveTimeoutMs = timeout;
         int nr = epoll_wait(cholder.Epfd, ev, MAX_EVENTS, timeout);
         if (nr < 0) {
@@ -455,7 +452,7 @@ static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
             continue;
         }
 
-        queue->DeliverEvents(cholder);
+        context.Queue->DeliverEvents(*context.Cholder);
 
         for (int i = 0; i < nr; i++) {
             if (ev[i].data.fd == sfd) {
@@ -478,14 +475,14 @@ static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
                 if (failsafe)
                     continue;
 
-                ret = ReapSpawner(REAP_EVT_FD, cholder);
+                ret = ReapSpawner(REAP_EVT_FD, *context.Cholder);
                 if (done)
                     break;
-            } else if (netEvt && netEvt->GetFd() == ev[i].data.fd) {
+            } else if (context.NetEvt && context.NetEvt->GetFd() == ev[i].data.fd) {
                 L() << "Refresh list of available network interfaces" << std::endl;
-                netEvt->FlushEvents();
+                context.NetEvt->FlushEvents();
 
-                TError error = net->Update();
+                TError error = context.Net->Update();
                 if (error) {
                     L() << "Can't refresh list of network interfaces: " << error << std::endl;
                     break;
@@ -495,8 +492,8 @@ static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
                 bool needClose = false;
 
                 if (ev[i].events & EPOLLIN)
-                    needClose = HandleRequest(cholder, ev[i].data.fd,
-                                              ci.Uid, ci.Gid);
+                    needClose = HandleRequest(context, ev[i].data.fd,
+                                              TCred(ci.Uid, ci.Gid));
 
                 if ((ev[i].events & EPOLLHUP) || needClose) {
                     close(ev[i].data.fd);
@@ -521,8 +518,12 @@ static int SlaveRpc(std::shared_ptr<TEventQueue> queue,
 }
 
 static void KvDump() {
-    TKeyValueStorage storage;
-    storage.Dump();
+    TKeyValueStorage storage(TMount("tmpfs", config().keyval().file().path(), "tmpfs", { config().keyval().size() }));
+    TError error = storage.MountTmpfs();
+    if (error)
+        L_ERR() << "Can't mount key-value storage: " << error << std::endl;
+    else
+        storage.Dump();
 }
 
 static int TuneLimits() {
@@ -587,67 +588,26 @@ static int SlaveMain() {
         L_ERR() << "Can't adjust OOM score: " << error << std::endl;
 
     try {
-        TKeyValueStorage storage;
-        // don't fail, try to recover anyway
-        TError error = storage.MountTmpfs();
-        if (error)
-            L_ERR() << "Can't create key-value storage, skipping recovery: " << error << std::endl;
-
         TCgroupSnapshot cs;
         error = cs.Create();
         if (error)
             L_ERR() << "Can't create cgroup snapshot: " << error << std::endl;
 
-        std::shared_ptr<TNetwork> net = std::make_shared<TNetwork>();
-        std::shared_ptr<TNl> netEvt;
-        if (config().network().enabled()) {
-            if (config().network().dynamic_ifaces()) {
-                netEvt = std::make_shared<TNl>();
-                error = netEvt->Connect();
-                if (error) {
-                    L_ERR() << "Can't connect netlink events socket: " << error << std::endl;
-                    return EXIT_FAILURE;
-                }
-
-                error = netEvt->SubscribeToLinkUpdates();
-                if (error) {
-                    L_ERR() << "Can't subscribe netlink socket to events: " << error << std::endl;
-                    return EXIT_FAILURE;
-                }
-            }
-
-            TError error = net->Prepare();
-            if (error)
-                L_ERR() << "Can't prepare network: " << error << std::endl;
-
-
-            if (net->Empty()) {
-                L() << "Error: couldn't find suitable network interface" << std::endl;
-                return EXIT_FAILURE;
-            }
-
-            for (auto &link : net->GetLinks())
-                L() << "Using " << link->GetAlias() << " interface" << std::endl;
-        }
-
-        auto queue = std::make_shared<TEventQueue>();
-        TContainerHolder cholder(queue, net);
-        error = cholder.CreateRoot();
-        if (error) {
-            L_ERR() << "Can't create root container: " << error << std::endl;
+        TContext context;
+        error = context.Initialize();
+        if (error)
             return EXIT_FAILURE;
-        }
 
         bool restored = false;
         {
             std::map<std::string, kv::TNode> m;
-            error = storage.Restore(m);
+            error = context.Storage->Restore(m);
             if (error)
                 L_ERR() << "Can't restore state: " << error << std::endl;
 
             for (auto &r : m) {
                 restored = true;
-                error = cholder.Restore(r.first, r.second);
+                error = context.Cholder->Restore(r.first, r.second);
                 if (error) {
                     L_ERR() << "Can't restore " << r.first << " state : " << error << std::endl;
                     Statistics->RestoreFailed++;
@@ -671,24 +631,15 @@ static int SlaveMain() {
             }
         }
 
-        ret = SlaveRpc(queue, cholder, net, netEvt);
+        ret = SlaveRpc(context);
         L() << "Shutting down..." << std::endl;
-
-        if (netEvt)
-            netEvt->Disconnect();
 
         RemoveRpcServer(config().rpc_sock().file().path());
 
         if (!cleanup && raiseSignum)
             RaiseSignal(raiseSignum);
 
-        error = storage.Destroy();
-        if (error)
-            L_ERR() << "Can't destroy key-value storage: " << error << std::endl;
-
-        error = net->Destroy();
-        if (error)
-            L_ERR() << "Can't destroy network: " << error << std::endl;
+        context.Destroy();
     } catch (string s) {
         std::cerr << s << std::endl;
         ret = EXIT_FAILURE;

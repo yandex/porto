@@ -8,7 +8,7 @@
 #include "util/file.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
-#include "util/pwd.hpp"
+#include "util/cred.hpp"
 #include "util/netlink.hpp"
 
 extern "C" {
@@ -193,7 +193,7 @@ public:
         if (error)
             return error;
 
-        c->Uid = u.GetId();
+        c->Cred.Uid = u.GetId();
 
         return TError::Success();
     }
@@ -214,7 +214,7 @@ public:
         if (error)
             return error;
 
-        c->Gid = g.GetId();
+        c->Cred.Gid = g.GetId();
 
         return TError::Success();
     }
@@ -1128,7 +1128,7 @@ public:
     TStrList GetDefaultList(std::shared_ptr<TContainer> c) override {
         TStrList v;
 
-        bool root = c->Uid == 0 || c->Gid == 0;
+        bool root = c->Cred.IsRoot();
         bool restricted = c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS;
 
         for (auto kv : supported)
@@ -1140,7 +1140,7 @@ public:
     TError SetList(std::shared_ptr<TContainer> c,
                    std::shared_ptr<TVariant> v,
                    const std::vector<std::string> &lines) override {
-        if (c->Uid != 0 && c->Gid != 0)
+        if (!c->Cred.IsRoot())
             return TError(EError::Permission, "Permission denied");
 
         return TListValue::SetList(c, v, lines);

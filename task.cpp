@@ -12,7 +12,7 @@
 #include "util/folder.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
-#include "util/pwd.hpp"
+#include "util/cred.hpp"
 #include "util/netlink.hpp"
 #include "util/crc32.hpp"
 
@@ -46,19 +46,9 @@ TError TTaskEnv::Prepare() {
     if (Command.empty())
         return TError::Success();
 
-    TUser u(User);
-    TError error = u.Load();
+    TError error = Cred.Parse(User, Group);
     if (error)
         return error;
-
-    Uid = u.GetId();
-
-    TGroup g(Group);
-    error = g.Load();
-    if (error)
-        return error;
-
-    Gid = g.GetId();
 
     return TError::Success();
 }
@@ -154,7 +144,7 @@ TError TTask::ChildOpenStdFile(const TPath &path, int expected) {
                       "open(" + path.ToString() + ") -> " +
                       std::to_string(expected) + ": unexpected fd");
 
-    ret = fchown(ret, Env->Uid, Env->Gid);
+    ret = fchown(ret, Env->Cred.Uid, Env->Cred.Gid);
     if (ret < 0)
         return TError(EError::Unknown, errno,
                       "fchown(" + path.ToString() + ") -> " +
@@ -192,7 +182,7 @@ TError TTask::ChildReopenStdio() {
 TError TTask::ChildApplyCapabilities() {
     uint64_t effective, permitted, inheritable;
 
-    if (Env->Uid && Env->Gid)
+    if (!Env->Cred.IsRoot())
         return TError::Success();
 
     PORTO_ASSERT(lastCap != 0);
@@ -223,13 +213,13 @@ TError TTask::ChildApplyCapabilities() {
 }
 
 TError TTask::ChildDropPriveleges() {
-    if (setgid(Env->Gid) < 0)
+    if (setgid(Env->Cred.Gid) < 0)
         return TError(EError::Unknown, errno, "setgid()");
 
-    if (initgroups(Env->User.c_str(), Env->Gid) < 0)
+    if (initgroups(Env->User.c_str(), Env->Cred.Gid) < 0)
         return TError(EError::Unknown, errno, "initgroups()");
 
-    if (setuid(Env->Uid) < 0)
+    if (setuid(Env->Cred.Uid) < 0)
         return TError(EError::Unknown, errno, "setuid()");
 
     return TError::Success();
@@ -452,7 +442,7 @@ TError TTask::ChildIsolateFs() {
     if (error)
         return error;
 
-    bool privileged = Env->Gid == 0 || Env->Uid == 0;
+    bool privileged = Env->Cred.IsRoot();
     error = RestrictProc(!privileged);
     if (error)
         return error;

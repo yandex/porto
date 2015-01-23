@@ -87,7 +87,7 @@ void TConfig::Load(bool silent) {
 
     for (auto &path : ConfigFiles)
         if (LoadFile(path, silent))
-            return;
+            goto load_cred;
 
     if (!silent)
         std::cerr << "Using default config" << std::endl;
@@ -97,6 +97,9 @@ void TConfig::Load(bool silent) {
         std::cerr << "aging_time_s should be greater than rotate_logs_timeout_s" << std::endl;
         throw string("Invalid configuration");
     }
+
+load_cred:
+    CredConf.Load();
 }
 
 int TConfig::Test(const std::string &path) {

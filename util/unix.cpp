@@ -3,7 +3,7 @@
 
 #include "util/file.hpp"
 #include "util/string.hpp"
-#include "util/pwd.hpp"
+#include "util/cred.hpp"
 #include "unix.hpp"
 
 extern "C" {

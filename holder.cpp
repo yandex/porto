@@ -7,43 +7,15 @@
 #include "data.hpp"
 #include "event.hpp"
 #include "util/string.hpp"
-#include "util/pwd.hpp"
+#include "util/cred.hpp"
 
-TContainerHolder::~TContainerHolder() {
+void TContainerHolder::DestroyRoot() {
     // we want children to be removed first
     while (Containers.begin() != Containers.end()) {
         auto name = Containers.begin()->first;
         TError error = _Destroy(name);
         if (error)
             L_ERR() << "Can't destroy container " << name << ": " << error << std::endl;
-    }
-}
-
-static void ParseUserConf(const ::google::protobuf::RepeatedPtrField<std::string> &source,
-                          std::set<int> &target) {
-    for (auto &val : source) {
-        TUser u(val);
-        TError error = u.Load();
-        if (error) {
-            L_WRN() << "Can't add privileged user: " << error << std::endl;
-            continue;
-        }
-
-        target.insert(u.GetId());
-    }
-}
-
-static void ParseGroupConf(const ::google::protobuf::RepeatedPtrField<std::string> &source,
-                          std::set<int> &target) {
-    for (auto &val : source) {
-        TGroup g(val);
-        TError error = g.Load();
-        if (error) {
-            L_WRN() << "Can't add privileged group: " << error << std::endl;
-            continue;
-        }
-
-        target.insert(g.GetId());
     }
 }
 
@@ -64,12 +36,6 @@ TError TContainerHolder::CreateRoot() {
     if (error)
         return error;
 
-    ParseUserConf(config().privileges().root_user(), PrivilegedUid);
-    ParseGroupConf(config().privileges().root_group(), PrivilegedGid);
-
-    ParseUserConf(config().privileges().restricted_root_user(), RestrictedRootUid);
-    ParseGroupConf(config().privileges().restricted_root_group(), RestrictedRootGid);
-
     // we are using single kvalue store for both properties and data
     // so make sure names don't clash
     std::string overlap = propertySet.Overlap(dataSet);
@@ -78,7 +44,7 @@ TError TContainerHolder::CreateRoot() {
 
     BootTime = GetBootTime();
 
-    error = Create(ROOT_CONTAINER, 0, 0);
+    error = Create(ROOT_CONTAINER, TCred(0, 0));
     if (error)
         return error;
 
@@ -144,7 +110,7 @@ std::shared_ptr<TContainer> TContainerHolder::GetParent(const std::string &name)
     }
 }
 
-TError TContainerHolder::Create(const std::string &name, int uid, int gid) {
+TError TContainerHolder::Create(const std::string &name, const TCred &cred) {
     if (!ValidName(name))
         return TError(EError::InvalidValue, "invalid container name " + name);
 
@@ -163,8 +129,8 @@ TError TContainerHolder::Create(const std::string &name, int uid, int gid) {
     if (error)
         return error;
 
-    auto c = std::make_shared<TContainer>(this, name, parent, id, Net);
-    error = c->Create(uid, gid);
+    auto c = std::make_shared<TContainer>(shared_from_this(), Storage, name, parent, id, Net);
+    error = c->Create(cred);
     if (error)
         return error;
 
@@ -178,45 +144,6 @@ std::shared_ptr<TContainer> TContainerHolder::Get(const std::string &name) {
         return nullptr;
 
     return Containers[name];
-}
-
-bool TContainerHolder::PrivilegedUser(int uid, int gid) {
-    if (uid == 0 || gid == 0)
-        return true;
-
-    if (PrivilegedUid.find(uid) != PrivilegedUid.end())
-        return true;
-
-    if (PrivilegedGid.find(gid) != PrivilegedGid.end())
-        return true;
-
-    return false;
-}
-
-bool TContainerHolder::RestrictedUser(int uid, int gid) {
-    if (RestrictedRootUid.find(uid) != RestrictedRootUid.end())
-        return true;
-
-    if (RestrictedRootGid.find(gid) != RestrictedRootGid.end())
-        return true;
-
-    return false;
-}
-
-TError TContainerHolder::CheckPermission(std::shared_ptr<TContainer> container,
-                                         int uid, int gid) {
-    if (PrivilegedUser(uid, gid))
-        return TError::Success();
-
-    // for root we report more meaningful errors from handlers, so don't
-    // check permissions here
-    if (container->IsRoot())
-        return TError::Success();
-
-    if (container->Uid == uid || container->Gid == gid)
-        return TError::Success();
-
-    return TError(EError::Permission, "Permission error");
 }
 
 TError TContainerHolder::_Destroy(const std::string &name) {
@@ -291,7 +218,7 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
     if (!id)
         return TError(EError::Unknown, "Couldn't restore container id");
 
-    auto c = std::make_shared<TContainer>(this, name, parent, id, Net);
+    auto c = std::make_shared<TContainer>(shared_from_this(), Storage, name, parent, id, Net);
     error = c->Restore(node);
     if (error) {
         L_ERR() << "Can't restore container " << name << ": " << error << std::endl;
