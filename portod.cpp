@@ -201,10 +201,20 @@ static void RemoveRpcServer(const string &path) {
         L_ERR() << "Can't remove socket file: " << error << std::endl;
 }
 
+static void SendReply(const TClient &client, rpc::TContainerResponse &response) {
+
+    google::protobuf::io::FileOutputStream post(client.Fd);
+
+    if (response.IsInitialized()) {
+        if (!WriteDelimitedTo(response, &post))
+            L() << "Write error for " << client.Fd << std:: endl;
+        post.Flush();
+    }
+}
+
 static bool HandleRequest(TContext &context, const TClient &client) {
     uint32_t slaveReadTimeout = config().daemon().slave_read_timeout_s();
     InterruptibleInputStream pist(client.Fd);
-    google::protobuf::io::FileOutputStream post(client.Fd);
 
     rpc::TContainerRequest request;
     rpc::TContainerResponse response;
@@ -227,12 +237,8 @@ static bool HandleRequest(TContext &context, const TClient &client) {
     if (!haveData)
         return true;
 
-    if (HandleRpcRequest(context, request, response, client.Cred) &&
-        response.IsInitialized()) {
-        if (!WriteDelimitedTo(response, &post))
-            L() << "Write error for " << client.Fd << std:: endl;
-        post.Flush();
-    }
+    if (HandleRpcRequest(context, request, response, client.Cred))
+        SendReply(client, response);
 
     return false;
 }
