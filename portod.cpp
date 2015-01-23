@@ -288,7 +288,7 @@ static int AcceptClient(int sfd, std::map<int, std::shared_ptr<TClient>> &client
         return -1;
     }
 
-    auto ci = std::make_shared<TClient>(fd);
+    auto ci = std::make_shared<TClient>(cfd);
     int ret = IdentifyClient(cfd, *ci, clients.size());
     if (ret)
         return ret;

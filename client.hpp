@@ -16,7 +16,7 @@ public:
     TCred Cred;
 
     TClient(int fd) : Fd(fd) {};
-    TClient() {
+    ~TClient() {
         L() << "pid " << Pid
             << " uid " << Cred.Uid
             << " gid " << Cred.Gid
