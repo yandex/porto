@@ -14,6 +14,8 @@ class TVolumeHolder;
 class TVolume : public std::enable_shared_from_this<TVolume>, public TNonCopyable {
 public:
     TError Create();
+    TError Construct() const;
+    TError Deconstruct() const;
     TError Destroy();
     TVolume(std::shared_ptr<TKeyValueStorage> storage,
             std::shared_ptr<TVolumeHolder> holder, const std::string &name,
@@ -28,7 +30,6 @@ public:
     }
 
     TError CheckPermission(const TCred &ucred) const;
-    TError CheckQuota();
 
     const std::string &GetName() const { return Name; }
     const std::string &GetSource() const { return Source; }
@@ -47,6 +48,9 @@ private:
     std::string Quota;
     uint64_t ParsedQuota;
     std::string Flags;
+
+    int LoopDev = -1;
+    TPath GetLoopPath() const;
 };
 
 class TVolumeHolder : public TNonCopyable, public std::enable_shared_from_this<TVolumeHolder> {

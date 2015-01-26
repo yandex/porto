@@ -8,7 +8,7 @@
 
 #include "error.hpp"
 
-std::string CommaSeparatedList(const std::vector<std::string> &list);
+std::string CommaSeparatedList(const std::vector<std::string> &list, const std::string &sep = ",");
 std::string CommaSeparatedList(const std::set<std::string> &list);
 
 TError StringsToIntegers(const std::vector<std::string> &strings,

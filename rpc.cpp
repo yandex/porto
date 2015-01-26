@@ -4,6 +4,7 @@
 #include "util/log.hpp"
 #include "util/protobuf.hpp"
 #include "batch.hpp"
+#include "util/string.hpp"
 
 using std::string;
 
@@ -231,11 +232,19 @@ static TError CreateVolume(TContext &context,
 
     std::shared_ptr<TVolume> volume;
     volume = std::make_shared<TVolume>(context.VolumeStorage, context.Vholder,
-                                       req.name(), req.source(),
-                                       req.quota(), req.flags(), client->Cred);
-    TError err = volume->Create();
-    if (err)
-        return err;
+                                       StringTrim(req.name()),
+                                       StringTrim(req.source()),
+                                       StringTrim(req.quota()),
+                                       StringTrim(req.flags()), cred);
+    TError error = volume->Create();
+    if (error)
+        return error;
+
+    error = volume->Construct();
+    if (error) {
+        (void)volume->Destroy();
+        return error;
+    }
 
     std::weak_ptr<TClient> c = client;
     TBatchTask task(
@@ -260,16 +269,20 @@ static TError DestroyVolume(TContext &context,
                             const rpc::TVolumeDestroyRequest &req,
                             rpc::TContainerResponse &rsp,
                             std::shared_ptr<TClient> client) {
-    auto volume = context.Vholder->Get(req.name());
+    auto volume = context.Vholder->Get(StringTrim(req.name()));
     if (volume) {
         TError error = volume->CheckPermission(client->Cred);
         if (error)
             return error;
+
+        error = volume->Deconstruct();
+        if (error)
+            return error;
+
         return volume->Destroy();
     }
 
-    return TError(EError::VolumeDoesNotExist, "volume " + volume->GetName() +
-                  "doesn't exist");
+    return TError(EError::VolumeDoesNotExist, "Volume doesn't exist");
 }
 
 static TError ListVolumes(TContext &context,

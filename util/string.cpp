@@ -8,12 +8,12 @@ using std::set;
 using std::istringstream;
 using std::stringstream;
 
-string CommaSeparatedList(const vector<string> &list) {
+string CommaSeparatedList(const vector<string> &list, const std::string &sep) {
     string ret;
     for (auto c = list.begin(); c != list.end(); ) {
         ret += *c;
         if (++c != list.end())
-            ret += ",";
+            ret += sep;
     }
     return ret;
 }

@@ -6,8 +6,6 @@ package rpc;
 
 // Возможная ошибка в ответе
 enum EError {
-	option allow_alias = true;
-
 	// Запрос выполнен без ошибок
 	Success = 0;
 	// Неизвестная критическая ошибка
@@ -34,9 +32,10 @@ enum EError {
 	// Недостаточно прав для выполнения операции
 	Permission = 11;
 
-	//
-	VolumeAlreadyExists = 3;
-	VolumeDoesNotExist = 4;
+	// Логический том уже существует
+	VolumeAlreadyExists = 12;
+	// Выполнение операции над несуществующим логическим томом
+	VolumeDoesNotExist = 13;
 }
 
 // Запрос на создание контейнера

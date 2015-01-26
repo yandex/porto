@@ -4,6 +4,7 @@
 #include "util/file.hpp"
 #include "util/string.hpp"
 #include "util/cred.hpp"
+#include "util/path.hpp"
 #include "unix.hpp"
 
 extern "C" {
@@ -19,6 +20,8 @@ extern "C" {
 #include <sys/syscall.h>
 #include <sys/epoll.h>
 #include <sys/signalfd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
 }
 
 int RetryBusy(int times, int timeoMs, std::function<int()> handler) {
@@ -408,6 +411,68 @@ TError TEpollLoop::GetEvents(std::vector<int> &signals,
         } else {
             events.push_back(Events[i]);
         }
+    }
+
+    return TError::Success();
+}
+
+TError AllocLoop(const TPath &path, size_t size) {
+    TError error;
+    TScopedFd fd;
+    fd = open(path.ToString().c_str(), O_WRONLY | O_CREAT, 0755);
+    if (fd.GetFd() < 0)
+        return TError(EError::Unknown, errno, "open(" + path.ToString() + ")");
+
+    int ret = fallocate(fd.GetFd(), 0, 0, size);
+    if (ret) {
+        error = TError(EError::Unknown, errno, "fallocate(" + path.ToString() + ")");
+        goto remove_file;
+    }
+
+    fd = -1;
+
+    int status;
+    error = Run({ "mkfs.ext4", "-F", "-F", path.ToString() }, status);
+    if (error)
+        goto remove_file;
+
+    if (status) {
+        error = TError(EError::Unknown, error.GetErrno(), "mkfs: " + error.GetMsg());
+        goto remove_file;
+    }
+
+    return TError::Success();
+
+remove_file:
+    TFile f(path);
+    (void)f.Remove();
+
+    return error;
+}
+
+TError Run(const std::vector<std::string> &command, int &status) {
+    int pid = fork();
+    if (pid < 0) {
+        return TError(EError::Unknown, errno, "fork()");
+    } else if (pid > 0) {
+        int ret;
+retry:
+        ret = waitpid(pid, &status, 0);
+        if (ret < 0) {
+            if (errno == EINTR)
+                goto retry;
+            return TError(EError::Unknown, errno, "waitpid(" + std::to_string(pid) + ")");
+        }
+    } else {
+        (void)prctl(PR_SET_PDEATHSIG, SIGTERM, 0, 0, 0);
+
+        char **p = (char **)malloc(sizeof(*p) * command.size() + 1);
+        for (size_t i = 0; i < command.size(); i++)
+            p[i] = strdup(command[i].c_str());
+        p[command.size()] = nullptr;
+
+        execvp(command[0].c_str(), p);
+        _exit(EXIT_FAILURE);
     }
 
     return TError::Success();

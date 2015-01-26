@@ -210,6 +210,12 @@ TError TLoopMount::Mount() {
     if (ioctl(dfd.GetFd(), LOOP_SET_FD, ffd.GetFd()) < 0)
         return TError(EError::Unknown, errno, "ioctl(LOOP_SET_FD)");
 
+    struct loop_info64 loopinfo64 = {};
+    strncpy((char *)loopinfo64.lo_file_name, Source.ToString().c_str(), LO_NAME_SIZE);
+
+    if (ioctl(dfd.GetFd(), LOOP_SET_STATUS64, &loopinfo64) < 0)
+        return TError(EError::Unknown, errno, "ioctl(LOOP_SET_STATUS64)");
+
     TMount m(dev, Target, Type, {});
     return m.Mount();
 }

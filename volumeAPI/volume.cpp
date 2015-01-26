@@ -1,6 +1,8 @@
 #include "volume.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
+#include "util/folder.hpp"
+#include "util/unix.hpp"
 #include "config.hpp"
 
 /* TVolumeHolder */
@@ -40,30 +42,130 @@ std::vector<std::string> TVolumeHolder::List() const {
 
 TError TVolume::Create() {
     TError ret;
+    TPath srcPath(Source), dstPath(Name);
+    TFolder dir(dstPath);
 
-    if (CheckQuota())
-        return TError(EError::InvalidValue, "Volume " + Name + " has invalid quota.");
+    if (!Name.length() || Name[0] != '/')
+        return TError(EError::InvalidValue, "Invalid volume name");
+
+    if (!Source.length() || Source[0] != '/')
+        return TError(EError::InvalidValue, "Invalid volume source");
+
+    ret = StringWithUnitToUint64(Quota, ParsedQuota);
+    if (ret)
+        return TError(EError::InvalidValue, "Invalid volume quota");
 
     ret = Holder->Insert(shared_from_this());
     if (ret)
         return ret;
 
-    ret = SaveToStorage();
-    if (ret) {
-        Holder->Remove(shared_from_this());
-        return ret;
+    if (!srcPath.Exists()) {
+        ret = TError(EError::InvalidValue, "Volume " + Name + " has non-existing source");
+        goto remove_volume;
     }
 
-    if (!Source.empty()) {
-        TPath f(Source);
-        if (!f.Exists()) {
-            Holder->Remove(shared_from_this());
-            return TError(EError::InvalidValue, "Volume " + Name + " has non-existing source.");
-        }
-        if (f.GetType() != EFileType::Regular) {
-            Holder->Remove(shared_from_this());
-            return TError(EError::InvalidValue, "Volume's " + Name + " source isn't a regular file.");
-        }
+    if (srcPath.GetType() != EFileType::Regular) {
+        ret = TError(EError::InvalidValue, "Volume's " + Name + " source isn't a regular file");
+        goto remove_volume;
+    }
+
+    if (dstPath.Exists()) {
+        ret = TError(EError::InvalidValue, "Destination path " + Name + " already exists");
+        goto remove_volume;
+    }
+
+    ret = dir.Create();
+    if (ret)
+        goto remove_volume;
+
+    ret = dstPath.Chown(Cred.UserAsString(), Cred.GroupAsString());
+    if (ret)
+        goto remove_volume;
+
+    if (ParsedQuota > 0) {
+        ret = GetLoopDev(LoopDev);
+        if (ret)
+            goto remove_volume;
+    }
+
+    ret = SaveToStorage();
+    if (ret)
+        goto remove_volume;
+
+    return TError::Success();
+
+remove_volume:
+    Holder->Remove(shared_from_this());
+    return ret;
+}
+
+TPath TVolume::GetLoopPath() const {
+    TPath path = config().volumes().tmp_dir();
+    path.AddComponent(std::to_string(LoopDev) + ".img");
+    return path;
+}
+
+TError TVolume::Construct() const {
+    int status;
+    TError error;
+    TLoopMount m(GetLoopPath(), Name, "ext4", LoopDev);
+    TFile loopFile(GetLoopPath());
+
+    if (LoopDev >= 0) {
+        error = AllocLoop(GetLoopPath(), ParsedQuota);
+        if (error)
+            return error;
+
+        error = m.Mount();
+        if (error)
+            goto remove_loop;
+    }
+
+    error = Run({ "tar", "xf", Source, "-C", Name }, status);
+    if (error)
+        goto umount_loop;
+    if (status) {
+        error = TError(EError::Unknown, "Can't execute tar " + std::to_string(status));
+        goto umount_loop;
+    }
+
+    return TError::Success();
+
+umount_loop:
+    if (ParsedQuota) {
+        TError ret = m.Umount();
+        if (ret)
+            L_ERR() << "Can't construct volume: " << ret << std::endl;
+
+        ret = loopFile.Remove();
+        if (ret)
+            L_ERR() << "Can't construct volume: " << ret << std::endl;
+    }
+
+remove_loop:
+    TFolder dir(Name);
+    TError ret = dir.Remove();
+    if (ret)
+        L_ERR() << "Can't construct volume: " << ret << std::endl;
+    return error;
+}
+
+TError TVolume::Deconstruct() const {
+    if (LoopDev >= 0) {
+        TLoopMount m(GetLoopPath(), Name, "ext4", LoopDev);
+        TError error = m.Umount();
+        if (error)
+            L_ERR() << "Can't umount volume " << Name << ": " << error << std::endl;
+
+        TFile img(GetLoopPath());
+        error = img.Remove();
+        if (error)
+            L_ERR() << "Can't remove volume loop image at " << GetLoopPath().ToString() << ": " << error << std::endl;
+    } else {
+        TFolder f(Name);
+        TError error = f.Remove(true);
+        if (error)
+            L_ERR() << "Can't deconstruct volume " << Name << ": " << error << std::endl;
     }
 
     return TError::Success();
@@ -79,19 +181,14 @@ TError TVolume::CheckPermission(const TCred &ucred) const {
     return TError(EError::Permission, "Permission error");
 }
 
-TError TVolume::CheckQuota() {
-    if (Quota.empty()) {
-        Quota = "0";
-        ParsedQuota = 0;
-        return TError::Success();
-    }
-
-    return StringWithUnitToUint64(Quota, ParsedQuota);
-}
-
 TError TVolume::Destroy() {
     Holder->Remove(shared_from_this());
     Storage->RemoveNode(Name);
+    if (LoopDev >= 0) {
+        TError error = PutLoopDev(LoopDev);
+        if (error)
+            return error;
+    }
     return TError::Success();
 }
 
@@ -117,6 +214,10 @@ TError TVolume::SaveToStorage() const {
     a = node.add_pairs();
     a->set_key("group");
     a->set_val(Cred.GroupAsString());
+
+    a = node.add_pairs();
+    a->set_key("loop_dev");
+    a->set_val(std::to_string(LoopDev));
 
     return Storage->SaveNode(Name, node);
 }
@@ -144,6 +245,10 @@ TError TVolume::LoadFromStorage() {
             user = value;
         } else if (key == "group") {
             group = value;
+        } else if (key == "loop_dev") {
+            TError error = StringToInt(value, LoopDev);
+            if (error)
+                L_WRN() << "Can't restore loop device number: " << value << std::endl;
         } else
             L_WRN() << "Unknown key in volume storage: " << key << std::endl;
     }
@@ -169,6 +274,15 @@ TError TVolume::LoadFromStorage() {
 
 TError TVolumeHolder::RestoreFromStorage() {
     std::vector<std::string> list;
+
+    TPath volumes = config().volumes().tmp_dir();
+    if (!volumes.Exists() || volumes.GetType() != EFileType::Directory) {
+        TFolder dir(config().volumes().tmp_dir());
+        (void)dir.Remove(true);
+        TError error = dir.Create(0755, true);
+        if (error)
+            return error;
+    }
 
     TError error = Storage->ListNodes(list);
     if (error)

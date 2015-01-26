@@ -14,6 +14,8 @@ extern "C" {
 constexpr int updateSignal = SIGHUP;
 constexpr int rotateSignal = SIGUSR1;
 
+class TPath;
+
 int RetryBusy(int times, int timeoMs, std::function<int()> handler);
 int RetryFailed(int times, int timeoMs, std::function<int()> handler);
 int SleepWhile(int timeoMs, std::function<int()> handler);
@@ -55,6 +57,8 @@ TError EpollCreate(int &epfd);
 TError EpollAdd(int &epfd, int fd);
 
 int64_t GetBootTime();
+TError Run(const std::vector<std::string> &command, int &status);
+TError AllocLoop(const TPath &path, size_t size);
 
 class TEpollLoop : public TNonCopyable {
 public:

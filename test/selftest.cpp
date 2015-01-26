@@ -1078,8 +1078,13 @@ static std::string StartWaitAndGetData(TPortoAPI &api, const std::string &name, 
     return v;
 }
 
-static map<string, string> ParseMountinfo(string s) {
-    map<string, string> m;
+struct TMountInfo {
+    std::string flags;
+    std::string source;
+};
+
+static map<string, TMountInfo> ParseMountinfo(string s) {
+    map<string, TMountInfo> m;
     vector<string> lines;
 
     TError error = SplitString(s, '\n', lines);
@@ -1092,7 +1097,14 @@ static map<string, string> ParseMountinfo(string s) {
         if (error)
             throw error.GetMsg();
 
-        m[tok[4]] = tok[5];
+        if (tok.size() <= 5)
+            throw string("Invalid mount: ") + line;
+
+        TMountInfo i;
+        i.flags = tok[5];
+        i.source = tok[8];
+
+        m[tok[4]] = i;
     }
 
     return m;
@@ -1231,13 +1243,13 @@ static void TestRootProperty(TPortoAPI &api) {
     v = StartWaitAndGetData(api, name, "stdout");
 
     auto m = ParseMountinfo(v);
-    Expect(m["/etc/resolv.conf"].find("ro,") != string::npos);
-    Expect(m["/etc/hosts"].find("ro,") != string::npos);
-    Expect(m["/sys"].find("ro,") != string::npos);
-    Expect(m["/proc/sys"].find("ro,") != string::npos);
-    Expect(m["/proc/sysrq-trigger"].find("ro,") != string::npos);
-    Expect(m["/proc/irq"].find("ro,") != string::npos);
-    Expect(m["/proc/bus"].find("ro,") != string::npos);
+    Expect(m["/etc/resolv.conf"].flags.find("ro,") != string::npos);
+    Expect(m["/etc/hosts"].flags.find("ro,") != string::npos);
+    Expect(m["/sys"].flags.find("ro,") != string::npos);
+    Expect(m["/proc/sys"].flags.find("ro,") != string::npos);
+    Expect(m["/proc/sysrq-trigger"].flags.find("ro,") != string::npos);
+    Expect(m["/proc/irq"].flags.find("ro,") != string::npos);
+    Expect(m["/proc/bus"].flags.find("ro,") != string::npos);
 
     ExpectSuccess(api.Stop(name));
 
@@ -1377,8 +1389,8 @@ static void TestBindProperty(TPortoAPI &api) {
     string v = StartWaitAndGetData(api, name, "stdout");
     auto m = ParseMountinfo(v);
 
-    Expect(m[path + "/bin"].find("ro,") != string::npos);
-    Expect(m[path + "/tmp"].find("rw,") != string::npos);
+    Expect(m[path + "/bin"].flags.find("ro,") != string::npos);
+    Expect(m[path + "/tmp"].flags.find("rw,") != string::npos);
     ExpectSuccess(api.Stop(name));
 
     path = TMPDIR + "/" + name;
@@ -1393,9 +1405,9 @@ static void TestBindProperty(TPortoAPI &api) {
     ExpectSuccess(api.SetProperty(name, "bind", "/bin /bin ro; /tmp/27389 /tmp"));
     v = StartWaitAndGetData(api, name, "stdout");
     m = ParseMountinfo(v);
-    Expect(m["/"].find("rw,") != string::npos);
-    Expect(m["/bin"].find("ro,") != string::npos);
-    Expect(m["/tmp"].find("rw,") != string::npos);
+    Expect(m["/"].flags.find("rw,") != string::npos);
+    Expect(m["/bin"].flags.find("ro,") != string::npos);
+    Expect(m["/tmp"].flags.find("rw,") != string::npos);
     ExpectSuccess(api.Stop(name));
 
     ExpectSuccess(api.Destroy(name));
@@ -1496,6 +1508,7 @@ static bool ShareMacAddress(const vector<string> &a, const vector<string> &b) {
 }
 
 static string System(const std::string &cmd) {
+    Say() << cmd << std::endl;
     vector<string> lines = Popen(cmd);
     Expect(lines.size() == 1);
     return StringTrim(lines[0]);
@@ -2992,6 +3005,178 @@ static void TestPerf(TPortoAPI &api) {
     Expect(ms < 120 * 1000);
 }
 
+static void CreateTar(const TPath &path, const TPath &from) {
+    std::string cmd = "tar czf " + path.ToString() + " -C " + from.ToString() + " /bin/bash";
+    Expect(system(cmd.c_str()) == 0);
+}
+
+static void RemoveTar(const TPath &path) {
+    TFile f(path);
+    (void)f.Remove();
+}
+
+static void RemoveVolumes(TPortoAPI &api) {
+    std::vector<TVolumeDescription> volumes;
+    volumes.clear();
+    ExpectSuccess(api.ListVolumes(volumes));
+
+    AsRoot(api);
+    for (auto v : volumes)
+        ExpectSuccess(api.DestroyVolume(v.Name));
+    AsNobody(api);
+}
+
+static void CleanupVolume(const std::string &path) {
+    TFolder dir(path);
+    (void)dir.Remove(true);
+}
+
+static void TestVolumeHolder(TPortoAPI &api) {
+    std::vector<TVolumeDescription> volumes;
+
+    RemoveVolumes(api);
+
+    volumes.clear();
+    ExpectSuccess(api.ListVolumes(volumes));
+    Expect(volumes.size() == 0);
+
+    Say() << "Create temporary tar archive" << std::endl;
+
+    std::string a = "/tmp/volume_a", b = "/tmp/volume_b";
+    std::string tar = "/tmp/porto.tar";
+
+    CleanupVolume(a);
+    CleanupVolume(b);
+
+    TPath aPath(a);
+    TPath bPath(b);
+    Expect(aPath.Exists() == false);
+    Expect(bPath.Exists() == false);
+
+    RemoveTar(tar);
+    CreateTar(tar, "/bin");
+
+    Say() << "Create volume A" << std::endl;
+    ExpectSuccess(api.CreateVolume(a, tar, "0", ""));
+
+    volumes.clear();
+    ExpectSuccess(api.ListVolumes(volumes));
+    Expect(volumes.size() == 1);
+    Expect(volumes[0].Name == a);
+    Expect(volumes[0].Source == tar);
+    Expect(volumes[0].Quota == "0");
+    Expect(volumes[0].Flags == "");
+
+    Expect(aPath.Exists() == true);
+    Expect(bPath.Exists() == false);
+
+    Say() << "Try to create existing volume A" << std::endl;
+    ExpectFailure(api.CreateVolume(a, tar, "1g", ""), EError::VolumeAlreadyExists);
+
+    volumes.clear();
+    ExpectSuccess(api.ListVolumes(volumes));
+    Expect(volumes.size() == 1);
+
+    Say() << "Create volume B" << std::endl;
+    ExpectSuccess(api.CreateVolume(b, tar, "1g", ""));
+
+    volumes.clear();
+    ExpectSuccess(api.ListVolumes(volumes));
+    Expect(volumes.size() == 2);
+    Expect(volumes[0].Name == a);
+    Expect(volumes[0].Source == tar);
+    Expect(volumes[0].Quota == "0");
+    Expect(volumes[0].Flags == "");
+    Expect(volumes[1].Name == b);
+    Expect(volumes[1].Source == tar);
+    Expect(volumes[1].Quota == "1g");
+    Expect(volumes[1].Flags == "");
+
+    Expect(aPath.Exists() == true);
+    Expect(bPath.Exists() == true);
+
+    Say() << "Remove volume A" << std::endl;
+    ExpectSuccess(api.DestroyVolume(a));
+    ExpectFailure(api.DestroyVolume(a), EError::VolumeDoesNotExist);
+
+    volumes.clear();
+    ExpectSuccess(api.ListVolumes(volumes));
+    Expect(volumes.size() == 1);
+    Expect(volumes[0].Name == b);
+    Expect(volumes[0].Source == tar);
+    Expect(volumes[0].Quota == "1g");
+    Expect(volumes[0].Flags == "");
+
+    Expect(aPath.Exists() == false);
+    Expect(bPath.Exists() == true);
+
+    Say() << "Remove volume B" << std::endl;
+
+    ExpectSuccess(api.DestroyVolume(b));
+    ExpectFailure(api.DestroyVolume(b), EError::VolumeDoesNotExist);
+
+    Expect(aPath.Exists() == false);
+    Expect(bPath.Exists() == false);
+
+    volumes.clear();
+    ExpectSuccess(api.ListVolumes(volumes));
+    Expect(volumes.size() == 0);
+
+    Say() << "Try to create volume with invalid name" << std::endl;
+    ExpectFailure(api.CreateVolume("a", tar, "1g", ""), EError::InvalidValue);
+    ExpectFailure(api.CreateVolume(a, "q", "1g", ""), EError::InvalidValue);
+}
+
+static void TestVolumeLoop(TPortoAPI &api) {
+    std::vector<TVolumeDescription> volumes;
+
+    RemoveVolumes(api);
+
+    volumes.clear();
+    ExpectSuccess(api.ListVolumes(volumes));
+    Expect(volumes.size() == 0);
+
+    Say() << "Create temporary tar archive" << std::endl;
+
+    std::string a = "/tmp/volume_a", b = "/tmp/volume_b";
+    std::string tar = "/tmp/porto.tar";
+
+    CleanupVolume(a);
+    CleanupVolume(b);
+
+    RemoveTar(tar);
+    CreateTar(tar, "/bin");
+
+    auto m = ParseMountinfo(CommaSeparatedList(Popen("cat /proc/self/mountinfo"), ""));
+    Expect(m.find(a) == m.end());
+
+    Say() << "Make sure loop device is created when quota specified" << std::endl;
+    ExpectSuccess(api.CreateVolume(a, tar, "1g", ""));
+
+    m = ParseMountinfo(CommaSeparatedList(Popen("cat /proc/self/mountinfo"), ""));
+    Expect(m.find(a) != m.end());
+
+    Say() << "Make sure loop device has correct size" << std::endl;
+    std::string loopDev = m[a].source;
+    AsRoot(api);
+    std::string img = System("losetup " + loopDev + " | sed -e 's/[^(]*(\\([^)]*\\)).*/\\1/'");
+    AsNobody(api);
+
+    TFile loopFile(img);
+    Expect(loopFile.GetSize() == 1 * 1024 * 1024 * 1024);
+
+    Say() << "Make sure loop device has correct contents" << std::endl;
+    TFile binBash(a + "/bin/bash");
+    Expect(binBash.Exists() == true);
+
+    Say() << "Make sure no loop device is created without quota" << std::endl;
+    ExpectSuccess(api.DestroyVolume(a));
+    ExpectSuccess(api.CreateVolume(b, tar, "0", ""));
+    m = ParseMountinfo(CommaSeparatedList(Popen("cat /proc/self/mountinfo"), ""));
+    Expect(m.find(b) == m.end());
+    Expect(m.find(a) == m.end());
+}
+
 static void KillPorto(TPortoAPI &api, int sig, int times = 10) {
     int portodPid = ReadPid(config().slave_pid().path());
     if (kill(portodPid, sig))
@@ -3414,6 +3599,8 @@ int SelfTest(string name, int leakNr) {
         { "hierarchy", TestLimitsHierarchy },
         { "leaks", TestLeaks },
         { "perf", TestPerf },
+        { "vholder", TestVolumeHolder },
+        { "volume_loop", TestVolumeLoop },
 
         { "daemon", TestDaemon },
         { "recovery", TestRecovery },
