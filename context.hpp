@@ -8,7 +8,10 @@
 #include "util/mount.hpp"
 #include "config.hpp"
 
-class TContext {
+typedef std::function<int()> task_t;
+typedef std::function<void(int ret)> posthook_t;
+
+class TContext : public TNonCopyable {
 public:
     std::shared_ptr<TKeyValueStorage> Storage;
     std::shared_ptr<TKeyValueStorage> VolumeStorage;
@@ -19,6 +22,8 @@ public:
     std::shared_ptr<TVolumeHolder> Vholder;
 
     int Epfd;
+    int SignalFd;
+    std::map<pid_t, posthook_t> Posthooks;
 
     TContext();
     TError Initialize();

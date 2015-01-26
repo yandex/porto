@@ -7,17 +7,12 @@
 #include "common.hpp"
 #include "context.hpp"
 
-typedef std::function<int()> task_t;
-typedef std::function<void(int ret)> posthook_t;
-
-extern std::map<pid_t, posthook_t> posthooks;
-
 class TBatchTask : public TNonCopyable {
 public:
     TBatchTask(task_t task, posthook_t post)
         : Task(task), PostHook(post) {};
 
-    TError Run() {
+    TError Run(TContext &context) {
 
         int ret = fork();
         switch (ret) {
@@ -32,7 +27,7 @@ public:
 
         default:
             /* Parent */
-            posthooks[ret] = PostHook;
+            context.Posthooks[ret] = PostHook;
         }
 
         return TError::Success();

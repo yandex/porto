@@ -253,7 +253,7 @@ static TError CreateVolume(TContext &context,
             std::cout << "stop hook" << std::endl;
         });
 
-    return task.Run();
+    return task.Run(context);
 }
 
 static TError DestroyVolume(TContext &context,
