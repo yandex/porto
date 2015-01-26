@@ -22,3 +22,10 @@ Depends: python (>= 2.6), python-central, python-protobuf, yandex-porto (= ${bin
 XS-Python-Version: >= 2.6
 XB-Python-Version: >= 2.6
 Description: Python API for porto
+
+Package: yandex-portoinit
+Section: utils
+Priority: extra
+Architecture: amd64
+Depends: yandex-porto (= ${binary:Version})
+Description: Init component of Porto

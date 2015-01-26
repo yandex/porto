@@ -43,6 +43,17 @@ static bool GetContainerProperty(std::string &f, std::string &parameterName, std
     return false;
 }
 
+static void CreateHook() {
+
+}
+
+static bool RunHook(std::string &containerName, std::string &hookName, std::string &hookValue, TPortoAPI &api) {
+    CreateHook();
+    StartHook();
+    WaitHook();
+    DestroyHook();
+}
+
 static void StartContainers (std::map<std::string, std::map<std::string, std::string>> &containers, TPortoAPI &api) {
     int ret, error;
     std::string msg;
@@ -270,7 +281,7 @@ int main(int argc, char * const argv[]) {
             reloadConfigs = false;
         }
         StartContainers(containers, api);
-        usleep(5000000);
+        usleep(60000000);
     }
 
     EventLoop();

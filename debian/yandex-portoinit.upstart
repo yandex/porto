@@ -1,0 +1,13 @@
+# yandex-porto - Init component of Porto
+#
+# 
+
+description	"Portoinit"
+author "Eugene Kilimchuk <ekilimchuk@yandex-team.ru>"
+
+start on yandex-porto
+
+expect fork
+respawn
+
+exec portoinit &

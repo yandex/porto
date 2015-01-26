@@ -39,10 +39,10 @@ add_custom_command(
 
 add_custom_target(version.hpp ./GIT-VERSION-GEN WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} VERBATIM)
 
-set_source_files_properties(tags PROPERTIES GENERATED true)
-add_custom_target(tags COMMAND ctags -R --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
-set_source_files_properties(TAGS PROPERTIES GENERATED true)
-add_custom_target(TAGS COMMAND ctags -R -e --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+#set_source_files_properties(tags PROPERTIES GENERATED true)
+#add_custom_target(tags COMMAND ctags -R --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+#set_source_files_properties(TAGS PROPERTIES GENERATED true)
+#add_custom_target(TAGS COMMAND ctags -R -e --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 link_directories(${yandex-porto_BINARY_DIR})
 include_directories(${yandex-porto_BINARY_DIR}/api/cpp)
@@ -61,6 +61,11 @@ target_link_libraries(portoctl porto ${PB} rt)
 add_executable(portotest portotest.cpp config.cpp qdisc.cpp test/selftest.cpp test/stresstest.cpp test/test.cpp config.cpp util/mount.cpp util/netlink.cpp util/log.cpp util/path.cpp util/file.cpp util/folder.cpp util/unix.cpp util/cred.cpp util/string.cpp)
 add_dependencies(portotest version.hpp)
 target_link_libraries(portotest porto ${PB} ${INSTALL_DIR}/lib/libnl-3.a ${INSTALL_DIR}/lib/libnl-route-3.a pthread rt)
+
+
+add_executable(portoinit init/portoinit.cpp init/init.pb.cc error.cpp rpc.pb.cc util/string.cpp util/protobuf.cpp util/unix.cpp util/file.cpp util/folder.cpp util/path.cpp util/log.cpp util/cred.cpp config.cpp config.pb.cc api/cpp/libporto.cpp util/unix.hpp
+    ${PROTO_SRCS} ${PROTO_HDRS})
+target_link_libraries(portoinit ${PB} pthread rt)
 
 install(
     TARGETS portod portoctl portotest
