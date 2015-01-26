@@ -224,7 +224,7 @@ message TContainerResponse {
 
 //Запрос на создание тома
 message TVolumeCreateRequest {
-	required string name = 1;
+	required string path = 1;
 	required string source = 2;
 	required string quota = 3;
 	optional string flags = 4;
@@ -232,7 +232,7 @@ message TVolumeCreateRequest {
 
 // Запрос на уничтожение тома
 message TVolumeDestroyRequest {
-	required string name = 1;
+	required string path = 1;
 }
 
 // Запрос на получение списка томов
@@ -242,7 +242,7 @@ message TVolumeListRequest {
 // Список томов с описанием
 message TVolumeListResponse {
 	message TVolumeDescription {
-		required string name = 1;
+		required string path = 1;
 		required string source = 2;
 		required string quota = 3;
 		optional string flags = 4;

@@ -1177,7 +1177,7 @@ public:
 class TCreateVolumeCmd : public ICmd {
 public:
     TCreateVolumeCmd(TPortoAPI *api) : ICmd(api, "vcreate", 2,
-                                            "<name> <source> [quota] [flags...]", "create volume") {}
+                                            "<path> <source> [quota] [flags...]", "create volume") {}
 
     int Execute(int argc, char *argv[]) {
         std::string flags = (argc == 4 ? argv[3] : "");
@@ -1194,7 +1194,7 @@ public:
 
 class TDestroyVolumeCmd : public ICmd {
 public:
-    TDestroyVolumeCmd(TPortoAPI *api) : ICmd(api, "vdestroy", 1, "<name> [name...]", "destroy volume") {}
+    TDestroyVolumeCmd(TPortoAPI *api) : ICmd(api, "vdestroy", 1, "<path> [path...]", "destroy volume") {}
 
     int Execute(int argc, char *argv[]) {
         for (int i = 0; i < argc; i++) {
@@ -1222,7 +1222,7 @@ public:
         }
 
         for (auto v : vlist)
-            std::cout << v.Name << " "
+            std::cout << v.Path << " "
                       << v.Quota << " "
                       << v.Flags << " "
                       << v.Source << " "

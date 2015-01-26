@@ -18,20 +18,20 @@ public:
     TError Deconstruct() const;
     TError Destroy();
     TVolume(std::shared_ptr<TKeyValueStorage> storage,
-            std::shared_ptr<TVolumeHolder> holder, const std::string &name,
+            std::shared_ptr<TVolumeHolder> holder, const std::string &path,
             const std::string &source, const std::string &quota,
             const std::string &flags, const TCred &cred) :
-        Storage(storage), Holder(holder), Cred(cred), Name(name),
+        Storage(storage), Holder(holder), Cred(cred), Path(path),
         Source(source), Quota(quota), Flags(flags) {
     }
     TVolume(std::shared_ptr<TKeyValueStorage> storage,
-            std::shared_ptr<TVolumeHolder> holder, const std::string &name) :
-        Storage(storage), Holder(holder), Name(name) {
+            std::shared_ptr<TVolumeHolder> holder, const std::string &path) :
+        Storage(storage), Holder(holder), Path(path) {
     }
 
     TError CheckPermission(const TCred &ucred) const;
 
-    const std::string &GetName() const { return Name; }
+    const std::string &GetPath() const { return Path; }
     const std::string &GetSource() const { return Source; }
     const std::string &GetQuota() const { return Quota; }
     const std::string &GetFlags() const { return Flags; }
@@ -43,7 +43,7 @@ private:
     std::shared_ptr<TVolumeHolder> Holder;
     TCred Cred;
 
-    std::string Name;
+    std::string Path;
     std::string Source;
     std::string Quota;
     uint64_t ParsedQuota;
@@ -57,7 +57,7 @@ class TVolumeHolder : public TNonCopyable, public std::enable_shared_from_this<T
 public:
     TError Insert(std::shared_ptr<TVolume> volume);
     void Remove(std::shared_ptr<TVolume> volume);
-    std::shared_ptr<TVolume> Get(const std::string &name);
+    std::shared_ptr<TVolume> Get(const std::string &path);
     std::vector<std::string> List() const;
     TVolumeHolder(std::shared_ptr<TKeyValueStorage> storage) :
         Storage(storage) {}

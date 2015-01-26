@@ -8,21 +8,21 @@
 /* TVolumeHolder */
 
 TError TVolumeHolder::Insert(std::shared_ptr<TVolume> volume) {
-    if (Volumes.find(volume->GetName()) == Volumes.end()) {
-        Volumes[volume->GetName()] = volume;
+    if (Volumes.find(volume->GetPath()) == Volumes.end()) {
+        Volumes[volume->GetPath()] = volume;
         return TError::Success();
     }
 
-    return TError(EError::VolumeAlreadyExists, "volume " + volume->GetName() +
+    return TError(EError::VolumeAlreadyExists, "volume " + volume->GetPath() +
                   "already exists");
 }
 
 void TVolumeHolder::Remove(std::shared_ptr<TVolume> volume) {
-    Volumes.erase(volume->GetName());
+    Volumes.erase(volume->GetPath());
 }
 
-std::shared_ptr<TVolume> TVolumeHolder::Get(const std::string &name) {
-    auto v = Volumes.find(name);
+std::shared_ptr<TVolume> TVolumeHolder::Get(const std::string &path) {
+    auto v = Volumes.find(path);
     if (v != Volumes.end())
         return v->second;
     else
@@ -42,11 +42,11 @@ std::vector<std::string> TVolumeHolder::List() const {
 
 TError TVolume::Create() {
     TError ret;
-    TPath srcPath(Source), dstPath(Name);
+    TPath srcPath(Source), dstPath(Path);
     TFolder dir(dstPath);
 
-    if (!Name.length() || Name[0] != '/')
-        return TError(EError::InvalidValue, "Invalid volume name");
+    if (!Path.length() || Path[0] != '/')
+        return TError(EError::InvalidValue, "Invalid volume path");
 
     if (!Source.length() || Source[0] != '/')
         return TError(EError::InvalidValue, "Invalid volume source");
@@ -60,17 +60,17 @@ TError TVolume::Create() {
         return ret;
 
     if (!srcPath.Exists()) {
-        ret = TError(EError::InvalidValue, "Volume " + Name + " has non-existing source");
+        ret = TError(EError::InvalidValue, "Source doesn't exist");
         goto remove_volume;
     }
 
     if (srcPath.GetType() != EFileType::Regular) {
-        ret = TError(EError::InvalidValue, "Volume's " + Name + " source isn't a regular file");
+        ret = TError(EError::InvalidValue, "Source isn't a regular file");
         goto remove_volume;
     }
 
     if (dstPath.Exists()) {
-        ret = TError(EError::InvalidValue, "Destination path " + Name + " already exists");
+        ret = TError(EError::InvalidValue, "Destination path already exists");
         goto remove_volume;
     }
 
@@ -108,7 +108,7 @@ TPath TVolume::GetLoopPath() const {
 TError TVolume::Construct() const {
     int status;
     TError error;
-    TLoopMount m(GetLoopPath(), Name, "ext4", LoopDev);
+    TLoopMount m(GetLoopPath(), Path, "ext4", LoopDev);
     TFile loopFile(GetLoopPath());
 
     if (LoopDev >= 0) {
@@ -121,7 +121,7 @@ TError TVolume::Construct() const {
             goto remove_loop;
     }
 
-    error = Run({ "tar", "xf", Source, "-C", Name }, status);
+    error = Run({ "tar", "xf", Source, "-C", Path }, status);
     if (error)
         goto umount_loop;
     if (status) {
@@ -143,7 +143,7 @@ umount_loop:
     }
 
 remove_loop:
-    TFolder dir(Name);
+    TFolder dir(Path);
     TError ret = dir.Remove();
     if (ret)
         L_ERR() << "Can't construct volume: " << ret << std::endl;
@@ -152,20 +152,20 @@ remove_loop:
 
 TError TVolume::Deconstruct() const {
     if (LoopDev >= 0) {
-        TLoopMount m(GetLoopPath(), Name, "ext4", LoopDev);
+        TLoopMount m(GetLoopPath(), Path, "ext4", LoopDev);
         TError error = m.Umount();
         if (error)
-            L_ERR() << "Can't umount volume " << Name << ": " << error << std::endl;
+            L_ERR() << "Can't umount volume " << Path << ": " << error << std::endl;
 
         TFile img(GetLoopPath());
         error = img.Remove();
         if (error)
             L_ERR() << "Can't remove volume loop image at " << GetLoopPath().ToString() << ": " << error << std::endl;
     } else {
-        TFolder f(Name);
+        TFolder f(Path);
         TError error = f.Remove(true);
         if (error)
-            L_ERR() << "Can't deconstruct volume " << Name << ": " << error << std::endl;
+            L_ERR() << "Can't deconstruct volume " << Path << ": " << error << std::endl;
     }
 
     return TError::Success();
@@ -183,7 +183,7 @@ TError TVolume::CheckPermission(const TCred &ucred) const {
 
 TError TVolume::Destroy() {
     Holder->Remove(shared_from_this());
-    Storage->RemoveNode(Name);
+    Storage->RemoveNode(Path);
     if (LoopDev >= 0) {
         TError error = PutLoopDev(LoopDev);
         if (error)
@@ -219,7 +219,7 @@ TError TVolume::SaveToStorage() const {
     a->set_key("loop_dev");
     a->set_val(std::to_string(LoopDev));
 
-    return Storage->SaveNode(Name, node);
+    return Storage->SaveNode(Path, node);
 }
 
 TError TVolume::LoadFromStorage() {
@@ -227,7 +227,7 @@ TError TVolume::LoadFromStorage() {
     TError error;
     std::string user, group, source, quota, flags;
 
-    error = Storage->LoadNode(Name, node);
+    error = Storage->LoadNode(Path, node);
     if (error)
         return error;
 
@@ -254,11 +254,11 @@ TError TVolume::LoadFromStorage() {
     }
 
     if (quota.empty())
-        return TError(EError::InvalidValue, "Volume " + Name + " info isn't full");
+        return TError(EError::InvalidValue, "Volume " + Path + " info isn't full");
 
     error = Cred.Parse(user, group);
     if (error)
-        return TError(EError::InvalidValue, "Bad volume " + Name + " credentials: " +
+        return TError(EError::InvalidValue, "Bad volume " + Path + " credentials: " +
                       user + " " + group);
 
     Source = source;
@@ -297,7 +297,7 @@ TError TVolumeHolder::RestoreFromStorage() {
             L_WRN() << "Corrupted volume " << i << " removed. " << error << std::endl;
         }
 
-        L() << "Volume " << v->GetName() << " restored." << std::endl;
+        L() << "Volume " << v->GetPath() << " restored." << std::endl;
     }
 
     return TError::Success();

@@ -21,14 +21,14 @@ struct TData {
 };
 
 struct TVolumeDescription {
-    std::string Name;
+    std::string Path;
     std::string Source;
     std::string Quota;
     std::string Flags;
 
-    TVolumeDescription(const std::string &name, const std::string &source,
+    TVolumeDescription(const std::string &path, const std::string &source,
                        const std::string &quota, const std::string &flags) :
-        Name(name), Source(source), Quota(quota), Flags(flags) {}
+        Path(path), Source(source), Quota(quota), Flags(flags) {}
 };
 
 class TPortoAPI {
@@ -72,9 +72,9 @@ public:
     void Cleanup();
 
     // VolumeAPI
-    int CreateVolume(const std::string &name, const std::string &source,
+    int CreateVolume(const std::string &path, const std::string &source,
                      const std::string &quota, const std::string &flags);
-    int DestroyVolume(const std::string &name);
+    int DestroyVolume(const std::string &path);
     int ListVolumes(std::vector<TVolumeDescription> &vlist);
 };
 

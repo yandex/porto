@@ -232,7 +232,7 @@ static TError CreateVolume(TContext &context,
 
     std::shared_ptr<TVolume> volume;
     volume = std::make_shared<TVolume>(context.VolumeStorage, context.Vholder,
-                                       StringTrim(req.name()),
+                                       StringTrim(req.path()),
                                        StringTrim(req.source()),
                                        StringTrim(req.quota()),
                                        StringTrim(req.flags()), cred);
@@ -287,10 +287,10 @@ static TError DestroyVolume(TContext &context,
 
 static TError ListVolumes(TContext &context,
                           rpc::TContainerResponse &rsp) {
-    for (auto name : context.Vholder->List()) {
+    for (auto path : context.Vholder->List()) {
         auto desc = rsp.mutable_volumelist()->add_list();
-        auto vol = context.Vholder->Get(name);
-        desc->set_name(vol->GetName());
+        auto vol = context.Vholder->Get(path);
+        desc->set_path(vol->GetPath());
         desc->set_source(vol->GetSource());
         desc->set_quota(vol->GetQuota());
         desc->set_flags(vol->GetFlags());

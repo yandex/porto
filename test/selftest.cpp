@@ -3022,7 +3022,7 @@ static void RemoveVolumes(TPortoAPI &api) {
 
     AsRoot(api);
     for (auto v : volumes)
-        ExpectSuccess(api.DestroyVolume(v.Name));
+        ExpectSuccess(api.DestroyVolume(v.Path));
     AsNobody(api);
 }
 
@@ -3062,7 +3062,7 @@ static void TestVolumeHolder(TPortoAPI &api) {
     volumes.clear();
     ExpectSuccess(api.ListVolumes(volumes));
     Expect(volumes.size() == 1);
-    Expect(volumes[0].Name == a);
+    Expect(volumes[0].Path == a);
     Expect(volumes[0].Source == tar);
     Expect(volumes[0].Quota == "0");
     Expect(volumes[0].Flags == "");
@@ -3083,11 +3083,11 @@ static void TestVolumeHolder(TPortoAPI &api) {
     volumes.clear();
     ExpectSuccess(api.ListVolumes(volumes));
     Expect(volumes.size() == 2);
-    Expect(volumes[0].Name == a);
+    Expect(volumes[0].Path == a);
     Expect(volumes[0].Source == tar);
     Expect(volumes[0].Quota == "0");
     Expect(volumes[0].Flags == "");
-    Expect(volumes[1].Name == b);
+    Expect(volumes[1].Path == b);
     Expect(volumes[1].Source == tar);
     Expect(volumes[1].Quota == "1g");
     Expect(volumes[1].Flags == "");
@@ -3102,7 +3102,7 @@ static void TestVolumeHolder(TPortoAPI &api) {
     volumes.clear();
     ExpectSuccess(api.ListVolumes(volumes));
     Expect(volumes.size() == 1);
-    Expect(volumes[0].Name == b);
+    Expect(volumes[0].Path == b);
     Expect(volumes[0].Source == tar);
     Expect(volumes[0].Quota == "1g");
     Expect(volumes[0].Flags == "");
@@ -3122,7 +3122,7 @@ static void TestVolumeHolder(TPortoAPI &api) {
     ExpectSuccess(api.ListVolumes(volumes));
     Expect(volumes.size() == 0);
 
-    Say() << "Try to create volume with invalid name" << std::endl;
+    Say() << "Try to create volume with invalid path" << std::endl;
     ExpectFailure(api.CreateVolume("a", tar, "1g", ""), EError::InvalidValue);
     ExpectFailure(api.CreateVolume(a, "q", "1g", ""), EError::InvalidValue);
 }
