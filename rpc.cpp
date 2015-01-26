@@ -3,29 +3,45 @@
 #include "data.hpp"
 #include "util/log.hpp"
 #include "util/protobuf.hpp"
+#include "batch.hpp"
 
 using std::string;
+
+void SendReply(std::shared_ptr<TClient> client, rpc::TContainerResponse &response) {
+    if (!client) {
+        std::cout << "no client" << std::endl;
+        return;
+    }
+
+    google::protobuf::io::FileOutputStream post(client->Fd);
+
+    if (response.IsInitialized()) {
+        if (!WriteDelimitedTo(response, &post))
+            L() << "Write error for " << client->Fd << std:: endl;
+        post.Flush();
+    }
+}
 
 static TError CreateContainer(TContext &context,
                               const rpc::TContainerCreateRequest &req,
                               rpc::TContainerResponse &rsp,
-                              const TCred &cred) {
+                              std::shared_ptr<TClient> client) {
     auto container = context.Cholder->Get(req.name());
     if (container)
         return TError(EError::ContainerAlreadyExists, "invalid name");
 
-    return context.Cholder->Create(req.name(), cred);
+    return context.Cholder->Create(req.name(), client->Cred);
 }
 
 static TError DestroyContainer(TContext &context,
                                const rpc::TContainerDestroyRequest &req,
                                rpc::TContainerResponse &rsp,
-                               const TCred &cred) {
+                               std::shared_ptr<TClient> client) {
     { // we don't want to hold container shared_ptr because Destroy
       // might think that it has some parent that holds it
         auto container = context.Cholder->Get(req.name());
         if (container) {
-            TError error = container->CheckPermission(cred);
+            TError error = container->CheckPermission(client->Cred);
             if (error)
                 return error;
         }
@@ -37,12 +53,12 @@ static TError DestroyContainer(TContext &context,
 static TError StartContainer(TContext &context,
                              const rpc::TContainerStartRequest &req,
                              rpc::TContainerResponse &rsp,
-                             const TCred &cred) {
+                             std::shared_ptr<TClient> client) {
     auto container = context.Cholder->Get(req.name());
     if (!container)
         return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    TError error = container->CheckPermission(cred);
+    TError error = container->CheckPermission(client->Cred);
     if (error)
         return error;
 
@@ -52,12 +68,12 @@ static TError StartContainer(TContext &context,
 static TError StopContainer(TContext &context,
                             const rpc::TContainerStopRequest &req,
                             rpc::TContainerResponse &rsp,
-                            const TCred &cred) {
+                            std::shared_ptr<TClient> client) {
     auto container = context.Cholder->Get(req.name());
     if (!container)
         return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    TError error = container->CheckPermission(cred);
+    TError error = container->CheckPermission(client->Cred);
     if (error)
         return error;
 
@@ -67,12 +83,12 @@ static TError StopContainer(TContext &context,
 static TError PauseContainer(TContext &context,
                              const rpc::TContainerPauseRequest &req,
                              rpc::TContainerResponse &rsp,
-                             const TCred &cred) {
+                             std::shared_ptr<TClient> client) {
     auto container = context.Cholder->Get(req.name());
     if (!container)
         return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    TError error = container->CheckPermission(cred);
+    TError error = container->CheckPermission(client->Cred);
     if (error)
         return error;
 
@@ -82,12 +98,12 @@ static TError PauseContainer(TContext &context,
 static TError ResumeContainer(TContext &context,
                               const rpc::TContainerResumeRequest &req,
                               rpc::TContainerResponse &rsp,
-                              const TCred &cred) {
+                              std::shared_ptr<TClient> client) {
     auto container = context.Cholder->Get(req.name());
     if (!container)
         return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    TError error = container->CheckPermission(cred);
+    TError error = container->CheckPermission(client->Cred);
     if (error)
         return error;
 
@@ -105,7 +121,7 @@ static TError ListContainers(TContext &context,
 static TError GetContainerProperty(TContext &context,
                                    const rpc::TContainerGetPropertyRequest &req,
                                    rpc::TContainerResponse &rsp,
-                                   const TCred &cred) {
+                                   std::shared_ptr<TClient> client) {
     auto container = context.Cholder->Get(req.name());
     if (!container)
         return TError(EError::ContainerDoesNotExist, "invalid name");
@@ -120,22 +136,22 @@ static TError GetContainerProperty(TContext &context,
 static TError SetContainerProperty(TContext &context,
                                    const rpc::TContainerSetPropertyRequest &req,
                                    rpc::TContainerResponse &rsp,
-                                   const TCred &cred) {
+                                   std::shared_ptr<TClient> client) {
     auto container = context.Cholder->Get(req.name());
     if (!container)
         return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    TError error = container->CheckPermission(cred);
+    TError error = container->CheckPermission(client->Cred);
     if (error)
         return error;
 
-    return container->SetProperty(req.property(), req.value(), cred.IsPrivileged());
+    return container->SetProperty(req.property(), req.value(), client->Cred.IsPrivileged());
 }
 
 static TError GetContainerData(TContext &context,
                                const rpc::TContainerGetDataRequest &req,
                                rpc::TContainerResponse &rsp,
-                               const TCred &cred) {
+                               std::shared_ptr<TClient> client) {
     auto container = context.Cholder->Get(req.name());
     if (!container)
         return TError(EError::ContainerDoesNotExist, "invalid name");
@@ -186,12 +202,12 @@ static TError ListData(TContext &context,
 static TError Kill(TContext &context,
                    const rpc::TContainerKillRequest &req,
                    rpc::TContainerResponse &rsp,
-                   const TCred &cred) {
+                   std::shared_ptr<TClient> client) {
     auto container = context.Cholder->Get(req.name());
     if (!container)
         return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    TError error = container->CheckPermission(cred);
+    TError error = container->CheckPermission(client->Cred);
     if (error)
         return error;
 
@@ -211,26 +227,42 @@ static TError Version(TContext &context,
 static TError CreateVolume(TContext &context,
                            const rpc::TVolumeCreateRequest &req,
                            rpc::TContainerResponse &rsp,
-                           const TCred &cred) {
+                           std::shared_ptr<TClient> client) {
 
     std::shared_ptr<TVolume> volume;
     volume = std::make_shared<TVolume>(context.VolumeStorage, context.Vholder,
                                        req.name(), req.source(),
-                                       req.quota(), req.flags(), cred);
+                                       req.quota(), req.flags(), client->Cred);
     TError err = volume->Create();
     if (err)
         return err;
 
-    return TError::Success();
+    std::weak_ptr<TClient> c = client;
+    TBatchTask task(
+        [] () {
+            std::cout << "start task" << std::endl;
+            sleep(5);
+            std::cout << "stop task" << std::endl;
+            return 0;
+
+        }, [c] (int ret) {
+            std::cout << "start hook" << std::endl;
+            rpc::TContainerResponse response;
+            response.set_error(EError::Success);
+            SendReply(c.lock(), response);
+            std::cout << "stop hook" << std::endl;
+        });
+
+    return task.Run();
 }
 
 static TError DestroyVolume(TContext &context,
                             const rpc::TVolumeDestroyRequest &req,
                             rpc::TContainerResponse &rsp,
-                            const TCred &cred) {
+                            std::shared_ptr<TClient> client) {
     auto volume = context.Vholder->Get(req.name());
     if (volume) {
-        TError error = volume->CheckPermission(cred);
+        TError error = volume->CheckPermission(client->Cred);
         if (error)
             return error;
         return volume->Destroy();
@@ -255,7 +287,7 @@ static TError ListVolumes(TContext &context,
 }
 
 bool HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
-                      rpc::TContainerResponse &rsp, const TCred &cred) {
+                      rpc::TContainerResponse &rsp, std::shared_ptr<TClient> client) {
     string str;
     bool send_reply = true;
 
@@ -266,39 +298,39 @@ bool HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
     TError error;
     try {
         if (req.has_create())
-            error = CreateContainer(context, req.create(), rsp, cred);
+            error = CreateContainer(context, req.create(), rsp, client);
         else if (req.has_destroy())
-            error = DestroyContainer(context, req.destroy(), rsp, cred);
+            error = DestroyContainer(context, req.destroy(), rsp, client);
         else if (req.has_list())
             error = ListContainers(context, rsp);
         else if (req.has_getproperty())
-            error = GetContainerProperty(context, req.getproperty(), rsp, cred);
+            error = GetContainerProperty(context, req.getproperty(), rsp, client);
         else if (req.has_setproperty())
-            error = SetContainerProperty(context, req.setproperty(), rsp, cred);
+            error = SetContainerProperty(context, req.setproperty(), rsp, client);
         else if (req.has_getdata())
-            error = GetContainerData(context, req.getdata(), rsp, cred);
+            error = GetContainerData(context, req.getdata(), rsp, client);
         else if (req.has_start())
-            error = StartContainer(context, req.start(), rsp, cred);
+            error = StartContainer(context, req.start(), rsp, client);
         else if (req.has_stop())
-            error = StopContainer(context, req.stop(), rsp, cred);
+            error = StopContainer(context, req.stop(), rsp, client);
         else if (req.has_pause())
-            error = PauseContainer(context, req.pause(), rsp, cred);
+            error = PauseContainer(context, req.pause(), rsp, client);
         else if (req.has_resume())
-            error = ResumeContainer(context, req.resume(), rsp, cred);
+            error = ResumeContainer(context, req.resume(), rsp, client);
         else if (req.has_propertylist())
             error = ListProperty(context, rsp);
         else if (req.has_datalist())
             error = ListData(context, rsp);
         else if (req.has_kill())
-            error = Kill(context, req.kill(), rsp, cred);
+            error = Kill(context, req.kill(), rsp, client);
         else if (req.has_version())
             error = Version(context, rsp);
         else if (req.has_createvolume()) {
-            error = CreateVolume(context, req.createvolume(), rsp, cred);
+            error = CreateVolume(context, req.createvolume(), rsp, client);
             if (!error)
                 send_reply = false;
         } else if (req.has_destroyvolume()) {
-            error = DestroyVolume(context, req.destroyvolume(), rsp, cred);
+            error = DestroyVolume(context, req.destroyvolume(), rsp, client);
             if (!error)
                 send_reply = false;
         } else if (req.has_listvolumes())

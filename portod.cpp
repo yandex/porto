@@ -19,6 +19,7 @@
 #include "util/string.hpp"
 #include "util/crash.hpp"
 #include "util/cred.hpp"
+#include "batch.hpp"
 
 extern "C" {
 #include <fcntl.h>
@@ -55,6 +56,17 @@ const int updateSignal = SIGHUP;
 const int rotateSignal = SIGUSR1;
 size_t SlaveStarted = 0;
 size_t MasterStarted = 0;
+
+std::map<pid_t, posthook_t> posthooks;
+static void HandleBatchTasks(int signum, siginfo_t *si, void *unused) {
+    int status;
+    pid_t pid;
+
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        if (WIFEXITED(status))
+            posthooks[pid](WEXITSTATUS(status));
+    }
+}
 
 static void DoExit(int signum) {
     done = true;
@@ -104,11 +116,12 @@ static void RegisterSignalHandlers() {
     (void)RegisterSignal(SIGTERM, DoExit);
     // don't catch SIGQUIT, may be useful to create core dump
     (void)RegisterSignal(rotateSignal, DoRotate);
+    (void)RegisterSignal(SIGCHLD, HandleBatchTasks);
 }
 
 static void SignalMask(int how) {
     sigset_t mask;
-    int sigs[] = { SIGALRM, SIGCHLD };
+    int sigs[] = { SIGALRM };
 
     if (sigemptyset(&mask) < 0) {
         L() << "Can't initialize signal mask: " << strerror(errno) << std::endl;
@@ -201,20 +214,9 @@ static void RemoveRpcServer(const string &path) {
         L_ERR() << "Can't remove socket file: " << error << std::endl;
 }
 
-static void SendReply(const TClient &client, rpc::TContainerResponse &response) {
-
-    google::protobuf::io::FileOutputStream post(client.Fd);
-
-    if (response.IsInitialized()) {
-        if (!WriteDelimitedTo(response, &post))
-            L() << "Write error for " << client.Fd << std:: endl;
-        post.Flush();
-    }
-}
-
-static bool HandleRequest(TContext &context, const TClient &client) {
+static bool HandleRequest(TContext &context, std::shared_ptr<TClient> client) {
     uint32_t slaveReadTimeout = config().daemon().slave_read_timeout_s();
-    InterruptibleInputStream pist(client.Fd);
+    InterruptibleInputStream pist(client->Fd);
 
     rpc::TContainerRequest request;
     rpc::TContainerResponse response;
@@ -230,28 +232,28 @@ static bool HandleRequest(TContext &context, const TClient &client) {
         (void)alarm(0);
 
     if (pist.Interrupted()) {
-        L() << "Interrupted read from " << client.Fd << std:: endl;
+        L() << "Interrupted read from " << client->Fd << std:: endl;
         return true;
     }
 
     if (!haveData)
         return true;
 
-    if (HandleRpcRequest(context, request, response, client.Cred))
+    if (HandleRpcRequest(context, request, response, client))
         SendReply(client, response);
 
     return false;
 }
 
-static int IdentifyClient(int fd, TClient &ci, int total) {
+static int IdentifyClient(int fd, std::shared_ptr<TClient> client, int total) {
     struct ucred cr;
     socklen_t len = sizeof(cr);
 
     if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cr, &len) == 0) {
-        TFile client("/proc/" + std::to_string(cr.pid) + "/comm");
+        TFile f("/proc/" + std::to_string(cr.pid) + "/comm");
         string comm;
 
-        if (client.AsString(comm))
+        if (f.AsString(comm))
             comm = "unknown process";
 
         comm.erase(remove(comm.begin(), comm.end(), '\n'), comm.end());
@@ -261,9 +263,9 @@ static int IdentifyClient(int fd, TClient &ci, int total) {
             << " gid " << cr.gid
             << ") connected (total " << total + 1 << ")" << std::endl;
 
-        ci.Pid = cr.pid;
-        ci.Cred.Uid = cr.uid;
-        ci.Cred.Gid = cr.gid;
+        client->Pid = cr.pid;
+        client->Cred.Uid = cr.uid;
+        client->Cred.Gid = cr.gid;
 
         return 0;
     } else {
@@ -288,13 +290,13 @@ static int AcceptClient(int sfd, std::map<int, std::shared_ptr<TClient>> &client
         return -1;
     }
 
-    auto ci = std::make_shared<TClient>(cfd);
-    int ret = IdentifyClient(cfd, *ci, clients.size());
+    auto client = std::make_shared<TClient>(cfd);
+    int ret = IdentifyClient(cfd, client, clients.size());
     if (ret)
         return ret;
 
     fd = cfd;
-    clients[cfd] = ci;
+    clients[cfd] = client;
     return 0;
 }
 
@@ -422,7 +424,8 @@ static int SlaveRpc(TContext &context) {
         Statistics->SlaveTimeoutMs = timeout;
         int nr = epoll_wait(context.Epfd, ev, MAX_EVENTS, timeout);
         if (nr < 0) {
-            L() << "epoll() error: " << strerror(errno) << std::endl;
+            if (errno != EINTR)
+                L() << "epoll() error: " << strerror(errno) << std::endl;
 
             if (done)
                 break;
@@ -482,11 +485,11 @@ static int SlaveRpc(TContext &context) {
                     break;
                 }
             } else if (clients.find(ev[i].data.fd) != clients.end()) {
-                auto &ci = clients[ev[i].data.fd];
+                auto client = clients[ev[i].data.fd];
                 bool needClose = false;
 
                 if (ev[i].events & EPOLLIN)
-                    needClose = HandleRequest(context, *ci);
+                    needClose = HandleRequest(context, client);
 
                 if ((ev[i].events & EPOLLHUP) || needClose) {
                     RemoveClient(ev[i].data.fd, clients);

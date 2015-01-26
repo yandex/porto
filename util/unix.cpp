@@ -136,6 +136,10 @@ void SetProcessName(const std::string &name) {
     prctl(PR_SET_NAME, (void *)name.c_str());
 }
 
+void SetDieOnParentExit() {
+    prctl(PR_SET_PDEATHSIG, SIGHUP);
+}
+
 std::string GetProcessName() {
     char name[17];
 

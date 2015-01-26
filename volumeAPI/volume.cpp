@@ -41,7 +41,7 @@ std::vector<std::string> TVolumeHolder::List() const {
 TError TVolume::Create() {
     TError ret;
 
-    if (!CheckQuota())
+    if (CheckQuota())
         return TError(EError::InvalidValue, "Volume " + Name + " has invalid quota.");
 
     ret = Holder->Insert(shared_from_this());
