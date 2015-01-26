@@ -186,7 +186,7 @@ string HumanValue(const string &name, const string &val) {
 
 class TRawCmd : public ICmd {
 public:
-    TRawCmd(TPortoAPI *api) : ICmd(api, "raw", 2, "<message>", "send raw protobuf message") {}
+    TRawCmd(TPortoAPI *api) : ICmd(api, "raw", 1, "<message>", "send raw protobuf message") {}
 
     int Execute(int argc, char *argv[]) {
         stringstream msg;
