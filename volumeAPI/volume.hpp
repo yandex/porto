@@ -79,6 +79,7 @@ public:
     TVolumeHolder(std::shared_ptr<TKeyValueStorage> storage) :
         Storage(storage) {}
     TError RestoreFromStorage();
+    void Destroy();
 private:
     std::shared_ptr<TKeyValueStorage> Storage;
     std::map<std::string, std::shared_ptr<TVolume> > Volumes;

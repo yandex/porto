@@ -151,6 +151,19 @@ public:
     void Restore(kv::TNode &node) override {
     }
 
+    TError SetQuota(const TPath &path, uint64_t quota) const {
+        /*
+           struct if_dqblk quota;
+           unsigned project_id = FIXME;
+           quota.dqb_bhardlimit = quota;
+           ret = init_project_quota(path.ToString().c_str());
+           ret = set_project_id(path.ToString().c_str(), project_id);
+           set_project_quota(path.ToString().c_str(), &quota);
+           project_quota_on(path.ToString());
+           */
+        return TError::Success();
+    }
+
     TError Construct() const override {
         TFolder workDir(Volume->GetPath());
         TFolder upperDir(OvlUpper);
@@ -186,17 +199,7 @@ public:
             return error;
         }
 
-        // TODO set project quota:
-        /*
-           struct if_dqblk quota;
-           unsigned project_id = FIXME;
-           quota.dqb_bhardlimit = ParsedQuota;
-           ret = init_project_quota(OvlUpper.ToString().c_str());
-           ret = set_project_id(OvlUpper.ToString().c_str(), project_id);
-           set_project_quota(OvlUpper.ToString().c_str(), &quota);
-           project_quota_on(OvlUpper.ToString());
-           */
-        return TError::Success();
+        return SetQuota(OvlUpper, Volume->GetParsedQuota());
     }
 
     TError Deconstruct() const override {
@@ -454,4 +457,18 @@ TError TVolumeHolder::RestoreFromStorage() {
     }
 
     return TError::Success();
+}
+
+void TVolumeHolder::Destroy() {
+    while (Volumes.begin() != Volumes.end()) {
+        auto name = Volumes.begin()->first;
+        auto volume = Volumes.begin()->second;
+        TError error = volume->Deconstruct();
+        if (error)
+            L_ERR() << "Can't deconstruct volume " << name << ": " << error << std::endl;
+
+        error = volume->Destroy();
+        if (error)
+            L_ERR() << "Can't destroy volume " << name << ": " << error << std::endl;
+    }
 }

@@ -3015,17 +3015,6 @@ static void RemoveTar(const TPath &path) {
     (void)f.Remove();
 }
 
-static void RemoveVolumes(TPortoAPI &api) {
-    std::vector<TVolumeDescription> volumes;
-    volumes.clear();
-    ExpectSuccess(api.ListVolumes(volumes));
-
-    AsRoot(api);
-    for (auto v : volumes)
-        ExpectSuccess(api.DestroyVolume(v.Path));
-    AsNobody(api);
-}
-
 static void CleanupVolume(const std::string &path) {
     TFolder dir(path);
     (void)dir.Remove(true);
@@ -3033,8 +3022,6 @@ static void CleanupVolume(const std::string &path) {
 
 static void TestVolumeHolder(TPortoAPI &api) {
     std::vector<TVolumeDescription> volumes;
-
-    RemoveVolumes(api);
 
     volumes.clear();
     ExpectSuccess(api.ListVolumes(volumes));
@@ -3129,8 +3116,6 @@ static void TestVolumeHolder(TPortoAPI &api) {
 
 static void TestVolumeLoop(TPortoAPI &api) {
     std::vector<TVolumeDescription> volumes;
-
-    RemoveVolumes(api);
 
     volumes.clear();
     ExpectSuccess(api.ListVolumes(volumes));

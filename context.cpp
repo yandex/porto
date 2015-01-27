@@ -77,6 +77,7 @@ TError TContext::Destroy() {
         L_ERR() << "Can't destroy network: " << error << std::endl;
 
     Cholder->DestroyRoot();
+    Vholder->Destroy();
 
     return TError::Success();
 }
