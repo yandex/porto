@@ -154,9 +154,11 @@ TError ReadSignalFd(int fd, std::vector<int> &signals) {
         struct signalfd_siginfo fdsi;
 
         ssize_t s = read(fd, &fdsi, sizeof(struct signalfd_siginfo));
-        if (s != sizeof(struct signalfd_siginfo))
+        if (s != sizeof(struct signalfd_siginfo)) {
             if (errno != EAGAIN)
                 return TError(EError::Unknown, "Eventfd read error", errno);
+            break;
+        }
 
         signals.push_back(fdsi.ssi_signo);
     }
