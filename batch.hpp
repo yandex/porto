@@ -21,6 +21,7 @@ public:
 
         case 0:
             /* Child */
+            CloseAllFds();
             SetDieOnParentExit();
             exit(Task());
             break;

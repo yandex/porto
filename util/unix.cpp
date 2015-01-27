@@ -362,3 +362,53 @@ int64_t GetBootTime() {
 
     return 0;
 }
+
+void CloseAllFds() {
+    for (int i = 1; i < getdtablesize(); i++)
+        close(i);
+}
+
+// TEpollLoop
+
+TError TEpollLoop::Create() {
+    TError error = EpollCreate(EpollFd);
+    if (error)
+        return error;
+
+    error = InitializeSignals(SignalFd, EpollFd);
+    if (error) {
+        close(EpollFd);
+        return error;
+    }
+
+    return TError::Success();
+}
+
+TError TEpollLoop::AddFd(int fd) {
+    return EpollAdd(EpollFd, fd);
+}
+
+TError TEpollLoop::GetEvents(std::vector<int> &signals,
+                             std::vector<struct epoll_event> &events,
+                             int timeout) {
+    signals.clear();
+    events.clear();
+
+    int nr = epoll_wait(EpollFd, Events, MAX_EVENTS, timeout);
+    if (nr < 0) {
+        if (errno != EINTR)
+            return TError(EError::Unknown, "epoll() error: ", errno);
+    }
+
+    for (int i = 0; i < nr; i++) {
+        if (Events[i].data.fd == SignalFd) {
+            TError error = ReadSignalFd(SignalFd, signals);
+            if (error)
+                return error;
+        } else {
+            events.push_back(Events[i]);
+        }
+    }
+
+    return TError::Success();
+}

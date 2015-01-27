@@ -21,8 +21,6 @@ public:
     std::shared_ptr<TContainerHolder> Cholder;
     std::shared_ptr<TVolumeHolder> Vholder;
 
-    int Epfd;
-    int SignalFd;
     std::map<pid_t, posthook_t> Posthooks;
 
     TContext();

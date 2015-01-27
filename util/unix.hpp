@@ -8,6 +8,7 @@
 
 extern "C" {
 #include <signal.h>
+#include <sys/epoll.h>
 }
 
 constexpr int updateSignal = SIGHUP;
@@ -37,6 +38,7 @@ TError SetHostName(const std::string &name);
 bool FdHasEvent(int fd);
 TError DropBoundedCap(int cap);
 TError SetCap(uint64_t effective, uint64_t permitted, uint64_t inheritable);
+void CloseAllFds();
 
 class TScopedFd : public TNonCopyable {
     int Fd;
@@ -53,5 +55,22 @@ TError EpollCreate(int &epfd);
 TError EpollAdd(int &epfd, int fd);
 
 int64_t GetBootTime();
+
+class TEpollLoop : public TNonCopyable {
+public:
+    TError Create();
+
+    TError AddFd(int fd);
+    TError GetEvents(std::vector<int> &signals,
+                     std::vector<struct epoll_event> &events,
+                     int timeout);
+
+private:
+    int EpollFd;
+    int SignalFd;
+
+    static const int MAX_EVENTS = 32;
+    struct epoll_event Events[MAX_EVENTS];
+};
 
 #endif

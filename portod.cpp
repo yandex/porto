@@ -43,8 +43,6 @@ using std::map;
 using std::vector;
 
 static pid_t slavePid;
-static volatile sig_atomic_t done = false;
-static volatile sig_atomic_t update = false;
 static bool stdlog = false;
 static bool failsafe = false;
 static bool noNetwork = false;
@@ -279,52 +277,7 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
     return 0;
 }
 
-static void HandleSignals(int fd, TContext *context) {
-    std::vector<int> signals;
-    ReadSignalFd(fd, signals);
-
-    for (int sig : signals) {
-        switch (sig) {
-        case SIGINT:
-            /* Cleanup and exit */
-            done = true;
-            if (context)
-                context->Destroy();
-        case SIGTERM:
-            /* Exit */
-            RaiseSignal(sig);
-            break;
-        case updateSignal:
-            L() << "Updating" << std::endl;
-            TLogger::CloseLog();
-            RaiseSignal(updateSignal);
-            break;
-        case rotateSignal:
-            DaemonRotateLog();
-            break;
-        case SIGCHLD:
-            if (context) {
-                int status;
-                pid_t pid;
-
-                while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
-                    if (WIFEXITED(status)) {
-                        context->Posthooks[pid](WEXITSTATUS(status));
-                        context->Posthooks.erase(pid);
-                    }
-                }
-            }
-            break;
-        case SIGPIPE:
-        case SIGALRM:
-        default:
-            /* Ignore other signals */
-            break;
-        }
-    }
-}
-
-static int SlaveRpc(TContext &context) {
+static int SlaveRpc(TEpollLoop &loop, TContext &context) {
     int ret = 0;
     int sfd;
     std::map<int, std::shared_ptr<TClient>> clients;
@@ -348,42 +301,81 @@ static int SlaveRpc(TContext &context) {
         return EXIT_FAILURE;
     }
 
-    error = EpollAdd(context.Epfd, sfd);
+    error = loop.AddFd(sfd);
     if (error) {
         L_ERR() << "Can't add RPC server fd to epoll: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
-    error = EpollAdd(context.Epfd, REAP_EVT_FD);
+    error = loop.AddFd(REAP_EVT_FD);
     if (error && !failsafe) {
         L_ERR() << "Can't add master fd to epoll: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
     if (context.NetEvt) {
-        error = EpollAdd(context.Epfd, context.NetEvt->GetFd());
+        error = loop.AddFd(context.NetEvt->GetFd());
         if (error) {
             L_ERR() << "Can't add netlink events fd to epoll: " << error << std::endl;
             return EXIT_FAILURE;
         }
     }
 
-    struct epoll_event ev[MAX_EVENTS];
-    while (!done) {
+    std::vector<int> signals;
+    std::vector<struct epoll_event> events;
+
+    while (true) {
+
         int timeout = context.Queue->GetNextTimeout();
         Statistics->SlaveTimeoutMs = timeout;
-        int nr = epoll_wait(context.Epfd, ev, MAX_EVENTS, timeout);
-        if (nr < 0) {
-            if (errno != EINTR)
-                L() << "epoll() error: " << strerror(errno) << std::endl;
+
+        error = loop.GetEvents(signals, events, timeout);
+        if (error) {
+            L_ERR() << "slave: epoll error " << error << std::endl;
+            return EXIT_FAILURE;
+            // handle error
         }
 
         context.Queue->DeliverEvents(*context.Cholder);
 
-        for (int i = 0; i < nr; i++) {
-            if (ev[i].data.fd == context.SignalFd) {
-                HandleSignals(context.SignalFd, &context);
-            } else if (ev[i].data.fd == sfd) {
+        for (auto s : signals) {
+            switch (s) {
+            case SIGINT:
+                context.Destroy();
+                // no break here
+            case SIGTERM:
+                RaiseSignal(s);
+                break;
+            case updateSignal:
+                L() << "Updating" << std::endl;
+                RaiseSignal(updateSignal);
+                break;
+            case rotateSignal:
+                DaemonRotateLog();
+                break;
+            case SIGCHLD:
+                int status;
+                pid_t pid;
+
+                while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+                    if (WIFEXITED(status)) {
+                        if (context.Posthooks.find(pid) != context.Posthooks.end()) {
+                            context.Posthooks[pid](WEXITSTATUS(status));
+                            context.Posthooks.erase(pid);
+                        } else {
+                            // Log warning
+                        }
+                    }
+                }
+                break;
+            default:
+                /* Ignore other signals */
+                break;
+            }
+        }
+
+        for (auto ev : events) {
+            if (ev.data.fd == sfd) {
                 if (clients.size() > config().daemon().max_clients()) {
                     L() << "Skip connection attempt" << std::endl;
                     continue;
@@ -394,19 +386,17 @@ static int SlaveRpc(TContext &context) {
                 if (ret < 0)
                     break;
 
-                error = EpollAdd(context.Epfd, fd);
+                error = loop.AddFd(fd);
                 if (error) {
                     L_ERR() << "Can't add client fd to epoll: " << error << std::endl;
                     return EXIT_FAILURE;
                 }
-            } else if (ev[i].data.fd == REAP_EVT_FD) {
+            } else if (ev.data.fd == REAP_EVT_FD) {
                 if (failsafe)
                     continue;
 
                 ret = ReapSpawner(REAP_EVT_FD, *context.Cholder);
-                if (done)
-                    break;
-            } else if (context.NetEvt && context.NetEvt->GetFd() == ev[i].data.fd) {
+            } else if (context.NetEvt && context.NetEvt->GetFd() == ev.data.fd) {
                 L() << "Refresh list of available network interfaces" << std::endl;
                 context.NetEvt->FlushEvents();
 
@@ -415,19 +405,19 @@ static int SlaveRpc(TContext &context) {
                     L() << "Can't refresh list of network interfaces: " << error << std::endl;
                     break;
                 }
-            } else if (clients.find(ev[i].data.fd) != clients.end()) {
-                auto client = clients[ev[i].data.fd];
+            } else if (clients.find(ev.data.fd) != clients.end()) {
+                auto client = clients[ev.data.fd];
                 bool needClose = false;
 
-                if (ev[i].events & EPOLLIN)
+                if (ev.events & EPOLLIN)
                     needClose = HandleRequest(context, client);
 
-                if ((ev[i].events & EPOLLHUP) || needClose) {
-                    RemoveClient(ev[i].data.fd, clients);
-                }
+                if ((ev.events & EPOLLHUP) || needClose)
+                    RemoveClient(ev.data.fd, clients);
+
             } else {
                 TEvent e(EEventType::OOM);
-                e.OOM.Fd = ev[i].data.fd;
+                e.OOM.Fd = ev.data.fd;
                 (void)cholder.DeliverEvent(e);
             }
         }
@@ -524,7 +514,10 @@ static int SlaveMain() {
             return EXIT_FAILURE;
         }
 
-        InitializeSignals(context.SignalFd, context.Epfd);
+        TEpollLoop ELoop;
+        error = ELoop.Create();
+        if (error)
+            return error;
 
         bool restored = false;
         {
@@ -561,7 +554,7 @@ static int SlaveMain() {
             }
         }
 
-        ret = SlaveRpc(context);
+        ret = SlaveRpc(ELoop, context);
         L() << "Shutting down..." << std::endl;
 
         RemoveRpcServer(config().rpc_sock().file().path());
@@ -697,7 +690,7 @@ static void RestoreStatuses(map<int, int> &exited) {
     }
 }
 
-static int SpawnSlave(map<int,int> &exited, int SignalFd, int Epfd) {
+static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
     int evtfd[2];
     int ackfd[2];
     int ret = EXIT_FAILURE;
@@ -748,81 +741,92 @@ static int SpawnSlave(map<int,int> &exited, int SignalFd, int Epfd) {
     for (auto &pair : exited)
         DeliverPidStatus(evtfd[1], pair.first, pair.second, exited.size());
 
-    error = EpollAdd(Epfd, evtfd[1]);
+    error = loop.AddFd(evtfd[1]);
     if (error) {
         L_ERR() << "Can't add evtfd[1] to epoll: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
-    error = EpollAdd(Epfd, ackfd[0]);
+    error = loop.AddFd(ackfd[0]);
     if (error) {
         L_ERR() << "Can't add ackfd[0] to epoll: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
-    struct epoll_event ev[MAX_EVENTS];
-    while (!done) {
-        int nr = epoll_wait(Epfd, ev, MAX_EVENTS, 300);
-        if (nr < 0) {
-            if (errno != EINTR)
-                L() << "epoll() error: " << strerror(errno) << std::endl;
+    while (true) {
+        std::vector<int> signals;
+        std::vector<struct epoll_event> events;
+
+        error = loop.GetEvents(signals, events, 10000);
+        if (error) {
+            L_ERR() << "master: epoll error " << error << std::endl;
+            return EXIT_FAILURE;
         }
 
-        if (update) {
-            update = false;
+        for (auto s : signals) {
+            switch (s) {
+            case SIGINT:
+            case SIGTERM:
+                if (kill(slavePid, s) < 0)
+                    L() << "Can't send " << s << " to slave" << std::endl;
 
-            int ret = DaemonSyncConfig(true);
-            if (ret)
-                return ret;
+                L() << "Waiting for slave to exit..." << std::endl;
+                (void)waitpid(slavePid, nullptr, 0);
 
-            L() << "Updating" << std::endl;
+                RaiseSignal(s);
+                break;
+            case updateSignal:
+            {
+                int ret = DaemonSyncConfig(true);
+                if (ret)
+                    return ret;
 
-            const char *stdlogArg = nullptr;
-            if (stdlog)
-                stdlogArg = "--stdlog";
+                L() << "Updating" << std::endl;
 
-            SaveStatuses(exited);
+                const char *stdlogArg = nullptr;
+                if (stdlog)
+                    stdlogArg = "--stdlog";
 
-            if (kill(slavePid, updateSignal) < 0) {
-                L() << "Can't send " << updateSignal << " to slave: " << strerror(errno) << std::endl;
-            } else {
-                if (waitpid(slavePid, NULL, 0) != slavePid)
-                    L() << "Can't wait for slave exit status: " << strerror(errno) << std::endl;
+                SaveStatuses(exited);
+
+                if (kill(slavePid, updateSignal) < 0) {
+                    L() << "Can't send " << updateSignal << " to slave: " << strerror(errno) << std::endl;
+                } else {
+                    if (waitpid(slavePid, NULL, 0) != slavePid)
+                        L() << "Can't wait for slave exit status: " << strerror(errno) << std::endl;
+                }
+                TLogger::CloseLog();
+                close(evtfd[1]);
+                close(ackfd[0]);
+                execlp(program_invocation_name, program_invocation_name, stdlogArg, nullptr);
+                L() << "Can't execlp(" << program_invocation_name << ", " << program_invocation_name << ", NULL)" << strerror(errno) << std::endl;
+                ret = EXIT_FAILURE;
+                break;
             }
-            TLogger::CloseLog();
-            close(evtfd[1]);
-            close(ackfd[0]);
-            execlp(program_invocation_name, program_invocation_name, stdlogArg, nullptr);
-            L() << "Can't execlp(" << program_invocation_name << ", " << program_invocation_name << ", NULL)" << strerror(errno) << std::endl;
-            ret = EXIT_FAILURE;
-            break;
+            case rotateSignal:
+                DaemonRotateLog();
+                break;
+            default:
+                /* Ignore other signals */
+                break;
+            }
         }
 
         std::set<int> acked;
-
-        for (int i = 0; i < nr; i++) {
-            if (ev[i].data.fd == SignalFd) {
-                HandleSignals(SignalFd, nullptr);
-            } else if (ev[i].data.fd == ackfd[0]) {
+        for (auto ev : events) {
+            if (ev.data.fd == ackfd[0]) {
                 ReceiveAcks(ackfd[0], exited, acked);
-            } else if (ev[i].data.fd == evtfd[1]) {
+            } else if (ev.data.fd == evtfd[1]) {
                 int status;
                 if (ReapDead(evtfd[1], exited, slavePid, status, acked)) {
                     L() << "slave exited with " << status << std::endl;
                     ret = EXIT_SUCCESS;
-                    break;
+                    goto exit;
                 }
             } else {
+                L() << "master received unknown epoll event: " << ev.data.fd << std::endl;
             }
         }
-    }
-
-    if (done) {
-        if (kill(slavePid, SIGINT) < 0)
-            L() << "Can't send SIGINT to slave" << std::endl;
-
-        L() << "Waiting for slave to exit..." << std::endl;
-        (void)waitpid(slavePid, nullptr, 0);
     }
 
 exit:
@@ -845,12 +849,8 @@ static int MasterMain() {
     if (ret)
         return ret;
 
-    int Epfd;
-    int SignalFd;
-    TError error = EpollCreate(Epfd);
-    if (error)
-        return error;
-    error = InitializeSignals(SignalFd, Epfd);
+    TEpollLoop ELoop;
+    TError error = ELoop.Create();
     if (error)
         return error;
 
@@ -872,12 +872,12 @@ static int MasterMain() {
     map<int,int> exited;
     RestoreStatuses(exited);
 
-    while (!done) {
+    while (true) {
         size_t started = GetCurrentTimeMs();
         size_t next = started + config().container().respawn_delay_ms();
-        ret = SpawnSlave(exited, SignalFd, Epfd);
+        ret = SpawnSlave(ELoop, exited);
         L() << "Returned " << ret << std::endl;
-        if (!done && next >= GetCurrentTimeMs())
+        if (next >= GetCurrentTimeMs())
             usleep((next - GetCurrentTimeMs()) * 1000);
 
         if (slavePid)

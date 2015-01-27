@@ -53,11 +53,6 @@ TError TContext::Initialize() {
             L() << "Using " << link->GetAlias() << " interface" << std::endl;
     }
 
-    error = EpollCreate(Epfd);
-    if (error)
-        return error;
-    Cholder->Epfd = Epfd;
-
     error = Cholder->CreateRoot();
     if (error) {
         L_ERR() << "Can't create root container: " << error << std::endl;
