@@ -20,6 +20,7 @@ class TMount {
     std::set<std::string> Data;
 
 public:
+    TMount() {}
     TMount(const TPath &source, const TPath &target, const std::string &type, std::set<std::string> data) :
         Source(source), Target(target), Type(type),
         Data(data) {}

@@ -229,7 +229,7 @@ static TError CreateVolume(TContext &context,
                            const rpc::TVolumeCreateRequest &req,
                            rpc::TContainerResponse &rsp,
                            std::shared_ptr<TClient> client) {
-
+                           const TCred &cred) {
     std::shared_ptr<TVolume> volume;
     volume = std::make_shared<TVolume>(context.VolumeStorage, context.Vholder,
                                        StringTrim(req.path()),

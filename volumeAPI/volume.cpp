@@ -1,9 +1,228 @@
+#include <memory>
+
 #include "volume.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/folder.hpp"
 #include "util/unix.hpp"
 #include "config.hpp"
+
+TError TVolumeImpl::Untar(const TPath &what, const TPath &where) const {
+    int status;
+
+    TError error = Run({ "tar", "xf", what.ToString(), "-C", where.ToString() }, status);
+    if (error)
+        return error;
+    if (status)
+        return TError(EError::Unknown, "Can't execute tar " + std::to_string(status));
+
+    return TError::Success();
+}
+
+class TVolumeLoopImpl : public TVolumeImpl {
+    int LoopDev = -1;
+    TPath LoopPath;
+
+public:
+    TVolumeLoopImpl(std::shared_ptr<TVolume> volume) : TVolumeImpl(volume) {}
+
+    TError Create() override {
+        if (Volume->GetParsedQuota() > 0) {
+            if (LoopDev < 0) {
+                TError error = GetLoopDev(LoopDev);
+                if (error)
+                    return error;
+            }
+
+            LoopPath = config().volumes().tmp_dir();
+            LoopPath.AddComponent(std::to_string(LoopDev) + ".img");
+        }
+        return TError::Success();
+    }
+
+    TError Destroy() override {
+        if (LoopDev >= 0) {
+            TError error = PutLoopDev(LoopDev);
+            if (error)
+                return error;
+        }
+        return TError::Success();
+    }
+
+    void Save(kv::TNode &node) override {
+        auto a = node.add_pairs();
+        a = node.add_pairs();
+        a->set_key("loop_dev");
+        a->set_val(std::to_string(LoopDev));
+    }
+
+    void Restore(kv::TNode &node) override {
+        for (int i = 0; i < node.pairs_size(); i++) {
+            auto key = node.pairs(i).key();
+            auto value = node.pairs(i).val();
+
+            if (key == "loop_dev") {
+                TError error = StringToInt(value, LoopDev);
+                if (error)
+                    L_WRN() << "Can't restore loop device number: " << value << std::endl;
+            }
+        }
+
+        TError error = Create();
+        if (error)
+            L_WRN() << "Can't restore loop device number: " << LoopDev << std::endl;
+    }
+
+    TError Construct() const override {
+        TError error;
+        TFile loopFile(LoopPath);
+
+        if (LoopDev >= 0) {
+            error = AllocLoop(LoopPath, Volume->GetParsedQuota());
+            if (error)
+                return error;
+
+            TLoopMount m = TLoopMount(LoopPath, Volume->GetPath(), "ext4", LoopDev);
+            error = m.Mount();
+            if (error) {
+                TFolder dir(Volume->GetPath());
+                TError ret = dir.Remove();
+                if (ret)
+                    L_ERR() << "Can't construct volume: " << ret << std::endl;
+                return error;
+            }
+        }
+
+        error = Untar(Volume->GetSource(), Volume->GetPath());
+        if (error) {
+            (void)Deconstruct();
+            return error;
+        }
+
+        return TError::Success();
+    }
+
+    TError Deconstruct() const override {
+        if (LoopDev >= 0) {
+            TLoopMount m = TLoopMount(LoopPath, Volume->GetPath(), "ext4", LoopDev);
+            TError error = m.Umount();
+            if (error)
+                L_ERR() << "Can't umount volume " << Volume->GetPath() << ": " << error << std::endl;
+
+            TFile img(LoopPath);
+            error = img.Remove();
+            if (error)
+                L_ERR() << "Can't remove volume loop image at " << LoopPath.ToString() << ": " << error << std::endl;
+        } else {
+            TFolder f(Volume->GetPath());
+            TError error = f.Remove(true);
+            if (error)
+                L_ERR() << "Can't deconstruct volume " << Volume->GetPath() << ": " << error << std::endl;
+        }
+
+        return TError::Success();
+    }
+};
+
+class TVolumeNativeImpl : public TVolumeImpl {
+    TPath OvlUpper;
+    TPath OvlLower;
+    TMount OvlMount;
+
+public:
+    TVolumeNativeImpl(std::shared_ptr<TVolume> volume) : TVolumeImpl(volume) {}
+
+    TError Create() override {
+        OvlUpper = config().volumes().tmp_dir();
+        OvlUpper.AddComponent("upper");
+        OvlLower = config().volumes().tmp_dir();
+        OvlLower.AddComponent("lower");
+        OvlMount = TMount("overlayfs", Volume->GetPath(), "overlayfs", {"lowerdir=" + OvlLower.ToString(), "upperdir=" + OvlUpper.ToString() });
+        return TError::Success();
+    }
+
+    TError Destroy() override {
+        return TError::Success();
+    }
+
+    void Save(kv::TNode &node) override {
+    }
+
+    void Restore(kv::TNode &node) override {
+    }
+
+    TError Construct() const override {
+        TFolder workDir(Volume->GetPath());
+        TFolder upperDir(OvlUpper);
+        TFolder lowerDir(OvlLower);
+
+        TError error = upperDir.Create(0755, true);
+        if (error) {
+            (void)Deconstruct();
+            return error;
+        }
+
+        error = lowerDir.Create(0755, true);
+        if (error) {
+            (void)Deconstruct();
+            return error;
+        }
+
+        error = Untar(Volume->GetSource(), OvlLower);
+        if (error) {
+            (void)Deconstruct();
+            return error;
+        }
+
+        error = workDir.Create(0755, true);
+        if (error) {
+            (void)Deconstruct();
+            return error;
+        }
+
+        error = OvlMount.Mount();
+        if (error) {
+            (void)Deconstruct();
+            return error;
+        }
+
+        // TODO set project quota:
+        /*
+           struct if_dqblk quota;
+           unsigned project_id = FIXME;
+           quota.dqb_bhardlimit = ParsedQuota;
+           ret = init_project_quota(OvlUpper.ToString().c_str());
+           ret = set_project_id(OvlUpper.ToString().c_str(), project_id);
+           set_project_quota(OvlUpper.ToString().c_str(), &quota);
+           project_quota_on(OvlUpper.ToString());
+           */
+        return TError::Success();
+    }
+
+    TError Deconstruct() const override {
+        TFolder workDir(Volume->GetPath());
+        TFolder upperDir(OvlUpper);
+        TFolder lowerDir(OvlLower);
+
+        TError error = OvlMount.Umount();
+        if (error)
+            L_ERR() << "Can't deconstruct volume: " << error << std::endl;
+
+        error = workDir.Remove(true);
+        if (error)
+            L_ERR() << "Can't deconstruct volume: " << error << std::endl;
+
+        error = lowerDir.Remove(true);
+        if (error)
+            L_ERR() << "Can't deconstruct volume: " << error << std::endl;
+
+        error = upperDir.Remove(true);
+        if (error)
+            L_ERR() << "Can't deconstruct volume: " << error << std::endl;
+
+        return TError::Success();
+    }
+};
 
 /* TVolumeHolder */
 
@@ -39,6 +258,13 @@ std::vector<std::string> TVolumeHolder::List() const {
 }
 
 /* TVolume */
+
+void TVolume::CreateImpl() {
+    if (config().volumes().native())
+        Impl = std::unique_ptr<TVolumeImpl>(new TVolumeNativeImpl(shared_from_this()));
+    else
+        Impl = std::unique_ptr<TVolumeImpl>(new TVolumeLoopImpl(shared_from_this()));
+}
 
 TError TVolume::Create() {
     TError ret;
@@ -82,22 +308,8 @@ TError TVolume::Create() {
     if (ret)
         goto remove_volume;
 
-    if (ParsedQuota > 0) {
-        if (config().volumes().native()) {
-            OvlUpper = config().volumes().tmp_dir();
-            OvlUpper.AddComponent("upper");
-            OvlLower = config().volumes().tmp_dir();
-            OvlLower.AddComponent("lower");
-            OvlMount = TMount("overlayfs", Path, "overlayfs", {"lowerdir=" + OvlLower.ToString(), "upperdir=" + OvlUpper.ToString() });
-        } else {
-            ret = GetLoopDev(LoopDev);
-            if (ret)
-                goto remove_volume;
-
-            LoopPath = config().volumes().tmp_dir();
-            LoopPath.AddComponent(std::to_string(LoopDev) + ".img");
-        }
-    }
+    CreateImpl();
+    Impl->Create();
 
     ret = SaveToStorage();
     if (ret)
@@ -110,164 +322,12 @@ remove_volume:
     return ret;
 }
 
-TError TVolume::Untar(const TPath &what, const TPath &where) const {
-    int status;
-
-    TError error = Run({ "tar", "xf", what.ToString(), "-C", where.ToString() }, status);
-    if (error)
-        return error;
-    if (status)
-        return TError(EError::Unknown, "Can't execute tar " + std::to_string(status));
-
-    return TError::Success();
-}
-
-TError TVolume::ConstructLoop() const {
-    TError error;
-    TLoopMount m(LoopPath, Path, "ext4", LoopDev);
-    TFile loopFile(LoopPath);
-
-    if (LoopDev >= 0) {
-        error = AllocLoop(LoopPath, ParsedQuota);
-        if (error)
-            return error;
-
-        error = m.Mount();
-        if (error)
-            goto remove_loop;
-    }
-
-    error = Untar(Source, Path);
-    if (error)
-        goto umount_loop;
-
-    return TError::Success();
-
-umount_loop:
-    if (ParsedQuota) {
-        TError ret = m.Umount();
-        if (ret)
-            L_ERR() << "Can't construct volume: " << ret << std::endl;
-
-        ret = loopFile.Remove();
-        if (ret)
-            L_ERR() << "Can't construct volume: " << ret << std::endl;
-    }
-
-remove_loop:
-    TFolder dir(Path);
-    TError ret = dir.Remove();
-    if (ret)
-        L_ERR() << "Can't construct volume: " << ret << std::endl;
-    return error;
-}
-
-TError TVolume::DeconstructLoop() const {
-    if (LoopDev >= 0) {
-        TLoopMount m(LoopPath, Path, "ext4", LoopDev);
-        TError error = m.Umount();
-        if (error)
-            L_ERR() << "Can't umount volume " << Path << ": " << error << std::endl;
-
-        TFile img(LoopPath);
-        error = img.Remove();
-        if (error)
-            L_ERR() << "Can't remove volume loop image at " << LoopPath.ToString() << ": " << error << std::endl;
-    } else {
-        TFolder f(Path);
-        TError error = f.Remove(true);
-        if (error)
-            L_ERR() << "Can't deconstruct volume " << Path << ": " << error << std::endl;
-    }
-
-    return TError::Success();
-}
-
-TError TVolume::ConstructNative() const {
-    TFolder workDir(Path);
-    TFolder upperDir(OvlUpper);
-    TFolder lowerDir(OvlLower);
-
-    TError error = upperDir.Create(0755, true);
-    if (error) {
-        DeconstructNative();
-        return error;
-    }
-
-    error = lowerDir.Create(0755, true);
-    if (error) {
-        DeconstructNative();
-        return error;
-    }
-
-    error = Untar(Source, OvlLower);
-    if (error) {
-        DeconstructNative();
-        return error;
-    }
-
-    error = workDir.Create(0755, true);
-    if (error) {
-        DeconstructNative();
-        return error;
-    }
-
-    error = OvlMount.Mount();
-    if (error) {
-        DeconstructNative();
-        return error;
-    }
-
-    // TODO set project quota:
-    /*
-    struct if_dqblk quota;
-    unsigned project_id = FIXME;
-    quota.dqb_bhardlimit = ParsedQuota;
-    ret = init_project_quota(OvlUpper.ToString().c_str());
-    ret = set_project_id(OvlUpper.ToString().c_str(), project_id);
-    set_project_quota(OvlUpper.ToString().c_str(), &quota);
-    project_quota_on(OvlUpper.ToString());
-    */
-
-    return TError::Success();
-}
-
-TError TVolume::DeconstructNative() const {
-    TFolder workDir(Path);
-    TFolder upperDir(OvlUpper);
-    TFolder lowerDir(OvlLower);
-
-    TError error = OvlMount.Umount();
-    if (error)
-        L_ERR() << "Can't deconstruct volume: " << error << std::endl;
-
-    error = workDir.Remove(true);
-    if (error)
-        L_ERR() << "Can't deconstruct volume: " << error << std::endl;
-
-    error = lowerDir.Remove(true);
-    if (error)
-        L_ERR() << "Can't deconstruct volume: " << error << std::endl;
-
-    error = upperDir.Remove(true);
-    if (error)
-        L_ERR() << "Can't deconstruct volume: " << error << std::endl;
-
-    return TError::Success();
-}
-
 TError TVolume::Construct() const {
-    if (config().volumes().native())
-        return ConstructNative();
-    else
-        return ConstructLoop();
+    return Impl->Construct();
 }
 
 TError TVolume::Deconstruct() const {
-    if (config().volumes().native())
-        return DeconstructNative();
-    else
-        return DeconstructLoop();
+    return Impl->Deconstruct();
 }
 
 TError TVolume::CheckPermission(const TCred &ucred) const {
@@ -283,13 +343,8 @@ TError TVolume::CheckPermission(const TCred &ucred) const {
 TError TVolume::Destroy() {
     Holder->Remove(shared_from_this());
     Storage->RemoveNode(Path);
-    if (!config().volumes().native()) {
-        if (LoopDev >= 0) {
-            TError error = PutLoopDev(LoopDev);
-            if (error)
-                return error;
-        }
-    }
+    Impl->Destroy();
+    Impl = nullptr;
     return TError::Success();
 }
 
@@ -316,9 +371,7 @@ TError TVolume::SaveToStorage() const {
     a->set_key("group");
     a->set_val(Cred.GroupAsString());
 
-    a = node.add_pairs();
-    a->set_key("loop_dev");
-    a->set_val(std::to_string(LoopDev));
+    Impl->Save(node);
 
     return Storage->SaveNode(Path, node);
 }
@@ -346,13 +399,12 @@ TError TVolume::LoadFromStorage() {
             user = value;
         } else if (key == "group") {
             group = value;
-        } else if (key == "loop_dev") {
-            TError error = StringToInt(value, LoopDev);
-            if (error)
-                L_WRN() << "Can't restore loop device number: " << value << std::endl;
         } else
             L_WRN() << "Unknown key in volume storage: " << key << std::endl;
     }
+
+    CreateImpl();
+    Impl->Restore(node);
 
     if (quota.empty())
         return TError(EError::InvalidValue, "Volume " + Path + " info isn't full");

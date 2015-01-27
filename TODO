@@ -1,3 +1,4 @@
+- ? remove volumes from SIGINT
 - nuke volumeAPI dir and move ext4_proj_quota.[hc] into util/
 - kvalue - use id instead of substituting / with +
 - add max_rss support
