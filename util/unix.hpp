@@ -6,6 +6,13 @@
 
 #include "common.hpp"
 
+extern "C" {
+#include <signal.h>
+}
+
+constexpr int updateSignal = SIGHUP;
+constexpr int rotateSignal = SIGUSR1;
+
 int RetryBusy(int times, int timeoMs, std::function<int()> handler);
 int RetryFailed(int times, int timeoMs, std::function<int()> handler);
 int SleepWhile(int timeoMs, std::function<int()> handler);
@@ -14,6 +21,9 @@ size_t GetCurrentTimeMs();
 int RegisterSignal(int signum, void (*handler)(int));
 int RegisterSignal(int signum, void (*handler)(int sig, siginfo_t *si, void *unused));
 void ResetAllSignalHandlers(void);
+void RaiseSignal(int signum);
+TError InitializeSignals(int &SignalFd, int Epfd);
+TError ReadSignalFd(int fd, std::vector<int> &signals);
 size_t GetTotalMemory();
 int CreatePidFile(const std::string &path, const int mode);
 void RemovePidFile(const std::string &path);

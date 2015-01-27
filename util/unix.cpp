@@ -18,6 +18,7 @@ extern "C" {
 #include <linux/capability.h>
 #include <sys/syscall.h>
 #include <sys/epoll.h>
+#include <sys/signalfd.h>
 }
 
 int RetryBusy(int times, int timeoMs, std::function<int()> handler) {
@@ -110,6 +111,57 @@ void ResetAllSignalHandlers(void) {
         return;
 
     (void)sigprocmask(SIG_SETMASK, &mask, NULL);
+}
+
+void RaiseSignal(int signum) {
+    struct sigaction sa = {};
+    sa.sa_handler = SIG_DFL;
+
+    (void)sigaction(SIGTERM, &sa, NULL);
+    (void)sigaction(SIGINT, &sa, NULL);
+    (void)sigaction(updateSignal, &sa, NULL);
+    raise(signum);
+    exit(-signum);
+}
+
+TError InitializeSignals(int &SignalFd, int Epfd) {
+    sigset_t mask;
+    int sigs [] = {SIGPIPE, SIGINT, updateSignal, SIGALRM, SIGTERM, rotateSignal, SIGCHLD};
+
+    if (sigemptyset(&mask) < 0)
+        return TError(EError::Unknown, "Can't initialize signal mask: ", errno);
+
+    for (auto sig: sigs)
+        if (sigaddset(&mask, sig) < 0)
+            return TError(EError::Unknown, "Can't add signal to mask: ", errno);
+
+    if (sigprocmask(SIG_BLOCK, &mask, NULL) < 0)
+        return TError(EError::Unknown, "Can't set signal mask: ", errno);
+
+    SignalFd = signalfd(-1, &mask, SFD_NONBLOCK | SFD_CLOEXEC);
+    if (SignalFd < 0)
+        return TError(EError::Unknown, "Can't create signalfd: ", errno);
+
+    TError error = EpollAdd(Epfd, SignalFd);
+    if (error)
+        return error;
+
+    return TError::Success();
+}
+
+TError ReadSignalFd(int fd, std::vector<int> &signals) {
+    while (true) {
+        struct signalfd_siginfo fdsi;
+
+        ssize_t s = read(fd, &fdsi, sizeof(struct signalfd_siginfo));
+        if (s != sizeof(struct signalfd_siginfo))
+            if (errno != EAGAIN)
+                return TError(EError::Unknown, "Eventfd read error", errno);
+
+        signals.push_back(fdsi.ssi_signo);
+    }
+
+    return TError::Success();
 }
 
 size_t GetTotalMemory() {

@@ -44,99 +44,15 @@ using std::vector;
 
 static pid_t slavePid;
 static volatile sig_atomic_t done = false;
-static volatile sig_atomic_t cleanup = true;
-static volatile sig_atomic_t rotate = false;
 static volatile sig_atomic_t update = false;
-static volatile sig_atomic_t raiseSignum = 0;
 static bool stdlog = false;
 static bool failsafe = false;
 static bool noNetwork = false;
 
-const int updateSignal = SIGHUP;
-const int rotateSignal = SIGUSR1;
 size_t SlaveStarted = 0;
 size_t MasterStarted = 0;
 
-std::map<pid_t, posthook_t> posthooks;
-static void HandleBatchTasks(int signum, siginfo_t *si, void *unused) {
-    int status;
-    pid_t pid;
-
-    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
-        if (WIFEXITED(status))
-            posthooks[pid](WEXITSTATUS(status));
-    }
-}
-
-static void DoExit(int signum) {
-    done = true;
-    cleanup = false;
-    raiseSignum = signum;
-}
-
-static void DoExitAndCleanup(int signum) {
-    done = true;
-    cleanup = true;
-    raiseSignum = signum;
-}
-
-static void DoUpdate(int signum) {
-    update = true;
-}
-
-static void DoRotate(int signum) {
-    rotate = true;
-}
-
-static void DoNothing(int signum) {
-}
-
-static void RaiseSignal(int signum) {
-    struct sigaction sa = {};
-    sa.sa_handler = SIG_DFL;
-
-    (void)sigaction(SIGTERM, &sa, NULL);
-    (void)sigaction(SIGINT, &sa, NULL);
-    (void)sigaction(rotateSignal, &sa, NULL);
-    (void)sigaction(updateSignal, &sa, NULL);
-    raise(signum);
-    exit(-signum);
-}
-
-static void RegisterSignalHandlers() {
-    ResetAllSignalHandlers();
-
-    // we may die while writing into communication pipe
-    (void)RegisterSignal(SIGPIPE, SIG_IGN);
-    // kill all running containers in case of SIGINT (useful for debugging)
-    (void)RegisterSignal(SIGINT, DoExitAndCleanup);
-    (void)RegisterSignal(updateSignal, DoUpdate);
-    (void)RegisterSignal(SIGALRM, DoNothing);
-    // don't stop containers when terminating
-    (void)RegisterSignal(SIGTERM, DoExit);
-    // don't catch SIGQUIT, may be useful to create core dump
-    (void)RegisterSignal(rotateSignal, DoRotate);
-    (void)RegisterSignal(SIGCHLD, HandleBatchTasks);
-}
-
-static void SignalMask(int how) {
-    sigset_t mask;
-    int sigs[] = { SIGALRM };
-
-    if (sigemptyset(&mask) < 0) {
-        L() << "Can't initialize signal mask: " << strerror(errno) << std::endl;
-        return;
-    }
-
-    for (auto sig: sigs)
-        if (sigaddset(&mask, sig) < 0) {
-            L() << "Can't add signal to mask: " << strerror(errno) << std::endl;
-            return;
-        }
-
-    if (sigprocmask(how, &mask, NULL) < 0)
-        L() << "Can't set signal mask: " << strerror(errno) << std::endl;
-}
+constexpr int MAX_EVENTS = 32;
 
 TStatistics *Statistics;
 static void AllocStatistics() {
@@ -190,11 +106,6 @@ static int DaemonPrepare(bool master) {
     L() << "Started " << GIT_TAG << " " << GIT_REVISION << std::endl;
     L() << config().DebugString() << std::endl;
 
-    RegisterSignalHandlers();
-
-    if (master)
-        (void)RegisterSignal(SIGCHLD, DoNothing);
-
     return EXIT_SUCCESS;
 }
 
@@ -224,9 +135,7 @@ static bool HandleRequest(TContext &context, std::shared_ptr<TClient> client) {
     if (slaveReadTimeout)
         (void)alarm(slaveReadTimeout);
 
-    SignalMask(SIG_UNBLOCK);
     bool haveData = ReadDelimitedFrom(&pist, &request);
-    SignalMask(SIG_BLOCK);
 
     if (slaveReadTimeout)
         (void)alarm(0);
@@ -370,13 +279,56 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
     return 0;
 }
 
+static void HandleSignals(int fd, TContext *context) {
+    std::vector<int> signals;
+    ReadSignalFd(fd, signals);
+
+    for (int sig : signals) {
+        switch (sig) {
+        case SIGINT:
+            /* Cleanup and exit */
+            done = true;
+            if (context)
+                context->Destroy();
+        case SIGTERM:
+            /* Exit */
+            RaiseSignal(sig);
+            break;
+        case updateSignal:
+            L() << "Updating" << std::endl;
+            TLogger::CloseLog();
+            RaiseSignal(updateSignal);
+            break;
+        case rotateSignal:
+            DaemonRotateLog();
+            break;
+        case SIGCHLD:
+            if (context) {
+                int status;
+                pid_t pid;
+
+                while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+                    if (WIFEXITED(status)) {
+                        context->Posthooks[pid](WEXITSTATUS(status));
+                        context->Posthooks.erase(pid);
+                    }
+                }
+            }
+            break;
+        case SIGPIPE:
+        case SIGALRM:
+        default:
+            /* Ignore other signals */
+            break;
+        }
+    }
+}
+
 static int SlaveRpc(TContext &context) {
     int ret = 0;
     int sfd;
     std::map<int, std::shared_ptr<TClient>> clients;
     TContainerHolder &cholder = *context.Cholder;
-
-    SignalMask(SIG_BLOCK);
 
     TCred cred(getuid(), getgid());
 
@@ -416,9 +368,7 @@ static int SlaveRpc(TContext &context) {
         }
     }
 
-#define MAX_EVENTS 32
     struct epoll_event ev[MAX_EVENTS];
-
     while (!done) {
         int timeout = context.Queue->GetNextTimeout();
         Statistics->SlaveTimeoutMs = timeout;
@@ -426,33 +376,14 @@ static int SlaveRpc(TContext &context) {
         if (nr < 0) {
             if (errno != EINTR)
                 L() << "epoll() error: " << strerror(errno) << std::endl;
-
-            if (done)
-                break;
-        }
-
-        if (rotate) {
-            rotate = false;
-            DaemonRotateLog();
-            continue;
-        }
-
-        if (update) {
-            update = false;
-
-            L() << "Updating" << std::endl;
-            TLogger::CloseLog();
-
-            done = true;
-            cleanup = false;
-            raiseSignum = updateSignal;
-            continue;
         }
 
         context.Queue->DeliverEvents(*context.Cholder);
 
         for (int i = 0; i < nr; i++) {
-            if (ev[i].data.fd == sfd) {
+            if (ev[i].data.fd == context.SignalFd) {
+                HandleSignals(context.SignalFd, &context);
+            } else if (ev[i].data.fd == sfd) {
                 if (clients.size() > config().daemon().max_clients()) {
                     L() << "Skip connection attempt" << std::endl;
                     continue;
@@ -506,8 +437,6 @@ static int SlaveRpc(TContext &context) {
         close(pair.first);
 
     close(sfd);
-
-    SignalMask(SIG_UNBLOCK);
 
     return ret;
 }
@@ -590,8 +519,12 @@ static int SlaveMain() {
 
         TContext context;
         error = context.Initialize();
-        if (error)
+        if (error) {
+            L_ERR() << "Initialization error: " << error << std::endl;
             return EXIT_FAILURE;
+        }
+
+        InitializeSignals(context.SignalFd, context.Epfd);
 
         bool restored = false;
         {
@@ -632,11 +565,6 @@ static int SlaveMain() {
         L() << "Shutting down..." << std::endl;
 
         RemoveRpcServer(config().rpc_sock().file().path());
-
-        if (!cleanup && raiseSignum)
-            RaiseSignal(raiseSignum);
-
-        context.Destroy();
     } catch (string s) {
         std::cerr << s << std::endl;
         ret = EXIT_FAILURE;
@@ -652,9 +580,6 @@ static int SlaveMain() {
     }
 
     DaemonShutdown(false);
-
-    if (raiseSignum)
-        RaiseSignal(raiseSignum);
 
     return ret;
 }
@@ -772,11 +697,12 @@ static void RestoreStatuses(map<int, int> &exited) {
     }
 }
 
-static int SpawnSlave(map<int,int> &exited) {
+static int SpawnSlave(map<int,int> &exited, int SignalFd, int Epfd) {
     int evtfd[2];
     int ackfd[2];
     int ret = EXIT_FAILURE;
     int flags;
+    TError error;
 
     slavePid = 0;
 
@@ -819,16 +745,27 @@ static int SpawnSlave(map<int,int> &exited) {
     L() << "Spawned slave " << slavePid << std::endl;
     Statistics->Spawned++;
 
-    SignalMask(SIG_BLOCK);
-
     for (auto &pair : exited)
         DeliverPidStatus(evtfd[1], pair.first, pair.second, exited.size());
 
+    error = EpollAdd(Epfd, evtfd[1]);
+    if (error) {
+        L_ERR() << "Can't add evtfd[1] to epoll: " << error << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    error = EpollAdd(Epfd, ackfd[0]);
+    if (error) {
+        L_ERR() << "Can't add ackfd[0] to epoll: " << error << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    struct epoll_event ev[MAX_EVENTS];
     while (!done) {
-        if (rotate) {
-            rotate = false;
-            DaemonRotateLog();
-            continue;
+        int nr = epoll_wait(Epfd, ev, MAX_EVENTS, 300);
+        if (nr < 0) {
+            if (errno != EINTR)
+                L() << "epoll() error: " << strerror(errno) << std::endl;
         }
 
         if (update) {
@@ -862,15 +799,21 @@ static int SpawnSlave(map<int,int> &exited) {
         }
 
         std::set<int> acked;
-        SignalMask(SIG_UNBLOCK);
-        ReceiveAcks(ackfd[0], exited, acked);
-        SignalMask(SIG_BLOCK);
 
-        int status;
-        if (ReapDead(evtfd[1], exited, slavePid, status, acked)) {
-            L() << "slave exited with " << status << std::endl;
-            ret = EXIT_SUCCESS;
-            break;
+        for (int i = 0; i < nr; i++) {
+            if (ev[i].data.fd == SignalFd) {
+                HandleSignals(SignalFd, nullptr);
+            } else if (ev[i].data.fd == ackfd[0]) {
+                ReceiveAcks(ackfd[0], exited, acked);
+            } else if (ev[i].data.fd == evtfd[1]) {
+                int status;
+                if (ReapDead(evtfd[1], exited, slavePid, status, acked)) {
+                    L() << "slave exited with " << status << std::endl;
+                    ret = EXIT_SUCCESS;
+                    break;
+                }
+            } else {
+            }
         }
     }
 
@@ -889,8 +832,6 @@ exit:
     close(ackfd[0]);
     close(ackfd[1]);
 
-    SignalMask(SIG_UNBLOCK);
-
     return ret;
 }
 
@@ -904,6 +845,15 @@ static int MasterMain() {
     if (ret)
         return ret;
 
+    int Epfd;
+    int SignalFd;
+    TError error = EpollCreate(Epfd);
+    if (error)
+        return error;
+    error = InitializeSignals(SignalFd, Epfd);
+    if (error)
+        return error;
+
     if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0) {
         TError error(EError::Unknown, errno, "prctl(PR_SET_CHILD_SUBREAPER,)");
         L_ERR() << "Can't set myself as a subreaper: " << error << std::endl;
@@ -911,7 +861,7 @@ static int MasterMain() {
     }
 
     TMountSnapshot ms;
-    TError error = ms.RemountSlave();
+    error = ms.RemountSlave();
     if (error)
         L_ERR() << "Can't remount shared mountpoints: " << error << std::endl;
 
@@ -919,15 +869,13 @@ static int MasterMain() {
     if (error)
         L_ERR() << "Can't adjust OOM score: " << error << std::endl;
 
-    SignalMask(SIG_UNBLOCK);
-
     map<int,int> exited;
     RestoreStatuses(exited);
 
     while (!done) {
         size_t started = GetCurrentTimeMs();
         size_t next = started + config().container().respawn_delay_ms();
-        ret = SpawnSlave(exited);
+        ret = SpawnSlave(exited, SignalFd, Epfd);
         L() << "Returned " << ret << std::endl;
         if (!done && next >= GetCurrentTimeMs())
             usleep((next - GetCurrentTimeMs()) * 1000);
