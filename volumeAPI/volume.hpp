@@ -50,7 +50,17 @@ private:
     std::string Flags;
 
     int LoopDev = -1;
-    TPath GetLoopPath() const;
+    TPath LoopPath;
+
+    TPath OvlUpper;
+    TPath OvlLower;
+    TMount OvlMount;
+
+    TError ConstructLoop() const;
+    TError DeconstructLoop() const;
+    TError ConstructNative() const;
+    TError DeconstructNative() const;
+    TError Untar(const TPath &what, const TPath &where) const;
 };
 
 class TVolumeHolder : public TNonCopyable, public std::enable_shared_from_this<TVolumeHolder> {
