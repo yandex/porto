@@ -230,13 +230,18 @@ static TError CreateVolume(TContext &context,
                            rpc::TContainerResponse &rsp,
                            std::shared_ptr<TClient> client) {
                            const TCred &cred) {
+    std::shared_ptr<TResource> resource;
+    TError error = context.Vholder->GetResource(StringTrim(req.source()), resource);
+    if (error)
+        return error;
+
     std::shared_ptr<TVolume> volume;
     volume = std::make_shared<TVolume>(context.VolumeStorage, context.Vholder,
                                        StringTrim(req.path()),
-                                       StringTrim(req.source()),
+                                       resource,
                                        StringTrim(req.quota()),
                                        StringTrim(req.flags()), cred);
-    TError error = volume->Create();
+    error = volume->Create();
     if (error)
         return error;
 

@@ -1509,7 +1509,8 @@ static bool ShareMacAddress(const vector<string> &a, const vector<string> &b) {
 
 static string System(const std::string &cmd) {
     Say() << cmd << std::endl;
-    vector<string> lines = Popen(cmd);
+    vector<string> lines;
+    ExpectSuccess(Popen(cmd, lines));
     Expect(lines.size() == 1);
     return StringTrim(lines[0]);
 }
@@ -1540,7 +1541,8 @@ static void TestNetProperty(TPortoAPI &api) {
     string name = "a";
     ExpectSuccess(api.Create(name));
 
-    vector<string> hostLink = Popen("ip -o -d link show");
+    vector<string> hostLink;
+    ExpectSuccess(Popen("ip -o -d link show", hostLink));
 
     string link = links[0]->GetAlias();
 
@@ -1702,9 +1704,13 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectSuccess(api.SetProperty(name, "net", "veth eth0 portobr0"));
     ExpectSuccess(api.SetProperty(name, "command", "bash -c 'sleep 1 && ip -o -d link show'"));
 
-    auto pre = IfHw(Popen("ip -o -d link show"));
+    vector<string> v;
+    ExpectSuccess(Popen("ip -o -d link show", v));
+    auto pre = IfHw(v);
     ExpectSuccess(api.Start(name));
-    auto post = IfHw(Popen("ip -o -d link show"));
+    v.clear();
+    ExpectSuccess(Popen("ip -o -d link show", v));
+    auto post = IfHw(v);
     Expect(pre.size() + 1 == post.size());
     for (auto kv : pre)
         post.erase(kv.first);
@@ -1724,7 +1730,9 @@ static void TestNetProperty(TPortoAPI &api) {
     Expect(linkMap.find("eth0") != linkMap.end());
     ExpectSuccess(api.Stop(name));
 
-    post = IfHw(Popen("ip -o -d link show"));
+    v.clear();
+    ExpectSuccess(Popen("ip -o -d link show", v));
+    post = IfHw(v);
     Expect(post.find(portove) == post.end());
 
     AsRoot(api);
@@ -3132,13 +3140,17 @@ static void TestVolumeLoop(TPortoAPI &api) {
     RemoveTar(tar);
     CreateTar(tar, "/bin");
 
-    auto m = ParseMountinfo(CommaSeparatedList(Popen("cat /proc/self/mountinfo"), ""));
+    vector<string> v;
+    ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
+    auto m = ParseMountinfo(CommaSeparatedList(v, ""));
     Expect(m.find(a) == m.end());
 
     Say() << "Make sure loop device is created when quota specified" << std::endl;
     ExpectSuccess(api.CreateVolume(a, tar, "1g", ""));
 
-    m = ParseMountinfo(CommaSeparatedList(Popen("cat /proc/self/mountinfo"), ""));
+    v.clear();
+    ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
+    m = ParseMountinfo(CommaSeparatedList(v, ""));
     Expect(m.find(a) != m.end());
 
     Say() << "Make sure loop device has correct size" << std::endl;
@@ -3157,7 +3169,9 @@ static void TestVolumeLoop(TPortoAPI &api) {
     Say() << "Make sure no loop device is created without quota" << std::endl;
     ExpectSuccess(api.DestroyVolume(a));
     ExpectSuccess(api.CreateVolume(b, tar, "0", ""));
-    m = ParseMountinfo(CommaSeparatedList(Popen("cat /proc/self/mountinfo"), ""));
+    v.clear();
+    ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
+    m = ParseMountinfo(CommaSeparatedList(v, ""));
     Expect(m.find(b) == m.end());
     Expect(m.find(a) == m.end());
 }

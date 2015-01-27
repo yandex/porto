@@ -68,8 +68,13 @@ void TConfig::LoadDefaults() {
     config().mutable_volumes()->mutable_keyval()->set_size("size=32m");
 
     config().mutable_volumes()->set_tmp_dir("/place/volumes");
+    config().mutable_volumes()->set_resource_dir("/place/volumes/resources");
     // TODO: make sure we pick up correct default here depending on kernel
     // version
+    // TODO:
+    // - /place/porto -> /place/porto/containers
+    // - /place/volumes -> /place/porto/volumes
+    // - /place/volumes/resources -> /place/porto/resources
     config().mutable_volumes()->set_native(false);
 }
 

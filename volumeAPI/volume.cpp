@@ -7,18 +7,6 @@
 #include "util/unix.hpp"
 #include "config.hpp"
 
-TError TVolumeImpl::Untar(const TPath &what, const TPath &where) const {
-    int status;
-
-    TError error = Run({ "tar", "xf", what.ToString(), "-C", where.ToString() }, status);
-    if (error)
-        return error;
-    if (status)
-        return TError(EError::Unknown, "Can't execute tar " + std::to_string(status));
-
-    return TError::Success();
-}
-
 class TVolumeLoopImpl : public TVolumeImpl {
     int LoopDev = -1;
     TPath LoopPath;
@@ -93,7 +81,7 @@ public:
             }
         }
 
-        error = Untar(Volume->GetSource(), Volume->GetPath());
+        error = Volume->GetResource()->Copy(Volume->GetPath());
         if (error) {
             (void)Deconstruct();
             return error;
@@ -181,7 +169,7 @@ public:
             return error;
         }
 
-        error = Untar(Volume->GetSource(), OvlLower);
+        error = Volume->GetResource()->Copy(OvlLower);
         if (error) {
             (void)Deconstruct();
             return error;
@@ -262,23 +250,26 @@ std::vector<std::string> TVolumeHolder::List() const {
 
 /* TVolume */
 
-void TVolume::CreateImpl() {
+TError TVolume::Prepare() {
     if (config().volumes().native())
         Impl = std::unique_ptr<TVolumeImpl>(new TVolumeNativeImpl(shared_from_this()));
     else
         Impl = std::unique_ptr<TVolumeImpl>(new TVolumeLoopImpl(shared_from_this()));
+
+    TError error = Resource->Prepare();
+    if (error)
+        return error;
+
+    return TError::Success();
 }
 
 TError TVolume::Create() {
     TError ret;
-    TPath srcPath(Source), dstPath(Path);
+    TPath dstPath(Path);
     TFolder dir(dstPath);
 
     if (!Path.length() || Path[0] != '/')
         return TError(EError::InvalidValue, "Invalid volume path");
-
-    if (!Source.length() || Source[0] != '/')
-        return TError(EError::InvalidValue, "Invalid volume source");
 
     ret = StringWithUnitToUint64(Quota, ParsedQuota);
     if (ret)
@@ -287,16 +278,6 @@ TError TVolume::Create() {
     ret = Holder->Insert(shared_from_this());
     if (ret)
         return ret;
-
-    if (!srcPath.Exists()) {
-        ret = TError(EError::InvalidValue, "Source doesn't exist");
-        goto remove_volume;
-    }
-
-    if (srcPath.GetType() != EFileType::Regular) {
-        ret = TError(EError::InvalidValue, "Source isn't a regular file");
-        goto remove_volume;
-    }
 
     if (dstPath.Exists()) {
         ret = TError(EError::InvalidValue, "Destination path already exists");
@@ -311,7 +292,9 @@ TError TVolume::Create() {
     if (ret)
         goto remove_volume;
 
-    CreateImpl();
+    ret = Prepare();
+    if (ret)
+        goto remove_volume;
     Impl->Create();
 
     ret = SaveToStorage();
@@ -330,6 +313,9 @@ TError TVolume::Construct() const {
 }
 
 TError TVolume::Deconstruct() const {
+    // TODO: Deconstruct resource if nobody else is using it
+    // do we need some kind of global semaphore to make sure
+    // no new references created in other process???
     return Impl->Deconstruct();
 }
 
@@ -341,6 +327,10 @@ TError TVolume::CheckPermission(const TCred &ucred) const {
         return TError::Success();
 
     return TError(EError::Permission, "Permission error");
+}
+
+const std::string TVolume::GetSource() const {
+    return Resource->GetSource().ToString();
 }
 
 TError TVolume::Destroy() {
@@ -356,7 +346,7 @@ TError TVolume::SaveToStorage() const {
 
     auto a = node.add_pairs();
     a->set_key("source");
-    a->set_val(Source);
+    a->set_val(Resource->GetSource().ToString());
 
     a = node.add_pairs();
     a->set_key("quota");
@@ -406,7 +396,9 @@ TError TVolume::LoadFromStorage() {
             L_WRN() << "Unknown key in volume storage: " << key << std::endl;
     }
 
-    CreateImpl();
+    error = Prepare();
+    if (error)
+        return error;
     Impl->Restore(node);
 
     if (quota.empty())
@@ -417,7 +409,10 @@ TError TVolume::LoadFromStorage() {
         return TError(EError::InvalidValue, "Bad volume " + Path + " credentials: " +
                       user + " " + group);
 
-    Source = source;
+    error = Holder->GetResource(source, Resource);
+    if (error)
+        return error;
+
     Quota = quota;
     Flags = flags;
 
@@ -471,4 +466,105 @@ void TVolumeHolder::Destroy() {
         if (error)
             L_ERR() << "Can't destroy volume " << name << ": " << error << std::endl;
     }
+}
+
+TError TVolumeHolder::GetResource(const TPath &path, std::shared_ptr<TResource> &resource) {
+    if (!path.ToString().length() || path.ToString()[0] != '/')
+        return TError(EError::InvalidValue, "Invalid source");
+
+    TPath srcPath(path);
+    if (!srcPath.Exists())
+        return TError(EError::InvalidValue, "Source doesn't exist");
+
+    if (srcPath.GetType() != EFileType::Regular)
+        return TError(EError::InvalidValue, "Source isn't a regular file");
+
+    resource = nullptr;
+    auto weak = Resources.find(path.ToString());
+    if (weak != Resources.end()) {
+        resource = weak->second.lock();
+        if (resource)
+            Resources.erase(path.ToString());
+    }
+
+    if (!resource) {
+        resource = std::make_shared<TResource>(path);
+        Resources[path.ToString()] = resource;
+    }
+
+    return TError::Success();
+}
+
+TError TResource::Untar(const TPath &what, const TPath &where) const {
+    int status;
+
+    TError error = Run({ "tar", "xf", what.ToString(), "-C", where.ToString() }, status);
+    if (error)
+        return error;
+    if (status)
+        return TError(EError::Unknown, "Can't execute tar " + std::to_string(status));
+
+    return TError::Success();
+}
+
+// TODO: don't call external process to calculate sha256
+static TError Sha256(const std::string &s, std::string &sha) {
+    std::vector<std::string> v;
+    TError error = Popen("echo " + s + " | sha256sum", v);
+    if (error)
+        return error;
+    if (v.size() != 1)
+        return TError(EError::Unknown, "Can't calculate SHA256 for " + s);
+    sha = StringTrim(v[0], "- \t\n");
+    return TError::Success();
+}
+
+TError TResource::Prepare() {
+    Path = config().volumes().resource_dir();
+    std::string sha;
+    TError error = Sha256(Path.ToString(), sha);
+    if (error)
+        return error;
+    Path.AddComponent(sha);
+
+    TFolder dir(Path);
+    if (!dir.Exists())
+        return dir.Create(0755, true);
+
+    return TError::Success();
+}
+
+TError TResource::Copy(const TPath &to) const {
+    TPath p = Path;
+    p.AddComponent(".done");
+
+    if (!p.Exists()) {
+        TError error = Untar(Source, Path);
+        if (error)
+            return error;
+
+        TFile f(p);
+        return f.Touch();
+    }
+
+    // TODO: don't call external process to copy resources
+    int status;
+    TError error = Run({ "cp", "-aT", Path.ToString(), to.ToString() }, status);
+    if (error)
+        return error;
+    if (status)
+        return TError(EError::Unknown, "Can't execute cp " + std::to_string(status));
+
+    return TError::Success();
+}
+
+TError TResource::Destroy() const {
+    TFolder dir(Path);
+    return dir.Remove(true);
+}
+
+TResource::~TResource() {
+    TError error = Destroy();
+    if (error)
+        L_ERR() << "Can't destroy resource " << Source.ToString() << ": " << error << std::endl;
 }

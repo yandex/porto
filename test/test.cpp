@@ -7,6 +7,7 @@
 #include "util/string.hpp"
 #include "util/netlink.hpp"
 #include "util/cred.hpp"
+#include "util/unix.hpp"
 
 using std::string;
 using std::vector;
@@ -49,33 +50,17 @@ int ReadPid(const std::string &path) {
     return pid;
 }
 
-vector<string> Popen(const std::string &cmd) {
-    vector<string> lines;
-    FILE *f = popen(cmd.c_str(), "r");
-    if (f == nullptr)
-        throw std::string("Can't execute ") + cmd;
-
-    char *line = nullptr;
-    size_t n;
-
-    while (getline(&line, &n, f) >= 0) {
-        lines.push_back(line);
-    }
-
-    fclose(f);
-
-    return lines;
-}
-
 int Pgrep(const std::string &name) {
-    vector<string> lines = Popen("pgrep -x " + name);
+    vector<string> lines;
+    ExpectSuccess(Popen("pgrep -x " + name, lines));
     return lines.size();
 }
 
 string GetRlimit(const std::string &pid, const std::string &type, const bool soft) {
     string kind = soft ? "SOFT" : "HARD";
     string cmd = "prlimit --pid " + pid + " --" + type + " -o " + kind + " --noheading";
-    vector<string> lines = Popen(cmd);
+    vector<string> lines;
+    ExpectSuccess(Popen(cmd, lines));
     return StringTrim(lines[0]);
 }
 
@@ -457,7 +442,8 @@ void BootstrapCommand(const std::string &cmd, const std::string &path, bool remo
     if (remove)
         (void)d.Remove(true);
 
-    vector<string> lines = Popen("ldd " + cmd);
+    vector<string> lines;
+    ExpectSuccess(Popen("ldd " + cmd, lines));
 
     for (auto &line : lines) {
         vector<string> tokens;

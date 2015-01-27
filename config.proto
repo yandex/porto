@@ -72,6 +72,7 @@ message TCfg {
 		optional TKeyvalCfg keyval = 1;
 		optional string tmp_dir = 2;
 		optional bool native = 3;
+		optional string resource_dir = 4;
 	}
 
 	optional TNetworkCfg network = 1;

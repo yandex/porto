@@ -19,7 +19,6 @@ namespace test {
     void ExpectReturn(int ret, int exp, int line, const char *func);
 
     int ReadPid(const std::string &path);
-    std::vector<std::string> Popen(const std::string &cmd);
     int Pgrep(const std::string &name);
     std::string GetRlimit(const std::string &pid, const std::string &type, const bool soft);
     void WaitExit(TPortoAPI &api, const std::string &pid);

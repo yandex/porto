@@ -477,3 +477,19 @@ retry:
 
     return TError::Success();
 }
+
+TError Popen(const std::string &cmd, std::vector<std::string> &lines) {
+    FILE *f = popen(cmd.c_str(), "r");
+    if (f == nullptr)
+        return TError(EError::Unknown, errno, "Can't execute " + cmd);
+
+    char *line = nullptr;
+    size_t n;
+
+    while (getline(&line, &n, f) >= 0)
+        lines.push_back(line);
+
+    fclose(f);
+
+    return TError::Success();
+}
