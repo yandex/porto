@@ -75,7 +75,7 @@ void TConfig::LoadDefaults() {
     // - /place/porto -> /place/porto/containers
     // - /place/volumes -> /place/porto/volumes
     // - /place/volumes/resources -> /place/porto/resources
-    config().mutable_volumes()->set_native(false);
+    config().mutable_volumes()->set_native(true);
 }
 
 bool TConfig::LoadFile(const std::string &path, bool silent) {

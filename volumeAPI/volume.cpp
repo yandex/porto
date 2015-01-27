@@ -7,6 +7,8 @@
 #include "util/unix.hpp"
 #include "config.hpp"
 
+// TODO: use correct credentials when creating directories!!!
+
 class TVolumeLoopImpl : public TVolumeImpl {
     int LoopDev = -1;
     TPath LoopPath;
@@ -112,8 +114,21 @@ public:
     }
 };
 
+// TODO: don't call external process to calculate sha256
+static TError Sha256(const std::string &s, std::string &sha) {
+    std::vector<std::string> v;
+    TError error = Popen("echo " + s + " | sha256sum", v);
+    if (error)
+        return error;
+    if (v.size() != 1)
+        return TError(EError::Unknown, "Can't calculate SHA256 for " + s);
+    sha = StringTrim(v[0], "- \t\n");
+    return TError::Success();
+}
+
 class TVolumeNativeImpl : public TVolumeImpl {
     TPath OvlUpper;
+    TPath OvlWork;
     TPath OvlLower;
     TMount OvlMount;
 
@@ -121,11 +136,17 @@ public:
     TVolumeNativeImpl(std::shared_ptr<TVolume> volume) : TVolumeImpl(volume) {}
 
     TError Create() override {
+        std::string id;
+        TError error = Sha256(Volume->GetPath(), id);
+
         OvlUpper = config().volumes().tmp_dir();
+        OvlUpper.AddComponent(id);
         OvlUpper.AddComponent("upper");
-        OvlLower = config().volumes().tmp_dir();
-        OvlLower.AddComponent("lower");
-        OvlMount = TMount("overlayfs", Volume->GetPath(), "overlayfs", {"lowerdir=" + OvlLower.ToString(), "upperdir=" + OvlUpper.ToString() });
+        OvlWork = config().volumes().tmp_dir();
+        OvlWork.AddComponent(id);
+        OvlWork.AddComponent("work");
+        OvlLower = Volume->GetResource()->GetPath();
+        OvlMount = TMount("overlay", Volume->GetPath(), "overlay", {"lowerdir=" + OvlLower.ToString(), "upperdir=" + OvlUpper.ToString(), "workdir=" + OvlWork.ToString() });
         return TError::Success();
     }
 
@@ -153,9 +174,8 @@ public:
     }
 
     TError Construct() const override {
-        TFolder workDir(Volume->GetPath());
         TFolder upperDir(OvlUpper);
-        TFolder lowerDir(OvlLower);
+        TFolder workDir(OvlWork);
 
         TError error = upperDir.Create(0755, true);
         if (error) {
@@ -163,19 +183,13 @@ public:
             return error;
         }
 
-        error = lowerDir.Create(0755, true);
-        if (error) {
-            (void)Deconstruct();
-            return error;
-        }
-
-        error = Volume->GetResource()->Copy(OvlLower);
-        if (error) {
-            (void)Deconstruct();
-            return error;
-        }
-
         error = workDir.Create(0755, true);
+        if (error) {
+            (void)Deconstruct();
+            return error;
+        }
+
+        error = Volume->GetResource()->Create();
         if (error) {
             (void)Deconstruct();
             return error;
@@ -191,9 +205,8 @@ public:
     }
 
     TError Deconstruct() const override {
-        TFolder workDir(Volume->GetPath());
         TFolder upperDir(OvlUpper);
-        TFolder lowerDir(OvlLower);
+        TFolder workDir(OvlWork);
 
         TError error = OvlMount.Umount();
         if (error)
@@ -203,11 +216,12 @@ public:
         if (error)
             L_ERR() << "Can't deconstruct volume: " << error << std::endl;
 
-        error = lowerDir.Remove(true);
+        error = upperDir.Remove(true);
         if (error)
             L_ERR() << "Can't deconstruct volume: " << error << std::endl;
 
-        error = upperDir.Remove(true);
+        TFolder dir(Volume->GetPath());
+        error = dir.Remove(true);
         if (error)
             L_ERR() << "Can't deconstruct volume: " << error << std::endl;
 
@@ -255,6 +269,8 @@ TError TVolume::Prepare() {
         Impl = std::unique_ptr<TVolumeImpl>(new TVolumeNativeImpl(shared_from_this()));
     else
         Impl = std::unique_ptr<TVolumeImpl>(new TVolumeLoopImpl(shared_from_this()));
+
+    PORTO_ASSERT(Resource);
 
     TError error = Resource->Prepare();
     if (error)
@@ -396,6 +412,10 @@ TError TVolume::LoadFromStorage() {
             L_WRN() << "Unknown key in volume storage: " << key << std::endl;
     }
 
+    error = Holder->GetResource(source, Resource);
+    if (error)
+        return error;
+
     error = Prepare();
     if (error)
         return error;
@@ -408,10 +428,6 @@ TError TVolume::LoadFromStorage() {
     if (error)
         return TError(EError::InvalidValue, "Bad volume " + Path + " credentials: " +
                       user + " " + group);
-
-    error = Holder->GetResource(source, Resource);
-    if (error)
-        return error;
 
     Quota = quota;
     Flags = flags;
@@ -483,7 +499,7 @@ TError TVolumeHolder::GetResource(const TPath &path, std::shared_ptr<TResource> 
     auto weak = Resources.find(path.ToString());
     if (weak != Resources.end()) {
         resource = weak->second.lock();
-        if (resource)
+        if (!resource)
             Resources.erase(path.ToString());
     }
 
@@ -507,18 +523,6 @@ TError TResource::Untar(const TPath &what, const TPath &where) const {
     return TError::Success();
 }
 
-// TODO: don't call external process to calculate sha256
-static TError Sha256(const std::string &s, std::string &sha) {
-    std::vector<std::string> v;
-    TError error = Popen("echo " + s + " | sha256sum", v);
-    if (error)
-        return error;
-    if (v.size() != 1)
-        return TError(EError::Unknown, "Can't calculate SHA256 for " + s);
-    sha = StringTrim(v[0], "- \t\n");
-    return TError::Success();
-}
-
 TError TResource::Prepare() {
     Path = config().volumes().resource_dir();
     std::string sha;
@@ -534,7 +538,7 @@ TError TResource::Prepare() {
     return TError::Success();
 }
 
-TError TResource::Copy(const TPath &to) const {
+TError TResource::Create() const {
     TPath p = Path;
     p.AddComponent(".done");
 
@@ -547,9 +551,17 @@ TError TResource::Copy(const TPath &to) const {
         return f.Touch();
     }
 
+    return TError::Success();
+}
+
+TError TResource::Copy(const TPath &to) const {
+    TError error = Create();
+    if (error)
+        return error;
+
     // TODO: don't call external process to copy resources
     int status;
-    TError error = Run({ "cp", "-aT", Path.ToString(), to.ToString() }, status);
+    error = Run({ "cp", "-aT", Path.ToString(), to.ToString() }, status);
     if (error)
         return error;
     if (status)

@@ -79,9 +79,11 @@ public:
     TResource(const TPath &source) : Source(source) {}
     ~TResource();
     TError Prepare();
+    TError Create() const;
     TError Copy(const TPath &to) const;
     TError Destroy() const;
     const TPath &GetSource() { return Source; }
+    const TPath &GetPath() { return Path; }
 };
 
 class TVolumeHolder : public TNonCopyable, public std::enable_shared_from_this<TVolumeHolder> {

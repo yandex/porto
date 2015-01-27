@@ -3025,7 +3025,8 @@ static void RemoveTar(const TPath &path) {
 
 static void CleanupVolume(const std::string &path) {
     TFolder dir(path);
-    (void)dir.Remove(true);
+    if (dir.Exists())
+        ExpectSuccess(dir.Remove(true));
 }
 
 static void TestVolumeHolder(TPortoAPI &api) {
@@ -3122,7 +3123,7 @@ static void TestVolumeHolder(TPortoAPI &api) {
     ExpectFailure(api.CreateVolume(a, "q", "1g", ""), EError::InvalidValue);
 }
 
-static void TestVolumeLoop(TPortoAPI &api) {
+static void TestVolumeImpl(TPortoAPI &api) {
     std::vector<TVolumeDescription> volumes;
 
     volumes.clear();
@@ -3145,35 +3146,53 @@ static void TestVolumeLoop(TPortoAPI &api) {
     auto m = ParseMountinfo(CommaSeparatedList(v, ""));
     Expect(m.find(a) == m.end());
 
-    Say() << "Make sure loop device is created when quota specified" << std::endl;
-    ExpectSuccess(api.CreateVolume(a, tar, "1g", ""));
+    if (config().volumes().native()) {
+        Say() << "Make sure overlayfs mount is created" << std::endl;
 
-    v.clear();
-    ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
-    m = ParseMountinfo(CommaSeparatedList(v, ""));
-    Expect(m.find(a) != m.end());
+        ExpectSuccess(api.CreateVolume(a, tar, "0", ""));
 
-    Say() << "Make sure loop device has correct size" << std::endl;
-    std::string loopDev = m[a].source;
-    AsRoot(api);
-    std::string img = System("losetup " + loopDev + " | sed -e 's/[^(]*(\\([^)]*\\)).*/\\1/'");
-    AsNobody(api);
+        v.clear();
+        ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
+        m = ParseMountinfo(CommaSeparatedList(v, ""));
+        Expect(m.find(a) != m.end());
 
-    TFile loopFile(img);
-    Expect(loopFile.GetSize() == 1 * 1024 * 1024 * 1024);
+        // TODO: test quota when ready
+    } else {
+        Say() << "Make sure loop device is created when quota specified" << std::endl;
 
-    Say() << "Make sure loop device has correct contents" << std::endl;
-    TFile binBash(a + "/bin/bash");
-    Expect(binBash.Exists() == true);
+        ExpectSuccess(api.CreateVolume(a, tar, "1g", ""));
 
-    Say() << "Make sure no loop device is created without quota" << std::endl;
-    ExpectSuccess(api.DestroyVolume(a));
-    ExpectSuccess(api.CreateVolume(b, tar, "0", ""));
-    v.clear();
-    ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
-    m = ParseMountinfo(CommaSeparatedList(v, ""));
-    Expect(m.find(b) == m.end());
-    Expect(m.find(a) == m.end());
+        v.clear();
+        ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
+        m = ParseMountinfo(CommaSeparatedList(v, ""));
+        Expect(m.find(a) != m.end());
+
+        Say() << "Make sure loop device has correct size" << std::endl;
+        std::string loopDev = m[a].source;
+        AsRoot(api);
+        std::string img = System("losetup " + loopDev + " | sed -e 's/[^(]*(\\([^)]*\\)).*/\\1/'");
+        AsNobody(api);
+
+        TFile loopFile(img);
+        Expect(loopFile.GetSize() == 1 * 1024 * 1024 * 1024);
+
+        Say() << "Make sure loop device has correct contents" << std::endl;
+        TFile binBash(a + "/bin/bash");
+        Expect(binBash.Exists() == true);
+
+        Say() << "Make sure no loop device is created without quota" << std::endl;
+        ExpectSuccess(api.DestroyVolume(a));
+        ExpectSuccess(api.CreateVolume(b, tar, "0", ""));
+        v.clear();
+        ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
+        m = ParseMountinfo(CommaSeparatedList(v, ""));
+        Expect(m.find(b) == m.end());
+        Expect(m.find(a) == m.end());
+    }
+
+    Say() << "Make porto recovers volumes with or without quotas" << std::endl;
+    // TODO:
+    // - also make sure porto removes dangling resources after recovery
 }
 
 static void KillPorto(TPortoAPI &api, int sig, int times = 10) {
@@ -3599,7 +3618,7 @@ int SelfTest(string name, int leakNr) {
         { "leaks", TestLeaks },
         { "perf", TestPerf },
         { "vholder", TestVolumeHolder },
-        { "volume_loop", TestVolumeLoop },
+        { "volume_impl", TestVolumeImpl },
 
         { "daemon", TestDaemon },
         { "recovery", TestRecovery },
