@@ -736,12 +736,6 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
     for (auto &pair : exited)
         DeliverPidStatus(evtfd[1], pair.first, pair.second, exited.size());
 
-    error = loop.AddFd(evtfd[1]);
-    if (error) {
-        L_ERR() << "Can't add evtfd[1] to epoll: " << error << std::endl;
-        return EXIT_FAILURE;
-    }
-
     error = loop.AddFd(ackfd[0]);
     if (error) {
         L_ERR() << "Can't add ackfd[0] to epoll: " << error << std::endl;
@@ -811,16 +805,16 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
         for (auto ev : events) {
             if (ev.data.fd == ackfd[0]) {
                 ReceiveAcks(ackfd[0], exited, acked);
-            } else if (ev.data.fd == evtfd[1]) {
-                int status;
-                if (ReapDead(evtfd[1], exited, slavePid, status, acked)) {
-                    L() << "slave exited with " << status << std::endl;
-                    ret = EXIT_SUCCESS;
-                    goto exit;
-                }
             } else {
                 L() << "master received unknown epoll event: " << ev.data.fd << std::endl;
             }
+        }
+
+        int status;
+        if (ReapDead(evtfd[1], exited, slavePid, status, acked)) {
+            L() << "slave exited with " << status << std::endl;
+            ret = EXIT_SUCCESS;
+            goto exit;
         }
     }
 
