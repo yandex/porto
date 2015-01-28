@@ -507,17 +507,17 @@ static int SlaveMain() {
         if (error)
             L_ERR() << "Can't create cgroup snapshot: " << error << std::endl;
 
-        TContext context;
+        TEpollLoop ELoop;
+        error = ELoop.Create();
+        if (error)
+            return error;
+
+        TContext context(&ELoop);
         error = context.Initialize();
         if (error) {
             L_ERR() << "Initialization error: " << error << std::endl;
             return EXIT_FAILURE;
         }
-
-        TEpollLoop ELoop;
-        error = ELoop.Create();
-        if (error)
-            return error;
 
         bool restored = false;
         {

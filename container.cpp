@@ -13,6 +13,7 @@
 #include "event.hpp"
 #include "holder.hpp"
 #include "qdisc.hpp"
+#include "context.hpp"
 #include "util/log.hpp"
 #include "util/file.hpp"
 #include "util/string.hpp"
@@ -392,7 +393,7 @@ TError TContainer::PrepareOomMonitor() {
         return error;
     }
 
-    TError error = EpollAdd(Holder->Epfd, Efd.GetFd());
+    TError error = Holder->Context->EpollLoop->AddFd(Efd.GetFd());
     if (error)
         return error;
 
