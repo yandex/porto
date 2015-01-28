@@ -229,7 +229,6 @@ static TError CreateVolume(TContext &context,
                            const rpc::TVolumeCreateRequest &req,
                            rpc::TContainerResponse &rsp,
                            std::shared_ptr<TClient> client) {
-                           const TCred &cred) {
     std::shared_ptr<TResource> resource;
     TError error = context.Vholder->GetResource(StringTrim(req.source()), resource);
     if (error)
@@ -240,7 +239,7 @@ static TError CreateVolume(TContext &context,
                                        StringTrim(req.path()),
                                        resource,
                                        StringTrim(req.quota()),
-                                       StringTrim(req.flags()), cred);
+                                       StringTrim(req.flags()), client->Cred);
     error = volume->Create();
     if (error)
         return error;
@@ -251,6 +250,7 @@ static TError CreateVolume(TContext &context,
         return error;
     }
 
+#if 0
     std::weak_ptr<TClient> c = client;
     TBatchTask task(
         [] () {
@@ -268,13 +268,16 @@ static TError CreateVolume(TContext &context,
         });
 
     return task.Run(context);
+#else
+    return TError::Success();
+#endif
 }
 
 static TError DestroyVolume(TContext &context,
                             const rpc::TVolumeDestroyRequest &req,
                             rpc::TContainerResponse &rsp,
                             std::shared_ptr<TClient> client) {
-    auto volume = context.Vholder->Get(StringTrim(req.name()));
+    auto volume = context.Vholder->Get(StringTrim(req.path()));
     if (volume) {
         TError error = volume->CheckPermission(client->Cred);
         if (error)
