@@ -393,7 +393,7 @@ TError TContainer::PrepareOomMonitor() {
         return error;
     }
 
-    TError error = Holder->Context->EpollLoop->AddFd(Efd.GetFd());
+    TError error = Holder->EpollLoop->AddFd(Efd.GetFd());
     if (error)
         return error;
 

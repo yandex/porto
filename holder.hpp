@@ -15,7 +15,7 @@ class TContainer;
 class TIdMap;
 class TEventQueue;
 class TEvent;
-class TContext;
+class TEpollLoop;
 
 class TContainerHolder : public std::enable_shared_from_this<TContainerHolder> {
     std::shared_ptr<TNetwork> Net;
@@ -30,13 +30,13 @@ class TContainerHolder : public std::enable_shared_from_this<TContainerHolder> {
 
 public:
     std::shared_ptr<TEventQueue> Queue;
-    TContext *Context;
+    std::shared_ptr<TEpollLoop> EpollLoop;
 
-    TContainerHolder(TContext *context,
+    TContainerHolder(std::shared_ptr<TEpollLoop> epollLoop,
                      std::shared_ptr<TEventQueue> queue,
                      std::shared_ptr<TNetwork> net,
                      std::shared_ptr<TKeyValueStorage> storage) :
-        Net(net), Storage(storage), Queue(queue), Context(context) { }
+        Net(net), Storage(storage), Queue(queue), EpollLoop(epollLoop) { }
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot();
     TError Create(const std::string &name, const TCred &cred);

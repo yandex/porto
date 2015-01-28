@@ -8,9 +8,9 @@ TContext:: TContext() {
     VolumeStorage = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().volumes().keyval().file().path(), "tmpfs", { config().volumes().keyval().size() }));
     Queue = std::make_shared<TEventQueue>();
     Net = std::make_shared<TNetwork>();
-    Cholder = std::make_shared<TContainerHolder>(this, Queue, Net, Storage);
-    Vholder = std::make_shared<TVolumeHolder>(VolumeStorage);
     EpollLoop = std::make_shared<TEpollLoop>();
+    Cholder = std::make_shared<TContainerHolder>(EpollLoop, Queue, Net, Storage);
+    Vholder = std::make_shared<TVolumeHolder>(VolumeStorage);
 }
 
 TError TContext::Initialize() {
