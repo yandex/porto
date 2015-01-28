@@ -56,7 +56,7 @@ netup() {
 }
 
 netdown() {
-	sudo ip link del $DUMMY_ETH
+	sudo ip link del $DUMMY_ETH &> /dev/null
 	# TODO: enable dynamic_ifaces?
 	sudo reload yandex-porto
 }
