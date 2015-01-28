@@ -3156,7 +3156,9 @@ static void TestVolumeImpl(TPortoAPI &api) {
         m = ParseMountinfo(CommaSeparatedList(v, ""));
         Expect(m.find(a) != m.end());
 
-        // TODO: test quota when ready
+        // TODO:
+        // - test quota when ready
+        // - make sure overlayfs upper/lower/work dirs are correct
     } else {
         Say() << "Make sure loop device is created when quota specified" << std::endl;
 
@@ -3191,8 +3193,16 @@ static void TestVolumeImpl(TPortoAPI &api) {
     }
 
     Say() << "Make porto recovers volumes with or without quotas" << std::endl;
+    ExpectSuccess(api.CreateVolume(a, tar, "1g", ""));
+    ExpectSuccess(api.CreateVolume(b, tar, "0", ""));
+
+    //KillPorto(api, SIGKILL);
+
     // TODO:
     // - also make sure porto removes dangling resources after recovery
+
+    ExpectSuccess(api.DestroyVolume(a));
+    ExpectSuccess(api.DestroyVolume(b));
 }
 
 static void KillPorto(TPortoAPI &api, int sig, int times = 10) {
