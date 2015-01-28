@@ -325,7 +325,6 @@ static int SlaveRpc(TContext &context) {
     std::vector<struct epoll_event> events;
 
     while (true) {
-
         int timeout = context.Queue->GetNextTimeout();
         Statistics->SlaveTimeoutMs = timeout;
 
@@ -333,7 +332,6 @@ static int SlaveRpc(TContext &context) {
         if (error) {
             L_ERR() << "slave: epoll error " << error << std::endl;
             return EXIT_FAILURE;
-            // handle error
         }
 
         context.Queue->DeliverEvents(*context.Cholder);
@@ -612,9 +610,9 @@ static void ReceiveAcks(int fd, std::map<int,int> &exited,
                         std::set<int> &acked) {
     int pid;
 
-    while (read(fd, &pid, sizeof(pid)) == sizeof(pid)) {
+    if (read(fd, &pid, sizeof(pid)) == sizeof(pid)) {
         if (pid <= 0)
-            continue;
+            return;
 
         if (exited.find(pid) == exited.end())
             acked.insert(pid);
@@ -689,7 +687,6 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
     int evtfd[2];
     int ackfd[2];
     int ret = EXIT_FAILURE;
-    int flags;
     TError error;
 
     slavePid = 0;
@@ -724,12 +721,6 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
     close(evtfd[0]);
     close(ackfd[1]);
 
-    flags = fcntl(ackfd[0], F_GETFL, 0);
-    if (flags < 0 || fcntl(ackfd[0], F_SETFL, flags & (~O_NONBLOCK)) < 0) {
-        L() << "Can't clear O_NONBLOCK flag from ackfd: " << strerror(errno) << std::endl;
-        return EXIT_FAILURE;
-    }
-
     L() << "Spawned slave " << slavePid << std::endl;
     Statistics->Spawned++;
 
@@ -746,7 +737,7 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
         std::vector<int> signals;
         std::vector<struct epoll_event> events;
 
-        error = loop.GetEvents(signals, events, 10000);
+        error = loop.GetEvents(signals, events, -1);
         if (error) {
             L_ERR() << "master: epoll error " << error << std::endl;
             return EXIT_FAILURE;
