@@ -348,12 +348,16 @@ bool HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
             error = Version(context, rsp);
         else if (req.has_createvolume()) {
             error = CreateVolume(context, req.createvolume(), rsp, client);
+            /*
             if (!error)
                 send_reply = false;
+                */
         } else if (req.has_destroyvolume()) {
             error = DestroyVolume(context, req.destroyvolume(), rsp, client);
+            /*
             if (!error)
                 send_reply = false;
+                */
         } else if (req.has_listvolumes())
             error = ListVolumes(context, rsp);
         else

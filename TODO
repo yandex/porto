@@ -1,3 +1,5 @@
+- fix log
+- fix f*cking capabilities test on newer kernels
 - return last error from TBatchTask
 - nuke volumeAPI dir and move ext4_proj_quota.[hc] into util/
 - kvalue - use id instead of substituting / with +
