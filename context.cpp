@@ -3,17 +3,22 @@
 #include "util/unix.hpp"
 #include "config.hpp"
 
-TContext:: TContext(TEpollLoop *epollLoop) : EpollLoop(epollLoop) {
+TContext:: TContext() {
     Storage = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().keyval().file().path(), "tmpfs", { config().keyval().size() }));
     VolumeStorage = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().volumes().keyval().file().path(), "tmpfs", { config().volumes().keyval().size() }));
     Queue = std::make_shared<TEventQueue>();
     Net = std::make_shared<TNetwork>();
     Cholder = std::make_shared<TContainerHolder>(this, Queue, Net, Storage);
     Vholder = std::make_shared<TVolumeHolder>(VolumeStorage);
+    EpollLoop = std::make_shared<TEpollLoop>();
 }
 
 TError TContext::Initialize() {
     TError error;
+
+    error = EpollLoop->Create();
+    if (error)
+        return error;
 
     // don't fail, try to recover anyway
     error = Storage->MountTmpfs();

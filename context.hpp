@@ -22,11 +22,11 @@ public:
     std::shared_ptr<TNl> NetEvt;
     std::shared_ptr<TContainerHolder> Cholder;
     std::shared_ptr<TVolumeHolder> Vholder;
-    TEpollLoop *EpollLoop;
+    std::shared_ptr<TEpollLoop> EpollLoop;
 
     std::map<pid_t, posthook_t> Posthooks;
 
-    TContext(TEpollLoop *epollLoop);
+    TContext();
     TError Initialize();
     TError Destroy();
 };

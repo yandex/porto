@@ -277,7 +277,7 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
     return 0;
 }
 
-static int SlaveRpc(TEpollLoop &loop, TContext &context) {
+static int SlaveRpc(TContext &context) {
     int ret = 0;
     int sfd;
     std::map<int, std::shared_ptr<TClient>> clients;
@@ -301,20 +301,20 @@ static int SlaveRpc(TEpollLoop &loop, TContext &context) {
         return EXIT_FAILURE;
     }
 
-    error = loop.AddFd(sfd);
+    error = context.EpollLoop->AddFd(sfd);
     if (error) {
         L_ERR() << "Can't add RPC server fd to epoll: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
-    error = loop.AddFd(REAP_EVT_FD);
+    error = context.EpollLoop->AddFd(REAP_EVT_FD);
     if (error && !failsafe) {
         L_ERR() << "Can't add master fd to epoll: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
     if (context.NetEvt) {
-        error = loop.AddFd(context.NetEvt->GetFd());
+        error = context.EpollLoop->AddFd(context.NetEvt->GetFd());
         if (error) {
             L_ERR() << "Can't add netlink events fd to epoll: " << error << std::endl;
             return EXIT_FAILURE;
@@ -329,7 +329,7 @@ static int SlaveRpc(TEpollLoop &loop, TContext &context) {
         int timeout = context.Queue->GetNextTimeout();
         Statistics->SlaveTimeoutMs = timeout;
 
-        error = loop.GetEvents(signals, events, timeout);
+        error = context.EpollLoop->GetEvents(signals, events, timeout);
         if (error) {
             L_ERR() << "slave: epoll error " << error << std::endl;
             return EXIT_FAILURE;
@@ -386,7 +386,7 @@ static int SlaveRpc(TEpollLoop &loop, TContext &context) {
                 if (ret < 0)
                     break;
 
-                error = loop.AddFd(fd);
+                error = context.EpollLoop->AddFd(fd);
                 if (error) {
                     L_ERR() << "Can't add client fd to epoll: " << error << std::endl;
                     return EXIT_FAILURE;
@@ -507,12 +507,7 @@ static int SlaveMain() {
         if (error)
             L_ERR() << "Can't create cgroup snapshot: " << error << std::endl;
 
-        TEpollLoop ELoop;
-        error = ELoop.Create();
-        if (error)
-            return error;
-
-        TContext context(&ELoop);
+        TContext context;
         error = context.Initialize();
         if (error) {
             L_ERR() << "Initialization error: " << error << std::endl;
@@ -554,7 +549,7 @@ static int SlaveMain() {
             }
         }
 
-        ret = SlaveRpc(ELoop, context);
+        ret = SlaveRpc(context);
         L() << "Shutting down..." << std::endl;
 
         RemoveRpcServer(config().rpc_sock().file().path());
