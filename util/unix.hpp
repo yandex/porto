@@ -14,6 +14,11 @@ extern "C" {
 constexpr int updateSignal = SIGHUP;
 constexpr int rotateSignal = SIGUSR1;
 
+static constexpr int HANDLE_SIGNALS[] = {SIGINT, SIGTERM,
+                                         updateSignal, rotateSignal,
+                                         SIGALRM};
+static constexpr int HANDLE_SIGNALS_WAIT[] = {SIGCHLD};
+
 class TPath;
 
 int RetryBusy(int times, int timeoMs, std::function<int()> handler);
@@ -71,8 +76,10 @@ public:
                      int timeout);
 
 private:
+    TError InitializeSignals();
+    bool GetSignals(std::vector<int> &signals);
+
     int EpollFd;
-    int SignalFd;
 
     static const int MAX_EVENTS = 32;
     struct epoll_event Events[MAX_EVENTS];
