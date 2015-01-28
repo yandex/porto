@@ -128,7 +128,7 @@ void RaiseSignal(int signum) {
 }
 
 static volatile sig_atomic_t signal_mask;
-static void MultiHandler(int sig, siginfo_t *si, void *unused) {
+static void MultiHandler(int sig) {
     if (sig < 32) /* Ignore other boring signals */
         signal_mask |= (1 << sig);
 }
@@ -140,12 +140,18 @@ TError TEpollLoop::InitializeSignals() {
         return TError(EError::Unknown, "Can't initialize signal mask: ", errno);
 
     for (auto sig: HANDLE_SIGNALS) {
-        RegisterSignal(sig, MultiHandler);
+        if (RegisterSignal(sig, MultiHandler))
+            return TError(EError::Unknown, "Can't register signal: ", errno);
+    }
+
+    for (auto sig: HANDLE_SIGNALS_WAIT) {
+        if (RegisterSignal(sig, MultiHandler))
+            return TError(EError::Unknown, "Can't register signal: ", errno);
         if (sigaddset(&mask, sig) < 0)
             return TError(EError::Unknown, "Can't add signal to mask: ", errno);
     }
 
-    if (sigprocmask(SIG_SETMASK, &mask, NULL) < 0)
+    if (sigprocmask(SIG_BLOCK, &mask, NULL) < 0)
         return TError(EError::Unknown, "Can't set signal mask: ", errno);
 
     return TError::Success();
@@ -391,21 +397,12 @@ TError TEpollLoop::GetEvents(std::vector<int> &signals,
                              int timeout) {
     events.clear();
 
+    sigset_t mask;
+
+    if (sigemptyset(&mask) < 0)
+        return TError(EError::Unknown, "Can't initialize signal mask: ", errno);
+
     if (!GetSignals(signals)) {
-        sigset_t mask;
-        if (sigemptyset(&mask) < 0)
-            return TError(EError::Unknown, "Can't initialize signal mask: ", errno);
-
-        for (auto sig: HANDLE_SIGNALS) {
-            if (sigaddset(&mask, sig) < 0)
-                return TError(EError::Unknown, "Can't add signal to mask: ", errno);
-        }
-
-        for (auto sig: HANDLE_SIGNALS_WAIT) {
-            if (sigaddset(&mask, sig) < 0)
-                return TError(EError::Unknown, "Can't add signal to mask: ", errno);
-        }
-
         int nr = epoll_pwait(EpollFd, Events, MAX_EVENTS, timeout, &mask);
         if (nr < 0) {
             if (errno != EINTR)
