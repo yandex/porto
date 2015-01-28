@@ -11,6 +11,8 @@
 typedef std::function<int()> task_t;
 typedef std::function<void(int ret)> posthook_t;
 
+class TEpollLoop;
+
 class TContext : public TNonCopyable {
 public:
     std::shared_ptr<TKeyValueStorage> Storage;
@@ -20,6 +22,7 @@ public:
     std::shared_ptr<TNl> NetEvt;
     std::shared_ptr<TContainerHolder> Cholder;
     std::shared_ptr<TVolumeHolder> Vholder;
+    std::shared_ptr<TEpollLoop> EpollLoop;
 
     std::map<pid_t, posthook_t> Posthooks;
 
