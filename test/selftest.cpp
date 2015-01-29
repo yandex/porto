@@ -3023,10 +3023,18 @@ static void RemoveTar(const TPath &path) {
     (void)f.Remove();
 }
 
-static void CleanupVolume(const std::string &path) {
+static void CleanupVolume(TPortoAPI &api, const std::string &path) {
+    AsRoot(api);
+    TMount m(path, path, "", {});
+    (void)m.Umount();
+
     TFolder dir(path);
-    if (dir.Exists())
-        ExpectSuccess(dir.Remove(true));
+    if (dir.Exists()) {
+        TError error = dir.Remove(true);
+        if (error)
+            throw error.GetMsg();
+    }
+    AsNobody(api);
 }
 
 static void TestVolumeHolder(TPortoAPI &api) {
@@ -3041,8 +3049,8 @@ static void TestVolumeHolder(TPortoAPI &api) {
     std::string a = "/tmp/volume_a", b = "/tmp/volume_b";
     std::string tar = "/tmp/porto.tar";
 
-    CleanupVolume(a);
-    CleanupVolume(b);
+    CleanupVolume(api, a);
+    CleanupVolume(api, b);
 
     TPath aPath(a);
     TPath bPath(b);
@@ -3135,8 +3143,8 @@ static void TestVolumeImpl(TPortoAPI &api) {
     std::string a = "/tmp/volume_a", b = "/tmp/volume_b";
     std::string tar = "/tmp/porto.tar";
 
-    CleanupVolume(a);
-    CleanupVolume(b);
+    CleanupVolume(api, a);
+    CleanupVolume(api, b);
 
     RemoveTar(tar);
     CreateTar(tar, "/bin");
@@ -3190,6 +3198,7 @@ static void TestVolumeImpl(TPortoAPI &api) {
         m = ParseMountinfo(CommaSeparatedList(v, ""));
         Expect(m.find(b) == m.end());
         Expect(m.find(a) == m.end());
+        ExpectSuccess(api.DestroyVolume(b));
     }
 
     Say() << "Make porto recovers volumes with or without quotas" << std::endl;
