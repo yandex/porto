@@ -237,8 +237,7 @@ TError TVolumeHolder::Insert(std::shared_ptr<TVolume> volume) {
         return TError::Success();
     }
 
-    return TError(EError::VolumeAlreadyExists, "volume " + volume->GetPath() +
-                  "already exists");
+    return TError(EError::VolumeAlreadyExists, "Volume already exists");
 }
 
 void TVolumeHolder::Remove(std::shared_ptr<TVolume> volume) {
