@@ -16,13 +16,14 @@ public:
         int ret = fork();
         switch (ret) {
         case -1:
-            return TError(EError::Unknown, "");
+            return TError(EError::Unknown, "fork(batch)");
 
         case 0:
             /* Child */
             CloseAllFds();
             SetProcessName("portod-batch");
             SetDieOnParentExit();
+            TLogger::DisableLog();
             exit(Task());
             break;
 
