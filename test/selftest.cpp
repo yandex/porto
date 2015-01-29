@@ -2897,7 +2897,7 @@ static void TestRespawnProperty(TPortoAPI &api) {
     ExpectSuccess(api.Create(name));
     ExpectFailure(api.SetProperty(name, "max_respawns", "true"), EError::InvalidValue);
 
-    ExpectSuccess(api.SetProperty(name, "command", "true"));
+    ExpectSuccess(api.SetProperty(name, "command", "sleep 1"));
 
     ExpectSuccess(api.SetProperty(name, "respawn", "false"));
     ExpectSuccess(api.Start(name));
