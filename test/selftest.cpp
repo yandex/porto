@@ -1542,7 +1542,7 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectSuccess(api.Create(name));
 
     vector<string> hostLink;
-    ExpectSuccess(Popen("ip -o -d link show", hostLink));
+    ExpectSuccess(Popen("ip -o link show", hostLink));
 
     string link = links[0]->GetAlias();
 
@@ -1559,7 +1559,7 @@ static void TestNetProperty(TPortoAPI &api) {
     Say() << "Check net=none" << std::endl;
 
     ExpectSuccess(api.SetProperty(name, "net", "none"));
-    ExpectSuccess(api.SetProperty(name, "command", "ip -o -d link show"));
+    ExpectSuccess(api.SetProperty(name, "command", "ip -o link show"));
     string s = StartWaitAndGetData(api, name, "stdout");
     auto containerLink = StringToVec(s);
     Expect(containerLink.size() == 1);
@@ -1581,7 +1581,7 @@ static void TestNetProperty(TPortoAPI &api) {
     Expect(linkMap.at("lo").up == true);
     ExpectSuccess(api.Stop(name));
 
-    ExpectSuccess(api.SetProperty(name, "command", "ip -o -d link show"));
+    ExpectSuccess(api.SetProperty(name, "command", "ip -o link show"));
 
     Say() << "Check net=host:veth0" << std::endl;
 
@@ -1616,7 +1616,7 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectSuccess(api.Stop(name));
 
     Say() << "Check net=macvlan" << std::endl;
-    ExpectSuccess(api.SetProperty(name, "command", "ip -o -d link show"));
+    ExpectSuccess(api.SetProperty(name, "command", "ip -o link show"));
     ExpectFailure(api.SetProperty(name, "net", "macvlan"), EError::InvalidValue);
     ExpectFailure(api.SetProperty(name, "net", "macvlan invalid " + link), EError::InvalidValue);
     ExpectFailure(api.SetProperty(name, "net", "macvlan " + link), EError::InvalidValue);
@@ -1702,14 +1702,14 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectSuccess(api.Create(name));
     ExpectFailure(api.SetProperty(name, "net", "veth eth0 invalid"), EError::InvalidValue);
     ExpectSuccess(api.SetProperty(name, "net", "veth eth0 portobr0"));
-    ExpectSuccess(api.SetProperty(name, "command", "bash -c 'sleep 1 && ip -o -d link show'"));
+    ExpectSuccess(api.SetProperty(name, "command", "bash -c 'sleep 1 && ip -o link show'"));
 
     vector<string> v;
-    ExpectSuccess(Popen("ip -o -d link show", v));
+    ExpectSuccess(Popen("ip -o link show", v));
     auto pre = IfHw(v);
     ExpectSuccess(api.Start(name));
     v.clear();
-    ExpectSuccess(Popen("ip -o -d link show", v));
+    ExpectSuccess(Popen("ip -o link show", v));
     auto post = IfHw(v);
     Expect(pre.size() + 1 == post.size());
     for (auto kv : pre)
@@ -1731,7 +1731,7 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectSuccess(api.Stop(name));
 
     v.clear();
-    ExpectSuccess(Popen("ip -o -d link show", v));
+    ExpectSuccess(Popen("ip -o link show", v));
     post = IfHw(v);
     Expect(post.find(portove) == post.end());
 
