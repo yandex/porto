@@ -3603,7 +3603,7 @@ static void TestPackage(TPortoAPI &api) {
     WaitPortod(api);
 }
 
-int SelfTest(string name, int leakNr) {
+int SelfTest(std::vector<std::string> name, int leakNr) {
     pair<string, std::function<void(TPortoAPI &)>> tests[] = {
         { "root", TestRoot },
         { "data", TestData },
@@ -3679,7 +3679,8 @@ int SelfTest(string name, int leakNr) {
         Expect(setgroups(1, &portoGid) == 0);
 
         for (auto t : tests) {
-            if (name.length() && name != t.first)
+            if (name.size() &&
+                std::find(name.begin(), name.end(), t.first) == name.end())
                 continue;
 
             std::cerr << ">>> Testing " << t.first << "..." << std::endl;

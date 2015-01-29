@@ -60,7 +60,7 @@ namespace test {
     bool NetworkEnabled();
     void TestDaemon(TPortoAPI &api);
 
-    int SelfTest(std::string name, int leakNr);
+    int SelfTest(std::vector<std::string> name, int leakNr);
     int StressTest(int threads, int iter, bool killPorto);
 
     bool IsCfqActive();
