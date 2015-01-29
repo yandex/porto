@@ -13,7 +13,6 @@ public:
         : Task(task), PostHook(post) {};
 
     TError Run(TContext &context) {
-
         int ret = fork();
         switch (ret) {
         case -1:
@@ -22,6 +21,7 @@ public:
         case 0:
             /* Child */
             CloseAllFds();
+            SetProcessName("portod-batch");
             SetDieOnParentExit();
             exit(Task());
             break;
