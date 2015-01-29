@@ -576,10 +576,10 @@ void TestDaemon(TPortoAPI &api) {
     Say() << "Number of portod-master fds=" << nr << std::endl;
     path = ("/proc/" + std::to_string(pid) + "/fd");
 
-    // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 5(event pipe) 6(ack pipe)
+    // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 4(epoll) 5(event pipe) 6(ack pipe)
     nr = scandir(path.c_str(), &lst, NULL, alphasort);
     PrintFds(path, lst, nr);
-    Expect(nr == 2 + 6);
+    Expect(nr == 2 + 7);
 
     Say() << "Check portod-master queue size" << std::endl;
     std::string v;
