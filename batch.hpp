@@ -2,8 +2,6 @@
 
 #include <map>
 
-#include "util/unix.hpp"
-#include "client.hpp"
 #include "common.hpp"
 #include "context.hpp"
 

@@ -1,9 +1,12 @@
 #include "batch.hpp"
+#include "util/unix.hpp"
+#include "util/log.hpp"
 
 extern "C" {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <unistd.h>
 }
 
 TError TBatchTask::RunSync(TContext &context) {
