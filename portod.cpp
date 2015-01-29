@@ -107,13 +107,16 @@ static int DaemonPrepare(bool master) {
     return EXIT_SUCCESS;
 }
 
-static void DaemonShutdown(bool master) {
+static void DaemonShutdown(bool master, int ret) {
     const auto &pid = master ? config().master_pid() : config().slave_pid();
 
     L() << "Stopped" << std::endl;
 
     TLogger::CloseLog();
     RemovePidFile(pid.path());
+
+    if (ret < 0)
+        RaiseSignal(-ret);
 }
 
 static void RemoveRpcServer(const string &path) {
@@ -277,6 +280,10 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
     return 0;
 }
 
+static inline int EncodeSignal(int sig) {
+    return -sig;
+}
+
 static int SlaveRpc(TContext &context) {
     int ret = 0;
     int sfd;
@@ -331,7 +338,8 @@ static int SlaveRpc(TContext &context) {
         error = context.EpollLoop->GetEvents(signals, events, timeout);
         if (error) {
             L_ERR() << "slave: epoll error " << error << std::endl;
-            return EXIT_FAILURE;
+            ret = EXIT_FAILURE;
+            goto exit;
         }
 
         context.Queue->DeliverEvents(*context.Cholder);
@@ -342,12 +350,12 @@ static int SlaveRpc(TContext &context) {
                 context.Destroy();
                 // no break here
             case SIGTERM:
-                RaiseSignal(s);
-                break;
+                ret = EncodeSignal(s);
+                goto exit;
             case updateSignal:
                 L() << "Updating" << std::endl;
-                RaiseSignal(updateSignal);
-                break;
+                ret = EncodeSignal(s);
+                goto exit;
             case rotateSignal:
                 DaemonRotateLog();
                 break;
@@ -387,7 +395,8 @@ static int SlaveRpc(TContext &context) {
                 error = context.EpollLoop->AddFd(fd);
                 if (error) {
                     L_ERR() << "Can't add client fd to epoll: " << error << std::endl;
-                    return EXIT_FAILURE;
+                    ret = EXIT_FAILURE;
+                    goto exit;
                 }
             } else if (ev.data.fd == REAP_EVT_FD) {
                 if (failsafe)
@@ -421,6 +430,7 @@ static int SlaveRpc(TContext &context) {
         }
     }
 
+exit:
     for (auto pair : clients)
         close(pair.first);
 
@@ -449,9 +459,9 @@ static int TuneLimits() {
 
     int ret = setrlimit(RLIMIT_NOFILE, &rlim);
     if (ret)
-        return ret;
+        return EXIT_FAILURE;
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 static int SlaveMain() {
@@ -499,13 +509,13 @@ static int SlaveMain() {
     if (error)
         L_ERR() << "Can't adjust OOM score: " << error << std::endl;
 
+    TContext context;
     try {
         TCgroupSnapshot cs;
         error = cs.Create();
         if (error)
             L_ERR() << "Can't create cgroup snapshot: " << error << std::endl;
 
-        TContext context;
         error = context.Initialize();
         if (error) {
             L_ERR() << "Initialization error: " << error << std::endl;
@@ -565,7 +575,7 @@ static int SlaveMain() {
         ret = EXIT_FAILURE;
     }
 
-    DaemonShutdown(false);
+    DaemonShutdown(false, ret);
 
     return ret;
 }
@@ -751,10 +761,11 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
                     L() << "Can't send " << s << " to slave" << std::endl;
 
                 L() << "Waiting for slave to exit..." << std::endl;
-                (void)waitpid(slavePid, nullptr, 0);
+                (void)RetryFailed(10, 50,
+                [&]() { return waitpid(slavePid, nullptr, WNOHANG) != slavePid; });
 
-                RaiseSignal(s);
-                break;
+                ret = EncodeSignal(s);
+                goto exit;
             case updateSignal:
             {
                 int ret = DaemonSyncConfig(true);
@@ -862,9 +873,11 @@ static int MasterMain() {
 
         if (slavePid)
             (void)kill(slavePid, SIGKILL);
+        if (ret < 0)
+            break;
     }
 
-    DaemonShutdown(true);
+    DaemonShutdown(true, ret);
 
     return ret;
 }

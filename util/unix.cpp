@@ -117,12 +117,8 @@ void ResetAllSignalHandlers(void) {
 }
 
 void RaiseSignal(int signum) {
-    struct sigaction sa = {};
-    sa.sa_handler = SIG_DFL;
+    ResetAllSignalHandlers();
 
-    (void)sigaction(SIGTERM, &sa, NULL);
-    (void)sigaction(SIGINT, &sa, NULL);
-    (void)sigaction(updateSignal, &sa, NULL);
     raise(signum);
     exit(-signum);
 }
