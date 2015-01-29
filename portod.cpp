@@ -368,6 +368,14 @@ static int SlaveRpc(TContext &context) {
                         if (context.Posthooks.find(pid) != context.Posthooks.end()) {
                             context.Posthooks[pid](WEXITSTATUS(status));
                             context.Posthooks.erase(pid);
+
+                            int fd = context.Errors[pid];
+                            TError error = TError::Deserialize(fd);
+                            close(fd);
+                            if (error)
+                                L_ERR() << "Batch task " << pid << " returned: " << error << std::endl;
+
+                            context.Errors.erase(pid);
                         } else {
                             // Log warning
                         }

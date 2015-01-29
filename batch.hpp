@@ -12,28 +12,7 @@ public:
     TBatchTask(task_t task, posthook_t post)
         : Task(task), PostHook(post) {};
 
-    TError Run(TContext &context) {
-        int ret = fork();
-        switch (ret) {
-        case -1:
-            return TError(EError::Unknown, "fork(batch)");
-
-        case 0:
-            /* Child */
-            CloseAllFds();
-            SetProcessName("portod-batch");
-            SetDieOnParentExit();
-            TLogger::DisableLog();
-            exit(Task());
-            break;
-
-        default:
-            /* Parent */
-            context.Posthooks[ret] = PostHook;
-        }
-
-        return TError::Success();
-    }
+    TError Run(TContext &context);
 
 private:
     task_t Task;

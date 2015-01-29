@@ -257,8 +257,7 @@ static TError CreateVolume(TContext &context,
             std::cout << "start task" << std::endl;
             sleep(5);
             std::cout << "stop task" << std::endl;
-            return 0;
-
+            return TError::Success();
         }, [c] (int ret) {
             std::cout << "start hook" << std::endl;
             rpc::TContainerResponse response;
