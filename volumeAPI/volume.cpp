@@ -570,12 +570,15 @@ TError TResource::Copy(const TPath &to) const {
 }
 
 TError TResource::Destroy() const {
-    TFolder dir(Path);
-    return dir.Remove(true);
+    if (Path.Exists()) {
+        TFolder dir(Path);
+        return dir.Remove(true);
+    }
+    return TError::Success();
 }
 
 TResource::~TResource() {
     TError error = Destroy();
     if (error)
-        L_ERR() << "Can't destroy resource " << Source.ToString() << ": " << error << std::endl;
+        L_ERR() << "Can't destroy resource " << Source.ToString() << " at " << Path.ToString() << ": " << error << std::endl;
 }
