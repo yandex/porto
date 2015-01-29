@@ -1,6 +1,4 @@
-- fix log in batch task
 - fix f*cking capabilities test on newer kernels
-- return last error from TBatchTask
 - nuke volumeAPI dir and move ext4_proj_quota.[hc] into util/
 - kvalue - use id instead of substituting / with +
 - add max_rss support
@@ -15,6 +13,13 @@
 - ? create cgroup for portod/portod-slave
 - ? do periodic persistence checks
 - ? use chrt instead of cpu.smart so we don't depend on smart kernels + set rt prio
+
+# volume api
+- add sync mode in which we run batch tasks on the main thread (for debugging)
+- use correct credentials when creating directories!!!
+- don't call external process to copy resources
+- don't call external process to calculate sha256
+- do we need some kind of global semaphore to make sure no new references created in other process while we deconstructing volume
 
 # properties
 - ? supplementary_groups

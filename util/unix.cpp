@@ -178,7 +178,7 @@ void SetProcessName(const std::string &name) {
 }
 
 void SetDieOnParentExit() {
-    prctl(PR_SET_PDEATHSIG, SIGHUP);
+    (void)prctl(PR_SET_PDEATHSIG, SIGTERM, 0, 0, 0);
 }
 
 std::string GetProcessName() {
@@ -470,7 +470,7 @@ retry:
             return TError(EError::Unknown, errno, "waitpid(" + std::to_string(pid) + ")");
         }
     } else {
-        (void)prctl(PR_SET_PDEATHSIG, SIGTERM, 0, 0, 0);
+        SetDieOnParentExit();
 
         char **p = (char **)malloc(sizeof(*p) * command.size() + 1);
         for (size_t i = 0; i < command.size(); i++)

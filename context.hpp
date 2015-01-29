@@ -9,7 +9,7 @@
 #include "config.hpp"
 
 typedef std::function<TError()> task_t;
-typedef std::function<void(int ret)> posthook_t;
+typedef std::function<void(TError error)> posthook_t;
 
 class TEpollLoop;
 
@@ -25,7 +25,7 @@ public:
     std::shared_ptr<TEpollLoop> EpollLoop;
 
     std::map<pid_t, posthook_t> Posthooks;
-    std::map<pid_t, int> Errors;
+    std::map<pid_t, int> PosthooksError;
 
     TContext();
     TError Initialize();

@@ -7,8 +7,6 @@
 #include "util/unix.hpp"
 #include "config.hpp"
 
-// TODO: use correct credentials when creating directories!!!
-
 class TVolumeLoopImpl : public TVolumeImpl {
     int LoopDev = -1;
     TPath LoopPath;
@@ -76,9 +74,7 @@ public:
             error = m.Mount();
             if (error) {
                 TFolder dir(Volume->GetPath());
-                TError ret = dir.Remove();
-                if (ret)
-                    L_ERR() << "Can't construct volume: " << ret << std::endl;
+                (void)dir.Remove();
                 return error;
             }
         }
@@ -96,25 +92,25 @@ public:
         if (LoopDev >= 0) {
             TLoopMount m = TLoopMount(LoopPath, Volume->GetPath(), "ext4", LoopDev);
             TError error = m.Umount();
-            if (error)
-                L_ERR() << "Can't umount volume " << Volume->GetPath() << ": " << error << std::endl;
+            TError firstError;
+            if (error && !firstError)
+                firstError = error;
 
             TFile img(LoopPath);
             error = img.Remove();
-            if (error)
-                L_ERR() << "Can't remove volume loop image at " << LoopPath.ToString() << ": " << error << std::endl;
+            if (error && !firstError)
+                firstError = error;
         } else {
             TFolder f(Volume->GetPath());
             TError error = f.Remove(true);
             if (error)
-                L_ERR() << "Can't deconstruct volume " << Volume->GetPath() << ": " << error << std::endl;
+                return error;
         }
 
         return TError::Success();
     }
 };
 
-// TODO: don't call external process to calculate sha256
 static TError Sha256(const std::string &s, std::string &sha) {
     std::vector<std::string> v;
     TError error = Popen("echo " + s + " | sha256sum", v);
@@ -328,9 +324,6 @@ TError TVolume::Construct() const {
 }
 
 TError TVolume::Deconstruct() const {
-    // TODO: Deconstruct resource if nobody else is using it
-    // do we need some kind of global semaphore to make sure
-    // no new references created in other process???
     return Impl->Deconstruct();
 }
 
@@ -558,7 +551,6 @@ TError TResource::Copy(const TPath &to) const {
     if (error)
         return error;
 
-    // TODO: don't call external process to copy resources
     int status;
     error = Run({ "cp", "-aT", Path.ToString(), to.ToString() }, status);
     if (error)

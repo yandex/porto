@@ -244,32 +244,24 @@ static TError CreateVolume(TContext &context,
     if (error)
         return error;
 
-    error = volume->Construct();
-    if (error) {
-        (void)volume->Destroy();
-        return error;
-    }
-
-#if 0
     std::weak_ptr<TClient> c = client;
     TBatchTask task(
-        [] () {
-            std::cout << "start task" << std::endl;
-            sleep(5);
-            std::cout << "stop task" << std::endl;
-            return TError::Success();
-        }, [c] (int ret) {
-            std::cout << "start hook" << std::endl;
+        [volume] () {
+            // TODO: mark volume as CONSTRUCTION IN-PROGRESS
+            return volume->Construct();
+        },
+        [volume, c] (TError error) {
+            if (error) {
+                L() << "Can't construct volume: " << error << std::endl;
+                (void)volume->Destroy();
+            }
+
             rpc::TContainerResponse response;
-            response.set_error(EError::Success);
+            response.set_error(error.GetError());
             SendReply(c.lock(), response);
-            std::cout << "stop hook" << std::endl;
         });
 
     return task.Run(context);
-#else
-    return TError::Success();
-#endif
 }
 
 static TError DestroyVolume(TContext &context,
@@ -282,11 +274,28 @@ static TError DestroyVolume(TContext &context,
         if (error)
             return error;
 
-        error = volume->Deconstruct();
-        if (error)
-            return error;
+        std::weak_ptr<TClient> c = client;
+        TBatchTask task(
+            [volume] () {
+                // TODO: mark volume as DECONSTRUCTION IN-PROGRESS
+                TError error = volume->Deconstruct();
+                if (error)
+                    return error;
+            },
+            [volume, c] (TError error) {
+                if (error) {
+                    L() << "Can't construct volume: " << error << std::endl;
+                    (void)volume->Destroy();
+                }
 
-        return volume->Destroy();
+                error = volume->Destroy();
+
+                rpc::TContainerResponse response;
+                response.set_error(error.GetError());
+                SendReply(c.lock(), response);
+            });
+
+        return task.Run(context);
     }
 
     return TError(EError::VolumeDoesNotExist, "Volume doesn't exist");
@@ -297,6 +306,7 @@ static TError ListVolumes(TContext &context,
     for (auto path : context.Vholder->List()) {
         auto desc = rsp.mutable_volumelist()->add_list();
         auto vol = context.Vholder->Get(path);
+        // TODO: EXCLUDE CONSTRUCTION IN-PROGRESS
         desc->set_path(vol->GetPath());
         desc->set_source(vol->GetSource());
         desc->set_quota(vol->GetQuota());
@@ -347,16 +357,12 @@ bool HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
             error = Version(context, rsp);
         else if (req.has_createvolume()) {
             error = CreateVolume(context, req.createvolume(), rsp, client);
-            /*
             if (!error)
                 send_reply = false;
-                */
         } else if (req.has_destroyvolume()) {
             error = DestroyVolume(context, req.destroyvolume(), rsp, client);
-            /*
             if (!error)
                 send_reply = false;
-                */
         } else if (req.has_listvolumes())
             error = ListVolumes(context, rsp);
         else

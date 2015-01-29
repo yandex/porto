@@ -366,19 +366,15 @@ static int SlaveRpc(TContext &context) {
                 while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
                     if (WIFEXITED(status)) {
                         if (context.Posthooks.find(pid) != context.Posthooks.end()) {
-                            context.Posthooks[pid](WEXITSTATUS(status));
-                            context.Posthooks.erase(pid);
-
-                            int fd = context.Errors[pid];
+                            int fd = context.PosthooksError.at(pid);
                             TError error = TError::Deserialize(fd);
                             close(fd);
-                            if (error)
-                                L_ERR() << "Batch task " << pid << " returned: " << error << std::endl;
-
-                            context.Errors.erase(pid);
-                        } else {
-                            // Log warning
+                            context.Posthooks[pid](error);
+                            context.Posthooks.erase(pid);
+                            context.PosthooksError.erase(pid);
                         }
+                    } else {
+                        L_ERR() << "Batch task died on signal " << WTERMSIG(status) << std::endl;
                     }
                 }
                 break;

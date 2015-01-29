@@ -30,8 +30,8 @@ TError TBatchTask::Run(TContext &context) {
     } else {
         close(pfd[1]);
         /* Parent */
-        context.Posthooks[ret] = PostHook;
-        context.Errors[ret] = pfd[0];
+        context.Posthooks[pid] = PostHook;
+        context.PosthooksError[pid] = pfd[0];
     }
 
     return TError::Success();
