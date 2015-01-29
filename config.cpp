@@ -50,6 +50,7 @@ void TConfig::LoadDefaults() {
     config().mutable_daemon()->mutable_pidmap()->set_path("/tmp/portod.pidmap");
     config().mutable_daemon()->set_rotate_logs_timeout_s(60);
     config().mutable_daemon()->set_sysfs_root("/sys/fs/cgroup");
+    config().mutable_daemon()->set_sync_batch(false);
 
     config().mutable_container()->set_max_log_size(10 * 1024 * 1024);
     config().mutable_container()->set_tmp_dir("/place/porto");

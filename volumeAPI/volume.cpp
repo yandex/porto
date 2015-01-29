@@ -454,6 +454,7 @@ TError TVolumeHolder::RestoreFromStorage() {
         if (error) {
             Storage->RemoveNode(i);
             L_WRN() << "Corrupted volume " << i << " removed. " << error << std::endl;
+            continue;
         }
 
         L() << "Volume " << v->GetPath() << " restored." << std::endl;

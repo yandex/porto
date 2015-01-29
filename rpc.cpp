@@ -278,9 +278,7 @@ static TError DestroyVolume(TContext &context,
         TBatchTask task(
             [volume] () {
                 // TODO: mark volume as DECONSTRUCTION IN-PROGRESS
-                TError error = volume->Deconstruct();
-                if (error)
-                    return error;
+                return volume->Deconstruct();
             },
             [volume, c] (TError error) {
                 if (error) {
@@ -381,11 +379,11 @@ bool HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
         error = TError(EError::Unknown, "unknown error");
     }
 
-    rsp.set_error(error.GetError());
-    rsp.set_errormsg(error.GetMsg());
-
-    if (send_reply)
+    if (send_reply) {
+        rsp.set_error(error.GetError());
+        rsp.set_errormsg(error.GetMsg());
         TLogger::LogResponse(rsp.ShortDebugString());
+    }
 
     return send_reply;
 }

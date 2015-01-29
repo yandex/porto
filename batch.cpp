@@ -6,7 +6,22 @@ extern "C" {
 #include <fcntl.h>
 }
 
+TError TBatchTask::RunSync(TContext &context) {
+    TError error = Task();
+    if (error)
+        L_ERR() << "Batch task returned: " << error << std::endl;
+    PostHook(error);
+    return error;
+}
+
 TError TBatchTask::Run(TContext &context) {
+    if (config().daemon().sync_batch())
+        return RunSync(context);
+    else
+        return RunAsync(context);
+}
+
+TError TBatchTask::RunAsync(TContext &context) {
     int pfd[2];
     int ret = pipe2(pfd, O_CLOEXEC);
     if (ret)

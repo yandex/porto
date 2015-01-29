@@ -29,7 +29,7 @@ end script
 post-stop script
 	# make sure we remove any daemon state leftovers when something
 	# goes wrong
-	rm -rf /run/porto/kvs /tmp/portod.pidmap
+	rm -rf /run/porto/pkvs /run/porto/kvs /tmp/portod.pidmap
 end script
 
 exec portod &

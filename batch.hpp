@@ -17,4 +17,7 @@ public:
 private:
     task_t Task;
     posthook_t PostHook;
+
+    TError RunSync(TContext &context);
+    TError RunAsync(TContext &context);
 };

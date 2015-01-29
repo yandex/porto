@@ -45,6 +45,7 @@ message TCfg {
 		optional TFileCfg pidmap = 6;
 		optional uint64 rotate_logs_timeout_s = 7;
 		optional string sysfs_root = 8;
+		optional bool sync_batch = 9;
 	}
 
 	message TContainerCfg {
