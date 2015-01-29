@@ -421,19 +421,27 @@ TError TEpollLoop::GetEvents(std::vector<int> &signals,
 TError AllocLoop(const TPath &path, size_t size) {
     TError error;
     TScopedFd fd;
+    uint8_t ch = 0;
+    int status;
+
     fd = open(path.ToString().c_str(), O_WRONLY | O_CREAT, 0755);
     if (fd.GetFd() < 0)
         return TError(EError::Unknown, errno, "open(" + path.ToString() + ")");
 
-    int ret = fallocate(fd.GetFd(), 0, 0, size);
-    if (ret) {
-        error = TError(EError::Unknown, errno, "fallocate(" + path.ToString() + ")");
+    int ret = lseek(fd.GetFd(), size - 1, SEEK_SET);
+    if (ret < 0) {
+        error = TError(EError::Unknown, errno, "lseek(" + path.ToString() + ")");
+        goto remove_file;
+    }
+
+    ret = write(fd.GetFd(), &ch, sizeof(ch));
+    if (ret < 0) {
+        error = TError(EError::Unknown, errno, "write(" + path.ToString() + ")");
         goto remove_file;
     }
 
     fd = -1;
 
-    int status;
     error = Run({ "mkfs.ext4", "-F", "-F", path.ToString() }, status);
     if (error)
         goto remove_file;
