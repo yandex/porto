@@ -35,6 +35,9 @@ public:
         os << err.GetErrorName() << " (" << err.GetMsg() << ")";
         return os;
     }
+
+    TError Serialize(int fd) const;
+    static TError Deserialize(int fd);
 };
 
 #endif

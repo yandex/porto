@@ -115,7 +115,6 @@ class TTask: public TNonCopyable {
     int CloseAllFds(int except) const;
     void Syslog(const std::string &s) const;
     void ReportPid(int pid) const;
-    void Abort(int result, const std::string &msg) const;
 
     TError RotateFile(const TPath &path) const;
     TError CreateCwd();
@@ -157,7 +156,7 @@ public:
     TError Restore(int pid);
     TError FixCgroups() const;
     TError Rotate() const;
-    void Abort(const TError &error, const std::string &msg = "") const;
+    void Abort(const TError &error) const;
 };
 
 TError TaskGetLastCap();

@@ -104,22 +104,11 @@ void TTask::ReportPid(int pid) const {
     }
 }
 
-void TTask::Abort(int result, const string &msg) const {
-    if (write(Wfd, &result, sizeof(result)) != sizeof(result)) {
-        Syslog("partial write of result: " + std::to_string(result));
-    } else {
-        if (write(Wfd, msg.data(), msg.length()) != (ssize_t)msg.length())
-            Syslog("partial write of message: " + msg);
-    }
-
+void TTask::Abort(const TError &error) const {
+    TError ret = error.Serialize(Wfd);
+    if (ret)
+        Syslog(ret.GetMsg());
     exit(EXIT_FAILURE);
-}
-
-void TTask::Abort(const TError &error, const std::string &msg) const {
-    if (msg == "")
-        Abort(error.GetErrno(), error.GetMsg());
-    else
-        Abort(error.GetErrno(), msg);
 }
 
 static int ChildFn(void *arg) {
@@ -857,28 +846,17 @@ TError TTask::Start() {
         return error;
     }
 
-    n = read(Rfd, &ret, sizeof(ret));
-    char buf[1024];
-    string msg;
-    ssize_t len = read(Rfd, buf, sizeof(buf));
-    if (len > 0)
-        msg = string(buf, len);
+    error = TError::Deserialize(Rfd);
     close(Rfd);
-
-    if (n < 0) {
-        Pid = 0;
-        TError error(EError::Unknown, errno, "read(Rfd)");
-        L_ERR() << "Can't read result from the child: " << error << std::endl;
-        return error;
-    } else if (n == 0) {
-        State = Started;
-        return TError::Success();
-    } else {
+    if (error) {
         Pid = 0;
         ExitStatus = -1;
 
-        return TError(EError::Unknown, msg, ret);
+        return error;
     }
+
+    State = Started;
+    return TError::Success();
 }
 
 int TTask::GetPid() const {
