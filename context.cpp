@@ -77,6 +77,10 @@ TError TContext::Destroy() {
     if (error)
         L_ERR() << "Can't destroy key-value storage: " << error << std::endl;
 
+    error = VolumeStorage->Destroy();
+    if (error)
+        L_ERR() << "Can't destroy volume key-value storage: " << error << std::endl;
+
     error = Net->Destroy();
     if (error)
         L_ERR() << "Can't destroy network: " << error << std::endl;
