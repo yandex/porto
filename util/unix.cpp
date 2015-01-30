@@ -22,6 +22,8 @@ extern "C" {
 #include <sys/signalfd.h>
 #include <fcntl.h>
 #include <sys/wait.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 }
 
 int RetryBusy(int times, int timeoMs, std::function<int()> handler) {
@@ -419,6 +421,8 @@ TError AllocLoop(const TPath &path, size_t size) {
     TScopedFd fd;
     uint8_t ch = 0;
     int status;
+    size_t blocks;
+    struct stat st;
 
     fd = open(path.ToString().c_str(), O_WRONLY | O_CREAT, 0755);
     if (fd.GetFd() < 0)
@@ -436,9 +440,17 @@ TError AllocLoop(const TPath &path, size_t size) {
         goto remove_file;
     }
 
+    ret = fstat(fd.GetFd(), &st);
+    if (ret < 0) {
+        error = TError(EError::Unknown, errno, "fstat(" + path.ToString() + ")");
+        goto remove_file;
+    }
+
     fd = -1;
 
-    error = Run({ "mkfs.ext4", "-F", "-F", path.ToString() }, status);
+    blocks = st.st_blksize - 1;
+
+    error = Run({ "mkfs.ext4", "-F", "-F", path.ToString(), "-b", std::to_string(st.st_blksize),  std::to_string(blocks - 1)}, status);
     if (error)
         goto remove_file;
 

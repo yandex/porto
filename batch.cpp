@@ -18,7 +18,7 @@ TError TBatchTask::RunSync(TContext &context) {
 }
 
 TError TBatchTask::Run(TContext &context) {
-    if (config().daemon().sync_batch())
+    if (config().daemon().batch_sync())
         return RunSync(context);
     else
         return RunAsync(context);
@@ -41,7 +41,10 @@ TError TBatchTask::RunAsync(TContext &context) {
         CloseAllFds();
         SetProcessName("portod-batch");
         SetDieOnParentExit();
-        TLogger::DisableLog();
+        if (config().daemon().batch_log())
+            TLogger::InitLog("/var/log/portobatch.log", 0755);
+        else
+            TLogger::DisableLog();
         TError error = Task();
         (void)error.Serialize(pfd[1]);
         exit(error);
