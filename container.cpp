@@ -689,11 +689,8 @@ TError TContainer::Start() {
 
     error = Prop->SetInt(P_RAW_LOOP_DEV, loopNr);
     if (error) {
-        error = PutLoopDev(loopNr);
-        if (error) {
-            L_ERR() << "Can't put loop device: " << error << std::endl;
-            FreeResources();
-        }
+        (void)PutLoopDev(loopNr);
+        (void)FreeResources();
         return error;
     }
 
@@ -817,12 +814,13 @@ void TContainer::FreeResources() {
 
     int loopNr = Prop->GetInt(P_RAW_LOOP_DEV);
     TError error = Prop->SetInt(P_RAW_LOOP_DEV, -1);
-    if (error)
+    if (error) {
         L_ERR() << "Can't set " << P_RAW_LOOP_DEV << ": " << error << std::endl;
-
-    error = PutLoopDev(loopNr);
-    if (error)
-        L_ERR() << "Can't put loop device: " << error << std::endl;
+    } else {
+        error = PutLoopDev(loopNr);
+        if (error)
+            L_ERR() << "Can't put loop device: " << error << std::endl;
+    }
 }
 
 TError TContainer::Stop() {
