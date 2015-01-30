@@ -30,9 +30,7 @@ public:
 
     TError Destroy() override {
         if (LoopDev >= 0) {
-            TError error = PutLoopDev(LoopDev);
-            if (error)
-                return error;
+            (void)PutLoopDev(LoopDev);
         }
         return TError::Success();
     }
