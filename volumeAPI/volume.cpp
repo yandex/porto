@@ -308,9 +308,12 @@ TError TVolume::Create() {
 
     ret = SaveToStorage();
     if (ret)
-        goto remove_volume;
+        goto destroy_volume;
 
     return TError::Success();
+
+destroy_volume:
+    Impl->Destroy();
 
 remove_volume:
     Holder->Remove(shared_from_this());
