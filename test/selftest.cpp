@@ -3184,7 +3184,8 @@ static void TestVolumeImpl(TPortoAPI &api) {
         AsNobody(api);
 
         TFile loopFile(img);
-        Expect(loopFile.GetSize() == 1 * 1024 * 1024 * 1024);
+        size_t expected = 1 * 1024 * 1024 * 1024;
+        Expect(loopFile.GetSize() > expected - 4096 && loopFile.GetSize() < expected + 4096);
 
         Say() << "Make sure loop device has correct contents" << std::endl;
         TFile binBash(a + "/bin/bash");

@@ -563,6 +563,8 @@ TError TResource::Copy(const TPath &to) const {
 }
 
 TError TResource::Destroy() const {
+    L() << "Destroy resource " << Path.ToString() << std::endl;
+
     if (Path.Exists()) {
         TFolder dir(Path);
         return dir.Remove(true);
