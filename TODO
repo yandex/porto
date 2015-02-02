@@ -18,8 +18,6 @@
 # volume api
 - remove leftover resources from previous runs
 - use correct credentials when creating directories!!!
-- don't call external process to copy resources
-- don't call external process to calculate sha256
 - do we need some kind of global semaphore to make sure no new references created in other process while we deconstructing volume
 
 # properties

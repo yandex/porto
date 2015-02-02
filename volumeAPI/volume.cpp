@@ -23,8 +23,7 @@ public:
                     return error;
             }
 
-            LoopPath = config().volumes().tmp_dir();
-            LoopPath.AddComponent(std::to_string(LoopDev) + ".img");
+            LoopPath = TPath(config().volumes().tmp_dir()).AddComponent(std::to_string(LoopDev) + ".img");
         }
         return TError::Success();
     }
@@ -122,12 +121,8 @@ public:
     TError Create() override {
         std::string id = Sha256(Volume->GetPath());
 
-        OvlUpper = config().volumes().tmp_dir();
-        OvlUpper.AddComponent(id);
-        OvlUpper.AddComponent("upper");
-        OvlWork = config().volumes().tmp_dir();
-        OvlWork.AddComponent(id);
-        OvlWork.AddComponent("work");
+        OvlUpper = TPath(config().volumes().tmp_dir()).AddComponent(id).AddComponent("upper");
+        OvlWork = TPath(config().volumes().tmp_dir()).AddComponent(id).AddComponent("work");
         OvlLower = Volume->GetResource()->GetPath();
         OvlMount = TMount("overlay", Volume->GetPath(), "overlay", {"lowerdir=" + OvlLower.ToString(), "upperdir=" + OvlUpper.ToString(), "workdir=" + OvlWork.ToString() });
         return TError::Success();
@@ -507,9 +502,7 @@ TError TResource::Untar(const TPath &what, const TPath &where) const {
 }
 
 TError TResource::Prepare() {
-    Path = config().volumes().resource_dir();
-    std::string sha = Sha256(Path.ToString());
-    Path.AddComponent(sha);
+    Path = TPath(config().volumes().resource_dir()).AddComponent(Sha256(Path.ToString()));
 
     TFolder dir(Path);
     if (!dir.Exists())
@@ -519,8 +512,7 @@ TError TResource::Prepare() {
 }
 
 TError TResource::Create() const {
-    TPath p = Path;
-    p.AddComponent(".done");
+    TPath p = Path.AddComponent(".done");
 
     if (!p.Exists()) {
         TError error = Untar(Source, Path);
@@ -539,14 +531,8 @@ TError TResource::Copy(const TPath &to) const {
     if (error)
         return error;
 
-    int status;
-    error = Run({ "cp", "-aT", Path.ToString(), to.ToString() }, status);
-    if (error)
-        return error;
-    if (status)
-        return TError(EError::Unknown, "Can't execute cp " + std::to_string(status));
-
-    return TError::Success();
+    TFolder dir(Path);
+    return dir.Copy(to);
 }
 
 TError TResource::Destroy() const {

@@ -21,6 +21,7 @@ public:
 
     TError Create(mode_t mode = 0755, bool recursive = false) const;
     TError Remove(bool recursive = false) const;
+    TError Copy(const TPath &dir) const;
 
     TError Items(const EFileType type, std::vector<std::string> &list) const;
     TError Subfolders(std::vector<std::string> &list) const;

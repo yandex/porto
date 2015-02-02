@@ -55,8 +55,7 @@ TError TFolder::Remove(bool recursive) const {
             return error;
 
         for (auto f : items) {
-            TPath p(Path);
-            p.AddComponent(f);
+            TPath p(Path.AddComponent(f));
             TFile child(p);
             TError error;
 
@@ -110,5 +109,44 @@ TError TFolder::Items(const EFileType type, std::vector<std::string> &list) cons
     }
 
     closedir(dirp);
+    return TError::Success();
+}
+
+TError TFolder::Copy(const TPath &dir) const {
+    L() << "cp " << Path.ToString() << " " << dir.ToString() << std::endl;
+
+    std::vector<std::string> list;
+    TError error = Items(EFileType::Any, list);
+    if (error)
+        return error;
+
+    for (auto &entry : list) {
+        TPath from(Path.AddComponent(entry));
+        TPath to(dir.AddComponent(entry));
+        TFolder fromDir(from);
+        TFolder toDir(to);
+        switch(from.GetType()) {
+        case EFileType::Directory:
+            if (!toDir.Exists()) {
+                error = toDir.Create(from.GetMode(), true);
+                if (error)
+                    return error;
+            }
+
+            error = fromDir.Copy(to);
+            break;
+        default:
+            error = from.Copy(to);
+            break;
+        }
+
+        if (error)
+            return error;
+
+        error = to.Chown(from.GetUid(), from.GetGid());
+        if (error)
+            return error;
+    }
+
     return TError::Success();
 }

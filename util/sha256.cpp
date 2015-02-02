@@ -162,9 +162,9 @@ std::string Sha256(const std::string &s) {
     Sha256_Final(&p, digest);
 
     std::stringstream ss;
-    ss << std::setfill('0') << std::setw(2) << std::hex;
+    ss << std::setfill('0') << std::hex;
     for (int i = 0; i < 32; i++)
-        ss << digest[i];
+        ss << std::setw(2) << (int)digest[i];
 
     return ss.str();
 }

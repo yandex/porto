@@ -141,13 +141,12 @@ static std::string DefaultStdFile(std::shared_ptr<TContainer> c,
 
     TPath path = root;
     if (!path.Exists() || path.GetType() == EFileType::Directory) {
-        path.AddComponent(cwd);
+        path = path.AddComponent(cwd);
     } else {
         path = c->GetTmpDir();
     }
 
-    path.AddComponent(prefix + name);
-    return path.ToString();
+    return path.AddComponent(prefix + name).ToString();
 }
 
 static std::set<EContainerState> staticProperty = {
