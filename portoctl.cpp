@@ -1223,9 +1223,9 @@ public:
 
         for (auto v : vlist)
             std::cout << v.Path << " "
+                      << v.Source << " "
                       << v.Quota << " "
                       << v.Flags << " "
-                      << v.Source << " "
                       << std::endl;
 
         return EXIT_SUCCESS;

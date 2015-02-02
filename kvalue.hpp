@@ -25,4 +25,6 @@ public:
     TError Restore(std::map<std::string, kv::TNode> &map) const;
     TError Dump() const;
     TError Destroy();
+    TError Create(const std::string &name) const;
+    TError Append(const std::string &name, const std::string& key, const std::string& value) const;
 };

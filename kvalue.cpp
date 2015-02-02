@@ -240,3 +240,18 @@ TError TKeyValueStorage::Dump() const {
 TError TKeyValueStorage::Destroy() {
     return Tmpfs.Umount();
 }
+
+TError TKeyValueStorage::Create(const std::string &name) const {
+    kv::TNode node;
+    return SaveNode(name, node);
+}
+
+TError TKeyValueStorage::Append(const std::string &name, const std::string& key, const std::string& value) const {
+    kv::TNode node;
+
+    auto pair = node.add_pairs();
+    pair->set_key(key);
+    pair->set_val(value);
+
+    return AppendNode(name, node);
+}

@@ -23,7 +23,7 @@ public:
                     return error;
             }
 
-            LoopPath = TPath(config().volumes().tmp_dir()).AddComponent(std::to_string(LoopDev) + ".img");
+            LoopPath = TPath(config().volumes().volume_dir()).AddComponent(std::to_string(LoopDev) + ".img");
         }
         return TError::Success();
     }
@@ -35,11 +35,11 @@ public:
         return TError::Success();
     }
 
-    void Save(kv::TNode &node) override {
+    bool Save(kv::TNode &node) override {
         auto a = node.add_pairs();
-        a = node.add_pairs();
         a->set_key("loop_dev");
         a->set_val(std::to_string(LoopDev));
+        return true;
     }
 
     void Restore(kv::TNode &node) override {
@@ -119,10 +119,10 @@ public:
     TVolumeNativeImpl(std::shared_ptr<TVolume> volume) : TVolumeImpl(volume) {}
 
     TError Create() override {
-        std::string id = Sha256(Volume->GetPath());
+        std::string id = Sha256(Volume->GetPath().ToString());
 
-        OvlUpper = TPath(config().volumes().tmp_dir()).AddComponent(id).AddComponent("upper");
-        OvlWork = TPath(config().volumes().tmp_dir()).AddComponent(id).AddComponent("work");
+        OvlUpper = TPath(config().volumes().volume_dir()).AddComponent(id).AddComponent("upper");
+        OvlWork = TPath(config().volumes().volume_dir()).AddComponent(id).AddComponent("work");
         OvlLower = Volume->GetResource()->GetPath();
         OvlMount = TMount("overlay", Volume->GetPath(), "overlay", {"lowerdir=" + OvlLower.ToString(), "upperdir=" + OvlUpper.ToString(), "workdir=" + OvlWork.ToString() });
         return TError::Success();
@@ -132,7 +132,8 @@ public:
         return TError::Success();
     }
 
-    void Save(kv::TNode &node) override {
+    bool Save(kv::TNode &node) override {
+        return false;
     }
 
     void Restore(kv::TNode &node) override {
@@ -222,7 +223,7 @@ void TVolumeHolder::Remove(std::shared_ptr<TVolume> volume) {
     Volumes.erase(volume->GetPath());
 }
 
-std::shared_ptr<TVolume> TVolumeHolder::Get(const std::string &path) {
+std::shared_ptr<TVolume> TVolumeHolder::Get(const TPath &path) {
     auto v = Volumes.find(path);
     if (v != Volumes.end())
         return v->second;
@@ -230,8 +231,8 @@ std::shared_ptr<TVolume> TVolumeHolder::Get(const std::string &path) {
         return nullptr;
 }
 
-std::vector<std::string> TVolumeHolder::List() const {
-    std::vector<std::string> ret;
+std::vector<TPath> TVolumeHolder::List() const {
+    std::vector<TPath> ret;
 
     for (auto v : Volumes)
         ret.push_back(v.first);
@@ -258,10 +259,9 @@ TError TVolume::Prepare() {
 
 TError TVolume::Create() {
     TError ret;
-    TPath dstPath(Path);
-    TFolder dir(dstPath);
+    TFolder dir(Path);
 
-    if (!Path.length() || Path[0] != '/')
+    if (!Path.ToString().length() || Path.ToString()[0] != '/')
         return TError(EError::InvalidValue, "Invalid volume path");
 
     ret = StringWithUnitToUint64(Quota, ParsedQuota);
@@ -272,7 +272,7 @@ TError TVolume::Create() {
     if (ret)
         return ret;
 
-    if (dstPath.Exists()) {
+    if (Path.Exists()) {
         ret = TError(EError::InvalidValue, "Destination path already exists");
         goto remove_volume;
     }
@@ -281,7 +281,7 @@ TError TVolume::Create() {
     if (ret)
         goto remove_volume;
 
-    ret = dstPath.Chown(Cred.UserAsString(), Cred.GroupAsString());
+    ret = Path.Chown(Cred.UserAsString(), Cred.GroupAsString());
     if (ret)
         goto remove_volume;
 
@@ -328,38 +328,37 @@ const std::string TVolume::GetSource() const {
 
 TError TVolume::Destroy() {
     Holder->Remove(shared_from_this());
-    Storage->RemoveNode(Path);
+    Storage->RemoveNode(Path.ToString());
     Impl->Destroy();
     Impl = nullptr;
     return TError::Success();
 }
 
 TError TVolume::SaveToStorage() const {
+    TError error = Storage->Append(Path.ToString(), "source", Resource->GetSource().ToString());
+    if (error)
+        return error;
+
+    error = Storage->Append(Path.ToString(), "quota", Quota);
+    if (error)
+        return error;
+
+    error = Storage->Append(Path.ToString(), "flags", Flags);
+    if (error)
+        return error;
+
+    error = Storage->Append(Path.ToString(), "user", Cred.UserAsString());
+    if (error)
+        return error;
+
+    error = Storage->Append(Path.ToString(), "group", Cred.GroupAsString());
+    if (error)
+        return error;
+
     kv::TNode node;
-
-    auto a = node.add_pairs();
-    a->set_key("source");
-    a->set_val(Resource->GetSource().ToString());
-
-    a = node.add_pairs();
-    a->set_key("quota");
-    a->set_val(Quota);
-
-    a = node.add_pairs();
-    a->set_key("flags");
-    a->set_val(Flags);
-
-    a = node.add_pairs();
-    a->set_key("user");
-    a->set_val(Cred.UserAsString());
-
-    a = node.add_pairs();
-    a->set_key("group");
-    a->set_val(Cred.GroupAsString());
-
-    Impl->Save(node);
-
-    return Storage->SaveNode(Path, node);
+    if (Impl->Save(node))
+        error = Storage->AppendNode(Path.ToString(), node);
+    return error;
 }
 
 TError TVolume::LoadFromStorage() {
@@ -367,7 +366,7 @@ TError TVolume::LoadFromStorage() {
     TError error;
     std::string user, group, source, quota, flags;
 
-    error = Storage->LoadNode(Path, node);
+    error = Storage->LoadNode(Path.ToString(), node);
     if (error)
         return error;
 
@@ -399,11 +398,11 @@ TError TVolume::LoadFromStorage() {
     Impl->Restore(node);
 
     if (quota.empty())
-        return TError(EError::InvalidValue, "Volume " + Path + " info isn't full");
+        return TError(EError::InvalidValue, "Volume " + Path.ToString() + " info isn't full");
 
     error = Cred.Parse(user, group);
     if (error)
-        return TError(EError::InvalidValue, "Bad volume " + Path + " credentials: " +
+        return TError(EError::InvalidValue, "Bad volume " + Path.ToString() + " credentials: " +
                       user + " " + group);
 
     Quota = quota;
@@ -416,12 +415,35 @@ TError TVolume::LoadFromStorage() {
     return TError::Success();
 }
 
+static void RemoveUnused(const TPath &path,
+                         std::function<bool(const TPath &path)> f) {
+    std::vector<std::string> list;
+    TFolder dir(path);
+
+    TError error = dir.Subfolders(list);
+    if (error)
+        return;
+
+    for (auto &entry : list) {
+        TPath name = path.AddComponent(entry);
+        if (f(name)) {
+            L() << "Removing unused " << name.ToString() << std::endl;
+            TMount m(name, name, "", {});
+            (void)m.Umount();
+            TFolder d(name);
+            error = d.Remove(true);
+            if (error)
+                L_WRN() << "Can't remove unused " << name.ToString() << ": " << error << std::endl;
+        }
+    }
+}
+
 TError TVolumeHolder::RestoreFromStorage() {
     std::vector<std::string> list;
 
-    TPath volumes = config().volumes().tmp_dir();
+    TPath volumes = config().volumes().volume_dir();
     if (!volumes.Exists() || volumes.GetType() != EFileType::Directory) {
-        TFolder dir(config().volumes().tmp_dir());
+        TFolder dir(config().volumes().volume_dir());
         (void)dir.Remove(true);
         TError error = dir.Create(0755, true);
         if (error)
@@ -438,12 +460,18 @@ TError TVolumeHolder::RestoreFromStorage() {
         error = v->LoadFromStorage();
         if (error) {
             Storage->RemoveNode(i);
-            L_WRN() << "Corrupted volume " << i << " removed. " << error << std::endl;
+            L_WRN() << "Corrupted volume " << i << " removed: " << error << std::endl;
             continue;
         }
 
-        L() << "Volume " << v->GetPath() << " restored." << std::endl;
+        L() << "Volume " << v->GetPath().ToString() << " restored" << std::endl;
     }
+
+    RemoveUnused(config().volumes().resource_dir(),
+                 [&](const TPath &path) { return Resources.find(path) == Resources.end(); });
+
+    RemoveUnused(config().volumes().volume_dir(),
+                 [&](const TPath &path) { return Volumes.find(path) == Volumes.end(); });
 
     return TError::Success();
 }
@@ -454,11 +482,11 @@ void TVolumeHolder::Destroy() {
         auto volume = Volumes.begin()->second;
         TError error = volume->Deconstruct();
         if (error)
-            L_ERR() << "Can't deconstruct volume " << name << ": " << error << std::endl;
+            L_ERR() << "Can't deconstruct volume " << name.ToString() << ": " << error << std::endl;
 
         error = volume->Destroy();
         if (error)
-            L_ERR() << "Can't destroy volume " << name << ": " << error << std::endl;
+            L_ERR() << "Can't destroy volume " << name.ToString() << ": " << error << std::endl;
     }
 }
 

@@ -281,12 +281,11 @@ static TError DestroyVolume(TContext &context,
                 return volume->Deconstruct();
             },
             [volume, c] (TError error) {
-                if (error) {
-                    L() << "Can't construct volume: " << error << std::endl;
-                    (void)volume->Destroy();
-                }
+                if (error)
+                    L() << "Can't deconstruct volume: " << error << std::endl;
 
-                error = volume->Destroy();
+                if (!error)
+                    error = volume->Destroy();
 
                 rpc::TContainerResponse response;
                 response.set_error(error.GetError());
@@ -305,7 +304,7 @@ static TError ListVolumes(TContext &context,
         auto desc = rsp.mutable_volumelist()->add_list();
         auto vol = context.Vholder->Get(path);
         // TODO: EXCLUDE CONSTRUCTION IN-PROGRESS
-        desc->set_path(vol->GetPath());
+        desc->set_path(vol->GetPath().ToString());
         desc->set_source(vol->GetSource());
         desc->set_quota(vol->GetQuota());
         desc->set_flags(vol->GetFlags());

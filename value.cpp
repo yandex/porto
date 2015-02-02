@@ -254,21 +254,14 @@ TVariantSet::TVariantSet(std::shared_ptr<TKeyValueStorage> storage,
 }
 
 TError TVariantSet::Create() {
-    kv::TNode node;
-    return Storage->SaveNode(Name, node);
+    return Storage->Create(Name);
 }
 
 TError TVariantSet::AppendStorage(const std::string& key, const std::string& value) {
     if (IsRoot())
         return TError::Success();
 
-    kv::TNode node;
-
-    auto pair = node.add_pairs();
-    pair->set_key(key);
-    pair->set_val(value);
-
-    return Storage->AppendNode(Name, node);
+    return Storage->Append(Name, key, value);
 }
 
 TError TVariantSet::Restore(const kv::TNode &node) {
@@ -360,8 +353,7 @@ void TVariantSet::Reset(const std::string &name) {
 }
 
 TError TVariantSet::Flush() {
-    kv::TNode node;
-    return Storage->SaveNode(Name, node);
+    return Storage->Create(Name);
 }
 
 TError TVariantSet::Sync() {

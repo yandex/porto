@@ -72,7 +72,7 @@ message TCfg {
 
 	message TVolumesCfg {
 		optional TKeyvalCfg keyval = 1;
-		optional string tmp_dir = 2;
+		optional string volume_dir = 2;
 		optional bool native = 3;
 		optional string resource_dir = 4;
 	}

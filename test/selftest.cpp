@@ -3025,9 +3025,6 @@ static void RemoveTar(const TPath &path) {
 
 static void CleanupVolume(TPortoAPI &api, const std::string &path) {
     AsRoot(api);
-    TMount m(path, path, "", {});
-    (void)m.Umount();
-
     TFolder dir(path);
     if (dir.Exists()) {
         TError error = dir.Remove(true);
@@ -3201,18 +3198,6 @@ static void TestVolumeImpl(TPortoAPI &api) {
         Expect(m.find(a) == m.end());
         ExpectSuccess(api.DestroyVolume(b));
     }
-
-    Say() << "Make porto recovers volumes with or without quotas" << std::endl;
-    ExpectSuccess(api.CreateVolume(a, tar, "1g", ""));
-    ExpectSuccess(api.CreateVolume(b, tar, "0", ""));
-
-    //KillPorto(api, SIGKILL);
-
-    // TODO:
-    // - also make sure porto removes dangling resources after recovery
-
-    ExpectSuccess(api.DestroyVolume(a));
-    ExpectSuccess(api.DestroyVolume(b));
 }
 
 static void KillPorto(TPortoAPI &api, int sig, int times = 10) {
@@ -3451,6 +3436,62 @@ static void TestRecovery(TPortoAPI &api) {
     }
 }
 
+static void TestVolumeFiles(TPortoAPI &api, const std::string &path) {
+    vector<string> v;
+
+    ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
+    auto m = ParseMountinfo(CommaSeparatedList(v, ""));
+    Expect(m.find(path) != m.end());
+}
+
+static void TestVolumeRecovery(TPortoAPI &api) {
+    Say() << "Make sure porto removes leftover resources/volumes" << std::endl;
+    std::string a = "/tmp/volume_c", b = "/tmp/volume_d";
+    std::string tar = "/tmp/porto.tar";
+
+    CleanupVolume(api, a);
+    CleanupVolume(api, b);
+
+    RemoveTar(tar);
+    CreateTar(tar, "/bin");
+    ExpectSuccess(api.CreateVolume(a, tar, "0", ""));
+    ExpectSuccess(api.CreateVolume(b, tar, "2g", ""));
+
+    TFolder resource(config().volumes().resource_dir() + "/leftover_resource");
+    TFolder volume(config().volumes().volume_dir() + "/leftover_volume");
+    AsRoot(api);
+    resource.Remove(true);
+    ExpectSuccess(resource.Create());
+    volume.Remove(true);
+    ExpectSuccess(volume.Create());
+    AsNobody(api);
+
+    Expect(resource.Exists() == true);
+    Expect(volume.Exists() == true);
+
+    KillPorto(api, SIGKILL);
+
+    Expect(resource.Exists() == false);
+    Expect(volume.Exists() == false);
+
+    Say() << "Make sure porto preserves mounted loop/overlayfs" << std::endl;
+
+    TestVolumeFiles(api, b);
+
+    vector<string> v;
+    ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
+    auto m = ParseMountinfo(CommaSeparatedList(v, ""));
+    Expect(m.find(b) != m.end());
+
+    ExpectSuccess(api.DestroyVolume(a));
+    ExpectSuccess(api.DestroyVolume(b));
+
+    v.clear();
+    ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
+    m = ParseMountinfo(CommaSeparatedList(v, ""));
+    Expect(m.find(b) == m.end());
+}
+
 static void TestCgroups(TPortoAPI &api) {
     AsRoot(api);
 
@@ -3642,6 +3683,7 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
 
         { "daemon", TestDaemon },
         { "recovery", TestRecovery },
+        { "volume_recovery", TestVolumeRecovery },
         { "cgroups", TestCgroups },
         { "version", TestVersion },
         { "remove_dead", TestRemoveDead },

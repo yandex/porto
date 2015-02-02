@@ -19,7 +19,7 @@ public:
     TVolumeImpl(std::shared_ptr<TVolume> volume) : Volume(volume) {}
     virtual TError Create() =0;
     virtual TError Destroy() =0;
-    virtual void Save(kv::TNode &node) =0;
+    virtual bool Save(kv::TNode &node) =0;
     virtual void Restore(kv::TNode &node) =0;
     virtual TError Construct() const =0;
     virtual TError Deconstruct() const =0;
@@ -32,7 +32,7 @@ public:
     TError Deconstruct() const;
     TError Destroy();
     TVolume(std::shared_ptr<TKeyValueStorage> storage,
-            std::shared_ptr<TVolumeHolder> holder, const std::string &path,
+            std::shared_ptr<TVolumeHolder> holder, const TPath &path,
             std::shared_ptr<TResource> resource,
             const std::string &quota,
             const std::string &flags, const TCred &cred) :
@@ -40,13 +40,13 @@ public:
         Resource(resource), Quota(quota), Flags(flags) {
     }
     TVolume(std::shared_ptr<TKeyValueStorage> storage,
-            std::shared_ptr<TVolumeHolder> holder, const std::string &path) :
+            std::shared_ptr<TVolumeHolder> holder, const TPath &path) :
         Storage(storage), Holder(holder), Path(path) {
     }
 
     TError CheckPermission(const TCred &ucred) const;
 
-    const std::string &GetPath() const { return Path; }
+    const TPath &GetPath() const { return Path; }
     const std::string GetSource() const;
     const std::string &GetQuota() const { return Quota; }
     const uint64_t GetParsedQuota() const { return ParsedQuota; }
@@ -60,7 +60,7 @@ private:
     std::shared_ptr<TVolumeHolder> Holder;
     TCred Cred;
 
-    std::string Path;
+    TPath Path;
     std::shared_ptr<TResource> Resource;
     std::string Quota;
     uint64_t ParsedQuota;
@@ -75,7 +75,7 @@ class TResource : public TNonCopyable {
     TPath Path;
     TError Untar(const TPath &what, const TPath &where) const;
 public:
-    TResource(const TPath &source) : Source(source) {}
+    TResource(const TPath &source, const TPath &path = "") : Source(source), Path(path) {}
     ~TResource();
     TError Prepare();
     TError Create() const;
@@ -89,8 +89,8 @@ class TVolumeHolder : public TNonCopyable, public std::enable_shared_from_this<T
 public:
     TError Insert(std::shared_ptr<TVolume> volume);
     void Remove(std::shared_ptr<TVolume> volume);
-    std::shared_ptr<TVolume> Get(const std::string &path);
-    std::vector<std::string> List() const;
+    std::shared_ptr<TVolume> Get(const TPath &path);
+    std::vector<TPath> List() const;
     TVolumeHolder(std::shared_ptr<TKeyValueStorage> storage) :
         Storage(storage) {}
     TError RestoreFromStorage();
@@ -98,6 +98,8 @@ public:
     TError GetResource(const TPath &path, std::shared_ptr<TResource> &resource);
 private:
     std::shared_ptr<TKeyValueStorage> Storage;
-    std::map<std::string, std::shared_ptr<TVolume>> Volumes;
-    std::map<std::string, std::weak_ptr<TResource>> Resources;
+    std::map<TPath, std::shared_ptr<TVolume>> Volumes;
+    std::map<TPath, std::weak_ptr<TResource>> Resources;
+    void RemoveUnusedResources();
+    void RemoveUnusedVolumes();
 };

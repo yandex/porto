@@ -69,8 +69,8 @@ void TConfig::LoadDefaults() {
     config().mutable_volumes()->mutable_keyval()->mutable_file()->set_perm(0755);
     config().mutable_volumes()->mutable_keyval()->set_size("size=32m");
 
-    config().mutable_volumes()->set_tmp_dir("/place/volumes");
-    config().mutable_volumes()->set_resource_dir("/place/volumes/resources");
+    config().mutable_volumes()->set_volume_dir("/place/volumes");
+    config().mutable_volumes()->set_resource_dir("/place/resources");
     // TODO: make sure we pick up correct default here depending on kernel
     // version
     // TODO:
