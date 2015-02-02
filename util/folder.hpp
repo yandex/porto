@@ -4,7 +4,8 @@
 #include <vector>
 
 #include "util/path.hpp"
-#include "file.hpp"
+#include "util/cred.hpp"
+#include "util/file.hpp"
 
 class TFolder {
     const TPath Path;
@@ -18,7 +19,7 @@ public:
     const TPath &GetPath() const { return Path; }
     bool Exists() const { return Path.Exists(); }
 
-    TError Create(mode_t mode = 0755, bool recursive = false) const;
+    TError Create(mode_t mode = 0755, bool recursive = false, const TCred cred = {}) const;
     TError Remove(bool recursive = false) const;
     TError Copy(const TPath &dir) const;
 

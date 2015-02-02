@@ -26,6 +26,18 @@ public:
 };
 
 class TVolume : public std::enable_shared_from_this<TVolume>, public TNonCopyable {
+    std::shared_ptr<TKeyValueStorage> Storage;
+    std::shared_ptr<TVolumeHolder> Holder;
+    TCred Cred;
+
+    TPath Path;
+    std::shared_ptr<TResource> Resource;
+    std::string Quota;
+    uint64_t ParsedQuota;
+    std::string Flags;
+
+    std::unique_ptr<TVolumeImpl> Impl;
+    TError Prepare();
 public:
     TError Create();
     TError Construct() const;
@@ -55,19 +67,7 @@ public:
 
     TError SaveToStorage() const;
     TError LoadFromStorage();
-private:
-    std::shared_ptr<TKeyValueStorage> Storage;
-    std::shared_ptr<TVolumeHolder> Holder;
-    TCred Cred;
-
-    TPath Path;
-    std::shared_ptr<TResource> Resource;
-    std::string Quota;
-    uint64_t ParsedQuota;
-    std::string Flags;
-
-    std::unique_ptr<TVolumeImpl> Impl;
-    TError Prepare();
+    TCred GetCred() const { return Cred; }
 };
 
 class TResource : public TNonCopyable {

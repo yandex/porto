@@ -14,9 +14,9 @@
 - ? use chrt instead of cpu.smart so we don't depend on smart kernels + set rt prio
 
 # volume api
-- use correct credentials when creating directories!!!
 - do we need some kind of global semaphore to make sure no new references created in other process while we deconstructing volume (TBatchQueue?)
 - add stresstest
+- ? allow non-empty destination dir if uid/gid matches
 
 # properties
 - ? supplementary_groups

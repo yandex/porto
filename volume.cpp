@@ -156,13 +156,13 @@ public:
         TFolder upperDir(OvlUpper);
         TFolder workDir(OvlWork);
 
-        TError error = upperDir.Create(0755, true);
+        TError error = upperDir.Create(0755, true, Volume->GetCred());
         if (error) {
             (void)Deconstruct();
             return error;
         }
 
-        error = workDir.Create(0755, true);
+        error = workDir.Create(0755, true, Volume->GetCred());
         if (error) {
             (void)Deconstruct();
             return error;
@@ -277,11 +277,7 @@ TError TVolume::Create() {
         goto remove_volume;
     }
 
-    ret = dir.Create();
-    if (ret)
-        goto remove_volume;
-
-    ret = Path.Chown(Cred.UserAsString(), Cred.GroupAsString());
+    ret = dir.Create(0755, false, Cred);
     if (ret)
         goto remove_volume;
 
