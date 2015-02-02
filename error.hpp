@@ -1,5 +1,4 @@
-#ifndef __ERROR_HPP__
-#define __ERROR_HPP__
+#pragma once
 
 #include <string>
 #include <ostream>
@@ -39,5 +38,3 @@ public:
     TError Serialize(int fd) const;
     static TError Deserialize(int fd);
 };
-
-#endif

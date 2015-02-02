@@ -1,5 +1,4 @@
-#ifndef __VALUE_HPP__
-#define __VALUE_HPP__
+#pragma once
 
 #include <string>
 #include <map>
@@ -265,5 +264,3 @@ public:
 };
 
 #undef SYNTHESIZE_ACCESSOR
-
-#endif

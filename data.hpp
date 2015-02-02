@@ -1,5 +1,4 @@
-#ifndef __DATA_HPP__
-#define __DATA_HPP__
+#pragma once
 
 #include "value.hpp"
 
@@ -12,5 +11,3 @@ const std::string D_STATE = "state";
 
 extern TValueSet dataSet;
 TError RegisterData();
-
-#endif

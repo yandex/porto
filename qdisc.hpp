@@ -1,5 +1,4 @@
-#ifndef __QDISC_H__
-#define __QDISC_H__
+#pragma once
 
 #include <memory>
 #include <string>
@@ -84,5 +83,3 @@ public:
     std::shared_ptr<TFilter> GetFilter() { return Filter; }
     bool Empty() { return Links.size() == 0; }
 };
-
-#endif

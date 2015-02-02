@@ -1,5 +1,4 @@
-#ifndef __PROPERTY_HPP__
-#define __PROPERTY_HPP__
+#pragma once
 
 #include <map>
 #include <string>
@@ -134,5 +133,3 @@ public:
 #undef SYNTHESIZE_ACCESSOR
 
 TError RegisterProperties();
-
-#endif

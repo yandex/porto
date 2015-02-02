@@ -1,5 +1,4 @@
-#ifndef __UNIX_HPP__
-#define __UNIX_HPP__
+#pragma once
 
 #include <csignal>
 #include <functional>
@@ -84,5 +83,3 @@ private:
     static const int MAX_EVENTS = 32;
     struct epoll_event Events[MAX_EVENTS];
 };
-
-#endif

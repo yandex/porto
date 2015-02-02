@@ -1,5 +1,4 @@
-#ifndef __MOUNT_HPP__
-#define __MOUNT_HPP__
+#pragma once
 
 #include <string>
 #include <iostream>
@@ -80,5 +79,3 @@ public:
 
 TError GetLoopDev(int &nr);
 TError PutLoopDev(const int nr);
-
-#endif

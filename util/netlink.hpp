@@ -1,5 +1,4 @@
-#ifndef __NETLINK_H__
-#define __NETLINK_H__
+#pragma once
 
 #include <string>
 #include <functional>
@@ -146,5 +145,3 @@ public:
 };
 
 TError ParseIpPrefix(const std::string &s, TNlAddr &addr, int &prefix);
-
-#endif

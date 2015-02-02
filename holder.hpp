@@ -1,5 +1,4 @@
-#ifndef __HOLDER_H__
-#define __HOLDER_H__
+#pragma once
 
 #include <vector>
 #include <map>
@@ -49,5 +48,3 @@ public:
 
     bool DeliverEvent(const TEvent &event);
 };
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef __PATH_HPP__
-#define __PATH_HPP__
+#pragma once
 
 #include <string>
 #include <functional>
@@ -67,5 +66,3 @@ public:
     TError Mkfifo(unsigned int mode) const;
     TError Mknod(unsigned int mode, unsigned int dev) const;
 };
-
-#endif

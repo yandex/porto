@@ -1,5 +1,4 @@
-#ifndef __CRED_H__
-#define __CRED_H__
+#pragma once
 
 #include <string>
 #include <set>
@@ -70,5 +69,3 @@ public:
 };
 
 extern TCredConf CredConf;
-
-#endif /* __CRED_H__ */

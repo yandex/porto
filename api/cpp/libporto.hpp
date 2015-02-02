@@ -1,5 +1,4 @@
-#ifndef __LIBPORTO_HPP__
-#define __LIBPORTO_HPP__
+#pragma once
 
 #include "rpc.hpp"
 #include "util/protobuf.hpp"
@@ -77,5 +76,3 @@ public:
     int DestroyVolume(const std::string &path);
     int ListVolumes(std::vector<TVolumeDescription> &vlist);
 };
-
-#endif

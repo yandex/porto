@@ -1,5 +1,4 @@
-#ifndef __FILE_HPP__
-#define __FILE_HPP__
+#pragma once
 
 #include <string>
 #include <vector>
@@ -32,5 +31,3 @@ public:
     TError Truncate(size_t size) const;
     size_t GetSize() const;
 };
-
-#endif

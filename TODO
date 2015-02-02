@@ -1,4 +1,3 @@
-- convert everything to #pragma once
 - fix f*cking capabilities test on newer kernels
 - nuke volumeAPI dir and move ext4_proj_quota.[hc] into util/
 - kvalue - use id instead of substituting / with +

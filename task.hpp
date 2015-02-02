@@ -1,5 +1,4 @@
-#ifndef __TASK_HPP__
-#define __TASK_HPP__
+#pragma once
 
 #include <string>
 #include <vector>
@@ -160,5 +159,3 @@ public:
 };
 
 TError TaskGetLastCap();
-
-#endif

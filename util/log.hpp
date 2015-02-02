@@ -1,5 +1,4 @@
-#ifndef __LOG_HPP__
-#define __LOG_HPP__
+#pragma once
 
 #include <fstream>
 #include <string>
@@ -42,5 +41,3 @@ public:
 static inline std::basic_ostream<char> &L() { return TLogger::Log(); }
 static inline std::basic_ostream<char> &L_ERR() { return TLogger::Log(LOG_ERROR); }
 static inline std::basic_ostream<char> &L_WRN() { return TLogger::Log(LOG_WARN); }
-
-#endif /* __LOG_HPP__ */

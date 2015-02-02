@@ -1,5 +1,4 @@
-#ifndef __VOLUME_H__
-#define __VOLUME_H__
+#pragma once
 
 #include <string>
 #include <set>
@@ -102,5 +101,3 @@ private:
     std::map<std::string, std::shared_ptr<TVolume>> Volumes;
     std::map<std::string, std::weak_ptr<TResource>> Resources;
 };
-
-#endif /* __VOLUME_H__ */

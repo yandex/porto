@@ -1,5 +1,4 @@
-#ifndef __KVALUE_HPP__
-#define __KVALUE_HPP__
+#pragma once
 
 #include <string>
 #include <vector>
@@ -27,5 +26,3 @@ public:
     TError Dump() const;
     TError Destroy();
 };
-
-#endif

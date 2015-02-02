@@ -1,5 +1,4 @@
-#ifndef __EVENT_H__
-#define __EVENT_H__
+#pragma once
 
 #include <string>
 #include <memory>
@@ -52,5 +51,3 @@ public:
     void DeliverEvents(TContainerHolder &cholder);
     int GetNextTimeout();
 };
-
-#endif

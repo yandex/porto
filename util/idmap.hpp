@@ -1,5 +1,4 @@
-#ifndef __IDMAP_H__
-#define __IDMAP_H__
+#pragma once
 
 #include <cstdint>
 
@@ -16,5 +15,3 @@ public:
     TError Get(uint16_t &id);
     void Put(uint16_t id);
 };
-
-#endif

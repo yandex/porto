@@ -1,5 +1,4 @@
-#ifndef __CONTEXT_H__
-#define __CONTEXT_H__
+#pragma once
 
 #include "event.hpp"
 #include "holder.hpp"
@@ -31,5 +30,3 @@ public:
     TError Initialize();
     TError Destroy();
 };
-
-#endif /* __CONTEXT_H__ */

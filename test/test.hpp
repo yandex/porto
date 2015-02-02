@@ -1,5 +1,4 @@
-#ifndef __TEST_H__
-#define __TEST_H__
+#pragma once
 
 #include <iostream>
 #include <string>
@@ -69,5 +68,3 @@ namespace test {
 #define Expect(ret) ExpectReturn(ret, true, __LINE__, __func__)
 #define ExpectSuccess(ret) ExpectReturn(ret, 0, __LINE__, __func__)
 #define ExpectFailure(ret, exp) ExpectReturn(ret, exp, __LINE__, __func__)
-
-#endif

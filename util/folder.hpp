@@ -1,5 +1,4 @@
-#ifndef __FOLDER_HPP__
-#define __FOLDER_HPP__
+#pragma once
 
 #include <string>
 #include <vector>
@@ -26,5 +25,3 @@ public:
     TError Items(const EFileType type, std::vector<std::string> &list) const;
     TError Subfolders(std::vector<std::string> &list) const;
 };
-
-#endif
