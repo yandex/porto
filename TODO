@@ -1,5 +1,4 @@
 - fix f*cking capabilities test on newer kernels
-- nuke volumeAPI dir and move ext4_proj_quota.[hc] into util/
 - kvalue - use id instead of substituting / with +
 - add max_rss support
 - run some kind of init process in meta container

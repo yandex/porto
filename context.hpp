@@ -3,7 +3,7 @@
 #include "event.hpp"
 #include "holder.hpp"
 #include "qdisc.hpp"
-#include "volumeAPI/volume.hpp"
+#include "volume.hpp"
 #include "util/mount.hpp"
 #include "config.hpp"
 
