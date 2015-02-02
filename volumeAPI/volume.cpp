@@ -5,6 +5,7 @@
 #include "util/string.hpp"
 #include "util/folder.hpp"
 #include "util/unix.hpp"
+#include "util/sha256.hpp"
 #include "config.hpp"
 
 class TVolumeLoopImpl : public TVolumeImpl {
@@ -109,17 +110,6 @@ public:
     }
 };
 
-static TError Sha256(const std::string &s, std::string &sha) {
-    std::vector<std::string> v;
-    TError error = Popen("echo " + s + " | sha256sum", v);
-    if (error)
-        return error;
-    if (v.size() != 1)
-        return TError(EError::Unknown, "Can't calculate SHA256 for " + s);
-    sha = StringTrim(v[0], "- \t\n");
-    return TError::Success();
-}
-
 class TVolumeNativeImpl : public TVolumeImpl {
     TPath OvlUpper;
     TPath OvlWork;
@@ -130,8 +120,7 @@ public:
     TVolumeNativeImpl(std::shared_ptr<TVolume> volume) : TVolumeImpl(volume) {}
 
     TError Create() override {
-        std::string id;
-        TError error = Sha256(Volume->GetPath(), id);
+        std::string id = Sha256(Volume->GetPath());
 
         OvlUpper = config().volumes().tmp_dir();
         OvlUpper.AddComponent(id);
@@ -519,10 +508,7 @@ TError TResource::Untar(const TPath &what, const TPath &where) const {
 
 TError TResource::Prepare() {
     Path = config().volumes().resource_dir();
-    std::string sha;
-    TError error = Sha256(Path.ToString(), sha);
-    if (error)
-        return error;
+    std::string sha = Sha256(Path.ToString());
     Path.AddComponent(sha);
 
     TFolder dir(Path);
