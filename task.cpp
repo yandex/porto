@@ -63,14 +63,6 @@ const char** TTaskEnv::GetEnvp() const {
 }
 
 // TTask
-int TTask::CloseAllFds(int except) const {
-    for (int i = 0; i < 3; i++)
-        if (i != except)
-            close(i);
-
-    return except;
-}
-
 void TTask::Syslog(const string &s) const {
     openlog("portod", LOG_NDELAY, LOG_DAEMON);
     syslog(LOG_ERR, "%s", s.c_str());

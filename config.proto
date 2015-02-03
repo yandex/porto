@@ -46,7 +46,6 @@ message TCfg {
 		optional uint64 rotate_logs_timeout_s = 7;
 		optional string sysfs_root = 8;
 		optional bool batch_sync = 9;
-		optional bool batch_log = 10;
 	}
 
 	message TContainerCfg {

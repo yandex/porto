@@ -38,13 +38,9 @@ TError TBatchTask::RunAsync(TContext &context) {
     } else if (pid == 0) {
         close(pfd[0]);
         /* Child */
-        CloseAllFds();
+        CloseAllFds(TLogger::GetFd());
         SetProcessName("portod-batch");
         SetDieOnParentExit();
-        if (config().daemon().batch_log())
-            TLogger::InitLog("/var/log/portobatch.log", 0755);
-        else
-            TLogger::DisableLog();
         TError error = Task();
         (void)error.Serialize(pfd[1]);
         exit(error);

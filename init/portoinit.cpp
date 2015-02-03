@@ -174,8 +174,8 @@ static bool NeedRestart = false;
 int main(int argc, char * const argv[]) {
     int ret;
 
-    TLogger::InitLog("", 0);
-    TLogger::LogToStd();
+    TLogger::InitLog("/var/log/portoinit.log", 0755);
+    TLogger::OpenLog(false);
 
     ret = PrepareSystem();
     if (ret)

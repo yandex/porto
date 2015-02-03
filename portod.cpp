@@ -61,9 +61,11 @@ static void AllocStatistics() {
         throw std::bad_alloc();
 }
 
-static void DaemonRotateLog() {
-    if (!stdlog)
-        TLogger::CloseLog();
+static void DaemonOpenLog(bool master) {
+    const auto &log = master ? config().master_log() : config().slave_log();
+
+    TLogger::CloseLog();
+    TLogger::OpenLog(stdlog, log.path(), log.perm());
 }
 
 static int DaemonSyncConfig(bool master) {
@@ -75,14 +77,11 @@ static int DaemonSyncConfig(bool master) {
         config().mutable_network()->set_enabled(false);
     TNl::EnableDebug(config().network().debug());
 
-    const auto &log = master ? config().master_log() : config().slave_log();
     const auto &pid = master ? config().master_pid() : config().slave_pid();
 
-    TLogger::InitLog(log.path(), log.perm());
-    if (stdlog)
-        TLogger::LogToStd();
+    DaemonOpenLog(master);
 
-    if (CreatePidFile(pid.path(), log.perm())) {
+    if (CreatePidFile(pid.path(), pid.perm())) {
         L() << "Can't create pid file " <<
             pid.path() << "!" << std::endl;
         return EXIT_FAILURE;
@@ -357,7 +356,7 @@ static int SlaveRpc(TContext &context) {
                 ret = EncodeSignal(s);
                 goto exit;
             case rotateSignal:
-                DaemonRotateLog();
+                DaemonOpenLog(false);
                 break;
             case SIGCHLD:
                 int status;
@@ -806,7 +805,7 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
                 break;
             }
             case rotateSignal:
-                DaemonRotateLog();
+                DaemonOpenLog(true);
                 break;
             default:
                 /* Ignore other signals */

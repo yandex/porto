@@ -3,71 +3,39 @@
 
 #include "log.hpp"
 #include "util/unix.hpp"
-#include "util/path.hpp"
 #include "util/file.hpp"
 
-static std::ofstream logFile;
-static std::ofstream kmsgFile;
-static TPath logPath;
-static unsigned int logMode;
-static bool stdlog = false;
-static bool disabled = false;
-static std::ostringstream disabledStream;
-
-void TLogger::InitLog(const std::string &path, const unsigned int mode) {
-    logPath = path;
-    logMode = mode;
-    logFile.close();
+extern "C" {
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 }
 
-void TLogger::LogToStd() {
-    stdlog = true;
-}
+static TLogBuf logBuf(1024);
+static std::ostream logStream(&logBuf);
 
-void TLogger::OpenLog() {
-    if (logFile.is_open())
-        return;
-
-    if (!logPath.DirName().AccessOk(EFileAccess::Write)) {
-        if (!kmsgFile.is_open())
-            kmsgFile.open("/dev/kmsg", std::ios_base::out);
-        return;
-    }
-
-    bool needCreate = false;
-
-    if (logPath.Exists()) {
-        if (logPath.GetType() != EFileType::Regular ||
-            logPath.GetMode() != logMode) {
-
-            TFile f(logPath);
-            (void)f.Remove();
-            needCreate = true;
-        }
-    } else {
-        needCreate = true;
-    }
-
-    if (needCreate) {
-        TFile f(logPath, logMode);
-        (void)f.Touch();
-    }
-
-    logFile.open(logPath.ToString(), std::ios_base::app);
-
-    if (logFile.is_open() && kmsgFile.is_open())
-        kmsgFile.close();
+void TLogger::OpenLog(bool std, const TPath &path, const unsigned int mode) {
+    if (std)
+        logBuf.SetFd(STDOUT_FILENO);
+    else
+        logBuf.Open(path, mode);
 }
 
 void TLogger::DisableLog() {
     TLogger::CloseLog();
-    disabled = true;
-    stdlog = true;
+    logBuf.SetFd(-1);
+}
+
+int TLogger::GetFd() {
+    return logBuf.GetFd();
 }
 
 void TLogger::CloseLog() {
-    logFile.close();
-    kmsgFile.close();
+    int fd = logBuf.GetFd();
+    if (fd > 2)
+        close(fd);
+    logBuf.SetFd(STDOUT_FILENO);
 }
 
 static std::string GetTime() {
@@ -83,9 +51,71 @@ static std::string GetTime() {
     return std::string();
 }
 
+TLogBuf::TLogBuf(const size_t size) {
+    Data.reserve(size);
+    char *base = static_cast<char *>(Data.data());
+    setp(base, base + Data.capacity() - 1);
+}
+
+void TLogBuf::Open(const TPath &path, const unsigned int mode) {
+    if (!path.DirName().AccessOk(EFileAccess::Write)) {
+        Fd = open("/dev/kmsg", O_WRONLY | O_APPEND);
+        if (Fd < 0)
+            Fd = STDERR_FILENO;
+
+        return;
+    }
+
+    bool needCreate = false;
+
+    if (path.Exists()) {
+        if (path.GetType() != EFileType::Regular ||
+            path.GetMode() != mode) {
+
+            TFile f(path);
+            (void)f.Remove();
+            needCreate = true;
+        }
+    } else {
+        needCreate = true;
+    }
+
+    if (needCreate) {
+        TFile f(path, mode);
+        (void)f.Touch();
+    }
+
+    Fd = open(path.ToString().c_str(), O_WRONLY | O_APPEND);
+    if (Fd < 0)
+        Fd = STDERR_FILENO;
+}
+
+int TLogBuf::sync() {
+    std::ptrdiff_t n = pptr() - pbase();
+    pbump(-n);
+
+    int ret = write(Fd, pbase(), n);
+    return (ret == n) ? 0 : -1;
+}
+
+TLogBuf::int_type TLogBuf::overflow(int_type ch) {
+    if (ch != traits_type::eof()) {
+        if (sync() < 0)
+            return traits_type::eof();
+
+        PORTO_ASSERT(std::less_equal<char *>()(pptr(), epptr()));
+        *pptr() = ch;
+        pbump(1);
+
+        return ch;
+    }
+
+    return traits_type::eof();
+}
+
 std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
-    static int openlog;
     static const std::string prefix[] = { "", "Warning! ", "Error! " };
+    std::string name = GetProcessName();
 
 #ifdef PORTOD
     if (level == LOG_WARN)
@@ -94,27 +124,7 @@ std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
         Statistics->Errors++;
 #endif
 
-    std::string name = GetProcessName();
-    if (disabled) {
-        disabledStream.str("");
-        return disabledStream;
-    } else if (stdlog) {
-        return  std::cerr << GetTime() << " " << name << ": " << prefix[level];
-    } else {
-        if (openlog)
-            return  std::cerr << GetTime() << " " << name << ": " << prefix[level];
-
-        openlog++;
-        OpenLog();
-        openlog--;
-
-        if (logFile.is_open())
-            return logFile << GetTime() << " " << prefix[level];
-        else if (kmsgFile.is_open())
-            return kmsgFile << " " << name << ": " << prefix[level];
-        else
-            return std::cerr << GetTime() << " " << name << ": " << prefix[level];
-    }
+    return logStream << GetTime() << " " << name << ": " << prefix[level];
 }
 
 void TLogger::LogRequest(const std::string &message) {

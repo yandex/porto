@@ -1,6 +1,5 @@
 #include "path.hpp"
 #include "util/string.hpp"
-#include "util/cred.hpp"
 #include "util/unix.hpp"
 
 extern "C" {
@@ -130,6 +129,10 @@ TError TPath::Chroot() const {
         return TError(EError::Unknown, errno, "chroot(" + Path + ")");
 
     return TError::Success();
+}
+
+TError TPath::Chown(const TCred &cred) const {
+    return Chown(cred.UserAsString(), cred.GroupAsString());
 }
 
 TError TPath::Chown(unsigned int uid, unsigned int gid) const {

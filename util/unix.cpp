@@ -352,9 +352,12 @@ int64_t GetBootTime() {
     return 0;
 }
 
-void CloseAllFds() {
-    for (int i = 1; i < getdtablesize(); i++)
-        close(i);
+int CloseAllFds(int except) {
+    for (int i = 0; i < 3; i++)
+        if (i != except)
+            close(i);
+
+    return except;
 }
 
 // TEpollLoop

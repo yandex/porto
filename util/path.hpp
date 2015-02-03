@@ -4,6 +4,7 @@
 #include <functional>
 
 #include "error.hpp"
+#include "util/cred.hpp"
 
 enum class EFileType {
     Regular,
@@ -61,6 +62,7 @@ public:
     TPath AddComponent(const std::string &component) const;
     TError Chdir() const;
     TError Chroot() const;
+    TError Chown(const TCred &cred) const;
     TError Chown(const std::string &user, const std::string &group) const;
     TError Chown(unsigned int uid, unsigned int gid) const;
     TError Chmod(const int mode) const;

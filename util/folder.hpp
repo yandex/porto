@@ -19,7 +19,7 @@ public:
     const TPath &GetPath() const { return Path; }
     bool Exists() const { return Path.Exists(); }
 
-    TError Create(mode_t mode = 0755, bool recursive = false, const TCred cred = {}) const;
+    TError Create(mode_t mode = 0755, bool recursive = false) const;
     TError Remove(bool recursive = false) const;
     TError Copy(const TPath &dir) const;
 

@@ -156,17 +156,25 @@ public:
         TFolder upperDir(OvlUpper);
         TFolder workDir(OvlWork);
 
-        TError error = upperDir.Create(0755, true, Volume->GetCred());
+        TError error = upperDir.Create(0755, true);
         if (error) {
             (void)Deconstruct();
             return error;
         }
 
-        error = workDir.Create(0755, true, Volume->GetCred());
+        error = OvlUpper.Chown(Volume->GetCred());
+        if (error)
+            return error;
+
+        error = workDir.Create(0755, true);
         if (error) {
             (void)Deconstruct();
             return error;
         }
+
+        error = OvlWork.Chown(Volume->GetCred());
+        if (error)
+            return error;
 
         error = Volume->GetResource()->Create();
         if (error) {
@@ -277,7 +285,11 @@ TError TVolume::Create() {
         goto remove_volume;
     }
 
-    ret = dir.Create(0755, false, Cred);
+    ret = dir.Create(0755, false);
+    if (ret)
+        goto remove_volume;
+
+    ret = Path.Chown(Cred);
     if (ret)
         goto remove_volume;
 
@@ -370,18 +382,16 @@ TError TVolume::LoadFromStorage() {
         auto key = node.pairs(i).key();
         auto value = node.pairs(i).val();
 
-        if (key == "source") {
+        if (key == "source")
             source = value;
-        } else if (key == "quota") {
+        else if (key == "quota")
             quota = value;
-        } else if (key == "flags") {
+        else if (key == "flags")
             flags = value;
-        } else if (key == "user") {
+        else if (key == "user")
             user = value;
-        } else if (key == "group") {
+        else if (key == "group")
             group = value;
-        } else
-            L_WRN() << "Unknown key in volume storage: " << key << std::endl;
     }
 
     error = Holder->GetResource(source, Resource);

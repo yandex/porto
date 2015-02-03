@@ -44,7 +44,7 @@ TError SetHostName(const std::string &name);
 bool FdHasEvent(int fd);
 TError DropBoundedCap(int cap);
 TError SetCap(uint64_t effective, uint64_t permitted, uint64_t inheritable);
-void CloseAllFds();
+int CloseAllFds(int except);
 
 class TScopedFd : public TNonCopyable {
     int Fd;

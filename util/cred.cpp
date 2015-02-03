@@ -7,6 +7,8 @@
 extern "C" {
 #include <grp.h>
 #include <pwd.h>
+#include <unistd.h>
+#include <sys/types.h>
 }
 
 std::string TUserEntry::GetName() {

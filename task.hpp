@@ -111,7 +111,6 @@ class TTask: public TNonCopyable {
     pid_t Pid;
     std::shared_ptr<TFolder> Cwd;
 
-    int CloseAllFds(int except) const;
     void Syslog(const std::string &s) const;
     void ReportPid(int pid) const;
 
