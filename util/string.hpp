@@ -22,3 +22,4 @@ TError SplitString(const std::string &s, const char sep, std::vector<std::string
 TError SplitEscapedString(const std::string &s, const char sep, std::vector<std::string> &tokens);
 std::string StringTrim(const std::string& s, const std::string &what = " \t\n");
 std::string StringRemoveRepeating(const std::string &str, const char rc);
+bool StringOnlyDigits(const std::string &s);

@@ -13,6 +13,7 @@
 constexpr const char *P_RAW_ROOT_PID = "_root_pid";
 constexpr const char *P_RAW_ID = "_id";
 constexpr const char *P_RAW_LOOP_DEV = "_loop_dev";
+constexpr const char *P_RAW_NAME = "_name";
 constexpr const char *P_COMMAND = "command";
 constexpr const char *P_USER = "user";
 constexpr const char *P_GROUP = "group";
@@ -99,8 +100,9 @@ class TPropertySet : public TNonCopyable {
 
 public:
     TPropertySet(std::shared_ptr<TKeyValueStorage> storage,
-                 std::shared_ptr<TContainer> c) :
-        Container(c), Name(c->GetName()), VariantSet(storage, &propertySet, c) {}
+                 std::shared_ptr<TContainer> c,
+                 bool preserve) :
+        Container(c), Name(c->GetName()), VariantSet(storage, &propertySet, c, preserve) {}
 
     SYNTHESIZE_ACCESSOR(String, std::string);
     SYNTHESIZE_ACCESSOR(Bool, bool);

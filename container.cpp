@@ -590,6 +590,10 @@ TError TContainer::Create(const TCred &cred) {
     if (error)
         return error;
 
+    error = Prop->SetString(P_RAW_NAME, Name);
+    if (error)
+        return error;
+
     if (Parent)
         Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
 
@@ -1081,8 +1085,8 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
 }
 
 TError TContainer::Prepare() {
-    Prop = std::make_shared<TPropertySet>(Storage, shared_from_this());
-    Data = std::make_shared<TVariantSet>(Storage, &dataSet, shared_from_this());
+    Prop = std::make_shared<TPropertySet>(Storage, shared_from_this(), Name != ROOT_CONTAINER);
+    Data = std::make_shared<TVariantSet>(Storage, &dataSet, shared_from_this(), Name != ROOT_CONTAINER);
     if (!Prop || !Data)
         throw std::bad_alloc();
 

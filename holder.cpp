@@ -9,6 +9,8 @@
 #include "util/string.hpp"
 #include "util/cred.hpp"
 
+constexpr uint16_t ROOT_CONTAINER_ID = 1;
+
 void TContainerHolder::DestroyRoot() {
     // we want children to be removed first
     while (Containers.begin() != Containers.end()) {
@@ -44,15 +46,11 @@ TError TContainerHolder::CreateRoot() {
     if (error)
         return error;
 
-    uint16_t id;
-    error = IdMap.Get(id);
-    if (error)
-        return error;
-
-    if (id != 2)
-        return TError(EError::Unknown, "Unexpected root container id");
-
     auto root = Get(ROOT_CONTAINER);
+
+    if (root->GetId() != ROOT_CONTAINER_ID)
+        return TError(EError::Unknown, "Unexpected root container id " + std::to_string(root->GetId()));
+
     error = root->Start();
     if (error)
         return error;
@@ -175,30 +173,37 @@ std::vector<std::string> TContainerHolder::List() const {
 
 TError TContainerHolder::RestoreId(const kv::TNode &node, uint16_t &id) {
     std::string value = "";
-    for (int i = 0; i < node.pairs_size(); i++) {
-        auto key = node.pairs(i).key();
 
-        if (key == P_RAW_ID)
-            value = node.pairs(i).val();
-    }
+    TError error = Storage->Get(node, P_RAW_ID, value);
+    if (error)
+        return error;
 
-    if (value.length() == 0) {
-        TError error = IdMap.Get(id);
-        if (error)
-            return error;
-    } else {
-        uint32_t id32;
-        TError error = StringToUint32(value, id32);
-        if (error)
-            return error;
+    uint32_t id32;
+    error = StringToUint32(value, id32);
+    if (error)
+        return error;
 
-        id = (uint16_t)id32;
-    }
+    id = (uint16_t)id32;
+
+    error = IdMap.GetAt(id);
+    if (error)
+        return error;
 
     return TError::Success();
 }
 
-TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node) {
+TError TContainerHolder::Restore(const std::string &nodeName, const kv::TNode &node) {
+    std::string name = nodeName;
+
+    // since porto v0.31 we use container id is kvalue node name
+    if (StringOnlyDigits(name)) {
+        TError error = Storage->Get(node, P_RAW_NAME, name);
+        if (error)
+            return error;
+    } else {
+        Storage->RemoveNode(name);
+    }
+
     if (name == ROOT_CONTAINER)
         return TError::Success();
 

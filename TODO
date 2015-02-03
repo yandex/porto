@@ -1,5 +1,4 @@
 - fix f*cking capabilities test on newer kernels
-- kvalue - use id instead of substituting / with +
 - add max_rss support
 - run some kind of init process in meta container
 - fix netfilter bug with >3.10

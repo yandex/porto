@@ -3739,8 +3739,6 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
     } catch (string e) {
         std::cerr << "EXCEPTION: " << e << std::endl;
         ret = EXIT_FAILURE;
-        AsRoot(api);
-        SetHostName(origHostname);
         goto exit;
     }
 

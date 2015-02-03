@@ -160,6 +160,14 @@ static std::set<EContainerState> dynamicProperty = {
     EContainerState::Meta,
 };
 
+static std::set<EContainerState> anyState = {
+    EContainerState::Stopped,
+    EContainerState::Dead,
+    EContainerState::Running,
+    EContainerState::Paused,
+    EContainerState::Meta
+};
+
 class TCommandProperty : public TStringValue {
 public:
     TCommandProperty() :
@@ -1197,20 +1205,25 @@ public:
     }
 };
 
-class TIdProperty : public TIntValue {
+class TRawIdProperty : public TIntValue {
 public:
-    TIdProperty() : TIntValue(P_RAW_ID, "", HIDDEN_VALUE | PERSISTENT_VALUE, {}) {}
+    TRawIdProperty() : TIntValue(P_RAW_ID, "", HIDDEN_VALUE | PERSISTENT_VALUE, anyState) {}
 };
 
-class TRootPidProperty : public TIntValue {
+class TRawRootPidProperty : public TIntValue {
 public:
-    TRootPidProperty() : TIntValue(P_RAW_ROOT_PID, "", HIDDEN_VALUE | PERSISTENT_VALUE, {}) {}
+    TRawRootPidProperty() : TIntValue(P_RAW_ROOT_PID, "", HIDDEN_VALUE | PERSISTENT_VALUE, anyState) {}
 };
 
-class TLoopDevProperty : public TIntValue {
+class TRawLoopDevProperty : public TIntValue {
 public:
-    TLoopDevProperty() : TIntValue(P_RAW_LOOP_DEV, "", HIDDEN_VALUE | PERSISTENT_VALUE, {}) {}
+    TRawLoopDevProperty() : TIntValue(P_RAW_LOOP_DEV, "", HIDDEN_VALUE | PERSISTENT_VALUE, anyState) {}
     int GetDefaultInt(std::shared_ptr<TContainer> c) override { return -1; }
+};
+
+class TRawNameProperty : public TStringValue {
+public:
+    TRawNameProperty() : TStringValue(P_RAW_NAME, "", HIDDEN_VALUE | PERSISTENT_VALUE, anyState) {}
 };
 
 TValueSet propertySet;
@@ -1250,9 +1263,10 @@ TError RegisterProperties() {
         new TDefaultGwProperty,
         new TVirtModeProperty,
 
-        new TIdProperty,
-        new TRootPidProperty,
-        new TLoopDevProperty,
+        new TRawIdProperty,
+        new TRawRootPidProperty,
+        new TRawLoopDevProperty,
+        new TRawNameProperty,
     };
 
     return propertySet.Register(properties);

@@ -230,18 +230,19 @@ class TVariantSet : public TNonCopyable {
     std::shared_ptr<TKeyValueStorage> Storage;
     TValueSet *ValueSet;
     std::weak_ptr<TContainer> Container;
-    std::string Name;
+    uint16_t Id;
+    bool Persist;
     std::map<std::string, std::shared_ptr<TVariant>> Variant;
 
     TError AppendStorage(const std::string& key, const std::string& value);
-    bool IsRoot();
 
 public:
     TError Get(const std::string &name, std::shared_ptr<TContainer> &c,
                TValue **p, std::shared_ptr<TVariant> &v);
 
     TVariantSet(std::shared_ptr<TKeyValueStorage> storage,
-                TValueSet *v, std::shared_ptr<TContainer> c);
+                TValueSet *v, std::shared_ptr<TContainer> c,
+                bool persist);
     ~TVariantSet();
 
     TError Create();

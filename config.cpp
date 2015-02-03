@@ -61,21 +61,17 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_default_cpu_prio(50);
     config().mutable_container()->set_kill_timeout_ms(1000);
     config().mutable_container()->set_stop_timeout_ms(1000);
-    config().mutable_container()->set_use_hierarchy(false);
+    config().mutable_container()->set_use_hierarchy(true);
     config().mutable_container()->set_max_total(3000);
 
     config().mutable_volumes()->mutable_keyval()->mutable_file()->set_path("/run/porto/pkvs");
     config().mutable_volumes()->mutable_keyval()->mutable_file()->set_perm(0755);
     config().mutable_volumes()->mutable_keyval()->set_size("size=32m");
 
-    config().mutable_volumes()->set_volume_dir("/place/volumes");
-    config().mutable_volumes()->set_resource_dir("/place/resources");
+    config().mutable_volumes()->set_volume_dir("/place/porto/volumes");
+    config().mutable_volumes()->set_resource_dir("/place/porto/resources");
     // TODO: make sure we pick up correct default here depending on kernel
     // version
-    // TODO:
-    // - /place/porto -> /place/porto/containers
-    // - /place/volumes -> /place/porto/volumes
-    // - /place/volumes/resources -> /place/porto/resources
     config().mutable_volumes()->set_native(false);
 }
 

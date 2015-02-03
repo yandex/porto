@@ -255,3 +255,17 @@ TError TKeyValueStorage::Append(const std::string &name, const std::string& key,
 
     return AppendNode(name, node);
 }
+
+TError TKeyValueStorage::Get(const kv::TNode &node, const std::string &name, std::string &val) const {
+    for (int i = 0; i < node.pairs_size(); i++) {
+        auto key = node.pairs(i).key();
+        auto value = node.pairs(i).val();
+
+        if (key == name) {
+            val = node.pairs(i).val();
+            return TError::Success();
+        }
+    }
+
+    return TError(EError::Unknown, "Entry " + name + " not found");
+}

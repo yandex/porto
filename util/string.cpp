@@ -185,3 +185,7 @@ std::string StringRemoveRepeating(const std::string &str, const char rc) {
 
     return s.str();
 }
+
+bool StringOnlyDigits(const std::string &s) {
+    return std::all_of(s.begin(), s.end(), ::isdigit);
+}

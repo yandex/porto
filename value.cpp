@@ -237,31 +237,32 @@ std::vector<std::string> TValueSet::GetNames() {
 }
 
 TVariantSet::~TVariantSet() {
-    if (!IsRoot()) {
-        TError error = Storage->RemoveNode(Name);
-        if (error)
-            L_ERR() << "Can't remove key-value node " << Name << ": " << error << std::endl;
-    }
-}
+    if (!Persist)
+        return;
 
-bool TVariantSet::IsRoot() {
-    return Name == ROOT_CONTAINER;
+    TError error = Storage->RemoveNode(std::to_string(Id));
+    if (error)
+        L_ERR() << "Can't remove key-value node " << Id << ": " << error << std::endl;
 }
 
 TVariantSet::TVariantSet(std::shared_ptr<TKeyValueStorage> storage,
-                         TValueSet *v, std::shared_ptr<TContainer> c) :
-    Storage(storage), ValueSet(v), Container(c), Name(c->GetName()) {
+                         TValueSet *v, std::shared_ptr<TContainer> c,
+                         bool persist) :
+    Storage(storage), ValueSet(v), Container(c), Id(c->GetId()), Persist(persist) {
 }
 
 TError TVariantSet::Create() {
-    return Storage->Create(Name);
+    if (!Persist)
+        return TError::Success();
+
+    return Storage->Create(std::to_string(Id));
 }
 
 TError TVariantSet::AppendStorage(const std::string& key, const std::string& value) {
-    if (IsRoot())
+    if (!Persist)
         return TError::Success();
 
-    return Storage->Append(Name, key, value);
+    return Storage->Append(std::to_string(Id), key, value);
 }
 
 TError TVariantSet::Restore(const kv::TNode &node) {
@@ -353,11 +354,14 @@ void TVariantSet::Reset(const std::string &name) {
 }
 
 TError TVariantSet::Flush() {
-    return Storage->Create(Name);
+    if (!Persist)
+        return TError::Success();
+
+    return Storage->Create(std::to_string(Id));
 }
 
 TError TVariantSet::Sync() {
-    if (IsRoot())
+    if (!Persist)
         return TError::Success();
 
     kv::TNode node;
@@ -380,5 +384,5 @@ TError TVariantSet::Sync() {
             L() << "Sync " << name << " = " << GetString(name) << std::endl;
     }
 
-    return Storage->AppendNode(Name, node);
+    return Storage->AppendNode(std::to_string(Id), node);
 }

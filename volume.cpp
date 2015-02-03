@@ -119,7 +119,7 @@ public:
     TVolumeNativeImpl(std::shared_ptr<TVolume> volume) : TVolumeImpl(volume) {}
 
     TError Create() override {
-        std::string id = Sha256(Volume->GetPath().ToString());
+        std::string id = std::to_string(Volume->GetId());
 
         OvlUpper = TPath(config().volumes().volume_dir()).AddComponent(id).AddComponent("upper");
         OvlWork = TPath(config().volumes().volume_dir()).AddComponent(id).AddComponent("work");
@@ -276,9 +276,13 @@ TError TVolume::Create() {
     if (ret)
         return TError(EError::InvalidValue, "Invalid volume quota");
 
-    ret = Holder->Insert(shared_from_this());
+    ret = Holder->IdMap.Get(Id);
     if (ret)
         return ret;
+
+    ret = Holder->Insert(shared_from_this());
+    if (ret)
+        goto put_id;
 
     if (Path.Exists()) {
         ret = TError(EError::InvalidValue, "Destination path already exists");
@@ -298,7 +302,7 @@ TError TVolume::Create() {
         goto remove_volume;
     Impl->Create();
 
-    ret = SaveToStorage();
+    ret = SaveToStorage(std::to_string(Id));
     if (ret)
         goto destroy_volume;
 
@@ -309,6 +313,9 @@ destroy_volume:
 
 remove_volume:
     Holder->Remove(shared_from_this());
+
+put_id:
+    (void)Holder->IdMap.Put(Id);
     return ret;
 }
 
@@ -336,45 +343,53 @@ const std::string TVolume::GetSource() const {
 
 TError TVolume::Destroy() {
     Holder->Remove(shared_from_this());
-    Storage->RemoveNode(Path.ToString());
+    Storage->RemoveNode(std::to_string(Id));
     Impl->Destroy();
     Impl = nullptr;
     return TError::Success();
 }
 
-TError TVolume::SaveToStorage() const {
-    TError error = Storage->Append(Path.ToString(), "source", Resource->GetSource().ToString());
+TError TVolume::SaveToStorage(const std::string &path) const {
+    TError error = Storage->Append(path, "path", Path.ToString());
     if (error)
         return error;
 
-    error = Storage->Append(Path.ToString(), "quota", Quota);
+    error = Storage->Append(path, "source", Resource->GetSource().ToString());
     if (error)
         return error;
 
-    error = Storage->Append(Path.ToString(), "flags", Flags);
+    error = Storage->Append(path, "quota", Quota);
     if (error)
         return error;
 
-    error = Storage->Append(Path.ToString(), "user", Cred.UserAsString());
+    error = Storage->Append(path, "flags", Flags);
     if (error)
         return error;
 
-    error = Storage->Append(Path.ToString(), "group", Cred.GroupAsString());
+    error = Storage->Append(path, "user", Cred.UserAsString());
+    if (error)
+        return error;
+
+    error = Storage->Append(path, "group", Cred.GroupAsString());
+    if (error)
+        return error;
+
+    error = Storage->Append(path, "id", std::to_string(Id));
     if (error)
         return error;
 
     kv::TNode node;
     if (Impl->Save(node))
-        error = Storage->AppendNode(Path.ToString(), node);
+        error = Storage->AppendNode(path, node);
     return error;
 }
 
-TError TVolume::LoadFromStorage() {
+TError TVolume::LoadFromStorage(const std::string &path) {
     kv::TNode node;
     TError error;
     std::string user, group, source, quota, flags;
 
-    error = Storage->LoadNode(Path.ToString(), node);
+    error = Storage->LoadNode(path, node);
     if (error)
         return error;
 
@@ -382,7 +397,9 @@ TError TVolume::LoadFromStorage() {
         auto key = node.pairs(i).key();
         auto value = node.pairs(i).val();
 
-        if (key == "source")
+        if (key == "path")
+            Path = value;
+        else if (key == "source")
             source = value;
         else if (key == "quota")
             quota = value;
@@ -392,7 +409,19 @@ TError TVolume::LoadFromStorage() {
             user = value;
         else if (key == "group")
             group = value;
+        else if (key == "id") {
+            uint32_t id32;
+            TError error = StringToUint32(value, id32);
+            if (error)
+                return error;
+
+            Id = (uint16_t)id32;
+        }
     }
+
+    error = Holder->IdMap.GetAt(Id);
+    if (error)
+        return error;
 
     error = Holder->GetResource(source, Resource);
     if (error)
@@ -461,9 +490,9 @@ TError TVolumeHolder::RestoreFromStorage() {
         return error;
 
     for (auto &i : list) {
-        std::shared_ptr<TVolume> v = std::make_shared<TVolume>(Storage, shared_from_this(), i);
+        std::shared_ptr<TVolume> v = std::make_shared<TVolume>(Storage, shared_from_this());
 
-        error = v->LoadFromStorage();
+        error = v->LoadFromStorage(i);
         if (error) {
             Storage->RemoveNode(i);
             L_WRN() << "Corrupted volume " << i << " removed: " << error << std::endl;

@@ -27,4 +27,5 @@ public:
     TError Destroy();
     TError Create(const std::string &name) const;
     TError Append(const std::string &name, const std::string& key, const std::string& value) const;
+    TError Get(const kv::TNode &node, const std::string &name, std::string &val) const;
 };
