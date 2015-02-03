@@ -2,6 +2,7 @@
 
 #include "test.hpp"
 #include "config.hpp"
+#include "error.hpp"
 #include "util/file.hpp"
 #include "util/folder.hpp"
 #include "util/string.hpp"
@@ -37,6 +38,32 @@ void ExpectReturn(int ret, int exp, int line, const char *func) {
     if (ret == exp)
         return;
     throw std::string("Got " + std::to_string(ret) + ", but expected " + std::to_string(exp) + " at " + func + ":" + std::to_string(line));
+}
+
+void ExpectError(const TError &ret, const TError &exp, int line, const char *func) {
+    std::stringstream ss;
+
+    if (ret == exp)
+        return;
+
+    ss << "Got " << ret << ", but expected " << exp << " at " << func << ":" << line;
+
+    throw ss.str();
+}
+
+void ExpectApi(TPortoAPI &api, int ret, int exp, int line, const char *func) {
+    std::stringstream ss;
+
+    if (ret == exp)
+        return;
+
+    int err;
+    std::string msg;
+    api.GetLastError(err, msg);
+    TError error((rpc::EError)err, msg);
+    ss << "Got error from libporto: " << error << " (" << ret << " != " << exp << ") at " << func << ":" << line;
+
+    throw ss.str();
 }
 
 int ReadPid(const std::string &path) {
@@ -583,11 +610,11 @@ void TestDaemon(TPortoAPI &api) {
 
     Say() << "Check portod-master queue size" << std::endl;
     std::string v;
-    ExpectSuccess(api.GetData("/", "porto_stat[queued_statuses]", v));
+    ExpectApiSuccess(api.GetData("/", "porto_stat[queued_statuses]", v));
     Expect(v == std::to_string(0));
 
     Say() << "Check portod-slave queue size" << std::endl;
-    ExpectSuccess(api.GetData("/", "porto_stat[queued_events]", v));
+    ExpectApiSuccess(api.GetData("/", "porto_stat[queued_events]", v));
     Expect(v == std::to_string(1)); // RotateLogs
 
     // TODO: check rtnl classes

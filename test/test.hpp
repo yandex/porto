@@ -16,6 +16,8 @@ namespace test {
 
     std::basic_ostream<char> &Say(std::basic_ostream<char> &stream = std::cout);
     void ExpectReturn(int ret, int exp, int line, const char *func);
+    void ExpectError(const TError &ret, const TError &exp, int line, const char *func);
+    void ExpectApi(TPortoAPI &api, int ret, int exp, int line, const char *func);
 
     int ReadPid(const std::string &path);
     int Pgrep(const std::string &name);
@@ -66,5 +68,9 @@ namespace test {
 }
 
 #define Expect(ret) ExpectReturn(ret, true, __LINE__, __func__)
-#define ExpectSuccess(ret) ExpectReturn(ret, 0, __LINE__, __func__)
-#define ExpectFailure(ret, exp) ExpectReturn(ret, exp, __LINE__, __func__)
+
+#define ExpectSuccess(ret) ExpectError(ret, TError::Success(), __LINE__, __func__)
+#define ExpectFailure(ret, exp) ExpectError(ret, exp, __LINE__, __func__)
+
+#define ExpectApiSuccess(ret) ExpectApi(api, ret, 0, __LINE__, __func__)
+#define ExpectApiFailure(ret, exp) ExpectApi(api, ret, exp, __LINE__, __func__)
