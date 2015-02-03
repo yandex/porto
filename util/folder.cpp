@@ -3,6 +3,7 @@
 #include "util/log.hpp"
 #include "util/unix.hpp"
 #include "util/folder.hpp"
+#include "util/mount.hpp"
 
 extern "C" {
 #include <sys/stat.h>
@@ -149,4 +150,28 @@ TError TFolder::Copy(const TPath &dir) const {
     }
 
     return TError::Success();
+}
+
+void RemoveIf(const TPath &path,
+              EFileType type,
+              std::function<bool(const std::string &name, const TPath &path)> f) {
+    std::vector<std::string> list;
+    TFolder dir(path);
+
+    TError error = dir.Items(type, list);
+    if (error)
+        return;
+
+    for (auto &entry : list) {
+        TPath id = path.AddComponent(entry);
+        if (f(entry, id)) {
+            L() << "Removing " << id.ToString() << std::endl;
+            TMount m(id, id, "", {});
+            (void)m.Umount();
+            TFolder d(id);
+            error = d.Remove(true);
+            if (error)
+                L_WRN() << "Can't remove " << id.ToString() << ": " << error << std::endl;
+        }
+    }
 }

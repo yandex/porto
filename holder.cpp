@@ -81,7 +81,6 @@ bool TContainerHolder::ValidName(const std::string &name) const {
     if (*(name.end()--) == '/')
         return false;
 
-    // . (dot) is used for kvstorage, so don't allow it here
     return find_if(name.begin(), name.end(),
                    [](const char c) -> bool {
                         return !(isalnum(c) || c == '_' || c == '/' || c == '-' || c == '@' || c == ':' || c == '.');
@@ -195,7 +194,7 @@ TError TContainerHolder::RestoreId(const kv::TNode &node, uint16_t &id) {
 TError TContainerHolder::Restore(const std::string &nodeName, const kv::TNode &node) {
     std::string name = nodeName;
 
-    // since porto v0.31 we use container id is kvalue node name
+    // FIXME since v0.31 we use container id is kvalue node name
     if (StringOnlyDigits(name)) {
         TError error = Storage->Get(node, P_RAW_NAME, name);
         if (error)

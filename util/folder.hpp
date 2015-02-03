@@ -26,3 +26,7 @@ public:
     TError Items(const EFileType type, std::vector<std::string> &list) const;
     TError Subfolders(std::vector<std::string> &list) const;
 };
+
+void RemoveIf(const TPath &path,
+              EFileType type,
+              std::function<bool(const std::string &name, const TPath &path)> f);

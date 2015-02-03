@@ -557,14 +557,12 @@ static int SlaveMain() {
 
         if (!restored) {
             // Remove any container leftovers from previous run
-            string path = config().container().tmp_dir();
-            TFolder dir(path);
-            if (dir.Exists()) {
-                L() << "Removing container leftovers from " << path << std::endl;
-                TError error = dir.Remove(true);
-                if (error)
-                    L_ERR() << "Error while removing " << path << " : " << error << std::endl;
-            }
+            RemoveIf(config().container().tmp_dir(),
+                     EFileType::Directory,
+                     [](const std::string &name, const TPath &path) {
+                        return name != TPath(config().volumes().resource_dir()).BaseName() &&
+                               name != TPath(config().volumes().volume_dir()).BaseName();
+                     });
         }
 
         ret = SlaveRpc(context);

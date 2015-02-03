@@ -450,29 +450,6 @@ TError TVolume::LoadFromStorage(const std::string &path) {
     return TError::Success();
 }
 
-static void RemoveUnused(const TPath &path,
-                         std::function<bool(const TPath &path)> f) {
-    std::vector<std::string> list;
-    TFolder dir(path);
-
-    TError error = dir.Subfolders(list);
-    if (error)
-        return;
-
-    for (auto &entry : list) {
-        TPath name = path.AddComponent(entry);
-        if (f(name)) {
-            L() << "Removing unused " << name.ToString() << std::endl;
-            TMount m(name, name, "", {});
-            (void)m.Umount();
-            TFolder d(name);
-            error = d.Remove(true);
-            if (error)
-                L_WRN() << "Can't remove unused " << name.ToString() << ": " << error << std::endl;
-        }
-    }
-}
-
 TError TVolumeHolder::RestoreFromStorage() {
     std::vector<std::string> list;
 
@@ -502,11 +479,21 @@ TError TVolumeHolder::RestoreFromStorage() {
         L() << "Volume " << v->GetPath().ToString() << " restored" << std::endl;
     }
 
-    RemoveUnused(config().volumes().resource_dir(),
-                 [&](const TPath &path) { return Resources.find(path) == Resources.end(); });
+    RemoveIf(config().volumes().resource_dir(),
+             EFileType::Directory,
+             [&](const std::string &name, const TPath &path) {
+                return Resources.find(path) == Resources.end();
+             });
 
-    RemoveUnused(config().volumes().volume_dir(),
-                 [&](const TPath &path) { return Volumes.find(path) == Volumes.end(); });
+    RemoveIf(config().volumes().volume_dir(),
+             EFileType::Directory,
+             [&](const std::string &name, const TPath &path) {
+                bool found = false;
+                for (auto v : Volumes)
+                    if (std::to_string(v.second->GetId()) == name)
+                        found = true;
+                return !found;
+             });
 
     return TError::Success();
 }
