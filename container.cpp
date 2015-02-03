@@ -594,6 +594,10 @@ TError TContainer::Create(const TCred &cred) {
     if (error)
         return error;
 
+    error = Prop->SetInt(P_RAW_ID, (int)Id);
+    if (error)
+        return error;
+
     if (Parent)
         Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
 
@@ -655,10 +659,6 @@ TError TContainer::Start() {
         return error;
 
     error = Data->SetInt(D_EXIT_STATUS, -1);
-    if (error)
-        return error;
-
-    error = Prop->SetInt(P_RAW_ID, (int)Id);
     if (error)
         return error;
 
