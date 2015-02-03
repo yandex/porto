@@ -187,5 +187,5 @@ std::string StringRemoveRepeating(const std::string &str, const char rc) {
 }
 
 bool StringOnlyDigits(const std::string &s) {
-    return std::all_of(s.begin(), s.end(), ::isdigit);
+    return s.find_first_not_of("0123456789") == std::string::npos;
 }
