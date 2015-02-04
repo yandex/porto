@@ -1005,9 +1005,13 @@ public:
 
 class TListCmd : public ICmd {
 public:
-    TListCmd(TPortoAPI *api) : ICmd(api, "list", 0, "", "list created containers") {}
+    TListCmd(TPortoAPI *api) : ICmd(api, "list", 0, "[-1]", "list created containers") {}
 
     int Execute(int argc, char *argv[]) {
+        bool details = true;
+        if (argc >= 1 && argv[0] == std::string("-1"))
+            details = false;
+
         vector<string> clist;
         int ret = Api->List(clist);
         if (ret) {
@@ -1023,20 +1027,23 @@ public:
             if (c == "/")
                 continue;
 
-            string s;
-            ret = Api->GetData(c, "state", s);
-            if (ret)
-                PrintError("Can't get container state");
+            std::cout << std::left << std::setw(nameLen) << c;
 
-            std::cout << std::left << std::setw(nameLen) << c
-                      << std::right << std::setw(stateLen) << s;
+            if (details) {
+                string s;
+                ret = Api->GetData(c, "state", s);
+                if (ret)
+                    PrintError("Can't get container state");
 
-            if (s == "running" || s == "dead") {
-                string tm;
-                ret = Api->GetData(c, "time", tm);
-                if (!ret)
-                        std::cout << std::right << std::setw(timeLen)
-                            << DataValue("time", tm);
+                std::cout << std::right << std::setw(stateLen) << s;
+
+                if (s == "running" || s == "dead") {
+                    string tm;
+                    ret = Api->GetData(c, "time", tm);
+                    if (!ret)
+                            std::cout << std::right << std::setw(timeLen)
+                                << DataValue("time", tm);
+                }
             }
 
             std::cout << std::endl;
