@@ -50,7 +50,7 @@ public:
     static int GetFd();
     static std::basic_ostream<char> &Log(ELogLevel level = LOG_NOTICE);
     static void LogRequest(const std::string &message);
-    static void LogResponse(const std::string &message);
+    static void LogResponse(const std::string &message, size_t execTimeMs);
 };
 
 static inline std::basic_ostream<char> &L() { return TLogger::Log(); }

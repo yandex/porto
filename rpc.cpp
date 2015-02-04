@@ -16,9 +16,12 @@ void SendReply(std::shared_ptr<TClient> client, rpc::TContainerResponse &respons
 
     google::protobuf::io::FileOutputStream post(client->Fd);
 
+    size_t execTimeMs = GetCurrentTimeMs() - client->RequestStartMs;
     if (response.IsInitialized()) {
         if (!WriteDelimitedTo(response, &post))
             L() << "Write error for " << client->Fd << std:: endl;
+        else
+            TLogger::LogResponse(response.ShortDebugString(), execTimeMs);
         post.Flush();
     }
 }
@@ -318,6 +321,8 @@ bool HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
     string str;
     bool send_reply = true;
 
+    client->RequestStartMs = GetCurrentTimeMs();
+
     TLogger::LogRequest(req.ShortDebugString());
 
     rsp.set_error(EError::Unknown);
@@ -381,7 +386,6 @@ bool HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
     if (send_reply) {
         rsp.set_error(error.GetError());
         rsp.set_errormsg(error.GetMsg());
-        TLogger::LogResponse(rsp.ShortDebugString());
     }
 
     return send_reply;

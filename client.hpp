@@ -14,6 +14,7 @@ public:
     int Fd;
     pid_t Pid;
     TCred Cred;
+    size_t RequestStartMs;
 
     TClient(int fd) : Fd(fd) {};
     ~TClient() {

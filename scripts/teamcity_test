@@ -20,10 +20,17 @@ build() {
 	checkver client v$version $(getver client)
 }
 
+toprpc() {
+	cat /var/log/portod.log | egrep ': (->|<-)' | cut -d ':' -f4- | sed '$!N;s/\n/ /' | awk '{print $2, $(NF)}' | sed -e 's/ms//' | sort -n -k2 -r | head -n 100
+}
+
 selftest() {
 	netup
-	sudo scripts/test false true
+	sudo scripts/test false
+	toprpc
+	sudo scripts/test true
 	netdown
+	toprpc
 }
 
 pkgtest() {
