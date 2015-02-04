@@ -250,7 +250,6 @@ static TError CreateVolume(TContext &context,
     std::weak_ptr<TClient> c = client;
     TBatchTask task(
         [volume] () {
-            // TODO: mark volume as CONSTRUCTION IN-PROGRESS
             return volume->Construct();
         },
         [volume, c] (TError error) {
@@ -258,6 +257,8 @@ static TError CreateVolume(TContext &context,
                 L() << "Can't construct volume: " << error << std::endl;
                 (void)volume->Destroy();
             }
+
+            volume->SetValid(true);
 
             rpc::TContainerResponse response;
             response.set_error(error.GetError());
@@ -272,15 +273,16 @@ static TError DestroyVolume(TContext &context,
                             rpc::TContainerResponse &rsp,
                             std::shared_ptr<TClient> client) {
     auto volume = context.Vholder->Get(StringTrim(req.path()));
-    if (volume) {
+    if (volume && volume->IsValid()) {
         TError error = volume->CheckPermission(client->Cred);
         if (error)
             return error;
 
+        volume->SetValid(false);
+
         std::weak_ptr<TClient> c = client;
         TBatchTask task(
             [volume] () {
-                // TODO: mark volume as DECONSTRUCTION IN-PROGRESS
                 return volume->Deconstruct();
             },
             [volume, c] (TError error) {
@@ -304,9 +306,10 @@ static TError DestroyVolume(TContext &context,
 static TError ListVolumes(TContext &context,
                           rpc::TContainerResponse &rsp) {
     for (auto path : context.Vholder->List()) {
-        auto desc = rsp.mutable_volumelist()->add_list();
         auto vol = context.Vholder->Get(path);
-        // TODO: EXCLUDE CONSTRUCTION IN-PROGRESS
+        if (!vol->IsValid())
+            continue;
+        auto desc = rsp.mutable_volumelist()->add_list();
         desc->set_path(vol->GetPath().ToString());
         desc->set_source(vol->GetSource());
         desc->set_quota(vol->GetQuota());

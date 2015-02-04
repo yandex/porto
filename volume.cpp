@@ -269,6 +269,8 @@ TError TVolume::Create() {
     TError ret;
     TFolder dir(Path);
 
+    SetValid(false);
+
     if (!Path.ToString().length() || Path.ToString()[0] != '/')
         return TError(EError::InvalidValue, "Invalid volume path");
 
@@ -446,6 +448,8 @@ TError TVolume::LoadFromStorage(const std::string &path) {
     error = Holder->Insert(shared_from_this());
     if (error)
         return error;
+
+    SetValid(true);
 
     return TError::Success();
 }

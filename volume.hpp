@@ -37,6 +37,7 @@ class TVolume : public std::enable_shared_from_this<TVolume>, public TNonCopyabl
     uint64_t ParsedQuota;
     std::string Flags;
     uint16_t Id;
+    bool Valid = false;
 
     std::unique_ptr<TVolumeImpl> Impl;
     TError Prepare();
@@ -69,6 +70,8 @@ public:
     TError SaveToStorage(const std::string &path) const;
     TError LoadFromStorage(const std::string &path);
     TCred GetCred() const { return Cred; }
+    bool IsValid() { return Valid; }
+    void SetValid(bool v) { Valid = v; }
 };
 
 class TResource : public TNonCopyable {
