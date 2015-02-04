@@ -191,18 +191,48 @@ TError TContainerHolder::RestoreId(const kv::TNode &node, uint16_t &id) {
     return TError::Success();
 }
 
-TError TContainerHolder::Restore(const std::string &nodeName, const kv::TNode &node) {
-    std::string name = nodeName;
-
-    // FIXME since v0.31 we use container id is kvalue node name
-    if (StringOnlyDigits(name)) {
-        TError error = Storage->Get(node, P_RAW_NAME, name);
-        if (error)
-            return error;
-    } else {
-        Storage->RemoveNode(name);
+bool TContainerHolder::RestoreFromStorage() {
+    std::map<std::string, kv::TNode> id2node;
+    TError error = Storage->Restore(id2node);
+    if (error) {
+        L_ERR() << "Can't restore state: " << error << std::endl;
+        return false;
     }
 
+    // FIXME since v0.31 we use container id as kvalue node name and because
+    // we need to create containers in particular order we create this
+    // name-sorted map
+    std::map<std::string, std::string> name2id;
+    for (auto pair : id2node) {
+        std::string name = pair.first;
+        if (StringOnlyDigits(name)) {
+            TError error = Storage->Get(pair.second, P_RAW_NAME, name);
+            if (error) {
+                L_ERR() << "Can't get " << P_RAW_NAME << " from " << name << std::endl;
+                Storage->RemoveNode(pair.first);
+                continue;
+            }
+        } else {
+            Storage->RemoveNode(pair.first);
+        }
+
+        name2id[name] = pair.first;
+    }
+
+    bool restored = false;
+    for (auto &r : name2id) {
+        restored = true;
+        error = Restore(r.first, id2node[r.second]);
+        if (error) {
+            L_ERR() << "Can't restore " << r.first << " state : " << error << " (" << id2node[r.second].ShortDebugString() << ")" << std::endl;
+            Statistics->RestoreFailed++;
+        }
+    }
+
+    return restored;
+}
+
+TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node) {
     if (name == ROOT_CONTAINER)
         return TError::Success();
 

@@ -40,7 +40,8 @@ public:
     TError CreateRoot();
     TError Create(const std::string &name, const TCred &cred);
     std::shared_ptr<TContainer> Get(const std::string &name);
-    TError Restore(const std::string &nodeName, const kv::TNode &node);
+    TError Restore(const std::string &name, const kv::TNode &node);
+    bool RestoreFromStorage();
     TError Destroy(const std::string &name);
     void DestroyRoot();
 

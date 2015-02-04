@@ -574,7 +574,7 @@ TError TContainer::PrepareTask() {
 }
 
 TError TContainer::Create(const TCred &cred) {
-    L() << "Create " << GetName() << " " << Id << " " << cred.Uid << " " << cred.Gid << std::endl;
+    L() << "Create " << GetName() << " with id " << Id << " uid " << cred.Uid << " gid " << cred.Gid << std::endl;
 
     TError error = Prepare();
     if (error) {
@@ -590,7 +590,7 @@ TError TContainer::Create(const TCred &cred) {
     if (error)
         return error;
 
-    error = Prop->SetString(P_RAW_NAME, Name);
+    error = Prop->SetString(P_RAW_NAME, GetName());
     if (error)
         return error;
 
@@ -1106,7 +1106,7 @@ TError TContainer::Prepare() {
 }
 
 TError TContainer::Restore(const kv::TNode &node) {
-    L() << "Restore " << GetName() << " " << Id << std::endl;
+    L() << "Restore " << GetName() << " with id " << Id << std::endl;
 
     TError error = Prepare();
     if (error)

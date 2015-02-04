@@ -532,23 +532,7 @@ static int SlaveMain() {
             return EXIT_FAILURE;
         }
 
-        bool restored = false;
-        {
-            std::map<std::string, kv::TNode> m;
-            error = context.Storage->Restore(m);
-            if (error)
-                L_ERR() << "Can't restore state: " << error << std::endl;
-
-            for (auto &r : m) {
-                restored = true;
-                error = context.Cholder->Restore(r.first, r.second);
-                if (error) {
-                    L_ERR() << "Can't restore " << r.first << " state : " << error << " (" << r.second.ShortDebugString() << ")" << std::endl;
-                    Statistics->RestoreFailed++;
-                }
-            }
-        }
-
+        bool restored = context.Cholder->RestoreFromStorage();
         context.Vholder->RestoreFromStorage();
 
         L() << "Done restoring" << std::endl;

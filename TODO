@@ -1,3 +1,6 @@
+- add request service time to log
+- portoctl stopall startall restartall
+- portoctl list -1 (without time)
 - fix f*cking capabilities test on newer kernels
 - add max_rss support
 - run some kind of init process in meta container
