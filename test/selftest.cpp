@@ -190,8 +190,17 @@ static void ShouldHaveValidRunningData(TPortoAPI &api, const string &name) {
         ExpectApiSuccess(api.GetData(name, "net_drops", v));
         ExpectApiSuccess(api.GetData(name, "net_overlimits", v));
     }
+
+    int intval;
     ExpectApiSuccess(api.GetData(name, "minor_faults", v));
+    ExpectSuccess(StringToInt(v, intval));
+    Expect(intval > 0);
     ExpectApiSuccess(api.GetData(name, "major_faults", v));
+    ExpectSuccess(StringToInt(v, intval));
+    Expect(intval >= 0);
+    ExpectApiSuccess(api.GetData(name, "max_rss", v));
+    ExpectSuccess(StringToInt(v, intval));
+    Expect(intval >= 0);
 
     ExpectApiFailure(api.GetData(name, "oom_killed", v), EError::InvalidState);
     ExpectApiSuccess(api.GetData(name, "respawn_count", v));
@@ -228,6 +237,7 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     }
     ExpectApiFailure(api.GetData(name, "minor_faults", v), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "major_faults", v), EError::InvalidState);
+    ExpectApiFailure(api.GetData(name, "max_rss", v), EError::InvalidState);
 
     ExpectApiFailure(api.GetData(name, "oom_killed", v), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "respawn_count", v), EError::InvalidState);
@@ -1997,6 +2007,7 @@ static void TestRoot(TPortoAPI &api) {
         "io_read",
         "io_write",
         "time",
+        "max_rss",
     };
 
     std::vector<TProperty> plist;

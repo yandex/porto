@@ -420,6 +420,26 @@ public:
     }
 };
 
+class TMaxRssData : public TUintValue {
+public:
+    TMaxRssData() :
+        TUintValue(D_MAX_RSS,
+                   "Guaranteed amount of memory",
+                   NODEF_VALUE,
+                   rpdmState) {}
+
+    uint64_t GetUint(std::shared_ptr<TContainer> c,
+                     std::shared_ptr<TVariant> v) override {
+        uint64_t val;
+        auto cg = c->GetLeafCgroup(memorySubsystem);
+        TError error = memorySubsystem->Statistics(cg, "max_rss", val);
+        if (error)
+            return 0;
+
+        return val;
+    }
+};
+
 class TPortoStatData : public TMapValue {
 public:
     TPortoStatData() :
@@ -472,6 +492,7 @@ TError RegisterData() {
         new TIoReadData,
         new TIoWriteData,
         new TTimeData,
+        new TMaxRssData,
         new TPortoStatData,
     };
 

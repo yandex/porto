@@ -1,5 +1,4 @@
 - portoctl stopall startall restartall
-- add max_rss support
 - run some kind of init process in meta container
 - fix f*cking capabilities test on newer kernels
 - rework TValue on templates
