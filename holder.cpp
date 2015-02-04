@@ -21,6 +21,16 @@ void TContainerHolder::DestroyRoot() {
     }
 }
 
+TError TContainerHolder::ReserveDefaultClassId() {
+    uint16_t id;
+    TError error = IdMap.Get(id);
+    if (error)
+        return error;
+    if (id != 2)
+        return TError(EError::Unknown, "Unexpected default class id " + std::to_string(id));
+    return TError::Success();
+}
+
 TError TContainerHolder::CreateRoot() {
     TError error = RegisterProperties();
     if (error)
@@ -50,6 +60,10 @@ TError TContainerHolder::CreateRoot() {
 
     if (root->GetId() != ROOT_CONTAINER_ID)
         return TError(EError::Unknown, "Unexpected root container id " + std::to_string(root->GetId()));
+
+    error = ReserveDefaultClassId();
+    if (error)
+        return error;
 
     error = root->Start();
     if (error)

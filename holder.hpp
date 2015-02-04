@@ -20,12 +20,13 @@ class TContainerHolder : public std::enable_shared_from_this<TContainerHolder> {
     std::shared_ptr<TNetwork> Net;
     std::map<std::string, std::shared_ptr<TContainer>> Containers;
     TIdMap IdMap;
+    std::shared_ptr<TKeyValueStorage> Storage;
 
     bool ValidName(const std::string &name) const;
     TError RestoreId(const kv::TNode &node, uint16_t &id);
     void ScheduleLogRotatation();
     TError _Destroy(const std::string &name);
-    std::shared_ptr<TKeyValueStorage> Storage;
+    TError ReserveDefaultClassId();
 
 public:
     std::shared_ptr<TEventQueue> Queue;

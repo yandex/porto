@@ -1,7 +1,8 @@
 - portoctl stopall startall restartall
-- fix f*cking capabilities test on newer kernels
 - add max_rss support
 - run some kind of init process in meta container
+- fix f*cking capabilities test on newer kernels
+- rework TValue on templates
 - fix netfilter bug with >3.10
 - mount root loop in root namespace (to better diagnose possible problems)
 - root_readonly: remount root instead of binding into itself with ro
