@@ -1,3 +1,8 @@
+- move NODEF TO TValue
+
+- TVariantSet -> TValueMap
+- remove stdout/stderr only when it's default value
+- make restricted_root not so restricted with root
 - portoctl stopall startall restartall
 - run some kind of init process in meta container
 - fix f*cking capabilities test on newer kernels

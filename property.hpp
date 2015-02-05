@@ -67,8 +67,6 @@ const unsigned int RESTROOT_PROPERTY = (1 << 3);
 // start with virt_mode==os
 const unsigned int OS_MODE_PROPERTY = (1 << 4);
 
-extern TValueSet propertySet;
-
 #define SYNTHESIZE_ACCESSOR(NAME, TYPE) \
     TYPE Get ## NAME(const std::string &property) { \
         if (VariantSet.IsDefault(property)) { \
@@ -80,7 +78,7 @@ extern TValueSet propertySet;
     } \
     TError Set ## NAME(const std::string &property, \
                        const TYPE &value) { \
-        if (!propertySet.Valid(property)) { \
+        if (!VariantSet.IsValid(property)) { \
             TError error(EError::InvalidValue, property + " not found"); \
             L_ERR() << "Can't set property: " << error << std::endl; \
             return error; \
@@ -92,17 +90,18 @@ extern TValueSet propertySet;
     }
 
 class TPropertySet : public TNonCopyable {
-    std::weak_ptr<TContainer> Container;
-    const std::string Name;
     TVariantSet VariantSet;
+    std::weak_ptr<TContainer> Container;
 
     TError GetSharedContainer(std::shared_ptr<TContainer> &c);
 
 public:
     TPropertySet(std::shared_ptr<TKeyValueStorage> storage,
-                 std::shared_ptr<TContainer> c,
-                 bool preserve) :
-        Container(c), Name(c->GetName()), VariantSet(storage, &propertySet, c, preserve) {}
+                std::shared_ptr<TRawValueMap> values,
+                std::shared_ptr<TContainer> c,
+                bool persist) :
+        VariantSet(storage, values, std::to_string(c->GetId()), persist),
+        Container(c) {}
 
     SYNTHESIZE_ACCESSOR(String, std::string);
     SYNTHESIZE_ACCESSOR(Bool, bool);
@@ -128,10 +127,14 @@ public:
     TError Flush();
     TError Sync();
 
+    TContainerValue *GetContainerValue(const std::string &name) { return VariantSet.GetContainerValue(name); }
+    std::vector<std::string> List() { return VariantSet.List(); }
+
     TError PrepareTaskEnv(const std::string &property,
                           std::shared_ptr<TTaskEnv> taskEnv);
 };
 
 #undef SYNTHESIZE_ACCESSOR
 
-TError RegisterProperties();
+void RegisterProperties(std::shared_ptr<TRawValueMap> m,
+                        std::shared_ptr<TContainer> c);

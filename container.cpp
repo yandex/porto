@@ -478,10 +478,10 @@ TError TContainer::PrepareCgroups() {
 
 TError TContainer::PrepareTask() {
     if (!Prop->GetBool(P_ISOLATE))
-        for (auto property : propertySet.GetNames())
-            if (propertySet.Get(property)->Flags & PARENT_RO_PROPERTY)
-                if (!Prop->IsDefault(property))
-                    return TError(EError::InvalidValue, "Can't use custom " + property + " with " + P_ISOLATE + " == false");
+        for (auto name : Prop->List())
+            if (Prop->GetContainerValue(name)->GetFlags() & PARENT_RO_PROPERTY)
+                if (!Prop->IsDefault(name))
+                    return TError(EError::InvalidValue, "Can't use custom " + name + " with " + P_ISOLATE + " == false");
 
 
     auto taskEnv = std::make_shared<TTaskEnv>();
@@ -646,9 +646,10 @@ TError TContainer::Start() {
 
     if (Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS &&
         !CredConf.PrivilegedUser(Cred)) {
-        for (auto property : propertySet.GetNames())
-            if (propertySet.Get(property)->Flags & OS_MODE_PROPERTY)
-                Prop->Reset(property);
+
+        for (auto name : Prop->List())
+            if (Prop->GetContainerValue(name)->GetFlags() & OS_MODE_PROPERTY)
+                Prop->Reset(name);
     }
 
     if (!IsRoot() && !Prop->GetString(P_COMMAND).length())
@@ -922,28 +923,21 @@ TError TContainer::GetData(const string &origName, string &value) {
     std::string idx;
     ParseName(name, idx);
 
-    if (!dataSet.Valid(name))
+    if (!Data->IsValid(name))
         return TError(EError::InvalidData, "invalid container data");
 
-    auto d = dataSet.Get(name);
-    if (d->State.find(GetState()) == d->State.end())
+    auto validState = Data->GetContainerValue(name)->GetState();
+    if (validState.find(GetState()) == validState.end())
         return TError(EError::InvalidState, "invalid container state");
 
-    TValue *p = nullptr;
-    std::shared_ptr<TContainer> c;
-    std::shared_ptr<TVariant> v;
-    TError error = Data->Get(name, c, &p, v);
-    if (error)
-        return error;
-
     if (idx.length()) {
-        TUintMap m = p->GetMap(c, v);
+        TUintMap m = Data->GetMap(name);
         if (m.find(idx) == m.end())
             return TError(EError::InvalidValue, "invalid index " + idx);
 
         value = std::to_string(m.at(idx));
     } else {
-        value = p->GetString(c, v);
+        value = Data->GetString(name);
     }
 
     return TError::Success();
@@ -1085,8 +1079,25 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
 }
 
 TError TContainer::Prepare() {
-    Prop = std::make_shared<TPropertySet>(Storage, shared_from_this(), Name != ROOT_CONTAINER);
-    Data = std::make_shared<TVariantSet>(Storage, &dataSet, shared_from_this(), Name != ROOT_CONTAINER);
+    auto dataValues = std::make_shared<TRawValueMap>();
+    RegisterData(dataValues, shared_from_this());
+
+    auto propValues = std::make_shared<TRawValueMap>();
+    RegisterProperties(propValues, shared_from_this());
+
+    if (Name == ROOT_CONTAINER) {
+        auto dataList = dataValues->List();
+        auto propList = propValues->List();
+
+        for (auto name : dataList)
+            if (std::find(propList.begin(), propList.end(), name) != propList.end())
+                return TError(EError::Unknown, "Data and property names conflict: " + name);
+    }
+
+    bool persist = Name != ROOT_CONTAINER;
+
+    Prop = std::make_shared<TPropertySet>(Storage, propValues, shared_from_this(), persist);
+    Data = std::make_shared<TVariantSet>(Storage, dataValues, std::to_string(Id), persist);
     if (!Prop || !Data)
         throw std::bad_alloc();
 

@@ -171,15 +171,19 @@ static TError ListProperty(TContext &context,
                            rpc::TContainerResponse &rsp) {
     auto list = rsp.mutable_propertylist();
 
-    for (auto property : propertySet.GetNames()) {
-        auto p = propertySet.Get(property);
-        if (p->Flags & HIDDEN_VALUE)
+    auto container = context.Cholder->Get(ROOT_CONTAINER);
+    if (!container)
+        return TError(EError::Unknown, "Can't find root container");
+
+    for (auto name : container->Prop->List()) {
+        auto p = container->Prop->GetContainerValue(name);
+        if (p->GetFlags() & HIDDEN_VALUE)
             continue;
 
         auto entry = list->add_list();
 
-        entry->set_name(property);
-        entry->set_desc(p->Desc);
+        entry->set_name(name);
+        entry->set_desc(p->GetDesc());
     }
 
     return TError::Success();
@@ -189,15 +193,19 @@ static TError ListData(TContext &context,
                        rpc::TContainerResponse &rsp) {
     auto list = rsp.mutable_datalist();
 
-    for (auto data : dataSet.GetNames()) {
-        auto d = dataSet.Get(data);
-        if (d->Flags & HIDDEN_VALUE)
+    auto container = context.Cholder->Get(ROOT_CONTAINER);
+    if (!container)
+        return TError(EError::Unknown, "Can't find root container");
+
+    for (auto name : container->Data->List()) {
+        auto d = container->Data->GetContainerValue(name);
+        if (d->GetFlags() & HIDDEN_VALUE)
             continue;
 
         auto entry = list->add_list();
 
-        entry->set_name(data);
-        entry->set_desc(d->Desc);
+        entry->set_name(name);
+        entry->set_desc(d->GetDesc());
     }
 
     return TError::Success();

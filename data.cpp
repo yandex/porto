@@ -51,125 +51,123 @@ static std::set<EContainerState> sState = {
     EContainerState::Stopped,
 };
 
-class TStateData : public TStringValue {
+class TStateData : public TStringValue, public TContainerValue {
 public:
     TStateData() :
-        TStringValue(D_STATE,
-                     "container state",
-                     NODEF_VALUE | PERSISTENT_VALUE,
-                     anyState) {}
+        TContainerValue(D_STATE,
+                        "container state",
+                        NODEF_VALUE | PERSISTENT_VALUE,
+                        anyState) {}
 };
 
-class TOomKilledData : public TBoolValue {
+class TOomKilledData : public TBoolValue, public TContainerValue {
 public:
     TOomKilledData() :
-        TBoolValue(D_OOM_KILLED,
-                   "indicates whether container has been killed by OOM",
-                   NODEF_VALUE | PERSISTENT_VALUE,
-                   dState) {}
+        TContainerValue(D_OOM_KILLED,
+                        "indicates whether container has been killed by OOM",
+                        NODEF_VALUE | PERSISTENT_VALUE,
+                        dState) {}
 };
 
-class TParentData : public TStringValue {
+class TParentData : public TStringValue, public TContainerValue {
 public:
     TParentData() :
-        TStringValue("parent",
-                     "parent container",
-                     NODEF_VALUE,
-                     anyState) {}
+        TContainerValue(D_PARENT,
+                        "parent container",
+                        NODEF_VALUE,
+                        anyState) {}
 
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) override {
-        return c->GetParent() ? c->GetParent()->GetName() : "";
+    std::string GetDefault() const override {
+        return GetContainer()->GetParent() ?
+            GetContainer()->GetParent()->GetName() : "";
     }
 };
 
-class TRespawnCountData : public TUintValue {
+class TRespawnCountData : public TUintValue, public TContainerValue {
 public:
     TRespawnCountData() :
-        TUintValue(D_RESPAWN_COUNT,
-                   "how many times container was automatically respawned",
-                   NODEF_VALUE | PERSISTENT_VALUE,
-                   rdState) {}
+        TContainerValue(D_RESPAWN_COUNT,
+                        "how many times container was automatically respawned",
+                        NODEF_VALUE | PERSISTENT_VALUE,
+                        rdState) {}
 };
 
-class TRootPidData : public TIntValue {
+class TRootPidData : public TIntValue, public TContainerValue {
 public:
     TRootPidData() :
-        TIntValue(D_ROOT_PID,
-                  "root process id",
-                  NODEF_VALUE,
-                  rpState) {}
+        TContainerValue(D_ROOT_PID,
+                        "root process id",
+                        NODEF_VALUE,
+                        rpState) {}
 
-    int GetInt(std::shared_ptr<TContainer> c,
-               std::shared_ptr<TVariant> v) override {
-        if (!c->Task)
+    int GetDefault() const override {
+        if (!GetContainer()->Task)
             return -1;
-        return c->Task->GetPid();
+        return GetContainer()->Task->GetPid();
     }
 };
 
-class TExitStatusData : public TIntValue {
+class TExitStatusData : public TIntValue, public TContainerValue {
 public:
     TExitStatusData() :
-        TIntValue(D_EXIT_STATUS,
-                  "container exit status",
-                  NODEF_VALUE | PERSISTENT_VALUE,
-                  dState) {}
+        TContainerValue(D_EXIT_STATUS,
+                        "container exit status",
+                        NODEF_VALUE | PERSISTENT_VALUE,
+                        dState) {}
 };
 
-class TStartErrnoData : public TIntValue {
+class TStartErrnoData : public TIntValue, public TContainerValue {
 public:
     TStartErrnoData() :
-        TIntValue(D_START_ERRNO,
-                  "container start error",
-                  NODEF_VALUE,
-                  sState) {}
+        TContainerValue(D_START_ERRNO,
+                        "container start error",
+                        NODEF_VALUE,
+                        sState) {}
 };
 
-class TStdoutData : public TStringValue {
+class TStdoutData : public TStringValue, public TContainerValue {
 public:
     TStdoutData() :
-        TStringValue("stdout",
-                     "return task stdout",
-                     NODEF_VALUE,
-                     rpdState) {}
+        TContainerValue(D_STDOUT,
+                        "return task stdout",
+                        NODEF_VALUE,
+                        rpdState) {}
 
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) override {
+    std::string GetDefault() const override {
+        auto c = GetContainer();
         if (c->Task)
             return c->Task->GetStdout(c->Prop->GetUint(P_STDOUT_LIMIT));
         return "";
     }
 };
 
-class TStderrData : public TStringValue {
+class TStderrData : public TStringValue, public TContainerValue {
 public:
     TStderrData() :
-        TStringValue("stderr",
-                     "return task stderr",
-                     NODEF_VALUE,
-                     rpdState) {}
+        TContainerValue(D_STDERR,
+                        "return task stderr",
+                        NODEF_VALUE,
+                        rpdState) {}
 
-    std::string GetString(std::shared_ptr<TContainer> c,
-                          std::shared_ptr<TVariant> v) override {
+    std::string GetDefault() const override {
+        auto c = GetContainer();
         if (c->Task)
             return c->Task->GetStderr(c->Prop->GetUint(P_STDOUT_LIMIT));
         return "";
     }
 };
 
-class TCpuUsageData : public TUintValue {
+class TCpuUsageData : public TUintValue, public TContainerValue {
 public:
     TCpuUsageData() :
-        TUintValue("cpu_usage",
-                   "return consumed CPU time in nanoseconds",
-                   NODEF_VALUE,
-                   rpdmState) {}
+        TContainerValue(D_CPU_USAGE,
+                        "return consumed CPU time in nanoseconds",
+                        NODEF_VALUE,
+                        rpdmState) {}
 
-    uint64_t GetUint(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v) override {
+    uint64_t GetDefault() const override {
         auto subsys = cpuacctSubsystem;
-        auto cg = c->GetLeafCgroup(subsys);
+        auto cg = GetContainer()->GetLeafCgroup(subsys);
         if (!cg) {
             L_ERR() << "Can't find cpuacct cgroup" << std::endl;
             return -1;
@@ -186,18 +184,17 @@ public:
     }
 };
 
-class TMemUsageData : public TUintValue {
+class TMemUsageData : public TUintValue, public TContainerValue {
 public:
     TMemUsageData() :
-        TUintValue("memory_usage",
-                     "return consumed memory in bytes",
-                     NODEF_VALUE,
-                     rpdmState) {}
+        TContainerValue(D_MEMORY_USAGE,
+                        "return consumed memory in bytes",
+                        NODEF_VALUE,
+                        rpdmState) {}
 
-    uint64_t GetUint(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v) override {
+    uint64_t GetDefault() const override {
         auto subsys = memorySubsystem;
-        auto cg = c->GetLeafCgroup(subsys);
+        auto cg = GetContainer()->GetLeafCgroup(subsys);
         if (!cg) {
             L_ERR() << "Can't find memory cgroup" << std::endl;
             return -1;
@@ -214,90 +211,85 @@ public:
     }
 };
 
-class TNetBytesData : public TMapValue {
+class TNetBytesData : public TMapValue, public TContainerValue {
 public:
     TNetBytesData() :
-        TMapValue("net_bytes",
-                  "number of tx bytes",
-                  NODEF_VALUE,
-                  rpdmState) {}
+        TContainerValue(D_NET_BYTES,
+                        "number of tx bytes",
+                        NODEF_VALUE,
+                        rpdmState) {}
 
-    TUintMap GetMap(std::shared_ptr<TContainer> c,
-                    std::shared_ptr<TVariant> v) override {
+    TUintMap GetDefault() const override {
         TUintMap m;
-        TError error = c->GetStat(ETclassStat::Bytes, m);
+        TError error = GetContainer()->GetStat(ETclassStat::Bytes, m);
         if (error)
             L_ERR() << "Can't get transmitted bytes: " << error << std::endl;
         return m;
     }
 };
 
-class TNetPacketsData : public TMapValue {
+class TNetPacketsData : public TMapValue, public TContainerValue {
 public:
     TNetPacketsData() :
-        TMapValue("net_packets",
-                  "number of tx packets",
-                  NODEF_VALUE,
-                  rpdmState) {}
+        TContainerValue(D_NET_PACKETS,
+                        "number of tx packets",
+                        NODEF_VALUE,
+                        rpdmState) {}
 
-    TUintMap GetMap(std::shared_ptr<TContainer> c,
-                    std::shared_ptr<TVariant> v) override {
+    TUintMap GetDefault() const override {
         TUintMap m;
-        TError error = c->GetStat(ETclassStat::Packets, m);
+        TError error = GetContainer()->GetStat(ETclassStat::Packets, m);
         if (error)
             L_ERR() << "Can't get transmitted packets: " << error << std::endl;
         return m;
     }
 };
 
-class TNetDropsData : public TMapValue {
+class TNetDropsData : public TMapValue, public TContainerValue {
 public:
     TNetDropsData() :
-        TMapValue("net_drops",
-                  "number of dropped tx packets",
-                  NODEF_VALUE,
-                  rpdmState) {}
+        TContainerValue(D_NET_DROPS,
+                        "number of dropped tx packets",
+                        NODEF_VALUE,
+                        rpdmState) {}
 
-    TUintMap GetMap(std::shared_ptr<TContainer> c,
-                    std::shared_ptr<TVariant> v) override {
+    TUintMap GetDefault() const override {
         TUintMap m;
-        TError error = c->GetStat(ETclassStat::Drops, m);
+        TError error = GetContainer()->GetStat(ETclassStat::Drops, m);
         if (error)
             L_ERR() << "Can't get dropped packets: " << error << std::endl;
         return m;
     }
 };
 
-class TNetOverlimitsData : public TMapValue {
+class TNetOverlimitsData : public TMapValue, public TContainerValue {
 public:
     TNetOverlimitsData() :
-        TMapValue("net_overlimits",
-                  "number of tx packets that exceeded the limit",
-                  NODEF_VALUE,
-                  rpdmState) {}
+        TContainerValue(D_NET_OVERLIMITS,
+                        "number of tx packets that exceeded the limit",
+                        NODEF_VALUE,
+                        rpdmState) {}
 
-    TUintMap GetMap(std::shared_ptr<TContainer> c,
-                    std::shared_ptr<TVariant> v) override {
+    TUintMap GetDefault() const override {
         TUintMap m;
-        TError error = c->GetStat(ETclassStat::Overlimits, m);
+        TError error = GetContainer()->GetStat(ETclassStat::Overlimits, m);
         if (error)
             L_ERR() << "Can't get number of packets over limit: " << error << std::endl;
         return m;
     }
 };
 
-class TMinorFaultsData : public TUintValue {
+class TMinorFaultsData : public TUintValue, public TContainerValue {
 public:
     TMinorFaultsData() :
-        TUintValue("minor_faults",
-                   "return number of minor page faults",
-                   NODEF_VALUE,
-                   rpdmState) {}
+        TContainerValue(D_MINOR_FAULTS,
+                        "return number of minor page faults",
+                        NODEF_VALUE,
+                        rpdmState) {}
 
-    uint64_t GetUint(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v) override {
+    uint64_t GetDefault() const override {
         uint64_t val;
-        auto cg = c->GetLeafCgroup(memorySubsystem);
+        auto cg = GetContainer()->GetLeafCgroup(memorySubsystem);
         TError error = memorySubsystem->Statistics(cg, "total_pgfault", val);
         if (error)
             return -1;
@@ -306,18 +298,17 @@ public:
     }
 };
 
-class TMajorFaultsData : public TUintValue {
+class TMajorFaultsData : public TUintValue, public TContainerValue {
 public:
     TMajorFaultsData() :
-        TUintValue("major_faults",
-                     "return number of major page faults",
-                     NODEF_VALUE,
-                     rpdmState) {}
+        TContainerValue(D_MAJOR_FAULTS,
+                        "return number of major page faults",
+                        NODEF_VALUE,
+                        rpdmState) {}
 
-    uint64_t GetUint(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v) override {
+    uint64_t GetDefault() const override {
         uint64_t val;
-        auto cg = c->GetLeafCgroup(memorySubsystem);
+        auto cg = GetContainer()->GetLeafCgroup(memorySubsystem);
         TError error = memorySubsystem->Statistics(cg, "total_pgmajfault", val);
         if (error)
             return -1;
@@ -326,18 +317,17 @@ public:
     }
 };
 
-class TIoReadData : public TMapValue {
+class TIoReadData : public TMapValue, public TContainerValue {
 public:
     TIoReadData() :
-        TMapValue("io_read",
-                  "return number of bytes read from disk",
-                  NODEF_VALUE,
-                  rpdmState) {}
+        TContainerValue(D_IO_READ,
+                        "return number of bytes read from disk",
+                        NODEF_VALUE,
+                        rpdmState) {}
 
-    TUintMap GetMap(std::shared_ptr<TContainer> c,
-                    std::shared_ptr<TVariant> v) override {
+    TUintMap GetDefault() const override {
         TUintMap m;
-        auto cg = c->GetLeafCgroup(blkioSubsystem);
+        auto cg = GetContainer()->GetLeafCgroup(blkioSubsystem);
 
         std::vector<BlkioStat> stat;
         TError error = blkioSubsystem->Statistics(cg, "blkio.io_service_bytes_recursive", stat);
@@ -353,18 +343,17 @@ public:
     }
 };
 
-class TIoWriteData : public TMapValue {
+class TIoWriteData : public TMapValue, public TContainerValue {
 public:
     TIoWriteData() :
-        TMapValue("io_write",
-                  "return number of bytes written to disk",
-                  NODEF_VALUE,
-                  rpdmState) {}
+        TContainerValue(D_IO_WRITE,
+                        "return number of bytes written to disk",
+                        NODEF_VALUE,
+                        rpdmState) {}
 
-    TUintMap GetMap(std::shared_ptr<TContainer> c,
-                    std::shared_ptr<TVariant> v) override {
+    TUintMap GetDefault() const override {
         TUintMap m;
-        auto cg = c->GetLeafCgroup(blkioSubsystem);
+        auto cg = GetContainer()->GetLeafCgroup(blkioSubsystem);
 
         std::vector<BlkioStat> stat;
         TError error = blkioSubsystem->Statistics(cg, "blkio.io_service_bytes_recursive", stat);
@@ -380,16 +369,16 @@ public:
     }
 };
 
-class TTimeData : public TUintValue {
+class TTimeData : public TUintValue, public TContainerValue {
 public:
     TTimeData() :
-        TUintValue("time",
-                   "root process running time",
-                   NODEF_VALUE,
-                   rpdState) {}
+        TContainerValue(D_TIME,
+                        "root process running time",
+                        NODEF_VALUE,
+                        rpdState) {}
 
-    uint64_t GetUint(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v) override {
+    uint64_t GetDefault() const override {
+        auto c = GetContainer();
         if (c->GetState() == EContainerState::Dead)
             return (GetCurrentTimeMs() - c->GetTimeOfDeath()) / 1000;
 
@@ -420,18 +409,17 @@ public:
     }
 };
 
-class TMaxRssData : public TUintValue {
+class TMaxRssData : public TUintValue, public TContainerValue {
 public:
     TMaxRssData() :
-        TUintValue(D_MAX_RSS,
-                   "Guaranteed amount of memory",
-                   NODEF_VALUE,
-                   rpdmState) {}
+        TContainerValue(D_MAX_RSS,
+                        "Guaranteed amount of memory",
+                        NODEF_VALUE,
+                        rpdmState) {}
 
-    uint64_t GetUint(std::shared_ptr<TContainer> c,
-                     std::shared_ptr<TVariant> v) override {
+    uint64_t GetDefault() const override {
         uint64_t val;
-        auto cg = c->GetLeafCgroup(memorySubsystem);
+        auto cg = GetContainer()->GetLeafCgroup(memorySubsystem);
         TError error = memorySubsystem->Statistics(cg, "max_rss", val);
         if (error)
             return 0;
@@ -440,16 +428,15 @@ public:
     }
 };
 
-class TPortoStatData : public TMapValue {
+class TPortoStatData : public TMapValue, public TContainerValue {
 public:
     TPortoStatData() :
-        TMapValue("porto_stat",
-                  "",
-                  NODEF_VALUE | HIDDEN_VALUE,
-                  anyState) {}
+        TContainerValue(D_PORTO_STAT,
+                        "",
+                        NODEF_VALUE | HIDDEN_VALUE,
+                        anyState) {}
 
-    TUintMap GetMap(std::shared_ptr<TContainer> c,
-                    std::shared_ptr<TVariant> v) override {
+    TUintMap GetDefault() const override {
         TUintMap m;
 
         m["spawned"] = Statistics->Spawned;
@@ -469,9 +456,9 @@ public:
     }
 };
 
-TValueSet dataSet;
-TError RegisterData() {
-    std::vector<TValue *> dat = {
+void RegisterData(std::shared_ptr<TRawValueMap> m,
+                  std::shared_ptr<TContainer> c) {
+    std::vector<TAbstractValue *> data = {
         new TStateData,
         new TOomKilledData,
         new TParentData,
@@ -496,5 +483,6 @@ TError RegisterData() {
         new TPortoStatData,
     };
 
-    return dataSet.Register(dat);
+    for (auto d : data)
+        AddContainerValue(m, c, d);
 }

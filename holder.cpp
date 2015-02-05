@@ -32,23 +32,9 @@ TError TContainerHolder::ReserveDefaultClassId() {
 }
 
 TError TContainerHolder::CreateRoot() {
-    TError error = RegisterProperties();
+    TError error = TaskGetLastCap();
     if (error)
         return error;
-
-    error = RegisterData();
-    if (error)
-        return error;
-
-    error = TaskGetLastCap();
-    if (error)
-        return error;
-
-    // we are using single kvalue store for both properties and data
-    // so make sure names don't clash
-    std::string overlap = propertySet.Overlap(dataSet);
-    if (overlap.length())
-        return TError(EError::Unknown, "Data and property names conflict: " + overlap);
 
     BootTime = GetBootTime();
 
