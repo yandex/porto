@@ -81,15 +81,17 @@ TTask::~TTask() {
     if (!Env)
         return;
 
-    TFile out(Env->StdoutPath);
-    if (Env->StdoutPath.GetType() != EFileType::Character &&
+    if (Env->RemoveStdout &&
+        Env->StdoutPath.GetType() != EFileType::Character &&
         Env->StdoutPath.GetType() != EFileType::Block) {
+        TFile out(Env->StdoutPath);
         TError error = out.Remove();
         if (error)
             L_ERR() << "Can't remove task stdout " << Env->StdoutPath.ToString() << ": " << error << std::endl;
     }
 
-    if (Env->StderrPath.GetType() != EFileType::Character &&
+    if (Env->RemoveStderr &&
+        Env->StderrPath.GetType() != EFileType::Character &&
         Env->StderrPath.GetType() != EFileType::Block) {
         TFile err(Env->StderrPath);
         TError error = err.Remove();

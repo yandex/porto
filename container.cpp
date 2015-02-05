@@ -520,7 +520,9 @@ TError TContainer::PrepareTask() {
     taskEnv->Isolate = Prop->GetBool(P_ISOLATE);
     taskEnv->StdinPath = Prop->GetString(P_STDIN_PATH);
     taskEnv->StdoutPath = Prop->GetString(P_STDOUT_PATH);
+    taskEnv->RemoveStdout = Prop->IsDefault(P_STDOUT_PATH);
     taskEnv->StderrPath = Prop->GetString(P_STDERR_PATH);
+    taskEnv->RemoveStderr = Prop->IsDefault(P_STDERR_PATH);
     taskEnv->Hostname = Prop->GetString(P_HOSTNAME);
     taskEnv->BindDns = Prop->GetBool(P_BIND_DNS);
 
