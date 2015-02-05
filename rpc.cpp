@@ -1,9 +1,10 @@
 #include "rpc.hpp"
 #include "property.hpp"
 #include "data.hpp"
+#include "batch.hpp"
+#include "container_value.hpp"
 #include "util/log.hpp"
 #include "util/protobuf.hpp"
-#include "batch.hpp"
 #include "util/string.hpp"
 
 using std::string;
@@ -176,14 +177,15 @@ static TError ListProperty(TContext &context,
         return TError(EError::Unknown, "Can't find root container");
 
     for (auto name : container->Prop->List()) {
-        auto p = container->Prop->GetContainerValue(name);
-        if (p->GetFlags() & HIDDEN_VALUE)
+        auto av = (*container->Prop)[name];
+        if (av->GetFlags() & HIDDEN_VALUE)
             continue;
 
+        auto cv = ToContainerValue(av);
         auto entry = list->add_list();
 
         entry->set_name(name);
-        entry->set_desc(p->GetDesc());
+        entry->set_desc(cv->GetDesc());
     }
 
     return TError::Success();
@@ -198,14 +200,15 @@ static TError ListData(TContext &context,
         return TError(EError::Unknown, "Can't find root container");
 
     for (auto name : container->Data->List()) {
-        auto d = container->Data->GetContainerValue(name);
-        if (d->GetFlags() & HIDDEN_VALUE)
+        auto av = (*container->Data)[name];
+        if (av->GetFlags() & HIDDEN_VALUE)
             continue;
 
+        auto cv = ToContainerValue(av);
         auto entry = list->add_list();
 
         entry->set_name(name);
-        entry->set_desc(d->GetDesc());
+        entry->set_desc(cv->GetDesc());
     }
 
     return TError::Success();

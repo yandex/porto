@@ -50,14 +50,10 @@ std::string TUintValue::ToString(const uint64_t &value) const {
 TError TUintValue::FromString(const std::string &value) {
     TError error;
     uint64_t tmp;
-    /*
-    if (Flags & UINT_UNIT_VALUE)
-    */
+    if (GetFlags() & UINT_UNIT_VALUE)
         error = StringWithUnitToUint64(value, tmp);
-        /*
     else
         error = StringToUint64(value, tmp);
-        */
     if (error)
         return TError(EError::InvalidValue, "Invalid unsigned integer value " + value);
 
@@ -73,7 +69,7 @@ uint64_t TUintValue::GetDefault() const {
 }
 
 std::string TBoolValue::ToString(const bool &value) const {
-    if (Get())
+    if (value)
         return "true";
     return "false";
 }
@@ -210,9 +206,20 @@ TError TRawValueMap::IsValid(const std::string &name) const {
 
 bool TRawValueMap::IsDefault(const std::string &name) const {
     TAbstractValue *p = AbstractValues.at(name);
-    if (p->HasValue())
-        return p->ToString() == p->DefaultString();
-    return true;
+    if (!HasValue(name))
+        return true;
+
+    if (p->ToString() == p->DefaultString()) {
+        p->Reset(); // don't keep redundant default value
+        return true;
+    }
+
+    return false;
+}
+
+bool TRawValueMap::HasValue(const std::string &name) const {
+    TAbstractValue *p = AbstractValues.at(name);
+    return p->HasValue();
 }
 
 std::vector<std::string> TRawValueMap::List() const {
@@ -253,11 +260,8 @@ TError TVariantSet::Restore(const kv::TNode &node) {
         if (error)
             continue;
 
-        TAbstractValue *av = (*Values)[key];
-
-        // TODO REMOVE HACK
-        TContainerValue *cv = dynamic_cast<TContainerValue *>(av);
-        if (!(cv->GetFlags() & PERSISTENT_VALUE))
+        auto *av = (*Values)[key];
+        if (!(av->GetFlags() & PERSISTENT_VALUE))
             continue;
 
         if (config().log().verbose())
@@ -275,20 +279,12 @@ std::vector<std::string> TVariantSet::List() {
     return Values->List();
 }
 
-bool TVariantSet::IsDefault(const std::string &name) {
-    TError error = Values->IsValid(name);
-    if (error)
-        return true;
-
+bool TVariantSet::IsDefault(const std::string &name) const {
     return Values->IsDefault(name);
 }
 
-bool TVariantSet::HasValue(const std::string &name) {
-    TError error = Values->IsValid(name);
-    if (error)
-        return true;
-
-    return (*Values)[name]->HasValue();
+bool TVariantSet::HasValue(const std::string &name) const {
+    return Values->HasValue(name);
 }
 
 void TVariantSet::Reset(const std::string &name) {
@@ -309,11 +305,9 @@ TError TVariantSet::Sync() {
     kv::TNode node;
 
     for (auto name : Values->List()) {
-        TAbstractValue *av = (*Values)[name];
+        auto *av = (*Values)[name];
 
-        // TODO REMOVE HACK
-        TContainerValue *cv = dynamic_cast<TContainerValue *>(av);
-        if (!(cv->GetFlags() & PERSISTENT_VALUE))
+        if (!(av->GetFlags() & PERSISTENT_VALUE))
             continue;
 
         if (Values->IsDefault(name))
@@ -328,9 +322,4 @@ TError TVariantSet::Sync() {
     }
 
     return Storage->AppendNode(Id, node);
-}
-
-TContainerValue *TVariantSet::GetContainerValue(const std::string &name) {
-    TAbstractValue *av = (*Values)[name];
-    return dynamic_cast<TContainerValue *>(av);
 }

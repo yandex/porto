@@ -2,6 +2,7 @@
 
 #include "data.hpp"
 #include "container.hpp"
+#include "container_value.hpp"
 #include "property.hpp"
 #include "subsystem.hpp"
 #include "qdisc.hpp"
@@ -54,27 +55,27 @@ static std::set<EContainerState> sState = {
 class TStateData : public TStringValue, public TContainerValue {
 public:
     TStateData() :
+        TStringValue(PERSISTENT_VALUE),
         TContainerValue(D_STATE,
                         "container state",
-                        NODEF_VALUE | PERSISTENT_VALUE,
                         anyState) {}
 };
 
 class TOomKilledData : public TBoolValue, public TContainerValue {
 public:
     TOomKilledData() :
+        TBoolValue(PERSISTENT_VALUE),
         TContainerValue(D_OOM_KILLED,
                         "indicates whether container has been killed by OOM",
-                        NODEF_VALUE | PERSISTENT_VALUE,
                         dState) {}
 };
 
 class TParentData : public TStringValue, public TContainerValue {
 public:
     TParentData() :
+        TStringValue(0),
         TContainerValue(D_PARENT,
                         "parent container",
-                        NODEF_VALUE,
                         anyState) {}
 
     std::string GetDefault() const override {
@@ -86,18 +87,18 @@ public:
 class TRespawnCountData : public TUintValue, public TContainerValue {
 public:
     TRespawnCountData() :
+        TUintValue(PERSISTENT_VALUE),
         TContainerValue(D_RESPAWN_COUNT,
                         "how many times container was automatically respawned",
-                        NODEF_VALUE | PERSISTENT_VALUE,
                         rdState) {}
 };
 
 class TRootPidData : public TIntValue, public TContainerValue {
 public:
     TRootPidData() :
+        TIntValue(0),
         TContainerValue(D_ROOT_PID,
                         "root process id",
-                        NODEF_VALUE,
                         rpState) {}
 
     int GetDefault() const override {
@@ -110,27 +111,27 @@ public:
 class TExitStatusData : public TIntValue, public TContainerValue {
 public:
     TExitStatusData() :
+        TIntValue(PERSISTENT_VALUE),
         TContainerValue(D_EXIT_STATUS,
                         "container exit status",
-                        NODEF_VALUE | PERSISTENT_VALUE,
                         dState) {}
 };
 
 class TStartErrnoData : public TIntValue, public TContainerValue {
 public:
     TStartErrnoData() :
+        TIntValue(0),
         TContainerValue(D_START_ERRNO,
                         "container start error",
-                        NODEF_VALUE,
                         sState) {}
 };
 
 class TStdoutData : public TStringValue, public TContainerValue {
 public:
     TStdoutData() :
+        TStringValue(0),
         TContainerValue(D_STDOUT,
                         "return task stdout",
-                        NODEF_VALUE,
                         rpdState) {}
 
     std::string GetDefault() const override {
@@ -144,9 +145,9 @@ public:
 class TStderrData : public TStringValue, public TContainerValue {
 public:
     TStderrData() :
+        TStringValue(0),
         TContainerValue(D_STDERR,
                         "return task stderr",
-                        NODEF_VALUE,
                         rpdState) {}
 
     std::string GetDefault() const override {
@@ -160,9 +161,9 @@ public:
 class TCpuUsageData : public TUintValue, public TContainerValue {
 public:
     TCpuUsageData() :
+        TUintValue(0),
         TContainerValue(D_CPU_USAGE,
                         "return consumed CPU time in nanoseconds",
-                        NODEF_VALUE,
                         rpdmState) {}
 
     uint64_t GetDefault() const override {
@@ -187,9 +188,9 @@ public:
 class TMemUsageData : public TUintValue, public TContainerValue {
 public:
     TMemUsageData() :
+        TUintValue(0),
         TContainerValue(D_MEMORY_USAGE,
                         "return consumed memory in bytes",
-                        NODEF_VALUE,
                         rpdmState) {}
 
     uint64_t GetDefault() const override {
@@ -214,9 +215,9 @@ public:
 class TNetBytesData : public TMapValue, public TContainerValue {
 public:
     TNetBytesData() :
+        TMapValue(0),
         TContainerValue(D_NET_BYTES,
                         "number of tx bytes",
-                        NODEF_VALUE,
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
@@ -231,9 +232,9 @@ public:
 class TNetPacketsData : public TMapValue, public TContainerValue {
 public:
     TNetPacketsData() :
+        TMapValue(0),
         TContainerValue(D_NET_PACKETS,
                         "number of tx packets",
-                        NODEF_VALUE,
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
@@ -248,9 +249,9 @@ public:
 class TNetDropsData : public TMapValue, public TContainerValue {
 public:
     TNetDropsData() :
+        TMapValue(0),
         TContainerValue(D_NET_DROPS,
                         "number of dropped tx packets",
-                        NODEF_VALUE,
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
@@ -265,9 +266,9 @@ public:
 class TNetOverlimitsData : public TMapValue, public TContainerValue {
 public:
     TNetOverlimitsData() :
+        TMapValue(0),
         TContainerValue(D_NET_OVERLIMITS,
                         "number of tx packets that exceeded the limit",
-                        NODEF_VALUE,
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
@@ -282,9 +283,9 @@ public:
 class TMinorFaultsData : public TUintValue, public TContainerValue {
 public:
     TMinorFaultsData() :
+        TUintValue(0),
         TContainerValue(D_MINOR_FAULTS,
                         "return number of minor page faults",
-                        NODEF_VALUE,
                         rpdmState) {}
 
     uint64_t GetDefault() const override {
@@ -301,9 +302,9 @@ public:
 class TMajorFaultsData : public TUintValue, public TContainerValue {
 public:
     TMajorFaultsData() :
+        TUintValue(0),
         TContainerValue(D_MAJOR_FAULTS,
                         "return number of major page faults",
-                        NODEF_VALUE,
                         rpdmState) {}
 
     uint64_t GetDefault() const override {
@@ -320,9 +321,9 @@ public:
 class TIoReadData : public TMapValue, public TContainerValue {
 public:
     TIoReadData() :
+        TMapValue(0),
         TContainerValue(D_IO_READ,
                         "return number of bytes read from disk",
-                        NODEF_VALUE,
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
@@ -346,9 +347,9 @@ public:
 class TIoWriteData : public TMapValue, public TContainerValue {
 public:
     TIoWriteData() :
+        TMapValue(0),
         TContainerValue(D_IO_WRITE,
                         "return number of bytes written to disk",
-                        NODEF_VALUE,
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
@@ -372,9 +373,9 @@ public:
 class TTimeData : public TUintValue, public TContainerValue {
 public:
     TTimeData() :
+        TUintValue(0),
         TContainerValue(D_TIME,
                         "root process running time",
-                        NODEF_VALUE,
                         rpdState) {}
 
     uint64_t GetDefault() const override {
@@ -412,9 +413,9 @@ public:
 class TMaxRssData : public TUintValue, public TContainerValue {
 public:
     TMaxRssData() :
+        TUintValue(0),
         TContainerValue(D_MAX_RSS,
                         "Guaranteed amount of memory",
-                        NODEF_VALUE,
                         rpdmState) {}
 
     uint64_t GetDefault() const override {
@@ -431,9 +432,9 @@ public:
 class TPortoStatData : public TMapValue, public TContainerValue {
 public:
     TPortoStatData() :
+        TMapValue(HIDDEN_VALUE),
         TContainerValue(D_PORTO_STAT,
                         "",
-                        NODEF_VALUE | HIDDEN_VALUE,
                         anyState) {}
 
     TUintMap GetDefault() const override {

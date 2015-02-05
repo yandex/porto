@@ -14,6 +14,7 @@
 #include "holder.hpp"
 #include "qdisc.hpp"
 #include "context.hpp"
+#include "container_value.hpp"
 #include "util/log.hpp"
 #include "util/file.hpp"
 #include "util/string.hpp"
@@ -479,10 +480,9 @@ TError TContainer::PrepareCgroups() {
 TError TContainer::PrepareTask() {
     if (!Prop->GetBool(P_ISOLATE))
         for (auto name : Prop->List())
-            if (Prop->GetContainerValue(name)->GetFlags() & PARENT_RO_PROPERTY)
+            if ((*Prop)[name]->GetFlags() & PARENT_RO_PROPERTY)
                 if (!Prop->IsDefault(name))
                     return TError(EError::InvalidValue, "Can't use custom " + name + " with " + P_ISOLATE + " == false");
-
 
     auto taskEnv = std::make_shared<TTaskEnv>();
 
@@ -648,7 +648,7 @@ TError TContainer::Start() {
         !CredConf.PrivilegedUser(Cred)) {
 
         for (auto name : Prop->List())
-            if (Prop->GetContainerValue(name)->GetFlags() & OS_MODE_PROPERTY)
+            if ((*Prop)[name]->GetFlags() & OS_MODE_PROPERTY)
                 Prop->Reset(name);
     }
 
@@ -926,7 +926,7 @@ TError TContainer::GetData(const string &origName, string &value) {
     if (!Data->IsValid(name))
         return TError(EError::InvalidData, "invalid container data");
 
-    auto validState = Data->GetContainerValue(name)->GetState();
+    auto validState = ToContainerValue((*Data)[name])->GetState();
     if (validState.find(GetState()) == validState.end())
         return TError(EError::InvalidState, "invalid container state");
 

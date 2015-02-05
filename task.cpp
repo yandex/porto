@@ -715,26 +715,29 @@ TError TTask::ChildCallback() {
 }
 
 TError TTask::CreateCwd() {
-    if (!Env->CreateCwd)
-        return TError::Success();
-
     Cwd = std::make_shared<TFolder>(Env->Cwd, true);
     if (!Cwd->Exists()) {
         TError error = Cwd->Create(0755, true);
         if (error)
             return error;
+        error = Env->Cwd.Chown(Env->User, Env->Group);
+        if (error)
+            return error;
     }
-    return Env->Cwd.Chown(Env->User, Env->Group);
+
+    return TError::Success();
 }
 
 TError TTask::Start() {
     int ret;
     int pfd[2], syncfd[2];
 
-    TError error = CreateCwd();
-    if (error) {
-        L_ERR() << "Can't create temporary cwd: " << error << std::endl;
-        return error;
+    if (Env->CreateCwd) {
+        TError error = CreateCwd();
+        if (error) {
+            L_ERR() << "Can't create temporary cwd: " << error << std::endl;
+            return error;
+        }
     }
 
     ExitStatus = 0;
@@ -838,7 +841,7 @@ TError TTask::Start() {
         return error;
     }
 
-    error = TError::Deserialize(Rfd);
+    TError error = TError::Deserialize(Rfd);
     close(Rfd);
     if (error) {
         Pid = 0;

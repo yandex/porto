@@ -9,24 +9,12 @@
 #include "kvalue.hpp"
 #include "util/log.hpp"
 
-
-/// {{{ TEMP
-#include <sstream>
-#include "util/string.hpp"
-/// }}} TEMP
-
-class TContainer;
-enum class EContainerState;
-class TTaskEnv;
-
-// Don't return default value, call get handler
-const unsigned int NODEF_VALUE = (1 << 31);
 // Value is not shown in the property/data list
-const unsigned int HIDDEN_VALUE = (1 << 30);
+const unsigned int HIDDEN_VALUE = (1 << 31);
 // Value should be preserved upon recovery
-const unsigned int PERSISTENT_VALUE = (1 << 29);
+const unsigned int PERSISTENT_VALUE = (1 << 30);
 // Uint value can include options G/M/K suffix
-const unsigned int UINT_UNIT_VALUE = (1 << 28);
+const unsigned int UINT_UNIT_VALUE = (1 << 29);
 
 class TVariant : public TNonCopyable {
     struct TValueAbstractImpl {
@@ -61,9 +49,8 @@ public:
     }
 
     template<typename T>
-    TError Set(const T &value) {
+    void Set(const T &value) {
         Impl = std::make_shared<TValueImpl<T>>(value);
-        return TError::Success();
     };
 
     void Reset() { Impl = nullptr; }
@@ -74,18 +61,19 @@ class TValue;
 
 class TAbstractValue : public TNonCopyable {
 protected:
-    TVariant variant;
-//    int Flags;
+    TVariant Variant;
+    int Flags;
 public:
-    TAbstractValue() {}
+    TAbstractValue(int flags) : Flags(flags) {}
     virtual ~TAbstractValue() {}
 
     virtual std::string ToString() const =0;
     virtual TError FromString(const std::string &value) =0;
     virtual std::string DefaultString() const =0;
 
-    bool HasValue() { return variant.HasValue(); }
-    void Reset() { variant.Reset(); }
+    bool HasValue() { return Variant.HasValue(); }
+    void Reset() { Variant.Reset(); }
+    int GetFlags() { return Flags; }
 
     template<typename T>
     const T Get() {
@@ -105,7 +93,7 @@ public:
             return p->Set(value);
         } catch (std::bad_cast &e) {
             PORTO_RUNTIME_ERROR(std::string("Bad cast: ") + e.what());
-            return {};
+            return TError(EError::Unknown, "");
         }
     }
 };
@@ -113,7 +101,7 @@ public:
 template<typename T>
 class TValue : public TAbstractValue {
 public:
-    TValue() {}
+    TValue(int flags) : TAbstractValue(flags) {}
 
     virtual T GetDefault() const =0;
     virtual std::string ToString(const T &value) const =0;
@@ -130,8 +118,8 @@ public:
     }
 
     const T Get() const {
-        if (variant.HasValue())
-            return variant.Get<T>();
+        if (Variant.HasValue())
+            return Variant.Get<T>();
         else
             return GetDefault();
     }
@@ -141,14 +129,15 @@ public:
         if (error)
             return error;
 
-        variant.Set(value);
+        Variant.Set(value);
+
         return TError::Success();
     }
 };
 
 class TStringValue : public TValue<std::string> {
 public:
-    TStringValue() {}
+    TStringValue(int flags) : TValue(flags) {}
 
     std::string ToString(const std::string &value) const override;
     TError FromString(const std::string &value) override;
@@ -157,7 +146,7 @@ public:
 
 class TIntValue : public TValue<int> {
 public:
-    TIntValue() {}
+    TIntValue(int flags) : TValue(flags) {}
 
     std::string ToString(const int &value) const override;
     TError FromString(const std::string &value) override;
@@ -166,7 +155,7 @@ public:
 
 class TUintValue : public TValue<uint64_t> {
 public:
-    TUintValue() {}
+    TUintValue(int flags) : TValue(flags) {}
 
     std::string ToString(const uint64_t &value) const override;
     TError FromString(const std::string &value) override;
@@ -175,7 +164,7 @@ public:
 
 class TBoolValue : public TValue<bool> {
 public:
-    TBoolValue() {}
+    TBoolValue(int flags) : TValue(flags) {}
 
     std::string ToString(const bool &value) const override;
     TError FromString(const std::string &value) override;
@@ -186,7 +175,7 @@ typedef std::vector<std::string> TStrList;
 
 class TListValue : public TValue<TStrList> {
 public:
-    TListValue() {}
+    TListValue(int flags) : TValue(flags) {}
 
     std::string ToString(const TStrList &value) const override;
     TError FromString(const std::string &value) override;
@@ -197,7 +186,7 @@ typedef std::map<std::string, uint64_t> TUintMap;
 
 class TMapValue : public TValue<TUintMap> {
 public:
-    TMapValue() {}
+    TMapValue(int flags) : TValue(flags) {}
 
     std::string ToString(const TUintMap &value) const override;
     TError FromString(const std::string &value) override;
@@ -214,59 +203,11 @@ public:
     TAbstractValue *operator[](const std::string &name) const;
     TError IsValid(const std::string &name) const;
     bool IsDefault(const std::string &name) const;
+    bool HasValue(const std::string &name) const;
     std::vector<std::string> List() const;
 };
 
-
-// TODO MOVE OUT OF THIS FILE {{{
-class TContainerValue {
-protected:
-    const char *Name;
-    const char *Desc;
-    const int Flags;
-    const std::set<EContainerState> State;
-    std::weak_ptr<TContainer> Container;
-
-    TContainerValue(
-           const char *name,
-           const char *desc,
-           const int flags,
-           const std::set<EContainerState> &state) :
-        Name(name), Desc(desc), Flags(flags), State(state) {}
-
-    std::shared_ptr<TContainer> GetContainer() const {
-        std::shared_ptr<TContainer> container = Container.lock();
-        PORTO_ASSERT(container);
-        return container;
-    }
-
-public:
-    void SetContainer(std::shared_ptr<TContainer> container) {
-        Container = container;
-    }
-    const char *GetName() { return Name; }
-    const char *GetDesc() { return Desc; }
-    int GetFlags() { return Flags; }
-    const std::set<EContainerState> &GetState() { return State; }
-    virtual TError PrepareTaskEnv(std::shared_ptr<TTaskEnv> taskEnv) {
-        return TError::Success();
-    }
-};
-
-static inline const void AddContainerValue(std::shared_ptr<TRawValueMap> m, std::shared_ptr<TContainer> c, TAbstractValue *v) {
-    try {
-        auto cv = dynamic_cast<TContainerValue *>(v);
-        auto name = cv->GetName();
-        cv->SetContainer(c);
-        m->Add(name, v);
-    } catch (std::bad_cast &e) {
-        PORTO_RUNTIME_ERROR(std::string("Invalid variant cast: ") + e.what());
-    }
-}
-// TODO MOVE OUT OF THIS FILE }}}
-
-
-
+// TODO: rework into template method
 #define SYNTHESIZE_ACCESSOR(NAME, TYPE) \
     TYPE Get ## NAME(const std::string &name) { \
         return (*Values)[name]->Get<TYPE>(); \
@@ -275,8 +216,7 @@ static inline const void AddContainerValue(std::shared_ptr<TRawValueMap> m, std:
         TError error = (*Values)[name]->Set<TYPE>(value); \
         if (error) \
             return error; \
-        TContainerValue *p = GetContainerValue(name); \
-        if (p->GetFlags() & PERSISTENT_VALUE) \
+        if ((*Values)[name]->GetFlags() & PERSISTENT_VALUE) \
             error = Storage->Append(Id, name, (*Values)[name]->ToString()); \
         return error; \
     }
@@ -284,7 +224,6 @@ static inline const void AddContainerValue(std::shared_ptr<TRawValueMap> m, std:
 class TVariantSet : public TNonCopyable {
     std::shared_ptr<TKeyValueStorage> Storage;
     std::shared_ptr<TRawValueMap> Values;
-    std::weak_ptr<TContainer> Container;
     const std::string Id;
     bool Persist;
 
@@ -306,11 +245,12 @@ public:
         if (error)
             return error;
 
-        TContainerValue *p = GetContainerValue(name);
-        if (p->GetFlags() & PERSISTENT_VALUE)
+        if ((*Values)[name]->GetFlags() & PERSISTENT_VALUE)
             error = Storage->Append(Id, name, value);
         return error;
     }
+
+    TAbstractValue *operator[](const std::string &name) const { return (*Values)[name]; }
 
     SYNTHESIZE_ACCESSOR(Bool, bool)
     SYNTHESIZE_ACCESSOR(Int, int)
@@ -319,16 +259,13 @@ public:
     SYNTHESIZE_ACCESSOR(Map, TUintMap)
 
     std::vector<std::string> List();
-    bool IsDefault(const std::string &name);
-    bool HasValue(const std::string &name);
+    bool IsDefault(const std::string &name) const;
+    bool HasValue(const std::string &name) const;
     void Reset(const std::string &name);
     bool IsValid(const std::string &name) { return Values->IsValid(name) == TError::Success(); }
-    // TODO MOVE OUT
-    TContainerValue *GetContainerValue(const std::string &name);
 
     TError Flush();
     TError Sync();
 };
 
 #undef SYNTHESIZE_ACCESSOR
-

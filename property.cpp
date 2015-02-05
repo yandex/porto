@@ -3,6 +3,7 @@
 #include "subsystem.hpp"
 #include "cgroup.hpp"
 #include "container.hpp"
+#include "container_value.hpp"
 #include "qdisc.hpp"
 #include "util/log.hpp"
 #include "util/file.hpp"
@@ -37,8 +38,8 @@ bool TPropertySet::HasFlags(const std::string &property, int flags) {
         return false;
     }
 
-    auto cv = VariantSet.GetContainerValue(property);
-    return cv->GetFlags() & flags;
+    auto av = VariantSet[property];
+    return av->GetFlags() & flags;
 }
 bool TPropertySet::HasState(const std::string &property, EContainerState state) {
     TError error = Valid(property);
@@ -47,7 +48,7 @@ bool TPropertySet::HasState(const std::string &property, EContainerState state) 
         return false;
     }
 
-    auto cv = VariantSet.GetContainerValue(property);
+    auto cv = ToContainerValue(VariantSet[property]);
     auto valueState = cv->GetState();
 
     return valueState.find(state) != valueState.end();
@@ -86,23 +87,19 @@ TError TPropertySet::Sync() {
 
 TError TPropertySet::PrepareTaskEnv(const std::string &property,
                                     std::shared_ptr<TTaskEnv> taskEnv) {
+    auto av = VariantSet[property];
 
-    auto cv = VariantSet.GetContainerValue(property);
-    try {
-        auto av = dynamic_cast<TAbstractValue *>(cv);
-        if (VariantSet.IsDefault(property)) {
-            TError error = av->FromString(av->DefaultString());
-            if (error)
-                return error;
+    if (VariantSet.IsDefault(property)) {
+        // if the value is default we still need PrepareTaskEnv method
+        // to be called, so set value to default and then reset it
+        TError error = av->FromString(av->DefaultString());
+        if (error)
+            return error;
 
-            av->Reset();
-        }
-
-        return cv->PrepareTaskEnv(taskEnv);
-    } catch (std::bad_cast &e) {
-        PORTO_RUNTIME_ERROR(std::string("Invalid variant cast: ") + e.what());
-        return TError::Success();
+        av->Reset();
     }
+
+    return ToContainerValue(av)->PrepareTaskEnv(taskEnv);
 }
 
 TError TPropertySet::GetSharedContainer(std::shared_ptr<TContainer> &c) {
@@ -177,9 +174,9 @@ static std::set<EContainerState> anyState = {
 class TCommandProperty : public TStringValue, public TContainerValue {
 public:
     TCommandProperty() :
+        TStringValue(PERSISTENT_VALUE | OS_MODE_PROPERTY),
         TContainerValue(P_COMMAND,
                         "Command executed upon container start",
-                        PERSISTENT_VALUE | OS_MODE_PROPERTY,
                         staticProperty) {}
 
     std::string GetDefault() const override {
@@ -194,9 +191,9 @@ public:
 class TUserProperty : public TStringValue, public TContainerValue {
 public:
     TUserProperty() :
+        TStringValue(SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_USER,
                         "Start command with given user",
-                        NODEF_VALUE | SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY | PERSISTENT_VALUE,
                         staticProperty) {}
 
     TError CheckValue(const std::string &value) override {
@@ -214,9 +211,9 @@ public:
 class TGroupProperty : public TStringValue, public TContainerValue {
 public:
     TGroupProperty() :
+        TStringValue(SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_GROUP,
                         "Start command with given group",
-                        NODEF_VALUE | SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY | PERSISTENT_VALUE,
                         staticProperty) {}
 
     TError CheckValue(const std::string &value) override {
@@ -234,18 +231,18 @@ public:
 class TEnvProperty : public TListValue, public TContainerValue {
 public:
     TEnvProperty() :
+        TListValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_ENV,
                         "Container environment variables",
-                        PARENT_DEF_PROPERTY | PERSISTENT_VALUE,
                         staticProperty) {}
 };
 
 class TRootProperty : public TStringValue, public TContainerValue {
 public:
     TRootProperty() :
+        TStringValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_ROOT,
                      "Container root directory",
-                     PARENT_RO_PROPERTY | PERSISTENT_VALUE,
                      staticProperty) {}
 
     std::string GetDefault() const override {
@@ -260,9 +257,9 @@ public:
 class TRootRdOnlyProperty : public TBoolValue, public TContainerValue {
 public:
     TRootRdOnlyProperty() :
+        TBoolValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_ROOT_RDONLY,
                         "Mount root directory in read-only mode",
-                        PARENT_RO_PROPERTY | PERSISTENT_VALUE,
                         staticProperty) {}
 
     bool GetDefault() const override {
@@ -273,9 +270,9 @@ public:
 class TCwdProperty : public TStringValue, public TContainerValue {
 public:
     TCwdProperty() :
+        TStringValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY),
         TContainerValue(P_CWD,
                         "Container working directory",
-                        PARENT_DEF_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY,
                         staticProperty) {}
 
     std::string GetDefault() const override {
@@ -298,9 +295,9 @@ public:
 class TStdinPathProperty : public TStringValue, public TContainerValue {
 public:
     TStdinPathProperty() :
+        TStringValue(PERSISTENT_VALUE | OS_MODE_PROPERTY),
         TContainerValue(P_STDIN_PATH,
                         "Container standard input path",
-                        PERSISTENT_VALUE | OS_MODE_PROPERTY,
                         staticProperty) {}
 
     std::string GetDefault() const override {
@@ -315,9 +312,9 @@ public:
 class TStdoutPathProperty : public TStringValue, public TContainerValue {
 public:
     TStdoutPathProperty() :
+        TStringValue(PERSISTENT_VALUE | OS_MODE_PROPERTY),
         TContainerValue(P_STDOUT_PATH,
                         "Container standard input path",
-                        PERSISTENT_VALUE | OS_MODE_PROPERTY,
                         staticProperty) {}
 
     std::string GetDefault() const override {
@@ -337,9 +334,9 @@ public:
 class TStderrPathProperty : public TStringValue, public TContainerValue {
 public:
     TStderrPathProperty() :
+        TStringValue(PERSISTENT_VALUE | OS_MODE_PROPERTY),
         TContainerValue(P_STDERR_PATH,
                         "Container standard error path",
-                        PERSISTENT_VALUE | OS_MODE_PROPERTY,
                         staticProperty) {}
 
     std::string GetDefault() const override {
@@ -359,9 +356,9 @@ public:
 class TStdoutLimitProperty : public TUintValue, public TContainerValue {
 public:
     TStdoutLimitProperty() :
+        TUintValue(PERSISTENT_VALUE),
         TContainerValue(P_STDOUT_LIMIT,
                         "Return no more than given number of bytes from standard output/error",
-                        PERSISTENT_VALUE,
                         staticProperty) {}
 
     uint64_t GetDefault() const override {
@@ -383,9 +380,9 @@ public:
 class TMemoryGuaranteeProperty : public TUintValue, public TContainerValue {
 public:
     TMemoryGuaranteeProperty() :
+        TUintValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | UINT_UNIT_VALUE),
         TContainerValue(P_MEM_GUARANTEE,
                         "Guaranteed amount of memory",
-                        PARENT_RO_PROPERTY | PERSISTENT_VALUE | UINT_UNIT_VALUE,
                         dynamicProperty) {}
 
     TError CheckValue(const uint64_t &value) override {
@@ -411,9 +408,9 @@ public:
 class TMemoryLimitProperty : public TUintValue, public TContainerValue {
 public:
     TMemoryLimitProperty() :
+        TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE),
         TContainerValue(P_MEM_LIMIT,
                         "Memory hard limit",
-                        PERSISTENT_VALUE | UINT_UNIT_VALUE,
                         dynamicProperty) {}
 
     TError CheckValue(const uint64_t &value) override {
@@ -427,9 +424,9 @@ public:
 class TRechargeOnPgfaultProperty : public TBoolValue, public TContainerValue {
 public:
     TRechargeOnPgfaultProperty() :
+        TBoolValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_RECHARGE_ON_PGFAULT,
                         "Recharge memory on page fault",
-                        PARENT_RO_PROPERTY | PERSISTENT_VALUE,
                         dynamicProperty) {}
 
     bool GetDefault() const override {
@@ -448,9 +445,9 @@ public:
 class TCpuPolicyProperty : public TStringValue, public TContainerValue {
 public:
     TCpuPolicyProperty() :
+        TStringValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_CPU_POLICY,
                         "CPU policy: rt, normal, idle",
-                        PARENT_RO_PROPERTY | PERSISTENT_VALUE,
                         dynamicProperty) {}
 
     std::string GetDefault() const override {
@@ -477,9 +474,9 @@ public:
 class TCpuPriorityProperty : public TUintValue, public TContainerValue {
 public:
     TCpuPriorityProperty() :
+        TUintValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_CPU_PRIO,
                         "CPU priority: 0-99",
-                        PARENT_RO_PROPERTY | PERSISTENT_VALUE,
                         dynamicProperty) {}
 
     uint64_t GetDefault() const override {
@@ -506,7 +503,8 @@ public:
            const char *desc,
            const int flags,
            const std::set<EContainerState> &state) :
-        TContainerValue(name, desc, flags, state) {}
+        TMapValue(flags),
+        TContainerValue(name, desc, state) {}
 
     TUintMap GetDefault() const override {
         auto c = GetContainer();
@@ -591,9 +589,9 @@ public:
 class TRespawnProperty : public TBoolValue, public TContainerValue {
 public:
     TRespawnProperty() :
+        TBoolValue(PERSISTENT_VALUE),
         TContainerValue(P_RESPAWN,
                         "Automatically respawn dead container",
-                        PERSISTENT_VALUE,
                         staticProperty) {}
 
     bool GetDefault() const override {
@@ -604,9 +602,9 @@ public:
 class TMaxRespawnsProperty : public TIntValue, public TContainerValue {
 public:
     TMaxRespawnsProperty() :
+        TIntValue(PERSISTENT_VALUE),
         TContainerValue(P_MAX_RESPAWNS,
                         "Limit respawn count for specific container",
-                        PERSISTENT_VALUE,
                         staticProperty) {}
 
     int GetDefault() const override {
@@ -617,9 +615,9 @@ public:
 class TIsolateProperty : public TBoolValue, public TContainerValue {
 public:
     TIsolateProperty() :
+        TBoolValue(PERSISTENT_VALUE | OS_MODE_PROPERTY),
         TContainerValue(P_ISOLATE,
                         "Isolate container from parent",
-                        PERSISTENT_VALUE | OS_MODE_PROPERTY,
                         staticProperty) {}
 
     bool GetDefault() const override {
@@ -630,9 +628,9 @@ public:
 class TPrivateProperty : public TStringValue, public TContainerValue {
 public:
     TPrivateProperty() :
+        TStringValue(PERSISTENT_VALUE),
         TContainerValue(P_PRIVATE,
                         "User-defined property",
-                        PERSISTENT_VALUE,
                         dynamicProperty) {}
 
     std::string GetDefault() const override {
@@ -654,9 +652,9 @@ class TUlimitProperty : public TListValue, public TContainerValue {
 
 public:
     TUlimitProperty() :
+        TListValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_ULIMIT,
                         "Container resource limits",
-                        PARENT_DEF_PROPERTY | PERSISTENT_VALUE,
                         staticProperty) {}
 
     TError CheckValue(const std::vector<std::string> &lines) override {
@@ -731,18 +729,18 @@ public:
 class THostnameProperty : public TStringValue, public TContainerValue {
 public:
     THostnameProperty() :
+        TStringValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_HOSTNAME,
                         "Container hostname",
-                        PARENT_RO_PROPERTY | PERSISTENT_VALUE,
                         staticProperty) {}
 };
 
 class TBindDnsProperty : public TBoolValue, public TContainerValue {
 public:
     TBindDnsProperty() :
+        TBoolValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY),
         TContainerValue(P_BIND_DNS,
                         "Bind /etc/resolv.conf and /etc/hosts of host to container",
-                        PARENT_RO_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY,
                         staticProperty) {}
 
     bool GetDefault() const override {
@@ -765,9 +763,9 @@ class TBindProperty : public TListValue, public TContainerValue {
 
 public:
     TBindProperty() :
+        TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY),
         TContainerValue(P_BIND,
                         "Share host directories with container",
-                        PARENT_RO_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY,
                         staticProperty) {}
 
     TError CheckValue(const std::vector<std::string> &lines) override {
@@ -818,9 +816,9 @@ class TDefaultGwProperty : public TStringValue, public TContainerValue {
     struct TNlAddr Addr;
 public:
     TDefaultGwProperty() :
+        TStringValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | HIDDEN_VALUE),
         TContainerValue(P_DEFAULT_GW,
                         "Default gateway",
-                        PARENT_RO_PROPERTY | PERSISTENT_VALUE | HIDDEN_VALUE,
                         staticProperty) {}
 
     std::string GetDefault() const override {
@@ -842,9 +840,9 @@ class TIpProperty : public TListValue, public TContainerValue {
 
 public:
     TIpProperty() :
+        TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | HIDDEN_VALUE),
         TContainerValue(P_IP,
                         "IP configuration",
-                        PARENT_RO_PROPERTY | PERSISTENT_VALUE | HIDDEN_VALUE,
                         staticProperty) {}
 
     TStrList GetDefault() const override {
@@ -884,9 +882,9 @@ class TNetProperty : public TListValue, public TContainerValue {
 
 public:
     TNetProperty() :
+        TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_NET,
                         "Container network settings",
-                        PARENT_RO_PROPERTY | PERSISTENT_VALUE,
                         staticProperty) {}
 
     TStrList GetDefault() const override {
@@ -1051,9 +1049,9 @@ public:
 class TAllowedDevicesProperty : public TListValue, public TContainerValue {
 public:
     TAllowedDevicesProperty() :
+        TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY),
         TContainerValue(P_ALLOWED_DEVICES,
                         "Devices that container can create/read/write",
-                        PARENT_RO_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY,
                         staticProperty) {}
 
     TStrList GetDefault() const override {
@@ -1119,9 +1117,9 @@ class TCapabilitiesProperty : public TListValue, public TContainerValue {
 
 public:
     TCapabilitiesProperty() :
+        TListValue(PERSISTENT_VALUE | OS_MODE_PROPERTY | SUPERUSER_PROPERTY),
         TContainerValue(P_CAPABILITIES,
                         "Limit container capabilities",
-                        PERSISTENT_VALUE | OS_MODE_PROPERTY | SUPERUSER_PROPERTY,
                         staticProperty) {}
 
     TStrList GetDefault() const override {
@@ -1163,9 +1161,9 @@ public:
 class TVirtModeProperty : public TIntValue, public TContainerValue {
 public:
     TVirtModeProperty() :
+        TIntValue(PERSISTENT_VALUE | RESTROOT_PROPERTY),
         TContainerValue(P_VIRT_MODE,
                         "Virtualization mode: os or app",
-                        PERSISTENT_VALUE | RESTROOT_PROPERTY,
                         staticProperty) {}
 
     TError CheckValue(const int &value) override {
@@ -1191,23 +1189,31 @@ public:
 
 class TRawIdProperty : public TIntValue, public TContainerValue {
 public:
-    TRawIdProperty() : TContainerValue(P_RAW_ID, "", HIDDEN_VALUE | PERSISTENT_VALUE, anyState) {}
+    TRawIdProperty() :
+        TIntValue(HIDDEN_VALUE | PERSISTENT_VALUE),
+        TContainerValue(P_RAW_ID, "", anyState) {}
 };
 
 class TRawRootPidProperty : public TIntValue, public TContainerValue {
 public:
-    TRawRootPidProperty() : TContainerValue(P_RAW_ROOT_PID, "", HIDDEN_VALUE | PERSISTENT_VALUE, anyState) {}
+    TRawRootPidProperty() :
+        TIntValue(HIDDEN_VALUE | PERSISTENT_VALUE),
+        TContainerValue(P_RAW_ROOT_PID, "", anyState) {}
 };
 
 class TRawLoopDevProperty : public TIntValue, public TContainerValue {
 public:
-    TRawLoopDevProperty() : TContainerValue(P_RAW_LOOP_DEV, "", HIDDEN_VALUE | PERSISTENT_VALUE, anyState) {}
+    TRawLoopDevProperty() :
+        TIntValue(HIDDEN_VALUE | PERSISTENT_VALUE),
+        TContainerValue(P_RAW_LOOP_DEV, "", anyState) {}
     int GetDefault() const override { return -1; }
 };
 
 class TRawNameProperty : public TStringValue, public TContainerValue {
 public:
-    TRawNameProperty() : TContainerValue(P_RAW_NAME, "", HIDDEN_VALUE | PERSISTENT_VALUE, anyState) {}
+    TRawNameProperty() :
+        TStringValue(HIDDEN_VALUE | PERSISTENT_VALUE),
+        TContainerValue(P_RAW_NAME, "", anyState) {}
 };
 
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,

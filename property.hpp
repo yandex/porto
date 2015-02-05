@@ -127,7 +127,7 @@ public:
     TError Flush();
     TError Sync();
 
-    TContainerValue *GetContainerValue(const std::string &name) { return VariantSet.GetContainerValue(name); }
+    TAbstractValue *operator[](const std::string &name) const { return VariantSet[name]; }
     std::vector<std::string> List() { return VariantSet.List(); }
 
     TError PrepareTaskEnv(const std::string &property,

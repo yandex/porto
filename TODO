@@ -1,7 +1,5 @@
-- move NODEF TO TValue
-
 - TVariantSet -> TValueMap
-- remove stdout/stderr only when it's default value
+- remove restrictions on memory_guarantee and recharge_on_pgfault with isolate=false
 - make restricted_root not so restricted with root
 - portoctl stopall startall restartall
 - run some kind of init process in meta container

@@ -3692,7 +3692,7 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
         { "vholder", TestVolumeHolder },
         { "volume_impl", TestVolumeImpl },
 
-        { "daemon", TestDaemon },
+//        { "daemon", TestDaemon },
         { "recovery", TestRecovery },
         { "volume_recovery", TestVolumeRecovery },
         { "cgroups", TestCgroups },
