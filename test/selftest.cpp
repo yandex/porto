@@ -1020,52 +1020,62 @@ static void TestCwdProperty(TPortoAPI &api) {
 static void TestStdPathProperty(TPortoAPI &api) {
     string pid;
     string name = "a";
+    std::string stdinPath, stdoutPath, stderrPath;
 
     AsRoot(api);
 
     ExpectApiSuccess(api.Create(name));
 
     Say() << "Check default stdin/stdout/stderr" << std::endl;
-    Expect(!FileExists("/tmp/stdout"));
-    Expect(!FileExists("/tmp/stderr"));
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
-    ExpectApiSuccess(api.SetProperty(name, "cwd", "/tmp"));
+    ExpectApiSuccess(api.GetProperty(name, "stdout_path", stdoutPath));
+    ExpectApiSuccess(api.GetProperty(name, "stderr_path", stderrPath));
+
+    Expect(!FileExists(stdoutPath));
+    Expect(!FileExists(stderrPath));
     ExpectApiSuccess(api.Start(name));
-    Expect(FileExists("/tmp/stdout"));
-    Expect(FileExists("/tmp/stderr"));
+    Expect(FileExists(stdoutPath));
+    Expect(FileExists(stderrPath));
+
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
     Expect(ReadLink("/proc/" + pid + "/fd/0") == "/dev/null");
-    Expect(ReadLink("/proc/" + pid + "/fd/1") == "/tmp/stdout");
-    Expect(ReadLink("/proc/" + pid + "/fd/2") == "/tmp/stderr");
+    Expect(ReadLink("/proc/" + pid + "/fd/1") == stdoutPath);
+    Expect(ReadLink("/proc/" + pid + "/fd/2") == stderrPath);
     ExpectApiSuccess(api.Stop(name));
-    Expect(!FileExists("/tmp/stdout"));
-    Expect(!FileExists("/tmp/stderr"));
 
+    Expect(!FileExists(stdoutPath));
+    Expect(!FileExists(stderrPath));
 
     Say() << "Check custom stdin/stdout/stderr" << std::endl;
-    TFile f("/tmp/a_stdin");
-    TError error = f.WriteStringNoAppend("hi");
-    if (error)
-        throw error.GetMsg();
+    stdinPath = "/tmp/a_stdin";
+    stdoutPath = "/tmp/a_stdout";
+    stderrPath = "/tmp/a_stderr";
 
-    Expect(!FileExists("/tmp/a_stdout"));
-    Expect(!FileExists("/tmp/a_stderr"));
+    TFile stdinFile(stdinPath);
+    (void)stdinFile.Remove();
+    TFile stdoutFile(stdoutPath);
+    (void)stdoutFile.Remove();
+    TFile stderrFile(stderrPath);
+    (void)stderrFile.Remove();
+
+    TFile f(stdinPath);
+    ExpectSuccess(f.Touch());
+    ExpectSuccess(f.WriteStringNoAppend("hi"));
+
     ExpectApiSuccess(api.SetProperty(name, "stdin_path", "/tmp/a_stdin"));
     ExpectApiSuccess(api.SetProperty(name, "stdout_path", "/tmp/a_stdout"));
     ExpectApiSuccess(api.SetProperty(name, "stderr_path", "/tmp/a_stderr"));
+    Expect(!FileExists(stdoutPath));
+    Expect(!FileExists(stderrPath));
     ExpectApiSuccess(api.Start(name));
-    ExpectApiSuccess(api.GetData(name, "root_pid", pid));
-    Expect(FileExists("/tmp/a_stdout"));
-    Expect(FileExists("/tmp/a_stderr"));
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
     Expect(ReadLink("/proc/" + pid + "/fd/0") == "/tmp/a_stdin");
     Expect(ReadLink("/proc/" + pid + "/fd/1") == "/tmp/a_stdout");
     Expect(ReadLink("/proc/" + pid + "/fd/2") == "/tmp/a_stderr");
     ExpectApiSuccess(api.Stop(name));
-    Expect(FileExists("/tmp/a_stdin"));
-    Expect(!FileExists("/tmp/a_stdout"));
-    Expect(!FileExists("/tmp/a_stderr"));
-
+    Expect(FileExists(stdinPath));
+    Expect(FileExists(stdoutPath));
+    Expect(FileExists(stderrPath));
 
     Say() << "Make sure custom stdin is not removed" << std::endl;
     string ret;
@@ -1076,6 +1086,10 @@ static void TestStdPathProperty(TPortoAPI &api) {
     Expect(ret == string("hi"));
 
     ExpectApiSuccess(api.Destroy(name));
+
+    Expect(FileExists(stdinPath));
+    Expect(FileExists(stdoutPath));
+    Expect(FileExists(stderrPath));
 
     AsNobody(api);
 }
