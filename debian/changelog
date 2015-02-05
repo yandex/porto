@@ -1,3 +1,9 @@
+yandex-porto (0.32) precise; urgency=low
+
+  * Don't remove custom stdout/stderr
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Thu, 05 Feb 2015 14:41:00 +0400
+
 yandex-porto (0.31) precise; urgency=low
 
   * Add SYS_RESOURCE to restricted_root
