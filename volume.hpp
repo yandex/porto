@@ -27,7 +27,7 @@ public:
 };
 
 class TVolume : public std::enable_shared_from_this<TVolume>, public TNonCopyable {
-    std::shared_ptr<TKeyValueStorage> Storage;
+    std::shared_ptr<TKeyValueNode> KvNode;
     std::shared_ptr<TVolumeHolder> Holder;
     TCred Cred;
 
@@ -42,20 +42,19 @@ class TVolume : public std::enable_shared_from_this<TVolume>, public TNonCopyabl
     std::unique_ptr<TVolumeImpl> Impl;
     TError Prepare();
 public:
-    TError Create();
+    TError Create(std::shared_ptr<TKeyValueStorage> storage);
     TError Construct() const;
     TError Deconstruct() const;
     TError Destroy();
-    TVolume(std::shared_ptr<TKeyValueStorage> storage,
-            std::shared_ptr<TVolumeHolder> holder, const TPath &path,
+    TVolume(std::shared_ptr<TVolumeHolder> holder, const TPath &path,
             std::shared_ptr<TResource> resource,
             const std::string &quota,
             const std::string &flags, const TCred &cred) :
-        Storage(storage), Holder(holder), Cred(cred), Path(path),
+        KvNode(nullptr), Holder(holder), Cred(cred), Path(path),
         Resource(resource), Quota(quota), Flags(flags) {}
-    TVolume(std::shared_ptr<TKeyValueStorage> storage,
+    TVolume(std::shared_ptr<TKeyValueNode> kvnode,
             std::shared_ptr<TVolumeHolder> holder) :
-        Storage(storage), Holder(holder) {}
+        KvNode(kvnode), Holder(holder) {}
 
     TError CheckPermission(const TCred &ucred) const;
 
@@ -67,8 +66,8 @@ public:
     const uint16_t GetId() const { return Id; }
     std::shared_ptr<TResource> GetResource() { return Resource; }
 
-    TError SaveToStorage(const std::string &path) const;
-    TError LoadFromStorage(const std::string &path);
+    TError SaveToStorage() const;
+    TError LoadFromStorage();
     TCred GetCred() const { return Cred; }
     bool IsValid() { return Valid; }
     void SetValid(bool v) { Valid = v; }

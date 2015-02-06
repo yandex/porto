@@ -230,24 +230,19 @@ std::vector<std::string> TRawValueMap::List() const {
 }
 
 TValueMap::~TValueMap() {
-    if (!Persist)
+    if (!KvNode)
         return;
 
-    TError error = Storage->RemoveNode(Id);
+    TError error = KvNode->Remove();
     if (error)
-        L_ERR() << "Can't remove key-value node " << Id << ": " << error << std::endl;
+        L_ERR() << "Can't remove key-value node " << KvNode->GetName() << ": " << error << std::endl;
 }
 
-TValueMap::TValueMap(std::shared_ptr<TKeyValueStorage> storage,
-            const std::string &id,
-            bool persist) :
-    Storage(storage), Id(id), Persist(persist) { }
-
 TError TValueMap::Create() {
-    if (!Persist)
+    if (!KvNode)
         return TError::Success();
 
-    return Storage->Create(Id);
+    return KvNode->Create();
 }
 
 TError TValueMap::Restore(const kv::TNode &node) {
@@ -274,14 +269,14 @@ TError TValueMap::Restore(const kv::TNode &node) {
 }
 
 TError TValueMap::Flush() {
-    if (!Persist)
+    if (!KvNode)
         return TError::Success();
 
-    return Storage->Create(Id);
+    return KvNode->Create();
 }
 
 TError TValueMap::Sync() {
-    if (!Persist)
+    if (!KvNode)
         return TError::Success();
 
     kv::TNode node;
@@ -303,7 +298,7 @@ TError TValueMap::Sync() {
             L() << "Sync " << name << " = " << ToString(name) << std::endl;
     }
 
-    return Storage->AppendNode(Id, node);
+    return KvNode->Append(node);
 }
 
 std::string TValueMap::ToString(const std::string &name) const {
@@ -317,9 +312,8 @@ TError TValueMap::FromString(const std::string &name, const std::string &value) 
     if (error)
         return error;
 
-    if (Find(name)->GetFlags() & PERSISTENT_VALUE) {
-        error = Storage->Append(Id, name, value);
-    }
+    if (KvNode && Find(name)->GetFlags() & PERSISTENT_VALUE)
+        error = KvNode->Append(name, value);
 
     if (resetOnDefault)
         Find(name)->Reset();

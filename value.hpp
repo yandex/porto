@@ -208,14 +208,10 @@ public:
 };
 
 class TValueMap : public TRawValueMap, public TNonCopyable {
-    std::shared_ptr<TKeyValueStorage> Storage;
-    const std::string Id;
-    bool Persist;
+    std::shared_ptr<TKeyValueNode> KvNode;
 
 public:
-    TValueMap(std::shared_ptr<TKeyValueStorage> storage,
-              const std::string &id,
-              bool persist);
+    TValueMap(std::shared_ptr<TKeyValueNode> kvnode) : KvNode(kvnode) {}
     ~TValueMap();
 
     TError Create();
@@ -248,12 +244,12 @@ public:
         if (error)
             return error;
 
-        if (Find(name)->GetFlags() & PERSISTENT_VALUE)
-            error = Storage->Append(Id, name, Find(name)->ToString());
+        if (KvNode && Find(name)->GetFlags() & PERSISTENT_VALUE)
+            error = KvNode->Append(name, Find(name)->ToString());
 
         // we don't want to keep default values in memory but we also
         // want custom TValue descendants to do some internal preparation
-        // event we set value to default value; so just set it and reset
+        // even if we set value to default; so just set it and reset
         // afterwards
         if (resetOnDefault)
             Find(name)->Reset();

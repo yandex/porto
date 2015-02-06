@@ -249,12 +249,12 @@ static TError CreateVolume(TContext &context,
         return error;
 
     std::shared_ptr<TVolume> volume;
-    volume = std::make_shared<TVolume>(context.VolumeStorage, context.Vholder,
+    volume = std::make_shared<TVolume>(context.Vholder,
                                        StringTrim(req.path()),
                                        resource,
                                        StringTrim(req.quota()),
                                        StringTrim(req.flags()), client->Cred);
-    error = volume->Create();
+    error = volume->Create(context.VolumeStorage);
     if (error)
         return error;
 

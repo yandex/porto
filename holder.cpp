@@ -177,12 +177,9 @@ TError TContainerHolder::RestoreId(const kv::TNode &node, uint16_t &id) {
     if (error)
         return error;
 
-    uint32_t id32;
-    error = StringToUint32(value, id32);
+    error = StringToUint16(value, id);
     if (error)
         return error;
-
-    id = (uint16_t)id32;
 
     error = IdMap.GetAt(id);
     if (error)
@@ -191,41 +188,81 @@ TError TContainerHolder::RestoreId(const kv::TNode &node, uint16_t &id) {
     return TError::Success();
 }
 
-bool TContainerHolder::RestoreFromStorage() {
-    std::map<std::string, kv::TNode> id2node;
-    TError error = Storage->Restore(id2node);
-    if (error) {
-        L_ERR() << "Can't restore state: " << error << std::endl;
-        return false;
-    }
-
-    // FIXME since v0.31 we use container id as kvalue node name and because
+std::map<std::string, std::shared_ptr<TKeyValueNode>> TContainerHolder::SortNodes(const std::vector<std::shared_ptr<TKeyValueNode>> &nodes) {
+    // FIXME since v0.33 we use container id as kvalue node name and because
     // we need to create containers in particular order we create this
     // name-sorted map
-    std::map<std::string, std::string> name2id;
-    for (auto pair : id2node) {
-        std::string name = pair.first;
+    std::map<std::string, std::shared_ptr<TKeyValueNode>> name2node;
+
+    for (auto node : nodes) {
+        std::string name = node->GetName();
         if (StringOnlyDigits(name)) {
-            TError error = Storage->Get(pair.second, P_RAW_NAME, name);
+            uint16_t id;
+            TError error = StringToUint16(name, id);
+            if (error) {
+                L_ERR() << "Can't convert id to integer: " << error << std::endl;
+                node->Remove();
+                Statistics->RestoreFailed++;
+                continue;
+            }
+
+            kv::TNode n;
+            error = node->Load(n);
+            if (error) {
+                L_ERR() << "Can't load key-value node " << node->GetPath() << ": " << error << std::endl;
+                node->Remove();
+                Statistics->RestoreFailed++;
+                continue;
+            }
+
+            error = Storage->Get(n, P_RAW_NAME, name);
             if (error) {
                 L_ERR() << "Can't get " << P_RAW_NAME << " from " << name << std::endl;
-                Storage->RemoveNode(pair.first);
+                node->Remove();
+                Statistics->RestoreFailed++;
                 continue;
             }
         } else {
-            Storage->RemoveNode(pair.first);
+            node->Remove();
         }
 
-        name2id[name] = pair.first;
+        name2node[name] = node;
     }
 
+    return name2node;
+}
+
+bool TContainerHolder::RestoreFromStorage() {
+    std::vector<std::shared_ptr<TKeyValueNode>> nodes;
+
+    TError error = Storage->ListNodes(nodes);
+    if (error) {
+        L_ERR() << "Can't list key-value nodes: " << error << std::endl;
+        return false;
+    }
+
+    std::map<std::string, std::shared_ptr<TKeyValueNode>> name2node = SortNodes(nodes);
+
     bool restored = false;
-    for (auto &r : name2id) {
-        restored = true;
-        error = Restore(r.first, id2node[r.second]);
+    for (auto &pair : name2node) {
+        auto node = pair.second;
+        auto name = pair.first;
+
+        kv::TNode n;
+        TError error = pair.second->Load(n);
         if (error) {
-            L_ERR() << "Can't restore " << r.first << " state : " << error << " (" << id2node[r.second].ShortDebugString() << ")" << std::endl;
+            L_ERR() << "Can't load key-value node " << node->GetPath() << ": " << error << std::endl;
+            node->Remove();
+            continue;
+        }
+
+        restored = true;
+        error = Restore(name, n);
+        if (error) {
+            L_ERR() << "Can't restore " << name << " state : " << error << " (" << n.ShortDebugString() << ")" << std::endl;
             Statistics->RestoreFailed++;
+            node->Remove();
+            continue;
         }
     }
 

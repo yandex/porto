@@ -1078,10 +1078,12 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
 }
 
 TError TContainer::Prepare() {
-    bool persist = Name != ROOT_CONTAINER;
+    std::shared_ptr<TKeyValueNode> kvnode;
+    if (Name != ROOT_CONTAINER)
+        kvnode = Storage->GetNode(Id);
 
-    Prop = std::make_shared<TPropertyMap>(Storage, shared_from_this(), persist);
-    Data = std::make_shared<TValueMap>(Storage, std::to_string(Id), persist);
+    Prop = std::make_shared<TPropertyMap>(kvnode, shared_from_this());
+    Data = std::make_shared<TValueMap>(kvnode);
     if (!Prop || !Data)
         throw std::bad_alloc();
 

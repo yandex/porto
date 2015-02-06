@@ -25,7 +25,7 @@ using std::set;
 using std::shared_ptr;
 
 TError TMount::Mount(unsigned long flags) const {
-    L() << "mount " << Target.ToString() << std::endl;
+    L() << "mount " << Target << std::endl;
 
     int ret = RetryBusy(10, 100, [&]{ return mount(Source.ToString().c_str(),
                                                    Target.ToString().c_str(),
@@ -39,7 +39,7 @@ TError TMount::Mount(unsigned long flags) const {
 }
 
 TError TMount::Umount() const {
-    L() << "umount " << Target.ToString() << std::endl;
+    L() << "umount " << Target << std::endl;
 
     int ret = RetryBusy(10, 100, [&]{ return umount(Target.ToString().c_str()); });
     if (ret)

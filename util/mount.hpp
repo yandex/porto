@@ -50,7 +50,7 @@ public:
     TError Umount() const;
 
     friend std::ostream& operator<<(std::ostream& stream, const TMount& mount) {
-        stream << mount.Source.ToString() << " " << mount.Target.ToString() << " " << mount.Type << " ";
+        stream << mount.Source << " " << mount.Target << " " << mount.Type << " ";
 
         for (auto &f : mount.Data)
             stream << f << ",";

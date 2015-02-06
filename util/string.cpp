@@ -41,6 +41,19 @@ TError StringsToIntegers(const std::vector<std::string> &strings,
     return TError::Success();
 }
 
+TError StringToUint16(const std::string &str, uint16_t &value) {
+    uint32_t uint32;
+    TError error = StringToUint32(str, uint32);
+    if (error)
+        return error;
+
+    if (uint32 >= 1 << 16)
+        return TError(EError::Unknown, string(__func__) + ": Integer value out of range");
+
+    value = (uint16_t)uint32;
+    return TError::Success();
+}
+
 TError StringToUint32(const std::string &str, uint32_t &value) {
     try {
         value = stoul(str);

@@ -265,7 +265,7 @@ TError TVolume::Prepare() {
     return TError::Success();
 }
 
-TError TVolume::Create() {
+TError TVolume::Create(std::shared_ptr<TKeyValueStorage> storage) {
     TError ret;
     TFolder dir(Path);
 
@@ -281,6 +281,8 @@ TError TVolume::Create() {
     ret = Holder->IdMap.Get(Id);
     if (ret)
         return ret;
+
+    KvNode = storage->GetNode(Id);
 
     ret = Holder->Insert(shared_from_this());
     if (ret)
@@ -304,7 +306,7 @@ TError TVolume::Create() {
         goto remove_volume;
     Impl->Create();
 
-    ret = SaveToStorage(std::to_string(Id));
+    ret = SaveToStorage();
     if (ret)
         goto destroy_volume;
 
@@ -345,53 +347,53 @@ const std::string TVolume::GetSource() const {
 
 TError TVolume::Destroy() {
     Holder->Remove(shared_from_this());
-    Storage->RemoveNode(std::to_string(Id));
+    KvNode->Remove();
     Impl->Destroy();
     Impl = nullptr;
     return TError::Success();
 }
 
-TError TVolume::SaveToStorage(const std::string &path) const {
-    TError error = Storage->Append(path, "path", Path.ToString());
+TError TVolume::SaveToStorage() const {
+    TError error = KvNode->Append("path", Path.ToString());
     if (error)
         return error;
 
-    error = Storage->Append(path, "source", Resource->GetSource().ToString());
+    error = KvNode->Append("source", Resource->GetSource().ToString());
     if (error)
         return error;
 
-    error = Storage->Append(path, "quota", Quota);
+    error = KvNode->Append("quota", Quota);
     if (error)
         return error;
 
-    error = Storage->Append(path, "flags", Flags);
+    error = KvNode->Append("flags", Flags);
     if (error)
         return error;
 
-    error = Storage->Append(path, "user", Cred.UserAsString());
+    error = KvNode->Append("user", Cred.UserAsString());
     if (error)
         return error;
 
-    error = Storage->Append(path, "group", Cred.GroupAsString());
+    error = KvNode->Append("group", Cred.GroupAsString());
     if (error)
         return error;
 
-    error = Storage->Append(path, "id", std::to_string(Id));
+    error = KvNode->Append("id", std::to_string(Id));
     if (error)
         return error;
 
     kv::TNode node;
     if (Impl->Save(node))
-        error = Storage->AppendNode(path, node);
+        error = KvNode->Append(node);
     return error;
 }
 
-TError TVolume::LoadFromStorage(const std::string &path) {
+TError TVolume::LoadFromStorage() {
     kv::TNode node;
     TError error;
     std::string user, group, source, quota, flags;
 
-    error = Storage->LoadNode(path, node);
+    error = KvNode->Load(node);
     if (error)
         return error;
 
@@ -455,7 +457,7 @@ TError TVolume::LoadFromStorage(const std::string &path) {
 }
 
 TError TVolumeHolder::RestoreFromStorage() {
-    std::vector<std::string> list;
+    std::vector<std::shared_ptr<TKeyValueNode>> list;
 
     TPath volumes = config().volumes().volume_dir();
     if (!volumes.Exists() || volumes.GetType() != EFileType::Directory) {
@@ -471,16 +473,16 @@ TError TVolumeHolder::RestoreFromStorage() {
         return error;
 
     for (auto &i : list) {
-        std::shared_ptr<TVolume> v = std::make_shared<TVolume>(Storage, shared_from_this());
+        std::shared_ptr<TVolume> v = std::make_shared<TVolume>(i, shared_from_this());
 
-        error = v->LoadFromStorage(i);
+        error = v->LoadFromStorage();
         if (error) {
-            Storage->RemoveNode(i);
+            i->Remove();
             L_WRN() << "Corrupted volume " << i << " removed: " << error << std::endl;
             continue;
         }
 
-        L() << "Volume " << v->GetPath().ToString() << " restored" << std::endl;
+        L() << "Volume " << v->GetPath() << " restored" << std::endl;
     }
 
     RemoveIf(config().volumes().resource_dir(),
@@ -508,11 +510,11 @@ void TVolumeHolder::Destroy() {
         auto volume = Volumes.begin()->second;
         TError error = volume->Deconstruct();
         if (error)
-            L_ERR() << "Can't deconstruct volume " << name.ToString() << ": " << error << std::endl;
+            L_ERR() << "Can't deconstruct volume " << name << ": " << error << std::endl;
 
         error = volume->Destroy();
         if (error)
-            L_ERR() << "Can't destroy volume " << name.ToString() << ": " << error << std::endl;
+            L_ERR() << "Can't destroy volume " << name << ": " << error << std::endl;
     }
 }
 
@@ -590,7 +592,7 @@ TError TResource::Copy(const TPath &to) const {
 }
 
 TError TResource::Destroy() const {
-    L() << "Destroy resource " << Path.ToString() << std::endl;
+    L() << "Destroy resource " << Path << std::endl;
 
     if (Path.Exists()) {
         TFolder dir(Path);
@@ -602,5 +604,5 @@ TError TResource::Destroy() const {
 TResource::~TResource() {
     TError error = Destroy();
     if (error)
-        L_ERR() << "Can't destroy resource " << Source.ToString() << " at " << Path.ToString() << ": " << error << std::endl;
+        L_ERR() << "Can't destroy resource " << Source << " at " << Path << ": " << error << std::endl;
 }

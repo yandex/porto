@@ -73,10 +73,9 @@ class TPropertyMap : public TValueMap {
     TError GetSharedContainer(std::shared_ptr<TContainer> &c) const;
 
 public:
-    TPropertyMap(std::shared_ptr<TKeyValueStorage> storage,
-                std::shared_ptr<TContainer> c,
-                bool persist) :
-        TValueMap(storage, std::to_string(c->GetId()), persist),
+    TPropertyMap(std::shared_ptr<TKeyValueNode> kvnode,
+                 std::shared_ptr<TContainer> c) :
+        TValueMap(kvnode),
         Container(c) {}
 
     std::string ToString(const std::string &name) const;
