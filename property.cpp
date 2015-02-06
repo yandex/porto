@@ -16,6 +16,16 @@ extern "C" {
 #include <linux/capability.h>
 }
 
+std::string TPropertySet::ToString(const std::string &name) const {
+    if (IsDefault(name)) {
+        std::shared_ptr<TContainer> c;
+        if (ParentDefault(c, name))
+            return c->GetParent()->Prop->ToString(name);
+    }
+
+    return TVariantSet::ToString(name);
+}
+
 bool TPropertySet::ParentDefault(std::shared_ptr<TContainer> &c,
                                  const std::string &property) const {
     TError error = GetSharedContainer(c);
@@ -28,45 +38,40 @@ bool TPropertySet::ParentDefault(std::shared_ptr<TContainer> &c,
 }
 
 bool TPropertySet::HasFlags(const std::string &property, int flags) const {
-    TError error = Valid(property);
+    TError error = Check(property);
     if (error) {
         L_ERR() << error << std::endl;
         return false;
     }
 
-    auto av = VariantSet[property];
-    return av->GetFlags() & flags;
+    return Find(property)->GetFlags() & flags;
 }
 
 bool TPropertySet::HasState(const std::string &property, EContainerState state) const {
-    TError error = Valid(property);
+    TError error = Check(property);
     if (error) {
         L_ERR() << error << std::endl;
         return false;
     }
 
-    auto cv = ToContainerValue(VariantSet[property]);
+    auto cv = ToContainerValue(Find(property));
     auto valueState = cv->GetState();
 
     return valueState.find(state) != valueState.end();
 }
 
-TError TPropertySet::Valid(const std::string &property) const {
-    if (!VariantSet.IsValid(property))
+TError TPropertySet::Check(const std::string &property) const {
+    if (!IsValid(property))
         return TError(EError::Unknown, "Invalid property " + property);
 
     return TError::Success();
 }
 
-TError TPropertySet::Restore(const kv::TNode &node) {
-    return VariantSet.Restore(node);
-}
-
 TError TPropertySet::PrepareTaskEnv(const std::string &property,
                                     std::shared_ptr<TTaskEnv> taskEnv) {
-    auto av = VariantSet[property];
+    auto av = Find(property);
 
-    if (VariantSet.IsDefault(property)) {
+    if (IsDefault(property)) {
         // if the value is default we still need PrepareTaskEnv method
         // to be called, so set value to default and then reset it
         TError error = av->FromString(av->DefaultString());

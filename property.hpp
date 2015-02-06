@@ -67,74 +67,50 @@ const unsigned int RESTROOT_PROPERTY = (1 << 3);
 // start with virt_mode==os
 const unsigned int OS_MODE_PROPERTY = (1 << 4);
 
-class TPropertySet : public TNonCopyable {
-    TVariantSet VariantSet;
+class TPropertySet : public TVariantSet {
     std::weak_ptr<TContainer> Container;
 
     TError GetSharedContainer(std::shared_ptr<TContainer> &c) const;
 
 public:
     TPropertySet(std::shared_ptr<TKeyValueStorage> storage,
-                std::shared_ptr<TRawValueMap> values,
                 std::shared_ptr<TContainer> c,
                 bool persist) :
-        VariantSet(storage, values, std::to_string(c->GetId()), persist),
+        TVariantSet(storage, std::to_string(c->GetId()), persist),
         Container(c) {}
 
-    std::string ToString(const std::string &name) const {
-        if (VariantSet.IsDefault(name)) {
-            std::shared_ptr<TContainer> c;
-            if (ParentDefault(c, name))
-                return c->GetParent()->Prop->ToString(name);
-        }
-
-        return VariantSet.ToString(name);
-    }
-    TError FromString(const std::string &name, const std::string &value) { return VariantSet.FromString(name, value); }
-
-    bool IsDefault(const std::string &property) const { return VariantSet.IsDefault(property); }
+    std::string ToString(const std::string &name) const;
     bool ParentDefault(std::shared_ptr<TContainer> &c,
                        const std::string &property) const;
 
     bool HasFlags(const std::string &property, int flags) const;
     bool HasState(const std::string &property, EContainerState state) const;
 
-    TError Valid(const std::string &property) const;
-
-    TError Create() { return VariantSet.Create(); }
-    TError Restore(const kv::TNode &node);
-    void Reset(const std::string &name) { VariantSet.Reset(name); }
-
-    bool HasValue(const std::string &name) { return VariantSet.HasValue(name); }
-    TError Flush() { return VariantSet.Flush(); }
-    TError Sync() { return VariantSet.Sync(); }
-
-    TAbstractValue *operator[](const std::string &name) const { return VariantSet[name]; }
-    std::vector<std::string> List() { return VariantSet.List(); }
+    TError Check(const std::string &property) const;
 
     TError PrepareTaskEnv(const std::string &property,
                           std::shared_ptr<TTaskEnv> taskEnv);
 
     template<typename T>
     const T Get(const std::string &name) const {
-        if (VariantSet.IsDefault(name)) {
+        if (IsDefault(name)) {
             std::shared_ptr<TContainer> c;
             if (ParentDefault(c, name))
                 return c->GetParent()->Prop->Get<T>(name);
         }
-        return VariantSet.Get<T>(name);
+        return TVariantSet::Get<T>(name);
     }
 
     template<typename T>
     TError Set(const std::string &name, const T& value) {
-        if (!VariantSet.IsValid(name))
+        if (!IsValid(name))
             return TError(EError::InvalidValue, name + " not found");
-        return VariantSet.Set<T>(name, value);
+        return TVariantSet::Set<T>(name, value);
     }
 
     template<typename T>
     const T GetRaw(const std::string &name) const {
-        return VariantSet.Get<T>(name);
+        return TVariantSet::Get<T>(name);
     }
 };
 

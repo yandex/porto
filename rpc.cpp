@@ -177,7 +177,7 @@ static TError ListProperty(TContext &context,
         return TError(EError::Unknown, "Can't find root container");
 
     for (auto name : container->Prop->List()) {
-        auto av = (*container->Prop)[name];
+        auto av = container->Prop->Find(name);
         if (av->GetFlags() & HIDDEN_VALUE)
             continue;
 
@@ -200,7 +200,7 @@ static TError ListData(TContext &context,
         return TError(EError::Unknown, "Can't find root container");
 
     for (auto name : container->Data->List()) {
-        auto av = (*container->Data)[name];
+        auto av = container->Data->Find(name);
         if (av->GetFlags() & HIDDEN_VALUE)
             continue;
 

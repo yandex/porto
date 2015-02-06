@@ -71,9 +71,9 @@ public:
     virtual TError FromString(const std::string &value) =0;
     virtual std::string DefaultString() const =0;
 
-    bool HasValue() { return Variant.HasValue(); }
-    void Reset() { Variant.Reset(); }
-    int GetFlags() { return Flags; }
+    bool HasValue() const;
+    void Reset();
+    int GetFlags() const;
 
     template<typename T>
     const T Get() const {
@@ -200,22 +200,20 @@ public:
     ~TRawValueMap();
 
     TError Add(const std::string &name, TAbstractValue *av);
-    TAbstractValue *operator[](const std::string &name) const;
-    TError IsValid(const std::string &name) const;
+    TAbstractValue *Find(const std::string &name) const;
+    bool IsValid(const std::string &name) const;
     bool IsDefault(const std::string &name) const;
     bool HasValue(const std::string &name) const;
     std::vector<std::string> List() const;
 };
 
-class TVariantSet : public TNonCopyable {
+class TVariantSet : public TRawValueMap, public TNonCopyable {
     std::shared_ptr<TKeyValueStorage> Storage;
-    std::shared_ptr<TRawValueMap> Values;
     const std::string Id;
     bool Persist;
 
 public:
     TVariantSet(std::shared_ptr<TKeyValueStorage> storage,
-                std::shared_ptr<TRawValueMap> values,
                 const std::string &id,
                 bool persist);
     ~TVariantSet();
@@ -223,20 +221,18 @@ public:
     TError Create();
     TError Restore(const kv::TNode &node);
 
-    TAbstractValue *operator[](const std::string &name) const { return (*Values)[name]; }
-
     std::string ToString(const std::string &name) const;
     TError FromString(const std::string &name, const std::string &value);
 
     template<typename T>
     const T Get(const std::string &name) const {
-        return (*Values)[name]->Get<T>();
+        return Find(name)->Get<T>();
     }
 
     template<typename T>
     bool IsDefaultValue(const std::string &name, const T& value) {
         try {
-            auto av = (*Values)[name];
+            auto av = Find(name);
             auto p = dynamic_cast<TValue<T> *>(av);
             return p->GetDefault() == value;
         } catch (std::bad_cast &e) {
@@ -248,29 +244,24 @@ public:
     template<typename T>
     TError Set(const std::string &name, const T& value) {
         bool resetOnDefault = IsDefaultValue(name, value);
-        TError error = (*Values)[name]->Set<T>(value);
+        TError error = Find(name)->Set<T>(value);
         if (error)
             return error;
 
-        if ((*Values)[name]->GetFlags() & PERSISTENT_VALUE)
-            error = Storage->Append(Id, name, (*Values)[name]->ToString());
+        if (Find(name)->GetFlags() & PERSISTENT_VALUE)
+            error = Storage->Append(Id, name, Find(name)->ToString());
 
         // we don't want to keep default values in memory but we also
         // want custom TValue descendants to do some internal preparation
         // event we set value to default value; so just set it and reset
         // afterwards
         if (resetOnDefault)
-            (*Values)[name]->Reset();
+            Find(name)->Reset();
 
         return error;
     }
 
-    std::vector<std::string> List();
-    bool IsDefault(const std::string &name) const;
-    bool HasValue(const std::string &name) const;
     void Reset(const std::string &name);
-    bool IsValid(const std::string &name) const { return Values->IsValid(name) == TError::Success(); }
-
     TError Flush();
     TError Sync();
 };

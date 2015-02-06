@@ -6,6 +6,18 @@
 #include "util/log.hpp"
 #include "util/string.hpp"
 
+bool TAbstractValue::HasValue() const {
+    return Variant.HasValue();
+}
+
+void TAbstractValue::Reset() {
+    Variant.Reset();
+}
+
+int TAbstractValue::GetFlags() const {
+    return Flags;
+}
+
 std::string TStringValue::ToString(const std::string &value) const {
     return value;
 }
@@ -193,15 +205,12 @@ TError TRawValueMap::Add(const std::string &name, TAbstractValue *av) {
     return TError::Success();
 }
 
-TAbstractValue *TRawValueMap::operator[](const std::string &name) const {
+TAbstractValue *TRawValueMap::Find(const std::string &name) const {
     return AbstractValues.at(name);
 }
 
-TError TRawValueMap::IsValid(const std::string &name) const {
-    if (AbstractValues.find(name) != AbstractValues.end())
-        return TError::Success();
-
-    return TError(EError::InvalidValue, "Invalid value " + name);
+bool TRawValueMap::IsValid(const std::string &name) const {
+   return AbstractValues.find(name) != AbstractValues.end();
 }
 
 bool TRawValueMap::IsDefault(const std::string &name) const {
@@ -230,10 +239,9 @@ TVariantSet::~TVariantSet() {
 }
 
 TVariantSet::TVariantSet(std::shared_ptr<TKeyValueStorage> storage,
-            std::shared_ptr<TRawValueMap> values,
             const std::string &id,
             bool persist) :
-    Storage(storage), Values(values), Id(id), Persist(persist) { }
+    Storage(storage), Id(id), Persist(persist) { }
 
 TError TVariantSet::Create() {
     if (!Persist)
@@ -247,39 +255,22 @@ TError TVariantSet::Restore(const kv::TNode &node) {
         auto key = node.pairs(i).key();
         auto value = node.pairs(i).val();
 
-        TError error = Values->IsValid(key);
-        if (error)
+        if (!IsValid(key))
             continue;
 
-        auto *av = (*Values)[key];
+        auto *av = Find(key);
         if (!(av->GetFlags() & PERSISTENT_VALUE))
             continue;
 
         if (config().log().verbose())
             L() << "Restoring " << key << " = " << value << std::endl;
 
-        error = av->FromString(value);
+        TError error = av->FromString(value);
         if (error)
             L_ERR() << error << ": Can't restore " << key << ", skipped" << std::endl;
     }
 
     return TError::Success();
-}
-
-std::vector<std::string> TVariantSet::List() {
-    return Values->List();
-}
-
-bool TVariantSet::IsDefault(const std::string &name) const {
-    return Values->IsDefault(name);
-}
-
-bool TVariantSet::HasValue(const std::string &name) const {
-    return Values->HasValue(name);
-}
-
-void TVariantSet::Reset(const std::string &name) {
-    (*Values)[name]->Reset();
 }
 
 TError TVariantSet::Flush() {
@@ -295,13 +286,13 @@ TError TVariantSet::Sync() {
 
     kv::TNode node;
 
-    for (auto name : Values->List()) {
-        auto *av = (*Values)[name];
+    for (auto name : List()) {
+        auto *av = Find(name);
 
         if (!(av->GetFlags() & PERSISTENT_VALUE))
             continue;
 
-        if (Values->IsDefault(name))
+        if (IsDefault(name))
             continue;
 
         auto pair = node.add_pairs();
@@ -316,21 +307,26 @@ TError TVariantSet::Sync() {
 }
 
 std::string TVariantSet::ToString(const std::string &name) const {
-    return (*Values)[name]->ToString();
+    return Find(name)->ToString();
 }
-TError TVariantSet::FromString(const std::string &name, const std::string &value) {
-    bool resetOnDefault = HasValue(name) && (*Values)[name]->DefaultString() == value;
 
-    TError error = (*Values)[name]->FromString(value);
+TError TVariantSet::FromString(const std::string &name, const std::string &value) {
+    bool resetOnDefault = HasValue(name) && Find(name)->DefaultString() == value;
+
+    TError error = Find(name)->FromString(value);
     if (error)
         return error;
 
-    if ((*Values)[name]->GetFlags() & PERSISTENT_VALUE) {
+    if (Find(name)->GetFlags() & PERSISTENT_VALUE) {
         error = Storage->Append(Id, name, value);
     }
 
     if (resetOnDefault)
-        (*Values)[name]->Reset();
+        Find(name)->Reset();
 
     return error;
+}
+
+void TVariantSet::Reset(const std::string &name) {
+    Find(name)->Reset();
 }

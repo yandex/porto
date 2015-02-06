@@ -479,7 +479,7 @@ TError TContainer::PrepareCgroups() {
 TError TContainer::PrepareTask() {
     if (!Prop->Get<bool>(P_ISOLATE))
         for (auto name : Prop->List())
-            if ((*Prop)[name]->GetFlags() & PARENT_RO_PROPERTY)
+            if (Prop->Find(name)->GetFlags() & PARENT_RO_PROPERTY)
                 if (!Prop->IsDefault(name))
                     return TError(EError::InvalidValue, "Can't use custom " + name + " with " + P_ISOLATE + " == false");
 
@@ -647,7 +647,7 @@ TError TContainer::Start() {
         !CredConf.PrivilegedUser(Cred)) {
 
         for (auto name : Prop->List())
-            if ((*Prop)[name]->GetFlags() & OS_MODE_PROPERTY)
+            if (Prop->Find(name)->GetFlags() & OS_MODE_PROPERTY)
                 Prop->Reset(name);
     }
 
@@ -925,7 +925,7 @@ TError TContainer::GetData(const string &origName, string &value) {
     if (!Data->IsValid(name))
         return TError(EError::InvalidData, "invalid container data");
 
-    auto validState = ToContainerValue((*Data)[name])->GetState();
+    auto validState = ToContainerValue(Data->Find(name))->GetState();
     if (validState.find(GetState()) == validState.end())
         return TError(EError::InvalidState, "invalid container state");
 
@@ -992,7 +992,7 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
     if (alias.find(origProperty) != alias.end())
         property = alias.at(origProperty);
 
-    TError error = Prop->Valid(property);
+    TError error = Prop->Check(property);
     if (error)
         return error;
 
@@ -1034,7 +1034,7 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
     if (error)
         return error;
 
-    error = Prop->Valid(property);
+    error = Prop->Check(property);
     if (error)
         return error;
 
@@ -1078,27 +1078,24 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
 }
 
 TError TContainer::Prepare() {
-    auto dataValues = std::make_shared<TRawValueMap>();
-    RegisterData(dataValues, shared_from_this());
+    bool persist = Name != ROOT_CONTAINER;
 
-    auto propValues = std::make_shared<TRawValueMap>();
-    RegisterProperties(propValues, shared_from_this());
+    Prop = std::make_shared<TPropertySet>(Storage, shared_from_this(), persist);
+    Data = std::make_shared<TVariantSet>(Storage, std::to_string(Id), persist);
+    if (!Prop || !Data)
+        throw std::bad_alloc();
+
+    RegisterData(Data, shared_from_this());
+    RegisterProperties(Prop, shared_from_this());
 
     if (Name == ROOT_CONTAINER) {
-        auto dataList = dataValues->List();
-        auto propList = propValues->List();
+        auto dataList = Data->List();
+        auto propList = Prop->List();
 
         for (auto name : dataList)
             if (std::find(propList.begin(), propList.end(), name) != propList.end())
                 return TError(EError::Unknown, "Data and property names conflict: " + name);
     }
-
-    bool persist = Name != ROOT_CONTAINER;
-
-    Prop = std::make_shared<TPropertySet>(Storage, propValues, shared_from_this(), persist);
-    Data = std::make_shared<TVariantSet>(Storage, dataValues, std::to_string(Id), persist);
-    if (!Prop || !Data)
-        throw std::bad_alloc();
 
     TError error = Prop->Create();
     if (error)
