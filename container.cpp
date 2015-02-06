@@ -612,8 +612,7 @@ TError TContainer::PrepareMetaParent() {
             return error;
     }
 
-    auto state = GetState();
-    //auto state = State;
+    auto state = State;
     if (state == EContainerState::Stopped) {
         SetState(EContainerState::Meta);
 
@@ -1174,13 +1173,13 @@ TError TContainer::Restore(const kv::TNode &node) {
 
         TError error = PrepareResources();
         if (error) {
-            //FreeResources();
+            FreeResources();
             return error;
         }
 
         error = PrepareTask();
         if (error) {
-            //FreeResources();
+            FreeResources();
             return error;
         }
 
