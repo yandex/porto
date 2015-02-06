@@ -14,8 +14,8 @@
 
 class TCgroup;
 class TSubsystem;
-class TPropertySet;
-class TVariantSet;
+class TPropertyMap;
+class TValueMap;
 enum class ETclassStat;
 class TEvent;
 class TContainerHolder;
@@ -87,8 +87,8 @@ public:
 
     // TODO: make private
     std::unique_ptr<TTask> Task;
-    std::shared_ptr<TPropertySet> Prop;
-    std::shared_ptr<TVariantSet> Data;
+    std::shared_ptr<TPropertyMap> Prop;
+    std::shared_ptr<TValueMap> Data;
     std::shared_ptr<TNetwork> Net;
 
     std::string GetTmpDir() const;

@@ -16,17 +16,17 @@ extern "C" {
 #include <linux/capability.h>
 }
 
-std::string TPropertySet::ToString(const std::string &name) const {
+std::string TPropertyMap::ToString(const std::string &name) const {
     if (IsDefault(name)) {
         std::shared_ptr<TContainer> c;
         if (ParentDefault(c, name))
             return c->GetParent()->Prop->ToString(name);
     }
 
-    return TVariantSet::ToString(name);
+    return TValueMap::ToString(name);
 }
 
-bool TPropertySet::ParentDefault(std::shared_ptr<TContainer> &c,
+bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
                                  const std::string &property) const {
     TError error = GetSharedContainer(c);
     if (error) {
@@ -37,7 +37,7 @@ bool TPropertySet::ParentDefault(std::shared_ptr<TContainer> &c,
     return HasFlags(property, PARENT_DEF_PROPERTY) && c->UseParentNamespace();
 }
 
-bool TPropertySet::HasFlags(const std::string &property, int flags) const {
+bool TPropertyMap::HasFlags(const std::string &property, int flags) const {
     TError error = Check(property);
     if (error) {
         L_ERR() << error << std::endl;
@@ -47,7 +47,7 @@ bool TPropertySet::HasFlags(const std::string &property, int flags) const {
     return Find(property)->GetFlags() & flags;
 }
 
-bool TPropertySet::HasState(const std::string &property, EContainerState state) const {
+bool TPropertyMap::HasState(const std::string &property, EContainerState state) const {
     TError error = Check(property);
     if (error) {
         L_ERR() << error << std::endl;
@@ -60,14 +60,14 @@ bool TPropertySet::HasState(const std::string &property, EContainerState state) 
     return valueState.find(state) != valueState.end();
 }
 
-TError TPropertySet::Check(const std::string &property) const {
+TError TPropertyMap::Check(const std::string &property) const {
     if (!IsValid(property))
         return TError(EError::Unknown, "Invalid property " + property);
 
     return TError::Success();
 }
 
-TError TPropertySet::PrepareTaskEnv(const std::string &property,
+TError TPropertyMap::PrepareTaskEnv(const std::string &property,
                                     std::shared_ptr<TTaskEnv> taskEnv) {
     auto av = Find(property);
 
@@ -84,7 +84,7 @@ TError TPropertySet::PrepareTaskEnv(const std::string &property,
     return ToContainerValue(av)->PrepareTaskEnv(taskEnv);
 }
 
-TError TPropertySet::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
+TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
     c = Container.lock();
     if (!c)
         return TError(EError::Unknown, "Can't convert weak container reference");
@@ -502,22 +502,15 @@ public:
 
     TError CheckValue(const TUintMap &value) {
         std::set<std::string> validKey;
+        auto availableLinks = GetContainer()->Net->GetLinks();
 
-        for (auto &link : GetContainer()->Net->GetLinks())
+        for (auto &link : availableLinks)
             validKey.insert(link->GetAlias());
 
         for (auto &kv : value)
             if (validKey.find(kv.first) == validKey.end())
                 return TError(EError::InvalidValue,
                               "invalid interface " + kv.first);
-
-        // TODO: check that all interfaces are specified!!!
-
-        /*
-        TUintMap m = Get();
-        for (auto &kv : value)
-            m[kv.first] = kv.second;
-            */
 
         return TError::Success();
     }
@@ -732,9 +725,9 @@ public:
         if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
             return false;
 
-        if (!c->Prop->Get<bool>("isolate"))
+        if (!c->Prop->Get<bool>(P_ISOLATE))
             return false;
-        else if (c->Prop->IsDefault("root"))
+        else if (c->Prop->IsDefault(P_ROOT))
             return false;
         else
             return true;

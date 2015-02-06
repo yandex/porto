@@ -67,16 +67,16 @@ const unsigned int RESTROOT_PROPERTY = (1 << 3);
 // start with virt_mode==os
 const unsigned int OS_MODE_PROPERTY = (1 << 4);
 
-class TPropertySet : public TVariantSet {
+class TPropertyMap : public TValueMap {
     std::weak_ptr<TContainer> Container;
 
     TError GetSharedContainer(std::shared_ptr<TContainer> &c) const;
 
 public:
-    TPropertySet(std::shared_ptr<TKeyValueStorage> storage,
+    TPropertyMap(std::shared_ptr<TKeyValueStorage> storage,
                 std::shared_ptr<TContainer> c,
                 bool persist) :
-        TVariantSet(storage, std::to_string(c->GetId()), persist),
+        TValueMap(storage, std::to_string(c->GetId()), persist),
         Container(c) {}
 
     std::string ToString(const std::string &name) const;
@@ -98,19 +98,19 @@ public:
             if (ParentDefault(c, name))
                 return c->GetParent()->Prop->Get<T>(name);
         }
-        return TVariantSet::Get<T>(name);
+        return TValueMap::Get<T>(name);
     }
 
     template<typename T>
     TError Set(const std::string &name, const T& value) {
         if (!IsValid(name))
             return TError(EError::InvalidValue, name + " not found");
-        return TVariantSet::Set<T>(name, value);
+        return TValueMap::Set<T>(name, value);
     }
 
     template<typename T>
     const T GetRaw(const std::string &name) const {
-        return TVariantSet::Get<T>(name);
+        return TValueMap::Get<T>(name);
     }
 };
 

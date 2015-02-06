@@ -207,16 +207,16 @@ public:
     std::vector<std::string> List() const;
 };
 
-class TVariantSet : public TRawValueMap, public TNonCopyable {
+class TValueMap : public TRawValueMap, public TNonCopyable {
     std::shared_ptr<TKeyValueStorage> Storage;
     const std::string Id;
     bool Persist;
 
 public:
-    TVariantSet(std::shared_ptr<TKeyValueStorage> storage,
-                const std::string &id,
-                bool persist);
-    ~TVariantSet();
+    TValueMap(std::shared_ptr<TKeyValueStorage> storage,
+              const std::string &id,
+              bool persist);
+    ~TValueMap();
 
     TError Create();
     TError Restore(const kv::TNode &node);

@@ -1080,8 +1080,8 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
 TError TContainer::Prepare() {
     bool persist = Name != ROOT_CONTAINER;
 
-    Prop = std::make_shared<TPropertySet>(Storage, shared_from_this(), persist);
-    Data = std::make_shared<TVariantSet>(Storage, std::to_string(Id), persist);
+    Prop = std::make_shared<TPropertyMap>(Storage, shared_from_this(), persist);
+    Data = std::make_shared<TValueMap>(Storage, std::to_string(Id), persist);
     if (!Prop || !Data)
         throw std::bad_alloc();
 

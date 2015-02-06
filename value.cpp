@@ -229,7 +229,7 @@ std::vector<std::string> TRawValueMap::List() const {
     return v;
 }
 
-TVariantSet::~TVariantSet() {
+TValueMap::~TValueMap() {
     if (!Persist)
         return;
 
@@ -238,19 +238,19 @@ TVariantSet::~TVariantSet() {
         L_ERR() << "Can't remove key-value node " << Id << ": " << error << std::endl;
 }
 
-TVariantSet::TVariantSet(std::shared_ptr<TKeyValueStorage> storage,
+TValueMap::TValueMap(std::shared_ptr<TKeyValueStorage> storage,
             const std::string &id,
             bool persist) :
     Storage(storage), Id(id), Persist(persist) { }
 
-TError TVariantSet::Create() {
+TError TValueMap::Create() {
     if (!Persist)
         return TError::Success();
 
     return Storage->Create(Id);
 }
 
-TError TVariantSet::Restore(const kv::TNode &node) {
+TError TValueMap::Restore(const kv::TNode &node) {
     for (int i = 0; i < node.pairs_size(); i++) {
         auto key = node.pairs(i).key();
         auto value = node.pairs(i).val();
@@ -273,14 +273,14 @@ TError TVariantSet::Restore(const kv::TNode &node) {
     return TError::Success();
 }
 
-TError TVariantSet::Flush() {
+TError TValueMap::Flush() {
     if (!Persist)
         return TError::Success();
 
     return Storage->Create(Id);
 }
 
-TError TVariantSet::Sync() {
+TError TValueMap::Sync() {
     if (!Persist)
         return TError::Success();
 
@@ -306,11 +306,11 @@ TError TVariantSet::Sync() {
     return Storage->AppendNode(Id, node);
 }
 
-std::string TVariantSet::ToString(const std::string &name) const {
+std::string TValueMap::ToString(const std::string &name) const {
     return Find(name)->ToString();
 }
 
-TError TVariantSet::FromString(const std::string &name, const std::string &value) {
+TError TValueMap::FromString(const std::string &name, const std::string &value) {
     bool resetOnDefault = HasValue(name) && Find(name)->DefaultString() == value;
 
     TError error = Find(name)->FromString(value);
@@ -327,6 +327,6 @@ TError TVariantSet::FromString(const std::string &name, const std::string &value
     return error;
 }
 
-void TVariantSet::Reset(const std::string &name) {
+void TValueMap::Reset(const std::string &name) {
     Find(name)->Reset();
 }
