@@ -17,21 +17,17 @@ extern "C" {
 }
 
 bool TPropertySet::ParentDefault(std::shared_ptr<TContainer> &c,
-                                 const std::string &property) {
+                                 const std::string &property) const {
     TError error = GetSharedContainer(c);
     if (error) {
         L_ERR() << "Can't get default for " << property << ": " << error << std::endl;
         return "";
     }
 
-    return c->UseParentNamespace() && HasFlags(property, PARENT_DEF_PROPERTY);
+    return HasFlags(property, PARENT_DEF_PROPERTY) && c->UseParentNamespace();
 }
 
-bool TPropertySet::IsDefault(const std::string &property) {
-    return VariantSet.IsDefault(property);
-}
-
-bool TPropertySet::HasFlags(const std::string &property, int flags) {
+bool TPropertySet::HasFlags(const std::string &property, int flags) const {
     TError error = Valid(property);
     if (error) {
         L_ERR() << error << std::endl;
@@ -41,7 +37,8 @@ bool TPropertySet::HasFlags(const std::string &property, int flags) {
     auto av = VariantSet[property];
     return av->GetFlags() & flags;
 }
-bool TPropertySet::HasState(const std::string &property, EContainerState state) {
+
+bool TPropertySet::HasState(const std::string &property, EContainerState state) const {
     TError error = Valid(property);
     if (error) {
         L_ERR() << error << std::endl;
@@ -54,35 +51,15 @@ bool TPropertySet::HasState(const std::string &property, EContainerState state) 
     return valueState.find(state) != valueState.end();
 }
 
-TError TPropertySet::Valid(const std::string &property) {
+TError TPropertySet::Valid(const std::string &property) const {
     if (!VariantSet.IsValid(property))
         return TError(EError::Unknown, "Invalid property " + property);
 
     return TError::Success();
 }
 
-TError TPropertySet::Create() {
-    return VariantSet.Create();
-}
-
 TError TPropertySet::Restore(const kv::TNode &node) {
     return VariantSet.Restore(node);
-}
-
-void TPropertySet::Reset(const std::string &name) {
-    VariantSet.Reset(name);
-}
-
-bool TPropertySet::HasValue(const std::string &name) {
-    return VariantSet.HasValue(name);
-}
-
-TError TPropertySet::Flush() {
-    return VariantSet.Flush();
-}
-
-TError TPropertySet::Sync() {
-    return VariantSet.Sync();
 }
 
 TError TPropertySet::PrepareTaskEnv(const std::string &property,
@@ -102,7 +79,7 @@ TError TPropertySet::PrepareTaskEnv(const std::string &property,
     return ToContainerValue(av)->PrepareTaskEnv(taskEnv);
 }
 
-TError TPropertySet::GetSharedContainer(std::shared_ptr<TContainer> &c) {
+TError TPropertySet::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
     c = Container.lock();
     if (!c)
         return TError(EError::Unknown, "Can't convert weak container reference");
@@ -125,6 +102,7 @@ static TError ExistingFile(std::shared_ptr<TContainer> c, const std::string &str
 
 static std::string DefaultStdFile(std::shared_ptr<TContainer> c,
                                   const std::string &name) {
+
     std::string cwd, root;
     TError error = c->GetProperty("cwd", cwd);
     if (error) {
@@ -180,7 +158,7 @@ public:
                         staticProperty) {}
 
     std::string GetDefault() const override {
-        if (GetContainer()->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS)
+        if (GetContainer()->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
             return "/sbin/init";
 
         return "";
@@ -278,10 +256,10 @@ public:
     std::string GetDefault() const override {
         auto c = GetContainer();
 
-        if (c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS)
+        if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
             return "/";
 
-        if (!c->Prop->IsDefault("root"))
+        if (!c->Prop->IsDefault(P_ROOT))
             return "/";
 
         return config().container().tmp_dir() + "/" + c->GetName();
@@ -320,7 +298,7 @@ public:
     std::string GetDefault() const override {
         auto c = GetContainer();
 
-        if (c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS)
+        if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
             return "/dev/null";
 
         return DefaultStdFile(c, "stdout");
@@ -342,7 +320,7 @@ public:
     std::string GetDefault() const override {
         auto c = GetContainer();
 
-        if (c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS)
+        if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
             return "/dev/null";
 
         return DefaultStdFile(c, "stderr");
@@ -746,10 +724,10 @@ public:
     bool GetDefault() const override {
         auto c = GetContainer();
 
-        if (c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS)
+        if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
             return false;
 
-        if (!c->Prop->GetBool("isolate"))
+        if (!c->Prop->Get<bool>("isolate"))
             return false;
         else if (c->Prop->IsDefault("root"))
             return false;
@@ -1055,7 +1033,7 @@ public:
                         staticProperty) {}
 
     TStrList GetDefault() const override {
-        if (GetContainer()->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS)
+        if (GetContainer()->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
             return TStrList{
                 "c 1:3 rwm", "c 1:5 rwm", "c 1:7 rwm", "c 1:9 rwm",
                 "c 1:8 rwm", "c 136:* rw", "c 5:2 rwm", "c 254:0 rm",
@@ -1127,7 +1105,7 @@ public:
         auto c = GetContainer();
 
         bool root = c->Cred.IsRoot();
-        bool restricted = c->Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS;
+        bool restricted = c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS;
 
         for (auto kv : supported)
             if (root || (restricted && kv.second.flags & RESTRICTED_CAP))
@@ -1169,9 +1147,6 @@ public:
     TError CheckValue(const int &value) override {
         if (value != VIRT_MODE_APP && value != VIRT_MODE_OS)
             return TError(EError::InvalidValue, std::string("Unsupported ") + P_VIRT_MODE);
-
-
-
 
         return TError::Success();
     }

@@ -76,9 +76,9 @@ public:
     int GetFlags() { return Flags; }
 
     template<typename T>
-    const T Get() {
+    const T Get() const {
         try {
-            auto p = dynamic_cast<TValue<T> *>(this);
+            auto p = dynamic_cast<const TValue<T> *>(this);
             return p->Get();
         } catch (std::bad_cast &e) {
             PORTO_RUNTIME_ERROR(std::string("Bad cast: ") + e.what());
@@ -207,20 +207,6 @@ public:
     std::vector<std::string> List() const;
 };
 
-// TODO: rework into template method
-#define SYNTHESIZE_ACCESSOR(NAME, TYPE) \
-    TYPE Get ## NAME(const std::string &name) { \
-        return (*Values)[name]->Get<TYPE>(); \
-    } \
-    TError Set ## NAME(const std::string &name, const TYPE &value) { \
-        TError error = (*Values)[name]->Set<TYPE>(value); \
-        if (error) \
-            return error; \
-        if ((*Values)[name]->GetFlags() & PERSISTENT_VALUE) \
-            error = Storage->Append(Id, name, (*Values)[name]->ToString()); \
-        return error; \
-    }
-
 class TVariantSet : public TNonCopyable {
     std::shared_ptr<TKeyValueStorage> Storage;
     std::shared_ptr<TRawValueMap> Values;
@@ -237,35 +223,54 @@ public:
     TError Create();
     TError Restore(const kv::TNode &node);
 
-    std::string GetString(const std::string &name) {
-        return (*Values)[name]->ToString();
+    TAbstractValue *operator[](const std::string &name) const { return (*Values)[name]; }
+
+    std::string ToString(const std::string &name) const;
+    TError FromString(const std::string &name, const std::string &value);
+
+    template<typename T>
+    const T Get(const std::string &name) const {
+        return (*Values)[name]->Get<T>();
     }
-    TError SetString(const std::string &name, const std::string &value) {
-        TError error = (*Values)[name]->FromString(value);
+
+    template<typename T>
+    bool IsDefaultValue(const std::string &name, const T& value) {
+        try {
+            auto av = (*Values)[name];
+            auto p = dynamic_cast<TValue<T> *>(av);
+            return p->GetDefault() == value;
+        } catch (std::bad_cast &e) {
+            PORTO_RUNTIME_ERROR(std::string("Bad cast: ") + e.what());
+        }
+        return false;
+    }
+
+    template<typename T>
+    TError Set(const std::string &name, const T& value) {
+        bool resetOnDefault = IsDefaultValue(name, value);
+        TError error = (*Values)[name]->Set<T>(value);
         if (error)
             return error;
 
         if ((*Values)[name]->GetFlags() & PERSISTENT_VALUE)
-            error = Storage->Append(Id, name, value);
+            error = Storage->Append(Id, name, (*Values)[name]->ToString());
+
+        // we don't want to keep default values in memory but we also
+        // want custom TValue descendants to do some internal preparation
+        // event we set value to default value; so just set it and reset
+        // afterwards
+        if (resetOnDefault)
+            (*Values)[name]->Reset();
+
         return error;
     }
-
-    TAbstractValue *operator[](const std::string &name) const { return (*Values)[name]; }
-
-    SYNTHESIZE_ACCESSOR(Bool, bool)
-    SYNTHESIZE_ACCESSOR(Int, int)
-    SYNTHESIZE_ACCESSOR(Uint, uint64_t)
-    SYNTHESIZE_ACCESSOR(List, TStrList)
-    SYNTHESIZE_ACCESSOR(Map, TUintMap)
 
     std::vector<std::string> List();
     bool IsDefault(const std::string &name) const;
     bool HasValue(const std::string &name) const;
     void Reset(const std::string &name);
-    bool IsValid(const std::string &name) { return Values->IsValid(name) == TError::Success(); }
+    bool IsValid(const std::string &name) const { return Values->IsValid(name) == TError::Success(); }
 
     TError Flush();
     TError Sync();
 };
-
-#undef SYNTHESIZE_ACCESSOR

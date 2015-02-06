@@ -67,33 +67,11 @@ const unsigned int RESTROOT_PROPERTY = (1 << 3);
 // start with virt_mode==os
 const unsigned int OS_MODE_PROPERTY = (1 << 4);
 
-#define SYNTHESIZE_ACCESSOR(NAME, TYPE) \
-    TYPE Get ## NAME(const std::string &property) { \
-        if (VariantSet.IsDefault(property)) { \
-            std::shared_ptr<TContainer> c; \
-            if (ParentDefault(c, property)) \
-                return c->GetParent()->Prop->Get ## NAME(property); \
-        } \
-        return VariantSet.Get ## NAME(property); \
-    } \
-    TError Set ## NAME(const std::string &property, \
-                       const TYPE &value) { \
-        if (!VariantSet.IsValid(property)) { \
-            TError error(EError::InvalidValue, property + " not found"); \
-            L_ERR() << "Can't set property: " << error << std::endl; \
-            return error; \
-        } \
-        return VariantSet.Set ## NAME(property, value); \
-    } \
-    TYPE GetRaw ## NAME(const std::string &property) { \
-        return VariantSet.Get ## NAME(property); \
-    }
-
 class TPropertySet : public TNonCopyable {
     TVariantSet VariantSet;
     std::weak_ptr<TContainer> Container;
 
-    TError GetSharedContainer(std::shared_ptr<TContainer> &c);
+    TError GetSharedContainer(std::shared_ptr<TContainer> &c) const;
 
 public:
     TPropertySet(std::shared_ptr<TKeyValueStorage> storage,
@@ -103,38 +81,62 @@ public:
         VariantSet(storage, values, std::to_string(c->GetId()), persist),
         Container(c) {}
 
-    SYNTHESIZE_ACCESSOR(String, std::string);
-    SYNTHESIZE_ACCESSOR(Bool, bool);
-    SYNTHESIZE_ACCESSOR(Int, int);
-    SYNTHESIZE_ACCESSOR(Uint, uint64_t);
-    SYNTHESIZE_ACCESSOR(List, TStrList);
-    SYNTHESIZE_ACCESSOR(Map, TUintMap);
+    std::string ToString(const std::string &name) const {
+        if (VariantSet.IsDefault(name)) {
+            std::shared_ptr<TContainer> c;
+            if (ParentDefault(c, name))
+                return c->GetParent()->Prop->ToString(name);
+        }
 
-    bool IsDefault(const std::string &property);
+        return VariantSet.ToString(name);
+    }
+    TError FromString(const std::string &name, const std::string &value) { return VariantSet.FromString(name, value); }
+
+    bool IsDefault(const std::string &property) const { return VariantSet.IsDefault(property); }
     bool ParentDefault(std::shared_ptr<TContainer> &c,
-                       const std::string &property);
+                       const std::string &property) const;
 
-    bool HasFlags(const std::string &property, int flags);
-    bool HasState(const std::string &property, EContainerState state);
+    bool HasFlags(const std::string &property, int flags) const;
+    bool HasState(const std::string &property, EContainerState state) const;
 
-    TError Valid(const std::string &property);
+    TError Valid(const std::string &property) const;
 
-    TError Create();
+    TError Create() { return VariantSet.Create(); }
     TError Restore(const kv::TNode &node);
-    void Reset(const std::string &name);
+    void Reset(const std::string &name) { VariantSet.Reset(name); }
 
-    bool HasValue(const std::string &name);
-    TError Flush();
-    TError Sync();
+    bool HasValue(const std::string &name) { return VariantSet.HasValue(name); }
+    TError Flush() { return VariantSet.Flush(); }
+    TError Sync() { return VariantSet.Sync(); }
 
     TAbstractValue *operator[](const std::string &name) const { return VariantSet[name]; }
     std::vector<std::string> List() { return VariantSet.List(); }
 
     TError PrepareTaskEnv(const std::string &property,
                           std::shared_ptr<TTaskEnv> taskEnv);
-};
 
-#undef SYNTHESIZE_ACCESSOR
+    template<typename T>
+    const T Get(const std::string &name) const {
+        if (VariantSet.IsDefault(name)) {
+            std::shared_ptr<TContainer> c;
+            if (ParentDefault(c, name))
+                return c->GetParent()->Prop->Get<T>(name);
+        }
+        return VariantSet.Get<T>(name);
+    }
+
+    template<typename T>
+    TError Set(const std::string &name, const T& value) {
+        if (!VariantSet.IsValid(name))
+            return TError(EError::InvalidValue, name + " not found");
+        return VariantSet.Set<T>(name, value);
+    }
+
+    template<typename T>
+    const T GetRaw(const std::string &name) const {
+        return VariantSet.Get<T>(name);
+    }
+};
 
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c);

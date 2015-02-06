@@ -715,6 +715,10 @@ TError TTask::ChildCallback() {
 }
 
 TError TTask::CreateCwd() {
+    //auto path = Env->Cwd.ToString();
+    //bool cleanup = std::find(path.begin(), path.end(), config().container().tmp_dir()) == 0;
+
+    //Cwd = std::make_shared<TFolder>(Env->Cwd, cleanup);
     Cwd = std::make_shared<TFolder>(Env->Cwd, true);
     if (!Cwd->Exists()) {
         TError error = Cwd->Create(0755, true);

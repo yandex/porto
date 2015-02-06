@@ -137,7 +137,7 @@ public:
     std::string GetDefault() const override {
         auto c = GetContainer();
         if (c->Task)
-            return c->Task->GetStdout(c->Prop->GetUint(P_STDOUT_LIMIT));
+            return c->Task->GetStdout(c->Prop->Get<uint64_t>(P_STDOUT_LIMIT));
         return "";
     }
 };
@@ -153,7 +153,7 @@ public:
     std::string GetDefault() const override {
         auto c = GetContainer();
         if (c->Task)
-            return c->Task->GetStderr(c->Prop->GetUint(P_STDOUT_LIMIT));
+            return c->Task->GetStderr(c->Prop->Get<uint64_t>(P_STDOUT_LIMIT));
         return "";
     }
 };

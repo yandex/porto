@@ -205,16 +205,7 @@ TError TRawValueMap::IsValid(const std::string &name) const {
 }
 
 bool TRawValueMap::IsDefault(const std::string &name) const {
-    TAbstractValue *p = AbstractValues.at(name);
-    if (!HasValue(name))
-        return true;
-
-    if (p->ToString() == p->DefaultString()) {
-        p->Reset(); // don't keep redundant default value
-        return true;
-    }
-
-    return false;
+    return !HasValue(name);
 }
 
 bool TRawValueMap::HasValue(const std::string &name) const {
@@ -315,11 +306,31 @@ TError TVariantSet::Sync() {
 
         auto pair = node.add_pairs();
         pair->set_key(name);
-        pair->set_val(GetString(name));
+        pair->set_val(ToString(name));
 
         if (config().log().verbose())
-            L() << "Sync " << name << " = " << GetString(name) << std::endl;
+            L() << "Sync " << name << " = " << ToString(name) << std::endl;
     }
 
     return Storage->AppendNode(Id, node);
+}
+
+std::string TVariantSet::ToString(const std::string &name) const {
+    return (*Values)[name]->ToString();
+}
+TError TVariantSet::FromString(const std::string &name, const std::string &value) {
+    bool resetOnDefault = HasValue(name) && (*Values)[name]->DefaultString() == value;
+
+    TError error = (*Values)[name]->FromString(value);
+    if (error)
+        return error;
+
+    if ((*Values)[name]->GetFlags() & PERSISTENT_VALUE) {
+        error = Storage->Append(Id, name, value);
+    }
+
+    if (resetOnDefault)
+        (*Values)[name]->Reset();
+
+    return error;
 }
