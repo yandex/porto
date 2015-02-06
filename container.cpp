@@ -2,6 +2,7 @@
 #include <memory>
 #include <csignal>
 #include <cstdlib>
+#include <algorithm>
 
 #include "container.hpp"
 #include "config.hpp"
