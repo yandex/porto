@@ -273,6 +273,8 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
     if (name == ROOT_CONTAINER)
         return TError::Success();
 
+    L() << "Restore container " << name << std::endl;
+
     auto parent = GetParent(name);
     if (!parent)
         return TError(EError::InvalidValue, "invalid parent container");

@@ -3500,6 +3500,9 @@ static void TestVolumeRecovery(TPortoAPI &api) {
     Expect(volume.Exists() == false);
 
     Say() << "Make sure porto preserves mounted loop/overlayfs" << std::endl;
+    std::vector<TVolumeDescription> volumes;
+    ExpectApiSuccess(api.ListVolumes(volumes));
+    Expect(volumes.size() == 2);
 
     TestVolumeFiles(api, b);
 

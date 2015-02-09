@@ -249,12 +249,12 @@ static TError CreateVolume(TContext &context,
         return error;
 
     std::shared_ptr<TVolume> volume;
-    volume = std::make_shared<TVolume>(context.Vholder,
-                                       StringTrim(req.path()),
-                                       resource,
-                                       StringTrim(req.quota()),
-                                       StringTrim(req.flags()), client->Cred);
-    error = volume->Create(context.VolumeStorage);
+    volume = std::make_shared<TVolume>(context.Vholder, client->Cred);
+    error = volume->Create(context.VolumeStorage,
+                           StringTrim(req.path()),
+                           resource,
+                           StringTrim(req.quota()),
+                           StringTrim(req.flags()));
     if (error)
         return error;
 
@@ -267,9 +267,13 @@ static TError CreateVolume(TContext &context,
             if (error) {
                 L() << "Can't construct volume: " << error << std::endl;
                 (void)volume->Destroy();
+            } else {
+                error = volume->SetValid(true);
+                if (error) {
+                    L() << "Can't mark volume valid: " << error << std::endl;
+                    (void)volume->Destroy();
+                }
             }
-
-            volume->SetValid(true);
 
             rpc::TContainerResponse response;
             response.set_error(error.GetError());
@@ -289,7 +293,11 @@ static TError DestroyVolume(TContext &context,
         if (error)
             return error;
 
-        volume->SetValid(false);
+        error = volume->SetValid(false);
+        if (error) {
+            L() << "Can't mark volume invalid: " << error << std::endl;
+            (void)volume->Destroy();
+        }
 
         std::weak_ptr<TClient> c = client;
         TBatchTask task(

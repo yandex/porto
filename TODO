@@ -1,4 +1,5 @@
-- make TVolume use TValue for kvalue storage
+- add log to interrupted messages
+- rework KValue Load->Restore->Flush->Sync chain
 - remove restrictions on memory_guarantee and recharge_on_pgfault with isolate=false
 - ? portoctl stopall startall restartall
 - run some kind of init process in meta container
@@ -15,6 +16,7 @@
 - ? use chrt instead of cpu.smart so we don't depend on smart kernels + set rt prio
 
 # volume api
+- do some forced cleanup (umount at least) of source/destination when recovery fails
 - return volume usage via rpc
 - add stresstest
 - ? allow non-empty destination dir if uid/gid matches
