@@ -265,11 +265,7 @@ TError TValueMap::Restore(const kv::TNode &node) {
             L_ERR() << error << ": Can't restore " << key << ", skipped" << std::endl;
     }
 
-    TError error = Flush();
-    if (error)
-        return error;
-
-    return Sync();
+    return TError::Success();
 }
 
 TError TValueMap::Restore() {
