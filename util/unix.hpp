@@ -68,6 +68,7 @@ TError Popen(const std::string &cmd, std::vector<std::string> &lines);
 class TEpollLoop : public TNonCopyable {
 public:
     TError Create();
+    void Destroy();
 
     TError AddFd(int fd);
     TError GetEvents(std::vector<int> &signals,

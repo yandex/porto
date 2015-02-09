@@ -210,6 +210,7 @@ static int AcceptClient(int sfd, std::map<int, std::shared_ptr<TClient>> &client
 }
 
 static void RemoveClient(int cfd, std::map<int, std::shared_ptr<TClient>> &clients) {
+    close(cfd);
     clients.erase(cfd);
 }
 
@@ -712,6 +713,7 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
         close(evtfd[1]);
         close(ackfd[0]);
         TLogger::CloseLog();
+        loop.Destroy();
         dup2(evtfd[0], REAP_EVT_FD);
         dup2(ackfd[1], REAP_ACK_FD);
         close(evtfd[0]);

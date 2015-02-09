@@ -369,11 +369,15 @@ TError TEpollLoop::Create() {
 
     error = InitializeSignals();
     if (error) {
-        close(EpollFd);
+        Destroy();
         return error;
     }
 
     return TError::Success();
+}
+
+void TEpollLoop::Destroy() {
+    close(EpollFd);
 }
 
 TError TEpollLoop::AddFd(int fd) {
