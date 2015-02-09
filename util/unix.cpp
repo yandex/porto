@@ -149,7 +149,7 @@ TError TEpollLoop::InitializeSignals() {
             return TError(EError::Unknown, "Can't add signal to mask: ", errno);
     }
 
-    if (sigprocmask(SIG_BLOCK, &mask, NULL) < 0)
+    if (sigprocmask(SIG_SETMASK, &mask, NULL) < 0)
         return TError(EError::Unknown, "Can't set signal mask: ", errno);
 
     return TError::Success();
