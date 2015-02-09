@@ -127,7 +127,7 @@ int init_project_quota(const char *quota_path)
 			.dqi_bgrace = 7 * 24 * 60 * 60,
 			.dqi_igrace = 7 * 24 * 60 * 60,
 			.dqi_flags = 0,
-			.dqi_blocks = 1,
+			.dqi_blocks = 2, /* header and root layer */
 			.dqi_free_blk = 0,
 			.dqi_free_entry = 0,
 		},
