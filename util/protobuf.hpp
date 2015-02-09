@@ -38,4 +38,5 @@ public:
     bool Skip(int count);
     int64_t ByteCount() const;
     int Interrupted();
+    void GetBuf(uint8_t **buf, size_t *pos) const;
 };
