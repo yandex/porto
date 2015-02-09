@@ -772,12 +772,10 @@ TError TContainer::KillAll() {
 }
 
 void TContainer::StopChildren() {
-    for (auto iter : Children) {
-        if (auto child = iter.lock()) {
-            if (child->GetState() != EContainerState::Stopped && child->GetState() != EContainerState::Dead)
+    for (auto iter : Children)
+        if (auto child = iter.lock())
+            if (child->GetState() != EContainerState::Stopped)
                 child->Stop();
-        }
-    }
 }
 
 TError TContainer::PrepareResources() {

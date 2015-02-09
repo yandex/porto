@@ -240,7 +240,7 @@ TError TTask::ChildExec() {
         Syslog("command=" + Env->Command);
         for (unsigned i = 0; i < result.we_wordc; i++)
             Syslog("argv[" + std::to_string(i) + "]=" + result.we_wordv[i]);
-        for (unsigned i = 0; *envp[i]; i++)
+        for (unsigned i = 0; envp[i]; i++)
             Syslog("environ[" + std::to_string(i) + "]=" + envp[i]);
     }
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
