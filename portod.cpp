@@ -2,6 +2,8 @@
 #include <string>
 #include <algorithm>
 #include <csignal>
+#include <sstream>
+#include <iomanip>
 
 #include "portod.hpp"
 #include "rpc.hpp"
@@ -141,7 +143,16 @@ static bool HandleRequest(TContext &context, std::shared_ptr<TClient> client) {
         (void)alarm(0);
 
     if (pist.Interrupted()) {
-        L() << "Interrupted read from " << client->Fd << std:: endl;
+        uint8_t *buf;
+        size_t pos;
+        pist.GetBuf(&buf, &pos);
+
+        std::stringstream ss;
+        ss << std::setfill('0') << std::hex;
+        for (size_t i = 0; i < pos; i++)
+            ss << std::setw(2) << (int)buf[i];
+
+        L() << "Interrupted read from " << client->Fd << ", partial message: " << ss.str() << std:: endl;
         return true;
     }
 

@@ -196,3 +196,8 @@ int64_t InterruptibleInputStream::ByteCount() const {
 int InterruptibleInputStream::Interrupted() {
     return interrupted;
 }
+
+void InterruptibleInputStream::GetBuf(uint8_t **buf, size_t *pos) const {
+    *buf = Buf;
+    *pos = Pos;
+}
