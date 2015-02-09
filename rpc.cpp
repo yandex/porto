@@ -371,15 +371,15 @@ bool HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
             error = Kill(context, req.kill(), rsp, client);
         else if (req.has_version())
             error = Version(context, rsp);
-        else if (req.has_createvolume()) {
+        else if (config().volumes().enabled() && req.has_createvolume()) {
             error = CreateVolume(context, req.createvolume(), rsp, client);
             if (!error)
                 send_reply = false;
-        } else if (req.has_destroyvolume()) {
+        } else if (config().volumes().enabled() && req.has_destroyvolume()) {
             error = DestroyVolume(context, req.destroyvolume(), rsp, client);
             if (!error)
                 send_reply = false;
-        } else if (req.has_listvolumes())
+        } else if (config().volumes().enabled() && req.has_listvolumes())
             error = ListVolumes(context, rsp);
         else
             error = TError(EError::InvalidMethod, "invalid RPC method");

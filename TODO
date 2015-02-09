@@ -15,6 +15,7 @@
 - ? use chrt instead of cpu.smart so we don't depend on smart kernels + set rt prio
 
 # volume api
+- return volume usage via rpc
 - add stresstest
 - ? allow non-empty destination dir if uid/gid matches
 

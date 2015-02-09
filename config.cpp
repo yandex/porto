@@ -73,6 +73,7 @@ void TConfig::LoadDefaults() {
     // TODO: make sure we pick up correct default here depending on kernel
     // version
     config().mutable_volumes()->set_native(false);
+    config().mutable_volumes()->set_enabled(false);
 }
 
 bool TConfig::LoadFile(const std::string &path, bool silent) {
