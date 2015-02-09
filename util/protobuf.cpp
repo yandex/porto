@@ -166,7 +166,7 @@ bool InterruptibleInputStream::Next(const void **data, int *size) {
         ReserveChunk();
     }
     if (n < 0 && errno == EINTR)
-        interrupted ++;
+        interrupted++;
 
     *data = &Buf[startPos];
     *size = sz;

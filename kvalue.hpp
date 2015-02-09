@@ -38,7 +38,7 @@ public:
     std::shared_ptr<TKeyValueNode> GetNode(const std::string &path) const;
     std::shared_ptr<TKeyValueNode> GetNode(uint16_t id) const;
     TError Dump() const;
-    TError ListNodes(std::vector<std::shared_ptr<TKeyValueNode>> &list) const; // TODO: make private
+    TError ListNodes(std::vector<std::shared_ptr<TKeyValueNode>> &list) const;
     TError Destroy();
     std::string GetRoot() const { return Tmpfs.GetMountpoint() + "/"; }
 

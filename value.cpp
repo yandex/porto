@@ -265,7 +265,31 @@ TError TValueMap::Restore(const kv::TNode &node) {
             L_ERR() << error << ": Can't restore " << key << ", skipped" << std::endl;
     }
 
-    return TError::Success();
+    TError error = Flush();
+    if (error)
+        return error;
+
+    return Sync();
+}
+
+TError TValueMap::Restore() {
+    if (!KvNode)
+        return TError::Success();
+
+    kv::TNode n;
+    TError error = KvNode->Load(n);
+    if (error)
+        return error;
+
+    error = Restore(n);
+    if (error)
+        return error;
+
+    error = Flush();
+    if (error)
+        return error;
+
+    return Sync();
 }
 
 TError TValueMap::Flush() {
@@ -280,7 +304,6 @@ TError TValueMap::Sync() {
         return TError::Success();
 
     kv::TNode node;
-
     for (auto name : List()) {
         auto *av = Find(name);
 

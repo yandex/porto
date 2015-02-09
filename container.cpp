@@ -1130,22 +1130,6 @@ TError TContainer::Restore(const kv::TNode &node) {
     if (error)
         return error;
 
-    error = Prop->Flush();
-    if (error)
-        return error;
-
-    error = Data->Flush();
-    if (error)
-        return error;
-
-    error = Prop->Sync();
-    if (error)
-        return error;
-
-    error = Data->Sync();
-    if (error)
-        return error;
-
     // There are several points where we save value to the persistent store
     // which we may use as indication for events like:
     // - Container create failed

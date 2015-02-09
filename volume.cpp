@@ -405,20 +405,7 @@ TError TVolume::LoadFromStorage() {
     Data = std::make_shared<TValueMap>(KvNode);
     RegisterVolumeProperties(Data);
 
-    kv::TNode n;
-    TError error = KvNode->Load(n);
-    if (error)
-        return error;
-
-    error = Data->Restore(n);
-    if (error)
-        return error;
-
-    error = Data->Flush();
-    if (error)
-        return error;
-
-    error = Data->Sync();
+    TError error = Data->Restore();
     if (error)
         return error;
 

@@ -1,5 +1,4 @@
 - add log to interrupted messages
-- rework KValue Load->Restore->Flush->Sync chain
 - remove restrictions on memory_guarantee and recharge_on_pgfault with isolate=false
 - ? portoctl stopall startall restartall
 - run some kind of init process in meta container

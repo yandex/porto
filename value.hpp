@@ -209,6 +209,8 @@ public:
 
 class TValueMap : public TRawValueMap, public TNonCopyable {
     std::shared_ptr<TKeyValueNode> KvNode;
+    TError Flush();
+    TError Sync();
 
 public:
     TValueMap(std::shared_ptr<TKeyValueNode> kvnode) : KvNode(kvnode) {}
@@ -216,6 +218,7 @@ public:
 
     TError Create();
     TError Restore(const kv::TNode &node);
+    TError Restore();
 
     std::string ToString(const std::string &name) const;
     TError FromString(const std::string &name, const std::string &value);
@@ -258,6 +261,4 @@ public:
     }
 
     void Reset(const std::string &name);
-    TError Flush();
-    TError Sync();
 };
