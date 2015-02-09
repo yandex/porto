@@ -1,3 +1,9 @@
+yandex-porto (0.33) precise; urgency=low
+
+  * Fix loop devices removal
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 09 Feb 2015 18:18:00 +0400
+
 yandex-porto (0.32) precise; urgency=low
 
   * Don't remove custom stdout/stderr
