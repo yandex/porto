@@ -56,7 +56,7 @@ TError TTaskEnv::Prepare() {
 const char** TTaskEnv::GetEnvp() const {
     auto envp = new const char* [Environ.size() + 1];
     for (size_t i = 0; i < Environ.size(); i++)
-        envp[i] = Environ[i].c_str();
+        envp[i] = strdup(Environ[i].c_str());
     envp[Environ.size()] = NULL;
 
     return envp;
@@ -235,13 +235,14 @@ TError TTask::ChildExec() {
         break;
     }
 
-    if (config().log().verbose()) {
-        Syslog(Env->Command.c_str());
-        for (unsigned i = 0; i < result.we_wordc; i++)
-            Syslog(result.we_wordv[i]);
-    }
-
     auto envp = Env->GetEnvp();
+    if (config().log().verbose()) {
+        Syslog("command=" + Env->Command);
+        for (unsigned i = 0; i < result.we_wordc; i++)
+            Syslog("argv[" + std::to_string(i) + "]=" + result.we_wordv[i]);
+        for (unsigned i = 0; *envp[i]; i++)
+            Syslog("environ[" + std::to_string(i) + "]=" + envp[i]);
+    }
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
 
     return TError(EError::Unknown, errno, string("execvpe(") + result.we_wordv[0] + ", " + std::to_string(result.we_wordc) + ", " + std::to_string(Env->Environ.size()) + ")");
