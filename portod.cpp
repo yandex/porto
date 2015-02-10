@@ -380,7 +380,9 @@ static int SlaveRpc(TContext &context) {
                     if (WIFEXITED(status)) {
                         if (context.Posthooks.find(pid) != context.Posthooks.end()) {
                             int fd = context.PosthooksError.at(pid);
-                            TError error = TError::Deserialize(fd);
+                            TError error;
+                            if (!TError::Deserialize(fd, error))
+                                error = TError(EError::Unknown, "Didn't get any result from batch task");
                             close(fd);
                             context.Posthooks[pid](error);
                             context.Posthooks.erase(pid);

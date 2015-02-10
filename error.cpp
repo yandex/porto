@@ -56,34 +56,42 @@ TError TError::Serialize(int fd) const {
     return TError::Success();
 }
 
-TError TError::Deserialize(int fd) {
-    EError error;
+bool TError::Deserialize(int fd, TError &error) {
+    EError err;
     int errno;
     std::string desc;
     int ret;
     int len;
 
-    ret = read(fd, &error, sizeof(Error));
+    ret = read(fd, &err, sizeof(err));
     if (ret == 0)
-        return TError::Success();
-    if (ret != sizeof(Error))
-        return TError(EError::Unknown, errno, "Can't deserialize error");
+        return false;
+    if (ret != sizeof(Error)) {
+        error = TError(EError::Unknown, errno, "Can't deserialize error");
+        return true;
+    }
     ret = read(fd, &errno, sizeof(Errno));
-    if (ret != sizeof(Errno))
-        return TError(EError::Unknown, errno, "Can't deserialize errno");
+    if (ret != sizeof(Errno)) {
+        error = TError(EError::Unknown, errno, "Can't deserialize errno");
+        return true;
+    }
     ret = read(fd, &len, sizeof(len));
-    if (ret != sizeof(len))
-        return TError(EError::Unknown, errno, "Can't deserialize length");
+    if (ret != sizeof(len)) {
+        error = TError(EError::Unknown, errno, "Can't deserialize length");
+        return true;
+    }
 
     char *buf = new char[len];
     ret = read(fd, buf, len);
     if (ret != len) {
         delete[] buf;
-        return TError(EError::Unknown, errno, "Can't unmarshall description");
+        error = TError(EError::Unknown, errno, "Can't unmarshall description");
+        return true;
     }
 
     desc = std::string(buf, len);
     delete[] buf;
 
-    return TError(error, errno, desc);
+    error = TError(err, errno, desc);
+    return true;
 }

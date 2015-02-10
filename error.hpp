@@ -36,5 +36,5 @@ public:
     }
 
     TError Serialize(int fd) const;
-    static TError Deserialize(int fd);
+    static bool Deserialize(int fd, TError &error);
 };

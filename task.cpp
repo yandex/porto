@@ -833,7 +833,8 @@ TError TTask::Start() {
         return error;
     }
 
-    TError error = TError::Deserialize(Rfd);
+    TError error;
+    (void)TError::Deserialize(Rfd, error);
     close(Rfd);
     if (error) {
         Pid = 0;
