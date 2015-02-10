@@ -182,6 +182,8 @@ TError PutLoopDev(const int nr) {
 TError TLoopMount::Mount() {
     std::string dev = "/dev/loop" + std::to_string(LoopNr);
 
+    L() << "Mount loop device " << dev << " " << Source  << " -> " << Target << std::endl;
+
     TScopedFd imageFd, loopFd;
     imageFd = open(Source.ToString().c_str(), O_RDWR | O_CLOEXEC);
     if (imageFd.GetFd() < 0)
@@ -206,6 +208,8 @@ TError TLoopMount::Mount() {
 
 TError TLoopMount::Umount() {
     std::string dev = "/dev/loop" + std::to_string(LoopNr);
+
+    L() << "Umount loop device " << dev << " at " << Source << std::endl;
 
     TMount m(dev, Target, Type, {});
     TError error = m.Umount();
