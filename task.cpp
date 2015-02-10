@@ -225,10 +225,10 @@ TError TTask::ChildExec() {
     auto envp = Env->GetEnvp();
     if (config().log().verbose()) {
         L() << "command=" << Env->Command << std::endl;
-        for (unsigned i = 0; i < result.we_wordc; i++)
-            L() << "argv[" << std::to_string(i) << "]=" << result.we_wordv[i] << std::endl;
+        for (unsigned i = 0; result.we_wordv[i]; i++)
+            L() << "argv[" << i << "]=" << result.we_wordv[i] << std::endl;
         for (unsigned i = 0; envp[i]; i++)
-            L() << "environ[" << std::to_string(i) << "]=" << envp[i] << std::endl;
+            L() << "environ[" << i << "]=" << envp[i] << std::endl;
     }
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
 
