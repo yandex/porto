@@ -65,6 +65,7 @@ public:
         TFile loopFile(LoopPath);
 
         if (LoopDev >= 0) {
+            L() << "Allocate loop image with size " << Volume->GetParsedQuota() << std::endl;
             error = AllocLoop(LoopPath, Volume->GetParsedQuota());
             if (error)
                 return error;
