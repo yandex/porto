@@ -47,6 +47,9 @@ public:
     TError Destroy() override {
         if (LoopDev >= 0) {
             (void)PutLoopDev(LoopDev);
+
+            TFile img(LoopPath);
+            (void)img.Remove();
         }
         return TError::Success();
     }
@@ -91,15 +94,7 @@ public:
     TError Deconstruct() const override {
         if (LoopDev >= 0) {
             TLoopMount m = TLoopMount(LoopPath, Volume->GetPath(), "ext4", LoopDev);
-            TError error = m.Umount();
-            TError firstError;
-            if (error && !firstError)
-                firstError = error;
-
-            TFile img(LoopPath);
-            error = img.Remove();
-            if (error && !firstError)
-                firstError = error;
+            return m.Umount();
         } else {
             TFolder f(Volume->GetPath());
             TError error = f.Remove(true);
