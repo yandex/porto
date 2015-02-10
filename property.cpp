@@ -363,7 +363,7 @@ public:
 class TMemoryGuaranteeProperty : public TUintValue, public TContainerValue {
 public:
     TMemoryGuaranteeProperty() :
-        TUintValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | UINT_UNIT_VALUE),
+        TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE),
         TContainerValue(P_MEM_GUARANTEE,
                         "Guaranteed amount of memory",
                         dynamicProperty) {}
@@ -407,7 +407,7 @@ public:
 class TRechargeOnPgfaultProperty : public TBoolValue, public TContainerValue {
 public:
     TRechargeOnPgfaultProperty() :
-        TBoolValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
+        TBoolValue(PERSISTENT_VALUE),
         TContainerValue(P_RECHARGE_ON_PGFAULT,
                         "Recharge memory on page fault",
                         dynamicProperty) {}

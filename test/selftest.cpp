@@ -2766,7 +2766,7 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
 
     string exp_limit = "268435456";
     ExpectApiSuccess(api.SetProperty(child, "memory_limit", exp_limit));
-    ExpectApiFailure(api.SetProperty(child, "memory_guarantee", "10000"), EError::NotSupported);
+    ExpectApiFailure(api.SetProperty(child, "cpu_priority", "10"), EError::NotSupported);
     ExpectApiSuccess(api.SetProperty(child, "respawn", "true"));
 
     ExpectApiSuccess(api.Start(child));
@@ -3113,6 +3113,10 @@ static void TestVolumeHolder(TPortoAPI &api) {
     volumes.clear();
     ExpectApiSuccess(api.ListVolumes(volumes));
     Expect(volumes.size() == 2);
+
+    Say() << volumes[0].Path << " used " << volumes[0].Used << " avail " << volumes[0].Avail << std::endl;
+    Say() << volumes[1].Path << " used " << volumes[1].Used << " avail " << volumes[1].Avail << std::endl;
+
     Expect(volumes[0].Path == a);
     Expect(volumes[0].Source == tar);
     Expect(volumes[0].Quota == "0");
