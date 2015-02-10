@@ -1,4 +1,5 @@
 #include <string>
+#include <algorithm>
 
 #include "util/file.hpp"
 #include "util/string.hpp"
