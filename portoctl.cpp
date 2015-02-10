@@ -8,6 +8,7 @@
 #include "config.hpp"
 #include "cli.hpp"
 #include "util/string.hpp"
+#include "util/signal.hpp"
 #include "util/unix.hpp"
 #include "util/namespace.hpp"
 #include "util/file.hpp"

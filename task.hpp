@@ -113,7 +113,6 @@ class TTask: public TNonCopyable {
     pid_t Pid;
     std::shared_ptr<TFolder> Cwd;
 
-    void Syslog(const std::string &s) const;
     void ReportPid(int pid) const;
 
     TError RotateFile(const TPath &path) const;

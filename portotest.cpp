@@ -3,6 +3,7 @@
 
 #include "config.hpp"
 #include "qdisc.hpp"
+#include "util/signal.hpp"
 #include "util/unix.hpp"
 #include "util/string.hpp"
 #include "util/log.hpp"

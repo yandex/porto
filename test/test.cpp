@@ -1,4 +1,5 @@
 #include <sstream>
+#include <csignal>
 
 #include "test.hpp"
 #include "config.hpp"
@@ -18,7 +19,6 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <dirent.h>
-#include <signal.h>
 }
 
 namespace test {

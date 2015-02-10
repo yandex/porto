@@ -1,3 +1,4 @@
 usr/sbin/portoctl usr/sbin
 usr/sbin/portod usr/sbin
+usr/sbin/portod-meta-root usr/sbin
 usr/sbin/portotest usr/sbin

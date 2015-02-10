@@ -38,7 +38,7 @@ TError TBatchTask::RunAsync(TContext &context) {
     } else if (pid == 0) {
         close(pfd[0]);
         /* Child */
-        CloseAllFds(TLogger::GetFd());
+        CloseFds(-1, { TLogger::GetFd() });
         SetProcessName("portod-batch");
         SetDieOnParentExit();
         TError error = Task();

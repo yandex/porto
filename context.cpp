@@ -1,4 +1,5 @@
 #include "context.hpp"
+#include "epoll.hpp"
 #include "util/log.hpp"
 #include "util/unix.hpp"
 #include "config.hpp"

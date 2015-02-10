@@ -59,7 +59,7 @@ TLogBuf::TLogBuf(const size_t size) {
 
 void TLogBuf::Open(const TPath &path, const unsigned int mode) {
     if (!path.DirName().AccessOk(EFileAccess::Write)) {
-        Fd = open("/dev/kmsg", O_WRONLY | O_APPEND);
+        Fd = open("/dev/kmsg", O_WRONLY | O_APPEND | O_CLOEXEC);
         if (Fd < 0)
             Fd = STDERR_FILENO;
 
@@ -85,7 +85,7 @@ void TLogBuf::Open(const TPath &path, const unsigned int mode) {
         (void)f.Touch();
     }
 
-    Fd = open(path.ToString().c_str(), O_WRONLY | O_APPEND);
+    Fd = open(path.ToString().c_str(), O_WRONLY | O_APPEND | O_CLOEXEC);
     if (Fd < 0)
         Fd = STDERR_FILENO;
 }

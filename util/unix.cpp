@@ -1,5 +1,4 @@
 #include <string>
-#include <csignal>
 
 #include "util/file.hpp"
 #include "util/string.hpp"
@@ -18,8 +17,6 @@ extern "C" {
 #include <poll.h>
 #include <linux/capability.h>
 #include <sys/syscall.h>
-#include <sys/epoll.h>
-#include <sys/signalfd.h>
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <sys/types.h>
@@ -81,80 +78,6 @@ size_t GetCurrentTimeMs() {
     return ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
 
-int RegisterSignal(int signum, void (*handler)(int)) {
-    struct sigaction sa = {};
-
-    sa.sa_handler = handler;
-    return sigaction(signum, &sa, NULL);
-}
-
-int RegisterSignal(int signum, void (*handler)(int sig, siginfo_t *si, void *unused)) {
-    struct sigaction sa = {};
-
-    sa.sa_sigaction = handler;
-    sa.sa_flags = SA_SIGINFO;
-
-    return sigaction(signum, &sa, NULL);
-}
-
-void ResetAllSignalHandlers(void) {
-    int sig;
-
-    for (sig = 1; sig < _NSIG; sig++) {
-        struct sigaction sa = {};
-        sa.sa_handler = SIG_DFL;
-        sa.sa_flags = SA_RESTART;
-
-        if (sig == SIGKILL || sig == SIGSTOP)
-            continue;
-
-        (void)sigaction(sig, &sa, NULL);
-    }
-
-    sigset_t mask;
-    if (sigemptyset(&mask) < 0)
-        return;
-
-    (void)sigprocmask(SIG_SETMASK, &mask, NULL);
-}
-
-void RaiseSignal(int signum) {
-    ResetAllSignalHandlers();
-
-    raise(signum);
-    exit(-signum);
-}
-
-static volatile sig_atomic_t signal_mask;
-static void MultiHandler(int sig) {
-    if (sig < 32) /* Ignore other boring signals */
-        signal_mask |= (1 << sig);
-}
-
-TError TEpollLoop::InitializeSignals() {
-    sigset_t mask;
-
-    if (sigemptyset(&mask) < 0)
-        return TError(EError::Unknown, "Can't initialize signal mask: ", errno);
-
-    for (auto sig: HANDLE_SIGNALS) {
-        if (RegisterSignal(sig, MultiHandler))
-            return TError(EError::Unknown, "Can't register signal: ", errno);
-    }
-
-    for (auto sig: HANDLE_SIGNALS_WAIT) {
-        if (RegisterSignal(sig, MultiHandler))
-            return TError(EError::Unknown, "Can't register signal: ", errno);
-        if (sigaddset(&mask, sig) < 0)
-            return TError(EError::Unknown, "Can't add signal to mask: ", errno);
-    }
-
-    if (sigprocmask(SIG_SETMASK, &mask, NULL) < 0)
-        return TError(EError::Unknown, "Can't set signal mask: ", errno);
-
-    return TError::Success();
-}
-
 size_t GetTotalMemory() {
     struct sysinfo si;
     if (sysinfo(&si) < 0)
@@ -209,18 +132,6 @@ TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap) 
     }
 
     return TError::Success();
-}
-
-int BlockAllSignals() {
-    sigset_t mask;
-
-    if (sigfillset(&mask) < 0)
-        return -1;
-
-    if (sigprocmask(SIG_BLOCK, &mask, NULL) < 0)
-        return -1;
-
-    return 0;
 }
 
 std::string GetHostName() {
@@ -314,22 +225,6 @@ TError SetOomScoreAdj(int value) {
     return f.WriteStringNoAppend(std::to_string(value));
 }
 
-TError EpollCreate(int &epfd) {
-    epfd = epoll_create1(EPOLL_CLOEXEC);
-    if (epfd < 0)
-        return TError(EError::Unknown, errno, "epoll_create1()");
-    return TError::Success();
-}
-
-TError EpollAdd(int &epfd, int fd) {
-    struct epoll_event ev;
-    ev.events = EPOLLIN | EPOLLHUP;
-    ev.data.fd = fd;
-    if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) < 0)
-        return TError(EError::Unknown, errno, "epoll_add(" + std::to_string(fd) + ")");
-    return TError::Success();
-}
-
 int64_t GetBootTime() {
     std::vector<std::string> lines;
     TFile f("/proc/stat");
@@ -352,75 +247,13 @@ int64_t GetBootTime() {
     return 0;
 }
 
-int CloseAllFds(int except) {
-    for (int i = 0; i < 3; i++)
-        if (i != except)
+void CloseFds(int max, const std::vector<int> &except) {
+    if (max < 0)
+        max = getdtablesize();
+
+    for (int i = 0; i < max; i++)
+        if (std::find(except.begin(), except.end(), i) == except.end())
             close(i);
-
-    return except;
-}
-
-// TEpollLoop
-
-TError TEpollLoop::Create() {
-    TError error = EpollCreate(EpollFd);
-    if (error)
-        return error;
-
-    error = InitializeSignals();
-    if (error) {
-        Destroy();
-        return error;
-    }
-
-    return TError::Success();
-}
-
-void TEpollLoop::Destroy() {
-    close(EpollFd);
-}
-
-TError TEpollLoop::AddFd(int fd) {
-    return EpollAdd(EpollFd, fd);
-}
-
-bool TEpollLoop::GetSignals(std::vector<int> &signals) {
-    signals.clear();
-
-    bool ret = false;
-    for (int sig = ffs(signal_mask) - 1; sig > 0; sig = ffs(signal_mask) - 1) {
-        signal_mask &= ~ (1 << sig);
-        signals.push_back(sig);
-        ret = true;
-    }
-
-    return ret;
-}
-
-TError TEpollLoop::GetEvents(std::vector<int> &signals,
-                             std::vector<struct epoll_event> &events,
-                             int timeout) {
-    events.clear();
-
-    sigset_t mask;
-
-    if (sigemptyset(&mask) < 0)
-        return TError(EError::Unknown, "Can't initialize signal mask: ", errno);
-
-    if (!GetSignals(signals)) {
-        int nr = epoll_pwait(EpollFd, Events, MAX_EVENTS, timeout, &mask);
-        if (nr < 0) {
-            if (errno != EINTR)
-                return TError(EError::Unknown, "epoll() error: ", errno);
-        }
-
-        GetSignals(signals);
-
-        for (int i = 0; i < nr; i++)
-            events.push_back(Events[i]);
-    }
-
-    return TError::Success();
 }
 
 TError AllocLoop(const TPath &path, size_t size) {

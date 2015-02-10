@@ -735,8 +735,9 @@ static void TestIsolateProperty(TPortoAPI &api) {
     string pid;
 
     ExpectApiSuccess(api.Create("meta"));
-    ExpectApiSuccess(api.Create("meta/test"));
+    ExpectApiSuccess(api.SetProperty("meta", "isolate", "false"));
 
+    ExpectApiSuccess(api.Create("meta/test"));
     ExpectApiSuccess(api.SetProperty("meta/test", "isolate", "false"));
     ExpectApiSuccess(api.SetProperty("meta/test", "command", "sleep 1000"));
     ExpectApiSuccess(api.Start("meta/test"));
@@ -760,6 +761,7 @@ static void TestIsolateProperty(TPortoAPI &api) {
 
     ExpectApiSuccess(api.Create("test"));
     ExpectApiSuccess(api.Create("test/meta"));
+    ExpectApiSuccess(api.SetProperty("test/meta", "isolate", "false"));
     ExpectApiSuccess(api.Create("test/meta/test"));
 
     ExpectApiSuccess(api.SetProperty("test", "command", "sleep 1000"));
@@ -786,6 +788,70 @@ static void TestIsolateProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy("test/meta/test"));
     ExpectApiSuccess(api.Destroy("test/meta"));
     ExpectApiSuccess(api.Destroy("test"));
+
+    Say() << "Make sure isolate works correctly with isolate=true in meta containers" << std::endl;
+    ExpectApiSuccess(api.Create("iss"));
+    ExpectApiSuccess(api.SetProperty("iss", "isolate", "false"));
+
+    ExpectApiSuccess(api.Create("iss/container"));
+    ExpectApiSuccess(api.SetProperty("iss/container", "isolate", "true"));
+
+    ExpectApiSuccess(api.Create("iss/container/hook1"));
+    ExpectApiSuccess(api.SetProperty("iss/container/hook1", "isolate", "false"));
+    ExpectApiSuccess(api.SetProperty("iss/container/hook1", "command", "sleep 1000"));
+    ExpectApiSuccess(api.Create("iss/container/hook2"));
+    ExpectApiSuccess(api.SetProperty("iss/container/hook2", "isolate", "false"));
+    ExpectApiSuccess(api.SetProperty("iss/container/hook2", "command", "sleep 1000"));
+
+    ExpectApiSuccess(api.Start("iss/container/hook1"));
+    ExpectApiSuccess(api.Start("iss/container/hook2"));
+
+    std::string rootPid, hook1Pid, hook2Pid;
+    ExpectApiSuccess(api.GetData("iss/container/hook1", "root_pid", hook1Pid));
+    ExpectApiSuccess(api.GetData("iss/container/hook2", "root_pid", hook2Pid));
+
+    std::string state;
+    ExpectApiSuccess(api.GetData("iss/container", "state", state));
+    Expect(state == "running");
+
+    AsRoot(api);
+    Expect(GetNamespace("self", "pid") != GetNamespace(hook1Pid, "pid"));
+    Expect(GetNamespace("self", "pid") != GetNamespace(hook2Pid, "pid"));
+    Expect(GetNamespace(hook1Pid, "pid") == GetNamespace(hook2Pid, "pid"));
+    AsNobody(api);
+
+    ExpectApiSuccess(api.Stop("iss/container"));
+
+    Say() << "Make sure isolate works correctly with isolate=true and chroot in meta containers" << std::endl;
+
+    TPath path(TMPDIR + "/" + name);
+
+    RemakeDir(api, path);
+    AsRoot(api);
+    BootstrapCommand("/bin/sleep", path.ToString());
+    path.Chown("nobody", "nogroup");
+    AsNobody(api);
+
+    ExpectApiSuccess(api.SetProperty("iss/container", "root", path.ToString()));
+    ExpectApiSuccess(api.SetProperty("iss/container/hook1", "command", "/sleep 1000"));
+    ExpectApiSuccess(api.SetProperty("iss/container/hook2", "command", "/sleep 1000"));
+
+    ExpectApiSuccess(api.Start("iss/container/hook1"));
+    ExpectApiSuccess(api.Start("iss/container/hook2"));
+
+    ExpectApiSuccess(api.GetData("iss/container/hook1", "root_pid", hook1Pid));
+    ExpectApiSuccess(api.GetData("iss/container/hook2", "root_pid", hook2Pid));
+
+    ExpectApiSuccess(api.GetData("iss/container", "state", state));
+    Expect(state == "running");
+
+    AsRoot(api);
+    Expect(GetNamespace("self", "pid") != GetNamespace(hook1Pid, "pid"));
+    Expect(GetNamespace("self", "pid") != GetNamespace(hook2Pid, "pid"));
+    Expect(GetNamespace(hook1Pid, "pid") == GetNamespace(hook2Pid, "pid"));
+    AsNobody(api);
+
+    ExpectApiSuccess(api.Destroy("iss"));
 }
 
 static void TestEnvTrim(TPortoAPI &api) {

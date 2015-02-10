@@ -25,7 +25,7 @@ using std::set;
 using std::shared_ptr;
 
 TError TMount::Mount(unsigned long flags) const {
-    L() << "mount " << Target << std::endl;
+    L() << "mount " << Target << " " << flags << std::endl;
 
     int ret = RetryBusy(10, 100, [&]{ return mount(Source.ToString().c_str(),
                                                    Target.ToString().c_str(),

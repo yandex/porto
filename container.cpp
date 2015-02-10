@@ -16,6 +16,7 @@
 #include "qdisc.hpp"
 #include "context.hpp"
 #include "container_value.hpp"
+#include "epoll.hpp"
 #include "util/log.hpp"
 #include "util/file.hpp"
 #include "util/string.hpp"
@@ -351,8 +352,10 @@ TError TContainer::PrepareNetwork() {
 
     PORTO_ASSERT(Tclass == nullptr);
 
-    if (UseParentNamespace())
+    if (UseParentNamespace()) {
+        Tclass = Parent->Tclass;
         return TError::Success();
+    }
 
     if (Parent) {
         PORTO_ASSERT(Parent->Tclass != nullptr);
@@ -617,18 +620,38 @@ TError TContainer::PrepareMetaParent() {
 
     auto state = State;
     if (state == EContainerState::Stopped) {
-        SetState(EContainerState::Meta);
+        if (Prop->Get<bool>(P_ISOLATE)) {
+            auto cwd = Prop->Get<std::string>(P_CWD);
+            TError error = Prop->Set<std::string>(P_COMMAND, cwd + "/portod-meta-root");
+            if (error)
+                return error;
 
-        TError error = PrepareNetwork();
-        if (error) {
-            FreeResources();
-            return error;
-        }
+            auto bind = Prop->Get<TStrList>(P_BIND);
+            auto metaRoot = "/usr/sbin/portod-meta-root /portod-meta-root ro";
+            if (std::find(bind.begin(), bind.end(), metaRoot) == bind.end())
+                bind.push_back(metaRoot);
 
-        error = PrepareCgroups();
-        if (error) {
-            FreeResources();
-            return error;
+            error = Prop->Set<TStrList>(P_BIND, bind);
+            if (error)
+                return error;
+
+            error = Start();
+            if (error)
+                return error;
+        } else {
+            SetState(EContainerState::Meta);
+
+            TError error = PrepareNetwork();
+            if (error) {
+                FreeResources();
+                return error;
+            }
+
+            error = PrepareCgroups();
+            if (error) {
+                FreeResources();
+                return error;
+            }
         }
     } else if (state == EContainerState::Meta) {
         return TError::Success();
@@ -808,10 +831,12 @@ void TContainer::FreeResources() {
     LeafCgroups.clear();
 
     if (Tclass) {
-        TError error = Tclass->Remove();
+        if (!UseParentNamespace()) {
+            TError error = Tclass->Remove();
+            if (error)
+                L_ERR() << "Can't remove tc classifier: " << error << std::endl;
+        }
         Tclass = nullptr;
-        if (error)
-            L_ERR() << "Can't remove tc classifier: " << error << std::endl;
     }
 
     Task = nullptr;

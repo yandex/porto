@@ -1,5 +1,6 @@
+- try to remove Tclass in destructor
+- make fuzzy test and check for portod respawns
 - ? portoctl stopall startall restartall
-- run some kind of init process in meta container
 - fix f*cking capabilities test on newer kernels
 - fix netfilter bug with >3.10
 - mount root loop in root namespace (to better diagnose possible problems)

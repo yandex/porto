@@ -11,6 +11,7 @@
 #include "util/mount.hpp"
 #include "util/folder.hpp"
 #include "util/string.hpp"
+#include "util/signal.hpp"
 #include "util/unix.hpp"
 #include "util/cred.hpp"
 #include "util/netlink.hpp"
@@ -25,7 +26,6 @@ extern "C" {
 #include <sys/syscall.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <syslog.h>
 #include <wordexp.h>
 #include <grp.h>
 #include <linux/kdev_t.h>
@@ -63,12 +63,6 @@ const char** TTaskEnv::GetEnvp() const {
 }
 
 // TTask
-void TTask::Syslog(const string &s) const {
-    openlog("portod", LOG_NDELAY, LOG_DAEMON);
-    syslog(LOG_ERR, "%s", s.c_str());
-    closelog();
-}
-
 TTask::~TTask() {
     if (!Env)
         return;
@@ -94,21 +88,20 @@ TTask::~TTask() {
 
 void TTask::ReportPid(int pid) const {
     if (write(Wfd, &pid, sizeof(pid)) != sizeof(pid)) {
-        Syslog("partial write of pid: " + std::to_string(pid));
+        L_ERR() << "partial write of pid: " << std::to_string(pid) << std::endl;
     }
 }
 
 void TTask::Abort(const TError &error) const {
     TError ret = error.Serialize(Wfd);
     if (ret)
-        Syslog(ret.GetMsg());
+        L_ERR() << ret << std::endl;
     exit(EXIT_FAILURE);
 }
 
 static int ChildFn(void *arg) {
     SetProcessName("portod-spawn-c");
 
-    TLogger::DisableLog();
     TTask *task = static_cast<TTask*>(arg);
     TError error = task->ChildCallback();
     task->Abort(error);
@@ -137,13 +130,7 @@ TError TTask::ChildOpenStdFile(const TPath &path, int expected) {
 }
 
 TError TTask::ChildReopenStdio() {
-    Wfd = CloseAllFds(Wfd);
-    if (Wfd < 0) {
-        Syslog(string("close fds: ") + strerror(errno));
-        /* there is no way of telling parent that we failed (because we
-         * screwed up fds), so exit with some eye catching error code */
-        exit(0xAA);
-    }
+    CloseFds(3, { Wfd, TLogger::GetFd() });
 
     int ret = open(Env->StdinPath.ToString().c_str(), O_CREAT | O_RDONLY, 0700);
     if (ret < 0)
@@ -237,11 +224,11 @@ TError TTask::ChildExec() {
 
     auto envp = Env->GetEnvp();
     if (config().log().verbose()) {
-        Syslog("command=" + Env->Command);
+        L() << "command=" << Env->Command << std::endl;
         for (unsigned i = 0; i < result.we_wordc; i++)
-            Syslog("argv[" + std::to_string(i) + "]=" + result.we_wordv[i]);
+            L() << "argv[" << std::to_string(i) << "]=" << result.we_wordv[i] << std::endl;
         for (unsigned i = 0; envp[i]; i++)
-            Syslog("environ[" + std::to_string(i) + "]=" + envp[i]);
+            L() << "environ[" << std::to_string(i) << "]=" << envp[i] << std::endl;
     }
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
 
