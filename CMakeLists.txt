@@ -67,7 +67,7 @@ add_dependencies(portod-meta-root version.hpp)
 set_target_properties(portod-meta-root PROPERTIES LINK_FLAGS "-static")
 
 install(
-    TARGETS portod portoctl portotest
+    TARGETS portod portoctl portotest portod-meta-root
     RUNTIME DESTINATION sbin
     LIBRARY DESTINATION lib
     )
