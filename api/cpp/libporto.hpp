@@ -24,10 +24,13 @@ struct TVolumeDescription {
     std::string Source;
     std::string Quota;
     std::string Flags;
+    uint64_t Used;
+    uint64_t Avail;
 
     TVolumeDescription(const std::string &path, const std::string &source,
-                       const std::string &quota, const std::string &flags) :
-        Path(path), Source(source), Quota(quota), Flags(flags) {}
+                       const std::string &quota, const std::string &flags,
+                       uint64_t used, uint64_t avail) :
+        Path(path), Source(source), Quota(quota), Flags(flags), Used(used), Avail(avail) {}
 };
 
 class TPortoAPI {

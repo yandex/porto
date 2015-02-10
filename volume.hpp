@@ -35,6 +35,7 @@ public:
     virtual TError Restore(std::shared_ptr<TValueMap> data) =0;
     virtual TError Construct() const =0;
     virtual TError Deconstruct() const =0;
+    virtual TError GetUsage(uint64_t &used, uint64_t &avail) const =0;
 };
 
 class TVolume : public std::enable_shared_from_this<TVolume>, public TNonCopyable {
@@ -73,6 +74,7 @@ public:
     std::string GetFlags() const { return Data->Get<std::string>(V_FLAGS); }
     uint16_t GetId() const { return (uint16_t)Data->Get<int>(V_ID); }
     std::shared_ptr<TResource> GetResource() { return Resource; }
+    TError GetUsage(uint64_t &used, uint64_t &avail) const;
 
     TError LoadFromStorage();
     TCred GetCred() const { return Cred; }

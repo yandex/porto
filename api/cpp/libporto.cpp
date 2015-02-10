@@ -244,7 +244,9 @@ int TPortoAPI::ListVolumes(std::vector<TVolumeDescription> &vlist) {
             vlist.push_back(TVolumeDescription(list.list(i).path(),
                                                list.list(i).source(),
                                                list.list(i).quota(),
-                                               list.list(i).flags()));
+                                               list.list(i).flags(),
+                                               list.list(i).used(),
+                                               list.list(i).avail()));
     }
 
     return ret;

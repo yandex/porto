@@ -5,7 +5,7 @@
 - fix netfilter bug with >3.10
 - mount root loop in root namespace (to better diagnose possible problems)
 - root_readonly: remount root instead of binding into itself with ro
-  - bind fails when source is link
+- bind fails when source is link
 - selftest: make sure we don't leak fds into child processes
 - remove net_guarantee/net_limit
 - chroot -> pivot_root (to remove all mounts from container)
@@ -15,7 +15,6 @@
 
 # volume api
 - do some forced cleanup (umount at least) of source/destination when recovery fails
-- return volume usage via rpc
 - add stresstest
 - ? allow non-empty destination dir if uid/gid matches
 

@@ -3106,6 +3106,10 @@ static void TestVolumeHolder(TPortoAPI &api) {
     Say() << "Create volume B" << std::endl;
     ExpectApiSuccess(api.CreateVolume(b, tar, "1g", ""));
 
+    size_t mb10 = 10 * 1024 * 1024;
+    size_t mb900 = 900 * 1024 * 1024;
+    size_t gb1 = 1 * 1024 * 1024 * 1024;
+
     volumes.clear();
     ExpectApiSuccess(api.ListVolumes(volumes));
     Expect(volumes.size() == 2);
@@ -3113,10 +3117,17 @@ static void TestVolumeHolder(TPortoAPI &api) {
     Expect(volumes[0].Source == tar);
     Expect(volumes[0].Quota == "0");
     Expect(volumes[0].Flags == "");
+
+    Expect(volumes[0].Used != 0);
+    Expect(volumes[0].Avail > gb1);
+
     Expect(volumes[1].Path == b);
     Expect(volumes[1].Source == tar);
     Expect(volumes[1].Quota == "1g");
     Expect(volumes[1].Flags == "");
+
+    Expect(volumes[1].Used < mb10);
+    Expect(volumes[1].Avail < gb1 && volumes[1].Avail > mb900);
 
     Expect(aPath.Exists() == true);
     Expect(bPath.Exists() == true);
@@ -3207,7 +3218,8 @@ static void TestVolumeImpl(TPortoAPI &api) {
 
         TFile loopFile(img);
         size_t expected = 1 * 1024 * 1024 * 1024;
-        Expect(loopFile.GetSize() > expected - 4096 && loopFile.GetSize() < expected + 4096);
+        size_t mistake = 1 * 1024 * 1024;
+        Expect(loopFile.GetSize() > expected - mistake && loopFile.GetSize() < expected + mistake);
 
         Say() << "Make sure loop device has correct contents" << std::endl;
         TFile binBash(a + "/bin/bash");

@@ -328,11 +328,19 @@ static TError ListVolumes(TContext &context,
         auto vol = context.Vholder->Get(path);
         if (!vol->IsValid())
             continue;
+
+        uint64_t used, avail;
+        TError error = vol->GetUsage(used, avail);
+        if (error)
+            L_ERR() << "Can't get used for volume " << vol->GetPath() << ": " << error << std::endl;
+
         auto desc = rsp.mutable_volumelist()->add_list();
         desc->set_path(vol->GetPath().ToString());
         desc->set_source(vol->GetSource());
         desc->set_quota(vol->GetQuota());
         desc->set_flags(vol->GetFlags());
+        desc->set_used(used);
+        desc->set_avail(avail);
     }
 
     return TError::Success();

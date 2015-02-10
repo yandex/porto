@@ -1228,12 +1228,14 @@ public:
             return ret;
         }
 
-        for (auto v : vlist)
+        for (auto v : vlist) {
             std::cout << v.Path << " "
                       << v.Source << " "
                       << v.Quota << " "
                       << v.Flags << " "
+                      << "usage: " << v.Used << "/" << v.Avail << " (" << (v.Used * 100 / v.Avail) << "%) "
                       << std::endl;
+        }
 
         return EXIT_SUCCESS;
     }

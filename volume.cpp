@@ -8,6 +8,10 @@
 #include "util/sha256.hpp"
 #include "config.hpp"
 
+extern "C" {
+#include <sys/vfs.h>
+}
+
 void RegisterVolumeProperties(std::shared_ptr<TRawValueMap> m) {
     m->Add(V_PATH, new TStringValue(PERSISTENT_VALUE));
     m->Add(V_SOURCE, new TStringValue(PERSISTENT_VALUE));
@@ -101,6 +105,18 @@ public:
             if (error)
                 return error;
         }
+
+        return TError::Success();
+    }
+
+    TError GetUsage(uint64_t &used, uint64_t &avail) const {
+        struct statfs st;
+        int ret = statfs(Volume->GetPath().ToString().c_str(), &st);
+        if (ret)
+            return TError(EError::Unknown, errno, "statvfs(" + Volume->GetPath().ToString() + ")");
+
+        used = (st.f_blocks - st.f_bfree) * st.f_frsize;
+        avail = st.f_bfree * st.f_frsize;
 
         return TError::Success();
     }
@@ -208,6 +224,19 @@ public:
         error = dir.Remove(true);
         if (error)
             L_ERR() << "Can't deconstruct volume: " << error << std::endl;
+
+        return TError::Success();
+    }
+
+    TError GetUsage(uint64_t &used, uint64_t &avail) const {
+        struct statfs st;
+        int ret = statfs(Volume->GetPath().ToString().c_str(), &st);
+        if (ret)
+            return TError(EError::Unknown, errno, "statvfs(" + Volume->GetPath().ToString() + ")");
+
+        used = (st.f_blocks - st.f_bfree) * st.f_frsize;
+        // TODO: get info from kernel quota subsystem
+        avail = st.f_bfree * st.f_frsize;
 
         return TError::Success();
     }
@@ -399,6 +428,13 @@ TError TVolume::Destroy() {
         Impl = nullptr;
     }
     return TError::Success();
+}
+
+TError TVolume::GetUsage(uint64_t &used, uint64_t &avail) const {
+    if (!Impl)
+        return TError::Success();
+
+    return Impl->GetUsage(used, avail);
 }
 
 TError TVolume::LoadFromStorage() {

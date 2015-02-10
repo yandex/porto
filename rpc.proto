@@ -246,6 +246,8 @@ message TVolumeListResponse {
 		required string source = 2;
 		required string quota = 3;
 		optional string flags = 4;
+		required uint64 used = 5;
+		required uint64 avail = 6;
 	}
 	repeated TVolumeDescription list = 1;
 }
