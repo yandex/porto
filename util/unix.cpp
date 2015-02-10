@@ -263,11 +263,17 @@ TError AllocLoop(const TPath &path, size_t size) {
     uint8_t ch = 0;
     int status;
 
-    fd = open(path.ToString().c_str(), O_WRONLY | O_CREAT, 0755);
+    fd = open(path.ToString().c_str(), O_WRONLY | O_CREAT | O_EXCL, 0755);
     if (fd.GetFd() < 0)
         return TError(EError::Unknown, errno, "open(" + path.ToString() + ")");
 
-    int ret = lseek(fd.GetFd(), size - 1, SEEK_SET);
+    int ret = ftruncate(fd.GetFd(), 0);
+    if (ret < 0) {
+        error = TError(EError::Unknown, errno, "truncate(" + path.ToString() + ")");
+        goto remove_file;
+    }
+
+    ret = lseek(fd.GetFd(), size - 1, SEEK_SET);
     if (ret < 0) {
         error = TError(EError::Unknown, errno, "lseek(" + path.ToString() + ")");
         goto remove_file;
