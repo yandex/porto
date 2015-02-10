@@ -3114,8 +3114,8 @@ static void TestVolumeHolder(TPortoAPI &api) {
     ExpectApiSuccess(api.ListVolumes(volumes));
     Expect(volumes.size() == 2);
 
-    Say() << volumes[0].Path << " used " << volumes[0].Used << " avail " << volumes[0].Avail << std::endl;
-    Say() << volumes[1].Path << " used " << volumes[1].Used << " avail " << volumes[1].Avail << std::endl;
+    Say() << volumes[0].Path << " used " << (volumes[0].Used / 1024 / 1024) << "mb avail " << (volumes[0].Avail / 1024 / 1024) << "mb" << std::endl;
+    Say() << volumes[1].Path << " used " << (volumes[1].Used / 1024 / 1024) << "mb avail " << (volumes[1].Avail / 1024 / 1024) << "mb" << std::endl;
 
     Expect(volumes[0].Path == a);
     Expect(volumes[0].Source == tar);
