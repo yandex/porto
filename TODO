@@ -1,4 +1,3 @@
-- try to remove Tclass in destructor
 - make fuzzy test and check for portod respawns
 - ? portoctl stopall startall restartall
 - fix f*cking capabilities test on newer kernels

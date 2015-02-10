@@ -830,15 +830,7 @@ TError TContainer::PrepareResources() {
 void TContainer::FreeResources() {
     LeafCgroups.clear();
 
-    if (Tclass) {
-        if (!UseParentNamespace()) {
-            TError error = Tclass->Remove();
-            if (error)
-                L_ERR() << "Can't remove tc classifier: " << error << std::endl;
-        }
-        Tclass = nullptr;
-    }
-
+    Tclass = nullptr;
     Task = nullptr;
     Efd = -1;
 

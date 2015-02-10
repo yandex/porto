@@ -383,10 +383,10 @@ static void TestHolder(TPortoAPI &api) {
     Expect(containers[2] == string("a/b"));
     Expect(containers[3] == string("a/b/c"));
 
-    ExpectApiSuccess(api.SetProperty("a", "command", "sleep 1000"));
-    ExpectApiSuccess(api.SetProperty("a/b", "command", "sleep 1000"));
-    ExpectApiSuccess(api.SetProperty("a/b/c", "command", "sleep 1000"));
+    ExpectApiSuccess(api.SetProperty("a", "isolate", "false"));
+    ExpectApiSuccess(api.SetProperty("a/b", "isolate", "false"));
 
+    ExpectApiSuccess(api.SetProperty("a/b/c", "command", "sleep 1000"));
     ExpectApiSuccess(api.Start("a/b/c"));
     ExpectApiSuccess(api.GetData("a/b/c", "state", v));
     Expect(v == "running");
@@ -396,6 +396,9 @@ static void TestHolder(TPortoAPI &api) {
     Expect(v == "meta");
     ExpectApiSuccess(api.Stop("a/b/c"));
 
+    ExpectApiSuccess(api.SetProperty("a/b", "command", "sleep 1000"));
+    ExpectApiSuccess(api.SetProperty("a/b", "isolate", "true"));
+
     ExpectApiSuccess(api.Start("a/b"));
     ExpectApiSuccess(api.GetData("a/b/c", "state", v));
     Expect(v == "stopped");
@@ -404,6 +407,9 @@ static void TestHolder(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData("a", "state", v));
     Expect(v == "meta");
     ExpectApiSuccess(api.Stop("a/b"));
+
+    ExpectApiSuccess(api.SetProperty("a", "command", "sleep 1000"));
+    ExpectApiSuccess(api.SetProperty("a", "isolate", "true"));
 
     ExpectApiSuccess(api.Start("a"));
     ExpectApiSuccess(api.GetData("a/b/c", "state", v));
@@ -3382,6 +3388,7 @@ static void TestRecovery(TPortoAPI &api) {
     string child = "a/b";
     ExpectApiSuccess(api.Create(parent));
     ExpectApiSuccess(api.Create(child));
+    ExpectApiSuccess(api.SetProperty(parent, "isolate", "false"));
     ExpectApiSuccess(api.SetProperty(child, "command", "sleep 1000"));
     ExpectApiSuccess(api.Start(child));
 
