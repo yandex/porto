@@ -9,7 +9,15 @@ TIdMap::TIdMap() {
 }
 
 TError TIdMap::Get(uint16_t &id) {
-    for (size_t i = 0; i < sizeof(Ids) / sizeof(Ids[0]); i++) {
+    return GetSince(0, id);
+}
+
+TError TIdMap::GetSince(uint16_t since, uint16_t &id) {
+    size_t start = since / BITS_PER_LLONG;
+    if (since % BITS_PER_LLONG)
+        start++;
+
+    for (size_t i = start; i < sizeof(Ids) / sizeof(Ids[0]); i++) {
         int bit = ffsll(Ids[i]);
         if (bit == 0)
             continue;
@@ -36,7 +44,7 @@ TError TIdMap::GetAt(uint16_t id) {
     int bit = id % BITS_PER_LLONG;
 
     if ((Ids[bucket] & (1 << bit)) == 0)
-        return TError(EError::Unknown, "Id " + std::to_string(id) + " already used");
+        return TError(EError::Unknown, "Id " + std::to_string(id + 1) + " already used");
 
     Ids[bucket] &= ~(1 << bit);
     return TError::Success();

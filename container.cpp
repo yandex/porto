@@ -595,10 +595,6 @@ TError TContainer::Create(const TCred &cred) {
     if (error)
         return error;
 
-    error = Prop->Set<std::string>(P_RAW_NAME, GetName());
-    if (error)
-        return error;
-
     error = Prop->Set<int>(P_RAW_ID, (int)Id);
     if (error)
         return error;
@@ -1127,6 +1123,10 @@ TError TContainer::Prepare() {
         if (error)
             return error;
     }
+
+    error = Prop->Set<std::string>(P_RAW_NAME, GetName());
+    if (error)
+        return error;
 
     CgroupEmptySince = 0;
 

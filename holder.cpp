@@ -175,57 +175,45 @@ TError TContainerHolder::RestoreId(const kv::TNode &node, uint16_t &id) {
     std::string value = "";
 
     TError error = Storage->Get(node, P_RAW_ID, value);
-    if (error)
-        return error;
+    if (error) {
+        // FIXME before 0.35 we didn't store id for meta or stopped containers;
+        // don't try to recover, just assign new safe one
+        error = IdMap.GetSince(config().container().max_total(), id);
+        if (error)
+            return error;
+        L_WRN() << "Couldn't restore container id, using " << id << std::endl;
+    } else {
+        error = StringToUint16(value, id);
+        if (error)
+            return error;
 
-    error = StringToUint16(value, id);
-    if (error)
-        return error;
-
-    error = IdMap.GetAt(id);
-    if (error)
-        return error;
+        error = IdMap.GetAt(id);
+        if (error)
+            return error;
+    }
 
     return TError::Success();
 }
 
 std::map<std::string, std::shared_ptr<TKeyValueNode>> TContainerHolder::SortNodes(const std::vector<std::shared_ptr<TKeyValueNode>> &nodes) {
-    // FIXME since v0.33 we use container id as kvalue node name and because
+    // FIXME since v0.35 we use container id as kvalue node name and because
     // we need to create containers in particular order we create this
     // name-sorted map
     std::map<std::string, std::shared_ptr<TKeyValueNode>> name2node;
 
     for (auto node : nodes) {
-        std::string name = node->GetName();
-        if (StringOnlyDigits(name)) {
-            uint16_t id;
-            TError error = StringToUint16(name, id);
-            if (error) {
-                L_ERR() << "Can't convert id to integer: " << error << std::endl;
-                node->Remove();
-                Statistics->RestoreFailed++;
-                continue;
-            }
-
-            kv::TNode n;
-            error = node->Load(n);
-            if (error) {
-                L_ERR() << "Can't load key-value node " << node->GetPath() << ": " << error << std::endl;
-                node->Remove();
-                Statistics->RestoreFailed++;
-                continue;
-            }
-
-            error = Storage->Get(n, P_RAW_NAME, name);
-            if (error) {
-                L_ERR() << "Can't get " << P_RAW_NAME << " from " << name << std::endl;
-                node->Remove();
-                Statistics->RestoreFailed++;
-                continue;
-            }
-        } else {
+        kv::TNode n;
+        TError error = node->Load(n);
+        if (error) {
+            L_ERR() << "Can't load key-value node " << node->GetPath() << ": " << error << std::endl;
             node->Remove();
+            Statistics->RestoreFailed++;
+            continue;
         }
+
+        std::string name;
+        if (TKeyValueStorage::Get(n, P_RAW_NAME, name))
+            name = TKeyValueStorage::FromPath(node->GetName());
 
         name2node[name] = node;
     }
@@ -242,29 +230,29 @@ bool TContainerHolder::RestoreFromStorage() {
         return false;
     }
 
-    std::map<std::string, std::shared_ptr<TKeyValueNode>> name2node = SortNodes(nodes);
-
+    auto name2node = SortNodes(nodes);
     bool restored = false;
     for (auto &pair : name2node) {
         auto node = pair.second;
         auto name = pair.first;
 
         kv::TNode n;
-        TError error = pair.second->Load(n);
-        if (error) {
-            L_ERR() << "Can't load key-value node " << node->GetPath() << ": " << error << std::endl;
-            node->Remove();
+        error = node->Load(n);
+        if (error)
             continue;
-        }
 
         restored = true;
         error = Restore(name, n);
         if (error) {
-            L_ERR() << "Can't restore " << name << " state : " << error << " (" << n.ShortDebugString() << ")" << std::endl;
+            L_ERR() << "Can't restore " << name << ": " << error << " (" << n.ShortDebugString() << ")" << std::endl;
             Statistics->RestoreFailed++;
             node->Remove();
             continue;
         }
+
+        // FIXME since v0.35 we need to cleanup kvalue nodes with old naming
+        if (TKeyValueStorage::Get(n, P_RAW_NAME, name))
+            node->Remove();
     }
 
     return restored;

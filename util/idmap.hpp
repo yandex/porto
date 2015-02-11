@@ -13,6 +13,7 @@ class TIdMap : public TNonCopyable {
 public:
     TIdMap();
     TError Get(uint16_t &id);
+    TError GetSince(uint16_t since, uint16_t &id);
     TError GetAt(uint16_t id);
     void Put(uint16_t id);
 };

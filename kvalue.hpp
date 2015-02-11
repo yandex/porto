@@ -43,4 +43,5 @@ public:
     std::string GetRoot() const { return Tmpfs.GetMountpoint() + "/"; }
 
     static TError Get(const kv::TNode &node, const std::string &name, std::string &val);
+    static std::string FromPath(const std::string &path);
 };

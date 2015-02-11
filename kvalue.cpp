@@ -28,6 +28,14 @@ TPath TKeyValueStorage::ToPath(const std::string &name) const {
     return Tmpfs.GetMountpoint() + "/" + s;
 }
 
+std::string TKeyValueStorage::FromPath(const std::string &path) {
+    std::string s = path;
+    for (std::string::size_type i = 0; i < s.length(); i++)
+        if (s[i] == SLASH_SUBST)
+            s[i] = '/';
+    return s;
+}
+
 void TKeyValueNode::Merge(kv::TNode &node, kv::TNode &next) const {
     for (int i = 0; i < next.pairs_size(); i++) {
         auto key = next.pairs(i).key();
