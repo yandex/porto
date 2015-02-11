@@ -18,7 +18,6 @@ extern "C" {
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <dirent.h>
 }
 
 namespace test {
@@ -552,7 +551,7 @@ void RestartDaemon(TPortoAPI &api) {
     WaitPortod(api);
 }
 
-static void PrintFds(const std::string &path, struct dirent **lst, int nr) {
+void PrintFds(const std::string &path, struct dirent **lst, int nr) {
     for (int i = 0; i < nr; i++) {
         if (lst[i]->d_name == string(".") ||
             lst[i]->d_name == string("..")) {

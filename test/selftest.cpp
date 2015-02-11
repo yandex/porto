@@ -611,6 +611,13 @@ static void TestNsCgTc(TPortoAPI &api) {
     Expect(TaskRunning(api, pid) == true);
 
     AsRoot(api);
+    Say() << "Check that portod doesn't leak fds" << std::endl;
+    struct dirent **lst;
+    std::string path = "/proc/" + pid + "/fd/";
+    int nr = scandir(path.c_str(), &lst, NULL, alphasort);
+    PrintFds(path, lst, nr);
+    Expect(nr == 2 + 3);
+
     Say() << "Check that task namespaces are correct" << std::endl;
     Expect(GetNamespace("self", "pid") != GetNamespace(pid, "pid"));
     Expect(GetNamespace("self", "mnt") != GetNamespace(pid, "mnt"));
