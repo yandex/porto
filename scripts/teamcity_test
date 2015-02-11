@@ -25,7 +25,7 @@ toprpc() {
 	echo "Top queries:"
 	head -n 100 toprpc.txt
 	echo "Total message service time:"
-	cat toprpc.txt | awk '{a[$1] += $2}END{for (v in a) print v, a[v]}'
+	cat toprpc.txt | awk '{a[$1] += $2}END{for (v in a) print v, a[v]}' | sort -n -k2 -r
 }
 
 selftest() {

@@ -935,18 +935,20 @@ public:
                 break;
 
             for (size_t i = 0; i < fds.size(); i++) {
-                if (fds[i].fd != STDIN_FILENO && fds[i].revents & POLLHUP)
-                    hangup = true;
+                if (fds[i].revents & POLLIN) {
+                    if (fds[i].fd == STDIN_FILENO)
+                        MoveData(STDIN_FILENO, stdinFd);
+                    else if (fds[i].fd == stdoutFd)
+                        MoveData(stdoutFd, STDOUT_FILENO);
+                    else if (fds[i].fd == stderrFd)
+                        MoveData(stderrFd, STDERR_FILENO);
+                }
 
-                if (!(fds[i].revents & POLLIN))
-                    continue;
-
-                if (i == 0)
-                    MoveData(STDIN_FILENO, stdinFd);
-                else if (i == 1)
-                    MoveData(stdoutFd, STDOUT_FILENO);
-                else if (i == 2)
-                    MoveData(stderrFd, STDERR_FILENO);
+                if (fds[i].revents & POLLHUP) {
+                    if (fds[i].fd != STDIN_FILENO)
+                        hangup = true;
+                    fds.erase(fds.begin() + i);
+                }
             }
         }
 
