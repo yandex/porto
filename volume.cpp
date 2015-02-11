@@ -516,20 +516,33 @@ TError TVolumeHolder::RestoreFromStorage() {
         L() << "Volume " << v->GetPath() << " restored" << std::endl;
     }
 
+    // Remove stale resources
     RemoveIf(config().volumes().resource_dir(),
              EFileType::Directory,
              [&](const std::string &name, const TPath &path) {
                 return Resources.find(path) == Resources.end();
              });
 
+    // Remove stale volumes
     RemoveIf(config().volumes().volume_dir(),
              EFileType::Directory,
              [&](const std::string &name, const TPath &path) {
-                bool found = false;
+                bool used = false;
                 for (auto v : Volumes)
                     if (std::to_string(v.second->GetId()) == name)
-                        found = true;
-                return !found;
+                        used = true;
+                return !used;
+             });
+
+    // Remove stale loop device images
+    RemoveIf(config().volumes().volume_dir(),
+             EFileType::Regular,
+             [&](const std::string &name, const TPath &path) {
+                bool used = false;
+                for (auto v : Volumes)
+                    if (std::to_string(v.second->GetId()) + ".img" == name)
+                        used = true;
+                return !used;
              });
 
     return TError::Success();
