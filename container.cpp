@@ -751,6 +751,7 @@ TError TContainer::Start() {
         return error;
 
     SetState(EContainerState::Running);
+    Statistics->Started++;
 
     return TError::Success();
 }

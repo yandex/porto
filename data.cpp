@@ -452,6 +452,7 @@ public:
         m["slave_timeout_ms"] = Statistics->SlaveTimeoutMs;
         m["rotated"] = Statistics->Rotated;
         m["restore_failed"] = Statistics->RestoreFailed;
+        m["started"] = Statistics->Started;
 
         return m;
     }

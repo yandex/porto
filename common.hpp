@@ -40,6 +40,7 @@ struct TStatistics {
     std::atomic<uint64_t> QueuedStatuses;
     std::atomic<uint64_t> QueuedEvents;
     std::atomic<uint64_t> Created;
+    std::atomic<uint64_t> Started;
     std::atomic<uint64_t> RemoveDead;
     std::atomic<int> SlaveTimeoutMs;
     std::atomic<uint64_t> Rotated;

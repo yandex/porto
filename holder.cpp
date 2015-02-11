@@ -60,6 +60,7 @@ TError TContainerHolder::CreateRoot() {
     Statistics->RestoreFailed = 0;
     Statistics->RemoveDead = 0;
     Statistics->Rotated = 0;
+    Statistics->Started = 0;
 
     return TError::Success();
 }
