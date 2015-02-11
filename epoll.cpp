@@ -1,5 +1,7 @@
 #include "epoll.hpp"
+#include "config.hpp"
 #include "util/unix.hpp"
+#include "util/log.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -86,18 +88,28 @@ bool TEpollLoop::GetSignals(std::vector<int> &signals) {
     return ret;
 }
 
+TEpollLoop::~TEpollLoop() {
+    delete[] Events;
+}
+
 TError TEpollLoop::GetEvents(std::vector<int> &signals,
-                             std::vector<struct epoll_event> &events,
+                             std::vector<struct epoll_event> &evts,
                              int timeout) {
-    events.clear();
+    evts.clear();
+
+    if (MaxEvents != config().daemon().max_clients()) {
+        delete[] Events;
+        MaxEvents = config().daemon().max_clients();
+        Events = new struct epoll_event[MaxEvents];
+    }
+    PORTO_ASSERT(Events);
 
     sigset_t mask;
-
     if (sigemptyset(&mask) < 0)
         return TError(EError::Unknown, "Can't initialize signal mask: ", errno);
 
     if (!GetSignals(signals)) {
-        int nr = epoll_pwait(EpollFd, Events, MAX_EVENTS, timeout, &mask);
+        int nr = epoll_pwait(EpollFd, Events, MaxEvents, timeout, &mask);
         if (nr < 0) {
             if (errno != EINTR)
                 return TError(EError::Unknown, "epoll() error: ", errno);
@@ -106,7 +118,7 @@ TError TEpollLoop::GetEvents(std::vector<int> &signals,
         GetSignals(signals);
 
         for (int i = 0; i < nr; i++)
-            events.push_back(Events[i]);
+            evts.push_back(Events[i]);
     }
 
     return TError::Success();

@@ -19,21 +19,21 @@ TError EpollCreate(int &epfd);
 TError EpollAdd(int &epfd, int fd);
 
 class TEpollLoop : public TNonCopyable {
-public:
-    TError Create();
-    void Destroy();
-
-    TError AddFd(int fd);
-    TError GetEvents(std::vector<int> &signals,
-                     std::vector<struct epoll_event> &events,
-                     int timeout);
-
-private:
     TError InitializeSignals();
     bool GetSignals(std::vector<int> &signals);
 
     int EpollFd;
 
-    static const int MAX_EVENTS = 32;
-    struct epoll_event Events[MAX_EVENTS];
+    size_t MaxEvents = 0;
+    struct epoll_event *Events = nullptr;
+
+public:
+    TError Create();
+    void Destroy();
+    ~TEpollLoop();
+
+    TError AddFd(int fd);
+    TError GetEvents(std::vector<int> &signals,
+                     std::vector<struct epoll_event> &evts,
+                     int timeout);
 };

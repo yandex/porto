@@ -8,20 +8,6 @@
 #include "util/crash.hpp"
 #include "util/path.hpp"
 
-#define PORTO_ASSERT(EXPR) \
-    do { \
-        if (!(EXPR)) { \
-            L_ERR() << "Assertion failed: " << # EXPR << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
-            Crash(); \
-        } \
-    } while (0)
-
-#define PORTO_RUNTIME_ERROR(MSG) \
-    do { \
-        L_ERR() << "Runtime error: " << (MSG) << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
-        Crash(); \
-    } while (0)
-
 enum ELogLevel {
     LOG_NOTICE = 0,
     LOG_WARN = 1,
