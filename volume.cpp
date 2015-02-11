@@ -516,14 +516,14 @@ TError TVolumeHolder::RestoreFromStorage() {
         L() << "Volume " << v->GetPath() << " restored" << std::endl;
     }
 
-    // Remove stale resources
+    L() << "Remove stale resources..." << std::endl;
     RemoveIf(config().volumes().resource_dir(),
              EFileType::Directory,
              [&](const std::string &name, const TPath &path) {
                 return Resources.find(path) == Resources.end();
              });
 
-    // Remove stale volumes
+    L() << "Remove stale volumes..." << std::endl;
     RemoveIf(config().volumes().volume_dir(),
              EFileType::Directory,
              [&](const std::string &name, const TPath &path) {
@@ -534,7 +534,7 @@ TError TVolumeHolder::RestoreFromStorage() {
                 return !used;
              });
 
-    // Remove stale loop device images
+    L() << "Remove stale loop device images..." << std::endl;
     RemoveIf(config().volumes().volume_dir(),
              EFileType::Regular,
              [&](const std::string &name, const TPath &path) {

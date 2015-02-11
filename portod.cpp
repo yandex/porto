@@ -556,7 +556,7 @@ static int SlaveMain() {
         cs.Destroy();
 
         if (!restored) {
-            // Remove any container leftovers from previous run
+            L() << "Remove container leftovers from previous run..." << std::endl;
             RemoveIf(config().container().tmp_dir(),
                      EFileType::Directory,
                      [](const std::string &name, const TPath &path) {

@@ -168,8 +168,14 @@ void RemoveIf(const TPath &path,
             L() << "Removing " << id << std::endl;
             TMount m(id, id, "", {});
             (void)m.Umount();
-            TFolder d(id);
-            error = d.Remove(true);
+
+            if (id.GetType() == EFileType::Directory) {
+                TFolder d(id);
+                error = d.Remove(true);
+            } else {
+                TFile f(id);
+                error = f.Remove();
+            }
             if (error)
                 L_WRN() << "Can't remove " << id << ": " << error << std::endl;
         }
