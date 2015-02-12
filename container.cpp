@@ -595,10 +595,6 @@ TError TContainer::Create(const TCred &cred) {
     if (error)
         return error;
 
-    error = Prop->Set<int>(P_RAW_ID, (int)Id);
-    if (error)
-        return error;
-
     if (Parent)
         Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
 
@@ -1118,6 +1114,10 @@ TError TContainer::Prepare() {
     if (error)
         return error;
 
+    error = Data->Create();
+    if (error)
+        return error;
+
     if (!Data->HasValue(D_START_ERRNO)) {
         error = Data->Set<int>(D_START_ERRNO, -1);
         if (error)
@@ -1128,9 +1128,13 @@ TError TContainer::Prepare() {
     if (error)
         return error;
 
+    error = Prop->Set<int>(P_RAW_ID, (int)Id);
+    if (error)
+        return error;
+
     CgroupEmptySince = 0;
 
-    return Data->Create();
+    return TError::Success();
 }
 
 TError TContainer::Restore(const kv::TNode &node) {

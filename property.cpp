@@ -1165,6 +1165,7 @@ public:
     TRawIdProperty() :
         TIntValue(HIDDEN_VALUE | PERSISTENT_VALUE),
         TContainerValue(P_RAW_ID, "", anyState) {}
+    int GetDefault() const override { return -1; }
 };
 
 class TRawRootPidProperty : public TIntValue, public TContainerValue {

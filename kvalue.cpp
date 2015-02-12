@@ -118,6 +118,9 @@ TError TKeyValueNode::Save(const kv::TNode &node) const {
 }
 
 TError TKeyValueNode::Remove() const {
+    if (config().log().verbose())
+        L() << "Remove key-value node " << Path << std::endl;
+
     TFile node(Path);
     return node.Remove();
 }
@@ -227,6 +230,9 @@ TError TKeyValueStorage::Destroy() {
 }
 
 TError TKeyValueNode::Create() const {
+    if (config().log().verbose())
+        L() << "Create key-value node " << Path << std::endl;
+
     kv::TNode node;
     return Save(node);
 }
@@ -237,6 +243,9 @@ TError TKeyValueNode::Append(const std::string& key, const std::string& value) c
     auto pair = node.add_pairs();
     pair->set_key(key);
     pair->set_val(value);
+
+    if (config().log().verbose())
+        L() << "Append " << key << "=" << value << " to key-value node " << Path << std::endl;
 
     return Append(node);
 }
