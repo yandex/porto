@@ -15,9 +15,6 @@ static constexpr int HANDLE_SIGNALS[] = {SIGINT, SIGTERM,
                                          SIGALRM};
 static constexpr int HANDLE_SIGNALS_WAIT[] = {SIGCHLD};
 
-TError EpollCreate(int &epfd);
-TError EpollAdd(int &epfd, int fd);
-
 class TEpollLoop : public TNonCopyable {
     TError InitializeSignals();
     bool GetSignals(std::vector<int> &signals);
@@ -33,6 +30,7 @@ public:
     ~TEpollLoop();
 
     TError AddFd(int fd);
+    TError RemoveFd(int fd);
     TError GetEvents(std::vector<int> &signals,
                      std::vector<struct epoll_event> &evts,
                      int timeout);

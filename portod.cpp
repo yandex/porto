@@ -68,10 +68,8 @@ static void DaemonOpenLog(bool master) {
 }
 
 static int DaemonSyncConfig(bool master) {
-    const auto &oldPid = master ? config().master_pid() : config().slave_pid();
-    RemovePidFile(oldPid.path());
-
     config.Load();
+
     if (noNetwork)
         config().mutable_network()->set_enabled(false);
     TNl::EnableDebug(config().network().debug());
@@ -224,9 +222,7 @@ static void RemoveClient(int cfd, std::map<int, std::shared_ptr<TClient>> &clien
 
 static bool AnotherInstanceRunning(const string &path) {
     int fd;
-    TError error = ConnectToRpcServer(path, fd);
-
-    if (error)
+    if (ConnectToRpcServer(path, fd))
         return false;
 
     close(fd);
@@ -792,9 +788,11 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
                 TLogger::CloseLog();
                 close(evtfd[1]);
                 close(ackfd[0]);
+                loop.Destroy();
                 execlp(program_invocation_name, program_invocation_name, stdlogArg, nullptr);
-                L() << "Can't execlp(" << program_invocation_name << ", " << program_invocation_name << ", NULL)" << strerror(errno) << std::endl;
+                std::cerr << "Can't execlp(" << program_invocation_name << ", " << program_invocation_name << ", NULL)" << strerror(errno) << std::endl;
                 ret = EXIT_FAILURE;
+                goto exit;
                 break;
             }
             case rotateSignal:
@@ -812,6 +810,7 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
                 ReceiveAcks(ackfd[0], exited, acked);
             } else {
                 L() << "master received unknown epoll event: " << ev.data.fd << std::endl;
+                loop.RemoveFd(ev.data.fd);
             }
         }
 
@@ -913,6 +912,8 @@ int main(int argc, char * const argv[]) {
         return EXIT_FAILURE;
     }
 
+    config.Load();
+
     for (argn = 1; argn < argc; argn++) {
         string arg(argv[argn]);
 
@@ -920,7 +921,6 @@ int main(int argc, char * const argv[]) {
             std::cout << GIT_TAG << " " << GIT_REVISION <<std::endl;
             return EXIT_SUCCESS;
         } else if (arg == "--kv-dump") {
-            config.Load();
             KvDump();
             return EXIT_SUCCESS;
         } else if (arg == "--slave") {
@@ -935,11 +935,14 @@ int main(int argc, char * const argv[]) {
             if (argn + 1 >= argc)
                 return EXIT_FAILURE;
             return config.Test(argv[argn + 1]);
+        } else {
+            std::cerr << "Unknown option " << arg << std::endl;
+            return EXIT_FAILURE;
         }
     }
 
-    if (AnotherInstanceRunning(config().rpc_sock().file().path())) {
-        L() << "Another instance of portod is running!" << std::endl;
+    if (!slaveMode && AnotherInstanceRunning(config().rpc_sock().file().path())) {
+        std::cerr << "Another instance of portod is running!" << std::endl;
         return EXIT_FAILURE;
     }
 
