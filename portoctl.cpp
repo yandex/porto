@@ -1025,7 +1025,7 @@ public:
         vector<string> states = { "running", "dead", "stopped", "paused" };
         size_t stateLen = CalculateFieldLength(states);
         size_t nameLen = CalculateFieldLength(clist);
-        size_t timeLen = 16;
+        size_t timeLen = 12;
         for (auto c : clist) {
             if (c == "/")
                 continue;
