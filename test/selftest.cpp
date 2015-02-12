@@ -13,6 +13,7 @@
 #include "util/string.hpp"
 #include "util/unix.hpp"
 #include "util/cred.hpp"
+#include "util/idmap.hpp"
 #include "test.hpp"
 
 #define HOSTNAME "portotest"
@@ -2042,6 +2043,29 @@ static void TestStateMachine(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(name));
 }
 
+static void TestIdmap(TPortoAPI &api) {
+    TIdMap idmap;
+    uint16_t id;
+
+    for (uint16_t i = 1; i < 256; i++) {
+        ExpectSuccess(idmap.Get(id));
+        Expect(id == i);
+    }
+
+    for (uint16_t i = 1; i < 256; i++)
+        idmap.Put(i);
+
+    ExpectSuccess(idmap.Get(id));
+    Expect(id == 1);
+
+    uint16_t id1, id2;
+    ExpectSuccess(idmap.GetSince(5000, id1));
+    ExpectSuccess(idmap.GetSince(5000, id2));
+    Expect(id1 > 5000);
+    Expect(id2 > 5000);
+    Expect(id1 != id2);
+}
+
 static void TestRoot(TPortoAPI &api) {
     string v;
     string root = "/";
@@ -3771,6 +3795,7 @@ static void TestPackage(TPortoAPI &api) {
 
 int SelfTest(std::vector<std::string> name, int leakNr) {
     pair<string, std::function<void(TPortoAPI &)>> tests[] = {
+        { "idmap", TestIdmap },
         { "root", TestRoot },
         { "data", TestData },
         { "holder", TestHolder },

@@ -3,9 +3,8 @@
 #include "idmap.hpp"
 
 TIdMap::TIdMap() {
-    for (auto &i : Ids) {
+    for (auto &i : Ids)
         i = ULLONG_MAX;
-    }
 }
 
 TError TIdMap::Get(uint16_t &id) {
@@ -22,10 +21,7 @@ TError TIdMap::GetSince(uint16_t since, uint16_t &id) {
         if (bit == 0)
             continue;
 
-        bit--;
-
         id = i * BITS_PER_LLONG + bit;
-        id++;
 
         TError error = GetAt(id);
         if (error)
@@ -43,10 +39,10 @@ TError TIdMap::GetAt(uint16_t id) {
     int bucket = id / BITS_PER_LLONG;
     int bit = id % BITS_PER_LLONG;
 
-    if ((Ids[bucket] & (1 << bit)) == 0)
+    if ((Ids[bucket] & (1ULL << bit)) == 0)
         return TError(EError::Unknown, "Id " + std::to_string(id + 1) + " already used");
 
-    Ids[bucket] &= ~(1 << bit);
+    Ids[bucket] &= ~(1ULL << bit);
     return TError::Success();
 }
 
@@ -56,5 +52,5 @@ void TIdMap::Put(uint16_t id) {
     int bucket = id / BITS_PER_LLONG;
     int bit = id % BITS_PER_LLONG;
 
-    Ids[bucket] |= 1 << bit;
+    Ids[bucket] |= 1ULL << bit;
 }
