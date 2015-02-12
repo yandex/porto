@@ -1,3 +1,10 @@
+yandex-porto (0.91) precise; urgency=low
+
+  * Fix sparse id map range
+  * Fix check for already running instance
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Thu, 12 Feb 2015 19:05:00 +0400
+
 yandex-porto (0.90) precise; urgency=low
 
   * Volume API (disabled by default)
@@ -11,7 +18,7 @@ yandex-porto (0.90) precise; urgency=low
   * portoctl: make list time column longer
   * Count number of successful containers starts in porto_stat
 
- -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 20 Jan 2015 20:57:00 +0400
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Thu, 12 Feb 2015 15:00:00 +0400
 
 yandex-porto (0.31) precise; urgency=low
 
