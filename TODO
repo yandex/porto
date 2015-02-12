@@ -1,4 +1,5 @@
 - make fuzzy test and check for portod respawns
+- ? portoctl gc to remove all dead/stopped containers
 - ? portoctl stopall startall restartall
 - fix f*cking capabilities test on newer kernels
 - fix netfilter bug with >3.10
