@@ -51,11 +51,6 @@ static bool stdlog = false;
 static bool failsafe = false;
 static bool noNetwork = false;
 
-size_t SlaveStarted = 0;
-size_t MasterStarted = 0;
-
-constexpr int MAX_EVENTS = 32;
-
 TStatistics *Statistics;
 static void AllocStatistics() {
     Statistics = (TStatistics *)mmap(nullptr, sizeof(*Statistics),
@@ -495,7 +490,6 @@ static int SlaveMain() {
         AllocStatistics();
 
     Statistics->SlaveStarted = GetCurrentTimeMs();
-    SlaveStarted = GetCurrentTimeMs();
 
     int ret = DaemonPrepare(false);
     if (ret)
@@ -839,15 +833,34 @@ exit:
     return ret;
 }
 
+void CheckVersion(int &prevMaj, int &prevMin) {
+    std::string prevVer;
+
+    prevMaj = 0;
+    prevMin = 0;
+
+    TFile f(config().version().path(), config().version().perm());
+
+    TError error = f.AsString(prevVer);
+    if (!error)
+        (void)sscanf(prevVer.c_str(), "v%d.%d", &prevMaj, &prevMin);
+
+    error = f.WriteStringNoAppend(GIT_TAG);
+    if (error)
+        L_ERR() << "Can't update current version" << std::endl;
+}
+
 static int MasterMain() {
     AllocStatistics();
     Statistics->MasterStarted = GetCurrentTimeMs();
 
-    MasterStarted = GetCurrentTimeMs();
-
     int ret = DaemonPrepare(true);
     if (ret)
         return ret;
+
+    int prevMaj, prevMin;
+    CheckVersion(prevMaj, prevMin);
+    L() << "Updating from previous version v" << prevMaj << "." << prevMin << std::endl;
 
     TEpollLoop ELoop;
     TError error = ELoop.Create();

@@ -74,6 +74,9 @@ void TConfig::LoadDefaults() {
     // version
     config().mutable_volumes()->set_native(false);
     config().mutable_volumes()->set_enabled(false);
+
+    config().mutable_version()->set_path("/run/portod.version");
+    config().mutable_version()->set_perm(0644);
 }
 
 bool TConfig::LoadFile(const std::string &path, bool silent) {

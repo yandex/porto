@@ -89,4 +89,5 @@ message TCfg {
 	optional TContainerCfg container = 10;
 	optional TPrivilegesCfg privileges = 11;
 	optional TVolumesCfg volumes = 12;
+	optional TFileCfg version = 13;
 }

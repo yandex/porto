@@ -176,7 +176,7 @@ TError TContainerHolder::RestoreId(const kv::TNode &node, uint16_t &id) {
 
     TError error = Storage->Get(node, P_RAW_ID, value);
     if (error) {
-        // FIXME before 0.35 we didn't store id for meta or stopped containers;
+        // FIXME before v1.0 we didn't store id for meta or stopped containers;
         // don't try to recover, just assign new safe one
         error = IdMap.GetSince(config().container().max_total(), id);
         if (error)
@@ -196,7 +196,7 @@ TError TContainerHolder::RestoreId(const kv::TNode &node, uint16_t &id) {
 }
 
 std::map<std::string, std::shared_ptr<TKeyValueNode>> TContainerHolder::SortNodes(const std::vector<std::shared_ptr<TKeyValueNode>> &nodes) {
-    // FIXME since v0.35 we use container id as kvalue node name and because
+    // FIXME since v1.0 we use container id as kvalue node name and because
     // we need to create containers in particular order we create this
     // name-sorted map
     std::map<std::string, std::shared_ptr<TKeyValueNode>> name2node;
@@ -250,7 +250,7 @@ bool TContainerHolder::RestoreFromStorage() {
             continue;
         }
 
-        // FIXME since v0.35 we need to cleanup kvalue nodes with old naming
+        // FIXME since v1.0 we need to cleanup kvalue nodes with old naming
         if (TKeyValueStorage::Get(n, P_RAW_NAME, name))
             node->Remove();
     }
