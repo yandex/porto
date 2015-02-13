@@ -113,5 +113,5 @@ public:
         Storage(storage) {}
     TError RestoreFromStorage();
     void Destroy();
-    TError GetResource(const TPath &path, std::shared_ptr<TResource> &resource);
+    TError GetResource(const TPath &source, std::shared_ptr<TResource> &resource);
 };

@@ -456,6 +456,10 @@ TError TVolume::LoadFromStorage() {
     if (error)
         return error;
 
+    error = ParseQuota(GetQuota());
+    if (error)
+        return error;
+
     error = Impl->Restore(Data);
     if (error)
         return error;
@@ -470,10 +474,6 @@ TError TVolume::LoadFromStorage() {
                       Data->Get<std::string>(V_GROUP));
 
     error = Holder->Insert(shared_from_this());
-    if (error)
-        return error;
-
-    error = ParseQuota(GetQuota());
     if (error)
         return error;
 
@@ -562,28 +562,27 @@ void TVolumeHolder::Destroy() {
     }
 }
 
-TError TVolumeHolder::GetResource(const TPath &path, std::shared_ptr<TResource> &resource) {
-    if (!path.ToString().length() || path.ToString()[0] != '/')
+TError TVolumeHolder::GetResource(const TPath &source, std::shared_ptr<TResource> &resource) {
+    if (!source.ToString().length() || source.ToString()[0] != '/')
         return TError(EError::InvalidValue, "Invalid source");
 
-    TPath srcPath(path);
-    if (!srcPath.Exists())
+    if (!source.Exists())
         return TError(EError::InvalidValue, "Source doesn't exist");
 
-    if (srcPath.GetType() != EFileType::Regular)
+    if (source.GetType() != EFileType::Regular)
         return TError(EError::InvalidValue, "Source isn't a regular file");
 
     resource = nullptr;
-    auto weak = Resources.find(path.ToString());
+    auto weak = Resources.find(source.ToString());
     if (weak != Resources.end()) {
         resource = weak->second.lock();
         if (!resource)
-            Resources.erase(path.ToString());
+            Resources.erase(source.ToString());
     }
 
     if (!resource) {
-        resource = std::make_shared<TResource>(path);
-        Resources[path.ToString()] = resource;
+        resource = std::make_shared<TResource>(source);
+        Resources[source.ToString()] = resource;
     }
 
     return TError::Success();
@@ -602,7 +601,7 @@ TError TResource::Untar(const TPath &what, const TPath &where) const {
 }
 
 TError TResource::Prepare() {
-    Path = TPath(config().volumes().resource_dir()).AddComponent(Sha256(Path.ToString()));
+    Path = TPath(config().volumes().resource_dir()).AddComponent(Sha256(Source.ToString()));
 
     TFolder dir(Path);
     if (!dir.Exists())
@@ -613,6 +612,8 @@ TError TResource::Prepare() {
 
 TError TResource::Create() const {
     TPath p = Path.AddComponent(".done");
+
+    L() << "Create resource " << Path << " from " << Source << " (" << p.Exists() << ")" << std::endl;
 
     if (!p.Exists()) {
         TError error = Untar(Source, Path);
@@ -636,7 +637,7 @@ TError TResource::Copy(const TPath &to) const {
 }
 
 TError TResource::Destroy() const {
-    L() << "Destroy resource " << Path << std::endl;
+    L() << "Destroy resource " << Path << " (" << Path.Exists() << ")" << std::endl;
 
     if (Path.Exists()) {
         TFolder dir(Path);

@@ -16,6 +16,7 @@
 - do some forced cleanup (umount at least) of source/destination when recovery fails
 - add stresstest
 - ? allow non-empty destination dir if uid/gid matches
+- create volume without tar.gz
 
 # properties
 - ? supplementary_groups

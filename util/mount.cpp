@@ -209,7 +209,7 @@ TError TLoopMount::Mount() {
 TError TLoopMount::Umount() {
     std::string dev = "/dev/loop" + std::to_string(LoopNr);
 
-    L() << "Umount loop device " << dev << " at " << Source << std::endl;
+    L() << "Umount loop device " << dev << " " << Source << " -> " << Target << std::endl;
 
     TMount m(dev, Target, Type, {});
     TError error = m.Umount();
