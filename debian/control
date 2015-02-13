@@ -27,5 +27,5 @@ Package: yandex-portoinit
 Section: utils
 Priority: extra
 Architecture: amd64
-Depends: yandex-porto (= ${binary:Version})
+Depends: yandex-porto
 Description: Init component of Porto

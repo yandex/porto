@@ -43,16 +43,16 @@ static bool GetContainerProperty(std::string &f, std::string &parameterName, std
     return false;
 }
 
-static void CreateHook() {
+//static void CreateHook() {
+//
+//}
 
-}
-
-static bool RunHook(std::string &containerName, std::string &hookName, std::string &hookValue, TPortoAPI &api) {
-    CreateHook();
-    StartHook();
-    WaitHook();
-    DestroyHook();
-}
+//static bool RunHook(std::string &containerName, std::string &hookName, std::string &hookValue, TPortoAPI &api) {
+//    CreateHook();
+//    StartHook();
+//    WaitHook();
+//    DestroyHook();
+//}
 
 static void StartContainers (std::map<std::string, std::map<std::string, std::string>> &containers, TPortoAPI &api) {
     int ret, error;
