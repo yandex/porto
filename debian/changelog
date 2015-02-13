@@ -1,3 +1,11 @@
+yandex-porto (0.92) precise; urgency=low
+
+  * Don't show error when can't kill process that doesn't exist
+  * Generate new id if the one we are recovering is already used
+  * Fix resource reusage and volume recovery
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Fri, 13 Feb 2015 15:52:00 +0400
+
 yandex-porto (0.91) precise; urgency=low
 
   * Fix sparse id map range
