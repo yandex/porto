@@ -188,7 +188,15 @@ TError TContainerHolder::RestoreId(const kv::TNode &node, uint16_t &id) {
             return error;
 
         error = IdMap.GetAt(id);
-        if (error)
+        if (error) {
+            // FIXME before v1.0 there was a possibility for two containers
+            // to use the same id, allocate new one upon restore we see this
+
+            error = IdMap.GetSince(config().container().max_total(), id);
+            if (error)
+                return error;
+            L_WRN() << "Container ids clashed, using new " << id << std::endl;
+        }
             return error;
     }
 
@@ -244,7 +252,7 @@ bool TContainerHolder::RestoreFromStorage() {
         restored = true;
         error = Restore(name, n);
         if (error) {
-            L_ERR() << "Can't restore " << name << ": " << error << " (" << n.ShortDebugString() << ")" << std::endl;
+            L_ERR() << "Can't restore " << name << ": " << error << std::endl;
             Statistics->RestoreFailed++;
             node->Remove();
             continue;
@@ -262,7 +270,7 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
     if (name == ROOT_CONTAINER)
         return TError::Success();
 
-    L() << "Restore container " << name << std::endl;
+    L() << "Restore container " << name << " (" << node.ShortDebugString() << ")" << std::endl;
 
     auto parent = GetParent(name);
     if (!parent)
