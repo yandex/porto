@@ -213,7 +213,7 @@ TError TCgroup::Kill(int signal) const {
             for (auto pid : tasks) {
                 TTask task(pid);
                 TError error = task.Kill(signal);
-                if (error)
+                if (error && error.GetErrno() != ESRCH)
                     L_ERR() << "Can't kill child process: " << error << std::endl;
             }
         }
