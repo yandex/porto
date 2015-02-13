@@ -6,9 +6,9 @@ set -x
 ROOTDIR=$(cd $(dirname $0)/../ && pwd)
 HOST=${HOST:-lxc-test0}
 
-run() { ssh -t "$HOST" sudo -i "bash -c \"$@\""; }
+run() { ssh -4 -t "$HOST" sudo -i "bash -c \"$@\""; }
 
-rsync -av $ROOTDIR ${HOST}:src
+rsync -4 -av $ROOTDIR ${HOST}:src
 run "ln -sf /home/$USER/src/porto/portod /usr/sbin"
 run "ln -sf /home/$USER/src/porto/portoctl /usr/sbin"
 run "ln -sf /home/$USER/src/porto/portotest /usr/sbin"

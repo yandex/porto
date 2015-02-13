@@ -83,7 +83,9 @@ public:
     bool Isolate = false;
     TPath StdinPath;
     TPath StdoutPath;
+    bool RemoveStdout;
     TPath StderrPath;
+    bool RemoveStderr;
     TNamespaceSnapshot Ns;
     std::map<int,struct rlimit> Rlimit;
     std::string Hostname;

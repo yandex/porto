@@ -149,16 +149,14 @@ TError TMountSnapshot::RemountSlave() {
 }
 
 TError GetLoopDev(int &nr) {
-    int cfd = open("/dev/loop-control", O_RDWR | O_CLOEXEC);
-    if (cfd < 0)
+    TScopedFd controlFd;
+    controlFd = open("/dev/loop-control", O_RDWR | O_CLOEXEC);
+    if (controlFd.GetFd() < 0)
         return TError(EError::Unknown, errno, "open(/dev/loop-control)");
 
-    nr = ioctl(cfd, LOOP_CTL_GET_FREE);
-    if (nr < 0) {
-        close(cfd);
+    nr = ioctl(controlFd.GetFd(), LOOP_CTL_GET_FREE);
+    if (nr < 0)
         return TError(EError::Unknown, errno, "ioctl(LOOP_CTL_GET_FREE)");
-    }
-    close(cfd);
 
     L() << "Loop device allocate " << nr << std::endl;
 
@@ -166,31 +164,17 @@ TError GetLoopDev(int &nr) {
 }
 
 TError PutLoopDev(const int nr) {
-    TScopedFd cfd, dfd;
-    TError error = TError::Success();
-
-    if (nr < 0)
-        return TError::Success();
+    L() << "Loop device free " << nr << std::endl;
 
     std::string dev = "/dev/loop" + std::to_string(nr);
 
-    cfd = open("/dev/loop-control", O_RDWR | O_CLOEXEC);
-    if (cfd.GetFd() < 0)
-        return TError(EError::Unknown, errno, "open(/dev/loop-control)");
+    TScopedFd loopFd;
+    loopFd = open(dev.c_str(), O_RDWR | O_CLOEXEC);
+    if (loopFd.GetFd() < 0)
+        return TError(EError::Unknown, errno, "open(" + dev + ")");
 
-    int ret = ioctl(cfd.GetFd(), LOOP_CTL_REMOVE, nr);
-    if (ret < 0)
-        error = TError(EError::Unknown, errno, "ioctl(/dev/loop-control, LOOP_CTL_GET_FREE)");
-
-    dfd = open(dev.c_str(), O_RDWR);
-    if (dfd.GetFd() >= 0)
-        error = TError(EError::Unknown, errno, "open(" + dev + ")");
-
-    ret = ioctl(dfd.GetFd(), LOOP_CLR_FD, 0);
-    if (ret < 0)
-        error = TError(EError::Unknown, errno, "ioctl(" + std::to_string(dfd.GetFd()) + ", LOOP_CLR_FD)");
-
-    L() << "Loop device free " << nr << std::endl;
+    if (ioctl(loopFd.GetFd(), LOOP_CLR_FD, 0) < 0)
+        return TError(EError::Unknown, errno, "ioctl(LOOP_CLR_FD)");
 
     return TError::Success();
 }
@@ -198,17 +182,23 @@ TError PutLoopDev(const int nr) {
 TError TLoopMount::Mount() {
     std::string dev = "/dev/loop" + std::to_string(LoopNr);
 
-    TScopedFd ffd, dfd;
-    ffd = open(Source.ToString().c_str(), O_RDWR | O_CLOEXEC);
-    if (ffd.GetFd() < 0)
+    TScopedFd imageFd, loopFd;
+    imageFd = open(Source.ToString().c_str(), O_RDWR | O_CLOEXEC);
+    if (imageFd.GetFd() < 0)
         return TError(EError::Unknown, errno, "open(" + Source.ToString() + ")");
 
-    dfd = open(dev.c_str(), O_RDWR);
-    if (dfd.GetFd() < 0)
+    loopFd = open(dev.c_str(), O_RDWR | O_CLOEXEC);
+    if (loopFd.GetFd() < 0)
         return TError(EError::Unknown, errno, "open(" + dev + ")");
 
-    if (ioctl(dfd.GetFd(), LOOP_SET_FD, ffd.GetFd()) < 0)
+    if (ioctl(loopFd.GetFd(), LOOP_SET_FD, imageFd.GetFd()) < 0)
         return TError(EError::Unknown, errno, "ioctl(LOOP_SET_FD)");
+
+    struct loop_info64 loopinfo64 = {};
+    strncpy((char *)loopinfo64.lo_file_name, Source.ToString().c_str(), LO_NAME_SIZE);
+
+    if (ioctl(loopFd.GetFd(), LOOP_SET_STATUS64, &loopinfo64) < 0)
+        return TError(EError::Unknown, errno, "ioctl(LOOP_SET_STATUS64)");
 
     TMount m(dev, Target, Type, {});
     return m.Mount();
@@ -222,10 +212,9 @@ TError TLoopMount::Umount() {
     if (error)
         return error;
 
-    TScopedFd fd;
-    fd = open(dev.c_str(), O_RDWR);
-    if (ioctl(fd.GetFd(), LOOP_CLR_FD, 0) < 0)
-        return TError(EError::Unknown, errno, "ioctl(LOOP_CLR_FD)");
+    error = PutLoopDev(LoopNr);
+    if (error)
+        return error;
 
     TFolder f(Target);
     return f.Remove(true);

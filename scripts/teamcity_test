@@ -49,14 +49,14 @@ print_logs() {
 
 netup() {
 	# we need multiple network interfaces for selftest
-	sudo ip link del $DUMMY_ETH || :
+	sudo ip link del $DUMMY_ETH &> /dev/null || :
 	sudo ip link add $DUMMY_ETH type dummy
 	sudo ip link set dev $DUMMY_ETH up
 	sudo ip addr add 192.168.2.2/16 dev $DUMMY_ETH
 }
 
 netdown() {
-	sudo ip link del $DUMMY_ETH
+	sudo ip link del $DUMMY_ETH &> /dev/null
 	# TODO: enable dynamic_ifaces?
 	sudo reload yandex-porto
 }

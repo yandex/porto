@@ -520,7 +520,9 @@ TError TContainer::PrepareTask() {
     taskEnv->Isolate = Prop->GetBool(P_ISOLATE);
     taskEnv->StdinPath = Prop->GetString(P_STDIN_PATH);
     taskEnv->StdoutPath = Prop->GetString(P_STDOUT_PATH);
+    taskEnv->RemoveStdout = Prop->IsDefault(P_STDOUT_PATH);
     taskEnv->StderrPath = Prop->GetString(P_STDERR_PATH);
+    taskEnv->RemoveStderr = Prop->IsDefault(P_STDERR_PATH);
     taskEnv->Hostname = Prop->GetString(P_HOSTNAME);
     taskEnv->BindDns = Prop->GetBool(P_BIND_DNS);
 
@@ -687,11 +689,9 @@ TError TContainer::Start() {
 
     error = Prop->SetInt(P_RAW_LOOP_DEV, loopNr);
     if (error) {
-        error = PutLoopDev(loopNr);
-        if (error) {
-            L_ERR() << "Can't put loop device: " << error << std::endl;
-            FreeResources();
-        }
+        if (loopNr >= 0)
+            (void)PutLoopDev(loopNr);
+        (void)FreeResources();
         return error;
     }
 
@@ -815,12 +815,14 @@ void TContainer::FreeResources() {
 
     int loopNr = Prop->GetInt(P_RAW_LOOP_DEV);
     TError error = Prop->SetInt(P_RAW_LOOP_DEV, -1);
-    if (error)
+    if (error) {
         L_ERR() << "Can't set " << P_RAW_LOOP_DEV << ": " << error << std::endl;
-
-    error = PutLoopDev(loopNr);
-    if (error)
-        L_ERR() << "Can't put loop device: " << error << std::endl;
+    } else {
+        if (loopNr >= 0)
+            error = PutLoopDev(loopNr);
+        if (error)
+            L_ERR() << "Can't put loop device: " << error << std::endl;
+    }
 }
 
 TError TContainer::Stop() {

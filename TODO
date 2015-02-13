@@ -1,3 +1,11 @@
+<<<<<<< HEAD
+=======
+- convert everything to #pragma once
+- fix f*cking capabilities test on newer kernels
+- nuke volumeAPI dir and move ext4_proj_quota.[hc] into util/
+- kvalue - use id instead of substituting / with +
+- add max_rss support
+>>>>>>> f3c8d6495d78... mount: rework PutLoopDevice
 - run some kind of init process in meta container
 - fix netfilter bug with >3.10
 - mount root loop in root namespace (to better diagnose possible problems)
