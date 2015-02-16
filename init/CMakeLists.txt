@@ -12,8 +12,14 @@ find_package(Protobuf REQUIRED)
 include_directories(${PROTOBUF_INCLUDE_DIRS})
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
-PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS init.proto)
+PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS init.proto ../rpc.proto ../config.proto)
 
-add_executable(portoinit portoinit.cpp init.pb.cc ../error.cpp ../rpc.pb.cc ../util/string.cpp ../util/protobuf.cpp ../util/unix.cpp ../util/file.cpp ../util/folder.cpp ../util/path.cpp ../util/log.cpp ../util/cred.cpp ../config.cpp ../config.pb.cc ../api/cpp/libporto.cpp ../util/unix.hpp
+add_executable(portoinit portoinit.cpp ../error.cpp ../util/string.cpp ../util/protobuf.cpp ../util/unix.cpp ../util/file.cpp ../util/folder.cpp ../util/path.cpp ../util/log.cpp ../util/cred.cpp ../config.cpp ../api/cpp/libporto.cpp ../util/unix.hpp
     ${PROTO_SRCS} ${PROTO_HDRS})
 target_link_libraries(portoinit ${PB} pthread rt)
+
+install(
+    TARGETS portoinit
+    RUNTIME DESTINATION sbin
+    LIBRARY DESTINATION lib
+    )

@@ -62,10 +62,7 @@ add_executable(portotest portotest.cpp config.cpp qdisc.cpp test/selftest.cpp te
 add_dependencies(portotest version.hpp)
 target_link_libraries(portotest porto ${PB} ${INSTALL_DIR}/lib/libnl-3.a ${INSTALL_DIR}/lib/libnl-route-3.a pthread rt)
 
-
-add_executable(portoinit init/portoinit.cpp init/init.pb.cc error.cpp rpc.pb.cc util/string.cpp util/protobuf.cpp util/unix.cpp util/file.cpp util/folder.cpp util/path.cpp util/log.cpp util/cred.cpp config.cpp config.pb.cc api/cpp/libporto.cpp util/unix.hpp
-    ${PROTO_SRCS} ${PROTO_HDRS})
-target_link_libraries(portoinit ${PB} pthread rt)
+add_subdirectory(init)
 
 install(
     TARGETS portod portoctl portotest
