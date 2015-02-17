@@ -280,6 +280,40 @@ public:
     }
 };
 
+class TNetBPSData : public TMapValue, public TContainerValue {
+public:
+    TNetBPSData() :
+        TMapValue(0),
+        TContainerValue(D_NET_BPS,
+                        "current network traffic (bytes/s)",
+                        rpdmState) {}
+
+    TUintMap GetDefault() const override {
+        TUintMap m;
+        TError error = GetContainer()->GetStat(ETclassStat::BPS, m);
+        if (error)
+            L_ERR() << "Can't get network speed (bps): " << error << std::endl;
+        return m;
+    }
+};
+
+class TNetPPSData : public TMapValue, public TContainerValue {
+public:
+    TNetPPSData() :
+        TMapValue(0),
+        TContainerValue(D_NET_PPS,
+                        "current network traffic (packets/s)",
+                        rpdmState) {}
+
+    TUintMap GetDefault() const override {
+        TUintMap m;
+        TError error = GetContainer()->GetStat(ETclassStat::PPS, m);
+        if (error)
+            L_ERR() << "Can't get network speed (bps): " << error << std::endl;
+        return m;
+    }
+};
+
 class TMinorFaultsData : public TUintValue, public TContainerValue {
 public:
     TMinorFaultsData() :
@@ -476,6 +510,8 @@ void RegisterData(std::shared_ptr<TRawValueMap> m,
         new TNetPacketsData,
         new TNetDropsData,
         new TNetOverlimitsData,
+        new TNetPPSData,
+        new TNetBPSData,
         new TMinorFaultsData,
         new TMajorFaultsData,
         new TIoReadData,

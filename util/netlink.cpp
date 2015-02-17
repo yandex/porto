@@ -623,7 +623,7 @@ TError TNlClass::GetStat(ETclassStat stat, uint64_t &val) {
     case ETclassStat::BPS:
         rtnlStat = RTNL_TC_RATE_BPS;
         break;
-    case ETclassStat::PPC:
+    case ETclassStat::PPS:
         rtnlStat = RTNL_TC_RATE_PPS;
         break;
     default:
