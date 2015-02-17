@@ -41,6 +41,8 @@ public:
 
         try {
             auto p = dynamic_cast<TValueImpl<T> *>(Impl.get());
+            if (!p)
+                PORTO_RUNTIME_ERROR(std::string("Invalid variant cast"));
             return p->Value;
         } catch (std::bad_cast &e) {
             PORTO_RUNTIME_ERROR(std::string("Invalid variant cast: ") + e.what());
@@ -79,6 +81,8 @@ public:
     const T Get() const {
         try {
             auto p = dynamic_cast<const TValue<T> *>(this);
+            if (!p)
+                PORTO_RUNTIME_ERROR(std::string("Bad cast"));
             return p->Get();
         } catch (std::bad_cast &e) {
             PORTO_RUNTIME_ERROR(std::string("Bad cast: ") + e.what());
@@ -90,6 +94,8 @@ public:
     TError Set(const T& value) {
         try {
             auto p = dynamic_cast<TValue<T> *>(this);
+            if (!p)
+                PORTO_RUNTIME_ERROR(std::string("Bad cast"));
             return p->Set(value);
         } catch (std::bad_cast &e) {
             PORTO_RUNTIME_ERROR(std::string("Bad cast: ") + e.what());
@@ -233,11 +239,26 @@ public:
         try {
             auto av = Find(name);
             auto p = dynamic_cast<TValue<T> *>(av);
+            if (!p)
+                PORTO_RUNTIME_ERROR(std::string("Bad cast"));
             return p->GetDefault() == value;
         } catch (std::bad_cast &e) {
             PORTO_RUNTIME_ERROR(std::string("Bad cast: ") + e.what());
         }
         return false;
+    }
+
+    template<typename T>
+    const TError GetChecked(const std::string &name, T &val) const {
+        try {
+            auto av = Find(name);
+            if (dynamic_cast<TValue<T> *>(av)) {
+                val = av->Get<T>();
+                return TError::Success();
+            }
+        } catch (...) {
+        }
+        return TError(EError::InvalidValue, "Invalid value type");
     }
 
     template<typename T>
