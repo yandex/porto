@@ -510,7 +510,12 @@ public:
         for (auto &kv : value)
             if (validKey.find(kv.first) == validKey.end())
                 return TError(EError::InvalidValue,
-                              "invalid interface " + kv.first);
+                              "Invalid interface " + kv.first);
+
+        for (auto iface : validKey)
+            if (value.find(iface) == value.end())
+                return TError(EError::InvalidValue,
+                              "Missing interface " + iface);
 
         return TError::Success();
     }
