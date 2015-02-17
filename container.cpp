@@ -93,18 +93,21 @@ EContainerState TContainer::GetState() {
         // process death. Use small delay here to let actual event be
         // delivered and only then assume that something got wrong
         // and simulate container death.
-        if (!CgroupEmptySince)
+        if (!CgroupEmptySince) {
             CgroupEmptySince = GetCurrentTimeMs();
+            L() << "Container " << GetName() << " seems to be empty, start timer" << std::endl;
+        }
 
-        if (CgroupEmptySince >= GetCurrentTimeMs() + 1000)
+        if (CgroupEmptySince + 1000 < GetCurrentTimeMs()) {
+            L() << "Container " << GetName() << " is empty for one second, kill it" << std::endl;
             Exit(-1, false);
+        }
     }
 
     // TODO: use some kind of reference count for accounting running children
-    if (State == EContainerState::Meta && !IsRoot()) {
+    if (State == EContainerState::Meta && !IsRoot())
         if (!HaveRunningChildren())
             Stop();
-    }
 
     rec = false;
 

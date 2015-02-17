@@ -505,6 +505,28 @@ void BootstrapCommand(const std::string &cmd, const std::string &path, bool remo
     Expect(system(("cp " + cmd + " " + path).c_str()) == 0);
 }
 
+void RotateDaemonLogs(TPortoAPI &api) {
+    // Truncate slave log
+    TFile slaveLog(config().slave_log().path());
+    ExpectSuccess(slaveLog.Remove());
+
+    int pid = ReadPid(config().slave_pid().path());
+    if (kill(pid, SIGUSR1))
+        throw string("Can't send SIGUSR1 to slave");
+
+    WaitPortod(api);
+
+    // Truncate master log
+    TFile masterLog(config().master_log().path());
+    ExpectSuccess(masterLog.Remove());
+
+    pid = ReadPid(config().master_pid().path());
+    if (kill(pid, SIGUSR1))
+        throw string("Can't send SIGUSR1 to master");
+
+    WaitPortod(api);
+}
+
 void RestartDaemon(TPortoAPI &api) {
     std::cerr << ">>> Truncating logs and restarting porto..." << std::endl;
 
@@ -523,25 +545,7 @@ void RestartDaemon(TPortoAPI &api) {
     // containers
     WaitPortod(api, 2 * 60);
 
-    // Truncate slave log
-    TFile slaveLog(config().slave_log().path());
-    (void)slaveLog.Remove();
-
-    pid = ReadPid(config().slave_pid().path());
-    if (kill(pid, SIGUSR1))
-        throw string("Can't send SIGUSR1 to slave");
-
-    WaitPortod(api);
-
-    // Truncate master log
-    TFile masterLog(config().master_log().path());
-    (void)masterLog.Remove();
-
-    pid = ReadPid(config().master_pid().path());
-    if (kill(pid, SIGUSR1))
-        throw string("Can't send SIGUSR1 to master");
-
-    WaitPortod(api);
+    RotateDaemonLogs(api);
 
     // Clean statistics
     pid = ReadPid(config().master_pid().path());

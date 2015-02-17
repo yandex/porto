@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "common.hpp"
+#include "util/signal.hpp"
 
 class TPath;
 
@@ -16,7 +17,7 @@ size_t GetTotalMemory();
 int CreatePidFile(const std::string &path, const int mode);
 void RemovePidFile(const std::string &path);
 void SetProcessName(const std::string &name);
-void SetDieOnParentExit();
+void SetDieOnParentExit(int sig = SIGTERM);
 std::string GetProcessName();
 TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap);
 std::string GetHostName();

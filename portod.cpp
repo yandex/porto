@@ -113,6 +113,11 @@ static void DaemonShutdown(bool master, int ret) {
 
     if (ret < 0)
         RaiseSignal(-ret);
+
+    if (master) {
+        TFile f(config().daemon().pidmap().path());
+        (void)f.Remove();
+    }
 }
 
 static void RemoveRpcServer(const string &path) {
@@ -482,6 +487,8 @@ static int TuneLimits() {
 }
 
 static int SlaveMain() {
+    SetDieOnParentExit(SIGTERM);
+
     if (failsafe)
         AllocStatistics();
 

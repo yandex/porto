@@ -61,6 +61,7 @@ namespace test {
     std::string GetDefaultGroup();
     void BootstrapCommand(const std::string &cmd, const std::string &path, bool remove = true);
 
+    void RotateDaemonLogs(TPortoAPI &api);
     void RestartDaemon(TPortoAPI &api);
     void PrintFds(const std::string &path, struct dirent **lst, int nr);
     bool NetworkEnabled();

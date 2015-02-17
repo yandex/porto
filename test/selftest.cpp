@@ -3344,7 +3344,25 @@ static void TestVolumeImpl(TPortoAPI &api) {
     }
 }
 
-static void KillPorto(TPortoAPI &api, int sig, int times = 10) {
+static void KillMaster(TPortoAPI &api, int sig, int times = 10) {
+    AsRoot(api);
+    RotateDaemonLogs(api);
+    AsNobody(api);
+
+    int pid = ReadPid(config().master_pid().path());
+    if (kill(pid, sig))
+        throw "Can't send " + std::to_string(sig) + " to master";
+    WaitExit(api, std::to_string(pid));
+    WaitPortod(api, times);
+
+    std::string v;
+    ExpectApiSuccess(api.GetData("/", "porto_stat[spawned]", v));
+    Expect(v == "1");
+
+    expectedErrors = expectedRespawns = expectedWarns = 0;
+}
+
+static void KillSlave(TPortoAPI &api, int sig, int times = 10) {
     int portodPid = ReadPid(config().slave_pid().path());
     if (kill(portodPid, sig))
         throw "Can't send " + std::to_string(sig) + " to slave";
@@ -3381,6 +3399,17 @@ static void TestRecovery(TPortoAPI &api) {
         { "env", "a=a; b=b" },
     };
 
+    Say() << "Make sure we can figure out that containers are dead even if master dies" << std::endl;
+
+    ExpectApiSuccess(api.Create(name));
+    ExpectApiSuccess(api.SetProperty(name, "command", "sleep 3"));
+    ExpectApiSuccess(api.Start(name));
+
+    KillMaster(api, SIGKILL);
+    WaitState(api, name, "dead");
+
+    ExpectApiSuccess(api.Destroy(name));
+
     Say() << "Make sure we don't kill containers when doing recovery" << std::endl;
 
     AsRoot(api);
@@ -3394,7 +3423,7 @@ static void TestRecovery(TPortoAPI &api) {
     Expect(TaskRunning(api, pid) == true);
     Expect(TaskZombie(api, pid) == false);
 
-    KillPorto(api, SIGKILL);
+    KillSlave(api, SIGKILL);
 
     ExpectApiSuccess(api.GetData(name, "state", v));
     Expect(v == "running");
@@ -3424,7 +3453,7 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectApiSuccess(api.Start(child));
 
     AsRoot(api);
-    KillPorto(api, SIGKILL);
+    KillSlave(api, SIGKILL);
     AsNobody(api);
 
     std::vector<std::string> containers;
@@ -3458,7 +3487,7 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectSuccess(f.AppendString(pid));
     auto cgmap = GetCgroups(pid);
     Expect(cgmap["memory"] == "/porto");
-    KillPorto(api, SIGKILL);
+    KillSlave(api, SIGKILL);
     AsNobody(api);
     expectedWarns++; // Task belongs to invalid subsystem
 
@@ -3477,7 +3506,7 @@ static void TestRecovery(TPortoAPI &api) {
     Expect(v == string("9"));
     ExpectApiSuccess(api.GetData(name, "oom_killed", v));
     Expect(v == string("true"));
-    KillPorto(api, SIGKILL);
+    KillSlave(api, SIGKILL);
     ExpectApiSuccess(api.GetData(name, "exit_status", v));
     Expect(v == string("9"));
     ExpectApiSuccess(api.GetData(name, "oom_killed", v));
@@ -3491,7 +3520,7 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "max_respawns", std::to_string(expected)));
     ExpectApiSuccess(api.Start(name));
     WaitState(api, name, "dead");
-    KillPorto(api, SIGKILL);
+    KillSlave(api, SIGKILL);
     WaitRespawn(api, name, expected);
     ExpectApiSuccess(api.GetData(name, "respawn_count", v));
     Expect(v == std::to_string(expected));
@@ -3501,7 +3530,7 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectApiSuccess(api.Create(name));
     ShouldHaveValidProperties(api, name);
     ShouldHaveValidData(api, name);
-    KillPorto(api, SIGKILL);
+    KillSlave(api, SIGKILL);
     ExpectApiSuccess(api.GetData(name, "state", v));
     Expect(v == "stopped");
     ShouldHaveValidProperties(api, name);
@@ -3517,7 +3546,7 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectApiSuccess(api.Pause(name));
     v = GetState(pid);
     Expect(v == "D");
-    KillPorto(api, SIGKILL);
+    KillSlave(api, SIGKILL);
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
     v = GetState(pid);
     Expect(v == "D");
@@ -3537,7 +3566,7 @@ static void TestRecovery(TPortoAPI &api) {
         WaitState(api, name, "dead");
 
         ExpectNonZeroLink(api, name, "net_bytes");
-        KillPorto(api, SIGKILL);
+        KillSlave(api, SIGKILL);
         ExpectNonZeroLink(api, name, "net_bytes");
 
         ExpectApiSuccess(api.Destroy(name));
@@ -3549,7 +3578,7 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "respawn", "true"));
     ExpectApiSuccess(api.Start(name));
     Expect(RespawnTicks(api, name) == true);
-    KillPorto(api, SIGKILL);
+    KillSlave(api, SIGKILL);
     Expect(RespawnTicks(api, name) == true);
     ExpectApiSuccess(api.Destroy(name));
 
@@ -3565,7 +3594,7 @@ static void TestRecovery(TPortoAPI &api) {
 
     ExpectApiFailure(api.Create("max_plus_one"), EError::ResourceNotAvailable);
 
-    KillPorto(api, SIGKILL, 100);
+    KillSlave(api, SIGKILL, 100);
 
     containers.clear();
     ExpectApiSuccess(api.List(containers));
@@ -3614,7 +3643,7 @@ static void TestVolumeRecovery(TPortoAPI &api) {
     Expect(resource.Exists() == true);
     Expect(volume.Exists() == true);
 
-    KillPorto(api, SIGKILL);
+    KillSlave(api, SIGKILL);
 
     Expect(resource.Exists() == false);
     Expect(volume.Exists() == false);
@@ -3649,7 +3678,7 @@ static void TestCgroups(TPortoAPI &api) {
 
     RemakeDir(api, freezerCg);
 
-    KillPorto(api, SIGINT);
+    KillSlave(api, SIGINT);
 
     TFolder qwerty(freezerCg);
     Expect(qwerty.Exists() == true);
@@ -3677,7 +3706,7 @@ static void TestCgroups(TPortoAPI &api) {
         abort();
     }
 
-    KillPorto(api, SIGKILL);
+    KillSlave(api, SIGKILL);
 
     TFolder freezer(freezerCg);
     Expect(freezer.Exists() == false);
@@ -3711,7 +3740,7 @@ static void TestRemoveDead(TPortoAPI &api) {
     remove = !f.Exists();
     ExpectSuccess(f.WriteStringNoAppend(config().ShortDebugString()));
 
-    KillPorto(api, SIGTERM);
+    KillSlave(api, SIGTERM);
 
     std::string name = "dead";
     ExpectApiSuccess(api.Create(name));
@@ -3829,8 +3858,10 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
         { "perf", TestPerf },
         { "vholder", TestVolumeHolder },
         { "volume_impl", TestVolumeImpl },
-
+        { "stats", TestStats },
         { "daemon", TestDaemon },
+
+        // the following tests will restart porto several times
         { "recovery", TestRecovery },
         { "volume_recovery", TestVolumeRecovery },
         { "cgroups", TestCgroups },
