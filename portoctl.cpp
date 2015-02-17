@@ -752,7 +752,7 @@ class TExecCmd : public ICmd {
     string containerName;
     sig_atomic_t Interrupted = 0;
 public:
-    TExecCmd(TPortoAPI *api) : ICmd(api, "exec", 2, "<container> [properties]", "create pty, execute and wait for command in container") {}
+    TExecCmd(TPortoAPI *api) : ICmd(api, "exec", 2, "<container> command=<command> [properties]", "create pty, execute and wait for command in container") {}
 
     int SwithToNonCanonical(int fd) {
         if (!isatty(fd))
