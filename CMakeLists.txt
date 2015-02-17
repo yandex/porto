@@ -62,8 +62,6 @@ add_executable(portotest portotest.cpp config.cpp qdisc.cpp test/selftest.cpp te
 add_dependencies(portotest version.hpp)
 target_link_libraries(portotest porto ${PB} ${INSTALL_DIR}/lib/libnl-3.a ${INSTALL_DIR}/lib/libnl-route-3.a pthread rt)
 
-add_subdirectory(init)
-
 install(
     TARGETS portod portoctl portotest
     RUNTIME DESTINATION sbin

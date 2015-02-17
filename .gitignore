@@ -1,7 +1,6 @@
 /portod
 /portoctl
 /portotest
-/portoinit
 /libporto.a
 /*.o
 /*.pb.cc
