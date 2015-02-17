@@ -1,3 +1,11 @@
+yandex-porto (0.93) precise; urgency=low
+
+  * Fix wrong error code when destroying container that doesn't exist
+  * Fix wrong container state (running) when we didn't get exit event
+  * portoctl: fix help for exec
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 17 Feb 2015 16:45:00 +0400
+
 yandex-porto (0.92) precise; urgency=low
 
   * Don't show error when can't kill process that doesn't exist
