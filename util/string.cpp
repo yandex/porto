@@ -8,12 +8,12 @@ using std::set;
 using std::istringstream;
 using std::stringstream;
 
-string CommaSeparatedList(const vector<string> &list) {
+string CommaSeparatedList(const vector<string> &list, const std::string &sep) {
     string ret;
     for (auto c = list.begin(); c != list.end(); ) {
         ret += *c;
         if (++c != list.end())
-            ret += ",";
+            ret += sep;
     }
     return ret;
 }
@@ -38,6 +38,19 @@ TError StringsToIntegers(const std::vector<std::string> &strings,
         }
     }
 
+    return TError::Success();
+}
+
+TError StringToUint16(const std::string &str, uint16_t &value) {
+    uint32_t uint32;
+    TError error = StringToUint32(str, uint32);
+    if (error)
+        return error;
+
+    if (uint32 >= 1 << 16)
+        return TError(EError::Unknown, string(__func__) + ": Integer value out of range");
+
+    value = (uint16_t)uint32;
     return TError::Success();
 }
 
@@ -184,4 +197,8 @@ std::string StringRemoveRepeating(const std::string &str, const char rc) {
         s << rc;
 
     return s.str();
+}
+
+bool StringOnlyDigits(const std::string &s) {
+    return s.find_first_not_of("0123456789") == std::string::npos;
 }

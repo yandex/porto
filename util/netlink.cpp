@@ -620,6 +620,12 @@ TError TNlClass::GetStat(ETclassStat stat, uint64_t &val) {
     case ETclassStat::Overlimits:
         rtnlStat = RTNL_TC_OVERLIMITS;
         break;
+    case ETclassStat::BPS:
+        rtnlStat = RTNL_TC_RATE_BPS;
+        break;
+    case ETclassStat::PPS:
+        rtnlStat = RTNL_TC_RATE_PPS;
+        break;
     default:
         return TError(EError::Unknown, "Unsupported netlink statistics");
     }
@@ -919,7 +925,10 @@ TNlAddr::TNlAddr(const TNlAddr &other) {
 TNlAddr &TNlAddr::operator=(const TNlAddr &other) {
     if (this != &other) {
         nl_addr_put(Addr);
-        Addr = nl_addr_clone(other.Addr);
+        if (other.Addr)
+            Addr = nl_addr_clone(other.Addr);
+        else
+            Addr = nullptr;
     }
     return *this;
 }

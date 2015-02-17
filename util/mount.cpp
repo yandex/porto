@@ -25,7 +25,7 @@ using std::set;
 using std::shared_ptr;
 
 TError TMount::Mount(unsigned long flags) const {
-    L() << "mount " << Target.ToString() << std::endl;
+    L() << "mount " << Target << " " << flags << std::endl;
 
     int ret = RetryBusy(10, 100, [&]{ return mount(Source.ToString().c_str(),
                                                    Target.ToString().c_str(),
@@ -39,7 +39,7 @@ TError TMount::Mount(unsigned long flags) const {
 }
 
 TError TMount::Umount() const {
-    L() << "umount " << Target.ToString() << std::endl;
+    L() << "umount " << Target << std::endl;
 
     int ret = RetryBusy(10, 100, [&]{ return umount(Target.ToString().c_str()); });
     if (ret)
@@ -182,6 +182,8 @@ TError PutLoopDev(const int nr) {
 TError TLoopMount::Mount() {
     std::string dev = "/dev/loop" + std::to_string(LoopNr);
 
+    L() << "Mount loop device " << dev << " " << Source  << " -> " << Target << std::endl;
+
     TScopedFd imageFd, loopFd;
     imageFd = open(Source.ToString().c_str(), O_RDWR | O_CLOEXEC);
     if (imageFd.GetFd() < 0)
@@ -206,6 +208,8 @@ TError TLoopMount::Mount() {
 
 TError TLoopMount::Umount() {
     std::string dev = "/dev/loop" + std::to_string(LoopNr);
+
+    L() << "Umount loop device " << dev << " " << Source << " -> " << Target << std::endl;
 
     TMount m(dev, Target, Type, {});
     TError error = m.Umount();

@@ -1,5 +1,4 @@
-#ifndef __CLI_HPP__
-#define __CLI_HPP__
+#pragma once
 
 #include <string>
 #include <csignal>
@@ -39,5 +38,3 @@ public:
 
 void RegisterCommand(ICmd *cmd);
 int HandleCommand(TPortoAPI *api, int argc, char *argv[]);
-
-#endif

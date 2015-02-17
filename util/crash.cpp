@@ -4,7 +4,6 @@
 #include "util/unix.hpp"
 
 extern "C" {
-#include <signal.h>
 #include <pthread.h>
 #include <unistd.h>
 #include <sys/prctl.h>

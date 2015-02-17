@@ -1,5 +1,4 @@
-#ifndef __NAMESPACE_HPP__
-#define __NAMESPACE_HPP__
+#pragma once
 
 #include <map>
 #include <string>
@@ -21,5 +20,3 @@ public:
     void Destroy();
     bool Valid();
 };
-
-#endif

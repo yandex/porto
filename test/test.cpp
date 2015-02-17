@@ -1,12 +1,15 @@
 #include <sstream>
+#include <csignal>
 
 #include "test.hpp"
 #include "config.hpp"
+#include "error.hpp"
 #include "util/file.hpp"
 #include "util/folder.hpp"
 #include "util/string.hpp"
 #include "util/netlink.hpp"
 #include "util/cred.hpp"
+#include "util/unix.hpp"
 
 using std::string;
 using std::vector;
@@ -15,8 +18,6 @@ extern "C" {
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <dirent.h>
-#include <signal.h>
 }
 
 namespace test {
@@ -38,6 +39,32 @@ void ExpectReturn(int ret, int exp, int line, const char *func) {
     throw std::string("Got " + std::to_string(ret) + ", but expected " + std::to_string(exp) + " at " + func + ":" + std::to_string(line));
 }
 
+void ExpectError(const TError &ret, const TError &exp, int line, const char *func) {
+    std::stringstream ss;
+
+    if (ret == exp)
+        return;
+
+    ss << "Got " << ret << ", but expected " << exp << " at " << func << ":" << line;
+
+    throw ss.str();
+}
+
+void ExpectApi(TPortoAPI &api, int ret, int exp, int line, const char *func) {
+    std::stringstream ss;
+
+    if (ret == exp)
+        return;
+
+    int err;
+    std::string msg;
+    api.GetLastError(err, msg);
+    TError error((rpc::EError)err, msg);
+    ss << "Got error from libporto: " << error << " (" << ret << " != " << exp << ") at " << func << ":" << line;
+
+    throw ss.str();
+}
+
 int ReadPid(const std::string &path) {
     TFile f(path);
     int pid = 0;
@@ -49,33 +76,17 @@ int ReadPid(const std::string &path) {
     return pid;
 }
 
-vector<string> Popen(const std::string &cmd) {
-    vector<string> lines;
-    FILE *f = popen(cmd.c_str(), "r");
-    if (f == nullptr)
-        throw std::string("Can't execute ") + cmd;
-
-    char *line = nullptr;
-    size_t n;
-
-    while (getline(&line, &n, f) >= 0) {
-        lines.push_back(line);
-    }
-
-    fclose(f);
-
-    return lines;
-}
-
 int Pgrep(const std::string &name) {
-    vector<string> lines = Popen("pgrep -x " + name);
+    vector<string> lines;
+    ExpectSuccess(Popen("pgrep -x " + name, lines));
     return lines.size();
 }
 
 string GetRlimit(const std::string &pid, const std::string &type, const bool soft) {
     string kind = soft ? "SOFT" : "HARD";
     string cmd = "prlimit --pid " + pid + " --" + type + " -o " + kind + " --noheading";
-    vector<string> lines = Popen(cmd);
+    vector<string> lines;
+    ExpectSuccess(Popen(cmd, lines));
     return StringTrim(lines[0]);
 }
 
@@ -457,7 +468,8 @@ void BootstrapCommand(const std::string &cmd, const std::string &path, bool remo
     if (remove)
         (void)d.Remove(true);
 
-    vector<string> lines = Popen("ldd " + cmd);
+    vector<string> lines;
+    ExpectSuccess(Popen("ldd " + cmd, lines));
 
     for (auto &line : lines) {
         vector<string> tokens;
@@ -493,6 +505,28 @@ void BootstrapCommand(const std::string &cmd, const std::string &path, bool remo
     Expect(system(("cp " + cmd + " " + path).c_str()) == 0);
 }
 
+void RotateDaemonLogs(TPortoAPI &api) {
+    // Truncate slave log
+    TFile slaveLog(config().slave_log().path());
+    ExpectSuccess(slaveLog.Remove());
+
+    int pid = ReadPid(config().slave_pid().path());
+    if (kill(pid, SIGUSR1))
+        throw string("Can't send SIGUSR1 to slave");
+
+    WaitPortod(api);
+
+    // Truncate master log
+    TFile masterLog(config().master_log().path());
+    ExpectSuccess(masterLog.Remove());
+
+    pid = ReadPid(config().master_pid().path());
+    if (kill(pid, SIGUSR1))
+        throw string("Can't send SIGUSR1 to master");
+
+    WaitPortod(api);
+}
+
 void RestartDaemon(TPortoAPI &api) {
     std::cerr << ">>> Truncating logs and restarting porto..." << std::endl;
 
@@ -511,25 +545,7 @@ void RestartDaemon(TPortoAPI &api) {
     // containers
     WaitPortod(api, 2 * 60);
 
-    // Truncate slave log
-    TFile slaveLog(config().slave_log().path());
-    (void)slaveLog.Remove();
-
-    pid = ReadPid(config().slave_pid().path());
-    if (kill(pid, SIGUSR1))
-        throw string("Can't send SIGUSR1 to slave");
-
-    WaitPortod(api);
-
-    // Truncate master log
-    TFile masterLog(config().master_log().path());
-    (void)masterLog.Remove();
-
-    pid = ReadPid(config().master_pid().path());
-    if (kill(pid, SIGUSR1))
-        throw string("Can't send SIGUSR1 to master");
-
-    WaitPortod(api);
+    RotateDaemonLogs(api);
 
     // Clean statistics
     pid = ReadPid(config().master_pid().path());
@@ -539,7 +555,7 @@ void RestartDaemon(TPortoAPI &api) {
     WaitPortod(api);
 }
 
-static void PrintFds(const std::string &path, struct dirent **lst, int nr) {
+void PrintFds(const std::string &path, struct dirent **lst, int nr) {
     for (int i = 0; i < nr; i++) {
         if (lst[i]->d_name == string(".") ||
             lst[i]->d_name == string("..")) {
@@ -590,18 +606,18 @@ void TestDaemon(TPortoAPI &api) {
     Say() << "Number of portod-master fds=" << nr << std::endl;
     path = ("/proc/" + std::to_string(pid) + "/fd");
 
-    // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 5(event pipe) 6(ack pipe)
+    // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 4(epoll) 5(event pipe) 6(ack pipe)
     nr = scandir(path.c_str(), &lst, NULL, alphasort);
     PrintFds(path, lst, nr);
-    Expect(nr == 2 + 6);
+    Expect(nr == 2 + 7);
 
     Say() << "Check portod-master queue size" << std::endl;
     std::string v;
-    ExpectSuccess(api.GetData("/", "porto_stat[queued_statuses]", v));
+    ExpectApiSuccess(api.GetData("/", "porto_stat[queued_statuses]", v));
     Expect(v == std::to_string(0));
 
     Say() << "Check portod-slave queue size" << std::endl;
-    ExpectSuccess(api.GetData("/", "porto_stat[queued_events]", v));
+    ExpectApiSuccess(api.GetData("/", "porto_stat[queued_events]", v));
     Expect(v == std::to_string(1)); // RotateLogs
 
     // TODO: check rtnl classes

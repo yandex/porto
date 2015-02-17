@@ -2,6 +2,7 @@
 #include <memory>
 #include <csignal>
 #include <cstdlib>
+#include <algorithm>
 
 #include "container.hpp"
 #include "config.hpp"
@@ -13,6 +14,9 @@
 #include "event.hpp"
 #include "holder.hpp"
 #include "qdisc.hpp"
+#include "context.hpp"
+#include "container_value.hpp"
+#include "epoll.hpp"
 #include "util/log.hpp"
 #include "util/file.hpp"
 #include "util/string.hpp"
@@ -89,18 +93,21 @@ EContainerState TContainer::GetState() {
         // process death. Use small delay here to let actual event be
         // delivered and only then assume that something got wrong
         // and simulate container death.
-        if (!CgroupEmptySince)
+        if (!CgroupEmptySince) {
             CgroupEmptySince = GetCurrentTimeMs();
+            L() << "Container " << GetName() << " seems to be empty, start timer" << std::endl;
+        }
 
-        if (CgroupEmptySince >= GetCurrentTimeMs() + 1000)
+        if (CgroupEmptySince + 1000 < GetCurrentTimeMs()) {
+            L() << "Container " << GetName() << " is empty for one second, kill it" << std::endl;
             Exit(-1, false);
+        }
     }
 
     // TODO: use some kind of reference count for accounting running children
-    if (State == EContainerState::Meta && !IsRoot()) {
+    if (State == EContainerState::Meta && !IsRoot())
         if (!HaveRunningChildren())
             Stop();
-    }
 
     rec = false;
 
@@ -117,7 +124,7 @@ void TContainer::SetState(EContainerState newState) {
 
     L() << GetName() << ": change state " << ContainerStateName(State) << " -> " << ContainerStateName(newState) << std::endl;
     State = newState;
-    Data->SetString(D_STATE, ContainerStateName(State));
+    Data->Set<std::string>(D_STATE, ContainerStateName(State));
 }
 
 const string TContainer::StripParentName(const string &name) const {
@@ -209,7 +216,7 @@ uint64_t TContainer::GetChildrenSum(const std::string &property, std::shared_ptr
                 continue;
             }
 
-            uint64_t childval = child->Prop->GetUint(property);
+            uint64_t childval = child->Prop->Get<uint64_t>(property);
             if (childval)
                 val += childval;
             else
@@ -225,13 +232,13 @@ bool TContainer::ValidHierarchicalProperty(const std::string &property, const ui
         return false;
 
     for (auto c = GetParent(); c; c = c->GetParent()) {
-        uint64_t parent = c->Prop->GetUint(property);
+        uint64_t parent = c->Prop->Get<uint64_t>(property);
         if (parent && value > parent)
             return false;
     }
 
     if (GetParent()) {
-        uint64_t parent = GetParent()->Prop->GetUint(property);
+        uint64_t parent = GetParent()->Prop->Get<uint64_t>(property);
         uint64_t children = GetParent()->GetChildrenSum(property, shared_from_this(), value);
         if (parent && children > parent)
             return false;
@@ -260,16 +267,16 @@ TError TContainer::ApplyDynamicProperties() {
     }
 
     auto memroot = memorySubsystem->GetRootCgroup();
-    if (memroot->HasKnob("memory.low_limit_in_bytes") && Prop->GetUint(P_MEM_GUARANTEE) != 0 && !UseParentNamespace()) {
-        TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", Prop->GetString(P_MEM_GUARANTEE), false);
+    if (memroot->HasKnob("memory.low_limit_in_bytes") && Prop->Get<uint64_t>(P_MEM_GUARANTEE) != 0 && !UseParentNamespace()) {
+        TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", Prop->ToString(P_MEM_GUARANTEE), false);
         if (error) {
             L_ERR() << "Can't set " << P_MEM_GUARANTEE << ": " << error << std::endl;
             return error;
         }
     }
 
-    if (Prop->GetUint(P_MEM_LIMIT) != 0) {
-        error = memcg->SetKnobValue("memory.limit_in_bytes", Prop->GetString(P_MEM_LIMIT), false);
+    if (Prop->Get<uint64_t>(P_MEM_LIMIT) != 0) {
+        error = memcg->SetKnobValue("memory.limit_in_bytes", Prop->ToString(P_MEM_LIMIT), false);
         if (error) {
             L_ERR() << "Can't set " << P_MEM_LIMIT << ": " << error << std::endl;
             return error;
@@ -277,7 +284,7 @@ TError TContainer::ApplyDynamicProperties() {
     }
 
     if (memroot->HasKnob("memory.recharge_on_pgfault") && !UseParentNamespace()) {
-        string value = Prop->GetBool(P_RECHARGE_ON_PGFAULT) ? "1" : "0";
+        string value = Prop->Get<bool>(P_RECHARGE_ON_PGFAULT) ? "1" : "0";
         error = memcg->SetKnobValue("memory.recharge_on_pgfault", value, false);
         if (error) {
             L_ERR() << "Can't set " << P_RECHARGE_ON_PGFAULT << ": " << error << std::endl;
@@ -289,7 +296,7 @@ TError TContainer::ApplyDynamicProperties() {
         return TError::Success();
 
     auto cpucg = GetLeafCgroup(cpuSubsystem);
-    if (Prop->GetString(P_CPU_POLICY) == "normal") {
+    if (Prop->Get<std::string>(P_CPU_POLICY) == "normal") {
         string smart;
 
         error = cpucg->GetKnobValue("cpu.smart", smart);
@@ -301,14 +308,14 @@ TError TContainer::ApplyDynamicProperties() {
             }
         }
 
-        int cpuPrio = Prop->GetUint(P_CPU_PRIO);
+        int cpuPrio = Prop->Get<uint64_t>(P_CPU_PRIO);
         error = cpucg->SetKnobValue("cpu.shares", std::to_string(cpuPrio + 2), false);
         if (error) {
             L_ERR() << "Can't set " << P_CPU_PRIO << ": " << error << std::endl;
             return error;
         }
 
-    } else if (Prop->GetString(P_CPU_POLICY) == "rt") {
+    } else if (Prop->Get<std::string>(P_CPU_POLICY) == "rt") {
         string smart;
 
         error = cpucg->GetKnobValue("cpu.smart", smart);
@@ -336,8 +343,7 @@ std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
 }
 
 bool TContainer::UseParentNamespace() const {
-    bool isolate = Prop->GetRawBool(P_ISOLATE);
-    if (isolate)
+    if (Prop->GetRaw<bool>(P_ISOLATE))
         return false;
 
     return FindRunningParent() != nullptr;
@@ -349,8 +355,10 @@ TError TContainer::PrepareNetwork() {
 
     PORTO_ASSERT(Tclass == nullptr);
 
-    if (UseParentNamespace())
+    if (UseParentNamespace()) {
+        Tclass = Parent->Tclass;
         return TError::Success();
+    }
 
     if (Parent) {
         PORTO_ASSERT(Parent->Tclass != nullptr);
@@ -364,9 +372,9 @@ TError TContainer::PrepareNetwork() {
     }
 
     TUintMap prio, rate, ceil;
-    prio = Prop->GetMap(P_NET_PRIO);
-    rate = Prop->GetMap(P_NET_GUARANTEE);
-    ceil = Prop->GetMap(P_NET_CEIL);
+    prio = Prop->Get<TUintMap>(P_NET_PRIO);
+    rate = Prop->Get<TUintMap>(P_NET_GUARANTEE);
+    ceil = Prop->Get<TUintMap>(P_NET_CEIL);
 
     Tclass->Prepare(prio, rate, ceil);
 
@@ -392,7 +400,7 @@ TError TContainer::PrepareOomMonitor() {
         return error;
     }
 
-    TError error = EpollAdd(Holder->Epfd, Efd.GetFd());
+    TError error = Holder->EpollLoop->AddFd(Efd.GetFd());
     if (error)
         return error;
 
@@ -431,7 +439,7 @@ TError TContainer::PrepareCgroups() {
     auto cpuroot = cpuSubsystem->GetRootCgroup();
     if (cpuroot->HasKnob("cpu.smart") && !UseParentNamespace()) {
         TError error;
-        if (Prop->GetString(P_CPU_POLICY) == "rt") {
+        if (Prop->Get<std::string>(P_CPU_POLICY) == "rt") {
             error = cpucg->SetKnobValue("cpu.smart", "1", false);
             if (error) {
                 L_ERR() << "Can't enable smart: " << error << std::endl;
@@ -465,7 +473,7 @@ TError TContainer::PrepareCgroups() {
     if (!UseParentNamespace()) {
         auto devices = GetLeafCgroup(devicesSubsystem);
         error = devicesSubsystem->AllowDevices(devices,
-                                               Prop->GetList(P_ALLOWED_DEVICES));
+                                               Prop->Get<TStrList>(P_ALLOWED_DEVICES));
         if (error) {
             L_ERR() << "Can't set " << P_ALLOWED_DEVICES << ": " << error << std::endl;
             return error;
@@ -476,55 +484,54 @@ TError TContainer::PrepareCgroups() {
 }
 
 TError TContainer::PrepareTask() {
-    if (!Prop->GetBool(P_ISOLATE))
-        for (auto property : propertySet.GetNames())
-            if (propertySet.Get(property)->Flags & PARENT_RO_PROPERTY)
-                if (!Prop->IsDefault(property))
-                    return TError(EError::InvalidValue, "Can't use custom " + property + " with " + P_ISOLATE + " == false");
-
+    if (!Prop->Get<bool>(P_ISOLATE))
+        for (auto name : Prop->List())
+            if (Prop->Find(name)->GetFlags() & PARENT_RO_PROPERTY)
+                if (!Prop->IsDefault(name))
+                    return TError(EError::InvalidValue, "Can't use custom " + name + " with " + P_ISOLATE + " == false");
 
     auto taskEnv = std::make_shared<TTaskEnv>();
 
-    taskEnv->Command = Prop->GetString(P_COMMAND);
-    taskEnv->Cwd = Prop->GetString(P_CWD);
+    taskEnv->Command = Prop->Get<std::string>(P_COMMAND);
+    taskEnv->Cwd = Prop->Get<std::string>(P_CWD);
 
-    TPath root(Prop->GetString(P_ROOT));
+    TPath root(Prop->Get<std::string>(P_ROOT));
     if (root.GetType() == EFileType::Directory) {
-        taskEnv->Root = Prop->GetString(P_ROOT);
+        taskEnv->Root = Prop->Get<std::string>(P_ROOT);
     } else {
         taskEnv->Root = GetTmpDir();
-        taskEnv->Loop = Prop->GetString(P_ROOT);
-        taskEnv->LoopDev = Prop->GetInt(P_RAW_LOOP_DEV);
+        taskEnv->Loop = Prop->Get<std::string>(P_ROOT);
+        taskEnv->LoopDev = Prop->Get<int>(P_RAW_LOOP_DEV);
     }
 
-    taskEnv->RootRdOnly = Prop->GetBool(P_ROOT_RDONLY);
+    taskEnv->RootRdOnly = Prop->Get<bool>(P_ROOT_RDONLY);
     taskEnv->CreateCwd = Prop->IsDefault(P_ROOT) && Prop->IsDefault(P_CWD) && !UseParentNamespace();
 
-    if (Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS) {
+    if (Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS) {
         taskEnv->User = "root";
         taskEnv->Group = "root";
     } else {
-        taskEnv->User = Prop->GetString(P_USER);
-        taskEnv->Group = Prop->GetString(P_GROUP);
+        taskEnv->User = Prop->Get<std::string>(P_USER);
+        taskEnv->Group = Prop->Get<std::string>(P_GROUP);
     }
 
     taskEnv->Environ.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
-    auto env = Prop->GetList(P_ENV);
+    auto env = Prop->Get<TStrList>(P_ENV);
     taskEnv->Environ.insert(taskEnv->Environ.end(), env.begin(), env.end());
     taskEnv->Environ.push_back("container=lxc");
     taskEnv->Environ.push_back("PORTO_NAME=" + GetName());
     taskEnv->Environ.push_back("PORTO_HOST=" + GetHostName());
-    taskEnv->Environ.push_back("HOME=" + Prop->GetString(P_CWD));
-    taskEnv->Environ.push_back("USER=" + Prop->GetString(P_USER));
+    taskEnv->Environ.push_back("HOME=" + Prop->Get<std::string>(P_CWD));
+    taskEnv->Environ.push_back("USER=" + Prop->Get<std::string>(P_USER));
 
-    taskEnv->Isolate = Prop->GetBool(P_ISOLATE);
-    taskEnv->StdinPath = Prop->GetString(P_STDIN_PATH);
-    taskEnv->StdoutPath = Prop->GetString(P_STDOUT_PATH);
+    taskEnv->Isolate = Prop->Get<bool>(P_ISOLATE);
+    taskEnv->StdinPath = Prop->Get<std::string>(P_STDIN_PATH);
+    taskEnv->StdoutPath = Prop->Get<std::string>(P_STDOUT_PATH);
     taskEnv->RemoveStdout = Prop->IsDefault(P_STDOUT_PATH);
-    taskEnv->StderrPath = Prop->GetString(P_STDERR_PATH);
+    taskEnv->StderrPath = Prop->Get<std::string>(P_STDERR_PATH);
     taskEnv->RemoveStderr = Prop->IsDefault(P_STDERR_PATH);
-    taskEnv->Hostname = Prop->GetString(P_HOSTNAME);
-    taskEnv->BindDns = Prop->GetBool(P_BIND_DNS);
+    taskEnv->Hostname = Prop->Get<std::string>(P_HOSTNAME);
+    taskEnv->BindDns = Prop->Get<bool>(P_BIND_DNS);
 
     TError error = Prop->PrepareTaskEnv(P_ULIMIT, taskEnv);
     if (error)
@@ -575,7 +582,7 @@ TError TContainer::PrepareTask() {
 }
 
 TError TContainer::Create(const TCred &cred) {
-    L() << "Create " << GetName() << " " << Id << " " << cred.Uid << " " << cred.Gid << std::endl;
+    L() << "Create " << GetName() << " with id " << Id << " uid " << cred.Uid << " gid " << cred.Gid << std::endl;
 
     TError error = Prepare();
     if (error) {
@@ -583,11 +590,11 @@ TError TContainer::Create(const TCred &cred) {
         return error;
     }
 
-    error = Prop->SetString(P_USER, cred.UserAsString());
+    error = Prop->Set<std::string>(P_USER, cred.UserAsString());
     if (error)
         return error;
 
-    error = Prop->SetString(P_GROUP, cred.GroupAsString());
+    error = Prop->Set<std::string>(P_GROUP, cred.GroupAsString());
     if (error)
         return error;
 
@@ -606,20 +613,40 @@ TError TContainer::PrepareMetaParent() {
             return error;
     }
 
-    auto state = GetState();
+    auto state = State;
     if (state == EContainerState::Stopped) {
-        SetState(EContainerState::Meta);
+        if (Prop->Get<bool>(P_ISOLATE)) {
+            auto cwd = Prop->Get<std::string>(P_CWD);
+            TError error = Prop->Set<std::string>(P_COMMAND, cwd + "/portod-meta-root");
+            if (error)
+                return error;
 
-        TError error = PrepareNetwork();
-        if (error) {
-            FreeResources();
-            return error;
-        }
+            auto bind = Prop->Get<TStrList>(P_BIND);
+            auto metaRoot = "/usr/sbin/portod-meta-root /portod-meta-root ro";
+            if (std::find(bind.begin(), bind.end(), metaRoot) == bind.end())
+                bind.push_back(metaRoot);
 
-        error = PrepareCgroups();
-        if (error) {
-            FreeResources();
-            return error;
+            error = Prop->Set<TStrList>(P_BIND, bind);
+            if (error)
+                return error;
+
+            error = Start();
+            if (error)
+                return error;
+        } else {
+            SetState(EContainerState::Meta);
+
+            TError error = PrepareNetwork();
+            if (error) {
+                FreeResources();
+                return error;
+            }
+
+            error = PrepareCgroups();
+            if (error) {
+                FreeResources();
+                return error;
+            }
         }
     } else if (state == EContainerState::Meta) {
         return TError::Success();
@@ -637,29 +664,26 @@ TError TContainer::Start() {
         return TError(EError::InvalidState, "invalid container state " +
                       ContainerStateName(state));
 
-    if (Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS &&
+    if (Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS &&
         !CredConf.PrivilegedUser(Cred)) {
-        for (auto property : propertySet.GetNames())
-            if (propertySet.Get(property)->Flags & OS_MODE_PROPERTY)
-                Prop->Reset(property);
+
+        for (auto name : Prop->List())
+            if (Prop->Find(name)->GetFlags() & OS_MODE_PROPERTY)
+                Prop->Reset(name);
     }
 
-    if (!IsRoot() && !Prop->GetString(P_COMMAND).length())
+    if (!IsRoot() && !Prop->Get<std::string>(P_COMMAND).length())
         return TError(EError::InvalidValue, "container command is empty");
 
-    TError error = Data->SetUint(D_RESPAWN_COUNT, 0);
+    TError error = Data->Set<uint64_t>(D_RESPAWN_COUNT, 0);
     if (error)
         return error;
 
-    error = Data->SetInt(D_EXIT_STATUS, -1);
+    error = Data->Set<int>(D_EXIT_STATUS, -1);
     if (error)
         return error;
 
-    error = Prop->SetInt(P_RAW_ID, (int)Id);
-    if (error)
-        return error;
-
-    error = Data->SetBool(D_OOM_KILLED, false);
+    error = Data->Set<bool>(D_OOM_KILLED, false);
     if (error)
         return error;
 
@@ -672,7 +696,7 @@ TError TContainer::Start() {
         return TError::Success();
     }
 
-    TPath root(Prop->GetString(P_ROOT));
+    TPath root(Prop->Get<std::string>(P_ROOT));
     int loopNr = -1;
     if (root.GetType() != EFileType::Directory) {
         error = GetLoopDev(loopNr);
@@ -681,13 +705,13 @@ TError TContainer::Start() {
             FreeResources();
         }
     } else {
-        if (Prop->GetInt(P_VIRT_MODE) == VIRT_MODE_OS) {
+        if (Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS) {
             FreeResources();
             return TError(EError::Permission, "Can't start OS container on non-loop backed root");
         }
     }
 
-    error = Prop->SetInt(P_RAW_LOOP_DEV, loopNr);
+    error = Prop->Set<int>(P_RAW_LOOP_DEV, loopNr);
     if (error) {
         if (loopNr >= 0)
             (void)PutLoopDev(loopNr);
@@ -704,24 +728,25 @@ TError TContainer::Start() {
 
     error = Task->Start();
     if (error) {
-        TError e = Data->SetInt(D_START_ERRNO, error.GetErrno());
+        TError e = Data->Set<int>(D_START_ERRNO, error.GetErrno());
         if (e)
             L_ERR() << "Can't set start_errno: " << e << std::endl;
         FreeResources();
         return error;
     }
 
-    error = Data->SetInt(D_START_ERRNO, -1);
+    error = Data->Set<int>(D_START_ERRNO, -1);
     if (error)
         return error;
 
     L() << GetName() << " started " << std::to_string(Task->GetPid()) << std::endl;
 
-    error = Prop->SetInt(P_RAW_ROOT_PID, Task->GetPid());
+    error = Prop->Set<int>(P_RAW_ROOT_PID, Task->GetPid());
     if (error)
         return error;
 
     SetState(EContainerState::Running);
+    Statistics->Started++;
 
     return TError::Success();
 }
@@ -766,12 +791,10 @@ TError TContainer::KillAll() {
 }
 
 void TContainer::StopChildren() {
-    for (auto iter : Children) {
-        if (auto child = iter.lock()) {
-            if (child->GetState() != EContainerState::Stopped && child->GetState() != EContainerState::Dead)
+    for (auto iter : Children)
+        if (auto child = iter.lock())
+            if (child->GetState() != EContainerState::Stopped)
                 child->Stop();
-        }
-    }
 }
 
 TError TContainer::PrepareResources() {
@@ -803,18 +826,12 @@ TError TContainer::PrepareResources() {
 void TContainer::FreeResources() {
     LeafCgroups.clear();
 
-    if (Tclass) {
-        TError error = Tclass->Remove();
-        Tclass = nullptr;
-        if (error)
-            L_ERR() << "Can't remove tc classifier: " << error << std::endl;
-    }
-
+    Tclass = nullptr;
     Task = nullptr;
     Efd = -1;
 
-    int loopNr = Prop->GetInt(P_RAW_LOOP_DEV);
-    TError error = Prop->SetInt(P_RAW_LOOP_DEV, -1);
+    int loopNr = Prop->Get<int>(P_RAW_LOOP_DEV);
+    TError error = Prop->Set<int>(P_RAW_LOOP_DEV, -1);
     if (error) {
         L_ERR() << "Can't set " << P_RAW_LOOP_DEV << ": " << error << std::endl;
     } else {
@@ -919,28 +936,21 @@ TError TContainer::GetData(const string &origName, string &value) {
     std::string idx;
     ParseName(name, idx);
 
-    if (!dataSet.Valid(name))
+    if (!Data->IsValid(name))
         return TError(EError::InvalidData, "invalid container data");
 
-    auto d = dataSet.Get(name);
-    if (d->State.find(GetState()) == d->State.end())
+    auto validState = ToContainerValue(Data->Find(name))->GetState();
+    if (validState.find(GetState()) == validState.end())
         return TError(EError::InvalidState, "invalid container state");
 
-    TValue *p = nullptr;
-    std::shared_ptr<TContainer> c;
-    std::shared_ptr<TVariant> v;
-    TError error = Data->Get(name, c, &p, v);
-    if (error)
-        return error;
-
     if (idx.length()) {
-        TUintMap m = p->GetMap(c, v);
+        TUintMap m = Data->Get<TUintMap>(name);
         if (m.find(idx) == m.end())
             return TError(EError::InvalidValue, "invalid index " + idx);
 
         value = std::to_string(m.at(idx));
     } else {
-        value = p->GetString(c, v);
+        value = Data->ToString(name);
     }
 
     return TError::Success();
@@ -996,18 +1006,22 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
     if (alias.find(origProperty) != alias.end())
         property = alias.at(origProperty);
 
-    TError error = Prop->Valid(property);
+    TError error = Prop->Check(property);
     if (error)
         return error;
 
     if (idx.length()) {
-        TUintMap m = Prop->GetMap(property);
+        TUintMap m;
+        TError error = Prop->GetChecked<TUintMap>(property, m);
+        if (error)
+            return TError(EError::InvalidValue, "Invalid subscript for property");
+
         if (m.find(idx) == m.end())
             return TError(EError::InvalidValue, "invalid index " + idx);
 
         value = std::to_string(m.at(idx));
     } else {
-        value = Prop->GetString(property);
+        value = Prop->ToString(property);
     }
     PropertyToAlias(origProperty, value);
 
@@ -1038,15 +1052,15 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
     if (error)
         return error;
 
-    error = Prop->Valid(property);
+    error = Prop->Check(property);
     if (error)
         return error;
 
     if (Prop->HasFlags(property, SUPERUSER_PROPERTY) && !superuser)
-        if (Prop->GetString(property) != value)
+        if (Prop->ToString(property) != value)
             return TError(EError::Permission, "Only root can change this property");
 
-    if (Prop->HasFlags(property, RESTROOT_PROPERTY) && !CredConf.RestrictedUser(Cred))
+    if (Prop->HasFlags(property, RESTROOT_PROPERTY) && !superuser && !CredConf.RestrictedUser(Cred))
         return TError(EError::Permission, "Only restricted root can change this property");
 
     if (!Prop->HasState(property, GetState()))
@@ -1056,24 +1070,29 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
         return TError(EError::NotSupported, "Can't set " + property + " for child container");
 
     if (idx.length()) {
-        TUintMap m = Prop->GetMap(property);
-        if (m.find(idx) == m.end()) {
-            return TError(EError::InvalidValue, "invalid index " + idx);
-        } else {
-            std::stringstream str;
-            for (auto kv: m) {
-                if (kv.first == idx)
-                    str << kv.first << ":" << value << ";";
-                else
-                    str << kv.first << ":" << kv.second << ";";
-            }
-            value = str.str();
-        }
-    }
+        TUintMap m;
+        TError error = Prop->GetChecked<TUintMap>(property, m);
+        if (error)
+            return TError(EError::InvalidValue, "Invalid subscript for property");
 
-    error = Prop->SetString(property, value);
-    if (error)
-        return error;
+        if (m.find(idx) == m.end()) {
+            return TError(EError::InvalidValue, "Invalid index " + idx);
+        } else {
+            uint64_t uval;
+            TError error = StringToUint64(value, uval);
+            if (error)
+                return TError(EError::InvalidValue, "Invalid integer value for index " + idx);
+
+            m[idx] = uval;
+            error = Prop->Set<TUintMap>(property, m);
+            if (error)
+                return error;
+        }
+    } else {
+        error = Prop->FromString(property, value);
+        if (error)
+            return error;
+    }
 
     if (ShouldApplyProperty(property))
         error = ApplyDynamicProperties();
@@ -1082,28 +1101,56 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
 }
 
 TError TContainer::Prepare() {
-    Prop = std::make_shared<TPropertySet>(Storage, shared_from_this());
-    Data = std::make_shared<TVariantSet>(Storage, &dataSet, shared_from_this());
+    std::shared_ptr<TKeyValueNode> kvnode;
+    if (Name != ROOT_CONTAINER)
+        kvnode = Storage->GetNode(Id);
+
+    Prop = std::make_shared<TPropertyMap>(kvnode, shared_from_this());
+    Data = std::make_shared<TValueMap>(kvnode);
     if (!Prop || !Data)
         throw std::bad_alloc();
+
+    RegisterData(Data, shared_from_this());
+    RegisterProperties(Prop, shared_from_this());
+
+    if (Name == ROOT_CONTAINER) {
+        auto dataList = Data->List();
+        auto propList = Prop->List();
+
+        for (auto name : dataList)
+            if (std::find(propList.begin(), propList.end(), name) != propList.end())
+                return TError(EError::Unknown, "Data and property names conflict: " + name);
+    }
 
     TError error = Prop->Create();
     if (error)
         return error;
 
+    error = Data->Create();
+    if (error)
+        return error;
+
     if (!Data->HasValue(D_START_ERRNO)) {
-        error = Data->SetInt(D_START_ERRNO, -1);
+        error = Data->Set<int>(D_START_ERRNO, -1);
         if (error)
             return error;
     }
 
+    error = Prop->Set<std::string>(P_RAW_NAME, GetName());
+    if (error)
+        return error;
+
+    error = Prop->Set<int>(P_RAW_ID, (int)Id);
+    if (error)
+        return error;
+
     CgroupEmptySince = 0;
 
-    return Data->Create();
+    return TError::Success();
 }
 
 TError TContainer::Restore(const kv::TNode &node) {
-    L() << "Restore " << GetName() << " " << Id << std::endl;
+    L() << "Restore " << GetName() << " with id " << Id << std::endl;
 
     TError error = Prepare();
     if (error)
@@ -1154,23 +1201,27 @@ TError TContainer::Restore(const kv::TNode &node) {
 
     bool started = Prop->HasValue(P_RAW_ROOT_PID);
     if (started) {
-        int pid = Prop->GetInt(P_RAW_ROOT_PID);
+        int pid = Prop->Get<int>(P_RAW_ROOT_PID);
 
         L() << GetName() << ": restore started container " << pid << std::endl;
 
         TError error = PrepareResources();
-        if (error)
+        if (error) {
+            FreeResources();
             return error;
+        }
 
         error = PrepareTask();
-        if (error)
+        if (error) {
+            FreeResources();
             return error;
+        }
 
         error = Task->Restore(pid);
         if (error)
             L_ERR() << "Can't restore task: " << error << std::endl;
 
-        auto state = Data->GetString(D_STATE);
+        auto state = Data->Get<std::string>(D_STATE);
         if (state == ContainerStateName(EContainerState::Dead)) {
             SetState(EContainerState::Dead);
             TimeOfDeath = GetCurrentTimeMs();
@@ -1197,7 +1248,7 @@ TError TContainer::Restore(const kv::TNode &node) {
         if (error)
             (void)KillAll();
 
-        auto state = Data->GetString(D_STATE);
+        auto state = Data->Get<std::string>(D_STATE);
         if (state == ContainerStateName(EContainerState::Dead))
             SetState(EContainerState::Dead);
         else
@@ -1233,7 +1284,7 @@ bool TContainer::Exit(int status, bool oomKilled) {
     if (oomKilled) {
         L() << Task->GetPid() << " killed by OOM" << std::endl;
 
-        TError error = Data->SetBool(D_OOM_KILLED, true);
+        TError error = Data->Set<bool>(D_OOM_KILLED, true);
         if (error)
             L_ERR() << "Can't set " << D_OOM_KILLED << ": " << error << std::endl;
 
@@ -1244,7 +1295,7 @@ bool TContainer::Exit(int status, bool oomKilled) {
         Efd = -1;
     }
 
-    if (!Prop->GetBool(P_ISOLATE)) {
+    if (!Prop->Get<bool>(P_ISOLATE)) {
         TError error = KillAll();
         if (error)
             L_WRN() << "Can't kill all tasks in container" << error << std::endl;
@@ -1255,7 +1306,7 @@ bool TContainer::Exit(int status, bool oomKilled) {
     if (MayRespawn())
         ScheduleRespawn();
 
-    TError error = Data->SetInt(D_EXIT_STATUS, status);
+    TError error = Data->Set<int>(D_EXIT_STATUS, status);
     if (error)
         L_ERR() << "Can't set " << D_EXIT_STATUS << ": " << error << std::endl;
 
@@ -1281,10 +1332,10 @@ bool TContainer::MayRespawn() {
     if (GetState() != EContainerState::Dead)
         return false;
 
-    if (!Prop->GetBool(P_RESPAWN))
+    if (!Prop->Get<bool>(P_RESPAWN))
         return false;
 
-    return Prop->GetInt(P_MAX_RESPAWNS) < 0 || Data->GetUint(D_RESPAWN_COUNT) < (uint64_t)Prop->GetInt(P_MAX_RESPAWNS);
+    return Prop->Get<int>(P_MAX_RESPAWNS) < 0 || Data->Get<uint64_t>(D_RESPAWN_COUNT) < (uint64_t)Prop->Get<int>(P_MAX_RESPAWNS);
 }
 
 void TContainer::ScheduleRespawn() {
@@ -1297,9 +1348,9 @@ TError TContainer::Respawn() {
     if (error)
         return error;
 
-    uint64_t tmp = Data->GetUint(D_RESPAWN_COUNT);
+    uint64_t tmp = Data->Get<uint64_t>(D_RESPAWN_COUNT);
     error = Start();
-    Data->SetUint(D_RESPAWN_COUNT, tmp + 1);
+    Data->Set<uint64_t>(D_RESPAWN_COUNT, tmp + 1);
     if (error)
         return error;
 

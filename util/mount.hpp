@@ -1,5 +1,4 @@
-#ifndef __MOUNT_HPP__
-#define __MOUNT_HPP__
+#pragma once
 
 #include <string>
 #include <iostream>
@@ -20,6 +19,7 @@ class TMount {
     std::set<std::string> Data;
 
 public:
+    TMount() {}
     TMount(const TPath &source, const TPath &target, const std::string &type, std::set<std::string> data) :
         Source(source), Target(target), Type(type),
         Data(data) {}
@@ -50,7 +50,7 @@ public:
     TError Umount() const;
 
     friend std::ostream& operator<<(std::ostream& stream, const TMount& mount) {
-        stream << mount.Source.ToString() << " " << mount.Target.ToString() << " " << mount.Type << " ";
+        stream << mount.Source << " " << mount.Target << " " << mount.Type << " ";
 
         for (auto &f : mount.Data)
             stream << f << ",";
@@ -79,5 +79,3 @@ public:
 
 TError GetLoopDev(int &nr);
 TError PutLoopDev(const int nr);
-
-#endif

@@ -1,6 +1,3 @@
-#ifndef __CRASH_HPP__
-#define __CRASH_HPP__
+#pragma once
 
 void Crash();
-
-#endif

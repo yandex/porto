@@ -3,6 +3,7 @@
 
 #include "config.hpp"
 #include "qdisc.hpp"
+#include "util/signal.hpp"
 #include "util/unix.hpp"
 #include "util/string.hpp"
 #include "util/log.hpp"
@@ -16,13 +17,15 @@ extern "C" {
 }
 
 static int Selftest(int argc, char *argv[]) {
-    string test = "";
+    std::vector<std::string> test;
     int leakNr = 1000;
-    if (argc >= 1) {
-        TError error = StringToInt(argv[0], leakNr);
+
+    for (int i = 0; i < argc; i++) {
+        TError error = StringToInt(argv[i], leakNr);
         if (error)
-            test = argv[0];
+            test.push_back(argv[i]);
     }
+
     return test::SelfTest(test, leakNr);
 }
 

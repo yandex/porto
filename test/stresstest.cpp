@@ -66,12 +66,12 @@ static void Create(TPortoAPI &api, const std::string &name, const std::string &c
     Say() << "Create container: " << name << std::endl;
 
     containers.clear();
-    ExpectSuccess(api.List(containers));
+    ExpectApiSuccess(api.List(containers));
     Expect(std::find(containers.begin(),containers.end(),name) == containers.end());
     auto ret = api.Create(name);
     Expect(ret == EError::Success || ret == EError::ContainerAlreadyExists);
     containers.clear();
-    ExpectSuccess(api.List(containers));
+    ExpectApiSuccess(api.List(containers));
     Expect(std::find(containers.begin(),containers.end(),name) != containers.end());
 
     if (cwd.length()) {
@@ -88,8 +88,8 @@ static void SetProperty(TPortoAPI &api, std::string name, std::string type, std:
 
     Say() << "SetProperty container: " << name << std::endl;
 
-    ExpectSuccess(api.SetProperty(name, type, value));
-    ExpectSuccess(api.GetProperty(name, type, res_value));
+    ExpectApiSuccess(api.SetProperty(name, type, value));
+    ExpectApiSuccess(api.GetProperty(name, type, res_value));
     Expect(res_value == value);
 }
 
@@ -100,7 +100,7 @@ static void Start(TPortoAPI &api, std::string name) {
     Say() << "Start container: " << name << std::endl;
 
     (void)api.Start(name);
-    ExpectSuccess(api.GetData(name, "state", ret));
+    ExpectApiSuccess(api.GetData(name, "state", ret));
     Expect(ret == "dead" || ret == "running");
 }
 
@@ -110,7 +110,7 @@ static void PauseResume(TPortoAPI &api, const std::string &name) {
     std::string ret;
     int err = api.Pause(name);
     if (err) {
-        ExpectSuccess(api.GetData(name, "state", ret));
+        ExpectApiSuccess(api.GetData(name, "state", ret));
         if (ret == "dead")
             return;
         else if (ret != "paused")
@@ -119,7 +119,7 @@ static void PauseResume(TPortoAPI &api, const std::string &name) {
     usleep(1000000);
     err = api.Resume(name);
     if (err) {
-        ExpectSuccess(api.GetData(name, "state", ret));
+        ExpectApiSuccess(api.GetData(name, "state", ret));
         if (ret == "dead" || ret == "running")
             return;
         else
@@ -136,7 +136,7 @@ static void WaitDead(TPortoAPI &api, std::string name, std::string timeout) {
 
     StringToInt(timeout, t);
     while (t--) {
-        ExpectSuccess(api.GetData(name, "state", ret));
+        ExpectApiSuccess(api.GetData(name, "state", ret));
         Say() << "Poll " << name << ": "<< ret << std::endl;
         if (ret == "dead")
             return;
@@ -168,7 +168,7 @@ static void CheckStderr(TPortoAPI &api, std::string name, std::string stream) {
 static void CheckExit(TPortoAPI &api, std::string name, std::string stream) {
     std::string ret;
     Say() << "CheckExit container: " << name << std::endl;
-    ExpectSuccess(api.GetData(name, "exit_status", ret));
+    ExpectApiSuccess(api.GetData(name, "exit_status", ret));
     Expect(ret == stream);
 }
 
@@ -177,11 +177,11 @@ static void Destroy(TPortoAPI &api, const std::string &name, const std::string &
 
     Say() << "Destroy container: " << name << std::endl;
 
-    ExpectSuccess(api.List(containers));
+    ExpectApiSuccess(api.List(containers));
     Expect(std::find(containers.begin(),containers.end(),name) != containers.end());
-    ExpectSuccess(api.Destroy(name));
+    ExpectApiSuccess(api.Destroy(name));
     containers.clear();
-    ExpectSuccess(api.List(containers));
+    ExpectApiSuccess(api.List(containers));
     Expect(std::find(containers.begin(),containers.end(),name) == containers.end());
 
     if (cwd.length()) {

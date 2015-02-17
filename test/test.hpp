@@ -1,5 +1,4 @@
-#ifndef __TEST_H__
-#define __TEST_H__
+#pragma once
 
 #include <iostream>
 #include <string>
@@ -7,6 +6,10 @@
 
 #include "libporto.hpp"
 #include "util/cred.hpp"
+
+extern "C" {
+#include <dirent.h>
+}
 
 class TNlLink;
 
@@ -17,9 +20,10 @@ namespace test {
 
     std::basic_ostream<char> &Say(std::basic_ostream<char> &stream = std::cout);
     void ExpectReturn(int ret, int exp, int line, const char *func);
+    void ExpectError(const TError &ret, const TError &exp, int line, const char *func);
+    void ExpectApi(TPortoAPI &api, int ret, int exp, int line, const char *func);
 
     int ReadPid(const std::string &path);
-    std::vector<std::string> Popen(const std::string &cmd);
     int Pgrep(const std::string &name);
     std::string GetRlimit(const std::string &pid, const std::string &type, const bool soft);
     void WaitExit(TPortoAPI &api, const std::string &pid);
@@ -57,18 +61,22 @@ namespace test {
     std::string GetDefaultGroup();
     void BootstrapCommand(const std::string &cmd, const std::string &path, bool remove = true);
 
+    void RotateDaemonLogs(TPortoAPI &api);
     void RestartDaemon(TPortoAPI &api);
+    void PrintFds(const std::string &path, struct dirent **lst, int nr);
     bool NetworkEnabled();
     void TestDaemon(TPortoAPI &api);
 
-    int SelfTest(std::string name, int leakNr);
+    int SelfTest(std::vector<std::string> name, int leakNr);
     int StressTest(int threads, int iter, bool killPorto);
 
     bool IsCfqActive();
 }
 
 #define Expect(ret) ExpectReturn(ret, true, __LINE__, __func__)
-#define ExpectSuccess(ret) ExpectReturn(ret, 0, __LINE__, __func__)
-#define ExpectFailure(ret, exp) ExpectReturn(ret, exp, __LINE__, __func__)
 
-#endif
+#define ExpectSuccess(ret) ExpectError(ret, TError::Success(), __LINE__, __func__)
+#define ExpectFailure(ret, exp) ExpectError(ret, exp, __LINE__, __func__)
+
+#define ExpectApiSuccess(ret) ExpectApi(api, ret, 0, __LINE__, __func__)
+#define ExpectApiFailure(ret, exp) ExpectApi(api, ret, exp, __LINE__, __func__)

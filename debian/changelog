@@ -1,3 +1,41 @@
+yandex-porto (0.93) precise; urgency=low
+
+  * Fix wrong error code when destroying container that doesn't exist
+  * Fix wrong container state (running) when we didn't get exit event
+  * portoctl: fix help for exec
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 17 Feb 2015 16:45:00 +0400
+
+yandex-porto (0.92) precise; urgency=low
+
+  * Don't show error when can't kill process that doesn't exist
+  * Generate new id if the one we are recovering is already used
+  * Fix resource reusage and volume recovery
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Fri, 13 Feb 2015 15:52:00 +0400
+
+yandex-porto (0.91) precise; urgency=low
+
+  * Fix sparse id map range
+  * Fix check for already running instance
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Thu, 12 Feb 2015 19:05:00 +0400
+
+yandex-porto (0.90) precise; urgency=low
+
+  * Volume API (disabled by default)
+  * Add more logging for process creation
+  * Skip restricted_root checks for root user
+  * Don't remove custom stdout/stderr
+  * Stop dead children when stopping root
+  * Run portod-meta-root in meta container with isolate=true
+  * Remove restriction on memory_guarantee/recharge_on_pgfault with isolate=false
+  * portoctl: fix 100% cpu load for exec
+  * portoctl: make list time column longer
+  * Count number of successful containers starts in porto_stat
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Thu, 12 Feb 2015 15:00:00 +0400
+
 yandex-porto (0.34) precise; urgency=low
 
   * use_hierarchy=true by default (kernels should be already updated)

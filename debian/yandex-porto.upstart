@@ -7,12 +7,17 @@ author "Eugene Kilimchuk <ekilimchuk@yandex-team.ru>"
 
 start on yandex-networking-started
 
-expect fork
 respawn
 
 kill signal SIGINT
 
 pre-start script
+	# we want to clean up daemon state only if it stopped gracefully by
+	# the user
+	if [ ! -e /run/portoloop.pid ]; then
+		rm -rf /run/porto/pkvs /run/porto/kvs /tmp/portod.pidmap || :
+	fi
+
 	# if there is cgroup-bin installed, we need to wait while it mounts
 	# sysfs and creates controllers
 	timeout=10
@@ -26,10 +31,4 @@ pre-start script
 	fi
 end script
 
-post-stop script
-	# make sure we remove any daemon state leftovers when something
-	# goes wrong
-	rm -rf /run/porto/kvs /tmp/portod.pidmap
-end script
-
-exec portod &
+exec portod

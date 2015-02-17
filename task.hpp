@@ -1,5 +1,4 @@
-#ifndef __TASK_HPP__
-#define __TASK_HPP__
+#pragma once
 
 #include <string>
 #include <vector>
@@ -114,10 +113,7 @@ class TTask: public TNonCopyable {
     pid_t Pid;
     std::shared_ptr<TFolder> Cwd;
 
-    int CloseAllFds(int except) const;
-    void Syslog(const std::string &s) const;
     void ReportPid(int pid) const;
-    void Abort(int result, const std::string &msg) const;
 
     TError RotateFile(const TPath &path) const;
     TError CreateCwd();
@@ -159,9 +155,7 @@ public:
     TError Restore(int pid);
     TError FixCgroups() const;
     TError Rotate() const;
-    void Abort(const TError &error, const std::string &msg = "") const;
+    void Abort(const TError &error) const;
 };
 
 TError TaskGetLastCap();
-
-#endif

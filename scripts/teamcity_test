@@ -20,10 +20,21 @@ build() {
 	checkver client v$version $(getver client)
 }
 
+toprpc() {
+	cat /var/log/portod.log | egrep ': (->|<-)' | cut -d ':' -f4- | sed '$!N;s/\n/ /' | awk '{print $2, $(NF)}' | sed -e 's/ms//' | sort -n -k2 -r > toprpc.txt
+	echo "Top queries:"
+	head -n 100 toprpc.txt
+	echo "Total message service time:"
+	cat toprpc.txt | awk '{a[$1] += $2}END{for (v in a) print v, a[v]}' | sort -n -k2 -r
+}
+
 selftest() {
 	netup
-	sudo scripts/test false true
+	sudo scripts/test false
+	toprpc
+	sudo scripts/test true
 	netdown
+	toprpc
 }
 
 pkgtest() {

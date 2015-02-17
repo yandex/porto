@@ -18,7 +18,7 @@ void TConfig::LoadDefaults() {
     config().mutable_network()->set_debug(false);
     config().mutable_network()->set_default_prio(3);
     config().mutable_network()->set_default_max_guarantee(-1);
-    config().mutable_network()->set_default_guarantee(-1);
+    config().mutable_network()->set_default_guarantee(1);
     config().mutable_network()->set_default_limit(-1);
     config().mutable_network()->set_dynamic_ifaces(false);
 
@@ -50,6 +50,7 @@ void TConfig::LoadDefaults() {
     config().mutable_daemon()->mutable_pidmap()->set_path("/tmp/portod.pidmap");
     config().mutable_daemon()->set_rotate_logs_timeout_s(60);
     config().mutable_daemon()->set_sysfs_root("/sys/fs/cgroup");
+    config().mutable_daemon()->set_batch_sync(false);
 
     config().mutable_container()->set_max_log_size(10 * 1024 * 1024);
     config().mutable_container()->set_tmp_dir("/place/porto");
@@ -62,6 +63,20 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_stop_timeout_ms(1000);
     config().mutable_container()->set_use_hierarchy(true);
     config().mutable_container()->set_max_total(3000);
+
+    config().mutable_volumes()->mutable_keyval()->mutable_file()->set_path("/run/porto/pkvs");
+    config().mutable_volumes()->mutable_keyval()->mutable_file()->set_perm(0755);
+    config().mutable_volumes()->mutable_keyval()->set_size("size=32m");
+
+    config().mutable_volumes()->set_volume_dir("/place/porto_volumes");
+    config().mutable_volumes()->set_resource_dir("/place/porto_resources");
+    // TODO: make sure we pick up correct default here depending on kernel
+    // version
+    config().mutable_volumes()->set_native(false);
+    config().mutable_volumes()->set_enabled(false);
+
+    config().mutable_version()->set_path("/run/portod.version");
+    config().mutable_version()->set_perm(0644);
 }
 
 bool TConfig::LoadFile(const std::string &path, bool silent) {

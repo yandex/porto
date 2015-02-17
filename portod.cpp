@@ -12,14 +12,18 @@
 #include "event.hpp"
 #include "qdisc.hpp"
 #include "context.hpp"
+#include "client.hpp"
+#include "epoll.hpp"
 #include "util/log.hpp"
 #include "util/file.hpp"
 #include "util/folder.hpp"
 #include "util/protobuf.hpp"
+#include "util/signal.hpp"
 #include "util/unix.hpp"
 #include "util/string.hpp"
 #include "util/crash.hpp"
 #include "util/cred.hpp"
+#include "batch.hpp"
 
 extern "C" {
 #include <fcntl.h>
@@ -43,88 +47,9 @@ using std::map;
 using std::vector;
 
 static pid_t slavePid;
-static volatile sig_atomic_t done = false;
-static volatile sig_atomic_t cleanup = true;
-static volatile sig_atomic_t rotate = false;
-static volatile sig_atomic_t update = false;
-static volatile sig_atomic_t raiseSignum = 0;
 static bool stdlog = false;
 static bool failsafe = false;
 static bool noNetwork = false;
-
-const int updateSignal = SIGHUP;
-const int rotateSignal = SIGUSR1;
-size_t SlaveStarted = 0;
-size_t MasterStarted = 0;
-
-static void DoExit(int signum) {
-    done = true;
-    cleanup = false;
-    raiseSignum = signum;
-}
-
-static void DoExitAndCleanup(int signum) {
-    done = true;
-    cleanup = true;
-    raiseSignum = signum;
-}
-
-static void DoUpdate(int signum) {
-    update = true;
-}
-
-static void DoRotate(int signum) {
-    rotate = true;
-}
-
-static void DoNothing(int signum) {
-}
-
-static void RaiseSignal(int signum) {
-    struct sigaction sa = {};
-    sa.sa_handler = SIG_DFL;
-
-    (void)sigaction(SIGTERM, &sa, NULL);
-    (void)sigaction(SIGINT, &sa, NULL);
-    (void)sigaction(rotateSignal, &sa, NULL);
-    (void)sigaction(updateSignal, &sa, NULL);
-    raise(signum);
-    exit(-signum);
-}
-
-static void RegisterSignalHandlers() {
-    ResetAllSignalHandlers();
-
-    // we may die while writing into communication pipe
-    (void)RegisterSignal(SIGPIPE, SIG_IGN);
-    // kill all running containers in case of SIGINT (useful for debugging)
-    (void)RegisterSignal(SIGINT, DoExitAndCleanup);
-    (void)RegisterSignal(updateSignal, DoUpdate);
-    (void)RegisterSignal(SIGALRM, DoNothing);
-    // don't stop containers when terminating
-    (void)RegisterSignal(SIGTERM, DoExit);
-    // don't catch SIGQUIT, may be useful to create core dump
-    (void)RegisterSignal(rotateSignal, DoRotate);
-}
-
-static void SignalMask(int how) {
-    sigset_t mask;
-    int sigs[] = { SIGALRM, SIGCHLD };
-
-    if (sigemptyset(&mask) < 0) {
-        L() << "Can't initialize signal mask: " << strerror(errno) << std::endl;
-        return;
-    }
-
-    for (auto sig: sigs)
-        if (sigaddset(&mask, sig) < 0) {
-            L() << "Can't add signal to mask: " << strerror(errno) << std::endl;
-            return;
-        }
-
-    if (sigprocmask(how, &mask, NULL) < 0)
-        L() << "Can't set signal mask: " << strerror(errno) << std::endl;
-}
 
 TStatistics *Statistics;
 static void AllocStatistics() {
@@ -135,28 +60,25 @@ static void AllocStatistics() {
         throw std::bad_alloc();
 }
 
-static void DaemonRotateLog() {
-    if (!stdlog)
-        TLogger::CloseLog();
+static void DaemonOpenLog(bool master) {
+    const auto &log = master ? config().master_log() : config().slave_log();
+
+    TLogger::CloseLog();
+    TLogger::OpenLog(stdlog, log.path(), log.perm());
 }
 
 static int DaemonSyncConfig(bool master) {
-    const auto &oldPid = master ? config().master_pid() : config().slave_pid();
-    RemovePidFile(oldPid.path());
-
     config.Load();
+
     if (noNetwork)
         config().mutable_network()->set_enabled(false);
     TNl::EnableDebug(config().network().debug());
 
-    const auto &log = master ? config().master_log() : config().slave_log();
     const auto &pid = master ? config().master_pid() : config().slave_pid();
 
-    TLogger::InitLog(log.path(), log.perm());
-    if (stdlog)
-        TLogger::LogToStd();
+    DaemonOpenLog(master);
 
-    if (CreatePidFile(pid.path(), log.perm())) {
+    if (CreatePidFile(pid.path(), pid.perm())) {
         L() << "Can't create pid file " <<
             pid.path() << "!" << std::endl;
         return EXIT_FAILURE;
@@ -178,21 +100,24 @@ static int DaemonPrepare(bool master) {
     L() << "Started " << GIT_TAG << " " << GIT_REVISION << std::endl;
     L() << config().DebugString() << std::endl;
 
-    RegisterSignalHandlers();
-
-    if (master)
-        (void)RegisterSignal(SIGCHLD, DoNothing);
-
     return EXIT_SUCCESS;
 }
 
-static void DaemonShutdown(bool master) {
+static void DaemonShutdown(bool master, int ret) {
     const auto &pid = master ? config().master_pid() : config().slave_pid();
 
     L() << "Stopped" << std::endl;
 
     TLogger::CloseLog();
     RemovePidFile(pid.path());
+
+    if (ret < 0)
+        RaiseSignal(-ret);
+
+    if (master) {
+        TFile f(config().daemon().pidmap().path());
+        (void)f.Remove();
+    }
 }
 
 static void RemoveRpcServer(const string &path) {
@@ -202,26 +127,17 @@ static void RemoveRpcServer(const string &path) {
         L_ERR() << "Can't remove socket file: " << error << std::endl;
 }
 
-struct ClientInfo {
-    int Pid;
-    int Uid;
-    int Gid;
-};
-
-static bool HandleRequest(TContext &context, const int fd,
-                          const TCred &cred) {
+static bool HandleRequest(TContext &context, std::shared_ptr<TClient> client) {
     uint32_t slaveReadTimeout = config().daemon().slave_read_timeout_s();
-    InterruptibleInputStream pist(fd);
-    google::protobuf::io::FileOutputStream post(fd);
+    InterruptibleInputStream pist(client->Fd);
 
     rpc::TContainerRequest request;
+    rpc::TContainerResponse response;
 
     if (slaveReadTimeout)
         (void)alarm(slaveReadTimeout);
 
-    SignalMask(SIG_UNBLOCK);
     bool haveData = ReadDelimitedFrom(&pist, &request);
-    SignalMask(SIG_BLOCK);
 
     if (slaveReadTimeout)
         (void)alarm(0);
@@ -236,33 +152,28 @@ static bool HandleRequest(TContext &context, const int fd,
         for (size_t i = 0; i < pos; i++)
             ss << std::setw(2) << (int)buf[i];
 
-        L() << "Interrupted read from " << fd << ", partial message: " << ss.str() << std:: endl;
+        L() << "Interrupted read from " << client->Fd << ", partial message: " << ss.str() << std:: endl;
         return true;
     }
 
-    if (haveData) {
-        auto rsp = HandleRpcRequest(context, request, cred);
-        if (rsp.IsInitialized()) {
-            if (!WriteDelimitedTo(rsp, &post))
-                L() << "Write error for " << fd << std:: endl;
-            post.Flush();
-        }
-    } else {
+    if (!haveData)
         return true;
-    }
+
+    if (HandleRpcRequest(context, request, response, client))
+        SendReply(client, response);
 
     return false;
 }
 
-static int IdentifyClient(int fd, ClientInfo &ci, int total) {
+static int IdentifyClient(int fd, std::shared_ptr<TClient> client, int total) {
     struct ucred cr;
     socklen_t len = sizeof(cr);
 
     if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cr, &len) == 0) {
-        TFile client("/proc/" + std::to_string(cr.pid) + "/comm");
+        TFile f("/proc/" + std::to_string(cr.pid) + "/comm");
         string comm;
 
-        if (client.AsString(comm))
+        if (f.AsString(comm))
             comm = "unknown process";
 
         comm.erase(remove(comm.begin(), comm.end(), '\n'), comm.end());
@@ -272,9 +183,9 @@ static int IdentifyClient(int fd, ClientInfo &ci, int total) {
             << " gid " << cr.gid
             << ") connected (total " << total + 1 << ")" << std::endl;
 
-        ci.Pid = cr.pid;
-        ci.Uid = cr.uid;
-        ci.Gid = cr.gid;
+        client->Pid = cr.pid;
+        client->Cred.Uid = cr.uid;
+        client->Cred.Gid = cr.gid;
 
         return 0;
     } else {
@@ -283,7 +194,7 @@ static int IdentifyClient(int fd, ClientInfo &ci, int total) {
     }
 }
 
-static int AcceptClient(int sfd, std::map<int,ClientInfo> &clients, int &fd) {
+static int AcceptClient(int sfd, std::map<int, std::shared_ptr<TClient>> &clients, int &fd) {
     int cfd;
     struct sockaddr_un peer_addr;
     socklen_t peer_addr_size;
@@ -299,31 +210,24 @@ static int AcceptClient(int sfd, std::map<int,ClientInfo> &clients, int &fd) {
         return -1;
     }
 
-    ClientInfo ci;
-    int ret = IdentifyClient(cfd, ci, clients.size());
+    auto client = std::make_shared<TClient>(cfd);
+    int ret = IdentifyClient(cfd, client, clients.size());
     if (ret)
         return ret;
 
     fd = cfd;
-    clients[cfd] = ci;
+    clients[cfd] = client;
     return 0;
 }
 
-static void RemoveClient(int cfd, std::map<int,ClientInfo> &clients) {
-    ClientInfo ci = clients.at(cfd);
+static void RemoveClient(int cfd, std::map<int, std::shared_ptr<TClient>> &clients) {
+    close(cfd);
     clients.erase(cfd);
-
-    L() << "pid " << ci.Pid
-        << " uid " << ci.Uid
-        << " gid " << ci.Gid
-        << " disconnected (total " << clients.size() << ")" << std::endl;
 }
 
 static bool AnotherInstanceRunning(const string &path) {
     int fd;
-    TError error = ConnectToRpcServer(path, fd);
-
-    if (error)
+    if (ConnectToRpcServer(path, fd))
         return false;
 
     close(fd);
@@ -385,13 +289,15 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
     return 0;
 }
 
+static inline int EncodeSignal(int sig) {
+    return -sig;
+}
+
 static int SlaveRpc(TContext &context) {
     int ret = 0;
     int sfd;
-    std::map<int,ClientInfo> clients;
+    std::map<int, std::shared_ptr<TClient>> clients;
     TContainerHolder &cholder = *context.Cholder;
-
-    SignalMask(SIG_BLOCK);
 
     TCred cred(getuid(), getgid());
 
@@ -411,62 +317,86 @@ static int SlaveRpc(TContext &context) {
         return EXIT_FAILURE;
     }
 
-    error = EpollAdd(cholder.Epfd, sfd);
+    error = context.EpollLoop->AddFd(sfd);
     if (error) {
         L_ERR() << "Can't add RPC server fd to epoll: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
-    error = EpollAdd(cholder.Epfd, REAP_EVT_FD);
+    error = context.EpollLoop->AddFd(REAP_EVT_FD);
     if (error && !failsafe) {
         L_ERR() << "Can't add master fd to epoll: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
     if (context.NetEvt) {
-        error = EpollAdd(cholder.Epfd, context.NetEvt->GetFd());
+        error = context.EpollLoop->AddFd(context.NetEvt->GetFd());
         if (error) {
             L_ERR() << "Can't add netlink events fd to epoll: " << error << std::endl;
             return EXIT_FAILURE;
         }
     }
 
-#define MAX_EVENTS 32
-    struct epoll_event ev[MAX_EVENTS];
+    std::vector<int> signals;
+    std::vector<struct epoll_event> events;
 
-    while (!done) {
+    while (true) {
         int timeout = context.Queue->GetNextTimeout();
         Statistics->SlaveTimeoutMs = timeout;
-        int nr = epoll_wait(cholder.Epfd, ev, MAX_EVENTS, timeout);
-        if (nr < 0) {
-            L() << "epoll() error: " << strerror(errno) << std::endl;
 
-            if (done)
-                break;
-        }
-
-        if (rotate) {
-            rotate = false;
-            DaemonRotateLog();
-            continue;
-        }
-
-        if (update) {
-            update = false;
-
-            L() << "Updating" << std::endl;
-            TLogger::CloseLog();
-
-            done = true;
-            cleanup = false;
-            raiseSignum = updateSignal;
-            continue;
+        error = context.EpollLoop->GetEvents(signals, events, timeout);
+        if (error) {
+            L_ERR() << "slave: epoll error " << error << std::endl;
+            ret = EXIT_FAILURE;
+            goto exit;
         }
 
         context.Queue->DeliverEvents(*context.Cholder);
 
-        for (int i = 0; i < nr; i++) {
-            if (ev[i].data.fd == sfd) {
+        for (auto s : signals) {
+            switch (s) {
+            case SIGINT:
+                context.Destroy();
+                // no break here
+            case SIGTERM:
+                ret = EncodeSignal(s);
+                goto exit;
+            case updateSignal:
+                L() << "Updating" << std::endl;
+                ret = EncodeSignal(s);
+                goto exit;
+            case rotateSignal:
+                DaemonOpenLog(false);
+                break;
+            case SIGCHLD:
+                int status;
+                pid_t pid;
+
+                while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+                    if (WIFEXITED(status)) {
+                        if (context.Posthooks.find(pid) != context.Posthooks.end()) {
+                            int fd = context.PosthooksError.at(pid);
+                            TError error;
+                            if (!TError::Deserialize(fd, error))
+                                error = TError(EError::Unknown, "Didn't get any result from batch task");
+                            close(fd);
+                            context.Posthooks[pid](error);
+                            context.Posthooks.erase(pid);
+                            context.PosthooksError.erase(pid);
+                        }
+                    } else {
+                        L_ERR() << "Batch task died on signal " << WTERMSIG(status) << std::endl;
+                    }
+                }
+                break;
+            default:
+                /* Ignore other signals */
+                break;
+            }
+        }
+
+        for (auto ev : events) {
+            if (ev.data.fd == sfd) {
                 if (clients.size() > config().daemon().max_clients()) {
                     L() << "Skip connection attempt" << std::endl;
                     continue;
@@ -477,19 +407,18 @@ static int SlaveRpc(TContext &context) {
                 if (ret < 0)
                     break;
 
-                error = EpollAdd(cholder.Epfd, fd);
+                error = context.EpollLoop->AddFd(fd);
                 if (error) {
                     L_ERR() << "Can't add client fd to epoll: " << error << std::endl;
-                    return EXIT_FAILURE;
+                    ret = EXIT_FAILURE;
+                    goto exit;
                 }
-            } else if (ev[i].data.fd == REAP_EVT_FD) {
+            } else if (ev.data.fd == REAP_EVT_FD) {
                 if (failsafe)
                     continue;
 
                 ret = ReapSpawner(REAP_EVT_FD, *context.Cholder);
-                if (done)
-                    break;
-            } else if (context.NetEvt && context.NetEvt->GetFd() == ev[i].data.fd) {
+            } else if (context.NetEvt && context.NetEvt->GetFd() == ev.data.fd) {
                 L() << "Refresh list of available network interfaces" << std::endl;
                 context.NetEvt->FlushEvents();
 
@@ -498,43 +427,47 @@ static int SlaveRpc(TContext &context) {
                     L() << "Can't refresh list of network interfaces: " << error << std::endl;
                     break;
                 }
-            } else if (clients.find(ev[i].data.fd) != clients.end()) {
-                auto &ci = clients.at(ev[i].data.fd);
+            } else if (clients.find(ev.data.fd) != clients.end()) {
+                auto client = clients[ev.data.fd];
                 bool needClose = false;
 
-                if (ev[i].events & EPOLLIN)
-                    needClose = HandleRequest(context, ev[i].data.fd,
-                                              TCred(ci.Uid, ci.Gid));
+                if (ev.events & EPOLLIN)
+                    needClose = HandleRequest(context, client);
 
-                if ((ev[i].events & EPOLLHUP) || needClose) {
-                    close(ev[i].data.fd);
-                    RemoveClient(ev[i].data.fd, clients);
-                }
+                if ((ev.events & EPOLLHUP) || needClose)
+                    RemoveClient(ev.data.fd, clients);
+
             } else {
                 TEvent e(EEventType::OOM);
-                e.OOM.Fd = ev[i].data.fd;
+                e.OOM.Fd = ev.data.fd;
                 (void)cholder.DeliverEvent(e);
             }
         }
     }
 
+exit:
     for (auto pair : clients)
         close(pair.first);
 
     close(sfd);
 
-    SignalMask(SIG_UNBLOCK);
-
     return ret;
 }
 
 static void KvDump() {
-    TKeyValueStorage storage(TMount("tmpfs", config().keyval().file().path(), "tmpfs", { config().keyval().size() }));
-    TError error = storage.MountTmpfs();
+    TKeyValueStorage containers(TMount("tmpfs", config().keyval().file().path(), "tmpfs", { config().keyval().size() }));
+    TError error = containers.MountTmpfs();
     if (error)
-        L_ERR() << "Can't mount key-value storage: " << error << std::endl;
+        L_ERR() << "Can't mount containers key-value storage: " << error << std::endl;
     else
-        storage.Dump();
+        containers.Dump();
+
+    TKeyValueStorage volumes(TMount("tmpfs", config().volumes().keyval().file().path(), "tmpfs", { config().volumes().keyval().size() }));
+    error = volumes.MountTmpfs();
+    if (error)
+        L_ERR() << "Can't mount volumes key-value storage: " << error << std::endl;
+    else
+        volumes.Dump();
 }
 
 static int TuneLimits() {
@@ -548,17 +481,18 @@ static int TuneLimits() {
 
     int ret = setrlimit(RLIMIT_NOFILE, &rlim);
     if (ret)
-        return ret;
+        return EXIT_FAILURE;
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 static int SlaveMain() {
+    SetDieOnParentExit(SIGTERM);
+
     if (failsafe)
         AllocStatistics();
 
     Statistics->SlaveStarted = GetCurrentTimeMs();
-    SlaveStarted = GetCurrentTimeMs();
 
     int ret = DaemonPrepare(false);
     if (ret)
@@ -598,59 +532,40 @@ static int SlaveMain() {
     if (error)
         L_ERR() << "Can't adjust OOM score: " << error << std::endl;
 
+    TContext context;
     try {
         TCgroupSnapshot cs;
         error = cs.Create();
         if (error)
             L_ERR() << "Can't create cgroup snapshot: " << error << std::endl;
 
-        TContext context;
         error = context.Initialize();
-        if (error)
+        if (error) {
+            L_ERR() << "Initialization error: " << error << std::endl;
             return EXIT_FAILURE;
-
-        bool restored = false;
-        {
-            std::map<std::string, kv::TNode> m;
-            error = context.Storage->Restore(m);
-            if (error)
-                L_ERR() << "Can't restore state: " << error << std::endl;
-
-            for (auto &r : m) {
-                restored = true;
-                error = context.Cholder->Restore(r.first, r.second);
-                if (error) {
-                    L_ERR() << "Can't restore " << r.first << " state : " << error << std::endl;
-                    Statistics->RestoreFailed++;
-                }
-            }
         }
+
+        bool restored = context.Cholder->RestoreFromStorage();
+        context.Vholder->RestoreFromStorage();
 
         L() << "Done restoring" << std::endl;
 
         cs.Destroy();
 
         if (!restored) {
-            // Remove any container leftovers from previous run
-            string path = config().container().tmp_dir();
-            TFolder dir(path);
-            if (dir.Exists()) {
-                L() << "Removing container leftovers from " << path << std::endl;
-                TError error = dir.Remove(true);
-                if (error)
-                    L_ERR() << "Error while removing " << path << " : " << error << std::endl;
-            }
+            L() << "Remove container leftovers from previous run..." << std::endl;
+            RemoveIf(config().container().tmp_dir(),
+                     EFileType::Directory,
+                     [](const std::string &name, const TPath &path) {
+                        return name != TPath(config().volumes().resource_dir()).BaseName() &&
+                               name != TPath(config().volumes().volume_dir()).BaseName();
+                     });
         }
 
         ret = SlaveRpc(context);
         L() << "Shutting down..." << std::endl;
 
         RemoveRpcServer(config().rpc_sock().file().path());
-
-        if (!cleanup && raiseSignum)
-            RaiseSignal(raiseSignum);
-
-        context.Destroy();
     } catch (string s) {
         std::cerr << s << std::endl;
         ret = EXIT_FAILURE;
@@ -665,10 +580,7 @@ static int SlaveMain() {
         ret = EXIT_FAILURE;
     }
 
-    DaemonShutdown(false);
-
-    if (raiseSignum)
-        RaiseSignal(raiseSignum);
+    DaemonShutdown(false, ret);
 
     return ret;
 }
@@ -713,9 +625,9 @@ static void ReceiveAcks(int fd, std::map<int,int> &exited,
                         std::set<int> &acked) {
     int pid;
 
-    while (read(fd, &pid, sizeof(pid)) == sizeof(pid)) {
+    if (read(fd, &pid, sizeof(pid)) == sizeof(pid)) {
         if (pid <= 0)
-            continue;
+            return;
 
         if (exited.find(pid) == exited.end())
             acked.insert(pid);
@@ -786,11 +698,11 @@ static void RestoreStatuses(map<int, int> &exited) {
     }
 }
 
-static int SpawnSlave(map<int,int> &exited) {
+static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
     int evtfd[2];
     int ackfd[2];
     int ret = EXIT_FAILURE;
-    int flags;
+    TError error;
 
     slavePid = 0;
 
@@ -813,6 +725,7 @@ static int SpawnSlave(map<int,int> &exited) {
         close(evtfd[1]);
         close(ackfd[0]);
         TLogger::CloseLog();
+        loop.Destroy();
         dup2(evtfd[0], REAP_EVT_FD);
         dup2(ackfd[1], REAP_ACK_FD);
         close(evtfd[0]);
@@ -824,76 +737,96 @@ static int SpawnSlave(map<int,int> &exited) {
     close(evtfd[0]);
     close(ackfd[1]);
 
-    flags = fcntl(ackfd[0], F_GETFL, 0);
-    if (flags < 0 || fcntl(ackfd[0], F_SETFL, flags & (~O_NONBLOCK)) < 0) {
-        L() << "Can't clear O_NONBLOCK flag from ackfd: " << strerror(errno) << std::endl;
-        return EXIT_FAILURE;
-    }
-
     L() << "Spawned slave " << slavePid << std::endl;
     Statistics->Spawned++;
-
-    SignalMask(SIG_BLOCK);
 
     for (auto &pair : exited)
         DeliverPidStatus(evtfd[1], pair.first, pair.second, exited.size());
 
-    while (!done) {
-        if (rotate) {
-            rotate = false;
-            DaemonRotateLog();
-            continue;
+    error = loop.AddFd(ackfd[0]);
+    if (error) {
+        L_ERR() << "Can't add ackfd[0] to epoll: " << error << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    while (true) {
+        std::vector<int> signals;
+        std::vector<struct epoll_event> events;
+
+        error = loop.GetEvents(signals, events, -1);
+        if (error) {
+            L_ERR() << "master: epoll error " << error << std::endl;
+            return EXIT_FAILURE;
         }
 
-        if (update) {
-            update = false;
+        for (auto s : signals) {
+            switch (s) {
+            case SIGINT:
+            case SIGTERM:
+                if (kill(slavePid, s) < 0)
+                    L() << "Can't send " << s << " to slave" << std::endl;
 
-            int ret = DaemonSyncConfig(true);
-            if (ret)
-                return ret;
+                L() << "Waiting for slave to exit..." << std::endl;
+                (void)RetryFailed(10, 50,
+                [&]() { return waitpid(slavePid, nullptr, WNOHANG) != slavePid; });
 
-            L() << "Updating" << std::endl;
+                ret = EncodeSignal(s);
+                goto exit;
+            case updateSignal:
+            {
+                int ret = DaemonSyncConfig(true);
+                if (ret)
+                    return ret;
 
-            const char *stdlogArg = nullptr;
-            if (stdlog)
-                stdlogArg = "--stdlog";
+                L() << "Updating" << std::endl;
 
-            SaveStatuses(exited);
+                const char *stdlogArg = nullptr;
+                if (stdlog)
+                    stdlogArg = "--stdlog";
 
-            if (kill(slavePid, updateSignal) < 0) {
-                L() << "Can't send " << updateSignal << " to slave: " << strerror(errno) << std::endl;
-            } else {
-                if (waitpid(slavePid, NULL, 0) != slavePid)
-                    L() << "Can't wait for slave exit status: " << strerror(errno) << std::endl;
+                SaveStatuses(exited);
+
+                if (kill(slavePid, updateSignal) < 0) {
+                    L() << "Can't send " << updateSignal << " to slave: " << strerror(errno) << std::endl;
+                } else {
+                    if (waitpid(slavePid, NULL, 0) != slavePid)
+                        L() << "Can't wait for slave exit status: " << strerror(errno) << std::endl;
+                }
+                TLogger::CloseLog();
+                close(evtfd[1]);
+                close(ackfd[0]);
+                loop.Destroy();
+                execlp(program_invocation_name, program_invocation_name, stdlogArg, nullptr);
+                std::cerr << "Can't execlp(" << program_invocation_name << ", " << program_invocation_name << ", NULL)" << strerror(errno) << std::endl;
+                ret = EXIT_FAILURE;
+                goto exit;
+                break;
             }
-            TLogger::CloseLog();
-            close(evtfd[1]);
-            close(ackfd[0]);
-            execlp(program_invocation_name, program_invocation_name, stdlogArg, nullptr);
-            L() << "Can't execlp(" << program_invocation_name << ", " << program_invocation_name << ", NULL)" << strerror(errno) << std::endl;
-            ret = EXIT_FAILURE;
-            break;
+            case rotateSignal:
+                DaemonOpenLog(true);
+                break;
+            default:
+                /* Ignore other signals */
+                break;
+            }
         }
 
         std::set<int> acked;
-        SignalMask(SIG_UNBLOCK);
-        ReceiveAcks(ackfd[0], exited, acked);
-        SignalMask(SIG_BLOCK);
+        for (auto ev : events) {
+            if (ev.data.fd == ackfd[0]) {
+                ReceiveAcks(ackfd[0], exited, acked);
+            } else {
+                L() << "master received unknown epoll event: " << ev.data.fd << std::endl;
+                loop.RemoveFd(ev.data.fd);
+            }
+        }
 
         int status;
         if (ReapDead(evtfd[1], exited, slavePid, status, acked)) {
             L() << "slave exited with " << status << std::endl;
             ret = EXIT_SUCCESS;
-            break;
+            goto exit;
         }
-    }
-
-    if (done) {
-        if (kill(slavePid, SIGINT) < 0)
-            L() << "Can't send SIGINT to slave" << std::endl;
-
-        L() << "Waiting for slave to exit..." << std::endl;
-        (void)waitpid(slavePid, nullptr, 0);
     }
 
 exit:
@@ -903,20 +836,42 @@ exit:
     close(ackfd[0]);
     close(ackfd[1]);
 
-    SignalMask(SIG_UNBLOCK);
-
     return ret;
+}
+
+void CheckVersion(int &prevMaj, int &prevMin) {
+    std::string prevVer;
+
+    prevMaj = 0;
+    prevMin = 0;
+
+    TFile f(config().version().path(), config().version().perm());
+
+    TError error = f.AsString(prevVer);
+    if (!error)
+        (void)sscanf(prevVer.c_str(), "v%d.%d", &prevMaj, &prevMin);
+
+    error = f.WriteStringNoAppend(GIT_TAG);
+    if (error)
+        L_ERR() << "Can't update current version" << std::endl;
 }
 
 static int MasterMain() {
     AllocStatistics();
     Statistics->MasterStarted = GetCurrentTimeMs();
 
-    MasterStarted = GetCurrentTimeMs();
-
     int ret = DaemonPrepare(true);
     if (ret)
         return ret;
+
+    int prevMaj, prevMin;
+    CheckVersion(prevMaj, prevMin);
+    L() << "Updating from previous version v" << prevMaj << "." << prevMin << std::endl;
+
+    TEpollLoop ELoop;
+    TError error = ELoop.Create();
+    if (error)
+        return error;
 
     if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0) {
         TError error(EError::Unknown, errno, "prctl(PR_SET_CHILD_SUBREAPER,)");
@@ -925,7 +880,7 @@ static int MasterMain() {
     }
 
     TMountSnapshot ms;
-    TError error = ms.RemountSlave();
+    error = ms.RemountSlave();
     if (error)
         L_ERR() << "Can't remount shared mountpoints: " << error << std::endl;
 
@@ -933,24 +888,24 @@ static int MasterMain() {
     if (error)
         L_ERR() << "Can't adjust OOM score: " << error << std::endl;
 
-    SignalMask(SIG_UNBLOCK);
-
     map<int,int> exited;
     RestoreStatuses(exited);
 
-    while (!done) {
+    while (true) {
         size_t started = GetCurrentTimeMs();
         size_t next = started + config().container().respawn_delay_ms();
-        ret = SpawnSlave(exited);
+        ret = SpawnSlave(ELoop, exited);
         L() << "Returned " << ret << std::endl;
-        if (!done && next >= GetCurrentTimeMs())
+        if (next >= GetCurrentTimeMs())
             usleep((next - GetCurrentTimeMs()) * 1000);
 
         if (slavePid)
             (void)kill(slavePid, SIGKILL);
+        if (ret < 0)
+            break;
     }
 
-    DaemonShutdown(true);
+    DaemonShutdown(true, ret);
 
     return ret;
 }
@@ -964,6 +919,8 @@ int main(int argc, char * const argv[]) {
         return EXIT_FAILURE;
     }
 
+    config.Load();
+
     for (argn = 1; argn < argc; argn++) {
         string arg(argv[argn]);
 
@@ -971,7 +928,6 @@ int main(int argc, char * const argv[]) {
             std::cout << GIT_TAG << " " << GIT_REVISION <<std::endl;
             return EXIT_SUCCESS;
         } else if (arg == "--kv-dump") {
-            config.Load();
             KvDump();
             return EXIT_SUCCESS;
         } else if (arg == "--slave") {
@@ -986,11 +942,14 @@ int main(int argc, char * const argv[]) {
             if (argn + 1 >= argc)
                 return EXIT_FAILURE;
             return config.Test(argv[argn + 1]);
+        } else {
+            std::cerr << "Unknown option " << arg << std::endl;
+            return EXIT_FAILURE;
         }
     }
 
-    if (AnotherInstanceRunning(config().rpc_sock().file().path())) {
-        L() << "Another instance of portod is running!" << std::endl;
+    if (!slaveMode && AnotherInstanceRunning(config().rpc_sock().file().path())) {
+        std::cerr << "Another instance of portod is running!" << std::endl;
         return EXIT_FAILURE;
     }
 

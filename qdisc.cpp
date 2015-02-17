@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <sstream>
 
 #include "qdisc.hpp"
 #include "config.hpp"
@@ -36,9 +37,26 @@ uint32_t TTclass::GetParent() {
         return ParentTclass->Handle;
 }
 
+TTclass::~TTclass() {
+    TError error = Remove();
+    if (error)
+        L_ERR() << "Can't remove tc classifier: " << error << std::endl;
+}
+
+static std::string MapToStr(const std::map<std::string, uint64_t> &m) {
+    std::stringstream ss;
+    for (auto pair : m) {
+        if (ss.str().length())
+            ss << " ";
+        ss << pair.first << ": " << pair.second;
+    }
+    return ss.str();
+}
+
 void TTclass::Prepare(std::map<std::string, uint64_t> prio,
                        std::map<std::string, uint64_t> rate,
                        std::map<std::string, uint64_t> ceil) {
+    L() << "Prepare tc class 0x" << std::hex << Handle << std::dec << " prio={" << MapToStr(prio) << "} rate={" << MapToStr(rate) << "} ceil={" << MapToStr(ceil) << "}" << std::endl;
     Prio = prio;
     Rate = rate;
     Ceil = ceil;
@@ -49,25 +67,27 @@ TError TTclass::Create(bool fallback) {
         return TError::Success();
 
     for (auto &link : Net->GetLinks()) {
-        if (Prio.find(link->GetAlias()) == Prio.end()) {
+        auto alias = link->GetAlias();
+
+        if (Prio.find(alias) == Prio.end()) {
             if (fallback)
-                Prio[link->GetAlias()] = config().container().default_cpu_prio();
+                Prio[alias] = config().container().default_cpu_prio();
             else
-                return TError(EError::Unknown, "Unknown interface in net_priority");
+                return TError(EError::Unknown, "Unknown interface " + alias + " in net_priority");
         }
 
-        if (Rate.find(link->GetAlias()) == Rate.end()) {
+        if (Rate.find(alias) == Rate.end()) {
             if (fallback)
-                Rate[link->GetAlias()] = config().network().default_guarantee();
+                Rate[alias] = config().network().default_guarantee();
             else
-                return TError(EError::Unknown, "Unknown interface in net_guarantee");
+                return TError(EError::Unknown, "Unknown interface " + alias + " in net_guarantee");
         }
 
-        if (Ceil.find(link->GetAlias()) == Ceil.end()) {
+        if (Ceil.find(alias) == Ceil.end()) {
             if (fallback)
-                Ceil[link->GetAlias()] = config().network().default_limit();
+                Ceil[alias] = config().network().default_limit();
             else
-                return TError(EError::Unknown, "Unknown interface in net_limit");
+                return TError(EError::Unknown, "Unknown interface " + alias + " in net_ceil");
         }
 
         if (config().network().dynamic_ifaces() &&
@@ -273,7 +293,7 @@ TError TNetwork::PrepareLink(std::shared_ptr<TNlLink> link) {
 
     uint64_t prio, rate, ceil;
     prio = config().container().default_cpu_prio();
-    rate = config().network().default_guarantee();
+    rate = config().network().default_max_guarantee();
     ceil = config().network().default_limit();
 
     error = tclass.Create(prio, rate, ceil);

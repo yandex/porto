@@ -1,5 +1,4 @@
-#ifndef __HOLDER_H__
-#define __HOLDER_H__
+#pragma once
 
 #include <vector>
 #include <map>
@@ -15,31 +14,36 @@ class TContainer;
 class TIdMap;
 class TEventQueue;
 class TEvent;
+class TEpollLoop;
 
 class TContainerHolder : public std::enable_shared_from_this<TContainerHolder> {
     std::shared_ptr<TNetwork> Net;
     std::map<std::string, std::shared_ptr<TContainer>> Containers;
     TIdMap IdMap;
+    std::shared_ptr<TKeyValueStorage> Storage;
 
     bool ValidName(const std::string &name) const;
     TError RestoreId(const kv::TNode &node, uint16_t &id);
     void ScheduleLogRotatation();
     TError _Destroy(const std::string &name);
-    std::shared_ptr<TKeyValueStorage> Storage;
+    TError ReserveDefaultClassId();
+    std::map<std::string, std::shared_ptr<TKeyValueNode>> SortNodes(const std::vector<std::shared_ptr<TKeyValueNode>> &nodes);
 
 public:
     std::shared_ptr<TEventQueue> Queue;
-    int Epfd;
+    std::shared_ptr<TEpollLoop> EpollLoop;
 
-    TContainerHolder(std::shared_ptr<TEventQueue> queue,
+    TContainerHolder(std::shared_ptr<TEpollLoop> epollLoop,
+                     std::shared_ptr<TEventQueue> queue,
                      std::shared_ptr<TNetwork> net,
                      std::shared_ptr<TKeyValueStorage> storage) :
-        Net(net), Storage(storage), Queue(queue) { }
+        Net(net), Storage(storage), Queue(queue), EpollLoop(epollLoop) { }
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot();
     TError Create(const std::string &name, const TCred &cred);
     std::shared_ptr<TContainer> Get(const std::string &name);
     TError Restore(const std::string &name, const kv::TNode &node);
+    bool RestoreFromStorage();
     TError Destroy(const std::string &name);
     void DestroyRoot();
 
@@ -47,5 +51,3 @@ public:
 
     bool DeliverEvent(const TEvent &event);
 };
-
-#endif

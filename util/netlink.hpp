@@ -1,5 +1,4 @@
-#ifndef __NETLINK_H__
-#define __NETLINK_H__
+#pragma once
 
 #include <string>
 #include <functional>
@@ -31,7 +30,9 @@ enum class ETclassStat {
     Packets,
     Bytes,
     Drops,
-    Overlimits
+    Overlimits,
+    BPS,
+    PPS,
 };
 
 uint32_t TcHandle(uint16_t maj, uint16_t min);
@@ -146,5 +147,3 @@ public:
 };
 
 TError ParseIpPrefix(const std::string &s, TNlAddr &addr, int &prefix);
-
-#endif

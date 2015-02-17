@@ -11,6 +11,7 @@
 #include "util/mount.hpp"
 #include "util/folder.hpp"
 #include "util/string.hpp"
+#include "util/signal.hpp"
 #include "util/unix.hpp"
 #include "util/cred.hpp"
 #include "util/netlink.hpp"
@@ -25,7 +26,6 @@ extern "C" {
 #include <sys/syscall.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <syslog.h>
 #include <wordexp.h>
 #include <grp.h>
 #include <linux/kdev_t.h>
@@ -56,27 +56,13 @@ TError TTaskEnv::Prepare() {
 const char** TTaskEnv::GetEnvp() const {
     auto envp = new const char* [Environ.size() + 1];
     for (size_t i = 0; i < Environ.size(); i++)
-        envp[i] = Environ[i].c_str();
+        envp[i] = strdup(Environ[i].c_str());
     envp[Environ.size()] = NULL;
 
     return envp;
 }
 
 // TTask
-int TTask::CloseAllFds(int except) const {
-    for (int i = 0; i < 3; i++)
-        if (i != except)
-            close(i);
-
-    return except;
-}
-
-void TTask::Syslog(const string &s) const {
-    openlog("portod", LOG_NDELAY, LOG_DAEMON);
-    syslog(LOG_ERR, "%s", s.c_str());
-    closelog();
-}
-
 TTask::~TTask() {
     if (!Env)
         return;
@@ -87,7 +73,7 @@ TTask::~TTask() {
         TFile out(Env->StdoutPath);
         TError error = out.Remove();
         if (error)
-            L_ERR() << "Can't remove task stdout " << Env->StdoutPath.ToString() << ": " << error << std::endl;
+            L_ERR() << "Can't remove task stdout " << Env->StdoutPath << ": " << error << std::endl;
     }
 
     if (Env->RemoveStderr &&
@@ -96,38 +82,26 @@ TTask::~TTask() {
         TFile err(Env->StderrPath);
         TError error = err.Remove();
         if (error)
-            L_ERR() << "Can't remove task stderr " << Env->StderrPath.ToString() << ": " << error << std::endl;
+            L_ERR() << "Can't remove task stderr " << Env->StderrPath << ": " << error << std::endl;
     }
 }
 
 void TTask::ReportPid(int pid) const {
     if (write(Wfd, &pid, sizeof(pid)) != sizeof(pid)) {
-        Syslog("partial write of pid: " + std::to_string(pid));
+        L_ERR() << "partial write of pid: " << std::to_string(pid) << std::endl;
     }
 }
 
-void TTask::Abort(int result, const string &msg) const {
-    if (write(Wfd, &result, sizeof(result)) != sizeof(result)) {
-        Syslog("partial write of result: " + std::to_string(result));
-    } else {
-        if (write(Wfd, msg.data(), msg.length()) != (ssize_t)msg.length())
-            Syslog("partial write of message: " + msg);
-    }
-
+void TTask::Abort(const TError &error) const {
+    TError ret = error.Serialize(Wfd);
+    if (ret)
+        L_ERR() << ret << std::endl;
     exit(EXIT_FAILURE);
-}
-
-void TTask::Abort(const TError &error, const std::string &msg) const {
-    if (msg == "")
-        Abort(error.GetErrno(), error.GetMsg());
-    else
-        Abort(error.GetErrno(), msg);
 }
 
 static int ChildFn(void *arg) {
     SetProcessName("portod-spawn-c");
 
-    TLogger::DisableLog();
     TTask *task = static_cast<TTask*>(arg);
     TError error = task->ChildCallback();
     task->Abort(error);
@@ -156,13 +130,7 @@ TError TTask::ChildOpenStdFile(const TPath &path, int expected) {
 }
 
 TError TTask::ChildReopenStdio() {
-    Wfd = CloseAllFds(Wfd);
-    if (Wfd < 0) {
-        Syslog(string("close fds: ") + strerror(errno));
-        /* there is no way of telling parent that we failed (because we
-         * screwed up fds), so exit with some eye catching error code */
-        exit(0xAA);
-    }
+    CloseFds(3, { Wfd, TLogger::GetFd() });
 
     int ret = open(Env->StdinPath.ToString().c_str(), O_CREAT | O_RDONLY, 0700);
     if (ret < 0)
@@ -254,13 +222,14 @@ TError TTask::ChildExec() {
         break;
     }
 
-    if (config().log().verbose()) {
-        Syslog(Env->Command.c_str());
-        for (unsigned i = 0; i < result.we_wordc; i++)
-            Syslog(result.we_wordv[i]);
-    }
-
     auto envp = Env->GetEnvp();
+    if (config().log().verbose()) {
+        L() << "command=" << Env->Command << std::endl;
+        for (unsigned i = 0; result.we_wordv[i]; i++)
+            L() << "argv[" << i << "]=" << result.we_wordv[i] << std::endl;
+        for (unsigned i = 0; envp[i]; i++)
+            L() << "environ[" << i << "]=" << envp[i] << std::endl;
+    }
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
 
     return TError(EError::Unknown, errno, string("execvpe(") + result.we_wordv[0] + ", " + std::to_string(result.we_wordc) + ", " + std::to_string(Env->Environ.size()) + ")");
@@ -736,26 +705,31 @@ TError TTask::ChildCallback() {
 }
 
 TError TTask::CreateCwd() {
-    if (!Env->CreateCwd)
-        return TError::Success();
+    bool cleanup = Env->Cwd.ToString().find(config().container().tmp_dir()) == 0;
 
-    Cwd = std::make_shared<TFolder>(Env->Cwd, true);
+    Cwd = std::make_shared<TFolder>(Env->Cwd, cleanup);
     if (!Cwd->Exists()) {
         TError error = Cwd->Create(0755, true);
         if (error)
             return error;
+        error = Env->Cwd.Chown(Env->User, Env->Group);
+        if (error)
+            return error;
     }
-    return Env->Cwd.Chown(Env->User, Env->Group);
+
+    return TError::Success();
 }
 
 TError TTask::Start() {
     int ret;
     int pfd[2], syncfd[2];
 
-    TError error = CreateCwd();
-    if (error) {
-        L_ERR() << "Can't create temporary cwd: " << error << std::endl;
-        return error;
+    if (Env->CreateCwd) {
+        TError error = CreateCwd();
+        if (error) {
+            L_ERR() << "Can't create temporary cwd: " << error << std::endl;
+            return error;
+        }
     }
 
     ExitStatus = 0;
@@ -859,28 +833,18 @@ TError TTask::Start() {
         return error;
     }
 
-    n = read(Rfd, &ret, sizeof(ret));
-    char buf[1024];
-    string msg;
-    ssize_t len = read(Rfd, buf, sizeof(buf));
-    if (len > 0)
-        msg = string(buf, len);
+    TError error;
+    (void)TError::Deserialize(Rfd, error);
     close(Rfd);
-
-    if (n < 0) {
-        Pid = 0;
-        TError error(EError::Unknown, errno, "read(Rfd)");
-        L_ERR() << "Can't read result from the child: " << error << std::endl;
-        return error;
-    } else if (n == 0) {
-        State = Started;
-        return TError::Success();
-    } else {
+    if (error) {
         Pid = 0;
         ExitStatus = -1;
 
-        return TError(EError::Unknown, msg, ret);
+        return error;
     }
+
+    State = Started;
+    return TError::Success();
 }
 
 int TTask::GetPid() const {

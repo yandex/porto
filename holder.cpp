@@ -9,6 +9,8 @@
 #include "util/string.hpp"
 #include "util/cred.hpp"
 
+constexpr uint16_t ROOT_CONTAINER_ID = 1;
+
 void TContainerHolder::DestroyRoot() {
     // we want children to be removed first
     while (Containers.begin() != Containers.end()) {
@@ -19,28 +21,20 @@ void TContainerHolder::DestroyRoot() {
     }
 }
 
+TError TContainerHolder::ReserveDefaultClassId() {
+    uint16_t id;
+    TError error = IdMap.Get(id);
+    if (error)
+        return error;
+    if (id != 2)
+        return TError(EError::Unknown, "Unexpected default class id " + std::to_string(id));
+    return TError::Success();
+}
+
 TError TContainerHolder::CreateRoot() {
-    TError error = EpollCreate(Epfd);
+    TError error = TaskGetLastCap();
     if (error)
         return error;
-
-    error = RegisterProperties();
-    if (error)
-        return error;
-
-    error = RegisterData();
-    if (error)
-        return error;
-
-    error = TaskGetLastCap();
-    if (error)
-        return error;
-
-    // we are using single kvalue store for both properties and data
-    // so make sure names don't clash
-    std::string overlap = propertySet.Overlap(dataSet);
-    if (overlap.length())
-        return TError(EError::Unknown, "Data and property names conflict: " + overlap);
 
     BootTime = GetBootTime();
 
@@ -48,15 +42,15 @@ TError TContainerHolder::CreateRoot() {
     if (error)
         return error;
 
-    uint16_t id;
-    error = IdMap.Get(id);
+    auto root = Get(ROOT_CONTAINER);
+
+    if (root->GetId() != ROOT_CONTAINER_ID)
+        return TError(EError::Unknown, "Unexpected root container id " + std::to_string(root->GetId()));
+
+    error = ReserveDefaultClassId();
     if (error)
         return error;
 
-    if (id != 2)
-        return TError(EError::Unknown, "Unexpected root container id");
-
-    auto root = Get(ROOT_CONTAINER);
     error = root->Start();
     if (error)
         return error;
@@ -66,6 +60,7 @@ TError TContainerHolder::CreateRoot() {
     Statistics->RestoreFailed = 0;
     Statistics->RemoveDead = 0;
     Statistics->Rotated = 0;
+    Statistics->Started = 0;
 
     return TError::Success();
 }
@@ -87,7 +82,6 @@ bool TContainerHolder::ValidName(const std::string &name) const {
     if (*(name.end()--) == '/')
         return false;
 
-    // . (dot) is used for kvstorage, so don't allow it here
     return find_if(name.begin(), name.end(),
                    [](const char c) -> bool {
                         return !(isalnum(c) || c == '_' || c == '/' || c == '-' || c == '@' || c == ':' || c == '.');
@@ -160,7 +154,7 @@ TError TContainerHolder::_Destroy(const std::string &name) {
 }
 
 TError TContainerHolder::Destroy(const std::string &name) {
-    if (name == ROOT_CONTAINER || Containers.find(name) == Containers.end())
+    if (name == ROOT_CONTAINER || !ValidName(name))
         return TError(EError::InvalidValue, "invalid container name " + name);
 
     return _Destroy(name);
@@ -179,32 +173,104 @@ std::vector<std::string> TContainerHolder::List() const {
 
 TError TContainerHolder::RestoreId(const kv::TNode &node, uint16_t &id) {
     std::string value = "";
-    for (int i = 0; i < node.pairs_size(); i++) {
-        auto key = node.pairs(i).key();
 
-        if (key == P_RAW_ID)
-            value = node.pairs(i).val();
-    }
-
-    if (value.length() == 0) {
-        TError error = IdMap.Get(id);
+    TError error = Storage->Get(node, P_RAW_ID, value);
+    if (error) {
+        // FIXME before v1.0 we didn't store id for meta or stopped containers;
+        // don't try to recover, just assign new safe one
+        error = IdMap.GetSince(config().container().max_total(), id);
         if (error)
             return error;
+        L_WRN() << "Couldn't restore container id, using " << id << std::endl;
     } else {
-        uint32_t id32;
-        TError error = StringToUint32(value, id32);
+        error = StringToUint16(value, id);
         if (error)
             return error;
 
-        id = (uint16_t)id32;
+        error = IdMap.GetAt(id);
+        if (error) {
+            // FIXME before v1.0 there was a possibility for two containers
+            // to use the same id, allocate new one upon restore we see this
+
+            error = IdMap.GetSince(config().container().max_total(), id);
+            if (error)
+                return error;
+            L_WRN() << "Container ids clashed, using new " << id << std::endl;
+        }
+            return error;
     }
 
     return TError::Success();
 }
 
+std::map<std::string, std::shared_ptr<TKeyValueNode>> TContainerHolder::SortNodes(const std::vector<std::shared_ptr<TKeyValueNode>> &nodes) {
+    // FIXME since v1.0 we use container id as kvalue node name and because
+    // we need to create containers in particular order we create this
+    // name-sorted map
+    std::map<std::string, std::shared_ptr<TKeyValueNode>> name2node;
+
+    for (auto node : nodes) {
+        kv::TNode n;
+        TError error = node->Load(n);
+        if (error) {
+            L_ERR() << "Can't load key-value node " << node->GetPath() << ": " << error << std::endl;
+            node->Remove();
+            Statistics->RestoreFailed++;
+            continue;
+        }
+
+        std::string name;
+        if (TKeyValueStorage::Get(n, P_RAW_NAME, name))
+            name = TKeyValueStorage::FromPath(node->GetName());
+
+        name2node[name] = node;
+    }
+
+    return name2node;
+}
+
+bool TContainerHolder::RestoreFromStorage() {
+    std::vector<std::shared_ptr<TKeyValueNode>> nodes;
+
+    TError error = Storage->ListNodes(nodes);
+    if (error) {
+        L_ERR() << "Can't list key-value nodes: " << error << std::endl;
+        return false;
+    }
+
+    auto name2node = SortNodes(nodes);
+    bool restored = false;
+    for (auto &pair : name2node) {
+        auto node = pair.second;
+        auto name = pair.first;
+
+        kv::TNode n;
+        error = node->Load(n);
+        if (error)
+            continue;
+
+        restored = true;
+        error = Restore(name, n);
+        if (error) {
+            L_ERR() << "Can't restore " << name << ": " << error << std::endl;
+            Statistics->RestoreFailed++;
+            node->Remove();
+            continue;
+        }
+
+        // FIXME since v1.0 we need to cleanup kvalue nodes with old naming
+        if (TKeyValueStorage::Get(n, P_RAW_NAME, name))
+            node->Remove();
+    }
+
+    return restored;
+}
+
 TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node) {
     if (name == ROOT_CONTAINER)
         return TError::Success();
+
+    L() << "Restore container " << name << " (" << node.ShortDebugString() << ")" << std::endl;
 
     auto parent = GetParent(name);
     if (!parent)
@@ -266,7 +332,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
 
     if (event.Type == EEventType::RotateLogs) {
         if (config().log().verbose())
-            TLogger::Log() << "Rotated logs " << std::endl;
+            L() << "Rotated logs " << std::endl;
 
         ScheduleLogRotatation();
         Statistics->Rotated++;

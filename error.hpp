@@ -1,5 +1,4 @@
-#ifndef __ERROR_HPP__
-#define __ERROR_HPP__
+#pragma once
 
 #include <string>
 #include <ostream>
@@ -35,6 +34,7 @@ public:
         os << err.GetErrorName() << " (" << err.GetMsg() << ")";
         return os;
     }
-};
 
-#endif
+    TError Serialize(int fd) const;
+    static bool Deserialize(int fd, TError &error);
+};

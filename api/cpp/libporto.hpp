@@ -1,5 +1,4 @@
-#ifndef __LIBPORTO_HPP__
-#define __LIBPORTO_HPP__
+#pragma once
 
 #include "rpc.hpp"
 #include "util/protobuf.hpp"
@@ -18,6 +17,20 @@ struct TData {
 
     TData(std::string name, std::string description) :
         Name(name), Description(description) {}
+};
+
+struct TVolumeDescription {
+    std::string Path;
+    std::string Source;
+    std::string Quota;
+    std::string Flags;
+    uint64_t Used;
+    uint64_t Avail;
+
+    TVolumeDescription(const std::string &path, const std::string &source,
+                       const std::string &quota, const std::string &flags,
+                       uint64_t used, uint64_t avail) :
+        Path(path), Source(source), Quota(quota), Flags(flags), Used(used), Avail(avail) {}
 };
 
 class TPortoAPI {
@@ -59,6 +72,10 @@ public:
     int Raw(const std::string &message, std::string &response);
     void GetLastError(int &error, std::string &msg) const;
     void Cleanup();
-};
 
-#endif
+    // VolumeAPI
+    int CreateVolume(const std::string &path, const std::string &source,
+                     const std::string &quota, const std::string &flags);
+    int DestroyVolume(const std::string &path);
+    int ListVolumes(std::vector<TVolumeDescription> &vlist);
+};

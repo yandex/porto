@@ -1,5 +1,4 @@
-#ifndef __VALUE_HPP__
-#define __VALUE_HPP__
+#pragma once
 
 #include <string>
 #include <map>
@@ -10,27 +9,12 @@
 #include "kvalue.hpp"
 #include "util/log.hpp"
 
-class TContainer;
-enum class EContainerState;
-class TTaskEnv;
-
-enum class EValueType {
-    String,
-    Bool,
-    Int,
-    Uint,
-    Map,
-    List,
-};
-
-// Don't return default value, call get handler
-const unsigned int NODEF_VALUE = (1 << 31);
 // Value is not shown in the property/data list
-const unsigned int HIDDEN_VALUE = (1 << 30);
+const unsigned int HIDDEN_VALUE = (1 << 31);
 // Value should be preserved upon recovery
-const unsigned int PERSISTENT_VALUE = (1 << 29);
+const unsigned int PERSISTENT_VALUE = (1 << 30);
 // Uint value can include options G/M/K suffix
-const unsigned int UINT_UNIT_VALUE = (1 << 28);
+const unsigned int UINT_UNIT_VALUE = (1 << 29);
 
 class TVariant : public TNonCopyable {
     struct TValueAbstractImpl {
@@ -43,227 +27,259 @@ class TVariant : public TNonCopyable {
         TValueImpl(T value) : Value(value) {}
     };
 
-    std::shared_ptr<TValueAbstractImpl> Impl;
+    std::shared_ptr<TValueAbstractImpl> Impl = nullptr;
 
 public:
-    const EValueType Type;
-    const std::string Name;
+    TVariant() {}
 
-    TVariant(const EValueType type, const std::string &name) :
-        Type(type), Name(name) {}
-
-    bool HasValue() { return Impl != nullptr; }
+    bool HasValue() const { return Impl != nullptr; }
 
     template<typename T>
-    const T Get(const EValueType type) {
+    const T Get() const {
         if (!Impl)
-            PORTO_RUNTIME_ERROR("Invalid variant " + Name + " get: nullptr");
+            PORTO_RUNTIME_ERROR("Invalid variant get: nullptr");
 
-        if (Type != type)
-            PORTO_RUNTIME_ERROR("Invalid variant " + Name + " get type: " +
-                                std::to_string((int)Type) + " != " +
-                                std::to_string((int)type));
-
-        auto p = static_cast<TValueImpl<T> *>(Impl.get());
-        return p->Value;
+        try {
+            auto p = dynamic_cast<TValueImpl<T> *>(Impl.get());
+            if (!p)
+                PORTO_RUNTIME_ERROR(std::string("Invalid variant cast"));
+            return p->Value;
+        } catch (std::bad_cast &e) {
+            PORTO_RUNTIME_ERROR(std::string("Invalid variant cast: ") + e.what());
+            return {};
+        }
     }
 
     template<typename T>
-    TError Set(const EValueType type, const T &value) {
-        if (Type != type)
-            PORTO_RUNTIME_ERROR("Invalid variant " + Name + " get type: " +
-                                std::to_string((int)Type) + " != " +
-                                std::to_string((int)type));
-
+    void Set(const T &value) {
         Impl = std::make_shared<TValueImpl<T>>(value);
-        return TError::Success();
     };
+
+    void Reset() { Impl = nullptr; }
+};
+
+template<typename T>
+class TValue;
+
+class TAbstractValue : public TNonCopyable {
+protected:
+    TVariant Variant;
+    int Flags;
+public:
+    TAbstractValue(int flags) : Flags(flags) {}
+    virtual ~TAbstractValue() {}
+
+    virtual std::string ToString() const =0;
+    virtual TError FromString(const std::string &value) =0;
+    virtual std::string DefaultString() const =0;
+
+    bool HasValue() const;
+    void Reset();
+    int GetFlags() const;
+
+    template<typename T>
+    const T Get() const {
+        try {
+            auto p = dynamic_cast<const TValue<T> *>(this);
+            if (!p)
+                PORTO_RUNTIME_ERROR(std::string("Bad cast"));
+            return p->Get();
+        } catch (std::bad_cast &e) {
+            PORTO_RUNTIME_ERROR(std::string("Bad cast: ") + e.what());
+            return {};
+        }
+    }
+
+    template<typename T>
+    TError Set(const T& value) {
+        try {
+            auto p = dynamic_cast<TValue<T> *>(this);
+            if (!p)
+                PORTO_RUNTIME_ERROR(std::string("Bad cast"));
+            return p->Set(value);
+        } catch (std::bad_cast &e) {
+            PORTO_RUNTIME_ERROR(std::string("Bad cast: ") + e.what());
+            return TError(EError::Unknown, "");
+        }
+    }
+};
+
+template<typename T>
+class TValue : public TAbstractValue {
+public:
+    TValue(int flags) : TAbstractValue(flags) {}
+
+    virtual T GetDefault() const =0;
+    virtual std::string ToString(const T &value) const =0;
+    virtual TError CheckValue(const T& value) {
+        return TError::Success();
+    }
+
+    std::string ToString() const override {
+        return ToString(Get());
+    }
+
+    std::string DefaultString() const override {
+        return ToString(GetDefault());
+    }
+
+    const T Get() const {
+        if (Variant.HasValue())
+            return Variant.Get<T>();
+        else
+            return GetDefault();
+    }
+
+    TError Set(const T &value) {
+        TError error = CheckValue(value);
+        if (error)
+            return error;
+
+        Variant.Set(value);
+
+        return TError::Success();
+    }
+};
+
+class TStringValue : public TValue<std::string> {
+public:
+    TStringValue(int flags) : TValue(flags) {}
+
+    std::string ToString(const std::string &value) const override;
+    TError FromString(const std::string &value) override;
+    std::string GetDefault() const override;
+};
+
+class TIntValue : public TValue<int> {
+public:
+    TIntValue(int flags) : TValue(flags) {}
+
+    std::string ToString(const int &value) const override;
+    TError FromString(const std::string &value) override;
+    int GetDefault() const override;
+};
+
+class TUintValue : public TValue<uint64_t> {
+public:
+    TUintValue(int flags) : TValue(flags) {}
+
+    std::string ToString(const uint64_t &value) const override;
+    TError FromString(const std::string &value) override;
+    uint64_t GetDefault() const override;
+};
+
+class TBoolValue : public TValue<bool> {
+public:
+    TBoolValue(int flags) : TValue(flags) {}
+
+    std::string ToString(const bool &value) const override;
+    TError FromString(const std::string &value) override;
+    bool GetDefault() const override;
+};
+
+typedef std::vector<std::string> TStrList;
+
+class TListValue : public TValue<TStrList> {
+public:
+    TListValue(int flags) : TValue(flags) {}
+
+    std::string ToString(const TStrList &value) const override;
+    TError FromString(const std::string &value) override;
+    TStrList GetDefault() const override;
 };
 
 typedef std::map<std::string, uint64_t> TUintMap;
-typedef std::vector<std::string> TStrList;
 
-#define DEFINE_TVALUE(NAME, TYPE) \
-virtual TYPE GetDefault ## NAME(std::shared_ptr<TContainer> c) { \
-    return TYPE{}; \
-} \
-virtual TError Parse ## NAME(std::shared_ptr<TContainer> c,\
-                             const TYPE &value) { \
-    ExpectType(EValueType::NAME); \
-    return TError::Success(); \
-} \
-virtual TError Set ## NAME(std::shared_ptr<TContainer> c, \
-                           std::shared_ptr<TVariant> v, \
-                           const TYPE &value) { \
-    ExpectType(EValueType::NAME); \
-    TError error = Parse ## NAME(c, value); \
-    if (error) \
-        return error; \
-    return v->Set(EValueType::NAME, value); \
-} \
-virtual TYPE Get ## NAME(std::shared_ptr<TContainer> c, \
-                         std::shared_ptr<TVariant> v) { \
-    ExpectType(EValueType::NAME); \
-    if (!v->HasValue() && NeedDefault()) \
-        return GetDefault ## NAME(c); \
-    return v->Get<TYPE>(Type); \
-}
-
-class TValue : public TNonCopyable {
-protected:
-    void ExpectType(EValueType type);
-    bool NeedDefault();
+class TMapValue : public TValue<TUintMap> {
 public:
-    TValue(const std::string &name,
-           const EValueType type,
-           const std::string &desc,
-           const int flags,
-           const std::set<EContainerState> &state) :
-        Name(name), Type(type), Desc(desc), Flags(flags), State(state) {}
+    TMapValue(int flags) : TValue(flags) {}
 
-    const std::string Name;
-    const EValueType Type;
-    const std::string Desc;
-    const int Flags;
-    const std::set<EContainerState> State;
-
-    virtual bool IsDefault(std::shared_ptr<TContainer> c,
-                           std::shared_ptr<TVariant> v) = 0;
-
-    virtual std::string GetDefaultString(std::shared_ptr<TContainer> c) = 0;
-    virtual TError SetString(std::shared_ptr<TContainer> c,
-                             std::shared_ptr<TVariant> v,
-                             const std::string &value) = 0;
-    virtual std::string GetString(std::shared_ptr<TContainer> c,
-                                  std::shared_ptr<TVariant> v) = 0;
-    virtual TError ParseString(std::shared_ptr<TContainer> c,
-                               const std::string &value) {
-        return TError::Success();
-    }
-    virtual TError ParseDefault(std::shared_ptr<TContainer> c) = 0;
-
-    DEFINE_TVALUE(Bool, bool)
-    DEFINE_TVALUE(Int, int)
-    DEFINE_TVALUE(Uint, uint64_t)
-    DEFINE_TVALUE(Map, TUintMap)
-    DEFINE_TVALUE(List, TStrList)
-
-    virtual TError PrepareTaskEnv(std::shared_ptr<TContainer> container,
-                                  std::shared_ptr<TTaskEnv> taskEnv);
+    std::string ToString(const TUintMap &value) const override;
+    TError FromString(const std::string &value) override;
+    TUintMap GetDefault() const override;
 };
 
-#undef DEFINE_TVALUE
+class TRawValueMap {
+    std::map<std::string, TAbstractValue *> AbstractValues;
 
-#define VALUE_CLASS(NAME, TYPE) \
-std::string NAME ## ToString(const TYPE &v); \
-class T ## NAME ## Value : public TValue { \
-public: \
-    T ## NAME ## Value(const std::string &name, \
-                 const std::string &desc, \
-                 const int flags, \
-                 const std::set<EContainerState> &state) : \
-        TValue(name, EValueType::NAME, desc, flags, state) {} \
-    std::string GetDefaultString(std::shared_ptr<TContainer> c); \
-    TError SetString(std::shared_ptr<TContainer> c, \
-                     std::shared_ptr<TVariant> v, \
-                     const std::string &value); \
-    std::string GetString(std::shared_ptr<TContainer> c, \
-                          std::shared_ptr<TVariant> v); \
-    bool IsDefault(std::shared_ptr<TContainer> c, \
-                   std::shared_ptr<TVariant> v) { \
-        if (!NeedDefault()) \
-            return false; \
-        if (!v->HasValue()) \
-            return true; \
-        return v->Get<TYPE>(EValueType::NAME) == GetDefault ## NAME(c); \
-    } \
-    virtual TError ParseDefault(std::shared_ptr<TContainer> c) { \
-        return Parse ## NAME(c, GetDefault ## NAME (c)); \
-    } \
-}
-
-VALUE_CLASS(String, std::string);
-VALUE_CLASS(Bool, bool);
-VALUE_CLASS(Int, int);
-VALUE_CLASS(Uint, uint64_t);
-VALUE_CLASS(Map, TUintMap);
-VALUE_CLASS(List, TStrList);
-
-#undef VALUE_CLASS
-
-class TValueSet {
-    std::map<std::string, TValue *> Value;
 public:
-    TError Register(TValue *p);
-    TError Register(const std::vector<TValue *> &v);
-    bool Valid(const std::string &name);
-    TValue *Get(const std::string &name);
-    std::vector<std::string> GetNames();
-    std::string Overlap(TValueSet &other);
+    ~TRawValueMap();
+
+    TError Add(const std::string &name, TAbstractValue *av);
+    TAbstractValue *Find(const std::string &name) const;
+    bool IsValid(const std::string &name) const;
+    bool IsDefault(const std::string &name) const;
+    bool HasValue(const std::string &name) const;
+    std::vector<std::string> List() const;
 };
 
-#define SYNTHESIZE_ACCESSOR(NAME, TYPE) \
-    TYPE Get ## NAME(const std::string &name) { \
-        TValue *p = nullptr; \
-        std::shared_ptr<TContainer> c; \
-        std::shared_ptr<TVariant> v; \
-        TError error = Get(name, c, &p, v); \
-        if (error) \
-            L_ERR() << "Can't get value " << name << ": " << error << std::endl; \
-        return p->Get ## NAME(c, v); \
-    } \
-    TError Set ## NAME(const std::string &name, const TYPE &value) { \
-        TValue *p = nullptr; \
-        std::shared_ptr<TContainer> c; \
-        std::shared_ptr<TVariant> v; \
-        TError error = Get(name, c, &p, v); \
-        if (error) \
-            return error; \
-        if (p->Flags & PERSISTENT_VALUE) { \
-            error = AppendStorage(name, NAME ## ToString(value)); \
-            if (error) \
-                return error; \
-        } \
-        return p->Set ## NAME(c, v, value); \
-    }
-
-class TVariantSet : public TNonCopyable {
-    std::shared_ptr<TKeyValueStorage> Storage;
-    TValueSet *ValueSet;
-    std::weak_ptr<TContainer> Container;
-    std::string Name;
-    std::map<std::string, std::shared_ptr<TVariant>> Variant;
-
-    TError AppendStorage(const std::string& key, const std::string& value);
-    bool IsRoot();
+class TValueMap : public TRawValueMap, public TNonCopyable {
+    std::shared_ptr<TKeyValueNode> KvNode;
 
 public:
-    TError Get(const std::string &name, std::shared_ptr<TContainer> &c,
-               TValue **p, std::shared_ptr<TVariant> &v);
-
-    TVariantSet(std::shared_ptr<TKeyValueStorage> storage,
-                TValueSet *v, std::shared_ptr<TContainer> c);
-    ~TVariantSet();
+    TValueMap(std::shared_ptr<TKeyValueNode> kvnode) : KvNode(kvnode) {}
+    ~TValueMap();
 
     TError Create();
     TError Restore(const kv::TNode &node);
-
-    SYNTHESIZE_ACCESSOR(String, std::string)
-    SYNTHESIZE_ACCESSOR(Bool, bool)
-    SYNTHESIZE_ACCESSOR(Int, int)
-    SYNTHESIZE_ACCESSOR(Uint, uint64_t)
-    SYNTHESIZE_ACCESSOR(List, TStrList)
-    SYNTHESIZE_ACCESSOR(Map, TUintMap)
-
-    std::vector<std::string> List();
-    bool IsDefault(const std::string &name);
-    bool HasValue(const std::string &name);
-    void Reset(const std::string &name);
-
+    TError Restore();
     TError Flush();
     TError Sync();
+
+    std::string ToString(const std::string &name) const;
+    TError FromString(const std::string &name, const std::string &value);
+
+    template<typename T>
+    const T Get(const std::string &name) const {
+        return Find(name)->Get<T>();
+    }
+
+    template<typename T>
+    bool IsDefaultValue(const std::string &name, const T& value) {
+        try {
+            auto av = Find(name);
+            auto p = dynamic_cast<TValue<T> *>(av);
+            if (!p)
+                PORTO_RUNTIME_ERROR(std::string("Bad cast"));
+            return p->GetDefault() == value;
+        } catch (std::bad_cast &e) {
+            PORTO_RUNTIME_ERROR(std::string("Bad cast: ") + e.what());
+        }
+        return false;
+    }
+
+    template<typename T>
+    const TError GetChecked(const std::string &name, T &val) const {
+        try {
+            auto av = Find(name);
+            if (dynamic_cast<TValue<T> *>(av)) {
+                val = av->Get<T>();
+                return TError::Success();
+            }
+        } catch (...) {
+        }
+        return TError(EError::InvalidValue, "Invalid value type");
+    }
+
+    template<typename T>
+    TError Set(const std::string &name, const T& value) {
+        bool resetOnDefault = IsDefaultValue(name, value);
+        TError error = Find(name)->Set<T>(value);
+        if (error)
+            return error;
+
+        if (KvNode && Find(name)->GetFlags() & PERSISTENT_VALUE)
+            error = KvNode->Append(name, Find(name)->ToString());
+
+        // we don't want to keep default values in memory but we also
+        // want custom TValue descendants to do some internal preparation
+        // even if we set value to default; so just set it and reset
+        // afterwards
+        if (resetOnDefault)
+            Find(name)->Reset();
+
+        return error;
+    }
+
+    void Reset(const std::string &name);
 };
-
-#undef SYNTHESIZE_ACCESSOR
-
-#endif

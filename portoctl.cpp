@@ -8,6 +8,7 @@
 #include "config.hpp"
 #include "cli.hpp"
 #include "util/string.hpp"
+#include "util/signal.hpp"
 #include "util/unix.hpp"
 #include "util/namespace.hpp"
 #include "util/file.hpp"
@@ -751,7 +752,7 @@ class TExecCmd : public ICmd {
     string containerName;
     sig_atomic_t Interrupted = 0;
 public:
-    TExecCmd(TPortoAPI *api) : ICmd(api, "exec", 2, "<container> [properties]", "create pty, execute and wait for command in container") {}
+    TExecCmd(TPortoAPI *api) : ICmd(api, "exec", 2, "<container> command=<command> [properties]", "create pty, execute and wait for command in container") {}
 
     int SwithToNonCanonical(int fd) {
         if (!isatty(fd))
@@ -934,18 +935,20 @@ public:
                 break;
 
             for (size_t i = 0; i < fds.size(); i++) {
-                if (fds[i].fd != STDIN_FILENO && fds[i].revents & POLLHUP)
-                    hangup = true;
+                if (fds[i].revents & POLLIN) {
+                    if (fds[i].fd == STDIN_FILENO)
+                        MoveData(STDIN_FILENO, stdinFd);
+                    else if (fds[i].fd == stdoutFd)
+                        MoveData(stdoutFd, STDOUT_FILENO);
+                    else if (fds[i].fd == stderrFd)
+                        MoveData(stderrFd, STDERR_FILENO);
+                }
 
-                if (!(fds[i].revents & POLLIN))
-                    continue;
-
-                if (i == 0)
-                    MoveData(STDIN_FILENO, stdinFd);
-                else if (i == 1)
-                    MoveData(stdoutFd, STDOUT_FILENO);
-                else if (i == 2)
-                    MoveData(stderrFd, STDERR_FILENO);
+                if (fds[i].revents & POLLHUP) {
+                    if (fds[i].fd != STDIN_FILENO)
+                        hangup = true;
+                    fds.erase(fds.begin() + i);
+                }
             }
         }
 
@@ -1005,9 +1008,13 @@ public:
 
 class TListCmd : public ICmd {
 public:
-    TListCmd(TPortoAPI *api) : ICmd(api, "list", 0, "", "list created containers") {}
+    TListCmd(TPortoAPI *api) : ICmd(api, "list", 0, "[-1]", "list created containers") {}
 
     int Execute(int argc, char *argv[]) {
+        bool details = true;
+        if (argc >= 1 && argv[0] == std::string("-1"))
+            details = false;
+
         vector<string> clist;
         int ret = Api->List(clist);
         if (ret) {
@@ -1018,25 +1025,28 @@ public:
         vector<string> states = { "running", "dead", "stopped", "paused" };
         size_t stateLen = CalculateFieldLength(states);
         size_t nameLen = CalculateFieldLength(clist);
-        size_t timeLen = 10;
+        size_t timeLen = 12;
         for (auto c : clist) {
             if (c == "/")
                 continue;
 
-            string s;
-            ret = Api->GetData(c, "state", s);
-            if (ret)
-                PrintError("Can't get container state");
+            std::cout << std::left << std::setw(nameLen) << c;
 
-            std::cout << std::left << std::setw(nameLen) << c
-                      << std::right << std::setw(stateLen) << s;
+            if (details) {
+                string s;
+                ret = Api->GetData(c, "state", s);
+                if (ret)
+                    PrintError("Can't get container state");
 
-            if (s == "running" || s == "dead") {
-                string tm;
-                ret = Api->GetData(c, "time", tm);
-                if (!ret)
-                        std::cout << std::right << std::setw(timeLen)
-                            << DataValue("time", tm);
+                std::cout << std::right << std::setw(stateLen) << s;
+
+                if (s == "running" || s == "dead") {
+                    string tm;
+                    ret = Api->GetData(c, "time", tm);
+                    if (!ret)
+                            std::cout << std::right << std::setw(timeLen)
+                                << DataValue("time", tm);
+                }
             }
 
             std::cout << std::endl;
@@ -1174,6 +1184,66 @@ public:
     }
 };
 
+class TCreateVolumeCmd : public ICmd {
+public:
+    TCreateVolumeCmd(TPortoAPI *api) : ICmd(api, "vcreate", 2,
+                                            "<path> <source> [quota] [flags...]", "create volume") {}
+
+    int Execute(int argc, char *argv[]) {
+        std::string flags = (argc == 4 ? argv[3] : "");
+        std::string quota = (argc >= 3 ? argv[2] : "0");
+        int ret = Api->CreateVolume(argv[0], argv[1], quota, flags);
+        if (ret) {
+            PrintError("Can't create volume");
+            return ret;
+        }
+
+        return 0;
+    }
+};
+
+class TDestroyVolumeCmd : public ICmd {
+public:
+    TDestroyVolumeCmd(TPortoAPI *api) : ICmd(api, "vdestroy", 1, "<path> [path...]", "destroy volume") {}
+
+    int Execute(int argc, char *argv[]) {
+        for (int i = 0; i < argc; i++) {
+            int ret = Api->DestroyVolume(argv[i]);
+            if (ret) {
+                PrintError("Can't destroy volume");
+                return ret;
+            }
+        }
+
+        return 0;
+    }
+};
+
+class TListVolumesCmd : public ICmd {
+public:
+    TListVolumesCmd(TPortoAPI *api) : ICmd(api, "vlist", 0, "", "list created volumes") {}
+
+    int Execute(int argc, char *argv[]) {
+        vector<TVolumeDescription> vlist;
+        int ret = Api->ListVolumes(vlist);
+        if (ret) {
+            PrintError("Can't list volumes");
+            return ret;
+        }
+
+        for (auto v : vlist) {
+            std::cout << v.Path << " "
+                      << v.Source << " "
+                      << v.Quota << " "
+                      << v.Flags << " "
+                      << "usage: " << v.Used << "/" << v.Avail << " (" << (v.Used * 100 / v.Avail) << "%) "
+                      << std::endl;
+        }
+
+        return EXIT_SUCCESS;
+    }
+};
+
 int main(int argc, char *argv[]) {
     config.Load(true);
     TPortoAPI api(config().rpc_sock().file().path());
@@ -1197,6 +1267,10 @@ int main(int argc, char *argv[]) {
     RegisterCommand(new TEnterCmd(&api));
     RegisterCommand(new TRunCmd(&api));
     RegisterCommand(new TExecCmd(&api));
+
+    RegisterCommand(new TCreateVolumeCmd(&api));
+    RegisterCommand(new TDestroyVolumeCmd(&api));
+    RegisterCommand(new TListVolumesCmd(&api));
 
     TLogger::DisableLog();
 

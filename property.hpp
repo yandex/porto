@@ -1,5 +1,4 @@
-#ifndef __PROPERTY_HPP__
-#define __PROPERTY_HPP__
+#pragma once
 
 #include <map>
 #include <string>
@@ -14,6 +13,7 @@
 constexpr const char *P_RAW_ROOT_PID = "_root_pid";
 constexpr const char *P_RAW_ID = "_id";
 constexpr const char *P_RAW_LOOP_DEV = "_loop_dev";
+constexpr const char *P_RAW_NAME = "_name";
 constexpr const char *P_COMMAND = "command";
 constexpr const char *P_USER = "user";
 constexpr const char *P_GROUP = "group";
@@ -67,72 +67,51 @@ const unsigned int RESTROOT_PROPERTY = (1 << 3);
 // start with virt_mode==os
 const unsigned int OS_MODE_PROPERTY = (1 << 4);
 
-extern TValueSet propertySet;
-
-#define SYNTHESIZE_ACCESSOR(NAME, TYPE) \
-    TYPE Get ## NAME(const std::string &property) { \
-        if (VariantSet.IsDefault(property)) { \
-            std::shared_ptr<TContainer> c; \
-            if (ParentDefault(c, property)) \
-                return c->GetParent()->Prop->Get ## NAME(property); \
-        } \
-        return VariantSet.Get ## NAME(property); \
-    } \
-    TError Set ## NAME(const std::string &property, \
-                       const TYPE &value) { \
-        if (!propertySet.Valid(property)) { \
-            TError error(EError::InvalidValue, property + " not found"); \
-            L_ERR() << "Can't set property: " << error << std::endl; \
-            return error; \
-        } \
-        return VariantSet.Set ## NAME(property, value); \
-    } \
-    TYPE GetRaw ## NAME(const std::string &property) { \
-        return VariantSet.Get ## NAME(property); \
-    }
-
-class TPropertySet : public TNonCopyable {
+class TPropertyMap : public TValueMap {
     std::weak_ptr<TContainer> Container;
-    const std::string Name;
-    TVariantSet VariantSet;
 
-    TError GetSharedContainer(std::shared_ptr<TContainer> &c);
+    TError GetSharedContainer(std::shared_ptr<TContainer> &c) const;
 
 public:
-    TPropertySet(std::shared_ptr<TKeyValueStorage> storage,
+    TPropertyMap(std::shared_ptr<TKeyValueNode> kvnode,
                  std::shared_ptr<TContainer> c) :
-        Container(c), Name(c->GetName()), VariantSet(storage, &propertySet, c) {}
+        TValueMap(kvnode),
+        Container(c) {}
 
-    SYNTHESIZE_ACCESSOR(String, std::string);
-    SYNTHESIZE_ACCESSOR(Bool, bool);
-    SYNTHESIZE_ACCESSOR(Int, int);
-    SYNTHESIZE_ACCESSOR(Uint, uint64_t);
-    SYNTHESIZE_ACCESSOR(List, TStrList);
-    SYNTHESIZE_ACCESSOR(Map, TUintMap);
-
-    bool IsDefault(const std::string &property);
+    std::string ToString(const std::string &name) const;
     bool ParentDefault(std::shared_ptr<TContainer> &c,
-                       const std::string &property);
+                       const std::string &property) const;
 
-    bool HasFlags(const std::string &property, int flags);
-    bool HasState(const std::string &property, EContainerState state);
+    bool HasFlags(const std::string &property, int flags) const;
+    bool HasState(const std::string &property, EContainerState state) const;
 
-    TError Valid(const std::string &property);
-
-    TError Create();
-    TError Restore(const kv::TNode &node);
-    void Reset(const std::string &name);
-
-    bool HasValue(const std::string &name);
-    TError Flush();
-    TError Sync();
+    TError Check(const std::string &property) const;
 
     TError PrepareTaskEnv(const std::string &property,
                           std::shared_ptr<TTaskEnv> taskEnv);
+
+    template<typename T>
+    const T Get(const std::string &name) const {
+        if (IsDefault(name)) {
+            std::shared_ptr<TContainer> c;
+            if (ParentDefault(c, name))
+                return c->GetParent()->Prop->Get<T>(name);
+        }
+        return TValueMap::Get<T>(name);
+    }
+
+    template<typename T>
+    TError Set(const std::string &name, const T& value) {
+        if (!IsValid(name))
+            return TError(EError::InvalidValue, name + " not found");
+        return TValueMap::Set<T>(name, value);
+    }
+
+    template<typename T>
+    const T GetRaw(const std::string &name) const {
+        return TValueMap::Get<T>(name);
+    }
 };
 
-#undef SYNTHESIZE_ACCESSOR
-
-TError RegisterProperties();
-
-#endif
+void RegisterProperties(std::shared_ptr<TRawValueMap> m,
+                        std::shared_ptr<TContainer> c);

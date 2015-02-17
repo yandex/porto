@@ -8,7 +8,7 @@ say() { [ ! -t 1 ] || tput setaf 3; echo "$@"; [ ! -t 1 ] || tput sgr0; }
 
 selftest() {
 	say "Self test with network=$1"
-	echo "log { verbose: true } network { enabled: $1 dynamic_ifaces: false } container { use_hierarchy: true } privileges { root_user: \"$USER\" restricted_root_user: \"daemon\" }" > /etc/portod.conf
+	echo "log { verbose: true } network { enabled: $1 dynamic_ifaces: false } container { use_hierarchy: true } privileges { root_user: \"$USER\" restricted_root_user: \"daemon\" } volumes { enabled: true }" > /etc/portod.conf
 	shift
 	portotest "$@"
 }
@@ -20,9 +20,79 @@ stresstest() {
 
 pkgtest() {
 	say "Package test"
+	mkdir -p /place
 	for f in $ROOTDIR/dist/*.conf; do
-		$ROOTDIR/scripts/mkimg 5G ${f}.img $f -vT -c $ROOTDIR
+		img=/place/$(basename $f).img
+		touch $img
+		$ROOTDIR/scripts/mkimg 5G $img $f -vTd -c $ROOTDIR
 	done
+}
+
+HOST=kernel1.search.yandex.net
+PORT=8080
+
+IFACES=$(ip l | grep -w 'eth.' | awk '{print $2}' | tr -d ':')
+
+getrate() {
+	local guarantee=$1
+	local ceil=$2
+
+	local prop=""
+	for iface in $IFACES; do
+		[ -z "$guarantee" ] || prop="$prop net_guarantee[$iface]=$guarantee"
+		[ -z "$ceil" ] || prop="$prop net_ceil[$iface]=$ceil"
+	done
+
+	#say "Use limits:$prop" >&2
+
+	printf '%.0f' $(portoctl exec iperf-$guarantee-$ceil command="iperf -c $HOST -p $PORT" $prop | grep '/sec' | awk '{print $5}' 2>/dev/null)
+}
+
+expect() {
+	local what=$1
+	local min=$2
+	local max=$3
+
+	if [ $what -lt $min -o $what -gt $max ]; then
+		say "- unexpected $min < $what < $max"
+		exit 1
+	else
+		say "- rate $what"
+	fi
+}
+
+nettest() {
+	# ssh kernel1 iperf -s -p 8080
+
+	say "THE FOLLOWING TEST ASSUMES 100MBIT LINK"
+
+	say "Single container with default limits"
+	expect $(getrate 1) 90 120
+
+	say "1MB/s ceil"
+	expect $(getrate 1 $(echo '1 * 1024 * 1024' | bc)) 8 16
+
+	local a_g=$(echo "100 * 1024 * 1024" | bc)
+
+	say "$a_g guarantee"
+	local a_out=$(mktemp)
+	local b_out=$(mktemp)
+
+	getrate $a_g > $a_out &
+	getrate 1 > $b_out &
+
+	wait
+	wait
+
+	a_rate=$(cat $a_out)
+	b_rate=$(cat $b_out)
+	rm $a_out $b_out
+
+	say "- rate with guarantee $a_rate, without $b_rate"
+	if [ $a_rate -lt $b_rate ]; then
+		say "- unexpected $a_rate > $b_rate"
+		exit 1
+	fi
 }
 
 fixcg() {
@@ -41,6 +111,7 @@ for t in "$@"; do
 		true|false) selftest $t ;;
 		stress) stresstest ;;
 		pkg) pkgtest ;;
+		net) nettest ;;
 		*) say "Invalid test $t"; exit 1 ;;
 	esac
 done

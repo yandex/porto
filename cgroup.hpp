@@ -1,5 +1,4 @@
-#ifndef __CGROUP_HPP__
-#define __CGROUP_HPP__
+#pragma once
 
 #include <string>
 #include <unordered_map>
@@ -64,5 +63,3 @@ public:
     TError Create();
     void Destroy();
 };
-
-#endif

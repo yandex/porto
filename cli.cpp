@@ -2,6 +2,7 @@
 #include <iomanip>
 
 #include "cli.hpp"
+#include "util/signal.hpp"
 #include "util/unix.hpp"
 
 using std::string;

@@ -1,5 +1,4 @@
-#ifndef __SUBSYSTEM_HPP__
-#define __SUBSYSTEM_HPP__
+#pragma once
 
 #include <ostream>
 #include <string>
@@ -92,5 +91,3 @@ extern std::shared_ptr<TCpuacctSubsystem> cpuacctSubsystem;
 extern std::shared_ptr<TNetclsSubsystem> netclsSubsystem;
 extern std::shared_ptr<TBlkioSubsystem> blkioSubsystem;
 extern std::shared_ptr<TDevicesSubsystem> devicesSubsystem;
-
-#endif

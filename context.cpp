@@ -1,19 +1,31 @@
 #include "context.hpp"
+#include "epoll.hpp"
 #include "util/log.hpp"
+#include "util/unix.hpp"
 #include "config.hpp"
 
-TContext::TContext() {
+TContext:: TContext() {
     Storage = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().keyval().file().path(), "tmpfs", { config().keyval().size() }));
+    VolumeStorage = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().volumes().keyval().file().path(), "tmpfs", { config().volumes().keyval().size() }));
     Queue = std::make_shared<TEventQueue>();
     Net = std::make_shared<TNetwork>();
-    Cholder = std::make_shared<TContainerHolder>(Queue, Net, Storage);
+    EpollLoop = std::make_shared<TEpollLoop>();
+    Cholder = std::make_shared<TContainerHolder>(EpollLoop, Queue, Net, Storage);
+    Vholder = std::make_shared<TVolumeHolder>(VolumeStorage);
 }
 
 TError TContext::Initialize() {
     TError error;
 
+    error = EpollLoop->Create();
+    if (error)
+        return error;
+
     // don't fail, try to recover anyway
     error = Storage->MountTmpfs();
+    if (error)
+        L_ERR() << "Can't create key-value storage, skipping recovery: " << error << std::endl;
+    error = VolumeStorage->MountTmpfs();
     if (error)
         L_ERR() << "Can't create key-value storage, skipping recovery: " << error << std::endl;
 
@@ -66,11 +78,16 @@ TError TContext::Destroy() {
     if (error)
         L_ERR() << "Can't destroy key-value storage: " << error << std::endl;
 
+    error = VolumeStorage->Destroy();
+    if (error)
+        L_ERR() << "Can't destroy volume key-value storage: " << error << std::endl;
+
     error = Net->Destroy();
     if (error)
         L_ERR() << "Can't destroy network: " << error << std::endl;
 
     Cholder->DestroyRoot();
+    Vholder->Destroy();
 
     return TError::Success();
 }

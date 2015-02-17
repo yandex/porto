@@ -3,6 +3,7 @@
 #include "util/log.hpp"
 #include "util/unix.hpp"
 #include "util/folder.hpp"
+#include "util/mount.hpp"
 
 extern "C" {
 #include <sys/stat.h>
@@ -21,12 +22,12 @@ TFolder::~TFolder() {
     if (Tmp) {
         TError error = Remove(true);
         if (error)
-            L_ERR() << "Can't remove " << Path.ToString() << ": " << error << std::endl;
+            L_ERR() << "Can't remove " << Path << ": " << error << std::endl;
     }
 }
 
 TError TFolder::Create(mode_t mode, bool recursive) const {
-    L() << "mkdir " << Path.ToString() << std::endl;
+    L() << "mkdir " << Path << std::endl;
 
     if (recursive) {
         string copy(Path.ToString());
@@ -55,8 +56,7 @@ TError TFolder::Remove(bool recursive) const {
             return error;
 
         for (auto f : items) {
-            TPath p(Path);
-            p.AddComponent(f);
+            TPath p(Path.AddComponent(f));
             TFile child(p);
             TError error;
 
@@ -70,7 +70,7 @@ TError TFolder::Remove(bool recursive) const {
         }
     }
 
-    L() << "rmdir " << Path.ToString() << std::endl;
+    L() << "rmdir " << Path << std::endl;
 
     int ret = RetryBusy(10, 100, [&]{ return rmdir(Path.ToString().c_str()); });
     if (ret)
@@ -111,4 +111,73 @@ TError TFolder::Items(const EFileType type, std::vector<std::string> &list) cons
 
     closedir(dirp);
     return TError::Success();
+}
+
+TError TFolder::Copy(const TPath &dir) const {
+    L() << "cp " << Path << " " << dir << std::endl;
+
+    std::vector<std::string> list;
+    TError error = Items(EFileType::Any, list);
+    if (error)
+        return error;
+
+    for (auto &entry : list) {
+        TPath from(Path.AddComponent(entry));
+        TPath to(dir.AddComponent(entry));
+        TFolder fromDir(from);
+        TFolder toDir(to);
+        switch(from.GetType()) {
+        case EFileType::Directory:
+            if (!toDir.Exists()) {
+                error = toDir.Create(from.GetMode(), true);
+                if (error)
+                    return error;
+            }
+
+            error = fromDir.Copy(to);
+            break;
+        default:
+            error = from.Copy(to);
+            break;
+        }
+
+        if (error)
+            return error;
+
+        error = to.Chown(from.GetUid(), from.GetGid());
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
+}
+
+void RemoveIf(const TPath &path,
+              EFileType type,
+              std::function<bool(const std::string &name, const TPath &path)> f) {
+    std::vector<std::string> list;
+    TFolder dir(path);
+
+    TError error = dir.Items(type, list);
+    if (error)
+        return;
+
+    for (auto &entry : list) {
+        TPath id = path.AddComponent(entry);
+        if (f(entry, id)) {
+            L() << "Removing " << id << std::endl;
+            TMount m(id, id, "", {});
+            (void)m.Umount();
+
+            if (id.GetType() == EFileType::Directory) {
+                TFolder d(id);
+                error = d.Remove(true);
+            } else {
+                TFile f(id);
+                error = f.Remove();
+            }
+            if (error)
+                L_WRN() << "Can't remove " << id << ": " << error << std::endl;
+        }
+    }
 }
