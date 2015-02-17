@@ -500,7 +500,7 @@ public:
         return m;
     }
 
-    TError CheckValue(const TUintMap &value) {
+    TError CheckValue(const TUintMap &value) override {
         std::set<std::string> validKey;
         auto availableLinks = GetContainer()->Net->GetLinks();
 
@@ -553,15 +553,14 @@ public:
     uint32_t GetDef() const override { return config().network().default_prio(); }
     uint32_t GetRootDef() const override { return config().network().default_prio(); }
 
-    TError CheckValue(const TUintMap &value) {
+    TError CheckValue(const TUintMap &value) override {
         TError error = TNetMapValue::CheckValue(value);
         if (error)
             return error;
 
-        for (auto &kv : value) {
+        for (auto &kv : value)
             if (kv.second > 7)
                 return TError(EError::InvalidValue, "invalid value");
-        }
 
         return TError::Success();
     }

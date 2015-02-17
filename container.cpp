@@ -1085,12 +1085,14 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
 
             m[idx] = uval;
             error = Prop->Set<TUintMap>(property, m);
+            if (error)
+                return error;
         }
     } else {
         error = Prop->FromString(property, value);
+        if (error)
+            return error;
     }
-    if (error)
-        return error;
 
     if (ShouldApplyProperty(property))
         error = ApplyDynamicProperties();

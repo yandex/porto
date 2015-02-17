@@ -30,7 +30,7 @@ extern "C" {
 const uint32_t DEF_CLASS_PRIO = 50;
 
 const uint32_t DEF_CLASS_MAX_RATE = -1;
-const uint32_t DEF_CLASS_RATE = -1;
+const uint32_t DEF_CLASS_RATE = 1;
 const uint32_t DEF_CLASS_CEIL = DEF_CLASS_MAX_RATE;
 const uint32_t DEF_CLASS_NET_PRIO = 3;
 
@@ -2127,6 +2127,8 @@ static void TestRoot(TPortoAPI &api) {
         "net_packets",
         "net_drops",
         "net_overlimits",
+        "net_bps",
+        "net_pps",
         "minor_faults",
         "major_faults",
         "io_read",

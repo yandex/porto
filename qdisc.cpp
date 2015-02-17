@@ -293,7 +293,7 @@ TError TNetwork::PrepareLink(std::shared_ptr<TNlLink> link) {
 
     uint64_t prio, rate, ceil;
     prio = config().container().default_cpu_prio();
-    rate = config().network().default_guarantee();
+    rate = config().network().default_max_guarantee();
     ceil = config().network().default_limit();
 
     error = tclass.Create(prio, rate, ceil);

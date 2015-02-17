@@ -309,7 +309,7 @@ public:
         TUintMap m;
         TError error = GetContainer()->GetStat(ETclassStat::PPS, m);
         if (error)
-            L_ERR() << "Can't get network speed (bps): " << error << std::endl;
+            L_ERR() << "Can't get network speed (pps): " << error << std::endl;
         return m;
     }
 };
