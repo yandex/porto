@@ -1011,7 +1011,11 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
         return error;
 
     if (idx.length()) {
-        TUintMap m = Prop->Get<TUintMap>(property);
+        TUintMap m;
+        TError error = Prop->GetChecked<TUintMap>(property, m);
+        if (error)
+            return TError(EError::InvalidValue, "Invalid subscript for property");
+
         if (m.find(idx) == m.end())
             return TError(EError::InvalidValue, "invalid index " + idx);
 
@@ -1066,22 +1070,25 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
         return TError(EError::NotSupported, "Can't set " + property + " for child container");
 
     if (idx.length()) {
-        TUintMap m = Prop->Get<TUintMap>(property);
-        if (m.find(idx) == m.end()) {
-            return TError(EError::InvalidValue, "invalid index " + idx);
-        } else {
-            std::stringstream str;
-            for (auto kv: m) {
-                if (kv.first == idx)
-                    str << kv.first << ":" << value << ";";
-                else
-                    str << kv.first << ":" << kv.second << ";";
-            }
-            value = str.str();
-        }
-    }
+        TUintMap m;
+        TError error = Prop->GetChecked<TUintMap>(property, m);
+        if (error)
+            return TError(EError::InvalidValue, "Invalid subscript for property");
 
-    error = Prop->FromString(property, value);
+        if (m.find(idx) == m.end()) {
+            return TError(EError::InvalidValue, "Invalid index " + idx);
+        } else {
+            uint64_t uval;
+            TError error = StringToUint64(value, uval);
+            if (error)
+                return TError(EError::InvalidValue, "Invalid integer value for index " + idx);
+
+            m[idx] = uval;
+            error = Prop->Set<TUintMap>(property, m);
+        }
+    } else {
+        error = Prop->FromString(property, value);
+    }
     if (error)
         return error;
 

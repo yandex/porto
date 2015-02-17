@@ -93,6 +93,9 @@ static void ShouldHaveOnlyRoot(TPortoAPI &api) {
 static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     string v;
 
+    ExpectApiFailure(api.GetProperty(name, "command[1]", v), EError::InvalidValue);
+    ExpectApiFailure(api.SetProperty(name, "command[1]", "ls"), EError::InvalidValue);
+
     ExpectApiSuccess(api.GetProperty(name, "command", v));
     Expect(v == string(""));
     ExpectApiSuccess(api.GetProperty(name, "cwd", v));

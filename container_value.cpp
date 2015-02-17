@@ -10,9 +10,12 @@ void AddContainerValue(std::shared_ptr<TRawValueMap> m, std::shared_ptr<TContain
 
 TContainerValue *ToContainerValue(TAbstractValue *av) {
     try {
-        return dynamic_cast<TContainerValue *>(av);
+        auto p = dynamic_cast<TContainerValue *>(av);
+        if (!p)
+            PORTO_RUNTIME_ERROR("Invalid value cast");
+        return p;
     } catch (std::bad_cast &e) {
-        PORTO_RUNTIME_ERROR(std::string("Invalid variant cast: ") + e.what());
+        PORTO_RUNTIME_ERROR(std::string("Invalid value cast: ") + e.what());
         return nullptr;
     }
 }
