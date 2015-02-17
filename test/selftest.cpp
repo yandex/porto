@@ -473,6 +473,11 @@ static void TestHolder(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy("a/b"));
     ExpectApiSuccess(api.Destroy("a"));
 
+    Say() << "Make sure porto returns valid error code for destroy" << std::endl;
+    ExpectApiFailure(api.Destroy("/"), EError::InvalidValue);
+    ExpectApiFailure(api.Destroy("doesntexist"), EError::ContainerDoesNotExist);
+    ExpectApiFailure(api.Destroy("z$"), EError::ContainerDoesNotExist);
+
     ShouldHaveOnlyRoot(api);
 }
 

@@ -49,6 +49,8 @@ static TError DestroyContainer(TContext &context,
             TError error = container->CheckPermission(client->Cred);
             if (error)
                 return error;
+        } else {
+            return TError(EError::ContainerDoesNotExist, "invalid name");
         }
     }
 

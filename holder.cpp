@@ -154,7 +154,7 @@ TError TContainerHolder::_Destroy(const std::string &name) {
 }
 
 TError TContainerHolder::Destroy(const std::string &name) {
-    if (name == ROOT_CONTAINER || Containers.find(name) == Containers.end())
+    if (name == ROOT_CONTAINER || !ValidName(name))
         return TError(EError::InvalidValue, "invalid container name " + name);
 
     return _Destroy(name);
