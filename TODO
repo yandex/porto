@@ -1,50 +1,28 @@
-- update wiki howto (when remove cpu_priority)
-- make sure macvlan allows container<>container connections without external switch
-- make fuzzy test and check for portod respawns
-- ? portoctl gc to remove all dead/stopped containers
-- ? portoctl stopall startall restartall
-- fix f*cking capabilities test on newer kernels
-- fix netfilter bug with >3.10
-- mount root loop in root namespace (to better diagnose possible problems)
-- root_readonly: remount root instead of binding into itself with ro
-- bind fails when source is link
-- remove net_guarantee/net_limit
-- chroot -> pivot_root (to remove all mounts from container)
-- ? create cgroup for portod/portod-slave
 - ? do periodic persistence checks
 - ? use chrt instead of cpu.smart so we don't depend on smart kernels + set rt prio
 
-# volume api
-- do some forced cleanup (umount at least) of source/destination when recovery fails
-- add stresstest
-- ? allow non-empty destination dir if uid/gid matches
-- create volume without tar.gz
+# root property
+- mount root loop in root namespace (to better diagnose possible problems)
+- root_readonly: remount root instead of binding into itself with ro
+- chroot -> pivot_root (to remove all mounts from container)
 
-# properties
-- ? supplementary_groups
-- ? umask
-- ? oneshot
-- ? cpu_cores - reserve some cores for a container
+# 3.18
+- fix netfilter bug
+- fix capabilities selftest on newer kernels
+- enable user namespace for virt_mode=os
 
-# phase 4
-##
-- ? ro+rw images for container distribution
-- ? enable user namespace
-## net
-- ? net_prio 0-7 -> 0-99
-## cpu
-- rt: create cgroup for non-smart tasks and throttle them
-## kernel
+# kernel
 - ? kernel support for cgroup to limit allowed ports
 - ? kernel support for cgroup coredump path
-## other
-- ? start portod in container -> need to parse mountinfo, not mounts (because mountinfo skips mounts outside of chroot)
-- ? use SO_PEERCRED to isolate parent containers from child in portod
-## cleanup
+
+# volume api
+- add stresstest
+- allow non-empty destination dir if uid/gid matches
+- create volume without tar.gz
+
+# cleanup
 - remove extern AckExitStatus from container->Stop()
-- ? rotate (instead of truncating) subprocess stdout/stderr
 - move all 'extern "C"' into one file
 - use some kind of reference count for accounting running children
-## nekt0n
-- add namespaces
+- add c++ namespaces
 - ? get rid of globals/static which have class types (http://google-styleguide.googlecode.com/svn/trunk/cppguide.html#Static_and_Global_Variables)
