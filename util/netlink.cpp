@@ -199,8 +199,8 @@ TError TNlLink::SetDefaultGw(const TNlAddr &addr) {
     return TError::Success();
 }
 
-bool TNlLink::IsLoopback() {
-    return rtnl_link_get_flags(Link) & IFF_LOOPBACK;
+bool TNlLink::HasQueue() {
+    return !(rtnl_link_get_flags(Link) & (IFF_LOOPBACK | IFF_POINTOPOINT | IFF_SLAVE));
 }
 
 TError TNlLink::SetIpAddr(const TNlAddr &addr, const int prefix) {
@@ -570,7 +570,7 @@ TError TNlClass::Create(uint32_t prio, uint32_t rate, uint32_t ceil) {
 
     ret = rtnl_class_add(Link->GetSock(), tclass, NLM_F_CREATE);
     if (ret < 0)
-        error = TError(EError::Unknown, string("Unable to add tclass: ") + nl_geterror(ret));
+        error = TError(EError::Unknown, "Unable to add tclass for link " + Link->GetAlias() + ": " + nl_geterror(ret));
 
 free_class:
     rtnl_class_put(tclass);

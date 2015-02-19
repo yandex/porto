@@ -95,7 +95,7 @@ public:
 
     TError SetDefaultGw(const TNlAddr &addr);
     TError SetIpAddr(const TNlAddr &addr, const int prefix);
-    bool IsLoopback();
+    bool HasQueue();
 
     int GetIndex();
     struct rtnl_link *GetLink() { return Link; }

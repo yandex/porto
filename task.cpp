@@ -495,7 +495,7 @@ TError TTask::EnableNet() {
             }
         }
 
-        if (!gw && !link->IsLoopback())
+        if (!gw && link->HasQueue())
             gw = link;
     }
 
