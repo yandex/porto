@@ -1,3 +1,4 @@
+- update wiki howto (when remove cpu_priority)
 - make sure macvlan allows container<>container connections without external switch
 - make fuzzy test and check for portod respawns
 - ? portoctl gc to remove all dead/stopped containers

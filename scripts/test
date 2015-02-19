@@ -93,6 +93,45 @@ nettest() {
 		say "- unexpected $a_rate > $b_rate"
 		exit 1
 	fi
+
+	local a_l=$(echo "1 * 1024 * 1024" | bc)
+	say "$a_l limit"
+	local a_out=$(mktemp)
+	local b_out=$(mktemp)
+
+	getrate 1 $a_l > $a_out &
+	getrate 1 > $b_out &
+
+	wait
+	wait
+
+	a_rate=$(cat $a_out)
+	b_rate=$(cat $b_out)
+	rm $a_out $b_out
+
+	expect $a_rate 0 16
+	expect $b_rate 16 120
+}
+
+mvlantest() {
+	local iface=eth1
+	local container_suffix=50
+	local host_suffix=60
+
+	local host_net=$(ip addr show dev $iface | grep -w inet | awk '{print $2}')
+	local host_ip=$(echo $host_net | cut -d'/' -f 1)
+	local host_mask=$(echo $host_net | cut -d'/' -f 2)
+	local container_ip=$(echo $host_ip | sed "s/\([0-9]*\.[0-9]*\.[0-9]*\).*/\1.$container_suffix/")
+	local macvlan_ip=$(echo $host_ip | sed "s/\([0-9]*\.[0-9]*\.[0-9]*\).*/\1.$host_suffix/")
+	#local macvlan_ip=$host_ip
+	local default_gw=$(ip -o route | grep default | awk '{print $3}')
+
+	#ip link del macvlan0 || :
+	#ip link add link $iface name macvlan0 type macvlan
+	#ip link set dev macvlan0 up
+	#ip addr add $macvlan_ip/$host_mask dev macvlan0
+
+	portoctl exec ping command="ping $host_ip" net="macvlan $iface eth0" ip="eth0 $container_ip/$host_mask" default_gw="$default_gw"
 }
 
 fixcg() {
@@ -112,6 +151,7 @@ for t in "$@"; do
 		stress) stresstest ;;
 		pkg) pkgtest ;;
 		net) nettest ;;
+		macvlan) mvlantest ;;
 		*) say "Invalid test $t"; exit 1 ;;
 	esac
 done

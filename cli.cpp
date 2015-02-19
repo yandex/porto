@@ -9,6 +9,15 @@ using std::string;
 using std::map;
 using std::vector;
 
+size_t MaxFieldLength(std::vector<std::string> &vec, size_t min) {
+    size_t len = 0;
+    for (auto &i : vec)
+        if (i.length() > len)
+            len  = i.length();
+
+    return (len > min ? len : min) + 1;
+}
+
 ICmd::ICmd(TPortoAPI *api, const string& name, int args, const string& usage, const string& desc) :
     Api(api), Name(name), Usage(usage), Desc(desc), NeedArgs(args) {}
 
@@ -66,14 +75,49 @@ static map<string, ICmd *> commands;
 
 THelpCmd::THelpCmd(TPortoAPI *api, bool usagePrintData) : ICmd(api, "help", 1, "[command]", "print help message for command"), UsagePrintData(usagePrintData) {}
 
+static void PrintAligned(const std::string &name, const std::string &desc,
+                         const size_t nameWidth, const size_t termWidth) {
+    std::vector<std::string> v;
+    size_t descWidth = termWidth - nameWidth - 2;
+
+    size_t start = 0;
+    for (size_t i = 0; i < desc.length(); i++) {
+        if (i - start > descWidth) {
+            v.push_back(std::string(desc, start, i - start));
+            start = i;
+        }
+    }
+    std::string last = std::string(desc, start, desc.length());
+    if (last.length())
+        v.push_back(last);
+
+    std::cerr << " " << std::left << std::setw(nameWidth) << name
+        << v[0] << std::endl;
+    for (size_t i = 1; i < v.size(); i++)
+        std::cerr << " " << std::left << std::setw(nameWidth) << " "
+            << v[i] << std::endl;
+}
+
+
 void THelpCmd::Usage() {
-    const int nameWidth = 32;
+    int nameWidth;
+    int termWidth = 80;
+
+    struct winsize w;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0)
+        termWidth = w.ws_col;
 
     std::cerr << "Usage: " << program_invocation_short_name << " <command> [<args>]" << std::endl;
     std::cerr << std::endl;
     std::cerr << "Command list:" << std::endl;
+
+    std::vector<std::string> tmpVec;
     for (auto i : commands)
-        std::cerr << " " << std::left << std::setw(nameWidth) << i.second->GetName() << i.second->GetDescription() << std::endl;
+        tmpVec.push_back(i.first);
+    nameWidth = MaxFieldLength(tmpVec);
+
+    for (auto i : commands)
+        PrintAligned(i.second->GetName(), i.second->GetDescription(), nameWidth, termWidth);
 
     int ret;
     std::cerr << std::endl << "Property list:" << std::endl;
@@ -81,10 +125,15 @@ void THelpCmd::Usage() {
     ret = Api->Plist(plist);
     if (ret) {
         PrintError("Unavailable");
-    } else
+    } else {
+        tmpVec.clear();
         for (auto p : plist)
-            std::cerr << " " << std::left << std::setw(nameWidth) << p.Name
-                << p.Description << std::endl;
+            tmpVec.push_back(p.Name);
+        nameWidth = MaxFieldLength(tmpVec);
+
+        for (auto p : plist)
+            PrintAligned(p.Name, p.Description, nameWidth, termWidth);
+    }
 
     if (!UsagePrintData)
         return;
@@ -92,12 +141,17 @@ void THelpCmd::Usage() {
     std::cerr << std::endl << "Data list:" << std::endl;
     vector<TData> dlist;
     ret = Api->Dlist(dlist);
-    if (ret)
+    if (ret) {
         PrintError("Unavailable");
-    else
+    } else {
+        tmpVec.clear();
         for (auto d : dlist)
-            std::cerr << " " << std::left << std::setw(nameWidth) << d.Name
-                << d.Description << std::endl;
+            tmpVec.push_back(d.Name);
+        nameWidth = MaxFieldLength(tmpVec);
+
+        for (auto d : dlist)
+            PrintAligned(d.Name, d.Description, nameWidth, termWidth);
+    }
 }
 
 int THelpCmd::Execute(int argc, char *argv[]) {

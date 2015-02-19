@@ -216,7 +216,7 @@ public:
     TEnvProperty() :
         TListValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_ENV,
-                        "Container environment variables",
+                        "Container environment variables: <name>: <value>; ...",
                         staticProperty) {}
 };
 
@@ -225,7 +225,7 @@ public:
     TRootProperty() :
         TStringValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_ROOT,
-                     "Container root directory",
+                     "Container root directory (container will be chrooted into this directory)",
                      staticProperty) {}
 
     std::string GetDefault() const override {
@@ -365,7 +365,7 @@ public:
     TMemoryGuaranteeProperty() :
         TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE),
         TContainerValue(P_MEM_GUARANTEE,
-                        "Guaranteed amount of memory",
+                        "Guaranteed amount of memory [bytes]",
                         dynamicProperty) {}
 
     TError CheckValue(const uint64_t &value) override {
@@ -393,7 +393,7 @@ public:
     TMemoryLimitProperty() :
         TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE),
         TContainerValue(P_MEM_LIMIT,
-                        "Memory hard limit",
+                        "Memory hard limit [bytes]",
                         dynamicProperty) {}
 
     TError CheckValue(const uint64_t &value) override {
@@ -634,7 +634,7 @@ public:
     TUlimitProperty() :
         TListValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_ULIMIT,
-                        "Container resource limits",
+                        "Container resource limits: <type> <soft> <hard>; ... (man 2 getrlimit)",
                         staticProperty) {}
 
     TError CheckValue(const std::vector<std::string> &lines) override {
@@ -745,7 +745,7 @@ public:
     TBindProperty() :
         TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY),
         TContainerValue(P_BIND,
-                        "Share host directories with container",
+                        "Share host directories with container: <host_path> <container_path> [ro|rw]; ...",
                         staticProperty) {}
 
     TError CheckValue(const std::vector<std::string> &lines) override {
@@ -798,7 +798,7 @@ public:
     TDefaultGwProperty() :
         TStringValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | HIDDEN_VALUE),
         TContainerValue(P_DEFAULT_GW,
-                        "Default gateway",
+                        "Default gateway: <ip>",
                         staticProperty) {}
 
     std::string GetDefault() const override {
@@ -822,7 +822,7 @@ public:
     TIpProperty() :
         TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | HIDDEN_VALUE),
         TContainerValue(P_IP,
-                        "IP configuration",
+                        "IP configuration: <interface> <ip>/<prefix>",
                         staticProperty) {}
 
     TStrList GetDefault() const override {
@@ -864,7 +864,7 @@ public:
     TNetProperty() :
         TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_NET,
-                        "Container network settings",
+                        "Container network settings: host [interface] | macvlan <master> <name> [type] [mtu] [hw] | veth <name> <bridge> [mtu] [hw]",
                         staticProperty) {}
 
     TStrList GetDefault() const override {
@@ -928,8 +928,6 @@ public:
                     NetCfg.Host.push_back(hnet);
                 }
             } else if (type == "macvlan") {
-                // macvlan <master> <name> [type] [mtu] [hw]
-
                 if (settings.size() < 3)
                     return TError(EError::InvalidValue, "Invalid macvlan in: " + line);
 
@@ -978,8 +976,6 @@ public:
 
                 NetCfg.MacVlan.push_back(mvlan);
             } else if (type == "veth") {
-                // veth <name> <bridge> [mtu] [hw]
-
                 if (settings.size() < 3)
                     return TError(EError::InvalidValue, "Invalid veth in: " + line);
                 std::string name = StringTrim(settings[1]);
@@ -1031,7 +1027,7 @@ public:
     TAllowedDevicesProperty() :
         TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY),
         TContainerValue(P_ALLOWED_DEVICES,
-                        "Devices that container can create/read/write",
+                        "Devices that container can create/read/write: <c|b|a> <maj>:<min> [r][m][w]; ...",
                         staticProperty) {}
 
     TStrList GetDefault() const override {
@@ -1099,7 +1095,7 @@ public:
     TCapabilitiesProperty() :
         TListValue(PERSISTENT_VALUE | OS_MODE_PROPERTY | SUPERUSER_PROPERTY),
         TContainerValue(P_CAPABILITIES,
-                        "Limit container capabilities",
+                        "Limit container capabilities: list of capabilities without CAP_ prefix (man 7 capabilities)",
                         staticProperty) {}
 
     TStrList GetDefault() const override {
@@ -1143,7 +1139,7 @@ public:
     TVirtModeProperty() :
         TIntValue(PERSISTENT_VALUE | RESTROOT_PROPERTY),
         TContainerValue(P_VIRT_MODE,
-                        "Virtualization mode: os or app",
+                        "Virtualization mode: os|app",
                         staticProperty) {}
 
     TError CheckValue(const int &value) override {

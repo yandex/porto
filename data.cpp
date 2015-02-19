@@ -75,7 +75,7 @@ public:
     TParentData() :
         TStringValue(0),
         TContainerValue(D_PARENT,
-                        "parent container",
+                        "parent container name",
                         anyState) {}
 
     std::string GetDefault() const override {
@@ -285,7 +285,7 @@ public:
     TNetBPSData() :
         TMapValue(0),
         TContainerValue(D_NET_BPS,
-                        "current network traffic (bytes/s)",
+                        "current network traffic [bytes/s]",
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
@@ -302,7 +302,7 @@ public:
     TNetPPSData() :
         TMapValue(0),
         TContainerValue(D_NET_PPS,
-                        "current network traffic (packets/s)",
+                        "current network traffic [packets/s]",
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
@@ -449,7 +449,7 @@ public:
     TMaxRssData() :
         TUintValue(0),
         TContainerValue(D_MAX_RSS,
-                        "Guaranteed amount of memory",
+                        "maximum amount of anonymous memory container consumed",
                         rpdmState) {}
 
     uint64_t GetDefault() const override {

@@ -36,5 +36,6 @@ public:
     int Execute(int argc, char *argv[]);
 };
 
+size_t MaxFieldLength(std::vector<std::string> &vec, size_t min = 8);
 void RegisterCommand(ICmd *cmd);
 int HandleCommand(TPortoAPI *api, int argc, char *argv[]);

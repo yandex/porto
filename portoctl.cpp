@@ -153,15 +153,6 @@ string DataValue(const string &name, const string &val) {
     }
 }
 
-size_t CalculateFieldLength(vector<string> &vec, size_t min = 8) {
-    size_t len = 0;
-    for (auto &i : vec)
-        if (i.length() > len)
-            len  = i.length();
-
-    return (len > min ? len : min) + 1;
-}
-
 const std::string StripIdx(const std::string &name) {
     if (name.find('[') != std::string::npos)
         return std::string(name.c_str(), name.find('['));
@@ -1023,8 +1014,8 @@ public:
         }
 
         vector<string> states = { "running", "dead", "stopped", "paused" };
-        size_t stateLen = CalculateFieldLength(states);
-        size_t nameLen = CalculateFieldLength(clist);
+        size_t stateLen = MaxFieldLength(states);
+        size_t nameLen = MaxFieldLength(clist);
         size_t timeLen = 12;
         for (auto c : clist) {
             if (c == "/")
@@ -1110,7 +1101,7 @@ public:
         }
 
         string sortBy = showData[0];
-        size_t nameLen = CalculateFieldLength(clist, strlen("container"));
+        size_t nameLen = MaxFieldLength(clist, strlen("container"));
 
         for (auto container : clist) {
             string state;
@@ -1162,7 +1153,7 @@ public:
             for (auto &pair : containerData)
                 tmp.push_back(HumanValue(data, pair.second[data]));
 
-            fieldLen.push_back(CalculateFieldLength(tmp));
+            fieldLen.push_back(MaxFieldLength(tmp));
         }
 
         std::cout << std::left << std::setw(nameLen) << "container";
