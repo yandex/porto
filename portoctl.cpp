@@ -706,7 +706,7 @@ public:
         for (auto iter: properties) {
             ret = Api->SetProperty(containerName, iter.first, iter.second);
             if (ret) {
-                PrintError("Can't set property");
+                PrintError("Can't set property " + iter.first);
                 (void)Api->Destroy(containerName);
                 return EXIT_FAILURE;
             }
