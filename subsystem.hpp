@@ -78,6 +78,7 @@ class TBlkioSubsystem : public TSubsystem {
 public:
     TBlkioSubsystem() : TSubsystem("blkio") {}
     TError Statistics(std::shared_ptr<TCgroup> &cg, const std::string &file, std::vector<BlkioStat> &stat) const;
+    TError SetPolicy(std::shared_ptr<TCgroup> &cg, bool batch);
 };
 
 class TDevicesSubsystem : public TSubsystem {

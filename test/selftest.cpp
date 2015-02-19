@@ -116,6 +116,10 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     Expect(v == "100");
     ExpectApiSuccess(api.GetProperty(name, "cpu_guarantee", v));
     Expect(v == "0");
+    ExpectApiSuccess(api.GetProperty(name, "io_policy", v));
+    Expect(v == "normal");
+    ExpectApiSuccess(api.GetProperty(name, "io_limit", v));
+    Expect(v == "0");
 
     for (auto &link : links) {
         ExpectApiSuccess(api.GetProperty(name, "net_guarantee[" + link->GetAlias() + "]", v));
@@ -2093,6 +2097,8 @@ static void TestRoot(TPortoAPI &api) {
         "cpu_policy",
         "cpu_limit",
         "cpu_guarantee",
+        "io_limit",
+        "io_policy",
         "net_guarantee",
         "net_ceil",
         "net_priority",
@@ -2238,6 +2244,7 @@ static void TestRoot(TPortoAPI &api) {
     Say() << "Check cpu_limit/cpu_guarantee" << std::endl;
     Expect(GetCgKnob("cpu", "", "cpu.cfs_quota_us") == "-1");
     Expect(GetCgKnob("cpu", "", "cpu.shares") == "1024");
+    Expect(GetCgKnob("blkio", "", "blkio.weight") == "1000");
 }
 
 static void TestDataMap(TPortoAPI &api, const std::string &name, const std::string &data) {
@@ -2537,6 +2544,38 @@ static void TestLimits(TPortoAPI &api) {
     ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
     Expect(shares == rootShares * (100 + 1));
     ExpectApiSuccess(api.Stop(name));
+
+    Say() << "Check io_policy" << std::endl;
+    uint64_t rootWeight, weight;
+    ExpectSuccess(StringToUint64(GetCgKnob("blkio", "", "blkio.weight"), rootWeight));
+
+    ExpectApiFailure(api.SetProperty(name, "io_policy", "invalid"), EError::InvalidValue);
+
+    ExpectApiSuccess(api.SetProperty(name, "io_policy", "normal"));
+    ExpectApiSuccess(api.Start(name));
+    ExpectSuccess(StringToUint64(GetCgKnob("blkio", name, "blkio.weight"), weight));
+    Expect(weight == rootWeight);
+    ExpectApiSuccess(api.Stop(name));
+
+    ExpectApiSuccess(api.SetProperty(name, "io_policy", "batch"));
+    ExpectApiSuccess(api.Start(name));
+    ExpectSuccess(StringToUint64(GetCgKnob("blkio", name, "blkio.weight"), weight));
+    Expect(weight != rootWeight || weight == config().container().batch_io_weight());
+    ExpectApiSuccess(api.Stop(name));
+
+    if (HaveCgKnob("memory", "memory.fs_bps_limit")) {
+        Say() << "Check io_limit" << std::endl;
+
+        ExpectApiSuccess(api.SetProperty(name, "io_limit", "0"));
+        ExpectApiSuccess(api.Start(name));
+        Expect(GetCgKnob("memory", name, "memory.fs_bps_limit") == "0");
+        ExpectApiSuccess(api.Stop(name));
+
+        ExpectApiSuccess(api.SetProperty(name, "io_limit", "1000"));
+        ExpectApiSuccess(api.Start(name));
+        Expect(GetCgKnob("memory", name, "memory.fs_bps_limit") == "1000");
+        ExpectApiSuccess(api.Stop(name));
+    }
 
     Say() << "Check net_cls cgroup" << std::endl;
 

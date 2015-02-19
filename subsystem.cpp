@@ -286,6 +286,17 @@ TError TBlkioSubsystem::Statistics(std::shared_ptr<TCgroup> &cg, const std::stri
     return TError::Success();
 }
 
+TError TBlkioSubsystem::SetPolicy(std::shared_ptr<TCgroup> &cg, bool batch) {
+    std::string rootWeight;
+    if (!batch) {
+        TError error = GetRootCgroup()->GetKnobValue("blkio.weight", rootWeight);
+        if (error)
+            return TError(EError::Unknown, "Can't get root blkio.weight");
+    }
+
+    return cg->SetKnobValue("blkio.weight", batch ? std::to_string(config().container().batch_io_weight()) : rootWeight, false);
+}
+
 // Devices
 
 TError TDevicesSubsystem::AllowDevices(std::shared_ptr<TCgroup> &cg, const std::vector<std::string> &allowed) {

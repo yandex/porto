@@ -490,6 +490,47 @@ public:
     }
 };
 
+class TIoPolicyProperty : public TStringValue, public TContainerValue {
+public:
+    TIoPolicyProperty() :
+        TStringValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
+        TContainerValue(P_IO_POLICY,
+                        "IO policy: normal, batch",
+                        dynamicProperty) {}
+
+    std::string GetDefault() const override {
+        return "normal";
+    }
+
+    TError CheckValue(const std::string &value) override {
+        if (value != "normal" && value != "batch")
+            return TError(EError::InvalidValue, "invalid policy");
+
+        return TError::Success();
+    }
+};
+
+class TIoLimitProperty : public TUintValue, public TContainerValue {
+public:
+    TIoLimitProperty() :
+        TUintValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
+        TContainerValue(P_IO_LIMIT,
+                        "IO limit",
+                        dynamicProperty) {}
+
+    uint64_t GetDefault() const override {
+        return 0;
+    }
+
+    TError CheckValue(const uint64_t &value) override {
+        auto memroot = memorySubsystem->GetRootCgroup();
+        if (!memroot->HasKnob("memory.fs_bps_limit"))
+            return TError(EError::NotSupported, "invalid kernel");
+
+        return TError::Success();
+    }
+};
+
 class TNetMapValue : public TMapValue, public TContainerValue {
     uint64_t Def, RootDef;
 
@@ -1226,6 +1267,8 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TCpuPolicyProperty,
         new TCpuLimitProperty,
         new TCpuGuaranteeProperty,
+        new TIoPolicyProperty,
+        new TIoLimitProperty,
         new TNetGuaranteeProperty,
         new TNetCeilProperty,
         new TNetPriorityProperty,

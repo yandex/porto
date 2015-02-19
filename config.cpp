@@ -62,6 +62,7 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_stop_timeout_ms(1000);
     config().mutable_container()->set_use_hierarchy(true);
     config().mutable_container()->set_max_total(3000);
+    config().mutable_container()->set_batch_io_weight(10);
 
     config().mutable_volumes()->mutable_keyval()->mutable_file()->set_path("/run/porto/pkvs");
     config().mutable_volumes()->mutable_keyval()->mutable_file()->set_perm(0755);

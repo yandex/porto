@@ -332,6 +332,21 @@ TError TContainer::ApplyDynamicProperties() {
         }
     }
 
+    auto blkcg = GetLeafCgroup(blkioSubsystem);
+    error = blkioSubsystem->SetPolicy(blkcg, Prop->Get<std::string>(P_IO_POLICY) == "batch");
+    if (error) {
+        L_ERR() << "Can't set " << P_IO_POLICY << ": " << error << std::endl;
+        return error;
+    }
+
+    if (memroot->HasKnob("memory.fs_bps_limit")) {
+        TError error = memcg->SetKnobValue("memory.fs_bps_limit", Prop->ToString(P_IO_LIMIT), false);
+        if (error) {
+            L_ERR() << "Can't set " << P_IO_LIMIT << ": " << error << std::endl;
+            return error;
+        }
+    }
+
     return TError::Success();
 }
 
