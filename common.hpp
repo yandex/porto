@@ -45,6 +45,7 @@ struct TStatistics {
     std::atomic<int> SlaveTimeoutMs;
     std::atomic<uint64_t> Rotated;
     std::atomic<uint64_t> RestoreFailed;
+    std::atomic<uint64_t> InterruptedReads;
 };
 
 extern TStatistics *Statistics;

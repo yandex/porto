@@ -153,6 +153,7 @@ static bool HandleRequest(TContext &context, std::shared_ptr<TClient> client) {
             ss << std::setw(2) << (int)buf[i];
 
         L() << "Interrupted read from " << client->Fd << ", partial message: " << ss.str() << std:: endl;
+        Statistics->InterruptedReads++;
         return true;
     }
 

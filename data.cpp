@@ -487,6 +487,7 @@ public:
         m["rotated"] = Statistics->Rotated;
         m["restore_failed"] = Statistics->RestoreFailed;
         m["started"] = Statistics->Started;
+        m["interrupted_reads"] = Statistics->InterruptedReads;
 
         return m;
     }
