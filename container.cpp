@@ -308,13 +308,17 @@ TError TContainer::ApplyDynamicProperties() {
             }
         }
 
-        int cpuPrio = Prop->Get<uint64_t>(P_CPU_PRIO);
-        error = cpucg->SetKnobValue("cpu.shares", std::to_string(cpuPrio + 2), false);
+        error = cpuSubsystem->SetLimit(cpucg, Prop->Get<uint64_t>(P_CPU_LIMIT));
         if (error) {
-            L_ERR() << "Can't set " << P_CPU_PRIO << ": " << error << std::endl;
+            L_ERR() << "Can't set " << P_CPU_LIMIT << ": " << error << std::endl;
             return error;
         }
 
+        error = cpuSubsystem->SetGuarantee(cpucg, Prop->Get<uint64_t>(P_CPU_GUARANTEE));
+        if (error) {
+            L_ERR() << "Can't set " << P_CPU_GUARANTEE << ": " << error << std::endl;
+            return error;
+        }
     } else if (Prop->Get<std::string>(P_CPU_POLICY) == "rt") {
         string smart;
 

@@ -454,20 +454,36 @@ public:
     }
 };
 
-class TCpuPriorityProperty : public TUintValue, public TContainerValue {
+class TCpuLimitProperty : public TUintValue, public TContainerValue {
 public:
-    TCpuPriorityProperty() :
+    TCpuLimitProperty() :
         TUintValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
-        TContainerValue(P_CPU_PRIO,
-                        "CPU priority: 0-99",
+        TContainerValue(P_CPU_LIMIT,
+                        "CPU limit: 0-100",
                         dynamicProperty) {}
 
     uint64_t GetDefault() const override {
-        return config().container().default_cpu_prio();
+        return 100;
     }
 
     TError CheckValue(const uint64_t &value) override {
-        if (value < 0 || value > 99)
+        if (value < 1 || value > 100)
+            return TError(EError::InvalidValue, "invalid value");
+
+        return TError::Success();
+    }
+};
+
+class TCpuGuaranteeProperty : public TUintValue, public TContainerValue {
+public:
+    TCpuGuaranteeProperty() :
+        TUintValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
+        TContainerValue(P_CPU_GUARANTEE,
+                        "CPU guarantee: 0-100",
+                        dynamicProperty) {}
+
+    TError CheckValue(const uint64_t &value) override {
+        if (value > 100)
             return TError(EError::InvalidValue, "invalid value");
 
         return TError::Success();
@@ -1208,7 +1224,8 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TMemoryLimitProperty,
         new TRechargeOnPgfaultProperty,
         new TCpuPolicyProperty,
-        new TCpuPriorityProperty,
+        new TCpuLimitProperty,
+        new TCpuGuaranteeProperty,
         new TNetGuaranteeProperty,
         new TNetCeilProperty,
         new TNetPriorityProperty,

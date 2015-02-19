@@ -201,6 +201,9 @@ TRawValueMap::~TRawValueMap() {
 }
 
 TError TRawValueMap::Add(const std::string &name, TAbstractValue *av) {
+    if (AbstractValues.find(name) != AbstractValues.end())
+        PORTO_RUNTIME_ERROR("Duplicate value");
+
     AbstractValues[name] = av;
     return TError::Success();
 }

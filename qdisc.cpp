@@ -71,7 +71,7 @@ TError TTclass::Create(bool fallback) {
 
         if (Prio.find(alias) == Prio.end()) {
             if (fallback)
-                Prio[alias] = config().container().default_cpu_prio();
+                Prio[alias] = config().network().default_prio();
             else
                 return TError(EError::Unknown, "Unknown interface " + alias + " in net_priority");
         }
@@ -292,7 +292,7 @@ TError TNetwork::PrepareLink(std::shared_ptr<TNlLink> link) {
     TNlClass tclass(link, rootHandle, defClass);
 
     uint64_t prio, rate, ceil;
-    prio = config().container().default_cpu_prio();
+    prio = config().network().default_prio();
     rate = config().network().default_max_guarantee();
     ceil = config().network().default_limit();
 

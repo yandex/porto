@@ -27,8 +27,6 @@ extern "C" {
 #include <linux/capability.h>
 }
 
-const uint32_t DEF_CLASS_PRIO = 50;
-
 const uint32_t DEF_CLASS_MAX_RATE = -1;
 const uint32_t DEF_CLASS_RATE = 1;
 const uint32_t DEF_CLASS_CEIL = DEF_CLASS_MAX_RATE;
@@ -114,8 +112,10 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     Expect(v == string("0"));
     ExpectApiSuccess(api.GetProperty(name, "cpu_policy", v));
     Expect(v == string("normal"));
-    ExpectApiSuccess(api.GetProperty(name, "cpu_priority", v));
-    Expect(v == std::to_string(DEF_CLASS_PRIO));
+    ExpectApiSuccess(api.GetProperty(name, "cpu_limit", v));
+    Expect(v == "100");
+    ExpectApiSuccess(api.GetProperty(name, "cpu_guarantee", v));
+    Expect(v == "0");
 
     for (auto &link : links) {
         ExpectApiSuccess(api.GetProperty(name, "net_guarantee[" + link->GetAlias() + "]", v));
@@ -2091,7 +2091,8 @@ static void TestRoot(TPortoAPI &api) {
         "memory_limit",
         "recharge_on_pgfault",
         "cpu_policy",
-        "cpu_priority",
+        "cpu_limit",
+        "cpu_guarantee",
         "net_guarantee",
         "net_ceil",
         "net_priority",
@@ -2233,6 +2234,10 @@ static void TestRoot(TPortoAPI &api) {
     ExpectApiFailure(api.Destroy(root), EError::InvalidValue);
     ExpectApiSuccess(api.Destroy("a"));
     ExpectApiSuccess(api.Destroy("b"));
+
+    Say() << "Check cpu_limit/cpu_guarantee" << std::endl;
+    Expect(GetCgKnob("cpu", "", "cpu.cfs_quota_us") == "-1");
+    Expect(GetCgKnob("cpu", "", "cpu.shares") == "1024");
 }
 
 static void TestDataMap(TPortoAPI &api, const std::string &name, const std::string &data) {
@@ -2446,11 +2451,16 @@ static void TestLimits(TPortoAPI &api) {
     }
     ExpectApiSuccess(api.Stop(name));
 
-    Say() << "Check cpu_priority" << std::endl;
-    ExpectApiFailure(api.SetProperty(name, "cpu_priority", "-1"), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "cpu_priority", "100"), EError::InvalidValue);
-    ExpectApiSuccess(api.SetProperty(name, "cpu_priority", "0"));
-    ExpectApiSuccess(api.SetProperty(name, "cpu_priority", "99"));
+    Say() << "Check cpu_limit and cpu_guarantee range" << std::endl;
+    ExpectApiFailure(api.SetProperty(name, "cpu_limit", "0"), EError::InvalidValue);
+    ExpectApiFailure(api.SetProperty(name, "cpu_limit", "101"), EError::InvalidValue);
+    ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "1"));
+    ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "100"));
+
+    ExpectApiFailure(api.SetProperty(name, "cpu_guarantee", "-1"), EError::InvalidValue);
+    ExpectApiFailure(api.SetProperty(name, "cpu_guarantee", "101"), EError::InvalidValue);
+    ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "0"));
+    ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "100"));
 
     Say() << "Check cpu_policy" << std::endl;
     string smart;
@@ -2472,25 +2482,63 @@ static void TestLimits(TPortoAPI &api) {
         ExpectApiSuccess(api.Stop(name));
     }
 
-    string shares;
+    Say() << "Check cpu_limit" << std::endl;
     ExpectApiSuccess(api.SetProperty(name, "cpu_policy", "normal"));
-    ExpectApiSuccess(api.SetProperty(name, "cpu_priority", "0"));
+
+    uint64_t period, quota;
+    ExpectSuccess(StringToUint64(GetCgKnob("cpu", "", "cpu.cfs_period_us"), period));
+    long ncores = sysconf(_SC_NPROCESSORS_CONF);
+
+    const uint64_t minQuota = 1 * 1000;
+    uint64_t half = ncores * period / 2;
+    if (half < minQuota)
+        half = minQuota;
+
+    ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "20"));
     ExpectApiSuccess(api.Start(name));
-    shares = GetCgKnob("cpu", name, "cpu.shares");
-    Expect(shares == "2");
+    ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.cfs_quota_us"), quota));
+    Say() << "quota=" << quota << " half="<< half << " min=" << minQuota << std::endl;
+
+    Expect(quota < half);
+    Expect(quota > minQuota);
     ExpectApiSuccess(api.Stop(name));
 
-    ExpectApiSuccess(api.SetProperty(name, "cpu_priority", "50"));
+    ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "80"));
     ExpectApiSuccess(api.Start(name));
-    shares = GetCgKnob("cpu", name, "cpu.shares");
-    Expect(shares == "52");
+    ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.cfs_quota_us"), quota));
+    Say() << "quota=" << quota << " half="<< half << " min=" << minQuota << std::endl;
+    Expect(quota > half);
+    Expect(quota > minQuota);
     ExpectApiSuccess(api.Stop(name));
 
-    ExpectApiSuccess(api.SetProperty(name, "cpu_priority", "99"));
+    ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "100"));
     ExpectApiSuccess(api.Start(name));
-    shares = GetCgKnob("cpu", name, "cpu.shares");
-    Expect(shares == "101");
+    Expect(GetCgKnob("cpu", name, "cpu.cfs_quota_us") == "-1");
     ExpectApiSuccess(api.Stop(name));
+
+    Say() << "Check cpu_guarantee" << std::endl;
+    uint64_t rootShares, shares;
+    ExpectSuccess(StringToUint64(GetCgKnob("cpu", "", "cpu.shares"), rootShares));
+
+    ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "0"));
+    ExpectApiSuccess(api.Start(name));
+    ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
+    Expect(shares == rootShares);
+    ExpectApiSuccess(api.Stop(name));
+
+    ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "1"));
+    ExpectApiSuccess(api.Start(name));
+    ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
+    Expect(shares == rootShares * (1 + 1));
+    ExpectApiSuccess(api.Stop(name));
+
+    ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "100"));
+    ExpectApiSuccess(api.Start(name));
+    ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
+    Expect(shares == rootShares * (100 + 1));
+    ExpectApiSuccess(api.Stop(name));
+
+    Say() << "Check net_cls cgroup" << std::endl;
 
     uint32_t netGuarantee = 100000, netCeil = 200000, netPrio = 4;
 
@@ -2883,7 +2931,8 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
 
     string exp_limit = "268435456";
     ExpectApiSuccess(api.SetProperty(child, "memory_limit", exp_limit));
-    ExpectApiFailure(api.SetProperty(child, "cpu_priority", "10"), EError::NotSupported);
+    ExpectApiFailure(api.SetProperty(child, "cpu_limit", "10"), EError::NotSupported);
+    ExpectApiFailure(api.SetProperty(child, "cpu_guarantee", "10"), EError::NotSupported);
     ExpectApiSuccess(api.SetProperty(child, "respawn", "true"));
 
     ExpectApiSuccess(api.Start(child));

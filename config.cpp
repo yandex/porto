@@ -58,7 +58,6 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_respawn_delay_ms(1000);
     config().mutable_container()->set_stdout_limit(8 * 1024 * 1024);
     config().mutable_container()->set_private_max(1024);
-    config().mutable_container()->set_default_cpu_prio(50);
     config().mutable_container()->set_kill_timeout_ms(1000);
     config().mutable_container()->set_stop_timeout_ms(1000);
     config().mutable_container()->set_use_hierarchy(true);
