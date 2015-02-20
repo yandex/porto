@@ -36,6 +36,8 @@ selftest() {
 	sudo scripts/test false
 	toprpc
 	sudo scripts/test true
+	toprpc
+	sudo scripts/test dynamic
 	netdown
 	toprpc
 }

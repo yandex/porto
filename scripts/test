@@ -8,7 +8,8 @@ say() { [ ! -t 1 ] || tput setaf 3; echo "$@"; [ ! -t 1 ] || tput sgr0; }
 
 selftest() {
 	say "Self test with network=$1"
-	echo "log { verbose: true } network { enabled: $1 dynamic_ifaces: false } container { use_hierarchy: true } privileges { root_user: \"$USER\" restricted_root_user: \"daemon\" } volumes { enabled: true }" > /etc/portod.conf
+	echo "log { verbose: true } network { enabled: $1 dynamic_ifaces: $2 } container { use_hierarchy: true } privileges { root_user: \"$USER\" restricted_root_user: \"daemon\" } volumes { enabled: true }" > /etc/portod.conf
+	shift
 	shift
 	portotest "$@"
 }
@@ -146,8 +147,9 @@ fixcg
 [ ! $# -eq 0 ] || set -- false true pkg stress
 for t in "$@"; do
 	case $t in
-		self) shift; selftest true "$@"; exit ;;
-		true|false) selftest $t ;;
+		self) shift; selftest true false "$@"; exit ;;
+		true|false) selftest $t false ;;
+		dynamic) selftest true true ;;
 		stress) stresstest ;;
 		pkg) pkgtest ;;
 		net) nettest ;;

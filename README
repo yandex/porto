@@ -32,7 +32,7 @@ Compile with -O0
 # Coverage
 cmake -DCMAKE_BUILD_TYPE=Debug . && make
 
-HOST=vm ./scripts/remote_test true false stress
+HOST=vm ./scripts/remote_test false true stress
 
 rm -rf porto && rsync -4 -av vm:src/porto $PWD
 scripts/gencoverage porto coverage
