@@ -2,11 +2,19 @@ cmake_minimum_required(VERSION 2.8)
 
 PROJECT(yandex-porto)
 
-set(CMAKE_INSTALL_PREFIX /usr)
-set(CMAKE_CXX_FLAGS "-O2 -Wall -std=c++11 -g")
+if(NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE MATCHES None)
+	set(CMAKE_BUILD_TYPE Release)
+endif()
+
+set(CMAKE_CXX_FLAGS "-Wall -std=c++11 -g")
 set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc")
-#set(CMAKE_CXX_FLAGS "-O0 -Wall -std=c++11 -g -fno-omit-frame-pointer -fprofile-arcs -ftest-coverage")
-#set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc -fprofile-arcs -ftest-coverage")
+
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -fno-omit-frame-pointer --coverage")
+set(CMAKE_EXE_LINKER_FLAGS_DEBUG "--coverage")
+
+set(CMAKE_CXX_FLAGS_RELEASE "-O2")
+
+set(CMAKE_INSTALL_PREFIX /usr)
 
 if(EXISTS "/usr/bin/g++-4.7")
     set(CMAKE_CXX_COMPILER "g++-4.7")

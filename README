@@ -29,5 +29,13 @@ Compile with -O0
 ~stfomichev/perf record -e cycles:u -g -F1000 -- portod
 ~stfomichev/perf report --stdio -n -G
 
+# Coverage
+cmake -DCMAKE_BUILD_TYPE=Debug . && make
+
+HOST=vm ./scripts/remote_test true false stress
+
+rm -rf porto && rsync -4 -av vm:src/porto $PWD
+scripts/gencoverage porto coverage
+
 # Debug netlink
 NLDBG=10 NLCB=debug portod

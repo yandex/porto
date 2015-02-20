@@ -9,16 +9,19 @@ DUMMY_ETH=eth9
 getver() { portoctl -v 2>&1 | grep $1 | awk '{print $2}'; }
 checkver() { [ "$2" = "$3" ] || { echo "Invalid $1 version ($2 != $3)"; }; }
 
-build() {
+_build() {
 	version=$(git describe | sed -e 's/^v//')
 	dch --newversion $version "teamcity build"
 	find ../ -name '*.deb' -o -name '*.build' -o -name '*.changes' -print0 | xargs -0 rm -f
-	debuild -i -us -uc -b
+	debuild "$@" -i -us -uc -b
 	sudo dpkg -i ../yandex-porto_${version}_amd64.deb
 
 	checkver server v$version $(getver server)
 	checkver client v$version $(getver client)
 }
+
+build() { _build; }
+debug_build() { _build -e BUILD_TYPE=Debug; }
 
 toprpc() {
 	cat /var/log/portod.log | egrep ': (->|<-)' | cut -d ':' -f4- | sed '$!N;s/\n/ /' | awk '{print $2, $(NF)}' | sed -e 's/ms//' | sort -n -k2 -r > toprpc.txt
@@ -43,6 +46,10 @@ pkgtest() {
 
 stresstest() {
 	sudo scripts/test stress
+}
+
+coverage() {
+	scripts/gencoverage . /var/www
 }
 
 prlog() {

@@ -1,0 +1,50 @@
+#!/bin/sh
+
+set -e
+set -x
+
+if [ $# -eq 0 ]; then
+	echo "Please specify old binary path"
+	exit
+fi
+
+OLDBIN=$(realpath $1)
+
+ROOTDIR=$(cd $(dirname $0)/../ && pwd)
+HOST=${HOST:-vm}
+
+run() { ssh -4 -t "$HOST" sudo -i "bash -c \"$@\""; }
+
+make
+
+run "start yandex-porto" || :
+run "rm -f /home/$USER/portod /home/$USER/$(basename $OLDBIN)"
+scp $OLDBIN portod ${HOST}:
+
+run "chmod 0755 /home/$USER/porto*"
+
+run "ln -sf /home/$USER/$(basename $OLDBIN) /usr/sbin/portod"
+run "restart yandex-porto"
+sleep 5
+run "portoctl -v" ||:
+
+run "portoctl run q command='sleep 1000' isolate=false"
+run "portoctl run w command='sleep 2000'"
+run "portoctl create z"
+run "portoctl create a"
+run "portoctl set a isolate false"
+run "portoctl destroy z"
+
+run "portoctl create a/b"
+run "portoctl set a/b command sleep 3000"
+run "portoctl start a/b"
+
+run "portoctl list"
+
+echo "START NEW VERSION"
+
+run "ln -sf /home/$USER/portod /usr/sbin"
+run "reload yandex-porto"
+sleep 5
+run "portoctl -v" ||:
+run "portoctl list"

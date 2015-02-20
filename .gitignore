@@ -36,3 +36,6 @@
 /dist/yandex/
 *.py[oc]
 /libnl-prefix/
+/coverage.info
+/coverage.info.cleaned
+/coverage/
