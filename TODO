@@ -1,4 +1,3 @@
-- cpu_guarantee 0 -> 1024
 - ? do periodic persistence checks
 - ? use chrt instead of cpu.smart so we don't depend on smart kernels + set rt prio
 

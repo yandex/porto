@@ -46,7 +46,7 @@ class TCpuSubsystem : public TSubsystem {
 public:
     TCpuSubsystem() : TSubsystem("cpu") {}
     TError SetLimit(std::shared_ptr<TCgroup> cg, const uint64_t limit);
-    TError SetGuarantee(std::shared_ptr<TCgroup> cg, const uint64_t guarantee);
+    TError SetGuarantee(std::shared_ptr<TCgroup> cg, uint64_t guarantee);
 };
 
 class TCpuacctSubsystem : public TSubsystem {

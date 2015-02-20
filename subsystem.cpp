@@ -179,7 +179,7 @@ TError TCpuSubsystem::SetLimit(std::shared_ptr<TCgroup> cg, const uint64_t limit
     return cg->SetKnobValue("cpu.cfs_quota_us", std::to_string(runtime), false);
 }
 
-TError TCpuSubsystem::SetGuarantee(std::shared_ptr<TCgroup> cg, const uint64_t guarantee) {
+TError TCpuSubsystem::SetGuarantee(std::shared_ptr<TCgroup> cg, uint64_t guarantee) {
     uint64_t rootShares;
     std::string str;
     TError error = GetRootCgroup()->GetKnobValue("cpu.shares", str);
@@ -189,7 +189,10 @@ TError TCpuSubsystem::SetGuarantee(std::shared_ptr<TCgroup> cg, const uint64_t g
     if (error)
         return TError(EError::Unknown, "Can't parse root cpu.shares");
 
-    return cg->SetKnobValue("cpu.shares", std::to_string((guarantee + 1) * rootShares), false);
+    if (guarantee == 0)
+        guarantee = 1;
+
+    return cg->SetKnobValue("cpu.shares", std::to_string(guarantee * rootShares), false);
 }
 
 // Cpuacct

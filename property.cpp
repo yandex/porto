@@ -459,7 +459,7 @@ public:
     TCpuLimitProperty() :
         TUintValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_CPU_LIMIT,
-                        "CPU limit: 0-100",
+                        "CPU limit: 1-100",
                         dynamicProperty) {}
 
     uint64_t GetDefault() const override {
