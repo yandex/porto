@@ -734,7 +734,7 @@ public:
                 return TError(EError::InvalidValue, "Invalid limits number for " + name);
 
             rlim_t soft, hard;
-            if (softhard[0] == "unlim" || softhard[0] == "unliminted") {
+            if (softhard[0] == "unlim" || softhard[0] == "unlimited") {
                 soft = RLIM_INFINITY;
             } else {
                 TError error = StringToUint64(softhard[0], soft);
@@ -742,7 +742,7 @@ public:
                     return TError(EError::InvalidValue, "Invalid soft limit for " + name);
             }
 
-            if (softhard[1] == "unlim" || softhard[1] == "unliminted") {
+            if (softhard[1] == "unlim" || softhard[1] == "unlimited") {
                 hard = RLIM_INFINITY;
             } else {
                 TError error = StringToUint64(softhard[1], hard);
