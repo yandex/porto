@@ -594,6 +594,9 @@ void TestDaemon(TPortoAPI &api) {
 
     int nl = NetworkEnabled() ? 1 : 0;
 
+    if (config().network().dynamic_ifaces())
+        nl++; // event netlink
+
     // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 4(rpc socket) 5(epoll) 6(netlink socket) 128(event pipe) 129(ack pipe)
     int nr = scandir(path.c_str(), &lst, NULL, alphasort);
     PrintFds(path, lst, nr);
