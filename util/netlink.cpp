@@ -76,10 +76,12 @@ void TNl::Disconnect() {
     if (LinkCache) {
         nl_cache_mngt_unprovide(LinkCache);
         nl_cache_free(LinkCache);
+        LinkCache = nullptr;
     }
     if (Sock) {
         nl_close(Sock);
         nl_socket_free(Sock);
+        Sock = nullptr;
     }
 }
 

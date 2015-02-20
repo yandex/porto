@@ -90,21 +90,28 @@ TError TTclass::Create(bool fallback) {
                 return TError(EError::Unknown, "Unknown interface " + alias + " in net_ceil");
         }
 
-        if (config().network().dynamic_ifaces() &&
-            ParentTclass && !ParentTclass->Exists(link)) {
-            TError error = ParentTclass->Create(true);
-            if (error) {
-                L_ERR() << "Can't create parent tc class: " << error << std::endl;
-                return error;
-            }
-        }
-
         TNlClass tclass(link, GetParent(), Handle);
         TError error = tclass.Create(Prio[link->GetAlias()],
                                      Rate[link->GetAlias()],
                                      Ceil[link->GetAlias()]);
-        if (error)
-            return error;
+        if (error) {
+            // make sure parent exist and retry
+            if (config().network().dynamic_ifaces() &&
+                ParentTclass && !ParentTclass->Exists(link)) {
+                TError error = ParentTclass->Create(true);
+                if (error) {
+                    L_ERR() << "Can't create parent tc class: " << error << std::endl;
+                    return error;
+                }
+
+                error = tclass.Create(Prio[link->GetAlias()],
+                                      Rate[link->GetAlias()],
+                                      Ceil[link->GetAlias()]);
+            }
+
+            if (error)
+                return error;
+        }
     }
 
     return TError::Success();
@@ -237,6 +244,8 @@ TError TNetwork::Update() {
     if (!config().network().dynamic_ifaces())
         return TError::Success();
 
+    L() << "Update network" << std::endl;
+
     std::vector<std::shared_ptr<TNlLink>> newLinks;
 
     TError error = OpenLinks(newLinks);
@@ -313,16 +322,16 @@ TError TNetwork::OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links) {
         Nl = std::make_shared<TNl>();
         if (!Nl)
             throw std::bad_alloc();
-    }
 
-    TError error = Nl->Connect();
-    if (error) {
-        L_ERR() << "Can't open link: " << error << std::endl;
-        return error;
+        TError error = Nl->Connect();
+        if (error) {
+            L_ERR() << "Can't open link: " << error << std::endl;
+            return error;
+        }
     }
 
     if (!devices.size()) {
-        error = Nl->GetDefaultLink(devices);
+        TError error = Nl->GetDefaultLink(devices);
         if (error) {
             L_ERR() << "Can't open link: " << error << std::endl;
             return error;
@@ -338,7 +347,7 @@ TError TNetwork::OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links) {
         if (!l)
             throw std::bad_alloc();
 
-        error = l->Load();
+        TError error = l->Load();
         if (error) {
             L_ERR() << "Can't open link: " << error << std::endl;
             return error;
