@@ -14,26 +14,14 @@ debuild
 # Release new version
 scripts/release
 
-# Run fedora
-yum -y --installroot=/home/stfomichev/src/porto/dist/fedora20 --releasever=20 --nogpg install systemd passwd yum fedora-release vim-minimal openssh-server procps-ng iproute net-tools dhclient
-sudo ./portoctl exec fedora20 command="/sbin/init" root=/home/stfomichev/src/porto/dist/fedora20_stfomichev env="container=lxc" hostname="fedora20"
-sudo ./portoctl exec fedora20 command="/bin/bash" root=/home/stfomichev/src/porto/dist/fedora20 env="container=lxc" user="$USER" group="$USER" hostname="fedora20"
-sudo ./portoctl enter fedora20
-
-# Run debian
-sudo ./portoctl exec trusty command="/sbin/init" root=/home/stfomichev/src/porto/dist/trusty env="container=lxc"
-TODO - fix SELinux:  Could not open policy file <= /etc/selinux/targeted/policy/policy.29:  No such file or directory
-
 # Profile
-Compile with -O0
+cmake -DCMAKE_BUILD_TYPE=Debug . && make
 ~stfomichev/perf record -e cycles:u -g -F1000 -- portod
 ~stfomichev/perf report --stdio -n -G
 
 # Coverage
 cmake -DCMAKE_BUILD_TYPE=Debug . && make
-
 HOST=vm ./scripts/remote_test false true stress
-
 rm -rf porto && rsync -4 -av vm:src/porto $PWD
 scripts/gencoverage porto coverage
 
