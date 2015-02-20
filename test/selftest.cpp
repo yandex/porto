@@ -194,6 +194,8 @@ static void ShouldHaveValidRunningData(TPortoAPI &api, const string &name) {
 
     if (NetworkEnabled()) {
         ExpectApiSuccess(api.GetData(name, "net_bytes", v));
+        ExpectApiSuccess(api.GetData(name, "net_bps", v));
+        ExpectApiSuccess(api.GetData(name, "net_pps", v));
         ExpectApiSuccess(api.GetData(name, "net_packets", v));
         ExpectApiSuccess(api.GetData(name, "net_drops", v));
         ExpectApiSuccess(api.GetData(name, "net_overlimits", v));
@@ -239,6 +241,8 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
 
     if (NetworkEnabled()) {
         ExpectApiFailure(api.GetData(name, "net_bytes", v), EError::InvalidState);
+        ExpectApiFailure(api.GetData(name, "net_bps", v), EError::InvalidState);
+        ExpectApiFailure(api.GetData(name, "net_pps", v), EError::InvalidState);
         ExpectApiFailure(api.GetData(name, "net_packets", v), EError::InvalidState);
         ExpectApiFailure(api.GetData(name, "net_drops", v), EError::InvalidState);
         ExpectApiFailure(api.GetData(name, "net_overlimits", v), EError::InvalidState);
@@ -2411,6 +2415,27 @@ static bool CanTestLimits() {
     return true;
 }
 
+static TUintMap ParseMap(const std::string &s) {
+    TUintMap m;
+    std::vector<std::string> lines;
+    TError error = SplitEscapedString(s, ';', lines);
+    for (auto &line : lines) {
+        std::vector<std::string> nameval;
+
+        ExpectSuccess(SplitEscapedString(line, ':', nameval));
+        Expect(nameval.size() == 2);
+
+        std::string key = StringTrim(nameval[0]);
+        uint64_t val;
+
+        ExpectSuccess(StringToUint64(nameval[1], val));
+
+        m[key] = val;
+    }
+
+    return m;
+}
+
 static void TestLimits(TPortoAPI &api) {
     string name = "a";
     ExpectApiSuccess(api.Create(name));
@@ -2607,16 +2632,32 @@ static void TestLimits(TPortoAPI &api) {
 
             i++;
         }
+
+        ExpectApiSuccess(api.Stop(name));
+
+        Say() << "Make sure we can set map properties without subscript" << std::endl;
+
+        std::string guarantee, v;
+        ExpectApiSuccess(api.GetProperty(name, "net_guarantee", guarantee));
+
+        auto m = ParseMap(guarantee);
+
+        guarantee = "";
+        for (auto pair : m)
+            guarantee += pair.first + ": 1000; ";
+        Expect(guarantee.length() != 0);
+        ExpectApiSuccess(api.SetProperty(name, "net_guarantee", guarantee));
+        ExpectApiSuccess(api.GetProperty(name, "net_guarantee", v));
+        Expect(StringTrim(guarantee, " ;") == v);
+
+        Say() << "Make sure we have a cap for stdout_limit property" << std::endl;
+
+        ExpectApiFailure(api.SetProperty(name, "stdout_limit", std::to_string(config().container().stdout_limit() + 1)), EError::InvalidValue);
+
+        Say() << "Make sure we have a cap for private property" << std::endl;
+        std::string tooLong = std::string(config().container().private_max() + 1, 'a');
+        ExpectApiFailure(api.SetProperty(name, "stdout_limit", tooLong), EError::InvalidValue);
     }
-
-    ExpectApiSuccess(api.Stop(name));
-
-    std::string guarantee, v;
-    for (auto &link : links)
-        guarantee += link->GetAlias() + ": 1000; ";
-    ExpectApiSuccess(api.SetProperty(name, "net_guarantee", guarantee));
-    ExpectApiSuccess(api.GetProperty(name, "net_guarantee", v));
-    Expect(StringTrim(guarantee, " ;") == v);
 
     ExpectApiSuccess(api.Destroy(name));
 }
@@ -2666,6 +2707,11 @@ static void TestUlimitProperty(TPortoAPI &api) {
         Expect(GetRlimit(pid, lim.first, true) == lim.second.first);
         Expect(GetRlimit(pid, lim.first, false) == lim.second.second);
     }
+
+    ExpectApiSuccess(api.Stop(name));
+
+    Say() << "Make sure we can set limit to unlimited" << std::endl;
+    ExpectApiSuccess(api.SetProperty(name, "ulimit", "data: unlim unlimited"));
 
     ExpectApiSuccess(api.Destroy(name));
 }
