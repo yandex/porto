@@ -582,6 +582,7 @@ static int SlaveMain() {
     }
 
     DaemonShutdown(false, ret);
+    context.Destroy();
 
     return ret;
 }
