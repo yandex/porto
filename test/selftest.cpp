@@ -2609,6 +2609,15 @@ static void TestLimits(TPortoAPI &api) {
         }
     }
 
+    ExpectApiSuccess(api.Stop(name));
+
+    std::string guarantee, v;
+    for (auto &link : links)
+        guarantee += link->GetAlias() + ": 1000; ";
+    ExpectApiSuccess(api.SetProperty(name, "net_guarantee", guarantee));
+    ExpectApiSuccess(api.GetProperty(name, "net_guarantee", v));
+    Expect(StringTrim(guarantee, " ;") == v);
+
     ExpectApiSuccess(api.Destroy(name));
 }
 
