@@ -921,7 +921,7 @@ public:
     TNetProperty() :
         TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_NET,
-                        "Container network settings: host [interface] | macvlan <master> <name> [type] [mtu] [hw] | veth <name> <bridge> [mtu] [hw]",
+                        "Container network settings: none | host [interface] | macvlan <master> <name> [type] [mtu] [hw] | veth <name> <bridge> [mtu] [hw]",
                         staticProperty) {}
 
     TStrList GetDefault() const override {
