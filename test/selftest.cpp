@@ -2561,13 +2561,13 @@ static void TestLimits(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "1"));
     ExpectApiSuccess(api.Start(name));
     ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
-    Expect(shares == rootShares * (1 + 1));
+    Expect(shares == rootShares);
     ExpectApiSuccess(api.Stop(name));
 
     ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "100"));
     ExpectApiSuccess(api.Start(name));
     ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
-    Expect(shares == rootShares * (100 + 1));
+    Expect(shares == rootShares * 100);
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check io_policy" << std::endl;
