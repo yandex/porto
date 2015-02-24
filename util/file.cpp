@@ -70,6 +70,15 @@ TError TFile::AsInt(int &value) const {
     return StringToInt(s, value);
 }
 
+TError TFile::AsUint64(uint64_t &value) const {
+    string s;
+    auto ret = AsString(s);
+    if (ret)
+        return ret;
+
+    return StringToUint64(s, value);
+}
+
 TError TFile::AsLines(vector<string> &value) const {
     FILE *f = fopen(Path.ToString().c_str(), "r");
     if (!f)

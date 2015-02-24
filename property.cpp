@@ -1106,9 +1106,14 @@ struct TCapDesc {
 
 #define RESTRICTED_CAP 1
 
+#ifndef CAP_AUDIT_READ
+#define CAP_AUDIT_READ 37
+#endif
+
 class TCapabilitiesProperty : public TListValue, public TContainerValue {
     uint64_t Caps;
     const std::map<std::string, TCapDesc> supported = {
+        { "AUDIT_READ",         { CAP_AUDIT_READ, 0 } },
         { "CHOWN",              { CAP_CHOWN, RESTRICTED_CAP } },
         { "DAC_OVERRIDE",       { CAP_DAC_OVERRIDE, RESTRICTED_CAP } },
         { "DAC_READ_SEARCH",    { CAP_DAC_READ_SEARCH, 0 } },
@@ -1155,6 +1160,15 @@ public:
                         "Limit container capabilities: list of capabilities without CAP_ prefix (man 7 capabilities)",
                         staticProperty) {}
 
+    uint64_t GetLastCap() const {
+        uint64_t lastCap = 36;
+        TFile f("/proc/sys/kernel/cap_last_cap");
+        TError error = f.AsUint64(lastCap);
+        if (error)
+            L() << "Can't read /proc/sys/kernel/cap_last_cap, assuming 3.10 kernel" << std::endl;
+        return lastCap;
+    }
+
     TStrList GetDefault() const override {
         TStrList v;
         auto c = GetContainer();
@@ -1162,8 +1176,9 @@ public:
         bool root = c->Cred.IsRoot();
         bool restricted = c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS;
 
+        uint64_t lastCap = GetLastCap();
         for (auto kv : supported)
-            if (root || (restricted && kv.second.flags & RESTRICTED_CAP))
+            if ((root || (restricted && kv.second.flags & RESTRICTED_CAP)) && kv.second.id <= lastCap)
                 v.push_back(kv.first);
         return v;
     }
@@ -1172,10 +1187,15 @@ public:
     TError CheckValue(const std::vector<std::string> &lines) override {
         uint64_t allowed = 0;
 
+        uint64_t lastCap = GetLastCap();
         for (auto &line: lines) {
             if (supported.find(line) == supported.end())
                 return TError(EError::InvalidValue,
                               "Unsupported capability " + line);
+
+            if (supported.at(line).id > lastCap)
+                return TError(EError::InvalidValue,
+                              "Unsupported kernel capability " + line);
 
             allowed |= (1ULL << supported.at(line).id);
         }

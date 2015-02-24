@@ -8,7 +8,6 @@
 
 # 3.18
 - fix netfilter bug
-- fix capabilities selftest on newer kernels
 - enable user namespace for virt_mode=os
 
 # kernel
