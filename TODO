@@ -7,7 +7,6 @@
 - chroot -> pivot_root (to remove all mounts from container)
 
 # 3.18
-- fix netfilter bug
 - enable user namespace for virt_mode=os
 
 # kernel

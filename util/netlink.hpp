@@ -114,6 +114,7 @@ public:
     TNlClass(std::shared_ptr<TNlLink> link, uint32_t parent, uint32_t handle) : Link(link), Parent(parent), Handle(handle) {}
 
     TError Create(uint32_t prio, uint32_t rate, uint32_t ceil);
+    bool Valid(uint32_t prio, uint32_t rate, uint32_t ceil);
     TError Remove();
     TError GetStat(ETclassStat stat, uint64_t &val);
     TError GetProperties(uint32_t &prio, uint32_t &rate, uint32_t &ceil);

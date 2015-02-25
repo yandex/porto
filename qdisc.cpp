@@ -278,21 +278,25 @@ TError TNetwork::PrepareLink(std::shared_ptr<TNlLink> link) {
     // (unclassified        1:3 container a, 1:4 container b
     //          traffic)    1:5 container a/c
 
+    L() << "Prepare link " << link->GetAlias() << " " << link->GetIndex() << std::endl;
+
     TNlHtb qdisc(link, TcRootHandle(), rootHandle);
 
-    if (qdisc.Valid(defClass))
-        return TError::Success();
-
-    (void)qdisc.Remove();
-
-    TError error = qdisc.Create(defClass);
-    if (error) {
-        L_ERR() << "Can't create root qdisc: " << error << std::endl;
-        return error;
+    if (!qdisc.Valid(defClass)) {
+        (void)qdisc.Remove();
+        TError error = qdisc.Create(defClass);
+        if (error) {
+            L_ERR() << "Can't create root qdisc: " << error << std::endl;
+            return error;
+        }
     }
 
+
     TNlCgFilter filter(link, rootHandle, 1);
-    error = filter.Create();
+    if (filter.Exists())
+        (void)filter.Remove();
+
+    TError error = filter.Create();
     if (error) {
         L_ERR() << "Can't create tc filter: " << error << std::endl;
         return error;
@@ -305,9 +309,14 @@ TError TNetwork::PrepareLink(std::shared_ptr<TNlLink> link) {
     rate = config().network().default_max_guarantee();
     ceil = config().network().default_limit();
 
-    error = tclass.Create(prio, rate, ceil);
-    if (error) {
-        L_ERR() << "Can't create default tclass: " << error << std::endl;
+    if (!tclass.Valid(prio, rate, ceil)) {
+        (void)tclass.Remove();
+
+        TError error = tclass.Create(prio, rate, ceil);
+        if (error) {
+            L_ERR() << "Can't create default tclass: " << error << std::endl;
+            return error;
+        }
     }
 
     return TError::Success();

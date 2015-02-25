@@ -342,8 +342,8 @@ TError TNlLink::RefillCache() {
 
     int ret = nl_cache_refill(GetSock(), Nl->GetCache());
     if (ret < 0) {
-        error = TError(EError::Unknown, string("Unable to add macvlan: ") + nl_geterror(ret));
-        L_ERR() << "Can't refill cache: " << error << std::endl;
+        error = TError(EError::Unknown, string("Can't refill cache: ") + nl_geterror(ret));
+        L_ERR() << error << std::endl;
     } else {
         LogCache(Nl->GetCache());
     }
@@ -677,6 +677,45 @@ TError TNlClass::GetProperties(uint32_t &prio, uint32_t &rate, uint32_t &ceil) {
     return TError::Success();
 }
 
+bool TNlClass::Valid(uint32_t prio, uint32_t rate, uint32_t ceil) {
+    int ret;
+    struct nl_cache *classCache;
+    bool valid = true;
+
+    ret = rtnl_class_alloc_cache(Link->GetSock(),
+                                 Link->GetIndex(),
+                                 &classCache);
+    if (ret < 0)
+        return false;
+
+    Link->LogCache(classCache);
+
+    struct rtnl_class *tclass = rtnl_class_get(classCache, Link->GetIndex(), Handle);
+    if (tclass) {
+        if (rtnl_tc_get_link(TC_CAST(tclass)) != Link->GetLink())
+            valid = false;
+        else if (rtnl_tc_get_parent(TC_CAST(tclass)) != Parent)
+            valid = false;
+        else if (rtnl_tc_get_handle(TC_CAST(tclass)) != Handle)
+            valid = false;
+        else if (rtnl_tc_get_kind(TC_CAST(tclass)) != string("htb"))
+            valid = false;
+        else if (rtnl_htb_get_rate(tclass) != rate)
+            valid = false;
+        else if (prio && rtnl_htb_get_prio(tclass) != prio)
+            valid = false;
+        else if (valid && rtnl_htb_get_ceil(tclass) != ceil)
+            valid = false;
+    } else {
+        valid = false;
+    }
+
+    rtnl_class_put(tclass);
+    nl_cache_free(classCache);
+
+    return valid;
+}
+
 bool TNlClass::Exists() {
     int ret;
     struct nl_cache *classCache;
@@ -814,7 +853,7 @@ TError TNlCgFilter::Create() {
     tchdr.tcm_parent = Parent;
 	tchdr.tcm_info = TC_H_MAKE(FilterPrio << 16, htons(ETH_P_IP));
 
-	msg = nlmsg_alloc_simple(RTM_NEWTFILTER, NLM_F_CREATE);
+	msg = nlmsg_alloc_simple(RTM_NEWTFILTER, NLM_F_EXCL|NLM_F_CREATE);
 	if (!msg)
         return TError(EError::Unknown, "Unable to add filter: no memory");
 

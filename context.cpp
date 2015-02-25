@@ -46,9 +46,10 @@ TError TContext::Initialize() {
         }
 
         TError error = Net->Prepare();
-        if (error)
+        if (error) {
             L_ERR() << "Can't prepare network: " << error << std::endl;
-
+            return error;
+        }
 
         if (Net->Empty()) {
             L() << "Error: couldn't find suitable network interface" << std::endl;
