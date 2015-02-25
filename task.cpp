@@ -275,7 +275,7 @@ TError TTask::CreateNode(const TPath &path, unsigned int mode, unsigned int dev)
     return TError::Success();
 }
 
-TError TTask::RestrictProc(bool restrictProcSys) {
+TError TTask::ChildRestrictProc(bool restrictProcSys) {
     vector<string> dirs = { "/proc/sysrq-trigger", "/proc/irq", "/proc/bus" };
 
     if (restrictProcSys)
@@ -371,33 +371,19 @@ TError TTask::ChildMountDev() {
 }
 
 TError TTask::ChildIsolateFs() {
+    if (Env->Root.ToString() == "/")
+        return ChildBindDirectores();
+
     if (Env->Loop.Exists()) {
         TLoopMount m(Env->Loop, Env->Root, "ext4", Env->LoopDev);
         TError error = m.Mount();
         if (error)
             return error;
-    }
-
-    if (Env->Root.ToString() != "/") {
+    } else {
         TMount root(Env->Root, Env->Root, "none", {});
         TError error = root.BindDir(false, MS_SHARED);
         if (error)
             return error;
-    }
-
-    if (Env->Root.ToString() == "/") {
-        TError error = ChildBindDirectores();
-        if (error)
-            return error;
-
-        if (Env->RootRdOnly) {
-            TMount root("/", "/", "none", {});
-            TError error = root.BindDir(true);
-            if (error)
-                return error;
-        }
-
-        return TError::Success();
     }
 
     unsigned long defaultFlags = MS_NOEXEC | MS_NOSUID | MS_NODEV;
@@ -414,7 +400,7 @@ TError TTask::ChildIsolateFs() {
         return error;
 
     bool privileged = Env->Cred.IsRoot();
-    error = RestrictProc(!privileged);
+    error = ChildRestrictProc(!privileged);
     if (error)
         return error;
 
@@ -444,9 +430,13 @@ TError TTask::ChildIsolateFs() {
     if (error)
         return error;
 
-    if (Env->RootRdOnly == true) {
+    if (Env->RootRdOnly) {
+        int flags = MS_REMOUNT | MS_RDONLY;
+        if (!Env->Loop.Exists())
+            flags |= MS_BIND;
+
         TMount root(Env->Root, Env->Root, "none", {});
-        TError error = root.Mount(MS_BIND | MS_REMOUNT | MS_RDONLY);
+        error = root.Mount(flags);
         if (error)
             return error;
     }
@@ -455,9 +445,14 @@ TError TTask::ChildIsolateFs() {
     if (error)
         return error;
 
-    error = Env->Root.Chroot();
-    if (error)
-        return error;
+    error = PivotRoot(Env->Root);
+    if (error) {
+        L_WRN() << "Can't pivot root, roll back to chroot: " << error << std::endl;
+
+        error = Env->Root.Chroot();
+        if (error)
+            return error;
+    }
 
     TPath newRoot("/");
     return newRoot.Chdir();
@@ -647,8 +642,8 @@ TError TTask::ChildCallback() {
 
     if (Env->Isolate) {
         // remount proc so PID namespace works
-        TMount proc("proc", "/proc", "proc", {});
-        if (proc.MountDir())
+        TMount tmpProc("proc", "/proc", "proc", {});
+        if (tmpProc.MountDir())
             return TError(EError::Unknown, errno, "remount procfs");
     }
 
@@ -775,6 +770,9 @@ TError TTask::Start() {
             Env->NetCfg.Host.clear();
             Env->NetCfg.MacVlan.clear();
         }
+
+        if (Env->RootRdOnly || Env->BindMap.size())
+            cloneFlags |= CLONE_NEWNS;
 
         if (Env->Hostname != "")
             cloneFlags |= CLONE_NEWUTS;

@@ -1251,6 +1251,7 @@ static void TestRootRdOnlyProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "root", path.ToString()));
     AsRoot(api);
     BootstrapCommand("/usr/bin/touch", path.ToString());
+    BootstrapCommand("/bin/cat", path.ToString(), false);
     path.Chown("nobody", "nogroup");
     AsNobody(api);
 
@@ -1269,8 +1270,50 @@ static void TestRootRdOnlyProperty(TPortoAPI &api) {
     Expect(ret != string("0"));
     ExpectApiSuccess(api.Stop(name));
 
+    ExpectApiSuccess(api.SetProperty(name, "root", "/"));
+    ExpectApiSuccess(api.SetProperty(name, "root_readonly", "true"));
+    ExpectApiSuccess(api.SetProperty(name, "command", "touch /test2"));
+    ExpectApiFailure(api.Start(name), EError::InvalidValue);
+
+    Say() << "Make sure pivot_root works and we don't leak host mount points" << std::endl;
+    std::set<std::string> expected = {
+        // restricted proc
+        "/proc/sysrq-trigger",
+        "/proc/irq",
+        "/proc/bus",
+        "/proc/sys",
+        "/proc/kcore",
+
+        // dev
+        "/dev",
+        "/dev/shm",
+        "/dev/pts",
+
+        "/proc",
+        "/sys",
+        "/",
+    };
+
+    ExpectApiSuccess(api.SetProperty(name, "root", path.ToString()));
+    ExpectApiSuccess(api.SetProperty(name, "root_readonly", "true"));
+    ExpectApiSuccess(api.SetProperty(name, "bind_dns", "false"));
+    ExpectApiSuccess(api.SetProperty(name, "command", "/cat /proc/self/mountinfo"));
+    auto v = StartWaitAndGetData(api, name, "stdout");
+    auto m = ParseMountinfo(v);
+    Expect(m.size() == expected.size());
+    for (auto pair : m)
+        Expect(expected.find(pair.first) != expected.end());
+
+    ExpectApiSuccess(api.Stop(name));
+
     ExpectApiSuccess(api.Destroy(name));
 };
+
+unsigned long GetInode(const TPath &path) {
+    struct stat st;
+    Expect(stat(path.ToString().c_str(), &st) == 0);
+    return st.st_ino;
+}
 
 static void TestRootProperty(TPortoAPI &api) {
     string pid;
@@ -1322,14 +1365,14 @@ static void TestRootProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
 
+    // root or cwd may have / but it actually points to correct path,
+    // test inodes instead
     AsRoot(api);
-    cwd = GetCwd(pid);
-    string root = GetRoot(pid);
+    Expect(GetInode("/proc/" + pid + "/cwd") == GetInode(path));
+    Expect(GetInode("/proc/" + pid + "/root") == GetInode(path));
     AsNobody(api);
-    ExpectApiSuccess(api.Stop(name));
 
-    Expect(cwd == path);
-    Expect(root == path);
+    ExpectApiSuccess(api.Stop(name));
 
     ExpectApiSuccess(api.SetProperty(name, "command", "/pwd"));
     ExpectApiSuccess(api.Start(name));
@@ -1573,7 +1616,10 @@ static map<string, LinkInfo> IfHw(const vector<string> &iplines) {
         string fulliface = StringTrim(tokens[1]);
         string flags = StringTrim(tokens[2]);
 
-        bool up = flags.find("DOWN") == std::string::npos;
+        std::vector<std::string> flagsVec;
+        ExpectSuccess(SplitString(flags, ',', flagsVec));
+
+        bool up = std::find(flagsVec.begin(), flagsVec.end(), "UP") != flagsVec.end();
         string master = "";
         string mtu = "";
 

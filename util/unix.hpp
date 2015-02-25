@@ -42,3 +42,4 @@ int64_t GetBootTime();
 TError Run(const std::vector<std::string> &command, int &status);
 TError AllocLoop(const TPath &path, size_t size);
 TError Popen(const std::string &cmd, std::vector<std::string> &lines);
+TError PivotRoot(const TPath &rootfs);

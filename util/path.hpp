@@ -63,7 +63,7 @@ public:
     std::string ToString() const;
     bool Exists() const;
     bool AccessOk(EFileAccess type) const;
-    TPath AddComponent(const std::string &component) const;
+    TPath AddComponent(const TPath &component) const;
     TError Chdir() const;
     TError Chroot() const;
     TError Chown(const TCred &cred) const;

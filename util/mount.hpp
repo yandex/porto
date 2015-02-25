@@ -30,6 +30,8 @@ public:
             m1.Type == m2.Type;
     }
 
+    const TPath GetSource() const { return Source; }
+
     const std::string GetMountpoint() const {
         return Target.ToString();
     }

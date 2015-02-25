@@ -694,6 +694,10 @@ TError TContainer::Start() {
     if (!IsRoot() && !Prop->Get<std::string>(P_COMMAND).length())
         return TError(EError::InvalidValue, "container command is empty");
 
+    if (Prop->Get<std::string>(P_ROOT) == "/" &&
+        Prop->Get<bool>(P_ROOT_RDONLY) == true)
+        return TError(EError::InvalidValue, "can't make / read-only");
+
     TError error = Data->Set<uint64_t>(D_RESPAWN_COUNT, 0);
     if (error)
         return error;

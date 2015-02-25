@@ -125,7 +125,7 @@ class TTask: public TNonCopyable {
     TError ChildExec();
     TError ChildBindDns();
     TError ChildBindDirectores();
-    TError RestrictProc(bool restrictProcSys);
+    TError ChildRestrictProc(bool restrictProcSys);
     TError ChildMountDev();
     TError ChildMountRun();
     TError ChildIsolateFs();

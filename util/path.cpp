@@ -113,8 +113,8 @@ std::string TPath::ToString() const {
     return StringRemoveRepeating(Path, '/');
 }
 
-TPath TPath::AddComponent(const std::string &component) const {
-    return TPath(Path + "/" + component);
+TPath TPath::AddComponent(const TPath &component) const {
+    return TPath(Path + "/" + component.ToString());
 }
 
 TError TPath::Chdir() const {
