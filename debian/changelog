@@ -1,3 +1,25 @@
+yandex-porto (0.94) precise; urgency=low
+
+  * Add checks for [] in non-map properties
+  * Set default network guarantee to 1 byte/sec
+  * Make sure all interfaces specified for net map
+  * Add net_bps and net_pps statistics
+  * Skip all links without queue
+  * Add number of interrupted reads to statistics
+  * portoctl: print more details about failed property in run
+  * Deprecate cpu_priority, add cpu_limit and cpu_guarantee properties
+  * Add io_policy and io_limit properties
+  * Don't leak sockets with dynamic_ifaces and improve performance
+  * Fix description for net property
+  * Fix wrong unlimited spelling for ulimit property
+  * Fix capabilities property on 3.18
+  * Try to create tc class even if qdisk exists
+  * Use pivot_root instead of chroot for filesystem isolation
+  * Set correct cwd for child(isolate=false) with parent (isolate=true)
+  * mkimg: use /dev/null as main container stdout_path and stderr_path
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Thu, 26 Feb 2015 17:32:00 +0400
+
 yandex-porto (0.93) precise; urgency=low
 
   * Fix wrong error code when destroying container that doesn't exist
