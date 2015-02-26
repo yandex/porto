@@ -667,6 +667,10 @@ TError TTask::ChildCallback() {
         error = Env->Ns.Chroot();
         if (error)
             return error;
+
+        error = Env->Cwd.Chdir();
+        if (error)
+            return error;
     } else {
         error = ChildIsolateFs();
         if (error)

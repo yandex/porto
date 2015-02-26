@@ -51,6 +51,14 @@ static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"ut
 
 static int LeakConainersNr;
 
+static std::string StartWaitAndGetData(TPortoAPI &api, const std::string &name, const std::string &data) {
+    string v;
+    ExpectApiSuccess(api.Start(name));
+    WaitState(api, name, "dead");
+    ExpectApiSuccess(api.GetData(name, data, v));
+    return v;
+}
+
 static void RemakeDir(TPortoAPI &api, const TPath &path) {
     bool drop = geteuid() != 0;
     TFolder f(path);
@@ -1116,6 +1124,18 @@ static void TestCwdProperty(TPortoAPI &api) {
 
     ExpectApiSuccess(api.Destroy(name));
 
+    Say() << "Check working directory of meta parent/child" << std::endl;
+    std::string parent = "parent", child = "parent/child";
+
+    ExpectApiSuccess(api.Create(parent));
+    ExpectApiSuccess(api.Create(child));
+    ExpectApiSuccess(api.SetProperty(child, "cwd", "/tmp"));
+    ExpectApiSuccess(api.SetProperty(child, "command", "pwd"));
+    ExpectApiSuccess(api.SetProperty(child, "isolate", "false"));
+    auto s = StartWaitAndGetData(api, child, "stdout");
+    Expect(StringTrim(s) == "/tmp");
+    ExpectApiSuccess(api.Destroy(parent));
+
     AsNobody(api);
 }
 
@@ -1198,14 +1218,6 @@ static void TestStdPathProperty(TPortoAPI &api) {
     Expect(FileExists(stderrPath));
 
     AsNobody(api);
-}
-
-static std::string StartWaitAndGetData(TPortoAPI &api, const std::string &name, const std::string &data) {
-    string v;
-    ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
-    ExpectApiSuccess(api.GetData(name, data, v));
-    return v;
 }
 
 struct TMountInfo {
