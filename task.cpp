@@ -750,7 +750,6 @@ TError TTask::Start() {
 
         TError error = ChildReopenStdio();
         if (error) {
-            L_ERR() << "Can't open stdio: " << error << std::endl;
             ReportPid(-1);
             Abort(error);
         }
