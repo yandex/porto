@@ -425,6 +425,26 @@ public:
     }
 };
 
+class TCpuPriorityProperty : public TUintValue, public TContainerValue {
+public:
+    TCpuPriorityProperty() :
+        TUintValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
+        TContainerValue("cpu_priority",
+                        "CPU priority: 1-100 [DEPRECATED]",
+                        dynamicProperty) {}
+
+    uint64_t GetDefault() const override {
+        return 100;
+    }
+
+    TError CheckValue(const uint64_t &value) override {
+        if (value < 0 || value > 99)
+            return TError(EError::InvalidValue, "invalid value");
+
+        return TError::Success();
+    }
+};
+
 class TCpuPolicyProperty : public TStringValue, public TContainerValue {
 public:
     TCpuPolicyProperty() :
@@ -1286,6 +1306,7 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TRechargeOnPgfaultProperty,
         new TCpuPolicyProperty,
         new TCpuLimitProperty,
+        new TCpuPriorityProperty,
         new TCpuGuaranteeProperty,
         new TIoPolicyProperty,
         new TIoLimitProperty,

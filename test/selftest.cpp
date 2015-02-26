@@ -2162,6 +2162,7 @@ static void TestRoot(TPortoAPI &api) {
         "memory_guarantee",
         "memory_limit",
         "recharge_on_pgfault",
+        "cpu_priority",
         "cpu_policy",
         "cpu_limit",
         "cpu_guarantee",
