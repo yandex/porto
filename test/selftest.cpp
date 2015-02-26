@@ -2508,7 +2508,7 @@ static void TestLimits(TPortoAPI &api) {
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check custom limits" << std::endl;
-    string exp_limit = "524288";
+    string exp_limit = "134217728";
     string exp_guar = "16384";
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
 
