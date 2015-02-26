@@ -647,13 +647,6 @@ TError TTask::ChildCallback() {
             return TError(EError::Unknown, errno, "remount procfs");
     }
 
-    // move to target cgroups
-    for (auto cg : LeafCgroups) {
-        auto error = cg.second->Attach(getpid());
-        if (error)
-            return TError(EError::Unknown, error, "cgroup attach");
-    }
-
     if (Env->Isolate) {
         error = ChildPrepareLoop();
         if (error)
@@ -755,6 +748,17 @@ TError TTask::Start() {
 
         (void)setsid();
 
+        // move to target cgroups
+        for (auto cg : LeafCgroups) {
+            auto error = cg.second->Attach(getpid());
+            if (error) {
+                L_ERR() << "Can't attach to cgroup: " << error << std::endl;
+                ReportPid(-1);
+                Abort(error);
+            }
+        }
+
+        // move to target namespace
         TError error = Env->Ns.Attach();
         if (error) {
             L_ERR() << "Can't spawn child: " << error << std::endl;
@@ -826,9 +830,8 @@ TError TTask::Start() {
     close(Wfd);
     int n = read(Rfd, &Pid, sizeof(Pid));
     if (n <= 0) {
-        TError error(EError::Unknown, errno, "read(Rfd)");
-        L_ERR() << "Can't read pid from the child: " << error << std::endl;
-        return error;
+        close(Rfd);
+        return TError(EError::Unknown, errno, "Can't read pid from the child");
     }
 
     TError error;
