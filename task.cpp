@@ -134,7 +134,7 @@ TError TTask::ChildReopenStdio() {
 
     int ret = open(Env->StdinPath.ToString().c_str(), O_CREAT | O_RDONLY, 0700);
     if (ret < 0)
-        return TError(EError::Unknown, errno, "open(0)");
+        return TError(EError::Unknown, errno, "open(" + Env->StdinPath.ToString() + ") -> 0");
 
     if (ret != 0)
         return TError(EError::Unknown, EINVAL, "open(0): unexpected fd");
