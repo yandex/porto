@@ -659,10 +659,6 @@ TError TTask::ChildCallback() {
             return error;
     }
 
-    error = ChildReopenStdio();
-    if (error)
-        return error;
-
     if (Env->Ns.Valid()) {
         error = Env->Ns.Chroot();
         if (error)
@@ -752,6 +748,13 @@ TError TTask::Start() {
 
         (void)setsid();
 
+        TError error = ChildReopenStdio();
+        if (error) {
+            L_ERR() << "Can't open stdio: " << error << std::endl;
+            ReportPid(-1);
+            Abort(error);
+        }
+
         // move to target cgroups
         for (auto cg : LeafCgroups) {
             auto error = cg.second->Attach(getpid());
@@ -763,7 +766,7 @@ TError TTask::Start() {
         }
 
         // move to target namespace
-        TError error = Env->Ns.Attach();
+        error = Env->Ns.Attach();
         if (error) {
             L_ERR() << "Can't spawn child: " << error << std::endl;
             ReportPid(-1);
