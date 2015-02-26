@@ -27,7 +27,8 @@ extern "C" {
 #include <linux/capability.h>
 }
 
-const std::string memoryLimitOom = "1000000";
+const std::string oomMemoryLimit = "1000000";
+const std::string oomCommand = "dd if=/dev/zero of=/dev/shm/fill bs=1k count=1024k";
 
 const uint32_t DEF_CLASS_MAX_RATE = -1;
 const uint32_t DEF_CLASS_RATE = 1;
@@ -584,12 +585,12 @@ static void TestExitStatus(TPortoAPI &api) {
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check oom_killed property" << std::endl;
-    ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectApiSuccess(api.SetProperty(name, "command", oomCommand));
     ExpectApiSuccess(api.SetProperty(name, "memory_limit", "10"));
     // limit is so small we can't even start process
     ExpectApiFailure(api.Start(name), EError::Unknown);
 
-    ExpectApiSuccess(api.SetProperty(name, "memory_limit", memoryLimitOom));
+    ExpectApiSuccess(api.SetProperty(name, "memory_limit", oomMemoryLimit));
     ExpectApiSuccess(api.Start(name));
     WaitState(api, name, "dead");
     ExpectApiSuccess(api.GetData(name, "exit_status", ret));
@@ -3720,8 +3721,8 @@ static void TestRecovery(TPortoAPI &api) {
     Say() << "Make sure some data is persistent" << std::endl;
     ExpectApiSuccess(api.Create(name));
 
-    ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
-    ExpectApiSuccess(api.SetProperty(name, "memory_limit", memoryLimitOom));
+    ExpectApiSuccess(api.SetProperty(name, "command", oomCommand));
+    ExpectApiSuccess(api.SetProperty(name, "memory_limit", oomMemoryLimit));
     ExpectApiSuccess(api.Start(name));
     WaitState(api, name, "dead");
     ExpectApiSuccess(api.GetData(name, "exit_status", v));
