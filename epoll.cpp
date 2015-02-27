@@ -13,6 +13,11 @@ static void MultiHandler(int sig) {
         signal_mask |= (1 << sig);
 }
 
+static void DumpStack(int sig) {
+    Crash();
+    RaiseSignal(sig);
+}
+
 static TError EpollCreate(int &epfd) {
     epfd = epoll_create1(EPOLL_CLOEXEC);
     if (epfd < 0)
@@ -39,19 +44,22 @@ TError TEpollLoop::InitializeSignals() {
     sigset_t mask;
 
     if (sigemptyset(&mask) < 0)
-        return TError(EError::Unknown, "Can't initialize signal mask: ", errno);
+        return TError(EError::Unknown, "Can't initialize signal mask", errno);
 
     for (auto sig: HANDLE_SIGNALS) {
         if (RegisterSignal(sig, MultiHandler))
-            return TError(EError::Unknown, "Can't register signal: ", errno);
+            return TError(EError::Unknown, "Can't register signal", errno);
     }
 
     for (auto sig: HANDLE_SIGNALS_WAIT) {
         if (RegisterSignal(sig, MultiHandler))
-            return TError(EError::Unknown, "Can't register signal: ", errno);
+            return TError(EError::Unknown, "Can't register signal", errno);
         if (sigaddset(&mask, sig) < 0)
-            return TError(EError::Unknown, "Can't add signal to mask: ", errno);
+            return TError(EError::Unknown, "Can't add signal to mask", errno);
     }
+
+    if (RegisterSignal(SIGSEGV, DumpStack))
+            return TError(EError::Unknown, "Can't register SIGSEGV handler", errno);
 
     if (sigprocmask(SIG_SETMASK, &mask, NULL) < 0)
         return TError(EError::Unknown, "Can't set signal mask: ", errno);
