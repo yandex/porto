@@ -626,6 +626,30 @@ void TestDaemon(TPortoAPI &api) {
     // TODO: check rtnl classes
 }
 
+bool HaveCfsBandwidth() {
+    return HaveCgKnob("cpu", "cpu.cfs_period_us");
+}
+
+bool HaveCfsGroupSched() {
+    return HaveCgKnob("cpu", "cpu.shares");
+}
+
+bool HaveSmart() {
+    return HaveCgKnob("cpu", "cpu.smart");
+}
+
+bool HaveIoLimit() {
+    return HaveCgKnob("memory", "memory.fs_bps_limit");
+}
+
+bool HaveLowLimit() {
+    return HaveCgKnob("memory", "memory.low_limit_in_bytes");
+}
+
+bool HaveRechargeOnPgfault() {
+    return HaveCgKnob("memory", "memory.recharge_on_pgfault");
+}
+
 bool IsCfqActive() {
     TFolder f("/sys/block");
     std::vector<std::string> items;

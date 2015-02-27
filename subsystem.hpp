@@ -27,32 +27,45 @@ public:
 class TMemorySubsystem : public TSubsystem {
 public:
     TMemorySubsystem() : TSubsystem("memory") {}
-    TError Usage(std::shared_ptr<TCgroup> &cg, uint64_t &value) const;
-    TError Statistics(std::shared_ptr<TCgroup> &cg, const std::string &name, uint64_t &val) const;
-    TError UseHierarchy(TCgroup &cg, bool enable) const;
+    TError Usage(std::shared_ptr<TCgroup> cg, uint64_t &value) const;
+    TError Statistics(std::shared_ptr<TCgroup> cg,
+                      const std::string &name,
+                      uint64_t &val) const;
+    TError UseHierarchy(std::shared_ptr<TCgroup> cg, bool enable) const;
+    bool SupportGuarantee();
+    TError SetGuarantee(std::shared_ptr<TCgroup> cg, uint64_t guarantee);
+    bool SupportLimit();
+    TError SetLimit(std::shared_ptr<TCgroup> cg, uint64_t limit) const;
+    bool SupportRechargeOnPgfault();
+    TError RechargeOnPgfault(std::shared_ptr<TCgroup> cg, bool enable);
 };
 
 class TFreezerSubsystem : public TSubsystem {
 public:
     TFreezerSubsystem() : TSubsystem("freezer") {}
 
-    TError WaitState(TCgroup &cg, const std::string &state) const;
-    TError Freeze(TCgroup &cg) const;
-    TError Unfreeze(TCgroup &cg) const;
-    bool IsFreezed(TCgroup &cg) const;
+    TError WaitState(std::shared_ptr<TCgroup> cg,
+                     const std::string &state) const;
+    TError Freeze(std::shared_ptr<TCgroup> cg) const;
+    TError Unfreeze(std::shared_ptr<TCgroup> cg) const;
+    bool IsFreezed(std::shared_ptr<TCgroup> cg) const;
 };
 
 class TCpuSubsystem : public TSubsystem {
 public:
     TCpuSubsystem() : TSubsystem("cpu") {}
+    TError SetPolicy(std::shared_ptr<TCgroup> cg, const std::string &policy);
     TError SetLimit(std::shared_ptr<TCgroup> cg, const uint64_t limit);
     TError SetGuarantee(std::shared_ptr<TCgroup> cg, uint64_t guarantee);
+    bool SupportSmart();
+    bool SupportLimit();
+    bool SupportGuarantee();
 };
 
 class TCpuacctSubsystem : public TSubsystem {
 public:
     TCpuacctSubsystem() : TSubsystem("cpuacct") {}
-    TError Usage(std::shared_ptr<TCgroup> &cg, uint64_t &value) const;
+    TError Usage(std::shared_ptr<TCgroup> cg, uint64_t &value) const;
 };
 
 class TNetclsSubsystem : public TSubsystem {
@@ -77,14 +90,18 @@ class TBlkioSubsystem : public TSubsystem {
                      std::string &device) const;
 public:
     TBlkioSubsystem() : TSubsystem("blkio") {}
-    TError Statistics(std::shared_ptr<TCgroup> &cg, const std::string &file, std::vector<BlkioStat> &stat) const;
-    TError SetPolicy(std::shared_ptr<TCgroup> &cg, bool batch);
+    TError Statistics(std::shared_ptr<TCgroup> cg,
+                      const std::string &file,
+                      std::vector<BlkioStat> &stat) const;
+    TError SetPolicy(std::shared_ptr<TCgroup> cg, bool batch);
+    TError SetLimit(std::shared_ptr<TCgroup> cg, uint64_t limit);
+    bool SupportPolicy();
 };
 
 class TDevicesSubsystem : public TSubsystem {
 public:
     TDevicesSubsystem() : TSubsystem("devices") {}
-    TError AllowDevices(std::shared_ptr<TCgroup> &cg, const std::vector<std::string> &allowed);
+    TError AllowDevices(std::shared_ptr<TCgroup> cg, const std::vector<std::string> &allowed);
 };
 
 extern std::shared_ptr<TMemorySubsystem> memorySubsystem;

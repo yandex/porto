@@ -2312,9 +2312,12 @@ static void TestRoot(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy("b"));
 
     Say() << "Check cpu_limit/cpu_guarantee" << std::endl;
-    Expect(GetCgKnob("cpu", "", "cpu.cfs_quota_us") == "-1");
-    Expect(GetCgKnob("cpu", "", "cpu.shares") == "1024");
-    Expect(GetCgKnob("blkio", "", "blkio.weight") == "1000");
+    if (HaveCfsBandwidth())
+        Expect(GetCgKnob("cpu", "", "cpu.cfs_quota_us") == "-1");
+    if (HaveCfsGroupSched())
+        Expect(GetCgKnob("cpu", "", "cpu.shares") == "1024");
+    if (IsCfqActive())
+        Expect(GetCgKnob("blkio", "", "blkio.weight") == "1000");
 }
 
 static void TestDataMap(TPortoAPI &api, const std::string &name, const std::string &data) {
@@ -2469,13 +2472,13 @@ static void TestData(TPortoAPI &api) {
 }
 
 static bool CanTestLimits() {
-    if (!HaveCgKnob("memory", "memory.low_limit_in_bytes"))
+    if (!HaveLowLimit())
         return false;
 
-    if (!HaveCgKnob("memory", "memory.recharge_on_pgfault"))
+    if (!HaveRechargeOnPgfault())
         return false;
 
-    if (!HaveCgKnob("cpu", "cpu.smart"))
+    if (!HaveSmart())
         return false;
 
     return true;
@@ -2521,7 +2524,7 @@ static void TestLimits(TPortoAPI &api) {
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
     Expect(current == std::to_string(LLONG_MAX) || current == std::to_string(ULLONG_MAX));
 
-    if (HaveCgKnob("memory", "memory.low_limit_in_bytes")) {
+    if (HaveLowLimit()) {
         current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
         Expect(current == "0");
     }
@@ -2537,28 +2540,32 @@ static void TestLimits(TPortoAPI &api) {
     Expect(current == "1073741824");
 
     ExpectApiSuccess(api.SetProperty(name, "memory_limit", exp_limit));
-    if (HaveCgKnob("memory", "memory.low_limit_in_bytes"))
+    if (HaveLowLimit())
         ExpectApiSuccess(api.SetProperty(name, "memory_guarantee", exp_guar));
     ExpectApiSuccess(api.Start(name));
 
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
     Expect(current == exp_limit);
-    if (HaveCgKnob("memory", "memory.low_limit_in_bytes")) {
+    if (HaveLowLimit()) {
         current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
         Expect(current == exp_guar);
     }
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check cpu_limit and cpu_guarantee range" << std::endl;
-    ExpectApiFailure(api.SetProperty(name, "cpu_limit", "0"), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "cpu_limit", "101"), EError::InvalidValue);
-    ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "1"));
-    ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "100"));
+    if (HaveCfsBandwidth()) {
+        ExpectApiFailure(api.SetProperty(name, "cpu_limit", "0"), EError::InvalidValue);
+        ExpectApiFailure(api.SetProperty(name, "cpu_limit", "101"), EError::InvalidValue);
+        ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "1"));
+        ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "100"));
+    }
 
-    ExpectApiFailure(api.SetProperty(name, "cpu_guarantee", "-1"), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "cpu_guarantee", "101"), EError::InvalidValue);
-    ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "0"));
-    ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "100"));
+    if (HaveCfsGroupSched()) {
+        ExpectApiFailure(api.SetProperty(name, "cpu_guarantee", "-1"), EError::InvalidValue);
+        ExpectApiFailure(api.SetProperty(name, "cpu_guarantee", "101"), EError::InvalidValue);
+        ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "0"));
+        ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "100"));
+    }
 
     Say() << "Check cpu_policy" << std::endl;
     string smart;
@@ -2566,7 +2573,7 @@ static void TestLimits(TPortoAPI &api) {
     ExpectApiFailure(api.SetProperty(name, "cpu_policy", "somecrap"), EError::InvalidValue);
     ExpectApiFailure(api.SetProperty(name, "cpu_policy", "idle"), EError::NotSupported);
 
-    if (HaveCgKnob("cpu", "cpu.smart")) {
+    if (HaveSmart()) {
         ExpectApiSuccess(api.SetProperty(name, "cpu_policy", "rt"));
         ExpectApiSuccess(api.Start(name));
         smart = GetCgKnob("cpu", name, "cpu.smart");
@@ -2580,81 +2587,87 @@ static void TestLimits(TPortoAPI &api) {
         ExpectApiSuccess(api.Stop(name));
     }
 
-    Say() << "Check cpu_limit" << std::endl;
-    ExpectApiSuccess(api.SetProperty(name, "cpu_policy", "normal"));
+    if (HaveCfsBandwidth()) {
+        Say() << "Check cpu_limit" << std::endl;
+        ExpectApiSuccess(api.SetProperty(name, "cpu_policy", "normal"));
 
-    uint64_t period, quota;
-    ExpectSuccess(StringToUint64(GetCgKnob("cpu", "", "cpu.cfs_period_us"), period));
-    long ncores = sysconf(_SC_NPROCESSORS_CONF);
+        uint64_t period, quota;
+        ExpectSuccess(StringToUint64(GetCgKnob("cpu", "", "cpu.cfs_period_us"), period));
+        long ncores = sysconf(_SC_NPROCESSORS_CONF);
 
-    const uint64_t minQuota = 1 * 1000;
-    uint64_t half = ncores * period / 2;
-    if (half < minQuota)
-        half = minQuota;
+        const uint64_t minQuota = 1 * 1000;
+        uint64_t half = ncores * period / 2;
+        if (half < minQuota)
+            half = minQuota;
 
-    ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "20"));
-    ExpectApiSuccess(api.Start(name));
-    ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.cfs_quota_us"), quota));
-    Say() << "quota=" << quota << " half="<< half << " min=" << minQuota << std::endl;
+        ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "20"));
+        ExpectApiSuccess(api.Start(name));
+        ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.cfs_quota_us"), quota));
+        Say() << "quota=" << quota << " half="<< half << " min=" << minQuota << std::endl;
 
-    Expect(quota < half);
-    Expect(quota > minQuota);
-    ExpectApiSuccess(api.Stop(name));
+        Expect(quota < half);
+        Expect(quota > minQuota);
+        ExpectApiSuccess(api.Stop(name));
 
-    ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "80"));
-    ExpectApiSuccess(api.Start(name));
-    ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.cfs_quota_us"), quota));
-    Say() << "quota=" << quota << " half="<< half << " min=" << minQuota << std::endl;
-    Expect(quota > half);
-    Expect(quota > minQuota);
-    ExpectApiSuccess(api.Stop(name));
+        ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "80"));
+        ExpectApiSuccess(api.Start(name));
+        ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.cfs_quota_us"), quota));
+        Say() << "quota=" << quota << " half="<< half << " min=" << minQuota << std::endl;
+        Expect(quota > half);
+        Expect(quota > minQuota);
+        ExpectApiSuccess(api.Stop(name));
 
-    ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "100"));
-    ExpectApiSuccess(api.Start(name));
-    Expect(GetCgKnob("cpu", name, "cpu.cfs_quota_us") == "-1");
-    ExpectApiSuccess(api.Stop(name));
+        ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "100"));
+        ExpectApiSuccess(api.Start(name));
+        Expect(GetCgKnob("cpu", name, "cpu.cfs_quota_us") == "-1");
+        ExpectApiSuccess(api.Stop(name));
+    }
 
-    Say() << "Check cpu_guarantee" << std::endl;
-    uint64_t rootShares, shares;
-    ExpectSuccess(StringToUint64(GetCgKnob("cpu", "", "cpu.shares"), rootShares));
+    if (HaveCfsGroupSched()) {
+        Say() << "Check cpu_guarantee" << std::endl;
+        uint64_t rootShares, shares;
+        ExpectSuccess(StringToUint64(GetCgKnob("cpu", "", "cpu.shares"), rootShares));
 
-    ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "0"));
-    ExpectApiSuccess(api.Start(name));
-    ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
-    Expect(shares == rootShares);
-    ExpectApiSuccess(api.Stop(name));
+        ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "0"));
+        ExpectApiSuccess(api.Start(name));
+        ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
+        Expect(shares == rootShares);
+        ExpectApiSuccess(api.Stop(name));
 
-    ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "1"));
-    ExpectApiSuccess(api.Start(name));
-    ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
-    Expect(shares == rootShares);
-    ExpectApiSuccess(api.Stop(name));
+        ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "1"));
+        ExpectApiSuccess(api.Start(name));
+        ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
+        Expect(shares == rootShares);
+        ExpectApiSuccess(api.Stop(name));
 
-    ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "100"));
-    ExpectApiSuccess(api.Start(name));
-    ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
-    Expect(shares == rootShares * 100);
-    ExpectApiSuccess(api.Stop(name));
+        ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "100"));
+        ExpectApiSuccess(api.Start(name));
+        ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
+        Expect(shares == rootShares * 100);
+        ExpectApiSuccess(api.Stop(name));
+    }
 
-    Say() << "Check io_policy" << std::endl;
-    uint64_t rootWeight, weight;
-    ExpectSuccess(StringToUint64(GetCgKnob("blkio", "", "blkio.weight"), rootWeight));
+    if (IsCfqActive()) {
+        Say() << "Check io_policy" << std::endl;
+        uint64_t rootWeight, weight;
+        ExpectSuccess(StringToUint64(GetCgKnob("blkio", "", "blkio.weight"), rootWeight));
 
-    ExpectApiFailure(api.SetProperty(name, "io_policy", "invalid"), EError::InvalidValue);
+        ExpectApiFailure(api.SetProperty(name, "io_policy", "invalid"), EError::InvalidValue);
 
-    ExpectApiSuccess(api.SetProperty(name, "io_policy", "normal"));
-    ExpectApiSuccess(api.Start(name));
-    ExpectSuccess(StringToUint64(GetCgKnob("blkio", name, "blkio.weight"), weight));
-    Expect(weight == rootWeight);
-    ExpectApiSuccess(api.Stop(name));
+        ExpectApiSuccess(api.SetProperty(name, "io_policy", "normal"));
+        ExpectApiSuccess(api.Start(name));
+        ExpectSuccess(StringToUint64(GetCgKnob("blkio", name, "blkio.weight"), weight));
+        Expect(weight == rootWeight);
+        ExpectApiSuccess(api.Stop(name));
 
-    ExpectApiSuccess(api.SetProperty(name, "io_policy", "batch"));
-    ExpectApiSuccess(api.Start(name));
-    ExpectSuccess(StringToUint64(GetCgKnob("blkio", name, "blkio.weight"), weight));
-    Expect(weight != rootWeight || weight == config().container().batch_io_weight());
-    ExpectApiSuccess(api.Stop(name));
+        ExpectApiSuccess(api.SetProperty(name, "io_policy", "batch"));
+        ExpectApiSuccess(api.Start(name));
+        ExpectSuccess(StringToUint64(GetCgKnob("blkio", name, "blkio.weight"), weight));
+        Expect(weight != rootWeight || weight == config().container().batch_io_weight());
+        ExpectApiSuccess(api.Stop(name));
+    }
 
-    if (HaveCgKnob("memory", "memory.fs_bps_limit")) {
+    if (HaveIoLimit()) {
         Say() << "Check io_limit" << std::endl;
 
         ExpectApiSuccess(api.SetProperty(name, "io_limit", "0"));
@@ -2876,11 +2889,11 @@ static void TestVirtModeProperty(TPortoAPI &api) {
 }
 
 static void TestAlias(TPortoAPI &api) {
-    if (!HaveCgKnob("memory", "memory.low_limit_in_bytes"))
+    if (!HaveLowLimit())
         return;
-    if (!HaveCgKnob("memory", "memory.recharge_on_pgfault"))
+    if (!HaveRechargeOnPgfault())
         return;
-    if (!HaveCgKnob("cpu", "cpu.smart"))
+    if (!HaveSmart())
         return;
 
     string name = "a";
@@ -3004,7 +3017,7 @@ static void TestDynamic(TPortoAPI &api) {
 }
 
 static void TestLimitsHierarchy(TPortoAPI &api) {
-    if (!HaveCgKnob("memory", "memory.low_limit_in_bytes"))
+    if (!HaveLowLimit())
         return;
 
     //
@@ -4148,6 +4161,10 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
     std::cerr << "SUCCESS: All tests successfully passed!" << std::endl;
     if (!CanTestLimits())
         std::cerr << "WARNING: Due to missing kernel support, memory_guarantee/cpu_policy has not been tested!" << std::endl;
+    if (!HaveCfsBandwidth())
+        std::cerr << "WARNING: CFS bandwidth is not enabled, skipping cpu_limit tests" << std::endl;
+    if (!HaveCfsGroupSched())
+        std::cerr << "WARNING: CFS group scheduling is not enabled, skipping cpu_guarantee tests" << std::endl;
     if (!IsCfqActive())
         std::cerr << "WARNING: CFQ is not enabled for one of your block devices, skipping io_read and io_write tests" << std::endl;
     if (!NetworkEnabled())

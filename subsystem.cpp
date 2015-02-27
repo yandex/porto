@@ -71,7 +71,7 @@ std::shared_ptr<TCgroup> TSubsystem::GetRootCgroup(std::shared_ptr<TMount> mount
 }
 
 // Memory
-TError TMemorySubsystem::Usage(shared_ptr<TCgroup> &cg, uint64_t &value) const {
+TError TMemorySubsystem::Usage(shared_ptr<TCgroup> cg, uint64_t &value) const {
     string s;
     TError error = cg->GetKnobValue("memory.usage_in_bytes", s);
     if (error)
@@ -79,7 +79,9 @@ TError TMemorySubsystem::Usage(shared_ptr<TCgroup> &cg, uint64_t &value) const {
     return StringToUint64(s, value);
 }
 
-TError TMemorySubsystem::Statistics(std::shared_ptr<TCgroup> &cg, const std::string &name, uint64_t &val) const {
+TError TMemorySubsystem::Statistics(std::shared_ptr<TCgroup> cg,
+                                    const std::string &name,
+                                    uint64_t &val) const {
     vector<string> lines;
     TError error = cg->GetKnobValueAsLines("memory.stat", lines);
     if (error)
@@ -101,16 +103,54 @@ TError TMemorySubsystem::Statistics(std::shared_ptr<TCgroup> &cg, const std::str
     return TError(EError::InvalidValue, "Invalid memory cgroup stat: " + name);
 }
 
-TError TMemorySubsystem::UseHierarchy(TCgroup &cg, bool enable) const {
-    return TError(cg.SetKnobValue("memory.use_hierarchy", enable ? "1" : "0"));
+TError TMemorySubsystem::UseHierarchy(std::shared_ptr<TCgroup> cg, bool enable) const {
+    return TError(cg->SetKnobValue("memory.use_hierarchy", enable ? "1" : "0"));
+}
+
+TError TMemorySubsystem::SetGuarantee(std::shared_ptr<TCgroup> cg, uint64_t guarantee) {
+    if (!SupportGuarantee())
+        return TError::Success();
+
+    if (guarantee == 0)
+        return TError::Success();
+
+    return cg->SetKnobValue("memory.low_limit_in_bytes", std::to_string(guarantee), false);
+}
+
+TError TMemorySubsystem::SetLimit(std::shared_ptr<TCgroup> cg, uint64_t limit) const {
+    if (limit == 0)
+        return TError::Success();
+
+    return cg->SetKnobValue("memory.limit_in_bytes", std::to_string(limit), false);
+}
+
+TError TMemorySubsystem::RechargeOnPgfault(std::shared_ptr<TCgroup> cg, bool enable) {
+    if (!SupportRechargeOnPgfault())
+        return TError::Success();
+
+    string value = enable ? "1" : "0";
+    return cg->SetKnobValue("memory.recharge_on_pgfault", value, false);
+}
+
+bool TMemorySubsystem::SupportGuarantee() {
+    return GetRootCgroup()->HasKnob("memory.low_limit_in_bytes");
+}
+
+bool TMemorySubsystem::SupportRechargeOnPgfault() {
+    return GetRootCgroup()->HasKnob("memory.recharge_on_pgfault");
+}
+
+bool TMemorySubsystem::SupportLimit() {
+    return GetRootCgroup()->HasKnob("memory.fs_bps_limit");
 }
 
 // Freezer
-TError TFreezerSubsystem::WaitState(TCgroup &cg, const std::string &state) const {
+TError TFreezerSubsystem::WaitState(std::shared_ptr<TCgroup> cg,
+                                    const std::string &state) const {
 
     int ret = RetryFailed(config().daemon().freezer_wait_timeout_s() * 10, 100, [&]{
         string s;
-        TError error = cg.GetKnobValue("freezer.state", s);
+        TError error = cg->GetKnobValue("freezer.state", s);
         if (error)
             L_ERR() << "Can't freeze cgroup: " << error << std::endl;
 
@@ -119,42 +159,66 @@ TError TFreezerSubsystem::WaitState(TCgroup &cg, const std::string &state) const
 
     if (ret) {
         string s = "?";
-        (void)cg.GetKnobValue("freezer.state", s);
+        (void)cg->GetKnobValue("freezer.state", s);
 
         TError error(EError::Unknown, "Can't wait for freezer state " + state + ", current state is " + s);
         if (error)
-            L_ERR() << cg.Relpath() << ": " << error << std::endl;
+            L_ERR() << cg->Relpath() << ": " << error << std::endl;
         return error;
     }
     return TError::Success();
 }
 
-TError TFreezerSubsystem::Freeze(TCgroup &cg) const {
-    TError error(cg.SetKnobValue("freezer.state", "FROZEN"));
+TError TFreezerSubsystem::Freeze(std::shared_ptr<TCgroup> cg) const {
+    TError error(cg->SetKnobValue("freezer.state", "FROZEN"));
     if (error)
         return error;
 
     return WaitState(cg, "FROZEN");
 }
 
-TError TFreezerSubsystem::Unfreeze(TCgroup &cg) const {
-    TError error(cg.SetKnobValue("freezer.state", "THAWED"));
+TError TFreezerSubsystem::Unfreeze(std::shared_ptr<TCgroup> cg) const {
+    TError error(cg->SetKnobValue("freezer.state", "THAWED"));
     if (error)
         return error;
 
     return WaitState(cg, "THAWED");
 }
 
-bool TFreezerSubsystem::IsFreezed(TCgroup &cg) const {
+bool TFreezerSubsystem::IsFreezed(std::shared_ptr<TCgroup> cg) const {
     string s;
-    TError error = cg.GetKnobValue("freezer.state", s);
+    TError error = cg->GetKnobValue("freezer.state", s);
     if (error)
         L_ERR() << "Can't get freezer status: " << error << std::endl;
     return StringTrim(s) != "THAWED";
 }
 
 // Cpu
+TError TCpuSubsystem::SetPolicy(std::shared_ptr<TCgroup> cg, const std::string &policy) {
+    if (!SupportSmart())
+        return TError::Success();
+
+    if (policy == "normal") {
+        TError error = cg->SetKnobValue("cpu.smart", "0", false);
+        if (error) {
+            L_ERR() << "Can't disable smart: " << error << std::endl;
+            return error;
+        }
+    } else if (policy == "rt") {
+        TError error = cg->SetKnobValue("cpu.smart", "1", false);
+        if (error) {
+            L_ERR() << "Can't set enable smart: " << error << std::endl;
+            return error;
+        }
+    }
+
+    return TError::Success();
+}
+
 TError TCpuSubsystem::SetLimit(std::shared_ptr<TCgroup> cg, const uint64_t limit) {
+    if (!SupportLimit())
+        return TError::Success();
+
     if (limit == 100)
         return cg->SetKnobValue("cpu.cfs_quota_us", "-1", false);
 
@@ -180,6 +244,9 @@ TError TCpuSubsystem::SetLimit(std::shared_ptr<TCgroup> cg, const uint64_t limit
 }
 
 TError TCpuSubsystem::SetGuarantee(std::shared_ptr<TCgroup> cg, uint64_t guarantee) {
+    if (!SupportGuarantee())
+        return TError::Success();
+
     uint64_t rootShares;
     std::string str;
     TError error = GetRootCgroup()->GetKnobValue("cpu.shares", str);
@@ -195,8 +262,20 @@ TError TCpuSubsystem::SetGuarantee(std::shared_ptr<TCgroup> cg, uint64_t guarant
     return cg->SetKnobValue("cpu.shares", std::to_string(guarantee * rootShares), false);
 }
 
+bool TCpuSubsystem::SupportSmart() {
+    return GetRootCgroup()->HasKnob("cpu.smart");
+}
+
+bool TCpuSubsystem::SupportLimit() {
+    return GetRootCgroup()->HasKnob("cpu.cfs_period_us");
+}
+
+bool TCpuSubsystem::SupportGuarantee() {
+    return GetRootCgroup()->HasKnob("cpu.shares");
+}
+
 // Cpuacct
-TError TCpuacctSubsystem::Usage(shared_ptr<TCgroup> &cg, uint64_t &value) const {
+TError TCpuacctSubsystem::Usage(shared_ptr<TCgroup> cg, uint64_t &value) const {
     string s;
     TError error = cg->GetKnobValue("cpuacct.usage", s);
     if (error)
@@ -249,7 +328,9 @@ TError TBlkioSubsystem::GetDevice(const std::string &majmin,
     return TError(EError::Unknown, "Unable to convert device maj+min to name");
 }
 
-TError TBlkioSubsystem::Statistics(std::shared_ptr<TCgroup> &cg, const std::string &file, std::vector<BlkioStat> &stat) const {
+TError TBlkioSubsystem::Statistics(std::shared_ptr<TCgroup> cg,
+                                   const std::string &file,
+                                   std::vector<BlkioStat> &stat) const {
     vector<string> lines;
     TError error = cg->GetKnobValueAsLines(file, lines);
     if (error)
@@ -289,7 +370,10 @@ TError TBlkioSubsystem::Statistics(std::shared_ptr<TCgroup> &cg, const std::stri
     return TError::Success();
 }
 
-TError TBlkioSubsystem::SetPolicy(std::shared_ptr<TCgroup> &cg, bool batch) {
+TError TBlkioSubsystem::SetPolicy(std::shared_ptr<TCgroup> cg, bool batch) {
+    if (!SupportPolicy())
+        return TError::Success();
+
     std::string rootWeight;
     if (!batch) {
         TError error = GetRootCgroup()->GetKnobValue("blkio.weight", rootWeight);
@@ -300,9 +384,20 @@ TError TBlkioSubsystem::SetPolicy(std::shared_ptr<TCgroup> &cg, bool batch) {
     return cg->SetKnobValue("blkio.weight", batch ? std::to_string(config().container().batch_io_weight()) : rootWeight, false);
 }
 
+TError TBlkioSubsystem::SetLimit(std::shared_ptr<TCgroup> cg, uint64_t limit) {
+    if (!memorySubsystem->SupportLimit())
+        return TError::Success();
+
+    return cg->SetKnobValue("memory.fs_bps_limit", std::to_string(limit), false);
+}
+
+bool TBlkioSubsystem::SupportPolicy() {
+    return GetRootCgroup()->HasKnob("blkio.weight");
+}
+
 // Devices
 
-TError TDevicesSubsystem::AllowDevices(std::shared_ptr<TCgroup> &cg, const std::vector<std::string> &allowed) {
+TError TDevicesSubsystem::AllowDevices(std::shared_ptr<TCgroup> cg, const std::vector<std::string> &allowed) {
     vector<string> lines;
 
     TError error = cg->GetKnobValueAsLines("devices.list", lines);

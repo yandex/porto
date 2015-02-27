@@ -258,7 +258,7 @@ vector<pid_t> TContainer::Processes() {
 TError TContainer::ApplyDynamicProperties() {
     auto memcg = GetLeafCgroup(memorySubsystem);
 
-    TError error = memorySubsystem->UseHierarchy(*memcg, config().container().use_hierarchy());
+    TError error = memorySubsystem->UseHierarchy(memcg, config().container().use_hierarchy());
     if (error) {
         L_ERR() << "Can't set use_hierarchy for " << memcg->Relpath() << ": " << error << std::endl;
         // we don't want to get this error endlessly when user switches config
@@ -266,48 +266,37 @@ TError TContainer::ApplyDynamicProperties() {
         //return error;
     }
 
-    auto memroot = memorySubsystem->GetRootCgroup();
-    if (memroot->HasKnob("memory.low_limit_in_bytes") && Prop->Get<uint64_t>(P_MEM_GUARANTEE) != 0 && !UseParentNamespace()) {
-        TError error = memcg->SetKnobValue("memory.low_limit_in_bytes", Prop->ToString(P_MEM_GUARANTEE), false);
-        if (error) {
-            L_ERR() << "Can't set " << P_MEM_GUARANTEE << ": " << error << std::endl;
-            return error;
-        }
+    error = memorySubsystem->SetGuarantee(memcg, Prop->Get<uint64_t>(P_MEM_GUARANTEE));
+    if (error) {
+        L_ERR() << "Can't set " << P_MEM_GUARANTEE << ": " << error << std::endl;
+        return error;
     }
 
-    if (Prop->Get<uint64_t>(P_MEM_LIMIT) != 0) {
-        error = memcg->SetKnobValue("memory.limit_in_bytes", Prop->ToString(P_MEM_LIMIT), false);
-        if (error) {
-            L_ERR() << "Can't set " << P_MEM_LIMIT << ": " << error << std::endl;
-            return error;
-        }
+    error = memorySubsystem->SetLimit(memcg, Prop->Get<uint64_t>(P_MEM_LIMIT));
+    if (error) {
+        L_ERR() << "Can't set " << P_MEM_LIMIT << ": " << error << std::endl;
+        return error;
     }
 
-    if (memroot->HasKnob("memory.recharge_on_pgfault") && !UseParentNamespace()) {
-        string value = Prop->Get<bool>(P_RECHARGE_ON_PGFAULT) ? "1" : "0";
-        error = memcg->SetKnobValue("memory.recharge_on_pgfault", value, false);
-        if (error) {
-            L_ERR() << "Can't set " << P_RECHARGE_ON_PGFAULT << ": " << error << std::endl;
-            return error;
-        }
+    error = memorySubsystem->RechargeOnPgfault(memcg, Prop->Get<bool>(P_RECHARGE_ON_PGFAULT));
+    if (error) {
+        L_ERR() << "Can't set " << P_RECHARGE_ON_PGFAULT << ": " << error << std::endl;
+        return error;
     }
 
     if (UseParentNamespace())
         return TError::Success();
 
     auto cpucg = GetLeafCgroup(cpuSubsystem);
-    if (Prop->Get<std::string>(P_CPU_POLICY) == "normal") {
-        string smart;
-
-        error = cpucg->GetKnobValue("cpu.smart", smart);
-        if (!error && smart == "1") {
-            error = cpucg->SetKnobValue("cpu.smart", "0", false);
-            if (error) {
-                L_ERR() << "Can't disable smart: " << error << std::endl;
-                return error;
-            }
+    if (!UseParentNamespace()) {
+        error = cpuSubsystem->SetPolicy(cpucg, Prop->Get<std::string>(P_CPU_POLICY));
+        if (error) {
+            L_ERR() << "Can't set " << P_CPU_POLICY << ": " << error << std::endl;
+            return error;
         }
+    }
 
+    if (Prop->Get<std::string>(P_CPU_POLICY) == "normal") {
         error = cpuSubsystem->SetLimit(cpucg, Prop->Get<uint64_t>(P_CPU_LIMIT));
         if (error) {
             L_ERR() << "Can't set " << P_CPU_LIMIT << ": " << error << std::endl;
@@ -319,17 +308,6 @@ TError TContainer::ApplyDynamicProperties() {
             L_ERR() << "Can't set " << P_CPU_GUARANTEE << ": " << error << std::endl;
             return error;
         }
-    } else if (Prop->Get<std::string>(P_CPU_POLICY) == "rt") {
-        string smart;
-
-        error = cpucg->GetKnobValue("cpu.smart", smart);
-        if (!error && smart == "0") {
-            error = cpucg->SetKnobValue("cpu.smart", "1", false);
-            if (error) {
-                L_ERR() << "Can't set enable smart: " << error << std::endl;
-                return error;
-            }
-        }
     }
 
     auto blkcg = GetLeafCgroup(blkioSubsystem);
@@ -339,12 +317,10 @@ TError TContainer::ApplyDynamicProperties() {
         return error;
     }
 
-    if (memroot->HasKnob("memory.fs_bps_limit")) {
-        TError error = memcg->SetKnobValue("memory.fs_bps_limit", Prop->ToString(P_IO_LIMIT), false);
-        if (error) {
-            L_ERR() << "Can't set " << P_IO_LIMIT << ": " << error << std::endl;
-            return error;
-        }
+    error = blkioSubsystem->SetLimit(blkcg, Prop->Get<uint64_t>(P_IO_LIMIT));
+    if (error) {
+        L_ERR() << "Can't set " << P_IO_LIMIT << ": " << error << std::endl;
+        return error;
     }
 
     return TError::Success();
@@ -451,19 +427,6 @@ TError TContainer::PrepareCgroups() {
         if (ret) {
             LeafCgroups.clear();
             return ret;
-        }
-    }
-
-    auto cpucg = GetLeafCgroup(cpuSubsystem);
-    auto cpuroot = cpuSubsystem->GetRootCgroup();
-    if (cpuroot->HasKnob("cpu.smart") && !UseParentNamespace()) {
-        TError error;
-        if (Prop->Get<std::string>(P_CPU_POLICY) == "rt") {
-            error = cpucg->SetKnobValue("cpu.smart", "1", false);
-            if (error) {
-                L_ERR() << "Can't enable smart: " << error << std::endl;
-                return error;
-            }
         }
     }
 
@@ -796,7 +759,7 @@ TError TContainer::KillAll() {
 
     // then kill any task that didn't want to stop via SIGTERM signal;
     // freeze all container tasks to make sure no one forks and races with us
-    error = freezerSubsystem->Freeze(*cg);
+    error = freezerSubsystem->Freeze(cg);
     if (error)
         L_ERR() << "Can't freeze container: " << error << std::endl;
 
@@ -806,7 +769,7 @@ TError TContainer::KillAll() {
         return error;
     }
     cg->Kill(SIGKILL);
-    error = freezerSubsystem->Unfreeze(*cg);
+    error = freezerSubsystem->Unfreeze(cg);
     if (error)
         L_ERR() << "Can't unfreeze container: " << error << std::endl;
 
@@ -906,7 +869,7 @@ TError TContainer::Pause() {
                       ContainerStateName(state));
 
     auto cg = GetLeafCgroup(freezerSubsystem);
-    TError error(freezerSubsystem->Freeze(*cg));
+    TError error(freezerSubsystem->Freeze(cg));
     if (error) {
         L_ERR() << "Can't pause " << GetName() << ": " << error << std::endl;
         return error;
@@ -923,7 +886,7 @@ TError TContainer::Resume() {
                       ContainerStateName(state));
 
     auto cg = GetLeafCgroup(freezerSubsystem);
-    TError error(freezerSubsystem->Unfreeze(*cg));
+    TError error(freezerSubsystem->Unfreeze(cg));
     if (error) {
         L_ERR() << "Can't resume " << GetName() << ": " << error << std::endl;
         return error;
@@ -1253,7 +1216,7 @@ TError TContainer::Restore(const kv::TNode &node) {
         }
 
         auto cg = GetLeafCgroup(freezerSubsystem);
-        if (freezerSubsystem->IsFreezed(*cg))
+        if (freezerSubsystem->IsFreezed(cg))
             SetState(EContainerState::Paused);
 
         (void)GetState();

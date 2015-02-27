@@ -371,9 +371,8 @@ public:
     TError CheckValue(const uint64_t &value) override {
         auto c = GetContainer();
 
-        auto memroot = memorySubsystem->GetRootCgroup();
-        if (!memroot->HasKnob("memory.low_limit_in_bytes"))
-            return TError(EError::NotSupported, "invalid kernel");
+        if (!memorySubsystem->SupportGuarantee())
+            return TError(EError::NotSupported, "invalid kernel (no Yandex extensions)");
 
         if (!c->ValidHierarchicalProperty(P_MEM_GUARANTEE, value))
             return TError(EError::InvalidValue, "invalid hierarchical value");
@@ -417,9 +416,8 @@ public:
     }
 
     TError CheckValue(const bool &value) override {
-        auto memroot = memorySubsystem->GetRootCgroup();
-        if (!memroot->HasKnob("memory.recharge_on_pgfault"))
-            return TError(EError::NotSupported, "invalid kernel");
+        if (!memorySubsystem->SupportRechargeOnPgfault())
+            return TError(EError::NotSupported, "invalid kernel (no Yandex extensions)");
 
         return TError::Success();
     }
@@ -462,9 +460,8 @@ public:
             return TError(EError::InvalidValue, "invalid policy");
 
         if (value == "rt") {
-            auto cpuroot = cpuSubsystem->GetRootCgroup();
-            if (!cpuroot->HasKnob("cpu.smart"))
-                return TError(EError::NotSupported, "invalid kernel");
+            if (!cpuSubsystem->SupportSmart())
+                return TError(EError::NotSupported, "invalid kernel (no Yandex extensions)");
         }
 
         if (value == "idle")
@@ -487,6 +484,9 @@ public:
     }
 
     TError CheckValue(const uint64_t &value) override {
+        if (!cpuSubsystem->SupportLimit())
+            return TError(EError::NotSupported, "invalid kernel (CFS bandwidth is disabled)");
+
         if (value < 1 || value > 100)
             return TError(EError::InvalidValue, "invalid value");
 
@@ -503,6 +503,9 @@ public:
                         dynamicProperty) {}
 
     TError CheckValue(const uint64_t &value) override {
+        if (!cpuSubsystem->SupportGuarantee())
+            return TError(EError::NotSupported, "invalid kernel (CFS group scheduling is disabled)");
+
         if (value > 100)
             return TError(EError::InvalidValue, "invalid value");
 
@@ -523,6 +526,9 @@ public:
     }
 
     TError CheckValue(const std::string &value) override {
+        if (!blkioSubsystem->SupportPolicy())
+            return TError(EError::NotSupported, "invalid kernel (CFQ is disabled)");
+
         if (value != "normal" && value != "batch")
             return TError(EError::InvalidValue, "invalid policy");
 
@@ -543,8 +549,7 @@ public:
     }
 
     TError CheckValue(const uint64_t &value) override {
-        auto memroot = memorySubsystem->GetRootCgroup();
-        if (!memroot->HasKnob("memory.fs_bps_limit"))
+        if (!memorySubsystem->SupportLimit())
             return TError(EError::NotSupported, "invalid kernel");
 
         return TError::Success();

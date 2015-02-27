@@ -290,7 +290,7 @@ void TCgroupSnapshot::Destroy() {
         if (cg.use_count() > 2)
             continue;
 
-        (void)freezerSubsystem->Unfreeze(*cg);
+        (void)freezerSubsystem->Unfreeze(cg);
     }
 
     Cgroups.clear();

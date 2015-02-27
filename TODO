@@ -1,4 +1,5 @@
 - ? use chrt instead of cpu.smart so we don't depend on smart kernels + set rt prio
+- support volume as root
 
 # root property
 - mount root loop in root namespace (to better diagnose possible problems)

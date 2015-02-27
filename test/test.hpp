@@ -70,6 +70,12 @@ namespace test {
     int SelfTest(std::vector<std::string> name, int leakNr);
     int StressTest(int threads, int iter, bool killPorto);
 
+    bool HaveCfsBandwidth();
+    bool HaveCfsGroupSched();
+    bool HaveSmart();
+    bool HaveIoLimit();
+    bool HaveLowLimit();
+    bool HaveRechargeOnPgfault();
     bool IsCfqActive();
 }
 
