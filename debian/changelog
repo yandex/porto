@@ -1,3 +1,9 @@
+yandex-porto (0.95) precise; urgency=low
+
+  * Don't fail on cpu.cfs_period_us/cpu.shares with default cpu_policy/cpu_guarantee
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Fri, 27 Feb 2015 17:10:00 +0400
+
 yandex-porto (0.94) precise; urgency=low
 
   * Add checks for [] in non-map properties
