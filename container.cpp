@@ -123,6 +123,11 @@ void TContainer::SetState(EContainerState newState) {
         return;
 
     L() << GetName() << ": change state " << ContainerStateName(State) << " -> " << ContainerStateName(newState) << std::endl;
+    if (newState == EContainerState::Running)
+        Statistics->Running++;
+    else if (State == EContainerState::Running)
+        Statistics->Running--;
+
     State = newState;
     Data->Set<std::string>(D_STATE, ContainerStateName(State));
 }
