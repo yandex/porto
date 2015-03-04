@@ -3580,6 +3580,28 @@ static void TestVolumeImpl(TPortoAPI &api) {
     }
 }
 
+static void TestSigPipe(TPortoAPI &api) {
+    std::string before;
+    ExpectApiSuccess(api.GetData("/", "porto_stat[spawned]", before));
+
+    int fd;
+    ExpectSuccess(ConnectToRpcServer(config().rpc_sock().file().path(), fd));
+
+    rpc::TContainerRequest req;
+    req.mutable_list();
+
+    google::protobuf::io::FileOutputStream post(fd);
+    WriteDelimitedTo(req, &post);
+    post.Flush();
+
+    close(fd);
+    WaitPortod(api);
+
+    std::string after;
+    ExpectApiSuccess(api.GetData("/", "porto_stat[spawned]", after));
+    Expect(before == after);
+}
+
 static void KillMaster(TPortoAPI &api, int sig, int times = 10) {
     AsRoot(api);
     RotateDaemonLogs(api);
@@ -4094,6 +4116,7 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
         { "perf", TestPerf },
         { "vholder", TestVolumeHolder },
         { "volume_impl", TestVolumeImpl },
+        { "sigpipe", TestSigPipe },
         { "stats", TestStats },
         { "daemon", TestDaemon },
 
