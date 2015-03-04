@@ -279,6 +279,9 @@ TError TContainer::ApplyDynamicProperties() {
 
     error = memorySubsystem->SetLimit(memcg, Prop->Get<uint64_t>(P_MEM_LIMIT));
     if (error) {
+        if (error.GetErrno() == EBUSY)
+            return TError(EError::InvalidValue, "limit is too low");
+
         L_ERR() << "Can't set " << P_MEM_LIMIT << ": " << error << std::endl;
         return error;
     }

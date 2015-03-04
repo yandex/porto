@@ -2550,7 +2550,13 @@ static void TestLimits(TPortoAPI &api) {
         current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
         Expect(current == exp_guar);
     }
+
+    ExpectApiSuccess(api.SetProperty(name, "memory_limit", "2g"));
+    ExpectApiFailure(api.SetProperty(name, "memory_limit", "10k"), EError::InvalidValue);
+
     ExpectApiSuccess(api.Stop(name));
+
+    ExpectApiSuccess(api.SetProperty(name, "memory_limit", "0"));
 
     Say() << "Check cpu_limit and cpu_guarantee range" << std::endl;
     if (HaveCfsBandwidth()) {
