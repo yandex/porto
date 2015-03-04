@@ -13,9 +13,15 @@ static void MultiHandler(int sig) {
         signal_mask |= (1 << sig);
 }
 
-static void DumpStack(int sig) {
-    Crash();
+static void DumpStackAndDie(int sig) {
+    L() << "Received fatal signal " << strsignal(sig) << std::endl;
+    PrintTrace();
     RaiseSignal(sig);
+}
+
+static void DumpStack(int sig) {
+    L() << "Received SIGPIPE" << std::endl;
+    PrintTrace();
 }
 
 static TError EpollCreate(int &epfd) {
@@ -44,25 +50,28 @@ TError TEpollLoop::InitializeSignals() {
     sigset_t mask;
 
     if (sigemptyset(&mask) < 0)
-        return TError(EError::Unknown, "Can't initialize signal mask", errno);
+        return TError(EError::Unknown, errno, "Can't initialize signal mask");
 
     for (auto sig: HANDLE_SIGNALS) {
         if (RegisterSignal(sig, MultiHandler))
-            return TError(EError::Unknown, "Can't register signal", errno);
+            return TError(EError::Unknown, errno, "Can't register signal");
     }
 
     for (auto sig: HANDLE_SIGNALS_WAIT) {
         if (RegisterSignal(sig, MultiHandler))
-            return TError(EError::Unknown, "Can't register signal", errno);
+            return TError(EError::Unknown, errno, "Can't register signal");
         if (sigaddset(&mask, sig) < 0)
-            return TError(EError::Unknown, "Can't add signal to mask", errno);
+            return TError(EError::Unknown, errno, "Can't add signal to mask");
     }
 
-    if (RegisterSignal(SIGSEGV, DumpStack))
-            return TError(EError::Unknown, "Can't register SIGSEGV handler", errno);
+    if (RegisterSignal(SIGSEGV, DumpStackAndDie))
+            return TError(EError::Unknown, errno, "Can't register SIGSEGV handler");
+
+    if (RegisterSignal(SIGPIPE, DumpStack))
+            return TError(EError::Unknown, errno, "Can't register SIGPIPE handler");
 
     if (sigprocmask(SIG_SETMASK, &mask, NULL) < 0)
-        return TError(EError::Unknown, "Can't set signal mask: ", errno);
+        return TError(EError::Unknown, errno, "Can't set signal mask: ");
 
     return TError::Success();
 }

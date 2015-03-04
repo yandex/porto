@@ -11,7 +11,7 @@ extern "C" {
 #include <stdlib.h>
 }
 
-static void PrintTrace() {
+void PrintTrace() {
     void *array[20];
     size_t size;
     char **strings;
