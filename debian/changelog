@@ -1,3 +1,12 @@
+yandex-porto (0.96) precise; urgency=low
+
+  * Dump stack on SIGSEGV and SIGPIPE
+  * Change default max clients 128 -> 512
+  * Add number of running containers to porto_stat
+  * Don't die on SIGPIPE (regression)
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Wed, 04 Mar 2015 16:18:00 +0400
+
 yandex-porto (0.95) precise; urgency=low
 
   * Don't fail on cpu.cfs_period_us/cpu.shares with default cpu_policy/cpu_guarantee
