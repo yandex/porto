@@ -213,17 +213,25 @@ public:
 
 class TGetPropertyCmd : public ICmd {
 public:
-    TGetPropertyCmd(TPortoAPI *api) : ICmd(api, "pget", 2, "<name> <property> [property...]", "get raw container property") {}
+    TGetPropertyCmd(TPortoAPI *api) : ICmd(api, "pget", 2, "[-k] <name> <property> [property...]", "get raw container property") {}
 
     int Execute(int argc, char *argv[]) {
-        for (int i = 1; i < argc; i++) {
+        bool printKey = false;
+        int start = GetOpt(argc, argv, {
+            { 'k', [&]() { printKey = true; } },
+        });
+
+        for (int i = start + 1; i < argc; i++) {
             string value;
-            int ret = Api->GetProperty(argv[0], argv[i], value);
+            int ret = Api->GetProperty(argv[start], argv[i], value);
             if (ret) {
                 PrintError("Can't get property");
                 return ret;
             }
-            Print(value);
+            if (printKey)
+                PrintPair(argv[i], value);
+            else
+                Print(value);
         }
 
         return 0;
@@ -251,17 +259,25 @@ public:
 
 class TGetDataCmd : public ICmd {
 public:
-    TGetDataCmd(TPortoAPI *api) : ICmd(api, "dget", 2, "<name> <data> [data...]", "get raw container data") {}
+    TGetDataCmd(TPortoAPI *api) : ICmd(api, "dget", 2, "[-k] <name> <data> [data...]", "get raw container data") {}
 
     int Execute(int argc, char *argv[]) {
-        for (int i = 1; i < argc; i++) {
+        bool printKey = false;
+        int start = GetOpt(argc, argv, {
+            { 'k', [&]() { printKey = true; } },
+        });
+
+        for (int i = start + 1; i < argc; i++) {
             string value;
-            int ret = Api->GetData(argv[0], argv[i], value);
+            int ret = Api->GetData(argv[start], argv[i], value);
             if (ret) {
                 PrintError("Can't get data");
                 return ret;
             }
-            Print(value);
+            if (printKey)
+                PrintPair(argv[i], value);
+            else
+                Print(value);
         }
 
         return 0;
@@ -468,7 +484,7 @@ public:
 
                 ret = Api->GetProperty(argv[0], p.Name, value);
                 if (!ret) {
-                    Print(p.Name + " = " + PropertyValue(p.Name, value));
+                    PrintPair(p.Name, PropertyValue(p.Name, value));
                     printed++;
                 }
             }
@@ -479,7 +495,7 @@ public:
 
                 ret = Api->GetData(argv[0], d.Name, value);
                 if (!ret) {
-                    Print(d.Name + " = " + DataValue(d.Name, value));
+                    PrintPair(d.Name, DataValue(d.Name, value));
                     printed++;
                 }
             }
@@ -524,7 +540,7 @@ public:
 
 class TEnterCmd : public ICmd {
 public:
-    TEnterCmd(TPortoAPI *api) : ICmd(api, "enter", 1, "<name> [-C] [command]", "execute command in container namespace") {}
+    TEnterCmd(TPortoAPI *api) : ICmd(api, "enter", 1, "[-C] <name> [command]", "execute command in container namespace") {}
 
     void PrintErrno(const string &str) {
         std::cerr << str << ": " << strerror(errno) << std::endl;
@@ -561,18 +577,13 @@ public:
     }
 
     int Execute(int argc, char *argv[]) {
-        string cmd = "";
-        int start = 1;
         bool enterCgroups = true;
+        int start = GetOpt(argc, argv, {
+            { 'C', [&]() { enterCgroups = false; } },
+        });
 
-        if (argc >= 2) {
-            if (argv[1] == string("-C"))
-                enterCgroups = false;
-
-            start++;
-        }
-
-        for (int i = start; i < argc; i++) {
+        string cmd = "";
+        for (int i = start + 1; i < argc; i++) {
             cmd += argv[i];
             cmd += " ";
         }
@@ -581,7 +592,7 @@ public:
             cmd = "/bin/bash";
 
         string pidStr;
-        int ret = Api->GetData(argv[0], "root_pid", pidStr);
+        int ret = Api->GetData(argv[start], "root_pid", pidStr);
         if (ret) {
             PrintError("Can't get container root_pid");
             return EXIT_FAILURE;
@@ -1003,8 +1014,9 @@ public:
 
     int Execute(int argc, char *argv[]) {
         bool details = true;
-        if (argc >= 1 && argv[0] == std::string("-1"))
-            details = false;
+        (void)GetOpt(argc, argv, {
+            { '1', [&]() { details = false; } },
+        });
 
         vector<string> clist;
         int ret = Api->List(clist);

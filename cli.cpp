@@ -40,6 +40,10 @@ void ICmd::Print(const std::string &val) {
         std::cout << std::endl;
 }
 
+void ICmd::PrintPair(const std::string &key, const std::string &val) {
+    Print(key + " = " + val);
+}
+
 void ICmd::PrintError(const TError &error, const string &str) {
     if (error.GetMsg().length())
         std::cerr << str << ": " << ErrorName(error.GetError()) << " (" << error.GetMsg() << ")" << std::endl;
@@ -257,4 +261,23 @@ int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
     }
 
     return EXIT_FAILURE;
+}
+
+int GetOpt(int argc, char *argv[],
+           const std::map<char, std::function<void()>> &opts) {
+    std::string optstring;
+    for (auto pair : opts)
+        optstring += pair.first;
+
+    int opt;
+    while ((opt = getopt(argc + 1, argv - 1, optstring.c_str())) != -1) {
+        if (opts.find(opt) == opts.end()) {
+            Usage(NULL);
+            exit(EXIT_FAILURE);
+        }
+
+        opts.at(opt)();
+    }
+
+    return optind - 1;
 }
