@@ -1730,6 +1730,8 @@ static void TestNetProperty(TPortoAPI &api) {
     string name = "a";
     ExpectApiSuccess(api.Create(name));
 
+    ExpectApiFailure(api.SetProperty(name, "net_tos", "1"), EError::NotSupported);
+
     vector<string> hostLink;
     ExpectSuccess(Popen("ip -o link show", hostLink));
 
@@ -2186,6 +2188,7 @@ static void TestRoot(TPortoAPI &api) {
         "max_respawns",
         "bind",
         "net",
+        "net_tos",
         "allowed_devices",
         "root_readonly",
         "capabilities",

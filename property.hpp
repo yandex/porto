@@ -45,6 +45,7 @@ constexpr const char *P_HOSTNAME = "hostname";
 constexpr const char *P_BIND_DNS = "bind_dns";
 constexpr const char *P_BIND = "bind";
 constexpr const char *P_NET = "net";
+constexpr const char *P_NET_TOS = "net_tos";
 constexpr const char *P_ALLOWED_DEVICES = "allowed_devices";
 constexpr const char *P_CAPABILITIES = "capabilities";
 constexpr const char *P_IP = "ip";

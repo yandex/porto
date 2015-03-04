@@ -1104,6 +1104,19 @@ public:
     }
 };
 
+class TNetTosProperty : public TUintValue, public TContainerValue {
+public:
+    TNetTosProperty() :
+        TUintValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
+        TContainerValue(P_NET_TOS,
+                        "IP TOS",
+                        staticProperty) {}
+
+    TError CheckValue(const uint64_t &value) override {
+        return TError(EError::NotSupported, "No kernel support");
+    }
+};
+
 class TAllowedDevicesProperty : public TListValue, public TContainerValue {
 public:
     TAllowedDevicesProperty() :
@@ -1327,6 +1340,7 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TBindDnsProperty,
         new TBindProperty,
         new TNetProperty,
+        new TNetTosProperty,
         new TAllowedDevicesProperty,
         new TCapabilitiesProperty,
         new TIpProperty,
