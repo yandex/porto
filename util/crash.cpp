@@ -12,13 +12,13 @@ extern "C" {
 }
 
 void PrintTrace() {
-    void *array[20];
+    void *array[64];
     size_t size;
     char **strings;
     size_t i;
 
-    size = backtrace (array, 20);
-    strings = backtrace_symbols (array, size);
+    size = backtrace(array, 64);
+    strings = backtrace_symbols(array, size);
 
     L() << "Backtrace:" << std::endl;
     for (i = 0; i < size; i++)
