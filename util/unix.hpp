@@ -36,6 +36,16 @@ public:
     TScopedFd &operator=(int fd);
 };
 
+class TScopedMem : public TNonCopyable {
+    size_t Size;
+    void *Data = nullptr;
+public:
+    TScopedMem(size_t size);
+    ~TScopedMem();
+    void *GetData();
+    size_t GetSize();
+};
+
 TError SetOomScoreAdj(int value);
 
 int64_t GetBootTime();

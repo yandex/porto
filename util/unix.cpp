@@ -5,6 +5,7 @@
 #include "util/string.hpp"
 #include "util/cred.hpp"
 #include "util/path.hpp"
+#include "util/log.hpp"
 #include "unix.hpp"
 
 extern "C" {
@@ -220,6 +221,24 @@ TScopedFd &TScopedFd::operator=(int fd) {
     Fd = fd;
 
     return *this;
+}
+
+TScopedMem::TScopedMem(size_t size) : Size(size) {
+    Data = malloc(size);
+    PORTO_ASSERT(Data != nullptr);
+}
+
+TScopedMem::~TScopedMem() {
+    free(Data);
+    Data = nullptr;
+}
+
+void *TScopedMem::GetData() {
+    return Data;
+}
+
+size_t TScopedMem::GetSize() {
+    return Size;
 }
 
 TError SetOomScoreAdj(int value) {

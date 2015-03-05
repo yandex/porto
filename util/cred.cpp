@@ -1,6 +1,7 @@
 #include "util/string.hpp"
 #include "util/log.hpp"
 #include "util/cred.hpp"
+#include "util/unix.hpp"
 
 #include "config.hpp"
 
@@ -19,11 +20,19 @@ int TUserEntry::GetId() {
     return Id;
 }
 
+static size_t GetPwSize() {
+    long bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
+    if (bufsize < 0)
+        return 4096;
+    return bufsize;
+}
+
 TError TUser::Load() {
-    struct passwd *p;
+    struct passwd pwd, *p;
+    TScopedMem buf(GetPwSize());
 
     if (Id >= 0) {
-        p = getpwuid(Id);
+        getpwuid_r(Id, &pwd, (char *)buf.GetData(), buf.GetSize(), &p);
         if (p) {
             Id = p->pw_uid;
             Name = p->pw_name;
@@ -34,7 +43,7 @@ TError TUser::Load() {
     }
 
     if (Name.length()) {
-        p = getpwnam(Name.c_str());
+        getpwnam_r(Name.c_str(), &pwd, (char *)buf.GetData(), buf.GetSize(), &p);
         if (p) {
             Id = p->pw_uid;
             Name = p->pw_name;
@@ -46,7 +55,7 @@ TError TUser::Load() {
         if (error)
             return TError(EError::InvalidValue, "Invalid user: " + Name);
 
-        p = getpwuid(uid);
+        getpwuid_r(Id, &pwd, (char *)buf.GetData(), buf.GetSize(), &p);
         if (p) {
             Id = p->pw_uid;
             Name = p->pw_name;
@@ -58,10 +67,11 @@ TError TUser::Load() {
 }
 
 TError TGroup::Load() {
-    struct group *g;
+    struct group grp, *g;
+    TScopedMem buf(GetPwSize());
 
     if (Id >= 0) {
-        g = getgrgid(Id);
+        getgrgid_r(Id, &grp, (char *)buf.GetData(), buf.GetSize(), &g);
         if (g) {
             Id = g->gr_gid;
             Name = g->gr_name;
@@ -72,7 +82,7 @@ TError TGroup::Load() {
     }
 
     if (Name.length()) {
-        g = getgrnam(Name.c_str());
+        getgrnam_r(Name.c_str(), &grp, (char *)buf.GetData(), buf.GetSize(), &g);
         if (g) {
             Id = g->gr_gid;
             Name = g->gr_name;
@@ -84,7 +94,7 @@ TError TGroup::Load() {
         if (error)
             return TError(EError::InvalidValue, "Invalid group: " + Name);
 
-        g = getgrgid(uid);
+        getgrgid_r(Id, &grp, (char *)buf.GetData(), buf.GetSize(), &g);
         if (g) {
             Id = g->gr_gid;
             Name = g->gr_name;
