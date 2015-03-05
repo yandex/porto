@@ -109,8 +109,9 @@ TError TMount::MountDir(unsigned long flags) const {
 
 TError TMountSnapshot::Mounts(std::set<std::shared_ptr<TMount>> &mounts) const {
     FILE* f = setmntent(Path.c_str(), "r");
-    struct mntent* m;
-    while ((m = getmntent(f)) != NULL) {
+    struct mntent* m, mntbuf;
+    TScopedMem buf(4096);
+    while ((m = getmntent_r(f, &mntbuf, (char *)buf.GetData(), buf.GetSize())) != NULL) {
            vector<string> vflags;
            set<string> flags;
 
