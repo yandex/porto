@@ -46,8 +46,9 @@ static TError CreateContainer(TContext &context,
                               const rpc::TContainerCreateRequest &req,
                               rpc::TContainerResponse &rsp,
                               std::shared_ptr<TClient> client) {
-    auto container = context.Cholder->Get(req.name());
-    if (container)
+    std::shared_ptr<TContainer> container;
+    TError error = context.Cholder->Get(req.name(), container);
+    if (!error)
         return TError(EError::ContainerAlreadyExists, "invalid name");
 
     return context.Cholder->Create(req.name(), client->Cred);
@@ -59,14 +60,14 @@ static TError DestroyContainer(TContext &context,
                                std::shared_ptr<TClient> client) {
     { // we don't want to hold container shared_ptr because Destroy
       // might think that it has some parent that holds it
-        auto container = context.Cholder->Get(req.name());
-        if (container) {
-            TError error = container->CheckPermission(client->Cred);
-            if (error)
-                return error;
-        } else {
-            return TError(EError::ContainerDoesNotExist, "invalid name");
-        }
+        std::shared_ptr<TContainer> container;
+        TError error = context.Cholder->Get(req.name(), container);
+        if (error)
+            return error;
+
+        error = container->CheckPermission(client->Cred);
+        if (error)
+            return error;
     }
 
     return context.Cholder->Destroy(req.name());
@@ -76,11 +77,12 @@ static TError StartContainer(TContext &context,
                              const rpc::TContainerStartRequest &req,
                              rpc::TContainerResponse &rsp,
                              std::shared_ptr<TClient> client) {
-    auto container = context.Cholder->Get(req.name());
-    if (!container)
-        return TError(EError::ContainerDoesNotExist, "invalid name");
+    std::shared_ptr<TContainer> container;
+    TError error = context.Cholder->Get(req.name(), container);
+    if (error)
+        return error;
 
-    TError error = container->CheckPermission(client->Cred);
+    error = container->CheckPermission(client->Cred);
     if (error)
         return error;
 
@@ -91,11 +93,12 @@ static TError StopContainer(TContext &context,
                             const rpc::TContainerStopRequest &req,
                             rpc::TContainerResponse &rsp,
                             std::shared_ptr<TClient> client) {
-    auto container = context.Cholder->Get(req.name());
-    if (!container)
-        return TError(EError::ContainerDoesNotExist, "invalid name");
+    std::shared_ptr<TContainer> container;
+    TError error = context.Cholder->Get(req.name(), container);
+    if (error)
+        return error;
 
-    TError error = container->CheckPermission(client->Cred);
+    error = container->CheckPermission(client->Cred);
     if (error)
         return error;
 
@@ -106,11 +109,12 @@ static TError PauseContainer(TContext &context,
                              const rpc::TContainerPauseRequest &req,
                              rpc::TContainerResponse &rsp,
                              std::shared_ptr<TClient> client) {
-    auto container = context.Cholder->Get(req.name());
-    if (!container)
-        return TError(EError::ContainerDoesNotExist, "invalid name");
+    std::shared_ptr<TContainer> container;
+    TError error = context.Cholder->Get(req.name(), container);
+    if (error)
+        return error;
 
-    TError error = container->CheckPermission(client->Cred);
+    error = container->CheckPermission(client->Cred);
     if (error)
         return error;
 
@@ -121,11 +125,12 @@ static TError ResumeContainer(TContext &context,
                               const rpc::TContainerResumeRequest &req,
                               rpc::TContainerResponse &rsp,
                               std::shared_ptr<TClient> client) {
-    auto container = context.Cholder->Get(req.name());
-    if (!container)
-        return TError(EError::ContainerDoesNotExist, "invalid name");
+    std::shared_ptr<TContainer> container;
+    TError error = context.Cholder->Get(req.name(), container);
+    if (error)
+        return error;
 
-    TError error = container->CheckPermission(client->Cred);
+    error = container->CheckPermission(client->Cred);
     if (error)
         return error;
 
@@ -144,12 +149,13 @@ static TError GetContainerProperty(TContext &context,
                                    const rpc::TContainerGetPropertyRequest &req,
                                    rpc::TContainerResponse &rsp,
                                    std::shared_ptr<TClient> client) {
-    auto container = context.Cholder->Get(req.name());
-    if (!container)
-        return TError(EError::ContainerDoesNotExist, "invalid name");
+    std::shared_ptr<TContainer> container;
+    TError error = context.Cholder->Get(req.name(), container);
+    if (error)
+        return error;
 
     string value;
-    TError error = container->GetProperty(req.property(), value);
+    error = container->GetProperty(req.property(), value);
     if (!error)
         rsp.mutable_getproperty()->set_value(value);
     return error;
@@ -159,11 +165,12 @@ static TError SetContainerProperty(TContext &context,
                                    const rpc::TContainerSetPropertyRequest &req,
                                    rpc::TContainerResponse &rsp,
                                    std::shared_ptr<TClient> client) {
-    auto container = context.Cholder->Get(req.name());
-    if (!container)
-        return TError(EError::ContainerDoesNotExist, "invalid name");
+    std::shared_ptr<TContainer> container;
+    TError error = context.Cholder->Get(req.name(), container);
+    if (error)
+        return error;
 
-    TError error = container->CheckPermission(client->Cred);
+    error = container->CheckPermission(client->Cred);
     if (error)
         return error;
 
@@ -174,12 +181,13 @@ static TError GetContainerData(TContext &context,
                                const rpc::TContainerGetDataRequest &req,
                                rpc::TContainerResponse &rsp,
                                std::shared_ptr<TClient> client) {
-    auto container = context.Cholder->Get(req.name());
-    if (!container)
-        return TError(EError::ContainerDoesNotExist, "invalid name");
+    std::shared_ptr<TContainer> container;
+    TError error = context.Cholder->Get(req.name(), container);
+    if (error)
+        return error;
 
     string value;
-    TError error = container->GetData(req.data(), value);
+    error = container->GetData(req.data(), value);
     if (!error)
         rsp.mutable_getdata()->set_value(value);
     return error;
@@ -189,8 +197,9 @@ static TError ListProperty(TContext &context,
                            rpc::TContainerResponse &rsp) {
     auto list = rsp.mutable_propertylist();
 
-    auto container = context.Cholder->Get(ROOT_CONTAINER);
-    if (!container)
+    std::shared_ptr<TContainer> container;
+    TError error = context.Cholder->Get(ROOT_CONTAINER, container);
+    if (error)
         return TError(EError::Unknown, "Can't find root container");
 
     for (auto name : container->Prop->List()) {
@@ -212,8 +221,9 @@ static TError ListData(TContext &context,
                        rpc::TContainerResponse &rsp) {
     auto list = rsp.mutable_datalist();
 
-    auto container = context.Cholder->Get(ROOT_CONTAINER);
-    if (!container)
+    std::shared_ptr<TContainer> container;
+    TError error = context.Cholder->Get(ROOT_CONTAINER, container);
+    if (error)
         return TError(EError::Unknown, "Can't find root container");
 
     for (auto name : container->Data->List()) {
@@ -235,11 +245,12 @@ static TError Kill(TContext &context,
                    const rpc::TContainerKillRequest &req,
                    rpc::TContainerResponse &rsp,
                    std::shared_ptr<TClient> client) {
-    auto container = context.Cholder->Get(req.name());
-    if (!container)
-        return TError(EError::ContainerDoesNotExist, "invalid name");
+    std::shared_ptr<TContainer> container;
+    TError error = context.Cholder->Get(req.name(), container);
+    if (error)
+        return error;
 
-    TError error = container->CheckPermission(client->Cred);
+    error = container->CheckPermission(client->Cred);
     if (error)
         return error;
 

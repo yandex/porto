@@ -42,7 +42,10 @@ TError TContainerHolder::CreateRoot() {
     if (error)
         return error;
 
-    auto root = Get(ROOT_CONTAINER);
+    std::shared_ptr<TContainer> root;
+    error = Get(ROOT_CONTAINER, root);
+    if (error)
+        return error;
 
     if (root->GetId() != ROOT_CONTAINER_ID)
         return TError(EError::Unknown, "Unexpected root container id " + std::to_string(root->GetId()));
@@ -134,11 +137,12 @@ TError TContainerHolder::Create(const std::string &name, const TCred &cred) {
     return TError::Success();
 }
 
-std::shared_ptr<TContainer> TContainerHolder::Get(const std::string &name) {
+TError TContainerHolder::Get(const std::string &name, std::shared_ptr<TContainer> &c) {
     if (Containers.find(name) == Containers.end())
-        return nullptr;
+        return TError(EError::ContainerDoesNotExist, "invalid name");
 
-    return Containers[name];
+    c = Containers[name];
+    return TError::Success();
 }
 
 TError TContainerHolder::_Destroy(const std::string &name) {

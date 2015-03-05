@@ -41,7 +41,7 @@ public:
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot();
     TError Create(const std::string &name, const TCred &cred);
-    std::shared_ptr<TContainer> Get(const std::string &name);
+    TError Get(const std::string &name, std::shared_ptr<TContainer> &c);
     TError Restore(const std::string &name, const kv::TNode &node);
     bool RestoreFromStorage();
     TError Destroy(const std::string &name);
