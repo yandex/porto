@@ -23,7 +23,7 @@ int TUserEntry::GetId() {
 static size_t GetPwSize() {
     long bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
     if (bufsize < 0)
-        return 4096;
+        return 16384;
     return bufsize;
 }
 
