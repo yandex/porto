@@ -22,8 +22,8 @@ int TUserEntry::GetId() {
 
 static size_t GetPwSize() {
     long bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
-    if (bufsize < 0)
-        return 16384;
+    if (bufsize < 32768)
+        return 32768;
     return bufsize;
 }
 
@@ -37,6 +37,8 @@ TError TUser::Load() {
             Id = p->pw_uid;
             Name = p->pw_name;
             return TError::Success();
+        } else if (errno == ENOMEM || errno == ERANGE) {
+            L_WRN() << "Not enough space in buffer for credentials" << std::endl;
         }
 
         return TError(EError::InvalidValue, "Invalid uid: " + std::to_string(Id));
@@ -48,6 +50,8 @@ TError TUser::Load() {
             Id = p->pw_uid;
             Name = p->pw_name;
             return TError::Success();
+        } else if (errno == ENOMEM || errno == ERANGE) {
+            L_WRN() << "Not enough space in buffer for credentials" << std::endl;
         }
 
         int uid;
@@ -60,6 +64,8 @@ TError TUser::Load() {
             Id = p->pw_uid;
             Name = p->pw_name;
             return TError::Success();
+        } else if (errno == ENOMEM || errno == ERANGE) {
+            L_WRN() << "Not enough space in buffer for credentials" << std::endl;
         }
     }
 
@@ -76,6 +82,8 @@ TError TGroup::Load() {
             Id = g->gr_gid;
             Name = g->gr_name;
             return TError::Success();
+        } else if (errno == ENOMEM || errno == ERANGE) {
+            L_WRN() << "Not enough space in buffer for credentials" << std::endl;
         }
 
         return TError(EError::InvalidValue, "Invalid gid: " + std::to_string(Id));
@@ -87,6 +95,8 @@ TError TGroup::Load() {
             Id = g->gr_gid;
             Name = g->gr_name;
             return TError::Success();
+        } else if (errno == ENOMEM || errno == ERANGE) {
+            L_WRN() << "Not enough space in buffer for credentials" << std::endl;
         }
 
         int uid;
@@ -99,6 +109,8 @@ TError TGroup::Load() {
             Id = g->gr_gid;
             Name = g->gr_name;
             return TError::Success();
+        } else if (errno == ENOMEM || errno == ERANGE) {
+            L_WRN() << "Not enough space in buffer for credentials" << std::endl;
         }
     }
 
