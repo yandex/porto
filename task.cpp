@@ -626,8 +626,9 @@ TError TTask::ChildPrepareLoop() {
 
 TError TTask::ChildCallback() {
     int ret;
+    close(WaitParentWfd);
     if (read(WaitParentRfd, &ret, sizeof(ret)) != sizeof(ret))
-        return TError(EError::Unknown, errno, "partial read from child sync pipe");
+        return TError(EError::Unknown, errno ?: ENODATA, "partial read from child sync pipe");
 
     close(Rfd);
     ResetAllSignalHandlers();
@@ -712,6 +713,8 @@ TError TTask::Start() {
     int ret;
     int pfd[2], syncfd[2];
 
+    Pid = 0;
+
     if (Env->CreateCwd) {
         TError error = CreateCwd();
         if (error) {
@@ -740,6 +743,8 @@ TError TTask::Start() {
     if (forkPid < 0) {
         TError error(EError::Unknown, errno, "fork()");
         L_ERR() << "Can't spawn child: " << error << std::endl;
+        close(Rfd);
+        close(Wfd);
         return error;
     } else if (forkPid == 0) {
         SetProcessName("portod-spawn-p");
@@ -802,19 +807,18 @@ TError TTask::Start() {
         WaitParentWfd = syncfd[1];
 
         pid_t clonePid = clone(ChildFn, stack + sizeof(stack), cloneFlags, this);
+        close(WaitParentRfd);
+        ReportPid(clonePid);
         if (clonePid < 0) {
             TError error(EError::Unknown, errno, "clone()");
             L_ERR() << "Can't spawn child: " << error << std::endl;
-            ReportPid(-1);
             Abort(error);
         }
 
         if (config().network().enabled()) {
             error = IsolateNet(clonePid);
             if (error) {
-                (void)kill(clonePid, SIGKILL);
                 L_ERR() << "Can't spawn child: " << error << std::endl;
-                ReportPid(-1);
                 Abort(error);
             }
         }
@@ -822,18 +826,16 @@ TError TTask::Start() {
         int result = 0;
         if (write(WaitParentWfd, &result, sizeof(result)) != sizeof(result)) {
             TError error(EError::Unknown, "Partial write to child sync pipe");
-            (void)kill(clonePid, SIGKILL);
             L_ERR() << "Can't spawn child: " << error << std::endl;
-            ReportPid(-1);
             Abort(error);
         }
 
-        ReportPid(clonePid);
         exit(EXIT_SUCCESS);
     }
-    (void)waitpid(forkPid, NULL, 0);
-
     close(Wfd);
+    int status = 0;
+    (void)waitpid(forkPid, &status, 0);
+
     int n = read(Rfd, &Pid, sizeof(Pid));
     if (n <= 0) {
         close(Rfd);
@@ -843,9 +845,16 @@ TError TTask::Start() {
     TError error;
     (void)TError::Deserialize(Rfd, error);
     close(Rfd);
-    if (error) {
+    if (error || status) {
+        if (Pid > 0) {
+            (void)kill(Pid, SIGKILL);
+            L() << "Kill partly constructed container " << Pid << ": " << strerror(errno) << std::endl;
+        }
         Pid = 0;
         ExitStatus = -1;
+
+        if (!error)
+            error = TError(EError::Unknown, "Can't prepare container: " + std::to_string(status));
 
         return error;
     }

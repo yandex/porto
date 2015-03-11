@@ -154,6 +154,7 @@ for t in "$@"; do
 		pkg) pkgtest ;;
 		net) nettest ;;
 		macvlan) mvlantest ;;
+		nop) : ;;
 		*) say "Invalid test $t"; exit 1 ;;
 	esac
 done

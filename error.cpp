@@ -85,13 +85,13 @@ bool TError::Deserialize(int fd, TError &error) {
     ret = read(fd, buf, len);
     if (ret != len) {
         delete[] buf;
-        error = TError(EError::Unknown, errno, "Can't unmarshall description");
+        error = TError(EError::Unknown, errno, "Can't deserialize description");
         return true;
     }
 
     desc = std::string(buf, len);
     delete[] buf;
 
-    error = TError(err, errno, desc);
+    error = TError(err, desc, errno);
     return true;
 }

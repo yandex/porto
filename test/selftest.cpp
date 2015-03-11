@@ -27,7 +27,7 @@ extern "C" {
 #include <linux/capability.h>
 }
 
-const std::string oomMemoryLimit = "1000000";
+const std::string oomMemoryLimit = "1000000000";
 const std::string oomCommand = "dd if=/dev/zero of=/dev/shm/fill bs=1k count=1024k";
 
 const uint32_t DEF_CLASS_MAX_RATE = -1;
@@ -2943,7 +2943,7 @@ static void TestAlias(TPortoAPI &api) {
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check custom limits" << std::endl;
-    string exp_limit = "524288";
+    string exp_limit = "52428800";
     string exp_guar = "16384";
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
 
