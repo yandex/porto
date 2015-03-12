@@ -111,9 +111,6 @@ TError TMemorySubsystem::SetGuarantee(std::shared_ptr<TCgroup> cg, uint64_t guar
     if (!SupportGuarantee())
         return TError::Success();
 
-    if (guarantee == 0)
-        return TError::Success();
-
     return cg->SetKnobValue("memory.low_limit_in_bytes", std::to_string(guarantee), false);
 }
 
