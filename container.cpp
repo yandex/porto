@@ -325,7 +325,7 @@ TError TContainer::ApplyDynamicProperties() {
         return error;
     }
 
-    error = blkioSubsystem->SetLimit(blkcg, Prop->Get<uint64_t>(P_IO_LIMIT));
+    error = memorySubsystem->SetIoLimit(memcg, Prop->Get<uint64_t>(P_IO_LIMIT));
     if (error) {
         L_ERR() << "Can't set " << P_IO_LIMIT << ": " << error << std::endl;
         return error;

@@ -140,8 +140,15 @@ bool TMemorySubsystem::SupportRechargeOnPgfault() {
     return GetRootCgroup()->HasKnob("memory.recharge_on_pgfault");
 }
 
-bool TMemorySubsystem::SupportLimit() {
+bool TMemorySubsystem::SupportIoLimit() {
     return GetRootCgroup()->HasKnob("memory.fs_bps_limit");
+}
+
+TError TMemorySubsystem::SetIoLimit(std::shared_ptr<TCgroup> cg, uint64_t limit) {
+    if (!SupportIoLimit())
+        return TError::Success();
+
+    return cg->SetKnobValue("memory.fs_bps_limit", std::to_string(limit), false);
 }
 
 // Freezer
@@ -382,13 +389,6 @@ TError TBlkioSubsystem::SetPolicy(std::shared_ptr<TCgroup> cg, bool batch) {
     }
 
     return cg->SetKnobValue("blkio.weight", batch ? std::to_string(config().container().batch_io_weight()) : rootWeight, false);
-}
-
-TError TBlkioSubsystem::SetLimit(std::shared_ptr<TCgroup> cg, uint64_t limit) {
-    if (!memorySubsystem->SupportLimit())
-        return TError::Success();
-
-    return cg->SetKnobValue("memory.fs_bps_limit", std::to_string(limit), false);
 }
 
 bool TBlkioSubsystem::SupportPolicy() {

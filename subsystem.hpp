@@ -34,10 +34,11 @@ public:
     TError UseHierarchy(std::shared_ptr<TCgroup> cg, bool enable) const;
     bool SupportGuarantee();
     TError SetGuarantee(std::shared_ptr<TCgroup> cg, uint64_t guarantee);
-    bool SupportLimit();
+    bool SupportIoLimit();
     TError SetLimit(std::shared_ptr<TCgroup> cg, uint64_t limit) const;
     bool SupportRechargeOnPgfault();
     TError RechargeOnPgfault(std::shared_ptr<TCgroup> cg, bool enable);
+    TError SetIoLimit(std::shared_ptr<TCgroup> cg, uint64_t limit);
 };
 
 class TFreezerSubsystem : public TSubsystem {
@@ -94,7 +95,6 @@ public:
                       const std::string &file,
                       std::vector<BlkioStat> &stat) const;
     TError SetPolicy(std::shared_ptr<TCgroup> cg, bool batch);
-    TError SetLimit(std::shared_ptr<TCgroup> cg, uint64_t limit);
     bool SupportPolicy();
 };
 

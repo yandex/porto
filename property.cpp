@@ -549,7 +549,7 @@ public:
     }
 
     TError CheckValue(const uint64_t &value) override {
-        if (!memorySubsystem->SupportLimit())
+        if (!memorySubsystem->SupportIoLimit())
             return TError(EError::NotSupported, "invalid kernel");
 
         return TError::Success();
