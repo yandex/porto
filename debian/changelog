@@ -1,3 +1,14 @@
+yandex-porto (0.97) precise; urgency=low
+
+  * Fix interrupted message error when message size is 1024
+  * Fix io_limit on 3.18
+  * Fix error when OOM kills portod-spawn-X
+  * Add net_tos dummy
+  * Return correct error when can't change memory_limit
+  * portoctl: add -k option to dget/pget
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Thu, 12 Mar 2015 16:05:00 +0400
+
 yandex-porto (0.96) precise; urgency=low
 
   * Dump stack on SIGSEGV and SIGPIPE
