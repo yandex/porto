@@ -9,6 +9,8 @@
 
 // http://stackoverflow.com/questions/2340730/are-there-c-equivalents-for-the-protocol-buffers-delimited-i-o-functions-in-ja
 
+class InterruptibleInputStream;
+
 bool WriteDelimitedTo(const google::protobuf::MessageLite& message,
                       google::protobuf::io::ZeroCopyOutputStream* rawOutput);
 
@@ -26,6 +28,7 @@ class InterruptibleInputStream : public google::protobuf::io::ZeroCopyInputStrea
     size_t BufSize = 0;
     const size_t CHUNK_SIZE = 1024;
     int interrupted = false;
+    int Limit = 0;
 
     void ReserveChunk();
 
@@ -39,4 +42,5 @@ public:
     int64_t ByteCount() const;
     int Interrupted();
     void GetBuf(uint8_t **buf, size_t *pos) const;
+    void SetLimit(size_t limit);
 };

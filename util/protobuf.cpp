@@ -40,6 +40,14 @@ bool WriteDelimitedTo(
 bool ReadDelimitedFrom(
                        google::protobuf::io::ZeroCopyInputStream* rawInput,
                        google::protobuf::MessageLite* message) {
+    InterruptibleInputStream *is = nullptr;
+    try {
+        is = dynamic_cast<InterruptibleInputStream *>(rawInput);
+    } catch (...) { }
+
+    if (is)
+        is->SetLimit(8);
+
     // We create a new coded stream for each message.  Don't worry, this is fast,
     // and it makes sure the 64MB total size limit is imposed per-message rather
     // than on the whole stream.  (See the CodedInputStream interface for more
@@ -49,6 +57,9 @@ bool ReadDelimitedFrom(
     // Read the size.
     uint32_t size;
     if (!input.ReadVarint32(&size)) return false;
+
+    if (is)
+        is->SetLimit(size);
 
     // Tell the stream not to read beyond that size.
     google::protobuf::io::CodedInputStream::Limit limit =
@@ -160,6 +171,9 @@ bool InterruptibleInputStream::Next(const void **data, int *size) {
         Pos += n;
         sz += n;
 
+        if (Limit && sz >= Limit)
+            break;
+
         if ((size_t)n < CHUNK_SIZE)
             break;
 
@@ -200,4 +214,8 @@ int InterruptibleInputStream::Interrupted() {
 void InterruptibleInputStream::GetBuf(uint8_t **buf, size_t *pos) const {
     *buf = Buf;
     *pos = Pos;
+}
+
+void InterruptibleInputStream::SetLimit(size_t limit) {
+    Limit = limit;
 }
