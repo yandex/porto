@@ -2,36 +2,45 @@ cmake_minimum_required(VERSION 2.8)
 
 PROJECT(yandex-porto)
 
+OPTION(ENABLE_TEST "Enables building portotest utility" ON)
+OPTION(ENABLE_PYTHON "Enables building python API" ON)
+OPTION(USE_SYSTEM_LIBNL "Use system libln" OFF)
+
 if(NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE MATCHES None)
 	set(CMAKE_BUILD_TYPE Release)
 endif()
 
 set(CMAKE_CXX_FLAGS "-Wall -std=c++11 -g")
 set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc")
-
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -fno-omit-frame-pointer --coverage")
 set(CMAKE_EXE_LINKER_FLAGS_DEBUG "--coverage")
-
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
-
 set(CMAKE_INSTALL_PREFIX /usr)
 
 if(EXISTS "/usr/bin/g++-4.7")
-    set(CMAKE_CXX_COMPILER "g++-4.7")
+	set(CMAKE_CXX_COMPILER "g++-4.7")
 endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/api/cpp)
 
-include(ExternalProject)
-ExternalProject_Add(libnl
-	SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/contrib/libnl
-	UPDATE_COMMAND autoreconf -fi
-	CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --disable-cli --disable-pthreads
-	BUILD_COMMAND ${MAKE})
-
-ExternalProject_Get_Property(libnl INSTALL_DIR)
-include_directories(${INSTALL_DIR}/include/libnl3)
+if(USE_SYSTEM_LIBNL)
+	find_library(LIBNL NAMES libnl-3.a)
+	find_library(LIBNL_ROUTE NAMES libnl-route-3.a)
+	find_path (LIBNL_INCLUDE_DIR NAMES netlink/netlink.h PATH_SUFFIXES libnl3)
+	include_directories(${LIBNL_INCLUDE_DIR})
+else()
+	include(ExternalProject)
+	ExternalProject_Add(libnl
+		SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/contrib/libnl
+		UPDATE_COMMAND autoreconf -fi
+		CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --disable-cli --disable-pthreads
+		BUILD_COMMAND ${MAKE})
+	ExternalProject_Get_Property(libnl INSTALL_DIR)
+	include_directories(${INSTALL_DIR}/include/libnl3)
+	SET(LIBNL ${INSTALL_DIR}/lib/libnl-3.a)
+	SET(LIBNL_ROUTE ${INSTALL_DIR}/lib/libnl-route-3.a)
+endif()
 
 find_library(PB NAMES libprotobuf.a)
 find_package(Protobuf REQUIRED)
@@ -39,11 +48,16 @@ include_directories(${PROTOBUF_INCLUDE_DIRS})
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS rpc.proto kv.proto config.proto)
-add_custom_command(
-	OUTPUT "api/python/porto/rpc_pb2.py"
-	COMMAND protoc ARGS --python_out=${CMAKE_CURRENT_SOURCE_DIR}/api/python/porto/ --proto_path=${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/rpc.proto
-	DEPENDS rpc.proto
-	VERBATIM)
+
+set(PYTHON_SOURCES "")
+if(ENABLE_PYTHON)
+	add_custom_command(
+		OUTPUT "api/python/porto/rpc_pb2.py"
+		COMMAND protoc ARGS --python_out=${CMAKE_CURRENT_SOURCE_DIR}/api/python/porto/ --proto_path=${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/rpc.proto
+		DEPENDS rpc.proto
+		VERBATIM)
+	set(PYTHON_SOURCES "api/python/porto/rpc_pb2.py")
+endif()
 
 add_custom_target(version.hpp ./GIT-VERSION-GEN WORKING_DIRECTORY ${CMAKE_SOURCE_DIR} VERBATIM)
 
@@ -60,22 +74,27 @@ add_dependencies(porto version.hpp)
 add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp holder.cpp event.cpp task.cpp kvalue.cpp subsystem.cpp config.cpp container_value.cpp value.cpp data.cpp property.cpp qdisc.cpp context.cpp batch.cpp volume.cpp epoll.cpp util/idmap.cpp util/namespace.cpp util/netlink.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/signal.cpp util/unix.cpp util/cred.cpp util/string.cpp util/crash.cpp util/crc32.cpp util/sha256.cpp util/ext4_proj_quota.c)
 set_target_properties(portod PROPERTIES COMPILE_DEFINITIONS "PORTOD=1")
 add_dependencies(portod version.hpp)
-target_link_libraries(portod porto ${PB} ${INSTALL_DIR}/lib/libnl-3.a ${INSTALL_DIR}/lib/libnl-route-3.a pthread rt)
+target_link_libraries(portod porto ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
 
-add_executable(portoctl api/python/porto/rpc_pb2.py portoctl.cpp cli.cpp config.cpp util/namespace.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/signal.cpp util/unix.cpp util/cred.cpp util/string.cpp util/crash.cpp)
+add_executable(portoctl ${PYTHON_SOURCES} portoctl.cpp cli.cpp config.cpp util/namespace.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/signal.cpp util/unix.cpp util/cred.cpp util/string.cpp util/crash.cpp)
+
 add_dependencies(portoctl version.hpp)
 target_link_libraries(portoctl porto ${PB} rt)
-
-add_executable(portotest portotest.cpp config.cpp qdisc.cpp test/selftest.cpp test/stresstest.cpp test/test.cpp config.cpp util/idmap.cpp util/mount.cpp util/netlink.cpp util/log.cpp util/path.cpp util/file.cpp util/folder.cpp util/signal.cpp util/unix.cpp util/cred.cpp util/string.cpp util/crash.cpp)
-add_dependencies(portotest version.hpp)
-target_link_libraries(portotest porto ${PB} ${INSTALL_DIR}/lib/libnl-3.a ${INSTALL_DIR}/lib/libnl-route-3.a pthread rt)
 
 add_executable(portod-meta-root meta_root.cpp util/signal.cpp)
 add_dependencies(portod-meta-root version.hpp)
 set_target_properties(portod-meta-root PROPERTIES LINK_FLAGS "-static")
 
+set(TEST_TARGETS "")
+if(ENABLE_TEST)
+	add_executable(portotest portotest.cpp config.cpp qdisc.cpp test/selftest.cpp test/stresstest.cpp test/test.cpp config.cpp util/idmap.cpp util/mount.cpp util/netlink.cpp util/log.cpp util/path.cpp util/file.cpp util/folder.cpp util/signal.cpp util/unix.cpp util/cred.cpp util/string.cpp util/crash.cpp)
+	add_dependencies(portotest version.hpp)
+	target_link_libraries(portotest porto ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
+	set(TEST_TARGETS "portotest")
+endif()
+
 install(
-    TARGETS portod portoctl portotest portod-meta-root
+    TARGETS portod portoctl ${TEST_TARGETS} portod-meta-root
     RUNTIME DESTINATION sbin
     LIBRARY DESTINATION lib
-    )
+)
