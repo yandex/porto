@@ -10,6 +10,7 @@
 class TKeyValueNode : public TNonCopyable {
     const TPath Path;
     const std::string Name;
+
     void Merge(kv::TNode &node, kv::TNode &next) const;
 
 public:
@@ -26,9 +27,10 @@ public:
 };
 
 class TKeyValueStorage : public TNonCopyable {
-    TMount Tmpfs;
+    const TMount Tmpfs;
+    const size_t DirnameLen;
+
     TPath ToPath(const std::string &name) const;
-    size_t DirnameLen;
 
 public:
     TError MountTmpfs();
