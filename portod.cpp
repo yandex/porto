@@ -396,6 +396,12 @@ static int SlaveRpc(TContext &context) {
             }
         }
 
+        if (!failsafe) {
+            ret = ReapSpawner(REAP_EVT_FD, *context.Cholder);
+            if (ret)
+                goto exit;
+        }
+
         for (auto ev : events) {
             if (ev.data.fd == sfd) {
                 if (clients.size() > config().daemon().max_clients()) {
@@ -406,7 +412,7 @@ static int SlaveRpc(TContext &context) {
                 int fd = -1;
                 ret = AcceptClient(sfd, clients, fd);
                 if (ret < 0)
-                    break;
+                    goto exit;
 
                 error = context.EpollLoop->AddFd(fd);
                 if (error) {
@@ -415,19 +421,17 @@ static int SlaveRpc(TContext &context) {
                     goto exit;
                 }
             } else if (ev.data.fd == REAP_EVT_FD) {
-                if (failsafe)
-                    continue;
-
-                ret = ReapSpawner(REAP_EVT_FD, *context.Cholder);
+                // we handled all events from the master before events
+                // from the clients (so clients see updated view of the
+                // world as soon as possible)
+                continue;
             } else if (context.NetEvt && context.NetEvt->GetFd() == ev.data.fd) {
                 L() << "Refresh list of available network interfaces" << std::endl;
                 context.NetEvt->FlushEvents();
 
                 TError error = context.Net->Update();
-                if (error) {
+                if (error)
                     L() << "Can't refresh list of network interfaces: " << error << std::endl;
-                    break;
-                }
             } else if (clients.find(ev.data.fd) != clients.end()) {
                 auto client = clients[ev.data.fd];
                 bool needClose = false;
