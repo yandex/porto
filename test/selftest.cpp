@@ -3113,8 +3113,9 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
 
     string exp_limit = "268435456";
     ExpectApiSuccess(api.SetProperty(child, "memory_limit", exp_limit));
-    ExpectApiFailure(api.SetProperty(child, "cpu_limit", "10"), EError::NotSupported);
-    ExpectApiFailure(api.SetProperty(child, "cpu_guarantee", "10"), EError::NotSupported);
+    ExpectApiFailure(api.SetProperty(child, "hostname", "qwerty"), EError::NotSupported);
+    ExpectApiSuccess(api.SetProperty(child, "cpu_limit", "10"));
+    ExpectApiSuccess(api.SetProperty(child, "cpu_guarantee", "10"));
     ExpectApiSuccess(api.SetProperty(child, "respawn", "true"));
 
     ExpectApiSuccess(api.Start(child));
@@ -3150,9 +3151,9 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
 
     Expect(parentCgmap["freezer"] != childCgmap["freezer"]);
     Expect(parentCgmap["memory"] != childCgmap["memory"]);
-    Expect(parentCgmap["net_cls"] == childCgmap["net_cls"]);
-    Expect(parentCgmap["cpu"] == childCgmap["cpu"]);
-    Expect(parentCgmap["cpuact"] == childCgmap["cpuact"]);
+    Expect(parentCgmap["net_cls"] != childCgmap["net_cls"]);
+    Expect(parentCgmap["cpu"] != childCgmap["cpu"]);
+    Expect(parentCgmap["cpuacct"] != childCgmap["cpuacct"]);
 
     Expect(GetCwd(parentPid) == GetCwd(childPid));
 

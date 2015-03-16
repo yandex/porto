@@ -292,16 +292,11 @@ TError TContainer::ApplyDynamicProperties() {
         return error;
     }
 
-    if (UseParentNamespace())
-        return TError::Success();
-
     auto cpucg = GetLeafCgroup(cpuSubsystem);
-    if (!UseParentNamespace()) {
-        error = cpuSubsystem->SetPolicy(cpucg, Prop->Get<std::string>(P_CPU_POLICY));
-        if (error) {
-            L_ERR() << "Can't set " << P_CPU_POLICY << ": " << error << std::endl;
-            return error;
-        }
+    error = cpuSubsystem->SetPolicy(cpucg, Prop->Get<std::string>(P_CPU_POLICY));
+    if (error) {
+        L_ERR() << "Can't set " << P_CPU_POLICY << ": " << error << std::endl;
+        return error;
     }
 
     if (Prop->Get<std::string>(P_CPU_POLICY) == "normal") {
@@ -438,7 +433,7 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
-    if (config().network().enabled() && !UseParentNamespace()) {
+    if (config().network().enabled()) {
         auto netcls = GetLeafCgroup(netclsSubsystem);
         uint32_t handle = Tclass->GetHandle();
         TError error = netcls->SetKnobValue("net_cls.classid", std::to_string(handle), false);
@@ -460,14 +455,12 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
-    if (!UseParentNamespace()) {
-        auto devices = GetLeafCgroup(devicesSubsystem);
-        error = devicesSubsystem->AllowDevices(devices,
-                                               Prop->Get<TStrList>(P_ALLOWED_DEVICES));
-        if (error) {
-            L_ERR() << "Can't set " << P_ALLOWED_DEVICES << ": " << error << std::endl;
-            return error;
-        }
+    auto devices = GetLeafCgroup(devicesSubsystem);
+    error = devicesSubsystem->AllowDevices(devices,
+                                           Prop->Get<TStrList>(P_ALLOWED_DEVICES));
+    if (error) {
+        L_ERR() << "Can't set " << P_ALLOWED_DEVICES << ": " << error << std::endl;
+        return error;
     }
 
     return TError::Success();
@@ -1261,11 +1254,6 @@ std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys
 
     if (Name == ROOT_CONTAINER)
         return subsys->GetRootCgroup()->GetChild(PORTO_ROOT_CGROUP);
-
-    if (UseParentNamespace() &&
-        subsys != freezerSubsystem &&
-        subsys != memorySubsystem)
-        return Parent->GetLeafCgroup(subsys);
 
     return Parent->GetLeafCgroup(subsys)->GetChild(Name);
 }

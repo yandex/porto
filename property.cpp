@@ -426,7 +426,7 @@ public:
 class TCpuPriorityProperty : public TUintValue, public TContainerValue {
 public:
     TCpuPriorityProperty() :
-        TUintValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
+        TUintValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue("cpu_priority",
                         "CPU priority: 1-100 [DEPRECATED]",
                         dynamicProperty) {}
@@ -446,7 +446,7 @@ public:
 class TCpuPolicyProperty : public TStringValue, public TContainerValue {
 public:
     TCpuPolicyProperty() :
-        TStringValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
+        TStringValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_CPU_POLICY,
                         "CPU policy: rt, normal, idle",
                         dynamicProperty) {}
@@ -474,7 +474,7 @@ public:
 class TCpuLimitProperty : public TUintValue, public TContainerValue {
 public:
     TCpuLimitProperty() :
-        TUintValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
+        TUintValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_CPU_LIMIT,
                         "CPU limit: 1-100",
                         dynamicProperty) {}
@@ -497,7 +497,7 @@ public:
 class TCpuGuaranteeProperty : public TUintValue, public TContainerValue {
 public:
     TCpuGuaranteeProperty() :
-        TUintValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
+        TUintValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_CPU_GUARANTEE,
                         "CPU guarantee: 0-100",
                         dynamicProperty) {}
@@ -516,7 +516,7 @@ public:
 class TIoPolicyProperty : public TStringValue, public TContainerValue {
 public:
     TIoPolicyProperty() :
-        TStringValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
+        TStringValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_IO_POLICY,
                         "IO policy: normal, batch",
                         dynamicProperty) {}
@@ -539,7 +539,7 @@ public:
 class TIoLimitProperty : public TUintValue, public TContainerValue {
 public:
     TIoLimitProperty() :
-        TUintValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
+        TUintValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_IO_LIMIT,
                         "IO limit",
                         dynamicProperty) {}
@@ -608,7 +608,7 @@ public:
     TNetGuaranteeProperty() :
         TNetMapValue(P_NET_GUARANTEE,
                      "Guaranteed container network bandwidth [bytes/s] (max 32Gbps)",
-                     PARENT_RO_PROPERTY,
+                     PARENT_DEF_PROPERTY,
                      staticProperty) {}
     uint32_t GetDef() const override { return config().network().default_guarantee(); }
     uint32_t GetRootDef() const override { return config().network().default_max_guarantee(); }
@@ -619,7 +619,7 @@ public:
     TNetCeilProperty() :
         TNetMapValue(P_NET_CEIL,
                      "Maximum container network bandwidth [bytes/s] (max 32Gbps)",
-                     PARENT_RO_PROPERTY,
+                     PARENT_DEF_PROPERTY,
                      staticProperty) {}
     uint32_t GetDef() const override { return config().network().default_limit(); }
     uint32_t GetRootDef() const override { return config().network().default_max_guarantee(); }
@@ -630,7 +630,7 @@ public:
     TNetPriorityProperty() :
         TNetMapValue(P_NET_PRIO,
                      "Container network priority: 0-7",
-                     PARENT_RO_PROPERTY,
+                     PARENT_DEF_PROPERTY,
                      staticProperty) {}
     uint32_t GetDef() const override { return config().network().default_prio(); }
     uint32_t GetRootDef() const override { return config().network().default_prio(); }
@@ -1120,7 +1120,7 @@ public:
 class TAllowedDevicesProperty : public TListValue, public TContainerValue {
 public:
     TAllowedDevicesProperty() :
-        TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY),
+        TListValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY),
         TContainerValue(P_ALLOWED_DEVICES,
                         "Devices that container can create/read/write: <c|b|a> <maj>:<min> [r][m][w]; ...",
                         staticProperty) {}
