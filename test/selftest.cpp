@@ -3151,7 +3151,8 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
 
     Expect(parentCgmap["freezer"] != childCgmap["freezer"]);
     Expect(parentCgmap["memory"] != childCgmap["memory"]);
-    Expect(parentCgmap["net_cls"] != childCgmap["net_cls"]);
+    if (NetworkEnabled())
+        Expect(parentCgmap["net_cls"] != childCgmap["net_cls"]);
     Expect(parentCgmap["cpu"] != childCgmap["cpu"]);
     Expect(parentCgmap["cpuacct"] != childCgmap["cpuacct"]);
 
