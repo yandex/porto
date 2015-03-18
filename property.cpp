@@ -614,10 +614,10 @@ public:
     uint32_t GetRootDef() const override { return config().network().default_max_guarantee(); }
 };
 
-class TNetCeilProperty : public TNetMapValue {
+class TNetLimitProperty : public TNetMapValue {
 public:
-    TNetCeilProperty() :
-        TNetMapValue(P_NET_CEIL,
+    TNetLimitProperty() :
+        TNetMapValue(P_NET_LIMIT,
                      "Maximum container network bandwidth [bytes/s] (max 32Gbps)",
                      PARENT_DEF_PROPERTY,
                      staticProperty) {}
@@ -1329,7 +1329,7 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TIoPolicyProperty,
         new TIoLimitProperty,
         new TNetGuaranteeProperty,
-        new TNetCeilProperty,
+        new TNetLimitProperty,
         new TNetPriorityProperty,
         new TRespawnProperty,
         new TMaxRespawnsProperty,

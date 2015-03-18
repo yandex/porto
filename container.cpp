@@ -372,7 +372,7 @@ TError TContainer::PrepareNetwork() {
     TUintMap prio, rate, ceil;
     prio = Prop->Get<TUintMap>(P_NET_PRIO);
     rate = Prop->Get<TUintMap>(P_NET_GUARANTEE);
-    ceil = Prop->Get<TUintMap>(P_NET_CEIL);
+    ceil = Prop->Get<TUintMap>(P_NET_LIMIT);
 
     Tclass->Prepare(prio, rate, ceil);
 

@@ -135,7 +135,7 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     for (auto &link : links) {
         ExpectApiSuccess(api.GetProperty(name, "net_guarantee[" + link->GetAlias() + "]", v));
         Expect(v == std::to_string(DEF_CLASS_RATE));
-        ExpectApiSuccess(api.GetProperty(name, "net_ceil[" + link->GetAlias() + "]", v));
+        ExpectApiSuccess(api.GetProperty(name, "net_limit[" + link->GetAlias() + "]", v));
         Expect(v == std::to_string(DEF_CLASS_CEIL));
         ExpectApiSuccess(api.GetProperty(name, "net_priority[" + link->GetAlias() + "]", v));
         Expect(v == std::to_string(DEF_CLASS_NET_PRIO));
@@ -2172,7 +2172,7 @@ static void TestRoot(TPortoAPI &api) {
         "io_limit",
         "io_policy",
         "net_guarantee",
-        "net_ceil",
+        "net_limit",
         "net_priority",
         "respawn",
         "isolate",
@@ -2697,7 +2697,7 @@ static void TestLimits(TPortoAPI &api) {
     uint32_t i = 0;
     for (auto &link : links) {
         ExpectApiSuccess(api.SetProperty(name, "net_guarantee[" + link->GetAlias() + "]", std::to_string(netGuarantee + i)));
-        ExpectApiSuccess(api.SetProperty(name, "net_ceil[" + link->GetAlias() + "]", std::to_string(netCeil + i)));
+        ExpectApiSuccess(api.SetProperty(name, "net_limit[" + link->GetAlias() + "]", std::to_string(netCeil + i)));
         ExpectApiFailure(api.SetProperty(name, "net_priority[" + link->GetAlias() + "]", "-1"), EError::InvalidValue);
         ExpectApiFailure(api.SetProperty(name, "net_priority[" + link->GetAlias() + "]", "8"), EError::InvalidValue);
         ExpectApiSuccess(api.SetProperty(name, "net_priority[" + link->GetAlias() + "]", "0"));
