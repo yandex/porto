@@ -588,7 +588,7 @@ static void TestExitStatus(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "command", oomCommand));
     ExpectApiSuccess(api.SetProperty(name, "memory_limit", "10"));
     // limit is so small we can't even start process
-    ExpectApiFailure(api.Start(name), EError::Unknown);
+    ExpectApiFailure(api.Start(name), EError::InvalidValue);
 
     ExpectApiSuccess(api.SetProperty(name, "memory_limit", oomMemoryLimit));
     ExpectApiSuccess(api.Start(name));

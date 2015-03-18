@@ -839,7 +839,7 @@ TError TTask::Start() {
     int n = read(Rfd, &Pid, sizeof(Pid));
     if (n <= 0) {
         close(Rfd);
-        return TError(EError::Unknown, errno, "Can't read pid from the child");
+        return TError(EError::InvalidValue, errno, "Container couldn't start due to resource limits");
     }
 
     TError error;
