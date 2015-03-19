@@ -16,7 +16,7 @@ selftest() {
 
 stresstest() {
 	say "Stress test"
-	portotest stress
+	portotest stress "$@"
 }
 
 pkgtest() {
@@ -151,6 +151,7 @@ for t in "$@"; do
 		true|false) selftest $t false ;;
 		dynamic) selftest true true ;;
 		stress) stresstest ;;
+		stressargs) shift; stresstest "$@"; exit $? ;;
 		pkg) pkgtest ;;
 		net) nettest ;;
 		macvlan) mvlantest ;;
