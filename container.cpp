@@ -149,6 +149,20 @@ const string TContainer::StripParentName(const string &name) const {
         return string(name.begin() + n + 1, name.end());
 }
 
+void TContainer::RemoveKvs() {
+    if (IsRoot())
+        return;
+
+    for (auto iter : Children)
+        if (auto child = iter.lock())
+            child->RemoveKvs();
+
+    auto kvnode = Storage->GetNode(Id);
+    TError error = kvnode->Remove();
+    if (error)
+        L_ERR() << "Can't remove key-value node " << kvnode->GetName() << ": " << error << std::endl;
+}
+
 TError TContainer::Destroy() {
     L() << "Destroy " << GetName() << " " << Id << std::endl;
 
@@ -166,6 +180,8 @@ TError TContainer::Destroy() {
         if (error)
             return error;
     }
+
+    RemoveKvs();
 
     if (Parent)
         for (auto iter = Children.begin(); iter != Children.end();) {

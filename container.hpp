@@ -63,6 +63,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareTask();
     TError KillAll();
     TError PrepareMetaParent();
+    void RemoveKvs();
 
     const std::string StripParentName(const std::string &name) const;
     void ScheduleRespawn();
