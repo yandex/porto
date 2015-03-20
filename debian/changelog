@@ -1,3 +1,11 @@
+yandex-porto (0.99) precise; urgency=low
+
+  * Fix net_ceil name (net_limit)
+  * Change error message when container can't be started due to resource limits
+  * Add pid of client to rpc request/response
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Fri, 20 Mar 2015 14:07:00 +0400
+
 yandex-porto (0.98) precise; urgency=low
 
   * Fix setting memory_guarantee to 0 (previous versions ignored it)
