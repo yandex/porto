@@ -105,7 +105,11 @@ void RemovePidFile(const std::string &path) {
         (void)f.Remove();
 }
 
+static thread_local std::string *processName;
+
 void SetProcessName(const std::string &name) {
+    delete processName;
+    processName = nullptr;
     prctl(PR_SET_NAME, (void *)name.c_str());
 }
 
@@ -114,12 +118,16 @@ void SetDieOnParentExit(int sig) {
 }
 
 std::string GetProcessName() {
-    char name[17];
+    if (!processName) {
+        char name[17];
 
-    if (prctl(PR_GET_NAME, (void *)name) < 0)
-        strncpy(name, program_invocation_short_name, sizeof(name));
+        if (prctl(PR_GET_NAME, (void *)name) < 0)
+            strncpy(name, program_invocation_short_name, sizeof(name));
 
-    return name;
+        processName = new std::string(name);
+    }
+
+    return *processName;
 }
 
 TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap) {
