@@ -62,6 +62,7 @@ public:
     int GetFd();
     TError SubscribeToLinkUpdates();
     void FlushEvents();
+    TError RefillCache();
 };
 
 class TNlLink : public TNonCopyable {

@@ -337,18 +337,20 @@ int TNlLink::FindIndex(const std::string &device) {
     return data.idx;
 }
 
-TError TNlLink::RefillCache() {
+TError TNl::RefillCache() {
     TError error;
 
-    int ret = nl_cache_refill(GetSock(), Nl->GetCache());
+    int ret = nl_cache_refill(GetSock(), GetCache());
     if (ret < 0) {
         error = TError(EError::Unknown, string("Can't refill cache: ") + nl_geterror(ret));
         L_ERR() << error << std::endl;
-    } else {
-        LogCache(Nl->GetCache());
     }
 
     return error;
+}
+
+TError TNlLink::RefillCache() {
+    return Nl->RefillCache();
 }
 
 TError TNlLink::AddMacVlan(const std::string &master,

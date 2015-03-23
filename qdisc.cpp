@@ -337,6 +337,12 @@ TError TNetwork::OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links) {
             L_ERR() << "Can't open link: " << error << std::endl;
             return error;
         }
+    } else {
+        TError error = Nl->RefillCache();
+        if (error) {
+            L_ERR() << "Can't refill link cache: " << error << std::endl;
+            return error;
+        }
     }
 
     if (!devices.size()) {
