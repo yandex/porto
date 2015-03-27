@@ -7,6 +7,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <libgen.h>
+#include <ftw.h>
+#include <linux/quota.h>
 #include <sys/quota.h>
 #include <sys/ioctl.h>
 #include <sys/types.h>
@@ -19,21 +22,18 @@
 #define PRJQUOTA 2
 #endif
 
-#define FS_IOC_FSGETXATTR		_IOR('f', 31, struct fsxattr)
-#define FS_IOC_FSSETXATTR		_IOW('f', 32, struct fsxattr)
-
-/*
- * Structure for FS_IOC_FSGETXATTR and FS_IOC_FSSETXATTR.
- */
 struct fsxattr {
-	__u32		fsx_xflags;	/* xflags field value (get/set) */
-	__u32		fsx_extsize;	/* extsize field value (get/set)*/
-	__u32		fsx_nextents;	/* nextents field value (get)	*/
-	__u32		fsx_projid;	/* project identifier (get/set) */
+	__u32		fsx_xflags;
+	__u32		fsx_extsize;
+	__u32		fsx_nextents;
+	__u32		fsx_projid;
 	unsigned char	fsx_pad[12];
 };
 
-#define FS_XFLAG_PROJINHERIT	0x00000200	/* create with parents projid */
+#define FS_IOC_FSGETXATTR		_IOR('X', 31, struct fsxattr)
+#define FS_IOC_FSSETXATTR		_IOW('X', 32, struct fsxattr)
+
+#define FS_XFLAG_PROJINHERIT		0x00000200 /* Ignored */
 
 /* First generic header */
 struct v2_disk_dqheader {
@@ -52,20 +52,23 @@ struct v2_disk_dqinfo {
 };
 
 #define PROJECT_QUOTA_FILE	"quota.project"
+#define PROJECT_QUOTA_MAGIC	0xd9c03f14
 
-static int find_mountpoint(const char *path,
-		char **device, char **fstype, char **root_path)
+static int find_mountpoint(const char *path, struct stat *path_st,
+			   char **device, char **fstype, char **root_path)
 {
-	struct stat path_st, dev_st;
+	struct stat dev_st;
 	char *buf = NULL, *ptr, *real_device;
 	unsigned major, minor;
 	size_t len;
 	FILE *file;
 
-	if (stat(path, &path_st))
+	if (lstat(path, path_st))
 		return -1;
 
 	*root_path = malloc(PATH_MAX + 1);
+	if (!*root_path)
+		return -1;
 
 	/* since v2.6.26 */
 	file = fopen("/proc/self/mountinfo", "r");
@@ -73,7 +76,7 @@ static int find_mountpoint(const char *path,
 		goto parse_mounts;
 	while (getline(&buf, &len, file) > 0) {
 		sscanf(buf, "%*d %*d %u:%u %*s %s", &major, &minor, *root_path);
-		if (makedev(major, minor) != path_st.st_dev)
+		if (makedev(major, minor) != path_st->st_dev)
 			continue;
 		ptr = strstr(buf, " - ") + 3;
 		*fstype = strdup(strsep(&ptr, " "));
@@ -90,7 +93,7 @@ parse_mounts:
 		ptr = buf;
 		strsep(&ptr, " ");
 		if (*buf != '/' || stat(buf, &dev_st) ||
-		    dev_st.st_rdev != path_st.st_dev)
+		    dev_st.st_rdev != path_st->st_dev)
 			continue;
 		strcpy(*root_path, strsep(&ptr, " "));
 		*fstype = strdup(strsep(&ptr, " "));
@@ -103,6 +106,13 @@ not_found:
 	return -1;
 
 found:
+	if (!*fstype || !*device) {
+		free(*fstype);
+		free(*device);
+		free(*root_path);
+		errno = ENOMEM;
+		return -1;
+	}
 	real_device = realpath(*device, NULL);
 	if (real_device) {
 		free(*device);
@@ -111,229 +121,305 @@ found:
 	return 0;
 }
 
-int init_project_quota(const char *quota_path)
+static int init_project_quota(const char *quota_path)
 {
-	FILE *quota_file;
 	struct {
 		struct v2_disk_dqheader header;
 		struct v2_disk_dqinfo info;
-		char zero[1024 - 8*4];
+		char zero[1024 * 2 - 8 * 4];
 	} quota_init = {
 		.header = {
-			.dqh_magic = 0xd9c03f14,
+			.dqh_magic = PROJECT_QUOTA_MAGIC,
 			.dqh_version = 1,
 		},
 		.info = {
 			.dqi_bgrace = 7 * 24 * 60 * 60,
 			.dqi_igrace = 7 * 24 * 60 * 60,
 			.dqi_flags = 0,
-			.dqi_blocks = 2, /* header and root layer */
+			.dqi_blocks = 2, /* header and root */
 			.dqi_free_blk = 0,
 			.dqi_free_entry = 0,
 		},
 		.zero = {0, },
 	};
+	int fd, ret, saved_errno;
 
-	quota_file = fopen(quota_path, "wx");
-	if (!quota_file)
+	fd = open(quota_path, O_CREAT|O_RDWR|O_EXCL, 0600);
+	if (fd < 0)
+		return fd;
+	ret = write(fd, &quota_init, sizeof(quota_init));
+	saved_errno = errno;
+	fsync(fd);
+	close(fd);
+	if (ret == sizeof(quota_init))
+		return 0;
+	if (ret >= 0)
+		saved_errno = EIO;
+	errno = saved_errno;
+	return -1;
+}
+
+static int get_project(const char *path, unsigned *project)
+{
+	struct fsxattr attr;
+	int fd, ret, saved_errno;
+
+	fd = open(path, O_RDONLY | O_NOCTTY | O_NOFOLLOW | O_NOATIME);
+	if (fd < 0 && errno == EPERM)
+		fd = open(path, O_RDONLY | O_NOCTTY | O_NOFOLLOW);
+	if (fd < 0) {
+		char *dirc, *dir;
+
+		dirc = strdup(path);
+		dir = dirname(dirc);
+		fd = open(dir, O_RDONLY | O_DIRECTORY);
+		free(dirc);
+	}
+	if (fd < 0)
+		return fd;
+	ret = ioctl(fd, FS_IOC_FSGETXATTR, &attr);
+	if (ret)
+		saved_errno = errno;
+	close(fd);
+	if (ret)
+		errno = saved_errno;
+	*project = attr.fsx_projid;
+	return ret;
+}
+
+static int set_project(const char *path, unsigned project)
+{
+	int fd, ret, saved_errno;
+	struct fsxattr attr;
+
+	fd = open(path, O_RDONLY | O_NOCTTY | O_NOFOLLOW | O_NOATIME);
+	if (fd < 0 && errno == EPERM)
+		fd = open(path, O_RDONLY | O_NOCTTY | O_NOFOLLOW);
+	if (fd < 0)
+		return fd;
+
+	ret = ioctl(fd, FS_IOC_FSGETXATTR, &attr);
+	if (!ret) {
+		attr.fsx_xflags |= FS_XFLAG_PROJINHERIT;
+		attr.fsx_projid = project;
+		ret = ioctl(fd, FS_IOC_FSSETXATTR, &attr);
+	}
+	if (ret)
+		saved_errno = errno;
+	close(fd);
+	if (ret)
+		errno = saved_errno;
+	return ret;
+}
+
+static int project_quota_on(const char *device, const char *root_path)
+{
+	char *quota_path;
+
+	if (mount(NULL, root_path, NULL, MS_REMOUNT, "quota")) {
+		warn("Cannot enable project quota in \"%s\"", root_path);
 		return -1;
-	fwrite(&quota_init, sizeof(quota_init), 1, quota_file);
-	fflush(quota_file);
-	fclose(quota_file);
+	}
+
+	if (asprintf(&quota_path, "%s/%s", root_path, PROJECT_QUOTA_FILE))
+		return -1;
+
+	if (access(quota_path, F_OK) && init_project_quota(quota_path)) {
+		warn("Cannot init project quota file \"%s\"", quota_path);
+		free(quota_path);
+		return -1;
+	}
+
+	if (quotactl(QCMD(Q_QUOTAON, PRJQUOTA), device,
+				QFMT_VFS_V1, (caddr_t)quota_path)) {
+		warn("Cannot turn on project quota for %s", device);
+		free(quota_path);
+		return -1;
+	}
+
+	free(quota_path);
 	return 0;
 }
 
-void project_quota_on(const char *path)
+static unsigned target_project;
+
+static int walk_set_project(const char *path, const struct stat *st,
+				int flag, struct FTW *data)
 {
-	char *device, *fstype ,*root_path, *quota_path;
+	int ret;
 
-	if (find_mountpoint(path, &device, &fstype, &root_path))
-		err(2, "cannot find mountpoint for \"%s\"", path);
+	(void)st;
+	(void)flag;
+	(void)data;
 
-	if (strcmp(fstype, "ext4"))
-		errx(2, "unsupported filesystem \"%s\"", fstype);
-
-	if (mount(NULL, root_path, NULL, MS_REMOUNT, "prjquota"))
-		err(2, "cannot enable project quota in \"%s\"", root_path);
-
-	asprintf(&quota_path, "%s/%s", root_path, PROJECT_QUOTA_FILE);
-	if (access(quota_path, F_OK) && init_project_quota(quota_path))
-		err(2, "cannot init project quota file \"%s\"", quota_path);
-
-	if (quotactl(QCMD(Q_QUOTAON, PRJQUOTA), device,
-				QFMT_VFS_V1, (caddr_t)quota_path))
-		err(2, "cannot turn on project quota for %s", device);
-
-	free(device);
-	free(fstype);
-	free(root_path);
-	free(quota_path);
-}
-
-void project_quota_off(const char *path)
-{
-	char *device, *fstype ,*root_path;
-
-	if (find_mountpoint(path, &device, &fstype, &root_path))
-		err(2, "cannot find mountpoint for \"%s\"", path);
-
-	if (strcmp(fstype, "ext4"))
-		errx(2, "unsupported filesystem \"%s\"", fstype);
-
-	if (quotactl(QCMD(Q_QUOTAOFF, PRJQUOTA), device, 0, NULL))
-		err(2, "cannot turn off project quota for %s", device);
-
-	//if (mount(NULL, root_path, NULL, MS_REMOUNT, "noquota"))
-	//	err(2, "cannot disable project quota in \"%s\"", root_path);
-
-	free(device);
-	free(fstype);
-	free(root_path);
-}
-
-int get_project_id(const char *path, unsigned *project_id)
-{
-	struct fsxattr fsx;
-	int dir_fd, ret;
-
-	dir_fd = open(path, O_RDONLY | O_NOCTTY);
-	if (dir_fd < 0)
-		return dir_fd;
-	ret = ioctl(dir_fd, FS_IOC_FSGETXATTR, &fsx);
-	if (!ret)
-		*project_id = fsx.fsx_projid;
-	close(dir_fd);
-	return ret;
-}
-
-int set_project_id(const char *path, unsigned project_id)
-{
-	struct fsxattr fsx;
-	int dir_fd, ret;
-
-	dir_fd = open(path, O_RDONLY | O_NOCTTY);
-	if (dir_fd < 0)
-		return dir_fd;
-
-	ret = ioctl(dir_fd, FS_IOC_FSGETXATTR, &fsx);
-	if (!ret) {
-		fsx.fsx_xflags |= FS_XFLAG_PROJINHERIT;
-		fsx.fsx_projid = project_id;
-		ret = ioctl(dir_fd, FS_IOC_FSSETXATTR, &fsx);
+	if (flag == FTW_NS) {
+		warnx("Cannot stat file \"%s\". Aborting.", path);
+		return -1;
 	}
-	close(dir_fd);
+
+	if (!S_ISREG(st->st_mode) && !S_ISDIR(st->st_mode)) {
+		warnx("Impossible set project for non-regular file \"%s\". Skipping.", path);
+		return 0;
+	}
+
+	ret = set_project(path, target_project);
+	if (ret)
+		warn("Cannot set project for \"%s\". Aborting.", path);
+
 	return ret;
 }
 
-void get_project_quota(const char *path, struct if_dqblk *quota)
+int ext4_create_project(const char *path,
+			unsigned long long max_bytes,
+			unsigned long long max_inodes)
 {
-	char *root_path, *fstype, *device;
-	unsigned project_id;
+	char *device, *fstype, *root_path;
+	struct if_dqblk quota;
+	struct stat path_st;
+	struct if_dqinfo dqinfo;
+	unsigned project;
+	int ret = -1;
 
-	if (find_mountpoint(path, &device, &fstype, &root_path))
-		err(2, "cannot find mountpoint for \"%s\"", path);
+	if (find_mountpoint(path, &path_st, &device, &fstype, &root_path)) {
+		warn("Cannot find mountpoint for \"%s\"", path);
+		return -1;
+	}
 
-	if (strcmp(fstype, "ext4"))
-		errx(2, "unsupported filesystem \"%s\"", fstype);
+	if (strcmp(fstype, "ext4")) {
+		warnx("Unsupported filesystem \"%s\"", fstype);
+		goto out;
+	}
 
-	if (get_project_id(path, &project_id))
-		err(2, "cannot get project id for \"%s\"", path);
+	if (!S_ISDIR(path_st.st_mode)) {
+		warn("Project root must be a directory: \"%s\"", path);
+		goto out;
+	}
 
-	if (!project_id)
-		errx(2, "project id isn't set for \"%s\"", path);
+	if (quotactl(QCMD(Q_GETINFO, PRJQUOTA), device, 0, (caddr_t)&dqinfo) &&
+	    project_quota_on(device, root_path))
+		goto out;
+
+	project = path_st.st_ino | (1u << 31);
 
 	if (quotactl(QCMD(Q_GETQUOTA, PRJQUOTA), device,
-				project_id, (caddr_t)quota))
-		err(2, "cannot get project quota \"%u\" at \"%s\"",
-				project_id, root_path);
+				project, (caddr_t)&quota)) {
+		warn("Cannot get project quota %u", project);
+		goto out;
+	}
 
-	free(root_path);
-	free(fstype);
-	free(device);
-}
+	if (quota.dqb_curspace || quota.dqb_curinodes)
+		warn("Project %u inuse or stale. Reinitializing.", project);
 
-void set_project_quota(const char *path, struct if_dqblk *quota)
-{
-	char *root_path, *fstype, *device;
-	unsigned project_id;
-
-	if (find_mountpoint(path, &device, &fstype, &root_path))
-		err(2, "cannot find mountpoint for \"%s\"", path);
-
-	if (strcmp(fstype, "ext4"))
-		errx(2, "unsupported filesystem \"%s\"", fstype);
-
-	if (get_project_id(path, &project_id))
-		err(2, "cannot get project id for \"%s\"", path);
-
-	if (!project_id)
-		errx(2, "project id isn't set for \"%s\"", path);
+	memset(&quota, 0, sizeof(quota));
+	quota.dqb_bhardlimit = (max_bytes + QIF_DQBLKSIZE - 1) / QIF_DQBLKSIZE;
+	quota.dqb_ihardlimit = max_inodes;
+	quota.dqb_valid = QIF_ALL;
 
 	if (quotactl(QCMD(Q_SETQUOTA, PRJQUOTA), device,
-				project_id, (caddr_t)quota))
-		err(2, "cannot set project quota limit \"%u\" at \"%s\"",
-				project_id, root_path);
+				project, (caddr_t)&quota)) {
+		warn("Cannot set project quota %u", project);
+		goto out;
+	}
+	quotactl(QCMD(Q_SYNC, PRJQUOTA), device, 0, NULL);
 
+	target_project = project;
+	ret = nftw(path, walk_set_project, 100, FTW_PHYS | FTW_MOUNT);
+out:
 	free(root_path);
 	free(fstype);
 	free(device);
+	return ret;
 }
-/* int main (int argc, char **argv) { */
-/* 	struct if_dqblk quota; */
-/* 	unsigned project_id; */
 
-/* 	if (argc < 2) */
-/* 		goto usage; */
+extern int ext4_resize_project(const char *path,
+			       unsigned long long max_bytes,
+			       unsigned long long max_inodes)
+{
+	char *device, *fstype, *root_path;
+	struct if_dqblk quota;
+	struct stat path_st;
+	unsigned project;
+	int ret = -1;
 
-/* 	if (!strcmp(argv[1], "on")) { */
-/* 		if (argc < 3) */
-/* 			goto usage; */
-/* 		project_quota_on(argv[2]); */
-/* 	} else if (!strcmp(argv[1], "off")) { */
-/* 		if (argc < 3) */
-/* 			goto usage; */
-/* 		project_quota_off(argv[2]); */
-/* 	} else if (!strcmp(argv[1], "project")) { */
-/* 		if (argc < 4) */
-/* 			goto usage; */
-/* 		set_project_id(argv[2], atoi(argv[3])); */
-/* 	} else if (!strcmp(argv[1], "limit")) { */
-/* 		if (argc < 4) */
-/* 			goto usage; */
-/* 		quota.dqb_bhardlimit = atoll(argv[3]) / QIF_DQBLKSIZE; */
-/* 		quota.dqb_bsoftlimit = quota.dqb_bhardlimit; */
-/* 		quota.dqb_valid |= QIF_BLIMITS; */
-/* 		set_project_quota(argv[2], &quota); */
-/* 	} else if (!strcmp(argv[1], "ilimit")) { */
-/* 		if (argc < 4) */
-/* 			goto usage; */
-/* 		quota.dqb_ihardlimit = atoll(argv[3]); */
-/* 		quota.dqb_isoftlimit = quota.dqb_bhardlimit; */
-/* 		quota.dqb_valid |= QIF_ILIMITS; */
-/* 		set_project_quota(argv[2], &quota); */
-/* 	} else if (!strcmp(argv[1], "info")) { */
-/* 		if (argc < 3) */
-/* 			goto usage; */
-/* 		get_project_id(argv[2], &project_id); */
-/* 		get_project_quota(argv[2], &quota); */
-/* 		printf("project   %u\n", project_id); */
-/* 		printf("space     %llu\n", quota.dqb_curspace); */
-/* 		printf("limit     %llu\n", quota.dqb_bhardlimit * QIF_DQBLKSIZE); */
-/* 		printf("inodes    %llu\n", quota.dqb_curinodes); */
-/* 		printf("ilimit    %llu\n", quota.dqb_ihardlimit); */
-/* 	} */
+	if (find_mountpoint(path, &path_st, &device, &fstype, &root_path)) {
+		warn("cannot find mountpoint for \"%s\"", path);
+		return -1;
+	}
 
-/* 	return 0; */
+	if (get_project(path, &project)) {
+		warn("Cannot get project for path \"%s\"", path);
+		goto out;
+	}
 
-/* usage: */
-/* 	fprintf(stderr, "Usage: %s <command> <path> [args]...\n" */
-/* 			"Commands: \n" */
-/* 			"  on      <path>                turn on\n" */
-/* 			"  off     <path>                turn off\n" */
-/* 			"  info    <path>                print usage and limits\n" */
-/* 			"  project <path> <id>           set project id\n" */
-/* 			"  limit   <path> <bytes>        set space limit\n" */
-/* 			"  ilimit  <path> <inodes>       set inodes limit\n", */
-/* 			argv[0]); */
-/* 	return 2; */
-/* } */
+	memset(&quota, 0, sizeof(quota));
+	quota.dqb_bhardlimit = (max_bytes + QIF_DQBLKSIZE - 1)  / QIF_DQBLKSIZE;
+	quota.dqb_ihardlimit = max_inodes;
+	quota.dqb_valid = QIF_LIMITS;
+
+	if (quotactl(QCMD(Q_SETQUOTA, PRJQUOTA), device,
+				project, (caddr_t)&quota)) {
+		warn("Cannot set project quota %u", project);
+		goto out;
+	}
+	quotactl(QCMD(Q_SYNC, PRJQUOTA), device, 0, NULL);
+
+	ret = 0;
+out:
+	free(root_path);
+	free(fstype);
+	free(device);
+	return ret;
+}
+
+int ext4_destroy_project(const char *path)
+{
+	char *device, *fstype, *root_path;
+	struct if_dqblk quota;
+	struct stat path_st;
+	struct if_dqinfo dqinfo;
+	unsigned project;
+	int ret = -1;
+
+	if (find_mountpoint(path, &path_st, &device, &fstype, &root_path)) {
+		warn("cannot find mountpoint for \"%s\"", path);
+		return -1;
+	}
+
+	if (strcmp(fstype, "ext4")) {
+		warnx("Unsupported filesystem \"%s\"", fstype);
+		goto out;
+	}
+
+	if (!S_ISDIR(path_st.st_mode)) {
+		warnx("Project root must be a directory: \"%s\"", path);
+		goto out;
+	}
+
+	if (get_project(path, &project)) {
+		warn("Cannot get project for directory: \"%s\"", path);
+		goto out;
+	}
+
+	if (project != (path_st.st_ino | (1u << 31))) {
+		warnx("Not a project root: \"%s\". Cannot destroy it.", path);
+		goto out;
+	}
+
+	target_project = 0;
+	ret = nftw(path, walk_set_project, 100, FTW_PHYS | FTW_MOUNT);
+
+	memset(&quota, 0, sizeof(quota));
+	quota.dqb_valid = QIF_ALL;
+
+	if (quotactl(QCMD(Q_SETQUOTA, PRJQUOTA), device,
+				project, (caddr_t)&quota)) {
+		warn("Cannot clear project %u quota", project);
+		ret = -1;
+	}
+	quotactl(QCMD(Q_SYNC, PRJQUOTA), device, 0, NULL);
+out:
+	free(root_path);
+	free(fstype);
+	free(device);
+	return ret;
+}

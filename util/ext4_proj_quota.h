@@ -1,14 +1,16 @@
 #ifndef __EXT4_PROJ_QUOTA_H__
 #define __EXT4_PROJ_QUOTA_H__
 
-#include <linux/quota.h>
+extern int ext4_create_project(const char *path,
+			       unsigned long long max_bytes,
+			       unsigned long long max_inodes);
 
-extern int init_project_quota(const char *quota_path);
-extern void project_quota_on(const char *path);
-extern void project_quota_off(const char *path);
-extern int get_project_id(const char *path, unsigned *project_id);
-extern int set_project_id(const char *path, unsigned project_id);
-extern void get_project_quota(const char *path, struct if_dqblk *quota);
-extern void set_project_quota(const char *path, struct if_dqblk *quota);
+/* Use statfs(path, struct statfs) to get current limits and usage */
+
+extern int ext4_resize_project(const char *path,
+			       unsigned long long max_bytes,
+			       unsigned long long max_inodes);
+
+extern int ext4_destroy_project(const char *path);
 
 #endif /* __EXT4_PROJ_QUOTA_H__ */
