@@ -10,6 +10,7 @@
 
 extern "C" {
 #include <sys/vfs.h>
+#include "util/ext4_proj_quota.h"
 }
 
 void RegisterVolumeProperties(std::shared_ptr<TRawValueMap> m) {
@@ -119,10 +120,13 @@ public:
 };
 
 class TVolumeNativeImpl : public TVolumeImpl {
+    TPath OvlPrivate;
     TPath OvlUpper;
     TPath OvlWork;
     TPath OvlLower;
     TMount OvlMount;
+
+    const int inode_ratio = 8192; /* quota bytes-per-inode ratio FIXME */
 
 public:
     TVolumeNativeImpl(std::shared_ptr<TVolume> volume) : TVolumeImpl(volume) {}
@@ -130,8 +134,9 @@ public:
     TError Create() override {
         std::string id = std::to_string(Volume->GetId());
 
-        OvlUpper = TPath(config().volumes().volume_dir()).AddComponent(id).AddComponent("upper");
-        OvlWork = TPath(config().volumes().volume_dir()).AddComponent(id).AddComponent("work");
+        OvlPrivate = TPath(config().volumes().volume_dir()).AddComponent(id);
+        OvlUpper = OvlPrivate.AddComponent("upper");
+        OvlWork = OvlPrivate.AddComponent("work");
         OvlLower = Volume->GetResource()->GetPath();
         OvlMount = TMount("overlay", Volume->GetPath(), "overlay", {"lowerdir=" + OvlLower.ToString(), "upperdir=" + OvlUpper.ToString(), "workdir=" + OvlWork.ToString() });
         return TError::Success();
@@ -148,24 +153,33 @@ public:
         return TError::Success();
     }
 
-    TError SetQuota(const TPath &path, uint64_t quota) const {
-        /*
-           struct if_dqblk quota;
-           unsigned project_id = FIXME;
-           quota.dqb_bhardlimit = quota;
-           ret = init_project_quota(path.ToString().c_str());
-           ret = set_project_id(path.ToString().c_str(), project_id);
-           set_project_quota(path.ToString().c_str(), &quota);
-           project_quota_on(path.ToString());
-           */
+    TError SetQuota(uint64_t quota) const {
+        if (ext4_resize_project(OvlPrivate.ToString().c_str(),
+                                quota, quota / inode_ratio))
+            TError(EError::Unknown, errno, "ext4_resize_project");
         return TError::Success();
     }
 
     TError Construct() const override {
+        TFolder privateDir(OvlPrivate);
         TFolder upperDir(OvlUpper);
         TFolder workDir(OvlWork);
+        uint64_t quota = Volume->GetParsedQuota();
+        TError error;
 
-        TError error = upperDir.Create(0755, true);
+        error = privateDir.Create(0755, true);
+        if (error) {
+            (void)Deconstruct();
+            return error;
+        }
+
+        if (ext4_create_project(OvlPrivate.ToString().c_str(),
+                                quota, quota / inode_ratio)) {
+            (void)Deconstruct();
+            return TError(EError::Unknown, errno, "ext4_create_project");
+        }
+
+        error = upperDir.Create(0755, true);
         if (error) {
             (void)Deconstruct();
             return error;
@@ -197,10 +211,11 @@ public:
             return error;
         }
 
-        return SetQuota(OvlUpper, Volume->GetParsedQuota());
+        return TError::Success();
     }
 
     TError Deconstruct() const override {
+        TFolder privateDir(OvlPrivate);
         TFolder upperDir(OvlUpper);
         TFolder workDir(OvlWork);
 
@@ -213,6 +228,13 @@ public:
             L_ERR() << "Can't deconstruct volume: " << error << std::endl;
 
         error = upperDir.Remove(true);
+        if (error)
+            L_ERR() << "Can't deconstruct volume: " << error << std::endl;
+
+        if (ext4_destroy_project(OvlPrivate.ToString().c_str()))
+            L_ERR() << "Can't destroy ext4 project: " << errno << std::endl;
+
+        error = privateDir.Remove(true);
         if (error)
             L_ERR() << "Can't deconstruct volume: " << error << std::endl;
 
@@ -230,9 +252,9 @@ public:
         if (ret)
             return TError(EError::Unknown, errno, "statvfs(" + Volume->GetPath().ToString() + ")");
 
-        used = (st.f_blocks - st.f_bfree) * st.f_frsize;
-        // TODO: get info from kernel quota subsystem
-        avail = st.f_bfree * st.f_frsize;
+        /* Project quota usage/limit modifies statfs results */
+        used = (uint64_t)(st.f_blocks - st.f_bfree) * st.f_frsize;
+        avail = (uint64_t)st.f_bfree * st.f_frsize;
 
         return TError::Success();
     }

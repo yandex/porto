@@ -154,7 +154,7 @@ public:
     void Restore(kv::TNode &node) override {
     }
 
-    TError SetQuota(const TPath &path, uint64_t quota) const {
+    TError SetQuota(uint64_t quota) const {
         /*
            struct if_dqblk quota;
            unsigned project_id = FIXME;
@@ -195,7 +195,7 @@ public:
             return error;
         }
 
-        return SetQuota(OvlUpper, Volume->GetParsedQuota());
+        return SetQuota(Volume->GetParsedQuota());
     }
 
     TError Deconstruct() const override {
