@@ -101,11 +101,13 @@ parse_mounts:
 		goto found;
 	}
 not_found:
+	free(buf);
 	free(*root_path);
 	errno = ENODEV;
 	return -1;
 
 found:
+	free(buf);
 	if (!*fstype || !*device) {
 		free(*fstype);
 		free(*device);
