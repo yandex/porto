@@ -1,3 +1,10 @@
+yandex-porto (1.1) precise; urgency=low
+
+  * Fix memory leak
+  * Change freezer timeout to 30 seconds
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 30 Mar 2015 15:18:00 +0400
+
 yandex-porto (1.0) precise; urgency=low
 
   * Refill link cache upon network even (fixes broken dynamic_ifaces)
