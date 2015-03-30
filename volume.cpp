@@ -654,8 +654,13 @@ TError TResource::Copy(const TPath &to) const {
     if (error)
         return error;
 
-    TFolder dir(Path);
-    return dir.Copy(to);
+    int status;
+    error = Run({ "cp", "-aT", Path.ToString(), to.ToString() }, status);
+    if (error)
+        return error;
+    if (status)
+        return TError(EError::Unknown, "Can't execute cp " + std::to_string(status));
+    return TError::Success();
 }
 
 TError TResource::Destroy() const {
