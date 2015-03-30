@@ -166,9 +166,9 @@ static int get_project(const char *path, unsigned *project)
 	struct fsxattr attr;
 	int fd, ret, saved_errno;
 
-	fd = open(path, O_RDONLY | O_NOCTTY | O_NOFOLLOW | O_NOATIME);
+	fd = open(path, O_RDONLY | O_NOCTTY | O_NOFOLLOW | O_NOATIME | O_NONBLOCK);
 	if (fd < 0 && errno == EPERM)
-		fd = open(path, O_RDONLY | O_NOCTTY | O_NOFOLLOW);
+		fd = open(path, O_RDONLY | O_NOCTTY | O_NOFOLLOW | O_NONBLOCK);
 	if (fd < 0) {
 		char *dirc, *dir;
 
@@ -194,9 +194,9 @@ static int set_project(const char *path, unsigned project)
 	int fd, ret, saved_errno;
 	struct fsxattr attr;
 
-	fd = open(path, O_RDONLY | O_NOCTTY | O_NOFOLLOW | O_NOATIME);
+	fd = open(path, O_RDONLY | O_NOCTTY | O_NOFOLLOW | O_NOATIME | O_NONBLOCK);
 	if (fd < 0 && errno == EPERM)
-		fd = open(path, O_RDONLY | O_NOCTTY | O_NOFOLLOW);
+		fd = open(path, O_RDONLY | O_NOCTTY | O_NOFOLLOW | O_NONBLOCK);
 	if (fd < 0)
 		return fd;
 
@@ -223,7 +223,7 @@ static int project_quota_on(const char *device, const char *root_path)
 		return -1;
 	}
 
-	if (asprintf(&quota_path, "%s/%s", root_path, PROJECT_QUOTA_FILE))
+	if (asprintf(&quota_path, "%s/%s", root_path, PROJECT_QUOTA_FILE) < 0)
 		return -1;
 
 	if (access(quota_path, F_OK) && init_project_quota(quota_path)) {
