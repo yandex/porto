@@ -176,7 +176,12 @@ TError TPath::ReadLink(TPath &value) const {
 }
 
 TError TPath::Symlink(const TPath &to) const {
-    int ret = symlink(Path.c_str(), to.ToString().c_str());
+    TPath target;
+    TError error = ReadLink(target);
+    if (error)
+        return error;
+
+    int ret = symlink(target.ToString().c_str(), to.ToString().c_str());
     if (ret)
         return TError(EError::Unknown, errno, "symlink(" + Path + ", " + to.ToString() + ")");
     return TError::Success();
