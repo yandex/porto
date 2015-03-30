@@ -359,12 +359,13 @@ TError Popen(const std::string &cmd, std::vector<std::string> &lines) {
         return TError(EError::Unknown, errno, "Can't execute " + cmd);
 
     char *line = nullptr;
-    size_t n;
+    size_t n = 0;
 
     while (getline(&line, &n, f) >= 0)
         lines.push_back(line);
 
     fclose(f);
+    free(line);
 
     return TError::Success();
 }

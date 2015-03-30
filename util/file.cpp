@@ -85,12 +85,13 @@ TError TFile::AsLines(vector<string> &value) const {
         return TError(EError::Unknown, errno, "fopen(" + Path.ToString() + ")");
 
     char *line = nullptr;
-    size_t len;
+    size_t len = 0;
     ssize_t n;
     while ((n = getline(&line, &len, f)) != -1)
         value.push_back(string(line, n - 1));
 
     fclose(f);
+    free(line);
 
     return TError::Success();
 }
