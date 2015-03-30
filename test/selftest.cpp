@@ -3308,7 +3308,7 @@ static void TestRespawnProperty(TPortoAPI &api) {
 
 static void TestLeaks(TPortoAPI &api) {
     string slavePid, masterPid;
-    string name;
+    string name, v;
     int slack = 4096;
 
     TFile slaveFile(config().slave_pid().path());
@@ -3316,11 +3316,30 @@ static void TestLeaks(TPortoAPI &api) {
     TFile masterFile(config().master_pid().path());
     ExpectSuccess(masterFile.AsString(masterPid));
 
+    std::vector<TProperty> plist;
+    std::vector<TData> dlist;
+
+    ExpectApiSuccess(api.Plist(plist));
+    ExpectApiSuccess(api.Dlist(dlist));
+
     for (int i = 0; i < LeakConainersNr; i++) {
         name = "a" + std::to_string(i);
         ExpectApiSuccess(api.Create(name));
         ExpectApiSuccess(api.SetProperty(name, "command", "true"));
         ExpectApiSuccess(api.Start(name));
+
+        for (auto p : plist)
+            (void)api.GetProperty(name, p.Name, v);
+        for (auto d : dlist)
+            (void)api.GetData(name, d.Name, v);
+    }
+
+    name = "a0";
+    for (int i = 0; i < LeakConainersNr; i++) {
+        for (auto p : plist)
+            (void)api.GetProperty(name, p.Name, v);
+        for (auto d : dlist)
+            (void)api.GetData(name, d.Name, v);
     }
 
     for (int i = 0; i < LeakConainersNr; i++) {
@@ -3336,6 +3355,19 @@ static void TestLeaks(TPortoAPI &api) {
         ExpectApiSuccess(api.Create(name));
         ExpectApiSuccess(api.SetProperty(name, "command", "true"));
         ExpectApiSuccess(api.Start(name));
+
+        for (auto p : plist)
+            (void)api.GetProperty(name, p.Name, v);
+        for (auto d : dlist)
+            (void)api.GetData(name, d.Name, v);
+    }
+
+    name = "b0";
+    for (int i = 0; i < LeakConainersNr; i++) {
+        for (auto p : plist)
+            (void)api.GetProperty(name, p.Name, v);
+        for (auto d : dlist)
+            (void)api.GetData(name, d.Name, v);
     }
 
     for (int i = 0; i < LeakConainersNr; i++) {
