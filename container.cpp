@@ -167,7 +167,7 @@ void TContainer::Destroy() {
         }
 }
 
-const string TContainer::GetName(bool recursive) const {
+const string TContainer::GetName(bool recursive, const std::string &sep) const {
     if (!recursive)
         return Name;
 
@@ -177,7 +177,7 @@ const string TContainer::GetName(bool recursive) const {
     if (Parent->Name == ROOT_CONTAINER)
         return Name;
     else
-        return Parent->GetName() + "/" + Name;
+        return Parent->GetName(recursive, sep) + sep + Name;
 }
 
 bool TContainer::IsRoot() const {

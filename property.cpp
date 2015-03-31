@@ -106,7 +106,7 @@ static TError ExistingFile(std::shared_ptr<TContainer> c, const std::string &str
 }
 
 static std::string DefaultStdFile(std::shared_ptr<TContainer> c,
-                                  const std::string &name) {
+                                  const std::string &prefix) {
 
     std::string cwd, root;
     TError error = c->GetProperty("cwd", cwd);
@@ -121,9 +121,7 @@ static std::string DefaultStdFile(std::shared_ptr<TContainer> c,
         return "";
     }
 
-    std::string prefix;
-    if (c->UseParentNamespace())
-        prefix = c->GetName(false) + ".";
+    std::string name = c->GetName(true, "_");
 
     TPath path = root;
     if (!path.Exists() || path.GetType() == EFileType::Directory) {
@@ -132,7 +130,7 @@ static std::string DefaultStdFile(std::shared_ptr<TContainer> c,
         path = c->GetTmpDir();
     }
 
-    return path.AddComponent(prefix + name).ToString();
+    return path.AddComponent(prefix + '.' + name).ToString();
 }
 
 static std::set<EContainerState> staticProperty = {

@@ -156,9 +156,9 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectApiSuccess(api.GetProperty(name, "stdin_path", v));
     Expect(v == string("/dev/null"));
     ExpectApiSuccess(api.GetProperty(name, "stdout_path", v));
-    Expect(v == config().container().tmp_dir() + "/" + name + "/stdout");
+    Expect(v == config().container().tmp_dir() + "/" + name + "/stdout." + name);
     ExpectApiSuccess(api.GetProperty(name, "stderr_path", v));
-    Expect(v == config().container().tmp_dir() + "/" + name + "/stderr");
+    Expect(v == config().container().tmp_dir() + "/" + name + "/stderr." + name);
     ExpectApiSuccess(api.GetProperty(name, "ulimit", v));
     Expect(v == "");
     ExpectApiSuccess(api.GetProperty(name, "hostname", v));
@@ -1113,8 +1113,8 @@ static void TestCwdProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
 
-    Expect(access("/tmp/stdout", F_OK) == 0);
-    Expect(access("/tmp/stderr", F_OK) == 0);
+    Expect(access(("/tmp/stdout." + name).c_str(), F_OK) == 0);
+    Expect(access(("/tmp/stderr." + name).c_str(), F_OK) == 0);
 
     cwd = GetCwd(pid);
 
@@ -1456,7 +1456,7 @@ static void TestRootProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "command", "ls -1 " + cwd));
 
     v = StartWaitAndGetData(api, name, "stdout");
-    Expect(v == "stderr\nstdout\n");
+    Expect(v == "stderr." + name + "\nstdout." + name + "\n");
 
     ExpectApiSuccess(api.Destroy(name));
 }
