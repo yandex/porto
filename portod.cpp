@@ -152,10 +152,13 @@ static bool HandleRequest(TContext &context, std::shared_ptr<TClient> client) {
         for (size_t i = 0; i < pos; i++)
             ss << std::setw(2) << (int)buf[i];
 
-        L() << "Interrupted read from " << client->Fd << ", partial message: " << ss.str() << std:: endl;
+        L_WRN() << "Interrupted read from " << client->Fd << ", partial message: " << ss.str() << std:: endl;
         Statistics->InterruptedReads++;
         return true;
     }
+
+    if (pist.GetLeftovers())
+        L_WRN() << "Message is greater that expected from " << client->Fd << ", skipped " << pist.GetLeftovers() << std:: endl;
 
     if (!haveData)
         return true;
