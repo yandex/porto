@@ -153,6 +153,13 @@ static void CheckStdout(TPortoAPI &api, std::string name, std::string stream) {
     Say() << "CheckStdout container: " << name << std::endl;
 
     api.GetData(name, "stdout", ret);
+
+    Say() << "{{{" << std::endl;
+    Say() << ret << std::endl;
+    Say() << "---" << std::endl;
+    Say() << stream << std::endl;
+    Say() << "}}}" << std::endl;
+
     Expect(ret == stream);
 }
 

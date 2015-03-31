@@ -152,7 +152,10 @@ public:
     TError ChildSetHostname();
     TError ChildPrepareLoop();
     TError ChildCallback();
-    TError Restore(int pid);
+    TError Restore(int pid_,
+                   const std::string &stdinPath,
+                   const std::string &stdoutPath,
+                   const std::string &stderrPath);
     TError FixCgroups() const;
     TError Rotate() const;
     void Abort(const TError &error) const;

@@ -1204,7 +1204,10 @@ TError TContainer::Restore(const kv::TNode &node) {
             return error;
         }
 
-        error = Task->Restore(pid);
+        error = Task->Restore(pid,
+                              Prop->Get<std::string>(P_STDIN_PATH),
+                              Prop->Get<std::string>(P_STDOUT_PATH),
+                              Prop->Get<std::string>(P_STDERR_PATH));
         if (error)
             L_ERR() << "Can't restore task: " << error << std::endl;
 

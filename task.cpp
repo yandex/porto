@@ -918,7 +918,10 @@ std::string TTask::GetStderr(size_t limit) const {
     return s;
 }
 
-TError TTask::Restore(int pid_) {
+TError TTask::Restore(int pid_,
+                      const std::string &stdinPath,
+                      const std::string &stdoutPath,
+                      const std::string &stderrPath) {
     ExitStatus = 0;
     Pid = pid_;
     State = Started;
@@ -943,9 +946,9 @@ TError TTask::Restore(int pid_) {
     // away under us any time, so don't fail if we can't recover
     // something.
 
-    Env->StdinPath = "";
-    Env->StdoutPath = Env->Cwd + "/stdout";
-    Env->StderrPath = Env->Cwd + "/stderr";
+    Env->StdinPath = stdinPath;
+    Env->StdoutPath = stdoutPath;
+    Env->StderrPath = stderrPath;
 
     if (running) {
         TPath stdinLink("/proc/" + std::to_string(Pid) + "/fd/0");
