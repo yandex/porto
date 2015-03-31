@@ -3922,6 +3922,10 @@ static void TestRecovery(TPortoAPI &api) {
         ExpectApiSuccess(api.Start(name));
     }
 
+    containers.clear();
+    ExpectApiSuccess(api.List(containers));
+    Expect(containers.size() == nr + 1);
+
     ExpectApiFailure(api.Create("max_plus_one"), EError::ResourceNotAvailable);
 
     KillSlave(api, SIGKILL, 100);
