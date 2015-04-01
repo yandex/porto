@@ -262,7 +262,7 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
             return ret;
         }
 
-        if (!fds[0].revents)
+        if (!fds[0].revents || (fds[0].revents & POLLHUP))
             return 0;
 
         int pid, status;
