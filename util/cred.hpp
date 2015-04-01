@@ -4,13 +4,16 @@
 #include <set>
 
 #include "common.hpp"
+#include "util/string.hpp"
 
 class TUserEntry : public TNonCopyable {
 protected:
     std::string Name;
     int Id;
 public:
-    TUserEntry(const std::string &name) : Name(name), Id(-1) {}
+    TUserEntry(const std::string &name) :
+        Name(!name.empty() && StringOnlyDigits(name) ? "" : name),
+          Id(!name.empty() && StringOnlyDigits(name) ? stoi(name) : -1) {}
     TUserEntry(const int id) : Name(""), Id(id) {}
     std::string GetName();
     int GetId();

@@ -36,12 +36,10 @@ TError TUser::Load() {
         if (p) {
             Id = p->pw_uid;
             Name = p->pw_name;
-            return TError::Success();
         } else if (errno == ENOMEM || errno == ERANGE) {
             L_WRN() << "Not enough space in buffer for credentials" << std::endl;
         }
-
-        return TError(EError::InvalidValue, "Invalid uid: " + std::to_string(Id));
+        return TError::Success();
     }
 
     if (Name.length()) {
@@ -81,12 +79,11 @@ TError TGroup::Load() {
         if (g) {
             Id = g->gr_gid;
             Name = g->gr_name;
-            return TError::Success();
         } else if (errno == ENOMEM || errno == ERANGE) {
             L_WRN() << "Not enough space in buffer for credentials" << std::endl;
         }
 
-        return TError(EError::InvalidValue, "Invalid gid: " + std::to_string(Id));
+        return TError::Success();
     }
 
     if (Name.length()) {
@@ -127,7 +124,8 @@ bool TCred::IsPrivileged() const {
 std::string TCred::UserAsString() const {
     TUser u(Uid);
 
-    if (u.Load())
+    (void)u.Load();
+    if (u.GetName().empty())
         return std::to_string(Uid);
     else
         return u.GetName();
@@ -136,7 +134,8 @@ std::string TCred::UserAsString() const {
 std::string TCred::GroupAsString() const {
     TGroup g(Gid);
 
-    if (g.Load())
+    (void)g.Load();
+    if (g.GetName().empty())
         return std::to_string(Gid);
     else
         return g.GetName();

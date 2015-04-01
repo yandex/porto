@@ -1061,6 +1061,14 @@ static void TestUserGroupProperty(TPortoAPI &api) {
     Expect(gid == GroupGid("bin"));
     ExpectApiSuccess(api.Stop(name));
 
+    Say() << "Check integer user & group" << std::endl;
+    ExpectApiSuccess(api.SetProperty(name, "user", "123"));
+    ExpectApiSuccess(api.SetProperty(name, "group", "234"));
+    ExpectApiSuccess(api.GetProperty(name, "user", user));
+    ExpectApiSuccess(api.GetProperty(name, "group", group));
+    Expect(user == "123");
+    Expect(group == "234");
+
     ExpectApiSuccess(api.Destroy(name));
     AsNobody(api);
 }
