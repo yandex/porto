@@ -854,7 +854,7 @@ TError TTask::Start() {
         ExitStatus = -1;
 
         if (!error)
-            error = TError(EError::Unknown, "Can't prepare container: " + std::to_string(status));
+            error = TError(EError::InvalidValue, errno, "Container couldn't start due to resource limits (child terminated with " + std::to_string(status) + ")");
 
         return error;
     }
