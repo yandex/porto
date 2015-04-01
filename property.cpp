@@ -421,26 +421,6 @@ public:
     }
 };
 
-class TCpuPriorityProperty : public TUintValue, public TContainerValue {
-public:
-    TCpuPriorityProperty() :
-        TUintValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
-        TContainerValue("cpu_priority",
-                        "CPU priority: 1-100 [DEPRECATED]",
-                        dynamicProperty) {}
-
-    uint64_t GetDefault() const override {
-        return 100;
-    }
-
-    TError CheckValue(const uint64_t &value) override {
-        if (value < 0 || value > 99)
-            return TError(EError::InvalidValue, "invalid value");
-
-        return TError::Success();
-    }
-};
-
 class TCpuPolicyProperty : public TStringValue, public TContainerValue {
 public:
     TCpuPolicyProperty() :
@@ -1118,7 +1098,7 @@ public:
 class TAllowedDevicesProperty : public TListValue, public TContainerValue {
 public:
     TAllowedDevicesProperty() :
-        TListValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY),
+        TListValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY | HIDDEN_VALUE),
         TContainerValue(P_ALLOWED_DEVICES,
                         "Devices that container can create/read/write: <c|b|a> <maj>:<min> [r][m][w]; ...",
                         staticProperty) {}
@@ -1191,7 +1171,7 @@ class TCapabilitiesProperty : public TListValue, public TContainerValue {
 
 public:
     TCapabilitiesProperty() :
-        TListValue(PERSISTENT_VALUE | OS_MODE_PROPERTY | SUPERUSER_PROPERTY),
+        TListValue(PERSISTENT_VALUE | OS_MODE_PROPERTY | SUPERUSER_PROPERTY | HIDDEN_VALUE),
         TContainerValue(P_CAPABILITIES,
                         "Limit container capabilities: list of capabilities without CAP_ prefix (man 7 capabilities)",
                         staticProperty) {}
@@ -1322,7 +1302,6 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TRechargeOnPgfaultProperty,
         new TCpuPolicyProperty,
         new TCpuLimitProperty,
-        new TCpuPriorityProperty,
         new TCpuGuaranteeProperty,
         new TIoPolicyProperty,
         new TIoLimitProperty,
