@@ -75,6 +75,10 @@ int GetPid() {
     return getpid();
 }
 
+int GetPPid() {
+    return getppid();
+}
+
 size_t GetCurrentTimeMs() {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);

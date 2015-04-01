@@ -30,6 +30,7 @@ private:
 
 const std::string ROOT_CONTAINER = "/";
 const std::string PORTO_ROOT_CGROUP = "porto";
+const std::string PORTO_DAEMON_CGROUP = "portod";
 
 struct TStatistics {
     std::atomic<uint64_t> Spawned;

@@ -11,8 +11,12 @@ typedef std::function<TError()> task_t;
 typedef std::function<void(TError error)> posthook_t;
 
 class TEpollLoop;
+class TCgroup;
+class TSubsystem;
 
 class TContext : public TNonCopyable {
+    TError CreateDaemonCgs();
+
 public:
     std::shared_ptr<TKeyValueStorage> Storage;
     std::shared_ptr<TKeyValueStorage> VolumeStorage;
@@ -22,6 +26,7 @@ public:
     std::shared_ptr<TContainerHolder> Cholder;
     std::shared_ptr<TVolumeHolder> Vholder;
     std::shared_ptr<TEpollLoop> EpollLoop;
+    std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> DaemonCgs;
 
     std::map<pid_t, posthook_t> Posthooks;
     std::map<pid_t, int> PosthooksError;

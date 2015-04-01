@@ -12,6 +12,7 @@ int RetryBusy(int times, int timeoMs, std::function<int()> handler);
 int RetryFailed(int times, int timeoMs, std::function<int()> handler);
 int SleepWhile(int timeoMs, std::function<int()> handler);
 int GetPid();
+int GetPPid();
 size_t GetCurrentTimeMs();
 size_t GetTotalMemory();
 int CreatePidFile(const std::string &path, const int mode);

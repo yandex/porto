@@ -3,6 +3,8 @@
 #include "util/log.hpp"
 #include "util/unix.hpp"
 #include "config.hpp"
+#include "cgroup.hpp"
+#include "subsystem.hpp"
 
 TContext::TContext() {
     Storage = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().keyval().file().path(), "tmpfs", { config().keyval().size() }));
@@ -12,6 +14,33 @@ TContext::TContext() {
     EpollLoop = std::make_shared<TEpollLoop>();
     Cholder = std::make_shared<TContainerHolder>(EpollLoop, Queue, Net, Storage);
     Vholder = std::make_shared<TVolumeHolder>(VolumeStorage);
+}
+
+TError TContext::CreateDaemonCgs() {
+    DaemonCgs[memorySubsystem] = memorySubsystem->GetRootCgroup()->GetChild(PORTO_DAEMON_CGROUP);
+    DaemonCgs[cpuacctSubsystem] = cpuacctSubsystem->GetRootCgroup()->GetChild(PORTO_DAEMON_CGROUP);
+
+    for (auto cg : DaemonCgs) {
+        TError error = cg.second->Create();
+        if (error)
+            return error;
+
+        // portod-slave
+        error = cg.second->Attach(GetPid());
+        if (error)
+            return error;
+
+        // portod master
+        error = cg.second->Attach(GetPPid());
+        if (error)
+            return error;
+    }
+
+    TError error = memorySubsystem->SetLimit(DaemonCgs[memorySubsystem], config().daemon().memory_limit());
+    if (error)
+        return error;
+
+    return TError::Success();
 }
 
 TError TContext::Initialize() {
@@ -65,6 +94,10 @@ TError TContext::Initialize() {
         L_ERR() << "Can't create root container: " << error << std::endl;
         return error;
     }
+
+    error = CreateDaemonCgs();
+    if (error)
+        return error;
 
     return TError::Success();
 }
