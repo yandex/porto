@@ -86,3 +86,19 @@ namespace test {
 
 #define ExpectApiSuccess(ret) ExpectApi(api, ret, 0, __LINE__, __func__)
 #define ExpectApiFailure(ret, exp) ExpectApi(api, ret, exp, __LINE__, __func__)
+
+#define ExpectEq(ret, exp) \
+    do { \
+        if (ret != exp) { \
+            Say() << "Unexpected " << ret << " != " << exp << " at " << __func__ << ":" << __LINE__ << std::endl; \
+            abort(); \
+        } \
+    } while (0)
+
+#define ExpectNeq(ret, exp) \
+    do { \
+        if (ret == exp) { \
+            Say() << "Unexpected " << ret << " == " << exp << " at " << __func__ << ":" << __LINE__ << std::endl; \
+            abort(); \
+        } \
+    } while (0)

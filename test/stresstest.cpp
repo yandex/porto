@@ -78,7 +78,7 @@ static void Create(TPortoAPI &api, const std::string &name, const std::string &c
         TFolder f(cwd);
         if (!f.Exists()) {
             TError error = f.Create(0755, true);
-            Expect(error == false);
+            ExpectEq(error, false);
         }
     }
 }
@@ -90,7 +90,7 @@ static void SetProperty(TPortoAPI &api, std::string name, std::string type, std:
 
     ExpectApiSuccess(api.SetProperty(name, type, value));
     ExpectApiSuccess(api.GetProperty(name, type, res_value));
-    Expect(res_value == value);
+    ExpectEq(res_value, value);
 }
 
 static void Start(TPortoAPI &api, std::string name) {
@@ -153,7 +153,7 @@ static void CheckStdout(TPortoAPI &api, std::string name, std::string stream) {
     Say() << "CheckStdout container: " << name << std::endl;
 
     api.GetData(name, "stdout", ret);
-    Expect(ret == stream);
+    ExpectEq(ret, stream);
 }
 
 static void CheckStderr(TPortoAPI &api, std::string name, std::string stream) {
@@ -162,14 +162,14 @@ static void CheckStderr(TPortoAPI &api, std::string name, std::string stream) {
     Say() << "CheckStderr container: " << name << std::endl;
 
     api.GetData(name, "stderr", ret);
-    Expect(ret == stream);
+    ExpectEq(ret, stream);
 }
 
 static void CheckExit(TPortoAPI &api, std::string name, std::string stream) {
     std::string ret;
     Say() << "CheckExit container: " << name << std::endl;
     ExpectApiSuccess(api.GetData(name, "exit_status", ret));
-    Expect(ret == stream);
+    ExpectEq(ret, stream);
 }
 
 static void Destroy(TPortoAPI &api, const std::string &name, const std::string &cwd) {
