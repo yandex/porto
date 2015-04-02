@@ -44,7 +44,7 @@ void TConfig::LoadDefaults() {
 
     config().mutable_daemon()->set_max_clients(512);
     config().mutable_daemon()->set_slave_read_timeout_s(5);
-    config().mutable_daemon()->set_cgroup_remove_timeout_s(1);
+    config().mutable_daemon()->set_cgroup_remove_timeout_s(5);
     // wait 30 seconds for container cgroup to freeze/unfreeze
     config().mutable_daemon()->set_freezer_wait_timeout_s(30);
     config().mutable_daemon()->set_memory_guarantee_reserve(2 * 1024 * 1024 * 1024UL);
