@@ -2198,6 +2198,7 @@ static void TestRoot(TPortoAPI &api) {
         "net_tos",
         "root_readonly",
         "virt_mode",
+        "aging_time",
     };
 
     vector<string> data = {
@@ -4064,7 +4065,6 @@ static void TestVersion(TPortoAPI &api) {
 }
 
 static void TestRemoveDead(TPortoAPI &api) {
-    int seconds = 4;
     bool remove;
 
     std::string v;
@@ -4073,7 +4073,6 @@ static void TestRemoveDead(TPortoAPI &api) {
 
     AsRoot(api);
 
-    config().mutable_container()->set_aging_time_s(seconds);
     config().mutable_daemon()->set_rotate_logs_timeout_s(1);
     TFile f("/etc/portod.conf");
     remove = !f.Exists();
@@ -4084,15 +4083,12 @@ static void TestRemoveDead(TPortoAPI &api) {
     std::string name = "dead";
     ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.SetProperty(name, "command", "true"));
+    ExpectApiSuccess(api.SetProperty(name, "aging_time", "1"));
     ExpectApiSuccess(api.Start(name));
     WaitState(api, name, "dead");
 
-    usleep(seconds / 2 * 1000 * 1000);
+    usleep(2 * 1000 * 1000);
     std::string state;
-    ExpectApiSuccess(api.GetData(name, "state", state));
-    ExpectEq(state, "dead");
-
-    usleep((seconds / 2 + 1) * 1000 * 1000);
     ExpectApiFailure(api.GetData(name, "state", state), EError::ContainerDoesNotExist);
 
     ExpectApiSuccess(api.GetData("/", "porto_stat[remove_dead]", v));
@@ -4101,7 +4097,6 @@ static void TestRemoveDead(TPortoAPI &api) {
     if (remove) {
         ExpectSuccess(f.Remove());
     } else {
-        config().mutable_container()->set_aging_time_s(60 * 60 * 24 * 7);
         config().mutable_daemon()->set_rotate_logs_timeout_s(60);
         ExpectSuccess(f.WriteStringNoAppend(config().ShortDebugString()));
     }

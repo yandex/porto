@@ -1253,6 +1253,19 @@ public:
     }
 };
 
+class TAgingTimeProperty : public TUintValue, public TContainerValue {
+public:
+    TAgingTimeProperty() :
+        TUintValue(PERSISTENT_VALUE),
+        TContainerValue(P_AGING_TIME,
+                        "After given number of seconds container in dead state is automatically removed",
+                        staticProperty) {}
+
+    uint64_t GetDefault() const override {
+        return config().container().default_aging_time_s();
+    }
+};
+
 class TRawIdProperty : public TIntValue, public TContainerValue {
 public:
     TRawIdProperty() :
@@ -1323,6 +1336,7 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TIpProperty,
         new TDefaultGwProperty,
         new TVirtModeProperty,
+        new TAgingTimeProperty,
 
         new TRawIdProperty,
         new TRawRootPidProperty,

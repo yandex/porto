@@ -1344,7 +1344,7 @@ TError TContainer::Respawn() {
 
 bool TContainer::CanRemoveDead() const {
     return State == EContainerState::Dead &&
-        TimeOfDeath / 1000 + config().container().aging_time_s() <=
+        TimeOfDeath / 1000 + Prop->Get<uint64_t>(P_AGING_TIME) <=
         GetCurrentTimeMs() / 1000;
 }
 
