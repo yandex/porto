@@ -45,6 +45,7 @@ void TConfig::LoadDefaults() {
     config().mutable_daemon()->set_max_clients(512);
     config().mutable_daemon()->set_slave_read_timeout_s(5);
     config().mutable_daemon()->set_cgroup_remove_timeout_s(1);
+    // wait 30 seconds for container cgroup to freeze/unfreeze
     config().mutable_daemon()->set_freezer_wait_timeout_s(30);
     config().mutable_daemon()->set_memory_guarantee_reserve(2 * 1024 * 1024 * 1024UL);
     config().mutable_daemon()->mutable_pidmap()->set_path("/tmp/portod.pidmap");
@@ -60,7 +61,8 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_stdout_limit(8 * 1024 * 1024);
     config().mutable_container()->set_private_max(1024);
     config().mutable_container()->set_kill_timeout_ms(1000);
-    config().mutable_container()->set_stop_timeout_ms(1000);
+    // wait 30 seconds for container process to exit after SIGKILL
+    config().mutable_container()->set_stop_timeout_ms(30 * 1000);
     config().mutable_container()->set_use_hierarchy(true);
     config().mutable_container()->set_max_total(3000);
     config().mutable_container()->set_batch_io_weight(10);
