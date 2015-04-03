@@ -98,7 +98,7 @@ EContainerState TContainer::GetState() {
             L() << "Container " << GetName() << " seems to be empty, start timer" << std::endl;
         }
 
-        if (CgroupEmptySince + 1000 < GetCurrentTimeMs()) {
+        if (CgroupEmptySince + 5000 < GetCurrentTimeMs()) {
             L() << "Container " << GetName() << " is empty for one second, kill it" << std::endl;
             Exit(-1, false);
         }
