@@ -147,6 +147,8 @@ public:
 
     std::string GetStdout(size_t limit) const;
     std::string GetStderr(size_t limit) const;
+    static void RemoveStdioFile(const TPath &path);
+    void RemoveStdio() const;
 
     TError ChildApplyLimits();
     TError ChildSetHostname();

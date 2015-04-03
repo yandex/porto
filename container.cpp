@@ -1281,6 +1281,13 @@ TError TContainer::Restore(const kv::TNode &node) {
             SetState(EContainerState::Stopped);
     }
 
+    if (GetState() == EContainerState::Stopped) {
+        if (Prop->IsDefault(P_STDOUT_PATH))
+            TTask::RemoveStdioFile(Prop->Get<std::string>(P_STDOUT_PATH));
+        if (Prop->IsDefault(P_STDERR_PATH))
+            TTask::RemoveStdioFile(Prop->Get<std::string>(P_STDERR_PATH));
+    }
+
     if (Parent)
         Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
 

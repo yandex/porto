@@ -62,26 +62,29 @@ const char** TTaskEnv::GetEnvp() const {
 
 // TTask
 TTask::~TTask() {
+    RemoveStdio();
+}
+
+void TTask::RemoveStdioFile(const TPath &path) {
+    if (path.GetType() != EFileType::Character &&
+        path.GetType() != EFileType::Block) {
+        TFile f(path);
+        if (f.Exists()) {
+            TError error = f.Remove();
+            if (error)
+                L_ERR() << "Can't remove task stdio file " << path << ": " << error << std::endl;
+        }
+    }
+}
+
+void TTask::RemoveStdio() const {
     if (!Env)
         return;
 
-    if (Env->RemoveStdout &&
-        Env->StdoutPath.GetType() != EFileType::Character &&
-        Env->StdoutPath.GetType() != EFileType::Block) {
-        TFile out(Env->StdoutPath);
-        TError error = out.Remove();
-        if (error)
-            L_ERR() << "Can't remove task stdout " << Env->StdoutPath << ": " << error << std::endl;
-    }
-
-    if (Env->RemoveStderr &&
-        Env->StderrPath.GetType() != EFileType::Character &&
-        Env->StderrPath.GetType() != EFileType::Block) {
-        TFile err(Env->StderrPath);
-        TError error = err.Remove();
-        if (error)
-            L_ERR() << "Can't remove task stderr " << Env->StderrPath << ": " << error << std::endl;
-    }
+    if (Env->RemoveStdout)
+        TTask::RemoveStdioFile(Env->StdoutPath);
+    if (Env->RemoveStderr)
+        TTask::RemoveStdioFile(Env->StderrPath);
 }
 
 void TTask::ReportPid(int pid) const {
