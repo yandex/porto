@@ -991,6 +991,43 @@ public:
     }
 };
 
+class TGcCmd : public ICmd {
+public:
+    TGcCmd(TPortoAPI *api) : ICmd(api, "gc", 0, "", "remove all dead containers") {}
+
+    int Execute(int argc, char *argv[]) {
+        vector<string> clist;
+        int ret = Api->List(clist);
+        if (ret) {
+            PrintError("Can't list containers");
+            return ret;
+        }
+
+        for (auto c : clist) {
+            if (c == "/")
+                continue;
+
+            string state;
+            ret = Api->GetData(c, "state", state);
+            if (ret) {
+                PrintError("Can't get container state");
+                continue;
+            }
+
+            if (state != "dead")
+                continue;
+
+            int ret = Api->Destroy(c);
+            if (ret) {
+                PrintError("Can't destroy container");
+                return ret;
+            }
+        }
+
+        return EXIT_SUCCESS;
+    }
+};
+
 class TDestroyCmd : public ICmd {
 public:
     TDestroyCmd(TPortoAPI *api) : ICmd(api, "destroy", 1, "<name> [name...]", "destroy container") {}
@@ -1270,6 +1307,7 @@ int main(int argc, char *argv[]) {
     RegisterCommand(new TEnterCmd(&api));
     RegisterCommand(new TRunCmd(&api));
     RegisterCommand(new TExecCmd(&api));
+    RegisterCommand(new TGcCmd(&api));
 
     RegisterCommand(new TCreateVolumeCmd(&api));
     RegisterCommand(new TDestroyVolumeCmd(&api));
