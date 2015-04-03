@@ -1,6 +1,8 @@
 #ifndef __EXT4_PROJ_QUOTA_H__
 #define __EXT4_PROJ_QUOTA_H__
 
+extern int ext4_support_project(const char *path);
+
 extern int ext4_create_project(const char *path,
 			       unsigned long long max_bytes,
 			       unsigned long long max_inodes);
