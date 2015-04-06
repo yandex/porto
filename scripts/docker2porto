@@ -5,16 +5,26 @@ require 'net/http'
 require 'json'
 require 'fileutils'
 
+$debug = false
+
 OptionParser.new do |opts|
   opts.banner = <<END
 Usage: docker2porto <image> [tag]
+
+Options:
 END
+
+  opts.on("-d", "--debug",
+          "Debugging mode") do |v|
+            $debug = v
+          end
 end.parse!
 
 image = ARGV.shift
 abort "Please specify docker image!" if not image
 image_tag = ARGV.shift
 image_tag = 'latest' if not image_tag
+$docker_url = 'index.docker.io'
 
 container = "#{image}-#{image_tag}"
 script = "#{container}.sh"
@@ -24,18 +34,30 @@ vroot = '/place/docker'
 def escape_arg(s) s.gsub('"'){'\\"'} end
 def escape_env(s) s.gsub(';'){'\\;'} end
 
+def expect(field, x, y)
+  abort "Image json has unexpected #{field} value!" if x != y
+end
+
 def generate_conf(script, name, rootfs, meta, vroot)
   config = {}
+
+  expect("config.Domainname", meta["config"]["Domainname"], "")
+  expect("config.User", meta["config"]["User"], "")
+  expect("config.NetworkDisabled", meta["config"]["NetworkDisabled"], false)
 
   id = meta["id"]
 
   cmd = []
   cmd += meta["config"]["Entrypoint"] if meta["config"]["Entrypoint"]
-  cmd += meta["config"]["Cmd"]
+  cmd += meta["config"]["Cmd"] if meta["config"]["Cmd"]
 
   env = meta["config"]["Env"]
 
   config["command"] = cmd.shift
+  config["command"] = "bash" unless config["command"]
+  config["hostname"] = meta["config"]["Hostname"]
+  # TODO: we need to use user from container /etc/passwd
+  #config["user"] = meta["config"]["User"] if meta["config"]["User"]
   cmd.each { |s| config["command"] += " \"#{escape_arg(s)}\"" }
 
   config["env"] = '$ENV; '
@@ -115,13 +137,13 @@ end
 
 puts "Retrieving #{image} manifest..."
 
-rsp = get("https://index.docker.io/v1/repositories/#{image}/images", { 'X-Docker-Token' => 'True' })
+rsp = get("https://#{$docker_url}/v1/repositories/#{image}/images", { 'X-Docker-Token' => 'True' })
 registry = rsp['X-Docker-Endpoints']
 token = rsp['X-Docker-Token']
 images = JSON.parse(rsp.body)
 
 puts "Retrieving #{image} tags..."
-rsp = get("https://index.docker.io/v1/repositories/#{image}/tags")
+rsp = get("https://#{$docker_url}/v1/repositories/#{image}/tags")
 tags = JSON.parse(rsp.body)
 
 latest = tags.find { |tag| tag["name"] == image_tag }
@@ -146,7 +168,7 @@ puts "Retrieving #{id} manifest..."
 rsp = get("https://#{registry}/v1/images/#{id}/json", headers)
 json = JSON.parse(rsp.body)
 
-#File.write('config.json', JSON.pretty_generate(json))
+File.write("#{container}.json", JSON.pretty_generate(json)) if $debug
 
 imgtar = File.expand_path(imgtar)
 script = File.expand_path(script)
