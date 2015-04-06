@@ -26,8 +26,9 @@ TError TFile::Touch() const {
     return TError::Success();
 }
 
-TError TFile::Remove() const {
-    L() << "unlink " << Path << std::endl;
+TError TFile::Remove(bool silent) const {
+    if (!silent)
+        L() << "unlink " << Path << std::endl;
 
     int ret = RetryBusy(10, 100, [&]{ return unlink(Path.ToString().c_str()); });
 

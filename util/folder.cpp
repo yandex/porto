@@ -48,7 +48,7 @@ TError TFolder::Create(mode_t mode, bool recursive) const {
     return TError::Success();
 }
 
-TError TFolder::Remove(bool recursive) const {
+TError TFolder::Remove(bool recursive, bool silent) const {
     if (recursive) {
         vector<string> items;
         TError error = Items(EFileType::Any, items);
@@ -61,16 +61,17 @@ TError TFolder::Remove(bool recursive) const {
             TError error;
 
             if (p.GetType() == EFileType::Directory)
-                error = TFolder(p).Remove(recursive);
+                error = TFolder(p).Remove(recursive, true);
             else
-                error = child.Remove();
+                error = child.Remove(true);
 
             if (error)
                 return error;
         }
     }
 
-    L() << "rmdir " << Path << std::endl;
+    if (!silent)
+        L() << "rmdir " << Path << std::endl;
 
     int ret = RetryBusy(10, 100, [&]{ return rmdir(Path.ToString().c_str()); });
     if (ret)

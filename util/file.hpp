@@ -19,7 +19,7 @@ public:
     bool Exists() const { return Path.Exists(); }
 
     TError Touch() const;
-    TError Remove() const;
+    TError Remove(bool silent = false) const;
 
     TError AsString(std::string &value) const;
     TError AsInt(int &value) const;
