@@ -20,7 +20,7 @@ pre-start script
 
 	# if there is cgroup-bin installed, we need to wait while it mounts
 	# sysfs and creates controllers
-	timeout=10
+	timeout=60
 	if [ -f /usr/sbin/cgrulesengd ]; then
 		for i in `seq $timeout`; do
 			if status cgred | grep -q "^cgred start/running" > /dev/null; then
