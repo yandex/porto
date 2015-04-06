@@ -4207,7 +4207,6 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
     };
 
     int ret = EXIT_SUCCESS;
-    std::string origHostname = GetHostname();
     ExpectSuccess(SetHostName(HOSTNAME));
 
     if (NetworkEnabled())
@@ -4273,7 +4272,7 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
 
 exit:
     AsRoot(api);
-    SetHostName(origHostname);
+    system("hostname -F /etc/hostname");
     return ret;
 }
 }
