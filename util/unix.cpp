@@ -344,6 +344,7 @@ retry:
         }
     } else {
         SetDieOnParentExit();
+        CloseFds(-1, {});
 
         char **p = (char **)malloc(sizeof(*p) * command.size() + 1);
         for (size_t i = 0; i < command.size(); i++)
