@@ -76,7 +76,7 @@ void TConfig::LoadDefaults() {
     // TODO: make sure we pick up correct default here depending on kernel
     // version
     config().mutable_volumes()->set_native(false);
-    config().mutable_volumes()->set_enabled(false);
+    config().mutable_volumes()->set_enabled(true);
 
     config().mutable_version()->set_path("/run/portod.version");
     config().mutable_version()->set_perm(0644);
