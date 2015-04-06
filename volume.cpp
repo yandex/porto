@@ -613,7 +613,7 @@ TError TVolumeHolder::GetResource(const TPath &source, std::shared_ptr<TResource
 TError TResource::Untar(const TPath &what, const TPath &where) const {
     int status;
 
-    TError error = Run({ "tar", "xf", what.ToString(), "-C", where.ToString() }, status);
+    TError error = Run({ "tar", "--numeric-owner", "-pxf", what.ToString(), "-C", where.ToString() }, status);
     if (error)
         return error;
     if (status)
