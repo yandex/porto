@@ -1,129 +1,178 @@
 #!/usr/bin/env ruby
 
+require 'optparse'
+require 'net/http'
 require 'json'
 require 'fileutils'
-require 'optparse'
-
-options = {
-  reserve: 128 * 1024 * 1024
-}
 
 OptionParser.new do |opts|
   opts.banner = <<END
-Usage: docker2porto [options] <image>
-
-Options:
+Usage: docker2porto <image> [tag]
 END
-
-  opts.on("-r", "--reserve [BYTES]",
-          Integer,
-          "Reserve given amount of free space on the image") do |v|
-    options[:reserve] = v
-  end
 end.parse!
 
-capabilities = [ "CHOWN", "DAC_OVERRIDE", "FSETID", "FOWNER", "MKNOD", "NET_RAW", "SETGID", "SETUID", "SETFCAP", "SETPCAP", "NET_BIND_SERVICE", "SYS_CHROOT", "KILL", "AUDIT_WRITE" ].join ";"
+image = ARGV.shift
+abort "Please specify docker image!" if not image
+image_tag = ARGV.shift
+image_tag = 'latest' if not image_tag
 
-def docker_snapshot(image, data, metadata)
-  name = "docker2porto"
-  system "docker pull #{image}" or abort "Docker can't pull image #{image}"
-  system "docker stop #{name}"
-  system "docker rm #{name}"
-  system "docker run --name #{name} -d #{image}" or abort "Docker can't start container #{name}"
-  #need new docker:
-  #system "docker create --name #{name} #{image}" or abort "Docker can't create container #{name}"
-  system "docker stop #{name}" or abort "Docker can't stop container #{name}"
-  system "docker inspect #{name} > #{metadata}" or abort "Docker can't export #{name} metadata"
-  system "docker export #{name} > #{data}" or abort "Docker can't export #{name} data"
-  system "docker rm #{name}"
-end
+container = "#{image}-#{image_tag}"
+script = "#{container}.sh"
+imgtar = "#{container}.tar"
+vroot = '/place/docker'
 
-def cleanup(data, metadata)
-  FileUtils.rm([ data, metadata ])
-end
+def escape_arg(s) s.gsub('"'){'\\"'} end
+def escape_env(s) s.gsub(';'){'\\;'} end
 
-def generate_loop(tar, rootfs, reserve)
-  size = File.size(tar)
-  size += 32 * 1024 * 1024 # filesystem metadata
-  size += reserve
-  system "umount tmp"
-  system "dd if=/dev/zero of=#{rootfs} bs=1 count=0 seek=#{size}" or abort "Can't create image file"
-  system "mkfs.ext4 -F #{rootfs}" or abort "Can't create filesystem"
-  FileUtils.mkdir_p('tmp') or abort "Can't create temporary directory"
-  system "mount -o loop #{rootfs} tmp" or abort "Can't mount loop device"
-  system "tar xf #{tar} -C tmp" or abort "Can't untar snapshot"
-  system "umount tmp"
-  FileUtils.rmdir('tmp')
-end
-
-def escape_arg(s)
-  s.gsub('"'){'\\"'}
-end
-
-def escape_env(s)
-  s.gsub(';'){'\\;'}
-end
-
-def generate_conf(script, name, rootfs, meta, capabilities)
+def generate_conf(script, name, rootfs, meta, vroot)
   config = {}
 
-  id = meta["Id"]
+  id = meta["id"]
 
   cmd = []
-  cmd += meta["Config"]["Entrypoint"] if meta["Config"]["Entrypoint"]
-  cmd += meta["Config"]["Cmd"]
+  cmd += meta["config"]["Entrypoint"] if meta["config"]["Entrypoint"]
+  cmd += meta["config"]["Cmd"]
 
-  env = meta["Config"]["Env"]
+  env = meta["config"]["Env"]
 
   config["command"] = cmd.shift
   cmd.each { |s| config["command"] += " \"#{escape_arg(s)}\"" }
 
-  config["env"] = ""
+  config["env"] = '$ENV; '
   env.each { |s| config["env"] += "#{escape_env(s)};" }
+  config["bind"] = '$BIND;'
 
-  config["cwd"] = "/#{meta["Config"]["WorkingDir"]}"
-  config["root"] = "$DIR/#{rootfs}"
+  config["cwd"] = "/#{meta["config"]["WorkingDir"]}"
+  vdir = "#{vroot}/#{name}"
+  config["root"] = "#{vdir}"
+  config["virt_mode"] = 'docker'
 
-  config["user"] = "root"
-  config["group"] = "root"
-  config["capabilities"] = capabilities
-
-  portoctl = "exec $PORTOCTL exec #{name} hostname=\"$HOSTNAME\""
-  config.each { |k, v| portoctl += " #{k}=\"#{escape_arg(v)}\""}
+  props = ''
+  config.each { |k, v| props += " #{k}=\"#{escape_arg(v)}\""}
 
   text = <<END
-#!/bin/sh -x
+#!/bin/sh
 
-DIR="#{Dir.pwd}"
-PORTOCTL="portoctl"
-HOSTNAME="#{name}"
+set -e
+set -x
 
-[ -f "../portoctl" ] && PORTOCTL="../portoctl"
+OPTS='e:v:'
+getopt -Qq "$OPTS" $*
+set -- $(getopt "$OPTS" $*)
 
-#{portoctl}
+while [ ! "$1" = "--" ]; do
+  case "$1" in
+  -e) ENV="$2"; shift; ;;
+  -v) BIND=$(echo "$2" | sed -e 's/:/ /g'); shift; ;;
+  *) echo "Unknown argumen $1"; exit 1; ;;
+  esac
+  shift
+done
+shift
+
+cleanup() { portoctl vdestroy #{vdir}; }
+trap cleanup EXIT
+
+portoctl vcreate #{vdir} #{rootfs}
+portoctl exec #{name} #{props}
 END
 
   File.write(script, text)
 end
 
-tmp_data = "data.tar"
-tmp_meta = "meta.json"
+def get(url, headers = {})
+  uri = URI(url)
+  Net::HTTP.start(uri.host, uri.port,
+    :use_ssl => uri.scheme == 'https') do |http|
+    req = Net::HTTP::Get.new(uri)
+    headers.each { |k,v| req[k] = v }
 
-image = ARGV.shift
-abort "Please specify docker image!" if not image
+    rsp = http.request(req)
+    case rsp
+    when Net::HTTPSuccess     then rsp
+    when Net::HTTPRedirection then get(rsp['location'], headers)
+    else
+      rsp.error!
+    end
+  end
+end
 
-script = "#{image}"
+def whiteout(tar)
+  puts "Whiteout #{tar}..."
 
-abort "Need root privileges" if Process.uid != 0
+  list = `tar tf #{tar}`.split(/\n/)
+  remove = list.select { |path| path.include? '.wh.' }
+  puts remove.inspect
 
-puts ">>> Create docker container snapshot..."
-docker_snapshot(image, tmp_data, tmp_meta)
-json = JSON.parse(File.read(tmp_meta))[0]
-puts ">>> Generate root filesystem..."
-rootfs = "#{json["Image"]}"
-generate_loop(tmp_data, rootfs, options[:reserve])
-puts ">>> Generate config..."
-generate_conf(script, image, rootfs, json, capabilities)
-puts ">>> Cleanup..."
-FileUtils.chmod "+x", script
-cleanup(tmp_data, tmp_meta)
+  remove.each do |wh|
+    orig = wh.sub(/\.wh\./, '')
+    puts "Removing #{wh}..."
+    system "tar -f #{tar} --delete #{wh}"
+    puts "Removing #{orig}..."
+    system "tar -f #{tar} --delete #{orig}"
+  end
+end
+
+puts "Retrieving #{image} manifest..."
+
+rsp = get("https://index.docker.io/v1/repositories/#{image}/images", { 'X-Docker-Token' => 'True' })
+registry = rsp['X-Docker-Endpoints']
+token = rsp['X-Docker-Token']
+images = JSON.parse(rsp.body)
+
+puts "Retrieving #{image} tags..."
+rsp = get("https://index.docker.io/v1/repositories/#{image}/tags")
+tags = JSON.parse(rsp.body)
+
+latest = tags.find { |tag| tag["name"] == image_tag }
+unless latest
+  puts '#{image} tags:'
+  tags.each { |tag| puts tag["name"] }
+  abort "Invalid tag #{image_tag}"
+end
+
+latest = latest["layer"]
+id = images.find { |img| img["id"].start_with? latest }["id"]
+
+abort "Can't find tag #{image_tag}" unless id
+
+headers = { 'Authorization' => "Token #{token}" }
+
+puts "Retrieving #{id} ancestors..."
+rsp = get("https://#{registry}/v1/images/#{id}/ancestry", headers)
+ancestry = JSON.parse(rsp.body)
+
+puts "Retrieving #{id} manifest..."
+rsp = get("https://#{registry}/v1/images/#{id}/json", headers)
+json = JSON.parse(rsp.body)
+
+#File.write('config.json', JSON.pretty_generate(json))
+
+imgtar = File.expand_path(imgtar)
+script = File.expand_path(script)
+
+system "tar cSf #{imgtar} --files-from /dev/null"
+
+ancestry.reverse_each { |id|
+  tar = "#{id}.tar"
+  targz = "#{id}.tar.gz"
+
+  unless File.exists?(targz)
+    puts "Downloading layer #{id}..."
+    rsp = get("https://#{registry}/v1/images/#{id}/layer", headers)
+    File.write(targz, rsp.body)
+  end
+
+  unless File.exists?(tar)
+    puts "Extracting layer #{id}..."
+    system "gunzip -c #{targz} > #{tar}"
+  end
+
+  puts "Merging layer #{id}..."
+  system "tar -A -f #{imgtar} #{tar}"
+}
+
+#whiteout(imgtar)
+
+generate_conf(script, container, imgtar, json, vroot)
+puts "Generated #{script} script and #{imgtar} image"

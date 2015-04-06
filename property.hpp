@@ -55,6 +55,7 @@ constexpr const char *P_AGING_TIME = "aging_time";
 
 constexpr int VIRT_MODE_APP = 1;
 constexpr int VIRT_MODE_OS = 2;
+constexpr int VIRT_MODE_DOCKER = 3;
 
 class TBindMap;
 class TNetCfg;
@@ -71,6 +72,9 @@ const unsigned int RESTROOT_PROPERTY = (1 << 3);
 // Properties marked with this flag are reverted to default upon container
 // start with virt_mode==os
 const unsigned int OS_MODE_PROPERTY = (1 << 4);
+// Properties marked with this flag are reverted to default upon container
+// start with virt_mode==docker
+const unsigned int DOCKER_MODE_PROPERTY = (1 << 5);
 
 class TPropertyMap : public TValueMap {
     std::weak_ptr<TContainer> Container;

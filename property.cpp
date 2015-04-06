@@ -166,7 +166,6 @@ public:
 
         return "";
     }
-
 };
 
 class TUserProperty : public TStringValue, public TContainerValue {
@@ -655,7 +654,7 @@ public:
 class TIsolateProperty : public TBoolValue, public TContainerValue {
 public:
     TIsolateProperty() :
-        TBoolValue(PERSISTENT_VALUE | OS_MODE_PROPERTY),
+        TBoolValue(PERSISTENT_VALUE | OS_MODE_PROPERTY | DOCKER_MODE_PROPERTY),
         TContainerValue(P_ISOLATE,
                         "Isolate container from parent",
                         staticProperty) {}
@@ -778,7 +777,7 @@ public:
 class TBindDnsProperty : public TBoolValue, public TContainerValue {
 public:
     TBindDnsProperty() :
-        TBoolValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY),
+        TBoolValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY | DOCKER_MODE_PROPERTY),
         TContainerValue(P_BIND_DNS,
                         "Bind /etc/resolv.conf and /etc/hosts of host to container",
                         staticProperty) {}
@@ -786,7 +785,10 @@ public:
     bool GetDefault() const override {
         auto c = GetContainer();
 
-        if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
+        auto vmode = c->Prop->Get<int>(P_VIRT_MODE);
+        if (vmode == VIRT_MODE_DOCKER)
+            return true;
+        else if (vmode == VIRT_MODE_OS)
             return false;
 
         if (!c->Prop->Get<bool>(P_ISOLATE))
@@ -1098,13 +1100,15 @@ public:
 class TAllowedDevicesProperty : public TListValue, public TContainerValue {
 public:
     TAllowedDevicesProperty() :
-        TListValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY | HIDDEN_VALUE),
+        TListValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY | DOCKER_MODE_PROPERTY | HIDDEN_VALUE),
         TContainerValue(P_ALLOWED_DEVICES,
                         "Devices that container can create/read/write: <c|b|a> <maj>:<min> [r][m][w]; ...",
                         staticProperty) {}
 
     TStrList GetDefault() const override {
-        if (GetContainer()->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
+        auto vmode = GetContainer()->Prop->Get<int>(P_VIRT_MODE);
+
+        if (vmode == VIRT_MODE_OS || vmode == VIRT_MODE_DOCKER)
             return TStrList{
                 "c 1:3 rwm", "c 1:5 rwm", "c 1:7 rwm", "c 1:9 rwm",
                 "c 1:8 rwm", "c 136:* rw", "c 5:2 rwm", "c 254:0 rm",
@@ -1171,7 +1175,7 @@ class TCapabilitiesProperty : public TListValue, public TContainerValue {
 
 public:
     TCapabilitiesProperty() :
-        TListValue(PERSISTENT_VALUE | OS_MODE_PROPERTY | SUPERUSER_PROPERTY | HIDDEN_VALUE),
+        TListValue(PERSISTENT_VALUE | OS_MODE_PROPERTY | DOCKER_MODE_PROPERTY | SUPERUSER_PROPERTY | HIDDEN_VALUE),
         TContainerValue(P_CAPABILITIES,
                         "Limit container capabilities: list of capabilities without CAP_ prefix (man 7 capabilities)",
                         staticProperty) {}
@@ -1190,7 +1194,8 @@ public:
         auto c = GetContainer();
 
         bool root = c->Cred.IsRoot();
-        bool restricted = c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS;
+        auto vmode = c->Prop->Get<int>(P_VIRT_MODE);
+        bool restricted = vmode == VIRT_MODE_OS || vmode == VIRT_MODE_DOCKER;
 
         uint64_t lastCap = GetLastCap();
         for (auto kv : supported)
@@ -1198,7 +1203,6 @@ public:
                 v.push_back(kv.first);
         return v;
     }
-
 
     TError CheckValue(const std::vector<std::string> &lines) override {
         uint64_t allowed = 0;
@@ -1232,11 +1236,11 @@ public:
     TVirtModeProperty() :
         TIntValue(PERSISTENT_VALUE | RESTROOT_PROPERTY),
         TContainerValue(P_VIRT_MODE,
-                        "Virtualization mode: os|app",
+                        "Virtualization mode: os|app|docker",
                         staticProperty) {}
 
     TError CheckValue(const int &value) override {
-        if (value != VIRT_MODE_APP && value != VIRT_MODE_OS)
+        if (value != VIRT_MODE_APP && value != VIRT_MODE_OS && value != VIRT_MODE_DOCKER)
             return TError(EError::InvalidValue, std::string("Unsupported ") + P_VIRT_MODE);
 
         return TError::Success();
@@ -1247,6 +1251,8 @@ public:
             return Set(VIRT_MODE_OS);
         else if (value == "app")
             return Set(VIRT_MODE_APP);
+        else if (value == "docker")
+            return Set(VIRT_MODE_DOCKER);
         else
             return TError(EError::InvalidValue, std::string("Unsupported ") + P_VIRT_MODE + ": " + value);
 

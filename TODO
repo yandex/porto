@@ -1,3 +1,4 @@
+- ? die when cgoups are not mounted
 - try to mount overlay with all fields empty EINVAL(supported)/ENODEV(not supported)
 - ? use chrt instead of cpu.smart so we don't depend on smart kernels + set rt prio
 - support volume as root

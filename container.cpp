@@ -490,7 +490,8 @@ TError TContainer::PrepareTask() {
     taskEnv->RootRdOnly = Prop->Get<bool>(P_ROOT_RDONLY);
     taskEnv->CreateCwd = Prop->IsDefault(P_ROOT) && Prop->IsDefault(P_CWD) && !UseParentNamespace();
 
-    if (Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS) {
+    auto vmode = Prop->Get<int>(P_VIRT_MODE);
+    if (vmode == VIRT_MODE_OS || vmode == VIRT_MODE_DOCKER) {
         taskEnv->User = "root";
         taskEnv->Group = "root";
     } else {
@@ -505,7 +506,7 @@ TError TContainer::PrepareTask() {
     taskEnv->Environ.push_back("PORTO_NAME=" + GetName());
     taskEnv->Environ.push_back("PORTO_HOST=" + GetHostName());
     taskEnv->Environ.push_back("HOME=" + Prop->Get<std::string>(P_CWD));
-    taskEnv->Environ.push_back("USER=" + Prop->Get<std::string>(P_USER));
+    taskEnv->Environ.push_back("USER=" + taskEnv->User);
 
     taskEnv->Isolate = Prop->Get<bool>(P_ISOLATE);
     taskEnv->StdinPath = Prop->Get<std::string>(P_STDIN_PATH);
@@ -647,12 +648,20 @@ TError TContainer::Start() {
         return TError(EError::InvalidState, "invalid container state " +
                       ContainerStateName(state));
 
-    if (Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS &&
-        !CredConf.PrivilegedUser(Cred)) {
-
+    auto vmode = Prop->Get<int>(P_VIRT_MODE);
+    if (vmode == VIRT_MODE_OS && !CredConf.PrivilegedUser(Cred)) {
         for (auto name : Prop->List())
-            if (Prop->Find(name)->GetFlags() & OS_MODE_PROPERTY)
+            if (Prop->Find(name)->GetFlags() & OS_MODE_PROPERTY) {
+                L() << "RESET " << name << std::endl;
                 Prop->Reset(name);
+            }
+    }
+    else if (vmode == VIRT_MODE_DOCKER && !CredConf.PrivilegedUser(Cred)) {
+        for (auto name : Prop->List())
+            if (Prop->Find(name)->GetFlags() & DOCKER_MODE_PROPERTY) {
+                L() << "RESET " << name << std::endl;
+                Prop->Reset(name);
+            }
     }
 
     if (!IsRoot() && !Prop->Get<std::string>(P_COMMAND).length())
