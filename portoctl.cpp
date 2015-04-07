@@ -1077,7 +1077,6 @@ public:
 
         if (forest)
             for (size_t i = 0; i < clist.size(); i++) {
-
                 auto c = clist[i];
 
                 string parent;
@@ -1113,7 +1112,7 @@ public:
 
                 std::cout << std::right << std::setw(stateLen) << s;
 
-                if (s == "running" || s == "dead") {
+                if (s == "running") {
                     string tm;
                     ret = Api->GetData(c, "time", tm);
                     if (!ret)
