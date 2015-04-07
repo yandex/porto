@@ -1049,10 +1049,20 @@ class TListCmd : public ICmd {
 public:
     TListCmd(TPortoAPI *api) : ICmd(api, "list", 0, "[-1]", "list created containers") {}
 
+    size_t CountChar(const std::string &s) {
+        size_t count = 0;
+        for (size_t i = 0; i < s.length(); i++)
+            if (s[i] == '/')
+                count++;
+        return count;
+    }
+
     int Execute(int argc, char *argv[]) {
         bool details = true;
+        bool forest = false;
         (void)GetOpt(argc, argv, {
             { '1', [&]() { details = false; } },
+            { 'f', [&]() { forest = true; } },
         });
 
         vector<string> clist;
@@ -1062,15 +1072,38 @@ public:
             return ret;
         }
 
+        vector<string> displayName;
+        std::copy(clist.begin(), clist.end(), std::back_inserter(displayName));
+
+        if (forest)
+            for (size_t i = 0; i < clist.size(); i++) {
+
+                auto c = clist[i];
+
+                string parent;
+                ret = Api->GetData(c, "parent", parent);
+                if (ret)
+                    PrintError("Can't get container parent");
+
+                if (parent != "/") {
+                    string prefix = " ";
+                    for (size_t j = 1; j < CountChar(displayName[i]); j++)
+                            prefix = prefix + "   ";
+
+                    displayName[i] = prefix + "\\_ " + displayName[i].substr(parent.length() + 1);
+                }
+            }
+
         vector<string> states = { "running", "dead", "stopped", "paused" };
         size_t stateLen = MaxFieldLength(states);
-        size_t nameLen = MaxFieldLength(clist);
+        size_t nameLen = MaxFieldLength(displayName);
         size_t timeLen = 12;
-        for (auto c : clist) {
+        for (size_t i = 0; i < clist.size(); i++) {
+            auto c = clist[i];
             if (c == "/")
                 continue;
 
-            std::cout << std::left << std::setw(nameLen) << c;
+            std::cout << std::left << std::setw(nameLen) << displayName[i];
 
             if (details) {
                 string s;
