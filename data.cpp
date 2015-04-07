@@ -6,6 +6,7 @@
 #include "property.hpp"
 #include "subsystem.hpp"
 #include "qdisc.hpp"
+#include "cgroup.hpp"
 #include "util/file.hpp"
 #include "util/string.hpp"
 
@@ -489,6 +490,11 @@ public:
         m["started"] = Statistics->Started;
         m["interrupted_reads"] = Statistics->InterruptedReads;
         m["running"] = Statistics->Running;
+        uint64_t usage = 0;
+        TError error = memorySubsystem->Usage(memorySubsystem->GetRootCgroup()->GetChild(PORTO_DAEMON_CGROUP), usage);
+        if (error)
+            L() << "Can't get memory usage of portod" << std::endl;
+        m["memory_usage_mb"] = usage / 1024 / 1024;
 
         return m;
     }
