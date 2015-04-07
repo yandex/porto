@@ -7,6 +7,7 @@
 extern "C" {
 #include <fcntl.h>
 #include <unistd.h>
+#include "util/ext4_proj_quota.h"
 }
 
 using std::string;
@@ -73,9 +74,14 @@ void TConfig::LoadDefaults() {
 
     config().mutable_volumes()->set_volume_dir("/place/porto_volumes");
     config().mutable_volumes()->set_resource_dir("/place/porto_resources");
-    // TODO: make sure we pick up correct default here depending on kernel
-    // version
+#ifdef PORTOD
+    bool supportQuota = ext4_support_project(config().volumes().volume_dir().c_str()) == 0;
+    bool supportOvl = SupportOverlayfs();
+    std::cerr << "Q " << supportQuota << " " << supportOvl << std::endl;
+    config().mutable_volumes()->set_native(supportQuota && supportOvl);
+#else
     config().mutable_volumes()->set_native(false);
+#endif
     config().mutable_volumes()->set_enabled(true);
 
     config().mutable_version()->set_path("/run/portod.version");

@@ -401,3 +401,15 @@ TError PivotRoot(const TPath &rootfs) {
 
     return TError::Success();
 }
+
+bool SupportOverlayfs() {
+    (void)mount("/", "/", "overlay", 0, "");
+    if (errno == EINVAL) {
+        return true;
+    } else if (errno == ENODEV) {
+        return false;
+    } else {
+        L_ERR() << "Unexpected errno when testing for overlayfs " << errno << std::endl;
+        return false;
+    }
+}
