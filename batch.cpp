@@ -36,9 +36,8 @@ TError TBatchTask::RunAsync(TContext &context) {
         close(pfd[1]);
         return TError(EError::Unknown, "fork(batch)");
     } else if (pid == 0) {
-        close(pfd[0]);
         /* Child */
-        CloseFds(-1, { TLogger::GetFd(), pfd[1] });
+        CloseFds(-1, { TLogger::GetFd(), pfd[1] }, true);
         SetProcessName("portod-batch");
         SetDieOnParentExit();
         TError error = Task();

@@ -60,7 +60,7 @@ def generate_conf(script, name, rootfs, meta, vroot)
   #config["user"] = meta["config"]["User"] if meta["config"]["User"]
   cmd.each { |s| config["command"] += " \"#{escape_arg(s)}\"" }
 
-  config["env"] = '$ENV; '
+  config["env"] = '$ENVIRON; '
   env.each { |s| config["env"] += "#{escape_env(s)};" }
   config["bind"] = '$BIND;'
 
@@ -78,14 +78,15 @@ def generate_conf(script, name, rootfs, meta, vroot)
 set -e
 set -x
 
-OPTS='e:v:'
+OPTS='e:v:q:'
 getopt -Qq "$OPTS" $*
 set -- $(getopt "$OPTS" $*)
 
 while [ ! "$1" = "--" ]; do
   case "$1" in
-  -e) ENV="$2"; shift; ;;
+  -e) ENVIRON="$2"; shift; ;;
   -v) BIND=$(echo "$2" | sed -e 's/:/ /g'); shift; ;;
+  -q) QUOTA="$2"; shift; ;;
   *) echo "Unknown argumen $1"; exit 1; ;;
   esac
   shift
@@ -95,7 +96,7 @@ shift
 cleanup() { portoctl vdestroy #{vdir}; }
 trap cleanup EXIT
 
-portoctl vcreate #{vdir} #{rootfs}
+portoctl vcreate #{vdir} #{rootfs} $QUOTA
 portoctl exec #{name} #{props}
 END
 

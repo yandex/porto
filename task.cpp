@@ -118,7 +118,8 @@ TError TTask::ChildOpenStdFile(const TPath &path, int expected) {
     if (ret != expected)
         return TError(EError::Unknown, EINVAL,
                       "open(" + path.ToString() + ") -> " +
-                      std::to_string(expected) + ": unexpected fd");
+                      std::to_string(expected) + ": unexpected fd " +
+                      std::to_string(ret));
 
     ret = fchown(ret, Env->Cred.Uid, Env->Cred.Gid);
     if (ret < 0)

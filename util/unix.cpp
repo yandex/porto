@@ -272,40 +272,37 @@ int64_t GetBootTime() {
     return 0;
 }
 
-void CloseFds(int max, const std::vector<int> &except) {
+void CloseFds(int max, const std::set<int> &except, bool openStd) {
     if (max < 0)
         max = getdtablesize();
 
-    for (int i = 0; i < max; i++)
-        if (std::find(except.begin(), except.end(), i) == except.end())
-            close(i);
+    for (int i = 0; i < max; i++) {
+        if (std::find(except.begin(), except.end(), i) != except.end())
+            continue;
+
+        close(i);
+
+        if (i < 3 && openStd) {
+            int fd = open("/dev/null", O_RDWR);
+            if (fd != i)
+                L_ERR() << "Got unexpected std fd " << fd << ", expected " << i << std::endl;
+        }
+    }
 }
 
 TError AllocLoop(const TPath &path, size_t size) {
     TError error;
     TScopedFd fd;
-    uint8_t ch = 0;
     int status;
+    std::vector<std::string> lines;
 
     fd = open(path.ToString().c_str(), O_WRONLY | O_CREAT | O_EXCL, 0755);
     if (fd.GetFd() < 0)
         return TError(EError::Unknown, errno, "open(" + path.ToString() + ")");
 
-    int ret = ftruncate(fd.GetFd(), 0);
+    int ret = ftruncate(fd.GetFd(), size);
     if (ret < 0) {
         error = TError(EError::Unknown, errno, "truncate(" + path.ToString() + ")");
-        goto remove_file;
-    }
-
-    ret = lseek(fd.GetFd(), size - 1, SEEK_SET);
-    if (ret < 0) {
-        error = TError(EError::Unknown, errno, "lseek(" + path.ToString() + ")");
-        goto remove_file;
-    }
-
-    ret = write(fd.GetFd(), &ch, sizeof(ch));
-    if (ret < 0) {
-        error = TError(EError::Unknown, errno, "write(" + path.ToString() + ")");
         goto remove_file;
     }
 

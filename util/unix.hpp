@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <vector>
+#include <set>
 
 #include "common.hpp"
 #include "util/signal.hpp"
@@ -26,7 +27,7 @@ TError SetHostName(const std::string &name);
 bool FdHasEvent(int fd);
 TError DropBoundedCap(int cap);
 TError SetCap(uint64_t effective, uint64_t permitted, uint64_t inheritable);
-void CloseFds(int max, const std::vector<int> &except);
+void CloseFds(int max, const std::set<int> &except, bool openStd = false);
 
 class TScopedFd : public TNonCopyable {
     int Fd;

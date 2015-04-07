@@ -16,10 +16,14 @@ static TLogBuf logBuf(1024);
 static std::ostream logStream(&logBuf);
 
 void TLogger::OpenLog(bool std, const TPath &path, const unsigned int mode) {
-    if (std)
-        logBuf.SetFd(STDOUT_FILENO);
-    else
+    if (std) {
+        // because in task.cpp we expect that nothing should be in 0-2 fd,
+        // we need to duplicate our std log somewhere else
+        dup2(STDOUT_FILENO, 1024);
+        logBuf.SetFd(1024);
+    } else {
         logBuf.Open(path, mode);
+    }
 }
 
 void TLogger::DisableLog() {
