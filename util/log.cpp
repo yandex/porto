@@ -19,8 +19,7 @@ void TLogger::OpenLog(bool std, const TPath &path, const unsigned int mode) {
     if (std) {
         // because in task.cpp we expect that nothing should be in 0-2 fd,
         // we need to duplicate our std log somewhere else
-        dup2(STDOUT_FILENO, 1024);
-        logBuf.SetFd(1024);
+        logBuf.SetFd(dup(STDOUT_FILENO));
     } else {
         logBuf.Open(path, mode);
     }
@@ -39,7 +38,7 @@ void TLogger::CloseLog() {
     int fd = logBuf.GetFd();
     if (fd > 2)
         close(fd);
-    logBuf.SetFd(STDOUT_FILENO);
+    logBuf.SetFd(dup(STDOUT_FILENO));
 }
 
 static std::string GetTime() {
