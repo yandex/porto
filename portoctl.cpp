@@ -1047,7 +1047,7 @@ public:
 
 class TListCmd : public ICmd {
 public:
-    TListCmd(TPortoAPI *api) : ICmd(api, "list", 0, "[-1]", "list created containers") {}
+    TListCmd(TPortoAPI *api) : ICmd(api, "list", 0, "[-1] [-f] [-t]", "list created containers") {}
 
     size_t CountChar(const std::string &s, const char ch) {
         size_t count = 0;
