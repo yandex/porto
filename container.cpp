@@ -651,17 +651,13 @@ TError TContainer::Start() {
     auto vmode = Prop->Get<int>(P_VIRT_MODE);
     if (vmode == VIRT_MODE_OS && !CredConf.PrivilegedUser(Cred)) {
         for (auto name : Prop->List())
-            if (Prop->Find(name)->GetFlags() & OS_MODE_PROPERTY) {
-                L() << "RESET " << name << std::endl;
+            if (Prop->Find(name)->GetFlags() & OS_MODE_PROPERTY)
                 Prop->Reset(name);
-            }
     }
     else if (vmode == VIRT_MODE_DOCKER && !CredConf.PrivilegedUser(Cred)) {
         for (auto name : Prop->List())
-            if (Prop->Find(name)->GetFlags() & DOCKER_MODE_PROPERTY) {
-                L() << "RESET " << name << std::endl;
+            if (Prop->Find(name)->GetFlags() & DOCKER_MODE_PROPERTY)
                 Prop->Reset(name);
-            }
     }
 
     if (!IsRoot() && !Prop->Get<std::string>(P_COMMAND).length())
