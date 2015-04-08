@@ -77,7 +77,6 @@ void TConfig::LoadDefaults() {
 #ifdef PORTOD
     bool supportQuota = ext4_support_project(config().volumes().volume_dir().c_str()) == 0;
     bool supportOvl = SupportOverlayfs();
-    std::cerr << "Q " << supportQuota << " " << supportOvl << std::endl;
     config().mutable_volumes()->set_native(supportQuota && supportOvl);
 #else
     config().mutable_volumes()->set_native(false);
