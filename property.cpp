@@ -271,6 +271,8 @@ public:
         TError error = ValidPath(value);
         if (error)
             return error;
+        if (value == "/")
+            return TError::Success;
         error = PathAccessible(c, value, EFileAccess::Read);
         if (error)
             return error;
