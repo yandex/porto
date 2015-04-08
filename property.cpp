@@ -272,7 +272,7 @@ public:
         if (error)
             return error;
         if (value == "/")
-            return TError::Success;
+            return TError::Success();
         error = PathAccessible(c, value, EFileAccess::Read);
         if (error)
             return error;
