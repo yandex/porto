@@ -4,7 +4,7 @@ set -e
 
 BINARY=$(basename $0)
 usage() {
-	echo "Usage: $BINARY [options] <size> <image> <config>"
+	echo "Usage: $BINARY [options] <size> <image> <config> [custom config]"
 	echo "Options:"
 	echo -e "\t-T\tDon't create tar archive"
 	echo -e "\t-c\tExecute check hook"
