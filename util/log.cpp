@@ -38,7 +38,7 @@ void TLogger::CloseLog() {
     int fd = logBuf.GetFd();
     if (fd > 2)
         close(fd);
-    logBuf.SetFd(dup(STDOUT_FILENO));
+    logBuf.SetFd(STDOUT_FILENO);
 }
 
 static std::string GetTime() {
