@@ -678,8 +678,7 @@ class TRunCmd : public ICmd {
 public:
     TRunCmd(TPortoAPI *api) : ICmd(api, "run", 2, "<container> [properties]", "create and start container with given properties") {}
 
-    int Parser(string property, map<string, string> &properties) {
-        string propertyKey, propertyValue;
+    int Parser(string property, string &key, string &val) {
         string::size_type n;
         n = property.find('=');
         if (n == string::npos) {
@@ -687,26 +686,28 @@ public:
             PrintError(error, "Can't parse property (no value): " + property);
             return EXIT_FAILURE;
         }
-        propertyKey = property.substr(0, n);
-        propertyValue = property.substr(n + 1, property.size());
-        if (propertyKey == "" || propertyValue == "") {
+        key = property.substr(0, n);
+        val = property.substr(n + 1, property.size());
+        if (key == "" || val == "") {
             TError error(EError::InvalidValue, "Invalid value");
             PrintError(error, "Can't parse property (key or value is nil): " + property);
             return EXIT_FAILURE;
         }
-        properties[propertyKey] = propertyValue;
         return EXIT_SUCCESS;
     }
 
     int Execute(int argc, char *argv[]) {
         string containerName = argv[0];
-        map<string, string> properties;
+        std::vector<std::pair<std::string, std::string>> properties;
+
         int ret;
 
         for (int i = 1; i < argc; i++) {
-            ret = Parser(argv[i], properties);
+            string key, val;
+            ret = Parser(argv[i], key, val);
             if (ret)
                 return ret;
+            properties.push_back(std::make_pair(key, val));
         }
 
         ret = Api->Create(containerName);
