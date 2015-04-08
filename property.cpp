@@ -92,13 +92,23 @@ TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
     return TError::Success();
 }
 
-static TError ValidPath(std::shared_ptr<TContainer> c, const std::string &str) {
+static TError ValidPath(const std::string &str) {
     if (!str.length() || str[0] != '/')
         return TError(EError::InvalidValue, "invalid directory");
+
     return TError::Success();
 }
 
-static TError ExistingFile(std::shared_ptr<TContainer> c, const std::string &str) {
+static TError PathAccessible(std::shared_ptr<TContainer> c,
+                             const TPath &path,
+                             EFileAccess type) {
+    if (!path.AccessOk(type, c->OwnerCred))
+        return TError(EError::InvalidValue, "insufficient " + AccessTypeToString(type) + " permission for " + path.ToString());
+
+    return TError::Success();
+}
+
+static TError ExistingFile(const std::string &str) {
     TFile f(str);
     if (!f.Exists())
         return TError(EError::InvalidValue, "file doesn't exist");
@@ -155,7 +165,7 @@ static std::set<EContainerState> anyState = {
 class TCommandProperty : public TStringValue, public TContainerValue {
 public:
     TCommandProperty() :
-        TStringValue(PERSISTENT_VALUE | OS_MODE_PROPERTY),
+        TStringValue(PERSISTENT_VALUE),
         TContainerValue(P_COMMAND,
                         "Command executed upon container start",
                         staticProperty) {}
@@ -171,18 +181,31 @@ public:
 class TUserProperty : public TStringValue, public TContainerValue {
 public:
     TUserProperty() :
-        TStringValue(SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TStringValue(SUPERUSER_PROPERTY /*RESTROOT_PROPERTY*/ | PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_USER,
                         "Start command with given user",
                         staticProperty) {}
 
     TError CheckValue(const std::string &value) override {
+        auto c = GetContainer();
         TUser u(value);
-        TError error = u.Load();
-        if (error)
-            return error;
+        TError error(EError::InvalidValue, "");
 
-        GetContainer()->Cred.Uid = u.GetId();
+        if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS) {
+            TPath root = c->Prop->Get<std::string>(P_ROOT);
+            TPath passwd = root.AddComponent("etc").AddComponent("passwd");
+            if (root.ToString() != "/" && passwd.Exists())
+                error = u.LoadFromFile(passwd);
+        }
+
+        if (error) {
+            error = u.Load();
+            if (error)
+                return error;
+        }
+
+        c->TaskCred.Uid = u.GetId();
+        c->OwnerCred.Uid = u.GetId(); // TODO: remove
 
         return TError::Success();
     }
@@ -191,18 +214,31 @@ public:
 class TGroupProperty : public TStringValue, public TContainerValue {
 public:
     TGroupProperty() :
-        TStringValue(SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TStringValue(SUPERUSER_PROPERTY /*RESTROOT_PROPERTY*/ | PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_GROUP,
                         "Start command with given group",
                         staticProperty) {}
 
     TError CheckValue(const std::string &value) override {
+        auto c = GetContainer();
         TGroup g(value);
-        TError error = g.Load();
-        if (error)
-            return error;
+        TError error(EError::InvalidValue, "");
 
-        GetContainer()->Cred.Gid = g.GetId();
+        if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS) {
+            TPath root = c->Prop->Get<std::string>(P_ROOT);
+            TPath group = root.AddComponent("etc").AddComponent("group");
+            if (root.ToString() != "/" && group.Exists())
+                error = g.LoadFromFile(group);
+        }
+
+        if (error) {
+            error = g.Load();
+            if (error)
+                return error;
+        }
+
+        c->TaskCred.Gid = g.GetId();
+        c->OwnerCred.Gid = g.GetId(); // TODO: remove
 
         return TError::Success();
     }
@@ -230,7 +266,27 @@ public:
     }
 
     TError CheckValue(const std::string &value) override {
-        return ValidPath(GetContainer(), value);
+        auto c = GetContainer();
+
+        TError error = ValidPath(value);
+        if (error)
+            return error;
+        error = PathAccessible(c, value, EFileAccess::Read);
+        if (error)
+            return error;
+        error = PathAccessible(c, value, EFileAccess::Write);
+        if (error)
+            return error;
+
+        if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS) {
+            TPath root(value);
+            TPath realRoot("/");
+
+            if (root.GetType() == EFileType::Directory && root.GetDev() == realRoot.GetDev())
+                return TError(EError::Permission, "Can't start OS container on the same mount point as /");
+        }
+
+        return TError::Success();
     }
 };
 
@@ -250,7 +306,7 @@ public:
 class TCwdProperty : public TStringValue, public TContainerValue {
 public:
     TCwdProperty() :
-        TStringValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY),
+        TStringValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_CWD,
                         "Container working directory",
                         staticProperty) {}
@@ -268,14 +324,14 @@ public:
     }
 
     TError CheckValue(const std::string &value) override {
-        return ValidPath(GetContainer(), value);
+        return ValidPath(value);
     }
 };
 
 class TStdinPathProperty : public TStringValue, public TContainerValue {
 public:
     TStdinPathProperty() :
-        TStringValue(PERSISTENT_VALUE | OS_MODE_PROPERTY),
+        TStringValue(PERSISTENT_VALUE),
         TContainerValue(P_STDIN_PATH,
                         "Container standard input path",
                         staticProperty) {}
@@ -285,14 +341,20 @@ public:
     }
 
     TError CheckValue(const std::string &value) override {
-        return ExistingFile(GetContainer(), value);
+        TError error = ExistingFile(value);
+        if (error)
+            return error;
+        error = PathAccessible(GetContainer(), value, EFileAccess::Read);
+        if (error)
+            return error;
+        return TError::Success();
     }
 };
 
 class TStdoutPathProperty : public TStringValue, public TContainerValue {
 public:
     TStdoutPathProperty() :
-        TStringValue(PERSISTENT_VALUE | OS_MODE_PROPERTY),
+        TStringValue(PERSISTENT_VALUE),
         TContainerValue(P_STDOUT_PATH,
                         "Container standard input path",
                         staticProperty) {}
@@ -307,14 +369,23 @@ public:
     }
 
     TError CheckValue(const std::string &value) override {
-        return ValidPath(GetContainer(), value);
+        TError error = ValidPath(value);
+        if (error)
+            return error;
+        TPath path(value);
+        if (!path.Exists())
+            path = path.DirName();
+        error = PathAccessible(GetContainer(), path, EFileAccess::Write);
+        if (error)
+            return error;
+        return TError::Success();
     }
 };
 
 class TStderrPathProperty : public TStringValue, public TContainerValue {
 public:
     TStderrPathProperty() :
-        TStringValue(PERSISTENT_VALUE | OS_MODE_PROPERTY),
+        TStringValue(PERSISTENT_VALUE),
         TContainerValue(P_STDERR_PATH,
                         "Container standard error path",
                         staticProperty) {}
@@ -329,7 +400,16 @@ public:
     }
 
     TError CheckValue(const std::string &value) override {
-        return ValidPath(GetContainer(), value);
+        TError error = ValidPath(value);
+        if (error)
+            return error;
+        TPath path(value);
+        if (!path.Exists())
+            path = path.DirName();
+        error = PathAccessible(GetContainer(), path, EFileAccess::Write);
+        if (error)
+            return error;
+        return TError::Success();
     }
 };
 
@@ -654,7 +734,7 @@ public:
 class TIsolateProperty : public TBoolValue, public TContainerValue {
 public:
     TIsolateProperty() :
-        TBoolValue(PERSISTENT_VALUE | OS_MODE_PROPERTY | DOCKER_MODE_PROPERTY),
+        TBoolValue(PERSISTENT_VALUE | OS_MODE_PROPERTY),
         TContainerValue(P_ISOLATE,
                         "Isolate container from parent",
                         staticProperty) {}
@@ -777,7 +857,7 @@ public:
 class TBindDnsProperty : public TBoolValue, public TContainerValue {
 public:
     TBindDnsProperty() :
-        TBoolValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY | DOCKER_MODE_PROPERTY),
+        TBoolValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_BIND_DNS,
                         "Bind /etc/resolv.conf and /etc/hosts of host to container",
                         staticProperty) {}
@@ -786,9 +866,7 @@ public:
         auto c = GetContainer();
 
         auto vmode = c->Prop->Get<int>(P_VIRT_MODE);
-        if (vmode == VIRT_MODE_DOCKER)
-            return true;
-        else if (vmode == VIRT_MODE_OS)
+        if (vmode == VIRT_MODE_OS)
             return false;
 
         if (!c->Prop->Get<bool>(P_ISOLATE))
@@ -805,15 +883,15 @@ class TBindProperty : public TListValue, public TContainerValue {
 
 public:
     TBindProperty() :
-        TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY),
+        TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_BIND,
                         "Share host directories with container: <host_path> <container_path> [ro|rw]; ...",
                         staticProperty) {}
 
     TError CheckValue(const std::vector<std::string> &lines) override {
-        if (lines.size())
+        auto c = GetContainer();
 
-        BindMap.clear();
+        std::vector<TBindMap> bm;
 
         for (auto &line : lines) {
             std::vector<std::string> tok;
@@ -842,8 +920,14 @@ public:
             if (!m.Source.Exists())
                 return TError(EError::InvalidValue, "Source bind " + m.Source.ToString() + " doesn't exist");
 
-            BindMap.push_back(m);
+            error = PathAccessible(c, m.Source, m.Rdonly ? EFileAccess::Read : EFileAccess::Write);
+            if (error)
+                return error;
+
+            bm.push_back(m);
         }
+
+        BindMap = bm;
 
         return TError::Success();
     }
@@ -1100,7 +1184,7 @@ public:
 class TAllowedDevicesProperty : public TListValue, public TContainerValue {
 public:
     TAllowedDevicesProperty() :
-        TListValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | OS_MODE_PROPERTY | DOCKER_MODE_PROPERTY | HIDDEN_VALUE),
+        TListValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | HIDDEN_VALUE | OS_MODE_PROPERTY),
         TContainerValue(P_ALLOWED_DEVICES,
                         "Devices that container can create/read/write: <c|b|a> <maj>:<min> [r][m][w]; ...",
                         staticProperty) {}
@@ -1108,7 +1192,7 @@ public:
     TStrList GetDefault() const override {
         auto vmode = GetContainer()->Prop->Get<int>(P_VIRT_MODE);
 
-        if (vmode == VIRT_MODE_OS || vmode == VIRT_MODE_DOCKER)
+        if (vmode == VIRT_MODE_OS)
             return TStrList{
                 "c 1:3 rwm", "c 1:5 rwm", "c 1:7 rwm", "c 1:9 rwm",
                 "c 1:8 rwm", "c 136:* rw", "c 5:2 rwm", "c 254:0 rm",
@@ -1175,7 +1259,7 @@ class TCapabilitiesProperty : public TListValue, public TContainerValue {
 
 public:
     TCapabilitiesProperty() :
-        TListValue(PERSISTENT_VALUE | OS_MODE_PROPERTY | DOCKER_MODE_PROPERTY | SUPERUSER_PROPERTY | HIDDEN_VALUE),
+        TListValue(PERSISTENT_VALUE | SUPERUSER_PROPERTY | HIDDEN_VALUE),
         TContainerValue(P_CAPABILITIES,
                         "Limit container capabilities: list of capabilities without CAP_ prefix (man 7 capabilities)",
                         staticProperty) {}
@@ -1193,9 +1277,9 @@ public:
         TStrList v;
         auto c = GetContainer();
 
-        bool root = c->Cred.IsRoot();
+        bool root = c->OwnerCred.IsRoot();
         auto vmode = c->Prop->Get<int>(P_VIRT_MODE);
-        bool restricted = vmode == VIRT_MODE_OS || vmode == VIRT_MODE_DOCKER;
+        bool restricted = vmode == VIRT_MODE_OS;
 
         uint64_t lastCap = GetLastCap();
         for (auto kv : supported)
@@ -1236,25 +1320,51 @@ public:
     TVirtModeProperty() :
         TIntValue(PERSISTENT_VALUE | RESTROOT_PROPERTY),
         TContainerValue(P_VIRT_MODE,
-                        "Virtualization mode: os|app|docker",
+                        "Virtualization mode: os|app",
                         staticProperty) {}
 
     TError CheckValue(const int &value) override {
-        if (value != VIRT_MODE_APP && value != VIRT_MODE_OS && value != VIRT_MODE_DOCKER)
+        if (value != VIRT_MODE_APP && value != VIRT_MODE_OS)
             return TError(EError::InvalidValue, std::string("Unsupported ") + P_VIRT_MODE);
 
         return TError::Success();
     }
 
-    TError FromString(const std::string &value) override {
-        if (value == "os")
-            return Set(VIRT_MODE_OS);
-        else if (value == "app")
-            return Set(VIRT_MODE_APP);
-        else if (value == "docker")
-            return Set(VIRT_MODE_DOCKER);
+    void RevertUserAndGroup() {
+        auto c = GetContainer();
+        TError error = c->Prop->FromString(P_USER, std::to_string(c->OwnerCred.Uid));
+        if (error)
+            c->TaskCred = c->OwnerCred;
+        error = c->Prop->FromString(P_GROUP, std::to_string(c->OwnerCred.Gid));
+        if (error)
+            c->TaskCred = c->OwnerCred;
+    }
+
+    std::string ToString(const int &value) const override {
+        if (value == VIRT_MODE_OS)
+            return "os";
+        else if (value == VIRT_MODE_APP)
+            return "app";
         else
+            return "unknown";
+    }
+
+    TError FromString(const std::string &value) override {
+        if (value == "os") {
+            TError error = Set(VIRT_MODE_OS);
+            if (error)
+                return error;
+
+            // we might have read user or group from the file on virt_mode=os
+            // root, revert it back to owner
+            RevertUserAndGroup();
+
+            return TError::Success();
+        } else if (value == "app") {
+            return Set(VIRT_MODE_APP);
+        } else {
             return TError(EError::InvalidValue, std::string("Unsupported ") + P_VIRT_MODE + ": " + value);
+        }
 
     }
 };

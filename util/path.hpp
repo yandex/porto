@@ -24,6 +24,8 @@ enum class EFileAccess {
     Execute
 };
 
+std::string AccessTypeToString(EFileAccess type);
+
 class TPath {
     std::string Path;
 
@@ -63,6 +65,7 @@ public:
     std::string ToString() const;
     bool Exists() const;
     bool AccessOk(EFileAccess type) const;
+    bool AccessOk(EFileAccess type, const TCred &cred) const;
     TPath AddComponent(const TPath &component) const;
     TError Chdir() const;
     TError Chroot() const;

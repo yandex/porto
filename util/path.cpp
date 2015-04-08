@@ -10,9 +10,21 @@ extern "C" {
 #include <sys/prctl.h>
 #include <libgen.h>
 #include <linux/limits.h>
+#include <sys/syscall.h>
 }
 
 using std::string;
+
+std::string AccessTypeToString(EFileAccess type) {
+    if (type == EFileAccess::Read)
+        return "read";
+    else if (type == EFileAccess::Write)
+        return "write";
+    else if (type == EFileAccess::Execute)
+        return "execute";
+    else
+        return "unknown";
+}
 
 std::string TPath::DirNameStr() const {
     char *dup = strdup(Path.c_str());
@@ -107,6 +119,26 @@ bool TPath::AccessOk(EFileAccess type) const {
     default:
         return false;
     }
+}
+
+bool TPath::AccessOk(EFileAccess type, const TCred &cred) const {
+    int ret;
+    bool result = false;
+
+    ret = syscall(SYS_setreuid, cred.Uid, 0);
+    if (ret)
+        goto exit;
+    ret = syscall(SYS_setregid, cred.Gid, 0);
+    if (ret)
+        goto exit;
+
+    result = AccessOk(type);
+
+exit:
+    (void)syscall(SYS_setreuid, 0, 0);
+    (void)syscall(SYS_setregid, 0, 0);
+
+    return result;
 }
 
 std::string TPath::ToString() const {

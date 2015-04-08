@@ -491,7 +491,7 @@ TError TContainer::PrepareTask() {
     taskEnv->CreateCwd = Prop->IsDefault(P_ROOT) && Prop->IsDefault(P_CWD) && !UseParentNamespace();
 
     auto vmode = Prop->Get<int>(P_VIRT_MODE);
-    if (vmode == VIRT_MODE_OS || vmode == VIRT_MODE_DOCKER) {
+    if (vmode == VIRT_MODE_OS) {
         taskEnv->User = "root";
         taskEnv->Group = "root";
     } else {
@@ -557,7 +557,7 @@ TError TContainer::PrepareTask() {
             return error;
     }
 
-    error = taskEnv->Prepare();
+    error = taskEnv->Prepare(TaskCred);
     if (error)
         return error;
 
@@ -581,6 +581,8 @@ TError TContainer::Create(const TCred &cred) {
     error = Prop->Set<std::string>(P_GROUP, cred.GroupAsString());
     if (error)
         return error;
+
+    OwnerCred = TaskCred;
 
     if (Parent)
         Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
@@ -649,14 +651,9 @@ TError TContainer::Start() {
                       ContainerStateName(state));
 
     auto vmode = Prop->Get<int>(P_VIRT_MODE);
-    if (vmode == VIRT_MODE_OS && !CredConf.PrivilegedUser(Cred)) {
+    if (vmode == VIRT_MODE_OS && !CredConf.PrivilegedUser(OwnerCred)) {
         for (auto name : Prop->List())
             if (Prop->Find(name)->GetFlags() & OS_MODE_PROPERTY)
-                Prop->Reset(name);
-    }
-    else if (vmode == VIRT_MODE_DOCKER && !CredConf.PrivilegedUser(Cred)) {
-        for (auto name : Prop->List())
-            if (Prop->Find(name)->GetFlags() & DOCKER_MODE_PROPERTY)
                 Prop->Reset(name);
     }
 
@@ -666,6 +663,17 @@ TError TContainer::Start() {
     if (Prop->Get<std::string>(P_ROOT) == "/" &&
         Prop->Get<bool>(P_ROOT_RDONLY) == true)
         return TError(EError::InvalidValue, "can't make / read-only");
+
+    // since we now have a complete picture of properties, check
+    // them once again (so we don't miss something due to set order)
+    for (auto name : Prop->List()) {
+        if (Prop->IsDefault(name))
+            continue;
+
+        TError error = Prop->FromString(name, Prop->ToString(name), false);
+        if (error)
+            return error;
+    }
 
     TError error = Data->Set<uint64_t>(D_RESPAWN_COUNT, 0);
     if (error)
@@ -695,11 +703,6 @@ TError TContainer::Start() {
         if (error) {
             return error;
             FreeResources();
-        }
-    } else {
-        if (Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS) {
-            FreeResources();
-            return TError(EError::Permission, "Can't start OS container on non-loop backed root");
         }
     }
 
@@ -1052,7 +1055,7 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
         if (Prop->ToString(property) != value)
             return TError(EError::Permission, "Only root can change this property");
 
-    if (Prop->HasFlags(property, RESTROOT_PROPERTY) && !superuser && !CredConf.RestrictedUser(Cred))
+    if (Prop->HasFlags(property, RESTROOT_PROPERTY) && !superuser && !CredConf.RestrictedUser(OwnerCred))
         return TError(EError::Permission, "Only restricted root can change this property");
 
     if (!Prop->HasState(property, GetState()))
@@ -1419,7 +1422,7 @@ TError TContainer::CheckPermission(const TCred &ucred) {
     if (IsRoot())
         return TError::Success();
 
-    if (Cred == ucred)
+    if (OwnerCred == ucred)
         return TError::Success();
 
     return TError(EError::Permission, "Permission error");

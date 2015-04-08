@@ -42,13 +42,11 @@ static int lastCap;
 
 // TTaskEnv
 
-TError TTaskEnv::Prepare() {
+TError TTaskEnv::Prepare(const TCred &cred) {
     if (Command.empty())
         return TError::Success();
 
-    TError error = Cred.Parse(User, Group);
-    if (error)
-        return error;
+    Cred = cred;
 
     return TError::Success();
 }
@@ -170,7 +168,6 @@ TError TTask::ChildApplyCapabilities() {
             TError error = DropBoundedCap(i);
             if (error)
                 return error;
-
         }
     }
 

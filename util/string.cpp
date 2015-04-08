@@ -202,3 +202,15 @@ std::string StringRemoveRepeating(const std::string &str, const char rc) {
 bool StringOnlyDigits(const std::string &s) {
     return s.find_first_not_of("0123456789") == std::string::npos;
 }
+
+std::string StringReplaceAll(const std::string &str, const std::string &from, const std::string &to) {
+    std::string copy(str);
+
+    std::string::size_type n = 0;
+    while ((n = copy.find(from, n)) != std::string::npos) {
+        copy.replace(n, from.size(), to);
+        n += to.size();
+    }
+
+    return copy;
+}

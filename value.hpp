@@ -227,7 +227,7 @@ public:
     TError Sync();
 
     std::string ToString(const std::string &name) const;
-    TError FromString(const std::string &name, const std::string &value);
+    TError FromString(const std::string &name, const std::string &value, bool apply = true);
 
     template<typename T>
     const T Get(const std::string &name) const {

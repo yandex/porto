@@ -97,7 +97,7 @@ public:
     TNlAddr DefaultGw;
     std::map<std::string, TIpMap> IpMap;
 
-    TError Prepare();
+    TError Prepare(const TCred &cred);
     const char** GetEnvp() const;
 };
 

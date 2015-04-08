@@ -6,6 +6,8 @@
 #include "common.hpp"
 #include "util/string.hpp"
 
+class TPath;
+
 class TUserEntry : public TNonCopyable {
 protected:
     std::string Name;
@@ -17,6 +19,7 @@ public:
     TUserEntry(const int id) : Name(""), Id(id) {}
     std::string GetName();
     int GetId();
+    TError LoadFromFile(const TPath &path);
 };
 
 class TUser : public TUserEntry {

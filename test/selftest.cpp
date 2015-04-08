@@ -61,14 +61,15 @@ static std::string StartWaitAndGetData(TPortoAPI &api, const std::string &name, 
 }
 
 static void RemakeDir(TPortoAPI &api, const TPath &path) {
-    bool drop = geteuid() != 0;
     TFolder f(path);
-    if (drop)
-        AsRoot(api);
-    if (f.Exists())
+    if (f.Exists()) {
+        bool drop = geteuid() != 0;
+        if (drop)
+            AsRoot(api);
         ExpectSuccess(f.Remove(true));
-    if (drop)
-        AsNobody(api);
+        if (drop)
+            AsNobody(api);
+    }
     ExpectSuccess(f.Create(0755, true));
 }
 
@@ -1352,6 +1353,7 @@ static void TestRootProperty(TPortoAPI &api) {
     Say() << "Make sure root is empty" << std::endl;
 
     ExpectApiSuccess(api.Create(name));
+    RemakeDir(api, path);
 
     ExpectApiSuccess(api.SetProperty(name, "command", "ls"));
     ExpectApiSuccess(api.SetProperty(name, "root", path));
@@ -1369,7 +1371,7 @@ static void TestRootProperty(TPortoAPI &api) {
     RemakeDir(api, path);
 
     AsRoot(api);
-    BootstrapCommand("/bin/sleep", path);
+    BootstrapCommand("/bin/sleep", path, false);
     BootstrapCommand("/bin/pwd", path, false);
     BootstrapCommand("/bin/ls", path, false);
     AsNobody(api);
@@ -1429,8 +1431,9 @@ static void TestRootProperty(TPortoAPI &api) {
 
     Say() << "Check /proc restrictions" << std::endl;
 
+    RemakeDir(api, path);
     AsRoot(api);
-    BootstrapCommand("/bin/cat", path);
+    BootstrapCommand("/bin/cat", path, false);
     AsNobody(api);
 
     ExpectApiSuccess(api.SetProperty(name, "command", "/cat /proc/self/mountinfo"));
@@ -1486,7 +1489,7 @@ static void TestHostnameProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Create(name));
 
     AsRoot(api);
-    BootstrapCommand("/bin/hostname", path);
+    BootstrapCommand("/bin/hostname", path, false);
     BootstrapCommand("/bin/sleep", path, false);
     AsNobody(api);
     ExpectApiSuccess(api.SetProperty(name, "root", path));
@@ -1527,8 +1530,9 @@ static void TestHostnameProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check /etc/hostname" << std::endl;
+    RemakeDir(api, path);
     AsRoot(api);
-    BootstrapCommand("/bin/cat", path);
+    BootstrapCommand("/bin/cat", path, false);
     AsNobody(api);
 
     TFolder d(path + "/etc");
@@ -1565,7 +1569,8 @@ static void TestBindProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "bind", "/tmp /bin ro"));
     ExpectApiSuccess(api.SetProperty(name, "bind", "/tmp /bin rw"));
     ExpectApiFailure(api.SetProperty(name, "bind", "/tmp /bin ro; q"), EError::InvalidValue);
-    ExpectApiSuccess(api.SetProperty(name, "bind", "/tmp /bin ro; /bin /sbin"));
+    ExpectApiSuccess(api.SetProperty(name, "bind", "/tmp /bin ro; /tmp /sbin"));
+    ExpectApiFailure(api.SetProperty(name, "bind", "/bin /sbin"), EError::InvalidValue);
 
     Say() << "Check bind without root isolation" << std::endl;
     string path = config().container().tmp_dir() + "/" + name;
@@ -1588,10 +1593,10 @@ static void TestBindProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Stop(name));
 
     path = TMPDIR + "/" + name;
-    RemakeDir(api, path);
 
+    RemakeDir(api, path);
     AsRoot(api);
-    BootstrapCommand("/bin/cat", path);
+    BootstrapCommand("/bin/cat", path, false);
     AsNobody(api);
 
     ExpectApiSuccess(api.SetProperty(name, "command", "/cat /proc/self/mountinfo"));
@@ -2844,8 +2849,7 @@ static void TestVirtModeProperty(TPortoAPI &api) {
         ExpectEq(s, kv.second);
     }
 
-    ExpectApiSuccess(api.SetProperty(name, "root", "/tmp"));
-    ExpectApiFailure(api.Start(name), EError::Permission);
+    ExpectApiFailure(api.SetProperty(name, "root", "/tmp"), EError::Permission);
 
     Say() << "Check credentials and default roolback" << std::endl;
 

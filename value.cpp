@@ -113,7 +113,7 @@ std::string TListValue::ToString(const TStrList &value) const {
     for (auto v : value) {
         if (str.str().length())
             str << "; ";
-        str << v;
+        str << StringReplaceAll(v, ";", "\\;");
     }
 
     return str.str();
@@ -327,14 +327,14 @@ std::string TValueMap::ToString(const std::string &name) const {
     return Find(name)->ToString();
 }
 
-TError TValueMap::FromString(const std::string &name, const std::string &value) {
+TError TValueMap::FromString(const std::string &name, const std::string &value, bool apply) {
     bool resetOnDefault = HasValue(name) && Find(name)->DefaultString() == value;
 
     TError error = Find(name)->FromString(value);
     if (error)
         return error;
 
-    if (KvNode && Find(name)->GetFlags() & PERSISTENT_VALUE)
+    if (apply && KvNode && Find(name)->GetFlags() & PERSISTENT_VALUE)
         error = KvNode->Append(name, value);
 
     if (resetOnDefault)
