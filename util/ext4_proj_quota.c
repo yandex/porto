@@ -83,6 +83,7 @@ static int find_mountpoint(const char *path, struct stat *path_st,
 		*device = strdup(strsep(&ptr, " "));
 		goto found;
 	}
+	fclose(file);
 
 parse_mounts:
 	/* for older versions */
@@ -107,6 +108,7 @@ not_found:
 	return -1;
 
 found:
+	fclose(file);
 	free(buf);
 	if (!*fstype || !*device) {
 		free(*fstype);
