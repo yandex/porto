@@ -490,14 +490,13 @@ TError TContainer::PrepareTask() {
     taskEnv->RootRdOnly = Prop->Get<bool>(P_ROOT_RDONLY);
     taskEnv->CreateCwd = Prop->IsDefault(P_ROOT) && Prop->IsDefault(P_CWD) && !UseParentNamespace();
 
+    TCred cred(OwnerCred);
     auto vmode = Prop->Get<int>(P_VIRT_MODE);
     if (vmode == VIRT_MODE_OS) {
         taskEnv->User = "root";
-        taskEnv->Group = "root";
-        TaskCred.Uid = TaskCred.Gid = 0;
+        cred.Uid = cred.Gid = 0;
     } else {
         taskEnv->User = Prop->Get<std::string>(P_USER);
-        taskEnv->Group = Prop->Get<std::string>(P_GROUP);
     }
 
     taskEnv->Environ.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
@@ -558,7 +557,7 @@ TError TContainer::PrepareTask() {
             return error;
     }
 
-    error = taskEnv->Prepare(TaskCred);
+    error = taskEnv->Prepare(cred);
     if (error)
         return error;
 
@@ -575,6 +574,8 @@ TError TContainer::Create(const TCred &cred) {
         return error;
     }
 
+    OwnerCred = cred;
+
     error = Prop->Set<std::string>(P_USER, cred.UserAsString());
     if (error)
         return error;
@@ -582,8 +583,6 @@ TError TContainer::Create(const TCred &cred) {
     error = Prop->Set<std::string>(P_GROUP, cred.GroupAsString());
     if (error)
         return error;
-
-    OwnerCred = TaskCred;
 
     if (Parent)
         Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));

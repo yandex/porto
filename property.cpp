@@ -181,7 +181,7 @@ public:
 class TUserProperty : public TStringValue, public TContainerValue {
 public:
     TUserProperty() :
-        TStringValue(SUPERUSER_PROPERTY /*RESTROOT_PROPERTY*/ | PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TStringValue(SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_USER,
                         "Start command with given user",
                         staticProperty) {}
@@ -204,8 +204,7 @@ public:
                 return error;
         }
 
-        c->TaskCred.Uid = u.GetId();
-        c->OwnerCred.Uid = u.GetId(); // TODO: remove
+        c->OwnerCred.Uid = u.GetId();
 
         return TError::Success();
     }
@@ -214,7 +213,7 @@ public:
 class TGroupProperty : public TStringValue, public TContainerValue {
 public:
     TGroupProperty() :
-        TStringValue(SUPERUSER_PROPERTY /*RESTROOT_PROPERTY*/ | PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TStringValue(SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_GROUP,
                         "Start command with given group",
                         staticProperty) {}
@@ -237,8 +236,7 @@ public:
                 return error;
         }
 
-        c->TaskCred.Gid = g.GetId();
-        c->OwnerCred.Gid = g.GetId(); // TODO: remove
+        c->OwnerCred.Gid = g.GetId();
 
         return TError::Success();
     }
@@ -1332,36 +1330,18 @@ public:
         return TError::Success();
     }
 
-    void RevertUserAndGroup() {
-        auto c = GetContainer();
-        TError error = c->Prop->FromString(P_USER, std::to_string(c->OwnerCred.Uid));
-        if (error)
-            c->TaskCred = c->OwnerCred;
-        error = c->Prop->FromString(P_GROUP, std::to_string(c->OwnerCred.Gid));
-        if (error)
-            c->TaskCred = c->OwnerCred;
-    }
-
     std::string ToString(const int &value) const override {
         if (value == VIRT_MODE_OS)
             return "os";
         else if (value == VIRT_MODE_APP)
             return "app";
         else
-            return "unknown";
+            return "unknown " + std::to_string(value);
     }
 
     TError FromString(const std::string &value) override {
         if (value == "app") {
-            TError error = Set(VIRT_MODE_APP);
-            if (error)
-                return error;
-
-            // we might have read user or group from the file on virt_mode=os
-            // root, revert it back to owner
-            RevertUserAndGroup();
-
-            return TError::Success();
+            return Set(VIRT_MODE_APP);
         } else if (value == "os") {
             return Set(VIRT_MODE_OS);
         } else {

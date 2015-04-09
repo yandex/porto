@@ -699,7 +699,7 @@ TError TTask::CreateCwd() {
         TError error = Cwd->Create(0755, true);
         if (error)
             return error;
-        error = Env->Cwd.Chown(Env->User, Env->Group);
+        error = Env->Cwd.Chown(Env->Cred.Uid, Env->Cred.Gid);
         if (error)
             return error;
     }

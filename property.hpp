@@ -53,9 +53,8 @@ constexpr const char *P_DEFAULT_GW = "default_gw";
 constexpr const char *P_VIRT_MODE = "virt_mode";
 constexpr const char *P_AGING_TIME = "aging_time";
 
-constexpr int VIRT_MODE_APP = 1;
-constexpr int VIRT_MODE_OS = 2;
-constexpr int VIRT_MODE_DOCKER = 3;
+constexpr int VIRT_MODE_APP = 0;
+constexpr int VIRT_MODE_OS = 1;
 
 class TBindMap;
 class TNetCfg;

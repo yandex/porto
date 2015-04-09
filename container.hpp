@@ -84,7 +84,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
 public:
     TCred OwnerCred;
-    TCred TaskCred;
 
     // TODO: make private
     std::unique_ptr<TTask> Task;
