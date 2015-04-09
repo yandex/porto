@@ -1029,6 +1029,43 @@ public:
     }
 };
 
+class TFindCmd : public ICmd {
+public:
+    TFindCmd(TPortoAPI *api) : ICmd(api, "find", 1, "", "find container for given process id") {}
+
+    int Execute(int argc, char *argv[]) {
+        int pid;
+        TError error = StringToInt(argv[0], pid);
+        if (error) {
+            std::cerr << "Can't parse pid " << argv[0] << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        std::map<std::string, std::string> cgmap;
+        error = GetTaskCgroups(pid, cgmap);
+        if (error) {
+            std::cerr << "Can't read /proc/" << pid << "/cgroup, is process alive?" << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        if (cgmap.find("freezer") == cgmap.end()) {
+            std::cerr << "Process " << pid << " is not part of freezer cgroup" << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        auto freezer = cgmap["freezer"];
+        auto prefix = "/" + PORTO_ROOT_CGROUP + "/";
+        if (freezer.length() < prefix.length() || freezer.substr(0, prefix.length()) != prefix) {
+            std::cerr << "Process " << pid << " is not managed by porto" << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        Print(freezer.replace(0, prefix.length(), ""));
+
+        return EXIT_SUCCESS;
+    }
+};
+
 class TDestroyCmd : public ICmd {
 public:
     TDestroyCmd(TPortoAPI *api) : ICmd(api, "destroy", 1, "<name> [name...]", "destroy container") {}
@@ -1346,6 +1383,7 @@ int main(int argc, char *argv[]) {
     RegisterCommand(new TRunCmd(&api));
     RegisterCommand(new TExecCmd(&api));
     RegisterCommand(new TGcCmd(&api));
+    RegisterCommand(new TFindCmd(&api));
 
     RegisterCommand(new TCreateVolumeCmd(&api));
     RegisterCommand(new TDestroyVolumeCmd(&api));
