@@ -93,7 +93,7 @@ unsigned int TPath::GetMode() const {
 }
 
 unsigned int TPath::GetDev() const {
-    return Stat([](struct stat *st) { return st->st_rdev; });
+    return Stat([](struct stat *st) { return st->st_dev; });
 }
 
 unsigned int TPath::GetUid() const {
