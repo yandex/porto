@@ -89,6 +89,13 @@ public:
             return error;
         }
 
+        // fix permissions after extracting
+        error = Volume->GetPath().Chown(Volume->GetCred().Uid, Volume->GetCred().Gid);
+        if (error) {
+            (void)Deconstruct();
+            return error;
+        }
+
         return TError::Success();
     }
 
@@ -385,7 +392,7 @@ TError TVolume::Create(std::shared_ptr<TKeyValueStorage> storage,
     if (error)
         goto remove_volume;
 
-    error = dir.GetPath().Chown(Cred);
+    error = path.Chown(Cred.Uid, Cred.Gid);
     if (error)
         goto remove_volume;
 

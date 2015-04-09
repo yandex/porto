@@ -271,14 +271,14 @@ public:
         TError error = ValidPath(value);
         if (error)
             return error;
-        if (value == "/")
-            return TError::Success();
-        error = PathAccessible(c, value, EFileAccess::Read);
-        if (error)
-            return error;
-        error = PathAccessible(c, value, EFileAccess::Write);
-        if (error)
-            return error;
+        if (value != "/") {
+            error = PathAccessible(c, value, EFileAccess::Read);
+            if (error)
+                return error;
+            error = PathAccessible(c, value, EFileAccess::Write);
+            if (error)
+                return error;
+        }
 
         if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS) {
             TPath root(value);
@@ -1352,8 +1352,8 @@ public:
     }
 
     TError FromString(const std::string &value) override {
-        if (value == "os") {
-            TError error = Set(VIRT_MODE_OS);
+        if (value == "app") {
+            TError error = Set(VIRT_MODE_APP);
             if (error)
                 return error;
 
@@ -1362,8 +1362,8 @@ public:
             RevertUserAndGroup();
 
             return TError::Success();
-        } else if (value == "app") {
-            return Set(VIRT_MODE_APP);
+        } else if (value == "os") {
+            return Set(VIRT_MODE_OS);
         } else {
             return TError(EError::InvalidValue, std::string("Unsupported ") + P_VIRT_MODE + ": " + value);
         }

@@ -494,6 +494,7 @@ TError TContainer::PrepareTask() {
     if (vmode == VIRT_MODE_OS) {
         taskEnv->User = "root";
         taskEnv->Group = "root";
+        TaskCred.Uid = TaskCred.Gid = 0;
     } else {
         taskEnv->User = Prop->Get<std::string>(P_USER);
         taskEnv->Group = Prop->Get<std::string>(P_GROUP);
