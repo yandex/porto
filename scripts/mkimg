@@ -73,11 +73,13 @@ say() {
 run() { say "$@"; eval "$@"; }
 
 TMPDIR=$(mktemp -d)
+CGTMPDIR=$(mktemp -d)
 cleanup() {
 	set +e
 	[ $CLEANUP -eq 0 ] && pexec iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE &> /dev/null
 	[ $CLEANUP -eq 0 ] && pexec ip link delete veth0 &> /dev/null
 	[ -d $TMPDIR ] && rmdir $TMPDIR
+	[ -d $CGTMPDIR ] && rmdir $CGTMPDIR
 	[ $CLEANUP -eq 0 ] && pctl destroy $CONTAINER
 }
 
@@ -127,7 +129,7 @@ initnet() {
 }
 
 prepare() {
-	pctl run $CONTAINER command="/sbin/init" root="$IMAGE" hostname="$(hostname -f)" user=root group=root bind="$CONF /config ro; $BIND_PROPERTY" bind_dns=false allowed_devices="$ALLOWED_DEVICES" net="host veth1" default_gw="192.168.1.2" ip="veth1 192.168.1.1/24" stdout_path="/dev/null" stderr_path="/dev/null"
+	pctl run $CONTAINER command="/sbin/init" root="$IMAGE" hostname="$(hostname -f)" user=root group=root bind="$CONF /config ro; $BIND_PROPERTY; $CGTMPDIR /sys/fs/cgroup ro" bind_dns=false allowed_devices="$ALLOWED_DEVICES" net="host veth1" default_gw="192.168.1.2" ip="veth1 192.168.1.1/24" stdout_path="/dev/null" stderr_path="/dev/null"
 
 	pctl exec $CONTAINER/prepare command="bash -c '/config prepare'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
 	[ -z "$CUSTOM" ] || pctl exec $CONTAINER/prepare command="bash -c '/custom_config'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
