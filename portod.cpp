@@ -270,7 +270,10 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
             L() << "read(pid): " << strerror(errno) << std::endl;
             return 0;
         }
+retry:
         if (read(fd, &status, sizeof(status)) < 0) {
+            if (errno == EAGAIN)
+                goto retry;
             L() << "read(status): " << strerror(errno) << std::endl;
             return 0;
         }
