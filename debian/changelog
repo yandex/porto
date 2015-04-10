@@ -1,3 +1,27 @@
+yandex-porto (1.2) precise; urgency=low
+
+  * Use cp -a to copy volume resource data (fixes wrong links)
+  * Add container name to stdout/stderr default paths
+  * Hide allowed_devices and capabilities properties
+  * Remove cpu_priority property
+  * Support numeric ids in user/group properties
+  * Change cgroup stop timeout from 1s to 30s
+  * Add aging_time property
+  * Enable volumes support by default and automatically detect best backend (loop/overlayfs)
+  * Increase cgconfig wait timeout to 1m
+  * Rework docker2porto script which downloads docker image and converts it to porto (doesn't rely on docker binary anymore)
+  * Add memory_usage to porto_stat
+  * python: fix variant decoding
+  * portod: print warning when message is longer than expected
+  * portod: move daemon into cgroup and set 1g memory limit
+  * portoctl: add gc command
+  * portoctl: add find command
+  * portoctl: don't show time for dead containers in list
+  * portoctl: add -f option in list to print ascii art
+  * portoctl: add -t option in list to show topmost containers
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 07 Apr 2015 16:41:00 +0400
+
 yandex-porto (1.1) precise; urgency=low
 
   * Fix memory leak
