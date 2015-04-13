@@ -43,7 +43,7 @@ TError TFolder::Create(mode_t mode, bool recursive) const {
     }
 
     if (mkdir(Path.ToString().c_str(), mode) < 0)
-        return TError(EError::Unknown, errno, "mkdir(" + Path.ToString() + ", " + std::to_string(mode) + ")");
+        return TError(errno == ENOSPC ? EError::NoSpace : EError::Unknown, errno, "mkdir(" + Path.ToString() + ", " + std::to_string(mode) + ")");
 
     return TError::Success();
 }
