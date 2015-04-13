@@ -53,7 +53,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     // data
     bool HaveRunningChildren();
-    void SetState(EContainerState newState);
+    void SetState(EContainerState newState, bool tree = false);
     std::string ContainerStateName(EContainerState state);
 
     TError ApplyDynamicProperties();
@@ -116,7 +116,7 @@ public:
     std::vector<pid_t> Processes();
 
     TError Create(const TCred &cred);
-    void Destroy();
+    TError Destroy();
     TError Start();
     TError Stop();
     TError Pause();

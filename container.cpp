@@ -118,7 +118,12 @@ TError TContainer::GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m)
     return Tclass->GetStat(stat, m);
 }
 
-void TContainer::SetState(EContainerState newState) {
+void TContainer::SetState(EContainerState newState, bool tree) {
+    if (tree)
+        for (auto iter : Children)
+            if (auto child = iter.lock())
+                child->SetState(newState, tree);
+
     if (State == newState)
         return;
 
@@ -143,14 +148,23 @@ const string TContainer::StripParentName(const string &name) const {
         return string(name.begin() + n + 1, name.end());
 }
 
-void TContainer::Destroy() {
+TError TContainer::Destroy() {
     L() << "Destroy " << GetName() << " " << Id << std::endl;
 
-    if (GetState() == EContainerState::Paused)
-        Resume();
+    if (GetState() == EContainerState::Paused) {
+        TError error = Resume();
+        if (error)
+            return error;
+    }
 
-    Kill(SIGKILL);
-    Stop();
+    if (GetState() == EContainerState::Running)
+        (void)Kill(SIGKILL);
+
+    if (GetState() != EContainerState::Stopped) {
+        TError error = Stop();
+        if (error)
+            return error;
+    }
 
     if (Parent)
         for (auto iter = Children.begin(); iter != Children.end();) {
@@ -165,6 +179,8 @@ void TContainer::Destroy() {
             }
             iter++;
         }
+
+    return TError::Success();
 }
 
 const string TContainer::GetName(bool recursive, const std::string &sep) const {
@@ -788,8 +804,11 @@ TError TContainer::KillAll() {
 void TContainer::StopChildren() {
     for (auto iter : Children)
         if (auto child = iter.lock())
-            if (child->GetState() != EContainerState::Stopped)
-                child->Stop();
+            if (child->GetState() != EContainerState::Stopped) {
+                TError error = child->Stop();
+                if (error)
+                    L_ERR() << "Can't stop child " << child->GetName() << ": " << error << std::endl;
+            }
 }
 
 TError TContainer::PrepareResources() {
@@ -852,13 +871,17 @@ TError TContainer::Stop() {
         AckExitStatus(pid);
 
         TError error = KillAll();
-        if (error)
+        if (error) {
             L_ERR() << "Can't kill all tasks in container: " << error << std::endl;
+            return error;
+        }
 
         int ret = SleepWhile(config().container().stop_timeout_ms(),
                              [&]{ kill(pid, 0); return errno != ESRCH; });
-        if (ret)
+        if (ret) {
             L_ERR() << "Can't wait for container to stop" << std::endl;
+            return TError(EError::Unknown, "Container didn't stop in " + std::to_string(config().container().stop_timeout_ms()) + "ms");
+        }
 
         Task->DeliverExitStatus(-1);
     }
@@ -885,7 +908,7 @@ TError TContainer::Pause() {
         return error;
     }
 
-    SetState(EContainerState::Paused);
+    SetState(EContainerState::Paused, true);
     return TError::Success();
 }
 
@@ -895,6 +918,10 @@ TError TContainer::Resume() {
         return TError(EError::InvalidState, "invalid container state " +
                       ContainerStateName(state));
 
+    for (auto p = Parent; p; p = p->Parent)
+        if (p->GetState() == EContainerState::Paused)
+            return TError(EError::InvalidState, "parent " + p->GetName() + " is paused");
+
     auto cg = GetLeafCgroup(freezerSubsystem);
     TError error(freezerSubsystem->Unfreeze(cg));
     if (error) {
@@ -902,7 +929,7 @@ TError TContainer::Resume() {
         return error;
     }
 
-    SetState(EContainerState::Running);
+    SetState(EContainerState::Running, true);
     return TError::Success();
 }
 

@@ -143,11 +143,20 @@ std::shared_ptr<TContainer> TContainerHolder::Get(const std::string &name) {
 
 TError TContainerHolder::_Destroy(const std::string &name) {
     auto c = Containers[name];
-    for (auto child: c->GetChildren())
-        _Destroy(child);
+
+    (void)c->Resume();
+
+    for (auto child: c->GetChildren()) {
+        TError error = _Destroy(child);
+        if (error)
+            return error;
+    }
+
+    TError error = c->Destroy();
+    if (error)
+        return error;
 
     IdMap.Put(c->GetId());
-    c->Destroy();
     Containers.erase(name);
     Statistics->Created--;
 
