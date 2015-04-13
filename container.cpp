@@ -858,7 +858,7 @@ TError TContainer::Stop() {
         int ret = SleepWhile(config().container().stop_timeout_ms(),
                              [&]{ kill(pid, 0); return errno != ESRCH; });
         if (ret)
-            L() << "Error while waiting for container to stop" << std::endl;
+            L_ERR() << "Can't wait for container to stop" << std::endl;
 
         Task->DeliverExitStatus(-1);
     }

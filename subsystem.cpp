@@ -165,7 +165,7 @@ TError TFreezerSubsystem::WaitState(std::shared_ptr<TCgroup> cg,
         string s = "?";
         (void)cg->GetKnobValue("freezer.state", s);
 
-        TError error(EError::Unknown, "Can't wait for freezer state " + state + ", current state is " + s);
+        TError error(EError::Unknown, "Can't wait " + std::to_string(config().daemon().freezer_wait_timeout_s()) + "s for freezer state " + state + ", current state is " + s);
         if (error)
             L_ERR() << cg->Relpath() << ": " << error << std::endl;
         return error;
