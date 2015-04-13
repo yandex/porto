@@ -73,6 +73,9 @@ TError TFolder::Remove(bool recursive, bool silent) const {
     if (!silent)
         L() << "rmdir " << Path << std::endl;
 
+    if (!Path.Exists())
+        return TError::Success();
+
     int ret = RetryBusy(10, 100, [&]{ return rmdir(Path.ToString().c_str()); });
     if (ret)
         return TError(EError::Unknown, errno, "rmdir(" + Path.ToString() + ")");

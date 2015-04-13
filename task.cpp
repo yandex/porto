@@ -716,7 +716,8 @@ TError TTask::Start() {
     if (Env->CreateCwd) {
         TError error = CreateCwd();
         if (error) {
-            L_ERR() << "Can't create temporary cwd: " << error << std::endl;
+            if (error.GetError() != EError::NoSpace)
+                L_ERR() << "Can't create temporary cwd: " << error << std::endl;
             return error;
         }
     }

@@ -796,7 +796,8 @@ TError TContainer::PrepareResources() {
     if (Parent) {
         TError error = Parent->PrepareMetaParent();
         if (error) {
-            L_ERR() << "Can't prepare parent: " << error << std::endl;
+            if (error.GetError() != EError::NoSpace)
+                L_ERR() << "Can't prepare parent: " << error << std::endl;
             return error;
         }
     }
