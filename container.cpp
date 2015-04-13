@@ -637,7 +637,7 @@ TError TContainer::PrepareMetaParent() {
     } else if (state == EContainerState::Meta) {
         return TError::Success();
     } else if (state != EContainerState::Running) {
-        return TError(EError::InvalidState, "invalid parent state");
+        return TError(EError::InvalidState, "invalid parent state " + ContainerStateName(state));
     }
 
     return TError::Success();
