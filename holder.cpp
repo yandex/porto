@@ -143,6 +143,9 @@ std::shared_ptr<TContainer> TContainerHolder::Get(const std::string &name) {
 
 TError TContainerHolder::_Destroy(const std::string &name) {
     auto c = Containers[name];
+
+    (void)c->Resume();
+
     for (auto child: c->GetChildren()) {
         TError error = _Destroy(child);
         if (error)

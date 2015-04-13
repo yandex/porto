@@ -53,7 +53,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     // data
     bool HaveRunningChildren();
-    void SetState(EContainerState newState);
+    void SetState(EContainerState newState, bool tree = false);
     std::string ContainerStateName(EContainerState state);
 
     TError ApplyDynamicProperties();

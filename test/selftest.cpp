@@ -3173,6 +3173,34 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
 
     ExpectApiSuccess(api.Destroy(child));
     ExpectApiSuccess(api.Destroy(parent));
+
+    Say() << "Test resume/pause propagation" << std::endl;
+    ExpectApiSuccess(api.Create(parent));
+    ExpectApiSuccess(api.SetProperty(parent, "command", "sleep 1000"));
+    ExpectApiSuccess(api.Start(parent));
+
+    ExpectApiSuccess(api.Create(child));
+    ExpectApiSuccess(api.SetProperty(child, "command", "sleep 1000"));
+    ExpectApiSuccess(api.Start(child));
+
+    std::string parentState, childState;
+    ExpectApiSuccess(api.Pause(parent));
+    ExpectApiSuccess(api.GetData(parent, "state", parentState));
+    ExpectApiSuccess(api.GetData(child, "state", childState));
+    ExpectEq(parentState, "paused");
+    ExpectEq(childState, "paused");
+
+    ExpectApiSuccess(api.Resume(parent));
+    ExpectApiSuccess(api.GetData(parent, "state", parentState));
+    ExpectApiSuccess(api.GetData(child, "state", childState));
+    ExpectEq(parentState, "running");
+    ExpectEq(childState, "running");
+
+    ExpectApiSuccess(api.Pause(parent));
+    ExpectApiFailure(api.Resume(child), EError::InvalidState);
+
+    ExpectApiFailure(api.Destroy(child), EError::InvalidState);
+    ExpectApiSuccess(api.Destroy(parent));
 }
 
 static void TestPermissions(TPortoAPI &api) {
