@@ -116,7 +116,7 @@ public:
     std::vector<pid_t> Processes();
 
     TError Create(const TCred &cred);
-    void Destroy();
+    TError Destroy();
     TError Start();
     TError Stop();
     TError Pause();

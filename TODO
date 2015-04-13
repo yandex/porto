@@ -1,3 +1,4 @@
+- pause on parent should change child containers state
 - ? die when cgoups are not mounted
 - ? use chrt instead of cpu.smart so we don't depend on smart kernels + set rt prio
 - support volume as root
