@@ -2,4 +2,4 @@ usr/sbin/portoctl usr/sbin
 usr/sbin/portod usr/sbin
 usr/sbin/portod-meta-root usr/sbin
 usr/sbin/portotest usr/sbin
-logrotate-porto.conf etc/porto
+debian/logrotate-porto.conf etc/porto
