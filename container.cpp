@@ -829,11 +829,11 @@ void TContainer::FreeResources() {
     TError error = Prop->Set<int>(P_RAW_LOOP_DEV, -1);
     if (error) {
         L_ERR() << "Can't set " << P_RAW_LOOP_DEV << ": " << error << std::endl;
-    } else {
-        if (loopNr >= 0)
-            error = PutLoopDev(loopNr);
+    }
+    if (loopNr >= 0) {
+        error = PutLoopDev(loopNr);
         if (error)
-            L_ERR() << "Can't put loop device: " << error << std::endl;
+            L_ERR() << "Can't put loop device " << loopNr << ": " << error << std::endl;
     }
 }
 
