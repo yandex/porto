@@ -153,10 +153,8 @@ TError TContainer::Destroy() {
 
     if (GetState() == EContainerState::Paused) {
         TError error = Resume();
-        if (error) {
-            L_ERR() << "Can't resume container " << GetName() << ": " << error << std::endl;
+        if (error)
             return error;
-        }
     }
 
     if (GetState() == EContainerState::Running)
@@ -922,7 +920,7 @@ TError TContainer::Resume() {
 
     for (auto p = Parent; p; p = p->Parent)
         if (p->GetState() == EContainerState::Paused)
-            return TError(EError::InvalidState, "parent " + p->GetName() + " is paused " + GetName());
+            return TError(EError::InvalidState, "parent " + p->GetName() + " is paused");
 
     auto cg = GetLeafCgroup(freezerSubsystem);
     TError error(freezerSubsystem->Unfreeze(cg));
