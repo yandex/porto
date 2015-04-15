@@ -402,9 +402,6 @@ TError TContainer::PrepareNetwork() {
 }
 
 TError TContainer::PrepareOomMonitor() {
-    if (UseParentNamespace())
-        return TError::Success();
-
     auto memcg = GetLeafCgroup(memorySubsystem);
 
     Efd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);

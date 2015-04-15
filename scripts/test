@@ -155,6 +155,7 @@ for t in "$@"; do
 		net) nettest ;;
 		macvlan) mvlantest ;;
 		nop) : ;;
+		script) shift; eval "$@"; exit ;;
 		*) say "Invalid test $t"; exit 1 ;;
 	esac
 done
