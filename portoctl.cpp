@@ -142,7 +142,7 @@ string DataValue(const string &name, const string &val) {
             ret = "Success";
 
         return ret + " (" + val + ")";
-    } else if (name == "memory_usage") {
+    } else if (name == "memory_usage" || name == "max_rss") {
         return HumanSize(val);
     } else if (name == "cpu_usage") {
         return HumanNsec(val);
