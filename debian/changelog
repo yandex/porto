@@ -1,3 +1,11 @@
+yandex-porto (1.4) precise; urgency=low
+
+  * Fix wrong oom_killed for subcontainers with isolate=false
+  * portoctl: humanify max_rss
+  * debian: remove /etc/logrotate.d/yandex-porto
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 13 Apr 2015 21:09:00 +0400
+
 yandex-porto (1.3) precise; urgency=low
 
   * New logrotate scheme (every hour, 400mb limit)
