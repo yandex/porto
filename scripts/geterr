@@ -1,0 +1,53 @@
+#!/bin/bash
+
+SSH="ssh -o StrictHostKeyChecking=no"
+TAG="+ASEARCH"
+RELAY=kernel1
+
+geterrors() {
+	$SSH $RELAY "sky run -t 60 --separate -p -U 'portoctl dget / porto_stat[errors]' $TAG"
+}
+
+parse() {
+	local state=0
+	local host=""
+	local nr=1
+	local line=""
+	while read line; do
+		if [ "$line" = "================================================================================" ]; then
+			[ $state -eq 0 ] && state=1
+		elif [ "$line" = "--------------------------------------------------------------------------------" ]; then
+			state=2
+		elif [ -z "$line" ]; then
+			state=0
+		else
+			if [ $state -eq 1 ]; then
+				host=$(echo "$line" | cut -d ':' -f '2-' | tr -d " ")
+			elif [ $state -eq 2 ]; then
+				[ "$line" != "0" ] && echo "$host $line"
+			fi
+		fi
+
+		nr=$(($nr + 1))
+	done
+}
+
+getlog() {
+	local line=""
+	echo >$2
+	while read -u 100 line; do
+		host=$(echo "$line" | cut -d ' ' -f1)
+		echo "$line"
+		echo "@@@ $host" &>>$2
+		$SSH $host portoctl -v &>>$2
+		$SSH $host zgrep Error! /var/log/portod.log* &>>$2
+		echo >>$2
+	done 100< $1
+}
+
+echo "Get errors on all $TAG hosts"
+geterrors > result.txt
+echo "Filter only hosts that have errors"
+parse < result.txt > result2.txt
+echo "Get error details"
+getlog result2.txt result3.txt
