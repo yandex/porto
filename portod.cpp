@@ -97,7 +97,7 @@ static int DaemonPrepare(bool master) {
         return ret;
 
     L() << string(80, '-') << std::endl;
-    L() << "Started " << GIT_TAG << " " << GIT_REVISION << std::endl;
+    L() << "Started " << GIT_TAG << " " << GIT_REVISION << " " << GetPid() << std::endl;
     L() << config().DebugString() << std::endl;
 
     return EXIT_SUCCESS;
