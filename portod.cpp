@@ -106,7 +106,7 @@ static int DaemonPrepare(bool master) {
 static void DaemonShutdown(bool master, int ret) {
     const auto &pid = master ? config().master_pid() : config().slave_pid();
 
-    L() << "Stopped" << std::endl;
+    L() << "Stopped " << ret << std::endl;
 
     TLogger::CloseLog();
     RemovePidFile(pid.path());
