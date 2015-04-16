@@ -14,15 +14,11 @@ public:
     int Fd;
     pid_t Pid;
     TCred Cred;
+    std::string Comm;
     size_t RequestStartMs;
 
     TClient(int fd) : Fd(fd) {};
     ~TClient() {
-        L() << "pid " << Pid
-            << " uid " << Cred.Uid
-            << " gid " << Cred.Gid
-            << " disconnected" << std::endl;
-
         close(Fd);
     }
 };

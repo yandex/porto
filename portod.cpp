@@ -132,7 +132,6 @@ static bool HandleRequest(TContext &context, std::shared_ptr<TClient> client) {
     InterruptibleInputStream pist(client->Fd);
 
     rpc::TContainerRequest request;
-    rpc::TContainerResponse response;
 
     if (slaveReadTimeout)
         (void)alarm(slaveReadTimeout);
@@ -163,8 +162,7 @@ static bool HandleRequest(TContext &context, std::shared_ptr<TClient> client) {
     if (!haveData)
         return true;
 
-    if (HandleRpcRequest(context, request, response, client))
-        SendReply(client, response);
+    HandleRpcRequest(context, request, client);
 
     return false;
 }
@@ -181,15 +179,11 @@ static int IdentifyClient(int fd, std::shared_ptr<TClient> client, int total) {
             comm = "unknown process";
 
         comm.erase(remove(comm.begin(), comm.end(), '\n'), comm.end());
-        L() << comm
-            << " (pid " << cr.pid
-            << " uid " << cr.uid
-            << " gid " << cr.gid
-            << ") connected (total " << total + 1 << ")" << std::endl;
 
         client->Pid = cr.pid;
         client->Cred.Uid = cr.uid;
         client->Cred.Gid = cr.gid;
+        client->Comm = comm;
 
         return 0;
     } else {

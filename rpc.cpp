@@ -9,7 +9,22 @@
 
 using std::string;
 
-void SendReply(std::shared_ptr<TClient> client, rpc::TContainerResponse &response) {
+static bool InfoRequest(const rpc::TContainerRequest &req) {
+    if (config().log().verbose())
+        return false;
+
+    return req.has_list() ||
+        req.has_getproperty() ||
+        req.has_getdata() ||
+        req.has_propertylist() ||
+        req.has_datalist() ||
+        req.has_version() ||
+        req.has_listvolumes();
+}
+
+static void SendReply(std::shared_ptr<TClient> client,
+                      rpc::TContainerResponse &response,
+                      bool log) {
     if (!client) {
         std::cout << "no client" << std::endl;
         return;
@@ -21,7 +36,7 @@ void SendReply(std::shared_ptr<TClient> client, rpc::TContainerResponse &respons
     if (response.IsInitialized()) {
         if (!WriteDelimitedTo(response, &post))
             L() << "Write error for " << client->Fd << std:: endl;
-        else
+        else if (log)
             L() << "<- " << response.ShortDebugString() << " " << execTimeMs << "ms " << client->Pid << std::endl;
         post.Flush();
     }
@@ -279,7 +294,7 @@ static TError CreateVolume(TContext &context,
 
             rpc::TContainerResponse response;
             response.set_error(error.GetError());
-            SendReply(c.lock(), response);
+            SendReply(c.lock(), response, true);
         });
 
     return task.Run(context);
@@ -315,7 +330,7 @@ static TError DestroyVolume(TContext &context,
 
                 rpc::TContainerResponse response;
                 response.set_error(error.GetError());
-                SendReply(c.lock(), response);
+                SendReply(c.lock(), response, true);
             });
 
         return task.Run(context);
@@ -348,14 +363,17 @@ static TError ListVolumes(TContext &context,
     return TError::Success();
 }
 
-bool HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
-                      rpc::TContainerResponse &rsp, std::shared_ptr<TClient> client) {
+void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
+                      std::shared_ptr<TClient> client) {
+    rpc::TContainerResponse rsp;
     string str;
     bool send_reply = true;
 
     client->RequestStartMs = GetCurrentTimeMs();
 
-    L() << "-> " << req.ShortDebugString() << " " << client->Pid << std::endl;
+    bool log = !InfoRequest(req);
+    if (log)
+        L() << "-> " << req.ShortDebugString() << " " << client->Pid << " " << client->Comm << std::endl;
 
     rsp.set_error(EError::Unknown);
 
@@ -418,7 +436,6 @@ bool HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
     if (send_reply) {
         rsp.set_error(error.GetError());
         rsp.set_errormsg(error.GetMsg());
+        SendReply(client, rsp, log);
     }
-
-    return send_reply;
 }
