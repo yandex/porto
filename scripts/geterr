@@ -1,7 +1,8 @@
 #!/bin/bash
 
 SSH="ssh -o StrictHostKeyChecking=no"
-TAG="+ASEARCH"
+TAG="$1"
+[ -z "$TAG" ] && TAG="+ASEARCH"
 RELAY=kernel1
 
 geterrors() {
