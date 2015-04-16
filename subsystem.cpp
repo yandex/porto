@@ -114,11 +114,21 @@ TError TMemorySubsystem::SetGuarantee(std::shared_ptr<TCgroup> cg, uint64_t guar
     return cg->SetKnobValue("memory.low_limit_in_bytes", std::to_string(guarantee), false);
 }
 
-TError TMemorySubsystem::SetLimit(std::shared_ptr<TCgroup> cg, uint64_t limit) const {
+TError TMemorySubsystem::SetLimit(std::shared_ptr<TCgroup> cg, uint64_t limit) {
     if (limit == 0)
         return TError::Success();
 
-    return cg->SetKnobValue("memory.limit_in_bytes", std::to_string(limit), false);
+    TError error = cg->SetKnobValue("memory.limit_in_bytes", std::to_string(limit), false);
+    if (error)
+        return error;
+
+    if (SupportSwap()) {
+        error = cg->SetKnobValue("memory.memsw.limit_in_bytes", std::to_string(limit), false);
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
 }
 
 TError TMemorySubsystem::RechargeOnPgfault(std::shared_ptr<TCgroup> cg, bool enable) {
@@ -135,6 +145,10 @@ bool TMemorySubsystem::SupportGuarantee() {
 
 bool TMemorySubsystem::SupportRechargeOnPgfault() {
     return GetRootCgroup()->HasKnob("memory.recharge_on_pgfault");
+}
+
+bool TMemorySubsystem::SupportSwap() {
+    return GetRootCgroup()->HasKnob("memory.memsw.limit_in_bytes");
 }
 
 bool TMemorySubsystem::SupportIoLimit() {

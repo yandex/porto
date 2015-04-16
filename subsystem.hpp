@@ -35,8 +35,9 @@ public:
     bool SupportGuarantee();
     TError SetGuarantee(std::shared_ptr<TCgroup> cg, uint64_t guarantee);
     bool SupportIoLimit();
-    TError SetLimit(std::shared_ptr<TCgroup> cg, uint64_t limit) const;
+    TError SetLimit(std::shared_ptr<TCgroup> cg, uint64_t limit);
     bool SupportRechargeOnPgfault();
+    bool SupportSwap();
     TError RechargeOnPgfault(std::shared_ptr<TCgroup> cg, bool enable);
     TError SetIoLimit(std::shared_ptr<TCgroup> cg, uint64_t limit);
 };
