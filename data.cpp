@@ -223,9 +223,7 @@ public:
 
     TUintMap GetDefault() const override {
         TUintMap m;
-        TError error = GetContainer()->GetStat(ETclassStat::Bytes, m);
-        if (error)
-            L_ERR() << "Can't get transmitted bytes: " << error << std::endl;
+        (void)GetContainer()->GetStat(ETclassStat::Bytes, m);
         return m;
     }
 };
@@ -240,9 +238,7 @@ public:
 
     TUintMap GetDefault() const override {
         TUintMap m;
-        TError error = GetContainer()->GetStat(ETclassStat::Packets, m);
-        if (error)
-            L_ERR() << "Can't get transmitted packets: " << error << std::endl;
+        (void)GetContainer()->GetStat(ETclassStat::Packets, m);
         return m;
     }
 };
@@ -257,9 +253,7 @@ public:
 
     TUintMap GetDefault() const override {
         TUintMap m;
-        TError error = GetContainer()->GetStat(ETclassStat::Drops, m);
-        if (error)
-            L_ERR() << "Can't get dropped packets: " << error << std::endl;
+        (void)GetContainer()->GetStat(ETclassStat::Drops, m);
         return m;
     }
 };
@@ -274,9 +268,7 @@ public:
 
     TUintMap GetDefault() const override {
         TUintMap m;
-        TError error = GetContainer()->GetStat(ETclassStat::Overlimits, m);
-        if (error)
-            L_ERR() << "Can't get number of packets over limit: " << error << std::endl;
+        (void)GetContainer()->GetStat(ETclassStat::Overlimits, m);
         return m;
     }
 };
@@ -291,9 +283,7 @@ public:
 
     TUintMap GetDefault() const override {
         TUintMap m;
-        TError error = GetContainer()->GetStat(ETclassStat::BPS, m);
-        if (error)
-            L_ERR() << "Can't get network speed (bps): " << error << std::endl;
+        (void)GetContainer()->GetStat(ETclassStat::BPS, m);
         return m;
     }
 };
@@ -308,9 +298,7 @@ public:
 
     TUintMap GetDefault() const override {
         TUintMap m;
-        TError error = GetContainer()->GetStat(ETclassStat::PPS, m);
-        if (error)
-            L_ERR() << "Can't get network speed (pps): " << error << std::endl;
+        (void)GetContainer()->GetStat(ETclassStat::PPS, m);
         return m;
     }
 };
