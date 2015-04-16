@@ -1,12 +1,15 @@
 #!/bin/bash
 
-SSH="ssh -o StrictHostKeyChecking=no"
+SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=quiet"
 TAG="$1"
 [ -z "$TAG" ] && TAG="+ASEARCH"
 RELAY=kernel1
+STAT="$2"
+[ -z "$STAT" ] && STAT="porto_stat[errors]"
+WORKERS=100
 
 geterrors() {
-	$SSH $RELAY "sky run -t 60 --separate -p -U 'portoctl dget / porto_stat[errors]' $TAG"
+	$SSH $RELAY "sky run -t 60 --separate -p -U 'portoctl dget / $STAT' $TAG"
 }
 
 parse() {
@@ -33,22 +36,44 @@ parse() {
 	done
 }
 
+LOCK=$(mktemp)
+cleanup() { wait; rm -f $LOCK; }
+trap cleanup EXIT
+
 getlog() {
-	local line=""
-	echo >$2
-	while read -u 100 line; do
-		host=$(echo "$line" | cut -d ' ' -f1)
-		echo "$line"
-		echo "@@@ $host" &>>$2
-		$SSH $host portoctl -v &>>$2
-		$SSH $host zgrep Error! /var/log/portod.log* &>>$2
-		echo >>$2
-	done 100< $1
+	host=$(echo "$1" | cut -d ' ' -f1)
+
+	echo "$line"
+	local title="@@@ $host"
+	local version="$($SSH $host portoctl -v 2>&1)"
+	local log="$($SSH $host zgrep "$3" /var/log/portod.log*)"
+
+	echo -e "$line\n$version\n$log\n\n" | flock $LOCK -c "bash -c 'cat >> $2'"
 }
 
 echo "Get errors on all $TAG hosts"
 geterrors > result.txt
-echo "Filter only hosts that have errors"
+echo "Filter only hosts that have $STAT"
 parse < result.txt > result2.txt
-echo "Get error details"
-getlog result2.txt result3.txt
+
+GREP=""
+[ "$STAT" = "porto_stat[errors]" ] && GREP="Error!"
+[ "$STAT" = "porto_stat[warnings]" ] && GREP="Warning!"
+
+if [ ! -z "$GREP" ]; then
+	echo "Get error details"
+
+	echo >result3.txt
+	running=0
+	while read -u 100 line; do
+		if [ $running -ge $WORKERS ]; then
+			wait -n
+			running=$(($running - 1))
+		fi
+
+		getlog "$line" result3.txt "$GREP" &
+
+		running=$(($running + 1))
+	done 100< result2.txt
+fi
+wait
