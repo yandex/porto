@@ -109,7 +109,7 @@ static int ChildFn(void *arg) {
 TError TTask::ChildOpenStdFile(const TPath &path, int expected) {
     int ret = open(path.ToString().c_str(), O_CREAT | O_WRONLY | O_APPEND, 0700);
     if (ret < 0)
-        return TError(EError::Unknown, errno,
+        return TError(EError::InvalidValue, errno,
                       "open(" + path.ToString() + ") -> " +
                       std::to_string(expected));
 
