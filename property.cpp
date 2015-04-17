@@ -282,7 +282,8 @@ public:
             TPath root(value);
             TPath realRoot("/");
 
-            if (root.GetType() == EFileType::Directory && root.GetDev() == realRoot.GetDev())
+            if (!GetContainer()->OwnerCred.IsPrivileged() &&
+                root.GetType() == EFileType::Directory && root.GetDev() == realRoot.GetDev())
                 return TError(EError::Permission, "Can't start OS container on the same mount point as /");
         }
 
