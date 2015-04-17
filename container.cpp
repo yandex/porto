@@ -1222,6 +1222,8 @@ TError TContainer::Restore(const kv::TNode &node) {
     bool started = Prop->HasValue(P_RAW_ROOT_PID);
     if (started) {
         int pid = Prop->Get<int>(P_RAW_ROOT_PID);
+        if (pid == GetPid())
+            pid = 0;
 
         L() << GetName() << ": restore started container " << pid << std::endl;
 

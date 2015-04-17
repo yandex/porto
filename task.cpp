@@ -925,7 +925,7 @@ TError TTask::Restore(int pid_,
     Pid = pid_;
     State = Started;
 
-    bool running = kill(Pid, 0) == 0;
+    bool running = Pid ? kill(Pid, 0) == 0 : false;
 
     // There are several possibilities here:
     // 1. We died and loop reaped container, so it will deliver
