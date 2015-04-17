@@ -2,6 +2,8 @@
 #include <vector>
 #include <list>
 #include <functional>
+#include <algorithm>
+#include <cmath>
 
 #include "libporto.hpp"
 #include "util/namespace.hpp"
@@ -568,7 +570,7 @@ static print_fn nice_seconds(double multiplier = 1) {
             char buf[40];
 
             double seconds = stod(raw) / multiplier;
-            double minutes = floor(seconds / 60);
+            double minutes = std::floor(seconds / 60);
             seconds -= minutes * 60;
 
             snprintf(buf, sizeof(buf), "%4.lf:%2.2lf", minutes, seconds);
