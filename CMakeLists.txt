@@ -49,7 +49,8 @@ include_directories(${PROTOBUF_INCLUDE_DIRS})
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS rpc.proto kv.proto config.proto)
 
-find_library(NCURSES NAMES libncurses.so)
+find_package(Curses REQUIRED)
+include_directories(${CURSES_INCLUDE_DIR})
 
 set(PYTHON_SOURCES "")
 if(ENABLE_PYTHON)
@@ -81,7 +82,7 @@ target_link_libraries(portod porto ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
 add_executable(portoctl ${PYTHON_SOURCES} portoctl.cpp cli.cpp config.cpp util/namespace.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/signal.cpp util/unix.cpp util/cred.cpp util/string.cpp util/crash.cpp portotop.cpp)
 
 add_dependencies(portoctl version.hpp)
-target_link_libraries(portoctl porto ${PB} rt ${NCURSES})
+target_link_libraries(portoctl porto ${PB} rt ${CURSES_LIBRARIES})
 
 add_executable(portod-meta-root meta_root.cpp util/signal.cpp)
 add_dependencies(portod-meta-root version.hpp)
