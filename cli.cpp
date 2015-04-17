@@ -226,10 +226,10 @@ int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
     }
 
     if (name == "-v" || name == "--version") {
+        std::cerr << "client: " << GIT_TAG << " " << GIT_REVISION << std::endl;
         std::string tag, revision;
         int ret = api->GetVersion(tag, revision);
 
-        std::cerr << "client: " << GIT_TAG << " " << GIT_REVISION << std::endl;
         if (!ret)
             std::cerr << "server: " << tag << " " << revision << std::endl;
 
