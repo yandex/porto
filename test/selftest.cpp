@@ -552,7 +552,7 @@ static void TestExitStatus(TPortoAPI &api) {
     Say() << "Check exit status of invalid command" << std::endl;
     ExpectApiSuccess(api.SetProperty(name, "command", "__invalid_command_name__"));
     ExpectApiSuccess(api.SetProperty(name, "cwd", "/"));
-    ExpectApiFailure(api.Start(name), EError::Unknown);
+    ExpectApiFailure(api.Start(name), EError::InvalidValue);
     ExpectApiFailure(api.GetData(name, "root_pid", ret), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "exit_status", ret), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "oom_killed", ret), EError::InvalidState);
@@ -562,7 +562,7 @@ static void TestExitStatus(TPortoAPI &api) {
     Say() << "Check exit status of invalid directory" << std::endl;
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectApiSuccess(api.SetProperty(name, "cwd", "/__invalid__dir__"));
-    ExpectApiFailure(api.Start(name), EError::Unknown);
+    ExpectApiFailure(api.Start(name), EError::InvalidValue);
     ExpectApiFailure(api.GetData(name, "root_pid", ret), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "exit_status", ret), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "oom_killed", ret), EError::InvalidState);
@@ -1358,7 +1358,7 @@ static void TestRootProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "command", "ls"));
     ExpectApiSuccess(api.SetProperty(name, "root", path));
 
-    ExpectApiFailure(api.Start(name), EError::Unknown);
+    ExpectApiFailure(api.Start(name), EError::InvalidValue);
     ExpectApiSuccess(api.GetData(name, "start_errno", v));
     ExpectEq(v, string("2"));
 
