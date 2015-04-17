@@ -1171,6 +1171,16 @@ public:
     }
 };
 
+extern int portotop(TPortoAPI *api);
+class TTopCmd : public ICmd {
+public:
+    TTopCmd(TPortoAPI *api) : ICmd(api, "top", 0, "", "top-like tool for container monitoring and control") {}
+
+    int Execute(int argc, char *argv[]) {
+        return portotop(Api);
+    }
+};
+
 class TSortCmd : public ICmd {
 public:
     TSortCmd(TPortoAPI *api) : ICmd(api, "sort", 0, "[sort-by]", "print containers sorted by resource usage") {}
@@ -1367,6 +1377,7 @@ int main(int argc, char *argv[]) {
     RegisterCommand(new TCreateCmd(&api));
     RegisterCommand(new TDestroyCmd(&api));
     RegisterCommand(new TListCmd(&api));
+    RegisterCommand(new TTopCmd(&api));
     RegisterCommand(new TSortCmd(&api));
     RegisterCommand(new TStartCmd(&api));
     RegisterCommand(new TStopCmd(&api));

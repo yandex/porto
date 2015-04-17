@@ -76,10 +76,10 @@ set_target_properties(portod PROPERTIES COMPILE_DEFINITIONS "PORTOD=1")
 add_dependencies(portod version.hpp)
 target_link_libraries(portod porto ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
 
-add_executable(portoctl ${PYTHON_SOURCES} portoctl.cpp cli.cpp config.cpp util/namespace.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/signal.cpp util/unix.cpp util/cred.cpp util/string.cpp util/crash.cpp)
+add_executable(portoctl ${PYTHON_SOURCES} portoctl.cpp cli.cpp config.cpp util/namespace.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/signal.cpp util/unix.cpp util/cred.cpp util/string.cpp util/crash.cpp portotop.cpp)
 
 add_dependencies(portoctl version.hpp)
-target_link_libraries(portoctl porto ${PB} rt)
+target_link_libraries(portoctl porto ${PB} rt ncurses)
 
 add_executable(portod-meta-root meta_root.cpp util/signal.cpp)
 add_dependencies(portod-meta-root version.hpp)
