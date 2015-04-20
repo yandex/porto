@@ -1,3 +1,12 @@
+yandex-porto (1.6) precise; urgency=low
+
+  * Don't print non-modifying requests/replies to the log
+  * task: don't change restored cgroup if pid == portod pid (fixes hang)
+  * portoctl: add find command to find container by pid
+  * portoctl: complete top rewrite (old version is available as sort command)
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Fri, 17 Apr 2015 19:15:00 +0400
+
 yandex-porto (1.5) precise; urgency=low
 
   * Set memory+swap limit if available for memory_limit
