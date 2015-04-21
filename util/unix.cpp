@@ -105,7 +105,7 @@ void RemovePidFile(const std::string &path) {
         (void)f.Remove();
 }
 
-static thread_local std::string *processName;
+static __thread std::string *processName;
 
 void SetProcessName(const std::string &name) {
     delete processName;
