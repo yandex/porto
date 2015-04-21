@@ -179,7 +179,12 @@ static void Destroy(TPortoAPI &api, const std::string &name, const std::string &
 
     ExpectApiSuccess(api.List(containers));
     Expect(std::find(containers.begin(),containers.end(),name) != containers.end());
-    ExpectApiSuccess(api.Destroy(name));
+    auto error = (EError)api.Destroy(name);
+    // portod may be killed during invocation of destroy (so it might or might
+    // not destroy the container), expect either success (if portod was
+    // killed before it had time to remove container) or error (if portod
+    // finished removal but didn't have time to send ack to the user)
+    Expect(error == EError::Success || error == EError::ContainerDoesNotExist);
     containers.clear();
     ExpectApiSuccess(api.List(containers));
     Expect(std::find(containers.begin(),containers.end(),name) == containers.end());
