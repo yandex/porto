@@ -1278,7 +1278,7 @@ TError TContainer::Restore(const kv::TNode &node) {
         }
 
         auto cg = GetLeafCgroup(freezerSubsystem);
-        if (freezerSubsystem->IsFreezed(cg))
+        if (freezerSubsystem->IsFreezed(cg) && !Processes().empty())
             SetState(EContainerState::Paused);
 
         (void)GetState();
