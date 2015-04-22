@@ -978,22 +978,22 @@ TError TTask::Restore(int pid_,
         TPath stdinLink("/proc/" + std::to_string(Pid) + "/fd/0");
         TError error = stdinLink.ReadLink(Env->StdinPath);
         if (error)
-            L_WRN() << "Can't restore stdin: " << error << std::endl;
+            L() << "Can't restore stdin: " << error << std::endl;
 
         TPath stdoutLink("/proc/" + std::to_string(Pid) + "/fd/1");
         error = stdoutLink.ReadLink(Env->StdoutPath);
         if (error)
-            L_WRN() << "Can't restore stdout: " << error << std::endl;
+            L() << "Can't restore stdout: " << error << std::endl;
 
         TPath stderrLink("/proc/" + std::to_string(Pid) + "/fd/2");
         error = stderrLink.ReadLink(Env->StderrPath);
         if (error)
-            L_WRN() << "Can't restore stderr: " << error << std::endl;
+            L() << "Can't restore stderr: " << error << std::endl;
 
         if (IsValid()) {
             error = FixCgroups();
             if (error)
-                L_WRN() << "Can't fx cgroups: " << error << std::endl;
+                L_WRN() << "Can't fix cgroups: " << error << std::endl;
         } else {
             Pid = 0;
             State = Stopped;
