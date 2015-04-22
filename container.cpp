@@ -1311,8 +1311,16 @@ std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys
 }
 
 bool TContainer::Exit(int status, bool oomKilled) {
-    Task->DeliverExitStatus(status);
     L() << "Delivered " << status << " to " << GetName() << " with root_pid " << Task->GetPid() << std::endl;
+
+    if (!oomKilled && !Processes().empty()) {
+        L_WRN() << "Skipped bogus exit event, some process is still alive" << std::endl;
+        return true;
+    }
+
+    Efd = -1;
+
+    Task->DeliverExitStatus(status);
     SetState(EContainerState::Dead);
 
     if (oomKilled) {
@@ -1417,8 +1425,6 @@ bool TContainer::DeliverOom(int fd) {
 
     if (!Task)
         return false;
-
-    Efd = -1;
 
     if (GetState() == EContainerState::Dead)
         return true;
