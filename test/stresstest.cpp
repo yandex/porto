@@ -29,7 +29,7 @@ static std::vector<std::map<std::string, std::string>> vtasks =
         { "stdout", "" },
         { "stderr", "" },
         { "exit_status", "0" },
-        { "timeout", "5" },
+        { "timeout", "15" },
     },
     {
         { "command", "bash -ec 'echo $A'" },
@@ -37,7 +37,7 @@ static std::vector<std::map<std::string, std::string>> vtasks =
         { "stdout", "qwerty\n" },
         { "stderr", "" },
         { "exit_status", "0" },
-        { "timeout", "5" },
+        { "timeout", "15" },
     },
     {
         { "parent", "meta" },
@@ -48,7 +48,7 @@ static std::vector<std::map<std::string, std::string>> vtasks =
         { "stdout", "qwerty\n" },
         { "stderr", "" },
         { "exit_status", "256" },
-        { "timeout", "5" },
+        { "timeout", "15" },
     },
     {
         { "command", "bash -ec 'for i in $A; do sleep 1; echo $i >&2; done'" },
@@ -56,7 +56,7 @@ static std::vector<std::map<std::string, std::string>> vtasks =
         { "stdout", "" },
         { "stderr", "1\n2\n3\n" },
         { "exit_status", "0" },
-        { "timeout", "10" },
+        { "timeout", "20" },
     }
 };
 
@@ -141,7 +141,6 @@ static void WaitDead(TPortoAPI &api, std::string name, std::string timeout) {
         if (ret == "dead")
             return;
         PauseResume(api, name);
-        usleep(1000000);
     }
     done++;
     throw std::string("Timeout");
