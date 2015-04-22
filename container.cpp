@@ -874,8 +874,14 @@ TError TContainer::Stop() {
             return error;
         }
 
+        auto cg = GetLeafCgroup(freezerSubsystem);
         int ret = SleepWhile(config().container().stop_timeout_ms(),
-                             [&]{ kill(pid, 0); return errno != ESRCH; });
+                             [&]()->int{
+                                if (cg && cg->IsEmpty())
+                                    return 0;
+                                 kill(pid, 0);
+                                 return errno != ESRCH;
+                             });
         if (ret) {
             L_ERR() << "Can't wait for container to stop" << std::endl;
             return TError(EError::Unknown, "Container didn't stop in " + std::to_string(config().container().stop_timeout_ms()) + "ms");
@@ -1337,6 +1343,10 @@ bool TContainer::Exit(int status, bool oomKilled) {
     TError error = Data->Set<int>(D_EXIT_STATUS, status);
     if (error)
         L_ERR() << "Can't set " << D_EXIT_STATUS << ": " << error << std::endl;
+
+    error = Prop->Set<int>(P_RAW_ROOT_PID, 0);
+    if (error)
+        L_ERR() << "Can't set " << P_RAW_ROOT_PID << ": " << error << std::endl;
 
     TimeOfDeath = GetCurrentTimeMs();
 

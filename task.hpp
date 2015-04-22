@@ -131,6 +131,7 @@ class TTask: public TNonCopyable {
     TError ChildIsolateFs();
     TError EnableNet();
     TError IsolateNet(int childPid);
+    bool IsValid();
 
 public:
     TTask(std::shared_ptr<TTaskEnv> env,
