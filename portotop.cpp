@@ -274,9 +274,10 @@ private:
     bool Selected = false;
 };
 
-typedef std::function<std::string (TRowTree&)> calc_fn;
-typedef std::function<std::string (TRowTree&, std::string, unsigned long*,
-                                   unsigned long*, unsigned long)> diff_fn;
+typedef std::function<std::string (TPortoAPI*, TRowTree&)> calc_fn;
+typedef std::function<std::string (TPortoAPI*, TRowTree&, std::string,
+                                   unsigned long*, unsigned long*,
+                                   unsigned long)> diff_fn;
 typedef std::function<std::string (TRowTree&, std::string)> print_fn;
 
 class TColumn {
@@ -306,12 +307,12 @@ public:
             attroff(A_REVERSE);
         return ret;
     }
-    void Update(TRowTree* tree, unsigned long gone, int maxlevel) {
+    void Update(TPortoAPI *api, TRowTree* tree, unsigned long gone, int maxlevel) {
         tree->for_each([&] (TRowTree &row) {
-                Cache[row.GetContainer()].value = CalcFn(row);
+                Cache[row.GetContainer()].value = CalcFn(api, row);
                 if (DiffFn)
                     Cache[row.GetContainer()].value =
-                        DiffFn(row,
+                        DiffFn(api, row,
                                Cache[row.GetContainer()].value,
                                &Cache[row.GetContainer()].prev,
                                &Cache[row.GetContainer()].pprev, gone);
@@ -397,7 +398,7 @@ public:
     void AddColumn(const TColumn &c) {
         Columns.push_back(c);
     }
-    void Update(TConsoleScreen &screen, TPortoAPI *api) {
+    void Update(TPortoAPI *api, TConsoleScreen &screen) {
         LastUpdate = Now;
         clock_gettime(CLOCK_MONOTONIC, &Now);
         unsigned long gone = 1000 * (Now.tv_sec - LastUpdate.tv_sec) +
@@ -419,7 +420,7 @@ public:
             MaxMaxLevel = RowTree->GetMaxLevel();
 
             for (auto &column : Columns)
-                column.Update(RowTree, gone, MaxLevel);
+                column.Update(api, RowTree, gone, MaxLevel);
 
             RowTree->Sort(Columns[SelectedColumn]);
         }
@@ -594,16 +595,16 @@ static print_fn nice_percents() {
     };
 }
 
-static calc_fn container_data(TPortoAPI *api, std::string data) {
-    return [=] (TRowTree &row) {
+static calc_fn container_data(std::string data) {
+    return [=] (TPortoAPI *api, TRowTree &row) {
         std::string curr;
         api->GetData(row.GetContainer(), data, curr);
         return curr;
     };
 }
 
-static calc_fn map_summ(TPortoAPI *api, std::string data) {
-    return [=] (TRowTree &row) {
+static calc_fn map_summ(std::string data) {
+    return [=] (TPortoAPI *api, TRowTree &row) {
         std::string value;
         api->GetData(row.GetContainer(), data, value);
         std::vector<std::string> values;
@@ -630,16 +631,16 @@ static calc_fn map_summ(TPortoAPI *api, std::string data) {
 }
 
 
-static calc_fn container_property(TPortoAPI *api, std::string property) {
-    return [=] (TRowTree &row) {
+static calc_fn container_property(std::string property) {
+    return [=] (TPortoAPI *api, TRowTree &row) {
         std::string curr;
         api->GetProperty(row.GetContainer(), property, curr);
         return curr;
     };
 }
 
-static diff_fn diff_percents_of_root(TPortoAPI *api, std::string data) {
-    return [=] (TRowTree &row, std::string value, unsigned long *prev,
+static diff_fn diff_percents_of_root(std::string data) {
+    return [=] (TPortoAPI *api, TRowTree &row, std::string value, unsigned long *prev,
                 unsigned long *pprev, unsigned long gone) {
         std::string pcurr;
         api->GetData("/", data, pcurr);
@@ -663,8 +664,8 @@ static diff_fn diff_percents_of_root(TPortoAPI *api, std::string data) {
     };
 }
 
-static diff_fn diff(TPortoAPI *api = nullptr) {
-    return [=] (TRowTree &row, std::string value, unsigned long *prev,
+static diff_fn diff() {
+    return [=] (TPortoAPI *api, TRowTree &row, std::string value, unsigned long *prev,
                 unsigned long *pprev, unsigned long gone) {
         try {
             unsigned long c = stoull(value);
@@ -684,7 +685,7 @@ int portotop(TPortoAPI *api) {
 
     /* Common */
     top.AddColumn(TColumn("container",
-                          [] (TRowTree &row) {
+                          [] (TPortoAPI *api, TRowTree &row) {
                               return row.GetContainer();
                           },
                           nullptr,
@@ -705,38 +706,38 @@ int portotop(TPortoAPI *api) {
                               return std::string(level, ' ') + curr;
                           },
                           true));
-    top.AddColumn(TColumn("state", container_data(api, "state")));
-    top.AddColumn(TColumn("time", container_data(api, "time"),
+    top.AddColumn(TColumn("state", container_data("state")));
+    top.AddColumn(TColumn("time", container_data("time"),
                           nullptr, nice_seconds(1)));
 
     /* CPU */
-    top.AddColumn(TColumn("policy", container_property(api, "cpu_policy")));
-    top.AddColumn(TColumn("cpu%", container_data(api, "cpu_usage"),
-                          diff_percents_of_root(api, "cpu_usage"),
+    top.AddColumn(TColumn("policy", container_property("cpu_policy")));
+    top.AddColumn(TColumn("cpu%", container_data("cpu_usage"),
+                          diff_percents_of_root("cpu_usage"),
                           nice_percents()));
-    top.AddColumn(TColumn("cpu", container_data(api, "cpu_usage"),
+    top.AddColumn(TColumn("cpu", container_data("cpu_usage"),
                           nullptr, nice_seconds(1E9)));
 
     /* Memory */
-    top.AddColumn(TColumn("memory", container_data(api, "memory_usage"),
+    top.AddColumn(TColumn("memory", container_data("memory_usage"),
                           nullptr, nice_number(1024)));
-    top.AddColumn(TColumn("limit", container_property(api, "memory_limit"),
+    top.AddColumn(TColumn("limit", container_property("memory_limit"),
                           nullptr, nice_number(1024)));
     top.AddColumn(TColumn("guarantee",
-                          container_property(api, "memory_guarantee"),
+                          container_property("memory_guarantee"),
                           nullptr, nice_number(1024)));
 
     /* I/O */
-    top.AddColumn(TColumn("maj/s", container_data(api, "major_faults"),
+    top.AddColumn(TColumn("maj/s", container_data("major_faults"),
                           diff(), nice_number(1000)));
-    top.AddColumn(TColumn("read b/s", map_summ(api, "io_read"),
+    top.AddColumn(TColumn("read b/s", map_summ("io_read"),
                           diff(),  nice_number(1000)));
-    top.AddColumn(TColumn("write b/s", map_summ(api, "io_write"),
+    top.AddColumn(TColumn("write b/s", map_summ("io_write"),
                           diff(), nice_number(1000)));
 
     /* Network */
     top.AddColumn(TColumn("net b/s",
-                          map_summ(api, "net_bytes"),
+                          map_summ("net_bytes"),
                           diff(), nice_number(1024)));
 
     /* Main loop */
@@ -744,7 +745,7 @@ int portotop(TPortoAPI *api) {
     bool paused = false;
     while (true) {
         if (!paused)
-            top.Update(screen, api);
+            top.Update(api, screen);
 
         top.Print(screen);
 
