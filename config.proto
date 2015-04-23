@@ -61,6 +61,7 @@ message TCfg {
 		optional bool use_hierarchy = 10;
 		optional uint32 max_total = 11;
 		optional uint32 batch_io_weight = 12;
+		optional uint32 empty_wait_timeout_ms = 13;
 	}
 
 	message TPrivilegesCfg {

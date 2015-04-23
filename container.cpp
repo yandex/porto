@@ -98,7 +98,7 @@ EContainerState TContainer::GetState() {
             L() << "Container " << GetName() << " seems to be empty, start timer" << std::endl;
         }
 
-        constexpr auto timeoutMs = 5000;
+        auto timeoutMs = config().container().empty_wait_timeout_ms();
         if (CgroupEmptySince + timeoutMs < GetCurrentTimeMs()) {
             L() << "Container " << GetName() << " is empty for " << (timeoutMs / 1000) << "s, kill it" << std::endl;
             Exit(-1, false);
@@ -1275,11 +1275,11 @@ TError TContainer::Restore(const kv::TNode &node) {
             TimeOfDeath = GetCurrentTimeMs();
         } else {
             SetState(EContainerState::Running);
-        }
 
-        auto cg = GetLeafCgroup(freezerSubsystem);
-        if (freezerSubsystem->IsFreezed(cg))
-            SetState(EContainerState::Paused);
+            auto cg = GetLeafCgroup(freezerSubsystem);
+            if (freezerSubsystem->IsFreezed(cg))
+                SetState(EContainerState::Paused);
+        }
 
         (void)GetState();
 
@@ -1296,11 +1296,8 @@ TError TContainer::Restore(const kv::TNode &node) {
         if (error)
             (void)KillAll();
 
-        auto state = Data->Get<std::string>(D_STATE);
-        if (state == ContainerStateName(EContainerState::Dead))
-            SetState(EContainerState::Dead);
-        else
-            SetState(EContainerState::Stopped);
+        SetState(EContainerState::Stopped);
+        Task = nullptr;
     }
 
     if (GetState() == EContainerState::Stopped) {

@@ -994,9 +994,6 @@ TError TTask::Restore(int pid_,
             error = FixCgroups();
             if (error)
                 L_WRN() << "Can't fix cgroups: " << error << std::endl;
-        } else {
-            Pid = 0;
-            State = Stopped;
         }
     }
 
