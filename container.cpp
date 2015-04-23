@@ -1269,11 +1269,8 @@ TError TContainer::Restore(const kv::TNode &node) {
         if (error)
             L_ERR() << "Can't restore task: " << error << std::endl;
 
-        bool haveRunningTasks = !Processes().empty();
-
         auto state = Data->Get<std::string>(D_STATE);
-        if (!haveRunningTasks ||
-            state == ContainerStateName(EContainerState::Dead)) {
+        if (state == ContainerStateName(EContainerState::Dead)) {
             SetState(EContainerState::Dead);
             TimeOfDeath = GetCurrentTimeMs();
         } else {
@@ -1281,7 +1278,7 @@ TError TContainer::Restore(const kv::TNode &node) {
         }
 
         auto cg = GetLeafCgroup(freezerSubsystem);
-        if (freezerSubsystem->IsFreezed(cg) && haveRunningTasks)
+        if (freezerSubsystem->IsFreezed(cg) && !Processes().empty())
             SetState(EContainerState::Paused);
 
         (void)GetState();
