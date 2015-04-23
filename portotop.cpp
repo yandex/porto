@@ -850,6 +850,8 @@ int portotop(TPortoAPI *api) {
             break;
         case 0:
         case -1:
+        case KEY_RESIZE:
+        case KEY_MOUSE:
             break;
         case '?':
         case 'h':
