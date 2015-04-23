@@ -100,7 +100,7 @@ EContainerState TContainer::GetState() {
 
         auto timeoutMs = config().container().empty_wait_timeout_ms();
         if (CgroupEmptySince + timeoutMs < GetCurrentTimeMs()) {
-            L() << "Container " << GetName() << " is empty for " << (timeoutMs / 1000) << "s, kill it" << std::endl;
+            L() << "Container " << GetName() << " is empty for " << timeoutMs << "ms, kill it" << std::endl;
             Exit(-1, false);
         }
     }

@@ -6,9 +6,13 @@ ROOTDIR=$(cd $(dirname $0)/../ && pwd)
 
 say() { [ ! -t 1 ] || tput setaf 3; echo "$@"; [ ! -t 1 ] || tput sgr0; }
 
+update_config() {
+	echo "log { verbose: true } network { enabled: $1 dynamic_ifaces: $2 } container { use_hierarchy: true empty_wait_timeout_ms: 1000 } privileges { root_user: \"$USER\" restricted_root_user: \"daemon\" } volumes { enabled: true }" > /etc/portod.conf
+}
+
 selftest() {
 	say "Self test with network=$1"
-	echo "log { verbose: true } network { enabled: $1 dynamic_ifaces: $2 } container { use_hierarchy: true empty_wait_timeout_ms: 1000 } privileges { root_user: \"$USER\" restricted_root_user: \"daemon\" } volumes { enabled: true }" > /etc/portod.conf
+	update_config
 	shift
 	shift
 	portotest "$@"
@@ -16,6 +20,7 @@ selftest() {
 
 stresstest() {
 	say "Stress test"
+	update_config
 	portotest stress "$@"
 }
 
