@@ -280,6 +280,147 @@ typedef std::function<std::string (TPortoAPI*, TRowTree&, std::string,
                                    unsigned long)> diff_fn;
 typedef std::function<std::string (TRowTree&, std::string)> print_fn;
 
+static print_fn nice_number(int base) {
+    return [=] (TRowTree &row, std::string raw) {
+        try {
+            char buf[20];
+            char s = 0;
+
+            double v = stod(raw);
+            if (v > base * base * base) {
+                v /= base * base * base;
+                s = 'G';
+            } else if (v > base * base) {
+                v /= base * base;
+                s = 'M';
+            } else if (v > base) {
+                v /= base;
+                s = 'k';
+            }
+
+            snprintf(buf, sizeof(buf), "%.1lf%c", v, s);
+            return std::string(buf);
+        } catch (...) {
+            return raw;
+        }
+    };
+}
+
+static print_fn nice_seconds(double multiplier = 1) {
+    return [=] (TRowTree &row, std::string raw) {
+        try {
+            char buf[40];
+
+            double seconds = stod(raw) / multiplier;
+            double minutes = std::floor(seconds / 60);
+            seconds -= minutes * 60;
+
+            snprintf(buf, sizeof(buf), "%4.lf:%2.2lf", minutes, seconds);
+            return std::string(buf);
+        } catch (...) {
+            return std::string();
+        }
+    };
+}
+
+static print_fn nice_percents() {
+    return [] (TRowTree &row, std::string raw) {
+        try {
+            char buf[20];
+            snprintf(buf, sizeof(buf), "%.1lf%%", 100 * stod(raw));
+            return std::string(buf);
+        } catch (...) {
+            return std::string();
+        }
+        return raw;
+    };
+}
+
+static calc_fn container_data(std::string data) {
+    return [=] (TPortoAPI *api, TRowTree &row) {
+        std::string curr;
+        api->GetData(row.GetContainer(), data, curr);
+        return curr;
+    };
+}
+
+static calc_fn map_summ(std::string data) {
+    return [=] (TPortoAPI *api, TRowTree &row) {
+        std::string value;
+        api->GetData(row.GetContainer(), data, value);
+        std::vector<std::string> values;
+        unsigned long start_v = 0;
+        for (unsigned long off = 0; off < value.length(); off++) {
+            if (value[off] == ':') {
+                start_v = off + 2; // key: value
+            } else if (value[off] == ';') {
+                values.push_back(value.substr(start_v, off - start_v));
+            }
+        }
+        values.push_back(value.substr(start_v));
+
+        unsigned long ret = 0;
+        try {
+            for (auto &s : values)
+                ret += stoull(s);
+        } catch (...) {
+            ret = 0;
+        }
+
+        return std::to_string(ret);
+    };
+}
+
+
+static calc_fn container_property(std::string property) {
+    return [=] (TPortoAPI *api, TRowTree &row) {
+        std::string curr;
+        api->GetProperty(row.GetContainer(), property, curr);
+        return curr;
+    };
+}
+
+static diff_fn diff_percents_of_root(std::string data) {
+    return [=] (TPortoAPI *api, TRowTree &row, std::string value, unsigned long *prev,
+                unsigned long *pprev, unsigned long gone) {
+        std::string pcurr;
+        api->GetData("/", data, pcurr);
+
+        try {
+            unsigned long c = stoull(value);
+            unsigned long pc = stoull(pcurr);
+
+            if (pc == *pprev)
+                return std::string("0");
+
+            std::string str = std::to_string(1.0d * (c - *prev) /
+                                             (pc - *pprev));
+            *prev = c;
+            *pprev = pc;
+
+            return str;
+        } catch (...) {
+            return std::string();
+        }
+    };
+}
+
+static diff_fn diff() {
+    return [=] (TPortoAPI *api, TRowTree &row, std::string value, unsigned long *prev,
+                unsigned long *pprev, unsigned long gone) {
+        try {
+            unsigned long c = stoull(value);
+
+            std::string str = std::to_string((c - *prev) / gone);
+            *prev = c;
+
+            return str;
+        } catch (...) {
+            return std::string();
+        }
+    };
+}
+
 class TColumn {
 public:
     TColumn(std::string title, calc_fn calc, diff_fn diff = nullptr,
@@ -397,6 +538,88 @@ public:
     }
     void AddColumn(const TColumn &c) {
         Columns.push_back(c);
+    }
+    bool AddColumn(TPortoAPI *api, std::string title, std::string desc) {
+        calc_fn calc = nullptr; // major_fault
+        diff_fn fn = nullptr; // "", "'", "'%"
+        print_fn print = nullptr; // "", "b", "1E9s", "%"
+        size_t off = 0;
+        std::string data;
+        bool map = false;
+
+        if (desc.length() > 4 && desc[0] == 'S' && desc[1] == '(') {
+            off = desc.find(')');
+            data = desc.substr(2, off == std::string::npos ?
+                               std::string::npos : off - 2);
+            calc = map_summ(data);
+            map = true;
+        } else {
+            off = desc.find('\'');
+            if (off == std::string::npos)
+                off = desc.find(' ');
+
+            data = desc.substr(0, off);
+
+            std::vector<TProperty> plist;
+            api->Plist(plist);
+            for (auto &p : plist) {
+                if (data == p.Name) {
+                    calc = container_property(data);
+                    break;
+                }
+            }
+
+            std::vector<TData> dlist;
+            api->Dlist(dlist);
+            for (auto &d : dlist) {
+                if (data == d.Name) {
+                    calc = container_data(data);
+                    break;
+                }
+            }
+        }
+
+        if (!calc)
+            return false;
+
+        double base = 1;
+        print = nice_number(1000);
+
+        if (off != std::string::npos) {
+            for (; off < desc.length(); off++) {
+                switch (desc[off]) {
+                case 'b':
+                case 'B':
+                    print = nice_number(1024);
+                    break;
+                case 's':
+                case 'S':
+                    print = nice_seconds(base);
+                    break;
+                case '\'':
+                    fn = diff();
+                    break;
+                case '%':
+                    if (fn)
+                        fn = diff_percents_of_root(data);
+                    print = nice_percents();
+                    break;
+                case ' ':
+                    break;
+                default:
+                    try {
+                        size_t tmp;
+                        base = stod(desc.substr(off), &tmp);
+                        off += tmp - 1;
+                    } catch (...) {
+                    }
+                    break;
+                }
+            }
+        }
+
+        Columns.push_back(TColumn(title, calc, fn, print, map));
+        return true;
     }
     void Update(TPortoAPI *api, TConsoleScreen &screen) {
         LastUpdate = Now;
@@ -539,147 +762,6 @@ private:
     struct timespec Now = {0};;
 };
 
-static print_fn nice_number(int base) {
-    return [=] (TRowTree &row, std::string raw) {
-        try {
-            char buf[20];
-            char s = 0;
-
-            double v = stod(raw);
-            if (v > base * base * base) {
-                v /= base * base * base;
-                s = 'G';
-            } else if (v > base * base) {
-                v /= base * base;
-                s = 'M';
-            } else if (v > base) {
-                v /= base;
-                s = 'k';
-            }
-
-            snprintf(buf, sizeof(buf), "%.1lf%c", v, s);
-            return std::string(buf);
-        } catch (...) {
-            return std::string();
-        }
-    };
-}
-
-static print_fn nice_seconds(double multiplier = 1) {
-    return [=] (TRowTree &row, std::string raw) {
-        try {
-            char buf[40];
-
-            double seconds = stod(raw) / multiplier;
-            double minutes = std::floor(seconds / 60);
-            seconds -= minutes * 60;
-
-            snprintf(buf, sizeof(buf), "%4.lf:%2.2lf", minutes, seconds);
-            return std::string(buf);
-        } catch (...) {
-            return std::string();
-        }
-    };
-}
-
-static print_fn nice_percents() {
-    return [] (TRowTree &row, std::string raw) {
-        try {
-            char buf[20];
-            snprintf(buf, sizeof(buf), "%.1lf%%", 100 * stod(raw));
-            return std::string(buf);
-        } catch (...) {
-            return std::string();
-        }
-        return raw;
-    };
-}
-
-static calc_fn container_data(std::string data) {
-    return [=] (TPortoAPI *api, TRowTree &row) {
-        std::string curr;
-        api->GetData(row.GetContainer(), data, curr);
-        return curr;
-    };
-}
-
-static calc_fn map_summ(std::string data) {
-    return [=] (TPortoAPI *api, TRowTree &row) {
-        std::string value;
-        api->GetData(row.GetContainer(), data, value);
-        std::vector<std::string> values;
-        unsigned long start_v = 0;
-        for (unsigned long off = 0; off < value.length(); off++) {
-            if (value[off] == ':') {
-                start_v = off + 2; // key: value
-            } else if (value[off] == ';') {
-                values.push_back(value.substr(start_v, off - start_v));
-            }
-        }
-        values.push_back(value.substr(start_v));
-
-        unsigned long ret = 0;
-        try {
-            for (auto &s : values)
-                ret += stoull(s);
-        } catch (...) {
-            ret = 0;
-        }
-
-        return std::to_string(ret);
-    };
-}
-
-
-static calc_fn container_property(std::string property) {
-    return [=] (TPortoAPI *api, TRowTree &row) {
-        std::string curr;
-        api->GetProperty(row.GetContainer(), property, curr);
-        return curr;
-    };
-}
-
-static diff_fn diff_percents_of_root(std::string data) {
-    return [=] (TPortoAPI *api, TRowTree &row, std::string value, unsigned long *prev,
-                unsigned long *pprev, unsigned long gone) {
-        std::string pcurr;
-        api->GetData("/", data, pcurr);
-                              
-        try {
-            unsigned long c = stoull(value);
-            unsigned long pc = stoull(pcurr);
-
-            if (pc == *pprev)
-                return std::string("0");
-
-            std::string str = std::to_string(1.0d * (c - *prev) /
-                                             (pc - *pprev));
-            *prev = c;
-            *pprev = pc;
-
-            return str;
-        } catch (...) {
-            return std::string();
-        }
-    };
-}
-
-static diff_fn diff() {
-    return [=] (TPortoAPI *api, TRowTree &row, std::string value, unsigned long *prev,
-                unsigned long *pprev, unsigned long gone) {
-        try {
-            unsigned long c = stoull(value);
-
-            std::string str = std::to_string((c - *prev) / gone);
-            *prev = c;
-
-            return str;
-        } catch (...) {
-            return std::string();
-        }
-    };
-}
-
 int portotop(TPortoAPI *api) {
     TTable top;
 
@@ -706,39 +788,26 @@ int portotop(TPortoAPI *api) {
                               return std::string(level, ' ') + curr;
                           },
                           true));
-    top.AddColumn(TColumn("state", container_data("state")));
-    top.AddColumn(TColumn("time", container_data("time"),
-                          nullptr, nice_seconds(1)));
+    top.AddColumn(api, "state", "state");
+    top.AddColumn(api, "time", "time s");
 
     /* CPU */
-    top.AddColumn(TColumn("policy", container_property("cpu_policy")));
-    top.AddColumn(TColumn("cpu%", container_data("cpu_usage"),
-                          diff_percents_of_root("cpu_usage"),
-                          nice_percents()));
-    top.AddColumn(TColumn("cpu", container_data("cpu_usage"),
-                          nullptr, nice_seconds(1E9)));
+    top.AddColumn(api, "policy", "cpu_policy");
+    top.AddColumn(api, "cpu%", "cpu_usage'%");
+    top.AddColumn(api, "cpu", "cpu_usage 1e9s");
 
     /* Memory */
-    top.AddColumn(TColumn("memory", container_data("memory_usage"),
-                          nullptr, nice_number(1024)));
-    top.AddColumn(TColumn("limit", container_property("memory_limit"),
-                          nullptr, nice_number(1024)));
-    top.AddColumn(TColumn("guarantee",
-                          container_property("memory_guarantee"),
-                          nullptr, nice_number(1024)));
+    top.AddColumn(api, "memory", "memory_usage b");
+    top.AddColumn(api, "limit", "memory_limit b");
+    top.AddColumn(api, "guarantee", "memory_guarantee b");
 
     /* I/O */
-    top.AddColumn(TColumn("maj/s", container_data("major_faults"),
-                          diff(), nice_number(1000)));
-    top.AddColumn(TColumn("read b/s", map_summ("io_read"),
-                          diff(),  nice_number(1000)));
-    top.AddColumn(TColumn("write b/s", map_summ("io_write"),
-                          diff(), nice_number(1000)));
+    top.AddColumn(api, "maj/s", "major_faults'");
+    top.AddColumn(api, "read b/s", "S(io_read)' b");
+    top.AddColumn(api, "write b/s", "S(io_write)' b");
 
     /* Network */
-    top.AddColumn(TColumn("net b/s",
-                          map_summ("net_bytes"),
-                          diff(), nice_number(1024)));
+    top.AddColumn(api, "net b/s", "S(net_bytes) 'b");
 
     /* Main loop */
     TConsoleScreen screen;
