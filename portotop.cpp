@@ -125,6 +125,12 @@ public:
         else
             Dialog("Unknown error occured", {"Ok"});
     }
+    void ErrorDialog(std::string message, int error) {
+        if (error != -1)
+            Dialog("Done", {"Ok"});
+        else
+            Dialog(strerror(errno), {"Ok"});
+    }
     void InfoDialog(std::vector<std::string> lines) {
         unsigned int w = 0;
         for (auto &l : lines)
@@ -765,7 +771,7 @@ public:
         else
             ConfigFile = config;
 
-        if (LoadConfig())
+        if (LoadConfig() != -1)
             return;
 
         Config = {"state: state",
@@ -822,24 +828,31 @@ public:
     }
     int SaveConfig() {
         std::ofstream out(ConfigFile);
-        for (auto &s : Config)
-            out << s << std::endl;
-        return 0;
+        if (out.is_open()) {
+            for (auto &s : Config)
+                out << s << std::endl;
+            return 0;
+        } else
+            return -1;
     }
     int LoadConfig() {
         int ret = 0;
         Config.clear();
         std::ifstream in(ConfigFile);
 
-        for (std::string line; getline(in, line);)
-            if (line.size()) {
-                Config.push_back(line);
-                ret++;
-            }
+        if (in.is_open()) {
+            for (std::string line; getline(in, line);)
+                if (line.size()) {
+                    Config.push_back(line);
+                    ret++;
+                }
 
-        UpdateColumns();
+            UpdateColumns();
 
-        return ret;
+            return ret;
+        }
+
+        return -1;
     }
 private:
     std::string ConfigFile;
@@ -973,11 +986,11 @@ int portotop(TPortoAPI *api, std::string config) {
             break;
         case 'l':
         case 'L':
-            top.LoadConfig();
+            screen.ErrorDialog("Can't load config", top.LoadConfig());
             break;
         case 'w':
         case 'W':
-            top.SaveConfig();
+            screen.ErrorDialog("Can't save config", top.SaveConfig());
             break;
         case 0:
         case -1:
