@@ -123,7 +123,7 @@ public:
         if (error)
             Dialog(message, {"Ok"});
         else
-            Dialog("Unknown error occured", {"Ok"});
+            Dialog("Unknown error occured (probably, simple you aren't root)", {"Ok"});
     }
     void ErrorDialog(std::string message, int error) {
         if (error != -1)
