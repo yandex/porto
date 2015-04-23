@@ -4,6 +4,8 @@
 #include <functional>
 #include <algorithm>
 #include <cmath>
+#include <iostream>
+#include <fstream>
 
 #include "libporto.hpp"
 #include "util/namespace.hpp"
@@ -160,12 +162,15 @@ public:
              "p - pause/resume container",
              "k - kill container",
              "d - destroy container",
-             "g - show container properties",
+             "g/? - show container properties",
              "o - show container stdout",
              "e - show container stderr",
+             "w - save portotop config",
+             "l - load portotop config",
              "enter - run top in container",
              "space - pause",
-             "q - quit"};
+             "q - quit",
+             "h - help"};
         InfoDialog(help);
     }
 };
@@ -265,6 +270,9 @@ public:
                     ret = &row;
             }, max_level);
         return ret->GetContainer();
+    }
+    bool HasChildren() {
+        return Children.size() > 0;
     }
 private:
     TRowTree* Parent = nullptr;
@@ -539,13 +547,17 @@ public:
     void AddColumn(const TColumn &c) {
         Columns.push_back(c);
     }
-    bool AddColumn(TPortoAPI *api, std::string title, std::string desc) {
+    bool AddColumn(std::string desc) {
         calc_fn calc = nullptr; // major_fault
         diff_fn fn = nullptr; // "", "'", "'%"
         print_fn print = nullptr; // "", "b", "1E9s", "%"
         size_t off = 0;
         std::string data;
         bool map = false;
+
+        off = desc.find(':');
+        std::string title = desc.substr(0, off);
+        desc = desc.substr(off + 2);
 
         if (desc.length() > 4 && desc[0] == 'S' && desc[1] == '(') {
             off = desc.find(')');
@@ -561,7 +573,7 @@ public:
             data = desc.substr(0, off);
 
             std::vector<TProperty> plist;
-            api->Plist(plist);
+            Api->Plist(plist);
             for (auto &p : plist) {
                 if (data == p.Name) {
                     calc = container_property(data);
@@ -570,7 +582,7 @@ public:
             }
 
             std::vector<TData> dlist;
-            api->Dlist(dlist);
+            Api->Dlist(dlist);
             for (auto &d : dlist) {
                 if (data == d.Name) {
                     calc = container_data(data);
@@ -600,8 +612,7 @@ public:
                     fn = diff();
                     break;
                 case '%':
-                    if (fn)
-                        fn = diff_percents_of_root(data);
+                    fn = diff_percents_of_root(data);
                     print = nice_percents();
                     break;
                 case ' ':
@@ -621,7 +632,7 @@ public:
         Columns.push_back(TColumn(title, calc, fn, print, map));
         return true;
     }
-    void Update(TPortoAPI *api, TConsoleScreen &screen) {
+    void Update(TConsoleScreen &screen) {
         LastUpdate = Now;
         clock_gettime(CLOCK_MONOTONIC, &Now);
         unsigned long gone = 1000 * (Now.tv_sec - LastUpdate.tv_sec) +
@@ -631,7 +642,7 @@ public:
             return;
 
         std::vector<std::string> containers;
-        int ret = api->List(containers);
+        int ret = Api->List(containers);
         if (ret)
             exit(EXIT_FAILURE);
 
@@ -643,7 +654,7 @@ public:
             MaxMaxLevel = RowTree->GetMaxLevel();
 
             for (auto &column : Columns)
-                column.Update(api, RowTree, gone, MaxLevel);
+                column.Update(Api, RowTree, gone, MaxLevel);
 
             RowTree->Sort(Columns[SelectedColumn]);
         }
@@ -748,33 +759,49 @@ public:
     std::string SelectedContainer() {
         return RowTree->ContainerAt(FirstRow + SelectedRow, MaxLevel);
     }
-private:
-    std::vector<TColumn> Columns;
-    TRowTree* RowTree = nullptr;
-    int SelectedRow = 0;
-    int SelectedColumn = 0;
-    int FirstRow = 0;
-    int MaxRows = 0;
-    int DisplayRows = 0;
-    int MaxLevel = 1;
-    int MaxMaxLevel = 1;
-    struct timespec LastUpdate = {0};
-    struct timespec Now = {0};;
-};
+    TTable(TPortoAPI *api, std::string config) : Api(api) {
+        if (config.size() == 0)
+            ConfigFile = std::string(getenv("HOME")) + "/.portotop";
+        else
+            ConfigFile = config;
 
-int portotop(TPortoAPI *api) {
-    TTable top;
+        if (LoadConfig())
+            return;
 
-    /* Common */
-    top.AddColumn(TColumn("container",
+        Config = {"state: state",
+                  "time: time s",
+
+                  /* CPU */
+                  "policy: cpu_policy",
+                  "cpu%: cpu_usage'%",
+                  "cpu: cpu_usage 1e9s",
+
+                  /* Memory */
+                  "memory: memory_usage b",
+                  "limit: memory_limit b",
+                  "guarantee: memory_guarantee b",
+
+                  /* I/O */
+                  "maj/s: major_faults'",
+                  "read b/s: S(io_read)' b",
+                  "write b/s: S(io_write)' b",
+
+                  /* Network */
+                  "net b/s: S(net_bytes) 'b",
+        };
+        UpdateColumns();
+    }
+    int UpdateColumns() {
+        Columns.clear();
+        AddColumn(TColumn("container",
                           [] (TPortoAPI *api, TRowTree &row) {
                               return row.GetContainer();
                           },
                           nullptr,
                           [] (TRowTree &row, std::string curr) {
                               int level = row.GetLevel();
-                              if (level > 1)
-                                  curr = std::string("\\_ ") +
+                              if (level > 0)
+                                  curr = (row.HasChildren() ? "+" : "-") +
                                       curr.substr(1 + curr.rfind('/'));
                               if (curr.length() > 30) {
                                   /* Hide too long containers*/
@@ -786,35 +813,60 @@ int portotop(TPortoAPI *api) {
                                   curr[14] = '>';
                               }
                               return std::string(level, ' ') + curr;
-                          },
-                          true));
-    top.AddColumn(api, "state", "state");
-    top.AddColumn(api, "time", "time s");
+                          }, true));
 
-    /* CPU */
-    top.AddColumn(api, "policy", "cpu_policy");
-    top.AddColumn(api, "cpu%", "cpu_usage'%");
-    top.AddColumn(api, "cpu", "cpu_usage 1e9s");
+        for (auto &c : Config)
+            AddColumn(c);
 
-    /* Memory */
-    top.AddColumn(api, "memory", "memory_usage b");
-    top.AddColumn(api, "limit", "memory_limit b");
-    top.AddColumn(api, "guarantee", "memory_guarantee b");
+        return 0;
+    }
+    int SaveConfig() {
+        std::ofstream out(ConfigFile);
+        for (auto &s : Config)
+            out << s << std::endl;
+        return 0;
+    }
+    int LoadConfig() {
+        int ret = 0;
+        Config.clear();
+        std::ifstream in(ConfigFile);
 
-    /* I/O */
-    top.AddColumn(api, "maj/s", "major_faults'");
-    top.AddColumn(api, "read b/s", "S(io_read)' b");
-    top.AddColumn(api, "write b/s", "S(io_write)' b");
+        for (std::string line; getline(in, line);)
+            if (line.size()) {
+                Config.push_back(line);
+                ret++;
+            }
 
-    /* Network */
-    top.AddColumn(api, "net b/s", "S(net_bytes) 'b");
+        UpdateColumns();
+
+        return ret;
+    }
+private:
+    std::string ConfigFile;
+    std::vector<std::string> Config;
+    std::vector<TColumn> Columns;
+    TRowTree* RowTree = nullptr;
+    int SelectedRow = 0;
+    int SelectedColumn = 0;
+    int FirstRow = 0;
+    int MaxRows = 0;
+    int DisplayRows = 0;
+    int MaxLevel = 1;
+    int MaxMaxLevel = 1;
+    struct timespec LastUpdate = {0};
+    struct timespec Now = {0};;
+    TPortoAPI *Api = nullptr;
+};
+
+int portotop(TPortoAPI *api, std::string config) {
+    TTable top(api, config);
 
     /* Main loop */
     TConsoleScreen screen;
     bool paused = false;
     while (true) {
         if (!paused)
-            top.Update(api, screen);
+            top.Update(screen);
 
         top.Print(screen);
 
@@ -900,6 +952,7 @@ int portotop(TPortoAPI *api) {
             } else
                 screen.Restore();
             break;
+        case '?':
         case 'g':
         case 'G':
             screen.Save();
@@ -918,12 +971,19 @@ int portotop(TPortoAPI *api) {
             top.LessPortoctl(top.SelectedContainer(), "stderr");
             screen.Restore();
             break;
+        case 'l':
+        case 'L':
+            top.LoadConfig();
+            break;
+        case 'w':
+        case 'W':
+            top.SaveConfig();
+            break;
         case 0:
         case -1:
         case KEY_RESIZE:
         case KEY_MOUSE:
             break;
-        case '?':
         case 'h':
         default:
             screen.HelpDialog();
