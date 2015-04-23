@@ -174,6 +174,7 @@ public:
              "w - save portotop config",
              "l - load portotop config",
              "enter - run top in container",
+             "b - run bash in container",
              "space - pause",
              "q - quit",
              "h - help"};
@@ -723,7 +724,7 @@ public:
     int Destroy(TPortoAPI *api) {
         return api->Destroy(SelectedContainer());
     }
-    int RunTop(TPortoAPI *api) {
+    int RunCmd(TPortoAPI *api, std::string cmd) {
         if (SelectedContainer() != "/") {
             std::string pidStr;
             int ret = api->GetData(SelectedContainer(), "root_pid", pidStr);
@@ -749,11 +750,11 @@ public:
             if (error)
                 return -1;
 
-            system("top");
+            system(cmd.c_str());
 
             my_ns.Attach();
         } else
-            system("top");
+            system(cmd.c_str());
 
         return 0;
     }
@@ -959,7 +960,16 @@ int portotop(TPortoAPI *api, std::string config) {
             break;
         case '\n':
             screen.Save();
-            if (top.RunTop(api)) {
+            if (top.RunCmd(api, "top")) {
+                screen.Restore();
+                screen.ErrorDialog(api);
+            } else
+                screen.Restore();
+            break;
+        case 'b':
+        case 'B':
+            screen.Save();
+            if (top.RunCmd(api, "bash")) {
                 screen.Restore();
                 screen.ErrorDialog(api);
             } else
