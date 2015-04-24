@@ -242,23 +242,7 @@ int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
     (void)RegisterSignal(SIGINT, SigInt);
 
     try {
-        // porto <command> <arg2> <arg2>
-        int ret = TryExec(argc, argv);
-        if (ret)
-            return ret;
-
-#if 0
-        // porto <arg1> <command> <arg2>
-        if (argc >= 2) {
-            char *p = argv[1];
-            argv[1] = argv[2];
-            argv[2] = p;
-
-            ret = TryExec(argc, argv);
-            if (ret)
-                return EXIT_FAILURE;
-        }
-#endif
+        return TryExec(argc, argv);
     } catch (string err) {
         std::cerr << err << std::endl;
     } catch (const char *err) {
