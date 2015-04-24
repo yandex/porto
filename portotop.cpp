@@ -23,11 +23,10 @@ class TConsoleScreen {
 private:
     WINDOW *Wnd;
 
+public:
     int Width() {
         return getmaxx(Wnd);
     }
-
-public:
     int Height() {
         return getmaxy(Wnd);
     }
@@ -46,13 +45,25 @@ public:
         endwin();
     }
     template<class T>
-    int PrintAt(T arg, int x, int y, int width, bool leftaligned) {
-        return PrintAt(std::to_string(arg), x, y, width, leftaligned);
+    void PrintAt(T arg, int x, int y, int width, bool leftaligned) {
+        PrintAt(std::to_string(arg), x, y, width, leftaligned);
     }
-    int PrintAt(std::string str, int x, int y, int width, bool leftaligned) {
-        int w = x + width < Width() ? width : Width() - x;
-        mvprintw(y, x, (leftaligned ? "%-*s" : "%*s"), w, str.c_str());
-        return w;
+    void PrintAt(std::string str0, int x0, int y0, int w0, bool leftaligned) {
+        if (x0 + w0 < 0 || x0 >= Width())
+            return;
+
+        int x = x0 < 0 ? 0 : x0;
+        int w = w0 - (x - x0);
+        if (x + w >= Width())
+            w = Width() - x;
+
+        std::string str;
+        if ((int)str0.length() > x - x0)
+            str = str0.substr(x - x0, w);
+        else
+            str = std::string(w, ' ');
+
+        mvprintw(y0, x, (leftaligned ? "%-*s" : "%*s"), w, str.c_str());
     }
     void Refresh() {
         refresh();
@@ -92,7 +103,8 @@ public:
             for (auto &b : buttons) {
                 if (n == selected)
                     attron(A_REVERSE);
-                x += 1 + PrintAt(b, x, y0 + 2, b.length(), false);
+                PrintAt(b, x, y0 + 2, b.length(), false);
+                x += 1 + b.length();
                 attroff(A_REVERSE);
                 n++;
             }
@@ -162,7 +174,7 @@ public:
     }
     void HelpDialog() {
         std::vector<std::string> help =
-            {"horizontal arrows - change sorting",
+            {"horizontal arrows - change sorting/scroll",
              "vertical arrows - select container/scroll",
              "tab - expand subcontainers",
              "s - start/stop container",
@@ -449,20 +461,20 @@ public:
         attron(A_BOLD);
         if (Selected)
             attron(A_UNDERLINE);
-        int ret = screen.PrintAt(Title, x, y, Width, LeftAligned);
+        screen.PrintAt(Title, x, y, Width, LeftAligned);
         if (Selected)
             attroff(A_UNDERLINE);
         attroff(A_BOLD);
-        return ret;
+        return Width;
     }
     int Print(TRowTree &row, int x, int y, TConsoleScreen &screen) {
         if (row.IsSelected())
             attron(A_REVERSE);
-        int ret = screen.PrintAt(Cache[row.GetContainer()].to_print, x, y, Width,
-                                 LeftAligned);
+        screen.PrintAt(Cache[row.GetContainer()].to_print, x, y, Width,
+                       LeftAligned);
         if (row.IsSelected())
             attroff(A_REVERSE);
-        return ret;
+        return Width;
     }
     void Update(TPortoAPI *api, TRowTree* tree, unsigned long gone, int maxlevel) {
         tree->for_each([&] (TRowTree &row) {
@@ -481,7 +493,7 @@ public:
                     Cache[row.GetContainer()].to_print =
                         Cache[row.GetContainer()].value;
 
-                if (Cache[row.GetContainer()].to_print.length() > Width)
+                if ((int)Cache[row.GetContainer()].to_print.length() > Width)
                     Width = Cache[row.GetContainer()].to_print.length();
             }, maxlevel);
     }
@@ -491,9 +503,12 @@ public:
     void Highlight(bool enable) {
         Selected = enable;
     }
+    int GetWidth() {
+        return Width;
+    }
 private:
     std::string Title;
-    unsigned int Width;
+    int Width;
     calc_fn CalcFn;
     diff_fn DiffFn;
     print_fn PrintFn;
@@ -525,7 +540,7 @@ void TRowTree::Sort(TColumn &column) {
 
 class TTable {
     void PrintTitle(int y, TConsoleScreen &screen) {
-        int x = 0;
+        int x = FirstX;
         for (auto &c : Columns)
             x += 1 + c.PrintTitle(x, y, screen);
     }
@@ -533,20 +548,19 @@ public:
     void Print(TConsoleScreen &screen) {
         MaxRows = RowTree->RowCount(MaxLevel);
         DisplayRows = std::min(screen.Height() - 1, MaxRows);
-        ChangeSelection(0, 0);
+        ChangeSelection(0, 0, screen);
 
         screen.Clear();
         PrintTitle(0, screen);
-        int x = 0;
         int y = 0;
         RowTree->for_each([&] (TRowTree &row) {
                 if (y >= FirstRow && y < MaxRows) {
                     if (y == FirstRow + SelectedRow)
                         row.Select(true);
+                    int x = FirstX;
                     for (auto &c : Columns)
                         x += 1 + c.Print(row, x, y + 1 - FirstRow, screen);
                     row.Select(false);
-                    x = 0;
                 }
                 y++;
             }, MaxLevel);
@@ -667,7 +681,7 @@ public:
             RowTree->Sort(Columns[SelectedColumn]);
         }
     }
-    void ChangeSelection(int x, int y) {
+    void ChangeSelection(int x, int y, TConsoleScreen &screen) {
         SelectedRow += y;
         if (SelectedRow < 0) {
             SelectedRow = 0;
@@ -684,11 +698,29 @@ public:
 
         Columns[SelectedColumn].Highlight(false);
         SelectedColumn += x;
-        if (SelectedColumn < 0)
+        if (SelectedColumn < 0) {
+            SelectedColumn = 0;
+        } else if (SelectedColumn > (int)Columns.size() - 1) {
             SelectedColumn = Columns.size() - 1;
-        else
-            SelectedColumn %= Columns.size();
+        }
         Columns[SelectedColumn].Highlight(true);
+
+        if (x == 0 && y == 0) {
+            int i = 0;
+            int x = 0;
+            for (auto &c : Columns) {
+                if (i == SelectedColumn && FirstX + x <= 0) {
+                    FirstX = x;
+                    break;
+                }
+                x += c.GetWidth() + 1;
+                if (i == SelectedColumn && x > screen.Width()) {
+                    FirstX = -x + screen.Width();
+                    break;
+                }
+                i++;
+            }
+        }
     }
     void Expand() {
         if (++MaxLevel > MaxMaxLevel)
@@ -863,6 +895,7 @@ private:
     TRowTree* RowTree = nullptr;
     int SelectedRow = 0;
     int SelectedColumn = 0;
+    int FirstX = 0;
     int FirstRow = 0;
     int MaxRows = 0;
     int DisplayRows = 0;
@@ -891,22 +924,22 @@ int portotop(TPortoAPI *api, std::string config) {
             return EXIT_SUCCESS;
             break;
         case KEY_UP:
-            top.ChangeSelection(0, -1);
+            top.ChangeSelection(0, -1, screen);
             break;
         case KEY_PPAGE:
-            top.ChangeSelection(0, -10);
+            top.ChangeSelection(0, -10, screen);
             break;
         case KEY_DOWN:
-            top.ChangeSelection(0, 1);
+            top.ChangeSelection(0, 1, screen);
             break;
         case KEY_NPAGE:
-            top.ChangeSelection(0, 10);
+            top.ChangeSelection(0, 10, screen);
             break;
         case KEY_LEFT:
-            top.ChangeSelection(-1, 0);
+            top.ChangeSelection(-1, 0, screen);
             break;
         case KEY_RIGHT:
-            top.ChangeSelection(1, 0);
+            top.ChangeSelection(1, 0, screen);
             break;
         case '\t':
             top.Expand();
