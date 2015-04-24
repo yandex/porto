@@ -1,3 +1,9 @@
+yandex-porto (1.7) precise; urgency=low
+
+  * Skip tasks with invalid freezer cgroup upon restore (fixes restoring wrong processes)
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Wed, 22 Apr 2015 17:18:00 +0400
+
 yandex-porto (1.6) precise; urgency=low
 
   * Don't print non-modifying requests/replies to the log
