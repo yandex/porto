@@ -1171,13 +1171,16 @@ public:
     }
 };
 
-extern int portotop(TPortoAPI *api);
+extern int portotop(TPortoAPI *api, std::string config);
 class TTopCmd : public ICmd {
 public:
-    TTopCmd(TPortoAPI *api) : ICmd(api, "top", 0, "", "top-like tool for container monitoring and control") {}
+    TTopCmd(TPortoAPI *api) : ICmd(api, "top", 0, "[config]", "top-like tool for container monitoring and control") {}
 
     int Execute(int argc, char *argv[]) {
-        return portotop(Api);
+        if (argc == 0)
+            return portotop(Api, "");
+        else
+            return portotop(Api, argv[0]);
     }
 };
 
