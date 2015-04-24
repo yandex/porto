@@ -6,6 +6,7 @@
 #include <cmath>
 #include <iostream>
 #include <fstream>
+#include <unordered_map>
 
 #include "libporto.hpp"
 #include "util/namespace.hpp"
@@ -502,7 +503,7 @@ private:
         unsigned long prev = 0;
         unsigned long pprev = 0;
     };
-    std::map<std::string, struct CacheEntry> Cache;
+    std::unordered_map<std::string, struct CacheEntry> Cache;
     bool Selected = false;
     bool LeftAligned = false;
 };
