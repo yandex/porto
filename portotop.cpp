@@ -76,7 +76,7 @@ public:
     }
     void Save() {
         def_prog_mode();
-	endwin();
+        endwin();
     }
     void Restore() {
         reset_prog_mode();
@@ -665,8 +665,12 @@ public:
 
         std::vector<std::string> containers;
         int ret = Api->List(containers);
-        if (ret)
-            exit(EXIT_FAILURE);
+        if (ret) {
+            int error;
+            std::string msg;
+            Api->GetLastError(error, msg);
+            throw "Can't list containers: " + msg;
+        }
 
         if (RowTree)
             delete RowTree;

@@ -192,20 +192,19 @@ void RegisterCommand(ICmd *cmd) {
 
 ICmd *currentCmd;
 
-static void TryExec(int argc, char *argv[]) {
+static int TryExec(int argc, char *argv[]) {
     string name(argv[1]);
 
     if (commands.find(name) == commands.end())
-        return;
+        return EXIT_FAILURE;
 
     ICmd *cmd = commands[name];
     if (!cmd->ValidArgs(argc - 2, argv + 2)) {
         Usage(cmd->GetName().c_str());
-        exit(EXIT_FAILURE);
+        return EXIT_FAILURE;
     }
 
-    currentCmd = cmd;
-    exit(cmd->Execute(argc - 2, argv + 2));
+    return cmd->Execute(argc - 2, argv + 2);
 }
 
 void SigInt(int sig) {
@@ -242,7 +241,9 @@ int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
 
     try {
         // porto <command> <arg2> <arg2>
-        TryExec(argc, argv);
+        int ret = TryExec(argc, argv);
+        if (ret)
+            return ret;
 
 #if 0
         // porto <arg1> <command> <arg2>
@@ -251,13 +252,19 @@ int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
             argv[1] = argv[2];
             argv[2] = p;
 
-            TryExec(argc, argv);
+            ret = TryExec(argc, argv);
+            if (ret)
+                return EXIT_FAILURE;
         }
 #endif
 
         std::cerr << "Invalid command " << name << "!" << std::endl;
     } catch (string err) {
         std::cerr << err << std::endl;
+    } catch (const char *err) {
+        std::cerr << err << std::endl;
+    } catch (...) {
+        std::cerr << "Got unknown error" << std::endl;
     }
 
     return EXIT_FAILURE;
