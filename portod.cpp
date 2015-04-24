@@ -127,6 +127,16 @@ static void RemoveRpcServer(const string &path) {
         L_ERR() << "Can't remove socket file: " << error << std::endl;
 }
 
+static void UpdateClientCredentials(std::shared_ptr<TClient> client) {
+    struct ucred cr;
+    socklen_t len = sizeof(cr);
+
+    if (getsockopt(client->Fd, SOL_SOCKET, SO_PEERCRED, &cr, &len) == 0) {
+        client->Cred.Uid = cr.uid;
+        client->Cred.Gid = cr.gid;
+    }
+}
+
 static bool HandleRequest(TContext &context, std::shared_ptr<TClient> client) {
     uint32_t slaveReadTimeout = config().daemon().slave_read_timeout_s();
     InterruptibleInputStream pist(client->Fd);
@@ -162,16 +172,17 @@ static bool HandleRequest(TContext &context, std::shared_ptr<TClient> client) {
     if (!haveData)
         return true;
 
+    UpdateClientCredentials(client);
     HandleRpcRequest(context, request, client);
 
     return false;
 }
 
-static int IdentifyClient(int fd, std::shared_ptr<TClient> client, int total) {
+static int IdentifyClient(std::shared_ptr<TClient> client) {
     struct ucred cr;
     socklen_t len = sizeof(cr);
 
-    if (getsockopt(fd, SOL_SOCKET, SO_PEERCRED, &cr, &len) == 0) {
+    if (getsockopt(client->Fd, SOL_SOCKET, SO_PEERCRED, &cr, &len) == 0) {
         TFile f("/proc/" + std::to_string(cr.pid) + "/comm");
         string comm;
 
@@ -209,7 +220,7 @@ static int AcceptClient(int sfd, std::map<int, std::shared_ptr<TClient>> &client
     }
 
     auto client = std::make_shared<TClient>(cfd);
-    int ret = IdentifyClient(cfd, client, clients.size());
+    int ret = IdentifyClient(client);
     if (ret)
         return ret;
 
