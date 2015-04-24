@@ -384,7 +384,7 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
 
     bool log = !InfoRequest(req);
     if (log)
-        L() << "-> " << req.ShortDebugString() << " " << client->Pid << " " << client->Comm << std::endl;
+        L() << "-> " << req.ShortDebugString() << " pid " << client->Pid << " uid " << client->Cred.Uid << " gid " << client->Cred.Gid << " comm " << client->Comm << std::endl;
 
     rsp.set_error(EError::Unknown);
 
