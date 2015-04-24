@@ -12,7 +12,7 @@ update_config() {
 
 selftest() {
 	say "Self test with network=$1"
-	update_config
+	update_config "$1" "$2"
 	shift
 	shift
 	portotest "$@"
@@ -20,7 +20,7 @@ selftest() {
 
 stresstest() {
 	say "Stress test"
-	update_config
+	update_config true true
 	portotest stress "$@"
 }
 
