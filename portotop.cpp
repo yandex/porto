@@ -175,13 +175,13 @@ public:
     void HelpDialog() {
         std::vector<std::string> help =
             {"horizontal arrows - change sorting/scroll",
-             "vertical arrows - select container/scroll",
+             "vertical arrows / j,k - select container/scroll",
              "tab - expand subcontainers",
              "s - start/stop container",
              "p - pause/resume container",
-             "k - kill container",
+             "K - kill container",
              "d - destroy container",
-             "g/? - show container properties",
+             "g - show container properties",
              "o - show container stdout",
              "e - show container stderr",
              "w - save portotop config",
@@ -190,7 +190,7 @@ public:
              "b - run bash in container",
              "space - pause",
              "q - quit",
-             "h - help"};
+             "h,? - help"};
         InfoDialog(help);
     }
 };
@@ -923,12 +923,14 @@ int portotop(TPortoAPI *api, std::string config) {
         case 'Q':
             return EXIT_SUCCESS;
             break;
+        case 'k':
         case KEY_UP:
             top.ChangeSelection(0, -1, screen);
             break;
         case KEY_PPAGE:
             top.ChangeSelection(0, -10, screen);
             break;
+        case 'j':
         case KEY_DOWN:
             top.ChangeSelection(0, 1, screen);
             break;
@@ -961,7 +963,6 @@ int portotop(TPortoAPI *api, std::string config) {
                 if (top.PauseResume(api))
                     screen.ErrorDialog(api);
             break;
-        case 'k':
         case 'K':
         {
             int signal = -1;
@@ -1009,7 +1010,6 @@ int portotop(TPortoAPI *api, std::string config) {
             } else
                 screen.Restore();
             break;
-        case '?':
         case 'g':
         case 'G':
             screen.Save();
@@ -1042,6 +1042,7 @@ int portotop(TPortoAPI *api, std::string config) {
         case KEY_MOUSE:
             break;
         case 'h':
+        case '?':
         default:
             screen.HelpDialog();
             break;
