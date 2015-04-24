@@ -195,8 +195,10 @@ ICmd *currentCmd;
 static int TryExec(int argc, char *argv[]) {
     string name(argv[1]);
 
-    if (commands.find(name) == commands.end())
+    if (commands.find(name) == commands.end()) {
+        std::cerr << "Invalid command " << name << "!" << std::endl;
         return EXIT_FAILURE;
+    }
 
     ICmd *cmd = commands[name];
     if (!cmd->ValidArgs(argc - 2, argv + 2)) {
@@ -257,8 +259,6 @@ int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
                 return EXIT_FAILURE;
         }
 #endif
-
-        std::cerr << "Invalid command " << name << "!" << std::endl;
     } catch (string err) {
         std::cerr << err << std::endl;
     } catch (const char *err) {
