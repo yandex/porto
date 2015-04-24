@@ -732,31 +732,26 @@ public:
     }
     int StartStop(TPortoAPI *api) {
         std::string state;
-        api->GetData(SelectedContainer(), "state", state);
+        int ret = api->GetData(SelectedContainer(), "state", state);
+        if (ret)
+            return ret;
         if (state == "running" || state == "dead")
             return api->Stop(SelectedContainer());
-        else if (state == "stopped")
-            return api->Start(SelectedContainer());
         else
-            return -1;
+            return api->Start(SelectedContainer());
     }
     int PauseResume(TPortoAPI *api) {
         std::string state;
-        api->GetData(SelectedContainer(), "state", state);
+        int ret = api->GetData(SelectedContainer(), "state", state);
+        if (ret)
+            return ret;
         if (state == "paused")
             return api->Resume(SelectedContainer());
-        else if (state == "running")
-            return api->Pause(SelectedContainer());
         else
-            return -1;
+            return api->Pause(SelectedContainer());
     }
     int Kill(TPortoAPI *api, int signal) {
-        std::string state;
-        api->GetData(SelectedContainer(), "state", state);
-        if (state == "running")
-            return api->Kill(SelectedContainer(), signal);
-        else
-            return -1;
+        return api->Kill(SelectedContainer(), signal);
     }
     int Destroy(TPortoAPI *api) {
         return api->Destroy(SelectedContainer());
