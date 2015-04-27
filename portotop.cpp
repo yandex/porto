@@ -80,6 +80,7 @@ public:
         endwin();
     }
     void Restore() {
+        tcsetpgrp(1, getpgrp());
         reset_prog_mode();
         refresh();
     }
@@ -906,6 +907,8 @@ void exit_handler(int unused) {
 int portotop(TPortoAPI *api, std::string config) {
     signal(SIGINT, exit_handler);
     signal(SIGTERM, exit_handler);
+    signal(SIGTTOU, SIG_IGN);
+    signal(SIGTTIN, SIG_IGN);
 
     TTable top(api, config);
 
