@@ -764,6 +764,7 @@ public:
         (void)system(s.c_str());
     }
     int RunCmdInContainer(TPortoAPI *api, TConsoleScreen &screen, std::string cmd) {
+        bool enter = (SelectedContainer() != "/");
         int ret = -1;
         screen.Save();
         switch (fork()) {
@@ -772,8 +773,11 @@ public:
             break;
         case 0:
         {
-            exit(execl(program_invocation_name, program_invocation_name,
-                       "enter", SelectedContainer().c_str(), cmd.c_str(), nullptr));
+            if (enter)
+                exit(execl(program_invocation_name, program_invocation_name,
+                           "enter", SelectedContainer().c_str(), cmd.c_str(), nullptr));
+            else
+                exit(execlp(cmd.c_str(), cmd.c_str(), nullptr));
             break;
         }
         default:
