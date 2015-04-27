@@ -840,14 +840,12 @@ public:
                               if (level > 0)
                                   curr = (row.HasChildren() ? "+" : "-") +
                                       curr.substr(1 + curr.rfind('/'));
-                              if (curr.length() > 30) {
+                              if (curr.length() > 40) {
                                   /* Hide too long containers*/
-                                  curr = curr.substr(0, 30);
-                                  curr[10] = '<';
+                                  curr = curr.substr(0, 40);
                                   curr[11] = '.';
                                   curr[12] = '.';
                                   curr[13] = '.';
-                                  curr[14] = '>';
                               }
                               return std::string(level, ' ') + curr;
                           }, true));
