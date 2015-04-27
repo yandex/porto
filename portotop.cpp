@@ -761,7 +761,7 @@ public:
     void LessPortoctl(std::string container, std::string cmd) {
         std::string s(program_invocation_name);
         s += " get " + container + " " + cmd + " | less";
-        system(s.c_str());
+        (void)system(s.c_str());
     }
     int RunCmdInContainer(TPortoAPI *api, TConsoleScreen &screen, std::string cmd) {
         int ret = -1;
