@@ -13,6 +13,7 @@
 
 extern "C" {
 #include <ncurses.h>
+#include <signal.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -901,17 +902,28 @@ private:
     int MaxLevel = 1;
     int MaxMaxLevel = 1;
     struct timespec LastUpdate = {0};
-    struct timespec Now = {0};;
+    struct timespec Now = {0};
     TPortoAPI *Api = nullptr;
 };
 
+static bool exit_immediatly = false;
+void exit_handler(int unused) {
+    exit_immediatly = true;
+}
+
 int portotop(TPortoAPI *api, std::string config) {
+    signal(SIGINT, exit_handler);
+    signal(SIGTERM, exit_handler);
+
     TTable top(api, config);
 
     /* Main loop */
     TConsoleScreen screen;
     bool paused = false;
     while (true) {
+        if (exit_immediatly)
+            break;
+
         if (!paused)
             top.Update(screen);
 
