@@ -757,44 +757,31 @@ public:
     int Destroy(TPortoAPI *api) {
         return api->Destroy(SelectedContainer());
     }
-    int RunCmd(TPortoAPI *api, std::string cmd) {
-        if (SelectedContainer() != "/") {
-            std::string pidStr;
-            int ret = api->GetData(SelectedContainer(), "root_pid", pidStr);
-            if (ret)
-                return -1;
-
-            int pid;
-            TError error = StringToInt(pidStr, pid);
-            if (error)
-                return -1;
-
-            TNamespaceSnapshot guest_ns;
-            error = guest_ns.Create(pid);
-            if (error)
-                return -1;
-
-            TNamespaceSnapshot my_ns;
-            error = my_ns.Create(getpid());
-            if (error)
-                return -1;
-
-            error = guest_ns.Attach();
-            if (error)
-                return -1;
-
-            system(cmd.c_str());
-
-            my_ns.Attach();
-        } else
-            system(cmd.c_str());
-
-        return 0;
-    }
     void LessPortoctl(std::string container, std::string cmd) {
         std::string s(program_invocation_name);
         s += " get " + container + " " + cmd + " | less";
         system(s.c_str());
+    }
+    int RunCmdInContainer(TPortoAPI *api, TConsoleScreen &screen, std::string cmd) {
+        int ret = -1;
+        screen.Save();
+        switch(fork()) {
+        case -1:
+            break;
+        case 0:
+        {
+            exit(execl(program_invocation_name, program_invocation_name,
+                       "enter", SelectedContainer().c_str(), cmd.c_str(), nullptr));
+            break;
+        }
+        default:
+        {
+            wait(&ret);
+            break;
+        }
+        }
+        screen.Restore();
+        return ret;
     }
     std::string SelectedContainer() {
         return RowTree->ContainerAt(FirstRow + SelectedRow, MaxLevel);
@@ -1005,21 +992,11 @@ int portotop(TPortoAPI *api, std::string config) {
                     screen.ErrorDialog(api);
             break;
         case '\n':
-            screen.Save();
-            if (top.RunCmd(api, "top")) {
-                screen.Restore();
-                screen.ErrorDialog(api);
-            } else
-                screen.Restore();
+            top.RunCmdInContainer(api, screen, "top");
             break;
         case 'b':
         case 'B':
-            screen.Save();
-            if (top.RunCmd(api, "bash")) {
-                screen.Restore();
-                screen.ErrorDialog(api);
-            } else
-                screen.Restore();
+            top.RunCmdInContainer(api, screen, "bash");
             break;
         case 'g':
         case 'G':
