@@ -765,8 +765,9 @@ public:
     int RunCmdInContainer(TPortoAPI *api, TConsoleScreen &screen, std::string cmd) {
         int ret = -1;
         screen.Save();
-        switch(fork()) {
+        switch (fork()) {
         case -1:
+            ret = errno;
             break;
         case 0:
         {
@@ -781,6 +782,10 @@ public:
         }
         }
         screen.Restore();
+
+        if (ret)
+            screen.Dialog(strerror(ret), {"Ok"});
+
         return ret;
     }
     std::string SelectedContainer() {
