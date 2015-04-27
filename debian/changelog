@@ -1,8 +1,8 @@
 yandex-porto (1.8) precise; urgency=low
 
-  * porotctl: several "portoctl top" bugfixes (broken terminal, etc) and enhancements
+  * portoctl: several "portoctl top" bugfixes (broken terminal, etc) and enhancements
 
- -- Roman Gushchin <klamm@kernel1.search.yandex.net>  Mon, 27 Apr 2015 16:55:50 +0300
+ -- Roman Gushchin <klamm@yandex-team.ru>  Mon, 27 Apr 2015 16:55:50 +0300
 
 yandex-porto (1.7) precise; urgency=low
 
