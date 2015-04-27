@@ -412,7 +412,7 @@ static calc_fn container_property(std::string property) {
 
 static diff_fn diff_percents_of_root(std::string data) {
     return [=] (TPortoAPI *api, TRowTree &row, std::string value, unsigned long *prev,
-                unsigned long *pprev, unsigned long gone) {
+                unsigned long *pprev, unsigned long gone_ms) {
         std::string pcurr;
         api->GetData("/", data, pcurr);
 
@@ -423,7 +423,7 @@ static diff_fn diff_percents_of_root(std::string data) {
             if (pc == *pprev)
                 return std::string("0");
 
-            std::string str = std::to_string(1.0d * (c - *prev) /
+            std::string str = std::to_string((1.0d * (c - *prev)) /
                                              (pc - *pprev));
             *prev = c;
             *pprev = pc;
@@ -437,11 +437,11 @@ static diff_fn diff_percents_of_root(std::string data) {
 
 static diff_fn diff() {
     return [=] (TPortoAPI *api, TRowTree &row, std::string value, unsigned long *prev,
-                unsigned long *pprev, unsigned long gone) {
+                unsigned long *pprev, unsigned long gone_ms) {
         try {
             unsigned long c = stoull(value);
 
-            std::string str = std::to_string(1.0d * (c - *prev) / gone);
+            std::string str = std::to_string((1000.0d * (c - *prev)) / gone_ms);
             *prev = c;
 
             return str;
@@ -478,7 +478,7 @@ public:
             attroff(A_REVERSE);
         return Width;
     }
-    void Update(TPortoAPI *api, TRowTree* tree, unsigned long gone, int maxlevel) {
+    void Update(TPortoAPI *api, TRowTree* tree, unsigned long gone_ms, int maxlevel) {
         tree->for_each([&] (TRowTree &row) {
                 Cache[row.GetContainer()].value = CalcFn(api, row);
                 if (DiffFn)
@@ -486,7 +486,7 @@ public:
                         DiffFn(api, row,
                                Cache[row.GetContainer()].value,
                                &Cache[row.GetContainer()].prev,
-                               &Cache[row.GetContainer()].pprev, gone);
+                               &Cache[row.GetContainer()].pprev, gone_ms);
 
                 if (PrintFn)
                     Cache[row.GetContainer()].to_print =
@@ -659,10 +659,10 @@ public:
     void Update(TConsoleScreen &screen) {
         LastUpdate = Now;
         clock_gettime(CLOCK_MONOTONIC, &Now);
-        unsigned long gone = 1000 * (Now.tv_sec - LastUpdate.tv_sec) +
+        unsigned long gone_ms = 1000 * (Now.tv_sec - LastUpdate.tv_sec) +
             (Now.tv_nsec - LastUpdate.tv_nsec) / 1000000;
 
-        if (gone < 300)
+        if (gone_ms < 300)
             return;
 
         std::vector<std::string> containers;
@@ -682,7 +682,7 @@ public:
             MaxMaxLevel = RowTree->GetMaxLevel();
 
             for (auto &column : Columns)
-                column.Update(Api, RowTree, gone, MaxLevel);
+                column.Update(Api, RowTree, gone_ms, MaxLevel);
 
             RowTree->Sort(Columns[SelectedColumn]);
         }
