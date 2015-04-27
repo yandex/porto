@@ -441,7 +441,7 @@ static diff_fn diff() {
         try {
             unsigned long c = stoull(value);
 
-            std::string str = std::to_string(1.0 (c - *prev) / gone);
+            std::string str = std::to_string(1.0d * (c - *prev) / gone);
             *prev = c;
 
             return str;
