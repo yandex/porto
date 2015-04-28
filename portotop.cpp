@@ -766,6 +766,12 @@ public:
     int RunCmdInContainer(TPortoAPI *api, TConsoleScreen &screen, std::string cmd) {
         bool enter = (SelectedContainer() != "/");
         int ret = -1;
+
+        if (enter && getuid()) {
+            screen.Dialog("You have to be root to enter containers.", {"Ok"});
+            return -1;
+        }
+
         screen.Save();
         switch (fork()) {
         case -1:
