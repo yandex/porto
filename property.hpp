@@ -89,6 +89,7 @@ public:
 
     bool HasFlags(const std::string &property, int flags) const;
     bool HasState(const std::string &property, EContainerState state) const;
+    bool IsImplemented(const std::string &property) const;
 
     TError Check(const std::string &property) const;
 

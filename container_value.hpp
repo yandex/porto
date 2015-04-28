@@ -9,6 +9,7 @@ protected:
     const char *Desc;
     const std::set<EContainerState> State;
     std::weak_ptr<TContainer> Container;
+    bool Implemented = true;
 
     TContainerValue(
            const char *name,
@@ -30,6 +31,7 @@ public:
     const char *GetDesc() { return Desc; }
     const std::set<EContainerState> &GetState() { return State; }
     virtual TError PrepareTaskEnv(std::shared_ptr<TTaskEnv> taskEnv) { return TError::Success(); }
+    virtual bool IsImplemented() { return Implemented; }
 };
 
 class TRawValueMap;

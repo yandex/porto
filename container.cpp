@@ -982,7 +982,11 @@ TError TContainer::GetData(const string &origName, string &value) {
     if (!Data->IsValid(name))
         return TError(EError::InvalidData, "invalid container data");
 
-    auto validState = ToContainerValue(Data->Find(name))->GetState();
+    auto cv = ToContainerValue(Data->Find(name));
+    if (!cv->IsImplemented())
+        return TError(EError::NotSupported, name + " is not implemented");
+
+    auto validState = cv->GetState();
     if (validState.find(GetState()) == validState.end())
         return TError(EError::InvalidState, "invalid container state");
 
@@ -1053,6 +1057,9 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
     if (error)
         return error;
 
+    if (!Prop->IsImplemented(property))
+        return TError(EError::NotSupported, property + " is not implemented");
+
     if (idx.length()) {
         TUintMap m;
         TError error = Prop->GetChecked<TUintMap>(property, m);
@@ -1098,6 +1105,9 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
     error = Prop->Check(property);
     if (error)
         return error;
+
+    if (!Prop->IsImplemented(property))
+        return TError(EError::NotSupported, property + " is not implemented");
 
     if (Prop->HasFlags(property, SUPERUSER_PROPERTY) && !superuser)
         if (Prop->ToString(property) != value)

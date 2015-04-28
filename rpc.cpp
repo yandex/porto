@@ -208,6 +208,8 @@ static TError ListProperty(TContext &context,
             continue;
 
         auto cv = ToContainerValue(av);
+        if (!cv->IsImplemented())
+            continue;
         auto entry = list->add_list();
 
         entry->set_name(name);
@@ -232,6 +234,8 @@ static TError ListData(TContext &context,
             continue;
 
         auto cv = ToContainerValue(av);
+        if (!cv->IsImplemented())
+            continue;
         auto entry = list->add_list();
 
         entry->set_name(name);

@@ -60,6 +60,10 @@ bool TPropertyMap::HasState(const std::string &property, EContainerState state) 
     return valueState.find(state) != valueState.end();
 }
 
+bool TPropertyMap::IsImplemented(const std::string &property) const {
+    return ToContainerValue(Find(property))->IsImplemented();
+}
+
 TError TPropertyMap::Check(const std::string &property) const {
     if (!IsValid(property))
         return TError(EError::Unknown, "Invalid property " + property);
