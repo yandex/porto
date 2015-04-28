@@ -780,7 +780,7 @@ public:
         case 0:
         {
             if (enter)
-                exit(execl(program_invocation_name, program_invocation_name,
+                exit(execlp(program_invocation_name, program_invocation_name,
                            "enter", SelectedContainer().c_str(), cmd.c_str(), nullptr));
             else
                 exit(execlp(cmd.c_str(), cmd.c_str(), nullptr));
