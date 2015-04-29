@@ -2,7 +2,7 @@ Source: yandex-porto
 #Section: utils
 #Priority: extra
 Maintainer: Eugene Kilimchuk <ekilimchuk@yandex-team.ru>
-Build-Depends: debhelper (>= 8.0.0), bison, flex, pkg-config, autoconf, libtool, protobuf-compiler, libprotobuf-dev, g++-4.7 | g++-4.8
+Build-Depends: debhelper (>= 8.0.0), bison, flex, pkg-config, autoconf, libtool, protobuf-compiler, libprotobuf-dev, g++-4.7 | g++-4.8, libncurses5-dev
 Standards-Version: 3.9.2
 Homepage: https://wiki.yandex-team.ru/porto
 Vcs-Git: git://git.yandex.ru/search-admin/porto.git
