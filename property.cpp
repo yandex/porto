@@ -448,13 +448,12 @@ public:
         TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE),
         TContainerValue(P_MEM_GUARANTEE,
                         "Guaranteed amount of memory [bytes]",
-                        dynamicProperty) {}
+                        dynamicProperty) {
+        Implemented = memorySubsystem->SupportGuarantee();
+    }
 
     TError CheckValue(const uint64_t &value) override {
         auto c = GetContainer();
-
-        if (!memorySubsystem->SupportGuarantee())
-            return TError(EError::NotSupported, "invalid kernel (no Yandex extensions)");
 
         if (!c->ValidHierarchicalProperty(P_MEM_GUARANTEE, value))
             return TError(EError::InvalidValue, "invalid hierarchical value");
@@ -491,17 +490,12 @@ public:
         TBoolValue(PERSISTENT_VALUE),
         TContainerValue(P_RECHARGE_ON_PGFAULT,
                         "Recharge memory on page fault",
-                        dynamicProperty) {}
+                        dynamicProperty) {
+        Implemented = memorySubsystem->SupportRechargeOnPgfault();
+    }
 
     bool GetDefault() const override {
         return false;
-    }
-
-    TError CheckValue(const bool &value) override {
-        if (!memorySubsystem->SupportRechargeOnPgfault())
-            return TError(EError::NotSupported, "invalid kernel (no Yandex extensions)");
-
-        return TError::Success();
     }
 };
 
@@ -539,16 +533,15 @@ public:
         TUintValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_CPU_LIMIT,
                         "CPU limit: 1-100",
-                        dynamicProperty) {}
+                        dynamicProperty) {
+        Implemented = cpuSubsystem->SupportLimit();
+    }
 
     uint64_t GetDefault() const override {
         return 100;
     }
 
     TError CheckValue(const uint64_t &value) override {
-        if (!cpuSubsystem->SupportLimit())
-            return TError(EError::NotSupported, "invalid kernel (CFS bandwidth is disabled)");
-
         if (value < 1 || value > 100)
             return TError(EError::InvalidValue, "invalid value");
 
@@ -562,12 +555,11 @@ public:
         TUintValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_CPU_GUARANTEE,
                         "CPU guarantee: 0-100",
-                        dynamicProperty) {}
+                        dynamicProperty) {
+        Implemented = cpuSubsystem->SupportGuarantee();
+    }
 
     TError CheckValue(const uint64_t &value) override {
-        if (!cpuSubsystem->SupportGuarantee())
-            return TError(EError::NotSupported, "invalid kernel (CFS group scheduling is disabled)");
-
         if (value > 100)
             return TError(EError::InvalidValue, "invalid value");
 
@@ -581,16 +573,15 @@ public:
         TStringValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_IO_POLICY,
                         "IO policy: normal, batch",
-                        dynamicProperty) {}
+                        dynamicProperty) {
+        Implemented = blkioSubsystem->SupportPolicy();
+    }
 
     std::string GetDefault() const override {
         return "normal";
     }
 
     TError CheckValue(const std::string &value) override {
-        if (!blkioSubsystem->SupportPolicy())
-            return TError(EError::NotSupported, "invalid kernel (CFQ is disabled)");
-
         if (value != "normal" && value != "batch")
             return TError(EError::InvalidValue, "invalid policy");
 
@@ -604,17 +595,12 @@ public:
         TUintValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_IO_LIMIT,
                         "IO limit",
-                        dynamicProperty) {}
+                        dynamicProperty) {
+        Implemented = memorySubsystem->SupportIoLimit();
+    }
 
     uint64_t GetDefault() const override {
         return 0;
-    }
-
-    TError CheckValue(const uint64_t &value) override {
-        if (!memorySubsystem->SupportIoLimit())
-            return TError(EError::NotSupported, "invalid kernel");
-
-        return TError::Success();
     }
 };
 
@@ -631,7 +617,9 @@ public:
            const int flags,
            const std::set<EContainerState> &state) :
         TMapValue(flags),
-        TContainerValue(name, desc, state) {}
+        TContainerValue(name, desc, state) {
+        Implemented = config().network().enabled();
+    }
 
     TUintMap GetDefault() const override {
         auto c = GetContainer();
@@ -671,7 +659,9 @@ public:
         TNetMapValue(P_NET_GUARANTEE,
                      "Guaranteed container network bandwidth [bytes/s] (max 32Gbps)",
                      PARENT_DEF_PROPERTY,
-                     staticProperty) {}
+                     staticProperty) {
+        Implemented = config().network().enabled();
+    }
     uint32_t GetDef() const override { return config().network().default_guarantee(); }
     uint32_t GetRootDef() const override { return config().network().default_max_guarantee(); }
 };
@@ -682,7 +672,9 @@ public:
         TNetMapValue(P_NET_LIMIT,
                      "Maximum container network bandwidth [bytes/s] (max 32Gbps)",
                      PARENT_DEF_PROPERTY,
-                     staticProperty) {}
+                     staticProperty) {
+        Implemented = config().network().enabled();
+    }
     uint32_t GetDef() const override { return config().network().default_limit(); }
     uint32_t GetRootDef() const override { return config().network().default_max_guarantee(); }
 };
@@ -693,7 +685,9 @@ public:
         TNetMapValue(P_NET_PRIO,
                      "Container network priority: 0-7",
                      PARENT_DEF_PROPERTY,
-                     staticProperty) {}
+                     staticProperty) {
+        Implemented = config().network().enabled();
+    }
     uint32_t GetDef() const override { return config().network().default_prio(); }
     uint32_t GetRootDef() const override { return config().network().default_prio(); }
 
@@ -1016,16 +1010,15 @@ public:
         TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_NET,
                         "Container network settings: none | host [interface] | macvlan <master> <name> [type] [mtu] [hw] | veth <name> <bridge> [mtu] [hw]",
-                        staticProperty) {}
+                        staticProperty) {
+        Implemented = config().network().enabled();
+    }
 
     TStrList GetDefault() const override {
         return TStrList{ "host" };
     }
 
     TError CheckValue(const std::vector<std::string> &lines) override {
-        if (!config().network().enabled())
-            return TError(EError::Unknown, "Network support is disabled");
-
         bool none = false;
         NetCfg.Share = false;
         NetCfg.Host.clear();
@@ -1179,10 +1172,8 @@ public:
         TUintValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_NET_TOS,
                         "IP TOS",
-                        staticProperty) {}
-
-    TError CheckValue(const uint64_t &value) override {
-        return TError(EError::NotSupported, "No kernel support");
+                        staticProperty) {
+        Implemented = false;
     }
 };
 

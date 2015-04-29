@@ -9,6 +9,7 @@
 #include "cgroup.hpp"
 #include "util/file.hpp"
 #include "util/string.hpp"
+#include "config.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -219,7 +220,9 @@ public:
         TMapValue(0),
         TContainerValue(D_NET_BYTES,
                         "number of tx bytes",
-                        rpdmState) {}
+                        rpdmState) {
+        Implemented = config().network().enabled();
+    }
 
     TUintMap GetDefault() const override {
         TUintMap m;
@@ -234,7 +237,9 @@ public:
         TMapValue(0),
         TContainerValue(D_NET_PACKETS,
                         "number of tx packets",
-                        rpdmState) {}
+                        rpdmState) {
+        Implemented = config().network().enabled();
+    }
 
     TUintMap GetDefault() const override {
         TUintMap m;
@@ -249,7 +254,9 @@ public:
         TMapValue(0),
         TContainerValue(D_NET_DROPS,
                         "number of dropped tx packets",
-                        rpdmState) {}
+                        rpdmState) {
+        Implemented = config().network().enabled();
+    }
 
     TUintMap GetDefault() const override {
         TUintMap m;
@@ -264,7 +271,9 @@ public:
         TMapValue(0),
         TContainerValue(D_NET_OVERLIMITS,
                         "number of tx packets that exceeded the limit",
-                        rpdmState) {}
+                        rpdmState) {
+        Implemented = config().network().enabled();
+    }
 
     TUintMap GetDefault() const override {
         TUintMap m;
@@ -279,7 +288,10 @@ public:
         TMapValue(0),
         TContainerValue(D_NET_BPS,
                         "current network traffic [bytes/s]",
-                        rpdmState) {}
+                        rpdmState) {
+        // TODO: requires custom HTB config
+        Implemented = false && config().network().enabled();
+    }
 
     TUintMap GetDefault() const override {
         TUintMap m;
@@ -294,7 +306,10 @@ public:
         TMapValue(0),
         TContainerValue(D_NET_PPS,
                         "current network traffic [packets/s]",
-                        rpdmState) {}
+                        rpdmState) {
+        // TODO: requires custom HTB config
+        Implemented = false && config().network().enabled();
+    }
 
     TUintMap GetDefault() const override {
         TUintMap m;
@@ -439,7 +454,13 @@ public:
         TUintValue(0),
         TContainerValue(D_MAX_RSS,
                         "maximum amount of anonymous memory container consumed",
-                        rpdmState) {}
+                        rpdmState) {
+        uint64_t val;
+        auto err = memorySubsystem->Statistics(memorySubsystem->GetRootCgroup(),
+                                               "max_rss", val);
+        if (err)
+            Implemented = false;
+    }
 
     uint64_t GetDefault() const override {
         uint64_t val;
