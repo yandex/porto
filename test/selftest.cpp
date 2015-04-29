@@ -206,8 +206,8 @@ static void ShouldHaveValidRunningData(TPortoAPI &api, const string &name) {
 
     if (NetworkEnabled()) {
         ExpectApiSuccess(api.GetData(name, "net_bytes", v));
-        ExpectApiSuccess(api.GetData(name, "net_bps", v));
-        ExpectApiSuccess(api.GetData(name, "net_pps", v));
+        //ExpectApiSuccess(api.GetData(name, "net_bps", v));
+        //ExpectApiSuccess(api.GetData(name, "net_pps", v));
         ExpectApiSuccess(api.GetData(name, "net_packets", v));
         ExpectApiSuccess(api.GetData(name, "net_drops", v));
         ExpectApiSuccess(api.GetData(name, "net_overlimits", v));
@@ -253,8 +253,8 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
 
     if (NetworkEnabled()) {
         ExpectApiFailure(api.GetData(name, "net_bytes", v), EError::InvalidState);
-        ExpectApiFailure(api.GetData(name, "net_bps", v), EError::InvalidState);
-        ExpectApiFailure(api.GetData(name, "net_pps", v), EError::InvalidState);
+        //ExpectApiFailure(api.GetData(name, "net_bps", v), EError::InvalidState);
+        //ExpectApiFailure(api.GetData(name, "net_pps", v), EError::InvalidState);
         ExpectApiFailure(api.GetData(name, "net_packets", v), EError::InvalidState);
         ExpectApiFailure(api.GetData(name, "net_drops", v), EError::InvalidState);
         ExpectApiFailure(api.GetData(name, "net_overlimits", v), EError::InvalidState);
