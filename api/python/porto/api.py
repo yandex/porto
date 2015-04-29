@@ -98,7 +98,13 @@ class _RPC(object):
             self._sendall(hdr)
             self._sendall(data)
 
-            buf = self._recv(4)
+            msb = 1
+            buf = ""
+            while msb:
+                b = self._recv(1)
+                msb = ord(b) >> 7
+                buf += b
+
             length = _DecodeVarint32(buf, 0)
             resp = rpc_pb2.TContainerResponse()
             buf += self._recv(length[0])
