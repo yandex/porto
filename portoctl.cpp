@@ -529,8 +529,21 @@ public:
             }
 
             if (!validProperty && !validData) {
-                std::cerr << "Invalid property or data" << std::endl;
-                return EXIT_FAILURE;
+                /* Probably it's a valid property/data, but it isn't supported now */
+                ret = Api->GetData(argv[0], argv[i], value);
+                if (ret == EError::NotSupported) {
+                    PrintError("Can't get data");
+                    return EXIT_FAILURE;
+                } else {
+                    ret = Api->GetProperty(argv[0], argv[i], value);
+                    if (ret == EError::NotSupported) {
+                        PrintError("Can't get property");
+                        return EXIT_FAILURE;
+                    } else {
+                        std::cerr << "Invalid property or data" << std::endl;
+                        return EXIT_FAILURE;
+                    }
+                }
             }
         }
 
