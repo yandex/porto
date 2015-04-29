@@ -2235,7 +2235,7 @@ static void TestRoot(TPortoAPI &api) {
     std::vector<TProperty> plist;
 
     ExpectApiSuccess(api.Plist(plist));
-    ExpectEq(plist.size(), properties.size());
+    ExpectLessOrEq(plist.size(), properties.size());
 
     for (auto p: plist)
         Expect(std::find(properties.begin(), properties.end(), p.Name) != properties.end());
@@ -2243,7 +2243,7 @@ static void TestRoot(TPortoAPI &api) {
     std::vector<TData> dlist;
 
     ExpectApiSuccess(api.Dlist(dlist));
-    ExpectEq(dlist.size(), data.size());
+    ExpectLessOrEq(dlist.size(), data.size());
 
     for (auto d: dlist)
         Expect(std::find(data.begin(), data.end(), d.Name) != data.end());
