@@ -592,7 +592,7 @@ public:
 class TIoLimitProperty : public TUintValue, public TContainerValue {
 public:
     TIoLimitProperty() :
-        TUintValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TUintValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | UINT_UNIT_VALUE),
         TContainerValue(P_IO_LIMIT,
                         "IO limit",
                         dynamicProperty) {
