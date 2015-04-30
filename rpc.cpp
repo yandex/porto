@@ -30,14 +30,15 @@ static void SendReply(std::shared_ptr<TClient> client,
         return;
     }
 
-    google::protobuf::io::FileOutputStream post(client->Fd);
+    google::protobuf::io::FileOutputStream post(client->GetFd());
 
-    size_t execTimeMs = GetCurrentTimeMs() - client->RequestStartMs;
+    size_t execTimeMs = GetCurrentTimeMs() - client->GetRequestStartMs();
     if (response.IsInitialized()) {
         if (!WriteDelimitedTo(response, &post))
-            L() << "Write error for " << client->Fd << std:: endl;
+            L() << "Write error for " << client->GetFd() << std:: endl;
         else if (log)
-            L() << "<- " << response.ShortDebugString() << " " << execTimeMs << "ms " << client->Pid << std::endl;
+            L() << "<- " << response.ShortDebugString() << " " << execTimeMs
+                << "ms " << client->GetPid() << std::endl;
         post.Flush();
     }
 }
@@ -51,7 +52,7 @@ static TError CreateContainer(TContext &context,
     if (!error)
         return TError(EError::ContainerAlreadyExists, "invalid name");
 
-    return context.Cholder->Create(req.name(), client->Cred);
+    return context.Cholder->Create(req.name(), client->GetCred());
 }
 
 static TError DestroyContainer(TContext &context,
@@ -65,7 +66,7 @@ static TError DestroyContainer(TContext &context,
         if (error)
             return error;
 
-        error = container->CheckPermission(client->Cred);
+        error = container->CheckPermission(client->GetCred());
         if (error)
             return error;
     }
@@ -82,7 +83,7 @@ static TError StartContainer(TContext &context,
     if (error)
         return error;
 
-    error = container->CheckPermission(client->Cred);
+    error = container->CheckPermission(client->GetCred());
     if (error)
         return error;
 
@@ -98,7 +99,7 @@ static TError StopContainer(TContext &context,
     if (error)
         return error;
 
-    error = container->CheckPermission(client->Cred);
+    error = container->CheckPermission(client->GetCred());
     if (error)
         return error;
 
@@ -114,7 +115,7 @@ static TError PauseContainer(TContext &context,
     if (error)
         return error;
 
-    error = container->CheckPermission(client->Cred);
+    error = container->CheckPermission(client->GetCred());
     if (error)
         return error;
 
@@ -130,7 +131,7 @@ static TError ResumeContainer(TContext &context,
     if (error)
         return error;
 
-    error = container->CheckPermission(client->Cred);
+    error = container->CheckPermission(client->GetCred());
     if (error)
         return error;
 
@@ -170,11 +171,11 @@ static TError SetContainerProperty(TContext &context,
     if (error)
         return error;
 
-    error = container->CheckPermission(client->Cred);
+    error = container->CheckPermission(client->GetCred());
     if (error)
         return error;
 
-    return container->SetProperty(req.property(), req.value(), client->Cred.IsPrivileged());
+    return container->SetProperty(req.property(), req.value(), client->GetCred().IsPrivileged());
 }
 
 static TError GetContainerData(TContext &context,
@@ -254,7 +255,7 @@ static TError Kill(TContext &context,
     if (error)
         return error;
 
-    error = container->CheckPermission(client->Cred);
+    error = container->CheckPermission(client->GetCred());
     if (error)
         return error;
 
@@ -281,7 +282,7 @@ static TError CreateVolume(TContext &context,
         return error;
 
     std::shared_ptr<TVolume> volume;
-    volume = std::make_shared<TVolume>(context.Vholder, client->Cred);
+    volume = std::make_shared<TVolume>(context.Vholder, client->GetCred());
     error = volume->Create(context.VolumeStorage,
                            StringTrim(req.path()),
                            resource,
@@ -321,7 +322,7 @@ static TError DestroyVolume(TContext &context,
                             std::shared_ptr<TClient> client) {
     auto volume = context.Vholder->Get(StringTrim(req.path()));
     if (volume && volume->IsValid()) {
-        TError error = volume->CheckPermission(client->Cred);
+        TError error = volume->CheckPermission(client->GetCred());
         if (error)
             return error;
 
@@ -384,11 +385,13 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
     string str;
     bool send_reply = true;
 
-    client->RequestStartMs = GetCurrentTimeMs();
+    client->SetRequestStartMs(GetCurrentTimeMs());
 
     bool log = !InfoRequest(req);
     if (log)
-        L() << "-> " << req.ShortDebugString() << " pid " << client->Pid << " uid " << client->Cred.Uid << " gid " << client->Cred.Gid << " comm " << client->Comm << std::endl;
+        L() << "-> " << req.ShortDebugString() << " pid " << client->GetPid()
+            << " uid " << client->GetCred().Uid << " gid " << client->GetCred().Gid
+            << " comm " << client->GetComm() << std::endl;
 
     rsp.set_error(EError::Unknown);
 

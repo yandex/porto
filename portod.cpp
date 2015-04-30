@@ -127,19 +127,9 @@ static void RemoveRpcServer(const string &path) {
         L_ERR() << "Can't remove socket file: " << error << std::endl;
 }
 
-static void UpdateClientCredentials(std::shared_ptr<TClient> client) {
-    struct ucred cr;
-    socklen_t len = sizeof(cr);
-
-    if (getsockopt(client->Fd, SOL_SOCKET, SO_PEERCRED, &cr, &len) == 0) {
-        client->Cred.Uid = cr.uid;
-        client->Cred.Gid = cr.gid;
-    }
-}
-
 static bool HandleRequest(TContext &context, std::shared_ptr<TClient> client) {
     uint32_t slaveReadTimeout = config().daemon().slave_read_timeout_s();
-    InterruptibleInputStream pist(client->Fd);
+    InterruptibleInputStream pist(client->GetFd());
 
     rpc::TContainerRequest request;
 
@@ -161,46 +151,23 @@ static bool HandleRequest(TContext &context, std::shared_ptr<TClient> client) {
         for (size_t i = 0; i < pos; i++)
             ss << std::setw(2) << (int)buf[i];
 
-        L_WRN() << "Interrupted read from " << client->Fd << ", partial message: " << ss.str() << std:: endl;
+        L_WRN() << "Interrupted read from " << client->GetFd()
+                << ", partial message: " << ss.str() << std:: endl;
         Statistics->InterruptedReads++;
         return true;
     }
 
     if (pist.GetLeftovers())
-        L_WRN() << "Message is greater that expected from " << client->Fd << ", skipped " << pist.GetLeftovers() << std:: endl;
+        L_WRN() << "Message is greater that expected from " << client->GetFd()
+                << ", skipped " << pist.GetLeftovers() << std:: endl;
 
     if (!haveData)
         return true;
 
-    UpdateClientCredentials(client);
+    client->Identify(false);
     HandleRpcRequest(context, request, client);
 
     return false;
-}
-
-static int IdentifyClient(std::shared_ptr<TClient> client) {
-    struct ucred cr;
-    socklen_t len = sizeof(cr);
-
-    if (getsockopt(client->Fd, SOL_SOCKET, SO_PEERCRED, &cr, &len) == 0) {
-        TFile f("/proc/" + std::to_string(cr.pid) + "/comm");
-        string comm;
-
-        if (f.AsString(comm))
-            comm = "unknown process";
-
-        comm.erase(remove(comm.begin(), comm.end(), '\n'), comm.end());
-
-        client->Pid = cr.pid;
-        client->Cred.Uid = cr.uid;
-        client->Cred.Gid = cr.gid;
-        client->Comm = comm;
-
-        return 0;
-    } else {
-        L() << "unknown process connected" << std::endl;
-        return EXIT_FAILURE;
-    }
 }
 
 static int AcceptClient(int sfd, std::map<int, std::shared_ptr<TClient>> &clients, int &fd) {
@@ -220,7 +187,7 @@ static int AcceptClient(int sfd, std::map<int, std::shared_ptr<TClient>> &client
     }
 
     auto client = std::make_shared<TClient>(cfd);
-    int ret = IdentifyClient(client);
+    int ret = client->Identify();
     if (ret)
         return ret;
 
