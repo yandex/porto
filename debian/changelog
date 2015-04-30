@@ -1,3 +1,11 @@
+yandex-porto (1.10) precise; urgency=low
+
+  * hide non-supported properties/data
+  * python API: read varint properly
+  * portotop: repair container entering: bash and top
+
+ -- Roman Gushchin <klamm@yandex-team.ru>  Thu, 30 Apr 2015 15:32:05 +0300
+
 yandex-porto (1.9) precise; urgency=low
 
   * python API: revert 60525de7a811601ce2a6e18d180562dc7b4e8282
