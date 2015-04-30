@@ -164,13 +164,14 @@ static bool HandleRequest(TContext &context, std::shared_ptr<TClient> client) {
     if (!haveData)
         return true;
 
-    client->Identify(false);
+    client->Identify(*context.Cholder, false);
     HandleRpcRequest(context, request, client);
 
     return false;
 }
 
-static int AcceptClient(int sfd, std::map<int, std::shared_ptr<TClient>> &clients, int &fd) {
+static int AcceptClient(TContext &context, int sfd,
+                        std::map<int, std::shared_ptr<TClient>> &clients, int &fd) {
     int cfd;
     struct sockaddr_un peer_addr;
     socklen_t peer_addr_size;
@@ -187,7 +188,7 @@ static int AcceptClient(int sfd, std::map<int, std::shared_ptr<TClient>> &client
     }
 
     auto client = std::make_shared<TClient>(cfd);
-    int ret = client->Identify();
+    int ret = client->Identify(*context.Cholder);
     if (ret)
         return ret;
 
@@ -388,7 +389,7 @@ static int SlaveRpc(TContext &context) {
                 }
 
                 int fd = -1;
-                ret = AcceptClient(sfd, clients, fd);
+                ret = AcceptClient(context, sfd, clients, fd);
                 if (ret < 0)
                     goto exit;
 

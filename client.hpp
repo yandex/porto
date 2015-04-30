@@ -1,9 +1,11 @@
 #pragma once
 
-#include <map>
+#include <string>
+
 #include "common.hpp"
 #include "util/cred.hpp"
 #include "util/log.hpp"
+#include "container.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -22,7 +24,9 @@ public:
     size_t GetRequestStartMs() const;
     void SetRequestStartMs(size_t start);
 
-    TError Identify(bool full = true);
+    TError Identify(TContainerHolder &holder, bool full = true);
+    std::string GetContainerName() const;
+    std::shared_ptr<TContainer> GetContainer() const;
 
 private:
     int Fd;
@@ -30,4 +34,7 @@ private:
     TCred Cred;
     std::string Comm;
     size_t RequestStartMs;
+
+    TError IdentifyContainer(TContainerHolder &holder);
+    std::weak_ptr<TContainer> Container;
 };

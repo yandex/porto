@@ -1,6 +1,7 @@
 #include "client.hpp"
 
 #include "util/file.hpp"
+#include "holder.hpp"
 
 extern "C" {
 #include <sys/types.h>
@@ -38,7 +39,7 @@ void TClient::SetRequestStartMs(size_t start) {
     RequestStartMs = start;
 }
 
-TError TClient::Identify(bool full) {
+TError TClient::Identify(TContainerHolder &holder, bool full) {
     struct ucred cr;
     socklen_t len = sizeof(cr);
 
@@ -54,6 +55,8 @@ TError TClient::Identify(bool full) {
 
             Pid = cr.pid;
             Comm = comm;
+
+            IdentifyContainer(holder);
         }
 
         Cred.Uid = cr.uid;
@@ -63,4 +66,38 @@ TError TClient::Identify(bool full) {
     } else {
         return TError(EError::Unknown, "Can't identify client");
     }
+}
+
+TError TClient::IdentifyContainer(TContainerHolder &holder) {
+    std::map<std::string, std::string> cgmap;
+    TError error = GetTaskCgroups(Pid, cgmap);
+    if (error)
+        return error;
+
+    if (cgmap.find("freezer") == cgmap.end())
+        return TError(EError::Unknown, "Can't determine freezer cgroup of client process");
+
+    auto freezer = cgmap["freezer"];
+    auto prefix = "/" + PORTO_ROOT_CGROUP + "/";
+    std::string name = "/";
+
+    if (freezer.length() > prefix.length() && freezer.substr(0, prefix.length()) == prefix)
+        name = freezer.replace(0, prefix.length(), "");
+
+    std::shared_ptr<TContainer> container;
+    if (!holder.Get(name, container))
+        Container = container;
+
+    return TError::Success();
+}
+
+std::string TClient::GetContainerName() const {
+    auto c = Container.lock();
+    if (c)
+        return c->GetName();
+    return "/";
+}
+
+std::shared_ptr<TContainer> TClient::GetContainer() const {
+    return Container.lock();
 }
