@@ -1501,3 +1501,32 @@ TError TContainer::CheckPermission(const TCred &ucred) {
 
     return TError(EError::Permission, "Permission error");
 }
+
+std::string TContainer::GetPortoNamespace() const {
+    if (Parent)
+        return Parent->GetPortoNamespace() + Prop->Get<std::string>(P_PORTO_NAMESPACE);
+    else
+        return "";
+}
+
+TError TContainer::RelativeName(std::shared_ptr<TContainer> c, std::string &name) const {
+    std::string ns = GetPortoNamespace();
+    if (ns == "") {
+        name = c->GetName();
+        return TError::Success();
+    } else {
+        std::string n = c->GetName();
+        if (n.length() <= ns.length() || n.compare(0, ns.length(), ns) != 0) {
+            return TError(EError::ContainerDoesNotExist,
+                          "Can't access container " + n + " from namespace " + ns);
+        }
+
+        name = n.substr(ns.length());
+        return TError::Success();
+    }
+}
+
+std::string TContainer::AbsoluteName(const std::string &orig) const {
+    std::string ns = GetPortoNamespace();
+    return ns + orig;
+}

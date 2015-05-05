@@ -18,6 +18,7 @@ constexpr const char *P_COMMAND = "command";
 constexpr const char *P_USER = "user";
 constexpr const char *P_GROUP = "group";
 constexpr const char *P_ENV = "env";
+constexpr const char *P_PORTO_NAMESPACE = "porto_namespace";
 constexpr const char *P_ROOT = "root";
 constexpr const char *P_ROOT_RDONLY = "root_readonly";
 constexpr const char *P_CWD = "cwd";

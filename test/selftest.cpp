@@ -2204,6 +2204,7 @@ static void TestRoot(TPortoAPI &api) {
         "root_readonly",
         "virt_mode",
         "aging_time",
+        "isolate_porto"
     };
 
     vector<string> data = {

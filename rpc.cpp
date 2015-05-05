@@ -47,22 +47,20 @@ static TError CreateContainer(TContext &context,
                               const rpc::TContainerCreateRequest &req,
                               rpc::TContainerResponse &rsp,
                               std::shared_ptr<TClient> client) {
-    std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(req.name(), container);
-    if (!error)
-        return TError(EError::ContainerAlreadyExists, "invalid name");
-
-    return context.Cholder->Create(req.name(), client->GetCred());
+    std::string name = client->GetContainer()->AbsoluteName(req.name());
+    return context.Cholder->Create(name, client->GetCred());
 }
 
 static TError DestroyContainer(TContext &context,
                                const rpc::TContainerDestroyRequest &req,
                                rpc::TContainerResponse &rsp,
                                std::shared_ptr<TClient> client) {
+    std::string name = client->GetContainer()->AbsoluteName(req.name());
+
     { // we don't want to hold container shared_ptr because Destroy
       // might think that it has some parent that holds it
         std::shared_ptr<TContainer> container;
-        TError error = context.Cholder->Get(req.name(), container);
+        TError error = context.Cholder->Get(name, container);
         if (error)
             return error;
 
@@ -71,15 +69,16 @@ static TError DestroyContainer(TContext &context,
             return error;
     }
 
-    return context.Cholder->Destroy(req.name());
+    return context.Cholder->Destroy(name);
 }
 
 static TError StartContainer(TContext &context,
                              const rpc::TContainerStartRequest &req,
                              rpc::TContainerResponse &rsp,
                              std::shared_ptr<TClient> client) {
+    std::string name = client->GetContainer()->AbsoluteName(req.name());
     std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(req.name(), container);
+    TError error = context.Cholder->Get(name, container);
     if (error)
         return error;
 
@@ -94,8 +93,9 @@ static TError StopContainer(TContext &context,
                             const rpc::TContainerStopRequest &req,
                             rpc::TContainerResponse &rsp,
                             std::shared_ptr<TClient> client) {
+    std::string name = client->GetContainer()->AbsoluteName(req.name());
     std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(req.name(), container);
+    TError error = context.Cholder->Get(name, container);
     if (error)
         return error;
 
@@ -110,8 +110,9 @@ static TError PauseContainer(TContext &context,
                              const rpc::TContainerPauseRequest &req,
                              rpc::TContainerResponse &rsp,
                              std::shared_ptr<TClient> client) {
+    std::string name = client->GetContainer()->AbsoluteName(req.name());
     std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(req.name(), container);
+    TError error = context.Cholder->Get(name, container);
     if (error)
         return error;
 
@@ -126,8 +127,9 @@ static TError ResumeContainer(TContext &context,
                               const rpc::TContainerResumeRequest &req,
                               rpc::TContainerResponse &rsp,
                               std::shared_ptr<TClient> client) {
+    std::string name = client->GetContainer()->AbsoluteName(req.name());
     std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(req.name(), container);
+    TError error = context.Cholder->Get(name, container);
     if (error)
         return error;
 
@@ -139,9 +141,14 @@ static TError ResumeContainer(TContext &context,
 }
 
 static TError ListContainers(TContext &context,
-                             rpc::TContainerResponse &rsp) {
-    for (auto name : context.Cholder->List())
-        rsp.mutable_list()->add_name(name);
+                             rpc::TContainerResponse &rsp,
+                             std::shared_ptr<TClient> client) {
+    for (auto c : context.Cholder->List()) {
+        std::string name;
+        TError err = client->GetContainer()->RelativeName(c, name);
+        if (!err)
+            rsp.mutable_list()->add_name(name);
+    }
 
     return TError::Success();
 }
@@ -150,8 +157,9 @@ static TError GetContainerProperty(TContext &context,
                                    const rpc::TContainerGetPropertyRequest &req,
                                    rpc::TContainerResponse &rsp,
                                    std::shared_ptr<TClient> client) {
+    std::string name = client->GetContainer()->AbsoluteName(req.name());
     std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(req.name(), container);
+    TError error = context.Cholder->Get(name, container);
     if (error)
         return error;
 
@@ -166,8 +174,9 @@ static TError SetContainerProperty(TContext &context,
                                    const rpc::TContainerSetPropertyRequest &req,
                                    rpc::TContainerResponse &rsp,
                                    std::shared_ptr<TClient> client) {
+    std::string name = client->GetContainer()->AbsoluteName(req.name());
     std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(req.name(), container);
+    TError error = context.Cholder->Get(name, container);
     if (error)
         return error;
 
@@ -182,8 +191,9 @@ static TError GetContainerData(TContext &context,
                                const rpc::TContainerGetDataRequest &req,
                                rpc::TContainerResponse &rsp,
                                std::shared_ptr<TClient> client) {
+    std::string name = client->GetContainer()->AbsoluteName(req.name());
     std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(req.name(), container);
+    TError error = context.Cholder->Get(name, container);
     if (error)
         return error;
 
@@ -250,8 +260,9 @@ static TError Kill(TContext &context,
                    const rpc::TContainerKillRequest &req,
                    rpc::TContainerResponse &rsp,
                    std::shared_ptr<TClient> client) {
+    std::string name = client->GetContainer()->AbsoluteName(req.name());
     std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(req.name(), container);
+    TError error = context.Cholder->Get(name, container);
     if (error)
         return error;
 
@@ -403,7 +414,7 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
         else if (req.has_destroy())
             error = DestroyContainer(context, req.destroy(), rsp, client);
         else if (req.has_list())
-            error = ListContainers(context, rsp);
+            error = ListContainers(context, rsp, client);
         else if (req.has_getproperty())
             error = GetContainerProperty(context, req.getproperty(), rsp, client);
         else if (req.has_setproperty())

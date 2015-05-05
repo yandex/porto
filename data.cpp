@@ -72,6 +72,19 @@ public:
                         dState) {}
 };
 
+class TAbsoluteNameData : public TStringValue, public TContainerValue {
+public:
+    TAbsoluteNameData() :
+        TStringValue(0),
+        TContainerValue(D_ABSOLUTE_NAME,
+                        "Absolute name of Porto container",
+                        anyState) {};
+
+    std::string GetDefault() const override {
+        return GetContainer()->GetName();
+    }
+};
+
 class TParentData : public TStringValue, public TContainerValue {
 public:
     TParentData() :
@@ -513,6 +526,7 @@ void RegisterData(std::shared_ptr<TRawValueMap> m,
                   std::shared_ptr<TContainer> c) {
     std::vector<TAbstractValue *> data = {
         new TStateData,
+        new TAbsoluteNameData,
         new TOomKilledData,
         new TParentData,
         new TRespawnCountData,

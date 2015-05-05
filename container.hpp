@@ -139,4 +139,13 @@ public:
     size_t GetTimeOfDeath() { return TimeOfDeath; }
 
     TError CheckPermission(const TCred &ucred);
+
+    // *self is observer container
+    TError RelativeName(std::shared_ptr<TContainer> c, std::string &name) const;
+    std::string AbsoluteName(const std::string &orig) const;
+
+private:
+    std::string GetPortoNamespace() const;
+    void UpdateMetaState();
+    void SyncStateWithCgroup();
 };

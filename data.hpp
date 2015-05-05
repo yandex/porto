@@ -4,6 +4,7 @@
 
 class TContainer;
 
+constexpr const char *D_ABSOLUTE_NAME = "absolute_name";
 constexpr const char *D_OOM_KILLED = "oom_killed";
 constexpr const char *D_PARENT = "parent";
 constexpr const char *D_ROOT_PID = "root_pid";

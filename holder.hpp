@@ -47,7 +47,7 @@ public:
     TError Destroy(const std::string &name);
     void DestroyRoot();
 
-    std::vector<std::string> List() const;
+    std::vector<std::shared_ptr<TContainer> > List() const;
 
     bool DeliverEvent(const TEvent &event);
 };

@@ -174,12 +174,12 @@ TError TContainerHolder::Destroy(const std::string &name) {
     return _Destroy(name);
 }
 
-std::vector<std::string> TContainerHolder::List() const {
-    std::vector<std::string> ret;
+std::vector<std::shared_ptr<TContainer> > TContainerHolder::List() const {
+    std::vector<std::shared_ptr<TContainer> > ret;
 
     for (auto c : Containers) {
         PORTO_ASSERT(c.first == c.second->GetName());
-        ret.push_back(c.first);
+        ret.push_back(c.second);
     }
 
     return ret;

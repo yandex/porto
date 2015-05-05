@@ -255,6 +255,15 @@ public:
                         staticProperty) {}
 };
 
+class TPortoNamespaceProperty : public TStringValue, public TContainerValue {
+public:
+    TPortoNamespaceProperty() :
+        TStringValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TContainerValue(P_PORTO_NAMESPACE,
+                        "Porto containers/volumes namespace",
+                        staticProperty) {}
+};
+
 class TRootProperty : public TStringValue, public TContainerValue {
 public:
     TRootProperty() :
@@ -1397,6 +1406,7 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TUserProperty,
         new TGroupProperty,
         new TEnvProperty,
+        new TPortoNamespaceProperty,
         new TRootProperty,
         new TRootRdOnlyProperty,
         new TCwdProperty,
