@@ -900,6 +900,56 @@ static void TestIsolateProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy("iss"));
 }
 
+static void TestContainerNamespaces(TPortoAPI &api) {
+    std::string val;
+
+    Say() << "Test container namespaces" << std::endl;
+
+    Say() << "Check default value" << std::endl;
+    ExpectApiSuccess(api.Create("c"));
+    ExpectApiSuccess(api.GetProperty("c", "porto_namespace", val));
+    ExpectEq(val, "");
+
+    Say() << "Check inheritance" << std::endl;
+    ExpectApiSuccess(api.SetProperty("c", "porto_namespace", "my-prefix-"));
+    ExpectApiSuccess(api.GetProperty("c", "porto_namespace", val));
+    ExpectApiSuccess(api.Create("c/d"));
+    ExpectApiSuccess(api.GetProperty("c/d", "porto_namespace", val));
+    ExpectEq(val, "");
+    ExpectApiSuccess(api.SetProperty("c/d", "porto_namespace", "second-prefix-"));
+    ExpectApiSuccess(api.GetProperty("c/d", "porto_namespace", val));
+    ExpectEq(val, "second-prefix-");
+
+    Say() << "Check simple prefix" << std::endl;
+    ExpectApiSuccess(api.SetProperty("c", "porto_namespace", "simple-prefix-"));
+    ExpectApiSuccess(api.SetProperty("c/d", "command", "portoctl create test"));
+    AsRoot(api);
+    ExpectApiSuccess(api.SetProperty("c/d", "user", "root"));
+    ExpectApiSuccess(api.Start("c/d"));
+    WaitState(api, "c/d", "dead");
+
+    ExpectApiSuccess(api.Destroy("simple-prefix-second-prefix-test"));
+    ExpectApiSuccess(api.Stop("c/d"));
+    ExpectApiSuccess(api.Stop("c"));
+
+    Say() << "Check container prefix" << std::endl;
+    ExpectApiSuccess(api.SetProperty("c", "porto_namespace", "c/"));
+    ExpectApiSuccess(api.SetProperty("c/d", "command", "portoctl create test"));
+    ExpectApiSuccess(api.Start("c/d"));
+    WaitState(api, "c/d", "dead");
+    ExpectApiSuccess(api.Destroy("c/second-prefix-test"));
+    ExpectApiSuccess(api.Stop("c/d"));
+
+    Say() << "Check absolute name" << std::endl;
+    ExpectApiSuccess(api.Start("c/d"));
+    WaitState(api, "c/d", "dead");
+    ExpectApiSuccess(api.GetData("c/second-prefix-test", "absolute_name", val));
+    ExpectEq(val, "c/second-prefix-test");
+    ExpectApiSuccess(api.Stop("c/d"));
+    ExpectApiSuccess(api.Destroy("c/d"));
+    ExpectApiSuccess(api.Destroy("c"));
+}
+
 static void TestEnvTrim(TPortoAPI &api) {
     string val;
     string name = "a";
@@ -2204,15 +2254,14 @@ static void TestRoot(TPortoAPI &api) {
         "root_readonly",
         "virt_mode",
         "aging_time",
-        "isolate_porto"
+        "porto_namespace"
     };
 
     vector<string> data = {
+        "absolute_name",
         "state",
         "oom_killed",
-        "parent",
         "respawn_count",
-        "root_pid",
         "exit_status",
         "start_errno",
         "stdout",
@@ -4201,6 +4250,7 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
         { "streams", TestStreams },
         { "ns_cg_tc", TestNsCgTc },
         { "isolate_property", TestIsolateProperty },
+        { "container_namespaces", TestContainerNamespaces },
         { "env_trim", TestEnvTrim },
         { "env_property", TestEnvProperty },
         { "user_group_property", TestUserGroupProperty },
