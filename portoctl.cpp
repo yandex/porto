@@ -531,12 +531,16 @@ public:
             if (!validProperty && !validData) {
                 /* Probably it's a valid property/data, but it isn't supported now */
                 ret = Api->GetData(argv[0], argv[i], value);
-                if (ret == EError::NotSupported) {
+                if (!ret)
+                    Print(DataValue(argv[i], value));
+                else if (ret == EError::NotSupported) {
                     PrintError("Can't get data");
                     return EXIT_FAILURE;
                 } else {
                     ret = Api->GetProperty(argv[0], argv[i], value);
-                    if (ret == EError::NotSupported) {
+                    if (!ret) {
+                        Print(PropertyValue(argv[i], value));
+                    } else if (ret == EError::NotSupported) {
                         PrintError("Can't get property");
                         return EXIT_FAILURE;
                     } else {
