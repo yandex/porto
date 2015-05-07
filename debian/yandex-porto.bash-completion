@@ -32,7 +32,7 @@ _portoctl ()
 	help)
 		COMPREPLY=( $(compgen -W "$_porto_commands" -- $cur) )
 		;;
-	create|destroy|start|restart|pause|resume)
+	create|destroy|start|stop|restart|pause|resume)
 		_porto_containers
 		;;
 	enter)
@@ -83,6 +83,16 @@ _portoctl ()
 			;;
 		4)
 			[ -z "$cur" ] && COMPREPLY=$(portoctl pget "${words[2]}" "${words[3]}" 2>/dev/null)
+			;;
+		esac
+		;;
+	kill)
+		case "$cword" in
+		2)
+			_porto_containers
+			;;
+		3)
+			COMPREPLY=( $( compgen -A signal -- $cur ) )
 			;;
 		esac
 		;;
