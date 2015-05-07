@@ -88,9 +88,9 @@ public:
 class TParentData : public TStringValue, public TContainerValue {
 public:
     TParentData() :
-        TStringValue(0),
+        TStringValue(HIDDEN_VALUE),
         TContainerValue(D_PARENT,
-                        "parent container name",
+                        "parent container name (deprecated)",
                         anyState) {}
 
     std::string GetDefault() const override {
