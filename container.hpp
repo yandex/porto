@@ -77,6 +77,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError AliasToProperty(std::string &property, std::string &value);
 
     bool Exit(int status, bool oomKilled);
+    void ExitChildren(int status, bool oomKilled);
     bool DeliverExitStatus(int pid, int status);
     bool DeliverOom(int fd);
 
@@ -93,7 +94,7 @@ public:
     std::shared_ptr<TNetwork> Net;
 
     std::string GetTmpDir() const;
-    EContainerState GetState();
+    EContainerState GetState(bool do_inspect = true);
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);
 
     TContainer(std::shared_ptr<TContainerHolder> holder,

@@ -79,8 +79,8 @@ std::string TContainer::GetTmpDir() const {
     return config().container().tmp_dir() + "/" + std::to_string(Id);
 }
 
-EContainerState TContainer::GetState() {
-    if (InGetState)
+EContainerState TContainer::GetState(bool do_inspect) {
+    if (!do_inspect || InGetState)
         return State;
 
     InGetState = true;
@@ -823,6 +823,13 @@ void TContainer::StopChildren() {
             }
 }
 
+void TContainer::ExitChildren(int status, bool oomKilled) {
+    for (auto iter : Children)
+        if (auto child = iter.lock())
+            if (child->GetState() == EContainerState::Running)
+                child->Exit(status, oomKilled);
+}
+
 TError TContainer::PrepareResources() {
     if (Parent) {
         TError error = Parent->PrepareMetaParent();
@@ -870,7 +877,8 @@ void TContainer::FreeResources() {
 }
 
 TError TContainer::Stop() {
-    auto state = GetState();
+    /* GetState can call Stop(), so be careful here */
+    auto state = GetState(false);
 
     if (state == EContainerState::Stopped ||
         state == EContainerState::Paused)
@@ -1332,7 +1340,9 @@ std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys
 }
 
 bool TContainer::Exit(int status, bool oomKilled) {
-    L(LOG_EVENT) << "Delivered " << status << " to " << GetName() << " with root_pid " << Task->GetPid() << std::endl;
+    L(LOG_EVENT) << "Exit " << GetName() << " (root_pid " << Task->GetPid() << ")"
+                 << " with status " << status << (oomKilled ? " invoked by OOM" : "")
+                 << std::endl;
 
     if (!oomKilled && !Processes().empty()) {
         L_WRN() << "Skipped bogus exit event, some process is still alive" << std::endl;
@@ -1364,7 +1374,10 @@ bool TContainer::Exit(int status, bool oomKilled) {
             L_WRN() << "Can't kill all tasks in container" << error << std::endl;
     }
 
-    StopChildren();
+    if (oomKilled)
+        ExitChildren(status, oomKilled);
+    else
+        StopChildren();
 
     if (MayRespawn())
         ScheduleRespawn();
@@ -1389,7 +1402,7 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
     if (Task->GetPid() != pid)
         return false;
 
-    if (GetState() == EContainerState::Dead)
+    if (GetState(false) == EContainerState::Dead)
         return true;
 
     return Exit(status, FdHasEvent(Efd.GetFd()));
@@ -1457,7 +1470,7 @@ bool TContainer::DeliverEvent(const TEvent &event) {
     TError error;
     switch (event.Type) {
         case EEventType::Exit:
-            if (event.Exit.Pid < 0 && GetState() == EContainerState::Running)
+            if (event.Exit.Pid < 0 && GetState(false) == EContainerState::Running)
                 return Exit(event.Exit.Status, false);
             else
                 return DeliverExitStatus(event.Exit.Pid, event.Exit.Status);
