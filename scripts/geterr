@@ -57,8 +57,8 @@ echo "Filter only hosts that have $STAT"
 parse < result.txt > result2.txt
 
 GREP=""
-[ "$STAT" = "porto_stat[errors]" ] && GREP="Error!"
-[ "$STAT" = "porto_stat[warnings]" ] && GREP="Warning!"
+[ "$STAT" = "porto_stat[errors]" ] && GREP="ERR "
+[ "$STAT" = "porto_stat[warnings]" ] && GREP="WARN "
 
 if [ ! -z "$GREP" ]; then
 	echo "Get error details"

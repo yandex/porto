@@ -79,7 +79,7 @@ static int DaemonSyncConfig(bool master) {
     DaemonOpenLog(master);
 
     if (CreatePidFile(pid.path(), pid.perm())) {
-        L() << "Can't create pid file " <<
+        L(LOG_ERROR) << "Can't create pid file " <<
             pid.path() << "!" << std::endl;
         return EXIT_FAILURE;
     }
@@ -96,9 +96,9 @@ static int DaemonPrepare(bool master) {
     if (ret)
         return ret;
 
-    L() << string(80, '-') << std::endl;
-    L() << "Started " << GIT_TAG << " " << GIT_REVISION << " " << GetPid() << std::endl;
-    L() << config().DebugString() << std::endl;
+    L(LOG_STATE) << string(80, '-') << std::endl;
+    L(LOG_STATE) << "Started " << GIT_TAG << " " << GIT_REVISION << " " << GetPid() << std::endl;
+    L(LOG_STATE) << config().DebugString() << std::endl;
 
     return EXIT_SUCCESS;
 }
@@ -106,7 +106,7 @@ static int DaemonPrepare(bool master) {
 static void DaemonShutdown(bool master, int ret) {
     const auto &pid = master ? config().master_pid() : config().slave_pid();
 
-    L() << "Stopped " << ret << std::endl;
+    L(LOG_STATE) << "Stopped " << ret << std::endl;
 
     TLogger::CloseLog();
     RemovePidFile(pid.path());
@@ -183,7 +183,7 @@ static int AcceptClient(TContext &context, int sfd,
         if (errno == EAGAIN)
             return 0;
 
-        L() << "accept() error: " << strerror(errno) << std::endl;
+        L_ERR() << "accept() error: " << strerror(errno) << std::endl;
         return -1;
     }
 
@@ -217,7 +217,7 @@ void AckExitStatus(int pid) {
 
     int ret = write(REAP_ACK_FD, &pid, sizeof(pid));
     if (ret == sizeof(pid)) {
-        L() << "Acknowledge exit status for " << std::to_string(pid) << std::endl;
+        L(LOG_NOTICE) << "Acknowledge exit status for " << std::to_string(pid) << std::endl;
     } else {
         TError error(EError::Unknown, errno, "write(): returned " + std::to_string(ret));
         if (error)
@@ -237,7 +237,7 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
     while (nr--) {
         int ret = poll(fds, 1, 0);
         if (ret < 0) {
-            L() << "poll() error: " << strerror(errno) << std::endl;
+            L(LOG_ERROR) << "poll() error: " << strerror(errno) << std::endl;
             return ret;
         }
 
@@ -246,14 +246,14 @@ static int ReapSpawner(int fd, TContainerHolder &cholder) {
 
         int pid, status;
         if (read(fd, &pid, sizeof(pid)) < 0) {
-            L() << "read(pid): " << strerror(errno) << std::endl;
+            L(LOG_ERROR) << "read(pid): " << strerror(errno) << std::endl;
             return 0;
         }
 retry:
         if (read(fd, &status, sizeof(status)) < 0) {
             if (errno == EAGAIN)
                 goto retry;
-            L() << "read(status): " << strerror(errno) << std::endl;
+            L(LOG_ERROR) << "read(status): " << strerror(errno) << std::endl;
             return 0;
         }
 
@@ -293,7 +293,7 @@ static int SlaveRpc(TContext &context) {
                             config().rpc_sock().file().perm(),
                             cred, sfd);
     if (error) {
-        L() << "Can't create RPC server: " << error.GetMsg() << std::endl;
+        L(LOG_ERROR) << "Can't create RPC server: " << error.GetMsg() << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -342,7 +342,7 @@ static int SlaveRpc(TContext &context) {
                 ret = EncodeSignal(s);
                 goto exit;
             case updateSignal:
-                L() << "Updating" << std::endl;
+                L(LOG_EVENT) << "Updating" << std::endl;
                 ret = EncodeSignal(s);
                 goto exit;
             case rotateSignal:
@@ -384,7 +384,7 @@ static int SlaveRpc(TContext &context) {
         for (auto ev : events) {
             if (ev.data.fd == sfd) {
                 if (clients.size() > config().daemon().max_clients()) {
-                    L() << "Skip connection attempt" << std::endl;
+                    L(LOG_WARN) << "Skip connection attempt" << std::endl;
                     continue;
                 }
 
@@ -405,12 +405,12 @@ static int SlaveRpc(TContext &context) {
                 // world as soon as possible)
                 continue;
             } else if (context.NetEvt && context.NetEvt->GetFd() == ev.data.fd) {
-                L() << "Refresh list of available network interfaces" << std::endl;
+                L(LOG_NOTICE) << "Refresh list of available network interfaces" << std::endl;
                 context.NetEvt->FlushEvents();
 
                 TError error = context.Net->Update();
                 if (error)
-                    L() << "Can't refresh list of network interfaces: " << error << std::endl;
+                    L(LOG_ERROR) << "Can't refresh list of network interfaces: " << error << std::endl;
             } else if (clients.find(ev.data.fd) != clients.end()) {
                 auto client = clients[ev.data.fd];
                 bool needClose = false;
@@ -484,13 +484,13 @@ static int SlaveMain() {
 
     ret = TuneLimits();
     if (ret) {
-        L() << "Can't set correct limits: " << strerror(errno) << std::endl;
+        L(LOG_ERROR) << "Can't set correct limits: " << strerror(errno) << std::endl;
         return ret;
     }
 
     if (config().network().enabled()) {
         if (system("modprobe cls_cgroup")) {
-            L() << "Can't load cls_cgroup kernel module: " << strerror(errno) << std::endl;
+            L(LOG_ERROR) << "Can't load cls_cgroup kernel module: " << strerror(errno) << std::endl;
             if (!failsafe)
                 return EXIT_FAILURE;
 
@@ -499,13 +499,13 @@ static int SlaveMain() {
     }
 
     if (fcntl(REAP_EVT_FD, F_SETFD, FD_CLOEXEC) < 0) {
-        L() << "Can't set close-on-exec flag on REAP_EVT_FD: " << strerror(errno) << std::endl;
+        L(LOG_ERROR) << "Can't set close-on-exec flag on REAP_EVT_FD: " << strerror(errno) << std::endl;
         if (!failsafe)
             return EXIT_FAILURE;
     }
 
     if (fcntl(REAP_ACK_FD, F_SETFD, FD_CLOEXEC) < 0) {
-        L() << "Can't set close-on-exec flag on REAP_ACK_FD: " << strerror(errno) << std::endl;
+        L(LOG_ERROR) << "Can't set close-on-exec flag on REAP_ACK_FD: " << strerror(errno) << std::endl;
         if (!failsafe)
             return EXIT_FAILURE;
     }
@@ -532,12 +532,12 @@ static int SlaveMain() {
         bool restored = context.Cholder->RestoreFromStorage();
         context.Vholder->RestoreFromStorage();
 
-        L() << "Done restoring" << std::endl;
+        L(LOG_NOTICE) << "Done restoring" << std::endl;
 
         cs.Destroy();
 
         if (!restored) {
-            L() << "Remove container leftovers from previous run..." << std::endl;
+            L(LOG_NOTICE) << "Remove container leftovers from previous run..." << std::endl;
             RemoveIf(config().container().tmp_dir(),
                      EFileType::Directory,
                      [](const std::string &name, const TPath &path) {
@@ -547,7 +547,7 @@ static int SlaveMain() {
         }
 
         ret = SlaveRpc(context);
-        L() << "Shutting down..." << std::endl;
+        L(LOG_STATE) << "Shutting down..." << std::endl;
 
         RemoveRpcServer(config().rpc_sock().file().path());
     } catch (string s) {
@@ -571,12 +571,12 @@ static int SlaveMain() {
 }
 
 static void DeliverPidStatus(int fd, int pid, int status, size_t queued) {
-    L() << "Deliver " << pid << " status " << status << " (" << queued << " queued)" << std::endl;
+    L(LOG_EVENT) << "Deliver " << pid << " status " << status << " (" << queued << " queued)" << std::endl;
 
     if (write(fd, &pid, sizeof(pid)) < 0)
-        L() << "write(pid): " << strerror(errno) << std::endl;
+        L(LOG_ERROR) << "write(pid): " << strerror(errno) << std::endl;
     if (write(fd, &status, sizeof(status)) < 0)
-        L() << "write(status): " << strerror(errno) << std::endl;
+        L(LOG_ERROR) << "write(status): " << strerror(errno) << std::endl;
 }
 
 static int ReapDead(int fd, map<int,int> &exited, int slavePid, int &slaveStatus, std::set<int> &acked) {
@@ -620,7 +620,7 @@ static void ReceiveAcks(int fd, std::map<int,int> &exited,
             exited.erase(pid);
 
         Statistics->QueuedStatuses = exited.size();
-        L() << "Got acknowledge for " << pid << " (" << exited.size() << " queued)" << std::endl;
+        L(LOG_EVENT) << "Got acknowledge for " << pid << " (" << exited.size() << " queued)" << std::endl;
     }
 }
 
@@ -692,18 +692,18 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
     slavePid = 0;
 
     if (pipe2(evtfd, O_NONBLOCK) < 0) {
-        L() << "pipe(): " << strerror(errno) << std::endl;
+        L(LOG_ERROR) << "pipe(): " << strerror(errno) << std::endl;
         return EXIT_FAILURE;
     }
 
     if (pipe2(ackfd, O_NONBLOCK) < 0) {
-        L() << "pipe(): " << strerror(errno) << std::endl;
+        L(LOG_ERROR) << "pipe(): " << strerror(errno) << std::endl;
         return EXIT_FAILURE;
     }
 
     slavePid = fork();
     if (slavePid < 0) {
-        L() << "fork(): " << strerror(errno) << std::endl;
+        L(LOG_ERROR) << "fork(): " << strerror(errno) << std::endl;
         ret = EXIT_FAILURE;
         goto exit;
     } else if (slavePid == 0) {
@@ -722,7 +722,7 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
     close(evtfd[0]);
     close(ackfd[1]);
 
-    L() << "Spawned slave " << slavePid << std::endl;
+    L(LOG_STATE) << "Spawned slave " << slavePid << std::endl;
     Statistics->Spawned++;
 
     for (auto &pair : exited)
@@ -749,9 +749,9 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
             case SIGINT:
             case SIGTERM:
                 if (kill(slavePid, s) < 0)
-                    L() << "Can't send " << s << " to slave" << std::endl;
+                    L(LOG_ERROR) << "Can't send " << s << " to slave" << std::endl;
 
-                L() << "Waiting for slave to exit..." << std::endl;
+                L(LOG_NOTICE) << "Waiting for slave to exit..." << std::endl;
                 (void)RetryFailed(10, 50,
                 [&]() { return waitpid(slavePid, nullptr, WNOHANG) != slavePid; });
 
@@ -763,7 +763,7 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
                 if (ret)
                     return ret;
 
-                L() << "Updating" << std::endl;
+                L(LOG_STATE) << "Updating" << std::endl;
 
                 const char *stdlogArg = nullptr;
                 if (stdlog)
@@ -772,10 +772,10 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
                 SaveStatuses(exited);
 
                 if (kill(slavePid, updateSignal) < 0) {
-                    L() << "Can't send " << updateSignal << " to slave: " << strerror(errno) << std::endl;
+                    L(LOG_ERROR) << "Can't send " << updateSignal << " to slave: " << strerror(errno) << std::endl;
                 } else {
                     if (waitpid(slavePid, NULL, 0) != slavePid)
-                        L() << "Can't wait for slave exit status: " << strerror(errno) << std::endl;
+                        L(LOG_ERROR) << "Can't wait for slave exit status: " << strerror(errno) << std::endl;
                 }
                 TLogger::CloseLog();
                 close(evtfd[1]);
@@ -801,14 +801,14 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
             if (ev.data.fd == ackfd[0]) {
                 ReceiveAcks(ackfd[0], exited, acked);
             } else {
-                L() << "master received unknown epoll event: " << ev.data.fd << std::endl;
+                L(LOG_WARN) << "master received unknown epoll event: " << ev.data.fd << std::endl;
                 loop.RemoveFd(ev.data.fd);
             }
         }
 
         int status;
         if (ReapDead(evtfd[1], exited, slavePid, status, acked)) {
-            L() << "slave exited with " << status << std::endl;
+            L(LOG_STATE) << "slave exited with " << status << std::endl;
             ret = EXIT_SUCCESS;
             goto exit;
         }
@@ -851,7 +851,7 @@ static int MasterMain() {
 
     int prevMaj, prevMin;
     CheckVersion(prevMaj, prevMin);
-    L() << "Updating from previous version v" << prevMaj << "." << prevMin << std::endl;
+    L(LOG_STATE) << "Updating from previous version v" << prevMaj << "." << prevMin << std::endl;
 
     TEpollLoop ELoop;
     TError error = ELoop.Create();
@@ -880,7 +880,7 @@ static int MasterMain() {
         size_t started = GetCurrentTimeMs();
         size_t next = started + config().container().respawn_delay_ms();
         ret = SpawnSlave(ELoop, exited);
-        L() << "Returned " << ret << std::endl;
+        L(LOG_NOTICE) << "Returned " << ret << std::endl;
         if (next >= GetCurrentTimeMs())
             usleep((next - GetCurrentTimeMs()) * 1000);
 

@@ -25,7 +25,7 @@ using std::set;
 using std::shared_ptr;
 
 TError TMount::Mount(unsigned long flags) const {
-    L() << "mount " << Target << " " << flags << std::endl;
+    L(LOG_ACTION) << "mount " << Target << " " << flags << std::endl;
 
     int ret = RetryBusy(10, 100, [&]{ return mount(Source.ToString().c_str(),
                                                    Target.ToString().c_str(),
@@ -39,7 +39,7 @@ TError TMount::Mount(unsigned long flags) const {
 }
 
 TError TMount::Umount() const {
-    L() << "umount " << Target << std::endl;
+    L(LOG_ACTION) << "umount " << Target << std::endl;
 
     int ret = RetryBusy(10, 100, [&]{ return umount(Target.ToString().c_str()); });
     if (ret)
@@ -143,7 +143,7 @@ TError TMountSnapshot::RemountSlave() {
         // to MS_SLAVE, nothing is remounted or mounted over
         error = m->Mount(MS_SLAVE);
         if (error)
-            L() << "Can't remount " << m->GetMountpoint() << std::endl;
+            L(LOG_ERROR) << "Can't remount " << m->GetMountpoint() << std::endl;
     }
 
     return TError::Success();
@@ -159,13 +159,13 @@ TError GetLoopDev(int &nr) {
     if (nr < 0)
         return TError(EError::Unknown, errno, "ioctl(LOOP_CTL_GET_FREE)");
 
-    L() << "Loop device allocate " << nr << std::endl;
+    L(LOG_NOTICE) << "Loop device allocate " << nr << std::endl;
 
     return TError::Success();
 }
 
 TError PutLoopDev(const int nr) {
-    L() << "Loop device free " << nr << std::endl;
+    L(LOG_ACTION) << "Loop device free " << nr << std::endl;
 
     std::string dev = "/dev/loop" + std::to_string(nr);
 
@@ -183,7 +183,7 @@ TError PutLoopDev(const int nr) {
 TError TLoopMount::Mount() {
     std::string dev = "/dev/loop" + std::to_string(LoopNr);
 
-    L() << "Mount loop device " << dev << " " << Source  << " -> " << Target << std::endl;
+    L(LOG_ACTION) << "Mount loop device " << dev << " " << Source  << " -> " << Target << std::endl;
 
     TScopedFd imageFd, loopFd;
     imageFd = open(Source.ToString().c_str(), O_RDWR | O_CLOEXEC);
@@ -210,7 +210,7 @@ TError TLoopMount::Mount() {
 TError TLoopMount::Umount() {
     std::string dev = "/dev/loop" + std::to_string(LoopNr);
 
-    L() << "Umount loop device " << dev << " " << Source << " -> " << Target << std::endl;
+    L(LOG_ACTION) << "Umount loop device " << dev << " " << Source << " -> " << Target << std::endl;
 
     TMount m(dev, Target, Type, {});
     TError error = m.Umount();

@@ -28,6 +28,19 @@ public:
     std::string GetContainerName() const;
     std::shared_ptr<TContainer> GetContainer() const;
 
+    friend std::ostream& operator<<(std::ostream& stream, TClient& client) {
+        if (client.FullLog) {
+            client.FullLog = false;
+            stream << client.Comm << "(" << client.Pid << ") "
+                   << client.Cred.UserAsString() << ":"
+                   << client.Cred.GroupAsString() << " "
+                   << client.GetContainerName();
+        } else {
+            stream << client.Comm << "(" << client.Pid << ")";
+        }
+        return stream;
+    }
+
 private:
     int Fd;
     pid_t Pid;
@@ -37,4 +50,6 @@ private:
 
     TError IdentifyContainer(TContainerHolder &holder);
     std::weak_ptr<TContainer> Container;
+
+    bool FullLog = true;
 };

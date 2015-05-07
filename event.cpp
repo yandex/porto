@@ -29,7 +29,7 @@ void TEventQueue::Add(size_t timeoutMs, const TEvent &e) {
     copy.DueMs = GetCurrentTimeMs() + timeoutMs;
 
     if (config().log().verbose())
-        L() << "Schedule event " << e.GetMsg() << " in " << timeoutMs << std::endl;
+        L(LOG_ACTION) << "Schedule event " << e.GetMsg() << " in " << timeoutMs << std::endl;
 
     Queue.push(copy);
 }

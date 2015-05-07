@@ -1274,7 +1274,7 @@ public:
         TFile f("/proc/sys/kernel/cap_last_cap");
         TError error = f.AsUint64(lastCap);
         if (error)
-            L() << "Can't read /proc/sys/kernel/cap_last_cap, assuming 3.10 kernel" << std::endl;
+            L(LOG_WARN) << "Can't read /proc/sys/kernel/cap_last_cap, assuming 3.10 kernel" << std::endl;
         return lastCap;
     }
 

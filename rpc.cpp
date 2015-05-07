@@ -35,10 +35,10 @@ static void SendReply(std::shared_ptr<TClient> client,
     size_t execTimeMs = GetCurrentTimeMs() - client->GetRequestStartMs();
     if (response.IsInitialized()) {
         if (!WriteDelimitedTo(response, &post))
-            L() << "Write error for " << client->GetFd() << std:: endl;
+            L_ERR() << "Write error for " << client->GetFd() << std:: endl;
         else if (log)
-            L() << "<- " << response.ShortDebugString() << " " << execTimeMs
-                << "ms " << client->GetPid() << std::endl;
+            L(LOG_RESPONSE) << response.ShortDebugString() << " to " << *client
+                            << " (request took " << execTimeMs << "ms)" << std::endl;
         post.Flush();
     }
 }
@@ -309,12 +309,12 @@ static TError CreateVolume(TContext &context,
         },
         [volume, c] (TError error) {
             if (error) {
-                L() << "Can't construct volume: " << error << std::endl;
+                L_WRN() << "Can't construct volume: " << error << std::endl;
                 (void)volume->Destroy();
             } else {
                 error = volume->SetValid(true);
                 if (error) {
-                    L() << "Can't mark volume valid: " << error << std::endl;
+                    L_WRN() << "Can't mark volume valid: " << error << std::endl;
                     (void)volume->Destroy();
                 }
             }
@@ -339,7 +339,7 @@ static TError DestroyVolume(TContext &context,
 
         error = volume->SetValid(false);
         if (error) {
-            L() << "Can't mark volume invalid: " << error << std::endl;
+            L_WRN() << "Can't mark volume invalid: " << error << std::endl;
             (void)volume->Destroy();
         }
 
@@ -350,7 +350,7 @@ static TError DestroyVolume(TContext &context,
             },
             [volume, c] (TError error) {
                 if (error)
-                    L() << "Can't deconstruct volume: " << error << std::endl;
+                    L_WRN() << "Can't deconstruct volume: " << error << std::endl;
 
                 if (!error)
                     error = volume->Destroy();
@@ -400,10 +400,7 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
 
     bool log = !InfoRequest(req);
     if (log)
-        L() << "-> " << req.ShortDebugString() << " pid " << client->GetPid()
-            << " uid " << client->GetCred().Uid << " gid " << client->GetCred().Gid
-            << " comm " << client->GetComm() << " cont " << client->GetContainerName()
-            << std::endl;
+        L(LOG_REQUEST) << req.ShortDebugString() << " from " << *client << std::endl;
 
     rsp.set_error(EError::Unknown);
 

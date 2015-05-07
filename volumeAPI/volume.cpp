@@ -455,7 +455,7 @@ TError TVolumeHolder::RestoreFromStorage() {
             continue;
         }
 
-        L() << "Volume " << v->GetPath() << " restored." << std::endl;
+        L(LOG_NOTICE) << "Volume " << v->GetPath() << " restored." << std::endl;
     }
 
     return TError::Success();
@@ -561,7 +561,7 @@ TError TResource::Copy(const TPath &to) const {
 }
 
 TError TResource::Destroy() const {
-    L() << "Destroy resource " << Path.ToString() << std::endl;
+    L(LOG_ACTION) << "Destroy resource " << Path.ToString() << std::endl;
 
     if (Path.Exists()) {
         TFolder dir(Path);

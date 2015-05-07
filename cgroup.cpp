@@ -158,7 +158,7 @@ TError TCgroup::Create() {
 
     TFolder f(Path());
     if (!f.Exists()) {
-        L() << "Create cgroup " << Path() << std::endl;
+        L(LOG_ACTION) << "Create cgroup " << Path() << std::endl;
 
         TError error = f.Create(Mode);
         if (error) {
@@ -190,9 +190,9 @@ TError TCgroup::Remove() {
                                return !IsEmpty(); });
 
     if (ret)
-        L() << "Can't kill all tasks in cgroup " << Path() << std::endl;
+        L_WRN() << "Can't kill all tasks in cgroup " << Path() << std::endl;
 
-    L() << "Remove cgroup " << Path() << std::endl;
+    L(LOG_ACTION) << "Remove cgroup " << Path() << std::endl;
     TFolder f(Path());
     return f.Remove();
 }
@@ -239,7 +239,7 @@ TError TCgroup::GetKnobValueAsLines(const std::string &knob, vector<string> &lin
 TError TCgroup::SetKnobValue(const std::string &knob, const std::string &value, bool append) const {
     TFile f(Path() + "/" + knob);
 
-    L() << "Set " << Path() << "/" << knob << " = " << value << std::endl;
+    L(LOG_ACTION) << "Set " << Path() << "/" << knob << " = " << value << std::endl;
 
     if (append)
         return f.AppendString(value);

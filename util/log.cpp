@@ -117,7 +117,14 @@ TLogBuf::int_type TLogBuf::overflow(int_type ch) {
 }
 
 std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
-    static const std::string prefix[] = { "", "Warning! ", "Error! " };
+    static const std::string prefix[] = { "     ",
+                                          "WARN ",
+                                          "ERR  ",
+                                          "EVT  ",
+                                          "ACT  ",
+                                          "REQ  ",
+                                          "RESP ",
+                                          "STAT "};
     std::string name = GetProcessName();
 
 #ifdef PORTOD

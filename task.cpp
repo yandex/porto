@@ -225,11 +225,11 @@ TError TTask::ChildExec() {
 
     auto envp = Env->GetEnvp();
     if (config().log().verbose()) {
-        L() << "command=" << Env->Command << std::endl;
+        L(LOG_NOTICE) << "command=" << Env->Command << std::endl;
         for (unsigned i = 0; result.we_wordv[i]; i++)
-            L() << "argv[" << i << "]=" << result.we_wordv[i] << std::endl;
+            L(LOG_NOTICE) << "argv[" << i << "]=" << result.we_wordv[i] << std::endl;
         for (unsigned i = 0; envp[i]; i++)
-            L() << "environ[" << i << "]=" << envp[i] << std::endl;
+            L(LOG_NOTICE) << "environ[" << i << "]=" << envp[i] << std::endl;
     }
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
 
@@ -549,7 +549,7 @@ TError TTask::IsolateNet(int childPid) {
             hw = GenerateHw(Env->Hostname, mvlan.Master + mvlan.Name);
 
         if (config().network().debug())
-            L() << "Using " << hw << " for " << mvlan.Master << " -> " << mvlan.Name << std::endl;
+            L(LOG_NOTICE) << "Using " << hw << " for " << mvlan.Master << " -> " << mvlan.Name << std::endl;
 
         TError error = link->AddMacVlan(mvlan.Master, mvlan.Type, hw, mvlan.Mtu);
         if (error)
@@ -571,7 +571,7 @@ TError TTask::IsolateNet(int childPid) {
             hw = GenerateHw(Env->Hostname, veth.Name + veth.Peer);
 
         if (config().network().debug())
-            L() << "Using " << hw << " for " << veth.Name << " -> " << veth.Peer << std::endl;
+            L(LOG_NOTICE) << "Using " << hw << " for " << veth.Name << " -> " << veth.Peer << std::endl;
 
         error = bridge->AddVeth(veth.Name, veth.Peer, hw, veth.Mtu, childPid);
         if (error)
@@ -850,7 +850,7 @@ TError TTask::Start() {
     if (error || status) {
         if (Pid > 0) {
             (void)kill(Pid, SIGKILL);
-            L() << "Kill partly constructed container " << Pid << ": " << strerror(errno) << std::endl;
+            L(LOG_ACTION) << "Kill partly constructed container " << Pid << ": " << strerror(errno) << std::endl;
         }
         Pid = 0;
         ExitStatus = -1;
@@ -887,7 +887,7 @@ TError TTask::Kill(int signal) const {
     if (!Pid)
         throw "Tried to kill invalid process!";
 
-    L() << "kill " << signal << " " << Pid << std::endl;
+    L(LOG_ACTION) << "kill " << signal << " " << Pid << std::endl;
 
     int ret = kill(Pid, signal);
     if (ret != 0)
@@ -978,17 +978,17 @@ TError TTask::Restore(int pid_,
         TPath stdinLink("/proc/" + std::to_string(Pid) + "/fd/0");
         TError error = stdinLink.ReadLink(Env->StdinPath);
         if (error)
-            L() << "Can't restore stdin: " << error << std::endl;
+            L(LOG_ERROR) << "Can't restore stdin: " << error << std::endl;
 
         TPath stdoutLink("/proc/" + std::to_string(Pid) + "/fd/1");
         error = stdoutLink.ReadLink(Env->StdoutPath);
         if (error)
-            L() << "Can't restore stdout: " << error << std::endl;
+            L(LOG_ERROR) << "Can't restore stdout: " << error << std::endl;
 
         TPath stderrLink("/proc/" + std::to_string(Pid) + "/fd/2");
         error = stderrLink.ReadLink(Env->StderrPath);
         if (error)
-            L() << "Can't restore stderr: " << error << std::endl;
+            L(LOG_ERROR) << "Can't restore stderr: " << error << std::endl;
 
         if (IsValid()) {
             error = FixCgroups();

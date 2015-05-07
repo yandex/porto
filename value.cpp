@@ -261,7 +261,7 @@ TError TValueMap::Restore(const kv::TNode &node) {
             continue;
 
         if (config().log().verbose())
-            L() << "Restoring " << key << " = " << value << std::endl;
+            L(LOG_ACTION) << "Restoring " << key << " = " << value << std::endl;
 
         TError error = av->FromString(value);
         if (error)
@@ -317,7 +317,7 @@ TError TValueMap::Sync() {
         pair->set_val(ToString(name));
 
         if (config().log().verbose())
-            L() << "Sync " << name << " = " << ToString(name) << std::endl;
+            L(LOG_ACTION) << "Sync " << name << " = " << ToString(name) << std::endl;
     }
 
     return KvNode->Append(node);

@@ -69,7 +69,7 @@ public:
         TFile loopFile(LoopPath);
 
         if (LoopDev >= 0) {
-            L() << "Allocate loop image with size " << Volume->GetParsedQuota() << std::endl;
+            L(LOG_ACTION) << "Allocate loop image with size " << Volume->GetParsedQuota() << std::endl;
             error = AllocLoop(LoopPath, Volume->GetParsedQuota());
             if (error)
                 return error;
@@ -530,7 +530,7 @@ TError TVolumeHolder::RestoreFromStorage() {
         return error;
 
     for (auto &i : list) {
-        L() << "Restore volume " << i->GetName() << std::endl;
+        L(LOG_ACTION) << "Restore volume " << i->GetName() << std::endl;
 
         std::shared_ptr<TVolume> v = std::make_shared<TVolume>(i, shared_from_this());
 
@@ -542,17 +542,17 @@ TError TVolumeHolder::RestoreFromStorage() {
             continue;
         }
 
-        L() << "Volume " << v->GetPath() << " restored" << std::endl;
+        L(LOG_NOTICE) << "Volume " << v->GetPath() << " restored" << std::endl;
     }
 
-    L() << "Remove stale resources..." << std::endl;
+    L(LOG_ACTION) << "Remove stale resources..." << std::endl;
     RemoveIf(config().volumes().resource_dir(),
              EFileType::Directory,
              [&](const std::string &name, const TPath &path) {
                 return Resources.find(path) == Resources.end();
              });
 
-    L() << "Remove stale volumes..." << std::endl;
+    L(LOG_ACTION) << "Remove stale volumes..." << std::endl;
     RemoveIf(config().volumes().volume_dir(),
              EFileType::Directory,
              [&](const std::string &name, const TPath &path) {
@@ -563,7 +563,7 @@ TError TVolumeHolder::RestoreFromStorage() {
                 return !used;
              });
 
-    L() << "Remove stale loop device images..." << std::endl;
+    L(LOG_ACTION) << "Remove stale loop device images..." << std::endl;
     RemoveIf(config().volumes().volume_dir(),
              EFileType::Regular,
              [&](const std::string &name, const TPath &path) {
@@ -642,7 +642,7 @@ TError TResource::Prepare() {
 TError TResource::Create() const {
     TPath p = Path.AddComponent(".done");
 
-    L() << "Create resource " << Path << " from " << Source << " (" << p.Exists() << ")" << std::endl;
+    L(LOG_ACTION) << "Create resource " << Path << " from " << Source << " (" << p.Exists() << ")" << std::endl;
 
     if (!p.Exists()) {
         TError error = Untar(Source, Path);
@@ -671,7 +671,7 @@ TError TResource::Copy(const TPath &to) const {
 }
 
 TError TResource::Destroy() const {
-    L() << "Destroy resource " << Path << " (" << Path.Exists() << ")" << std::endl;
+    L(LOG_ACTION) << "Destroy resource " << Path << " (" << Path.Exists() << ")" << std::endl;
 
     if (Path.Exists()) {
         TFolder dir(Path);

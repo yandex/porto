@@ -56,7 +56,7 @@ static std::string MapToStr(const std::map<std::string, uint64_t> &m) {
 void TTclass::Prepare(std::map<std::string, uint64_t> prio,
                        std::map<std::string, uint64_t> rate,
                        std::map<std::string, uint64_t> ceil) {
-    L() << "Prepare tc class 0x" << std::hex << Handle << std::dec << " prio={" << MapToStr(prio) << "} rate={" << MapToStr(rate) << "} ceil={" << MapToStr(ceil) << "}" << std::endl;
+    L(LOG_ACTION) << "Prepare tc class 0x" << std::hex << Handle << std::dec << " prio={" << MapToStr(prio) << "} rate={" << MapToStr(rate) << "} ceil={" << MapToStr(ceil) << "}" << std::endl;
     Prio = prio;
     Rate = rate;
     Ceil = ceil;
@@ -192,7 +192,7 @@ TError TFilter::Create() {
 }
 
 TError TNetwork::Destroy() {
-    L() << "Removing network..." << std::endl;
+    L(LOG_ACTION) << "Removing network..." << std::endl;
 
     if (Tclass) {
         TError error = Tclass->Remove();
@@ -244,7 +244,7 @@ TError TNetwork::Update() {
     if (!config().network().dynamic_ifaces())
         return TError::Success();
 
-    L() << "Update network" << std::endl;
+    L(LOG_NOTICE) << "Update network" << std::endl;
 
     std::vector<std::shared_ptr<TNlLink>> newLinks;
 
@@ -259,12 +259,12 @@ TError TNetwork::Update() {
                               });
 
         if (i == Links.end()) {
-            L() << "Found new link: " << link->GetAlias() << std::endl;
+            L(LOG_NOTICE) << "Found new link: " << link->GetAlias() << std::endl;
             TError error = PrepareLink(link);
             if (error)
                 return error;
         } else {
-            L() << "Found existing link: " << link->GetAlias() << std::endl;
+            L(LOG_NOTICE) << "Found existing link: " << link->GetAlias() << std::endl;
         }
     }
 
@@ -278,7 +278,7 @@ TError TNetwork::PrepareLink(std::shared_ptr<TNlLink> link) {
     // (unclassified        1:3 container a, 1:4 container b
     //          traffic)    1:5 container a/c
 
-    L() << "Prepare link " << link->GetAlias() << " " << link->GetIndex() << std::endl;
+    L(LOG_NOTICE) << "Prepare link " << link->GetAlias() << " " << link->GetIndex() << std::endl;
 
     TNlHtb qdisc(link, TcRootHandle(), rootHandle);
 

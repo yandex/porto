@@ -27,7 +27,7 @@ TFolder::~TFolder() {
 }
 
 TError TFolder::Create(mode_t mode, bool recursive) const {
-    L() << "mkdir " << Path << std::endl;
+    L(LOG_ACTION) << "mkdir " << Path << std::endl;
 
     if (recursive) {
         string copy(Path.ToString());
@@ -71,7 +71,7 @@ TError TFolder::Remove(bool recursive, bool silent) const {
     }
 
     if (!silent)
-        L() << "rmdir " << Path << std::endl;
+        L(LOG_ACTION) << "rmdir " << Path << std::endl;
 
     if (!Path.Exists())
         return TError::Success();
@@ -118,7 +118,7 @@ TError TFolder::Items(const EFileType type, std::vector<std::string> &list) cons
 }
 
 TError TFolder::Copy(const TPath &dir) const {
-    L() << "cp " << Path << " " << dir << std::endl;
+    L(LOG_ACTION) << "cp " << Path << " " << dir << std::endl;
 
     std::vector<std::string> list;
     TError error = Items(EFileType::Any, list);
@@ -169,7 +169,7 @@ void RemoveIf(const TPath &path,
     for (auto &entry : list) {
         TPath id = path.AddComponent(entry);
         if (f(entry, id)) {
-            L() << "Removing " << id << std::endl;
+            L(LOG_ACTION) << "Removing " << id << std::endl;
             TMount m(id, id, "", {});
             (void)m.Umount();
 

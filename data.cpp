@@ -515,7 +515,7 @@ public:
         uint64_t usage = 0;
         TError error = memorySubsystem->Usage(memorySubsystem->GetRootCgroup()->GetChild(PORTO_DAEMON_CGROUP), usage);
         if (error)
-            L() << "Can't get memory usage of portod" << std::endl;
+            L(LOG_ERROR) << "Can't get memory usage of portod" << std::endl;
         m["memory_usage_mb"] = usage / 1024 / 1024;
 
         return m;
