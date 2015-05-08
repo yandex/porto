@@ -91,9 +91,9 @@ void TContainer::UpdateMetaState() {
 }
 
 void TContainer::SyncStateWithCgroup() {
-    if (Restored && State == EContainerState::Running &&
+    if (LostAndRestored && State == EContainerState::Running &&
         (!Task || Processes().empty())) {
-        L(LOG_NOTICE) << "Restored container " << GetName() << " is empty"
+        L(LOG_NOTICE) << "Lost and restored container " << GetName() << " is empty"
                       << ", mark them dead." << std::endl;
         Exit(-1, false);
     }
@@ -1206,7 +1206,6 @@ TError TContainer::Prepare() {
 
 TError TContainer::Restore(const kv::TNode &node) {
     L(LOG_ACTION) << "Restore " << GetName() << " with id " << Id << std::endl;
-    Restored = true;
 
     TError error = Prepare();
     if (error)
@@ -1279,8 +1278,28 @@ TError TContainer::Restore(const kv::TNode &node) {
                               Prop->Get<std::string>(P_STDIN_PATH),
                               Prop->Get<std::string>(P_STDOUT_PATH),
                               Prop->Get<std::string>(P_STDERR_PATH));
-        if (error)
+        if (error) {
             L_ERR() << "Can't restore task: " << error << std::endl;
+            LostAndRestored = true;
+        } else {
+            pid_t ppid;
+            TError err = Task->GetPPid(ppid);
+            if (err) {
+                L(LOG_NOTICE) << "Can't get ppid of restored task: " << err << std::endl;
+                LostAndRestored = true;
+            } else if (ppid != getppid()) {
+                L(LOG_NOTICE) << "Container " << GetName()
+                              << " seems to be reparented to init ("
+                              << ppid << " != " << getppid() << ")"
+                              << std::endl;
+                LostAndRestored = true;
+            } else {
+                L(LOG_NOTICE) << "Container " << GetName()
+                              << " seems to be not reparented ("
+                              << ppid << " == " << getppid() << ")"
+                              << std::endl;
+            }
+        }
 
         auto state = Data->Get<std::string>(D_STATE);
         if (state == ContainerStateName(EContainerState::Dead)) {

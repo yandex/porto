@@ -162,6 +162,8 @@ public:
     TError FixCgroups() const;
     TError Rotate() const;
     void Abort(const TError &error) const;
+
+    TError GetPPid(pid_t &ppid) const;
 };
 
 TError TaskGetLastCap();

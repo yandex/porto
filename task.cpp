@@ -1075,6 +1075,23 @@ TError TTask::Rotate() const {
     return TError::Success();
 }
 
+TError TTask::GetPPid(pid_t &ppid) const {
+    TFile f("/proc/" + std::to_string(Pid) + "/status");
+
+    std::vector<std::string> lines;
+    TError err = f.AsLines(lines);
+    if (err)
+        return err;
+
+    for (auto &l : lines)
+        if (l.compare(0, 6, "PPid:\t") == 0)
+            return StringToInt(l.substr(6), ppid);
+
+    L_WRN() << "Can't parse /proc/pid/status" << std::endl;
+
+    return TError(EError::Unknown, "Can't parse /proc/pid/status");
+}
+
 TError TaskGetLastCap() {
     TFile f("/proc/sys/kernel/cap_last_cap");
     return f.AsInt(lastCap);

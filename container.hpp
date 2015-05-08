@@ -48,7 +48,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     int TaskStartErrno = -1;
     TScopedFd Efd;
     size_t CgroupEmptySince = 0;
-    bool Restored = false;
+    bool LostAndRestored = false;
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
 
