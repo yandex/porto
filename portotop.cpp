@@ -530,11 +530,23 @@ void TRowTree::Sort(TColumn &column) {
             std::string str1 = column.at(*row1);
             std::string str2 = column.at(*row2);
 
+            bool numeric_1 = false, numeric_2 = false;
+            double v1, v2;
+
             try {
-                return stod(str1) > stod(str2);
-            } catch (...) {
+                v1 = stod(str1);
+                numeric_1 = true;
+            } catch (...) {}
+            try {
+                v2 = stod(str2);
+                numeric_2 = true;
+            } catch (...) {}
+
+            if (numeric_1 && numeric_2)
+                return v1 > v2;
+            if (!numeric_1 && !numeric_2)
                 return str1 < str2;
-            }
+            return numeric_1;
         });
     for (auto &c : Children)
         c->Sort(column);
@@ -662,22 +674,22 @@ public:
         unsigned long gone_ms = 1000 * (Now.tv_sec - LastUpdate.tv_sec) +
             (Now.tv_nsec - LastUpdate.tv_nsec) / 1000000;
 
-        if (gone_ms < 300)
-            return;
+        if (!RowTree || gone_ms > 300) {
+            std::vector<std::string> containers;
+            int ret = Api->List(containers);
+            if (ret) {
+                int error;
+                std::string msg;
+                Api->GetLastError(error, msg);
+                throw "Can't list containers: " + msg;
+            }
 
-        std::vector<std::string> containers;
-        int ret = Api->List(containers);
-        if (ret) {
-            int error;
-            std::string msg;
-            Api->GetLastError(error, msg);
-            throw "Can't list containers: " + msg;
+            if (RowTree)
+                delete RowTree;
+
+            RowTree = TRowTree::ContainerTree(containers);
         }
 
-        if (RowTree)
-            delete RowTree;
-
-        RowTree = TRowTree::ContainerTree(containers);
         if (RowTree) {
             MaxMaxLevel = RowTree->GetMaxLevel();
 
