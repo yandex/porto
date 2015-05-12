@@ -80,12 +80,10 @@ std::string TContainer::GetTmpDir() const {
 }
 
 EContainerState TContainer::GetState() {
-    static bool rec = false;
-
-    if (rec)
+    if (InGetState)
         return State;
 
-    rec = true;
+    InGetState = true;
 
     if (State == EContainerState::Running && (!Task || Processes().empty())) {
         // We can't just change our state to Dead if we see container
@@ -110,7 +108,7 @@ EContainerState TContainer::GetState() {
         if (!HaveRunningChildren())
             Stop();
 
-    rec = false;
+    InGetState = false;
 
     return State;
 }
