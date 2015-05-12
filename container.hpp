@@ -48,6 +48,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     int TaskStartErrno = -1;
     TScopedFd Efd;
     size_t CgroupEmptySince = 0;
+    bool Restored = false;
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
 
@@ -94,7 +95,7 @@ public:
     std::shared_ptr<TNetwork> Net;
 
     std::string GetTmpDir() const;
-    EContainerState GetState(bool do_inspect = true);
+    EContainerState GetState();
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);
 
     TContainer(std::shared_ptr<TContainerHolder> holder,

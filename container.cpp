@@ -79,38 +79,24 @@ std::string TContainer::GetTmpDir() const {
     return config().container().tmp_dir() + "/" + std::to_string(Id);
 }
 
-EContainerState TContainer::GetState(bool do_inspect) {
-    if (!do_inspect || InGetState)
-        return State;
+EContainerState TContainer::GetState() {
+    return State;
+}
 
-    InGetState = true;
-
-    if (State == EContainerState::Running && (!Task || Processes().empty())) {
-        // We can't just change our state to Dead if we see container
-        // with empty cgroup because we may race with event signaling
-        // process death. Use small delay here to let actual event be
-        // delivered and only then assume that something got wrong
-        // and simulate container death.
-        if (!CgroupEmptySince) {
-            CgroupEmptySince = GetCurrentTimeMs();
-            L(LOG_NOTICE) << "Container " << GetName() << " seems to be empty, start timer" << std::endl;
-        }
-
-        auto timeoutMs = config().container().empty_wait_timeout_ms();
-        if (CgroupEmptySince + timeoutMs < GetCurrentTimeMs()) {
-            L(LOG_NOTICE) << "Container " << GetName() << " is empty for " << timeoutMs << "ms, kill it" << std::endl;
-            Exit(-1, false);
-        }
-    }
-
+void TContainer::UpdateMetaState() {
     // TODO: use some kind of reference count for accounting running children
     if (State == EContainerState::Meta && !IsRoot())
         if (!HaveRunningChildren())
             Stop();
+}
 
-    InGetState = false;
-
-    return State;
+void TContainer::SyncStateWithCgroup() {
+    if (Restored && State == EContainerState::Running &&
+        (!Task || Processes().empty())) {
+        L(LOG_NOTICE) << "Restored container " << GetName() << " is empty"
+                      << ", mark them dead." << std::endl;
+        Exit(-1, false);
+    }
 }
 
 TError TContainer::GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) {
@@ -163,6 +149,7 @@ void TContainer::RemoveKvs() {
 
 TError TContainer::Destroy() {
     L(LOG_ACTION) << "Destroy " << GetName() << " " << Id << std::endl;
+    SyncStateWithCgroup();
 
     if (GetState() == EContainerState::Paused) {
         TError error = Resume();
@@ -672,6 +659,7 @@ TError TContainer::PrepareMetaParent() {
 }
 
 TError TContainer::Start() {
+    SyncStateWithCgroup();
     auto state = GetState();
 
     if (state != EContainerState::Stopped)
@@ -877,8 +865,8 @@ void TContainer::FreeResources() {
 }
 
 TError TContainer::Stop() {
-    /* GetState can call Stop(), so be careful here */
-    auto state = GetState(false);
+    SyncStateWithCgroup();
+    auto state = GetState();
 
     if (state == EContainerState::Stopped ||
         state == EContainerState::Paused)
@@ -914,6 +902,8 @@ TError TContainer::Stop() {
 
     if (!IsRoot())
         SetState(EContainerState::Stopped);
+    if (Parent)
+        Parent->UpdateMetaState();
     StopChildren();
     if (!IsRoot())
         FreeResources();
@@ -922,6 +912,7 @@ TError TContainer::Stop() {
 }
 
 TError TContainer::Pause() {
+    SyncStateWithCgroup();
     auto state = GetState();
     if (state != EContainerState::Running)
         return TError(EError::InvalidState, "invalid container state " +
@@ -939,6 +930,7 @@ TError TContainer::Pause() {
 }
 
 TError TContainer::Resume() {
+    SyncStateWithCgroup();
     auto state = GetState();
     if (state != EContainerState::Paused)
         return TError(EError::InvalidState, "invalid container state " +
@@ -991,6 +983,8 @@ TError TContainer::GetData(const string &origName, string &value) {
     auto cv = ToContainerValue(Data->Find(name));
     if (!cv->IsImplemented())
         return TError(EError::NotSupported, name + " is not implemented");
+
+    SyncStateWithCgroup();
 
     auto validState = cv->GetState();
     if (validState.find(GetState()) == validState.end())
@@ -1122,6 +1116,8 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
     if (Prop->HasFlags(property, RESTROOT_PROPERTY) && !superuser && !CredConf.RestrictedUser(OwnerCred))
         return TError(EError::Permission, "Only restricted root can change this property");
 
+    SyncStateWithCgroup();
+
     if (!Prop->HasState(property, GetState()))
         return TError(EError::InvalidState, "Can't set dynamic property " + property + " for running container");
 
@@ -1210,6 +1206,7 @@ TError TContainer::Prepare() {
 
 TError TContainer::Restore(const kv::TNode &node) {
     L(LOG_ACTION) << "Restore " << GetName() << " with id " << Id << std::endl;
+    Restored = true;
 
     TError error = Prepare();
     if (error)
@@ -1297,7 +1294,7 @@ TError TContainer::Restore(const kv::TNode &node) {
                 SetState(EContainerState::Paused);
         }
 
-        (void)GetState();
+        SyncStateWithCgroup();
 
         if (MayRespawn())
             ScheduleRespawn();
@@ -1374,6 +1371,9 @@ bool TContainer::Exit(int status, bool oomKilled) {
             L_WRN() << "Can't kill all tasks in container" << error << std::endl;
     }
 
+    if (Parent)
+        Parent->UpdateMetaState();
+
     if (oomKilled)
         ExitChildren(status, oomKilled);
     else
@@ -1402,7 +1402,7 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
     if (Task->GetPid() != pid)
         return false;
 
-    if (GetState(false) == EContainerState::Dead)
+    if (GetState() == EContainerState::Dead)
         return true;
 
     return Exit(status, FdHasEvent(Efd.GetFd()));
@@ -1470,7 +1470,7 @@ bool TContainer::DeliverEvent(const TEvent &event) {
     TError error;
     switch (event.Type) {
         case EEventType::Exit:
-            if (event.Exit.Pid < 0 && GetState(false) == EContainerState::Running)
+            if (event.Exit.Pid < 0 && GetState() == EContainerState::Running)
                 return Exit(event.Exit.Status, false);
             else
                 return DeliverExitStatus(event.Exit.Pid, event.Exit.Status);
