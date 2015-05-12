@@ -111,9 +111,9 @@ public:
 class TRootPidData : public TIntValue, public TContainerValue {
 public:
     TRootPidData() :
-        TIntValue(0),
+        TIntValue(HIDDEN_VALUE),
         TContainerValue(D_ROOT_PID,
-                        "root process id",
+                        "root process id (deprecated)",
                         rpState) {}
 
     int GetDefault() const override {
