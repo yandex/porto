@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "client.hpp"
 
 #include "util/file.hpp"
@@ -51,7 +53,7 @@ TError TClient::Identify(TContainerHolder &holder, bool full) {
             if (f.AsString(comm))
                 comm = "unknown process";
 
-            comm.erase(remove(comm.begin(), comm.end(), '\n'), comm.end());
+            comm.erase(std::remove(comm.begin(), comm.end(), '\n'), comm.end());
 
             Pid = cr.pid;
             Comm = comm;
