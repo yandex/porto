@@ -1,6 +1,11 @@
+- portoctl top: dynamic field width (adjust to screen width)
+- / and . containers
+- fix container restoration: (try to) check if task is owned by porto
+- add gc of dead containers with lost events
 - porto can't restore parent/child (stopped) when parent is dead
-- ? die when cgoups are not mounted
-- ? use chrt instead of cpu.smart so we don't depend on smart kernels + set rt prio
+- set soft limits for abandoned cgroups
+- find and fix bug with meta-containers
+- add ability to set cpu_limit in percents of single core
 - support volume as root
 - custom SIGTERM timeout (allow to send SIGKILL for such containers so we can 'force-destroy' them)
 
