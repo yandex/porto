@@ -473,8 +473,8 @@ public:
         if (usage + reserve > total)
             return TError(EError::ResourceNotAvailable,
                           "can't guarantee all available memory: requested " +
-                          std::to_string(usage) + " of " + std::to_string(total) +
-                          " (reserved " + std::to_string(reserve) + ")");
+                          std::to_string(value) + " (will be " + std::to_string(usage) +
+                          " of " + std::to_string(total) + ", reserve " + std::to_string(reserve) + ")");
 
         return TError::Success();
     }
