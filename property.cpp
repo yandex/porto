@@ -467,11 +467,14 @@ public:
         if (!c->ValidHierarchicalProperty(P_MEM_GUARANTEE, value))
             return TError(EError::InvalidValue, "invalid hierarchical value");
 
-        uint64_t total = c->GetRoot()->GetChildrenSum(P_MEM_GUARANTEE, c, value);
-        if (total + config().daemon().memory_guarantee_reserve() >
-            GetTotalMemory())
+        uint64_t usage = c->GetRoot()->GetChildrenSum(P_MEM_GUARANTEE, c, value);
+        uint64_t total = GetTotalMemory();
+        uint64_t reserve = config().daemon().memory_guarantee_reserve();
+        if (usage + reserve > total)
             return TError(EError::ResourceNotAvailable,
-                          "can't guarantee all available memory");
+                          "can't guarantee all available memory: requested " +
+                          std::to_string(usage) + " of " + std::to_string(total) +
+                          " (reserved " + std::to_string(reserve) + ")");
 
         return TError::Success();
     }
