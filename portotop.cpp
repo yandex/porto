@@ -451,6 +451,42 @@ static diff_fn diff() {
     };
 }
 
+class TCommonValue {
+public:
+    TCommonValue(std::string title, calc_fn calc = nullptr, print_fn print = nullptr) :
+        Title(title), CalcFn(calc), PrintFn(print) {
+    }
+    int PrintAt(int x, int y, TConsoleScreen &screen) {
+        std::string p = Title + ": ";
+        int w = p.length();
+        screen.PrintAt(p, x, y, w, false);
+        p = Cache.to_print;
+        attron(A_BOLD);
+        screen.PrintAt(p, x + w, y, p.length(), false);
+        attroff(A_BOLD);
+        return w + p.length();
+    }
+    void Update(TPortoAPI *api, TRowTree &row) {
+        if (!CalcFn)
+            return;
+
+        Cache.value = CalcFn(api, row);
+
+        if (PrintFn)
+            Cache.to_print = PrintFn(row, Cache.value);
+        else
+            Cache.to_print = Cache.value;
+    }
+private:
+    std::string Title;
+    calc_fn CalcFn;
+    print_fn PrintFn;
+    struct CacheEntry {
+        std::string value;
+        std::string to_print;
+    } Cache;
+};
+
 class TColumn {
 public:
     TColumn(std::string title, calc_fn calc, diff_fn diff = nullptr,
@@ -561,14 +597,27 @@ class TTable {
         for (auto &c : Columns)
             x += 1 + c.PrintTitle(x, y, screen);
     }
+    int PrintCommon(TConsoleScreen &screen) {
+        int x = 0;
+        int y = 0;
+        for (auto &line : Common) {
+            for (auto &item : line)
+                x += 1 + item.PrintAt(x, y, screen);
+            y++;
+            x = 0;
+        }
+        return y;
+    }
 public:
     void Print(TConsoleScreen &screen) {
+        screen.Clear();
+
+        int at_row = 1 + PrintCommon(screen);
         MaxRows = RowTree->RowCount(MaxLevel);
-        DisplayRows = std::min(screen.Height() - 1, MaxRows);
+        DisplayRows = std::min(screen.Height() - at_row, MaxRows);
         ChangeSelection(0, 0, screen);
 
-        screen.Clear();
-        PrintTitle(0, screen);
+        PrintTitle(at_row - 1, screen);
         int y = 0;
         RowTree->for_each([&] (TRowTree &row) {
                 if (y >= FirstRow && y < MaxRows) {
@@ -576,7 +625,7 @@ public:
                         row.Select(true);
                     int x = FirstX;
                     for (auto &c : Columns)
-                        x += 1 + c.Print(row, x, y + 1 - FirstRow, screen);
+                        x += 1 + c.Print(row, x, at_row + y - FirstRow, screen);
                     row.Select(false);
                 }
                 y++;
@@ -691,6 +740,10 @@ public:
                 delete RowTree;
 
             RowTree = TRowTree::ContainerTree(containers);
+
+            for (auto &line : Common)
+                for (auto &item : line)
+                    item.Update(Api, *RowTree);
         }
 
         if (RowTree) {
@@ -836,6 +889,11 @@ public:
         else
             ConfigFile = config;
 
+        Common = {{{"containers running", container_data("porto_stat[running]")},
+                   {"total", container_data("porto_stat[created]")},
+                   {"porto errors", container_data("porto_stat[errors]")},
+                   {"warnings", container_data("porto_stat[warnings]")}}};
+
         if (LoadConfig() != -1)
             return;
 
@@ -926,6 +984,7 @@ private:
     struct timespec LastUpdate = {0};
     struct timespec Now = {0};
     TPortoAPI *Api = nullptr;
+    std::vector<std::vector<TCommonValue> > Common;
 };
 
 static bool exit_immediatly = false;
