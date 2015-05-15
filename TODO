@@ -6,6 +6,7 @@
 - set soft limits for abandoned cgroups
 - find and fix bug with meta-containers
 - add ability to set cpu_limit in percents of single core
+- namespaces for volumes
 - support volume as root
 - custom SIGTERM timeout (allow to send SIGKILL for such containers so we can 'force-destroy' them)
 
