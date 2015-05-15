@@ -508,6 +508,9 @@ public:
     int GetWidth() {
         return Width;
     }
+    void SetWidth(int width) {
+        Width = width;
+    }
 private:
     std::string Title;
     int Width;
@@ -693,8 +696,21 @@ public:
         if (RowTree) {
             MaxMaxLevel = RowTree->GetMaxLevel();
 
-            for (auto &column : Columns)
+            int width = 0;
+            for (auto &column : Columns) {
                 column.Update(Api, RowTree, gone_ms, MaxLevel);
+                width += column.GetWidth();
+            }
+
+            if (width > screen.Width()) {
+                int excess = width - screen.Width();
+                int current = Columns[0].GetWidth();
+                if (current > 30)
+                    current -= excess;
+                if (current < 30)
+                    current = 30;
+                Columns[0].SetWidth(current);
+            }
 
             RowTree->Sort(Columns[SelectedColumn]);
         }
@@ -858,13 +874,6 @@ public:
                               if (level > 0)
                                   curr = (row.HasChildren() ? "+" : "-") +
                                       curr.substr(1 + curr.rfind('/'));
-                              if (curr.length() > 40) {
-                                  /* Hide too long containers*/
-                                  curr = curr.substr(0, 40);
-                                  curr[11] = '.';
-                                  curr[12] = '.';
-                                  curr[13] = '.';
-                              }
                               return std::string(level, ' ') + curr;
                           }, true));
 
