@@ -76,6 +76,7 @@ namespace test {
     bool HaveIoLimit();
     bool HaveLowLimit();
     bool HaveRechargeOnPgfault();
+    bool HaveMaxRss();
     bool IsCfqActive();
 }
 

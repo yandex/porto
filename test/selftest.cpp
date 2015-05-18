@@ -128,10 +128,14 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectEq(v, "100");
     ExpectApiSuccess(api.GetProperty(name, "cpu_guarantee", v));
     ExpectEq(v, "0");
-    ExpectApiSuccess(api.GetProperty(name, "io_policy", v));
-    ExpectEq(v, "normal");
-    ExpectApiSuccess(api.GetProperty(name, "io_limit", v));
-    ExpectEq(v, "0");
+    if (IsCfqActive()) {
+        ExpectApiSuccess(api.GetProperty(name, "io_policy", v));
+        ExpectEq(v, "normal");
+    }
+    if (HaveIoLimit()) {
+        ExpectApiSuccess(api.GetProperty(name, "io_limit", v));
+        ExpectEq(v, "0");
+    }
 
     for (auto &link : links) {
         ExpectApiSuccess(api.GetProperty(name, "net_guarantee[" + link->GetAlias() + "]", v));
@@ -220,9 +224,11 @@ static void ShouldHaveValidRunningData(TPortoAPI &api, const string &name) {
     ExpectApiSuccess(api.GetData(name, "major_faults", v));
     ExpectSuccess(StringToInt(v, intval));
     Expect(intval >= 0);
-    ExpectApiSuccess(api.GetData(name, "max_rss", v));
-    ExpectSuccess(StringToInt(v, intval));
-    Expect(intval >= 0);
+    if (HaveMaxRss()) {
+        ExpectApiSuccess(api.GetData(name, "max_rss", v));
+        ExpectSuccess(StringToInt(v, intval));
+        Expect(intval >= 0);
+    }
 
     ExpectApiFailure(api.GetData(name, "oom_killed", v), EError::InvalidState);
     ExpectApiSuccess(api.GetData(name, "respawn_count", v));
@@ -261,7 +267,9 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     }
     ExpectApiFailure(api.GetData(name, "minor_faults", v), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "major_faults", v), EError::InvalidState);
-    ExpectApiFailure(api.GetData(name, "max_rss", v), EError::InvalidState);
+    if (HaveMaxRss()) {
+        ExpectApiFailure(api.GetData(name, "max_rss", v), EError::InvalidState);
+    }
 
     ExpectApiFailure(api.GetData(name, "oom_killed", v), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "respawn_count", v), EError::InvalidState);
@@ -4352,6 +4360,10 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
         std::cerr << "WARNING: Network support is not tested" << std::endl;
     if (links.size() == 1)
         std::cerr << "WARNING: Multiple network support is not tested" << std::endl;
+    if (!HaveMaxRss())
+        std::cerr << "WARNING: max_rss is not tested" << std::endl;
+    if (!HaveIoLimit())
+        std::cerr << "WARNING: io_limit is not tested" << std::endl;
 
 exit:
     AsRoot(api);

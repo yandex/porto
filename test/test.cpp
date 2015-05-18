@@ -650,6 +650,30 @@ bool HaveRechargeOnPgfault() {
     return HaveCgKnob("memory", "memory.recharge_on_pgfault");
 }
 
+bool HaveMaxRss() {
+    TFile f(CgRoot("memory", "") + "memory.stat");
+
+    std::vector<std::string> lines;
+    TError error = f.AsLines(lines);
+    if (error)
+        return false;
+
+    for (auto line : lines) {
+        std::vector<std::string> tokens;
+        error = SplitString(line, ' ', tokens);
+        if (error)
+            return false;
+
+        if (tokens.size() != 2)
+            continue;
+
+        if (tokens[0] == "max_rss")
+            return true;
+    }
+
+    return false;
+}
+
 bool IsCfqActive() {
     TFolder f("/sys/block");
     std::vector<std::string> items;
