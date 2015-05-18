@@ -86,7 +86,7 @@ TError TContext::Initialize() {
         }
 
         for (auto &link : Net->GetLinks())
-            L(LOG_NOTICE) << "Using " << link->GetAlias() << " interface" << std::endl;
+            L() << "Using " << link->GetAlias() << " interface" << std::endl;
     }
 
     error = Cholder->CreateRoot();

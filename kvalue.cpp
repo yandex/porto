@@ -194,7 +194,7 @@ TError TKeyValueStorage::Dump() const {
 
     TError error = ListNodes(nodes);
     if (error) {
-        L(LOG_ERROR) << "Can't list nodes: " << error.GetMsg() << std::endl;
+        L_ERR() << "Can't list nodes: " << error.GetMsg() << std::endl;
         return error;
     }
 
@@ -207,7 +207,7 @@ TError TKeyValueStorage::Dump() const {
 
         error = n->Load(node);
         if (error) {
-            L(LOG_ERROR) << "Can't load node: " << error.GetMsg() << std::endl;
+            L_ERR() << "Can't load node: " << error.GetMsg() << std::endl;
             continue;
         }
 
@@ -228,7 +228,7 @@ TError TKeyValueStorage::Destroy() {
 
 TError TKeyValueNode::Create() const {
     if (config().log().verbose())
-        L(LOG_ACTION) << "Create key-value node " << Path << std::endl;
+        L_ACT() << "Create key-value node " << Path << std::endl;
 
     kv::TNode node;
     return Save(node);
@@ -242,7 +242,7 @@ TError TKeyValueNode::Append(const std::string& key, const std::string& value) c
     pair->set_val(value);
 
     if (config().log().verbose())
-        L(LOG_ACTION) << "Append " << key << "=" << value << " to key-value node " << Path << std::endl;
+        L_ACT() << "Append " << key << "=" << value << " to key-value node " << Path << std::endl;
 
     return Append(node);
 }

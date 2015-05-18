@@ -36,8 +36,8 @@ static void SendReply(std::shared_ptr<TClient> client,
         if (!WriteDelimitedTo(response, &post))
             L_ERR() << "Write error for " << client->GetFd() << std:: endl;
         else if (log)
-            L(LOG_RESPONSE) << response.ShortDebugString() << " to " << *client
-                            << " (request took " << client->GetRequestTime() << "ms)" << std::endl;
+            L_RSP() << response.ShortDebugString() << " to " << *client
+                    << " (request took " << client->GetRequestTime() << "ms)" << std::endl;
         post.Flush();
     }
 }
@@ -399,7 +399,7 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
 
     bool log = !InfoRequest(req);
     if (log)
-        L(LOG_REQUEST) << req.ShortDebugString() << " from " << *client << std::endl;
+        L_REQ() << req.ShortDebugString() << " from " << *client << std::endl;
 
     rsp.set_error(EError::Unknown);
 

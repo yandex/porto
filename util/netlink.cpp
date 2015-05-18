@@ -503,7 +503,7 @@ void TNlLink::LogObj(const std::string &prefix, void *obj) {
     struct nl_dump_params dp = {};
     dp.dp_cb = [](struct nl_dump_params *params, char *buf) { handler(params, buf); };
 
-    auto &str = L(LOG_NOTICE);
+    auto &str = L();
     handler = [&](struct nl_dump_params *params, char *buf) { str << buf; };
 
     if (Link)
@@ -523,7 +523,7 @@ void TNlLink::LogCache(struct nl_cache *cache) {
     dp.dp_cb = [](struct nl_dump_params *params, char *buf) { handler(params, buf); };
     dp.dp_type = NL_DUMP_DETAILS;
 
-    auto &str = L(LOG_NOTICE);
+    auto &str = L();
     handler = [&](struct nl_dump_params *params, char *buf) { str << buf; };
 
     if (Link)
@@ -877,7 +877,9 @@ TError TNlCgFilter::Create() {
 		goto free_msg;
     }
 
-    L(LOG_NOTICE) << "netlink " << rtnl_link_get_name(Link->GetLink()) << ": create tfilter id 0x" << std::hex << Handle << " parent 0x" << Parent << std::dec  << std::endl;
+    L() << "netlink " << rtnl_link_get_name(Link->GetLink())
+        << ": create tfilter id 0x" << std::hex << Handle
+        << " parent 0x" << Parent << std::dec  << std::endl;
 
     ret = nl_send_sync(Link->GetSock(), msg);
     if (ret) {
@@ -902,7 +904,7 @@ bool TNlCgFilter::Exists() {
 
     ret = rtnl_cls_alloc_cache(Link->GetSock(), Link->GetIndex(), Parent, &clsCache);
     if (ret < 0) {
-        L(LOG_ERROR) << "Can't allocate filter cache: " << nl_geterror(ret) << std::endl;
+        L_ERR() << "Can't allocate filter cache: " << nl_geterror(ret) << std::endl;
         return false;
     }
 

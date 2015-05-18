@@ -284,7 +284,7 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
     if (name == ROOT_CONTAINER)
         return TError::Success();
 
-    L(LOG_ACTION) << "Restore container " << name << " (" << node.ShortDebugString() << ")" << std::endl;
+    L_ACT() << "Restore container " << name << " (" << node.ShortDebugString() << ")" << std::endl;
 
     auto parent = GetParent(name);
     if (!parent)
@@ -317,7 +317,7 @@ void TContainerHolder::ScheduleLogRotatation() {
 
 bool TContainerHolder::DeliverEvent(const TEvent &event) {
     if (config().log().verbose())
-        L(LOG_EVENT) << "Deliver event " << event.GetMsg() << std::endl;
+        L_EVT() << "Deliver event " << event.GetMsg() << std::endl;
 
     if (event.Targeted) {
         auto c = event.Container.lock();
@@ -336,7 +336,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
         }
 
         for (auto name : remove) {
-            L(LOG_ACTION) << "Remove old dead " << name << std::endl;
+            L_ACT() << "Remove old dead " << name << std::endl;
             TError error = Destroy(name);
             if (error)
                 L_ERR() << "Can't destroy " << name << ": " << error << std::endl;
@@ -350,7 +350,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
         return true;
     } else {
         // TODO: convert to LOG_WARN
-        L(LOG_NOTICE) << "Couldn't deliver " << event.GetMsg() << std::endl;
+        L() << "Couldn't deliver " << event.GetMsg() << std::endl;
         return false;
     }
 }

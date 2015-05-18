@@ -1,3 +1,4 @@
+- remove net_bps/net_ppsk
 - portoctl top: dynamic field width (adjust to screen width)
 - / and . containers
 - fix container restoration: (try to) check if task is owned by porto

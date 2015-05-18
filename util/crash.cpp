@@ -20,15 +20,15 @@ void PrintTrace() {
     size = backtrace(array, 64);
     strings = backtrace_symbols(array, size);
 
-    L(LOG_NOTICE) << "Backtrace:" << std::endl;
+    L() << "Backtrace:" << std::endl;
     for (i = 0; i < size; i++)
-        L(LOG_NOTICE) << strings[i] << std::endl;
+        L() << strings[i] << std::endl;
 
     free (strings);
 }
 
 void Crash() {
-    L(LOG_ERROR) << "Crashed" << std::endl;
+    L()<< "Crashed" << std::endl;
     PrintTrace();
     exit(-1);
 }

@@ -93,7 +93,7 @@ void TContainer::UpdateMetaState() {
 void TContainer::SyncStateWithCgroup() {
     if (LostAndRestored && State == EContainerState::Running &&
         (!Task || Processes().empty())) {
-        L(LOG_NOTICE) << "Lost and restored container " << GetName() << " is empty"
+        L() << "Lost and restored container " << GetName() << " is empty"
                       << ", mark them dead." << std::endl;
         Exit(-1, false);
     }
@@ -112,7 +112,7 @@ void TContainer::SetState(EContainerState newState, bool tree) {
     if (State == newState)
         return;
 
-    L(LOG_ACTION) << GetName() << ": change state " << ContainerStateName(State) << " -> " << ContainerStateName(newState) << std::endl;
+    L_ACT() << GetName() << ": change state " << ContainerStateName(State) << " -> " << ContainerStateName(newState) << std::endl;
     if (newState == EContainerState::Running)
         Statistics->Running++;
     else if (State == EContainerState::Running)
@@ -148,7 +148,7 @@ void TContainer::RemoveKvs() {
 }
 
 TError TContainer::Destroy() {
-    L(LOG_ACTION) << "Destroy " << GetName() << " " << Id << std::endl;
+    L_ACT() << "Destroy " << GetName() << " " << Id << std::endl;
     SyncStateWithCgroup();
 
     if (GetState() == EContainerState::Paused) {
@@ -581,7 +581,7 @@ TError TContainer::PrepareTask() {
 }
 
 TError TContainer::Create(const TCred &cred) {
-    L(LOG_ACTION) << "Create " << GetName() << " with id " << Id << " uid " << cred.Uid << " gid " << cred.Gid << std::endl;
+    L_ACT() << "Create " << GetName() << " with id " << Id << " uid " << cred.Uid << " gid " << cred.Gid << std::endl;
 
     TError error = Prepare();
     if (error) {
@@ -750,7 +750,7 @@ TError TContainer::Start() {
     if (error)
         return error;
 
-    L(LOG_NOTICE) << GetName() << " started " << std::to_string(Task->GetPid()) << std::endl;
+    L() << GetName() << " started " << std::to_string(Task->GetPid()) << std::endl;
 
     error = Prop->Set<int>(P_RAW_ROOT_PID, Task->GetPid());
     if (error)
@@ -765,7 +765,7 @@ TError TContainer::Start() {
 TError TContainer::KillAll() {
     auto cg = GetLeafCgroup(freezerSubsystem);
 
-    L(LOG_ACTION) << "Kill all " << GetName() << std::endl;
+    L_ACT() << "Kill all " << GetName() << std::endl;
 
     vector<pid_t> reap;
     TError error = cg->GetTasks(reap);
@@ -780,7 +780,7 @@ TError TContainer::KillAll() {
     int ret = SleepWhile(config().container().kill_timeout_ms(),
                          [&]{ return cg->IsEmpty() == false; });
     if (ret)
-        L(LOG_NOTICE) << "Child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
+        L() << "Child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
 
     // then kill any task that didn't want to stop via SIGTERM signal;
     // freeze all container tasks to make sure no one forks and races with us
@@ -872,7 +872,7 @@ TError TContainer::Stop() {
         state == EContainerState::Paused)
         return TError(EError::InvalidState, "invalid container state " + ContainerStateName(state));
 
-    L(LOG_ACTION) << "Stop " << GetName() << " " << Id << std::endl;
+    L_ACT() << "Stop " << GetName() << " " << Id << std::endl;
 
     if (state == EContainerState::Running || state == EContainerState::Dead) {
         int pid = Task->GetPid();
@@ -952,7 +952,7 @@ TError TContainer::Resume() {
 }
 
 TError TContainer::Kill(int sig) {
-    L(LOG_ACTION) << "Kill " << GetName() << " " << Id << std::endl;
+    L_ACT() << "Kill " << GetName() << " " << Id << std::endl;
 
     auto state = GetState();
     if (state != EContainerState::Running)
@@ -1205,7 +1205,7 @@ TError TContainer::Prepare() {
 }
 
 TError TContainer::Restore(const kv::TNode &node) {
-    L(LOG_ACTION) << "Restore " << GetName() << " with id " << Id << std::endl;
+    L_ACT() << "Restore " << GetName() << " with id " << Id << std::endl;
 
     TError error = Prepare();
     if (error)
@@ -1260,7 +1260,7 @@ TError TContainer::Restore(const kv::TNode &node) {
         if (pid == GetPid())
             pid = 0;
 
-        L(LOG_ACTION) << GetName() << ": restore started container " << pid << std::endl;
+        L_ACT() << GetName() << ": restore started container " << pid << std::endl;
 
         TError error = PrepareResources();
         if (error) {
@@ -1285,19 +1285,19 @@ TError TContainer::Restore(const kv::TNode &node) {
             pid_t ppid;
             TError err = Task->GetPPid(ppid);
             if (err) {
-                L(LOG_NOTICE) << "Can't get ppid of restored task: " << err << std::endl;
+                L() << "Can't get ppid of restored task: " << err << std::endl;
                 LostAndRestored = true;
             } else if (ppid != getppid()) {
-                L(LOG_NOTICE) << "Container " << GetName()
-                              << " seems to be reparented to init ("
-                              << ppid << " != " << getppid() << ")"
-                              << std::endl;
+                L() << "Container " << GetName()
+                    << " seems to be reparented to init ("
+                    << ppid << " != " << getppid() << ")"
+                    << std::endl;
                 LostAndRestored = true;
             } else {
-                L(LOG_NOTICE) << "Container " << GetName()
-                              << " seems to be not reparented ("
-                              << ppid << " == " << getppid() << ")"
-                              << std::endl;
+                L() << "Container " << GetName()
+                    << " seems to be not reparented ("
+                    << ppid << " == " << getppid() << ")"
+                    << std::endl;
             }
         }
 
@@ -1318,7 +1318,7 @@ TError TContainer::Restore(const kv::TNode &node) {
         if (MayRespawn())
             ScheduleRespawn();
     } else {
-        L(LOG_ACTION) << GetName() << ": restore created container " << std::endl;
+        L_ACT() << GetName() << ": restore created container " << std::endl;
 
         // we didn't report to user that we started container,
         // make sure nobody is running
@@ -1356,9 +1356,9 @@ std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys
 }
 
 bool TContainer::Exit(int status, bool oomKilled) {
-    L(LOG_EVENT) << "Exit " << GetName() << " (root_pid " << Task->GetPid() << ")"
-                 << " with status " << status << (oomKilled ? " invoked by OOM" : "")
-                 << std::endl;
+    L_EVT() << "Exit " << GetName() << " (root_pid " << Task->GetPid() << ")"
+            << " with status " << status << (oomKilled ? " invoked by OOM" : "")
+            << std::endl;
 
     if (!oomKilled && !Processes().empty()) {
         L_WRN() << "Skipped bogus exit event, some process is still alive" << std::endl;
@@ -1371,7 +1371,7 @@ bool TContainer::Exit(int status, bool oomKilled) {
     SetState(EContainerState::Dead);
 
     if (oomKilled) {
-        L(LOG_EVENT) << Task->GetPid() << " killed by OOM" << std::endl;
+        L_EVT() << Task->GetPid() << " killed by OOM" << std::endl;
 
         TError error = Data->Set<bool>(D_OOM_KILLED, true);
         if (error)
@@ -1506,7 +1506,7 @@ bool TContainer::DeliverEvent(const TEvent &event) {
                 if (error)
                     L_ERR() << "Can't respawn container: " << error << std::endl;
                 else
-                    L(LOG_NOTICE) << "Respawned " << GetName() << std::endl;
+                    L() << "Respawned " << GetName() << std::endl;
                 return true;
             }
             return false;

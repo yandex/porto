@@ -429,7 +429,7 @@ TError TDevicesSubsystem::AllowDevices(std::shared_ptr<TCgroup> cg, const std::v
         }
 
         if (!needUpdate) {
-            L(LOG_NOTICE) << "Don't update allowed devices" << std::endl;
+            L() << "Don't update allowed devices" << std::endl;
             return TError::Success();
         }
     }

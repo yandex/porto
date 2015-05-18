@@ -16,7 +16,7 @@ enum ELogLevel {
     LOG_ACTION = 4,
     LOG_REQUEST = 5,
     LOG_RESPONSE = 6,
-    LOG_STATE = 7,
+    LOG_SYSTEM = 7,
 };
 
 class TLogBuf : public std::streambuf {
@@ -42,6 +42,11 @@ public:
     static std::basic_ostream<char> &Log(ELogLevel level = LOG_NOTICE);
 };
 
-static inline std::basic_ostream<char> &L(enum ELogLevel level) { return TLogger::Log(level); }
-static inline std::basic_ostream<char> &L_ERR() { return TLogger::Log(LOG_ERROR); }
+static inline std::basic_ostream<char> &L() { return TLogger::Log(LOG_NOTICE); }
 static inline std::basic_ostream<char> &L_WRN() { return TLogger::Log(LOG_WARN); }
+static inline std::basic_ostream<char> &L_ERR() { return TLogger::Log(LOG_ERROR); }
+static inline std::basic_ostream<char> &L_EVT() { return TLogger::Log(LOG_EVENT); }
+static inline std::basic_ostream<char> &L_ACT() { return TLogger::Log(LOG_ACTION); }
+static inline std::basic_ostream<char> &L_REQ() { return TLogger::Log(LOG_REQUEST); }
+static inline std::basic_ostream<char> &L_RSP() { return TLogger::Log(LOG_RESPONSE); }
+static inline std::basic_ostream<char> &L_SYS() { return TLogger::Log(LOG_SYSTEM); }

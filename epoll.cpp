@@ -14,13 +14,13 @@ static void MultiHandler(int sig) {
 }
 
 static void DumpStackAndDie(int sig) {
-    L(LOG_EVENT) << "Received fatal signal " << strsignal(sig) << std::endl;
+    L_EVT() << "Received fatal signal " << strsignal(sig) << std::endl;
     PrintTrace();
     RaiseSignal(sig);
 }
 
 static void DumpStack(int sig) {
-    L(LOG_EVENT) << "Received SIGPIPE" << std::endl;
+    L_EVT() << "Received SIGPIPE" << std::endl;
     PrintTrace();
 }
 
