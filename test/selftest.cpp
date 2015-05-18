@@ -2233,17 +2233,11 @@ static void TestRoot(TPortoAPI &api) {
         "group",
         "env",
         "cwd",
-        "memory_guarantee",
         "memory_limit",
-        "recharge_on_pgfault",
         "cpu_policy",
         "cpu_limit",
         "cpu_guarantee",
-        "io_limit",
         "io_policy",
-        "net_guarantee",
-        "net_limit",
-        "net_priority",
         "respawn",
         "isolate",
         "stdin_path",
@@ -2257,13 +2251,30 @@ static void TestRoot(TPortoAPI &api) {
         "bind_dns",
         "max_respawns",
         "bind",
-        "net",
-        "net_tos",
         "root_readonly",
         "virt_mode",
         "aging_time",
         "porto_namespace"
     };
+
+    if (HaveLowLimit())
+        properties.push_back("memory_guarantee");
+
+    if (HaveRechargeOnPgfault())
+        properties.push_back("recharge_on_pgfault");
+
+    if (HaveIoLimit())
+        properties.push_back("io_limit");
+
+    if (NetworkEnabled()) {
+        properties.push_back("net");
+        /*
+        properties.push_back("net_tos");
+        */
+        properties.push_back("net_guarantee");
+        properties.push_back("net_limit");
+        properties.push_back("net_priority");
+    }
 
     vector<string> data = {
         "absolute_name",
@@ -2276,24 +2287,31 @@ static void TestRoot(TPortoAPI &api) {
         "stderr",
         "cpu_usage",
         "memory_usage",
-        "net_bytes",
-        "net_packets",
-        "net_drops",
-        "net_overlimits",
-        "net_bps",
-        "net_pps",
         "minor_faults",
         "major_faults",
         "io_read",
         "io_write",
         "time",
-        "max_rss",
     };
+
+    if (NetworkEnabled()) {
+        data.push_back("net_bytes");
+        data.push_back("net_packets");
+        data.push_back("net_drops");
+        data.push_back("net_overlimits");
+        /*
+        data.push_back("net_bps");
+        data.push_back("net_pps");
+        */
+    }
+
+    if (HaveMaxRss())
+        data.push_back("max_rss");
 
     std::vector<TProperty> plist;
 
     ExpectApiSuccess(api.Plist(plist));
-    ExpectLessOrEq(plist.size(), properties.size());
+    ExpectEq(plist.size(), properties.size());
 
     for (auto p: plist)
         Expect(std::find(properties.begin(), properties.end(), p.Name) != properties.end());
@@ -2301,7 +2319,7 @@ static void TestRoot(TPortoAPI &api) {
     std::vector<TData> dlist;
 
     ExpectApiSuccess(api.Dlist(dlist));
-    ExpectLessOrEq(dlist.size(), data.size());
+    ExpectEq(dlist.size(), data.size());
 
     for (auto d: dlist)
         Expect(std::find(data.begin(), data.end(), d.Name) != data.end());
