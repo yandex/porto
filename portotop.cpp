@@ -257,7 +257,7 @@ public:
         return Level;
     }
     void for_each(std::function<void (TRowTree&)> fn, int maxlevel) {
-        if (Level <= maxlevel)
+        if (Level && Level <= maxlevel)
             fn(*this);
         if (Level < maxlevel)
             for (auto &c : Children)
@@ -278,7 +278,7 @@ public:
         return level;
     }
     int RowCount(int max_level) {
-        int count = 1;
+        int count = Level > 0 ? 1 : 0;
         if (Level < max_level)
             for (auto &c : Children)
                 count += c->RowCount(max_level);
@@ -813,7 +813,7 @@ public:
     }
     void Expand() {
         if (++MaxLevel > MaxMaxLevel)
-            MaxLevel = 0;
+            MaxLevel = 1;
     }
     int StartStop(TPortoAPI *api) {
         std::string state;
@@ -934,7 +934,7 @@ public:
                               if (level > 0)
                                   curr = (row.HasChildren() ? "+" : "-") +
                                       curr.substr(1 + curr.rfind('/'));
-                              return std::string(level, ' ') + curr;
+                              return std::string(level - 1, ' ') + curr;
                           }, true));
 
         for (auto &c : Config)
