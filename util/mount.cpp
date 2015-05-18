@@ -159,7 +159,7 @@ TError GetLoopDev(int &nr) {
     if (nr < 0)
         return TError(EError::Unknown, errno, "ioctl(LOOP_CTL_GET_FREE)");
 
-    L_ERR() << "Loop device allocate " << nr << std::endl;
+    L_ACT() << "Loop device allocate " << nr << std::endl;
 
     return TError::Success();
 }
