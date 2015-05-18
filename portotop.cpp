@@ -378,6 +378,8 @@ static calc_fn map_summ(std::string data) {
     return [=] (TPortoAPI *api, TRowTree &row) {
         std::string value;
         api->GetData(row.GetContainer(), data, value);
+        if (value.length() == 0)
+            return std::string();
         std::vector<std::string> values;
         unsigned long start_v = 0;
         for (unsigned long off = 0; off < value.length(); off++) {
