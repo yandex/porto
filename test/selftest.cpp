@@ -4198,9 +4198,9 @@ static void TestStats(TPortoAPI &api) {
 
     AsRoot(api);
 
-    int respawns = WordCount(config().master_log().path(), "STAT Spawned");
+    int respawns = WordCount(config().master_log().path(), "SYS Spawned");
     int errors = WordCount(config().slave_log().path(), "ERR ");
-    int warns = WordCount(config().slave_log().path(), "WARN ");
+    int warns = WordCount(config().slave_log().path(), "WRN ");
 
     std::string v;
     ExpectApiSuccess(api.GetData("/", "porto_stat[spawned]", v));
