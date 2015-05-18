@@ -39,11 +39,14 @@ public:
         noecho();
         intrflush(stdscr, true);
         keypad(stdscr, true);
-        timeout(1000);
+        SetTimeout(3000);
         curs_set(0);
     }
     ~TConsoleScreen() {
         endwin();
+    }
+    void SetTimeout(int ms) {
+        timeout(ms);
     }
     template<class T>
     void PrintAt(T arg, int x, int y, int width, bool leftaligned) {
@@ -191,6 +194,7 @@ public:
              "enter - run top in container",
              "b - run bash in container",
              "space - pause",
+             "1,2,3,5,0 - set update time to 1s,2s,3s,5s and 10s",
              "q - quit",
              "h,? - help"};
         InfoDialog(help);
@@ -1121,6 +1125,21 @@ int portotop(TPortoAPI *api, std::string config) {
         case 'w':
         case 'W':
             screen.ErrorDialog("Can't save config", top.SaveConfig());
+            break;
+        case '1':
+            screen.SetTimeout(1000);
+            break;
+        case '2':
+            screen.SetTimeout(2000);
+            break;
+        case '3':
+            screen.SetTimeout(3000);
+            break;
+        case '5':
+            screen.SetTimeout(5000);
+            break;
+        case '0':
+            screen.SetTimeout(10000);
             break;
         case 0:
         case -1:
