@@ -33,12 +33,12 @@ const std::string& TClient::GetComm() const {
     return Comm;
 }
 
-size_t TClient::GetRequestStartMs() const {
-    return RequestStartMs;
+void TClient::BeginRequest() {
+    RequestStartMs = GetCurrentTimeMs();
 }
 
-void TClient::SetRequestStartMs(size_t start) {
-    RequestStartMs = start;
+size_t TClient::GetRequestTime() {
+    return GetCurrentTimeMs() - RequestStartMs;
 }
 
 TError TClient::Identify(TContainerHolder &holder, bool full) {

@@ -21,8 +21,8 @@ public:
     const TCred& GetCred() const;
     const std::string& GetComm() const;
 
-    size_t GetRequestStartMs() const;
-    void SetRequestStartMs(size_t start);
+    void BeginRequest();
+    size_t GetRequestTime();
 
     TError Identify(TContainerHolder &holder, bool full = true);
     std::string GetContainerName() const;

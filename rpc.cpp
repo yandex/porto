@@ -32,13 +32,12 @@ static void SendReply(std::shared_ptr<TClient> client,
 
     google::protobuf::io::FileOutputStream post(client->GetFd());
 
-    size_t execTimeMs = GetCurrentTimeMs() - client->GetRequestStartMs();
     if (response.IsInitialized()) {
         if (!WriteDelimitedTo(response, &post))
             L_ERR() << "Write error for " << client->GetFd() << std:: endl;
         else if (log)
             L(LOG_RESPONSE) << response.ShortDebugString() << " to " << *client
-                            << " (request took " << execTimeMs << "ms)" << std::endl;
+                            << " (request took " << client->GetRequestTime() << "ms)" << std::endl;
         post.Flush();
     }
 }
@@ -396,7 +395,7 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
     string str;
     bool send_reply = true;
 
-    client->SetRequestStartMs(GetCurrentTimeMs());
+    client->BeginRequest();
 
     bool log = !InfoRequest(req);
     if (log)
