@@ -96,14 +96,6 @@ namespace test {
         } \
     } while (0)
 
-#define ExpectLessOrEq(ret, exp)                                              \
-    do {                                                                \
-        if (ret > exp) {                                               \
-            Say() << "Unexpected " << ret << " != " << exp << " at " << __func__ << ":" << __LINE__ << std::endl; \
-            abort();                                                    \
-        }                                                               \
-    } while (0)
-
 #define ExpectNeq(ret, exp) \
     do { \
         if (ret == exp) { \
