@@ -104,6 +104,24 @@ unsigned int TPath::GetGid() const {
     return Stat([](struct stat *st) { return st->st_gid; });
 }
 
+off_t TPath::GetSize() const {
+    struct stat st;
+
+    if (lstat(Path.c_str(), &st))
+        return -1;
+
+    return st.st_size;
+}
+
+off_t TPath::GetDiskUsage() const {
+    struct stat st;
+
+    if (lstat(Path.c_str(), &st))
+        return -1;
+
+    return st.st_blocks * 512;
+}
+
 bool TPath::Exists() const {
     return access(Path.c_str(), F_OK) == 0;
 }

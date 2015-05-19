@@ -30,5 +30,5 @@ public:
     TError WriteStringNoAppend(const std::string &str) const;
     TError AppendString(const std::string &str) const;
     TError Truncate(size_t size) const;
-    size_t GetSize() const;
+    off_t GetSize() const;
 };

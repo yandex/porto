@@ -165,11 +165,6 @@ TError TFile::Truncate(size_t size) const {
     return TError::Success();
 }
 
-size_t TFile::GetSize() const {
-    struct stat st;
-
-    if (lstat(Path.ToString().c_str(), &st))
-        return -1;
-
-    return st.st_size;
+off_t TFile::GetSize() const {
+    return Path.GetSize();
 }

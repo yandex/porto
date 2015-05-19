@@ -62,6 +62,8 @@ public:
     unsigned int GetDev() const;
     unsigned int GetUid() const;
     unsigned int GetGid() const;
+    off_t GetSize() const;
+    off_t GetDiskUsage() const;
     std::string ToString() const;
     bool Exists() const;
     bool AccessOk(EFileAccess type) const;

@@ -103,3 +103,11 @@ namespace test {
             abort(); \
         } \
     } while (0)
+
+#define ExpectLess(ret, exp) \
+    do { \
+        if (ret >= exp) { \
+            Say() << "Unexpected " << ret << " >= " << exp << " at " << __func__ << ":" << __LINE__ << std::endl; \
+            abort(); \
+        } \
+    } while (0)

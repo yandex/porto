@@ -4172,21 +4172,24 @@ static void TestVersion(TPortoAPI &api) {
     ExpectEq(revision, GIT_REVISION);
 }
 
-static void TestRemoveDead(TPortoAPI &api) {
-    bool remove;
+static void SetLogRotateTimeout(TPortoAPI &api, size_t s) {
+    AsRoot(api);
 
+    config().mutable_daemon()->set_rotate_logs_timeout_s(s);
+    TFile f("/etc/portod.conf");
+    ExpectSuccess(f.WriteStringNoAppend(config().ShortDebugString()));
+
+    KillSlave(api, SIGTERM);
+
+    AsNobody(api);
+}
+
+static void TestRemoveDead(TPortoAPI &api) {
     std::string v;
     ExpectApiSuccess(api.GetData("/", "porto_stat[remove_dead]", v));
     ExpectEq(v, std::to_string(0));
 
-    AsRoot(api);
-
-    config().mutable_daemon()->set_rotate_logs_timeout_s(1);
-    TFile f("/etc/portod.conf");
-    remove = !f.Exists();
-    ExpectSuccess(f.WriteStringNoAppend(config().ShortDebugString()));
-
-    KillSlave(api, SIGTERM);
+    SetLogRotateTimeout(api, 1);
 
     std::string name = "dead";
     ExpectApiSuccess(api.Create(name));
@@ -4202,12 +4205,24 @@ static void TestRemoveDead(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData("/", "porto_stat[remove_dead]", v));
     ExpectEq(v, std::to_string(1));
 
-    if (remove) {
-        ExpectSuccess(f.Remove());
-    } else {
-        config().mutable_daemon()->set_rotate_logs_timeout_s(60);
-        ExpectSuccess(f.WriteStringNoAppend(config().ShortDebugString()));
-    }
+    SetLogRotateTimeout(api, 60);
+}
+
+static void TestLogRotate(TPortoAPI &api) {
+    std::string v;
+    SetLogRotateTimeout(api, 2);
+
+    std::string name = "biglog";
+    ExpectApiSuccess(api.Create(name));
+    ExpectApiSuccess(api.GetProperty(name, "stdout_path", v));
+    ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'dd if=/dev/zero bs=1M count=100 && sleep 5'"));
+    ExpectApiSuccess(api.Start(name));
+    WaitState(api, name, "dead");
+
+    TPath stdoutPath(v);
+    ExpectLess(stdoutPath.GetDiskUsage(), config().container().max_log_size());
+
+    SetLogRotateTimeout(api, 60);
 }
 
 static void TestStats(TPortoAPI &api) {
@@ -4311,6 +4326,7 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
         { "cgroups", TestCgroups },
         { "version", TestVersion },
         { "remove_dead", TestRemoveDead },
+        { "log_rotate", TestLogRotate },
         { "stats", TestStats },
         { "package", TestPackage },
     };
