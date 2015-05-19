@@ -49,6 +49,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TScopedFd Efd;
     size_t CgroupEmptySince = 0;
     bool LostAndRestored = false;
+    std::unique_ptr<TTask> Task;
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
 
@@ -89,7 +90,6 @@ public:
     TCred OwnerCred;
 
     // TODO: make private
-    std::unique_ptr<TTask> Task;
     std::shared_ptr<TPropertyMap> Prop;
     std::shared_ptr<TValueMap> Data;
     std::shared_ptr<TNetwork> Net;

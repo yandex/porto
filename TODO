@@ -1,3 +1,4 @@
+- fix kill for isolate = false
 - net property: support external namespace
 - test for log rotate
 - a - empty, b - empty, c - command, start a/b/c

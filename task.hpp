@@ -147,8 +147,6 @@ public:
     TError Kill(int signal) const;
     void DeliverExitStatus(int status);
 
-    std::string GetStdout(size_t limit) const;
-    std::string GetStderr(size_t limit) const;
     static void RemoveStdioFile(const TPath &path);
     void RemoveStdio() const;
 

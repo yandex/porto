@@ -117,9 +117,12 @@ public:
                         rpState) {}
 
     int GetDefault() const override {
-        if (!GetContainer()->Task)
+        auto c = GetContainer();
+
+        if (!c->Prop->HasValue(P_RAW_ROOT_PID))
             return -1;
-        return GetContainer()->Task->GetPid();
+
+        return c->Prop->Get<int>(P_RAW_ROOT_PID);
     }
 };
 
@@ -141,6 +144,18 @@ public:
                         sState) {}
 };
 
+static std::string ReadStdio(const TPath &path, size_t limit) {
+    if (!path.Exists() || path.GetType() != EFileType::Regular)
+        return "";
+
+    std::string s;
+    TFile f(path);
+    TError error(f.LastStrings(limit, s));
+    if (error)
+        L_ERR() << "Can't read container stdout: " << error << std::endl;
+    return s;
+}
+
 class TStdoutData : public TStringValue, public TContainerValue {
 public:
     TStdoutData() :
@@ -151,9 +166,8 @@ public:
 
     std::string GetDefault() const override {
         auto c = GetContainer();
-        if (c->Task)
-            return c->Task->GetStdout(c->Prop->Get<uint64_t>(P_STDOUT_LIMIT));
-        return "";
+        return ReadStdio(c->Prop->Get<std::string>(P_STDOUT_PATH),
+                         c->Prop->Get<uint64_t>(P_STDOUT_LIMIT));
     }
 };
 
@@ -167,9 +181,8 @@ public:
 
     std::string GetDefault() const override {
         auto c = GetContainer();
-        if (c->Task)
-            return c->Task->GetStderr(c->Prop->Get<uint64_t>(P_STDOUT_LIMIT));
-        return "";
+        return ReadStdio(c->Prop->Get<std::string>(P_STDERR_PATH),
+                         c->Prop->Get<uint64_t>(P_STDOUT_LIMIT));
     }
 };
 
@@ -398,10 +411,11 @@ public:
         if (c->GetState() == EContainerState::Dead)
             return (GetCurrentTimeMs() - c->GetTimeOfDeath()) / 1000;
 
-        if (!c->Task || !c->Task->IsRunning())
+        if (c->GetState() != EContainerState::Running ||
+            !c->Prop->HasValue(P_RAW_ROOT_PID))
             return 0;
 
-        int pid = c->Task->GetPid();
+        int pid = c->Prop->Get<int>(P_RAW_ROOT_PID);
         TFile f("/proc/" + std::to_string(pid) + "/stat");
         std::string line;
         if (f.AsString(line))

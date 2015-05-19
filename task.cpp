@@ -904,30 +904,6 @@ TError TTask::Kill(int signal) const {
     return TError::Success();
 }
 
-std::string TTask::GetStdout(size_t limit) const {
-    if (Env->StdoutPath.GetType() != EFileType::Regular)
-        return "";
-
-    string s;
-    TFile f(Env->StdoutPath);
-    TError error(f.LastStrings(limit, s));
-    if (error)
-        L_ERR() << "Can't read container stdout: " << error << std::endl;
-    return s;
-}
-
-std::string TTask::GetStderr(size_t limit) const {
-    if (Env->StderrPath.GetType() != EFileType::Regular)
-        return "";
-
-    string s;
-    TFile f(Env->StderrPath);
-    TError error(f.LastStrings(limit, s));
-    if (error)
-        L_ERR() << "Can't read container stderr: " << error << std::endl;
-    return s;
-}
-
 bool TTask::IsValid() {
         // if task belongs to different freezer cgroup we don't
         // restore it since pids may have wrapped or previous kvs state
