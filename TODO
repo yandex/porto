@@ -1,3 +1,5 @@
+- ? respawn = true - respawn only if exit_status != 0
+- ? porto_namespace -> namespace
 - remove net_bps/net_ppsk
 - portoctl top: dynamic field width (adjust to screen width)
 - / and . containers
