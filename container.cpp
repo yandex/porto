@@ -1288,7 +1288,6 @@ TError TContainer::Restore(const kv::TNode &node) {
             TError err = Task->GetPPid(ppid);
             if (err) {
                 L() << "Can't get ppid of restored task: " << err << std::endl;
-                LostAndRestored = true;
             } else if (ppid != getppid()) {
                 L() << "Container " << GetName()
                     << " seems to be reparented to init ("
