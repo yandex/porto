@@ -904,6 +904,35 @@ static void TestIsolateProperty(TPortoAPI &api) {
     AsNobody(api);
 
     ExpectApiSuccess(api.Destroy("iss"));
+
+    Say() << "Make sure kill correctly works with isolate = false" << std::endl;
+    ExpectApiSuccess(api.Create("a"));
+    ExpectApiSuccess(api.SetProperty("a", "isolate", "true"));
+
+    ExpectApiSuccess(api.Create("a/b"));
+    ExpectApiSuccess(api.SetProperty("a/b", "command", "sleep 1000"));
+    ExpectApiSuccess(api.SetProperty("a/b", "isolate", "false"));
+    ExpectApiSuccess(api.Start("a/b"));
+
+    ExpectApiSuccess(api.Create("a/c"));
+    ExpectApiSuccess(api.SetProperty("a/c", "command", "bash -c 'nohup sleep 1000 & nohup sleep 1000 & sleep 1000'"));
+    ExpectApiSuccess(api.SetProperty("a/c", "isolate", "false"));
+    ExpectApiSuccess(api.Start("a/c"));
+
+    ExpectApiSuccess(api.GetData("a/c", "root_pid", pid));
+    ExpectApiSuccess(api.Kill("a/c", SIGKILL));
+    WaitState(api, "a/c", "dead");
+
+    kill(stoi(pid), 0);
+    ExpectEq(errno, ESRCH);
+
+    ExpectApiSuccess(api.GetData("a", "state", state));
+    ExpectEq(state, "running");
+    ExpectApiSuccess(api.GetData("a/b", "state", state));
+    ExpectEq(state, "running");
+    ExpectApiSuccess(api.GetData("a/c", "state", state));
+    ExpectEq(state, "dead");
+    ExpectApiSuccess(api.Destroy("a"));
 }
 
 static void TestContainerNamespaces(TPortoAPI &api) {

@@ -1362,7 +1362,7 @@ bool TContainer::Exit(int status, bool oomKilled) {
             << " with status " << status << (oomKilled ? " invoked by OOM" : "")
             << std::endl;
 
-    if (!oomKilled && !Processes().empty()) {
+    if (!oomKilled && !Processes().empty() && Prop->Get<bool>(P_ISOLATE) == true) {
         L_WRN() << "Skipped bogus exit event, some process is still alive" << std::endl;
         return true;
     }
@@ -1395,10 +1395,7 @@ bool TContainer::Exit(int status, bool oomKilled) {
     if (Parent)
         Parent->UpdateMetaState();
 
-    if (oomKilled)
-        ExitChildren(status, oomKilled);
-    else
-        StopChildren();
+    ExitChildren(status, oomKilled);
 
     if (MayRespawn())
         ScheduleRespawn();
