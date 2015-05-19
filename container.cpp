@@ -544,6 +544,8 @@ TError TContainer::PrepareTask() {
     if (error)
         return error;
 
+    taskEnv->NewMountNs = taskEnv->RootRdOnly || taskEnv->BindMap.size();
+
     if (config().network().enabled()) {
         error = Prop->PrepareTaskEnv(P_IP, taskEnv);
         if (error)

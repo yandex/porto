@@ -863,11 +863,6 @@ static int MasterMain() {
         return EXIT_FAILURE;
     }
 
-    TMountSnapshot ms;
-    error = ms.RemountSlave();
-    if (error)
-        L_ERR() << "Can't remount shared mountpoints: " << error << std::endl;
-
     error = SetOomScoreAdj(-1000);
     if (error)
         L_ERR() << "Can't adjust OOM score: " << error << std::endl;

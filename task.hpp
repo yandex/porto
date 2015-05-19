@@ -96,6 +96,7 @@ public:
     uint64_t Caps;
     TNlAddr DefaultGw;
     std::map<std::string, TIpMap> IpMap;
+    bool NewMountNs;
 
     TError Prepare(const TCred &cred);
     const char** GetEnvp() const;
@@ -154,6 +155,7 @@ public:
     TError ChildApplyLimits();
     TError ChildSetHostname();
     TError ChildPrepareLoop();
+    TError ChildRemountSlave();
     TError ChildCallback();
     TError Restore(int pid_,
                    const std::string &stdinPath,

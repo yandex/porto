@@ -625,6 +625,11 @@ TError TTask::ChildPrepareLoop() {
     return TError::Success();
 }
 
+TError TTask::ChildRemountSlave() {
+    TMountSnapshot ms;
+    return ms.RemountSlave();
+}
+
 TError TTask::ChildCallback() {
     int ret;
     close(WaitParentWfd);
@@ -641,6 +646,9 @@ TError TTask::ChildCallback() {
         return TError(EError::Unknown, errno, "setsid()");
 
     umask(0);
+
+    if (Env->NewMountNs)
+        ChildRemountSlave();
 
     if (Env->Isolate) {
         // remount proc so PID namespace works
@@ -788,7 +796,7 @@ TError TTask::Start() {
             Env->NetCfg.MacVlan.clear();
         }
 
-        if (Env->RootRdOnly || Env->BindMap.size())
+        if (Env->NewMountNs)
             cloneFlags |= CLONE_NEWNS;
 
         if (Env->Hostname != "")
