@@ -210,8 +210,6 @@ static void ShouldHaveValidRunningData(TPortoAPI &api, const string &name) {
 
     if (NetworkEnabled()) {
         ExpectApiSuccess(api.GetData(name, "net_bytes", v));
-        //ExpectApiSuccess(api.GetData(name, "net_bps", v));
-        //ExpectApiSuccess(api.GetData(name, "net_pps", v));
         ExpectApiSuccess(api.GetData(name, "net_packets", v));
         ExpectApiSuccess(api.GetData(name, "net_drops", v));
         ExpectApiSuccess(api.GetData(name, "net_overlimits", v));
@@ -2299,10 +2297,6 @@ static void TestRoot(TPortoAPI &api) {
         data.push_back("net_packets");
         data.push_back("net_drops");
         data.push_back("net_overlimits");
-        /*
-        data.push_back("net_bps");
-        data.push_back("net_pps");
-        */
     }
 
     if (HaveMaxRss())
@@ -3434,8 +3428,6 @@ static void ReadPropsAndData(TPortoAPI &api, const std::string &name) {
         "net_packets",
         "net_drops",
         "net_overlimits",
-        "net_bps",
-        "net_pps",
     };
 
     std::vector<TProperty> plist;
@@ -3746,8 +3738,8 @@ static void TestVolumeImpl(TPortoAPI &api) {
         AsNobody(api);
 
         TFile loopFile(img);
-        size_t expected = 1 * 1024 * 1024 * 1024;
-        size_t mistake = 1 * 1024 * 1024;
+        off_t expected = 1 * 1024 * 1024 * 1024;
+        off_t mistake = 1 * 1024 * 1024;
         Expect(loopFile.GetSize() > expected - mistake && loopFile.GetSize() < expected + mistake);
 
         Say() << "Make sure loop device has correct contents" << std::endl;

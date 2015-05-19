@@ -295,42 +295,6 @@ public:
     }
 };
 
-class TNetBPSData : public TMapValue, public TContainerValue {
-public:
-    TNetBPSData() :
-        TMapValue(0),
-        TContainerValue(D_NET_BPS,
-                        "current network traffic [bytes/s]",
-                        rpdmState) {
-        // TODO: requires custom HTB config
-        Implemented = false && config().network().enabled();
-    }
-
-    TUintMap GetDefault() const override {
-        TUintMap m;
-        (void)GetContainer()->GetStat(ETclassStat::BPS, m);
-        return m;
-    }
-};
-
-class TNetPPSData : public TMapValue, public TContainerValue {
-public:
-    TNetPPSData() :
-        TMapValue(0),
-        TContainerValue(D_NET_PPS,
-                        "current network traffic [packets/s]",
-                        rpdmState) {
-        // TODO: requires custom HTB config
-        Implemented = false && config().network().enabled();
-    }
-
-    TUintMap GetDefault() const override {
-        TUintMap m;
-        (void)GetContainer()->GetStat(ETclassStat::PPS, m);
-        return m;
-    }
-};
-
 class TMinorFaultsData : public TUintValue, public TContainerValue {
 public:
     TMinorFaultsData() :
@@ -541,8 +505,6 @@ void RegisterData(std::shared_ptr<TRawValueMap> m,
         new TNetPacketsData,
         new TNetDropsData,
         new TNetOverlimitsData,
-        new TNetPPSData,
-        new TNetBPSData,
         new TMinorFaultsData,
         new TMajorFaultsData,
         new TIoReadData,
