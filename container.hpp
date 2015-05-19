@@ -144,7 +144,8 @@ public:
 
     // *self is observer container
     TError RelativeName(std::shared_ptr<TContainer> c, std::string &name) const;
-    std::string AbsoluteName(const std::string &orig) const;
+    TError AbsoluteName(const std::string &orig, std::string &name,
+                        bool resolve_dot = false) const;
 
 private:
     std::string GetPortoNamespace() const;

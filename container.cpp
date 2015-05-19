@@ -1556,7 +1556,20 @@ TError TContainer::RelativeName(std::shared_ptr<TContainer> c, std::string &name
     }
 }
 
-std::string TContainer::AbsoluteName(const std::string &orig) const {
+TError TContainer::AbsoluteName(const std::string &orig, std::string &name,
+                                bool resolve_dot) const {
+    if (!resolve_dot && orig == ".")
+        return TError(EError::Permission, "Dot container is provided in read-only mode");
+
     std::string ns = GetPortoNamespace();
-    return ns + orig;
+    if (orig == ".") {
+        size_t off = ns.rfind('/');
+        if (off != std::string::npos) {
+            name = ns.substr(0, off);
+        } else
+            name = "/";
+    } else
+        name = ns + orig;
+
+    return TError::Success();
 }
