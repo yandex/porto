@@ -411,7 +411,7 @@ TError PivotRoot(const TPath &rootfs) {
 }
 
 bool SupportOverlayfs() {
-    (void)mount("/", "/", "overlay", 0, "");
+    (void)mount(NULL, "/", "overlay", MS_SILENT, NULL);
     if (errno == EINVAL) {
         return true;
     } else if (errno == ENODEV) {
