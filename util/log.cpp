@@ -136,3 +136,130 @@ std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
 
     return logStream << GetTime() << " " << name << ": " << prefix[level];
 }
+
+std::string RequestAsString(const rpc::TContainerRequest &req) {
+    if (req.has_create())
+        return "create " + req.create().name();
+    else if (req.has_destroy())
+        return "destroy " + req.destroy().name();
+    else if (req.has_list())
+        return "list containers";
+    else if (req.has_getproperty())
+        return "pget "  + req.getproperty().name() + " " + req.getproperty().property();
+    else if (req.has_setproperty())
+        return "pset " + req.setproperty().name() + " " + req.getproperty().property();
+    else if (req.has_getdata())
+        return "dget " + req.getdata().name() + " " + req.getdata().data();
+    else if (req.has_start())
+        return "start " + req.start().name();
+    else if (req.has_stop())
+        return "stop " + req.stop().name();
+    else if (req.has_pause())
+        return "pause " + req.pause().name();
+    else if (req.has_resume())
+        return "resume " + req.resume().name();
+    else if (req.has_propertylist())
+        return "list available properties";
+    else if (req.has_datalist())
+        return "list available data";
+    else if (req.has_kill())
+        return "kill " + req.kill().name() + " " + std::to_string(req.kill().sig());
+    else if (req.has_version())
+        return "get version";
+    else if (req.has_createvolume())
+        return "volumeAPI: create " + req.createvolume().path() + " " +
+            req.createvolume().source() + " " +
+            req.createvolume().quota() + " " +
+            req.createvolume().flags();
+    else if (req.has_destroyvolume())
+        return "volumeAPI: destroy " + req.destroyvolume().path();
+    else if (req.has_listvolumes())
+        return "volumeAPI: list volumes";
+    else
+        return req.ShortDebugString();
+}
+
+std::string ResponseAsString(const rpc::TContainerResponse &resp) {
+    switch (resp.error()) {
+    case EError::Success:
+    {
+        std::string ret;
+
+        if (resp.has_list()) {
+            for (int i = 0; i < resp.list().name_size(); i++)
+                ret += resp.list().name(i) + " ";
+        } else if (resp.has_propertylist()) {
+            for (int i = 0; i < resp.propertylist().list_size(); i++)
+                ret += resp.propertylist().list(i).name()
+                    + " (" + resp.propertylist().list(i).desc() + ")";
+        } else if (resp.has_datalist()) {
+            for (int i = 0; i < resp.datalist().list_size(); i++)
+                ret += resp.datalist().list(i).name()
+                    + " (" + resp.datalist().list(i).desc() + ")";
+        } else if (resp.has_volumelist()) {
+            for (int i = 0; i < resp.list().name_size(); i++)
+                ret += resp.volumelist().list(i).path() + " (" +
+                    resp.volumelist().list(i).source() + " " +
+                    resp.volumelist().list(i).quota() + " " +
+                    resp.volumelist().list(i).flags() + " " +
+                    std::to_string(resp.volumelist().list(i).used()) + " " +
+                    std::to_string(resp.volumelist().list(i).avail()) + ") ";
+
+        } else if (resp.has_getproperty()) {
+            ret = resp.getproperty().value();
+        } else if (resp.has_getdata()) {
+            ret = resp.getdata().value();
+        } else if (resp.has_version())
+            ret = resp.version().tag() + " #" + resp.version().revision();
+        else
+            ret = "Ok";
+        return ret;
+        break;
+    }
+    case EError::Unknown:
+        return "Error: Unknown (" + resp.errormsg() + ")";
+        break;
+    case EError::InvalidMethod:
+        return "Error: InvalidMethod (" + resp.errormsg() + ")";
+        break;
+    case EError::ContainerAlreadyExists:
+        return "Error: ContainerAlreadyExists (" + resp.errormsg() + ")";
+        break;
+    case EError::ContainerDoesNotExist:
+        return "Error: ContainerDoesNotExist (" + resp.errormsg() + ")";
+        break;
+    case EError::InvalidProperty:
+        return "Error: InvalidProperty (" + resp.errormsg() + ")";
+        break;
+    case EError::InvalidData:
+        return "Error: InvalidData (" + resp.errormsg() + ")";
+        break;
+    case EError::InvalidValue:
+        return "Error: InvalidValue (" + resp.errormsg() + ")";
+        break;
+    case EError::InvalidState:
+        return "Error: InvalidState (" + resp.errormsg() + ")";
+        break;
+    case EError::NotSupported:
+        return "Error: NotSupported (" + resp.errormsg() + ")";
+        break;
+    case EError::ResourceNotAvailable:
+        return "Error: ResourceNotAvailable (" + resp.errormsg() + ")";
+        break;
+    case EError::Permission:
+        return "Error: Permission (" + resp.errormsg() + ")";
+        break;
+    case EError::VolumeAlreadyExists:
+        return "Error: VolumeAlreadyExists (" + resp.errormsg() + ")";
+        break;
+    case EError::VolumeDoesNotExist:
+        return "Error: VolumeDoesNotExist (" + resp.errormsg() + ")";
+        break;
+    case EError::NoSpace:
+        return "Error: NoSpace (" + resp.errormsg() + ")";
+        break;
+    default:
+        return resp.ShortDebugString();
+        break;
+    };
+}

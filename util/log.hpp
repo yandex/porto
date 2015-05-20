@@ -50,3 +50,6 @@ static inline std::basic_ostream<char> &L_ACT() { return TLogger::Log(LOG_ACTION
 static inline std::basic_ostream<char> &L_REQ() { return TLogger::Log(LOG_REQUEST); }
 static inline std::basic_ostream<char> &L_RSP() { return TLogger::Log(LOG_RESPONSE); }
 static inline std::basic_ostream<char> &L_SYS() { return TLogger::Log(LOG_SYSTEM); }
+
+std::string RequestAsString(const rpc::TContainerRequest &req);
+std::string ResponseAsString(const rpc::TContainerResponse &resp);
