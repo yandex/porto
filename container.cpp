@@ -1498,7 +1498,7 @@ bool TContainer::DeliverEvent(const TEvent &event) {
                 return DeliverExitStatus(event.Exit.Pid, event.Exit.Status);
         case EEventType::RotateLogs:
             if (GetState() == EContainerState::Running && Task) {
-                error = Task->Rotate();
+                error = Task->RotateLogs();
                 if (error)
                     L_ERR() << "Can't rotate logs: " << error << std::endl;
             }

@@ -1028,37 +1028,6 @@ TError TTask::FixCgroups() const {
     return TError::Success();
 }
 
-TError TTask::RotateFile(const TPath &path) const {
-    if (!path.ToString().length())
-        return TError::Success();
-
-    if (path.GetType() != EFileType::Regular)
-        return TError::Success();
-
-    TFile f(path);
-    if (f.GetSize() > config().container().max_log_size()) {
-        TError error = f.Truncate(0);
-        if (error)
-            return error;
-    }
-
-    return TError::Success();
-}
-
-TError TTask::Rotate() const {
-    TError error;
-
-    error = RotateFile(Env->StdoutPath);
-    if (error)
-        return error;
-
-    error = RotateFile(Env->StderrPath);
-    if (error)
-        return error;
-
-    return TError::Success();
-}
-
 TError TTask::GetPPid(pid_t &ppid) const {
     TFile f("/proc/" + std::to_string(Pid) + "/status");
 
@@ -1079,4 +1048,27 @@ TError TTask::GetPPid(pid_t &ppid) const {
 TError TaskGetLastCap() {
     TFile f("/proc/sys/kernel/cap_last_cap");
     return f.AsInt(lastCap);
+}
+
+TError TTask::RotateLogs() const {
+    off_t max_log_size = config().container().max_log_size();
+    TError error;
+
+    if (Env->StdoutPath.GetType() == EFileType::Regular) {
+        TFile file(Env->StdoutPath);
+
+        error = file.RotateLog(max_log_size);
+        if (error)
+            return error;
+    }
+
+    if (Env->StderrPath.GetType() == EFileType::Regular) {
+        TFile file(Env->StderrPath);
+
+        error = file.RotateLog(max_log_size);
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
 }

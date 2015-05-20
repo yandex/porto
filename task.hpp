@@ -116,7 +116,6 @@ class TTask: public TNonCopyable {
 
     void ReportPid(int pid) const;
 
-    TError RotateFile(const TPath &path) const;
     TError CreateCwd();
     TError CreateNode(const TPath &path, unsigned int mode, unsigned int dev);
     TError ChildOpenStdFile(const TPath &path, int expected);
@@ -160,7 +159,7 @@ public:
                    const std::string &stdoutPath,
                    const std::string &stderrPath);
     TError FixCgroups() const;
-    TError Rotate() const;
+    TError RotateLogs() const;
     void Abort(const TError &error) const;
 
     TError GetPPid(pid_t &ppid) const;
