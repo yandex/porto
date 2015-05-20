@@ -46,7 +46,8 @@ _portoctl ()
 		if [ -z "$ct" ] ; then
 			_porto_containers
 		else
-			COMPREPLY=( $( compgen -W "$_porto_properies" -- "$cur" ) )
+			COMPREPLY=( $( compgen -S "=" -W "$_porto_properies" -- "$cur" ) )
+			compopt -o nospace
 		fi
 		;;
 	find)
