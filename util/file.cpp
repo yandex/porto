@@ -169,6 +169,10 @@ off_t TFile::GetSize() const {
     return Path.GetSize();
 }
 
+#ifndef FALLOC_FL_COLLAPSE_RANGE
+#define FALLOC_FL_COLLAPSE_RANGE        0x08
+#endif
+
 TError TFile::RotateLog(off_t max_disk_usage) const {
     struct stat st;
     off_t hole_len;
