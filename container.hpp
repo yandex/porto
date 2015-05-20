@@ -78,7 +78,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void PropertyToAlias(const std::string &property, std::string &value) const;
     TError AliasToProperty(std::string &property, std::string &value);
 
-    bool Exit(int status, bool oomKilled);
+    bool Exit(int status, bool oomKilled, bool force = false);
     void ExitChildren(int status, bool oomKilled);
     bool DeliverExitStatus(int pid, int status);
     bool DeliverOom(int fd);

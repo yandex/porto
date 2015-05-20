@@ -816,8 +816,12 @@ void TContainer::StopChildren() {
 void TContainer::ExitChildren(int status, bool oomKilled) {
     for (auto iter : Children)
         if (auto child = iter.lock())
-            if (child->GetState() == EContainerState::Running)
-                child->Exit(status, oomKilled);
+            if (child->GetState() == EContainerState::Running) {
+                TError error = child->KillAll();
+                if (error)
+                    L_ERR() << "Child " << child->GetName() << " can't be killed: " << error << std::endl;
+                child->Exit(status, oomKilled, true);
+            }
 }
 
 TError TContainer::PrepareResources() {
@@ -1356,12 +1360,12 @@ std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys
     return Parent->GetLeafCgroup(subsys)->GetChild(Name);
 }
 
-bool TContainer::Exit(int status, bool oomKilled) {
+bool TContainer::Exit(int status, bool oomKilled, bool force) {
     L_EVT() << "Exit " << GetName() << " (root_pid " << Task->GetPid() << ")"
             << " with status " << status << (oomKilled ? " invoked by OOM" : "")
             << std::endl;
 
-    if (!oomKilled && !Processes().empty() && Prop->Get<bool>(P_ISOLATE) == true) {
+    if (!force && !oomKilled && !Processes().empty() && Prop->Get<bool>(P_ISOLATE) == true) {
         L_WRN() << "Skipped bogus exit event, some process is still alive" << std::endl;
         return true;
     }
