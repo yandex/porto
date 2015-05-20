@@ -181,7 +181,7 @@ TError TFile::RotateLog(off_t max_disk_usage) const {
     if (!S_ISREG(st.st_mode) || (off_t)st.st_blocks * 512 <= max_disk_usage)
         return TError::Success();
 
-    fd = open(Path.ToString().c_str(), O_RDONLY | O_NOCTTY);
+    fd = open(Path.ToString().c_str(), O_RDWR | O_NOCTTY);
     if (fd < 0)
         return TError(EError::Unknown, errno, "open(" + Path.ToString() + ")");
 
