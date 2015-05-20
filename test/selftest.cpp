@@ -493,10 +493,10 @@ static void TestHolder(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData("a/b", "state", state));
     ExpectEq(state, "dead");
     ExpectApiSuccess(api.GetData("a/b/c", "state", state));
-    ExpectEq(state, "stopped");
+    ExpectEq(state, "dead");
     ExpectEq(CgExists("memory", "a"), true);
     ExpectEq(CgExists("memory", "a/b"), true);
-    ExpectEq(CgExists("memory", "a/b/c"), false);
+    ExpectEq(CgExists("memory", "a/b/c"), true);
 
     ExpectApiSuccess(api.Destroy("a/b/c"));
     ExpectApiSuccess(api.Destroy("a/b"));
