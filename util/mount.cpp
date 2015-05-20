@@ -132,18 +132,10 @@ TError TMountSnapshot::Mounts(std::set<std::shared_ptr<TMount>> &mounts) const {
 TError TMountSnapshot::RemountSlave() {
     // systemd mounts / with MS_SHARED so any changes made to it in the container
     // are propagated back (in particular, mounting new /proc breaks host)
-    set<shared_ptr<TMount>> mounts;
 
-    TError error = Mounts(mounts);
-    if (error)
-        return error;
-
-    for (auto &m : mounts) {
-        // we are only changing type of the mount from (possibly) MS_SHARED
-        // to MS_SLAVE, nothing is remounted or mounted over
-        error = m->Mount(MS_SLAVE);
-        if (error)
-            L_ERR() << "Can't remount " << m->GetMountpoint() << std::endl;
+    if (mount(NULL, "/", NULL, MS_REC | MS_SLAVE, NULL)) {
+        L_ERR() << "Can't remount / recursively as slave" << std::endl;
+        return TError(EError::Unknown, errno, "mount(NULL, /, NULL, MS_REC | MS_SLAVE, NULL)");
     }
 
     return TError::Success();
