@@ -789,7 +789,7 @@ TError TTask::Start() {
 
         int cloneFlags = SIGCHLD;
         if (Env->Isolate) {
-            cloneFlags |= CLONE_NEWPID | CLONE_NEWNS | CLONE_NEWIPC;
+            cloneFlags |= CLONE_NEWPID | CLONE_NEWIPC;
         } else {
             Env->NetCfg.Share = true;
             Env->NetCfg.Host.clear();
