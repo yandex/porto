@@ -58,6 +58,9 @@ std::string TPath::BaseName() {
 EFileType TPath::GetType() const {
     struct stat st;
 
+    if (!Path.length())
+        return EFileType::Unknown;
+
     if (lstat(Path.c_str(), &st))
         return EFileType::Unknown;
 
