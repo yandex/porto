@@ -163,7 +163,9 @@ static bool HandleRequest(TContext &context, std::shared_ptr<TClient> client) {
     if (!haveData)
         return true;
 
-    client->Identify(*context.Cholder, false);
+    if (client->Identify(*context.Cholder, false))
+        return true;
+
     HandleRpcRequest(context, request, client);
 
     return false;

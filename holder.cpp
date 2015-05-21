@@ -139,7 +139,7 @@ TError TContainerHolder::Create(const std::string &name, const TCred &cred) {
 
 TError TContainerHolder::Get(const std::string &name, std::shared_ptr<TContainer> &c) {
     if (Containers.find(name) == Containers.end())
-        return TError(EError::ContainerDoesNotExist, "invalid name");
+        return TError(EError::ContainerDoesNotExist, "container " + name + "doesn't exist");
 
     c = Containers[name];
     return TError::Success();

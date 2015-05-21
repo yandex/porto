@@ -58,7 +58,12 @@ TError TClient::Identify(TContainerHolder &holder, bool full) {
             Pid = cr.pid;
             Comm = comm;
 
-            IdentifyContainer(holder);
+            TError err = IdentifyContainer(holder);
+            if (err) {
+                L_WRN() << "Can't identify container of pid " << cr.pid
+                        << " : " << err << std::endl;
+                return err;
+            }
         }
 
         Cred.Uid = cr.uid;
@@ -66,7 +71,7 @@ TError TClient::Identify(TContainerHolder &holder, bool full) {
 
         return TError::Success();
     } else {
-        return TError(EError::Unknown, "Can't identify client");
+        return TError(EError::Unknown, "Can't identify client (getsockopt() failed)");
     }
 }
 
@@ -87,17 +92,18 @@ TError TClient::IdentifyContainer(TContainerHolder &holder) {
         name = freezer.replace(0, prefix.length(), "");
 
     std::shared_ptr<TContainer> container;
-    if (!holder.Get(name, container))
-        Container = container;
+    error = holder.Get(name, container);
+    if (error)
+        return error;
 
+    Container = container;
     return TError::Success();
 }
 
 std::string TClient::GetContainerName() const {
     auto c = Container.lock();
-    if (c)
-        return c->GetName();
-    return "/";
+    PORTO_ASSERT(c);
+    return c->GetName();
 }
 
 std::shared_ptr<TContainer> TClient::GetContainer() const {
