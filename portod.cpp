@@ -623,13 +623,14 @@ static int ReapDead(int fd, map<int,int> &exited, int slavePid, int &slaveStatus
     return 0;
 }
 
-static void ReceiveAcks(int fd, std::map<int,int> &exited,
-                        std::set<int> &acked) {
+static int ReceiveAcks(int fd, std::map<int,int> &exited,
+                       std::set<int> &acked) {
     int pid;
+    int nr = 0;
 
     if (read(fd, &pid, sizeof(pid)) == sizeof(pid)) {
         if (pid <= 0)
-            return;
+            return nr;
 
         L_EVT() << "Got acknowledge for " << pid << " (" << exited.size() << " queued)" << std::endl;
 
@@ -641,7 +642,10 @@ static void ReceiveAcks(int fd, std::map<int,int> &exited,
         }
 
         Statistics->QueuedStatuses = exited.size();
+        nr++;
     }
+
+    return nr;
 }
 
 static void SaveStatuses(map<int, int> &exited) {
@@ -819,7 +823,10 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
         std::set<int> acked;
         for (auto ev : events) {
             if (ev.data.fd == ackfd[0]) {
-                ReceiveAcks(ackfd[0], exited, acked);
+                if (!ReceiveAcks(ackfd[0], exited, acked)) {
+                    ret = EXIT_FAILURE;
+                    goto exit;
+                }
             } else {
                 L_WRN() << "master received unknown epoll event: " << ev.data.fd << std::endl;
                 loop.RemoveFd(ev.data.fd);
