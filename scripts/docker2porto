@@ -151,11 +151,13 @@ unless latest
 end
 
 latest = latest["layer"]
-id = images.find { |img| img["id"].start_with? latest }["id"]
-
-abort "Can't find tag #{image_tag}" unless id
 
 headers = { 'Authorization' => "Token #{token}" }
+
+rsp = get("https://#{registry}/v1/repositories/#{image}/tags/#{image_tag}", headers)
+id = rsp.body.delete "\""
+
+abort "Can't find tag #{image_tag}" unless id
 
 puts "Retrieving #{id} ancestors..."
 rsp = get("https://#{registry}/v1/images/#{id}/ancestry", headers)

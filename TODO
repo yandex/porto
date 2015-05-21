@@ -1,4 +1,3 @@
-- import docker2porto patch
 - bind create target directory if doesn't exist (only when root is isolated?)
 - make sure when using docker2porto stdout/stderr files are created
 - net property: support external namespace
