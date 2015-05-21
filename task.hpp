@@ -154,15 +154,16 @@ public:
     TError ChildPrepareLoop();
     TError ChildRemountSlave();
     TError ChildCallback();
-    TError Restore(int pid_,
-                   const std::string &stdinPath,
-                   const std::string &stdoutPath,
-                   const std::string &stderrPath);
+    void Restore(int pid_,
+                 const std::string &stdinPath,
+                 const std::string &stdoutPath,
+                 const std::string &stderrPath);
     TError FixCgroups() const;
     TError RotateLogs() const;
     void Abort(const TError &error) const;
 
     TError GetPPid(pid_t &ppid) const;
+    bool IsZombie() const;
 };
 
 TError TaskGetLastCap();

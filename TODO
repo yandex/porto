@@ -1,9 +1,10 @@
+- add ability to set cpu_limit in percents of single core
+- import docker2porto patch
+- bind create target directory if doesn't exist (only when root is isolated?)
+- make sure when using docker2porto stdout/stderr files are created
 - net property: support external namespace
-- test for log rotate
 - a - empty, b - empty, c - command, start a/b/c
 - ? respawn = true - respawn only if exit_status != 0
-- ? porto_namespace -> namespace
-- remove net_bps/net_ppsk
 - portoctl top: dynamic field width (adjust to screen width)
 - / and . containers
 - fix container restoration: (try to) check if task is owned by porto
@@ -11,7 +12,6 @@
 - porto can't restore parent/child (stopped) when parent is dead
 - set soft limits for abandoned cgroups
 - find and fix bug with meta-containers
-- add ability to set cpu_limit in percents of single core
 - namespaces for volumes
 - support volume as root
 - custom SIGTERM timeout (allow to send SIGKILL for such containers so we can 'force-destroy' them)

@@ -259,10 +259,8 @@ retry:
         TEvent e(EEventType::Exit);
         e.Exit.Pid = pid;
         e.Exit.Status = status;
-        if (!cholder.DeliverEvent(e)) {
-            AckExitStatus(pid);
-            return 0;
-        }
+        (void)cholder.DeliverEvent(e);
+        AckExitStatus(pid);
     }
 
     return 0;
@@ -578,27 +576,45 @@ static void DeliverPidStatus(int fd, int pid, int status, size_t queued) {
         L_ERR() << "write(status): " << strerror(errno) << std::endl;
 }
 
-static int ReapDead(int fd, map<int,int> &exited, int slavePid, int &slaveStatus, std::set<int> &acked) {
-    int status;
-    int pid;
+static void Reap(int pid) {
+    (void)waitpid(pid, NULL, 0);
+}
 
+static int ReapDead(int fd, map<int,int> &exited, int slavePid, int &slaveStatus, std::set<int> &acked) {
     while (true) {
-        pid = waitpid(-1, &status, WNOHANG);
-        if (pid <= 0)
+        siginfo_t info = { 0 };
+        if (waitid(P_ALL, -1, &info, WNOHANG | WNOWAIT | WEXITED) < 0)
             break;
 
-        if (pid == slavePid) {
+        if (info.si_pid <= 0)
+            break;
+
+        int status = 0;
+        if (info.si_code == CLD_KILLED) {
+            status = info.si_status;
+        } else if (info.si_code == CLD_DUMPED) {
+            status = info.si_status | (1 << 7);
+        } else { // CLD_EXITED
+            status = info.si_status << 8;
+        }
+
+        if (info.si_pid == slavePid) {
             slaveStatus = status;
+            Reap(info.si_pid);
             return -1;
         }
 
-        if (acked.find(pid) != acked.end()) {
-            acked.erase(pid);
+        if (acked.find(info.si_pid) != acked.end()) {
+            acked.erase(info.si_pid);
+            Reap(info.si_pid);
             continue;
         }
 
-        exited[pid] = status;
-        DeliverPidStatus(fd, pid, status, exited.size());
+        if (exited.find(info.si_pid) != exited.end())
+            return 0;
+
+        exited[info.si_pid] = status;
+        DeliverPidStatus(fd, info.si_pid, status, exited.size());
         Statistics->QueuedStatuses = exited.size();
     }
 
@@ -613,13 +629,16 @@ static void ReceiveAcks(int fd, std::map<int,int> &exited,
         if (pid <= 0)
             return;
 
-        if (exited.find(pid) == exited.end())
+        L_EVT() << "Got acknowledge for " << pid << " (" << exited.size() << " queued)" << std::endl;
+
+        if (exited.find(pid) == exited.end()) {
             acked.insert(pid);
-        else
+        } else {
             exited.erase(pid);
+            Reap(pid);
+        }
 
         Statistics->QueuedStatuses = exited.size();
-        L_EVT() << "Got acknowledge for " << pid << " (" << exited.size() << " queued)" << std::endl;
     }
 }
 
@@ -807,7 +826,7 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
 
         int status;
         if (ReapDead(evtfd[1], exited, slavePid, status, acked)) {
-            L_SYS() << "slave exited with " << status << std::endl;
+            L_SYS() << "Slave exited with " << status << std::endl;
             ret = EXIT_SUCCESS;
             goto exit;
         }
@@ -878,8 +897,10 @@ static int MasterMain() {
         if (next >= GetCurrentTimeMs())
             usleep((next - GetCurrentTimeMs()) * 1000);
 
-        if (slavePid)
+        if (slavePid) {
             (void)kill(slavePid, SIGKILL);
+            Reap(slavePid);
+        }
         if (ret < 0)
             break;
     }

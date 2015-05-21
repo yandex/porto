@@ -881,9 +881,10 @@ TError TContainer::Stop() {
 
     L_ACT() << "Stop " << GetName() << " " << Id << std::endl;
 
+    int pid = 0;
+
     if (state == EContainerState::Running || state == EContainerState::Dead) {
-        int pid = Task->GetPid();
-        AckExitStatus(pid);
+        pid = Task->GetPid();
 
         TError error = KillAll();
         if (error) {
@@ -914,6 +915,9 @@ TError TContainer::Stop() {
     StopChildren();
     if (!IsRoot())
         FreeResources();
+
+    if (pid)
+        AckExitStatus(pid);
 
     return TError::Success();
 }
@@ -1281,30 +1285,29 @@ TError TContainer::Restore(const kv::TNode &node) {
             return error;
         }
 
-        error = Task->Restore(pid,
-                              Prop->Get<std::string>(P_STDIN_PATH),
-                              Prop->Get<std::string>(P_STDOUT_PATH),
-                              Prop->Get<std::string>(P_STDERR_PATH));
-        if (error) {
-            L_ERR() << "Can't restore task: " << error << std::endl;
+        Task->Restore(pid,
+                      Prop->Get<std::string>(P_STDIN_PATH),
+                      Prop->Get<std::string>(P_STDOUT_PATH),
+                      Prop->Get<std::string>(P_STDERR_PATH));
+
+        pid_t ppid;
+        TError err = Task->GetPPid(ppid);
+        if (err) {
+            L() << "Can't get ppid of restored task: " << err << std::endl;
+            LostAndRestored = true;
+        } else if (ppid != getppid()) {
+            L() << "Container " << GetName()
+                << " seems to be reparented to init ("
+                << ppid << " != " << getppid() << ")"
+                << std::endl;
             LostAndRestored = true;
         } else {
-            pid_t ppid;
-            TError err = Task->GetPPid(ppid);
-            if (err) {
-                L() << "Can't get ppid of restored task: " << err << std::endl;
-            } else if (ppid != getppid()) {
-                L() << "Container " << GetName()
-                    << " seems to be reparented to init ("
-                    << ppid << " != " << getppid() << ")"
-                    << std::endl;
-                LostAndRestored = true;
-            } else {
-                L() << "Container " << GetName()
-                    << " seems to be not reparented ("
-                    << ppid << " == " << getppid() << ")"
-                    << std::endl;
-            }
+            // TODO: check if process really belongs to porto
+
+            L() << "Container " << GetName()
+                << " seems to be not reparented ("
+                << ppid << " == " << getppid() << ")"
+                << std::endl;
         }
 
         auto state = Data->Get<std::string>(D_STATE);
@@ -1319,10 +1322,12 @@ TError TContainer::Restore(const kv::TNode &node) {
                 SetState(EContainerState::Paused);
         }
 
-        SyncStateWithCgroup();
+        if (!Task->IsZombie()) {
+            SyncStateWithCgroup();
 
-        if (MayRespawn())
-            ScheduleRespawn();
+            if (MayRespawn())
+                ScheduleRespawn();
+        }
     } else {
         L_ACT() << GetName() << ": restore created container " << std::endl;
 
@@ -1492,10 +1497,7 @@ bool TContainer::DeliverEvent(const TEvent &event) {
     TError error;
     switch (event.Type) {
         case EEventType::Exit:
-            if (event.Exit.Pid < 0 && GetState() == EContainerState::Running)
-                return Exit(event.Exit.Status, false);
-            else
-                return DeliverExitStatus(event.Exit.Pid, event.Exit.Status);
+            return DeliverExitStatus(event.Exit.Pid, event.Exit.Status);
         case EEventType::RotateLogs:
             if (GetState() == EContainerState::Running && Task) {
                 error = Task->RotateLogs();

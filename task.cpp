@@ -904,32 +904,50 @@ TError TTask::Kill(int signal) const {
     return TError::Success();
 }
 
-bool TTask::IsValid() {
-        // if task belongs to different freezer cgroup we don't
-        // restore it since pids may have wrapped or previous kvs state
-        // is too old
-        map<string, string> cgmap;
-        TError error = GetTaskCgroups(Pid, cgmap);
-        if (error) {
-            L_WRN() << "Can't read " << Pid << " cgroups, don't restore: " << error << std::endl;
-            return false;
-        } else {
-            auto cg = LeafCgroups.at(freezerSubsystem);
-            if (cg && cg->Relpath() != cgmap["freezer"]) {
-                L_WRN() << "Unexpected freezer cgroup for " << Pid << " (" << cg->Path() << " != " << cgmap["freezer"] << "), don't restore" << std::endl;
-                Pid = 0;
-                State = Stopped;
-                return false;
-            }
-        }
+bool TTask::IsZombie() const {
+    TFile f("/proc/" + std::to_string(Pid) + "/status");
 
-        return true;
+    std::vector<std::string> lines;
+    TError err = f.AsLines(lines);
+    if (err)
+        return false;
+
+    for (auto &l : lines)
+        if (l.compare(0, 7, "State:\t") == 0)
+            return l.substr(7, 1) == "Z";
+
+    return false;
 }
 
-TError TTask::Restore(int pid_,
-                      const std::string &stdinPath,
-                      const std::string &stdoutPath,
-                      const std::string &stderrPath) {
+bool TTask::IsValid() {
+    if (IsZombie())
+        return false;
+
+    // if task belongs to different freezer cgroup we don't
+    // restore it since pids may have wrapped or previous kvs state
+    // is too old
+    map<string, string> cgmap;
+    TError error = GetTaskCgroups(Pid, cgmap);
+    if (error) {
+        L_WRN() << "Can't read " << Pid << " cgroups, don't restore: " << error << std::endl;
+        return false;
+    } else {
+        auto cg = LeafCgroups.at(freezerSubsystem);
+        if (cg && cg->Relpath() != cgmap["freezer"]) {
+            L_WRN() << "Unexpected freezer cgroup for " << Pid << " (" << cg->Path() << " != " << cgmap["freezer"] << "), don't restore" << std::endl;
+            Pid = 0;
+            State = Stopped;
+            return false;
+        }
+    }
+
+    return true;
+}
+
+void TTask::Restore(int pid_,
+                    const std::string &stdinPath,
+                    const std::string &stdoutPath,
+                    const std::string &stderrPath) {
     ExitStatus = 0;
     Pid = pid_;
     State = Started;
@@ -980,8 +998,6 @@ TError TTask::Restore(int pid_,
                 L_WRN() << "Can't fix cgroups: " << error << std::endl;
         }
     }
-
-    return TError::Success();
 }
 
 TError TTask::FixCgroups() const {

@@ -109,6 +109,25 @@ void WaitExit(TPortoAPI &api, const std::string &pid) {
         throw std::string("Waited too long for task to exit");
 }
 
+void WaitProcessExit(const std::string &pid, int sec) {
+    Say() << "Waiting for " << pid << " to exit" << std::endl;
+
+    int times = sec * 10;
+    int pidVal = stoi(pid);
+
+    std::string ret;
+    do {
+        if (times-- <= 0)
+            break;
+
+        usleep(100000);
+
+    } while (kill(pidVal, 0) == 0);
+
+    if (times <= 0)
+        throw std::string("Waited too long for process to exit");
+}
+
 void WaitState(TPortoAPI &api, const std::string &name, const std::string &state, int sec) {
     Say() << "Waiting for " << name << " to be in state " << state << std::endl;
 
@@ -571,6 +590,12 @@ bool NetworkEnabled() {
     return links.size() != 0;
 }
 
+static size_t ChildrenNum(int pid) {
+    vector<string> lines;
+    ExpectSuccess(Popen("pgrep -P " + std::to_string(pid), lines));
+    return lines.size();
+}
+
 void TestDaemon(TPortoAPI &api) {
     struct dirent **lst;
     int pid;
@@ -582,6 +607,7 @@ void TestDaemon(TPortoAPI &api) {
 
     Say() << "Make sure portod-slave doesn't have zombies" << std::endl;
     pid = ReadPid(config().slave_pid().path());
+    ExpectEq(ChildrenNum(pid), 0);
 
     Say() << "Make sure portod-slave doesn't have invalid FDs" << std::endl;
 
@@ -604,6 +630,7 @@ void TestDaemon(TPortoAPI &api) {
 
     Say() << "Make sure portod-master doesn't have zombies" << std::endl;
     pid = ReadPid(config().master_pid().path());
+    ExpectEq(ChildrenNum(pid), 1);
 
     Say() << "Make sure portod-master doesn't have invalid FDs" << std::endl;
     Say() << "Number of portod-master fds=" << nr << std::endl;

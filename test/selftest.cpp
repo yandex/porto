@@ -693,7 +693,7 @@ static void TestNsCgTc(TPortoAPI &api) {
     }
 
     ExpectApiSuccess(api.Stop(name));
-    ExpectEq(TaskRunning(api, pid), false);
+    WaitProcessExit(pid);
 
     if (NetworkEnabled()) {
         ExpectEq(TcClassExist(stoul(leaf_cls)), false);
@@ -2180,7 +2180,7 @@ static void TestStateMachine(TPortoAPI &api) {
     ExpectApiFailure(api.Resume(name), EError::InvalidState);
 
     ExpectApiSuccess(api.Stop(name));
-    ExpectEq(TaskRunning(api, pid), false);
+    WaitProcessExit(pid);
 
     Say() << "Make sure we can stop unintentionally frozen container " << std::endl;
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
