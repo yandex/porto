@@ -86,10 +86,12 @@ TError TClient::IdentifyContainer(TContainerHolder &holder) {
 
     auto freezer = cgmap["freezer"];
     auto prefix = "/" + PORTO_ROOT_CGROUP + "/";
-    std::string name = "/";
+    std::string name;
 
     if (freezer.length() > prefix.length() && freezer.substr(0, prefix.length()) == prefix)
-        name = freezer.replace(0, prefix.length(), "");
+        name = freezer.substr(prefix.length());
+    else
+        name = "/";
 
     std::shared_ptr<TContainer> container;
     error = holder.Get(name, container);
