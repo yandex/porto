@@ -107,5 +107,7 @@ std::string TClient::GetContainerName() const {
 }
 
 std::shared_ptr<TContainer> TClient::GetContainer() const {
-    return Container.lock();
+    auto c = Container.lock();
+    PORTO_ASSERT(c);
+    return c;
 }
