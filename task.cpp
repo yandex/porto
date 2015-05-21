@@ -254,6 +254,11 @@ TError TTask::ChildBindDirectores() {
         TPath dest = Env->Root + bindMap.Dest;
         if (Env->Root == "/")
             dest = Env->Cwd + bindMap.Dest;
+        else if (!StringStartsWith(dest.RealPath().ToString(), Env->Root.ToString()))
+            return TError(EError::InvalidValue, "Container bind mount "
+                          + bindMap.Source.ToString() + " resolves to root "
+                          + dest.RealPath().ToString()
+                          + " (" + Env->Root.ToString() + ")");
 
         TMount mnt(bindMap.Source, dest, "none", {});
 

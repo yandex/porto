@@ -214,3 +214,11 @@ std::string StringReplaceAll(const std::string &str, const std::string &from, co
 
     return copy;
 }
+
+#include "util/log.hpp"
+bool StringStartsWith(const std::string &str, const std::string &prefix) {
+    if (str.length() < prefix.length())
+        return false;
+
+    return str.substr(0, prefix.length()) == prefix;
+}

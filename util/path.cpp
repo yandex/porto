@@ -298,3 +298,14 @@ TError TPath::Copy(const TPath &to) const {
     }
     return TError(EError::Unknown, "Unknown file type " + Path);
 }
+
+TPath TPath::RealPath() {
+    char *p = realpath(Path.c_str(), NULL);
+    if (!p)
+        return Path;
+
+    TPath path(p);
+
+    free(p);
+    return path;
+}

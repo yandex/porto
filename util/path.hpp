@@ -80,4 +80,5 @@ public:
     TError Symlink(const TPath &to) const;
     TError Mkfifo(unsigned int mode) const;
     TError Mknod(unsigned int mode, unsigned int dev) const;
+    TPath RealPath();
 };

@@ -25,3 +25,4 @@ std::string StringTrim(const std::string& s, const std::string &what = " \t\n");
 std::string StringRemoveRepeating(const std::string &str, const char rc);
 bool StringOnlyDigits(const std::string &s);
 std::string StringReplaceAll(const std::string &str, const std::string &from, const std::string &to);
+bool StringStartsWith(const std::string &str, const std::string &prefix);

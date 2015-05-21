@@ -1,7 +1,4 @@
-- bind create target directory if doesn't exist (only when root is isolated?)
-- make sure when using docker2porto stdout/stderr files are created
 - net property: support external namespace
-- a - empty, b - empty, c - command, start a/b/c
 - ? respawn = true - respawn only if exit_status != 0
 - portoctl top: dynamic field width (adjust to screen width)
 - / and . containers
@@ -13,6 +10,7 @@
 - namespaces for volumes
 - support volume as root
 - custom SIGTERM timeout (allow to send SIGKILL for such containers so we can 'force-destroy' them)
+- kill master when can't restart slave many times
 
 # root property
 - mount root loop in root namespace (to better diagnose possible problems)
