@@ -553,11 +553,20 @@ public:
         return 100;
     }
 
-    TError CheckValue(const uint64_t &value) override {
-        if (value < 1 || value > 100)
-            return TError(EError::InvalidValue, "invalid value");
+    TError FromString(const std::string &str) override {
+        try {
+            size_t pos = 0;
+            double v = stoull(str, &pos);
+            if (pos > 0 && pos < str.length() && str[pos] == 'c')
+                v = v * 100 / GetNumCores();
 
-        return TError::Success();
+            if (v < 1 || v > 100)
+                return TError(EError::InvalidValue, "invalid value");
+
+            return Set((uint64_t)v);
+        } catch (...) {
+            return TError(EError::InvalidValue, "invalid value");
+        }
     }
 };
 
@@ -571,11 +580,20 @@ public:
         Implemented = cpuSubsystem->SupportGuarantee();
     }
 
-    TError CheckValue(const uint64_t &value) override {
-        if (value > 100)
-            return TError(EError::InvalidValue, "invalid value");
+    TError FromString(const std::string &str) override {
+        try {
+            size_t pos = 0;
+            double v = stoull(str, &pos);
+            if (pos > 0 && pos < str.length() && str[pos] == 'c')
+                v = v * 100 / GetNumCores();
 
-        return TError::Success();
+            if (v < 0 || v > 100)
+                return TError(EError::InvalidValue, "invalid value");
+
+            return Set((uint64_t)v);
+        } catch (...) {
+            return TError(EError::InvalidValue, "invalid value");
+        }
     }
 };
 
@@ -1331,13 +1349,6 @@ public:
                         "Virtualization mode: os|app",
                         staticProperty) {}
 
-    TError CheckValue(const int &value) override {
-        if (value != VIRT_MODE_APP && value != VIRT_MODE_OS)
-            return TError(EError::InvalidValue, std::string("Unsupported ") + P_VIRT_MODE);
-
-        return TError::Success();
-    }
-
     std::string ToString(const int &value) const override {
         if (value == VIRT_MODE_OS)
             return "os";
@@ -1355,7 +1366,6 @@ public:
         } else {
             return TError(EError::InvalidValue, std::string("Unsupported ") + P_VIRT_MODE + ": " + value);
         }
-
     }
 };
 

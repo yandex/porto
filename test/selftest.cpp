@@ -2618,6 +2618,19 @@ static TUintMap ParseMap(const std::string &s) {
     return m;
 }
 
+static void TestCoresConvertion(TPortoAPI &api, const std::string &name, const std::string &property) {
+    auto cores = GetNumCores();
+    std::string v;
+
+    ExpectApiSuccess(api.SetProperty(name, property, std::to_string(cores) + "c"));
+    ExpectApiSuccess(api.GetProperty(name, property, v));
+    ExpectEq(v, "100");
+
+    ExpectApiSuccess(api.SetProperty(name, property, std::to_string(cores / 2) + "c"));
+    ExpectApiSuccess(api.GetProperty(name, property, v));
+    ExpectEq(v, "50");
+}
+
 static void TestLimits(TPortoAPI &api) {
     string name = "a";
     ExpectApiSuccess(api.Create(name));
@@ -2673,6 +2686,7 @@ static void TestLimits(TPortoAPI &api) {
 
     Say() << "Check cpu_limit and cpu_guarantee range" << std::endl;
     if (HaveCfsBandwidth()) {
+        ExpectApiFailure(api.SetProperty(name, "cpu_limit", "test"), EError::InvalidValue);
         ExpectApiFailure(api.SetProperty(name, "cpu_limit", "0"), EError::InvalidValue);
         ExpectApiFailure(api.SetProperty(name, "cpu_limit", "101"), EError::InvalidValue);
         ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "1"));
@@ -2680,6 +2694,7 @@ static void TestLimits(TPortoAPI &api) {
     }
 
     if (HaveCfsGroupSched()) {
+        ExpectApiFailure(api.SetProperty(name, "cpu_guarantee", "test"), EError::InvalidValue);
         ExpectApiFailure(api.SetProperty(name, "cpu_guarantee", "-1"), EError::InvalidValue);
         ExpectApiFailure(api.SetProperty(name, "cpu_guarantee", "101"), EError::InvalidValue);
         ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "0"));
@@ -2740,6 +2755,8 @@ static void TestLimits(TPortoAPI &api) {
         ExpectApiSuccess(api.Start(name));
         ExpectEq(GetCgKnob("cpu", name, "cpu.cfs_quota_us"), "-1");
         ExpectApiSuccess(api.Stop(name));
+
+        TestCoresConvertion(api, name, "cpu_limit");
     }
 
     if (HaveCfsGroupSched()) {
@@ -2764,6 +2781,8 @@ static void TestLimits(TPortoAPI &api) {
         ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
         ExpectEq(shares, rootShares * 100);
         ExpectApiSuccess(api.Stop(name));
+
+        TestCoresConvertion(api, name, "cpu_guarantee");
     }
 
     if (IsCfqActive()) {
@@ -2941,6 +2960,7 @@ static void TestVirtModeProperty(TPortoAPI &api) {
 
     AsDaemon(api);
     ExpectApiSuccess(api.Create(name));
+    ExpectApiFailure(api.SetProperty(name, "virt_mode", "invalid"), EError::InvalidValue);
     ExpectApiSuccess(api.SetProperty(name, "virt_mode", "os"));
 
     for (auto kv : expected) {

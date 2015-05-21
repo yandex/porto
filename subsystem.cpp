@@ -250,11 +250,7 @@ TError TCpuSubsystem::SetLimit(std::shared_ptr<TCgroup> cg, const uint64_t limit
     if (error)
         return TError(EError::Unknown, "Can't parse cpu.cfs_period_us");
 
-    long ncores = sysconf(_SC_NPROCESSORS_CONF);
-    if (ncores <= 0)
-        return TError(EError::Unknown, "Can't get number of CPU cores");
-
-    uint64_t runtime = ncores * period * limit / 100;
+    uint64_t runtime = GetNumCores() * period * limit / 100;
     const uint64_t minQuota = 1000;
     if (runtime < minQuota)
         runtime = minQuota;

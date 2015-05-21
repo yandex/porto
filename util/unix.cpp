@@ -421,3 +421,14 @@ bool SupportOverlayfs() {
         return false;
     }
 }
+
+size_t GetNumCores() {
+    long ncores = sysconf(_SC_NPROCESSORS_CONF);
+    if (ncores <= 0) {
+        TError error(EError::Unknown, "Can't get number of CPU cores");
+        L_ERR() << error << std::endl;
+        return 1;
+    }
+
+    return (size_t)ncores;
+}
