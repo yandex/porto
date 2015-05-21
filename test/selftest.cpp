@@ -451,6 +451,20 @@ static void TestHolder(TPortoAPI &api) {
     ShouldHaveValidRunningData(api, "a");
     ExpectApiSuccess(api.Stop("a"));
 
+    Say() << "Make sure we can have multiple meta parents" << std::endl;
+
+    ExpectApiSuccess(api.Create("x"));
+    ExpectApiSuccess(api.Create("x/y"));
+    ExpectApiSuccess(api.Create("x/y/z"));
+    ExpectApiSuccess(api.SetProperty("x/y/z", "command", "sleep 1000"));
+    ExpectApiSuccess(api.Start("x/y/z"));
+
+    ExpectApiSuccess(api.GetProperty("x", "command", v));
+    ExpectEq(v, config().container().tmp_dir() + "/x/portod-meta-root");
+    ExpectApiSuccess(api.GetProperty("x/y", "command", v));
+    ExpectEq(v, config().container().tmp_dir() + "/x/y/portod-meta-root");
+    ExpectApiSuccess(api.Destroy("x"));
+
     Say() << "Make sure when parent stops/dies children are stopped" << std::endl;
 
     string state;
@@ -3880,6 +3894,7 @@ static bool RespawnTicks(TPortoAPI &api, const std::string &name, int maxTries =
 static void TestRecovery(TPortoAPI &api) {
     string pid, v;
     string name = "a:b";
+    std::vector<std::string> containers;
 
     map<string,string> props = {
         { "command", "sleep 1000" },
@@ -3887,6 +3902,29 @@ static void TestRecovery(TPortoAPI &api) {
         { "group", "daemon" },
         { "env", "a=a; b=b" },
     };
+
+#if 0
+    Say() << "Make sure we can restore stopped child when parent is dead" << std::endl;
+
+    ExpectApiSuccess(api.Create("parent"));
+    ExpectApiSuccess(api.Create("parent/child"));
+    ExpectApiSuccess(api.SetProperty("parent", "command", "sleep 1"));
+    ExpectApiSuccess(api.SetProperty("parent/child", "command", "sleep 2"));
+    ExpectApiSuccess(api.Start("parent"));
+    ExpectApiSuccess(api.Start("parent/child"));
+    ExpectApiSuccess(api.Stop("parent/child"));
+    WaitState(api, "parent", "dead");
+
+    KillMaster(api, SIGKILL);
+
+    ExpectApiSuccess(api.List(containers));
+    ExpectEq(containers.size(), 3);
+    ExpectEq(containers[0], string("/"));
+    ExpectEq(containers[1], string("parent"));
+    ExpectEq(containers[2], string("parent/child"));
+
+    ExpectApiSuccess(api.Destroy("parent"));
+#endif
 
     Say() << "Make sure we can figure out that containers are dead even if master dies" << std::endl;
 
@@ -3944,8 +3982,6 @@ static void TestRecovery(TPortoAPI &api) {
     AsRoot(api);
     KillSlave(api, SIGKILL);
     AsNobody(api);
-
-    std::vector<std::string> containers;
 
     ExpectApiSuccess(api.List(containers));
     ExpectEq(containers.size(), 3);
