@@ -1694,6 +1694,10 @@ static void TestBindProperty(TPortoAPI &api) {
     ExpectNeq(m["/tmp"].flags.find("rw,"), string::npos);
     ExpectApiSuccess(api.Stop(name));
 
+    Say() << "Make sure bind creates missing directories" << std::endl;
+    ExpectApiSuccess(api.SetProperty(name, "bind", "/sbin /a/b/c ro; /sbin/init /x/y/z/init ro"));
+    ExpectApiSuccess(api.Start(name));
+
     ExpectApiSuccess(api.Destroy(name));
 }
 
