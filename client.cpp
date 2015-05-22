@@ -64,6 +64,9 @@ TError TClient::Identify(TContainerHolder &holder, bool full) {
                         << " : " << err << std::endl;
                 return err;
             }
+        } else {
+            if (Container.expired())
+                return TError(EError::Unknown, "Can't identify client (container is dead)");
         }
 
         Cred.Uid = cr.uid;
