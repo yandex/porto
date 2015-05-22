@@ -1,3 +1,19 @@
+yandex-porto (1.12) precise; urgency=low
+
+  * don't let user specify bind target that points to host root
+  * print usage and total in error code on memory_guarantee overcommitment
+  * support cores in cpu_limit/cpu_guarantee (for example 3c)
+  * portotop: common statistics, auto adjusting fields, custom update interval
+  * dot container
+  * remove net_bps & net_pps (never worked)
+  * fix task kill when isolate = false
+  * fix broken log rotate
+  * try to collapse log files instead of truncating
+  * don't reap processes until slave ack
+  * don't accept requests from unknown clients
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Fri, 22 May 2015 14:25:00 +0300
+
 yandex-porto (1.11) precise; urgency=low
 
   * container namespaces
