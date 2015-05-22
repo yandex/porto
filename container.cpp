@@ -60,34 +60,12 @@ std::string TContainer::ContainerStateName(EContainerState state) {
     }
 }
 
-bool TContainer::HaveRunningChildren() {
-    for (auto iter : Children)
-        if (auto child = iter.lock()) {
-            if (child->State == EContainerState::Running ||
-                child->State == EContainerState::Dead) {
-                return true;
-            } else if (child->State == EContainerState::Meta) {
-                if (child->HaveRunningChildren())
-                    return true;
-            }
-        }
-
-    return false;
-}
-
 std::string TContainer::GetTmpDir() const {
     return config().container().tmp_dir() + "/" + std::to_string(Id);
 }
 
-EContainerState TContainer::GetState() {
+EContainerState TContainer::GetState() const {
     return State;
-}
-
-void TContainer::UpdateMetaState() {
-    // TODO: use some kind of reference count for accounting running children
-    if (State == EContainerState::Meta && !IsRoot())
-        if (!HaveRunningChildren())
-            Stop();
 }
 
 void TContainer::SyncStateWithCgroup() {
@@ -157,7 +135,7 @@ TError TContainer::Destroy() {
             return error;
     }
 
-    if (GetState() == EContainerState::Running)
+    if (Task && Task->IsRunning())
         (void)Kill(SIGKILL);
 
     if (GetState() != EContainerState::Stopped) {
@@ -350,7 +328,7 @@ TError TContainer::ApplyDynamicProperties() {
 std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
     auto p = Parent;
     while (p) {
-        if (p->State == EContainerState::Running)
+        if (p->Task && p->Task->IsRunning())
             return p;
         p = p->Parent;
     }
@@ -637,6 +615,8 @@ TError TContainer::PrepareMetaParent() {
             error = Start();
             if (error)
                 return error;
+
+            SetState(EContainerState::Meta);
         } else {
             SetState(EContainerState::Meta);
 
@@ -817,7 +797,8 @@ void TContainer::StopChildren() {
 void TContainer::ExitChildren(int status, bool oomKilled) {
     for (auto iter : Children)
         if (auto child = iter.lock())
-            if (child->GetState() == EContainerState::Running) {
+            if (child->GetState() == EContainerState::Running ||
+                child->GetState() == EContainerState::Meta) {
                 TError error = child->KillAll();
                 if (error)
                     L_ERR() << "Child " << child->GetName() << " can't be killed: " << error << std::endl;
@@ -883,7 +864,7 @@ TError TContainer::Stop() {
 
     int pid = 0;
 
-    if (state == EContainerState::Running || state == EContainerState::Dead) {
+    if (Task && Task->IsRunning()) {
         pid = Task->GetPid();
 
         TError error = KillAll();
@@ -910,8 +891,6 @@ TError TContainer::Stop() {
 
     if (!IsRoot())
         SetState(EContainerState::Stopped);
-    if (Parent)
-        Parent->UpdateMetaState();
     StopChildren();
     if (!IsRoot())
         FreeResources();
@@ -1400,9 +1379,6 @@ bool TContainer::Exit(int status, bool oomKilled, bool force) {
         if (error)
             L_WRN() << "Can't kill all tasks in container" << error << std::endl;
     }
-
-    if (Parent)
-        Parent->UpdateMetaState();
 
     ExitChildren(status, oomKilled);
 

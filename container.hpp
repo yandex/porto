@@ -54,7 +54,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
 
     // data
-    bool HaveRunningChildren();
     void SetState(EContainerState newState, bool tree = false);
     std::string ContainerStateName(EContainerState state);
 
@@ -95,7 +94,7 @@ public:
     std::shared_ptr<TNetwork> Net;
 
     std::string GetTmpDir() const;
-    EContainerState GetState();
+    EContainerState GetState() const;
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);
 
     TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -149,6 +148,5 @@ public:
 
 private:
     std::string GetPortoNamespace() const;
-    void UpdateMetaState();
     void SyncStateWithCgroup();
 };

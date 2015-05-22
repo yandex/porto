@@ -43,6 +43,12 @@ static std::set<EContainerState> rpdState = {
     EContainerState::Dead,
 };
 
+static std::set<EContainerState> rpmState = {
+    EContainerState::Running,
+    EContainerState::Paused,
+    EContainerState::Meta,
+};
+
 static std::set<EContainerState> rpdmState = {
     EContainerState::Running,
     EContainerState::Paused,
@@ -114,7 +120,7 @@ public:
         TIntValue(HIDDEN_VALUE),
         TContainerValue(D_ROOT_PID,
                         "root process id (deprecated)",
-                        rpState) {}
+                        rpmState) {}
 
     int GetDefault() const override {
         auto c = GetContainer();

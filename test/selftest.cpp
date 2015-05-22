@@ -425,6 +425,11 @@ static void TestHolder(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData("a", "state", v));
     ExpectEq(v, "meta");
     ExpectApiSuccess(api.Stop("a/b/c"));
+    ExpectApiSuccess(api.GetData("a/b", "state", v));
+    ExpectEq(v, "meta");
+    ExpectApiSuccess(api.GetData("a", "state", v));
+    ExpectEq(v, "meta");
+    ExpectApiSuccess(api.Stop("a"));
 
     ExpectApiSuccess(api.SetProperty("a/b", "command", "sleep 1000"));
     ExpectApiSuccess(api.SetProperty("a/b", "isolate", "true"));
@@ -437,6 +442,9 @@ static void TestHolder(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData("a", "state", v));
     ExpectEq(v, "meta");
     ExpectApiSuccess(api.Stop("a/b"));
+    ExpectApiSuccess(api.GetData("a", "state", v));
+    ExpectEq(v, "meta");
+    ExpectApiSuccess(api.Stop("a"));
 
     ExpectApiSuccess(api.SetProperty("a", "command", "sleep 1000"));
     ExpectApiSuccess(api.SetProperty("a", "isolate", "true"));
@@ -522,6 +530,54 @@ static void TestHolder(TPortoAPI &api) {
     ExpectApiFailure(api.Destroy("z$"), EError::ContainerDoesNotExist);
 
     ShouldHaveOnlyRoot(api);
+}
+
+static void TestMeta(TPortoAPI &api) {
+    std::string state;
+    ShouldHaveOnlyRoot(api);
+
+    std::vector<std::string> isolateVals = { "true", "false" };
+
+    for (auto isolate : isolateVals) {
+        Say() << "Test meta state machine with isolate = " << isolate << std::endl;
+
+        ExpectApiSuccess(api.Create("a"));
+        ExpectApiSuccess(api.Create("a/b"));
+
+        ExpectApiSuccess(api.SetProperty("a/b", "command", "sleep 2"));
+
+        ExpectApiSuccess(api.SetProperty("a", "isolate", isolate));
+        ExpectApiSuccess(api.SetProperty("a/b", "isolate", "true"));
+
+        ExpectApiSuccess(api.GetData("a", "state", state));
+        ExpectEq(state, "stopped");
+        ExpectApiSuccess(api.GetData("a/b", "state", state));
+        ExpectEq(state, "stopped");
+
+        ExpectApiSuccess(api.Start("a/b"));
+        ExpectApiSuccess(api.GetData("a", "state", state));
+        ExpectEq(state, "meta");
+        ExpectApiSuccess(api.GetData("a/b", "state", state));
+        ExpectEq(state, "running");
+
+        WaitState(api, "a/b", "dead");
+        ExpectApiSuccess(api.GetData("a", "state", state));
+        ExpectEq(state, "meta");
+        ExpectApiSuccess(api.GetData("a/b", "state", state));
+        ExpectEq(state, "dead");
+
+        ExpectApiSuccess(api.Stop("a/b"));
+        ExpectApiSuccess(api.GetData("a", "state", state));
+        ExpectEq(state, "meta");
+        ExpectApiSuccess(api.GetData("a/b", "state", state));
+        ExpectEq(state, "stopped");
+
+        ExpectApiSuccess(api.Stop("a"));
+        ExpectApiSuccess(api.GetData("a", "state", state));
+        ExpectEq(state, "stopped");
+
+        ExpectApiSuccess(api.Destroy("a"));
+    }
 }
 
 static void TestEmpty(TPortoAPI &api) {
@@ -613,7 +669,7 @@ static void TestExitStatus(TPortoAPI &api) {
 
     ExpectApiSuccess(api.SetProperty(name, "memory_limit", oomMemoryLimit));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitState(api, name, "dead", 60);
     ExpectApiSuccess(api.GetData(name, "exit_status", ret));
     ExpectEq(ret, string("9"));
     ExpectApiSuccess(api.GetData(name, "oom_killed", ret));
@@ -878,7 +934,7 @@ static void TestIsolateProperty(TPortoAPI &api) {
 
     std::string state;
     ExpectApiSuccess(api.GetData("iss/container", "state", state));
-    ExpectEq(state, "running");
+    ExpectEq(state, "meta");
 
     AsRoot(api);
     ExpectNeq(GetNamespace("self", "pid"), GetNamespace(hook1Pid, "pid"));
@@ -909,7 +965,7 @@ static void TestIsolateProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData("iss/container/hook2", "root_pid", hook2Pid));
 
     ExpectApiSuccess(api.GetData("iss/container", "state", state));
-    ExpectEq(state, "running");
+    ExpectEq(state, "meta");
 
     AsRoot(api);
     ExpectNeq(GetNamespace("self", "pid"), GetNamespace(hook1Pid, "pid"));
@@ -941,7 +997,7 @@ static void TestIsolateProperty(TPortoAPI &api) {
     ExpectEq(errno, ESRCH);
 
     ExpectApiSuccess(api.GetData("a", "state", state));
-    ExpectEq(state, "running");
+    ExpectEq(state, "meta");
     ExpectApiSuccess(api.GetData("a/b", "state", state));
     ExpectEq(state, "running");
     ExpectApiSuccess(api.GetData("a/c", "state", state));
@@ -2414,7 +2470,7 @@ static void TestRoot(TPortoAPI &api) {
     ExpectEq(v, string("meta"));
     ExpectApiFailure(api.GetData(root, "exit_status", v), EError::InvalidState);
     ExpectApiFailure(api.GetData(root, "start_errno", v), EError::InvalidState);
-    ExpectApiFailure(api.GetData(root, "root_pid", v), EError::InvalidState);
+    ExpectApiSuccess(api.GetData(root, "root_pid", v));
     ExpectApiFailure(api.GetData(root, "stdout", v), EError::InvalidState);
     ExpectApiSuccess(api.GetData(root, "parent", v));
     ExpectEq(v, "");
@@ -4366,6 +4422,7 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
         { "root", TestRoot },
         { "data", TestData },
         { "holder", TestHolder },
+        { "meta", TestMeta },
         { "empty", TestEmpty },
         { "state_machine", TestStateMachine },
         { "exit_status", TestExitStatus },

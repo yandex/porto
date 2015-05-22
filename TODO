@@ -1,3 +1,4 @@
+- bind: follow links instead of realpath (fails when target doesn't exist)
 - net property: support external namespace
 - ? respawn = true - respawn only if exit_status != 0
 - portoctl top: dynamic field width (adjust to screen width)
