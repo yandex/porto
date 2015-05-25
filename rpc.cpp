@@ -16,6 +16,7 @@ static bool InfoRequest(const rpc::TContainerRequest &req) {
     return req.has_list() ||
         req.has_getproperty() ||
         req.has_getdata() ||
+        req.has_get() ||
         req.has_propertylist() ||
         req.has_datalist() ||
         req.has_version() ||
@@ -228,6 +229,58 @@ static TError GetContainerData(TContext &context,
     if (!error)
         rsp.mutable_getdata()->set_value(value);
     return error;
+}
+
+static TError GetContainer(TContext &context,
+                           const rpc::TContainerGetRequest &req,
+                           rpc::TContainerResponse &rsp,
+                           std::shared_ptr<TClient> client) {
+    if (!req.variable_size())
+        return TError(EError::InvalidValue, "Properties/data are not specified");
+
+    if (!req.name_size())
+        return TError(EError::InvalidValue, "Containers are not specified");
+
+    auto get = rsp.mutable_get();
+
+    for (int i = 0; i < req.name_size(); i++) {
+        auto relname = req.name(i);
+
+        std::string name;
+        std::shared_ptr<TContainer> container;
+        TError error = client->GetContainer()->AbsoluteName(relname, name, true);
+        if (!error)
+            error = context.Cholder->Get(name, container);
+
+        auto entry = get->add_list();
+        entry->set_name(relname);
+
+        for (int j = 0; j < req.variable_size(); j++) {
+            auto var = req.variable(j);
+
+            auto keyval = entry->add_keyval();
+            std::string value;
+
+            if (!error) {
+                if (container->Prop->IsValid(var))
+                    error = container->GetProperty(var, value);
+                else if (container->Data->IsValid(var))
+                    error = container->GetData(var, value);
+                else
+                    error = TError(EError::InvalidValue, "Unknown property or data " + var);
+            }
+
+            keyval->set_variable(var);
+            if (error) {
+                keyval->set_error(error.GetError());
+                keyval->set_errormsg(error.GetMsg());
+            } else {
+                keyval->set_value(value);
+            }
+        }
+    }
+
+    return TError::Success();
 }
 
 static TError ListProperty(TContext &context,
@@ -447,6 +500,8 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
             error = SetContainerProperty(context, req.setproperty(), rsp, client);
         else if (req.has_getdata())
             error = GetContainerData(context, req.getdata(), rsp, client);
+        else if (req.has_get())
+            error = GetContainer(context, req.get(), rsp, client);
         else if (req.has_start())
             error = StartContainer(context, req.start(), rsp, client);
         else if (req.has_stop())

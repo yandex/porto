@@ -33,6 +33,12 @@ struct TVolumeDescription {
         Path(path), Source(source), Quota(quota), Flags(flags), Used(used), Avail(avail) {}
 };
 
+struct TPortoGetResponse {
+    std::string Value;
+    int Error;
+    std::string ErrorMsg;
+};
+
 class TPortoAPI {
     int Fd;
     const int Retries;
@@ -62,6 +68,10 @@ public:
     int List(std::vector<std::string> &clist);
     int Plist(std::vector<TProperty> &plist);
     int Dlist(std::vector<TData> &dlist);
+
+    int Get(const std::vector<std::string> &name,
+            const std::vector<std::string> &variable,
+            std::map<std::string, std::map<std::string, TPortoGetResponse>> &result);
 
     int GetProperty(const std::string &name, const std::string &property, std::string &value);
     int SetProperty(const std::string &name, const std::string &property, std::string value);

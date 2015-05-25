@@ -195,6 +195,32 @@ class _RPC(object):
             return True
         return res
 
+    def Get(self, name, var):
+        request = rpc_pb2.TContainerRequest()
+        request.get.name.extend(name)
+        request.get.variable.extend(var)
+        resp = self.call(request)
+        if resp.error != rpc_pb2.Success:
+            raise resp.errorMsg
+
+        res = {}
+        for container in resp.get.list:
+            var = {}
+            for kv in container.keyval:
+                if kv.HasField('error'):
+                    var[kv.variable] = exceptions.EError.Create(kv.error, kv.errorMsg)
+                    continue
+                if kv.value == 'false':
+                    var[kv.variable] = False
+                elif kv.value == 'true':
+                    var[kv.variable] = True
+                else:
+                    var[kv.variable] = kv.value
+
+            res[container.name] = var
+
+        return res
+
     def Plist(self):
         request = rpc_pb2.TContainerRequest()
         request.propertyList.CopyFrom(rpc_pb2.TContainerPropertyListRequest())
@@ -229,8 +255,11 @@ class Container(object):
     def Resume(self, name):
         self.rpc.Resume(self.name)
 
+    def Get(self, var):
+        return self.rpc.Get(self.name, var)[self.name]
+
     def GetProperties(self):
-        return {name: self.GetProperty(name) for name in self.rpc.Plist()}
+        return self.Get(self.rpc.Plist())
 
     def GetProperty(self, property):
         # TODO make real property getters/setters
@@ -293,6 +322,9 @@ class Connection(object):
     def Resume(self, name):
         self.rpc.Resume(name)
 
+    def Get(self, name, var):
+        return self.rpc.Get(name, var)
+
     def GetProperty(self, name, property):
         return self.rpc.GetProperty(name, property)
 
@@ -323,5 +355,6 @@ class Connection(object):
 # container = conn.Create('test2')
 # print container.GetProperty('command')
 # print container.GetData('/', 'state')
+# print container.Get(['command', 'state'])
 # conn.Destroy(container)
 # conn.disconnect()

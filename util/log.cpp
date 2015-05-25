@@ -150,7 +150,20 @@ std::string RequestAsString(const rpc::TContainerRequest &req) {
         return "pset " + req.setproperty().name() + " " + req.getproperty().property();
     else if (req.has_getdata())
         return "dget " + req.getdata().name() + " " + req.getdata().data();
-    else if (req.has_start())
+    else if (req.has_get()) {
+        std::string ret = "get";
+
+        for (int i = 0; i < req.get().name_size(); i++)
+            ret += " " + req.get().name(i);
+
+        if (req.get().name_size() && req.get().variable_size())
+            ret += ",";
+
+        for (int i = 0; i < req.get().variable_size(); i++)
+            ret += " " + req.get().variable(i);
+
+        return ret;
+    } else if (req.has_start())
         return "start " + req.start().name();
     else if (req.has_stop())
         return "stop " + req.stop().name();
@@ -209,6 +222,20 @@ std::string ResponseAsString(const rpc::TContainerResponse &resp) {
             ret = resp.getproperty().value();
         } else if (resp.has_getdata()) {
             ret = resp.getdata().value();
+        } else if (resp.has_get()) {
+            for (int i = 0; i < resp.get().list_size(); i++) {
+                auto entry = resp.get().list(i);
+
+                if (ret.length())
+                    ret += "; ";
+                ret += entry.name() + ":";
+
+                for (int j = 0; j < entry.keyval_size(); j++)
+                    if (entry.keyval(j).has_error())
+                        ret += " " + entry.keyval(j).variable() + "=" + std::to_string(entry.keyval(j).error()) + "?";
+                    else if (entry.keyval(i).has_value())
+                        ret += " " + entry.keyval(j).variable() + "=" + entry.keyval(j).value();
+            }
         } else if (resp.has_version())
             ret = resp.version().tag() + " #" + resp.version().revision();
         else

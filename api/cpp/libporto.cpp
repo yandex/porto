@@ -134,6 +134,42 @@ int TPortoAPI::Dlist(vector<TData> &dlist) {
     return ret;
 }
 
+int TPortoAPI::Get(const std::vector<std::string> &name,
+                   const std::vector<std::string> &variable,
+                   std::map<std::string, std::map<std::string, TPortoGetResponse>> &result) {
+    auto get = Req.mutable_get();
+
+    for (auto n : name)
+        get->add_name(n);
+    for (auto v : variable)
+        get->add_variable(v);
+
+    int ret = Rpc(Req, Rsp);
+    if (!ret) {
+         for (int i = 0; i < Rsp.get().list_size(); i++) {
+             auto entry = Rsp.get().list(i);
+             auto name = entry.name();
+
+             for (int j = 0; j < entry.keyval_size(); j++) {
+                 auto keyval = entry.keyval(j);
+
+                 TPortoGetResponse resp;
+                 resp.Error = 0;
+                 if (keyval.has_error())
+                     resp.Error = keyval.error();
+                 if (keyval.has_errormsg())
+                     resp.ErrorMsg = keyval.errormsg();
+                 if (keyval.has_value())
+                     resp.Value = keyval.value();
+
+                 result[name][keyval.variable()] = resp;
+             }
+         }
+    }
+
+    return ret;
+}
+
 int TPortoAPI::GetProperty(const string &name, const string &property, string &value) {
     Req.mutable_getproperty()->set_name(name);
     Req.mutable_getproperty()->set_property(property);

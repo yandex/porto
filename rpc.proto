@@ -130,6 +130,13 @@ message TContainerKillRequest {
 message TVersionRequest {
 }
 
+// Запрос на получение нескольких свойств/данных нескольких контейнеров
+message TContainerGetRequest {
+	// Список контейнеров, у которых надо получить свойства\данные
+	repeated string name = 1;
+	// Список свойтв\данных, которые надо получить у всех контейнеров
+	repeated string variable = 2;
+}
 
 // Сообщение-запрос
 // В запросе может быть только одно опциональное сообщение, только оно
@@ -150,6 +157,7 @@ message TContainerRequest {
 	optional TContainerDataListRequest dataList = 12;
 	optional TContainerKillRequest kill = 13;
 	optional TVersionRequest version = 14;
+	optional TContainerGetRequest get = 15;
 
 	optional TVolumeCreateRequest createVolume = 100;
 	optional TVolumeDestroyRequest destroyVolume = 101;
@@ -204,6 +212,22 @@ message TVersionResponse {
 	required string revision = 2;
 }
 
+// Ответ на запрос нескольких свойств/данных контейнеров
+message TContainerGetResponse {
+	message TContainerGetValueResponse {
+		required string variable = 1;
+		optional EError error = 2;
+		optional string errorMsg = 3;
+		optional string value = 4;
+	}
+	message TContainerGetListResponse {
+		required string name = 1;
+		repeated TContainerGetValueResponse keyval = 2;
+	}
+
+	repeated TContainerGetListResponse list = 1;
+}
+
 // Сообщение-ответ
 // В ответе будет присутствовать статус запроса (ошибка) и соответствующей
 // запросу результат.
@@ -220,6 +244,7 @@ message TContainerResponse {
 	optional TVersionResponse version = 8;
 
 	optional TVolumeListResponse volumeList = 9;
+	optional TContainerGetResponse get = 10;
 }
 
 // VolumeAPI

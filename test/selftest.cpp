@@ -532,6 +532,80 @@ static void TestHolder(TPortoAPI &api) {
     ShouldHaveOnlyRoot(api);
 }
 
+static void TestGet(TPortoAPI &api) {
+    ExpectApiSuccess(api.Create("a"));
+    ExpectApiSuccess(api.Create("b"));
+
+    ExpectApiSuccess(api.SetProperty("a", "command", "sleep 1000"));
+
+    ExpectApiSuccess(api.Start("a"));
+
+    Say() << "Test combined get" << std::endl;
+
+    std::vector<std::string> name;
+    std::vector<std::string> variable;
+    std::map<std::string, std::map<std::string, TPortoGetResponse>> result;
+
+    ExpectApiFailure(api.Get(name, variable, result), EError::InvalidValue);
+    ExpectEq(result.size(), 0);
+
+    name.push_back("a");
+    name.push_back("b");
+    ExpectApiFailure(api.Get(name, variable, result), EError::InvalidValue);
+    ExpectEq(result.size(), 0);
+
+    name.clear();
+    variable.push_back("cwd");
+    ExpectApiFailure(api.Get(name, variable, result), EError::InvalidValue);
+    ExpectEq(result.size(), 0);
+
+    name.clear();
+    variable.clear();
+
+    name.push_back("a");
+    name.push_back("b");
+    variable.push_back("user");
+    variable.push_back("command");
+    variable.push_back("state");
+    variable.push_back("invalid");
+    ExpectApiSuccess(api.Get(name, variable, result));
+
+    ExpectEq(result.size(), 2);
+    ExpectEq(result["a"].size(), 4);
+    ExpectEq(result["b"].size(), 4);
+
+    std::string user = GetDefaultUser();
+
+    ExpectEq(result["a"]["user"].Value, user);
+    ExpectEq(result["a"]["user"].Error, 0);
+    ExpectEq(result["a"]["user"].ErrorMsg, "");
+    ExpectEq(result["a"]["command"].Value, "sleep 1000");
+    ExpectEq(result["a"]["command"].Error, 0);
+    ExpectEq(result["a"]["command"].ErrorMsg, "");
+    ExpectEq(result["a"]["state"].Value, "running");
+    ExpectEq(result["a"]["state"].Error, 0);
+    ExpectEq(result["a"]["state"].ErrorMsg, "");
+    ExpectEq(result["a"]["invalid"].Value, "");
+    ExpectEq(result["a"]["invalid"].Error, (int)EError::InvalidValue);
+    ExpectNeq(result["a"]["invalid"].ErrorMsg, "");
+
+    ExpectEq(result["b"]["user"].Value, user);
+    ExpectEq(result["b"]["user"].Error, 0);
+    ExpectEq(result["b"]["user"].ErrorMsg, "");
+    ExpectEq(result["b"]["command"].Value, "");
+    ExpectEq(result["b"]["command"].Error, 0);
+    ExpectEq(result["b"]["command"].ErrorMsg, "");
+    ExpectEq(result["b"]["state"].Value, "stopped");
+    ExpectEq(result["b"]["state"].Error, 0);
+    ExpectEq(result["b"]["state"].ErrorMsg, "");
+    ExpectEq(result["b"]["invalid"].Value, "");
+    ExpectEq(result["b"]["invalid"].Error, (int)EError::InvalidValue);
+    ExpectNeq(result["b"]["invalid"].ErrorMsg, "");
+
+    ExpectApiSuccess(api.Destroy("a"));
+    ExpectApiSuccess(api.Destroy("b"));
+}
+
 static void TestMeta(TPortoAPI &api) {
     std::string state;
     ShouldHaveOnlyRoot(api);
@@ -4422,6 +4496,7 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
         { "root", TestRoot },
         { "data", TestData },
         { "holder", TestHolder },
+        { "get", TestGet },
         { "meta", TestMeta },
         { "empty", TestEmpty },
         { "state_machine", TestStateMachine },
