@@ -886,8 +886,8 @@ static int MasterMain() {
         return error;
 
     if (prctl(PR_SET_CHILD_SUBREAPER, 1) < 0) {
-        TError error(EError::Unknown, errno, "prctl(PR_SET_CHILD_SUBREAPER,)");
-        L_ERR() << "Can't set myself as a subreaper: " << error << std::endl;
+        TError error(EError::Unknown, errno, "prctl(PR_SET_CHILD_SUBREAPER)");
+        L_ERR() << "Can't set myself as a subreaper, make sure kernel version is at least 3.4: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
