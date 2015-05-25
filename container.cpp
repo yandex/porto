@@ -436,11 +436,12 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
-    TError error = ApplyDynamicProperties();
-    if (error)
-        return error;
-
+    TError error;
     if (!IsRoot()) {
+        error = ApplyDynamicProperties();
+        if (error)
+            return error;
+
         error = PrepareOomMonitor();
         if (error) {
             L_ERR() << "Can't prepare OOM monitoring: " << error << std::endl;
@@ -1340,7 +1341,7 @@ std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys
         return LeafCgroups[subsys];
 
     if (Name == ROOT_CONTAINER)
-        return subsys->GetRootCgroup()->GetChild(PORTO_ROOT_CGROUP);
+        return subsys->GetRootCgroup();
 
     return Parent->GetLeafCgroup(subsys)->GetChild(Name);
 }
