@@ -1522,7 +1522,10 @@ std::string TContainer::GetPortoNamespace() const {
 
 TError TContainer::RelativeName(std::shared_ptr<TContainer> c, std::string &name) const {
     std::string ns = GetPortoNamespace();
-    if (ns == "") {
+    if (c->IsRoot()) {
+        name = ROOT_CONTAINER;
+        return TError::Success();
+    } else if (ns == "") {
         name = c->GetName();
         return TError::Success();
     } else {
