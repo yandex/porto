@@ -219,7 +219,14 @@ std::string RequestAsString(const rpc::TContainerRequest &req) {
         return "kill " + req.kill().name() + " " + std::to_string(req.kill().sig());
     else if (req.has_version())
         return "get version";
-    else if (req.has_createvolume())
+    else if (req.has_wait()) {
+        std::string ret = "wait";
+
+        for (int i = 0; i < req.wait().name_size(); i++)
+            ret += " " + req.wait().name(i);
+
+        return ret;
+    } else if (req.has_createvolume())
         return "volumeAPI: create " + req.createvolume().path() + " " +
             req.createvolume().source() + " " +
             req.createvolume().quota() + " " +
@@ -278,6 +285,8 @@ std::string ResponseAsString(const rpc::TContainerResponse &resp) {
             }
         } else if (resp.has_version())
             ret = resp.version().tag() + " #" + resp.version().revision();
+        else if (resp.has_wait())
+            ret = resp.wait().name() + " isn't running";
         else
             ret = "Ok";
         return ret;
