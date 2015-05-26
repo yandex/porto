@@ -84,8 +84,10 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     bool DeliverExitStatus(int pid, int status);
     bool DeliverOom(int fd);
 
-    void ParseName(std::string &name, std::string &idx) const;
     TError Prepare();
+
+    std::string GetPortoNamespace() const;
+    void SyncStateWithCgroup();
 
 public:
     TCred OwnerCred;
@@ -148,8 +150,5 @@ public:
     TError RelativeName(std::shared_ptr<TContainer> c, std::string &name) const;
     TError AbsoluteName(const std::string &orig, std::string &name,
                         bool resolve_meta = false) const;
-
-private:
-    std::string GetPortoNamespace() const;
-    void SyncStateWithCgroup();
+    static void ParsePropertyName(std::string &name, std::string &idx);
 };

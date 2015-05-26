@@ -262,9 +262,12 @@ static TError GetContainer(TContext &context,
             std::string value;
 
             if (!error) {
-                if (container->Prop->IsValid(var))
+                std::string name = var, idx;
+                TContainer::ParsePropertyName(name, idx);
+
+                if (container->Prop->IsValid(name))
                     error = container->GetProperty(var, value);
-                else if (container->Data->IsValid(var))
+                else if (container->Data->IsValid(name))
                     error = container->GetData(var, value);
                 else
                     error = TError(EError::InvalidValue, "Unknown property or data " + var);

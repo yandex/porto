@@ -970,7 +970,7 @@ TError TContainer::Kill(int sig) {
     return Task->Kill(sig);
 }
 
-void TContainer::ParseName(std::string &name, std::string &idx) const {
+void TContainer::ParsePropertyName(std::string &name, std::string &idx) {
     std::vector<std::string> tokens;
     TError error = SplitString(name, '[', tokens);
     if (error || tokens.size() != 2)
@@ -983,7 +983,7 @@ void TContainer::ParseName(std::string &name, std::string &idx) const {
 TError TContainer::GetData(const string &origName, string &value) {
     std::string name = origName;
     std::string idx;
-    ParseName(name, idx);
+    ParsePropertyName(name, idx);
 
     if (!Data->IsValid(name))
         return TError(EError::InvalidData, "invalid container data");
@@ -1056,7 +1056,7 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
 
     string property = origProperty;
     std::string idx;
-    ParseName(property, idx);
+    ParsePropertyName(property, idx);
 
     if (alias.find(origProperty) != alias.end())
         property = alias.at(origProperty);
@@ -1103,7 +1103,7 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
 
     string property = origProperty;
     std::string idx;
-    ParseName(property, idx);
+    ParsePropertyName(property, idx);
     string value = StringTrim(origValue);
 
     TError error = AliasToProperty(property, value);
