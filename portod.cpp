@@ -313,6 +313,7 @@ static int SlaveRpc(TContext &context) {
     std::vector<int> signals;
     std::vector<struct epoll_event> events;
 
+    bool discardState = false;
     while (true) {
         int timeout = context.Queue->GetNextTimeout();
         Statistics->SlaveTimeoutMs = timeout;
@@ -331,7 +332,7 @@ static int SlaveRpc(TContext &context) {
         for (auto s : signals) {
             switch (s) {
             case SIGINT:
-                context.Destroy();
+                discardState = true;
                 // no break here
             case SIGTERM:
                 ret = EncodeSignal(s);
@@ -454,6 +455,9 @@ exit:
 
     close(sfd);
 
+    if (discardState)
+        context.Destroy();
+
     return ret;
 }
 
@@ -489,15 +493,34 @@ static int TuneLimits() {
     return EXIT_SUCCESS;
 }
 
+static void preFork(void) {
+    //NetworkPreFork();
+}
+
+static void postParentFork(void) {
+    //NetworkPostFork();
+}
+
+static void postChildFork(void) {
+    //NetworkPostFork();
+    TLogger::ClearBuffer();
+}
+
 static int SlaveMain() {
     SetDieOnParentExit(SIGTERM);
+
+    int ret = pthread_atfork(preFork, postParentFork, postChildFork);
+    if (ret) {
+        std::cerr << "Can't set fork handlers: " << strerror(ret) << std::endl;
+        return EXIT_FAILURE;
+    }
 
     if (failsafe)
         AllocStatistics();
 
     Statistics->SlaveStarted = GetCurrentTimeMs();
 
-    int ret = DaemonPrepare(false);
+    ret = DaemonPrepare(false);
     if (ret)
         return ret;
 
