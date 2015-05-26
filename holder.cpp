@@ -52,11 +52,32 @@ TError TContainerHolder::CreateRoot() {
     if (error)
         return error;
 
-    error = root->Start();
+    error = root->Start(true);
+    if (error)
+        return error;
+
+    return TError::Success();
+}
+
+TError TContainerHolder::CreatePortoRoot() {
+    TError error = Create(PORTO_ROOT_CONTAINER, TCred(0, 0));
+    if (error)
+        return error;
+
+    std::shared_ptr<TContainer> root;
+    error = Get(PORTO_ROOT_CONTAINER, root);
+    if (error)
+        return error;
+
+    if (root->GetId() != PORTO_ROOT_CONTAINER_ID)
+        return TError(EError::Unknown, "Unexpected /porto container id " + std::to_string(root->GetId()));
+
+    error = root->Start(true);
     if (error)
         return error;
 
     ScheduleLogRotatation();
+
     Statistics->Created = 0;
     Statistics->RestoreFailed = 0;
     Statistics->RemoveDead = 0;
@@ -68,7 +89,7 @@ TError TContainerHolder::CreateRoot() {
 }
 
 bool TContainerHolder::ValidName(const std::string &name) const {
-    if (name == ROOT_CONTAINER)
+    if (name == ROOT_CONTAINER || name == PORTO_ROOT_CONTAINER)
         return true;
 
     if (name.length() == 0 || name.length() > 128)
@@ -93,9 +114,14 @@ bool TContainerHolder::ValidName(const std::string &name) const {
 std::shared_ptr<TContainer> TContainerHolder::GetParent(const std::string &name) const {
     std::shared_ptr<TContainer> parent;
 
+    if (name == ROOT_CONTAINER)
+        return nullptr;
+    else if (name == PORTO_ROOT_CONTAINER)
+        return Containers.at(ROOT_CONTAINER);
+
     std::string::size_type n = name.rfind('/');
     if (n == std::string::npos) {
-        return Containers.at(ROOT_CONTAINER);
+        return Containers.at(PORTO_ROOT_CONTAINER);
     } else {
         std::string parentName = name.substr(0, n);
 
@@ -137,7 +163,7 @@ TError TContainerHolder::Create(const std::string &name, const TCred &cred) {
 
 TError TContainerHolder::Get(const std::string &name, std::shared_ptr<TContainer> &c) {
     if (Containers.find(name) == Containers.end())
-        return TError(EError::ContainerDoesNotExist, "container " + name + "doesn't exist");
+        return TError(EError::ContainerDoesNotExist, "container " + name + " doesn't exist");
 
     c = Containers[name];
     return TError::Success();
@@ -177,6 +203,8 @@ std::vector<std::shared_ptr<TContainer> > TContainerHolder::List() const {
 
     for (auto c : Containers) {
         PORTO_ASSERT(c.first == c.second->GetName());
+        if (c.second->IsPortoRoot())
+            continue;
         ret.push_back(c.second);
     }
 
@@ -279,7 +307,7 @@ bool TContainerHolder::RestoreFromStorage() {
 }
 
 TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node) {
-    if (name == ROOT_CONTAINER)
+    if (name == ROOT_CONTAINER || name == PORTO_ROOT_CONTAINER)
         return TError::Success();
 
     L_ACT() << "Restore container " << name << " (" << node.ShortDebugString() << ")" << std::endl;

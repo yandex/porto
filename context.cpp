@@ -95,6 +95,12 @@ TError TContext::Initialize() {
         return error;
     }
 
+    error = Cholder->CreatePortoRoot();
+    if (error) {
+        L_ERR() << "Can't create porto root container: " << error << std::endl;
+        return error;
+    }
+
     error = CreateDaemonCgs();
     if (error)
         return error;

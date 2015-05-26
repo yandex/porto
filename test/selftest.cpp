@@ -232,7 +232,7 @@ static void ShouldHaveValidRunningData(TPortoAPI &api, const string &name) {
     ExpectApiSuccess(api.GetData(name, "respawn_count", v));
     ExpectEq(v, string("0"));
     ExpectApiSuccess(api.GetData(name, "parent", v));
-    ExpectEq(v, string("/"));
+    ExpectEq(v, string("/porto"));
     if (IsCfqActive()) {
         ExpectApiSuccess(api.GetData(name, "io_read", v));
         ExpectApiSuccess(api.GetData(name, "io_write", v));
@@ -272,7 +272,7 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     ExpectApiFailure(api.GetData(name, "oom_killed", v), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "respawn_count", v), EError::InvalidState);
     ExpectApiSuccess(api.GetData(name, "parent", v));
-    ExpectEq(v, string("/"));
+    ExpectEq(v, string("/porto"));
     if (IsCfqActive()) {
         ExpectApiFailure(api.GetData(name, "io_read", v), EError::InvalidState);
         ExpectApiFailure(api.GetData(name, "io_write", v), EError::InvalidState);
@@ -525,7 +525,7 @@ static void TestHolder(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy("a"));
 
     Say() << "Make sure porto returns valid error code for destroy" << std::endl;
-    ExpectApiFailure(api.Destroy("/"), EError::InvalidValue);
+    ExpectApiFailure(api.Destroy("/"), EError::Permission);
     ExpectApiFailure(api.Destroy("doesntexist"), EError::ContainerDoesNotExist);
     ExpectApiFailure(api.Destroy("z$"), EError::ContainerDoesNotExist);
 
@@ -2371,7 +2371,7 @@ static void TestStateMachine(TPortoAPI &api) {
 
     // we can't kill root or non-running container
     ExpectApiFailure(api.Kill(name, SIGKILL), EError::InvalidState);
-    ExpectApiFailure(api.Kill("/", SIGKILL), EError::InvalidState);
+    ExpectApiFailure(api.Kill("/", SIGKILL), EError::Permission);
 
     ExpectApiSuccess(api.Destroy(name));
 }
@@ -2402,6 +2402,7 @@ static void TestIdmap(TPortoAPI &api) {
 static void TestRoot(TPortoAPI &api) {
     string v;
     string root = "/";
+    string porto_root = "/porto";
     vector<string> properties = {
         "command",
         "user",
@@ -2496,33 +2497,34 @@ static void TestRoot(TPortoAPI &api) {
         Expect(std::find(data.begin(), data.end(), d.Name) != data.end());
 
     Say() << "Check root cpu_usage & memory_usage" << std::endl;
-    ExpectApiSuccess(api.GetData(root, "cpu_usage", v));
+    ExpectApiSuccess(api.GetData(porto_root, "cpu_usage", v));
     ExpectEq(v, "0");
-    ExpectApiSuccess(api.GetData(root, "memory_usage", v));
+    ExpectApiSuccess(api.GetData(porto_root, "memory_usage", v));
     ExpectEq(v, "0");
 
     for (auto &link : links) {
-        ExpectApiSuccess(api.GetData(root, "net_bytes[" + link->GetAlias() + "]", v));
+        ExpectApiSuccess(api.GetData(porto_root, "net_bytes[" + link->GetAlias() + "]", v));
         ExpectEq(v, "0");
-        ExpectApiSuccess(api.GetData(root, "net_packets[" + link->GetAlias() + "]", v));
+        ExpectApiSuccess(api.GetData(porto_root, "net_packets[" + link->GetAlias() + "]", v));
         ExpectEq(v, "0");
-        ExpectApiSuccess(api.GetData(root, "net_drops[" + link->GetAlias() + "]", v));
+        ExpectApiSuccess(api.GetData(porto_root, "net_drops[" + link->GetAlias() + "]", v));
         ExpectEq(v, "0");
-        ExpectApiSuccess(api.GetData(root, "net_overlimits[" + link->GetAlias() + "]", v));
+        ExpectApiSuccess(api.GetData(porto_root, "net_overlimits[" + link->GetAlias() + "]", v));
         ExpectEq(v, "0");
     }
 
     if (IsCfqActive()) {
-        ExpectApiSuccess(api.GetData(root, "io_read", v));
+        ExpectApiSuccess(api.GetData(porto_root, "io_read", v));
         ExpectEq(v, "");
-        ExpectApiSuccess(api.GetData(root, "io_write", v));
+        ExpectApiSuccess(api.GetData(porto_root, "io_write", v));
         ExpectEq(v, "");
     }
 
     if (NetworkEnabled()) {
         uint32_t defClass = TcHandle(1, 2);
         uint32_t rootClass = TcHandle(1, 1);
-        uint32_t nextClass = TcHandle(1, 3);
+        uint32_t portoRootClass = TcHandle(1, 3);
+        uint32_t nextClass = TcHandle(1, 4);
 
         uint32_t rootQdisc = TcHandle(1, 0);
         uint32_t nextQdisc = TcHandle(2, 0);
@@ -2531,6 +2533,7 @@ static void TestRoot(TPortoAPI &api) {
         ExpectEq(TcQdiscExist(nextQdisc), false);
         ExpectEq(TcClassExist(defClass), true);
         ExpectEq(TcClassExist(rootClass), true);
+        ExpectEq(TcClassExist(portoRootClass), true);
         ExpectEq(TcClassExist(nextClass), false);
         ExpectEq(TcCgFilterExist(rootQdisc, 1), true);
         ExpectEq(TcCgFilterExist(rootQdisc, 2), false);
@@ -2559,16 +2562,7 @@ static void TestRoot(TPortoAPI &api) {
     ExpectApiSuccess(api.Start("a"));
     ExpectApiSuccess(api.Start("b"));
 
-    ExpectApiSuccess(api.Stop(root));
-
-    ExpectApiSuccess(api.GetData("a", "state", v));
-    ExpectEq(v, "stopped");
-    ExpectApiSuccess(api.GetData("b", "state", v));
-    ExpectEq(v, "stopped");
-    ExpectApiSuccess(api.GetData(root, "state", v));
-    ExpectEq(v, "meta");
-
-    ExpectApiFailure(api.Destroy(root), EError::InvalidValue);
+    ExpectApiFailure(api.Destroy(root), EError::Permission);
     ExpectApiSuccess(api.Destroy("a"));
     ExpectApiSuccess(api.Destroy("b"));
 
@@ -4241,7 +4235,7 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(name));
 
     Say() << "Make sure we can recover huge number of containers " << std::endl;
-    const size_t nr = config().container().max_total() - 1;
+    const size_t nr = config().container().max_total() - 2;
 
     for (size_t i = 0; i < nr; i++) {
         name = "recover" + std::to_string(i);

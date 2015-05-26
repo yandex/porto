@@ -88,13 +88,13 @@ TError TClient::IdentifyContainer(TContainerHolder &holder) {
         return TError(EError::Unknown, "Can't determine freezer cgroup of client process");
 
     auto freezer = cgmap["freezer"];
-    auto prefix = "/" + PORTO_ROOT_CGROUP + "/";
+    auto prefix = PORTO_ROOT_CONTAINER + "/";
     std::string name;
 
     if (freezer.length() > prefix.length() && freezer.substr(0, prefix.length()) == prefix)
         name = freezer.substr(prefix.length());
     else
-        name = "/";
+        name = PORTO_ROOT_CONTAINER;
 
     std::shared_ptr<TContainer> container;
     error = holder.Get(name, container);
