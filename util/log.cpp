@@ -273,7 +273,7 @@ std::string ResponseAsString(const rpc::TContainerResponse &resp) {
                 for (int j = 0; j < entry.keyval_size(); j++)
                     if (entry.keyval(j).has_error())
                         ret += " " + entry.keyval(j).variable() + "=" + std::to_string(entry.keyval(j).error()) + "?";
-                    else if (entry.keyval(i).has_value())
+                    else if (entry.keyval(j).has_value())
                         ret += " " + entry.keyval(j).variable() + "=" + entry.keyval(j).value();
             }
         } else if (resp.has_version())

@@ -572,16 +572,16 @@ static int SlaveMain() {
 
         RemoveRpcServer(config().rpc_sock().file().path());
     } catch (string s) {
-        L_ERR() << s << std::endl;
+        L_ERR() << "EXCEPTION: " << s << std::endl;
         ret = EXIT_FAILURE;
     } catch (const char *s) {
-        L_ERR() << s << std::endl;
+        L_ERR() << "EXCEPTION: " << s << std::endl;
         ret = EXIT_FAILURE;
     } catch (const std::exception &exc) {
-        L_ERR() << exc.what() << std::endl;
+        L_ERR() << "EXCEPTION: " << exc.what() << std::endl;
         ret = EXIT_FAILURE;
     } catch (...) {
-        L_ERR() << "Uncaught exception!" << std::endl;
+        L_ERR() << "EXCEPTION: uncaught exception!" << std::endl;
         ret = EXIT_FAILURE;
     }
 

@@ -3718,6 +3718,7 @@ static void TestPerf(TPortoAPI &api) {
     const int createMs = 30;
     const int getStateMs = 1;
     const int destroyMs = 120;
+    const int combinedGetStateMs = 20;
 
     begin = GetCurrentTimeMs();
     for (int i = 0; i < nr; i++) {
@@ -3738,6 +3739,21 @@ static void TestPerf(TPortoAPI &api) {
     ms = GetCurrentTimeMs() - begin;
     Say() << "Get state " << nr << " containers took " << ms / 1000.0 << "s" << std::endl;
     Expect(ms < getStateMs * nr);
+
+    std::vector<std::string> containers;
+    std::vector<std::string> variables = { "state" };
+    std::map<std::string, std::map<std::string, TPortoGetResponse>> result;
+
+    for (int i = 0; i < nr; i++)
+        containers.push_back("perf" + std::to_string(i));
+
+    begin = GetCurrentTimeMs();
+    ExpectApiSuccess(api.Get(containers, variables, result));
+    ms = GetCurrentTimeMs() - begin;
+
+    Say() << "Combined get state " << nr << " took " << ms / 1000.0 << "s" << std::endl;
+    Expect(ms < combinedGetStateMs);
+    ExpectEq(result.size(), nr);
 
     begin = GetCurrentTimeMs();
     for (int i = 0; i < nr; i++) {
