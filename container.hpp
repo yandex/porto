@@ -108,6 +108,7 @@ public:
     const uint16_t GetId() const { return Id; }
 
     bool IsRoot() const;
+    bool IsPortoRoot() const;
     std::shared_ptr<const TContainer> GetRoot() const;
     std::shared_ptr<const TContainer> GetParent() const;
     bool ValidLink(const std::string &name) const;
@@ -119,7 +120,7 @@ public:
 
     TError Create(const TCred &cred);
     TError Destroy();
-    TError Start();
+    TError Start(bool meta);
     TError Stop();
     TError Pause();
     TError Resume();
@@ -144,7 +145,7 @@ public:
     // *self is observer container
     TError RelativeName(std::shared_ptr<TContainer> c, std::string &name) const;
     TError AbsoluteName(const std::string &orig, std::string &name,
-                        bool resolve_dot = false) const;
+                        bool resolve_meta = false) const;
 
 private:
     std::string GetPortoNamespace() const;

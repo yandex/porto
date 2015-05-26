@@ -95,7 +95,7 @@ static TError StartContainer(TContext &context,
     if (error)
         return error;
 
-    return container->Start();
+    return container->Start(false);
 }
 
 static TError StopContainer(TContext &context,

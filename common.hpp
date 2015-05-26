@@ -29,6 +29,8 @@ private:
 };
 
 const std::string ROOT_CONTAINER = "/";
+const std::string DOT_CONTAINER = ".";
+const std::string PORTO_ROOT_CONTAINER = "/porto";
 const std::string PORTO_ROOT_CGROUP = "porto";
 const std::string PORTO_DAEMON_CGROUP = "portod";
 

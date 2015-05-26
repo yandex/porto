@@ -103,12 +103,14 @@ void TContainer::SetState(EContainerState newState, bool tree) {
 const string TContainer::StripParentName(const string &name) const {
     if (name == ROOT_CONTAINER)
         return ROOT_CONTAINER;
+    else if (name == PORTO_ROOT_CONTAINER)
+        return PORTO_ROOT_CONTAINER;
 
     std::string::size_type n = name.rfind('/');
     if (n == std::string::npos)
         return name;
     else
-        return string(name.begin() + n + 1, name.end());
+        return name.substr(n + 1);
 }
 
 void TContainer::RemoveKvs() {
@@ -167,17 +169,18 @@ const string TContainer::GetName(bool recursive, const std::string &sep) const {
     if (!recursive)
         return Name;
 
-    if (!Parent)
-        return Name;
-
-    if (Parent->Name == ROOT_CONTAINER)
+    if (IsRoot() || IsPortoRoot() || Parent->IsPortoRoot())
         return Name;
     else
         return Parent->GetName(recursive, sep) + sep + Name;
 }
 
 bool TContainer::IsRoot() const {
-    return Name == ROOT_CONTAINER;
+    return Parent == nullptr;
+}
+
+bool TContainer::IsPortoRoot() const {
+    return Name == PORTO_ROOT_CONTAINER;
 }
 
 std::shared_ptr<const TContainer> TContainer::GetRoot() const {
@@ -613,7 +616,7 @@ TError TContainer::PrepareMetaParent() {
             if (error)
                 return error;
 
-            error = Start();
+            error = Start(false);
             if (error)
                 return error;
 
@@ -642,7 +645,7 @@ TError TContainer::PrepareMetaParent() {
     return TError::Success();
 }
 
-TError TContainer::Start() {
+TError TContainer::Start(bool meta) {
     SyncStateWithCgroup();
     auto state = GetState();
 
@@ -657,7 +660,7 @@ TError TContainer::Start() {
                 Prop->Reset(name);
     }
 
-    if (!IsRoot() && !Prop->Get<std::string>(P_COMMAND).length())
+    if (!meta && !Prop->Get<std::string>(P_COMMAND).length())
         return TError(EError::InvalidValue, "container command is empty");
 
     if (Prop->Get<std::string>(P_ROOT) == "/" &&
@@ -691,7 +694,7 @@ TError TContainer::Start() {
     if (error)
         return error;
 
-    if (IsRoot()) {
+    if (meta) {
         SetState(EContainerState::Meta);
         return TError::Success();
     }
@@ -1340,8 +1343,10 @@ std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys
     if (LeafCgroups.find(subsys) != LeafCgroups.end())
         return LeafCgroups[subsys];
 
-    if (Name == ROOT_CONTAINER)
+    if (IsRoot())
         return subsys->GetRootCgroup();
+    else if (IsPortoRoot())
+        return subsys->GetRootCgroup()->GetChild(PORTO_ROOT_CGROUP);
 
     return Parent->GetLeafCgroup(subsys)->GetChild(Name);
 }
@@ -1433,7 +1438,7 @@ TError TContainer::Respawn() {
         return error;
 
     uint64_t tmp = Data->Get<uint64_t>(D_RESPAWN_COUNT);
-    error = Start();
+    error = Start(false);
     Data->Set<uint64_t>(D_RESPAWN_COUNT, tmp + 1);
     if (error)
         return error;
@@ -1542,17 +1547,21 @@ TError TContainer::RelativeName(std::shared_ptr<TContainer> c, std::string &name
 }
 
 TError TContainer::AbsoluteName(const std::string &orig, std::string &name,
-                                bool resolve_dot) const {
-    if (!resolve_dot && orig == ".")
-        return TError(EError::Permission, "Dot container is provided in read-only mode");
+                                bool resolve_meta) const {
+    if (!resolve_meta && (orig == DOT_CONTAINER || orig == PORTO_ROOT_CONTAINER ||
+                          orig == ROOT_CONTAINER))
+        return TError(EError::Permission,
+                      "Meta containers (like . and /) are provided in read-only mode");
 
     std::string ns = GetPortoNamespace();
-    if (orig == ".") {
+    if (orig == ROOT_CONTAINER || orig == PORTO_ROOT_CONTAINER)
+        name = orig;
+    else if (orig == DOT_CONTAINER) {
         size_t off = ns.rfind('/');
         if (off != std::string::npos) {
             name = ns.substr(0, off);
         } else
-            name = "/";
+            name = PORTO_ROOT_CONTAINER;
     } else
         name = ns + orig;
 
