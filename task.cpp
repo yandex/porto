@@ -849,7 +849,9 @@ TError TTask::Start() {
     }
     close(Wfd);
     int status = 0;
-    (void)waitpid(forkPid, &status, 0);
+    int forkResult = waitpid(forkPid, &status, 0);
+    if (forkResult < 0)
+        (void)kill(forkPid, SIGKILL);
 
     int n = read(Rfd, &Pid, sizeof(Pid));
     if (n <= 0) {
@@ -1037,7 +1039,7 @@ TError TTask::FixCgroups() const {
         }
 
         auto cg = LeafCgroups.at(subsys);
-        if (cg->Relpath() != path) {
+        if (cg && cg->Relpath() != path) {
             L_WRN() << "Fixed invalid task subsystem for " << subsys->GetName() << ":" << path << std::endl;
 
             error = cg->Attach(Pid);
