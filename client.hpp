@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <mutex>
 
 #include "common.hpp"
 #include "util/cred.hpp"
@@ -13,6 +14,8 @@ extern "C" {
 
 class TClient : public TNonCopyable {
 public:
+    std::mutex Lock;
+
     TClient(int fd);
     ~TClient();
 

@@ -4,6 +4,9 @@
 #include <memory>
 #include <queue>
 
+#include "util/worker.hpp"
+#include "holder.hpp"
+
 class TContainer;
 class TContainerHolder;
 
@@ -13,6 +16,8 @@ enum class EEventType {
     Respawn,
     OOM,
 };
+
+class TEventWorker;
 
 class TEvent {
 public:
@@ -43,11 +48,16 @@ public:
 
 class TEventQueue {
     std::priority_queue<TEvent> Queue;
+    std::shared_ptr<TEventWorker> Worker;
 
 public:
-    TEventQueue() {}
+    TEventQueue(std::shared_ptr<TContainerHolder> holder);
+    void Start();
+    void Stop();
 
     void Add(size_t timeoutMs, const TEvent &e);
+#if !THREADS
     void DeliverEvents(TContainerHolder &cholder);
     int GetNextTimeout();
+#endif
 };

@@ -7,3 +7,4 @@ int RegisterSignal(int signum, void (*handler)(int sig, siginfo_t *si, void *unu
 void ResetSignalHandler(int signum);
 void ResetAllSignalHandlers(void);
 void RaiseSignal(int signum);
+void BlockAllSignals();

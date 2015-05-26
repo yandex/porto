@@ -50,3 +50,10 @@ void RaiseSignal(int signum) {
     raise(signum);
     exit(-signum);
 }
+
+void BlockAllSignals() {
+    sigset_t mask;
+    if (sigfillset(&mask) < 0)
+        return;
+    (void)sigprocmask(SIG_SETMASK, &mask, NULL);
+}

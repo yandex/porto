@@ -23,6 +23,7 @@
 #include "util/string.hpp"
 #include "util/crash.hpp"
 #include "util/cred.hpp"
+#include "util/worker.hpp"
 #include "batch.hpp"
 
 extern "C" {
@@ -126,16 +127,38 @@ static void RemoveRpcServer(const string &path) {
         L_ERR() << "Can't remove socket file: " << error << std::endl;
 }
 
-static bool HandleRequest(TContext &context, std::shared_ptr<TClient> client) {
+struct TRequest {
+    TContext *Context;
+    std::shared_ptr<TClient> Client;
+    rpc::TContainerRequest Request;
+};
+
+class TRpcWorker : public TWorker<TRequest> {
+public:
+    TRpcWorker(const size_t nr) : TWorker("portod-worker", nr) {}
+
+    const TRequest &Top() override {
+        return Queue.front();
+    }
+
+    bool Handle(const TRequest &request) override {
+        std::lock_guard<std::mutex> lock(request.Client->Lock);
+        HandleRpcRequest(*request.Context, request.Request, request.Client);
+
+        return true;
+    }
+};
+
+static bool HandleRequest(TContext &context, TRpcWorker &worker, std::shared_ptr<TClient> client) {
     uint32_t slaveReadTimeout = config().daemon().slave_read_timeout_s();
     InterruptibleInputStream pist(client->GetFd());
 
-    rpc::TContainerRequest request;
+    TRequest req{&context, client};
 
     if (slaveReadTimeout)
         (void)alarm(slaveReadTimeout);
 
-    bool haveData = ReadDelimitedFrom(&pist, &request);
+    bool haveData = ReadDelimitedFrom(&pist, &req.Request);
 
     if (slaveReadTimeout)
         (void)alarm(0);
@@ -166,7 +189,11 @@ static bool HandleRequest(TContext &context, std::shared_ptr<TClient> client) {
     if (client->Identify(*context.Cholder, false))
         return true;
 
-    HandleRpcRequest(context, request, client);
+#if THREADS
+    worker.Push(req);
+#else
+    HandleRpcRequest(context, req.Request, client);
+#endif
 
     return false;
 }
@@ -223,7 +250,7 @@ void AckExitStatus(int pid) {
     }
 }
 
-static int ReapSpawner(int fd, TContainerHolder &cholder) {
+static int ReapSpawner(int fd, TContext &context) {
     struct pollfd fds[1];
     int nr = 1000;
 
@@ -256,7 +283,7 @@ retry:
         TEvent e(EEventType::Exit);
         e.Exit.Pid = pid;
         e.Exit.Status = status;
-        (void)cholder.DeliverEvent(e);
+        (void)context.Cholder->DeliverEvent(e);
     }
 
     return 0;
@@ -266,7 +293,19 @@ static inline int EncodeSignal(int sig) {
     return -sig;
 }
 
-static int SlaveRpc(TContext &context) {
+static void StartWorkers(TContext &context, TRpcWorker &worker) {
+#if THREADS
+    worker.Start();
+    context.Queue->Start();
+#endif
+}
+
+static void StopWorkers(TContext &context, TRpcWorker &worker) {
+    context.Queue->Stop();
+    worker.Stop();
+}
+
+static int SlaveRpc(TContext &context, TRpcWorker &worker) {
     int ret = 0;
     int sfd;
     std::map<int, std::shared_ptr<TClient>> clients;
@@ -313,21 +352,27 @@ static int SlaveRpc(TContext &context) {
     std::vector<int> signals;
     std::vector<struct epoll_event> events;
 
+    StartWorkers(context, worker);
+
     bool discardState = false;
     while (true) {
+#if THREADS
+        error = context.EpollLoop->GetEvents(signals, events, -1);
+#else
         int timeout = context.Queue->GetNextTimeout();
         Statistics->SlaveTimeoutMs = timeout;
 
         error = context.EpollLoop->GetEvents(signals, events, timeout);
-        // FIXME THREADS
-        //error = context.EpollLoop->GetEvents(signals, events, -1);
+#endif
         if (error) {
             L_ERR() << "slave: epoll error " << error << std::endl;
             ret = EXIT_FAILURE;
             goto exit;
         }
 
+#if !THREADS
         context.Queue->DeliverEvents(*context.Cholder);
+#endif
 
         for (auto s : signals) {
             switch (s) {
@@ -372,7 +417,7 @@ static int SlaveRpc(TContext &context) {
         }
 
         if (!failsafe) {
-            ret = ReapSpawner(REAP_EVT_FD, *context.Cholder);
+            ret = ReapSpawner(REAP_EVT_FD, context);
             if (ret)
                 goto exit;
         }
@@ -419,9 +464,11 @@ static int SlaveRpc(TContext &context) {
                 if (container) {
                     TEvent e(EEventType::OOM, container);
                     e.OOM.Fd = source->Fd;
-                    // FIXME THREADS
-                    //context.Queue->Add(0, e);
+#if THREADS
+                    context.Queue->Add(0, e);
+#else
                     (void)cholder.DeliverEvent(e);
+#endif
                 }
 
                 // we don't want any repeated events from OOM fd, so remove
@@ -432,11 +479,10 @@ static int SlaveRpc(TContext &context) {
                 auto client = clients[source->Fd];
                 bool needClose = false;
 
-                // FIXME THREADS
-                //std::lock_guard<std::mutex> lock(client->Lock);
+                std::lock_guard<std::mutex> lock(client->Lock);
 
                 if (ev.events & EPOLLIN)
-                    needClose = HandleRequest(context, client);
+                    needClose = HandleRequest(context, worker, client);
 
                 if ((ev.events & EPOLLHUP) || needClose) {
                     context.EpollLoop->RemoveSource(source);
@@ -450,6 +496,8 @@ static int SlaveRpc(TContext &context) {
     }
 
 exit:
+    StopWorkers(context, worker);
+
     for (auto pair : clients)
         close(pair.first);
 
@@ -517,6 +565,8 @@ static int SlaveMain() {
 
     if (failsafe)
         AllocStatistics();
+
+    TRpcWorker worker(config().daemon().workers());
 
     Statistics->SlaveStarted = GetCurrentTimeMs();
 
@@ -590,7 +640,7 @@ static int SlaveMain() {
                      });
         }
 
-        ret = SlaveRpc(context);
+        ret = SlaveRpc(context, worker);
         L_SYS() << "Shutting down..." << std::endl;
 
         RemoveRpcServer(config().rpc_sock().file().path());

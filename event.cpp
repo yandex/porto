@@ -3,6 +3,45 @@
 #include "holder.hpp"
 #include "util/log.hpp"
 #include "util/unix.hpp"
+#include "util/worker.hpp"
+
+class TEventWorker : public TWorker<TEvent, std::priority_queue<TEvent>> {
+    std::shared_ptr<TContainerHolder> Holder;
+public:
+    TEventWorker(std::shared_ptr<TContainerHolder> holder) : TWorker("portod-event", 1), Holder(holder) {}
+
+    const TEvent &Top() override {
+        return Queue.top();
+    }
+
+    void Wait(std::unique_lock<std::mutex> &lock) override {
+        if (!Valid)
+            return;
+
+        Statistics->QueuedEvents = Queue.size();
+
+        if (Queue.size()) {
+            auto now = GetCurrentTimeMs();
+            if (Top().DueMs <= now)
+                return;
+            auto timeout = Top().DueMs - now;
+            Statistics->SlaveTimeoutMs = timeout;
+            Cv.wait_for(lock, std::chrono::milliseconds(timeout));
+        } else {
+            Statistics->SlaveTimeoutMs = 0;
+            TWorker::Wait(lock);
+        }
+    }
+
+    bool Handle(const TEvent &event) override {
+        if (event.DueMs <= GetCurrentTimeMs()) {
+            (void)Holder->DeliverEvent(event);
+            return true;
+        }
+
+        return false;
+    }
+};
 
 std::string TEvent::GetMsg() const {
     switch (Type) {
@@ -25,6 +64,15 @@ bool TEvent::operator<(const TEvent& rhs) const {
 }
 
 void TEventQueue::Add(size_t timeoutMs, const TEvent &e) {
+#if THREADS
+    TEvent copy = e;
+    copy.DueMs = GetCurrentTimeMs() + timeoutMs;
+
+    if (config().log().verbose())
+        L() << "Schedule event " << e.GetMsg() << " in " << timeoutMs << " (now " << GetCurrentTimeMs() << " will fire at " << copy.DueMs << ")" << std::endl;
+
+    Worker->Push(copy);
+#else
     TEvent copy = e;
     copy.DueMs = GetCurrentTimeMs() + timeoutMs;
 
@@ -32,6 +80,7 @@ void TEventQueue::Add(size_t timeoutMs, const TEvent &e) {
         L_ACT() << "Schedule event " << e.GetMsg() << " in " << timeoutMs << std::endl;
 
     Queue.push(copy);
+#endif
 }
 
 void TEventQueue::DeliverEvents(TContainerHolder &cholder) {
@@ -56,4 +105,16 @@ int TEventQueue::GetNextTimeout() {
         else
             return due - now;
     }
+}
+
+TEventQueue::TEventQueue(std::shared_ptr<TContainerHolder> holder) {
+    Worker = std::make_shared<TEventWorker>(holder);
+}
+
+void TEventQueue::Start() {
+    Worker->Start();
+}
+
+void TEventQueue::Stop() {
+    Worker->Stop();
 }

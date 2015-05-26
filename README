@@ -27,3 +27,19 @@ scripts/gencoverage porto coverage
 
 # Debug netlink
 NLDBG=10 NLCB=debug portod
+
+# Locking scheme
+## Containers
+We have single lock on holder, and multiple locks for each container (child
+containers share lock with topmost non-root parent so when we lock some child,
+we have whole tree locked). Operations that add or remove containers
+take holder lock, mark container as "in-progress", drop the lock and continue
+construction/destruction with unlocked container. Other operations, that
+modify or read container state find container in locked holder, acquire
+container lock and drop holder lock.
+Whenever we try to modify container that is currently "in-progress" (by taking
+holder lock, finding container, and then locking individual container lock) we
+return Busy error (so user can retry later).
+
+## Volumes
+We have single lock on volume holder, so any volume operation blocks others.

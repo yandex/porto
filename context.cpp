@@ -9,10 +9,11 @@
 TContext::TContext() {
     Storage = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().keyval().file().path(), "tmpfs", { config().keyval().size() }));
     VolumeStorage = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().volumes().keyval().file().path(), "tmpfs", { config().volumes().keyval().size() }));
-    Queue = std::make_shared<TEventQueue>();
     Net = std::make_shared<TNetwork>();
     EpollLoop = std::make_shared<TEpollLoop>();
-    Cholder = std::make_shared<TContainerHolder>(EpollLoop, Queue, Net, Storage);
+    Cholder = std::make_shared<TContainerHolder>(EpollLoop, Net, Storage);
+    Queue = std::make_shared<TEventQueue>(Cholder);
+    Cholder->Queue = Queue;
     Vholder = std::make_shared<TVolumeHolder>(VolumeStorage);
 }
 

@@ -30,14 +30,13 @@ class TContainerHolder : public std::enable_shared_from_this<TContainerHolder> {
     std::map<std::string, std::shared_ptr<TKeyValueNode>> SortNodes(const std::vector<std::shared_ptr<TKeyValueNode>> &nodes);
 
 public:
-    std::shared_ptr<TEventQueue> Queue;
+    std::shared_ptr<TEventQueue> Queue = nullptr;
     std::shared_ptr<TEpollLoop> EpollLoop;
 
     TContainerHolder(std::shared_ptr<TEpollLoop> epollLoop,
-                     std::shared_ptr<TEventQueue> queue,
                      std::shared_ptr<TNetwork> net,
                      std::shared_ptr<TKeyValueStorage> storage) :
-        Net(net), Storage(storage), Queue(queue), EpollLoop(epollLoop) { }
+        Net(net), Storage(storage), EpollLoop(epollLoop) { }
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot();
     TError CreatePortoRoot();
