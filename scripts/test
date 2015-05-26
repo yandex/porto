@@ -46,7 +46,7 @@ getrate() {
 	local prop=""
 	for iface in $IFACES; do
 		[ -z "$guarantee" ] || prop="$prop net_guarantee[$iface]=$guarantee"
-		[ -z "$ceil" ] || prop="$prop net_ceil[$iface]=$ceil"
+		[ -z "$ceil" ] || prop="$prop net_limit[$iface]=$ceil"
 	done
 
 	#say "Use limits:$prop" >&2
