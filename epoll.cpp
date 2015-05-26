@@ -34,21 +34,6 @@ static TError EpollCreate(int &epfd) {
     return TError::Success();
 }
 
-static TError EpollAdd(int &epfd, int fd) {
-    struct epoll_event ev;
-    ev.events = EPOLLIN | EPOLLHUP;
-    ev.data.fd = fd;
-    if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) < 0)
-        return TError(EError::Unknown, errno, "epoll_add(" + std::to_string(fd) + ")");
-    return TError::Success();
-}
-
-static TError EpollRemove(int &epfd, int fd) {
-    if (epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr) < 0)
-        return TError(EError::Unknown, errno, "epoll_del(" + std::to_string(fd) + ")");
-    return TError::Success();
-}
-
 TError TEpollLoop::InitializeSignals() {
     sigset_t mask;
 
@@ -94,15 +79,10 @@ TError TEpollLoop::Create() {
 }
 
 void TEpollLoop::Destroy() {
+    std::lock_guard<std::mutex> lock(Lock);
+    Sources.clear();
     close(EpollFd);
-}
-
-TError TEpollLoop::AddFd(int fd) {
-    return EpollAdd(EpollFd, fd);
-}
-
-TError TEpollLoop::RemoveFd(int fd) {
-    return EpollRemove(EpollFd, fd);
+    EpollFd = -1;
 }
 
 bool TEpollLoop::GetSignals(std::vector<int> &signals) {
@@ -152,4 +132,49 @@ TError TEpollLoop::GetEvents(std::vector<int> &signals,
     }
 
     return TError::Success();
+}
+
+TError TEpollLoop::AddSource(std::shared_ptr<TEpollSource> source) {
+    std::lock_guard<std::mutex> lock(Lock);
+
+    void *ptr = static_cast<void *>(source.get());
+    Sources[ptr] = source;
+    Statistics->EpollSources = Sources.size();
+
+    struct epoll_event ev;
+    ev.events = EPOLLIN | EPOLLHUP;
+    ev.data.ptr = ptr;
+    if (epoll_ctl(EpollFd, EPOLL_CTL_ADD, source->Fd, &ev) < 0)
+        return TError(EError::Unknown, errno, "epoll_add(" + std::to_string(source->Fd) + ")");
+    return TError::Success();
+}
+
+TError TEpollLoop::RemoveFd(int fd) {
+    if (epoll_ctl(EpollFd, EPOLL_CTL_DEL, fd, nullptr) < 0)
+        return TError(EError::Unknown, errno, "epoll_del(" + std::to_string(fd) + ")");
+    return TError::Success();
+}
+
+void TEpollLoop::RemoveSource(std::shared_ptr<TEpollSource> source) {
+    std::lock_guard<std::mutex> lock(Lock);
+
+    void *ptr = static_cast<void *>(source.get());
+    if (Sources.find(ptr) == Sources.end())
+        return;
+
+    Sources.erase(ptr);
+    Statistics->EpollSources = Sources.size();
+
+    TError error = RemoveFd(source->Fd);
+    if (error)
+        L() << "Can't remove fd " << source->Fd << " from epoll: " << error << std::endl;
+}
+
+std::shared_ptr<TEpollSource> TEpollLoop::GetSource(void *ptr) {
+    std::lock_guard<std::mutex> lock(Lock);
+
+    if (Sources.find(ptr) == Sources.end())
+        return nullptr;
+
+    return Sources.at(ptr);
 }

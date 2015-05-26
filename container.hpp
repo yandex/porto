@@ -12,6 +12,7 @@
 #include "task.hpp"
 #include "util/unix.hpp"
 
+class TEpollSource;
 class TCgroup;
 class TSubsystem;
 class TPropertyMap;
@@ -50,8 +51,8 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     size_t CgroupEmptySince = 0;
     bool LostAndRestored = false;
     std::unique_ptr<TTask> Task;
-
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
+    std::shared_ptr<TEpollSource> Source;
 
     // data
     void SetState(EContainerState newState, bool tree = false);
@@ -60,6 +61,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError ApplyDynamicProperties();
     TError PrepareNetwork();
     TError PrepareOomMonitor();
+    void ShutdownOom();
     TError PrepareCgroups();
     TError PrepareTask();
     TError KillAll();

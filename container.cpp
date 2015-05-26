@@ -381,6 +381,13 @@ TError TContainer::PrepareNetwork() {
     return TError::Success();
 }
 
+void TContainer::ShutdownOom() {
+    if (Source)
+        Holder->EpollLoop->RemoveSource(Source);
+    Efd = -1;
+    Source = nullptr;
+}
+
 TError TContainer::PrepareOomMonitor() {
     auto memcg = GetLeafCgroup(memorySubsystem);
 
@@ -391,13 +398,18 @@ TError TContainer::PrepareOomMonitor() {
         return error;
     }
 
-    TError error = Holder->EpollLoop->AddFd(Efd.GetFd());
-    if (error)
+    Source = std::make_shared<TEpollSource>(Efd.GetFd(), EPOLL_EVENT_OOM, shared_from_this());
+
+    TError error = Holder->EpollLoop->AddSource(Source);
+    if (error) {
+        ShutdownOom();
         return error;
+    }
 
     string cfdPath = memcg->Path() + "/memory.oom_control";
     TScopedFd cfd(open(cfdPath.c_str(), O_RDONLY | O_CLOEXEC));
     if (cfd.GetFd() < 0) {
+        ShutdownOom();
         TError error(EError::Unknown, errno, "Can't open " + memcg->Path());
         L_ERR() << "Can't update OOM settings: " << error << std::endl;
         return error;
@@ -405,7 +417,13 @@ TError TContainer::PrepareOomMonitor() {
 
     TFile f(memcg->Path() + "/cgroup.event_control");
     string s = std::to_string(Efd.GetFd()) + " " + std::to_string(cfd.GetFd());
-    return f.WriteStringNoAppend(s);
+    error = f.WriteStringNoAppend(s);
+    if (error) {
+        ShutdownOom();
+        return error;
+    }
+
+    return TError::Success();
 }
 
 TError TContainer::PrepareCgroups() {
@@ -838,7 +856,7 @@ void TContainer::FreeResources() {
 
     Tclass = nullptr;
     Task = nullptr;
-    Efd = -1;
+    ShutdownOom();
 
     int loopNr = Prop->Get<int>(P_RAW_LOOP_DEV);
     TError error = Prop->Set<int>(P_RAW_LOOP_DEV, -1);
@@ -862,11 +880,9 @@ TError TContainer::Stop() {
 
     L_ACT() << "Stop " << GetName() << " " << Id << std::endl;
 
-    int pid = 0;
+    ShutdownOom();
 
     if (Task && Task->IsRunning()) {
-        pid = Task->GetPid();
-
         TError error = KillAll();
         if (error) {
             L_ERR() << "Can't kill all tasks in container: " << error << std::endl;
@@ -878,7 +894,7 @@ TError TContainer::Stop() {
                              [&]()->int{
                                 if (cg && cg->IsEmpty())
                                     return 0;
-                                 kill(pid, 0);
+                                 kill(Task->GetPid(), 0);
                                  return errno != ESRCH;
                              });
         if (ret) {
@@ -894,9 +910,6 @@ TError TContainer::Stop() {
     StopChildren();
     if (!IsRoot())
         FreeResources();
-
-    if (pid)
-        AckExitStatus(pid);
 
     return TError::Success();
 }
@@ -1355,7 +1368,7 @@ bool TContainer::Exit(int status, bool oomKilled, bool force) {
         return true;
     }
 
-    Efd = -1;
+    ShutdownOom();
 
     Task->DeliverExitStatus(status);
     SetState(EContainerState::Dead);
@@ -1370,8 +1383,6 @@ bool TContainer::Exit(int status, bool oomKilled, bool force) {
         error = KillAll();
         if (error)
             L_WRN() << "Can't kill all tasks in container" << error << std::endl;
-
-        Efd = -1;
     }
 
     if (!Prop->Get<bool>(P_ISOLATE)) {
@@ -1394,6 +1405,10 @@ bool TContainer::Exit(int status, bool oomKilled, bool force) {
         L_ERR() << "Can't set " << P_RAW_ROOT_PID << ": " << error << std::endl;
 
     TimeOfDeath = GetCurrentTimeMs();
+
+    int pid = Task->GetPid();
+    if (pid > 0)
+        AckExitStatus(pid);
 
     return true;
 }
@@ -1462,6 +1477,8 @@ bool TContainer::DeliverOom(int fd) {
 
     if (!Task)
         return false;
+
+    ShutdownOom();
 
     if (GetState() == EContainerState::Dead)
         return true;

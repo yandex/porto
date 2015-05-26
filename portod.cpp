@@ -198,11 +198,6 @@ static int AcceptClient(TContext &context, int sfd,
     return 0;
 }
 
-static void RemoveClient(int cfd, std::map<int, std::shared_ptr<TClient>> &clients) {
-    close(cfd);
-    clients.erase(cfd);
-}
-
 static bool AnotherInstanceRunning(const string &path) {
     int fd;
     if (ConnectToRpcServer(path, fd))
@@ -262,7 +257,6 @@ retry:
         e.Exit.Pid = pid;
         e.Exit.Status = status;
         (void)cholder.DeliverEvent(e);
-        AckExitStatus(pid);
     }
 
     return 0;
@@ -296,20 +290,20 @@ static int SlaveRpc(TContext &context) {
         return EXIT_FAILURE;
     }
 
-    error = context.EpollLoop->AddFd(sfd);
+    error = context.EpollLoop->AddSource(std::make_shared<TEpollSource>(sfd));
     if (error) {
         L_ERR() << "Can't add RPC server fd to epoll: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
-    error = context.EpollLoop->AddFd(REAP_EVT_FD);
+    error = context.EpollLoop->AddSource(std::make_shared<TEpollSource>(REAP_EVT_FD));
     if (error && !failsafe) {
         L_ERR() << "Can't add master fd to epoll: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
     if (context.NetEvt) {
-        error = context.EpollLoop->AddFd(context.NetEvt->GetFd());
+        error = context.EpollLoop->AddSource(std::make_shared<TEpollSource>(context.NetEvt->GetFd()));
         if (error) {
             L_ERR() << "Can't add netlink events fd to epoll: " << error << std::endl;
             return EXIT_FAILURE;
@@ -324,6 +318,8 @@ static int SlaveRpc(TContext &context) {
         Statistics->SlaveTimeoutMs = timeout;
 
         error = context.EpollLoop->GetEvents(signals, events, timeout);
+        // FIXME THREADS
+        //error = context.EpollLoop->GetEvents(signals, events, -1);
         if (error) {
             L_ERR() << "slave: epoll error " << error << std::endl;
             ret = EXIT_FAILURE;
@@ -381,7 +377,11 @@ static int SlaveRpc(TContext &context) {
         }
 
         for (auto ev : events) {
-            if (ev.data.fd == sfd) {
+            auto source = context.EpollLoop->GetSource(ev.data.ptr);
+            if (!source)
+                continue;
+
+            if (source->Fd == sfd) {
                 if (clients.size() > config().daemon().max_clients()) {
                     L_WRN() << "Skip connection attempt" << std::endl;
                     continue;
@@ -392,38 +392,58 @@ static int SlaveRpc(TContext &context) {
                 if (ret < 0)
                     goto exit;
 
-                error = context.EpollLoop->AddFd(fd);
+
+                error = context.EpollLoop->AddSource(std::make_shared<TEpollSource>(fd));
                 if (error) {
                     L_ERR() << "Can't add client fd to epoll: " << error << std::endl;
                     ret = EXIT_FAILURE;
                     goto exit;
                 }
-            } else if (ev.data.fd == REAP_EVT_FD) {
+
+            } else if (source->Fd == REAP_EVT_FD) {
                 // we handled all events from the master before events
                 // from the clients (so clients see updated view of the
                 // world as soon as possible)
                 continue;
-            } else if (context.NetEvt && context.NetEvt->GetFd() == ev.data.fd) {
+            } else if (context.NetEvt && source->Fd == context.NetEvt->GetFd()) {
                 L() << "Refresh list of available network interfaces" << std::endl;
                 context.NetEvt->FlushEvents();
 
                 TError error = context.Net->Update();
                 if (error)
                     L_ERR() << "Can't refresh list of network interfaces: " << error << std::endl;
-            } else if (clients.find(ev.data.fd) != clients.end()) {
-                auto client = clients[ev.data.fd];
+
+            } else if (source->Flags & EPOLL_EVENT_OOM) {
+                auto container = source->Container.lock();
+                if (container) {
+                    TEvent e(EEventType::OOM, container);
+                    e.OOM.Fd = source->Fd;
+                    // FIXME THREADS
+                    //context.Queue->Add(0, e);
+                    (void)cholder.DeliverEvent(e);
+                }
+
+                // we don't want any repeated events from OOM fd, so remove
+                // it from epoll
+                context.EpollLoop->RemoveSource(source);
+
+            } else if (clients.find(source->Fd) != clients.end()) {
+                auto client = clients[source->Fd];
                 bool needClose = false;
+
+                // FIXME THREADS
+                //std::lock_guard<std::mutex> lock(client->Lock);
 
                 if (ev.events & EPOLLIN)
                     needClose = HandleRequest(context, client);
 
-                if ((ev.events & EPOLLHUP) || needClose)
-                    RemoveClient(ev.data.fd, clients);
-
+                if ((ev.events & EPOLLHUP) || needClose) {
+                    context.EpollLoop->RemoveSource(source);
+                    clients.erase(source->Fd);
+                }
             } else {
-                TEvent e(EEventType::OOM);
-                e.OOM.Fd = ev.data.fd;
-                (void)cholder.DeliverEvent(e);
+                L_WRN() << "Unknown event " << source->Fd << std::endl;
+                context.EpollLoop->RemoveSource(source);
             }
         }
     }
@@ -584,7 +604,14 @@ static void Reap(int pid) {
     (void)waitpid(pid, NULL, 0);
 }
 
+static void UpdateQueueSize(map<int,int> &exited, std::set<int> &acked) {
+    Statistics->QueuedStatuses = exited.size();
+    Statistics->QueuedAcks = acked.size();
+}
+
 static int ReapDead(int fd, map<int,int> &exited, int slavePid, int &slaveStatus, std::set<int> &acked) {
+    bool delivered = false;
+
     while (true) {
         siginfo_t info = { 0 };
         if (waitid(P_ALL, -1, &info, WNOHANG | WNOWAIT | WEXITED) < 0)
@@ -609,18 +636,23 @@ static int ReapDead(int fd, map<int,int> &exited, int slavePid, int &slaveStatus
         }
 
         if (acked.find(info.si_pid) != acked.end()) {
+            L() << "Skip acknowledged " << info.si_pid << std::endl;
             acked.erase(info.si_pid);
             Reap(info.si_pid);
             continue;
         }
 
         if (exited.find(info.si_pid) != exited.end())
-            return 0;
+            break;
 
         exited[info.si_pid] = status;
         DeliverPidStatus(fd, info.si_pid, status, exited.size());
-        Statistics->QueuedStatuses = exited.size();
+        delivered = true;
     }
+
+    UpdateQueueSize(exited, acked);
+    if (delivered)
+        acked.clear();
 
     return 0;
 }
@@ -630,9 +662,9 @@ static int ReceiveAcks(int fd, std::map<int,int> &exited,
     int pid;
     int nr = 0;
 
-    if (read(fd, &pid, sizeof(pid)) == sizeof(pid)) {
+    while (read(fd, &pid, sizeof(pid)) == sizeof(pid)) {
         if (pid <= 0)
-            return nr;
+            continue;
 
         L_EVT() << "Got acknowledge for " << pid << " (" << exited.size() << " queued)" << std::endl;
 
@@ -643,10 +675,11 @@ static int ReceiveAcks(int fd, std::map<int,int> &exited,
             Reap(pid);
         }
 
-        Statistics->QueuedStatuses = exited.size();
+        L() << "Got acknowledge for " << pid << " (" << exited.size() << " queued, " << acked.size() << " acked)" << std::endl;
         nr++;
     }
 
+    UpdateQueueSize(exited, acked);
     return nr;
 }
 
@@ -714,6 +747,7 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
     int ackfd[2];
     int ret = EXIT_FAILURE;
     TError error;
+    std::set<int> acked;
 
     slavePid = 0;
 
@@ -754,7 +788,9 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
     for (auto &pair : exited)
         DeliverPidStatus(evtfd[1], pair.first, pair.second, exited.size());
 
-    error = loop.AddFd(ackfd[0]);
+    UpdateQueueSize(exited, acked);
+
+    error = loop.AddSource(std::make_shared<TEpollSource>(ackfd[0]));
     if (error) {
         L_ERR() << "Can't add ackfd[0] to epoll: " << error << std::endl;
         return EXIT_FAILURE;
@@ -832,16 +868,19 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
             }
         }
 
-        std::set<int> acked;
         for (auto ev : events) {
-            if (ev.data.fd == ackfd[0]) {
+            auto source = loop.GetSource(ev.data.ptr);
+            if (!source)
+                continue;
+
+            if (source->Fd == ackfd[0]) {
                 if (!ReceiveAcks(ackfd[0], exited, acked)) {
                     ret = EXIT_FAILURE;
                     goto exit;
                 }
             } else {
-                L_WRN() << "master received unknown epoll event: " << ev.data.fd << std::endl;
-                loop.RemoveFd(ev.data.fd);
+                L() << "Unknown event " << source->Fd << std::endl;
+                loop.RemoveSource(source);
             }
         }
 

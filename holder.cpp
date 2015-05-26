@@ -338,7 +338,8 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
             TError error = Destroy(name);
             if (error)
                 L_ERR() << "Can't destroy " << name << ": " << error << std::endl;
-            Statistics->RemoveDead++;
+            else
+                Statistics->RemoveDead++;
         }
     }
 
@@ -349,6 +350,10 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     } else {
         // TODO: convert to LOG_WARN
         L() << "Couldn't deliver " << event.GetMsg() << std::endl;
+
+        if (event.Type == EEventType::Exit)
+            AckExitStatus(event.Exit.Pid);
+
         return false;
     }
 }

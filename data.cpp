@@ -501,6 +501,8 @@ public:
         if (error)
             L_ERR() << "Can't get memory usage of portod" << std::endl;
         m["memory_usage_mb"] = usage / 1024 / 1024;
+        m["queued_acks"] = Statistics->QueuedAcks;
+        m["epoll_sources"] = Statistics->EpollSources;
 
         return m;
     }
