@@ -11,6 +11,9 @@ static volatile sig_atomic_t signal_mask;
 static void MultiHandler(int sig) {
     if (sig < 32) /* Ignore other boring signals */
         signal_mask |= (1 << sig);
+
+    if (sig == debugSignal)
+        PrintTrace();
 }
 
 static void DumpStackAndDie(int sig) {
@@ -20,7 +23,7 @@ static void DumpStackAndDie(int sig) {
 }
 
 static void DumpStack(int sig) {
-    L_EVT() << "Received SIGPIPE" << std::endl;
+    L_EVT() << "Received " << strsignal(sig) << std::endl;
     PrintTrace();
 }
 

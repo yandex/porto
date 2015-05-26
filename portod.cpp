@@ -783,6 +783,16 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
 
                 ret = EncodeSignal(s);
                 goto exit;
+            case debugSignal:
+                L() << "Acknowledges:" << std::endl;
+                for (auto pid : acked)
+                    L() << pid << std::endl;
+
+                L() << "Statuses:" << std::endl;
+                for (auto pair : exited)
+                    L() << pair.first << "=" << pair.second << std::endl;;
+
+                break;
             case updateSignal:
             {
                 int ret = DaemonSyncConfig(true);

@@ -9,10 +9,11 @@ extern "C" {
 
 constexpr int updateSignal = SIGHUP;
 constexpr int rotateSignal = SIGUSR1;
+constexpr int debugSignal = SIGUSR2;
 
 static constexpr int HANDLE_SIGNALS[] = {SIGINT, SIGTERM,
                                          updateSignal, rotateSignal,
-                                         SIGALRM};
+                                         debugSignal, SIGALRM};
 static constexpr int HANDLE_SIGNALS_WAIT[] = {SIGCHLD};
 
 class TEpollLoop : public TNonCopyable {
