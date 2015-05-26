@@ -170,14 +170,14 @@ const string TContainer::GetName(bool recursive, const std::string &sep) const {
     if (!Parent)
         return Name;
 
-    if (Parent->Name == ROOT_CONTAINER)
+    if (Parent->IsRoot())
         return Name;
     else
         return Parent->GetName(recursive, sep) + sep + Name;
 }
 
 bool TContainer::IsRoot() const {
-    return Name == ROOT_CONTAINER;
+    return Id == ROOT_CONTAINER_ID;
 }
 
 std::shared_ptr<const TContainer> TContainer::GetRoot() const {
@@ -1339,7 +1339,7 @@ std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys
     if (LeafCgroups.find(subsys) != LeafCgroups.end())
         return LeafCgroups[subsys];
 
-    if (Name == ROOT_CONTAINER)
+    if (IsRoot())
         return subsys->GetRootCgroup()->GetChild(PORTO_ROOT_CGROUP);
 
     return Parent->GetLeafCgroup(subsys)->GetChild(Name);

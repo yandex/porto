@@ -9,8 +9,6 @@
 #include "util/string.hpp"
 #include "util/cred.hpp"
 
-constexpr uint16_t ROOT_CONTAINER_ID = 1;
-
 void TContainerHolder::DestroyRoot() {
     // we want children to be removed first
     while (Containers.begin() != Containers.end()) {
