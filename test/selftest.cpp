@@ -3721,6 +3721,9 @@ static void TestPerf(TPortoAPI &api) {
     std::string name, v;
     size_t begin, ms;
     const int nr = 1000;
+    const int createMs = 30;
+    const int getStateMs = 1;
+    const int destroyMs = 120;
 
     begin = GetCurrentTimeMs();
     for (int i = 0; i < nr; i++) {
@@ -3731,7 +3734,7 @@ static void TestPerf(TPortoAPI &api) {
     }
     ms = GetCurrentTimeMs() - begin;
     Say() << "Create " << nr << " containers took " << ms / 1000.0 << "s" << std::endl;
-    Expect(ms < 20 * 1000);
+    Expect(ms < createMs * nr);
 
     begin = GetCurrentTimeMs();
     for (int i = 0; i < nr; i++) {
@@ -3740,7 +3743,7 @@ static void TestPerf(TPortoAPI &api) {
     }
     ms = GetCurrentTimeMs() - begin;
     Say() << "Get state " << nr << " containers took " << ms / 1000.0 << "s" << std::endl;
-    Expect(ms < 1000);
+    Expect(ms < getStateMs * nr);
 
     begin = GetCurrentTimeMs();
     for (int i = 0; i < nr; i++) {
@@ -3749,7 +3752,7 @@ static void TestPerf(TPortoAPI &api) {
     }
     ms = GetCurrentTimeMs() - begin;
     Say() << "Destroy " << nr << " containers took " << ms / 1000.0 << "s" << std::endl;
-    Expect(ms < 120 * 1000);
+    Expect(ms < destroyMs * nr);
 }
 
 static void CreateTar(const TPath &path, const TPath &from) {
