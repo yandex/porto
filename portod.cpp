@@ -531,9 +531,11 @@ static int SlaveMain() {
         bool restored = context.Cholder->RestoreFromStorage();
         context.Vholder->RestoreFromStorage();
 
-        L() << "Done restoring" << std::endl;
+        L() << "Remove cgroup leftovers..." << std::endl;
 
         cs.Destroy();
+
+        L() << "Done restoring" << std::endl;
 
         if (!restored) {
             L() << "Remove container leftovers from previous run..." << std::endl;
@@ -550,16 +552,16 @@ static int SlaveMain() {
 
         RemoveRpcServer(config().rpc_sock().file().path());
     } catch (string s) {
-        std::cerr << s << std::endl;
+        L_ERR() << s << std::endl;
         ret = EXIT_FAILURE;
     } catch (const char *s) {
-        std::cerr << s << std::endl;
+        L_ERR() << s << std::endl;
         ret = EXIT_FAILURE;
     } catch (const std::exception &exc) {
-        std::cerr << exc.what() << std::endl;
+        L_ERR() << exc.what() << std::endl;
         ret = EXIT_FAILURE;
     } catch (...) {
-        std::cerr << "Uncaught exception!" << std::endl;
+        L_ERR() << "Uncaught exception!" << std::endl;
         ret = EXIT_FAILURE;
     }
 
