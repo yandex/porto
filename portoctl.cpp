@@ -1100,6 +1100,28 @@ public:
     }
 };
 
+class TWaitCmd : public ICmd {
+public:
+    TWaitCmd(TPortoAPI *api) : ICmd(api, "wait", 1, "<container1> [container2] ...", "wait for listed containers") {}
+
+    int Execute(int argc, char *argv[]) {
+        std::vector<std::string> containers;
+        for (int i = 0; i < argc; i++)
+            containers.push_back(argv[i]);
+
+        std::string name;
+        int ret = Api->Wait(containers, name);
+        if (ret) {
+            PrintError("Can't wait for containers");
+            return ret;
+        }
+
+        std::cout << name << " isn't running" << std::endl;
+
+        return 0;
+    }
+};
+
 class TListCmd : public ICmd {
 public:
     TListCmd(TPortoAPI *api) : ICmd(api, "list", 0, "[-1] [-f] [-t]", "list created containers") {}
@@ -1415,6 +1437,7 @@ int main(int argc, char *argv[]) {
     RegisterCommand(new TExecCmd(&api));
     RegisterCommand(new TGcCmd(&api));
     RegisterCommand(new TFindCmd(&api));
+    RegisterCommand(new TWaitCmd(&api));
 
     RegisterCommand(new TCreateVolumeCmd(&api));
     RegisterCommand(new TDestroyVolumeCmd(&api));
