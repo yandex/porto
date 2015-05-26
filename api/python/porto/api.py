@@ -201,7 +201,7 @@ class _RPC(object):
         request.get.variable.extend(var)
         resp = self.call(request)
         if resp.error != rpc_pb2.Success:
-            raise resp.errorMsg
+            raise exceptions.EError.Create(resp.error, resp.errorMsg)
 
         res = {}
         for container in resp.get.list:
