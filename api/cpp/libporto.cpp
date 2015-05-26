@@ -243,6 +243,15 @@ int TPortoAPI::Resume(const string &name) {
     return Rpc(Req, Rsp);
 }
 
+int TPortoAPI::Wait(const std::vector<std::string> &containers, std::string &name) {
+    for (auto &c : containers)
+        Req.mutable_wait()->add_name(c);
+
+    int ret = Rpc(Req, Rsp);
+    name.assign(Rsp.wait().name());
+    return ret;
+}
+
 void TPortoAPI::GetLastError(int &error, std::string &msg) const {
     error = LastError;
     msg = LastErrorMsg;
