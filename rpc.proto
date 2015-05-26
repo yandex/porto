@@ -138,6 +138,11 @@ message TContainerGetRequest {
 	repeated string variable = 2;
 }
 
+// Подождать, пока контейнер выполняется
+message TContainerWaitRequest {
+	repeated string name = 1;
+}
+
 // Сообщение-запрос
 // В запросе может быть только одно опциональное сообщение, только оно
 // и будет выполнено.
@@ -158,6 +163,7 @@ message TContainerRequest {
 	optional TContainerKillRequest kill = 13;
 	optional TVersionRequest version = 14;
 	optional TContainerGetRequest get = 15;
+	optional TContainerWaitRequest wait = 16;
 
 	optional TVolumeCreateRequest createVolume = 100;
 	optional TVolumeDestroyRequest destroyVolume = 101;
@@ -228,6 +234,10 @@ message TContainerGetResponse {
 	repeated TContainerGetListResponse list = 1;
 }
 
+message TContainerWaitResponse {
+	required string name = 1;
+}
+
 // Сообщение-ответ
 // В ответе будет присутствовать статус запроса (ошибка) и соответствующей
 // запросу результат.
@@ -245,6 +255,7 @@ message TContainerResponse {
 
 	optional TVolumeListResponse volumeList = 9;
 	optional TContainerGetResponse get = 10;
+	optional TContainerWaitResponse wait = 11;
 }
 
 // VolumeAPI
