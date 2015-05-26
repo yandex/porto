@@ -218,7 +218,6 @@ class TValueMap : public TRawValueMap, public TNonCopyable {
 
 public:
     TValueMap(std::shared_ptr<TKeyValueNode> kvnode) : KvNode(kvnode) {}
-    ~TValueMap();
 
     TError Create();
     TError Restore(const kv::TNode &node);

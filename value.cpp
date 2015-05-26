@@ -232,15 +232,6 @@ std::vector<std::string> TRawValueMap::List() const {
     return v;
 }
 
-TValueMap::~TValueMap() {
-    if (!KvNode)
-        return;
-
-    TError error = KvNode->Remove();
-    if (error)
-        L_ERR() << "Can't remove key-value node " << KvNode->GetName() << ": " << error << std::endl;
-}
-
 TError TValueMap::Create() {
     if (!KvNode)
         return TError::Success();
