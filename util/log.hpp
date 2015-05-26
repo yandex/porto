@@ -19,22 +19,9 @@ enum ELogLevel {
     LOG_SYSTEM = 7,
 };
 
-class TLogBuf : public std::streambuf {
-    int Fd = -1;
-    std::vector<char> Data;
-public:
-    TLogBuf(const size_t size);
-    void Open(const TPath &path, const unsigned int mode);
-    int GetFd() { return Fd; }
-    void SetFd(int fd) { Fd = fd; }
-protected:
-    int sync() override;
-    int_type overflow(int_type ch) override;
-};
-
-
 class TLogger {
 public:
+    static void ClearBuffer();
     static void OpenLog(bool std, const TPath &path, const unsigned int mode);
     static void CloseLog();
     static void DisableLog();

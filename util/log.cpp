@@ -12,41 +12,75 @@ extern "C" {
 #include <fcntl.h>
 }
 
-static TLogBuf logBuf(1024);
-static std::ostream logStream(&logBuf);
+static int logBufFd = -1;
+class TLogBuf : public std::streambuf {
+    std::vector<char> Data;
+    public:
+    TLogBuf(const size_t size);
+    void Open(const TPath &path, const unsigned int mode);
+    int GetFd() { return logBufFd; }
+    void SetFd(int fd) { logBufFd = fd; }
+    void ClearBuffer() {
+        std::ptrdiff_t n = pptr() - pbase();
+        pbump(-n);
+    }
+    protected:
+    int sync() override;
+    int_type overflow(int_type ch) override;
+};
+
+static __thread TLogBuf *logBuf;
+static __thread std::ostream *logStream;
+
+static inline void PrepareLog() {
+    if (!logBuf) {
+        logBuf = new TLogBuf(1024);
+        logStream = new std::ostream(logBuf);
+    }
+}
+
+void TLogger::ClearBuffer() {
+    PrepareLog();
+    logBuf->ClearBuffer();
+}
 
 void TLogger::OpenLog(bool std, const TPath &path, const unsigned int mode) {
+    PrepareLog();
     if (std) {
         // because in task.cpp we expect that nothing should be in 0-2 fd,
         // we need to duplicate our std log somewhere else
-        logBuf.SetFd(dup(STDOUT_FILENO));
+        logBuf->SetFd(dup(STDOUT_FILENO));
     } else {
-        logBuf.Open(path, mode);
+        logBuf->Open(path, mode);
     }
 }
 
 void TLogger::DisableLog() {
+    PrepareLog();
     TLogger::CloseLog();
-    logBuf.SetFd(-1);
+    logBuf->SetFd(-1);
 }
 
 int TLogger::GetFd() {
-    return logBuf.GetFd();
+    PrepareLog();
+    return logBuf->GetFd();
 }
 
 void TLogger::CloseLog() {
-    int fd = logBuf.GetFd();
+    PrepareLog();
+    int fd = logBuf->GetFd();
     if (fd > 2)
         close(fd);
-    logBuf.SetFd(STDOUT_FILENO);
+    logBuf->SetFd(STDOUT_FILENO);
+    logBuf->ClearBuffer();
 }
 
 static std::string GetTime() {
     char tmstr[256];
     time_t t;
-    struct tm *tmp;
+    struct tm *tmp, result;
     t = time(NULL);
-    tmp = localtime(&t);
+    tmp = localtime_r(&t, &result);
 
     if (tmp && strftime(tmstr, sizeof(tmstr), "%F %T", tmp))
         return std::string(tmstr);
@@ -62,9 +96,9 @@ TLogBuf::TLogBuf(const size_t size) {
 
 void TLogBuf::Open(const TPath &path, const unsigned int mode) {
     if (!path.DirName().AccessOk(EFileAccess::Write)) {
-        Fd = open("/dev/kmsg", O_WRONLY | O_APPEND | O_CLOEXEC);
-        if (Fd < 0)
-            Fd = STDERR_FILENO;
+        logBufFd = open("/dev/kmsg", O_WRONLY | O_APPEND | O_CLOEXEC);
+        if (logBufFd < 0)
+            logBufFd = STDERR_FILENO;
 
         return;
     }
@@ -88,16 +122,16 @@ void TLogBuf::Open(const TPath &path, const unsigned int mode) {
         (void)f.Touch();
     }
 
-    Fd = open(path.ToString().c_str(), O_WRONLY | O_APPEND | O_CLOEXEC);
-    if (Fd < 0)
-        Fd = STDERR_FILENO;
+    logBufFd = open(path.ToString().c_str(), O_WRONLY | O_APPEND | O_CLOEXEC);
+    if (logBufFd < 0)
+        logBufFd = STDERR_FILENO;
 }
 
 int TLogBuf::sync() {
     std::ptrdiff_t n = pptr() - pbase();
     pbump(-n);
 
-    int ret = write(Fd, pbase(), n);
+    int ret = write(logBufFd, pbase(), n);
     return (ret == n) ? 0 : -1;
 }
 
@@ -117,6 +151,8 @@ TLogBuf::int_type TLogBuf::overflow(int_type ch) {
 }
 
 std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
+    PrepareLog();
+
     static const std::string prefix[] = { "    ",
                                           "WRN ",
                                           "ERR ",
@@ -134,7 +170,11 @@ std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
         Statistics->Errors++;
 #endif
 
-    return logStream << GetTime() << " " << name << ": " << prefix[level];
+#if 0
+    return (*logStream) << GetTime() << " " << name << "[" << GetTid() << "]: " << prefix[level];
+#else
+    return (*logStream) << GetTime() << " " << name << ": " << prefix[level];
+#endif
 }
 
 std::string RequestAsString(const rpc::TContainerRequest &req) {
