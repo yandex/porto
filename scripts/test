@@ -13,7 +13,7 @@ update_config() {
 selftest() {
 	say "Self test with network=$1"
 	update_config true true
-	portotest
+	portotest "$@"
 }
 
 stresstest() {
@@ -151,6 +151,7 @@ fixcg
 for t in "$@"; do
 	case $t in
 		self) selftest ; exit ;;
+		selfargs) selftest "$@" ; exit ;;
 		stress) stresstest ;;
 		stressargs) shift; stresstest "$@"; exit $? ;;
 		pkg) pkgtest ;;
