@@ -15,6 +15,7 @@ enum class EEventType {
     RotateLogs,
     Respawn,
     OOM,
+    CgroupSync,
 };
 
 class TEventWorker;

@@ -94,7 +94,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError Prepare();
 
     std::string GetPortoNamespace() const;
-    void SyncStateWithCgroup();
 
     void CleanupWaiters();
 
@@ -164,6 +163,9 @@ public:
     size_t GetRunningChildren() { return RunningChildren; }
 
     void AddWaiter(std::shared_ptr<TContainerWaiter> waiter);
+
+    bool IsLostAndRestored() const;
+    void SyncStateWithCgroup();
 };
 
 class TContainerWaiter {

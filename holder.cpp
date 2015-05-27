@@ -302,6 +302,15 @@ bool TContainerHolder::RestoreFromStorage() {
             node->Remove();
     }
 
+    if (restored) {
+        for (auto &c: Containers) {
+            if (c.second->IsLostAndRestored()) {
+                ScheduleCgroupSync();
+                break;
+            }
+        }
+    }
+
     return restored;
 }
 
@@ -340,6 +349,11 @@ void TContainerHolder::ScheduleLogRotatation() {
     Queue->Add(config().daemon().rotate_logs_timeout_s() * 1000, e);
 }
 
+void TContainerHolder::ScheduleCgroupSync() {
+    TEvent e(EEventType::CgroupSync);
+    Queue->Add(5000, e);
+}
+
 bool TContainerHolder::DeliverEvent(const TEvent &event) {
     if (config().log().verbose())
         L_EVT() << "Deliver event " << event.GetMsg() << std::endl;
@@ -370,7 +384,18 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
         }
     }
 
-    if (event.Type == EEventType::RotateLogs) {
+    if (event.Type == EEventType::CgroupSync) {
+        bool rearm = false;
+        for (auto &c : Containers) {
+            if (c.second->IsLostAndRestored()) {
+                rearm = true;
+                c.second->SyncStateWithCgroup();
+            }
+        }
+        if (rearm)
+            ScheduleCgroupSync();
+        return true;
+    } else if (event.Type == EEventType::RotateLogs) {
         ScheduleLogRotatation();
         Statistics->Rotated++;
         return true;

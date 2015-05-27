@@ -69,6 +69,10 @@ EContainerState TContainer::GetState() const {
     return State;
 }
 
+bool TContainer::IsLostAndRestored() const {
+    return LostAndRestored;
+}
+
 void TContainer::SyncStateWithCgroup() {
     if (LostAndRestored && State == EContainerState::Running &&
         (!Task || Processes().empty())) {
