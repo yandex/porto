@@ -2151,7 +2151,7 @@ static void TestNetProperty(TPortoAPI &api) {
 
     ExpectApiSuccess(api.Start(name));
     AsNobody(api);
-    WaitContainer(api, name);
+    WaitContainer(api, name, 60);
     ExpectApiSuccess(api.GetData(name, "net_bytes[" + dev + "]", s));
     ExpectNeq(s, "0");
 
@@ -3745,7 +3745,6 @@ static void TestPerf(TPortoAPI &api) {
     const int createMs = 30;
     const int getStateMs = 1;
     const int destroyMs = 120;
-    const int combinedGetStateMs = 20;
 
     begin = GetCurrentTimeMs();
     for (int i = 0; i < nr; i++) {
@@ -3779,7 +3778,7 @@ static void TestPerf(TPortoAPI &api) {
     ms = GetCurrentTimeMs() - begin;
 
     Say() << "Combined get state " << nr << " took " << ms / 1000.0 << "s" << std::endl;
-    Expect(ms < combinedGetStateMs);
+    Expect(ms < getStateMs * nr);
     ExpectEq(result.size(), nr);
 
     begin = GetCurrentTimeMs();
@@ -4069,6 +4068,7 @@ static void TestWait(TPortoAPI &api) {
     Say() << "Check wait for non-existing and invalid containers" << std::endl;
     ExpectApiFailure(api.Wait({c}, tmp), EError::ContainerDoesNotExist);
     ExpectApiFailure(api.Wait({"/"}, tmp), EError::Permission);
+    ExpectApiFailure(api.Wait({}, tmp), EError::InvalidValue);
 
     Say() << "Check wait for stopped container" << std::endl;
     ExpectApiSuccess(api.Create(c));
@@ -4125,6 +4125,12 @@ static void TestWait(TPortoAPI &api) {
 
     for (auto &name : containers)
         ExpectApiSuccess(api.Destroy(name));
+}
+
+static void TestWaitRecovery(TPortoAPI &api) {
+    std::string c = "aaa";
+    std::string d = "aaa/bbb";
+    std::string tmp;
 
     Say() << "Check wait for restored container" << std::endl;
 
@@ -4669,6 +4675,7 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
 
         // the following tests will restart porto several times
         { "recovery", TestRecovery },
+        { "wait_recovery", TestWaitRecovery },
         { "volume_recovery", TestVolumeRecovery },
         { "cgroups", TestCgroups },
         { "version", TestVersion },

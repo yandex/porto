@@ -376,6 +376,8 @@ static TError Wait(TContext &context,
                    const rpc::TContainerWaitRequest &req,
                    rpc::TContainerResponse &rsp,
                    std::shared_ptr<TClient> client) {
+    if (!req.name_size())
+        return TError(EError::InvalidValue, "Containers are not specified");
 
     auto fn = [] (std::shared_ptr<TClient> client,
                   TError error, std::string name) {
