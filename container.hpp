@@ -57,6 +57,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     // data
     void UpdateRunningChildren(size_t diff);
+    TError UpdateSoftLimit();
     void SetState(EContainerState newState, bool tree = false);
     std::string ContainerStateName(EContainerState state);
 
@@ -75,7 +76,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     bool MayRespawn();
     bool ShouldApplyProperty(const std::string &property);
     TError Respawn();
-    void StopChildren();
+    bool StopChildren();
     TError PrepareResources();
     void FreeResources();
     void PropertyToAlias(const std::string &property, std::string &value) const;

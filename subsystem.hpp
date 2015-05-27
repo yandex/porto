@@ -32,6 +32,8 @@ public:
                       const std::string &name,
                       uint64_t &val) const;
     TError UseHierarchy(std::shared_ptr<TCgroup> cg, bool enable) const;
+    TError GetSoftLimit(std::shared_ptr<TCgroup> cg, uint64_t &limit);
+    TError SetSoftLimit(std::shared_ptr<TCgroup> cg, uint64_t limit);
     bool SupportGuarantee();
     TError SetGuarantee(std::shared_ptr<TCgroup> cg, uint64_t guarantee);
     bool SupportIoLimit();

@@ -107,6 +107,19 @@ TError TMemorySubsystem::UseHierarchy(std::shared_ptr<TCgroup> cg, bool enable) 
     return TError(cg->SetKnobValue("memory.use_hierarchy", enable ? "1" : "0"));
 }
 
+TError TMemorySubsystem::GetSoftLimit(std::shared_ptr<TCgroup> cg, uint64_t &limit) {
+    std::string v;
+    TError error = cg->GetKnobValue("memory.soft_limit_in_bytes", v);
+    if (error)
+        return error;
+
+    return StringToUint64(v, limit);
+}
+
+TError TMemorySubsystem::SetSoftLimit(std::shared_ptr<TCgroup> cg, uint64_t limit) {
+    return cg->SetKnobValue("memory.soft_limit_in_bytes", std::to_string(limit), false);
+}
+
 TError TMemorySubsystem::SetGuarantee(std::shared_ptr<TCgroup> cg, uint64_t guarantee) {
     if (!SupportGuarantee())
         return TError::Success();

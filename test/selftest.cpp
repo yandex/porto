@@ -402,7 +402,7 @@ static void TestHolder(TPortoAPI &api) {
     ExpectEq(containers[1], string("a"));
     ExpectEq(containers[2], string("a/b"));
 
-    Say() << "Make sure parent gets valid state when child starts" << std::endl;
+    Say() << "Check meta soft limits" << std::endl;
 
     ExpectApiSuccess(api.Create("a/b/c"));
     containers.clear();
@@ -413,10 +413,36 @@ static void TestHolder(TPortoAPI &api) {
     ExpectEq(containers[2], string("a/b"));
     ExpectEq(containers[3], string("a/b/c"));
 
+    ExpectApiSuccess(api.SetProperty("a/b/c", "command", "sleep 1000"));
+
+    std::string defaultLimit = GetCgKnob("memory", "", "memory.soft_limit_in_bytes");
+    std::string customLimit = std::to_string(1 * 1024 * 1024);
+
+    ExpectApiSuccess(api.Start("a/b/c"));
+    ExpectApiSuccess(api.GetData("a/b/c", "state", v));
+    ExpectEq(v, "running");
+    ExpectApiSuccess(api.GetData("a/b", "state", v));
+    ExpectEq(v, "meta");
+    ExpectApiSuccess(api.GetData("a", "state", v));
+    ExpectEq(v, "meta");
+    ExpectEq(GetCgKnob("memory", "a/b/c", "memory.soft_limit_in_bytes"), defaultLimit);
+    ExpectEq(GetCgKnob("memory", "a/b", "memory.soft_limit_in_bytes"), defaultLimit);
+    ExpectEq(GetCgKnob("memory", "a", "memory.soft_limit_in_bytes"), defaultLimit);
+    ExpectApiSuccess(api.Stop("a/b/c"));
+    ExpectEq(GetCgKnob("memory", "a/b", "memory.soft_limit_in_bytes"), customLimit);
+    ExpectEq(GetCgKnob("memory", "a", "memory.soft_limit_in_bytes"), customLimit);
+
+    ExpectApiSuccess(api.Start("a/b/c"));
+    ExpectNeq(GetCgKnob("memory", "a/b/c", "memory.soft_limit_in_bytes"), customLimit);
+    ExpectNeq(GetCgKnob("memory", "a/b", "memory.soft_limit_in_bytes"), customLimit);
+    ExpectNeq(GetCgKnob("memory", "a", "memory.soft_limit_in_bytes"), customLimit);
+    ExpectApiSuccess(api.Stop("a"));
+
+    Say() << "Make sure parent gets valid state when child starts" << std::endl;
+
     ExpectApiSuccess(api.SetProperty("a", "isolate", "false"));
     ExpectApiSuccess(api.SetProperty("a/b", "isolate", "false"));
 
-    ExpectApiSuccess(api.SetProperty("a/b/c", "command", "sleep 1000"));
     ExpectApiSuccess(api.Start("a/b/c"));
     ExpectApiSuccess(api.GetData("a/b/c", "state", v));
     ExpectEq(v, "running");

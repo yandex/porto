@@ -88,6 +88,38 @@ void TContainer::UpdateRunningChildren(size_t diff) {
         Parent->UpdateRunningChildren(diff);
 }
 
+TError TContainer::UpdateSoftLimit() {
+    if (IsRoot() || IsPortoRoot())
+        return TError::Success();
+
+    if (Parent)
+        Parent->UpdateSoftLimit();
+
+    if (GetState() == EContainerState::Meta) {
+        uint64_t defaultLimit;
+
+        TError error = memorySubsystem->GetSoftLimit(memorySubsystem->GetRootCgroup(), defaultLimit);
+        if (error)
+            return error;
+
+        uint64_t limit = RunningChildren ? defaultLimit : 1 * 1024 * 1024;
+        uint64_t currentLimit;
+
+        auto cg = GetLeafCgroup(memorySubsystem);
+        error = memorySubsystem->GetSoftLimit(cg, currentLimit);
+        if (error)
+            return error;
+
+        if (currentLimit != limit) {
+            error = memorySubsystem->SetSoftLimit(cg, limit);
+            if (error)
+                return error;
+        }
+    }
+
+    return TError::Success();
+}
+
 void TContainer::SetState(EContainerState newState, bool tree) {
     if (tree)
         for (auto iter : Children)
@@ -705,6 +737,8 @@ TError TContainer::Start(bool meta) {
             return error;
     }
 
+    L_ACT() << "Start " << GetName() << " " << Id << std::endl;
+
     TError error = Data->Set<uint64_t>(D_RESPAWN_COUNT, 0);
     if (error)
         return error;
@@ -772,6 +806,9 @@ TError TContainer::Start(bool meta) {
 
     SetState(EContainerState::Running);
     Statistics->Started++;
+    error = UpdateSoftLimit();
+    if (error)
+        L_ERR() << "Can't update meta soft limit: " << error << std::endl;
 
     return TError::Success();
 }
@@ -815,14 +852,18 @@ TError TContainer::KillAll() {
     return TError::Success();
 }
 
-void TContainer::StopChildren() {
+bool TContainer::StopChildren() {
+    bool stopped = false;
     for (auto iter : Children)
         if (auto child = iter.lock())
             if (child->GetState() != EContainerState::Stopped) {
                 TError error = child->Stop();
                 if (error)
                     L_ERR() << "Can't stop child " << child->GetName() << ": " << error << std::endl;
+                else
+                    stopped = true;
             }
+    return stopped;
 }
 
 void TContainer::ExitChildren(int status, bool oomKilled) {
@@ -920,7 +961,11 @@ TError TContainer::Stop() {
 
     if (!IsRoot() && !IsPortoRoot())
         SetState(EContainerState::Stopped);
-    StopChildren();
+    if (!StopChildren()) {
+        TError error = UpdateSoftLimit();
+        if (error)
+            L_ERR() << "Can't update meta soft limit: " << error << std::endl;
+    }
     if (!IsRoot() && !IsPortoRoot())
         FreeResources();
 
