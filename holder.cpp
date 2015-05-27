@@ -83,7 +83,6 @@ TError TContainerHolder::CreatePortoRoot() {
     Statistics->RemoveDead = 0;
     Statistics->Rotated = 0;
     Statistics->Started = 0;
-    Statistics->Running = 0;
 
     return TError::Success();
 }

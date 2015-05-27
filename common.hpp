@@ -53,7 +53,6 @@ struct TStatistics {
     std::atomic<uint64_t> Rotated;
     std::atomic<uint64_t> RestoreFailed;
     std::atomic<uint64_t> InterruptedReads;
-    std::atomic<uint64_t> Running;
     std::atomic<uint64_t> QueuedAcks;
     std::atomic<uint64_t> EpollSources;
 };

@@ -7,7 +7,7 @@
 - fix container restoration: (try to) check if task is owned by porto
 - add gc of dead containers with lost events
 - porto can't restore parent/child (stopped) when parent is dead
-- set soft limits for abandoned cgroups
+- set soft limits for abandoned cgroups (for meta without running children)
 - find and fix bug with meta-containers
 - namespaces for volumes
 - support volume as root

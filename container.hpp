@@ -49,12 +49,14 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     int TaskStartErrno = -1;
     TScopedFd Efd;
     size_t CgroupEmptySince = 0;
+    size_t RunningChildren = 0;
     bool LostAndRestored = false;
     std::unique_ptr<TTask> Task;
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
     std::shared_ptr<TEpollSource> Source;
 
     // data
+    void UpdateRunningChildren(size_t diff);
     void SetState(EContainerState newState, bool tree = false);
     std::string ContainerStateName(EContainerState state);
 
@@ -151,4 +153,5 @@ public:
     TError AbsoluteName(const std::string &orig, std::string &name,
                         bool resolve_meta = false) const;
     static void ParsePropertyName(std::string &name, std::string &idx);
+    size_t GetRunningChildren() { return RunningChildren; }
 };

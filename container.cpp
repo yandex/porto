@@ -81,6 +81,13 @@ TError TContainer::GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m)
     return Tclass->GetStat(stat, m);
 }
 
+void TContainer::UpdateRunningChildren(size_t diff) {
+    RunningChildren += diff;
+
+    if (Parent)
+        Parent->UpdateRunningChildren(diff);
+}
+
 void TContainer::SetState(EContainerState newState, bool tree) {
     if (tree)
         for (auto iter : Children)
@@ -91,10 +98,11 @@ void TContainer::SetState(EContainerState newState, bool tree) {
         return;
 
     L_ACT() << GetName() << ": change state " << ContainerStateName(State) << " -> " << ContainerStateName(newState) << std::endl;
-    if (newState == EContainerState::Running)
-        Statistics->Running++;
-    else if (State == EContainerState::Running)
-        Statistics->Running--;
+    if (newState == EContainerState::Running) {
+        UpdateRunningChildren(+1);
+    } else if (State == EContainerState::Running) {
+        UpdateRunningChildren(-1);
+    }
 
     State = newState;
     Data->Set<std::string>(D_STATE, ContainerStateName(State));
