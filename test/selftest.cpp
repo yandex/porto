@@ -4061,6 +4061,99 @@ static bool RespawnTicks(TPortoAPI &api, const std::string &name, int maxTries =
     return false;
 }
 
+static void TestWait(TPortoAPI &api) {
+    std::string c = "aaa";
+    std::string d = "aaa/bbb";
+    std::string tmp;
+
+    Say() << "Check wait for non-existing and invalid containers" << std::endl;
+    ExpectApiFailure(api.Wait({c}, tmp), EError::ContainerDoesNotExist);
+    ExpectApiFailure(api.Wait({"/"}, tmp), EError::Permission);
+
+    Say() << "Check wait for stopped container" << std::endl;
+    ExpectApiSuccess(api.Create(c));
+    ExpectApiSuccess(api.Wait({c}, tmp));
+    ExpectEq(c, tmp);
+
+    Say() << "Check wait for running/dead container" << std::endl;
+    ExpectApiSuccess(api.SetProperty(c, "command", "sleep 1"));
+    ExpectApiSuccess(api.Start(c));
+    ExpectApiSuccess(api.Wait({c}, tmp));
+    ExpectEq(c, tmp);
+    ExpectApiSuccess(api.GetData(c, "state", tmp));
+    ExpectEq(tmp, "dead");
+
+    ExpectApiSuccess(api.Wait({c}, tmp));
+    ExpectEq(c, tmp);
+    ExpectApiSuccess(api.GetData(c, "state", tmp));
+    ExpectEq(tmp, "dead");
+    ExpectApiSuccess(api.Stop(c));
+    ExpectApiSuccess(api.Destroy(c));
+
+    Say() << "Check wait for containers in meta-state" << std::endl;
+    ExpectApiSuccess(api.Create(c));
+    ExpectApiSuccess(api.Create(d));
+
+    ExpectApiSuccess(api.SetProperty(d, "command", "sleep 1"));
+    ExpectApiSuccess(api.Start(d));
+    ExpectApiSuccess(api.GetData(c, "state", tmp));
+    ExpectEq(tmp, "meta");
+    ExpectApiSuccess(api.Wait({c}, tmp));
+    ExpectEq(c, tmp);
+    ExpectApiSuccess(api.Stop(d));
+    ExpectApiSuccess(api.Destroy(d));
+    ExpectApiSuccess(api.Stop(c));
+    ExpectApiSuccess(api.Destroy(c));
+
+    Say() << "Check wait for large number of containers" << std::endl;
+    std::vector<std::string> containers;
+    for (int i = 0; i < 100; i++)
+        containers.push_back(c + std::to_string(i));
+    for (auto &name : containers) {
+        ExpectApiSuccess(api.Create(name));
+        ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
+        ExpectApiSuccess(api.Start(name));
+        ExpectApiSuccess(api.GetData(name, "state", tmp));
+        ExpectEq(tmp, "running");
+    }
+
+    ExpectApiSuccess(api.Kill(containers[50], 9));
+    ExpectApiSuccess(api.Wait(containers, tmp));
+    ExpectEq(tmp, containers[50]);
+    ExpectApiSuccess(api.GetData(containers[50], "state", tmp));
+    ExpectEq(tmp, "dead");
+
+    for (auto &name : containers)
+        ExpectApiSuccess(api.Destroy(name));
+
+    Say() << "Check wait for restored container" << std::endl;
+
+    ExpectApiSuccess(api.Create(c));
+    ExpectApiSuccess(api.SetProperty(c, "command", "sleep 3"));
+    ExpectApiSuccess(api.Start(c));
+
+    KillSlave(api, SIGKILL);
+
+    ExpectApiSuccess(api.Wait({c}, tmp));
+    ExpectEq(c, tmp);
+    ExpectApiSuccess(api.GetData(c, "state", tmp));
+    ExpectEq(tmp, "dead");
+    ExpectApiSuccess(api.Stop(c));
+
+    Say() << "Check wait for lost and restored container" << std::endl;
+    ExpectApiSuccess(api.SetProperty(c, "command", "sleep 3"));
+    ExpectApiSuccess(api.Start(c));
+
+    KillMaster(api, SIGKILL);
+
+    ExpectApiSuccess(api.Wait({c}, tmp));
+    ExpectEq(c, tmp);
+    ExpectApiSuccess(api.GetData(c, "state", tmp));
+    ExpectEq(tmp, "dead");
+    ExpectApiSuccess(api.Stop(c));
+    ExpectApiSuccess(api.Destroy(c));
+}
+
 static void TestRecovery(TPortoAPI &api) {
     string pid, v;
     string name = "a:b";
@@ -4540,6 +4633,7 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
         { "meta", TestMeta },
         { "empty", TestEmpty },
         { "state_machine", TestStateMachine },
+        { "wait", TestWait },
         { "exit_status", TestExitStatus },
         { "streams", TestStreams },
         { "ns_cg_tc", TestNsCgTc },
