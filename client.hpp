@@ -12,6 +12,8 @@ extern "C" {
 #include <unistd.h>
 };
 
+class TContainerWaiter;
+
 class TClient : public TNonCopyable {
 public:
     std::mutex Lock;
@@ -43,6 +45,8 @@ public:
         }
         return stream;
     }
+
+    std::shared_ptr<TContainerWaiter> Waiter;
 
 private:
     int Fd;

@@ -23,6 +23,8 @@ class TContainerHolder;
 class TNetwork;
 class TTclass;
 class TTask;
+class TContainerWaiter;
+class TClient;
 
 extern int64_t BootTime;
 
@@ -52,6 +54,8 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     size_t RunningChildren = 0;
     bool LostAndRestored = false;
     std::unique_ptr<TTask> Task;
+    std::vector<std::weak_ptr<TContainerWaiter>> Waiters;
+
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
     std::shared_ptr<TEpollSource> Source;
 
@@ -91,6 +95,8 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     std::string GetPortoNamespace() const;
     void SyncStateWithCgroup();
+
+    void CleanupWaiters();
 
 public:
     TCred OwnerCred;
@@ -150,9 +156,23 @@ public:
     TError CheckPermission(const TCred &ucred);
 
     // *self is observer container
-    TError RelativeName(std::shared_ptr<TContainer> c, std::string &name) const;
+    TError RelativeName(const TContainer &c, std::string &name) const;
     TError AbsoluteName(const std::string &orig, std::string &name,
                         bool resolve_meta = false) const;
+
     static void ParsePropertyName(std::string &name, std::string &idx);
     size_t GetRunningChildren() { return RunningChildren; }
+
+    void AddWaiter(std::shared_ptr<TContainerWaiter> waiter);
+};
+
+class TContainerWaiter {
+private:
+    std::weak_ptr<TClient> Client;
+    std::function<void (std::shared_ptr<TClient>, TError, std::string)> Callback;
+public:
+    TContainerWaiter(std::shared_ptr<TClient> client,
+                     std::function<void (std::shared_ptr<TClient>, TError, std::string)> callback);
+    void SetClient(std::shared_ptr<TClient> client);
+    void Signal(const TContainer &who);
 };

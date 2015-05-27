@@ -23,6 +23,7 @@
 #include "util/netlink.hpp"
 #include "util/cred.hpp"
 #include "util/unix.hpp"
+#include "client.hpp"
 
 #include "portod.hpp"
 
@@ -125,6 +126,15 @@ void TContainer::SetState(EContainerState newState, bool tree) {
         for (auto iter : Children)
             if (auto child = iter.lock())
                 child->SetState(newState, tree);
+
+    if (newState != EContainerState::Running) {
+        CleanupWaiters();
+        for (auto &w : Waiters) {
+            auto waiter = w.lock();
+            if (waiter)
+                waiter->Signal(*this);
+        }
+    }
 
     if (State == newState)
         return;
@@ -1597,16 +1607,16 @@ std::string TContainer::GetPortoNamespace() const {
         return "";
 }
 
-TError TContainer::RelativeName(std::shared_ptr<TContainer> c, std::string &name) const {
+TError TContainer::RelativeName(const TContainer &c, std::string &name) const {
     std::string ns = GetPortoNamespace();
-    if (c->IsRoot()) {
+    if (c.IsRoot()) {
         name = ROOT_CONTAINER;
         return TError::Success();
     } else if (ns == "") {
-        name = c->GetName();
+        name = c.GetName();
         return TError::Success();
     } else {
-        std::string n = c->GetName();
+        std::string n = c.GetName();
         if (n.length() <= ns.length() || n.compare(0, ns.length(), ns) != 0) {
             return TError(EError::ContainerDoesNotExist,
                           "Can't access container " + n + " from namespace " + ns);
@@ -1637,4 +1647,48 @@ TError TContainer::AbsoluteName(const std::string &orig, std::string &name,
         name = ns + orig;
 
     return TError::Success();
+}
+
+void TContainer::AddWaiter(std::shared_ptr<TContainerWaiter> waiter) {
+    if (GetState() == EContainerState::Running) {
+        CleanupWaiters();
+        Waiters.push_back(waiter);
+    } else {
+        waiter->Signal(*this);
+    }
+}
+
+void TContainer::CleanupWaiters() {
+    std::vector<std::weak_ptr<TContainerWaiter>>::iterator iter;
+    for (iter = Waiters.begin(); iter != Waiters.end();) {
+        if (iter->expired()) {
+            iter = Waiters.erase(iter);
+            continue;
+        }
+        iter++;
+    }
+}
+
+TContainerWaiter::TContainerWaiter(std::shared_ptr<TClient> client,
+                                   std::function<void (std::shared_ptr<TClient>,
+                                                       TError, std::string)> callback) :
+    Client(client), Callback(callback) {
+}
+
+void TContainerWaiter::SetClient(std::shared_ptr<TClient> client) {
+    Client = client;
+}
+
+void TContainerWaiter::Signal(const TContainer &who) {
+    std::shared_ptr<TClient> client = Client.lock();
+    if (client) {
+        auto container = client->GetContainer();
+        if (container) {
+            std::string name;
+            TError err = container->RelativeName(who, name);
+            Callback(client, err, name);
+        }
+
+        client->Waiter = nullptr;
+    }
 }

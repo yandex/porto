@@ -166,7 +166,7 @@ static TError ListContainers(TContext &context,
                              std::shared_ptr<TClient> client) {
     for (auto c : context.Cholder->List()) {
         std::string name;
-        TError err = client->GetContainer()->RelativeName(c, name);
+        TError err = client->GetContainer()->RelativeName(*c, name);
         if (!err)
             rsp.mutable_list()->add_name(name);
     }
@@ -371,6 +371,44 @@ static TError Version(TContext &context,
     return TError::Success();
 }
 
+static TError Wait(TContext &context,
+                   const rpc::TContainerWaitRequest &req,
+                   rpc::TContainerResponse &rsp,
+                   std::shared_ptr<TClient> client) {
+
+    auto fn = [] (std::shared_ptr<TClient> client,
+                  TError error, std::string name) {
+        rpc::TContainerResponse response;
+        response.set_error(error.GetError());
+        response.mutable_wait()->set_name(name);
+        SendReply(client, response, false);
+    };
+
+    auto waiter = std::make_shared<TContainerWaiter>(client, fn);
+
+    for (int i = 0; i < req.name_size(); i++) {
+        std::string name = req.name(i);
+        std::string abs_name;
+        TError err = client->GetContainer()->AbsoluteName(name, abs_name);
+        if (err) {
+            rsp.mutable_wait()->set_name(name);
+            return err;
+        }
+
+        std::shared_ptr<TContainer> container;
+        err = context.Cholder->Get(abs_name, container);
+        if (err) {
+            rsp.mutable_wait()->set_name(name);
+            return err;
+        }
+
+        container->AddWaiter(waiter);
+    }
+
+    client->Waiter = waiter;
+    return TError::Success();
+}
+
 static TError CreateVolume(TContext &context,
                            const rpc::TVolumeCreateRequest &req,
                            rpc::TContainerResponse &rsp,
@@ -524,7 +562,11 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
             error = Kill(context, req.kill(), rsp, client);
         else if (req.has_version())
             error = Version(context, rsp);
-        else if (config().volumes().enabled() && req.has_createvolume()) {
+        else if (req.has_wait()) {
+            error = Wait(context, req.wait(), rsp, client);
+            if (!error)
+                send_reply = false;
+        } else if (config().volumes().enabled() && req.has_createvolume()) {
             error = CreateVolume(context, req.createvolume(), rsp, client);
             if (!error)
                 send_reply = false;
