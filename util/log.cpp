@@ -170,7 +170,7 @@ std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
         Statistics->Errors++;
 #endif
 
-#if 0
+#if THREADS
     return (*logStream) << GetTime() << " " << name << "[" << GetTid() << "]: " << prefix[level];
 #else
     return (*logStream) << GetTime() << " " << name << ": " << prefix[level];

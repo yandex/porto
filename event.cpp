@@ -83,6 +83,7 @@ void TEventQueue::Add(size_t timeoutMs, const TEvent &e) {
 #endif
 }
 
+#if !THREADS
 void TEventQueue::DeliverEvents(TContainerHolder &cholder) {
     size_t now = GetCurrentTimeMs();
     while (!Queue.empty() && Queue.top().DueMs <= now) {
@@ -106,6 +107,7 @@ int TEventQueue::GetNextTimeout() {
             return due - now;
     }
 }
+#endif
 
 TEventQueue::TEventQueue(std::shared_ptr<TContainerHolder> holder) {
     Worker = std::make_shared<TEventWorker>(holder);
