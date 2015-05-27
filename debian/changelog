@@ -1,3 +1,15 @@
+yandex-porto (1.13) precise; urgency=low
+
+  * rework meta behavior (don't depend on isolate, don't change to stopped when all children exit)
+  * new combined get RPC
+  * new wait RPC
+  * / container now contains statistics for all host processes
+  * /porto container contains statistics for all porto containers
+  * set small soft limit for meta containers without running children
+  * enable dynamic network ifaces by default
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Wed, 27 May 2015 18:32:00 +0300
+
 yandex-porto (1.12) precise; urgency=low
 
   * don't let user specify bind target that points to host root
