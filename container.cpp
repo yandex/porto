@@ -1386,12 +1386,11 @@ TError TContainer::Restore(const kv::TNode &node) {
                 SetState(EContainerState::Paused);
         }
 
-        if (!Task->IsZombie()) {
+        if (!Task->IsZombie())
             SyncStateWithCgroup();
 
-            if (MayRespawn())
-                ScheduleRespawn();
-        }
+        if (MayRespawn())
+            ScheduleRespawn();
     } else {
         L_ACT() << GetName() << ": restore created container " << std::endl;
 

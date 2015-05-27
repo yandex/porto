@@ -983,7 +983,7 @@ void TTask::Restore(int pid_,
     Env->StdoutPath = stdoutPath;
     Env->StderrPath = stderrPath;
 
-    if (running) {
+    if (running && !IsZombie()) {
         TPath stdinLink("/proc/" + std::to_string(Pid) + "/fd/0");
         TError error = stdinLink.ReadLink(Env->StdinPath);
         if (error)
