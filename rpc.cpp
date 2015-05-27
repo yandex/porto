@@ -20,7 +20,8 @@ static bool InfoRequest(const rpc::TContainerRequest &req) {
         req.has_resume() ||
         req.has_kill() ||
         req.has_createvolume() ||
-        req.has_destroyvolume())
+        req.has_destroyvolume() ||
+        req.has_wait())
         return false;
 
     return true;
@@ -381,7 +382,7 @@ static TError Wait(TContext &context,
         rpc::TContainerResponse response;
         response.set_error(error.GetError());
         response.mutable_wait()->set_name(name);
-        SendReply(client, response, false);
+        SendReply(client, response, true);
     };
 
     auto waiter = std::make_shared<TContainerWaiter>(client, fn);
