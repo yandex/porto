@@ -29,6 +29,7 @@ namespace test {
     void WaitExit(TPortoAPI &api, const std::string &pid);
     void WaitProcessExit(const std::string &pid, int sec = 10);
     void WaitState(TPortoAPI &api, const std::string &name, const std::string &state, int sec = 10);
+    void WaitContainer(TPortoAPI &api, const std::string &name, int sec = 10);
     void WaitPortod(TPortoAPI &api, int times = 10);
     std::string GetCwd(const std::string &pid);
     std::string GetRoot(const std::string &pid);

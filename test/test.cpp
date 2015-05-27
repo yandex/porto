@@ -128,6 +128,14 @@ void WaitProcessExit(const std::string &pid, int sec) {
         throw std::string("Waited too long for process to exit");
 }
 
+void WaitContainer(TPortoAPI &api, const std::string &name, int sec) {
+    std::vector<std::string> containers = {name};
+    std::string who;
+    alarm(sec);
+    if (api.Wait(containers, who) == 0)
+        alarm(0);
+}
+
 void WaitState(TPortoAPI &api, const std::string &name, const std::string &state, int sec) {
     Say() << "Waiting for " << name << " to be in state " << state << std::endl;
 

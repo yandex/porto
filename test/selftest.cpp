@@ -55,7 +55,7 @@ static int LeakConainersNr;
 static std::string StartWaitAndGetData(TPortoAPI &api, const std::string &name, const std::string &data) {
     string v;
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, data, v));
     return v;
 }
@@ -537,7 +537,7 @@ static void TestHolder(TPortoAPI &api) {
         ExpectTclass("a/b/c", true);
     }
 
-    WaitState(api, "a/b", "dead");
+    WaitContainer(api, "a/b");
     ExpectApiSuccess(api.GetData("a/b", "state", state));
     ExpectEq(state, "dead");
     ExpectApiSuccess(api.GetData("a/b/c", "state", state));
@@ -660,7 +660,7 @@ static void TestMeta(TPortoAPI &api) {
         ExpectApiSuccess(api.GetData("a/b", "state", state));
         ExpectEq(state, "running");
 
-        WaitState(api, "a/b", "dead");
+        WaitContainer(api, "a/b");
         ExpectApiSuccess(api.GetData("a", "state", state));
         ExpectEq(state, "meta");
         ExpectApiSuccess(api.GetData("a/b", "state", state));
@@ -706,7 +706,7 @@ static void TestExitStatus(TPortoAPI &api) {
     Say() << "Check exit status of 'false'" << std::endl;
     ExpectApiSuccess(api.SetProperty(name, "command", "false"));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "exit_status", ret));
     ExpectEq(ret, string("256"));
     ExpectApiSuccess(api.GetData(name, "oom_killed", ret));
@@ -717,7 +717,7 @@ static void TestExitStatus(TPortoAPI &api) {
     Say() << "Check exit status of 'true'" << std::endl;
     ExpectApiSuccess(api.SetProperty(name, "command", "true"));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "exit_status", ret));
     ExpectEq(ret, string("0"));
     ExpectApiSuccess(api.GetData(name, "oom_killed", ret));
@@ -752,8 +752,8 @@ static void TestExitStatus(TPortoAPI &api) {
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
     kill(stoi(pid), SIGKILL);
-    WaitState(api, name, "dead");
-    ExpectEq(TaskRunning(api, pid), false);
+    WaitContainer(api, name);
+    WaitProcessExit(pid);
     ExpectApiSuccess(api.GetData(name, "exit_status", ret));
     ExpectEq(ret, string("9"));
     ExpectApiSuccess(api.GetData(name, "oom_killed", ret));
@@ -769,7 +769,7 @@ static void TestExitStatus(TPortoAPI &api) {
 
     ExpectApiSuccess(api.SetProperty(name, "memory_limit", oomMemoryLimit));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead", 60);
+    WaitContainer(api, name, 60);
     ExpectApiSuccess(api.GetData(name, "exit_status", ret));
     ExpectEq(ret, string("9"));
     ExpectApiSuccess(api.GetData(name, "oom_killed", ret));
@@ -787,7 +787,7 @@ static void TestStreams(TPortoAPI &api) {
     Say() << "Make sure stdout works" << std::endl;
     ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'echo out >&1'"));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "stdout", ret));
     ExpectEq(ret, string("out\n"));
     ExpectApiSuccess(api.GetData(name, "stderr", ret));
@@ -797,7 +797,7 @@ static void TestStreams(TPortoAPI &api) {
     Say() << "Make sure stderr works" << std::endl;
     ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'echo err >&2'"));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "stdout", ret));
     ExpectEq(ret, string(""));
     ExpectApiSuccess(api.GetData(name, "stderr", ret));
@@ -914,14 +914,14 @@ static void TestIsolateProperty(TPortoAPI &api) {
 
     ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'echo $BASHPID'"));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "stdout", ret));
     ExpectNeq(ret, string("1\n"));
     ExpectApiSuccess(api.Stop(name));
 
     ExpectApiSuccess(api.SetProperty(name, "command", "ps aux"));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "stdout", ret));
     ExpectNeq(std::count(ret.begin(), ret.end(), '\n'), 2);
     ExpectApiSuccess(api.Stop(name));
@@ -930,14 +930,14 @@ static void TestIsolateProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "isolate", "true"));
     ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'echo $BASHPID'"));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "stdout", ret));
     ExpectEq(ret, string("1\n"));
     ExpectApiSuccess(api.Stop(name));
 
     ExpectApiSuccess(api.SetProperty(name, "command", "ps aux"));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "stdout", ret));
     ExpectEq(std::count(ret.begin(), ret.end(), '\n'), 2);
 
@@ -1091,8 +1091,9 @@ static void TestIsolateProperty(TPortoAPI &api) {
 
     ExpectApiSuccess(api.GetData("a/c", "root_pid", pid));
     ExpectApiSuccess(api.Kill("a/c", SIGKILL));
-    WaitState(api, "a/c", "dead");
+    WaitContainer(api, "a/c");
 
+    WaitProcessExit(pid);
     kill(stoi(pid), 0);
     ExpectEq(errno, ESRCH);
 
@@ -1131,7 +1132,7 @@ static void TestContainerNamespaces(TPortoAPI &api) {
     AsRoot(api);
     ExpectApiSuccess(api.SetProperty("c/d", "user", "root"));
     ExpectApiSuccess(api.Start("c/d"));
-    WaitState(api, "c/d", "dead");
+    WaitContainer(api, "c/d");
 
     ExpectApiSuccess(api.Destroy("simple-prefix-second-prefix-test"));
     ExpectApiSuccess(api.Stop("c/d"));
@@ -1141,13 +1142,13 @@ static void TestContainerNamespaces(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty("c", "porto_namespace", "c/"));
     ExpectApiSuccess(api.SetProperty("c/d", "command", "portoctl create test"));
     ExpectApiSuccess(api.Start("c/d"));
-    WaitState(api, "c/d", "dead");
+    WaitContainer(api, "c/d");
     ExpectApiSuccess(api.Destroy("c/second-prefix-test"));
     ExpectApiSuccess(api.Stop("c/d"));
 
     Say() << "Check absolute name" << std::endl;
     ExpectApiSuccess(api.Start("c/d"));
-    WaitState(api, "c/d", "dead");
+    WaitContainer(api, "c/d");
     ExpectApiSuccess(api.GetData("c/second-prefix-test", "absolute_name", val));
     ExpectEq(val, "c/second-prefix-test");
     ExpectApiSuccess(api.Stop("c/d"));
@@ -1468,7 +1469,7 @@ static void TestStdPathProperty(TPortoAPI &api) {
     string ret;
     ExpectApiSuccess(api.SetProperty(name, "command", "cat"));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "stdout", ret));
     ExpectEq(ret, string("hi"));
 
@@ -1540,7 +1541,7 @@ static void TestRootRdOnlyProperty(TPortoAPI &api) {
 
     ExpectApiSuccess(api.SetProperty(name, "command", "/touch test"));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "exit_status", ret));
     ExpectEq(ret, string("0"));
     ExpectApiSuccess(api.Stop(name));
@@ -1548,7 +1549,7 @@ static void TestRootRdOnlyProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "root_readonly", "true"));
     ExpectApiSuccess(api.SetProperty(name, "command", "/touch test2"));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "exit_status", ret));
     ExpectNeq(ret, string("0"));
     ExpectApiSuccess(api.Stop(name));
@@ -1660,7 +1661,7 @@ static void TestRootProperty(TPortoAPI &api) {
 
     ExpectApiSuccess(api.SetProperty(name, "command", "/pwd"));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
 
     ExpectApiSuccess(api.GetData(name, "stdout", v));
     ExpectEq(v, string("/\n"));
@@ -1760,7 +1761,7 @@ static void TestHostnameProperty(TPortoAPI &api) {
 
     ExpectApiSuccess(api.SetProperty(name, "command", "/hostname"));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "stdout", v));
     ExpectEq(v, GetHostname() + "\n");
     ExpectApiSuccess(api.Stop(name));
@@ -1778,7 +1779,7 @@ static void TestHostnameProperty(TPortoAPI &api) {
 
     ExpectApiSuccess(api.SetProperty(name, "command", "/hostname"));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "stdout", v));
     ExpectNeq(v, GetHostname() + "\n");
     ExpectEq(v, host + "\n");
@@ -1801,7 +1802,7 @@ static void TestHostnameProperty(TPortoAPI &api) {
 
     ExpectApiSuccess(api.SetProperty(name, "command", "/cat /etc/hostname"));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "stdout", v));
     ExpectNeq(v, GetHostname() + "\n");
     ExpectEq(v, host + "\n");
@@ -2138,7 +2139,7 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "net", "macvlan " + dev + " " + dev));
     ExpectApiSuccess(api.SetProperty(name, "command", "false"));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "net_bytes[" + dev + "]", s));
     ExpectEq(s, "0");
 
@@ -2150,7 +2151,7 @@ static void TestNetProperty(TPortoAPI &api) {
 
     ExpectApiSuccess(api.Start(name));
     AsNobody(api);
-    WaitState(api, name, "dead", 60);
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "net_bytes[" + dev + "]", s));
     ExpectNeq(s, "0");
 
@@ -2181,7 +2182,7 @@ static void TestNetProperty(TPortoAPI &api) {
     auto portove = post.begin()->first;
     ExpectEq(post[portove].master, "portobr0");
 
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "stdout", s));
     containerLink = StringToVec(s);
     ExpectEq(containerLink.size(), 2);
@@ -2675,7 +2676,7 @@ static void TestData(TPortoAPI &api) {
     ExpectEq(system("ls -la /bin >/dev/null"), 0);
     ExpectApiSuccess(api.SetProperty(noop, "command", "ls -la /bin"));
     ExpectApiSuccess(api.Start(noop));
-    WaitState(api, noop, "dead");
+    WaitContainer(api, noop);
 
     ExpectApiSuccess(api.Create(wget));
     if (NetworkEnabled())
@@ -2683,7 +2684,7 @@ static void TestData(TPortoAPI &api) {
     else
         ExpectApiSuccess(api.SetProperty(wget, "command", "bash -c 'dd if=/dev/urandom bs=4M count=1 of=/tmp/porto.tmp && sync'"));
     ExpectApiSuccess(api.Start(wget));
-    WaitState(api, wget, "dead");
+    WaitContainer(api, wget);
 
     string v, rv;
     ExpectApiSuccess(api.GetData(wget, "exit_status", v));
@@ -3185,7 +3186,7 @@ static void TestVirtModeProperty(TPortoAPI &api) {
     }
 
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
 
     for (auto kv : expected) {
         ExpectApiSuccess(api.GetProperty(name, kv.first, s));
@@ -3603,7 +3604,7 @@ static void TestRespawnProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.GetData(name, "respawn_count", ret));
     ExpectEq(ret, string("0"));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     sleep(config().container().respawn_delay_ms() / 1000);
     ExpectApiSuccess(api.GetData(name, "respawn_count", ret));
     ExpectEq(ret, string("0"));
@@ -3612,7 +3613,7 @@ static void TestRespawnProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "respawn", "true"));
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     WaitState(api, name, "running");
     ExpectApiSuccess(api.GetData(name, "root_pid", respawnPid));
     ExpectNeq(pid, respawnPid);
@@ -4082,7 +4083,7 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectApiSuccess(api.Start("parent"));
     ExpectApiSuccess(api.Start("parent/child"));
     ExpectApiSuccess(api.Stop("parent/child"));
-    WaitState(api, "parent", "dead");
+    WaitContainer(api, "parent");
 
     KillMaster(api, SIGKILL);
 
@@ -4102,7 +4103,7 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectApiSuccess(api.Start(name));
 
     KillMaster(api, SIGKILL);
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
 
     ExpectApiSuccess(api.Destroy(name));
 
@@ -4195,7 +4196,7 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "command", oomCommand));
     ExpectApiSuccess(api.SetProperty(name, "memory_limit", oomMemoryLimit));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "exit_status", v));
     ExpectEq(v, string("9"));
     ExpectApiSuccess(api.GetData(name, "oom_killed", v));
@@ -4213,7 +4214,7 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "respawn", "true"));
     ExpectApiSuccess(api.SetProperty(name, "max_respawns", std::to_string(expected)));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
     KillSlave(api, SIGKILL);
     WaitRespawn(api, name, expected);
     ExpectApiSuccess(api.GetData(name, "respawn_count", v));
@@ -4257,7 +4258,7 @@ static void TestRecovery(TPortoAPI &api) {
         ExpectApiSuccess(api.Create(name));
         ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'wget yandex.ru && sync'"));
         ExpectApiSuccess(api.Start(name));
-        WaitState(api, name, "dead");
+        WaitContainer(api, name);
 
         ExpectNonZeroLink(api, name, "net_bytes");
         KillSlave(api, SIGKILL);
@@ -4446,7 +4447,7 @@ static void TestRemoveDead(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "command", "true"));
     ExpectApiSuccess(api.SetProperty(name, "aging_time", "1"));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
 
     usleep(2 * 1000 * 1000);
     std::string state;
@@ -4467,7 +4468,7 @@ static void TestLogRotate(TPortoAPI &api) {
     ExpectApiSuccess(api.GetProperty(name, "stdout_path", v));
     ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'dd if=/dev/zero bs=1M count=100 && sleep 5'"));
     ExpectApiSuccess(api.Start(name));
-    WaitState(api, name, "dead");
+    WaitContainer(api, name);
 
     TPath stdoutPath(v);
     ExpectLess(stdoutPath.GetDiskUsage(), config().container().max_log_size());
