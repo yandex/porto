@@ -12,10 +12,8 @@ update_config() {
 
 selftest() {
 	say "Self test with network=$1"
-	update_config "$1" "$2"
-	shift
-	shift
-	portotest "$@"
+	update_config true true
+	portotest
 }
 
 stresstest() {
@@ -149,12 +147,10 @@ fixcg() {
 
 fixcg
 
-[ ! $# -eq 0 ] || set -- false true pkg stress
+[ ! $# -eq 0 ] || set -- self pkg stress
 for t in "$@"; do
 	case $t in
-		self) shift; selftest true false "$@"; exit ;;
-		true|false) selftest $t false ;;
-		dynamic) selftest true true ;;
+		self) selftest ; exit ;;
 		stress) stresstest ;;
 		stressargs) shift; stresstest "$@"; exit $? ;;
 		pkg) pkgtest ;;

@@ -33,11 +33,7 @@ toprpc() {
 
 selftest() {
 	netup
-	sudo scripts/test false
-	toprpc
-	sudo scripts/test true
-	toprpc
-	sudo scripts/test dynamic
+	sudo scripts/test self
 	netdown
 	toprpc
 }
