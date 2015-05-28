@@ -774,6 +774,8 @@ class TExecCmd : public ICmd {
 public:
     TExecCmd(TPortoAPI *api) : ICmd(api, "exec", 2, "<container> command=<command> [properties]", "create pty, execute and wait for command in container") {}
 
+    void Signal(int sig) { Interrupted = 1; InterruptedSignal = sig; }
+
     int SwithToNonCanonical(int fd) {
         if (!isatty(fd))
             return 0;

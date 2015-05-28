@@ -555,6 +555,19 @@ static void TestHolder(TPortoAPI &api) {
     ExpectApiFailure(api.Destroy("doesntexist"), EError::ContainerDoesNotExist);
     ExpectApiFailure(api.Destroy("z$"), EError::ContainerDoesNotExist);
 
+    Say() << "Make sure we can't start child when parent is dead" << std::endl;
+
+    ExpectApiSuccess(api.Create("parent"));
+    ExpectApiSuccess(api.Create("parent/child"));
+    ExpectApiSuccess(api.SetProperty("parent", "command", "sleep 1"));
+    ExpectApiSuccess(api.SetProperty("parent/child", "command", "sleep 2"));
+    ExpectApiSuccess(api.Start("parent"));
+    ExpectApiSuccess(api.Start("parent/child"));
+    ExpectApiSuccess(api.Stop("parent/child"));
+    WaitContainer(api, "parent");
+    ExpectApiFailure(api.Start("parent"), EError::InvalidState);
+    ExpectApiSuccess(api.Destroy("parent"));
+
     ShouldHaveOnlyRoot(api);
 }
 
@@ -4172,7 +4185,6 @@ static void TestRecovery(TPortoAPI &api) {
         { "env", "a=a; b=b" },
     };
 
-#if 0
     Say() << "Make sure we can restore stopped child when parent is dead" << std::endl;
 
     ExpectApiSuccess(api.Create("parent"));
@@ -4193,7 +4205,6 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectEq(containers[2], string("parent/child"));
 
     ExpectApiSuccess(api.Destroy("parent"));
-#endif
 
     Say() << "Make sure we can figure out that containers are dead even if master dies" << std::endl;
 
@@ -4252,6 +4263,7 @@ static void TestRecovery(TPortoAPI &api) {
     KillSlave(api, SIGKILL);
     AsNobody(api);
 
+    containers.clear();
     ExpectApiSuccess(api.List(containers));
     ExpectEq(containers.size(), 3);
     ExpectEq(containers[0], string("/"));

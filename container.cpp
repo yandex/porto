@@ -709,7 +709,7 @@ TError TContainer::PrepareMetaParent() {
                 return error;
             }
         }
-    } else if (state == EContainerState::Meta) {
+    } else if (state == EContainerState::Meta || state == EContainerState::Dead) {
         return TError::Success();
     } else if (state != EContainerState::Running) {
         return TError(EError::InvalidState, "invalid parent state " + ContainerStateName(state));

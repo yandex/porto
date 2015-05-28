@@ -1,10 +1,11 @@
+- PORTO_NAME - support namespaces
+- python: add wait
 - top: use new get
 - bind: follow links instead of realpath (fails when target doesn't exist)
 - net property: support external namespace
 - ? respawn = true - respawn only if exit_status != 0
 - fix container restoration: (try to) check if task is owned by porto
 - add gc of dead containers with lost events
-- porto can't restore parent/child (stopped) when parent is dead
 - find and fix bug with meta-containers
 - namespaces for volumes
 - support volume as root
