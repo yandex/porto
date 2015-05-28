@@ -2697,7 +2697,7 @@ static void TestData(TPortoAPI &api) {
     else
         ExpectApiSuccess(api.SetProperty(wget, "command", "bash -c 'dd if=/dev/urandom bs=4M count=1 of=/tmp/porto.tmp && sync'"));
     ExpectApiSuccess(api.Start(wget));
-    WaitContainer(api, wget);
+    WaitContainer(api, wget, 60);
 
     string v, rv;
     ExpectApiSuccess(api.GetData(wget, "exit_status", v));
@@ -3586,6 +3586,16 @@ static void TestPermissions(TPortoAPI &api) {
     AsRoot(api);
     ExpectApiSuccess(api.Destroy(name));
     AsNobody(api);
+
+    Say() << "Make sure we can't create child for parent with different uid/gid " << std::endl;
+    AsUser(api, binUser, binGroup);
+           ExpectApiSuccess(api.Create("a"));
+
+    AsUser(api, daemonUser, daemonGroup);
+           ExpectApiFailure(api.Create("a/b"), EError::Permission);
+
+    AsUser(api, binUser, binGroup);
+           ExpectApiSuccess(api.Destroy("a"));
 }
 
 static void WaitRespawn(TPortoAPI &api, const std::string &name, int expected, int maxTries = 10) {

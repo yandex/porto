@@ -145,6 +145,12 @@ TError TContainerHolder::Create(const std::string &name, const TCred &cred) {
     if (!parent && name != ROOT_CONTAINER)
         return TError(EError::InvalidValue, "invalid parent container");
 
+    if (parent && !parent->IsRoot() && !parent->IsPortoRoot()) {
+        TError error = parent->CheckPermission(cred);
+        if (error)
+            return error;
+    }
+
     uint16_t id;
     TError error = IdMap.Get(id);
     if (error)
