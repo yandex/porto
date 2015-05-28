@@ -4,7 +4,6 @@
 - bind: follow links instead of realpath (fails when target doesn't exist)
 - net property: support external namespace
 - ? respawn = true - respawn only if exit_status != 0
-- fix container restoration: (try to) check if task is owned by porto
 - add gc of dead containers with lost events
 - find and fix bug with meta-containers
 - namespaces for volumes

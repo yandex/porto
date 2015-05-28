@@ -131,7 +131,6 @@ class TTask: public TNonCopyable {
     TError ChildIsolateFs();
     TError EnableNet();
     TError IsolateNet(int childPid);
-    bool IsValid();
 
 public:
     TTask(std::shared_ptr<TTaskEnv> env,
@@ -164,6 +163,9 @@ public:
 
     TError GetPPid(pid_t &ppid) const;
     bool IsZombie() const;
+
+    bool HasCorrectParent();
+    bool HasCorrectFreezer();
 };
 
 TError TaskGetLastCap();

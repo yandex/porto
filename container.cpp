@@ -1354,24 +1354,29 @@ TError TContainer::Restore(const kv::TNode &node) {
                       Prop->Get<std::string>(P_STDOUT_PATH),
                       Prop->Get<std::string>(P_STDERR_PATH));
 
-        pid_t ppid;
-        TError err = Task->GetPPid(ppid);
-        if (err) {
-            L() << "Can't get ppid of restored task: " << err << std::endl;
-            LostAndRestored = true;
-        } else if (ppid != getppid()) {
-            L() << "Container " << GetName()
-                << " seems to be reparented to init ("
-                << ppid << " != " << getppid() << ")"
-                << std::endl;
-            LostAndRestored = true;
-        } else {
-            // TODO: check if process really belongs to porto
+        if (Task->HasCorrectParent()) {
+            if (Task->IsZombie()) {
+                    L() << "Task is zombie and belongs to porto" << std::endl;
+            } else {
+                if (Task->HasCorrectFreezer()) {
+                    L() << "Task is running and belongs to porto" << std::endl;
 
-            L() << "Container " << GetName()
-                << " seems to be not reparented ("
-                << ppid << " == " << getppid() << ")"
-                << std::endl;
+                    TError error = Task->FixCgroups();
+                    if (error)
+                        L_WRN() << "Can't fix cgroups: " << error << std::endl;
+                } else {
+                    L_ERR() << "Task is running, belongs to porto but doesn't have valid freezer" << std::endl;
+                    LostAndRestored = true;
+                }
+            }
+        } else {
+            if (Task->HasCorrectFreezer()) {
+                L() << "Task is dead or doesn't belong to porto" << std::endl;
+                LostAndRestored = true;
+            } else {
+                L() << "Task is not running or has been reparented" << std::endl;
+                LostAndRestored = true;
+            }
         }
 
         auto state = Data->Get<std::string>(D_STATE);

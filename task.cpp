@@ -926,22 +926,35 @@ bool TTask::IsZombie() const {
     return false;
 }
 
-bool TTask::IsValid() {
-    if (IsZombie())
+bool TTask::HasCorrectParent() {
+    pid_t ppid;
+    TError error = GetPPid(ppid);
+    if (error) {
+        L() << "Can't get ppid of restored task: " << error << std::endl;
         return false;
+    }
 
+    if (ppid != getppid()) {
+        L() << "Invalid ppid of restored task: " << ppid << " != " << getppid() << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+bool TTask::HasCorrectFreezer() {
     // if task belongs to different freezer cgroup we don't
     // restore it since pids may have wrapped or previous kvs state
     // is too old
     map<string, string> cgmap;
     TError error = GetTaskCgroups(Pid, cgmap);
     if (error) {
-        L_WRN() << "Can't read " << Pid << " cgroups, don't restore: " << error << std::endl;
+        L() << "Can't read " << Pid << " cgroups of restored task: " << error << std::endl;
         return false;
     } else {
         auto cg = LeafCgroups.at(freezerSubsystem);
         if (cg && cg->Relpath() != cgmap["freezer"]) {
-            L_WRN() << "Unexpected freezer cgroup for " << Pid << " (" << cg->Path() << " != " << cgmap["freezer"] << "), don't restore" << std::endl;
+            L_WRN() << "Unexpected freezer cgroup of restored task  " << Pid << ": " << cg->Path() << " != " << cgmap["freezer"] << std::endl;
             Pid = 0;
             State = Stopped;
             return false;
@@ -998,12 +1011,6 @@ void TTask::Restore(int pid_,
         error = stderrLink.ReadLink(Env->StderrPath);
         if (error)
             L_ERR() << "Can't restore stderr: " << error << std::endl;
-
-        if (IsValid()) {
-            error = FixCgroups();
-            if (error)
-                L_WRN() << "Can't fix cgroups: " << error << std::endl;
-        }
     }
 }
 
