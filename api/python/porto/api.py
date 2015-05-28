@@ -65,6 +65,7 @@ class _RPC(object):
         self.lock = threading.Lock()
         self.socket_path = socket_path
         self.timeout = timeout
+        self._timeout = timeout
 
     def connect(self):
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -89,12 +90,17 @@ class _RPC(object):
         except socket.timeout:
             raise exceptions.SocketTimeout("Got timeout %d" % self.timeout)
 
-    def call(self, request):
+    def call(self, request, timeout):
         data = request.SerializeToString()
         hdr = bytearray()
         _EncodeVarint(hdr.append, len(data))
 
         with self.lock:
+            if timeout != self.timeout:
+                self.sock.settimeout(timeout)
+                self._timeout = self.timeout
+                self.timeout = timeout
+
             self._sendall(hdr)
             self._sendall(data)
 
@@ -108,6 +114,9 @@ class _RPC(object):
             length = _DecodeVarint32(buf, 0)
             resp = rpc_pb2.TContainerResponse()
             buf += self._recv(length[0])
+
+            self.timeout = self._timeout
+            self.sock.settimeout(self.timeout)
 
         resp.ParseFromString(buf[length[1]:])
 
@@ -124,44 +133,44 @@ class _RPC(object):
     def Create(self, name):
         request = rpc_pb2.TContainerRequest()
         request.create.name = name
-        self.call(request)
+        self.call(request, self.timeout)
 
     def Destroy(self, name):
         request = rpc_pb2.TContainerRequest()
         request.destroy.name = name
-        self.call(request)
+        self.call(request, self.timeout)
 
     def Start(self, name):
         request = rpc_pb2.TContainerRequest()
         request.start.name = name
-        self.call(request)
+        self.call(request, self.timeout)
 
     def Stop(self, name):
         request = rpc_pb2.TContainerRequest()
         request.stop.name = name
-        self.call(request)
+        self.call(request, self.timeout)
 
     def Kill(self, name, sig):
         request = rpc_pb2.TContainerRequest()
         request.kill.name = name
         request.kill.sig = sig
-        self.call(request)
+        self.call(request, self.timeout)
 
     def Pause(self, name):
         request = rpc_pb2.TContainerRequest()
         request.pause.name = name
-        self.call(request)
+        self.call(request, self.timeout)
 
     def Resume(self, name):
         request = rpc_pb2.TContainerRequest()
         request.resume.name = name
-        self.call(request)
+        self.call(request, self.timeout)
 
     def GetProperty(self, name, property):
         request = rpc_pb2.TContainerRequest()
         request.getProperty.name = name
         request.getProperty.property = property
-        res = self.call(request).getProperty.value
+        res = self.call(request, self.timeout).getProperty.value
         if res == 'false':
             return False
         elif res == 'true':
@@ -182,13 +191,13 @@ class _RPC(object):
         request.setProperty.name = name
         request.setProperty.property = property
         request.setProperty.value = value
-        self.call(request)
+        self.call(request, self.timeout)
 
     def GetData(self, name, data):
         request = rpc_pb2.TContainerRequest()
         request.getData.name = name
         request.getData.data = data
-        res = self.call(request).getData.value
+        res = self.call(request, self.timeout).getData.value
         if res == 'false':
             return False
         elif res == 'true':
@@ -199,7 +208,7 @@ class _RPC(object):
         request = rpc_pb2.TContainerRequest()
         request.get.name.extend(name)
         request.get.variable.extend(var)
-        resp = self.call(request)
+        resp = self.call(request, self.timeout)
         if resp.error != rpc_pb2.Success:
             raise exceptions.EError.Create(resp.error, resp.errorMsg)
 
@@ -224,13 +233,20 @@ class _RPC(object):
     def Plist(self):
         request = rpc_pb2.TContainerRequest()
         request.propertyList.CopyFrom(rpc_pb2.TContainerPropertyListRequest())
-        return [item.name for item in self.call(request).propertyList.list]
+        return [item.name for item in self.call(request, self.timeout).propertyList.list]
 
     def Dlist(self):
         request = rpc_pb2.TContainerRequest()
         request.dataList.CopyFrom(rpc_pb2.TContainerDataListRequest())
-        return [item.name for item in self.call(request).dataList.list]
+        return [item.name for item in self.call(request, self.timeout).dataList.list]
 
+    def Wait(self, containers, timeout=None):
+        request = rpc_pb2.TContainerRequest()
+        request.wait.name.extend(containers)
+        resp = self.call(request, timeout)
+        if resp.error != rpc_pb2.Success:
+            raise exceptions.EError.Create(resp.error, resp.errorMsg)
+        return resp.wait.name
 
 class Container(object):
     def __init__(self, rpc, name):
@@ -270,6 +286,9 @@ class Container(object):
 
     def GetData(self, data):
         return self.rpc.GetData(self.name, data)
+
+    def Wait(self, timeout=None):
+        return self.rpc.Wait([self.name], timeout)
 
     def __str__(self):
         return 'Container `{}`'.format(self.name)
@@ -342,6 +361,7 @@ class Connection(object):
 
 
 # Example:
+# from porto import *
 # conn = Connection()
 # conn.connect()
 # print conn.Create('test')
@@ -354,7 +374,7 @@ class Connection(object):
 #
 # container = conn.Create('test2')
 # print container.GetProperty('command')
-# print container.GetData('/', 'state')
+# print container.GetData('state')
 # print container.Get(['command', 'state'])
 # conn.Destroy(container)
 # conn.disconnect()
