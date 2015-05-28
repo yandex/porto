@@ -774,7 +774,10 @@ class TExecCmd : public ICmd {
 public:
     TExecCmd(TPortoAPI *api) : ICmd(api, "exec", 2, "<container> command=<command> [properties]", "create pty, execute and wait for command in container") {}
 
-    void Signal(int sig) { Interrupted = 1; InterruptedSignal = sig; }
+    void Signal(int sig) override {
+        Interrupted = 1;
+        InterruptedSignal = sig;
+    }
 
     int SwithToNonCanonical(int fd) {
         if (!isatty(fd))
@@ -821,6 +824,15 @@ public:
         }
 
         return fd;
+    }
+
+    void HandleSignal() {
+        if (Interrupted) {
+            destroyContainer();
+            ResetAllSignalHandlers();
+            raise(InterruptedSignal);
+            exit(EXIT_FAILURE);
+        }
     }
 
     int Execute(int argc, char *argv[]) {
@@ -952,6 +964,8 @@ public:
 
         bool hangup = false;
         while (!hangup) {
+            HandleSignal();
+
             ret = poll(fds.data(), fds.size(), -1);
             if (ret < 0)
                 break;
@@ -974,22 +988,15 @@ public:
             }
         }
 
-        string state;
-        int loop = 1000;
-        do {
-            usleep(1000 * 1000);
-            ret = Api->GetData(containerName, "state", state);
-            if (ret) {
-                PrintError("Can't get state");
-                return EXIT_FAILURE;
-            }
+        HandleSignal();
 
-            if (Interrupted) {
-                ResetAllSignalHandlers();
-                raise(InterruptedSignal);
-                exit(EXIT_FAILURE);
-            }
-        } while (loop-- && state == "running");
+        std::string tmp;
+        ret = Api->Wait({ containerName }, tmp);
+        HandleSignal();
+        if (ret) {
+            PrintError("Can't get state");
+            return EXIT_FAILURE;
+        }
 
         string s;
         ret = Api->GetData(containerName, "exit_status", s);

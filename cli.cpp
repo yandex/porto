@@ -75,6 +75,11 @@ bool ICmd::ValidArgs(int argc, char *argv[]) {
     return true;
 }
 
+void ICmd::Signal(int sig) {
+    ResetAllSignalHandlers();
+    raise(sig);
+}
+
 static map<string, ICmd *> commands;
 
 THelpCmd::THelpCmd(TPortoAPI *api, bool usagePrintData) : ICmd(api, "help", 1, "[command]", "print help message for command"), UsagePrintData(usagePrintData) {}
@@ -206,11 +211,11 @@ static int TryExec(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    currentCmd = cmd;
     return cmd->Execute(argc - 2, argv + 2);
 }
 
 void SigInt(int sig) {
-    (void)RegisterSignal(sig, SIG_DFL);
     currentCmd->Signal(sig);
 }
 
@@ -240,6 +245,7 @@ int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
     // in case client closes pipe we are writing to in the protobuf code
     (void)RegisterSignal(SIGPIPE, SIG_IGN);
     (void)RegisterSignal(SIGINT, SigInt);
+    (void)RegisterSignal(SIGTERM, SigInt);
 
     try {
         return TryExec(argc, argv);

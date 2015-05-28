@@ -25,7 +25,7 @@ public:
     void PrintError(const std::string &str);
     bool ValidArgs(int argc, char *argv[]);
     virtual int Execute(int argc, char *argv[]) = 0;
-    virtual void Signal(int sig) { Interrupted = 1; InterruptedSignal = sig; }
+    virtual void Signal(int sig);
 };
 
 class THelpCmd : public ICmd {
