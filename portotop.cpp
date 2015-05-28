@@ -824,7 +824,7 @@ public:
         int ret = api->GetData(SelectedContainer(), "state", state);
         if (ret)
             return ret;
-        if (state == "running" || state == "dead")
+        if (state == "running" || state == "dead" || state == "meta")
             return api->Stop(SelectedContainer());
         else
             return api->Start(SelectedContainer());
