@@ -252,9 +252,9 @@ static TError GetContainer(TContext &context,
 
         std::string name;
         std::shared_ptr<TContainer> container;
-        TError error = client->GetContainer()->AbsoluteName(relname, name, true);
-        if (!error)
-            error = context.Cholder->Get(name, container);
+        TError containerError = client->GetContainer()->AbsoluteName(relname, name, true);
+        if (!containerError)
+            containerError = context.Cholder->Get(name, container);
 
         auto entry = get->add_list();
         entry->set_name(relname);
@@ -265,6 +265,7 @@ static TError GetContainer(TContext &context,
             auto keyval = entry->add_keyval();
             std::string value;
 
+            TError error = containerError;
             if (!error) {
                 std::string name = var, idx;
                 TContainer::ParsePropertyName(name, idx);

@@ -603,10 +603,10 @@ static void TestGet(TPortoAPI &api) {
 
     name.push_back("a");
     name.push_back("b");
+    variable.push_back("invalid");
     variable.push_back("user");
     variable.push_back("command");
     variable.push_back("state");
-    variable.push_back("invalid");
     ExpectApiSuccess(api.Get(name, variable, result));
 
     ExpectEq(result.size(), 2);
