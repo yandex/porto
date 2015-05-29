@@ -17,9 +17,6 @@ using std::set;
 using std::shared_ptr;
 using std::vector;
 
-// TODO: make lock per key-value node
-static std::mutex kvalueLock;
-
 // use some forbidden character to represent slash in container name
 const char SLASH_SUBST = '+';
 
@@ -37,10 +34,6 @@ std::string TKeyValueStorage::FromPath(const std::string &path) {
         if (s[i] == SLASH_SUBST)
             s[i] = '/';
     return s;
-}
-
-std::mutex &TKeyValueNode::GetLock() const {
-    return kvalueLock;
 }
 
 void TKeyValueNode::Merge(kv::TNode &node, kv::TNode &next) const {
@@ -67,7 +60,7 @@ void TKeyValueNode::Merge(kv::TNode &node, kv::TNode &next) const {
 #define __class__ (std::string(typeid(*this).name()))
 
 TError TKeyValueNode::Load(kv::TNode &node) const {
-    std::lock_guard<std::mutex> lock(GetLock());
+    std::lock_guard<std::mutex> lock(Storage->GetLock());
 
     int fd = open(Path.ToString().c_str(), O_RDONLY | O_CLOEXEC);
     node.Clear();
@@ -90,7 +83,7 @@ TError TKeyValueNode::Load(kv::TNode &node) const {
 }
 
 TError TKeyValueNode::Append(const kv::TNode &node) const {
-    std::lock_guard<std::mutex> lock(GetLock());
+    std::lock_guard<std::mutex> lock(Storage->GetLock());
 
     int fd = open(Path.ToString().c_str(), O_CREAT | O_WRONLY | O_CLOEXEC, 0755);
     TError error;
@@ -115,7 +108,7 @@ TError TKeyValueNode::Append(const kv::TNode &node) const {
 }
 
 TError TKeyValueNode::Save(const kv::TNode &node) const {
-    std::lock_guard<std::mutex> lock(GetLock());
+    std::lock_guard<std::mutex> lock(Storage->GetLock());
 
     int fd = open(Path.ToString().c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0755);
     TError error;
@@ -131,7 +124,7 @@ TError TKeyValueNode::Save(const kv::TNode &node) const {
 }
 
 TError TKeyValueNode::Remove() const {
-    std::lock_guard<std::mutex> lock(GetLock());
+    std::lock_guard<std::mutex> lock(Storage->GetLock());
 
     TFile node(Path);
     return node.Remove();
@@ -180,18 +173,18 @@ TError TKeyValueStorage::MountTmpfs() {
     return error;
 }
 
-std::shared_ptr<TKeyValueNode> TKeyValueStorage::GetNode(const std::string &path) const {
+std::shared_ptr<TKeyValueNode> TKeyValueStorage::GetNode(const std::string &path) {
     PORTO_ASSERT(path.length() > DirnameLen);
-    return std::make_shared<TKeyValueNode>(path, path.substr(DirnameLen));
+    return std::make_shared<TKeyValueNode>(shared_from_this(), path, path.substr(DirnameLen));
 }
 
-std::shared_ptr<TKeyValueNode> TKeyValueStorage::GetNode(uint16_t id) const {
+std::shared_ptr<TKeyValueNode> TKeyValueStorage::GetNode(uint16_t id) {
     TPath path = ToPath(std::to_string(id));
     PORTO_ASSERT(path.ToString().length() > DirnameLen);
-    return std::make_shared<TKeyValueNode>(path, path.ToString().substr(DirnameLen));
+    return std::make_shared<TKeyValueNode>(shared_from_this(), path, path.ToString().substr(DirnameLen));
 }
 
-TError TKeyValueStorage::ListNodes(std::vector<std::shared_ptr<TKeyValueNode>> &list) const {
+TError TKeyValueStorage::ListNodes(std::vector<std::shared_ptr<TKeyValueNode>> &list) {
     vector<string> tmp;
     TFolder f(Tmpfs.GetMountpoint());
     TError error = f.Items(EFileType::Regular, tmp);
@@ -204,7 +197,7 @@ TError TKeyValueStorage::ListNodes(std::vector<std::shared_ptr<TKeyValueNode>> &
     return TError::Success();
 }
 
-TError TKeyValueStorage::Dump() const {
+TError TKeyValueStorage::Dump() {
     std::vector<std::shared_ptr<TKeyValueNode>> nodes;
 
     TError error = ListNodes(nodes);
