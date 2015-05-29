@@ -541,16 +541,23 @@ static int TuneLimits() {
     return EXIT_SUCCESS;
 }
 
+static TContext *globalContext;
+
 static void preFork(void) {
-    //NetworkPreFork();
+    if (globalContext)
+        globalContext->Net->GetLock().lock();
 }
 
 static void postParentFork(void) {
-    //NetworkPostFork();
+    if (globalContext)
+        globalContext->Net->GetLock().unlock();
 }
 
 static void postChildFork(void) {
-    //NetworkPostFork();
+    if (globalContext) {
+        globalContext->Net->GetLock().unlock();
+        globalContext = nullptr;
+    }
     TLogger::ClearBuffer();
 }
 
@@ -609,6 +616,7 @@ static int SlaveMain() {
         L_ERR() << "Can't adjust OOM score: " << error << std::endl;
 
     TContext context;
+    globalContext = &context;
     try {
         TCgroupSnapshot cs;
         error = cs.Create();
@@ -660,6 +668,7 @@ static int SlaveMain() {
 
     DaemonShutdown(false, ret);
     context.Destroy();
+    globalContext = nullptr;
 
     return ret;
 }
