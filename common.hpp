@@ -28,6 +28,8 @@ protected:
 private:
     TNonCopyable(TNonCopyable const&) = delete;
     TNonCopyable& operator= (TNonCopyable const&) = delete;
+    TNonCopyable(TNonCopyable const&&) = delete;
+    TNonCopyable& operator= (TNonCopyable const&&) = delete;
 };
 
 const std::string ROOT_CONTAINER = "/";
