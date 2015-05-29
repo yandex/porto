@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <mutex>
 
 #include "common.hpp"
 #include "kv.pb.h"
@@ -24,6 +25,7 @@ public:
     TError Create() const;
     const TPath &GetPath() const { return Path; }
     const std::string &GetName() const { return Name; }
+    std::mutex &GetLock() const;
 };
 
 class TKeyValueStorage : public TNonCopyable {

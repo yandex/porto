@@ -1,5 +1,4 @@
 - PORTO_NAME - support namespaces
-- python: add wait
 - top: use new get
 - bind: follow links instead of realpath (fails when target doesn't exist)
 - net property: support external namespace

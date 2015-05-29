@@ -17,6 +17,9 @@ using std::set;
 using std::shared_ptr;
 using std::vector;
 
+// TODO: make lock per key-value node
+static std::mutex kvalueLock;
+
 // use some forbidden character to represent slash in container name
 const char SLASH_SUBST = '+';
 
@@ -34,6 +37,10 @@ std::string TKeyValueStorage::FromPath(const std::string &path) {
         if (s[i] == SLASH_SUBST)
             s[i] = '/';
     return s;
+}
+
+std::mutex &TKeyValueNode::GetLock() const {
+    return kvalueLock;
 }
 
 void TKeyValueNode::Merge(kv::TNode &node, kv::TNode &next) const {
@@ -60,6 +67,8 @@ void TKeyValueNode::Merge(kv::TNode &node, kv::TNode &next) const {
 #define __class__ (std::string(typeid(*this).name()))
 
 TError TKeyValueNode::Load(kv::TNode &node) const {
+    std::lock_guard<std::mutex> lock(GetLock());
+
     int fd = open(Path.ToString().c_str(), O_RDONLY | O_CLOEXEC);
     node.Clear();
     TError error;
@@ -81,6 +90,8 @@ TError TKeyValueNode::Load(kv::TNode &node) const {
 }
 
 TError TKeyValueNode::Append(const kv::TNode &node) const {
+    std::lock_guard<std::mutex> lock(GetLock());
+
     int fd = open(Path.ToString().c_str(), O_CREAT | O_WRONLY | O_CLOEXEC, 0755);
     TError error;
 
@@ -104,6 +115,8 @@ TError TKeyValueNode::Append(const kv::TNode &node) const {
 }
 
 TError TKeyValueNode::Save(const kv::TNode &node) const {
+    std::lock_guard<std::mutex> lock(GetLock());
+
     int fd = open(Path.ToString().c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0755);
     TError error;
     try {
@@ -118,6 +131,8 @@ TError TKeyValueNode::Save(const kv::TNode &node) const {
 }
 
 TError TKeyValueNode::Remove() const {
+    std::lock_guard<std::mutex> lock(GetLock());
+
     TFile node(Path);
     return node.Remove();
 }
