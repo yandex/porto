@@ -34,7 +34,7 @@ void TConfig::LoadDefaults() {
     config().mutable_master_log()->set_perm(0644);
 
     config().mutable_rpc_sock()->mutable_file()->set_path("/run/portod.socket");
-    config().mutable_rpc_sock()->mutable_file()->set_perm(0660);
+    config().mutable_rpc_sock()->mutable_file()->set_perm(0666);
     config().mutable_rpc_sock()->set_group("porto");
 
     config().mutable_log()->set_verbose(false);

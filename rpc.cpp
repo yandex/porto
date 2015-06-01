@@ -47,12 +47,23 @@ static void SendReply(std::shared_ptr<TClient> client,
     }
 }
 
+static TError CheckRequestPermissions(std::shared_ptr<TClient> client) {
+    if (client->Readonly())
+        return TError(EError::Permission, "Client is not a member of porto group");
+
+    return TError::Success();
+}
+
 static TError CreateContainer(TContext &context,
                               const rpc::TContainerCreateRequest &req,
                               rpc::TContainerResponse &rsp,
                               std::shared_ptr<TClient> client) {
+    TError err = CheckRequestPermissions(client);
+    if (err)
+        return err;
+
     std::string name;
-    TError err = client->GetContainer()->AbsoluteName(req.name(), name);
+    err = client->GetContainer()->AbsoluteName(req.name(), name);
     if (err)
         return err;
     return context.Cholder->Create(name, client->GetCred());
@@ -62,8 +73,12 @@ static TError DestroyContainer(TContext &context,
                                const rpc::TContainerDestroyRequest &req,
                                rpc::TContainerResponse &rsp,
                                std::shared_ptr<TClient> client) {
+    TError err = CheckRequestPermissions(client);
+    if (err)
+        return err;
+
     std::string name;
-    TError err = client->GetContainer()->AbsoluteName(req.name(), name);
+    err = client->GetContainer()->AbsoluteName(req.name(), name);
     if (err)
         return err;
 
@@ -86,8 +101,12 @@ static TError StartContainer(TContext &context,
                              const rpc::TContainerStartRequest &req,
                              rpc::TContainerResponse &rsp,
                              std::shared_ptr<TClient> client) {
+    TError err = CheckRequestPermissions(client);
+    if (err)
+        return err;
+
     std::string name;
-    TError err = client->GetContainer()->AbsoluteName(req.name(), name);
+    err = client->GetContainer()->AbsoluteName(req.name(), name);
     if (err)
         return err;
     std::shared_ptr<TContainer> container;
@@ -106,8 +125,12 @@ static TError StopContainer(TContext &context,
                             const rpc::TContainerStopRequest &req,
                             rpc::TContainerResponse &rsp,
                             std::shared_ptr<TClient> client) {
+    TError err = CheckRequestPermissions(client);
+    if (err)
+        return err;
+
     std::string name;
-    TError err = client->GetContainer()->AbsoluteName(req.name(), name);
+    err = client->GetContainer()->AbsoluteName(req.name(), name);
     if (err)
         return err;
     std::shared_ptr<TContainer> container;
@@ -126,8 +149,12 @@ static TError PauseContainer(TContext &context,
                              const rpc::TContainerPauseRequest &req,
                              rpc::TContainerResponse &rsp,
                              std::shared_ptr<TClient> client) {
+    TError err = CheckRequestPermissions(client);
+    if (err)
+        return err;
+
     std::string name;
-    TError err = client->GetContainer()->AbsoluteName(req.name(), name);
+    err = client->GetContainer()->AbsoluteName(req.name(), name);
     if (err)
         return err;
     std::shared_ptr<TContainer> container;
@@ -146,8 +173,12 @@ static TError ResumeContainer(TContext &context,
                               const rpc::TContainerResumeRequest &req,
                               rpc::TContainerResponse &rsp,
                               std::shared_ptr<TClient> client) {
+    TError err = CheckRequestPermissions(client);
+    if (err)
+        return err;
+
     std::string name;
-    TError err = client->GetContainer()->AbsoluteName(req.name(), name);
+    err = client->GetContainer()->AbsoluteName(req.name(), name);
     if (err)
         return err;
     std::shared_ptr<TContainer> container;
@@ -199,8 +230,12 @@ static TError SetContainerProperty(TContext &context,
                                    const rpc::TContainerSetPropertyRequest &req,
                                    rpc::TContainerResponse &rsp,
                                    std::shared_ptr<TClient> client) {
+    TError err = CheckRequestPermissions(client);
+    if (err)
+        return err;
+
     std::string name;
-    TError err = client->GetContainer()->AbsoluteName(req.name(), name);
+    err = client->GetContainer()->AbsoluteName(req.name(), name);
     if (err)
         return err;
     std::shared_ptr<TContainer> container;
@@ -235,10 +270,10 @@ static TError GetContainerData(TContext &context,
     return error;
 }
 
-static TError GetContainer(TContext &context,
-                           const rpc::TContainerGetRequest &req,
-                           rpc::TContainerResponse &rsp,
-                           std::shared_ptr<TClient> client) {
+static TError GetContainerCombined(TContext &context,
+                                   const rpc::TContainerGetRequest &req,
+                                   rpc::TContainerResponse &rsp,
+                                   std::shared_ptr<TClient> client) {
     if (!req.variable_size())
         return TError(EError::InvalidValue, "Properties/data are not specified");
 
@@ -347,8 +382,12 @@ static TError Kill(TContext &context,
                    const rpc::TContainerKillRequest &req,
                    rpc::TContainerResponse &rsp,
                    std::shared_ptr<TClient> client) {
+    TError err = CheckRequestPermissions(client);
+    if (err)
+        return err;
+
     std::string name;
-    TError err = client->GetContainer()->AbsoluteName(req.name(), name);
+    err = client->GetContainer()->AbsoluteName(req.name(), name);
     if (err)
         return err;
     std::shared_ptr<TContainer> container;
@@ -417,8 +456,12 @@ static TError CreateVolume(TContext &context,
                            const rpc::TVolumeCreateRequest &req,
                            rpc::TContainerResponse &rsp,
                            std::shared_ptr<TClient> client) {
+    TError error = CheckRequestPermissions(client);
+    if (error)
+        return error;
+
     std::shared_ptr<TResource> resource;
-    TError error = context.Vholder->GetResource(StringTrim(req.source()), resource);
+    error = context.Vholder->GetResource(StringTrim(req.source()), resource);
     if (error)
         return error;
 
@@ -461,9 +504,13 @@ static TError DestroyVolume(TContext &context,
                             const rpc::TVolumeDestroyRequest &req,
                             rpc::TContainerResponse &rsp,
                             std::shared_ptr<TClient> client) {
+    TError error = CheckRequestPermissions(client);
+    if (error)
+        return error;
+
     auto volume = context.Vholder->Get(StringTrim(req.path()));
     if (volume && volume->IsValid()) {
-        TError error = volume->CheckPermission(client->GetCred());
+        error = volume->CheckPermission(client->GetCred());
         if (error)
             return error;
 
@@ -549,7 +596,7 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
         else if (req.has_getdata())
             error = GetContainerData(context, req.getdata(), rsp, client);
         else if (req.has_get())
-            error = GetContainer(context, req.get(), rsp, client);
+            error = GetContainerCombined(context, req.get(), rsp, client);
         else if (req.has_start())
             error = StartContainer(context, req.start(), rsp, client);
         else if (req.has_stop())

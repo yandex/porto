@@ -47,6 +47,7 @@ public:
     }
 
     std::shared_ptr<TContainerWaiter> Waiter;
+    bool Readonly() { return !MemberOfPortoGroup && !Cred.IsPrivileged(); }
 
 private:
     int Fd;
@@ -54,7 +55,9 @@ private:
     TCred Cred;
     std::string Comm;
     size_t RequestStartMs;
+    bool MemberOfPortoGroup = false;
 
+    TError CheckPortoMembership();
     TError IdentifyContainer(TContainerHolder &holder);
     std::weak_ptr<TContainer> Container;
 

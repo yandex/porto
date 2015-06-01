@@ -58,7 +58,13 @@ TError TClient::Identify(TContainerHolder &holder, bool full) {
             Pid = cr.pid;
             Comm = comm;
 
-            TError err = IdentifyContainer(holder);
+            TError err = CheckPortoMembership();
+            if (err) {
+                L_WRN() << "Can't check porto membership of pid " << cr.pid
+                        << " : " << err << std::endl;
+            }
+
+            err = IdentifyContainer(holder);
             if (err) {
                 L_WRN() << "Can't identify container of pid " << cr.pid
                         << " : " << err << std::endl;
@@ -76,6 +82,45 @@ TError TClient::Identify(TContainerHolder &holder, bool full) {
     } else {
         return TError(EError::Unknown, "Can't identify client (getsockopt() failed)");
     }
+}
+
+TError TClient::CheckPortoMembership() {
+    TFile f("/proc/" + std::to_string(Pid) + "/status");
+
+    std::vector<std::string> lines;
+    TError error = f.AsLines(lines);
+    if (error)
+        return error;
+
+    std::vector<int> groups;
+    for (auto &l : lines)
+        if (l.compare(0, 8, "Groups:\t") == 0) {
+            std::vector<std::string> groupsStr;
+
+            error = SplitString(l.substr(8), ' ', groupsStr);
+            if (error)
+                return error;
+
+            for (auto g : groupsStr) {
+                int group;
+                error = StringToInt(g, group);
+                if (error)
+                    return error;
+
+                groups.push_back(group);
+            }
+
+            break;
+        }
+
+    TGroup porto("porto");
+    error = porto.Load();
+    if (error)
+        return error;
+
+    MemberOfPortoGroup = std::find(groups.begin(), groups.end(), porto.GetId()) != groups.end();
+
+    return TError::Success();
 }
 
 TError TClient::IdentifyContainer(TContainerHolder &holder) {
