@@ -4439,7 +4439,7 @@ static void TestVolumeFiles(TPortoAPI &api, const std::string &path) {
 }
 
 static void TestVolumeRecovery(TPortoAPI &api) {
-    Say() << "Make sure porto removes leftover resources/volumes" << std::endl;
+    Say() << "Make sure porto removes leftover volumes" << std::endl;
     std::string a = "/tmp/volume_c", b = "/tmp/volume_d";
     std::string tar = "/tmp/porto.tar";
 
@@ -4451,21 +4451,16 @@ static void TestVolumeRecovery(TPortoAPI &api) {
     ExpectApiSuccess(api.CreateVolume(a, tar, "0", ""));
     ExpectApiSuccess(api.CreateVolume(b, tar, "2g", ""));
 
-    TFolder resource(config().volumes().resource_dir() + "/leftover_resource");
     TFolder volume(config().volumes().volume_dir() + "/leftover_volume");
     AsRoot(api);
-    resource.Remove(true);
-    ExpectSuccess(resource.Create());
     volume.Remove(true);
     ExpectSuccess(volume.Create());
     AsNobody(api);
 
-    ExpectEq(resource.Exists(), true);
     ExpectEq(volume.Exists(), true);
 
     KillSlave(api, SIGKILL);
 
-    ExpectEq(resource.Exists(), false);
     ExpectEq(volume.Exists(), false);
 
     Say() << "Make sure porto preserves mounted loop/overlayfs" << std::endl;

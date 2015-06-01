@@ -83,12 +83,6 @@ public:
             }
         }
 
-        error = Volume->GetResource()->Copy(Volume->GetPath());
-        if (error) {
-            (void)Deconstruct();
-            return error;
-        }
-
         // fix permissions after extracting
         error = Volume->GetPath().Chown(Volume->GetCred().Uid, Volume->GetCred().Gid);
         if (error) {
@@ -144,7 +138,6 @@ public:
         OvlPrivate = TPath(config().volumes().volume_dir()).AddComponent(id);
         OvlUpper = OvlPrivate.AddComponent("upper");
         OvlWork = OvlPrivate.AddComponent("work");
-        OvlLower = Volume->GetResource()->GetPath();
         OvlMount = TMount("overlay", Volume->GetPath(), "overlay", {"lowerdir=" + OvlLower.ToString(), "upperdir=" + OvlUpper.ToString(), "workdir=" + OvlWork.ToString() });
         return TError::Success();
     }
@@ -205,12 +198,6 @@ public:
         error = OvlWork.Chown(Volume->GetCred());
         if (error)
             return error;
-
-        error = Volume->GetResource()->Create();
-        if (error) {
-            (void)Deconstruct();
-            return error;
-        }
 
         error = OvlMount.Mount();
         if (error) {
@@ -307,12 +294,6 @@ TError TVolume::Prepare() {
     else
         Impl = std::unique_ptr<TVolumeImpl>(new TVolumeLoopImpl(shared_from_this()));
 
-    PORTO_ASSERT(Resource);
-
-    TError error = Resource->Prepare();
-    if (error)
-        return error;
-
     return TError::Success();
 }
 
@@ -333,7 +314,6 @@ TError TVolume::ParseQuota(const std::string &quota) {
 
 TError TVolume::Create(std::shared_ptr<TKeyValueStorage> storage,
                        const TPath &path,
-                       std::shared_ptr<TResource> resource,
                        const std::string &quota,
                        const std::string &flags) {
     uint16_t id;
@@ -351,14 +331,10 @@ TError TVolume::Create(std::shared_ptr<TKeyValueStorage> storage,
         return error;
 
     KvNode = storage->GetNode(id);
-    Resource = resource;
     Data = std::make_shared<TValueMap>(KvNode);
     RegisterVolumeProperties(Data);
 
     error = Data->Set<std::string>(V_PATH, path.ToString());
-    if (error)
-        return error;
-    error = Data->Set<std::string>(V_SOURCE, Resource->GetSource().ToString());
     if (error)
         return error;
     error = Data->Set<std::string>(V_QUOTA, quota);
@@ -439,10 +415,6 @@ TError TVolume::CheckPermission(const TCred &ucred) const {
     return TError(EError::Permission, "Permission error");
 }
 
-const std::string TVolume::GetSource() const {
-    return Resource->GetSource().ToString();
-}
-
 TError TVolume::Destroy() {
     if (Holder)
         Holder->Remove(shared_from_this());
@@ -474,10 +446,6 @@ TError TVolume::LoadFromStorage() {
         return TError(EError::Unknown, "Invalid volume");
 
     error = Holder->IdMap.GetAt((uint16_t)Data->Get<int>(V_ID));
-    if (error)
-        return error;
-
-    error = Holder->GetResource(Data->Get<std::string>(V_SOURCE), Resource);
     if (error)
         return error;
 
@@ -545,13 +513,6 @@ TError TVolumeHolder::RestoreFromStorage() {
         L() << "Volume " << v->GetPath() << " restored" << std::endl;
     }
 
-    L_ACT() << "Remove stale resources..." << std::endl;
-    RemoveIf(config().volumes().resource_dir(),
-             EFileType::Directory,
-             [&](const std::string &name, const TPath &path) {
-                return Resources.find(path) == Resources.end();
-             });
-
     L_ACT() << "Remove stale volumes..." << std::endl;
     RemoveIf(config().volumes().volume_dir(),
              EFileType::Directory,
@@ -589,99 +550,4 @@ void TVolumeHolder::Destroy() {
         if (error)
             L_ERR() << "Can't destroy volume " << name << ": " << error << std::endl;
     }
-}
-
-TError TVolumeHolder::GetResource(const TPath &source, std::shared_ptr<TResource> &resource) {
-    if (!source.ToString().length() || source.ToString()[0] != '/')
-        return TError(EError::InvalidValue, "Invalid source");
-
-    if (!source.Exists())
-        return TError(EError::InvalidValue, "Source doesn't exist");
-
-    if (source.GetType() != EFileType::Regular)
-        return TError(EError::InvalidValue, "Source isn't a regular file");
-
-    resource = nullptr;
-    auto weak = Resources.find(source.ToString());
-    if (weak != Resources.end()) {
-        resource = weak->second.lock();
-        if (!resource)
-            Resources.erase(source.ToString());
-    }
-
-    if (!resource) {
-        resource = std::make_shared<TResource>(source);
-        Resources[source.ToString()] = resource;
-    }
-
-    return TError::Success();
-}
-
-TError TResource::Untar(const TPath &what, const TPath &where) const {
-    int status;
-
-    TError error = Run({ "tar", "--numeric-owner", "-pxf", what.ToString(), "-C", where.ToString() }, status);
-    if (error)
-        return error;
-    if (status)
-        return TError(EError::Unknown, "Can't execute tar " + std::to_string(status));
-
-    return TError::Success();
-}
-
-TError TResource::Prepare() {
-    Path = TPath(config().volumes().resource_dir()).AddComponent(Sha256(Source.ToString()));
-
-    TFolder dir(Path);
-    if (!dir.Exists())
-        return dir.Create(0755, true);
-
-    return TError::Success();
-}
-
-TError TResource::Create() const {
-    TPath p = Path.AddComponent(".done");
-
-    L_ACT() << "Create resource " << Path << " from " << Source << " (" << p.Exists() << ")" << std::endl;
-
-    if (!p.Exists()) {
-        TError error = Untar(Source, Path);
-        if (error)
-            return error;
-
-        TFile f(p);
-        return f.Touch();
-    }
-
-    return TError::Success();
-}
-
-TError TResource::Copy(const TPath &to) const {
-    TError error = Create();
-    if (error)
-        return error;
-
-    int status;
-    error = Run({ "cp", "-aT", Path.ToString(), to.ToString() }, status);
-    if (error)
-        return error;
-    if (status)
-        return TError(EError::Unknown, "Can't execute cp " + std::to_string(status));
-    return TError::Success();
-}
-
-TError TResource::Destroy() const {
-    L_ACT() << "Destroy resource " << Path << " (" << Path.Exists() << ")" << std::endl;
-
-    if (Path.Exists()) {
-        TFolder dir(Path);
-        return dir.Remove(true);
-    }
-    return TError::Success();
-}
-
-TResource::~TResource() {
-    TError error = Destroy();
-    if (error)
-        L_ERR() << "Can't destroy resource " << Source << " at " << Path << ": " << error << std::endl;
 }

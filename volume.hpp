@@ -22,7 +22,6 @@ constexpr const char *V_LOOP_DEV = "_loop_dev";
 
 class TVolumeHolder;
 class TVolume;
-class TResource;
 
 class TVolumeImpl {
 protected:
@@ -43,7 +42,6 @@ class TVolume : public std::enable_shared_from_this<TVolume>, public TNonCopyabl
     std::shared_ptr<TVolumeHolder> Holder;
     std::shared_ptr<TValueMap> Data = nullptr;
     TCred Cred;
-    std::shared_ptr<TResource> Resource;
     uint64_t ParsedQuota;
 
     std::unique_ptr<TVolumeImpl> Impl;
@@ -52,7 +50,6 @@ class TVolume : public std::enable_shared_from_this<TVolume>, public TNonCopyabl
 public:
     TError Create(std::shared_ptr<TKeyValueStorage> storage,
                   const TPath &path,
-                  std::shared_ptr<TResource> resource,
                   const std::string &quota,
                   const std::string &flags);
     TError Construct() const;
@@ -68,12 +65,10 @@ public:
     TError CheckPermission(const TCred &ucred) const;
 
     TPath GetPath() const { return Data->Get<std::string>(V_PATH); }
-    const std::string GetSource() const;
     std::string GetQuota() const { return Data->Get<std::string>(V_QUOTA); }
     uint64_t GetParsedQuota() const { return ParsedQuota; }
     std::string GetFlags() const { return Data->Get<std::string>(V_FLAGS); }
     uint16_t GetId() const { return (uint16_t)Data->Get<int>(V_ID); }
-    std::shared_ptr<TResource> GetResource() { return Resource; }
     TError GetUsage(uint64_t &used, uint64_t &avail) const;
 
     TError LoadFromStorage();
@@ -82,26 +77,9 @@ public:
     TError SetValid(bool v);
 };
 
-class TResource : public TNonCopyable {
-    TPath Source;
-    TPath Path;
-    TError Untar(const TPath &what, const TPath &where) const;
-public:
-    TResource(const TPath &source, const TPath &path = "") : Source(source), Path(path) {}
-    ~TResource();
-    TError Prepare();
-    TError Create() const;
-    TError Copy(const TPath &to) const;
-    TError Destroy() const;
-    const TPath &GetSource() { return Source; }
-    const TPath &GetPath() { return Path; }
-};
-
 class TVolumeHolder : public TNonCopyable, public std::enable_shared_from_this<TVolumeHolder> {
     std::shared_ptr<TKeyValueStorage> Storage;
     std::map<TPath, std::shared_ptr<TVolume>> Volumes;
-    std::map<TPath, std::weak_ptr<TResource>> Resources;
-    void RemoveUnusedResources();
     void RemoveUnusedVolumes();
 public:
     TIdMap IdMap;
@@ -113,5 +91,4 @@ public:
         Storage(storage) {}
     TError RestoreFromStorage();
     void Destroy();
-    TError GetResource(const TPath &source, std::shared_ptr<TResource> &resource);
 };

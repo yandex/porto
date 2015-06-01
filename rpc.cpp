@@ -460,16 +460,10 @@ static TError CreateVolume(TContext &context,
     if (error)
         return error;
 
-    std::shared_ptr<TResource> resource;
-    error = context.Vholder->GetResource(StringTrim(req.source()), resource);
-    if (error)
-        return error;
-
     std::shared_ptr<TVolume> volume;
     volume = std::make_shared<TVolume>(context.Vholder, client->GetCred());
-    error = volume->Create(context.VolumeStorage,
+    TError error = volume->Create(context.VolumeStorage,
                            StringTrim(req.path()),
-                           resource,
                            StringTrim(req.quota()),
                            StringTrim(req.flags()));
     if (error)
@@ -557,7 +551,6 @@ static TError ListVolumes(TContext &context,
 
         auto desc = rsp.mutable_volumelist()->add_list();
         desc->set_path(vol->GetPath().ToString());
-        desc->set_source(vol->GetSource());
         desc->set_quota(vol->GetQuota());
         desc->set_flags(vol->GetFlags());
         desc->set_used(used);

@@ -644,8 +644,7 @@ static int SlaveMain() {
             RemoveIf(config().container().tmp_dir(),
                      EFileType::Directory,
                      [](const std::string &name, const TPath &path) {
-                        return name != TPath(config().volumes().resource_dir()).BaseName() &&
-                               name != TPath(config().volumes().volume_dir()).BaseName();
+                        return name != TPath(config().volumes().volume_dir()).BaseName();
                      });
         }
 
