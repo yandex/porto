@@ -449,7 +449,8 @@ static TError Wait(TContext &context,
     }
 
     client->Waiter = waiter;
-    return TError::Success();
+
+    return TError::Queued();
 }
 
 static TError CreateVolume(TContext &context,
@@ -491,7 +492,11 @@ static TError CreateVolume(TContext &context,
             SendReply(c.lock(), response, true);
         });
 
-    return task.Run(context);
+    error = task.Run(context);
+    if (error)
+        return error;
+
+    return TError::Queued();
 }
 
 static TError DestroyVolume(TContext &context,
@@ -531,7 +536,11 @@ static TError DestroyVolume(TContext &context,
                 SendReply(c.lock(), response, true);
             });
 
-        return task.Run(context);
+        error = task.Run(context);
+        if (error)
+            return error;
+
+        return TError::Queued();
     }
 
     return TError(EError::VolumeDoesNotExist, "Volume doesn't exist");
@@ -564,7 +573,6 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
                       std::shared_ptr<TClient> client) {
     rpc::TContainerResponse rsp;
     string str;
-    bool send_reply = true;
 
     client->BeginRequest();
 
@@ -606,19 +614,13 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
             error = Kill(context, req.kill(), rsp, client);
         else if (req.has_version())
             error = Version(context, rsp);
-        else if (req.has_wait()) {
+        else if (req.has_wait())
             error = Wait(context, req.wait(), rsp, client);
-            if (!error)
-                send_reply = false;
-        } else if (config().volumes().enabled() && req.has_createvolume()) {
+        else if (config().volumes().enabled() && req.has_createvolume())
             error = CreateVolume(context, req.createvolume(), rsp, client);
-            if (!error)
-                send_reply = false;
-        } else if (config().volumes().enabled() && req.has_destroyvolume()) {
+        else if (config().volumes().enabled() && req.has_destroyvolume())
             error = DestroyVolume(context, req.destroyvolume(), rsp, client);
-            if (!error)
-                send_reply = false;
-        } else if (config().volumes().enabled() && req.has_listvolumes())
+        else if (config().volumes().enabled() && req.has_listvolumes())
             error = ListVolumes(context, rsp);
         else
             error = TError(EError::InvalidMethod, "invalid RPC method");
@@ -636,7 +638,7 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
         error = TError(EError::Unknown, "unknown error");
     }
 
-    if (send_reply) {
+    if (error.GetError() != EError::Queued) {
         rsp.set_error(error.GetError());
         rsp.set_errormsg(error.GetMsg());
         SendReply(client, rsp, log);

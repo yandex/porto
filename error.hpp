@@ -30,6 +30,11 @@ public:
         return e;
     }
 
+    static const TError& Queued() {
+        static TError e(EError::Queued, "Queued");
+        return e;
+    }
+
     friend std::ostream& operator<<(std::ostream& os, const TError& err) {
         os << err.GetErrorName() << " (" << err.GetMsg() << ")";
         return os;
