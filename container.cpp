@@ -712,7 +712,7 @@ TError TContainer::PrepareMetaParent() {
     } else if (state == EContainerState::Meta || state == EContainerState::Dead) {
         return TError::Success();
     } else if (state != EContainerState::Running) {
-        return TError(EError::InvalidState, "invalid parent state " + ContainerStateName(state));
+        return TError(EError::InvalidState, "invalid parent (" + GetName() + ") state " + ContainerStateName(state));
     }
 
     return TError::Success();
@@ -895,11 +895,8 @@ void TContainer::ExitChildren(int status, bool oomKilled) {
 TError TContainer::PrepareResources() {
     if (Parent) {
         TError error = Parent->PrepareMetaParent();
-        if (error) {
-            if (error.GetError() != EError::NoSpace)
-                L_ERR() << "Can't prepare parent: " << error << std::endl;
+        if (error)
             return error;
-        }
     }
 
     TError error = PrepareNetwork();
@@ -1442,7 +1439,7 @@ bool TContainer::Exit(int status, bool oomKilled, bool force) {
             << std::endl;
 
     if (!force && !oomKilled && !Processes().empty() && Prop->Get<bool>(P_ISOLATE) == true) {
-        L_WRN() << "Skipped bogus exit event, some process is still alive" << std::endl;
+        L_WRN() << "Skipped bogus exit event (" << status << "), some process is still alive in " << GetName() << std::endl;
         return true;
     }
 

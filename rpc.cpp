@@ -39,7 +39,7 @@ static void SendReply(std::shared_ptr<TClient> client,
 
     if (response.IsInitialized()) {
         if (!WriteDelimitedTo(response, &post))
-            L_ERR() << "Write error for " << client->GetFd() << std:: endl;
+            L() << "Protobuf write error for " << client->GetFd() << std:: endl;
         else if (log)
             L_RSP() << ResponseAsString(response) << " to " << *client
                     << " (request took " << client->GetRequestTime() << "ms)" << std::endl;

@@ -1,3 +1,4 @@
+- return EAGAIN from destroy/etc when can't wait for freezer
 - PORTO_NAME - support namespaces
 - top: use new get
 - bind: follow links instead of realpath (fails when target doesn't exist)

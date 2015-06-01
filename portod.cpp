@@ -173,15 +173,15 @@ static bool HandleRequest(TContext &context, TRpcWorker &worker, std::shared_ptr
         for (size_t i = 0; i < pos; i++)
             ss << std::setw(2) << (int)buf[i];
 
-        L_WRN() << "Interrupted read from " << client->GetFd()
-                << ", partial message: " << ss.str() << std:: endl;
+        L() << "Interrupted read from " << client->GetFd()
+            << ", partial message: " << ss.str() << std:: endl;
         Statistics->InterruptedReads++;
         return true;
     }
 
     if (pist.GetLeftovers())
-        L_WRN() << "Message is greater that expected from " << client->GetFd()
-                << ", skipped " << pist.GetLeftovers() << std:: endl;
+        L() << "Message is greater that expected from " << client->GetFd()
+            << ", skipped " << pist.GetLeftovers() << std:: endl;
 
     if (!haveData)
         return true;
@@ -588,8 +588,9 @@ static int SlaveMain() {
     }
 
     if (config().network().enabled()) {
-        if (system("modprobe cls_cgroup")) {
-            L_ERR() << "Can't load cls_cgroup kernel module: " << strerror(errno) << std::endl;
+        int ret = system("modprobe cls_cgroup");
+        if (ret) {
+            L_ERR() << "Can't load cls_cgroup kernel module, modprobe returned " << ret << std::endl;
             if (!failsafe)
                 return EXIT_FAILURE;
 

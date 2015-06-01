@@ -757,7 +757,7 @@ TError TTask::Start() {
     pid_t forkPid = fork();
     if (forkPid < 0) {
         TError error(EError::Unknown, errno, "fork()");
-        L_ERR() << "Can't spawn child: " << error << std::endl;
+        L() << "Can't spawn child: " << error << std::endl;
         close(Rfd);
         close(Wfd);
         return error;
@@ -778,7 +778,7 @@ TError TTask::Start() {
         for (auto cg : LeafCgroups) {
             auto error = cg.second->Attach(getpid());
             if (error) {
-                L_ERR() << "Can't attach to cgroup: " << error << std::endl;
+                L() << "Can't attach to cgroup: " << error << std::endl;
                 ReportPid(-1);
                 Abort(error);
             }
@@ -787,7 +787,7 @@ TError TTask::Start() {
         // move to target namespace
         error = Env->Ns.Attach();
         if (error) {
-            L_ERR() << "Can't spawn child: " << error << std::endl;
+            L() << "Can't move task to target namespace: " << error << std::endl;
             ReportPid(-1);
             Abort(error);
         }
@@ -813,7 +813,7 @@ TError TTask::Start() {
         int ret = pipe2(syncfd, O_CLOEXEC);
         if (ret) {
             TError error(EError::Unknown, errno, "pipe2(pdf)");
-            L_ERR() << "Can't create sync pipe for child: " << error << std::endl;
+            L() << "Can't create sync pipe for child: " << error << std::endl;
             ReportPid(-1);
             Abort(error);
         }
@@ -825,23 +825,26 @@ TError TTask::Start() {
         close(WaitParentRfd);
         ReportPid(clonePid);
         if (clonePid < 0) {
-            TError error(EError::Unknown, errno, "clone()");
-            L_ERR() << "Can't spawn child: " << error << std::endl;
+            TError error(errno == ENOMEM ?
+                         Error::ResourceNotAvailable :
+                         EError::Unknown, errno, "clone()");
+            L() << "Can't spawn child: " << error << std::endl;
             Abort(error);
         }
 
         if (config().network().enabled()) {
             error = IsolateNet(clonePid);
             if (error) {
-                L_ERR() << "Can't spawn child: " << error << std::endl;
+                L() << "Can't isolate child network: " << error << std::endl;
                 Abort(error);
             }
         }
 
         int result = 0;
-        if (write(WaitParentWfd, &result, sizeof(result)) != sizeof(result)) {
-            TError error(EError::Unknown, "Partial write to child sync pipe");
-            L_ERR() << "Can't spawn child: " << error << std::endl;
+        int ret = write(WaitParentWfd, &result, sizeof(result));
+        if (ret != sizeof(result)) {
+            TError error(EError::Unknown, "Partial write to child sync pipe (" + std::to_string(ret) + " != " + std::to_string(result) + ")");
+            L() << "Can't spawn child: " << error << std::endl;
             Abort(error);
         }
 

@@ -190,7 +190,7 @@ TError TCgroup::Remove() {
                                return !IsEmpty(); });
 
     if (ret)
-        L_WRN() << "Can't kill all tasks in cgroup " << Path() << std::endl;
+        L_ERR() << "Can't kill all tasks in cgroup " << Path() << std::endl;
 
     L_ACT() << "Remove cgroup " << Path() << std::endl;
     TFolder f(Path());
