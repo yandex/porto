@@ -38,6 +38,8 @@ public:
     TPath(const char *path) : Path(path) {}
     TPath() : Path("") {}
 
+    bool IsAbsolute() const { return Path[0] == '/'; }
+
     TPath operator+(const TPath &p) const {
         return TPath(Path + p.ToString());
     }
@@ -55,7 +57,9 @@ public:
     }
 
     TPath DirName() const;
-    std::string BaseName();
+    std::string BaseName() const;
+    TPath RealPath() const;
+    bool StartsWith(const TPath &prefix) const;
 
     EFileType GetType() const;
     unsigned int GetMode() const;
@@ -80,5 +84,10 @@ public:
     TError Symlink(const TPath &to) const;
     TError Mkfifo(unsigned int mode) const;
     TError Mknod(unsigned int mode, unsigned int dev) const;
-    TPath RealPath();
+    TError Mkdir(unsigned int mode) const;
+    TError Rmdir() const;
+    TError ClearDirectory() const;
+    TError StatVFS(uint64_t &space_used, uint64_t &space_avail,
+                   uint64_t &inode_used, uint64_t &inode_avail) const;
+    TError StatVFS(uint64_t &space_used, uint64_t &space_avail) const;
 };

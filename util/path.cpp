@@ -6,11 +6,13 @@ extern "C" {
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/statvfs.h>
 #include <fcntl.h>
 #include <sys/prctl.h>
 #include <libgen.h>
 #include <linux/limits.h>
 #include <sys/syscall.h>
+#include <dirent.h>
 }
 
 using std::string;
@@ -43,7 +45,7 @@ TPath TPath::DirName() const {
     return TPath(s);
 }
 
-std::string TPath::BaseName() {
+std::string TPath::BaseName() const {
     char *dup = strdup(Path.c_str());
     if (!dup)
         throw std::bad_alloc();
@@ -146,6 +148,10 @@ bool TPath::AccessOk(EFileAccess type, const TCred &cred) const {
     int ret;
     bool result = false;
 
+    /*
+     * Set real uid/gid -- syscall access uses it for checks.
+     * Use raw syscalls because libc wrapper changes uid for all threads.
+     */
     ret = syscall(SYS_setreuid, cred.Uid, 0);
     if (ret)
         goto exit;
@@ -299,7 +305,7 @@ TError TPath::Copy(const TPath &to) const {
     return TError(EError::Unknown, "Unknown file type " + Path);
 }
 
-TPath TPath::RealPath() {
+TPath TPath::RealPath() const {
     char *p = realpath(Path.c_str(), NULL);
     if (!p)
         return Path;
@@ -308,4 +314,132 @@ TPath TPath::RealPath() {
 
     free(p);
     return path;
+}
+
+bool TPath::StartsWith(const TPath &prefix) const {
+    unsigned len = prefix.Path.length();
+
+    return Path.compare(0, len, prefix.Path) &&
+        (Path.length() == len  ||      /* completely equal     */
+         Path[len] == '/'      ||      /* next char is '/'     */
+         (len && Path[len-1] == '/')); /* prefix ends with '/' */
+}
+
+TError TPath::StatVFS(uint64_t &space_used, uint64_t &space_avail,
+                      uint64_t &inode_used, uint64_t &inode_avail) const {
+    struct statvfs st;
+
+    int ret = statvfs(Path.c_str(), &st);
+    if (ret)
+        return TError(EError::Unknown, errno, "statvfs(" + Path + ")");
+
+    space_used = (uint64_t)(st.f_blocks - st.f_bfree) * st.f_bsize;
+    space_avail = (uint64_t)(st.f_bavail) * st.f_bsize;
+    inode_used = st.f_files - st.f_ffree;
+    inode_avail = st.f_favail;
+    return TError::Success();
+}
+
+TError TPath::StatVFS(uint64_t &space_used, uint64_t &space_avail) const {
+    uint64_t inode_used, inode_avail;
+    return StatVFS(space_used, space_avail, inode_used, inode_avail);
+}
+
+TError TPath::Mkdir(unsigned int mode) const {
+    if (mkdir(Path.c_str(), mode) < 0)
+        return TError(errno == ENOSPC ? EError::NoSpace :
+                                        EError::Unknown,
+                      errno, "mkdir(" + Path + ", " + std::to_string(mode) + ")");
+    return TError::Success();
+}
+
+TError TPath::Rmdir() const {
+    if (rmdir(Path.c_str()) < 0)
+        return TError(EError::Unknown, errno, "rmdir(" + Path + ")");
+    return TError::Success();
+}
+
+/*
+ * Removes everything in the directory but not directory itself.
+ * Works only on one filesystem and aborts if sees mountpint.
+ */
+TError TPath::ClearDirectory() const {
+    int top_fd, dir_fd;
+    DIR *dir;
+    struct dirent *de;
+    struct stat top_st, st;
+    TError error = TError::Success();
+
+    top_fd = open(Path.c_str(),  O_RDONLY | O_DIRECTORY |
+                                 O_CLOEXEC | O_NOFOLLOW | O_NOATIME);
+    if (top_fd < 0)
+        return TError(EError::Unknown, errno, "ClearDirectory open(" + Path + ")");
+
+    if (fstat(top_fd, &top_st)) {
+        close(top_fd);
+        return TError(EError::Unknown, errno, "ClearDirectory fstat(" + Path + ")");
+    }
+
+    dir_fd = top_fd;
+
+deeper:
+    dir = fdopendir(dir_fd);
+    if (dir == NULL) {
+        close(dir_fd);
+        error = TError(EError::Unknown, errno, "ClearDirectory fdopendir(" + Path + "/.../)");
+        goto close_top;
+    }
+
+    while ((de = readdir(dir))) {
+        if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+            continue;
+
+        if (fstatat(dir_fd, de->d_name, &st, AT_SYMLINK_NOFOLLOW)) {
+            if (errno == ENOENT)
+                continue;
+            error = TError(EError::Unknown, errno, "ClearDirectory fstatat(" +
+                                          Path + "/.../" + de->d_name + ")");
+            break;
+        }
+
+        if (st.st_dev != top_st.st_dev) {
+            error = TError(EError::Unknown, EXDEV, "ClearDirectory found mountpoint in " + Path);
+            break;
+        }
+
+        if (S_ISDIR(st.st_mode)) {
+            int sub_fd = openat(dir_fd, de->d_name, O_RDONLY | O_DIRECTORY |
+                                                    O_CLOEXEC | O_NOFOLLOW |
+                                                    O_NOATIME);
+            if (sub_fd >= 0) {
+                closedir(dir); /* closes dir_fd */
+                dir_fd = sub_fd;
+                goto deeper;
+            }
+            if (errno == ENOENT)
+                continue;
+            error = TError(EError::Unknown, errno, "ClearDirectory openat(" +
+                                          Path + "/.../" + de->d_name + ")");
+            break;
+        }
+
+        if (unlinkat(dir_fd, de->d_name, S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0)) {
+            if (errno == ENOENT)
+                continue;
+            error = TError(EError::Unknown, errno, "ClearDirectory unlinkat(" +
+                                            Path + "/.../" + de->d_name + ")");
+            break;
+        }
+    }
+
+    closedir(dir); /* closes dir_fd */
+    if (!error && dir_fd != top_fd) {
+        dir_fd = top_fd;
+        goto deeper; /* Restart from top directory */
+    }
+
+close_top:
+    if (top_fd != dir_fd)
+        close(top_fd);
+    return error;
 }
