@@ -129,6 +129,22 @@ void THelpCmd::Usage() {
         PrintAligned(i.second->GetName(), i.second->GetDescription(), nameWidth, termWidth);
 
     int ret;
+
+    std::cerr << std::endl << "Volume properties:" << std::endl;
+    vector<TProperty> vlist;
+    ret = Api->ListVolumeProperties(vlist);
+    if (ret) {
+        PrintError("Unavailable");
+    } else {
+        tmpVec.clear();
+        for (auto p : vlist)
+            tmpVec.push_back(p.Name);
+        nameWidth = MaxFieldLength(tmpVec);
+
+        for (auto p : vlist)
+            PrintAligned(p.Name, p.Description, nameWidth, termWidth);
+    }
+
     std::cerr << std::endl << "Property list:" << std::endl;
     vector<TProperty> plist;
     ret = Api->Plist(plist);
@@ -161,6 +177,7 @@ void THelpCmd::Usage() {
         for (auto d : dlist)
             PrintAligned(d.Name, d.Description, nameWidth, termWidth);
     }
+    std::cerr << std::endl;
 }
 
 int THelpCmd::Execute(int argc, char *argv[]) {

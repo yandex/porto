@@ -6,6 +6,7 @@
 #include "util/log.hpp"
 #include "util/protobuf.hpp"
 #include "util/string.hpp"
+#include <algorithm>
 
 using std::string;
 
@@ -20,7 +21,8 @@ static bool InfoRequest(const rpc::TContainerRequest &req) {
         req.has_resume() ||
         req.has_kill() ||
         req.has_createvolume() ||
-        req.has_destroyvolume() ||
+        req.has_linkvolume() ||
+        req.has_unlinkvolume() ||
         req.has_wait())
         return false;
 
@@ -453,43 +455,103 @@ static TError Wait(TContext &context,
     return TError::Queued();
 }
 
+static TError ListVolumeProperties(TContext &context,
+                                   const rpc::TVolumePropertyListRequest &req,
+                                   rpc::TContainerResponse &rsp,
+                                   std::shared_ptr<TClient> client) {
+
+    if (!config().volumes().enabled())
+            return TError(EError::InvalidMethod, "volume api is disabled");
+
+    auto list = rsp.mutable_volumepropertylist();
+    for (auto kv: context.Vholder->ListProperties()) {
+        auto p = list->add_properties();
+        p->set_name(kv.first);
+        p->set_desc(kv.second);
+    }
+    return TError::Success();
+}
+
+static void FillVolumeDescription(rpc::TVolumeDescription *desc,
+                                  std::shared_ptr<TVolume> volume) {
+    desc->set_path(volume->GetPath().ToString());
+    for (auto kv: volume->GetProperties()) {
+        auto p = desc->add_properties();
+        p->set_name(kv.first);
+        p->set_value(kv.second);
+    }
+    for (auto name: volume->GetContainers())
+        desc->add_containers(name);
+}
+
 static TError CreateVolume(TContext &context,
                            const rpc::TVolumeCreateRequest &req,
                            rpc::TContainerResponse &rsp,
                            std::shared_ptr<TClient> client) {
+
+    if (!config().volumes().enabled())
+            return TError(EError::InvalidMethod, "volume api is disabled");
+
     TError error = CheckRequestPermissions(client);
     if (error)
         return error;
 
+    std::map<std::string, std::string> properties;
+    for (auto p: req.properties())
+        properties[p.name()] = p.value();
+
     std::shared_ptr<TVolume> volume;
-    volume = std::make_shared<TVolume>(context.Vholder, client->GetCred());
-    error = volume->Create(context.VolumeStorage,
-                           StringTrim(req.path()),
-                           StringTrim(req.quota()),
-                           StringTrim(req.flags()));
+    error = context.Vholder->Create(volume);
     if (error)
         return error;
+
+    auto container = client->GetContainer();
+
+    error = volume->Configure(TPath(req.has_path() ? req.path() : ""),
+                              client->GetCred(), container, properties);
+    if (error) {
+        volume->Destroy();
+        return error;
+    }
+
+    error = volume->LinkContainer(container->GetName());
+    if (error) {
+        volume->Destroy();
+        return error;
+    }
+    container->LinkVolume(volume);
+
+    error = context.Vholder->Register(volume);
+    if (error) {
+        volume->Destroy();
+        return error;
+    }
 
     std::weak_ptr<TClient> c = client;
     TBatchTask task(
         [volume] () {
-            return volume->Construct();
+            return volume->Build();
         },
         [volume, c] (TError error) {
+            auto client = c.lock();
+
             if (error) {
-                L_WRN() << "Can't construct volume: " << error << std::endl;
+                L_WRN() << "Can't build volume: " << error << std::endl;
+                (void)volume->Destroy();
+            } else if (!client) {
+                L_WRN() << "Can't link volume, client is gone" << std::endl;
                 (void)volume->Destroy();
             } else {
-                error = volume->SetValid(true);
-                if (error) {
-                    L_WRN() << "Can't mark volume valid: " << error << std::endl;
-                    (void)volume->Destroy();
-                }
+                volume->SetReady(true);
             }
 
             rpc::TContainerResponse response;
             response.set_error(error.GetError());
-            SendReply(c.lock(), response, true);
+            if (!error) {
+                auto desc = response.volume();
+                FillVolumeDescription(&desc, volume);
+            }
+            SendReply(client, response, true);
         });
 
     error = task.Run(context);
@@ -499,71 +561,122 @@ static TError CreateVolume(TContext &context,
     return TError::Queued();
 }
 
-static TError DestroyVolume(TContext &context,
-                            const rpc::TVolumeDestroyRequest &req,
-                            rpc::TContainerResponse &rsp,
-                            std::shared_ptr<TClient> client) {
+static TError LinkVolume(TContext &context,
+                         const rpc::TVolumeLinkRequest &req,
+                         rpc::TContainerResponse &rsp,
+                         std::shared_ptr<TClient> client) {
+
+    if (!config().volumes().enabled())
+            return TError(EError::InvalidMethod, "volume api is disabled");
+
     TError error = CheckRequestPermissions(client);
     if (error)
         return error;
 
-    auto volume = context.Vholder->Get(StringTrim(req.path()));
-    if (volume && volume->IsValid()) {
-        error = volume->CheckPermission(client->GetCred());
+    std::shared_ptr<TContainer> container;
+    if (req.has_container()) {
+        std::string name;
+        TError err = client->GetContainer()->AbsoluteName(req.container(), name, true);
+        if (err)
+            return err;
+
+        TError error = context.Cholder->Get(name, container);
         if (error)
             return error;
 
-        error = volume->SetValid(false);
-        if (error) {
-            L_WRN() << "Can't mark volume invalid: " << error << std::endl;
-            (void)volume->Destroy();
-        }
-
-        std::weak_ptr<TClient> c = client;
-        TBatchTask task(
-            [volume] () {
-                return volume->Deconstruct();
-            },
-            [volume, c] (TError error) {
-                if (error)
-                    L_WRN() << "Can't deconstruct volume: " << error << std::endl;
-
-                if (!error)
-                    error = volume->Destroy();
-
-                rpc::TContainerResponse response;
-                response.set_error(error.GetError());
-                SendReply(c.lock(), response, true);
-            });
-
-        error = task.Run(context);
+        error = container->CheckPermission(client->GetCred());
         if (error)
             return error;
-
-        return TError::Queued();
+    } else {
+        container = client->GetContainer();
     }
 
-    return TError(EError::VolumeDoesNotExist, "Volume doesn't exist");
+    auto volume = context.Vholder->Find(req.path());
+    if (!volume)
+        return TError(EError::VolumeNotFound, "Volume not found");
+
+    if (!volume->IsReady())
+        return TError(EError::VolumeNotReady, "Volume not ready");
+
+    if (!container->LinkVolume(volume))
+        return TError(EError::VolumeAlreadyExists, "Already linked");
+
+    return volume->LinkContainer(container->GetName());
+}
+
+static TError UnlinkVolume(TContext &context,
+                           const rpc::TVolumeUnlinkRequest &req,
+                           rpc::TContainerResponse &rsp,
+                           std::shared_ptr<TClient> client) {
+
+    if (!config().volumes().enabled())
+            return TError(EError::InvalidMethod, "volume api is disabled");
+
+    TError error = CheckRequestPermissions(client);
+    if (error)
+        return error;
+
+    std::shared_ptr<TContainer> container;
+    if (req.has_container()) {
+        std::string name;
+        TError err = client->GetContainer()->AbsoluteName(req.container(), name, true);
+        if (err)
+            return err;
+
+        TError error = context.Cholder->Get(name, container);
+        if (error)
+            return error;
+
+        error = container->CheckPermission(client->GetCred());
+        if (error)
+            return error;
+    } else {
+        container = client->GetContainer();
+    }
+
+    std::shared_ptr<TVolume> volume = context.Vholder->Find(req.path());
+    if (!volume)
+        return TError(EError::VolumeNotFound, "Volume not found");
+
+    error = volume->CheckPermission(client->GetCred());
+    if (error)
+        return error;
+
+    if (!container->UnlinkVolume(volume))
+        return TError(EError::InvalidValue, "Container not linked to the volume");
+
+    return volume->UnlinkContainer(container->GetName());
 }
 
 static TError ListVolumes(TContext &context,
+                          const rpc::TVolumeListRequest &req,
                           rpc::TContainerResponse &rsp) {
-    for (auto path : context.Vholder->List()) {
-        auto vol = context.Vholder->Get(path);
-        if (!vol->IsValid())
+
+    if (!config().volumes().enabled())
+            return TError(EError::InvalidMethod, "volume api is disabled");
+
+    if (req.has_path()) {
+        auto volume = context.Vholder->Find(req.path());
+        if (volume == nullptr)
+            return TError(EError::VolumeNotFound, "volume not found");
+        auto desc = rsp.mutable_volumelist()->add_volumes();
+        FillVolumeDescription(desc, volume);
+        return TError::Success();
+    }
+
+    for (auto path : context.Vholder->ListPaths()) {
+        auto volume = context.Vholder->Find(path);
+        if (volume == nullptr)
             continue;
 
-        uint64_t used, avail;
-        TError error = vol->GetUsage(used, avail);
-        if (error)
-            L_ERR() << "Can't get used for volume " << vol->GetPath() << ": " << error << std::endl;
+        auto containers = volume->GetContainers();
+        if (req.has_container() &&
+            std::find(containers.begin(), containers.end(),
+                      req.container()) == containers.end())
+            continue;
 
-        auto desc = rsp.mutable_volumelist()->add_list();
-        desc->set_path(vol->GetPath().ToString());
-        desc->set_quota(vol->GetQuota());
-        desc->set_flags(vol->GetFlags());
-        desc->set_used(used);
-        desc->set_avail(avail);
+        auto desc = rsp.mutable_volumelist()->add_volumes();
+        FillVolumeDescription(desc, volume);
     }
 
     return TError::Success();
@@ -616,12 +729,16 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
             error = Version(context, rsp);
         else if (req.has_wait())
             error = Wait(context, req.wait(), rsp, client);
-        else if (config().volumes().enabled() && req.has_createvolume())
+        else if (req.has_listvolumeproperties())
+            error = ListVolumeProperties(context, req.listvolumeproperties(), rsp, client);
+        else if (req.has_createvolume())
             error = CreateVolume(context, req.createvolume(), rsp, client);
-        else if (config().volumes().enabled() && req.has_destroyvolume())
-            error = DestroyVolume(context, req.destroyvolume(), rsp, client);
-        else if (config().volumes().enabled() && req.has_listvolumes())
-            error = ListVolumes(context, rsp);
+        else if (req.has_linkvolume())
+            error = LinkVolume(context, req.linkvolume(), rsp, client);
+        else if (req.has_unlinkvolume())
+            error = UnlinkVolume(context, req.unlinkvolume(), rsp, client);
+        else if (req.has_listvolumes())
+            error = ListVolumes(context, req.listvolumes(), rsp);
         else
             error = TError(EError::InvalidMethod, "invalid RPC method");
     } catch (std::bad_alloc exc) {

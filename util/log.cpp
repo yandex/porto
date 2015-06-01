@@ -226,13 +226,17 @@ std::string RequestAsString(const rpc::TContainerRequest &req) {
             ret += " " + req.wait().name(i);
 
         return ret;
-    } else if (req.has_createvolume())
-        return "volumeAPI: create " + req.createvolume().path() + " " +
-            req.createvolume().source() + " " +
-            req.createvolume().quota() + " " +
-            req.createvolume().flags();
-    else if (req.has_destroyvolume())
-        return "volumeAPI: destroy " + req.destroyvolume().path();
+    } else if (req.has_createvolume()) {
+        std::string ret = "volumeAPI: create " + req.createvolume().path();
+        for (auto p: req.createvolume().properties())
+            ret += " " + p.name() + "=" + p.value();
+        return ret;
+    } else if (req.has_linkvolume())
+        return "volumeAPI: link " + req.linkvolume().path() + " to " +
+                                    req.linkvolume().container();
+    else if (req.has_unlinkvolume())
+        return "volumeAPI: unlink " + req.unlinkvolume().path() + " from " +
+                                      req.unlinkvolume().container();
     else if (req.has_listvolumes())
         return "volumeAPI: list volumes";
     else
@@ -257,14 +261,8 @@ std::string ResponseAsString(const rpc::TContainerResponse &resp) {
                 ret += resp.datalist().list(i).name()
                     + " (" + resp.datalist().list(i).desc() + ")";
         } else if (resp.has_volumelist()) {
-            for (int i = 0; i < resp.list().name_size(); i++)
-                ret += resp.volumelist().list(i).path() + " (" +
-                    resp.volumelist().list(i).source() + " " +
-                    resp.volumelist().list(i).quota() + " " +
-                    resp.volumelist().list(i).flags() + " " +
-                    std::to_string(resp.volumelist().list(i).used()) + " " +
-                    std::to_string(resp.volumelist().list(i).avail()) + ") ";
-
+            for (auto v: resp.volumelist().volumes())
+                ret += v.path() + " ";
         } else if (resp.has_getproperty()) {
             ret = resp.getproperty().value();
         } else if (resp.has_getdata()) {
@@ -328,8 +326,14 @@ std::string ResponseAsString(const rpc::TContainerResponse &resp) {
     case EError::VolumeAlreadyExists:
         return "Error: VolumeAlreadyExists (" + resp.errormsg() + ")";
         break;
-    case EError::VolumeDoesNotExist:
-        return "Error: VolumeDoesNotExist (" + resp.errormsg() + ")";
+    case EError::VolumeNotFound:
+        return "Error: VolumeNotFound (" + resp.errormsg() + ")";
+        break;
+    case EError::VolumeNotReady:
+        return "Error: VolumeNotReady (" + resp.errormsg() + ")";
+        break;
+    case EError::VolumeIsBusy:
+        return "Error: VolumeIsBusy (" + resp.errormsg() + ")";
         break;
     case EError::NoSpace:
         return "Error: NoSpace (" + resp.errormsg() + ")";

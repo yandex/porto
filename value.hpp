@@ -223,6 +223,7 @@ public:
     TValueMap(std::shared_ptr<TKeyValueNode> kvnode) : KvNode(kvnode) {}
 
     TError Create();
+    TError Remove();
     TError Restore(const kv::TNode &node);
     TError Restore();
     TError Flush();

@@ -21,16 +21,14 @@ struct TData {
 
 struct TVolumeDescription {
     std::string Path;
-    std::string Source;
-    std::string Quota;
-    std::string Flags;
-    uint64_t Used;
-    uint64_t Avail;
+    std::map<std::string, std::string> Properties;
+    std::vector<std::string> Containers;
 
-    TVolumeDescription(const std::string &path, const std::string &source,
-                       const std::string &quota, const std::string &flags,
-                       uint64_t used, uint64_t avail) :
-        Path(path), Source(source), Quota(quota), Flags(flags), Used(used), Avail(avail) {}
+    TVolumeDescription() {}
+    TVolumeDescription(const std::string &path,
+                       const std::map<std::string, std::string> &properties,
+                       const std::vector<std::string> &containers) :
+        Path(path), Properties(properties), Containers(containers) {}
 };
 
 struct TPortoGetResponse {
@@ -86,8 +84,17 @@ public:
     void Cleanup();
 
     // VolumeAPI
-    int CreateVolume(const std::string &path, const std::string &source,
-                     const std::string &quota, const std::string &flags);
-    int DestroyVolume(const std::string &path);
-    int ListVolumes(std::vector<TVolumeDescription> &vlist);
+    int ListVolumeProperties(std::vector<TProperty> &properties);
+    int CreateVolume(const std::string &path,
+                     const std::map<std::string, std::string> &config,
+                     TVolumeDescription &result);
+    int CreateVolume(std::string &path,
+                     const std::map<std::string, std::string> &config);
+    int LinkVolume(const std::string &path, const std::string &container);
+    int UnlinkVolume(const std::string &path, const std::string &container);
+    int ListVolumes(const std::string &path, const std::string &container,
+                    std::vector<TVolumeDescription> &volumes);
+    int ListVolumes(std::vector<TVolumeDescription> &volumes) {
+        return ListVolumes("", "", volumes);
+    }
 };

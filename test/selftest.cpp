@@ -3842,10 +3842,9 @@ static void TestVolumeHolder(TPortoAPI &api) {
     ExpectApiSuccess(api.ListVolumes(volumes));
     ExpectEq(volumes.size(), 0);
 
-    Say() << "Create temporary tar archive" << std::endl;
-
     std::string a = "/tmp/volume_a", b = "/tmp/volume_b";
-    std::string tar = "/tmp/porto.tar";
+    std::map<std::string, std::string> prop_default = {};
+    std::map<std::string, std::string> prop_invalid = {{"foo", "bar"}};
 
     CleanupVolume(api, a);
     CleanupVolume(api, b);
@@ -3855,82 +3854,75 @@ static void TestVolumeHolder(TPortoAPI &api) {
     ExpectEq(aPath.Exists(), false);
     ExpectEq(bPath.Exists(), false);
 
-    RemoveTar(tar);
-    CreateTar(tar, "/bin");
-
     Say() << "Create volume A" << std::endl;
-    ExpectApiSuccess(api.CreateVolume(a, tar, "0", ""));
+    ExpectApiSuccess(api.CreateVolume(a, prop_default));
 
     volumes.clear();
     ExpectApiSuccess(api.ListVolumes(volumes));
     ExpectEq(volumes.size(), 1);
     ExpectEq(volumes[0].Path, a);
-    ExpectEq(volumes[0].Source, tar);
-    ExpectEq(volumes[0].Quota, "0");
-    ExpectEq(volumes[0].Flags, "");
+    ExpectEq(volumes[0].Containers.size(), 1);
+
+    ExpectEq(volumes[0].Properties.count("backend"), 1);
+    ExpectEq(volumes[0].Properties.count("user"), 1);
+    ExpectEq(volumes[0].Properties.count("group"), 1);
+    ExpectEq(volumes[0].Properties.count("read_only"), 1);
+
+    ExpectEq(volumes[0].Properties.count("space_limit"), 1);
+    ExpectEq(volumes[0].Properties.count("space_guarantee"), 1);
+    ExpectEq(volumes[0].Properties.count("inode_limit"), 1);
+    ExpectEq(volumes[0].Properties.count("inode_guarantee"), 1);
+
+    ExpectEq(volumes[0].Properties.count("space_used"), 1);
+    ExpectEq(volumes[0].Properties.count("space_available"), 1);
+    ExpectEq(volumes[0].Properties.count("inode_used"), 1);
+    ExpectEq(volumes[0].Properties.count("inode_available"), 1);
 
     ExpectEq(aPath.Exists(), true);
     ExpectEq(bPath.Exists(), false);
 
     Say() << "Try to create existing volume A" << std::endl;
-    ExpectApiFailure(api.CreateVolume(a, tar, "1g", ""), EError::VolumeAlreadyExists);
+    ExpectApiFailure(api.CreateVolume(a, prop_default), EError::VolumeAlreadyExists);
 
     volumes.clear();
     ExpectApiSuccess(api.ListVolumes(volumes));
     ExpectEq(volumes.size(), 1);
 
     Say() << "Create volume B" << std::endl;
-    ExpectApiSuccess(api.CreateVolume(b, tar, "1g", ""));
-
-    size_t mb10 = 10 * 1024 * 1024;
-    size_t mb900 = 900 * 1024 * 1024;
-    size_t gb1 = 1 * 1024 * 1024 * 1024;
+    ExpectApiSuccess(api.CreateVolume(b, prop_default));
 
     volumes.clear();
     ExpectApiSuccess(api.ListVolumes(volumes));
     ExpectEq(volumes.size(), 2);
 
-    Say() << volumes[0].Path << " used " << (volumes[0].Used / 1024 / 1024) << "mb avail " << (volumes[0].Avail / 1024 / 1024) << "mb" << std::endl;
-    Say() << volumes[1].Path << " used " << (volumes[1].Used / 1024 / 1024) << "mb avail " << (volumes[1].Avail / 1024 / 1024) << "mb" << std::endl;
-
     ExpectEq(volumes[0].Path, a);
-    ExpectEq(volumes[0].Source, tar);
-    ExpectEq(volumes[0].Quota, "0");
-    ExpectEq(volumes[0].Flags, "");
-
-    ExpectNeq(volumes[0].Used, 0);
-    Expect(volumes[0].Avail > gb1);
-
     ExpectEq(volumes[1].Path, b);
-    ExpectEq(volumes[1].Source, tar);
-    ExpectEq(volumes[1].Quota, "1g");
-    ExpectEq(volumes[1].Flags, "");
+    ExpectEq(volumes[0].Containers.size(), 1);
+    ExpectEq(volumes[1].Containers.size(), 1);
 
-    Expect(volumes[1].Used < mb10);
-    Expect(volumes[1].Avail < gb1 && volumes[1].Avail > mb900);
+    volumes.clear();
+    ExpectApiSuccess(api.ListVolumes(a, nullptr, volumes));
+    ExpectEq(volumes.size(), 1);
 
     ExpectEq(aPath.Exists(), true);
     ExpectEq(bPath.Exists(), true);
 
     Say() << "Remove volume A" << std::endl;
-    ExpectApiSuccess(api.DestroyVolume(a));
-    ExpectApiFailure(api.DestroyVolume(a), EError::VolumeDoesNotExist);
+    ExpectApiSuccess(api.UnlinkVolume(a, ""));
+    ExpectApiFailure(api.UnlinkVolume(a, ""), EError::VolumeNotFound);
 
     volumes.clear();
     ExpectApiSuccess(api.ListVolumes(volumes));
     ExpectEq(volumes.size(), 1);
     ExpectEq(volumes[0].Path, b);
-    ExpectEq(volumes[0].Source, tar);
-    ExpectEq(volumes[0].Quota, "1g");
-    ExpectEq(volumes[0].Flags, "");
+    ExpectEq(volumes[0].Containers.size(), 1);
 
     ExpectEq(aPath.Exists(), false);
     ExpectEq(bPath.Exists(), true);
 
     Say() << "Remove volume B" << std::endl;
-
-    ExpectApiSuccess(api.DestroyVolume(b));
-    ExpectApiFailure(api.DestroyVolume(b), EError::VolumeDoesNotExist);
+    ExpectApiSuccess(api.UnlinkVolume(b, ""));
+    ExpectApiFailure(api.UnlinkVolume(b, ""), EError::VolumeNotFound);
 
     ExpectEq(aPath.Exists(), false);
     ExpectEq(bPath.Exists(), false);
@@ -3940,81 +3932,85 @@ static void TestVolumeHolder(TPortoAPI &api) {
     ExpectEq(volumes.size(), 0);
 
     Say() << "Try to create volume with invalid path" << std::endl;
-    ExpectApiFailure(api.CreateVolume("a", tar, "1g", ""), EError::InvalidValue);
-    ExpectApiFailure(api.CreateVolume(a, "q", "1g", ""), EError::InvalidValue);
+    b = "b";
+    ExpectApiFailure(api.CreateVolume(b, prop_default), EError::InvalidValue);
+    ExpectApiFailure(api.CreateVolume(a, prop_invalid), EError::InvalidValue);
 }
 
 static void TestVolumeImpl(TPortoAPI &api) {
     std::vector<TVolumeDescription> volumes;
+    std::map<std::string, std::string> prop_limited = {{"space_limit", "100m"}, {"inode_limit", "1000"}};
+    std::map<std::string, std::string> prop_unlimit = {};
+    uint64_t usage, limit, avail, guarantee;
 
     volumes.clear();
     ExpectApiSuccess(api.ListVolumes(volumes));
     ExpectEq(volumes.size(), 0);
 
-    Say() << "Create temporary tar archive" << std::endl;
-
     std::string a = "/tmp/volume_a", b = "/tmp/volume_b";
-    std::string tar = "/tmp/porto.tar";
 
     CleanupVolume(api, a);
     CleanupVolume(api, b);
-
-    RemoveTar(tar);
-    CreateTar(tar, "/bin");
 
     vector<string> v;
     ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
     auto m = ParseMountinfo(CommaSeparatedList(v, ""));
     Expect(m.find(a) == m.end());
+    Expect(m.find(b) == m.end());
+
+    ExpectApiSuccess(api.CreateVolume(a, prop_limited));
+    ExpectApiSuccess(api.CreateVolume(b, prop_unlimit));
+
+    Say() << "Make mountpoint is created" << std::endl;
+
+    v.clear();
+    ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
+    m = ParseMountinfo(CommaSeparatedList(v, ""));
+    Expect(m.find(a) != m.end());
+    Expect(m.find(b) != m.end());
 
     if (config().volumes().native()) {
-        Say() << "Make sure overlayfs mount is created" << std::endl;
-
-        ExpectApiSuccess(api.CreateVolume(a, tar, "0", ""));
-
-        v.clear();
-        ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
-        m = ParseMountinfo(CommaSeparatedList(v, ""));
-        Expect(m.find(a) != m.end());
 
         // TODO:
         // - test quota when ready
         // - make sure overlayfs upper/lower/work dirs are correct
     } else {
-        Say() << "Make sure loop device is created when quota specified" << std::endl;
-
-        ExpectApiSuccess(api.CreateVolume(a, tar, "1g", ""));
-
-        v.clear();
-        ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
-        m = ParseMountinfo(CommaSeparatedList(v, ""));
-        Expect(m.find(a) != m.end());
-
         Say() << "Make sure loop device has correct size" << std::endl;
+        Expect(StringStartsWith(m[a].source, "/dev/loop"));
         std::string loopDev = m[a].source;
         AsRoot(api);
         std::string img = System("losetup " + loopDev + " | sed -e 's/[^(]*(\\([^)]*\\)).*/\\1/'");
         AsNobody(api);
 
         TFile loopFile(img);
-        off_t expected = 1 * 1024 * 1024 * 1024;
+        off_t expected = 100 * 1024 * 1024;
         off_t mistake = 1 * 1024 * 1024;
         Expect(loopFile.GetSize() > expected - mistake && loopFile.GetSize() < expected + mistake);
 
-        Say() << "Make sure loop device has correct contents" << std::endl;
-        TFile binBash(a + "/bin/bash");
-        ExpectEq(binBash.Exists(), true);
-
         Say() << "Make sure no loop device is created without quota" << std::endl;
-        ExpectApiSuccess(api.DestroyVolume(a));
-        ExpectApiSuccess(api.CreateVolume(b, tar, "0", ""));
-        v.clear();
-        ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
-        m = ParseMountinfo(CommaSeparatedList(v, ""));
-        Expect(m.find(b) == m.end());
-        Expect(m.find(a) == m.end());
-        ExpectApiSuccess(api.DestroyVolume(b));
+        Expect(!StringStartsWith(m[b].source, "/dev/loop"));
     }
+
+    ExpectSuccess(StringToUint64(volumes[0].Properties["space_usage"], usage));
+    ExpectSuccess(StringToUint64(volumes[0].Properties["space_limit"], limit));
+    ExpectSuccess(StringToUint64(volumes[0].Properties["space_avail"], avail));
+    ExpectSuccess(StringToUint64(volumes[0].Properties["space_guarantee"], guarantee));
+
+    Expect(limit == 104857600);
+    Expect(usage + avail <= limit);
+    Expect(usage + avail >= guarantee);
+
+    ExpectSuccess(StringToUint64(volumes[0].Properties["inode_usage"], usage));
+    ExpectSuccess(StringToUint64(volumes[0].Properties["inode_limit"], limit));
+    ExpectSuccess(StringToUint64(volumes[0].Properties["inode_avail"], avail));
+    ExpectSuccess(StringToUint64(volumes[0].Properties["inode_guarantee"], guarantee));
+
+    Expect(limit == 100);
+    Expect(usage + avail <= limit);
+    Expect(usage + avail >= guarantee);
+
+    ExpectApiSuccess(api.UnlinkVolume(a, ""));
+    ExpectApiSuccess(api.UnlinkVolume(b, ""));
 }
 
 static void TestSigPipe(TPortoAPI &api) {
@@ -4441,15 +4437,18 @@ static void TestVolumeFiles(TPortoAPI &api, const std::string &path) {
 static void TestVolumeRecovery(TPortoAPI &api) {
     Say() << "Make sure porto removes leftover volumes" << std::endl;
     std::string a = "/tmp/volume_c", b = "/tmp/volume_d";
-    std::string tar = "/tmp/porto.tar";
+    std::map<std::string, std::string> prop_limited = {{"space_limit", "100m"}, {"inode_limit", "1000"}};
+    std::map<std::string, std::string> prop_unlimit = {};
 
     CleanupVolume(api, a);
     CleanupVolume(api, b);
 
-    RemoveTar(tar);
-    CreateTar(tar, "/bin");
-    ExpectApiSuccess(api.CreateVolume(a, tar, "0", ""));
-    ExpectApiSuccess(api.CreateVolume(b, tar, "2g", ""));
+    std::vector<TVolumeDescription> volumes;
+    ExpectApiSuccess(api.ListVolumes(volumes));
+    ExpectEq(volumes.size(), 0);
+
+    ExpectApiSuccess(api.CreateVolume(a, prop_limited));
+    ExpectApiSuccess(api.CreateVolume(b, prop_unlimit));
 
     TFolder volume(config().volumes().volume_dir() + "/leftover_volume");
     AsRoot(api);
@@ -4464,7 +4463,7 @@ static void TestVolumeRecovery(TPortoAPI &api) {
     ExpectEq(volume.Exists(), false);
 
     Say() << "Make sure porto preserves mounted loop/overlayfs" << std::endl;
-    std::vector<TVolumeDescription> volumes;
+    volumes.clear();
     ExpectApiSuccess(api.ListVolumes(volumes));
     ExpectEq(volumes.size(), 2);
 
@@ -4475,8 +4474,8 @@ static void TestVolumeRecovery(TPortoAPI &api) {
     auto m = ParseMountinfo(CommaSeparatedList(v, ""));
     Expect(m.find(b) != m.end());
 
-    ExpectApiSuccess(api.DestroyVolume(a));
-    ExpectApiSuccess(api.DestroyVolume(b));
+    ExpectApiSuccess(api.UnlinkVolume(a, ""));
+    ExpectApiSuccess(api.UnlinkVolume(b, ""));
 
     v.clear();
     ExpectSuccess(Popen("cat /proc/self/mountinfo", v));

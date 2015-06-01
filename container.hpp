@@ -25,6 +25,7 @@ class TTclass;
 class TTask;
 class TContainerWaiter;
 class TClient;
+class TVolume;
 
 extern int64_t BootTime;
 
@@ -58,6 +59,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
     std::shared_ptr<TEpollSource> Source;
+    std::set<std::shared_ptr<TVolume>> Volumes;
 
     // data
     void UpdateRunningChildren(size_t diff);
@@ -166,6 +168,14 @@ public:
 
     bool IsLostAndRestored() const;
     void SyncStateWithCgroup();
+
+    bool LinkVolume(std::shared_ptr<TVolume> volume) {
+        return Volumes.insert(volume).second;
+    }
+
+    bool UnlinkVolume(std::shared_ptr<TVolume> volume) {
+        return Volumes.erase(volume);
+    }
 };
 
 class TContainerWaiter {

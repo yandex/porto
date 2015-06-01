@@ -200,6 +200,12 @@ TError TContainer::Destroy() {
             return error;
     }
 
+    if (!IsRoot() && !IsPortoRoot()) {
+        for (auto volume: Volumes)
+            (void)volume->UnlinkContainer(GetName());
+    }
+    Volumes.clear();
+
     RemoveKvs();
 
     if (Parent)

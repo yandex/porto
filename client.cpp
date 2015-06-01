@@ -161,3 +161,7 @@ std::shared_ptr<TContainer> TClient::GetContainer() const {
     PORTO_ASSERT(c);
     return c;
 }
+
+std::shared_ptr<TContainer> TClient::TryGetContainer() const {
+    return Container.lock();
+}

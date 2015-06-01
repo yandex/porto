@@ -631,7 +631,7 @@ static int SlaveMain() {
         }
 
         bool restored = context.Cholder->RestoreFromStorage();
-        context.Vholder->RestoreFromStorage();
+        context.Vholder->RestoreFromStorage(context.Cholder);
 
         L() << "Remove cgroup leftovers..." << std::endl;
 

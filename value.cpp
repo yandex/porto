@@ -243,6 +243,13 @@ TError TValueMap::Create() {
     return KvNode->Create();
 }
 
+TError TValueMap::Remove() {
+    if (!KvNode)
+        return TError::Success();
+
+    return KvNode->Remove();
+}
+
 TError TValueMap::Restore(const kv::TNode &node) {
     for (int i = 0; i < node.pairs_size(); i++) {
         auto key = node.pairs(i).key();

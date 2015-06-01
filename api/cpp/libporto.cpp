@@ -264,36 +264,94 @@ void TPortoAPI::Cleanup() {
     Fd = -1;
 }
 
-int TPortoAPI::CreateVolume(const std::string &path, const std::string &source,
-                            const std::string &quota, const std::string &flags) {
-    Req.mutable_createvolume()->set_path(path);
-    Req.mutable_createvolume()->set_source(source);
-    Req.mutable_createvolume()->set_quota(quota);
-    Req.mutable_createvolume()->set_flags(flags);
+int TPortoAPI::ListVolumeProperties(std::vector<TProperty> &properties) {
+    Req.mutable_listvolumeproperties();
+    int ret = Rpc(Req, Rsp);
+    if (!ret) {
+        for (auto prop: Rsp.volumepropertylist().properties())
+            properties.push_back(TProperty(prop.name(), prop.desc()));
+    }
+    return ret;
+}
+
+int TPortoAPI::CreateVolume(const std::string &path,
+                            const std::map<std::string, std::string> &config,
+                            TVolumeDescription &result) {
+    auto req = Req.mutable_createvolume();
+
+    req->set_path(path);
+
+    for (auto kv: config) {
+        auto prop = req->add_properties();
+        prop->set_name(kv.first);
+        prop->set_value(kv.second);
+    }
+
+    int ret = Rpc(Req, Rsp);
+    if (!ret) {
+        auto volume = Rsp.volume();
+        result.Path = volume.path();
+        result.Containers = std::vector<std::string>(std::begin(volume.containers()), std::end(volume.containers()));
+        result.Properties.clear();
+        for (auto p: volume.properties())
+            result.Properties[p.name()] = p.value();
+    }
+    return ret;
+}
+
+int TPortoAPI::CreateVolume(std::string &path,
+                            const std::map<std::string, std::string> &config) {
+    TVolumeDescription result;
+    int ret = CreateVolume(path, config, result);
+    if (!ret && path == "")
+        path = result.Path;
+    return ret;
+}
+
+int TPortoAPI::LinkVolume(const std::string &path, const std::string &container) {
+    auto req = Req.mutable_linkvolume();
+
+    req->set_path(path);
+    if (container != "")
+        req->set_container(container);
 
     return Rpc(Req, Rsp);
 }
 
-int TPortoAPI::DestroyVolume(const std::string &path) {
-    Req.mutable_destroyvolume()->set_path(path);
+int TPortoAPI::UnlinkVolume(const std::string &path, const std::string &container) {
+    auto req = Req.mutable_unlinkvolume();
+
+    req->set_path(path);
+    if (container != "")
+        req->set_container(container);
 
     return Rpc(Req, Rsp);
 }
 
-int TPortoAPI::ListVolumes(std::vector<TVolumeDescription> &vlist) {
-    Req.mutable_listvolumes();
+int TPortoAPI::ListVolumes(const std::string &path,
+                           const std::string &container,
+                           std::vector<TVolumeDescription> &volumes) {
+    auto req = Req.mutable_listvolumes();
+
+    if (path != "")
+        req->set_path(path);
+
+    if (container != "")
+        req->set_container(container);
 
     int ret = Rpc(Req, Rsp);
     if (!ret) {
         auto list = Rsp.volumelist();
 
-        for (int i = 0; i < list.list_size(); i++)
-            vlist.push_back(TVolumeDescription(list.list(i).path(),
-                                               list.list(i).source(),
-                                               list.list(i).quota(),
-                                               list.list(i).flags(),
-                                               list.list(i).used(),
-                                               list.list(i).avail()));
+        for (auto v: list.volumes()) {
+            std::map<std::string, std::string> properties;
+            std::vector<std::string> containers(v.containers().begin(), v.containers().end());
+
+            for (auto p: v.properties())
+                properties[p.name()] = p.value();
+
+            volumes.push_back(TVolumeDescription(v.path(), properties, containers));
+        }
     }
 
     return ret;

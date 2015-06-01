@@ -32,6 +32,7 @@ public:
     TError Identify(TContainerHolder &holder, bool full = true);
     std::string GetContainerName() const;
     std::shared_ptr<TContainer> GetContainer() const;
+    std::shared_ptr<TContainer> TryGetContainer() const;
 
     friend std::ostream& operator<<(std::ostream& stream, TClient& client) {
         if (client.FullLog) {

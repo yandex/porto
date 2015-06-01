@@ -1362,13 +1362,22 @@ public:
 
 class TCreateVolumeCmd : public ICmd {
 public:
-    TCreateVolumeCmd(TPortoAPI *api) : ICmd(api, "vcreate", 2,
-                                            "<path> <source> [quota] [flags...]", "create volume") {}
+    TCreateVolumeCmd(TPortoAPI *api) : ICmd(api, "vcreate", 1, "<path> [property=value...]", "create volume") {}
 
     int Execute(int argc, char *argv[]) {
-        std::string flags = (argc == 4 ? argv[3] : "");
-        std::string quota = (argc >= 3 ? argv[2] : "0");
-        int ret = Api->CreateVolume(argv[0], argv[1], quota, flags);
+        std::map<std::string, std::string> properties;
+
+        for (int i = 1; i < argc; i++) {
+            std::string arg(argv[i]);
+            std::size_t sep = arg.find('=');
+            if (sep == string::npos)
+                properties[arg] = "";
+            else
+                properties[arg.substr(0, sep)] = arg.substr(sep + 1);
+        }
+
+        TVolumeDescription volume;
+        int ret = Api->CreateVolume(argv[0], properties, volume);
         if (ret) {
             PrintError("Can't create volume");
             return ret;
@@ -1378,42 +1387,78 @@ public:
     }
 };
 
-class TDestroyVolumeCmd : public ICmd {
+class TLinkVolumeCmd : public ICmd {
 public:
-    TDestroyVolumeCmd(TPortoAPI *api) : ICmd(api, "vdestroy", 1, "<path> [path...]", "destroy volume") {}
+    TLinkVolumeCmd(TPortoAPI *api) : ICmd(api, "vlink", 1, "<path> [container]", "link volume") {}
 
     int Execute(int argc, char *argv[]) {
-        for (int i = 0; i < argc; i++) {
-            int ret = Api->DestroyVolume(argv[i]);
-            if (ret) {
-                PrintError("Can't destroy volume");
-                return ret;
-            }
-        }
+        int ret = Api->LinkVolume(argv[0], (argc > 1) ? argv[1] : "");
+        if (ret)
+            PrintError("Can't link volume");
+        return ret;
+    }
+};
 
-        return 0;
+class TUnlinkVolumeCmd : public ICmd {
+public:
+    TUnlinkVolumeCmd(TPortoAPI *api) : ICmd(api, "vunlink", 1, "<path> [container]", "unlink volume") {}
+
+    int Execute(int argc, char *argv[]) {
+        int ret = Api->UnlinkVolume(argv[0], (argc > 1) ? argv[1] : "");
+        if (ret)
+            PrintError("Can't unlink volume");
+        return ret;
     }
 };
 
 class TListVolumesCmd : public ICmd {
+    bool details = true;
 public:
-    TListVolumesCmd(TPortoAPI *api) : ICmd(api, "vlist", 0, "", "list created volumes") {}
+    TListVolumesCmd(TPortoAPI *api) : ICmd(api, "vlist", 0, "[-1] [volume]...", "list created volumes") {}
+
+    void ShowVolume(TVolumeDescription &v) {
+        std::cout << v.Path << std::endl;
+        if (!details)
+            return;
+        std::cout << "  " << std::left << std::setw(20) << "containers";
+        for (auto name: v.Containers)
+            std::cout << " " << name;
+        std::cout << std::endl;
+        for (auto kv: v.Properties) {
+             std::cout << "  " << std::left << std::setw(20) << kv.first;
+             if (kv.second.length())
+                  std::cout << " " << kv.second;
+             std::cout << std::endl;
+        }
+        std::cout << std::endl;
+    }
 
     int Execute(int argc, char *argv[]) {
-        vector<TVolumeDescription> vlist;
-        int ret = Api->ListVolumes(vlist);
-        if (ret) {
-            PrintError("Can't list volumes");
-            return ret;
-        }
+        int start = GetOpt(argc, argv, {
+            { '1', [&]() { details = false; } },
+        });
 
-        for (auto v : vlist) {
-            std::cout << v.Path << " "
-                      << v.Source << " "
-                      << v.Quota << " "
-                      << v.Flags << " "
-                      << "usage: " << v.Used << "/" << v.Avail << " (" << (v.Used * 100 / v.Avail) << "%) "
-                      << std::endl;
+        vector<TVolumeDescription> vlist;
+
+        if (start == argc) {
+          int ret = Api->ListVolumes(vlist);
+          if (ret) {
+              PrintError("Can't list volumes");
+              return ret;
+          }
+
+          for (auto v : vlist)
+              ShowVolume(v);
+        } else {
+            for (int i = start; i < argc; i++) {
+                int ret = Api->ListVolumes(argv[i], "", vlist);
+                if (ret) {
+                    PrintError(argv[i]);
+                    continue;
+                }
+                for (auto v : vlist)
+                    ShowVolume(v);
+            }
         }
 
         return EXIT_SUCCESS;
@@ -1449,7 +1494,8 @@ int main(int argc, char *argv[]) {
     RegisterCommand(new TWaitCmd(&api));
 
     RegisterCommand(new TCreateVolumeCmd(&api));
-    RegisterCommand(new TDestroyVolumeCmd(&api));
+    RegisterCommand(new TLinkVolumeCmd(&api));
+    RegisterCommand(new TUnlinkVolumeCmd(&api));
     RegisterCommand(new TListVolumesCmd(&api));
 
     TLogger::DisableLog();
