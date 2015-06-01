@@ -826,7 +826,7 @@ TError TTask::Start() {
         ReportPid(clonePid);
         if (clonePid < 0) {
             TError error(errno == ENOMEM ?
-                         Error::ResourceNotAvailable :
+                         EError::ResourceNotAvailable :
                          EError::Unknown, errno, "clone()");
             L() << "Can't spawn child: " << error << std::endl;
             Abort(error);
@@ -841,7 +841,7 @@ TError TTask::Start() {
         }
 
         int result = 0;
-        int ret = write(WaitParentWfd, &result, sizeof(result));
+        ret = write(WaitParentWfd, &result, sizeof(result));
         if (ret != sizeof(result)) {
             TError error(EError::Unknown, "Partial write to child sync pipe (" + std::to_string(ret) + " != " + std::to_string(result) + ")");
             L() << "Can't spawn child: " << error << std::endl;
