@@ -536,6 +536,21 @@ TError TContainer::PrepareCgroups() {
     return TError::Success();
 }
 
+bool TContainer::IsNamespaceIsolated() {
+    if (IsRoot() || IsPortoRoot())
+        return false;
+
+    if (Prop->Get<std::string>(P_ROOT) != "/" &&
+        !Prop->Get<std::string>(P_PORTO_NAMESPACE).empty() &&
+        Prop->Get<bool>(P_ENABLE_PORTO))
+        return true;
+
+    if (Parent)
+        return Parent->IsNamespaceIsolated();
+
+    return false;
+}
+
 TError TContainer::PrepareTask() {
     if (!Prop->Get<bool>(P_ISOLATE))
         for (auto name : Prop->List())
@@ -598,6 +613,14 @@ TError TContainer::PrepareTask() {
     error = Prop->PrepareTaskEnv(P_CAPABILITIES, taskEnv);
     if (error)
         return error;
+
+    if (Prop->Get<bool>(P_ENABLE_PORTO) && IsNamespaceIsolated()) {
+        TBindMap bm = { config().rpc_sock().file().path(),
+                        config().rpc_sock().file().path(),
+                        false };
+
+        taskEnv->BindMap.push_back(bm);
+    }
 
     taskEnv->NewMountNs = taskEnv->Isolate || taskEnv->RootRdOnly ||
                           taskEnv->BindMap.size();

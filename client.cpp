@@ -161,3 +161,14 @@ std::shared_ptr<TContainer> TClient::GetContainer() const {
     PORTO_ASSERT(c);
     return c;
 }
+
+bool TClient::Readonly() {
+    auto c = Container.lock();
+    if (!c)
+        return true;
+
+    if (c->IsNamespaceIsolated())
+        return false;
+
+    return !MemberOfPortoGroup && !Cred.IsPrivileged();
+}

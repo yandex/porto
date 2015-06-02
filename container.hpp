@@ -166,6 +166,7 @@ public:
 
     bool IsLostAndRestored() const;
     void SyncStateWithCgroup();
+    bool IsNamespaceIsolated();
 };
 
 class TContainerWaiter {
