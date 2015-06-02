@@ -25,6 +25,8 @@
 - add stresstest
 - allow non-empty destination dir if uid/gid matches
 - create volume without tar.gz
+- handle volume creation from chrooted containers
+- merge ext4 quota management into volumes
 
 # cleanup
 - remove extern AckExitStatus from container->Stop()
@@ -32,3 +34,8 @@
 - use some kind of reference count for accounting running children
 - add c++ namespaces
 - ? get rid of globals/static which have class types (http://google-styleguide.googlecode.com/svn/trunk/cppguide.html#Static_and_Global_Variables)
+
+# key-value refactor
+- use one key-value storage for containers and volumes
+- write to key-value using create-rename instead of merge
+- repace uint16_t identifiers with something bigger
