@@ -218,7 +218,7 @@ public:
     int Execute(int argc, char *argv[]) {
         bool printKey = false;
         int start = GetOpt(argc, argv, {
-            { 'k', [&]() { printKey = true; } },
+            { 'k', false, [&](const char *arg) { printKey = true; } },
         });
 
         for (int i = start + 1; i < argc; i++) {
@@ -264,7 +264,7 @@ public:
     int Execute(int argc, char *argv[]) {
         bool printKey = false;
         int start = GetOpt(argc, argv, {
-            { 'k', [&]() { printKey = true; } },
+            { 'k', false, [&](const char *arg) { printKey = true; } },
         });
 
         for (int i = start + 1; i < argc; i++) {
@@ -596,7 +596,7 @@ public:
     int Execute(int argc, char *argv[]) {
         bool enterCgroups = true;
         int start = GetOpt(argc, argv, {
-            { 'C', [&]() { enterCgroups = false; } },
+            { 'C', false, [&](const char *arg) { enterCgroups = false; } },
         });
 
         string cmd = "";
@@ -1114,18 +1114,26 @@ public:
     TWaitCmd(TPortoAPI *api) : ICmd(api, "wait", 1, "<container1> [container2] ...", "wait for listed containers") {}
 
     int Execute(int argc, char *argv[]) {
+        int timeout = -1;
+        int start = GetOpt(argc, argv, {
+            { 't', true, [&](const char *arg) { timeout = std::stoi(arg); } },
+        });
+
         std::vector<std::string> containers;
-        for (int i = 0; i < argc; i++)
+        for (int i = start; i < argc; i++)
             containers.push_back(argv[i]);
 
         std::string name;
-        int ret = Api->Wait(containers, name);
+        int ret = Api->Wait(containers, name, timeout);
         if (ret) {
             PrintError("Can't wait for containers");
             return ret;
         }
 
-        std::cout << name << " isn't running" << std::endl;
+        if (name.empty())
+            std::cerr << "timeout" << std::endl;
+        else
+            std::cout << name << " isn't running" << std::endl;
 
         return 0;
     }
@@ -1148,9 +1156,9 @@ public:
         bool forest = false;
         bool toplevel = false;
         (void)GetOpt(argc, argv, {
-            { '1', [&]() { details = false; } },
-            { 'f', [&]() { forest = true; } },
-            { 't', [&]() { toplevel = true; } },
+            { '1', false, [&](const char *arg) { details = false; } },
+            { 'f', false, [&](const char *arg) { forest = true; } },
+            { 't', false, [&](const char *arg) { toplevel = true; } },
         });
 
         vector<string> clist;
