@@ -131,7 +131,7 @@ class _RPC(object):
     def List(self):
         request = rpc_pb2.TContainerRequest()
         request.list.CopyFrom(rpc_pb2.TContainerListRequest())
-        return self.call(request).list.name
+        return self.call(request, self.timeout).list.name
 
     def Create(self, name):
         request = rpc_pb2.TContainerRequest()
