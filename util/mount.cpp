@@ -41,10 +41,25 @@ TError TMount::Mount(unsigned long flags) const {
 TError TMount::Umount() const {
     L_ACT() << "umount " << Target << std::endl;
 
-    int ret = RetryBusy(10, 100, [&]{ return umount(Target.ToString().c_str()); });
+    int ret = RetryBusy(10, 100, [&]{ return umount2(Target.ToString().c_str(), UMOUNT_NOFOLLOW); });
     if (ret)
         return TError(EError::Unknown, errno, "umount(" + Target.ToString() + ")");
 
+    return TError::Success();
+}
+
+TError TMount::Move(TPath destination) {
+    int ret = mount(Target.ToString().c_str(), destination.ToString().c_str(), NULL, MS_MOVE, NULL);
+    if (ret)
+        return TError(EError::Unknown, errno, "mount(" + Target.ToString() + ", " + destination.ToString() + ", MS_MOVE)");
+    Target = destination;
+    return TError::Success();
+}
+
+TError TMount::Detach() const {
+    int ret = umount2(Target.ToString().c_str(), MNT_DETACH | UMOUNT_NOFOLLOW);
+    if (ret)
+        return TError(EError::Unknown, errno, "umount2(" + Target.ToString() + ", MNT_DETACH | UMOUNT_NOFOLLOW)");
     return TError::Success();
 }
 
