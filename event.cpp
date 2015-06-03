@@ -56,6 +56,8 @@ std::string TEvent::GetMsg() const {
             return "OOM killed with fd " + std::to_string(OOM.Fd);
         case EEventType::CgroupSync:
             return "cgroup sync";
+        case EEventType::WaitTimeout:
+            return "wait timeout";
         default:
             return "unknown event";
     }

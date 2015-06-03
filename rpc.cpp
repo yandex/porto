@@ -449,6 +449,13 @@ static TError Wait(TContext &context,
     }
 
     client->Waiter = waiter;
+
+    if (req.has_timeout()) {
+        TEvent e(EEventType::WaitTimeout, nullptr);
+        e.WaitTimeout.Waiter = waiter;
+        context.Queue->Add(req.timeout(), e);
+    }
+
     return TError::Success();
 }
 

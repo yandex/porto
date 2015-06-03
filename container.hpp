@@ -176,6 +176,5 @@ private:
 public:
     TContainerWaiter(std::shared_ptr<TClient> client,
                      std::function<void (std::shared_ptr<TClient>, TError, std::string)> callback);
-    void SetClient(std::shared_ptr<TClient> client);
-    void Signal(const TContainer &who);
+    void Signal(const TContainer *who);
 };

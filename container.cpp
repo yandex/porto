@@ -136,7 +136,7 @@ void TContainer::SetState(EContainerState newState, bool tree) {
         for (auto &w : Waiters) {
             auto waiter = w.lock();
             if (waiter)
-                waiter->Signal(*this);
+                waiter->Signal(this);
         }
     }
 
@@ -1682,7 +1682,7 @@ void TContainer::AddWaiter(std::shared_ptr<TContainerWaiter> waiter) {
         CleanupWaiters();
         Waiters.push_back(waiter);
     } else {
-        waiter->Signal(*this);
+        waiter->Signal(this);
     }
 }
 
@@ -1703,17 +1703,15 @@ TContainerWaiter::TContainerWaiter(std::shared_ptr<TClient> client,
     Client(client), Callback(callback) {
 }
 
-void TContainerWaiter::SetClient(std::shared_ptr<TClient> client) {
-    Client = client;
-}
-
-void TContainerWaiter::Signal(const TContainer &who) {
+void TContainerWaiter::Signal(const TContainer *who) {
     std::shared_ptr<TClient> client = Client.lock();
     if (client) {
         auto container = client->GetContainer();
         if (container) {
             std::string name;
-            TError err = container->RelativeName(who, name);
+            TError err = TError::Success();
+            if (who)
+                err = container->RelativeName(*who, name);
             Callback(client, err, name);
         }
 

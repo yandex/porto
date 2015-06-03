@@ -369,7 +369,8 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
         if (c)
             return c->DeliverEvent(event);
         return false;
-    } else {
+    } else if (event.Type != EEventType::CgroupSync &&
+               event.Type != EEventType::WaitTimeout) {
         std::vector<std::string> remove;
         for (auto c : Containers) {
             if (event.Type == EEventType::RotateLogs)
@@ -400,6 +401,11 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
         }
         if (rearm)
             ScheduleCgroupSync();
+        return true;
+    } else if (event.Type == EEventType::WaitTimeout) {
+        auto w = event.WaitTimeout.Waiter.lock();
+        if (w)
+            w->Signal(nullptr);
         return true;
     } else if (event.Type == EEventType::RotateLogs) {
         ScheduleLogRotatation();

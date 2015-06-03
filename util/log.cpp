@@ -225,6 +225,9 @@ std::string RequestAsString(const rpc::TContainerRequest &req) {
         for (int i = 0; i < req.wait().name_size(); i++)
             ret += " " + req.wait().name(i);
 
+        if (req.wait().has_timeout())
+            ret += " timeout " + std::to_string(req.wait().timeout());
+
         return ret;
     } else if (req.has_createvolume())
         return "volumeAPI: create " + req.createvolume().path() + " " +
