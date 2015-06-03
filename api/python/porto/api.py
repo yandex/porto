@@ -246,7 +246,10 @@ class _RPC(object):
     def Wait(self, containers, timeout=None):
         request = rpc_pb2.TContainerRequest()
         request.wait.name.extend(containers)
-        resp = self.call(request, timeout)
+        if timeout is not None and timeout >= 0:
+            request.wait.timeout = timeout
+
+        resp = self.call(request, None)
         if resp.error != rpc_pb2.Success:
             raise exceptions.EError.Create(resp.error, resp.errorMsg)
         return resp.wait.name
@@ -361,6 +364,9 @@ class Connection(object):
 
     def Dlist(self):
         return self.rpc.Dlist()
+
+    def Wait(self, containers, timeout=None):
+        return self.rpc.Wait(containers, timeout)
 
 
 # Example:
