@@ -1,5 +1,71 @@
 #include "portotop.hpp"
 
+static double ParseNumber(const std::string &str) {
+    try {
+        return stod(str);
+    } catch (...) {
+        return NAN;
+    }
+}
+
+static double ParseValue(const std::string &value, bool map) {
+    if (!map)
+        return ParseNumber(value);
+
+    double ret = 0;
+    unsigned long start_v = 0;
+    for (unsigned long off = 0; off < value.length(); off++) {
+        if (value[off] == ':')
+            start_v = off + 2; // key: value
+        else if (value[off] == ';')
+            ret += ParseNumber(value.substr(start_v, off - start_v));
+    }
+    return ret + ParseNumber(value.substr(start_v));
+};
+
+static std::string PrintNumber(double number, int base,
+                               bool seconds, bool percents,
+                               double multiplier) {
+    char buf[20];
+
+    number /= multiplier;
+
+    if (percents) {
+        snprintf(buf, sizeof(buf), "%.1lf%%", 100 * number);
+    } else if (seconds) {
+        double seconds = number;
+        double minutes = std::floor(seconds / 60);
+        seconds -= minutes * 60;
+
+        snprintf(buf, sizeof(buf), "%4.lf:%2.2lf", minutes, seconds);
+    } else {
+        char s = 0;
+        if (number > base * base * base) {
+            number /= base * base * base;
+            s = 'G';
+        } else if (number > base * base) {
+            number /= base * base;
+            s = 'M';
+        } else if (number > base) {
+            number /= base;
+            s = 'k';
+        }
+
+        snprintf(buf, sizeof(buf), "%.1lf%c", number, s);
+    }
+
+    return std::string(buf);
+};
+
+static double DfDt(double curr, double prev, unsigned long gone_ms) {
+    return 1000.0d * (curr - prev) / gone_ms;
+};
+
+static double PartOf(double value, double total) {
+    return value / total;
+}
+////////////////////////////////////////////////////////////////////////////////
+
 int TConsoleScreen::Width() {
     return getmaxx(Wnd);
 }
@@ -109,11 +175,11 @@ int TConsoleScreen::Dialog(std::string text, const std::vector<std::string> &but
 
     return -1;
 }
-void TConsoleScreen::ErrorDialog(TPortoAPI *api) {
+void TConsoleScreen::ErrorDialog(TPortoAPI &api) {
     std::string message;
     int error;
 
-    api->GetLastError(error, message);
+    api.GetLastError(error, message);
 
     if (error)
         Dialog(message, {"Ok"});
@@ -177,111 +243,147 @@ void TConsoleScreen::HelpDialog() {
     InfoDialog(help);
 }
 
-void TPortoValueCache::Register(TPortoValue &value) {
-    Items.insert(&value);
+void TPortoValueCache::Register(const std::string &container,
+                                const std::string &variable) {
+    if (Containers.find(container) == Containers.end())
+        Containers[container] = 1;
+    else
+        Containers[container]++;
+    if (Variables.find(variable) == Variables.end())
+        Variables[variable] = 1;
+    else
+        Variables[variable]++;
 }
-void TPortoValueCache::Unregister(TPortoValue &value) {
-    Items.erase(&value);
-}
-
-int TPortoValueCache::Update(TPortoAPI *api) {
-    LastUpdate = Now;
-    clock_gettime(CLOCK_MONOTONIC, &Now);
-    GoneMs = 1000 * (Now.tv_sec - LastUpdate.tv_sec) +
-        (Now.tv_nsec - LastUpdate.tv_nsec) / 1000000;
-
-    std::unordered_set<std::string> containers;
-    std::unordered_set<std::string> variables;
-
-    for (auto &iter : Items) {
-        containers.insert(iter->GetContainer());
-        variables.insert(iter->GetVariable());
+void TPortoValueCache::Unregister(const std::string &container,
+                                  const std::string &variable) {
+    auto c = Containers.find(container);
+    if (c != Containers.end()) {
+        if (c->second == 1)
+            Containers.erase(c);
+        else
+            c->second--;
     }
+    auto v = Variables.find(variable);
+    if (v != Variables.end()) {
+        if (v->second == 1)
+            Variables.erase(v);
+        else
+            v->second--;
+    }
+}
 
+std::string TPortoValueCache::GetValue(const std::string &container,
+                                       const std::string &variable,
+                                       bool prev) {
+    return Cache[CacheSelector ^ prev][container][variable].Value;
+}
+
+int TPortoValueCache::Update(TPortoAPI &api) {
     std::vector<std::string> _containers;
-    for (auto &iter : containers)
-        _containers.push_back(iter);
+    for (auto &iter : Containers)
+        _containers.push_back(iter.first);
 
     std::vector<std::string> _variables;
-    for (auto &iter : variables)
-        _variables.push_back(iter);
+    for (auto &iter : Variables)
+        _variables.push_back(iter.first);
 
     CacheSelector = !CacheSelector;
     Cache[CacheSelector].clear();
-    int ret = api->Get(_containers, _variables, Cache[CacheSelector]);
-
-    for (auto &iter : Items) {
-        std::string c = iter->GetContainer();
-        std::string v = iter->GetVariable();
-        iter->ProcessValue(Cache[CacheSelector][c][v].Value,
-                           Cache[!CacheSelector][c][v].Value, GoneMs);
-    }
+    int ret = api.Get(_containers, _variables, Cache[CacheSelector]);
 
     return ret;
 }
 
-TPortoValue::TPortoValue() : Cache(nullptr), Saved() {
+TPortoValue::TPortoValue() : Cache(nullptr), Container(nullptr), Flags(ValueFlags::Raw) {
 }
-TPortoValue::TPortoValue(const TPortoValue &src, const std::string &container) :
-    Cache(src.Cache),
-    Variable(src.Variable),
-    Container(container),
-    Processor(src.Processor),
-    Printer(src.Printer),
-    Saved(src.Saved),
-    Printed(src.Printed) {
-    if (Cache)
-        Cache->Register(*this);
+
+TPortoValue::TPortoValue(const TPortoValue &src) :
+    Cache(src.Cache), Container(src.Container), Variable(src.Variable), Flags(src.Flags),
+    Multiplier(src.Multiplier) {
+    if (Cache && Container)
+        Cache->Register(Container->GetName(), Variable);
 }
-TPortoValue::TPortoValue(const TPortoValue &src) : Cache(src.Cache),
-                                                   Variable(src.Variable),
-                                                   Container(src.Container),
-                                                   Processor(src.Processor),
-                                                   Printer(src.Printer),
-                                                   Saved(src.Saved),
-                                                   Printed(src.Printed) {
-    if (Cache)
-        Cache->Register(*this);
+
+TPortoValue::TPortoValue(const TPortoValue &src, TPortoContainer *container) :
+    Cache(src.Cache), Container(container), Variable(src.Variable), Flags(src.Flags),
+    Multiplier(src.Multiplier) {
+    if (Cache && Container)
+        Cache->Register(Container->GetName(), Variable);
 }
-TPortoValue::TPortoValue(TPortoValueCache &cache, const std::string &variable,
-                         const std::string &container, TProcessor processor,
-                         TPrinter printer) :
-    Cache(&cache), Variable(variable), Container(container),
-    Processor(processor), Printer(printer) {
-    Cache->Register(*this);
+
+TPortoValue::TPortoValue(TPortoValueCache &cache, TPortoContainer *container,
+                             const std::string &variable, int flags, double multiplier) :
+    Cache(&cache), Container(container), Variable(variable), Flags(flags),
+    Multiplier(multiplier) {
+    if (Cache && Container)
+        Cache->Register(Container->GetName(), Variable);
 }
-// static fields like title
-TPortoValue::TPortoValue(const std::string &value) : Cache(nullptr), Saved(value),
-                                                     Printed(value) {
-                                                     }
+
 TPortoValue::~TPortoValue() {
-    if (Cache)
-        Cache->Unregister(*this);
+    if (Cache && Container)
+        Cache->Unregister(Container->GetName(), Variable);
 }
-const std::string TPortoValue::GetContainer() const {
-    return Container;
+
+void TPortoValue::Process(unsigned long gone) {
+    if (Flags == ValueFlags::Container) {
+        std::string name = Container->GetName();
+        int level = Container->GetLevel();
+        if (level > 0) {
+            name = (Container->HasChildren() ? "+" : "-") +
+                name.substr(1 + name.rfind('/'));
+            AsString = std::string(level, ' ') + name;
+        }
+        return;
+    }
+
+    AsString = Cache->GetValue(Container->GetName(), Variable, false);
+    if (Flags == ValueFlags::Raw || AsString.length() == 0)
+        return;
+
+    AsNumber = ParseValue(AsString, Flags & ValueFlags::Map);
+
+    if (Flags & ValueFlags::DfDt) {
+        std::string old = Cache->GetValue(Container->GetName(), Variable, true);
+        if (old.length() == 0)
+            old = AsString;
+        AsNumber = DfDt(AsNumber, ParseValue(old, Flags & ValueFlags::Map), gone);
+    }
+
+    if (Flags & ValueFlags::PartOfRoot) {
+        std::string root_raw = Cache->GetValue("/", Variable, false);
+        double root_number;
+
+        root_number = ParseValue(root_raw, Flags & ValueFlags::Map);
+
+        if (Flags & ValueFlags::DfDt) {
+            std::string old = Cache->GetValue("/", Variable, true);
+            if (old.length() == 0)
+                old = root_raw;
+            root_number = DfDt(root_number, ParseValue(old, Flags & ValueFlags::Map), gone);
+        }
+
+        AsNumber = PartOf(AsNumber, root_number);
+    }
+
+    int base = (Flags & ValueFlags::Bytes) ? 1024 : 1000;
+    bool seconds = Flags & ValueFlags::Seconds;
+    bool percents = Flags & ValueFlags::Percents;
+    double multiplier = (Flags & ValueFlags::Multiplier) ? Multiplier : 1;
+    AsString = PrintNumber(AsNumber, base, seconds, percents, multiplier);
 }
-const std::string TPortoValue::GetVariable() const {
-    return Variable;
-}
-void TPortoValue::ProcessValue(std::string curr, std::string old, unsigned long gone) {
-    if (Processor)
-        Saved = Processor(curr, old, gone);
-    else
-        Saved = curr;
-    if (Printer)
-        Printed = Printer(Saved);
-    else
-        Printed = Saved;
-}
-std::string TPortoValue::GetSortValue() const {
-    return Saved;
-}
-std::string TPortoValue::GetPrintValue() const {
-    return Printed;
+std::string TPortoValue::GetValue() const {
+    return AsString;
 }
 int TPortoValue::GetLength() const {
-    return Printed.length();
+    return AsString.length();
+}
+bool TPortoValue::operator< (const TPortoValue &v) {
+    if (Flags == ValueFlags::Raw)
+        return AsString < v.AsString;
+    else if (Flags == ValueFlags::Container)
+        return Container->GetName() < v.Container->GetName();
+    else
+        return AsNumber > v.AsNumber;
 }
 
 TCommonValue::TCommonValue(const std::string &label, const TPortoValue &val) :
@@ -315,7 +417,12 @@ TPortoContainer::~TPortoContainer() {
         delete c;
 }
 
-TPortoContainer* TPortoContainer::ContainerTree(std::vector<std::string> &containers) {
+TPortoContainer* TPortoContainer::ContainerTree(TPortoAPI &api) {
+    std::vector<std::string> containers;
+    int ret = api.List(containers);
+    if (ret)
+        return nullptr;
+
     TPortoContainer *root = nullptr;
     TPortoContainer *curr = nullptr;
     TPortoContainer *prev = nullptr;
@@ -347,26 +454,19 @@ TPortoContainer* TPortoContainer::ContainerTree(std::vector<std::string> &contai
     }
     return root;
 }
-std::string TPortoContainer::GetContainer() {
+std::string TPortoContainer::GetName() {
     return Container;
 }
 int TPortoContainer::GetLevel() {
     return Level;
 }
-void TPortoContainer::for_each(std::function<void (TPortoContainer&)> fn, int maxlevel,
+void TPortoContainer::ForEachChild(std::function<void (TPortoContainer&)> fn, int maxlevel,
                                bool check_root) {
     if ((Level || check_root) && Level <= maxlevel)
         fn(*this);
     if (Level < maxlevel)
         for (auto &c : Children)
-            c->for_each(fn, maxlevel);
-}
-
-bool TPortoContainer::IsSelected() {
-    return Selected;
-}
-void TPortoContainer::Select(bool select) {
-    Selected = select;
+            c->ForEachChild(fn, maxlevel);
 }
 int TPortoContainer::GetMaxLevel() {
     int level = Level;
@@ -375,21 +475,21 @@ int TPortoContainer::GetMaxLevel() {
             level = c->GetMaxLevel();
     return level;
 }
-int TPortoContainer::RowCount(int max_level) {
+int TPortoContainer::ChildrenCount(int max_level) {
     int count = Level > 0 ? 1 : 0;
     if (Level < max_level)
         for (auto &c : Children)
-            count += c->RowCount(max_level);
+            count += c->ChildrenCount(max_level);
     return count;
 }
 std::string TPortoContainer::ContainerAt(int n, int max_level) {
     TPortoContainer *ret = this;
     int i = 0;
-    for_each([&] (TPortoContainer &row) {
+    ForEachChild([&] (TPortoContainer &row) {
             if (i++ == n)
                 ret = &row;
         }, max_level);
-    return ret->GetContainer();
+    return ret->GetName();
 }
 bool TPortoContainer::HasChildren() {
     return Children.size() > 0;
@@ -398,135 +498,41 @@ TPortoContainer* TPortoContainer::GetRoot() const {
     return Root;
 }
 
-static TPrinter nice_number(int base) {
-    return [=] (std::string raw) {
-        try {
-            char buf[20];
-            char s = 0;
-
-            double v = stod(raw);
-            if (v > base * base * base) {
-                v /= base * base * base;
-                s = 'G';
-            } else if (v > base * base) {
-                v /= base * base;
-                s = 'M';
-            } else if (v > base) {
-                v /= base;
-                s = 'k';
-            }
-
-            snprintf(buf, sizeof(buf), "%.1lf%c", v, s);
-            return std::string(buf);
-        } catch (...) {
-            return raw;
-        }
-    };
-}
-
-static TPrinter nice_seconds(double multiplier = 1) {
-    return [=] (std::string raw) {
-        try {
-            char buf[40];
-
-            double seconds = stod(raw) / multiplier;
-            double minutes = std::floor(seconds / 60);
-            seconds -= minutes * 60;
-
-            snprintf(buf, sizeof(buf), "%4.lf:%2.2lf", minutes, seconds);
-            return std::string(buf);
-        } catch (...) {
-            return std::string();
-        }
-    };
-}
-
-static TProcessor map_summ(std::string data) {
-    return [=] (std::string value, std::string unused, unsigned long unused2) {
-        std::vector<std::string> values;
-        unsigned long start_v = 0;
-        for (unsigned long off = 0; off < value.length(); off++) {
-            if (value[off] == ':') {
-                start_v = off + 2; // key: value
-            } else if (value[off] == ';') {
-                values.push_back(value.substr(start_v, off - start_v));
-            }
-        }
-        values.push_back(value.substr(start_v));
-
-        unsigned long ret = 0;
-        try {
-            for (auto &s : values)
-                ret += stoull(s);
-        } catch (...) {
-            ret = 0;
-        }
-
-        return std::to_string(ret);
-    };
-}
-
-static TProcessor diff() {
-    return [=] (std::string value, std::string prev_value, unsigned long gone_ms) {
-        try {
-            unsigned long c = stoull(value);
-            unsigned long prev = stoull(prev_value);
-
-            std::string str = std::to_string((1000.0d * (c - prev)) / gone_ms);
-
-            return str;
-        } catch (...) {
-            return std::string();
-        }
-    };
-}
-
-TColumn::TColumn(std::string title, TPortoValue var, TColumnProcessor processor,
-        TColumnPrinter printer, bool left_aligned) :
-    Title(title), RootValue(var), LeftAligned(left_aligned),
-    Processor(processor), Printer(printer) {
+TColumn::TColumn(std::string title, TPortoValue var, bool left_aligned) :
+    Title(title), RootValue(var), LeftAligned(left_aligned) {
     Width = title.length();
 }
 int TColumn::PrintTitle(int x, int y, TConsoleScreen &screen) {
-    screen.PrintAt(Title.GetPrintValue(), x, y, Width, LeftAligned,
+    screen.PrintAt(Title, x, y, Width, LeftAligned,
                    A_BOLD | (Selected ? A_UNDERLINE : 0));
     return Width;
 }
-int TColumn::Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen) {
-    std::string p;
-    if (Printer)
-        p = Printer(row, *this, At(row, true));
-    else
-        p = At(row, true);
-
-    screen.PrintAt(p, x, y, Width, LeftAligned, row.IsSelected() ? A_REVERSE : 0);
+int TColumn::Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, bool selected) {
+    std::string p = At(row).GetValue();
+    screen.PrintAt(p, x, y, Width, LeftAligned, selected ? A_REVERSE : 0);
     return Width;
 }
-void TColumn::Update(TPortoAPI *api, TPortoContainer* tree, int maxlevel) {
+void TColumn::Update(TPortoAPI &api, TPortoContainer* tree, int maxlevel) {
     Cache.clear();
-    tree->for_each([&] (TPortoContainer &row) {
-            TPortoValue val(RootValue, row.GetContainer());
-            Cache.insert(std::make_pair(row.GetContainer(), val));
+    tree->ForEachChild([&] (TPortoContainer &row) {
+            TPortoValue val(RootValue, &row);
+            Cache.insert(std::make_pair(row.GetName(), val));
         }, maxlevel, true);
 }
-std::string TColumn::At(TPortoContainer &row, bool print, bool cached) {
-    if (Processor && !cached)
-        return Processor(row, *this);
-    else
-        return print ? Cache[row.GetContainer()].GetPrintValue() :
-            Cache[row.GetContainer()].GetSortValue();
+TPortoValue& TColumn::At(TPortoContainer &row) {
+    return Cache[row.GetName()];
 }
 void TColumn::Highlight(bool enable) {
     Selected = enable;
 }
-void TColumn::UpdateWidth() {
+void TColumn::Process(unsigned long gone) {
     for (auto &iter : Cache) {
+        iter.second.Process(gone);
+
         int w = iter.second.GetLength();
         if (w > Width)
             Width = w;
     }
-    if (Title.GetLength() > Width)
-        Width = Title.GetLength();
 }
 int TColumn::GetWidth() {
     return Width;
@@ -535,62 +541,13 @@ void TColumn::SetWidth(int width) {
     Width = width;
 }
 
-void TPortoContainer::Sort(TColumn &column) {
+void TPortoContainer::SortTree(TColumn &column) {
     Children.sort([&] (TPortoContainer *row1, TPortoContainer *row2) {
-            std::string str1 = column.At(*row1);
-            std::string str2 = column.At(*row2);
-
-            bool numeric_1 = false, numeric_2 = false;
-            double v1, v2;
-
-            try {
-                v1 = stod(str1);
-                numeric_1 = true;
-            } catch (...) {}
-            try {
-                v2 = stod(str2);
-                numeric_2 = true;
-            } catch (...) {}
-
-            if (numeric_1 && numeric_2)
-                return v1 > v2;
-            if (!numeric_1 && !numeric_2)
-                return str1 < str2;
-            return numeric_1;
+            return column.At(*row1) < column.At(*row2);
         });
     for (auto &c : Children)
-        c->Sort(column);
+        c->SortTree(column);
 }
-
-static TColumnProcessor part_of_root() {
-    return [] (TPortoContainer &row, TColumn &column) {
-        try {
-            std::string _curr = column.At(row, false, true);
-            std::string _root = column.At(*row.GetRoot(), false, true);
-
-            double curr = stod(_curr);
-            double root = stod(_root);
-
-            return std::to_string(curr / root);
-        } catch (...) {
-            return std::string("error");
-        }
-    };
-}
-
-static TColumnPrinter nice_percents() {
-    return [] (TPortoContainer &row, TColumn &column, std::string raw) {
-        try {
-            char buf[20];
-            snprintf(buf, sizeof(buf), "%.1lf%%", 100 * stod(raw));
-            return std::string(buf);
-        } catch (...) {
-            return std::string();
-        }
-        return raw;
-    };
-}
-
 
 void TPortoTop::PrintTitle(int y, TConsoleScreen &screen) {
     int x = FirstX;
@@ -605,7 +562,7 @@ int TPortoTop::PrintCommon(TConsoleScreen &screen) {
             std::string p = item.GetLabel();
             screen.PrintAt(p, x, y, p.length());
             x += p.length();
-            p = item.GetValue().GetPrintValue();
+            p = item.GetValue().GetValue();
             screen.PrintAt(p, x, y, p.length(), false, A_BOLD);
             x += p.length() + 1;
         }
@@ -619,33 +576,31 @@ void TPortoTop::Print(TConsoleScreen &screen) {
     screen.Clear();
 
     int at_row = 1 + PrintCommon(screen);
-    MaxRows = ContainerTree->RowCount(MaxLevel);
-    DisplayRows = std::min(screen.Height() - at_row, MaxRows);
-    ChangeSelection(0, 0, screen);
 
-    PrintTitle(at_row - 1, screen);
-    int y = 0;
-    ContainerTree->for_each([&] (TPortoContainer &row) {
-            if (y >= FirstRow && y < MaxRows) {
-                if (y == FirstRow + SelectedRow)
-                    row.Select(true);
-                int x = FirstX;
-                for (auto &c : Columns)
-                    x += 1 + c.Print(row, x, at_row + y - FirstRow, screen);
-                row.Select(false);
-            }
-            y++;
-        }, MaxLevel);
-    screen.Refresh();
+    if (ContainerTree) {
+        MaxRows = ContainerTree->ChildrenCount(MaxLevel);
+        DisplayRows = std::min(screen.Height() - at_row, MaxRows);
+        ChangeSelection(0, 0, screen);
+
+        PrintTitle(at_row - 1, screen);
+        int y = 0;
+        ContainerTree->ForEachChild([&] (TPortoContainer &row) {
+                if (y >= FirstRow && y < MaxRows) {
+                    bool selected = y == FirstRow + SelectedRow;
+                    int x = FirstX;
+                    for (auto &c : Columns)
+                        x += 1 + c.Print(row, x, at_row + y - FirstRow, screen, selected);
+                }
+                y++;
+            }, MaxLevel);
+        screen.Refresh();
+    }
 }
 void TPortoTop::AddColumn(const TColumn &c) {
     Columns.push_back(c);
 }
 bool TPortoTop::AddColumn(std::string desc) {
-    TProcessor processor = nullptr;
-    TPrinter printer = nullptr; // "", "b", "1E9s", "%"
-    TColumnProcessor column_processor = nullptr;
-    TColumnPrinter column_printer = nullptr;
+    int flags = ValueFlags::Raw;
     size_t off = 0;
     std::string data;
 
@@ -657,7 +612,7 @@ bool TPortoTop::AddColumn(std::string desc) {
         off = desc.find(')');
         data = desc.substr(2, off == std::string::npos ?
                            std::string::npos : off - 2);
-        processor = map_summ(data);
+        flags |= ValueFlags::Map;
     } else {
         off = desc.find('\'');
         if (off == std::string::npos)
@@ -668,34 +623,34 @@ bool TPortoTop::AddColumn(std::string desc) {
         data = desc.substr(0, off);
     }
 
-    double base = 1;
-    printer = nice_number(1000);
+    double multiplier = 1;
 
     if (off != std::string::npos) {
         for (; off < desc.length(); off++) {
             switch (desc[off]) {
             case 'b':
             case 'B':
-                printer = nice_number(1024);
+                flags |= ValueFlags::Bytes;
                 break;
             case 's':
             case 'S':
-                printer = nice_seconds(base);
+                flags |= ValueFlags::Seconds;
                 break;
             case '\'':
-                processor = diff();
+                flags |= ValueFlags::DfDt;
                 break;
             case '%':
-                column_processor = part_of_root();
-                column_printer = nice_percents();
+                flags |= ValueFlags::PartOfRoot;
+                flags |= ValueFlags::Percents;
                 break;
             case ' ':
                 break;
             default:
                 try {
                     size_t tmp;
-                    base = stod(desc.substr(off), &tmp);
+                    multiplier = stod(desc.substr(off), &tmp);
                     off += tmp - 1;
+                    flags |= ValueFlags::Multiplier;
                 } catch (...) {
                 }
                 break;
@@ -703,35 +658,37 @@ bool TPortoTop::AddColumn(std::string desc) {
         }
     }
 
-    TPortoValue v(Cache, data, "/", processor, printer);
-    Columns.push_back(TColumn(title, v, column_processor, column_printer));
+    TPortoValue v(Cache, &RootContainer, data, flags, multiplier);
+    Columns.push_back(TColumn(title, v));
     return true;
 }
 int TPortoTop::Update(TConsoleScreen &screen) {
-    std::vector<std::string> containers;
-    int ret = Api->List(containers);
-    if (ret)
-        return ret;
+    struct timespec Now = {0};
+    clock_gettime(CLOCK_MONOTONIC, &Now);
+    unsigned long gone = 1000 * (Now.tv_sec - LastUpdate.tv_sec) +
+        (Now.tv_nsec - LastUpdate.tv_nsec) / 1000000;
+    LastUpdate = Now;
 
-    if (ContainerTree)
-        delete ContainerTree;
-
-    ContainerTree = TPortoContainer::ContainerTree(containers);
+    ContainerTree.reset(TPortoContainer::ContainerTree(*Api));
     if (ContainerTree) {
         MaxMaxLevel = ContainerTree->GetMaxLevel();
 
         for (auto &column : Columns)
-            column.Update(Api, ContainerTree, MaxLevel);
+            column.Update(*Api, ContainerTree.get(), MaxLevel);
 
-        int ret = Cache.Update(Api);
+        int ret = Cache.Update(*Api);
         if (ret)
             return ret;
 
         int width = 0;
         for (auto &column : Columns) {
-            column.UpdateWidth();
+            column.Process(gone);
             width += column.GetWidth();
         }
+
+        for (auto &line : Common)
+            for (auto &item : line)
+                item.GetValue().Process(gone);
 
         if (width > screen.Width()) {
             int excess = width - screen.Width();
@@ -744,7 +701,7 @@ int TPortoTop::Update(TConsoleScreen &screen) {
             Columns[0].SetWidth(current);
         }
 
-        ContainerTree->Sort(Columns[SelectedColumn]);
+        ContainerTree->SortTree(Columns[SelectedColumn]);
     }
 
     return 0;
@@ -794,38 +751,38 @@ void TPortoTop::Expand() {
     if (++MaxLevel > MaxMaxLevel)
         MaxLevel = 1;
 }
-int TPortoTop::StartStop(TPortoAPI *api) {
+int TPortoTop::StartStop() {
     std::string state;
-    int ret = api->GetData(SelectedContainer(), "state", state);
+    int ret = Api->GetData(SelectedContainer(), "state", state);
     if (ret)
         return ret;
     if (state == "running" || state == "dead" || state == "meta")
-        return api->Stop(SelectedContainer());
+        return Api->Stop(SelectedContainer());
     else
-        return api->Start(SelectedContainer());
+        return Api->Start(SelectedContainer());
 }
-int TPortoTop::PauseResume(TPortoAPI *api) {
+int TPortoTop::PauseResume() {
     std::string state;
-    int ret = api->GetData(SelectedContainer(), "state", state);
+    int ret = Api->GetData(SelectedContainer(), "state", state);
     if (ret)
         return ret;
     if (state == "paused")
-        return api->Resume(SelectedContainer());
+        return Api->Resume(SelectedContainer());
     else
-        return api->Pause(SelectedContainer());
+        return Api->Pause(SelectedContainer());
 }
-int TPortoTop::Kill(TPortoAPI *api, int signal) {
-    return api->Kill(SelectedContainer(), signal);
+int TPortoTop::Kill(int signal) {
+    return Api->Kill(SelectedContainer(), signal);
 }
-int TPortoTop::Destroy(TPortoAPI *api) {
-    return api->Destroy(SelectedContainer());
+int TPortoTop::Destroy() {
+    return Api->Destroy(SelectedContainer());
 }
 void TPortoTop::LessPortoctl(std::string container, std::string cmd) {
     std::string s(program_invocation_name);
     s += " get " + container + " " + cmd + " | less";
     (void)system(s.c_str());
 }
-int TPortoTop::RunCmdInContainer(TPortoAPI *api, TConsoleScreen &screen, std::string cmd) {
+int TPortoTop::RunCmdInContainer(TConsoleScreen &screen, std::string cmd) {
     bool enter = (SelectedContainer() != "/");
     int ret = -1;
 
@@ -864,20 +821,22 @@ int TPortoTop::RunCmdInContainer(TPortoAPI *api, TConsoleScreen &screen, std::st
 std::string TPortoTop::SelectedContainer() {
     return ContainerTree->ContainerAt(FirstRow + SelectedRow, MaxLevel);
 }
-TPortoTop::TPortoTop(TPortoAPI *api, std::string config) : Api(api) {
+void TPortoTop::AddCommon(int row, const std::string &title, const std::string &var, int flags) {
+    Common.resize(row + 1);
+    TPortoValue v(Cache, &RootContainer, var, flags);
+    Common[row].push_back(TCommonValue(title, v));
+}
+TPortoTop::TPortoTop(TPortoAPI *api, std::string config) : Api(api),
+                                                           RootContainer("/") {
     if (config.size() == 0)
         ConfigFile = std::string(getenv("HOME")) + "/.portotop";
     else
         ConfigFile = config;
 
-    Common = {{TCommonValue("Containers running: ",
-                            TPortoValue(Cache, "porto_stat[running]", "/")),
-               TCommonValue("total: ",
-                            TPortoValue(Cache, "porto_stat[created]", "/")),
-               TCommonValue("Porto errors: ",
-                            TPortoValue(Cache, "porto_stat[errors]", "/")),
-               TCommonValue("warnings: ",
-                            TPortoValue(Cache, "porto_stat[warnings]", "/"))}};
+    AddCommon(0, "Containers running: ", "porto_stat[running]", ValueFlags::Raw);
+    AddCommon(0, "total: ", "porto_stat[created]", ValueFlags::Raw);
+    AddCommon(0, "Porto errors: ", "porto_stat[errors]", ValueFlags::Raw);
+    AddCommon(0, "warnings: ", "porto_stat[warnings]", ValueFlags::Raw);
 
     if (LoadConfig() != -1)
         return;
@@ -903,23 +862,12 @@ TPortoTop::TPortoTop(TPortoAPI *api, std::string config) : Api(api) {
               /* Network */
               "net b/s: S(net_bytes) 'b",
     };
-    UpdateColumns();
+    RecreateColumns();
 }
-int TPortoTop::UpdateColumns() {
+int TPortoTop::RecreateColumns() {
     Columns.clear();
-    TColumnPrinter nice_container = [] (TPortoContainer &row, TColumn &column,
-                                        std::string unused) {
-        std::string name = row.GetContainer();
-        int level = row.GetLevel();
-        if (level > 0)
-            name = (row.HasChildren() ? "+" : "-") +
-                name.substr(1 + name.rfind('/'));
-        return std::string(level - 1, ' ') + name;
-
-        return name;
-    };
-    AddColumn(TColumn("container", TPortoValue(Cache, "absolute_name", "/"),
-                      nullptr, nice_container, true));
+    AddColumn(TColumn("container", TPortoValue(Cache, ContainerTree.get(), "",
+                                               ValueFlags::Container), true));
 
     for (auto &c : Config)
         AddColumn(c);
@@ -947,7 +895,7 @@ int TPortoTop::LoadConfig() {
                 ret++;
             }
 
-        UpdateColumns();
+        RecreateColumns();
 
         return ret;
     }
@@ -1015,15 +963,15 @@ int portotop(TPortoAPI *api, std::string config) {
         case 'S':
             if (screen.Dialog("Start/stop container " + top.SelectedContainer(),
                               {"No", "Yes"}) == 1)
-                if (top.StartStop(api))
-                    screen.ErrorDialog(api);
+                if (top.StartStop())
+                    screen.ErrorDialog(*api);
             break;
         case 'p':
         case 'P':
             if (screen.Dialog("Pause/resume container " + top.SelectedContainer(),
                               {"No", "Yes"}) == 1)
-                if (top.PauseResume(api))
-                    screen.ErrorDialog(api);
+                if (top.PauseResume())
+                    screen.ErrorDialog(*api);
             break;
         case 'K':
         {
@@ -1044,23 +992,23 @@ int portotop(TPortoAPI *api, std::string config) {
                 break;
             }
             if (signal > 0)
-                if (top.Kill(api, signal))
-                    screen.ErrorDialog(api);
+                if (top.Kill(signal))
+                    screen.ErrorDialog(*api);
             break;
         }
         case 'd':
         case 'D':
             if (screen.Dialog("Destroy container " + top.SelectedContainer(),
                               {"No", "Yes"}) == 1)
-                if (top.Destroy(api))
-                    screen.ErrorDialog(api);
+                if (top.Destroy())
+                    screen.ErrorDialog(*api);
             break;
         case '\n':
-            top.RunCmdInContainer(api, screen, "top");
+            top.RunCmdInContainer(screen, "top");
             break;
         case 'b':
         case 'B':
-            top.RunCmdInContainer(api, screen, "bash");
+            top.RunCmdInContainer(screen, "bash");
             break;
         case 'g':
         case 'G':

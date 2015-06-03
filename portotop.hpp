@@ -45,7 +45,7 @@ public:
     void Save();
     void Restore();
     int Dialog(std::string text, const std::vector<std::string> &buttons);
-    void ErrorDialog(TPortoAPI *api);
+    void ErrorDialog(TPortoAPI &api);
     void ErrorDialog(std::string message, int error);
     void InfoDialog(std::vector<std::string> lines);
     void HelpDialog();
@@ -53,82 +53,78 @@ private:
     WINDOW *Wnd;
 };
 
-typedef std::function<std::string(std::string, std::string, unsigned long)> TProcessor;
-typedef std::function<std::string(std::string)> TPrinter;
-
-typedef std::function<std::string(TPortoContainer&, TColumn&)> TColumnProcessor;
-typedef std::function<std::string(TPortoContainer&, TColumn&, std::string)> TColumnPrinter;
-
 class TPortoContainer {
 public:
+    TPortoContainer(std::string container);
+    static TPortoContainer* ContainerTree(TPortoAPI &api);
     ~TPortoContainer();
-    static TPortoContainer* ContainerTree(std::vector<std::string> &containers);
-    std::string GetContainer();
+    std::string GetName();
     int GetLevel();
-    void for_each(std::function<void (TPortoContainer&)> fn, int maxlevel,
-                  bool check_root = false);
-    void Sort(TColumn &column);
-    bool IsSelected();
-    void Select(bool select);
+    void ForEachChild(std::function<void (TPortoContainer&)> fn, int maxlevel,
+                      bool check_root = false);
+    void SortTree(TColumn &column);
     int GetMaxLevel();
-    int RowCount(int max_level);
-    std::string ContainerAt(int n, int max_level);
     bool HasChildren();
+    int ChildrenCount(int max_level);
+    std::string ContainerAt(int n, int max_level);
     TPortoContainer* GetRoot() const;
 private:
-    TPortoContainer(std::string container);
     TPortoContainer* GetParent(int level);
     TPortoContainer* Root = nullptr;
     TPortoContainer* Parent = nullptr;
     std::list<TPortoContainer*> Children;
     std::string Container;
     int Level = 0;
-    bool Selected = false;
 };
 
 class TPortoValueCache {
 public:
-    void Register(TPortoValue &value);
-    void Unregister(TPortoValue &value);
-    int Update(TPortoAPI *Api);
+    void Register(const std::string &container, const std::string &variable);
+    void Unregister(const std::string &container, const std::string &variable);
+    std::string GetValue(const std::string &container, const std::string &variable,
+                         bool prev);
+    int Update(TPortoAPI &api);
 private:
-    std::unordered_set<TPortoValue*> Items;
+    std::unordered_map<std::string, unsigned long> Containers;
+    std::unordered_map<std::string, unsigned long> Variables;
     bool CacheSelector = false;
     std::map<std::string, std::map<std::string, TPortoGetResponse>> Cache[2];
-    struct timespec Now = {0};
-    struct timespec LastUpdate = {0};
-    unsigned long GoneMs;
 };
 
-typedef std::function<std::string(std::string, std::string, unsigned long)> TProcessor;
-typedef std::function<std::string(std::string)> TPrinter;
+namespace ValueFlags {
+    static const int Raw = 0x0;
+    static const int Container = 0x1;
+    static const int Map = 0x2;
+    static const int DfDt = 0x4;
+    static const int PartOfRoot = 0x8;
+    static const int Seconds = 0x10;
+    static const int Bytes = 0x20;
+    static const int Percents = 0x40;
+    static const int Multiplier = 0x80;
+};
 
 class TPortoValue {
 public:
     TPortoValue();
-    TPortoValue(const TPortoValue &src, const std::string &container);
     TPortoValue(const TPortoValue &src);
-    TPortoValue(TPortoValueCache &cache, const std::string &variable,
-                const std::string &container, TProcessor processor = nullptr,
-                TPrinter printer = nullptr);
-    TPortoValue(const std::string &value);
+    TPortoValue(const TPortoValue &src, TPortoContainer *container);
+    TPortoValue(TPortoValueCache &cache, TPortoContainer *container,
+                const std::string &variable, int flags, double multiplier = 1);
     ~TPortoValue();
-    const std::string GetContainer() const;
-    const std::string GetVariable() const;
-    void ProcessValue(std::string curr, std::string old, unsigned long gone);
-    std::string GetSortValue() const;
-    std::string GetPrintValue() const;
+    void Process(unsigned long gone);
+    std::string GetValue() const;
     int GetLength() const;
+    bool operator< (const TPortoValue &v);
 private:
     TPortoValueCache *Cache;
+    TPortoContainer *Container;
     std::string Variable; // property or data
-    std::string Container;
 
-    TProcessor Processor = nullptr;
-    TPrinter Printer = nullptr;
+    int Flags;
 
-    std::string Saved;
-    std::string Printed;
+    std::string AsString;
+    double AsNumber;
+    double Multiplier;
 };
 
 class TCommonValue {
@@ -143,58 +139,64 @@ private:
 
 class TColumn {
 public:
-    TColumn(std::string title, TPortoValue var, TColumnProcessor processor = nullptr,
-            TColumnPrinter printer = nullptr, bool left_aligned = false);
+    TColumn(std::string title, TPortoValue var, bool left_aligned = false);
     int PrintTitle(int x, int y, TConsoleScreen &screen);
-    int Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen);
-    void Update(TPortoAPI *api, TPortoContainer* tree, int maxlevel);
-    std::string At(TPortoContainer &row, bool print = false, bool cached = false);
+    int Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, bool selected);
+    void Update(TPortoAPI &api, TPortoContainer* tree, int maxlevel);
+    TPortoValue& At(TPortoContainer &row);
     void Highlight(bool enable);
-    void UpdateWidth();
+    void Process(unsigned long gone);
     int GetWidth();
     void SetWidth(int width);
 private:
-    TPortoValue Title;
+    std::string Title;
     TPortoValue RootValue;
 
     int Width;
     std::unordered_map<std::string, TPortoValue> Cache;
     bool Selected = false;
     bool LeftAligned = false;
-
-    TColumnProcessor Processor;
-    TColumnPrinter Printer;
 };
 
 class TPortoTop {
 public:
     TPortoTop(TPortoAPI *api, std::string config);
     void Print(TConsoleScreen &screen);
-    void AddColumn(const TColumn &c);
+
     bool AddColumn(std::string desc);
+    int RecreateColumns();
     int Update(TConsoleScreen &screen);
+
     void ChangeSelection(int x, int y, TConsoleScreen &screen);
-    void Expand();
-    int StartStop(TPortoAPI *api);
-    int PauseResume(TPortoAPI *api);
-    int Kill(TPortoAPI *api, int signal);
-    int Destroy(TPortoAPI *api);
-    void LessPortoctl(std::string container, std::string cmd);
-    int RunCmdInContainer(TPortoAPI *api, TConsoleScreen &screen, std::string cmd);
     std::string SelectedContainer();
-    int UpdateColumns();
+    void Expand();
+
+    int StartStop();
+    int PauseResume();
+    int Kill(int signal);
+    int Destroy();
+    void LessPortoctl(std::string container, std::string cmd);
+    int RunCmdInContainer(TConsoleScreen &screen, std::string cmd);
     int SaveConfig();
     int LoadConfig();
+
 private:
+    void AddCommon(int row, const std::string &title, const std::string &var, int flags);
+    void AddColumn(const TColumn &c);
     void PrintTitle(int y, TConsoleScreen &screen);
     int PrintCommon(TConsoleScreen &screen);
 
-    TPortoAPI *Api = nullptr;
+    TPortoAPI *Api;
     TPortoValueCache Cache;
     std::string ConfigFile;
     std::vector<std::string> Config;
     std::vector<TColumn> Columns;
-    TPortoContainer* ContainerTree = nullptr;
+    TPortoContainer RootContainer;
+    std::vector<std::vector<TCommonValue>> Common;
+    std::unique_ptr<TPortoContainer> ContainerTree;
+
+    struct timespec LastUpdate = {0};
+
     int SelectedRow = 0;
     int SelectedColumn = 0;
     int FirstX = 0;
@@ -203,6 +205,5 @@ private:
     int DisplayRows = 0;
     int MaxLevel = 1;
     int MaxMaxLevel = 1;
-    std::vector<std::vector<TCommonValue> > Common;
 };
 
