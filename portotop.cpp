@@ -356,14 +356,14 @@ int TPortoValueCache::Update(TPortoAPI *api) {
 }
 
 class TColumn;
-class TRowTree {
-    TRowTree(std::string container) : Container(container) {
+class TPortoContainer {
+    TPortoContainer(std::string container) : Container(container) {
         if (Container == "/")
             Level = 0;
         else
             Level = 1 + std::count(container.begin(), container.end(), '/');
     }
-    TRowTree* GetParent(int level) {
+    TPortoContainer* GetParent(int level) {
         if (Parent) {
             if (Parent->GetLevel() == level)
                 return Parent;
@@ -373,20 +373,20 @@ class TRowTree {
             return nullptr;
     }
 public:
-    ~TRowTree() {
+    ~TPortoContainer() {
         for (auto &c : Children)
             delete c;
     }
-    static TRowTree* ContainerTree(std::vector<std::string> &containers) {
-        TRowTree *root = nullptr;
-        TRowTree *curr = nullptr;
-        TRowTree *prev = nullptr;
+    static TPortoContainer* ContainerTree(std::vector<std::string> &containers) {
+        TPortoContainer *root = nullptr;
+        TPortoContainer *curr = nullptr;
+        TPortoContainer *prev = nullptr;
         int level = 0;
 
         std::sort(containers.begin(), containers.end());
 
         for (auto &c : containers) {
-            curr = new TRowTree(c);
+            curr = new TPortoContainer(c);
             level = curr->GetLevel();
             if (!root) {
                 /* assume that / container is first in the list */
@@ -415,7 +415,7 @@ public:
     int GetLevel() {
         return Level;
     }
-    void for_each(std::function<void (TRowTree&)> fn, int maxlevel,
+    void for_each(std::function<void (TPortoContainer&)> fn, int maxlevel,
                   bool check_root = false) {
         if ((Level || check_root) && Level <= maxlevel)
             fn(*this);
@@ -445,9 +445,9 @@ public:
         return count;
     }
     std::string ContainerAt(int n, int max_level) {
-        TRowTree *ret = this;
+        TPortoContainer *ret = this;
         int i = 0;
-        for_each([&] (TRowTree &row) {
+        for_each([&] (TPortoContainer &row) {
                 if (i++ == n)
                     ret = &row;
             }, max_level);
@@ -456,13 +456,13 @@ public:
     bool HasChildren() {
         return Children.size() > 0;
     }
-    TRowTree* GetRoot() const {
+    TPortoContainer* GetRoot() const {
         return Root;
     }
 private:
-    TRowTree* Root = nullptr;
-    TRowTree* Parent = nullptr;
-    std::list<TRowTree*> Children;
+    TPortoContainer* Root = nullptr;
+    TPortoContainer* Parent = nullptr;
+    std::list<TPortoContainer*> Children;
     std::string Container;
     int Level = 0;
     bool Selected = false;
@@ -551,8 +551,8 @@ static TProcessor diff() {
     };
 }
 
-typedef std::function<std::string(TRowTree&, TColumn&)> TColumnProcessor;
-typedef std::function<std::string(TRowTree&, TColumn&, std::string)> TColumnPrinter;
+typedef std::function<std::string(TPortoContainer&, TColumn&)> TColumnProcessor;
+typedef std::function<std::string(TPortoContainer&, TColumn&, std::string)> TColumnPrinter;
 
 class TColumn {
 public:
@@ -567,7 +567,7 @@ public:
                       A_BOLD | (Selected ? A_UNDERLINE : 0));
         return Width;
     }
-    int Print(TRowTree &row, int x, int y, TConsoleScreen &screen) {
+    int Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen) {
         std::string p;
         if (Printer)
             p = Printer(row, *this, At(row, true));
@@ -577,14 +577,14 @@ public:
         screen.PrintAt(p, x, y, Width, LeftAligned, row.IsSelected() ? A_REVERSE : 0);
         return Width;
     }
-    void Update(TPortoAPI *api, TRowTree* tree, int maxlevel) {
+    void Update(TPortoAPI *api, TPortoContainer* tree, int maxlevel) {
         Cache.clear();
-        tree->for_each([&] (TRowTree &row) {
+        tree->for_each([&] (TPortoContainer &row) {
                 TPortoValue val(RootValue, row.GetContainer());
                 Cache.insert(std::make_pair(row.GetContainer(), val));
             }, maxlevel, true);
     }
-    std::string At(TRowTree &row, bool print = false, bool cached = false) {
+    std::string At(TPortoContainer &row, bool print = false, bool cached = false) {
         if (Processor && !cached)
             return Processor(row, *this);
         else
@@ -622,8 +622,8 @@ private:
     TColumnPrinter Printer;
 };
 
-void TRowTree::Sort(TColumn &column) {
-    Children.sort([&] (TRowTree *row1, TRowTree *row2) {
+void TPortoContainer::Sort(TColumn &column) {
+    Children.sort([&] (TPortoContainer *row1, TPortoContainer *row2) {
             std::string str1 = column.At(*row1);
             std::string str2 = column.At(*row2);
 
@@ -650,7 +650,7 @@ void TRowTree::Sort(TColumn &column) {
 }
 
 static TColumnProcessor part_of_root() {
-    return [] (TRowTree &row, TColumn &column) {
+    return [] (TPortoContainer &row, TColumn &column) {
         try {
             std::string _curr = column.At(row, false, true);
             std::string _root = column.At(*row.GetRoot(), false, true);
@@ -666,7 +666,7 @@ static TColumnProcessor part_of_root() {
 }
 
 static TColumnPrinter nice_percents() {
-    return [] (TRowTree &row, TColumn &column, std::string raw) {
+    return [] (TPortoContainer &row, TColumn &column, std::string raw) {
         try {
             char buf[20];
             snprintf(buf, sizeof(buf), "%.1lf%%", 100 * stod(raw));
@@ -678,7 +678,7 @@ static TColumnPrinter nice_percents() {
     };
 }
 
-class TTable {
+class TPortoTop {
     void PrintTitle(int y, TConsoleScreen &screen) {
         int x = FirstX;
         for (auto &c : Columns)
@@ -706,13 +706,13 @@ public:
         screen.Clear();
 
         int at_row = 1 + PrintCommon(screen);
-        MaxRows = RowTree->RowCount(MaxLevel);
+        MaxRows = ContainerTree->RowCount(MaxLevel);
         DisplayRows = std::min(screen.Height() - at_row, MaxRows);
         ChangeSelection(0, 0, screen);
 
         PrintTitle(at_row - 1, screen);
         int y = 0;
-        RowTree->for_each([&] (TRowTree &row) {
+        ContainerTree->for_each([&] (TPortoContainer &row) {
                 if (y >= FirstRow && y < MaxRows) {
                     if (y == FirstRow + SelectedRow)
                         row.Select(true);
@@ -800,15 +800,15 @@ public:
         if (ret)
             return ret;
 
-        if (RowTree)
-            delete RowTree;
+        if (ContainerTree)
+            delete ContainerTree;
 
-        RowTree = TRowTree::ContainerTree(containers);
-        if (RowTree) {
-            MaxMaxLevel = RowTree->GetMaxLevel();
+        ContainerTree = TPortoContainer::ContainerTree(containers);
+        if (ContainerTree) {
+            MaxMaxLevel = ContainerTree->GetMaxLevel();
 
             for (auto &column : Columns)
-                column.Update(Api, RowTree, MaxLevel);
+                column.Update(Api, ContainerTree, MaxLevel);
 
             int ret = Cache.Update(Api);
             if (ret)
@@ -831,7 +831,7 @@ public:
                 Columns[0].SetWidth(current);
             }
 
-            RowTree->Sort(Columns[SelectedColumn]);
+            ContainerTree->Sort(Columns[SelectedColumn]);
         }
 
         return 0;
@@ -949,9 +949,9 @@ public:
         return ret;
     }
     std::string SelectedContainer() {
-        return RowTree->ContainerAt(FirstRow + SelectedRow, MaxLevel);
+        return ContainerTree->ContainerAt(FirstRow + SelectedRow, MaxLevel);
     }
-    TTable(TPortoAPI *api, std::string config) : Api(api) {
+    TPortoTop(TPortoAPI *api, std::string config) : Api(api) {
         if (config.size() == 0)
             ConfigFile = std::string(getenv("HOME")) + "/.portotop";
         else
@@ -994,7 +994,7 @@ public:
     }
     int UpdateColumns() {
         Columns.clear();
-        TColumnPrinter nice_container = [] (TRowTree &row, TColumn &column,
+        TColumnPrinter nice_container = [] (TPortoContainer &row, TColumn &column,
                                             std::string unused) {
             std::string name = row.GetContainer();
             int level = row.GetLevel();
@@ -1047,7 +1047,7 @@ private:
     std::string ConfigFile;
     std::vector<std::string> Config;
     std::vector<TColumn> Columns;
-    TRowTree* RowTree = nullptr;
+    TPortoContainer* ContainerTree = nullptr;
     int SelectedRow = 0;
     int SelectedColumn = 0;
     int FirstX = 0;
@@ -1070,7 +1070,7 @@ int portotop(TPortoAPI *api, std::string config) {
     signal(SIGTTOU, SIG_IGN);
     signal(SIGTTIN, SIG_IGN);
 
-    TTable top(api, config);
+    TPortoTop top(api, config);
 
     /* Main loop */
     TConsoleScreen screen;
