@@ -243,11 +243,14 @@ int TPortoAPI::Resume(const string &name) {
     return Rpc(Req, Rsp);
 }
 
-int TPortoAPI::Wait(const std::vector<std::string> &containers, std::string &name) {
+int TPortoAPI::Wait(const std::vector<std::string> &containers, std::string &name, int timeout) {
     auto wait = Req.mutable_wait();
 
     for (auto &c : containers)
         wait->add_name(c);
+
+    if (timeout >= 0)
+        wait->set_timeout(timeout);
 
     int ret = Rpc(Req, Rsp);
     name.assign(Rsp.wait().name());

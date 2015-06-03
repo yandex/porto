@@ -4237,6 +4237,27 @@ static void TestWait(TPortoAPI &api) {
 
     for (auto &name : containers)
         ExpectApiSuccess(api.Destroy(name));
+
+    Say() << "Check wait timeout" << std::endl;
+    size_t begin, end;
+
+    ExpectApiSuccess(api.Create(c));
+    ExpectApiSuccess(api.SetProperty(c, "command", "sleep 1000"));
+    ExpectApiSuccess(api.Start(c));
+
+    begin = GetCurrentTimeMs();
+    ExpectApiSuccess(api.Wait({c}, tmp, 0));
+    end = GetCurrentTimeMs();
+    ExpectEq(tmp, "");
+    Expect(end - begin < 100);
+
+    begin = GetCurrentTimeMs();
+    ExpectApiSuccess(api.Wait({c}, tmp, 2000));
+    end = GetCurrentTimeMs();
+    ExpectEq(tmp, "");
+    Expect(end - begin >= 2000);
+
+    ExpectApiSuccess(api.Destroy(c));
 }
 
 static void TestWaitRecovery(TPortoAPI &api) {

@@ -65,7 +65,7 @@ public:
     int Pause(const std::string &name);
     int Resume(const std::string &name);
 
-    int Wait(const std::vector<std::string> &containers, std::string &name);
+    int Wait(const std::vector<std::string> &containers, std::string &name, int timeout = -1);
 
     int List(std::vector<std::string> &clist);
     int Plist(std::vector<TProperty> &plist);
