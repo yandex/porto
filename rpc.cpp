@@ -463,7 +463,7 @@ static TError CreateVolume(TContext &context,
 
     std::shared_ptr<TVolume> volume;
     volume = std::make_shared<TVolume>(context.Vholder, client->GetCred());
-    TError error = volume->Create(context.VolumeStorage,
+    error = volume->Create(context.VolumeStorage,
                            StringTrim(req.path()),
                            StringTrim(req.quota()),
                            StringTrim(req.flags()));
