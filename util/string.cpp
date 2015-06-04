@@ -94,6 +94,15 @@ TError StringToInt(const std::string &str, int &value) {
     return TError::Success();
 }
 
+TError StringToOct(const std::string &str, unsigned &value) {
+    try {
+        value = stoul(str, nullptr, 8);
+    } catch (...) {
+        return TError(EError::Unknown, string(__func__) + ": Bad integer value " + str);
+    }
+    return TError::Success();
+}
+
 TError StringWithUnitToUint64(const std::string &str, uint64_t &value) {
     try {
         size_t pos = 0;
