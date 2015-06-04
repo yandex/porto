@@ -181,7 +181,8 @@ public:
     int LoadConfig();
 
 private:
-    void AddCommon(int row, const std::string &title, const std::string &var, int flags);
+    void AddCommon(int row, const std::string &title, const std::string &var,
+                   TPortoContainer &container, int flags);
     void AddColumn(const TColumn &c);
     void PrintTitle(int y, TConsoleScreen &screen);
     int PrintCommon(TConsoleScreen &screen);
@@ -192,6 +193,8 @@ private:
     std::vector<std::string> Config;
     std::vector<TColumn> Columns;
     TPortoContainer RootContainer;
+    TPortoContainer DotContainer;
+    TPortoContainer PortoContainer; // /porto
     std::vector<std::vector<TCommonValue>> Common;
     std::unique_ptr<TPortoContainer> ContainerTree;
 

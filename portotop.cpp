@@ -821,22 +821,33 @@ int TPortoTop::RunCmdInContainer(TConsoleScreen &screen, std::string cmd) {
 std::string TPortoTop::SelectedContainer() {
     return ContainerTree->ContainerAt(FirstRow + SelectedRow, MaxLevel);
 }
-void TPortoTop::AddCommon(int row, const std::string &title, const std::string &var, int flags) {
+void TPortoTop::AddCommon(int row, const std::string &title, const std::string &var,
+                          TPortoContainer &container, int flags) {
     Common.resize(row + 1);
-    TPortoValue v(Cache, &RootContainer, var, flags);
+    TPortoValue v(Cache, &container, var, flags);
     Common[row].push_back(TCommonValue(title, v));
 }
 TPortoTop::TPortoTop(TPortoAPI *api, std::string config) : Api(api),
-                                                           RootContainer("/") {
+                                                           RootContainer("/"),
+                                                           DotContainer("."),
+                                                           PortoContainer("/porto") {
     if (config.size() == 0)
         ConfigFile = std::string(getenv("HOME")) + "/.portotop";
     else
         ConfigFile = config;
 
-    AddCommon(0, "Containers running: ", "porto_stat[running]", ValueFlags::Raw);
-    AddCommon(0, "total: ", "porto_stat[created]", ValueFlags::Raw);
-    AddCommon(0, "Porto errors: ", "porto_stat[errors]", ValueFlags::Raw);
-    AddCommon(0, "warnings: ", "porto_stat[warnings]", ValueFlags::Raw);
+    AddCommon(0, "Containers running: ", "porto_stat[running]", RootContainer, ValueFlags::Raw);
+    AddCommon(0, "total: ", "porto_stat[created]", RootContainer, ValueFlags::Raw);
+    AddCommon(0, "Porto errors: ", "porto_stat[errors]", RootContainer, ValueFlags::Raw);
+    AddCommon(0, "warnings: ", "porto_stat[warnings]", RootContainer, ValueFlags::Raw);
+
+    AddCommon(1, "Memory: ", "memory_usage", PortoContainer, ValueFlags::Bytes);
+    AddCommon(1, "/ ", "memory_usage", RootContainer, ValueFlags::Bytes);
+    AddCommon(1, ": ", "memory_usage", PortoContainer, ValueFlags::Bytes | ValueFlags::PartOfRoot |
+        ValueFlags::Percents);
+
+    AddCommon(1, "CPU: ", "cpu_usage", PortoContainer, ValueFlags::DfDt | ValueFlags::PartOfRoot |
+        ValueFlags::Percents);
 
     if (LoadConfig() != -1)
         return;
