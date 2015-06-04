@@ -2153,12 +2153,14 @@ static void TestNetProperty(TPortoAPI &api) {
     Say() << "Using device " << dev << " gateway " << gw << " ip " << addr << " -> " << ip << std::endl;
     ExpectApiSuccess(api.SetProperty(name, "net", "macvlan " + dev + " " + dev));
     ExpectApiSuccess(api.SetProperty(name, "command", "false"));
+    /* we now catch all packets (neighbor solicitation), not only ipv4, so can't expect 0 here
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "net_bytes[" + dev + "]", s));
     ExpectEq(s, "0");
 
     ExpectApiSuccess(api.Stop(name));
+    */
     ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'ip addr add " + ip + " dev " + dev + " && ip route add default via " + gw + " && ping ya.ru -c 1 -w 1'"));
     AsRoot(api);
     ExpectApiSuccess(api.SetProperty(name, "user", "root"));
