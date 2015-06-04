@@ -124,29 +124,11 @@ TError TClient::CheckPortoMembership() {
 }
 
 TError TClient::IdentifyContainer(TContainerHolder &holder) {
-    std::map<std::string, std::string> cgmap;
-    TError error = GetTaskCgroups(Pid, cgmap);
-    if (error)
-        return error;
-
-    if (cgmap.find("freezer") == cgmap.end())
-        return TError(EError::Unknown, "Can't determine freezer cgroup of client process");
-
-    auto freezer = cgmap["freezer"];
-    auto prefix = PORTO_ROOT_CONTAINER + "/";
-    std::string name;
-
-    if (freezer.length() > prefix.length() && freezer.substr(0, prefix.length()) == prefix)
-        name = freezer.substr(prefix.length());
-    else
-        name = PORTO_ROOT_CONTAINER;
-
-    std::shared_ptr<TContainer> container;
-    error = holder.Get(name, container);
-    if (error)
-        return error;
-
-    Container = container;
+    std::shared_ptr<TContainer> c;
+    TError err = holder.Get(Pid, c);
+    if (err)
+        return err;
+    Container = c;
     return TError::Success();
 }
 

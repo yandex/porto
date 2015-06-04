@@ -28,7 +28,8 @@ class TContainerHolder : public std::enable_shared_from_this<TContainerHolder> {
     void ScheduleCgroupSync();
     TError _Destroy(const std::string &name);
     TError ReserveDefaultClassId();
-    std::map<std::string, std::shared_ptr<TKeyValueNode>> SortNodes(const std::vector<std::shared_ptr<TKeyValueNode>> &nodes);
+    std::map<std::string, std::shared_ptr<TKeyValueNode>>
+        SortNodes(const std::vector<std::shared_ptr<TKeyValueNode>> &nodes);
 
 public:
     std::shared_ptr<TEventQueue> Queue = nullptr;
@@ -43,6 +44,7 @@ public:
     TError CreatePortoRoot();
     TError Create(const std::string &name, const TCred &cred);
     TError Get(const std::string &name, std::shared_ptr<TContainer> &c);
+    TError Get(int pid, std::shared_ptr<TContainer> &c);
     TError Restore(const std::string &name, const kv::TNode &node);
     bool RestoreFromStorage();
     TError Destroy(const std::string &name);
