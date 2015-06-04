@@ -315,7 +315,6 @@ TError TNetwork::PrepareLink(std::shared_ptr<TNlLink> link) {
         }
     }
 
-
     TNlCgFilter filter(link, rootHandle, 1);
     if (filter.Exists())
         (void)filter.Remove();

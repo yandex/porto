@@ -78,7 +78,7 @@ getrate() {
 	netdetails $container >&2
 	portoctl destroy $container
 	kbits=$(echo "$ret" | grep '/sec' | awk '{print $7}')
-	mbytes=$(expr $kbits / 1000 / 8)
+	mbytes=$(($kbits / 1000 / 8))
 	echo "kbits=$kbits mbytes=$mbytes" >&2
 	echo $mbytes
 }
@@ -107,8 +107,6 @@ trap cleanup EXIT
 
 nettest() {
 	# ssh kernel1 iperf -V -s -p 8081
-
-	say "THE FOLLOWING TEST ASSUMES 100MBIT LINK"
 
 	say "Single container with default limits"
 	expect `getrate 1` 90 500

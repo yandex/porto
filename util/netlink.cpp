@@ -936,7 +936,6 @@ TError TNlCgFilter::Remove() {
         return TError(EError::Unknown, string("Unable to allocate filter object"));
 
     rtnl_tc_set_link(TC_CAST(cls), Link->GetLink());
-    rtnl_tc_set_handle(TC_CAST(cls), Handle);
 
     ret = rtnl_tc_set_kind(TC_CAST(cls), FilterType);
     if (ret < 0) {
@@ -945,6 +944,7 @@ TError TNlCgFilter::Remove() {
     }
 
     rtnl_cls_set_prio(cls, FilterPrio);
+    rtnl_cls_set_protocol(cls, 0);
     rtnl_tc_set_parent(TC_CAST(cls), Parent);
 
     Link->LogObj("remove", cls);
