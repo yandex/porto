@@ -1,6 +1,7 @@
 #include "path.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
+#include "util/log.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -340,8 +341,8 @@ TError TPath::StatVFS(uint64_t &space_used, uint64_t &space_avail,
     return TError::Success();
 }
 
-TError TPath::StatVFS(uint64_t &space_used, uint64_t &space_avail) const {
-    uint64_t inode_used, inode_avail;
+TError TPath::StatVFS(uint64_t &space_avail) const {
+    uint64_t space_used, inode_used, inode_avail;
     return StatVFS(space_used, space_avail, inode_used, inode_avail);
 }
 
@@ -363,15 +364,17 @@ TError TPath::Rmdir() const {
  * Removes everything in the directory but not directory itself.
  * Works only on one filesystem and aborts if sees mountpint.
  */
-TError TPath::ClearDirectory() const {
-    int top_fd, dir_fd;
-    DIR *dir;
+TError TPath::ClearDirectory(bool verbose) const {
+    int top_fd, dir_fd, sub_fd;
+    DIR *top = NULL, *dir;
     struct dirent *de;
     struct stat top_st, st;
     TError error = TError::Success();
 
-    top_fd = open(Path.c_str(),  O_RDONLY | O_DIRECTORY |
-                                 O_CLOEXEC | O_NOFOLLOW | O_NOATIME);
+    L_ACT() << "ClearDirectory " << Path << std::endl;
+
+    top_fd = open(Path.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC |
+                                O_NOFOLLOW | O_NOATIME);
     if (top_fd < 0)
         return TError(EError::Unknown, errno, "ClearDirectory open(" + Path + ")");
 
@@ -386,10 +389,12 @@ deeper:
     dir = fdopendir(dir_fd);
     if (dir == NULL) {
         close(dir_fd);
-        error = TError(EError::Unknown, errno, "ClearDirectory fdopendir(" + Path + "/.../)");
-        goto close_top;
+        if (dir_fd != top_fd)
+            closedir(top);
+        return TError(EError::Unknown, errno, "ClearDirectory fdopendir(" + Path + "/.../)");
     }
 
+restart:
     while ((de = readdir(dir))) {
         if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
             continue;
@@ -407,39 +412,53 @@ deeper:
             break;
         }
 
-        if (S_ISDIR(st.st_mode)) {
-            int sub_fd = openat(dir_fd, de->d_name, O_RDONLY | O_DIRECTORY |
-                                                    O_CLOEXEC | O_NOFOLLOW |
-                                                    O_NOATIME);
-            if (sub_fd >= 0) {
-                closedir(dir); /* closes dir_fd */
-                dir_fd = sub_fd;
-                goto deeper;
-            }
-            if (errno == ENOENT)
-                continue;
-            error = TError(EError::Unknown, errno, "ClearDirectory openat(" +
-                                          Path + "/.../" + de->d_name + ")");
+        if (verbose)
+            L_ACT() << "ClearDirectory unlink " << de->d_name << std::endl;
+        if (!unlinkat(dir_fd, de->d_name, S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0))
+            continue;
+
+        if (errno == ENOENT)
+            continue;
+
+        if (!S_ISDIR(st.st_mode) || (errno != ENOTEMPTY && errno != EEXIST)) {
+            error = TError(EError::Unknown, errno, "ClearDirectory unlinkat(" +
+                           Path + "/.../" + de->d_name + ")");
             break;
         }
 
-        if (unlinkat(dir_fd, de->d_name, S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0)) {
-            if (errno == ENOENT)
-                continue;
-            error = TError(EError::Unknown, errno, "ClearDirectory unlinkat(" +
-                                            Path + "/.../" + de->d_name + ")");
-            break;
+        sub_fd = openat(dir_fd, de->d_name, O_RDONLY | O_DIRECTORY | O_CLOEXEC |
+                                            O_NOFOLLOW | O_NOATIME);
+        if (sub_fd >= 0) {
+            if (dir_fd != top_fd)
+                closedir(dir); /* closes dir_fd */
+            else
+                top = dir;
+            dir_fd = sub_fd;
+            if (verbose)
+                L_ACT() << "ClearDirectory enter " << de->d_name << std::endl;
+            goto deeper;
         }
+        if (errno == ENOENT)
+            continue;
+
+        error = TError(EError::Unknown, errno, "ClearDirectory openat(" +
+                       Path + "/.../" + de->d_name + ")");
+        break;
     }
 
     closedir(dir); /* closes dir_fd */
-    if (!error && dir_fd != top_fd) {
-        dir_fd = top_fd;
-        goto deeper; /* Restart from top directory */
+
+    if (dir_fd != top_fd) {
+        if (!error) {
+            rewinddir(top);
+            dir = top;
+            dir_fd = top_fd;
+            if (verbose)
+                L_ACT() << "ClearDirectory restart " << Path << std::endl;
+            goto restart; /* Restart from top directory */
+        }
+        closedir(top); /* closes top_fd */
     }
 
-close_top:
-    if (top_fd != dir_fd)
-        close(top_fd);
     return error;
 }
