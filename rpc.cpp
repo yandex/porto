@@ -605,6 +605,10 @@ static TError LinkVolume(TContext &context,
     if (!volume->IsReady())
         return TError(EError::VolumeNotReady, "Volume not ready");
 
+    error = volume->CheckPermission(client->GetCred());
+    if (error)
+        return error;
+
     if (!container->LinkVolume(volume))
         return TError(EError::VolumeAlreadyExists, "Already linked");
 
@@ -650,7 +654,7 @@ static TError UnlinkVolume(TContext &context,
         return error;
 
     if (!container->UnlinkVolume(volume))
-        return TError(EError::InvalidValue, "Container not linked to the volume");
+        return TError(EError::VolumeNotFound, "Container not linked to the volume");
 
     return volume->UnlinkContainer(container->GetName());
 }

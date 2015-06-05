@@ -602,7 +602,7 @@ TError TVolume::CheckPermission(const TCred &ucred) const {
     if (Cred == ucred)
         return TError::Success();
 
-    return TError(EError::Permission, "Permission error");
+    return TError(EError::Permission, "Permission denied");
 }
 
 TError TVolume::Restore() {
