@@ -853,7 +853,7 @@ TError TNlCgFilter::Create() {
     tchdr.tcm_ifindex = Link->GetIndex();
     tchdr.tcm_handle = Handle;
     tchdr.tcm_parent = Parent;
-	tchdr.tcm_info = TC_H_MAKE(FilterPrio << 16, htons(ETH_P_IP));
+	tchdr.tcm_info = TC_H_MAKE(FilterPrio << 16, htons(ETH_P_ALL));
 
 	msg = nlmsg_alloc_simple(RTM_NEWTFILTER, NLM_F_EXCL|NLM_F_CREATE);
 	if (!msg)
@@ -936,7 +936,6 @@ TError TNlCgFilter::Remove() {
         return TError(EError::Unknown, string("Unable to allocate filter object"));
 
     rtnl_tc_set_link(TC_CAST(cls), Link->GetLink());
-    rtnl_tc_set_handle(TC_CAST(cls), Handle);
 
     ret = rtnl_tc_set_kind(TC_CAST(cls), FilterType);
     if (ret < 0) {
@@ -945,7 +944,7 @@ TError TNlCgFilter::Remove() {
     }
 
     rtnl_cls_set_prio(cls, FilterPrio);
-    rtnl_cls_set_protocol(cls, ETH_P_IP);
+    rtnl_cls_set_protocol(cls, 0);
     rtnl_tc_set_parent(TC_CAST(cls), Parent);
 
     Link->LogObj("remove", cls);

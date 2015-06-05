@@ -187,7 +187,7 @@ std::string RequestAsString(const rpc::TContainerRequest &req) {
     else if (req.has_getproperty())
         return "pget "  + req.getproperty().name() + " " + req.getproperty().property();
     else if (req.has_setproperty())
-        return "pset " + req.setproperty().name() + " " + req.getproperty().property();
+        return "pset " + req.setproperty().name() + " " + req.setproperty().property();
     else if (req.has_getdata())
         return "dget " + req.getdata().name() + " " + req.getdata().data();
     else if (req.has_get()) {
@@ -224,6 +224,9 @@ std::string RequestAsString(const rpc::TContainerRequest &req) {
 
         for (int i = 0; i < req.wait().name_size(); i++)
             ret += " " + req.wait().name(i);
+
+        if (req.wait().has_timeout())
+            ret += " timeout " + std::to_string(req.wait().timeout());
 
         return ret;
     } else if (req.has_createvolume()) {

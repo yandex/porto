@@ -147,7 +147,10 @@ message TContainerGetRequest {
 
 // Подождать, пока контейнер выполняется
 message TContainerWaitRequest {
+	// Список контейнеров
 	repeated string name = 1;
+	// Таймаут, ms
+	optional uint32 timeout = 2;
 }
 
 // Сообщение-запрос

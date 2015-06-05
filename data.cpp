@@ -454,7 +454,7 @@ public:
                         rpdmState) {
         uint64_t val;
         auto err = memorySubsystem->Statistics(memorySubsystem->GetRootCgroup(),
-                                               "max_rss", val);
+                                               "total_max_rss", val);
         if (err)
             Implemented = false;
     }
@@ -462,7 +462,7 @@ public:
     uint64_t GetDefault() const override {
         uint64_t val;
         auto cg = GetContainer()->GetLeafCgroup(memorySubsystem);
-        TError error = memorySubsystem->Statistics(cg, "max_rss", val);
+        TError error = memorySubsystem->Statistics(cg, "total_max_rss", val);
         if (error)
             return 0;
 

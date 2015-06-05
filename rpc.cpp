@@ -452,6 +452,12 @@ static TError Wait(TContext &context,
 
     client->Waiter = waiter;
 
+    if (req.has_timeout()) {
+        TEvent e(EEventType::WaitTimeout, nullptr);
+        e.WaitTimeout.Waiter = waiter;
+        context.Queue->Add(req.timeout(), e);
+    }
+
     return TError::Queued();
 }
 
@@ -469,6 +475,7 @@ static TError ListVolumeProperties(TContext &context,
         p->set_name(kv.first);
         p->set_desc(kv.second);
     }
+
     return TError::Success();
 }
 

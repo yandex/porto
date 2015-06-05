@@ -188,6 +188,8 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectEq(v, "false");
     ExpectApiSuccess(api.GetProperty(name, "max_respawns", v));
     ExpectEq(v, "-1");
+    ExpectApiSuccess(api.GetProperty(name, "enable_porto", v));
+    ExpectEq(v, "true");
 }
 
 static void ShouldHaveValidRunningData(TPortoAPI &api, const string &name) {
@@ -2151,12 +2153,14 @@ static void TestNetProperty(TPortoAPI &api) {
     Say() << "Using device " << dev << " gateway " << gw << " ip " << addr << " -> " << ip << std::endl;
     ExpectApiSuccess(api.SetProperty(name, "net", "macvlan " + dev + " " + dev));
     ExpectApiSuccess(api.SetProperty(name, "command", "false"));
+    /* we now catch all packets (neighbor solicitation), not only ipv4, so can't expect 0 here
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "net_bytes[" + dev + "]", s));
     ExpectEq(s, "0");
 
     ExpectApiSuccess(api.Stop(name));
+    */
     ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'ip addr add " + ip + " dev " + dev + " && ip route add default via " + gw + " && ping ya.ru -c 1 -w 1'"));
     AsRoot(api);
     ExpectApiSuccess(api.SetProperty(name, "user", "root"));
@@ -2312,6 +2316,92 @@ static void TestCapabilitiesProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Stop(name));
 
     ExpectApiSuccess(api.Destroy(name));
+}
+
+static void CheckConnectivity(TPortoAPI &api, const std::string &name,
+                              bool enabled, bool disabled) {
+    string v;
+
+    if (disabled) {
+        ExpectApiSuccess(api.SetProperty(name, "enable_porto", "false"));
+        ExpectApiSuccess(api.Start(name));
+        WaitContainer(api, name);
+        ExpectApiSuccess(api.GetData(name, "exit_status", v));
+        ExpectNeq(v, "0");
+        ExpectApiSuccess(api.Stop(name));
+    }
+
+    if (enabled) {
+        ExpectApiSuccess(api.SetProperty(name, "enable_porto", "true"));
+        ExpectApiSuccess(api.Start(name));
+        WaitContainer(api, name);
+        ExpectApiSuccess(api.GetData(name, "exit_status", v));
+        ExpectEq(v, "0");
+        ExpectApiSuccess(api.Stop(name));
+    }
+}
+
+static void TestEnablePortoProperty(TPortoAPI &api) {
+    string name = "a";
+    TPath path(TMPDIR + "/" + name);
+
+    RemakeDir(api, path);
+    AsRoot(api);
+    BootstrapCommand("/usr/sbin/portotest", path.ToString());
+    path.Chown("nobody", "nogroup");
+    AsNobody(api);
+
+    ExpectApiSuccess(api.Create(name));
+    ExpectApiSuccess(api.SetProperty(name, "command", "/portotest connectivity"));
+
+    Say() << "Non-isolated" << std::endl;
+
+    ExpectApiFailure(api.SetProperty(name, "enable_porto", "false"), EError::InvalidValue);
+    ExpectApiSuccess(api.SetProperty(name, "enable_porto", "true"));
+
+    Say() << "Root-isolated" << std::endl;
+
+    ExpectApiSuccess(api.SetProperty(name, "root", path.ToString()));
+    ExpectApiFailure(api.SetProperty(name, "enable_porto", "false"), EError::InvalidValue);
+    ExpectApiSuccess(api.SetProperty(name, "enable_porto", "true"));
+
+    Say() << "Namespace-isolated" << std::endl;
+
+    ExpectApiSuccess(api.SetProperty(name, "root", "/"));
+    ExpectApiSuccess(api.SetProperty(name, "porto_namespace", "a/"));
+    ExpectApiFailure(api.SetProperty(name, "enable_porto", "false"), EError::InvalidValue);
+    ExpectApiSuccess(api.SetProperty(name, "enable_porto", "true"));
+
+    Say() << "Isolated" << std::endl;
+
+    ExpectApiSuccess(api.SetProperty(name, "root", path.ToString()));
+
+    CheckConnectivity(api, name, true, true);
+
+    ExpectApiSuccess(api.Destroy(name));
+
+    Say() << "Isolated hierarchy" << std::endl;
+    name = "a/b";
+    ExpectApiSuccess(api.Create("a"));
+    ExpectApiSuccess(api.Create(name));
+
+    ExpectApiSuccess(api.SetProperty(name, "command", "/portotest connectivity"));
+    ExpectApiSuccess(api.SetProperty(name, "isolate", "true"));
+    ExpectApiSuccess(api.SetProperty(name, "porto_namespace", "a/"));
+    ExpectApiSuccess(api.SetProperty(name, "root", path.ToString()));
+
+    CheckConnectivity(api, name, true, true);
+
+    ExpectApiSuccess(api.Stop("a"));
+    ExpectApiSuccess(api.SetProperty(name, "isolate", "false"));
+    ExpectApiSuccess(api.SetProperty(name, "porto_namespace", ""));
+    ExpectApiSuccess(api.SetProperty(name, "root", "/"));
+    ExpectApiSuccess(api.SetProperty("a", "porto_namespace", "a/"));
+    ExpectApiSuccess(api.SetProperty("a", "root", path.ToString()));
+
+    CheckConnectivity(api, name, true, false);
+
+    ExpectApiSuccess(api.Destroy("a"));
 }
 
 static void TestStateMachine(TPortoAPI &api) {
@@ -2470,7 +2560,8 @@ static void TestRoot(TPortoAPI &api) {
         "root_readonly",
         "virt_mode",
         "aging_time",
-        "porto_namespace"
+        "porto_namespace",
+        "enable_porto",
     };
 
     if (HaveLowLimit())
@@ -4144,6 +4235,27 @@ static void TestWait(TPortoAPI &api) {
 
     for (auto &name : containers)
         ExpectApiSuccess(api.Destroy(name));
+
+    Say() << "Check wait timeout" << std::endl;
+    size_t begin, end;
+
+    ExpectApiSuccess(api.Create(c));
+    ExpectApiSuccess(api.SetProperty(c, "command", "sleep 1000"));
+    ExpectApiSuccess(api.Start(c));
+
+    begin = GetCurrentTimeMs();
+    ExpectApiSuccess(api.Wait({c}, tmp, 0));
+    end = GetCurrentTimeMs();
+    ExpectEq(tmp, "");
+    Expect(end - begin < 100);
+
+    begin = GetCurrentTimeMs();
+    ExpectApiSuccess(api.Wait({c}, tmp, 2000));
+    end = GetCurrentTimeMs();
+    ExpectEq(tmp, "");
+    Expect(end - begin >= 2000);
+
+    ExpectApiSuccess(api.Destroy(c));
 }
 
 static void TestWaitRecovery(TPortoAPI &api) {
@@ -4673,6 +4785,7 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
         { "net_property", TestNetProperty },
         { "allowed_devices_property", TestAllowedDevicesProperty },
         { "capabilities_property", TestCapabilitiesProperty },
+        { "enable_porto_property", TestEnablePortoProperty },
         { "limits", TestLimits },
         { "ulimit_property", TestUlimitProperty },
         { "virt_mode_property", TestVirtModeProperty },

@@ -53,6 +53,7 @@ constexpr const char *P_IP = "ip";
 constexpr const char *P_DEFAULT_GW = "default_gw";
 constexpr const char *P_VIRT_MODE = "virt_mode";
 constexpr const char *P_AGING_TIME = "aging_time";
+constexpr const char *P_ENABLE_PORTO = "enable_porto";
 
 constexpr int VIRT_MODE_APP = 0;
 constexpr int VIRT_MODE_OS = 1;

@@ -9,6 +9,7 @@
 
 class TContainer;
 class TContainerHolder;
+class TContainerWaiter;
 
 enum class EEventType {
     Exit,
@@ -16,6 +17,7 @@ enum class EEventType {
     Respawn,
     OOM,
     CgroupSync,
+    WaitTimeout,
 };
 
 class TEventWorker;
@@ -26,16 +28,18 @@ public:
     std::weak_ptr<TContainer> Container;
     bool Targeted;
 
-    union {
-        struct {
-            int Pid;
-            int Status;
-        } Exit;
+    struct {
+        int Pid;
+        int Status;
+    } Exit;
 
-        struct {
-            int Fd;
-        } OOM;
-    };
+    struct {
+        int Fd;
+    } OOM;
+
+    struct {
+        std::weak_ptr<TContainerWaiter> Waiter;
+    } WaitTimeout;
 
     size_t DueMs = 0;
 

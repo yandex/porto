@@ -48,7 +48,7 @@ public:
     }
 
     std::shared_ptr<TContainerWaiter> Waiter;
-    bool Readonly() { return !MemberOfPortoGroup && !Cred.IsPrivileged(); }
+    bool Readonly();
 
 private:
     int Fd;

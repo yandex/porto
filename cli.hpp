@@ -37,8 +37,13 @@ public:
     int Execute(int argc, char *argv[]);
 };
 
-int GetOpt(int argc, char *argv[],
-           const std::map<char, std::function<void()>> &opts);
+struct Option {
+    char key;
+    bool hasArg;
+    std::function<void(const char *arg)> handler;
+};
+
+int GetOpt(int argc, char *argv[], const std::vector<Option> &opts);
 
 size_t MaxFieldLength(std::vector<std::string> &vec, size_t min = 8);
 void RegisterCommand(ICmd *cmd);

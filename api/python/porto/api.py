@@ -101,22 +101,25 @@ class _RPC(object):
                 self._timeout = self.timeout
                 self.timeout = timeout
 
-            self._sendall(hdr)
-            self._sendall(data)
+            try:
+                self._sendall(hdr)
+                self._sendall(data)
 
-            msb = 1
-            buf = ""
-            while msb:
-                b = self._recv(1)
-                msb = ord(b) >> 7
-                buf += b
+                msb = 1
+                buf = ""
+                while msb:
+                    b = self._recv(1)
+                    msb = ord(b) >> 7
+                    buf += b
 
-            length = _DecodeVarint32(buf, 0)
-            resp = rpc_pb2.TContainerResponse()
-            buf += self._recv(length[0])
-
-            self.timeout = self._timeout
-            self.sock.settimeout(self.timeout)
+                length = _DecodeVarint32(buf, 0)
+                resp = rpc_pb2.TContainerResponse()
+                buf += self._recv(length[0])
+            except:
+                raise
+            finally:
+                self.timeout = self._timeout
+                self.sock.settimeout(self.timeout)
 
         resp.ParseFromString(buf[length[1]:])
 
@@ -128,7 +131,7 @@ class _RPC(object):
     def List(self):
         request = rpc_pb2.TContainerRequest()
         request.list.CopyFrom(rpc_pb2.TContainerListRequest())
-        return self.call(request).list.name
+        return self.call(request, self.timeout).list.name
 
     def Create(self, name):
         request = rpc_pb2.TContainerRequest()
@@ -243,7 +246,10 @@ class _RPC(object):
     def Wait(self, containers, timeout=None):
         request = rpc_pb2.TContainerRequest()
         request.wait.name.extend(containers)
-        resp = self.call(request, timeout)
+        if timeout is not None and timeout >= 0:
+            request.wait.timeout = timeout
+
+        resp = self.call(request, None)
         if resp.error != rpc_pb2.Success:
             raise exceptions.EError.Create(resp.error, resp.errorMsg)
         return resp.wait.name
@@ -358,6 +364,9 @@ class Connection(object):
 
     def Dlist(self):
         return self.rpc.Dlist()
+
+    def Wait(self, containers, timeout=None):
+        return self.rpc.Wait(containers, timeout)
 
 
 # Example:

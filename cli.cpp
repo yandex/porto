@@ -277,20 +277,29 @@ int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
     return EXIT_FAILURE;
 }
 
-int GetOpt(int argc, char *argv[],
-           const std::map<char, std::function<void()>> &opts) {
+int GetOpt(int argc, char *argv[], const std::vector<Option> &opts) {
     std::string optstring;
-    for (auto pair : opts)
-        optstring += pair.first;
+    for (auto o : opts) {
+        optstring += o.key;
+        if (o.hasArg)
+            optstring += ":";
+    }
 
     int opt;
     while ((opt = getopt(argc + 1, argv - 1, optstring.c_str())) != -1) {
-        if (opts.find(opt) == opts.end()) {
+        bool found = false;
+        for (auto o : opts) {
+            if (o.key == opt) {
+                o.handler(optarg);
+                found = true;
+                break;
+            }
+        }
+
+        if (!found) {
             Usage(NULL);
             exit(EXIT_FAILURE);
         }
-
-        opts.at(opt)();
     }
 
     return optind - 1;

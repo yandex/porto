@@ -47,6 +47,21 @@ static void Usage() {
     std::cout << "       " << program_invocation_short_name << " stress [threads] [iterations] [kill=on/off]" << std::endl;
 }
 
+static int TestConnectivity() {
+    using namespace test;
+    config.Load();
+    TPortoAPI api(config().rpc_sock().file().path(), 0);
+
+    std::vector<std::string> containers;
+    ExpectApiSuccess(api.List(containers));
+
+    std::string name = "a";
+    ExpectApiSuccess(api.Create(name));
+    ExpectApiSuccess(api.Destroy(name));
+
+    return 0;
+}
+
 int main(int argc, char *argv[])
 {
     // in case client closes pipe we are writing to in the protobuf code
@@ -85,6 +100,8 @@ int main(int argc, char *argv[])
 
         if (what == "stress")
             return Stresstest(argc - 2, argv + 2);
+        else if (what == "connectivity")
+            return TestConnectivity();
         else
             return Selftest(argc - 1, argv + 1);
     } catch (string err) {

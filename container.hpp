@@ -168,6 +168,7 @@ public:
 
     bool IsLostAndRestored() const;
     void SyncStateWithCgroup();
+    bool IsNamespaceIsolated();
 
     bool LinkVolume(std::shared_ptr<TVolume> volume) {
         return Volumes.insert(volume).second;
@@ -185,6 +186,5 @@ private:
 public:
     TContainerWaiter(std::shared_ptr<TClient> client,
                      std::function<void (std::shared_ptr<TClient>, TError, std::string)> callback);
-    void SetClient(std::shared_ptr<TClient> client);
-    void Signal(const TContainer &who);
+    void Signal(const TContainer *who);
 };

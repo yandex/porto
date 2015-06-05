@@ -258,7 +258,7 @@ public:
 class TPortoNamespaceProperty : public TStringValue, public TContainerValue {
 public:
     TPortoNamespaceProperty() :
-        TStringValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TStringValue(PERSISTENT_VALUE),
         TContainerValue(P_PORTO_NAMESPACE,
                         "Porto containers/volumes namespace",
                         staticProperty) {}
@@ -1382,6 +1382,30 @@ public:
     }
 };
 
+class TEnablePortoProperty : public TBoolValue, public TContainerValue {
+public:
+    TEnablePortoProperty() :
+        TBoolValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TContainerValue(P_ENABLE_PORTO,
+                        "Allow container communication with porto",
+                        staticProperty) {}
+
+    bool GetDefault() const override {
+        return true;
+    }
+
+    TError CheckValue(const bool &value) override {
+        if (value == false) {
+            auto c = GetContainer();
+            if (c->Prop->Get<std::string>(P_ROOT) == "/" ||
+                c->Prop->Get<std::string>(P_PORTO_NAMESPACE).empty())
+                return TError(EError::InvalidValue, "Can't disable porto socket when container is not isolated");
+        }
+
+        return TError::Success();
+    }
+};
+
 class TRawIdProperty : public TIntValue, public TContainerValue {
 public:
     TRawIdProperty() :
@@ -1454,6 +1478,7 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TDefaultGwProperty,
         new TVirtModeProperty,
         new TAgingTimeProperty,
+        new TEnablePortoProperty,
 
         new TRawIdProperty,
         new TRawRootPidProperty,
