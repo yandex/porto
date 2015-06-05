@@ -555,8 +555,8 @@ static TError CreateVolume(TContext &context,
             rpc::TContainerResponse response;
             response.set_error(error.GetError());
             if (!error) {
-                auto desc = response.volume();
-                FillVolumeDescription(&desc, volume);
+                auto desc = response.mutable_volume();
+                FillVolumeDescription(desc, volume);
             }
             SendReply(client, response, true);
         });

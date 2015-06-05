@@ -114,15 +114,18 @@ _portoctl ()
 		_filedir
 		;;
 	vcreate)
-		if [ -z "$ct" ] ; then
-			_filedir
-		else
+		case "$cword" in
+		2)
+			_filedir -d
+			;;
+		*)
 			COMPREPLY=( $( compgen -S "=" -W "$_porto_volume_properies" -- "$cur" ) )
 			compopt -o nospace
-		fi
+			;;
+		esac
 		;;
 	vlist)
-		COMPREPLY=( $( compgen -W "-1" -- $cur ) )
+		_porto_volumes "-1"
 		;;
 	vlink|vunlink)
 		case "$cword" in

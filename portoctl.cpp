@@ -1370,10 +1370,18 @@ public:
 
 class TCreateVolumeCmd : public ICmd {
 public:
-    TCreateVolumeCmd(TPortoAPI *api) : ICmd(api, "vcreate", 1, "<path> [property=value...]", "create volume") {}
+    TCreateVolumeCmd(TPortoAPI *api) : ICmd(api, "vcreate", 1, "-A|<path> [property=value...]", "create volume") {}
 
     int Execute(int argc, char *argv[]) {
         std::map<std::string, std::string> properties;
+        std::string path(argv[0]);
+
+        if (path == "-A") {
+            path = "";
+        } else if (path[0] != '/') {
+            std::cerr << "Volume path must be absolute" << std::endl;
+            return EXIT_FAILURE;
+        }
 
         for (int i = 1; i < argc; i++) {
             std::string arg(argv[i]);
@@ -1385,11 +1393,14 @@ public:
         }
 
         TVolumeDescription volume;
-        int ret = Api->CreateVolume(argv[0], properties, volume);
+        int ret = Api->CreateVolume(path, properties, volume);
         if (ret) {
             PrintError("Can't create volume");
             return ret;
         }
+
+        if (path == "")
+            std::cout << volume.Path << std::endl;
 
         return 0;
     }
@@ -1443,7 +1454,7 @@ public:
 
     int Execute(int argc, char *argv[]) {
         int start = GetOpt(argc, argv, {
-            { '1', [&]() { details = false; } },
+            { '1', false, [&](const char *arg) { details = false; } },
         });
 
         vector<TVolumeDescription> vlist;
@@ -1459,6 +1470,7 @@ public:
               ShowVolume(v);
         } else {
             for (int i = start; i < argc; i++) {
+                vlist.clear();
                 int ret = Api->ListVolumes(argv[i], "", vlist);
                 if (ret) {
                     PrintError(argv[i]);
