@@ -131,15 +131,6 @@ void TContainer::SetState(EContainerState newState, bool tree) {
             if (auto child = iter.lock())
                 child->SetState(newState, tree);
 
-    if (newState != EContainerState::Running) {
-        CleanupWaiters();
-        for (auto &w : Waiters) {
-            auto waiter = w.lock();
-            if (waiter)
-                waiter->Signal(this);
-        }
-    }
-
     if (State == newState)
         return;
 
@@ -152,6 +143,8 @@ void TContainer::SetState(EContainerState newState, bool tree) {
 
     State = newState;
     Data->Set<std::string>(D_STATE, ContainerStateName(State));
+
+    NotifyWaiters();
 }
 
 const string TContainer::StripParentName(const string &name) const {
@@ -867,7 +860,8 @@ bool TContainer::StopChildren() {
     return stopped;
 }
 
-void TContainer::ExitChildren(int status, bool oomKilled) {
+bool TContainer::ExitChildren(int status, bool oomKilled) {
+    bool exited = false;
     for (auto iter : Children)
         if (auto child = iter.lock())
             if (child->GetState() == EContainerState::Running ||
@@ -875,8 +869,10 @@ void TContainer::ExitChildren(int status, bool oomKilled) {
                 TError error = child->KillAll();
                 if (error)
                     L_ERR() << "Child " << child->GetName() << " can't be killed: " << error << std::endl;
-                child->Exit(status, oomKilled, true);
+                if (child->Exit(status, oomKilled, true))
+                    exited = true;
             }
+    return exited;
 }
 
 TError TContainer::PrepareResources() {
@@ -1658,6 +1654,17 @@ void TContainer::AddWaiter(std::shared_ptr<TContainerWaiter> waiter) {
         Waiters.push_back(waiter);
     } else {
         waiter->Signal(this);
+    }
+}
+
+void TContainer::NotifyWaiters() {
+    if (GetState() != EContainerState::Running) {
+        CleanupWaiters();
+        for (auto &w : Waiters) {
+            auto waiter = w.lock();
+            if (waiter)
+                waiter->Signal(this);
+        }
     }
 }
 

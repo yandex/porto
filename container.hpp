@@ -86,7 +86,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError AliasToProperty(std::string &property, std::string &value);
 
     bool Exit(int status, bool oomKilled, bool force = false);
-    void ExitChildren(int status, bool oomKilled);
+    bool ExitChildren(int status, bool oomKilled);
     bool DeliverExitStatus(int pid, int status);
     bool DeliverOom(int fd);
 
@@ -95,6 +95,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     std::string GetPortoNamespace() const;
 
     void CleanupWaiters();
+    void NotifyWaiters();
 
 public:
     TCred OwnerCred;
