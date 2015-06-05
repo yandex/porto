@@ -52,6 +52,10 @@ TError TContainerHolder::CreateRoot() {
     if (error)
         return error;
 
+    error = root->Prop->Set<bool>(P_ISOLATE, false);
+    if (error)
+        return error;
+
     error = root->Start(true);
     if (error)
         return error;
@@ -71,6 +75,10 @@ TError TContainerHolder::CreatePortoRoot() {
 
     if (root->GetId() != PORTO_ROOT_CONTAINER_ID)
         return TError(EError::Unknown, "Unexpected /porto container id " + std::to_string(root->GetId()));
+
+    error = root->Prop->Set<bool>(P_ISOLATE, false);
+    if (error)
+        return error;
 
     error = root->Start(true);
     if (error)

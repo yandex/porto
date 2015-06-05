@@ -109,16 +109,41 @@ static TError StartContainer(TContext &context,
     err = client->GetContainer()->AbsoluteName(req.name(), name);
     if (err)
         return err;
-    std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(name, container);
-    if (error)
-        return error;
 
-    error = container->CheckPermission(client->GetCred());
-    if (error)
-        return error;
+    std::vector<std::string> nameVec;
+    err = SplitString(name, '/', nameVec);
+    if (err)
+        return TError(EError::InvalidValue, "Invalid container name " + name);
 
-    return container->Start(false);
+    name = "";
+    for (auto i = nameVec.begin(); i != nameVec.end(); i++) {
+        if (!name.empty())
+            name += "/";
+        name += *i;
+
+        std::shared_ptr<TContainer> container;
+        err = context.Cholder->Get(name, container);
+        if (err)
+            return err;
+
+        err = container->CheckPermission(client->GetCred());
+        if (err)
+            return err;
+
+        if (nameVec.size() > 1)
+            if (container->GetState() == EContainerState::Running ||
+                container->GetState() == EContainerState::Meta)
+                continue;
+
+        std::string cmd = container->Prop->Get<std::string>(P_COMMAND);
+        bool meta = i + 1 != nameVec.end() && cmd.empty();
+        //bool meta = std::distance(i, nameVec.end()) == 1 && cmd.empty();
+        err = container->Start(meta);
+        if (err)
+            return err;
+    }
+
+    return TError::Success();
 }
 
 static TError StopContainer(TContext &context,

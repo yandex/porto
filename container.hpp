@@ -70,9 +70,8 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareOomMonitor();
     void ShutdownOom();
     TError PrepareCgroups();
-    TError PrepareTask();
+    TError PrepareTask(bool meta);
     TError KillAll();
-    TError PrepareMetaParent();
     void RemoveKvs();
 
     const std::string StripParentName(const std::string &name) const;
