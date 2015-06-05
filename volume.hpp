@@ -72,8 +72,8 @@ public:
     TVolume(std::shared_ptr<TVolumeHolder> holder,
             std::shared_ptr<TValueMap> config) :
         Holder(holder), Config(config) {}
-    TError Configure(const TPath &path, const TCred &cred,
-                     std::shared_ptr<TContainer> container,
+    TError Configure(const TPath &path, const TCred &creator_cred,
+                     std::shared_ptr<TContainer> creator_container,
                      const std::map<std::string, std::string> &properties);
     TError Build();
     TError Destroy();

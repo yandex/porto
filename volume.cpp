@@ -342,8 +342,8 @@ TPath TVolume::GetInternal(std::string type) const {
     return TPath(config().volumes().volume_dir()).AddComponent(std::to_string(GetId())).AddComponent(type);
 }
 
-TError TVolume::Configure(const TPath &path, const TCred &cred,
-                          std::shared_ptr<TContainer> container,
+TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
+                          std::shared_ptr<TContainer> creator_container,
                           const std::map<std::string, std::string> &properties) {
     TError error;
 
@@ -353,23 +353,28 @@ TError TVolume::Configure(const TPath &path, const TCred &cred,
     if (!path.IsEmpty() && path.Exists())
         return TError(EError::InvalidValue, "Volume path already exists");
 
-    if (path.IsEmpty())
-        error = Config->Set<std::string>(V_PATH, GetInternal("mount").ToString());
-    else
+    if (path.IsEmpty()) {
+        error = Config->Set<std::string>(V_PATH, GetInternal("volume").ToString());
+        if (error)
+            return error;
+    } else {
+        if (!path.DirName().AccessOk(EFileAccess::Write, creator_cred))
+            return TError(EError::Permission, "Volume creation not permitted");
         error = Config->Set<std::string>(V_PATH, path.ToString());
-    if (error)
-        return error;
+        if (error)
+            return error;
+    }
 
-    error = Config->Set<std::string>(V_CREATOR, container->GetName() + " " +
-                            cred.UserAsString() + " " + cred.GroupAsString());
+    error = Config->Set<std::string>(V_CREATOR, creator_container->GetName() + " " +
+                    creator_cred.UserAsString() + " " + creator_cred.GroupAsString());
     if (error)
         return error;
 
     /* Set default credentials to creator */
-    error = Config->Set<std::string>(V_USER, cred.UserAsString());
+    error = Config->Set<std::string>(V_USER, creator_cred.UserAsString());
     if (error)
         return error;
-    error = Config->Set<std::string>(V_GROUP, cred.GroupAsString());
+    error = Config->Set<std::string>(V_GROUP, creator_cred.GroupAsString());
     if (error)
         return error;
     error = Config->Set<std::string>(V_PERMISSIONS, "0755");
@@ -413,7 +418,10 @@ TError TVolume::Configure(const TPath &path, const TCred &cred,
             return error;
     }
 
-    if (!Config->HasValue(V_STORAGE)) {
+    if (Config->HasValue(V_STORAGE)) {
+        if (!GetStorage().DirName().AccessOk(EFileAccess::Write, creator_cred))
+            return TError(EError::Permission, "Storage creation not permitted");
+    } else {
         error = Config->Set<std::string>(V_STORAGE,
                         GetInternal(GetBackend()).ToString());
         if (error)
