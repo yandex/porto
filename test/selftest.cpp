@@ -2060,6 +2060,7 @@ static void TestNetProperty(TPortoAPI &api) {
 
     AsRoot(api);
     (void)system("ip link delete veth0");
+    (void)system("ip link delete veth1");
     ExpectEq(system("ip link add veth0 type veth peer name veth1"), 0);
     AsNobody(api);
 

@@ -551,7 +551,7 @@ bool TContainer::IsNamespaceIsolated() {
     return false;
 }
 
-TError TContainer::PrepareTask(bool meta) {
+TError TContainer::PrepareTask() {
     if (!Prop->Get<bool>(P_ISOLATE))
         for (auto name : Prop->List())
             if (Prop->Find(name)->GetFlags() & PARENT_RO_PROPERTY)
@@ -653,10 +653,17 @@ TError TContainer::PrepareTask(bool meta) {
             return error;
     }
 
-    if (meta) {
+    // if command is empty we need to start meta task
+    if (taskEnv->Command.empty()) {
+        TPath exe("/proc/self/exe");
+        TPath path;
+        TError error = exe.ReadLink(path);
+        if (error)
+            return error;
+
         taskEnv->Command = Prop->Get<std::string>(P_CWD) + "/portod-meta-root";
 
-        TBindMap bm = { "/usr/sbin/portod-meta-root",
+        TBindMap bm = { path.ToString() + "-meta-root",
                         "/portod-meta-root",
                         true };
 
@@ -768,7 +775,7 @@ TError TContainer::Start(bool meta) {
             return error;
         }
 
-        error = PrepareTask(meta);
+        error = PrepareTask();
         if (error) {
             L_ERR() << "Can't prepare task: " << error << std::endl;
             FreeResources();
@@ -1331,8 +1338,7 @@ TError TContainer::Restore(const kv::TNode &node) {
             return error;
         }
 
-        bool meta = Prop->Get<std::string>(P_COMMAND).empty();
-        error = PrepareTask(meta);
+        error = PrepareTask();
         if (error) {
             FreeResources();
             return error;
