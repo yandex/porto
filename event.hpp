@@ -26,7 +26,6 @@ class TEvent {
 public:
     EEventType Type;
     std::weak_ptr<TContainer> Container;
-    bool Targeted;
 
     struct {
         int Pid;
@@ -44,7 +43,7 @@ public:
     size_t DueMs = 0;
 
     TEvent(EEventType type, std::shared_ptr<TContainer> container = nullptr) :
-        Type(type), Container(container), Targeted(container != nullptr) {}
+        Type(type), Container(container) {}
 
     bool operator<(const TEvent& rhs) const;
 

@@ -417,7 +417,6 @@ static void TestHolder(TPortoAPI &api) {
 
     ExpectApiSuccess(api.SetProperty("a/b/c", "command", "sleep 1000"));
 
-    std::string defaultLimit = GetCgKnob("memory", "", "memory.soft_limit_in_bytes");
     std::string customLimit = std::to_string(1 * 1024 * 1024);
 
     ExpectApiSuccess(api.Start("a/b/c"));
@@ -427,9 +426,9 @@ static void TestHolder(TPortoAPI &api) {
     ExpectEq(v, "meta");
     ExpectApiSuccess(api.GetData("a", "state", v));
     ExpectEq(v, "meta");
-    ExpectEq(GetCgKnob("memory", "a/b/c", "memory.soft_limit_in_bytes"), defaultLimit);
-    ExpectEq(GetCgKnob("memory", "a/b", "memory.soft_limit_in_bytes"), defaultLimit);
-    ExpectEq(GetCgKnob("memory", "a", "memory.soft_limit_in_bytes"), defaultLimit);
+    ExpectNeq(GetCgKnob("memory", "a/b/c", "memory.soft_limit_in_bytes"), customLimit);
+    ExpectNeq(GetCgKnob("memory", "a/b", "memory.soft_limit_in_bytes"), customLimit);
+    ExpectNeq(GetCgKnob("memory", "a", "memory.soft_limit_in_bytes"), customLimit);
     ExpectApiSuccess(api.Stop("a/b/c"));
     ExpectEq(GetCgKnob("memory", "a/b", "memory.soft_limit_in_bytes"), customLimit);
     ExpectEq(GetCgKnob("memory", "a", "memory.soft_limit_in_bytes"), customLimit);
@@ -494,11 +493,6 @@ static void TestHolder(TPortoAPI &api) {
     ExpectApiSuccess(api.Create("x/y/z"));
     ExpectApiSuccess(api.SetProperty("x/y/z", "command", "sleep 1000"));
     ExpectApiSuccess(api.Start("x/y/z"));
-
-    ExpectApiSuccess(api.GetProperty("x", "command", v));
-    ExpectEq(v, config().container().tmp_dir() + "/x/portod-meta-root");
-    ExpectApiSuccess(api.GetProperty("x/y", "command", v));
-    ExpectEq(v, config().container().tmp_dir() + "/x/y/portod-meta-root");
     ExpectApiSuccess(api.Destroy("x"));
 
     Say() << "Make sure when parent stops/dies children are stopped" << std::endl;
@@ -2066,6 +2060,7 @@ static void TestNetProperty(TPortoAPI &api) {
 
     AsRoot(api);
     (void)system("ip link delete veth0");
+    (void)system("ip link delete veth1");
     ExpectEq(system("ip link add veth0 type veth peer name veth1"), 0);
     AsNobody(api);
 

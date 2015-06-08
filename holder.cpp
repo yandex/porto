@@ -52,6 +52,10 @@ TError TContainerHolder::CreateRoot() {
     if (error)
         return error;
 
+    error = root->Prop->Set<bool>(P_ISOLATE, false);
+    if (error)
+        return error;
+
     error = root->Start(true);
     if (error)
         return error;
@@ -71,6 +75,10 @@ TError TContainerHolder::CreatePortoRoot() {
 
     if (root->GetId() != PORTO_ROOT_CONTAINER_ID)
         return TError(EError::Unknown, "Unexpected /porto container id " + std::to_string(root->GetId()));
+
+    error = root->Prop->Set<bool>(P_ISOLATE, false);
+    if (error)
+        return error;
 
     error = root->Start(true);
     if (error)
@@ -386,34 +394,31 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     if (config().log().verbose())
         L_EVT() << "Deliver event " << event.GetMsg() << std::endl;
 
-    if (event.Targeted) {
-        auto c = event.Container.lock();
-        if (c)
-            return c->DeliverEvent(event);
-        return false;
-    } else if (event.Type != EEventType::CgroupSync &&
-               event.Type != EEventType::WaitTimeout) {
-        std::vector<std::string> remove;
-        for (auto c : Containers) {
-            if (event.Type == EEventType::RotateLogs)
-                if (c.second->CanRemoveDead())
-                    remove.push_back(c.second->GetName());
+    bool delivered = false;
 
-            if (c.second->DeliverEvent(event))
-                return true;
-        }
-
-        for (auto name : remove) {
-            L_ACT() << "Remove old dead " << name << std::endl;
-            TError error = Destroy(name);
-            if (error)
-                L_ERR() << "Can't destroy " << name << ": " << error << std::endl;
-            else
-                Statistics->RemoveDead++;
-        }
+    switch (event.Type) {
+    case EEventType::OOM:
+    {
+        std::shared_ptr<TContainer> target = event.Container.lock();
+        if (target)
+            delivered = target->DeliverEvent(event);
+        break;
     }
-
-    if (event.Type == EEventType::CgroupSync) {
+    case EEventType::Respawn:
+    case EEventType::Exit:
+    {
+        for (auto &target : Containers) {
+            delivered = target.second->DeliverEvent(event);
+            if (delivered)
+                break;
+        }
+        if (event.Type == EEventType::Exit)
+            AckExitStatus(event.Exit.Pid);
+        delivered = true;
+        break;
+    }
+    case EEventType::CgroupSync:
+    {
         bool rearm = false;
         for (auto &c : Containers) {
             if (c.second->IsLostAndRestored()) {
@@ -423,23 +428,49 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
         }
         if (rearm)
             ScheduleCgroupSync();
-        return true;
-    } else if (event.Type == EEventType::WaitTimeout) {
+        delivered = true;
+        break;
+    }
+    case EEventType::WaitTimeout:
+    {
         auto w = event.WaitTimeout.Waiter.lock();
         if (w)
             w->Signal(nullptr);
-        return true;
-    } else if (event.Type == EEventType::RotateLogs) {
+        delivered = true;
+        break;
+    }
+    case EEventType::RotateLogs:
+    {
+        { /* gc */
+            std::vector<std::string> remove;
+            for (auto c : Containers)
+                if (c.second->CanRemoveDead())
+                    remove.push_back(c.second->GetName());
+
+            for (auto name : remove) {
+                L_ACT() << "Remove old dead " << name << std::endl;
+                TError error = Destroy(name);
+                if (error)
+                    L_ERR() << "Can't destroy " << name << ": " << error << std::endl;
+                else
+                    Statistics->RemoveDead++;
+            }
+        }
+
+        for (auto c : Containers)
+            c.second->DeliverEvent(event);
+
         ScheduleLogRotatation();
         Statistics->Rotated++;
-        return true;
-    } else {
-        // TODO: convert to LOG_WARN
-        L() << "Couldn't deliver " << event.GetMsg() << std::endl;
-
-        if (event.Type == EEventType::Exit)
-            AckExitStatus(event.Exit.Pid);
-
-        return false;
+        delivered = true;
+        break;
     }
+    default:
+        L_ERR() << "Unknown event " << event.GetMsg() << std::endl;
+    }
+
+    if (!delivered)
+        L_WRN() << "Couldn't deliver " << event.GetMsg() << std::endl;
+
+    return delivered;
 }

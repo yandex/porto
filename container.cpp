@@ -131,15 +131,6 @@ void TContainer::SetState(EContainerState newState, bool tree) {
             if (auto child = iter.lock())
                 child->SetState(newState, tree);
 
-    if (newState != EContainerState::Running) {
-        CleanupWaiters();
-        for (auto &w : Waiters) {
-            auto waiter = w.lock();
-            if (waiter)
-                waiter->Signal(this);
-        }
-    }
-
     if (State == newState)
         return;
 
@@ -152,6 +143,8 @@ void TContainer::SetState(EContainerState newState, bool tree) {
 
     State = newState;
     Data->Set<std::string>(D_STATE, ContainerStateName(State));
+
+    NotifyWaiters();
 }
 
 const string TContainer::StripParentName(const string &name) const {
@@ -659,6 +652,23 @@ TError TContainer::PrepareTask() {
             return error;
     }
 
+    // if command is empty we need to start meta task
+    if (taskEnv->Command.empty()) {
+        TPath exe("/proc/self/exe");
+        TPath path;
+        TError error = exe.ReadLink(path);
+        if (error)
+            return error;
+
+        taskEnv->Command = Prop->Get<std::string>(P_CWD) + "/portod-meta-root";
+
+        TBindMap bm = { path.ToString() + "-meta-root",
+                        "/portod-meta-root",
+                        true };
+
+        taskEnv->BindMap.push_back(bm);
+    }
+
     error = taskEnv->Prepare(cred);
     if (error)
         return error;
@@ -690,59 +700,6 @@ TError TContainer::Create(const TCred &cred) {
         Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
 
     SetState(EContainerState::Stopped);
-
-    return TError::Success();
-}
-
-TError TContainer::PrepareMetaParent() {
-    if (Parent && Parent->GetState() != EContainerState::Meta) {
-        TError error = Parent->PrepareMetaParent();
-        if (error)
-            return error;
-    }
-
-    auto state = State;
-    if (state == EContainerState::Stopped) {
-        if (Prop->Get<bool>(P_ISOLATE)) {
-            auto cwd = Prop->Get<std::string>(P_CWD);
-            TError error = Prop->Set<std::string>(P_COMMAND, cwd + "/portod-meta-root");
-            if (error)
-                return error;
-
-            auto bind = Prop->Get<TStrList>(P_BIND);
-            auto metaRoot = "/usr/sbin/portod-meta-root /portod-meta-root ro";
-            if (std::find(bind.begin(), bind.end(), metaRoot) == bind.end())
-                bind.push_back(metaRoot);
-
-            error = Prop->Set<TStrList>(P_BIND, bind);
-            if (error)
-                return error;
-
-            error = Start(false);
-            if (error)
-                return error;
-
-            SetState(EContainerState::Meta);
-        } else {
-            SetState(EContainerState::Meta);
-
-            TError error = PrepareNetwork();
-            if (error) {
-                FreeResources();
-                return error;
-            }
-
-            error = PrepareCgroups();
-            if (error) {
-                FreeResources();
-                return error;
-            }
-        }
-    } else if (state == EContainerState::Meta || state == EContainerState::Dead) {
-        return TError::Success();
-    } else if (state != EContainerState::Running) {
-        return TError(EError::InvalidState, "invalid parent (" + GetName() + ") state " + ContainerStateName(state));
-    }
 
     return TError::Success();
 }
@@ -798,56 +755,56 @@ TError TContainer::Start(bool meta) {
     if (error)
         return error;
 
-    if (meta) {
-        SetState(EContainerState::Meta);
-        return TError::Success();
-    }
-
-    TPath root(Prop->Get<std::string>(P_ROOT));
-    int loopNr = -1;
-    if (root.GetType() != EFileType::Directory) {
-        error = GetLoopDev(loopNr);
-        if (error) {
-            return error;
-            FreeResources();
+    if (!meta || (meta && Prop->Get<bool>(P_ISOLATE))) {
+        TPath root(Prop->Get<std::string>(P_ROOT));
+        int loopNr = -1;
+        if (root.GetType() != EFileType::Directory) {
+            error = GetLoopDev(loopNr);
+            if (error) {
+                return error;
+                FreeResources();
+            }
         }
+
+        error = Prop->Set<int>(P_RAW_LOOP_DEV, loopNr);
+        if (error) {
+            if (loopNr >= 0)
+                (void)PutLoopDev(loopNr);
+            (void)FreeResources();
+            return error;
+        }
+
+        error = PrepareTask();
+        if (error) {
+            L_ERR() << "Can't prepare task: " << error << std::endl;
+            FreeResources();
+            return error;
+        }
+
+        error = Task->Start();
+        if (error) {
+            TError e = Data->Set<int>(D_START_ERRNO, error.GetErrno());
+            if (e)
+                L_ERR() << "Can't set start_errno: " << e << std::endl;
+            FreeResources();
+            return error;
+        }
+
+        error = Data->Set<int>(D_START_ERRNO, -1);
+        if (error)
+            return error;
+
+        L() << GetName() << " started " << std::to_string(Task->GetPid()) << std::endl;
+
+        error = Prop->Set<int>(P_RAW_ROOT_PID, Task->GetPid());
+        if (error)
+            return error;
     }
 
-    error = Prop->Set<int>(P_RAW_LOOP_DEV, loopNr);
-    if (error) {
-        if (loopNr >= 0)
-            (void)PutLoopDev(loopNr);
-        (void)FreeResources();
-        return error;
-    }
-
-    error = PrepareTask();
-    if (error) {
-        L_ERR() << "Can't prepare task: " << error << std::endl;
-        FreeResources();
-        return error;
-    }
-
-    error = Task->Start();
-    if (error) {
-        TError e = Data->Set<int>(D_START_ERRNO, error.GetErrno());
-        if (e)
-            L_ERR() << "Can't set start_errno: " << e << std::endl;
-        FreeResources();
-        return error;
-    }
-
-    error = Data->Set<int>(D_START_ERRNO, -1);
-    if (error)
-        return error;
-
-    L() << GetName() << " started " << std::to_string(Task->GetPid()) << std::endl;
-
-    error = Prop->Set<int>(P_RAW_ROOT_PID, Task->GetPid());
-    if (error)
-        return error;
-
-    SetState(EContainerState::Running);
+    if (meta)
+        SetState(EContainerState::Meta);
+    else
+        SetState(EContainerState::Running);
     Statistics->Started++;
     error = UpdateSoftLimit();
     if (error)
@@ -909,7 +866,8 @@ bool TContainer::StopChildren() {
     return stopped;
 }
 
-void TContainer::ExitChildren(int status, bool oomKilled) {
+bool TContainer::ExitChildren(int status, bool oomKilled) {
+    bool exited = false;
     for (auto iter : Children)
         if (auto child = iter.lock())
             if (child->GetState() == EContainerState::Running ||
@@ -917,17 +875,13 @@ void TContainer::ExitChildren(int status, bool oomKilled) {
                 TError error = child->KillAll();
                 if (error)
                     L_ERR() << "Child " << child->GetName() << " can't be killed: " << error << std::endl;
-                child->Exit(status, oomKilled, true);
+                if (child->Exit(status, oomKilled, true))
+                    exited = true;
             }
+    return exited;
 }
 
 TError TContainer::PrepareResources() {
-    if (Parent) {
-        TError error = Parent->PrepareMetaParent();
-        if (error)
-            return error;
-    }
-
     TError error = PrepareNetwork();
     if (error) {
         L_ERR() << "Can't prepare task network: " << error << std::endl;
@@ -1363,6 +1317,23 @@ TError TContainer::Restore(const kv::TNode &node) {
 
         L_ACT() << GetName() << ": restore started container " << pid << std::endl;
 
+        auto parent = Parent;
+        while (parent && !parent->IsRoot() && !parent->IsPortoRoot()) {
+            if (parent->GetState() == EContainerState::Running ||
+                parent->GetState() == EContainerState::Meta ||
+                parent->GetState() == EContainerState::Dead)
+                break;
+            bool meta = parent->Prop->Get<std::string>(P_COMMAND).empty();
+
+            L() << "Start parent " << parent->GetName() << " meta " << meta << std::endl;
+
+            TError error = parent->Start(meta);
+            if (error)
+                return error;
+
+            parent = parent->Parent;
+        }
+
         TError error = PrepareResources();
         if (error) {
             FreeResources();
@@ -1689,6 +1660,17 @@ void TContainer::AddWaiter(std::shared_ptr<TContainerWaiter> waiter) {
         Waiters.push_back(waiter);
     } else {
         waiter->Signal(this);
+    }
+}
+
+void TContainer::NotifyWaiters() {
+    if (GetState() != EContainerState::Running) {
+        CleanupWaiters();
+        for (auto &w : Waiters) {
+            auto waiter = w.lock();
+            if (waiter)
+                waiter->Signal(this);
+        }
     }
 }
 
