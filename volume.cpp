@@ -397,6 +397,13 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
     if (error)
         return error;
 
+    if (Cred.Uid != creator_cred.Uid && !creator_cred.IsPrivileged())
+        return TError(EError::Permission, "Changing user is not permitted");
+
+    if (Cred.Gid != creator_cred.Gid && !creator_cred.IsPrivileged() &&
+            !creator_cred.MemberOf(Cred.Gid))
+        return TError(EError::Permission, "Changing group is not permitted");
+
     error = StringToOct(Config->Get<std::string>(V_PERMISSIONS), Permissions);
     if (error)
         return error;
