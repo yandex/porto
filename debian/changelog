@@ -1,3 +1,21 @@
+yandex-porto (1.14) precise; urgency=low
+
+  * support for wait operation in python API
+  * fix for restoring stopped child in dead parent
+  * fix portoctl signal handling
+  * check parent container credentials when creating child
+  * check whether container belongs to porto while restoring
+  * fix wrong combined get error
+  * convert some errors/warnings to notice
+  * change socket permissions and check for porto group when client connects
+  * add enable_porto property
+  * fix max_rss - return hierarchical value
+  * support timeout in wait operation
+  * create tc filter for all protocols
+  * fix stdout/stderr permissions (700 -> 660)
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 08 Jun 2015 18:18:00 +0300
+
 yandex-porto (1.13) precise; urgency=low
 
   * rework meta behavior (don't depend on isolate, don't change to stopped when all children exit)
