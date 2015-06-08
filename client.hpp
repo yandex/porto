@@ -56,9 +56,8 @@ private:
     TCred Cred;
     std::string Comm;
     size_t RequestStartMs;
-    bool MemberOfPortoGroup = false;
 
-    TError CheckPortoMembership();
+    TError LoadGroups();
     TError IdentifyContainer(TContainerHolder &holder);
     std::weak_ptr<TContainer> Container;
 
