@@ -110,7 +110,7 @@ static int ChildFn(void *arg) {
 }
 
 TError TTask::ChildOpenStdFile(const TPath &path, int expected) {
-    int ret = open(path.ToString().c_str(), O_CREAT | O_WRONLY | O_APPEND, 0700);
+    int ret = open(path.ToString().c_str(), O_CREAT | O_WRONLY | O_APPEND, 0660);
     if (ret < 0)
         return TError(EError::InvalidValue, errno,
                       "open(" + path.ToString() + ") -> " +
@@ -134,7 +134,7 @@ TError TTask::ChildOpenStdFile(const TPath &path, int expected) {
 TError TTask::ChildReopenStdio() {
     CloseFds(3, { Wfd, TLogger::GetFd() });
 
-    int ret = open(Env->StdinPath.ToString().c_str(), O_CREAT | O_RDONLY, 0700);
+    int ret = open(Env->StdinPath.ToString().c_str(), O_CREAT | O_RDONLY, 0660);
     if (ret < 0)
         return TError(EError::Unknown, errno, "open(" + Env->StdinPath.ToString() + ") -> 0");
 
