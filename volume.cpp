@@ -377,7 +377,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
     error = Config->Set<std::string>(V_GROUP, creator_cred.GroupAsString());
     if (error)
         return error;
-    error = Config->Set<std::string>(V_PERMISSIONS, "0755");
+    error = Config->Set<std::string>(V_PERMISSIONS, "0775");
     if (error)
         return error;
 
@@ -643,7 +643,7 @@ const std::vector<std::pair<std::string, std::string>> TVolumeHolder::ListProper
         { V_READY,       "true|false (readonly)" },
         { V_USER,        "user  default - creator" },
         { V_GROUP,       "group  default - creator" },
-        { V_PERMISSIONS, "directory permissions  default - 0755" },
+        { V_PERMISSIONS, "directory permissions  default - 0775" },
         { V_CREATOR,     "container user group" },
         { V_READ_ONLY,   "true|false  default - false" },
         { V_OVERLAYS,    "top-layer;...;bottom-layer  overlay layers" },
