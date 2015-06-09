@@ -153,25 +153,9 @@ class TVolumeLoopBackend : public TVolumeBackend {
     int LoopDev = -1;
 
 public:
-    TVolumeLoopBackend(std::shared_ptr<TVolume> volume) : TVolumeBackend(volume) {}
+    TVolumeLoopBackend(std::shared_ptr<TVolume> volume) : TVolumeBackend(volume) { }
 
-    TError Configure() override {
-        uint64_t space, inode;
-
-        Volume->GetQuota(space, inode);
-        if (!space)
-            return TError(EError::InvalidValue, "loop backend requires space_limit");
-
-        if (LoopDev < 0) {
-            TError error = GetLoopDev(LoopDev);
-            if (error)
-                return error;
-        }
-
-        return TError::Success();
-    }
-
-    TPath GetLoopPath() {
+    TPath GetLoopImage() {
         return Volume->GetStorage().AddComponent("loop.img");
     }
 
@@ -186,36 +170,58 @@ public:
 
     TError Build() override {
         TPath path = Volume->GetPath();
-        TPath LoopPath = GetLoopPath();
-        uint64_t bytes, inodes;
+        TPath image = GetLoopImage();
+        uint64_t space_limit, inode_limit;
         TError error;
 
-        Volume->GetQuota(bytes, inodes);
+        Volume->GetQuota(space_limit, inode_limit);
+        if (!space_limit)
+            return TError(EError::InvalidValue, "loop backend requires space_limit");
 
-        L_ACT() << "Allocate loop image with size " << bytes << std::endl;
-        error = AllocLoop(LoopPath, bytes);
+        error = GetLoopDev(LoopDev);
         if (error)
             return error;
 
-        TLoopMount m = TLoopMount(LoopPath, path, "ext4", LoopDev);
+        TLoopMount m = TLoopMount(image, path, "ext4", LoopDev);
+
+        if (!image.Exists()) {
+            L_ACT() << "Allocate loop image with size " << space_limit << std::endl;
+            error = AllocLoop(image, space_limit);
+            if (error)
+                goto put_loop;
+        } else {
+            //FIXME call resize2fs
+        }
+
         error = m.Mount();
         if (error)
-            return error;
+            goto put_loop;
 
         error = path.Chown(Volume->GetCred());
         if (error)
-            return error;
+            goto umount_loop;
 
         error = path.Chmod(Volume->GetPermissions());
         if (error)
-            return error;
+            goto umount_loop;
 
         return TError::Success();
+
+umount_loop:
+        (void)m.Umount();
+        LoopDev = -1;
+        return error;
+
+put_loop:
+        if (LoopDev != -1)
+            PutLoopDev(LoopDev);
+        LoopDev = -1;
+        return error;
     }
 
     TError Destroy() override {
-        TPath LoopPath = GetLoopPath();
-        TLoopMount m = TLoopMount(LoopPath, Volume->GetPath(), "ext4", LoopDev);
+        L_ACT() << "Destroy loop " << LoopDev << std::endl;
+        TLoopMount m = TLoopMount(GetLoopImage(), Volume->GetPath(), "ext4", LoopDev);
         return m.Umount();
     }
 
@@ -224,7 +230,7 @@ public:
     }
 
     TError Move(TPath dest) override {
-        TMount mount(GetLoopPath(), Volume->GetPath(), "ext4", {});
+        TMount mount(GetLoopImage(), Volume->GetPath(), "ext4", {});
         return mount.Move(dest);
     }
 
@@ -266,23 +272,25 @@ public:
 
         error = upper.Mkdir(0755);
         if (error)
-            goto out;
+            goto err;
 
         error = work.Mkdir(0755);
         if (error)
-            goto out;
+            goto err;
 
         error = upper.Chown(Volume->GetCred());
         if (error)
-            goto out;
+            goto err;
 
         error = upper.Chmod(Volume->GetPermissions());
         if (error)
             return error;
 
-        return mount.Mount(Volume->IsReadOnly() ? MS_RDONLY : 0);
-out:
-        ext4_destroy_project(storage.c_str());
+        error = mount.Mount(Volume->IsReadOnly() ? MS_RDONLY : 0);
+        if (!error)
+            return error;
+err:
+        (void)ext4_destroy_project(storage.c_str());
         return error;
     }
 

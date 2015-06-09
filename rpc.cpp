@@ -541,56 +541,31 @@ static TError CreateVolume(TContext &context,
 
     error = volume->Configure(TPath(req.has_path() ? req.path() : ""),
                               client->GetCred(), container, properties);
+    if (error)
+        return error;
+
+    error = context.Vholder->Register(volume);
+    if (error)
+        return error;
+
+    error = volume->Build();
     if (error) {
-        volume->Destroy();
+        L_WRN() << "Can't build volume: " << error << std::endl;
+        context.Vholder->Unregister(volume);
         return error;
     }
 
     error = volume->LinkContainer(container->GetName());
     if (error) {
-        volume->Destroy();
+        L_WRN() << "Can't link volume" << std::endl;
+        (void)volume->Destroy();
         return error;
     }
     container->LinkVolume(volume);
+    volume->SetReady(true);
 
-    error = context.Vholder->Register(volume);
-    if (error) {
-        volume->Destroy();
-        return error;
-    }
-
-    std::weak_ptr<TClient> c = client;
-    TBatchTask task(
-        [volume] () {
-            return volume->Build();
-        },
-        [volume, c] (TError error) {
-            auto client = c.lock();
-
-            if (error) {
-                L_WRN() << "Can't build volume: " << error << std::endl;
-                (void)volume->Destroy();
-            } else if (!client) {
-                L_WRN() << "Can't link volume, client is gone" << std::endl;
-                (void)volume->Destroy();
-            } else {
-                volume->SetReady(true);
-            }
-
-            rpc::TContainerResponse response;
-            response.set_error(error.GetError());
-            if (!error) {
-                auto desc = response.mutable_volume();
-                FillVolumeDescription(desc, volume);
-            }
-            SendReply(client, response, true);
-        });
-
-    error = task.Run(context);
-    if (error)
-        return error;
-
-    return TError::Queued();
+    FillVolumeDescription(rsp.mutable_volume(), volume);
+    return TError::Success();
 }
 
 static TError LinkVolume(TContext &context,
