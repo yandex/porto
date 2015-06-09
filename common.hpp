@@ -5,8 +5,6 @@
 #include "error.hpp"
 #include "version.hpp"
 
-#define THREADS 0
-
 #define PORTO_ASSERT(EXPR) \
     do { \
         if (!(EXPR)) { \

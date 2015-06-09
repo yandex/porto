@@ -470,7 +470,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     }
 
     if (!delivered)
-        L_WRN() << "Couldn't deliver " << event.GetMsg() << std::endl;
+        L() << "Couldn't deliver " << event.GetMsg() << std::endl;
 
     return delivered;
 }

@@ -24,7 +24,6 @@
 #include "util/crash.hpp"
 #include "util/cred.hpp"
 #include "util/worker.hpp"
-#include "batch.hpp"
 
 extern "C" {
 #include <fcntl.h>
@@ -142,7 +141,6 @@ public:
     }
 
     bool Handle(const TRequest &request) override {
-        std::lock_guard<std::mutex> lock(request.Client->Lock);
         HandleRpcRequest(*request.Context, request.Request, request.Client);
 
         return true;
@@ -189,11 +187,7 @@ static bool HandleRequest(TContext &context, TRpcWorker &worker, std::shared_ptr
     if (client->Identify(*context.Cholder, false))
         return true;
 
-#if THREADS
     worker.Push(req);
-#else
-    HandleRpcRequest(context, req.Request, client);
-#endif
 
     return false;
 }
@@ -283,7 +277,7 @@ retry:
         TEvent e(EEventType::Exit);
         e.Exit.Pid = pid;
         e.Exit.Status = status;
-        (void)context.Cholder->DeliverEvent(e);
+        context.Queue->Add(0, e);
     }
 
     return 0;
@@ -294,10 +288,8 @@ static inline int EncodeSignal(int sig) {
 }
 
 static void StartWorkers(TContext &context, TRpcWorker &worker) {
-#if THREADS
     worker.Start();
     context.Queue->Start();
-#endif
 }
 
 static void StopWorkers(TContext &context, TRpcWorker &worker) {
@@ -309,7 +301,6 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
     int ret = 0;
     int sfd;
     std::map<int, std::shared_ptr<TClient>> clients;
-    TContainerHolder &cholder = *context.Cholder;
 
     TCred cred(getuid(), getgid());
 
@@ -356,23 +347,12 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
 
     bool discardState = false;
     while (true) {
-#if THREADS
         error = context.EpollLoop->GetEvents(signals, events, -1);
-#else
-        int timeout = context.Queue->GetNextTimeout();
-        Statistics->SlaveTimeoutMs = timeout;
-
-        error = context.EpollLoop->GetEvents(signals, events, timeout);
-#endif
         if (error) {
             L_ERR() << "slave: epoll error " << error << std::endl;
             ret = EXIT_FAILURE;
             goto exit;
         }
-
-#if !THREADS
-        context.Queue->DeliverEvents(*context.Cholder);
-#endif
 
         for (auto s : signals) {
             switch (s) {
@@ -388,27 +368,6 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                 goto exit;
             case rotateSignal:
                 DaemonOpenLog(false);
-                break;
-            case SIGCHLD:
-                int status;
-                pid_t pid;
-
-                while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
-                    if (WIFEXITED(status)) {
-                        if (context.Posthooks.find(pid) != context.Posthooks.end()) {
-                            int fd = context.PosthooksError.at(pid);
-                            TError error;
-                            if (!TError::Deserialize(fd, error))
-                                error = TError(EError::Unknown, "Didn't get any result from batch task");
-                            close(fd);
-                            context.Posthooks[pid](error);
-                            context.Posthooks.erase(pid);
-                            context.PosthooksError.erase(pid);
-                        }
-                    } else {
-                        L_ERR() << "Batch task died on signal " << WTERMSIG(status) << std::endl;
-                    }
-                }
                 break;
             default:
                 /* Ignore other signals */
@@ -464,11 +423,7 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                 if (container) {
                     TEvent e(EEventType::OOM, container);
                     e.OOM.Fd = source->Fd;
-#if THREADS
                     context.Queue->Add(0, e);
-#else
-                    (void)cholder.DeliverEvent(e);
-#endif
                 }
 
                 // we don't want any repeated events from OOM fd, so remove
@@ -479,7 +434,7 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                 auto client = clients[source->Fd];
                 bool needClose = false;
 
-                std::lock_guard<std::mutex> lock(client->Lock);
+                std::lock_guard<std::mutex> lock(client->GetLock());
 
                 if (ev.events & EPOLLIN)
                     needClose = HandleRequest(context, worker, client);

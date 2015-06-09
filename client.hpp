@@ -16,8 +16,6 @@ class TContainerWaiter;
 
 class TClient : public TNonCopyable {
 public:
-    std::mutex Lock;
-
     TClient(int fd);
     ~TClient();
 
@@ -48,6 +46,7 @@ public:
 
     std::shared_ptr<TContainerWaiter> Waiter;
     bool Readonly();
+    std::mutex &GetLock() { return Lock; }
 
 private:
     int Fd;
@@ -56,6 +55,7 @@ private:
     std::string Comm;
     size_t RequestStartMs;
     bool MemberOfPortoGroup = false;
+    std::mutex Lock;
 
     TError CheckPortoMembership();
     TError IdentifyContainer(TContainerHolder &holder);

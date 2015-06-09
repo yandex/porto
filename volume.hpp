@@ -103,6 +103,7 @@ class TVolumeHolder : public TNonCopyable, public std::enable_shared_from_this<T
     std::map<TPath, std::weak_ptr<TResource>> Resources;
     void RemoveUnusedResources();
     void RemoveUnusedVolumes();
+    std::mutex Lock;
 public:
     TIdMap IdMap;
     TError Insert(std::shared_ptr<TVolume> volume);
@@ -114,4 +115,5 @@ public:
     TError RestoreFromStorage();
     void Destroy();
     TError GetResource(const TPath &source, std::shared_ptr<TResource> &resource);
+    std::mutex &GetLock() { return Lock; }
 };
