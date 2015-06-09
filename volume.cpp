@@ -18,7 +18,7 @@ extern "C" {
 #include "util/ext4_proj_quota.h"
 }
 
-/* TVolumeBackend */
+/* TVolumeBackend - abstract */
 
 TError TVolumeBackend::Configure() {
     return TError::Success();
@@ -342,29 +342,52 @@ TPath TVolume::GetInternal(std::string type) const {
     return TPath(config().volumes().volume_dir()).AddComponent(std::to_string(GetId())).AddComponent(type);
 }
 
+TPath TVolume::GetPath() const {
+    auto val = Config->Find(V_PATH);
+    if (val->HasValue())
+        return val->Get<std::string>();
+    else
+        return GetInternal("volume");
+}
+
+TPath TVolume::GetStorage() const {
+    auto val = Config->Find(V_STORAGE);
+    if (val->HasValue())
+        return val->Get<std::string>();
+    else
+        return GetInternal(GetBackend());
+}
+
 TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
                           std::shared_ptr<TContainer> creator_container,
                           const std::map<std::string, std::string> &properties) {
     TError error;
 
-    if (!path.IsEmpty() && !path.IsAbsolute())
-        return TError(EError::InvalidValue, "Volume path must be absolute");
-
-    if (!path.IsEmpty() && path.Exists())
-        return TError(EError::InvalidValue, "Volume path already exists");
-
-    if (path.IsEmpty()) {
-        error = Config->Set<std::string>(V_PATH, GetInternal("volume").ToString());
-        if (error)
-            return error;
-    } else {
-        if (!path.DirName().AccessOk(EFileAccess::Write, creator_cred))
-            return TError(EError::Permission, "Volume creation not permitted");
+    /* Verify volume path */
+    if (!path.IsEmpty()) {
+        if (!path.IsAbsolute())
+            return TError(EError::InvalidValue, "Volume path must be absolute");
+        if (path.GetType() != EFileType::Directory)
+            return TError(EError::InvalidValue, "Volume path must be a directory");
+        if (!path.AccessOk(EFileAccess::Write, creator_cred))
+            return TError(EError::Permission, "Volume path usage not permitted");
         error = Config->Set<std::string>(V_PATH, path.ToString());
         if (error)
             return error;
     }
 
+    /* Verify storage path */
+    if (properties.count(V_STORAGE)) {
+        TPath storage(properties.at(V_STORAGE));
+        if (!storage.IsAbsolute())
+            return TError(EError::InvalidValue, "Storage path must be absolute");
+        if (storage.GetType() != EFileType::Directory)
+            return TError(EError::InvalidValue, "Storage path must be a directory");
+        if (!storage.AccessOk(EFileAccess::Write, creator_cred))
+            return TError(EError::Permission, "Storage path usage not permitted");
+    }
+
+    /* Save original creator. Just for the record. */
     error = Config->Set<std::string>(V_CREATOR, creator_container->GetName() + " " +
                     creator_cred.UserAsString() + " " + creator_cred.GroupAsString());
     if (error)
@@ -377,6 +400,8 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
     error = Config->Set<std::string>(V_GROUP, creator_cred.GroupAsString());
     if (error)
         return error;
+
+    /* Default permissions for volume root directory */
     error = Config->Set<std::string>(V_PERMISSIONS, "0775");
     if (error)
         return error;
@@ -397,6 +422,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
     if (error)
         return error;
 
+    /* Verify default credentials */
     if (Cred.Uid != creator_cred.Uid && !creator_cred.IsPrivileged())
         return TError(EError::Permission, "Changing user is not permitted");
 
@@ -404,6 +430,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             !creator_cred.MemberOf(Cred.Gid))
         return TError(EError::Permission, "Changing group is not permitted");
 
+    /* Verify default permissions */
     error = StringToOct(Config->Get<std::string>(V_PERMISSIONS), Permissions);
     if (error)
         return error;
@@ -421,16 +448,6 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             error = Config->Set<std::string>(V_BACKEND, "loop");
         else
             error = Config->Set<std::string>(V_BACKEND, "plain");
-        if (error)
-            return error;
-    }
-
-    if (Config->HasValue(V_STORAGE)) {
-        if (!GetStorage().DirName().AccessOk(EFileAccess::Write, creator_cred))
-            return TError(EError::Permission, "Storage creation not permitted");
-    } else {
-        error = Config->Set<std::string>(V_STORAGE,
-                        GetInternal(GetBackend()).ToString());
         if (error)
             return error;
     }
@@ -457,21 +474,27 @@ TError TVolume::Build() {
     if (error)
         goto err_internal;
 
-    error = storage.Mkdir(0755);
-    if (error)
-        goto err_storage;
+    if (!Config->HasValue(V_STORAGE)) {
+        error = storage.Mkdir(0755);
+        if (error)
+            goto err_storage;
+    }
 
-    error = path.Mkdir(0755);
-    if (error)
-        goto err_path;
+    if (!Config->HasValue(V_PATH)) {
+        error = path.Mkdir(0755);
+        if (error)
+            goto err_path;
+    }
 
     error = Backend->Build();
     if (!error)
         return error;
 
-    (void)path.Rmdir();
+    if (!Config->HasValue(V_PATH))
+        (void)path.Rmdir();
 err_path:
-    (void)storage.Rmdir();
+    if (!Config->HasValue(V_STORAGE))
+        (void)storage.Rmdir();
 err_storage:
     (void)internal.Rmdir();
 err_internal:
@@ -500,23 +523,7 @@ TError TVolume::Destroy() {
         }
     }
 
-    if (internal.Exists()) {
-        error = internal.ClearDirectory();
-        if (error) {
-            L_ERR() << "Can't clear internal: " << error << std::endl;
-            if (!ret)
-                ret = error;
-        }
-
-        error = internal.Rmdir();
-        if (error) {
-            L_ERR() << "Can't remove internal: " << error << std::endl;
-            if (!ret)
-                ret = error;
-        }
-    }
-
-    if (storage.Exists()) {
+    if (!Config->HasValue(V_STORAGE) && storage.Exists()) {
         error = storage.ClearDirectory();
         if (error) {
             L_ERR() << "Can't clear storage: " << error << std::endl;
@@ -532,10 +539,26 @@ TError TVolume::Destroy() {
         }
     }
 
-    if (path.Exists()) {
-        error = GetPath().Rmdir();
+    if (!Config->HasValue(V_PATH) && path.Exists()) {
+        error = path.Rmdir();
         if (error) {
             L_ERR() << "Can't remove volume path: " << error << std::endl;
+            if (!ret)
+                ret = error;
+        }
+    }
+
+    if (internal.Exists()) {
+        error = internal.ClearDirectory();
+        if (error) {
+            L_ERR() << "Can't clear internal: " << error << std::endl;
+            if (!ret)
+                ret = error;
+        }
+
+        error = internal.Rmdir();
+        if (error) {
+            L_ERR() << "Can't remove internal: " << error << std::endl;
             if (!ret)
                 ret = error;
         }
@@ -609,6 +632,9 @@ TError TVolume::CheckPermission(const TCred &ucred) const {
     if (Cred == ucred)
         return TError::Success();
 
+    if (ucred.MemberOf(Cred.Gid))
+        return TError::Success();
+
     return TError(EError::Permission, "Permission denied");
 }
 
@@ -622,6 +648,10 @@ TError TVolume::Restore() {
         return TError(EError::InvalidValue, "Bad volume " + GetPath().ToString() + " credentials: " +
                       Config->Get<std::string>(V_USER) + " " +
                       Config->Get<std::string>(V_GROUP));
+
+    error = StringToOct(Config->Get<std::string>(V_PERMISSIONS), Permissions);
+    if (error)
+        return error;
 
     error = OpenBackend();
     if (error)
@@ -660,7 +690,7 @@ const std::vector<std::pair<std::string, std::string>> TVolumeHolder::ListProper
 
 static void RegisterVolumeProperties(std::shared_ptr<TRawValueMap> m) {
     m->Add(V_PATH, new TStringValue(HIDDEN_VALUE | PERSISTENT_VALUE));
-    m->Add(V_STORAGE, new TStringValue(HIDDEN_VALUE | PERSISTENT_VALUE));
+    m->Add(V_STORAGE, new TStringValue(PERSISTENT_VALUE));
 
     m->Add(V_BACKEND, new TStringValue(PERSISTENT_VALUE));
 

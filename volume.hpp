@@ -89,8 +89,8 @@ public:
     TError CheckPermission(const TCred &ucred) const;
 
     std::string GetBackend() const { return Config->Get<std::string>(V_BACKEND); }
-    TPath GetPath() const { return Config->Get<std::string>(V_PATH); }
-    TPath GetStorage() const { return Config->Get<std::string>(V_STORAGE); }
+    TPath GetPath() const;
+    TPath GetStorage() const;
     TPath GetInternal(std::string type) const;
     int GetId() const { return Config->Get<int>(V_ID); }
     bool IsReadOnly() const { return Config->Get<bool>(V_READ_ONLY); }
