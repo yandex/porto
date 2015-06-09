@@ -23,7 +23,7 @@ public:
     ~TNlAddr();
     TError Parse(const std::string &s);
     struct nl_addr *GetAddr() const { return Addr; }
-    bool IsEmpty();
+    bool IsEmpty() const;
 };
 
 enum class ETclassStat {

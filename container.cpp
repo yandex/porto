@@ -663,6 +663,12 @@ TError TContainer::PrepareTask() {
         taskEnv->BindMap.push_back(bm);
     }
 
+    if (!taskEnv->Isolate) {
+        taskEnv->NetCfg.Share = true;
+        taskEnv->NetCfg.Host.clear();
+        taskEnv->NetCfg.MacVlan.clear();
+    }
+
     error = taskEnv->Prepare(cred);
     if (error)
         return error;
@@ -1340,10 +1346,7 @@ TError TContainer::Restore(const kv::TNode &node) {
             return error;
         }
 
-        Task->Restore(pid,
-                      Prop->Get<std::string>(P_STDIN_PATH),
-                      Prop->Get<std::string>(P_STDOUT_PATH),
-                      Prop->Get<std::string>(P_STDERR_PATH));
+        Task->Restore(pid);
 
         if (Task->HasCorrectParent()) {
             if (Task->IsZombie()) {

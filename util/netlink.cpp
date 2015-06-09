@@ -981,7 +981,7 @@ TNlAddr::~TNlAddr() {
     nl_addr_put(Addr);
 }
 
-bool TNlAddr::IsEmpty() {
+bool TNlAddr::IsEmpty() const {
     return !Addr || nl_addr_iszero(Addr);
 }
 
