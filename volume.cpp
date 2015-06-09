@@ -805,17 +805,6 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
                 return !used;
              });
 
-    L_ACT() << "Remove stale loop device images..." << std::endl;
-    RemoveIf(config().volumes().volume_dir(),
-             EFileType::Regular,
-             [&](const std::string &name, const TPath &path) {
-                bool used = false;
-                for (auto v : Volumes)
-                    if (std::to_string(v.second->GetId()) + ".img" == name)
-                        used = true;
-                return !used;
-             });
-
     return TError::Success();
 }
 
