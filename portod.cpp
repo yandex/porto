@@ -465,19 +465,19 @@ exit:
 }
 
 static void KvDump() {
-    TKeyValueStorage containers(TMount("tmpfs", config().keyval().file().path(), "tmpfs", { config().keyval().size() }));
-    TError error = containers.MountTmpfs();
+    auto containers = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().keyval().file().path(), "tmpfs", { config().keyval().size() }));
+    TError error = containers->MountTmpfs();
     if (error)
         L_ERR() << "Can't mount containers key-value storage: " << error << std::endl;
     else
-        containers.Dump();
+        containers->Dump();
 
-    TKeyValueStorage volumes(TMount("tmpfs", config().volumes().keyval().file().path(), "tmpfs", { config().volumes().keyval().size() }));
-    error = volumes.MountTmpfs();
+    auto volumes = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().volumes().keyval().file().path(), "tmpfs", { config().volumes().keyval().size() }));
+    error = volumes->MountTmpfs();
     if (error)
         L_ERR() << "Can't mount volumes key-value storage: " << error << std::endl;
     else
-        volumes.Dump();
+        volumes->Dump();
 }
 
 static int TuneLimits() {
