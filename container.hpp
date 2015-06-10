@@ -46,7 +46,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     std::vector<std::weak_ptr<TContainer>> Children;
     std::shared_ptr<TKeyValueStorage> Storage;
     EContainerState State = EContainerState::Unknown;
-    size_t TimeOfDeath = 0;
     uint16_t Id;
     int TaskStartErrno = -1;
     TScopedFd Efd;
@@ -150,7 +149,6 @@ public:
     std::shared_ptr<TContainer> FindRunningParent() const;
     bool UseParentNamespace() const;
     bool DeliverEvent(const TEvent &event);
-    size_t GetTimeOfDeath() { return TimeOfDeath; }
 
     TError CheckPermission(const TCred &ucred);
 

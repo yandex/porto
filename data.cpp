@@ -13,6 +13,7 @@
 
 extern "C" {
 #include <unistd.h>
+#include <sys/sysinfo.h>
 }
 
 static std::set<EContainerState> anyState = {
@@ -409,39 +410,33 @@ public:
     TTimeData() :
         TUintValue(0),
         TContainerValue(D_TIME,
-                        "root process running time",
-                        rpdState) {}
+                        "container running time",
+                        rpdmState) {}
 
     uint64_t GetDefault() const override {
         auto c = GetContainer();
+
+        if (c->IsRoot()) {
+            struct sysinfo si;
+            int ret = sysinfo(&si);
+            if (ret)
+                return -1;
+
+            return si.uptime;
+        }
+
+        // we started recording raw start/dead time since porto v1.15;
+        // in case we updated from old version, return zero
+        if (!c->Prop->Get<uint64_t>(P_RAW_START_TIME))
+            c->Prop->Set<uint64_t>(P_RAW_START_TIME, GetCurrentTimeMs());
+
+        if (!c->Prop->Get<uint64_t>(P_RAW_DEAD_TIME))
+            c->Prop->Set<uint64_t>(P_RAW_DEAD_TIME, GetCurrentTimeMs());
+
         if (c->GetState() == EContainerState::Dead)
-            return (GetCurrentTimeMs() - c->GetTimeOfDeath()) / 1000;
-
-        if (c->GetState() != EContainerState::Running ||
-            !c->Prop->HasValue(P_RAW_ROOT_PID))
-            return 0;
-
-        int pid = c->Prop->Get<int>(P_RAW_ROOT_PID);
-        TFile f("/proc/" + std::to_string(pid) + "/stat");
-        std::string line;
-        if (f.AsString(line))
-            return 0;
-
-        std::vector<std::string> cols;
-        if (SplitString(line, ' ', cols))
-            return 0;
-
-        if (cols.size() <= 21)
-            return 0;
-
-        int64_t started;
-        if (StringToInt64(cols[21], started))
-            return 0;
-
-        started /= sysconf(_SC_CLK_TCK);
-        started += BootTime;
-
-        return time(nullptr) - started;
+            return (c->Prop->Get<uint64_t>(P_RAW_DEAD_TIME) - c->Prop->Get<uint64_t>(P_RAW_START_TIME)) / 1000;
+        else
+            return (GetCurrentTimeMs() - c->Prop->Get<uint64_t>(P_RAW_START_TIME)) / 1000;
     }
 };
 

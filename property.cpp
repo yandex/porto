@@ -1436,6 +1436,20 @@ public:
         TContainerValue(P_RAW_NAME, "", anyState) {}
 };
 
+class TRawStartTimeProperty : public TUintValue, public TContainerValue {
+public:
+    TRawStartTimeProperty() :
+        TUintValue(HIDDEN_VALUE | PERSISTENT_VALUE),
+        TContainerValue(P_RAW_START_TIME, "", anyState) {}
+};
+
+class TRawDeadTimeProperty : public TUintValue, public TContainerValue {
+public:
+    TRawDeadTimeProperty() :
+        TUintValue(HIDDEN_VALUE | PERSISTENT_VALUE),
+        TContainerValue(P_RAW_DEAD_TIME, "", anyState) {}
+};
+
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
     std::vector<TAbstractValue *> properties = {
@@ -1484,6 +1498,8 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TRawRootPidProperty,
         new TRawLoopDevProperty,
         new TRawNameProperty,
+        new TRawStartTimeProperty,
+        new TRawDeadTimeProperty,
     };
 
     for (auto p : properties)

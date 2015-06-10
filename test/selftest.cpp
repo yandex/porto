@@ -2681,6 +2681,7 @@ static void TestRoot(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData(root, "parent", v));
     ExpectEq(v, "");
     ExpectApiFailure(api.GetData(root, "stderr", v), EError::InvalidState);
+    ExpectApiSuccess(api.GetData(root, "time", v));
 
     Say() << "Check that stop on root stops all children" << std::endl;
 
