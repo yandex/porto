@@ -3927,7 +3927,7 @@ static void TestVolumeHolder(TPortoAPI &api) {
     TPath aPath(a);
     ExpectEq(aPath.Exists(), false);
 
-    ExpectApiSuccess(aPath.Mkdir(0775));
+    ExpectSuccess(aPath.Mkdir(0775));
 
     Say() << "Create volume A" << std::endl;
     ExpectApiSuccess(api.CreateVolume(a, prop_default));
@@ -4084,7 +4084,7 @@ static void TestVolumeImpl(TPortoAPI &api) {
     */
 
     ExpectApiSuccess(api.UnlinkVolume(a, ""));
-    ExpectApiSuccess(api.UnlinkVolume(b, ""));
+    ExpectApiSuccess(api.UnlinkVolume(b));
 
     ExpectEq(TPath(a).Exists(), false);
     ExpectEq(TPath(b).Exists(), false);
@@ -4539,7 +4539,7 @@ static void TestVolumeRecovery(TPortoAPI &api) {
     std::map<std::string, std::string> prop_unlimit = {};
 
     CleanupVolume(api, a);
-    ExpectApiSuccess(TPath(a).Mkdir(0775));
+    ExpectSuccess(TPath(a).Mkdir(0775));
 
     std::vector<TVolumeDescription> volumes;
     ExpectApiSuccess(api.ListVolumes(volumes));
@@ -4570,18 +4570,20 @@ static void TestVolumeRecovery(TPortoAPI &api) {
     vector<string> v;
     ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
     auto m = ParseMountinfo(CommaSeparatedList(v, ""));
+    Expect(m.find(a) != m.end());
     Expect(m.find(b) != m.end());
 
-    ExpectApiSuccess(api.UnlinkVolume(a, ""));
+    ExpectApiSuccess(api.UnlinkVolume(a));
     ExpectApiSuccess(api.UnlinkVolume(b, ""));
 
     v.clear();
     ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
     m = ParseMountinfo(CommaSeparatedList(v, ""));
+    Expect(m.find(a) == m.end());
     Expect(m.find(b) == m.end());
 
+    ExpectSuccess(TPath(a).Rmdir());
     ExpectEq(TPath(b).Exists(), false);
-    ExpectApiSuccess(TPath(a).Rmdir());
 }
 
 static void TestCgroups(TPortoAPI &api) {
