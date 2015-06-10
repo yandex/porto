@@ -78,7 +78,7 @@ static TError DestroyContainer(TContext &context,
                                const rpc::TContainerDestroyRequest &req,
                                rpc::TContainerResponse &rsp,
                                std::shared_ptr<TClient> client) {
-    std::lock_guard<std::mutex> lock(context.Cholder->GetLock());
+    std::unique_lock<std::mutex> cholder_lock(context.Cholder->GetLock());
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -99,6 +99,37 @@ static TError DestroyContainer(TContext &context,
         error = container->CheckPermission(client->GetCred());
         if (error)
             return error;
+
+        cholder_lock.unlock();
+        auto vholder_lock = context.Vholder->Lock();
+
+
+        for (auto volume: container->Volumes) {
+            if (!volume->UnlinkContainer(name))
+                continue; /* Still linked to somebody */
+            if (container->IsRoot() || container->IsPortoRoot())
+                continue;
+            vholder_lock.unlock();
+            auto volume_lock = volume->Lock();
+            if (!volume->IsReady()) {
+                volume_lock.unlock();
+                vholder_lock.lock();
+                continue;
+            }
+            vholder_lock.lock();
+            error = volume->SetReady(false);
+            vholder_lock.unlock();
+            error = volume->Destroy();
+            vholder_lock.lock();
+            context.Vholder->Unregister(volume);
+            context.Vholder->Remove(volume);
+            volume_lock.unlock();
+        }
+
+        container->Volumes.clear();
+        vholder_lock.unlock();
+
+        cholder_lock.lock();
     }
 
     return context.Cholder->Destroy(name);
@@ -555,8 +586,6 @@ static TError CreateVolume(TContext &context,
     if (!config().volumes().enabled())
             return TError(EError::InvalidMethod, "volume api is disabled");
 
-    auto vholder_lock = context.Vholder->Lock();
-
     TError error = CheckRequestPermissions(client);
     if (error)
         return error;
@@ -565,6 +594,7 @@ static TError CreateVolume(TContext &context,
     for (auto p: req.properties())
         properties[p.name()] = p.value();
 
+    auto vholder_lock = context.Vholder->Lock();
     std::shared_ptr<TVolume> volume;
     error = context.Vholder->Create(volume);
     if (error)
@@ -637,9 +667,7 @@ static TError LinkVolume(TContext &context,
     if (error)
         return error;
 
-    auto vholder_lock = context.Vholder->Lock();
-    std::lock_guard<std::mutex> cholder_lock(context.Cholder->GetLock());
-
+    std::unique_lock<std::mutex> cholder_lock(context.Cholder->GetLock());
     std::shared_ptr<TContainer> container;
     if (req.has_container()) {
         std::string name;
@@ -657,11 +685,15 @@ static TError LinkVolume(TContext &context,
     } else {
         container = client->GetContainer();
     }
+    cholder_lock.unlock();
 
+    auto vholder_lock = context.Vholder->Lock();
     auto volume = context.Vholder->Find(req.path());
     if (!volume)
         return TError(EError::VolumeNotFound, "Volume not found");
+    vholder_lock.unlock();
 
+    auto volume_lock = volume->Lock();
     if (!volume->IsReady())
         return TError(EError::VolumeNotReady, "Volume not ready");
 
@@ -669,6 +701,7 @@ static TError LinkVolume(TContext &context,
     if (error)
         return error;
 
+    vholder_lock.lock();
     if (!container->LinkVolume(volume))
         return TError(EError::VolumeAlreadyExists, "Already linked");
 
@@ -688,7 +721,7 @@ static TError UnlinkVolume(TContext &context,
         return error;
 
     auto vholder_lock = context.Vholder->Lock();
-    std::lock_guard<std::mutex> cholder_lock(context.Cholder->GetLock());
+    std::unique_lock<std::mutex> cholder_lock(context.Cholder->GetLock());
 
     std::shared_ptr<TContainer> container;
     if (req.has_container()) {
@@ -719,7 +752,31 @@ static TError UnlinkVolume(TContext &context,
     if (!container->UnlinkVolume(volume))
         return TError(EError::VolumeNotFound, "Container not linked to the volume");
 
-    return volume->UnlinkContainer(container->GetName());
+    if (!volume->UnlinkContainer(container->GetName()))
+        return TError::Success(); /* Still linked to somebody */
+
+    cholder_lock.unlock();
+    vholder_lock.unlock();
+
+    auto volume_lock = volume->Lock();
+    if (!volume->IsReady())
+        return TError::Success();
+
+    vholder_lock.lock();
+    error = volume->SetReady(false);
+    if (error)
+        return error;
+    vholder_lock.unlock();
+    error = volume->Destroy();
+    if (!error) {
+        vholder_lock.lock();
+        context.Vholder->Unregister(volume);
+        context.Vholder->Remove(volume);
+        vholder_lock.unlock();
+    }
+    volume_lock.unlock();
+
+    return error;
 }
 
 static TError ListVolumes(TContext &context,

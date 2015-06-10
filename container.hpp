@@ -59,7 +59,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
     std::shared_ptr<TEpollSource> Source;
-    std::set<std::shared_ptr<TVolume>> Volumes;
 
     // data
     void UpdateRunningChildren(size_t diff);
@@ -169,6 +168,9 @@ public:
     bool IsLostAndRestored() const;
     void SyncStateWithCgroup();
     bool IsNamespaceIsolated();
+
+    /* protected with TVolumeHolder->Lock */
+    std::set<std::shared_ptr<TVolume>> Volumes;
 
     bool LinkVolume(std::shared_ptr<TVolume> volume) {
         return Volumes.insert(volume).second;

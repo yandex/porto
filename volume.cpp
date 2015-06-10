@@ -605,17 +605,11 @@ TError TVolume::LinkContainer(std::string name) {
     return Config->Set<std::vector<std::string>>(V_CONTAINERS, containers);
 }
 
-TError TVolume::UnlinkContainer(std::string name) {
+bool TVolume::UnlinkContainer(std::string name) {
     auto containers(Config->Get<std::vector<std::string>>(V_CONTAINERS));
     containers.erase(std::remove(containers.begin(), containers.end(), name), containers.end());
     TError error = Config->Set<std::vector<std::string>>(V_CONTAINERS, containers);
-    if (!error && containers.empty()) {
-        error = SetReady(false);
-        error = Destroy(); //FIXME later
-        Holder->Unregister(shared_from_this());
-        Holder->Remove(shared_from_this());
-    }
-    return error;
+    return containers.empty();
 }
 
 std::map<std::string, std::string> TVolume::GetProperties() {
@@ -791,6 +785,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
         if (error) {
             L_WRN() << "Corrupted volume " << node << " removed: " << error << std::endl;
             (void)volume->Destroy();
+            (void)Remove(volume);
             continue;
         }
 
@@ -798,15 +793,19 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
         if (error) {
             L_WRN() << "Cannot register volume " << node << " removed: " << error << std::endl;
             (void)volume->Destroy();
+            (void)Remove(volume);
             continue;
         }
 
         for (auto name: volume->GetContainers()) {
             std::shared_ptr<TContainer> container;
-            if (Cholder->Get(name, container))
-                volume->UnlinkContainer(name);
-            else
+            if (!Cholder->Get(name, container)) {
                 container->LinkVolume(volume);
+            } else if (!volume->UnlinkContainer(name)) {
+                (void)volume->Destroy();
+                (void)Unregister(volume);
+                (void)Remove(volume);
+            }
         }
 
         L() << "Volume " << volume->GetPath() << " restored" << std::endl;

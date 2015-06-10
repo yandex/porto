@@ -78,8 +78,11 @@ public:
     TError Configure(const TPath &path, const TCred &creator_cred,
                      std::shared_ptr<TContainer> creator_container,
                      const std::map<std::string, std::string> &properties);
+
+    /* Protected with TVolume->Lock() */
     TError Build();
     TError Destroy();
+
     TError Restore();
     TError Clear();
 
@@ -87,7 +90,7 @@ public:
         return Config->Get<std::vector<std::string>>(V_CONTAINERS);
     }
     TError LinkContainer(const std::string name);
-    TError UnlinkContainer(const std::string name);
+    bool UnlinkContainer(const std::string name);
 
     TError CheckPermission(const TCred &ucred) const;
 
@@ -97,8 +100,11 @@ public:
     TPath GetInternal(std::string type) const;
     int GetId() const { return Config->Get<int>(V_ID); }
     bool IsReadOnly() const { return Config->Get<bool>(V_READ_ONLY); }
-    bool IsReady() const { return Config->Get<bool>(V_READY); }
+
+    /* Protected with TVolume->Lock() _and_ TVolumeHolder->Lock() */
     TError SetReady(bool ready) { return Config->Set<bool>(V_READY, ready); }
+    bool IsReady() const { return Config->Get<bool>(V_READY); }
+
     TError Resize(uint64_t space_limit, uint64_t inode_limit);
 
     void GetGuarantee(uint64_t &space_guarantee, uint64_t &inode_guarantee) const {
