@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <mutex>
 
 #include "error.hpp"
 #include "version.hpp"
@@ -28,6 +29,13 @@ private:
     TNonCopyable& operator= (TNonCopyable const&) = delete;
     TNonCopyable(TNonCopyable const&&) = delete;
     TNonCopyable& operator= (TNonCopyable const&&) = delete;
+};
+
+class TLockable {
+protected:
+    std::mutex Mutex;
+public:
+    std::unique_lock<std::mutex> Lock() { return std::unique_lock<std::mutex>(Mutex); }
 };
 
 const std::string ROOT_CONTAINER = "/";

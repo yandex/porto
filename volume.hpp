@@ -59,7 +59,9 @@ public:
                            uint64_t &inode_used, uint64_t &inode_avail);
 };
 
-class TVolume : public std::enable_shared_from_this<TVolume>, public TNonCopyable {
+class TVolume : public std::enable_shared_from_this<TVolume>,
+                public TLockable,
+                public TNonCopyable {
     friend class TVolumeHolder;
     std::shared_ptr<TVolumeHolder> Holder;
     std::shared_ptr<TValueMap> Config;
@@ -127,10 +129,11 @@ public:
     std::map<std::string, std::string> GetProperties();
 };
 
-class TVolumeHolder : public TNonCopyable, public std::enable_shared_from_this<TVolumeHolder> {
+class TVolumeHolder : public std::enable_shared_from_this<TVolumeHolder>,
+                      public TLockable,
+                      public TNonCopyable {
     std::shared_ptr<TKeyValueStorage> Storage;
     std::map<TPath, std::shared_ptr<TVolume>> Volumes;
-    std::mutex Lock;
     TIdMap IdMap;
 public:
     TVolumeHolder(std::shared_ptr<TKeyValueStorage> storage) : Storage(storage) {}
@@ -143,5 +146,4 @@ public:
     std::vector<TPath> ListPaths() const;
     TError RestoreFromStorage(std::shared_ptr<TContainerHolder> Cholder);
     void Destroy();
-    std::mutex &GetLock() { return Lock; }
 };

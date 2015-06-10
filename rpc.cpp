@@ -555,7 +555,7 @@ static TError CreateVolume(TContext &context,
     if (!config().volumes().enabled())
             return TError(EError::InvalidMethod, "volume api is disabled");
 
-    std::lock_guard<std::mutex> vlock(context.Vholder->GetLock());
+    auto vholder_lock = context.Vholder->Lock();
 
     TError error = CheckRequestPermissions(client);
     if (error)
@@ -569,6 +569,9 @@ static TError CreateVolume(TContext &context,
     error = context.Vholder->Create(volume);
     if (error)
         return error;
+
+    /* cannot block: volume is not registered yet */
+    auto volume_lock = volume->Lock();
 
     auto container = client->GetContainer();
 
@@ -585,7 +588,12 @@ static TError CreateVolume(TContext &context,
         return error;
     }
 
+    vholder_lock.unlock();
+
     error = volume->Build();
+
+    vholder_lock.lock();
+
     if (error) {
         L_WRN() << "Can't build volume: " << error << std::endl;
         context.Vholder->Unregister(volume);
@@ -593,10 +601,12 @@ static TError CreateVolume(TContext &context,
         return error;
     }
 
-    std::lock_guard<std::mutex> clock(context.Cholder->GetLock());
+    std::unique_lock<std::mutex> cholder_lock(context.Cholder->GetLock());
 
     error = volume->LinkContainer(container->GetName());
     if (error) {
+        cholder_lock.unlock();
+
         L_WRN() << "Can't link volume" << std::endl;
         (void)volume->Destroy();
         context.Vholder->Unregister(volume);
@@ -604,9 +614,14 @@ static TError CreateVolume(TContext &context,
         return error;
     }
     container->LinkVolume(volume);
+    cholder_lock.unlock();
+
     volume->SetReady(true);
+    vholder_lock.unlock();
 
     FillVolumeDescription(rsp.mutable_volume(), volume);
+    volume_lock.unlock();
+
     return TError::Success();
 }
 
@@ -622,8 +637,8 @@ static TError LinkVolume(TContext &context,
     if (error)
         return error;
 
-    std::lock_guard<std::mutex> vlock(context.Vholder->GetLock());
-    std::lock_guard<std::mutex> clock(context.Cholder->GetLock());
+    auto vholder_lock = context.Vholder->Lock();
+    std::lock_guard<std::mutex> cholder_lock(context.Cholder->GetLock());
 
     std::shared_ptr<TContainer> container;
     if (req.has_container()) {
@@ -672,8 +687,8 @@ static TError UnlinkVolume(TContext &context,
     if (error)
         return error;
 
-    std::lock_guard<std::mutex> vlock(context.Vholder->GetLock());
-    std::lock_guard<std::mutex> clock(context.Cholder->GetLock());
+    auto vholder_lock = context.Vholder->Lock();
+    std::lock_guard<std::mutex> cholder_lock(context.Cholder->GetLock());
 
     std::shared_ptr<TContainer> container;
     if (req.has_container()) {
@@ -714,7 +729,7 @@ static TError ListVolumes(TContext &context,
     if (!config().volumes().enabled())
             return TError(EError::InvalidMethod, "volume api is disabled");
 
-    std::lock_guard<std::mutex> vlock(context.Vholder->GetLock());
+    auto vholder_lock = context.Vholder->Lock();
 
     if (req.has_path()) {
         auto volume = context.Vholder->Find(req.path());
