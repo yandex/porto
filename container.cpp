@@ -1378,7 +1378,10 @@ TError TContainer::Restore(const kv::TNode &node) {
             SetState(EContainerState::Dead);
             TimeOfDeath = GetCurrentTimeMs();
         } else {
-            SetState(EContainerState::Running);
+            if (Prop->Get<std::string>(P_COMMAND).empty())
+                SetState(EContainerState::Meta);
+            else
+                SetState(EContainerState::Running);
 
             auto cg = GetLeafCgroup(freezerSubsystem);
             if (freezerSubsystem->IsFreezed(cg))
