@@ -47,14 +47,14 @@ protected:
     std::shared_ptr<TVolume> Volume;
 public:
     TVolumeBackend(std::shared_ptr<TVolume> volume) : Volume(volume) {}
-    virtual TError Configure();
+    virtual TError Configure(std::shared_ptr<TValueMap> Config);
+    virtual TError Save(std::shared_ptr<TValueMap> Config);
+    virtual TError Restore(std::shared_ptr<TValueMap> Config);
     virtual TError Build() =0;
     virtual TError Destroy() =0;
     virtual TError Clear();
     virtual TError Move(TPath dest);
     virtual TError Resize(uint64_t space_limit, uint64_t inode_limit);
-    virtual TError Save(std::shared_ptr<TValueMap> Config);
-    virtual TError Restore(std::shared_ptr<TValueMap> Config);
     virtual TError GetStat(uint64_t &space_used, uint64_t &space_avail,
                            uint64_t &inode_used, uint64_t &inode_avail);
 };

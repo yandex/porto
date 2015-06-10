@@ -20,7 +20,7 @@ extern "C" {
 
 /* TVolumeBackend - abstract */
 
-TError TVolumeBackend::Configure() {
+TError TVolumeBackend::Configure(std::shared_ptr<TValueMap> Config) {
     return TError::Success();
 }
 
@@ -464,7 +464,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
     if (error)
         return error;
 
-    error = Backend->Configure();
+    error = Backend->Configure(Config);
     if (error)
         return error;
 
@@ -495,9 +495,18 @@ TError TVolume::Build() {
     }
 
     error = Backend->Build();
-    if (!error)
-        return error;
+    if (error)
+        goto err_build;
 
+    error = Backend->Save(Config);
+    if (error)
+        goto err_save;
+
+    return TError::Success();
+
+err_save:
+    (void)Backend->Destroy();
+err_build:
     if (!Config->HasValue(V_PATH))
         (void)path.Rmdir();
 err_path:
