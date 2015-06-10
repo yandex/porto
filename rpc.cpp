@@ -574,17 +574,22 @@ static TError CreateVolume(TContext &context,
 
     error = volume->Configure(TPath(req.has_path() ? req.path() : ""),
                               client->GetCred(), container, properties);
-    if (error)
+    if (error) {
+        context.Vholder->Remove(volume);
         return error;
+    }
 
     error = context.Vholder->Register(volume);
-    if (error)
+    if (error) {
+        context.Vholder->Remove(volume);
         return error;
+    }
 
     error = volume->Build();
     if (error) {
         L_WRN() << "Can't build volume: " << error << std::endl;
         context.Vholder->Unregister(volume);
+        context.Vholder->Remove(volume);
         return error;
     }
 
@@ -594,6 +599,8 @@ static TError CreateVolume(TContext &context,
     if (error) {
         L_WRN() << "Can't link volume" << std::endl;
         (void)volume->Destroy();
+        context.Vholder->Unregister(volume);
+        context.Vholder->Remove(volume);
         return error;
     }
     container->LinkVolume(volume);

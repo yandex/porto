@@ -572,12 +572,6 @@ TError TVolume::Destroy() {
         }
     }
 
-    if (Holder)
-        Holder->Unregister(shared_from_this());
-
-    if (Config)
-        Config->Remove();
-
     return ret;
 }
 
@@ -609,6 +603,8 @@ TError TVolume::UnlinkContainer(std::string name) {
     if (!error && containers.empty()) {
         error = SetReady(false);
         error = Destroy(); //FIXME later
+        Holder->Unregister(shared_from_this());
+        Holder->Remove(shared_from_this());
     }
     return error;
 }
@@ -747,6 +743,11 @@ TError TVolumeHolder::Create(std::shared_ptr<TVolume> &volume) {
     return TError::Success();
 }
 
+void TVolumeHolder::Remove(std::shared_ptr<TVolume> volume) {
+    volume->Config->Remove();
+    IdMap.Put(volume->GetId());
+}
+
 TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Cholder) {
     std::vector<std::shared_ptr<TKeyValueNode>> list;
 
@@ -823,6 +824,8 @@ void TVolumeHolder::Destroy() {
         TError error = volume->Destroy();
         if (error)
             L_ERR() << "Can't destroy volume " << name << ": " << error << std::endl;
+        Unregister(volume);
+        Remove(volume);
     }
 }
 
@@ -837,7 +840,6 @@ TError TVolumeHolder::Register(std::shared_ptr<TVolume> volume) {
 
 void TVolumeHolder::Unregister(std::shared_ptr<TVolume> volume) {
     Volumes.erase(volume->GetPath());
-    IdMap.Put(volume->GetId());
 }
 
 std::shared_ptr<TVolume> TVolumeHolder::Find(const TPath &path) {

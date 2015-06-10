@@ -60,6 +60,7 @@ public:
 };
 
 class TVolume : public std::enable_shared_from_this<TVolume>, public TNonCopyable {
+    friend class TVolumeHolder;
     std::shared_ptr<TVolumeHolder> Holder;
     std::shared_ptr<TValueMap> Config;
     TCred Cred;
@@ -135,6 +136,7 @@ public:
     TVolumeHolder(std::shared_ptr<TKeyValueStorage> storage) : Storage(storage) {}
     const std::vector<std::pair<std::string, std::string>> ListProperties();
     TError Create(std::shared_ptr<TVolume> &volume);
+    void Remove(std::shared_ptr<TVolume> volume);
     TError Register(std::shared_ptr<TVolume> volume);
     void Unregister(std::shared_ptr<TVolume> volume);
     std::shared_ptr<TVolume> Find(const TPath &path);
