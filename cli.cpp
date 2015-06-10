@@ -197,6 +197,11 @@ void RegisterCommand(ICmd *cmd) {
 
 ICmd *currentCmd;
 
+void SigInt(int sig) {
+    if (currentCmd)
+        currentCmd->Signal(sig);
+}
+
 static int TryExec(int argc, char *argv[]) {
     string name(argv[1]);
 
@@ -219,11 +224,6 @@ static int TryExec(int argc, char *argv[]) {
     (void)RegisterSignal(SIGTERM, SigInt);
 
     return cmd->Execute(argc - 2, argv + 2);
-}
-
-void SigInt(int sig) {
-    if (currentCmd)
-        currentCmd->Signal(sig);
 }
 
 int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
