@@ -60,8 +60,4 @@ public:
     void Stop();
 
     void Add(size_t timeoutMs, const TEvent &e);
-#if !THREADS
-    void DeliverEvents(TContainerHolder &cholder);
-    int GetNextTimeout();
-#endif
 };

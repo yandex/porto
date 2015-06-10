@@ -70,17 +70,15 @@ TError TNamespaceSnapshot::Create(int pid) {
     return TError::Success();
 }
 
-TError TNamespaceSnapshot::Chroot() {
+TError TNamespaceSnapshot::Chroot() const {
     if (fchdir(Root.GetFd()) < 0)
         return TError(EError::Unknown, errno, "Can't change root directory: fchdir(" + std::to_string(Root.GetFd()) + ")");
 
     if (chroot(".") < 0)
         return TError(EError::Unknown, errno, "Can't change root directory chroot(" + std::to_string(Root.GetFd()) + ")");
-    Root = -1;
 
     if (fchdir(Cwd.GetFd()) < 0)
         return TError(EError::Unknown, errno, "Can't change working directory fchdir(" + std::to_string(Cwd.GetFd()) + ")");
-    Root = -1;
 
     return TError::Success();
 }
@@ -91,7 +89,7 @@ void TNamespaceSnapshot::Destroy() {
     nsToFd.clear();
 }
 
-TError TNamespaceSnapshot::Attach() {
+TError TNamespaceSnapshot::Attach() const {
     for (auto &pair : nsToFd) {
         if (setns(pair.second, pair.first))
             return TError(EError::Unknown, errno, "Can't set namespace");
@@ -100,7 +98,7 @@ TError TNamespaceSnapshot::Attach() {
     return TError::Success();
 }
 
-bool TNamespaceSnapshot::Valid() {
+bool TNamespaceSnapshot::Valid() const {
     return Root.GetFd() >= 0 && Cwd.GetFd() >= 0;
 
 }

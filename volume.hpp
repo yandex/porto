@@ -129,6 +129,7 @@ public:
 class TVolumeHolder : public TNonCopyable, public std::enable_shared_from_this<TVolumeHolder> {
     std::shared_ptr<TKeyValueStorage> Storage;
     std::map<TPath, std::shared_ptr<TVolume>> Volumes;
+    std::mutex Lock;
     TIdMap IdMap;
 public:
     TVolumeHolder(std::shared_ptr<TKeyValueStorage> storage) : Storage(storage) {}
@@ -140,4 +141,5 @@ public:
     std::vector<TPath> ListPaths() const;
     TError RestoreFromStorage(std::shared_ptr<TContainerHolder> Cholder);
     void Destroy();
+    std::mutex &GetLock() { return Lock; }
 };

@@ -7,9 +7,6 @@
 #include "util/mount.hpp"
 #include "config.hpp"
 
-typedef std::function<TError()> task_t;
-typedef std::function<void(TError error)> posthook_t;
-
 class TEpollLoop;
 class TCgroup;
 class TSubsystem;
@@ -27,9 +24,6 @@ public:
     std::shared_ptr<TVolumeHolder> Vholder;
     std::shared_ptr<TEpollLoop> EpollLoop;
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> DaemonCgs;
-
-    std::map<pid_t, posthook_t> Posthooks;
-    std::map<pid_t, int> PosthooksError;
 
     TContext();
     TError Initialize();

@@ -3,6 +3,7 @@
 #include <vector>
 #include <map>
 #include <memory>
+#include <mutex>
 
 #include "common.hpp"
 #include "kvalue.hpp"
@@ -21,6 +22,7 @@ class TContainerHolder : public std::enable_shared_from_this<TContainerHolder> {
     std::map<std::string, std::shared_ptr<TContainer>> Containers;
     TIdMap IdMap;
     std::shared_ptr<TKeyValueStorage> Storage;
+    std::mutex Lock;
 
     bool ValidName(const std::string &name) const;
     TError RestoreId(const kv::TNode &node, uint16_t &id);
@@ -53,4 +55,5 @@ public:
     std::vector<std::shared_ptr<TContainer> > List() const;
 
     bool DeliverEvent(const TEvent &event);
+    std::mutex &GetLock() { return Lock; }
 };

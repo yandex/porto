@@ -15,8 +15,8 @@ public:
     TNamespaceSnapshot() {}
     ~TNamespaceSnapshot() { Destroy(); }
     TError Create(int pid);
-    TError Chroot();
-    TError Attach();
+    TError Chroot() const;
+    TError Attach() const;
     void Destroy();
-    bool Valid();
+    bool Valid() const;
 };

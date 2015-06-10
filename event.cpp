@@ -35,6 +35,7 @@ public:
 
     bool Handle(const TEvent &event) override {
         if (event.DueMs <= GetCurrentTimeMs()) {
+            std::lock_guard<std::mutex> lock(Holder->GetLock());
             (void)Holder->DeliverEvent(event);
             return true;
         }
@@ -68,7 +69,6 @@ bool TEvent::operator<(const TEvent& rhs) const {
 }
 
 void TEventQueue::Add(size_t timeoutMs, const TEvent &e) {
-#if THREADS
     TEvent copy = e;
     copy.DueMs = GetCurrentTimeMs() + timeoutMs;
 
@@ -76,42 +76,7 @@ void TEventQueue::Add(size_t timeoutMs, const TEvent &e) {
         L() << "Schedule event " << e.GetMsg() << " in " << timeoutMs << " (now " << GetCurrentTimeMs() << " will fire at " << copy.DueMs << ")" << std::endl;
 
     Worker->Push(copy);
-#else
-    TEvent copy = e;
-    copy.DueMs = GetCurrentTimeMs() + timeoutMs;
-
-    if (config().log().verbose())
-        L_ACT() << "Schedule event " << e.GetMsg() << " in " << timeoutMs << std::endl;
-
-    Queue.push(copy);
-#endif
 }
-
-#if !THREADS
-void TEventQueue::DeliverEvents(TContainerHolder &cholder) {
-    size_t now = GetCurrentTimeMs();
-    while (!Queue.empty() && Queue.top().DueMs <= now) {
-        (void)cholder.DeliverEvent(Queue.top());
-        Queue.pop();
-    }
-
-    Statistics->QueuedEvents = Queue.size();
-}
-
-int TEventQueue::GetNextTimeout() {
-    if (Queue.empty()) {
-        return -1;
-    } else {
-        size_t now = GetCurrentTimeMs();
-        size_t due = Queue.top().DueMs;
-
-        if (now > due)
-            return 0;
-        else
-            return due - now;
-    }
-}
-#endif
 
 TEventQueue::TEventQueue(std::shared_ptr<TContainerHolder> holder) {
     Worker = std::make_shared<TEventWorker>(holder);

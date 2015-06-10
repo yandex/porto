@@ -35,7 +35,7 @@ class TScopedFd : public TNonCopyable {
 public:
     TScopedFd(int fd = -1);
     ~TScopedFd();
-    int GetFd();
+    int GetFd() const;
     TScopedFd &operator=(int fd);
 };
 

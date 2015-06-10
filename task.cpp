@@ -250,7 +250,7 @@ TError TTask::ChildBindDns() {
 }
 
 TError TTask::ChildBindDirectores() {
-    for (TBindMap &bindMap : Env->BindMap) {
+    for (auto &bindMap : Env->BindMap) {
         TPath dest = Env->Root + bindMap.Dest;
         if (Env->Root == "/")
             dest = Env->Cwd + bindMap.Dest;
@@ -487,7 +487,7 @@ TError TTask::EnableNet() {
             return error;
 
         if (Env->IpMap.find(dev) != Env->IpMap.end()) {
-            auto ip = Env->IpMap[dev];
+            auto ip = Env->IpMap.at(dev);
 
             if (!ip.Addr.IsEmpty()) {
                 TError error = link->SetIpAddr(ip.Addr, ip.Prefix);
@@ -793,13 +793,8 @@ TError TTask::Start() {
         }
 
         int cloneFlags = SIGCHLD;
-        if (Env->Isolate) {
+        if (Env->Isolate)
             cloneFlags |= CLONE_NEWPID | CLONE_NEWIPC;
-        } else {
-            Env->NetCfg.Share = true;
-            Env->NetCfg.Host.clear();
-            Env->NetCfg.MacVlan.clear();
-        }
 
         if (Env->NewMountNs)
             cloneFlags |= CLONE_NEWNS;
@@ -967,54 +962,10 @@ bool TTask::HasCorrectFreezer() {
     return true;
 }
 
-void TTask::Restore(int pid_,
-                    const std::string &stdinPath,
-                    const std::string &stdoutPath,
-                    const std::string &stderrPath) {
+void TTask::Restore(int pid_) {
     ExitStatus = 0;
     Pid = pid_;
     State = Started;
-
-    bool running = Pid ? kill(Pid, 0) == 0 : false;
-
-    // There are several possibilities here:
-    // 1. We died and loop reaped container, so it will deliver
-    // exit_status later;
-    // 2. In previous session we died right after we reaped exit_status
-    // but didn't save it to persistent store.
-    // 3. We died in consistent dead state.
-    // 4. We died in consistent stopped state.
-    //
-    // Thus, we need to be in Started state so we can possibly receive
-    // exit_status from (1); if it was really case (2) we will indicate
-    // error when user tries to get task state in Reap() from waitpit().
-    //
-    // For 3/4 case we rely on the saved state.
-    //
-    // Moreover, if task didn't die, but we are restoring, it can go
-    // away under us any time, so don't fail if we can't recover
-    // something.
-
-    Env->StdinPath = stdinPath;
-    Env->StdoutPath = stdoutPath;
-    Env->StderrPath = stderrPath;
-
-    if (running && !IsZombie()) {
-        TPath stdinLink("/proc/" + std::to_string(Pid) + "/fd/0");
-        TError error = stdinLink.ReadLink(Env->StdinPath);
-        if (error)
-            L_ERR() << "Can't restore stdin: " << error << std::endl;
-
-        TPath stdoutLink("/proc/" + std::to_string(Pid) + "/fd/1");
-        error = stdoutLink.ReadLink(Env->StdoutPath);
-        if (error)
-            L_ERR() << "Can't restore stdout: " << error << std::endl;
-
-        TPath stderrLink("/proc/" + std::to_string(Pid) + "/fd/2");
-        error = stderrLink.ReadLink(Env->StderrPath);
-        if (error)
-            L_ERR() << "Can't restore stderr: " << error << std::endl;
-    }
 }
 
 TError TTask::FixCgroups() const {

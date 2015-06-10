@@ -2059,8 +2059,10 @@ static void TestNetProperty(TPortoAPI &api) {
     Say() << "Check net=host:veth0" << std::endl;
 
     AsRoot(api);
-    (void)system("ip link delete veth0");
-    (void)system("ip link delete veth1");
+    if (system("ip link | grep veth0") == 0)
+        ExpectEq(system("ip link delete veth0"), 0);
+    if (system("ip link | grep veth1") == 0)
+        ExpectEq(system("ip link delete veth1"), 0);
     ExpectEq(system("ip link add veth0 type veth peer name veth1"), 0);
     AsNobody(api);
 
@@ -2170,7 +2172,8 @@ static void TestNetProperty(TPortoAPI &api) {
     Say() << "Check net=veth" << std::endl;
     AsRoot(api);
     ExpectApiSuccess(api.Destroy(name));
-    (void)system("ip link delete portobr0");
+    if (system("ip link | grep portobr0") == 0)
+        ExpectEq(system("ip link delete portobr0"), 0);
     ExpectEq(system("ip link add portobr0 type bridge"), 0);
     ExpectEq(system("ip link set portobr0 up"), 0);
     AsNobody(api);
@@ -4744,7 +4747,7 @@ static void TestPackage(TPortoAPI &api) {
     Expect(FileExists(config().slave_log().path()));
     ExpectEq(FileExists(config().rpc_sock().file().path()), false);
 
-    system("start yandex-porto");
+    ExpectEq(system("start yandex-porto"), 0);
     WaitPortod(api);
 }
 
@@ -4875,7 +4878,8 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
 
 exit:
     AsRoot(api);
-    system("hostname -F /etc/hostname");
+    if (system("hostname -F /etc/hostname") != 0)
+        std::cerr << "WARNING: can't restore hostname" << std::endl;
     return ret;
 }
 }

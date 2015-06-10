@@ -105,7 +105,7 @@ public:
 class TTask: public TNonCopyable {
     int Rfd, Wfd;
     int WaitParentRfd, WaitParentWfd;
-    std::shared_ptr<TTaskEnv> Env;
+    std::shared_ptr<const TTaskEnv> Env;
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
 
     enum ETaskState { Stopped, Started } State;
@@ -133,7 +133,7 @@ class TTask: public TNonCopyable {
     TError IsolateNet(int childPid);
 
 public:
-    TTask(std::shared_ptr<TTaskEnv> env,
+    TTask(std::shared_ptr<const TTaskEnv> env,
           const std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> &leafCgroups) : Env(env), LeafCgroups(leafCgroups) {};
     TTask(pid_t pid) : Pid(pid) {};
     ~TTask();
@@ -153,10 +153,7 @@ public:
     TError ChildPrepareLoop();
     TError ChildRemountSlave();
     TError ChildCallback();
-    void Restore(int pid_,
-                 const std::string &stdinPath,
-                 const std::string &stdoutPath,
-                 const std::string &stderrPath);
+    void Restore(int pid_);
     TError FixCgroups() const;
     TError RotateLogs() const;
     void Abort(const TError &error) const;

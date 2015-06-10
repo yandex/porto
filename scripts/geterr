@@ -54,11 +54,11 @@ getlog() {
 echo "Get errors on all $TAG hosts"
 geterrors > result.txt
 echo "Filter only hosts that have $STAT"
-parse < result.txt > result2.txt
+cat result.txt | parse | sort -r -n -k2 > result2.txt
 
 GREP=""
 [ "$STAT" = "porto_stat[errors]" ] && GREP="ERR "
-[ "$STAT" = "porto_stat[warnings]" ] && GREP="WARN "
+[ "$STAT" = "porto_stat[warnings]" ] && GREP="WRN "
 
 if [ ! -z "$GREP" ]; then
 	echo "Get error details"

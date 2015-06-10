@@ -226,7 +226,7 @@ TScopedFd::~TScopedFd() {
         close(Fd);
 }
 
-int TScopedFd::GetFd() {
+int TScopedFd::GetFd() const {
     return Fd;
 }
 
