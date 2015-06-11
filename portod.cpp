@@ -684,15 +684,14 @@ static int ReceiveAcks(int fd, std::map<int,int> &exited) {
             continue;
 
         if (exited.find(pid) == exited.end()) {
-            //
-            //
+            L_WRN() << "Got acknowledge for unknown pid " << pid << std::endl;
         } else {
             exited.erase(pid);
             Reap(pid);
+            L_EVT() << "Got acknowledge for " << pid << " (" << exited.size()
+                    << " queued" << std::endl;
         }
 
-        L_EVT() << "Got acknowledge for " << pid << " (" << exited.size() << " queued"
-                << std::endl;
         nr++;
     }
 
