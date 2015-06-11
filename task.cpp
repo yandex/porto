@@ -545,6 +545,7 @@ TError TTask::IsolateNet(int childPid) {
     std::string hostname = GetHostName();
 
     for (auto &mvlan : Env->NetCfg.MacVlan) {
+        // FIXME THREADS
         auto link = std::make_shared<TNlLink>(nl, "portomv0");
 
         (void)link->Remove();

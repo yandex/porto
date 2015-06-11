@@ -737,4 +737,52 @@ bool IsCfqActive() {
     }
     return true;
 }
+
+template<typename T>
+static inline void ExpectEqTemplate(T ret, T exp, size_t line, const char *func) {
+    if (ret != exp) {
+        Say() << "Unexpected " << ret << " != " << exp << " at " << func << ":" << line << std::endl;
+        abort();
+    }
+}
+
+template<typename T>
+static inline void ExpectNeqTemplate(T ret, T exp, size_t line, const char *func) {
+    if (ret == exp) {
+        Say() << "Unexpected " << ret << " == " << exp << " at " << func << ":" << line << std::endl;
+        abort();
+    }
+}
+
+template<typename T>
+static inline void ExpectLessTemplate(T ret, T exp, size_t line, const char *func) {
+    if (ret >= exp) {
+        Say() << "Unexpected " << ret << " >= " << exp << " at " << func << ":" << line << std::endl;
+        abort();
+    }
+}
+
+void _ExpectEq(size_t ret, size_t exp, size_t line, const char *func) {
+    ExpectEqTemplate(ret, exp, line, func);
+}
+
+void _ExpectEq(const std::string &ret, const std::string &exp, size_t line, const char *func) {
+    ExpectEqTemplate(ret, exp, line, func);
+}
+
+void _ExpectNeq(size_t ret, size_t exp, size_t line, const char *func) {
+    ExpectNeqTemplate(ret, exp, line, func);
+}
+
+void _ExpectNeq(const std::string &ret, const std::string &exp, size_t line, const char *func) {
+    ExpectNeqTemplate(ret, exp, line, func);
+}
+
+void _ExpectLess(size_t ret, size_t exp, size_t line, const char *func) {
+    ExpectLessTemplate(ret, exp, line, func);
+}
+
+void _ExpectLess(const std::string &ret, const std::string &exp, size_t line, const char *func) {
+    ExpectLessTemplate(ret, exp, line, func);
+}
 }

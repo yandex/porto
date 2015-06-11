@@ -81,6 +81,13 @@ namespace test {
     bool HaveRechargeOnPgfault();
     bool HaveMaxRss();
     bool IsCfqActive();
+
+    void _ExpectEq(size_t ret, size_t exp, size_t line, const char *func);
+    void _ExpectEq(const std::string &ret, const std::string &exp, size_t line, const char *func);
+    void _ExpectNeq(size_t ret, size_t exp, size_t line, const char *func);
+    void _ExpectNeq(const std::string &ret, const std::string &exp, size_t line, const char *func);
+    void _ExpectLess(size_t ret, size_t exp, size_t line, const char *func);
+    void _ExpectLess(const std::string &ret, const std::string &exp, size_t line, const char *func);
 }
 
 #define Expect(ret) ExpectReturn(ret, true, __LINE__, __func__)
@@ -91,26 +98,6 @@ namespace test {
 #define ExpectApiSuccess(ret) ExpectApi(api, ret, 0, __LINE__, __func__)
 #define ExpectApiFailure(ret, exp) ExpectApi(api, ret, exp, __LINE__, __func__)
 
-#define ExpectEq(ret, exp) \
-    do { \
-        if (ret != exp) { \
-            Say() << "Unexpected " << ret << " != " << exp << " at " << __func__ << ":" << __LINE__ << std::endl; \
-            abort(); \
-        } \
-    } while (0)
-
-#define ExpectNeq(ret, exp) \
-    do { \
-        if (ret == exp) { \
-            Say() << "Unexpected " << ret << " == " << exp << " at " << __func__ << ":" << __LINE__ << std::endl; \
-            abort(); \
-        } \
-    } while (0)
-
-#define ExpectLess(ret, exp) \
-    do { \
-        if (ret >= exp) { \
-            Say() << "Unexpected " << ret << " >= " << exp << " at " << __func__ << ":" << __LINE__ << std::endl; \
-            abort(); \
-        } \
-    } while (0)
+#define ExpectEq(ret, exp) _ExpectEq(ret, exp, __LINE__, __func__)
+#define ExpectNeq(ret, exp) _ExpectNeq(ret, exp, __LINE__, __func__)
+#define ExpectLess(ret, exp) _ExpectLess(ret, exp, __LINE__, __func__)
