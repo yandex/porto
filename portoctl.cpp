@@ -1452,17 +1452,17 @@ public:
           std::cout << std::setw(w) << StringWithUnit(val);
     }
 
-    void ShowPercent(TVolumeDescription &v, const char *p, const char *b, int w) {
-      uint64_t val, base;
+    void ShowPercent(TVolumeDescription &v, const char *u, const char *a, int w) {
+      uint64_t used, avail;
 
-      if (!v.Properties.count(std::string(p)) |
-          !v.Properties.count(std::string(b)))
+      if (!v.Properties.count(std::string(u)) |
+          !v.Properties.count(std::string(a)))
           std::cout << std::setw(w) << "-";
-      else if (StringToUint64(v.Properties.at(std::string(p)), val)||
-               StringToUint64(v.Properties.at(std::string(b)), base))
+      else if (StringToUint64(v.Properties.at(std::string(u)), used) ||
+               StringToUint64(v.Properties.at(std::string(a)), avail))
           std::cout << std::setw(w) << "err";
-      else if (base)
-          std::cout << std::setw(w - 1) << std::llround(100. * val / base) << "%";
+      else if (used + avail)
+          std::cout << std::setw(w - 1) << std::llround(100. * used / (used + avail)) << "%";
       else
           std::cout << std::setw(w) << "inf";
     }
@@ -1476,12 +1476,12 @@ public:
                 ShowSizeProperty(v, V_INODE_LIMIT, 8, true);
                 ShowSizeProperty(v, V_INODE_USED, 8, true);
                 ShowSizeProperty(v, V_INODE_AVAILABLE, 8, true);
-                ShowPercent(v, V_INODE_USED, V_INODE_LIMIT, 5);
+                ShowPercent(v, V_INODE_USED, V_INODE_AVAILABLE, 5);
             } else {
                 ShowSizeProperty(v, V_SPACE_LIMIT, 8);
                 ShowSizeProperty(v, V_SPACE_USED, 8);
                 ShowSizeProperty(v, V_SPACE_AVAILABLE, 8);
-                ShowPercent(v, V_SPACE_USED, V_SPACE_LIMIT, 5);
+                ShowPercent(v, V_SPACE_USED, V_SPACE_AVAILABLE, 5);
             }
 
             for (auto name: v.Containers)
