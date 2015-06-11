@@ -1443,11 +1443,11 @@ public:
         TContainerValue(P_RAW_START_TIME, "", anyState) {}
 };
 
-class TRawDeadTimeProperty : public TUintValue, public TContainerValue {
+class TRawDeathTimeProperty : public TUintValue, public TContainerValue {
 public:
-    TRawDeadTimeProperty() :
+    TRawDeathTimeProperty() :
         TUintValue(HIDDEN_VALUE | PERSISTENT_VALUE),
-        TContainerValue(P_RAW_DEAD_TIME, "", anyState) {}
+        TContainerValue(P_RAW_DEATH_TIME, "", anyState) {}
 };
 
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
@@ -1499,7 +1499,7 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TRawLoopDevProperty,
         new TRawNameProperty,
         new TRawStartTimeProperty,
-        new TRawDeadTimeProperty,
+        new TRawDeathTimeProperty,
     };
 
     for (auto p : properties)

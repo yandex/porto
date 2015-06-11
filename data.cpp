@@ -425,18 +425,20 @@ public:
             return si.uptime;
         }
 
-        // we started recording raw start/dead time since porto v1.15;
+        // we started recording raw start/death time since porto v1.15;
         // in case we updated from old version, return zero
         if (!c->Prop->Get<uint64_t>(P_RAW_START_TIME))
             c->Prop->Set<uint64_t>(P_RAW_START_TIME, GetCurrentTimeMs());
 
-        if (!c->Prop->Get<uint64_t>(P_RAW_DEAD_TIME))
-            c->Prop->Set<uint64_t>(P_RAW_DEAD_TIME, GetCurrentTimeMs());
+        if (!c->Prop->Get<uint64_t>(P_RAW_DEATH_TIME))
+            c->Prop->Set<uint64_t>(P_RAW_DEATH_TIME, GetCurrentTimeMs());
 
         if (c->GetState() == EContainerState::Dead)
-            return (c->Prop->Get<uint64_t>(P_RAW_DEAD_TIME) - c->Prop->Get<uint64_t>(P_RAW_START_TIME)) / 1000;
+            return (c->Prop->Get<uint64_t>(P_RAW_DEATH_TIME) -
+                    c->Prop->Get<uint64_t>(P_RAW_START_TIME)) / 1000;
         else
-            return (GetCurrentTimeMs() - c->Prop->Get<uint64_t>(P_RAW_START_TIME)) / 1000;
+            return (GetCurrentTimeMs() -
+                    c->Prop->Get<uint64_t>(P_RAW_START_TIME)) / 1000;
     }
 };
 

@@ -1379,10 +1379,10 @@ TError TContainer::Restore(const kv::TNode &node) {
 
         auto state = Data->Get<std::string>(D_STATE);
         if (state == ContainerStateName(EContainerState::Dead)) {
-            // we started recording dead time since porto v1.15,
+            // we started recording death time since porto v1.15,
             // use some sensible default
-            if (!Prop->HasValue(P_RAW_DEAD_TIME))
-                Prop->Set<uint64_t>(P_RAW_DEAD_TIME, GetCurrentTimeMs());
+            if (!Prop->HasValue(P_RAW_DEATH_TIME))
+                Prop->Set<uint64_t>(P_RAW_DEATH_TIME, GetCurrentTimeMs());
 
             SetState(EContainerState::Dead);
         } else {
@@ -1492,9 +1492,9 @@ bool TContainer::Exit(int status, bool oomKilled, bool force) {
     if (error)
         L_ERR() << "Can't set " << P_RAW_ROOT_PID << ": " << error << std::endl;
 
-    error = Prop->Set<uint64_t>(P_RAW_DEAD_TIME, GetCurrentTimeMs());
+    error = Prop->Set<uint64_t>(P_RAW_DEATH_TIME, GetCurrentTimeMs());
     if (error)
-        L_ERR() << "Can't set " << P_RAW_DEAD_TIME << ": " << error << std::endl;
+        L_ERR() << "Can't set " << P_RAW_DEATH_TIME << ": " << error << std::endl;
 
     return true;
 }
@@ -1543,7 +1543,7 @@ TError TContainer::Respawn() {
 
 bool TContainer::CanRemoveDead() const {
     return State == EContainerState::Dead &&
-        Prop->Get<uint64_t>(P_RAW_DEAD_TIME) / 1000 +
+        Prop->Get<uint64_t>(P_RAW_DEATH_TIME) / 1000 +
         Prop->Get<uint64_t>(P_AGING_TIME) <= GetCurrentTimeMs() / 1000;
 }
 
