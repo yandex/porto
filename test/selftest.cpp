@@ -2059,10 +2059,14 @@ static void TestNetProperty(TPortoAPI &api) {
     Say() << "Check net=host:veth0" << std::endl;
 
     AsRoot(api);
-    if (system("ip link | grep veth0") == 0)
+    if (system("ip link | grep veth0") == 0) {
+        Say() << "Delete link veth0" << std::endl;
         ExpectEq(system("ip link delete veth0"), 0);
-    if (system("ip link | grep veth1") == 0)
+    }
+    if (system("ip link | grep veth1") == 0) {
+        Say() << "Delete link veth1" << std::endl;
         ExpectEq(system("ip link delete veth1"), 0);
+    }
     ExpectEq(system("ip link add veth0 type veth peer name veth1"), 0);
     AsNobody(api);
 
