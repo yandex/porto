@@ -22,6 +22,12 @@ stresstest() {
 	portotest stress "$@"
 }
 
+fuzzytest() {
+	say "Fuzzy test"
+	update_config true true
+	portotest fuzzy "$@"
+}
+
 pkgtest() {
 	say "Package test"
 	mkdir -p /place
@@ -191,6 +197,7 @@ for t in "$@"; do
 		self) selftest ; exit ;;
 		selfargs) selftest "$@" ; exit ;;
 		stress) stresstest ;;
+		fuzzy) fuzzytest ;;
 		stressargs) shift; stresstest "$@"; exit $? ;;
 		pkg) pkgtest ;;
 		net) nettest ;;

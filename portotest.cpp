@@ -42,6 +42,16 @@ static int Stresstest(int argc, char *argv[]) {
     return test::StressTest(threads, iter, killPorto);
 }
 
+static int Fuzzytest(int argc, char *argv[]) {
+    int threads = 32, iter = 1000;
+    if (argc >= 1)
+        StringToInt(argv[0], threads);
+    if (argc >= 2)
+        StringToInt(argv[1], iter);
+    std::cout << "Threads: " << threads << " Iterations: " << iter << std::endl;
+    return test::FuzzyTest(threads, iter);
+}
+
 static void Usage() {
     std::cout << "usage: " << program_invocation_short_name << " [selftest name]" << std::endl;
     std::cout << "       " << program_invocation_short_name << " stress [threads] [iterations] [kill=on/off]" << std::endl;
@@ -100,6 +110,8 @@ int main(int argc, char *argv[])
 
         if (what == "stress")
             return Stresstest(argc - 2, argv + 2);
+        if (what == "fuzzy")
+            return Fuzzytest(argc - 2, argv + 2);
         else if (what == "connectivity")
             return TestConnectivity();
         else

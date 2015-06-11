@@ -90,7 +90,7 @@ set_target_properties(portod-meta-root PROPERTIES LINK_FLAGS "-static")
 
 set(TEST_TARGETS "")
 if(ENABLE_TEST)
-	add_executable(portotest portotest.cpp config.cpp qdisc.cpp test/selftest.cpp test/stresstest.cpp test/test.cpp config.cpp util/idmap.cpp util/mount.cpp util/netlink.cpp util/log.cpp util/path.cpp util/file.cpp util/folder.cpp util/signal.cpp util/unix.cpp util/cred.cpp util/string.cpp util/crash.cpp)
+	add_executable(portotest portotest.cpp config.cpp qdisc.cpp test/selftest.cpp test/stresstest.cpp test/fuzzytest.cpp test/test.cpp config.cpp util/idmap.cpp util/mount.cpp util/netlink.cpp util/log.cpp util/path.cpp util/file.cpp util/folder.cpp util/signal.cpp util/unix.cpp util/cred.cpp util/string.cpp util/crash.cpp)
 	add_dependencies(portotest version.hpp)
 	target_link_libraries(portotest porto ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
 	set(TEST_TARGETS "portotest")

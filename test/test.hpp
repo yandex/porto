@@ -71,6 +71,7 @@ namespace test {
 
     int SelfTest(std::vector<std::string> name, int leakNr);
     int StressTest(int threads, int iter, bool killPorto);
+    int FuzzyTest(int threads, int iter);
 
     bool HaveCfsBandwidth();
     bool HaveCfsGroupSched();

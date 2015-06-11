@@ -1207,7 +1207,7 @@ public:
                 string s;
                 ret = Api->GetData(c, "state", s);
                 if (ret)
-                    PrintError("Can't get container state");
+                    s = "?";
 
                 std::cout << std::right << std::setw(stateLen) << s;
 
