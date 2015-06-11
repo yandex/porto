@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <csignal>
+#include <cmath>
 
 #include "libporto.hpp"
 #include "config.hpp"
@@ -1432,13 +1433,66 @@ public:
 
 class TListVolumesCmd : public ICmd {
     bool details = true;
+    bool verbose = false;
+    bool inodes = false;
+
 public:
-    TListVolumesCmd(TPortoAPI *api) : ICmd(api, "vlist", 0, "[-1] [volume]...", "list created volumes") {}
+    TListVolumesCmd(TPortoAPI *api) : ICmd(api, "vlist", 0, "[-1|-i|-v] [volume]...", "list created volumes") {}
+
+    void ShowSizeProperty(TVolumeDescription &v, const char *p, int w, bool raw = false) {
+      uint64_t val;
+
+      if (!v.Properties.count(std::string(p)))
+          std::cout << std::setw(w) << "-";
+      else if (StringToUint64(v.Properties.at(std::string(p)), val))
+          std::cout << std::setw(w) << "err";
+      else if (raw)
+          std::cout << std::setw(w) << val;
+      else
+          std::cout << std::setw(w) << StringWithUnit(val);
+    }
+
+    void ShowPercent(TVolumeDescription &v, const char *p, const char *b, int w) {
+      uint64_t val, base;
+
+      if (!v.Properties.count(std::string(p)) |
+          !v.Properties.count(std::string(b)))
+          std::cout << std::setw(w) << "-";
+      else if (StringToUint64(v.Properties.at(std::string(p)), val)||
+               StringToUint64(v.Properties.at(std::string(b)), base))
+          std::cout << std::setw(w) << "err";
+      else if (base)
+          std::cout << std::setw(w - 1) << std::llround(100. * val / base) << "%";
+      else
+          std::cout << std::setw(w) << "inf";
+    }
 
     void ShowVolume(TVolumeDescription &v) {
-        std::cout << v.Path << std::endl;
-        if (!details)
+        if (!details) {
+            std::cout << v.Path << std::endl;
+        } else {
+            std::cout << std::left << std::setw(40) << v.Path << std::right;
+            if (inodes) {
+                ShowSizeProperty(v, V_INODE_LIMIT, 8, true);
+                ShowSizeProperty(v, V_INODE_USED, 8, true);
+                ShowSizeProperty(v, V_INODE_AVAILABLE, 8, true);
+                ShowPercent(v, V_INODE_USED, V_INODE_LIMIT, 5);
+            } else {
+                ShowSizeProperty(v, V_SPACE_LIMIT, 8);
+                ShowSizeProperty(v, V_SPACE_USED, 8);
+                ShowSizeProperty(v, V_SPACE_AVAILABLE, 8);
+                ShowPercent(v, V_SPACE_USED, V_SPACE_LIMIT, 5);
+            }
+
+            for (auto name: v.Containers)
+                std::cout << " " << name;
+
+            std::cout << std::endl;
+        }
+
+        if (!verbose)
             return;
+
         std::cout << "  " << std::left << std::setw(20) << "containers";
         for (auto name: v.Containers)
             std::cout << " " << name;
@@ -1455,9 +1509,20 @@ public:
     int Execute(int argc, char *argv[]) {
         int start = GetOpt(argc, argv, {
             { '1', false, [&](const char *arg) { details = false; } },
+            { 'i', false, [&](const char *arg) { inodes = true; } },
+            { 'v', false, [&](const char *arg) { verbose = true; details = false; } },
         });
 
         vector<TVolumeDescription> vlist;
+
+        if (details) {
+            std::cout << std::left << std::setw(40) << "Volume" << std::right;
+            std::cout << std::setw(8) << "Limit";
+            std::cout << std::setw(8) << "Used";
+            std::cout << std::setw(8) << "Avail";
+            std::cout << std::setw(5) << "Use%";
+            std::cout << std::left << " Containers" << std::endl;
+        }
 
         if (start == argc) {
           int ret = Api->ListVolumes(vlist);

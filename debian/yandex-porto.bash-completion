@@ -125,7 +125,14 @@ _portoctl ()
 		esac
 		;;
 	vlist)
-		_porto_volumes "-1"
+		case "$cword" in
+		2)
+			_porto_volumes "-1" "-i" "-v"
+			;;
+		3)
+			_porto_volumes
+			;;
+		esac
 		;;
 	vlink|vunlink)
 		case "$cword" in
