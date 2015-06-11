@@ -112,11 +112,6 @@ static void DaemonShutdown(bool master, int ret) {
 
     if (ret < 0)
         RaiseSignal(-ret);
-
-    if (master) {
-        TFile f(config().daemon().pidmap().path());
-        (void)f.Remove();
-    }
 }
 
 static void RemoveRpcServer(const string &path) {
@@ -704,8 +699,6 @@ static int ReceiveAcks(int fd, std::map<int,int> &exited,
         if (pid <= 0)
             continue;
 
-        L_EVT() << "Got acknowledge for " << pid << " (" << exited.size() << " queued)" << std::endl;
-
         if (exited.find(pid) == exited.end()) {
             acked.insert(pid);
         } else {
@@ -713,71 +706,12 @@ static int ReceiveAcks(int fd, std::map<int,int> &exited,
             Reap(pid);
         }
 
-        L() << "Got acknowledge for " << pid << " (" << exited.size() << " queued, " << acked.size() << " acked)" << std::endl;
+        L_EVT() << "Got acknowledge for " << pid << " (" << exited.size() << " queued, " << acked.size() << " acked)" << std::endl;
         nr++;
     }
 
     UpdateQueueSize(exited, acked);
     return nr;
-}
-
-static void SaveStatuses(map<int, int> &exited) {
-    TFile f(config().daemon().pidmap().path());
-    if (f.Exists()) {
-        TError error = f.Remove();
-        if (error) {
-            L_ERR() << "Can't save pid map: " << error << std::endl;
-            return;
-        }
-    }
-
-    for (auto &kv : exited) {
-        TError error = f.AppendString(std::to_string(kv.first) + " " + std::to_string(kv.second) + "\n");
-        if (error)
-            L_ERR() << "Can't save pid map: " << error << std::endl;
-    }
-}
-
-static void RestoreStatuses(map<int, int> &exited) {
-    TFile f(config().daemon().pidmap().path());
-    if (!f.Exists())
-        return;
-
-    vector<string> lines;
-    TError error = f.AsLines(lines);
-    if (error) {
-        L_ERR() << "Can't restore pid map: " << error << std::endl;
-        return;
-    }
-
-    for (auto &line : lines) {
-        vector<string> tokens;
-        error = SplitString(line, ' ', tokens);
-        if (error) {
-            L_ERR() << "Can't restore pid map: " << error << std::endl;
-            continue;
-        }
-
-        if (tokens.size() != 2) {
-            continue;
-        }
-
-        int pid, status;
-
-        error = StringToInt(tokens[0], pid);
-        if (error) {
-            L_ERR() << "Can't restore pid map: " << error << std::endl;
-            continue;
-        }
-
-        error = StringToInt(tokens[0], status);
-        if (error) {
-            L_ERR() << "Can't restore pid map: " << error << std::endl;
-            continue;
-        }
-
-        exited[pid] = status;
-    }
 }
 
 static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
@@ -878,8 +812,6 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
                 const char *stdlogArg = nullptr;
                 if (stdlog)
                     stdlogArg = "--stdlog";
-
-                SaveStatuses(exited);
 
                 if (kill(slavePid, updateSignal) < 0) {
                     L_ERR() << "Can't send " << updateSignal << " to slave: " << strerror(errno) << std::endl;
@@ -985,7 +917,6 @@ static int MasterMain() {
         L_ERR() << "Can't adjust OOM score: " << error << std::endl;
 
     map<int,int> exited;
-    RestoreStatuses(exited);
 
     while (true) {
         size_t started = GetCurrentTimeMs();

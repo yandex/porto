@@ -42,7 +42,6 @@ message TCfg {
 		optional uint32 cgroup_remove_timeout_s = 3;
 		optional uint32 freezer_wait_timeout_s = 4;
 		optional uint64 memory_guarantee_reserve = 5;
-		optional TFileCfg pidmap = 6;
 		optional uint64 rotate_logs_timeout_s = 7;
 		optional string sysfs_root = 8;
 		optional uint64 memory_limit = 9;

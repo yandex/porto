@@ -49,7 +49,6 @@ void TConfig::LoadDefaults() {
     // wait 30 seconds for container cgroup to freeze/unfreeze
     config().mutable_daemon()->set_freezer_wait_timeout_s(60);
     config().mutable_daemon()->set_memory_guarantee_reserve(2 * 1024 * 1024 * 1024UL);
-    config().mutable_daemon()->mutable_pidmap()->set_path("/tmp/portod.pidmap");
     config().mutable_daemon()->set_rotate_logs_timeout_s(60);
     config().mutable_daemon()->set_sysfs_root("/sys/fs/cgroup");
     config().mutable_daemon()->set_memory_limit(1 * 1024 * 1024 * 1024);
