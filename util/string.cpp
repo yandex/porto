@@ -1,4 +1,5 @@
 #include <sstream>
+#include <iomanip>
 
 #include "util/string.hpp"
 
@@ -127,6 +128,29 @@ TError StringWithUnitToUint64(const std::string &str, uint64_t &value) {
     }
 
     return TError::Success();
+}
+
+std::string StringWithUnit(uint64_t value, int precision)
+{
+    std::ostringstream ret;
+    double val = value / 1024;
+
+    if (value < 1024) {
+        ret << value << "B";
+    } else if (value <= 1024ull * 1024) {
+        ret << std::fixed << std::setprecision(precision) << val << "K";
+    } else if (value <= 1024ull * 1024 * 1024) {
+        val /= 1024;
+        ret << std::fixed << std::setprecision(precision) << val << "M";
+    } else if (value <= 1024ull * 1024 * 1024 * 1024) {
+        val /= 1024 * 1024;
+        ret << std::fixed << std::setprecision(precision) << val << "G";
+    } else {
+        val /= 1024ull * 1024 * 1024;
+        ret << std::fixed << std::setprecision(precision) << val << "T";
+    }
+
+    return ret.str();
 }
 
 TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens, size_t maxFields) {
