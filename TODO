@@ -36,7 +36,6 @@
 - create volume without tar.gz
 
 # cleanup
-- remove extern AckExitStatus from container->Stop()
 - move all 'extern "C"' into one file
 - use some kind of reference count for accounting running children
 - add c++ namespaces

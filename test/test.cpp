@@ -654,9 +654,6 @@ void TestDaemon(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData("/", "porto_stat[queued_statuses]", v));
     Expect(v == std::to_string(0));
 
-    ExpectApiSuccess(api.GetData("/", "porto_stat[queued_acks]", v));
-    Expect(v == std::to_string(0));
-
     Say() << "Check portod-slave queue size" << std::endl;
     ExpectApiSuccess(api.GetData("/", "porto_stat[queued_events]", v));
     Expect(v != std::to_string(0)); // RotateLogs

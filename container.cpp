@@ -1496,10 +1496,6 @@ bool TContainer::Exit(int status, bool oomKilled, bool force) {
     if (error)
         L_ERR() << "Can't set " << P_RAW_DEAD_TIME << ": " << error << std::endl;
 
-    int pid = Task->GetPid();
-    if (pid > 0)
-        AckExitStatus(pid);
-
     return true;
 }
 
