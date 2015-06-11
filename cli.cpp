@@ -15,7 +15,7 @@ size_t MaxFieldLength(std::vector<std::string> &vec, size_t min) {
         if (i.length() > len)
             len  = i.length();
 
-    return (len > min ? len : min) + 1;
+    return (len > min ? len : min) + 2;
 }
 
 ICmd::ICmd(TPortoAPI *api, const string& name, int args, const string& usage, const string& desc) :
@@ -87,7 +87,7 @@ THelpCmd::THelpCmd(TPortoAPI *api, bool usagePrintData) : ICmd(api, "help", 1, "
 static void PrintAligned(const std::string &name, const std::string &desc,
                          const size_t nameWidth, const size_t termWidth) {
     std::vector<std::string> v;
-    size_t descWidth = termWidth - nameWidth - 2;
+    size_t descWidth = termWidth - nameWidth - 4;
 
     size_t start = 0;
     for (size_t i = 0; i < desc.length(); i++) {
@@ -100,10 +100,10 @@ static void PrintAligned(const std::string &name, const std::string &desc,
     if (last.length())
         v.push_back(last);
 
-    std::cerr << " " << std::left << std::setw(nameWidth) << name
+    std::cerr << "  " << std::left << std::setw(nameWidth) << name
         << v[0] << std::endl;
     for (size_t i = 1; i < v.size(); i++)
-        std::cerr << " " << std::left << std::setw(nameWidth) << " "
+        std::cerr << "  " << std::left << std::setw(nameWidth) << " "
             << v[i] << std::endl;
 }
 
@@ -129,6 +129,22 @@ void THelpCmd::Usage() {
         PrintAligned(i.second->GetName(), i.second->GetDescription(), nameWidth, termWidth);
 
     int ret;
+
+    std::cerr << std::endl << "Volume properties:" << std::endl;
+    vector<TProperty> vlist;
+    ret = Api->ListVolumeProperties(vlist);
+    if (ret) {
+        PrintError("Unavailable");
+    } else {
+        tmpVec.clear();
+        for (auto p : vlist)
+            tmpVec.push_back(p.Name);
+        nameWidth = MaxFieldLength(tmpVec);
+
+        for (auto p : vlist)
+            PrintAligned(p.Name, p.Description, nameWidth, termWidth);
+    }
+
     std::cerr << std::endl << "Property list:" << std::endl;
     vector<TProperty> plist;
     ret = Api->Plist(plist);
@@ -161,6 +177,7 @@ void THelpCmd::Usage() {
         for (auto d : dlist)
             PrintAligned(d.Name, d.Description, nameWidth, termWidth);
     }
+    std::cerr << std::endl;
 }
 
 int THelpCmd::Execute(int argc, char *argv[]) {

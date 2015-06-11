@@ -216,6 +216,10 @@ bool TRawValueMap::IsValid(const std::string &name) const {
    return AbstractValues.find(name) != AbstractValues.end();
 }
 
+bool TRawValueMap::IsReadOnly(const std::string &name) const {
+   return Find(name)->GetFlags() & READ_ONLY_VALUE;
+}
+
 bool TRawValueMap::IsDefault(const std::string &name) const {
     return !HasValue(name);
 }
@@ -237,6 +241,13 @@ TError TValueMap::Create() {
         return TError::Success();
 
     return KvNode->Create();
+}
+
+TError TValueMap::Remove() {
+    if (!KvNode)
+        return TError::Success();
+
+    return KvNode->Remove();
 }
 
 TError TValueMap::Restore(const kv::TNode &node) {

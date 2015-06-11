@@ -30,6 +30,7 @@ public:
     TError Identify(TContainerHolder &holder, bool full = true);
     std::string GetContainerName() const;
     std::shared_ptr<TContainer> GetContainer() const;
+    std::shared_ptr<TContainer> TryGetContainer() const;
 
     friend std::ostream& operator<<(std::ostream& stream, TClient& client) {
         if (client.FullLog) {
@@ -54,10 +55,9 @@ private:
     TCred Cred;
     std::string Comm;
     size_t RequestStartMs;
-    bool MemberOfPortoGroup = false;
     std::mutex Lock;
 
-    TError CheckPortoMembership();
+    TError LoadGroups();
     TError IdentifyContainer(TContainerHolder &holder);
     std::weak_ptr<TContainer> Container;
 

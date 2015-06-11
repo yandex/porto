@@ -25,6 +25,7 @@ class TTclass;
 class TTask;
 class TContainerWaiter;
 class TClient;
+class TVolume;
 
 extern int64_t BootTime;
 
@@ -165,6 +166,17 @@ public:
     bool IsLostAndRestored() const;
     void SyncStateWithCgroup();
     bool IsNamespaceIsolated();
+
+    /* protected with TVolumeHolder->Lock */
+    std::set<std::shared_ptr<TVolume>> Volumes;
+
+    bool LinkVolume(std::shared_ptr<TVolume> volume) {
+        return Volumes.insert(volume).second;
+    }
+
+    bool UnlinkVolume(std::shared_ptr<TVolume> volume) {
+        return Volumes.erase(volume);
+    }
 };
 
 class TContainerWaiter {

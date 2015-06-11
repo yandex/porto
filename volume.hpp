@@ -11,109 +11,145 @@
 #include "util/idmap.hpp"
 
 constexpr const char *V_PATH = "path";
-constexpr const char *V_SOURCE = "source";
-constexpr const char *V_QUOTA = "quota";
-constexpr const char *V_FLAGS = "flags";
+constexpr const char *V_BACKEND = "backend";
+constexpr const char *V_READY = "ready";
+
+constexpr const char *V_ID = "_id";
+constexpr const char *V_CONTAINERS = "_containers";
+constexpr const char *V_LOOP_DEV = "_loop_dev";
+
 constexpr const char *V_USER = "user";
 constexpr const char *V_GROUP = "group";
-constexpr const char *V_ID = "_id";
-constexpr const char *V_VALID = "_valid";
-constexpr const char *V_LOOP_DEV = "_loop_dev";
+constexpr const char *V_PERMISSIONS = "permissions";
+constexpr const char *V_CREATOR = "creator";
+
+constexpr const char *V_STORAGE = "storage";
+constexpr const char *V_OVERLAYS = "overlays";
+constexpr const char *V_READ_ONLY = "read_only";
+
+constexpr const char *V_SPACE_LIMIT = "space_limit";
+constexpr const char *V_INODE_LIMIT = "inode_limit";
+constexpr const char *V_SPACE_GUARANTEE = "space_guarantee";
+constexpr const char *V_INODE_GUARANTEE = "inode_guarantee";
+
+constexpr const char *V_SPACE_USED = "space_used";
+constexpr const char *V_INODE_USED = "inode_used";
+constexpr const char *V_SPACE_AVAILABLE = "space_available";
+constexpr const char *V_INODE_AVAILABLE = "inode_available";
 
 class TVolumeHolder;
 class TVolume;
-class TResource;
+class TContainer;
+class TContainerHolder;
 
-class TVolumeImpl {
+class TVolumeBackend {
 protected:
     std::shared_ptr<TVolume> Volume;
 public:
-    TVolumeImpl(std::shared_ptr<TVolume> volume) : Volume(volume) {}
-    virtual TError Create() =0;
+    TVolumeBackend(std::shared_ptr<TVolume> volume) : Volume(volume) {}
+    virtual TError Configure(std::shared_ptr<TValueMap> Config);
+    virtual TError Save(std::shared_ptr<TValueMap> Config);
+    virtual TError Restore(std::shared_ptr<TValueMap> Config);
+    virtual TError Build() =0;
     virtual TError Destroy() =0;
-    virtual TError Save(std::shared_ptr<TValueMap> data) =0;
-    virtual TError Restore(std::shared_ptr<TValueMap> data) =0;
-    virtual TError Construct() const =0;
-    virtual TError Deconstruct() const =0;
-    virtual TError GetUsage(uint64_t &used, uint64_t &avail) const =0;
+    virtual TError Clear();
+    virtual TError Move(TPath dest);
+    virtual TError Resize(uint64_t space_limit, uint64_t inode_limit);
+    virtual TError GetStat(uint64_t &space_used, uint64_t &space_avail,
+                           uint64_t &inode_used, uint64_t &inode_avail);
 };
 
-class TVolume : public std::enable_shared_from_this<TVolume>, public TNonCopyable {
-    std::shared_ptr<TKeyValueNode> KvNode;
+class TVolume : public std::enable_shared_from_this<TVolume>,
+                public TLockable,
+                public TNonCopyable {
+    friend class TVolumeHolder;
     std::shared_ptr<TVolumeHolder> Holder;
-    std::shared_ptr<TValueMap> Data = nullptr;
+    std::shared_ptr<TValueMap> Config;
     TCred Cred;
-    std::shared_ptr<TResource> Resource;
-    uint64_t ParsedQuota;
+    unsigned Permissions;
 
-    std::unique_ptr<TVolumeImpl> Impl;
-    TError Prepare();
-    TError ParseQuota(const std::string &quota);
+    std::unique_ptr<TVolumeBackend> Backend;
+    TError OpenBackend();
+
 public:
-    TError Create(std::shared_ptr<TKeyValueStorage> storage,
-                  const TPath &path,
-                  std::shared_ptr<TResource> resource,
-                  const std::string &quota,
-                  const std::string &flags);
-    TError Construct() const;
-    TError Deconstruct() const;
-    TError Destroy();
     TVolume(std::shared_ptr<TVolumeHolder> holder,
-            const TCred &cred) :
-        KvNode(nullptr), Holder(holder), Cred(cred) {}
-    TVolume(std::shared_ptr<TKeyValueNode> kvnode,
-            std::shared_ptr<TVolumeHolder> holder) :
-        KvNode(kvnode), Holder(holder) {}
+            std::shared_ptr<TValueMap> config) :
+        Holder(holder), Config(config) {}
+    TError Configure(const TPath &path, const TCred &creator_cred,
+                     std::shared_ptr<TContainer> creator_container,
+                     const std::map<std::string, std::string> &properties);
+
+    /* Protected with TVolume->Lock() */
+    TError Build();
+    TError Destroy();
+
+    TError Restore();
+    TError Clear();
+
+    const std::vector<std::string> GetContainers() const {
+        return Config->Get<std::vector<std::string>>(V_CONTAINERS);
+    }
+    TError LinkContainer(const std::string name);
+    bool UnlinkContainer(const std::string name);
 
     TError CheckPermission(const TCred &ucred) const;
 
-    TPath GetPath() const { return Data->Get<std::string>(V_PATH); }
-    const std::string GetSource() const;
-    std::string GetQuota() const { return Data->Get<std::string>(V_QUOTA); }
-    uint64_t GetParsedQuota() const { return ParsedQuota; }
-    std::string GetFlags() const { return Data->Get<std::string>(V_FLAGS); }
-    uint16_t GetId() const { return (uint16_t)Data->Get<int>(V_ID); }
-    std::shared_ptr<TResource> GetResource() { return Resource; }
-    TError GetUsage(uint64_t &used, uint64_t &avail) const;
+    std::string GetBackend() const { return Config->Get<std::string>(V_BACKEND); }
+    TPath GetPath() const;
+    TPath GetStorage() const;
+    TPath GetInternal(std::string type) const;
+    int GetId() const { return Config->Get<int>(V_ID); }
+    bool IsReadOnly() const { return Config->Get<bool>(V_READ_ONLY); }
 
-    TError LoadFromStorage();
+    /* Protected with TVolume->Lock() _and_ TVolumeHolder->Lock() */
+    TError SetReady(bool ready) { return Config->Set<bool>(V_READY, ready); }
+    bool IsReady() const { return Config->Get<bool>(V_READY); }
+
+    TError Resize(uint64_t space_limit, uint64_t inode_limit);
+
+    void GetGuarantee(uint64_t &space_guarantee, uint64_t &inode_guarantee) const {
+        space_guarantee = Config->Get<uint64_t>(V_SPACE_GUARANTEE);
+        inode_guarantee = Config->Get<uint64_t>(V_INODE_GUARANTEE);
+    }
+
+    void GetQuota(uint64_t &space_limit, uint64_t &inode_limit) const {
+        space_limit = Config->Get<uint64_t>(V_SPACE_LIMIT);
+        inode_limit = Config->Get<uint64_t>(V_INODE_LIMIT);
+    }
+
+    TError GetStat(uint64_t &space_used, uint64_t &space_avail,
+                   uint64_t &inode_used, uint64_t &inode_avail) const;
+
+    TError GetStat(uint64_t &space_used, uint64_t &space_avail) const {
+        uint64_t inode_used, inode_avail;
+        return GetStat(space_used, space_avail, inode_used, inode_avail);
+    }
+
+    const std::vector<std::string> GetOverlays() const {
+        return Config->Get<std::vector<std::string>>(V_OVERLAYS);
+    }
+
     TCred GetCred() const { return Cred; }
-    bool IsValid() const;
-    TError SetValid(bool v);
+    unsigned GetPermissions() const { return Permissions; }
+
+    std::map<std::string, std::string> GetProperties();
 };
 
-class TResource : public TNonCopyable {
-    TPath Source;
-    TPath Path;
-    TError Untar(const TPath &what, const TPath &where) const;
-public:
-    TResource(const TPath &source, const TPath &path = "") : Source(source), Path(path) {}
-    ~TResource();
-    TError Prepare();
-    TError Create() const;
-    TError Copy(const TPath &to) const;
-    TError Destroy() const;
-    const TPath &GetSource() { return Source; }
-    const TPath &GetPath() { return Path; }
-};
-
-class TVolumeHolder : public TNonCopyable, public std::enable_shared_from_this<TVolumeHolder> {
+class TVolumeHolder : public std::enable_shared_from_this<TVolumeHolder>,
+                      public TLockable,
+                      public TNonCopyable {
     std::shared_ptr<TKeyValueStorage> Storage;
     std::map<TPath, std::shared_ptr<TVolume>> Volumes;
-    std::map<TPath, std::weak_ptr<TResource>> Resources;
-    void RemoveUnusedResources();
-    void RemoveUnusedVolumes();
-    std::mutex Lock;
-public:
     TIdMap IdMap;
-    TError Insert(std::shared_ptr<TVolume> volume);
+public:
+    TVolumeHolder(std::shared_ptr<TKeyValueStorage> storage) : Storage(storage) {}
+    const std::vector<std::pair<std::string, std::string>> ListProperties();
+    TError Create(std::shared_ptr<TVolume> &volume);
     void Remove(std::shared_ptr<TVolume> volume);
-    std::shared_ptr<TVolume> Get(const TPath &path);
-    std::vector<TPath> List() const;
-    TVolumeHolder(std::shared_ptr<TKeyValueStorage> storage) :
-        Storage(storage) {}
-    TError RestoreFromStorage();
+    TError Register(std::shared_ptr<TVolume> volume);
+    void Unregister(std::shared_ptr<TVolume> volume);
+    std::shared_ptr<TVolume> Find(const TPath &path);
+    std::vector<TPath> ListPaths() const;
+    TError RestoreFromStorage(std::shared_ptr<TContainerHolder> Cholder);
     void Destroy();
-    TError GetResource(const TPath &source, std::shared_ptr<TResource> &resource);
-    std::mutex &GetLock() { return Lock; }
 };

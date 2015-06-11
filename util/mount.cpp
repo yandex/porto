@@ -1,4 +1,5 @@
 #include <sstream>
+#include <mutex>
 
 #include "util/mount.hpp"
 #include "util/file.hpp"
@@ -41,10 +42,25 @@ TError TMount::Mount(unsigned long flags) const {
 TError TMount::Umount() const {
     L_ACT() << "umount " << Target << std::endl;
 
-    int ret = RetryBusy(10, 100, [&]{ return umount(Target.ToString().c_str()); });
+    int ret = RetryBusy(10, 100, [&]{ return umount2(Target.ToString().c_str(), UMOUNT_NOFOLLOW); });
     if (ret)
         return TError(EError::Unknown, errno, "umount(" + Target.ToString() + ")");
 
+    return TError::Success();
+}
+
+TError TMount::Move(TPath destination) {
+    int ret = mount(Target.ToString().c_str(), destination.ToString().c_str(), NULL, MS_MOVE, NULL);
+    if (ret)
+        return TError(EError::Unknown, errno, "mount(" + Target.ToString() + ", " + destination.ToString() + ", MS_MOVE)");
+    Target = destination;
+    return TError::Success();
+}
+
+TError TMount::Detach() const {
+    int ret = umount2(Target.ToString().c_str(), MNT_DETACH | UMOUNT_NOFOLLOW);
+    if (ret)
+        return TError(EError::Unknown, errno, "umount2(" + Target.ToString() + ", MNT_DETACH | UMOUNT_NOFOLLOW)");
     return TError::Success();
 }
 
@@ -139,6 +155,80 @@ TError TMountSnapshot::RemountSlave() {
     }
 
     return TError::Success();
+}
+
+TError SetupLoopDevice(TPath image, int &dev)
+{
+    static std::mutex BigLoopLock;
+    int control_fd, image_fd, loop_nr, loop_fd;
+    struct loop_info64 info;
+    std::string loop;
+    int retry = 10;
+    TError error;
+
+    image_fd = open(image.c_str(), O_RDWR | O_CLOEXEC);
+    if (image_fd < 0) {
+        error = TError(EError::Unknown, errno, "open(" + image.ToString() + ")");
+        goto err_image;
+    }
+
+    control_fd = open("/dev/loop-control", O_RDWR | O_CLOEXEC);
+    if (control_fd < 0) {
+        error = TError(EError::Unknown, errno, "open(/dev/loop-control)");
+        goto err_control;
+    }
+
+    BigLoopLock.lock();
+
+again:
+    loop_nr = ioctl(control_fd, LOOP_CTL_GET_FREE);
+    if (loop_nr < 0) {
+        error = TError(EError::Unknown, errno, "ioctl(LOOP_CTL_GET_FREE)");
+        goto err_get_free;
+    }
+
+    loop = "/dev/loop" + std::to_string(loop_nr);
+    loop_fd = open(loop.c_str(), O_RDWR | O_CLOEXEC);
+    if (loop_fd < 0) {
+        error = TError(EError::Unknown, errno, "open(" + loop + ")");
+        goto err_loop_open;
+    }
+
+    if (ioctl(loop_fd, LOOP_SET_FD, image_fd) < 0) {
+        error = TError(EError::Unknown, errno, "ioctl(LOOP_SET_FD)");
+        if (errno == EBUSY) {
+            if (!ioctl(loop_fd, LOOP_GET_STATUS64, &info) || errno == ENXIO) {
+                if (--retry > 0) {
+                    close(loop_fd);
+                    goto again;
+                }
+            }
+        }
+        goto err_set_fd;
+    }
+
+    memset(&info, 0, sizeof(info));
+    strncpy((char *)info.lo_file_name, image.c_str(), LO_NAME_SIZE);
+
+    if (ioctl(loop_fd, LOOP_SET_STATUS64, &info) < 0) {
+        error = TError(EError::Unknown, errno, "ioctl(LOOP_SET_STATUS64)");
+        ioctl(loop_fd, LOOP_CLR_FD, 0);
+        goto err_set_status;
+    }
+
+    dev = loop_nr;
+    error = TError::Success();
+err_set_status:
+err_set_fd:
+    close(loop_fd);
+err_loop_open:
+err_get_free:
+    BigLoopLock.unlock();
+    close(control_fd);
+err_control:
+    close(image_fd);
+err_image:
+    return error;
 }
 
 TError GetLoopDev(int &nr) {

@@ -50,6 +50,8 @@ public:
     TError BindDir(bool rdonly, unsigned long flags = 0) const;
     TError MountDir(unsigned long flags = 0) const;
     TError Umount() const;
+    TError Move(TPath destination);
+    TError Detach() const;
 
     friend std::ostream& operator<<(std::ostream& stream, const TMount& mount) {
         stream << mount.Source << " " << mount.Target << " " << mount.Type << " ";
@@ -78,6 +80,8 @@ public:
     TError Mount();
     TError Umount();
 };
+
+TError SetupLoopDevice(TPath image, int &dev);
 
 TError GetLoopDev(int &nr);
 TError PutLoopDev(const int nr);

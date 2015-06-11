@@ -35,9 +35,16 @@ enum EError {
 	// Логический том уже существует
 	VolumeAlreadyExists = 12;
 	// Выполнение операции над несуществующим логическим томом
-	VolumeDoesNotExist = 13;
+	VolumeNotFound = 13;
 	// Недостаточно места для выполнения операции
 	NoSpace = 14;
+	// Используется
+	VolumeIsBusy = 15;
+	// Том в процессе создания/уничтожения
+	VolumeNotReady = 16;
+
+	// Внутренний код. Ответ будет послан позже
+	Queued = 1000;
 }
 
 // Запрос на создание контейнера
@@ -168,9 +175,11 @@ message TContainerRequest {
 	optional TContainerGetRequest get = 15;
 	optional TContainerWaitRequest wait = 16;
 
-	optional TVolumeCreateRequest createVolume = 100;
-	optional TVolumeDestroyRequest destroyVolume = 101;
-	optional TVolumeListRequest listVolumes = 102;
+	optional TVolumePropertyListRequest listVolumeProperties = 103;
+	optional TVolumeCreateRequest createVolume = 104;
+	optional TVolumeLinkRequest linkVolume = 105;
+	optional TVolumeUnlinkRequest unlinkVolume = 106;
+	optional TVolumeListRequest listVolumes = 107;
 }
 
 // Ответ на запрос списка контейнеров
@@ -259,36 +268,62 @@ message TContainerResponse {
 	optional TVolumeListResponse volumeList = 9;
 	optional TContainerGetResponse get = 10;
 	optional TContainerWaitResponse wait = 11;
+	optional TVolumePropertyListResponse volumePropertyList = 12;
+	optional TVolumeDescription volume = 13;
 }
 
 // VolumeAPI
 
-//Запрос на создание тома
-message TVolumeCreateRequest {
-	required string path = 1;
-	required string source = 2;
-	required string quota = 3;
-	optional string flags = 4;
+message TVolumeProperty {
+	required string name = 1;
+	required string value = 2;
 }
 
-// Запрос на уничтожение тома
-message TVolumeDestroyRequest {
+message TVolumePropertyDescription {
+	required string name = 1;
+	required string desc = 2;
+}
+
+message TVolumeDescription {
 	required string path = 1;
+	repeated TVolumeProperty properties = 2;
+	repeated string containers = 3;
+}
+
+// Запрос на получение списка свойств тома
+message TVolumePropertyListRequest {
+}
+
+// Ответ на запрос списка свойств тома
+message TVolumePropertyListResponse {
+	repeated TVolumePropertyDescription properties = 1;
+}
+
+// Запрос на создание тома
+message TVolumeCreateRequest {
+	optional string path = 1;
+	repeated TVolumeProperty properties = 2;
+}
+
+// Запрос на подсоединение тома к контейнеру
+message TVolumeLinkRequest {
+	required string path = 1;
+	optional string container = 2;
+}
+
+// Запрос на отсоединение тома от контейнера
+message TVolumeUnlinkRequest {
+	required string path = 1;
+	optional string container = 2;
 }
 
 // Запрос на получение списка томов
 message TVolumeListRequest {
+	optional string path = 1;
+	optional string container = 2;
 }
 
 // Список томов с описанием
 message TVolumeListResponse {
-	message TVolumeDescription {
-		required string path = 1;
-		required string source = 2;
-		required string quota = 3;
-		optional string flags = 4;
-		required uint64 used = 5;
-		required uint64 avail = 6;
-	}
-	repeated TVolumeDescription list = 1;
+	repeated TVolumeDescription volumes = 1;
 }

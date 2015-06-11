@@ -780,8 +780,10 @@ int TPortoTop::Destroy() {
 void TPortoTop::LessPortoctl(std::string container, std::string cmd) {
     std::string s(program_invocation_name);
     s += " get " + container + " " + cmd + " | less";
-    (void)system(s.c_str());
+    int status = system(s.c_str());
+    (void)status;
 }
+
 int TPortoTop::RunCmdInContainer(TConsoleScreen &screen, std::string cmd) {
     bool enter = (SelectedContainer() != "/");
     int ret = -1;

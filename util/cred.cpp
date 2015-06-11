@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "util/string.hpp"
 #include "util/log.hpp"
 #include "util/cred.hpp"
@@ -13,11 +15,11 @@ extern "C" {
 #include <sys/types.h>
 }
 
-std::string TUserEntry::GetName() {
+std::string TUserEntry::GetName() const {
     return Name;
 }
 
-int TUserEntry::GetId() {
+int TUserEntry::GetId() const {
     return Id;
 }
 
@@ -156,6 +158,10 @@ bool TCred::IsPrivileged() const {
     return CredConf.PrivilegedUser(*this);
 }
 
+bool TCred::MemberOf(gid_t gid) const {
+    return Gid == gid || std::find(Groups.begin(), Groups.end(), gid) != Groups.end();
+}
+
 std::string TCred::UserAsString() const {
     TUser u(Uid);
 
@@ -227,6 +233,13 @@ void TCredConf::Load() {
 
     ParseUserConf(config().privileges().restricted_root_user(), RestrictedRootUid);
     ParseGroupConf(config().privileges().restricted_root_group(), RestrictedRootGid);
+
+    TGroup porto("porto");
+    TError error = porto.Load();
+    if (error)
+            L_WRN() << "Cannot load group porto: " << error << std::endl;
+    else
+        PortoGid = porto.GetId();
 }
 
 bool TCredConf::PrivilegedUser(const TCred &cred) {

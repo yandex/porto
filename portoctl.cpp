@@ -3,6 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <csignal>
+#include <cmath>
 
 #include "libporto.hpp"
 #include "config.hpp"
@@ -1080,7 +1081,7 @@ public:
         }
 
         auto freezer = cgmap["freezer"];
-        auto prefix = PORTO_ROOT_CONTAINER + "/";
+        auto prefix = "/" + PORTO_ROOT_CGROUP + "/";
         if (freezer.length() < prefix.length() || freezer.substr(0, prefix.length()) != prefix) {
             std::cerr << "Process " << pid << " is not managed by porto" << std::endl;
             return EXIT_FAILURE;
@@ -1370,58 +1371,179 @@ public:
 
 class TCreateVolumeCmd : public ICmd {
 public:
-    TCreateVolumeCmd(TPortoAPI *api) : ICmd(api, "vcreate", 2,
-                                            "<path> <source> [quota] [flags...]", "create volume") {}
+    TCreateVolumeCmd(TPortoAPI *api) : ICmd(api, "vcreate", 1, "-A|<path> [property=value...]", "create volume") {}
 
     int Execute(int argc, char *argv[]) {
-        std::string flags = (argc == 4 ? argv[3] : "");
-        std::string quota = (argc >= 3 ? argv[2] : "0");
-        int ret = Api->CreateVolume(argv[0], argv[1], quota, flags);
+        std::map<std::string, std::string> properties;
+        std::string path(argv[0]);
+
+        if (path == "-A") {
+            path = "";
+        } else if (path[0] != '/') {
+            std::cerr << "Volume path must be absolute" << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        for (int i = 1; i < argc; i++) {
+            std::string arg(argv[i]);
+            std::size_t sep = arg.find('=');
+            if (sep == string::npos)
+                properties[arg] = "";
+            else
+                properties[arg.substr(0, sep)] = arg.substr(sep + 1);
+        }
+
+        TVolumeDescription volume;
+        int ret = Api->CreateVolume(path, properties, volume);
         if (ret) {
             PrintError("Can't create volume");
             return ret;
         }
 
+        if (path == "")
+            std::cout << volume.Path << std::endl;
+
         return 0;
     }
 };
 
-class TDestroyVolumeCmd : public ICmd {
+class TLinkVolumeCmd : public ICmd {
 public:
-    TDestroyVolumeCmd(TPortoAPI *api) : ICmd(api, "vdestroy", 1, "<path> [path...]", "destroy volume") {}
+    TLinkVolumeCmd(TPortoAPI *api) : ICmd(api, "vlink", 1, "<path> [container]", "link volume") {}
 
     int Execute(int argc, char *argv[]) {
-        for (int i = 0; i < argc; i++) {
-            int ret = Api->DestroyVolume(argv[i]);
-            if (ret) {
-                PrintError("Can't destroy volume");
-                return ret;
-            }
-        }
+        int ret = Api->LinkVolume(argv[0], (argc > 1) ? argv[1] : "");
+        if (ret)
+            PrintError("Can't link volume");
+        return ret;
+    }
+};
 
-        return 0;
+class TUnlinkVolumeCmd : public ICmd {
+public:
+    TUnlinkVolumeCmd(TPortoAPI *api) : ICmd(api, "vunlink", 1, "<path> [container]", "unlink volume") {}
+
+    int Execute(int argc, char *argv[]) {
+        int ret = Api->UnlinkVolume(argv[0], (argc > 1) ? argv[1] : "");
+        if (ret)
+            PrintError("Can't unlink volume");
+        return ret;
     }
 };
 
 class TListVolumesCmd : public ICmd {
-public:
-    TListVolumesCmd(TPortoAPI *api) : ICmd(api, "vlist", 0, "", "list created volumes") {}
+    bool details = true;
+    bool verbose = false;
+    bool inodes = false;
 
-    int Execute(int argc, char *argv[]) {
-        vector<TVolumeDescription> vlist;
-        int ret = Api->ListVolumes(vlist);
-        if (ret) {
-            PrintError("Can't list volumes");
-            return ret;
+public:
+    TListVolumesCmd(TPortoAPI *api) : ICmd(api, "vlist", 0, "[-1|-i|-v] [volume]...", "list created volumes") {}
+
+    void ShowSizeProperty(TVolumeDescription &v, const char *p, int w, bool raw = false) {
+      uint64_t val;
+
+      if (!v.Properties.count(std::string(p)))
+          std::cout << std::setw(w) << "-";
+      else if (StringToUint64(v.Properties.at(std::string(p)), val))
+          std::cout << std::setw(w) << "err";
+      else if (raw)
+          std::cout << std::setw(w) << val;
+      else
+          std::cout << std::setw(w) << StringWithUnit(val);
+    }
+
+    void ShowPercent(TVolumeDescription &v, const char *u, const char *a, int w) {
+      uint64_t used, avail;
+
+      if (!v.Properties.count(std::string(u)) |
+          !v.Properties.count(std::string(a)))
+          std::cout << std::setw(w) << "-";
+      else if (StringToUint64(v.Properties.at(std::string(u)), used) ||
+               StringToUint64(v.Properties.at(std::string(a)), avail))
+          std::cout << std::setw(w) << "err";
+      else if (used + avail)
+          std::cout << std::setw(w - 1) << std::llround(100. * used / (used + avail)) << "%";
+      else
+          std::cout << std::setw(w) << "inf";
+    }
+
+    void ShowVolume(TVolumeDescription &v) {
+        if (!details) {
+            std::cout << v.Path << std::endl;
+        } else {
+            std::cout << std::left << std::setw(40) << v.Path << std::right;
+            if (inodes) {
+                ShowSizeProperty(v, V_INODE_LIMIT, 8, true);
+                ShowSizeProperty(v, V_INODE_USED, 8, true);
+                ShowSizeProperty(v, V_INODE_AVAILABLE, 8, true);
+                ShowPercent(v, V_INODE_USED, V_INODE_AVAILABLE, 5);
+            } else {
+                ShowSizeProperty(v, V_SPACE_LIMIT, 8);
+                ShowSizeProperty(v, V_SPACE_USED, 8);
+                ShowSizeProperty(v, V_SPACE_AVAILABLE, 8);
+                ShowPercent(v, V_SPACE_USED, V_SPACE_AVAILABLE, 5);
+            }
+
+            for (auto name: v.Containers)
+                std::cout << " " << name;
+
+            std::cout << std::endl;
         }
 
-        for (auto v : vlist) {
-            std::cout << v.Path << " "
-                      << v.Source << " "
-                      << v.Quota << " "
-                      << v.Flags << " "
-                      << "usage: " << v.Used << "/" << v.Avail << " (" << (v.Used * 100 / v.Avail) << "%) "
-                      << std::endl;
+        if (!verbose)
+            return;
+
+        std::cout << "  " << std::left << std::setw(20) << "containers";
+        for (auto name: v.Containers)
+            std::cout << " " << name;
+        std::cout << std::endl;
+        for (auto kv: v.Properties) {
+             std::cout << "  " << std::left << std::setw(20) << kv.first;
+             if (kv.second.length())
+                  std::cout << " " << kv.second;
+             std::cout << std::endl;
+        }
+        std::cout << std::endl;
+    }
+
+    int Execute(int argc, char *argv[]) {
+        int start = GetOpt(argc, argv, {
+            { '1', false, [&](const char *arg) { details = false; } },
+            { 'i', false, [&](const char *arg) { inodes = true; } },
+            { 'v', false, [&](const char *arg) { verbose = true; details = false; } },
+        });
+
+        vector<TVolumeDescription> vlist;
+
+        if (details) {
+            std::cout << std::left << std::setw(40) << "Volume" << std::right;
+            std::cout << std::setw(8) << "Limit";
+            std::cout << std::setw(8) << "Used";
+            std::cout << std::setw(8) << "Avail";
+            std::cout << std::setw(5) << "Use%";
+            std::cout << std::left << " Containers" << std::endl;
+        }
+
+        if (start == argc) {
+          int ret = Api->ListVolumes(vlist);
+          if (ret) {
+              PrintError("Can't list volumes");
+              return ret;
+          }
+
+          for (auto v : vlist)
+              ShowVolume(v);
+        } else {
+            for (int i = start; i < argc; i++) {
+                vlist.clear();
+                int ret = Api->ListVolumes(argv[i], "", vlist);
+                if (ret) {
+                    PrintError(argv[i]);
+                    continue;
+                }
+                for (auto v : vlist)
+                    ShowVolume(v);
+            }
         }
 
         return EXIT_SUCCESS;
@@ -1457,7 +1579,8 @@ int main(int argc, char *argv[]) {
     RegisterCommand(new TWaitCmd(&api));
 
     RegisterCommand(new TCreateVolumeCmd(&api));
-    RegisterCommand(new TDestroyVolumeCmd(&api));
+    RegisterCommand(new TLinkVolumeCmd(&api));
+    RegisterCommand(new TUnlinkVolumeCmd(&api));
     RegisterCommand(new TListVolumesCmd(&api));
 
     TLogger::DisableLog();

@@ -58,10 +58,10 @@ TError TClient::Identify(TContainerHolder &holder, bool full) {
             Pid = cr.pid;
             Comm = comm;
 
-            TError err = CheckPortoMembership();
+            TError err = LoadGroups();
             if (err) {
-                L_WRN() << "Can't check porto membership of pid " << cr.pid
-                        << " : " << err << std::endl;
+                L_WRN() << "Can't load supplementary group list" << cr.pid
+                    << " : " << err << std::endl;
             }
 
             err = IdentifyContainer(holder);
@@ -84,7 +84,7 @@ TError TClient::Identify(TContainerHolder &holder, bool full) {
     }
 }
 
-TError TClient::CheckPortoMembership() {
+TError TClient::LoadGroups() {
     TFile f("/proc/" + std::to_string(Pid) + "/status");
 
     std::vector<std::string> lines;
@@ -92,7 +92,7 @@ TError TClient::CheckPortoMembership() {
     if (error)
         return error;
 
-    std::vector<int> groups;
+    Cred.Groups.clear();
     for (auto &l : lines)
         if (l.compare(0, 8, "Groups:\t") == 0) {
             std::vector<std::string> groupsStr;
@@ -107,18 +107,11 @@ TError TClient::CheckPortoMembership() {
                 if (error)
                     return error;
 
-                groups.push_back(group);
+                Cred.Groups.push_back(group);
             }
 
             break;
         }
-
-    TGroup porto("porto");
-    error = porto.Load();
-    if (error)
-        return error;
-
-    MemberOfPortoGroup = std::find(groups.begin(), groups.end(), porto.GetId()) != groups.end();
 
     return TError::Success();
 }
@@ -144,6 +137,10 @@ std::shared_ptr<TContainer> TClient::GetContainer() const {
     return c;
 }
 
+std::shared_ptr<TContainer> TClient::TryGetContainer() const {
+    return Container.lock();
+}
+
 bool TClient::Readonly() {
     auto c = Container.lock();
     if (!c)
@@ -152,5 +149,5 @@ bool TClient::Readonly() {
     if (c->IsNamespaceIsolated())
         return false;
 
-    return !MemberOfPortoGroup && !Cred.IsPrivileged();
+    return !Cred.IsPrivileged() && !Cred.MemberOf(CredConf.GetPortoGid());
 }

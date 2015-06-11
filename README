@@ -43,3 +43,10 @@ return Busy error (so user can retry later).
 
 ## Volumes
 We have single lock on volume holder, so any volume operation blocks others.
+
+
+## Lock order
+
+TVolume->Lock -> TVolumeHolder->Lock
+
+TVolumeHolder->Lock -> TContainerHolder->Lock

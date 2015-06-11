@@ -193,13 +193,13 @@ TError TContainerHolder::Get(int pid, std::shared_ptr<TContainer> &c) {
         return TError(EError::Unknown, "Can't determine freezer cgroup of client process");
 
     auto freezer = cgmap["freezer"];
-    auto prefix = PORTO_ROOT_CONTAINER + "/";
+    auto prefix = "/" + PORTO_ROOT_CGROUP + "/";
     std::string name;
 
     if (freezer.length() > prefix.length() && freezer.substr(0, prefix.length()) == prefix)
         name = freezer.substr(prefix.length());
     else
-        name = PORTO_ROOT_CONTAINER;
+        name = ROOT_CONTAINER;
 
     return Get(name, c);
 }

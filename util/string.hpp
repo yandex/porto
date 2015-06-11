@@ -17,7 +17,9 @@ TError StringToUint32(const std::string &str, uint32_t &value);
 TError StringToUint64(const std::string &string, uint64_t &value);
 TError StringToInt64(const std::string &str, int64_t &value);
 TError StringToInt(const std::string &string, int &value);
+TError StringToOct(const std::string &str, unsigned &value);
 TError StringWithUnitToUint64(const std::string &str, uint64_t &value);
+std::string StringWithUnit(uint64_t value, int precision = 1);
 
 TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens, size_t maxFields = -1);
 TError SplitEscapedString(const std::string &s, const char sep, std::vector<std::string> &tokens);

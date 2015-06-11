@@ -17,8 +17,8 @@ public:
         Name(!name.empty() && StringOnlyDigits(name) ? "" : name),
           Id(!name.empty() && StringOnlyDigits(name) ? stoi(name) : -1) {}
     TUserEntry(const int id) : Name(""), Id(id) {}
-    std::string GetName();
-    int GetId();
+    std::string GetName() const;
+    int GetId() const;
     TError LoadFromFile(const TPath &path);
 };
 
@@ -40,6 +40,7 @@ struct TCred {
 public:
     uid_t Uid;
     gid_t Gid;
+    std::vector<gid_t> Groups;
 
     TCred(uid_t uid, gid_t gid) : Uid(uid), Gid(gid) {}
     TCred() : Uid(0), Gid(0) {}
@@ -51,6 +52,8 @@ public:
     bool operator!= (const TCred &cred) const {
         return (cred.Uid != Uid && cred.Gid != Gid);
     }
+
+    bool MemberOf(gid_t gid) const;
 
     std::string UserAsString() const;
     std::string GroupAsString() const;
@@ -68,10 +71,12 @@ class TCredConf : public TNonCopyable {
 private:
     std::set<int> PrivilegedUid, PrivilegedGid;
     std::set<int> RestrictedRootUid, RestrictedRootGid;
+    gid_t PortoGid;
 public:
     void Load();
     bool PrivilegedUser(const TCred &cred);
     bool RestrictedUser(const TCred &cred);
+    gid_t GetPortoGid() { return PortoGid; }
 };
 
 extern TCredConf CredConf;

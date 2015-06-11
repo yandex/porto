@@ -15,6 +15,8 @@ const unsigned int HIDDEN_VALUE = (1 << 31);
 const unsigned int PERSISTENT_VALUE = (1 << 30);
 // Uint value can include options G/M/K suffix
 const unsigned int UINT_UNIT_VALUE = (1 << 29);
+// User cannot modify value
+const unsigned int READ_ONLY_VALUE = (1 << 28);
 
 class TVariant : public TNonCopyable {
     struct TValueAbstractImpl {
@@ -210,6 +212,7 @@ public:
     bool IsValid(const std::string &name) const;
     bool IsDefault(const std::string &name) const;
     bool HasValue(const std::string &name) const;
+    bool IsReadOnly(const std::string &name) const;
     std::vector<std::string> List() const;
 };
 
@@ -220,6 +223,7 @@ public:
     TValueMap(std::shared_ptr<TKeyValueNode> kvnode) : KvNode(kvnode) {}
 
     TError Create();
+    TError Remove();
     TError Restore(const kv::TNode &node);
     TError Restore();
     TError Flush();

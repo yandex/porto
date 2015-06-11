@@ -2,7 +2,13 @@
 
 _porto_containers ()
 {
-	COMPREPLY=( $( compgen -W "$(portoctl list -1 2>/dev/null) $@" -- "$cur" ) )
+	COMPREPLY=( $( compgen -W "$(portoctl list -1 2>/dev/null) / /porto $@" -- "$cur" ) )
+	__ltrim_colon_completions "$cur"
+}
+
+_porto_volumes ()
+{
+	COMPREPLY=( $( compgen -W "$(portoctl vlist -1 2>/dev/null) $@" -- "$cur" ) )
 	__ltrim_colon_completions "$cur"
 }
 
@@ -15,9 +21,10 @@ _portoctl ()
 	_get_comp_words_by_ref -n : cur prev words cword
 
 	i=$(portoctl 2>&1)
-	_porto_commands=$(echo "$i" | awk '/^Command/ {f=1;next} !f { next } !NF { exit } /^ [^ ]/ { print $1 }')
-	_porto_properies=$(echo "$i" | awk '/^Property/ {f=1;next} !f { next } !NF { exit } /^ [^ ]/ { print $1 }')
-	_porto_data=$(echo "$i" | awk '/^Data/ {f=1;next} !f { next } !NF { exit } /^ [^ ]/ { print $1 }')
+	_porto_commands=$(echo "$i" | awk '/^Command/ {f=1;next} !f { next } !NF { exit } /^  [^ ]/ { print $1 }')
+	_porto_volume_properies=$(echo "$i" | awk '/^Volume properties/ {f=1;next} !f { next } !NF { exit } /^  [^ ]/ { print $1 }')
+	_porto_properies=$(echo "$i" | awk '/^Property/ {f=1;next} !f { next } !NF { exit } /^  [^ ]/ { print $1 }')
+	_porto_data=$(echo "$i" | awk '/^Data/ {f=1;next} !f { next } !NF { exit } /^  [^ ]/ { print $1 }')
 
 	if [ "$cword" = 1 ]; then
 		COMPREPLY=( $(compgen -W "$_porto_commands -h --help -v --version" -- $cur) )
@@ -103,8 +110,39 @@ _portoctl ()
 	sort)
 		COMPREPLY=( $( compgen -W "$_porto_data $_porto_properies" -- $cur ) )
 		;;
-	top|vcreate|vdestroy)
+	top)
 		_filedir
+		;;
+	vcreate)
+		case "$cword" in
+		2)
+			_filedir -d
+			;;
+		*)
+			COMPREPLY=( $( compgen -S "=" -W "$_porto_volume_properies" -- "$cur" ) )
+			compopt -o nospace
+			;;
+		esac
+		;;
+	vlist)
+		case "$cword" in
+		2)
+			_porto_volumes "-1" "-i" "-v"
+			;;
+		3)
+			_porto_volumes
+			;;
+		esac
+		;;
+	vlink|vunlink)
+		case "$cword" in
+		2)
+			_porto_volumes
+			;;
+		3)
+			_porto_containers
+			;;
+		esac
 		;;
 	esac
 }

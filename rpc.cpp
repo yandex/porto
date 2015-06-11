@@ -5,6 +5,7 @@
 #include "util/log.hpp"
 #include "util/protobuf.hpp"
 #include "util/string.hpp"
+#include <algorithm>
 
 using std::string;
 
@@ -19,7 +20,8 @@ static bool InfoRequest(const rpc::TContainerRequest &req) {
         req.has_resume() ||
         req.has_kill() ||
         req.has_createvolume() ||
-        req.has_destroyvolume() ||
+        req.has_linkvolume() ||
+        req.has_unlinkvolume() ||
         req.has_wait())
         return false;
 
@@ -76,7 +78,7 @@ static TError DestroyContainer(TContext &context,
                                const rpc::TContainerDestroyRequest &req,
                                rpc::TContainerResponse &rsp,
                                std::shared_ptr<TClient> client) {
-    std::lock_guard<std::mutex> lock(context.Cholder->GetLock());
+    std::unique_lock<std::mutex> cholder_lock(context.Cholder->GetLock());
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -97,6 +99,37 @@ static TError DestroyContainer(TContext &context,
         error = container->CheckPermission(client->GetCred());
         if (error)
             return error;
+
+        cholder_lock.unlock();
+        auto vholder_lock = context.Vholder->Lock();
+
+
+        for (auto volume: container->Volumes) {
+            if (!volume->UnlinkContainer(name))
+                continue; /* Still linked to somebody */
+            if (container->IsRoot() || container->IsPortoRoot())
+                continue;
+            vholder_lock.unlock();
+            auto volume_lock = volume->Lock();
+            if (!volume->IsReady()) {
+                volume_lock.unlock();
+                vholder_lock.lock();
+                continue;
+            }
+            vholder_lock.lock();
+            error = volume->SetReady(false);
+            vholder_lock.unlock();
+            error = volume->Destroy();
+            vholder_lock.lock();
+            context.Vholder->Unregister(volume);
+            context.Vholder->Remove(volume);
+            volume_lock.unlock();
+        }
+
+        container->Volumes.clear();
+        vholder_lock.unlock();
+
+        cholder_lock.lock();
     }
 
     return context.Cholder->Destroy(name);
@@ -512,105 +545,271 @@ static TError Wait(TContext &context,
         context.Queue->Add(req.timeout(), e);
     }
 
+    return TError::Queued();
+}
+
+static TError ListVolumeProperties(TContext &context,
+                                   const rpc::TVolumePropertyListRequest &req,
+                                   rpc::TContainerResponse &rsp,
+                                   std::shared_ptr<TClient> client) {
+
+    if (!config().volumes().enabled())
+            return TError(EError::InvalidMethod, "volume api is disabled");
+
+    auto list = rsp.mutable_volumepropertylist();
+    for (auto kv: context.Vholder->ListProperties()) {
+        auto p = list->add_properties();
+        p->set_name(kv.first);
+        p->set_desc(kv.second);
+    }
+
     return TError::Success();
+}
+
+static void FillVolumeDescription(rpc::TVolumeDescription *desc,
+                                  std::shared_ptr<TVolume> volume) {
+    desc->set_path(volume->GetPath().ToString());
+    for (auto kv: volume->GetProperties()) {
+        auto p = desc->add_properties();
+        p->set_name(kv.first);
+        p->set_value(kv.second);
+    }
+    for (auto name: volume->GetContainers())
+        desc->add_containers(name);
 }
 
 static TError CreateVolume(TContext &context,
                            const rpc::TVolumeCreateRequest &req,
                            rpc::TContainerResponse &rsp,
                            std::shared_ptr<TClient> client) {
-    std::lock_guard<std::mutex> lock(context.Vholder->GetLock());
+
+    if (!config().volumes().enabled())
+            return TError(EError::InvalidMethod, "volume api is disabled");
 
     TError error = CheckRequestPermissions(client);
     if (error)
         return error;
 
-    std::shared_ptr<TResource> resource;
-    error = context.Vholder->GetResource(StringTrim(req.source()), resource);
-    if (error)
-        return error;
+    std::map<std::string, std::string> properties;
+    for (auto p: req.properties())
+        properties[p.name()] = p.value();
 
+    auto vholder_lock = context.Vholder->Lock();
     std::shared_ptr<TVolume> volume;
-    volume = std::make_shared<TVolume>(context.Vholder, client->GetCred());
-    error = volume->Create(context.VolumeStorage,
-                           StringTrim(req.path()),
-                           resource,
-                           StringTrim(req.quota()),
-                           StringTrim(req.flags()));
+    error = context.Vholder->Create(volume);
     if (error)
         return error;
 
-    error = volume->Construct();
+    /* cannot block: volume is not registered yet */
+    auto volume_lock = volume->Lock();
+
+    auto container = client->GetContainer();
+
+    error = volume->Configure(TPath(req.has_path() ? req.path() : ""),
+                              client->GetCred(), container, properties);
     if (error) {
-        L_WRN() << "Can't construct volume: " << error << std::endl;
-        (void)volume->Destroy();
-    } else {
-        error = volume->SetValid(true);
-        if (error) {
-            L_WRN() << "Can't mark volume valid: " << error << std::endl;
-            (void)volume->Destroy();
-        }
+        context.Vholder->Remove(volume);
+        return error;
     }
+
+    error = context.Vholder->Register(volume);
+    if (error) {
+        context.Vholder->Remove(volume);
+        return error;
+    }
+
+    vholder_lock.unlock();
+
+    error = volume->Build();
+
+    vholder_lock.lock();
+
+    if (error) {
+        L_WRN() << "Can't build volume: " << error << std::endl;
+        context.Vholder->Unregister(volume);
+        context.Vholder->Remove(volume);
+        return error;
+    }
+
+    std::unique_lock<std::mutex> cholder_lock(context.Cholder->GetLock());
+
+    error = volume->LinkContainer(container->GetName());
+    if (error) {
+        cholder_lock.unlock();
+
+        L_WRN() << "Can't link volume" << std::endl;
+        (void)volume->Destroy();
+        context.Vholder->Unregister(volume);
+        context.Vholder->Remove(volume);
+        return error;
+    }
+    container->LinkVolume(volume);
+    cholder_lock.unlock();
+
+    volume->SetReady(true);
+    vholder_lock.unlock();
+
+    FillVolumeDescription(rsp.mutable_volume(), volume);
+    volume_lock.unlock();
 
     return TError::Success();
 }
 
-static TError DestroyVolume(TContext &context,
-                            const rpc::TVolumeDestroyRequest &req,
-                            rpc::TContainerResponse &rsp,
-                            std::shared_ptr<TClient> client) {
-    std::lock_guard<std::mutex> lock(context.Vholder->GetLock());
+static TError LinkVolume(TContext &context,
+                         const rpc::TVolumeLinkRequest &req,
+                         rpc::TContainerResponse &rsp,
+                         std::shared_ptr<TClient> client) {
+
+    if (!config().volumes().enabled())
+            return TError(EError::InvalidMethod, "volume api is disabled");
 
     TError error = CheckRequestPermissions(client);
     if (error)
         return error;
 
-    auto volume = context.Vholder->Get(StringTrim(req.path()));
-    if (volume && volume->IsValid()) {
-        error = volume->CheckPermission(client->GetCred());
+    std::unique_lock<std::mutex> cholder_lock(context.Cholder->GetLock());
+    std::shared_ptr<TContainer> container;
+    if (req.has_container()) {
+        std::string name;
+        TError err = client->GetContainer()->AbsoluteName(req.container(), name, true);
+        if (err)
+            return err;
+
+        TError error = context.Cholder->Get(name, container);
         if (error)
             return error;
 
-        error = volume->SetValid(false);
-        if (error) {
-            L_WRN() << "Can't mark volume invalid: " << error << std::endl;
-            (void)volume->Destroy();
-        }
-
-        error = volume->Deconstruct();
+        error = container->CheckPermission(client->GetCred());
         if (error)
-            L_WRN() << "Can't deconstruct volume: " << error << std::endl;
+            return error;
+    } else {
+        container = client->GetContainer();
+    }
+    cholder_lock.unlock();
 
-        if (!error)
-            error = volume->Destroy();
+    auto vholder_lock = context.Vholder->Lock();
+    auto volume = context.Vholder->Find(req.path());
+    if (!volume)
+        return TError(EError::VolumeNotFound, "Volume not found");
+    vholder_lock.unlock();
 
-        return TError::Success();
+    auto volume_lock = volume->Lock();
+    if (!volume->IsReady())
+        return TError(EError::VolumeNotReady, "Volume not ready");
+
+    error = volume->CheckPermission(client->GetCred());
+    if (error)
+        return error;
+
+    vholder_lock.lock();
+    if (!container->LinkVolume(volume))
+        return TError(EError::VolumeAlreadyExists, "Already linked");
+
+    return volume->LinkContainer(container->GetName());
+}
+
+static TError UnlinkVolume(TContext &context,
+                           const rpc::TVolumeUnlinkRequest &req,
+                           rpc::TContainerResponse &rsp,
+                           std::shared_ptr<TClient> client) {
+
+    if (!config().volumes().enabled())
+            return TError(EError::InvalidMethod, "volume api is disabled");
+
+    TError error = CheckRequestPermissions(client);
+    if (error)
+        return error;
+
+    auto vholder_lock = context.Vholder->Lock();
+    std::unique_lock<std::mutex> cholder_lock(context.Cholder->GetLock());
+
+    std::shared_ptr<TContainer> container;
+    if (req.has_container()) {
+        std::string name;
+        TError err = client->GetContainer()->AbsoluteName(req.container(), name, true);
+        if (err)
+            return err;
+
+        TError error = context.Cholder->Get(name, container);
+        if (error)
+            return error;
+
+        error = container->CheckPermission(client->GetCred());
+        if (error)
+            return error;
+    } else {
+        container = client->GetContainer();
     }
 
-    return TError(EError::VolumeDoesNotExist, "Volume doesn't exist");
+    std::shared_ptr<TVolume> volume = context.Vholder->Find(req.path());
+    if (!volume)
+        return TError(EError::VolumeNotFound, "Volume not found");
+
+    error = volume->CheckPermission(client->GetCred());
+    if (error)
+        return error;
+
+    if (!container->UnlinkVolume(volume))
+        return TError(EError::VolumeNotFound, "Container not linked to the volume");
+
+    if (!volume->UnlinkContainer(container->GetName()))
+        return TError::Success(); /* Still linked to somebody */
+
+    cholder_lock.unlock();
+    vholder_lock.unlock();
+
+    auto volume_lock = volume->Lock();
+    if (!volume->IsReady())
+        return TError::Success();
+
+    vholder_lock.lock();
+    error = volume->SetReady(false);
+    if (error)
+        return error;
+    vholder_lock.unlock();
+    error = volume->Destroy();
+    if (!error) {
+        vholder_lock.lock();
+        context.Vholder->Unregister(volume);
+        context.Vholder->Remove(volume);
+        vholder_lock.unlock();
+    }
+    volume_lock.unlock();
+
+    return error;
 }
 
 static TError ListVolumes(TContext &context,
+                          const rpc::TVolumeListRequest &req,
                           rpc::TContainerResponse &rsp) {
-    std::lock_guard<std::mutex> lock(context.Vholder->GetLock());
 
-    for (auto path : context.Vholder->List()) {
-        auto vol = context.Vholder->Get(path);
-        if (!vol->IsValid())
+    if (!config().volumes().enabled())
+            return TError(EError::InvalidMethod, "volume api is disabled");
+
+    auto vholder_lock = context.Vholder->Lock();
+
+    if (req.has_path()) {
+        auto volume = context.Vholder->Find(req.path());
+        if (volume == nullptr)
+            return TError(EError::VolumeNotFound, "volume not found");
+        auto desc = rsp.mutable_volumelist()->add_volumes();
+        FillVolumeDescription(desc, volume);
+        return TError::Success();
+    }
+
+    for (auto path : context.Vholder->ListPaths()) {
+        auto volume = context.Vholder->Find(path);
+        if (volume == nullptr)
             continue;
 
-        uint64_t used, avail;
-        TError error = vol->GetUsage(used, avail);
-        if (error)
-            L_ERR() << "Can't get used for volume " << vol->GetPath() << ": " << error << std::endl;
+        auto containers = volume->GetContainers();
+        if (req.has_container() &&
+            std::find(containers.begin(), containers.end(),
+                      req.container()) == containers.end())
+            continue;
 
-        auto desc = rsp.mutable_volumelist()->add_list();
-        desc->set_path(vol->GetPath().ToString());
-        desc->set_source(vol->GetSource());
-        desc->set_quota(vol->GetQuota());
-        desc->set_flags(vol->GetFlags());
-        desc->set_used(used);
-        desc->set_avail(avail);
+        auto desc = rsp.mutable_volumelist()->add_volumes();
+        FillVolumeDescription(desc, volume);
     }
 
     return TError::Success();
@@ -620,7 +819,6 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
                       std::shared_ptr<TClient> client) {
     rpc::TContainerResponse rsp;
     string str;
-    bool send_reply = true;
 
     client->BeginRequest();
 
@@ -662,16 +860,18 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
             error = Kill(context, req.kill(), rsp, client);
         else if (req.has_version())
             error = Version(context, rsp);
-        else if (req.has_wait()) {
+        else if (req.has_wait())
             error = Wait(context, req.wait(), rsp, client);
-            if (!error)
-                send_reply = false;
-        } else if (config().volumes().enabled() && req.has_createvolume()) {
+        else if (req.has_listvolumeproperties())
+            error = ListVolumeProperties(context, req.listvolumeproperties(), rsp, client);
+        else if (req.has_createvolume())
             error = CreateVolume(context, req.createvolume(), rsp, client);
-        } else if (config().volumes().enabled() && req.has_destroyvolume()) {
-            error = DestroyVolume(context, req.destroyvolume(), rsp, client);
-        } else if (config().volumes().enabled() && req.has_listvolumes())
-            error = ListVolumes(context, rsp);
+        else if (req.has_linkvolume())
+            error = LinkVolume(context, req.linkvolume(), rsp, client);
+        else if (req.has_unlinkvolume())
+            error = UnlinkVolume(context, req.unlinkvolume(), rsp, client);
+        else if (req.has_listvolumes())
+            error = ListVolumes(context, req.listvolumes(), rsp);
         else
             error = TError(EError::InvalidMethod, "invalid RPC method");
     } catch (std::bad_alloc exc) {
@@ -688,7 +888,7 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
         error = TError(EError::Unknown, "unknown error");
     }
 
-    if (send_reply) {
+    if (error.GetError() != EError::Queued) {
         rsp.set_error(error.GetError());
         rsp.set_errormsg(error.GetMsg());
         SendReply(client, rsp, log);
