@@ -159,6 +159,12 @@ public:
         return Volume->GetStorage().AddComponent("loop.img");
     }
 
+    TPath GetLoopDevice() {
+        if (LoopDev < 0)
+            return TPath();
+        return TPath("/dev/loop" + std::to_string(LoopDev));
+    }
+
     TError Save(std::shared_ptr<TValueMap> Config) override {
         return Config->Set<int>(V_LOOP_DEV, LoopDev);
     }
@@ -178,24 +184,23 @@ public:
         if (!space_limit)
             return TError(EError::InvalidValue, "loop backend requires space_limit");
 
-        error = GetLoopDev(LoopDev);
-        if (error)
-            return error;
-
-        TLoopMount m = TLoopMount(image, path, "ext4", LoopDev);
-
         if (!image.Exists()) {
             L_ACT() << "Allocate loop image with size " << space_limit << std::endl;
             error = AllocLoop(image, space_limit);
             if (error)
-                goto put_loop;
+                return error;
         } else {
             //FIXME call resize2fs
         }
 
-        error = m.Mount();
+        error = SetupLoopDevice(image, LoopDev);
         if (error)
-            goto put_loop;
+            return error;
+
+        TMount mount(GetLoopDevice(), path, "ext4", {});
+        error = mount.Mount();
+        if (error)
+            goto free_loop;
 
         error = path.Chown(Volume->GetCred());
         if (error)
@@ -208,21 +213,29 @@ public:
         return TError::Success();
 
 umount_loop:
-        (void)m.Umount();
-        LoopDev = -1;
-        return error;
-
-put_loop:
-        if (LoopDev != -1)
-            PutLoopDev(LoopDev);
+        (void)mount.Umount();
+free_loop:
+        PutLoopDev(LoopDev);
         LoopDev = -1;
         return error;
     }
 
     TError Destroy() override {
-        L_ACT() << "Destroy loop " << LoopDev << std::endl;
-        TLoopMount m = TLoopMount(GetLoopImage(), Volume->GetPath(), "ext4", LoopDev);
-        return m.Umount();
+        TPath loop = GetLoopDevice();
+        TPath path = Volume->GetPath();
+        TError error;
+
+        if (LoopDev < 0)
+            return TError::Success();
+
+        L_ACT() << "Destroy loop " << loop << std::endl;
+        TMount mount(loop, path, "ext4", {});
+        error = mount.Umount();
+        TError error2 = PutLoopDev(LoopDev);
+        if (!error)
+            error = error2;
+        LoopDev = -1;
+        return error;
     }
 
     TError Clear() override {
@@ -230,7 +243,7 @@ put_loop:
     }
 
     TError Move(TPath dest) override {
-        TMount mount(GetLoopImage(), Volume->GetPath(), "ext4", {});
+        TMount mount(GetLoopDevice(), Volume->GetPath(), "ext4", {});
         return mount.Move(dest);
     }
 

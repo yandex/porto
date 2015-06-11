@@ -81,5 +81,7 @@ public:
     TError Umount();
 };
 
+TError SetupLoopDevice(TPath image, int &dev);
+
 TError GetLoopDev(int &nr);
 TError PutLoopDev(const int nr);
