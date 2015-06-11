@@ -617,10 +617,10 @@ std::map<std::string, std::string> TVolume::GetProperties() {
     std::map<std::string, std::string> ret;
 
     if (IsReady() && !GetStat(space_used, space_avail, inode_used, inode_avail)) {
-        Config->Set<uint64_t>(V_SPACE_USED, space_used);
-        Config->Set<uint64_t>(V_INODE_USED, inode_used);
-        Config->Set<uint64_t>(V_SPACE_AVAILABLE, space_avail);
-        Config->Set<uint64_t>(V_INODE_AVAILABLE, inode_avail);
+        ret[V_SPACE_USED] = std::to_string(space_used);
+        ret[V_INODE_USED] = std::to_string(inode_used);
+        ret[V_SPACE_AVAILABLE] = std::to_string(space_avail);
+        ret[V_INODE_AVAILABLE] = std::to_string(inode_avail);
     }
 
     for (auto name: Config->List()) {
@@ -717,14 +717,8 @@ static void RegisterVolumeProperties(std::shared_ptr<TRawValueMap> m) {
     m->Add(V_SPACE_LIMIT, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
     m->Add(V_INODE_LIMIT, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
 
-    m->Add(V_SPACE_GUARANTEE, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
-    m->Add(V_INODE_GUARANTEE, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
-
-    m->Add(V_SPACE_USED, new TUintValue(READ_ONLY_VALUE | UINT_UNIT_VALUE));
-    m->Add(V_INODE_USED, new TUintValue(READ_ONLY_VALUE | UINT_UNIT_VALUE));
-
-    m->Add(V_SPACE_AVAILABLE, new TUintValue(READ_ONLY_VALUE | UINT_UNIT_VALUE));
-    m->Add(V_INODE_AVAILABLE, new TUintValue(READ_ONLY_VALUE | UINT_UNIT_VALUE));
+    //m->Add(V_SPACE_GUARANTEE, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
+    //m->Add(V_INODE_GUARANTEE, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
 }
 
 TError TVolumeHolder::Create(std::shared_ptr<TVolume> &volume) {
