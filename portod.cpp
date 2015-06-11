@@ -301,6 +301,7 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
     int ret = 0;
     int sfd;
     std::map<int, std::shared_ptr<TClient>> clients;
+    bool accept_paused = false;
 
     TCred cred(getuid(), getgid());
 
@@ -320,7 +321,8 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
         return EXIT_FAILURE;
     }
 
-    error = context.EpollLoop->AddSource(std::make_shared<TEpollSource>(sfd));
+    auto AcceptSource = std::make_shared<TEpollSource>(sfd);
+    error = context.EpollLoop->AddSource(AcceptSource);
     if (error) {
         L_ERR() << "Can't add RPC server fd to epoll: " << error << std::endl;
         return EXIT_FAILURE;
@@ -347,6 +349,18 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
 
     bool discardState = false;
     while (true) {
+
+        if (accept_paused && clients.size() * 4 / 3 < config().daemon().max_clients()) {
+            L_WRN() << "Resume accepting connections" << std::endl;
+            error = context.EpollLoop->AddSource(AcceptSource);
+            if (error) {
+                L_ERR() << "Can't add RPC server fd to epoll: " << error << std::endl;
+                ret = EXIT_FAILURE;
+                goto exit;
+            }
+            accept_paused = false;
+        }
+
         error = context.EpollLoop->GetEvents(signals, events, -1);
         if (error) {
             L_ERR() << "slave: epoll error " << error << std::endl;
@@ -387,8 +401,11 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                 continue;
 
             if (source->Fd == sfd) {
-                if (clients.size() > config().daemon().max_clients()) {
-                    L_WRN() << "Skip connection attempt" << std::endl;
+
+                if (!accept_paused && clients.size() >= config().daemon().max_clients()) {
+                    L_WRN() << "Pause accepting connections" << std::endl;
+                    context.EpollLoop->RemoveSource(AcceptSource);
+                    accept_paused = true;
                     continue;
                 }
 
