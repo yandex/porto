@@ -112,11 +112,6 @@ static void DaemonShutdown(bool master, int ret) {
 
     if (ret < 0)
         RaiseSignal(-ret);
-
-    if (master) {
-        TFile f(config().daemon().pidmap().path());
-        (void)f.Remove();
-    }
 }
 
 static void RemoveRpcServer(const string &path) {
@@ -237,10 +232,8 @@ void AckExitStatus(int pid) {
         L() << "Acknowledge exit status for " << std::to_string(pid) << std::endl;
     } else {
         TError error(EError::Unknown, errno, "write(): returned " + std::to_string(ret));
-        if (error)
-            L_ERR() << "Can't acknowledge exit status for " << pid << ": " << error << std::endl;
-        if (ret < 0)
-            Crash();
+        L_ERR() << "Can't acknowledge exit status for " << pid << ": " << error << std::endl;
+        Crash();
     }
 }
 
@@ -482,19 +475,19 @@ exit:
 }
 
 static void KvDump() {
-    TKeyValueStorage containers(TMount("tmpfs", config().keyval().file().path(), "tmpfs", { config().keyval().size() }));
-    TError error = containers.MountTmpfs();
+    auto containers = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().keyval().file().path(), "tmpfs", { config().keyval().size() }));
+    TError error = containers->MountTmpfs();
     if (error)
         L_ERR() << "Can't mount containers key-value storage: " << error << std::endl;
     else
-        containers.Dump();
+        containers->Dump();
 
-    TKeyValueStorage volumes(TMount("tmpfs", config().volumes().keyval().file().path(), "tmpfs", { config().volumes().keyval().size() }));
-    error = volumes.MountTmpfs();
+    auto volumes = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().volumes().keyval().file().path(), "tmpfs", { config().volumes().keyval().size() }));
+    error = volumes->MountTmpfs();
     if (error)
         L_ERR() << "Can't mount volumes key-value storage: " << error << std::endl;
     else
-        volumes.Dump();
+        volumes->Dump();
 }
 
 static int TuneLimits() {
@@ -658,14 +651,11 @@ static void Reap(int pid) {
     (void)waitpid(pid, NULL, 0);
 }
 
-static void UpdateQueueSize(map<int,int> &exited, std::set<int> &acked) {
+static void UpdateQueueSize(map<int,int> &exited) {
     Statistics->QueuedStatuses = exited.size();
-    Statistics->QueuedAcks = acked.size();
 }
 
-static int ReapDead(int fd, map<int,int> &exited, int slavePid, int &slaveStatus, std::set<int> &acked) {
-    bool delivered = false;
-
+static int ReapDead(int fd, map<int,int> &exited, int slavePid, int &slaveStatus) {
     while (true) {
         siginfo_t info = { 0 };
         if (waitid(P_ALL, -1, &info, WNOHANG | WNOWAIT | WEXITED) < 0)
@@ -689,30 +679,19 @@ static int ReapDead(int fd, map<int,int> &exited, int slavePid, int &slaveStatus
             return -1;
         }
 
-        if (acked.find(info.si_pid) != acked.end()) {
-            L() << "Skip acknowledged " << info.si_pid << std::endl;
-            acked.erase(info.si_pid);
-            Reap(info.si_pid);
-            continue;
-        }
-
         if (exited.find(info.si_pid) != exited.end())
             break;
 
         exited[info.si_pid] = status;
         DeliverPidStatus(fd, info.si_pid, status, exited.size());
-        delivered = true;
     }
 
-    UpdateQueueSize(exited, acked);
-    if (delivered)
-        acked.clear();
+    UpdateQueueSize(exited);
 
     return 0;
 }
 
-static int ReceiveAcks(int fd, std::map<int,int> &exited,
-                       std::set<int> &acked) {
+static int ReceiveAcks(int fd, std::map<int,int> &exited) {
     int pid;
     int nr = 0;
 
@@ -720,80 +699,21 @@ static int ReceiveAcks(int fd, std::map<int,int> &exited,
         if (pid <= 0)
             continue;
 
-        L_EVT() << "Got acknowledge for " << pid << " (" << exited.size() << " queued)" << std::endl;
-
         if (exited.find(pid) == exited.end()) {
-            acked.insert(pid);
+            //
+            //
         } else {
             exited.erase(pid);
             Reap(pid);
         }
 
-        L() << "Got acknowledge for " << pid << " (" << exited.size() << " queued, " << acked.size() << " acked)" << std::endl;
+        L_EVT() << "Got acknowledge for " << pid << " (" << exited.size() << " queued"
+                << std::endl;
         nr++;
     }
 
-    UpdateQueueSize(exited, acked);
+    UpdateQueueSize(exited);
     return nr;
-}
-
-static void SaveStatuses(map<int, int> &exited) {
-    TFile f(config().daemon().pidmap().path());
-    if (f.Exists()) {
-        TError error = f.Remove();
-        if (error) {
-            L_ERR() << "Can't save pid map: " << error << std::endl;
-            return;
-        }
-    }
-
-    for (auto &kv : exited) {
-        TError error = f.AppendString(std::to_string(kv.first) + " " + std::to_string(kv.second) + "\n");
-        if (error)
-            L_ERR() << "Can't save pid map: " << error << std::endl;
-    }
-}
-
-static void RestoreStatuses(map<int, int> &exited) {
-    TFile f(config().daemon().pidmap().path());
-    if (!f.Exists())
-        return;
-
-    vector<string> lines;
-    TError error = f.AsLines(lines);
-    if (error) {
-        L_ERR() << "Can't restore pid map: " << error << std::endl;
-        return;
-    }
-
-    for (auto &line : lines) {
-        vector<string> tokens;
-        error = SplitString(line, ' ', tokens);
-        if (error) {
-            L_ERR() << "Can't restore pid map: " << error << std::endl;
-            continue;
-        }
-
-        if (tokens.size() != 2) {
-            continue;
-        }
-
-        int pid, status;
-
-        error = StringToInt(tokens[0], pid);
-        if (error) {
-            L_ERR() << "Can't restore pid map: " << error << std::endl;
-            continue;
-        }
-
-        error = StringToInt(tokens[0], status);
-        if (error) {
-            L_ERR() << "Can't restore pid map: " << error << std::endl;
-            continue;
-        }
-
-        exited[pid] = status;
-    }
 }
 
 static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
@@ -801,7 +721,6 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
     int ackfd[2];
     int ret = EXIT_FAILURE;
     TError error;
-    std::set<int> acked;
 
     slavePid = 0;
 
@@ -842,7 +761,7 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
     for (auto &pair : exited)
         DeliverPidStatus(evtfd[1], pair.first, pair.second, exited.size());
 
-    UpdateQueueSize(exited, acked);
+    UpdateQueueSize(exited);
 
     error = loop.AddSource(std::make_shared<TEpollSource>(ackfd[0]));
     if (error) {
@@ -874,10 +793,6 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
                 ret = EncodeSignal(s);
                 goto exit;
             case debugSignal:
-                L() << "Acknowledges:" << std::endl;
-                for (auto pid : acked)
-                    L() << pid << std::endl;
-
                 L() << "Statuses:" << std::endl;
                 for (auto pair : exited)
                     L() << pair.first << "=" << pair.second << std::endl;;
@@ -894,8 +809,6 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
                 const char *stdlogArg = nullptr;
                 if (stdlog)
                     stdlogArg = "--stdlog";
-
-                SaveStatuses(exited);
 
                 if (kill(slavePid, updateSignal) < 0) {
                     L_ERR() << "Can't send " << updateSignal << " to slave: " << strerror(errno) << std::endl;
@@ -928,7 +841,7 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
                 continue;
 
             if (source->Fd == ackfd[0]) {
-                if (!ReceiveAcks(ackfd[0], exited, acked)) {
+                if (!ReceiveAcks(ackfd[0], exited)) {
                     ret = EXIT_FAILURE;
                     goto exit;
                 }
@@ -939,7 +852,7 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
         }
 
         int status;
-        if (ReapDead(evtfd[1], exited, slavePid, status, acked)) {
+        if (ReapDead(evtfd[1], exited, slavePid, status)) {
             L_SYS() << "Slave exited with " << status << std::endl;
             ret = EXIT_SUCCESS;
             goto exit;
@@ -1001,7 +914,6 @@ static int MasterMain() {
         L_ERR() << "Can't adjust OOM score: " << error << std::endl;
 
     map<int,int> exited;
-    RestoreStatuses(exited);
 
     while (true) {
         size_t started = GetCurrentTimeMs();

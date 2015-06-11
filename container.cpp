@@ -751,6 +751,10 @@ TError TContainer::Start(bool meta) {
     if (error)
         return error;
 
+    error = Prop->Set<uint64_t>(P_RAW_START_TIME, GetCurrentTimeMs());
+    if (error)
+        return error;
+
     error = PrepareResources();
     if (error)
         return error;
@@ -1375,10 +1379,22 @@ TError TContainer::Restore(const kv::TNode &node) {
 
         auto state = Data->Get<std::string>(D_STATE);
         if (state == ContainerStateName(EContainerState::Dead)) {
+            // we started recording dead time since porto v1.15,
+            // use some sensible default
+            if (!Prop->HasValue(P_RAW_DEAD_TIME))
+                Prop->Set<uint64_t>(P_RAW_DEAD_TIME, GetCurrentTimeMs());
+
             SetState(EContainerState::Dead);
-            TimeOfDeath = GetCurrentTimeMs();
         } else {
-            SetState(EContainerState::Running);
+            // we started recording start time since porto v1.15,
+            // use some sensible default
+            if (!Prop->HasValue(P_RAW_START_TIME))
+                Prop->Set<uint64_t>(P_RAW_START_TIME, GetCurrentTimeMs());
+
+            if (Prop->Get<std::string>(P_COMMAND).empty())
+                SetState(EContainerState::Meta);
+            else
+                SetState(EContainerState::Running);
 
             auto cg = GetLeafCgroup(freezerSubsystem);
             if (freezerSubsystem->IsFreezed(cg))
@@ -1476,11 +1492,9 @@ bool TContainer::Exit(int status, bool oomKilled, bool force) {
     if (error)
         L_ERR() << "Can't set " << P_RAW_ROOT_PID << ": " << error << std::endl;
 
-    TimeOfDeath = GetCurrentTimeMs();
-
-    int pid = Task->GetPid();
-    if (pid > 0)
-        AckExitStatus(pid);
+    error = Prop->Set<uint64_t>(P_RAW_DEAD_TIME, GetCurrentTimeMs());
+    if (error)
+        L_ERR() << "Can't set " << P_RAW_DEAD_TIME << ": " << error << std::endl;
 
     return true;
 }
@@ -1529,8 +1543,8 @@ TError TContainer::Respawn() {
 
 bool TContainer::CanRemoveDead() const {
     return State == EContainerState::Dead &&
-        TimeOfDeath / 1000 + Prop->Get<uint64_t>(P_AGING_TIME) <=
-        GetCurrentTimeMs() / 1000;
+        Prop->Get<uint64_t>(P_RAW_DEAD_TIME) / 1000 +
+        Prop->Get<uint64_t>(P_AGING_TIME) <= GetCurrentTimeMs() / 1000;
 }
 
 std::vector<std::string> TContainer::GetChildren() {

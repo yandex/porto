@@ -214,6 +214,11 @@ void RegisterCommand(ICmd *cmd) {
 
 ICmd *currentCmd;
 
+void SigInt(int sig) {
+    if (currentCmd)
+        currentCmd->Signal(sig);
+}
+
 static int TryExec(int argc, char *argv[]) {
     string name(argv[1]);
 
@@ -229,11 +234,13 @@ static int TryExec(int argc, char *argv[]) {
     }
 
     currentCmd = cmd;
-    return cmd->Execute(argc - 2, argv + 2);
-}
 
-void SigInt(int sig) {
-    currentCmd->Signal(sig);
+    // in case client closes pipe we are writing to in the protobuf code
+    (void)RegisterSignal(SIGPIPE, SIG_IGN);
+    (void)RegisterSignal(SIGINT, SigInt);
+    (void)RegisterSignal(SIGTERM, SigInt);
+
+    return cmd->Execute(argc - 2, argv + 2);
 }
 
 int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
@@ -258,11 +265,6 @@ int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
 
         return EXIT_FAILURE;
     }
-
-    // in case client closes pipe we are writing to in the protobuf code
-    (void)RegisterSignal(SIGPIPE, SIG_IGN);
-    (void)RegisterSignal(SIGINT, SigInt);
-    (void)RegisterSignal(SIGTERM, SigInt);
 
     try {
         return TryExec(argc, argv);

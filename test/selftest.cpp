@@ -2681,6 +2681,7 @@ static void TestRoot(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData(root, "parent", v));
     ExpectEq(v, "");
     ExpectApiFailure(api.GetData(root, "stderr", v), EError::InvalidState);
+    ExpectApiSuccess(api.GetData(root, "time", v));
 
     Say() << "Check that stop on root stops all children" << std::endl;
 
@@ -4356,10 +4357,27 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(name));
     AsNobody(api);
 
-    Say() << "Make sure hierarchical recovery works" << std::endl;
-
+    Say() << "Make sure meta gets correct state upon recovery" << std::endl;
     string parent = "a";
     string child = "a/b";
+
+    ExpectApiSuccess(api.Create(parent));
+    ExpectApiSuccess(api.Create(child));
+    ExpectApiSuccess(api.SetProperty(parent, "isolate", "true"));
+    ExpectApiSuccess(api.SetProperty(child, "command", "sleep 1000"));
+    ExpectApiSuccess(api.Start(child));
+
+    AsRoot(api);
+    KillSlave(api, SIGKILL);
+    AsNobody(api);
+
+    ExpectApiSuccess(api.GetData(parent, "state", v));
+    ExpectEq(v, "meta");
+
+    ExpectApiSuccess(api.Destroy(parent));
+
+    Say() << "Make sure hierarchical recovery works" << std::endl;
+
     ExpectApiSuccess(api.Create(parent));
     ExpectApiSuccess(api.Create(child));
     ExpectApiSuccess(api.SetProperty(parent, "isolate", "false"));

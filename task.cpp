@@ -952,6 +952,10 @@ bool TTask::HasCorrectFreezer() {
     } else {
         auto cg = LeafCgroups.at(freezerSubsystem);
         if (cg && cg->Relpath() != cgmap["freezer"]) {
+            // if at this point task is zombie we don't have any cgroup info
+            if (IsZombie())
+                return true;
+
             L_WRN() << "Unexpected freezer cgroup of restored task  " << Pid << ": " << cg->Path() << " != " << cgmap["freezer"] << std::endl;
             Pid = 0;
             State = Stopped;
@@ -969,6 +973,9 @@ void TTask::Restore(int pid_) {
 }
 
 TError TTask::FixCgroups() const {
+    if (IsZombie())
+        return TError::Success();
+
     map<string, string> cgmap;
     TError error = GetTaskCgroups(Pid, cgmap);
     if (error)

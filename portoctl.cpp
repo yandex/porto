@@ -58,8 +58,8 @@ string HumanNsec(const string &val) {
 }
 
 string HumanSec(const string &val) {
-    int64_t n = stoll(val);
-    int64_t h = 0, m = 0, s = n;
+    uint64_t n = stoull(val);
+    uint64_t h = 0, m = 0, s = n;
 
     if (s > 60) {
         m = s / 60;
