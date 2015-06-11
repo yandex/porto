@@ -34,7 +34,7 @@ int RetryBusy(int times, int timeoMs, std::function<int()> handler) {
 
     while (times-- > 0) {
         ret = handler();
-        if (errno != EBUSY)
+        if (!ret || errno != EBUSY)
             return ret;
         if (usleep(timeoMs * 1000) < 0)
             return -1;
