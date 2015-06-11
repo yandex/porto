@@ -819,15 +819,36 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
     }
 
     L_ACT() << "Remove stale volumes..." << std::endl;
-    RemoveIf(config().volumes().volume_dir(),
-             EFileType::Directory,
-             [&](const std::string &name, const TPath &path) {
-                bool used = false;
-                for (auto v : Volumes)
-                    if (std::to_string(v.second->GetId()) == name)
-                        used = true;
-                return !used;
-             });
+
+    std::vector<std::string> subdirs;
+    error = TFolder(volumes).Items(EFileType::Directory, subdirs);
+    if (error)
+        L_ERR() << "Cannot list " << volumes << std::endl;
+
+    for (auto dir_name: subdirs) {
+        bool used = false;
+        for (auto v: Volumes) {
+            if (std::to_string(v.second->GetId()) == dir_name) {
+                used = true;
+                break;
+            }
+        }
+        if (used)
+            continue;
+
+        TPath dir = volumes.AddComponent(dir_name);
+        TPath mnt = dir.AddComponent("volume");
+        if (mnt.Exists()) {
+            TMount mount(mnt, mnt, "", {});
+            (void)mount.Umount();
+        }
+        error = dir.ClearDirectory();
+        if (error)
+            L_ERR() << "Cannot clear directory " << dir << std::endl;
+        error = dir.Rmdir();
+        if (error)
+            L_ERR() << "Cannot remove directory " << dir << std::endl;
+    }
 
     return TError::Success();
 }
