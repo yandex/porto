@@ -355,7 +355,7 @@ retry:
         SetDieOnParentExit();
         CloseFds(-1, {});
 
-        char **p = (char **)malloc(sizeof(*p) * command.size() + 1);
+        char **p = (char **)malloc(sizeof(*p) * (command.size() + 1));
         for (size_t i = 0; i < command.size(); i++)
             p[i] = strdup(command[i].c_str());
         p[command.size()] = nullptr;
