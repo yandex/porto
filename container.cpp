@@ -1458,8 +1458,13 @@ bool TContainer::Exit(int status, bool oomKilled, bool force) {
 
     ShutdownOom();
 
-    Task->DeliverExitStatus(status);
-    SetState(EContainerState::Dead);
+    TError error = Data->Set<int>(D_EXIT_STATUS, status);
+    if (error)
+        L_ERR() << "Can't set " << D_EXIT_STATUS << ": " << error << std::endl;
+
+    error = Prop->Set<uint64_t>(P_RAW_DEATH_TIME, GetCurrentTimeMs());
+    if (error)
+        L_ERR() << "Can't set " << P_RAW_DEATH_TIME << ": " << error << std::endl;
 
     if (oomKilled) {
         L_EVT() << Task->GetPid() << " killed by OOM" << std::endl;
@@ -1481,20 +1486,15 @@ bool TContainer::Exit(int status, bool oomKilled, bool force) {
 
     ExitChildren(status, oomKilled);
 
-    if (MayRespawn())
-        ScheduleRespawn();
-
-    TError error = Data->Set<int>(D_EXIT_STATUS, status);
-    if (error)
-        L_ERR() << "Can't set " << D_EXIT_STATUS << ": " << error << std::endl;
+    Task->DeliverExitStatus(status);
+    SetState(EContainerState::Dead);
 
     error = Prop->Set<int>(P_RAW_ROOT_PID, 0);
     if (error)
         L_ERR() << "Can't set " << P_RAW_ROOT_PID << ": " << error << std::endl;
 
-    error = Prop->Set<uint64_t>(P_RAW_DEATH_TIME, GetCurrentTimeMs());
-    if (error)
-        L_ERR() << "Can't set " << P_RAW_DEATH_TIME << ": " << error << std::endl;
+    if (MayRespawn())
+        ScheduleRespawn();
 
     return true;
 }
