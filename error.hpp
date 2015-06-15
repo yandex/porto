@@ -25,20 +25,9 @@ public:
     const std::string &GetMsg() const;
     const int &GetErrno() const;
 
-    static const TError& Success() {
-        static TError e;
-        return e;
-    }
-
-    static const TError& Queued() {
-        static TError e(EError::Queued, "Queued");
-        return e;
-    }
-
-    friend std::ostream& operator<<(std::ostream& os, const TError& err) {
-        os << err.GetErrorName() << " (" << err.GetMsg() << ")";
-        return os;
-    }
+    static const TError& Success();
+    static const TError& Queued();
+    friend std::ostream& operator<<(std::ostream& os, const TError& err);
 
     TError Serialize(int fd) const;
     static bool Deserialize(int fd, TError &error);

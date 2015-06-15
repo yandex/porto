@@ -95,3 +95,18 @@ bool TError::Deserialize(int fd, TError &error) {
     error = TError(err, desc, errno);
     return true;
 }
+
+const TError& TError::Success() {
+    static TError e;
+    return e;
+}
+
+const TError& TError::Queued() {
+    static TError e(EError::Queued, "Queued");
+    return e;
+}
+
+std::ostream& operator<<(std::ostream& os, const TError& err) {
+    os << err.GetErrorName() << " (" << err.GetMsg() << ")";
+    return os;
+}
