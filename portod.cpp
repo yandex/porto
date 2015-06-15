@@ -886,7 +886,6 @@ void CheckVersion(int &prevMaj, int &prevMin) {
 }
 
 static int MasterMain() {
-    AllocStatistics();
     Statistics->MasterStarted = GetCurrentTimeMs();
 
     int ret = DaemonPrepare(true);
@@ -943,6 +942,8 @@ int main(int argc, char * const argv[]) {
         std::cerr << "Need root privileges to start" << std::endl;
         return EXIT_FAILURE;
     }
+
+    AllocStatistics();
 
     config.Load();
 
