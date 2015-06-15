@@ -1,3 +1,5 @@
+#include <sstream>
+
 #include "path.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
@@ -304,6 +306,51 @@ TError TPath::Copy(const TPath &to) const {
         break;
     }
     return TError(EError::Unknown, "Unknown file type " + Path);
+}
+
+TPath TPath::NormalPath() const {
+    std::stringstream ss(Path);
+    std::string component, path;
+
+    if (IsEmpty())
+        return TPath();
+
+    if (IsAbsolute())
+        path = "/";
+
+    while (std::getline(ss, component, '/')) {
+
+        if (component == "" || component == ".")
+            continue;
+
+        if (component == "..") {
+            auto last = path.rfind('/');
+
+            /* /.. */
+            if (last == 0)
+                continue;
+
+            if (last == std::string::npos) {
+                /* a/.. */
+                if (!path.empty() && path != "..") {
+                    path = "";
+                    continue;
+                }
+            } else if (path.compare(last + 1, std::string::npos, "..") != 0) {
+                path.erase(last);
+                continue;
+            }
+        }
+
+        if (!path.empty())
+            path += "/";
+        path += component;
+    }
+
+    if (path.empty())
+        path = ".";
+
+    return TPath(path);
 }
 
 TPath TPath::RealPath() const {

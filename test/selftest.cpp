@@ -2508,6 +2508,78 @@ static void TestStateMachine(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(name));
 }
 
+static void TestPath(TPortoAPI &api) {
+    vector<pair<string, string>> normalize = {
+        { "",   "" },
+        { ".",  "." },
+        { "..", ".." },
+        { "a",  "a" },
+        { "/a",   "/a" },
+        { "/a/b/c",   "/a/b/c" },
+        { "////a//",   "/a" },
+        { "/././.",   "/" },
+        { "/a/..",   "/" },
+        { "a/..",   "." },
+        { "../a/../..",   "../.." },
+        { "/a/../..",   "/" },
+        { "/abc/cde/../..",   "/" },
+        { "/abc/../cde/.././../abc",   "/abc" },
+
+        /* Stolen from golang src/path/filepath/path_test.go */
+
+        // Already clean
+        {"abc", "abc"},
+        {"abc/def", "abc/def"},
+        {"a/b/c", "a/b/c"},
+        {".", "."},
+        {"..", ".."},
+        {"../..", "../.."},
+        {"../../abc", "../../abc"},
+        {"/abc", "/abc"},
+        {"/", "/"},
+
+        // Remove trailing slash
+        {"abc/", "abc"},
+        {"abc/def/", "abc/def"},
+        {"a/b/c/", "a/b/c"},
+        {"./", "."},
+        {"../", ".."},
+        {"../../", "../.."},
+        {"/abc/", "/abc"},
+
+        // Remove doubled slash
+        {"abc//def//ghi", "abc/def/ghi"},
+        {"//abc", "/abc"},
+        {"///abc", "/abc"},
+        {"//abc//", "/abc"},
+        {"abc//", "abc"},
+
+        // Remove . elements
+        {"abc/./def", "abc/def"},
+        {"/./abc/def", "/abc/def"},
+        {"abc/.", "abc"},
+
+        // Remove .. elements
+        {"abc/def/ghi/../jkl", "abc/def/jkl"},
+        {"abc/def/../ghi/../jkl", "abc/jkl"},
+        {"abc/def/..", "abc"},
+        {"abc/def/../..", "."},
+        {"/abc/def/../..", "/"},
+        {"abc/def/../../..", ".."},
+        {"/abc/def/../../..", "/"},
+        {"abc/def/../../../ghi/jkl/../../../mno", "../../mno"},
+        {"/../abc", "/abc"},
+
+        // Combinations
+        {"abc/./../def", "def"},
+        {"abc//./../def", "def"},
+        {"abc/../../././../def", "../../def"},
+    };
+
+    for (auto n: normalize)
+        ExpectEq(TPath(n.first).NormalPath().ToString(), n.second);
+}
+
 static void TestIdmap(TPortoAPI &api) {
     TIdMap idmap;
     uint16_t id;
@@ -4775,6 +4847,7 @@ static void TestPackage(TPortoAPI &api) {
 
 int SelfTest(std::vector<std::string> name, int leakNr) {
     pair<string, std::function<void(TPortoAPI &)>> tests[] = {
+        { "path", TestPath },
         { "idmap", TestIdmap },
         { "root", TestRoot },
         { "data", TestData },

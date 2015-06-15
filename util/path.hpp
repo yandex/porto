@@ -62,6 +62,7 @@ public:
 
     TPath DirName() const;
     std::string BaseName() const;
+    TPath NormalPath() const;
     TPath RealPath() const;
     bool StartsWith(const TPath &prefix) const;
 
