@@ -36,7 +36,7 @@ static void SendReply(std::shared_ptr<TClient> client,
         return;
     }
 
-    std::lock_guard<std::mutex> lock(client->GetLock());
+    auto lock = client->Lock();
 
     google::protobuf::io::FileOutputStream post(client->GetFd());
 
@@ -61,7 +61,7 @@ static TError CreateContainer(TContext &context,
                               const rpc::TContainerCreateRequest &req,
                               rpc::TContainerResponse &rsp,
                               std::shared_ptr<TClient> client) {
-    std::lock_guard<std::mutex> lock(context.Cholder->GetLock());
+    auto lock = context.Cholder->Lock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -78,7 +78,7 @@ static TError DestroyContainer(TContext &context,
                                const rpc::TContainerDestroyRequest &req,
                                rpc::TContainerResponse &rsp,
                                std::shared_ptr<TClient> client) {
-    std::unique_lock<std::mutex> cholder_lock(context.Cholder->GetLock());
+    auto cholder_lock = context.Cholder->Lock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -139,7 +139,7 @@ static TError StartContainer(TContext &context,
                              const rpc::TContainerStartRequest &req,
                              rpc::TContainerResponse &rsp,
                              std::shared_ptr<TClient> client) {
-    std::lock_guard<std::mutex> lock(context.Cholder->GetLock());
+    auto lock = context.Cholder->Lock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -190,7 +190,7 @@ static TError StopContainer(TContext &context,
                             const rpc::TContainerStopRequest &req,
                             rpc::TContainerResponse &rsp,
                             std::shared_ptr<TClient> client) {
-    std::lock_guard<std::mutex> lock(context.Cholder->GetLock());
+    auto lock = context.Cholder->Lock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -216,7 +216,7 @@ static TError PauseContainer(TContext &context,
                              const rpc::TContainerPauseRequest &req,
                              rpc::TContainerResponse &rsp,
                              std::shared_ptr<TClient> client) {
-    std::lock_guard<std::mutex> lock(context.Cholder->GetLock());
+    auto lock = context.Cholder->Lock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -242,7 +242,7 @@ static TError ResumeContainer(TContext &context,
                               const rpc::TContainerResumeRequest &req,
                               rpc::TContainerResponse &rsp,
                               std::shared_ptr<TClient> client) {
-    std::lock_guard<std::mutex> lock(context.Cholder->GetLock());
+    auto lock = context.Cholder->Lock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -267,7 +267,7 @@ static TError ResumeContainer(TContext &context,
 static TError ListContainers(TContext &context,
                              rpc::TContainerResponse &rsp,
                              std::shared_ptr<TClient> client) {
-    std::lock_guard<std::mutex> lock(context.Cholder->GetLock());
+    auto lock = context.Cholder->Lock();
 
     for (auto c : context.Cholder->List()) {
         std::string name;
@@ -283,7 +283,7 @@ static TError GetContainerProperty(TContext &context,
                                    const rpc::TContainerGetPropertyRequest &req,
                                    rpc::TContainerResponse &rsp,
                                    std::shared_ptr<TClient> client) {
-    std::lock_guard<std::mutex> lock(context.Cholder->GetLock());
+    auto lock = context.Cholder->Lock();
 
     std::string name;
     TError err = client->GetContainer()->AbsoluteName(req.name(), name, true);
@@ -305,7 +305,7 @@ static TError SetContainerProperty(TContext &context,
                                    const rpc::TContainerSetPropertyRequest &req,
                                    rpc::TContainerResponse &rsp,
                                    std::shared_ptr<TClient> client) {
-    std::lock_guard<std::mutex> lock(context.Cholder->GetLock());
+    auto lock = context.Cholder->Lock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -331,7 +331,7 @@ static TError GetContainerData(TContext &context,
                                const rpc::TContainerGetDataRequest &req,
                                rpc::TContainerResponse &rsp,
                                std::shared_ptr<TClient> client) {
-    std::lock_guard<std::mutex> lock(context.Cholder->GetLock());
+    auto lock = context.Cholder->Lock();
 
     std::string name;
     TError err = client->GetContainer()->AbsoluteName(req.name(), name, true);
@@ -353,7 +353,7 @@ static TError GetContainerCombined(TContext &context,
                                    const rpc::TContainerGetRequest &req,
                                    rpc::TContainerResponse &rsp,
                                    std::shared_ptr<TClient> client) {
-    std::lock_guard<std::mutex> lock(context.Cholder->GetLock());
+    auto lock = context.Cholder->Lock();
 
     if (!req.variable_size())
         return TError(EError::InvalidValue, "Properties/data are not specified");
@@ -409,7 +409,7 @@ static TError GetContainerCombined(TContext &context,
 
 static TError ListProperty(TContext &context,
                            rpc::TContainerResponse &rsp) {
-    std::lock_guard<std::mutex> lock(context.Cholder->GetLock());
+    auto lock = context.Cholder->Lock();
 
     auto list = rsp.mutable_propertylist();
 
@@ -437,7 +437,7 @@ static TError ListProperty(TContext &context,
 
 static TError ListData(TContext &context,
                        rpc::TContainerResponse &rsp) {
-    std::lock_guard<std::mutex> lock(context.Cholder->GetLock());
+    auto lock = context.Cholder->Lock();
 
     auto list = rsp.mutable_datalist();
 
@@ -467,7 +467,7 @@ static TError Kill(TContext &context,
                    const rpc::TContainerKillRequest &req,
                    rpc::TContainerResponse &rsp,
                    std::shared_ptr<TClient> client) {
-    std::lock_guard<std::mutex> lock(context.Cholder->GetLock());
+    auto lock = context.Cholder->Lock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -503,7 +503,7 @@ static TError Wait(TContext &context,
                    const rpc::TContainerWaitRequest &req,
                    rpc::TContainerResponse &rsp,
                    std::shared_ptr<TClient> client) {
-    std::lock_guard<std::mutex> lock(context.Cholder->GetLock());
+    auto lock = context.Cholder->Lock();
 
     if (!req.name_size())
         return TError(EError::InvalidValue, "Containers are not specified");
@@ -631,7 +631,7 @@ static TError CreateVolume(TContext &context,
         return error;
     }
 
-    std::unique_lock<std::mutex> cholder_lock(context.Cholder->GetLock());
+    auto cholder_lock = context.Cholder->Lock();
 
     error = volume->LinkContainer(container->GetName());
     if (error) {
@@ -667,7 +667,7 @@ static TError LinkVolume(TContext &context,
     if (error)
         return error;
 
-    std::unique_lock<std::mutex> cholder_lock(context.Cholder->GetLock());
+    auto cholder_lock = context.Cholder->Lock();
     std::shared_ptr<TContainer> container;
     if (req.has_container()) {
         std::string name;
@@ -721,7 +721,7 @@ static TError UnlinkVolume(TContext &context,
         return error;
 
     auto vholder_lock = context.Vholder->Lock();
-    std::unique_lock<std::mutex> cholder_lock(context.Cholder->GetLock());
+    auto cholder_lock = context.Cholder->Lock();
 
     std::shared_ptr<TContainer> container;
     if (req.has_container()) {

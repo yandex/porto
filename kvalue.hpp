@@ -33,10 +33,9 @@ public:
 };
 
 class TKeyValueStorage : public std::enable_shared_from_this<TKeyValueStorage>,
-                         public TNonCopyable {
+                         public TLockable, public TNonCopyable {
     const TMount Tmpfs;
     const size_t DirnameLen;
-    std::mutex Lock;
 
     TPath ToPath(const std::string &name) const;
 
@@ -54,5 +53,4 @@ public:
 
     static TError Get(const kv::TNode &node, const std::string &name, std::string &val);
     static std::string FromPath(const std::string &path);
-    std::mutex &GetLock() { return Lock; }
 };

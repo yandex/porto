@@ -35,7 +35,7 @@ public:
 
     bool Handle(const TEvent &event) override {
         if (event.DueMs <= GetCurrentTimeMs()) {
-            std::lock_guard<std::mutex> lock(Holder->GetLock());
+            auto lock = Holder->Lock();
             (void)Holder->DeliverEvent(event);
             return true;
         }

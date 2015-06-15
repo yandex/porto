@@ -14,7 +14,7 @@ extern "C" {
 
 class TContainerWaiter;
 
-class TClient : public TNonCopyable {
+class TClient : public TLockable, public TNonCopyable {
 public:
     TClient(int fd);
     ~TClient();
@@ -47,7 +47,6 @@ public:
 
     std::shared_ptr<TContainerWaiter> Waiter;
     bool Readonly();
-    std::mutex &GetLock() { return Lock; }
 
 private:
     int Fd;
@@ -55,7 +54,6 @@ private:
     TCred Cred;
     std::string Comm;
     size_t RequestStartMs;
-    std::mutex Lock;
 
     TError LoadGroups();
     TError IdentifyContainer(TContainerHolder &holder);

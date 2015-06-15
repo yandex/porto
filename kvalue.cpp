@@ -60,7 +60,7 @@ void TKeyValueNode::Merge(kv::TNode &node, kv::TNode &next) const {
 #define __class__ (std::string(typeid(*this).name()))
 
 TError TKeyValueNode::Load(kv::TNode &node) const {
-    std::lock_guard<std::mutex> lock(Storage->GetLock());
+    auto lock = Storage->Lock();
 
     int fd = open(Path.ToString().c_str(), O_RDONLY | O_CLOEXEC);
     node.Clear();
@@ -83,7 +83,7 @@ TError TKeyValueNode::Load(kv::TNode &node) const {
 }
 
 TError TKeyValueNode::Append(const kv::TNode &node) const {
-    std::lock_guard<std::mutex> lock(Storage->GetLock());
+    auto lock = Storage->Lock();
 
     int fd = open(Path.ToString().c_str(), O_CREAT | O_WRONLY | O_CLOEXEC, 0755);
     TError error;
@@ -108,7 +108,7 @@ TError TKeyValueNode::Append(const kv::TNode &node) const {
 }
 
 TError TKeyValueNode::Save(const kv::TNode &node) const {
-    std::lock_guard<std::mutex> lock(Storage->GetLock());
+    auto lock = Storage->Lock();
 
     int fd = open(Path.ToString().c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0755);
     TError error;
@@ -124,7 +124,7 @@ TError TKeyValueNode::Save(const kv::TNode &node) const {
 }
 
 TError TKeyValueNode::Remove() const {
-    std::lock_guard<std::mutex> lock(Storage->GetLock());
+    auto lock = Storage->Lock();
 
     TFile node(Path);
     return node.Remove();

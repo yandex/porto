@@ -444,7 +444,7 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                 auto client = clients[source->Fd];
                 bool needClose = false;
 
-                std::lock_guard<std::mutex> lock(client->GetLock());
+                auto lock = client->Lock();
 
                 if (ev.events & EPOLLIN)
                     needClose = HandleRequest(context, worker, client);
