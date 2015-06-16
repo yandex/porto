@@ -509,3 +509,20 @@ restart:
 
     return error;
 }
+
+TError TPath::ReadDirectory(std::vector<std::string> &result) const {
+    struct dirent *de;
+    DIR *dir;
+
+    result.clear();
+    dir = opendir(c_str());
+    if (!dir)
+        return TError(EError::Unknown, errno, "Cannot open directory " + Path);
+
+    while ((de = readdir(dir))) {
+        if (strcmp(de->d_name, ".") && strcmp(de->d_name, ".."))
+            result.push_back(string(de->d_name));
+    }
+    closedir(dir);
+    return TError::Success();
+}

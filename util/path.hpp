@@ -91,6 +91,7 @@ public:
     TError Mknod(unsigned int mode, unsigned int dev) const;
     TError Mkdir(unsigned int mode) const;
     TError Rmdir() const;
+    TError ReadDirectory(std::vector<std::string> &result) const;
     TError ClearDirectory(bool verbose = false) const;
     TError StatVFS(uint64_t &space_used, uint64_t &space_avail,
                    uint64_t &inode_used, uint64_t &inode_avail) const;
