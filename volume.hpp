@@ -24,7 +24,7 @@ constexpr const char *V_PERMISSIONS = "permissions";
 constexpr const char *V_CREATOR = "creator";
 
 constexpr const char *V_STORAGE = "storage";
-constexpr const char *V_OVERLAYS = "overlays";
+constexpr const char *V_LAYERS = "layers";
 constexpr const char *V_READ_ONLY = "read_only";
 
 constexpr const char *V_SPACE_LIMIT = "space_limit";
@@ -125,8 +125,8 @@ public:
         return GetStat(space_used, space_avail, inode_used, inode_avail);
     }
 
-    const std::vector<std::string> GetOverlays() const {
-        return Config->Get<std::vector<std::string>>(V_OVERLAYS);
+    const std::vector<std::string> GetLayers() const {
+        return Config->Get<std::vector<std::string>>(V_LAYERS);
     }
 
     TCred GetCred() const { return Cred; }

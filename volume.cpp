@@ -267,7 +267,7 @@ public:
         std::stringstream lower;
         int index = 0;
 
-        for (auto layer: Volume->GetOverlays()) {
+        for (auto layer: Volume->GetLayers()) {
             if (index++)
                 lower << ":";
             lower << layer;
@@ -458,7 +458,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
 
     /* Autodetect volume backend */
     if (!Config->HasValue(V_BACKEND)) {
-        if (Config->HasValue(V_OVERLAYS)) {
+        if (Config->HasValue(V_LAYERS)) {
             if (!config().volumes().native()) //FIXME
                 return TError(EError::InvalidValue, "overlay not supported");
             error = Config->Set<std::string>(V_BACKEND, "overlay");
@@ -696,7 +696,7 @@ const std::vector<std::pair<std::string, std::string>> TVolumeHolder::ListProper
         { V_PERMISSIONS, "directory permissions  default - 0775" },
         { V_CREATOR,     "container user group" },
         { V_READ_ONLY,   "true|false  default - false" },
-        { V_OVERLAYS,    "top-layer;...;bottom-layer  overlay layers" },
+        { V_LAYERS,      "top-layer;...;bottom-layer  overlay layers" },
         { V_SPACE_LIMIT, " " },
         { V_INODE_LIMIT, " " },
         //{ V_SPACE_GUARANTEE, " " },
@@ -725,7 +725,7 @@ static void RegisterVolumeProperties(std::shared_ptr<TRawValueMap> m) {
 
     m->Add(V_LOOP_DEV, new TIntValue(HIDDEN_VALUE | PERSISTENT_VALUE));
     m->Add(V_READ_ONLY, new TBoolValue(PERSISTENT_VALUE));
-    m->Add(V_OVERLAYS, new TListValue(PERSISTENT_VALUE));
+    m->Add(V_LAYERS, new TListValue(PERSISTENT_VALUE));
 
     m->Add(V_SPACE_LIMIT, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
     m->Add(V_INODE_LIMIT, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
