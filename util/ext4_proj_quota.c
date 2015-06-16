@@ -278,18 +278,25 @@ int ext4_support_project(const char *path)
 	char *device, *fstype, *root_path;
 	struct stat path_st;
 	struct if_dqinfo dqinfo;
+	int ret = -1;
 
 	if (find_mountpoint(path, &path_st, &device, &fstype, &root_path))
-		return -1;
+		goto out;
 
 	if (strcmp(fstype, "ext4"))
-		return -1;
+		goto out;
 
 	if (quotactl(QCMD(Q_GETINFO, PRJQUOTA), device, 0, (caddr_t)&dqinfo) &&
 	    (errno != ESRCH || project_quota_on(device, root_path)))
-		return -1;
+		goto out;
 
-	return 0;
+	ret = 0;
+out:
+	free(device);
+	free(fstype);
+	free(root_path);
+
+	return ret;
 }
 
 int ext4_create_project(const char *path,
