@@ -42,6 +42,8 @@ class TVolume;
 class TContainer;
 class TContainerHolder;
 
+TError SanitizeLayer(TPath layer, bool merge);
+
 class TVolumeBackend {
 protected:
     std::shared_ptr<TVolume> Volume;

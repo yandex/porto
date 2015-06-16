@@ -359,3 +359,33 @@ int TPortoAPI::ListVolumes(const std::string &path,
 
     return ret;
 }
+
+int TPortoAPI::ImportLayer(const std::string &layer,
+                           const std::string &tarball, bool merge) {
+    auto req = Req.mutable_importlayer();
+
+    req->set_layer(layer);
+    req->set_tarball(tarball);
+    req->set_merge(merge);
+    return Rpc(Req, Rsp);
+}
+
+int TPortoAPI::RemoveLayer(const std::string &layer) {
+    auto req = Req.mutable_removelayer();
+
+    req->set_layer(layer);
+    return Rpc(Req, Rsp);
+}
+
+int TPortoAPI::ListLayers(std::vector<std::string> &layers) {
+    Req.mutable_listlayers();
+
+    int ret = Rpc(Req, Rsp);
+    if (!ret) {
+        auto list = Rsp.layers().layer();
+        layers.clear();
+        layers.reserve(list.size());
+        copy(list.begin(), list.end(), std::back_inserter(layers));
+    }
+    return ret;
+}

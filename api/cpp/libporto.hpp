@@ -97,4 +97,8 @@ public:
     int ListVolumes(std::vector<TVolumeDescription> &volumes) {
         return ListVolumes("", "", volumes);
     }
+
+    int ImportLayer(const std::string &layer, const std::string &tarball, bool merge = false);
+    int RemoveLayer(const std::string &layer);
+    int ListLayers(std::vector<std::string> &layers);
 };

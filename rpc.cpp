@@ -817,6 +817,111 @@ static TError ListVolumes(TContext &context,
     return TError::Success();
 }
 
+static TError ImportLayer(TContext &context,
+                          const rpc::TLayerImportRequest &req,
+                          std::shared_ptr<TClient> client) {
+
+    if (!config().volumes().enabled())
+        return TError(EError::InvalidMethod, "volume api is disabled");
+
+    TError error = CheckRequestPermissions(client);
+    if (error)
+        return error;
+
+    std::string layer_name = req.layer();
+    if (layer_name.find_first_of("/\\\n\r\t ") != string::npos)
+        return TError(EError::InvalidValue, "invalid layer name");
+
+    TPath layer = TPath(config().volumes().layers_dir()).AddComponent(layer_name);
+    TPath tarball(req.tarball());
+
+    if (tarball.GetType() != EFileType::Regular)
+        return TError(EError::InvalidValue, "tarball not a file");
+
+    if (!tarball.AccessOk(EFileAccess::Read, client->GetCred()))
+        return TError(EError::Permission, "client has not read access to tarball");
+
+    if (layer.Exists()) {
+        if (!req.merge())
+            return TError(EError::InvalidValue, "layer already exists");
+    } else {
+        error = layer.Mkdir(0755);
+        if (error)
+            return error;
+    }
+
+    error = UnpackTarball(tarball, layer);
+    if (error) {
+        (void)layer.ClearDirectory();
+        (void)layer.Rmdir();
+        return error;
+    }
+
+    error = SanitizeLayer(layer, req.merge());
+    if (error) {
+        (void)layer.ClearDirectory();
+        (void)layer.Rmdir();
+        return error;
+    }
+
+    return TError::Success();
+}
+
+static TError RemoveLayer(TContext &context,
+                          const rpc::TLayerRemoveRequest &req,
+                          std::shared_ptr<TClient> client) {
+
+    if (!config().volumes().enabled())
+            return TError(EError::InvalidMethod, "volume api is disabled");
+
+    TError error = CheckRequestPermissions(client);
+    if (error)
+        return error;
+
+    TPath layer = TPath(config().volumes().layers_dir()).AddComponent(req.layer());
+    if (!layer.Exists())
+        return TError(EError::InvalidValue, "layer does not exist");
+
+    auto vholder_lock = context.Vholder->Lock();
+    for (auto path : context.Vholder->ListPaths()) {
+        auto volume = context.Vholder->Find(path);
+        if (volume == nullptr)
+            continue;
+
+        for (auto l: volume->GetLayers()) {
+            if (l.NormalPath() == layer)
+                return TError(EError::VolumeIsBusy, "layer still in use");
+        }
+    }
+    vholder_lock.unlock();
+
+    error = layer.ClearDirectory();
+    if (error)
+        return error;
+
+    error = layer.Rmdir();
+
+    return error;
+}
+
+static TError ListLayers(TContext &context,
+                         rpc::TContainerResponse &rsp) {
+
+    if (!config().volumes().enabled())
+            return TError(EError::InvalidMethod, "volume api is disabled");
+
+    TPath layers_dir = TPath(config().volumes().layers_dir());
+    std::vector<std::string> layers;
+
+    TError error = layers_dir.ReadDirectory(layers);
+    if (!error) {
+        auto list = rsp.mutable_layers();
+        for (auto l: layers)
+            list->add_layer(l);
+    }
+    return error;
+}
+
 void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
                       std::shared_ptr<TClient> client) {
     rpc::TContainerResponse rsp;
@@ -874,6 +979,12 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
             error = UnlinkVolume(context, req.unlinkvolume(), rsp, client);
         else if (req.has_listvolumes())
             error = ListVolumes(context, req.listvolumes(), rsp);
+        else if (req.has_importlayer())
+            error = ImportLayer(context, req.importlayer(), client);
+        else if (req.has_removelayer())
+            error = RemoveLayer(context, req.removelayer(), client);
+        else if (req.has_listlayers())
+            error = ListLayers(context, rsp);
         else
             error = TError(EError::InvalidMethod, "invalid RPC method");
     } catch (std::bad_alloc exc) {

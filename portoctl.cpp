@@ -1550,6 +1550,58 @@ public:
     }
 };
 
+class TLayerCmd : public ICmd {
+public:
+    TLayerCmd(TPortoAPI *api) : ICmd(api, "layer", 1, "-I|-M|-R|-L <layer> [tarball]", "import/merge/remove/list overlayfs layer") {}
+
+    bool import = false;
+    bool merge  = false;
+    bool remove = false;
+    bool list   = false;
+
+    int Execute(int argc, char *argv[]) {
+        int ret;
+        int start = GetOpt(argc, argv, {
+            { 'I', false, [&](const char *arg) { import = true; } },
+            { 'M', false, [&](const char *arg) { merge  = true; } },
+            { 'R', false, [&](const char *arg) { remove = true; } },
+            { 'L', false, [&](const char *arg) { list   = true; } },
+        });
+
+        if (import) {
+            if (argc < start + 2)
+                return EXIT_FAILURE;
+            ret = Api->ImportLayer(argv[start], argv[start + 1]);
+            if (ret)
+                PrintError("Can't import layer");
+        } else if (merge) {
+            if (argc < start + 2)
+                return EXIT_FAILURE;
+            ret = Api->ImportLayer(argv[start], argv[start + 1], true);
+            if (ret)
+                PrintError("Can't merge layer");
+        } else if (remove) {
+            if (argc < start + 1)
+                return EXIT_FAILURE;
+            ret = Api->RemoveLayer(argv[start]);
+            if (ret)
+                PrintError("Can't remove layer");
+        } else if (list) {
+            std::vector<std::string> layers;
+            ret = Api->ListLayers(layers);
+            if (ret) {
+                PrintError("Can't list layers");
+            } else {
+                for (auto l: layers)
+                    std::cout << l << std::endl;
+            }
+        } else
+            return EXIT_FAILURE;
+
+        return ret;
+    }
+};
+
 int main(int argc, char *argv[]) {
     config.Load(true);
     TPortoAPI api(config().rpc_sock().file().path());
@@ -1582,6 +1634,8 @@ int main(int argc, char *argv[]) {
     RegisterCommand(new TLinkVolumeCmd(&api));
     RegisterCommand(new TUnlinkVolumeCmd(&api));
     RegisterCommand(new TListVolumesCmd(&api));
+
+    RegisterCommand(new TLayerCmd(&api));
 
     TLogger::DisableLog();
 

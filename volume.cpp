@@ -13,6 +13,7 @@
 #include "config.hpp"
 
 extern "C" {
+#include <sys/stat.h>
 #include <sys/vfs.h>
 #include <sys/mount.h>
 #include "util/ext4_proj_quota.h"
@@ -915,4 +916,51 @@ std::vector<TPath> TVolumeHolder::ListPaths() const {
         ret.push_back(v.first);
 
     return ret;
+}
+
+TError SanitizeLayer(TPath layer, bool merge) {
+    std::vector<std::string> content;
+
+    TError error = layer.ReadDirectory(content);
+    if (error)
+        return error;
+
+    for (auto entry: content) {
+        TPath path = layer.AddComponent(entry);
+
+        /* Handle aufs whiteouts */
+        if (entry.compare(0, 4, ".wh.") == 0) {
+            error = path.Unlink();
+            if (error)
+                return error;
+
+            path = layer.AddComponent(entry.substr(4));
+            if (path.Exists()) {
+                if (path.GetType() == EFileType::Directory) {
+                    error = path.ClearDirectory();
+                    if (!error)
+                        error = path.Rmdir();
+                } else
+                    error = path.Unlink();
+                if (error)
+                    return error;
+            }
+
+            if (!merge) {
+                /* Convert into overlayfs whiteout */
+                error = path.Mknod(S_IFCHR, 0);
+                if (error)
+                    return error;
+            }
+
+            continue;
+        }
+
+        if (path.GetType() == EFileType::Directory) {
+            error = SanitizeLayer(path, merge);
+            if (error)
+                return error;
+        }
+    }
+    return TError::Success();
 }

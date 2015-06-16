@@ -180,6 +180,10 @@ message TContainerRequest {
 	optional TVolumeLinkRequest linkVolume = 105;
 	optional TVolumeUnlinkRequest unlinkVolume = 106;
 	optional TVolumeListRequest listVolumes = 107;
+
+	optional TLayerImportRequest importLayer = 110;
+	optional TLayerRemoveRequest removeLayer = 111;
+	optional TLayerListRequest listLayers = 112;
 }
 
 // Ответ на запрос списка контейнеров
@@ -270,6 +274,7 @@ message TContainerResponse {
 	optional TContainerWaitResponse wait = 11;
 	optional TVolumePropertyListResponse volumePropertyList = 12;
 	optional TVolumeDescription volume = 13;
+	optional TLayerListResponse layers = 14;
 }
 
 // VolumeAPI
@@ -326,4 +331,23 @@ message TVolumeListRequest {
 // Список томов с описанием
 message TVolumeListResponse {
 	repeated TVolumeDescription volumes = 1;
+}
+
+// Импорт overlayfs слоя
+message TLayerImportRequest {
+	required string layer = 1;
+	required string tarball = 2;
+	required bool merge = 3;
+}
+
+// Удаление overlayfs слоя
+message TLayerRemoveRequest {
+	required string layer = 1;
+}
+
+message TLayerListRequest {
+}
+
+message TLayerListResponse {
+	repeated string layer = 1;
 }

@@ -144,6 +144,19 @@ _portoctl ()
 			;;
 		esac
 		;;
+	layer)
+		case "$cword" in
+		2)
+			COMPREPLY=( $( compgen -W "-I -M -R -L" -- "$cur" ) )
+			;;
+		3)
+			COMPREPLY=( $( compgen -W "$(portoctl layer -L 2>/dev/null)" -- "$cur" ) )
+			;;
+		4)
+			_filedir
+			;;
+		esac
+		;;
 	esac
 }
 
