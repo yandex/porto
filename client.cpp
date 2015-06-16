@@ -10,7 +10,7 @@ extern "C" {
 #include <sys/socket.h>
 };
 
-TClient::TClient(int fd) : Fd(fd) {
+TClient::TClient(std::shared_ptr<TEpollLoop> loop, int fd) : TEpollSource(loop, fd) {
 }
 
 TClient::~TClient() {

@@ -448,7 +448,8 @@ TError TContainer::PrepareOomMonitor() {
         return error;
     }
 
-    Source = std::make_shared<TEpollSource>(Efd.GetFd(), EPOLL_EVENT_OOM, shared_from_this());
+    Source = std::make_shared<TEpollSource>(Holder->EpollLoop, Efd.GetFd(),
+                                            EPOLL_EVENT_OOM, shared_from_this());
 
     TError error = Holder->EpollLoop->AddSource(Source);
     if (error) {

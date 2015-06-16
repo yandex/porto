@@ -142,7 +142,7 @@ public:
     }
 };
 
-static bool HandleRequest(TContext &context, TRpcWorker &worker, std::shared_ptr<TClient> client) {
+static bool QueueRequest(TContext &context, TRpcWorker &worker, std::shared_ptr<TClient> client) {
     uint32_t slaveReadTimeout = config().daemon().slave_read_timeout_s();
     InterruptibleInputStream pist(client->GetFd());
 
@@ -204,7 +204,7 @@ static int AcceptClient(TContext &context, int sfd,
         return -1;
     }
 
-    auto client = std::make_shared<TClient>(cfd);
+    auto client = std::make_shared<TClient>(context.EpollLoop, cfd);
     int ret = client->Identify(*context.Cholder);
     if (ret)
         return ret;
@@ -314,21 +314,25 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
         return EXIT_FAILURE;
     }
 
-    auto AcceptSource = std::make_shared<TEpollSource>(sfd);
+    auto AcceptSource = std::make_shared<TEpollSource>(context.EpollLoop, sfd);
     error = context.EpollLoop->AddSource(AcceptSource);
     if (error) {
         L_ERR() << "Can't add RPC server fd to epoll: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
-    error = context.EpollLoop->AddSource(std::make_shared<TEpollSource>(REAP_EVT_FD));
+    auto MasterSource = std::make_shared<TEpollSource>(context.EpollLoop, REAP_EVT_FD);
+    error = context.EpollLoop->AddSource(MasterSource);
     if (error && !failsafe) {
         L_ERR() << "Can't add master fd to epoll: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
+    std::shared_ptr<TEpollSource> NetworkSource;
     if (context.NetEvt) {
-        error = context.EpollLoop->AddSource(std::make_shared<TEpollSource>(context.NetEvt->GetFd()));
+        NetworkSource = std::make_shared<TEpollSource>(context.EpollLoop,
+                                                       context.NetEvt->GetFd());
+        error = context.EpollLoop->AddSource(NetworkSource);
         if (error) {
             L_ERR() << "Can't add netlink events fd to epoll: " << error << std::endl;
             return EXIT_FAILURE;
@@ -407,8 +411,7 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                 if (ret < 0)
                     goto exit;
 
-
-                error = context.EpollLoop->AddSource(std::make_shared<TEpollSource>(fd));
+                error = context.EpollLoop->AddSource(clients[fd]);
                 if (error) {
                     L_ERR() << "Can't add client fd to epoll: " << error << std::endl;
                     ret = EXIT_FAILURE;
@@ -444,15 +447,13 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                 auto client = clients[source->Fd];
                 bool needClose = false;
 
-                auto lock = client->Lock();
+                context.EpollLoop->RemoveSource(source);
 
                 if (ev.events & EPOLLIN)
-                    needClose = HandleRequest(context, worker, client);
+                    needClose = QueueRequest(context, worker, client);
 
-                if ((ev.events & EPOLLHUP) || needClose) {
-                    context.EpollLoop->RemoveSource(source);
+                if ((ev.events & EPOLLHUP) || needClose)
                     clients.erase(source->Fd);
-                }
             } else {
                 L_WRN() << "Unknown event " << source->Fd << std::endl;
                 context.EpollLoop->RemoveSource(source);
@@ -715,7 +716,7 @@ static int ReceiveAcks(int fd, std::map<int,int> &exited) {
     return nr;
 }
 
-static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
+static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
     int evtfd[2];
     int ackfd[2];
     int ret = EXIT_FAILURE;
@@ -742,7 +743,7 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
         close(evtfd[1]);
         close(ackfd[0]);
         TLogger::CloseLog();
-        loop.Destroy();
+        loop->Destroy();
         dup2(evtfd[0], REAP_EVT_FD);
         dup2(ackfd[1], REAP_ACK_FD);
         close(evtfd[0]);
@@ -762,7 +763,9 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
 
     UpdateQueueSize(exited);
 
-    error = loop.AddSource(std::make_shared<TEpollSource>(ackfd[0]));
+    {
+    auto AckSource = std::make_shared<TEpollSource>(loop, ackfd[0]);
+    error = loop->AddSource(AckSource);
     if (error) {
         L_ERR() << "Can't add ackfd[0] to epoll: " << error << std::endl;
         return EXIT_FAILURE;
@@ -772,7 +775,7 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
         std::vector<int> signals;
         std::vector<struct epoll_event> events;
 
-        error = loop.GetEvents(signals, events, -1);
+        error = loop->GetEvents(signals, events, -1);
         if (error) {
             L_ERR() << "master: epoll error " << error << std::endl;
             return EXIT_FAILURE;
@@ -818,7 +821,7 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
                 TLogger::CloseLog();
                 close(evtfd[1]);
                 close(ackfd[0]);
-                loop.Destroy();
+                loop->Destroy();
                 execlp(program_invocation_name, program_invocation_name, stdlogArg, nullptr);
                 std::cerr << "Can't execlp(" << program_invocation_name << ", " << program_invocation_name << ", NULL)" << strerror(errno) << std::endl;
                 ret = EXIT_FAILURE;
@@ -835,7 +838,7 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
         }
 
         for (auto ev : events) {
-            auto source = loop.GetSource(ev.data.ptr);
+            auto source = loop->GetSource(ev.data.ptr);
             if (!source)
                 continue;
 
@@ -846,7 +849,7 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
                 }
             } else {
                 L() << "Unknown event " << source->Fd << std::endl;
-                loop.RemoveSource(source);
+                loop->RemoveSource(source);
             }
         }
 
@@ -856,6 +859,7 @@ static int SpawnSlave(TEpollLoop &loop, map<int,int> &exited) {
             ret = EXIT_SUCCESS;
             goto exit;
         }
+    }
     }
 
 exit:
@@ -896,8 +900,8 @@ static int MasterMain() {
     CheckVersion(prevMaj, prevMin);
     L_SYS() << "Updating from previous version v" << prevMaj << "." << prevMin << std::endl;
 
-    TEpollLoop ELoop;
-    TError error = ELoop.Create();
+    std::shared_ptr<TEpollLoop> ELoop = std::make_shared<TEpollLoop>();
+    TError error = ELoop->Create();
     if (error)
         return error;
 

@@ -7,16 +7,18 @@
 #include "util/cred.hpp"
 #include "util/log.hpp"
 #include "container.hpp"
+#include "epoll.hpp"
 
 extern "C" {
 #include <unistd.h>
 };
 
 class TContainerWaiter;
+class TEpollLoop;
 
-class TClient : public TLockable, public TNonCopyable {
+class TClient : public TEpollSource {
 public:
-    TClient(int fd);
+    TClient(std::shared_ptr<TEpollLoop> loop, int fd);
     ~TClient();
 
     int GetFd() const;
@@ -49,7 +51,6 @@ public:
     bool Readonly();
 
 private:
-    int Fd;
     pid_t Pid;
     TCred Cred;
     std::string Comm;

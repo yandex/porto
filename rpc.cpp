@@ -36,8 +36,6 @@ static void SendReply(std::shared_ptr<TClient> client,
         return;
     }
 
-    auto lock = client->Lock();
-
     google::protobuf::io::FileOutputStream post(client->GetFd());
 
     if (response.IsInitialized()) {
@@ -48,6 +46,10 @@ static void SendReply(std::shared_ptr<TClient> client,
                     << " (request took " << client->GetRequestTime() << "ms)" << std::endl;
         post.Flush();
     }
+
+    auto loop = client->EpollLoop.lock();
+    if (loop)
+        loop->AddSource(client);
 }
 
 static TError CheckRequestPermissions(std::shared_ptr<TClient> client) {

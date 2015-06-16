@@ -24,14 +24,21 @@ static constexpr int HANDLE_SIGNALS_WAIT[] = {SIGCHLD};
 constexpr int EPOLL_EVENT_OOM = 1;
 
 class TContainer;
+class TEpollLoop;
 
 struct TEpollSource : public TNonCopyable {
+    std::weak_ptr<TEpollLoop> EpollLoop;
     int Fd;
     int Flags;
     std::weak_ptr<TContainer> Container;
 
-    TEpollSource(int fd, int flags, std::weak_ptr<TContainer> container) : Fd(fd), Flags(flags), Container(container) {}
-    TEpollSource(int fd) : Fd(fd), Flags(0), Container() {}
+    TEpollSource(std::shared_ptr<TEpollLoop> loop, int fd, int flags,
+                 std::weak_ptr<TContainer> container) : EpollLoop(loop), Fd(fd),
+                                                        Flags(flags),
+                                                        Container(container) {}
+    TEpollSource(std::shared_ptr<TEpollLoop> loop, int fd) : EpollLoop(loop),
+                                                             Fd(fd), Flags(0),
+                                                             Container() {}
 };
 
 class TEpollLoop : public TNonCopyable {
@@ -43,7 +50,7 @@ class TEpollLoop : public TNonCopyable {
     size_t MaxEvents = 0;
     struct epoll_event *Events = nullptr;
 
-    std::map<void *, std::shared_ptr<TEpollSource>> Sources;
+    std::map<void *, std::weak_ptr<TEpollSource>> Sources;
     std::mutex Lock;
 
     TError RemoveFd(int fd);
@@ -52,7 +59,6 @@ public:
     TError Create();
     void Destroy();
     ~TEpollLoop();
-
 
     TError AddSource(std::shared_ptr<TEpollSource> source);
     void RemoveSource(std::shared_ptr<TEpollSource> source);

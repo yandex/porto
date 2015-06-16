@@ -176,5 +176,5 @@ std::shared_ptr<TEpollSource> TEpollLoop::GetSource(void *ptr) {
     if (Sources.find(ptr) == Sources.end())
         return nullptr;
 
-    return Sources.at(ptr);
+    return Sources.at(ptr).lock();
 }
