@@ -393,6 +393,12 @@ TError TPath::StatVFS(uint64_t &space_avail) const {
     return StatVFS(space_used, space_avail, inode_used, inode_avail);
 }
 
+TError TPath::Unlink() const {
+    if (unlink(c_str()))
+        return TError(EError::Unknown, errno, "unlink(" + Path + ")");
+    return TError::Success();
+}
+
 TError TPath::Mkdir(unsigned int mode) const {
     if (mkdir(Path.c_str(), mode) < 0)
         return TError(errno == ENOSPC ? EError::NoSpace :
