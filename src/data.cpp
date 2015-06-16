@@ -155,7 +155,7 @@ public:
 };
 
 static std::string ReadStdio(const TPath &path, size_t limit) {
-    if (!path.Exists() || path.GetType() != EFileType::Regular)
+    if (!path.IsRegular())
         return "";
 
     std::string s;

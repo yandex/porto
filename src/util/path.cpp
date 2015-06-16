@@ -140,6 +140,16 @@ off_t TPath::GetDiskUsage() const {
     return st.st_blocks * 512;
 }
 
+bool TPath::IsRegular() const {
+    struct stat st;
+    return !lstat(c_str(), &st) && S_ISREG(st.st_mode);
+}
+
+bool TPath::IsDirectory() const {
+    struct stat st;
+    return !lstat(c_str(), &st) && S_ISDIR(st.st_mode);
+}
+
 bool TPath::Exists() const {
     return access(Path.c_str(), F_OK) == 0;
 }

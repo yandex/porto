@@ -772,7 +772,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             return TError(EError::InvalidValue, "Volume path must be absolute");
         if (!path.IsNormal())
             return TError(EError::InvalidValue, "Volume path must be normalized");
-        if (path.GetType() != EFileType::Directory)
+        if (!path.IsDirectory())
             return TError(EError::InvalidValue, "Volume path must be a directory");
         if (!path.AccessOk(EFileAccess::Write, creator_cred))
             return TError(EError::Permission, "Volume path usage not permitted");
@@ -804,7 +804,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             return TError(EError::InvalidValue, "Storage path must be absolute");
         if (!storage.IsNormal())
             return TError(EError::InvalidValue, "Storage path must be normalized");
-        if (storage.GetType() != EFileType::Directory)
+        if (!storage.IsDirectory())
             return TError(EError::InvalidValue, "Storage path must be a directory");
         if (!storage.AccessOk(EFileAccess::Write, creator_cred))
             return TError(EError::Permission, "Storage path usage not permitted");
@@ -878,7 +878,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
         }
         if (!layer.Exists())
             return TError(EError::LayerNotFound, "Layer not found");
-        if (layer.GetType() != EFileType::Directory)
+        if (!layer.IsDirectory())
             return TError(EError::InvalidValue, "Layer must be a directory");
     }
     error = Config->Set<std::vector<std::string>>(V_LAYERS, layers);
@@ -1243,7 +1243,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
     std::vector<std::shared_ptr<TKeyValueNode>> list;
 
     TPath volumes = config().volumes().volume_dir();
-    if (!volumes.Exists() || volumes.GetType() != EFileType::Directory) {
+    if (!volumes.IsDirectory()) {
         TFolder dir(config().volumes().volume_dir());
         (void)dir.Remove(true);
         TError error = dir.Create(0755, true);
@@ -1252,7 +1252,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
     }
 
     TPath layers = config().volumes().layers_dir();
-    if (!layers.Exists() || layers.GetType() != EFileType::Directory) {
+    if (!layers.IsDirectory()) {
         TFolder dir(layers.ToString());
         (void)dir.Remove(true);
         TError error = layers.Mkdir(0700);
@@ -1416,7 +1416,7 @@ TError SanitizeLayer(TPath layer, bool merge) {
 
             path = layer / entry.substr(4);
             if (path.Exists()) {
-                if (path.GetType() == EFileType::Directory) {
+                if (path.IsDirectory()) {
                     error = path.ClearDirectory();
                     if (!error)
                         error = path.Rmdir();
@@ -1436,7 +1436,7 @@ TError SanitizeLayer(TPath layer, bool merge) {
             continue;
         }
 
-        if (path.GetType() == EFileType::Directory) {
+        if (path.IsDirectory()) {
             error = SanitizeLayer(path, merge);
             if (error)
                 return error;

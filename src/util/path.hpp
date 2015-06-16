@@ -89,6 +89,8 @@ public:
     off_t GetSize() const;
     off_t GetDiskUsage() const;
     std::string ToString() const;
+    bool IsRegular() const;
+    bool IsDirectory() const;
     bool Exists() const;
     bool AccessOk(EFileAccess type) const;
     bool AccessOk(EFileAccess type, const TCred &cred) const;

@@ -270,7 +270,7 @@ public:
 
             auto path = TPath(layer).RealPath();
 
-            if (path.GetType() == EFileType::Directory) {
+            if (path.IsDirectory()) {
                 Layers.push_back(path.ToString());
                 continue;
             }

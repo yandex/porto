@@ -150,8 +150,7 @@ void TLogBuf::Open(const TPath &path, const unsigned int mode) {
     bool needCreate = false;
 
     if (path.Exists()) {
-        if (path.GetType() != EFileType::Regular ||
-            path.GetMode() != mode) {
+        if (!path.IsRegular() || path.GetMode() != mode) {
 
             TFile f(path);
             (void)f.Remove();

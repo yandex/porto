@@ -93,7 +93,7 @@ TPath TContainer::RootPath() const {
 
     TPath path(Prop->Get<std::string>(P_ROOT));
     if (!path.IsRoot()) {
-        if (path.GetType() == EFileType::Regular)
+        if (path.IsRegular())
             path = GetTmpDir();
         path = path.NormalPath();
     }
@@ -106,7 +106,7 @@ TPath TContainer::DefaultStdFile(const std::string prefix) const {
     std::string cwd(Prop->Get<std::string>(P_CWD));
     std::string name(prefix + "." + GetName(true, "_"));
 
-    if (root.GetType() == EFileType::Regular)
+    if (root.IsRegular())
         return GetTmpDir() / name;
 
     return root / cwd / name;
@@ -1137,7 +1137,7 @@ TError TContainer::ApplyForTreePostorder(TScopedLock &holder_lock,
 
 TError TContainer::PrepareLoop() {
     TPath loop_image(Prop->Get<std::string>(P_ROOT));
-    if (loop_image.GetType() != EFileType::Regular)
+    if (!loop_image.IsRegular())
         return TError::Success();
 
     TError error;
@@ -1190,14 +1190,10 @@ TError TContainer::PrepareResources() {
 }
 
 void TContainer::RemoveLog(const TPath &path) {
-    if (path.GetType() != EFileType::Character &&
-        path.GetType() != EFileType::Block) {
-        TFile f(path);
-        if (f.Exists()) {
-            TError error = f.Remove();
-            if (error)
-                L_ERR() << "Can't remove stdio file " << path << ": " << error << std::endl;
-        }
+    if (path.IsRegular()) {
+        TError error = path.Unlink();
+        if (error)
+            L_ERR() << "Can't remove stdio file " << path << ": " << error << std::endl;
     }
 }
 
@@ -2044,7 +2040,7 @@ std::vector<std::string> TContainer::GetChildren() {
 TError TContainer::RotateLog(const TPath &path) {
     off_t max_log_size = config().container().max_log_size();
 
-    if (path.GetType() == EFileType::Regular) {
+    if (path.IsRegular()) {
         TFile file(path);
 
         TError error = file.RotateLog(max_log_size);

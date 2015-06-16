@@ -336,7 +336,7 @@ TError TTask::ChildBindDirectores() {
         TMount mnt(bindMap.Source, dest, "none", {});
 
         TError error;
-        if (bindMap.Source.GetType() == EFileType::Directory)
+        if (bindMap.Source.IsDirectory())
             error = mnt.BindDir(bindMap.Rdonly);
         else
             error = mnt.BindFile(bindMap.Rdonly);

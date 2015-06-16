@@ -60,7 +60,7 @@ TError TFolder::Remove(bool recursive, bool silent) const {
             TFile child(p);
             TError error;
 
-            if (p.GetType() == EFileType::Directory)
+            if (p.IsDirectory())
                 error = TFolder(p).Remove(recursive, true);
             else
                 error = child.Remove(true);
@@ -173,7 +173,7 @@ void RemoveIf(const TPath &path,
             TMount m(id, id, "", {});
             (void)m.Umount();
 
-            if (id.GetType() == EFileType::Directory) {
+            if (id.IsDirectory()) {
                 TFolder d(id);
                 error = d.Remove(true);
             } else {

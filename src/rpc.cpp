@@ -1231,7 +1231,7 @@ noinline TError ImportLayer(TContext &context,
 
     tarball = clientContainer->RootPath() / tarball;
 
-    if (tarball.GetType() != EFileType::Regular)
+    if (!tarball.IsRegular())
         return TError(EError::InvalidValue, "tarball not a file");
 
     if (!tarball.AccessOk(EFileAccess::Read, client->GetCred()))
