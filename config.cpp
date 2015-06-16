@@ -73,6 +73,7 @@ void TConfig::LoadDefaults() {
     config().mutable_volumes()->mutable_keyval()->set_size("size=32m");
 
     config().mutable_volumes()->set_volume_dir("/place/porto_volumes");
+    config().mutable_volumes()->set_layers_dir("/place/porto_layers");
 #ifdef PORTOD
     bool supportQuota = ext4_support_project(config().volumes().volume_dir().c_str()) == 0;
     bool supportOvl = SupportOverlayfs();

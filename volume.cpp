@@ -379,6 +379,19 @@ TPath TVolume::GetStorage() const {
         return GetInternal(GetBackend());
 }
 
+std::vector<TPath> TVolume::GetLayers() const {
+    std::vector<TPath> result;
+
+    for (auto layer: Config->Get<std::vector<std::string>>(V_LAYERS)) {
+        TPath path(layer);
+        if (!path.IsAbsolute())
+            path = TPath(config().volumes().layers_dir()).AddComponent(layer);
+        result.push_back(path);
+    }
+
+    return result;
+}
+
 TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
                           std::shared_ptr<TContainer> creator_container,
                           const std::map<std::string, std::string> &properties) {
@@ -766,6 +779,15 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
         TFolder dir(config().volumes().volume_dir());
         (void)dir.Remove(true);
         TError error = dir.Create(0755, true);
+        if (error)
+            return error;
+    }
+
+    TPath layers = config().volumes().layers_dir();
+    if (!layers.Exists() || layers.GetType() != EFileType::Directory) {
+        TFolder dir(layers.ToString());
+        (void)dir.Remove(true);
+        TError error = layers.Mkdir(0755);
         if (error)
             return error;
     }

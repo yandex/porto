@@ -125,9 +125,7 @@ public:
         return GetStat(space_used, space_avail, inode_used, inode_avail);
     }
 
-    const std::vector<std::string> GetLayers() const {
-        return Config->Get<std::vector<std::string>>(V_LAYERS);
-    }
+    std::vector<TPath> GetLayers() const;
 
     TCred GetCred() const { return Cred; }
     unsigned GetPermissions() const { return Permissions; }

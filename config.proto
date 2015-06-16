@@ -75,6 +75,7 @@ message TCfg {
 		optional string volume_dir = 2;
 		optional bool native = 3;
 		optional bool enabled = 5;
+		optional string layers_dir = 6;
 	}
 
 	optional TNetworkCfg network = 1;
