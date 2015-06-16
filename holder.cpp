@@ -223,6 +223,10 @@ TError TContainerHolder::_Destroy(const std::string &name) {
     Containers.erase(name);
     Statistics->Created--;
 
+    auto parent = c->GetParent();
+    c = nullptr;
+    parent->CleanupExpiredChildren();
+
     return TError::Success();
 }
 

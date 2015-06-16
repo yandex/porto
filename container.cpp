@@ -223,7 +223,7 @@ std::shared_ptr<const TContainer> TContainer::GetRoot() const {
         return shared_from_this();
 }
 
-std::shared_ptr<const TContainer> TContainer::GetParent() const {
+std::shared_ptr<TContainer> TContainer::GetParent() const {
     return Parent;
 }
 
@@ -529,6 +529,18 @@ bool TContainer::IsNamespaceIsolated() {
         return Parent->IsNamespaceIsolated();
 
     return false;
+}
+
+void TContainer::CleanupExpiredChildren() {
+    for (auto iter = Children.begin(); iter != Children.end();) {
+        auto child = iter->lock();
+        if (child) {
+            iter++;
+            continue;
+        }
+
+        iter = Children.erase(iter);
+    }
 }
 
 TError TContainer::PrepareTask() {

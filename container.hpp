@@ -122,7 +122,7 @@ public:
     bool IsRoot() const;
     bool IsPortoRoot() const;
     std::shared_ptr<const TContainer> GetRoot() const;
-    std::shared_ptr<const TContainer> GetParent() const;
+    std::shared_ptr<TContainer> GetParent() const;
     bool ValidLink(const std::string &name) const;
     std::shared_ptr<TNlLink> GetLink(const std::string &name) const;
 
@@ -166,6 +166,7 @@ public:
     bool IsLostAndRestored() const;
     void SyncStateWithCgroup();
     bool IsNamespaceIsolated();
+    void CleanupExpiredChildren();
 
     /* protected with TVolumeHolder->Lock */
     std::set<std::shared_ptr<TVolume>> Volumes;

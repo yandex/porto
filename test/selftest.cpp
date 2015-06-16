@@ -3879,6 +3879,30 @@ static void TestLeaks(TPortoAPI &api) {
     TFile masterFile(config().master_pid().path());
     ExpectSuccess(masterFile.AsString(masterPid));
 
+    int prevSlave = GetVmRss(slavePid);
+    int prevMaster = GetVmRss(masterPid);
+
+    int createDestroyNr = 50000;
+
+    Say() << "Create and destroy single container " << createDestroyNr << " times" << std::endl;
+    name = "a";
+    for (int i = 0; i < createDestroyNr; i++) {
+        ExpectApiSuccess(api.Create(name));
+        api.Cleanup();
+        ExpectApiSuccess(api.Destroy(name));
+        api.Cleanup();
+    }
+
+    int nowSlave = GetVmRss(slavePid);
+    int nowMaster = GetVmRss(masterPid);
+
+    Say() << "Expected slave " << nowSlave << " < " << prevSlave + slack << std::endl;
+    Expect(nowSlave <= prevSlave + slack);
+
+    Say() << "Expected master " << nowMaster << " < " << prevMaster + slack << std::endl;
+    Expect(nowMaster <= prevMaster + slack);
+
+    Say() << "Create and destroy " << LeakConainersNr << " containers" << std::endl;
     for (int i = 0; i < LeakConainersNr; i++) {
         name = "a" + std::to_string(i);
         ExpectApiSuccess(api.Create(name));
@@ -3897,16 +3921,18 @@ static void TestLeaks(TPortoAPI &api) {
         ExpectApiSuccess(api.Destroy(name));
     }
 
-    int prevSlave = GetVmRss(slavePid);
-    int prevMaster = GetVmRss(masterPid);
+    prevSlave = GetVmRss(slavePid);
+    prevMaster = GetVmRss(masterPid);
+
+    Say() << "Create and destroy " << LeakConainersNr << " containers, current RSS " << prevMaster << "/" << prevSlave << std::endl;
 
     for (int i = 0; i < LeakConainersNr; i++) {
         name = "b" + std::to_string(i);
         ExpectApiSuccess(api.Create(name));
         ExpectApiSuccess(api.SetProperty(name, "command", "true"));
         ExpectApiSuccess(api.Start(name));
-
         ReadPropsAndData(api, name);
+        api.Cleanup();
     }
 
     name = "b0";
@@ -3916,10 +3942,11 @@ static void TestLeaks(TPortoAPI &api) {
     for (int i = 0; i < LeakConainersNr; i++) {
         name = "b" + std::to_string(i);
         ExpectApiSuccess(api.Destroy(name));
+        api.Cleanup();
     }
 
-    int nowSlave = GetVmRss(slavePid);
-    int nowMaster = GetVmRss(masterPid);
+    nowSlave = GetVmRss(slavePid);
+    nowMaster = GetVmRss(masterPid);
 
     Say() << "Expected slave " << nowSlave << " < " << prevSlave + slack << std::endl;
     Expect(nowSlave <= prevSlave + slack);
