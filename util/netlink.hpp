@@ -70,6 +70,12 @@ class TNlLink : public TNonCopyable {
     std::string Name;
     std::string Alias;
 
+    TError AddXVlan(const std::string &vlantype,
+                    const std::string &master,
+                    uint32_t type,
+                    const std::string &hw,
+                    int mtu);
+
 public:
     struct rtnl_link *Link = nullptr;
 

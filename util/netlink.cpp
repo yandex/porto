@@ -6,6 +6,7 @@
 // http://luxik.cdi.cz/~devik/qos/htb/manual/userg.htm
 
 extern "C" {
+#include <linux/if.h>
 #include <linux/if_ether.h>
 #include <netinet/ether.h>
 #include <netlink/route/class.h>
@@ -239,7 +240,7 @@ TError TNlLink::Remove() {
     LogObj("remove", hostLink);
     int ret = rtnl_link_delete(GetSock(), hostLink);
     if (ret < 0)
-        error = TError(EError::Unknown, string("Unable to remove macvlan: ") + nl_geterror(ret));
+        error = TError(EError::Unknown, string("Unable to remove link: ") + nl_geterror(ret));
     rtnl_link_put(hostLink);
 
     return error;
@@ -353,51 +354,113 @@ TError TNlLink::RefillCache() {
     return Nl->RefillCache();
 }
 
-TError TNlLink::AddMacVlan(const std::string &master,
-                           const std::string &type, const std::string &hw,
-                           int mtu) {
-    TError error = TError::Success();
-    struct rtnl_link *hostLink = rtnl_link_macvlan_alloc();
-    int mode = rtnl_link_macvlan_str2mode(type.c_str());
-    if (mode < 0)
-        return TError(EError::Unknown, "Invalid MAC VLAN type " + type);
+#ifdef IFLA_IPVLAN_MAX
+static const std::map<std::string, int> ipvlanType = {
+    { "l2", IPVLAN_MODE_L2 },
+    { "l3", IPVLAN_MODE_L3 },
+};
+#endif
 
+static const std::map<std::string, int> macvlanType = {
+    { "private", MACVLAN_MODE_PRIVATE },
+    { "vepa", MACVLAN_MODE_VEPA },
+    { "bridge", MACVLAN_MODE_BRIDGE },
+    {" passthru", MACVLAN_MODE_PASSTHRU },
+};
+
+TError TNlLink::AddXVlan(const std::string &vlantype,
+                         const std::string &master,
+                         uint32_t type,
+                         const std::string &hw,
+                         int mtu) {
+    TError error = TError::Success();
+    int ret;
+    uint32_t masterIdx = FindIndex(master);
+    struct nl_msg *msg;
+    struct nlattr *data;
+    struct ifinfomsg ifi = { 0 };
     struct ether_addr *ea = nullptr;
+
     if (hw.length()) {
+        // FIXME THREADS
         ea = ether_aton(hw.c_str());
         if (!ea)
-            return TError(EError::Unknown, "Invalid MAC VLAN mac address " + hw);
+            return TError(EError::Unknown, "Invalid " + vlantype + " mac address " + hw);
     }
 
-    int ret;
-    int masterIdx = FindIndex(master);
+	msg = nlmsg_alloc_simple(RTM_NEWLINK, NLM_F_CREATE);
+	if (!msg)
+        return TError(EError::Unknown, "Unable to add " + vlantype + ": no memory");
 
-    rtnl_link_set_link(hostLink, masterIdx);
-    rtnl_link_set_name(hostLink, Name.c_str());
+	ret = nlmsg_append(msg, &ifi, sizeof(ifi), NLMSG_ALIGNTO);
+    if (ret < 0) {
+        error = TError(EError::Unknown, "Unable to add " + vlantype + ": " + nl_geterror(ret));
+		goto free_msg;
+    }
+
+    /* link configuration */
+    nla_put(msg, IFLA_LINK, sizeof(uint32_t), &masterIdx);
+    nla_put(msg, IFLA_IFNAME, Name.length() + 1, Name.c_str());
 
     if (mtu > 0)
-        rtnl_link_set_mtu(hostLink, (unsigned int)mtu);
+        nla_put(msg, IFLA_MTU, sizeof(int), &mtu);
 
     if (ea) {
         struct nl_addr *addr = nl_addr_build(AF_LLC, ea, ETH_ALEN);
-        rtnl_link_set_addr(hostLink, addr);
+        nla_put(msg, IFLA_ADDRESS, nl_addr_get_len(addr), nl_addr_get_binary_addr(addr));
         nl_addr_put(addr);
     }
 
-    rtnl_link_macvlan_set_mode(hostLink, mode);
+    /* link type */
+    data = nla_nest_start(msg, IFLA_LINKINFO);
+    if (!data) {
+        error = TError(EError::Unknown, "Unable to add " + vlantype + ": can't nest IFLA_LINKINFO");
+		goto free_msg;
+    }
+    nla_put(msg, IFLA_INFO_KIND, vlantype.length() + 1, vlantype.c_str());
+    nla_nest_end(msg, data);
 
-    LogObj("add", hostLink);
+    /* macvlan specific */
+	data = nla_nest_start(msg, IFLA_INFO_DATA);
+    if (!data) {
+        error = TError(EError::Unknown, "Unable to add " + vlantype + ": can't nest IFLA_INFO_DATA");
+		goto free_msg;
+    }
 
-    ret = rtnl_link_add(GetSock(), hostLink, NLM_F_CREATE);
-    if (ret < 0)
-        error = TError(EError::Unknown, string("Unable to add macvlan: ") + nl_geterror(ret));
+    if (vlantype == "macvlan") {
+        nla_put(msg, IFLA_MACVLAN_MODE, sizeof(uint32_t), &type);
+#ifdef IFLA_IPVLAN_MAX
+    } else if (vlantype == "ipvlan") {
+        uint16_t mode = type;
+        nla_put(msg, IFLA_IPVLAN_MODE, sizeof(uint16_t), &mode);
+#endif
+    }
 
-    rtnl_link_put(hostLink);
+	nla_nest_end(msg, data);
+
+    L() << "netlink: add " << vlantype << " " << Name << " master " << master
+        << " type " << type << " hw " << hw << " mtu " << mtu << std::endl;
+
+    ret = nl_send_sync(GetSock(), msg);
+    if (ret) {
+        error = TError(EError::Unknown, "Unable to add " + vlantype + ": " + nl_geterror(ret));
+        goto free_msg;
+    }
 
     if (!error)
-        error = RefillCache();
-
+       error = RefillCache();
     return error;
+
+free_msg:
+	nlmsg_free(msg);
+    return error;
+
+}
+
+TError TNlLink::AddMacVlan(const std::string &master,
+                           const std::string &type, const std::string &hw,
+                           int mtu) {
+    return AddXVlan("macvlan", master, macvlanType.at(type), hw, mtu);
 }
 
 TError TNlLink::Enslave(const std::string &name) {
@@ -480,7 +543,7 @@ const std::string &TNlLink::GetAlias() {
 }
 
 bool TNlLink::ValidMacVlanType(const std::string &type) {
-    return rtnl_link_macvlan_str2mode(type.c_str()) >= 0;
+    return macvlanType.find(type) != macvlanType.end();
 }
 
 bool TNlLink::ValidMacAddr(const std::string &hw) {
@@ -878,7 +941,7 @@ TError TNlCgFilter::Create() {
     }
 
     L() << "netlink " << rtnl_link_get_name(Link->GetLink())
-        << ": create tfilter id 0x" << std::hex << Handle
+        << ": add tfilter id 0x" << std::hex << Handle
         << " parent 0x" << Parent << std::dec  << std::endl;
 
     ret = nl_send_sync(Link->GetSock(), msg);
