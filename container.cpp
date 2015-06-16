@@ -195,20 +195,6 @@ TError TContainer::Destroy() {
 
     RemoveKvs();
 
-    if (Parent)
-        for (auto iter = Children.begin(); iter != Children.end();) {
-            if (auto child = iter->lock()) {
-                if (child->GetName() == GetName()) {
-                    iter = Children.erase(iter);
-                    continue;
-                }
-            } else {
-                iter = Children.erase(iter);
-                continue;
-            }
-            iter++;
-        }
-
     return TError::Success();
 }
 
