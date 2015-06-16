@@ -817,6 +817,20 @@ static TError ListVolumes(TContext &context,
     return TError::Success();
 }
 
+static bool LayerInUse(TContext &context, TPath layer) {
+    auto vholder_lock = context.Vholder->Lock();
+    for (auto path : context.Vholder->ListPaths()) {
+        auto volume = context.Vholder->Find(path);
+        if (volume == nullptr)
+            continue;
+        for (auto l: volume->GetLayers()) {
+            if (l.NormalPath() == layer)
+                return true;
+        }
+    }
+    return false;
+}
+
 static TError ImportLayer(TContext &context,
                           const rpc::TLayerImportRequest &req,
                           std::shared_ptr<TClient> client) {
@@ -844,6 +858,8 @@ static TError ImportLayer(TContext &context,
     if (layer.Exists()) {
         if (!req.merge())
             return TError(EError::InvalidValue, "layer already exists");
+        if (LayerInUse(context, layer))
+            return TError(EError::VolumeIsBusy, "layer in use");
     } else {
         error = layer.Mkdir(0755);
         if (error)
@@ -882,18 +898,8 @@ static TError RemoveLayer(TContext &context,
     if (!layer.Exists())
         return TError(EError::InvalidValue, "layer does not exist");
 
-    auto vholder_lock = context.Vholder->Lock();
-    for (auto path : context.Vholder->ListPaths()) {
-        auto volume = context.Vholder->Find(path);
-        if (volume == nullptr)
-            continue;
-
-        for (auto l: volume->GetLayers()) {
-            if (l.NormalPath() == layer)
-                return TError(EError::VolumeIsBusy, "layer still in use");
-        }
-    }
-    vholder_lock.unlock();
+    if (LayerInUse(context, layer))
+        return TError(EError::VolumeIsBusy, "layer in use");
 
     error = layer.ClearDirectory();
     if (error)
