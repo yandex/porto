@@ -436,3 +436,16 @@ size_t GetNumCores() {
 
     return (size_t)ncores;
 }
+
+TError UnpackTarball(const TPath &tar, const TPath &path) {
+    int status;
+
+    TError error = Run({ "tar", "--numeric-owner", "-pxf", tar.ToString(), "-C", path.ToString() }, status);
+    if (error)
+        return error;
+
+    if (status)
+        return TError(EError::Unknown, "Can't execute tar " + std::to_string(status));
+
+    return TError::Success();
+}
