@@ -793,6 +793,14 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
             return error;
     }
 
+    TPath layers_tmp = layers.AddComponent("_tmp_");
+    if (layers_tmp.Exists()) {
+        L_ACT() << "Remove stale layers..." << std::endl;
+        (void)layers_tmp.ClearDirectory();
+        (void)layers_tmp.Rmdir();
+        (void)layers_tmp.Unlink();
+    }
+
     TError error = Storage->ListNodes(list);
     if (error)
         return error;

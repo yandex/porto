@@ -818,7 +818,6 @@ static TError ListVolumes(TContext &context,
 }
 
 static bool LayerInUse(TContext &context, TPath layer) {
-    auto vholder_lock = context.Vholder->Lock();
     for (auto path : context.Vholder->ListPaths()) {
         auto volume = context.Vholder->Find(path);
         if (volume == nullptr)
@@ -843,10 +842,14 @@ static TError ImportLayer(TContext &context,
         return error;
 
     std::string layer_name = req.layer();
-    if (layer_name.find_first_of("/\\\n\r\t ") != string::npos)
+    if (layer_name.find_first_of("/\\\n\r\t ") != string::npos ||
+            layer_name == "_tmp_")
         return TError(EError::InvalidValue, "invalid layer name");
 
-    TPath layer = TPath(config().volumes().layers_dir()).AddComponent(layer_name);
+    TPath layers = TPath(config().volumes().layers_dir());
+    TPath layers_tmp = layers.AddComponent("_tmp_");
+    TPath layer = layers.AddComponent(layer_name);
+    TPath layer_tmp = layers_tmp.AddComponent(layer_name);
     TPath tarball(req.tarball());
 
     if (tarball.GetType() != EFileType::Regular)
@@ -855,32 +858,53 @@ static TError ImportLayer(TContext &context,
     if (!tarball.AccessOk(EFileAccess::Read, client->GetCred()))
         return TError(EError::Permission, "client has not read access to tarball");
 
-    if (layer.Exists()) {
-        if (!req.merge())
-            return TError(EError::InvalidValue, "layer already exists");
-        if (LayerInUse(context, layer))
-            return TError(EError::VolumeIsBusy, "layer in use");
-    } else {
-        error = layer.Mkdir(0755);
+    if (!layers_tmp.Exists()) {
+        error = layers_tmp.Mkdir(0700);
         if (error)
             return error;
     }
 
-    error = UnpackTarball(tarball, layer);
-    if (error) {
-        (void)layer.ClearDirectory();
-        (void)layer.Rmdir();
-        return error;
+    auto vholder_lock = context.Vholder->Lock();
+    if (layer.Exists()) {
+        if (!req.merge()) {
+            error = TError(EError::InvalidValue, "layer already exists");
+            goto err_tmp;
+        }
+        if (LayerInUse(context, layer)) {
+            error = TError(EError::VolumeIsBusy, "layer in use");
+            goto err_tmp;
+        }
+        error = layer.Rename(layer_tmp);
+        if (error)
+            goto err_tmp;
+    } else {
+        error = layer_tmp.Mkdir(0755);
+        if (error)
+            goto err_tmp;
     }
+    vholder_lock.unlock();
 
-    error = SanitizeLayer(layer, req.merge());
-    if (error) {
-        (void)layer.ClearDirectory();
-        (void)layer.Rmdir();
-        return error;
-    }
+    error = UnpackTarball(tarball, layer_tmp);
+    if (error)
+        goto err;
+
+    error = SanitizeLayer(layer_tmp, req.merge());
+    if (error)
+        goto err;
+
+    error = layer_tmp.Rename(layer);
+    (void)layers_tmp.Rmdir();
+    if (error)
+        goto err;
 
     return TError::Success();
+
+err:
+    (void)layer_tmp.ClearDirectory();
+    (void)layer_tmp.Rmdir();
+err_tmp:
+    (void)layers_tmp.Rmdir();
+    return error;
 }
 
 static TError RemoveLayer(TContext &context,
@@ -894,19 +918,36 @@ static TError RemoveLayer(TContext &context,
     if (error)
         return error;
 
-    TPath layer = TPath(config().volumes().layers_dir()).AddComponent(req.layer());
+    TPath layers = TPath(config().volumes().layers_dir());
+    TPath layer = layers.AddComponent(req.layer());
     if (!layer.Exists())
         return TError(EError::InvalidValue, "layer does not exist");
 
-    if (LayerInUse(context, layer))
-        return TError(EError::VolumeIsBusy, "layer in use");
+    TPath layers_tmp = layers.AddComponent("_tmp_");
+    TPath layer_tmp = layers_tmp.AddComponent(req.layer());
+    if (!layers_tmp.Exists()) {
+        error = layers_tmp.Mkdir(0700);
+        if (error)
+            return error;
+    }
 
-    error = layer.ClearDirectory();
+    auto vholder_lock = context.Vholder->Lock();
+    if (LayerInUse(context, layer)) {
+        error = TError(EError::VolumeIsBusy, "layer in use");
+        goto err;
+    }
+    error = layer.Rename(layer_tmp);
     if (error)
-        return error;
+        goto err;
+    vholder_lock.unlock();
 
-    error = layer.Rmdir();
+    error = layer_tmp.ClearDirectory();
+    if (error)
+        goto err;
 
+    error = layer_tmp.Rmdir();
+err:
+    (void)layers_tmp.Rmdir();
     return error;
 }
 

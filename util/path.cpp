@@ -399,6 +399,12 @@ TError TPath::Unlink() const {
     return TError::Success();
 }
 
+TError TPath::Rename(const TPath &dest) const {
+    if (rename(c_str(), dest.c_str()))
+        return TError(EError::Unknown, errno, "rename(" + Path + ", " + dest.Path + ")");
+    return TError::Success();
+}
+
 TError TPath::Mkdir(unsigned int mode) const {
     if (mkdir(Path.c_str(), mode) < 0)
         return TError(errno == ENOSPC ? EError::NoSpace :
