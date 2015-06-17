@@ -79,7 +79,7 @@ TError TEpollLoop::Create() {
 }
 
 void TEpollLoop::Destroy() {
-    auto lock = Lock();
+    auto lock = ScopedLock();
     Sources.clear();
     close(EpollFd);
     EpollFd = -1;
@@ -135,7 +135,7 @@ TError TEpollLoop::GetEvents(std::vector<int> &signals,
 }
 
 TError TEpollLoop::AddSource(std::shared_ptr<TEpollSource> source) {
-    auto lock = Lock();
+    auto lock = ScopedLock();
 
     void *ptr = static_cast<void *>(source.get());
     Sources[ptr] = source;
@@ -156,7 +156,7 @@ TError TEpollLoop::RemoveFd(int fd) {
 }
 
 void TEpollLoop::RemoveSource(std::shared_ptr<TEpollSource> source) {
-    auto lock = Lock();
+    auto lock = ScopedLock();
 
     void *ptr = static_cast<void *>(source.get());
     if (Sources.find(ptr) == Sources.end())
@@ -171,7 +171,7 @@ void TEpollLoop::RemoveSource(std::shared_ptr<TEpollSource> source) {
 }
 
 std::shared_ptr<TEpollSource> TEpollLoop::GetSource(void *ptr) {
-    auto lock = Lock();
+    auto lock = ScopedLock();
 
     if (Sources.find(ptr) == Sources.end())
         return nullptr;

@@ -35,7 +35,7 @@ public:
 
     bool Handle(const TEvent &event) override {
         if (event.DueMs <= GetCurrentTimeMs()) {
-            auto lock = Holder->Lock();
+            auto lock = Holder->ScopedLock();
             (void)Holder->DeliverEvent(event);
             return true;
         }

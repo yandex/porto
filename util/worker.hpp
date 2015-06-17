@@ -28,7 +28,7 @@ public:
     void Stop() {
         if (Valid) {
             {
-                auto lock = Lock();
+                auto lock = ScopedLock();
                 Valid = false;
                 Cv.notify_all();
             }
@@ -39,7 +39,7 @@ public:
     }
 
     void Push(const T &elem) {
-        auto lock = Lock();
+        auto lock = ScopedLock();
         Queue.push(elem);
         Seq++;
         Cv.notify_one();
@@ -55,7 +55,7 @@ public:
     void WorkerFn(const std::string &name) {
         BlockAllSignals();;
         SetProcessName(name);
-        auto lock = Lock();
+        auto lock = ScopedLock();
         while (Valid) {
             if (Queue.empty())
                 Wait(lock);

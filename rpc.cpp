@@ -63,7 +63,7 @@ static TError CreateContainer(TContext &context,
                               const rpc::TContainerCreateRequest &req,
                               rpc::TContainerResponse &rsp,
                               std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->Lock();
+    auto lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -80,7 +80,7 @@ static TError DestroyContainer(TContext &context,
                                const rpc::TContainerDestroyRequest &req,
                                rpc::TContainerResponse &rsp,
                                std::shared_ptr<TClient> client) {
-    auto cholder_lock = context.Cholder->Lock();
+    auto cholder_lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -103,7 +103,7 @@ static TError DestroyContainer(TContext &context,
             return error;
 
         cholder_lock.unlock();
-        auto vholder_lock = context.Vholder->Lock();
+        auto vholder_lock = context.Vholder->ScopedLock();
 
 
         for (auto volume: container->Volumes) {
@@ -112,7 +112,7 @@ static TError DestroyContainer(TContext &context,
             if (container->IsRoot() || container->IsPortoRoot())
                 continue;
             vholder_lock.unlock();
-            auto volume_lock = volume->Lock();
+            auto volume_lock = volume->ScopedLock();
             if (!volume->IsReady()) {
                 volume_lock.unlock();
                 vholder_lock.lock();
@@ -141,7 +141,7 @@ static TError StartContainer(TContext &context,
                              const rpc::TContainerStartRequest &req,
                              rpc::TContainerResponse &rsp,
                              std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->Lock();
+    auto lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -192,7 +192,7 @@ static TError StopContainer(TContext &context,
                             const rpc::TContainerStopRequest &req,
                             rpc::TContainerResponse &rsp,
                             std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->Lock();
+    auto lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -218,7 +218,7 @@ static TError PauseContainer(TContext &context,
                              const rpc::TContainerPauseRequest &req,
                              rpc::TContainerResponse &rsp,
                              std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->Lock();
+    auto lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -244,7 +244,7 @@ static TError ResumeContainer(TContext &context,
                               const rpc::TContainerResumeRequest &req,
                               rpc::TContainerResponse &rsp,
                               std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->Lock();
+    auto lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -269,7 +269,7 @@ static TError ResumeContainer(TContext &context,
 static TError ListContainers(TContext &context,
                              rpc::TContainerResponse &rsp,
                              std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->Lock();
+    auto lock = context.Cholder->ScopedLock();
 
     for (auto c : context.Cholder->List()) {
         std::string name;
@@ -285,7 +285,7 @@ static TError GetContainerProperty(TContext &context,
                                    const rpc::TContainerGetPropertyRequest &req,
                                    rpc::TContainerResponse &rsp,
                                    std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->Lock();
+    auto lock = context.Cholder->ScopedLock();
 
     std::string name;
     TError err = client->GetContainer()->AbsoluteName(req.name(), name, true);
@@ -307,7 +307,7 @@ static TError SetContainerProperty(TContext &context,
                                    const rpc::TContainerSetPropertyRequest &req,
                                    rpc::TContainerResponse &rsp,
                                    std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->Lock();
+    auto lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -333,7 +333,7 @@ static TError GetContainerData(TContext &context,
                                const rpc::TContainerGetDataRequest &req,
                                rpc::TContainerResponse &rsp,
                                std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->Lock();
+    auto lock = context.Cholder->ScopedLock();
 
     std::string name;
     TError err = client->GetContainer()->AbsoluteName(req.name(), name, true);
@@ -355,7 +355,7 @@ static TError GetContainerCombined(TContext &context,
                                    const rpc::TContainerGetRequest &req,
                                    rpc::TContainerResponse &rsp,
                                    std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->Lock();
+    auto lock = context.Cholder->ScopedLock();
 
     if (!req.variable_size())
         return TError(EError::InvalidValue, "Properties/data are not specified");
@@ -411,7 +411,7 @@ static TError GetContainerCombined(TContext &context,
 
 static TError ListProperty(TContext &context,
                            rpc::TContainerResponse &rsp) {
-    auto lock = context.Cholder->Lock();
+    auto lock = context.Cholder->ScopedLock();
 
     auto list = rsp.mutable_propertylist();
 
@@ -439,7 +439,7 @@ static TError ListProperty(TContext &context,
 
 static TError ListData(TContext &context,
                        rpc::TContainerResponse &rsp) {
-    auto lock = context.Cholder->Lock();
+    auto lock = context.Cholder->ScopedLock();
 
     auto list = rsp.mutable_datalist();
 
@@ -469,7 +469,7 @@ static TError Kill(TContext &context,
                    const rpc::TContainerKillRequest &req,
                    rpc::TContainerResponse &rsp,
                    std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->Lock();
+    auto lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -505,7 +505,7 @@ static TError Wait(TContext &context,
                    const rpc::TContainerWaitRequest &req,
                    rpc::TContainerResponse &rsp,
                    std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->Lock();
+    auto lock = context.Cholder->ScopedLock();
 
     if (!req.name_size())
         return TError(EError::InvalidValue, "Containers are not specified");
@@ -596,14 +596,14 @@ static TError CreateVolume(TContext &context,
     for (auto p: req.properties())
         properties[p.name()] = p.value();
 
-    auto vholder_lock = context.Vholder->Lock();
+    auto vholder_lock = context.Vholder->ScopedLock();
     std::shared_ptr<TVolume> volume;
     error = context.Vholder->Create(volume);
     if (error)
         return error;
 
     /* cannot block: volume is not registered yet */
-    auto volume_lock = volume->Lock();
+    auto volume_lock = volume->ScopedLock();
 
     auto container = client->GetContainer();
 
@@ -633,7 +633,7 @@ static TError CreateVolume(TContext &context,
         return error;
     }
 
-    auto cholder_lock = context.Cholder->Lock();
+    auto cholder_lock = context.Cholder->ScopedLock();
 
     error = volume->LinkContainer(container->GetName());
     if (error) {
@@ -669,7 +669,7 @@ static TError LinkVolume(TContext &context,
     if (error)
         return error;
 
-    auto cholder_lock = context.Cholder->Lock();
+    auto cholder_lock = context.Cholder->ScopedLock();
     std::shared_ptr<TContainer> container;
     if (req.has_container()) {
         std::string name;
@@ -689,13 +689,13 @@ static TError LinkVolume(TContext &context,
     }
     cholder_lock.unlock();
 
-    auto vholder_lock = context.Vholder->Lock();
+    auto vholder_lock = context.Vholder->ScopedLock();
     auto volume = context.Vholder->Find(req.path());
     if (!volume)
         return TError(EError::VolumeNotFound, "Volume not found");
     vholder_lock.unlock();
 
-    auto volume_lock = volume->Lock();
+    auto volume_lock = volume->ScopedLock();
     if (!volume->IsReady())
         return TError(EError::VolumeNotReady, "Volume not ready");
 
@@ -722,8 +722,8 @@ static TError UnlinkVolume(TContext &context,
     if (error)
         return error;
 
-    auto vholder_lock = context.Vholder->Lock();
-    auto cholder_lock = context.Cholder->Lock();
+    auto vholder_lock = context.Vholder->ScopedLock();
+    auto cholder_lock = context.Cholder->ScopedLock();
 
     std::shared_ptr<TContainer> container;
     if (req.has_container()) {
@@ -760,7 +760,7 @@ static TError UnlinkVolume(TContext &context,
     cholder_lock.unlock();
     vholder_lock.unlock();
 
-    auto volume_lock = volume->Lock();
+    auto volume_lock = volume->ScopedLock();
     if (!volume->IsReady())
         return TError::Success();
 
@@ -788,7 +788,7 @@ static TError ListVolumes(TContext &context,
     if (!config().volumes().enabled())
             return TError(EError::InvalidMethod, "volume api is disabled");
 
-    auto vholder_lock = context.Vholder->Lock();
+    auto vholder_lock = context.Vholder->ScopedLock();
 
     if (req.has_path()) {
         auto volume = context.Vholder->Find(req.path());
@@ -864,7 +864,7 @@ static TError ImportLayer(TContext &context,
             return error;
     }
 
-    auto vholder_lock = context.Vholder->Lock();
+    auto vholder_lock = context.Vholder->ScopedLock();
     if (layer.Exists()) {
         if (!req.merge()) {
             error = TError(EError::InvalidValue, "layer already exists");
@@ -931,7 +931,7 @@ static TError RemoveLayer(TContext &context,
             return error;
     }
 
-    auto vholder_lock = context.Vholder->Lock();
+    auto vholder_lock = context.Vholder->ScopedLock();
     if (LayerInUse(context, layer)) {
         error = TError(EError::VolumeIsBusy, "layer in use");
         goto err;

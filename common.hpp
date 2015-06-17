@@ -35,7 +35,7 @@ class TLockable {
 protected:
     std::mutex Mutex;
 public:
-    std::unique_lock<std::mutex> Lock() { return std::unique_lock<std::mutex>(Mutex); }
+    std::unique_lock<std::mutex> ScopedLock() { return std::unique_lock<std::mutex>(Mutex); }
 };
 
 const std::string ROOT_CONTAINER = "/";
