@@ -172,7 +172,7 @@ exit:
 }
 
 std::string TPath::ToString() const {
-    return StringRemoveRepeating(Path, '/');
+    return Path;
 }
 
 TPath TPath::AddComponent(const TPath &component) const {
