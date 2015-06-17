@@ -18,7 +18,7 @@ class TEvent;
 class TEpollLoop;
 
 class TContainerHolder : public std::enable_shared_from_this<TContainerHolder>,
-                         public TLockable {
+                         public TLockable<> {
     std::shared_ptr<TNetwork> Net;
     std::map<std::string, std::shared_ptr<TContainer>> Containers;
     TIdMap IdMap;

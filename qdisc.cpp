@@ -6,14 +6,14 @@
 #include "util/log.hpp"
 
 bool TTclass::Exists(std::shared_ptr<TNlLink> link) {
-    std::lock_guard<std::recursive_mutex> lock(Net->GetLock());
+    auto lock = Net->ScopedLock();
 
     TNlClass tclass(link, GetParent(), Handle);
     return tclass.Exists();
 }
 
 TError TTclass::GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) {
-    std::lock_guard<std::recursive_mutex> lock(Net->GetLock());
+    auto lock = Net->ScopedLock();
 
     if (!config().network().enabled())
         return TError(EError::Unknown, "Network support is disabled");
@@ -32,7 +32,7 @@ TError TTclass::GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) {
 }
 
 uint32_t TTclass::GetParent() {
-    std::lock_guard<std::recursive_mutex> lock(Net->GetLock());
+    auto lock = Net->ScopedLock();
 
     if (!config().network().enabled())
         return 0;
@@ -69,7 +69,7 @@ void TTclass::Prepare(std::map<std::string, uint64_t> prio,
 }
 
 TError TTclass::Create(bool fallback) {
-    std::lock_guard<std::recursive_mutex> lock(Net->GetLock());
+    auto lock = Net->ScopedLock();
 
     if (!config().network().enabled())
         return TError::Success();
@@ -126,7 +126,7 @@ TError TTclass::Create(bool fallback) {
 }
 
 TError TTclass::Remove() {
-    std::lock_guard<std::recursive_mutex> lock(Net->GetLock());
+    auto lock = Net->ScopedLock();
 
     if (!config().network().enabled())
         return TError::Success();
@@ -149,7 +149,7 @@ std::shared_ptr<TNetwork> TQdisc::GetNet() {
 }
 
 TError TQdisc::Create() {
-    std::lock_guard<std::recursive_mutex> lock(Net->GetLock());
+    auto lock = Net->ScopedLock();
 
     if (!config().network().enabled())
         return TError::Success();
@@ -171,7 +171,7 @@ TError TQdisc::Create() {
 }
 
 TError TQdisc::Remove() {
-    std::lock_guard<std::recursive_mutex> lock(Net->GetLock());
+    auto lock = Net->ScopedLock();
 
     if (!config().network().enabled())
         return TError::Success();
@@ -187,14 +187,14 @@ TError TQdisc::Remove() {
 }
 
 bool TFilter::Exists(std::shared_ptr<TNlLink> link) {
-    std::lock_guard<std::recursive_mutex> lock(Net->GetLock());
+    auto lock = Net->ScopedLock();
 
     TNlCgFilter filter(link, Parent->GetHandle(), 1);
     return filter.Exists();
 }
 
 TError TFilter::Create() {
-    std::lock_guard<std::recursive_mutex> lock(Net->GetLock());
+    auto lock = Net->ScopedLock();
 
     if (!config().network().enabled())
         return TError::Success();
@@ -210,7 +210,7 @@ TError TFilter::Create() {
 }
 
 TError TNetwork::Destroy() {
-    std::lock_guard<std::recursive_mutex> lock(GetLock());
+    auto lock = ScopedLock();
 
     L_ACT() << "Removing network..." << std::endl;
 
@@ -261,7 +261,7 @@ TError TNetwork::Prepare() {
 }
 
 TError TNetwork::Update() {
-    std::lock_guard<std::recursive_mutex> lock(GetLock());
+    auto lock = ScopedLock();
 
     if (!config().network().dynamic_ifaces())
         return TError::Success();
@@ -295,7 +295,7 @@ TError TNetwork::Update() {
 }
 
 TError TNetwork::PrepareLink(std::shared_ptr<TNlLink> link) {
-    std::lock_guard<std::recursive_mutex> lock(GetLock());
+    auto lock = ScopedLock();
 
     // 1:0 qdisc
     // 1:2 default class    1:1 root class
@@ -346,7 +346,7 @@ TError TNetwork::PrepareLink(std::shared_ptr<TNlLink> link) {
 }
 
 TError TNetwork::OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links) {
-    std::lock_guard<std::recursive_mutex> lock(GetLock());
+    auto lock = ScopedLock();
 
     std::vector<std::string> devices;
     for (auto &device : config().network().devices())

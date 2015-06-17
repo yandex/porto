@@ -41,7 +41,7 @@ struct TEpollSource : public TNonCopyable {
                                                              Container() {}
 };
 
-class TEpollLoop : public TLockable, public TNonCopyable {
+class TEpollLoop : public TLockable<>, public TNonCopyable {
     TError InitializeSignals();
     bool GetSignals(std::vector<int> &signals);
 

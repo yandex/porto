@@ -33,7 +33,7 @@ public:
 };
 
 class TKeyValueStorage : public std::enable_shared_from_this<TKeyValueStorage>,
-                         public TLockable, public TNonCopyable {
+                         public TLockable<>, public TNonCopyable {
     const TMount Tmpfs;
     const size_t DirnameLen;
 

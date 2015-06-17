@@ -62,7 +62,7 @@ public:
 };
 
 class TVolume : public std::enable_shared_from_this<TVolume>,
-                public TLockable,
+                public TLockable<>,
                 public TNonCopyable {
     friend class TVolumeHolder;
     std::shared_ptr<TVolumeHolder> Holder;
@@ -136,7 +136,7 @@ public:
 };
 
 class TVolumeHolder : public std::enable_shared_from_this<TVolumeHolder>,
-                      public TLockable,
+                      public TLockable<>,
                       public TNonCopyable {
     std::shared_ptr<TKeyValueStorage> Storage;
     std::map<TPath, std::shared_ptr<TVolume>> Volumes;

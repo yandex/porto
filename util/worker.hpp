@@ -8,7 +8,7 @@
 
 template<typename T,
          typename Q = std::queue<T>>
-class TWorker : public TLockable {
+class TWorker : public TLockable<> {
 protected:
     volatile bool Valid = true;
     Q Queue;

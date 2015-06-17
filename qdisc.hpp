@@ -58,7 +58,8 @@ public:
 };
 
 class TNetwork : public std::enable_shared_from_this<TNetwork>,
-                 public TNonCopyable {
+                 public TNonCopyable,
+                 public TLockable<std::recursive_mutex> {
     std::shared_ptr<TNl> Nl;
     std::vector<std::shared_ptr<TNlLink>> Links;
     std::shared_ptr<TQdisc> Qdisc;
@@ -69,8 +70,6 @@ class TNetwork : public std::enable_shared_from_this<TNetwork>,
     const uint32_t rootHandle = TcHandle(1, 0);
 
     TError PrepareLink(std::shared_ptr<TNlLink> link);
-
-    std::recursive_mutex Lock;
 
 public:
     TNetwork() {}
@@ -86,5 +85,4 @@ public:
     std::shared_ptr<TTclass> GetTclass() { return Tclass; }
     std::shared_ptr<TFilter> GetFilter() { return Filter; }
     bool Empty() { return Links.size() == 0; }
-    std::recursive_mutex &GetLock() { return Lock; }
 };

@@ -511,17 +511,17 @@ static TContext *globalContext;
 
 static void preFork(void) {
     if (globalContext)
-        globalContext->Net->GetLock().lock();
+        globalContext->Net->LockUnsafe();
 }
 
 static void postParentFork(void) {
     if (globalContext)
-        globalContext->Net->GetLock().unlock();
+        globalContext->Net->UnlockUnsafe();
 }
 
 static void postChildFork(void) {
     if (globalContext) {
-        globalContext->Net->GetLock().unlock();
+        globalContext->Net->UnlockUnsafe();
         globalContext = nullptr;
     }
     TLogger::ClearBuffer();
