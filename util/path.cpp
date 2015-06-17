@@ -372,13 +372,42 @@ TPath TPath::RealPath() const {
     return path;
 }
 
-bool TPath::StartsWith(const TPath &prefix) const {
-    unsigned len = prefix.Path.length();
+/*
+ * Returns relative or absolute path inside this or
+ * empty path if argument path is not inside:
+ *
+ * "/root".InnerPath("/root/foo", true) -> "/foo"
+ * "/root".InnerPath("/foo", true) -> ""
+ */
+TPath TPath::InnerPath(const TPath &path, bool absolute) const {
 
-    return Path.compare(0, len, prefix.Path) &&
-        (Path.length() == len  ||      /* completely equal     */
-         Path[len] == '/'      ||      /* next char is '/'     */
-         (len && Path[len-1] == '/')); /* prefix ends with '/' */
+    unsigned len = Path.length();
+
+    /* check prefix */
+    if (!len || path.Path.compare(0, len, Path) != 0)
+        return TPath();
+
+    /* exact match */
+    if (path.Path.length() == len) {
+        if (absolute)
+            return TPath("/");
+        else
+            return TPath(".");
+    }
+
+    /* prefix "/" act as "" */
+    if (len == 1 && Path[0] == '/')
+        len = 0;
+
+    /* '/' must follow prefix */
+    if (path.Path[len] != '/')
+        return TPath();
+
+    /* cut prefix */
+    if (absolute)
+        return TPath(path.Path.substr(len));
+    else
+        return TPath(path.Path.substr(len + 1));
 }
 
 TError TPath::StatVFS(uint64_t &space_used, uint64_t &space_avail,

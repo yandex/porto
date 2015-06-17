@@ -66,7 +66,7 @@ public:
     std::string BaseName() const;
     TPath NormalPath() const;
     TPath RealPath() const;
-    bool StartsWith(const TPath &prefix) const;
+    TPath InnerPath(const TPath &path, bool absolute = true) const;
 
     EFileType GetType() const;
     unsigned int GetMode() const;

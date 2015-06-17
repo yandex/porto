@@ -2589,8 +2589,33 @@ static void TestPath(TPortoAPI &api) {
         {"abc/../../././../def", "../../def"},
     };
 
+    vector<vector<string>> inner = {
+        { "/", "/", ".", "/" },
+        { "/", "a", "", "" },
+        { "a", "/", "", "" },
+        { "/", "", "", "" },
+        { "", "/", "", "" },
+        { "/", "/abc", "abc", "/abc" },
+        { "/", "/abc/def", "abc/def", "/abc/def" },
+        { "/abc", "/abc", ".", "/" },
+        { "/abc", "/abc/def", "def", "/def" },
+        { "/abc", "/abcdef", "", "" },
+        { "/abcdef", "/abc", "", "" },
+        { "/abc/def", "/abc", "", "" },
+        { "abc", "abc", ".", "/" },
+        { "abc", "abc/def", "def", "/def" },
+        { "abc", "abcdef", "", "" },
+    };
+
     for (auto n: normalize)
         ExpectEq(TPath(n.first).NormalPath().ToString(), n.second);
+
+    for (auto n: inner) {
+        ExpectEq(TPath(n[0]).InnerPath(n[1], false).ToString(), n[2]);
+        ExpectEq(TPath(n[0]).InnerPath(n[1], true).ToString(), n[3]);
+        if (n[3] != "")
+            ExpectEq(TPath(n[0]).AddComponent(n[3]).ToString(), n[1]);
+    }
 }
 
 static void TestIdmap(TPortoAPI &api) {
