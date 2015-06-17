@@ -539,6 +539,14 @@ public:
     }
 };
 
+double ParseCpuLimit(const std::string &str) {
+    size_t pos = 0;
+    double v = stod(str, &pos);
+    if (pos > 0 && pos < str.length() && str[pos] == 'c')
+        v = v * 100 / GetNumCores();
+    return v;
+}
+
 class TCpuLimitProperty : public TUintValue, public TContainerValue {
 public:
     TCpuLimitProperty() :
@@ -555,13 +563,9 @@ public:
 
     TError FromString(const std::string &str) override {
         try {
-            size_t pos = 0;
-            double v = stoull(str, &pos);
-            if (pos > 0 && pos < str.length() && str[pos] == 'c')
-                v = v * 100 / GetNumCores();
-
+            auto v = ParseCpuLimit(str);
             if (v < 1 || v > 100)
-                return TError(EError::InvalidValue, "invalid value");
+                return TError(EError::InvalidValue, "invalid value absolute value " + std::to_string(v));
 
             return Set((uint64_t)v);
         } catch (...) {
@@ -582,13 +586,9 @@ public:
 
     TError FromString(const std::string &str) override {
         try {
-            size_t pos = 0;
-            double v = stoull(str, &pos);
-            if (pos > 0 && pos < str.length() && str[pos] == 'c')
-                v = v * 100 / GetNumCores();
-
+            auto v = ParseCpuLimit(str);
             if (v < 0 || v > 100)
-                return TError(EError::InvalidValue, "invalid value");
+                return TError(EError::InvalidValue, "invalid value absolute value " + std::to_string(v));
 
             return Set((uint64_t)v);
         } catch (...) {
