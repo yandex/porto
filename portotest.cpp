@@ -99,6 +99,7 @@ int main(int argc, char *argv[])
 
         auto net = std::make_shared<TNetwork>();
         if (config().network().enabled()) {
+            auto lock = net->ScopedLock();
             TError error = net->OpenLinks(test::links);
             if (error)
                 throw error.GetMsg();

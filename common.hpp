@@ -31,12 +31,13 @@ private:
     TNonCopyable& operator= (TNonCopyable const&&) = delete;
 };
 
-template <class T = std::mutex>
 class TLockable {
 protected:
-    T Mutex;
+    std::mutex Mutex;
 public:
-    std::unique_lock<T> ScopedLock() { return std::unique_lock<T>(Mutex); }
+    std::unique_lock<std::mutex> ScopedLock() {
+        return std::unique_lock<std::mutex>(Mutex);
+    }
     void LockUnsafe() { Mutex.lock(); }
     void UnlockUnsafe() { Mutex.unlock(); }
 };

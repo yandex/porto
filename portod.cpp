@@ -425,6 +425,7 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                 continue;
             } else if (context.NetEvt && source->Fd == context.NetEvt->GetFd()) {
                 L() << "Refresh list of available network interfaces" << std::endl;
+
                 context.NetEvt->FlushEvents();
 
                 TError error = context.Net->Update();

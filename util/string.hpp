@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <set>
+#include <map>
 
 #include "error.hpp"
 
@@ -28,3 +29,4 @@ std::string StringRemoveRepeating(const std::string &str, const char rc);
 bool StringOnlyDigits(const std::string &s);
 std::string StringReplaceAll(const std::string &str, const std::string &from, const std::string &to);
 bool StringStartsWith(const std::string &str, const std::string &prefix);
+std::string MapToStr(const std::map<std::string, uint64_t> &m);

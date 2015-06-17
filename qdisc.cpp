@@ -6,18 +6,11 @@
 #include "util/log.hpp"
 
 bool TTclass::Exists(std::shared_ptr<TNlLink> link) {
-    auto lock = Net->ScopedLock();
-
     TNlClass tclass(link, GetParent(), Handle);
     return tclass.Exists();
 }
 
 TError TTclass::GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) {
-    auto lock = Net->ScopedLock();
-
-    if (!config().network().enabled())
-        return TError(EError::Unknown, "Network support is disabled");
-
     for (auto &link : Net->GetLinks()) {
         uint64_t val;
         TNlClass tclass(link, GetParent(), Handle);
@@ -32,11 +25,6 @@ TError TTclass::GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) {
 }
 
 uint32_t TTclass::GetParent() {
-    auto lock = Net->ScopedLock();
-
-    if (!config().network().enabled())
-        return 0;
-
     if (ParentQdisc)
         return ParentQdisc->GetHandle();
     else
@@ -49,16 +37,6 @@ TTclass::~TTclass() {
         L_ERR() << "Can't remove tc classifier: " << error << std::endl;
 }
 
-static std::string MapToStr(const std::map<std::string, uint64_t> &m) {
-    std::stringstream ss;
-    for (auto pair : m) {
-        if (ss.str().length())
-            ss << " ";
-        ss << pair.first << ": " << pair.second;
-    }
-    return ss.str();
-}
-
 void TTclass::Prepare(std::map<std::string, uint64_t> prio,
                        std::map<std::string, uint64_t> rate,
                        std::map<std::string, uint64_t> ceil) {
@@ -69,11 +47,6 @@ void TTclass::Prepare(std::map<std::string, uint64_t> prio,
 }
 
 TError TTclass::Create(bool fallback) {
-    auto lock = Net->ScopedLock();
-
-    if (!config().network().enabled())
-        return TError::Success();
-
     for (auto &link : Net->GetLinks()) {
         auto alias = link->GetAlias();
 
@@ -126,11 +99,6 @@ TError TTclass::Create(bool fallback) {
 }
 
 TError TTclass::Remove() {
-    auto lock = Net->ScopedLock();
-
-    if (!config().network().enabled())
-        return TError::Success();
-
     for (auto &link : Net->GetLinks()) {
         if (!Exists(link))
             continue;
@@ -149,11 +117,6 @@ std::shared_ptr<TNetwork> TQdisc::GetNet() {
 }
 
 TError TQdisc::Create() {
-    auto lock = Net->ScopedLock();
-
-    if (!config().network().enabled())
-        return TError::Success();
-
     for (auto &link : Net->GetLinks()) {
         TNlHtb qdisc(link, TcRootHandle(), Handle);
 
@@ -171,11 +134,6 @@ TError TQdisc::Create() {
 }
 
 TError TQdisc::Remove() {
-    auto lock = Net->ScopedLock();
-
-    if (!config().network().enabled())
-        return TError::Success();
-
     for (auto &link : Net->GetLinks()) {
         TNlHtb qdisc(link, TcRootHandle(), Handle);
         TError error = qdisc.Remove();
@@ -186,19 +144,22 @@ TError TQdisc::Remove() {
     return TError::Success();
 }
 
-bool TFilter::Exists(std::shared_ptr<TNlLink> link) {
-    auto lock = Net->ScopedLock();
+class TFilter : public TNonCopyable {
+    std::shared_ptr<TNetwork> Net;
+    const std::shared_ptr<TQdisc> Parent;
+    bool Exists(std::shared_ptr<TNlLink> link);
 
+public:
+    TFilter(std::shared_ptr<TNetwork> net, const std::shared_ptr<TQdisc> parent) : Net(net), Parent(parent) { }
+    TError Create();
+};
+
+bool TFilter::Exists(std::shared_ptr<TNlLink> link) {
     TNlCgFilter filter(link, Parent->GetHandle(), 1);
     return filter.Exists();
 }
 
 TError TFilter::Create() {
-    auto lock = Net->ScopedLock();
-
-    if (!config().network().enabled())
-        return TError::Success();
-
     for (auto &link : Net->GetLinks()) {
         TNlCgFilter filter(link, Parent->GetHandle(), 1);
         TError error = filter.Create();
@@ -243,6 +204,8 @@ TError TNetwork::Prepare() {
     PORTO_ASSERT(Links.size() == 0);
 #endif
 
+    auto lock = ScopedLock();
+
     TError error = OpenLinks(Links);
     if (error)
         return error;
@@ -261,14 +224,14 @@ TError TNetwork::Prepare() {
 }
 
 TError TNetwork::Update() {
-    auto lock = ScopedLock();
-
     if (!config().network().dynamic_ifaces())
         return TError::Success();
 
     L() << "Update network" << std::endl;
 
     std::vector<std::shared_ptr<TNlLink>> newLinks;
+
+    auto lock = ScopedLock();
 
     TError error = OpenLinks(newLinks);
     if (error)
@@ -295,8 +258,6 @@ TError TNetwork::Update() {
 }
 
 TError TNetwork::PrepareLink(std::shared_ptr<TNlLink> link) {
-    auto lock = ScopedLock();
-
     // 1:0 qdisc
     // 1:2 default class    1:1 root class
     // (unclassified        1:3 container a, 1:4 container b
@@ -346,8 +307,6 @@ TError TNetwork::PrepareLink(std::shared_ptr<TNlLink> link) {
 }
 
 TError TNetwork::OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links) {
-    auto lock = ScopedLock();
-
     std::vector<std::string> devices;
     for (auto &device : config().network().devices())
         devices.push_back(device);

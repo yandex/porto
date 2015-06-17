@@ -44,6 +44,12 @@ using std::map;
 
 int64_t BootTime = 0;
 
+TContainer::~TContainer() {
+    // Tclass destructor should be called with TNetwork locked,
+    // so call them explicitly in Tcontainer::Destroy()
+    PORTO_ASSERT(Tclass == nullptr);
+};
+
 std::string TContainer::ContainerStateName(EContainerState state) {
     switch (state) {
     case EContainerState::Stopped:
@@ -83,6 +89,7 @@ void TContainer::SyncStateWithCgroup() {
 }
 
 TError TContainer::GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) {
+    auto lock = Net->ScopedLock();
     return Tclass->GetStat(stat, m);
 }
 
@@ -195,6 +202,11 @@ TError TContainer::Destroy() {
 
     RemoveKvs();
 
+    if (Tclass) {
+        auto lock = Net->ScopedLock();
+        Tclass.reset();
+    }
+
     return TError::Success();
 }
 
@@ -228,6 +240,8 @@ std::shared_ptr<TContainer> TContainer::GetParent() const {
 }
 
 bool TContainer::ValidLink(const std::string &name) const {
+    auto lock = Net->ScopedLock();
+
     if (Net->Empty())
         return false;
 
@@ -236,6 +250,8 @@ bool TContainer::ValidLink(const std::string &name) const {
 }
 
 std::shared_ptr<TNlLink> TContainer::GetLink(const std::string &name) const {
+    auto lock = Net->ScopedLock();
+
     for (auto &link : Net->GetLinks())
         if (link->GetAlias() == name)
             return link;
@@ -382,6 +398,8 @@ bool TContainer::UseParentNamespace() const {
 TError TContainer::PrepareNetwork() {
     if (!config().network().enabled())
         return TError::Success();
+
+    auto lock = Net->ScopedLock();
 
     PORTO_ASSERT(Tclass == nullptr);
 
@@ -905,7 +923,10 @@ TError TContainer::PrepareResources() {
 void TContainer::FreeResources() {
     LeafCgroups.clear();
 
-    Tclass = nullptr;
+    {
+        auto lock = Net->ScopedLock();
+        Tclass = nullptr;
+    }
     Task = nullptr;
     ShutdownOom();
 

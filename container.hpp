@@ -115,6 +115,7 @@ public:
                uint16_t id, std::shared_ptr<TNetwork> net) :
         Holder(holder), Name(StripParentName(name)), Parent(parent),
         Storage(storage), Id(id), Net(net) { }
+    ~TContainer();
 
     const std::string GetName(bool recursive = true, const std::string &sep = "/") const;
     const uint16_t GetId() const { return Id; }

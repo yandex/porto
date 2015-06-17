@@ -8,6 +8,7 @@
 #include "util/netlink.hpp"
 
 class TNetwork;
+class TFilter;
 
 class TQdisc : public TNonCopyable {
     std::shared_ptr<TNetwork> Net;
@@ -29,6 +30,7 @@ class TTclass : public TNonCopyable {
     const std::shared_ptr<TTclass> ParentTclass;
     const uint32_t Handle;
     bool Exists(std::shared_ptr<TNlLink> link);
+    uint32_t GetParent();
 
     std::map<std::string, uint64_t> Prio;
     std::map<std::string, uint64_t> Rate;
@@ -42,24 +44,13 @@ public:
     void Prepare(std::map<std::string, uint64_t> prio, std::map<std::string, uint64_t> rate, std::map<std::string, uint64_t> ceil);
     TError Create(bool fallback = false);
     TError Remove();
-    uint32_t GetParent();
     uint32_t GetHandle() { return Handle; }
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);
 };
 
-class TFilter : public TNonCopyable {
-    std::shared_ptr<TNetwork> Net;
-    const std::shared_ptr<TQdisc> Parent;
-    bool Exists(std::shared_ptr<TNlLink> link);
-
-public:
-    TFilter(std::shared_ptr<TNetwork> net, const std::shared_ptr<TQdisc> parent) : Net(net), Parent(parent) { }
-    TError Create();
-};
-
 class TNetwork : public std::enable_shared_from_this<TNetwork>,
                  public TNonCopyable,
-                 public TLockable<std::recursive_mutex> {
+                 public TLockable {
     std::shared_ptr<TNl> Nl;
     std::vector<std::shared_ptr<TNlLink>> Links;
     std::shared_ptr<TQdisc> Qdisc;
@@ -76,13 +67,12 @@ public:
     ~TNetwork();
     TError Prepare();
     TError Update();
+    // OpenLinks doesn't lock TNetwork
     TError OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links);
     TError Destroy();
 
     std::shared_ptr<TNl> GetNl() { return Nl; }
     std::vector<std::shared_ptr<TNlLink>> GetLinks() { return Links; }
     std::shared_ptr<TQdisc> GetQdisc() { return Qdisc; }
-    std::shared_ptr<TTclass> GetTclass() { return Tclass; }
-    std::shared_ptr<TFilter> GetFilter() { return Filter; }
     bool Empty() { return Links.size() == 0; }
 };

@@ -254,3 +254,13 @@ bool StringStartsWith(const std::string &str, const std::string &prefix) {
 
     return str.substr(0, prefix.length()) == prefix;
 }
+
+std::string MapToStr(const std::map<std::string, uint64_t> &m) {
+    std::stringstream ss;
+    for (auto pair : m) {
+        if (ss.str().length())
+            ss << " ";
+        ss << pair.first << ": " << pair.second;
+    }
+    return ss.str();
+}
