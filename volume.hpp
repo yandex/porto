@@ -17,6 +17,7 @@ constexpr const char *V_READY = "ready";
 constexpr const char *V_ID = "_id";
 constexpr const char *V_CONTAINERS = "_containers";
 constexpr const char *V_LOOP_DEV = "_loop_dev";
+constexpr const char *V_AUTO_PATH = "_auto_path";
 
 constexpr const char *V_USER = "user";
 constexpr const char *V_GROUP = "group";
@@ -98,6 +99,7 @@ public:
 
     std::string GetBackend() const { return Config->Get<std::string>(V_BACKEND); }
     TPath GetPath() const;
+    bool IsAutoPath() const;
     TPath GetStorage() const;
     TPath GetInternal(std::string type) const;
     int GetId() const { return Config->Get<int>(V_ID); }

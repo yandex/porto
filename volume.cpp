@@ -365,11 +365,11 @@ TPath TVolume::GetInternal(std::string type) const {
 }
 
 TPath TVolume::GetPath() const {
-    auto val = Config->Find(V_PATH);
-    if (val->HasValue())
-        return val->Get<std::string>();
-    else
-        return GetInternal("volume");
+    return Config->Get<std::string>(V_PATH);
+}
+
+bool TVolume::IsAutoPath() const {
+    return Config->Get<bool>(V_AUTO_PATH);
 }
 
 TPath TVolume::GetStorage() const {
@@ -409,6 +409,13 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
         if (!path.AccessOk(EFileAccess::Write, creator_cred))
             return TError(EError::Permission, "Volume path usage not permitted");
         error = Config->Set<std::string>(V_PATH, path.ToString());
+        if (error)
+            return error;
+    } else {
+        error = Config->Set<std::string>(V_PATH, GetInternal("volume").ToString());
+        if (error)
+            return error;
+        error = Config->Set<bool>(V_AUTO_PATH, true);
         if (error)
             return error;
     }
@@ -528,7 +535,7 @@ TError TVolume::Build() {
             goto err_storage;
     }
 
-    if (!Config->HasValue(V_PATH)) {
+    if (IsAutoPath()) {
         error = path.Mkdir(0755);
         if (error)
             goto err_path;
@@ -547,7 +554,7 @@ TError TVolume::Build() {
 err_save:
     (void)Backend->Destroy();
 err_build:
-    if (!Config->HasValue(V_PATH))
+    if (IsAutoPath())
         (void)path.Rmdir();
 err_path:
     if (!Config->HasValue(V_STORAGE))
@@ -596,7 +603,7 @@ TError TVolume::Destroy() {
         }
     }
 
-    if (!Config->HasValue(V_PATH) && path.Exists()) {
+    if (IsAutoPath() && path.Exists()) {
         error = path.Rmdir();
         if (error) {
             L_ERR() << "Can't remove volume path: " << error << std::endl;
@@ -737,6 +744,7 @@ const std::vector<std::pair<std::string, std::string>> TVolumeHolder::ListProper
 
 static void RegisterVolumeProperties(std::shared_ptr<TRawValueMap> m) {
     m->Add(V_PATH, new TStringValue(HIDDEN_VALUE | PERSISTENT_VALUE));
+    m->Add(V_AUTO_PATH, new TBoolValue(HIDDEN_VALUE | PERSISTENT_VALUE));
     m->Add(V_STORAGE, new TStringValue(PERSISTENT_VALUE));
 
     m->Add(V_BACKEND, new TStringValue(PERSISTENT_VALUE));
