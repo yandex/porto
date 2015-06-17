@@ -71,6 +71,22 @@ std::string TContainer::GetTmpDir() const {
     return config().container().tmp_dir() + "/" + std::to_string(Id);
 }
 
+/* Returns normalized root path in host namespace */
+TPath TContainer::RootPath() const {
+
+    if (IsRoot() || IsPortoRoot())
+        return TPath("/");
+
+    TPath path(Prop->Get<std::string>(P_ROOT));
+    if (!path.IsRoot()) {
+        if (path.GetType() == EFileType::Regular)
+            path = TPath(GetTmpDir());
+        path = path.NormalPath();
+    }
+
+    return path;
+}
+
 EContainerState TContainer::GetState() const {
     return State;
 }
