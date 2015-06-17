@@ -132,8 +132,10 @@ TError TMountSnapshot::Mounts(std::set<std::shared_ptr<TMount>> &mounts) const {
            set<string> flags;
 
            TError error = SplitString(m->mnt_opts, ',', vflags);
-           if (error)
+           if (error) {
+               endmntent(f);
                return error;
+           }
 
            for (auto kv : vflags)
                flags.insert(kv);
