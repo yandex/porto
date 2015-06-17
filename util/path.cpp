@@ -326,10 +326,6 @@ TPath TPath::NormalPath() const {
         if (component == "..") {
             auto last = path.rfind('/');
 
-            /* /.. */
-            if (last == 0)
-                continue;
-
             if (last == std::string::npos) {
                 /* a/.. */
                 if (!path.empty() && path != "..") {
@@ -337,12 +333,15 @@ TPath TPath::NormalPath() const {
                     continue;
                 }
             } else if (path.compare(last + 1, std::string::npos, "..") != 0) {
-                path.erase(last);
+                if (last == 0)
+                    path.erase(last + 1);   /* /.. or /a/.. */
+                else
+                    path.erase(last);       /* a/b/.. */
                 continue;
             }
         }
 
-        if (!path.empty())
+        if (!path.empty() && path != "/")
             path += "/";
         path += component;
     }
