@@ -44,6 +44,8 @@ public:
 
     bool IsEmpty() const { return Path.empty(); }
 
+    bool IsNormal() const { return Path == NormalPath().Path; }
+
     const char *c_str() const noexcept { return Path.c_str(); }
 
     TPath operator+(const TPath &p) const {

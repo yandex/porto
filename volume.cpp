@@ -402,6 +402,8 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
     if (!path.IsEmpty()) {
         if (!path.IsAbsolute())
             return TError(EError::InvalidValue, "Volume path must be absolute");
+        if (!path.IsNormal())
+            return TError(EError::InvalidValue, "Volume path must be normalized");
         if (path.GetType() != EFileType::Directory)
             return TError(EError::InvalidValue, "Volume path must be a directory");
         if (!path.AccessOk(EFileAccess::Write, creator_cred))
@@ -416,6 +418,8 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
         TPath storage(properties.at(V_STORAGE));
         if (!storage.IsAbsolute())
             return TError(EError::InvalidValue, "Storage path must be absolute");
+        if (!storage.IsNormal())
+            return TError(EError::InvalidValue, "Storage path must be normalized");
         if (storage.GetType() != EFileType::Directory)
             return TError(EError::InvalidValue, "Storage path must be a directory");
         if (!storage.AccessOk(EFileAccess::Write, creator_cred))
@@ -469,6 +473,15 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
     error = StringToOct(Config->Get<std::string>(V_PERMISSIONS), Permissions);
     if (error)
         return error;
+
+    /* Verify layers */
+    for (auto l: Config->Get<std::vector<std::string>>(V_LAYERS)) {
+        TPath layer(l);
+        if (!layer.IsNormal())
+            return TError(EError::InvalidValue, "Layer path must be normalized");
+        if (l.substr(0, 3) == "../")
+            return TError(EError::InvalidValue, "Don't even try to get out");
+    }
 
     /* Autodetect volume backend */
     if (!Config->HasValue(V_BACKEND)) {
