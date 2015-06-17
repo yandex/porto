@@ -225,7 +225,8 @@ TError TContainerHolder::_Destroy(const std::string &name) {
 
     auto parent = c->GetParent();
     c = nullptr;
-    parent->CleanupExpiredChildren();
+    if (parent)
+        parent->CleanupExpiredChildren();
 
     return TError::Success();
 }
