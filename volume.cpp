@@ -364,6 +364,14 @@ TPath TVolume::GetInternal(std::string type) const {
     return TPath(config().volumes().volume_dir()).AddComponent(std::to_string(GetId())).AddComponent(type);
 }
 
+/* /chroot/porto/<type>_<id> */
+TPath TVolume::GetChrootInternal(TPath container_root, std::string type) const {
+    TPath porto_path = container_root.AddComponent(config().container().chroot_porto_dir());
+    if (!porto_path.Exists() && porto_path.Mkdir(0755))
+        return TPath();
+    return porto_path.AddComponent(type + "_" + std::to_string(GetId()));
+}
+
 TPath TVolume::GetPath() const {
     return Config->Get<std::string>(V_PATH);
 }
@@ -412,7 +420,17 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
         if (error)
             return error;
     } else {
-        error = Config->Set<std::string>(V_PATH, GetInternal("volume").ToString());
+        TPath container_root = creator_container->RootPath();
+        TPath volume_path;
+
+        if (container_root.IsRoot())
+            volume_path = GetInternal("volume");
+        else
+            volume_path = GetChrootInternal(container_root, "volume");
+        if (volume_path.IsEmpty())
+            return TError(EError::InvalidValue, "Cannot choose automatic volume path");
+
+        error = Config->Set<std::string>(V_PATH, volume_path.ToString());
         if (error)
             return error;
         error = Config->Set<bool>(V_AUTO_PATH, true);

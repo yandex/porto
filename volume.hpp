@@ -102,6 +102,7 @@ public:
     bool IsAutoPath() const;
     TPath GetStorage() const;
     TPath GetInternal(std::string type) const;
+    TPath GetChrootInternal(TPath container_root, std::string type) const;
     int GetId() const { return Config->Get<int>(V_ID); }
     bool IsReadOnly() const { return Config->Get<bool>(V_READ_ONLY); }
 

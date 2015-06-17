@@ -572,8 +572,9 @@ static TError ListVolumeProperties(TContext &context,
 }
 
 static void FillVolumeDescription(rpc::TVolumeDescription *desc,
+                                  TPath volume_path,
                                   std::shared_ptr<TVolume> volume) {
-    desc->set_path(volume->GetPath().ToString());
+    desc->set_path(volume_path.ToString());
     for (auto kv: volume->GetProperties()) {
         auto p = desc->add_properties();
         p->set_name(kv.first);
@@ -610,9 +611,22 @@ static TError CreateVolume(TContext &context,
 
     auto container = client->GetContainer();
 
-    error = volume->Configure(TPath(req.has_path() ? req.path() : ""),
-                              client->GetCred(), container, properties);
+    TPath volume_path("");
+    if (req.has_path() && !req.path().empty())
+        volume_path = container->RootPath().AddComponent(req.path());
+
+    error = volume->Configure(volume_path, client->GetCred(),
+                              container, properties);
     if (error) {
+        context.Vholder->Remove(volume);
+        return error;
+    }
+
+    volume_path = container->RootPath().InnerPath(volume->GetPath(), true);
+    if (volume_path.IsEmpty()) {
+        /* sanity check */
+        error = TError(EError::Unknown, "volume inner path not found");
+        L_ERR() << error << " " << volume->GetPath() << " in " << container->RootPath() << std::endl;
         context.Vholder->Remove(volume);
         return error;
     }
@@ -654,7 +668,7 @@ static TError CreateVolume(TContext &context,
     volume->SetReady(true);
     vholder_lock.unlock();
 
-    FillVolumeDescription(rsp.mutable_volume(), volume);
+    FillVolumeDescription(rsp.mutable_volume(), volume_path, volume);
     volume_lock.unlock();
 
     return TError::Success();
@@ -692,8 +706,11 @@ static TError LinkVolume(TContext &context,
     }
     cholder_lock.unlock();
 
+    TPath volume_path = client->GetContainer()->RootPath().AddComponent(req.path());
+
     auto vholder_lock = context.Vholder->ScopedLock();
-    auto volume = context.Vholder->Find(req.path());
+    auto volume = context.Vholder->Find(volume_path);
+
     if (!volume)
         return TError(EError::VolumeNotFound, "Volume not found");
     vholder_lock.unlock();
@@ -746,7 +763,9 @@ static TError UnlinkVolume(TContext &context,
         container = client->GetContainer();
     }
 
-    std::shared_ptr<TVolume> volume = context.Vholder->Find(req.path());
+    TPath volume_path = client->GetContainer()->RootPath().AddComponent(req.path());
+
+    std::shared_ptr<TVolume> volume = context.Vholder->Find(volume_path);
     if (!volume)
         return TError(EError::VolumeNotFound, "Volume not found");
 
@@ -786,19 +805,25 @@ static TError UnlinkVolume(TContext &context,
 
 static TError ListVolumes(TContext &context,
                           const rpc::TVolumeListRequest &req,
-                          rpc::TContainerResponse &rsp) {
+                          rpc::TContainerResponse &rsp,
+                          std::shared_ptr<TClient> client) {
 
     if (!config().volumes().enabled())
             return TError(EError::InvalidMethod, "volume api is disabled");
 
+    auto container = client->GetContainer();
+    TPath container_root = container->RootPath();
+
     auto vholder_lock = context.Vholder->ScopedLock();
 
-    if (req.has_path()) {
-        auto volume = context.Vholder->Find(req.path());
+    if (req.has_path() && !req.path().empty()) {
+        TPath volume_path = container_root.AddComponent(req.path());
+        auto volume = context.Vholder->Find(volume_path);
         if (volume == nullptr)
             return TError(EError::VolumeNotFound, "volume not found");
         auto desc = rsp.mutable_volumelist()->add_volumes();
-        FillVolumeDescription(desc, volume);
+        volume_path = container_root.InnerPath(volume->GetPath(), true);
+        FillVolumeDescription(desc, volume_path, volume);
         return TError::Success();
     }
 
@@ -813,8 +838,12 @@ static TError ListVolumes(TContext &context,
                       req.container()) == containers.end())
             continue;
 
+        TPath volume_path = container_root.InnerPath(volume->GetPath(), true);
+        if (volume_path.IsEmpty())
+            continue;
+
         auto desc = rsp.mutable_volumelist()->add_volumes();
-        FillVolumeDescription(desc, volume);
+        FillVolumeDescription(desc, volume_path, volume);
     }
 
     return TError::Success();
@@ -1028,7 +1057,7 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
         else if (req.has_unlinkvolume())
             error = UnlinkVolume(context, req.unlinkvolume(), rsp, client);
         else if (req.has_listvolumes())
-            error = ListVolumes(context, req.listvolumes(), rsp);
+            error = ListVolumes(context, req.listvolumes(), rsp, client);
         else if (req.has_importlayer())
             error = ImportLayer(context, req.importlayer(), client);
         else if (req.has_removelayer())
