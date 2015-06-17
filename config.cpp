@@ -56,6 +56,7 @@ void TConfig::LoadDefaults() {
 
     config().mutable_container()->set_max_log_size(10 * 1024 * 1024);
     config().mutable_container()->set_tmp_dir("/place/porto");
+    config().mutable_container()->set_chroot_porto_dir("porto");
     config().mutable_container()->set_default_aging_time_s(60 * 60 * 24);
     config().mutable_container()->set_respawn_delay_ms(1000);
     config().mutable_container()->set_stdout_limit(8 * 1024 * 1024);
