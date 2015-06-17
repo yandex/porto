@@ -41,7 +41,7 @@ struct TEpollSource : public TNonCopyable {
                                                              Container() {}
 };
 
-class TEpollLoop : public TNonCopyable {
+class TEpollLoop : public TLockable, public TNonCopyable {
     TError InitializeSignals();
     bool GetSignals(std::vector<int> &signals);
 
@@ -51,7 +51,6 @@ class TEpollLoop : public TNonCopyable {
     struct epoll_event *Events = nullptr;
 
     std::map<void *, std::weak_ptr<TEpollSource>> Sources;
-    std::mutex Lock;
 
     TError RemoveFd(int fd);
 

@@ -8,12 +8,11 @@
 
 template<typename T,
          typename Q = std::queue<T>>
-class TWorker {
+class TWorker : public TLockable {
 protected:
     volatile bool Valid = true;
     Q Queue;
     std::condition_variable Cv;
-    std::mutex Mutex;
     std::vector<std::shared_ptr<std::thread>> Threads;
     size_t Seq = 0;
     const std::string Name;
@@ -29,7 +28,7 @@ public:
     void Stop() {
         if (Valid) {
             {
-                std::lock_guard<std::mutex> lock(Mutex);
+                auto lock = Lock();
                 Valid = false;
                 Cv.notify_all();
             }
@@ -40,7 +39,7 @@ public:
     }
 
     void Push(const T &elem) {
-        std::lock_guard<std::mutex> lock(Mutex);
+        auto lock = Lock();
         Queue.push(elem);
         Seq++;
         Cv.notify_one();
@@ -56,7 +55,7 @@ public:
     void WorkerFn(const std::string &name) {
         BlockAllSignals();;
         SetProcessName(name);
-        std::unique_lock<std::mutex> lock(Mutex);
+        auto lock = Lock();
         while (Valid) {
             if (Queue.empty())
                 Wait(lock);
