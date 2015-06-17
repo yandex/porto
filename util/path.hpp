@@ -40,6 +40,8 @@ public:
 
     bool IsAbsolute() const { return Path[0] == '/'; }
 
+    bool IsRoot() const { return Path == "/"; }
+
     bool IsEmpty() const { return Path.empty(); }
 
     const char *c_str() const noexcept { return Path.c_str(); }

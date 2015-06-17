@@ -176,7 +176,16 @@ std::string TPath::ToString() const {
 }
 
 TPath TPath::AddComponent(const TPath &component) const {
-    return TPath(Path + "/" + component.ToString());
+    if (component.IsAbsolute()) {
+        if (IsRoot())
+            return TPath(component.Path);
+        if (component.IsRoot())
+            return TPath(Path);
+        return TPath(Path + component.Path);
+    }
+    if (IsRoot())
+        return TPath("/" + component.Path);
+    return TPath(Path + "/" + component.Path);
 }
 
 TError TPath::Chdir() const {
