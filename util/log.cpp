@@ -4,6 +4,7 @@
 #include "log.hpp"
 #include "util/unix.hpp"
 #include "util/file.hpp"
+#include "config.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -174,6 +175,9 @@ std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
 }
 
 std::string RequestAsString(const rpc::TContainerRequest &req) {
+    if (config().log().verbose())
+        return req.ShortDebugString();
+
     if (req.has_create())
         return "create " + req.create().name();
     else if (req.has_destroy())
@@ -245,6 +249,9 @@ std::string RequestAsString(const rpc::TContainerRequest &req) {
 }
 
 std::string ResponseAsString(const rpc::TContainerResponse &resp) {
+    if (config().log().verbose())
+        return resp.ShortDebugString();
+
     switch (resp.error()) {
     case EError::Success:
     {
