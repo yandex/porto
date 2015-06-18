@@ -171,7 +171,7 @@ void TEpollLoop::RemoveSource(std::shared_ptr<TEpollSource> source) {
 }
 
 TError TEpollLoop::ModifySourceEvents(std::shared_ptr<TEpollSource> source, bool in) {
-    std::lock_guard<std::mutex> lock(Lock);
+    auto lock = ScopedLock();
 
     void *ptr = static_cast<void *>(source.get());
     if (Sources.find(ptr) != Sources.end()) {
