@@ -1452,7 +1452,7 @@ public:
 
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
-    std::vector<TAbstractValue *> properties = {
+    const std::vector<TAbstractValue *> properties = {
         new TCommandProperty,
         new TUserProperty,
         new TGroupProperty,

@@ -1,3 +1,6 @@
+- remove atfork
+- portod: don't remove client, just disable EPOLLIN
+- dump protobuf when config.verbose == true
 - return EAGAIN from destroy/etc when can't wait for freezer
 - PORTO_NAME - support namespaces
 - top: use new get

@@ -1236,7 +1236,7 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
 
 TError TContainer::Prepare() {
     std::shared_ptr<TKeyValueNode> kvnode;
-    if (Name != ROOT_CONTAINER)
+    if (!IsRoot() && !IsPortoRoot())
         kvnode = Storage->GetNode(Id);
 
     Prop = std::make_shared<TPropertyMap>(kvnode, shared_from_this());
@@ -1706,8 +1706,7 @@ void TContainer::NotifyWaiters() {
 }
 
 void TContainer::CleanupWaiters() {
-    std::vector<std::weak_ptr<TContainerWaiter>>::iterator iter;
-    for (iter = Waiters.begin(); iter != Waiters.end();) {
+    for (auto iter = Waiters.begin(); iter != Waiters.end();) {
         if (iter->expired()) {
             iter = Waiters.erase(iter);
             continue;

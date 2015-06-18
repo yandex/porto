@@ -45,8 +45,7 @@ TCgroup::~TCgroup() {
 }
 
 shared_ptr<TCgroup> TCgroup::GetChild(const std::string& name) {
-    vector<weak_ptr<TCgroup>>::iterator iter;
-    for (iter = Children.begin(); iter != Children.end();) {
+    for (auto iter = Children.begin(); iter != Children.end();) {
         if (auto child = iter->lock()) {
             if (child->Name == name)
                 return child;

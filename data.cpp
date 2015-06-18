@@ -506,7 +506,7 @@ public:
 
 void RegisterData(std::shared_ptr<TRawValueMap> m,
                   std::shared_ptr<TContainer> c) {
-    std::vector<TAbstractValue *> data = {
+    const std::vector<TAbstractValue *> data = {
         new TStateData,
         new TAbsoluteNameData,
         new TOomKilledData,

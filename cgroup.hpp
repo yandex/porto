@@ -15,9 +15,7 @@ class TCgroup : public std::enable_shared_from_this<TCgroup>,
     const std::string Name;
     const std::shared_ptr<TCgroup> Parent;
     std::vector<std::weak_ptr<TCgroup>> Children;
-
     std::shared_ptr<TMount> Mount;
-
     mode_t Mode = 0755;
 
 public:

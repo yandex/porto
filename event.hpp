@@ -51,7 +51,6 @@ public:
 };
 
 class TEventQueue {
-    std::priority_queue<TEvent> Queue;
     std::shared_ptr<TEventWorker> Worker;
 
 public:
