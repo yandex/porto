@@ -1137,7 +1137,8 @@ static std::map<std::string, std::string> alias = {
     { "memory.recharge_on_pgfault", P_RECHARGE_ON_PGFAULT },
 };
 
-TError TContainer::GetProperty(const string &origProperty, string &value) const {
+TError TContainer::GetProperty(const string &origProperty, string &value,
+                               std::shared_ptr<TClient> client) const {
     if (IsRoot() || IsPortoRoot())
         return TError(EError::InvalidProperty, "no properties for container " + GetName());
 
@@ -1170,6 +1171,16 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
     }
     PropertyToAlias(origProperty, value);
 
+    if (Prop->HasFlags(property, PATH_PROPERTY) && client) {
+        auto client_container = client->TryGetContainer();
+        if (!client_container)
+            return TError(EError::InvalidValue, "Cannot get client container");
+        TPath client_root = client_container->RootPath();
+        if (client_root.IsEmpty())
+            return TError(EError::InvalidValue, "Cannot get client root path");
+        value = client_root.InnerPath(value, true).ToString();
+    }
+
     return TError::Success();
 }
 
@@ -1184,7 +1195,9 @@ bool TContainer::ShouldApplyProperty(const std::string &property) {
     return true;
 }
 
-TError TContainer::SetProperty(const string &origProperty, const string &origValue, bool superuser) {
+TError TContainer::SetProperty(const string &origProperty,
+                               const string &origValue,
+                               std::shared_ptr<TClient> client) {
     if (IsRoot() || IsPortoRoot())
         return TError(EError::InvalidValue, "Can't set property for container " + GetName());
 
@@ -1204,12 +1217,24 @@ TError TContainer::SetProperty(const string &origProperty, const string &origVal
     if (!Prop->IsImplemented(property))
         return TError(EError::NotSupported, property + " is not implemented");
 
+    bool superuser = client && client->GetCred().IsPrivileged();
+
     if (Prop->HasFlags(property, SUPERUSER_PROPERTY) && !superuser)
         if (Prop->ToString(property) != value)
             return TError(EError::Permission, "Only root can change this property");
 
     if (Prop->HasFlags(property, RESTROOT_PROPERTY) && !superuser && !CredConf.RestrictedUser(OwnerCred))
         return TError(EError::Permission, "Only restricted root can change this property");
+
+    if (Prop->HasFlags(property, PATH_PROPERTY) && client) {
+        auto client_container = client->TryGetContainer();
+        if (!client_container)
+            return TError(EError::InvalidValue, "Cannot get client container");
+        TPath client_root = client_container->RootPath();
+        if (client_root.IsEmpty())
+            return TError(EError::InvalidValue, "Cannot get client root path");
+        value = client_root.AddComponent(value).ToString();
+    }
 
     SyncStateWithCgroup();
 

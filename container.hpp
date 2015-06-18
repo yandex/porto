@@ -140,8 +140,10 @@ public:
     TError Resume();
     TError Kill(int sig);
 
-    TError GetProperty(const std::string &property, std::string &value) const;
-    TError SetProperty(const std::string &property, const std::string &value, bool superuser);
+    TError GetProperty(const std::string &property, std::string &value,
+                       std::shared_ptr<TClient> client) const;
+    TError SetProperty(const std::string &property, const std::string &value,
+                       std::shared_ptr<TClient> client);
 
     TError GetData(const std::string &data, std::string &value);
     TError Restore(const kv::TNode &node);

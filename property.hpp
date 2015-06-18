@@ -75,6 +75,8 @@ const unsigned int RESTROOT_PROPERTY = (1 << 3);
 // Properties marked with this flag are reverted to default upon container
 // start with virt_mode==os
 const unsigned int OS_MODE_PROPERTY = (1 << 4);
+// Property keeps absolute path in filesystem
+const unsigned int PATH_PROPERTY = (1 << 5);
 
 class TPropertyMap : public TValueMap {
     std::weak_ptr<TContainer> Container;

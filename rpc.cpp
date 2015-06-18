@@ -300,7 +300,7 @@ static TError GetContainerProperty(TContext &context,
         return error;
 
     string value;
-    error = container->GetProperty(req.property(), value);
+    error = container->GetProperty(req.property(), value, client);
     if (!error)
         rsp.mutable_getproperty()->set_value(value);
     return error;
@@ -329,7 +329,7 @@ static TError SetContainerProperty(TContext &context,
     if (error)
         return error;
 
-    return container->SetProperty(req.property(), req.value(), client->GetCred().IsPrivileged());
+    return container->SetProperty(req.property(), req.value(), client);
 }
 
 static TError GetContainerData(TContext &context,
@@ -392,7 +392,7 @@ static TError GetContainerCombined(TContext &context,
                 TContainer::ParsePropertyName(name, idx);
 
                 if (container->Prop->IsValid(name))
-                    error = container->GetProperty(var, value);
+                    error = container->GetProperty(var, value, client);
                 else if (container->Data->IsValid(name))
                     error = container->GetData(var, value);
                 else
