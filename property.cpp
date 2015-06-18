@@ -357,7 +357,7 @@ public:
     TError CheckValue(const std::string &value) override {
         TError error = ExistingFile(value);
         if (error)
-            return error;
+            return TError::Success();
         error = PathAccessible(GetContainer(), value, EFileAccess::Read);
         if (error)
             return error;
@@ -389,6 +389,8 @@ public:
         TPath path(value);
         if (!path.Exists())
             path = path.DirName();
+        if (!path.Exists())
+            return TError::Success();
         error = PathAccessible(GetContainer(), path, EFileAccess::Write);
         if (error)
             return error;
@@ -420,6 +422,8 @@ public:
         TPath path(value);
         if (!path.Exists())
             path = path.DirName();
+        if (!path.Exists())
+            return TError::Success();
         error = PathAccessible(GetContainer(), path, EFileAccess::Write);
         if (error)
             return error;

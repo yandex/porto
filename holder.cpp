@@ -56,7 +56,7 @@ TError TContainerHolder::CreateRoot() {
     if (error)
         return error;
 
-    error = root->Start(true);
+    error = root->Start(nullptr, true);
     if (error)
         return error;
 
@@ -80,7 +80,7 @@ TError TContainerHolder::CreatePortoRoot() {
     if (error)
         return error;
 
-    error = root->Start(true);
+    error = root->Start(nullptr, true);
     if (error)
         return error;
 

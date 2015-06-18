@@ -30,11 +30,15 @@ TError TNamespaceSnapshot::OpenFd(int pid, string v, TScopedFd &fd) {
     return TError::Success();
 }
 
-TError TNamespaceSnapshot::Create(int pid) {
+TError TNamespaceSnapshot::Create(int pid, bool only_mnt) {
     Destroy();
 
     int nr = 0;
     for (auto &pair : nameToType) {
+
+        if (only_mnt && pair.second != CLONE_NEWNS)
+            continue;
+
         std::string path = "/proc/" + std::to_string(pid) + "/" + pair.first;
 
         int fd = open(path.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);

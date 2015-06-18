@@ -183,7 +183,7 @@ static TError StartContainer(TContext &context,
         std::string cmd = container->Prop->Get<std::string>(P_COMMAND);
         bool meta = i + 1 != nameVec.end() && cmd.empty();
         //bool meta = std::distance(i, nameVec.end()) == 1 && cmd.empty();
-        err = container->Start(meta);
+        err = container->Start(client, meta);
         if (err)
             return err;
     }

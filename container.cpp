@@ -577,7 +577,7 @@ void TContainer::CleanupExpiredChildren() {
     }
 }
 
-TError TContainer::PrepareTask() {
+TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
     if (!Prop->Get<bool>(P_ISOLATE))
         for (auto name : Prop->List())
             if (Prop->Find(name)->GetFlags() & PARENT_RO_PROPERTY)
@@ -628,6 +628,22 @@ TError TContainer::PrepareTask() {
     taskEnv->Hostname = Prop->Get<std::string>(P_HOSTNAME);
     taskEnv->BindDns = Prop->Get<bool>(P_BIND_DNS);
 
+    if (client) {
+        auto client_container = client->TryGetContainer();
+        if (!client_container)
+            return TError(EError::InvalidValue, "Cannot get client container");
+        TPath client_root = client_container->RootPath();
+        if (client_root.IsEmpty())
+            return TError(EError::InvalidValue, "Cannot get client root path");
+        TError error = taskEnv->ClientNs.Create(client->GetPid(), true);
+        if (error)
+            return error;
+        taskEnv->Root = client_root.InnerPath(taskEnv->Root, true);
+        taskEnv->StdinPath = client_root.InnerPath(taskEnv->StdinPath, true);
+        taskEnv->StdoutPath = client_root.InnerPath(taskEnv->StdoutPath, true);
+        taskEnv->StderrPath = client_root.InnerPath(taskEnv->StderrPath, true);
+    }
+
     TError error = Prop->PrepareTaskEnv(P_ULIMIT, taskEnv);
     if (error)
         return error;
@@ -674,7 +690,7 @@ TError TContainer::PrepareTask() {
         if (!p)
             return TError(EError::Unknown, "Couldn't find running parent");
 
-        TError error = taskEnv->Ns.Create(p->Task->GetPid());
+        TError error = taskEnv->ParentNs.Create(p->Task->GetPid());
         if (error)
             return error;
     }
@@ -737,7 +753,7 @@ TError TContainer::Create(const TCred &cred) {
     return TError::Success();
 }
 
-TError TContainer::Start(bool meta) {
+TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
     SyncStateWithCgroup();
     auto state = GetState();
 
@@ -811,7 +827,7 @@ TError TContainer::Start(bool meta) {
             return error;
         }
 
-        error = PrepareTask();
+        error = PrepareTask(client);
         if (error) {
             L_ERR() << "Can't prepare task: " << error << std::endl;
             FreeResources();
@@ -1392,7 +1408,7 @@ TError TContainer::Restore(const kv::TNode &node) {
 
             L() << "Start parent " << parent->GetName() << " meta " << meta << std::endl;
 
-            TError error = parent->Start(meta);
+            TError error = parent->Start(nullptr, meta);
             if (error)
                 return error;
 
@@ -1405,7 +1421,7 @@ TError TContainer::Restore(const kv::TNode &node) {
             return error;
         }
 
-        error = PrepareTask();
+        error = PrepareTask(nullptr);
         if (error) {
             FreeResources();
             return error;
@@ -1594,7 +1610,7 @@ TError TContainer::Respawn() {
         return error;
 
     uint64_t tmp = Data->Get<uint64_t>(D_RESPAWN_COUNT);
-    error = Start(false);
+    error = Start(nullptr, false);
     Data->Set<uint64_t>(D_RESPAWN_COUNT, tmp + 1);
     if (error)
         return error;

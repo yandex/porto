@@ -85,7 +85,8 @@ public:
     bool RemoveStdout;
     TPath StderrPath;
     bool RemoveStderr;
-    TNamespaceSnapshot Ns;
+    TNamespaceSnapshot ParentNs;
+    TNamespaceSnapshot ClientNs;
     std::map<int,struct rlimit> Rlimit;
     std::string Hostname;
     bool BindDns;

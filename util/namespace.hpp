@@ -14,7 +14,7 @@ class TNamespaceSnapshot : public TNonCopyable {
 public:
     TNamespaceSnapshot() {}
     ~TNamespaceSnapshot() { Destroy(); }
-    TError Create(int pid);
+    TError Create(int pid, bool only_mnt = false);
     TError Chroot() const;
     TError Attach() const;
     void Destroy();

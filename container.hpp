@@ -70,7 +70,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareOomMonitor();
     void ShutdownOom();
     TError PrepareCgroups();
-    TError PrepareTask();
+    TError PrepareTask(std::shared_ptr<TClient> client);
     TError KillAll();
     void RemoveKvs();
 
@@ -134,7 +134,7 @@ public:
 
     TError Create(const TCred &cred);
     TError Destroy();
-    TError Start(bool meta);
+    TError Start(std::shared_ptr<TClient> client, bool meta);
     TError Stop();
     TError Pause();
     TError Resume();

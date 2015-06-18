@@ -675,8 +675,8 @@ TError TTask::ChildCallback() {
             return error;
     }
 
-    if (Env->Ns.Valid()) {
-        error = Env->Ns.Chroot();
+    if (Env->ParentNs.Valid()) {
+        error = Env->ParentNs.Chroot();
         if (error)
             return error;
 
@@ -763,21 +763,17 @@ TError TTask::Start() {
         close(Wfd);
         return error;
     } else if (forkPid == 0) {
+        TError error;
+
         SetProcessName("portod-spawn-p");
 
         char stack[8192];
 
         (void)setsid();
 
-        TError error = ChildReopenStdio();
-        if (error) {
-            ReportPid(-1);
-            Abort(error);
-        }
-
         // move to target cgroups
         for (auto cg : LeafCgroups) {
-            auto error = cg.second->Attach(getpid());
+            error = cg.second->Attach(getpid());
             if (error) {
                 L() << "Can't attach to cgroup: " << error << std::endl;
                 ReportPid(-1);
@@ -785,8 +781,30 @@ TError TTask::Start() {
             }
         }
 
+        if (Env->ClientNs.Valid()) {
+            error = Env->ClientNs.Attach();
+            if (error) {
+                L() << "Can't move task to client namespace: " << error << std::endl;
+                ReportPid(-1);
+                Abort(error);
+            }
+
+            error = Env->ClientNs.Chroot();
+            if (error) {
+                L() << "Can't move task to client chroot: " << error << std::endl;
+                ReportPid(-1);
+                Abort(error);
+            }
+        }
+
+        error = ChildReopenStdio();
+        if (error) {
+            ReportPid(-1);
+            Abort(error);
+        }
+
         // move to target namespace
-        error = Env->Ns.Attach();
+        error = Env->ParentNs.Attach();
         if (error) {
             L() << "Can't move task to target namespace: " << error << std::endl;
             ReportPid(-1);
