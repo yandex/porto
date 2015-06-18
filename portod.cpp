@@ -517,30 +517,14 @@ static int TuneLimits() {
     return EXIT_SUCCESS;
 }
 
-static TContext *globalContext;
-
-static void preFork(void) {
-    if (globalContext)
-        globalContext->Net->LockUnsafe();
-}
-
-static void postParentFork(void) {
-    if (globalContext)
-        globalContext->Net->UnlockUnsafe();
-}
-
 static void postChildFork(void) {
-    if (globalContext) {
-        globalContext->Net->UnlockUnsafe();
-        globalContext = nullptr;
-    }
     TLogger::ClearBuffer();
 }
 
 static int SlaveMain() {
     SetDieOnParentExit(SIGTERM);
 
-    int ret = pthread_atfork(preFork, postParentFork, postChildFork);
+    int ret = pthread_atfork(nullptr, nullptr, postChildFork);
     if (ret) {
         std::cerr << "Can't set fork handlers: " << strerror(ret) << std::endl;
         return EXIT_FAILURE;
@@ -593,7 +577,6 @@ static int SlaveMain() {
         L_ERR() << "Can't adjust OOM score: " << error << std::endl;
 
     TContext context;
-    globalContext = &context;
     try {
         TCgroupSnapshot cs;
         error = cs.Create();
@@ -644,7 +627,6 @@ static int SlaveMain() {
 
     DaemonShutdown(false, ret);
     context.Destroy();
-    globalContext = nullptr;
 
     return ret;
 }
