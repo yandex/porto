@@ -170,6 +170,30 @@ void TEpollLoop::RemoveSource(std::shared_ptr<TEpollSource> source) {
         L() << "Can't remove fd " << source->Fd << " from epoll: " << error << std::endl;
 }
 
+TError TEpollLoop::ModifySourceEvents(std::shared_ptr<TEpollSource> source, bool in) {
+    std::lock_guard<std::mutex> lock(Lock);
+
+    void *ptr = static_cast<void *>(source.get());
+    if (Sources.find(ptr) != Sources.end()) {
+        struct epoll_event ev;
+        ev.events = EPOLLHUP;
+        if (in)
+            ev.events |= EPOLLIN;
+        ev.data.ptr = ptr;
+        if (epoll_ctl(EpollFd, EPOLL_CTL_MOD, source->Fd, &ev) < 0)
+            return TError(EError::Unknown, errno, "epoll_mod(" + std::to_string(source->Fd) + ")");
+    }
+    return TError::Success();
+}
+
+TError TEpollLoop::EnableSource(std::shared_ptr<TEpollSource> source) {
+    return ModifySourceEvents(source, true);
+}
+
+TError TEpollLoop::DisableSource(std::shared_ptr<TEpollSource> source) {
+    return ModifySourceEvents(source, false);
+}
+
 std::shared_ptr<TEpollSource> TEpollLoop::GetSource(void *ptr) {
     auto lock = ScopedLock();
 

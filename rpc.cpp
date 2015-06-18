@@ -48,8 +48,11 @@ static void SendReply(std::shared_ptr<TClient> client,
     }
 
     auto loop = client->EpollLoop.lock();
-    if (loop)
-        loop->AddSource(client);
+    if (loop) {
+        TError error = loop->EnableSource(client);
+        if (error)
+            L_WRN() << "Can't enable client " << client->GetFd() << ": " << error << std::endl;
+    }
 }
 
 static TError CheckRequestPermissions(std::shared_ptr<TClient> client) {

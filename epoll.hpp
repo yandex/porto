@@ -53,6 +53,7 @@ class TEpollLoop : public TLockable, public TNonCopyable {
     std::map<void *, std::weak_ptr<TEpollSource>> Sources;
 
     TError RemoveFd(int fd);
+    TError ModifySourceEvents(std::shared_ptr<TEpollSource> source, bool in);
 
 public:
     TError Create();
@@ -62,6 +63,8 @@ public:
     TError AddSource(std::shared_ptr<TEpollSource> source);
     void RemoveSource(std::shared_ptr<TEpollSource> source);
     std::shared_ptr<TEpollSource> GetSource(void *ptr);
+    TError EnableSource(std::shared_ptr<TEpollSource> source);
+    TError DisableSource(std::shared_ptr<TEpollSource> source);
     TError GetEvents(std::vector<int> &signals,
                      std::vector<struct epoll_event> &evts,
                      int timeout);

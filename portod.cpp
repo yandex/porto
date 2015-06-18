@@ -400,7 +400,6 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                 continue;
 
             if (source->Fd == sfd) {
-
                 if (!accept_paused && clients.size() >= config().daemon().max_clients()) {
                     L_WRN() << "Pause accepting connections" << std::endl;
                     context.EpollLoop->RemoveSource(AcceptSource);
@@ -450,13 +449,21 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                 auto client = clients[source->Fd];
                 bool needClose = false;
 
-                context.EpollLoop->RemoveSource(source);
+                TError error = context.EpollLoop->DisableSource(source);
+                if (error) {
+                    L_WRN() << "Can't disable client " << client->GetFd() << ": " << error << std::endl;
+                    context.EpollLoop->RemoveSource(source);
+                    clients.erase(source->Fd);
+                    continue;
+                }
 
                 if (ev.events & EPOLLIN)
                     needClose = QueueRequest(context, worker, client);
 
-                if ((ev.events & EPOLLHUP) || needClose)
+                if ((ev.events & EPOLLHUP) || needClose) {
+                    context.EpollLoop->RemoveSource(source);
                     clients.erase(source->Fd);
+                }
             } else {
                 L_WRN() << "Unknown event " << source->Fd << std::endl;
                 context.EpollLoop->RemoveSource(source);

@@ -1,5 +1,5 @@
+- ? portoctl resolve paths
 - remove atfork
-- portod: don't remove client, just disable EPOLLIN
 - dump protobuf when config.verbose == true
 - return EAGAIN from destroy/etc when can't wait for freezer
 - PORTO_NAME - support namespaces
@@ -13,15 +13,6 @@
 - support volume as root
 - custom SIGTERM timeout (allow to send SIGKILL for such containers so we can 'force-destroy' them)
 - kill master when can't restart slave many times
-
-# threads
-0. +meta
-1. fast container select
-2. ? move rotate logs into thread
-3. cgroup_sync use try_lock
-4. exit_status + container queue
-5. UpdateSoftLimits (goes upwards)
-6. memory_guarantee ???
 
 # root property
 - mount root loop in root namespace (to better diagnose possible problems)
