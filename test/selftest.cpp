@@ -2085,6 +2085,10 @@ static void TestNetProperty(TPortoAPI &api) {
 
     Say() << "Make sure net=host:veth0 doesn't preserve L3 address" << std::endl;
     AsRoot(api);
+    if (system("ip link | grep veth1") == 0) {
+        Say() << "Delete link veth1" << std::endl;
+        ExpectEq(system("ip link delete veth1"), 0);
+    }
     ExpectEq(system("ip link"), 0);
     ExpectEq(system("ip link add veth0 type veth peer name veth1"), 0);
     ExpectEq(system("ip addr add dev veth0 1.2.3.4"), 0);
