@@ -892,7 +892,12 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
         TPath mnt = dir.AddComponent("volume");
         if (mnt.Exists()) {
             TMount mount(mnt, mnt, "", {});
-            (void)mount.Umount();
+            error = mount.Umount();
+            if (error && error.GetErrno() != EINVAL) {
+                L_ERR() << "Cannot umount volume directory " << mnt << ": " << error << std::endl;
+                error = mount.Umount(UMOUNT_NOFOLLOW | MNT_DETACH | MNT_FORCE);
+                L_ERR() << "Detach umount of " << mnt << ": " << error << std::endl;
+            }
         }
         error = dir.ClearDirectory();
         if (error)

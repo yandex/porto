@@ -39,10 +39,10 @@ TError TMount::Mount(unsigned long flags) const {
     return TError::Success();
 }
 
-TError TMount::Umount() const {
+TError TMount::Umount(int flags) const {
     L_ACT() << "umount " << Target << std::endl;
 
-    int ret = RetryBusy(10, 100, [&]{ return umount2(Target.ToString().c_str(), UMOUNT_NOFOLLOW); });
+    int ret = RetryBusy(10, 100, [&]{ return umount2(Target.ToString().c_str(), flags); });
     if (ret)
         return TError(EError::Unknown, errno, "umount(" + Target.ToString() + ")");
 

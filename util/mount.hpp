@@ -49,7 +49,7 @@ public:
     TError BindFile(bool rdonly, unsigned long flags = 0) const;
     TError BindDir(bool rdonly, unsigned long flags = 0) const;
     TError MountDir(unsigned long flags = 0) const;
-    TError Umount() const;
+    TError Umount(int flags = UMOUNT_NOFOLLOW) const;
     TError Move(TPath destination);
     TError Detach() const;
 
