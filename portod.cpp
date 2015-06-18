@@ -346,7 +346,6 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
 
     bool discardState = false;
     while (true) {
-
         if (accept_paused && clients.size() * 4 / 3 < config().daemon().max_clients()) {
             L_WRN() << "Resume accepting connections" << std::endl;
             error = context.EpollLoop->AddSource(AcceptSource);
@@ -379,6 +378,9 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                 goto exit;
             case rotateSignal:
                 DaemonOpenLog(false);
+                break;
+            case debugSignal:
+                DumpMallocInfo();
                 break;
             default:
                 /* Ignore other signals */
@@ -796,6 +798,8 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
                 ret = EncodeSignal(s);
                 goto exit;
             case debugSignal:
+                DumpMallocInfo();
+
                 L() << "Statuses:" << std::endl;
                 for (auto pair : exited)
                     L() << pair.first << "=" << pair.second << std::endl;;
@@ -989,3 +993,4 @@ int main(int argc, char * const argv[]) {
     else
         return MasterMain();
 }
+

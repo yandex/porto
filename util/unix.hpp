@@ -59,3 +59,4 @@ TError PivotRoot(const TPath &rootfs);
 bool SupportOverlayfs();
 size_t GetNumCores();
 TError UnpackTarball(const TPath &tar, const TPath &path);
+void DumpMallocInfo();

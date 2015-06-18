@@ -9,6 +9,7 @@
 #include "unix.hpp"
 
 extern "C" {
+#include <malloc.h>
 #include <unistd.h>
 #include <errno.h>
 #include <time.h>
@@ -448,4 +449,18 @@ TError UnpackTarball(const TPath &tar, const TPath &path) {
         return TError(EError::Unknown, "Can't execute tar " + std::to_string(status));
 
     return TError::Success();
+}
+
+void DumpMallocInfo() {
+    struct mallinfo mi = mallinfo();
+    L() << "Total non-mapped bytes (arena):\t" << mi.arena << std::endl;
+    L() << "# of free chunks (ordblks):\t" << mi.ordblks << std::endl;
+    L() << "# of free fastbin blocks (smblks):\t" << mi.smblks << std::endl;
+    L() << "# of mapped regions (hblks):\t" << mi.hblks << std::endl;
+    L() << "Bytes in mapped regions (hblkhd):\t" << mi.hblkhd << std::endl;
+    L() << "Max. total allocated space (usmblks):\t" << mi.usmblks << std::endl;
+    L() << "Free bytes held in fastbins (fsmblks):\t" << mi.fsmblks << std::endl;
+    L() << "Total allocated space (uordblks):\t" << mi.uordblks << std::endl;
+    L() << "Total free space (fordblks):\t" << mi.fordblks << std::endl;
+    L() << "Topmost releasable block (keepcost):\t" << mi.keepcost << std::endl;
 }
