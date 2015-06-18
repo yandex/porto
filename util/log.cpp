@@ -183,7 +183,9 @@ std::string RequestAsString(const rpc::TContainerRequest &req) {
     else if (req.has_getproperty())
         return "pget "  + req.getproperty().name() + " " + req.getproperty().property();
     else if (req.has_setproperty())
-        return "pset " + req.setproperty().name() + " " + req.setproperty().property();
+        return "pset " + req.setproperty().name() + " " +
+                         req.setproperty().property() + " " +
+                         req.setproperty().value();
     else if (req.has_getdata())
         return "dget " + req.getdata().name() + " " + req.getdata().data();
     else if (req.has_get()) {
