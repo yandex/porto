@@ -29,10 +29,11 @@ class TVariant : public TNonCopyable {
         TValueImpl(T value) : Value(value) {}
     };
 
-    std::shared_ptr<TValueAbstractImpl> Impl = nullptr;
+    TValueAbstractImpl *Impl = nullptr;
 
 public:
     TVariant() {}
+    ~TVariant() { Reset(); }
 
     bool HasValue() const { return Impl != nullptr; }
 
@@ -42,7 +43,7 @@ public:
             PORTO_RUNTIME_ERROR("Invalid variant get: nullptr");
 
         try {
-            auto p = dynamic_cast<TValueImpl<T> *>(Impl.get());
+            auto p = dynamic_cast<TValueImpl<T> *>(Impl);
             if (!p)
                 PORTO_RUNTIME_ERROR(std::string("Invalid variant cast"));
             return p->Value;
@@ -54,10 +55,16 @@ public:
 
     template<typename T>
     void Set(const T &value) {
-        Impl = std::make_shared<TValueImpl<T>>(value);
+        Reset();
+        Impl = new TValueImpl<T>(value);
     };
 
-    void Reset() { Impl = nullptr; }
+    void Reset() {
+        if (Impl) {
+            delete Impl;
+            Impl = nullptr;
+        }
+    }
 };
 
 template<typename T>
@@ -205,7 +212,7 @@ class TRawValueMap {
     std::map<std::string, TAbstractValue *> AbstractValues;
 
 public:
-    ~TRawValueMap();
+    virtual ~TRawValueMap();
 
     TError Add(const std::string &name, TAbstractValue *av);
     TAbstractValue *Find(const std::string &name) const;
