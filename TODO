@@ -8,7 +8,6 @@
 - ? respawn = true - respawn only if exit_status != 0
 - add gc of dead containers with lost events
 - find and fix bug with meta-containers
-- namespaces for volumes
 - support volume as root
 - custom SIGTERM timeout (allow to send SIGKILL for such containers so we can 'force-destroy' them)
 - kill master when can't restart slave many times
@@ -25,12 +24,10 @@
 
 # volume api
 - add stresstest
-- handle volume creation from chrooted containers
 - merge ext4 quota management into volumes
 - recalculate quota at creation from existing storage
 - handle disk guarantees
 - ? support overlay layers in loop/plain
-- suid helper for unpacking/converting/remoiving tarballs with aufs/overlayfs
 
 # cleanup
 - move all 'extern "C"' into one file
