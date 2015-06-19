@@ -1519,7 +1519,12 @@ static map<string, TMountInfo> ParseMountinfo(string s) {
 
         TMountInfo i;
         i.flags = tok[5];
-        i.source = tok[8];
+
+        int sep = 7;
+        while (tok[sep] != "-")
+            sep++;
+
+        i.source = tok[sep + 2];
 
         m[tok[4]] = i;
     }
@@ -4161,13 +4166,14 @@ static void TestVolumeImpl(TPortoAPI &api) {
         // - test quota when ready
         // - make sure overlayfs upper/lower/work dirs are correct
     } else {
-        Say() << "Make sure loop device has correct size" << std::endl;
+        Say() << "Make sure loop device has created" << std::endl;
         Expect(StringStartsWith(m[a].source, "/dev/loop"));
         std::string loopDev = m[a].source;
         AsRoot(api);
         std::string img = System("losetup " + loopDev + " | sed -e 's/[^(]*(\\([^)]*\\)).*/\\1/'");
         AsNobody(api);
 
+        Say() << "Make sure loop device has correct size" << std::endl;
         TFile loopFile(img);
         off_t expected = 100 * 1024 * 1024;
         off_t mistake = 1 * 1024 * 1024;
