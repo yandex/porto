@@ -1003,6 +1003,21 @@ void TContainer::FreeResources() {
     }
 }
 
+bool TContainer::Acquire() {
+    if (!IsAcquired())
+        Acquired = true;
+    return Acquired;
+}
+
+void TContainer::Release() {
+    PORTO_ASSERT(Acquired == true);
+    Acquired = false;
+}
+
+bool TContainer::IsAcquired() const {
+    return (Acquired || (Parent && Parent->IsAcquired()));
+}
+
 TError TContainer::Stop() {
     SyncStateWithCgroup();
     auto state = GetState();

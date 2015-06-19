@@ -48,6 +48,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     std::vector<std::weak_ptr<TContainer>> Children;
     std::shared_ptr<TKeyValueStorage> Storage;
     EContainerState State = EContainerState::Unknown;
+    bool Acquired = false;
     uint16_t Id;
     int TaskStartErrno = -1;
     TScopedFd Efd;
@@ -120,6 +121,10 @@ public:
         Holder(holder), Name(StripParentName(name)), Parent(parent),
         Storage(storage), Id(id), Net(net) { }
     ~TContainer();
+
+    bool Acquire();
+    void Release();
+    bool IsAcquired() const;
 
     const std::string GetName(bool recursive = true, const std::string &sep = "/") const;
     const uint16_t GetId() const { return Id; }
