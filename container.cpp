@@ -843,8 +843,6 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
             return error;
         }
 
-        Task->CloseNs();
-
         error = Data->Set<int>(D_START_ERRNO, -1);
         if (error)
             return error;
@@ -954,6 +952,17 @@ TError TContainer::PrepareResources() {
     return TError::Success();
 }
 
+void TContainer::RemoveLog(const TPath &path) {
+    if (path.GetType() != EFileType::Character &&
+        path.GetType() != EFileType::Block) {
+        TFile f(path);
+        if (f.Exists()) {
+            TError error = f.Remove();
+            if (error)
+                L_ERR() << "Can't remove stdio file " << path << ": " << error << std::endl;
+        }
+    }
+}
 void TContainer::FreeResources() {
     LeafCgroups.clear();
 
@@ -963,6 +972,12 @@ void TContainer::FreeResources() {
     }
     Task = nullptr;
     ShutdownOom();
+
+    if (Prop->IsDefault(P_STDOUT_PATH))
+        RemoveLog(Prop->Get<std::string>(P_STDOUT_PATH));
+
+    if (Prop->IsDefault(P_STDERR_PATH))
+        RemoveLog(Prop->Get<std::string>(P_STDERR_PATH));
 
     int loopNr = Prop->Get<int>(P_RAW_LOOP_DEV);
     TError error = Prop->Set<int>(P_RAW_LOOP_DEV, -1);
@@ -1431,8 +1446,6 @@ TError TContainer::Restore(const kv::TNode &node) {
 
         Task->Restore(pid);
 
-        Task->CloseNs();
-
         if (Task->HasCorrectParent()) {
             if (Task->IsZombie()) {
                     L() << "Task is zombie and belongs to porto" << std::endl;
@@ -1504,10 +1517,13 @@ TError TContainer::Restore(const kv::TNode &node) {
 
     if (GetState() == EContainerState::Stopped) {
         if (Prop->IsDefault(P_STDOUT_PATH))
-            TTask::RemoveStdioFile(Prop->Get<std::string>(P_STDOUT_PATH));
+            RemoveLog(Prop->Get<std::string>(P_STDOUT_PATH));
         if (Prop->IsDefault(P_STDERR_PATH))
-            TTask::RemoveStdioFile(Prop->Get<std::string>(P_STDERR_PATH));
+            RemoveLog(Prop->Get<std::string>(P_STDERR_PATH));
     }
+
+    if (Task)
+        Task->ClearEnv();
 
     if (Parent)
         Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
@@ -1653,6 +1669,20 @@ bool TContainer::DeliverOom(int fd) {
     return Exit(SIGKILL, true);
 }
 
+TError TContainer::RotateLog(const TPath &path) {
+    off_t max_log_size = config().container().max_log_size();
+
+    if (path.GetType() == EFileType::Regular) {
+        TFile file(path);
+
+        TError error = file.RotateLog(max_log_size);
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
+}
+
 bool TContainer::DeliverEvent(const TEvent &event) {
     TError error;
     switch (event.Type) {
@@ -1660,9 +1690,13 @@ bool TContainer::DeliverEvent(const TEvent &event) {
             return DeliverExitStatus(event.Exit.Pid, event.Exit.Status);
         case EEventType::RotateLogs:
             if (GetState() == EContainerState::Running && Task) {
-                error = Task->RotateLogs();
+                TError error = RotateLog(Prop->Get<std::string>(P_STDOUT_PATH));
                 if (error)
-                    L_ERR() << "Can't rotate logs: " << error << std::endl;
+                    L_ERR() << "Can't rotate stdout: " << error << std::endl;
+
+                error = RotateLog(Prop->Get<std::string>(P_STDERR_PATH));
+                if (error)
+                    L_ERR() << "Can't rotate stderr: " << error << std::endl;
             }
             return false;
         case EEventType::Respawn:

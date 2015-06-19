@@ -114,7 +114,7 @@ public:
 class TTask: public TNonCopyable {
     int Rfd, Wfd;
     int WaitParentRfd, WaitParentWfd;
-    std::shared_ptr<TTaskEnv> Env;
+    std::shared_ptr<const TTaskEnv> Env;
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
 
     enum ETaskState { Stopped, Started } State;
@@ -125,10 +125,12 @@ class TTask: public TNonCopyable {
 
     void ReportPid(int pid) const;
 
+    TError ReopenStdio();
+    TError IsolateNet(int childPid);
     TError CreateCwd();
-    TError CreateNode(const TPath &path, unsigned int mode, unsigned int dev);
+
+    TError ChildCreateNode(const TPath &path, unsigned int mode, unsigned int dev);
     TError ChildOpenStdFile(const TPath &path, int expected);
-    TError ChildReopenStdio();
     TError ChildApplyCapabilities();
     TError ChildDropPriveleges();
     TError ChildExec();
@@ -138,14 +140,12 @@ class TTask: public TNonCopyable {
     TError ChildMountDev();
     TError ChildMountRun();
     TError ChildIsolateFs();
-    TError EnableNet();
-    TError IsolateNet(int childPid);
+    TError ChildEnableNet();
 
 public:
-    TTask(std::shared_ptr<TTaskEnv> env,
+    TTask(std::shared_ptr<const TTaskEnv> env,
           const std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> &leafCgroups) : Env(env), LeafCgroups(leafCgroups) {};
     TTask(pid_t pid) : Pid(pid) {};
-    ~TTask();
 
     TError Start();
     int GetPid() const;
@@ -153,9 +153,7 @@ public:
     int GetExitStatus() const;
     TError Kill(int signal) const;
     void DeliverExitStatus(int status);
-
-    static void RemoveStdioFile(const TPath &path);
-    void RemoveStdio() const;
+    void ClearEnv();
 
     TError ChildApplyLimits();
     TError ChildSetHostname();
@@ -164,7 +162,6 @@ public:
     TError ChildCallback();
     void Restore(int pid_);
     TError FixCgroups() const;
-    TError RotateLogs() const;
     void Abort(const TError &error) const;
 
     TError GetPPid(pid_t &ppid) const;
@@ -172,8 +169,6 @@ public:
 
     bool HasCorrectParent();
     bool HasCorrectFreezer();
-
-    void CloseNs();
 };
 
 TError TaskGetLastCap();

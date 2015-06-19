@@ -8,6 +8,7 @@
 #include "event.hpp"
 #include "util/string.hpp"
 #include "util/cred.hpp"
+#include "util/file.hpp"
 
 void TContainerHolder::DestroyRoot() {
     // we want children to be removed first

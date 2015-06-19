@@ -61,31 +61,6 @@ const char** TTaskEnv::GetEnvp() const {
 }
 
 // TTask
-TTask::~TTask() {
-    RemoveStdio();
-}
-
-void TTask::RemoveStdioFile(const TPath &path) {
-    if (path.GetType() != EFileType::Character &&
-        path.GetType() != EFileType::Block) {
-        TFile f(path);
-        if (f.Exists()) {
-            TError error = f.Remove();
-            if (error)
-                L_ERR() << "Can't remove task stdio file " << path << ": " << error << std::endl;
-        }
-    }
-}
-
-void TTask::RemoveStdio() const {
-    if (!Env)
-        return;
-
-    if (Env->RemoveStdout)
-        TTask::RemoveStdioFile(Env->StdoutPath);
-    if (Env->RemoveStderr)
-        TTask::RemoveStdioFile(Env->StderrPath);
-}
 
 void TTask::ReportPid(int pid) const {
     if (write(Wfd, &pid, sizeof(pid)) != sizeof(pid)) {
@@ -131,7 +106,7 @@ TError TTask::ChildOpenStdFile(const TPath &path, int expected) {
     return TError::Success();
 }
 
-TError TTask::ChildReopenStdio() {
+TError TTask::ReopenStdio() {
     CloseFds(3, { Wfd, TLogger::GetFd() });
 
     int ret = open(Env->StdinPath.ToString().c_str(), O_CREAT | O_RDONLY, 0660);
@@ -274,7 +249,7 @@ TError TTask::ChildBindDirectores() {
     return TError::Success();
 }
 
-TError TTask::CreateNode(const TPath &path, unsigned int mode, unsigned int dev) {
+TError TTask::ChildCreateNode(const TPath &path, unsigned int mode, unsigned int dev) {
     if (mknod(path.ToString().c_str(), mode, dev) < 0)
         return TError(EError::Unknown, errno, "mknod(" + path.ToString() + ")");
 
@@ -356,7 +331,7 @@ TError TTask::ChildMountDev() {
         return error;
 
     for (size_t i = 0; i < sizeof(node) / sizeof(node[0]); i++) {
-        error = CreateNode(Env->Root + node[i].path,
+        error = ChildCreateNode(Env->Root + node[i].path,
                            node[i].mode, node[i].dev);
         if (error)
             return error;
@@ -464,7 +439,7 @@ TError TTask::ChildIsolateFs() {
     return newRoot.Chdir();
 }
 
-TError TTask::EnableNet() {
+TError TTask::ChildEnableNet() {
     auto nl = std::make_shared<TNl>();
     if (!nl)
         throw std::bad_alloc();
@@ -684,7 +659,7 @@ TError TTask::ChildCallback() {
     }
 
     if (!Env->NetCfg.Share) {
-        error = EnableNet();
+        error = ChildEnableNet();
         if (error)
             return error;
     }
@@ -811,7 +786,7 @@ TError TTask::Start() {
             }
         }
 
-        error = ChildReopenStdio();
+        error = ReopenStdio();
         if (error) {
             ReportPid(-1);
             Abort(error);
@@ -908,6 +883,9 @@ TError TTask::Start() {
     }
 
     State = Started;
+
+    ClearEnv();
+
     return TError::Success();
 }
 
@@ -924,7 +902,6 @@ int TTask::GetExitStatus() const {
 }
 
 void TTask::DeliverExitStatus(int status) {
-    LeafCgroups.clear();
     ExitStatus = status;
     State = Stopped;
 }
@@ -1069,35 +1046,12 @@ TError TTask::GetPPid(pid_t &ppid) const {
     return TError(EError::Unknown, "Can't parse /proc/pid/status");
 }
 
+void TTask::ClearEnv() {
+    LeafCgroups.clear();
+    Env = nullptr;
+}
+
 TError TaskGetLastCap() {
     TFile f("/proc/sys/kernel/cap_last_cap");
     return f.AsInt(lastCap);
-}
-
-TError TTask::RotateLogs() const {
-    off_t max_log_size = config().container().max_log_size();
-    TError error;
-
-    if (Env->StdoutPath.GetType() == EFileType::Regular) {
-        TFile file(Env->StdoutPath);
-
-        error = file.RotateLog(max_log_size);
-        if (error)
-            return error;
-    }
-
-    if (Env->StderrPath.GetType() == EFileType::Regular) {
-        TFile file(Env->StderrPath);
-
-        error = file.RotateLog(max_log_size);
-        if (error)
-            return error;
-    }
-
-    return TError::Success();
-}
-
-void TTask::CloseNs() {
-    Env->ClientNs.Close();
-    Env->ParentNs.Close();
 }
