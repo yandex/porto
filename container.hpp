@@ -39,7 +39,8 @@ enum class EContainerState {
 };
 
 class TContainer : public std::enable_shared_from_this<TContainer>,
-                   public TNonCopyable {
+                   public TNonCopyable,
+                   public TLockable {
     std::shared_ptr<TContainerHolder> Holder;
     const std::string Name;
     const std::shared_ptr<TContainer> Parent;
