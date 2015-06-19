@@ -12,7 +12,7 @@ extern "C" {
 }
 
 // order is important
-static pair<string, int> nameToType[] = {
+static pair<string, int> nameToType[TNamespaceSnapshot::nrNs] = {
     //{ "ns/user", CLONE_NEWUSER },
     { "ns/ipc", CLONE_NEWIPC },
     { "ns/uts", CLONE_NEWUTS },
@@ -21,53 +21,54 @@ static pair<string, int> nameToType[] = {
     { "ns/mnt", CLONE_NEWNS },
 };
 
-TError TNamespaceSnapshot::OpenFd(int pid, string v, TScopedFd &fd) {
-    std::string path = "/proc/" + std::to_string(pid) + "/" + v;
+TError TNamespaceSnapshot::OpenProcPidFd(int pid, string name, int &fd) {
+    std::string path = "/proc/" + std::to_string(pid) + "/" + name;
     fd = open(path.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-    if (fd.GetFd() < 0)
+    if (fd < 0)
         return TError(EError::Unknown, errno, "Can't open " + path);
 
     return TError::Success();
 }
 
-TError TNamespaceSnapshot::Create(int pid, bool only_mnt) {
-    Destroy();
-
+TError TNamespaceSnapshot::Open(int pid, bool only_mnt) {
     int nr = 0;
-    for (auto &pair : nameToType) {
+    TError error;
+
+    Close();
+
+    for (int i = 0; i < nrNs; i++) {
+        auto pair = nameToType[i];
 
         if (only_mnt && pair.second != CLONE_NEWNS)
             continue;
 
-        std::string path = "/proc/" + std::to_string(pid) + "/" + pair.first;
-
-        int fd = open(path.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-        if (fd < 0 && errno == ENOENT)
-            continue;
-
-        if (fd < 0) {
-            Destroy();
-            return TError(EError::Unknown, errno, "Can't open namespace fd");
+        int fd;
+        error = OpenProcPidFd(pid, pair.first, fd);
+        if (error) {
+            if (error.GetErrno() == ENOENT)
+                continue;
+            Close();
+            return error;
         }
 
-        nsToFd[pair.second] = fd;
+        nsFd[i] = fd;
         nr++;
     }
 
     if (!nr) {
-        Destroy();
+        Close();
         return TError(EError::Unknown, "Can't find any namespace");
     }
 
-    TError error = OpenFd(pid, "root", Root);
+    error = OpenProcPidFd(pid, "root", RootFd);
     if (error) {
-        Destroy();
+        Close();
         return error;
     }
 
-    error = OpenFd(pid, "cwd", Cwd);
+    error = OpenProcPidFd(pid, "cwd", CwdFd);
     if (error) {
-        Destroy();
+        Close();
         return error;
     }
 
@@ -75,34 +76,42 @@ TError TNamespaceSnapshot::Create(int pid, bool only_mnt) {
 }
 
 TError TNamespaceSnapshot::Chroot() const {
-    if (fchdir(Root.GetFd()) < 0)
-        return TError(EError::Unknown, errno, "Can't change root directory: fchdir(" + std::to_string(Root.GetFd()) + ")");
+    if (fchdir(RootFd) < 0)
+        return TError(EError::Unknown, errno, "Can't change root directory: fchdir(" + std::to_string(RootFd) + ")");
 
     if (chroot(".") < 0)
-        return TError(EError::Unknown, errno, "Can't change root directory chroot(" + std::to_string(Root.GetFd()) + ")");
+        return TError(EError::Unknown, errno, "Can't change root directory chroot(" + std::to_string(RootFd) + ")");
 
-    if (fchdir(Cwd.GetFd()) < 0)
-        return TError(EError::Unknown, errno, "Can't change working directory fchdir(" + std::to_string(Cwd.GetFd()) + ")");
+    if (fchdir(CwdFd) < 0)
+        return TError(EError::Unknown, errno, "Can't change working directory fchdir(" + std::to_string(CwdFd) + ")");
 
     return TError::Success();
 }
 
-void TNamespaceSnapshot::Destroy() {
-    for (auto &pair : nsToFd)
-        close(pair.second);
-    nsToFd.clear();
+void TNamespaceSnapshot::Close() {
+    for (int i = 0; i < nrNs; i++)
+        if (nsFd[i] >= 0) {
+            close(nsFd[i]);
+            nsFd[i] = -1;
+        }
+    if (RootFd >= 0) {
+        close(RootFd);
+        RootFd = -1;
+    }
+    if (CwdFd >= 0) {
+        close(CwdFd);
+        CwdFd = -1;
+    }
 }
 
 TError TNamespaceSnapshot::Attach() const {
-    for (auto &pair : nsToFd) {
-        if (setns(pair.second, pair.first))
+    for (int i = 0; i < nrNs; i++)
+        if (nsFd[i] >= 0 && setns(nsFd[i], nameToType[i].second))
             return TError(EError::Unknown, errno, "Can't set namespace");
-    }
 
     return TError::Success();
 }
 
 bool TNamespaceSnapshot::Valid() const {
-    return Root.GetFd() >= 0 && Cwd.GetFd() >= 0;
-
+    return RootFd >= 0 && CwdFd >= 0;
 }

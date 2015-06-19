@@ -624,7 +624,7 @@ public:
         }
 
         TNamespaceSnapshot ns;
-        error = ns.Create(pid);
+        error = ns.Open(pid);
         if (error) {
             PrintError(error, "Can't create namespace snapshot");
             return EXIT_FAILURE;

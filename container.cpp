@@ -635,7 +635,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         TPath client_root = client_container->RootPath();
         if (client_root.IsEmpty())
             return TError(EError::InvalidValue, "Cannot get client root path");
-        TError error = taskEnv->ClientNs.Create(client->GetPid(), true);
+        TError error = taskEnv->ClientNs.Open(client->GetPid(), true);
         if (error)
             return error;
         taskEnv->Root = client_root.InnerPath(taskEnv->Root, true);
@@ -690,7 +690,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         if (!p)
             return TError(EError::Unknown, "Couldn't find running parent");
 
-        TError error = taskEnv->ParentNs.Create(p->Task->GetPid());
+        TError error = taskEnv->ParentNs.Open(p->Task->GetPid());
         if (error)
             return error;
     }

@@ -1,22 +1,25 @@
 #pragma once
 
-#include <map>
 #include <string>
+#include <array>
 
 #include "common.hpp"
 #include "util/unix.hpp"
 
 class TNamespaceSnapshot : public TNonCopyable {
-    std::map<int,int> nsToFd;
-    TScopedFd Root, Cwd;
-    TError OpenFd(int pid, std::string v, TScopedFd &fd);
+public:
+    static const int nrNs = 5;
+private:
+    std::array<int, nrNs> nsFd;
+    int RootFd, CwdFd;
+    TError OpenProcPidFd(int pid, std::string name, int &fd);
 
 public:
-    TNamespaceSnapshot() {}
-    ~TNamespaceSnapshot() { Destroy(); }
-    TError Create(int pid, bool only_mnt = false);
+    TNamespaceSnapshot() : RootFd(-1), CwdFd(-1) { nsFd.fill(-1); }
+    ~TNamespaceSnapshot() { Close(); }
+    TError Open(int pid, bool only_mnt = false);
     TError Chroot() const;
     TError Attach() const;
-    void Destroy();
+    void Close();
     bool Valid() const;
 };
