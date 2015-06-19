@@ -187,6 +187,7 @@ void TContainer::RemoveKvs() {
     if (IsRoot() || IsPortoRoot())
         return;
 
+    // TODO
     for (auto iter : Children)
         if (auto child = iter.lock())
             child->RemoveKvs();
@@ -893,10 +894,12 @@ TError TContainer::KillAll() {
     // try to stop all tasks gracefully
     (void)cg->Kill(SIGTERM);
 
+    Holder->Unlock();
     int ret = SleepWhile(config().container().kill_timeout_ms(),
                          [&]{ return cg->IsEmpty() == false; });
     if (ret)
         L() << "Child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
+    Holder->Lock();
 
     // then kill any task that didn't want to stop via SIGTERM signal;
     // freeze all container tasks to make sure no one forks and races with us
@@ -919,8 +922,14 @@ TError TContainer::KillAll() {
 
 bool TContainer::StopChildren() {
     bool stopped = false;
-    for (auto iter : Children)
-        if (auto child = iter.lock())
+    std::vector<std::weak_ptr<TContainer>> children = Children;
+
+    Holder->Unlock();
+    for (auto iter : children)
+        if (auto child = iter.lock()) {
+            auto lock = child->ScopedLock();
+            auto holder_lock = Holder->ScopedLock();
+
             if (child->GetState() != EContainerState::Stopped) {
                 TError error = child->Stop();
                 if (error)
@@ -928,13 +937,21 @@ bool TContainer::StopChildren() {
                 else
                     stopped = true;
             }
+        }
+    Holder->Lock();
     return stopped;
 }
 
 bool TContainer::ExitChildren(int status, bool oomKilled) {
     bool exited = false;
-    for (auto iter : Children)
-        if (auto child = iter.lock())
+    std::vector<std::weak_ptr<TContainer>> children = Children;
+
+    Holder->Unlock();
+    for (auto iter : children)
+        if (auto child = iter.lock()) {
+            auto lock = child->ScopedLock();
+            auto holder_lock = Holder->ScopedLock();
+
             if (child->GetState() == EContainerState::Running ||
                 child->GetState() == EContainerState::Meta) {
                 TError error = child->KillAll();
@@ -943,6 +960,8 @@ bool TContainer::ExitChildren(int status, bool oomKilled) {
                 if (child->Exit(status, oomKilled, true))
                     exited = true;
             }
+        }
+    Holder->Lock();
     return exited;
 }
 
@@ -1004,12 +1023,14 @@ void TContainer::FreeResources() {
 }
 
 bool TContainer::Acquire() {
+    L() << "acquire " << Name << std::endl;
     if (!IsAcquired())
         Acquired = true;
     return Acquired;
 }
 
 void TContainer::Release() {
+    L() << "release " << Name << std::endl;
     PORTO_ASSERT(Acquired == true);
     Acquired = false;
 }
@@ -1038,13 +1059,16 @@ TError TContainer::Stop() {
         }
 
         auto cg = GetLeafCgroup(freezerSubsystem);
+
+        Holder->Unlock();
         int ret = SleepWhile(config().container().stop_timeout_ms(),
-                             [&]()->int{
-                                if (cg && cg->IsEmpty())
-                                    return 0;
+                             [&] () -> int {
+                                 if (cg && cg->IsEmpty())
+                                     return 0;
                                  kill(Task->GetPid(), 0);
                                  return errno != ESRCH;
                              });
+        Holder->Lock();
         if (ret) {
             L_ERR() << "Can't wait for container to stop" << std::endl;
             return TError(EError::Unknown, "Container didn't stop in " + std::to_string(config().container().stop_timeout_ms()) + "ms");

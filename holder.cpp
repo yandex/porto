@@ -404,19 +404,24 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
 
     bool delivered = false;
 
+    auto holder_lock = ScopedLock();
+
     switch (event.Type) {
     case EEventType::OOM:
     {
         std::shared_ptr<TContainer> target = event.Container.lock();
-        if (target)
+        if (target) {
+            auto lock = target->NestScopedLock(holder_lock);
             delivered = target->DeliverEvent(event);
+        }
         break;
     }
     case EEventType::Respawn:
     case EEventType::Exit:
     {
-        for (auto &target : Containers) {
-            delivered = target.second->DeliverEvent(event);
+        for (auto &target : List()) {
+            auto lock = target->NestScopedLock(holder_lock);
+            delivered = target->DeliverEvent(event);
             if (delivered)
                 break;
         }
@@ -428,10 +433,11 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     case EEventType::CgroupSync:
     {
         bool rearm = false;
-        for (auto &c : Containers) {
-            if (c.second->IsLostAndRestored()) {
+        for (auto &target : List()) {
+            auto lock = target->NestScopedLock(holder_lock);
+            if (target->IsLostAndRestored()) {
+                target->SyncStateWithCgroup();
                 rearm = true;
-                c.second->SyncStateWithCgroup();
             }
         }
         if (rearm)
@@ -451,9 +457,9 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     {
         { /* gc */
             std::vector<std::string> remove;
-            for (auto c : Containers)
-                if (c.second->CanRemoveDead())
-                    remove.push_back(c.second->GetName());
+            for (auto target : List())
+                if (target->CanRemoveDead())
+                    remove.push_back(target->GetName());
 
             for (auto name : remove) {
                 L_ACT() << "Remove old dead " << name << std::endl;
@@ -465,8 +471,10 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
             }
         }
 
-        for (auto c : Containers)
-            c.second->DeliverEvent(event);
+        for (auto &target : List()) {
+            auto lock = target->NestScopedLock(holder_lock);
+            target->DeliverEvent(event);
+        }
 
         ScheduleLogRotatation();
         Statistics->Rotated++;

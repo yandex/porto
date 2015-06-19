@@ -130,6 +130,11 @@ static TError DestroyContainer(TContext &context,
         if (error)
             return error;
 
+        if (!container->Acquire())
+            return TError(EError::Busy, "Can't destroy busy container");
+
+        auto lock = container->NestScopedLock(cholder_lock);
+
         cholder_lock.unlock();
         auto vholder_lock = context.Vholder->ScopedLock();
 
@@ -159,6 +164,7 @@ static TError DestroyContainer(TContext &context,
         container->Volumes.clear();
         vholder_lock.unlock();
 
+        container->Release();
         cholder_lock.lock();
     }
 
@@ -169,7 +175,7 @@ static TError StartContainer(TContext &context,
                              const rpc::TContainerStartRequest &req,
                              rpc::TContainerResponse &rsp,
                              std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->ScopedLock();
+    auto holder_lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -205,10 +211,18 @@ static TError StartContainer(TContext &context,
                 container->GetState() == EContainerState::Meta)
                 continue;
 
+        if (!container->Acquire())
+            return TError(EError::Busy, "Can't start busy container");
+
+        auto lock = container->NestScopedLock(holder_lock);
+
         std::string cmd = container->Prop->Get<std::string>(P_COMMAND);
         bool meta = i + 1 != nameVec.end() && cmd.empty();
         //bool meta = std::distance(i, nameVec.end()) == 1 && cmd.empty();
         err = container->Start(client, meta);
+
+        container->Release();
+
         if (err)
             return err;
     }
@@ -220,7 +234,7 @@ static TError StopContainer(TContext &context,
                             const rpc::TContainerStopRequest &req,
                             rpc::TContainerResponse &rsp,
                             std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->ScopedLock();
+    auto holder_lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -239,14 +253,23 @@ static TError StopContainer(TContext &context,
     if (error)
         return error;
 
-    return container->Stop();
+    if (!container->Acquire())
+        return TError(EError::Busy, "Can't stop busy container");
+
+    auto lock = container->NestScopedLock(holder_lock);
+
+    err = container->Stop();
+
+    container->Release();
+
+    return err;
 }
 
 static TError PauseContainer(TContext &context,
                              const rpc::TContainerPauseRequest &req,
                              rpc::TContainerResponse &rsp,
                              std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->ScopedLock();
+    auto holder_lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -265,14 +288,23 @@ static TError PauseContainer(TContext &context,
     if (error)
         return error;
 
-    return container->Pause();
+    if (!container->Acquire())
+        return TError(EError::Busy, "Can't pause busy container");
+
+    auto lock = container->NestScopedLock(holder_lock);
+
+    err = container->Pause();
+
+    container->Release();
+
+    return err;
 }
 
 static TError ResumeContainer(TContext &context,
                               const rpc::TContainerResumeRequest &req,
                               rpc::TContainerResponse &rsp,
                               std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->ScopedLock();
+    auto holder_lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -291,15 +323,24 @@ static TError ResumeContainer(TContext &context,
     if (error)
         return error;
 
-    return container->Resume();
+    if (!container->Acquire())
+        return TError(EError::Busy, "Can't resume busy container");
+
+    auto lock = container->NestScopedLock(holder_lock);
+
+    err = container->Resume();
+
+    container->Release();
+
+    return err;
 }
 
 static TError ListContainers(TContext &context,
                              rpc::TContainerResponse &rsp,
                              std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->ScopedLock();
+    auto holder_lock = context.Cholder->ScopedLock();
 
-    for (auto c : context.Cholder->List()) {
+    for (auto &c : context.Cholder->List()) {
         std::string name;
         TError err = client->GetContainer()->RelativeName(*c, name);
         if (!err)
@@ -313,7 +354,7 @@ static TError GetContainerProperty(TContext &context,
                                    const rpc::TContainerGetPropertyRequest &req,
                                    rpc::TContainerResponse &rsp,
                                    std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->ScopedLock();
+    auto holder_lock = context.Cholder->ScopedLock();
 
     std::string name;
     TError err = client->GetContainer()->AbsoluteName(req.name(), name, true);
@@ -324,10 +365,18 @@ static TError GetContainerProperty(TContext &context,
     if (error)
         return error;
 
+    if (!container->Acquire())
+        return TError(EError::Busy, "Can't get property of busy container");
+
+    auto lock = container->NestScopedLock(holder_lock);
+
     string value;
     error = container->GetProperty(req.property(), value, client);
     if (!error)
         rsp.mutable_getproperty()->set_value(value);
+
+    container->Release();
+
     return error;
 }
 
@@ -335,7 +384,7 @@ static TError SetContainerProperty(TContext &context,
                                    const rpc::TContainerSetPropertyRequest &req,
                                    rpc::TContainerResponse &rsp,
                                    std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->ScopedLock();
+    auto holder_lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -354,14 +403,23 @@ static TError SetContainerProperty(TContext &context,
     if (error)
         return error;
 
-    return container->SetProperty(req.property(), req.value(), client);
+    if (!container->Acquire())
+        return TError(EError::Busy, "Can't set property of busy container");
+
+    auto lock = container->NestScopedLock(holder_lock);
+
+    error = container->SetProperty(req.property(), req.value(), client);
+
+    container->Release();
+
+    return error;
 }
 
 static TError GetContainerData(TContext &context,
                                const rpc::TContainerGetDataRequest &req,
                                rpc::TContainerResponse &rsp,
                                std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->ScopedLock();
+    auto holder_lock = context.Cholder->ScopedLock();
 
     std::string name;
     TError err = client->GetContainer()->AbsoluteName(req.name(), name, true);
@@ -372,10 +430,18 @@ static TError GetContainerData(TContext &context,
     if (error)
         return error;
 
+    if (!container->Acquire())
+        return TError(EError::Busy, "Can't get data of busy container");
+
+    auto lock = container->NestScopedLock(holder_lock);
+
     string value;
     error = container->GetData(req.data(), value);
     if (!error)
         rsp.mutable_getdata()->set_value(value);
+
+    container->Release();
+
     return error;
 }
 
@@ -383,7 +449,7 @@ static TError GetContainerCombined(TContext &context,
                                    const rpc::TContainerGetRequest &req,
                                    rpc::TContainerResponse &rsp,
                                    std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->ScopedLock();
+    auto holder_lock = context.Cholder->ScopedLock();
 
     if (!req.variable_size())
         return TError(EError::InvalidValue, "Properties/data are not specified");
@@ -404,6 +470,11 @@ static TError GetContainerCombined(TContext &context,
 
         auto entry = get->add_list();
         entry->set_name(relname);
+
+        if (!container->Acquire())
+            return TError(EError::Busy, "Can't get data and property of busy container");
+
+        auto lock = container->NestScopedLock(holder_lock);
 
         for (int j = 0; j < req.variable_size(); j++) {
             auto var = req.variable(j);
@@ -432,6 +503,8 @@ static TError GetContainerCombined(TContext &context,
                 keyval->set_value(value);
             }
         }
+
+        container->Release();
     }
 
     return TError::Success();
@@ -497,7 +570,7 @@ static TError Kill(TContext &context,
                    const rpc::TContainerKillRequest &req,
                    rpc::TContainerResponse &rsp,
                    std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->ScopedLock();
+    auto holder_lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -516,7 +589,16 @@ static TError Kill(TContext &context,
     if (error)
         return error;
 
-    return container->Kill(req.sig());
+    if (!container->Acquire())
+        return TError(EError::Busy, "Can't kill busy container");
+
+    auto lock = container->NestScopedLock(holder_lock);
+
+    error = container->Kill(req.sig());
+
+    container->Release();
+
+    return error;
 }
 
 static TError Version(TContext &context,
