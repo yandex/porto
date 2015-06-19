@@ -979,7 +979,7 @@ static void TestIsolateProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Stop("meta/test"));
 
     ExpectApiSuccess(api.SetProperty("meta/test", "isolate", "true"));
-    ExpectApiSuccess(api.SetProperty("meta/test", "command", "ps aux"));
+    ExpectApiSuccess(api.SetProperty("meta/test", "command", "sh -c 'ps aux; sleep 1000'"));
     ExpectApiSuccess(api.Start("meta/test"));
     ExpectApiSuccess(api.GetData("meta/test", "root_pid", pid));
     AsRoot(api);
