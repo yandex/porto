@@ -89,6 +89,8 @@ public:
     bool Valid();
     int FindIndex(const std::string &device);
     TError RefillCache();
+    TError AddIpVlan(const std::string &master,
+                     const std::string &mode, int mtu);
     TError AddMacVlan(const std::string &master,
                       const std::string &type, const std::string &hw,
                       int mtu);
@@ -97,6 +99,7 @@ public:
     const std::string &GetAlias();
     void SetAlias(const std::string &alias) { Alias = alias; }
 
+    static bool ValidIpVlanMode(const std::string &mode);
     static bool ValidMacVlanType(const std::string &type);
     static bool ValidMacAddr(const std::string &hw);
 

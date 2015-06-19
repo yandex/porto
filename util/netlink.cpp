@@ -355,7 +355,7 @@ TError TNlLink::RefillCache() {
 }
 
 #ifdef IFLA_IPVLAN_MAX
-static const std::map<std::string, int> ipvlanType = {
+static const std::map<std::string, int> ipvlanMode = {
     { "l2", IPVLAN_MODE_L2 },
     { "l3", IPVLAN_MODE_L3 },
 };
@@ -420,13 +420,12 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
     nla_put(msg, IFLA_INFO_KIND, vlantype.length() + 1, vlantype.c_str());
     nla_nest_end(msg, data);
 
-    /* macvlan specific */
+    /* xvlan specific */
 	data = nla_nest_start(msg, IFLA_INFO_DATA);
     if (!data) {
         error = TError(EError::Unknown, "Unable to add " + vlantype + ": can't nest IFLA_INFO_DATA");
 		goto free_msg;
     }
-
     if (vlantype == "macvlan") {
         nla_put(msg, IFLA_MACVLAN_MODE, sizeof(uint32_t), &type);
 #ifdef IFLA_IPVLAN_MAX
@@ -435,17 +434,14 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
         nla_put(msg, IFLA_IPVLAN_MODE, sizeof(uint16_t), &mode);
 #endif
     }
-
 	nla_nest_end(msg, data);
 
     L() << "netlink: add " << vlantype << " " << Name << " master " << master
         << " type " << type << " hw " << hw << " mtu " << mtu << std::endl;
 
     ret = nl_send_sync(GetSock(), msg);
-    if (ret) {
+    if (ret)
         error = TError(EError::Unknown, "Unable to add " + vlantype + ": " + nl_geterror(ret));
-        goto free_msg;
-    }
 
     if (!error)
        error = RefillCache();
@@ -455,6 +451,11 @@ free_msg:
 	nlmsg_free(msg);
     return error;
 
+}
+
+TError TNlLink::AddIpVlan(const std::string &master,
+                          const std::string &mode, int mtu) {
+    return AddXVlan("ipvlan", master, ipvlanMode.at(mode), "", mtu);
 }
 
 TError TNlLink::AddMacVlan(const std::string &master,
@@ -540,6 +541,14 @@ const std::string &TNlLink::GetAlias() {
         return Alias;
     else
         return Name;
+}
+
+bool TNlLink::ValidIpVlanMode(const std::string &mode) {
+#ifdef IFLA_IPVLAN_MAX
+    return ipvlanMode.find(mode) != ipvlanMode.end();
+#else
+    return false;
+#endif
 }
 
 bool TNlLink::ValidMacVlanType(const std::string &type) {
@@ -945,10 +954,8 @@ TError TNlCgFilter::Create() {
         << " parent 0x" << Parent << std::dec  << std::endl;
 
     ret = nl_send_sync(Link->GetSock(), msg);
-    if (ret) {
+    if (ret)
         error = TError(EError::Unknown, string("Unable to add filter: ") + nl_geterror(ret));
-        goto free_msg;
-    }
 
     if (!Exists())
         error = TError(EError::Unknown, "BUG: created filter doesn't exist");

@@ -1925,7 +1925,8 @@ static map<string, LinkInfo> IfHw(const vector<string> &iplines) {
         std::vector<std::string> flagsVec;
         ExpectSuccess(SplitString(flags, ',', flagsVec));
 
-        bool up = std::find(flagsVec.begin(), flagsVec.end(), "UP") != flagsVec.end();
+        bool up = std::find(flagsVec.begin(), flagsVec.end(), "UP") != flagsVec.end() ||
+            std::find(flagsVec.begin(), flagsVec.end(), "UP>") != flagsVec.end();
         string master = "";
         string mtu = "";
 
@@ -1989,6 +1990,58 @@ static string System(const std::string &cmd) {
     ExpectSuccess(Popen(cmd, lines));
     ExpectEq(lines.size(), 1);
     return StringTrim(lines[0]);
+}
+
+static void TestXvlan(TPortoAPI &api, const std::string &name, const std::vector<std::string> &hostLink, const std::string &link, const std::string &type) {
+    bool shouldShareMac = type == "ipvlan";
+    ExpectApiSuccess(api.SetProperty(name, "command", "ip -o link show"));
+    ExpectApiFailure(api.SetProperty(name, "net", type), EError::InvalidValue);
+    ExpectApiFailure(api.SetProperty(name, "net", type + " invalid " + link), EError::InvalidValue);
+    ExpectApiFailure(api.SetProperty(name, "net", type + " " + link), EError::InvalidValue);
+    ExpectApiSuccess(api.SetProperty(name, "net", type + " " + link + " " + link));
+    auto s = StartWaitAndGetData(api, name, "stdout");
+    auto containerLink = StringToVec(s);
+    ExpectEq(containerLink.size(),  2);
+    ExpectNeq(containerLink.size(), hostLink.size());
+    ExpectEq(ShareMacAddress(hostLink, containerLink), shouldShareMac);
+    auto linkMap = IfHw(containerLink);
+    Expect(linkMap.find("lo") != linkMap.end());
+    ExpectEq(linkMap.at("lo").up, true);
+    Expect(linkMap.find(link) != linkMap.end());
+    ExpectEq(linkMap.at(link).up, true);
+    ExpectApiSuccess(api.Stop(name));
+
+    if (type != "ipvlan") {
+        string mtu = "1400";
+        ExpectApiSuccess(api.SetProperty(name, "net", type + " " + link + " eth10 bridge " + mtu));
+        s = StartWaitAndGetData(api, name, "stdout");
+        containerLink = StringToVec(s);
+        ExpectEq(containerLink.size(), 2);
+        ExpectNeq(containerLink.size(), hostLink.size());
+        ExpectEq(ShareMacAddress(hostLink, containerLink), false);
+        linkMap = IfHw(containerLink);
+        Expect(linkMap.find("lo") != linkMap.end());
+        ExpectEq(linkMap.at("lo").up, true);
+        Expect(linkMap.find("eth10") != linkMap.end());
+        ExpectEq(linkMap.at("eth10").mtu, mtu);
+        ExpectEq(linkMap.at("eth10").up, true);
+        ExpectApiSuccess(api.Stop(name));
+
+        string hw = "00:11:22:33:44:55";
+        ExpectApiSuccess(api.SetProperty(name, "net", type + " " + link + " eth10 bridge -1 " + hw));
+        s = StartWaitAndGetData(api, name, "stdout");
+        containerLink = StringToVec(s);
+        ExpectEq(containerLink.size(), 2);
+        ExpectNeq(containerLink.size(), hostLink.size());
+        ExpectEq(ShareMacAddress(hostLink, containerLink), false);
+        linkMap = IfHw(containerLink);
+        Expect(linkMap.find("lo") != linkMap.end());
+        ExpectEq(linkMap.at("lo").up, true);
+        Expect(linkMap.find("eth10") != linkMap.end());
+        ExpectEq(linkMap.at("eth10").hw, hw);
+        ExpectEq(linkMap.at("eth10").up, true);
+        ExpectApiSuccess(api.Stop(name));
+    }
 }
 
 static void TestNetProperty(TPortoAPI &api) {
@@ -2109,52 +2162,7 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check net=macvlan" << std::endl;
-    ExpectApiSuccess(api.SetProperty(name, "command", "ip -o link show"));
-    ExpectApiFailure(api.SetProperty(name, "net", "macvlan"), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "net", "macvlan invalid " + link), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "net", "macvlan " + link), EError::InvalidValue);
-    ExpectApiSuccess(api.SetProperty(name, "net", "macvlan " + link + " " + link));
-    s = StartWaitAndGetData(api, name, "stdout");
-    containerLink = StringToVec(s);
-    ExpectEq(containerLink.size(),  2);
-    ExpectNeq(containerLink.size(), hostLink.size());
-    ExpectEq(ShareMacAddress(hostLink, containerLink), false);
-    linkMap = IfHw(containerLink);
-    Expect(linkMap.find("lo") != linkMap.end());
-    ExpectEq(linkMap.at("lo").up, true);
-    Expect(linkMap.find(link) != linkMap.end());
-    ExpectEq(linkMap.at(link).up, true);
-    ExpectApiSuccess(api.Stop(name));
-
-    string mtu = "1400";
-    ExpectApiSuccess(api.SetProperty(name, "net", "macvlan " + link + " eth10 bridge " + mtu));
-    s = StartWaitAndGetData(api, name, "stdout");
-    containerLink = StringToVec(s);
-    ExpectEq(containerLink.size(), 2);
-    ExpectNeq(containerLink.size(), hostLink.size());
-    ExpectEq(ShareMacAddress(hostLink, containerLink), false);
-    linkMap = IfHw(containerLink);
-    Expect(linkMap.find("lo") != linkMap.end());
-    ExpectEq(linkMap.at("lo").up, true);
-    Expect(linkMap.find("eth10") != linkMap.end());
-    ExpectEq(linkMap.at("eth10").mtu, mtu);
-    ExpectEq(linkMap.at("eth10").up, true);
-    ExpectApiSuccess(api.Stop(name));
-
-    string hw = "00:11:22:33:44:55";
-    ExpectApiSuccess(api.SetProperty(name, "net", "macvlan " + link + " eth10 bridge -1 " + hw));
-    s = StartWaitAndGetData(api, name, "stdout");
-    containerLink = StringToVec(s);
-    ExpectEq(containerLink.size(), 2);
-    ExpectNeq(containerLink.size(), hostLink.size());
-    ExpectEq(ShareMacAddress(hostLink, containerLink), false);
-    linkMap = IfHw(containerLink);
-    Expect(linkMap.find("lo") != linkMap.end());
-    ExpectEq(linkMap.at("lo").up, true);
-    Expect(linkMap.find("eth10") != linkMap.end());
-    ExpectEq(linkMap.at("eth10").hw, hw);
-    ExpectEq(linkMap.at("eth10").up, true);
-    ExpectApiSuccess(api.Stop(name));
+    TestXvlan(api, name, hostLink, link, "macvlan");
 
     Say() << "Check net=macvlan statistics" << std::endl;
     // create macvlan on default interface and ping ya.ru
@@ -2229,9 +2237,23 @@ static void TestNetProperty(TPortoAPI &api) {
     v.clear();
     ExpectSuccess(Popen("ip -o link show", v));
     post = IfHw(v);
-    Expect(post.find(portove) == post.end());
+    Expect(post.find("portobr0") != post.end());
+    AsRoot(api);
+    ExpectEq(system("ip link delete portobr0"), 0);
+    AsNobody(api);
 
     AsRoot(api);
+    if (HaveIpVlan()) {
+        AsNobody(api);
+        Say() << "Check net=ipvlan" << std::endl;
+        AsRoot(api);
+        ExpectApiSuccess(api.SetProperty(name, "user", GetDefaultUser()));
+        ExpectApiSuccess(api.SetProperty(name, "group", GetDefaultGroup()));
+        AsNobody(api);
+        TestXvlan(api, name, hostLink, link, "ipvlan");
+    }
+    AsNobody(api);
+
     ExpectApiSuccess(api.Destroy(name));
 }
 

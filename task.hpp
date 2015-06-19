@@ -45,6 +45,13 @@ struct TMacVlanNetCfg {
     int Mtu;
 };
 
+struct TIpVlanNetCfg {
+    std::string Master;
+    std::string Name;
+    std::string Mode;
+    int Mtu;
+};
+
 struct TIpMap {
     TNlAddr Addr;
     int Prefix;
@@ -62,6 +69,7 @@ struct TNetCfg {
     bool Share;
     std::vector<THostNetCfg> Host;
     std::vector<TMacVlanNetCfg> MacVlan;
+    std::vector<TIpVlanNetCfg> IpVlan;
     std::vector<TVethNetCfg> Veth;
 };
 

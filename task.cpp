@@ -542,28 +542,42 @@ TError TTask::IsolateNet(int childPid) {
             return error;
     }
 
+    for (auto &ipvlan : Env->NetCfg.IpVlan) {
+        auto link = std::make_shared<TNlLink>(nl, "piv" + std::to_string(GetTid()));
+        (void)link->Remove();
+
+        TError error = link->AddIpVlan(ipvlan.Master, ipvlan.Mode, ipvlan.Mtu);
+        if (error)
+            return error;
+
+        error = link->ChangeNs(ipvlan.Name, childPid);
+        if (error) {
+            (void)link->Remove();
+            return error;
+        }
+    }
+
     std::string hostname = GetHostName();
 
     for (auto &mvlan : Env->NetCfg.MacVlan) {
-        // FIXME THREADS
-        auto link = std::make_shared<TNlLink>(nl, "portomv0");
-
+        auto link = std::make_shared<TNlLink>(nl, "pmv" + std::to_string(GetTid()));
         (void)link->Remove();
 
         string hw = mvlan.Hw;
-        if (hw == "" && Env->Hostname != "")
+        if (hw.empty())
             hw = GenerateHw(Env->Hostname, mvlan.Master + mvlan.Name);
 
-        if (config().network().debug())
-            L() << "Using " << hw << " for " << mvlan.Master << " -> " << mvlan.Name << std::endl;
+        L() << "Using " << hw << " for " << mvlan.Name << "@" << mvlan.Master << std::endl;
 
         TError error = link->AddMacVlan(mvlan.Master, mvlan.Type, hw, mvlan.Mtu);
         if (error)
             return error;
 
         error = link->ChangeNs(mvlan.Name, childPid);
-        if (error)
+        if (error) {
+            (void)link->Remove();
             return error;
+        }
     }
 
     for (auto &veth : Env->NetCfg.Veth) {
@@ -573,7 +587,7 @@ TError TTask::IsolateNet(int childPid) {
             return error;
 
         string hw = veth.Hw;
-        if (hw == "" && Env->Hostname != "")
+        if (hw.empty())
             hw = GenerateHw(Env->Hostname, veth.Name + veth.Peer);
 
         if (config().network().debug())

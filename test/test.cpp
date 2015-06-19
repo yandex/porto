@@ -709,6 +709,24 @@ bool HaveMaxRss() {
     return false;
 }
 
+bool HaveIpVlan() {
+    auto nl = std::make_shared<TNl>();
+    TError error = nl->Connect();
+    if (error)
+        return false;
+
+    auto link = std::make_shared<TNlLink>(nl, "portoivcheck");
+    (void)link->Remove();
+
+    error = link->AddIpVlan(links[0]->GetAlias(), "l2", -1);
+    if (error) {
+        return false;
+    } else {
+        (void)link->Remove();
+        return true;
+    }
+}
+
 bool IsCfqActive() {
     TFolder f("/sys/block");
     std::vector<std::string> items;

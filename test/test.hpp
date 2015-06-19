@@ -80,6 +80,7 @@ namespace test {
     bool HaveLowLimit();
     bool HaveRechargeOnPgfault();
     bool HaveMaxRss();
+    bool HaveIpVlan();
     bool IsCfqActive();
 
     void _ExpectEq(size_t ret, size_t exp, size_t line, const char *func);

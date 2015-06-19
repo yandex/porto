@@ -1043,7 +1043,7 @@ public:
     TNetProperty() :
         TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_NET,
-                        "Container network settings: none | host [interface] | macvlan <master> <name> [type] [mtu] [hw] | veth <name> <bridge> [mtu] [hw]",
+                        "Container network settings: none | host [interface] | macvlan <master> <name> [bridge|private|vepa|passthru] [mtu] [hw] | ipvlan <master> <name> [l2|l3] [mtu] | veth <name> <bridge> [mtu] [hw]",
                         staticProperty) {
         Implemented = config().network().enabled();
     }
@@ -1053,11 +1053,13 @@ public:
     }
 
     TError CheckValue(const std::vector<std::string> &lines) override {
+        TNetCfg cfg;
+
         bool none = false;
-        NetCfg.Share = false;
-        NetCfg.Host.clear();
-        NetCfg.MacVlan.clear();
-        NetCfg.Veth.clear();
+        cfg.Share = false;
+        cfg.Host.clear();
+        cfg.MacVlan.clear();
+        cfg.Veth.clear();
         int idx = 0;
 
         if (lines.size() == 0)
@@ -1081,7 +1083,7 @@ public:
 
             std::string type = StringTrim(settings[0]);
 
-            if (NetCfg.Share)
+            if (cfg.Share)
                 return TError(EError::InvalidValue,
                               "host can't be mixed with other settings");
 
@@ -1094,7 +1096,7 @@ public:
                     return TError(EError::InvalidValue, "Invalid net in: " + line);
 
                 if (settings.size() == 1) {
-                    NetCfg.Share = true;
+                    cfg.Share = true;
                 } else {
                     hnet.Dev = StringTrim(settings[1]);
 
@@ -1103,7 +1105,7 @@ public:
                         return TError(EError::InvalidValue,
                                       "Invalid host interface " + hnet.Dev);
 
-                    NetCfg.Host.push_back(hnet);
+                    cfg.Host.push_back(hnet);
                 }
             } else if (type == "macvlan") {
                 if (settings.size() < 3)
@@ -1152,7 +1154,46 @@ public:
                 mvlan.Hw = hw;
                 mvlan.Mtu = mtu;
 
-                NetCfg.MacVlan.push_back(mvlan);
+                cfg.MacVlan.push_back(mvlan);
+            } else if (type == "ipvlan") {
+                if (settings.size() < 3)
+                    return TError(EError::InvalidValue, "Invalid ipvlan in: " + line);
+
+                std::string master = StringTrim(settings[1]);
+                std::string name = StringTrim(settings[2]);
+                std::string mode = "l2";
+                int mtu = -1;
+
+                auto link = c->GetLink(master);
+                if (!link)
+                    return TError(EError::InvalidValue,
+                                  "Invalid ipvlan master " + master);
+
+                if (settings.size() > 3) {
+                    mode = StringTrim(settings[3]);
+                    if (!TNlLink::ValidIpVlanMode(mode))
+                        return TError(EError::InvalidValue,
+                                      "Invalid ipvlan mode " + mode);
+                }
+
+                if (settings.size() > 4) {
+                    TError error = StringToInt(settings[4], mtu);
+                    if (error)
+                        return TError(EError::InvalidValue,
+                                      "Invalid ipvlan mtu " + settings[4]);
+                }
+
+                int idx = link->FindIndex(master);
+                if (idx < 0)
+                    return TError(EError::InvalidValue, "Interface " + master + " doesn't exist or not in running state");
+
+                TIpVlanNetCfg ipvlan;
+                ipvlan.Master = master;
+                ipvlan.Name = name;
+                ipvlan.Mode = mode;
+                ipvlan.Mtu = mtu;
+
+                cfg.IpVlan.push_back(ipvlan);
             } else if (type == "veth") {
                 if (settings.size() < 3)
                     return TError(EError::InvalidValue, "Invalid veth in: " + line);
@@ -1185,11 +1226,20 @@ public:
                 veth.Mtu = mtu;
                 veth.Peer = "portove-" + std::to_string(c->GetId()) + "-" + std::to_string(idx++);
 
-                NetCfg.Veth.push_back(veth);
+                cfg.Veth.push_back(veth);
             } else {
                 return TError(EError::InvalidValue, "Configuration is not specified");
             }
         }
+
+        if (cfg.Share)
+            if (cfg.Host.size() ||
+                cfg.MacVlan.size() ||
+                cfg.IpVlan.size() ||
+                cfg.Veth.size())
+                cfg.Share = false;
+
+        NetCfg = cfg;
 
         return TError::Success();
     }
