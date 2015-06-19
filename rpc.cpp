@@ -743,7 +743,7 @@ static TError LinkVolume(TContext &context,
 
     auto volume_lock = volume->ScopedLock();
     if (!volume->IsReady())
-        return TError(EError::VolumeNotReady, "Volume not ready");
+        return TError(EError::Busy, "Volume not ready");
 
     error = volume->CheckPermission(client->GetCred());
     if (error)
@@ -935,7 +935,7 @@ static TError ImportLayer(TContext &context,
             goto err_tmp;
         }
         if (LayerInUse(context, layer)) {
-            error = TError(EError::VolumeIsBusy, "layer in use");
+            error = TError(EError::Busy, "layer in use");
             goto err_tmp;
         }
         error = layer.Rename(layer_tmp);
@@ -1006,7 +1006,7 @@ static TError ExportLayer(TContext &context,
 
     auto volume_lock = volume->ScopedLock();
     if (!volume->IsReady())
-        return TError(EError::VolumeNotReady, "Volume not ready");
+        return TError(EError::Busy, "Volume not ready");
 
     TPath upper;
     error = volume->GetUpperLayer(upper);
@@ -1054,7 +1054,7 @@ static TError RemoveLayer(TContext &context,
 
     auto vholder_lock = context.Vholder->ScopedLock();
     if (LayerInUse(context, layer)) {
-        error = TError(EError::VolumeIsBusy, "layer in use");
+        error = TError(EError::Busy, "layer in use");
         goto err;
     }
     error = layer.Rename(layer_tmp);

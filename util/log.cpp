@@ -337,11 +337,8 @@ std::string ResponseAsString(const rpc::TContainerResponse &resp) {
     case EError::VolumeNotFound:
         return "Error: VolumeNotFound (" + resp.errormsg() + ")";
         break;
-    case EError::VolumeNotReady:
-        return "Error: VolumeNotReady (" + resp.errormsg() + ")";
-        break;
-    case EError::VolumeIsBusy:
-        return "Error: VolumeIsBusy (" + resp.errormsg() + ")";
+    case EError::Busy:
+        return "Error: Busy (" + resp.errormsg() + ")";
         break;
     case EError::NoSpace:
         return "Error: NoSpace (" + resp.errormsg() + ")";

@@ -1006,7 +1006,7 @@ TError TVolume::CheckPermission(const TCred &ucred) const {
 
 TError TVolume::Restore() {
     if (!IsReady())
-        return TError(EError::VolumeNotReady, "Volume not ready");
+        return TError(EError::Busy, "Volume not ready");
 
     TError error = Cred.Parse(Config->Get<std::string>(V_USER),
                               Config->Get<std::string>(V_GROUP));
