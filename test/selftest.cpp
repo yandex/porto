@@ -1520,7 +1520,7 @@ static map<string, TMountInfo> ParseMountinfo(string s) {
         TMountInfo i;
         i.flags = tok[5];
 
-        int sep = 7;
+        int sep = 6;
         while (tok[sep] != "-")
             sep++;
 
