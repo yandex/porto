@@ -2133,7 +2133,7 @@ static void TestNetProperty(TPortoAPI &api) {
     s = StartWaitAndGetData(api, name, "stdout");
     containerLink = StringToVec(s);
     ExpectEq(containerLink.size(), 2);
-    ExpectNeq(containerLink.size(), hostLink.size());
+
     ExpectEq(ShareMacAddress(hostLink, containerLink), false);
     linkMap = IfHw(containerLink);
     Expect(linkMap.find("lo") != linkMap.end());
