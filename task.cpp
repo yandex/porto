@@ -1096,3 +1096,8 @@ TError TTask::RotateLogs() const {
 
     return TError::Success();
 }
+
+void TTask::CloseNs() {
+    Env->ClientNs.Close();
+    Env->ParentNs.Close();
+}

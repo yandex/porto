@@ -114,7 +114,7 @@ public:
 class TTask: public TNonCopyable {
     int Rfd, Wfd;
     int WaitParentRfd, WaitParentWfd;
-    std::shared_ptr<const TTaskEnv> Env;
+    std::shared_ptr<TTaskEnv> Env;
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
 
     enum ETaskState { Stopped, Started } State;
@@ -142,7 +142,7 @@ class TTask: public TNonCopyable {
     TError IsolateNet(int childPid);
 
 public:
-    TTask(std::shared_ptr<const TTaskEnv> env,
+    TTask(std::shared_ptr<TTaskEnv> env,
           const std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> &leafCgroups) : Env(env), LeafCgroups(leafCgroups) {};
     TTask(pid_t pid) : Pid(pid) {};
     ~TTask();
@@ -172,6 +172,8 @@ public:
 
     bool HasCorrectParent();
     bool HasCorrectFreezer();
+
+    void CloseNs();
 };
 
 TError TaskGetLastCap();

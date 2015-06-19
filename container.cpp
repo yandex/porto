@@ -843,6 +843,8 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
             return error;
         }
 
+        Task->CloseNs();
+
         error = Data->Set<int>(D_START_ERRNO, -1);
         if (error)
             return error;
@@ -1428,6 +1430,8 @@ TError TContainer::Restore(const kv::TNode &node) {
         }
 
         Task->Restore(pid);
+
+        Task->CloseNs();
 
         if (Task->HasCorrectParent()) {
             if (Task->IsZombie()) {
