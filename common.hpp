@@ -38,6 +38,12 @@ public:
     std::unique_lock<std::mutex> ScopedLock() {
         return std::unique_lock<std::mutex>(Mutex);
     }
+    void Lock() {
+        Mutex.lock();
+    }
+    void Unlock() {
+        Mutex.unlock();
+    }
 };
 
 const std::string ROOT_CONTAINER = "/";
