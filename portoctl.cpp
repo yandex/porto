@@ -1472,6 +1472,8 @@ public:
             std::cout << v.Path << std::endl;
         } else {
             std::cout << std::left << std::setw(40) << v.Path << std::right;
+            if (v.Path.length() > 40)
+                std::cout << std::endl << std::setw(40) << " ";
             if (inodes) {
                 ShowSizeProperty(v, V_INODE_LIMIT, 8, true);
                 ShowSizeProperty(v, V_INODE_USED, 8, true);
