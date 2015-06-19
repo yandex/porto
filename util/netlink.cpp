@@ -456,9 +456,9 @@ free_msg:
 TError TNlLink::AddIpVlan(const std::string &master,
                           const std::string &mode, int mtu) {
 #ifdef IFLA_IPVLAN_MAX
-    return TError(EError::NotSupported, "Porto is not compiled with IP VLAN support");
-#else
     return AddXVlan("ipvlan", master, ipvlanMode.at(mode), "", mtu);
+#else
+    return TError(EError::NotSupported, "Porto is not compiled with IP VLAN support");
 #endif
 }
 
