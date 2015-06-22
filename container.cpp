@@ -612,14 +612,22 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         taskEnv->User = Prop->Get<std::string>(P_USER);
     }
 
-    taskEnv->Environ.push_back("PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
-    auto env = Prop->Get<TStrList>(P_ENV);
-    taskEnv->Environ.insert(taskEnv->Environ.end(), env.begin(), env.end());
-    taskEnv->Environ.push_back("container=lxc");
-    taskEnv->Environ.push_back("PORTO_NAME=" + GetName());
-    taskEnv->Environ.push_back("PORTO_HOST=" + GetHostName());
-    taskEnv->Environ.push_back("HOME=" + Prop->Get<std::string>(P_CWD));
-    taskEnv->Environ.push_back("USER=" + taskEnv->User);
+    std::map<std::string, std::string> portoEnv = {
+        { "PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" },
+        { "container", "lxc" },
+        { "PORTO_NAME", GetName() },
+        { "PORTO_HOST", GetHostName() },
+        { "HOME", Prop->Get<std::string>(P_CWD) },
+        { "USER", taskEnv->User },
+    };
+
+    taskEnv->Environ = Prop->Get<TStrList>(P_ENV);
+    for (auto pair : portoEnv) {
+        if (taskEnv->EnvHasKey(pair.first))
+            continue;
+
+        taskEnv->Environ.push_back(pair.first + "=" + pair.second);
+    }
 
     taskEnv->Isolate = Prop->Get<bool>(P_ISOLATE);
     taskEnv->StdinPath = Prop->Get<std::string>(P_STDIN_PATH);

@@ -1240,35 +1240,38 @@ static void TestEnvProperty(TPortoAPI &api) {
 
     Say() << "Check default environment" << std::endl;
 
-    static const char empty_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
-        "container=lxc\0"
-        "PORTO_NAME=a\0"
-        "PORTO_HOST=" HOSTNAME "\0"
+    static const char empty_env[] =
         "HOME=/place/porto/a\0"
-        "USER=nobody\0";
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
+        "PORTO_HOST=" HOSTNAME "\0"
+        "PORTO_NAME=a\0"
+        "USER=nobody\0"
+        "container=lxc\0";
     ExpectEnv(api, name, "", empty_env, sizeof(empty_env));
 
     Say() << "Check user-defined environment" << std::endl;
-    static const char ab_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
+    static const char ab_env[] =
         "a=b\0"
         "c=d\0"
-        "container=lxc\0"
-        "PORTO_NAME=a\0"
-        "PORTO_HOST=" HOSTNAME "\0"
         "HOME=/place/porto/a\0"
-        "USER=nobody\0";
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
+        "PORTO_HOST=" HOSTNAME "\0"
+        "PORTO_NAME=a\0"
+        "USER=nobody\0"
+        "container=lxc\0";
 
     ExpectEnv(api, name, "a=b;c=d;", ab_env, sizeof(ab_env));
     ExpectEnv(api, name, "a=b;;c=d;", ab_env, sizeof(ab_env));
 
-    static const char asb_env[] = "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
+    static const char asb_env[] =
         "a=e;b\0"
         "c=d\0"
-        "container=lxc\0"
-        "PORTO_NAME=a\0"
-        "PORTO_HOST=" HOSTNAME "\0"
         "HOME=/place/porto/a\0"
-        "USER=nobody\0";
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
+        "PORTO_HOST=" HOSTNAME "\0"
+        "PORTO_NAME=a\0"
+        "USER=nobody\0"
+        "container=lxc\0";
     ExpectEnv(api, name, "a=e\\;b;c=d;", asb_env, sizeof(asb_env));
 
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep $N"));

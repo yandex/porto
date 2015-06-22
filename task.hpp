@@ -110,6 +110,7 @@ public:
 
     TError Prepare(const TCred &cred);
     const char** GetEnvp() const;
+    bool EnvHasKey(const std::string &key);
 };
 
 class TTask: public TNonCopyable {

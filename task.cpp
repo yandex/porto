@@ -60,6 +60,24 @@ const char** TTaskEnv::GetEnvp() const {
     return envp;
 }
 
+bool TTaskEnv::EnvHasKey(const std::string &key) {
+    for (auto str : Environ) {
+        std::string envKey;
+
+        std::vector<std::string> tok;
+        TError error = SplitString(str, '=', tok, 2);
+        if (error)
+            envKey = str;
+        else
+            envKey = tok[0];
+
+        if (key == envKey)
+            return true;
+    }
+
+    return false;
+}
+
 // TTask
 
 void TTask::ReportPid(int pid) const {
