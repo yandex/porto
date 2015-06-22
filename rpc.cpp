@@ -10,8 +10,7 @@
 using std::string;
 
 static bool InfoRequest(const rpc::TContainerRequest &req) {
-    if (true ||
-        req.has_create() ||
+    if (req.has_create() ||
         req.has_destroy() ||
         req.has_setproperty() ||
         req.has_start() ||
