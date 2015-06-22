@@ -46,7 +46,7 @@ getlog() {
 	echo "$line"
 	local title="@@@ $host"
 	local version="$($SSH $host portoctl -v 2>&1)"
-	local log="$($SSH $host zgrep "$3" /var/log/portod.log*)"
+	local log="$($SSH $host zgrep '$3' /var/log/portod.log*)"
 
 	echo -e "$line\n$version\n$log\n\n" | flock $LOCK -c "bash -c 'cat >> $2'"
 }
@@ -59,6 +59,7 @@ cat result.txt | parse | sort -r -n -k2 > result2.txt
 GREP=""
 [ "$STAT" = "porto_stat[errors]" ] && GREP="ERR "
 [ "$STAT" = "porto_stat[warnings]" ] && GREP="WRN "
+[ "$STAT" = "porto_stat[restore_failed]" ] && GREP="t restore container"
 
 if [ ! -z "$GREP" ]; then
 	echo "Get error details"

@@ -1,3 +1,17 @@
+yandex-porto (1.15) precise; urgency=low
+
+  * rework volume api (docker2porto doesn't work anymore)
+  * portoctl: fix signal handling
+  * allow time data in meta state
+  * support ipvlan in net property
+  * fix missing property value for SetProperty response in log
+  * support real numbers in cpu_limit/cpu_guarantee
+  * don't add predefined environment if user defines it
+  * multiple worker threads with single global lock in daemon
+  * fix portod memory leaks
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 22 Jun 2015 18:43:00 +0300
+
 yandex-porto (1.14) precise; urgency=low
 
   * support for wait operation in python API
