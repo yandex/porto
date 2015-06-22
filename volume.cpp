@@ -410,6 +410,9 @@ TError TVolume::CheckGuarantee() const {
 
     GetGuarantee(space_guarantee, inode_guarantee);
 
+    if (!space_guarantee && !inode_guarantee)
+        return TError::Success();
+
     if (Config->HasValue(V_STORAGE))
         storage = GetStorage();
     else
@@ -830,8 +833,8 @@ const std::vector<std::pair<std::string, std::string>> TVolumeHolder::ListProper
         { V_LAYERS,      "top-layer;...;bottom-layer  overlay layers" },
         { V_SPACE_LIMIT, " " },
         { V_INODE_LIMIT, " " },
-        { V_SPACE_GUARANTEE, " " },
-        { V_INODE_GUARANTEE, " " },
+//      { V_SPACE_GUARANTEE, " " },
+//      { V_INODE_GUARANTEE, " " },
         { V_SPACE_USED, " " },
         { V_INODE_USED, " " },
         { V_SPACE_AVAILABLE, " " },
