@@ -901,8 +901,8 @@ static int MasterMain() {
     if (error)
         return error;
 
-    if (mount(NULL, "/", NULL, MS_REC | MS_SHARED, NULL)) {
-        TError error(EError::Unknown, errno, "mount(NULL, \"/\", NULL, MS_REC | MS_SHARED, NULL)");
+    error = TMount::RemountRootShared();
+    if (error) {
         L_ERR() << "Can't remount / recursively as shared" << error << std::endl;
         return EXIT_FAILURE;
     }

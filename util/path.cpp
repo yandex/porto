@@ -104,6 +104,16 @@ unsigned int TPath::GetDev() const {
     return Stat([](struct stat *st) { return st->st_dev; });
 }
 
+/* Follows symlinks */
+unsigned int TPath::GetBlockDev() const {
+    struct stat st;
+
+    if (stat(Path.c_str(), &st) || !S_ISBLK(st.st_mode))
+        return 0;
+
+    return st.st_rdev;
+}
+
 unsigned int TPath::GetUid() const {
     return Stat([](struct stat *st) { return st->st_uid; });
 }

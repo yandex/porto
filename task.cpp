@@ -663,11 +663,6 @@ TError TTask::ChildPrepareLoop() {
     return TError::Success();
 }
 
-TError TTask::ChildRemountSlave() {
-    TMountSnapshot ms;
-    return ms.RemountSlave();
-}
-
 TError TTask::ChildCallback() {
     int ret;
     close(WaitParentWfd);
@@ -685,8 +680,11 @@ TError TTask::ChildCallback() {
 
     umask(0);
 
-    if (Env->NewMountNs)
-        ChildRemountSlave();
+    if (Env->NewMountNs) {
+        error = TMount::RemountRootSlave();
+        if (error)
+            return error;
+    }
 
     if (Env->Isolate) {
         // remount proc so PID namespace works

@@ -570,17 +570,15 @@ public:
         if (error)
             return error;
 
-        TMountSnapshot ms;
-        set<shared_ptr<TMount>> mounts;
-        error = ms.Mounts(mounts);
+        vector<shared_ptr<TMount>> mounts;
+        error = TMount::Snapshot(mounts);
         if (error)
             return error;
 
         for (auto &mount : mounts) {
-            set<string> data = mount->GetData();
             bool found = true;
             for (auto &ss : subsystems)
-                if (data.find(ss) == data.end()) {
+                if (!mount->HasFlag(ss)) {
                     found = false;
                     break;
                 }

@@ -73,6 +73,7 @@ public:
     EFileType GetType() const;
     unsigned int GetMode() const;
     unsigned int GetDev() const;
+    unsigned int GetBlockDev() const;
     unsigned int GetUid() const;
     unsigned int GetGid() const;
     off_t GetSize() const;

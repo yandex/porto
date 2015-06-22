@@ -25,6 +25,62 @@ using std::vector;
 using std::set;
 using std::shared_ptr;
 
+TError TMount::Snapshot(std::vector<std::shared_ptr<TMount>> &result, const TPath mounts) {
+    FILE* f = setmntent(mounts.c_str(), "r");
+    if (!f)
+        return TError(EError::Unknown, errno, "setmntent(" + mounts.ToString() + ")");
+
+    struct mntent* m, mntbuf;
+    TScopedMem buf(4096);
+    while ((m = getmntent_r(f, &mntbuf, (char *)buf.GetData(), buf.GetSize()))) {
+        vector<string> flags;
+        TError error = SplitString(m->mnt_opts, ',', flags);
+        if (error) {
+            endmntent(f);
+            return error;
+        }
+        result.push_back(std::make_shared<TMount>(m->mnt_fsname, m->mnt_dir, m->mnt_type, flags));
+    }
+    endmntent(f);
+    return TError::Success();
+}
+
+TError TMount::Find(TPath path, const TPath mounts) {
+
+    path = path.NormalPath();
+    auto device = path.GetDev();
+    if (!device)
+        return TError(EError::Unknown, "device not found: " + path.ToString() + ")");
+
+    FILE* f = setmntent(mounts.c_str(), "r");
+    if (!f)
+        return TError(EError::Unknown, errno, "setmntent(" + mounts.ToString() + ")");
+
+    struct mntent* m, mntbuf;
+    TScopedMem buf(4096);
+    TError error(EError::Unknown, "mountpoint not found: " + path.ToString() + ")");
+
+    while ((m = getmntent_r(f, &mntbuf, (char *)buf.GetData(), buf.GetSize()))) {
+
+        TPath source(m->mnt_fsname);
+        TPath target(m->mnt_dir);
+
+        if (target.InnerPath(path).IsEmpty() ||
+                source.GetBlockDev() != device)
+            continue;
+
+        Source = source;
+        Target = target;
+        Type = m->mnt_type;
+        Data.clear();
+        error = SplitString(m->mnt_opts, ',', Data);
+        break;
+    }
+    endmntent(f);
+
+    return error;
+}
+
 TError TMount::Mount(unsigned long flags) const {
     L_ACT() << "mount " << Target << " " << flags << std::endl;
 
@@ -123,31 +179,13 @@ TError TMount::MountDir(unsigned long flags) const {
     return Mount(flags);
 }
 
-TError TMountSnapshot::Mounts(std::set<std::shared_ptr<TMount>> &mounts) const {
-    FILE* f = setmntent(Path.c_str(), "r");
-    struct mntent* m, mntbuf;
-    TScopedMem buf(4096);
-    while ((m = getmntent_r(f, &mntbuf, (char *)buf.GetData(), buf.GetSize())) != NULL) {
-           vector<string> vflags;
-           set<string> flags;
-
-           TError error = SplitString(m->mnt_opts, ',', vflags);
-           if (error) {
-               endmntent(f);
-               return error;
-           }
-
-           for (auto kv : vflags)
-               flags.insert(kv);
-
-        mounts.insert(std::make_shared<TMount>(m->mnt_fsname, m->mnt_dir, m->mnt_type, flags));
-    }
-    endmntent(f);
-
+TError TMount::RemountRootShared() {
+    if (mount(NULL, "/", NULL, MS_REC | MS_SHARED, NULL))
+        return TError(EError::Unknown, errno, "mount(NULL, /, NULL, MS_REC | MS_SHARED, NULL)");
     return TError::Success();
 }
 
-TError TMountSnapshot::RemountSlave() {
+TError TMount::RemountRootSlave() {
     // systemd mounts / with MS_SHARED so any changes made to it in the container
     // are propagated back (in particular, mounting new /proc breaks host)
 

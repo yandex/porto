@@ -27,10 +27,10 @@ TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems,
     if (m)
         Mount = m;
     else {
-        set<string> flags;
+        vector<string> flags;
 
         for (auto c : subsystems)
-            flags.insert(c->GetName());
+            flags.push_back(c->GetName());
 
         Mount = std::make_shared<TMount>("cgroup", config().daemon().sysfs_root() + "/" +
                                          CommaSeparatedList(flags),
@@ -127,10 +127,8 @@ string TCgroup::Relpath() const {
 
 TError TCgroup::Create() {
     if (IsRoot()) {
-        TMountSnapshot ms;
-
-        set<shared_ptr<TMount>> mounts;
-        TError error = ms.Mounts(mounts);
+        vector<shared_ptr<TMount>> mounts;
+        TError error = TMount::Snapshot(mounts);
         if (error) {
             L_ERR() << "Can't create mount snapshot: " << error << std::endl;
             return error;
@@ -256,10 +254,8 @@ TError TCgroup::Attach(int pid) const {
 
 // TCgroupSnapshot
 TError TCgroupSnapshot::Create() {
-    TMountSnapshot ms;
-
-     set<shared_ptr<TMount>> mounts;
-     TError error = ms.Mounts(mounts);
+     vector<shared_ptr<TMount>> mounts;
+     TError error = TMount::Snapshot(mounts);
      if (error) {
          L_ERR() << "Can't create mount snapshot: " << error << std::endl;
          return error;

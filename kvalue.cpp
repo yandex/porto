@@ -134,10 +134,8 @@ TKeyValueStorage::TKeyValueStorage(const TMount &mount) :
     Tmpfs(mount), DirnameLen((Tmpfs.GetMountpoint() + "/").length()) {}
 
 TError TKeyValueStorage::MountTmpfs() {
-    TMountSnapshot ms;
-
-    set<shared_ptr<TMount>> mounts;
-    TError error = ms.Mounts(mounts);
+    vector<shared_ptr<TMount>> mounts;
+    TError error = TMount::Snapshot(mounts);
     if (error) {
         L_ERR() << "Can't create mount snapshot: " << error << std::endl;
         return error;

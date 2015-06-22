@@ -3,7 +3,8 @@
 #include <string>
 #include <iostream>
 #include <memory>
-#include <set>
+#include <vector>
+#include <algorithm>
 
 #include "error.hpp"
 #include "util/path.hpp"
@@ -16,13 +17,15 @@ class TMount {
     TPath Source;
     TPath Target;
     std::string Type;
-    std::set<std::string> Data;
+    std::vector<std::string> Data;
 
 public:
     TMount() {}
-    TMount(const TPath &source, const TPath &target, const std::string &type, std::set<std::string> data) :
-        Source(source), Target(target), Type(type),
-        Data(data) {}
+    TMount(const TPath &source,
+           const TPath &target,
+           const std::string &type,
+           std::vector<std::string> data) :
+        Source(source), Target(target), Type(type), Data(data) {}
 
     friend bool operator==(const TMount& m1, const TMount& m2) {
         return m1.Source == m2.Source &&
@@ -40,9 +43,17 @@ public:
         return Type;
     }
 
-    std::set<std::string> const GetData() const {
+    const std::vector<std::string> GetData() const {
         return Data;
     }
+
+    TError Find(TPath path, const TPath mounts = "/proc/self/mounts");
+
+    static TError Snapshot(std::vector<std::shared_ptr<TMount>> &result,
+                           const TPath mounts = "/proc/self/mounts");
+
+    static TError RemountRootShared();
+    static TError RemountRootSlave();
 
     TError Mount(unsigned long flags = 0) const;
     TError Bind(bool rdonly, unsigned long flags = 0) const;
@@ -53,22 +64,21 @@ public:
     TError Move(TPath destination);
     TError Detach() const;
 
+    bool HasFlag(const std::string flag) const {
+        return std::find(Data.begin(), Data.end(), flag) != Data.end();
+    }
+
     friend std::ostream& operator<<(std::ostream& stream, const TMount& mount) {
         stream << mount.Source << " " << mount.Target << " " << mount.Type << " ";
 
-        for (auto &f : mount.Data)
-            stream << f << ",";
+        for (auto &f : mount.Data) {
+            stream << f;
+            if (&f != &mount.Data.back())
+                stream << ",";
+        }
 
         return stream;
     }
-};
-
-class TMountSnapshot {
-    std::string Path;
-public:
-    TMountSnapshot(const std::string &path = "/proc/self/mounts") : Path(path) {}
-    TError Mounts(std::set<std::shared_ptr<TMount>> &mounts) const;
-    TError RemountSlave();
 };
 
 class TLoopMount {

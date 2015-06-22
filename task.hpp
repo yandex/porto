@@ -156,7 +156,6 @@ public:
     TError ChildApplyLimits();
     TError ChildSetHostname();
     TError ChildPrepareLoop();
-    TError ChildRemountSlave();
     TError ChildCallback();
     void Restore(int pid_);
     TError FixCgroups() const;
