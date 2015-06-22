@@ -1409,7 +1409,8 @@ public:
 
 class TLinkVolumeCmd : public ICmd {
 public:
-    TLinkVolumeCmd(TPortoAPI *api) : ICmd(api, "vlink", 1, "<path> [container]", "link volume") {}
+    TLinkVolumeCmd(TPortoAPI *api) : ICmd(api, "vlink", 1, "<path> [container]",
+                    "link volume to container (default - current container)") {}
 
     int Execute(int argc, char *argv[]) {
         int ret = Api->LinkVolume(argv[0], (argc > 1) ? argv[1] : "");
@@ -1421,7 +1422,9 @@ public:
 
 class TUnlinkVolumeCmd : public ICmd {
 public:
-    TUnlinkVolumeCmd(TPortoAPI *api) : ICmd(api, "vunlink", 1, "<path> [container]", "unlink volume") {}
+    TUnlinkVolumeCmd(TPortoAPI *api) : ICmd(api, "vunlink", 1, "<path> [container]",
+                    "unlink volume from container (default - current container)\n"
+                    "removing last link deletes volume") {}
 
     int Execute(int argc, char *argv[]) {
         int ret = Api->UnlinkVolume(argv[0], (argc > 1) ? argv[1] : "");
@@ -1437,7 +1440,13 @@ class TListVolumesCmd : public ICmd {
     bool inodes = false;
 
 public:
-    TListVolumesCmd(TPortoAPI *api) : ICmd(api, "vlist", 0, "[-1|-i|-v] [volume]...", "list created volumes") {}
+    TListVolumesCmd(TPortoAPI *api) : ICmd(api, "vlist", 0, "[-1|-i|-v] [volume]...",
+        "list volumes\n"
+        "\n"
+        "    -1        list only paths\n"
+        "    -i        list inode information\n"
+        "    -v        list all properties\n"
+        ) {}
 
     void ShowSizeProperty(TVolumeDescription &v, const char *p, int w, bool raw = false) {
       uint64_t val;
@@ -1554,7 +1563,15 @@ public:
 
 class TLayerCmd : public ICmd {
 public:
-    TLayerCmd(TPortoAPI *api) : ICmd(api, "layer", 1, "-I|-M|-R|-L <layer> [tarball]", "import/merge/remove/list overlayfs layer") {}
+    TLayerCmd(TPortoAPI *api) : ICmd(api, "layer", 1,
+        "-I|-M|-R|-L <layer> [tarball]",
+        "Manage overlayfs layers in internal storage\n"
+        "\n"
+        "    -I <layer> <tarball>     import layer from tarball\n"
+        "    -M <layer> <tarball>     merge tarball into existing or new layer\n"
+        "    -R <layer>               remove layer from storage\n"
+        "    -L                       list present layers\n"
+        ) {}
 
     bool import = false;
     bool merge  = false;
