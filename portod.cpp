@@ -486,6 +486,8 @@ exit:
 }
 
 static void KvDump() {
+    TLogger::OpenLog(true, "", 0);
+
     auto containers = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().keyval().file().path(), "tmpfs", { config().keyval().size() }));
     TError error = containers->MountTmpfs();
     if (error)

@@ -325,6 +325,8 @@ bool TContainerHolder::RestoreFromStorage() {
         auto node = pair.second;
         auto name = pair.first;
 
+        L_ACT() << "Found " << name << " container in kvs" << std::endl;
+
         kv::TNode n;
         error = node->Load(n);
         if (error)

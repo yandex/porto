@@ -211,7 +211,7 @@ TError TKeyValueStorage::Dump() {
         kv::TNode node;
         node.Clear();
 
-        std::cout << n->GetName() << ":" << std::endl;
+        L() << n->GetName() << ":" << std::endl;
 
         error = n->Load(node);
         if (error) {
@@ -223,7 +223,7 @@ TError TKeyValueStorage::Dump() {
             auto key = node.pairs(i).key();
             auto value = node.pairs(i).val();
 
-            std::cout << " " << key << " = " << value << std::endl;
+            L() << " " << key << " = " << value << std::endl;
         }
     }
 
