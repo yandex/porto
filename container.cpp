@@ -586,6 +586,8 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
 
     auto taskEnv = std::make_shared<TTaskEnv>();
 
+    taskEnv->LeafCgroups = LeafCgroups;
+
     taskEnv->Command = Prop->Get<std::string>(P_COMMAND);
     taskEnv->Cwd = Prop->Get<std::string>(P_CWD);
 
@@ -724,7 +726,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
     if (error)
         return error;
 
-    Task = unique_ptr<TTask>(new TTask(taskEnv, LeafCgroups));
+    Task = unique_ptr<TTask>(new TTask(taskEnv));
     return TError::Success();
 }
 

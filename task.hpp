@@ -106,6 +106,7 @@ public:
     TNlAddr DefaultGw;
     std::map<std::string, TIpMap> IpMap;
     bool NewMountNs;
+    std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
 
     TError Prepare(const TCred &cred);
     const char** GetEnvp() const;
@@ -115,7 +116,6 @@ class TTask: public TNonCopyable {
     int Rfd, Wfd;
     int WaitParentRfd, WaitParentWfd;
     std::shared_ptr<const TTaskEnv> Env;
-    std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
 
     enum ETaskState { Stopped, Started } State;
     int ExitStatus;
@@ -143,8 +143,7 @@ class TTask: public TNonCopyable {
     TError ChildEnableNet();
 
 public:
-    TTask(std::shared_ptr<const TTaskEnv> env,
-          const std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> &leafCgroups) : Env(env), LeafCgroups(leafCgroups) {};
+    TTask(std::shared_ptr<const TTaskEnv> env) : Env(env) {};
     TTask(pid_t pid) : Pid(pid) {};
 
     TError Start();

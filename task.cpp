@@ -761,7 +761,7 @@ TError TTask::Start() {
         (void)setsid();
 
         // move to target cgroups
-        for (auto cg : LeafCgroups) {
+        for (auto cg : Env->LeafCgroups) {
             error = cg.second->Attach(getpid());
             if (error) {
                 L() << "Can't attach to cgroup: " << error << std::endl;
@@ -960,7 +960,7 @@ bool TTask::HasCorrectFreezer() {
         L() << "Can't read " << Pid << " cgroups of restored task: " << error << std::endl;
         return false;
     } else {
-        auto cg = LeafCgroups.at(freezerSubsystem);
+        auto cg = Env->LeafCgroups.at(freezerSubsystem);
         if (cg && cg->Relpath() != cgmap["freezer"]) {
             // if at this point task is zombie we don't have any cgroup info
             if (IsZombie())
@@ -995,7 +995,7 @@ TError TTask::FixCgroups() const {
         auto subsys = TSubsystem::Get(pair.first);
         auto &path = pair.second;
 
-        if (!subsys || LeafCgroups.find(subsys) == LeafCgroups.end()) {
+        if (!subsys || Env->LeafCgroups.find(subsys) == Env->LeafCgroups.end()) {
             if (pair.first.find(',') != std::string::npos)
                 continue;
             if (pair.first == "net_cls" && !config().network().enabled()) {
@@ -1016,7 +1016,7 @@ TError TTask::FixCgroups() const {
             continue;
         }
 
-        auto cg = LeafCgroups.at(subsys);
+        auto cg = Env->LeafCgroups.at(subsys);
         if (cg && cg->Relpath() != path) {
             L_WRN() << "Fixed invalid task subsystem for " << subsys->GetName() << ":" << path << std::endl;
 
@@ -1047,7 +1047,6 @@ TError TTask::GetPPid(pid_t &ppid) const {
 }
 
 void TTask::ClearEnv() {
-    LeafCgroups.clear();
     Env = nullptr;
 }
 
