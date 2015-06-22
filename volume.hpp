@@ -116,6 +116,7 @@ public:
         space_guarantee = Config->Get<uint64_t>(V_SPACE_GUARANTEE);
         inode_guarantee = Config->Get<uint64_t>(V_INODE_GUARANTEE);
     }
+    TError CheckGuarantee() const;
 
     void GetQuota(uint64_t &space_limit, uint64_t &inode_limit) const {
         space_limit = Config->Get<uint64_t>(V_SPACE_LIMIT);

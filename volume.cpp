@@ -401,6 +401,72 @@ std::vector<TPath> TVolume::GetLayers() const {
     return result;
 }
 
+TError TVolume::CheckGuarantee() const {
+    uint64_t total_space_used, total_space_avail;
+    uint64_t total_inode_used, total_inode_avail;
+    uint64_t space_used, space_avail, space_guarantee;
+    uint64_t inode_used, inode_avail, inode_guarantee;
+    TPath storage;
+
+    GetGuarantee(space_guarantee, inode_guarantee);
+
+    if (Config->HasValue(V_STORAGE))
+        storage = GetStorage();
+    else
+        storage = TPath(config().volumes().volume_dir());
+
+    TError error = storage.StatVFS(total_space_used, total_space_avail,
+                                   total_inode_used, total_inode_avail);
+    if (error)
+        return error;
+
+    if (!IsReady() || GetStat(space_used, space_avail,
+                              inode_used, inode_avail))
+            space_used = inode_used = 0;
+
+    /* Check available space as is */
+    if (total_space_avail + space_used < space_guarantee)
+        return TError(EError::NoSpace, "Not enough space for volume guarantee");
+
+    if (total_inode_avail + inode_used < inode_guarantee)
+        return TError(EError::NoSpace, "Not enough inodes for volume guarantee");
+
+    /* Estimate unclaimed reservation */
+    uint64_t total_space_reserved = 0, total_inode_reserved = 0;
+    for (auto path : Holder->ListPaths()) {
+        auto volume = Holder->Find(path);
+        if (volume == nullptr || volume.get() == this ||
+                volume->GetStorage().GetDev() != storage.GetDev())
+            continue;
+
+        uint64_t volume_space_used, volume_space_avail, volume_space_guarantee;
+        uint64_t volume_inode_used, volume_inode_avail, volume_inode_guarantee;
+
+        volume->GetGuarantee(volume_space_guarantee, volume_inode_guarantee);
+        if (!volume_space_guarantee && !volume_inode_guarantee)
+            continue;
+
+        if (!volume->IsReady() ||
+            volume->GetStat(volume_space_used, volume_space_avail,
+                            volume_inode_used, volume_inode_avail))
+            volume_space_used = volume_inode_used = 0;
+
+        if (volume_space_guarantee > volume_space_used)
+            total_space_reserved += volume_space_guarantee - volume_space_used;
+
+        if (volume_inode_guarantee > volume_inode_used)
+            total_inode_reserved += volume_inode_guarantee - volume_inode_used;
+    }
+
+    if (total_space_avail + space_used < space_guarantee + total_space_reserved)
+        return TError(EError::NoSpace, "Not enough space for volume guarantee");
+
+    if (total_inode_avail + inode_used < inode_guarantee + total_inode_reserved)
+        return TError(EError::NoSpace, "Not enough inodes for volume guarantee");
+
+    return TError::Success();
+}
+
 TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
                           std::shared_ptr<TContainer> creator_container,
                           const std::map<std::string, std::string> &properties) {
@@ -508,6 +574,15 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             return TError(EError::InvalidValue, "Don't even try to get out");
     }
 
+    /* Verify guarantees */
+    if (Config->HasValue(V_SPACE_LIMIT) && Config->HasValue(V_SPACE_GUARANTEE) &&
+            Config->Get<uint64_t>(V_SPACE_LIMIT) < Config->Get<uint64_t>(V_SPACE_GUARANTEE))
+        return TError(EError::InvalidValue, "Space guarantree bigger than limit");
+
+    if (Config->HasValue(V_INODE_LIMIT) && Config->HasValue(V_INODE_GUARANTEE) &&
+            Config->Get<uint64_t>(V_INODE_LIMIT) < Config->Get<uint64_t>(V_INODE_GUARANTEE))
+        return TError(EError::InvalidValue, "Inode guarantree bigger than limit");
+
     /* Autodetect volume backend */
     if (!Config->HasValue(V_BACKEND)) {
         if (Config->HasValue(V_LAYERS)) {
@@ -530,6 +605,10 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
         return error;
 
     error = Backend->Configure(Config);
+    if (error)
+        return error;
+
+    error = CheckGuarantee();
     if (error)
         return error;
 
@@ -751,8 +830,8 @@ const std::vector<std::pair<std::string, std::string>> TVolumeHolder::ListProper
         { V_LAYERS,      "top-layer;...;bottom-layer  overlay layers" },
         { V_SPACE_LIMIT, " " },
         { V_INODE_LIMIT, " " },
-        //{ V_SPACE_GUARANTEE, " " },
-        //{ V_INODE_GUARANTEE, " " },
+        { V_SPACE_GUARANTEE, " " },
+        { V_INODE_GUARANTEE, " " },
         { V_SPACE_USED, " " },
         { V_INODE_USED, " " },
         { V_SPACE_AVAILABLE, " " },
@@ -783,8 +862,8 @@ static void RegisterVolumeProperties(std::shared_ptr<TRawValueMap> m) {
     m->Add(V_SPACE_LIMIT, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
     m->Add(V_INODE_LIMIT, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
 
-    //m->Add(V_SPACE_GUARANTEE, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
-    //m->Add(V_INODE_GUARANTEE, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
+    m->Add(V_SPACE_GUARANTEE, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
+    m->Add(V_INODE_GUARANTEE, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
 }
 
 TError TVolumeHolder::Create(std::shared_ptr<TVolume> &volume) {

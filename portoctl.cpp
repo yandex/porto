@@ -1475,11 +1475,13 @@ public:
             if (v.Path.length() > 40)
                 std::cout << std::endl << std::setw(40) << " ";
             if (inodes) {
+                ShowSizeProperty(v, V_INODE_GUARANTEE, 8, true);
                 ShowSizeProperty(v, V_INODE_LIMIT, 8, true);
                 ShowSizeProperty(v, V_INODE_USED, 8, true);
                 ShowSizeProperty(v, V_INODE_AVAILABLE, 8, true);
                 ShowPercent(v, V_INODE_USED, V_INODE_AVAILABLE, 5);
             } else {
+                ShowSizeProperty(v, V_SPACE_GUARANTEE, 8);
                 ShowSizeProperty(v, V_SPACE_LIMIT, 8);
                 ShowSizeProperty(v, V_SPACE_USED, 8);
                 ShowSizeProperty(v, V_SPACE_AVAILABLE, 8);
@@ -1518,7 +1520,8 @@ public:
         vector<TVolumeDescription> vlist;
 
         if (details) {
-            std::cout << std::left << std::setw(40) << "Volume" << std::right;
+            std::cout << std::left << std::setw(38) << "Volume" << std::right;
+            std::cout << std::setw(10) << "Guarantee";
             std::cout << std::setw(8) << "Limit";
             std::cout << std::setw(8) << "Used";
             std::cout << std::setw(8) << "Avail";
