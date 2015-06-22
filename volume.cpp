@@ -827,7 +827,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
     if (!layers.Exists() || layers.GetType() != EFileType::Directory) {
         TFolder dir(layers.ToString());
         (void)dir.Remove(true);
-        TError error = layers.Mkdir(0755);
+        TError error = layers.Mkdir(0700);
         if (error)
             return error;
     }
