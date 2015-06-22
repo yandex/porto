@@ -131,6 +131,8 @@ public:
         return GetStat(space_used, space_avail, inode_used, inode_avail);
     }
 
+    TError GetUpperLayer(TPath &upper);
+
     std::vector<TPath> GetLayers() const;
 
     TCred GetCred() const { return Cred; }

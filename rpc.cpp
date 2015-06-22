@@ -938,6 +938,56 @@ err_tmp:
     return error;
 }
 
+static TError ExportLayer(TContext &context,
+                          const rpc::TLayerExportRequest &req,
+                          std::shared_ptr<TClient> client) {
+
+    if (!config().volumes().enabled())
+        return TError(EError::InvalidMethod, "volume api is disabled");
+
+    TError error = CheckRequestPermissions(client);
+    if (error)
+        return error;
+
+    TPath tarball(req.tarball());
+    if (tarball.Exists())
+        return TError(EError::InvalidValue, "tarball already exists");
+    if (!tarball.DirName().AccessOk(EFileAccess::Write, client->GetCred()))
+        return TError(EError::Permission, "client has no write access to tarball directory");
+
+    auto vholder_lock = context.Vholder->ScopedLock();
+    auto volume = context.Vholder->Find(req.volume());
+    if (!volume)
+        return TError(EError::VolumeNotFound, "Volume not found");
+    error = volume->CheckPermission(client->GetCred());
+    if (error)
+        return error;
+    vholder_lock.unlock();
+
+    auto volume_lock = volume->ScopedLock();
+    if (!volume->IsReady())
+        return TError(EError::VolumeNotReady, "Volume not ready");
+
+    TPath upper;
+    error = volume->GetUpperLayer(upper);
+    if (error)
+        return error;
+
+    error = PackTarball(tarball, upper);
+    if (error) {
+        (void)tarball.Unlink();
+        return error;
+    }
+
+    error = tarball.Chown(client->GetCred());
+    if (error) {
+        (void)tarball.Unlink();
+        return error;
+    }
+
+    return TError::Success();
+}
+
 static TError RemoveLayer(TContext &context,
                           const rpc::TLayerRemoveRequest &req,
                           std::shared_ptr<TClient> client) {
@@ -1059,6 +1109,8 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
             error = ListVolumes(context, req.listvolumes(), rsp, client);
         else if (req.has_importlayer())
             error = ImportLayer(context, req.importlayer(), client);
+        else if (req.has_exportlayer())
+            error = ExportLayer(context, req.exportlayer(), client);
         else if (req.has_removelayer())
             error = RemoveLayer(context, req.removelayer(), client);
         else if (req.has_listlayers())

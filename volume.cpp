@@ -746,6 +746,13 @@ TError TVolume::Resize(uint64_t space_limit, uint64_t inode_limit) {
     return TError::Success();
 }
 
+TError TVolume::GetUpperLayer(TPath &upper) {
+    if (GetBackend() != "overlay")
+        return TError(EError::NotSupported, "not implemented");
+    upper = GetStorage().AddComponent("upper");
+    return TError::Success();
+}
+
 TError TVolume::LinkContainer(std::string name) {
     std::vector<std::string> containers(Config->Get<std::vector<std::string>>(V_CONTAINERS));
     containers.push_back(name);

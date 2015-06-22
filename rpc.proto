@@ -184,6 +184,7 @@ message TContainerRequest {
 	optional TLayerImportRequest importLayer = 110;
 	optional TLayerRemoveRequest removeLayer = 111;
 	optional TLayerListRequest listLayers = 112;
+	optional TLayerExportRequest exportLayer = 113;
 }
 
 // Ответ на запрос списка контейнеров
@@ -338,6 +339,11 @@ message TLayerImportRequest {
 	required string layer = 1;
 	required string tarball = 2;
 	required bool merge = 3;
+}
+
+message TLayerExportRequest {
+	required string volume = 1;
+	required string tarball = 2;
 }
 
 // Удаление overlayfs слоя

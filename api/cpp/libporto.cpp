@@ -370,6 +370,15 @@ int TPortoAPI::ImportLayer(const std::string &layer,
     return Rpc(Req, Rsp);
 }
 
+int TPortoAPI::ExportLayer(const std::string &volume,
+                           const std::string &tarball) {
+    auto req = Req.mutable_exportlayer();
+
+    req->set_volume(volume);
+    req->set_tarball(tarball);
+    return Rpc(Req, Rsp);
+}
+
 int TPortoAPI::RemoveLayer(const std::string &layer) {
     auto req = Req.mutable_removelayer();
 

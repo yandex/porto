@@ -99,6 +99,7 @@ public:
     }
 
     int ImportLayer(const std::string &layer, const std::string &tarball, bool merge = false);
+    int ExportLayer(const std::string &volume, const std::string &tarball);
     int RemoveLayer(const std::string &layer);
     int ListLayers(std::vector<std::string> &layers);
 };

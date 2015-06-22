@@ -1571,12 +1571,14 @@ public:
         "    -M <layer> <tarball>     merge tarball into existing or new layer\n"
         "    -R <layer>               remove layer from storage\n"
         "    -L                       list present layers\n"
+        "    -E <volume> <tarball>    export upper layer into tarball\n"
         ) {}
 
     bool import = false;
     bool merge  = false;
     bool remove = false;
     bool list   = false;
+    bool export_ = false;
 
     int Execute(int argc, char *argv[]) {
         int ret;
@@ -1585,6 +1587,7 @@ public:
             { 'M', false, [&](const char *arg) { merge  = true; } },
             { 'R', false, [&](const char *arg) { remove = true; } },
             { 'L', false, [&](const char *arg) { list   = true; } },
+            { 'E', false, [&](const char *arg) { export_= true; } },
         });
 
         if (import) {
@@ -1593,6 +1596,12 @@ public:
             ret = Api->ImportLayer(argv[start], argv[start + 1]);
             if (ret)
                 PrintError("Can't import layer");
+        } else if (export_) {
+            if (argc < start + 2)
+                return EXIT_FAILURE;
+            ret = Api->ExportLayer(argv[start], argv[start + 1]);
+            if (ret)
+                PrintError("Can't export layer");
         } else if (merge) {
             if (argc < start + 2)
                 return EXIT_FAILURE;
