@@ -58,5 +58,6 @@ TError Popen(const std::string &cmd, std::vector<std::string> &lines);
 TError PivotRoot(const TPath &rootfs);
 bool SupportOverlayfs();
 size_t GetNumCores();
+TError PackTarball(const TPath &tar, const TPath &path);
 TError UnpackTarball(const TPath &tar, const TPath &path);
 void DumpMallocInfo();

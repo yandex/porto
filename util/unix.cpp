@@ -438,6 +438,21 @@ size_t GetNumCores() {
     return (size_t)ncores;
 }
 
+TError PackTarball(const TPath &tar, const TPath &path) {
+    int status;
+
+    TError error = Run({ "tar", "--one-file-system", "--numeric-owner",
+                         "--sparse",  "--transform", "s:^./::",
+                         "-cpaf", tar.ToString(), "-C", path.ToString(), "." }, status);
+    if (error)
+        return error;
+
+    if (status)
+        return TError(EError::Unknown, "Can't create tar " + std::to_string(status));
+
+    return TError::Success();
+}
+
 TError UnpackTarball(const TPath &tar, const TPath &path) {
     int status;
 
