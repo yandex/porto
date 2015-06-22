@@ -21,6 +21,8 @@ static bool InfoRequest(const rpc::TContainerRequest &req) {
         req.has_createvolume() ||
         req.has_linkvolume() ||
         req.has_unlinkvolume() ||
+        req.has_importlayer() ||
+        req.has_removelayer() ||
         req.has_wait())
         return false;
 
