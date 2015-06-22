@@ -635,13 +635,15 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         TPath client_root = client_container->RootPath();
         if (client_root.IsEmpty())
             return TError(EError::InvalidValue, "Cannot get client root path");
-        TError error = taskEnv->ClientNs.Open(client->GetPid(), true);
-        if (error)
-            return error;
-        taskEnv->Root = client_root.InnerPath(taskEnv->Root, true);
-        taskEnv->StdinPath = client_root.InnerPath(taskEnv->StdinPath, true);
-        taskEnv->StdoutPath = client_root.InnerPath(taskEnv->StdoutPath, true);
-        taskEnv->StderrPath = client_root.InnerPath(taskEnv->StderrPath, true);
+        if (!client_root.IsRoot()) {
+            TError error = taskEnv->ClientNs.Open(client->GetPid(), true);
+            if (error)
+                return error;
+            taskEnv->Root = client_root.InnerPath(taskEnv->Root, true);
+            taskEnv->StdinPath = client_root.InnerPath(taskEnv->StdinPath, true);
+            taskEnv->StdoutPath = client_root.InnerPath(taskEnv->StdoutPath, true);
+            taskEnv->StderrPath = client_root.InnerPath(taskEnv->StderrPath, true);
+        }
     }
 
     TError error = Prop->PrepareTaskEnv(P_ULIMIT, taskEnv);
