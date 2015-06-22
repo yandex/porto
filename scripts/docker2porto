@@ -29,7 +29,6 @@ $docker_url = 'index.docker.io'
 container = "#{image}-#{image_tag}"
 script = "#{container}.sh"
 imgtar = "#{container}.tar"
-vroot = '/place/docker'
 
 def escape_arg(s) s.gsub('"'){'\\"'} end
 def escape_env(s) s.gsub(';'){'\\;'} end
@@ -38,7 +37,7 @@ def expect(field, x, y)
   abort "Image json has unexpected #{field} value!" if x != y
 end
 
-def generate_conf(script, name, rootfs, meta, vroot)
+def generate_conf(script, name, rootfs, meta, layers)
   config = {}
 
   expect("config.Domainname", meta["config"]["Domainname"], "")
@@ -63,9 +62,8 @@ def generate_conf(script, name, rootfs, meta, vroot)
   config["bind"] = '$BIND;'
 
   config["cwd"] = "/#{meta["config"]["WorkingDir"]}"
-  vdir = "#{vroot}/#{name}"
 
-  props = "virt_mode=\"os\" root=\"#{vdir}\""
+  props = "virt_mode=\"os\""
   config.each { |k, v| props += " #{k}=\"#{escape_arg(v)}\""}
 
   text = <<END
@@ -89,11 +87,25 @@ while [ ! "$1" = "--" ]; do
 done
 shift
 
-cleanup() { portoctl vdestroy #{vdir}; }
+layers="#{layers.join(' ')}"
+root=""
+cleanup() {
+  set +e
+  [ ! -z "$root" ] && portoctl vunlink $root
+  for id in $layers; do
+    portoctl layer -R $id
+  done
+}
 trap cleanup EXIT
 
-portoctl vcreate #{vdir} #{rootfs} $QUOTA
-portoctl exec #{name} #{props}
+layers_prop=""
+for id in $layers; do
+  portoctl layer -I $id $PWD/${id}.tar.gz
+  layers_prop="$layers_prop$id;"
+done
+
+root=$(portoctl vcreate -A backend=overlay layers="$layers_prop" $QUOTA)
+portoctl exec #{name} #{props} root=$root
 END
 
   File.write(script, text)
@@ -113,22 +125,6 @@ def get(url, headers = {})
     else
       rsp.error!
     end
-  end
-end
-
-def whiteout(tar)
-  puts "Whiteout #{tar}..."
-
-  list = `tar tf #{tar}`.split(/\n/)
-  remove = list.select { |path| path.include? '.wh.' }
-  puts remove.inspect
-
-  remove.each do |wh|
-    orig = wh.sub(/\.wh\./, '')
-    puts "Removing #{wh}..."
-    system "tar -f #{tar} --delete #{wh}"
-    puts "Removing #{orig}..."
-    system "tar -f #{tar} --delete #{orig}"
   end
 end
 
@@ -172,7 +168,7 @@ File.write("#{container}.json", JSON.pretty_generate(json)) if $debug
 imgtar = File.expand_path(imgtar)
 script = File.expand_path(script)
 
-system "tar cSf #{imgtar} --files-from /dev/null"
+layers = []
 
 ancestry.reverse_each { |id|
   tar = "#{id}.tar"
@@ -184,16 +180,8 @@ ancestry.reverse_each { |id|
     File.write(targz, rsp.body)
   end
 
-  unless File.exists?(tar)
-    puts "Extracting layer #{id}..."
-    system "gunzip -c #{targz} > #{tar}"
-  end
-
-  puts "Merging layer #{id}..."
-  system "tar -A -f #{imgtar} #{tar}"
+  layers.insert(0, id)
 }
 
-#whiteout(imgtar)
-
-generate_conf(script, container, imgtar, json, vroot)
+generate_conf(script, container, imgtar, json, layers)
 puts "Generated #{script} script and #{imgtar} image"
