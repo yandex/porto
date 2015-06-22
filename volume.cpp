@@ -831,14 +831,14 @@ const std::vector<std::pair<std::string, std::string>> TVolumeHolder::ListProper
         { V_CREATOR,     "container user group" },
         { V_READ_ONLY,   "true|false  default - false" },
         { V_LAYERS,      "top-layer;...;bottom-layer  overlay layers" },
-        { V_SPACE_LIMIT, " " },
-        { V_INODE_LIMIT, " " },
+        { V_SPACE_LIMIT, "disk space limit" },
+//      { V_INODE_LIMIT, " " },
 //      { V_SPACE_GUARANTEE, " " },
 //      { V_INODE_GUARANTEE, " " },
-        { V_SPACE_USED, " " },
-        { V_INODE_USED, " " },
-        { V_SPACE_AVAILABLE, " " },
-        { V_INODE_AVAILABLE, " " },
+        { V_SPACE_USED,  "current disk space usage" },
+//      { V_INODE_USED, " " },
+        { V_SPACE_AVAILABLE, "available disk space" },
+//      { V_INODE_AVAILABLE, " " },
     };
 }
 
