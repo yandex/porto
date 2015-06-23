@@ -10,23 +10,18 @@
 using std::string;
 
 static bool InfoRequest(const rpc::TContainerRequest &req) {
-    if (req.has_create() ||
-        req.has_destroy() ||
-        req.has_setproperty() ||
-        req.has_start() ||
-        req.has_stop() ||
-        req.has_pause() ||
-        req.has_resume() ||
-        req.has_kill() ||
-        req.has_createvolume() ||
-        req.has_linkvolume() ||
-        req.has_unlinkvolume() ||
-        req.has_importlayer() ||
-        req.has_removelayer() ||
-        req.has_wait())
-        return false;
-
-    return true;
+    return
+        req.has_list() ||
+        req.has_getproperty() ||
+        req.has_getdata() ||
+        req.has_get() ||
+        req.has_propertylist() ||
+        req.has_datalist() ||
+        req.has_version() ||
+        req.has_wait() ||
+        req.has_listvolumeproperties() ||
+        req.has_listvolumes() ||
+        req.has_listlayers();
 }
 
 static void SendReply(std::shared_ptr<TClient> client,
