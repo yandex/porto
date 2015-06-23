@@ -42,11 +42,29 @@ static int lastCap;
 
 // TTaskEnv
 
+TError TTaskEnv::GetGroupList() {
+    int ngroups = 0;
+    (void)getgrouplist(User.c_str(), Cred.Gid,
+                       nullptr, &ngroups);
+
+    GroupList = unique_ptr<TScopedMem>(new TScopedMem(ngroups * sizeof(gid_t)));
+    if (getgrouplist(User.c_str(), Cred.Gid,
+                     (gid_t*)GroupList->GetData(), &ngroups) < 0) {
+        return TError(EError::Unknown, errno, "Can't get supplementary group list");
+    }
+
+    return TError::Success();
+}
+
 TError TTaskEnv::Prepare(const TCred &cred) {
     if (Command.empty())
         return TError::Success();
 
     Cred = cred;
+
+    TError error = GetGroupList();
+    if (error)
+        return error;
 
     return TError::Success();
 }
@@ -180,8 +198,15 @@ TError TTask::ChildDropPriveleges() {
     if (setgid(Env->Cred.Gid) < 0)
         return TError(EError::Unknown, errno, "setgid()");
 
-    if (initgroups(Env->User.c_str(), Env->Cred.Gid) < 0)
-        return TError(EError::Unknown, errno, "initgroups()");
+    auto groupnr = Env->GroupList->GetSize() / sizeof(gid_t);
+    if (config().log().verbose()) {
+        auto gid = (const gid_t *)Env->GroupList->GetData();
+        for (unsigned i = 0; i < groupnr; i++)
+            L() << "supplemetary_group[" << i << "]=" << gid[i] << std::endl;
+    }
+
+    if (setgroups(groupnr, (const gid_t*)Env->GroupList->GetData()) < 0)
+        return TError(EError::Unknown, errno, "setgroups()");
 
     if (setuid(Env->Cred.Uid) < 0)
         return TError(EError::Unknown, errno, "setuid()");

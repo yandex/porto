@@ -73,12 +73,7 @@ struct TNetCfg {
     std::vector<TVethNetCfg> Veth;
 };
 
-class TTaskEnv : public TNonCopyable {
-    friend TTask;
-    TCred Cred;
-
-public:
-    TTaskEnv() {}
+struct TTaskEnv : public TNonCopyable {
     std::string Command;
     TPath Cwd;
     bool CreateCwd;
@@ -107,7 +102,10 @@ public:
     std::map<std::string, TIpMap> IpMap;
     bool NewMountNs;
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
+    std::unique_ptr<TScopedMem> GroupList;
+    TCred Cred;
 
+    TError GetGroupList();
     TError Prepare(const TCred &cred);
     const char** GetEnvp() const;
     bool EnvHasKey(const std::string &key);
