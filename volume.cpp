@@ -681,12 +681,17 @@ TError TVolume::Build() {
 err_save:
     (void)Backend->Destroy();
 err_build:
-    if (IsAutoPath())
+    if (IsAutoPath()) {
+        (void)path.ClearDirectory();
         (void)path.Rmdir();
+    }
 err_path:
-    if (!Config->HasValue(V_STORAGE))
+    if (!Config->HasValue(V_STORAGE)) {
+        (void)storage.ClearDirectory();
         (void)storage.Rmdir();
+    }
 err_storage:
+    (void)internal.ClearDirectory();
     (void)internal.Rmdir();
 err_internal:
     return error;
@@ -731,6 +736,13 @@ TError TVolume::Destroy() {
     }
 
     if (IsAutoPath() && path.Exists()) {
+        error = path.ClearDirectory();
+        if (error) {
+            L_ERR() << "Can't clear volume path: " << error << std::endl;
+            if (!ret)
+                ret = error;
+        }
+
         error = path.Rmdir();
         if (error) {
             L_ERR() << "Can't remove volume path: " << error << std::endl;
