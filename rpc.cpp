@@ -787,14 +787,15 @@ static TError UnlinkVolume(TContext &context,
     error = volume->SetReady(false);
     if (error)
         return error;
+
     vholder_lock.unlock();
     error = volume->Destroy();
-    if (!error) {
-        vholder_lock.lock();
-        context.Vholder->Unregister(volume);
-        context.Vholder->Remove(volume);
-        vholder_lock.unlock();
-    }
+
+    vholder_lock.lock();
+    context.Vholder->Unregister(volume);
+    context.Vholder->Remove(volume);
+    vholder_lock.unlock();
+
     volume_lock.unlock();
 
     return error;

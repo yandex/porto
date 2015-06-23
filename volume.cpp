@@ -80,10 +80,15 @@ public:
         auto storage = Volume->GetStorage();
         TMount Mount(storage, Volume->GetPath(), "none", {});
         TError error = Mount.Umount();
-        if (error)
+        if (error) {
             L_ERR() << "Can't umount volume: " << error << std::endl;
+            if (error.GetErrno() != EINVAL) {
+                L_ACT() << "Detach mount " << Mount.GetMountpoint() << std::endl;
+                (void)Mount.Detach();
+            }
+        }
 
-        return TError::Success();
+        return error;
     }
 
     TError Move(TPath dest) override {
@@ -126,13 +131,18 @@ public:
         auto storage = Volume->GetStorage();
         TMount Mount(storage, Volume->GetPath(), "none", {});
         TError error = Mount.Umount();
-        if (error)
+        if (error) {
             L_ERR() << "Can't umount volume: " << error << std::endl;
+            if (error.GetErrno() != EINVAL) {
+                L_ACT() << "Detach mount " << Mount.GetMountpoint() << std::endl;
+                (void)Mount.Detach();
+            }
+        }
 
         if (ext4_destroy_project(storage.c_str()))
             L_ERR() << "Can't destroy ext4 project: " << errno << std::endl;
 
-        return TError::Success();
+        return error;
     }
 
     TError Move(TPath dest) override {
@@ -179,7 +189,7 @@ public:
         TPath path = Volume->GetPath();
         TPath image = GetLoopImage();
         uint64_t space_limit, inode_limit;
-        TError error;
+        TError error, error2;
 
         Volume->GetQuota(space_limit, inode_limit);
         if (!space_limit)
@@ -214,7 +224,11 @@ public:
         return TError::Success();
 
 umount_loop:
-        (void)mount.Umount();
+        error2 = mount.Umount();
+        if (error2 && error2.GetErrno() != EINVAL) {
+            L_ACT() << "Detach mount " << mount.GetMountpoint() << std::endl;
+            (void)mount.Detach();
+        }
 free_loop:
         PutLoopDev(LoopDev);
         LoopDev = -1;
@@ -232,6 +246,10 @@ free_loop:
         L_ACT() << "Destroy loop " << loop << std::endl;
         TMount mount(loop, path, "ext4", {});
         error = mount.Umount();
+        if (error && error.GetErrno() != EINVAL) {
+            L_ACT() << "Detach volume " << mount.GetMountpoint() << std::endl;
+            (void)mount.Detach();
+        }
         TError error2 = PutLoopDev(LoopDev);
         if (!error)
             error = error2;
@@ -338,12 +356,20 @@ err:
         TPath storage = Volume->GetStorage();
         TMount mount("overlay", Volume->GetPath(), "overlay", {});
         TError error = mount.Umount();
-        if (error)
+        if (error) {
             L_ERR() << "Can't umount overlay: " << error << std::endl;
+            if (error.GetErrno() != EINVAL) {
+                L_ACT() << "Detach mount " << mount.GetMountpoint() << std::endl;
+                (void)mount.Detach();
+            }
+        }
 
         error = storage.ClearDirectory();
-        if (error)
+        if (error) {
             L_ERR() << "Can't clear overlay storage: " << error << std::endl;
+            (void)storage.AddComponent("upper").ClearDirectory();
+            (void)storage.AddComponent("work").ClearDirectory();
+        }
 
         if (ext4_destroy_project(storage.c_str()))
             L_ERR() << "Can't destroy ext4 project: " << errno << std::endl;
