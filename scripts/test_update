@@ -48,8 +48,7 @@ check_state() {
 
 wait_porto() { echo "Waiting porto startup..."; sleep 5; }
 
-#sudo apt-get install -y --force-yes yandex-porto/stable
-sudo apt-get install -y --force-yes yandex-porto=1.9
+sudo apt-get install -y --force-yes yandex-porto/stable
 sudo restart yandex-porto
 wait_porto
 oldver="$(getver)"

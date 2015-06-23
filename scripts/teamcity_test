@@ -5,19 +5,20 @@ set -e
 export PATH="/usr/sbin:$PATH"
 
 DUMMY_ETH=eth9
+PORTO_VERSION=$(git describe | sed -e 's/^v//')
+PORTO_DPKG="$PWD/../yandex-porto_${PORTO_VERSION}_amd64.deb"
 
 getver() { portoctl -v 2>&1 | grep $1 | awk '{print $2}'; }
 checkver() { [ "$2" = "$3" ] || { echo "Invalid $1 version ($2 != $3)"; }; }
 
 _build() {
-	version=$(git describe | sed -e 's/^v//')
-	dch --newversion $version "teamcity build"
+	dch --newversion $PORTO_VERSION "teamcity build"
 	find ../ -name '*.deb' -o -name '*.build' -o -name '*.changes' -print0 | xargs -0 rm -f
 	debuild "$@" -i -us -uc -b
-	sudo dpkg -i ../yandex-porto_${version}_amd64.deb
+	sudo dpkg -i "$PORTO_DPKG"
 
-	checkver server v$version $(getver server)
-	checkver client v$version $(getver client)
+	checkver server v$PORTO_VERSION $(getver server)
+	checkver client v$PORTO_VERSION $(getver client)
 }
 
 build() { _build; }
@@ -71,13 +72,17 @@ netup() {
 	sudo ip addr add 192.168.2.2/16 dev $DUMMY_ETH
 }
 
+update() {
+	scripts/test_update "$PORTO_DPKG"
+}
+
 netdown() {
 	sudo ip link del $DUMMY_ETH &> /dev/null
 	# TODO: enable dynamic_ifaces?
 	sudo reload yandex-porto
 }
 
-[ ! $# -eq 0 ] || set -- build selftest pkgtest stresstest
+[ ! $# -eq 0 ] || set -- build selftest pkgtest stresstest update
 trap print_logs EXIT
 for f in "$@"; do eval $f; done
 trap - EXIT
