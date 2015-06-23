@@ -77,8 +77,7 @@ void TConfig::LoadDefaults() {
     config().mutable_volumes()->set_layers_dir("/place/porto_layers");
 #ifdef PORTOD
     bool supportQuota = ext4_support_project(config().volumes().volume_dir().c_str()) == 0;
-    bool supportOvl = SupportOverlayfs();
-    config().mutable_volumes()->set_native(supportQuota && supportOvl);
+    config().mutable_volumes()->set_native(supportQuota);
 #else
     config().mutable_volumes()->set_native(false);
 #endif

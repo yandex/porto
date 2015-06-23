@@ -415,18 +415,6 @@ TError PivotRoot(const TPath &rootfs) {
     return TError::Success();
 }
 
-bool SupportOverlayfs() {
-    (void)mount(NULL, "/", "overlay", MS_SILENT, NULL);
-    if (errno == EINVAL) {
-        return true;
-    } else if (errno == ENODEV) {
-        return false;
-    } else {
-        L_ERR() << "Unexpected errno when testing for overlayfs " << errno << std::endl;
-        return false;
-    }
-}
-
 size_t GetNumCores() {
     long ncores = sysconf(_SC_NPROCESSORS_CONF);
     if (ncores <= 0) {

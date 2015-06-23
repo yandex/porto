@@ -259,6 +259,28 @@ class TVolumeOverlayBackend : public TVolumeBackend {
 public:
     TVolumeOverlayBackend(std::shared_ptr<TVolume> volume) : TVolumeBackend(volume) {}
 
+    static bool Supported() {
+        static bool supported = false, tested = false;
+
+        if (!tested) {
+            tested = true;
+            if (!mount(NULL, "/", "overlay", MS_SILENT, NULL))
+                L_ERR() << "Unexpected success when testing for overlayfs" << std::endl;
+            if (errno == EINVAL)
+                supported = true;
+            else if (errno != ENODEV)
+                L_ERR() << "Unexpected errno when testing for overlayfs " << errno << std::endl;
+        }
+
+        return supported;
+    }
+
+    TError Configure(std::shared_ptr<TValueMap> Config) override {
+        if (!Supported())
+            return TError(EError::InvalidValue, "overlay not supported");
+        return TError::Success();
+    }
+
     TError Build() override {
         TPath storage = Volume->GetStorage();
         TPath upper = storage.AddComponent("upper");
@@ -595,11 +617,9 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
 
     /* Autodetect volume backend */
     if (!Config->HasValue(V_BACKEND)) {
-        if (Config->HasValue(V_LAYERS)) {
-            if (!config().volumes().native()) //FIXME
-                return TError(EError::InvalidValue, "overlay not supported");
+        if (Config->HasValue(V_LAYERS))
             error = Config->Set<std::string>(V_BACKEND, "overlay");
-        } else if (config().volumes().native())
+        else if (config().volumes().native())
             error = Config->Set<std::string>(V_BACKEND, "native");
         else if (Config->HasValue(V_SPACE_LIMIT) ||
                  Config->HasValue(V_INODE_LIMIT))
