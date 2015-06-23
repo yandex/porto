@@ -24,6 +24,7 @@ std::string StringWithUnit(uint64_t value, int precision = 1);
 
 TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens, size_t maxFields = -1);
 TError SplitEscapedString(const std::string &s, const char sep, std::vector<std::string> &tokens);
+std::string MergeEscapeStrings(std::vector<std::string> &strings, std::string sep, std::string rep);
 std::string StringTrim(const std::string& s, const std::string &what = " \t\n");
 bool StringOnlyDigits(const std::string &s);
 std::string StringReplaceAll(const std::string &str, const std::string &from, const std::string &to);

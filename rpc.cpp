@@ -568,10 +568,10 @@ static TError ListVolumeProperties(TContext &context,
 }
 
 static void FillVolumeDescription(rpc::TVolumeDescription *desc,
-                                  TPath volume_path,
+                                  TPath container_root, TPath volume_path,
                                   std::shared_ptr<TVolume> volume) {
     desc->set_path(volume_path.ToString());
-    for (auto kv: volume->GetProperties()) {
+    for (auto kv: volume->GetProperties(container_root)) {
         auto p = desc->add_properties();
         p->set_name(kv.first);
         p->set_value(kv.second);
@@ -606,10 +606,11 @@ static TError CreateVolume(TContext &context,
     auto volume_lock = volume->ScopedLock();
 
     auto container = client->GetContainer();
+    auto container_root = container->RootPath();
 
     TPath volume_path("");
     if (req.has_path() && !req.path().empty())
-        volume_path = container->RootPath().AddComponent(req.path());
+        volume_path = container_root.AddComponent(req.path());
 
     error = volume->Configure(volume_path, client->GetCred(),
                               container, properties);
@@ -618,11 +619,11 @@ static TError CreateVolume(TContext &context,
         return error;
     }
 
-    volume_path = container->RootPath().InnerPath(volume->GetPath(), true);
+    volume_path = container_root.InnerPath(volume->GetPath(), true);
     if (volume_path.IsEmpty()) {
         /* sanity check */
         error = TError(EError::Unknown, "volume inner path not found");
-        L_ERR() << error << " " << volume->GetPath() << " in " << container->RootPath() << std::endl;
+        L_ERR() << error << " " << volume->GetPath() << " in " << container_root << std::endl;
         context.Vholder->Remove(volume);
         return error;
     }
@@ -664,7 +665,7 @@ static TError CreateVolume(TContext &context,
     volume->SetReady(true);
     vholder_lock.unlock();
 
-    FillVolumeDescription(rsp.mutable_volume(), volume_path, volume);
+    FillVolumeDescription(rsp.mutable_volume(), container_root, volume_path, volume);
     volume_lock.unlock();
 
     return TError::Success();
@@ -819,7 +820,7 @@ static TError ListVolumes(TContext &context,
             return TError(EError::VolumeNotFound, "volume not found");
         auto desc = rsp.mutable_volumelist()->add_volumes();
         volume_path = container_root.InnerPath(volume->GetPath(), true);
-        FillVolumeDescription(desc, volume_path, volume);
+        FillVolumeDescription(desc, container_root, volume_path, volume);
         return TError::Success();
     }
 
@@ -839,7 +840,7 @@ static TError ListVolumes(TContext &context,
             continue;
 
         auto desc = rsp.mutable_volumelist()->add_volumes();
-        FillVolumeDescription(desc, volume_path, volume);
+        FillVolumeDescription(desc, container_root, volume_path, volume);
     }
 
     return TError::Success();

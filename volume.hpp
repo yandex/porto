@@ -138,7 +138,7 @@ public:
     TCred GetCred() const { return Cred; }
     unsigned GetPermissions() const { return Permissions; }
 
-    std::map<std::string, std::string> GetProperties();
+    std::map<std::string, std::string> GetProperties(TPath container_root);
 };
 
 class TVolumeHolder : public std::enable_shared_from_this<TVolumeHolder>,

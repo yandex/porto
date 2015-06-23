@@ -201,6 +201,21 @@ TError SplitEscapedString(const std::string &s, const char sep, std::vector<std:
     return TError::Success();
 }
 
+std::string MergeEscapeStrings(std::vector<std::string> &strings,
+                               std::string sep, std::string rep) {
+    std::stringstream str;
+    bool first = true;
+
+    for (auto s : strings) {
+        if (!first)
+            str << sep;
+        first = false;
+        str << StringReplaceAll(s, sep, rep);
+    }
+
+    return str.str();
+}
+
 std::string StringTrim(const std::string& s, const std::string &what) {
     std::size_t first = s.find_first_not_of(what);
     std::size_t last  = s.find_last_not_of(what);

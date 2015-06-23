@@ -473,6 +473,8 @@ TError TVolume::CheckGuarantee() const {
 TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
                           std::shared_ptr<TContainer> creator_container,
                           const std::map<std::string, std::string> &properties) {
+
+    TPath container_root = creator_container->RootPath();
     TError error;
 
     /* Verify volume path */
@@ -489,7 +491,6 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
         if (error)
             return error;
     } else {
-        TPath container_root = creator_container->RootPath();
         TPath volume_path;
 
         if (container_root.IsRoot())
@@ -569,13 +570,19 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
         return error;
 
     /* Verify layers */
-    for (auto l: Config->Get<std::vector<std::string>>(V_LAYERS)) {
+    auto layers = Config->Get<std::vector<std::string>>(V_LAYERS);
+    for (auto &l: layers) {
         TPath layer(l);
         if (!layer.IsNormal())
             return TError(EError::InvalidValue, "Layer path must be normalized");
-        if (l.substr(0, 3) == "../")
-            return TError(EError::InvalidValue, "Don't even try to get out");
+        if (layer.IsAbsolute())
+            l = container_root.AddComponent(layer).ToString();
+        else if (l.find('/') != std::string::npos)
+            return TError(EError::InvalidValue, "Internal layer storage has no direcrotories");
     }
+    error = Config->Set<std::vector<std::string>>(V_LAYERS, layers);
+    if (error)
+        return error;
 
     /* Verify guarantees */
     if (Config->HasValue(V_SPACE_LIMIT) && Config->HasValue(V_SPACE_GUARANTEE) &&
@@ -766,7 +773,7 @@ bool TVolume::UnlinkContainer(std::string name) {
     return containers.empty();
 }
 
-std::map<std::string, std::string> TVolume::GetProperties() {
+std::map<std::string, std::string> TVolume::GetProperties(TPath container_root) {
     uint64_t space_used, space_avail, inode_used, inode_avail;
     std::map<std::string, std::string> ret;
 
@@ -781,6 +788,16 @@ std::map<std::string, std::string> TVolume::GetProperties() {
         auto property = Config->Find(name);
         if (!(property->GetFlags() & HIDDEN_VALUE) && property->HasValue())
             ret[name] = property->ToString();
+    }
+
+    if (Config->HasValue(V_LAYERS)) {
+        auto layers = Config->Get<std::vector<std::string>>(V_LAYERS);
+        for (auto &l: layers) {
+            TPath path(l);
+            if (path.IsAbsolute())
+                l = container_root.InnerPath(path).ToString();
+        }
+        ret[V_LAYERS] = MergeEscapeStrings(layers, ";", "\\;");
     }
 
     return ret;
@@ -868,7 +885,7 @@ static void RegisterVolumeProperties(std::shared_ptr<TRawValueMap> m) {
 
     m->Add(V_LOOP_DEV, new TIntValue(HIDDEN_VALUE | PERSISTENT_VALUE));
     m->Add(V_READ_ONLY, new TBoolValue(PERSISTENT_VALUE));
-    m->Add(V_LAYERS, new TListValue(PERSISTENT_VALUE));
+    m->Add(V_LAYERS, new TListValue(HIDDEN_VALUE | PERSISTENT_VALUE));
 
     m->Add(V_SPACE_LIMIT, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
     m->Add(V_INODE_LIMIT, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
