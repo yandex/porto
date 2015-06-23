@@ -1570,6 +1570,7 @@ public:
         "    -I <layer> <tarball>     import layer from tarball\n"
         "    -M <layer> <tarball>     merge tarball into existing or new layer\n"
         "    -R <layer>               remove layer from storage\n"
+        "    -F                       remove all unused layes\n"
         "    -L                       list present layers\n"
         "    -E <volume> <tarball>    export upper layer into tarball\n"
         ) {}
@@ -1579,6 +1580,7 @@ public:
     bool remove = false;
     bool list   = false;
     bool export_ = false;
+    bool flush = false;
 
     int Execute(int argc, char *argv[]) {
         int ret;
@@ -1586,6 +1588,7 @@ public:
             { 'I', false, [&](const char *arg) { import = true; } },
             { 'M', false, [&](const char *arg) { merge  = true; } },
             { 'R', false, [&](const char *arg) { remove = true; } },
+            { 'F', false, [&](const char *arg) { flush  = true; } },
             { 'L', false, [&](const char *arg) { list   = true; } },
             { 'E', false, [&](const char *arg) { export_= true; } },
         });
@@ -1614,6 +1617,16 @@ public:
             ret = Api->RemoveLayer(argv[start]);
             if (ret)
                 PrintError("Can't remove layer");
+        } else if (flush) {
+            std::vector<std::string> layers;
+            ret = Api->ListLayers(layers);
+            if (ret) {
+                PrintError("Can't list layers");
+                return EXIT_FAILURE;
+            } else {
+                for (auto l: layers)
+                    (void)Api->RemoveLayer(l);
+            }
         } else if (list) {
             std::vector<std::string> layers;
             ret = Api->ListLayers(layers);
