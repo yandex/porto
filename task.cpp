@@ -47,7 +47,7 @@ TError TTaskEnv::GetGroupList() {
     (void)getgrouplist(User.c_str(), Cred.Gid,
                        nullptr, &ngroups);
 
-    GroupList = unique_ptr<TScopedMem>(new TScopedMem(ngroups * sizeof(gid_t)));
+    GroupList = std::unique_ptr<TScopedMem>(new TScopedMem(ngroups * sizeof(gid_t)));
     if (getgrouplist(User.c_str(), Cred.Gid,
                      (gid_t*)GroupList->GetData(), &ngroups) < 0) {
         return TError(EError::Unknown, errno, "Can't get supplementary group list");
