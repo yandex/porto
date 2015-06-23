@@ -881,6 +881,11 @@ static TError ImportLayer(TContext &context,
     TPath layer_tmp = layers_tmp.AddComponent(layer_name);
     TPath tarball(req.tarball());
 
+    if (!tarball.IsAbsolute())
+        return TError(EError::InvalidValue, "tarball path must be absolute");
+
+    tarball = client->GetContainer()->RootPath().AddComponent(tarball);
+
     if (tarball.GetType() != EFileType::Regular)
         return TError(EError::InvalidValue, "tarball not a file");
 
@@ -948,8 +953,15 @@ static TError ExportLayer(TContext &context,
         return error;
 
     TPath tarball(req.tarball());
+
+    if (!tarball.IsAbsolute())
+        return TError(EError::InvalidValue, "tarball path must be absolute");
+
+    tarball = client->GetContainer()->RootPath().AddComponent(tarball);
+
     if (tarball.Exists())
         return TError(EError::InvalidValue, "tarball already exists");
+
     if (!tarball.DirName().AccessOk(EFileAccess::Write, client->GetCred()))
         return TError(EError::Permission, "client has no write access to tarball directory");
 
@@ -1043,7 +1055,8 @@ static TError ListLayers(TContext &context,
     if (!error) {
         auto list = rsp.mutable_layers();
         for (auto l: layers)
-            list->add_layer(l);
+            if (l != "_tmp_")
+                list->add_layer(l);
     }
     return error;
 }
