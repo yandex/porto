@@ -103,15 +103,42 @@ class TVolumeNativeBackend : public TVolumeBackend {
 public:
     TVolumeNativeBackend(std::shared_ptr<TVolume> volume) : TVolumeBackend(volume) {}
 
+    TError Configure(std::shared_ptr<TValueMap> Config) override {
+        TPath storage = Volume->GetStorage();
+
+        if (!config().volumes().enable_quota() &&
+            (Config->HasValue(V_SPACE_LIMIT) ||
+             Config->HasValue(V_INODE_LIMIT)))
+            return TError(EError::NotSupported, "project quota is disabled");
+
+        return TError::Success();
+    }
+
     TError Build() override {
         TPath storage = Volume->GetStorage();
-        uint64_t space, inodes;
+        uint64_t space_limit, inode_limit;
+        TMount storage_mount;
+        TError error;
 
-        Volume->GetQuota(space, inodes);
-        if (ext4_create_project(storage.c_str(), space, inodes))
+        Volume->GetQuota(space_limit, inode_limit);
+
+        error = storage_mount.Find(storage);
+        if (error)
+            return error;
+
+        if (!config().volumes().enable_quota() ||
+            ext4_support_project(storage_mount.GetSource().c_str(),
+                                 storage_mount.GetType().c_str(),
+                                 storage_mount.GetMountpoint().c_str())) {
+            if (space_limit || inode_limit)
+                return TError(EError::NotSupported, errno,
+                        "project quota not supported");
+        } else if (ext4_create_project(storage_mount.GetSource().c_str(),
+                                       storage.c_str(),
+                                       space_limit, inode_limit))
             return TError(EError::Unknown, errno, "ext4_create_project");
 
-        TError error = storage.Chown(Volume->GetCred());
+        error = storage.Chown(Volume->GetCred());
         if (error)
             return error;
 
@@ -119,8 +146,8 @@ public:
         if (error)
             return error;
 
-        TMount Mount = TMount(storage, Volume->GetPath(), "none", {});
-        return Mount.Bind(Volume->IsReadOnly());
+        TMount mount(storage, Volume->GetPath(), "none", {});
+        return mount.Bind(Volume->IsReadOnly());
     }
 
     TError Clear() override {
@@ -129,18 +156,28 @@ public:
 
     TError Destroy() override {
         auto storage = Volume->GetStorage();
-        TMount Mount(storage, Volume->GetPath(), "none", {});
-        TError error = Mount.Umount();
+        TMount mount(storage, Volume->GetPath(), "none", {});
+        TError error = mount.Umount(), error2;
         if (error) {
             L_ERR() << "Can't umount volume: " << error << std::endl;
             if (error.GetErrno() != EINVAL) {
-                L_ACT() << "Detach mount " << Mount.GetMountpoint() << std::endl;
-                (void)Mount.Detach();
+                L_ACT() << "Detach mount " << mount.GetMountpoint() << std::endl;
+                (void)mount.Detach();
             }
         }
 
-        if (ext4_destroy_project(storage.c_str()))
+        error2 = mount.Find(storage);
+        if (error2) {
+            L_ERR() << "Can't find storage mount: " << error << std::endl;
+            if (!error)
+                error = error2;
+        } else if (config().volumes().enable_quota() &&
+                 ext4_destroy_project(mount.GetSource().c_str(),
+                                      storage.c_str())) {
             L_ERR() << "Can't destroy ext4 project: " << errno << std::endl;
+            if (!error)
+                error = TError(EError::Unknown, errno, "ext4_destroy_project");
+        }
 
         return error;
     }
@@ -151,9 +188,18 @@ public:
     }
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
-        if (ext4_resize_project(Volume->GetStorage().c_str(),
+        TPath storage = Volume->GetStorage();
+        TMount storage_mount;
+
+        TError error = storage_mount.Find(storage);
+        if (error)
+            return error;
+
+        if (ext4_resize_project(storage_mount.GetSource().c_str(),
+                                storage.c_str(),
                                 space_limit, inode_limit))
-            TError(EError::Unknown, errno, "ext4_resize_project");
+            return TError(EError::Unknown, errno, "ext4_resize_project");
+
         return TError::Success();
     }
 };
@@ -294,8 +340,15 @@ public:
     }
 
     TError Configure(std::shared_ptr<TValueMap> Config) override {
+
         if (!Supported())
             return TError(EError::InvalidValue, "overlay not supported");
+
+        if (!config().volumes().enable_quota() &&
+            (Config->HasValue(V_SPACE_LIMIT) ||
+             Config->HasValue(V_INODE_LIMIT)))
+            return TError(EError::NotSupported, "project quota is disabled");
+
         return TError::Success();
     }
 
@@ -308,6 +361,25 @@ public:
         std::stringstream lower;
         int index = 0;
 
+        Volume->GetQuota(space_limit, inode_limit);
+
+        TMount storage_mount;
+        error = storage_mount.Find(storage);
+        if (error)
+            return error;
+
+        if (!config().volumes().enable_quota() ||
+            ext4_support_project(storage_mount.GetSource().c_str(),
+                                 storage_mount.GetType().c_str(),
+                                 storage_mount.GetMountpoint().c_str())) {
+            if (space_limit || inode_limit)
+                return TError(EError::NotSupported, errno,
+                        "project quota not supported");
+        } else if (ext4_create_project(storage_mount.GetSource().c_str(),
+                                       storage.c_str(),
+                                       space_limit, inode_limit))
+            return TError(EError::Unknown, errno, "ext4_create_project");
+
         for (auto layer: Volume->GetLayers()) {
             if (index++)
                 lower << ":";
@@ -315,14 +387,9 @@ public:
         }
 
         TMount mount("overlay", Volume->GetPath(), "overlay",
-                     { "lowerdir=" + lower.str(),
-                       "upperdir=" + upper.ToString(),
-                       "workdir=" + work.ToString() });
-
-        Volume->GetQuota(space_limit, inode_limit);
-        if (ext4_create_project(storage.c_str(),
-                                space_limit, inode_limit))
-            return TError(EError::Unknown, errno, "ext4_create_project");
+                { "lowerdir=" + lower.str(),
+                  "upperdir=" + upper.ToString(),
+                  "workdir=" + work.ToString() });
 
         error = upper.Mkdir(0755);
         if (error)
@@ -338,13 +405,15 @@ public:
 
         error = upper.Chmod(Volume->GetPermissions());
         if (error)
-            return error;
+            goto err;
 
         error = mount.Mount(Volume->IsReadOnly() ? MS_RDONLY : 0);
         if (!error)
             return error;
 err:
-        (void)ext4_destroy_project(storage.c_str());
+        if (config().volumes().enable_quota())
+            (void)ext4_destroy_project(storage_mount.GetSource().c_str(),
+                                       storage.c_str());
         return error;
     }
 
@@ -355,7 +424,7 @@ err:
     TError Destroy() override {
         TPath storage = Volume->GetStorage();
         TMount mount("overlay", Volume->GetPath(), "overlay", {});
-        TError error = mount.Umount();
+        TError error = mount.Umount(), error2;
         if (error) {
             L_ERR() << "Can't umount overlay: " << error << std::endl;
             if (error.GetErrno() != EINVAL) {
@@ -371,10 +440,21 @@ err:
             (void)storage.AddComponent("work").ClearDirectory();
         }
 
-        if (ext4_destroy_project(storage.c_str()))
+        TMount storage_mount;
+        error2 = storage_mount.Find(storage);
+        if (error2) {
+            L_ERR() << "Can't find storage mount: " << error << std::endl;
+            if (!error)
+                error = error2;
+        } else if (config().volumes().enable_quota() &&
+                 ext4_destroy_project(storage_mount.GetSource().c_str(),
+                                      storage.c_str())) {
             L_ERR() << "Can't destroy ext4 project: " << errno << std::endl;
+            if (!error)
+                error = TError(EError::Unknown, errno, "ext4_destroy_project");
+        }
 
-        return TError::Success();
+        return error;
     }
 
     TError Move(TPath dest) override {
@@ -383,9 +463,18 @@ err:
     }
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
-        if (ext4_resize_project(Volume->GetStorage().c_str(),
+        TPath storage = Volume->GetStorage();
+        TMount storage_mount;
+
+        TError error = storage_mount.Find(storage);
+        if (error)
+            return error;
+
+        if (ext4_resize_project(storage_mount.GetSource().c_str(),
+                                storage.c_str(),
                                 space_limit, inode_limit))
-            TError(EError::Unknown, errno, "ext4_resize_project");
+            return TError(EError::Unknown, errno, "ext4_resize_project");
+
         return TError::Success();
     }
 };
@@ -645,7 +734,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
     if (!Config->HasValue(V_BACKEND)) {
         if (Config->HasValue(V_LAYERS))
             error = Config->Set<std::string>(V_BACKEND, "overlay");
-        else if (config().volumes().native())
+        else if (config().volumes().enable_quota())
             error = Config->Set<std::string>(V_BACKEND, "native");
         else if (Config->HasValue(V_SPACE_LIMIT) ||
                  Config->HasValue(V_INODE_LIMIT))
