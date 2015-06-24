@@ -46,7 +46,20 @@ check_state() {
 	expect "$(portoctl get a/b state)" = "running"
 }
 
-wait_porto() { echo "Waiting porto startup..."; sleep 5; }
+wait_porto() {
+	echo "Waiting porto startup..."
+
+	for i in `seq 60`; do
+		if portoctl list; then
+			return
+		fi
+
+		sleep 1
+	done
+
+	echo "Porto is dead, don't continue"
+	exit 1
+}
 
 sudo apt-get install -y --force-yes yandex-porto/stable
 sudo restart yandex-porto
