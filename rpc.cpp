@@ -24,6 +24,35 @@ static bool InfoRequest(const rpc::TContainerRequest &req) {
         req.has_listlayers();
 }
 
+static bool ValidRequest(const rpc::TContainerRequest &req) {
+    return
+        req.has_create() +
+        req.has_destroy() +
+        req.has_list() +
+        req.has_getproperty() +
+        req.has_setproperty() +
+        req.has_getdata() +
+        req.has_get() +
+        req.has_start() +
+        req.has_stop() +
+        req.has_pause() +
+        req.has_resume() +
+        req.has_propertylist() +
+        req.has_datalist() +
+        req.has_kill() +
+        req.has_version() +
+        req.has_wait() +
+        req.has_listvolumeproperties() +
+        req.has_createvolume() +
+        req.has_linkvolume() +
+        req.has_unlinkvolume() +
+        req.has_listvolumes() +
+        req.has_importlayer() +
+        req.has_exportlayer() +
+        req.has_removelayer() +
+        req.has_listlayers() == 1;
+}
+
 static void SendReply(std::shared_ptr<TClient> client,
                       rpc::TContainerResponse &response,
                       bool log) {
@@ -1077,7 +1106,10 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
 
     TError error;
     try {
-        if (req.has_create())
+        if (!ValidRequest(req)) {
+            L_ERR() << "Invalid request " << req.ShortDebugString() << " from " << *client << std::endl;
+            error = TError(EError::InvalidMethod, "invalid request");
+        } else if (req.has_create())
             error = CreateContainer(context, req.create(), rsp, client);
         else if (req.has_destroy())
             error = DestroyContainer(context, req.destroy(), rsp, client);
