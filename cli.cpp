@@ -18,12 +18,14 @@ size_t MaxFieldLength(std::vector<std::string> &vec, size_t min) {
     return (len > min ? len : min) + 2;
 }
 
-ICmd::ICmd(TPortoAPI *api, const string& name, int args, const string& usage, const string& desc) :
-    Api(api), Name(name), Usage(usage), Desc(desc), NeedArgs(args) {}
+ICmd::ICmd(TPortoAPI *api, const string& name, int args,
+           const string& usage, const string& desc, const string& help) :
+    Api(api), Name(name), Usage(usage), Desc(desc), Help(help), NeedArgs(args) {}
 
     string& ICmd::GetName() { return Name; }
     string& ICmd::GetUsage() { return Usage; }
     string& ICmd::GetDescription() { return Desc; }
+    string& ICmd::GetHelp() { return Help; }
 
     const string &ICmd::ErrorName(int err) {
         if (err == INT_MIN) {
@@ -192,7 +194,7 @@ int THelpCmd::Execute(int argc, char *argv[]) {
             std::cerr << "Usage: " << program_invocation_short_name << " " << name << " " << i.second->GetUsage() << std::endl;
             std::cerr << std::endl;
             std::cerr << i.second->GetDescription() << std::endl;
-
+            std::cerr << i.second->GetHelp();
             return EXIT_SUCCESS;
         }
     }

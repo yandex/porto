@@ -1369,7 +1369,10 @@ public:
 
 class TCreateVolumeCmd : public ICmd {
 public:
-    TCreateVolumeCmd(TPortoAPI *api) : ICmd(api, "vcreate", 1, "-A|<path> [property=value...]", "create volume") {}
+    TCreateVolumeCmd(TPortoAPI *api) : ICmd(api, "vcreate", 1, "-A|<path> [property=value...]",
+        "create volume",
+        "    -A        choose path automatically\n"
+        ) {}
 
     int Execute(int argc, char *argv[]) {
         std::map<std::string, std::string> properties;
@@ -1408,7 +1411,7 @@ public:
 class TLinkVolumeCmd : public ICmd {
 public:
     TLinkVolumeCmd(TPortoAPI *api) : ICmd(api, "vlink", 1, "<path> [container]",
-                    "link volume to container (default - current container)") {}
+                    "link volume to container", "default container - current\n") {}
 
     int Execute(int argc, char *argv[]) {
         int ret = Api->LinkVolume(argv[0], (argc > 1) ? argv[1] : "");
@@ -1421,8 +1424,9 @@ public:
 class TUnlinkVolumeCmd : public ICmd {
 public:
     TUnlinkVolumeCmd(TPortoAPI *api) : ICmd(api, "vunlink", 1, "<path> [container]",
-                    "unlink volume from container (default - current container)\n"
-                    "removing last link deletes volume") {}
+                    "unlink volume from container",
+                    "default container - current\n"
+                    "removing last link deletes volume\n") {}
 
     int Execute(int argc, char *argv[]) {
         int ret = Api->UnlinkVolume(argv[0], (argc > 1) ? argv[1] : "");
@@ -1439,8 +1443,7 @@ class TListVolumesCmd : public ICmd {
 
 public:
     TListVolumesCmd(TPortoAPI *api) : ICmd(api, "vlist", 0, "[-1|-i|-v] [volume]...",
-        "list volumes\n"
-        "\n"
+        "list volumes",
         "    -1        list only paths\n"
         "    -i        list inode information\n"
         "    -v        list all properties\n"
@@ -1562,9 +1565,8 @@ public:
 class TLayerCmd : public ICmd {
 public:
     TLayerCmd(TPortoAPI *api) : ICmd(api, "layer", 1,
-        "-I|-M|-R|-L <layer> [tarball]",
-        "Manage overlayfs layers in internal storage\n"
-        "\n"
+        "-I|-M|-R|-L|-F|-E <layer> [tarball]",
+        "Manage overlayfs layers in internal storage",
         "    -I <layer> <tarball>     import layer from tarball\n"
         "    -M <layer> <tarball>     merge tarball into existing or new layer\n"
         "    -R <layer>               remove layer from storage\n"

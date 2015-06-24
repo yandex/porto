@@ -7,16 +7,18 @@
 class ICmd {
 protected:
     TPortoAPI *Api;
-    std::string Name, Usage, Desc;
+    std::string Name, Usage, Desc, Help;
     int NeedArgs;
     sig_atomic_t Interrupted = 0;
     int InterruptedSignal;
 
 public:
-    ICmd(TPortoAPI *api, const std::string& name, int args, const std::string& usage, const std::string& desc);
+    ICmd(TPortoAPI *api, const std::string& name, int args,
+         const std::string& usage, const std::string& desc, const std::string& help = "");
     std::string &GetName();
     std::string &GetUsage();
     std::string &GetDescription();
+    std::string &GetHelp();
 
     const std::string &ErrorName(int err);
     void Print(const std::string &val);
