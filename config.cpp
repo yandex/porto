@@ -3,6 +3,7 @@
 #include "config.hpp"
 #include "util/protobuf.hpp"
 #include "util/unix.hpp"
+#include "util/mount.hpp"
 
 extern "C" {
 #include <fcntl.h>
@@ -77,6 +78,15 @@ void TConfig::LoadDefaults() {
     config().mutable_volumes()->set_layers_dir("/place/porto_layers");
     config().mutable_volumes()->set_enabled(true);
     config().mutable_volumes()->set_enable_quota(true);
+
+#ifdef PORTOD
+    TMount storage_mount;
+    if (!storage_mount.Find(config().volumes().volume_dir()) &&
+        ext4_support_project(storage_mount.GetSource().c_str(),
+                             storage_mount.GetType().c_str(),
+                             storage_mount.GetMountpoint().c_str()))
+        config().mutable_volumes()->set_enable_quota(false);
+#endif
 
     config().mutable_version()->set_path("/run/portod.version");
     config().mutable_version()->set_perm(0644);

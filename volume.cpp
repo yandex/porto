@@ -172,8 +172,8 @@ public:
             if (!error)
                 error = error2;
         } else if (config().volumes().enable_quota() &&
-                 ext4_destroy_project(mount.GetSource().c_str(),
-                                      storage.c_str())) {
+                   ext4_destroy_project(mount.GetSource().c_str(),
+                                        storage.c_str()) && errno != ENOTTY) {
             L_ERR() << "Can't destroy ext4 project: " << errno << std::endl;
             if (!error)
                 error = TError(EError::Unknown, errno, "ext4_destroy_project");
@@ -447,8 +447,8 @@ err:
             if (!error)
                 error = error2;
         } else if (config().volumes().enable_quota() &&
-                 ext4_destroy_project(storage_mount.GetSource().c_str(),
-                                      storage.c_str())) {
+                   ext4_destroy_project(storage_mount.GetSource().c_str(),
+                                        storage.c_str()) && errno != ENOTTY) {
             L_ERR() << "Can't destroy ext4 project: " << errno << std::endl;
             if (!error)
                 error = TError(EError::Unknown, errno, "ext4_destroy_project");
