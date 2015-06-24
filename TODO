@@ -24,9 +24,6 @@
 
 # volume api
 - add stresstest
-- merge ext4 quota management into volumes
-- recalculate quota at creation from existing storage
-- ? support overlay layers in loop/plain
 
 # cleanup
 - move all 'extern "C"' into one file

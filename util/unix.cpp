@@ -454,6 +454,21 @@ TError UnpackTarball(const TPath &tar, const TPath &path) {
     return TError::Success();
 }
 
+TError CopyRecursive(const TPath &src, const TPath &dst) {
+    int status;
+
+    TError error = Run({ "cp", "--archive", "--force",
+                               "--one-file-system", "--no-target-directory",
+                               src.ToString(), dst.ToString() }, status);
+    if (error)
+        return error;
+
+    if (status)
+        return TError(EError::Unknown, "Can't execute cp " + std::to_string(status));
+
+    return TError::Success();
+}
+
 void DumpMallocInfo() {
     struct mallinfo mi = mallinfo();
     L() << "Total non-mapped bytes (arena):\t" << mi.arena << std::endl;

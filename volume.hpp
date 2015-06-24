@@ -100,6 +100,7 @@ public:
     std::string GetBackend() const { return Config->Get<std::string>(V_BACKEND); }
     TPath GetPath() const;
     bool IsAutoPath() const;
+    bool IsAutoStorage() const;
     TPath GetStorage() const;
     TPath GetInternal(std::string type) const;
     TPath GetChrootInternal(TPath container_root, std::string type) const;

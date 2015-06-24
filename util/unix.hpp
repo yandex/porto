@@ -59,4 +59,5 @@ TError PivotRoot(const TPath &rootfs);
 size_t GetNumCores();
 TError PackTarball(const TPath &tar, const TPath &path);
 TError UnpackTarball(const TPath &tar, const TPath &path);
+TError CopyRecursive(const TPath &src, const TPath &dst);
 void DumpMallocInfo();

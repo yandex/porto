@@ -391,13 +391,11 @@ public:
                   "upperdir=" + upper.ToString(),
                   "workdir=" + work.ToString() });
 
-        error = upper.Mkdir(0755);
-        if (error)
-            goto err;
-
-        error = work.Mkdir(0755);
-        if (error)
-            goto err;
+        if (!upper.Exists()) {
+            error = upper.Mkdir(0755);
+            if (error)
+                goto err;
+        }
 
         error = upper.Chown(Volume->GetCred());
         if (error)
@@ -406,6 +404,12 @@ public:
         error = upper.Chmod(Volume->GetPermissions());
         if (error)
             goto err;
+
+        if (!work.Exists()) {
+            error = work.Mkdir(0755);
+            if (error)
+                goto err;
+        }
 
         error = mount.Mount(Volume->IsReadOnly() ? MS_RDONLY : 0);
         if (!error)
@@ -433,11 +437,20 @@ err:
             }
         }
 
-        error = storage.ClearDirectory();
-        if (error) {
-            L_ERR() << "Can't clear overlay storage: " << error << std::endl;
-            (void)storage.AddComponent("upper").ClearDirectory();
-            (void)storage.AddComponent("work").ClearDirectory();
+        if (Volume->IsAutoStorage()) {
+            error2 = storage.ClearDirectory();
+            if (error2) {
+                if (!error)
+                    error = error2;
+                L_ERR() << "Can't clear overlay storage: " << error2 << std::endl;
+                (void)storage.AddComponent("upper").ClearDirectory();
+            }
+        }
+
+        TPath work = storage.AddComponent("work");
+        if (work.Exists()) {
+            (void)work.ClearDirectory();
+            (void)work.Rmdir();
         }
 
         TMount storage_mount;
@@ -517,6 +530,10 @@ bool TVolume::IsAutoPath() const {
     return Config->Get<bool>(V_AUTO_PATH);
 }
 
+bool TVolume::IsAutoStorage() const {
+    return !Config->HasValue(V_STORAGE);
+}
+
 TPath TVolume::GetStorage() const {
     auto val = Config->Find(V_STORAGE);
     if (val->HasValue())
@@ -550,10 +567,10 @@ TError TVolume::CheckGuarantee() const {
     if (!space_guarantee && !inode_guarantee)
         return TError::Success();
 
-    if (Config->HasValue(V_STORAGE))
-        storage = GetStorage();
-    else
+    if (IsAutoStorage())
         storage = TPath(config().volumes().volume_dir());
+    else
+        storage = GetStorage();
 
     TError error = storage.StatVFS(total_space_used, total_space_avail,
                                    total_inode_used, total_inode_avail);
@@ -712,10 +729,20 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
         TPath layer(l);
         if (!layer.IsNormal())
             return TError(EError::InvalidValue, "Layer path must be normalized");
-        if (layer.IsAbsolute())
-            l = container_root.AddComponent(layer).ToString();
-        else if (l.find('/') != std::string::npos)
-            return TError(EError::InvalidValue, "Internal layer storage has no direcrotories");
+        if (layer.IsAbsolute()) {
+            layer = container_root.AddComponent(layer);
+            l = layer.ToString();
+            if (!layer.AccessOk(EFileAccess::Write, creator_cred))
+                return TError(EError::Permission, "Layer path not permitted");
+        } else {
+            if (l.find('/') != std::string::npos)
+                return TError(EError::InvalidValue, "Internal layer storage has no direcrotories");
+            layer = TPath(config().volumes().layers_dir()).AddComponent(layer);
+        }
+        if (!layer.Exists())
+            return TError(EError::InvalidValue, "Layer does not exist");
+        if (layer.GetType() != EFileType::Directory)
+            return TError(EError::InvalidValue, "Layer must be a directory");
     }
     error = Config->Set<std::vector<std::string>>(V_LAYERS, layers);
     if (error)
@@ -732,7 +759,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
 
     /* Autodetect volume backend */
     if (!Config->HasValue(V_BACKEND)) {
-        if (Config->HasValue(V_LAYERS))
+        if (Config->HasValue(V_LAYERS) && TVolumeOverlayBackend::Supported())
             error = Config->Set<std::string>(V_BACKEND, "overlay");
         else if (config().volumes().enable_quota())
             error = Config->Set<std::string>(V_BACKEND, "native");
@@ -765,13 +792,13 @@ TError TVolume::Build() {
     TPath path = GetPath();
     TPath internal = GetInternal("");
 
-    L_ACT() << "Build volume " << GetPath() << std::endl;
+    L_ACT() << "Build volume " << path << std::endl;
 
     TError error = internal.Mkdir(0755);
     if (error)
         goto err_internal;
 
-    if (!Config->HasValue(V_STORAGE)) {
+    if (IsAutoStorage()) {
         error = storage.Mkdir(0755);
         if (error)
             goto err_storage;
@@ -791,8 +818,21 @@ TError TVolume::Build() {
     if (error)
         goto err_save;
 
+    if (Config->HasValue(V_LAYERS) && GetBackend() != "overlay") {
+        L_ACT() << "Merge layers into volume " << path << std::endl;
+        for (auto layer: GetLayers()) {
+            error = CopyRecursive(layer, path);
+            if (error)
+                goto err_merge;
+        }
+        error = SanitizeLayer(path, true);
+        if (error)
+            goto err_merge;
+    }
+
     return TError::Success();
 
+err_merge:
 err_save:
     (void)Backend->Destroy();
 err_build:
@@ -801,7 +841,7 @@ err_build:
         (void)path.Rmdir();
     }
 err_path:
-    if (!Config->HasValue(V_STORAGE)) {
+    if (IsAutoStorage()) {
         (void)storage.ClearDirectory();
         (void)storage.Rmdir();
     }
@@ -834,7 +874,7 @@ TError TVolume::Destroy() {
         }
     }
 
-    if (!Config->HasValue(V_STORAGE) && storage.Exists()) {
+    if (IsAutoStorage() && storage.Exists()) {
         error = storage.ClearDirectory();
         if (error) {
             L_ERR() << "Can't clear storage: " << error << std::endl;
