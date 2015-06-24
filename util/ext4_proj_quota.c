@@ -283,6 +283,9 @@ int ext4_destroy_project(const char *device, const char *path)
 	if (get_project(path, &project))
 		return -1;
 
+	if (!project)
+		return 0;
+
 	if (project != (path_st.st_ino | (1u << 31))) {
 		errno = ENOTDIR;
 		return -1;
