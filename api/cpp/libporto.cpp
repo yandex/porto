@@ -41,7 +41,7 @@ retry:
         TError error = ConnectToRpcServer(RpcSocketPath, Fd);
         if (error) {
             LastErrorMsg = error.GetMsg();
-            LastError = INT_MIN;
+            LastError = INT_MAX;
 
             if (error.GetErrno() == EACCES || error.GetErrno() == ENOENT)
                 goto exit;

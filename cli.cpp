@@ -28,7 +28,7 @@ ICmd::ICmd(TPortoAPI *api, const string& name, int args,
     string& ICmd::GetHelp() { return Help; }
 
     const string &ICmd::ErrorName(int err) {
-        if (err == INT_MIN) {
+        if (err == INT_MAX) {
             static const string err = "portod unavailable";
             return err;
         }
