@@ -309,7 +309,7 @@ TError AllocLoop(const TPath &path, size_t size) {
     int status;
     std::vector<std::string> lines;
 
-    fd = open(path.ToString().c_str(), O_WRONLY | O_CREAT | O_EXCL, 0755);
+    fd = open(path.ToString().c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0644);
     if (fd.GetFd() < 0)
         return TError(EError::Unknown, errno, "open(" + path.ToString() + ")");
 
