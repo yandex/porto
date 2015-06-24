@@ -46,6 +46,12 @@ check_state() {
 	expect "$(portoctl get a/b state)" = "running"
 }
 
+cleanup_tc() {
+	for link in $(ip -o link | awk -F: '{print $2}'); do
+		tc filter del dev $link pref 10
+	done
+}
+
 wait_porto() {
 	echo "Waiting porto startup..."
 
@@ -61,6 +67,7 @@ wait_porto() {
 	exit 1
 }
 
+cleanup_tc
 sudo apt-get install -y --force-yes yandex-porto/stable
 sudo restart yandex-porto
 wait_porto
@@ -80,6 +87,7 @@ portoctl start a/b
 
 check_state
 
+cleanup_tc
 sudo dpkg -i "$NEW_DPKG"
 wait_porto
 newver="$(getver)"
