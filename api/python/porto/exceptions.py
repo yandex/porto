@@ -77,3 +77,23 @@ class ResourceNotAvailable(EError):
 
 class PermissionError(EError):
     EID = rpc_pb2.Permission
+
+
+class VolumeAlreadyExists(EError):
+    EID = rpc_pb2.VolumeAlreadyExists
+
+
+class VolumeNotFound(EError):
+    EID = rpc_pb2.VolumeNotFound
+
+
+class NoSpace(EError):
+    EID = rpc_pb2.NoSpace
+
+
+class VolumeIsBusy(EError):
+    EID = rpc_pb2.VolumeIsBusy
+
+
+class VolumeNotReady(EError):
+    EID = rpc_pb2.VolumeNotReady
