@@ -941,9 +941,10 @@ TError TVolume::Resize(uint64_t space_limit, uint64_t inode_limit) {
 }
 
 TError TVolume::GetUpperLayer(TPath &upper) {
-    if (GetBackend() != "overlay")
-        return TError(EError::NotSupported, "not implemented");
-    upper = GetStorage().AddComponent("upper");
+    if (GetBackend() == "overlay")
+        upper = GetStorage().AddComponent("upper");
+    else
+        upper = GetPath();
     return TError::Success();
 }
 
