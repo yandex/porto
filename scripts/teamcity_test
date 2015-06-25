@@ -73,7 +73,7 @@ netup() {
 }
 
 update() {
-	scripts/test_update "$PORTO_DPKG"
+	sudo scripts/test_update "$PORTO_DPKG"
 }
 
 netdown() {
