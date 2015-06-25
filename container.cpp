@@ -1284,7 +1284,7 @@ TError TContainer::SetProperty(const string &origProperty,
     SyncStateWithCgroup();
 
     if (!Prop->HasState(property, GetState()))
-        return TError(EError::InvalidState, "Can't set dynamic property " + property + " for running container");
+        return TError(EError::InvalidState, "Can't set dynamic property " + property + " in state " + ContainerStateName(GetState()));
 
     if (UseParentNamespace() && Prop->HasFlags(property, PARENT_RO_PROPERTY))
         return TError(EError::NotSupported, "Can't set " + property + " for child container");
