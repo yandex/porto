@@ -1,8 +1,8 @@
 #ifndef __EXT4_PROJ_QUOTA_H__
 #define __EXT4_PROJ_QUOTA_H__
 
-extern int ext4_support_project(const char *device, const char *fstype,
-				const char *root_path);
+extern bool ext4_support_project(const char *device, const char *fstype,
+				 const char *root_path);
 
 extern int ext4_create_project(const char *device,
 			       const char *path,

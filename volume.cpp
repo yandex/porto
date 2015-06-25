@@ -127,9 +127,9 @@ public:
             return error;
 
         if (!config().volumes().enable_quota() ||
-            ext4_support_project(storage_mount.GetSource().c_str(),
-                                 storage_mount.GetType().c_str(),
-                                 storage_mount.GetMountpoint().c_str())) {
+            !ext4_support_project(storage_mount.GetSource().c_str(),
+                                  storage_mount.GetType().c_str(),
+                                  storage_mount.GetMountpoint().c_str())) {
             if (space_limit || inode_limit)
                 return TError(EError::NotSupported, errno,
                         "project quota not supported");
@@ -369,9 +369,9 @@ public:
             return error;
 
         if (!config().volumes().enable_quota() ||
-            ext4_support_project(storage_mount.GetSource().c_str(),
-                                 storage_mount.GetType().c_str(),
-                                 storage_mount.GetMountpoint().c_str())) {
+            !ext4_support_project(storage_mount.GetSource().c_str(),
+                                  storage_mount.GetType().c_str(),
+                                  storage_mount.GetMountpoint().c_str())) {
             if (space_limit || inode_limit)
                 return TError(EError::NotSupported, errno,
                         "project quota not supported");

@@ -77,7 +77,7 @@ void TConfig::LoadDefaults() {
     config().mutable_volumes()->set_volume_dir("/place/porto_volumes");
     config().mutable_volumes()->set_layers_dir("/place/porto_layers");
     config().mutable_volumes()->set_enabled(true);
-    config().mutable_volumes()->set_enable_quota(true);
+    config().mutable_volumes()->set_enable_quota(false);
 
 #ifdef PORTOD
     TMount storage_mount;
@@ -85,7 +85,7 @@ void TConfig::LoadDefaults() {
         ext4_support_project(storage_mount.GetSource().c_str(),
                              storage_mount.GetType().c_str(),
                              storage_mount.GetMountpoint().c_str()))
-        config().mutable_volumes()->set_enable_quota(false);
+        config().mutable_volumes()->set_enable_quota(true);
 #endif
 
     config().mutable_version()->set_path("/run/portod.version");

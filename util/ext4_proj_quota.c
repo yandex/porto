@@ -1,6 +1,7 @@
 #define _GNU_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <err.h>
@@ -187,21 +188,24 @@ static int walk_set_project(const char *path, const struct stat *st,
 	return set_project(path, target_project);
 }
 
-int ext4_support_project(const char *device,
-			 const char *fstype,
-			 const char *root_path)
+bool ext4_support_project(const char *device,
+			  const char *fstype,
+			  const char *root_path)
 {
 	struct if_dqinfo dqinfo;
 
 	if (strcmp(fstype, "ext4")) {
 		errno = ENOTSUP;
-		return -1;
+		return false;
 	}
 
-	if (quotactl(QCMD(Q_GETINFO, PRJQUOTA), device, 0, (caddr_t)&dqinfo) &&
-			errno == ESRCH)
-		return project_quota_on(device, root_path);
-	return 0;
+	if (quotactl(QCMD(Q_GETINFO, PRJQUOTA), device, 0, (caddr_t)&dqinfo) == 0)
+		return true;
+
+	if (errno != ESRCH)
+		return false;
+
+	return project_quota_on(device, root_path) == 0;
 }
 
 int ext4_create_project(const char *device,
