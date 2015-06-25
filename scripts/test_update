@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -x
 
 if [ $# -eq 0 ]; then
 	echo "Please specify new package path"
