@@ -164,7 +164,6 @@ static TError DestroyContainer(TContext &context,
         container->Volumes.clear();
         vholder_lock.unlock();
 
-        container->Release();
         cholder_lock.lock();
     }
 

@@ -199,13 +199,18 @@ void TContainer::RemoveKvs() {
 }
 
 TError TContainer::Destroy(TScopedLock &holder_lock) {
+    bool acquired = Acquired;
+
     L_ACT() << "Destroy " << GetName() << " " << Id << std::endl;
     SyncStateWithCgroup(holder_lock);
 
     if (GetState() == EContainerState::Paused) {
         TError error = Resume(holder_lock);
-        if (error)
+        if (error) {
+            if (acquired)
+                Release();
             return error;
+        }
     }
 
     if (Task && Task->IsRunning())
@@ -213,8 +218,11 @@ TError TContainer::Destroy(TScopedLock &holder_lock) {
 
     if (GetState() != EContainerState::Stopped) {
         TError error = Stop(holder_lock);
-        if (error)
+        if (error) {
+            if (acquired)
+                Release();
             return error;
+        }
     }
 
     RemoveKvs();
@@ -223,6 +231,9 @@ TError TContainer::Destroy(TScopedLock &holder_lock) {
         auto lock = Net->ScopedLock();
         Tclass.reset();
     }
+
+    if (acquired)
+        Release();
 
     return TError::Success();
 }
