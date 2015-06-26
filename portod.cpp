@@ -985,9 +985,23 @@ int main(int argc, char * const argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (slaveMode)
-        return SlaveMain();
-    else
-        return MasterMain();
+    try {
+        if (slaveMode)
+            return SlaveMain();
+        else
+            return MasterMain();
+    } catch (std::string s) {
+        L_ERR() << "EXCEPTION: " << s << std::endl;
+        Crash();
+    } catch (const char *s) {
+        L_ERR() << "EXCEPTION: " << s << std::endl;
+        Crash();
+    } catch (const std::exception &exc) {
+        L_ERR() << "EXCEPTION: " << exc.what() << std::endl;
+        Crash();
+    } catch (...) {
+        L_ERR() << "EXCEPTION: uncaught exception!" << std::endl;
+        Crash();
+    }
 }
 
