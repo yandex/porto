@@ -4,8 +4,23 @@ extern "C" {
 #include <stdlib.h>
 }
 
+static int UnblockSignal(int sig) {
+    sigset_t mask;
+    auto ret = sigfillset(&mask);
+    if (ret < 0)
+        return ret;
+    ret = sigaddset(&mask, sig);
+    if (ret < 0)
+        return ret;
+    return sigprocmask(SIG_UNBLOCK, &mask, NULL);
+}
+
 int RegisterSignal(int signum, void (*handler)(int)) {
     struct sigaction sa = {};
+
+    auto ret = UnblockSignal(signum);
+    if (ret < 0)
+        return ret;
 
     sa.sa_handler = handler;
     return sigaction(signum, &sa, NULL);
@@ -16,6 +31,10 @@ int RegisterSignal(int signum, void (*handler)(int sig, siginfo_t *si, void *unu
 
     sa.sa_sigaction = handler;
     sa.sa_flags = SA_SIGINFO;
+
+    auto ret = UnblockSignal(signum);
+    if (ret < 0)
+        return ret;
 
     return sigaction(signum, &sa, NULL);
 }

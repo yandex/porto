@@ -16,17 +16,6 @@ static void MultiHandler(int sig) {
         PrintTrace();
 }
 
-static void DumpStackAndDie(int sig) {
-    L_EVT() << "Received fatal signal " << strsignal(sig) << std::endl;
-    PrintTrace();
-    RaiseSignal(sig);
-}
-
-static void DumpStack(int sig) {
-    L_EVT() << "Received " << strsignal(sig) << std::endl;
-    PrintTrace();
-}
-
 static TError EpollCreate(int &epfd) {
     epfd = epoll_create1(EPOLL_CLOEXEC);
     if (epfd < 0)

@@ -56,7 +56,8 @@ public:
 
     void WorkerFn(const std::string &name) {
         try {
-            BlockAllSignals();;
+            BlockAllSignals();
+            RegisterSignal(SIGSEGV, DumpStackAndDie);
             SetProcessName(name);
             auto lock = ScopedLock();
             while (Valid) {
