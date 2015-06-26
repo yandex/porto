@@ -4,6 +4,7 @@
 #include <thread>
 #include <queue>
 
+#include "util/log.hpp"
 #include "util/unix.hpp"
 #include "util/locks.hpp"
 
@@ -54,29 +55,43 @@ public:
     }
 
     void WorkerFn(const std::string &name) {
-        BlockAllSignals();;
-        SetProcessName(name);
-        auto lock = ScopedLock();
-        while (Valid) {
-            if (Queue.empty())
-                Wait(lock);
+        try {
+            BlockAllSignals();;
+            SetProcessName(name);
+            auto lock = ScopedLock();
+            while (Valid) {
+                if (Queue.empty())
+                    Wait(lock);
 
-            while (Valid && !Queue.empty()) {
-                T request = Top();
-                Queue.pop();
+                while (Valid && !Queue.empty()) {
+                    T request = Top();
+                    Queue.pop();
 
-                size_t seq = Seq;
-                lock.unlock();
-                bool handled = Handle(request);
-                lock.lock();
-                bool haveNewData = seq != Seq;
+                    size_t seq = Seq;
+                    lock.unlock();
+                    bool handled = Handle(request);
+                    lock.lock();
+                    bool haveNewData = seq != Seq;
 
-                if (!handled) {
-                    Queue.push(request);
-                    if (!haveNewData)
-                        Wait(lock);
+                    if (!handled) {
+                        Queue.push(request);
+                        if (!haveNewData)
+                            Wait(lock);
+                    }
                 }
             }
+        } catch (std::string s) {
+            L_ERR() << "EXCEPTION: " << s << std::endl;
+            Crash();
+        } catch (const char *s) {
+            L_ERR() << "EXCEPTION: " << s << std::endl;
+            Crash();
+        } catch (const std::exception &exc) {
+            L_ERR() << "EXCEPTION: " << exc.what() << std::endl;
+            Crash();
+        } catch (...) {
+            L_ERR() << "EXCEPTION: uncaught exception!" << std::endl;
+            Crash();
         }
     }
 
