@@ -90,13 +90,15 @@ TError TContext::Initialize() {
             L() << "Using " << link->GetAlias() << " interface" << std::endl;
     }
 
-    error = Cholder->CreateRoot();
+    auto holder_lock = Cholder->ScopedLock();
+
+    error = Cholder->CreateRoot(holder_lock);
     if (error) {
         L_ERR() << "Can't create root container: " << error << std::endl;
         return error;
     }
 
-    error = Cholder->CreatePortoRoot();
+    error = Cholder->CreatePortoRoot(holder_lock);
     if (error) {
         L_ERR() << "Can't create porto root container: " << error << std::endl;
         return error;
@@ -127,7 +129,9 @@ TError TContext::Destroy() {
     if (error)
         L_ERR() << "Can't destroy network: " << error << std::endl;
 
-    Cholder->DestroyRoot();
+    auto holder_lock = Cholder->ScopedLock();
+
+    Cholder->DestroyRoot(holder_lock);
     Vholder->Destroy();
 
     return TError::Success();

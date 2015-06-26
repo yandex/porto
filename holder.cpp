@@ -10,11 +10,11 @@
 #include "util/cred.hpp"
 #include "util/file.hpp"
 
-void TContainerHolder::DestroyRoot() {
+void TContainerHolder::DestroyRoot(TScopedLock &holder_lock) {
     // we want children to be removed first
     while (Containers.begin() != Containers.end()) {
         auto name = Containers.begin()->first;
-        TError error = _Destroy(name);
+        TError error = _Destroy(holder_lock, name);
         if (error)
             L_ERR() << "Can't destroy container " << name << ": " << error << std::endl;
     }
@@ -30,7 +30,7 @@ TError TContainerHolder::ReserveDefaultClassId() {
     return TError::Success();
 }
 
-TError TContainerHolder::CreateRoot() {
+TError TContainerHolder::CreateRoot(TScopedLock &holder_lock) {
     TError error = TaskGetLastCap();
     if (error)
         return error;
@@ -57,14 +57,14 @@ TError TContainerHolder::CreateRoot() {
     if (error)
         return error;
 
-    error = root->Start(nullptr, true);
+    error = root->Start(holder_lock, nullptr, true);
     if (error)
         return error;
 
     return TError::Success();
 }
 
-TError TContainerHolder::CreatePortoRoot() {
+TError TContainerHolder::CreatePortoRoot(TScopedLock &holder_lock) {
     TError error = Create(PORTO_ROOT_CONTAINER, TCred(0, 0));
     if (error)
         return error;
@@ -81,7 +81,7 @@ TError TContainerHolder::CreatePortoRoot() {
     if (error)
         return error;
 
-    error = root->Start(nullptr, true);
+    error = root->Start(holder_lock, nullptr, true);
     if (error)
         return error;
 
@@ -205,18 +205,18 @@ TError TContainerHolder::Get(int pid, std::shared_ptr<TContainer> &c) {
     return Get(name, c);
 }
 
-TError TContainerHolder::_Destroy(const std::string &name) {
+TError TContainerHolder::_Destroy(TScopedLock &holder_lock, const std::string &name) {
     auto c = Containers[name];
 
-    (void)c->Resume();
+    (void)c->Resume(holder_lock);
 
     for (auto child: c->GetChildren()) {
-        TError error = _Destroy(child);
+        TError error = _Destroy(holder_lock, child);
         if (error)
             return error;
     }
 
-    TError error = c->Destroy();
+    TError error = c->Destroy(holder_lock);
     if (error)
         return error;
 
@@ -232,11 +232,11 @@ TError TContainerHolder::_Destroy(const std::string &name) {
     return TError::Success();
 }
 
-TError TContainerHolder::Destroy(const std::string &name) {
+TError TContainerHolder::Destroy(TScopedLock &holder_lock, const std::string &name) {
     if (name == ROOT_CONTAINER || !ValidName(name))
         return TError(EError::InvalidValue, "invalid container name " + name);
 
-    return _Destroy(name);
+    return _Destroy(holder_lock, name);
 }
 
 std::vector<std::shared_ptr<TContainer> > TContainerHolder::List() const {
@@ -313,6 +313,8 @@ std::map<std::string, std::shared_ptr<TKeyValueNode>> TContainerHolder::SortNode
 bool TContainerHolder::RestoreFromStorage() {
     std::vector<std::shared_ptr<TKeyValueNode>> nodes;
 
+    auto holder_lock = ScopedLock();
+
     TError error = Storage->ListNodes(nodes);
     if (error) {
         L_ERR() << "Can't list key-value nodes: " << error << std::endl;
@@ -333,7 +335,7 @@ bool TContainerHolder::RestoreFromStorage() {
             continue;
 
         restored = true;
-        error = Restore(name, n);
+        error = Restore(holder_lock, name, n);
         if (error) {
             L_ERR() << "Can't restore " << name << ": " << error << std::endl;
             Statistics->RestoreFailed++;
@@ -358,7 +360,8 @@ bool TContainerHolder::RestoreFromStorage() {
     return restored;
 }
 
-TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node) {
+TError TContainerHolder::Restore(TScopedLock &holder_lock, const std::string &name,
+                                 const kv::TNode &node) {
     if (name == ROOT_CONTAINER || name == PORTO_ROOT_CONTAINER)
         return TError::Success();
 
@@ -377,7 +380,7 @@ TError TContainerHolder::Restore(const std::string &name, const kv::TNode &node)
         return TError(EError::Unknown, "Couldn't restore container id");
 
     auto c = std::make_shared<TContainer>(shared_from_this(), Storage, name, parent, id, Net);
-    error = c->Restore(node);
+    error = c->Restore(holder_lock, node);
     if (error) {
         L_ERR() << "Can't restore container " << name << ": " << error << std::endl;
         return error;
@@ -412,7 +415,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
         std::shared_ptr<TContainer> target = event.Container.lock();
         if (target) {
             auto lock = target->NestScopedLock(holder_lock);
-            delivered = target->DeliverEvent(event);
+            delivered = target->DeliverEvent(holder_lock, event);
         }
         break;
     }
@@ -421,7 +424,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     {
         for (auto &target : List()) {
             auto lock = target->NestScopedLock(holder_lock);
-            delivered = target->DeliverEvent(event);
+            delivered = target->DeliverEvent(holder_lock, event);
             if (delivered)
                 break;
         }
@@ -436,7 +439,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
         for (auto &target : List()) {
             auto lock = target->NestScopedLock(holder_lock);
             if (target->IsLostAndRestored()) {
-                target->SyncStateWithCgroup();
+                target->SyncStateWithCgroup(holder_lock);
                 rearm = true;
             }
         }
@@ -463,7 +466,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
 
             for (auto name : remove) {
                 L_ACT() << "Remove old dead " << name << std::endl;
-                TError error = Destroy(name);
+                TError error = Destroy(holder_lock, name);
                 if (error)
                     L_ERR() << "Can't destroy " << name << ": " << error << std::endl;
                 else
@@ -473,7 +476,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
 
         for (auto &target : List()) {
             auto lock = target->NestScopedLock(holder_lock);
-            target->DeliverEvent(event);
+            target->DeliverEvent(holder_lock, event);
         }
 
         ScheduleLogRotatation();

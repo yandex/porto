@@ -14,7 +14,7 @@ public:
         return Queue.top();
     }
 
-    void Wait(std::unique_lock<std::mutex> &lock) override {
+    void Wait(TScopedLock &lock) override {
         if (!Valid)
             return;
 

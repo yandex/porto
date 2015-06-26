@@ -11,6 +11,7 @@
 #include "kvalue.hpp"
 #include "task.hpp"
 #include "util/unix.hpp"
+#include "util/locks.hpp"
 
 class TEpollSource;
 class TCgroup;
@@ -73,15 +74,15 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void ShutdownOom();
     TError PrepareCgroups();
     TError PrepareTask(std::shared_ptr<TClient> client);
-    TError KillAll();
+    TError KillAll(TScopedLock &holder_lock);
     void RemoveKvs();
 
     const std::string StripParentName(const std::string &name) const;
     void ScheduleRespawn();
     bool MayRespawn();
     bool ShouldApplyProperty(const std::string &property);
-    TError Respawn();
-    bool StopChildren();
+    TError Respawn(TScopedLock &holder_lock);
+    bool StopChildren(TScopedLock &holder_lock);
     TError PrepareResources();
     void RemoveLog(const TPath &path);
     TError RotateLog(const TPath &path);
@@ -89,10 +90,10 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void PropertyToAlias(const std::string &property, std::string &value) const;
     TError AliasToProperty(std::string &property, std::string &value);
 
-    bool Exit(int status, bool oomKilled, bool force = false);
-    bool ExitChildren(int status, bool oomKilled);
-    bool DeliverExitStatus(int pid, int status);
-    bool DeliverOom(int fd);
+    bool Exit(TScopedLock &holder_lock, int status, bool oomKilled, bool force = false);
+    bool ExitChildren(TScopedLock &holder_lock, int status, bool oomKilled);
+    bool DeliverExitStatus(TScopedLock &holder_lock, int pid, int status);
+    bool DeliverOom(TScopedLock &holder_lock, int fd);
 
     TError Prepare();
 
@@ -141,27 +142,27 @@ public:
     std::vector<pid_t> Processes();
 
     TError Create(const TCred &cred);
-    TError Destroy();
-    TError Start(std::shared_ptr<TClient> client, bool meta);
-    TError Stop();
-    TError Pause();
-    TError Resume();
+    TError Destroy(TScopedLock &holder_lock);
+    TError Start(TScopedLock &holder_lock, std::shared_ptr<TClient> client, bool meta);
+    TError Stop(TScopedLock &holder_lock);
+    TError Pause(TScopedLock &holder_lock);
+    TError Resume(TScopedLock &holder_lock);
     TError Kill(int sig);
 
     TError GetProperty(const std::string &property, std::string &value,
                        std::shared_ptr<TClient> client) const;
-    TError SetProperty(const std::string &property, const std::string &value,
-                       std::shared_ptr<TClient> client);
+    TError SetProperty(TScopedLock &holder_lock, const std::string &property,
+                       const std::string &value, std::shared_ptr<TClient> client);
 
-    TError GetData(const std::string &data, std::string &value);
-    TError Restore(const kv::TNode &node);
+    TError GetData(TScopedLock &holder_lock, const std::string &data, std::string &value);
+    TError Restore(TScopedLock &holder_lock, const kv::TNode &node);
 
     std::shared_ptr<TCgroup> GetLeafCgroup(std::shared_ptr<TSubsystem> subsys);
     bool CanRemoveDead() const;
     std::vector<std::string> GetChildren();
     std::shared_ptr<TContainer> FindRunningParent() const;
     bool UseParentNamespace() const;
-    bool DeliverEvent(const TEvent &event);
+    bool DeliverEvent(TScopedLock &holder_lock, const TEvent &event);
 
     TError CheckPermission(const TCred &ucred);
 
@@ -176,7 +177,7 @@ public:
     void AddWaiter(std::shared_ptr<TContainerWaiter> waiter);
 
     bool IsLostAndRestored() const;
-    void SyncStateWithCgroup();
+    void SyncStateWithCgroup(TScopedLock &holder_lock);
     bool IsNamespaceIsolated();
     void CleanupExpiredChildren();
 

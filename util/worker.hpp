@@ -5,6 +5,7 @@
 #include <queue>
 
 #include "util/unix.hpp"
+#include "util/locks.hpp"
 
 template<typename T,
          typename Q = std::queue<T>>
@@ -45,7 +46,7 @@ public:
         Cv.notify_one();
     }
 
-    virtual void Wait(std::unique_lock<std::mutex> &lock) {
+    virtual void Wait(TScopedLock &lock) {
         if (!Valid)
             return;
 

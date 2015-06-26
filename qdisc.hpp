@@ -6,6 +6,7 @@
 
 #include "common.hpp"
 #include "util/netlink.hpp"
+#include "util/locks.hpp"
 
 class TNetwork;
 class TFilter;

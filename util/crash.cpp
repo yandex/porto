@@ -2,6 +2,7 @@
 
 #include "util/log.hpp"
 #include "util/unix.hpp"
+#include "util/locks.hpp"
 
 extern "C" {
 #include <pthread.h>

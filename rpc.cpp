@@ -168,7 +168,7 @@ static TError DestroyContainer(TContext &context,
         cholder_lock.lock();
     }
 
-    return context.Cholder->Destroy(name);
+    return context.Cholder->Destroy(cholder_lock, name);
 }
 
 static TError StartContainer(TContext &context,
@@ -219,7 +219,7 @@ static TError StartContainer(TContext &context,
         std::string cmd = container->Prop->Get<std::string>(P_COMMAND);
         bool meta = i + 1 != nameVec.end() && cmd.empty();
         //bool meta = std::distance(i, nameVec.end()) == 1 && cmd.empty();
-        err = container->Start(client, meta);
+        err = container->Start(holder_lock, client, meta);
 
         container->Release();
 
@@ -258,7 +258,7 @@ static TError StopContainer(TContext &context,
 
     auto lock = container->NestScopedLock(holder_lock);
 
-    err = container->Stop();
+    err = container->Stop(holder_lock);
 
     container->Release();
 
@@ -293,7 +293,7 @@ static TError PauseContainer(TContext &context,
 
     auto lock = container->NestScopedLock(holder_lock);
 
-    err = container->Pause();
+    err = container->Pause(holder_lock);
 
     container->Release();
 
@@ -328,7 +328,7 @@ static TError ResumeContainer(TContext &context,
 
     auto lock = container->NestScopedLock(holder_lock);
 
-    err = container->Resume();
+    err = container->Resume(holder_lock);
 
     container->Release();
 
@@ -408,7 +408,7 @@ static TError SetContainerProperty(TContext &context,
 
     auto lock = container->NestScopedLock(holder_lock);
 
-    error = container->SetProperty(req.property(), req.value(), client);
+    error = container->SetProperty(holder_lock, req.property(), req.value(), client);
 
     container->Release();
 
@@ -436,7 +436,7 @@ static TError GetContainerData(TContext &context,
     auto lock = container->NestScopedLock(holder_lock);
 
     string value;
-    error = container->GetData(req.data(), value);
+    error = container->GetData(holder_lock, req.data(), value);
     if (!error)
         rsp.mutable_getdata()->set_value(value);
 
@@ -490,7 +490,7 @@ static TError GetContainerCombined(TContext &context,
                 if (container->Prop->IsValid(name))
                     error = container->GetProperty(var, value, client);
                 else if (container->Data->IsValid(name))
-                    error = container->GetData(var, value);
+                    error = container->GetData(holder_lock, var, value);
                 else
                     error = TError(EError::InvalidValue, "Unknown property or data " + var);
             }

@@ -6,6 +6,7 @@
 
 #include "common.hpp"
 #include "util/signal.hpp"
+#include "util/locks.hpp"
 
 extern "C" {
 #include <sys/epoll.h>

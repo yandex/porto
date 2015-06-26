@@ -31,38 +31,6 @@ private:
     TNonCopyable& operator= (TNonCopyable const&&) = delete;
 };
 
-class TScopedUnlock : public TNonCopyable {
-public:
-    TScopedUnlock(std::unique_lock<std::mutex> &lock) {
-        Lock = &lock;
-        Lock->unlock();
-    }
-    ~TScopedUnlock() {
-        Lock->lock();
-    }
-private:
-    std::unique_lock<std::mutex> *Lock;
-};
-
-class TLockable {
-protected:
-    std::mutex Mutex;
-public:
-    std::unique_lock<std::mutex> ScopedLock() {
-        return std::unique_lock<std::mutex>(Mutex);
-    }
-    std::unique_lock<std::mutex> NestScopedLock(std::unique_lock<std::mutex> &lock) {
-        TScopedUnlock unlock(lock);
-        return std::unique_lock<std::mutex>(Mutex);
-    }
-    void Lock() {
-        Mutex.lock();
-    }
-    void Unlock() {
-        Mutex.unlock();
-    }
-};
-
 const std::string ROOT_CONTAINER = "/";
 constexpr uint16_t ROOT_CONTAINER_ID = 1;
 const std::string DOT_CONTAINER = ".";

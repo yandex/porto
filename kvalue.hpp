@@ -7,6 +7,7 @@
 #include "common.hpp"
 #include "kv.pb.h"
 #include "util/mount.hpp"
+#include "util/locks.hpp"
 
 class TKeyValueStorage;
 

@@ -95,12 +95,12 @@ bool TContainer::IsLostAndRestored() const {
     return LostAndRestored;
 }
 
-void TContainer::SyncStateWithCgroup() {
+void TContainer::SyncStateWithCgroup(TScopedLock &holder_lock) {
     if (LostAndRestored && State == EContainerState::Running &&
         (!Task || Processes().empty())) {
         L() << "Lost and restored container " << GetName() << " is empty"
                       << ", mark them dead." << std::endl;
-        Exit(-1, false);
+        Exit(holder_lock, -1, false);
     }
 }
 
@@ -198,12 +198,12 @@ void TContainer::RemoveKvs() {
         L_ERR() << "Can't remove key-value node " << kvnode->GetName() << ": " << error << std::endl;
 }
 
-TError TContainer::Destroy() {
+TError TContainer::Destroy(TScopedLock &holder_lock) {
     L_ACT() << "Destroy " << GetName() << " " << Id << std::endl;
-    SyncStateWithCgroup();
+    SyncStateWithCgroup(holder_lock);
 
     if (GetState() == EContainerState::Paused) {
-        TError error = Resume();
+        TError error = Resume(holder_lock);
         if (error)
             return error;
     }
@@ -212,7 +212,7 @@ TError TContainer::Destroy() {
         (void)Kill(SIGKILL);
 
     if (GetState() != EContainerState::Stopped) {
-        TError error = Stop();
+        TError error = Stop(holder_lock);
         if (error)
             return error;
     }
@@ -766,8 +766,9 @@ TError TContainer::Create(const TCred &cred) {
     return TError::Success();
 }
 
-TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
-    SyncStateWithCgroup();
+TError TContainer::Start(TScopedLock &holder_lock,
+                         std::shared_ptr<TClient> client, bool meta) {
+    SyncStateWithCgroup(holder_lock);
     auto state = GetState();
 
     if (state != EContainerState::Stopped)
@@ -879,7 +880,7 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
     return TError::Success();
 }
 
-TError TContainer::KillAll() {
+TError TContainer::KillAll(TScopedLock &holder_lock) {
     auto cg = GetLeafCgroup(freezerSubsystem);
 
     L_ACT() << "Kill all " << GetName() << std::endl;
@@ -894,12 +895,12 @@ TError TContainer::KillAll() {
     // try to stop all tasks gracefully
     (void)cg->Kill(SIGTERM);
 
-    Holder->Unlock();
+    holder_lock.unlock();
     int ret = SleepWhile(config().container().kill_timeout_ms(),
                          [&]{ return cg->IsEmpty() == false; });
     if (ret)
         L() << "Child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
-    Holder->Lock();
+    holder_lock.lock();
 
     // then kill any task that didn't want to stop via SIGTERM signal;
     // freeze all container tasks to make sure no one forks and races with us
@@ -920,33 +921,33 @@ TError TContainer::KillAll() {
     return TError::Success();
 }
 
-bool TContainer::StopChildren() {
+bool TContainer::StopChildren(TScopedLock &holder_lock) {
     bool stopped = false;
     std::vector<std::weak_ptr<TContainer>> children = Children;
 
-    Holder->Unlock();
+    holder_lock.unlock();
     for (auto iter : children)
         if (auto child = iter.lock()) {
             auto lock = child->ScopedLock();
             auto holder_lock = Holder->ScopedLock();
 
             if (child->GetState() != EContainerState::Stopped) {
-                TError error = child->Stop();
+                TError error = child->Stop(holder_lock);
                 if (error)
                     L_ERR() << "Can't stop child " << child->GetName() << ": " << error << std::endl;
                 else
                     stopped = true;
             }
         }
-    Holder->Lock();
+    holder_lock.lock();
     return stopped;
 }
 
-bool TContainer::ExitChildren(int status, bool oomKilled) {
+bool TContainer::ExitChildren(TScopedLock &holder_lock, int status, bool oomKilled) {
     bool exited = false;
     std::vector<std::weak_ptr<TContainer>> children = Children;
 
-    Holder->Unlock();
+    holder_lock.unlock();
     for (auto iter : children)
         if (auto child = iter.lock()) {
             auto lock = child->ScopedLock();
@@ -954,14 +955,14 @@ bool TContainer::ExitChildren(int status, bool oomKilled) {
 
             if (child->GetState() == EContainerState::Running ||
                 child->GetState() == EContainerState::Meta) {
-                TError error = child->KillAll();
+                TError error = child->KillAll(holder_lock);
                 if (error)
                     L_ERR() << "Child " << child->GetName() << " can't be killed: " << error << std::endl;
-                if (child->Exit(status, oomKilled, true))
+                if (child->Exit(holder_lock, status, oomKilled, true))
                     exited = true;
             }
         }
-    Holder->Lock();
+    holder_lock.lock();
     return exited;
 }
 
@@ -1023,14 +1024,12 @@ void TContainer::FreeResources() {
 }
 
 bool TContainer::Acquire() {
-    L() << "acquire " << Name << std::endl;
     if (!IsAcquired())
         Acquired = true;
     return Acquired;
 }
 
 void TContainer::Release() {
-    L() << "release " << Name << std::endl;
     PORTO_ASSERT(Acquired == true);
     Acquired = false;
 }
@@ -1039,8 +1038,8 @@ bool TContainer::IsAcquired() const {
     return (Acquired || (Parent && Parent->IsAcquired()));
 }
 
-TError TContainer::Stop() {
-    SyncStateWithCgroup();
+TError TContainer::Stop(TScopedLock &holder_lock) {
+    SyncStateWithCgroup(holder_lock);
     auto state = GetState();
 
     if (state == EContainerState::Stopped ||
@@ -1052,7 +1051,7 @@ TError TContainer::Stop() {
     ShutdownOom();
 
     if (Task && Task->IsRunning()) {
-        TError error = KillAll();
+        TError error = KillAll(holder_lock);
         if (error) {
             L_ERR() << "Can't kill all tasks in container: " << error << std::endl;
             return error;
@@ -1060,7 +1059,7 @@ TError TContainer::Stop() {
 
         auto cg = GetLeafCgroup(freezerSubsystem);
 
-        Holder->Unlock();
+        holder_lock.unlock();
         int ret = SleepWhile(config().container().stop_timeout_ms(),
                              [&] () -> int {
                                  if (cg && cg->IsEmpty())
@@ -1068,7 +1067,7 @@ TError TContainer::Stop() {
                                  kill(Task->GetPid(), 0);
                                  return errno != ESRCH;
                              });
-        Holder->Lock();
+        holder_lock.lock();
         if (ret) {
             L_ERR() << "Can't wait for container to stop" << std::endl;
             return TError(EError::Unknown, "Container didn't stop in " + std::to_string(config().container().stop_timeout_ms()) + "ms");
@@ -1079,7 +1078,7 @@ TError TContainer::Stop() {
 
     if (!IsRoot() && !IsPortoRoot())
         SetState(EContainerState::Stopped);
-    if (!StopChildren()) {
+    if (!StopChildren(holder_lock)) {
         TError error = UpdateSoftLimit();
         if (error)
             L_ERR() << "Can't update meta soft limit: " << error << std::endl;
@@ -1090,8 +1089,8 @@ TError TContainer::Stop() {
     return TError::Success();
 }
 
-TError TContainer::Pause() {
-    SyncStateWithCgroup();
+TError TContainer::Pause(TScopedLock &holder_lock) {
+    SyncStateWithCgroup(holder_lock);
     auto state = GetState();
     if (state != EContainerState::Running)
         return TError(EError::InvalidState, "invalid container state " +
@@ -1108,8 +1107,8 @@ TError TContainer::Pause() {
     return TError::Success();
 }
 
-TError TContainer::Resume() {
-    SyncStateWithCgroup();
+TError TContainer::Resume(TScopedLock &holder_lock) {
+    SyncStateWithCgroup(holder_lock);
     auto state = GetState();
     if (state != EContainerState::Paused)
         return TError(EError::InvalidState, "invalid container state " +
@@ -1151,7 +1150,7 @@ void TContainer::ParsePropertyName(std::string &name, std::string &idx) {
     idx = StringTrim(tokens[1], " \t\n]");
 }
 
-TError TContainer::GetData(const string &origName, string &value) {
+TError TContainer::GetData(TScopedLock &holder_lock, const string &origName, string &value) {
     std::string name = origName;
     std::string idx;
     ParsePropertyName(name, idx);
@@ -1163,7 +1162,7 @@ TError TContainer::GetData(const string &origName, string &value) {
     if (!cv->IsImplemented())
         return TError(EError::NotSupported, name + " is not implemented");
 
-    SyncStateWithCgroup();
+    SyncStateWithCgroup(holder_lock);
 
     auto validState = cv->GetState();
     if (validState.find(GetState()) == validState.end())
@@ -1279,7 +1278,8 @@ bool TContainer::ShouldApplyProperty(const std::string &property) {
     return true;
 }
 
-TError TContainer::SetProperty(const string &origProperty,
+TError TContainer::SetProperty(TScopedLock &holder_lock,
+                               const string &origProperty,
                                const string &origValue,
                                std::shared_ptr<TClient> client) {
     if (IsRoot() || IsPortoRoot())
@@ -1320,7 +1320,7 @@ TError TContainer::SetProperty(const string &origProperty,
         value = client_root.AddComponent(value).ToString();
     }
 
-    SyncStateWithCgroup();
+    SyncStateWithCgroup(holder_lock);
 
     if (!Prop->HasState(property, GetState()))
         return TError(EError::InvalidState, "Can't set dynamic property " + property + " in state " + ContainerStateName(GetState()));
@@ -1408,7 +1408,7 @@ TError TContainer::Prepare() {
     return TError::Success();
 }
 
-TError TContainer::Restore(const kv::TNode &node) {
+TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
     L_ACT() << "Restore " << GetName() << " with id " << Id << std::endl;
 
     TError error = Prepare();
@@ -1476,7 +1476,7 @@ TError TContainer::Restore(const kv::TNode &node) {
 
             L() << "Start parent " << parent->GetName() << " meta " << meta << std::endl;
 
-            TError error = parent->Start(nullptr, meta);
+            TError error = parent->Start(holder_lock, nullptr, meta);
             if (error)
                 return error;
 
@@ -1547,7 +1547,7 @@ TError TContainer::Restore(const kv::TNode &node) {
         }
 
         if (!Task->IsZombie())
-            SyncStateWithCgroup();
+            SyncStateWithCgroup(holder_lock);
 
         if (MayRespawn())
             ScheduleRespawn();
@@ -1560,7 +1560,7 @@ TError TContainer::Restore(const kv::TNode &node) {
         auto cg = GetLeafCgroup(freezerSubsystem);
         TError error = cg->Create();
         if (error)
-            (void)KillAll();
+            (void)KillAll(holder_lock);
 
         SetState(EContainerState::Stopped);
         Task = nullptr;
@@ -1594,7 +1594,7 @@ std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys
     return Parent->GetLeafCgroup(subsys)->GetChild(Name);
 }
 
-bool TContainer::Exit(int status, bool oomKilled, bool force) {
+bool TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled, bool force) {
     L_EVT() << "Exit " << GetName() << " (root_pid " << Task->GetPid() << ")"
             << " with status " << status << (oomKilled ? " invoked by OOM" : "")
             << std::endl;
@@ -1621,20 +1621,21 @@ bool TContainer::Exit(int status, bool oomKilled, bool force) {
         if (error)
             L_ERR() << "Can't set " << D_OOM_KILLED << ": " << error << std::endl;
 
-        error = KillAll();
+        error = KillAll(holder_lock);
         if (error)
             L_WRN() << "Can't kill all tasks in container" << error << std::endl;
     }
 
     if (!Prop->Get<bool>(P_ISOLATE)) {
-        TError error = KillAll();
+        TError error = KillAll(holder_lock);
         if (error)
             L_WRN() << "Can't kill all tasks in container" << error << std::endl;
     }
 
-    ExitChildren(status, oomKilled);
+    ExitChildren(holder_lock, status, oomKilled);
 
-    Task->DeliverExitStatus(status);
+    if (Task)
+        Task->DeliverExitStatus(status);
     SetState(EContainerState::Dead);
 
     error = Prop->Set<int>(P_RAW_ROOT_PID, 0);
@@ -1647,7 +1648,7 @@ bool TContainer::Exit(int status, bool oomKilled, bool force) {
     return true;
 }
 
-bool TContainer::DeliverExitStatus(int pid, int status) {
+bool TContainer::DeliverExitStatus(TScopedLock &holder_lock, int pid, int status) {
     if (!Task)
         return false;
 
@@ -1657,7 +1658,7 @@ bool TContainer::DeliverExitStatus(int pid, int status) {
     if (GetState() == EContainerState::Dead)
         return true;
 
-    return Exit(status, FdHasEvent(Efd.GetFd()));
+    return Exit(holder_lock, status, FdHasEvent(Efd.GetFd()));
 }
 
 bool TContainer::MayRespawn() {
@@ -1675,13 +1676,13 @@ void TContainer::ScheduleRespawn() {
     Holder->Queue->Add(config().container().respawn_delay_ms(), e);
 }
 
-TError TContainer::Respawn() {
-    TError error = Stop();
+TError TContainer::Respawn(TScopedLock &holder_lock) {
+    TError error = Stop(holder_lock);
     if (error)
         return error;
 
     uint64_t tmp = Data->Get<uint64_t>(D_RESPAWN_COUNT);
-    error = Start(nullptr, false);
+    error = Start(holder_lock, nullptr, false);
     Data->Set<uint64_t>(D_RESPAWN_COUNT, tmp + 1);
     if (error)
         return error;
@@ -1705,7 +1706,7 @@ std::vector<std::string> TContainer::GetChildren() {
     return vec;
 }
 
-bool TContainer::DeliverOom(int fd) {
+bool TContainer::DeliverOom(TScopedLock &holder_lock, int fd) {
     if (Efd.GetFd() != fd)
         return false;
 
@@ -1717,7 +1718,7 @@ bool TContainer::DeliverOom(int fd) {
     if (GetState() == EContainerState::Dead)
         return true;
 
-    return Exit(SIGKILL, true);
+    return Exit(holder_lock, SIGKILL, true);
 }
 
 TError TContainer::RotateLog(const TPath &path) {
@@ -1734,11 +1735,11 @@ TError TContainer::RotateLog(const TPath &path) {
     return TError::Success();
 }
 
-bool TContainer::DeliverEvent(const TEvent &event) {
+bool TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
     TError error;
     switch (event.Type) {
         case EEventType::Exit:
-            return DeliverExitStatus(event.Exit.Pid, event.Exit.Status);
+            return DeliverExitStatus(holder_lock, event.Exit.Pid, event.Exit.Status);
         case EEventType::RotateLogs:
             if (GetState() == EContainerState::Running && Task) {
                 TError error = RotateLog(Prop->Get<std::string>(P_STDOUT_PATH));
@@ -1752,7 +1753,7 @@ bool TContainer::DeliverEvent(const TEvent &event) {
             return false;
         case EEventType::Respawn:
             if (MayRespawn()) {
-                error = Respawn();
+                error = Respawn(holder_lock);
                 if (error)
                     L_ERR() << "Can't respawn container: " << error << std::endl;
                 else
@@ -1761,7 +1762,7 @@ bool TContainer::DeliverEvent(const TEvent &event) {
             }
             return false;
         case EEventType::OOM:
-            return DeliverOom(event.OOM.Fd);
+            return DeliverOom(holder_lock, event.OOM.Fd);
         default:
             return false;
     }

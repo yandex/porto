@@ -9,6 +9,7 @@
 #include "util/mount.hpp"
 #include "util/cred.hpp"
 #include "util/idmap.hpp"
+#include "util/locks.hpp"
 
 constexpr const char *V_PATH = "path";
 constexpr const char *V_BACKEND = "backend";
