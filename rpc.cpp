@@ -1183,7 +1183,7 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
 
     client->BeginRequest();
 
-    bool log = !InfoRequest(req);
+    bool log = config().log().verbose() || !InfoRequest(req);
     if (log)
         L_REQ() << RequestAsString(req) << " from " << *client << std::endl;
 
