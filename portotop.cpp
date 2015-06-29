@@ -513,7 +513,6 @@ int TColumn::Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, b
     return Width;
 }
 void TColumn::Update(TPortoAPI &api, TPortoContainer* tree, int maxlevel) {
-    Cache.clear();
     tree->ForEachChild([&] (TPortoContainer &row) {
             TPortoValue val(RootValue, &row);
             Cache.insert(std::make_pair(row.GetName(), val));
@@ -539,6 +538,9 @@ int TColumn::GetWidth() {
 }
 void TColumn::SetWidth(int width) {
     Width = width;
+}
+void TColumn::ClearCache() {
+    Cache.clear();
 }
 
 void TPortoContainer::SortTree(TColumn &column) {
@@ -668,6 +670,9 @@ int TPortoTop::Update(TConsoleScreen &screen) {
     unsigned long gone = 1000 * (Now.tv_sec - LastUpdate.tv_sec) +
         (Now.tv_nsec - LastUpdate.tv_nsec) / 1000000;
     LastUpdate = Now;
+
+    for (auto &column : Columns)
+        column.ClearCache();
 
     ContainerTree.reset(TPortoContainer::ContainerTree(*Api));
     if (ContainerTree) {

@@ -148,6 +148,7 @@ public:
     void Process(unsigned long gone);
     int GetWidth();
     void SetWidth(int width);
+    void ClearCache();
 private:
     std::string Title;
     TPortoValue RootValue;
