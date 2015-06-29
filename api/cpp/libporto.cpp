@@ -7,13 +7,14 @@ extern "C" {
 #include <unistd.h>
 }
 
-int TPortoAPI::SendReceive(int fd, rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
-    google::protobuf::io::FileInputStream pist(fd);
-    google::protobuf::io::FileOutputStream post(fd);
-
+void TPortoAPI::Send(rpc::TContainerRequest &req) {
+    google::protobuf::io::FileOutputStream post(Fd);
     WriteDelimitedTo(req, &post);
     post.Flush();
+}
 
+int TPortoAPI::Recv(rpc::TContainerResponse &rsp) {
+    google::protobuf::io::FileInputStream pist(Fd);
     if (ReadDelimitedFrom(&pist, &rsp)) {
         LastErrorMsg = rsp.errormsg();
         LastError = (int)rsp.error();
@@ -21,6 +22,11 @@ int TPortoAPI::SendReceive(int fd, rpc::TContainerRequest &req, rpc::TContainerR
     } else {
         return -1;
     }
+}
+
+int TPortoAPI::SendReceive(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
+    Send(req);
+    return Recv(rsp);
 }
 
 TPortoAPI::TPortoAPI(const std::string &path, int retries) : Fd(-1), Retries(retries), RpcSocketPath(path) {
@@ -51,7 +57,7 @@ retry:
     }
 
     rsp.Clear();
-    ret = SendReceive(Fd, req, rsp);
+    ret = SendReceive(req, rsp);
     if (ret < 0) {
         Cleanup();
 

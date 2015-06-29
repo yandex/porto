@@ -4829,6 +4829,57 @@ static void TestVersion(TPortoAPI &api) {
     ExpectEq(revision, GIT_REVISION);
 }
 
+static void SetWorkersNr(TPortoAPI &api, size_t nr) {
+    AsRoot(api);
+
+    config().mutable_daemon()->set_workers(nr);
+    TFile f("/etc/portod.conf");
+    ExpectSuccess(f.WriteStringNoAppend(config().ShortDebugString()));
+
+    KillSlave(api, SIGTERM);
+
+    AsNobody(api);
+}
+
+static void TestBadClient(TPortoAPI &api) {
+    auto defaultWorkerNr = config().daemon().workers();
+    SetWorkersNr(api, 1);
+
+    std::vector<std::string> clist;
+    int sec = 120;
+
+    Say() << "Check client that doesn't read responses" << std::endl;
+
+    ExpectApiSuccess(api.List(clist)); // connect to porto
+
+    alarm(sec);
+    size_t nr = 100000;
+    while (nr--) {
+        rpc::TContainerRequest req;
+        req.mutable_propertylist();
+        api.Send(req);
+
+        if (nr && nr % 10000 == 0)
+            Say() << nr << " left" << std::endl;
+    }
+    alarm(0);
+
+    Say() << "Check client that does partial write" << std::endl;
+
+    int fd;
+    string buf = "xyz";
+    alarm(sec);
+    ExpectApiSuccess(ConnectToRpcServer(config().rpc_sock().file().path(), fd));
+    ExpectEq(write(fd, buf.c_str(), buf.length()), buf.length());
+    close(fd);
+
+    TPortoAPI api2(config().rpc_sock().file().path(), 0);
+    ExpectApiSuccess(api2.List(clist));
+    alarm(0);
+
+    SetWorkersNr(api, defaultWorkerNr);
+}
+
 static void SetLogRotateTimeout(TPortoAPI &api, size_t s) {
     AsRoot(api);
 
@@ -4846,6 +4897,7 @@ static void TestRemoveDead(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData("/", "porto_stat[remove_dead]", v));
     ExpectEq(v, std::to_string(0));
 
+    auto defaultTimeout = config().daemon().rotate_logs_timeout_s();
     SetLogRotateTimeout(api, 1);
 
     std::string name = "dead";
@@ -4862,11 +4914,12 @@ static void TestRemoveDead(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData("/", "porto_stat[remove_dead]", v));
     ExpectEq(v, std::to_string(1));
 
-    SetLogRotateTimeout(api, 60);
+    SetLogRotateTimeout(api, defaultTimeout);
 }
 
 static void TestLogRotate(TPortoAPI &api) {
     std::string v;
+    auto defaultTimeout = config().daemon().rotate_logs_timeout_s();
     SetLogRotateTimeout(api, 2);
 
     std::string name = "biglog";
@@ -4879,7 +4932,7 @@ static void TestLogRotate(TPortoAPI &api) {
     TPath stdoutPath(v);
     ExpectLess(stdoutPath.GetDiskUsage(), config().container().max_log_size());
 
-    SetLogRotateTimeout(api, 60);
+    SetLogRotateTimeout(api, defaultTimeout);
 }
 
 static void TestStats(TPortoAPI &api) {
@@ -4983,6 +5036,7 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
         { "daemon", TestDaemon },
 
         // the following tests will restart porto several times
+        { "bad_client", TestBadClient },
         { "recovery", TestRecovery },
         { "wait_recovery", TestWaitRecovery },
         { "volume_recovery", TestVolumeRecovery },

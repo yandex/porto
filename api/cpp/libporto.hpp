@@ -47,8 +47,8 @@ class TPortoAPI {
     int LastError;
     std::string LastErrorMsg;
 
-    int SendReceive(int fd, rpc::TContainerRequest &req,
-                    rpc::TContainerResponse &rsp);
+    int Recv(rpc::TContainerResponse &rsp);
+    int SendReceive(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp);
     int Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp);
 
 public:
@@ -102,4 +102,6 @@ public:
     int ExportLayer(const std::string &volume, const std::string &tarball);
     int RemoveLayer(const std::string &layer);
     int ListLayers(std::vector<std::string> &layers);
+
+    void Send(rpc::TContainerRequest &req);
 };
