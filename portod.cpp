@@ -535,13 +535,13 @@ static int SlaveMain() {
     if (failsafe)
         AllocStatistics();
 
-    TRpcWorker worker(config().daemon().workers());
-
     Statistics->SlaveStarted = GetCurrentTimeMs();
 
     ret = DaemonPrepare(false);
     if (ret)
         return ret;
+
+    TRpcWorker worker(config().daemon().workers());
 
     ret = TuneLimits();
     if (ret) {
