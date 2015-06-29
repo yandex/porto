@@ -827,7 +827,7 @@ public:
 
     void HandleSignal() {
         if (Interrupted) {
-            destroyContainer();
+            resetInputMode();
             ResetAllSignalHandlers();
             raise(InterruptedSignal);
             exit(EXIT_FAILURE);
@@ -1008,6 +1008,7 @@ public:
         if (WIFEXITED(status)) {
             exit(WEXITSTATUS(status));
         } else {
+            resetInputMode();
             ResetAllSignalHandlers();
             raise(WTERMSIG(status));
             exit(EXIT_FAILURE);
