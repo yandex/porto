@@ -240,14 +240,29 @@ TScopedFd &TScopedFd::operator=(int fd) {
     return *this;
 }
 
+TScopedMem::TScopedMem() : Size(0) {
+}
+
 TScopedMem::TScopedMem(size_t size) : Size(size) {
-    Data = malloc(size);
-    PORTO_ASSERT(Data != nullptr);
+    Alloc(size);
+}
+
+void TScopedMem::Alloc(size_t size) {
+    Size = size;
+    Free();
+    if (size) {
+        Data = malloc(size);
+        PORTO_ASSERT(Data != nullptr);
+    }
+}
+
+void TScopedMem::Free() {
+    free(Data);
+    Data = nullptr;
 }
 
 TScopedMem::~TScopedMem() {
-    free(Data);
-    Data = nullptr;
+    Free();
 }
 
 void *TScopedMem::GetData() {

@@ -1,4 +1,6 @@
 #include <algorithm>
+#include <sstream>
+#include <iomanip>
 
 #include "client.hpp"
 
@@ -10,7 +12,7 @@ extern "C" {
 #include <sys/socket.h>
 };
 
-TClient::TClient(std::shared_ptr<TEpollLoop> loop, int fd) : TEpollSource(loop, fd) {
+TClient::TClient(std::shared_ptr<TEpollLoop> loop, int fd) : TEpollSource(loop, fd), InputStream(fd) {
 }
 
 TClient::~TClient() {
@@ -150,4 +152,32 @@ bool TClient::Readonly() {
         return false;
 
     return !Cred.IsPrivileged() && !Cred.MemberOf(CredConf.GetPortoGid());
+}
+
+bool TClient::ReadRequest(rpc::TContainerRequest &req) {
+    return ReadDelimitedFrom(&InputStream, &req);
+}
+
+bool TClient::ReadInterrupted() {
+    if (InputStream.Interrupted()) {
+        uint8_t *buf;
+        size_t pos;
+        InputStream.GetBuf(&buf, &pos);
+
+        std::stringstream ss;
+        ss << std::setfill('0') << std::hex;
+        for (size_t i = 0; i < pos; i++)
+            ss << std::setw(2) << (int)buf[i];
+
+        L() << "Interrupted read from " << Fd
+            << ", partial message: " << ss.str() << std:: endl;
+
+        return true;
+    }
+
+    if (InputStream.GetLeftovers())
+        L() << "Message is greater that expected from " << Fd
+            << ", skipped " << InputStream.GetLeftovers() << std:: endl;
+
+    return false;
 }

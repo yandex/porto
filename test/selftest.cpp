@@ -4853,13 +4853,13 @@ static void TestBadClient(TPortoAPI &api) {
     ExpectApiSuccess(api.List(clist)); // connect to porto
 
     alarm(sec);
-    size_t nr = 100000;
+    size_t nr = 1000000;
     while (nr--) {
         rpc::TContainerRequest req;
         req.mutable_propertylist();
         api.Send(req);
 
-        if (nr && nr % 10000 == 0)
+        if (nr && nr % 100000 == 0)
             Say() << nr << " left" << std::endl;
     }
     alarm(0);
@@ -4871,10 +4871,10 @@ static void TestBadClient(TPortoAPI &api) {
     alarm(sec);
     ExpectApiSuccess(ConnectToRpcServer(config().rpc_sock().file().path(), fd));
     ExpectEq(write(fd, buf.c_str(), buf.length()), buf.length());
-    close(fd);
 
     TPortoAPI api2(config().rpc_sock().file().path(), 0);
     ExpectApiSuccess(api2.List(clist));
+    close(fd);
     alarm(0);
 
     SetWorkersNr(api, defaultWorkerNr);

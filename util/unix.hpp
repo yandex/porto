@@ -43,8 +43,11 @@ class TScopedMem : public TNonCopyable {
     size_t Size;
     void *Data = nullptr;
 public:
+    TScopedMem();
     TScopedMem(size_t size);
     ~TScopedMem();
+    void Alloc(size_t size);
+    void Free();
     void *GetData();
     size_t GetSize();
 };

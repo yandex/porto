@@ -4,10 +4,11 @@
 #include <mutex>
 
 #include "common.hpp"
-#include "util/cred.hpp"
-#include "util/log.hpp"
 #include "container.hpp"
 #include "epoll.hpp"
+#include "util/cred.hpp"
+#include "util/log.hpp"
+#include "util/protobuf.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -50,6 +51,9 @@ public:
     std::shared_ptr<TContainerWaiter> Waiter;
     bool Readonly();
 
+    bool ReadRequest(rpc::TContainerRequest &req);
+    bool ReadInterrupted();
+
 private:
     pid_t Pid;
     TCred Cred;
@@ -61,4 +65,9 @@ private:
     std::weak_ptr<TContainer> Container;
 
     bool FullLog = true;
+
+    InterruptibleInputStream InputStream;
+    bool ReadingLength;
+    uint64_t Length;
+    TScopedMem Request;
 };

@@ -2,8 +2,6 @@
 #include <string>
 #include <algorithm>
 #include <csignal>
-#include <sstream>
-#include <iomanip>
 
 #include "portod.hpp"
 #include "rpc.hpp"
@@ -143,38 +141,14 @@ public:
 };
 
 static bool QueueRequest(TContext &context, TRpcWorker &worker, std::shared_ptr<TClient> client) {
-    uint32_t slaveReadTimeout = config().daemon().slave_read_timeout_s();
-    InterruptibleInputStream pist(client->GetFd());
-
     TRequest req{&context, client};
 
-    if (slaveReadTimeout)
-        (void)alarm(slaveReadTimeout);
+    bool haveData = client->ReadRequest(req.Request);
 
-    bool haveData = ReadDelimitedFrom(&pist, &req.Request);
-
-    if (slaveReadTimeout)
-        (void)alarm(0);
-
-    if (pist.Interrupted()) {
-        uint8_t *buf;
-        size_t pos;
-        pist.GetBuf(&buf, &pos);
-
-        std::stringstream ss;
-        ss << std::setfill('0') << std::hex;
-        for (size_t i = 0; i < pos; i++)
-            ss << std::setw(2) << (int)buf[i];
-
-        L() << "Interrupted read from " << client->GetFd()
-            << ", partial message: " << ss.str() << std:: endl;
+    if (client->ReadInterrupted()) {
         Statistics->InterruptedReads++;
         return true;
     }
-
-    if (pist.GetLeftovers())
-        L() << "Message is greater that expected from " << client->GetFd()
-            << ", skipped " << pist.GetLeftovers() << std:: endl;
 
     if (!haveData)
         return true;
@@ -195,7 +169,7 @@ static int AcceptClient(TContext &context, int sfd,
 
     peer_addr_size = sizeof(struct sockaddr_un);
     cfd = accept4(sfd, (struct sockaddr *) &peer_addr,
-                  &peer_addr_size, SOCK_CLOEXEC);
+                  &peer_addr_size, SOCK_CLOEXEC | SOCK_NONBLOCK);
     if (cfd < 0) {
         if (errno == EAGAIN)
             return 0;

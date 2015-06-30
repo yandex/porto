@@ -1,3 +1,5 @@
+#pragma once
+
 #include <string>
 
 #include <google/protobuf/text_format.h>

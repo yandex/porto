@@ -78,8 +78,8 @@ cleanup() {
 	set +e
 	[ $CLEANUP -eq 0 ] && pexec iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE &> /dev/null
 	[ $CLEANUP -eq 0 ] && pexec ip link delete veth0 &> /dev/null
-	[ -d $TMPDIR ] && rmdir $TMPDIR
-	[ -d $CGTMPDIR ] && rmdir $CGTMPDIR
+	[ -d $TMPDIR ] && rm -rf $TMPDIR
+	[ -d $CGTMPDIR ] && rm -rf $CGTMPDIR
 	[ $CLEANUP -eq 0 ] && pctl destroy $CONTAINER
 }
 
