@@ -891,47 +891,57 @@ TError TContainer::Start(TScopedLock &holder_lock,
     return TError::Success();
 }
 
+TError TContainer::SendSignal(int signal, bool freeze) {
+    auto cg = GetLeafCgroup(freezerSubsystem);
+    TError error;
+
+    L_ACT() << "Send signal " << signal << " to " << GetName() << std::endl;
+
+    if (freeze) {
+        error = freezerSubsystem->Freeze(cg);
+        if (error)
+            L_ERR() << "Can't freeze container: " << error << std::endl;
+    }
+
+    vector<pid_t> reap;
+    error = cg->GetTasks(reap);
+    if (error) {
+        L_ERR() << "Can't read tasks list while sending signal: " << error << std::endl;
+        if (freeze)
+            freezerSubsystem->Unfreeze(cg);
+        return error;
+    }
+
+    error = cg->Kill(signal);
+
+    if (freeze) {
+        error = freezerSubsystem->Unfreeze(cg);
+        if (error)
+            L_ERR() << "Can't unfreeze container: " << error << std::endl;
+    }
+
+    return error;
+}
+
 TError TContainer::KillAll(TScopedLock &holder_lock) {
     auto cg = GetLeafCgroup(freezerSubsystem);
 
     L_ACT() << "Kill all " << GetName() << std::endl;
 
-    vector<pid_t> reap;
-    TError error = cg->GetTasks(reap);
-    if (error) {
-        L_ERR() << "Can't read tasks list while stopping container (SIGTERM): " << error << std::endl;
-        return error;
-    }
-
     // try to stop all tasks gracefully
-    (void)cg->Kill(SIGTERM);
-
-    if (AllowHolderUnlock)
-        holder_lock.unlock();
-    int ret = SleepWhile(config().container().kill_timeout_ms(),
-                         [&]{ return cg->IsEmpty() == false; });
-    if (ret)
-        L() << "Child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
-    if (AllowHolderUnlock)
-        holder_lock.lock();
+    if (!SendSignal(SIGTERM)) {
+        if (AllowHolderUnlock)
+            holder_lock.unlock();
+        int ret = SleepWhile(config().container().kill_timeout_ms(),
+                             [&]{ return cg->IsEmpty() == false; });
+        if (ret)
+            L() << "Child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
+        if (AllowHolderUnlock)
+            holder_lock.lock();
+    }
 
     // then kill any task that didn't want to stop via SIGTERM signal;
-    // freeze all container tasks to make sure no one forks and races with us
-    error = freezerSubsystem->Freeze(cg);
-    if (error)
-        L_ERR() << "Can't freeze container: " << error << std::endl;
-
-    error = cg->GetTasks(reap);
-    if (error) {
-        L_ERR() << "Can't read tasks list while stopping container (SIGKILL): " << error << std::endl;
-        return error;
-    }
-    cg->Kill(SIGKILL);
-    error = freezerSubsystem->Unfreeze(cg);
-    if (error)
-        L_ERR() << "Can't unfreeze container: " << error << std::endl;
-
-    return TError::Success();
+    return SendSignal(SIGKILL, true);
 }
 
 bool TContainer::StopChildren(TScopedLock &holder_lock) {
@@ -943,7 +953,8 @@ bool TContainer::StopChildren(TScopedLock &holder_lock) {
     for (auto iter : children)
         if (auto child = iter.lock()) {
             auto lock = child->ScopedLock();
-            auto holder_lock = Holder->ScopedLock();
+            if (AllowHolderUnlock)
+                holder_lock.lock();
 
             if (child->GetState() != EContainerState::Stopped) {
                 TError error = child->Stop(holder_lock);
@@ -952,6 +963,9 @@ bool TContainer::StopChildren(TScopedLock &holder_lock) {
                 else
                     stopped = true;
             }
+
+            if (AllowHolderUnlock)
+                holder_lock.unlock();
         }
     if (AllowHolderUnlock)
         holder_lock.lock();
@@ -967,7 +981,8 @@ bool TContainer::ExitChildren(TScopedLock &holder_lock, int status, bool oomKill
     for (auto iter : children)
         if (auto child = iter.lock()) {
             auto lock = child->ScopedLock();
-            auto holder_lock = Holder->ScopedLock();
+            if (AllowHolderUnlock)
+                holder_lock.lock();
 
             if (child->GetState() == EContainerState::Running ||
                 child->GetState() == EContainerState::Meta) {
@@ -977,6 +992,9 @@ bool TContainer::ExitChildren(TScopedLock &holder_lock, int status, bool oomKill
                 if (child->Exit(holder_lock, status, oomKilled, true))
                     exited = true;
             }
+
+            if (AllowHolderUnlock)
+                holder_lock.unlock();
         }
     if (AllowHolderUnlock)
         holder_lock.lock();
@@ -1076,7 +1094,8 @@ TError TContainer::Stop(TScopedLock &holder_lock) {
 
         auto cg = GetLeafCgroup(freezerSubsystem);
 
-        holder_lock.unlock();
+        if (AllowHolderUnlock)
+            holder_lock.unlock();
         int ret = SleepWhile(config().container().stop_timeout_ms(),
                              [&] () -> int {
                                  if (cg && cg->IsEmpty())
@@ -1084,7 +1103,8 @@ TError TContainer::Stop(TScopedLock &holder_lock) {
                                  kill(Task->GetPid(), 0);
                                  return errno != ESRCH;
                              });
-        holder_lock.lock();
+        if (AllowHolderUnlock)
+            holder_lock.lock();
         if (ret) {
             L_ERR() << "Can't wait for container to stop" << std::endl;
             return TError(EError::Unknown, "Container didn't stop in " + std::to_string(config().container().stop_timeout_ms()) + "ms");

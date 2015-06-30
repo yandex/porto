@@ -75,6 +75,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareCgroups();
     TError PrepareTask(std::shared_ptr<TClient> client);
     TError KillAll(TScopedLock &holder_lock);
+    TError SendSignal(int signal, bool freeze = false);
     void RemoveKvs();
 
     const std::string StripParentName(const std::string &name) const;
