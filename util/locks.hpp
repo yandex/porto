@@ -1,5 +1,7 @@
 #pragma once
 
+constexpr bool AllowHolderUnlock = false;
+
 typedef std::unique_lock<std::mutex> TScopedLock;
 
 class TScopedUnlock : public TNonCopyable {

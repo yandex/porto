@@ -906,12 +906,14 @@ TError TContainer::KillAll(TScopedLock &holder_lock) {
     // try to stop all tasks gracefully
     (void)cg->Kill(SIGTERM);
 
-    holder_lock.unlock();
+    if (AllowHolderUnlock)
+        holder_lock.unlock();
     int ret = SleepWhile(config().container().kill_timeout_ms(),
                          [&]{ return cg->IsEmpty() == false; });
     if (ret)
         L() << "Child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
-    holder_lock.lock();
+    if (AllowHolderUnlock)
+        holder_lock.lock();
 
     // then kill any task that didn't want to stop via SIGTERM signal;
     // freeze all container tasks to make sure no one forks and races with us
@@ -936,7 +938,8 @@ bool TContainer::StopChildren(TScopedLock &holder_lock) {
     bool stopped = false;
     std::vector<std::weak_ptr<TContainer>> children = Children;
 
-    holder_lock.unlock();
+    if (AllowHolderUnlock)
+        holder_lock.unlock();
     for (auto iter : children)
         if (auto child = iter.lock()) {
             auto lock = child->ScopedLock();
@@ -950,7 +953,8 @@ bool TContainer::StopChildren(TScopedLock &holder_lock) {
                     stopped = true;
             }
         }
-    holder_lock.lock();
+    if (AllowHolderUnlock)
+        holder_lock.lock();
     return stopped;
 }
 
@@ -958,7 +962,8 @@ bool TContainer::ExitChildren(TScopedLock &holder_lock, int status, bool oomKill
     bool exited = false;
     std::vector<std::weak_ptr<TContainer>> children = Children;
 
-    holder_lock.unlock();
+    if (AllowHolderUnlock)
+        holder_lock.unlock();
     for (auto iter : children)
         if (auto child = iter.lock()) {
             auto lock = child->ScopedLock();
@@ -973,7 +978,8 @@ bool TContainer::ExitChildren(TScopedLock &holder_lock, int status, bool oomKill
                     exited = true;
             }
         }
-    holder_lock.lock();
+    if (AllowHolderUnlock)
+        holder_lock.lock();
     return exited;
 }
 
