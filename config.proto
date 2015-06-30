@@ -45,6 +45,7 @@ message TCfg {
 		optional string sysfs_root = 6;
 		optional uint64 memory_limit = 7;
 		optional uint32 workers = 8;
+		optional uint64 max_msg_len = 9;
 	}
 
 	message TContainerCfg {

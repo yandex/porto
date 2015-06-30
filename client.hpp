@@ -17,6 +17,11 @@ extern "C" {
 class TContainerWaiter;
 class TEpollLoop;
 
+enum class EClientState {
+    ReadingLength,
+    ReadingData,
+};
+
 class TClient : public TEpollSource {
 public:
     TClient(std::shared_ptr<TEpollLoop> loop, int fd);
@@ -66,8 +71,10 @@ private:
 
     bool FullLog = true;
 
-    InterruptibleInputStream InputStream;
-    bool ReadingLength;
+    EClientState State;
     uint64_t Length;
+    uint64_t Pos;
     TScopedMem Request;
+
+    bool SetState(EClientState state);
 };

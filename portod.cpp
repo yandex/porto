@@ -145,11 +145,6 @@ static bool QueueRequest(TContext &context, TRpcWorker &worker, std::shared_ptr<
 
     bool haveData = client->ReadRequest(req.Request);
 
-    if (client->ReadInterrupted()) {
-        Statistics->InterruptedReads++;
-        return true;
-    }
-
     if (!haveData)
         return true;
 

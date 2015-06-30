@@ -491,7 +491,6 @@ public:
         m["rotated"] = Statistics->Rotated;
         m["restore_failed"] = Statistics->RestoreFailed;
         m["started"] = Statistics->Started;
-        m["interrupted_reads"] = Statistics->InterruptedReads;
         m["running"] = GetContainer()->GetRunningChildren();
         uint64_t usage = 0;
         TError error = memorySubsystem->Usage(memorySubsystem->GetRootCgroup()->GetChild(PORTO_DAEMON_CGROUP), usage);

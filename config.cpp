@@ -53,6 +53,7 @@ void TConfig::LoadDefaults() {
     config().mutable_daemon()->set_sysfs_root("/sys/fs/cgroup");
     config().mutable_daemon()->set_memory_limit(1 * 1024 * 1024 * 1024);
     config().mutable_daemon()->set_workers(4);
+    config().mutable_daemon()->set_max_msg_len(32 * 1024 * 1024);
 
     config().mutable_container()->set_max_log_size(10 * 1024 * 1024);
     config().mutable_container()->set_tmp_dir("/place/porto");

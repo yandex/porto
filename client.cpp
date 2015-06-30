@@ -3,16 +3,17 @@
 #include <iomanip>
 
 #include "client.hpp"
-
-#include "util/file.hpp"
 #include "holder.hpp"
+#include "config.hpp"
+#include "util/file.hpp"
 
 extern "C" {
 #include <sys/types.h>
 #include <sys/socket.h>
 };
 
-TClient::TClient(std::shared_ptr<TEpollLoop> loop, int fd) : TEpollSource(loop, fd), InputStream(fd) {
+TClient::TClient(std::shared_ptr<TEpollLoop> loop, int fd) : TEpollSource(loop, fd) {
+    SetState(EClientState::ReadingLength);
 }
 
 TClient::~TClient() {
@@ -154,30 +155,49 @@ bool TClient::Readonly() {
     return !Cred.IsPrivileged() && !Cred.MemberOf(CredConf.GetPortoGid());
 }
 
-bool TClient::ReadRequest(rpc::TContainerRequest &req) {
-    return ReadDelimitedFrom(&InputStream, &req);
+bool TClient::SetState(EClientState state) {
+    Pos = 0;
+    Length = 0;
+
+    State = state;
 }
 
-bool TClient::ReadInterrupted() {
-    if (InputStream.Interrupted()) {
-        uint8_t *buf;
-        size_t pos;
-        InputStream.GetBuf(&buf, &pos);
+bool TClient::ReadRequest(rpc::TContainerRequest &req) {
+    while (State == EClientState::ReadingLength) {
+        uint8_t byte;
+        if (read(Fd, &byte, sizeof(byte)) <= 0)
+            return false;
 
-        std::stringstream ss;
-        ss << std::setfill('0') << std::hex;
-        for (size_t i = 0; i < pos; i++)
-            ss << std::setw(2) << (int)buf[i];
+        Length |= (byte & 0x7f) << Pos;
+        Pos += 7;
 
-        L() << "Interrupted read from " << Fd
-            << ", partial message: " << ss.str() << std:: endl;
+        if ((byte & 0x80) == 0) {
+            if (Length > config().daemon().max_msg_len()) {
+                L_WRN() << "Got oversized request " << Length << " from client " << Fd << std::endl;
+                SetState(EClientState::ReadingLength);
+                return false;
+            }
 
-        return true;
+            Request.Alloc(Length);
+            SetState(EClientState::ReadingData);
+        }
     }
 
-    if (InputStream.GetLeftovers())
-        L() << "Message is greater that expected from " << Fd
-            << ", skipped " << InputStream.GetLeftovers() << std:: endl;
+    if (State == EClientState::ReadingData) {
+        int ret = read(Fd, Request.GetData() + Pos, Request.GetSize() - Pos);
+        if (ret <= 0)
+            return false;
+
+        Pos += ret;
+
+        if (Pos >= Request.GetSize()) {
+            bool ret = req.ParseFromArray(Request.GetData(), Request.GetSize());
+            if (!ret)
+                L_WRN() << "Couldn't parse request from client " << Fd << std::endl;
+            SetState(EClientState::ReadingLength);
+            return ret;
+        }
+    }
 
     return false;
 }
