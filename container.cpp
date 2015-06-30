@@ -944,8 +944,9 @@ TError TContainer::KillAll(TScopedLock &holder_lock) {
     return SendSignal(SIGKILL, true);
 }
 
-bool TContainer::StopChildren(TScopedLock &holder_lock) {
-    bool stopped = false;
+void TContainer::ApplyForChildren(TScopedLock &holder_lock,
+                                  std::function<void (TScopedLock &holder_lock,
+                                                      TContainer &container)> fn) {
     std::vector<std::weak_ptr<TContainer>> children = Children;
 
     if (AllowHolderUnlock)
@@ -955,50 +956,34 @@ bool TContainer::StopChildren(TScopedLock &holder_lock) {
             auto lock = child->ScopedLock();
             if (AllowHolderUnlock)
                 holder_lock.lock();
-
-            if (child->GetState() != EContainerState::Stopped) {
-                TError error = child->Stop(holder_lock);
-                if (error)
-                    L_ERR() << "Can't stop child " << child->GetName() << ": " << error << std::endl;
-                else
-                    stopped = true;
-            }
-
+            fn(holder_lock, *child);
             if (AllowHolderUnlock)
                 holder_lock.unlock();
         }
     if (AllowHolderUnlock)
         holder_lock.lock();
-    return stopped;
 }
 
-bool TContainer::ExitChildren(TScopedLock &holder_lock, int status, bool oomKilled) {
-    bool exited = false;
-    std::vector<std::weak_ptr<TContainer>> children = Children;
-
-    if (AllowHolderUnlock)
-        holder_lock.unlock();
-    for (auto iter : children)
-        if (auto child = iter.lock()) {
-            auto lock = child->ScopedLock();
-            if (AllowHolderUnlock)
-                holder_lock.lock();
-
-            if (child->GetState() == EContainerState::Running ||
-                child->GetState() == EContainerState::Meta) {
-                TError error = child->KillAll(holder_lock);
+void TContainer::StopChildren(TScopedLock &holder_lock) {
+    ApplyForChildren(holder_lock, [] (TScopedLock &holder_lock, TContainer &child) {
+            if (child.GetState() != EContainerState::Stopped) {
+                TError error = child.Stop(holder_lock);
                 if (error)
-                    L_ERR() << "Child " << child->GetName() << " can't be killed: " << error << std::endl;
-                if (child->Exit(holder_lock, status, oomKilled, true))
-                    exited = true;
+                    L_ERR() << "Can't stop child " << child.GetName() << ": " << error << std::endl;
             }
+        });
+}
 
-            if (AllowHolderUnlock)
-                holder_lock.unlock();
-        }
-    if (AllowHolderUnlock)
-        holder_lock.lock();
-    return exited;
+void TContainer::ExitChildren(TScopedLock &holder_lock, int status, bool oomKilled) {
+    ApplyForChildren(holder_lock, [&] (TScopedLock &holder_lock, TContainer &child) {
+            if (child.GetState() == EContainerState::Running ||
+                child.GetState() == EContainerState::Meta) {
+                TError error = child.KillAll(holder_lock);
+                if (error)
+                    L_ERR() << "Child " << child.GetName() << " can't be killed: " << error << std::endl;
+                child.Exit(holder_lock, status, oomKilled, true);
+            }
+        });
 }
 
 TError TContainer::PrepareResources() {
@@ -1115,11 +1100,17 @@ TError TContainer::Stop(TScopedLock &holder_lock) {
 
     if (!IsRoot() && !IsPortoRoot())
         SetState(EContainerState::Stopped);
-    if (!StopChildren(holder_lock)) {
+
+    bool update_soft_limit = Children.size() == 0;
+
+    StopChildren(holder_lock);
+
+    if (update_soft_limit) {
         TError error = UpdateSoftLimit();
         if (error)
             L_ERR() << "Can't update meta soft limit: " << error << std::endl;
     }
+
     if (!IsRoot() && !IsPortoRoot())
         FreeResources();
 

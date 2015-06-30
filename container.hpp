@@ -83,7 +83,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     bool MayRespawn();
     bool ShouldApplyProperty(const std::string &property);
     TError Respawn(TScopedLock &holder_lock);
-    bool StopChildren(TScopedLock &holder_lock);
+    void StopChildren(TScopedLock &holder_lock);
     TError PrepareResources();
     void RemoveLog(const TPath &path);
     TError RotateLog(const TPath &path);
@@ -92,7 +92,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError AliasToProperty(std::string &property, std::string &value);
 
     bool Exit(TScopedLock &holder_lock, int status, bool oomKilled, bool force = false);
-    bool ExitChildren(TScopedLock &holder_lock, int status, bool oomKilled);
+    void ExitChildren(TScopedLock &holder_lock, int status, bool oomKilled);
     bool DeliverExitStatus(TScopedLock &holder_lock, int pid, int status);
     bool DeliverOom(TScopedLock &holder_lock, int fd);
 
@@ -102,6 +102,10 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     void CleanupWaiters();
     void NotifyWaiters();
+
+    void ApplyForChildren(TScopedLock &holder_lock,
+                          std::function<void (TScopedLock &holder_lock,
+                                              TContainer &container)> fn);
 
 public:
     TCred OwnerCred;
