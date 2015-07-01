@@ -1893,9 +1893,8 @@ void TContainer::CleanupWaiters() {
 }
 
 TError TContainer::UpdateNetwork() {
-    if (GetState() == EContainerState::Running && Tclass)
+    if (Tclass)
         return Tclass->Create();
-
     return TError::Success();
 }
 
