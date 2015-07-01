@@ -185,6 +185,7 @@ public:
     void SyncStateWithCgroup(TScopedLock &holder_lock);
     bool IsNamespaceIsolated();
     void CleanupExpiredChildren();
+    TError UpdateNetwork();
 
     /* protected with TVolumeHolder->Lock */
     std::set<std::shared_ptr<TVolume>> Volumes;

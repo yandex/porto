@@ -1892,6 +1892,13 @@ void TContainer::CleanupWaiters() {
     }
 }
 
+TError TContainer::UpdateNetwork() {
+    if (GetState() == EContainerState::Running && Tclass)
+        return Tclass->Create();
+
+    return TError::Success();
+}
+
 TContainerWaiter::TContainerWaiter(std::shared_ptr<TClient> client,
                                    std::function<void (std::shared_ptr<TClient>,
                                                        TError, std::string)> callback) :

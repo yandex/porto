@@ -493,3 +493,11 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
 
     return delivered;
 }
+
+void TContainerHolder::UpdateNetwork() {
+    for (auto pair : Containers) {
+        TError error = pair.second->UpdateNetwork();
+        if (error)
+            L_WRN() << "Can't update " << pair.first << " network: " << error << std::endl;
+    }
+}

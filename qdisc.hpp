@@ -43,7 +43,7 @@ public:
     ~TTclass();
 
     void Prepare(std::map<std::string, uint64_t> prio, std::map<std::string, uint64_t> rate, std::map<std::string, uint64_t> ceil);
-    TError Create(bool fallback = false);
+    TError Create();
     TError Remove();
     uint32_t GetHandle() { return Handle; }
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);

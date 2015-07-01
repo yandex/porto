@@ -46,54 +46,40 @@ void TTclass::Prepare(std::map<std::string, uint64_t> prio,
     Ceil = ceil;
 }
 
-TError TTclass::Create(bool fallback) {
+TError TTclass::Create() {
+    TError firstError = TError::Success();
+
     for (auto &link : Net->GetLinks()) {
         auto alias = link->GetAlias();
 
-        if (Prio.find(alias) == Prio.end()) {
-            if (fallback)
-                Prio[alias] = config().network().default_prio();
-            else
-                return TError(EError::Unknown, "Unknown interface " + alias + " in net_priority");
-        }
+        if (Prio.find(alias) == Prio.end())
+            return TError(EError::Unknown, "Unknown interface " + alias + " in net_priority");
 
-        if (Rate.find(alias) == Rate.end()) {
-            if (fallback)
-                Rate[alias] = config().network().default_guarantee();
-            else
-                return TError(EError::Unknown, "Unknown interface " + alias + " in net_guarantee");
-        }
+        if (Rate.find(alias) == Rate.end())
+            return TError(EError::Unknown, "Unknown interface " + alias + " in net_guarantee");
 
-        if (Ceil.find(alias) == Ceil.end()) {
-            if (fallback)
-                Ceil[alias] = config().network().default_limit();
-            else
-                return TError(EError::Unknown, "Unknown interface " + alias + " in net_ceil");
-        }
+        if (Ceil.find(alias) == Ceil.end())
+            return TError(EError::Unknown, "Unknown interface " + alias + " in net_ceil");
 
         TNlClass tclass(link, GetParent(), Handle);
+        if (tclass.Exists()) {
+            if (!tclass.Valid(Prio[link->GetAlias()],
+                          Rate[link->GetAlias()],
+                          Ceil[link->GetAlias()]))
+                (void)tclass.Remove();
+            else
+                continue;
+        }
+
         TError error = tclass.Create(Prio[link->GetAlias()],
                                      Rate[link->GetAlias()],
                                      Ceil[link->GetAlias()]);
-        if (error) {
-            // make sure parent exist and retry
-            if (config().network().dynamic_ifaces() &&
-                ParentTclass && !ParentTclass->Exists(link)) {
-                TError error = ParentTclass->Create(true);
-                if (error) {
-                    L_ERR() << "Can't create parent tc class: " << error << std::endl;
-                    return error;
-                }
-
-                error = tclass.Create(Prio[link->GetAlias()],
-                                      Rate[link->GetAlias()],
-                                      Ceil[link->GetAlias()]);
-            }
-
-            if (error)
-                return error;
-        }
+        if (!firstError)
+            firstError = error;
     }
+
+    if (firstError)
+        return firstError;
 
     return TError::Success();
 }
