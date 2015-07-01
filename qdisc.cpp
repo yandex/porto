@@ -53,13 +53,13 @@ TError TTclass::Create() {
         auto alias = link->GetAlias();
 
         if (Prio.find(alias) == Prio.end())
-            return TError(EError::Unknown, "Unknown interface " + alias + " in net_priority");
+            Prio[alias] = config().network().default_prio();
 
         if (Rate.find(alias) == Rate.end())
-            return TError(EError::Unknown, "Unknown interface " + alias + " in net_guarantee");
+            Rate[alias] = config().network().default_guarantee();
 
         if (Ceil.find(alias) == Ceil.end())
-            return TError(EError::Unknown, "Unknown interface " + alias + " in net_ceil");
+            Ceil[alias] = config().network().default_limit();
 
         TNlClass tclass(link, GetParent(), Handle);
         if (tclass.Exists()) {
