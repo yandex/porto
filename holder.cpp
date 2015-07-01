@@ -6,6 +6,7 @@
 #include "property.hpp"
 #include "data.hpp"
 #include "event.hpp"
+#include "qdisc.hpp"
 #include "util/string.hpp"
 #include "util/cred.hpp"
 #include "util/file.hpp"
@@ -495,6 +496,8 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
 }
 
 void TContainerHolder::UpdateNetwork() {
+    auto lock = Net->ScopedLock();
+
     for (auto pair : Containers) {
         TError error = pair.second->UpdateNetwork();
         if (error)
