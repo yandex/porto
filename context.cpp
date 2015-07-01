@@ -119,7 +119,7 @@ TError TContext::Destroy() {
 
     {
         auto holder_lock = Cholder->ScopedLock();
-        Cholder->DestroyRoot();
+        Cholder->DestroyRoot(holder_lock);
         Vholder->Destroy();
     }
 
