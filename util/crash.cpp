@@ -44,6 +44,7 @@ void PrintTrace() {
     // address of this function.
     for (int i = 1; i < addrlen; i++) {
 	char *begin_name = 0, *begin_offset = 0, *end_offset = 0;
+        char *begin_addr = 0;
 
 	// find parentheses and +address offset surrounding the mangled name:
 	// ./module(function+0x15c) [0x8048a6d]
@@ -52,10 +53,12 @@ void PrintTrace() {
 		begin_name = p;
 	    else if (*p == '+')
 		begin_offset = p;
-	    else if (*p == ')' && begin_offset) {
+	    else if (*p == ')' && begin_offset)
 		end_offset = p;
-		break;
-	    }
+	    else if (*p == '[') {
+                begin_addr = p;
+                break;
+            }
 	}
 
 	if (begin_name && begin_offset && end_offset && begin_name < begin_offset) {
@@ -72,11 +75,13 @@ void PrintTrace() {
 					    funcname, &funcnamesize, &status);
 	    if (status == 0) {
 		funcname = ret; // use possibly realloc()-ed string
-		L() << symbollist[i] << ": " << funcname << "() + " << begin_offset << std::endl;
+		L() << symbollist[i] << ": " << funcname << "()+"
+                    << begin_offset << " " << begin_addr << std::endl;
 	    } else {
 		// demangling failed. Output function name as a C function with
 		// no arguments.
-		L() << symbollist[i] << ": " << begin_name << "() + " << begin_offset << std::endl;
+		L() << symbollist[i] << ": " << begin_name << "()+"
+                    << begin_offset << " " << begin_addr << std::endl;
 	    }
 	} else {
 	    // couldn't parse the line? print the whole line.
