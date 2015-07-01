@@ -91,9 +91,5 @@ class NoSpace(EError):
     EID = rpc_pb2.NoSpace
 
 
-class VolumeIsBusy(EError):
-    EID = rpc_pb2.VolumeIsBusy
-
-
-class VolumeNotReady(EError):
-    EID = rpc_pb2.VolumeNotReady
+class Busy(EError):
+    EID = rpc_pb2.Busy
