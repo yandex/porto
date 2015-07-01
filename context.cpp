@@ -117,6 +117,12 @@ TError TContext::Destroy() {
     if (NetEvt)
         NetEvt->Disconnect();
 
+    {
+        auto holder_lock = Cholder->ScopedLock();
+        Cholder->DestroyRoot();
+        Vholder->Destroy();
+    }
+
     error = Storage->Destroy();
     if (error)
         L_ERR() << "Can't destroy key-value storage: " << error << std::endl;
@@ -128,11 +134,6 @@ TError TContext::Destroy() {
     error = Net->Destroy();
     if (error)
         L_ERR() << "Can't destroy network: " << error << std::endl;
-
-    auto holder_lock = Cholder->ScopedLock();
-
-    Cholder->DestroyRoot(holder_lock);
-    Vholder->Destroy();
 
     return TError::Success();
 }
