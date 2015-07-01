@@ -64,15 +64,15 @@ static void SendReply(std::shared_ptr<TClient> client,
     google::protobuf::io::FileOutputStream post(client->GetFd());
 
     if (response.IsInitialized()) {
-        if (!WriteDelimitedTo(response, &post)) {
-            L() << "Protobuf write error for " << client->GetFd() << std:: endl;
-
+        if (WriteDelimitedTo(response, &post)) {
             post.Flush();
 
             if (log)
                 L_RSP() << ResponseAsString(response) << " to " << *client
                         << " (request took " << client->GetRequestTime() << "ms)"
                         << std::endl;
+        } else {
+            L_RSP() << "Protobuf write error for " << client->GetFd() << " " << strerror(errno) << std:: endl;
         }
     }
 
