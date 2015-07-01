@@ -953,12 +953,14 @@ void TContainer::ApplyForChildren(TScopedLock &holder_lock,
         holder_lock.unlock();
     for (auto iter : children)
         if (auto child = iter.lock()) {
-            auto lock = child->ScopedLock();
-            if (AllowHolderUnlock)
+            if (AllowHolderUnlock) {
+                auto lock = child->ScopedLock();
                 holder_lock.lock();
-            fn(holder_lock, *child);
-            if (AllowHolderUnlock)
+                fn(holder_lock, *child);
                 holder_lock.unlock();
+            } else {
+                fn(holder_lock, *child);
+            }
         }
     if (AllowHolderUnlock)
         holder_lock.lock();
