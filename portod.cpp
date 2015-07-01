@@ -142,8 +142,11 @@ public:
 
 static bool QueueRequest(TContext &context, TRpcWorker &worker, std::shared_ptr<TClient> client) {
     TRequest req{&context, client};
+    bool hangup = false;;
+    bool haveData = client->ReadRequest(req.Request, hangup);
 
-    bool haveData = client->ReadRequest(req.Request);
+    if (hangup)
+        return false;
 
     if (!haveData)
         return true;
@@ -401,7 +404,6 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                 TError error = context.Net->Update();
                 if (error)
                     L_ERR() << "Can't refresh list of network interfaces: " << error << std::endl;
-
             } else if (source->Flags & EPOLL_EVENT_OOM) {
                 auto container = source->Container.lock();
                 if (container) {

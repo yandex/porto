@@ -56,7 +56,7 @@ public:
     std::shared_ptr<TContainerWaiter> Waiter;
     bool Readonly();
 
-    bool ReadRequest(rpc::TContainerRequest &req);
+    bool ReadRequest(rpc::TContainerRequest &req, bool &hangup);
     bool ReadInterrupted();
 
 private:
@@ -76,5 +76,5 @@ private:
     uint64_t Pos;
     TScopedMem Request;
 
-    bool SetState(EClientState state);
+    void SetState(EClientState state);
 };

@@ -155,14 +155,14 @@ bool TClient::Readonly() {
     return !Cred.IsPrivileged() && !Cred.MemberOf(CredConf.GetPortoGid());
 }
 
-bool TClient::SetState(EClientState state) {
+void TClient::SetState(EClientState state) {
     Pos = 0;
     Length = 0;
 
     State = state;
 }
 
-bool TClient::ReadRequest(rpc::TContainerRequest &req) {
+bool TClient::ReadRequest(rpc::TContainerRequest &req, bool &hangup) {
     while (State == EClientState::ReadingLength) {
         uint8_t byte;
         if (read(Fd, &byte, sizeof(byte)) <= 0)
@@ -175,6 +175,7 @@ bool TClient::ReadRequest(rpc::TContainerRequest &req) {
             if (Length > config().daemon().max_msg_len()) {
                 L_WRN() << "Got oversized request " << Length << " from client " << Fd << std::endl;
                 SetState(EClientState::ReadingLength);
+                hangup = true;
                 return false;
             }
 
@@ -184,7 +185,7 @@ bool TClient::ReadRequest(rpc::TContainerRequest &req) {
     }
 
     if (State == EClientState::ReadingData) {
-        int ret = read(Fd, Request.GetData() + Pos, Request.GetSize() - Pos);
+        int ret = read(Fd, (uint8_t *)Request.GetData() + Pos, Request.GetSize() - Pos);
         if (ret <= 0)
             return false;
 
@@ -192,8 +193,10 @@ bool TClient::ReadRequest(rpc::TContainerRequest &req) {
 
         if (Pos >= Request.GetSize()) {
             bool ret = req.ParseFromArray(Request.GetData(), Request.GetSize());
-            if (!ret)
+            if (!ret) {
                 L_WRN() << "Couldn't parse request from client " << Fd << std::endl;
+                hangup = true;
+            }
             SetState(EClientState::ReadingLength);
             return ret;
         }
