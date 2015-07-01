@@ -174,7 +174,7 @@ TError TNlLink::SetDefaultGw(const TNlAddr &addr) {
     if (!route)
         return TError(EError::Unknown, "Unable to allocate route");
 
-    ret = nl_addr_parse("default", rtnl_route_get_family(route), &a);
+    ret = nl_addr_parse("default", nl_addr_get_family(addr.GetAddr()), &a);
     if (ret < 0) {
         rtnl_route_put(route);
         return TError(EError::Unknown, string("Unable to parse default address: ") + nl_geterror(ret));

@@ -52,9 +52,15 @@ struct TIpVlanNetCfg {
     int Mtu;
 };
 
-struct TIpMap {
+struct TIpVec {
+    std::string Iface;
     TNlAddr Addr;
     int Prefix;
+};
+
+struct TGwVec {
+    std::string Iface;
+    TNlAddr Addr;
 };
 
 struct TVethNetCfg {
@@ -98,8 +104,8 @@ struct TTaskEnv : public TNonCopyable {
     TPath Loop;
     int LoopDev;
     uint64_t Caps;
-    TNlAddr DefaultGw;
-    std::map<std::string, TIpMap> IpMap;
+    std::vector<TGwVec> GwVec;
+    std::vector<TIpVec> IpVec;
     bool NewMountNs;
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
     std::unique_ptr<TScopedMem> GroupList;

@@ -971,45 +971,18 @@ public:
     }
 };
 
-class TDefaultGwProperty : public TStringValue, public TContainerValue {
-    struct TNlAddr Addr;
+class TDefaultGwProperty : public TListValue, public TContainerValue {
+    std::vector<TGwVec> GwVec;
 public:
     TDefaultGwProperty() :
-        TStringValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | HIDDEN_VALUE),
-        TContainerValue(P_DEFAULT_GW,
-                        "Default gateway: <ip>",
-                        staticProperty) {}
-
-    std::string GetDefault() const override {
-        return "0.0.0.0";
-    }
-
-    TError CheckValue(const std::string &value) override {
-        return Addr.Parse(value);
-    }
-
-    TError PrepareTaskEnv(std::shared_ptr<TTaskEnv> taskEnv) override {
-        taskEnv->DefaultGw = Addr;
-        return TError::Success();
-    }
-};
-
-class TIpProperty : public TListValue, public TContainerValue {
-    std::map<std::string, TIpMap> IpMap;
-
-public:
-    TIpProperty() :
         TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | HIDDEN_VALUE),
-        TContainerValue(P_IP,
-                        "IP configuration: <interface> <ip>/<prefix>",
+        TContainerValue(P_DEFAULT_GW,
+                        "Default gateway: <interface> <ip>; ...",
                         staticProperty) {}
-
-    TStrList GetDefault() const override {
-        return TStrList{ "- 0.0.0.0/0" };
-    }
 
     TError CheckValue(const std::vector<std::string> &lines) override {
-        IpMap.clear();
+        std::vector<TGwVec> gwvec;
+
         for (auto &line : lines) {
             std::vector<std::string> settings;
             TError error = SplitEscapedString(line, ' ', settings);
@@ -1017,21 +990,62 @@ public:
                 return error;
 
             if (settings.size() != 2)
-                return TError(EError::InvalidValue, "Invalid address/prefix in: " + line);
+                return TError(EError::InvalidValue, "Invalid gateway address/prefix in: " + line);
 
-            TIpMap ip;
-            error = ParseIpPrefix(settings[1], ip.Addr, ip.Prefix);
+            TGwVec gw;
+            gw.Iface = settings[0];
+            error = gw.Addr.Parse(settings[1]);
             if (error)
                 return error;
-
-            IpMap[settings[0]] = ip;
+            gwvec.push_back(gw);
         }
 
+        GwVec = gwvec;
         return TError::Success();
     }
 
     TError PrepareTaskEnv(std::shared_ptr<TTaskEnv> taskEnv) override {
-        taskEnv->IpMap = IpMap;
+        taskEnv->GwVec = GwVec;
+        return TError::Success();
+    }
+};
+
+class TIpProperty : public TListValue, public TContainerValue {
+    std::vector<TIpVec> IpVec;
+
+public:
+    TIpProperty() :
+        TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | HIDDEN_VALUE),
+        TContainerValue(P_IP,
+                        "IP configuration: <interface> <ip>/<prefix>; ...",
+                        staticProperty) {}
+
+    TError CheckValue(const std::vector<std::string> &lines) override {
+        std::vector<TIpVec> ipvec;
+
+        for (auto &line : lines) {
+            std::vector<std::string> settings;
+            TError error = SplitEscapedString(line, ' ', settings);
+            if (error)
+                return error;
+
+            if (settings.size() != 2)
+                return TError(EError::InvalidValue, "Invalid ip address/prefix in: " + line);
+
+            TIpVec ip;
+            ip.Iface = settings[0];
+            error = ParseIpPrefix(settings[1], ip.Addr, ip.Prefix);
+            if (error)
+                return error;
+            ipvec.push_back(ip);
+        }
+
+        IpVec = ipvec;
+        return TError::Success();
+    }
+
+    TError PrepareTaskEnv(std::shared_ptr<TTaskEnv> taskEnv) override {
+        taskEnv->IpVec = IpVec;
         return TError::Success();
     }
 };

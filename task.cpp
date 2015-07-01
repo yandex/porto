@@ -492,7 +492,6 @@ TError TTask::ChildEnableNet() {
         return error;
 
     std::vector<std::string> devices = nl->FindLink(0);
-    std::shared_ptr<TNlLink> gw = nullptr;
     for (auto &dev : devices) {
         auto link = std::make_shared<TNlLink>(nl, dev);
 
@@ -504,24 +503,27 @@ TError TTask::ChildEnableNet() {
         if (error)
             return error;
 
-        if (Env->IpMap.find(dev) != Env->IpMap.end()) {
-            auto ip = Env->IpMap.at(dev);
+        for (auto ip : Env->IpVec) {
+            if (ip.Addr.IsEmpty())
+                continue;
 
-            if (!ip.Addr.IsEmpty()) {
+            if (ip.Iface == dev) {
                 TError error = link->SetIpAddr(ip.Addr, ip.Prefix);
                 if (error)
                     return error;
             }
         }
 
-        if (!gw && link->HasQueue())
-            gw = link;
-    }
+        for (auto gw : Env->GwVec) {
+            if (gw.Addr.IsEmpty())
+                continue;
 
-    if (!Env->DefaultGw.IsEmpty() && gw) {
-        error = gw->SetDefaultGw(Env->DefaultGw);
-        if (error)
-            return error;
+            if (gw.Iface == dev) {
+                error = link->SetDefaultGw(gw.Addr);
+                if (error)
+                    return error;
+            }
+        }
     }
 
     return TError::Success();
@@ -585,7 +587,7 @@ TError TTask::IsolateNet(int childPid) {
         if (hw.empty())
             hw = GenerateHw(Env->Hostname, mvlan.Master + mvlan.Name);
 
-        L() << "Using " << hw << " for " << mvlan.Name << "@" << mvlan.Master << std::endl;
+        L() << "Using " << (hw.empty() ? " generated " : "") << hw << " for " << mvlan.Name << "@" << mvlan.Master << std::endl;
 
         TError error = link->AddMacVlan(mvlan.Master, mvlan.Type, hw, mvlan.Mtu);
         if (error)
