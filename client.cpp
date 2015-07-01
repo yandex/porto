@@ -14,9 +14,13 @@ extern "C" {
 
 TClient::TClient(std::shared_ptr<TEpollLoop> loop, int fd) : TEpollSource(loop, fd) {
     SetState(EClientState::ReadingLength);
+    if (config().log().verbose())
+        L() << "Client connected " << Fd << std::endl;
 }
 
 TClient::~TClient() {
+    if (config().log().verbose())
+        L() << "Client disconnected " << Fd << std::endl;
     close(Fd);
 }
 
@@ -165,7 +169,7 @@ void TClient::SetState(EClientState state) {
 bool TClient::ReadRequest(rpc::TContainerRequest &req, bool &hangup) {
     while (State == EClientState::ReadingLength) {
         uint8_t byte;
-        if (read(Fd, &byte, sizeof(byte)) <= 0)
+        if (recv(Fd, &byte, sizeof(byte), MSG_DONTWAIT) <= 0)
             return false;
 
         Length |= (byte & 0x7f) << Pos;
@@ -185,7 +189,7 @@ bool TClient::ReadRequest(rpc::TContainerRequest &req, bool &hangup) {
     }
 
     if (State == EClientState::ReadingData) {
-        int ret = read(Fd, (uint8_t *)Request.GetData() + Pos, Request.GetSize() - Pos);
+        int ret = recv(Fd, (uint8_t *)Request.GetData() + Pos, Request.GetSize() - Pos, MSG_DONTWAIT);
         if (ret <= 0)
             return false;
 

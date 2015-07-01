@@ -142,14 +142,14 @@ public:
 
 static bool QueueRequest(TContext &context, TRpcWorker &worker, std::shared_ptr<TClient> client) {
     TRequest req{&context, client};
-    bool hangup = false;;
-    bool haveData = client->ReadRequest(req.Request, hangup);
+    bool hangup = false;
+    bool fullMessage = client->ReadRequest(req.Request, hangup);
 
     if (hangup)
-        return false;
-
-    if (!haveData)
         return true;
+
+    if (!fullMessage)
+        return false;
 
     if (client->Identify(*context.Cholder, false))
         return true;
@@ -167,12 +167,21 @@ static int AcceptClient(TContext &context, int sfd,
 
     peer_addr_size = sizeof(struct sockaddr_un);
     cfd = accept4(sfd, (struct sockaddr *) &peer_addr,
-                  &peer_addr_size, SOCK_CLOEXEC | SOCK_NONBLOCK);
+                  &peer_addr_size, SOCK_CLOEXEC);
     if (cfd < 0) {
         if (errno == EAGAIN)
             return 0;
 
         L_ERR() << "accept() error: " << strerror(errno) << std::endl;
+        return -1;
+    }
+
+    struct timeval to;
+    to.tv_sec = 5;
+    to.tv_usec = 0;
+
+    if (setsockopt(cfd, SOL_SOCKET, SO_SNDTIMEO, (void *)&to, sizeof(to)) < 0) {
+        L_ERR() << "setsockopt() error: " << strerror(errno) << std::endl;
         return -1;
     }
 

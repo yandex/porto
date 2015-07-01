@@ -4849,6 +4849,7 @@ static void TestBadClient(TPortoAPI &api) {
     std::vector<std::string> clist;
     int sec = 120;
 
+#if 0
     Say() << "Check client that doesn't read responses" << std::endl;
 
     ExpectApiSuccess(api.List(clist)); // connect to porto
@@ -4864,6 +4865,7 @@ static void TestBadClient(TPortoAPI &api) {
             Say() << nr << " left" << std::endl;
     }
     alarm(0);
+#endif
 
     Say() << "Check client that does partial write" << std::endl;
 
