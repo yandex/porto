@@ -86,7 +86,10 @@ class _RPC(object):
 
     def _recv(self, count, flags=0):
         try:
-            return self.sock.recv(count, flags)
+            buf = ""
+            while len(buf) < count:
+                buf += self.sock.recv(count - len(buf), flags)
+            return buf
         except socket.timeout:
             raise exceptions.SocketTimeout("Got timeout %d" % self.timeout)
 
