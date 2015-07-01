@@ -374,6 +374,7 @@ int GetVmRss(const std::string &pid) {
 bool TcClassExist(uint32_t handle) {
     size_t nr = 0;
     for (auto &link : links) {
+        ExpectSuccess(link->RefillClassCache());
         TNlClass tclass(link, -1, handle);
         if (tclass.Exists())
             nr++;
@@ -570,7 +571,7 @@ void RestartDaemon(TPortoAPI &api) {
 
     // We need to wait longer because porto may need to remove huge number of
     // containers
-    WaitPortod(api, 2 * 60);
+    WaitPortod(api, 5 * 60);
 
     RotateDaemonLogs(api);
 

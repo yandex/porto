@@ -250,6 +250,9 @@ TError TNetwork::Update() {
                 return error;
         } else {
             L() << "Found existing link: " << link->GetAlias() << std::endl;
+            TError error = link->RefillClassCache();
+            if (error)
+                return error;
         }
     }
 

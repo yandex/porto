@@ -157,6 +157,10 @@ void TNl::FlushEvents() {
 TNlLink::~TNlLink() {
     if (Link)
         rtnl_link_put(Link);
+    if (ClassCache) {
+        nl_cache_free(ClassCache);
+        ClassCache = nullptr;
+    }
 }
 
 TError TNlLink::SetDefaultGw(const TNlAddr &addr) {
@@ -351,7 +355,12 @@ TError TNl::RefillCache() {
 }
 
 TError TNlLink::RefillCache() {
-    return Nl->RefillCache();
+    TError error = Nl->RefillCache();
+    if (error)
+        return error;
+    if (ClassCache)
+        error = RefillClassCache();
+    return error;
 }
 
 #ifdef IFLA_IPVLAN_MAX
@@ -570,6 +579,24 @@ TError TNlLink::Load() {
     if (!Link)
         return TError(EError::Unknown, string("Invalid link ") + Name);
 
+    int ret = rtnl_class_alloc_cache(Nl->GetSock(), GetIndex(), &ClassCache);
+    if (ret < 0) {
+        (void)Remove();
+        return TError(EError::Unknown, string("Unable to allocate class cache: ") + nl_geterror(ret));
+    }
+
+    LogCache(ClassCache);
+
+    return TError::Success();
+}
+
+TError TNlLink::RefillClassCache() {
+    int ret = nl_cache_refill(GetSock(), ClassCache);
+    if (ret < 0)
+        return TError(EError::Unknown, string("Can't refill class cache: ") + nl_geterror(ret));
+
+    LogCache(ClassCache);
+
     return TError::Success();
 }
 
@@ -655,6 +682,9 @@ TError TNlClass::Create(uint32_t prio, uint32_t rate, uint32_t ceil) {
 free_class:
     rtnl_class_put(tclass);
 
+    if (!error)
+        error = Link->RefillClassCache();
+
     return error;
 }
 
@@ -679,12 +709,17 @@ TError TNlClass::Remove() {
 
     rtnl_class_put(tclass);
 
+    if (!error)
+        error = Link->RefillClassCache();
+
     return error;
 }
 
 TError TNlClass::GetStat(ETclassStat stat, uint64_t &val) {
-    int ret;
-    struct nl_cache *classCache;
+    TError error = Link->RefillClassCache();
+    if (error)
+        return error;
+
     rtnl_tc_stat rtnlStat;
 
     switch (stat) {
@@ -710,65 +745,34 @@ TError TNlClass::GetStat(ETclassStat stat, uint64_t &val) {
         return TError(EError::Unknown, "Unsupported netlink statistics");
     }
 
-    ret = rtnl_class_alloc_cache(Link->GetSock(), Link->GetIndex(), &classCache);
-    if (ret < 0)
-        return TError(EError::Unknown, string("Unable to allocate class cache: ") + nl_geterror(ret));
-
-    Link->LogCache(classCache);
-
-    struct rtnl_class *tclass = rtnl_class_get(classCache, Link->GetIndex(), Handle);
-    if (!tclass) {
-        nl_cache_free(classCache);
+    struct rtnl_class *tclass = rtnl_class_get(Link->GetClassCache(), Link->GetIndex(), Handle);
+    if (!tclass)
         return TError(EError::Unknown, "Can't get class statistics");
-    }
 
     val = rtnl_tc_get_stat(TC_CAST(tclass), (rtnl_tc_stat)rtnlStat);
     rtnl_class_put(tclass);
-    nl_cache_free(classCache);
 
     return TError::Success();
 }
 
 TError TNlClass::GetProperties(uint32_t &prio, uint32_t &rate, uint32_t &ceil) {
-    int ret;
-    struct nl_cache *classCache;
-
-    ret = rtnl_class_alloc_cache(Link->GetSock(), Link->GetIndex(), &classCache);
-    if (ret < 0)
-        return TError(EError::Unknown, string("Unable to allocate class cache: ") + nl_geterror(ret));
-
-    Link->LogCache(classCache);
-
-    struct rtnl_class *tclass = rtnl_class_get(classCache, Link->GetIndex(), Handle);
-    if (!tclass) {
-        nl_cache_free(classCache);
-        return TError(EError::Unknown, "Can't find tc cass");
-    }
+    struct rtnl_class *tclass = rtnl_class_get(Link->GetClassCache(), Link->GetIndex(), Handle);
+    if (!tclass)
+        return TError(EError::Unknown, "Can't find tc class");
 
     prio = rtnl_htb_get_prio(tclass);
     rate = rtnl_htb_get_rate(tclass);
     ceil = rtnl_htb_get_ceil(tclass);
 
     rtnl_class_put(tclass);
-    nl_cache_free(classCache);
 
     return TError::Success();
 }
 
 bool TNlClass::Valid(uint32_t prio, uint32_t rate, uint32_t ceil) {
-    int ret;
-    struct nl_cache *classCache;
     bool valid = true;
 
-    ret = rtnl_class_alloc_cache(Link->GetSock(),
-                                 Link->GetIndex(),
-                                 &classCache);
-    if (ret < 0)
-        return false;
-
-    Link->LogCache(classCache);
-
-    struct rtnl_class *tclass = rtnl_class_get(classCache, Link->GetIndex(), Handle);
+    struct rtnl_class *tclass = rtnl_class_get(Link->GetClassCache(), Link->GetIndex(), Handle);
     if (tclass) {
         if (rtnl_tc_get_link(TC_CAST(tclass)) != Link->GetLink())
             valid = false;
@@ -789,28 +793,15 @@ bool TNlClass::Valid(uint32_t prio, uint32_t rate, uint32_t ceil) {
     }
 
     rtnl_class_put(tclass);
-    nl_cache_free(classCache);
 
     return valid;
 }
 
 bool TNlClass::Exists() {
-    int ret;
-    struct nl_cache *classCache;
-
-    ret = rtnl_class_alloc_cache(Link->GetSock(),
-                                 Link->GetIndex(),
-                                 &classCache);
-    if (ret < 0)
-        return false;
-
-    Link->LogCache(classCache);
-
-    struct rtnl_class *tclass = rtnl_class_get(classCache,
+    struct rtnl_class *tclass = rtnl_class_get(Link->GetClassCache(),
                                                Link->GetIndex(),
                                                Handle);
     rtnl_class_put(tclass);
-    nl_cache_free(classCache);
 
     return tclass != nullptr;
 }

@@ -3251,6 +3251,7 @@ static void TestLimits(TPortoAPI &api) {
 
         i = 0;
         for (auto &link : links) {
+            ExpectSuccess(link->RefillClassCache());
             uint32_t prio, rate, ceil;
             TNlClass tclass(link, -1, stoul(handle));
             ExpectSuccess(tclass.GetProperties(prio, rate, ceil));
@@ -4696,7 +4697,7 @@ static void TestRecovery(TPortoAPI &api) {
 
     ExpectApiFailure(api.Create("max_plus_one"), EError::ResourceNotAvailable);
 
-    KillSlave(api, SIGKILL, 100);
+    KillSlave(api, SIGKILL, 5 * 60);
 
     containers.clear();
     ExpectApiSuccess(api.List(containers));
