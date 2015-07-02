@@ -139,10 +139,11 @@ start_init() {
 }
 
 prepare() {
-	local old_ip="192.168.1.2/24"
+	local old_ip="veth1 192.168.1.2/24"
+	local old_gw="192.168.1.1"
+
 	local new_ip="veth1 192.168.1.2/24; veth1 fec0::2/64"
-	local old_gw="veth1 192.168.1.1"
-	local net_gw="veth1 192.168.1.1; veth1 fec0::1"
+	local new_gw="veth1 192.168.1.1; veth1 fec0::1"
 
 	start_init "$new_gw" "$new_ip" || start_init "$old_gw" "$old_ip"
 	pctl exec $CONTAINER/prepare command="bash -c '/config prepare'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
