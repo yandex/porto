@@ -769,7 +769,7 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
                     L_ERR() << "Can't send " << s << " to slave" << std::endl;
 
                 L() << "Waiting for slave to exit..." << std::endl;
-                (void)RetryFailed(10, 50,
+                (void)RetryFailed(60 * 10, 100,
                 [&]() { return waitpid(slavePid, nullptr, WNOHANG) != slavePid; });
 
                 ret = EncodeSignal(s);
