@@ -9,13 +9,17 @@ typedef std::unique_lock<std::mutex> TScopedLock;
 class TScopedUnlock : public TNonCopyable {
 public:
     TScopedUnlock(TScopedLock &lock) {
-        PORTO_ASSERT(lock);
-        Lock = &lock;
-        Lock->unlock();
+        if (AllowHolderUnlock) {
+            PORTO_ASSERT(lock);
+            Lock = &lock;
+            Lock->unlock();
+        }
     }
     ~TScopedUnlock() {
-        PORTO_ASSERT(!*Lock);
-        Lock->lock();
+        if (AllowHolderUnlock) {
+            PORTO_ASSERT(!*Lock);
+            Lock->lock();
+        }
     }
 private:
     TScopedLock *Lock;
@@ -26,11 +30,20 @@ public:
     TScopedLock ScopedLock() {
         return TScopedLock(Mutex);
     }
-    TScopedLock NestScopedLock(TScopedLock &lock) {
-        PORTO_ASSERT(lock);
-        TScopedUnlock unlock(lock);
-        return TScopedLock(Mutex);
-    }
 private:
     std::mutex Mutex;
+};
+
+class TNestedScopedLock : public TNonCopyable {
+    TScopedLock InnerLock;
+
+public:
+    TNestedScopedLock(TLockable &inner, TScopedLock &outer) {
+        PORTO_ASSERT(outer);
+
+        if (AllowHolderUnlock) {
+            TScopedUnlock unlock(outer);
+            InnerLock = inner.ScopedLock();
+        }
+    }
 };

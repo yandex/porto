@@ -415,7 +415,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     {
         std::shared_ptr<TContainer> target = event.Container.lock();
         if (target) {
-            auto lock = target->NestScopedLock(holder_lock);
+            TNestedScopedLock lock(*target, holder_lock);
             delivered = target->DeliverEvent(holder_lock, event);
         }
         break;
@@ -424,7 +424,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     case EEventType::Exit:
     {
         for (auto &target : List()) {
-            auto lock = target->NestScopedLock(holder_lock);
+            TNestedScopedLock lock(*target, holder_lock);
             delivered = target->DeliverEvent(holder_lock, event);
             if (delivered)
                 break;
@@ -438,7 +438,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     {
         bool rearm = false;
         for (auto &target : List()) {
-            auto lock = target->NestScopedLock(holder_lock);
+            TNestedScopedLock lock(*target, holder_lock);
             if (target->IsLostAndRestored()) {
                 target->SyncStateWithCgroup(holder_lock);
                 rearm = true;
@@ -476,7 +476,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
         }
 
         for (auto &target : List()) {
-            auto lock = target->NestScopedLock(holder_lock);
+            TNestedScopedLock lock(*target, holder_lock);
             target->DeliverEvent(holder_lock, event);
         }
 

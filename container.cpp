@@ -930,14 +930,11 @@ TError TContainer::KillAll(TScopedLock &holder_lock) {
 
     // try to stop all tasks gracefully
     if (!SendSignal(SIGTERM)) {
-        if (AllowHolderUnlock)
-            holder_lock.unlock();
+        TScopedUnlock unlock(holder_lock);
         int ret = SleepWhile(config().container().kill_timeout_ms(),
                              [&]{ return cg->IsEmpty() == false; });
         if (ret)
             L() << "Child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
-        if (AllowHolderUnlock)
-            holder_lock.lock();
     }
 
     // then kill any task that didn't want to stop via SIGTERM signal;
@@ -949,8 +946,7 @@ void TContainer::ApplyForChildren(TScopedLock &holder_lock,
                                                       TContainer &container)> fn) {
     std::vector<std::weak_ptr<TContainer>> children = Children;
 
-    if (AllowHolderUnlock)
-        holder_lock.unlock();
+    TScopedUnlock unlock(holder_lock);
     for (auto iter : children)
         if (auto child = iter.lock()) {
             if (AllowHolderUnlock) {
@@ -962,8 +958,6 @@ void TContainer::ApplyForChildren(TScopedLock &holder_lock,
                 fn(holder_lock, *child);
             }
         }
-    if (AllowHolderUnlock)
-        holder_lock.lock();
 }
 
 void TContainer::StopChildren(TScopedLock &holder_lock) {
@@ -1081,8 +1075,7 @@ TError TContainer::Stop(TScopedLock &holder_lock) {
 
         auto cg = GetLeafCgroup(freezerSubsystem);
 
-        if (AllowHolderUnlock)
-            holder_lock.unlock();
+        TScopedUnlock unlock(holder_lock);
         int ret = SleepWhile(config().container().stop_timeout_ms(),
                              [&] () -> int {
                                  if (cg && cg->IsEmpty())
@@ -1090,8 +1083,6 @@ TError TContainer::Stop(TScopedLock &holder_lock) {
                                  kill(Task->GetPid(), 0);
                                  return errno != ESRCH;
                              });
-        if (AllowHolderUnlock)
-            holder_lock.lock();
         if (ret) {
             L_ERR() << "Can't wait for container to stop" << std::endl;
             return TError(EError::Unknown, "Container didn't stop in " + std::to_string(config().container().stop_timeout_ms()) + "ms");

@@ -137,7 +137,7 @@ static TError DestroyContainer(TContext &context,
         if (!container->Acquire())
             return TError(EError::Busy, "Can't destroy busy container");
 
-        auto lock = container->NestScopedLock(cholder_lock);
+        TNestedScopedLock lock(*container, cholder_lock);
 
         cholder_lock.unlock();
         auto vholder_lock = context.Vholder->ScopedLock();
@@ -217,7 +217,7 @@ static TError StartContainer(TContext &context,
         if (!container->Acquire())
             return TError(EError::Busy, "Can't start busy container");
 
-        auto lock = container->NestScopedLock(holder_lock);
+        TNestedScopedLock lock(*container, holder_lock);
 
         std::string cmd = container->Prop->Get<std::string>(P_COMMAND);
         bool meta = i + 1 != nameVec.end() && cmd.empty();
@@ -259,7 +259,7 @@ static TError StopContainer(TContext &context,
     if (!container->Acquire())
         return TError(EError::Busy, "Can't stop busy container");
 
-    auto lock = container->NestScopedLock(holder_lock);
+    TNestedScopedLock lock(*container, holder_lock);
 
     err = container->Stop(holder_lock);
 
@@ -294,7 +294,7 @@ static TError PauseContainer(TContext &context,
     if (!container->Acquire())
         return TError(EError::Busy, "Can't pause busy container");
 
-    auto lock = container->NestScopedLock(holder_lock);
+    TNestedScopedLock lock(*container, holder_lock);
 
     err = container->Pause(holder_lock);
 
@@ -329,7 +329,7 @@ static TError ResumeContainer(TContext &context,
     if (!container->Acquire())
         return TError(EError::Busy, "Can't resume busy container");
 
-    auto lock = container->NestScopedLock(holder_lock);
+    TNestedScopedLock lock(*container, holder_lock);
 
     err = container->Resume(holder_lock);
 
@@ -371,7 +371,7 @@ static TError GetContainerProperty(TContext &context,
     if (!container->Acquire())
         return TError(EError::Busy, "Can't get property of busy container");
 
-    auto lock = container->NestScopedLock(holder_lock);
+    TNestedScopedLock lock(*container, holder_lock);
 
     string value;
     error = container->GetProperty(req.property(), value, client);
@@ -409,7 +409,7 @@ static TError SetContainerProperty(TContext &context,
     if (!container->Acquire())
         return TError(EError::Busy, "Can't set property of busy container");
 
-    auto lock = container->NestScopedLock(holder_lock);
+    TNestedScopedLock lock(*container, holder_lock);
 
     error = container->SetProperty(holder_lock, req.property(), req.value(), client);
 
@@ -436,7 +436,7 @@ static TError GetContainerData(TContext &context,
     if (!container->Acquire())
         return TError(EError::Busy, "Can't get data of busy container");
 
-    auto lock = container->NestScopedLock(holder_lock);
+    TNestedScopedLock lock(*container, holder_lock);
 
     string value;
     error = container->GetData(holder_lock, req.data(), value);
@@ -474,10 +474,15 @@ static TError GetContainerCombined(TContext &context,
         auto entry = get->add_list();
         entry->set_name(relname);
 
-        if (!container->Acquire())
-            return TError(EError::Busy, "Can't get data and property of busy container");
+        bool acquired = false;
+        if (!containerError) {
+            acquired = container->Acquire();
 
-        auto lock = container->NestScopedLock(holder_lock);
+            if (!acquired)
+                containerError = TError(EError::Busy, "Can't get data and property of busy container");
+        }
+
+        TNestedScopedLock lock(*container, holder_lock);
 
         for (int j = 0; j < req.variable_size(); j++) {
             auto var = req.variable(j);
@@ -507,7 +512,8 @@ static TError GetContainerCombined(TContext &context,
             }
         }
 
-        container->Release();
+        if (acquired)
+            container->Release();
     }
 
     return TError::Success();
@@ -595,7 +601,7 @@ static TError Kill(TContext &context,
     if (!container->Acquire())
         return TError(EError::Busy, "Can't kill busy container");
 
-    auto lock = container->NestScopedLock(holder_lock);
+    TNestedScopedLock lock(*container, holder_lock);
 
     error = container->Kill(req.sig());
 
