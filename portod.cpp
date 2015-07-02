@@ -140,7 +140,9 @@ public:
     }
 };
 
-static bool QueueRequest(TContext &context, TRpcWorker &worker, std::shared_ptr<TClient> client) {
+static bool QueueRequest(TContext &context,
+                         std::shared_ptr<TEpollSource> source,
+                         TRpcWorker &worker, std::shared_ptr<TClient> client) {
     TRequest req{&context, client};
     bool hangup = false;
     bool fullMessage = client->ReadRequest(req.Request, hangup);
@@ -153,6 +155,12 @@ static bool QueueRequest(TContext &context, TRpcWorker &worker, std::shared_ptr<
 
     if (client->Identify(*context.Cholder, false))
         return true;
+
+    TError error = context.EpollLoop->DisableSource(source);
+    if (error) {
+        L_WRN() << "Can't disable client " << client->GetFd() << ": " << error << std::endl;
+        return true;
+    }
 
     worker.Push(req);
 
@@ -176,13 +184,15 @@ static int AcceptClient(TContext &context, int sfd,
         return -1;
     }
 
-    struct timeval to;
-    to.tv_sec = 30;
-    to.tv_usec = 0;
+    if (!config().daemon().blocking_write()) {
+        struct timeval to;
+        to.tv_sec = 30;
+        to.tv_usec = 0;
 
-    if (setsockopt(cfd, SOL_SOCKET, SO_SNDTIMEO, (void *)&to, sizeof(to)) < 0) {
-        L_ERR() << "setsockopt() error: " << strerror(errno) << std::endl;
-        return -1;
+        if (setsockopt(cfd, SOL_SOCKET, SO_SNDTIMEO, (void *)&to, sizeof(to)) < 0) {
+            L_ERR() << "setsockopt() error: " << strerror(errno) << std::endl;
+            return -1;
+        }
     }
 
     auto client = std::make_shared<TClient>(context.EpollLoop, cfd);
@@ -433,16 +443,8 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                 auto client = clients[source->Fd];
                 bool needClose = false;
 
-                TError error = context.EpollLoop->DisableSource(source);
-                if (error) {
-                    L_WRN() << "Can't disable client " << client->GetFd() << ": " << error << std::endl;
-                    context.EpollLoop->RemoveSource(source);
-                    clients.erase(source->Fd);
-                    continue;
-                }
-
                 if (ev.events & EPOLLIN)
-                    needClose = QueueRequest(context, worker, client);
+                    needClose = QueueRequest(context, source, worker, client);
 
                 if ((ev.events & EPOLLHUP) || needClose) {
                     context.EpollLoop->RemoveSource(source);

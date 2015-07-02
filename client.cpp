@@ -167,9 +167,15 @@ void TClient::SetState(EClientState state) {
 }
 
 bool TClient::ReadRequest(rpc::TContainerRequest &req, bool &hangup) {
+    if (config().daemon().blocking_read()) {
+        InterruptibleInputStream InputStream(Fd);
+        return ReadDelimitedFrom(&InputStream, &req);
+    }
+
     while (State == EClientState::ReadingLength) {
         uint8_t byte;
-        if (recv(Fd, &byte, sizeof(byte), MSG_DONTWAIT) <= 0)
+        int ret = recv(Fd, &byte, sizeof(byte), MSG_DONTWAIT);
+        if (ret <= 0)
             return false;
 
         Length |= (byte & 0x7f) << Pos;
