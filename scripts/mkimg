@@ -76,7 +76,10 @@ TMPDIR=$(mktemp -d)
 CGTMPDIR=$(mktemp -d)
 cleanup() {
 	set +e
-	[ $CLEANUP -eq 0 ] && pexec iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE &> /dev/null
+	[ $CLEANUP -eq 0 ] && {
+		pexec iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE &> /dev/null
+		pexec ip6tables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE &> /dev/null
+	}
 	[ $CLEANUP -eq 0 ] && pexec ip link delete veth0 &> /dev/null
 	[ -d $TMPDIR ] && rm -rf $TMPDIR
 	[ -d $CGTMPDIR ] && rm -rf $CGTMPDIR
@@ -87,7 +90,7 @@ trap cleanup EXIT
 
 pctl() {
 	say portoctl "$@"
-	portoctl "$@"
+	cat /dev/null | portoctl "$@"
 }
 
 pexec() { pctl exec ${CONTAINER}-sudo command="/bin/bash -c '$*'" user="root" group="root"; }
@@ -118,19 +121,30 @@ BIND_PROPERTY=""
 [ -z "$CUSTOM" ] || BIND_PROPERTY="${BIND_PROPERTY}; $CUSTOM /custom_config ro"
 
 initnet() {
-	pexec sysctl net.ipv4.ip_forward=1
+	pexec sysctl net.ipv6.conf.all.forwarding=1 net.ipv4.ip_forward=1
 	pexec ip link delete veth0 || :
 	pexec ip link add veth0 type veth peer name veth1
 	pexec ip link set veth0 up
-	pexec ip addr add 192.168.1.2/24 dev veth0
+	pexec ip addr add 192.168.1.1/24 dev veth0
+	pexec ip addr add fec0::1/64 dev veth0
 
 	pexec iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE || :
+	pexec ip6tables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE || :
 	pexec iptables -t nat -A POSTROUTING -o $IFACE -j MASQUERADE
+	pexec ip6tables -t nat -A POSTROUTING -o $IFACE -j MASQUERADE
+}
+
+start_init() {
+	pctl run $CONTAINER command="/sbin/init" root="$IMAGE" hostname="$(hostname -f)" user=root group=root bind="$CONF /config ro; $BIND_PROPERTY; $CGTMPDIR /sys/fs/cgroup ro" bind_dns=false allowed_devices="$ALLOWED_DEVICES" net="host veth1" default_gw="$1" ip="$2" stdout_path="/dev/null" stderr_path="/dev/null"
 }
 
 prepare() {
-	pctl run $CONTAINER command="/sbin/init" root="$IMAGE" hostname="$(hostname -f)" user=root group=root bind="$CONF /config ro; $BIND_PROPERTY; $CGTMPDIR /sys/fs/cgroup ro" bind_dns=false allowed_devices="$ALLOWED_DEVICES" net="host veth1" default_gw="192.168.1.2" ip="veth1 192.168.1.1/24" stdout_path="/dev/null" stderr_path="/dev/null"
+	local old_ip="192.168.1.2/24"
+	local new_ip="veth1 192.168.1.2/24; veth1 fec0::2/64"
+	local old_gw="veth1 192.168.1.1"
+	local net_gw="veth1 192.168.1.1; veth1 fec0::1"
 
+	start_init "$new_gw" "$new_ip" || start_init "$old_gw" "$old_ip"
 	pctl exec $CONTAINER/prepare command="bash -c '/config prepare'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
 	[ -z "$CUSTOM" ] || pctl exec $CONTAINER/prepare command="bash -c '/custom_config'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
 	pctl exec $CONTAINER/prepare command="bash -c '/config cleanup'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
