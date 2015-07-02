@@ -1,3 +1,9 @@
+yandex-porto (1.16.1) precise; urgency=low
+
+  * fix startup crash when checking project quota support
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Thu, 02 Jul 2015 15:04:00 +0300
+
 yandex-porto (1.16) precise; urgency=low
 
   * convert docker2porto to new volume api
