@@ -1040,12 +1040,18 @@ void TContainer::FreeResources() {
 }
 
 bool TContainer::Acquire() {
-    if (!IsAcquired())
+    if (!IsAcquired()) {
+        if (config().log().verbose())
+            L() << "Acquire " << GetName() << std::endl;
         Acquired = true;
-    return Acquired;
+        return true;
+    }
+    return false;
 }
 
 void TContainer::Release() {
+    if (config().log().verbose())
+        L() << "Release " << GetName() << std::endl;
     PORTO_ASSERT(Acquired == true);
     Acquired = false;
 }
