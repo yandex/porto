@@ -17,12 +17,13 @@ def thread2(conn): # top-level executor
     sub1 = 'iss/qloud'
     sub2 = 'iss/base'
 
-    try:
-        conn.Destroy(sub2)
-        conn.Destroy(sub1)
-        conn.Destroy(name)
-    except exceptions.ContainerDoesNotExist:
-        pass
+    for container in [ sub2, sub1, name ]:
+        try:
+            conn.Destroy(container)
+            conn.Destroy(container)
+            conn.Destroy(container)
+        except exceptions.ContainerDoesNotExist:
+            pass
 
     print('create ' + name)
     c = conn.Create(name)
