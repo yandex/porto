@@ -177,7 +177,7 @@ static int AcceptClient(TContext &context, int sfd,
     }
 
     struct timeval to;
-    to.tv_sec = 5;
+    to.tv_sec = 30;
     to.tv_usec = 0;
 
     if (setsockopt(cfd, SOL_SOCKET, SO_SNDTIMEO, (void *)&to, sizeof(to)) < 0) {
