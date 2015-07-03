@@ -94,12 +94,16 @@ def cloud(conn, this_script):
 
 ################################################################################
 
-def run_thread(thread, this_script):
+def run_thread(thread, this_script, iterations = 0):
     conn = Connection(socket_path='/run/portod.socket', timeout=30)
     conn.connect()
 
-    while True:
-        globals()[thread](conn, this_script)
+    if iterations > 0:
+        for i in range(0, iterations):
+            globals()[thread](conn, this_script)
+    else:
+        while True:
+            globals()[thread](conn, this_script)
 
 def init_worker():
     signal.signal(signal.SIGINT, signal.SIG_IGN)
@@ -109,7 +113,7 @@ if __name__ == '__main__':
         if len(sys.argv) > 1:
             run_thread(sys.argv[1], sys.argv[0])
         else:
-            run_thread('top_iss', os.getcwd() + '/' + sys.argv[0])
+            run_thread('top_iss', os.getcwd() + '/' + sys.argv[0], 10)
         sys.exit(0)
     except KeyboardInterrupt:
         print 'Terminated by user'
