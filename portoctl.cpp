@@ -1151,6 +1151,14 @@ public:
         return count;
     }
 
+    std::string GetParent(const std::string &child) {
+        auto lastSlash = child.rfind("/");
+        if (lastSlash == std::string::npos)
+            return "/";
+        else
+            return child.substr(0, lastSlash);
+    }
+
     int Execute(int argc, char *argv[]) {
         bool details = true;
         bool forest = false;
@@ -1175,11 +1183,7 @@ public:
             for (size_t i = 0; i < clist.size(); i++) {
                 auto c = clist[i];
 
-                string parent;
-                ret = Api->GetData(c, "parent", parent);
-                if (ret)
-                    PrintError("Can't get container parent");
-
+                string parent = GetParent(c);
                 if (parent != "/") {
                     string prefix = " ";
                     for (size_t j = 1; j < CountChar(displayName[i], '/'); j++)
