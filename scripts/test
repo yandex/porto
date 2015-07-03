@@ -38,6 +38,13 @@ pkgtest() {
 	done
 }
 
+threadstest() {
+	say "Threads test"
+	restart yandex-porto
+	python $ROOTDIR/test/threads.py
+	sudo NOCHECK=y portotest self daemon
+}
+
 HOST=kernel1.search.yandex.net
 PORT=8081
 
@@ -198,6 +205,7 @@ for t in "$@"; do
 		selfargs) selftest "$@" ; exit ;;
 		stress) stresstest ;;
 		fuzzy) fuzzytest ;;
+		threads) threadstest ;;
 		stressargs) shift; stresstest "$@"; exit $? ;;
 		pkg) pkgtest ;;
 		net) nettest ;;

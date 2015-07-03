@@ -156,8 +156,7 @@ static const std::vector<std::function<int(TPortoAPI&, int)>> handlers = {
 };
 
 static void ThreadMain(int n, int iter) {
-    //seed = (unsigned int)time();
-    seed = (unsigned int)n;
+    seed = (unsigned int)time(nullptr);
     tid = n + 1;
 
     TPortoAPI api(config().rpc_sock().file().path());

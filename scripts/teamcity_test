@@ -7,6 +7,7 @@ export PATH="/usr/sbin:$PATH"
 DUMMY_ETH=eth9
 PORTO_VERSION=$(git describe | sed -e 's/^v//')
 PORTO_DPKG="$PWD/../yandex-porto_${PORTO_VERSION}_amd64.deb"
+PYTHON_DPKG="$PWD/../python-portopy_${PORTO_VERSION}_all.deb"
 
 getver() { portoctl -v 2>&1 | grep $1 | awk '{print $2}'; }
 checkver() { [ "$2" = "$3" ] || { echo "Invalid $1 version ($2 != $3)"; }; }
@@ -15,7 +16,7 @@ _build() {
 	dch --newversion $PORTO_VERSION "teamcity build"
 	find ../ -name '*.deb' -o -name '*.build' -o -name '*.changes' -print0 | xargs -0 rm -f
 	debuild "$@" -i -us -uc -b
-	sudo dpkg -i "$PORTO_DPKG"
+	sudo dpkg -i "$PORTO_DPKG" "$PYTHON_DPKG"
 
 	checkver server v$PORTO_VERSION $(getver server)
 	checkver client v$PORTO_VERSION $(getver client)
@@ -72,7 +73,15 @@ netup() {
 	sudo ip addr add 192.168.2.2/16 dev $DUMMY_ETH
 }
 
+threadstest() {
+	scripts/test threads
+}
+
 update() {
+	# TODO: TEMPORARY!!! UNTIL WE CREATE STEP IN TEAMCITY {{{
+	threadstest
+	# }}}
+
 	sudo scripts/test_update "$PORTO_DPKG"
 }
 
@@ -82,7 +91,7 @@ netdown() {
 	sudo reload yandex-porto
 }
 
-[ ! $# -eq 0 ] || set -- build selftest pkgtest stresstest update
+[ ! $# -eq 0 ] || set -- build selftest pkgtest stresstest threadstest update
 trap print_logs EXIT
 for f in "$@"; do eval $f; done
 trap - EXIT
