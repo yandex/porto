@@ -75,8 +75,7 @@ void PrintTrace() {
 					    funcname, &funcnamesize, &status);
 	    if (status == 0) {
 		funcname = ret; // use possibly realloc()-ed string
-		L() << symbollist[i] << ": " << funcname << "()+"
-                    << begin_offset << " " << begin_addr << std::endl;
+		L() << symbollist[i] << ": " << funcname << " " << begin_addr << std::endl;
 	    } else {
 		// demangling failed. Output function name as a C function with
 		// no arguments.
