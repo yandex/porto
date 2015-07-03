@@ -91,10 +91,10 @@ static TError CheckRequestPermissions(std::shared_ptr<TClient> client) {
     return TError::Success();
 }
 
-static noinline TError CreateContainer(TContext &context,
-                              const rpc::TContainerCreateRequest &req,
-                              rpc::TContainerResponse &rsp,
-                              std::shared_ptr<TClient> client) {
+noinline TError CreateContainer(TContext &context,
+                                const rpc::TContainerCreateRequest &req,
+                                rpc::TContainerResponse &rsp,
+                                std::shared_ptr<TClient> client) {
     auto lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
@@ -113,10 +113,10 @@ static noinline TError CreateContainer(TContext &context,
     return context.Cholder->Create(name, client->GetCred());
 }
 
-static noinline TError DestroyContainer(TContext &context,
-                               const rpc::TContainerDestroyRequest &req,
-                               rpc::TContainerResponse &rsp,
-                               std::shared_ptr<TClient> client) {
+noinline TError DestroyContainer(TContext &context,
+                                 const rpc::TContainerDestroyRequest &req,
+                                 rpc::TContainerResponse &rsp,
+                                 std::shared_ptr<TClient> client) {
     auto cholder_lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
@@ -184,10 +184,10 @@ static noinline TError DestroyContainer(TContext &context,
     return context.Cholder->Destroy(cholder_lock, name);
 }
 
-static noinline TError StartContainer(TContext &context,
-                             const rpc::TContainerStartRequest &req,
-                             rpc::TContainerResponse &rsp,
-                             std::shared_ptr<TClient> client) {
+noinline TError StartContainer(TContext &context,
+                               const rpc::TContainerStartRequest &req,
+                               rpc::TContainerResponse &rsp,
+                               std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
@@ -248,10 +248,10 @@ static noinline TError StartContainer(TContext &context,
     return TError::Success();
 }
 
-static noinline TError StopContainer(TContext &context,
-                            const rpc::TContainerStopRequest &req,
-                            rpc::TContainerResponse &rsp,
-                            std::shared_ptr<TClient> client) {
+noinline TError StopContainer(TContext &context,
+                              const rpc::TContainerStopRequest &req,
+                              rpc::TContainerResponse &rsp,
+                              std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
@@ -288,10 +288,10 @@ static noinline TError StopContainer(TContext &context,
     return err;
 }
 
-static noinline TError PauseContainer(TContext &context,
-                             const rpc::TContainerPauseRequest &req,
-                             rpc::TContainerResponse &rsp,
-                             std::shared_ptr<TClient> client) {
+noinline TError PauseContainer(TContext &context,
+                               const rpc::TContainerPauseRequest &req,
+                               rpc::TContainerResponse &rsp,
+                               std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
@@ -328,10 +328,10 @@ static noinline TError PauseContainer(TContext &context,
     return err;
 }
 
-static noinline TError ResumeContainer(TContext &context,
-                              const rpc::TContainerResumeRequest &req,
-                              rpc::TContainerResponse &rsp,
-                              std::shared_ptr<TClient> client) {
+noinline TError ResumeContainer(TContext &context,
+                                const rpc::TContainerResumeRequest &req,
+                                rpc::TContainerResponse &rsp,
+                                std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
@@ -368,9 +368,9 @@ static noinline TError ResumeContainer(TContext &context,
     return err;
 }
 
-static noinline TError ListContainers(TContext &context,
-                             rpc::TContainerResponse &rsp,
-                             std::shared_ptr<TClient> client) {
+noinline TError ListContainers(TContext &context,
+                               rpc::TContainerResponse &rsp,
+                               std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
     for (auto &c : context.Cholder->List()) {
@@ -388,10 +388,10 @@ static noinline TError ListContainers(TContext &context,
     return TError::Success();
 }
 
-static noinline TError GetContainerProperty(TContext &context,
-                                   const rpc::TContainerGetPropertyRequest &req,
-                                   rpc::TContainerResponse &rsp,
-                                   std::shared_ptr<TClient> client) {
+noinline TError GetContainerProperty(TContext &context,
+                                     const rpc::TContainerGetPropertyRequest &req,
+                                     rpc::TContainerResponse &rsp,
+                                     std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
     std::shared_ptr<TContainer> clientContainer;
@@ -423,10 +423,10 @@ static noinline TError GetContainerProperty(TContext &context,
     return error;
 }
 
-static noinline TError SetContainerProperty(TContext &context,
-                                   const rpc::TContainerSetPropertyRequest &req,
-                                   rpc::TContainerResponse &rsp,
-                                   std::shared_ptr<TClient> client) {
+noinline TError SetContainerProperty(TContext &context,
+                                     const rpc::TContainerSetPropertyRequest &req,
+                                     rpc::TContainerResponse &rsp,
+                                     std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
@@ -463,10 +463,10 @@ static noinline TError SetContainerProperty(TContext &context,
     return error;
 }
 
-static noinline TError GetContainerData(TContext &context,
-                               const rpc::TContainerGetDataRequest &req,
-                               rpc::TContainerResponse &rsp,
-                               std::shared_ptr<TClient> client) {
+noinline TError GetContainerData(TContext &context,
+                                 const rpc::TContainerGetDataRequest &req,
+                                 rpc::TContainerResponse &rsp,
+                                 std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
     std::shared_ptr<TContainer> clientContainer;
@@ -498,10 +498,10 @@ static noinline TError GetContainerData(TContext &context,
     return error;
 }
 
-static noinline TError GetContainerCombined(TContext &context,
-                                   const rpc::TContainerGetRequest &req,
-                                   rpc::TContainerResponse &rsp,
-                                   std::shared_ptr<TClient> client) {
+noinline TError GetContainerCombined(TContext &context,
+                                     const rpc::TContainerGetRequest &req,
+                                     rpc::TContainerResponse &rsp,
+                                     std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
     if (!req.variable_size())
@@ -576,8 +576,8 @@ static noinline TError GetContainerCombined(TContext &context,
     return TError::Success();
 }
 
-static noinline TError ListProperty(TContext &context,
-                           rpc::TContainerResponse &rsp) {
+noinline TError ListProperty(TContext &context,
+                             rpc::TContainerResponse &rsp) {
     auto lock = context.Cholder->ScopedLock();
 
     auto list = rsp.mutable_propertylist();
@@ -604,8 +604,8 @@ static noinline TError ListProperty(TContext &context,
     return TError::Success();
 }
 
-static noinline TError ListData(TContext &context,
-                       rpc::TContainerResponse &rsp) {
+noinline TError ListData(TContext &context,
+                         rpc::TContainerResponse &rsp) {
     auto lock = context.Cholder->ScopedLock();
 
     auto list = rsp.mutable_datalist();
@@ -632,10 +632,10 @@ static noinline TError ListData(TContext &context,
     return TError::Success();
 }
 
-static noinline TError Kill(TContext &context,
-                   const rpc::TContainerKillRequest &req,
-                   rpc::TContainerResponse &rsp,
-                   std::shared_ptr<TClient> client) {
+noinline TError Kill(TContext &context,
+                     const rpc::TContainerKillRequest &req,
+                     rpc::TContainerResponse &rsp,
+                     std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
@@ -672,8 +672,8 @@ static noinline TError Kill(TContext &context,
     return error;
 }
 
-static noinline TError Version(TContext &context,
-                      rpc::TContainerResponse &rsp) {
+noinline TError Version(TContext &context,
+                        rpc::TContainerResponse &rsp) {
     auto ver = rsp.mutable_version();
 
     ver->set_tag(GIT_TAG);
@@ -682,10 +682,10 @@ static noinline TError Version(TContext &context,
     return TError::Success();
 }
 
-static noinline TError Wait(TContext &context,
-                   const rpc::TContainerWaitRequest &req,
-                   rpc::TContainerResponse &rsp,
-                   std::shared_ptr<TClient> client) {
+noinline TError Wait(TContext &context,
+                     const rpc::TContainerWaitRequest &req,
+                     rpc::TContainerResponse &rsp,
+                     std::shared_ptr<TClient> client) {
     auto lock = context.Cholder->ScopedLock();
 
     if (!req.name_size())
@@ -736,13 +736,13 @@ static noinline TError Wait(TContext &context,
     return TError::Queued();
 }
 
-static noinline TError ListVolumeProperties(TContext &context,
-                                   const rpc::TVolumePropertyListRequest &req,
-                                   rpc::TContainerResponse &rsp,
-                                   std::shared_ptr<TClient> client) {
+noinline TError ListVolumeProperties(TContext &context,
+                                     const rpc::TVolumePropertyListRequest &req,
+                                     rpc::TContainerResponse &rsp,
+                                     std::shared_ptr<TClient> client) {
 
     if (!config().volumes().enabled())
-            return TError(EError::InvalidMethod, "volume api is disabled");
+        return TError(EError::InvalidMethod, "volume api is disabled");
 
     auto list = rsp.mutable_volumepropertylist();
     for (auto kv: context.Vholder->ListProperties()) {
@@ -754,9 +754,9 @@ static noinline TError ListVolumeProperties(TContext &context,
     return TError::Success();
 }
 
-static noinline void FillVolumeDescription(rpc::TVolumeDescription *desc,
-                                  TPath container_root, TPath volume_path,
-                                  std::shared_ptr<TVolume> volume) {
+noinline void FillVolumeDescription(rpc::TVolumeDescription *desc,
+                                    TPath container_root, TPath volume_path,
+                                    std::shared_ptr<TVolume> volume) {
     desc->set_path(volume_path.ToString());
     for (auto kv: volume->GetProperties(container_root)) {
         auto p = desc->add_properties();
@@ -767,13 +767,13 @@ static noinline void FillVolumeDescription(rpc::TVolumeDescription *desc,
         desc->add_containers(name);
 }
 
-static noinline TError CreateVolume(TContext &context,
-                           const rpc::TVolumeCreateRequest &req,
-                           rpc::TContainerResponse &rsp,
-                           std::shared_ptr<TClient> client) {
+noinline TError CreateVolume(TContext &context,
+                             const rpc::TVolumeCreateRequest &req,
+                             rpc::TContainerResponse &rsp,
+                             std::shared_ptr<TClient> client) {
 
     if (!config().volumes().enabled())
-            return TError(EError::InvalidMethod, "volume api is disabled");
+        return TError(EError::InvalidMethod, "volume api is disabled");
 
     TError error = CheckRequestPermissions(client);
     if (error)
@@ -862,13 +862,13 @@ static noinline TError CreateVolume(TContext &context,
     return TError::Success();
 }
 
-static noinline TError LinkVolume(TContext &context,
-                         const rpc::TVolumeLinkRequest &req,
-                         rpc::TContainerResponse &rsp,
-                         std::shared_ptr<TClient> client) {
+noinline TError LinkVolume(TContext &context,
+                           const rpc::TVolumeLinkRequest &req,
+                           rpc::TContainerResponse &rsp,
+                           std::shared_ptr<TClient> client) {
 
     if (!config().volumes().enabled())
-            return TError(EError::InvalidMethod, "volume api is disabled");
+        return TError(EError::InvalidMethod, "volume api is disabled");
 
     TError error = CheckRequestPermissions(client);
     if (error)
@@ -923,13 +923,13 @@ static noinline TError LinkVolume(TContext &context,
     return volume->LinkContainer(container->GetName());
 }
 
-static noinline TError UnlinkVolume(TContext &context,
-                           const rpc::TVolumeUnlinkRequest &req,
-                           rpc::TContainerResponse &rsp,
-                           std::shared_ptr<TClient> client) {
+noinline TError UnlinkVolume(TContext &context,
+                             const rpc::TVolumeUnlinkRequest &req,
+                             rpc::TContainerResponse &rsp,
+                             std::shared_ptr<TClient> client) {
 
     if (!config().volumes().enabled())
-            return TError(EError::InvalidMethod, "volume api is disabled");
+        return TError(EError::InvalidMethod, "volume api is disabled");
 
     TError error = CheckRequestPermissions(client);
     if (error)
@@ -1002,13 +1002,13 @@ static noinline TError UnlinkVolume(TContext &context,
     return error;
 }
 
-static noinline TError ListVolumes(TContext &context,
-                          const rpc::TVolumeListRequest &req,
-                          rpc::TContainerResponse &rsp,
-                          std::shared_ptr<TClient> client) {
+noinline TError ListVolumes(TContext &context,
+                            const rpc::TVolumeListRequest &req,
+                            rpc::TContainerResponse &rsp,
+                            std::shared_ptr<TClient> client) {
 
     if (!config().volumes().enabled())
-            return TError(EError::InvalidMethod, "volume api is disabled");
+        return TError(EError::InvalidMethod, "volume api is disabled");
 
     std::shared_ptr<TContainer> clientContainer;
     TError error = client->GetContainer(clientContainer);
@@ -1065,9 +1065,9 @@ static bool LayerInUse(TContext &context, TPath layer) {
     return false;
 }
 
-static noinline TError ImportLayer(TContext &context,
-                          const rpc::TLayerImportRequest &req,
-                          std::shared_ptr<TClient> client) {
+noinline TError ImportLayer(TContext &context,
+                            const rpc::TLayerImportRequest &req,
+                            std::shared_ptr<TClient> client) {
 
     if (!config().volumes().enabled())
         return TError(EError::InvalidMethod, "volume api is disabled");
@@ -1083,7 +1083,7 @@ static noinline TError ImportLayer(TContext &context,
 
     std::string layer_name = req.layer();
     if (layer_name.find_first_of("/\\\n\r\t ") != string::npos ||
-            layer_name == "_tmp_")
+        layer_name == "_tmp_")
         return TError(EError::InvalidValue, "invalid layer name");
 
     TPath layers = TPath(config().volumes().layers_dir());
@@ -1152,9 +1152,9 @@ err_tmp:
     return error;
 }
 
-static noinline TError ExportLayer(TContext &context,
-                          const rpc::TLayerExportRequest &req,
-                          std::shared_ptr<TClient> client) {
+noinline TError ExportLayer(TContext &context,
+                            const rpc::TLayerExportRequest &req,
+                            std::shared_ptr<TClient> client) {
 
     if (!config().volumes().enabled())
         return TError(EError::InvalidMethod, "volume api is disabled");
@@ -1214,12 +1214,12 @@ static noinline TError ExportLayer(TContext &context,
     return TError::Success();
 }
 
-static noinline TError RemoveLayer(TContext &context,
-                          const rpc::TLayerRemoveRequest &req,
-                          std::shared_ptr<TClient> client) {
+noinline TError RemoveLayer(TContext &context,
+                            const rpc::TLayerRemoveRequest &req,
+                            std::shared_ptr<TClient> client) {
 
     if (!config().volumes().enabled())
-            return TError(EError::InvalidMethod, "volume api is disabled");
+        return TError(EError::InvalidMethod, "volume api is disabled");
 
     TError error = CheckRequestPermissions(client);
     if (error)
@@ -1258,11 +1258,11 @@ err:
     return error;
 }
 
-static noinline TError ListLayers(TContext &context,
-                         rpc::TContainerResponse &rsp) {
+noinline TError ListLayers(TContext &context,
+                           rpc::TContainerResponse &rsp) {
 
     if (!config().volumes().enabled())
-            return TError(EError::InvalidMethod, "volume api is disabled");
+        return TError(EError::InvalidMethod, "volume api is disabled");
 
     TPath layers_dir = TPath(config().volumes().layers_dir());
     std::vector<std::string> layers;
