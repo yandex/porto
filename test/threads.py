@@ -18,18 +18,21 @@ def top_iss(conn, this_script):  # top-level executor
     print('start monitoring...')
     monitoring = conn.Create('monitoring')
     monitoring.SetProperty('command', 'python ' + this_script + ' monitoring')
+    monitoring.SetProperty('cwd', os.getcwd())
     monitoring.SetProperty('isolate', 'false')
     monitoring.Start()
 
     print('start cloud')
     cloud = conn.Create('cloud')
     cloud.SetProperty('command', 'python ' + this_script + ' cloud')
+    cloud.SetProperty('cwd', os.getcwd())
     cloud.SetProperty('porto_namespace', 'cloud/')
     cloud.Start()
 
     print('start iss2')
     iss2 = conn.Create('iss2')
     iss2.SetProperty('command', 'python ' + this_script + ' iss')
+    iss2.SetProperty('cwd', os.getcwd())
     iss2.SetProperty('porto_namespace', 'iss2/')
     iss2.Start()
 
@@ -110,10 +113,14 @@ def init_worker():
 
 if __name__ == '__main__':
     try:
+        this_script = sys.argv[0]
+        if this_script[0] != '/':
+            this_script = os.getcwd() + '/' + this_script
+
         if len(sys.argv) > 1:
-            run_thread(sys.argv[1], sys.argv[0])
+            run_thread(sys.argv[1], this_script)
         else:
-            run_thread('top_iss', os.getcwd() + '/' + sys.argv[0], 10)
+            run_thread('top_iss', this_script, 10)
         sys.exit(0)
     except KeyboardInterrupt:
         print 'Terminated by user'
