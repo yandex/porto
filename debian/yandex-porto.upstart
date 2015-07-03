@@ -10,6 +10,7 @@ start on yandex-networking-started
 respawn
 
 kill signal SIGINT
+kill timeout 60
 
 pre-start script
 	# we want to clean up daemon state only if it stopped gracefully by
