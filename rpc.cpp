@@ -537,7 +537,9 @@ static noinline TError GetContainerCombined(TContext &context,
                 containerError = TError(EError::Busy, "Can't get data and property of busy container");
         }
 
-        TNestedScopedLock lock(*container, holder_lock);
+        TNestedScopedLock lock;
+        if (container)
+            lock = TNestedScopedLock(*container, holder_lock);
 
         for (int j = 0; j < req.variable_size(); j++) {
             auto var = req.variable(j);
