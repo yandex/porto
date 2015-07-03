@@ -6,6 +6,8 @@
 #include "error.hpp"
 #include "version.hpp"
 
+#define noinline __attribute__((noinline))
+
 #define PORTO_ASSERT(EXPR) \
     do { \
         if (!(EXPR)) { \
