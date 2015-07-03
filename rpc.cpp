@@ -101,8 +101,13 @@ static TError CreateContainer(TContext &context,
     if (err)
         return err;
 
+    std::shared_ptr<TContainer> clientContainer;
+    err = client->GetContainer(clientContainer);
+    if (err)
+        return err;
+
     std::string name;
-    err = client->GetContainer()->AbsoluteName(req.name(), name);
+    err = clientContainer->AbsoluteName(req.name(), name);
     if (err)
         return err;
     return context.Cholder->Create(name, client->GetCred());
@@ -118,8 +123,13 @@ static TError DestroyContainer(TContext &context,
     if (err)
         return err;
 
+    std::shared_ptr<TContainer> clientContainer;
+    err = client->GetContainer(clientContainer);
+    if (err)
+        return err;
+
     std::string name;
-    err = client->GetContainer()->AbsoluteName(req.name(), name);
+    err = clientContainer->AbsoluteName(req.name(), name);
     if (err)
         return err;
 
@@ -184,8 +194,13 @@ static TError StartContainer(TContext &context,
     if (err)
         return err;
 
+    std::shared_ptr<TContainer> clientContainer;
+    err = client->GetContainer(clientContainer);
+    if (err)
+        return err;
+
     std::string name;
-    err = client->GetContainer()->AbsoluteName(req.name(), name);
+    err = clientContainer->AbsoluteName(req.name(), name);
     if (err)
         return err;
 
@@ -243,8 +258,13 @@ static TError StopContainer(TContext &context,
     if (err)
         return err;
 
+    std::shared_ptr<TContainer> clientContainer;
+    err = client->GetContainer(clientContainer);
+    if (err)
+        return err;
+
     std::string name;
-    err = client->GetContainer()->AbsoluteName(req.name(), name);
+    err = clientContainer->AbsoluteName(req.name(), name);
     if (err)
         return err;
     std::shared_ptr<TContainer> container;
@@ -278,8 +298,13 @@ static TError PauseContainer(TContext &context,
     if (err)
         return err;
 
+    std::shared_ptr<TContainer> clientContainer;
+    err = client->GetContainer(clientContainer);
+    if (err)
+        return err;
+
     std::string name;
-    err = client->GetContainer()->AbsoluteName(req.name(), name);
+    err = clientContainer->AbsoluteName(req.name(), name);
     if (err)
         return err;
     std::shared_ptr<TContainer> container;
@@ -313,8 +338,13 @@ static TError ResumeContainer(TContext &context,
     if (err)
         return err;
 
+    std::shared_ptr<TContainer> clientContainer;
+    err = client->GetContainer(clientContainer);
+    if (err)
+        return err;
+
     std::string name;
-    err = client->GetContainer()->AbsoluteName(req.name(), name);
+    err = clientContainer->AbsoluteName(req.name(), name);
     if (err)
         return err;
     std::shared_ptr<TContainer> container;
@@ -344,8 +374,13 @@ static TError ListContainers(TContext &context,
     auto holder_lock = context.Cholder->ScopedLock();
 
     for (auto &c : context.Cholder->List()) {
+        std::shared_ptr<TContainer> clientContainer;
+        TError err = client->GetContainer(clientContainer);
+        if (err)
+            return err;
+
         std::string name;
-        TError err = client->GetContainer()->RelativeName(*c, name);
+        err = clientContainer->RelativeName(*c, name);
         if (!err)
             rsp.mutable_list()->add_name(name);
     }
@@ -359,8 +394,13 @@ static TError GetContainerProperty(TContext &context,
                                    std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
+    std::shared_ptr<TContainer> clientContainer;
+    TError err = client->GetContainer(clientContainer);
+    if (err)
+        return err;
+
     std::string name;
-    TError err = client->GetContainer()->AbsoluteName(req.name(), name, true);
+    err = clientContainer->AbsoluteName(req.name(), name, true);
     if (err)
         return err;
     std::shared_ptr<TContainer> container;
@@ -393,8 +433,13 @@ static TError SetContainerProperty(TContext &context,
     if (err)
         return err;
 
+    std::shared_ptr<TContainer> clientContainer;
+    err = client->GetContainer(clientContainer);
+    if (err)
+        return err;
+
     std::string name;
-    err = client->GetContainer()->AbsoluteName(req.name(), name);
+    err = clientContainer->AbsoluteName(req.name(), name);
     if (err)
         return err;
     std::shared_ptr<TContainer> container;
@@ -424,8 +469,13 @@ static TError GetContainerData(TContext &context,
                                std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
+    std::shared_ptr<TContainer> clientContainer;
+    TError err = client->GetContainer(clientContainer);
+    if (err)
+        return err;
+
     std::string name;
-    TError err = client->GetContainer()->AbsoluteName(req.name(), name, true);
+    err = clientContainer->AbsoluteName(req.name(), name, true);
     if (err)
         return err;
     std::shared_ptr<TContainer> container;
@@ -460,6 +510,11 @@ static TError GetContainerCombined(TContext &context,
     if (!req.name_size())
         return TError(EError::InvalidValue, "Containers are not specified");
 
+    std::shared_ptr<TContainer> clientContainer;
+    TError err = client->GetContainer(clientContainer);
+    if (err)
+        return err;
+
     auto get = rsp.mutable_get();
 
     for (int i = 0; i < req.name_size(); i++) {
@@ -467,7 +522,7 @@ static TError GetContainerCombined(TContext &context,
 
         std::string name;
         std::shared_ptr<TContainer> container;
-        TError containerError = client->GetContainer()->AbsoluteName(relname, name, true);
+        TError containerError = clientContainer->AbsoluteName(relname, name, true);
         if (!containerError)
             containerError = context.Cholder->Get(name, container);
 
@@ -585,8 +640,13 @@ static TError Kill(TContext &context,
     if (err)
         return err;
 
+    std::shared_ptr<TContainer> clientContainer;
+    err = client->GetContainer(clientContainer);
+    if (err)
+        return err;
+
     std::string name;
-    err = client->GetContainer()->AbsoluteName(req.name(), name);
+    err = clientContainer->AbsoluteName(req.name(), name);
     if (err)
         return err;
     std::shared_ptr<TContainer> container;
@@ -629,6 +689,11 @@ static TError Wait(TContext &context,
     if (!req.name_size())
         return TError(EError::InvalidValue, "Containers are not specified");
 
+    std::shared_ptr<TContainer> clientContainer;
+    TError err = client->GetContainer(clientContainer);
+    if (err)
+        return err;
+
     auto fn = [] (std::shared_ptr<TClient> client,
                   TError error, std::string name) {
         rpc::TContainerResponse response;
@@ -642,7 +707,7 @@ static TError Wait(TContext &context,
     for (int i = 0; i < req.name_size(); i++) {
         std::string name = req.name(i);
         std::string abs_name;
-        TError err = client->GetContainer()->AbsoluteName(name, abs_name);
+        err = clientContainer->AbsoluteName(name, abs_name);
         if (err) {
             rsp.mutable_wait()->set_name(name);
             return err;
@@ -712,6 +777,11 @@ static TError CreateVolume(TContext &context,
     if (error)
         return error;
 
+    std::shared_ptr<TContainer> clientContainer;
+    error = client->GetContainer(clientContainer);
+    if (error)
+        return error;
+
     std::map<std::string, std::string> properties;
     for (auto p: req.properties())
         properties[p.name()] = p.value();
@@ -725,15 +795,14 @@ static TError CreateVolume(TContext &context,
     /* cannot block: volume is not registered yet */
     auto volume_lock = volume->ScopedLock();
 
-    auto container = client->GetContainer();
-    auto container_root = container->RootPath();
+    auto container_root = clientContainer->RootPath();
 
     TPath volume_path("");
     if (req.has_path() && !req.path().empty())
         volume_path = container_root.AddComponent(req.path());
 
     error = volume->Configure(volume_path, client->GetCred(),
-                              container, properties);
+                              clientContainer, properties);
     if (error) {
         context.Vholder->Remove(volume);
         return error;
@@ -769,7 +838,7 @@ static TError CreateVolume(TContext &context,
 
     auto cholder_lock = context.Cholder->ScopedLock();
 
-    error = volume->LinkContainer(container->GetName());
+    error = volume->LinkContainer(clientContainer->GetName());
     if (error) {
         cholder_lock.unlock();
 
@@ -779,7 +848,7 @@ static TError CreateVolume(TContext &context,
         context.Vholder->Remove(volume);
         return error;
     }
-    container->LinkVolume(volume);
+    clientContainer->LinkVolume(volume);
     cholder_lock.unlock();
 
     volume->SetReady(true);
@@ -803,11 +872,16 @@ static TError LinkVolume(TContext &context,
     if (error)
         return error;
 
+    std::shared_ptr<TContainer> clientContainer;
+    error = client->GetContainer(clientContainer);
+    if (error)
+        return error;
+
     auto cholder_lock = context.Cholder->ScopedLock();
     std::shared_ptr<TContainer> container;
     if (req.has_container()) {
         std::string name;
-        TError err = client->GetContainer()->AbsoluteName(req.container(), name, true);
+        TError err = clientContainer->AbsoluteName(req.container(), name, true);
         if (err)
             return err;
 
@@ -819,11 +893,11 @@ static TError LinkVolume(TContext &context,
         if (error)
             return error;
     } else {
-        container = client->GetContainer();
+        container = clientContainer;
     }
     cholder_lock.unlock();
 
-    TPath volume_path = client->GetContainer()->RootPath().AddComponent(req.path());
+    TPath volume_path = clientContainer->RootPath().AddComponent(req.path());
 
     auto vholder_lock = context.Vholder->ScopedLock();
     auto volume = context.Vholder->Find(volume_path);
@@ -859,13 +933,18 @@ static TError UnlinkVolume(TContext &context,
     if (error)
         return error;
 
+    std::shared_ptr<TContainer> clientContainer;
+    error = client->GetContainer(clientContainer);
+    if (error)
+        return error;
+
     auto vholder_lock = context.Vholder->ScopedLock();
     auto cholder_lock = context.Cholder->ScopedLock();
 
     std::shared_ptr<TContainer> container;
     if (req.has_container()) {
         std::string name;
-        TError err = client->GetContainer()->AbsoluteName(req.container(), name, true);
+        TError err = clientContainer->AbsoluteName(req.container(), name, true);
         if (err)
             return err;
 
@@ -877,10 +956,10 @@ static TError UnlinkVolume(TContext &context,
         if (error)
             return error;
     } else {
-        container = client->GetContainer();
+        container = clientContainer;
     }
 
-    TPath volume_path = client->GetContainer()->RootPath().AddComponent(req.path());
+    TPath volume_path = clientContainer->RootPath().AddComponent(req.path());
 
     std::shared_ptr<TVolume> volume = context.Vholder->Find(volume_path);
     if (!volume)
@@ -929,8 +1008,12 @@ static TError ListVolumes(TContext &context,
     if (!config().volumes().enabled())
             return TError(EError::InvalidMethod, "volume api is disabled");
 
-    auto container = client->GetContainer();
-    TPath container_root = container->RootPath();
+    std::shared_ptr<TContainer> clientContainer;
+    TError error = client->GetContainer(clientContainer);
+    if (error)
+        return error;
+
+    TPath container_root = clientContainer->RootPath();
 
     auto vholder_lock = context.Vholder->ScopedLock();
 
@@ -991,6 +1074,11 @@ static TError ImportLayer(TContext &context,
     if (error)
         return error;
 
+    std::shared_ptr<TContainer> clientContainer;
+    error = client->GetContainer(clientContainer);
+    if (error)
+        return error;
+
     std::string layer_name = req.layer();
     if (layer_name.find_first_of("/\\\n\r\t ") != string::npos ||
             layer_name == "_tmp_")
@@ -1005,7 +1093,7 @@ static TError ImportLayer(TContext &context,
     if (!tarball.IsAbsolute())
         return TError(EError::InvalidValue, "tarball path must be absolute");
 
-    tarball = client->GetContainer()->RootPath().AddComponent(tarball);
+    tarball = clientContainer->RootPath().AddComponent(tarball);
 
     if (tarball.GetType() != EFileType::Regular)
         return TError(EError::InvalidValue, "tarball not a file");
@@ -1073,12 +1161,17 @@ static TError ExportLayer(TContext &context,
     if (error)
         return error;
 
+    std::shared_ptr<TContainer> clientContainer;
+    error = client->GetContainer(clientContainer);
+    if (error)
+        return error;
+
     TPath tarball(req.tarball());
 
     if (!tarball.IsAbsolute())
         return TError(EError::InvalidValue, "tarball path must be absolute");
 
-    tarball = client->GetContainer()->RootPath().AddComponent(tarball);
+    tarball = clientContainer->RootPath().AddComponent(tarball);
 
     if (tarball.Exists())
         return TError(EError::InvalidValue, "tarball already exists");

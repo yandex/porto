@@ -651,20 +651,21 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
     taskEnv->BindDns = Prop->Get<bool>(P_BIND_DNS);
 
     if (client) {
-        auto client_container = client->TryGetContainer();
-        if (!client_container)
-            return TError(EError::InvalidValue, "Cannot get client container");
-        TPath client_root = client_container->RootPath();
-        if (client_root.IsEmpty())
+        std::shared_ptr<TContainer> clientContainer;
+        TError error = client->GetContainer(clientContainer);
+        if (error)
+            return error;
+        TPath clientRoot = clientContainer->RootPath();
+        if (clientRoot.IsEmpty())
             return TError(EError::InvalidValue, "Cannot get client root path");
-        if (!client_root.IsRoot()) {
+        if (!clientRoot.IsRoot()) {
             TError error = taskEnv->ClientNs.Open(client->GetPid(), true);
             if (error)
                 return error;
-            taskEnv->Root = client_root.InnerPath(taskEnv->Root, true);
-            taskEnv->StdinPath = client_root.InnerPath(taskEnv->StdinPath, true);
-            taskEnv->StdoutPath = client_root.InnerPath(taskEnv->StdoutPath, true);
-            taskEnv->StderrPath = client_root.InnerPath(taskEnv->StderrPath, true);
+            taskEnv->Root = clientRoot.InnerPath(taskEnv->Root, true);
+            taskEnv->StdinPath = clientRoot.InnerPath(taskEnv->StdinPath, true);
+            taskEnv->StdoutPath = clientRoot.InnerPath(taskEnv->StdoutPath, true);
+            taskEnv->StderrPath = clientRoot.InnerPath(taskEnv->StderrPath, true);
         }
     }
 
@@ -1282,13 +1283,14 @@ TError TContainer::GetProperty(const string &origProperty, string &value,
     PropertyToAlias(origProperty, value);
 
     if (Prop->HasFlags(property, PATH_PROPERTY) && client) {
-        auto client_container = client->TryGetContainer();
-        if (!client_container)
-            return TError(EError::InvalidValue, "Cannot get client container");
-        TPath client_root = client_container->RootPath();
-        if (client_root.IsEmpty())
+        std::shared_ptr<TContainer> clientContainer;
+        TError error = client->GetContainer(clientContainer);
+        if (error)
+            return error;
+        TPath clientRoot = clientContainer->RootPath();
+        if (clientRoot.IsEmpty())
             return TError(EError::InvalidValue, "Cannot get client root path");
-        value = client_root.InnerPath(value, true).ToString();
+        value = clientRoot.InnerPath(value, true).ToString();
     }
 
     return TError::Success();
@@ -1338,13 +1340,14 @@ TError TContainer::SetProperty(TScopedLock &holder_lock,
         return TError(EError::Permission, "Only restricted root can change this property");
 
     if (Prop->HasFlags(property, PATH_PROPERTY) && client) {
-        auto client_container = client->TryGetContainer();
-        if (!client_container)
-            return TError(EError::InvalidValue, "Cannot get client container");
-        TPath client_root = client_container->RootPath();
-        if (client_root.IsEmpty())
+        std::shared_ptr<TContainer> clientContainer;
+        TError error = client->GetContainer(clientContainer);
+        if (error)
+            return error;
+        TPath clientRoot = clientContainer->RootPath();
+        if (clientRoot.IsEmpty())
             return TError(EError::InvalidValue, "Cannot get client root path");
-        value = client_root.AddComponent(value).ToString();
+        value = clientRoot.AddComponent(value).ToString();
     }
 
     SyncStateWithCgroup(holder_lock);
@@ -1904,8 +1907,9 @@ TContainerWaiter::TContainerWaiter(std::shared_ptr<TClient> client,
 void TContainerWaiter::Signal(const TContainer *who) {
     std::shared_ptr<TClient> client = Client.lock();
     if (client) {
-        auto container = client->GetContainer();
-        if (container) {
+        std::shared_ptr<TContainer> container;
+        TError error = client->GetContainer(container);
+        if (!error) {
             std::string name;
             TError err = TError::Success();
             if (who)

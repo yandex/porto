@@ -140,14 +140,11 @@ std::string TClient::GetContainerName() const {
         return "<deleted container>";
 }
 
-std::shared_ptr<TContainer> TClient::GetContainer() const {
-    auto c = Container.lock();
-    PORTO_ASSERT(c);
-    return c;
-}
-
-std::shared_ptr<TContainer> TClient::TryGetContainer() const {
-    return Container.lock();
+TError TClient::GetContainer(std::shared_ptr<TContainer> &container) const {
+    container = Container.lock();
+    if (!container)
+        return TError(EError::ContainerDoesNotExist, "Can't find client container");
+    return TError::Success();
 }
 
 bool TClient::Readonly() {
