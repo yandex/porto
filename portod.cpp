@@ -871,7 +871,7 @@ void CheckVersion(int &prevMaj, int &prevMin) {
         L_ERR() << "Can't update current version" << std::endl;
 }
 
-static int MasterMain() {
+static int MasterMain(bool respawn) {
     Statistics->MasterStarted = GetCurrentTimeMs();
 
     int ret = DaemonPrepare(true);
@@ -919,6 +919,8 @@ static int MasterMain() {
         }
         if (ret < 0)
             break;
+        if (!respawn)
+            break;
     }
 
     DaemonShutdown(true, ret);
@@ -928,6 +930,7 @@ static int MasterMain() {
 
 int main(int argc, char * const argv[]) {
     bool slaveMode = false;
+    bool respawn = true;
     int argn;
 
     if (getuid() != 0) {
@@ -952,6 +955,8 @@ int main(int argc, char * const argv[]) {
             slaveMode = true;
         } else if (arg == "--stdlog") {
             stdlog = true;
+        } else if (arg == "--norespawn") {
+            respawn = false;
         } else if (arg == "--failsafe") {
             failsafe = true;
         } else if (arg == "--nonet") {
@@ -975,7 +980,7 @@ int main(int argc, char * const argv[]) {
         if (slaveMode)
             return SlaveMain();
         else
-            return MasterMain();
+            return MasterMain(respawn);
     } catch (std::string s) {
         L_ERR() << "EXCEPTION: " << s << std::endl;
         Crash();
