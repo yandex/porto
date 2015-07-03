@@ -134,8 +134,10 @@ TError TClient::IdentifyContainer(TContainerHolder &holder) {
 
 std::string TClient::GetContainerName() const {
     auto c = Container.lock();
-    PORTO_ASSERT(c);
-    return c->GetName();
+    if (c)
+        return c->GetName();
+    else
+        return "<deleted container>";
 }
 
 std::shared_ptr<TContainer> TClient::GetContainer() const {
