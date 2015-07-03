@@ -34,10 +34,21 @@ private:
     std::mutex Mutex;
 };
 
-class TNestedScopedLock : public TNonCopyable {
+class TNestedScopedLock {
     TScopedLock InnerLock;
 
+    TNestedScopedLock(TNestedScopedLock const&) = delete;
+    TNestedScopedLock& operator= (TNestedScopedLock const&) = delete;
+
 public:
+    TNestedScopedLock() {}
+
+    TNestedScopedLock(TNestedScopedLock &&src) : InnerLock(std::move(src.InnerLock)) {}
+    TNestedScopedLock& operator= (TNestedScopedLock &&src) {
+        InnerLock = std::move(src.InnerLock);
+        return *this;
+    }
+
     TNestedScopedLock(TLockable &inner, TScopedLock &outer) {
         PORTO_ASSERT(outer);
 
