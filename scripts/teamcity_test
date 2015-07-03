@@ -74,7 +74,7 @@ netup() {
 }
 
 threadstest() {
-	scripts/test threads
+	sudo scripts/test threads
 }
 
 update() {
