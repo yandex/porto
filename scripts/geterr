@@ -1,15 +1,14 @@
 #!/bin/bash
 
-SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=quiet"
+SSH="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=quiet -o ConnectTimeout=60"
 TAG="$1"
 [ -z "$TAG" ] && TAG="+ASEARCH"
-RELAY=kernel1
 STAT="$2"
 [ -z "$STAT" ] && STAT="porto_stat[errors]"
-WORKERS=100
+WORKERS=1
 
 geterrors() {
-	$SSH $RELAY "sky run -t 60 --separate -p -U 'portoctl dget / $STAT' $TAG"
+	sky run -t 60 --separate -p -U "portoctl dget / $STAT" $TAG
 }
 
 parse() {
@@ -46,7 +45,7 @@ getlog() {
 	echo "$line"
 	local title="@@@ $host"
 	local version="$($SSH $host portoctl -v 2>&1)"
-	local log="$($SSH $host zgrep '$3' /var/log/portod.log*)"
+	local log="$($SSH $host zgrep \"$3\" '/var/log/portod.log*')"
 
 	echo -e "$line\n$version\n$log\n\n" | flock $LOCK -c "bash -c 'cat >> $2'"
 }
@@ -68,7 +67,7 @@ if [ ! -z "$GREP" ]; then
 	running=0
 	while read -u 100 line; do
 		if [ $running -ge $WORKERS ]; then
-			wait -n
+			[ $WORKERS -eq 1 ] && wait || wait -n
 			running=$(($running - 1))
 		fi
 
