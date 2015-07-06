@@ -1,3 +1,20 @@
+yandex-porto (1.17) precise; urgency=low
+
+  * fix portod crash when can't lock child container
+  * python api: fix reading long replies (partial read)
+  * fix invalid tc classes on links that are created after porto startup
+  * portoctl: reset terminal on exec error
+  * portoctl: fail with correct exit status when can't access socket
+  * portotop: fixed crash when tab is pressed
+  * rpc: non-blocking reads and writes with 30s timeout (fixes portod hangs)
+  * wait for one minute for porto to destroy containers when sending SIGINT
+  * mkimg: add support for ipv6 in container
+  * validate number of messages in incoming rpc requests
+  * request handling time in log now includes stream flush time
+  * stability fixes in volume api
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 06 Jul 2015 14:36:00 +0300
+
 yandex-porto (1.16) precise; urgency=low
 
   * convert docker2porto to new volume api
