@@ -197,7 +197,7 @@ public:
 
 class TCreateCmd : public ICmd {
 public:
-    TCreateCmd(TPortoAPI *api) : ICmd(api, "create", 1, "<name> [name...]", "create container") {}
+    TCreateCmd(TPortoAPI *api) : ICmd(api, "create", 1, "<container1> [container2...]", "create container") {}
 
     int Execute(int argc, char *argv[]) {
         for (int i = 0; i < argc; i++) {
@@ -214,7 +214,7 @@ public:
 
 class TGetPropertyCmd : public ICmd {
 public:
-    TGetPropertyCmd(TPortoAPI *api) : ICmd(api, "pget", 2, "[-k] <name> <property> [property...]", "get raw container property") {}
+    TGetPropertyCmd(TPortoAPI *api) : ICmd(api, "pget", 2, "[-k] <container> <property> [property...]", "get raw container property") {}
 
     int Execute(int argc, char *argv[]) {
         bool printKey = false;
@@ -241,7 +241,7 @@ public:
 
 class TSetPropertyCmd : public ICmd {
 public:
-    TSetPropertyCmd(TPortoAPI *api) : ICmd(api, "set", 3, "<name> <property>", "set container property") {}
+    TSetPropertyCmd(TPortoAPI *api) : ICmd(api, "set", 3, "<container> <property>", "set container property") {}
 
     int Execute(int argc, char *argv[]) {
         string val = argv[2];
@@ -260,7 +260,7 @@ public:
 
 class TGetDataCmd : public ICmd {
 public:
-    TGetDataCmd(TPortoAPI *api) : ICmd(api, "dget", 2, "[-k] <name> <data> [data...]", "get raw container data") {}
+    TGetDataCmd(TPortoAPI *api) : ICmd(api, "dget", 2, "[-k] <container> <data> [data...]", "get raw container data") {}
 
     int Execute(int argc, char *argv[]) {
         bool printKey = false;
@@ -287,7 +287,7 @@ public:
 
 class TStartCmd : public ICmd {
 public:
-    TStartCmd(TPortoAPI *api) : ICmd(api, "start", 1, "<name> [name...]", "start container") {}
+    TStartCmd(TPortoAPI *api) : ICmd(api, "start", 1, "<container1> [container2...]", "start container") {}
 
     int Execute(int argc, char *argv[]) {
         for (int i = 0; i < argc; i++) {
@@ -354,7 +354,7 @@ static const map<string, int> sigMap = {
 
 class TKillCmd : public ICmd {
 public:
-    TKillCmd(TPortoAPI *api) : ICmd(api, "kill", 1, "<name> [signal]", "send signal to container") {}
+    TKillCmd(TPortoAPI *api) : ICmd(api, "kill", 1, "<container> [signal]", "send signal to container") {}
 
     int Execute(int argc, char *argv[]) {
         int sig = SIGTERM;
@@ -382,7 +382,7 @@ public:
 
 class TStopCmd : public ICmd {
 public:
-    TStopCmd(TPortoAPI *api) : ICmd(api, "stop", 1, "<name> [name...]", "stop container") {}
+    TStopCmd(TPortoAPI *api) : ICmd(api, "stop", 1, "<container1> [container2...]", "stop container") {}
 
     int Execute(int argc, char *argv[]) {
         for (int i = 0; i < argc; i++) {
@@ -399,7 +399,7 @@ public:
 
 class TRestartCmd : public ICmd {
 public:
-    TRestartCmd(TPortoAPI *api) : ICmd(api, "restart", 1, "<name> [name...]", "restart container") {}
+    TRestartCmd(TPortoAPI *api) : ICmd(api, "restart", 1, "<container1> [container2...]", "restart container") {}
 
     int Execute(int argc, char *argv[]) {
         for (int i = 0; i < argc; i++) {
@@ -422,7 +422,7 @@ public:
 
 class TPauseCmd : public ICmd {
 public:
-    TPauseCmd(TPortoAPI *api) : ICmd(api, "pause", 1, "<name> [name...]", "pause container") {}
+    TPauseCmd(TPortoAPI *api) : ICmd(api, "pause", 1, "<container> [name...]", "pause container") {}
 
     int Execute(int argc, char *argv[]) {
         for (int i = 0; i < argc; i++) {
@@ -439,7 +439,7 @@ public:
 
 class TResumeCmd : public ICmd {
 public:
-    TResumeCmd(TPortoAPI *api) : ICmd(api, "resume", 1, "<name> [name...]", "resume container") {}
+    TResumeCmd(TPortoAPI *api) : ICmd(api, "resume", 1, "<container1> [container2...]", "resume container") {}
 
     int Execute(int argc, char *argv[]) {
         for (int i = 0; i < argc; i++) {
@@ -456,7 +456,7 @@ public:
 
 class TGetCmd : public ICmd {
 public:
-    TGetCmd(TPortoAPI *api) : ICmd(api, "get", 1, "<name> <variable> [variable...]", "get container property or data") {}
+    TGetCmd(TPortoAPI *api) : ICmd(api, "get", 1, "<container> <variable> [variable...]", "get container property or data") {}
 
     int Execute(int argc, char *argv[]) {
         string value;
@@ -558,7 +558,7 @@ public:
 
 class TEnterCmd : public ICmd {
 public:
-    TEnterCmd(TPortoAPI *api) : ICmd(api, "enter", 1, "[-C] <name> [command]", "execute command in container namespace") {}
+    TEnterCmd(TPortoAPI *api) : ICmd(api, "enter", 1, "[-C] <container> [command]", "execute command in container namespace") {}
 
     void PrintErrno(const string &str) {
         std::cerr << str << ": " << strerror(errno) << std::endl;
@@ -1094,7 +1094,7 @@ public:
 
 class TDestroyCmd : public ICmd {
 public:
-    TDestroyCmd(TPortoAPI *api) : ICmd(api, "destroy", 1, "<name> [name...]", "destroy container") {}
+    TDestroyCmd(TPortoAPI *api) : ICmd(api, "destroy", 1, "<container1> [container2...]", "destroy container") {}
 
     int Execute(int argc, char *argv[]) {
         for (int i = 0; i < argc; i++) {
