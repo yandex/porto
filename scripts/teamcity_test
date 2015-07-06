@@ -78,10 +78,6 @@ threadstest() {
 }
 
 update() {
-	# TODO: TEMPORARY!!! UNTIL WE CREATE STEP IN TEAMCITY {{{
-	threadstest
-	# }}}
-
 	sudo scripts/test_update "$PORTO_DPKG"
 }
 
