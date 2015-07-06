@@ -520,26 +520,22 @@ noinline TError GetContainerCombined(TContext &context,
     for (int i = 0; i < req.name_size(); i++) {
         auto relname = req.name(i);
 
-        std::string name;
-        std::shared_ptr<TContainer> container;
-        TError containerError = clientContainer->AbsoluteName(relname, name, true);
-        if (!containerError)
-            containerError = context.Cholder->Get(name, container);
-
         auto entry = get->add_list();
         entry->set_name(relname);
 
-        bool acquired = false;
-        if (!containerError) {
-            acquired = container->Acquire();
-
-            if (!acquired)
-                containerError = TError(EError::Busy, "Can't get data and property of busy container");
-        }
+        std::string name;
+        std::shared_ptr<TContainer> container;
 
         TNestedScopedLock lock;
-        if (container)
-            lock = TNestedScopedLock(*container, holder_lock);
+        TError containerError = clientContainer->AbsoluteName(relname, name, true);
+        if (!containerError) {
+            containerError = context.Cholder->Get(name, container);
+            if (!containerError && container) {
+                if (container->IsAcquired())
+                    containerError = TError(EError::Busy, "Can't get data and property of busy container");
+                lock = TNestedScopedLock(*container, holder_lock);
+            }
+        }
 
         for (int j = 0; j < req.variable_size(); j++) {
             auto var = req.variable(j);
@@ -548,7 +544,7 @@ noinline TError GetContainerCombined(TContext &context,
             std::string value;
 
             TError error = containerError;
-            if (!error) {
+            if (!error && container) {
                 std::string name = var, idx;
                 TContainer::ParsePropertyName(name, idx);
 
@@ -568,9 +564,6 @@ noinline TError GetContainerCombined(TContext &context,
                 keyval->set_value(value);
             }
         }
-
-        if (acquired)
-            container->Release();
     }
 
     return TError::Success();
