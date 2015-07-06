@@ -29,7 +29,6 @@ class TContainerHolder : public std::enable_shared_from_this<TContainerHolder>,
     TError RestoreId(const kv::TNode &node, uint16_t &id);
     void ScheduleLogRotatation();
     void ScheduleCgroupSync();
-    TError _Destroy(TScopedLock &holder_lock, const std::string &name);
     TError ReserveDefaultClassId();
     std::map<std::string, std::shared_ptr<TKeyValueNode>>
         SortNodes(const std::vector<std::shared_ptr<TKeyValueNode>> &nodes);

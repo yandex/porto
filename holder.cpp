@@ -15,7 +15,7 @@ void TContainerHolder::DestroyRoot(TScopedLock &holder_lock) {
     // we want children to be removed first
     while (Containers.begin() != Containers.end()) {
         auto name = Containers.begin()->first;
-        TError error = _Destroy(holder_lock, name);
+        TError error = Destroy(holder_lock, name);
         if (error)
             L_ERR() << "Can't destroy container " << name << ": " << error << std::endl;
     }
@@ -206,13 +206,13 @@ TError TContainerHolder::Get(int pid, std::shared_ptr<TContainer> &c) {
     return Get(name, c);
 }
 
-TError TContainerHolder::_Destroy(TScopedLock &holder_lock, const std::string &name) {
+TError TContainerHolder::Destroy(TScopedLock &holder_lock, const std::string &name) {
     auto c = Containers[name];
 
     (void)c->Resume();
 
     for (auto child: c->GetChildren()) {
-        TError error = _Destroy(holder_lock, child);
+        TError error = Destroy(holder_lock, child);
         if (error)
             return error;
     }
@@ -231,13 +231,6 @@ TError TContainerHolder::_Destroy(TScopedLock &holder_lock, const std::string &n
         parent->CleanupExpiredChildren();
 
     return TError::Success();
-}
-
-TError TContainerHolder::Destroy(TScopedLock &holder_lock, const std::string &name) {
-    if (name == ROOT_CONTAINER || !ValidName(name))
-        return TError(EError::InvalidValue, "invalid container name " + name);
-
-    return _Destroy(holder_lock, name);
 }
 
 std::vector<std::shared_ptr<TContainer> > TContainerHolder::List() const {
