@@ -148,18 +148,18 @@ public:
 
     TError Create(const TCred &cred);
     TError Destroy(TScopedLock &holder_lock);
-    TError Start(TScopedLock &holder_lock, std::shared_ptr<TClient> client, bool meta);
+    TError Start(std::shared_ptr<TClient> client, bool meta);
     TError Stop(TScopedLock &holder_lock);
-    TError Pause(TScopedLock &holder_lock);
-    TError Resume(TScopedLock &holder_lock);
+    TError Pause();
+    TError Resume();
     TError Kill(int sig);
 
     TError GetProperty(const std::string &property, std::string &value,
                        std::shared_ptr<TClient> client) const;
-    TError SetProperty(TScopedLock &holder_lock, const std::string &property,
+    TError SetProperty(const std::string &property,
                        const std::string &value, std::shared_ptr<TClient> client);
 
-    TError GetData(TScopedLock &holder_lock, const std::string &data, std::string &value);
+    TError GetData(const std::string &data, std::string &value);
     TError Restore(TScopedLock &holder_lock, const kv::TNode &node);
 
     std::shared_ptr<TCgroup> GetLeafCgroup(std::shared_ptr<TSubsystem> subsys);

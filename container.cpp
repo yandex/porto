@@ -202,10 +202,9 @@ TError TContainer::Destroy(TScopedLock &holder_lock) {
     bool acquired = Acquired;
 
     L_ACT() << "Destroy " << GetName() << " " << Id << std::endl;
-    SyncStateWithCgroup(holder_lock);
 
     if (GetState() == EContainerState::Paused) {
-        TError error = Resume(holder_lock);
+        TError error = Resume();
         if (error) {
             if (acquired)
                 Release();
@@ -778,9 +777,7 @@ TError TContainer::Create(const TCred &cred) {
     return TError::Success();
 }
 
-TError TContainer::Start(TScopedLock &holder_lock,
-                         std::shared_ptr<TClient> client, bool meta) {
-    SyncStateWithCgroup(holder_lock);
+TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
     auto state = GetState();
 
     if (state != EContainerState::Stopped)
@@ -1062,7 +1059,6 @@ bool TContainer::IsAcquired() const {
 }
 
 TError TContainer::Stop(TScopedLock &holder_lock) {
-    SyncStateWithCgroup(holder_lock);
     auto state = GetState();
 
     if (state == EContainerState::Stopped ||
@@ -1117,8 +1113,7 @@ TError TContainer::Stop(TScopedLock &holder_lock) {
     return TError::Success();
 }
 
-TError TContainer::Pause(TScopedLock &holder_lock) {
-    SyncStateWithCgroup(holder_lock);
+TError TContainer::Pause() {
     auto state = GetState();
     if (state != EContainerState::Running)
         return TError(EError::InvalidState, "invalid container state " +
@@ -1135,8 +1130,7 @@ TError TContainer::Pause(TScopedLock &holder_lock) {
     return TError::Success();
 }
 
-TError TContainer::Resume(TScopedLock &holder_lock) {
-    SyncStateWithCgroup(holder_lock);
+TError TContainer::Resume() {
     auto state = GetState();
     if (state != EContainerState::Paused)
         return TError(EError::InvalidState, "invalid container state " +
@@ -1178,7 +1172,7 @@ void TContainer::ParsePropertyName(std::string &name, std::string &idx) {
     idx = StringTrim(tokens[1], " \t\n]");
 }
 
-TError TContainer::GetData(TScopedLock &holder_lock, const string &origName, string &value) {
+TError TContainer::GetData(const string &origName, string &value) {
     std::string name = origName;
     std::string idx;
     ParsePropertyName(name, idx);
@@ -1189,8 +1183,6 @@ TError TContainer::GetData(TScopedLock &holder_lock, const string &origName, str
     auto cv = ToContainerValue(Data->Find(name));
     if (!cv->IsImplemented())
         return TError(EError::NotSupported, name + " is not implemented");
-
-    SyncStateWithCgroup(holder_lock);
 
     auto validState = cv->GetState();
     if (validState.find(GetState()) == validState.end())
@@ -1307,8 +1299,7 @@ bool TContainer::ShouldApplyProperty(const std::string &property) {
     return true;
 }
 
-TError TContainer::SetProperty(TScopedLock &holder_lock,
-                               const string &origProperty,
+TError TContainer::SetProperty(const string &origProperty,
                                const string &origValue,
                                std::shared_ptr<TClient> client) {
     if (IsRoot() || IsPortoRoot())
@@ -1349,8 +1340,6 @@ TError TContainer::SetProperty(TScopedLock &holder_lock,
             return TError(EError::InvalidValue, "Cannot get client root path");
         value = clientRoot.AddComponent(value).ToString();
     }
-
-    SyncStateWithCgroup(holder_lock);
 
     if (!Prop->HasState(property, GetState()))
         return TError(EError::InvalidState, "Can't set dynamic property " + property + " in state " + ContainerStateName(GetState()));
@@ -1506,7 +1495,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
 
             L() << "Start parent " << parent->GetName() << " meta " << meta << std::endl;
 
-            TError error = parent->Start(holder_lock, nullptr, meta);
+            TError error = parent->Start(nullptr, meta);
             if (error)
                 return error;
 
@@ -1712,7 +1701,7 @@ TError TContainer::Respawn(TScopedLock &holder_lock) {
         return error;
 
     uint64_t tmp = Data->Get<uint64_t>(D_RESPAWN_COUNT);
-    error = Start(holder_lock, nullptr, false);
+    error = Start(nullptr, false);
     Data->Set<uint64_t>(D_RESPAWN_COUNT, tmp + 1);
     if (error)
         return error;

@@ -31,7 +31,7 @@ TError TContainerHolder::ReserveDefaultClassId() {
     return TError::Success();
 }
 
-TError TContainerHolder::CreateRoot(TScopedLock &holder_lock) {
+TError TContainerHolder::CreateRoot() {
     TError error = TaskGetLastCap();
     if (error)
         return error;
@@ -58,14 +58,14 @@ TError TContainerHolder::CreateRoot(TScopedLock &holder_lock) {
     if (error)
         return error;
 
-    error = root->Start(holder_lock, nullptr, true);
+    error = root->Start(nullptr, true);
     if (error)
         return error;
 
     return TError::Success();
 }
 
-TError TContainerHolder::CreatePortoRoot(TScopedLock &holder_lock) {
+TError TContainerHolder::CreatePortoRoot() {
     TError error = Create(PORTO_ROOT_CONTAINER, TCred(0, 0));
     if (error)
         return error;
@@ -82,7 +82,7 @@ TError TContainerHolder::CreatePortoRoot(TScopedLock &holder_lock) {
     if (error)
         return error;
 
-    error = root->Start(holder_lock, nullptr, true);
+    error = root->Start(nullptr, true);
     if (error)
         return error;
 
@@ -209,7 +209,7 @@ TError TContainerHolder::Get(int pid, std::shared_ptr<TContainer> &c) {
 TError TContainerHolder::_Destroy(TScopedLock &holder_lock, const std::string &name) {
     auto c = Containers[name];
 
-    (void)c->Resume(holder_lock);
+    (void)c->Resume();
 
     for (auto child: c->GetChildren()) {
         TError error = _Destroy(holder_lock, child);

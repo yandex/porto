@@ -237,7 +237,7 @@ noinline TError StartContainer(TContext &context,
         std::string cmd = container->Prop->Get<std::string>(P_COMMAND);
         bool meta = i + 1 != nameVec.end() && cmd.empty();
         //bool meta = std::distance(i, nameVec.end()) == 1 && cmd.empty();
-        err = container->Start(holder_lock, client, meta);
+        err = container->Start(client, meta);
 
         container->Release();
 
@@ -321,7 +321,7 @@ noinline TError PauseContainer(TContext &context,
 
     TNestedScopedLock lock(*container, holder_lock);
 
-    err = container->Pause(holder_lock);
+    err = container->Pause();
 
     container->Release();
 
@@ -361,7 +361,7 @@ noinline TError ResumeContainer(TContext &context,
 
     TNestedScopedLock lock(*container, holder_lock);
 
-    err = container->Resume(holder_lock);
+    err = container->Resume();
 
     container->Release();
 
@@ -456,7 +456,7 @@ noinline TError SetContainerProperty(TContext &context,
 
     TNestedScopedLock lock(*container, holder_lock);
 
-    error = container->SetProperty(holder_lock, req.property(), req.value(), client);
+    error = container->SetProperty(req.property(), req.value(), client);
 
     container->Release();
 
@@ -489,7 +489,7 @@ noinline TError GetContainerData(TContext &context,
     TNestedScopedLock lock(*container, holder_lock);
 
     string value;
-    error = container->GetData(holder_lock, req.data(), value);
+    error = container->GetData(req.data(), value);
     if (!error)
         rsp.mutable_getdata()->set_value(value);
 
@@ -551,7 +551,7 @@ noinline TError GetContainerCombined(TContext &context,
                 if (container->Prop->IsValid(name))
                     error = container->GetProperty(var, value, client);
                 else if (container->Data->IsValid(name))
-                    error = container->GetData(holder_lock, var, value);
+                    error = container->GetData(var, value);
                 else
                     error = TError(EError::InvalidValue, "Unknown property or data " + var);
             }

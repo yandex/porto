@@ -43,8 +43,8 @@ public:
                      std::shared_ptr<TKeyValueStorage> storage) :
         Net(net), Storage(storage), EpollLoop(epollLoop) { }
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
-    TError CreateRoot(TScopedLock &holder_lock);
-    TError CreatePortoRoot(TScopedLock &holder_lock);
+    TError CreateRoot();
+    TError CreatePortoRoot();
     TError Create(const std::string &name, const TCred &cred);
     TError Get(const std::string &name, std::shared_ptr<TContainer> &c);
     TError Get(int pid, std::shared_ptr<TContainer> &c);
