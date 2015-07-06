@@ -81,11 +81,6 @@ TError TContext::Initialize() {
             return error;
         }
 
-        if (Net->Empty()) {
-            L_ERR() << "Error: couldn't find suitable network interface" << std::endl;
-            return error;
-        }
-
         for (auto &link : Net->GetLinks())
             L() << "Using " << link->GetAlias() << " interface" << std::endl;
     }

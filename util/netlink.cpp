@@ -130,9 +130,6 @@ TError TNl::GetDefaultLink(std::vector<std::string> &links) {
                         p->ifaces.push_back(rtnl_link_get_name(l));
                      }, &data);
 
-    if (!data.ifaces.size())
-        return TError(EError::Unknown, "Can't find appropriate link");
-
     links = data.ifaces;
 
     return TError::Success();
