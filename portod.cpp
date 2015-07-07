@@ -927,6 +927,11 @@ int main(int argc, char * const argv[]) {
         return EXIT_FAILURE;
     }
 
+    if (getenv("container")) {
+        std::cerr << "Can't start in container" << std::endl;
+        return EXIT_FAILURE;
+    }
+
     AllocStatistics();
 
     config.Load();
