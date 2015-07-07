@@ -555,7 +555,7 @@ std::vector<TPath> TVolume::GetLayers() const {
     return result;
 }
 
-TError TVolume::CheckGuarantee() const {
+TError TVolume::CheckGuarantee(TVolumeHolder &holder) const {
     uint64_t total_space_used, total_space_avail;
     uint64_t total_inode_used, total_inode_avail;
     uint64_t space_used, space_avail, space_guarantee;
@@ -590,8 +590,8 @@ TError TVolume::CheckGuarantee() const {
 
     /* Estimate unclaimed reservation */
     uint64_t total_space_reserved = 0, total_inode_reserved = 0;
-    for (auto path : Holder->ListPaths()) {
-        auto volume = Holder->Find(path);
+    for (auto path : holder.ListPaths()) {
+        auto volume = holder.Find(path);
         if (volume == nullptr || volume.get() == this ||
                 volume->GetStorage().GetDev() != storage.GetDev())
             continue;
@@ -626,7 +626,8 @@ TError TVolume::CheckGuarantee() const {
 
 TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
                           std::shared_ptr<TContainer> creator_container,
-                          const std::map<std::string, std::string> &properties) {
+                          const std::map<std::string, std::string> &properties,
+                          TVolumeHolder &holder) {
 
     TPath container_root = creator_container->RootPath();
     TError error;
@@ -780,7 +781,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
     if (error)
         return error;
 
-    error = CheckGuarantee();
+    error = CheckGuarantee(holder);
     if (error)
         return error;
 
@@ -1097,7 +1098,7 @@ TError TVolumeHolder::Create(std::shared_ptr<TVolume> &volume) {
         IdMap.Put(id);
         return error;
     }
-    volume = std::make_shared<TVolume>(shared_from_this(), config);
+    volume = std::make_shared<TVolume>(config);
     return TError::Success();
 }
 
@@ -1152,7 +1153,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
             continue;
         }
 
-        auto volume = std::make_shared<TVolume>(shared_from_this(), config);
+        auto volume = std::make_shared<TVolume>(config);
         error = volume->Restore();
         if (error) {
             L_WRN() << "Corrupted volume " << node << " removed: " << error << std::endl;

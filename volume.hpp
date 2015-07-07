@@ -67,7 +67,6 @@ class TVolume : public std::enable_shared_from_this<TVolume>,
                 public TLockable,
                 public TNonCopyable {
     friend class TVolumeHolder;
-    std::shared_ptr<TVolumeHolder> Holder;
     std::shared_ptr<TValueMap> Config;
     TCred Cred;
     unsigned Permissions;
@@ -76,12 +75,11 @@ class TVolume : public std::enable_shared_from_this<TVolume>,
     TError OpenBackend();
 
 public:
-    TVolume(std::shared_ptr<TVolumeHolder> holder,
-            std::shared_ptr<TValueMap> config) :
-        Holder(holder), Config(config) {}
+    TVolume(std::shared_ptr<TValueMap> config) : Config(config) {}
     TError Configure(const TPath &path, const TCred &creator_cred,
                      std::shared_ptr<TContainer> creator_container,
-                     const std::map<std::string, std::string> &properties);
+                     const std::map<std::string, std::string> &properties,
+                     TVolumeHolder &holder);
 
     /* Protected with TVolume->Lock() */
     TError Build();
@@ -118,7 +116,7 @@ public:
         space_guarantee = Config->Get<uint64_t>(V_SPACE_GUARANTEE);
         inode_guarantee = Config->Get<uint64_t>(V_INODE_GUARANTEE);
     }
-    TError CheckGuarantee() const;
+    TError CheckGuarantee(TVolumeHolder &holder) const;
 
     void GetQuota(uint64_t &space_limit, uint64_t &inode_limit) const {
         space_limit = Config->Get<uint64_t>(V_SPACE_LIMIT);
