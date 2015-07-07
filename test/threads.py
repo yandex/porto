@@ -61,7 +61,7 @@ def iss(conn, this_script): #sub-executor
         print('start search' + str(x))
         top = conn.Create('search' + str(x))
         top.SetProperty('isolate', 'true')
-        c = conn.Create('search' + str(x) + '/hook')
+        c = conn.Create(top.name + '/hook')
         c.SetProperty('command', 'sleep ' + str(random.randint(1, 20)))
         c.SetProperty('isolate', 'true')
         c.Start()
@@ -69,11 +69,18 @@ def iss(conn, this_script): #sub-executor
 
     time.sleep(random.randint(1, 5))
 
-    for x in range(0, 20):
-        print('stop search' + str(x))
-        jobs[x].Stop()
-        print('destroy search' + str(x))
-        conn.Destroy('search' + str(x))
+    for job in jobs:
+        print("{} state is {}".format(job.name, job.GetData('state')))
+        hook = conn.Find(job.name + "/hook")
+        print("{} state is {}".format(hook.name, hook.GetData('state')))
+
+    time.sleep(random.randint(1, 5))
+
+    for job in jobs:
+        print('stop ' + job.name)
+        job.Stop()
+        print('destroy ' + job.name)
+        conn.Destroy(job.name)
 
 def monitoring(conn, this_script):
     print(conn.Get(conn.List(), ['state', 'cpu_usage', 'memory_usage']))
@@ -89,10 +96,10 @@ def cloud(conn, this_script):
         jobs.append(c)
         time.sleep(random.randint(0, 1))
 
-    for x in range(0, 10):
-        print('stop and destroy job' + str(x))
-        jobs[x].Stop()
-        conn.Destroy('job' + str(x))
+    for job in jobs:
+        print('stop and destroy ' + job.name)
+        job.Stop()
+        conn.Destroy(job.name)
         time.sleep(random.randint(0, 1))
 
 ################################################################################
