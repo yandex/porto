@@ -942,19 +942,11 @@ TError TContainer::KillAll(TScopedLock &holder_lock) {
 void TContainer::ApplyForChildren(TScopedLock &holder_lock,
                                   std::function<void (TScopedLock &holder_lock,
                                                       TContainer &container)> fn) {
-    std::vector<std::weak_ptr<TContainer>> children = Children;
-
-    TScopedUnlock unlock(holder_lock);
-    for (auto iter : children)
+    for (auto iter : Children)
         if (auto child = iter.lock()) {
-            if (AllowHolderUnlock) {
-                auto lock = child->ScopedLock();
-                holder_lock.lock();
-                fn(holder_lock, *child);
-                holder_lock.unlock();
-            } else {
-                fn(holder_lock, *child);
-            }
+            TNestedScopedLock lock(*child, holder_lock);
+
+            fn(holder_lock, *child);
         }
 }
 
