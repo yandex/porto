@@ -172,6 +172,9 @@ public:
 
     bool HasCorrectParent();
     bool HasCorrectFreezer();
+
+    std::shared_ptr<TFolder> StdTmp;
+    TError CreateTmpDir(const TPath &path, std::shared_ptr<TFolder> &dir) const;
 };
 
 TError TaskGetLastCap();

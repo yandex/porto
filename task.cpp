@@ -120,6 +120,22 @@ static int ChildFn(void *arg) {
     return EXIT_FAILURE;
 }
 
+TError TTask::CreateTmpDir(const TPath &path, std::shared_ptr<TFolder> &dir) const {
+    bool cleanup = path.ToString().find(config().container().tmp_dir()) == 0;
+
+    dir = std::make_shared<TFolder>(path, cleanup);
+    if (!dir->Exists()) {
+        TError error = dir->Create(0755, true);
+        if (error)
+            return error;
+        error = path.Chown(Env->Cred.Uid, Env->Cred.Gid);
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
+}
+
 TError TTask::ChildOpenStdFile(const TPath &path, int expected) {
     int ret = open(path.ToString().c_str(), O_CREAT | O_WRONLY | O_APPEND, 0660);
     if (ret < 0)
@@ -741,19 +757,7 @@ TError TTask::ChildCallback() {
 }
 
 TError TTask::CreateCwd() {
-    bool cleanup = Env->Cwd.ToString().find(config().container().tmp_dir()) == 0;
-
-    Cwd = std::make_shared<TFolder>(Env->Cwd, cleanup);
-    if (!Cwd->Exists()) {
-        TError error = Cwd->Create(0755, true);
-        if (error)
-            return error;
-        error = Env->Cwd.Chown(Env->Cred.Uid, Env->Cred.Gid);
-        if (error)
-            return error;
-    }
-
-    return TError::Success();
+    return CreateTmpDir(Env->Cwd, Cwd);
 }
 
 TError TTask::Start() {

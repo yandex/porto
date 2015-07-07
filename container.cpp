@@ -747,6 +747,17 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         return error;
 
     Task = unique_ptr<TTask>(new TTask(taskEnv));
+
+    // if root is on loop device, we use some internal directory
+    // to hold stdout/stderr
+    if (StringStartsWith(taskEnv->StdinPath.ToString(), GetTmpDir()) ||
+        StringStartsWith(taskEnv->StdoutPath.ToString(), GetTmpDir()) ||
+        StringStartsWith(taskEnv->StderrPath.ToString(), GetTmpDir())) {
+        TError error = Task->CreateTmpDir(GetTmpDir(), Task->StdTmp);
+        if (error)
+            return error;
+    }
+
     return TError::Success();
 }
 
