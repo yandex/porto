@@ -1173,7 +1173,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
         for (auto name: volume->GetContainers()) {
             std::shared_ptr<TContainer> container;
             if (!Cholder->Get(name, container)) {
-                container->LinkVolume(volume);
+                container->LinkVolume(shared_from_this(), volume);
             } else if (!volume->UnlinkContainer(name)) {
                 (void)volume->Destroy();
                 (void)Unregister(volume);

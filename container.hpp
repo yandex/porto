@@ -27,6 +27,7 @@ class TTask;
 class TContainerWaiter;
 class TClient;
 class TVolume;
+class TVolumeHolder;
 
 extern int64_t BootTime;
 
@@ -106,6 +107,8 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void ApplyForChildren(TScopedLock &holder_lock,
                           std::function<void (TScopedLock &holder_lock,
                                               TContainer &container)> fn);
+
+    TError DestroyVolumes(TScopedLock &holder_lock);
 
 public:
     TCred OwnerCred;
@@ -187,10 +190,16 @@ public:
     void CleanupExpiredChildren();
     TError UpdateNetwork();
 
+    std::shared_ptr<TVolumeHolder> VolumeHolder;
     /* protected with TVolumeHolder->Lock */
     std::set<std::shared_ptr<TVolume>> Volumes;
 
-    bool LinkVolume(std::shared_ptr<TVolume> volume) {
+    bool LinkVolume(std::shared_ptr<TVolumeHolder> holder,
+                    std::shared_ptr<TVolume> volume) {
+        if (!VolumeHolder)
+            VolumeHolder = holder;
+        else
+            PORTO_ASSERT(VolumeHolder == holder);
         return Volumes.insert(volume).second;
     }
 

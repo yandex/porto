@@ -133,53 +133,23 @@ noinline TError DestroyContainer(TContext &context,
     if (err)
         return err;
 
-    { // we don't want to hold container shared_ptr because Destroy
-      // might think that it has some parent that holds it
-        std::shared_ptr<TContainer> container;
-        TError error = context.Cholder->Get(name, container);
-        if (error)
-            return error;
+    // we don't want to hold container shared_ptr because Destroy
+    // might think that it has some parent that holds it
+    std::shared_ptr<TContainer> container;
+    TError error = context.Cholder->Get(name, container);
+    if (error)
+        return error;
 
-        error = container->CheckPermission(client->GetCred());
-        if (error)
-            return error;
+    error = container->CheckPermission(client->GetCred());
+    if (error)
+        return error;
 
-        if (!container->Acquire())
-            return TError(EError::Busy, "Can't destroy busy container");
+    if (!container->Acquire())
+        return TError(EError::Busy, "Can't destroy busy container");
 
-        TNestedScopedLock lock(*container, cholder_lock);
-
-        cholder_lock.unlock();
-        auto vholder_lock = context.Vholder->ScopedLock();
-
-
-        for (auto volume: container->Volumes) {
-            if (!volume->UnlinkContainer(name))
-                continue; /* Still linked to somebody */
-            if (container->IsRoot() || container->IsPortoRoot())
-                continue;
-            vholder_lock.unlock();
-            auto volume_lock = volume->ScopedLock();
-            if (!volume->IsReady()) {
-                volume_lock.unlock();
-                vholder_lock.lock();
-                continue;
-            }
-            vholder_lock.lock();
-            error = volume->SetReady(false);
-            vholder_lock.unlock();
-            error = volume->Destroy();
-            vholder_lock.lock();
-            context.Vholder->Unregister(volume);
-            context.Vholder->Remove(volume);
-            volume_lock.unlock();
-        }
-
-        container->Volumes.clear();
-        vholder_lock.unlock();
-
-        cholder_lock.lock();
-    }
+    // we don't want to hold container shared_ptr because Destroy
+    // might think that it has some parent that holds it
+    container = nullptr;
 
     return context.Cholder->Destroy(cholder_lock, name);
 }
@@ -797,7 +767,7 @@ noinline TError CreateVolume(TContext &context,
         volume_path = container_root.AddComponent(req.path());
 
     error = volume->Configure(volume_path, client->GetCred(),
-                              clientContainer, properties);
+                              clientContainer, properties, *context.Vholder);
     if (error) {
         context.Vholder->Remove(volume);
         return error;
@@ -843,7 +813,7 @@ noinline TError CreateVolume(TContext &context,
         context.Vholder->Remove(volume);
         return error;
     }
-    clientContainer->LinkVolume(volume);
+    clientContainer->LinkVolume(context.Vholder, volume);
     cholder_lock.unlock();
 
     volume->SetReady(true);
@@ -910,7 +880,7 @@ noinline TError LinkVolume(TContext &context,
         return error;
 
     vholder_lock.lock();
-    if (!container->LinkVolume(volume))
+    if (!container->LinkVolume(context.Vholder, volume))
         return TError(EError::VolumeAlreadyExists, "Already linked");
 
     return volume->LinkContainer(container->GetName());

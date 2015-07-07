@@ -198,6 +198,38 @@ void TContainer::RemoveKvs() {
         L_ERR() << "Can't remove key-value node " << kvnode->GetName() << ": " << error << std::endl;
 }
 
+TError TContainer::DestroyVolumes(TScopedLock &holder_lock) {
+    if (!VolumeHolder)
+        return TError::Success();
+
+    TScopedUnlock holder_unlock(holder_lock);
+    TScopedLock vholder_lock = VolumeHolder->ScopedLock();
+
+    for (auto volume: Volumes) {
+        if (!volume->UnlinkContainer(Name))
+            continue; /* Still linked to somebody */
+        vholder_lock.unlock();
+        auto volume_lock = volume->ScopedLock();
+        if (!volume->IsReady()) {
+            volume_lock.unlock();
+            vholder_lock.lock();
+            continue;
+        }
+        vholder_lock.lock();
+        TError error = volume->SetReady(false);
+        vholder_lock.unlock();
+        error = volume->Destroy();
+        vholder_lock.lock();
+        VolumeHolder->Unregister(volume);
+        VolumeHolder->Remove(volume);
+        volume_lock.unlock();
+    }
+
+    Volumes.clear();
+
+    return TError::Success();
+}
+
 TError TContainer::Destroy(TScopedLock &holder_lock) {
     bool acquired = Acquired;
 
@@ -223,6 +255,10 @@ TError TContainer::Destroy(TScopedLock &holder_lock) {
             return error;
         }
     }
+
+    TError error = DestroyVolumes(holder_lock);
+    if (error)
+        return error;
 
     RemoveKvs();
 

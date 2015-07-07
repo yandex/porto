@@ -209,21 +209,25 @@ TError TContainerHolder::Get(int pid, std::shared_ptr<TContainer> &c) {
 TError TContainerHolder::Destroy(TScopedLock &holder_lock, const std::string &name) {
     auto c = Containers[name];
 
-    (void)c->Resume();
+    {
+        TNestedScopedLock lock(*c, holder_lock);
 
-    for (auto child: c->GetChildren()) {
-        TError error = Destroy(holder_lock, child);
+        (void)c->Resume();
+
+        for (auto child: c->GetChildren()) {
+            TError error = Destroy(holder_lock, child);
+            if (error)
+                return error;
+        }
+
+        TError error = c->Destroy(holder_lock);
         if (error)
             return error;
+
+        IdMap.Put(c->GetId());
+        Containers.erase(name);
+        Statistics->Created--;
     }
-
-    TError error = c->Destroy(holder_lock);
-    if (error)
-        return error;
-
-    IdMap.Put(c->GetId());
-    Containers.erase(name);
-    Statistics->Created--;
 
     auto parent = c->GetParent();
     c = nullptr;
