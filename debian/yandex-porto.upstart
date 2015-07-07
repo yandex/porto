@@ -30,6 +30,8 @@ pre-start script
 			sleep 1
 		done
 	fi
+
+	grep -q net_cls /proc/cgroups || modprobe cls_cgroup
 end script
 
 exec portod

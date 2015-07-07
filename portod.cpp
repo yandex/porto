@@ -535,17 +535,6 @@ static int SlaveMain() {
         return ret;
     }
 
-    if (config().network().enabled()) {
-        int ret = system("modprobe cls_cgroup");
-        if (ret) {
-            L_ERR() << "Can't load cls_cgroup kernel module, modprobe returned " << ret << std::endl;
-            if (!failsafe)
-                return EXIT_FAILURE;
-
-            config().mutable_network()->set_enabled(false);
-        }
-    }
-
     if (fcntl(REAP_EVT_FD, F_SETFD, FD_CLOEXEC) < 0) {
         L_ERR() << "Can't set close-on-exec flag on REAP_EVT_FD: " << strerror(errno) << std::endl;
         if (!failsafe)
