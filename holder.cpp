@@ -435,11 +435,17 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     {
         bool rearm = false;
         for (auto &target : List()) {
-            TNestedScopedLock lock(*target, holder_lock);
-            if (target->IsLostAndRestored()) {
-                target->SyncStateWithCgroup(holder_lock);
+            // don't lock container here, LostAndRestored is never changed
+            // after startup
+            if (target->IsLostAndRestored())
                 rearm = true;
-            }
+
+            if (target->IsAcquired())
+                continue;
+
+            TNestedScopedLock lock(*target, holder_lock);
+            if (target->IsLostAndRestored())
+                target->SyncStateWithCgroup(holder_lock);
         }
         if (rearm)
             ScheduleCgroupSync();
@@ -463,8 +469,18 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
                     remove.push_back(target->GetName());
 
             for (auto name : remove) {
+                std::shared_ptr<TContainer> container;
+                TError error = Get(name, container);
+                if (error)
+                    continue;
+
+                if (!container->Acquire())
+                    continue;
+
+                container = nullptr;
+
                 L_ACT() << "Remove old dead " << name << std::endl;
-                TError error = Destroy(holder_lock, name);
+                error = Destroy(holder_lock, name);
                 if (error)
                     L_ERR() << "Can't destroy " << name << ": " << error << std::endl;
                 else
@@ -473,6 +489,9 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
         }
 
         for (auto &target : List()) {
+            if (target->IsAcquired())
+                continue;
+
             TNestedScopedLock lock(*target, holder_lock);
             target->DeliverEvent(holder_lock, event);
         }
