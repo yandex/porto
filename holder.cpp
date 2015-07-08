@@ -31,14 +31,14 @@ TError TContainerHolder::ReserveDefaultClassId() {
     return TError::Success();
 }
 
-TError TContainerHolder::CreateRoot() {
+TError TContainerHolder::CreateRoot(TScopedLock &holder_lock) {
     TError error = TaskGetLastCap();
     if (error)
         return error;
 
     BootTime = GetBootTime();
 
-    error = Create(ROOT_CONTAINER, TCred(0, 0));
+    error = Create(holder_lock, ROOT_CONTAINER, TCred(0, 0));
     if (error)
         return error;
 
@@ -65,8 +65,8 @@ TError TContainerHolder::CreateRoot() {
     return TError::Success();
 }
 
-TError TContainerHolder::CreatePortoRoot() {
-    TError error = Create(PORTO_ROOT_CONTAINER, TCred(0, 0));
+TError TContainerHolder::CreatePortoRoot(TScopedLock &holder_lock) {
+    TError error = Create(holder_lock, PORTO_ROOT_CONTAINER, TCred(0, 0));
     if (error)
         return error;
 
@@ -141,7 +141,7 @@ std::shared_ptr<TContainer> TContainerHolder::GetParent(const std::string &name)
     }
 }
 
-TError TContainerHolder::Create(const std::string &name, const TCred &cred) {
+TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &name, const TCred &cred) {
     if (!ValidName(name))
         return TError(EError::InvalidValue, "invalid container name " + name);
 
@@ -170,6 +170,11 @@ TError TContainerHolder::Create(const std::string &name, const TCred &cred) {
     error = c->Create(cred);
     if (error)
         return error;
+
+    if (parent) {
+        TNestedScopedLock lock(*parent, holder_lock);
+        parent->AddChild(c);
+    }
 
     Containers[name] = c;
     Statistics->Created++;
@@ -209,30 +214,29 @@ TError TContainerHolder::Get(int pid, std::shared_ptr<TContainer> &c) {
 TError TContainerHolder::Destroy(TScopedLock &holder_lock, const std::string &name) {
     auto c = Containers[name];
 
-    {
-        TNestedScopedLock lock(*c, holder_lock);
+    TNestedScopedLock lock(*c, holder_lock);
 
-        (void)c->Resume();
-
-        for (auto child: c->GetChildren()) {
-            TError error = Destroy(holder_lock, child);
-            if (error)
-                return error;
-        }
-
-        TError error = c->Destroy(holder_lock);
+    // we destroy parent after child, but we need to unfreeze parent first
+    // so children may be killed
+    if (c->GetState() == EContainerState::Paused) {
+        TError error = c->Resume(holder_lock);
         if (error)
             return error;
-
-        IdMap.Put(c->GetId());
-        Containers.erase(name);
-        Statistics->Created--;
     }
 
-    auto parent = c->GetParent();
-    c = nullptr;
-    if (parent)
-        parent->CleanupExpiredChildren();
+    for (auto child: c->GetChildren()) {
+        TError error = Destroy(holder_lock, child);
+        if (error)
+            return error;
+    }
+
+    TError error = c->Destroy(holder_lock);
+    if (error)
+        return error;
+
+    IdMap.Put(c->GetId());
+    Containers.erase(name);
+    Statistics->Created--;
 
     return TError::Success();
 }
@@ -520,3 +524,4 @@ void TContainerHolder::UpdateNetwork() {
             L_WRN() << "Can't update " << pair.first << " network: " << error << std::endl;
     }
 }
+

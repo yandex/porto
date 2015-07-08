@@ -52,6 +52,13 @@ static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"ut
 
 static int LeakConainersNr;
 
+#define ExpectState(api, name, state) _ExpectState(api, name, state, __LINE__, __func__)
+void _ExpectState(TPortoAPI &api, const std::string &name, const std::string &state, size_t line, const char *func) {
+    std::string v;
+    ExpectApi(api, api.GetData(name, "state", v), 0, line, func);
+    _ExpectEq(v, state, line, func);
+}
+
 static std::string StartWaitAndGetData(TPortoAPI &api, const std::string &name, const std::string &data) {
     string v;
     ExpectApiSuccess(api.Start(name));
@@ -3732,6 +3739,41 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
 
     ExpectApiFailure(api.Destroy(child), EError::InvalidState);
     ExpectApiSuccess(api.Destroy(parent));
+
+    Say() << "Test mixed tree resume/pause" << std::endl;
+    ExpectApiSuccess(api.Create("a"));
+    ExpectApiSuccess(api.Create("a/b"));
+    ExpectApiSuccess(api.Create("a/b/c"));
+    ExpectApiSuccess(api.Create("a/b/d"));
+
+    ExpectApiSuccess(api.SetProperty("a", "command", "sleep 1000"));
+    ExpectApiSuccess(api.SetProperty("a/b/c", "command", "sleep 1000"));
+    ExpectApiSuccess(api.SetProperty("a/b/d", "command", "true"));
+
+    ExpectApiSuccess(api.Start("a/b/c"));
+    ExpectState(api, "a", "running");
+    ExpectState(api, "a/b", "meta");
+    ExpectState(api, "a/b/c", "running");
+    ExpectState(api, "a/b/d", "stopped");
+
+    ExpectApiSuccess(api.Pause("a"));
+    ExpectState(api, "a", "paused");
+    ExpectState(api, "a/b", "paused");
+    ExpectState(api, "a/b/c", "paused");
+    ExpectState(api, "a/b/d", "stopped");
+
+    ExpectApiFailure(api.Resume("a/b/c"), EError::InvalidState);
+    ExpectApiFailure(api.Destroy("a/b/c"), EError::InvalidState);
+    ExpectApiFailure(api.Start("a/b/d"), EError::InvalidState);
+
+    ExpectApiSuccess(api.Resume("a"));
+    ExpectState(api, "a", "running");
+    ExpectState(api, "a/b", "meta");
+    ExpectState(api, "a/b/c", "running");
+    ExpectState(api, "a/b/d", "stopped");
+
+    ExpectApiSuccess(api.Pause("a"));
+    ExpectApiSuccess(api.Destroy("a"));
 }
 
 static void TestPermissions(TPortoAPI &api) {

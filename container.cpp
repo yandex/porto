@@ -148,12 +148,7 @@ TError TContainer::UpdateSoftLimit() {
     return TError::Success();
 }
 
-void TContainer::SetState(EContainerState newState, bool tree) {
-    if (tree)
-        for (auto iter : Children)
-            if (auto child = iter.lock())
-                child->SetState(newState, tree);
-
+void TContainer::SetState(EContainerState newState) {
     if (State == newState)
         return;
 
@@ -226,17 +221,12 @@ TError TContainer::DestroyVolumes(TScopedLock &holder_lock) {
 }
 
 TError TContainer::Destroy(TScopedLock &holder_lock) {
-    bool acquired = Acquired;
-
     L_ACT() << "Destroy " << GetName() << " " << Id << std::endl;
 
     if (GetState() == EContainerState::Paused) {
-        TError error = Resume();
-        if (error) {
-            if (acquired)
-                Release();
+        TError error = Resume(holder_lock);
+        if (error)
             return error;
-        }
     }
 
     if (Task && Task->IsRunning())
@@ -244,19 +234,16 @@ TError TContainer::Destroy(TScopedLock &holder_lock) {
 
     if (GetState() != EContainerState::Stopped) {
         TError error = Stop(holder_lock);
-        if (error) {
-            if (acquired)
-                Release();
+        if (error)
             return error;
-        }
     }
 
     TError error = DestroyVolumes(holder_lock);
     if (error)
         return error;
 
-    ApplyForChildren(holder_lock, [&] (TScopedLock &holder_lock,
-                                       TContainer &child) {
+    ApplyForTree(holder_lock, [] (TScopedLock &holder_lock,
+                                  TContainer &child) {
         child.RemoveKvs();
     });
     RemoveKvs();
@@ -265,9 +252,6 @@ TError TContainer::Destroy(TScopedLock &holder_lock) {
         auto lock = Net->ScopedLock();
         Tclass.reset();
     }
-
-    if (acquired)
-        Release();
 
     return TError::Success();
 }
@@ -796,6 +780,10 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
     return TError::Success();
 }
 
+void TContainer::AddChild(std::shared_ptr<TContainer> child) {
+    Children.push_back(child);
+}
+
 TError TContainer::Create(const TCred &cred) {
     L_ACT() << "Create " << GetName() << " with id " << Id << " uid " << cred.Uid << " gid " << cred.Gid << std::endl;
 
@@ -815,9 +803,6 @@ TError TContainer::Create(const TCred &cred) {
     if (error)
         return error;
 
-    if (Parent)
-        Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
-
     SetState(EContainerState::Stopped);
 
     return TError::Success();
@@ -829,6 +814,10 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
     if (state != EContainerState::Stopped)
         return TError(EError::InvalidState, "invalid container state " +
                       ContainerStateName(state));
+
+    TError error = CheckPausedParent();
+    if (error)
+        return error;
 
     auto vmode = Prop->Get<int>(P_VIRT_MODE);
     if (vmode == VIRT_MODE_OS && !CredConf.PrivilegedUser(OwnerCred)) {
@@ -857,7 +846,7 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
 
     L_ACT() << "Start " << GetName() << " " << Id << std::endl;
 
-    TError error = Data->Set<uint64_t>(D_RESPAWN_COUNT, 0);
+    error = Data->Set<uint64_t>(D_RESPAWN_COUNT, 0);
     if (error)
         return error;
 
@@ -923,6 +912,7 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
             return error;
     }
 
+    IsMeta = meta;
     if (meta)
         SetState(EContainerState::Meta);
     else
@@ -985,13 +975,23 @@ TError TContainer::KillAll(TScopedLock &holder_lock) {
     return SendSignal(SIGKILL, true);
 }
 
+void TContainer::ApplyForTree(TScopedLock &holder_lock,
+                              std::function<void (TScopedLock &holder_lock,
+                                                  TContainer &container)> fn) {
+    for (auto iter : Children)
+        if (auto child = iter.lock()) {
+            TNestedScopedLock lock(*child, holder_lock);
+            fn(holder_lock, *child);
+            child->ApplyForTree(holder_lock, fn);
+        }
+}
+
 void TContainer::ApplyForChildren(TScopedLock &holder_lock,
                                   std::function<void (TScopedLock &holder_lock,
                                                       TContainer &container)> fn) {
     for (auto iter : Children)
         if (auto child = iter.lock()) {
             TNestedScopedLock lock(*child, holder_lock);
-
             fn(holder_lock, *child);
         }
 }
@@ -1007,7 +1007,7 @@ void TContainer::StopChildren(TScopedLock &holder_lock) {
 }
 
 void TContainer::ExitChildren(TScopedLock &holder_lock, int status, bool oomKilled) {
-    ApplyForChildren(holder_lock, [&] (TScopedLock &holder_lock, TContainer &child) {
+    ApplyForTree(holder_lock, [&] (TScopedLock &holder_lock, TContainer &child) {
             if (child.GetState() == EContainerState::Running ||
                 child.GetState() == EContainerState::Meta) {
                 TError error = child.KillAll(holder_lock);
@@ -1151,7 +1151,14 @@ TError TContainer::Stop(TScopedLock &holder_lock) {
     return TError::Success();
 }
 
-TError TContainer::Pause() {
+TError TContainer::CheckPausedParent() {
+    for (auto p = Parent; p; p = p->Parent)
+        if (p->GetState() == EContainerState::Paused)
+            return TError(EError::InvalidState, "parent " + p->GetName() + " is paused");
+    return TError::Success();
+}
+
+TError TContainer::Pause(TScopedLock &holder_lock) {
     auto state = GetState();
     if (state != EContainerState::Running)
         return TError(EError::InvalidState, "invalid container state " +
@@ -1164,28 +1171,43 @@ TError TContainer::Pause() {
         return error;
     }
 
-    SetState(EContainerState::Paused, true);
+    SetState(EContainerState::Paused);
+    ApplyForTree(holder_lock, [] (TScopedLock &holder_lock,
+                                  TContainer &child) {
+        if (child.GetState() == EContainerState::Running ||
+            child.GetState() == EContainerState::Meta)
+            child.SetState(EContainerState::Paused);
+    });
     return TError::Success();
 }
 
-TError TContainer::Resume() {
+TError TContainer::Resume(TScopedLock &holder_lock) {
     auto state = GetState();
     if (state != EContainerState::Paused)
         return TError(EError::InvalidState, "invalid container state " +
                       ContainerStateName(state));
 
-    for (auto p = Parent; p; p = p->Parent)
-        if (p->GetState() == EContainerState::Paused)
-            return TError(EError::InvalidState, "parent " + p->GetName() + " is paused");
+    TError error = CheckPausedParent();
+    if (error)
+        return error;
 
     auto cg = GetLeafCgroup(freezerSubsystem);
-    TError error(freezerSubsystem->Unfreeze(cg));
+    error = freezerSubsystem->Unfreeze(cg);
     if (error) {
         L_ERR() << "Can't resume " << GetName() << ": " << error << std::endl;
         return error;
     }
 
-    SetState(EContainerState::Running, true);
+    SetState(EContainerState::Running);
+    ApplyForTree(holder_lock, [] (TScopedLock &holder_lock,
+                                  TContainer &child) {
+        if (child.GetState() == EContainerState::Paused) {
+            if (child.IsMeta)
+                child.SetState(EContainerState::Meta);
+            else
+                child.SetState(EContainerState::Running);
+        }
+    });
     return TError::Success();
 }
 
@@ -1634,7 +1656,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
         Task->ClearEnv();
 
     if (Parent)
-        Parent->Children.push_back(std::weak_ptr<TContainer>(shared_from_this()));
+        Parent->AddChild(shared_from_this());
 
     return TError::Success();
 }

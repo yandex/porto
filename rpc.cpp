@@ -95,7 +95,7 @@ noinline TError CreateContainer(TContext &context,
                                 const rpc::TContainerCreateRequest &req,
                                 rpc::TContainerResponse &rsp,
                                 std::shared_ptr<TClient> client) {
-    auto lock = context.Cholder->ScopedLock();
+    auto holder_lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
@@ -110,7 +110,7 @@ noinline TError CreateContainer(TContext &context,
     err = clientContainer->AbsoluteName(req.name(), name);
     if (err)
         return err;
-    return context.Cholder->Create(name, client->GetCred());
+    return context.Cholder->Create(holder_lock, name, client->GetCred());
 }
 
 noinline TError DestroyContainer(TContext &context,
@@ -147,11 +147,21 @@ noinline TError DestroyContainer(TContext &context,
     if (!container->Acquire())
         return TError(EError::Busy, "Can't destroy busy container");
 
-    // we don't want to hold container shared_ptr because Destroy
-    // might think that it has some parent that holds it
+    auto parent = container->GetParent();
+
+    error = context.Cholder->Destroy(cholder_lock, name);
+    container->Release();
     container = nullptr;
 
-    return context.Cholder->Destroy(cholder_lock, name);
+    if (error)
+        return error;
+
+    if (parent) {
+        TNestedScopedLock lock(*parent, cholder_lock);
+        parent->CleanupExpiredChildren();
+    }
+
+    return TError::Success();
 }
 
 noinline TError StartContainer(TContext &context,
@@ -299,7 +309,7 @@ noinline TError PauseContainer(TContext &context,
 
     TNestedScopedLock lock(*container, holder_lock);
 
-    err = container->Pause();
+    err = container->Pause(holder_lock);
 
     container->Release();
 
@@ -339,7 +349,7 @@ noinline TError ResumeContainer(TContext &context,
 
     TNestedScopedLock lock(*container, holder_lock);
 
-    err = container->Resume();
+    err = container->Resume(holder_lock);
 
     container->Release();
 

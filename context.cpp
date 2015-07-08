@@ -87,13 +87,13 @@ TError TContext::Initialize() {
 
     auto holder_lock = Cholder->ScopedLock();
 
-    error = Cholder->CreateRoot();
+    error = Cholder->CreateRoot(holder_lock);
     if (error) {
         L_ERR() << "Can't create root container: " << error << std::endl;
         return error;
     }
 
-    error = Cholder->CreatePortoRoot();
+    error = Cholder->CreatePortoRoot(holder_lock);
     if (error) {
         L_ERR() << "Can't create porto root container: " << error << std::endl;
         return error;

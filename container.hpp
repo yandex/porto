@@ -62,11 +62,12 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
     std::shared_ptr<TEpollSource> Source;
+    bool IsMeta = false;
 
     // data
     void UpdateRunningChildren(size_t diff);
     TError UpdateSoftLimit();
-    void SetState(EContainerState newState, bool tree = false);
+    void SetState(EContainerState newState);
     std::string ContainerStateName(EContainerState state);
 
     TError ApplyDynamicProperties();
@@ -104,6 +105,9 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void CleanupWaiters();
     void NotifyWaiters();
 
+    void ApplyForTree(TScopedLock &holder_lock,
+                      std::function<void (TScopedLock &holder_lock,
+                                          TContainer &container)> fn);
     void ApplyForChildren(TScopedLock &holder_lock,
                           std::function<void (TScopedLock &holder_lock,
                                               TContainer &container)> fn);
@@ -149,12 +153,14 @@ public:
     bool ValidHierarchicalProperty(const std::string &property, const uint64_t value) const;
     std::vector<pid_t> Processes();
 
+    void AddChild(std::shared_ptr<TContainer> child);
     TError Create(const TCred &cred);
     TError Destroy(TScopedLock &holder_lock);
     TError Start(std::shared_ptr<TClient> client, bool meta);
     TError Stop(TScopedLock &holder_lock);
-    TError Pause();
-    TError Resume();
+    TError CheckPausedParent();
+    TError Pause(TScopedLock &holder_lock);
+    TError Resume(TScopedLock &holder_lock);
     TError Kill(int sig);
 
     TError GetProperty(const std::string &property, std::string &value,
