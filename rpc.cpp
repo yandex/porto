@@ -179,6 +179,8 @@ noinline TError StartContainer(TContext &context,
     if (err)
         return TError(EError::InvalidValue, "Invalid container name " + name);
 
+    std::shared_ptr<TContainer> topContainer = nullptr;
+
     name = "";
     for (auto i = nameVec.begin(); i != nameVec.end(); i++) {
         if (!name.empty())
@@ -188,19 +190,23 @@ noinline TError StartContainer(TContext &context,
         std::shared_ptr<TContainer> container;
         err = context.Cholder->Get(name, container);
         if (err)
-            return err;
+            goto release;
 
         err = container->CheckPermission(client->GetCred());
         if (err)
-            return err;
+            goto release;
 
         if (nameVec.size() > 1)
             if (container->GetState() == EContainerState::Running ||
                 container->GetState() == EContainerState::Meta)
                 continue;
 
-        if (!container->Acquire())
-            return TError(EError::Busy, "Can't start busy container");
+        if (!topContainer) {
+            topContainer = container;
+
+            if (!container->Acquire())
+                return TError(EError::Busy, "Can't start busy container");
+        }
 
         TNestedScopedLock lock(*container, holder_lock);
 
@@ -209,13 +215,15 @@ noinline TError StartContainer(TContext &context,
         //bool meta = std::distance(i, nameVec.end()) == 1 && cmd.empty();
         err = container->Start(client, meta);
 
-        container->Release();
-
         if (err)
-            return err;
+            goto release;
     }
 
-    return TError::Success();
+release:
+    if (topContainer)
+        topContainer->Release();
+
+    return err;
 }
 
 noinline TError StopContainer(TContext &context,
@@ -378,7 +386,7 @@ noinline TError GetContainerProperty(TContext &context,
     if (error)
         return error;
 
-    if (!container->Acquire())
+    if (container->IsAcquired())
         return TError(EError::Busy, "Can't get property of busy container");
 
     TNestedScopedLock lock(*container, holder_lock);
@@ -387,8 +395,6 @@ noinline TError GetContainerProperty(TContext &context,
     error = container->GetProperty(req.property(), value, client);
     if (!error)
         rsp.mutable_getproperty()->set_value(value);
-
-    container->Release();
 
     return error;
 }
@@ -453,7 +459,7 @@ noinline TError GetContainerData(TContext &context,
     if (error)
         return error;
 
-    if (!container->Acquire())
+    if (container->IsAcquired())
         return TError(EError::Busy, "Can't get data of busy container");
 
     TNestedScopedLock lock(*container, holder_lock);
@@ -462,8 +468,6 @@ noinline TError GetContainerData(TContext &context,
     error = container->GetData(req.data(), value);
     if (!error)
         rsp.mutable_getdata()->set_value(value);
-
-    container->Release();
 
     return error;
 }
