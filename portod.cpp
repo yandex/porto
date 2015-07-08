@@ -917,6 +917,43 @@ static int MasterMain(bool respawn) {
     return ret;
 }
 
+bool RunningInContainer() {
+    if (getpid() == 1) {
+        return getenv("container") != nullptr;
+    } else {
+        std::string line;
+        bool inContainer = false;
+
+        FILE *f = fopen("/proc/1/environ", "r");
+        if (!f)
+            return false;
+
+        bool done = false;
+        while (!done) {
+            int c = getc(f);
+
+            if (c == EOF) {
+                done = true;
+                break;
+            } else if (c == '\0') {
+                if (StringStartsWith(line, "container=")) {
+                    done = true;
+                    inContainer = true;
+                    break;
+                }
+
+                line.clear();
+            } else {
+                line += (char)c;
+            }
+        }
+
+        fclose(f);
+
+        return inContainer;
+    }
+}
+
 int main(int argc, char * const argv[]) {
     bool slaveMode = false;
     bool respawn = true;
@@ -927,7 +964,7 @@ int main(int argc, char * const argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (getenv("container")) {
+    if (RunningInContainer()) {
         std::cerr << "Can't start in container" << std::endl;
         return EXIT_FAILURE;
     }
