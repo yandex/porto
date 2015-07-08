@@ -8,7 +8,7 @@
 class TEventWorker : public TWorker<TEvent, std::priority_queue<TEvent>> {
     std::shared_ptr<TContainerHolder> Holder;
 public:
-    TEventWorker(std::shared_ptr<TContainerHolder> holder) : TWorker("portod-event", 1), Holder(holder) {}
+    TEventWorker(std::shared_ptr<TContainerHolder> holder, const size_t nr) : TWorker("portod-event", nr), Holder(holder) {}
 
     const TEvent &Top() override {
         return Queue.top();
@@ -78,7 +78,7 @@ void TEventQueue::Add(size_t timeoutMs, const TEvent &e) {
 }
 
 TEventQueue::TEventQueue(std::shared_ptr<TContainerHolder> holder) {
-    Worker = std::make_shared<TEventWorker>(holder);
+    Worker = std::make_shared<TEventWorker>(holder, config().daemon().event_workers());
 }
 
 void TEventQueue::Start() {

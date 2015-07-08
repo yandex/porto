@@ -48,6 +48,7 @@ message TCfg {
 		optional uint64 max_msg_len = 9;
 		optional bool blocking_read = 10;
 		optional bool blocking_write = 11;
+		optional uint32 event_workers = 12;
 	}
 
 	message TContainerCfg {
