@@ -187,11 +187,6 @@ void TContainer::RemoveKvs() {
     if (IsRoot() || IsPortoRoot())
         return;
 
-    // TODO
-    for (auto iter : Children)
-        if (auto child = iter.lock())
-            child->RemoveKvs();
-
     auto kvnode = Storage->GetNode(Id);
     TError error = kvnode->Remove();
     if (error)
@@ -260,6 +255,10 @@ TError TContainer::Destroy(TScopedLock &holder_lock) {
     if (error)
         return error;
 
+    ApplyForChildren(holder_lock, [&] (TScopedLock &holder_lock,
+                                       TContainer &child) {
+        child.RemoveKvs();
+    });
     RemoveKvs();
 
     if (Tclass) {
