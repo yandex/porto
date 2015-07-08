@@ -245,6 +245,7 @@ TError TContainer::Destroy(TScopedLock &holder_lock) {
     ApplyForTree(holder_lock, [] (TScopedLock &holder_lock,
                                   TContainer &child) {
         child.RemoveKvs();
+        return TError::Success();
     });
     RemoveKvs();
 
@@ -975,35 +976,19 @@ TError TContainer::KillAll(TScopedLock &holder_lock) {
     return SendSignal(SIGKILL, true);
 }
 
-void TContainer::ApplyForTree(TScopedLock &holder_lock,
-                              std::function<void (TScopedLock &holder_lock,
-                                                  TContainer &container)> fn) {
-    for (auto iter : Children)
-        if (auto child = iter.lock()) {
-            TNestedScopedLock lock(*child, holder_lock);
-            fn(holder_lock, *child);
-            child->ApplyForTree(holder_lock, fn);
-        }
-}
-
-void TContainer::ApplyForChildren(TScopedLock &holder_lock,
-                                  std::function<void (TScopedLock &holder_lock,
+TError TContainer::ApplyForTree(TScopedLock &holder_lock,
+                                std::function<TError (TScopedLock &holder_lock,
                                                       TContainer &container)> fn) {
     for (auto iter : Children)
         if (auto child = iter.lock()) {
             TNestedScopedLock lock(*child, holder_lock);
-            fn(holder_lock, *child);
+            TError error = fn(holder_lock, *child);
+            if (error)
+                return error;
+            child->ApplyForTree(holder_lock, fn);
         }
-}
 
-void TContainer::StopChildren(TScopedLock &holder_lock) {
-    ApplyForChildren(holder_lock, [] (TScopedLock &holder_lock, TContainer &child) {
-            if (child.GetState() != EContainerState::Stopped) {
-                TError error = child.Stop(holder_lock);
-                if (error)
-                    L_ERR() << "Can't stop child " << child.GetName() << ": " << error << std::endl;
-            }
-        });
+    return TError::Success();
 }
 
 void TContainer::ExitChildren(TScopedLock &holder_lock, int status, bool oomKilled) {
@@ -1015,6 +1000,7 @@ void TContainer::ExitChildren(TScopedLock &holder_lock, int status, bool oomKill
                     L_ERR() << "Child " << child.GetName() << " can't be killed: " << error << std::endl;
                 child.Exit(holder_lock, status, oomKilled, true);
             }
+            return TError::Success();
         });
 }
 
@@ -1132,21 +1118,10 @@ TError TContainer::Stop(TScopedLock &holder_lock) {
         Task->DeliverExitStatus(-1);
     }
 
-    if (!IsRoot() && !IsPortoRoot())
+    if (!IsRoot() && !IsPortoRoot()) {
         SetState(EContainerState::Stopped);
-
-    bool update_soft_limit = Children.size() == 0;
-
-    StopChildren(holder_lock);
-
-    if (update_soft_limit) {
-        TError error = UpdateSoftLimit();
-        if (error)
-            L_ERR() << "Can't update meta soft limit: " << error << std::endl;
-    }
-
-    if (!IsRoot() && !IsPortoRoot())
         FreeResources();
+    }
 
     return TError::Success();
 }
@@ -1177,6 +1152,7 @@ TError TContainer::Pause(TScopedLock &holder_lock) {
         if (child.GetState() == EContainerState::Running ||
             child.GetState() == EContainerState::Meta)
             child.SetState(EContainerState::Paused);
+        return TError::Success();
     });
     return TError::Success();
 }
@@ -1207,6 +1183,7 @@ TError TContainer::Resume(TScopedLock &holder_lock) {
             else
                 child.SetState(EContainerState::Running);
         }
+        return TError::Success();
     });
     return TError::Success();
 }
@@ -1756,7 +1733,7 @@ void TContainer::ScheduleRespawn() {
 }
 
 TError TContainer::Respawn(TScopedLock &holder_lock) {
-    TError error = Stop(holder_lock);
+    TError error = StopTree(holder_lock);
     if (error)
         return error;
 
@@ -1968,4 +1945,26 @@ void TContainerWaiter::Signal(const TContainer *who) {
 
         client->Waiter = nullptr;
     }
+}
+
+TError TContainer::StopTree(TScopedLock &holder_lock) {
+    TError error = ApplyForTree(holder_lock, [] (TScopedLock &holder_lock,
+                                                 TContainer &child) {
+        if (child.GetState() != EContainerState::Stopped)
+            return child.Stop(holder_lock);
+        return TError::Success();
+    });
+
+    if (error)
+        return error;
+
+    error = Stop(holder_lock);
+    if (error)
+        return error;
+
+    error = UpdateSoftLimit();
+    if (error)
+        L_ERR() << "Can't update meta soft limit: " << error << std::endl;
+
+    return TError::Success();
 }

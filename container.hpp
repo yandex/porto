@@ -105,14 +105,12 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void CleanupWaiters();
     void NotifyWaiters();
 
-    void ApplyForTree(TScopedLock &holder_lock,
-                      std::function<void (TScopedLock &holder_lock,
-                                          TContainer &container)> fn);
-    void ApplyForChildren(TScopedLock &holder_lock,
-                          std::function<void (TScopedLock &holder_lock,
-                                              TContainer &container)> fn);
+    TError ApplyForTree(TScopedLock &holder_lock,
+                      std::function<TError (TScopedLock &holder_lock,
+                                            TContainer &container)> fn);
 
     TError DestroyVolumes(TScopedLock &holder_lock);
+    TError Stop(TScopedLock &holder_lock);
 
 public:
     TCred OwnerCred;
@@ -157,7 +155,7 @@ public:
     TError Create(const TCred &cred);
     TError Destroy(TScopedLock &holder_lock);
     TError Start(std::shared_ptr<TClient> client, bool meta);
-    TError Stop(TScopedLock &holder_lock);
+    TError StopTree(TScopedLock &holder_lock);
     TError CheckPausedParent();
     TError Pause(TScopedLock &holder_lock);
     TError Resume(TScopedLock &holder_lock);

@@ -269,7 +269,7 @@ noinline TError StopContainer(TContext &context,
 
     TNestedScopedLock lock(*container, holder_lock);
 
-    err = container->Stop(holder_lock);
+    err = container->StopTree(holder_lock);
 
     container->Release();
 

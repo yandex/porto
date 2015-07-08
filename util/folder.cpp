@@ -19,7 +19,7 @@ using std::vector;
 using std::unordered_map;
 
 TFolder::~TFolder() {
-    if (Tmp) {
+    if (Tmp && Exists()) {
         TError error = Remove(true);
         if (error)
             L_ERR() << "Can't remove " << Path << ": " << error << std::endl;
