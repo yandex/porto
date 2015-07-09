@@ -49,7 +49,6 @@ static bool stdlog = false;
 static bool failsafe = false;
 static bool noNetwork = false;
 
-TStatistics *Statistics;
 static void AllocStatistics() {
     Statistics = (TStatistics *)mmap(nullptr, sizeof(*Statistics),
                                      PROT_READ | PROT_WRITE,

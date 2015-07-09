@@ -5,6 +5,7 @@
 #include "util/unix.hpp"
 #include "util/file.hpp"
 #include "config.hpp"
+#include "common.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -12,6 +13,8 @@ extern "C" {
 #include <sys/stat.h>
 #include <fcntl.h>
 }
+
+TStatistics *Statistics = nullptr;
 
 static int logBufFd = -1;
 class TLogBuf : public std::streambuf {
@@ -164,12 +167,12 @@ std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
                                           "SYS " };
     std::string name = GetProcessName();
 
-#ifdef PORTOD
-    if (level == LOG_WARN)
-        Statistics->Warns++;
-    else if (level == LOG_ERROR)
-        Statistics->Errors++;
-#endif
+    if (Statistics) {
+        if (level == LOG_WARN)
+            Statistics->Warns++;
+        else if (level == LOG_ERROR)
+            Statistics->Errors++;
+    }
 
     return (*logStream) << GetTime() << " " << name << "[" << GetTid() << "]: " << prefix[level];
 }

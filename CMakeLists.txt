@@ -75,20 +75,22 @@ add_custom_target(tags COMMAND ctags -R --c++-kinds=+p --fields=+iaS --extra=+q 
 set_source_files_properties(TAGS PROPERTIES GENERATED true)
 add_custom_target(TAGS COMMAND ctags -R -e --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
+add_library(util util/idmap.cpp util/namespace.cpp util/netlink.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/signal.cpp util/unix.cpp util/cred.cpp util/string.cpp util/crash.cpp util/crc32.cpp util/sha256.cpp util/ext4_proj_quota.c)
+
 link_directories(${yandex-porto_BINARY_DIR})
 include_directories(${yandex-porto_BINARY_DIR}/api/cpp)
-add_library(porto api/cpp/libporto.cpp error.cpp util/protobuf.cpp ${PROTO_SRCS} ${PROTO_HDRS})
+add_library(porto util api/cpp/libporto.cpp error.cpp util/protobuf.cpp ${PROTO_SRCS} ${PROTO_HDRS})
 add_dependencies(porto version.hpp)
 
-add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp holder.cpp event.cpp task.cpp kvalue.cpp subsystem.cpp config.cpp container_value.cpp value.cpp data.cpp property.cpp qdisc.cpp context.cpp volume.cpp epoll.cpp util/idmap.cpp util/namespace.cpp util/netlink.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/signal.cpp util/unix.cpp util/cred.cpp util/string.cpp util/crash.cpp util/crc32.cpp util/sha256.cpp util/ext4_proj_quota.c client.cpp)
+add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp holder.cpp event.cpp task.cpp kvalue.cpp subsystem.cpp config.cpp container_value.cpp value.cpp data.cpp property.cpp qdisc.cpp context.cpp volume.cpp epoll.cpp client.cpp)
 set_target_properties(portod PROPERTIES COMPILE_DEFINITIONS "PORTOD=1")
 add_dependencies(portod version.hpp)
-target_link_libraries(portod porto ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
+target_link_libraries(portod porto util ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
 
-add_executable(portoctl ${PYTHON_SOURCES} portoctl.cpp cli.cpp config.cpp util/namespace.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/signal.cpp util/unix.cpp util/cred.cpp util/string.cpp util/crash.cpp portotop.cpp)
+add_executable(portoctl ${PYTHON_SOURCES} portoctl.cpp cli.cpp config.cpp portotop.cpp)
 
 add_dependencies(portoctl version.hpp)
-target_link_libraries(portoctl porto ${PB} rt ${CURSES_LIBRARIES})
+target_link_libraries(portoctl util porto ${PB} rt ${CURSES_LIBRARIES})
 
 add_executable(portod-meta-root meta_root.cpp util/signal.cpp)
 add_dependencies(portod-meta-root version.hpp)
@@ -98,9 +100,9 @@ endif()
 
 set(TEST_TARGETS "")
 if(ENABLE_TEST)
-	add_executable(portotest portotest.cpp config.cpp qdisc.cpp test/selftest.cpp test/stresstest.cpp test/fuzzytest.cpp test/test.cpp config.cpp util/idmap.cpp util/mount.cpp util/netlink.cpp util/log.cpp util/path.cpp util/file.cpp util/folder.cpp util/signal.cpp util/unix.cpp util/cred.cpp util/string.cpp util/crash.cpp)
+	add_executable(portotest portotest.cpp config.cpp qdisc.cpp test/selftest.cpp test/stresstest.cpp test/fuzzytest.cpp test/test.cpp config.cpp)
 	add_dependencies(portotest version.hpp)
-	target_link_libraries(portotest porto ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
+	target_link_libraries(portotest util porto ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
 	set(TEST_TARGETS "portotest")
 endif()
 
