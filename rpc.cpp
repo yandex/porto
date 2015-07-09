@@ -517,7 +517,8 @@ noinline TError GetContainerCombined(TContext &context,
             if (!containerError && container) {
                 if (container->IsAcquired())
                     containerError = TError(EError::Busy, "Can't get data and property of busy container");
-                lock = TNestedScopedLock(*container, holder_lock);
+                else
+                    lock = TNestedScopedLock(*container, holder_lock);
             }
         }
 
