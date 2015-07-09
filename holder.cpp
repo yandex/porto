@@ -431,7 +431,8 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     }
     case EEventType::Respawn:
     {
-        for (auto &target : List()) {
+        std::shared_ptr<TContainer> target = event.Container.lock();
+        if (target) {
             // check whether container can respawn under holder lock,
             // assume container state is not changed when only holding
             // container lock
@@ -439,10 +440,10 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
                 TNestedScopedLock lock(*target, holder_lock);
                 if (target->MayRespawn()) {
                     target->DeliverEvent(holder_lock, event);
+                    delivered = true;
                 }
             }
         }
-        delivered = true;
         break;
     }
     case EEventType::Exit:
