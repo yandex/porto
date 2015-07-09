@@ -1115,7 +1115,7 @@ TError TContainer::Stop(TScopedLock &holder_lock) {
             return TError(EError::Unknown, "Container didn't stop in " + std::to_string(config().container().stop_timeout_ms()) + "ms");
         }
 
-        Task->DeliverExitStatus(-1);
+        Task->Exit(-1);
     }
 
     if (!IsRoot() && !IsPortoRoot()) {
@@ -1650,14 +1650,14 @@ std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys
     return Parent->GetLeafCgroup(subsys)->GetChild(Name);
 }
 
-bool TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled, bool force) {
+void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled, bool force) {
     L_EVT() << "Exit " << GetName() << " (root_pid " << Task->GetPid() << ")"
             << " with status " << status << (oomKilled ? " invoked by OOM" : "")
             << std::endl;
 
     if (!force && !oomKilled && !Processes().empty() && Prop->Get<bool>(P_ISOLATE) == true) {
         L_WRN() << "Skipped bogus exit event (" << status << "), some process is still alive in " << GetName() << std::endl;
-        return true;
+        return;
     }
 
     ShutdownOom();
@@ -1691,7 +1691,7 @@ bool TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled, bool
     ExitChildren(holder_lock, status, oomKilled);
 
     if (Task)
-        Task->DeliverExitStatus(status);
+        Task->Exit(status);
     SetState(EContainerState::Dead);
 
     error = Prop->Set<int>(P_RAW_ROOT_PID, 0);
@@ -1700,11 +1700,9 @@ bool TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled, bool
 
     if (MayRespawn())
         ScheduleRespawn();
-
-    return true;
 }
 
-bool TContainer::DeliverExitStatus(TScopedLock &holder_lock, int pid, int status) {
+bool TContainer::MayExit(int pid) {
     if (!Task)
         return false;
 
@@ -1712,9 +1710,9 @@ bool TContainer::DeliverExitStatus(TScopedLock &holder_lock, int pid, int status
         return false;
 
     if (GetState() == EContainerState::Dead)
-        return true;
+        return false;
 
-    return Exit(holder_lock, status, FdHasEvent(Efd.GetFd()));
+    return true;
 }
 
 bool TContainer::MayRespawn() {
@@ -1725,6 +1723,19 @@ bool TContainer::MayRespawn() {
         return false;
 
     return Prop->Get<int>(P_MAX_RESPAWNS) < 0 || Data->Get<uint64_t>(D_RESPAWN_COUNT) < (uint64_t)Prop->Get<int>(P_MAX_RESPAWNS);
+}
+
+bool TContainer::MayReceiveOom(int fd) {
+    if (Efd.GetFd() != fd)
+        return false;
+
+    if (!Task)
+        return false;
+
+    if (GetState() == EContainerState::Dead)
+        return false;
+
+    return true;
 }
 
 void TContainer::ScheduleRespawn() {
@@ -1762,21 +1773,6 @@ std::vector<std::string> TContainer::GetChildren() {
     return vec;
 }
 
-bool TContainer::DeliverOom(TScopedLock &holder_lock, int fd) {
-    if (Efd.GetFd() != fd)
-        return false;
-
-    if (!Task)
-        return false;
-
-    ShutdownOom();
-
-    if (GetState() == EContainerState::Dead)
-        return true;
-
-    return Exit(holder_lock, SIGKILL, true);
-}
-
 TError TContainer::RotateLog(const TPath &path) {
     off_t max_log_size = config().container().max_log_size();
 
@@ -1791,11 +1787,12 @@ TError TContainer::RotateLog(const TPath &path) {
     return TError::Success();
 }
 
-bool TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
+void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
     TError error;
     switch (event.Type) {
         case EEventType::Exit:
-            return DeliverExitStatus(holder_lock, event.Exit.Pid, event.Exit.Status);
+            Exit(holder_lock, event.Exit.Status, FdHasEvent(Efd.GetFd()));
+            break;
         case EEventType::RotateLogs:
             if (GetState() == EContainerState::Running && Task) {
                 TError error = RotateLog(Prop->Get<std::string>(P_STDOUT_PATH));
@@ -1806,21 +1803,19 @@ bool TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
                 if (error)
                     L_ERR() << "Can't rotate stderr: " << error << std::endl;
             }
-            return false;
+            break;
         case EEventType::Respawn:
-            if (MayRespawn()) {
-                error = Respawn(holder_lock);
-                if (error)
-                    L_ERR() << "Can't respawn container: " << error << std::endl;
-                else
-                    L() << "Respawned " << GetName() << std::endl;
-                return true;
-            }
-            return false;
+            error = Respawn(holder_lock);
+            if (error)
+                L_ERR() << "Can't respawn container: " << error << std::endl;
+            else
+                L() << "Respawned " << GetName() << std::endl;
+            break;
         case EEventType::OOM:
-            return DeliverOom(holder_lock, event.OOM.Fd);
+            Exit(holder_lock, SIGKILL, true);
+            break;
         default:
-            return false;
+            break;
     }
 }
 

@@ -416,22 +416,50 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     {
         std::shared_ptr<TContainer> target = event.Container.lock();
         if (target) {
-            TNestedScopedLock lock(*target, holder_lock);
-            delivered = target->DeliverEvent(holder_lock, event);
+            // check whether container can die due to OOM under holder lock,
+            // assume container state is not changed when only holding
+            // container lock
+            if (target->MayReceiveOom(event.OOM.Fd)) {
+                TNestedScopedLock lock(*target, holder_lock);
+                if (target->MayReceiveOom(event.OOM.Fd)) {
+                    target->DeliverEvent(holder_lock, event);
+                    delivered = true;
+                }
+            }
         }
         break;
     }
     case EEventType::Respawn:
+    {
+        for (auto &target : List()) {
+            // check whether container can respawn under holder lock,
+            // assume container state is not changed when only holding
+            // container lock
+            if (target->MayRespawn()) {
+                TNestedScopedLock lock(*target, holder_lock);
+                if (target->MayRespawn()) {
+                    target->DeliverEvent(holder_lock, event);
+                }
+            }
+        }
+        delivered = true;
+        break;
+    }
     case EEventType::Exit:
     {
         for (auto &target : List()) {
-            TNestedScopedLock lock(*target, holder_lock);
-            delivered = target->DeliverEvent(holder_lock, event);
-            if (delivered)
-                break;
+            // check whether container can exit under holder lock,
+            // assume container state is not changed when only holding
+            // container lock
+            if (target->MayExit(event.Exit.Pid)) {
+                TNestedScopedLock lock(*target, holder_lock);
+                if (target->MayExit(event.Exit.Pid)) {
+                    target->DeliverEvent(holder_lock, event);
+                    break;
+                }
+            }
         }
-        if (event.Type == EEventType::Exit)
-            AckExitStatus(event.Exit.Pid);
+        AckExitStatus(event.Exit.Pid);
         delivered = true;
         break;
     }

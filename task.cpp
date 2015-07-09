@@ -948,7 +948,7 @@ int TTask::GetExitStatus() const {
     return ExitStatus;
 }
 
-void TTask::DeliverExitStatus(int status) {
+void TTask::Exit(int status) {
     ExitStatus = status;
     State = Stopped;
 }

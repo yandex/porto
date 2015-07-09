@@ -55,7 +55,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     int TaskStartErrno = -1;
     TScopedFd Efd;
     size_t CgroupEmptySince = 0;
-    size_t RunningChildren = 0;
+    size_t RunningChildren = 0; // changed under holder lock
     bool LostAndRestored = false;
     std::unique_ptr<TTask> Task;
     std::vector<std::weak_ptr<TContainerWaiter>> Waiters;
@@ -82,7 +82,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     const std::string StripParentName(const std::string &name) const;
     void ScheduleRespawn();
-    bool MayRespawn();
     bool ShouldApplyProperty(const std::string &property);
     TError Respawn(TScopedLock &holder_lock);
     void StopChildren(TScopedLock &holder_lock);
@@ -93,10 +92,8 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void PropertyToAlias(const std::string &property, std::string &value) const;
     TError AliasToProperty(std::string &property, std::string &value);
 
-    bool Exit(TScopedLock &holder_lock, int status, bool oomKilled, bool force = false);
+    void Exit(TScopedLock &holder_lock, int status, bool oomKilled, bool force = false);
     void ExitChildren(TScopedLock &holder_lock, int status, bool oomKilled);
-    bool DeliverExitStatus(TScopedLock &holder_lock, int pid, int status);
-    bool DeliverOom(TScopedLock &holder_lock, int fd);
 
     TError Prepare();
 
@@ -174,7 +171,7 @@ public:
     std::vector<std::string> GetChildren();
     std::shared_ptr<TContainer> FindRunningParent() const;
     bool UseParentNamespace() const;
-    bool DeliverEvent(TScopedLock &holder_lock, const TEvent &event);
+    void DeliverEvent(TScopedLock &holder_lock, const TEvent &event);
 
     TError CheckPermission(const TCred &ucred);
 
@@ -193,6 +190,10 @@ public:
     bool IsNamespaceIsolated();
     void CleanupExpiredChildren();
     TError UpdateNetwork();
+
+    bool MayExit(int pid);
+    bool MayRespawn();
+    bool MayReceiveOom(int fd);
 
     std::shared_ptr<TVolumeHolder> VolumeHolder;
     /* protected with TVolumeHolder->Lock */

@@ -156,7 +156,7 @@ public:
     bool IsRunning() const;
     int GetExitStatus() const;
     TError Kill(int signal) const;
-    void DeliverExitStatus(int status);
+    void Exit(int status);
     void ClearEnv();
 
     TError ChildApplyLimits();
