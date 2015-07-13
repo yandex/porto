@@ -46,8 +46,7 @@ void TConfig::LoadDefaults() {
 
     config().mutable_daemon()->set_max_clients(512);
     config().mutable_daemon()->set_cgroup_remove_timeout_s(5);
-    // wait 30 seconds for container cgroup to freeze/unfreeze
-    config().mutable_daemon()->set_freezer_wait_timeout_s(60);
+    config().mutable_daemon()->set_freezer_wait_timeout_s(5 * 60);
     config().mutable_daemon()->set_memory_guarantee_reserve(2 * 1024 * 1024 * 1024UL);
     config().mutable_daemon()->set_rotate_logs_timeout_s(60);
     config().mutable_daemon()->set_sysfs_root("/sys/fs/cgroup");

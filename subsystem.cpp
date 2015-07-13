@@ -201,18 +201,18 @@ TError TFreezerSubsystem::WaitState(std::shared_ptr<TCgroup> cg,
 }
 
 TError TFreezerSubsystem::Freeze(std::shared_ptr<TCgroup> cg) const {
-    TError error(cg->SetKnobValue("freezer.state", "FROZEN"));
-    if (error)
-        return error;
-
-    return WaitState(cg, "FROZEN");
+    return cg->SetKnobValue("freezer.state", "FROZEN");
 }
 
 TError TFreezerSubsystem::Unfreeze(std::shared_ptr<TCgroup> cg) const {
-    TError error(cg->SetKnobValue("freezer.state", "THAWED"));
-    if (error)
-        return error;
+    return cg->SetKnobValue("freezer.state", "THAWED");
+}
 
+TError TFreezerSubsystem::WaitForFreeze(std::shared_ptr<TCgroup> cg) const {
+    return WaitState(cg, "FROZEN");
+}
+
+TError TFreezerSubsystem::WaitForUnfreeze(std::shared_ptr<TCgroup> cg) const {
     return WaitState(cg, "THAWED");
 }
 
@@ -220,7 +220,7 @@ bool TFreezerSubsystem::IsFreezed(std::shared_ptr<TCgroup> cg) const {
     string s;
     TError error = cg->GetKnobValue("freezer.state", s);
     if (error)
-        L_ERR() << "Can't get freezer status: " << error << std::endl;
+        return false;
     return StringTrim(s) != "THAWED";
 }
 

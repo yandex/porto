@@ -926,36 +926,60 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
     return TError::Success();
 }
 
-TError TContainer::SendSignal(int signal, bool freeze) {
+TError TContainer::Freeze(TScopedLock &holder_lock) {
+    auto cg = GetLeafCgroup(freezerSubsystem);
+    TError error = freezerSubsystem->Freeze(cg);
+    if (error) {
+        L_ERR() << "Can't freeze container: " << error << std::endl;
+        return error;
+    }
+
+    {
+        TScopedUnlock unlock(holder_lock);
+        error = freezerSubsystem->WaitForFreeze(cg);
+        if (error) {
+            L_ERR() << "Can't wait for freeze container: " << error << std::endl;
+            return error;
+        }
+    }
+
+    return error;
+}
+
+TError TContainer::Unfreeze(TScopedLock &holder_lock) {
+    auto cg = GetLeafCgroup(freezerSubsystem);
+    TError error = freezerSubsystem->Unfreeze(cg);
+    if (error) {
+        L_ERR() << "Can't unfreeze container: " << error << std::endl;
+        return error;
+    }
+
+    {
+        TScopedUnlock unlock(holder_lock);
+        error = freezerSubsystem->WaitForUnfreeze(cg);
+        if (error) {
+            L_ERR() << "Can't wait for unfreeze container: " << error << std::endl;
+            return error;
+        }
+    }
+
+    return error;
+}
+
+TError TContainer::SendSignal(int signal) {
     auto cg = GetLeafCgroup(freezerSubsystem);
     TError error;
 
     L_ACT() << "Send signal " << signal << " to " << GetName() << std::endl;
 
-    if (freeze) {
-        error = freezerSubsystem->Freeze(cg);
-        if (error)
-            L_ERR() << "Can't freeze container: " << error << std::endl;
-    }
-
     vector<pid_t> reap;
     error = cg->GetTasks(reap);
     if (error) {
         L_ERR() << "Can't read tasks list while sending signal: " << error << std::endl;
-        if (freeze)
-            freezerSubsystem->Unfreeze(cg);
         return error;
     }
 
-    error = cg->Kill(signal);
-
-    if (freeze) {
-        error = freezerSubsystem->Unfreeze(cg);
-        if (error)
-            L_ERR() << "Can't unfreeze container: " << error << std::endl;
-    }
-
-    return error;
+    return cg->Kill(signal);
 }
 
 TError TContainer::KillAll(TScopedLock &holder_lock) {
@@ -972,8 +996,19 @@ TError TContainer::KillAll(TScopedLock &holder_lock) {
             L() << "Child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
     }
 
+    TError error = Freeze(holder_lock);
+    if (error)
+        return error;
+
     // then kill any task that didn't want to stop via SIGTERM signal;
-    return SendSignal(SIGKILL, true);
+    // freeze all container tasks to make sure no one forks and races with us
+    error = SendSignal(SIGKILL);
+    if (error) {
+            (void)Unfreeze(holder_lock);
+            return error;
+    }
+
+    return Unfreeze(holder_lock);
 }
 
 TError TContainer::ApplyForTree(TScopedLock &holder_lock,
@@ -1139,12 +1174,9 @@ TError TContainer::Pause(TScopedLock &holder_lock) {
         return TError(EError::InvalidState, "invalid container state " +
                       ContainerStateName(state));
 
-    auto cg = GetLeafCgroup(freezerSubsystem);
-    TError error(freezerSubsystem->Freeze(cg));
-    if (error) {
-        L_ERR() << "Can't pause " << GetName() << ": " << error << std::endl;
+    TError error = Freeze(holder_lock);
+    if (error)
         return error;
-    }
 
     SetState(EContainerState::Paused);
     ApplyForTree(holder_lock, [] (TScopedLock &holder_lock,
@@ -1167,8 +1199,7 @@ TError TContainer::Resume(TScopedLock &holder_lock) {
     if (error)
         return error;
 
-    auto cg = GetLeafCgroup(freezerSubsystem);
-    error = freezerSubsystem->Unfreeze(cg);
+    error = Unfreeze(holder_lock);
     if (error) {
         L_ERR() << "Can't resume " << GetName() << ": " << error << std::endl;
         return error;

@@ -77,7 +77,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareCgroups();
     TError PrepareTask(std::shared_ptr<TClient> client);
     TError KillAll(TScopedLock &holder_lock);
-    TError SendSignal(int signal, bool freeze = false);
+    TError SendSignal(int signal);
     void RemoveKvs();
 
     const std::string StripParentName(const std::string &name) const;
@@ -108,6 +108,9 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     TError DestroyVolumes(TScopedLock &holder_lock);
     TError Stop(TScopedLock &holder_lock);
+
+    TError Unfreeze(TScopedLock &holder_lock);
+    TError Freeze(TScopedLock &holder_lock);
 
 public:
     TCred OwnerCred;
