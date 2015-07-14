@@ -13,10 +13,9 @@ getver() { portoctl -v 2>&1 | grep $1 | awk '{print $2}'; }
 checkver() { [ "$2" = "$3" ] || { echo "Invalid $1 version ($2 != $3)"; }; }
 
 _build() {
-	export DEB_BUILD_OPTIONS="parallel=$(grep CPU /proc/cpuinfo | wc -l)"
 	dch --newversion $PORTO_VERSION "teamcity build"
 	find ../ -name '*.deb' -o -name '*.build' -o -name '*.changes' -print0 | xargs -0 rm -f
-	debuild "$@" -i -us -uc -b
+	debuild "$@" -i -us -uc -b -j$(grep CPU /proc/cpuinfo | wc -l)
 	sudo dpkg -i "$PORTO_DPKG" "$PYTHON_DPKG"
 
 	checkver server v$PORTO_VERSION $(getver server)
