@@ -144,14 +144,16 @@ noinline TError DestroyContainer(TContext &context,
     if (error)
         return error;
 
-    if (!container->Acquire())
-        return TError(EError::Busy, "Can't destroy busy container");
-
     auto parent = container->GetParent();
 
-    error = context.Cholder->Destroy(cholder_lock, name);
-    container->Release();
-    container = nullptr;
+    {
+        TScopedAcquire acquire(container);
+        if (!acquire.IsAcquired())
+            return TError(EError::Busy, "Can't destroy busy container");
+
+        error = context.Cholder->Destroy(cholder_lock, name);
+        container = nullptr;
+    }
 
     if (error)
         return error;
@@ -214,15 +216,25 @@ noinline TError StartContainer(TContext &context,
         if (!topContainer) {
             topContainer = container;
 
-            if (!container->Acquire())
-                return TError(EError::Busy, "Can't start busy container");
+            if (!topContainer->Acquire())
+                return TError(EError::Busy, "Can't start busy container " + topContainer->GetName());
         }
 
         TNestedScopedLock lock(*container, holder_lock);
 
         std::string cmd = container->Prop->Get<std::string>(P_COMMAND);
         bool meta = i + 1 != nameVec.end() && cmd.empty();
-        //bool meta = std::distance(i, nameVec.end()) == 1 && cmd.empty();
+
+        auto parent = container->GetParent();
+        if (parent) {
+            // we got concurrent request which stopped our parent
+            if (parent->GetState() != EContainerState::Running &&
+                parent->GetState() != EContainerState::Meta) {
+                err = TError(EError::Busy, "Can't start busy container (concurrent stop/destroy)");
+                goto release;
+            }
+        }
+
         err = container->Start(client, meta);
 
         if (err)
@@ -264,16 +276,13 @@ noinline TError StopContainer(TContext &context,
     if (error)
         return error;
 
-    if (!container->Acquire())
+    TScopedAcquire acquire(container);
+    if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't stop busy container");
 
     TNestedScopedLock lock(*container, holder_lock);
 
-    err = container->StopTree(holder_lock);
-
-    container->Release();
-
-    return err;
+    return container->StopTree(holder_lock);
 }
 
 noinline TError PauseContainer(TContext &context,
@@ -304,16 +313,13 @@ noinline TError PauseContainer(TContext &context,
     if (error)
         return error;
 
-    if (!container->Acquire())
+    TScopedAcquire acquire(container);
+    if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't pause busy container");
 
     TNestedScopedLock lock(*container, holder_lock);
 
-    err = container->Pause(holder_lock);
-
-    container->Release();
-
-    return err;
+    return container->Pause(holder_lock);
 }
 
 noinline TError ResumeContainer(TContext &context,
@@ -344,16 +350,13 @@ noinline TError ResumeContainer(TContext &context,
     if (error)
         return error;
 
-    if (!container->Acquire())
+    TScopedAcquire acquire(container);
+    if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't resume busy container");
 
     TNestedScopedLock lock(*container, holder_lock);
 
-    err = container->Resume(holder_lock);
-
-    container->Release();
-
-    return err;
+    return container->Resume(holder_lock);
 }
 
 noinline TError ListContainers(TContext &context,
@@ -437,16 +440,13 @@ noinline TError SetContainerProperty(TContext &context,
     if (error)
         return error;
 
-    if (!container->Acquire())
+    TScopedAcquire acquire(container);
+    if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't set property of busy container");
 
     TNestedScopedLock lock(*container, holder_lock);
 
-    error = container->SetProperty(req.property(), req.value(), client);
-
-    container->Release();
-
-    return error;
+    return container->SetProperty(req.property(), req.value(), client);
 }
 
 noinline TError GetContainerData(TContext &context,
@@ -638,16 +638,13 @@ noinline TError Kill(TContext &context,
     if (error)
         return error;
 
-    if (!container->Acquire())
+    TScopedAcquire acquire(container);
+    if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't kill busy container");
 
     TNestedScopedLock lock(*container, holder_lock);
 
-    error = container->Kill(req.sig());
-
-    container->Release();
-
-    return error;
+    return container->Kill(req.sig());
 }
 
 noinline TError Version(TContext &context,

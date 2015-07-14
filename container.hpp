@@ -198,6 +198,8 @@ public:
     bool MayRespawn();
     bool MayReceiveOom(int fd);
 
+    bool IsFrozen();
+
     std::shared_ptr<TVolumeHolder> VolumeHolder;
     /* protected with TVolumeHolder->Lock */
     std::set<std::shared_ptr<TVolume>> Volumes;
@@ -214,6 +216,25 @@ public:
     bool UnlinkVolume(std::shared_ptr<TVolume> volume) {
         return Volumes.erase(volume);
     }
+};
+
+class TScopedAcquire : public TNonCopyable {
+    std::shared_ptr<TContainer> Container;
+    bool Acquired;
+
+public:
+    TScopedAcquire(std::shared_ptr<TContainer> c) : Container(c) {
+        if (Container)
+            Acquired = Container->Acquire();
+        else
+            Acquired = true;
+    }
+    ~TScopedAcquire() {
+        if (Acquired && Container)
+            Container->Release();
+    }
+
+    bool IsAcquired() { return Acquired; }
 };
 
 class TContainerWaiter {

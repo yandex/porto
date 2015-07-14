@@ -149,6 +149,9 @@ TError TContainer::UpdateSoftLimit() {
 }
 
 void TContainer::SetState(EContainerState newState) {
+    if (newState == EContainerState::Running && IsMeta)
+        newState = EContainerState::Meta;
+
     if (State == newState)
         return;
 
@@ -872,25 +875,21 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
         int loopNr = -1;
         if (root.GetType() != EFileType::Directory) {
             error = GetLoopDev(loopNr);
-            if (error) {
-                return error;
-                FreeResources();
-            }
+            if (error)
+                goto error;
         }
 
         error = Prop->Set<int>(P_RAW_LOOP_DEV, loopNr);
         if (error) {
             if (loopNr >= 0)
                 (void)PutLoopDev(loopNr);
-            (void)FreeResources();
-            return error;
+            goto error;
         }
 
         error = PrepareTask(client);
         if (error) {
             L_ERR() << "Can't prepare task: " << error << std::endl;
-            FreeResources();
-            return error;
+            goto error;
         }
 
         error = Task->Start();
@@ -898,19 +897,18 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
             TError e = Data->Set<int>(D_START_ERRNO, error.GetErrno());
             if (e)
                 L_ERR() << "Can't set start_errno: " << e << std::endl;
-            FreeResources();
-            return error;
+            goto error;
         }
 
         error = Data->Set<int>(D_START_ERRNO, -1);
         if (error)
-            return error;
+            goto error;
 
         L() << GetName() << " started " << std::to_string(Task->GetPid()) << std::endl;
 
         error = Prop->Set<int>(P_RAW_ROOT_PID, Task->GetPid());
         if (error)
-            return error;
+            goto error;
     }
 
     IsMeta = meta;
@@ -924,6 +922,10 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
         L_ERR() << "Can't update meta soft limit: " << error << std::endl;
 
     return TError::Success();
+
+error:
+    FreeResources();
+    return error;
 }
 
 TError TContainer::Freeze(TScopedLock &holder_lock) {
@@ -964,6 +966,11 @@ TError TContainer::Unfreeze(TScopedLock &holder_lock) {
     }
 
     return error;
+}
+
+bool TContainer::IsFrozen() {
+    auto cg = GetLeafCgroup(freezerSubsystem);
+    return freezerSubsystem->IsFrozen(cg);
 }
 
 TError TContainer::SendSignal(int signal) {
@@ -1191,7 +1198,9 @@ TError TContainer::Pause(TScopedLock &holder_lock) {
 
 TError TContainer::Resume(TScopedLock &holder_lock) {
     auto state = GetState();
-    if (state != EContainerState::Paused)
+
+    // container may be dead by still frozen
+    if (!IsFrozen())
         return TError(EError::InvalidState, "invalid container state " +
                       ContainerStateName(state));
 
@@ -1205,15 +1214,13 @@ TError TContainer::Resume(TScopedLock &holder_lock) {
         return error;
     }
 
-    SetState(EContainerState::Running);
+    if (GetState() == EContainerState::Paused)
+        SetState(EContainerState::Running);
+
     ApplyForTree(holder_lock, [] (TScopedLock &holder_lock,
                                   TContainer &child) {
-        if (child.GetState() == EContainerState::Paused) {
-            if (child.IsMeta)
-                child.SetState(EContainerState::Meta);
-            else
-                child.SetState(EContainerState::Running);
-        }
+        if (child.GetState() == EContainerState::Paused)
+            child.SetState(EContainerState::Running);
         return TError::Success();
     });
     return TError::Success();
@@ -1571,10 +1578,8 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
         }
 
         TError error = PrepareResources();
-        if (error) {
-            FreeResources();
+        if (error)
             return error;
-        }
 
         error = PrepareTask(nullptr);
         if (error) {
@@ -1629,7 +1634,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
                 SetState(EContainerState::Running);
 
             auto cg = GetLeafCgroup(freezerSubsystem);
-            if (freezerSubsystem->IsFreezed(cg))
+            if (freezerSubsystem->IsFrozen(cg))
                 SetState(EContainerState::Paused);
         }
 

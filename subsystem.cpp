@@ -216,7 +216,7 @@ TError TFreezerSubsystem::WaitForUnfreeze(std::shared_ptr<TCgroup> cg) const {
     return WaitState(cg, "THAWED");
 }
 
-bool TFreezerSubsystem::IsFreezed(std::shared_ptr<TCgroup> cg) const {
+bool TFreezerSubsystem::IsFrozen(std::shared_ptr<TCgroup> cg) const {
     string s;
     TError error = cg->GetKnobValue("freezer.state", s);
     if (error)

@@ -204,7 +204,8 @@ for t in "$@"; do
 		self) selftest ; exit ;;
 		selfargs) selftest "$@" ; exit ;;
 		stress) stresstest ;;
-		fuzzy) fuzzytest ;;
+		fuzzy) shift; fuzzytest ;;
+		fuzzyargs) shift; fuzzytest "$@" ;;
 		threads) threadstest ;;
 		stressargs) shift; stresstest "$@"; exit $? ;;
 		pkg) pkgtest ;;

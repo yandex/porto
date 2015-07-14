@@ -161,6 +161,10 @@ TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &nam
             return error;
     }
 
+    TScopedAcquire acquire(parent);
+    if (!acquire.IsAcquired())
+        return TError(EError::Busy, "Parent container is busy");
+
     uint16_t id;
     TError error = IdMap.Get(id);
     if (error)
@@ -212,13 +216,14 @@ TError TContainerHolder::Get(int pid, std::shared_ptr<TContainer> &c) {
 }
 
 TError TContainerHolder::Destroy(TScopedLock &holder_lock, const std::string &name) {
-    auto c = Containers[name];
+    auto c = Containers.at(name);
+    PORTO_ASSERT(c);
 
     TNestedScopedLock lock(*c, holder_lock);
 
     // we destroy parent after child, but we need to unfreeze parent first
     // so children may be killed
-    if (c->GetState() == EContainerState::Paused) {
+    if (c->IsFrozen()) {
         TError error = c->Resume(holder_lock);
         if (error)
             return error;

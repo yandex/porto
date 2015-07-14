@@ -52,7 +52,7 @@ public:
                      const std::string &state) const;
     TError Freeze(std::shared_ptr<TCgroup> cg) const;
     TError Unfreeze(std::shared_ptr<TCgroup> cg) const;
-    bool IsFreezed(std::shared_ptr<TCgroup> cg) const;
+    bool IsFrozen(std::shared_ptr<TCgroup> cg) const;
 
     TError WaitForFreeze(std::shared_ptr<TCgroup> cg) const;
     TError WaitForUnfreeze(std::shared_ptr<TCgroup> cg) const;
