@@ -9,6 +9,181 @@
 
 using std::string;
 
+static std::string RequestAsString(const rpc::TContainerRequest &req) {
+    if (config().log().verbose())
+        return req.ShortDebugString();
+
+    if (req.has_create())
+        return "create " + req.create().name();
+    else if (req.has_destroy())
+        return "destroy " + req.destroy().name();
+    else if (req.has_list())
+        return "list containers";
+    else if (req.has_getproperty())
+        return "pget "  + req.getproperty().name() + " " + req.getproperty().property();
+    else if (req.has_setproperty())
+        return "pset " + req.setproperty().name() + " " +
+                         req.setproperty().property() + " " +
+                         req.setproperty().value();
+    else if (req.has_getdata())
+        return "dget " + req.getdata().name() + " " + req.getdata().data();
+    else if (req.has_get()) {
+        std::string ret = "get";
+
+        for (int i = 0; i < req.get().name_size(); i++)
+            ret += " " + req.get().name(i);
+
+        if (req.get().name_size() && req.get().variable_size())
+            ret += ",";
+
+        for (int i = 0; i < req.get().variable_size(); i++)
+            ret += " " + req.get().variable(i);
+
+        return ret;
+    } else if (req.has_start())
+        return "start " + req.start().name();
+    else if (req.has_stop())
+        return "stop " + req.stop().name();
+    else if (req.has_pause())
+        return "pause " + req.pause().name();
+    else if (req.has_resume())
+        return "resume " + req.resume().name();
+    else if (req.has_propertylist())
+        return "list available properties";
+    else if (req.has_datalist())
+        return "list available data";
+    else if (req.has_kill())
+        return "kill " + req.kill().name() + " " + std::to_string(req.kill().sig());
+    else if (req.has_version())
+        return "get version";
+    else if (req.has_wait()) {
+        std::string ret = "wait";
+
+        for (int i = 0; i < req.wait().name_size(); i++)
+            ret += " " + req.wait().name(i);
+
+        if (req.wait().has_timeout())
+            ret += " timeout " + std::to_string(req.wait().timeout());
+
+        return ret;
+    } else if (req.has_createvolume()) {
+        std::string ret = "volumeAPI: create " + req.createvolume().path();
+        for (auto p: req.createvolume().properties())
+            ret += " " + p.name() + "=" + p.value();
+        return ret;
+    } else if (req.has_linkvolume())
+        return "volumeAPI: link " + req.linkvolume().path() + " to " +
+                                    req.linkvolume().container();
+    else if (req.has_unlinkvolume())
+        return "volumeAPI: unlink " + req.unlinkvolume().path() + " from " +
+                                      req.unlinkvolume().container();
+    else if (req.has_listvolumes())
+        return "volumeAPI: list volumes";
+    else
+        return req.ShortDebugString();
+}
+
+static std::string ResponseAsString(const rpc::TContainerResponse &resp) {
+    if (config().log().verbose())
+        return resp.ShortDebugString();
+
+    switch (resp.error()) {
+    case EError::Success:
+    {
+        std::string ret;
+
+        if (resp.has_list()) {
+            for (int i = 0; i < resp.list().name_size(); i++)
+                ret += resp.list().name(i) + " ";
+        } else if (resp.has_propertylist()) {
+            for (int i = 0; i < resp.propertylist().list_size(); i++)
+                ret += resp.propertylist().list(i).name()
+                    + " (" + resp.propertylist().list(i).desc() + ")";
+        } else if (resp.has_datalist()) {
+            for (int i = 0; i < resp.datalist().list_size(); i++)
+                ret += resp.datalist().list(i).name()
+                    + " (" + resp.datalist().list(i).desc() + ")";
+        } else if (resp.has_volumelist()) {
+            for (auto v: resp.volumelist().volumes())
+                ret += v.path() + " ";
+        } else if (resp.has_getproperty()) {
+            ret = resp.getproperty().value();
+        } else if (resp.has_getdata()) {
+            ret = resp.getdata().value();
+        } else if (resp.has_get()) {
+            for (int i = 0; i < resp.get().list_size(); i++) {
+                auto entry = resp.get().list(i);
+
+                if (ret.length())
+                    ret += "; ";
+                ret += entry.name() + ":";
+
+                for (int j = 0; j < entry.keyval_size(); j++)
+                    if (entry.keyval(j).has_error())
+                        ret += " " + entry.keyval(j).variable() + "=" + std::to_string(entry.keyval(j).error()) + "?";
+                    else if (entry.keyval(j).has_value())
+                        ret += " " + entry.keyval(j).variable() + "=" + entry.keyval(j).value();
+            }
+        } else if (resp.has_version())
+            ret = resp.version().tag() + " #" + resp.version().revision();
+        else if (resp.has_wait())
+            ret = resp.wait().name() + " isn't running";
+        else
+            ret = "Ok";
+        return ret;
+        break;
+    }
+    case EError::Unknown:
+        return "Error: Unknown (" + resp.errormsg() + ")";
+        break;
+    case EError::InvalidMethod:
+        return "Error: InvalidMethod (" + resp.errormsg() + ")";
+        break;
+    case EError::ContainerAlreadyExists:
+        return "Error: ContainerAlreadyExists (" + resp.errormsg() + ")";
+        break;
+    case EError::ContainerDoesNotExist:
+        return "Error: ContainerDoesNotExist (" + resp.errormsg() + ")";
+        break;
+    case EError::InvalidProperty:
+        return "Error: InvalidProperty (" + resp.errormsg() + ")";
+        break;
+    case EError::InvalidData:
+        return "Error: InvalidData (" + resp.errormsg() + ")";
+        break;
+    case EError::InvalidValue:
+        return "Error: InvalidValue (" + resp.errormsg() + ")";
+        break;
+    case EError::InvalidState:
+        return "Error: InvalidState (" + resp.errormsg() + ")";
+        break;
+    case EError::NotSupported:
+        return "Error: NotSupported (" + resp.errormsg() + ")";
+        break;
+    case EError::ResourceNotAvailable:
+        return "Error: ResourceNotAvailable (" + resp.errormsg() + ")";
+        break;
+    case EError::Permission:
+        return "Error: Permission (" + resp.errormsg() + ")";
+        break;
+    case EError::VolumeAlreadyExists:
+        return "Error: VolumeAlreadyExists (" + resp.errormsg() + ")";
+        break;
+    case EError::VolumeNotFound:
+        return "Error: VolumeNotFound (" + resp.errormsg() + ")";
+        break;
+    case EError::Busy:
+        return "Error: Busy (" + resp.errormsg() + ")";
+        break;
+    case EError::NoSpace:
+        return "Error: NoSpace (" + resp.errormsg() + ")";
+        break;
+    default:
+        return resp.ShortDebugString();
+        break;
+    };
+}
+
 static bool InfoRequest(const rpc::TContainerRequest &req) {
     return
         req.has_list() ||
@@ -117,49 +292,38 @@ noinline TError DestroyContainer(TContext &context,
                                  const rpc::TContainerDestroyRequest &req,
                                  rpc::TContainerResponse &rsp,
                                  std::shared_ptr<TClient> client) {
-    auto cholder_lock = context.Cholder->ScopedLock();
+    auto holder_lock = context.Cholder->ScopedLock();
 
     TError err = CheckRequestPermissions(client);
     if (err)
         return err;
 
-    std::shared_ptr<TContainer> clientContainer;
-    err = client->GetContainer(clientContainer);
-    if (err)
-        return err;
-
-    std::string name;
-    err = clientContainer->AbsoluteName(req.name(), name);
-    if (err)
-        return err;
+    std::shared_ptr<TContainer> parent;
 
     // we don't want to hold container shared_ptr because Destroy
     // might think that it has some parent that holds it
-    std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(name, container);
-    if (error)
-        return error;
-
-    error = container->CheckPermission(client->GetCred());
-    if (error)
-        return error;
-
-    auto parent = container->GetParent();
-
     {
-        TScopedAcquire acquire(container);
-        if (!acquire.IsAcquired())
-            return TError(EError::Busy, "Can't destroy busy container");
+        std::shared_ptr<TContainer> container;
+        TNestedScopedLock lock;
+        err = context.Cholder->GetLocked(holder_lock, client, req.name(), true, container, lock);
+        if (err)
+            return err;
 
-        error = context.Cholder->Destroy(cholder_lock, name);
-        container = nullptr;
+        parent = container->GetParent();
+
+        {
+            TScopedAcquire acquire(container);
+            if (!acquire.IsAcquired())
+                return TError(EError::Busy, "Can't destroy busy container");
+
+            err = context.Cholder->Destroy(holder_lock, container);
+            if (err)
+                return err;
+        }
     }
 
-    if (error)
-        return error;
-
     if (parent) {
-        TNestedScopedLock lock(*parent, cholder_lock);
+        TNestedScopedLock lock(*parent, holder_lock);
         parent->CleanupExpiredChildren();
     }
 
@@ -200,11 +364,8 @@ noinline TError StartContainer(TContext &context,
         name += *i;
 
         std::shared_ptr<TContainer> container;
-        err = context.Cholder->Get(name, container);
-        if (err)
-            goto release;
-
-        err = container->CheckPermission(client->GetCred());
+        TNestedScopedLock lock;
+        err = context.Cholder->GetLocked(holder_lock, client, name, true, container, lock);
         if (err)
             goto release;
 
@@ -219,8 +380,6 @@ noinline TError StartContainer(TContext &context,
             if (!topContainer->Acquire())
                 return TError(EError::Busy, "Can't start busy container " + topContainer->GetName());
         }
-
-        TNestedScopedLock lock(*container, holder_lock);
 
         std::string cmd = container->Prop->Get<std::string>(P_COMMAND);
         bool meta = i + 1 != nameVec.end() && cmd.empty();
@@ -258,29 +417,11 @@ noinline TError StopContainer(TContext &context,
     if (err)
         return err;
 
-    std::shared_ptr<TContainer> clientContainer;
-    err = client->GetContainer(clientContainer);
-    if (err)
-        return err;
-
-    std::string name;
-    err = clientContainer->AbsoluteName(req.name(), name);
-    if (err)
-        return err;
     std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(name, container);
+    TNestedScopedLock lock;
+    TError error = context.Cholder->GetLocked(holder_lock, client, req.name(), true, container, lock);
     if (error)
         return error;
-
-    error = container->CheckPermission(client->GetCred());
-    if (error)
-        return error;
-
-    TScopedAcquire acquire(container);
-    if (!acquire.IsAcquired())
-        return TError(EError::Busy, "Can't stop busy container");
-
-    TNestedScopedLock lock(*container, holder_lock);
 
     return container->StopTree(holder_lock);
 }
@@ -295,29 +436,15 @@ noinline TError PauseContainer(TContext &context,
     if (err)
         return err;
 
-    std::shared_ptr<TContainer> clientContainer;
-    err = client->GetContainer(clientContainer);
-    if (err)
-        return err;
-
-    std::string name;
-    err = clientContainer->AbsoluteName(req.name(), name);
-    if (err)
-        return err;
     std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(name, container);
-    if (error)
-        return error;
-
-    error = container->CheckPermission(client->GetCred());
+    TNestedScopedLock lock;
+    TError error = context.Cholder->GetLocked(holder_lock, client, req.name(), true, container, lock);
     if (error)
         return error;
 
     TScopedAcquire acquire(container);
     if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't pause busy container");
-
-    TNestedScopedLock lock(*container, holder_lock);
 
     return container->Pause(holder_lock);
 }
@@ -332,29 +459,15 @@ noinline TError ResumeContainer(TContext &context,
     if (err)
         return err;
 
-    std::shared_ptr<TContainer> clientContainer;
-    err = client->GetContainer(clientContainer);
-    if (err)
-        return err;
-
-    std::string name;
-    err = clientContainer->AbsoluteName(req.name(), name);
-    if (err)
-        return err;
     std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(name, container);
-    if (error)
-        return error;
-
-    error = container->CheckPermission(client->GetCred());
+    TNestedScopedLock lock;
+    TError error = context.Cholder->GetLocked(holder_lock, client, req.name(), true, container, lock);
     if (error)
         return error;
 
     TScopedAcquire acquire(container);
     if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't resume busy container");
-
-    TNestedScopedLock lock(*container, holder_lock);
 
     return container->Resume(holder_lock);
 }
@@ -395,21 +508,23 @@ noinline TError GetContainerProperty(TContext &context,
     if (err)
         return err;
     std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(name, container);
-    if (error)
-        return error;
+    err = context.Cholder->Get(name, container);
+    if (err)
+        return err;
 
     if (container->IsAcquired())
         return TError(EError::Busy, "Can't get property of busy container");
 
     TNestedScopedLock lock(*container, holder_lock);
+    if (!container->IsValid())
+        return TError(EError::ContainerDoesNotExist, "container doesn't exist");
 
     string value;
-    error = container->GetProperty(req.property(), value, client);
-    if (!error)
+    err = container->GetProperty(req.property(), value, client);
+    if (!err)
         rsp.mutable_getproperty()->set_value(value);
 
-    return error;
+    return err;
 }
 
 noinline TError SetContainerProperty(TContext &context,
@@ -422,29 +537,15 @@ noinline TError SetContainerProperty(TContext &context,
     if (err)
         return err;
 
-    std::shared_ptr<TContainer> clientContainer;
-    err = client->GetContainer(clientContainer);
-    if (err)
-        return err;
-
-    std::string name;
-    err = clientContainer->AbsoluteName(req.name(), name);
-    if (err)
-        return err;
     std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(name, container);
-    if (error)
-        return error;
-
-    error = container->CheckPermission(client->GetCred());
+    TNestedScopedLock lock;
+    TError error = context.Cholder->GetLocked(holder_lock, client, req.name(), true, container, lock);
     if (error)
         return error;
 
     TScopedAcquire acquire(container);
     if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't set property of busy container");
-
-    TNestedScopedLock lock(*container, holder_lock);
 
     return container->SetProperty(req.property(), req.value(), client);
 }
@@ -465,21 +566,23 @@ noinline TError GetContainerData(TContext &context,
     if (err)
         return err;
     std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(name, container);
-    if (error)
-        return error;
+    err = context.Cholder->Get(name, container);
+    if (err)
+        return err;
 
     if (container->IsAcquired())
         return TError(EError::Busy, "Can't get data of busy container");
 
     TNestedScopedLock lock(*container, holder_lock);
+    if (!container->IsValid())
+        return TError(EError::ContainerDoesNotExist, "container doesn't exist");
 
     string value;
-    error = container->GetData(req.data(), value);
-    if (!error)
+    err = container->GetData(req.data(), value);
+    if (!err)
         rsp.mutable_getdata()->set_value(value);
 
-    return error;
+    return err;
 }
 
 noinline TError GetContainerCombined(TContext &context,
@@ -515,10 +618,13 @@ noinline TError GetContainerCombined(TContext &context,
         if (!containerError) {
             containerError = context.Cholder->Get(name, container);
             if (!containerError && container) {
-                if (container->IsAcquired())
+                if (container->IsAcquired()) {
                     containerError = TError(EError::Busy, "Can't get data and property of busy container");
-                else
+                } else {
                     lock = TNestedScopedLock(*container, holder_lock);
+                    if (!container->IsValid())
+                        containerError = TError(EError::ContainerDoesNotExist, "container doesn't exist");
+                }
             }
         }
 
@@ -556,12 +662,13 @@ noinline TError GetContainerCombined(TContext &context,
 
 noinline TError ListProperty(TContext &context,
                              rpc::TContainerResponse &rsp) {
-    auto lock = context.Cholder->ScopedLock();
+    auto holder_lock = context.Cholder->ScopedLock();
 
     auto list = rsp.mutable_propertylist();
 
     std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(ROOT_CONTAINER, container);
+    TNestedScopedLock lock;
+    TError error = context.Cholder->GetLocked(holder_lock, nullptr, ROOT_CONTAINER, false, container, lock);
     if (error)
         return TError(EError::Unknown, "Can't find root container");
 
@@ -584,12 +691,13 @@ noinline TError ListProperty(TContext &context,
 
 noinline TError ListData(TContext &context,
                          rpc::TContainerResponse &rsp) {
-    auto lock = context.Cholder->ScopedLock();
+    auto holder_lock = context.Cholder->ScopedLock();
 
     auto list = rsp.mutable_datalist();
 
     std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(ROOT_CONTAINER, container);
+    TNestedScopedLock lock;
+    TError error = context.Cholder->GetLocked(holder_lock, nullptr, ROOT_CONTAINER, false, container, lock);
     if (error)
         return TError(EError::Unknown, "Can't find root container");
 
@@ -620,29 +728,15 @@ noinline TError Kill(TContext &context,
     if (err)
         return err;
 
-    std::shared_ptr<TContainer> clientContainer;
-    err = client->GetContainer(clientContainer);
-    if (err)
-        return err;
-
-    std::string name;
-    err = clientContainer->AbsoluteName(req.name(), name);
-    if (err)
-        return err;
     std::shared_ptr<TContainer> container;
-    TError error = context.Cholder->Get(name, container);
-    if (error)
-        return error;
-
-    error = container->CheckPermission(client->GetCred());
+    TNestedScopedLock lock;
+    TError error = context.Cholder->GetLocked(holder_lock, client, req.name(), true, container, lock);
     if (error)
         return error;
 
     TScopedAcquire acquire(container);
     if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't kill busy container");
-
-    TNestedScopedLock lock(*container, holder_lock);
 
     return container->Kill(req.sig());
 }

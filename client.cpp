@@ -2,6 +2,7 @@
 #include <sstream>
 #include <iomanip>
 
+#include "rpc.hpp"
 #include "client.hpp"
 #include "holder.hpp"
 #include "config.hpp"

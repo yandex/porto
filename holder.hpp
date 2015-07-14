@@ -17,6 +17,8 @@ class TIdMap;
 class TEventQueue;
 class TEvent;
 class TEpollLoop;
+class TClient;
+class TContainer;
 
 class TContainerHolder : public std::enable_shared_from_this<TContainerHolder>,
                          public TLockable {
@@ -47,9 +49,18 @@ public:
     TError Create(TScopedLock &holder_lock, const std::string &name, const TCred &cred);
     TError Get(const std::string &name, std::shared_ptr<TContainer> &c);
     TError Get(int pid, std::shared_ptr<TContainer> &c);
+
+    TError GetLocked(TScopedLock &holder_lock,
+                     const std::shared_ptr<TClient> client,
+                     const std::string &name,
+                     const bool checkPerm,
+                     std::shared_ptr<TContainer> &c,
+                     TNestedScopedLock &l);
+
     TError Restore(TScopedLock &holder_lock, const std::string &name,
                    const kv::TNode &node);
     bool RestoreFromStorage();
+    TError Destroy(TScopedLock &holder_lock, std::shared_ptr<TContainer> c);
     TError Destroy(TScopedLock &holder_lock, const std::string &name);
     void DestroyRoot(TScopedLock &holder_lock);
 

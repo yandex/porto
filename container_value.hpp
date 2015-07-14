@@ -19,7 +19,7 @@ protected:
 
     std::shared_ptr<TContainer> GetContainer() const {
         std::shared_ptr<TContainer> container = Container.lock();
-        PORTO_ASSERT(container);
+        PORTO_ASSERT(container != nullptr);
         return container;
     }
 

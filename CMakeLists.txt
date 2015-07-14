@@ -53,7 +53,7 @@ find_package(Protobuf REQUIRED)
 include_directories(${PROTOBUF_INCLUDE_DIRS})
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
-PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS rpc.proto kv.proto config.proto)
+PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS error.proto rpc.proto kv.proto config.proto)
 
 find_package(Curses REQUIRED)
 include_directories(${CURSES_INCLUDE_DIR})
@@ -75,7 +75,7 @@ add_custom_target(tags COMMAND ctags -R --c++-kinds=+p --fields=+iaS --extra=+q 
 set_source_files_properties(TAGS PROPERTIES GENERATED true)
 add_custom_target(TAGS COMMAND ctags -R -e --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
-add_library(util util/idmap.cpp util/namespace.cpp util/netlink.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/signal.cpp util/unix.cpp util/cred.cpp util/string.cpp util/crash.cpp util/crc32.cpp util/sha256.cpp util/ext4_proj_quota.c)
+add_library(util util/locks.cpp util/idmap.cpp util/namespace.cpp util/netlink.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/signal.cpp util/unix.cpp util/cred.cpp util/string.cpp util/crash.cpp util/crc32.cpp util/sha256.cpp util/ext4_proj_quota.c)
 
 link_directories(${yandex-porto_BINARY_DIR})
 include_directories(${yandex-porto_BINARY_DIR}/api/cpp)

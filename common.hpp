@@ -1,26 +1,11 @@
 #pragma once
 
 #include <atomic>
-#include <mutex>
 
 #include "error.hpp"
 #include "version.hpp"
 
 #define noinline __attribute__((noinline))
-
-#define PORTO_ASSERT(EXPR) \
-    do { \
-        if (!(EXPR)) { \
-            L_ERR() << "Assertion failed: " << # EXPR << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
-            Crash(); \
-        } \
-    } while (0)
-
-#define PORTO_RUNTIME_ERROR(MSG) \
-    do { \
-        L_ERR() << "Runtime error: " << (MSG) << " at " << __FILE__ << ":" << __LINE__ << std::endl; \
-        Crash(); \
-    } while (0)
 
 class TNonCopyable {
 protected:

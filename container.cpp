@@ -226,7 +226,7 @@ TError TContainer::DestroyVolumes(TScopedLock &holder_lock) {
 TError TContainer::Destroy(TScopedLock &holder_lock) {
     L_ACT() << "Destroy " << GetName() << " " << Id << std::endl;
 
-    if (GetState() == EContainerState::Paused) {
+    if (IsFrozen()) {
         TError error = Resume(holder_lock);
         if (error)
             return error;
@@ -244,6 +244,8 @@ TError TContainer::Destroy(TScopedLock &holder_lock) {
     TError error = DestroyVolumes(holder_lock);
     if (error)
         return error;
+
+    SetState(EContainerState::Unknown);
 
     ApplyForTree(holder_lock, [] (TScopedLock &holder_lock,
                                   TContainer &child) {
@@ -887,10 +889,8 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
         }
 
         error = PrepareTask(client);
-        if (error) {
-            L_ERR() << "Can't prepare task: " << error << std::endl;
+        if (error)
             goto error;
-        }
 
         error = Task->Start();
         if (error) {
@@ -973,6 +973,10 @@ bool TContainer::IsFrozen() {
     return freezerSubsystem->IsFrozen(cg);
 }
 
+bool TContainer::IsValid() {
+    return GetState() != EContainerState::Unknown;
+}
+
 TError TContainer::SendSignal(int signal) {
     auto cg = GetLeafCgroup(freezerSubsystem);
     TError error;
@@ -1024,10 +1028,12 @@ TError TContainer::ApplyForTree(TScopedLock &holder_lock,
     for (auto iter : Children)
         if (auto child = iter.lock()) {
             TNestedScopedLock lock(*child, holder_lock);
-            TError error = fn(holder_lock, *child);
-            if (error)
-                return error;
-            child->ApplyForTree(holder_lock, fn);
+            if (child->IsValid()) {
+                TError error = fn(holder_lock, *child);
+                if (error)
+                    return error;
+                child->ApplyForTree(holder_lock, fn);
+            }
         }
 
     return TError::Success();
@@ -1979,8 +1985,18 @@ void TContainerWaiter::Signal(const TContainer *who) {
 }
 
 TError TContainer::StopTree(TScopedLock &holder_lock) {
+    TScopedAcquire acquire(shared_from_this());
+    if (!acquire.IsAcquired())
+        return TError(EError::Busy, "Can't stop busy container");
+
+    if (IsFrozen())
+        (void)Resume(holder_lock);
+
     TError error = ApplyForTree(holder_lock, [] (TScopedLock &holder_lock,
                                                  TContainer &child) {
+        if (child.IsFrozen())
+            (void)child.Resume(holder_lock);
+
         if (child.GetState() != EContainerState::Stopped)
             return child.Stop(holder_lock);
         return TError::Success();

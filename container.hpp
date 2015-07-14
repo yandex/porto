@@ -12,6 +12,7 @@
 #include "task.hpp"
 #include "util/unix.hpp"
 #include "util/locks.hpp"
+#include "util/log.hpp"
 
 class TEpollSource;
 class TCgroup;
@@ -199,6 +200,7 @@ public:
     bool MayReceiveOom(int fd);
 
     bool IsFrozen();
+    bool IsValid();
 
     std::shared_ptr<TVolumeHolder> VolumeHolder;
     /* protected with TVolumeHolder->Lock */

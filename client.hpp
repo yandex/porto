@@ -17,6 +17,10 @@ extern "C" {
 class TContainerWaiter;
 class TEpollLoop;
 
+namespace rpc {
+    class TContainerRequest;
+}
+
 enum class EClientState {
     ReadingLength,
     ReadingData,

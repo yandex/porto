@@ -7,6 +7,7 @@
 #include "data.hpp"
 #include "event.hpp"
 #include "qdisc.hpp"
+#include "client.hpp"
 #include "util/string.hpp"
 #include "util/cred.hpp"
 #include "util/file.hpp"
@@ -175,13 +176,15 @@ TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &nam
     if (error)
         return error;
 
-    if (parent) {
-        TNestedScopedLock lock(*parent, holder_lock);
-        parent->AddChild(c);
-    }
-
     Containers[name] = c;
     Statistics->Created++;
+
+    if (parent) {
+        TNestedScopedLock lock(*parent, holder_lock);
+        if (parent->IsValid())
+            parent->AddChild(c);
+    }
+
     return TError::Success();
 }
 
@@ -190,6 +193,50 @@ TError TContainerHolder::Get(const std::string &name, std::shared_ptr<TContainer
         return TError(EError::ContainerDoesNotExist, "container " + name + " doesn't exist");
 
     c = Containers[name];
+    return TError::Success();
+}
+
+TError TContainerHolder::GetLocked(TScopedLock &holder_lock,
+                                   const std::shared_ptr<TClient> client,
+                                   const std::string &name,
+                                   const bool checkPerm,
+                                   std::shared_ptr<TContainer> &c,
+                                   TNestedScopedLock &l) {
+    std::string absoluteName;
+
+    // resolve name
+    if (client) {
+        std::shared_ptr<TContainer> clientContainer;
+        TError error = client->GetContainer(clientContainer);
+        if (error)
+            return error;
+
+        error = clientContainer->AbsoluteName(name, absoluteName);
+        if (error)
+            return error;
+    } else {
+        absoluteName = name;
+    }
+
+    // get container
+    TError error = Get(absoluteName, c);
+    if (error)
+        return error;
+
+    // lock container
+    l = TNestedScopedLock(*c, holder_lock);
+
+    // make sure it's still alive
+    if (!c->IsValid())
+        return TError(EError::ContainerDoesNotExist, "container doesn't exist");
+
+    // check permissions
+    if (client && checkPerm) {
+        error = c->CheckPermission(client->GetCred());
+        if (error)
+            return error;
+    }
+
     return TError::Success();
 }
 
@@ -215,12 +262,7 @@ TError TContainerHolder::Get(int pid, std::shared_ptr<TContainer> &c) {
     return Get(name, c);
 }
 
-TError TContainerHolder::Destroy(TScopedLock &holder_lock, const std::string &name) {
-    auto c = Containers.at(name);
-    PORTO_ASSERT(c);
-
-    TNestedScopedLock lock(*c, holder_lock);
-
+TError TContainerHolder::Destroy(TScopedLock &holder_lock, std::shared_ptr<TContainer> c) {
     // we destroy parent after child, but we need to unfreeze parent first
     // so children may be killed
     if (c->IsFrozen()) {
@@ -240,8 +282,19 @@ TError TContainerHolder::Destroy(TScopedLock &holder_lock, const std::string &na
         return error;
 
     IdMap.Put(c->GetId());
-    Containers.erase(name);
+    Containers.erase(c->GetName());
     Statistics->Created--;
+
+    return TError::Success();
+}
+
+TError TContainerHolder::Destroy(TScopedLock &holder_lock, const std::string &name) {
+    auto c = Containers.at(name);
+    PORTO_ASSERT(c != nullptr);
+
+    TNestedScopedLock childLock(*c, holder_lock);
+    if (c->IsValid())
+        return Destroy(holder_lock, c);
 
     return TError::Success();
 }
@@ -426,7 +479,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
             // container lock
             if (target->MayReceiveOom(event.OOM.Fd)) {
                 TNestedScopedLock lock(*target, holder_lock);
-                if (target->MayReceiveOom(event.OOM.Fd)) {
+                if (target->IsValid() && target->MayReceiveOom(event.OOM.Fd)) {
                     target->DeliverEvent(holder_lock, event);
                     delivered = true;
                 }
@@ -443,7 +496,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
             // container lock
             if (target->MayRespawn()) {
                 TNestedScopedLock lock(*target, holder_lock);
-                if (target->MayRespawn()) {
+                if (target->IsValid() && target->MayRespawn()) {
                     target->DeliverEvent(holder_lock, event);
                     delivered = true;
                 }
@@ -453,13 +506,14 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     }
     case EEventType::Exit:
     {
-        for (auto &target : List()) {
+        auto list = List();
+        for (auto &target : list) {
             // check whether container can exit under holder lock,
             // assume container state is not changed when only holding
             // container lock
             if (target->MayExit(event.Exit.Pid)) {
                 TNestedScopedLock lock(*target, holder_lock);
-                if (target->MayExit(event.Exit.Pid)) {
+                if (target->IsValid() && target->MayExit(event.Exit.Pid)) {
                     target->DeliverEvent(holder_lock, event);
                     break;
                 }
@@ -472,7 +526,8 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     case EEventType::CgroupSync:
     {
         bool rearm = false;
-        for (auto &target : List()) {
+        auto list = List();
+        for (auto &target : list) {
             // don't lock container here, LostAndRestored is never changed
             // after startup
             if (target->IsLostAndRestored())
@@ -482,7 +537,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
                 continue;
 
             TNestedScopedLock lock(*target, holder_lock);
-            if (target->IsLostAndRestored())
+            if (target->IsValid() && target->IsLostAndRestored())
                 target->SyncStateWithCgroup(holder_lock);
         }
         if (rearm)
@@ -526,12 +581,14 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
             }
         }
 
-        for (auto &target : List()) {
+        auto list = List();
+        for (auto &target : list) {
             if (target->IsAcquired())
                 continue;
 
             TNestedScopedLock lock(*target, holder_lock);
-            target->DeliverEvent(holder_lock, event);
+            if (target->IsValid())
+                target->DeliverEvent(holder_lock, event);
         }
 
         ScheduleLogRotatation();

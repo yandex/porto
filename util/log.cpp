@@ -12,6 +12,7 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <sys/time.h>
 }
 
 TStatistics *Statistics = nullptr;
@@ -80,14 +81,24 @@ void TLogger::CloseLog() {
 }
 
 static std::string GetTime() {
-    char tmstr[256];
-    time_t t;
+    char buf[256];
+    struct timeval tv;
     struct tm *tmp, result;
-    t = time(NULL);
-    tmp = localtime_r(&t, &result);
+    gettimeofday(&tv, NULL);
 
-    if (tmp && strftime(tmstr, sizeof(tmstr), "%F %T", tmp))
-        return std::string(tmstr);
+    if ((tmp = localtime_r(&tv.tv_sec, &result)) != nullptr) {
+        std::stringstream ss;
+
+        strftime(buf, sizeof(buf), "%F %T", tmp);
+        ss << buf;
+
+        if (config().log().verbose()) {
+            snprintf(buf, sizeof(buf), ".%06lu", tv.tv_usec);
+            ss << buf;
+        }
+
+        return ss.str();
+    }
 
     return std::string();
 }
@@ -177,177 +188,12 @@ std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
     return (*logStream) << GetTime() << " " << name << "[" << GetTid() << "]: " << prefix[level];
 }
 
-std::string RequestAsString(const rpc::TContainerRequest &req) {
-    if (config().log().verbose())
-        return req.ShortDebugString();
-
-    if (req.has_create())
-        return "create " + req.create().name();
-    else if (req.has_destroy())
-        return "destroy " + req.destroy().name();
-    else if (req.has_list())
-        return "list containers";
-    else if (req.has_getproperty())
-        return "pget "  + req.getproperty().name() + " " + req.getproperty().property();
-    else if (req.has_setproperty())
-        return "pset " + req.setproperty().name() + " " +
-                         req.setproperty().property() + " " +
-                         req.setproperty().value();
-    else if (req.has_getdata())
-        return "dget " + req.getdata().name() + " " + req.getdata().data();
-    else if (req.has_get()) {
-        std::string ret = "get";
-
-        for (int i = 0; i < req.get().name_size(); i++)
-            ret += " " + req.get().name(i);
-
-        if (req.get().name_size() && req.get().variable_size())
-            ret += ",";
-
-        for (int i = 0; i < req.get().variable_size(); i++)
-            ret += " " + req.get().variable(i);
-
-        return ret;
-    } else if (req.has_start())
-        return "start " + req.start().name();
-    else if (req.has_stop())
-        return "stop " + req.stop().name();
-    else if (req.has_pause())
-        return "pause " + req.pause().name();
-    else if (req.has_resume())
-        return "resume " + req.resume().name();
-    else if (req.has_propertylist())
-        return "list available properties";
-    else if (req.has_datalist())
-        return "list available data";
-    else if (req.has_kill())
-        return "kill " + req.kill().name() + " " + std::to_string(req.kill().sig());
-    else if (req.has_version())
-        return "get version";
-    else if (req.has_wait()) {
-        std::string ret = "wait";
-
-        for (int i = 0; i < req.wait().name_size(); i++)
-            ret += " " + req.wait().name(i);
-
-        if (req.wait().has_timeout())
-            ret += " timeout " + std::to_string(req.wait().timeout());
-
-        return ret;
-    } else if (req.has_createvolume()) {
-        std::string ret = "volumeAPI: create " + req.createvolume().path();
-        for (auto p: req.createvolume().properties())
-            ret += " " + p.name() + "=" + p.value();
-        return ret;
-    } else if (req.has_linkvolume())
-        return "volumeAPI: link " + req.linkvolume().path() + " to " +
-                                    req.linkvolume().container();
-    else if (req.has_unlinkvolume())
-        return "volumeAPI: unlink " + req.unlinkvolume().path() + " from " +
-                                      req.unlinkvolume().container();
-    else if (req.has_listvolumes())
-        return "volumeAPI: list volumes";
-    else
-        return req.ShortDebugString();
+void porto_assert(const char *msg, size_t line, const char *file) {
+    L_ERR() << "Assertion failed: " << msg << " at " << file << ":" << line << std::endl;
+    Crash();
 }
 
-std::string ResponseAsString(const rpc::TContainerResponse &resp) {
-    if (config().log().verbose())
-        return resp.ShortDebugString();
-
-    switch (resp.error()) {
-    case EError::Success:
-    {
-        std::string ret;
-
-        if (resp.has_list()) {
-            for (int i = 0; i < resp.list().name_size(); i++)
-                ret += resp.list().name(i) + " ";
-        } else if (resp.has_propertylist()) {
-            for (int i = 0; i < resp.propertylist().list_size(); i++)
-                ret += resp.propertylist().list(i).name()
-                    + " (" + resp.propertylist().list(i).desc() + ")";
-        } else if (resp.has_datalist()) {
-            for (int i = 0; i < resp.datalist().list_size(); i++)
-                ret += resp.datalist().list(i).name()
-                    + " (" + resp.datalist().list(i).desc() + ")";
-        } else if (resp.has_volumelist()) {
-            for (auto v: resp.volumelist().volumes())
-                ret += v.path() + " ";
-        } else if (resp.has_getproperty()) {
-            ret = resp.getproperty().value();
-        } else if (resp.has_getdata()) {
-            ret = resp.getdata().value();
-        } else if (resp.has_get()) {
-            for (int i = 0; i < resp.get().list_size(); i++) {
-                auto entry = resp.get().list(i);
-
-                if (ret.length())
-                    ret += "; ";
-                ret += entry.name() + ":";
-
-                for (int j = 0; j < entry.keyval_size(); j++)
-                    if (entry.keyval(j).has_error())
-                        ret += " " + entry.keyval(j).variable() + "=" + std::to_string(entry.keyval(j).error()) + "?";
-                    else if (entry.keyval(j).has_value())
-                        ret += " " + entry.keyval(j).variable() + "=" + entry.keyval(j).value();
-            }
-        } else if (resp.has_version())
-            ret = resp.version().tag() + " #" + resp.version().revision();
-        else if (resp.has_wait())
-            ret = resp.wait().name() + " isn't running";
-        else
-            ret = "Ok";
-        return ret;
-        break;
-    }
-    case EError::Unknown:
-        return "Error: Unknown (" + resp.errormsg() + ")";
-        break;
-    case EError::InvalidMethod:
-        return "Error: InvalidMethod (" + resp.errormsg() + ")";
-        break;
-    case EError::ContainerAlreadyExists:
-        return "Error: ContainerAlreadyExists (" + resp.errormsg() + ")";
-        break;
-    case EError::ContainerDoesNotExist:
-        return "Error: ContainerDoesNotExist (" + resp.errormsg() + ")";
-        break;
-    case EError::InvalidProperty:
-        return "Error: InvalidProperty (" + resp.errormsg() + ")";
-        break;
-    case EError::InvalidData:
-        return "Error: InvalidData (" + resp.errormsg() + ")";
-        break;
-    case EError::InvalidValue:
-        return "Error: InvalidValue (" + resp.errormsg() + ")";
-        break;
-    case EError::InvalidState:
-        return "Error: InvalidState (" + resp.errormsg() + ")";
-        break;
-    case EError::NotSupported:
-        return "Error: NotSupported (" + resp.errormsg() + ")";
-        break;
-    case EError::ResourceNotAvailable:
-        return "Error: ResourceNotAvailable (" + resp.errormsg() + ")";
-        break;
-    case EError::Permission:
-        return "Error: Permission (" + resp.errormsg() + ")";
-        break;
-    case EError::VolumeAlreadyExists:
-        return "Error: VolumeAlreadyExists (" + resp.errormsg() + ")";
-        break;
-    case EError::VolumeNotFound:
-        return "Error: VolumeNotFound (" + resp.errormsg() + ")";
-        break;
-    case EError::Busy:
-        return "Error: Busy (" + resp.errormsg() + ")";
-        break;
-    case EError::NoSpace:
-        return "Error: NoSpace (" + resp.errormsg() + ")";
-        break;
-    default:
-        return resp.ShortDebugString();
-        break;
-    };
+void porto_runtime_error(const std::string &msg, size_t line, const char *file) {
+    L_ERR() << "Runtime error: " << msg << " at " << file << ":" << line << std::endl; \
+        Crash(); \
 }

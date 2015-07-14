@@ -8,6 +8,9 @@
 #include "util/crash.hpp"
 #include "util/path.hpp"
 
+#define PORTO_ASSERT(EXPR) if (!(EXPR)) porto_assert(#EXPR, __LINE__, __FILE__)
+#define PORTO_RUNTIME_ERROR(MSG) porto_runtime_error((MSG), __LINE__, __FILE__)
+
 enum ELogLevel {
     LOG_NOTICE = 0,
     LOG_WARN = 1,
@@ -38,5 +41,5 @@ static inline std::basic_ostream<char> &L_REQ() { return TLogger::Log(LOG_REQUES
 static inline std::basic_ostream<char> &L_RSP() { return TLogger::Log(LOG_RESPONSE); }
 static inline std::basic_ostream<char> &L_SYS() { return TLogger::Log(LOG_SYSTEM); }
 
-std::string RequestAsString(const rpc::TContainerRequest &req);
-std::string ResponseAsString(const rpc::TContainerResponse &resp);
+void porto_assert(const char *msg, size_t line, const char *file);
+void porto_runtime_error(const std::string &msg, size_t line, const char *file);
