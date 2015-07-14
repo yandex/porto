@@ -1,5 +1,6 @@
 #include <algorithm>
 
+#include "statistics.hpp"
 #include "holder.hpp"
 #include "config.hpp"
 #include "container.hpp"
@@ -8,6 +9,9 @@
 #include "event.hpp"
 #include "qdisc.hpp"
 #include "client.hpp"
+#include "task.hpp"
+#include "kvalue.hpp"
+#include "kv.pb.h"
 #include "util/string.hpp"
 #include "util/cred.hpp"
 #include "util/file.hpp"

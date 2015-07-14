@@ -1,5 +1,6 @@
 #include <sstream>
 
+#include "statistics.hpp"
 #include "data.hpp"
 #include "container.hpp"
 #include "container_value.hpp"

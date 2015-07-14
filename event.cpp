@@ -1,4 +1,5 @@
 #include "config.hpp"
+#include "statistics.hpp"
 #include "event.hpp"
 #include "holder.hpp"
 #include "util/log.hpp"

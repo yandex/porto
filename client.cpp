@@ -4,13 +4,18 @@
 
 #include "rpc.hpp"
 #include "client.hpp"
+#include "container.hpp"
 #include "holder.hpp"
 #include "config.hpp"
 #include "util/file.hpp"
+#include "util/log.hpp"
+#include "util/protobuf.hpp"
+#include "util/string.hpp"
 
 extern "C" {
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <unistd.h>
 };
 
 TClient::TClient(std::shared_ptr<TEpollLoop> loop, int fd) : TEpollSource(loop, fd) {
@@ -213,4 +218,17 @@ bool TClient::ReadRequest(rpc::TContainerRequest &req, bool &hangup) {
     }
 
     return false;
+}
+
+std::ostream& operator<<(std::ostream& stream, TClient& client) {
+    if (client.FullLog) {
+        client.FullLog = false;
+        stream << client.Comm << "(" << client.Pid << ") "
+            << client.Cred.UserAsString() << ":"
+            << client.Cred.GroupAsString() << " "
+            << client.GetContainerName();
+    } else {
+        stream << client.Comm << "(" << client.Pid << ")";
+    }
+    return stream;
 }

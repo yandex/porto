@@ -1,6 +1,7 @@
 #include <iostream>
 #include <sstream>
 
+#include "statistics.hpp"
 #include "log.hpp"
 #include "util/unix.hpp"
 #include "util/file.hpp"

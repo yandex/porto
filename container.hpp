@@ -1,19 +1,15 @@
 #pragma once
 
-#include <iostream>
 #include <string>
-#include <unordered_map>
 #include <vector>
 #include <memory>
-#include <functional>
 #include <set>
 
-#include "kvalue.hpp"
-#include "task.hpp"
 #include "util/unix.hpp"
 #include "util/locks.hpp"
 #include "util/log.hpp"
 
+class TKeyValueStorage;
 class TEpollSource;
 class TCgroup;
 class TSubsystem;
@@ -23,12 +19,17 @@ enum class ETclassStat;
 class TEvent;
 class TContainerHolder;
 class TNetwork;
+class TNlLink;
 class TTclass;
 class TTask;
 class TContainerWaiter;
 class TClient;
 class TVolume;
 class TVolumeHolder;
+
+namespace kv {
+    class TNode;
+};
 
 extern int64_t BootTime;
 
@@ -129,9 +130,7 @@ public:
     TContainer(std::shared_ptr<TContainerHolder> holder,
                std::shared_ptr<TKeyValueStorage> storage,
                const std::string &name, std::shared_ptr<TContainer> parent,
-               uint16_t id, std::shared_ptr<TNetwork> net) :
-        Holder(holder), Name(StripParentName(name)), Parent(parent),
-        Storage(storage), Id(id), Net(net) { }
+               uint16_t id, std::shared_ptr<TNetwork> net);
     ~TContainer();
 
     bool Acquire();

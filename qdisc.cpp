@@ -4,6 +4,7 @@
 #include "qdisc.hpp"
 #include "config.hpp"
 #include "util/log.hpp"
+#include "util/string.hpp"
 
 bool TTclass::Exists(std::shared_ptr<TNlLink> link) {
     TNlClass tclass(link, GetParent(), Handle);

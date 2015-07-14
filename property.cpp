@@ -1,4 +1,5 @@
 #include "property.hpp"
+#include "task.hpp"
 #include "config.hpp"
 #include "subsystem.hpp"
 #include "cgroup.hpp"

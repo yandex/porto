@@ -4,16 +4,12 @@
 #include <mutex>
 
 #include "common.hpp"
-#include "container.hpp"
 #include "epoll.hpp"
 #include "util/cred.hpp"
-#include "util/log.hpp"
-#include "util/protobuf.hpp"
+#include "util/unix.hpp"
 
-extern "C" {
-#include <unistd.h>
-};
-
+class TContainer;
+class TContainerHolder;
 class TContainerWaiter;
 class TEpollLoop;
 
@@ -43,18 +39,7 @@ public:
     std::string GetContainerName() const;
     TError GetContainer(std::shared_ptr<TContainer> &container) const;
 
-    friend std::ostream& operator<<(std::ostream& stream, TClient& client) {
-        if (client.FullLog) {
-            client.FullLog = false;
-            stream << client.Comm << "(" << client.Pid << ") "
-                   << client.Cred.UserAsString() << ":"
-                   << client.Cred.GroupAsString() << " "
-                   << client.GetContainerName();
-        } else {
-            stream << client.Comm << "(" << client.Pid << ")";
-        }
-        return stream;
-    }
+    friend std::ostream& operator<<(std::ostream& stream, TClient& client);
 
     std::shared_ptr<TContainerWaiter> Waiter;
     bool Readonly();

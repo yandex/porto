@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <algorithm>
 
+#include "statistics.hpp"
 #include "container.hpp"
 #include "config.hpp"
 #include "task.hpp"
@@ -16,7 +17,10 @@
 #include "qdisc.hpp"
 #include "context.hpp"
 #include "container_value.hpp"
+#include "task.hpp"
 #include "epoll.hpp"
+#include "kvalue.hpp"
+#include "volume.hpp"
 #include "util/log.hpp"
 #include "util/file.hpp"
 #include "util/string.hpp"
@@ -43,6 +47,13 @@ using std::unique_ptr;
 using std::map;
 
 int64_t BootTime = 0;
+
+TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
+                       std::shared_ptr<TKeyValueStorage> storage,
+                       const std::string &name, std::shared_ptr<TContainer> parent,
+                       uint16_t id, std::shared_ptr<TNetwork> net) :
+    Holder(holder), Name(StripParentName(name)), Parent(parent),
+    Storage(storage), Id(id), Net(net) { }
 
 TContainer::~TContainer() {
     // Tclass destructor should be called with TNetwork locked,

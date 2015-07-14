@@ -4,7 +4,10 @@
 #include <csignal>
 
 #include "portod.hpp"
+#include "version.hpp"
+#include "statistics.hpp"
 #include "rpc.hpp"
+#include "holder.hpp"
 #include "cgroup.hpp"
 #include "config.hpp"
 #include "event.hpp"
@@ -12,6 +15,7 @@
 #include "context.hpp"
 #include "client.hpp"
 #include "epoll.hpp"
+#include "volume.hpp"
 #include "util/log.hpp"
 #include "util/file.hpp"
 #include "util/folder.hpp"

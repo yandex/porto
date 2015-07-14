@@ -5,6 +5,7 @@
 #include "util/cred.hpp"
 #include "util/unix.hpp"
 #include "util/file.hpp"
+#include "util/string.hpp"
 
 #include "config.hpp"
 
@@ -14,6 +15,10 @@ extern "C" {
 #include <unistd.h>
 #include <sys/types.h>
 }
+
+TUserEntry::TUserEntry(const std::string &name) :
+    Name(!name.empty() && StringOnlyDigits(name) ? "" : name),
+    Id(!name.empty() && StringOnlyDigits(name) ? stoi(name) : -1) {}
 
 std::string TUserEntry::GetName() const {
     return Name;

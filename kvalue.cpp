@@ -1,4 +1,5 @@
 #include "kvalue.hpp"
+#include "kv.pb.h"
 #include "config.hpp"
 #include "util/log.hpp"
 #include "util/protobuf.hpp"

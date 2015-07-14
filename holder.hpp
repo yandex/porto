@@ -6,7 +6,6 @@
 #include <mutex>
 
 #include "common.hpp"
-#include "kvalue.hpp"
 #include "util/idmap.hpp"
 #include "util/cred.hpp"
 #include "util/locks.hpp"
@@ -19,6 +18,12 @@ class TEvent;
 class TEpollLoop;
 class TClient;
 class TContainer;
+class TKeyValueStorage;
+class TKeyValueNode;
+
+namespace kv {
+    class TNode;
+};
 
 class TContainerHolder : public std::enable_shared_from_this<TContainerHolder>,
                          public TLockable {

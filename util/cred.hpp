@@ -4,7 +4,6 @@
 #include <set>
 
 #include "common.hpp"
-#include "util/string.hpp"
 
 class TPath;
 
@@ -13,9 +12,7 @@ protected:
     std::string Name;
     int Id;
 public:
-    TUserEntry(const std::string &name) :
-        Name(!name.empty() && StringOnlyDigits(name) ? "" : name),
-          Id(!name.empty() && StringOnlyDigits(name) ? stoi(name) : -1) {}
+    TUserEntry(const std::string &name);
     TUserEntry(const int id) : Name(""), Id(id) {}
     std::string GetName() const;
     int GetId() const;

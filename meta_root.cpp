@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "common.hpp"
+#include "version.hpp"
 #include "util/signal.hpp"
 
 extern "C" {

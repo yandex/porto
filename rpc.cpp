@@ -1,11 +1,18 @@
+#include <algorithm>
+
 #include "rpc.hpp"
+#include "config.hpp"
+#include "version.hpp"
+#include "holder.hpp"
 #include "property.hpp"
 #include "data.hpp"
 #include "container_value.hpp"
+#include "volume.hpp"
+#include "event.hpp"
 #include "util/log.hpp"
 #include "util/protobuf.hpp"
 #include "util/string.hpp"
-#include <algorithm>
+#include "util/cred.hpp"
 
 using std::string;
 

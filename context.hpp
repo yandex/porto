@@ -1,15 +1,18 @@
 #pragma once
 
-#include "event.hpp"
-#include "holder.hpp"
-#include "qdisc.hpp"
-#include "volume.hpp"
-#include "util/mount.hpp"
-#include "config.hpp"
+#include <memory>
+
+#include "common.hpp"
 
 class TEpollLoop;
 class TCgroup;
 class TSubsystem;
+class TKeyValueStorage;
+class TEventQueue;
+class TNetwork;
+class TNl;
+class TContainerHolder;
+class TVolumeHolder;
 
 class TContext : public TNonCopyable {
     TError CreateDaemonCgs();

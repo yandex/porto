@@ -1,7 +1,8 @@
 #pragma once
 
-#include "container.hpp"
 #include "util/log.hpp"
+
+class TTaskEnv;
 
 class TContainerValue {
 protected:
@@ -17,11 +18,7 @@ protected:
            const std::set<EContainerState> &state) :
         Name(name), Desc(desc), State(state) {}
 
-    std::shared_ptr<TContainer> GetContainer() const {
-        std::shared_ptr<TContainer> container = Container.lock();
-        PORTO_ASSERT(container != nullptr);
-        return container;
-    }
+    std::shared_ptr<TContainer> GetContainer() const;
 
 public:
     void SetContainer(std::shared_ptr<TContainer> container) {

@@ -5,11 +5,14 @@
 #include <mutex>
 
 #include "common.hpp"
-#include "kv.pb.h"
 #include "util/mount.hpp"
 #include "util/locks.hpp"
 
 class TKeyValueStorage;
+
+namespace kv {
+    class TNode;
+};
 
 class TKeyValueNode : public TNonCopyable {
     std::shared_ptr<TKeyValueStorage> Storage;

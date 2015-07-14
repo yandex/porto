@@ -8,6 +8,12 @@ void AddContainerValue(std::shared_ptr<TRawValueMap> m, std::shared_ptr<TContain
     m->Add(cv->GetName(), av);
 }
 
+std::shared_ptr<TContainer> TContainerValue::GetContainer() const {
+    std::shared_ptr<TContainer> container = Container.lock();
+    PORTO_ASSERT(container != nullptr);
+    return container;
+}
+
 TContainerValue *ToContainerValue(TAbstractValue *av) {
     try {
         auto p = dynamic_cast<TContainerValue *>(av);

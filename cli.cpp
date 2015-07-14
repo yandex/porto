@@ -2,8 +2,14 @@
 #include <iomanip>
 
 #include "cli.hpp"
+#include "version.hpp"
 #include "util/signal.hpp"
 #include "util/unix.hpp"
+
+extern "C" {
+#include <unistd.h>
+#include <sys/ioctl.h>
+}
 
 using std::string;
 using std::map;

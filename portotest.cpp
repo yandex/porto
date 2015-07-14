@@ -2,6 +2,7 @@
 #include <csignal>
 
 #include "config.hpp"
+#include "version.hpp"
 #include "qdisc.hpp"
 #include "util/signal.hpp"
 #include "util/unix.hpp"

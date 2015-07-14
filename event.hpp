@@ -2,10 +2,8 @@
 
 #include <string>
 #include <memory>
-#include <queue>
 
 #include "util/worker.hpp"
-#include "holder.hpp"
 
 class TContainer;
 class TContainerHolder;

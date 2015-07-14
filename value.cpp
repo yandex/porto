@@ -1,6 +1,7 @@
 #include <sstream>
 
 #include "value.hpp"
+#include "kv.pb.h"
 #include "config.hpp"
 #include "container.hpp"
 #include "util/log.hpp"

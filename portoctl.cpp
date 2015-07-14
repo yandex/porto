@@ -8,6 +8,7 @@
 #include "libporto.hpp"
 #include "config.hpp"
 #include "cli.hpp"
+#include "volume.hpp"
 #include "util/string.hpp"
 #include "util/signal.hpp"
 #include "util/unix.hpp"

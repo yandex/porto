@@ -1,10 +1,12 @@
 #include "epoll.hpp"
+#include "statistics.hpp"
 #include "config.hpp"
 #include "util/unix.hpp"
 #include "util/log.hpp"
 
 extern "C" {
 #include <unistd.h>
+#include <sys/epoll.h>
 }
 
 static volatile sig_atomic_t signal_mask;

@@ -1,16 +1,11 @@
 #pragma once
 
 #include <map>
-#include <mutex>
 #include <memory>
 
 #include "common.hpp"
 #include "util/signal.hpp"
 #include "util/locks.hpp"
-
-extern "C" {
-#include <sys/epoll.h>
-}
 
 constexpr int updateSignal = SIGHUP;
 constexpr int rotateSignal = SIGUSR1;
@@ -20,7 +15,6 @@ static constexpr int HANDLE_SIGNALS[] = {SIGINT, SIGTERM,
                                          updateSignal, rotateSignal,
                                          debugSignal, SIGALRM};
 static constexpr int HANDLE_SIGNALS_WAIT[] = {SIGCHLD};
-
 
 constexpr int EPOLL_EVENT_OOM = 1;
 

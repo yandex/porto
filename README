@@ -30,16 +30,35 @@ NLDBG=10 NLCB=debug portod
 
 # Locking scheme
 ## Containers
-We have single lock on holder, and multiple locks for each container (child
-containers share lock with topmost non-root parent so when we lock some child,
-we have whole tree locked). Operations that add or remove containers
-take holder lock, mark container as "in-progress", drop the lock and continue
-construction/destruction with unlocked container. Other operations, that
-modify or read container state find container in locked holder, acquire
-container lock and drop holder lock.
-Whenever we try to modify container that is currently "in-progress" (by taking
-holder lock, finding container, and then locking individual container lock) we
-return Busy error (so user can retry later).
+We have single lock on holder, and single lock for each container + acquired
+flag which doesn't permit user to perform any operation on the acquired tree.
+
+Container is acquired on the following RPC (other RPC methods just return BUSY
+if container is acquired):
+- start
+- stop
+- pause
+- resume
+- set property
+- kill
+- destroy
+
+Events:
+- OOM - targeted (check whether may die due to OOM without container lock)
+- Respawn - targeted (check whether may respawn without container lock)
+- Exit - check whether may exit without container lock
+- CgroupSync - skip acquired
+- RotateLogs - skip acquired
+- WaitTimeout - targeted (no locks)
+
+Acquire and locks:
+( - holder lock
+{ - acquire
+[ - container lock
+
+- Start/Stop a/b/c do ({a) [(a]) [(b]) [(c]})
+- Pause/Resume/Set/Kill do a/b/c does ({a/b/c) [(a/b/c]})
+- Wait - no locks, client is not in epoll so no concurrent access
 
 ## Volumes
 We have single lock on volume holder, so any volume operation blocks others.
