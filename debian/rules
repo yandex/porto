@@ -18,4 +18,4 @@ override_dh_install:
 	-dh_bash-completion
 
 %:
-	dh $@
+	dh $@ --parallel
