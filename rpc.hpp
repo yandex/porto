@@ -1,6 +1,6 @@
 #pragma once
 
-#include "rpc.pb.h"
+#include "common.hpp"
 #include "context.hpp"
 #include "client.hpp"
 

@@ -38,6 +38,8 @@ if(USE_SYSTEM_LIBNL)
 else()
 	include(ExternalProject)
 	ExternalProject_Add(libnl
+		BUILD_COMMAND $(MAKE)
+		INSTALL_COMMAND $(MAKE) install
 		SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/contrib/libnl
 		UPDATE_COMMAND autoreconf -fi
 		CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --disable-cli --disable-pthreads
@@ -53,7 +55,7 @@ find_package(Protobuf REQUIRED)
 include_directories(${PROTOBUF_INCLUDE_DIRS})
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
-PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS error.proto rpc.proto kv.proto config.proto)
+PROTOBUF_GENERATE_CPP(PROTO_SRCS PROTO_HDRS rpc.proto kv.proto config.proto)
 
 find_package(Curses REQUIRED)
 include_directories(${CURSES_INCLUDE_DIR})
@@ -62,7 +64,7 @@ set(PYTHON_SOURCES "")
 if(ENABLE_PYTHON)
 	add_custom_command(
 		OUTPUT "api/python/porto/rpc_pb2.py"
-		COMMAND protoc ARGS --python_out=${CMAKE_CURRENT_SOURCE_DIR}/api/python/porto/ --proto_path=${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/rpc.proto ${CMAKE_CURRENT_SOURCE_DIR}/error.proto
+		COMMAND protoc ARGS --python_out=${CMAKE_CURRENT_SOURCE_DIR}/api/python/porto/ --proto_path=${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/rpc.proto
 		DEPENDS rpc.proto
 		VERBATIM)
 	set(PYTHON_SOURCES "api/python/porto/rpc_pb2.py")
@@ -76,6 +78,7 @@ set_source_files_properties(TAGS PROPERTIES GENERATED true)
 add_custom_target(TAGS COMMAND ctags -R -e --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
 add_library(util error.cpp util/locks.cpp util/idmap.cpp util/namespace.cpp util/netlink.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/signal.cpp util/unix.cpp util/cred.cpp util/string.cpp util/crash.cpp util/crc32.cpp util/sha256.cpp util/ext4_proj_quota.c  ${PROTO_SRCS})
+add_dependencies(util libnl)
 
 link_directories(${yandex-porto_BINARY_DIR})
 include_directories(${yandex-porto_BINARY_DIR}/api/cpp)

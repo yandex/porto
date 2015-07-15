@@ -4,7 +4,6 @@
 #include <cstdio>
 #include <algorithm>
 
-#include "rpc.pb.h"
 #include "version.hpp"
 #include "libporto.hpp"
 #include "config.hpp"

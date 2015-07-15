@@ -3,7 +3,7 @@
 #include <string>
 #include <ostream>
 
-#include "error.pb.h"
+#include "rpc.pb.h"
 
 using ::rpc::EError;
 
