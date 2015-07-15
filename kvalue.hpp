@@ -48,12 +48,12 @@ public:
 
     TKeyValueStorage(const TMount &mount);
 
-    std::shared_ptr<TKeyValueNode> GetNode(const std::string &path);
+    std::shared_ptr<TKeyValueNode> GetNode(const TPath &path);
     std::shared_ptr<TKeyValueNode> GetNode(uint16_t id);
     TError Dump();
     TError ListNodes(std::vector<std::shared_ptr<TKeyValueNode>> &list);
     TError Destroy();
-    std::string GetRoot() const { return Tmpfs.GetMountpoint() + "/"; }
+    std::string GetRoot() const { return Tmpfs.GetMountpoint().ToString() + "/"; }
 
     static TError Get(const kv::TNode &node, const std::string &name, std::string &val);
     static std::string FromPath(const std::string &path);

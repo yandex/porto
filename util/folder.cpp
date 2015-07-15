@@ -56,7 +56,7 @@ TError TFolder::Remove(bool recursive, bool silent) const {
             return error;
 
         for (auto f : items) {
-            TPath p(Path.AddComponent(f));
+            TPath p(Path / f);
             TFile child(p);
             TError error;
 
@@ -126,8 +126,8 @@ TError TFolder::Copy(const TPath &dir) const {
         return error;
 
     for (auto &entry : list) {
-        TPath from(Path.AddComponent(entry));
-        TPath to(dir.AddComponent(entry));
+        TPath from(Path / entry);
+        TPath to(dir / entry);
         TFolder fromDir(from);
         TFolder toDir(to);
         switch(from.GetType()) {
@@ -167,7 +167,7 @@ void RemoveIf(const TPath &path,
         return;
 
     for (auto &entry : list) {
-        TPath id = path.AddComponent(entry);
+        TPath id = path / entry;
         if (f(entry, id)) {
             L_ACT() << "Removing " << id << std::endl;
             TMount m(id, id, "", {});

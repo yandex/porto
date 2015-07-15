@@ -26,7 +26,7 @@ TPath TKeyValueStorage::ToPath(const std::string &name) const {
     for (std::string::size_type i = 0; i < s.length(); i++)
         if (s[i] == '/')
             s[i] = SLASH_SUBST;
-    return Tmpfs.GetMountpoint() + "/" + s;
+    return Tmpfs.GetMountpoint() / s;
 }
 
 std::string TKeyValueStorage::FromPath(const std::string &path) {
@@ -132,7 +132,7 @@ TError TKeyValueNode::Remove() const {
 }
 
 TKeyValueStorage::TKeyValueStorage(const TMount &mount) :
-    Tmpfs(mount), DirnameLen((Tmpfs.GetMountpoint() + "/").length()) {}
+    Tmpfs(mount), DirnameLen((Tmpfs.GetMountpoint().ToString() + "/").length()) {}
 
 TError TKeyValueStorage::MountTmpfs() {
     vector<shared_ptr<TMount>> mounts;
@@ -172,9 +172,9 @@ TError TKeyValueStorage::MountTmpfs() {
     return error;
 }
 
-std::shared_ptr<TKeyValueNode> TKeyValueStorage::GetNode(const std::string &path) {
-    PORTO_ASSERT(path.length() > DirnameLen);
-    return std::make_shared<TKeyValueNode>(shared_from_this(), path, path.substr(DirnameLen));
+std::shared_ptr<TKeyValueNode> TKeyValueStorage::GetNode(const TPath &path) {
+    PORTO_ASSERT(path.ToString().length() > DirnameLen);
+    return std::make_shared<TKeyValueNode>(shared_from_this(), path, path.ToString().substr(DirnameLen));
 }
 
 std::shared_ptr<TKeyValueNode> TKeyValueStorage::GetNode(uint16_t id) {
@@ -191,7 +191,7 @@ TError TKeyValueStorage::ListNodes(std::vector<std::shared_ptr<TKeyValueNode>> &
         return error;
 
     for (auto s : tmp)
-        list.push_back(GetNode(Tmpfs.GetMountpoint() + "/" + s));
+        list.push_back(GetNode(Tmpfs.GetMountpoint() / s));
 
     return TError::Success();
 }

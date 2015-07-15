@@ -122,7 +122,7 @@ public:
     std::shared_ptr<TValueMap> Data;
     std::shared_ptr<TNetwork> Net;
 
-    std::string GetTmpDir() const;
+    TPath GetTmpDir() const;
     TPath RootPath() const;
     EContainerState GetState() const;
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);

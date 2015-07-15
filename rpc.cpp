@@ -872,7 +872,7 @@ noinline TError CreateVolume(TContext &context,
 
     TPath volume_path("");
     if (req.has_path() && !req.path().empty())
-        volume_path = container_root.AddComponent(req.path());
+        volume_path = container_root / req.path();
 
     error = volume->Configure(volume_path, client->GetCred(),
                               clientContainer, properties, *context.Vholder);
@@ -970,7 +970,7 @@ noinline TError LinkVolume(TContext &context,
     }
     cholder_lock.unlock();
 
-    TPath volume_path = clientContainer->RootPath().AddComponent(req.path());
+    TPath volume_path = clientContainer->RootPath() / req.path();
 
     auto vholder_lock = context.Vholder->ScopedLock();
     auto volume = context.Vholder->Find(volume_path);
@@ -1032,7 +1032,7 @@ noinline TError UnlinkVolume(TContext &context,
         container = clientContainer;
     }
 
-    TPath volume_path = clientContainer->RootPath().AddComponent(req.path());
+    TPath volume_path = clientContainer->RootPath() / req.path();
 
     std::shared_ptr<TVolume> volume = context.Vholder->Find(volume_path);
     if (!volume)
@@ -1091,7 +1091,7 @@ noinline TError ListVolumes(TContext &context,
     auto vholder_lock = context.Vholder->ScopedLock();
 
     if (req.has_path() && !req.path().empty()) {
-        TPath volume_path = container_root.AddComponent(req.path());
+        TPath volume_path = container_root / req.path();
         auto volume = context.Vholder->Find(volume_path);
         if (volume == nullptr)
             return TError(EError::VolumeNotFound, "volume not found");
@@ -1158,15 +1158,15 @@ noinline TError ImportLayer(TContext &context,
         return TError(EError::InvalidValue, "invalid layer name");
 
     TPath layers = TPath(config().volumes().layers_dir());
-    TPath layers_tmp = layers.AddComponent("_tmp_");
-    TPath layer = layers.AddComponent(layer_name);
-    TPath layer_tmp = layers_tmp.AddComponent(layer_name);
+    TPath layers_tmp = layers / "_tmp_";
+    TPath layer = layers / layer_name;
+    TPath layer_tmp = layers_tmp / layer_name;
     TPath tarball(req.tarball());
 
     if (!tarball.IsAbsolute())
         return TError(EError::InvalidValue, "tarball path must be absolute");
 
-    tarball = clientContainer->RootPath().AddComponent(tarball);
+    tarball = clientContainer->RootPath() / tarball;
 
     if (tarball.GetType() != EFileType::Regular)
         return TError(EError::InvalidValue, "tarball not a file");
@@ -1244,7 +1244,7 @@ noinline TError ExportLayer(TContext &context,
     if (!tarball.IsAbsolute())
         return TError(EError::InvalidValue, "tarball path must be absolute");
 
-    tarball = clientContainer->RootPath().AddComponent(tarball);
+    tarball = clientContainer->RootPath() / tarball;
 
     if (tarball.Exists())
         return TError(EError::InvalidValue, "tarball already exists");
@@ -1297,12 +1297,12 @@ noinline TError RemoveLayer(TContext &context,
         return error;
 
     TPath layers = TPath(config().volumes().layers_dir());
-    TPath layer = layers.AddComponent(req.layer());
+    TPath layer = layers / req.layer();
     if (!layer.Exists())
         return TError(EError::InvalidValue, "layer does not exist");
 
-    TPath layers_tmp = layers.AddComponent("_tmp_");
-    TPath layer_tmp = layers_tmp.AddComponent(req.layer());
+    TPath layers_tmp = layers / "_tmp_";
+    TPath layer_tmp = layers_tmp / req.layer();
     if (!layers_tmp.Exists()) {
         error = layers_tmp.Mkdir(0700);
         if (error)

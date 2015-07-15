@@ -140,12 +140,12 @@ static std::string DefaultStdFile(std::shared_ptr<TContainer> c,
 
     TPath path = root;
     if (!path.Exists() || path.GetType() == EFileType::Directory) {
-        path = path.AddComponent(cwd);
+        path = path / cwd;
     } else {
         path = c->GetTmpDir();
     }
 
-    return path.AddComponent(prefix + '.' + name).ToString();
+    return (path / (prefix + '.' + name)).ToString();
 }
 
 static std::set<EContainerState> staticProperty = {
@@ -198,7 +198,7 @@ public:
 
         if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS) {
             TPath root = c->Prop->Get<std::string>(P_ROOT);
-            TPath passwd = root.AddComponent("etc").AddComponent("passwd");
+            TPath passwd = root / "etc" / "passwd";
             if (root.ToString() != "/" && passwd.Exists())
                 error = u.LoadFromFile(passwd);
         }
@@ -230,7 +230,7 @@ public:
 
         if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS) {
             TPath root = c->Prop->Get<std::string>(P_ROOT);
-            TPath group = root.AddComponent("etc").AddComponent("group");
+            TPath group = root / "etc" / "group";
             if (root.ToString() != "/" && group.Exists())
                 error = g.LoadFromFile(group);
         }
@@ -335,7 +335,7 @@ public:
         if (!c->Prop->IsDefault(P_ROOT))
             return "/";
 
-        return config().container().tmp_dir() + "/" + c->GetName();
+        return (TPath(config().container().tmp_dir()) / c->GetName()).ToString();
     }
 
     TError CheckValue(const std::string &value) override {

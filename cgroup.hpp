@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "common.hpp"
+#include "util/path.hpp"
 
 class TSubsystem;
 class TMount;
@@ -28,8 +29,8 @@ public:
 
     bool IsRoot() const;
 
-    std::string Path() const;
-    std::string Relpath() const;
+    TPath Path() const;
+    TPath Relpath() const;
 
     TError Create();
     TError Remove();

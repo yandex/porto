@@ -78,8 +78,8 @@ std::string TContainer::ContainerStateName(EContainerState state) {
     }
 }
 
-std::string TContainer::GetTmpDir() const {
-    return config().container().tmp_dir() + "/" + std::to_string(Id);
+TPath TContainer::GetTmpDir() const {
+    return TPath(config().container().tmp_dir()) / std::to_string(Id);
 }
 
 /* Returns normalized root path in host namespace */
@@ -91,7 +91,7 @@ TPath TContainer::RootPath() const {
     TPath path(Prop->Get<std::string>(P_ROOT));
     if (!path.IsRoot()) {
         if (path.GetType() == EFileType::Regular)
-            path = TPath(GetTmpDir());
+            path = GetTmpDir();
         path = path.NormalPath();
     }
 
@@ -524,16 +524,16 @@ TError TContainer::PrepareOomMonitor() {
         return error;
     }
 
-    string cfdPath = memcg->Path() + "/memory.oom_control";
+    auto cfdPath = memcg->Path() / "memory.oom_control";
     TScopedFd cfd(open(cfdPath.c_str(), O_RDONLY | O_CLOEXEC));
     if (cfd.GetFd() < 0) {
         ShutdownOom();
-        TError error(EError::Unknown, errno, "Can't open " + memcg->Path());
+        TError error(EError::Unknown, errno, "Can't open " + memcg->Path().ToString());
         L_ERR() << "Can't update OOM settings: " << error << std::endl;
         return error;
     }
 
-    TFile f(memcg->Path() + "/cgroup.event_control");
+    TFile f(memcg->Path() / "cgroup.event_control");
     string s = std::to_string(Efd.GetFd()) + " " + std::to_string(cfd.GetFd());
     error = f.WriteStringNoAppend(s);
     if (error) {
@@ -786,9 +786,9 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
 
     // if root is on loop device, we use some internal directory
     // to hold stdout/stderr
-    if (StringStartsWith(taskEnv->StdinPath.ToString(), GetTmpDir()) ||
-        StringStartsWith(taskEnv->StdoutPath.ToString(), GetTmpDir()) ||
-        StringStartsWith(taskEnv->StderrPath.ToString(), GetTmpDir())) {
+    if (StringStartsWith(taskEnv->StdinPath.ToString(), GetTmpDir().ToString()) ||
+        StringStartsWith(taskEnv->StdoutPath.ToString(), GetTmpDir().ToString()) ||
+        StringStartsWith(taskEnv->StderrPath.ToString(), GetTmpDir().ToString())) {
         TError error = Task->CreateTmpDir(GetTmpDir(), Task->StdTmp);
         if (error)
             return error;
@@ -1430,7 +1430,7 @@ TError TContainer::SetProperty(const string &origProperty,
         TPath clientRoot = clientContainer->RootPath();
         if (clientRoot.IsEmpty())
             return TError(EError::InvalidValue, "Cannot get client root path");
-        value = clientRoot.AddComponent(value).ToString();
+        value = (clientRoot / value).ToString();
     }
 
     if (!Prop->HasState(property, GetState()))

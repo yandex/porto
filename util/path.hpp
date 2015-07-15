@@ -32,6 +32,7 @@ class TPath {
     std::string DirNameStr() const;
     TError RegularCopy(const TPath &to, unsigned int mode) const;
     unsigned int Stat(std::function<unsigned int(struct stat *st)> f) const;
+    TPath AddComponent(const TPath &component) const;
 
 public:
     TPath(const std::string &path) : Path(path) {}
@@ -64,6 +65,10 @@ public:
         return os << path.ToString();
     }
 
+    friend TPath operator/(const TPath& a, const TPath &b) {
+        return a.AddComponent(b);
+    }
+
     TPath DirName() const;
     std::string BaseName() const;
     TPath NormalPath() const;
@@ -82,7 +87,6 @@ public:
     bool Exists() const;
     bool AccessOk(EFileAccess type) const;
     bool AccessOk(EFileAccess type, const TCred &cred) const;
-    TPath AddComponent(const TPath &component) const;
     TError Chdir() const;
     TError Chroot() const;
     TError Chown(const TCred &cred) const;

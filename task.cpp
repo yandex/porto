@@ -1008,7 +1008,7 @@ bool TTask::HasCorrectFreezer() {
         return false;
     } else {
         auto cg = Env->LeafCgroups.at(freezerSubsystem);
-        if (cg && cg->Relpath() != cgmap["freezer"]) {
+        if (cg && cg->Relpath().ToString() != cgmap["freezer"]) {
             // if at this point task is zombie we don't have any cgroup info
             if (IsZombie())
                 return true;
@@ -1064,7 +1064,7 @@ TError TTask::FixCgroups() const {
         }
 
         auto cg = Env->LeafCgroups.at(subsys);
-        if (cg && cg->Relpath() != path) {
+        if (cg && cg->Relpath().ToString() != path) {
             L_WRN() << "Fixed invalid task subsystem for " << subsys->GetName() << ":" << path << std::endl;
 
             error = cg->Attach(Pid);

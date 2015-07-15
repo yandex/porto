@@ -2647,7 +2647,7 @@ static void TestPath(TPortoAPI &api) {
         ExpectEq(TPath(n[0]).InnerPath(n[1], false).ToString(), n[2]);
         ExpectEq(TPath(n[0]).InnerPath(n[1], true).ToString(), n[3]);
         if (n[3] != "")
-            ExpectEq(TPath(n[0]).AddComponent(n[3]).ToString(), n[1]);
+            ExpectEq((TPath(n[0]) / n[3]).ToString(), n[1]);
     }
 }
 

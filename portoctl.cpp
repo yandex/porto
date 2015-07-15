@@ -565,7 +565,7 @@ public:
         std::cerr << str << ": " << strerror(errno) << std::endl;
     }
 
-    TError GetCgMount(const string &subsys, string &root) {
+    TError GetCgMount(const string &subsys, TPath &root) {
         vector<string> subsystems;
         TError error = SplitString(subsys, ',', subsystems);
         if (error)
@@ -639,14 +639,14 @@ public:
             }
 
             for (auto &cg : cgmap) {
-                string root;
+                TPath root;
                 TError error = GetCgMount(cg.first, root);
                 if (error) {
                     PrintError(error, "Can't get task cgroups");
                     return EXIT_FAILURE;
                 }
 
-                TFile f(root + cg.second + "/cgroup.procs");
+                TFile f(root / cg.second / "cgroup.procs");
                 error = f.AppendString(std::to_string(GetPid()));
                 if (error) {
                     PrintError(error, "Can't get task cgroups");

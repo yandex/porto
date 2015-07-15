@@ -213,7 +213,7 @@ public:
     TVolumeLoopBackend(std::shared_ptr<TVolume> volume) : TVolumeBackend(volume) { }
 
     TPath GetLoopImage() {
-        return Volume->GetStorage().AddComponent("loop.img");
+        return Volume->GetStorage() / "loop.img";
     }
 
     TPath GetLoopDevice() {
@@ -354,8 +354,8 @@ public:
 
     TError Build() override {
         TPath storage = Volume->GetStorage();
-        TPath upper = storage.AddComponent("upper");
-        TPath work = storage.AddComponent("work");
+        TPath upper = storage / "upper";
+        TPath work = storage / "work";
         uint64_t space_limit, inode_limit;
         TError error;
         std::stringstream lower;
@@ -422,7 +422,7 @@ err:
     }
 
     TError Clear() override {
-        return Volume->GetStorage().AddComponent("upper").ClearDirectory();
+        return (Volume->GetStorage() / "upper").ClearDirectory();
     }
 
     TError Destroy() override {
@@ -443,11 +443,11 @@ err:
                 if (!error)
                     error = error2;
                 L_ERR() << "Can't clear overlay storage: " << error2 << std::endl;
-                (void)storage.AddComponent("upper").ClearDirectory();
+                (void)(storage / "upper").ClearDirectory();
             }
         }
 
-        TPath work = storage.AddComponent("work");
+        TPath work = storage / "work";
         if (work.Exists()) {
             (void)work.ClearDirectory();
             (void)work.Rmdir();
@@ -511,15 +511,15 @@ TError TVolume::OpenBackend() {
 
 /* /place/porto_volumes/<id>/<type> */
 TPath TVolume::GetInternal(std::string type) const {
-    return TPath(config().volumes().volume_dir()).AddComponent(std::to_string(GetId())).AddComponent(type);
+    return TPath(config().volumes().volume_dir()) / std::to_string(GetId()) / type;
 }
 
 /* /chroot/porto/<type>_<id> */
 TPath TVolume::GetChrootInternal(TPath container_root, std::string type) const {
-    TPath porto_path = container_root.AddComponent(config().container().chroot_porto_dir());
+    TPath porto_path = container_root / config().container().chroot_porto_dir();
     if (!porto_path.Exists() && porto_path.Mkdir(0755))
         return TPath();
-    return porto_path.AddComponent(type + "_" + std::to_string(GetId()));
+    return porto_path / (type + "_" + std::to_string(GetId()));
 }
 
 TPath TVolume::GetPath() const {
@@ -548,7 +548,7 @@ std::vector<TPath> TVolume::GetLayers() const {
     for (auto layer: Config->Get<std::vector<std::string>>(V_LAYERS)) {
         TPath path(layer);
         if (!path.IsAbsolute())
-            path = TPath(config().volumes().layers_dir()).AddComponent(layer);
+            path = TPath(config().volumes().layers_dir()) / layer;
         result.push_back(path);
     }
 
@@ -731,14 +731,14 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
         if (!layer.IsNormal())
             return TError(EError::InvalidValue, "Layer path must be normalized");
         if (layer.IsAbsolute()) {
-            layer = container_root.AddComponent(layer);
+            layer = container_root / layer;
             l = layer.ToString();
             if (!layer.AccessOk(EFileAccess::Write, creator_cred))
                 return TError(EError::Permission, "Layer path not permitted");
         } else {
             if (l.find('/') != std::string::npos)
                 return TError(EError::InvalidValue, "Internal layer storage has no direcrotories");
-            layer = TPath(config().volumes().layers_dir()).AddComponent(layer);
+            layer = TPath(config().volumes().layers_dir()) / layer;
         }
         if (!layer.Exists())
             return TError(EError::InvalidValue, "Layer does not exist");
@@ -943,7 +943,7 @@ TError TVolume::Resize(uint64_t space_limit, uint64_t inode_limit) {
 
 TError TVolume::GetUpperLayer(TPath &upper) {
     if (GetBackend() == "overlay")
-        upper = GetStorage().AddComponent("upper");
+        upper = GetStorage() / "upper";
     else
         upper = GetPath();
     return TError::Success();
@@ -1128,7 +1128,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
             return error;
     }
 
-    TPath layers_tmp = layers.AddComponent("_tmp_");
+    TPath layers_tmp = layers / "_tmp_";
     if (layers_tmp.Exists()) {
         L_ACT() << "Remove stale layers..." << std::endl;
         (void)layers_tmp.ClearDirectory();
@@ -1202,8 +1202,8 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
         if (used)
             continue;
 
-        TPath dir = volumes.AddComponent(dir_name);
-        TPath mnt = dir.AddComponent("volume");
+        TPath dir = volumes / dir_name;
+        TPath mnt = dir / "volume";
         if (mnt.Exists()) {
             TMount mount(mnt, mnt, "", {});
             error = mount.Umount();
@@ -1274,7 +1274,7 @@ TError SanitizeLayer(TPath layer, bool merge) {
         return error;
 
     for (auto entry: content) {
-        TPath path = layer.AddComponent(entry);
+        TPath path = layer / entry;
 
         /* Handle aufs whiteouts */
         if (entry.compare(0, 4, ".wh.") == 0) {
@@ -1282,7 +1282,7 @@ TError SanitizeLayer(TPath layer, bool merge) {
             if (error)
                 return error;
 
-            path = layer.AddComponent(entry.substr(4));
+            path = layer / entry.substr(4);
             if (path.Exists()) {
                 if (path.GetType() == EFileType::Directory) {
                     error = path.ClearDirectory();

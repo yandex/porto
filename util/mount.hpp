@@ -35,8 +35,8 @@ public:
 
     const TPath GetSource() const { return Source; }
 
-    const std::string GetMountpoint() const {
-        return Target.ToString();
+    const TPath GetMountpoint() const {
+        return Target;
     }
 
     const std::string GetType() const {

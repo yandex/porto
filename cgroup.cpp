@@ -32,8 +32,7 @@ TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems,
         for (auto c : subsystems)
             flags.push_back(c->GetName());
 
-        Mount = std::make_shared<TMount>("cgroup", config().daemon().sysfs_root() + "/" +
-                                         CommaSeparatedList(flags),
+        Mount = std::make_shared<TMount>("cgroup", TPath(config().daemon().sysfs_root()) / CommaSeparatedList(flags),
                                          "cgroup", flags);
     }
 }
@@ -111,18 +110,18 @@ bool TCgroup::IsRoot() const {
     return !Parent;
 }
 
-string TCgroup::Path() const {
+TPath TCgroup::Path() const {
     if (IsRoot())
         return Mount->GetMountpoint();
     else
-        return Parent->Path() + "/" + Name;
+        return Parent->Path() / Name;
 }
 
-string TCgroup::Relpath() const {
+TPath TCgroup::Relpath() const {
     if (IsRoot())
         return "";
     else
-        return Parent->Relpath() + "/" + Name;
+        return Parent->Relpath() / Name;
 }
 
 TError TCgroup::Create() {
@@ -219,22 +218,22 @@ TError TCgroup::Kill(int signal) const {
 }
 
 bool TCgroup::HasKnob(const std::string &knob) const {
-    TFile f(Path() + "/" + knob);
+    TFile f(Path() / knob);
     return f.Exists();
 }
 
 TError TCgroup::GetKnobValue(const std::string &knob, std::string &value) const {
-    TFile f(Path() + "/" + knob);
+    TFile f(Path() / knob);
     return f.AsString(value);
 }
 
 TError TCgroup::GetKnobValueAsLines(const std::string &knob, vector<string> &lines) const {
-    TFile f(Path() + "/" + knob);
+    TFile f(Path() / knob);
     return f.AsLines(lines);
 }
 
 TError TCgroup::SetKnobValue(const std::string &knob, const std::string &value, bool append) const {
-    TFile f(Path() + "/" + knob);
+    TFile f(Path() / knob);
 
     L_ACT() << "Set " << Path() << "/" << knob << " = " << value << std::endl;
 
