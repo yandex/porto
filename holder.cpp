@@ -166,12 +166,6 @@ TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &nam
             return error;
     }
 
-    /*
-    TScopedAcquire acquire(parent);
-    if (!acquire.IsAcquired())
-        return TError(EError::Busy, "Parent container is busy");
-        */
-
     uint16_t id;
     TError error = IdMap.Get(id);
     if (error)
@@ -185,11 +179,8 @@ TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &nam
     Containers[name] = c;
     Statistics->Created++;
 
-    if (parent) {
-        TNestedScopedLock lock(*parent, holder_lock);
-        if (parent->IsValid())
-            parent->AddChild(c);
-    }
+    if (parent)
+        parent->AddChild(c);
 
     return TError::Success();
 }
@@ -576,14 +567,16 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
                 if (!container->Acquire())
                     continue;
 
-                container = nullptr;
-
                 L_ACT() << "Remove old dead " << name << std::endl;
-                error = Destroy(holder_lock, name);
-                if (error)
-                    L_ERR() << "Can't destroy " << name << ": " << error << std::endl;
-                else
-                    Statistics->RemoveDead++;
+
+                TNestedScopedLock lock(*container, holder_lock);
+                if (container->IsValid()) {
+                    error = Destroy(holder_lock, name);
+                    if (error)
+                        L_ERR() << "Can't destroy " << name << ": " << error << std::endl;
+                    else
+                        Statistics->RemoveDead++;
+                }
             }
         }
 

@@ -292,6 +292,19 @@ noinline TError CreateContainer(TContext &context,
     err = clientContainer->AbsoluteName(req.name(), name);
     if (err)
         return err;
+
+    auto parent = context.Cholder->GetParent(name);
+    if (!parent)
+        return TError(EError::ContainerDoesNotExist, "Parent container doesn't exist");
+
+    TNestedScopedLock lock(*parent, holder_lock);
+    if (!parent->IsValid())
+        return TError(EError::ContainerDoesNotExist, "Parent container doesn't exist");
+
+    TScopedAcquire acquire(parent);
+    if (!acquire.IsAcquired())
+        return TError(EError::Busy, "Parent container is busy");
+
     return context.Cholder->Create(holder_lock, name, client->GetCred());
 }
 
