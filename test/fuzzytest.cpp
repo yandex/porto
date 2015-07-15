@@ -16,18 +16,18 @@ static const std::vector<std::string> names = {
 };
 
 static const std::vector<std::pair<std::string, std::vector<std::string>>> propval = {
-    { "command", { "sleep 1", "true", "false", } },
+    { "command", { "sleep 1", "true", "false", "invalid_command" } },
     { "isolate", { "true", "false", } },
-    { "memory_limit", { "10485760", "104857600", } },
-    { "memory_guarantee", { "10485760", "104857600", } },
-    { "recharge_on_pgfault", { "true", "false", } },
-    { "cpu_policy", { "rt", "normal", } },
-    { "cpu_limit", { "1", "50", "99", } },
-    { "cpu_guarantee", { "1", "50", "99", } },
-    { "io_policy", { "normal", "batch", } },
-    { "respawn", { "true", "false", } },
+    { "memory_limit", { "10485760", "104857600", "0" } },
+    { "memory_guarantee", { "10485760", "104857600", "0" } },
+    { "recharge_on_pgfault", { "true", "false" } },
+    { "cpu_policy", { "rt", "normal", "batch" } },
+    { "cpu_limit", { "1", "50", "99", "101" } },
+    { "cpu_guarantee", { "1", "50", "99", "101" } },
+    { "io_policy", { "normal", "batch", "invalid" } },
+    { "respawn", { "true", "false", "-1" } },
     { "max_respawns", { "-1", "0", "5", } },
-    { "net", {  "host", "none", } },
+    { "net", {  "host", "none", "macvlan eth0 eth0" } },
     { "enable_porto", {  "true", "false", } },
 };
 
