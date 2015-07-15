@@ -10,9 +10,14 @@ import random
 ################################################################################
 
 def check_running(conn, container):
-    state = conn.GetData(container, 'state')
-    if state != 'running':
-        raise exceptions.InvalidState(container + ' in state ' + state)
+    for i in range(0,100):
+        try:
+            state = conn.GetData(container, 'state')
+            if state != 'running':
+                raise Exception('Unexpected ' + container + ' state ' + state)
+            return
+        except exceptions.Busy:
+            pass
 
 def top_iss(conn, this_script):  # top-level executor
     print('start monitoring...')
@@ -70,9 +75,15 @@ def iss(conn, this_script): #sub-executor
     time.sleep(random.randint(1, 5))
 
     for job in jobs:
-        print("{} state is {}".format(job.name, job.GetData('state')))
-        hook = conn.Find(job.name + "/hook")
-        print("{} state is {}".format(hook.name, hook.GetData('state')))
+        try:
+            print("{} state is {}".format(job.name, job.GetData('state')))
+        except exceptions.Busy:
+            pass
+        try:
+            hook = conn.Find(job.name + "/hook")
+            print("{} state is {}".format(hook.name, hook.GetData('state')))
+        except exceptions.Busy:
+            pass
 
     time.sleep(random.randint(1, 5))
 
@@ -83,7 +94,11 @@ def iss(conn, this_script): #sub-executor
         conn.Destroy(job.name)
 
 def monitoring(conn, this_script):
-    print(conn.Get(conn.List(), ['state', 'cpu_usage', 'memory_usage']))
+    try:
+        print(conn.Get(conn.List(), ['state', 'cpu_usage', 'memory_usage']))
+    except exceptions.Busy:
+        pass
+
     time.sleep(random.randint(0, 1))
 
 def cloud(conn, this_script):
