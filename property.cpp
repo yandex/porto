@@ -572,6 +572,9 @@ public:
             if (v < 1 || v > 100)
                 return TError(EError::InvalidValue, "invalid value absolute value " + std::to_string(v));
 
+            if (!GetContainer()->ValidHierarchicalProperty(P_CPU_LIMIT, v))
+                return TError(EError::InvalidValue, "invalid hierarchical value");
+
             return Set((uint64_t)v);
         } catch (...) {
             return TError(EError::InvalidValue, "invalid value");
