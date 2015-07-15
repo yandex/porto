@@ -352,19 +352,14 @@ noinline TError StartContainer(TContext &context,
     if (err)
         return err;
 
-    std::string name;
-    err = clientContainer->AbsoluteName(req.name(), name);
-    if (err)
-        return err;
-
     std::vector<std::string> nameVec;
-    err = SplitString(name, '/', nameVec);
+    err = SplitString(req.name(), '/', nameVec);
     if (err)
-        return TError(EError::InvalidValue, "Invalid container name " + name);
+        return TError(EError::InvalidValue, "Invalid container name " + req.name());
 
     std::shared_ptr<TContainer> topContainer = nullptr;
 
-    name = "";
+    std::string name = "";
     for (auto i = nameVec.begin(); i != nameVec.end(); i++) {
         if (!name.empty())
             name += "/";
