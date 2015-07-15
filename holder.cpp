@@ -166,9 +166,11 @@ TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &nam
             return error;
     }
 
+    /*
     TScopedAcquire acquire(parent);
     if (!acquire.IsAcquired())
         return TError(EError::Busy, "Parent container is busy");
+        */
 
     uint16_t id;
     TError error = IdMap.Get(id);
