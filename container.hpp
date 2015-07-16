@@ -52,7 +52,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     std::vector<std::weak_ptr<TContainer>> Children;
     std::shared_ptr<TKeyValueStorage> Storage;
     EContainerState State = EContainerState::Unknown;
-    bool Acquired = false;
+    int Acquired = 0;
     uint16_t Id;
     int TaskStartErrno = -1;
     TScopedFd Efd;
@@ -133,6 +133,7 @@ public:
                uint16_t id, std::shared_ptr<TNetwork> net);
     ~TContainer();
 
+    void AcquireForced();
     bool Acquire();
     void Release();
     bool IsAcquired() const;
@@ -157,6 +158,7 @@ public:
     TError Start(std::shared_ptr<TClient> client, bool meta);
     TError StopTree(TScopedLock &holder_lock);
     TError CheckPausedParent();
+    TError CheckAcquiredChild(TScopedLock &holder_lock);
     TError Pause(TScopedLock &holder_lock);
     TError Resume(TScopedLock &holder_lock);
     TError Kill(int sig);

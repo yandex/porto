@@ -479,11 +479,11 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
             if (target->MayReceiveOom(event.OOM.Fd)) {
                 TNestedScopedLock lock(*target, holder_lock);
                 if (target->IsValid() && target->MayReceiveOom(event.OOM.Fd)) {
-                    TScopedAcquire acquire(target);
-                    if (!acquire.IsAcquired())
-                        L_WRN() << "Deliver OOM event for acquired " << target->GetName() << std::endl;
-
+                    // we don't want any concurrent stop/start/pause/etc and
+                    // don't care whether parent acquired or not
+                    target->AcquireForced();
                     target->DeliverEvent(holder_lock, event);
+                    target->Release();
                     delivered = true;
                 }
             }
@@ -517,11 +517,11 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
             if (target->MayExit(event.Exit.Pid)) {
                 TNestedScopedLock lock(*target, holder_lock);
                 if (target->IsValid() && target->MayExit(event.Exit.Pid)) {
-                    TScopedAcquire acquire(target);
-                    if (!acquire.IsAcquired())
-                        L_WRN() << "Deliver exit event for acquired " << target->GetName() << std::endl;
-
+                    // we don't want any concurrent stop/start/pause/etc and
+                    // don't care whether parent acquired or not
+                    target->AcquireForced();
                     target->DeliverEvent(holder_lock, event);
+                    target->Release();
                     break;
                 }
             }
@@ -544,8 +544,11 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
                 continue;
 
             TNestedScopedLock lock(*target, holder_lock);
-            if (target->IsValid() && target->IsLostAndRestored())
+            if (target->IsValid() && target->IsLostAndRestored()) {
+                if (target->IsAcquired())
+                    continue;
                 target->SyncStateWithCgroup(holder_lock);
+            }
         }
         if (rearm)
             ScheduleCgroupSync();
@@ -565,6 +568,8 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
         { /* gc */
             std::vector<std::string> remove;
             for (auto target : List())
+                // don't lock container here, we don't care if we race, we
+                // make real check under lock later
                 if (target->CanRemoveDead())
                     remove.push_back(target->GetName());
 

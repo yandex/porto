@@ -3,7 +3,7 @@
 #include <mutex>
 #include "common.hpp"
 
-constexpr bool AllowHolderUnlock = false;
+constexpr bool AllowHolderUnlock = true;
 
 typedef std::unique_lock<std::mutex> TScopedLock;
 

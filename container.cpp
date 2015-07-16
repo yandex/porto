@@ -1107,11 +1107,17 @@ void TContainer::FreeResources() {
     }
 }
 
+void TContainer::AcquireForced() {
+    if (config().log().verbose())
+        L() << "Acquire " << GetName() << " (forced)" << std::endl;
+    Acquired++;
+}
+
 bool TContainer::Acquire() {
     if (!IsAcquired()) {
         if (config().log().verbose())
             L() << "Acquire " << GetName() << std::endl;
-        Acquired = true;
+        Acquired++;
         return true;
     }
     return false;
@@ -1120,8 +1126,8 @@ bool TContainer::Acquire() {
 void TContainer::Release() {
     if (config().log().verbose())
         L() << "Release " << GetName() << std::endl;
-    PORTO_ASSERT(Acquired == true);
-    Acquired = false;
+    PORTO_ASSERT(Acquired > 0);
+    Acquired--;
 }
 
 bool TContainer::IsAcquired() const {
@@ -1179,13 +1185,28 @@ TError TContainer::CheckPausedParent() {
     return TError::Success();
 }
 
+TError TContainer::CheckAcquiredChild(TScopedLock &holder_lock) {
+    return ApplyForTree(holder_lock, [] (TScopedLock &holder_lock,
+                                  TContainer &child) {
+        if (child.IsAcquired())
+            return TError(EError::Busy, "child " + child.GetName() + " is busy");
+        return TError::Success();
+    });
+}
+
 TError TContainer::Pause(TScopedLock &holder_lock) {
     auto state = GetState();
     if (state != EContainerState::Running)
         return TError(EError::InvalidState, "invalid container state " +
                       ContainerStateName(state));
 
-    TError error = Freeze(holder_lock);
+    // some child subtree may be in stop/destroy and we don't want
+    // to freeze parent in that moment
+    TError error = CheckAcquiredChild(holder_lock);
+    if (error)
+        return error;
+
+    error = Freeze(holder_lock);
     if (error)
         return error;
 
