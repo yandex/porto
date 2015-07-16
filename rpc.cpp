@@ -295,7 +295,7 @@ noinline TError CreateContainer(TContext &context,
 
     auto parent = context.Cholder->GetParent(name);
     if (!parent)
-        return TError(EError::ContainerDoesNotExist, "Parent container doesn't exist");
+        return TError(EError::InvalidValue, "invalid parent container");
 
     TNestedScopedLock lock(*parent, holder_lock);
     if (!parent->IsValid())
@@ -534,6 +534,9 @@ noinline TError GetContainerProperty(TContext &context,
     if (!container->IsValid())
         return TError(EError::ContainerDoesNotExist, "container doesn't exist");
 
+    if (container->IsAcquired())
+        return TError(EError::Busy, "Can't get property of busy container");
+
     string value;
     err = container->GetProperty(req.property(), value, client);
     if (!err)
@@ -592,6 +595,9 @@ noinline TError GetContainerData(TContext &context,
     if (!container->IsValid())
         return TError(EError::ContainerDoesNotExist, "container doesn't exist");
 
+    if (container->IsAcquired())
+        return TError(EError::Busy, "Can't get data of busy container");
+
     string value;
     err = container->GetData(req.data(), value);
     if (!err)
@@ -639,6 +645,8 @@ noinline TError GetContainerCombined(TContext &context,
                     lock = TNestedScopedLock(*container, holder_lock);
                     if (!container->IsValid())
                         containerError = TError(EError::ContainerDoesNotExist, "container doesn't exist");
+                    else if (container->IsAcquired())
+                        containerError = TError(EError::Busy, "Can't get data and property of busy container");
                 }
             }
         }

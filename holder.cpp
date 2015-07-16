@@ -20,7 +20,7 @@ void TContainerHolder::DestroyRoot(TScopedLock &holder_lock) {
     // we want children to be removed first
     while (Containers.begin() != Containers.end()) {
         auto name = Containers.begin()->first;
-        TError error = Destroy(holder_lock, name);
+        TError error = Destroy(holder_lock, Containers.begin()->second);
         if (error)
             L_ERR() << "Can't destroy container " << name << ": " << error << std::endl;
     }
@@ -286,8 +286,10 @@ TError TContainerHolder::Destroy(TScopedLock &holder_lock, std::shared_ptr<TCont
 }
 
 TError TContainerHolder::Destroy(TScopedLock &holder_lock, const std::string &name) {
+    if (Containers.find(name) == Containers.end())
+        return TError(EError::ContainerDoesNotExist, "Can't find container " + name);
+
     auto c = Containers.at(name);
-    PORTO_ASSERT(c != nullptr);
 
     TNestedScopedLock childLock(*c, holder_lock);
     if (c->IsValid())
@@ -477,6 +479,10 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
             if (target->MayReceiveOom(event.OOM.Fd)) {
                 TNestedScopedLock lock(*target, holder_lock);
                 if (target->IsValid() && target->MayReceiveOom(event.OOM.Fd)) {
+                    TScopedAcquire acquire(target);
+                    if (!acquire.IsAcquired())
+                        L_WRN() << "Deliver OOM event for acquired " << target->GetName() << std::endl;
+
                     target->DeliverEvent(holder_lock, event);
                     delivered = true;
                 }
@@ -511,6 +517,10 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
             if (target->MayExit(event.Exit.Pid)) {
                 TNestedScopedLock lock(*target, holder_lock);
                 if (target->IsValid() && target->MayExit(event.Exit.Pid)) {
+                    TScopedAcquire acquire(target);
+                    if (!acquire.IsAcquired())
+                        L_WRN() << "Deliver exit event for acquired " << target->GetName() << std::endl;
+
                     target->DeliverEvent(holder_lock, event);
                     break;
                 }
@@ -564,14 +574,15 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
                 if (error)
                     continue;
 
-                if (!container->Acquire())
+                TScopedAcquire acquire(container);
+                if (!acquire.IsAcquired())
                     continue;
 
                 L_ACT() << "Remove old dead " << name << std::endl;
 
                 TNestedScopedLock lock(*container, holder_lock);
-                if (container->IsValid()) {
-                    error = Destroy(holder_lock, name);
+                if (container->IsValid() && container->CanRemoveDead()) {
+                    error = Destroy(holder_lock, container);
                     if (error)
                         L_ERR() << "Can't destroy " << name << ": " << error << std::endl;
                     else
@@ -586,7 +597,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
                 continue;
 
             TNestedScopedLock lock(*target, holder_lock);
-            if (target->IsValid())
+            if (target->IsValid() && !target->IsAcquired())
                 target->DeliverEvent(holder_lock, event);
         }
 

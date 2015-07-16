@@ -94,8 +94,8 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void PropertyToAlias(const std::string &property, std::string &value) const;
     TError AliasToProperty(std::string &property, std::string &value);
 
-    void Exit(TScopedLock &holder_lock, int status, bool oomKilled, bool force = false);
-    void ExitChildren(TScopedLock &holder_lock, int status, bool oomKilled);
+    void ExitTree(TScopedLock &holder_lock, int status, bool oomKilled);
+    void Exit(TScopedLock &holder_lock, int status, bool oomKilled);
 
     TError Prepare();
 

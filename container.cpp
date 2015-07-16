@@ -111,7 +111,7 @@ void TContainer::SyncStateWithCgroup(TScopedLock &holder_lock) {
         (!Task || Processes().empty())) {
         L() << "Lost and restored container " << GetName() << " is empty"
                       << ", mark them dead." << std::endl;
-        Exit(holder_lock, -1, false);
+        ExitTree(holder_lock, -1, false);
     }
 }
 
@@ -238,7 +238,7 @@ TError TContainer::Destroy(TScopedLock &holder_lock) {
     L_ACT() << "Destroy " << GetName() << " " << Id << std::endl;
 
     if (IsFrozen()) {
-        TError error = Resume(holder_lock);
+        TError error = Unfreeze(holder_lock);
         if (error)
             return error;
     }
@@ -1050,19 +1050,6 @@ TError TContainer::ApplyForTree(TScopedLock &holder_lock,
     return TError::Success();
 }
 
-void TContainer::ExitChildren(TScopedLock &holder_lock, int status, bool oomKilled) {
-    ApplyForTree(holder_lock, [&] (TScopedLock &holder_lock, TContainer &child) {
-            if (child.GetState() == EContainerState::Running ||
-                child.GetState() == EContainerState::Meta) {
-                TError error = child.KillAll(holder_lock);
-                if (error)
-                    L_ERR() << "Child " << child.GetName() << " can't be killed: " << error << std::endl;
-                child.Exit(holder_lock, status, oomKilled, true);
-            }
-            return TError::Success();
-        });
-}
-
 TError TContainer::PrepareResources() {
     TError error = PrepareNetwork();
     if (error) {
@@ -1703,15 +1690,40 @@ std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys
     return Parent->GetLeafCgroup(subsys)->GetChild(Name);
 }
 
-void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled, bool force) {
-    L_EVT() << "Exit " << GetName() << " (root_pid " << Task->GetPid() << ")"
-            << " with status " << status << (oomKilled ? " invoked by OOM" : "")
+void TContainer::ExitTree(TScopedLock &holder_lock, int status, bool oomKilled) {
+    L_EVT() << "Exit tree " << GetName() << " with status "
+            << status << (oomKilled ? " invoked by OOM" : "")
             << std::endl;
 
-    if (!force && !oomKilled && !Processes().empty() && Prop->Get<bool>(P_ISOLATE) == true) {
+    if (!oomKilled && !Processes().empty() && Prop->Get<bool>(P_ISOLATE) == true) {
         L_WRN() << "Skipped bogus exit event (" << status << "), some process is still alive in " << GetName() << std::endl;
         return;
     }
+
+    if (IsFrozen()) {
+        TError error = Resume(holder_lock);
+        if (error)
+            L_ERR() << "Can't exit tree: " << error << std::endl;
+    }
+
+    ApplyForTree(holder_lock, [&] (TScopedLock &holder_lock, TContainer &child) {
+        if (child.IsFrozen())
+            (void)child.Unfreeze(holder_lock);
+
+        child.Exit(holder_lock, status, oomKilled);
+        return TError::Success();
+    });
+
+    Exit(holder_lock, status, oomKilled);
+}
+
+void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
+    if (!Task)
+        return;
+
+    L_EVT() << "Exit " << GetName() << " (root_pid " << Task->GetPid() << ")"
+            << " with status " << status << (oomKilled ? " invoked by OOM" : "")
+            << std::endl;
 
     ShutdownOom();
 
@@ -1741,10 +1753,7 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled, bool
             L_WRN() << "Can't kill all tasks in container" << error << std::endl;
     }
 
-    ExitChildren(holder_lock, status, oomKilled);
-
-    if (Task)
-        Task->Exit(status);
+    Task->Exit(status);
     SetState(EContainerState::Dead);
 
     error = Prop->Set<int>(P_RAW_ROOT_PID, 0);
@@ -1844,7 +1853,7 @@ void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
     TError error;
     switch (event.Type) {
         case EEventType::Exit:
-            Exit(holder_lock, event.Exit.Status, FdHasEvent(Efd.GetFd()));
+            ExitTree(holder_lock, event.Exit.Status, FdHasEvent(Efd.GetFd()));
             break;
         case EEventType::RotateLogs:
             if (GetState() == EContainerState::Running && Task) {
@@ -1865,7 +1874,7 @@ void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
                 L() << "Respawned " << GetName() << std::endl;
             break;
         case EEventType::OOM:
-            Exit(holder_lock, SIGKILL, true);
+            ExitTree(holder_lock, SIGKILL, true);
             break;
         default:
             break;
@@ -2000,13 +2009,19 @@ TError TContainer::StopTree(TScopedLock &holder_lock) {
     if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't stop busy container");
 
-    if (IsFrozen())
-        (void)Resume(holder_lock);
+    if (IsFrozen()) {
+        TError error = Resume(holder_lock);
+        if (error)
+            return error;
+    }
 
     TError error = ApplyForTree(holder_lock, [] (TScopedLock &holder_lock,
                                                  TContainer &child) {
-        if (child.IsFrozen())
-            (void)child.Resume(holder_lock);
+        if (child.IsFrozen()) {
+            TError error = child.Unfreeze(holder_lock);
+            if (error)
+                return error;
+        }
 
         if (child.GetState() != EContainerState::Stopped)
             return child.Stop(holder_lock);
