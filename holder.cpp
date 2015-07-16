@@ -287,7 +287,7 @@ TError TContainerHolder::Destroy(TScopedLock &holder_lock, std::shared_ptr<TCont
 
 TError TContainerHolder::Destroy(TScopedLock &holder_lock, const std::string &name) {
     if (Containers.find(name) == Containers.end())
-        return TError(EError::ContainerDoesNotExist, "Can't find container " + name);
+        return TError::Success();
 
     auto c = Containers.at(name);
 
