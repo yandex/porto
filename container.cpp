@@ -1187,8 +1187,8 @@ TError TContainer::CheckPausedParent() {
 
 TError TContainer::CheckAcquiredChild(TScopedLock &holder_lock) {
     return ApplyForTree(holder_lock, [] (TScopedLock &holder_lock,
-                                  TContainer &child) {
-        if (child.IsAcquired())
+                                         TContainer &child) {
+        if (child.Acquired)
             return TError(EError::Busy, "child " + child.GetName() + " is busy");
         return TError::Success();
     });
