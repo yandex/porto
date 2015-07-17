@@ -21,7 +21,7 @@ TStatistics *Statistics = nullptr;
 static int logBufFd = -1;
 class TLogBuf : public std::streambuf {
     std::vector<char> Data;
-    public:
+public:
     TLogBuf(const size_t size);
     void Open(const TPath &path, const unsigned int mode);
     int GetFd() { return logBufFd; }
@@ -30,7 +30,7 @@ class TLogBuf : public std::streambuf {
         std::ptrdiff_t n = pptr() - pbase();
         pbump(-n);
     }
-    protected:
+protected:
     int sync() override;
     int_type overflow(int_type ch) override;
 };
@@ -43,6 +43,19 @@ static inline void PrepareLog() {
         logBuf = new TLogBuf(1024);
         logStream = new std::ostream(logBuf);
     }
+}
+
+static __thread struct tm logForkTm;
+static __thread struct timeval logForkTimeval;
+
+void TLogger::DisableLocaltime() {
+    gettimeofday(&logForkTimeval, NULL);
+    localtime_r(&logForkTimeval.tv_sec, &logForkTm);
+}
+
+void TLogger::EnableLocaltime() {
+    memset(&logForkTm, 0, sizeof(logForkTm));
+    memset(&logForkTimeval, 0, sizeof(logForkTimeval));
 }
 
 void TLogger::ClearBuffer() {
@@ -81,27 +94,41 @@ void TLogger::CloseLog() {
     logBuf->ClearBuffer();
 }
 
-static std::string GetTime() {
+static long tvdiff(struct timeval *start, struct timeval *stop) {
+    constexpr auto NSEC_PER_SEC = 1000000000L;
+    auto secdiff = stop->tv_sec - start->tv_sec;
+    if (secdiff == 1)
+        return NSEC_PER_SEC - start->tv_usec + stop->tv_usec >= NSEC_PER_SEC;
+    else
+        return secdiff;
+}
+
+std::string TLogger::GetTime() {
     char buf[256];
     struct timeval tv;
-    struct tm *tmp, result;
     gettimeofday(&tv, NULL);
 
-    if ((tmp = localtime_r(&tv.tv_sec, &result)) != nullptr) {
-        std::stringstream ss;
-
-        strftime(buf, sizeof(buf), "%F %T", tmp);
+    std::stringstream ss;
+    if (logForkTimeval.tv_sec) {
+        strftime(buf, sizeof(buf), "%F %T", &logForkTm);
         ss << buf;
+        auto offset = tvdiff(&logForkTimeval, &tv);
+        if (offset)
+            ss << "+" << offset;
+    } else {
+        struct tm *tmp, result;
+        if ((tmp = localtime_r(&tv.tv_sec, &result)) != nullptr) {
+            strftime(buf, sizeof(buf), "%F %T", tmp);
+            ss << buf;
+        }
 
         if (config().log().verbose()) {
             snprintf(buf, sizeof(buf), ".%06lu", tv.tv_usec);
             ss << buf;
         }
-
-        return ss.str();
     }
 
-    return std::string();
+    return ss.str();
 }
 
 TLogBuf::TLogBuf(const size_t size) {
