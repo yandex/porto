@@ -425,8 +425,8 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                     L_ERR() << "Can't refresh list of network interfaces: " << error << std::endl;
 
                 L() << "Refresh containers tc classes" << std::endl;
-                auto lock = context.Cholder->ScopedLock();
-                context.Cholder->UpdateNetwork();
+                auto holder_lock = context.Cholder->ScopedLock();
+                context.Cholder->UpdateNetwork(holder_lock);
             } else if (source->Flags & EPOLL_EVENT_OOM) {
                 auto container = source->Container.lock();
                 if (container) {
@@ -601,16 +601,16 @@ static int SlaveMain() {
         RemoveRpcServer(config().rpc_sock().file().path());
     } catch (string s) {
         L_ERR() << "EXCEPTION: " << s << std::endl;
-        ret = EXIT_FAILURE;
+        Crash();
     } catch (const char *s) {
         L_ERR() << "EXCEPTION: " << s << std::endl;
-        ret = EXIT_FAILURE;
+        Crash();
     } catch (const std::exception &exc) {
         L_ERR() << "EXCEPTION: " << exc.what() << std::endl;
-        ret = EXIT_FAILURE;
+        Crash();
     } catch (...) {
         L_ERR() << "EXCEPTION: uncaught exception!" << std::endl;
-        ret = EXIT_FAILURE;
+        Crash();
     }
 
     DaemonShutdown(false, ret);
