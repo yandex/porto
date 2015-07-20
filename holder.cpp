@@ -622,16 +622,15 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
 }
 
 void TContainerHolder::UpdateNetwork(TScopedLock &holder_lock) {
-    for (auto pair : Containers) {
-        auto c = pair.second;
-
+    auto containers = List();
+    for (auto c : containers) {
         TNestedScopedLock lock(*c, holder_lock);
         if (!c->IsValid())
             continue;
 
         TError error = c->UpdateNetwork();
         if (error)
-            L_WRN() << "Can't update " << pair.first << " network: " << error << std::endl;
+            L_WRN() << "Can't update " << c->GetName() << " network: " << error << std::endl;
     }
 }
 
