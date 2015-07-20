@@ -1765,13 +1765,13 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
 
         error = KillAll(holder_lock);
         if (error)
-            L_WRN() << "Can't kill all tasks in container" << error << std::endl;
+            L_WRN() << "Can't kill all tasks in container: " << error << std::endl;
     }
 
     if (!Prop->Get<bool>(P_ISOLATE)) {
         TError error = KillAll(holder_lock);
         if (error)
-            L_WRN() << "Can't kill all tasks in container" << error << std::endl;
+            L_WRN() << "Can't kill all tasks in non-isolated container: " << error << std::endl;
     }
 
     Task->Exit(status);
@@ -1997,8 +1997,10 @@ void TContainer::CleanupWaiters() {
 }
 
 TError TContainer::UpdateNetwork() {
-    if (Tclass)
+    if (Tclass) {
+        auto lock = Net->ScopedLock();
         return Tclass->Create();
+    }
     return TError::Success();
 }
 

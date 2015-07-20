@@ -499,7 +499,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
             // container lock
             if (target->MayRespawn()) {
                 TNestedScopedLock lock(*target, holder_lock);
-                if (target->IsValid() && target->MayRespawn()) {
+                if (target->IsValid() && target->MayRespawn() && !target->IsAcquired()) {
                     target->DeliverEvent(holder_lock, event);
                     delivered = true;
                 }
@@ -621,11 +621,15 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     return delivered;
 }
 
-void TContainerHolder::UpdateNetwork() {
-    auto lock = Net->ScopedLock();
-
+void TContainerHolder::UpdateNetwork(TScopedLock &holder_lock) {
     for (auto pair : Containers) {
-        TError error = pair.second->UpdateNetwork();
+        auto c = pair.second;
+
+        TNestedScopedLock lock(*c, holder_lock);
+        if (!c->IsValid())
+            continue;
+
+        TError error = c->UpdateNetwork();
         if (error)
             L_WRN() << "Can't update " << pair.first << " network: " << error << std::endl;
     }
