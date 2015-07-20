@@ -91,9 +91,7 @@ struct TTaskEnv : public TNonCopyable {
     bool Isolate = false;
     TPath StdinPath;
     TPath StdoutPath;
-    bool RemoveStdout;
     TPath StderrPath;
-    bool RemoveStderr;
     TNamespaceSnapshot ParentNs;
     TNamespaceSnapshot ClientNs;
     std::map<int,struct rlimit> Rlimit;

@@ -79,7 +79,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareCgroups();
     TError PrepareTask(std::shared_ptr<TClient> client);
     TError KillAll(TScopedLock &holder_lock);
-    TError SendSignal(int signal);
     void RemoveKvs();
 
     const std::string StripParentName(const std::string &name) const;
@@ -108,8 +107,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
                       std::function<TError (TScopedLock &holder_lock,
                                             TContainer &container)> fn);
 
-    TError DestroyVolumes(TScopedLock &holder_lock);
-    TError Stop(TScopedLock &holder_lock);
+    void DestroyVolumes(TScopedLock &holder_lock);
 
     TError Unfreeze(TScopedLock &holder_lock);
     TError Freeze(TScopedLock &holder_lock);
@@ -152,10 +150,12 @@ public:
     bool ValidHierarchicalProperty(const std::string &property, const uint64_t value) const;
     std::vector<pid_t> Processes();
 
+    TError SendSignal(int signal);
     void AddChild(std::shared_ptr<TContainer> child);
     TError Create(const TCred &cred);
     TError Destroy(TScopedLock &holder_lock);
     TError Start(std::shared_ptr<TClient> client, bool meta);
+    TError Stop(TScopedLock &holder_lock);
     TError StopTree(TScopedLock &holder_lock);
     TError CheckPausedParent();
     TError CheckAcquiredChild(TScopedLock &holder_lock);

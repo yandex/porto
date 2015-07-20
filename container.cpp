@@ -202,9 +202,9 @@ void TContainer::RemoveKvs() {
         L_ERR() << "Can't remove key-value node " << kvnode->GetName() << ": " << error << std::endl;
 }
 
-TError TContainer::DestroyVolumes(TScopedLock &holder_lock) {
+void TContainer::DestroyVolumes(TScopedLock &holder_lock) {
     if (!VolumeHolder)
-        return TError::Success();
+        return;
 
     TScopedUnlock holder_unlock(holder_lock);
     TScopedLock vholder_lock = VolumeHolder->ScopedLock();
@@ -230,45 +230,14 @@ TError TContainer::DestroyVolumes(TScopedLock &holder_lock) {
     }
 
     Volumes.clear();
-
-    return TError::Success();
 }
 
 TError TContainer::Destroy(TScopedLock &holder_lock) {
     L_ACT() << "Destroy " << GetName() << " " << Id << std::endl;
 
-    if (IsFrozen()) {
-        TError error = Unfreeze(holder_lock);
-        if (error)
-            return error;
-    }
-
-    if (Task && Task->IsRunning())
-        (void)Kill(SIGKILL);
-
-    if (GetState() != EContainerState::Stopped) {
-        TError error = Stop(holder_lock);
-        if (error)
-            return error;
-    }
-
-    TError error = DestroyVolumes(holder_lock);
-    if (error)
-        return error;
-
     SetState(EContainerState::Unknown);
-
-    ApplyForTree(holder_lock, [] (TScopedLock &holder_lock,
-                                  TContainer &child) {
-        child.RemoveKvs();
-        return TError::Success();
-    });
+    DestroyVolumes(holder_lock);
     RemoveKvs();
-
-    if (Tclass) {
-        auto lock = Net->ScopedLock();
-        Tclass.reset();
-    }
 
     return TError::Success();
 }
@@ -679,9 +648,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
     taskEnv->Isolate = Prop->Get<bool>(P_ISOLATE);
     taskEnv->StdinPath = Prop->Get<std::string>(P_STDIN_PATH);
     taskEnv->StdoutPath = Prop->Get<std::string>(P_STDOUT_PATH);
-    taskEnv->RemoveStdout = Prop->IsDefault(P_STDOUT_PATH);
     taskEnv->StderrPath = Prop->Get<std::string>(P_STDERR_PATH);
-    taskEnv->RemoveStderr = Prop->IsDefault(P_STDERR_PATH);
     taskEnv->Hostname = Prop->Get<std::string>(P_HOSTNAME);
     taskEnv->BindDns = Prop->Get<bool>(P_BIND_DNS);
 
@@ -989,17 +956,13 @@ bool TContainer::IsValid() {
 }
 
 TError TContainer::SendSignal(int signal) {
-    auto cg = GetLeafCgroup(freezerSubsystem);
-    TError error;
-
     L_ACT() << "Send signal " << signal << " to " << GetName() << std::endl;
 
     vector<pid_t> reap;
-    error = cg->GetTasks(reap);
-    if (error) {
-        L_ERR() << "Can't read tasks list while sending signal: " << error << std::endl;
+    auto cg = GetLeafCgroup(freezerSubsystem);
+    TError error = cg->GetTasks(reap);
+    if (error)
         return error;
-    }
 
     return cg->Kill(signal);
 }
@@ -1079,6 +1042,7 @@ void TContainer::RemoveLog(const TPath &path) {
         }
     }
 }
+
 void TContainer::FreeResources() {
     LeafCgroups.clear();
 
@@ -1088,6 +1052,9 @@ void TContainer::FreeResources() {
     }
     Task = nullptr;
     ShutdownOom();
+
+    if (IsRoot() || IsPortoRoot())
+        return;
 
     if (Prop->IsDefault(P_STDOUT_PATH))
         RemoveLog(Prop->Get<std::string>(P_STDOUT_PATH));
@@ -1170,10 +1137,8 @@ TError TContainer::Stop(TScopedLock &holder_lock) {
         Task->Exit(-1);
     }
 
-    if (!IsRoot() && !IsPortoRoot()) {
-        SetState(EContainerState::Stopped);
-        FreeResources();
-    }
+    SetState(EContainerState::Stopped);
+    FreeResources();
 
     return TError::Success();
 }

@@ -565,7 +565,7 @@ void RestartDaemon(TPortoAPI &api) {
         throw string("Porto slave is not running");
 
     // Remove porto cgroup to clear statistics
-    int pid = ReadPid(config().slave_pid().path());
+    int pid = ReadPid(config().master_pid().path());
     if (kill(pid, SIGINT))
         throw string("Can't send SIGINT to slave");
 

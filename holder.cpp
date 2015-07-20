@@ -17,12 +17,15 @@
 #include "util/file.hpp"
 
 void TContainerHolder::DestroyRoot(TScopedLock &holder_lock) {
+    auto list = List();
+
     // we want children to be removed first
-    while (Containers.begin() != Containers.end()) {
-        auto name = Containers.begin()->first;
-        TError error = Destroy(holder_lock, Containers.begin()->second);
+    std::reverse(std::begin(list), std::end(list));
+
+    for (auto c: list) {
+        TError error = Destroy(holder_lock, c);
         if (error)
-            L_ERR() << "Can't destroy container " << name << ": " << error << std::endl;
+            L_ERR() << "Can't destroy container " << c->GetName() << ": " << error << std::endl;
     }
 }
 
@@ -268,8 +271,18 @@ TError TContainerHolder::Destroy(TScopedLock &holder_lock, std::shared_ptr<TCont
             return error;
     }
 
+    // we are destroying container and we don't need any exit status, so
+    // forcefully kill all processes for destroy to be faster
+    (void)c->SendSignal(SIGKILL);
+
     for (auto child: c->GetChildren()) {
         TError error = Destroy(holder_lock, child);
+        if (error)
+            return error;
+    }
+
+    if (c->GetState() != EContainerState::Stopped) {
+        TError error = c->Stop(holder_lock);
         if (error)
             return error;
     }
