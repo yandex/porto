@@ -371,7 +371,7 @@ static const std::map<std::string, int> macvlanType = {
     { "private", MACVLAN_MODE_PRIVATE },
     { "vepa", MACVLAN_MODE_VEPA },
     { "bridge", MACVLAN_MODE_BRIDGE },
-    {" passthru", MACVLAN_MODE_PASSTHRU },
+    { "passthru", MACVLAN_MODE_PASSTHRU },
 };
 
 TError TNlLink::AddXVlan(const std::string &vlantype,
@@ -383,7 +383,7 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
     int ret;
     uint32_t masterIdx = FindIndex(master);
     struct nl_msg *msg;
-    struct nlattr *data;
+    struct nlattr *linkinfo, *infodata;
     struct ifinfomsg ifi = { 0 };
     struct ether_addr *ea = nullptr;
 
@@ -405,42 +405,72 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
     }
 
     /* link configuration */
-    nla_put(msg, IFLA_LINK, sizeof(uint32_t), &masterIdx);
-    nla_put(msg, IFLA_IFNAME, Name.length() + 1, Name.c_str());
+    ret = nla_put(msg, IFLA_LINK, sizeof(uint32_t), &masterIdx);
+    if (ret < 0) {
+        error = TError(EError::Unknown, std::string("Unable to put IFLA_LINK: ") + nl_geterror(ret));
+        goto free_msg;
+    }
+    ret = nla_put(msg, IFLA_IFNAME, Name.length() + 1, Name.c_str());
+    if (ret < 0) {
+        error = TError(EError::Unknown, std::string("Unable to put IFLA_IFNAME: ") + nl_geterror(ret));
+        goto free_msg;
+    }
 
-    if (mtu > 0)
-        nla_put(msg, IFLA_MTU, sizeof(int), &mtu);
+    if (mtu > 0) {
+        ret = nla_put(msg, IFLA_MTU, sizeof(int), &mtu);
+        if (ret < 0) {
+            error = TError(EError::Unknown, std::string("Unable to put IFLA_MTU: ") + nl_geterror(ret));
+            goto free_msg;
+        }
+    }
 
     if (ea) {
         struct nl_addr *addr = nl_addr_build(AF_LLC, ea, ETH_ALEN);
-        nla_put(msg, IFLA_ADDRESS, nl_addr_get_len(addr), nl_addr_get_binary_addr(addr));
+        ret = nla_put(msg, IFLA_ADDRESS, nl_addr_get_len(addr), nl_addr_get_binary_addr(addr));
+        if (ret < 0) {
+            error = TError(EError::Unknown, std::string("Unable to put IFLA_ADDRESS: ") + nl_geterror(ret));
+            goto free_msg;
+        }
         nl_addr_put(addr);
     }
 
     /* link type */
-    data = nla_nest_start(msg, IFLA_LINKINFO);
-    if (!data) {
+    linkinfo = nla_nest_start(msg, IFLA_LINKINFO);
+    if (!linkinfo) {
         error = TError(EError::Unknown, "Unable to add " + vlantype + ": can't nest IFLA_LINKINFO");
 		goto free_msg;
     }
-    nla_put(msg, IFLA_INFO_KIND, vlantype.length() + 1, vlantype.c_str());
-    nla_nest_end(msg, data);
+    ret = nla_put(msg, IFLA_INFO_KIND, vlantype.length() + 1, vlantype.c_str());
+    if (ret < 0) {
+        error = TError(EError::Unknown, std::string("Unable to put IFLA_INFO_KIND: ") + nl_geterror(ret));
+        goto free_msg;
+    }
 
     /* xvlan specific */
-	data = nla_nest_start(msg, IFLA_INFO_DATA);
-    if (!data) {
+	infodata = nla_nest_start(msg, IFLA_INFO_DATA);
+    if (!infodata) {
         error = TError(EError::Unknown, "Unable to add " + vlantype + ": can't nest IFLA_INFO_DATA");
 		goto free_msg;
     }
+
     if (vlantype == "macvlan") {
-        nla_put(msg, IFLA_MACVLAN_MODE, sizeof(uint32_t), &type);
+        ret = nla_put(msg, IFLA_MACVLAN_MODE, sizeof(uint32_t), &type);
+        if (ret < 0) {
+            error = TError(EError::Unknown, std::string("Unable to put IFLA_MACVLAN_MODE: ") + nl_geterror(ret));
+            goto free_msg;
+        }
 #ifdef IFLA_IPVLAN_MAX
     } else if (vlantype == "ipvlan") {
         uint16_t mode = type;
-        nla_put(msg, IFLA_IPVLAN_MODE, sizeof(uint16_t), &mode);
+        ret = nla_put(msg, IFLA_IPVLAN_MODE, sizeof(uint16_t), &mode);
+        if (ret < 0) {
+            error = TError(EError::Unknown, std::string("Unable to put IFLA_IPVLAN_MODE: ") + nl_geterror(ret));
+            goto free_msg;
+        }
 #endif
     }
-	nla_nest_end(msg, data);
+    nla_nest_end(msg, infodata);
+    nla_nest_end(msg, linkinfo);
 
     L() << "netlink: add " << vlantype << " " << Name << " master " << master
         << " type " << type << " hw " << hw << " mtu " << mtu << std::endl;
