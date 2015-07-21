@@ -1198,7 +1198,7 @@ public:
         std::map<std::string, std::map<std::string, TPortoGetResponse>> result;
         ret = Api->Get(clist, vars, result);
         if (ret) {
-            PrintError("Can't list containers");
+            PrintError("Can't get containers' data");
             return ret;
         }
 
