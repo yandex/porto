@@ -1194,7 +1194,15 @@ public:
                 }
             }
 
-        vector<string> states = { "running", "dead", "stopped", "paused" };
+        const std::vector<std::string> vars = { "state", "time" };
+        std::map<std::string, std::map<std::string, TPortoGetResponse>> result;
+        ret = Api->Get(clist, vars, result);
+        if (ret) {
+            PrintError("Can't list containers");
+            return ret;
+        }
+
+        vector<string> states = { "running", "dead", "meta", "stopped", "paused" };
         size_t stateLen = MaxFieldLength(states);
         size_t nameLen = MaxFieldLength(displayName);
         size_t timeLen = 12;
@@ -1203,26 +1211,25 @@ public:
             if (c == "/")
                 continue;
 
+            auto state = result[c]["state"];
+            if (state.Error)
+                continue;
+
             if (toplevel && CountChar(c, '/'))
                 continue;
 
             std::cout << std::left << std::setw(nameLen) << displayName[i];
 
             if (details) {
-                string s;
-                ret = Api->GetData(c, "state", s);
-                if (ret)
-                    s = "?";
+                std::cout << std::right << std::setw(stateLen) << state.Value;
 
-                std::cout << std::right << std::setw(stateLen) << s;
-
-                if (s == "running") {
-                    string tm;
-                    ret = Api->GetData(c, "time", tm);
-                    if (!ret)
-                            std::cout << std::right << std::setw(timeLen)
-                                << DataValue("time", tm);
-                }
+                auto time = result[c]["time"];
+                bool showTime = state.Value == "running" ||
+                                state.Value == "meta" ||
+                                state.Value == "dead";
+                if (showTime && !time.Error)
+                    std::cout << std::right << std::setw(timeLen)
+                              << DataValue("time", time.Value);
             }
 
             std::cout << std::endl;
