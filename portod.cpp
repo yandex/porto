@@ -427,9 +427,8 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                 if (error)
                     L_ERR() << "Can't refresh list of network interfaces: " << error << std::endl;
 
-                L() << "Refresh containers tc classes" << std::endl;
-                auto holder_lock = context.Cholder->ScopedLock();
-                context.Cholder->UpdateNetwork(holder_lock);
+                TEvent e(EEventType::UpdateNetwork);
+                context.Queue->Add(0, e);
             } else if (source->Flags & EPOLL_EVENT_OOM) {
                 auto container = source->Container.lock();
                 if (container) {

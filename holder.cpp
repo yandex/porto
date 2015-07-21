@@ -624,6 +624,23 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
         delivered = true;
         break;
     }
+    case EEventType::UpdateNetwork:
+    {
+        L() << "Refresh containers tc classes" << std::endl;
+
+        auto list = List();
+        for (auto &target : list) {
+            TNestedScopedLock lock(*target, holder_lock);
+            if (!target->IsValid())
+                continue;
+
+            TError error = target->UpdateNetwork();
+            if (error)
+                L_WRN() << "Can't update " << target->GetName() << " network: " << error << std::endl;
+        }
+        delivered = true;
+        break;
+    }
     default:
         L_ERR() << "Unknown event " << event.GetMsg() << std::endl;
     }
@@ -633,17 +650,3 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
 
     return delivered;
 }
-
-void TContainerHolder::UpdateNetwork(TScopedLock &holder_lock) {
-    auto containers = List();
-    for (auto c : containers) {
-        TNestedScopedLock lock(*c, holder_lock);
-        if (!c->IsValid())
-            continue;
-
-        TError error = c->UpdateNetwork();
-        if (error)
-            L_WRN() << "Can't update " << c->GetName() << " network: " << error << std::endl;
-    }
-}
-

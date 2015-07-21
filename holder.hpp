@@ -72,5 +72,4 @@ public:
     std::vector<std::shared_ptr<TContainer> > List() const;
 
     bool DeliverEvent(const TEvent &event);
-    void UpdateNetwork(TScopedLock &holder_lock);
 };

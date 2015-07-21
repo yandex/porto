@@ -1962,8 +1962,8 @@ void TContainer::CleanupWaiters() {
 }
 
 TError TContainer::UpdateNetwork() {
-    if (Tclass && IsValid()) {
-        auto lock = Net->ScopedLock();
+    if (Tclass) {
+        auto net_lock = Net->ScopedLock();
         return Tclass->Create();
     }
     return TError::Success();

@@ -59,6 +59,8 @@ std::string TEvent::GetMsg() const {
             return "cgroup sync";
         case EEventType::WaitTimeout:
             return "wait timeout";
+        case EEventType::UpdateNetwork:
+            return "update network";
         default:
             return "unknown event";
     }

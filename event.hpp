@@ -16,6 +16,7 @@ enum class EEventType {
     OOM,
     CgroupSync,
     WaitTimeout,
+    UpdateNetwork,
 };
 
 class TEventWorker;
