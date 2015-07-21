@@ -265,6 +265,7 @@ TError TTask::ChildExec() {
         for (unsigned i = 0; envp[i]; i++)
             L() << "environ[" << i << "]=" << envp[i] << std::endl;
     }
+    SetDieOnParentExit(0);
     execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
 
     return TError(EError::InvalidValue, errno, string("execvpe(") + result.we_wordv[0] + ", " + std::to_string(result.we_wordc) + ", " + std::to_string(Env->Environ.size()) + ")");
@@ -801,6 +802,7 @@ TError TTask::Start() {
     } else if (forkPid == 0) {
         TError error;
 
+        SetDieOnParentExit(SIGKILL);
         SetProcessName("portod-spawn-p");
 
         char stack[8192];

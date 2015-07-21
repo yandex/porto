@@ -368,7 +368,7 @@ retry:
             return TError(EError::Unknown, errno, "waitpid(" + std::to_string(pid) + ")");
         }
     } else {
-        SetDieOnParentExit();
+        SetDieOnParentExit(SIGKILL);
         CloseFds(-1, {});
 
         char **p = (char **)malloc(sizeof(*p) * (command.size() + 1));

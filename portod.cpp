@@ -520,7 +520,7 @@ static void postChildFork(void) {
 }
 
 static int SlaveMain() {
-    SetDieOnParentExit(SIGTERM);
+    SetDieOnParentExit(SIGKILL);
 
     int ret = pthread_atfork(preParentFork, postParentFork, postChildFork);
     if (ret) {
