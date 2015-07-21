@@ -2164,6 +2164,17 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectEq(s, "");
     ExpectApiSuccess(api.Stop(name));
 
+    Say() << "Check net=macvlan type" << std::endl;
+    ExpectApiSuccess(api.SetProperty(name, "command", "ip -o -d link show dev eth0"));
+    ExpectApiSuccess(api.SetProperty(name, "net", "macvlan " + link + " eth0"));
+    auto mode = StartWaitAndGetData(api, name, "stdout");
+    ExpectNeq(mode.find("bridge"), std::string::npos);
+    ExpectApiSuccess(api.Stop(name));
+    ExpectApiSuccess(api.SetProperty(name, "net", "macvlan " + link + " eth0 passthru"));
+    mode = StartWaitAndGetData(api, name, "stdout");
+    ExpectNeq(mode.find("passthru"), std::string::npos);
+    ExpectApiSuccess(api.Stop(name));
+
     Say() << "Check net=macvlan" << std::endl;
     TestXvlan(api, name, hostLink, link, "macvlan");
 
