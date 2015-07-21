@@ -57,7 +57,6 @@ void ICmd::PrintError(const TError &error, const string &str) {
         std::cerr << str << ": " << ErrorName(error.GetError()) << " (" << error.GetMsg() << ")" << std::endl;
     else
         std::cerr << str << ": " << ErrorName(error.GetError()) << std::endl;
-
 }
 
 void ICmd::PrintError(const string &str) {

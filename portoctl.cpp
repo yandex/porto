@@ -37,7 +37,7 @@ using std::pair;
 using std::set;
 using std::shared_ptr;
 
-string HumanNsec(const string &val) {
+static string HumanNsec(const string &val) {
     double n = stod(val);
     string suf = "ns";
     if (n > 1000) {
@@ -58,7 +58,7 @@ string HumanNsec(const string &val) {
     return str.str();
 }
 
-string HumanSec(const string &val) {
+static string HumanSec(const string &val) {
     uint64_t n = stoull(val);
     uint64_t h = 0, m = 0, s = n;
 
@@ -80,7 +80,7 @@ string HumanSec(const string &val) {
     return str.str();
 }
 
-string HumanSize(const string &val) {
+static string HumanSize(const string &val) {
     double n = stod(val);
     string suf = "";
     if (n > 1024) {
@@ -101,20 +101,32 @@ string HumanSize(const string &val) {
     return str.str();
 }
 
-string PropertyValue(const string &name, const string &val) {
-    if (name == "memory_guarantee" ||
-        name == "memory_limit") {
-        return HumanSize(val);
-    } else {
-        return val;
-    }
+static const std::string StripIdx(const std::string &name) {
+    if (name.find('[') != std::string::npos)
+        return std::string(name.c_str(), name.find('['));
+    else
+        return name;
 }
 
-string DataValue(const string &name, const string &val) {
+static bool ValidData(const vector<TData> &dlist, const string &name) {
+    return find_if(dlist.begin(), dlist.end(),
+                   [&](const TData &i)->bool { return i.Name == StripIdx(name); })
+        != dlist.end();
+}
+
+static bool ValidProperty(const vector<TProperty> &plist, const string &name) {
+    return find_if(plist.begin(), plist.end(),
+                   [&](const TProperty &i)->bool { return i.Name == StripIdx(name); })
+        != plist.end();
+}
+
+static string HumanValue(const string &name, const string &val) {
     if (val == "")
         return val;
 
-    if (name == "exit_status") {
+    if (name == "memory_guarantee" || name == "memory_limit") {
+        return HumanSize(val);
+    } else if (name == "exit_status") {
         int status;
         if (StringToInt(val, status))
             return val;
@@ -150,32 +162,9 @@ string DataValue(const string &name, const string &val) {
         return HumanNsec(val);
     } else if (name == "time") {
         return HumanSec(val);
-    } else {
-        return val;
     }
-}
 
-const std::string StripIdx(const std::string &name) {
-    if (name.find('[') != std::string::npos)
-        return std::string(name.c_str(), name.find('['));
-    else
-        return name;
-}
-
-bool ValidData(const vector<TData> &dlist, const string &name) {
-    return find_if(dlist.begin(), dlist.end(),
-                   [&](const TData &i)->bool { return i.Name == StripIdx(name); })
-        != dlist.end();
-}
-
-bool ValidProperty(const vector<TProperty> &plist, const string &name) {
-    return find_if(plist.begin(), plist.end(),
-                   [&](const TProperty &i)->bool { return i.Name == StripIdx(name); })
-        != plist.end();
-}
-
-string HumanValue(const string &name, const string &val) {
-    return DataValue(name, PropertyValue(name, val));
+    return val;
 }
 
 class TRawCmd : public ICmd {
@@ -462,6 +451,8 @@ public:
     int Execute(int argc, char *argv[]) {
         string value;
         int ret;
+        bool printKey = true;
+        bool printErrors = true;
 
         vector<TProperty> plist;
         ret = Api->Plist(plist);
@@ -477,80 +468,56 @@ public:
             return EXIT_FAILURE;
         }
 
-        if (argc <= 1) {
-            int printed = 0;
+        std::string container = argv[0];
+        std::vector<std::string> clist = { container };
+        std::vector<std::string> vars;
 
-            for (auto p : plist) {
-                if (!ValidProperty(plist, p.Name))
-                    continue;
-
-                ret = Api->GetProperty(argv[0], p.Name, value);
-                if (!ret) {
-                    PrintPair(p.Name, PropertyValue(p.Name, value));
-                    printed++;
-                }
-            }
-
-            for (auto d : dlist) {
-                if (!ValidData(dlist, d.Name))
-                    continue;
-
-                ret = Api->GetData(argv[0], d.Name, value);
-                if (!ret) {
-                    PrintPair(d.Name, DataValue(d.Name, value));
-                    printed++;
-                }
-            }
-
-            if (!printed)
-                    std::cerr << "Invalid container name" << std::endl;
-
-            return 0;
+        if (argc > 1) {
+            for (int i = 1; i < argc; i++)
+                vars.push_back(argv[i]);
+            // we want to preserve old behavior:
+            // - get without arguments prints all properties/data prefixed with name
+            // - get with arguments prints specified properties/data without prefix
+            printKey = false;
+        } else {
+            for (auto p : plist)
+                vars.push_back(p.Name);
+            for (auto d : dlist)
+                vars.push_back(d.Name);
+            std::sort(vars.begin(), vars.end());
+            // don't print any error when user lists all properties/data
+            // (container may be / which doesn't support properties or
+            // some property/data may be invalid in given state)
+            printErrors = false;
         }
 
-        for (int i = 1; i < argc; i++) {
-            bool validProperty = ValidProperty(plist, argv[i]);
-            bool validData = ValidData(dlist, argv[i]);
+        std::map<std::string, std::map<std::string, TPortoGetResponse>> result;
+        ret = Api->Get(clist, vars, result);
+        if (ret) {
+            PrintError("Can't get containers' data");
+            return ret;
+        }
 
-            if (validData) {
-                ret = Api->GetData(argv[0], argv[i], value);
-                if (!ret)
-                    Print(DataValue(argv[i], value));
-                else if (ret != EError::InvalidData)
-                    PrintError("Can't get data");
-            }
+        auto &data = result[container];
 
-            if (validProperty) {
-                ret = Api->GetProperty(argv[0], argv[i], value);
-                if (!ret) {
-                    Print(PropertyValue(argv[i], value));
-                } else if (ret != EError::InvalidProperty) {
-                    PrintError("Can't get data");
+        if (printErrors)
+            for (auto key : vars) {
+                if (data[key].Error) {
+                    TError error((rpc::EError)data[key].Error, data[key].ErrorMsg);
+                    PrintError(error, "Can't get " + key);
                     return EXIT_FAILURE;
                 }
             }
 
-            if (!validProperty && !validData) {
-                /* Probably it's a valid property/data, but it isn't supported now */
-                ret = Api->GetData(argv[0], argv[i], value);
-                if (!ret)
-                    Print(DataValue(argv[i], value));
-                else if (ret == EError::NotSupported) {
-                    PrintError("Can't get data");
-                    return EXIT_FAILURE;
-                } else {
-                    ret = Api->GetProperty(argv[0], argv[i], value);
-                    if (!ret) {
-                        Print(PropertyValue(argv[i], value));
-                    } else if (ret == EError::NotSupported) {
-                        PrintError("Can't get property");
-                        return EXIT_FAILURE;
-                    } else {
-                        std::cerr << "Invalid property or data" << std::endl;
-                        return EXIT_FAILURE;
-                    }
-                }
-            }
+        for (auto key : vars) {
+            if (data[key].Error)
+                continue;
+
+            auto val = HumanValue(key, data[key].Value);
+            if (printKey)
+                PrintPair(key, val);
+            else
+                Print(val);
         }
 
         return EXIT_SUCCESS;
@@ -1229,7 +1196,7 @@ public:
                                 state.Value == "dead";
                 if (showTime && !time.Error)
                     std::cout << std::right << std::setw(timeLen)
-                              << DataValue("time", time.Value);
+                              << HumanValue("time", time.Value);
             }
 
             std::cout << std::endl;
