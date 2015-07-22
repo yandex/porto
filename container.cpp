@@ -972,6 +972,14 @@ TError TContainer::KillAll(TScopedLock &holder_lock) {
 
     L_ACT() << "Kill all " << GetName() << std::endl;
 
+    // we can't unfreeze child if parent is frozen, so just
+    // send SIGKILL to all tasks, mark container as dead and hope that
+    // when parent container is thawed these tasks will die
+    if (CheckPausedParent() != TError::Success()) {
+        L_WRN() << "Container " << GetName() << " can't be thawed, just send SIGKILL" << std::endl;
+        return SendSignal(SIGKILL);
+    }
+
     // try to stop all tasks gracefully
     if (!SendSignal(SIGTERM)) {
         TScopedUnlock unlock(holder_lock);
@@ -1686,15 +1694,12 @@ void TContainer::ExitTree(TScopedLock &holder_lock, int status, bool oomKilled) 
         return;
     }
 
-    if (IsFrozen()) {
-        TError error = Resume(holder_lock);
-        if (error)
-            L_ERR() << "Can't exit tree: " << error << std::endl;
-    }
+    if (IsFrozen())
+        (void)Resume(holder_lock);
 
     ApplyForTree(holder_lock, [&] (TScopedLock &holder_lock, TContainer &child) {
         if (child.IsFrozen())
-            (void)child.Unfreeze(holder_lock);
+            (void)child.Resume(holder_lock);
 
         child.Exit(holder_lock, status, oomKilled);
         return TError::Success();
@@ -1855,7 +1860,7 @@ void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
         case EEventType::Respawn:
             error = Respawn(holder_lock);
             if (error)
-                L_ERR() << "Can't respawn container: " << error << std::endl;
+                L_WRN() << "Can't respawn container: " << error << std::endl;
             else
                 L() << "Respawned " << GetName() << std::endl;
             break;

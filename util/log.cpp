@@ -222,6 +222,6 @@ void porto_assert(const char *msg, size_t line, const char *file) {
 }
 
 void porto_runtime_error(const std::string &msg, size_t line, const char *file) {
-    L_ERR() << "Runtime error: " << msg << " at " << file << ":" << line << std::endl; \
-        Crash(); \
+    L_ERR() << "Runtime error: " << msg << " at " << file << ":" << line << std::endl;
+    Crash();
 }
