@@ -121,14 +121,17 @@ TError TMount::Detach() const {
 }
 
 TError TMount::Bind(bool rdonly, unsigned long flags) const {
-    TError error = Mount(MS_BIND | flags);
+    TError error = Mount(MS_BIND);
     if (error)
         return error;
 
-    if (!rdonly)
+    if (rdonly)
+        flags |= MS_RDONLY;
+
+    if (!flags)
         return TError::Success();
 
-    return Mount(MS_BIND | MS_REMOUNT | MS_RDONLY | flags);
+    return Mount(MS_BIND | MS_REMOUNT | flags);
 }
 
 TError TMount::BindFile(bool rdonly, unsigned long flags) const {
