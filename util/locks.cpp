@@ -1,8 +1,9 @@
 #include "locks.hpp"
+#include "config.hpp"
 #include "util/log.hpp"
 
 TScopedUnlock::TScopedUnlock(TScopedLock &lock) {
-    if (AllowHolderUnlock) {
+    if (config().container().scoped_unlock()) {
         PORTO_ASSERT(lock.owns_lock());
         Lock = &lock;
         Lock->unlock();
@@ -10,7 +11,7 @@ TScopedUnlock::TScopedUnlock(TScopedLock &lock) {
 }
 
 TScopedUnlock::~TScopedUnlock() {
-    if (AllowHolderUnlock) {
+    if (config().container().scoped_unlock()) {
         PORTO_ASSERT(!Lock->owns_lock());
         Lock->lock();
     }
@@ -31,7 +32,7 @@ TNestedScopedLock& TNestedScopedLock::operator=(TNestedScopedLock &&src) {
 TNestedScopedLock::TNestedScopedLock(TLockable &inner, TScopedLock &outer) {
     PORTO_ASSERT(outer.owns_lock());
 
-    if (AllowHolderUnlock) {
+    if (config().container().scoped_unlock()) {
         TScopedUnlock unlock(outer);
         InnerLock = inner.ScopedLock();
     }
