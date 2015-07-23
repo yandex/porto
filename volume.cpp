@@ -492,6 +492,135 @@ err:
     }
 };
 
+
+/* TVolumeRbdBackend - ext4 in ceph rados block device */
+
+class TVolumeRbdBackend : public TVolumeBackend {
+    int DeviceIndex = -1;
+
+public:
+    TVolumeRbdBackend(std::shared_ptr<TVolume> volume) : TVolumeBackend(volume) { }
+
+    std::string GetDevice() {
+        if (DeviceIndex < 0)
+            return "";
+        return "/dev/rbd" + std::to_string(DeviceIndex);
+    }
+
+    TError Save(std::shared_ptr<TValueMap> Config) override {
+        return Config->Set<int>(V_LOOP_DEV, DeviceIndex);
+    }
+
+    TError Restore(std::shared_ptr<TValueMap> Config) override {
+        DeviceIndex = Config->Get<int>(V_LOOP_DEV);
+        return TError::Success();
+    }
+
+    TError MapDevice(std::string id, std::string pool, std::string image,
+                     std::string &device) {
+        std::vector<std::string> lines;
+        L_ACT() << "Map rbd device " << id << "@" << pool << "/" << image << std::endl;
+        TError error = Popen("rbd --id=\"" + id + "\" --pool=\"" + pool +
+                             "\" map \"" + image + "\"", lines);
+        if (error)
+            return error;
+        if (lines.size() != 1)
+            return TError(EError::InvalidValue, "rbd map output have wrong lines count");
+        device = StringTrim(lines[0]);
+        return TError::Success();
+    }
+
+    TError UnmapDevice(std::string device) {
+        int status;
+        L_ACT() << "Unmap rbd device " << device << std::endl;
+        TError error = Run({"rbd", "unmap", device}, status);
+        if (!error && status)
+            error = TError(EError::Unknown, "rbd unmap " + device +
+                                " returned " + std::to_string(status));
+        return error;
+    }
+
+    TError Build() override {
+        TPath path = Volume->GetPath();
+        std::string id, pool, image, device;
+        std::vector<std::string> tok;
+        TError error, error2;
+
+        error = SplitEscapedString(Volume->GetStorage().ToString(), '@', tok);
+        if (error)
+            return error;
+        if (tok.size() != 2)
+            return TError(EError::InvalidValue, "Invalid rbd storage");
+        id = tok[0];
+        image = tok[1];
+        tok.clear();
+        error = SplitEscapedString(image, '/', tok);
+        if (error)
+            return error;
+        if (tok.size() != 2)
+            return TError(EError::InvalidValue, "Invalid rbd storage");
+        pool = tok[0];
+        image = tok[1];
+
+        error = MapDevice(id, pool, image, device);
+        if (error)
+            return error;
+
+        if (!StringStartsWith(device, "/dev/rbd")) {
+            UnmapDevice(device);
+            return TError(EError::InvalidValue, "not rbd device: " + device);
+        }
+
+        error = StringToInt(device.substr(8), DeviceIndex);
+        if (error) {
+            UnmapDevice(device);
+            return error;
+        }
+
+        TMount mount(device, path, "ext4", {});
+        error = mount.Mount(Volume->IsReadOnly() ? MS_RDONLY : 0);
+        if (error)
+            UnmapDevice(device);
+        return error;
+    }
+
+    TError Destroy() override {
+        std::string device = GetDevice();
+        TPath path = Volume->GetPath();
+        TError error, error2;
+
+        if (DeviceIndex < 0)
+            return TError::Success();
+
+        TMount mount(device, path, "ext4", {});
+        error = mount.Umount();
+        if (error && error.GetErrno() != EINVAL) {
+            L_ACT() << "Detach volume " << mount.GetMountpoint() << std::endl;
+            (void)mount.Detach();
+        }
+
+        error2 = UnmapDevice(device);
+        if (!error)
+            error = error2;
+        DeviceIndex = -1;
+        return error;
+    }
+
+    TError Clear() override {
+        return Volume->GetPath().ClearDirectory();
+    }
+
+    TError Move(TPath dest) override {
+        TMount mount(GetDevice(), Volume->GetPath(), "ext4", {});
+        return mount.Move(dest);
+    }
+
+    TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
+        return TError(EError::NotSupported, "rbd backend doesn't suppport resize");
+    }
+};
+
+
 /* TVolume */
 
 TError TVolume::OpenBackend() {
@@ -503,6 +632,8 @@ TError TVolume::OpenBackend() {
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeOverlayBackend(shared_from_this()));
     else if (GetBackend() == "loop")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeLoopBackend(shared_from_this()));
+    else if (GetBackend() == "rbd")
+        Backend = std::unique_ptr<TVolumeBackend>(new TVolumeRbdBackend(shared_from_this()));
     else
         return TError(EError::InvalidValue, "Unknown volume backend: " + GetBackend());
 
@@ -628,7 +759,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
                           std::shared_ptr<TContainer> creator_container,
                           const std::map<std::string, std::string> &properties,
                           TVolumeHolder &holder) {
-
+    auto backend = properties.count(V_BACKEND) ? properties.at(V_BACKEND) : "";
     TPath container_root = creator_container->RootPath();
     TError error;
 
@@ -664,7 +795,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
     }
 
     /* Verify storage path */
-    if (properties.count(V_STORAGE)) {
+    if (backend != "rbd" && properties.count(V_STORAGE)) {
         TPath storage(properties.at(V_STORAGE));
         if (!storage.IsAbsolute())
             return TError(EError::InvalidValue, "Storage path must be absolute");
