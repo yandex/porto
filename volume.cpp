@@ -69,7 +69,7 @@ public:
             return error;
 
         TMount Mount = TMount(storage, Volume->GetPath(), "none", {});
-        return Mount.Bind(Volume->IsReadOnly());
+        return Mount.Bind(false, Volume->GetMountFlags());
     }
 
     TError Clear() override {
@@ -147,7 +147,7 @@ public:
             return error;
 
         TMount mount(storage, Volume->GetPath(), "none", {});
-        return mount.Bind(Volume->IsReadOnly());
+        return mount.Bind(false, Volume->GetMountFlags());
     }
 
     TError Clear() override {
@@ -255,17 +255,19 @@ public:
             return error;
 
         TMount mount(GetLoopDevice(), path, "ext4", {});
-        error = mount.Mount();
+        error = mount.Mount(Volume->GetMountFlags());
         if (error)
             goto free_loop;
 
-        error = path.Chown(Volume->GetCred());
-        if (error)
-            goto umount_loop;
+        if (!Volume->IsReadOnly()) {
+            error = path.Chown(Volume->GetCred());
+            if (error)
+                goto umount_loop;
 
-        error = path.Chmod(Volume->GetPermissions());
-        if (error)
-            goto umount_loop;
+            error = path.Chmod(Volume->GetPermissions());
+            if (error)
+                goto umount_loop;
+        }
 
         return TError::Success();
 
@@ -411,7 +413,7 @@ public:
                 goto err;
         }
 
-        error = mount.Mount(Volume->IsReadOnly() ? MS_RDONLY : 0);
+        error = mount.Mount(Volume->GetMountFlags());
         if (!error)
             return error;
 err:
@@ -578,7 +580,7 @@ public:
         }
 
         TMount mount(device, path, "ext4", {});
-        error = mount.Mount(Volume->IsReadOnly() ? MS_RDONLY : 0);
+        error = mount.Mount(Volume->GetMountFlags());
         if (error)
             UnmapDevice(device);
         return error;
@@ -671,6 +673,15 @@ TPath TVolume::GetStorage() const {
         return val->Get<std::string>();
     else
         return GetInternal(GetBackend());
+}
+
+unsigned long TVolume::GetMountFlags() const {
+    unsigned flags = 0;
+
+    if (IsReadOnly())
+        flags |= MS_RDONLY;
+
+    return flags;
 }
 
 std::vector<TPath> TVolume::GetLayers() const {

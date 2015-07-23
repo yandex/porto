@@ -105,6 +105,7 @@ public:
     TPath GetChrootInternal(TPath container_root, std::string type) const;
     int GetId() const { return Config->Get<int>(V_ID); }
     bool IsReadOnly() const { return Config->Get<bool>(V_READ_ONLY); }
+    unsigned long GetMountFlags() const;
 
     /* Protected with TVolume->Lock() _and_ TVolumeHolder->Lock() */
     TError SetReady(bool ready) { return Config->Set<bool>(V_READY, ready); }
