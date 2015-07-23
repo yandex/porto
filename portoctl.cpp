@@ -1185,7 +1185,10 @@ public:
             if (toplevel && CountChar(c, '/'))
                 continue;
 
-            std::cout << std::left << std::setw(nameLen) << displayName[i];
+            if (details)
+                std::cout << std::left << std::setw(nameLen);
+
+            std::cout << displayName[i];
 
             if (details) {
                 std::cout << std::right << std::setw(stateLen) << state.Value;
