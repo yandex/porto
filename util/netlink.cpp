@@ -160,6 +160,8 @@ int TNl::GetFd() {
 }
 
 TError TNl::SubscribeToLinkUpdates() {
+    nl_socket_disable_seq_check(Sock);
+
     int ret = nl_socket_add_membership(Sock, RTNLGRP_LINK);
     if (ret < 0)
         return TError(EError::Unknown, string("Unable to set subscribe to group: ") + nl_geterror(ret));
@@ -819,11 +821,15 @@ TError TNlClass::GetProperties(uint32_t &prio, uint32_t &rate, uint32_t &ceil) {
 bool TNlClass::Valid(uint32_t prio, uint32_t rate, uint32_t ceil) {
     bool valid = true;
 
+    auto realParent = Parent;
+    if (realParent == TcHandle(1, 0))
+        realParent = TC_H_ROOT;
+
     struct rtnl_class *tclass = rtnl_class_get(Link->GetClassCache(), Link->GetIndex(), Handle);
     if (tclass) {
         if (rtnl_tc_get_link(TC_CAST(tclass)) != Link->GetLink())
             valid = false;
-        else if (rtnl_tc_get_parent(TC_CAST(tclass)) != Parent)
+        else if (rtnl_tc_get_parent(TC_CAST(tclass)) != realParent)
             valid = false;
         else if (rtnl_tc_get_handle(TC_CAST(tclass)) != Handle)
             valid = false;
