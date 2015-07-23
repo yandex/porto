@@ -188,13 +188,19 @@ TError TMount::RemountRootShared() {
     return TError::Success();
 }
 
-TError TMount::RemountRootSlave() {
+TError TMount::RemountContainerRoot() {
     // systemd mounts / with MS_SHARED so any changes made to it in the container
     // are propagated back (in particular, mounting new /proc breaks host)
 
     if (mount(NULL, "/", NULL, MS_REC | MS_SLAVE, NULL)) {
         L_ERR() << "Can't remount / recursively as slave" << std::endl;
         return TError(EError::Unknown, errno, "mount(NULL, /, NULL, MS_REC | MS_SLAVE, NULL)");
+    }
+
+    /* Reenable suid binaries and device nodes inside container. */
+    if (mount(NULL, "/", NULL, MS_REMOUNT | MS_BIND, NULL)) {
+        L_ERR() << "Can't remount / as suid and dev" << std::endl;
+        return TError(EError::Unknown, errno, "mount(NULL, /, NULL, MS_REMOUNT | MS_BIND, NULL)");
     }
 
     return TError::Success();

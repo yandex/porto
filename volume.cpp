@@ -681,6 +681,8 @@ unsigned long TVolume::GetMountFlags() const {
     if (IsReadOnly())
         flags |= MS_RDONLY;
 
+    flags |= MS_NODEV | MS_NOSUID;
+
     return flags;
 }
 

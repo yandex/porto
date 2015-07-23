@@ -53,7 +53,7 @@ public:
                            const TPath mounts = "/proc/self/mounts");
 
     static TError RemountRootShared();
-    static TError RemountRootSlave();
+    static TError RemountContainerRoot();
 
     TError Mount(unsigned long flags = 0) const;
     TError Bind(bool rdonly, unsigned long flags = 0) const;

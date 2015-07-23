@@ -700,7 +700,7 @@ TError TTask::ChildCallback() {
     umask(0);
 
     if (Env->NewMountNs) {
-        error = TMount::RemountRootSlave();
+        error = TMount::RemountContainerRoot();
         if (error)
             return error;
     }
