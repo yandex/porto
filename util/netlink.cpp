@@ -28,25 +28,6 @@ extern "C" {
 using std::string;
 using std::vector;
 
-static int RetryNlBusy(int times, int timeoMs, std::function<int()> handler) {
-    int ret = 0;
-
-    if (!times)
-        times = 1;
-
-    while (times-- > 0) {
-        ret = handler();
-        if (ret < 0 && -ret == NLE_BUSY) {
-            if (usleep(timeoMs * 1000) < 0)
-                return -1;
-        } else {
-            return ret;
-        }
-    }
-
-    return ret;
-}
-
 static bool debug = false;
 
 uint32_t TcHandle(uint16_t maj, uint16_t min) {
@@ -750,7 +731,7 @@ TError TNlClass::Remove() {
     rtnl_tc_set_parent(TC_CAST(tclass), Parent);
     rtnl_tc_set_handle(TC_CAST(tclass), Handle);
 
-    ret = RetryNlBusy(10, 100, [&]{ return rtnl_class_delete(Link->GetSock(), tclass); });
+    ret = rtnl_class_delete(Link->GetSock(), tclass);
     if (ret < 0)
         error = TError(EError::Unknown, string("Unable to remove tclass: ") + nl_geterror(ret));
 
