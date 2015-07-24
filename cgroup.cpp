@@ -279,10 +279,26 @@ TError TCgroupSnapshot::Create() {
 }
 
 void TCgroupSnapshot::Destroy() {
+    std::shared_ptr<TCgroup> root = freezerSubsystem->GetRootCgroup()->GetChild(PORTO_ROOT_CGROUP);
+
     for (auto cg: Cgroups) {
         // Thaw cgroups that we will definitely remove
         if (cg.use_count() > 2)
             continue;
+
+        L() << "About to remove " << cg->Relpath() << std::endl;
+
+        // don't let these poor suckaz fork away
+        (void)freezerSubsystem->Freeze(cg);
+
+        std::vector<pid_t> tasks;
+        TError error = cg->GetTasks(tasks);
+        if (!error)
+            for (auto pid : tasks) {
+                L() << "Kill " << pid << " and reattach it to /" << PORTO_ROOT_CGROUP << std::endl;
+                kill(pid, SIGKILL);
+                root->Attach(pid);
+            }
 
         (void)freezerSubsystem->Unfreeze(cg);
     }
