@@ -438,6 +438,10 @@ noinline TError StopContainer(TContext &context,
     if (error)
         return error;
 
+    TScopedAcquire acquire(container);
+    if (!acquire.IsAcquired())
+        return TError(EError::Busy, "Can't stop busy container");
+
     return container->StopTree(holder_lock);
 }
 

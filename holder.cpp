@@ -263,52 +263,37 @@ TError TContainerHolder::Get(int pid, std::shared_ptr<TContainer> &c) {
 }
 
 TError TContainerHolder::Destroy(TScopedLock &holder_lock, std::shared_ptr<TContainer> c) {
-    // we destroy parent after child, but we need to unfreeze parent first
-    // so children may be killed
-    if (c->IsFrozen()) {
-        TError error = c->Resume(holder_lock);
-        if (error)
-            return error;
-    }
-
-    // we are destroying container and we don't need any exit status, so
-    // forcefully kill all processes for destroy to be faster
-    (void)c->SendSignal(SIGKILL);
-
-    for (auto child: c->GetChildren()) {
-        TError error = Destroy(holder_lock, child);
-        if (error)
-            return error;
-    }
-
     if (c->GetState() != EContainerState::Stopped) {
-        TError error = c->Stop(holder_lock);
+        // we are destroying container and we don't need any exit status, so
+        // forcefully kill all processes for destroy to be faster
+        TError error = c->SendTreeSignal(holder_lock, SIGKILL);
+        if (error)
+            return error;
+
+        error = c->StopTree(holder_lock);
         if (error)
             return error;
     }
 
-    TError error = c->Destroy(holder_lock);
-    if (error)
-        return error;
-
-    IdMap.Put(c->GetId());
-    Containers.erase(c->GetName());
-    Statistics->Created--;
+    Unlink(holder_lock, c);
 
     return TError::Success();
 }
 
-TError TContainerHolder::Destroy(TScopedLock &holder_lock, const std::string &name) {
-    if (Containers.find(name) == Containers.end())
-        return TError::Success();
+void TContainerHolder::Unlink(TScopedLock &holder_lock, std::shared_ptr<TContainer> c) {
+    for (auto name: c->GetChildren()) {
+        std::shared_ptr<TContainer> child;
+        if (Get(name, child))
+            continue;
 
-    auto c = Containers.at(name);
+        Unlink(holder_lock, child);
+    }
 
-    TNestedScopedLock childLock(*c, holder_lock);
-    if (c->IsValid())
-        return Destroy(holder_lock, c);
+    c->Destroy(holder_lock);
 
-    return TError::Success();
+    IdMap.Put(c->GetId());
+    Containers.erase(c->GetName());
+    Statistics->Created--;
 }
 
 std::vector<std::shared_ptr<TContainer> > TContainerHolder::List() const {

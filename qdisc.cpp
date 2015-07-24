@@ -32,12 +32,6 @@ uint32_t TTclass::GetParent() {
         return ParentTclass->Handle;
 }
 
-TTclass::~TTclass() {
-    TError error = Remove();
-    if (error)
-        L_ERR() << "Can't remove tc classifier: " << error << std::endl;
-}
-
 void TTclass::Prepare(std::map<std::string, uint64_t> prio,
                        std::map<std::string, uint64_t> rate,
                        std::map<std::string, uint64_t> ceil) {
@@ -177,10 +171,6 @@ TError TNetwork::Destroy() {
     }
 
     return TError::Success();
-}
-
-TNetwork::~TNetwork() {
-    (void)Destroy();
 }
 
 TError TNetwork::Prepare() {

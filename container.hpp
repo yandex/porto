@@ -103,9 +103,14 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void CleanupWaiters();
     void NotifyWaiters();
 
-    TError ApplyForTree(TScopedLock &holder_lock,
-                      std::function<TError (TScopedLock &holder_lock,
-                                            TContainer &container)> fn);
+    // fn called for parent first then for all children (from top container to the leafs)
+    TError ApplyForTreePreorder(TScopedLock &holder_lock,
+                                std::function<TError (TScopedLock &holder_lock,
+                                                      TContainer &container)> fn);
+    // fn called for children first then for all parents (from leaf containers to the top)
+    TError ApplyForTreePostorder(TScopedLock &holder_lock,
+                                 std::function<TError (TScopedLock &holder_lock,
+                                                       TContainer &container)> fn);
 
     void DestroyVolumes(TScopedLock &holder_lock);
 
@@ -151,9 +156,10 @@ public:
     std::vector<pid_t> Processes();
 
     TError SendSignal(int signal);
+    TError SendTreeSignal(TScopedLock &holder_lock, int signal);
     void AddChild(std::shared_ptr<TContainer> child);
     TError Create(const TCred &cred);
-    TError Destroy(TScopedLock &holder_lock);
+    void Destroy(TScopedLock &holder_lock);
     TError Start(std::shared_ptr<TClient> client, bool meta);
     TError Stop(TScopedLock &holder_lock);
     TError StopTree(TScopedLock &holder_lock);

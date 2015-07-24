@@ -40,7 +40,6 @@ class TTclass : public TNonCopyable {
 public:
     TTclass(std::shared_ptr<TNetwork> net, const std::shared_ptr<TQdisc> qdisc, uint32_t handle) : Net(net), ParentQdisc(qdisc), Handle(handle) { }
     TTclass(std::shared_ptr<TNetwork> net, const std::shared_ptr<TTclass> tclass, uint32_t handle) : Net(net), ParentTclass(tclass), Handle(handle) { }
-    ~TTclass();
 
     void Prepare(std::map<std::string, uint64_t> prio, std::map<std::string, uint64_t> rate, std::map<std::string, uint64_t> ceil);
     TError Create();
@@ -64,8 +63,6 @@ class TNetwork : public std::enable_shared_from_this<TNetwork>,
     TError PrepareLink(std::shared_ptr<TNlLink> link);
 
 public:
-    TNetwork() {}
-    ~TNetwork();
     TError Prepare();
     TError Update();
     // OpenLinks doesn't lock TNetwork

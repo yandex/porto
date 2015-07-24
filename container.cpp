@@ -232,14 +232,12 @@ void TContainer::DestroyVolumes(TScopedLock &holder_lock) {
     Volumes.clear();
 }
 
-TError TContainer::Destroy(TScopedLock &holder_lock) {
+void TContainer::Destroy(TScopedLock &holder_lock) {
     L_ACT() << "Destroy " << GetName() << " " << Id << std::endl;
 
     SetState(EContainerState::Unknown);
     DestroyVolumes(holder_lock);
     RemoveKvs();
-
-    return TError::Success();
 }
 
 const string TContainer::GetName(bool recursive, const std::string &sep) const {
@@ -967,6 +965,21 @@ TError TContainer::SendSignal(int signal) {
     return cg->Kill(signal);
 }
 
+TError TContainer::SendTreeSignal(TScopedLock &holder_lock, int signal) {
+    TError error = CheckPausedParent();
+    if (error)
+        return error;
+
+    ApplyForTreePostorder(holder_lock, [] (TScopedLock &holder_lock,
+                                           TContainer &child) {
+        (void)child.SendSignal(SIGKILL);
+        return TError::Success();
+    });
+    (void)SendSignal(SIGKILL);
+
+    return TError::Success();
+}
+
 TError TContainer::KillAll(TScopedLock &holder_lock) {
     auto cg = GetLeafCgroup(freezerSubsystem);
 
@@ -1004,7 +1017,7 @@ TError TContainer::KillAll(TScopedLock &holder_lock) {
     return Unfreeze(holder_lock);
 }
 
-TError TContainer::ApplyForTree(TScopedLock &holder_lock,
+TError TContainer::ApplyForTreePreorder(TScopedLock &holder_lock,
                                 std::function<TError (TScopedLock &holder_lock,
                                                       TContainer &container)> fn) {
     for (auto iter : Children)
@@ -1014,7 +1027,30 @@ TError TContainer::ApplyForTree(TScopedLock &holder_lock,
                 TError error = fn(holder_lock, *child);
                 if (error)
                     return error;
-                child->ApplyForTree(holder_lock, fn);
+
+                error = child->ApplyForTreePreorder(holder_lock, fn);
+                if (error)
+                    return error;
+            }
+        }
+
+    return TError::Success();
+}
+
+TError TContainer::ApplyForTreePostorder(TScopedLock &holder_lock,
+                                std::function<TError (TScopedLock &holder_lock,
+                                                      TContainer &container)> fn) {
+    for (auto iter : Children)
+        if (auto child = iter.lock()) {
+            TNestedScopedLock lock(*child, holder_lock);
+            if (child->IsValid()) {
+                TError error = child->ApplyForTreePostorder(holder_lock, fn);
+                if (error)
+                    return error;
+
+                error = fn(holder_lock, *child);
+                if (error)
+                    return error;
             }
         }
 
@@ -1056,6 +1092,11 @@ void TContainer::FreeResources() {
 
     {
         auto lock = Net->ScopedLock();
+
+        TError error = Tclass->Remove();
+        if (error)
+            L_ERR() << "Can't remove tc classifier: " << error << std::endl;
+
         Tclass = nullptr;
     }
     Task = nullptr;
@@ -1159,8 +1200,8 @@ TError TContainer::CheckPausedParent() {
 }
 
 TError TContainer::CheckAcquiredChild(TScopedLock &holder_lock) {
-    return ApplyForTree(holder_lock, [] (TScopedLock &holder_lock,
-                                         TContainer &child) {
+    return ApplyForTreePreorder(holder_lock, [] (TScopedLock &holder_lock,
+                                                 TContainer &child) {
         if (child.Acquired)
             return TError(EError::Busy, "child " + child.GetName() + " is busy");
         return TError::Success();
@@ -1184,8 +1225,8 @@ TError TContainer::Pause(TScopedLock &holder_lock) {
         return error;
 
     SetState(EContainerState::Paused);
-    ApplyForTree(holder_lock, [] (TScopedLock &holder_lock,
-                                  TContainer &child) {
+    ApplyForTreePreorder(holder_lock, [] (TScopedLock &holder_lock,
+                                          TContainer &child) {
         if (child.GetState() == EContainerState::Running ||
             child.GetState() == EContainerState::Meta)
             child.SetState(EContainerState::Paused);
@@ -1215,8 +1256,8 @@ TError TContainer::Resume(TScopedLock &holder_lock) {
     if (GetState() == EContainerState::Paused)
         SetState(EContainerState::Running);
 
-    ApplyForTree(holder_lock, [] (TScopedLock &holder_lock,
-                                  TContainer &child) {
+    ApplyForTreePreorder(holder_lock, [] (TScopedLock &holder_lock,
+                                          TContainer &child) {
         if (child.GetState() == EContainerState::Paused)
             child.SetState(EContainerState::Running);
         return TError::Success();
@@ -1694,10 +1735,15 @@ void TContainer::ExitTree(TScopedLock &holder_lock, int status, bool oomKilled) 
         return;
     }
 
+    TError error = CheckPausedParent();
+    if (error)
+        L_ERR() << error << std::endl;
+
     if (IsFrozen())
         (void)Resume(holder_lock);
 
-    ApplyForTree(holder_lock, [&] (TScopedLock &holder_lock, TContainer &child) {
+    ApplyForTreePreorder(holder_lock, [&] (TScopedLock &holder_lock,
+                                           TContainer &child) {
         if (child.IsFrozen())
             (void)child.Resume(holder_lock);
 
@@ -1797,6 +1843,10 @@ void TContainer::ScheduleRespawn() {
 }
 
 TError TContainer::Respawn(TScopedLock &holder_lock) {
+    TScopedAcquire acquire(shared_from_this());
+    if (!acquire.IsAcquired())
+        return TError(EError::Busy, "Can't respawn busy container");
+
     TError error = StopTree(holder_lock);
     if (error)
         return error;
@@ -1998,18 +2048,14 @@ void TContainerWaiter::Signal(const TContainer *who) {
 }
 
 TError TContainer::StopTree(TScopedLock &holder_lock) {
-    TScopedAcquire acquire(shared_from_this());
-    if (!acquire.IsAcquired())
-        return TError(EError::Busy, "Can't stop busy container");
-
     if (IsFrozen()) {
         TError error = Resume(holder_lock);
         if (error)
             return error;
     }
 
-    TError error = ApplyForTree(holder_lock, [] (TScopedLock &holder_lock,
-                                                 TContainer &child) {
+    TError error = ApplyForTreePostorder(holder_lock, [] (TScopedLock &holder_lock,
+                                                          TContainer &child) {
         if (child.IsFrozen()) {
             TError error = child.Unfreeze(holder_lock);
             if (error)

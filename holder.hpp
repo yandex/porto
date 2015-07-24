@@ -38,7 +38,7 @@ class TContainerHolder : public std::enable_shared_from_this<TContainerHolder>,
     TError ReserveDefaultClassId();
     std::map<std::string, std::shared_ptr<TKeyValueNode>>
         SortNodes(const std::vector<std::shared_ptr<TKeyValueNode>> &nodes);
-    TError Destroy(TScopedLock &holder_lock, const std::string &name);
+    void Unlink(TScopedLock &holder_lock, std::shared_ptr<TContainer> c);
 
 public:
     std::shared_ptr<TEventQueue> Queue = nullptr;
