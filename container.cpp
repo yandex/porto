@@ -1090,15 +1090,14 @@ void TContainer::RemoveLog(const TPath &path) {
 void TContainer::FreeResources() {
     LeafCgroups.clear();
 
-    {
+    if (!Parent || Parent->Tclass != Tclass) {
         auto lock = Net->ScopedLock();
 
         TError error = Tclass->Remove();
         if (error)
             L_ERR() << "Can't remove tc classifier: " << error << std::endl;
-
-        Tclass = nullptr;
     }
+    Tclass = nullptr;
     Task = nullptr;
     ShutdownOom();
 
