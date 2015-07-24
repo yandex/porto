@@ -518,24 +518,14 @@ noinline TError GetContainerProperty(TContext &context,
     if (err)
         return err;
 
-    std::string name;
-    err = clientContainer->AbsoluteName(req.name(), name, true);
-    if (err)
-        return err;
     std::shared_ptr<TContainer> container;
-    err = context.Cholder->Get(name, container);
-    if (err)
-        return err;
+    TNestedScopedLock lock;
+    TError error = context.Cholder->GetLocked(holder_lock, client, req.name(), false, container, lock);
+    if (error)
+        return error;
 
-    if (container->IsAcquired())
-        return TError(EError::Busy, "Can't get property of busy container");
-
-    TNestedScopedLock lock(*container, holder_lock);
     if (!container->IsValid())
         return TError(EError::ContainerDoesNotExist, "container doesn't exist");
-
-    if (container->IsAcquired())
-        return TError(EError::Busy, "Can't get property of busy container");
 
     string value;
     err = container->GetProperty(req.property(), value, client);
@@ -579,24 +569,14 @@ noinline TError GetContainerData(TContext &context,
     if (err)
         return err;
 
-    std::string name;
-    err = clientContainer->AbsoluteName(req.name(), name, true);
-    if (err)
-        return err;
     std::shared_ptr<TContainer> container;
-    err = context.Cholder->Get(name, container);
-    if (err)
-        return err;
+    TNestedScopedLock lock;
+    TError error = context.Cholder->GetLocked(holder_lock, client, req.name(), false, container, lock);
+    if (error)
+        return error;
 
-    if (container->IsAcquired())
-        return TError(EError::Busy, "Can't get data of busy container");
-
-    TNestedScopedLock lock(*container, holder_lock);
     if (!container->IsValid())
         return TError(EError::ContainerDoesNotExist, "container doesn't exist");
-
-    if (container->IsAcquired())
-        return TError(EError::Busy, "Can't get data of busy container");
 
     string value;
     err = container->GetData(req.data(), value);
