@@ -273,8 +273,9 @@ int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    int ret = EXIT_FAILURE;
     try {
-        return TryExec(argc, argv);
+        ret = TryExec(argc, argv);
     } catch (string err) {
         std::cerr << err << std::endl;
     } catch (const char *err) {
@@ -283,7 +284,10 @@ int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
         std::cerr << "Got unknown error" << std::endl;
     }
 
-    return EXIT_FAILURE;
+    for (auto pair : commands)
+        delete pair.second;
+
+    return ret;
 }
 
 int GetOpt(int argc, char *argv[], const std::vector<Option> &opts) {

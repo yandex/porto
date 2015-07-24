@@ -12,9 +12,28 @@ protected:
     sig_atomic_t Interrupted = 0;
     int InterruptedSignal;
 
+    template <typename T>
+    int RunCmd(const std::vector<std::string> &args) {
+        std::vector<char *> cargs;
+
+        for (auto arg : args)
+            cargs.push_back(strdup(arg.c_str()));
+
+        auto exec = new T(Api);
+        int ret = exec->Execute(cargs.size(), (char **)cargs.data());
+
+        for (auto arg : cargs)
+            free(arg);
+
+        delete exec;
+
+        return ret;
+    }
+
 public:
     ICmd(TPortoAPI *api, const std::string& name, int args,
          const std::string& usage, const std::string& desc, const std::string& help = "");
+    virtual ~ICmd() {}
     std::string &GetName();
     std::string &GetUsage();
     std::string &GetDescription();

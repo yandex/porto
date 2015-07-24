@@ -805,7 +805,7 @@ public:
     int Execute(int argc, char *argv[]) {
         containerName = argv[0];
         bool hasTty = isatty(STDIN_FILENO);
-        vector<const char *> args;
+        std::vector<std::string> args;
         std::string env;
 
         if (hasTty)
@@ -913,16 +913,13 @@ public:
             fds.push_back(pfd);
         }
 
-        args.push_back(strdup(("stdin_path=" + stdinPath).c_str()));
-        args.push_back(strdup(("stdout_path=" + stdoutPath).c_str()));
-        args.push_back(strdup(("stderr_path=" + stderrPath).c_str()));
-        if (env.length()) {
-            env = "env=" + env;
-            args.push_back(env.c_str());
-        }
+        args.push_back("stdin_path=" + stdinPath);
+        args.push_back("stdout_path=" + stdoutPath);
+        args.push_back("stderr_path=" + stderrPath);
+        if (env.length())
+            args.push_back("env=" + env);
 
-        auto *run = new TRunCmd(Api);
-        int ret = run->Execute(args.size(), (char **)args.data());
+        int ret = RunCmd<TRunCmd>(args);
         if (ret)
             return ret;
 
