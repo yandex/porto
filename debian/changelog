@@ -1,3 +1,9 @@
+yandex-porto (1.17.1) precise; urgency=low
+
+  * fix wrong macvlan default type and broadcast address
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 28 Jul 2015 22:22:00 +0300
+
 yandex-porto (1.17) precise; urgency=low
 
   * fix portod crash when can't lock child container
