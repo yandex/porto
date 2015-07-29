@@ -18,9 +18,15 @@ push() {
     git push --tags
 }
 
+upload_python() {
+    (cd api/python && sed setup.py -i -e "s/\(    version='\)[^']*\('\)/\1${version}\2/" && python setup.py sdist upload -r yandex)
+
+}
+
 upload() {
     debuild
     debrelease -t search-precise
+    upload_python
 }
 
 if [ $# -eq 0 ]; then
