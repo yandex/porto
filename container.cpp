@@ -1737,7 +1737,7 @@ void TContainer::ExitTree(TScopedLock &holder_lock, int status, bool oomKilled) 
 
     TError error = CheckPausedParent();
     if (error)
-        L_ERR() << error << std::endl;
+        L() << "Exit tree while parent is paused" << std::endl;
 
     if (IsFrozen())
         (void)Resume(holder_lock);
