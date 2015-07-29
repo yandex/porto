@@ -659,7 +659,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         if (clientRoot.IsEmpty())
             return TError(EError::InvalidValue, "Cannot get client root path");
         if (!clientRoot.IsRoot()) {
-            TError error = taskEnv->ClientNs.Open(client->GetPid(), true);
+            TError error = taskEnv->ClientNs.Open(client->GetPid(), { "mnt" });
             if (error)
                 return error;
             taskEnv->Root = clientRoot.InnerPath(taskEnv->Root, true);
@@ -689,9 +689,6 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         taskEnv->BindMap.push_back(bm);
     }
 
-    taskEnv->NewMountNs = taskEnv->Isolate || taskEnv->RootRdOnly ||
-                          taskEnv->BindMap.size();
-
     if (config().network().enabled()) {
         error = Prop->PrepareTaskEnv(P_IP, taskEnv);
         if (error)
@@ -705,19 +702,26 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         if (error)
             return error;
     } else {
-        taskEnv->NetCfg.Share = true;
-        taskEnv->NetCfg.Host.clear();
-        taskEnv->NetCfg.MacVlan.clear();
+        taskEnv->NetCfg.Clear();
+        taskEnv->NetCfg.Host = true;
     }
 
-    if (UseParentNamespace()) {
+    if (!taskEnv->Isolate) {
         auto p = FindRunningParent();
-        if (!p)
-            return TError(EError::Unknown, "Couldn't find running parent");
-
-        TError error = taskEnv->ParentNs.Open(p->Task->GetPid());
-        if (error)
-            return error;
+        if (p) {
+            TError error = taskEnv->ParentNs.Open(p->Task->GetPid());
+            if (client && error)
+                return error;
+        }
+    } else {
+        if (taskEnv->NetCfg.Inherited) {
+            auto p = FindRunningParent();
+            if (p) {
+                TError error = taskEnv->ParentNs.Open(p->Task->GetPid(), { "net" });
+                if (client && error)
+                    return error;
+            }
+        }
     }
 
     // if command is empty we need to start meta task
@@ -737,11 +741,8 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         taskEnv->BindMap.push_back(bm);
     }
 
-    if (!taskEnv->Isolate) {
-        taskEnv->NetCfg.Share = true;
-        taskEnv->NetCfg.Host.clear();
-        taskEnv->NetCfg.MacVlan.clear();
-    }
+    taskEnv->NewMountNs = taskEnv->Isolate || taskEnv->RootRdOnly ||
+                          taskEnv->BindMap.size();
 
     error = taskEnv->Prepare(cred);
     if (error)

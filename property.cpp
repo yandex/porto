@@ -1061,7 +1061,7 @@ public:
     TNetProperty() :
         TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_NET,
-                        "Container network settings: none | host [interface] | macvlan <master> <name> [bridge|private|vepa|passthru] [mtu] [hw] | ipvlan <master> <name> [l2|l3] [mtu] | veth <name> <bridge> [mtu] [hw]",
+                        "Container network settings: none | inherited | host [interface] | macvlan <master> <name> [bridge|private|vepa|passthru] [mtu] [hw] | ipvlan <master> <name> [l2|l3] [mtu] | veth <name> <bridge> [mtu] [hw]",
                         staticProperty) {
         Implemented = config().network().enabled();
     }
@@ -1072,17 +1072,14 @@ public:
         if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
             return TStrList{ "none" };
 
-        return TStrList{ "host" };
+        return TStrList{ "inherited" };
     }
 
     TError CheckValue(const std::vector<std::string> &lines) override {
         TNetCfg cfg;
 
         bool none = false;
-        cfg.Share = false;
-        cfg.Host.clear();
-        cfg.MacVlan.clear();
-        cfg.Veth.clear();
+        cfg.Clear();
         int idx = 0;
 
         if (lines.size() == 0)
@@ -1091,10 +1088,6 @@ public:
         auto c = GetContainer();
 
         for (auto &line : lines) {
-            if (none)
-                return TError(EError::InvalidValue,
-                              "none can't be mixed with other types");
-
             std::vector<std::string> settings;
 
             TError error = SplitEscapedString(line, ' ', settings);
@@ -1106,12 +1099,10 @@ public:
 
             std::string type = StringTrim(settings[0]);
 
-            if (cfg.Share)
-                return TError(EError::InvalidValue,
-                              "host can't be mixed with other settings");
-
             if (type == "none") {
                 none = true;
+            } else if (type == "inherited") {
+                cfg.Inherited = true;
             } else if (type == "host") {
                 THostNetCfg hnet;
 
@@ -1119,7 +1110,7 @@ public:
                     return TError(EError::InvalidValue, "Invalid net in: " + line);
 
                 if (settings.size() == 1) {
-                    cfg.Share = true;
+                    cfg.Host = true;
                 } else {
                     hnet.Dev = StringTrim(settings[1]);
 
@@ -1128,7 +1119,7 @@ public:
                         return TError(EError::InvalidValue,
                                       "Invalid host interface " + hnet.Dev);
 
-                    cfg.Host.push_back(hnet);
+                    cfg.HostIface.push_back(hnet);
                 }
             } else if (type == "macvlan") {
                 if (settings.size() < 3)
@@ -1255,12 +1246,11 @@ public:
             }
         }
 
-        if (cfg.Share)
-            if (cfg.Host.size() ||
-                cfg.MacVlan.size() ||
-                cfg.IpVlan.size() ||
-                cfg.Veth.size())
-                cfg.Share = false;
+        int single = none + cfg.Host + cfg.Inherited;
+        int mixed = cfg.HostIface.size() + cfg.MacVlan.size() + cfg.IpVlan.size() + cfg.Veth.size();
+
+        if (single > 1 || (single == 1 && mixed))
+            return TError(EError::InvalidValue, "none/host/inherited can't be mixed with other types");
 
         NetCfg = cfg;
 

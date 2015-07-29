@@ -572,7 +572,7 @@ TError TTask::IsolateNet(int childPid) {
         return error;
 
 
-    for (auto &host : Env->NetCfg.Host) {
+    for (auto &host : Env->NetCfg.HostIface) {
         auto link = std::make_shared<TNlLink>(nl, host.Dev);
         TError error = link->ChangeNs(host.Dev, childPid);
         if (error)
@@ -718,13 +718,13 @@ TError TTask::ChildCallback() {
             return error;
     }
 
-    if (!Env->NetCfg.Share) {
+    if (!Env->NetCfg.Host && !Env->NetCfg.Inherited) {
         error = ChildEnableNet();
         if (error)
             return error;
     }
 
-    if (Env->ParentNs.Valid()) {
+    if (Env->ParentNs.HasNs("mnt")) {
         error = Env->ParentNs.Chroot();
         if (error)
             return error;
@@ -856,10 +856,10 @@ TError TTask::Start() {
         if (Env->NewMountNs)
             cloneFlags |= CLONE_NEWNS;
 
-        if (Env->Hostname != "")
+        if (!Env->Hostname.empty())
             cloneFlags |= CLONE_NEWUTS;
 
-        if (!Env->NetCfg.Share)
+        if (!Env->NetCfg.Host && !Env->NetCfg.Inherited)
             cloneFlags |= CLONE_NEWNET;
 
         int ret = pipe2(syncfd, O_CLOEXEC);
