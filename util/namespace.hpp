@@ -17,9 +17,10 @@ private:
 public:
     TNamespaceSnapshot() : RootFd(-1), CwdFd(-1) { nsFd.fill(-1); }
     ~TNamespaceSnapshot() { Close(); }
-    TError Open(int pid, bool only_mnt = false);
+    TError Open(int pid, std::set<std::string> ns = { "user", "ipc", "uts", "net", "pid", "mnt", });
     TError Chroot() const;
     TError Attach() const;
     void Close();
     bool Valid() const;
+    bool HasNs(const std::string &ns) const;
 };

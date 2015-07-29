@@ -72,11 +72,21 @@ struct TVethNetCfg {
 };
 
 struct TNetCfg {
-    bool Share;
-    std::vector<THostNetCfg> Host;
+    bool Inherited;
+    bool Host;
+    std::vector<THostNetCfg> HostIface;
     std::vector<TMacVlanNetCfg> MacVlan;
     std::vector<TIpVlanNetCfg> IpVlan;
     std::vector<TVethNetCfg> Veth;
+
+    void Clear() {
+        Host = false;
+        Inherited = false;
+        HostIface.clear();
+        MacVlan.clear();
+        IpVlan.clear();
+        Veth.clear();
+    }
 };
 
 struct TTaskEnv : public TNonCopyable {

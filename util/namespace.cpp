@@ -13,12 +13,12 @@ extern "C" {
 
 // order is important
 static pair<string, int> nameToType[TNamespaceSnapshot::nrNs] = {
-    //{ "ns/user", CLONE_NEWUSER },
-    { "ns/ipc", CLONE_NEWIPC },
-    { "ns/uts", CLONE_NEWUTS },
-    { "ns/net", CLONE_NEWNET },
-    { "ns/pid", CLONE_NEWPID },
-    { "ns/mnt", CLONE_NEWNS },
+    //{ "user", CLONE_NEWUSER },
+    { "ipc", CLONE_NEWIPC },
+    { "uts", CLONE_NEWUTS },
+    { "net", CLONE_NEWNET },
+    { "pid", CLONE_NEWPID },
+    { "mnt", CLONE_NEWNS },
 };
 
 TError TNamespaceSnapshot::OpenProcPidFd(int pid, string name, int &fd) {
@@ -30,20 +30,20 @@ TError TNamespaceSnapshot::OpenProcPidFd(int pid, string name, int &fd) {
     return TError::Success();
 }
 
-TError TNamespaceSnapshot::Open(int pid, bool only_mnt) {
+TError TNamespaceSnapshot::Open(int pid, std::set<std::string> ns) {
     int nr = 0;
     TError error;
 
     Close();
 
     for (int i = 0; i < nrNs; i++) {
-        auto pair = nameToType[i];
+        auto name = nameToType[i].first;
 
-        if (only_mnt && pair.second != CLONE_NEWNS)
+        if (ns.find(name) == ns.end())
             continue;
 
         int fd;
-        error = OpenProcPidFd(pid, pair.first, fd);
+        error = OpenProcPidFd(pid, "ns/" + name, fd);
         if (error) {
             if (error.GetErrno() == ENOENT)
                 continue;
@@ -114,4 +114,14 @@ TError TNamespaceSnapshot::Attach() const {
 
 bool TNamespaceSnapshot::Valid() const {
     return RootFd >= 0 && CwdFd >= 0;
+}
+
+bool TNamespaceSnapshot::HasNs(const std::string &ns) const {
+    for (int i = 0; i < nrNs; i++) {
+        auto name = nameToType[i].first;
+        if (name == ns)
+            return nsFd[i] >= 0;
+    }
+
+    return false;
 }

@@ -145,7 +145,7 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
         ExpectApiSuccess(api.GetProperty(name, "net_priority[" + link->GetAlias() + "]", v));
         ExpectEq(v, std::to_string(DEF_CLASS_NET_PRIO));
         ExpectApiSuccess(api.GetProperty(name, "net", v));
-        ExpectEq(v, "host");
+        ExpectEq(v, "inherited");
     }
 
     ExpectApiSuccess(api.GetProperty(name, "respawn", v));
@@ -2047,6 +2047,20 @@ static void TestXvlan(TPortoAPI &api, const std::string &name, const std::vector
     }
 }
 
+static void CreateVethPair(TPortoAPI &api) {
+    AsRoot(api);
+    if (system("ip link | grep veth0") == 0) {
+        Say() << "Delete link veth0" << std::endl;
+        ExpectEq(system("ip link delete veth0"), 0);
+    }
+    if (system("ip link | grep veth1") == 0) {
+        Say() << "Delete link veth1" << std::endl;
+        ExpectEq(system("ip link delete veth1"), 0);
+    }
+    ExpectEq(system("ip link add veth0 type veth peer name veth1"), 0);
+    AsNobody(api);
+}
+
 static void TestNetProperty(TPortoAPI &api) {
     if (!NetworkEnabled()) {
         Say() << "Make sure network namespace is shared when network disabled" << std::endl;
@@ -2084,11 +2098,17 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectApiFailure(api.SetProperty(name, "net", "qwerty"), EError::InvalidValue);
     ExpectApiFailure(api.SetProperty(name, "net", ""), EError::InvalidValue);
     ExpectApiSuccess(api.SetProperty(name, "net", "host"));
+    ExpectApiSuccess(api.SetProperty(name, "net", "inherited"));
     ExpectApiSuccess(api.SetProperty(name, "net", "none"));
     ExpectApiFailure(api.SetProperty(name, "net", "host; macvlan " + link + " " + link), EError::InvalidValue);
     ExpectApiFailure(api.SetProperty(name, "net", "host; host veth0"), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "net", "host; host"), EError::InvalidValue);
+    ExpectApiFailure(api.SetProperty(name, "net", "host; host " + link), EError::InvalidValue);
+    ExpectApiSuccess(api.SetProperty(name, "net", "host; host"));
     ExpectApiFailure(api.SetProperty(name, "net", "host; none"), EError::InvalidValue);
+    ExpectApiFailure(api.SetProperty(name, "net", "host; inherited"), EError::InvalidValue);
+    ExpectApiFailure(api.SetProperty(name, "net", "inherited; none"), EError::InvalidValue);
+    ExpectApiFailure(api.SetProperty(name, "net", "inherited; macvlan " + link + " eth0"), EError::InvalidValue);
+    ExpectApiFailure(api.SetProperty(name, "net", "none; macvlan " + link + " eth0"), EError::InvalidValue);
 
     Say() << "Check net=none" << std::endl;
 
@@ -2119,17 +2139,7 @@ static void TestNetProperty(TPortoAPI &api) {
 
     Say() << "Check net=host:veth0" << std::endl;
 
-    AsRoot(api);
-    if (system("ip link | grep veth0") == 0) {
-        Say() << "Delete link veth0" << std::endl;
-        ExpectEq(system("ip link delete veth0"), 0);
-    }
-    if (system("ip link | grep veth1") == 0) {
-        Say() << "Delete link veth1" << std::endl;
-        ExpectEq(system("ip link delete veth1"), 0);
-    }
-    ExpectEq(system("ip link add veth0 type veth peer name veth1"), 0);
-    AsNobody(api);
+    CreateVethPair(api);
 
     ExpectApiFailure(api.SetProperty(name, "net", "host invalid"), EError::InvalidValue);
     ExpectApiSuccess(api.SetProperty(name, "net", "host veth0"));
@@ -2269,6 +2279,50 @@ static void TestNetProperty(TPortoAPI &api) {
     AsNobody(api);
 
     ExpectApiSuccess(api.Destroy(name));
+
+    Say() << "Check net=host inheritance" << std::endl;
+    std::string aPid, abPid;
+
+    ExpectApiSuccess(api.Create("a"));
+    ExpectApiSuccess(api.SetProperty("a", "command", "sleep 1000"));
+    ExpectApiSuccess(api.SetProperty("a", "isolate", "true"));
+    ExpectApiSuccess(api.Create("a/b"));
+    ExpectApiSuccess(api.SetProperty("a/b", "command", "sleep 1000"));
+    ExpectApiSuccess(api.SetProperty("a/b", "isolate", "true"));
+
+    ExpectApiSuccess(api.Start("a/b"));
+    ExpectApiSuccess(api.GetData("a", "root_pid", aPid));
+    ExpectApiSuccess(api.GetData("a/b", "root_pid", abPid));
+    AsRoot(api);
+    ExpectEq(GetNamespace(aPid, "net"), GetNamespace(abPid, "net"));
+    ExpectEq(GetNamespace(aPid, "net"), GetNamespace("self", "net"));
+    AsNobody(api);
+    ExpectApiSuccess(api.Stop("a"));
+
+    CreateVethPair(api);
+
+    ExpectApiSuccess(api.SetProperty("a", "net", "host veth0"));
+    ExpectApiSuccess(api.SetProperty("a/b", "net", "inherited"));
+    ExpectApiSuccess(api.Start("a/b"));
+    ExpectApiSuccess(api.GetData("a", "root_pid", aPid));
+    ExpectApiSuccess(api.GetData("a/b", "root_pid", abPid));
+    AsRoot(api);
+    ExpectEq(GetNamespace(aPid, "net"), GetNamespace(abPid, "net"));
+    ExpectNeq(GetNamespace(aPid, "net"), GetNamespace("self", "net"));
+    AsNobody(api);
+    ExpectApiSuccess(api.Stop("a"));
+
+    CreateVethPair(api);
+
+    ExpectApiSuccess(api.SetProperty("a/b", "net", "none"));
+    ExpectApiSuccess(api.Start("a/b"));
+    ExpectApiSuccess(api.GetData("a", "root_pid", aPid));
+    ExpectApiSuccess(api.GetData("a/b", "root_pid", abPid));
+    AsRoot(api);
+    ExpectNeq(GetNamespace(aPid, "net"), GetNamespace(abPid, "net"));
+    ExpectNeq(GetNamespace(aPid, "net"), GetNamespace("self", "net"));
+    AsNobody(api);
+    ExpectApiSuccess(api.Destroy("a"));
 }
 
 static void TestAllowedDevicesProperty(TPortoAPI &api) {
