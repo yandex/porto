@@ -354,7 +354,7 @@ remove_file:
     return error;
 }
 
-TError Run(const std::vector<std::string> &command, int &status) {
+TError Run(const std::vector<std::string> &command, int &status, bool stdio) {
     int pid = fork();
     if (pid < 0) {
         return TError(EError::Unknown, errno, "fork()");
@@ -369,7 +369,12 @@ retry:
         }
     } else {
         SetDieOnParentExit(SIGKILL);
-        CloseFds(-1, {});
+        if (!stdio) {
+            CloseFds(-1, {});
+            open("/dev/null", O_RDONLY);
+            open("/dev/null", O_WRONLY);
+            open("/dev/null", O_WRONLY);
+        }
 
         char **p = (char **)malloc(sizeof(*p) * (command.size() + 1));
         for (size_t i = 0; i < command.size(); i++)
@@ -496,4 +501,11 @@ void DumpMallocInfo() {
     L() << "Total allocated space (uordblks):\t" << mi.uordblks << std::endl;
     L() << "Total free space (fordblks):\t" << mi.fordblks << std::endl;
     L() << "Topmost releasable block (keepcost):\t" << mi.keepcost << std::endl;
+}
+
+std::string GetCwd() {
+    char *cwd = get_current_dir_name();
+    std::string s(cwd);
+    free(cwd);
+    return s;
 }

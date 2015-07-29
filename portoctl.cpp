@@ -37,6 +37,8 @@ using std::pair;
 using std::set;
 using std::shared_ptr;
 
+#define ROOT_LAYERS "root_layers"
+
 static string HumanNsec(const string &val) {
     double n = stod(val);
     string suf = "ns";
@@ -166,6 +168,134 @@ static string HumanValue(const string &name, const string &val) {
 
     return val;
 }
+
+class TVolumeBuilder {
+    TPortoAPI *Api;
+    std::string Volume;
+    std::vector<std::string> Layers;
+    bool Cleanup = true;
+    int LayerIdx = 0;
+
+    TError GetLastError() {
+        int error;
+        std::string msg;
+        Api->GetLastError(error, msg);
+        return TError((EError)error, msg);
+    }
+
+    TError ImportLayer(const std::string &path, std::string &id) {
+        id = "portoctl-" + std::to_string(GetPid()) + "-" + std::to_string(LayerIdx++);
+        std::cout << "Importing layer " << path << "..." << std::endl;
+        int ret = Api->ImportLayer(id, path);
+        if (ret)
+            return GetLastError();
+        return TError::Success();
+    }
+
+    TError CreateOverlayVolume(const std::vector<std::string> &layers,
+                               std::string &path) {
+        TVolumeDescription volume;
+        std::map<std::string, std::string> config;
+        config["backend"] = "overlay";
+        config["layers"] = CommaSeparatedList(layers, ";");
+        int ret = Api->CreateVolume("", config, volume);
+        if (ret)
+            return GetLastError();
+
+        path = volume.Path;
+        return TError::Success();
+    }
+
+    TError CreatePlainVolume(std::string &path) {
+        TVolumeDescription volume;
+        std::map<std::string, std::string> config;
+        int ret = Api->CreateVolume("", config, volume);
+        if (ret)
+            return GetLastError();
+
+        path = volume.Path;
+        return TError::Success();
+    }
+
+public:
+    TVolumeBuilder(TPortoAPI *api) : Api(api) {}
+
+    std::string GetVolumePath() {
+        return Volume;
+    }
+
+    void NeedCleanup(bool cleanup) { Cleanup = cleanup; }
+
+    ~TVolumeBuilder() {
+        if (Cleanup) {
+            if (!Volume.empty()) {
+                int ret = Api->UnlinkVolume(Volume, "");
+                if (ret)
+                    std::cerr << "Can't unlink volume: " << GetLastError() << std::endl;
+            }
+
+            for (auto id : Layers) {
+                int ret = Api->RemoveLayer(id);
+                if (ret)
+                    std::cerr << "Can't remove layer " << id << ": " << GetLastError() << std::endl;
+            }
+        }
+    }
+
+    TError Prepare() {
+        return CreatePlainVolume(Volume);
+    }
+
+    TError Prepare(const std::vector<std::string> &layers) {
+        for (auto layer : layers) {
+            layer = StringTrim(layer);
+
+            if (layer.empty())
+                continue;
+
+            std::string id;
+            TPath path(layer);
+            TError error = ImportLayer(path.RealPath().ToString(), id);
+            if (error)
+                return error;
+
+            Layers.push_back(id);
+        }
+
+        return CreateOverlayVolume(Layers, Volume);
+    }
+
+    TError Prepare(const std::string &s) {
+        std::vector<std::string> layers;
+
+        TError error = SplitString(s, ';', layers);
+        if (error)
+            return error;
+
+        return Prepare(layers);
+    }
+
+    TError ExportLayer(const TPath &path) {
+        int ret = Api->ExportLayer(Volume, path.RealPath().ToString());
+        if (ret)
+            return GetLastError();
+        return TError::Success();
+    }
+
+    TError Link(const std::string &container) {
+        int ret = Api->LinkVolume(Volume, container);
+        if (ret)
+            return GetLastError();
+        return TError::Success();
+    }
+
+    TError Unlink() {
+        int ret = Api->UnlinkVolume(Volume, "");
+        if (ret)
+            return GetLastError();
+        return TError::Success();
+    }
+};
 
 class TRawCmd : public ICmd {
 public:
@@ -659,8 +789,9 @@ public:
 };
 
 class TRunCmd : public ICmd {
+    TVolumeBuilder VolumeBuilder;
 public:
-    TRunCmd(TPortoAPI *api) : ICmd(api, "run", 2, "<container> [properties]", "create and start container with given properties") {}
+    TRunCmd(TPortoAPI *api) : ICmd(api, "run", 2, "<container> [properties]", "create and start container with given properties"), VolumeBuilder(api) {}
 
     int Parser(string property, string &key, string &val) {
         string::size_type n;
@@ -691,13 +822,29 @@ public:
             ret = Parser(argv[i], key, val);
             if (ret)
                 return ret;
-            properties.push_back(std::make_pair(key, val));
+
+            if (key == ROOT_LAYERS) {
+                TError error = VolumeBuilder.Prepare(val);
+                if (error) {
+                    std::cerr << "Can't create volume: " << error << std::endl;
+                    return EXIT_FAILURE;
+                }
+
+                properties.push_back(std::make_pair("root", VolumeBuilder.GetVolumePath()));
+            } else {
+                properties.push_back(std::make_pair(key, val));
+            }
         }
 
         ret = Api->Create(containerName);
         if (ret) {
             PrintError("Can't create container");
             return EXIT_FAILURE;
+        }
+        if (!VolumeBuilder.GetVolumePath().empty()) {
+            VolumeBuilder.Link(containerName);
+            VolumeBuilder.Unlink();
+            VolumeBuilder.NeedCleanup(false);
         }
         for (auto iter: properties) {
             ret = Api->SetProperty(containerName, iter.first, iter.second);
@@ -717,44 +864,40 @@ public:
     }
 };
 
-static struct termios savedAttrs;
-static string destroyContainerName;
-static void resetInputMode(void) {
-  tcsetattr (STDIN_FILENO, TCSANOW, &savedAttrs);
-}
-
-static void destroyContainer(void) {
-    if (destroyContainerName != "") {
-        TPortoAPI api(config().rpc_sock().file().path());
-        (void)api.Destroy(destroyContainerName);
-    }
-}
-
-static void removeTempDir(int status, void *p) {
-    TFolder f((char *)p);
-    (void)f.Remove(true);
-}
-
 class TExecCmd : public ICmd {
     string containerName;
-    sig_atomic_t Interrupted = 0;
+    struct termios SavedAttrs;
+    bool Canonical = true;
+    TVolumeBuilder VolumeBuilder;
+    bool Cleanup = true;
+    char *TmpDir = nullptr;
 public:
-    TExecCmd(TPortoAPI *api) : ICmd(api, "exec", 2, "<container> command=<command> [properties]", "create pty, execute and wait for command in container") {}
+    TExecCmd(TPortoAPI *api) : ICmd(api, "exec", 2, "[-C] [-T] <container> command=<command> [properties]", "create pty, execute and wait for command in container"), VolumeBuilder(api) {
+        SetDieOnSignal(false);
+    }
 
-    void Signal(int sig) override {
-        Interrupted = 1;
-        InterruptedSignal = sig;
+    ~TExecCmd() {
+        if (Cleanup && !containerName.empty()) {
+            TPortoAPI api(config().rpc_sock().file().path());
+            (void)api.Destroy(containerName);
+        }
+        if (TmpDir) {
+            TFolder dir(TmpDir);
+            (void)dir.Remove(true);
+        }
+        if (!Canonical)
+            tcsetattr(STDIN_FILENO, TCSANOW, &SavedAttrs);
     }
 
     int SwithToNonCanonical(int fd) {
         if (!isatty(fd))
             return 0;
 
-        if (tcgetattr(fd, &savedAttrs) < 0)
+        if (tcgetattr(fd, &SavedAttrs) < 0)
             return -1;
-        atexit(resetInputMode);
+        Canonical = false;
 
-        static struct termios t = savedAttrs;
+        static struct termios t = SavedAttrs;
         t.c_lflag &= ~(ICANON | ISIG | IEXTEN | ECHO);
         t.c_iflag &= ~(BRKINT | ICRNL | IGNBRK | IGNCR | INLCR |
                        INPCK | ISTRIP | IXON | PARMRK);
@@ -793,29 +936,36 @@ public:
         return fd;
     }
 
-    void HandleSignal() {
-        if (Interrupted) {
-            resetInputMode();
-            ResetAllSignalHandlers();
-            raise(InterruptedSignal);
-            exit(EXIT_FAILURE);
-        }
-    }
-
     int Execute(int argc, char *argv[]) {
-        containerName = argv[0];
         bool hasTty = isatty(STDIN_FILENO);
         std::vector<std::string> args;
         std::string env;
 
+        int start = GetOpt(argc, argv, {
+            { 'C', false, [&](const char *arg) { Cleanup = false; } },
+            { 'T', false, [&](const char *arg) { hasTty = false; } },
+        });
+        VolumeBuilder.NeedCleanup(Cleanup);
+
         if (hasTty)
             env = std::string("TERM=") + getenv("TERM");
 
-        for (int i = 0; i < argc; i++)
-            if (strncmp(argv[i], "env=", 4) == 0)
+        args.push_back(argv[start]);
+        for (int i = start + 1; i < argc; i++)
+            if (strncmp(argv[i], "env=", 4) == 0) {
                 env = env + "; " + std::string(argv[i] + 4);
-            else
+            } else if (strncmp(argv[i], ROOT_LAYERS "=",
+                               strlen(ROOT_LAYERS) + 1) == 0) {
+
+                TError error = VolumeBuilder.Prepare(std::string(argv[i]).substr(strlen(ROOT_LAYERS "=")));
+                if (error) {
+                    std::cerr << "Can't create volume: " << error << std::endl;
+                    return EXIT_FAILURE;
+                }
+                args.push_back("root=" + VolumeBuilder.GetVolumePath());
+            } else {
                 args.push_back(argv[i]);
+            }
 
         vector<struct pollfd> fds;
 
@@ -871,24 +1021,22 @@ public:
             stdoutFd = ptm;
             stderrFd = ptm;
         } else {
-            char *dir = mkdtemp(strdup("/tmp/portoctl-XXXXXX"));
-            if (!dir) {
+            TmpDir = mkdtemp(strdup("/tmp/portoctl-exec-XXXXXX"));
+            if (!TmpDir) {
                 TError error(EError::Unknown, errno, "mkdtemp()");
                 PrintError(error, "Can't create temporary directory");
                 return EXIT_FAILURE;
             }
 
-            on_exit(removeTempDir, dir);
-
-            stdinPath = string(dir) + "/stdin";
+            stdinPath = string(TmpDir) + "/stdin";
             if (MakeFifo(stdinPath))
                 return EXIT_FAILURE;
 
-            stdoutPath = string(dir) + "/stdout";
+            stdoutPath = string(TmpDir) + "/stdout";
             if (MakeFifo(stdoutPath))
                 return EXIT_FAILURE;
 
-            stderrPath = string(dir) + "/stderr";
+            stderrPath = string(TmpDir) + "/stderr";
             if (MakeFifo(stderrPath))
                 return EXIT_FAILURE;
 
@@ -919,16 +1067,15 @@ public:
         if (env.length())
             args.push_back("env=" + env);
 
+        containerName = argv[start];
         int ret = RunCmd<TRunCmd>(args);
         if (ret)
             return ret;
 
-        destroyContainerName = containerName;
-        atexit(destroyContainer);
-
         bool hangup = false;
         while (!hangup) {
-            HandleSignal();
+            if (GotSignal())
+                return EXIT_FAILURE;
 
             ret = poll(fds.data(), fds.size(), -1);
             if (ret < 0)
@@ -952,11 +1099,13 @@ public:
             }
         }
 
-        HandleSignal();
+        if (GotSignal())
+            return EXIT_FAILURE;
 
         std::string tmp;
         ret = Api->Wait({ containerName }, tmp);
-        HandleSignal();
+        if (GotSignal())
+            return EXIT_FAILURE;
         if (ret) {
             PrintError("Can't get state");
             return EXIT_FAILURE;
@@ -971,15 +1120,13 @@ public:
 
         int status = stoi(s);
         if (WIFEXITED(status)) {
-            exit(WEXITSTATUS(status));
+            return WEXITSTATUS(status);
         } else {
-            resetInputMode();
-            ResetAllSignalHandlers();
-            raise(WTERMSIG(status));
-            exit(EXIT_FAILURE);
+            Interrupted = 1;
+            InterruptedSignal = WTERMSIG(status);
         }
 
-        return EXIT_SUCCESS;
+        return EXIT_FAILURE;
     }
 };
 
@@ -1623,6 +1770,147 @@ public:
     }
 };
 
+class TBuildCmd : public ICmd {
+    TVolumeBuilder VolumeBuilder;
+    bool Cleanup = true;
+    char *TmpFile = nullptr;
+
+public:
+    TBuildCmd(TPortoAPI *api) : ICmd(api, "build", 1, "[-C] [-o layer.tar] [-i NAT interface] <config> [top layer...] [bottom layer]", "build container image"), VolumeBuilder(api) {
+        SetDieOnSignal(false);
+    }
+
+    ~TBuildCmd() {
+        if (TmpFile) {
+            TFile f(TmpFile);
+            if (f.Exists())
+                (void)f.Remove();
+        }
+    }
+
+    void BindRootRo(std::vector<std::string> &bind) {
+            TFolder root("/");
+            std::vector<std::string> list;
+            TError error = root.Items(EFileType::Directory, list);
+            if (error) {
+                std::cerr << "Can't list root directory" << std::endl;
+                return;
+            }
+
+            // we are running user script as root without any isolation,
+            // remount everything that makes sense, so our host system
+            // is left intact
+            for (auto dir : list) {
+                if (dir == "tmp" || dir == "place")
+                    continue;
+
+                auto path = (TPath("/") / dir).RealPath();
+                bind.push_back(path.ToString() + " " + path.ToString() + " ro");
+            }
+    }
+
+    int Execute(int argc, char *argv[]) {
+        if (getuid() != 0) {
+            std::cerr << "Build required root privileges" << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        TPath output = TPath(GetCwd()) / "layer.tar";
+        std::vector<std::string> args;
+
+        int start = GetOpt(argc, argv, {
+            { 'o', true, [&](const char *arg) { output = TPath(GetCwd()) / arg; } },
+            { 'C', false, [&](const char *arg) { Cleanup = false; } },
+        });
+
+        if (!Cleanup) {
+            args.push_back("-C");
+            VolumeBuilder.NeedCleanup(false);
+        }
+        // don't use PTY in exec, use simple pipes so Ctrl-C works
+        args.push_back("-T");
+
+        TPath confPath = TPath(argv[start]).RealPath();
+
+        if (!confPath.Exists()) {
+            std::cerr << "Invalid config path " << confPath.ToString() << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        std::string name = "portctl-build-" + std::to_string(GetPid()) + "-" + confPath.BaseName();
+
+        char *TmpFile = strdup("/tmp/portoctl-build-XXXXXX");
+        int fd = mkstemp(TmpFile);
+        if (fd < 0) {
+            perror("mkstemp");
+            return EXIT_FAILURE;
+        }
+        close(fd);
+
+        // make sure apt-get doesn't ask any questions
+        std::vector<std::string> env;
+        env.push_back("DEBIAN_FRONTEND=noninteractive");
+
+        std::vector<std::string> bind;
+        bind.push_back(confPath.ToString() + " /config ro");
+
+        // mount host selinux into container (for fedora)
+        TPath selinux("/sys/fs/selinux");
+        if (selinux.Exists())
+            bind.push_back("/sys/fs/selinux /sys/fs/selinux ro");
+
+        std::vector<std::string> layers;
+        for (auto i = start + 1; i < argc; i++)
+            layers.push_back(argv[i]);
+
+        args.push_back(name);
+
+        if (layers.size()) {
+            // custom layer
+
+            TError error = VolumeBuilder.Prepare(layers);
+            if (error) {
+                std::cerr << "Can't create volume: " << error << std::endl;
+                return EXIT_FAILURE;
+            }
+
+            args.push_back("root=" + VolumeBuilder.GetVolumePath());
+            args.push_back("command=/bin/bash -e -x /config");
+        } else {
+            // base layer
+
+            TError error = VolumeBuilder.Prepare();
+            if (error) {
+                std::cerr << "Can't create volume: " << error << std::endl;
+                return EXIT_FAILURE;
+            }
+
+            BindRootRo(bind);
+
+            args.push_back("cwd=/");
+            args.push_back("command=/bin/bash -e -x -c 'mount -o remount,dev,suid,exec " + VolumeBuilder.GetVolumePath() + " && " + confPath.ToString() + " " + VolumeBuilder.GetVolumePath() + "'");
+        }
+
+        args.push_back("bind=" + CommaSeparatedList(bind, ";") + "");
+        args.push_back("bind_dns=false");
+        args.push_back("user=root");
+        args.push_back("group=root");
+        args.push_back("env=" + CommaSeparatedList(env, ";") + "");
+
+        int ret = RunCmd<TExecCmd>(args);
+        if (ret)
+            return ret;
+
+        TError error = VolumeBuilder.ExportLayer(output);
+        if (error) {
+            std::cerr << "Can't export layer:" << error << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        return EXIT_SUCCESS;
+    }
+};
+
 int main(int argc, char *argv[]) {
     config.Load(true);
     TPortoAPI api(config().rpc_sock().file().path());
@@ -1657,8 +1945,16 @@ int main(int argc, char *argv[]) {
     RegisterCommand(new TListVolumesCmd(&api));
 
     RegisterCommand(new TLayerCmd(&api));
+    RegisterCommand(new TBuildCmd(&api));
 
     TLogger::DisableLog();
 
-    return HandleCommand(&api, argc, argv);
+    int ret = HandleCommand(&api, argc, argv);
+    if (ret < 0) {
+        ResetAllSignalHandlers();
+        raise(-ret);
+        return EXIT_FAILURE;
+    } else {
+        return ret;
+    }
 };

@@ -55,7 +55,7 @@ public:
 TError SetOomScoreAdj(int value);
 
 int64_t GetBootTime();
-TError Run(const std::vector<std::string> &command, int &status);
+TError Run(const std::vector<std::string> &command, int &status, bool stdio = false);
 TError AllocLoop(const TPath &path, size_t size);
 TError Popen(const std::string &cmd, std::vector<std::string> &lines);
 TError PivotRoot(const TPath &rootfs);
@@ -64,3 +64,4 @@ TError PackTarball(const TPath &tar, const TPath &path);
 TError UnpackTarball(const TPath &tar, const TPath &path);
 TError CopyRecursive(const TPath &src, const TPath &dst);
 void DumpMallocInfo();
+std::string GetCwd();

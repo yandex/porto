@@ -4,33 +4,52 @@
 #include <csignal>
 #include "libporto.hpp"
 
+// Command that is being executed, used for signal handling
+class ICmd;
+extern ICmd *CurrentCmd;
+
 class ICmd {
 protected:
     TPortoAPI *Api;
     std::string Name, Usage, Desc, Help;
     int NeedArgs;
     sig_atomic_t Interrupted = 0;
-    int InterruptedSignal;
+    bool DieOnSignal = false;
 
     template <typename T>
     int RunCmd(const std::vector<std::string> &args) {
-        std::vector<char *> cargs;
+        ICmd *prevCmd = CurrentCmd;
 
+        std::vector<char *> cargs;
+        cargs.push_back(strdup(program_invocation_name));
         for (auto arg : args)
             cargs.push_back(strdup(arg.c_str()));
 
-        auto exec = new T(Api);
-        int ret = exec->Execute(cargs.size(), (char **)cargs.data());
+        auto cmd = new T(Api);
+        cmd->SetDieOnSignal(false);
+
+        CurrentCmd = cmd;
+        int ret = cmd->Execute(cargs.size() - 1, ((char **)cargs.data()) + 1);
+        CurrentCmd = prevCmd;
 
         for (auto arg : cargs)
             free(arg);
 
-        delete exec;
+        delete cmd;
+
+        if (GotSignal())
+            return InterruptedSignal;
 
         return ret;
     }
 
 public:
+    int InterruptedSignal;
+
+    bool GotSignal() {
+        return Interrupted;
+    }
+
     ICmd(TPortoAPI *api, const std::string& name, int args,
          const std::string& usage, const std::string& desc, const std::string& help = "");
     virtual ~ICmd() {}
@@ -45,8 +64,9 @@ public:
     void PrintError(const TError &error, const std::string &str);
     void PrintError(const std::string &str);
     bool ValidArgs(int argc, char *argv[]);
+    void SetDieOnSignal(bool die);
+    void Signal(int sig);
     virtual int Execute(int argc, char *argv[]) = 0;
-    virtual void Signal(int sig);
 };
 
 class THelpCmd : public ICmd {

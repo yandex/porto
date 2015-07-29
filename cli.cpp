@@ -15,6 +15,8 @@ using std::string;
 using std::map;
 using std::vector;
 
+ICmd *CurrentCmd;
+
 size_t MaxFieldLength(std::vector<std::string> &vec, size_t min) {
     size_t len = 0;
     for (auto &i : vec)
@@ -82,9 +84,18 @@ bool ICmd::ValidArgs(int argc, char *argv[]) {
     return true;
 }
 
+void ICmd::SetDieOnSignal(bool die) {
+    DieOnSignal = die;
+}
+
 void ICmd::Signal(int sig) {
-    ResetAllSignalHandlers();
-    raise(sig);
+    Interrupted = 1;
+    InterruptedSignal = sig;
+    if (DieOnSignal) {
+        // TODO: don't raise signal here, try to handle in each command
+        ResetAllSignalHandlers();
+        raise(sig);
+    }
 }
 
 static map<string, ICmd *> commands;
@@ -219,11 +230,9 @@ void RegisterCommand(ICmd *cmd) {
     commands[cmd->GetName()] = cmd;
 }
 
-ICmd *currentCmd;
-
 void SigInt(int sig) {
-    if (currentCmd)
-        currentCmd->Signal(sig);
+    if (CurrentCmd)
+        CurrentCmd->Signal(sig);
 }
 
 static int TryExec(int argc, char *argv[]) {
@@ -240,14 +249,18 @@ static int TryExec(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    currentCmd = cmd;
+    CurrentCmd = cmd;
 
     // in case client closes pipe we are writing to in the protobuf code
     (void)RegisterSignal(SIGPIPE, SIG_IGN);
     (void)RegisterSignal(SIGINT, SigInt);
     (void)RegisterSignal(SIGTERM, SigInt);
 
-    return cmd->Execute(argc - 2, argv + 2);
+    int ret = cmd->Execute(argc - 2, argv + 2);
+    if (cmd->GotSignal())
+        return -cmd->InterruptedSignal;
+    else
+        return ret;
 }
 
 int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
@@ -298,6 +311,7 @@ int GetOpt(int argc, char *argv[], const std::vector<Option> &opts) {
             optstring += ":";
     }
 
+    optind = 1;
     int opt;
     while ((opt = getopt(argc + 1, argv - 1, optstring.c_str())) != -1) {
         bool found = false;
