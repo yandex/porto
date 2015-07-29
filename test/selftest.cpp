@@ -3380,6 +3380,7 @@ static void TestVirtModeProperty(TPortoAPI &api) {
         { "stdin_path", "/dev/null" },
         { "stdout_path", "/dev/null" },
         { "stderr_path", "/dev/null" },
+        { "net", "none" },
         { "isolate", "true" },
         { "bind_dns", "false" },
         { "bind", "" },
