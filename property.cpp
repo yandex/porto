@@ -1067,6 +1067,11 @@ public:
     }
 
     TStrList GetDefault() const override {
+        auto c = GetContainer();
+
+        if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
+            return TStrList{ "none" };
+
         return TStrList{ "host" };
     }
 
