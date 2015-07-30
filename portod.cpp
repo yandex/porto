@@ -196,9 +196,9 @@ static int AcceptClient(TContext &context, int sfd,
     }
 
     auto client = std::make_shared<TClient>(context.EpollLoop, cfd);
-    int ret = client->Identify(*context.Cholder);
-    if (ret)
-        return ret;
+    TError error = client->Identify(*context.Cholder);
+    if (error)
+        return -1;
 
     fd = cfd;
     clients[cfd] = client;
@@ -400,7 +400,7 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
 
                 int fd = -1;
                 ret = AcceptClient(context, sfd, clients, fd);
-                if (ret < 0)
+                if (ret)
                     goto exit;
 
                 error = context.EpollLoop->AddSource(clients[fd]);
@@ -973,6 +973,15 @@ int main(int argc, char * const argv[]) {
     if (!slaveMode && AnotherInstanceRunning(config().rpc_sock().file().path())) {
         std::cerr << "Another instance of portod is running!" << std::endl;
         return EXIT_FAILURE;
+    }
+
+    if (!stdlog) {
+        close(0);
+        close(1);
+        close(2);
+        PORTO_ASSERT(open("/dev/null", O_RDONLY) == 0);
+        PORTO_ASSERT(open("/dev/null", O_WRONLY) == 1);
+        PORTO_ASSERT(open("/dev/null", O_WRONLY) == 2);
     }
 
     try {
