@@ -49,6 +49,7 @@ message TCfg {
 		optional bool blocking_read = 10;
 		optional bool blocking_write = 11;
 		optional uint32 event_workers = 12;
+		optional bool debug = 13;
 	}
 
 	message TContainerCfg {

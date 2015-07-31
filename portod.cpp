@@ -504,6 +504,15 @@ static int TuneLimits() {
     if (ret)
         return EXIT_FAILURE;
 
+    if (config().daemon().debug()) {
+        rlim.rlim_max = RLIM_INFINITY;
+        rlim.rlim_cur = RLIM_INFINITY;
+
+        ret = setrlimit(RLIMIT_CORE, &rlim);
+        if (ret)
+            return EXIT_FAILURE;
+    }
+
     return EXIT_SUCCESS;
 }
 
@@ -599,15 +608,23 @@ static int SlaveMain() {
 
         RemoveRpcServer(config().rpc_sock().file().path());
     } catch (string s) {
+        if (config().daemon().debug())
+            throw;
         L_ERR() << "EXCEPTION: " << s << std::endl;
         Crash();
     } catch (const char *s) {
+        if (config().daemon().debug())
+            throw;
         L_ERR() << "EXCEPTION: " << s << std::endl;
         Crash();
     } catch (const std::exception &exc) {
+        if (config().daemon().debug())
+            throw;
         L_ERR() << "EXCEPTION: " << exc.what() << std::endl;
         Crash();
     } catch (...) {
+        if (config().daemon().debug())
+            throw;
         L_ERR() << "EXCEPTION: uncaught exception!" << std::endl;
         Crash();
     }
@@ -1032,15 +1049,23 @@ int main(int argc, char * const argv[]) {
         else
             return MasterMain(respawn);
     } catch (std::string s) {
+        if (config().daemon().debug())
+            throw;
         L_ERR() << "EXCEPTION: " << s << std::endl;
         Crash();
     } catch (const char *s) {
+        if (config().daemon().debug())
+            throw;
         L_ERR() << "EXCEPTION: " << s << std::endl;
         Crash();
     } catch (const std::exception &exc) {
+        if (config().daemon().debug())
+            throw;
         L_ERR() << "EXCEPTION: " << exc.what() << std::endl;
         Crash();
     } catch (...) {
+        if (config().daemon().debug())
+            throw;
         L_ERR() << "EXCEPTION: uncaught exception!" << std::endl;
         Crash();
     }

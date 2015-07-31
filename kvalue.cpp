@@ -77,6 +77,8 @@ TError TKeyValueNode::Load(kv::TNode &node) const {
         while (ReadDelimitedFrom(&pist, &next))
             Merge(node, next);
     } catch (...) {
+        if (config().daemon().debug())
+            throw;
         error = TError(EError::Unknown, __class__ + ": unhandled exception");
     }
     close(fd);
@@ -100,6 +102,8 @@ TError TKeyValueNode::Append(const kv::TNode &node) const {
         if (!WriteDelimitedTo(node, &post))
             error = TError(EError::Unknown, __class__ + ": protobuf write error");
     } catch (...) {
+        if (config().daemon().debug())
+            throw;
         error = TError(EError::Unknown, __class__ + ": unhandled exception");
     }
     close(fd);
@@ -118,6 +122,8 @@ TError TKeyValueNode::Save(const kv::TNode &node) const {
         if (!WriteDelimitedTo(node, &post))
             error = TError(EError::Unknown, __class__ + ": protobuf write error");
     } catch (...) {
+        if (config().daemon().debug())
+            throw;
         error = TError(EError::Unknown, __class__ + ": unhandled exception");
     }
     close(fd);

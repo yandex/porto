@@ -56,6 +56,7 @@ void TConfig::LoadDefaults() {
     config().mutable_daemon()->set_blocking_read(false);
     config().mutable_daemon()->set_blocking_write(false);
     config().mutable_daemon()->set_event_workers(1);
+    config().mutable_daemon()->set_debug(false);
 
     config().mutable_container()->set_max_log_size(10 * 1024 * 1024);
     config().mutable_container()->set_tmp_dir("/place/porto");
