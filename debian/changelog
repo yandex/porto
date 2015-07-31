@@ -1,3 +1,25 @@
+yandex-porto (1.18) precise; urgency=low
+
+  * add ceph rbd backend for volume
+  * add portoctl build command to build volume layer from config
+  * when virt_mode == os net defaults to none
+  * default net is set to inherited (use parent network)
+  * multithreading can be enabled via config option
+  * fix wrong macvlan default type (vepa) and broadcast address
+  * create temporary directory for default stdout/stderr when root is loop
+  * fix hangup when child writes to log after fork (localtime_r)
+  * don't fail if no suitable link found (just start without network support)
+  * move modprobe cls_cgroup to upstart script
+  * refuse to start portod in container
+  * check cpu_limit hierarchical value
+  * make sure partly constructed container dies when porto dies
+  * remove trailing spaces from portoctl list -1
+  * move killed frozen tasks into /porto when removing snapshot
+  * don't remove container tc class if it's shared with parent
+  * fix restart when client identify fails (wrong descriptor added to epoll)
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Fri, 31 Jul 2015 17:55:00 +0300
+
 yandex-porto (1.17) precise; urgency=low
 
   * fix portod crash when can't lock child container
