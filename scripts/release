@@ -19,8 +19,8 @@ push() {
 }
 
 upload_python() {
+    version=v$(head -n1 debian/changelog | sed -e 's/[^(]*(\([^)]*\).*/\1/')
     (cd api/python && sed setup.py -i -e "s/\(    version='\)[^']*\('\)/\1${version}\2/" && python setup.py sdist upload -r yandex)
-
 }
 
 upload() {
