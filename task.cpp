@@ -900,7 +900,7 @@ TError TTask::Start() {
             Abort(error);
         }
 
-        exit(EXIT_SUCCESS);
+        _exit(EXIT_SUCCESS);
     }
     close(Wfd);
     int status = 0;
