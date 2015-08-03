@@ -1776,7 +1776,7 @@ class TBuildCmd : public ICmd {
     char *TmpFile = nullptr;
 
 public:
-    TBuildCmd(TPortoAPI *api) : ICmd(api, "build", 1, "[-C] [-o layer.tar] [-i NAT interface] <config> [top layer...] [bottom layer]", "build container image"), VolumeBuilder(api) {
+    TBuildCmd(TPortoAPI *api) : ICmd(api, "build", 1, "[-C] [-o layer.tar] [-i NAT interface] <script> [top layer...] [bottom layer]", "build container image"), VolumeBuilder(api) {
         SetDieOnSignal(false);
     }
 
@@ -1830,14 +1830,13 @@ public:
         // don't use PTY in exec, use simple pipes so Ctrl-C works
         args.push_back("-T");
 
-        TPath confPath = TPath(argv[start]).RealPath();
-
-        if (!confPath.Exists()) {
-            std::cerr << "Invalid config path " << confPath.ToString() << std::endl;
+        TPath script = TPath(argv[start]).RealPath();
+        if (!script.Exists()) {
+            std::cerr << "Invalid script path " << script.ToString() << std::endl;
             return EXIT_FAILURE;
         }
 
-        std::string name = "portctl-build-" + std::to_string(GetPid()) + "-" + confPath.BaseName();
+        std::string name = "portctl-build-" + std::to_string(GetPid()) + "-" + script.BaseName();
 
         char *TmpFile = strdup("/tmp/portoctl-build-XXXXXX");
         int fd = mkstemp(TmpFile);
@@ -1852,7 +1851,7 @@ public:
         env.push_back("DEBIAN_FRONTEND=noninteractive");
 
         std::vector<std::string> bind;
-        bind.push_back(confPath.ToString() + " /config ro");
+        bind.push_back(script.ToString() + " /script ro");
 
         // mount host selinux into container (for fedora)
         TPath selinux("/sys/fs/selinux");
@@ -1875,7 +1874,7 @@ public:
             }
 
             args.push_back("root=" + VolumeBuilder.GetVolumePath());
-            args.push_back("command=/bin/bash -e -x /config");
+            args.push_back("command=/bin/bash -e -x /script");
         } else {
             // base layer
 
@@ -1888,7 +1887,7 @@ public:
             BindRootRo(bind);
 
             args.push_back("cwd=/");
-            args.push_back("command=/bin/bash -e -x -c 'mount -o remount,dev,suid,exec " + VolumeBuilder.GetVolumePath() + " && " + confPath.ToString() + " " + VolumeBuilder.GetVolumePath() + "'");
+            args.push_back("command=/bin/bash -e -x -c 'mount -o remount,dev,suid,exec " + VolumeBuilder.GetVolumePath() + " && " + script.ToString() + " " + VolumeBuilder.GetVolumePath() + "'");
         }
 
         args.push_back("bind=" + CommaSeparatedList(bind, ";") + "");
