@@ -657,18 +657,20 @@ public:
 
     TUintMap GetDefault() const override {
         auto c = GetContainer();
-
         uint64_t def =  c->IsRoot() ? GetRootDef() : GetDef();
-
+        auto net_lock = c->Net->ScopedLock();
+        auto availableLinks = c->Net->GetLinks();
         TUintMap m;
-        for (auto &link : c->Net->GetLinks())
+        for (auto &link : availableLinks)
             m[link->GetAlias()] = def;
         return m;
     }
 
     TError CheckValue(const TUintMap &value) override {
         std::set<std::string> validKey;
-        auto availableLinks = GetContainer()->Net->GetLinks();
+        auto c = GetContainer();
+        auto net_lock = c->ScopedLock();
+        auto availableLinks = c->Net->GetLinks();
 
         for (auto &link : availableLinks)
             validKey.insert(link->GetAlias());
