@@ -18,7 +18,7 @@ extern "C" {
 // published under the WTFPL v2.0
 
 void PrintTrace() {
-    L() << "Backtrace:" << std::endl;
+    L_ERR() << "Backtrace:" << std::endl;
 
     unsigned int max_frames = 63;
     // storage array for stack trace address data
@@ -28,7 +28,7 @@ void PrintTrace() {
     int addrlen = backtrace(addrlist, sizeof(addrlist) / sizeof(void*));
 
     if (addrlen == 0) {
-	L() << "  <empty, possibly corrupt>\n" << std::endl;
+	L_ERR() << "  <empty, possibly corrupt>\n" << std::endl;
 	return;
     }
 
@@ -75,16 +75,16 @@ void PrintTrace() {
 					    funcname, &funcnamesize, &status);
 	    if (status == 0) {
 		funcname = ret; // use possibly realloc()-ed string
-		L() << symbollist[i] << ": " << funcname << " " << begin_addr << std::endl;
+		L_ERR() << symbollist[i] << ": " << funcname << " " << begin_addr << std::endl;
 	    } else {
 		// demangling failed. Output function name as a C function with
 		// no arguments.
-		L() << symbollist[i] << ": " << begin_name << "()+"
+		L_ERR() << symbollist[i] << ": " << begin_name << "()+"
                     << begin_offset << " " << begin_addr << std::endl;
 	    }
 	} else {
 	    // couldn't parse the line? print the whole line.
-	    L() << symbollist[i] << std::endl;
+	    L_ERR() << symbollist[i] << std::endl;
 	}
     }
 
@@ -96,18 +96,18 @@ static std::mutex CrashLock;
 
 void Crash() {
     std::lock_guard<std::mutex> guard(CrashLock);
-    L() << "Crashed" << std::endl;
+    L_ERR() << "Crashed" << std::endl;
     PrintTrace();
     exit(-1);
 }
 
 void DumpStackAndDie(int sig) {
-    L_EVT() << "Received fatal signal " << strsignal(sig) << std::endl;
+    L_ERR() << "Received fatal signal " << strsignal(sig) << std::endl;
     PrintTrace();
     RaiseSignal(sig);
 }
 
 void DumpStack(int sig) {
-    L_EVT() << "Received " << strsignal(sig) << std::endl;
+    L_ERR() << "Received " << strsignal(sig) << std::endl;
     PrintTrace();
 }
