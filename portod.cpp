@@ -930,8 +930,12 @@ static int MasterMain(bool respawn) {
             usleep((next - GetCurrentTimeMs()) * 1000);
 
         if (slavePid) {
-            (void)kill(slavePid, SIGKILL);
-            Reap(slavePid);
+            if (config().daemon().debug()) {
+                (void)waitpid(slavePid, nullptr, 0);
+            } else {
+                (void)kill(slavePid, SIGKILL);
+                Reap(slavePid);
+            }
         }
         if (ret < 0)
             break;

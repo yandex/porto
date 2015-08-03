@@ -42,9 +42,11 @@ TError TContext::CreateDaemonCgs() {
             return error;
     }
 
-    TError error = memorySubsystem->SetLimit(DaemonCgs[memorySubsystem], config().daemon().memory_limit());
-    if (error)
-        return error;
+    if (!config().daemon().debug()) {
+        TError error = memorySubsystem->SetLimit(DaemonCgs[memorySubsystem], config().daemon().memory_limit());
+        if (error)
+            return error;
+    }
 
     return TError::Success();
 }
