@@ -208,7 +208,7 @@ TError TNetwork::Update() {
 
     std::vector<std::shared_ptr<TNlLink>> newLinks;
 
-    auto lock = ScopedLock();
+    auto net_lock = ScopedLock();
 
     TError error = OpenLinks(newLinks);
     if (error)

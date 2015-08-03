@@ -429,8 +429,6 @@ TError TContainer::PrepareNetwork() {
     if (!config().network().enabled())
         return TError::Success();
 
-    auto lock = Net->ScopedLock();
-
     PORTO_ASSERT(Tclass == nullptr);
 
     if (UseParentNamespace()) {
@@ -456,6 +454,7 @@ TError TContainer::PrepareNetwork() {
 
     Tclass->Prepare(prio, rate, ceil);
 
+    auto net_lock = Net->ScopedLock();
     TError error = Tclass->Create();
     if (error) {
         L_ERR() << "Can't create tclass: " << error << std::endl;
