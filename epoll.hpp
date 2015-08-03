@@ -13,7 +13,7 @@ constexpr int debugSignal = SIGUSR2;
 
 static constexpr int HANDLE_SIGNALS[] = {SIGINT, SIGTERM,
                                          updateSignal, rotateSignal,
-                                         debugSignal, SIGALRM};
+                                         debugSignal, SIGALRM, SIGPIPE};
 static constexpr int HANDLE_SIGNALS_WAIT[] = {SIGCHLD};
 
 constexpr int EPOLL_EVENT_OOM = 1;
