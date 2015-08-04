@@ -1579,11 +1579,6 @@ static void TestRootRdOnlyProperty(TPortoAPI &api) {
     ExpectNeq(ret, string("0"));
     ExpectApiSuccess(api.Stop(name));
 
-    ExpectApiSuccess(api.SetProperty(name, "root", "/"));
-    ExpectApiSuccess(api.SetProperty(name, "root_readonly", "true"));
-    ExpectApiSuccess(api.SetProperty(name, "command", "touch /test2"));
-    ExpectApiFailure(api.Start(name), EError::InvalidValue);
-
     Say() << "Make sure pivot_root works and we don't leak host mount points" << std::endl;
     std::set<std::string> expected = {
         // restricted proc
