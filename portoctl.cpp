@@ -37,8 +37,6 @@ using std::pair;
 using std::set;
 using std::shared_ptr;
 
-#define ROOT_LAYERS "root_layers"
-
 static string HumanNsec(const string &val) {
     double n = stod(val);
     string suf = "ns";
@@ -791,7 +789,7 @@ public:
 class TRunCmd : public ICmd {
     TVolumeBuilder VolumeBuilder;
 public:
-    TRunCmd(TPortoAPI *api) : ICmd(api, "run", 2, "<container> [properties]", "create and start container with given properties"), VolumeBuilder(api) {}
+    TRunCmd(TPortoAPI *api) : ICmd(api, "run", 2, "[-L layers] <container> [properties]", "create and start container with given properties"), VolumeBuilder(api) {}
 
     int Parser(string property, string &key, string &val) {
         string::size_type n;
@@ -812,28 +810,33 @@ public:
     }
 
     int Execute(int argc, char *argv[]) {
-        string containerName = argv[0];
+        std::string layers;
+        int start = GetOpt(argc, argv, {
+            { 'L', true, [&](const char *arg) { layers = arg; } },
+        });
+
+        string containerName = argv[start];
         std::vector<std::pair<std::string, std::string>> properties;
 
         int ret;
 
-        for (int i = 1; i < argc; i++) {
+        for (int i = start + 1; i < argc; i++) {
             string key, val;
             ret = Parser(argv[i], key, val);
             if (ret)
                 return ret;
 
-            if (key == ROOT_LAYERS) {
-                TError error = VolumeBuilder.Prepare(val);
-                if (error) {
-                    std::cerr << "Can't create volume: " << error << std::endl;
-                    return EXIT_FAILURE;
-                }
+            properties.push_back(std::make_pair(key, val));
+        }
 
-                properties.push_back(std::make_pair("root", VolumeBuilder.GetVolumePath()));
-            } else {
-                properties.push_back(std::make_pair(key, val));
+        if (!layers.empty()) {
+            TError error = VolumeBuilder.Prepare(layers);
+            if (error) {
+                std::cerr << "Can't create volume: " << error << std::endl;
+                return EXIT_FAILURE;
             }
+
+            properties.push_back(std::make_pair("root", VolumeBuilder.GetVolumePath()));
         }
 
         ret = Api->Create(containerName);
@@ -872,7 +875,7 @@ class TExecCmd : public ICmd {
     bool Cleanup = true;
     char *TmpDir = nullptr;
 public:
-    TExecCmd(TPortoAPI *api) : ICmd(api, "exec", 2, "[-C] [-T] <container> command=<command> [properties]", "create pty, execute and wait for command in container"), VolumeBuilder(api) {
+    TExecCmd(TPortoAPI *api) : ICmd(api, "exec", 2, "[-C] [-T] [-L layers] <container> command=<command> [properties]", "create pty, execute and wait for command in container"), VolumeBuilder(api) {
         SetDieOnSignal(false);
     }
 
@@ -940,10 +943,12 @@ public:
         bool hasTty = isatty(STDIN_FILENO);
         std::vector<std::string> args;
         std::string env;
+        std::string layers;
 
         int start = GetOpt(argc, argv, {
             { 'C', false, [&](const char *arg) { Cleanup = false; } },
             { 'T', false, [&](const char *arg) { hasTty = false; } },
+            { 'L', true, [&](const char *arg) { layers = arg; } },
         });
         VolumeBuilder.NeedCleanup(Cleanup);
 
@@ -952,20 +957,19 @@ public:
 
         args.push_back(argv[start]);
         for (int i = start + 1; i < argc; i++)
-            if (strncmp(argv[i], "env=", 4) == 0) {
+            if (strncmp(argv[i], "env=", 4) == 0)
                 env = env + "; " + std::string(argv[i] + 4);
-            } else if (strncmp(argv[i], ROOT_LAYERS "=",
-                               strlen(ROOT_LAYERS) + 1) == 0) {
-
-                TError error = VolumeBuilder.Prepare(std::string(argv[i]).substr(strlen(ROOT_LAYERS "=")));
-                if (error) {
-                    std::cerr << "Can't create volume: " << error << std::endl;
-                    return EXIT_FAILURE;
-                }
-                args.push_back("root=" + VolumeBuilder.GetVolumePath());
-            } else {
+            else
                 args.push_back(argv[i]);
+
+        if (!layers.empty()) {
+            TError error = VolumeBuilder.Prepare(layers);
+            if (error) {
+                std::cerr << "Can't create volume: " << error << std::endl;
+                return EXIT_FAILURE;
             }
+            args.push_back("root=" + VolumeBuilder.GetVolumePath());
+        }
 
         vector<struct pollfd> fds;
 
@@ -1209,15 +1213,16 @@ public:
     TDestroyCmd(TPortoAPI *api) : ICmd(api, "destroy", 1, "<container1> [container2...]", "destroy container") {}
 
     int Execute(int argc, char *argv[]) {
+        int exitStatus = EXIT_SUCCESS;
         for (int i = 0; i < argc; i++) {
             int ret = Api->Destroy(argv[i]);
             if (ret) {
                 PrintError("Can't destroy container");
-                return ret;
+                exitStatus = ret;
             }
         }
 
-        return 0;
+        return ret;
     }
 };
 
@@ -1696,7 +1701,7 @@ public:
         "Manage overlayfs layers in internal storage",
         "    -I <layer> <tarball>     import layer from tarball\n"
         "    -M <layer> <tarball>     merge tarball into existing or new layer\n"
-        "    -R <layer>               remove layer from storage\n"
+        "    -R <layer> [layer...]    remove layer from storage\n"
         "    -F                       remove all unused layes\n"
         "    -L                       list present layers\n"
         "    -E <volume> <tarball>    export upper layer into tarball\n"
@@ -1710,7 +1715,7 @@ public:
     bool flush = false;
 
     int Execute(int argc, char *argv[]) {
-        int ret;
+        int ret = EXIT_SUCCESS;
         int start = GetOpt(argc, argv, {
             { 'I', false, [&](const char *arg) { import = true; } },
             { 'M', false, [&](const char *arg) { merge  = true; } },
@@ -1741,9 +1746,12 @@ public:
         } else if (remove) {
             if (argc < start + 1)
                 return EXIT_FAILURE;
-            ret = Api->RemoveLayer(argv[start]);
-            if (ret)
-                PrintError("Can't remove layer");
+
+            for (int i = start; i < argc; i++) {
+                ret = Api->RemoveLayer(argv[i]);
+                if (ret)
+                    PrintError("Can't remove layer");
+            }
         } else if (flush) {
             std::vector<std::string> layers;
             ret = Api->ListLayers(layers);
@@ -1830,7 +1838,6 @@ public:
         env.push_back("DEBIAN_FRONTEND=noninteractive");
 
         std::vector<std::string> bind;
-        bind.push_back(script.ToString() + " /script ro");
 
         // mount host selinux into container (for fedora)
         TPath selinux("/sys/fs/selinux");
@@ -1851,9 +1858,10 @@ public:
                 std::cerr << "Can't create volume: " << error << std::endl;
                 return EXIT_FAILURE;
             }
+            bind.push_back(script.ToString() + " /tmp/script ro");
 
             args.push_back("root=" + VolumeBuilder.GetVolumePath());
-            args.push_back("command=/bin/bash -e -x -c '. /script'");
+            args.push_back("command=/bin/bash -e -x -c '. /tmp/script'");
         } else {
             // base layer
 
@@ -1870,14 +1878,14 @@ public:
 
             args.push_back("root_readonly=true");
             args.push_back("cwd=/");
-            args.push_back("command=/bin/bash -e -x -c 'mount -o remount,dev,suid,exec " + volume + " && . " + script.ToString() + " " + volume + "'");
+            args.push_back("command=/bin/bash -e -x -c '. " + script.ToString() + " " + volume + "'");
         }
 
-        args.push_back("bind=" + CommaSeparatedList(bind, ";") + "");
+        args.push_back("bind=" + CommaSeparatedList(bind, ";"));
         args.push_back("bind_dns=false");
         args.push_back("user=root");
         args.push_back("group=root");
-        args.push_back("env=" + CommaSeparatedList(env, ";") + "");
+        args.push_back("env=" + CommaSeparatedList(env, ";"));
 
         int ret = RunCmd<TExecCmd>(args);
         if (ret)

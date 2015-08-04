@@ -304,6 +304,13 @@ TError TTask::ChildBindDirectores() {
             error = mnt.BindFile(bindMap.Rdonly);
         if (error)
             return error;
+
+        // drop nosuid,noexec,nodev from volumes
+        if (!bindMap.Rdonly) {
+            error = mnt.Mount(MS_REMOUNT | MS_BIND);
+            if (error)
+                return error;
+        }
     }
 
     return TError::Success();
@@ -419,16 +426,11 @@ TError TTask::ChildRemountRootRo() {
         if (!Env->Loop.Exists()) {
             flags |= MS_BIND;
 
-            // remount everything except binds and cwd to ro
+            // remount everything except binds to ro
             std::vector<std::shared_ptr<TMount>> snapshot;
             TError error = TMount::Snapshot(snapshot);
             if (error)
                 return error;
-
-            std::sort(snapshot.begin(), snapshot.end(),
-                      [](std::shared_ptr<TMount> a, std::shared_ptr<TMount> b) {
-                          return a->GetMountpoint() > b->GetMountpoint();
-                      });
 
             for (auto mnt : snapshot) {
                 TPath path = Env->Root.InnerPath(mnt->GetMountpoint());
@@ -460,12 +462,9 @@ TError TTask::ChildRemountRootRo() {
                 L_ACT() << "Remount " << path << " ro" << std::endl;
 
                 TMount romnt(Env->Root / path, Env->Root / path, "none", {});
-                error = romnt.Bind(true);
-                if (error) {
-                    error = romnt.Mount(MS_REMOUNT | MS_RDONLY);
-                    if (error)
-                        return error;
-                }
+                error = romnt.Mount(MS_REMOUNT | MS_BIND | MS_RDONLY);
+                if (error)
+                    return error;
             }
 
             TMount root(Env->Root, Env->Root, "none", {});
