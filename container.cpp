@@ -811,10 +811,6 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
     if (!meta && !Prop->Get<std::string>(P_COMMAND).length())
         return TError(EError::InvalidValue, "container command is empty");
 
-    if (Prop->Get<std::string>(P_ROOT) == "/" &&
-        Prop->Get<bool>(P_ROOT_RDONLY) == true)
-        return TError(EError::InvalidValue, "can't make / read-only");
-
     // since we now have a complete picture of properties, check
     // them once again (so we don't miss something due to set order)
     for (auto name : Prop->List()) {

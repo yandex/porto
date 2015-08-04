@@ -1788,27 +1788,6 @@ public:
         }
     }
 
-    void BindRootRo(std::vector<std::string> &bind) {
-            TFolder root("/");
-            std::vector<std::string> list;
-            TError error = root.Items(EFileType::Directory, list);
-            if (error) {
-                std::cerr << "Can't list root directory" << std::endl;
-                return;
-            }
-
-            // we are running user script as root without any isolation,
-            // remount everything that makes sense, so our host system
-            // is left intact
-            for (auto dir : list) {
-                if (dir == "tmp" || dir == "place")
-                    continue;
-
-                auto path = (TPath("/") / dir).RealPath();
-                bind.push_back(path.ToString() + " " + path.ToString() + " ro");
-            }
-    }
-
     int Execute(int argc, char *argv[]) {
         if (getuid() != 0) {
             std::cerr << "Build required root privileges" << std::endl;
@@ -1874,7 +1853,7 @@ public:
             }
 
             args.push_back("root=" + VolumeBuilder.GetVolumePath());
-            args.push_back("command=/bin/bash -e -x /script");
+            args.push_back("command=/bin/bash -e -x -c '. /script'");
         } else {
             // base layer
 
@@ -1884,10 +1863,14 @@ public:
                 return EXIT_FAILURE;
             }
 
-            BindRootRo(bind);
+            auto volume = VolumeBuilder.GetVolumePath();
 
+            bind.push_back("/tmp /tmp rw");
+            bind.push_back(volume + " " + volume + " rw");
+
+            args.push_back("root_readonly=true");
             args.push_back("cwd=/");
-            args.push_back("command=/bin/bash -e -x -c 'mount -o remount,dev,suid,exec " + VolumeBuilder.GetVolumePath() + " && " + script.ToString() + " " + VolumeBuilder.GetVolumePath() + "'");
+            args.push_back("command=/bin/bash -e -x -c 'mount -o remount,dev,suid,exec " + volume + " && . " + script.ToString() + " " + volume + "'");
         }
 
         args.push_back("bind=" + CommaSeparatedList(bind, ";") + "");

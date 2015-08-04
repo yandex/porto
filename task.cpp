@@ -316,8 +316,10 @@ TError TTask::ChildCreateNode(const TPath &path, unsigned int mode, unsigned int
     return TError::Success();
 }
 
+static const std::vector<std::string> roproc = { "/proc/sysrq-trigger", "/proc/irq", "/proc/bus" };
+
 TError TTask::ChildRestrictProc(bool restrictProcSys) {
-    vector<string> dirs = { "/proc/sysrq-trigger", "/proc/irq", "/proc/bus" };
+    std::vector<std::string> dirs = roproc;
 
     if (restrictProcSys)
         dirs.push_back("/proc/sys");
@@ -411,9 +413,84 @@ TError TTask::ChildMountDev() {
     return TError::Success();
 }
 
+TError TTask::ChildRemountRootRo() {
+    if (Env->RootRdOnly) {
+        int flags = MS_REMOUNT | MS_RDONLY;
+        if (!Env->Loop.Exists()) {
+            flags |= MS_BIND;
+
+            // remount everything except binds and cwd to ro
+            std::vector<std::shared_ptr<TMount>> snapshot;
+            TError error = TMount::Snapshot(snapshot);
+            if (error)
+                return error;
+
+            std::sort(snapshot.begin(), snapshot.end(),
+                      [](std::shared_ptr<TMount> a, std::shared_ptr<TMount> b) {
+                          return a->GetMountpoint() > b->GetMountpoint();
+                      });
+
+            for (auto mnt : snapshot) {
+                TPath path = Env->Root.InnerPath(mnt->GetMountpoint());
+                if (path.IsEmpty() || path.IsRoot())
+                    continue;
+
+                bool skip = false;
+                for (auto dir : roproc) {
+                    if (!path.InnerPath(dir).IsEmpty()) {
+                        skip = true;
+                        break;
+                    }
+                }
+                if (skip)
+                    continue;
+
+                for (auto &bindMap : Env->BindMap) {
+                    TPath dest = bindMap.Dest;
+
+                    if (dest.NormalPath() == path.NormalPath()) {
+                        skip = true;
+                        break;
+                    }
+                }
+
+                if (skip)
+                    continue;
+
+                L_ACT() << "Remount " << path << " ro" << std::endl;
+
+                TMount romnt(Env->Root / path, Env->Root / path, "none", {});
+                error = romnt.Bind(true);
+                if (error) {
+                    error = romnt.Mount(MS_REMOUNT | MS_RDONLY);
+                    if (error)
+                        return error;
+                }
+            }
+
+            TMount root(Env->Root, Env->Root, "none", {});
+            error = root.Mount(flags);
+            if (error)
+                return error;
+        }
+    }
+
+    return TError::Success();
+}
+
 TError TTask::ChildIsolateFs() {
-    if (Env->Root.ToString() == "/")
-        return ChildBindDirectores();
+    if (Env->Root.IsRoot()) {
+        if (Env->RootRdOnly) {
+            TMount root(Env->Root, Env->Root, "none", {});
+            TError error = root.BindDir(false, MS_SHARED);
+            if (error)
+                return error;
+        }
+        TError error = ChildBindDirectores();
+        if (error)
+            return error;
+        return ChildRemountRootRo();
+    }
 
     if (Env->Loop.Exists()) {
         TLoopMount m(Env->Loop, Env->Root, "ext4", Env->LoopDev);
@@ -471,16 +548,9 @@ TError TTask::ChildIsolateFs() {
     if (error)
         return error;
 
-    if (Env->RootRdOnly) {
-        int flags = MS_REMOUNT | MS_RDONLY;
-        if (!Env->Loop.Exists())
-            flags |= MS_BIND;
-
-        TMount root(Env->Root, Env->Root, "none", {});
-        error = root.Mount(flags);
-        if (error)
-            return error;
-    }
+    error = ChildRemountRootRo();
+    if (error)
+        return error;
 
     error = Env->Root.Chdir();
     if (error)

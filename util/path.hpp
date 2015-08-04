@@ -61,6 +61,10 @@ public:
         return a.ToString() < b.ToString();
     }
 
+    friend bool operator>(const TPath& a, const TPath& b) {
+        return a.ToString() > b.ToString();
+    }
+
     friend std::ostream& operator<<(std::ostream& os, const TPath& path) {
         return os << path.ToString();
     }
