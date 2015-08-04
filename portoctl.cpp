@@ -1222,7 +1222,7 @@ public:
             }
         }
 
-        return ret;
+        return exitStatus;
     }
 };
 
