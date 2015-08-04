@@ -53,6 +53,7 @@ _portoctl ()
 		if [ -z "$ct" ] ; then
 			_porto_containers
 		else
+			compopt -o filenames
 			COMPREPLY=( $( compgen -S "=" -W "$_porto_properies" -- "$cur" ) )
 			compopt -o nospace
 		fi
@@ -90,6 +91,7 @@ _portoctl ()
 			COMPREPLY=( $( compgen -W "$_porto_properies" -- $cur ) )
 			;;
 		4)
+			compopt -o filenames
 			[ -z "$cur" ] && COMPREPLY=$(portoctl pget "${words[2]}" "${words[3]}" 2>/dev/null)
 			;;
 		esac
