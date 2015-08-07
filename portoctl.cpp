@@ -1803,11 +1803,6 @@ public:
     }
 
     int Execute(int argc, char *argv[]) {
-        if (getuid() != 0) {
-            std::cerr << "Build required root privileges" << std::endl;
-            return EXIT_FAILURE;
-        }
-
         TPath output = TPath(GetCwd()) / "layer.tar";
         std::vector<std::string> args;
         std::vector<std::string> env;
