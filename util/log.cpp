@@ -211,6 +211,9 @@ std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
             Statistics->Warns++;
         else if (level == LOG_ERROR)
             Statistics->Errors++;
+
+        if (level == LOG_ERROR && config().daemon().debug())
+            Crash();
     }
 
     return (*logStream) << GetTime() << " " << name << "[" << GetTid() << "]: " << prefix[level];
