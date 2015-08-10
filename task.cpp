@@ -306,8 +306,9 @@ TError TTask::ChildBindDirectores() {
             return error;
 
         // drop nosuid,noexec,nodev from volumes
-        if (!bindMap.Rdonly) {
-            error = mnt.Mount(MS_REMOUNT | MS_BIND);
+        if (Env->NewMountNs) {
+            error = TMount::Remount(dest, MS_REMOUNT | MS_BIND |
+                                    (bindMap.Rdonly ? MS_RDONLY : 0));
             if (error)
                 return error;
         }
@@ -479,12 +480,6 @@ TError TTask::ChildRemountRootRo() {
 
 TError TTask::ChildIsolateFs() {
     if (Env->Root.IsRoot()) {
-        if (Env->RootRdOnly) {
-            TMount root(Env->Root, Env->Root, "none", {});
-            TError error = root.BindDir(false, MS_SHARED);
-            if (error)
-                return error;
-        }
         TError error = ChildBindDirectores();
         if (error)
             return error;
@@ -498,7 +493,7 @@ TError TTask::ChildIsolateFs() {
             return error;
     } else {
         TMount root(Env->Root, Env->Root, "none", {});
-        TError error = root.BindDir(false, MS_SHARED);
+        TError error = root.BindDir(false);
         if (error)
             return error;
     }
@@ -562,6 +557,14 @@ TError TTask::ChildIsolateFs() {
         error = Env->Root.Chroot();
         if (error)
             return error;
+    }
+
+    // Allow suid binaries and device nodes at container root.
+    error = TMount::Remount("/", MS_REMOUNT | MS_BIND |
+                                 (Env->RootRdOnly ? MS_RDONLY : 0));
+    if (error) {
+        L_ERR() << "Can't remount / as suid and dev:" << error << std::endl;
+        return error;
     }
 
     TPath newRoot("/");
@@ -769,7 +772,8 @@ TError TTask::ChildCallback() {
     umask(0);
 
     if (Env->NewMountNs) {
-        error = TMount::RemountContainerRoot();
+        // Remount to slave to receive propogations from parent namespace
+        error = TMount::Remount("/", MS_REC | MS_SLAVE);
         if (error)
             return error;
     }
@@ -813,6 +817,13 @@ TError TTask::ChildCallback() {
             return error;
 
         error = ChildSetHostname();
+        if (error)
+            return error;
+    }
+
+    if (Env->NewMountNs) {
+        // Make all shared: subcontainers will get propgation from us
+        error = TMount::Remount("/", MS_REC | MS_SHARED);
         if (error)
             return error;
     }

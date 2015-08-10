@@ -903,7 +903,8 @@ static int MasterMain(bool respawn) {
     if (error)
         return error;
 
-    error = TMount::RemountRootShared();
+    // We want propogate mounts into containers
+    error = TMount::Remount("/", MS_REC | MS_SHARED);
     if (error) {
         L_ERR() << "Can't remount / recursively as shared" << error << std::endl;
         return EXIT_FAILURE;
