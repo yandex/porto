@@ -740,8 +740,9 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         taskEnv->BindMap.push_back(bm);
     }
 
-    taskEnv->NewMountNs = taskEnv->Isolate || taskEnv->RootRdOnly ||
-                          taskEnv->BindMap.size();
+    // Create new mount namespaces if we have to make any changes
+    taskEnv->NewMountNs = taskEnv->Isolate || taskEnv->BindMap.size() ||
+                          taskEnv->RootRdOnly || !taskEnv->Root.IsRoot();
 
     error = taskEnv->Prepare(cred);
     if (error)
