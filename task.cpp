@@ -423,7 +423,7 @@ TError TTask::ChildMountDev() {
 TError TTask::ChildRemountRootRo() {
     if (Env->RootRdOnly) {
         int flags = MS_REMOUNT | MS_RDONLY;
-        if (!Env->Loop.Exists()) {
+        if (Env->Loop.IsEmpty()) {
             flags |= MS_BIND;
 
             // remount everything except binds to ro
@@ -491,7 +491,7 @@ TError TTask::ChildIsolateFs() {
         return ChildRemountRootRo();
     }
 
-    if (Env->Loop.Exists()) {
+    if (!Env->Loop.IsEmpty()) {
         TLoopMount m(Env->Loop, Env->Root, "ext4", Env->LoopDev);
         TError error = m.Mount();
         if (error)
@@ -525,7 +525,7 @@ TError TTask::ChildIsolateFs() {
     if (error)
         return error;
 
-    if (Env->Loop.Exists()) {
+    if (!Env->Loop.IsEmpty()) {
         error = ChildMountRun();
         if (error)
             return error;
@@ -739,7 +739,7 @@ TError TTask::ChildSetHostname() {
 }
 
 TError TTask::ChildPrepareLoop() {
-    if (Env->Loop.Exists()) {
+    if (!Env->Loop.IsEmpty()) {
         TFolder f(Env->Root);
         if (!f.Exists()) {
             TError error = f.Create(0755, true);
