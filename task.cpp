@@ -422,57 +422,47 @@ TError TTask::ChildMountDev() {
 }
 
 TError TTask::ChildRemountRootRo() {
-    if (Env->RootRdOnly) {
-        int flags = MS_REMOUNT | MS_RDONLY;
-        if (Env->Loop.IsEmpty()) {
-            flags |= MS_BIND;
+    if (!Env->RootRdOnly || !Env->Loop.IsEmpty())
+        return TError::Success();
 
-            // remount everything except binds to ro
-            std::vector<std::shared_ptr<TMount>> snapshot;
-            TError error = TMount::Snapshot(snapshot);
-            if (error)
-                return error;
+    // remount everything except binds to ro
+    std::vector<std::shared_ptr<TMount>> snapshot;
+    TError error = TMount::Snapshot(snapshot);
+    if (error)
+        return error;
 
-            for (auto mnt : snapshot) {
-                TPath path = Env->Root.InnerPath(mnt->GetMountpoint());
-                if (path.IsEmpty() || path.IsRoot())
-                    continue;
+    for (auto mnt : snapshot) {
+        TPath path = Env->Root.InnerPath(mnt->GetMountpoint());
+        if (path.IsEmpty())
+            continue;
 
-                bool skip = false;
-                for (auto dir : roproc) {
-                    if (!path.InnerPath(dir).IsEmpty()) {
-                        skip = true;
-                        break;
-                    }
-                }
-                if (skip)
-                    continue;
-
-                for (auto &bindMap : Env->BindMap) {
-                    TPath dest = bindMap.Dest;
-
-                    if (dest.NormalPath() == path.NormalPath()) {
-                        skip = true;
-                        break;
-                    }
-                }
-
-                if (skip)
-                    continue;
-
-                L_ACT() << "Remount " << path << " ro" << std::endl;
-
-                TMount romnt(Env->Root / path, Env->Root / path, "none", {});
-                error = romnt.Mount(MS_REMOUNT | MS_BIND | MS_RDONLY);
-                if (error)
-                    return error;
+        bool skip = false;
+        for (auto dir : roproc) {
+            if (!path.InnerPath(dir).IsEmpty()) {
+                skip = true;
+                break;
             }
-
-            TMount root(Env->Root, Env->Root, "none", {});
-            error = root.Mount(flags);
-            if (error)
-                return error;
         }
+        if (skip)
+            continue;
+
+        for (auto &bindMap : Env->BindMap) {
+            TPath dest = bindMap.Dest;
+
+            if (dest.NormalPath() == path.NormalPath()) {
+                skip = true;
+                break;
+            }
+        }
+
+        if (skip)
+            continue;
+
+        L_ACT() << "Remount " << path << " ro" << std::endl;
+        error =  TMount::Remount(mnt->GetMountpoint(),
+                                 MS_REMOUNT | MS_BIND | MS_RDONLY);
+        if (error)
+            return error;
     }
 
     return TError::Success();
