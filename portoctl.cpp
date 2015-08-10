@@ -1877,7 +1877,7 @@ public:
             bind.push_back(volume + " " + volume + " rw");
 
             args.push_back("root_readonly=true");
-            args.push_back("cwd=/");
+            args.push_back("cwd=" + volume);
             args.push_back("command=/bin/bash -e -x -c '. " + script.ToString() + " " + volume + "'");
         }
 
