@@ -150,6 +150,7 @@ class TTask: public TNonCopyable {
     TError ChildBindDns();
     TError ChildBindDirectores();
     TError ChildRestrictProc(bool restrictProcSys);
+    TError ChildMountRootFs();
     TError ChildMountDev();
     TError ChildMountRun();
     TError ChildRemountRootRo();

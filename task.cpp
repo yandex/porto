@@ -478,13 +478,10 @@ TError TTask::ChildRemountRootRo() {
     return TError::Success();
 }
 
-TError TTask::ChildIsolateFs() {
-    if (Env->Root.IsRoot()) {
-        TError error = ChildBindDirectores();
-        if (error)
-            return error;
-        return ChildRemountRootRo();
-    }
+TError TTask::ChildMountRootFs() {
+
+    if (Env->Root.IsRoot())
+        return TError::Success();
 
     if (!Env->Loop.IsEmpty()) {
         TLoopMount m(Env->Loop, Env->Root, "ext4", Env->LoopDev);
@@ -538,19 +535,15 @@ TError TTask::ChildIsolateFs() {
             return error;
     }
 
-    error = ChildBindDirectores();
-    if (error)
-        return error;
+    return TError::Success();
+}
 
-    error = ChildRemountRootRo();
-    if (error)
-        return error;
+TError TTask::ChildIsolateFs() {
 
-    error = Env->Root.Chdir();
-    if (error)
-        return error;
+    if (Env->Root.IsRoot())
+        return TError::Success();
 
-    error = PivotRoot(Env->Root);
+    TError error = PivotRoot(Env->Root);
     if (error) {
         L_WRN() << "Can't pivot root, roll back to chroot: " << error << std::endl;
 
@@ -808,6 +801,18 @@ TError TTask::ChildCallback() {
         if (error)
             return error;
     } else {
+        error = ChildMountRootFs();
+        if (error)
+            return error;
+
+        error = ChildBindDirectores();
+        if (error)
+            return error;
+
+        error = ChildRemountRootRo();
+        if (error)
+            return error;
+
         error = ChildIsolateFs();
         if (error)
             return error;
