@@ -1,159 +1,130 @@
-// Общение с демоном осуществляется через unix сокет /run/portod.socket.
-// Сообщения отправляются/принимаются в виде delimited пакетов: сначала отправляется/принимается длина сообщения, затем само сообщение (http://stackoverflow.com/questions/2340730/are-there-c-equivalents-for-the-protocol-buffers-delimited-i-o-functions-in-ja, https://developers.google.com/protocol-buffers/docs/reference/java/com/google/protobuf/MessageLite#writeDelimitedTo%28java.io.OutputStream%29).
-// Тип отправляемого сообщения - TContainerRequest, тип принимаемого - TContainerResponse.
+// Portod daemon listens on /run/portod.socket unix socket.
+// Messages are in delimited protocol buffers i/o format.
+// A message consists of their's length in varint format followed by protobuf data.
+// http://stackoverflow.com/questions/2340730/are-there-c-equivalents-for-the-protocol-buffers-delimited-i-o-functions-in-ja
+// https://developers.google.com/protocol-buffers/docs/reference/java/com/google/protobuf/MessageLite#writeDelimitedTo%28java.io.OutputStream%29).
+// Basic request type is TContainerRequest, response type is TContainerResponse (even for VolumeAPI requests).
 
 package rpc;
 
-// Возможная ошибка в ответе
+// List of error codes
 enum EError {
-	// Запрос выполнен без ошибок
+	// Request executed successfully. No errors occured.
 	Success = 0;
-	// Неизвестная критическая ошибка
+	// Unknown critical error.
 	Unknown = 1;
-	// Неизвестный запрос
+	// Unknown or bad request
 	InvalidMethod = 2;
-	// Запрос на создание существующего контейнера
+	// Container with specified name already exists. Can't create a new one.
 	ContainerAlreadyExists = 3;
-	// Выполнение операции над несуществующим контейнером
+	// Container with specified name doesn't exist.
 	ContainerDoesNotExist = 4;
-	// Неизвестное свойство
+	// Unknown property specified.
 	InvalidProperty = 5;
-	// Неизвестное runtime data
+	// Unknown data specified.
 	InvalidData = 6;
-	// Неверное значение свойств контейнера
+	// Invalid value of property or data.
 	InvalidValue = 7;
-	// Неверное состояние контейнера
+	// Can't perform specified operation in current container state.
 	InvalidState = 8;
-	// Свойство не может работать из-за старой версии ядра или других
-	// компонент
+	// Operation is not supported due to some reasons (old kernel version, missing
+	// kernel modules, etc).
 	NotSupported = 9;
-	// Невозможно гарантировать выделение запрошенных ресурсов
+	// Requested resources are not available (e.g. can't allocate requested memory
+	// without overcommiting).
 	ResourceNotAvailable = 10;
-	// Недостаточно прав для выполнения операции
+	// Insufficient rights for performing requested operation.
 	Permission = 11;
 
-	// Логический том уже существует
+	// Can't create new volume with specified name, because there is already one.
 	VolumeAlreadyExists = 12;
-	// Выполнение операции над несуществующим логическим томом
+	// Volume with specified name doesn't exist.
 	VolumeNotFound = 13;
-	// Недостаточно места для выполнения операции
+	// Operation failed because of insufficient disk space.
 	NoSpace = 14;
-	// Контейнер или том используется
+	// Operation can't be performed, because container or volume are in use by
+	// other simultaneous operation.
 	Busy = 15;
 
-	// Внутренний код. Ответ будет послан позже
+	// Reserved error code used by Porto internals. Can't be returned to a user.
 	Queued = 1000;
 }
 
-// Запрос на создание контейнера
-//
-// При создании контейнера и последующей установке свойств не производится
-// никаких проверок на доступность ресурсов.
 message TContainerCreateRequest {
-	// Имя контейнера
 	required string name = 1;
 }
 
-// Запрос на удаление контейнера
 message TContainerDestroyRequest {
-	// Имя контейнера
 	required string name = 1;
 }
 
-// Запрос на получение списка контейнеров
-//
-// Список содержит в себе созданные и запущенные контейнеры.
 message TContainerListRequest {
 }
 
-// Запрос на получение свойства контейнера
 message TContainerGetPropertyRequest {
-	// Имя контейнера
 	required string name = 1;
-	// Свойство контейнера
 	required string property = 2;
 }
 
-// Запрос на изменение свойства контейнера
 message TContainerSetPropertyRequest {
-	// Имя контейнера
 	required string name = 1;
-	// Свойство контейнера
 	required string property = 2;
-	// Значение свойства
 	required string value = 3;
 }
 
-// Запрос runtime данных контейнера
 message TContainerGetDataRequest {
-	// Имя контейнера
 	required string name = 1;
-	// Runtime data контейнера
 	required string data = 2;
 }
 
-// Запрос на запуск контейнера
 message TContainerStartRequest {
-	// Имя контейнера
 	required string name = 1;
 }
 
-// Запрос на остановку контейнера
-//
-// После получения ответа на этот запрос все процессы контейнера будут
-// гарантированно остановлены.
 message TContainerStopRequest {
-	// Имя контейнера
 	required string name = 1;
 }
 
-// Запрос на приостановку контейнера
 message TContainerPauseRequest {
 	required string name = 1;
 }
 
-// Запрос на продолжение работы после приостановки контейнера
 message TContainerResumeRequest {
 	required string name = 1;
 }
 
-// Запрос на получение списка свойств
 message TContainerPropertyListRequest {
 }
 
-// Запрос на получение списка runtime data
 message TContainerDataListRequest {
 }
 
-// Послать сигнал контейнеру
 message TContainerKillRequest {
 	required string name = 1;
 	required int32 sig = 2;
 }
 
-// Запросить версию демона
+// Get Porto version
 message TVersionRequest {
 }
 
-// Запрос на получение нескольких свойств/данных нескольких контейнеров
+// Get multiple properties/data of many containers with one request
+// (useful for monitoring)
 message TContainerGetRequest {
-	// Список контейнеров, у которых надо получить свойства\данные
+	// list of containers
 	repeated string name = 1;
-	// Список свойтв\данных, которые надо получить у всех контейнеров
+	// list of properties/data
 	repeated string variable = 2;
 }
 
-// Подождать, пока контейнер выполняется
+// Wait while container(s) is/are in running state
 message TContainerWaitRequest {
-	// Список контейнеров
+	// list of containers
 	repeated string name = 1;
-	// Таймаут, ms
+	// timeout, ms
 	optional uint32 timeout = 2;
 }
 
-// Сообщение-запрос
-// В запросе может быть только одно опциональное сообщение, только оно
-// и будет выполнено.
 message TContainerRequest {
 	optional TContainerCreateRequest create = 1;
 	optional TContainerDestroyRequest destroy = 2;
@@ -185,55 +156,43 @@ message TContainerRequest {
 	optional TLayerExportRequest exportLayer = 113;
 }
 
-// Ответ на запрос списка контейнеров
 message TContainerListResponse {
-	// Список имен контейнеров
 	repeated string name = 1;
 }
 
-// Ответ на запрос свойства контейнера
 message TContainerGetPropertyResponse {
-	// Значение свойства
 	required string value = 1;
 }
 
-// Ответ на запрос runtime data контейнера
 message TContainerGetDataResponse {
-	// Значение runtime data
 	required string value = 1;
 }
 
-// Ответ на запрос списка свойств
 message TContainerPropertyListResponse {
 	message TContainerPropertyListEntry {
-		// Имя свойства
+		// Property name
 		required string name = 1;
-		// Описание свойства
+		// Property description
 		required string desc = 2;
 	}
 	repeated TContainerPropertyListEntry list = 1;
 }
 
-// Ответ на запрос списка runtime data
 message TContainerDataListResponse {
 	message TContainerDataListEntry {
-		// Имя runtime data
+		// Data name
 		required string name = 1;
-		// Описание runtime data
+		// Data description
 		required string desc = 2;
 	}
 	repeated TContainerDataListEntry list = 1;
 }
 
-// Ответ на запрос версии
 message TVersionResponse {
-	// Тег версии
 	required string tag = 1;
-	// Ревизия версии
 	required string revision = 2;
 }
 
-// Ответ на запрос нескольких свойств/данных контейнеров
 message TContainerGetResponse {
 	message TContainerGetValueResponse {
 		required string variable = 1;
@@ -253,12 +212,9 @@ message TContainerWaitResponse {
 	required string name = 1;
 }
 
-// Сообщение-ответ
-// В ответе будет присутствовать статус запроса (ошибка) и соответствующей
-// запросу результат.
 message TContainerResponse {
 	required EError error = 1;
-	// Опциональное сообщение об ошибке
+	// Optional error message
 	optional string errorMsg = 2;
 
 	optional TContainerListResponse list = 3;
@@ -294,45 +250,37 @@ message TVolumeDescription {
 	repeated string containers = 3;
 }
 
-// Запрос на получение списка свойств тома
 message TVolumePropertyListRequest {
 }
 
-// Ответ на запрос списка свойств тома
 message TVolumePropertyListResponse {
 	repeated TVolumePropertyDescription properties = 1;
 }
 
-// Запрос на создание тома
 message TVolumeCreateRequest {
 	optional string path = 1;
 	repeated TVolumeProperty properties = 2;
 }
 
-// Запрос на подсоединение тома к контейнеру
 message TVolumeLinkRequest {
 	required string path = 1;
 	optional string container = 2;
 }
 
-// Запрос на отсоединение тома от контейнера
 message TVolumeUnlinkRequest {
 	required string path = 1;
 	optional string container = 2;
 }
 
-// Запрос на получение списка томов
 message TVolumeListRequest {
 	optional string path = 1;
 	optional string container = 2;
 }
 
-// Список томов с описанием
 message TVolumeListResponse {
 	repeated TVolumeDescription volumes = 1;
 }
 
-// Импорт overlayfs слоя
 message TLayerImportRequest {
 	required string layer = 1;
 	required string tarball = 2;
@@ -344,7 +292,6 @@ message TLayerExportRequest {
 	required string tarball = 2;
 }
 
-// Удаление overlayfs слоя
 message TLayerRemoveRequest {
 	required string layer = 1;
 }
