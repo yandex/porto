@@ -1860,7 +1860,7 @@ static void TestBindProperty(TPortoAPI &api) {
     ExpectSuccess(f.Touch());
 
     ExpectApiSuccess(api.SetProperty(name, "command", "cat /proc/self/mountinfo"));
-    ExpectApiSuccess(api.SetProperty(name, "bind", "/bin /bin ro; /tmp/27389 /tmp"));
+    ExpectApiSuccess(api.SetProperty(name, "bind", "/bin bin ro; /tmp/27389 tmp"));
     string v = StartWaitAndGetData(api, name, "stdout");
     auto m = ParseMountinfo(v);
 

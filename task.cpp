@@ -286,10 +286,14 @@ TError TTask::ChildBindDns() {
 
 TError TTask::ChildBindDirectores() {
     for (auto &bindMap : Env->BindMap) {
-        TPath dest = Env->Root + bindMap.Dest;
-        if (Env->Root == "/")
-            dest = Env->Cwd + bindMap.Dest;
-        else if (!StringStartsWith(dest.RealPath().ToString(), Env->Root.ToString()))
+        TPath dest;
+
+        if (bindMap.Dest.IsAbsolute())
+            dest = Env->Root / bindMap.Dest;
+        else
+            dest = Env->Root / Env->Cwd / bindMap.Dest;
+
+        if (!StringStartsWith(dest.RealPath().ToString(), Env->Root.ToString()))
             return TError(EError::InvalidValue, "Container bind mount "
                           + bindMap.Source.ToString() + " resolves to root "
                           + dest.RealPath().ToString()

@@ -734,7 +734,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         taskEnv->Command = Prop->Get<std::string>(P_CWD) + "/portod-meta-root";
 
         TBindMap bm = { path.ToString() + "-meta-root",
-                        "/portod-meta-root",
+                        "portod-meta-root",
                         true };
 
         taskEnv->BindMap.push_back(bm);
