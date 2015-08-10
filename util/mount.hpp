@@ -87,7 +87,7 @@ class TLoopMount {
     int LoopNr;
 public:
     TLoopMount(const TPath &source, const TPath &target, const std::string &type, const int loopNr) : Source(source), Target(target), Type(type), LoopNr(loopNr) {}
-    TError Mount();
+    TError Mount(bool rdonly = false);
     TError Umount();
 };
 

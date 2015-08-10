@@ -311,13 +311,14 @@ TError PutLoopDev(const int nr) {
     return TError::Success();
 }
 
-TError TLoopMount::Mount() {
+TError TLoopMount::Mount(bool rdonly) {
     std::string dev = "/dev/loop" + std::to_string(LoopNr);
 
     L_ACT() << "Mount loop device " << dev << " " << Source  << " -> " << Target << std::endl;
 
     TScopedFd imageFd, loopFd;
-    imageFd = open(Source.ToString().c_str(), O_RDWR | O_CLOEXEC);
+    imageFd = open(Source.ToString().c_str(), (rdonly ? O_RDONLY : O_RDWR) |
+                                              O_CLOEXEC);
     if (imageFd.GetFd() < 0)
         return TError(EError::Unknown, errno, "open(" + Source.ToString() + ")");
 
@@ -330,12 +331,14 @@ TError TLoopMount::Mount() {
 
     struct loop_info64 loopinfo64 = {};
     strncpy((char *)loopinfo64.lo_file_name, Source.ToString().c_str(), LO_NAME_SIZE);
+    if (rdonly)
+        loopinfo64.lo_flags |= LO_FLAGS_READ_ONLY;
 
     if (ioctl(loopFd.GetFd(), LOOP_SET_STATUS64, &loopinfo64) < 0)
         return TError(EError::Unknown, errno, "ioctl(LOOP_SET_STATUS64)");
 
     TMount m(dev, Target, Type, {});
-    return m.Mount();
+    return m.Mount(rdonly ? MS_RDONLY : 0);
 }
 
 TError TLoopMount::Umount() {

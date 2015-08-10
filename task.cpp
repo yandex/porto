@@ -493,7 +493,7 @@ TError TTask::ChildIsolateFs() {
 
     if (!Env->Loop.IsEmpty()) {
         TLoopMount m(Env->Loop, Env->Root, "ext4", Env->LoopDev);
-        TError error = m.Mount();
+        TError error = m.Mount(Env->RootRdOnly);
         if (error)
             return error;
     } else {
