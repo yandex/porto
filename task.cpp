@@ -777,6 +777,8 @@ TError TTask::ChildCallback() {
     if (Env->Isolate) {
         // remount proc so PID namespace works
         TMount tmpProc("proc", "/proc", "proc", {});
+        if (tmpProc.Detach())
+            return TError(EError::Unknown, errno, "datach procfs");
         if (tmpProc.MountDir())
             return TError(EError::Unknown, errno, "remount procfs");
     }
