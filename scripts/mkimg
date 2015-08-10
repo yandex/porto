@@ -107,8 +107,9 @@ bootstrap() {
 		if [ -L "$file" ]; then continue; fi
 		ro="$file $file ro; $ro"
 	done
+	ro="$ro; $IMAGE $IMAGE rw"
 
-	pctl exec $CONTAINER command="bash -c 'mount $IMAGE $TMPDIR && $CONF bootstrap $TMPDIR'" user=root group=root bind_dns=false env="DEBIAN_FRONTEND=noninteractive" bind="$ro" #root_readonly=true debootsrap chroot fails
+	pctl exec $CONTAINER command="bash -c 'mount $IMAGE $TMPDIR && $CONF bootstrap $TMPDIR'" user=root group=root bind_dns=false env="DEBIAN_FRONTEND=noninteractive" cwd=/ bind="$ro" #root_readonly=true debootsrap chroot fails
 }
 
 check() {
