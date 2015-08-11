@@ -1639,7 +1639,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
                     if (error)
                         L_WRN() << "Can't fix cgroups: " << error << std::endl;
                 } else {
-                    L_ERR() << "Task is running, belongs to porto but doesn't have valid freezer" << std::endl;
+                    L_WRN() << "Task is running, belongs to porto but doesn't have valid freezer" << std::endl;
                     LostAndRestored = true;
                 }
             }

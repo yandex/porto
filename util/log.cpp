@@ -30,6 +30,7 @@ public:
         std::ptrdiff_t n = pptr() - pbase();
         pbump(-n);
     }
+    bool DieOnNl = false;
 protected:
     int sync() override;
     int_type overflow(int_type ch) override;
@@ -175,6 +176,8 @@ int TLogBuf::sync() {
     pbump(-n);
 
     int ret = write(logBufFd, pbase(), n);
+    if (n && DieOnNl)
+        abort();
     return (ret == n) ? 0 : -1;
 }
 
@@ -213,7 +216,7 @@ std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
             Statistics->Errors++;
 
         if (level == LOG_ERROR && config().daemon().debug())
-            Crash();
+            logBuf->DieOnNl = true;
     }
 
     return (*logStream) << GetTime() << " " << name << "[" << GetTid() << "]: " << prefix[level];
