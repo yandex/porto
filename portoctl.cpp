@@ -1784,7 +1784,13 @@ class TBuildCmd : public ICmd {
     char *TmpFile = nullptr;
 
 public:
-    TBuildCmd(TPortoAPI *api) : ICmd(api, "build", 1, "[-C] [-o layer.tar] [-i NAT interface] <script> [top layer...] [bottom layer]", "build container image"), VolumeBuilder(api) {
+    TBuildCmd(TPortoAPI *api) : ICmd(api, "build", 1,
+            "[-C] [-o layer.tar] [-i NAT interface] [-E name=value]... "
+            "<script> [top layer...] [bottom layer]",
+            "build container image",
+            "    -o layer.tar         save resulting upper layer\n"
+            "    -E name=value        set environment variable\n"
+            ), VolumeBuilder(api) {
         SetDieOnSignal(false);
     }
 
@@ -1804,10 +1810,12 @@ public:
 
         TPath output = TPath(GetCwd()) / "layer.tar";
         std::vector<std::string> args;
+        std::vector<std::string> env;
 
         int start = GetOpt(argc, argv, {
             { 'o', true, [&](const char *arg) { output = TPath(GetCwd()) / arg; } },
             { 'C', false, [&](const char *arg) { Cleanup = false; } },
+            { 'E', true, [&](const char *arg) { env.push_back(arg); } },
         });
 
         if (!Cleanup) {
@@ -1834,7 +1842,6 @@ public:
         close(fd);
 
         // make sure apt-get doesn't ask any questions
-        std::vector<std::string> env;
         env.push_back("DEBIAN_FRONTEND=noninteractive");
 
         std::vector<std::string> bind;
