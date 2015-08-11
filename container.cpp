@@ -731,6 +731,10 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         if (error)
             return error;
 
+        std::string deleted = " (deleted)";
+        if (StringEndsWith(path.ToString(), deleted))
+            path = path.ToString().substr(0, path.ToString().length() - deleted.length());
+
         taskEnv->Command = Prop->Get<std::string>(P_CWD) + "/portod-meta-root";
 
         TBindMap bm = { path.ToString() + "-meta-root",
