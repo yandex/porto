@@ -123,10 +123,7 @@ public:
         Volume->GetQuota(space_limit, inode_limit);
 
         error = storage_mount.Find(storage);
-        if (error)
-            return error;
-
-        if (!config().volumes().enable_quota() ||
+        if (error || !config().volumes().enable_quota() ||
             !ext4_support_project(storage_mount.GetSource().c_str(),
                                   storage_mount.GetType().c_str(),
                                   storage_mount.GetMountpoint().c_str())) {
@@ -168,9 +165,7 @@ public:
 
         error2 = mount.Find(storage);
         if (error2) {
-            L_ERR() << "Can't find storage mount: " << error << std::endl;
-            if (!error)
-                error = error2;
+            L_ERR() << "Can't find storage mount: " << error2 << std::endl;
         } else if (config().volumes().enable_quota() &&
                    ext4_destroy_project(mount.GetSource().c_str(),
                                         storage.c_str()) && errno != ENOTTY) {
@@ -367,10 +362,7 @@ public:
 
         TMount storage_mount;
         error = storage_mount.Find(storage);
-        if (error)
-            return error;
-
-        if (!config().volumes().enable_quota() ||
+        if (error || !config().volumes().enable_quota() ||
             !ext4_support_project(storage_mount.GetSource().c_str(),
                                   storage_mount.GetType().c_str(),
                                   storage_mount.GetMountpoint().c_str())) {
@@ -458,9 +450,7 @@ err:
         TMount storage_mount;
         error2 = storage_mount.Find(storage);
         if (error2) {
-            L_ERR() << "Can't find storage mount: " << error << std::endl;
-            if (!error)
-                error = error2;
+            L_ERR() << "Can't find storage mount: " << error2 << std::endl;
         } else if (config().volumes().enable_quota() &&
                    ext4_destroy_project(storage_mount.GetSource().c_str(),
                                         storage.c_str()) && errno != ENOTTY) {
