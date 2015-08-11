@@ -94,7 +94,7 @@ target_link_libraries(portod porto util ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt
 
 add_executable(portoctl ${PYTHON_SOURCES} portoctl.cpp cli.cpp config.cpp portotop.cpp)
 add_dependencies(portoctl version.hpp)
-target_link_libraries(portoctl porto util ${PB} rt ${CURSES_LIBRARIES})
+target_link_libraries(portoctl porto util ${PB} rt ${CURSES_LIBRARIES} ${LIBNL} ${LIBNL_ROUTE})
 
 add_executable(portod-meta-root meta_root.cpp util/signal.cpp)
 add_dependencies(portod-meta-root version.hpp)
