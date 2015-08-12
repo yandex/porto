@@ -1410,6 +1410,9 @@ bool TContainer::ShouldApplyProperty(const std::string &property) {
     if (state == EContainerState::Dead || state == EContainerState::Stopped)
         return false;
 
+    if (property == P_PRIVATE)
+        return false;
+
     return true;
 }
 
