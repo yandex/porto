@@ -10,8 +10,7 @@ rootdir=$(cd $(dirname $0)/../ && pwd)
 spec=~/rpmbuild/SPECS/porto.spec
 
 version=v$(head -n1 $rootdir/debian/changelog | sed -e 's/[^(]*(\([^)]*\).*/\1/')
-cat $rootdir/spec/porto.spec.in > $spec
-#cat $rootdir/spec/porto.spec.in $rootdir/debian/changelog > $spec
+cp $rootdir/spec/porto.spec.in $spec
 sed -i -e "s/@VERSION@/$version/" $spec
 
 # download 

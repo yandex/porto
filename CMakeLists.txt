@@ -77,14 +77,14 @@ add_custom_target(tags COMMAND ctags -R --c++-kinds=+p --fields=+iaS --extra=+q 
 set_source_files_properties(TAGS PROPERTIES GENERATED true)
 add_custom_target(TAGS COMMAND ctags -R -e --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
-add_library(util error.cpp util/locks.cpp util/idmap.cpp util/namespace.cpp util/netlink.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/signal.cpp util/unix.cpp util/cred.cpp util/string.cpp util/crash.cpp util/crc32.cpp util/sha256.cpp util/ext4_proj_quota.c  ${PROTO_SRCS})
+add_library(util STATIC error.cpp util/locks.cpp util/idmap.cpp util/namespace.cpp util/netlink.cpp util/log.cpp util/mount.cpp util/path.cpp util/file.cpp util/folder.cpp util/signal.cpp util/unix.cpp util/cred.cpp util/string.cpp util/crash.cpp util/crc32.cpp util/sha256.cpp util/ext4_proj_quota.c  ${PROTO_SRCS})
 if(NOT USE_SYSTEM_LIBNL)
 add_dependencies(util libnl)
 endif()
 
 link_directories(${yandex-porto_BINARY_DIR})
 include_directories(${yandex-porto_BINARY_DIR}/api/cpp)
-add_library(porto util api/cpp/libporto.cpp util/protobuf.cpp)
+add_library(porto STATIC util api/cpp/libporto.cpp util/protobuf.cpp)
 add_dependencies(porto util version.hpp)
 
 add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp holder.cpp event.cpp task.cpp kvalue.cpp subsystem.cpp config.cpp container_value.cpp value.cpp data.cpp property.cpp qdisc.cpp context.cpp volume.cpp epoll.cpp client.cpp)

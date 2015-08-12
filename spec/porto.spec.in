@@ -14,12 +14,12 @@ Provides: python2-porto
 %description
 TODO
 
-%package -n python2-%{srcname}
-Summary: Python API for %{srcname}
+%package -n python2-%{name}
+Summary: Python API for %{name}
 Group: System Environment/Libraries
 
-%description -n python2-%{srcname}
-The python2-%{srcname} package contains Python API for %{name}.
+%description -n python2-%{name}
+The python2-%{name} package contains Python API for %{name}.
 
 %prep
 %setup -qn porto
@@ -27,10 +27,10 @@ The python2-%{srcname} package contains Python API for %{name}.
 %build
 %cmake -DUSE_SYSTEM_LIBNL=1 .
 #make %{?_smp_mflags}
+make
 
-# TODO: RENAME TO SPEC
 %install
-#make install DESTDIR=%{buildroot}
+make install DESTDIR=%{buildroot}
 
 mkdir -p %{buildroot}/%{python2_sitelib}/porto
 %{__install} api/python/porto/*.py %{buildroot}/%{python2_sitelib}/porto
@@ -46,8 +46,6 @@ mkdir -p %{buildroot}/%{python2_sitelib}/porto
 %config(noreplace) %{_sysconfdir}/cron.d/%{name}
 %config(noreplace) %{_sysconfdir}/porto/%{name}
 
-%files -n python2-%{srcname}
+%files -n python2-%{name}
 %defattr(755,root,root)
 %{python2_sitelib}/porto/*
-
-#%changelog

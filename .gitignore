@@ -28,6 +28,7 @@
 /debian/yandex-search-group-porto/
 /debian/yandex-search-porto-config/
 /debian/python-portopy/
+/spec/porto.spec
 /TAGS
 /api/python/porto/rpc_pb2.py*
 /dist/*.img
