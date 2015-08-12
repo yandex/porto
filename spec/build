@@ -13,6 +13,7 @@ version=v$(head -n1 $rootdir/debian/changelog | sed -e 's/[^(]*(\([^)]*\).*/\1/'
 cp $rootdir/spec/porto.spec.in $spec
 sed -i -e "s/@VERSION@/$version/" $spec
 
-# download 
+# create source tar.gz from git repository
 (cd ~/rpmbuild/SOURCES/ && spectool -g ~/rpmbuild/SPECS/porto.spec)
+# build package
 (cd ~/rpmbuild/SPECS/ && rpmbuild -vv -ba porto.spec)
