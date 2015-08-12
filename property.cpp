@@ -669,7 +669,7 @@ public:
     TError CheckValue(const TUintMap &value) override {
         std::set<std::string> validKey;
         auto c = GetContainer();
-        auto net_lock = c->ScopedLock();
+        auto net_lock = c->Net->ScopedLock();
         auto availableLinks = c->Net->GetLinks();
 
         for (auto &link : availableLinks)
