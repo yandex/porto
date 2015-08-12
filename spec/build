@@ -1,0 +1,19 @@
+#!/bin/bash
+
+set -x
+set -e
+
+# sudo dnf install @development-tools fedora-packager rpmdevtools
+# rpmdev-setuptree
+
+rootdir=$(cd $(dirname $0)/../ && pwd)
+spec=~/rpmbuild/SPECS/porto.spec
+
+version=v$(head -n1 $rootdir/debian/changelog | sed -e 's/[^(]*(\([^)]*\).*/\1/')
+cat $rootdir/spec/porto.spec.in > $spec
+#cat $rootdir/spec/porto.spec.in $rootdir/debian/changelog > $spec
+sed -i -e "s/@VERSION@/$version/" $spec
+
+# download 
+(cd ~/rpmbuild/SOURCES/ && spectool -g ~/rpmbuild/SPECS/porto.spec)
+(cd ~/rpmbuild/SPECS/ && rpmbuild -vv -ba porto.spec)
