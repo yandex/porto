@@ -1924,6 +1924,7 @@ void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
                 if (error)
                     L_ERR() << "Can't rotate stderr: " << error << std::endl;
             }
+            JournalStream.close();
             break;
         case EEventType::Respawn:
             error = Respawn(holder_lock);
@@ -2044,16 +2045,21 @@ TError TContainer::UpdateNetwork() {
 
 bool TContainer::PrepareJournal() {
     if (!JournalStream.is_open()) {
-        std::string filename = config().mutable_journal_dir()->path() + GetName(true, "+");
+        std::string filename = config().journal_dir().path() + GetName(true, "+");
+
+        TFile f(filename);
+        if (!f.Exists())
+            f.Touch();
+        f.GetPath().Chown(OwnerCred);
+        f.GetPath().Chmod(0644);
+        f.RotateLog(1024 * 1024);
+
         JournalStream.open(filename, std::ios_base::app);
         if (!JournalStream.is_open()) {
             L_WRN() << "Can't open " << filename << " for writing container journal"
                     << std::endl;
             return false;
         }
-        TFile f(filename);
-        f.GetPath().Chown(OwnerCred);
-        f.GetPath().Chmod(0644);
     }
     return true;
 }
