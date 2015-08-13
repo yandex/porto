@@ -21,6 +21,10 @@ TScopedLock TLockable::ScopedLock() {
     return TScopedLock(Mutex);
 }
 
+TScopedLock TLockable::TryScopedLock() {
+    return TScopedLock(Mutex, std::try_to_lock);
+}
+
 TNestedScopedLock::TNestedScopedLock() {}
 
 TNestedScopedLock::TNestedScopedLock(TNestedScopedLock &&src) : InnerLock(std::move(src.InnerLock)) {}
@@ -36,4 +40,17 @@ TNestedScopedLock::TNestedScopedLock(TLockable &inner, TScopedLock &outer) {
         TScopedUnlock unlock(outer);
         InnerLock = inner.ScopedLock();
     }
+}
+
+TNestedScopedLock::TNestedScopedLock(TLockable &inner, TScopedLock &outer, std::try_to_lock_t t) {
+    PORTO_ASSERT(outer.owns_lock());
+
+    if (config().container().scoped_unlock()) {
+        TScopedUnlock unlock(outer);
+        InnerLock = inner.TryScopedLock();
+    }
+}
+
+bool TNestedScopedLock::IsLocked() {
+    return InnerLock.owns_lock();
 }

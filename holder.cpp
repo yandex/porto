@@ -577,20 +577,23 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
                 if (error)
                     continue;
 
+                TNestedScopedLock lock(*container, holder_lock, std::try_to_lock);
+                if (!lock.IsLocked() ||
+                    !container->IsValid() ||
+                    !container->CanRemoveDead())
+                    continue;
+
                 TScopedAcquire acquire(container);
                 if (!acquire.IsAcquired())
                     continue;
 
                 L_ACT() << "Remove old dead " << name << std::endl;
 
-                TNestedScopedLock lock(*container, holder_lock);
-                if (container->IsValid() && container->CanRemoveDead()) {
-                    error = Destroy(holder_lock, container);
-                    if (error)
-                        L_ERR() << "Can't destroy " << name << ": " << error << std::endl;
-                    else
-                        Statistics->RemoveDead++;
-                }
+                error = Destroy(holder_lock, container);
+                if (error)
+                    L_ERR() << "Can't destroy " << name << ": " << error << std::endl;
+                else
+                    Statistics->RemoveDead++;
             }
         }
 

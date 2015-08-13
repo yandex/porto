@@ -16,6 +16,7 @@ private:
 class TLockable {
 public:
     TScopedLock ScopedLock();
+    TScopedLock TryScopedLock();
 private:
     std::mutex Mutex;
 };
@@ -31,4 +32,6 @@ public:
     TNestedScopedLock(TNestedScopedLock &&src);
     TNestedScopedLock& operator=(TNestedScopedLock &&src);
     TNestedScopedLock(TLockable &inner, TScopedLock &outer);
+    TNestedScopedLock(TLockable &inner, TScopedLock &outer, std::try_to_lock_t t);
+    bool IsLocked();
 };
