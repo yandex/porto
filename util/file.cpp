@@ -2,7 +2,6 @@
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
-#include "util/cred.hpp"
 
 extern "C" {
 #include <fcntl.h>
@@ -202,16 +201,4 @@ TError TFile::RotateLog(off_t max_disk_usage) const {
 
     close(fd);
     return error;
-}
-
-TError TFile::Chmod(mode_t mode) const {
-    if (chmod(Path.ToString().c_str(), mode) == -1)
-        return TError(EError::Unknown, errno, "chmod(" + Path.ToString() + ")");
-    return TError::Success();
-}
-
-TError TFile::Chown(const TCred &cred) const {
-    if (chown(Path.ToString().c_str(), cred.Uid, cred.Gid) == -1)
-        return TError(EError::Unknown, errno, "chmod(" + Path.ToString() + ")");
-    return TError::Success();
 }

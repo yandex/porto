@@ -2052,8 +2052,8 @@ bool TContainer::PrepareJournal() {
             return false;
         }
         TFile f(filename);
-        f.Chown(OwnerCred);
-        f.Chmod(0644);
+        f.GetPath().Chown(OwnerCred);
+        f.GetPath().Chmod(0644);
     }
     return true;
 }
