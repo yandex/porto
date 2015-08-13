@@ -308,7 +308,8 @@ noinline TError CreateContainer(TContext &context,
     err = context.Cholder->Create(holder_lock, name, client->GetCred());
     if (!err) {
         std::shared_ptr<TContainer> container;
-        err = context.Cholder->Get(name, container);
+        TNestedScopedLock lock;
+        err = context.Cholder->GetLocked(holder_lock, nullptr, name, false, container, lock);
         if (!err && container)
             container->Journal("created", client);
         else
