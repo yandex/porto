@@ -385,7 +385,7 @@ noinline TError StartContainer(TContext &context,
         return err;
 
     std::shared_ptr<TContainer> target;
-    err = context.Cholder->Get(req.name(), target);
+    err = context.Cholder->Get(name, target);
     if (err)
         return err;
 
@@ -404,7 +404,11 @@ noinline TError StartContainer(TContext &context,
 
         std::shared_ptr<TContainer> container;
         TNestedScopedLock lock;
-        err = context.Cholder->GetLocked(holder_lock, client, name, true, container, lock);
+        err = context.Cholder->GetLocked(holder_lock, nullptr, name, false, container, lock);
+        if (err)
+            goto release;
+
+        err = container->CheckPermission(client->GetCred());
         if (err)
             goto release;
 
@@ -1409,8 +1413,15 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
     client->BeginRequest();
 
     bool log = config().log().verbose() || !InfoRequest(req);
-    if (log)
-        L_REQ() << RequestAsString(req) << " from " << *client << std::endl;
+    if (log) {
+        std::string ns = "";
+        std::shared_ptr<TContainer> clientContainer;
+        TError error = client->GetContainer(clientContainer);
+        if (!error)
+            ns = clientContainer->GetPortoNamespace();
+
+        L_REQ() << RequestAsString(req) << " from " << *client << " [" << ns << "]" << std::endl;
+    }
 
     rsp.set_error(EError::Unknown);
 

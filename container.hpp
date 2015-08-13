@@ -100,8 +100,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     TError Prepare();
 
-    std::string GetPortoNamespace() const;
-
     void CleanupWaiters();
     void NotifyWaiters();
 
@@ -139,6 +137,8 @@ public:
                const std::string &name, std::shared_ptr<TContainer> parent,
                uint16_t id, std::shared_ptr<TNetwork> net);
     ~TContainer();
+
+    std::string GetPortoNamespace() const;
 
     void AcquireForced();
     bool Acquire();
