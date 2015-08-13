@@ -111,4 +111,5 @@ public:
     TError StatVFS(uint64_t &space_used, uint64_t &space_avail,
                    uint64_t &inode_used, uint64_t &inode_avail) const;
     TError StatVFS(uint64_t &space_avail) const;
+    TError SecondsSinceMtime(uint64_t &seconds) const;
 };

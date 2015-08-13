@@ -15,6 +15,7 @@
 #include "util/string.hpp"
 #include "util/cred.hpp"
 #include "util/file.hpp"
+#include "util/folder.hpp"
 
 void TContainerHolder::DestroyRoot(TScopedLock &holder_lock) {
     auto list = List();
@@ -594,6 +595,24 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
                     L_ERR() << "Can't destroy " << name << ": " << error << std::endl;
                 else
                     Statistics->RemoveDead++;
+            }
+        }
+
+        { /* clean old journals */
+            TFolder folder(config().journal_dir().path());
+            std::vector<std::string> list;
+
+            TError err = folder.Items(EFileType::Regular, list);
+            if (err)
+                L_WRN() << "Can't list container journals" << std::endl;
+            else {
+                for (auto &filename : list) {
+                    uint64_t seconds;
+                    TPath p(folder.GetPath() + "/" + filename);
+
+                    if (!p.SecondsSinceMtime(seconds) && seconds > config().keep_journals())
+                        p.Unlink();
+                }
             }
         }
 

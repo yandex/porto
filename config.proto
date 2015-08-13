@@ -98,4 +98,5 @@ message TCfg {
 	optional TVolumesCfg volumes = 12;
 	optional TFileCfg version = 13;
 	optional TFileCfg journal_dir = 14;
+	optional uint64 keep_journals = 15;
 }

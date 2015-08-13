@@ -585,3 +585,16 @@ TError TPath::ReadDirectory(std::vector<std::string> &result) const {
     closedir(dir);
     return TError::Success();
 }
+
+TError TPath::SecondsSinceMtime(uint64_t &seconds) const {
+    struct stat st;
+
+    if (stat(c_str(), &st) < 0)
+        return TError(EError::Unknown, "Cannot stat " + Path);
+
+    struct timespec Now = {0};
+    clock_gettime(CLOCK_MONOTONIC, &Now);
+    seconds = Now.tv_sec - st.st_mtim.tv_sec;
+
+    return TError::Success();
+}
