@@ -301,9 +301,8 @@ noinline TError CreateContainer(TContext &context,
     if (!parent->IsValid())
         return TError(EError::ContainerDoesNotExist, "Parent container doesn't exist");
 
-    TScopedAcquire acquire(parent);
-    if (!acquire.IsAcquired())
-        return TError(EError::Busy, "Parent container is busy");
+    if (parent->IsAcquired())
+        return TError(EError::Busy, "Parent container " + parent->GetName() + " is busy");
 
     err = context.Cholder->Create(holder_lock, name, client->GetCred());
     if (!err) {
@@ -602,7 +601,7 @@ noinline TError SetContainerProperty(TContext &context,
 
     TScopedAcquire acquire(container);
     if (!acquire.IsAcquired())
-        return TError(EError::Busy, "Can't set property of busy container");
+        return TError(EError::Busy, "Can't set property " + req.property() + " of busy container " + container->GetName());
 
     err = container->SetProperty(req.property(), req.value(), client);
     if (!err)
