@@ -304,15 +304,12 @@ noinline TError CreateContainer(TContext &context,
     if (parent->IsAcquired())
         return TError(EError::Busy, "Parent container " + parent->GetName() + " is busy");
 
-    err = context.Cholder->Create(holder_lock, name, client->GetCred());
+    std::shared_ptr<TContainer> container;
+    err = context.Cholder->Create(holder_lock, name, client->GetCred(), container);
     if (!err) {
-        std::shared_ptr<TContainer> container;
-        TNestedScopedLock lock;
-        err = context.Cholder->GetLocked(holder_lock, nullptr, name, false, container, lock);
-        if (!err && container)
+        TNestedScopedLock lock(*container, holder_lock);
+        if (container->IsValid())
             container->Journal("created", client);
-        else
-            L_WRN() << "can't write create journal record" << std::endl;
     }
 
     return err;

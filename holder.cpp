@@ -47,27 +47,23 @@ TError TContainerHolder::CreateRoot(TScopedLock &holder_lock) {
 
     BootTime = GetBootTime();
 
-    error = Create(holder_lock, ROOT_CONTAINER, TCred(0, 0));
+    std::shared_ptr<TContainer> container;
+    error = Create(holder_lock, ROOT_CONTAINER, TCred(0, 0), container);
     if (error)
         return error;
 
-    std::shared_ptr<TContainer> root;
-    error = Get(ROOT_CONTAINER, root);
-    if (error)
-        return error;
-
-    if (root->GetId() != ROOT_CONTAINER_ID)
-        return TError(EError::Unknown, "Unexpected root container id " + std::to_string(root->GetId()));
+    if (container->GetId() != ROOT_CONTAINER_ID)
+        return TError(EError::Unknown, "Unexpected root container id " + std::to_string(container->GetId()));
 
     error = ReserveDefaultClassId();
     if (error)
         return error;
 
-    error = root->Prop->Set<bool>(P_ISOLATE, false);
+    error = container->Prop->Set<bool>(P_ISOLATE, false);
     if (error)
         return error;
 
-    error = root->Start(nullptr, true);
+    error = container->Start(nullptr, true);
     if (error)
         return error;
 
@@ -75,23 +71,19 @@ TError TContainerHolder::CreateRoot(TScopedLock &holder_lock) {
 }
 
 TError TContainerHolder::CreatePortoRoot(TScopedLock &holder_lock) {
-    TError error = Create(holder_lock, PORTO_ROOT_CONTAINER, TCred(0, 0));
+    std::shared_ptr<TContainer> container;
+    TError error = Create(holder_lock, PORTO_ROOT_CONTAINER, TCred(0, 0), container);
     if (error)
         return error;
 
-    std::shared_ptr<TContainer> root;
-    error = Get(PORTO_ROOT_CONTAINER, root);
+    if (container->GetId() != PORTO_ROOT_CONTAINER_ID)
+        return TError(EError::Unknown, "Unexpected /porto container id " + std::to_string(container->GetId()));
+
+    error = container->Prop->Set<bool>(P_ISOLATE, false);
     if (error)
         return error;
 
-    if (root->GetId() != PORTO_ROOT_CONTAINER_ID)
-        return TError(EError::Unknown, "Unexpected /porto container id " + std::to_string(root->GetId()));
-
-    error = root->Prop->Set<bool>(P_ISOLATE, false);
-    if (error)
-        return error;
-
-    error = root->Start(nullptr, true);
+    error = container->Start(nullptr, true);
     if (error)
         return error;
 
@@ -150,7 +142,7 @@ std::shared_ptr<TContainer> TContainerHolder::GetParent(const std::string &name)
     }
 }
 
-TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &name, const TCred &cred) {
+TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &name, const TCred &cred, std::shared_ptr<TContainer> &container) {
     if (!ValidName(name))
         return TError(EError::InvalidValue, "invalid container name " + name);
 
@@ -185,6 +177,8 @@ TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &nam
 
     if (parent)
         parent->AddChild(c);
+
+    container = c;
 
     return TError::Success();
 }

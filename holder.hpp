@@ -52,7 +52,7 @@ public:
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot(TScopedLock &holder_lock);
     TError CreatePortoRoot(TScopedLock &holder_lock);
-    TError Create(TScopedLock &holder_lock, const std::string &name, const TCred &cred);
+    TError Create(TScopedLock &holder_lock, const std::string &name, const TCred &cred, std::shared_ptr<TContainer> &container);
     TError Get(const std::string &name, std::shared_ptr<TContainer> &c);
     TError Get(int pid, std::shared_ptr<TContainer> &c);
 
