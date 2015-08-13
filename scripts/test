@@ -41,7 +41,7 @@ pkgtest() {
 threadstest() {
 	say "Threads test"
 	restart yandex-porto
-	python $ROOTDIR/test/threads.py
+	python $ROOTDIR/test/threads.py "$@"
 	sudo NOCHECK=y portotest self daemon
 }
 
@@ -207,6 +207,7 @@ for t in "$@"; do
 		fuzzy) shift; fuzzytest ;;
 		fuzzyargs) shift; fuzzytest "$@" ;;
 		threads) threadstest ;;
+		threadsargs) shift; threadstest top_iss "$@"; exit $? ;;
 		stressargs) shift; stresstest "$@"; exit $? ;;
 		pkg) pkgtest ;;
 		net) nettest ;;

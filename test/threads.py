@@ -123,6 +123,8 @@ def run_thread(thread, this_script, iterations = 0):
     conn = Connection(socket_path='/run/portod.socket', timeout=30)
     conn.connect()
 
+    print '{} {} iterations'.format(thread, iterations)
+
     if iterations > 0:
         for i in range(0, iterations):
             globals()[thread](conn, this_script)
@@ -140,7 +142,10 @@ if __name__ == '__main__':
             this_script = os.getcwd() + '/' + this_script
 
         if len(sys.argv) > 1:
-            run_thread(sys.argv[1], this_script)
+            iterations = 0
+            if len(sys.argv) > 2:
+                iterations = int(sys.argv[2])
+            run_thread(sys.argv[1], this_script, iterations)
         else:
             run_thread('top_iss', this_script, 10)
         sys.exit(0)
