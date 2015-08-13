@@ -97,4 +97,5 @@ message TCfg {
 	optional TPrivilegesCfg privileges = 11;
 	optional TVolumesCfg volumes = 12;
 	optional TFileCfg version = 13;
+	optional TFileCfg journal_dir = 14;
 }

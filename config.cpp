@@ -28,6 +28,8 @@ void TConfig::LoadDefaults() {
     config().mutable_slave_pid()->set_perm(0644);
     config().mutable_slave_log()->set_path("/var/log/portod.log");
     config().mutable_slave_log()->set_perm(0644);
+    config().mutable_journal_dir()->set_path("/var/log/porto/");
+    config().mutable_journal_dir()->set_perm(0755);
 
     config().mutable_master_pid()->set_path("/run/portoloop.pid");
     config().mutable_master_pid()->set_perm(0644);

@@ -6,6 +6,8 @@
 #include "error.hpp"
 #include "util/path.hpp"
 
+class TCred;
+
 class TFile {
     const TPath Path;
     const int Mode; // currently used only by WriteStringNoAppend
@@ -32,4 +34,7 @@ public:
     TError Truncate(size_t size) const;
     TError RotateLog(off_t max_disk_usage) const;
     off_t GetSize() const;
+
+    TError Chmod(mode_t mode) const;
+    TError Chown(const TCred &cred) const;
 };

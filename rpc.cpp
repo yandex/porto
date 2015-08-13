@@ -305,7 +305,17 @@ noinline TError CreateContainer(TContext &context,
     if (!acquire.IsAcquired())
         return TError(EError::Busy, "Parent container is busy");
 
-    return context.Cholder->Create(holder_lock, name, client->GetCred());
+    err = context.Cholder->Create(holder_lock, name, client->GetCred());
+    if (!err) {
+        std::shared_ptr<TContainer> container;
+        err = context.Cholder->Get(name, container);
+        if (!err && container)
+            container->Journal("created", client);
+        else
+            L_WRN() << "can't write create journal record" << std::endl;
+    }
+
+    return err;
 }
 
 noinline TError DestroyContainer(TContext &context,
@@ -340,6 +350,8 @@ noinline TError DestroyContainer(TContext &context,
             if (err)
                 return err;
         }
+
+        container->Journal("destroyed", client);
     }
 
     if (parent) {
@@ -365,14 +377,25 @@ noinline TError StartContainer(TContext &context,
     if (err)
         return err;
 
+    /* Check if target container exists */
+    std::string name;
+    err = clientContainer->AbsoluteName(req.name(), name);
+    if (err)
+        return err;
+
+    std::shared_ptr<TContainer> target;
+    err = context.Cholder->Get(req.name(), target);
+    if (err)
+        return err;
+
     std::vector<std::string> nameVec;
-    err = SplitString(req.name(), '/', nameVec);
+    err = SplitString(name, '/', nameVec);
     if (err)
         return TError(EError::InvalidValue, "Invalid container name " + req.name());
 
     std::shared_ptr<TContainer> topContainer = nullptr;
 
-    std::string name = "";
+    name = "";
     for (auto i = nameVec.begin(); i != nameVec.end(); i++) {
         if (!name.empty())
             name += "/";
@@ -413,6 +436,11 @@ noinline TError StartContainer(TContext &context,
 
         if (err)
             goto release;
+
+        if (topContainer == container)
+            container->Journal("started", client);
+        else
+            container->Journal("started", target);
     }
 
 release:
@@ -442,7 +470,11 @@ noinline TError StopContainer(TContext &context,
     if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't stop busy container");
 
-    return container->StopTree(holder_lock);
+    err = container->StopTree(holder_lock);
+    if (!err)
+        container->Journal("stopped", client);
+
+    return err;
 }
 
 noinline TError PauseContainer(TContext &context,
@@ -465,7 +497,11 @@ noinline TError PauseContainer(TContext &context,
     if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't pause busy container");
 
-    return container->Pause(holder_lock);
+    err = container->Pause(holder_lock);
+    if (!err)
+        container->Journal("paused", client);
+
+    return err;
 }
 
 noinline TError ResumeContainer(TContext &context,
@@ -488,7 +524,11 @@ noinline TError ResumeContainer(TContext &context,
     if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't resume busy container");
 
-    return container->Resume(holder_lock);
+    err = container->Resume(holder_lock);
+    if (!err)
+        container->Journal("resumed", client);
+
+    return err;
 }
 
 noinline TError ListContainers(TContext &context,
@@ -559,7 +599,11 @@ noinline TError SetContainerProperty(TContext &context,
     if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't set property of busy container");
 
-    return container->SetProperty(req.property(), req.value(), client);
+    err = container->SetProperty(req.property(), req.value(), client);
+    if (!err)
+        container->Journal("set " + req.property() + " to " + req.value(), client);
+
+    return err;
 }
 
 noinline TError GetContainerData(TContext &context,
@@ -745,7 +789,10 @@ noinline TError Kill(TContext &context,
     if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't kill busy container");
 
-    return container->Kill(req.sig());
+    err = container->Kill(req.sig());
+    if (!err)
+        container->Journal("killed with " + req.sig(), client);
+    return err;
 }
 
 noinline TError Version(TContext &context,

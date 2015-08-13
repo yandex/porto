@@ -66,6 +66,12 @@ static void DaemonOpenLog(bool master) {
 
     TLogger::CloseLog();
     TLogger::OpenLog(stdlog, log.path(), log.perm());
+
+    if (!master) {
+        TFolder journals(config().journal_dir().path());
+        if (!journals.Exists())
+            journals.Create(config().journal_dir().perm());
+    }
 }
 
 static int DaemonSyncConfig(bool master) {

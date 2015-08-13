@@ -1,4 +1,5 @@
 #include <sstream>
+#include <fstream>
 #include <memory>
 #include <csignal>
 #include <cstdlib>
@@ -38,6 +39,8 @@ extern "C" {
 #include <sys/reboot.h>
 #include <fcntl.h>
 #include <sys/eventfd.h>
+#include <sys/fsuid.h>
+#include <sys/stat.h>
 }
 
 using std::string;
@@ -1225,11 +1228,13 @@ TError TContainer::Pause(TScopedLock &holder_lock) {
         return error;
 
     SetState(EContainerState::Paused);
-    ApplyForTreePreorder(holder_lock, [] (TScopedLock &holder_lock,
-                                          TContainer &child) {
+    ApplyForTreePreorder(holder_lock, [&] (TScopedLock &holder_lock,
+                                           TContainer &child) {
         if (child.GetState() == EContainerState::Running ||
-            child.GetState() == EContainerState::Meta)
+            child.GetState() == EContainerState::Meta) {
             child.SetState(EContainerState::Paused);
+            child.Journal("paused", shared_from_this());
+        }
         return TError::Success();
     });
     return TError::Success();
@@ -1256,10 +1261,12 @@ TError TContainer::Resume(TScopedLock &holder_lock) {
     if (GetState() == EContainerState::Paused)
         SetState(EContainerState::Running);
 
-    ApplyForTreePreorder(holder_lock, [] (TScopedLock &holder_lock,
-                                          TContainer &child) {
-        if (child.GetState() == EContainerState::Paused)
+    ApplyForTreePreorder(holder_lock, [&] (TScopedLock &holder_lock,
+                                           TContainer &child) {
+        if (child.GetState() == EContainerState::Paused) {
             child.SetState(EContainerState::Running);
+            child.Journal("resumed", shared_from_this());
+        }
         return TError::Success();
     });
     return TError::Success();
@@ -1713,6 +1720,8 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
     if (Parent)
         Parent->AddChild(shared_from_this());
 
+    Journal("restored");
+
     return TError::Success();
 }
 
@@ -1751,10 +1760,15 @@ void TContainer::ExitTree(TScopedLock &holder_lock, int status, bool oomKilled) 
             (void)child.Resume(holder_lock);
 
         child.Exit(holder_lock, status, oomKilled);
+        Journal(oomKilled ? "killed by OOM" : "killed", shared_from_this());
         return TError::Success();
     });
 
     Exit(holder_lock, status, oomKilled);
+    if (oomKilled)
+        Journal("killed by OOM");
+    else
+        Journal("init process quitted, exit code " + std::to_string(status));
 }
 
 void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
@@ -1860,6 +1874,7 @@ TError TContainer::Respawn(TScopedLock &holder_lock) {
     if (error)
         return error;
 
+    Journal("respawned");
     return TError::Success();
 }
 
@@ -2027,6 +2042,39 @@ TError TContainer::UpdateNetwork() {
     return TError::Success();
 }
 
+bool TContainer::PrepareJournal() {
+    if (!JournalStream.is_open()) {
+        std::string filename = config().mutable_journal_dir()->path() + GetName(true, "+");
+        JournalStream.open(filename, std::ios_base::app);
+        if (!JournalStream.is_open()) {
+            L_WRN() << "Can't open " << filename << " for writing container journal"
+                    << std::endl;
+            return false;
+        }
+        TFile f(filename);
+        f.Chown(OwnerCred);
+        f.Chmod(0644);
+    }
+    return true;
+}
+
+void TContainer::Journal(const std::string &message) {
+    if (PrepareJournal())
+        JournalStream << TLogger::GetTime() << " " << message << std::endl;
+}
+
+void TContainer::Journal(const std::string &message, std::shared_ptr<TClient> client) {
+    if (PrepareJournal())
+        JournalStream << TLogger::GetTime() << " " << message
+                      << " by " << *client << std::endl;
+}
+
+void TContainer::Journal(const std::string &message, std::shared_ptr<TContainer> root) {
+    if (PrepareJournal())
+        JournalStream << TLogger::GetTime() << " " << message
+                      << " due to container " << root->GetName() << std::endl;
+}
+
 TContainerWaiter::TContainerWaiter(std::shared_ptr<TClient> client,
                                    std::function<void (std::shared_ptr<TClient>,
                                                        TError, std::string)> callback) :
@@ -2057,16 +2105,20 @@ TError TContainer::StopTree(TScopedLock &holder_lock) {
             return error;
     }
 
-    TError error = ApplyForTreePostorder(holder_lock, [] (TScopedLock &holder_lock,
-                                                          TContainer &child) {
+    TError error = ApplyForTreePostorder(holder_lock, [&] (TScopedLock &holder_lock,
+                                                           TContainer &child) {
         if (child.IsFrozen()) {
             TError error = child.Unfreeze(holder_lock);
             if (error)
                 return error;
         }
 
-        if (child.GetState() != EContainerState::Stopped)
-            return child.Stop(holder_lock);
+        if (child.GetState() != EContainerState::Stopped) {
+            TError err = child.Stop(holder_lock);
+            if (!err && !IsRoot())
+                child.Journal("stopped", shared_from_this());
+            return err;
+        }
         return TError::Success();
     });
 

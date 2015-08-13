@@ -66,6 +66,8 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     std::shared_ptr<TEpollSource> Source;
     bool IsMeta = false;
 
+    std::ofstream JournalStream;
+
     // data
     void UpdateRunningChildren(size_t diff);
     TError UpdateSoftLimit();
@@ -116,6 +118,8 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     TError Unfreeze(TScopedLock &holder_lock);
     TError Freeze(TScopedLock &holder_lock);
+
+    bool PrepareJournal();
 
 public:
     TCred OwnerCred;
@@ -225,6 +229,13 @@ public:
     bool UnlinkVolume(std::shared_ptr<TVolume> volume) {
         return Volumes.erase(volume);
     }
+
+    // raw
+    void Journal(const std::string &message);
+    // for user's actions
+    void Journal(const std::string &message, std::shared_ptr<TClient> client);
+    // for recursive actions, like stopping tree of containers
+    void Journal(const std::string &message, std::shared_ptr<TContainer> root);
 };
 
 class TScopedAcquire : public TNonCopyable {
