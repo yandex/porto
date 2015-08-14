@@ -1,3 +1,16 @@
+yandex-porto (2.0) precise; urgency=low
+
+  * enable scoped unlock by default (threading)
+  * don't print backtrace on SIGPIPE
+  * portoctl: add build command to build image layer
+  * support root_readonly=true for root=/
+  * fix meta container start when portod binary is updated (without restart)
+  * rework bind property (/<dir> binds to root <dir> binds to <root>/<cwd>)
+  * don't update dynamic properties when private is set
+  * add container journals
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Wed, 12 Aug 2015 17:52:00 +0300
+
 yandex-porto (1.18) precise; urgency=low
 
   * add ceph rbd backend for volume
