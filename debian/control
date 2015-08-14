@@ -11,8 +11,13 @@ Package: yandex-porto
 Section: utils
 Priority: extra
 Architecture: amd64
-Depends: ${shlibs:Depends}, logrotate, linux-image-server (>= 3.4.0) | linux-image-generic (>= 3.4.0)
+Depends: ${shlibs:Depends}, logrotate
 Description: Porto allows to run processes in containers
+ Requires Linux kernel version >= 3.4
+ .
+ Some features work only for special kernel,
+ see https://wiki.yandex-team.ru/porto and
+ https://wiki.yandex-team.ru/kernel for details.
 
 Package: python-portopy
 Section: python
