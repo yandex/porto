@@ -104,6 +104,7 @@ bootstrap() {
 	local ro=""
 	for file in $(find / -maxdepth 1 -mindepth 1); do
 		if [ "$file" = "/tmp" ]; then continue; fi
+		if [ "$file" = "/lost+found" ]; then continue; fi
 		if [ -L "$file" ]; then continue; fi
 		ro="$file $file ro; $ro"
 	done
