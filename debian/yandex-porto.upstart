@@ -5,7 +5,8 @@
 description	"Porto"
 author "Eugene Kilimchuk <ekilimchuk@yandex-team.ru>"
 
-start on yandex-networking-started
+start on runlevel [2345]
+stop on runlevel [!2345]
 
 respawn
 
