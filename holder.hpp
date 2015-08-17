@@ -54,7 +54,7 @@ public:
     TError Destroy(TScopedLock &holder_lock, const std::string &name);
     void DestroyRoot(TScopedLock &holder_lock);
 
-    std::vector<std::shared_ptr<TContainer> > List() const;
+    std::vector<std::shared_ptr<TContainer> > List(bool all = false) const;
 
     bool DeliverEvent(const TEvent &event);
 };

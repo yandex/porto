@@ -657,7 +657,7 @@ public:
 
     TUintMap GetDefault() const override {
         auto c = GetContainer();
-        uint64_t def =  c->IsRoot() ? GetRootDef() : GetDef();
+        uint64_t def =  c->IsRoot() || c->IsPortoRoot() ? GetRootDef() : GetDef();
         auto net_lock = c->Net->ScopedLock();
         auto availableLinks = c->Net->GetLinks();
         TUintMap m;
