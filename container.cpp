@@ -2037,6 +2037,13 @@ void TContainer::CleanupWaiters() {
 
 TError TContainer::UpdateNetwork() {
     if (Tclass) {
+        TUintMap prio, rate, ceil;
+        prio = Prop->Get<TUintMap>(P_NET_PRIO);
+        rate = Prop->Get<TUintMap>(P_NET_GUARANTEE);
+        ceil = Prop->Get<TUintMap>(P_NET_LIMIT);
+
+        Tclass->Prepare(prio, rate, ceil);
+
         auto net_lock = Net->ScopedLock();
         return Tclass->Create();
     }

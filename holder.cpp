@@ -18,7 +18,7 @@
 #include "util/folder.hpp"
 
 void TContainerHolder::DestroyRoot(TScopedLock &holder_lock) {
-    auto list = List();
+    auto list = List(true);
 
     // we want children to be removed first
     std::reverse(std::begin(list), std::end(list));
@@ -291,12 +291,12 @@ void TContainerHolder::Unlink(TScopedLock &holder_lock, std::shared_ptr<TContain
     Statistics->Created--;
 }
 
-std::vector<std::shared_ptr<TContainer> > TContainerHolder::List() const {
+std::vector<std::shared_ptr<TContainer> > TContainerHolder::List(bool all) const {
     std::vector<std::shared_ptr<TContainer> > ret;
 
     for (auto c : Containers) {
         PORTO_ASSERT(c.first == c.second->GetName());
-        if (c.second->IsPortoRoot())
+        if (!all && c.second->IsPortoRoot())
             continue;
         ret.push_back(c.second);
     }
@@ -629,7 +629,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     {
         L() << "Refresh containers tc classes" << std::endl;
 
-        auto list = List();
+        auto list = List(true);
         for (auto &target : list) {
             TNestedScopedLock lock(*target, holder_lock);
             if (!target->IsValid())

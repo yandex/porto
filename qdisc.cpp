@@ -48,27 +48,21 @@ TError TTclass::Create() {
         auto alias = link->GetAlias();
 
         if (Prio.find(alias) == Prio.end())
-            Prio[alias] = config().network().default_prio();
-
-        if (Rate.find(alias) == Rate.end())
-            Rate[alias] = config().network().default_guarantee();
-
-        if (Ceil.find(alias) == Ceil.end())
-            Ceil[alias] = config().network().default_limit();
+            return TError(EError::Unknown, "Can't find prio for link " + alias);
+        else if (Rate.find(alias) == Rate.end())
+            return TError(EError::Unknown, "Can't find rate for link " + alias);
+        else if (Ceil.find(alias) == Ceil.end())
+            return TError(EError::Unknown, "Can't find ceil for link " + alias);
 
         TNlClass tclass(link, GetParent(), Handle);
         if (tclass.Exists()) {
-            if (!tclass.Valid(Prio[link->GetAlias()],
-                          Rate[link->GetAlias()],
-                          Ceil[link->GetAlias()]))
+            if (!tclass.Valid(Prio[alias], Rate[alias], Ceil[alias]))
                 (void)tclass.Remove();
             else
                 continue;
         }
 
-        TError error = tclass.Create(Prio[link->GetAlias()],
-                                     Rate[link->GetAlias()],
-                                     Ceil[link->GetAlias()]);
+        TError error = tclass.Create(Prio[alias], Rate[alias], Ceil[alias]);
         if (!firstError)
             firstError = error;
     }
