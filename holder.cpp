@@ -492,9 +492,6 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
         auto list = List(true);
         for (auto &target : list) {
             TNestedScopedLock lock(*target, holder_lock);
-            if (!target->IsValid())
-                continue;
-
             TError error = target->UpdateNetwork();
             if (error)
                 L_WRN() << "Can't update " << target->GetName() << " network: " << error << std::endl;
