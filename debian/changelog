@@ -1,3 +1,11 @@
+yandex-porto (1.17.2) precise; urgency=low
+
+  * default net is set to inherited (use parent network)
+  * fix invalid tc rate for / and /porto
+  * fix handling of client->Identify error
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 18 Aug 2015 18:45:00 +0300
+
 yandex-porto (1.17.1) precise; urgency=low
 
   * fix wrong macvlan default type and broadcast address
