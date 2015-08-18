@@ -516,9 +516,6 @@ void TContainerHolder::UpdateNetwork(TScopedLock &holder_lock) {
     auto containers = List();
     for (auto c : containers) {
         TNestedScopedLock lock(*c, holder_lock);
-        if (!c->IsValid())
-            continue;
-
         TError error = c->UpdateNetwork();
         if (error)
             L_WRN() << "Can't update " << c->GetName() << " network: " << error << std::endl;
