@@ -209,6 +209,7 @@ public:
 };
 
 class TRawValueMap {
+protected:
     std::map<std::string, TAbstractValue *> AbstractValues;
 
 public:

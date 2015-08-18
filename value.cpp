@@ -306,8 +306,9 @@ TError TValueMap::Sync() {
         return TError::Success();
 
     kv::TNode node;
-    for (auto name : List()) {
-        auto *av = Find(name);
+    for (auto kv : AbstractValues) {
+        auto name = kv.first;
+        auto av = kv.second;
 
         if (!(av->GetFlags() & PERSISTENT_VALUE))
             continue;
@@ -317,10 +318,10 @@ TError TValueMap::Sync() {
 
         auto pair = node.add_pairs();
         pair->set_key(name);
-        pair->set_val(ToString(name));
+        pair->set_val(av->ToString());
 
         if (config().log().verbose())
-            L_ACT() << "Sync " << name << " = " << ToString(name) << std::endl;
+            L_ACT() << "Sync " << name << " = " << av->ToString() << std::endl;
     }
 
     return KvNode->Append(node);

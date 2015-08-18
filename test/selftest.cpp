@@ -4039,7 +4039,7 @@ static void ReadPropsAndData(TPortoAPI &api, const std::string &name) {
 static void TestLeaks(TPortoAPI &api) {
     string slavePid, masterPid;
     string name;
-    int slack = 4096;
+    int slack = 4096 * 2;
 
     TFile slaveFile(config().slave_pid().path());
     ExpectSuccess(slaveFile.AsString(slavePid));

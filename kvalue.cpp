@@ -5,6 +5,7 @@
 #include "util/protobuf.hpp"
 #include "util/file.hpp"
 #include "util/folder.hpp"
+#include "util/unix.hpp"
 
 extern "C" {
 #include <sys/types.h>
@@ -63,11 +64,12 @@ void TKeyValueNode::Merge(kv::TNode &node, kv::TNode &next) const {
 TError TKeyValueNode::Load(kv::TNode &node) const {
     auto lock = Storage->ScopedLock();
 
-    int fd = open(Path.ToString().c_str(), O_RDONLY | O_CLOEXEC);
+    TScopedFd fd;
+    fd = open(Path.ToString().c_str(), O_RDONLY | O_CLOEXEC);
     node.Clear();
     TError error;
     try {
-        google::protobuf::io::FileInputStream pist(fd);
+        google::protobuf::io::FileInputStream pist(fd.GetFd());
         if (!ReadDelimitedFrom(&pist, &node)) {
             error = TError(EError::Unknown, __class__ + ": protobuf read error");
         }
@@ -81,24 +83,23 @@ TError TKeyValueNode::Load(kv::TNode &node) const {
             throw;
         error = TError(EError::Unknown, __class__ + ": unhandled exception");
     }
-    close(fd);
     return error;
 }
 
 TError TKeyValueNode::Append(const kv::TNode &node) const {
     auto lock = Storage->ScopedLock();
 
-    int fd = open(Path.ToString().c_str(), O_CREAT | O_WRONLY | O_CLOEXEC, 0755);
+    TScopedFd fd;
+    fd = open(Path.ToString().c_str(), O_CREAT | O_WRONLY | O_CLOEXEC, 0755);
     TError error;
 
-    if (lseek(fd, 0, SEEK_END) < 0) {
-        close(fd);
+    if (lseek(fd.GetFd(), 0, SEEK_END) < 0) {
         TError error(EError::Unknown, errno, __class__ + ": open(" + Path.ToString() + ")");
         L_ERR() << "Can't append key-value node: " << error << std::endl;
         return error;
     }
     try {
-        google::protobuf::io::FileOutputStream post(fd);
+        google::protobuf::io::FileOutputStream post(fd.GetFd());
         if (!WriteDelimitedTo(node, &post))
             error = TError(EError::Unknown, __class__ + ": protobuf write error");
     } catch (...) {
@@ -106,7 +107,6 @@ TError TKeyValueNode::Append(const kv::TNode &node) const {
             throw;
         error = TError(EError::Unknown, __class__ + ": unhandled exception");
     }
-    close(fd);
     if (error)
         L_ERR() << "Can't append key-value node: " << error << std::endl;
     return error;
@@ -115,10 +115,11 @@ TError TKeyValueNode::Append(const kv::TNode &node) const {
 TError TKeyValueNode::Save(const kv::TNode &node) const {
     auto lock = Storage->ScopedLock();
 
-    int fd = open(Path.ToString().c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0755);
+    TScopedFd fd;
+    fd = open(Path.ToString().c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0755);
     TError error;
     try {
-        google::protobuf::io::FileOutputStream post(fd);
+        google::protobuf::io::FileOutputStream post(fd.GetFd());
         if (!WriteDelimitedTo(node, &post))
             error = TError(EError::Unknown, __class__ + ": protobuf write error");
     } catch (...) {
@@ -126,7 +127,6 @@ TError TKeyValueNode::Save(const kv::TNode &node) const {
             throw;
         error = TError(EError::Unknown, __class__ + ": unhandled exception");
     }
-    close(fd);
     return error;
 }
 

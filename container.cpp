@@ -1496,8 +1496,24 @@ TError TContainer::SetProperty(const string &origProperty,
             return error;
     }
 
-    if (ShouldApplyProperty(property))
+    if (ShouldApplyProperty(property)) {
         error = ApplyDynamicProperties();
+        if (error)
+            return error;
+    }
+
+    // Write KVS snapshot, otherwise it may grow indefinitely and on next
+    // restart we will merge it forever
+
+    error = Prop->Flush();
+    if (error)
+        return error;
+
+    error = Prop->Sync();
+    if (error)
+        return error;
+
+    error = Data->Sync();
 
     return error;
 }
