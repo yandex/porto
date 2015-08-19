@@ -95,6 +95,14 @@ class VolumeNotLinked(EError):
     EID = rpc_pb2.VolumeNotLinked
 
 
+class LayerAlreadyExists(EError):
+    EID = rpc_pb2.LayerAlreadyExists
+
+
+class LayerNotFound(EError):
+    EID = rpc_pb2.LayerNotFound
+
+
 class NoSpace(EError):
     EID = rpc_pb2.NoSpace
 

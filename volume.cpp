@@ -867,6 +867,8 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
         if (layer.IsAbsolute()) {
             layer = container_root / layer;
             l = layer.ToString();
+            if (!layer.Exists())
+                return TError(EError::LayerNotFound, "Layer not found");
             if (!layer.AccessOk(EFileAccess::Write, creator_cred))
                 return TError(EError::Permission, "Layer path not permitted");
         } else {
@@ -875,7 +877,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             layer = TPath(config().volumes().layers_dir()) / layer;
         }
         if (!layer.Exists())
-            return TError(EError::InvalidValue, "Layer does not exist");
+            return TError(EError::LayerNotFound, "Layer not found");
         if (layer.GetType() != EFileType::Directory)
             return TError(EError::InvalidValue, "Layer must be a directory");
     }

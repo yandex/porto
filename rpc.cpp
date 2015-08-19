@@ -188,6 +188,10 @@ static std::string ResponseAsString(const rpc::TContainerResponse &resp) {
     case EError::Busy:
         return "Error: Busy (" + resp.errormsg() + ")";
         break;
+    case EError::LayerAlreadyExists:
+        return "Error: LayerAlreadyExists (" + resp.errormsg() + ")";
+    case EError::LayerNotFound:
+        return "Error: LayerNotFound (" + resp.errormsg() + ")";
     case EError::NoSpace:
         return "Error: NoSpace (" + resp.errormsg() + ")";
         break;
@@ -1242,7 +1246,7 @@ noinline TError ImportLayer(TContext &context,
     auto vholder_lock = context.Vholder->ScopedLock();
     if (layer.Exists()) {
         if (!req.merge()) {
-            error = TError(EError::InvalidValue, "layer already exists");
+            error = TError(EError::LayerAlreadyExists, "Layer already exists");
             goto err_tmp;
         }
         if (LayerInUse(context, layer)) {
@@ -1358,7 +1362,7 @@ noinline TError RemoveLayer(TContext &context,
     TPath layers = TPath(config().volumes().layers_dir());
     TPath layer = layers / req.layer();
     if (!layer.Exists())
-        return TError(EError::InvalidValue, "layer does not exist");
+        return TError(EError::LayerNotFound, "Layer not found");
 
     TPath layers_tmp = layers / "_tmp_";
     TPath layer_tmp = layers_tmp / req.layer();

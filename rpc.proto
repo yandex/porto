@@ -50,6 +50,9 @@ enum EError {
 	// Volume not linked with container
 	VolumeNotLinked = 17;
 
+	LayerAlreadyExists = 18;
+	LayerNotFound = 19;
+
 	// Reserved error code used by Porto internals. Can't be returned to a user.
 	Queued = 1000;
 }
