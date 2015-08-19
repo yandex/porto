@@ -107,8 +107,10 @@ public:
         if (IsDefault(name)) {
             std::shared_ptr<TContainer> c;
             if (ParentDefault(c, name))
-                return c->GetParent()->Prop->Get<T>(name);
+                if (c && c->GetParent())
+                    return c->GetParent()->Prop->Get<T>(name);
         }
+
         return TValueMap::Get<T>(name);
     }
 

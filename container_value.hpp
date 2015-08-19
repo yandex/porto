@@ -24,9 +24,9 @@ public:
     void SetContainer(std::shared_ptr<TContainer> container) {
         Container = container;
     }
-    const char *GetName() { return Name; }
-    const char *GetDesc() { return Desc; }
-    const std::set<EContainerState> &GetState() { return State; }
+    const char *GetName() const { return Name; }
+    const char *GetDesc() const { return Desc; }
+    const std::set<EContainerState> &GetState() const { return State; }
     virtual TError PrepareTaskEnv(std::shared_ptr<TTaskEnv> taskEnv) { return TError::Success(); }
     virtual bool IsImplemented() { return Implemented; }
 };

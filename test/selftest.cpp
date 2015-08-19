@@ -3836,6 +3836,30 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
 
     ExpectApiSuccess(api.Pause("a"));
     ExpectApiSuccess(api.Destroy("a"));
+
+    Say() << "Test property propagation" << std::endl;
+    std::string val;
+
+    ExpectApiSuccess(api.Create("a"));
+    ExpectApiSuccess(api.Create("a/b"));
+    ExpectApiSuccess(api.Create("a/b/c"));
+
+    ExpectApiSuccess(api.SetProperty("a/b", "isolate", "false"));
+    ExpectApiSuccess(api.SetProperty("a/b/c", "isolate", "false"));
+
+    ExpectApiSuccess(api.SetProperty("a", "root", "/tmp"));
+    ExpectApiSuccess(api.GetProperty("a/b", "root", val));
+    ExpectEq(val, "/tmp");
+    ExpectApiSuccess(api.GetProperty("a/b/c", "root", val));
+    ExpectEq(val, "/tmp");
+
+    ExpectApiSuccess(api.SetProperty("a", "memory_limit", "12345"));
+    ExpectApiSuccess(api.GetProperty("a/b", "memory_limit", val));
+    ExpectNeq(val, "12345");
+    ExpectApiSuccess(api.GetProperty("a/b/c", "memory_limit", val));
+    ExpectNeq(val, "12345");
+
+    ExpectApiSuccess(api.Destroy("a"));
 }
 
 static void TestPermissions(TPortoAPI &api) {
@@ -4605,6 +4629,7 @@ static void TestRecovery(TPortoAPI &api) {
     for (auto &pair : props)
         ExpectApiSuccess(api.SetProperty(name, pair.first, pair.second));
     ExpectApiSuccess(api.Start(name));
+    ExpectApiSuccess(api.SetProperty(name, "private", "ISS-AGENT"));
 
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
     ExpectEq(TaskRunning(api, pid), true);
