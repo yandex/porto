@@ -87,6 +87,14 @@ class VolumeNotFound(EError):
     EID = rpc_pb2.VolumeNotFound
 
 
+class VolumeAlreadyLinked(EError):
+    EID = rpc_pb2.VolumeAlreadyLinked
+
+
+class VolumeNotLinked(EError):
+    EID = rpc_pb2.VolumeNotLinked
+
+
 class NoSpace(EError):
     EID = rpc_pb2.NoSpace
 

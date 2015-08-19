@@ -45,6 +45,10 @@ enum EError {
 	// Operation can't be performed, because container or volume are in use by
 	// other simultaneous operation.
 	Busy = 15;
+	// Volume already linked with container
+	VolumeAlreadyLinked = 16;
+	// Volume not linked with container
+	VolumeNotLinked = 17;
 
 	// Reserved error code used by Porto internals. Can't be returned to a user.
 	Queued = 1000;

@@ -179,6 +179,12 @@ static std::string ResponseAsString(const rpc::TContainerResponse &resp) {
     case EError::VolumeNotFound:
         return "Error: VolumeNotFound (" + resp.errormsg() + ")";
         break;
+    case EError::VolumeAlreadyLinked:
+        return "Error: VolumeAlreadyLinked (" + resp.errormsg() + ")";
+        break;
+    case EError::VolumeNotLinked:
+        return "Error: VolumeNotLinked (" + resp.errormsg() + ")";
+        break;
     case EError::Busy:
         return "Error: Busy (" + resp.errormsg() + ")";
         break;
@@ -1042,7 +1048,7 @@ noinline TError LinkVolume(TContext &context,
 
     vholder_lock.lock();
     if (!container->LinkVolume(context.Vholder, volume))
-        return TError(EError::VolumeAlreadyExists, "Already linked");
+        return TError(EError::VolumeAlreadyLinked, "Already linked");
 
     return volume->LinkContainer(container->GetName());
 }
@@ -1096,7 +1102,7 @@ noinline TError UnlinkVolume(TContext &context,
         return error;
 
     if (!container->UnlinkVolume(volume))
-        return TError(EError::VolumeNotFound, "Container not linked to the volume");
+        return TError(EError::VolumeNotLinked, "Container not linked to the volume");
 
     if (!volume->UnlinkContainer(container->GetName()))
         return TError::Success(); /* Still linked to somebody */
