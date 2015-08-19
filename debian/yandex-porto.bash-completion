@@ -2,13 +2,13 @@
 
 _porto_containers ()
 {
-	COMPREPLY=( $( compgen -W "$(portoctl list -1 2>/dev/null) / /porto $@" -- "$cur" ) )
+	COMPREPLY=( $( compgen -W "$(portoctl list -1 2>/dev/null) / /porto $1" -- "$cur" ) )
 	__ltrim_colon_completions "$cur"
 }
 
 _porto_volumes ()
 {
-	COMPREPLY=( $( compgen -W "$(portoctl vlist -1 2>/dev/null) $@" -- "$cur" ) )
+	COMPREPLY=( $( compgen -W "$(portoctl vlist -1 2>/dev/null) $1" -- "$cur" ) )
 	__ltrim_colon_completions "$cur"
 }
 
@@ -129,7 +129,7 @@ _portoctl ()
 	vlist)
 		case "$cword" in
 		2)
-			_porto_volumes "-1" "-i" "-v"
+			_porto_volumes "-1 -i -v"
 			;;
 		3)
 			_porto_volumes
