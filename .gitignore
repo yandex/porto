@@ -3,6 +3,7 @@
 /portoctl
 /portotest
 /libporto.a
+/libutil.a
 /*.o
 /*.pb.cc
 /*.pb.h
