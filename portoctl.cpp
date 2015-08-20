@@ -750,15 +750,9 @@ public:
             }
         }
 
-        error = ns.Attach();
+        error = ns.Enter();
         if (error) {
-            PrintError(error, "Can't create namespace snapshot");
-            return EXIT_FAILURE;
-        }
-
-        error = ns.Chroot();
-        if (error) {
-            PrintError(error, "Can't change root directory");
+            PrintError(error, "Cannot enter namespaces");
             return EXIT_FAILURE;
         }
 

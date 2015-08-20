@@ -719,7 +719,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         if (taskEnv->NetCfg.Inherited) {
             auto p = FindRunningParent();
             if (p) {
-                TError error = taskEnv->ParentNs.Open(p->Task->GetPid(), { "net" });
+                TError error = taskEnv->ParentNs.Net.Open(p->Task->GetPid(), "ns/net");
                 if (client && error)
                     return error;
             }

@@ -61,117 +61,56 @@ bool TNamespaceFd::operator!=(const TNamespaceFd &other) const {
     return !(*this == other);
 }
 
-// order is important
-static pair<string, int> nameToType[TNamespaceSnapshot::nrNs] = {
-    //{ "user", CLONE_NEWUSER },
-    { "ipc", CLONE_NEWIPC },
-    { "uts", CLONE_NEWUTS },
-    { "net", CLONE_NEWNET },
-    { "pid", CLONE_NEWPID },
-    { "mnt", CLONE_NEWNS },
-};
-
-TError TNamespaceSnapshot::OpenProcPidFd(int pid, string name, int &fd) {
-    std::string path = "/proc/" + std::to_string(pid) + "/" + name;
-    fd = open(path.c_str(), O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-    if (fd < 0)
-        return TError(EError::Unknown, errno, "Can't open " + path);
-
-    return TError::Success();
-}
-
-TError TNamespaceSnapshot::Open(int pid, std::set<std::string> ns) {
-    int nr = 0;
+TError TNamespaceSnapshot::Open(pid_t pid) {
     TError error;
 
-    Close();
-
-    for (int i = 0; i < nrNs; i++) {
-        auto name = nameToType[i].first;
-
-        if (ns.find(name) == ns.end())
-            continue;
-
-        int fd;
-        error = OpenProcPidFd(pid, "ns/" + name, fd);
-        if (error) {
-            if (error.GetErrno() == ENOENT)
-                continue;
-            Close();
-            return error;
-        }
-
-        nsFd[i] = fd;
-        nr++;
-    }
-
-    if (!nr) {
-        Close();
-        return TError(EError::Unknown, "Can't find any namespace");
-    }
-
-    error = OpenProcPidFd(pid, "root", RootFd);
-    if (error) {
-        Close();
+    error = Ipc.Open(pid, "ns/ipc");
+    if (error)
         return error;
-    }
-
-    error = OpenProcPidFd(pid, "cwd", CwdFd);
-    if (error) {
-        Close();
+    error = Uts.Open(pid, "ns/uts");
+    if (error)
         return error;
-    }
-
+    error = Net.Open(pid, "ns/net");
+    if (error)
+        return error;
+    error = Pid.Open(pid, "ns/pid");
+    if (error)
+        return error;
+    error = Mnt.Open(pid, "ns/mnt");
+    if (error)
+        return error;
+    error = Root.Open(pid, "root");
+    if (error)
+        return error;
+    error = Cwd.Open(pid, "cwd");
+    if (error)
+        return error;
     return TError::Success();
 }
 
-TError TNamespaceSnapshot::Chroot() const {
-    if (fchdir(RootFd) < 0)
-        return TError(EError::Unknown, errno, "Can't change root directory: fchdir(" + std::to_string(RootFd) + ")");
+TError TNamespaceSnapshot::Enter() const {
+    TError error;
 
-    if (chroot(".") < 0)
-        return TError(EError::Unknown, errno, "Can't change root directory chroot(" + std::to_string(RootFd) + ")");
-
-    if (fchdir(CwdFd) < 0)
-        return TError(EError::Unknown, errno, "Can't change working directory fchdir(" + std::to_string(CwdFd) + ")");
-
+    error = Ipc.SetNs(CLONE_NEWIPC);
+    if (error)
+        return error;
+    error = Uts.SetNs(CLONE_NEWUTS);
+    if (error)
+        return error;
+    error = Net.SetNs(CLONE_NEWNET);
+    if (error)
+        return error;
+    error = Pid.SetNs(CLONE_NEWPID);
+    if (error)
+        return error;
+    error = Mnt.SetNs(CLONE_NEWNS);
+    if (error)
+        return error;
+    error = Root.Chroot();
+    if (error)
+        return error;
+    error = Cwd.Chdir();
+    if (error)
+        return error;
     return TError::Success();
-}
-
-void TNamespaceSnapshot::Close() {
-    for (int i = 0; i < nrNs; i++)
-        if (nsFd[i] >= 0) {
-            close(nsFd[i]);
-            nsFd[i] = -1;
-        }
-    if (RootFd >= 0) {
-        close(RootFd);
-        RootFd = -1;
-    }
-    if (CwdFd >= 0) {
-        close(CwdFd);
-        CwdFd = -1;
-    }
-}
-
-TError TNamespaceSnapshot::Attach() const {
-    for (int i = 0; i < nrNs; i++)
-        if (nsFd[i] >= 0 && setns(nsFd[i], nameToType[i].second))
-            return TError(EError::Unknown, errno, "Can't set namespace");
-
-    return TError::Success();
-}
-
-bool TNamespaceSnapshot::Valid() const {
-    return RootFd >= 0 && CwdFd >= 0;
-}
-
-bool TNamespaceSnapshot::HasNs(const std::string &ns) const {
-    for (int i = 0; i < nrNs; i++) {
-        auto name = nameToType[i].first;
-        if (name == ns)
-            return nsFd[i] >= 0;
-    }
-
-    return false;
 }

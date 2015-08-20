@@ -786,8 +786,12 @@ TError TTask::ChildCallback() {
             return error;
     }
 
-    if (Env->ParentNs.HasNs("mnt")) {
-        error = Env->ParentNs.Chroot();
+    if (Env->ParentNs.Mnt.IsOpened()) {
+        error = Env->ParentNs.Mnt.SetNs();
+        if (error)
+            return error;
+
+        error = Env->ParentNs.Root.Chroot();
         if (error)
             return error;
 
@@ -913,10 +917,9 @@ TError TTask::Start() {
             Abort(error);
         }
 
-        // move to target namespace
-        error = Env->ParentNs.Attach();
+        error = Env->ParentNs.Enter();
         if (error) {
-            L() << "Can't move task to target namespace: " << error << std::endl;
+            L() << "Cannot enter namespaces: " << error << std::endl;
             ReportPid(-1);
             Abort(error);
         }
