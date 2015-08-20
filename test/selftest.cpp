@@ -2489,25 +2489,24 @@ static void TestEnablePortoProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(name));
 
     Say() << "Isolated hierarchy" << std::endl;
-    name = "a/b";
     ExpectApiSuccess(api.Create("a"));
-    ExpectApiSuccess(api.Create(name));
+    ExpectApiSuccess(api.Create("a/b"));
 
-    ExpectApiSuccess(api.SetProperty(name, "command", "/portotest connectivity"));
-    ExpectApiSuccess(api.SetProperty(name, "isolate", "true"));
-    ExpectApiSuccess(api.SetProperty(name, "porto_namespace", "a/"));
-    ExpectApiSuccess(api.SetProperty(name, "root", path.ToString()));
+    ExpectApiSuccess(api.SetProperty("a/b", "command", "/portotest connectivity"));
+    ExpectApiSuccess(api.SetProperty("a/b", "isolate", "true"));
+    ExpectApiSuccess(api.SetProperty("a/b", "porto_namespace", "a/"));
+    ExpectApiSuccess(api.SetProperty("a/b", "root", path.ToString()));
 
-    CheckConnectivity(api, name, true, true);
+    CheckConnectivity(api, "a/b", true, true);
 
     ExpectApiSuccess(api.Stop("a"));
-    ExpectApiSuccess(api.SetProperty(name, "isolate", "false"));
-    ExpectApiSuccess(api.SetProperty(name, "porto_namespace", ""));
-    ExpectApiSuccess(api.SetProperty(name, "root", "/"));
+    ExpectApiSuccess(api.SetProperty("a/b", "root", "/"));
+    ExpectApiSuccess(api.SetProperty("a/b", "isolate", "false"));
+    ExpectApiSuccess(api.SetProperty("a/b", "porto_namespace", ""));
     ExpectApiSuccess(api.SetProperty("a", "porto_namespace", "a/"));
     ExpectApiSuccess(api.SetProperty("a", "root", path.ToString()));
 
-    CheckConnectivity(api, name, true, false);
+    CheckConnectivity(api, "a/b", true, false);
 
     ExpectApiSuccess(api.Destroy("a"));
 }
@@ -3843,11 +3842,12 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
     ExpectApiSuccess(api.Create("a"));
     ExpectApiSuccess(api.Create("a/b"));
     ExpectApiSuccess(api.Create("a/b/c"));
+    ExpectApiSuccess(api.SetProperty("a", "root", "/tmp"));
 
     ExpectApiSuccess(api.SetProperty("a/b", "isolate", "false"));
+    ExpectApiFailure(api.SetProperty("a/b", "root", "/tmp"), EError::NotSupported);
     ExpectApiSuccess(api.SetProperty("a/b/c", "isolate", "false"));
 
-    ExpectApiSuccess(api.SetProperty("a", "root", "/tmp"));
     ExpectApiSuccess(api.GetProperty("a/b", "root", val));
     ExpectEq(val, "/tmp");
     ExpectApiSuccess(api.GetProperty("a/b/c", "root", val));

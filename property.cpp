@@ -269,7 +269,7 @@ public:
 class TRootProperty : public TStringValue, public TContainerValue {
 public:
     TRootProperty() :
-        TStringValue(PATH_PROPERTY | PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TStringValue(PATH_PROPERTY | PARENT_RO_PROPERTY | PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_ROOT,
                      "Container root directory (container will be chrooted into this directory)",
                      staticProperty) {}
@@ -309,7 +309,7 @@ public:
 class TRootRdOnlyProperty : public TBoolValue, public TContainerValue {
 public:
     TRootRdOnlyProperty() :
-        TBoolValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TBoolValue(PARENT_RO_PROPERTY | PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_ROOT_RDONLY,
                         "Mount root directory in read-only mode",
                         staticProperty) {}
@@ -923,7 +923,7 @@ class TBindProperty : public TListValue, public TContainerValue {
 
 public:
     TBindProperty() :
-        TListValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TListValue(PARENT_RO_PROPERTY | PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_BIND,
                         "Share host directories with container: <host_path> <container_path> [ro|rw]; ...",
                         staticProperty) {}
