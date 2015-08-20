@@ -79,6 +79,7 @@ struct TNetCfg {
     std::vector<TMacVlanNetCfg> MacVlan;
     std::vector<TIpVlanNetCfg> IpVlan;
     std::vector<TVethNetCfg> Veth;
+    std::string NetNsName;
 
     void Clear() {
         /* default - create new empty netns */
@@ -89,6 +90,7 @@ struct TNetCfg {
         MacVlan.clear();
         IpVlan.clear();
         Veth.clear();
+        NetNsName = "";
     }
 };
 

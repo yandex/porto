@@ -727,6 +727,13 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         }
     }
 
+    if (taskEnv->NetCfg.NetNsName != "") {
+        error = taskEnv->ParentNs.Net.Open("/var/run/netns/" +
+                                           taskEnv->NetCfg.NetNsName);
+        if (client && error)
+            return error;
+    }
+
     // if command is empty we need to start meta task
     if (taskEnv->Command.empty()) {
         TPath exe("/proc/self/exe");

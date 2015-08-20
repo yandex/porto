@@ -1064,7 +1064,14 @@ public:
     TNetProperty() :
         TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_NET,
-                        "Container network settings: none | inherited | host [interface] | macvlan <master> <name> [bridge|private|vepa|passthru] [mtu] [hw] | ipvlan <master> <name> [l2|l3] [mtu] | veth <name> <bridge> [mtu] [hw]",
+                        "Container network settings: "
+                        "none | "
+                        "inherited | "
+                        "host [interface] | "
+                        "macvlan <master> <name> [bridge|private|vepa|passthru] [mtu] [hw] | "
+                        "ipvlan <master> <name> [l2|l3] [mtu] | "
+                        "veth <name> <bridge> [mtu] [hw] | "
+                        "netns <name>",
                         staticProperty) {
         Implemented = config().network().enabled();
     }
@@ -1246,6 +1253,15 @@ public:
                 veth.Peer = "portove-" + std::to_string(c->GetId()) + "-" + std::to_string(idx++);
 
                 cfg.Veth.push_back(veth);
+            } else if (type == "netns") {
+                if (settings.size() != 2)
+                    return TError(EError::InvalidValue, "Invalid netns in: " + line);
+                std::string name = StringTrim(settings[1]);
+                TPath path("/var/run/netns/" + name);
+                if (!path.Exists())
+                    return TError(EError::InvalidValue, "net namespace not found: " + name);
+                cfg.NewNetNs = false;
+                cfg.NetNsName = name;
             } else {
                 return TError(EError::InvalidValue, "Configuration is not specified");
             }
