@@ -11,6 +11,56 @@ extern "C" {
 #include <unistd.h>
 }
 
+TError TNamespaceFd::Open(TPath path) {
+    Close();
+    Fd = open(path.c_str(), O_RDONLY | O_NOCTTY | O_NONBLOCK | O_CLOEXEC);
+    if (Fd < 0)
+        return TError(EError::Unknown, errno, "Cannot open " + path.ToString());
+    return TError::Success();
+}
+
+TError TNamespaceFd::Open(pid_t pid, std::string type) {
+    return Open("/proc/" + std::to_string(pid) + "/" + type);
+}
+
+void TNamespaceFd::Close() {
+    if (Fd >= 0) {
+        close(Fd);
+        Fd = -1;
+    }
+}
+
+TError TNamespaceFd::SetNs(int type) const {
+    if (Fd >= 0 && setns(Fd, type))
+        return TError(EError::Unknown, errno, "Cannot set namespace");
+    return TError::Success();
+}
+
+TError TNamespaceFd::Chdir() const {
+    if (Fd >= 0 && fchdir(Fd))
+        return TError(EError::Unknown, errno, "Cannot change cwd");
+    return TError::Success();
+}
+
+TError TNamespaceFd::Chroot() const {
+    if (Fd >= 0 && (fchdir(Fd) || chroot(".")))
+        return TError(EError::Unknown, errno, "Cannot change root");
+    return TError::Success();
+}
+
+bool TNamespaceFd::operator==(const TNamespaceFd &other) const {
+    struct stat a, b;
+
+    if (Fd < 0 || other.Fd < 0 || fstat(Fd, &a) || fstat(other.Fd, &b))
+        return false;
+
+    return a.st_dev == b.st_dev && a.st_ino == b.st_ino;
+}
+
+bool TNamespaceFd::operator!=(const TNamespaceFd &other) const {
+    return !(*this == other);
+}
+
 // order is important
 static pair<string, int> nameToType[TNamespaceSnapshot::nrNs] = {
     //{ "user", CLONE_NEWUSER },
