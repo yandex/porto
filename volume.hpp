@@ -14,6 +14,7 @@
 constexpr const char *V_PATH = "path";
 constexpr const char *V_BACKEND = "backend";
 constexpr const char *V_READY = "ready";
+constexpr const char *V_PRIVATE = "private";
 
 constexpr const char *V_ID = "_id";
 constexpr const char *V_CONTAINERS = "_containers";

@@ -1174,6 +1174,7 @@ const std::vector<std::pair<std::string, std::string>> TVolumeHolder::ListProper
         { V_BACKEND,     "plain|native|loop|overlay     (default - autodetect)" },
         { V_STORAGE,     "path to data storage          (default - internal)" },
         { V_READY,       "true|false                    (readonly)" },
+        { V_PRIVATE,     "                              (user-defined property)" },
         { V_USER,        "user                          (default - creator)" },
         { V_GROUP,       "group                         (default - creator)" },
         { V_PERMISSIONS, "directory permissions         (default - 0775)" },
@@ -1206,6 +1207,7 @@ static void RegisterVolumeProperties(std::shared_ptr<TRawValueMap> m) {
 
     m->Add(V_ID, new TIntValue(HIDDEN_VALUE | PERSISTENT_VALUE));
     m->Add(V_READY, new TBoolValue(READ_ONLY_VALUE | PERSISTENT_VALUE));
+    m->Add(V_PRIVATE, new TStringValue(PERSISTENT_VALUE));
     m->Add(V_CONTAINERS, new TListValue(HIDDEN_VALUE | PERSISTENT_VALUE));
 
     m->Add(V_LOOP_DEV, new TIntValue(HIDDEN_VALUE | PERSISTENT_VALUE));
