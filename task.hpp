@@ -103,7 +103,7 @@ struct TTaskEnv : public TNonCopyable {
     TPath StdoutPath;
     TPath StderrPath;
     TNamespaceSnapshot ParentNs;
-    TNamespaceSnapshot ClientNs;
+    TNamespaceFd ClientMntNs;
     std::map<int,struct rlimit> Rlimit;
     std::string Hostname;
     bool BindDns;

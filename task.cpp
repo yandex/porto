@@ -900,20 +900,11 @@ TError TTask::Start() {
             }
         }
 
-        if (Env->ClientNs.Valid()) {
-            error = Env->ClientNs.Attach();
-            if (error) {
-                L() << "Can't move task to client namespace: " << error << std::endl;
-                ReportPid(-1);
-                Abort(error);
-            }
-
-            error = Env->ClientNs.Chroot();
-            if (error) {
-                L() << "Can't move task to client chroot: " << error << std::endl;
-                ReportPid(-1);
-                Abort(error);
-            }
+        error = Env->ClientMntNs.SetNs();
+        if (error) {
+            L() << "Can't move task to client mount namespace: " << error << std::endl;
+            ReportPid(-1);
+            Abort(error);
         }
 
         error = ReopenStdio();

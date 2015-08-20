@@ -661,7 +661,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         if (clientRoot.IsEmpty())
             return TError(EError::InvalidValue, "Cannot get client root path");
         if (!clientRoot.IsRoot()) {
-            TError error = taskEnv->ClientNs.Open(client->GetPid(), { "mnt" });
+            TError error = taskEnv->ClientMntNs.Open(client->GetPid(), "ns/mnt");
             if (error)
                 return error;
             taskEnv->Root = clientRoot.InnerPath(taskEnv->Root, true);
