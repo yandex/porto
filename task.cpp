@@ -780,7 +780,7 @@ TError TTask::ChildCallback() {
             return error;
     }
 
-    if (!Env->NetCfg.Host && !Env->NetCfg.Inherited) {
+    if (Env->NetCfg.NewNetNs) {
         error = ChildEnableNet();
         if (error)
             return error;
@@ -934,7 +934,7 @@ TError TTask::Start() {
         if (!Env->Hostname.empty())
             cloneFlags |= CLONE_NEWUTS;
 
-        if (!Env->NetCfg.Host && !Env->NetCfg.Inherited)
+        if (Env->NetCfg.NewNetNs)
             cloneFlags |= CLONE_NEWNET;
 
         int ret = pipe2(syncfd, O_CLOEXEC);

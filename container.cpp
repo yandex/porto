@@ -705,6 +705,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
             return error;
     } else {
         taskEnv->NetCfg.Clear();
+        taskEnv->NetCfg.NewNetNs = false;
         taskEnv->NetCfg.Host = true;
     }
 

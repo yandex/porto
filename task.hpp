@@ -72,6 +72,7 @@ struct TVethNetCfg {
 };
 
 struct TNetCfg {
+    bool NewNetNs;
     bool Inherited;
     bool Host;
     std::vector<THostNetCfg> HostIface;
@@ -80,6 +81,8 @@ struct TNetCfg {
     std::vector<TVethNetCfg> Veth;
 
     void Clear() {
+        /* default - create new empty netns */
+        NewNetNs = true;
         Host = false;
         Inherited = false;
         HostIface.clear();

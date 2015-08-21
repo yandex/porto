@@ -1105,6 +1105,7 @@ public:
             if (type == "none") {
                 none = true;
             } else if (type == "inherited") {
+                cfg.NewNetNs = false;
                 cfg.Inherited = true;
             } else if (type == "host") {
                 THostNetCfg hnet;
@@ -1113,6 +1114,7 @@ public:
                     return TError(EError::InvalidValue, "Invalid net in: " + line);
 
                 if (settings.size() == 1) {
+                    cfg.NewNetNs = false;
                     cfg.Host = true;
                 } else {
                     hnet.Dev = StringTrim(settings[1]);
