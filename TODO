@@ -2,7 +2,6 @@
 - return EAGAIN from destroy/etc when can't wait for freezer (or remove freezer timeout altogether)
 - PORTO_NAME - support namespaces
 - bind: follow links instead of realpath (fails when target doesn't exist)
-- net property: support external namespace
 - ? respawn = true - respawn only if exit_status != 0
 - add gc of dead containers with lost events
 - support volume as root
