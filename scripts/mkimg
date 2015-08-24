@@ -15,7 +15,7 @@ usage() {
 	exit 1
 }
 
-OPTS="c:dCTvh"
+OPTS="s:c:dCTvh"
 getopt -Qq $OPTS $* || usage
 set -- $(getopt $OPTS $*)
 
@@ -24,6 +24,7 @@ TAR=1
 VERBOSE=0
 DRYRUN=0
 CLEANUP=0
+STEPS="allocate_image bootstrap start_init prepare check"
 while [ ! "$1" = "--" ]; do
 	case "$1" in
 	-c)
@@ -41,6 +42,10 @@ while [ ! "$1" = "--" ]; do
 		;;
 	-v)
 		VERBOSE=1
+		;;
+	-s)
+		STEPS="$(echo $2 | tr ':' ' ')"
+		shift
 		;;
 	*)
 		usage
@@ -114,6 +119,7 @@ bootstrap() {
 }
 
 check() {
+	if [ -z "$CHECK" ]; then return; fi
 	pctl exec ${CONTAINER}/check command="/bin/bash -c 'mkdir /src && /config check /host_porto /src'" isolate="false" user=root group=root env="DEBIAN_FRONTEND=noninteractive"
 }
 
@@ -136,18 +142,21 @@ initnet() {
 	pexec ip6tables -t nat -A POSTROUTING -o $IFACE -j MASQUERADE
 }
 
-start_init() {
+__start() {
 	pctl run $CONTAINER command="/sbin/init" root="$IMAGE" hostname="$(hostname -f)" user=root group=root bind="$CONF /config ro; $BIND_PROPERTY; $CGTMPDIR /sys/fs/cgroup ro" bind_dns=false allowed_devices="$ALLOWED_DEVICES" net="host veth1" default_gw="$1" ip="$2" stdout_path="/dev/null" stderr_path="/dev/null"
 }
 
-prepare() {
+start_init() {
 	local old_ip="veth1 192.168.1.2/24"
 	local old_gw="192.168.1.1"
 
 	local new_ip="veth1 192.168.1.2/24; veth1 fec0::2/64"
 	local new_gw="veth1 192.168.1.1; veth1 fec0::1"
 
-	start_init "$new_gw" "$new_ip" || start_init "$old_gw" "$old_ip"
+	__start "$new_gw" "$new_ip" || __start "$old_gw" "$old_ip"
+}
+
+prepare() {
 	pctl exec $CONTAINER/prepare command="bash -c '/config prepare'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
 	[ -z "$CUSTOM" ] || pctl exec $CONTAINER/prepare command="bash -c '/custom_config'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
 	pctl exec $CONTAINER/prepare command="bash -c '/config cleanup'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
@@ -158,13 +167,11 @@ create_tar() {
 	run tar cSf $TARIMAGE -C $(dirname ${IMAGE}) $(basename $IMAGE)
 }
 
-allocate_image
-initnet
 IMAGE=$(realpath $IMAGE)
 TARIMAGE=${TARIMAGE:-${IMAGE}.tar}
-bootstrap
-prepare
-[ -z "$CHECK" ] || check
+
+initnet
+for i in $STEPS; do eval $i; done
 cleanup
 trap - EXIT
 [ $TAR -eq 0 ] || create_tar
