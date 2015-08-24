@@ -34,7 +34,7 @@ pkgtest() {
 	for f in $ROOTDIR/dist/*.conf; do
 		img=/place/$(basename $f).img
 		touch $img
-		$ROOTDIR/scripts/mkimg 5G $img $f -vTd -c $ROOTDIR
+		$ROOTDIR/scripts/mkimg 10G $img $f -vTd -c $ROOTDIR
 	done
 }
 
