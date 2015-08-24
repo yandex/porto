@@ -7,8 +7,8 @@ Source: https://git.yandex.ru/gitweb/search-admin/porto.git?a=snapshot;h=refs/ta
 Summary: Porto allows to run processes in containers
 Group: Applications/System
 License: Apache
-Requires: ncurses, logrotate
-BuildRequires: protobuf, protobuf-compiler, ncurses-devel, python2-devel, gcc-c++, systemd
+Requires: ncurses, logrotate, libnl3
+BuildRequires: protobuf, protobuf-compiler, ncurses-devel, python2-devel, gcc-c++, systemd, libnl3-devel
 
 %description
 TODO

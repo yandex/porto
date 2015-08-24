@@ -9,11 +9,11 @@ set -e
 rootdir=$(cd $(dirname $0)/../ && pwd)
 spec=~/rpmbuild/SPECS/porto.spec
 
-version=v$(head -n1 $rootdir/debian/changelog | sed -e 's/[^(]*(\([^)]*\).*/\1/')
+version=$(head -n1 $rootdir/debian/changelog | sed -e 's/[^(]*(\([^)]*\).*/\1/')
 cp $rootdir/spec/porto.spec.in $spec
 sed -i -e "s/@VERSION@/$version/" $spec
 
 # create source tar.gz from git repository
-(cd ~/rpmbuild/SOURCES/ && spectool -g ~/rpmbuild/SPECS/porto.spec)
+git archive --format=tar --prefix=porto/ HEAD | gzip >~/rpmbuild/SOURCES/yandex-porto-${version}.tar.gz
 # build package
 (cd ~/rpmbuild/SPECS/ && rpmbuild -vv -ba porto.spec)
