@@ -1,0 +1,93 @@
+#!/bin/sh
+
+set -e
+
+export PATH="/usr/sbin:$PATH"
+
+DUMMY_ETH=eth9
+PORTO_VERSION=$(git describe | sed -e 's/^v//')
+PORTO_DPKG="$PWD/../yandex-porto_${PORTO_VERSION}_amd64.deb"
+PYTHON_DPKG="$PWD/../python-portopy_${PORTO_VERSION}_all.deb"
+
+getver() { portoctl -v 2>&1 | grep $1 | awk '{print $2}'; }
+checkver() { [ "$2" = "$3" ] || { echo "Invalid $1 version ($2 != $3)"; }; }
+
+_build() {
+	dch --newversion $PORTO_VERSION "teamcity build"
+	find ../ -name '*.deb' -o -name '*.build' -o -name '*.changes' -print0 | xargs -0 rm -f
+	debuild "$@" -i -us -uc -b -j$(grep CPU /proc/cpuinfo | wc -l)
+	sudo dpkg -i "$PORTO_DPKG" "$PYTHON_DPKG"
+
+	checkver server v$PORTO_VERSION $(getver server)
+	checkver client v$PORTO_VERSION $(getver client)
+}
+
+build() { _build; }
+debug_build() { _build -e BUILD_TYPE=Debug; }
+
+toprpc() {
+	cat /var/log/portod.log | egrep ': (->|<-)' | cut -d ':' -f4- | sed '$!N;s/\n/ /' | awk '{print $2, $(NF)}' | sed -e 's/ms//' | sort -n -k2 -r > toprpc.txt
+	echo "Top queries:"
+	head -n 100 toprpc.txt
+	echo "Total message service time:"
+	cat toprpc.txt | awk '{a[$1] += $2}END{for (v in a) print v, a[v]}' | sort -n -k2 -r
+}
+
+selftest() {
+	netup
+	sudo scripts/test self
+	netdown
+	toprpc
+}
+
+pkgtest() {
+	sudo scripts/test pkg
+}
+
+stresstest() {
+	sudo scripts/test stress
+}
+
+coverage() {
+	scripts/gencoverage . /var/www
+}
+
+prlog() {
+	echo "$1:"
+	tail -n 40 $1
+}
+
+print_logs() {
+	set +e
+
+	prlog /var/log/portoloop.log
+	prlog /var/log/portod.log
+	netdown
+}
+
+netup() {
+	# we need multiple network interfaces for selftest
+	sudo ip link del $DUMMY_ETH &> /dev/null || :
+	sudo ip link add $DUMMY_ETH type dummy
+	sudo ip link set dev $DUMMY_ETH up
+	sudo ip addr add 192.168.2.2/16 dev $DUMMY_ETH
+}
+
+threadstest() {
+	sudo scripts/test threads
+}
+
+update() {
+	sudo scripts/test_update "$PORTO_DPKG"
+}
+
+netdown() {
+	sudo ip link del $DUMMY_ETH &> /dev/null
+	# TODO: enable dynamic_ifaces?
+	sudo reload yandex-porto
+}
+
+[ ! $# -eq 0 ] || set -- build selftest pkgtest stresstest threadstest update
+trap print_logs EXIT
+for f in "$@"; do eval $f; done
+trap - EXIT

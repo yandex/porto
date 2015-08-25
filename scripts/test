@@ -31,7 +31,7 @@ fuzzytest() {
 pkgtest() {
 	say "Package test"
 	mkdir -p /place
-	for f in $ROOTDIR/dist/*.conf; do
+	for f in $ROOTDIR/yandex/dist/*.conf; do
 		img=/place/$(basename $f).img
 		touch $img
 		$ROOTDIR/scripts/mkimg 10G $img $f -vTd -c $ROOTDIR
