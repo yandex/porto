@@ -1,11 +1,9 @@
 Source: yandex-porto
-#Section: utils
-#Priority: extra
 Maintainer: Eugene Kilimchuk <ekilimchuk@yandex-team.ru>
 Build-Depends: debhelper (>= 8.0.0), bison, flex, pkg-config, autoconf, libtool, protobuf-compiler, libprotobuf-dev, g++ (>= 4:4.7) | g++-4.7, libncurses5-dev
 Standards-Version: 3.9.2
-Homepage: https://wiki.yandex-team.ru/porto
-Vcs-Git: git://git.yandex.ru/search-admin/porto.git
+Homepage: https://github.com/yandex/porto
+Vcs-Git: https://github.com/yandex/porto.git
 
 Package: yandex-porto
 Section: utils
@@ -15,9 +13,7 @@ Depends: ${shlibs:Depends}, logrotate
 Description: Porto allows to run processes in containers
  Requires Linux kernel version >= 3.4
  .
- Some features work only for special kernel,
- see https://wiki.yandex-team.ru/porto and
- https://wiki.yandex-team.ru/kernel for details.
+ Some features work only for special kernel.
 
 Package: python-portopy
 Section: python

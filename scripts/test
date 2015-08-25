@@ -45,7 +45,7 @@ threadstest() {
 	sudo NOCHECK=y portotest self daemon
 }
 
-HOST=kernel1.search.yandex.net
+HOST=${HOST:-__please_specify_host__}
 PORT=8081
 
 IFACES=$(ip l | grep -w ' eth.' | grep -w UP | grep -v NO-CARRIER | awk '{print $2}' | tr -d ':')

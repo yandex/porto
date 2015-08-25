@@ -1,33 +1,3 @@
-# Build
-git clone ssh://git.yandex.ru/search-admin/porto.git
-sudo apt-get install build-essential libtool autoconf pkg-config flex bison
-cd porto
-git submodule init
-git submodule update
-cmake .
-make
-
-# Build stable version of package
-git checkout v0.7
-debuild
-
-# Release new version
-scripts/release
-
-# Profile
-cmake -DCMAKE_BUILD_TYPE=Debug . && make
-~stfomichev/perf record -e cycles:u -g -F1000 -- portod
-~stfomichev/perf report --stdio -n -G
-
-# Coverage
-cmake -DCMAKE_BUILD_TYPE=Debug . && make
-HOST=vm ./scripts/remote_test false true stress
-rm -rf porto && rsync -4 -av vm:src/porto $PWD
-scripts/gencoverage porto coverage
-
-# Debug netlink
-NLDBG=10 NLCB=debug portod
-
 # Locking scheme
 ## Containers
 We have single lock on holder, and single lock for each container + acquired

@@ -1,8 +1,8 @@
 [Unit]
-Description=Porto service - component of Nirvana
+Description=Porto service
 After=network-online.target
 Requires=network-online.target
-Documentation=https://wiki.yandex-team.ru/porto
+Documentation=https://github.com/yandex/porto
 
 [Service]
 ExecStart=/usr/sbin/portod

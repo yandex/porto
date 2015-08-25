@@ -4,7 +4,7 @@ set -e
 set -x
 
 ROOTDIR=$(cd $(dirname $0)/../ && pwd)
-HOST=${HOST:-lxc-test0}
+HOST=${HOST:-__please_specify_host__}
 
 run() { ssh -4 -t "$HOST" sudo -i "bash -c \"$@\""; }
 

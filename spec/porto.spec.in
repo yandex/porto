@@ -1,9 +1,8 @@
 Name: yandex-porto
 Version: @VERSION@
 Release: 1
-URL: https://wiki.yandex-team.ru/porto
-Source: https://git.yandex.ru/gitweb/search-admin/porto.git?a=snapshot;h=refs/tags/v@VERSION@/%{name}-%{version}.tar.gz
-#Source: https://git.yandex.ru/gitweb/search-admin/porto.git?a=snapshot;h=HEAD;sf=tgz#/%{name}-HEAD.tar.gz
+URL: https://github.com/yandex/porto
+Source: https://github.com/yandex/porto/archive/@VERSION@.tar.gz#/%{name}-%{version}.tar.gz
 Summary: Porto allows to run processes in containers
 Group: Applications/System
 License: Apache
