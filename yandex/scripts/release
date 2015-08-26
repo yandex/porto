@@ -2,7 +2,7 @@
 
 set -xe
 
-rootdir=$(cd $(dirname $0)/../ && pwd)
+rootdir=$(cd $(dirname $0)/../../ && pwd)
 
 changelog_modified() { test "$(git diff --name-only debian/changelog)" = "debian/changelog"; }
 
