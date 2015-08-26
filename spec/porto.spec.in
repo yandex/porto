@@ -10,7 +10,7 @@ Requires: ncurses, logrotate, libnl3
 BuildRequires: protobuf, protobuf-compiler, ncurses-devel, python2-devel, gcc-c++, systemd, libnl3-devel
 
 %description
-TODO
+Porto allows to run processes in containers
 
 %package -n python2-%{name}
 Summary: Python API for %{name}
