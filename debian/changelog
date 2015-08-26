@@ -1,3 +1,16 @@
+yandex-porto (2.1) precise; urgency=low
+
+  * fix tc issues
+  * new error codes in VolumeAPI
+  * fix bash-completion
+  * fix root/bind inheritance
+  * deny custom root/root_readonly/bind when isolate is false
+  * private property for volumes
+  * support net=netns <name> network mode
+  * cleanup and prepare for opensource
+
+ -- Roman Gushchin <klamm@yandex-team.ru>  Wed, 26 Aug 2015 15:04:21 +0300
+
 yandex-porto (2.0) precise; urgency=low
 
   * enable scoped unlock by default (threading)
