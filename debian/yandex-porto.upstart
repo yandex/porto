@@ -1,0 +1,38 @@
+# yandex-porto - Porto is component of Nirvana.
+#
+# Porto is a service which allows to run processes in isolated namespaces.
+
+description	"Porto"
+author "Eugene Kilimchuk <ekilimchuk@yandex-team.ru>"
+
+start on runlevel [2345]
+stop on runlevel [!2345]
+
+respawn
+
+kill signal SIGINT
+kill timeout 60
+
+pre-start script
+	# we want to clean up daemon state only if it stopped gracefully by
+	# the user
+	if [ ! -e /run/portoloop.pid ]; then
+		rm -rf /run/porto/pkvs /run/porto/kvs /tmp/portod.pidmap || :
+	fi
+
+	# if there is cgroup-bin installed, we need to wait while it mounts
+	# sysfs and creates controllers
+	timeout=60
+	if [ -f /usr/sbin/cgrulesengd ]; then
+		for i in `seq $timeout`; do
+			if status cgred | grep -q "^cgred start/running" > /dev/null; then
+				break
+			fi
+			sleep 1
+		done
+	fi
+
+	grep -q net_cls /proc/cgroups || modprobe cls_cgroup
+end script
+
+exec portod

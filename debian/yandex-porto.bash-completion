@@ -1,0 +1,165 @@
+# -*- shell-script -*-
+
+_porto_containers ()
+{
+	COMPREPLY=( $( compgen -W "$(portoctl list -1 2>/dev/null) / /porto $1" -- "$cur" ) )
+	__ltrim_colon_completions "$cur"
+}
+
+_porto_volumes ()
+{
+	COMPREPLY=( $( compgen -W "$(portoctl vlist -1 2>/dev/null) $1" -- "$cur" ) )
+	__ltrim_colon_completions "$cur"
+}
+
+_portoctl ()
+{
+	local i cur prev ct=
+	local _porto_commands _porto_properies _porto_data
+
+	COMPREPLY=()
+	_get_comp_words_by_ref -n : cur prev words cword
+
+	i=$(portoctl 2>&1)
+	_porto_commands=$(echo "$i" | awk '/^Command/ {f=1;next} !f { next } !NF { exit } /^  [^ ]/ { print $1 }')
+	_porto_volume_properies=$(echo "$i" | awk '/^Volume properties/ {f=1;next} !f { next } !NF { exit } /^  [^ ]/ { print $1 }')
+	_porto_properies=$(echo "$i" | awk '/^Property/ {f=1;next} !f { next } !NF { exit } /^  [^ ]/ { print $1 }')
+	_porto_data=$(echo "$i" | awk '/^Data/ {f=1;next} !f { next } !NF { exit } /^  [^ ]/ { print $1 }')
+
+	if [ "$cword" = 1 ]; then
+		COMPREPLY=( $(compgen -W "$_porto_commands -h --help -v --version" -- $cur) )
+		return 0
+	fi
+
+	for ((i=2; i<cword; i++)); do
+		[[ "${words[i]}" != -* ]] && ct=$i && break
+	done
+
+	case "${words[1]}" in
+	help)
+		COMPREPLY=( $(compgen -W "$_porto_commands" -- $cur) )
+		;;
+	create|destroy|start|stop|restart|pause|resume)
+		_porto_containers
+		;;
+	enter)
+		if [ -z "$ct" ] ; then
+			_porto_containers "-C"
+		else
+			_command_offset $(( $COMP_CWORD + $ct - $cword + 1 ))
+		fi
+		;;
+	exec|run)
+		if [ -z "$ct" ] ; then
+			_porto_containers
+		else
+			compopt -o filenames
+			COMPREPLY=( $( compgen -S "=" -W "$_porto_properies" -- "$cur" ) )
+			compopt -o nospace
+		fi
+		;;
+	find)
+		_pids
+		;;
+	get)
+		if [ -z "$ct" ] ; then
+			_porto_containers
+		else
+			COMPREPLY=( $( compgen -W "$_porto_data $_porto_properies" -- $cur ) )
+		fi
+		;;
+	pget)
+		if [ -z "$ct" ] ; then
+			_porto_containers "-k"
+		else
+			COMPREPLY=( $( compgen -W "$_porto_properies" -- $cur ) )
+		fi
+		;;
+	dget)
+		if [ -z "$ct" ] ; then
+			_porto_containers "-k"
+		else
+			COMPREPLY=( $( compgen -W "$_porto_data" -- $cur ) )
+		fi
+		;;
+	set)
+		case "$cword" in
+		2)
+			_porto_containers
+			;;
+		3)
+			COMPREPLY=( $( compgen -W "$_porto_properies" -- $cur ) )
+			;;
+		4)
+			compopt -o filenames
+			[ -z "$cur" ] && COMPREPLY=$(portoctl pget "${words[2]}" "${words[3]}" 2>/dev/null)
+			;;
+		esac
+		;;
+	kill)
+		case "$cword" in
+		2)
+			_porto_containers
+			;;
+		3)
+			COMPREPLY=( $( compgen -A signal -- $cur ) )
+			;;
+		esac
+		;;
+	list)
+		COMPREPLY=( $( compgen -W "-1 -f -t" -- $cur ) )
+		;;
+	sort)
+		COMPREPLY=( $( compgen -W "$_porto_data $_porto_properies" -- $cur ) )
+		;;
+	top)
+		_filedir
+		;;
+	vcreate)
+		case "$cword" in
+		2)
+			_filedir -d
+			;;
+		*)
+			COMPREPLY=( $( compgen -S "=" -W "$_porto_volume_properies" -- "$cur" ) )
+			compopt -o nospace
+			;;
+		esac
+		;;
+	vlist)
+		case "$cword" in
+		2)
+			_porto_volumes "-1 -i -v"
+			;;
+		3)
+			_porto_volumes
+			;;
+		esac
+		;;
+	vlink|vunlink)
+		case "$cword" in
+		2)
+			_porto_volumes
+			;;
+		3)
+			_porto_containers
+			;;
+		esac
+		;;
+	layer)
+		case "$cword" in
+		2)
+			COMPREPLY=( $( compgen -W "-I -M -R -L" -- "$cur" ) )
+			;;
+		3)
+			COMPREPLY=( $( compgen -W "$(portoctl layer -L 2>/dev/null)" -- "$cur" ) )
+			;;
+		4)
+			_filedir
+			;;
+		esac
+		;;
+	esac
+}
+
+complete -F _portoctl portoctl

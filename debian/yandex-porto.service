@@ -1,0 +1,19 @@
+[Unit]
+Description=Porto service
+After=network-online.target
+Requires=network-online.target
+Documentation=https://github.com/yandex/porto
+
+[Service]
+ExecStart=/usr/sbin/portod
+ExecStartPre=/bin/sh -c '[ ! -e /run/portoloop.pid ] && \
+    rm -rf /run/porto/pkvs /run/porto/kvs /tmp/portod.pidmap || \
+    /bin/true'
+ExecReload=/bin/kill -HUP $MAINPID
+PIDFile=/run/portoloop.pid
+Restart=on-failure
+KillSignal=SIGINT
+KillMode=process
+
+[Install]
+WantedBy=multi-user.target

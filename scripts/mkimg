@@ -1,0 +1,178 @@
+#!/bin/sh
+
+set -e
+
+BINARY=$(basename $0)
+usage() {
+	echo "Usage: $BINARY [options] <size> <image> <config> [custom config]"
+	echo "Options:"
+	echo -e "\t-T\tDon't create tar archive"
+	echo -e "\t-c\tExecute check hook"
+	echo -e "\t-d\tRemove image after build (dry-run)"
+	echo -e "\t-v\tShow underlying portoctl commands"
+	echo -e "\t-C\tDon't destroy porto containers on failure (for debugging)"
+	exit 1
+	exit 1
+}
+
+OPTS="s:c:dCTvh"
+getopt -Qq $OPTS $* || usage
+set -- $(getopt $OPTS $*)
+
+CHECK=
+TAR=1
+VERBOSE=0
+DRYRUN=0
+CLEANUP=0
+STEPS="allocate_image bootstrap start_init prepare check"
+while [ ! "$1" = "--" ]; do
+	case "$1" in
+	-c)
+		CHECK=$2
+		shift
+		;;
+	-C)
+		CLEANUP=1
+		;;
+	-d)
+		DRYRUN=1
+		;;
+	-T)
+		TAR=0
+		;;
+	-v)
+		VERBOSE=1
+		;;
+	-s)
+		STEPS="$(echo $2 | tr ':' ' ')"
+		shift
+		;;
+	*)
+		usage
+		;;
+	esac
+	shift
+done
+shift
+
+[ $# -lt 3 ] && usage || :
+SIZE=$1
+IMAGE=$2
+CONF=$(realpath $3)
+[ ! -z "$4" ] && CUSTOM=$(realpath $4) || CUSTOM=
+CONTAINER=${BINARY}-$(cat /dev/urandom | tr -dc _A-Z-a-z-0-9 | head -c8)
+ALLOWED_DEVICES="c 1:3 rwm; c 1:5 rwm; c 1:7 rwm; c 1:9 rwm; c 1:8 rwm; c 136:* rw; c 5:2 rwm; c 254:0 rm; c 10:237 rmw; b 7:* rmw"
+
+chmod +x $CONF
+[ -z "$CUSTOM" ] || chmod +x $CUSTOM
+
+IFACE=$(ip link | grep '[^@v]eth[0-9]' | grep -w UP | cut -d: -f2 | tr -d ' ')
+[ $(echo "$IFACE" | wc -l) -eq 1 ] || { echo "Can't find suitable network interface: $IFACE"; exit 1; }
+
+say() {
+	[ ! -t 1 ] || tput setaf 3
+	[ $VERBOSE -eq 0 ] || echo "$@"
+	[ ! -t 1 ] || tput sgr0
+}
+
+run() { say "$@"; eval "$@"; }
+
+TMPDIR=$(mktemp -d)
+CGTMPDIR=$(mktemp -d)
+cleanup() {
+	set +e
+	[ $CLEANUP -eq 0 ] && {
+		pexec iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE &> /dev/null
+		pexec ip6tables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE &> /dev/null
+	}
+	[ $CLEANUP -eq 0 ] && pexec ip link delete veth0 &> /dev/null
+	[ -d $TMPDIR ] && rm -rf $TMPDIR
+	[ -d $CGTMPDIR ] && rm -rf $CGTMPDIR
+	[ $CLEANUP -eq 0 ] && pctl destroy $CONTAINER
+}
+
+trap cleanup EXIT
+
+pctl() {
+	say portoctl "$@"
+	cat /dev/null | portoctl "$@"
+}
+
+pexec() { pctl exec ${CONTAINER}-sudo command="/bin/bash -c '$*'" user="root" group="root"; }
+
+allocate_image() {
+	run fallocate -l $SIZE $IMAGE || run dd if=/dev/zero of=$IMAGE bs=1 count=1 seek=$SIZE
+	run mkfs.ext4 -F -F $IMAGE
+}
+
+bootstrap() {
+	local ro=""
+	for file in $(find / -maxdepth 1 -mindepth 1); do
+		if [ "$file" = "/tmp" ]; then continue; fi
+		if [ "$file" = "/lost+found" ]; then continue; fi
+		if [ -L "$file" ]; then continue; fi
+		ro="$file $file ro; $ro"
+	done
+	ro="$ro; $IMAGE $IMAGE rw"
+
+	pctl exec $CONTAINER command="bash -c 'mount $IMAGE $TMPDIR && $CONF bootstrap $TMPDIR'" user=root group=root bind_dns=false env="DEBIAN_FRONTEND=noninteractive" cwd=/ bind="$ro" #root_readonly=true debootsrap chroot fails
+}
+
+check() {
+	if [ -z "$CHECK" ]; then return; fi
+	pctl exec ${CONTAINER}/check command="/bin/bash -c 'mkdir /src && /config check /host_porto /src'" isolate="false" user=root group=root env="DEBIAN_FRONTEND=noninteractive"
+}
+
+BIND_PROPERTY=""
+[ ! -d /sys/fs/selinux ] || BIND_PROPERTY="${BIND_PROPERTY}; /sys/fs/selinux /sys/fs/selinux ro"
+[ -z "$CHECK" ] || BIND_PROPERTY="${BIND_PROPERTY}; $CHECK /host_porto ro"
+[ -z "$CUSTOM" ] || BIND_PROPERTY="${BIND_PROPERTY}; $CUSTOM /custom_config ro"
+
+initnet() {
+	pexec sysctl net.ipv6.conf.all.forwarding=1 net.ipv4.ip_forward=1
+	pexec ip link delete veth0 || :
+	pexec ip link add veth0 type veth peer name veth1
+	pexec ip link set veth0 up
+	pexec ip addr add 192.168.1.1/24 dev veth0
+	pexec ip addr add fec0::1/64 dev veth0
+
+	pexec iptables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE || :
+	pexec ip6tables -t nat -D POSTROUTING -o $IFACE -j MASQUERADE || :
+	pexec iptables -t nat -A POSTROUTING -o $IFACE -j MASQUERADE
+	pexec ip6tables -t nat -A POSTROUTING -o $IFACE -j MASQUERADE
+}
+
+__start() {
+	pctl run $CONTAINER command="/sbin/init" root="$IMAGE" hostname="$(hostname -f)" user=root group=root bind="$CONF /config ro; $BIND_PROPERTY; $CGTMPDIR /sys/fs/cgroup ro" bind_dns=false allowed_devices="$ALLOWED_DEVICES" net="host veth1" default_gw="$1" ip="$2" stdout_path="/dev/null" stderr_path="/dev/null"
+}
+
+start_init() {
+	local old_ip="veth1 192.168.1.2/24"
+	local old_gw="192.168.1.1"
+
+	local new_ip="veth1 192.168.1.2/24; veth1 fec0::2/64"
+	local new_gw="veth1 192.168.1.1; veth1 fec0::1"
+
+	__start "$new_gw" "$new_ip" || __start "$old_gw" "$old_ip"
+}
+
+prepare() {
+	pctl exec $CONTAINER/prepare command="bash -c '/config prepare'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
+	[ -z "$CUSTOM" ] || pctl exec $CONTAINER/prepare command="bash -c '/custom_config'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
+	pctl exec $CONTAINER/prepare command="bash -c '/config cleanup'" isolate=false user=root group=root env="DEBIAN_FRONTEND=noninteractive"
+	pctl exec $CONTAINER/sync command="bash -c 'sync'" isolate="false" user=root group=root env=" DEBIAN_FRONTEND=noninteractive"
+}
+
+create_tar() {
+	run tar cSf $TARIMAGE -C $(dirname ${IMAGE}) $(basename $IMAGE)
+}
+
+IMAGE=$(realpath $IMAGE)
+TARIMAGE=${TARIMAGE:-${IMAGE}.tar}
+
+initnet
+for i in $STEPS; do eval $i; done
+cleanup
+trap - EXIT
+[ $TAR -eq 0 ] || create_tar
+[ $DRYRUN -eq 0 ] || rm $IMAGE

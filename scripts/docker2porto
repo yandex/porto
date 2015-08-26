@@ -1,0 +1,187 @@
+#!/usr/bin/env ruby
+
+require 'optparse'
+require 'net/http'
+require 'json'
+require 'fileutils'
+
+$debug = false
+
+OptionParser.new do |opts|
+  opts.banner = <<END
+Usage: docker2porto <image> [tag]
+
+Options:
+END
+
+  opts.on("-d", "--debug",
+          "Debugging mode") do |v|
+            $debug = v
+          end
+end.parse!
+
+image = ARGV.shift
+abort "Please specify docker image!" if not image
+image_tag = ARGV.shift
+image_tag = 'latest' if not image_tag
+$docker_url = 'index.docker.io'
+
+container = "#{image}-#{image_tag}"
+script = "#{container}.sh"
+imgtar = "#{container}.tar"
+
+def escape_arg(s) s.gsub('"'){'\\"'} end
+def escape_env(s) s.gsub(';'){'\\;'} end
+
+def expect(field, x, y)
+  abort "Image json has unexpected #{field} value!" if x != y
+end
+
+def generate_conf(script, name, rootfs, meta, layers)
+  config = {}
+
+  expect("config.Domainname", meta["config"]["Domainname"], "")
+  expect("config.NetworkDisabled", meta["config"]["NetworkDisabled"], false)
+
+  id = meta["id"]
+
+  cmd = []
+  cmd += meta["config"]["Entrypoint"] if meta["config"]["Entrypoint"]
+  cmd += meta["config"]["Cmd"] if meta["config"]["Cmd"]
+
+  env = meta["config"]["Env"]
+
+  config["command"] = cmd.shift
+  config["command"] = "bash" unless config["command"]
+  config["hostname"] = meta["config"]["Hostname"]
+  config["user"] = meta["config"]["User"] if meta["config"]["User"] != ""
+  cmd.each { |s| config["command"] += " \"#{escape_arg(s)}\"" }
+
+  config["env"] = '$ENVIRON; '
+  env.each { |s| config["env"] += "#{escape_env(s)};" }
+  config["bind"] = '$BIND;'
+
+  config["cwd"] = "/#{meta["config"]["WorkingDir"]}"
+
+  props = "virt_mode=\"os\""
+  config.each { |k, v| props += " #{k}=\"#{escape_arg(v)}\""}
+
+  text = <<END
+#!/bin/sh
+
+set -e
+set -x
+
+OPTS='e:v:q:'
+getopt -Qq "$OPTS" $*
+set -- $(getopt "$OPTS" $*)
+
+while [ ! "$1" = "--" ]; do
+  case "$1" in
+  -e) ENVIRON="$2"; shift; ;;
+  -v) BIND=$(echo "$2" | sed -e 's/:/ /g'); shift; ;;
+  -q) QUOTA="$2"; shift; ;;
+  *) echo "Unknown argument $1"; exit 1; ;;
+  esac
+  shift
+done
+shift
+
+layers="#{layers.join(' ')}"
+root=""
+cleanup() {
+  set +e
+  [ ! -z "$root" ] && portoctl vunlink $root
+  for id in $layers; do
+    portoctl layer -R $id
+  done
+}
+trap cleanup EXIT
+
+layers_prop=""
+for id in $layers; do
+  portoctl layer -I $id $PWD/${id}.tar.gz
+  layers_prop="$layers_prop$id;"
+done
+
+root=$(portoctl vcreate -A backend=overlay layers="$layers_prop" $QUOTA)
+portoctl exec #{name} #{props} root=$root
+END
+
+  File.write(script, text)
+end
+
+def get(url, headers = {})
+  uri = URI(url)
+  Net::HTTP.start(uri.host, uri.port,
+    :use_ssl => uri.scheme == 'https') do |http|
+    req = Net::HTTP::Get.new(uri)
+    headers.each { |k,v| req[k] = v }
+
+    rsp = http.request(req)
+    case rsp
+    when Net::HTTPSuccess     then rsp
+    when Net::HTTPRedirection then get(rsp['location'], headers)
+    else
+      rsp.error!
+    end
+  end
+end
+
+puts "Retrieving #{image} manifest..."
+
+rsp = get("https://#{$docker_url}/v1/repositories/#{image}/images", { 'X-Docker-Token' => 'True' })
+registry = rsp['X-Docker-Endpoints']
+token = rsp['X-Docker-Token']
+images = JSON.parse(rsp.body)
+
+puts "Retrieving #{image} tags..."
+rsp = get("https://#{$docker_url}/v1/repositories/#{image}/tags")
+tags = JSON.parse(rsp.body)
+
+latest = tags.find { |tag| tag["name"] == image_tag }
+unless latest
+  puts '#{image} tags:'
+  tags.each { |tag| puts tag["name"] }
+  abort "Invalid tag #{image_tag}"
+end
+
+latest = latest["layer"]
+
+headers = { 'Authorization' => "Token #{token}" }
+
+rsp = get("https://#{registry}/v1/repositories/#{image}/tags/#{image_tag}", headers)
+id = rsp.body.delete "\""
+
+abort "Can't find tag #{image_tag}" unless id
+
+puts "Retrieving #{id} ancestors..."
+rsp = get("https://#{registry}/v1/images/#{id}/ancestry", headers)
+ancestry = JSON.parse(rsp.body)
+
+puts "Retrieving #{id} manifest..."
+rsp = get("https://#{registry}/v1/images/#{id}/json", headers)
+json = JSON.parse(rsp.body)
+
+File.write("#{container}.json", JSON.pretty_generate(json)) if $debug
+
+imgtar = File.expand_path(imgtar)
+script = File.expand_path(script)
+
+layers = []
+
+ancestry.reverse_each { |id|
+  tar = "#{id}.tar"
+  targz = "#{id}.tar.gz"
+
+  unless File.exists?(targz)
+    puts "Downloading layer #{id}..."
+    rsp = get("https://#{registry}/v1/images/#{id}/layer", headers)
+    File.write(targz, rsp.body)
+  end
+
+  layers.insert(0, id)
+}
+
+generate_conf(script, container, imgtar, json, layers)
+puts "Generated #{script} script and #{imgtar} image"

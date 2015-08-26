@@ -1,0 +1,311 @@
+// Portod daemon listens on /run/portod.socket unix socket.
+// Messages are in delimited protocol buffers i/o format.
+// A message consists of their's length in varint format followed by protobuf data.
+// http://stackoverflow.com/questions/2340730/are-there-c-equivalents-for-the-protocol-buffers-delimited-i-o-functions-in-ja
+// https://developers.google.com/protocol-buffers/docs/reference/java/com/google/protobuf/MessageLite#writeDelimitedTo%28java.io.OutputStream%29).
+// Basic request type is TContainerRequest, response type is TContainerResponse (even for VolumeAPI requests).
+
+package rpc;
+
+// List of error codes
+enum EError {
+	// Request executed successfully. No errors occured.
+	Success = 0;
+	// Unknown critical error.
+	Unknown = 1;
+	// Unknown or bad request
+	InvalidMethod = 2;
+	// Container with specified name already exists. Can't create a new one.
+	ContainerAlreadyExists = 3;
+	// Container with specified name doesn't exist.
+	ContainerDoesNotExist = 4;
+	// Unknown property specified.
+	InvalidProperty = 5;
+	// Unknown data specified.
+	InvalidData = 6;
+	// Invalid value of property or data.
+	InvalidValue = 7;
+	// Can't perform specified operation in current container state.
+	InvalidState = 8;
+	// Operation is not supported due to some reasons (old kernel version, missing
+	// kernel modules, etc).
+	NotSupported = 9;
+	// Requested resources are not available (e.g. can't allocate requested memory
+	// without overcommiting).
+	ResourceNotAvailable = 10;
+	// Insufficient rights for performing requested operation.
+	Permission = 11;
+
+	// Can't create new volume with specified name, because there is already one.
+	VolumeAlreadyExists = 12;
+	// Volume with specified name doesn't exist.
+	VolumeNotFound = 13;
+	// Operation failed because of insufficient disk space.
+	NoSpace = 14;
+	// Operation can't be performed, because container or volume are in use by
+	// other simultaneous operation.
+	Busy = 15;
+	// Volume already linked with container
+	VolumeAlreadyLinked = 16;
+	// Volume not linked with container
+	VolumeNotLinked = 17;
+
+	LayerAlreadyExists = 18;
+	LayerNotFound = 19;
+
+	// Reserved error code used by Porto internals. Can't be returned to a user.
+	Queued = 1000;
+}
+
+message TContainerCreateRequest {
+	required string name = 1;
+}
+
+message TContainerDestroyRequest {
+	required string name = 1;
+}
+
+message TContainerListRequest {
+}
+
+message TContainerGetPropertyRequest {
+	required string name = 1;
+	required string property = 2;
+}
+
+message TContainerSetPropertyRequest {
+	required string name = 1;
+	required string property = 2;
+	required string value = 3;
+}
+
+message TContainerGetDataRequest {
+	required string name = 1;
+	required string data = 2;
+}
+
+message TContainerStartRequest {
+	required string name = 1;
+}
+
+message TContainerStopRequest {
+	required string name = 1;
+}
+
+message TContainerPauseRequest {
+	required string name = 1;
+}
+
+message TContainerResumeRequest {
+	required string name = 1;
+}
+
+message TContainerPropertyListRequest {
+}
+
+message TContainerDataListRequest {
+}
+
+message TContainerKillRequest {
+	required string name = 1;
+	required int32 sig = 2;
+}
+
+// Get Porto version
+message TVersionRequest {
+}
+
+// Get multiple properties/data of many containers with one request
+// (useful for monitoring)
+message TContainerGetRequest {
+	// list of containers
+	repeated string name = 1;
+	// list of properties/data
+	repeated string variable = 2;
+}
+
+// Wait while container(s) is/are in running state
+message TContainerWaitRequest {
+	// list of containers
+	repeated string name = 1;
+	// timeout, ms
+	optional uint32 timeout = 2;
+}
+
+message TContainerRequest {
+	optional TContainerCreateRequest create = 1;
+	optional TContainerDestroyRequest destroy = 2;
+	optional TContainerListRequest list = 3;
+	optional TContainerGetPropertyRequest getProperty = 4;
+	optional TContainerSetPropertyRequest setProperty = 5;
+	optional TContainerGetDataRequest getData = 6;
+
+	optional TContainerStartRequest start = 7;
+	optional TContainerStopRequest stop = 8;
+	optional TContainerPauseRequest pause = 9;
+	optional TContainerResumeRequest resume = 10;
+	optional TContainerPropertyListRequest propertyList = 11;
+	optional TContainerDataListRequest dataList = 12;
+	optional TContainerKillRequest kill = 13;
+	optional TVersionRequest version = 14;
+	optional TContainerGetRequest get = 15;
+	optional TContainerWaitRequest wait = 16;
+
+	optional TVolumePropertyListRequest listVolumeProperties = 103;
+	optional TVolumeCreateRequest createVolume = 104;
+	optional TVolumeLinkRequest linkVolume = 105;
+	optional TVolumeUnlinkRequest unlinkVolume = 106;
+	optional TVolumeListRequest listVolumes = 107;
+
+	optional TLayerImportRequest importLayer = 110;
+	optional TLayerRemoveRequest removeLayer = 111;
+	optional TLayerListRequest listLayers = 112;
+	optional TLayerExportRequest exportLayer = 113;
+}
+
+message TContainerListResponse {
+	repeated string name = 1;
+}
+
+message TContainerGetPropertyResponse {
+	required string value = 1;
+}
+
+message TContainerGetDataResponse {
+	required string value = 1;
+}
+
+message TContainerPropertyListResponse {
+	message TContainerPropertyListEntry {
+		// Property name
+		required string name = 1;
+		// Property description
+		required string desc = 2;
+	}
+	repeated TContainerPropertyListEntry list = 1;
+}
+
+message TContainerDataListResponse {
+	message TContainerDataListEntry {
+		// Data name
+		required string name = 1;
+		// Data description
+		required string desc = 2;
+	}
+	repeated TContainerDataListEntry list = 1;
+}
+
+message TVersionResponse {
+	required string tag = 1;
+	required string revision = 2;
+}
+
+message TContainerGetResponse {
+	message TContainerGetValueResponse {
+		required string variable = 1;
+		optional EError error = 2;
+		optional string errorMsg = 3;
+		optional string value = 4;
+	}
+	message TContainerGetListResponse {
+		required string name = 1;
+		repeated TContainerGetValueResponse keyval = 2;
+	}
+
+	repeated TContainerGetListResponse list = 1;
+}
+
+message TContainerWaitResponse {
+	required string name = 1;
+}
+
+message TContainerResponse {
+	required EError error = 1;
+	// Optional error message
+	optional string errorMsg = 2;
+
+	optional TContainerListResponse list = 3;
+	optional TContainerGetPropertyResponse getProperty = 4;
+	optional TContainerGetDataResponse getData = 5;
+	optional TContainerPropertyListResponse propertyList = 6;
+	optional TContainerDataListResponse dataList = 7;
+	optional TVersionResponse version = 8;
+
+	optional TVolumeListResponse volumeList = 9;
+	optional TContainerGetResponse get = 10;
+	optional TContainerWaitResponse wait = 11;
+	optional TVolumePropertyListResponse volumePropertyList = 12;
+	optional TVolumeDescription volume = 13;
+	optional TLayerListResponse layers = 14;
+}
+
+// VolumeAPI
+
+message TVolumeProperty {
+	required string name = 1;
+	required string value = 2;
+}
+
+message TVolumePropertyDescription {
+	required string name = 1;
+	required string desc = 2;
+}
+
+message TVolumeDescription {
+	required string path = 1;
+	repeated TVolumeProperty properties = 2;
+	repeated string containers = 3;
+}
+
+message TVolumePropertyListRequest {
+}
+
+message TVolumePropertyListResponse {
+	repeated TVolumePropertyDescription properties = 1;
+}
+
+message TVolumeCreateRequest {
+	optional string path = 1;
+	repeated TVolumeProperty properties = 2;
+}
+
+message TVolumeLinkRequest {
+	required string path = 1;
+	optional string container = 2;
+}
+
+message TVolumeUnlinkRequest {
+	required string path = 1;
+	optional string container = 2;
+}
+
+message TVolumeListRequest {
+	optional string path = 1;
+	optional string container = 2;
+}
+
+message TVolumeListResponse {
+	repeated TVolumeDescription volumes = 1;
+}
+
+message TLayerImportRequest {
+	required string layer = 1;
+	required string tarball = 2;
+	required bool merge = 3;
+}
+
+message TLayerExportRequest {
+	required string volume = 1;
+	required string tarball = 2;
+}
+
+message TLayerRemoveRequest {
+	required string layer = 1;
+}
+
+message TLayerListRequest {
+}
+
+message TLayerListResponse {
+	repeated string layer = 1;
+}

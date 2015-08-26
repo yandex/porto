@@ -1,0 +1,219 @@
+#!/bin/bash
+
+set -e
+
+ROOTDIR=$(cd $(dirname $0)/../ && pwd)
+
+say() { [ ! -t 1 ] || tput setaf 3; echo "$@"; [ ! -t 1 ] || tput sgr0; }
+
+update_config() {
+	echo "log { verbose: true } network { enabled: $1 dynamic_ifaces: $2 } container { use_hierarchy: true empty_wait_timeout_ms: 1000 } privileges { root_user: \"$USER\" restricted_root_user: \"daemon\" } volumes { enabled: true }" > /etc/portod.conf
+}
+
+selftest() {
+	say "Self test with network=$1"
+	update_config true true
+	portotest "$@"
+}
+
+stresstest() {
+	say "Stress test"
+	update_config true true
+	portotest stress "$@"
+}
+
+fuzzytest() {
+	say "Fuzzy test"
+	update_config true true
+	portotest fuzzy "$@"
+}
+
+pkgtest() {
+	say "Package test"
+	mkdir -p /place
+	for f in $ROOTDIR/yandex/dist/*.conf; do
+		img=/place/$(basename $f).img
+		touch $img
+		$ROOTDIR/scripts/mkimg 10G $img $f -vTd -c $ROOTDIR
+	done
+}
+
+threadstest() {
+	say "Threads test"
+	restart yandex-porto
+	python $ROOTDIR/test/threads.py "$@"
+	sudo NOCHECK=y portotest self daemon
+}
+
+HOST=${HOST:-__please_specify_host__}
+PORT=8081
+
+IFACES=$(ip l | grep -w ' eth.' | grep -w UP | grep -v NO-CARRIER | awk '{print $2}' | tr -d ':')
+
+# print container tc class details
+netdetails() {
+	local container="$1"
+
+	local class=$(cat /sys/fs/cgroup/net_cls/porto/$container/net_cls.classid)
+	local hi=$(( ($class & 0xFFFF0000) >> 16))
+	local lo=$(($class & 0xFFFF))
+	local id=$(printf "%x:%x" $hi $lo)
+
+	echo "$hi $lo $id"
+
+	for iface in $IFACES; do
+		tc -s class show dev $iface | grep "htb $id" -A4
+	done
+}
+
+# return number of Mbytes/sec
+getrate() {
+	local guarantee=$1
+	local ceil=$2
+	local container="iperf-$guarantee-$ceil"
+	local iperf_opts="-V"
+
+	local prop=""
+	for iface in $IFACES; do
+		[ -z "$guarantee" ] || prop="$prop net_guarantee[$iface]=$guarantee"
+		[ -z "$ceil" ] || prop="$prop net_limit[$iface]=$ceil"
+	done
+
+	echo portoctl run $container command="iperf $iperf_opts -fk -c $HOST -p $PORT" $prop >&2
+	portoctl run $container command="iperf $iperf_opts -fk -c $HOST -p $PORT" $prop
+	lsof -i TCP:8081 >&2
+
+	netdetails $container >&2
+
+	portoctl wait $container >/dev/null
+	ret=$(portoctl get $container stdout)
+	echo "$ret" >&2
+	netdetails $container >&2
+	portoctl destroy $container
+	kbits=$(echo "$ret" | grep '/sec' | awk '{print $7}')
+	mbytes=$(($kbits / 1000 / 8))
+	echo "kbits=$kbits mbytes=$mbytes" >&2
+	echo $mbytes
+}
+
+expect() {
+	local what=$1
+	local min=$2
+	local max=$3
+
+	if [ $what -lt $min -o $what -gt $max ]; then
+		say "- unexpected $min < $what < $max mbytes/sec"
+		exit 1
+	else
+		say "- rate $min < $what < $max mbytes/sec"
+	fi
+}
+
+A_OUT=""
+B_OUT=""
+cleanup() {
+	set +e
+	[ -z "$A_OUT" ] || rm $A_OUT
+	[ -z "$B_OUT" ] || rm $B_OUT
+}
+trap cleanup EXIT
+
+nettest() {
+	# ssh kernel1 iperf -V -s -p 8081
+
+	say "Single container with default limits"
+	expect `getrate 1` 90 500
+
+	say "1Mbyte/s ceil"
+	expect `getrate 1 $((1 * 1024 * 1024))` 0 2
+
+	local a_g=$((100 * 1024 * 1024))
+
+	say "$a_g guarantee"
+	local a_out=$(mktemp)
+	local b_out=$(mktemp)
+
+	getrate $a_g > $a_out &
+	getrate 1 > $b_out &
+
+	wait
+	wait
+
+	a_rate=$(cat $a_out)
+	b_rate=$(cat $b_out)
+	rm $a_out $b_out
+
+	say "- rate with guarantee $a_rate, without $b_rate"
+	if [ $a_rate -lt $b_rate ]; then
+		say "- unexpected $a_rate > $b_rate"
+		exit 1
+	fi
+
+	local a_l=$((1 * 1024 * 1024))
+	say "$a_l limit"
+	local a_out=$(mktemp)
+	local b_out=$(mktemp)
+
+	getrate 1 $a_l > $a_out &
+	getrate 1 > $b_out &
+
+	wait
+	wait
+
+	a_rate=$(cat $a_out)
+	b_rate=$(cat $b_out)
+	rm $a_out $b_out
+
+	expect $a_rate 0 2
+	expect $b_rate 90 500
+}
+
+mvlantest() {
+	local iface=eth1
+	local container_suffix=50
+	local host_suffix=60
+
+	local host_net=$(ip addr show dev $iface | grep -w inet | awk '{print $2}')
+	local host_ip=$(echo $host_net | cut -d'/' -f 1)
+	local host_mask=$(echo $host_net | cut -d'/' -f 2)
+	local container_ip=$(echo $host_ip | sed "s/\([0-9]*\.[0-9]*\.[0-9]*\).*/\1.$container_suffix/")
+	local macvlan_ip=$(echo $host_ip | sed "s/\([0-9]*\.[0-9]*\.[0-9]*\).*/\1.$host_suffix/")
+	#local macvlan_ip=$host_ip
+	local default_gw=$(ip -o route | grep default | awk '{print $3}')
+
+	#ip link del macvlan0 || :
+	#ip link add link $iface name macvlan0 type macvlan
+	#ip link set dev macvlan0 up
+	#ip addr add $macvlan_ip/$host_mask dev macvlan0
+
+	portoctl exec ping command="ping $host_ip" net="macvlan $iface eth0" ip="eth0 $container_ip/$host_mask" default_gw="$default_gw"
+}
+
+fixcg() {
+	# make current task belongs to root cgroups
+	for cg in /sys/fs/cgroup/*; do
+		echo $$ | sudo tee $cg/cgroup.procs &>/dev/null;
+	done
+}
+
+fixcg
+
+[ ! $# -eq 0 ] || set -- self pkg stress
+for t in "$@"; do
+	case $t in
+		self) selftest ; exit ;;
+		selfargs) selftest "$@" ; exit ;;
+		stress) stresstest ;;
+		fuzzy) shift; fuzzytest ;;
+		fuzzyargs) shift; fuzzytest "$@" ;;
+		threads) threadstest ;;
+		threadsargs) shift; threadstest top_iss "$@"; exit $? ;;
+		stressargs) shift; stresstest "$@"; exit $? ;;
+		pkg) pkgtest ;;
+		net) nettest ;;
+		macvlan) mvlantest ;;
+		nop) : ;;
+		script) shift; eval "$@"; exit ;;
+		*) say "Invalid test $t"; exit 1 ;;
+	esac
+done

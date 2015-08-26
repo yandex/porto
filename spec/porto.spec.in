@@ -1,0 +1,49 @@
+Name: yandex-porto
+Version: @VERSION@
+Release: 1
+URL: https://github.com/yandex/porto
+Source: https://github.com/yandex/porto/archive/@VERSION@.tar.gz#/%{name}-%{version}.tar.gz
+Summary: Porto allows to run processes in containers
+Group: Applications/System
+License: Apache
+Requires: ncurses, logrotate, libnl3
+BuildRequires: protobuf, protobuf-compiler, ncurses-devel, python2-devel, gcc-c++, systemd, libnl3-devel
+
+%description
+Porto allows to run processes in containers
+
+%package -n python2-%{name}
+Summary: Python API for %{name}
+Group: System Environment/Libraries
+Requires: %{name}
+
+%description -n python2-%{name}
+The python2-%{name} package contains Python API for %{name}.
+
+%prep
+%setup -qn porto
+
+%build
+%cmake -DUSE_SYSTEM_LIBNL=1 .
+make %{?_smp_mflags}
+
+%install
+make install DESTDIR=%{buildroot}
+
+mkdir -p %{buildroot}/%{python2_sitelib}/porto
+%{__install} api/python/porto/*.py %{buildroot}/%{python2_sitelib}/porto
+
+%{__install} -D debian/yandex-porto.service %{buildroot}/%{_unitdir}/%{name}.service
+%{__install} -D debian/yandex-porto.cron.d %{buildroot}/%{_sysconfdir}/cron.d/%{name}
+%{__install} -D debian/logrotate-porto.conf %{buildroot}/%{_sysconfdir}/porto/%{name}
+
+%files
+%defattr(755,root,root)
+%{_sbindir}/*
+%{_unitdir}/*
+%config(noreplace) %{_sysconfdir}/cron.d/%{name}
+%config(noreplace) %{_sysconfdir}/porto/%{name}
+
+%files -n python2-%{name}
+%defattr(755,root,root)
+%{python2_sitelib}/porto/*

@@ -1,0 +1,102 @@
+package cfg;
+
+message TCfg {
+	message TNetworkCfg {
+		optional bool enabled = 1;
+		optional bool debug = 2;
+		repeated string devices = 3;
+		optional uint32 default_prio = 4;
+		optional uint32 default_max_guarantee = 5;
+		optional uint32 default_guarantee = 6;
+		optional uint32 default_limit = 7;
+		message TNetworkAlias {
+			required string iface = 1;
+			required string name = 2;
+		}
+		repeated TNetworkAlias alias = 8;
+		optional bool dynamic_ifaces = 9;
+	}
+
+	message TFileCfg {
+		optional string path = 1;
+		optional uint32 perm = 2;
+	}
+
+	message TRpcSockCfg {
+		optional TFileCfg file = 1;
+		optional string group = 2;
+	}
+
+	message TLogCfg {
+		optional bool verbose = 1;
+	}
+
+	message TKeyvalCfg {
+		optional TFileCfg file = 1;
+		optional string size = 2;
+	}
+
+	message TDaemonCfg {
+		optional uint32 max_clients = 1;
+		optional uint32 cgroup_remove_timeout_s = 2;
+		optional uint32 freezer_wait_timeout_s = 3;
+		optional uint64 memory_guarantee_reserve = 4;
+		optional uint64 rotate_logs_timeout_s = 5;
+		optional string sysfs_root = 6;
+		optional uint64 memory_limit = 7;
+		optional uint32 workers = 8;
+		optional uint64 max_msg_len = 9;
+		optional bool blocking_read = 10;
+		optional bool blocking_write = 11;
+		optional uint32 event_workers = 12;
+		optional bool debug = 13;
+	}
+
+	message TContainerCfg {
+		optional uint32 max_log_size = 1;
+		optional string tmp_dir = 2;
+		optional uint32 default_aging_time_s = 3;
+		optional uint32 respawn_delay_ms = 4;
+		optional uint32 stdout_limit = 5;
+		optional uint32 private_max = 6;
+		optional uint32 kill_timeout_ms = 8;
+		optional uint32 stop_timeout_ms = 9;
+		optional bool use_hierarchy = 10;
+		optional uint32 max_total = 11;
+		optional uint32 batch_io_weight = 12;
+		optional uint32 empty_wait_timeout_ms = 13;
+		optional string chroot_porto_dir = 14;
+		optional bool scoped_unlock = 15;
+	}
+
+	message TPrivilegesCfg {
+		repeated string root_user = 1;
+		repeated string root_group = 2;
+		repeated string restricted_root_user = 3;
+		repeated string restricted_root_group = 4;
+	}
+
+	message TVolumesCfg {
+		optional TKeyvalCfg keyval = 1;
+		optional string volume_dir = 2;
+		optional bool enabled = 5;
+		optional string layers_dir = 6;
+		optional bool enable_quota = 7;
+	}
+
+	optional TNetworkCfg network = 1;
+	optional TFileCfg master_pid = 2;
+	optional TFileCfg slave_pid = 3;
+	optional TFileCfg master_log = 4;
+	optional TFileCfg slave_log = 5;
+	optional TRpcSockCfg rpc_sock = 6;
+	optional TLogCfg log = 7;
+	optional TKeyvalCfg keyval = 8;
+	optional TDaemonCfg daemon = 9;
+	optional TContainerCfg container = 10;
+	optional TPrivilegesCfg privileges = 11;
+	optional TVolumesCfg volumes = 12;
+	optional TFileCfg version = 13;
+	optional TFileCfg journal_dir = 14;
+	optional uint64 keep_journals = 15;
+}
