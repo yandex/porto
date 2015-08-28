@@ -2,7 +2,7 @@
 
 Specify arbitrary command to start a container:
 ```
-# Crete container, set command and start
+# Create container, set command and start
 $ portoctl run uname command="uname -a"
 # Get current container state
 $ portoctl get uname state
