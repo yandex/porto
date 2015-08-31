@@ -260,6 +260,7 @@ Porto supports container resource limits. For full list of supported limits look
 # Hierarchy
 
 Porto support hierarchical containers in two modes (to create child container use /):
+
 1. Parent container is started first and runs for a long time; child containers are periodically created and destroyed. When parent container dies, all child containers are stopped:
 
         $ portoctl run parent command="sleep 1000"
@@ -280,7 +281,7 @@ Porto support hierarchical containers in two modes (to create child container us
         $ portoctl get parent/child state
         stopped
 
-In this mode if child's container isolate property is set to false, it starts in the parent container namespaces (PID, filesystem, network).
+    In this mode if child's container isolate property is set to false, it starts in the parent container namespaces (PID, filesystem, network).
 
 2. Parent container is used to set total resource limit for a set of child containers. In this case, parent container is not started explicitly and it's mode is meta:
         $ portoctl create meta
@@ -299,7 +300,7 @@ In this mode if child's container isolate property is set to false, it starts in
         $ portoctl get meta/child2 state
         stopped
 
-Only memory\_limit, memory\_guarantee and recharge\_on\_pgfault limits are supported for meta containers.
+    Only memory\_limit, memory\_guarantee and recharge\_on\_pgfault limits are supported for meta containers.
 
 Meta containers have different behavior depending on isolate property:
 * isolate=true (default) - meta container starts dummy process that holds namespaces; child containers share this namespace if they have isolate=false.
