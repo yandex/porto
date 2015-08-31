@@ -284,6 +284,7 @@ Porto support hierarchical containers in two modes (to create child container us
     In this mode if child's container isolate property is set to false, it starts in the parent container namespaces (PID, filesystem, network).
 
 2. Parent container is used to set total resource limit for a set of child containers. In this case, parent container is not started explicitly and it's mode is meta:
+
         $ portoctl create meta
         $ portoctl set meta memory_limit 1073741824
         $ portoctl run meta/child1 command="sleep 1000"
