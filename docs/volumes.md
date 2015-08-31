@@ -2,7 +2,7 @@
 Porto provides "volumes" abstraction to manage disk space. Each volume is identified by full mount path. A volume can be linked to one or more containers, unlinked volume will be destroyed automatically.
 After creation a volume is linked to the container that created the volume ("/" for host). Then the container can create new links and optionally unlink the volume from itself.
 
-You can ether manually declare a mounting path for a new volume or delegate this task to Porto:
+You can either manually declare a mounting path for a new volume or delegate this task to Porto:
 ```
 $ portoctl vcreate </path/to/volume>
 ```
@@ -105,10 +105,12 @@ $ portoctl layer -L
 A tarball with a layer can be in one of two following formats:
 * overlayfs
 * aufs (used by Docker)
+
 If you want to use existing Docker images, you have two options:
 * you can import each aufs layer as a separate layer, or
 * you can merge them sequentially into one combined layer (please, refer to the portoctl layer command built-in help).
 You can find some additional information about using layers in docker2porto script, which is intended to run Docker images by Porto.
+
 # Persistency #
 * If a volume was created with auto-generated path, the data on this volume will be destroyed automatically with the volume (when the last link to the volume is dropped).
 * Otherwise, if a user has specified the path manually, Porto doesn't destroy data at this path.
