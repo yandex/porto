@@ -1,10 +1,3 @@
-yandex-porto (2.2) precise; urgency=low
-
-  * net: don't touch already configured interfaces in OS virt mode
-  * docs: merge docs from openporto branch
-
- -- Roman Gushchin <klamm@yandex-team.ru>  Mon, 31 Aug 2015 16:41:10 +0300
-
 yandex-porto (2.1) precise; urgency=low
 
   * fix tc issues
