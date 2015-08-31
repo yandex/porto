@@ -708,6 +708,8 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         taskEnv->NetCfg.Host = true;
     }
 
+    taskEnv->NetUp = Prop->Get<int>(P_VIRT_MODE) != VIRT_MODE_OS;
+
     if (!taskEnv->Isolate) {
         auto p = FindRunningParent();
         if (p) {

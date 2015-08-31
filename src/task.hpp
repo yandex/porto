@@ -123,6 +123,7 @@ struct TTaskEnv : public TNonCopyable {
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
     std::unique_ptr<TScopedMem> GroupList;
     TCred Cred;
+    bool NetUp;
 
     TError GetGroupList();
     TError Prepare(const TCred &cred);
