@@ -210,6 +210,10 @@ bool TNlLink::HasQueue() {
     return !(rtnl_link_get_flags(Link) & (IFF_LOOPBACK | IFF_POINTOPOINT | IFF_SLAVE));
 }
 
+bool TNlLink::IsLoopback() {
+    return rtnl_link_get_flags(Link) & IFF_LOOPBACK;
+}
+
 TError TNlLink::SetIpAddr(const TNlAddr &addr, const int prefix) {
     int ret;
     struct rtnl_addr *a = rtnl_addr_alloc();

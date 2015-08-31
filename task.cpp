@@ -575,9 +575,15 @@ TError TTask::ChildEnableNet() {
         if (error)
             return error;
 
-        error = link->Up();
-        if (error)
-            return error;
+        bool hasIp = find_if(Env->IpVec.begin(), Env->IpVec.end(), [&](const TIpVec &i)->bool { return i.Iface == dev; }) != Env->IpVec.end();
+        bool hasGw = find_if(Env->GwVec.begin(), Env->GwVec.end(), [&](const TGwVec &i)->bool { return i.Iface == dev; }) != Env->GwVec.end();
+
+        /* Don't touch non-loopback interfaces, that seems to be up. */
+        if (link->IsLoopback() || Env->NetUp || hasIp || hasGw) {
+            error = link->Up();
+            if (error)
+                return error;
+        }
 
         for (auto ip : Env->IpVec) {
             if (ip.Addr.IsEmpty())
