@@ -51,7 +51,7 @@ All limits can be set in stopped and running states (if not specified otherwise)
 * io\_policy ([batch, normal], default normal)
 
   - normal - interactive tasks;
-  - batch - background batch tasks (currently implemented as fixed bklio limit);
+  - batch - background batch tasks (currently implemented as fixed blkio limit);
 
 # Net
 

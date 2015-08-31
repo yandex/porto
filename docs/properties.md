@@ -14,7 +14,7 @@ Container properties define container environment, container data define contain
 * **stdout\_path** - path to the file where stdout of container will be redirected (if user redefines this property he is responsible for removal of the file); by default Porto provides some internal file which will be removed when container is stopped
 * **stderr\_path** - ditto for stderr
 * **stdin\_path** - container stdin path; by default is /dev/null
-* **stdout\_limit** - maximum number of bytes Proto will return when reading stdout/stderr data
+* **stdout\_limit** - maximum number of bytes Porto will return when reading stdout/stderr data
 * **virt\_mode** - virtualization mode:
   - *app* - (default) start process with specified user:group
   - *os* - start process with user and group set to root with limited capabilities (should be used to run lxc/docker containers)

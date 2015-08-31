@@ -95,7 +95,7 @@ $ sudo portoctl destroy id
 
 # Properties
 
-If for some reason container can't start, Porto returns errno of failed syscall. Use start\_errno to get it.:
+If for some reason container can't start, Porto returns errno of failed syscall. Use start\_errno to get it:
 ```
 $ portoctl create invalid
 $ portoctl set invalid command __invalid_command__
@@ -261,46 +261,43 @@ Porto supports container resource limits. For full list of supported limits look
 
 Porto support hierarchical containers in two modes (to create child container use /):
 1. Parent container is started first and runs for a long time; child containers are periodically created and destroyed. When parent container dies, all child containers are stopped:
-```
-$ portoctl run parent command="sleep 1000"
-$ portoctl run parent/child command="sleep 100" isolate=false
-$ portoctl run parent/ps command="ps aux" isolate=false
-$ portoctl get parent state
-running
-$ portoctl get parent/child state
-running
-$ portoctl get parent/ps state
-dead
-$ portoctl get parent/ps stdout
-USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
-stfomic+     1  0.0  0.0   4308   684 ?        Ss   16:27   0:00 sleep 1000
-stfomic+     2  0.0  0.0   4308   608 ?        Ss   16:27   0:00 sleep 100
-stfomic+     3  0.0  0.0  19744  1968 ?        Rs   16:27   0:00 ps aux
-$ portoctl stop parent
-$ portoctl get parent/child state
-stopped
-```
+
+        $ portoctl run parent command="sleep 1000"
+        $ portoctl run parent/child command="sleep 100" isolate=false
+        $ portoctl run parent/ps command="ps aux" isolate=false
+        $ portoctl get parent state
+        running
+        $ portoctl get parent/child state
+        running
+        $ portoctl get parent/ps state
+        dead
+        $ portoctl get parent/ps stdout
+        USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+        stfomic+     1  0.0  0.0   4308   684 ?        Ss   16:27   0:00 sleep 1000
+        stfomic+     2  0.0  0.0   4308   608 ?        Ss   16:27   0:00 sleep 100
+        stfomic+     3  0.0  0.0  19744  1968 ?        Rs   16:27   0:00 ps aux
+        $ portoctl stop parent
+        $ portoctl get parent/child state
+        stopped
 
 In this mode if child's container isolate property is set to false, it starts in the parent container namespaces (PID, filesystem, network).
 
 2. Parent container is used to set total resource limit for a set of child containers. In this case, parent container is not started explicitly and it's mode is meta:
-```
-$ portoctl create meta
-$ portoctl set meta memory_limit 1073741824
-$ portoctl run meta/child1 command="sleep 1000"
-$ portoctl run meta/child2 command="sleep 1000"
-$ portoctl get meta state
-meta
-$ portoctl get meta/child1 state
-running
-$ portoctl get meta/child2 state
-running
-$ portoctl stop meta
-$ portoctl get meta/child1 state
-stopped
-$ portoctl get meta/child2 state
-stopped
-```
+        $ portoctl create meta
+        $ portoctl set meta memory_limit 1073741824
+        $ portoctl run meta/child1 command="sleep 1000"
+        $ portoctl run meta/child2 command="sleep 1000"
+        $ portoctl get meta state
+        meta
+        $ portoctl get meta/child1 state
+        running
+        $ portoctl get meta/child2 state
+        running
+        $ portoctl stop meta
+        $ portoctl get meta/child1 state
+        stopped
+        $ portoctl get meta/child2 state
+        stopped
 
 Only memory\_limit, memory\_guarantee and recharge\_on\_pgfault limits are supported for meta containers.
 
@@ -332,7 +329,7 @@ $ portoctl destroy meta
 
 # Respawn
 
-By default, Porto doesn't restart dead containers. Using respawn property its possible to make Porto restart dead containers (delay is 1s). Maximum number of respawns is limited by max\_respawn proprty (unlimited by default, -1). respawn\_count data may be used to get number of container respawns.
+By default, Porto doesn't restart dead containers. Using respawn property its possible to make Porto restart dead containers (delay is 1s). Maximum number of respawns is limited by max\_respawn property (unlimited by default, -1). respawn\_count data may be used to get number of container respawns.
 
 # Statistics
 

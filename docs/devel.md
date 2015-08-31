@@ -8,6 +8,6 @@ Porto will support backward compatibility at least between minor version
 
 # How to contribute? #
 Any kind of contribution is kindly welcome!
-Ether you want to expand functionality, report a bug or add/fix the documentation,
+Either you want to expand functionality, report a bug or add/fix the documentation,
 you can make a significant investment into the Porto project.
 Please, send your pull-request/issues via github.
