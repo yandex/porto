@@ -171,6 +171,7 @@ class TVolumeBuilder {
     TPortoAPI *Api;
     std::string Volume;
     std::vector<std::string> Layers;
+    std::vector<std::string> ImportedLayers;
     bool Cleanup = true;
     int LayerIdx = 0;
 
@@ -181,12 +182,14 @@ class TVolumeBuilder {
         return TError((EError)error, msg);
     }
 
-    TError ImportLayer(const std::string &path, std::string &id) {
-        id = "portoctl-" + std::to_string(GetPid()) + "-" + std::to_string(LayerIdx++);
-        std::cout << "Importing layer " << path << "..." << std::endl;
-        int ret = Api->ImportLayer(id, path);
+    TError ImportLayer(const TPath &path, std::string &id) {
+        id = "portoctl-" + std::to_string(GetPid()) + "-" +
+             std::to_string(LayerIdx++) + "-" + path.BaseName();
+        std::cout << "Importing layer " << path << " as " << id << std::endl;
+        int ret = Api->ImportLayer(id, path.ToString());
         if (ret)
             return GetLastError();
+        ImportedLayers.push_back(id);
         return TError::Success();
     }
 
@@ -232,7 +235,8 @@ public:
                     std::cerr << "Can't unlink volume: " << GetLastError() << std::endl;
             }
 
-            for (auto id : Layers) {
+            for (auto id : ImportedLayers) {
+                std::cout << "Removing layer " << id << std::endl;
                 int ret = Api->RemoveLayer(id);
                 if (ret)
                     std::cerr << "Can't remove layer " << id << ": " << GetLastError() << std::endl;
@@ -245,15 +249,34 @@ public:
     }
 
     TError Prepare(const std::vector<std::string> &layers) {
+        std::vector<std::string> known;
+
+        if (layers.empty())
+            return CreatePlainVolume(Volume);
+
+        if (Api->ListLayers(known))
+            return GetLastError();
+
         for (auto layer : layers) {
             layer = StringTrim(layer);
 
             if (layer.empty())
                 continue;
 
+            if (std::find(known.begin(), known.end(), layer) != known.end()) {
+                Layers.push_back(layer);
+                continue;
+            }
+
+            auto path = TPath(layer).RealPath();
+
+            if (path.GetType() == EFileType::Directory) {
+                Layers.push_back(path.ToString());
+                continue;
+            }
+
             std::string id;
-            TPath path(layer);
-            TError error = ImportLayer(path.RealPath().ToString(), id);
+            TError error = ImportLayer(path, id);
             if (error)
                 return error;
 
@@ -799,7 +822,11 @@ public:
 class TRunCmd final : public ICmd {
     TVolumeBuilder VolumeBuilder;
 public:
-    TRunCmd(TPortoAPI *api) : ICmd(api, "run", 2, "[-L layers] <container> [properties]", "create and start container with given properties"), VolumeBuilder(api) {}
+    TRunCmd(TPortoAPI *api) : ICmd(api, "run", 2,
+            "[-L layer]... <container> [properties]",
+            "create and start container with given properties",
+            "    -L layer|dir|tarball        add lower layer (-L top ... -L bottom)\n"
+            ), VolumeBuilder(api) {}
 
     int Parser(string property, string &key, string &val) {
         string::size_type n;
@@ -820,9 +847,9 @@ public:
     }
 
     int Execute(TCommandEnviroment *env) final override {
-        std::string layers;
+        std::vector<std::string> layers;
         const auto &args = env->GetOpts({
-            { 'L', true, [&](const char *arg) { layers = arg; } },
+            { 'L', true, [&](const char *arg) { layers.push_back(arg); } },
         });
 
         const string &containerName = args[0];
@@ -885,7 +912,11 @@ class TExecCmd final : public ICmd {
     bool Cleanup = true;
     char *TmpDir = nullptr;
 public:
-    TExecCmd(TPortoAPI *api) : ICmd(api, "exec", 2, "[-C] [-T] [-L layers] <container> command=<command> [properties]", "create pty, execute and wait for command in container"), VolumeBuilder(api) {
+    TExecCmd(TPortoAPI *api) : ICmd(api, "exec", 2,
+        "[-C] [-T] [-L layer]... <container> command=<command> [properties]",
+        "create pty, execute and wait for command in container",
+        "    -L layer|dir|tarball        add lower layer (-L top ... -L bottom)\n"
+        ), VolumeBuilder(api) {
         SetDieOnSignal(false);
     }
 
@@ -958,12 +989,12 @@ public:
         bool hasTty = isatty(STDIN_FILENO);
         std::vector<std::string> args;
         std::string env;
-        std::string layers;
+        std::vector<std::string> layers;
 
         const auto &argv = environment->GetOpts({
             { 'C', false, [&](const char *arg) { Cleanup = false; } },
             { 'T', false, [&](const char *arg) { hasTty = false; } },
-            { 'L', true, [&](const char *arg) { layers = arg; } },
+            { 'L', true, [&](const char *arg) { layers.push_back(arg); } },
         });
         VolumeBuilder.NeedCleanup(Cleanup);
 
@@ -1804,11 +1835,11 @@ class TBuildCmd final : public ICmd {
 
 public:
     TBuildCmd(TPortoAPI *api) : ICmd(api, "build", 1,
-            "[-C] [-o layer.tar] [-i NAT interface] [-E name=value]... "
-            "<script> [top layer...] [bottom layer]",
+            "[-C] [-L layer]... [-o layer.tar] [-E name=value]... <script>",
             "build container image",
-            "    -o layer.tar         save resulting upper layer\n"
-            "    -E name=value        set environment variable\n"
+            "    -L layer|dir|tarball       add lower layer (-L top ... -L bottom)\n"
+            "    -o layer.tar               save resulting upper layer\n"
+            "    -E name=value              set environment variable\n"
             ), VolumeBuilder(api) {
         SetDieOnSignal(false);
     }
@@ -1825,7 +1856,9 @@ public:
         TPath output = TPath(GetCwd()) / "layer.tar";
         std::vector<std::string> args;
         std::vector<std::string> env;
+        std::vector<std::string> layers;
         const auto &opts = environment->GetOpts({
+            { 'L', true, [&](const char *arg) { layers.push_back(arg); } },
             { 'o', true, [&](const char *arg) { output = TPath(GetCwd()) / arg; } },
             { 'C', false, [&](const char *arg) { Cleanup = false; } },
             { 'E', true, [&](const char *arg) { env.push_back(arg); } },
@@ -1864,7 +1897,6 @@ public:
         if (selinux.Exists())
             bind.push_back("/sys/fs/selinux /sys/fs/selinux ro");
 
-        std::vector<std::string> layers(opts.begin() + 1, opts.end());
         args.push_back(name);
 
         if (!layers.empty()) {

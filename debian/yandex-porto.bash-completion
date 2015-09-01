@@ -49,9 +49,11 @@ _portoctl ()
 			_command_offset $(( $COMP_CWORD + $ct - $cword + 1 ))
 		fi
 		;;
-	exec|run)
-		if [ -z "$ct" ] ; then
-			_porto_containers
+	exec|run|build)
+		if [ "$prev" = "-L" ] ; then
+			COMPREPLY=( $( compgen -f -W "$(portoctl layer -L 2>/dev/null)" -- "$cur" ) )
+		elif [ -z "$ct" ] ; then
+			_porto_containers "-C -T -L"
 		else
 			compopt -o filenames
 			COMPREPLY=( $( compgen -S "=" -W "$_porto_properies" -- "$cur" ) )
