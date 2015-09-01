@@ -1831,116 +1831,170 @@ public:
 class TBuildCmd final : public ICmd {
     TVolumeBuilder VolumeBuilder;
     bool Cleanup = true;
-    char *TmpFile = nullptr;
 
 public:
-    TBuildCmd(TPortoAPI *api) : ICmd(api, "build", 1,
-            "[-C] [-L layer]... [-o layer.tar] [-E name=value]... <script>",
+    TBuildCmd(TPortoAPI *api) : ICmd(api, "build", 0,
+            "[-k] [-L layer]... [-o layer.tar] [-E name=value]... "
+            "[-B bootstrap] [-S script] [properties]...",
             "build container image",
             "    -L layer|dir|tarball       add lower layer (-L top ... -L bottom)\n"
             "    -o layer.tar               save resulting upper layer\n"
             "    -E name=value              set environment variable\n"
+            "    -B bootstrap               bash script runs outside (with cwd=volume)\n"
+            "    -S script                  bash script runs inside (with root=volume)\n"
+            "    -k                         keep volume and container\n"
             ), VolumeBuilder(api) {
         SetDieOnSignal(false);
     }
 
-    ~TBuildCmd() {
-        if (TmpFile) {
-            TFile f(TmpFile);
-            if (f.Exists())
-                (void)f.Remove();
-        }
-    }
+    ~TBuildCmd() { }
 
     int Execute(TCommandEnviroment *environment) final override {
-        TPath output = TPath("layer.tar").AbsolutePath();
-        std::vector<std::string> args;
+        std::string name = "portoctl-build-" + std::to_string(GetPid());
+        TPath output;
         std::vector<std::string> env;
         std::vector<std::string> layers;
+        TPath bootstrap, script;
         const auto &opts = environment->GetOpts({
             { 'L', true, [&](const char *arg) { layers.push_back(arg); } },
             { 'o', true, [&](const char *arg) { output =  TPath(arg).AbsolutePath(); } },
-            { 'C', false, [&](const char *arg) { Cleanup = false; } },
             { 'E', true, [&](const char *arg) { env.push_back(arg); } },
+            { 'B', true, [&](const char *arg) { bootstrap = TPath(arg).RealPath(); } },
+            { 'S', true, [&](const char *arg) { script = TPath(arg).RealPath(); } },
+            { 'k', false, [&](const char *arg) { Cleanup = false; } },
         });
 
-        if (!Cleanup) {
-            args.push_back("-C");
-            VolumeBuilder.NeedCleanup(false);
-        }
-        // don't use PTY in exec, use simple pipes so Ctrl-C works
-        args.push_back("-T");
-
-        TPath script = TPath(opts[0]).RealPath();
-        if (!script.Exists()) {
-            std::cerr << "Invalid script path " << script.ToString() << std::endl;
+        if (output.IsEmpty()) {
+            std::cerr << "No output file specified" << std::endl;
             return EXIT_FAILURE;
         }
 
-        std::string name = "portctl-build-" + std::to_string(GetPid()) + "-" + script.BaseName();
-
-        char *TmpFile = strdup("/tmp/portoctl-build-XXXXXX");
-        int fd = mkstemp(TmpFile);
-        if (fd < 0) {
-            perror("mkstemp");
+        if (output.Exists()) {
+            std::cerr << "Output file " << output << " already exists" << std::endl;
             return EXIT_FAILURE;
         }
-        close(fd);
 
-        // make sure apt-get doesn't ask any questions
-        env.push_back("DEBIAN_FRONTEND=noninteractive");
+        if (!output.DirName().Exists()) {
+            std::cerr << "Output directory " << output.DirName() << " not exists" << std::endl;
+            return EXIT_FAILURE;
+        }
 
-        std::vector<std::string> bind;
+        if (bootstrap.IsEmpty() && script.IsEmpty()) {
+            std::cerr << "Not script and bootstrap specified" << std::endl;
+            return EXIT_FAILURE;
+        }
 
-        // mount host selinux into container (for fedora)
-        TPath selinux("/sys/fs/selinux");
-        if (selinux.Exists())
-            bind.push_back("/sys/fs/selinux /sys/fs/selinux ro");
+        if (!bootstrap.IsEmpty() && !bootstrap.Exists()) {
+            std::cerr << "Bootstrap " << bootstrap << " not exists" << std::endl;
+            return EXIT_FAILURE;
+        }
 
-        args.push_back(name);
+        if (!script.IsEmpty() && !script.Exists()) {
+            std::cerr << "Script " << script << " not exists" << std::endl;
+            return EXIT_FAILURE;
+        }
 
-        if (!layers.empty()) {
-            // custom layer
+        TError error = VolumeBuilder.Prepare(layers);
+        if (error) {
+            std::cerr << "Cannot create volume: " << error << std::endl;
+            return EXIT_FAILURE;
+        }
+        VolumeBuilder.NeedCleanup(Cleanup);
 
-            TError error = VolumeBuilder.Prepare(layers);
-            if (error) {
-                std::cerr << "Can't create volume: " << error << std::endl;
-                return EXIT_FAILURE;
-            }
-            bind.push_back(script.ToString() + " /tmp/script ro");
+        auto volume = VolumeBuilder.GetVolumePath();
 
-            args.push_back("root=" + VolumeBuilder.GetVolumePath());
-            args.push_back("command=/bin/bash -e -x -c '. /tmp/script'");
-        } else {
-            // base layer
+        if (!bootstrap.IsEmpty()) {
+            std::vector<std::string> args;
+            std::vector<std::string> bind;
 
-            TError error = VolumeBuilder.Prepare();
-            if (error) {
-                std::cerr << "Can't create volume: " << error << std::endl;
-                return EXIT_FAILURE;
-            }
+            /* don't use PTY in exec, use simple pipes so Ctrl-C works FIXME */
+            args.push_back("-T");
 
-            auto volume = VolumeBuilder.GetVolumePath();
+            args.push_back(name + "-" + bootstrap.BaseName());
 
+            args.push_back("isolate=true");
+            args.push_back("env=" + CommaSeparatedList(env, ";"));
+
+            /* give write access only to volume and /tmp */
+            args.push_back("root_readonly=true");
             bind.push_back("/tmp /tmp rw");
             bind.push_back(volume + " " + volume + " rw");
+            args.push_back("bind=" + CommaSeparatedList(bind, ";"));
 
-            args.push_back("root_readonly=true");
+            /* add properies from commandline */
+            for (auto opt : opts)
+                args.push_back(opt);
+
             args.push_back("cwd=" + volume);
-            args.push_back("command=/bin/bash -e -x -c '. " + script.ToString() + " " + volume + "'");
+            args.push_back("command=/bin/bash -e -x -c '. " + bootstrap.ToString() + "'");
+
+            std::cout << "Starting bootstrap: exec " << CommaSeparatedList(args, "  ") << std::endl;
+
+            int ret = RunCmd<TExecCmd>(args, environment);
+            if (ret) {
+                std::cout << "Bootstrap failed with exitcode: " << ret << std::endl;
+                return ret;
+            }
         }
 
-        args.push_back("bind=" + CommaSeparatedList(bind, ";"));
-        args.push_back("bind_dns=false");
-        args.push_back("user=root");
-        args.push_back("group=root");
-        args.push_back("env=" + CommaSeparatedList(env, ";"));
+        if (!script.IsEmpty()) {
+            std::vector<std::string> args;
+            std::vector<std::string> bind;
 
-        int ret = RunCmd<TExecCmd>(args, environment);
-        if (ret)
-            return ret;
+            args.push_back(name);
+            args.push_back("virt_mode=os");
 
-        TError error = VolumeBuilder.ExportLayer(output);
+            /* add properies from commandline */
+            for (auto opt : opts)
+                args.push_back(opt);
+
+            /* Mount host selinux into container (for fedora) */
+            TPath selinux("/sys/fs/selinux");
+            if (selinux.Exists())
+                bind.push_back("/sys/fs/selinux /sys/fs/selinux ro");
+
+            bind.push_back(script.ToString() + " /" + name + " ro");
+            args.push_back("bind=" + CommaSeparatedList(bind, ";"));
+            args.push_back("root=" + volume);
+
+            std::cout << "Creating container: run " << CommaSeparatedList(args, "  ") << std::endl;
+
+            int ret = RunCmd<TRunCmd>(args, environment);
+            if (ret)
+                return ret;
+
+            args.clear();
+            args.push_back("-T");
+            args.push_back(name + "/" + script.BaseName());
+            args.push_back("isolate=false");
+            args.push_back("env=" + CommaSeparatedList(env, ";"));
+            args.push_back("command=/bin/bash -e -x -c '. /" + name + "'");
+
+            std::cout << "Starting script: exec " << CommaSeparatedList(args, "  ") << std::endl;
+
+            int ret2 = RunCmd<TExecCmd>(args, environment);
+            if (ret2)
+                std::cout << "Script failed with exitcode: " << ret2 << std::endl;
+
+            if (Cleanup) {
+                std::cout << "Destroying container: destroy " + name << std::endl;
+
+                args.clear();
+                args.push_back(name);
+                ret = RunCmd<TDestroyCmd>(args, environment);
+                if (ret)
+                    return ret;
+            }
+
+            if (ret2)
+                return ret2;
+        }
+
+        TPath(volume + "/" + name).Unlink();
+
+        std::cout << "Exporting upper layer into " << output.ToString() << std::endl;
+
+        error = VolumeBuilder.ExportLayer(output);
         if (error) {
             std::cerr << "Can't export layer:" << error << std::endl;
             return EXIT_FAILURE;
