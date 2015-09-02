@@ -1,6 +1,6 @@
 #pragma once
 
-#include "error.hpp"
+#include "util/error.hpp"
 
 #define noinline __attribute__((noinline))
 
