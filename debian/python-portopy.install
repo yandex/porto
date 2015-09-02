@@ -1,4 +1,4 @@
-api/python/porto/__init__.py usr/share/pyshared/porto/
-api/python/porto/api.py usr/share/pyshared/porto/
-api/python/porto/exceptions.py usr/share/pyshared/porto/
-api/python/porto/rpc_pb2.py usr/share/pyshared/porto/
+src/api/python/porto/__init__.py usr/share/pyshared/porto/
+src/api/python/porto/api.py usr/share/pyshared/porto/
+src/api/python/porto/exceptions.py usr/share/pyshared/porto/
+src/api/python/porto/rpc_pb2.py usr/share/pyshared/porto/
