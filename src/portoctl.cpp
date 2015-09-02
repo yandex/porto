@@ -295,11 +295,11 @@ public:
     }
 };
 
-class TRawCmd : public ICmd {
+class TRawCmd final : public ICmd {
 public:
     TRawCmd(TPortoAPI *api) : ICmd(api, "raw", 1, "<message>", "send raw protobuf message") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         stringstream msg;
 
         std::vector<std::string> args(argv, argv + argc);
@@ -313,11 +313,11 @@ public:
     }
 };
 
-class TCreateCmd : public ICmd {
+class TCreateCmd final : public ICmd {
 public:
     TCreateCmd(TPortoAPI *api) : ICmd(api, "create", 1, "<container1> [container2...]", "create container") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         for (int i = 0; i < argc; i++) {
             int ret = Api->Create(argv[i]);
             if (ret) {
@@ -330,11 +330,11 @@ public:
     }
 };
 
-class TGetPropertyCmd : public ICmd {
+class TGetPropertyCmd final : public ICmd {
 public:
     TGetPropertyCmd(TPortoAPI *api) : ICmd(api, "pget", 2, "[-k] <container> <property> [property...]", "get raw container property") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         bool printKey = false;
         int start = GetOpt(argc, argv, {
             { 'k', false, [&](const char *arg) { printKey = true; } },
@@ -357,11 +357,11 @@ public:
     }
 };
 
-class TSetPropertyCmd : public ICmd {
+class TSetPropertyCmd final : public ICmd {
 public:
     TSetPropertyCmd(TPortoAPI *api) : ICmd(api, "set", 3, "<container> <property>", "set container property") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         string val = argv[2];
         for (int i = 3; i < argc; i++) {
             val += " ";
@@ -376,11 +376,11 @@ public:
     }
 };
 
-class TGetDataCmd : public ICmd {
+class TGetDataCmd final : public ICmd {
 public:
     TGetDataCmd(TPortoAPI *api) : ICmd(api, "dget", 2, "[-k] <container> <data> [data...]", "get raw container data") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         bool printKey = false;
         int start = GetOpt(argc, argv, {
             { 'k', false, [&](const char *arg) { printKey = true; } },
@@ -403,11 +403,11 @@ public:
     }
 };
 
-class TStartCmd : public ICmd {
+class TStartCmd final : public ICmd {
 public:
     TStartCmd(TPortoAPI *api) : ICmd(api, "start", 1, "<container1> [container2...]", "start container") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         for (int i = 0; i < argc; i++) {
             int ret = Api->Start(argv[i]);
             if (ret) {
@@ -470,11 +470,11 @@ static const map<string, int> sigMap = {
     { "SIGUNUSED",  SIGUNUSED },
 };
 
-class TKillCmd : public ICmd {
+class TKillCmd final : public ICmd {
 public:
     TKillCmd(TPortoAPI *api) : ICmd(api, "kill", 1, "<container> [signal]", "send signal to container") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         int sig = SIGTERM;
         if (argc >= 2) {
             string sigName = argv[1];
@@ -498,11 +498,11 @@ public:
     }
 };
 
-class TStopCmd : public ICmd {
+class TStopCmd final : public ICmd {
 public:
     TStopCmd(TPortoAPI *api) : ICmd(api, "stop", 1, "<container1> [container2...]", "stop container") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         for (int i = 0; i < argc; i++) {
             int ret = Api->Stop(argv[0]);
             if (ret) {
@@ -515,11 +515,11 @@ public:
     }
 };
 
-class TRestartCmd : public ICmd {
+class TRestartCmd final : public ICmd {
 public:
     TRestartCmd(TPortoAPI *api) : ICmd(api, "restart", 1, "<container1> [container2...]", "restart container") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         for (int i = 0; i < argc; i++) {
             int ret = Api->Stop(argv[0]);
             if (ret) {
@@ -538,11 +538,11 @@ public:
     }
 };
 
-class TPauseCmd : public ICmd {
+class TPauseCmd final : public ICmd {
 public:
     TPauseCmd(TPortoAPI *api) : ICmd(api, "pause", 1, "<container> [name...]", "pause container") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         for (int i = 0; i < argc; i++) {
             int ret = Api->Pause(argv[0]);
             if (ret) {
@@ -555,11 +555,11 @@ public:
     }
 };
 
-class TResumeCmd : public ICmd {
+class TResumeCmd final : public ICmd {
 public:
     TResumeCmd(TPortoAPI *api) : ICmd(api, "resume", 1, "<container1> [container2...]", "resume container") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         for (int i = 0; i < argc; i++) {
             int ret = Api->Resume(argv[0]);
             if (ret) {
@@ -572,11 +572,11 @@ public:
     }
 };
 
-class TGetCmd : public ICmd {
+class TGetCmd final : public ICmd {
 public:
     TGetCmd(TPortoAPI *api) : ICmd(api, "get", 1, "<container> <variable> [variable...]", "get container property or data") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         string value;
         int ret;
         bool printKey = true;
@@ -652,7 +652,7 @@ public:
     }
 };
 
-class TEnterCmd : public ICmd {
+class TEnterCmd final : public ICmd {
 public:
     TEnterCmd(TPortoAPI *api) : ICmd(api, "enter", 1, "[-C] <container> [command]", "execute command in container namespace") {}
 
@@ -688,7 +688,7 @@ public:
         return TError(EError::Unknown, "Can't find root for " + subsys);
     }
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         bool enterCgroups = true;
         int start = GetOpt(argc, argv, {
             { 'C', false, [&](const char *arg) { enterCgroups = false; } },
@@ -780,7 +780,7 @@ public:
     }
 };
 
-class TRunCmd : public ICmd {
+class TRunCmd final : public ICmd {
     TVolumeBuilder VolumeBuilder;
 public:
     TRunCmd(TPortoAPI *api) : ICmd(api, "run", 2, "[-L layers] <container> [properties]", "create and start container with given properties"), VolumeBuilder(api) {}
@@ -803,7 +803,7 @@ public:
         return EXIT_SUCCESS;
     }
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         std::string layers;
         int start = GetOpt(argc, argv, {
             { 'L', true, [&](const char *arg) { layers = arg; } },
@@ -861,7 +861,7 @@ public:
     }
 };
 
-class TExecCmd : public ICmd {
+class TExecCmd final : public ICmd {
     string containerName;
     struct termios SavedAttrs;
     bool Canonical = true;
@@ -933,7 +933,7 @@ public:
         return fd;
     }
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         bool hasTty = isatty(STDIN_FILENO);
         std::vector<std::string> args;
         std::string env;
@@ -1128,11 +1128,11 @@ public:
     }
 };
 
-class TGcCmd : public ICmd {
+class TGcCmd final : public ICmd {
 public:
     TGcCmd(TPortoAPI *api) : ICmd(api, "gc", 0, "", "remove all dead containers") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         vector<string> clist;
         int ret = Api->List(clist);
         if (ret) {
@@ -1165,11 +1165,11 @@ public:
     }
 };
 
-class TFindCmd : public ICmd {
+class TFindCmd final : public ICmd {
 public:
     TFindCmd(TPortoAPI *api) : ICmd(api, "find", 1, "", "find container for given process id") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         int pid;
         TError error = StringToInt(argv[0], pid);
         if (error) {
@@ -1202,11 +1202,11 @@ public:
     }
 };
 
-class TDestroyCmd : public ICmd {
+class TDestroyCmd final : public ICmd {
 public:
     TDestroyCmd(TPortoAPI *api) : ICmd(api, "destroy", 1, "<container1> [container2...]", "destroy container") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         int exitStatus = EXIT_SUCCESS;
         for (int i = 0; i < argc; i++) {
             int ret = Api->Destroy(argv[i]);
@@ -1220,11 +1220,11 @@ public:
     }
 };
 
-class TWaitCmd : public ICmd {
+class TWaitCmd final : public ICmd {
 public:
     TWaitCmd(TPortoAPI *api) : ICmd(api, "wait", 1, "<container1> [container2] ...", "wait for listed containers") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         int timeout = -1;
         int start = GetOpt(argc, argv, {
             { 't', true, [&](const char *arg) { timeout = std::stoi(arg); } },
@@ -1250,7 +1250,7 @@ public:
     }
 };
 
-class TListCmd : public ICmd {
+class TListCmd final : public ICmd {
 public:
     TListCmd(TPortoAPI *api) : ICmd(api, "list", 0, "[-1] [-f] [-t]", "list created containers") {}
 
@@ -1270,7 +1270,7 @@ public:
             return child.substr(0, lastSlash);
     }
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         bool details = true;
         bool forest = false;
         bool toplevel = false;
@@ -1353,11 +1353,11 @@ public:
 };
 
 extern int portotop(TPortoAPI *api, std::string config);
-class TTopCmd : public ICmd {
+class TTopCmd final : public ICmd {
 public:
     TTopCmd(TPortoAPI *api) : ICmd(api, "top", 0, "[config]", "top-like tool for container monitoring and control") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         if (argc == 0)
             return portotop(Api, "");
         else
@@ -1365,11 +1365,11 @@ public:
     }
 };
 
-class TSortCmd : public ICmd {
+class TSortCmd final : public ICmd {
 public:
     TSortCmd(TPortoAPI *api) : ICmd(api, "sort", 0, "[sort-by]", "print containers sorted by resource usage") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         vector<string> clist;
         int ret = Api->List(clist);
         if (ret) {
@@ -1493,14 +1493,14 @@ public:
     }
 };
 
-class TCreateVolumeCmd : public ICmd {
+class TCreateVolumeCmd final : public ICmd {
 public:
     TCreateVolumeCmd(TPortoAPI *api) : ICmd(api, "vcreate", 1, "-A|<path> [property=value...]",
         "create volume",
         "    -A        choose path automatically\n"
         ) {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         std::map<std::string, std::string> properties;
         std::string path(argv[0]);
 
@@ -1534,12 +1534,12 @@ public:
     }
 };
 
-class TLinkVolumeCmd : public ICmd {
+class TLinkVolumeCmd final : public ICmd {
 public:
     TLinkVolumeCmd(TPortoAPI *api) : ICmd(api, "vlink", 1, "<path> [container]",
                     "link volume to container", "default container - current\n") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         int ret = Api->LinkVolume(argv[0], (argc > 1) ? argv[1] : "");
         if (ret)
             PrintError("Can't link volume");
@@ -1547,14 +1547,14 @@ public:
     }
 };
 
-class TUnlinkVolumeCmd : public ICmd {
+class TUnlinkVolumeCmd final : public ICmd {
 public:
     TUnlinkVolumeCmd(TPortoAPI *api) : ICmd(api, "vunlink", 1, "<path> [container]",
                     "unlink volume from container",
                     "default container - current\n"
                     "removing last link deletes volume\n") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         int ret = Api->UnlinkVolume(argv[0], (argc > 1) ? argv[1] : "");
         if (ret)
             PrintError("Can't unlink volume");
@@ -1562,7 +1562,7 @@ public:
     }
 };
 
-class TListVolumesCmd : public ICmd {
+class TListVolumesCmd final : public ICmd {
     bool details = true;
     bool verbose = false;
     bool inodes = false;
@@ -1644,7 +1644,7 @@ public:
         std::cout << std::endl;
     }
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         int start = GetOpt(argc, argv, {
             { '1', false, [&](const char *arg) { details = false; } },
             { 'i', false, [&](const char *arg) { inodes = true; } },
@@ -1688,7 +1688,7 @@ public:
     }
 };
 
-class TLayerCmd : public ICmd {
+class TLayerCmd final : public ICmd {
 public:
     TLayerCmd(TPortoAPI *api) : ICmd(api, "layer", 1,
         "-I|-M|-R|-L|-F|-E <layer> [tarball]",
@@ -1708,7 +1708,7 @@ public:
     bool export_ = false;
     bool flush = false;
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         int ret = EXIT_SUCCESS;
         int start = GetOpt(argc, argv, {
             { 'I', false, [&](const char *arg) { import = true; } },
@@ -1772,7 +1772,7 @@ public:
     }
 };
 
-class TBuildCmd : public ICmd {
+class TBuildCmd final : public ICmd {
     TVolumeBuilder VolumeBuilder;
     bool Cleanup = true;
     char *TmpFile = nullptr;
@@ -1796,7 +1796,7 @@ public:
         }
     }
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(int argc, char *argv[]) override {
         TPath output = TPath(GetCwd()) / "layer.tar";
         std::vector<std::string> args;
         std::vector<std::string> env;

@@ -34,15 +34,16 @@ int ICmd::RunCmdImpl(const std::vector<std::string> &args,
                      std::unique_ptr<ICmd> cmd) {
     ICmd *prevCmd = CurrentCmd;
 
-    std::vector<const char *> cargs;
+    std::vector<char *> cargs;
+    std::vector<std::string> mutableArgs(args);
     cargs.push_back(program_invocation_name);
-    for (const auto& arg : args)
-        cargs.push_back(arg.c_str());
+    for (auto& arg : mutableArgs)
+        cargs.push_back(&arg[0]);
 
     cmd->SetDieOnSignal(false);
 
     CurrentCmd = cmd.get();
-    int ret = cmd->Execute(cargs.size() - 1, ((char **)cargs.data()) + 1);
+    int ret = cmd->Execute(cargs.size() - 1, (&cargs[0]) + 1);
     CurrentCmd = prevCmd;
 
     if (GotSignal())

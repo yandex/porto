@@ -47,13 +47,13 @@ public:
     virtual int Execute(int argc, char *argv[]) = 0;
 };
 
-class THelpCmd : public ICmd {
-    bool UsagePrintData;
+class THelpCmd final : public ICmd {
+    const bool UsagePrintData;
 public:
     THelpCmd(TPortoAPI *api, bool usagePrintData);
 
     void Usage();
-    int Execute(int argc, char *argv[]);
+    int Execute(int argc, char *argv[]) override;
 };
 
 struct Option {
