@@ -13,7 +13,16 @@ respawn
 kill signal SIGINT
 kill timeout 60
 
+env PORTO_NAME
+
 pre-start script
+
+	# do not start porto in porto-container
+	if [ -n "$PORTO_NAME" ] ; then
+		stop
+		exit 0
+	fi
+
 	# we want to clean up daemon state only if it stopped gracefully by
 	# the user
 	if [ ! -e /run/portoloop.pid ]; then
