@@ -1,7 +1,6 @@
 #pragma once
 
 #include <string>
-#include <csignal>
 #include "libporto.hpp"
 
 // Command that is being executed, used for signal handling
