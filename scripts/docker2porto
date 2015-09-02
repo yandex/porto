@@ -97,8 +97,9 @@ cleanup() {
 trap cleanup EXIT
 
 layers_prop=""
+dir=$(dirname $0)
 for id in $layers; do
-  portoctl layer -I $id $PWD/${id}.tar.gz
+  portoctl layer -I $id "${dir}/${id}.tar.gz"
   layers_prop="$layers_prop$id;"
 done
 
