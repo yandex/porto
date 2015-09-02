@@ -88,7 +88,6 @@ add_library(porto STATIC util api/cpp/libporto.cpp util/protobuf.cpp)
 add_dependencies(porto util version.hpp)
 
 add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp holder.cpp event.cpp task.cpp kvalue.cpp subsystem.cpp config.cpp container_value.cpp value.cpp data.cpp property.cpp qdisc.cpp context.cpp volume.cpp epoll.cpp client.cpp)
-set_target_properties(portod PROPERTIES COMPILE_DEFINITIONS "PORTOD=1")
 add_dependencies(portod version.hpp)
 target_link_libraries(portod porto util ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
 

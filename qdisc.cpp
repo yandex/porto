@@ -168,12 +168,10 @@ TError TNetwork::Destroy() {
 }
 
 TError TNetwork::Prepare() {
-#ifdef PORTOD
     PORTO_ASSERT(Qdisc == nullptr);
     PORTO_ASSERT(Tclass == nullptr);
     PORTO_ASSERT(Filter == nullptr);
     PORTO_ASSERT(Links.size() == 0);
-#endif
 
     auto lock = ScopedLock();
 
