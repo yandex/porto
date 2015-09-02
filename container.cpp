@@ -571,7 +571,6 @@ bool TContainer::IsNamespaceIsolated() {
         return false;
 
     if (Prop->Get<std::string>(P_ROOT) != "/" &&
-        !Prop->Get<std::string>(P_PORTO_NAMESPACE).empty() &&
         Prop->Get<bool>(P_ENABLE_PORTO))
         return true;
 
