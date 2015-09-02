@@ -41,7 +41,7 @@ if(ENABLE_PYTHON)
 	set(PYTHON_SOURCES "api/python/porto/rpc_pb2.py")
 endif()
 
-add_custom_target(version.hpp ../GIT-VERSION-GEN VERBATIM)
+add_custom_target(version.hpp ${CMAKE_SOURCE_DIR}/GIT-VERSION-GEN VERBATIM)
 
 set_source_files_properties(tags PROPERTIES GENERATED true)
 add_custom_target(tags COMMAND ctags -R --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
