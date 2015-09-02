@@ -107,6 +107,7 @@ portoctl exec #{name} #{props} root=$root
 END
 
   File.write(script, text)
+  FileUtils.chmod('+x', script)
 end
 
 def get(url, headers = {})
