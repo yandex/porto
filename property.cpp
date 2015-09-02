@@ -1485,8 +1485,7 @@ public:
     TError CheckValue(const bool &value) override {
         if (value == false) {
             auto c = GetContainer();
-            if (c->Prop->Get<std::string>(P_ROOT) == "/" ||
-                c->Prop->Get<std::string>(P_PORTO_NAMESPACE).empty())
+            if (c->Prop->Get<std::string>(P_ROOT) == "/")
                 return TError(EError::InvalidValue, "Can't disable porto socket when container is not isolated");
         }
 

@@ -1601,6 +1601,7 @@ static void TestRootRdOnlyProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "root", path.ToString()));
     ExpectApiSuccess(api.SetProperty(name, "root_readonly", "true"));
     ExpectApiSuccess(api.SetProperty(name, "bind_dns", "false"));
+    ExpectApiSuccess(api.SetProperty(name, "enable_porto", "false"));
     ExpectApiSuccess(api.SetProperty(name, "command", "/cat /proc/self/mountinfo"));
     auto v = StartWaitAndGetData(api, name, "stdout");
     auto m = ParseMountinfo(v);
@@ -2470,7 +2471,7 @@ static void TestEnablePortoProperty(TPortoAPI &api) {
     Say() << "Root-isolated" << std::endl;
 
     ExpectApiSuccess(api.SetProperty(name, "root", path.ToString()));
-    ExpectApiFailure(api.SetProperty(name, "enable_porto", "false"), EError::InvalidValue);
+    ExpectApiSuccess(api.SetProperty(name, "enable_porto", "false"));
     ExpectApiSuccess(api.SetProperty(name, "enable_porto", "true"));
 
     Say() << "Namespace-isolated" << std::endl;
