@@ -35,3 +35,7 @@
 /coverage.info
 /coverage.info.cleaned
 /coverage/
+/util/libutil.a
+/util/Makefile
+/util/cmake_install.cmake
+/util/CMakeFiles/*
