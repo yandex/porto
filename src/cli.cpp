@@ -16,16 +16,18 @@ using std::string;
 using std::map;
 using std::vector;
 
+namespace {
 // Command that is being executed, used for signal handling
 ICmd *CurrentCmd;
+}
 
-size_t MaxFieldLength(std::vector<std::string> &vec, size_t min) {
+size_t MaxFieldLength(const std::vector<std::string> &vec, size_t min) {
     size_t len = 0;
-    for (auto &i : vec)
+    for (const auto &i : vec)
         if (i.length() > len)
             len  = i.length();
 
-    return (len > min ? len : min) + 2;
+    return std::max(len, min) + 2;
 }
 
 int ICmd::RunCmdImpl(const std::vector<std::string> &args,
@@ -53,18 +55,18 @@ ICmd::ICmd(TPortoAPI *api, const string& name, int args,
            const string& usage, const string& desc, const string& help) :
     Api(api), Name(name), Usage(usage), Desc(desc), Help(help), NeedArgs(args) {}
 
-    string& ICmd::GetName() { return Name; }
-    string& ICmd::GetUsage() { return Usage; }
-    string& ICmd::GetDescription() { return Desc; }
-    string& ICmd::GetHelp() { return Help; }
+const string& ICmd::GetName() const { return Name; }
+const string& ICmd::GetUsage() const { return Usage; }
+const string& ICmd::GetDescription() const { return Desc; }
+const string& ICmd::GetHelp() const { return Help; }
 
-    const string &ICmd::ErrorName(int err) {
-        if (err == INT_MAX) {
-            static const string err = "portod unavailable";
-            return err;
-        }
-        return rpc::EError_Name(static_cast<rpc::EError>(err));
+const string &ICmd::ErrorName(int err) {
+    if (err == INT_MAX) {
+        static const string err = "portod unavailable";
+        return err;
     }
+    return rpc::EError_Name(static_cast<rpc::EError>(err));
+}
 
 void ICmd::Print(const std::string &val) {
     std::cout << val;
@@ -178,11 +180,11 @@ void THelpCmd::Usage() {
         PrintError("Unavailable");
     } else {
         tmpVec.clear();
-        for (auto p : vlist)
+        for (const auto& p : vlist)
             tmpVec.push_back(p.Name);
         nameWidth = MaxFieldLength(tmpVec);
 
-        for (auto p : vlist)
+        for (const auto& p : vlist)
             PrintAligned(p.Name, p.Description, nameWidth, termWidth);
     }
 
@@ -193,11 +195,11 @@ void THelpCmd::Usage() {
         PrintError("Unavailable");
     } else {
         tmpVec.clear();
-        for (auto p : plist)
+        for (const auto& p : plist)
             tmpVec.push_back(p.Name);
         nameWidth = MaxFieldLength(tmpVec);
 
-        for (auto p : plist)
+        for (const auto& p : plist)
             PrintAligned(p.Name, p.Description, nameWidth, termWidth);
     }
 
@@ -211,11 +213,11 @@ void THelpCmd::Usage() {
         PrintError("Unavailable");
     } else {
         tmpVec.clear();
-        for (auto d : dlist)
+        for (const auto& d : dlist)
             tmpVec.push_back(d.Name);
         nameWidth = MaxFieldLength(tmpVec);
 
-        for (auto d : dlist)
+        for (const auto& d : dlist)
             PrintAligned(d.Name, d.Description, nameWidth, termWidth);
     }
     std::cerr << std::endl;
@@ -328,7 +330,7 @@ int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
 
 int GetOpt(int argc, char *argv[], const std::vector<Option> &opts) {
     std::string optstring;
-    for (auto o : opts) {
+    for (const auto& o : opts) {
         optstring += o.key;
         if (o.hasArg)
             optstring += ":";
@@ -338,7 +340,7 @@ int GetOpt(int argc, char *argv[], const std::vector<Option> &opts) {
     int opt;
     while ((opt = getopt(argc + 1, argv - 1, optstring.c_str())) != -1) {
         bool found = false;
-        for (auto o : opts) {
+        for (const auto& o : opts) {
             if (o.key == opt) {
                 o.handler(optarg);
                 found = true;

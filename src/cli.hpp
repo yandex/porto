@@ -31,10 +31,10 @@ public:
     ICmd(TPortoAPI *api, const std::string& name, int args,
          const std::string& usage, const std::string& desc, const std::string& help = "");
     virtual ~ICmd() {}
-    std::string &GetName();
-    std::string &GetUsage();
-    std::string &GetDescription();
-    std::string &GetHelp();
+    const std::string &GetName() const;
+    const std::string &GetUsage() const;
+    const std::string &GetDescription() const;
+    const std::string &GetHelp() const;
 
     const std::string &ErrorName(int err);
     void Print(const std::string &val);
@@ -64,6 +64,6 @@ struct Option {
 
 int GetOpt(int argc, char *argv[], const std::vector<Option> &opts);
 
-size_t MaxFieldLength(std::vector<std::string> &vec, size_t min = 8);
+size_t MaxFieldLength(const std::vector<std::string> &vec, size_t min = 8);
 void RegisterCommand(ICmd *cmd);
 int HandleCommand(TPortoAPI *api, int argc, char *argv[]);
