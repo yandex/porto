@@ -48,19 +48,17 @@ def generate_conf(script, name, rootfs, meta, layers)
   cmd = []
   cmd += meta["config"]["Entrypoint"] if meta["config"]["Entrypoint"]
   cmd += meta["config"]["Cmd"] if meta["config"]["Cmd"]
-
-  env = meta["config"]["Env"]
-
   config["command"] = cmd.shift
   config["command"] = "bash" unless config["command"]
-  config["hostname"] = meta["config"]["Hostname"]
-  config["user"] = meta["config"]["User"] if meta["config"]["User"] != ""
   cmd.each { |s| config["command"] += " \"#{escape_arg(s)}\"" }
 
   config["env"] = '$ENVIRON; '
-  env.each { |s| config["env"] += "#{escape_env(s)};" }
-  config["bind"] = '$BIND;'
+  env = meta["config"]["Env"]
+  env.each { |s| config["env"] += "#{escape_env(s)};" } if env
 
+  config["hostname"] = meta["config"]["Hostname"]
+  config["user"] = meta["config"]["User"] if meta["config"]["User"] != ""
+  config["bind"] = '$BIND;'
   config["cwd"] = "/#{meta["config"]["WorkingDir"]}"
 
   props = "virt_mode=\"os\""
