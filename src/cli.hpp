@@ -1,11 +1,9 @@
 #pragma once
 
+#include <memory>
 #include <string>
+#include <vector>
 #include "libporto.hpp"
-
-// Command that is being executed, used for signal handling
-class ICmd;
-extern ICmd *CurrentCmd;
 
 class ICmd {
 protected:
@@ -15,37 +13,18 @@ protected:
     sig_atomic_t Interrupted = 0;
     bool DieOnSignal = false;
 
+    int RunCmdImpl(const std::vector<std::string> &args,
+                   std::unique_ptr<ICmd> command);
+
     template <typename T>
     int RunCmd(const std::vector<std::string> &args) {
-        ICmd *prevCmd = CurrentCmd;
-
-        std::vector<char *> cargs;
-        cargs.push_back(strdup(program_invocation_name));
-        for (auto arg : args)
-            cargs.push_back(strdup(arg.c_str()));
-
-        auto cmd = new T(Api);
-        cmd->SetDieOnSignal(false);
-
-        CurrentCmd = cmd;
-        int ret = cmd->Execute(cargs.size() - 1, ((char **)cargs.data()) + 1);
-        CurrentCmd = prevCmd;
-
-        for (auto arg : cargs)
-            free(arg);
-
-        delete cmd;
-
-        if (GotSignal())
-            return InterruptedSignal;
-
-        return ret;
+        return RunCmdImpl(args, std::unique_ptr<T>(new T(Api)));
     }
 
 public:
     int InterruptedSignal;
 
-    bool GotSignal() {
+    bool GotSignal() const {
         return Interrupted;
     }
 

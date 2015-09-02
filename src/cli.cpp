@@ -16,6 +16,7 @@ using std::string;
 using std::map;
 using std::vector;
 
+// Command that is being executed, used for signal handling
 ICmd *CurrentCmd;
 
 size_t MaxFieldLength(std::vector<std::string> &vec, size_t min) {
@@ -25,6 +26,27 @@ size_t MaxFieldLength(std::vector<std::string> &vec, size_t min) {
             len  = i.length();
 
     return (len > min ? len : min) + 2;
+}
+
+int ICmd::RunCmdImpl(const std::vector<std::string> &args,
+                     std::unique_ptr<ICmd> cmd) {
+    ICmd *prevCmd = CurrentCmd;
+
+    std::vector<const char *> cargs;
+    cargs.push_back(program_invocation_name);
+    for (const auto& arg : args)
+        cargs.push_back(arg.c_str());
+
+    cmd->SetDieOnSignal(false);
+
+    CurrentCmd = cmd.get();
+    int ret = cmd->Execute(cargs.size() - 1, ((char **)cargs.data()) + 1);
+    CurrentCmd = prevCmd;
+
+    if (GotSignal())
+        return InterruptedSignal;
+
+    return ret;
 }
 
 ICmd::ICmd(TPortoAPI *api, const string& name, int args,
