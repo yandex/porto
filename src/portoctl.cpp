@@ -336,9 +336,6 @@ public:
 
     int Execute(TCommandEnviroment *env) final override {
         bool printKey = false;
-        /*int start = GetOpt(argc, argv, {
-            { 'k', false, [&](const char *arg) { printKey = true; } },
-        });*/
         const auto &args = env->GetOpts({
             { 'k', false, [&](const char *arg) { printKey = true; } },
         });
@@ -387,9 +384,6 @@ public:
 
     int Execute(TCommandEnviroment *env) final override {
         bool printKey = false;
-        /*int start = GetOpt(argc, argv, {
-            { 'k', false, [&](const char *arg) { printKey = true; } },
-        });*/
         const auto &args = env->GetOpts({
             { 'k', false, [&](const char *arg) { printKey = true; } },
         });
@@ -701,9 +695,6 @@ public:
 
     int Execute(TCommandEnviroment *env) final override {
         bool enterCgroups = true;
-        /*int start = GetOpt(argc, argv, {
-            { 'C', false, [&](const char *arg) { enterCgroups = false; } },
-        });*/
         const auto &args = env->GetOpts({
             { 'C', false, [&](const char *arg) { enterCgroups = false; } },
         });
@@ -819,9 +810,6 @@ public:
 
     int Execute(TCommandEnviroment *env) final override {
         std::string layers;
-        /*int start = GetOpt(argc, argv, {
-            { 'L', true, [&](const char *arg) { layers = arg; } },
-        });*/
         const auto &args = env->GetOpts({
             { 'L', true, [&](const char *arg) { layers = arg; } },
         });
@@ -956,11 +944,6 @@ public:
         std::string env;
         std::string layers;
 
-        /*int start = GetOpt(argc, argv, {
-            { 'C', false, [&](const char *arg) { Cleanup = false; } },
-            { 'T', false, [&](const char *arg) { hasTty = false; } },
-            { 'L', true, [&](const char *arg) { layers = arg; } },
-        });*/
         const auto &argv = environment->GetOpts({
             { 'C', false, [&](const char *arg) { Cleanup = false; } },
             { 'T', false, [&](const char *arg) { hasTty = false; } },
@@ -1249,9 +1232,6 @@ public:
 
     int Execute(TCommandEnviroment *env) final override {
         int timeout = -1;
-        /*int start = GetOpt(argc, argv, {
-            { 't', true, [&](const char *arg) { timeout = std::stoi(arg); } },
-        });*/
         const auto &containers = env->GetOpts({
             { 't', true, [&](const char *arg) { timeout = std::stoi(arg); } },
         });
@@ -1296,11 +1276,6 @@ public:
         bool details = true;
         bool forest = false;
         bool toplevel = false;
-        /*(void)GetOpt(argc, argv, {
-            { '1', false, [&](const char *arg) { details = false; } },
-            { 'f', false, [&](const char *arg) { forest = true; } },
-            { 't', false, [&](const char *arg) { toplevel = true; } },
-        });*/
         (void)env->GetOpts({
             { '1', false, [&](const char *arg) { details = false; } },
             { 'f', false, [&](const char *arg) { forest = true; } },
@@ -1672,11 +1647,6 @@ public:
     }
 
     int Execute(TCommandEnviroment *env) final override {
-        /*int start = GetOpt(argc, argv, {
-            { '1', false, [&](const char *arg) { details = false; } },
-            { 'i', false, [&](const char *arg) { inodes = true; } },
-            { 'v', false, [&](const char *arg) { verbose = true; details = false; } },
-        });*/
         const auto &args = env->GetOpts({
             { '1', false, [&](const char *arg) { details = false; } },
             { 'i', false, [&](const char *arg) { inodes = true; } },
@@ -1742,14 +1712,6 @@ public:
 
     int Execute(TCommandEnviroment *env) final override {
         int ret = EXIT_SUCCESS;
-        /*int start = GetOpt(argc, argv, {
-            { 'I', false, [&](const char *arg) { import = true; } },
-            { 'M', false, [&](const char *arg) { merge  = true; } },
-            { 'R', false, [&](const char *arg) { remove = true; } },
-            { 'F', false, [&](const char *arg) { flush  = true; } },
-            { 'L', false, [&](const char *arg) { list   = true; } },
-            { 'E', false, [&](const char *arg) { export_= true; } },
-        });*/
         const auto &args = env->GetOpts({
             { 'I', false, [&](const char *arg) { import = true; } },
             { 'M', false, [&](const char *arg) { merge  = true; } },
@@ -1840,12 +1802,6 @@ public:
         TPath output = TPath(GetCwd()) / "layer.tar";
         std::vector<std::string> args;
         std::vector<std::string> env;
-
-        /*int start = GetOpt(argc, argv, {
-            { 'o', true, [&](const char *arg) { output = TPath(GetCwd()) / arg; } },
-            { 'C', false, [&](const char *arg) { Cleanup = false; } },
-            { 'E', true, [&](const char *arg) { env.push_back(arg); } },
-        });*/
         const auto &opts = environment->GetOpts({
             { 'o', true, [&](const char *arg) { output = TPath(GetCwd()) / arg; } },
             { 'C', false, [&](const char *arg) { Cleanup = false; } },
