@@ -79,4 +79,5 @@ private:
 
 int GetOpt(int argc, char *argv[], const std::vector<Option> &opts);
 
-size_t MaxFieldLength(const std::vector<std::string> &vec, size_t min = 8);
+constexpr size_t MIN_FIELD_LENGTH = 8;
+size_t MaxFieldLength(const std::vector<std::string> &vec, size_t min = MIN_FIELD_LENGTH);

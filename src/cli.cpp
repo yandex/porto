@@ -51,6 +51,18 @@ void PrintAligned(const std::string &name, const std::string &desc,
             << v[i] << std::endl;
 }
 
+template <typename Collection, typename MapFunction>
+size_t MaxFieldLength(const Collection &coll, MapFunction mapper, size_t min = MIN_FIELD_LENGTH) {
+    size_t len = 0;
+    for (const auto &i : coll) {
+        const auto length = mapper(i).length();
+        if (length > len)
+            len  = length;
+    }
+
+    return std::max(len, min) + 2;
+}
+
 class THelpCmd final : public ICmd {
     const bool UsagePrintData;
     TCommandHandler &Handler;
@@ -67,7 +79,6 @@ public:
 };
 
 void THelpCmd::Usage() {
-    int nameWidth;
     int termWidth = 80;
 
     struct winsize w;
@@ -78,26 +89,19 @@ void THelpCmd::Usage() {
     std::cerr << std::endl;
     std::cerr << "Command list:" << std::endl;
 
-    std::vector<std::string> tmpVec;
-    for (const auto &i : Handler.GetCommands())
-        tmpVec.push_back(i.first);
-    nameWidth = MaxFieldLength(tmpVec);
+    using CmdPair = TCommandHandler::RegisteredCommands::value_type;
+    int nameWidth = MaxFieldLength(Handler.GetCommands(), [](const CmdPair &p) { return p.first; });
 
     for (const auto &i : Handler.GetCommands())
         PrintAligned(i.second->GetName(), i.second->GetDescription(), nameWidth, termWidth);
 
-    int ret;
-
     std::cerr << std::endl << "Volume properties:" << std::endl;
     vector<TProperty> vlist;
-    ret = Api->ListVolumeProperties(vlist);
+    int ret = Api->ListVolumeProperties(vlist);
     if (ret) {
         PrintError("Unavailable");
     } else {
-        tmpVec.clear();
-        for (const auto& p : vlist)
-            tmpVec.push_back(p.Name);
-        nameWidth = MaxFieldLength(tmpVec);
+        nameWidth = MaxFieldLength(vlist, [](const TProperty &p) { return p.Name; });
 
         for (const auto& p : vlist)
             PrintAligned(p.Name, p.Description, nameWidth, termWidth);
@@ -109,10 +113,7 @@ void THelpCmd::Usage() {
     if (ret) {
         PrintError("Unavailable");
     } else {
-        tmpVec.clear();
-        for (const auto& p : plist)
-            tmpVec.push_back(p.Name);
-        nameWidth = MaxFieldLength(tmpVec);
+        nameWidth = MaxFieldLength(vlist, [](const TProperty &p) { return p.Name; });
 
         for (const auto& p : plist)
             PrintAligned(p.Name, p.Description, nameWidth, termWidth);
@@ -127,10 +128,7 @@ void THelpCmd::Usage() {
     if (ret) {
         PrintError("Unavailable");
     } else {
-        tmpVec.clear();
-        for (const auto& d : dlist)
-            tmpVec.push_back(d.Name);
-        nameWidth = MaxFieldLength(tmpVec);
+        nameWidth = MaxFieldLength(dlist, [](const TData &d) { return d.Name; });
 
         for (const auto& d : dlist)
             PrintAligned(d.Name, d.Description, nameWidth, termWidth);
@@ -165,12 +163,7 @@ int THelpCmd::Execute(int argc, char *argv[]) {
 }  // namespace
 
 size_t MaxFieldLength(const std::vector<std::string> &vec, size_t min) {
-    size_t len = 0;
-    for (const auto &i : vec)
-        if (i.length() > len)
-            len  = i.length();
-
-    return std::max(len, min) + 2;
+    return MaxFieldLength(vec, [](const string &s) { return s; }, min);
 }
 
 int ICmd::RunCmdImpl(const std::vector<std::string> &args,
