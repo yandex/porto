@@ -426,7 +426,7 @@ TError TTask::ChildMountDev() {
 }
 
 TError TTask::ChildRemountRootRo() {
-    if (!Env->RootRdOnly || !Env->Loop.IsEmpty())
+    if (!Env->RootRdOnly || Env->LoopDev >= 0)
         return TError::Success();
 
     // remount everything except binds to ro
@@ -477,9 +477,10 @@ TError TTask::ChildMountRootFs() {
     if (Env->Root.IsRoot())
         return TError::Success();
 
-    if (!Env->Loop.IsEmpty()) {
-        TLoopMount m(Env->Loop, Env->Root, "ext4", Env->LoopDev);
-        TError error = m.Mount(Env->RootRdOnly);
+    if (Env->LoopDev >= 0) {
+        TMount root("/dev/loop" + std::to_string(Env->LoopDev),
+                    Env->Root, "ext4", {});
+        TError error = root.Mount(Env->RootRdOnly ? MS_RDONLY : 0);
         if (error)
             return error;
     } else {
@@ -511,7 +512,7 @@ TError TTask::ChildMountRootFs() {
     if (error)
         return error;
 
-    if (!Env->Loop.IsEmpty()) {
+    if (Env->LoopDev >= 0) {
         error = ChildMountRun();
         if (error)
             return error;
@@ -734,19 +735,6 @@ TError TTask::ChildSetHostname() {
     return TError::Success();
 }
 
-TError TTask::ChildPrepareLoop() {
-    if (!Env->Loop.IsEmpty()) {
-        TFolder f(Env->Root);
-        if (!f.Exists()) {
-            TError error = f.Create(0755, true);
-            if (error)
-                return error;
-        }
-    }
-
-    return TError::Success();
-}
-
 TError TTask::ChildCallback() {
     int ret;
     close(WaitParentWfd);
@@ -778,12 +766,6 @@ TError TTask::ChildCallback() {
             return TError(EError::Unknown, errno, "datach procfs");
         if (tmpProc.MountDir())
             return TError(EError::Unknown, errno, "remount procfs");
-    }
-
-    if (Env->Isolate) {
-        error = ChildPrepareLoop();
-        if (error)
-            return error;
     }
 
     if (Env->NetCfg.NewNetNs) {

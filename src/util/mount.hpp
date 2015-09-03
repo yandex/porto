@@ -80,17 +80,5 @@ public:
     }
 };
 
-class TLoopMount {
-    TPath Source, Target;
-    std::string Type;
-    int LoopNr;
-public:
-    TLoopMount(const TPath &source, const TPath &target, const std::string &type, const int loopNr) : Source(source), Target(target), Type(type), LoopNr(loopNr) {}
-    TError Mount(bool rdonly = false);
-    TError Umount();
-};
-
 TError SetupLoopDevice(TPath image, int &dev);
-
-TError GetLoopDev(int &nr);
 TError PutLoopDev(const int nr);

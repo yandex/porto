@@ -606,14 +606,11 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
     taskEnv->Command = Prop->Get<std::string>(P_COMMAND);
     taskEnv->Cwd = Prop->Get<std::string>(P_CWD);
 
-    TPath root(Prop->Get<std::string>(P_ROOT));
-    if (root.GetType() == EFileType::Directory) {
-        taskEnv->Root = Prop->Get<std::string>(P_ROOT);
-    } else {
+    taskEnv->LoopDev = Prop->Get<int>(P_RAW_LOOP_DEV);
+    if (taskEnv->LoopDev >= 0)
         taskEnv->Root = GetTmpDir();
-        taskEnv->Loop = Prop->Get<std::string>(P_ROOT);
-        taskEnv->LoopDev = Prop->Get<int>(P_RAW_LOOP_DEV);
-    }
+    else
+        taskEnv->Root = Prop->Get<std::string>(P_ROOT);
 
     taskEnv->RootRdOnly = Prop->Get<bool>(P_ROOT_RDONLY);
     taskEnv->CreateCwd = Prop->IsDefault(P_ROOT) && Prop->IsDefault(P_CWD) && !UseParentNamespace();
@@ -766,16 +763,6 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
 
     Task = unique_ptr<TTask>(new TTask(taskEnv));
 
-    // if root is on loop device, we use some internal directory
-    // to hold stdout/stderr
-    if (StringStartsWith(taskEnv->StdinPath.ToString(), GetTmpDir().ToString()) ||
-        StringStartsWith(taskEnv->StdoutPath.ToString(), GetTmpDir().ToString()) ||
-        StringStartsWith(taskEnv->StderrPath.ToString(), GetTmpDir().ToString())) {
-        TError error = Task->CreateTmpDir(GetTmpDir(), Task->StdTmp);
-        if (error)
-            return error;
-    }
-
     return TError::Success();
 }
 
@@ -862,20 +849,6 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
         return error;
 
     if (!meta || (meta && Prop->Get<bool>(P_ISOLATE))) {
-        TPath root(Prop->Get<std::string>(P_ROOT));
-        int loopNr = -1;
-        if (root.GetType() != EFileType::Directory) {
-            error = GetLoopDev(loopNr);
-            if (error)
-                goto error;
-        }
-
-        error = Prop->Set<int>(P_RAW_LOOP_DEV, loopNr);
-        if (error) {
-            if (loopNr >= 0)
-                (void)PutLoopDev(loopNr);
-            goto error;
-        }
 
         error = PrepareTask(client);
         if (error)
@@ -1070,6 +1043,31 @@ TError TContainer::ApplyForTreePostorder(TScopedLock &holder_lock,
     return TError::Success();
 }
 
+TError TContainer::PrepareLoop() {
+    TPath loop_image(Prop->Get<std::string>(P_ROOT));
+    if (loop_image.GetType() != EFileType::Regular)
+        return TError::Success();
+
+    TError error;
+    TPath temp_path = GetTmpDir();
+    if (!temp_path.Exists()) {
+        error = temp_path.Mkdir(0755);
+        if (error)
+            return error;
+    }
+
+    int loop_dev;
+    error = SetupLoopDevice(loop_image, loop_dev);
+    if (error)
+        return error;
+
+    error = Prop->Set<int>(P_RAW_LOOP_DEV, loop_dev);
+    if (error)
+        (void)PutLoopDev(loop_dev);
+
+    return error;
+}
+
 TError TContainer::PrepareResources() {
     TError error = PrepareNetwork();
     if (error) {
@@ -1081,6 +1079,13 @@ TError TContainer::PrepareResources() {
     error = PrepareCgroups();
     if (error) {
         L_ERR() << "Can't prepare task cgroups: " << error << std::endl;
+        FreeResources();
+        return error;
+    }
+
+    error = PrepareLoop();
+    if (error) {
+        L_ERR() << "Can't prepare loop device: " << error << std::endl;
         FreeResources();
         return error;
     }
@@ -1124,14 +1129,22 @@ void TContainer::FreeResources() {
         RemoveLog(Prop->Get<std::string>(P_STDERR_PATH));
 
     int loopNr = Prop->Get<int>(P_RAW_LOOP_DEV);
+
     TError error = Prop->Set<int>(P_RAW_LOOP_DEV, -1);
-    if (error) {
+    if (error)
         L_ERR() << "Can't set " << P_RAW_LOOP_DEV << ": " << error << std::endl;
-    }
+
     if (loopNr >= 0) {
         error = PutLoopDev(loopNr);
         if (error)
             L_ERR() << "Can't put loop device " << loopNr << ": " << error << std::endl;
+    }
+
+    TPath temp_path = GetTmpDir();
+    if (temp_path.Exists()) {
+        error = temp_path.Rmdir();
+        if (error)
+            L_ERR() << "Can't remove " << temp_path << ": " << error << std::endl;
     }
 }
 

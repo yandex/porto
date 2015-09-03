@@ -3466,10 +3466,10 @@ static void TestVirtModeProperty(TPortoAPI &api) {
 
     int nr;
     AsRoot(api);
-    TError error = GetLoopDev(nr);
+    TError error = SetupLoopDevice(tmpimg, nr);
     if (error)
         throw error.GetMsg();
-    TLoopMount m(tmpimg, tmpdir, "ext4", nr);
+    TMount m("/dev/loop" + std::to_string(nr), tmpdir, "ext4", {});
     AsDaemon(api);
 
     try {

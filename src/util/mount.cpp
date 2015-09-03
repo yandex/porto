@@ -262,21 +262,6 @@ err_image:
     return error;
 }
 
-TError GetLoopDev(int &nr) {
-    TScopedFd controlFd;
-    controlFd = open("/dev/loop-control", O_RDWR | O_CLOEXEC);
-    if (controlFd.GetFd() < 0)
-        return TError(EError::Unknown, errno, "open(/dev/loop-control)");
-
-    nr = ioctl(controlFd.GetFd(), LOOP_CTL_GET_FREE);
-    if (nr < 0)
-        return TError(EError::Unknown, errno, "ioctl(LOOP_CTL_GET_FREE)");
-
-    L_ACT() << "Loop device allocate " << nr << std::endl;
-
-    return TError::Success();
-}
-
 TError PutLoopDev(const int nr) {
     L_ACT() << "Loop device free " << nr << std::endl;
 
@@ -291,52 +276,4 @@ TError PutLoopDev(const int nr) {
         return TError(EError::Unknown, errno, "ioctl(LOOP_CLR_FD)");
 
     return TError::Success();
-}
-
-TError TLoopMount::Mount(bool rdonly) {
-    std::string dev = "/dev/loop" + std::to_string(LoopNr);
-
-    L_ACT() << "Mount loop device " << dev << " " << Source  << " -> " << Target << std::endl;
-
-    TScopedFd imageFd, loopFd;
-    imageFd = open(Source.ToString().c_str(), (rdonly ? O_RDONLY : O_RDWR) |
-                                              O_CLOEXEC);
-    if (imageFd.GetFd() < 0)
-        return TError(EError::Unknown, errno, "open(" + Source.ToString() + ")");
-
-    loopFd = open(dev.c_str(), O_RDWR | O_CLOEXEC);
-    if (loopFd.GetFd() < 0)
-        return TError(EError::Unknown, errno, "open(" + dev + ")");
-
-    if (ioctl(loopFd.GetFd(), LOOP_SET_FD, imageFd.GetFd()) < 0)
-        return TError(EError::Unknown, errno, "ioctl(LOOP_SET_FD)");
-
-    struct loop_info64 loopinfo64 = {};
-    strncpy((char *)loopinfo64.lo_file_name, Source.ToString().c_str(), LO_NAME_SIZE);
-    if (rdonly)
-        loopinfo64.lo_flags |= LO_FLAGS_READ_ONLY;
-
-    if (ioctl(loopFd.GetFd(), LOOP_SET_STATUS64, &loopinfo64) < 0)
-        return TError(EError::Unknown, errno, "ioctl(LOOP_SET_STATUS64)");
-
-    TMount m(dev, Target, Type, {});
-    return m.Mount(rdonly ? MS_RDONLY : 0);
-}
-
-TError TLoopMount::Umount() {
-    std::string dev = "/dev/loop" + std::to_string(LoopNr);
-
-    L_ACT() << "Umount loop device " << dev << " " << Source << " -> " << Target << std::endl;
-
-    TMount m(dev, Target, Type, {});
-    TError error = m.Umount();
-    if (error)
-        return error;
-
-    error = PutLoopDev(LoopNr);
-    if (error)
-        return error;
-
-    TFolder f(Target);
-    return f.Remove(true);
 }
