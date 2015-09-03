@@ -4,6 +4,7 @@
 
 #include "cli.hpp"
 #include "version.hpp"
+#include "util/log.hpp"
 #include "util/signal.hpp"
 #include "util/unix.hpp"
 
@@ -18,8 +19,150 @@ using std::vector;
 
 namespace {
 // Command that is being executed, used for signal handling
-ICmd *CurrentCmd;
+ICmd *CurrentCmd = nullptr;
+
+TCommandHandler *CurrentHandler = nullptr;
+
+void SigInt(int sig) {
+    if (CurrentCmd)
+        CurrentCmd->Signal(sig);
 }
+
+void PrintAligned(const std::string &name, const std::string &desc,
+                         const size_t nameWidth, const size_t termWidth) {
+    std::vector<std::string> v;
+    size_t descWidth = termWidth - nameWidth - 4;
+
+    size_t start = 0;
+    for (size_t i = 0; i < desc.length(); i++) {
+        if (i - start > descWidth) {
+            v.push_back(std::string(desc, start, i - start));
+            start = i;
+        }
+    }
+    std::string last = std::string(desc, start, desc.length());
+    if (last.length())
+        v.push_back(last);
+
+    std::cerr << "  " << std::left << std::setw(nameWidth) << name
+        << v[0] << std::endl;
+    for (size_t i = 1; i < v.size(); i++)
+        std::cerr << "  " << std::left << std::setw(nameWidth) << " "
+            << v[i] << std::endl;
+}
+
+class THelpCmd final : public ICmd {
+    const bool UsagePrintData;
+    TCommandHandler &Handler;
+
+public:
+    THelpCmd(TCommandHandler &handler, bool usagePrintData)
+        : ICmd(&handler.GetPortoApi(), "help", 1,
+               "[command]", "print help message for command"),
+          UsagePrintData(usagePrintData),
+          Handler(handler) {}
+
+    void Usage();
+    int Execute(int argc, char *argv[]) final override;
+};
+
+void THelpCmd::Usage() {
+    int nameWidth;
+    int termWidth = 80;
+
+    struct winsize w;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0)
+        termWidth = w.ws_col;
+
+    std::cerr << "Usage: " << program_invocation_short_name << " <command> [<args>]" << std::endl;
+    std::cerr << std::endl;
+    std::cerr << "Command list:" << std::endl;
+
+    std::vector<std::string> tmpVec;
+    for (const auto &i : Handler.GetCommands())
+        tmpVec.push_back(i.first);
+    nameWidth = MaxFieldLength(tmpVec);
+
+    for (const auto &i : Handler.GetCommands())
+        PrintAligned(i.second->GetName(), i.second->GetDescription(), nameWidth, termWidth);
+
+    int ret;
+
+    std::cerr << std::endl << "Volume properties:" << std::endl;
+    vector<TProperty> vlist;
+    ret = Api->ListVolumeProperties(vlist);
+    if (ret) {
+        PrintError("Unavailable");
+    } else {
+        tmpVec.clear();
+        for (const auto& p : vlist)
+            tmpVec.push_back(p.Name);
+        nameWidth = MaxFieldLength(tmpVec);
+
+        for (const auto& p : vlist)
+            PrintAligned(p.Name, p.Description, nameWidth, termWidth);
+    }
+
+    std::cerr << std::endl << "Property list:" << std::endl;
+    vector<TProperty> plist;
+    ret = Api->Plist(plist);
+    if (ret) {
+        PrintError("Unavailable");
+    } else {
+        tmpVec.clear();
+        for (const auto& p : plist)
+            tmpVec.push_back(p.Name);
+        nameWidth = MaxFieldLength(tmpVec);
+
+        for (const auto& p : plist)
+            PrintAligned(p.Name, p.Description, nameWidth, termWidth);
+    }
+
+    if (!UsagePrintData)
+        return;
+
+    std::cerr << std::endl << "Data list:" << std::endl;
+    vector<TData> dlist;
+    ret = Api->Dlist(dlist);
+    if (ret) {
+        PrintError("Unavailable");
+    } else {
+        tmpVec.clear();
+        for (const auto& d : dlist)
+            tmpVec.push_back(d.Name);
+        nameWidth = MaxFieldLength(tmpVec);
+
+        for (const auto& d : dlist)
+            PrintAligned(d.Name, d.Description, nameWidth, termWidth);
+    }
+    std::cerr << std::endl;
+}
+
+int THelpCmd::Execute(int argc, char *argv[]) {
+    int ret = EXIT_FAILURE;
+
+    if (argc == 0) {
+        Usage();
+        return ret;
+    }
+
+    const string name(argv[0]);
+    const auto it = Handler.GetCommands().find(name);
+    if (it == Handler.GetCommands().end()) {
+        Usage();
+    } else {
+        std::cerr << "Usage: " << program_invocation_short_name
+                  << " " << name << " " << it->second->GetUsage()
+                  << std::endl;
+        std::cerr << std::endl;
+        std::cerr << it->second->GetDescription() << std::endl;
+        std::cerr << it->second->GetHelp();
+        ret = EXIT_SUCCESS;
+    }
+    
+    return ret;
+}
+}  // namespace
 
 size_t MaxFieldLength(const std::vector<std::string> &vec, size_t min) {
     size_t len = 0;
@@ -124,152 +267,18 @@ void ICmd::Signal(int sig) {
     }
 }
 
-static map<string, ICmd *> commands;
+int TCommandHandler::TryExec(int argc, char *argv[]) {
+    PORTO_ASSERT(argc > 1);
+    const string name(argv[1]);
 
-THelpCmd::THelpCmd(TPortoAPI *api, bool usagePrintData) : ICmd(api, "help", 1, "[command]", "print help message for command"), UsagePrintData(usagePrintData) {}
-
-static void PrintAligned(const std::string &name, const std::string &desc,
-                         const size_t nameWidth, const size_t termWidth) {
-    std::vector<std::string> v;
-    size_t descWidth = termWidth - nameWidth - 4;
-
-    size_t start = 0;
-    for (size_t i = 0; i < desc.length(); i++) {
-        if (i - start > descWidth) {
-            v.push_back(std::string(desc, start, i - start));
-            start = i;
-        }
-    }
-    std::string last = std::string(desc, start, desc.length());
-    if (last.length())
-        v.push_back(last);
-
-    std::cerr << "  " << std::left << std::setw(nameWidth) << name
-        << v[0] << std::endl;
-    for (size_t i = 1; i < v.size(); i++)
-        std::cerr << "  " << std::left << std::setw(nameWidth) << " "
-            << v[i] << std::endl;
-}
-
-
-void THelpCmd::Usage() {
-    int nameWidth;
-    int termWidth = 80;
-
-    struct winsize w;
-    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0)
-        termWidth = w.ws_col;
-
-    std::cerr << "Usage: " << program_invocation_short_name << " <command> [<args>]" << std::endl;
-    std::cerr << std::endl;
-    std::cerr << "Command list:" << std::endl;
-
-    std::vector<std::string> tmpVec;
-    for (auto i : commands)
-        tmpVec.push_back(i.first);
-    nameWidth = MaxFieldLength(tmpVec);
-
-    for (auto i : commands)
-        PrintAligned(i.second->GetName(), i.second->GetDescription(), nameWidth, termWidth);
-
-    int ret;
-
-    std::cerr << std::endl << "Volume properties:" << std::endl;
-    vector<TProperty> vlist;
-    ret = Api->ListVolumeProperties(vlist);
-    if (ret) {
-        PrintError("Unavailable");
-    } else {
-        tmpVec.clear();
-        for (const auto& p : vlist)
-            tmpVec.push_back(p.Name);
-        nameWidth = MaxFieldLength(tmpVec);
-
-        for (const auto& p : vlist)
-            PrintAligned(p.Name, p.Description, nameWidth, termWidth);
-    }
-
-    std::cerr << std::endl << "Property list:" << std::endl;
-    vector<TProperty> plist;
-    ret = Api->Plist(plist);
-    if (ret) {
-        PrintError("Unavailable");
-    } else {
-        tmpVec.clear();
-        for (const auto& p : plist)
-            tmpVec.push_back(p.Name);
-        nameWidth = MaxFieldLength(tmpVec);
-
-        for (const auto& p : plist)
-            PrintAligned(p.Name, p.Description, nameWidth, termWidth);
-    }
-
-    if (!UsagePrintData)
-        return;
-
-    std::cerr << std::endl << "Data list:" << std::endl;
-    vector<TData> dlist;
-    ret = Api->Dlist(dlist);
-    if (ret) {
-        PrintError("Unavailable");
-    } else {
-        tmpVec.clear();
-        for (const auto& d : dlist)
-            tmpVec.push_back(d.Name);
-        nameWidth = MaxFieldLength(tmpVec);
-
-        for (const auto& d : dlist)
-            PrintAligned(d.Name, d.Description, nameWidth, termWidth);
-    }
-    std::cerr << std::endl;
-}
-
-int THelpCmd::Execute(int argc, char *argv[]) {
-    if (argc == 0) {
-        Usage();
-        return EXIT_FAILURE;
-    }
-
-    string name(argv[0]);
-    for (auto i : commands) {
-        if (i.second->GetName() == name) {
-            std::cerr << "Usage: " << program_invocation_short_name << " " << name << " " << i.second->GetUsage() << std::endl;
-            std::cerr << std::endl;
-            std::cerr << i.second->GetDescription() << std::endl;
-            std::cerr << i.second->GetHelp();
-            return EXIT_SUCCESS;
-        }
-    }
-
-    Usage();
-    return EXIT_FAILURE;
-}
-
-static void Usage(const char *command) {
-    ICmd *cmd = commands["help"];
-    char *argv[] = { (char *)command, NULL };
-
-    cmd->Execute(command ? 1 : 0, argv);
-}
-
-void RegisterCommand(ICmd *cmd) {
-    commands[cmd->GetName()] = cmd;
-}
-
-void SigInt(int sig) {
-    if (CurrentCmd)
-        CurrentCmd->Signal(sig);
-}
-
-static int TryExec(int argc, char *argv[]) {
-    string name(argv[1]);
-
-    if (commands.find(name) == commands.end()) {
+    const auto it = Commands.find(name);
+    if (it == Commands.end()) {
         std::cerr << "Invalid command " << name << "!" << std::endl;
         return EXIT_FAILURE;
     }
 
-    ICmd *cmd = commands[name];
+    ICmd *cmd = it->second.get();
+    PORTO_ASSERT(cmd);
     if (!cmd->ValidArgs(argc - 2, argv + 2)) {
         Usage(cmd->GetName().c_str());
         return EXIT_FAILURE;
@@ -289,22 +298,38 @@ static int TryExec(int argc, char *argv[]) {
         return ret;
 }
 
-int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
+TCommandHandler::TCommandHandler(TPortoAPI &api) : PortoApi(api) {
+    PORTO_ASSERT(CurrentHandler == nullptr);
+    CurrentHandler = this;
+    RegisterCommand(std::unique_ptr<ICmd>(new THelpCmd(*this, true)));
+}
+
+TCommandHandler::~TCommandHandler() {
+    PORTO_ASSERT(CurrentHandler == this);
+    CurrentHandler = nullptr;
+}
+
+void TCommandHandler::RegisterCommand(std::unique_ptr<ICmd> cmd) {
+    PORTO_ASSERT(cmd);
+    Commands[cmd->GetName()] = std::move(cmd);
+}
+
+int TCommandHandler::HandleCommand(int argc, char *argv[]) {
     if (argc <= 1) {
-        Usage(NULL);
+        Usage(nullptr);
         return EXIT_FAILURE;
     }
 
-    string name(argv[1]);
+    const string name(argv[1]);
     if (name == "-h" || name == "--help") {
-        Usage(NULL);
+        Usage(nullptr);
         return EXIT_FAILURE;
     }
 
     if (name == "-v" || name == "--version") {
         std::cerr << "client: " << GIT_TAG << " " << GIT_REVISION << std::endl;
         std::string tag, revision;
-        int ret = api->GetVersion(tag, revision);
+        int ret = PortoApi.GetVersion(tag, revision);
 
         if (!ret)
             std::cerr << "server: " << tag << " " << revision << std::endl;
@@ -315,7 +340,9 @@ int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
     int ret = EXIT_FAILURE;
     try {
         ret = TryExec(argc, argv);
-    } catch (string err) {
+    } catch (const std::exception &exc) {
+        std::cerr << exc.what() << std::endl;
+    } catch (const string &err) {
         std::cerr << err << std::endl;
     } catch (const char *err) {
         std::cerr << err << std::endl;
@@ -323,10 +350,15 @@ int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
         std::cerr << "Got unknown error" << std::endl;
     }
 
-    for (auto pair : commands)
-        delete pair.second;
-
     return ret;
+}
+
+void TCommandHandler::Usage(const char *command) {
+    ICmd *cmd = Commands["help"].get();
+    char *argv[] = { const_cast<char *>(command), nullptr };
+
+    PORTO_ASSERT(cmd);
+    cmd->Execute(command ? 1 : 0, argv);
 }
 
 int GetOpt(int argc, char *argv[], const std::vector<Option> &opts) {
@@ -350,7 +382,8 @@ int GetOpt(int argc, char *argv[], const std::vector<Option> &opts) {
         }
 
         if (!found) {
-            Usage(NULL);
+            PORTO_ASSERT(CurrentHandler);
+            CurrentHandler->Usage(nullptr);
             exit(EXIT_FAILURE);
         }
     }

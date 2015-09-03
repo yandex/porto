@@ -47,23 +47,36 @@ public:
     virtual int Execute(int argc, char *argv[]) = 0;
 };
 
-class THelpCmd final : public ICmd {
-    const bool UsagePrintData;
-public:
-    THelpCmd(TPortoAPI *api, bool usagePrintData);
-
-    void Usage();
-    int Execute(int argc, char *argv[]) override;
-};
-
 struct Option {
     char key;
     bool hasArg;
     std::function<void(const char *arg)> handler;
 };
 
+class TCommandHandler {
+    void operator=(const TCommandHandler&) = delete;
+    TCommandHandler(const TCommandHandler&) = delete;
+
+    int TryExec(int argc, char *argv[]);
+
+public:
+    using RegisteredCommands = std::map<std::string, std::unique_ptr<ICmd>>;
+
+    explicit TCommandHandler(TPortoAPI &api);
+    ~TCommandHandler();
+
+    void RegisterCommand(std::unique_ptr<ICmd> cmd);
+    int HandleCommand(int argc, char *argv[]);
+    void Usage(const char *command);
+
+    TPortoAPI &GetPortoApi() { return PortoApi; }
+    const RegisteredCommands &GetCommands() const { return Commands; }
+
+private:
+    RegisteredCommands Commands;
+    TPortoAPI &PortoApi;
+};
+
 int GetOpt(int argc, char *argv[], const std::vector<Option> &opts);
 
 size_t MaxFieldLength(const std::vector<std::string> &vec, size_t min = 8);
-void RegisterCommand(ICmd *cmd);
-int HandleCommand(TPortoAPI *api, int argc, char *argv[]);
