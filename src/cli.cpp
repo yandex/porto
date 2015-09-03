@@ -21,8 +21,6 @@ namespace {
 // Command that is being executed, used for signal handling
 ICmd *CurrentCmd = nullptr;
 
-TCommandHandler *CurrentHandler = nullptr;
-
 void SigInt(int sig) {
     if (CurrentCmd)
         CurrentCmd->Signal(sig);
@@ -75,7 +73,7 @@ public:
           Handler(handler) {}
 
     void Usage();
-    int Execute(int argc, char *argv[]) final override;
+    int Execute(TCommandEnviroment *env) final override;
 };
 
 void THelpCmd::Usage() {
@@ -136,15 +134,16 @@ void THelpCmd::Usage() {
     std::cerr << std::endl;
 }
 
-int THelpCmd::Execute(int argc, char *argv[]) {
+int THelpCmd::Execute(TCommandEnviroment *env) {
     int ret = EXIT_FAILURE;
+    const auto &args = env->GetArgs();
 
-    if (argc == 0) {
+    if (args.empty()) {
         Usage();
         return ret;
     }
 
-    const string name(argv[0]);
+    const string &name = args[0];
     const auto it = Handler.GetCommands().find(name);
     if (it == Handler.GetCommands().end()) {
         Usage();
@@ -167,19 +166,15 @@ size_t MaxFieldLength(const std::vector<std::string> &vec, size_t min) {
 }
 
 int ICmd::RunCmdImpl(const std::vector<std::string> &args,
-                     std::unique_ptr<ICmd> cmd) {
+                     std::unique_ptr<ICmd> cmd,
+                     TCommandEnviroment *env) {
     ICmd *prevCmd = CurrentCmd;
-
-    std::vector<char *> cargs;
-    std::vector<std::string> mutableArgs(args);
-    cargs.push_back(program_invocation_name);
-    for (auto& arg : mutableArgs)
-        cargs.push_back(&arg[0]);
-
     cmd->SetDieOnSignal(false);
 
     CurrentCmd = cmd.get();
-    int ret = cmd->Execute(cargs.size() - 1, (&cargs[0]) + 1);
+
+    TCommandEnviroment childEnv(env, args);
+    int ret = cmd->Execute(&childEnv);
     CurrentCmd = prevCmd;
 
     if (GotSignal())
@@ -233,12 +228,12 @@ void ICmd::PrintError(const string &str) {
     PrintError(error, str);
 }
 
-bool ICmd::ValidArgs(int argc, char *argv[]) {
-    if (argc < NeedArgs)
+bool ICmd::ValidArgs(const std::vector<std::string> &args) {
+    if (args.size() < NeedArgs)
         return false;
 
-    if (argc >= 1) {
-        string arg(argv[0]);
+    if (args.size() >= 1) {
+        const string &arg = args[0];
         if (arg == "-h" || arg == "--help" || arg == "help")
             return false;;
     }
@@ -260,19 +255,17 @@ void ICmd::Signal(int sig) {
     }
 }
 
-int TCommandHandler::TryExec(int argc, char *argv[]) {
-    PORTO_ASSERT(argc > 1);
-    const string name(argv[1]);
-
-    const auto it = Commands.find(name);
+int TCommandHandler::TryExec(const std::string &commandName,
+                             const std::vector<std::string> &commandArgs) {
+    const auto it = Commands.find(commandName);
     if (it == Commands.end()) {
-        std::cerr << "Invalid command " << name << "!" << std::endl;
+        std::cerr << "Invalid command " << commandName << "!" << std::endl;
         return EXIT_FAILURE;
     }
 
     ICmd *cmd = it->second.get();
     PORTO_ASSERT(cmd);
-    if (!cmd->ValidArgs(argc - 2, argv + 2)) {
+    if (!cmd->ValidArgs(commandArgs)) {
         Usage(cmd->GetName().c_str());
         return EXIT_FAILURE;
     }
@@ -284,7 +277,8 @@ int TCommandHandler::TryExec(int argc, char *argv[]) {
     (void)RegisterSignal(SIGINT, SigInt);
     (void)RegisterSignal(SIGTERM, SigInt);
 
-    int ret = cmd->Execute(argc - 2, argv + 2);
+    TCommandEnviroment commandEnv{*this, commandArgs};
+    int ret = cmd->Execute(&commandEnv);
     if (cmd->GotSignal())
         return -cmd->InterruptedSignal;
     else
@@ -292,14 +286,10 @@ int TCommandHandler::TryExec(int argc, char *argv[]) {
 }
 
 TCommandHandler::TCommandHandler(TPortoAPI &api) : PortoApi(api) {
-    PORTO_ASSERT(CurrentHandler == nullptr);
-    CurrentHandler = this;
     RegisterCommand(std::unique_ptr<ICmd>(new THelpCmd(*this, true)));
 }
 
 TCommandHandler::~TCommandHandler() {
-    PORTO_ASSERT(CurrentHandler == this);
-    CurrentHandler = nullptr;
 }
 
 void TCommandHandler::RegisterCommand(std::unique_ptr<ICmd> cmd) {
@@ -332,7 +322,10 @@ int TCommandHandler::HandleCommand(int argc, char *argv[]) {
 
     int ret = EXIT_FAILURE;
     try {
-        ret = TryExec(argc, argv);
+        // Skip program name and command name to build
+        // a list of command arguments.
+        const std::vector<std::string> commandArgs(argv + 2, argv + argc);
+        ret = TryExec(name, commandArgs);
     } catch (const std::exception &exc) {
         std::cerr << exc.what() << std::endl;
     } catch (const string &err) {
@@ -348,15 +341,18 @@ int TCommandHandler::HandleCommand(int argc, char *argv[]) {
 
 void TCommandHandler::Usage(const char *command) {
     ICmd *cmd = Commands["help"].get();
-    char *argv[] = { const_cast<char *>(command), nullptr };
-
     PORTO_ASSERT(cmd);
-    cmd->Execute(command ? 1 : 0, argv);
+
+    std::vector<std::string> args;
+    if (command)
+        args.push_back(command);
+    TCommandEnviroment commandEnv{*this, args};
+    cmd->Execute(&commandEnv);
 }
 
-int GetOpt(int argc, char *argv[], const std::vector<Option> &opts) {
+vector<string> TCommandEnviroment::GetOpts(const vector<Option> &options) {
     std::string optstring;
-    for (const auto& o : opts) {
+    for (const auto& o : options) {
         optstring += o.key;
         if (o.hasArg)
             optstring += ":";
@@ -364,9 +360,14 @@ int GetOpt(int argc, char *argv[], const std::vector<Option> &opts) {
 
     optind = 1;
     int opt;
-    while ((opt = getopt(argc + 1, argv - 1, optstring.c_str())) != -1) {
+    vector<string> mutableBuffer = Arguments;
+    vector<char*> rawArgs;
+    rawArgs.reserve(mutableBuffer.size());
+    for (auto & arg : mutableBuffer)
+        rawArgs.push_back(&arg[0]);
+    while ((opt = getopt(rawArgs.size(), &rawArgs[0], optstring.c_str())) != -1) {
         bool found = false;
-        for (const auto& o : opts) {
+        for (const auto& o : options) {
             if (o.key == opt) {
                 o.handler(optarg);
                 found = true;
@@ -375,11 +376,10 @@ int GetOpt(int argc, char *argv[], const std::vector<Option> &opts) {
         }
 
         if (!found) {
-            PORTO_ASSERT(CurrentHandler);
-            CurrentHandler->Usage(nullptr);
+            Handler.Usage(nullptr);
             exit(EXIT_FAILURE);
         }
     }
 
-    return optind - 1;
+    return vector<string>(Arguments.begin() + optind - 1, Arguments.end());
 }
