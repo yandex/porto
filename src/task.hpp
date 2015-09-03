@@ -114,7 +114,6 @@ struct TTaskEnv : public TNonCopyable {
     bool BindDns;
     std::vector<TBindMap> BindMap;
     TNetCfg NetCfg;
-    TPath Loop;
     int LoopDev;
     uint64_t Caps;
     std::vector<TGwVec> GwVec;
@@ -177,7 +176,6 @@ public:
 
     TError ChildApplyLimits();
     TError ChildSetHostname();
-    TError ChildPrepareLoop();
     TError ChildCallback();
     void Restore(int pid_);
     TError FixCgroups() const;
@@ -189,7 +187,6 @@ public:
     bool HasCorrectParent();
     bool HasCorrectFreezer();
 
-    std::shared_ptr<TFolder> StdTmp;
     TError CreateTmpDir(const TPath &path, std::shared_ptr<TFolder> &dir) const;
 };
 

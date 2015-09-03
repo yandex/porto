@@ -14,6 +14,7 @@
 
 # root property
 - mount root loop in root namespace (to better diagnose possible problems)
+- do not use loop mountpoint for stdio files (conflicts with previous)
 
 # 3.18
 - enable user namespace for virt_mode=os
