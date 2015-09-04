@@ -269,13 +269,16 @@ public:
 class TRootProperty : public TStringValue, public TContainerValue {
 public:
     TRootProperty() :
-        TStringValue(PATH_PROPERTY | PARENT_RO_PROPERTY | PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TStringValue(PATH_PROPERTY | PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_ROOT,
                      "Container root directory (container will be chrooted into this directory)",
                      staticProperty) {}
 
     std::string GetDefault() const override {
-        return "/";
+        auto c = GetContainer();
+        if (c->IsRoot() || c->IsPortoRoot())
+            return "/";
+        return c->GetParent()->Prop->Get<std::string>(P_ROOT);
     }
 
     TError CheckValue(const std::string &value) override {
@@ -333,7 +336,7 @@ public:
         if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
             return "/";
 
-        if (!c->Prop->IsDefault(P_ROOT))
+        if (c->Prop->Get<std::string>(P_ROOT) != "/")
             return "/";
 
         return (TPath(config().container().tmp_dir()) / c->GetName()).ToString();
@@ -923,7 +926,7 @@ class TBindProperty : public TListValue, public TContainerValue {
 
 public:
     TBindProperty() :
-        TListValue(PARENT_RO_PROPERTY | PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_BIND,
                         "Share host directories with container: <host_path> <container_path> [ro|rw]; ...",
                         staticProperty) {}
