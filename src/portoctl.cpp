@@ -1900,36 +1900,36 @@ int main(int argc, char *argv[]) {
     TPortoAPI api(config().rpc_sock().file().path());
     TCommandHandler handler(api);
 
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TCreateCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TDestroyCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TListCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TTopCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TSortCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TStartCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TStopCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TRestartCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TKillCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TPauseCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TResumeCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TGetPropertyCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TSetPropertyCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TGetDataCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TGetCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TRawCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TEnterCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TRunCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TExecCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TGcCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TFindCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TWaitCmd(&api)));
+    handler.RegisterCommand<TCreateCmd>();
+    handler.RegisterCommand<TDestroyCmd>();
+    handler.RegisterCommand<TListCmd>();
+    handler.RegisterCommand<TTopCmd>();
+    handler.RegisterCommand<TSortCmd>();
+    handler.RegisterCommand<TStartCmd>();
+    handler.RegisterCommand<TStopCmd>();
+    handler.RegisterCommand<TRestartCmd>();
+    handler.RegisterCommand<TKillCmd>();
+    handler.RegisterCommand<TPauseCmd>();
+    handler.RegisterCommand<TResumeCmd>();
+    handler.RegisterCommand<TGetPropertyCmd>();
+    handler.RegisterCommand<TSetPropertyCmd>();
+    handler.RegisterCommand<TGetDataCmd>();
+    handler.RegisterCommand<TGetCmd>();
+    handler.RegisterCommand<TRawCmd>();
+    handler.RegisterCommand<TEnterCmd>();
+    handler.RegisterCommand<TRunCmd>();
+    handler.RegisterCommand<TExecCmd>();
+    handler.RegisterCommand<TGcCmd>();
+    handler.RegisterCommand<TFindCmd>();
+    handler.RegisterCommand<TWaitCmd>();
 
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TCreateVolumeCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TLinkVolumeCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TUnlinkVolumeCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TListVolumesCmd(&api)));
+    handler.RegisterCommand<TCreateVolumeCmd>();
+    handler.RegisterCommand<TLinkVolumeCmd>();
+    handler.RegisterCommand<TUnlinkVolumeCmd>();
+    handler.RegisterCommand<TListVolumesCmd>();
 
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TLayerCmd(&api)));
-    handler.RegisterCommand(std::unique_ptr<ICmd>(new TBuildCmd(&api)));
+    handler.RegisterCommand<TLayerCmd>();
+    handler.RegisterCommand<TBuildCmd>();
 
     TLogger::DisableLog();
 

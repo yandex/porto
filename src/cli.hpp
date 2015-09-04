@@ -75,6 +75,11 @@ public:
     TPortoAPI &GetPortoApi() { return PortoApi; }
     const RegisteredCommands &GetCommands() const { return Commands; }
 
+    template <typename TCommand>
+    void RegisterCommand() {
+        RegisterCommand(std::unique_ptr<ICmd>(new TCommand(&PortoApi)));
+    }
+
 private:
     RegisteredCommands Commands;
     TPortoAPI &PortoApi;
