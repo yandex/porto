@@ -26,8 +26,8 @@ public:
         return Interrupted;
     }
 
-    ICmd(TPortoAPI *api, const std::string& name, int args,
-         const std::string& usage, const std::string& desc, const std::string& help = "");
+    ICmd(TPortoAPI *api, const std::string &name, int args,
+         const std::string &usage, const std::string &desc, const std::string &help = "");
     virtual ~ICmd() {}
     const std::string &GetName() const;
     const std::string &GetUsage() const;
@@ -81,19 +81,19 @@ private:
 };
 
 class TCommandEnviroment {
-    TCommandHandler& Handler;
+    TCommandHandler &Handler;
     const std::vector<std::string> &Arguments;
 
     TCommandEnviroment() = delete;
     TCommandEnviroment(const TCommandEnviroment &) = delete;
 
 public:
-    TCommandEnviroment(TCommandHandler& handler,
+    TCommandEnviroment(TCommandHandler &handler,
                        const std::vector<std::string> &arguments)
         : Handler(handler),
           Arguments(arguments) {}
 
-    TCommandEnviroment(TCommandEnviroment* env,
+    TCommandEnviroment(TCommandEnviroment *env,
                        const std::vector<std::string> &arguments)
         : Handler(env->Handler),
           Arguments(arguments) {}

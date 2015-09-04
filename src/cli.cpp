@@ -101,7 +101,7 @@ void THelpCmd::Usage() {
     } else {
         nameWidth = MaxFieldLength(vlist, [](const TProperty &p) { return p.Name; });
 
-        for (const auto& p : vlist)
+        for (const auto &p : vlist)
             PrintAligned(p.Name, p.Description, nameWidth, termWidth);
     }
 
@@ -113,7 +113,7 @@ void THelpCmd::Usage() {
     } else {
         nameWidth = MaxFieldLength(vlist, [](const TProperty &p) { return p.Name; });
 
-        for (const auto& p : plist)
+        for (const auto &p : plist)
             PrintAligned(p.Name, p.Description, nameWidth, termWidth);
     }
 
@@ -128,7 +128,7 @@ void THelpCmd::Usage() {
     } else {
         nameWidth = MaxFieldLength(dlist, [](const TData &d) { return d.Name; });
 
-        for (const auto& d : dlist)
+        for (const auto &d : dlist)
             PrintAligned(d.Name, d.Description, nameWidth, termWidth);
     }
     std::cerr << std::endl;
@@ -183,14 +183,14 @@ int ICmd::RunCmdImpl(const std::vector<std::string> &args,
     return ret;
 }
 
-ICmd::ICmd(TPortoAPI *api, const string& name, int args,
-           const string& usage, const string& desc, const string& help) :
+ICmd::ICmd(TPortoAPI *api, const string &name, int args,
+           const string &usage, const string &desc, const string &help) :
     Api(api), Name(name), Usage(usage), Desc(desc), Help(help), NeedArgs(args) {}
 
-const string& ICmd::GetName() const { return Name; }
-const string& ICmd::GetUsage() const { return Usage; }
-const string& ICmd::GetDescription() const { return Desc; }
-const string& ICmd::GetHelp() const { return Help; }
+const string &ICmd::GetName() const { return Name; }
+const string &ICmd::GetUsage() const { return Usage; }
+const string &ICmd::GetDescription() const { return Desc; }
+const string &ICmd::GetHelp() const { return Help; }
 
 const string &ICmd::ErrorName(int err) {
     if (err == INT_MAX) {
@@ -352,7 +352,7 @@ void TCommandHandler::Usage(const char *command) {
 
 vector<string> TCommandEnviroment::GetOpts(const vector<Option> &options) {
     std::string optstring;
-    for (const auto& o : options) {
+    for (const auto &o : options) {
         optstring += o.key;
         if (o.hasArg)
             optstring += ":";
@@ -363,11 +363,11 @@ vector<string> TCommandEnviroment::GetOpts(const vector<Option> &options) {
     vector<string> mutableBuffer = Arguments;
     vector<char*> rawArgs;
     rawArgs.reserve(mutableBuffer.size());
-    for (auto & arg : mutableBuffer)
+    for (auto &arg : mutableBuffer)
         rawArgs.push_back(&arg[0]);
     while ((opt = getopt(rawArgs.size(), &rawArgs[0], optstring.c_str())) != -1) {
         bool found = false;
-        for (const auto& o : options) {
+        for (const auto &o : options) {
             if (o.key == opt) {
                 o.handler(optarg);
                 found = true;
