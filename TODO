@@ -31,6 +31,7 @@
 - use some kind of reference count for accounting running children
 - add c++ namespaces
 - ? get rid of globals/static which have class types (http://google-styleguide.googlecode.com/svn/trunk/cppguide.html#Static_and_Global_Variables)
+- open std files earlier and do dup2 before exec
 
 # key-value refactor
 - use one key-value storage for containers and volumes

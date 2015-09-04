@@ -653,9 +653,14 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
     }
 
     taskEnv->Isolate = Prop->Get<bool>(P_ISOLATE);
+
+    taskEnv->DefaultStdin = Prop->IsDefault(P_STDIN_PATH);
+    taskEnv->DefaultStdout = Prop->IsDefault(P_STDOUT_PATH);
+    taskEnv->DefaultStderr = Prop->IsDefault(P_STDERR_PATH);
     taskEnv->StdinPath = Prop->Get<std::string>(P_STDIN_PATH);
     taskEnv->StdoutPath = Prop->Get<std::string>(P_STDOUT_PATH);
     taskEnv->StderrPath = Prop->Get<std::string>(P_STDERR_PATH);
+
     taskEnv->Hostname = Prop->Get<std::string>(P_HOSTNAME);
     taskEnv->BindDns = Prop->Get<bool>(P_BIND_DNS);
 
@@ -672,9 +677,12 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
             if (error)
                 return error;
             taskEnv->Root = clientRoot.InnerPath(taskEnv->Root, true);
-            taskEnv->StdinPath = clientRoot.InnerPath(taskEnv->StdinPath, true);
-            taskEnv->StdoutPath = clientRoot.InnerPath(taskEnv->StdoutPath, true);
-            taskEnv->StderrPath = clientRoot.InnerPath(taskEnv->StderrPath, true);
+            if (!taskEnv->DefaultStdin)
+                taskEnv->StdinPath = clientRoot.InnerPath(taskEnv->StdinPath, true);
+            if (!taskEnv->DefaultStdout)
+                taskEnv->StdoutPath = clientRoot.InnerPath(taskEnv->StdoutPath, true);
+            if (!taskEnv->DefaultStderr)
+                taskEnv->StderrPath = clientRoot.InnerPath(taskEnv->StderrPath, true);
         }
     }
 
