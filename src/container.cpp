@@ -611,17 +611,33 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
                     return TError(EError::InvalidValue, "Can't use custom " + name + " with " + P_ISOLATE + " == false");
 
     auto taskEnv = std::make_shared<TTaskEnv>();
+    auto parent = FindRunningParent();
 
     taskEnv->LeafCgroups = LeafCgroups;
 
     taskEnv->Command = Prop->Get<std::string>(P_COMMAND);
     taskEnv->Cwd = Prop->Get<std::string>(P_CWD);
 
+    taskEnv->Root = Prop->Get<std::string>(P_ROOT);
     taskEnv->LoopDev = Prop->Get<int>(P_RAW_LOOP_DEV);
-    if (taskEnv->LoopDev >= 0)
+    taskEnv->CloneParentMntNs = false;
+
+    if (taskEnv->LoopDev >= 0) {
         taskEnv->Root = GetTmpDir();
-    else
-        taskEnv->Root = Prop->Get<std::string>(P_ROOT);
+    } else if (parent) {
+        if (Prop->IsDefault(P_ROOT) ||
+                taskEnv->Root == parent->Prop->Get<std::string>(P_ROOT)) {
+            taskEnv->Root = "/";
+            taskEnv->CloneParentMntNs = true;
+        } else {
+            auto inner_root = parent->RootPath().InnerPath(taskEnv->Root, true);
+
+            if (!inner_root.IsEmpty()) {
+                taskEnv->Root = inner_root;
+                taskEnv->CloneParentMntNs = true;
+            }
+        }
+    }
 
     taskEnv->RootRdOnly = Prop->Get<bool>(P_ROOT_RDONLY);
     taskEnv->CreateCwd = Prop->IsDefault(P_ROOT) && Prop->IsDefault(P_CWD) && !UseParentNamespace();
@@ -676,7 +692,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
             TError error = taskEnv->ClientMntNs.Open(client->GetPid(), "ns/mnt");
             if (error)
                 return error;
-            taskEnv->Root = clientRoot.InnerPath(taskEnv->Root, true);
+
             if (!taskEnv->DefaultStdin)
                 taskEnv->StdinPath = clientRoot.InnerPath(taskEnv->StdinPath, true);
             if (!taskEnv->DefaultStdout)
@@ -726,22 +742,32 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
 
     taskEnv->NetUp = Prop->Get<int>(P_VIRT_MODE) != VIRT_MODE_OS;
 
-    if (!taskEnv->Isolate) {
-        auto p = FindRunningParent();
-        if (p) {
-            TError error = taskEnv->ParentNs.Open(p->Task->GetPid());
+    if (parent) {
+        pid_t parent_pid = parent->Task->GetPid();
+
+        if (!taskEnv->Isolate) {
+            error = taskEnv->ParentNs.Open(parent_pid);
             if (client && error)
                 return error;
-        }
-    } else {
-        if (taskEnv->NetCfg.Inherited) {
-            auto p = FindRunningParent();
-            if (p) {
-                TError error = taskEnv->ParentNs.Net.Open(p->Task->GetPid(), "ns/net");
+        } else {
+            if (taskEnv->NetCfg.Inherited) {
+                error = taskEnv->ParentNs.Net.Open(parent_pid, "ns/net");
+                if (client && error)
+                    return error;
+            }
+            if (taskEnv->CloneParentMntNs) {
+                error = taskEnv->ParentNs.Mnt.Open(parent_pid, "ns/mnt");
                 if (client && error)
                     return error;
             }
         }
+    }
+
+    if (!taskEnv->CloneParentMntNs) {
+        /* We'll return into host after trip into ClientMntNs */
+        error = taskEnv->ParentNs.Mnt.Open(getpid(), "ns/mnt");
+        if (client && error)
+            return error;
     }
 
     if (taskEnv->NetCfg.NetNsName != "") {
@@ -1074,6 +1100,10 @@ TError TContainer::PrepareLoop() {
         if (error)
             return error;
     }
+
+    if (Prop->IsDefault(P_ROOT) ||
+            loop_image == Parent->Prop->Get<std::string>(P_ROOT))
+        return TError::Success();
 
     int loop_dev;
     error = SetupLoopDevice(loop_image, loop_dev);

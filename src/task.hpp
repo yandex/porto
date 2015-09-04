@@ -98,7 +98,7 @@ struct TTaskEnv : public TNonCopyable {
     std::string Command;
     TPath Cwd;
     bool CreateCwd;
-    TPath Root;
+    TPath Root; /* path in ParentNs.Mnt */
     bool RootRdOnly;
     std::string User;
     std::string Group;
@@ -111,6 +111,7 @@ struct TTaskEnv : public TNonCopyable {
     bool DefaultStdout = false;
     bool DefaultStderr = false;
     TNamespaceSnapshot ParentNs;
+    bool CloneParentMntNs;
     TNamespaceFd ClientMntNs;
     std::map<int,struct rlimit> Rlimit;
     std::string Hostname;

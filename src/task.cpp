@@ -759,7 +759,7 @@ TError TTask::ChildApplyLimits() {
 }
 
 TError TTask::ChildSetHostname() {
-    if (Env->Hostname == "" || Env->Root.ToString() == "/")
+    if (Env->Hostname == "" || Env->Root.IsRoot())
         return TError::Success();
 
     TFile f("/etc/hostname");
@@ -815,43 +815,29 @@ TError TTask::ChildCallback() {
             return error;
     }
 
-    if (Env->ParentNs.Mnt.IsOpened()) {
-        error = Env->ParentNs.Mnt.SetNs();
-        if (error)
-            return error;
+    error = ChildMountRootFs();
+    if (error)
+        return error;
 
-        error = Env->ParentNs.Root.Chroot();
-        if (error)
-            return error;
+    error = ChildBindDirectores();
+    if (error)
+        return error;
 
-        error = Env->Cwd.Chdir();
-        if (error)
-            return error;
-    } else {
-        error = ChildMountRootFs();
-        if (error)
-            return error;
+    error = ChildRemountRootRo();
+    if (error)
+        return error;
 
-        error = ChildBindDirectores();
-        if (error)
-            return error;
+    error = ChildIsolateFs();
+    if (error)
+        return error;
 
-        error = ChildRemountRootRo();
-        if (error)
-            return error;
+    error = ChildSetHostname();
+    if (error)
+        return error;
 
-        error = ChildIsolateFs();
-        if (error)
-            return error;
-
-        error = Env->Cwd.Chdir();
-        if (error)
-            return error;
-
-        error = ChildSetHostname();
-        if (error)
-            return error;
-    }
+    error = Env->Cwd.Chdir();
+    if (error)
+        return error;
 
     if (Env->NewMountNs) {
         // Make all shared: subcontainers will get propgation from us
