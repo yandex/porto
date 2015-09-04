@@ -45,6 +45,12 @@ threadstest() {
 	sudo NOCHECK=y portotest self daemon
 }
 
+clitest() {
+	say "CLI test"
+	# update_config true true
+	python $ROOTDIR/src/test/clitest.py "$@"
+}
+
 HOST=${HOST:-__please_specify_host__}
 PORT=8081
 
@@ -207,6 +213,7 @@ for t in "$@"; do
 		fuzzy) shift; fuzzytest ;;
 		fuzzyargs) shift; fuzzytest "$@" ;;
 		threads) threadstest ;;
+		clitest) clitest ;;
 		threadsargs) shift; threadstest top_iss "$@"; exit $? ;;
 		stressargs) shift; stresstest "$@"; exit $? ;;
 		pkg) pkgtest ;;
