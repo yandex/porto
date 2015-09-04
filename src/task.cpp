@@ -143,11 +143,15 @@ TError TTask::ChildOpenStdFile(const TPath &path, int expected) {
                       "open(" + path.ToString() + ") -> " +
                       std::to_string(expected));
 
-    if (ret != expected)
-        return TError(EError::Unknown, EINVAL,
-                      "open(" + path.ToString() + ") -> " +
-                      std::to_string(expected) + ": unexpected fd " +
-                      std::to_string(ret));
+    if (ret != expected) {
+        if (dup2(ret, expected) < 0) {
+            close(ret);
+            return TError(EError::Unknown, errno,
+                    "dup2(" + std::to_string(ret) + ", " + std::to_string(expected) + ")");
+        }
+        close(ret);
+        ret = expected;
+    }
 
     ret = fchown(ret, Env->Cred.Uid, Env->Cred.Gid);
     if (ret < 0)
@@ -159,21 +163,58 @@ TError TTask::ChildOpenStdFile(const TPath &path, int expected) {
 }
 
 TError TTask::ReopenStdio() {
+    TError error;
+
     CloseFds(3, { Wfd, TLogger::GetFd() });
 
-    int ret = open(Env->StdinPath.ToString().c_str(), O_CREAT | O_RDONLY, 0660);
-    if (ret < 0)
-        return TError(EError::Unknown, errno, "open(" + Env->StdinPath.ToString() + ") -> 0");
+    if (Env->DefaultStdin) {
+        int ret = open(Env->StdinPath.ToString().c_str(), O_CREAT | O_RDONLY, 0660);
+        if (ret < 0)
+            return TError(EError::Unknown, errno, "open(" + Env->StdinPath.ToString() + ") -> 0");
 
-    if (ret != 0)
-        return TError(EError::Unknown, EINVAL, "open(0): unexpected fd");
+        if (ret != 0)
+            return TError(EError::Unknown, EINVAL, "open(0): unexpected fd");
+    }
 
-    TError error = ChildOpenStdFile(Env->StdoutPath, 1);
-    if (error)
-        return error;
-    error = ChildOpenStdFile(Env->StderrPath, 2);
-    if (error)
-        return error;
+    if (Env->DefaultStdout) {
+        error = ChildOpenStdFile(Env->StdoutPath, 1);
+        if (error)
+            return error;
+    }
+
+    if (Env->DefaultStderr) {
+        error = ChildOpenStdFile(Env->StderrPath, 2);
+        if (error)
+            return error;
+    }
+
+    error = Env->ClientMntNs.SetNs();
+    if (error) {
+        L() << "Can't move task to client mount namespace: " << error << std::endl;
+        ReportPid(-1);
+        Abort(error);
+    }
+
+    if (!Env->DefaultStdin) {
+        int ret = open(Env->StdinPath.ToString().c_str(), O_CREAT | O_RDONLY, 0660);
+        if (ret < 0)
+            return TError(EError::Unknown, errno, "open(" + Env->StdinPath.ToString() + ") -> 0");
+
+        if (ret != 0)
+            return TError(EError::Unknown, EINVAL, "open(0): unexpected fd");
+    }
+
+    if (!Env->DefaultStdout) {
+        TError error = ChildOpenStdFile(Env->StdoutPath, 1);
+        if (error)
+            return error;
+    }
+
+    if (!Env->DefaultStderr) {
+        error = ChildOpenStdFile(Env->StderrPath, 2);
+        if (error)
+            return error;
+    }
 
     return TError::Success();
 }
@@ -890,13 +931,6 @@ TError TTask::Start() {
                 ReportPid(-1);
                 Abort(error);
             }
-        }
-
-        error = Env->ClientMntNs.SetNs();
-        if (error) {
-            L() << "Can't move task to client mount namespace: " << error << std::endl;
-            ReportPid(-1);
-            Abort(error);
         }
 
         error = ReopenStdio();
