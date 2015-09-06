@@ -1,0 +1,17 @@
+os: linux
+
+language: cpp
+
+script:
+  - cmake .
+  - make
+
+compiler: gcc
+
+branches:
+  only: master
+
+sudo: required
+
+before_install:
+  - ./travis/install-build-deps.sh
