@@ -1,0 +1,15 @@
+os: linux
+
+language: cpp
+
+script:
+  - cmake .
+  - make
+
+compiler: gcc
+
+branches:
+  only: master
+
+install:
+- if [ "$TRAVIS_OS_NAME" == "linux" ]; then source ./travis/linux.install.sh; fi
