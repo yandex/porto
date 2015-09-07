@@ -120,7 +120,7 @@ bootstrap() {
 
 check() {
 	if [ -z "$CHECK" ]; then return; fi
-	pctl exec ${CONTAINER}/check command="/bin/bash -c 'mkdir /src && /config check /host_porto /src'" isolate="false" user=root group=root env="DEBIAN_FRONTEND=noninteractive"
+	pctl exec ${CONTAINER}/check command="/bin/bash -c 'mkdir -p /src && /config check /host_porto /src'" isolate="false" user=root group=root env="DEBIAN_FRONTEND=noninteractive"
 }
 
 BIND_PROPERTY=""
