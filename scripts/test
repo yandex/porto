@@ -41,7 +41,7 @@ pkgtest() {
 threadstest() {
 	say "Threads test"
 	restart yandex-porto
-	python $ROOTDIR/test/threads.py "$@"
+	python $ROOTDIR/src/test/threads.py "$@"
 	sudo NOCHECK=y portotest self daemon
 }
 
