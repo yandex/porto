@@ -11,6 +11,9 @@ branches:
 
 addons:
   apt:
+    # For gcc-4.7
+    sources:
+    - ubuntu-toolchain-r-test
     packages:
     - build-essential
     - flex
@@ -20,5 +23,7 @@ addons:
     - libncurses5-dev
     - libprotobuf-dev
     - protobuf-compiler
+    - gcc-4.7
+    - g++-4.7
 
-sudo: required
+sudo: false
