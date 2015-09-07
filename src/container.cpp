@@ -603,6 +603,19 @@ void TContainer::CleanupExpiredChildren() {
     }
 }
 
+static TError OpenMetaRoot(TScopedFd &fd) {
+    TPath exe("/proc/self/exe");
+    TPath path;
+    TError error = exe.ReadLink(path);
+    if (error)
+        return error;
+    path = path.DirName() / "portod-meta-root";
+    fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+    if (fd.GetFd() < 0)
+        return TError(EError::Unknown, errno, "Cannot open " + path.ToString());
+    return TError::Success();
+}
+
 TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
     if (!Prop->Get<bool>(P_ISOLATE))
         for (auto name : Prop->List())
@@ -669,6 +682,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
     }
 
     taskEnv->Isolate = Prop->Get<bool>(P_ISOLATE);
+    taskEnv->TripleFork = false;
 
     taskEnv->DefaultStdin = Prop->IsDefault(P_STDIN_PATH);
     taskEnv->DefaultStdout = Prop->IsDefault(P_STDOUT_PATH);
@@ -754,6 +768,12 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
             if (client && error)
                 return error;
         } else {
+            if (!InPidNamespace(parent_pid, getpid())) {
+                error = taskEnv->ParentNs.Pid.Open(parent_pid, "ns/pid");
+                if (client && error)
+                    return error;
+                taskEnv->TripleFork = true;
+            }
             if (taskEnv->NetCfg.Inherited) {
                 error = taskEnv->ParentNs.Net.Open(parent_pid, "ns/net");
                 if (client && error)
@@ -788,18 +808,16 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
 
     // if command is empty we need to start meta task
     if (taskEnv->Command.empty()) {
-        TPath exe("/proc/self/exe");
-        TPath path;
-        TError error = exe.ReadLink(path);
+        taskEnv->Command = "portod-meta-root";
+        error = OpenMetaRoot(taskEnv->ExecFd);
         if (error)
             return error;
+    }
 
-        taskEnv->Command = "portod-meta-root";
-
-        path = path.DirName() / taskEnv->Command;
-        taskEnv->ExecFd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
-        if (taskEnv->ExecFd.GetFd() < 0)
-            return TError(EError::Unknown, errno, "Cannot open " + path.ToString());
+    if (taskEnv->TripleFork) {
+        error = OpenMetaRoot(taskEnv->MetaExecFd);
+        if (error)
+            return error;
     }
 
     // Create new mount namespaces if we have to make any changes

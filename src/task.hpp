@@ -97,6 +97,7 @@ struct TNetCfg {
 struct TTaskEnv : public TNonCopyable {
     std::string Command;
     TScopedFd ExecFd;
+    TScopedFd MetaExecFd;
     TPath Cwd;
     bool CreateCwd;
     TPath Root; /* path in ParentNs.Mnt */
@@ -105,6 +106,7 @@ struct TTaskEnv : public TNonCopyable {
     std::string Group;
     std::vector<std::string> Environ;
     bool Isolate = false;
+    bool TripleFork;
     TPath StdinPath;
     TPath StdoutPath;
     TPath StderrPath;

@@ -782,9 +782,15 @@ TError TTask::ChildSetHostname() {
 
 TError TTask::ChildCallback() {
     int ret;
+
+    /* Die together with waiter */
+    if (Env->TripleFork)
+        SetDieOnParentExit(SIGKILL);
+
     close(WaitParentWfd);
     if (read(WaitParentRfd, &ret, sizeof(ret)) != sizeof(ret))
         return TError(EError::Unknown, errno ?: ENODATA, "partial read from child sync pipe");
+    close(WaitParentRfd);
 
     /* Report VPid in pid namespace we're enter */
     if (!Env->Isolate)
@@ -910,6 +916,7 @@ TError TTask::Start() {
     } else if (forkPid == 0) {
         TError error;
 
+        close(Rfd);
         SetDieOnParentExit(SIGKILL);
         SetProcessName("portod-spawn-p");
 
@@ -943,6 +950,45 @@ TError TTask::Start() {
             Abort(error);
         }
 
+        int ret = pipe2(syncfd, O_CLOEXEC);
+        if (ret) {
+            TError error(EError::Unknown, errno, "pipe2(pdf)");
+            L() << "Can't create sync pipe for child: " << error << std::endl;
+            ReportPid(-1);
+            ReportPid(-1);
+            Abort(error);
+        }
+
+        WaitParentRfd = syncfd[0];
+        WaitParentWfd = syncfd[1];
+
+        if (Env->TripleFork) {
+            forkPid = fork();
+            if (forkPid < 0) {
+                TError error(EError::Unknown, errno, "fork()");
+                L() << "Can't do tripple fork " << error << std::endl;
+                ReportPid(-1);
+                ReportPid(-1);
+                Abort(error);
+            } else if (forkPid) {
+                /* Report WPid in host pid namespace */
+                ReportPid(forkPid);
+                /* Unblock child and exit */
+                if (write(WaitParentWfd, &forkPid, sizeof(forkPid)) != sizeof(forkPid)) {
+                    L_ERR() << "partial write of pid: " << std::to_string(forkPid) << std::endl;
+                    _exit(EXIT_FAILURE);
+                }
+                _exit(EXIT_SUCCESS);
+            } else {
+                /* Wait for parent report our host pid */
+                if (read(WaitParentRfd, &forkPid, sizeof(forkPid)) != sizeof(forkPid)) {
+                    error = TError(EError::Unknown, errno, "partial read from child sync pipe");
+                    ReportPid(-1);
+                    Abort(error);
+                }
+            }
+        }
+
         int cloneFlags = SIGCHLD;
         if (Env->Isolate)
             cloneFlags |= CLONE_NEWPID | CLONE_NEWIPC;
@@ -956,19 +1002,7 @@ TError TTask::Start() {
         if (Env->NetCfg.NewNetNs)
             cloneFlags |= CLONE_NEWNET;
 
-        int ret = pipe2(syncfd, O_CLOEXEC);
-        if (ret) {
-            TError error(EError::Unknown, errno, "pipe2(pdf)");
-            L() << "Can't create sync pipe for child: " << error << std::endl;
-            ReportPid(-1);
-            Abort(error);
-        }
-
-        WaitParentRfd = syncfd[0];
-        WaitParentWfd = syncfd[1];
-
         pid_t clonePid = clone(ChildFn, stack + sizeof(stack), cloneFlags, this);
-        close(WaitParentRfd);
 
         if (clonePid < 0) {
             TError error(errno == ENOMEM ?
@@ -981,7 +1015,8 @@ TError TTask::Start() {
         }
 
         /* Report WPid in host pid namespace */
-        ReportPid(clonePid);
+        if (!Env->TripleFork)
+            ReportPid(clonePid);
 
         if (config().network().enabled()) {
             error = IsolateNet(clonePid);
@@ -1006,6 +1041,27 @@ TError TTask::Start() {
 
         /* ChildCallback() reports VPid here if !Env->Isolate */
 
+        close(WaitParentRfd);
+        close(WaitParentWfd);
+        close(Wfd);
+
+        if (Env->TripleFork) {
+            auto fd = Env->MetaExecFd.GetFd();
+            auto pid = std::to_string(clonePid);
+            const char * argv[] = {
+                "portod-waiter",
+                "--wait",
+                pid.c_str(),
+                NULL,
+            };
+            auto envp = Env->GetEnvp();
+
+            CloseFds(-1, { fd } );
+            fexecve(fd, (char *const *)argv, (char *const *)envp);
+            kill(clonePid, SIGKILL);
+            _exit(EXIT_FAILURE);
+        }
+
         _exit(EXIT_SUCCESS);
     }
     close(Wfd);
@@ -1027,6 +1083,14 @@ TError TTask::Start() {
     }
 
     Pid = WPid;
+
+    if (Env->TripleFork) {
+        std::vector<pid_t> childs;
+
+        TError error = GetTaskChildrens(WPid, childs);
+        if (!error && childs.size() == 1)
+            Pid = childs[0];
+    }
 
     TError error;
     (void)TError::Deserialize(Rfd, error);
