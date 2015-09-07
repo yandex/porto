@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE MATCHES None)
 	set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(CMAKE_CXX_FLAGS "-Wall -std=c++11 -g")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11 -g")
 set(CMAKE_EXE_LINKER_FLAGS "-static-libstdc++ -static-libgcc")
 set(CMAKE_CXX_FLAGS_DEBUG "-O0 -fno-omit-frame-pointer --coverage")
 set(CMAKE_EXE_LINKER_FLAGS_DEBUG "--coverage")
