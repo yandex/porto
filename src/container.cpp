@@ -101,6 +101,17 @@ TPath TContainer::RootPath() const {
     return path;
 }
 
+TPath TContainer::DefaultStdFile(const std::string prefix) const {
+    TPath root(Prop->Get<std::string>(P_ROOT));
+    std::string cwd(Prop->Get<std::string>(P_CWD));
+    std::string name(prefix + "." + GetName(true, "_"));
+
+    if (root.GetType() == EFileType::Regular)
+        return GetTmpDir() / name;
+
+    return root / cwd / name;
+}
+
 EContainerState TContainer::GetState() const {
     return State;
 }

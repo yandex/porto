@@ -130,6 +130,7 @@ public:
 
     TPath GetTmpDir() const;
     TPath RootPath() const;
+    TPath DefaultStdFile(const std::string prefix) const;
     EContainerState GetState() const;
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);
 
