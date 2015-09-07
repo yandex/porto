@@ -121,34 +121,6 @@ static TError ExistingFile(const std::string &str) {
     return TError::Success();
 }
 
-static std::string DefaultStdFile(std::shared_ptr<TContainer> c,
-                                  const std::string &prefix) {
-
-    std::string cwd, root;
-    TError error = c->GetProperty("cwd", cwd, nullptr);
-    if (error) {
-        L_ERR() << "Can't get cwd for std file: " << error << std::endl;
-        return "";
-    }
-
-    error = c->GetProperty("root", root, nullptr);
-    if (error) {
-        L_ERR() << "Can't get root for std file: " << error << std::endl;
-        return "";
-    }
-
-    std::string name = c->GetName(true, "_");
-
-    TPath path = root;
-    if (!path.Exists() || path.GetType() == EFileType::Directory) {
-        path = path / cwd;
-    } else {
-        path = c->GetTmpDir();
-    }
-
-    return (path / (prefix + '.' + name)).ToString();
-}
-
 static std::set<EContainerState> staticProperty = {
     EContainerState::Stopped,
 };
@@ -384,7 +356,7 @@ public:
         if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
             return "/dev/null";
 
-        return DefaultStdFile(c, "stdout");
+        return c->DefaultStdFile("stdout").ToString();
     }
 
     TError CheckValue(const std::string &value) override {
@@ -417,7 +389,7 @@ public:
         if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
             return "/dev/null";
 
-        return DefaultStdFile(c, "stderr");
+        return c->DefaultStdFile("stderr").ToString();
     }
 
     TError CheckValue(const std::string &value) override {
