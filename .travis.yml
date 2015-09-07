@@ -11,6 +11,18 @@ compiler: gcc
 branches:
   only: master
 
+addons:
+  apt:
+    packages:
+    - build-essential
+    - flex
+    - bison
+    - libtool
+    - autoconf
+    - libncurses5-dev
+    - libprotobuf-dev
+    - protobuf-compiler
+
 sudo: required
 
 before_install:
