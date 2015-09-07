@@ -1304,16 +1304,19 @@ public:
                         staticProperty) {}
 
     TStrList GetDefault() const override {
-        auto vmode = GetContainer()->Prop->Get<int>(P_VIRT_MODE);
+        auto c = GetContainer();
 
-        if (vmode == VIRT_MODE_OS)
+        if (c->IsRoot() || c->IsPortoRoot())
+            return TStrList{ "a *:* rwm" };
+
+        if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
             return TStrList{
                 "c 1:3 rwm", "c 1:5 rwm", "c 1:7 rwm", "c 1:9 rwm",
                 "c 1:8 rwm", "c 136:* rw", "c 5:2 rwm", "c 254:0 rm",
                 "c 254:0 rm", "c 10:237 rmw", "b 7:* rmw"
             };
 
-        return TStrList{ "a *:* rwm" };
+        return c->GetParent()->Prop->Get<TStrList>(P_ALLOWED_DEVICES);
     }
 };
 
