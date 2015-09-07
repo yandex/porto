@@ -48,7 +48,7 @@ add_custom_target(tags COMMAND ctags -R --c++-kinds=+p --fields=+iaS --extra=+q 
 set_source_files_properties(TAGS PROPERTIES GENERATED true)
 add_custom_target(TAGS COMMAND ctags -R -e --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
-add_library(protobufs ${PROTO_SRCS})
+add_library(protobufs STATIC ${PROTO_SRCS})
 
 add_subdirectory(util)
 
