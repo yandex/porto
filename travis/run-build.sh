@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # gcc-4.7
+apt-cache search gcc-4
 sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
 sudo add-apt-repository -y ppa:canonical-kernel-team/ppa
 
@@ -18,3 +19,5 @@ if [[ "${FORCE_SUBREAPER}" -eq 1 ]]; then
 fi
 
 export CXX="g++-4.7" CC="gcc-4.7"
+
+cmake . && make clean && make

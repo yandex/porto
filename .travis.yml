@@ -2,9 +2,7 @@ os: linux
 
 language: cpp
 
-script:
-  - cmake .
-  - make
+script: ./travis/run-build.sh
 
 compiler: gcc
 
@@ -24,6 +22,3 @@ addons:
     - protobuf-compiler
 
 sudo: required
-
-before_install:
-  - ./travis/install-build-deps.sh
