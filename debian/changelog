@@ -1,3 +1,20 @@
+yandex-porto (2.3.2) precise; urgency=low
+
+  * move sources into src
+  * do not start porto service in porto-container
+  * always get default allowed_devices from parent
+  * inherit default root from parent
+  * open default stdio from host mount namespace
+  * fork mount namespace from parent namespace for loop root
+  * rework hostname inheritance
+  * refactor permission checks, respects supplementary groups
+  * return error on starting already running sub-container
+  * start meta init using fexecve
+  * virtualize root_pid
+  * fork isolated pid-ns from parent pid-ns
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 16 Sep 2015 13:00:00 +0300
+
 yandex-porto (2.2) precise; urgency=low
 
   * net: don't touch already configured interfaces in OS virt mode
