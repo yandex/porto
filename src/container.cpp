@@ -678,6 +678,10 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
     taskEnv->StderrPath = Prop->Get<std::string>(P_STDERR_PATH);
 
     taskEnv->Hostname = Prop->Get<std::string>(P_HOSTNAME);
+    taskEnv->SetEtcHostname = (vmode == VIRT_MODE_OS) &&
+                                !taskEnv->Root.IsRoot() &&
+                                !taskEnv->RootRdOnly;
+
     taskEnv->BindDns = Prop->Get<bool>(P_BIND_DNS);
 
     if (client) {
@@ -757,6 +761,11 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
             }
             if (taskEnv->CloneParentMntNs) {
                 error = taskEnv->ParentNs.Mnt.Open(parent_pid, "ns/mnt");
+                if (client && error)
+                    return error;
+            }
+            if (taskEnv->Hostname == "") {
+                error = taskEnv->ParentNs.Uts.Open(parent_pid, "ns/uts");
                 if (client && error)
                     return error;
             }
