@@ -4151,7 +4151,7 @@ static void TestPerf(TPortoAPI &api) {
     std::string name, v;
     size_t begin, ms;
     const int nr = 1000;
-    const int createMs = 30;
+    const int createMs = 60;
     const int getStateMs = 1;
     const int destroyMs = 120;
 
