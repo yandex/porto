@@ -120,6 +120,10 @@ bootstrap() {
 
 check() {
 	if [ -z "$CHECK" ]; then return; fi
+	if [ -f "$CHECK/.git/objects/info/alternates" ] ; then
+		git --git-dir="$CHECK/.git" repack -a
+		rm "$CHECK/.git/objects/info/alternates"
+	fi
 	pctl exec ${CONTAINER}/check command="/bin/bash -c 'mkdir -p /src && /config check /host_porto /src'" isolate="false" user=root group=root env="DEBIAN_FRONTEND=noninteractive"
 }
 
