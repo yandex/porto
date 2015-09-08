@@ -115,6 +115,7 @@ struct TTaskEnv : public TNonCopyable {
     TNamespaceFd ClientMntNs;
     std::map<int,struct rlimit> Rlimit;
     std::string Hostname;
+    bool SetEtcHostname;
     bool BindDns;
     std::vector<TBindMap> BindMap;
     TNetCfg NetCfg;

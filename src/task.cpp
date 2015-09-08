@@ -759,15 +759,17 @@ TError TTask::ChildApplyLimits() {
 }
 
 TError TTask::ChildSetHostname() {
-    if (Env->Hostname == "" || Env->Root.IsRoot())
+    if (Env->Hostname == "")
         return TError::Success();
 
-    TFile f("/etc/hostname");
-    if (f.Exists()) {
-        string host = Env->Hostname + "\n";
-        TError error = f.WriteStringNoAppend(host);
-        if (error)
-            return TError(EError::Unknown, error, "write(/etc/hostname)");
+    if (Env->SetEtcHostname) {
+        TFile f("/etc/hostname");
+        if (f.Exists()) {
+            string host = Env->Hostname + "\n";
+            TError error = f.WriteStringNoAppend(host);
+            if (error)
+                return TError(EError::Unknown, error, "write(/etc/hostname)");
+        }
     }
 
     if (sethostname(Env->Hostname.c_str(), Env->Hostname.length()) < 0)
@@ -939,7 +941,7 @@ TError TTask::Start() {
         if (Env->NewMountNs)
             cloneFlags |= CLONE_NEWNS;
 
-        if (!Env->Hostname.empty())
+        if (Env->Isolate || Env->Hostname != "")
             cloneFlags |= CLONE_NEWUTS;
 
         if (Env->NetCfg.NewNetNs)
