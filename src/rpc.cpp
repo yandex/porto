@@ -418,7 +418,7 @@ noinline TError StartContainer(TContext &context,
         if (err)
             goto release;
 
-        if (nameVec.size() > 1)
+        if (i + 1 != nameVec.end())
             if (container->GetState() == EContainerState::Running ||
                 container->GetState() == EContainerState::Meta)
                 continue;
