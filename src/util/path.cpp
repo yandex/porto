@@ -200,7 +200,7 @@ TPath TPath::AddComponent(const TPath &component) const {
 
 TError TPath::Chdir() const {
     if (chdir(Path.c_str()) < 0)
-        return TError(EError::Unknown, errno, "chdir(" + Path + ")");
+        return TError(EError::InvalidValue, errno, "chdir(" + Path + ")");
 
     return TError::Success();
 }
