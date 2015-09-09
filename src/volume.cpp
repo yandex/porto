@@ -850,7 +850,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
         return TError(EError::Permission, "Changing user is not permitted");
 
     if (Cred.Gid != creator_cred.Gid && !creator_cred.IsPrivileged() &&
-            !creator_cred.MemberOf(Cred.Gid))
+            !creator_cred.IsMemberOf(Cred.Gid))
         return TError(EError::Permission, "Changing group is not permitted");
 
     /* Verify default permissions */
@@ -1129,13 +1129,7 @@ std::map<std::string, std::string> TVolume::GetProperties(TPath container_root) 
 }
 
 TError TVolume::CheckPermission(const TCred &ucred) const {
-    if (ucred.IsPrivileged())
-        return TError::Success();
-
-    if (Cred == ucred)
-        return TError::Success();
-
-    if (ucred.MemberOf(Cred.Gid))
+    if (ucred.IsPermitted(Cred))
         return TError::Success();
 
     return TError(EError::Permission, "Permission denied");

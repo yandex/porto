@@ -42,24 +42,13 @@ public:
     TCred(uid_t uid, gid_t gid) : Uid(uid), Gid(gid) {}
     TCred() : Uid(0), Gid(0) {}
 
-    bool operator== (const TCred &cred) const {
-        return (cred.Uid == Uid || cred.Gid == Gid);
-    }
-
-    bool operator!= (const TCred &cred) const {
-        return (cred.Uid != Uid && cred.Gid != Gid);
-    }
-
-    bool MemberOf(gid_t gid) const;
-
     std::string UserAsString() const;
     std::string GroupAsString() const;
 
-    bool IsRoot() const {
-        return Uid == 0 || Gid == 0;
-    }
-
+    bool IsRootUser() const;
     bool IsPrivileged() const;
+    bool IsMemberOf(gid_t gid) const;
+    bool IsPermitted(const TCred &requirement) const;
 
     TError Parse(const std::string &user, const std::string &group);
 };

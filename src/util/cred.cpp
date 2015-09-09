@@ -156,14 +156,38 @@ TError TGroup::Load() {
     return TError(EError::InvalidValue, "Invalid group");
 }
 
+/* FIXME should die */
+bool TCred::IsRootUser() const {
+    return Uid == 0 || Gid == 0;
+}
+
 bool TCred::IsPrivileged() const {
-    if (IsRoot())
+    if (IsRootUser())
         return true;
 
     return CredConf.PrivilegedUser(*this);
 }
 
-bool TCred::MemberOf(gid_t gid) const {
+/* Returns true for priveleged or if uid/gid intersects */
+bool TCred::IsPermitted(const TCred &requirement) const {
+
+    if (Uid == requirement.Uid)
+        return true;
+
+    if (IsPrivileged())
+        return true;
+
+    if (IsMemberOf(requirement.Gid))
+        return true;
+
+    for (auto gid: requirement.Groups)
+        if (IsMemberOf(gid))
+            return true;
+
+    return false;
+}
+
+bool TCred::IsMemberOf(gid_t gid) const {
     return Gid == gid || std::find(Groups.begin(), Groups.end(), gid) != Groups.end();
 }
 

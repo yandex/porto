@@ -161,7 +161,7 @@ bool TClient::Readonly() {
     if (c->IsNamespaceIsolated())
         return false;
 
-    return !Cred.IsPrivileged() && !Cred.MemberOf(CredConf.GetPortoGid());
+    return !Cred.IsPrivileged() && !Cred.IsMemberOf(CredConf.GetPortoGid());
 }
 
 void TClient::SetState(EClientState state) {

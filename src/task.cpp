@@ -222,7 +222,7 @@ TError TTask::ReopenStdio() {
 TError TTask::ChildApplyCapabilities() {
     uint64_t effective, permitted, inheritable;
 
-    if (!Env->Cred.IsRoot())
+    if (!Env->Cred.IsRootUser())
         return TError::Success();
 
     PORTO_ASSERT(lastCap != 0);
@@ -544,7 +544,7 @@ TError TTask::ChildMountRootFs() {
     if (error)
         return error;
 
-    bool privileged = Env->Cred.IsRoot();
+    bool privileged = Env->Cred.IsRootUser();
     error = ChildRestrictProc(!privileged);
     if (error)
         return error;
