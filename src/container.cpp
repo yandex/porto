@@ -833,7 +833,7 @@ TError TContainer::Create(const TCred &cred) {
         return error;
     }
 
-    OwnerCred = cred;
+    OwnerCred = TCred(cred.Uid, cred.Gid);
 
     error = Prop->Set<std::string>(P_USER, cred.UserAsString());
     if (error)
@@ -2039,15 +2039,12 @@ void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
 }
 
 TError TContainer::CheckPermission(const TCred &ucred) {
-    if (ucred.IsPrivileged())
-        return TError::Success();
-
     // for root we report more meaningful errors from handlers, so don't
     // check permissions here
     if (IsRoot() || IsPortoRoot())
         return TError::Success();
 
-    if (OwnerCred == ucred)
+    if (ucred.IsPermitted(OwnerCred))
         return TError::Success();
 
     return TError(EError::Permission, "Permission error");

@@ -1369,7 +1369,7 @@ public:
         TStrList v;
         auto c = GetContainer();
 
-        bool root = c->OwnerCred.IsRoot();
+        bool root = c->OwnerCred.IsRootUser();
         auto vmode = c->Prop->Get<int>(P_VIRT_MODE);
         bool restricted = vmode == VIRT_MODE_OS;
 
