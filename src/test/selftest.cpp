@@ -850,7 +850,7 @@ static void TestNsCgTc(TPortoAPI &api) {
     ExpectNeq(GetNamespace("self", "ipc"), GetNamespace(pid, "ipc"));
     ExpectEq(GetNamespace("self", "net"), GetNamespace(pid, "net"));
     //ExpectEq(GetNamespace("self", "user"), GetNamespace(pid, "user"));
-    ExpectEq(GetNamespace("self", "uts"), GetNamespace(pid, "uts"));
+    ExpectNeq(GetNamespace("self", "uts"), GetNamespace(pid, "uts"));
 
     Say() << "Check that task cgroups are correct" << std::endl;
     auto cgmap = GetCgroups("self");
@@ -1761,22 +1761,48 @@ static void TestHostnameProperty(TPortoAPI &api) {
     string host = "porto_" + name;
     string path = TMPDIR + "/" + name;
 
-    RemakeDir(api, path);
-
     ExpectApiSuccess(api.Create(name));
 
-    AsRoot(api);
-    BootstrapCommand("/bin/hostname", path, false);
-    BootstrapCommand("/bin/sleep", path, false);
-    AsNobody(api);
-    ExpectApiSuccess(api.SetProperty(name, "root", path));
 
-    Say() << "Check default hostname" << std::endl;
-    ExpectApiSuccess(api.SetProperty(name, "command", "/sleep 1000"));
+    Say() << "Check non-isolated hostname" << std::endl;
+    ExpectApiSuccess(api.SetProperty(name, "command", "/bin/sleep 1000"));
+    ExpectApiSuccess(api.SetProperty(name, "isolate", "false"));
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
     AsRoot(api);
     ExpectEq(GetNamespace("self", "uts"), GetNamespace(pid, "uts"));
+    AsNobody(api);
+    ExpectApiSuccess(api.Stop(name));
+
+    ExpectApiSuccess(api.SetProperty(name, "command", "/bin/hostname"));
+    ExpectApiSuccess(api.Start(name));
+    WaitContainer(api, name);
+    ExpectApiSuccess(api.GetData(name, "stdout", v));
+    ExpectEq(v, GetHostname() + "\n");
+    ExpectApiSuccess(api.Stop(name));
+
+    RemakeDir(api, path);
+
+    AsRoot(api);
+    TMount tmpfs(name, path, "tmpfs", {"size=32m"});
+    ExpectSuccess(tmpfs.Mount());
+    AsNobody(api);
+
+    AsRoot(api);
+    BootstrapCommand("/bin/hostname", path, false);
+    BootstrapCommand("/bin/sleep", path, false);
+    BootstrapCommand("/bin/cat", path, false);
+    AsNobody(api);
+
+    ExpectApiSuccess(api.SetProperty(name, "root", path));
+
+    Say() << "Check default isolated hostname" << std::endl;
+    ExpectApiSuccess(api.SetProperty(name, "command", "/sleep 1000"));
+    ExpectApiSuccess(api.SetProperty(name, "isolate", "true"));
+    ExpectApiSuccess(api.Start(name));
+    ExpectApiSuccess(api.GetData(name, "root_pid", pid));
+    AsRoot(api);
+    ExpectNeq(GetNamespace("self", "uts"), GetNamespace(pid, "uts"));
     AsNobody(api);
     ExpectApiSuccess(api.Stop(name));
 
@@ -1807,9 +1833,8 @@ static void TestHostnameProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check /etc/hostname" << std::endl;
-    RemakeDir(api, path);
     AsRoot(api);
-    BootstrapCommand("/bin/cat", path, false);
+    ExpectApiSuccess(api.SetProperty(name, "virt_mode", "os"));
     AsNobody(api);
 
     TFolder d(path + "/etc");
@@ -1822,13 +1847,16 @@ static void TestHostnameProperty(TPortoAPI &api) {
     AsNobody(api);
 
     ExpectApiSuccess(api.SetProperty(name, "command", "/cat /etc/hostname"));
+    ExpectApiSuccess(api.SetProperty(name, "stdout_path", path + "/stdout"));
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "stdout", v));
     ExpectNeq(v, GetHostname() + "\n");
     ExpectEq(v, host + "\n");
+
     AsRoot(api);
     ExpectSuccess(d.Remove(true));
+    ExpectSuccess(tmpfs.Umount());
     AsNobody(api);
 
     ExpectApiSuccess(api.Destroy(name));
