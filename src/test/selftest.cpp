@@ -2037,7 +2037,7 @@ static void TestXvlan(TPortoAPI &api, const std::string &name, const std::vector
     auto s = StartWaitAndGetData(api, name, "stdout");
     auto containerLink = StringToVec(s);
     ExpectEq(containerLink.size(),  2);
-    ExpectNeq(containerLink.size(), hostLink.size());
+    Expect(containerLink != hostLink);
     ExpectEq(ShareMacAddress(hostLink, containerLink), shouldShareMac);
     auto linkMap = IfHw(containerLink);
     Expect(linkMap.find("lo") != linkMap.end());
@@ -2052,7 +2052,7 @@ static void TestXvlan(TPortoAPI &api, const std::string &name, const std::vector
         s = StartWaitAndGetData(api, name, "stdout");
         containerLink = StringToVec(s);
         ExpectEq(containerLink.size(), 2);
-        ExpectNeq(containerLink.size(), hostLink.size());
+        Expect(containerLink != hostLink);
         ExpectEq(ShareMacAddress(hostLink, containerLink), false);
         linkMap = IfHw(containerLink);
         Expect(linkMap.find("lo") != linkMap.end());
@@ -2067,7 +2067,7 @@ static void TestXvlan(TPortoAPI &api, const std::string &name, const std::vector
         s = StartWaitAndGetData(api, name, "stdout");
         containerLink = StringToVec(s);
         ExpectEq(containerLink.size(), 2);
-        ExpectNeq(containerLink.size(), hostLink.size());
+        Expect(containerLink != hostLink);
         ExpectEq(ShareMacAddress(hostLink, containerLink), false);
         linkMap = IfHw(containerLink);
         Expect(linkMap.find("lo") != linkMap.end());
@@ -2149,7 +2149,7 @@ static void TestNetProperty(TPortoAPI &api) {
     string s = StartWaitAndGetData(api, name, "stdout");
     auto containerLink = StringToVec(s);
     ExpectEq(containerLink.size(), 1);
-    ExpectNeq(containerLink.size(), hostLink.size());
+    Expect(containerLink != hostLink);
     ExpectEq(ShareMacAddress(hostLink, containerLink), false);
     auto linkMap = IfHw(containerLink);
     Expect(linkMap.find("lo") != linkMap.end());
@@ -2282,7 +2282,7 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData(name, "stdout", s));
     containerLink = StringToVec(s);
     ExpectEq(containerLink.size(), 2);
-    ExpectNeq(containerLink.size(), hostLink.size());
+    Expect(containerLink != hostLink);
     ExpectEq(ShareMacAddress(hostLink, containerLink), false);
     linkMap = IfHw(containerLink);
     Expect(linkMap.find("lo") != linkMap.end());
