@@ -1858,11 +1858,6 @@ void TContainer::ExitTree(TScopedLock &holder_lock, int status, bool oomKilled) 
             << status << (oomKilled ? " invoked by OOM" : "")
             << std::endl;
 
-    if (!oomKilled && !Processes().empty() && Prop->Get<bool>(P_ISOLATE) == true) {
-        L_WRN() << "Skipped bogus exit event (" << status << "), some process is still alive in " << GetName() << std::endl;
-        return;
-    }
-
     TError error = CheckPausedParent();
     if (error)
         L() << "Exit tree while parent is paused" << std::endl;
