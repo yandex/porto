@@ -279,9 +279,9 @@ TError TTask::ChildExec() {
         putenv(d);
     }
 
-	wordexp_t result;
+    wordexp_t result;
 
-	int ret = wordexp(Env->Command.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
+    int ret = wordexp(Env->Command.c_str(), &result, WRDE_NOCMD | WRDE_UNDEF);
     switch (ret) {
     case WRDE_BADCHAR:
         return TError(EError::Unknown, EINVAL, "wordexp(): illegal occurrence of newline or one of |, &, ;, <, >, (, ), {, }");
@@ -307,7 +307,10 @@ TError TTask::ChildExec() {
             L() << "environ[" << i << "]=" << envp[i] << std::endl;
     }
     SetDieOnParentExit(0);
-    execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
+    if (Env->ExecFd.GetFd() < 0)
+        execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
+    else
+        fexecve(Env->ExecFd.GetFd(), (char *const *)result.we_wordv, (char *const *)envp);
 
     return TError(EError::InvalidValue, errno, string("execvpe(") + result.we_wordv[0] + ", " + std::to_string(result.we_wordc) + ", " + std::to_string(Env->Environ.size()) + ")");
 }

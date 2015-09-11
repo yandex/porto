@@ -794,17 +794,12 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         if (error)
             return error;
 
-        std::string deleted = " (deleted)";
-        if (StringEndsWith(path.ToString(), deleted))
-            path = path.ToString().substr(0, path.ToString().length() - deleted.length());
+        taskEnv->Command = "portod-meta-root";
 
-        taskEnv->Command = Prop->Get<std::string>(P_CWD) + "/portod-meta-root";
-
-        TBindMap bm = { path.ToString() + "-meta-root",
-                        "portod-meta-root",
-                        true };
-
-        taskEnv->BindMap.push_back(bm);
+        path = path.DirName() / taskEnv->Command;
+        taskEnv->ExecFd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+        if (taskEnv->ExecFd.GetFd() < 0)
+            return TError(EError::Unknown, errno, "Cannot open " + path.ToString());
     }
 
     // Create new mount namespaces if we have to make any changes
