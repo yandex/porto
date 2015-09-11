@@ -96,6 +96,7 @@ struct TNetCfg {
 
 struct TTaskEnv : public TNonCopyable {
     std::string Command;
+    TScopedFd ExecFd;
     TPath Cwd;
     bool CreateCwd;
     TPath Root; /* path in ParentNs.Mnt */
