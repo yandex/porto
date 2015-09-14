@@ -11,6 +11,7 @@
 extern "C" {
 #include <malloc.h>
 #include <unistd.h>
+#include <dirent.h>
 #include <errno.h>
 #include <time.h>
 #include <string.h>
@@ -97,6 +98,55 @@ TError GetTaskParent(pid_t pid, pid_t &parent_pid) {
     if (res != 1)
         return TError(EError::Unknown, errno, "Cannot parse " + path);
     parent_pid = ppid;
+    return TError::Success();
+}
+
+TError GetTaskChildrens(pid_t pid, std::vector<pid_t> &childrens) {
+    struct dirent *de;
+    FILE *file;
+    DIR *dir;
+    int child_pid, parent_pid;
+
+    childrens.clear();
+
+    dir = opendir(("/proc/" + std::to_string(pid) + "/task").c_str());
+    if (!dir)
+        goto full_scan;
+
+    while ((de = readdir(dir))) {
+        file = fopen(("/proc/" + std::to_string(pid) + "/task/" +
+                      std::string(de->d_name) + "/children").c_str(), "r");
+        if (!file) {
+            if (atoi(de->d_name) != pid)
+                continue;
+            closedir(dir);
+            goto full_scan;
+        }
+
+        while (fscanf(file, "%d", &child_pid) == 1)
+            childrens.push_back(child_pid);
+        fclose(file);
+    }
+    closedir(dir);
+
+    return TError::Success();
+
+full_scan:
+    dir = opendir("/proc");
+    if (!dir)
+        return TError(EError::Unknown, errno, "Cannot open /proc");
+
+    while ((de = readdir(dir))) {
+        file = fopen(("/proc/" + std::string(de->d_name) + "/stat").c_str(), "r");
+        if (!file)
+            continue;
+
+        if (fscanf(file, "%d (%*[^)]) %*c %d", &child_pid, &parent_pid) == 2 &&
+                parent_pid == pid)
+            childrens.push_back(child_pid);
+        fclose(file);
+    }
+    closedir(dir);
     return TError::Success();
 }
 

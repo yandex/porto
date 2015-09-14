@@ -17,6 +17,7 @@ pid_t GetPid();
 pid_t GetPPid();
 pid_t GetTid();
 TError GetTaskParent(pid_t pid, pid_t &parent_pid);
+TError GetTaskChildrens(pid_t pid, std::vector<pid_t> &childrens);
 
 size_t GetCurrentTimeMs();
 size_t GetTotalMemory();
