@@ -108,6 +108,41 @@ bool TBoolValue::GetDefault() const {
     return false;
 }
 
+std::string TIntListValue::ToString(const std::vector<int> &value) const {
+   std::stringstream str;
+   bool first = true;
+
+   for (auto v : value) {
+      if (first)
+         first = false;
+      else
+         str << ";";
+      str << v;
+   }
+
+   return str.str();
+}
+
+TError TIntListValue::FromString(const std::string &value) {
+   std::vector<std::string> strings;
+   std::vector<int> integers;
+
+   TError error = SplitEscapedString(value, ';', strings);
+   if (error)
+      return error;
+
+   error = StringsToIntegers(strings, integers);
+   if (error)
+      return error;
+
+   Set(integers);
+   return TError::Success();
+}
+
+std::vector<int> TIntListValue::GetDefault() const {
+    return std::vector<int>{};
+}
+
 std::string TListValue::ToString(const TStrList &value) const {
     std::stringstream str;
 
