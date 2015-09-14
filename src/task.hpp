@@ -144,10 +144,10 @@ class TTask: public TNonCopyable {
     enum ETaskState { Stopped, Started } State;
     int ExitStatus;
 
-    pid_t Pid;
+    pid_t Pid, VPid, WPid;
     std::shared_ptr<TFolder> Cwd;
 
-    void ReportPid(int pid) const;
+    void ReportPid(pid_t pid) const;
 
     TError ReopenStdio();
     TError IsolateNet(int childPid);
@@ -173,7 +173,9 @@ public:
     TTask(pid_t pid) : Pid(pid) {};
 
     TError Start();
-    int GetPid() const;
+    pid_t GetPid() const;
+    pid_t GetWPid() const;
+    pid_t GetPidFor(pid_t pid) const;
     std::vector<int> GetPids() const;
     bool IsRunning() const;
     int GetExitStatus() const;

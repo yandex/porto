@@ -1368,7 +1368,8 @@ void TContainer::ParsePropertyName(std::string &name, std::string &idx) {
     idx = StringTrim(tokens[1], " \t\n]");
 }
 
-TError TContainer::GetData(const string &origName, string &value) {
+TError TContainer::GetData(const string &origName, string &value,
+                           std::shared_ptr<TClient> client) {
     std::string name = origName;
     std::string idx;
     ParsePropertyName(name, idx);
@@ -1383,6 +1384,11 @@ TError TContainer::GetData(const string &origName, string &value) {
     auto validState = cv->GetState();
     if (validState.find(GetState()) == validState.end())
         return TError(EError::InvalidState, "invalid container state");
+
+    if (name == D_ROOT_PID && Task && client) {
+        value = std::to_string(Task->GetPidFor(client->GetPid()));
+        return TError::Success();
+    }
 
     if (idx.length()) {
         TUintMap m = Data->Get<TUintMap>(name);
@@ -1697,8 +1703,11 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
     if (started) {
         std::vector<int> pids = Prop->Get<std::vector<int>>(P_RAW_ROOT_PID);
 
+        if (pids.size() == 1)
+            pids = {pids[0], 0, pids[0]};
+
         if (pids[0] == GetPid())
-            pids = {0};
+            pids = {0, 0, 0};
 
         L_ACT() << GetName() << ": restore started container " << pids[0] << std::endl;
 
@@ -1903,7 +1912,7 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
     Task->Exit(status);
     SetState(EContainerState::Dead);
 
-    error = Prop->Set<std::vector<int>>(P_RAW_ROOT_PID, {0});
+    error = Prop->Set<std::vector<int>>(P_RAW_ROOT_PID, {0, 0, 0});
     if (error)
         L_ERR() << "Can't set " << P_RAW_ROOT_PID << ": " << error << std::endl;
 
@@ -1915,7 +1924,7 @@ bool TContainer::MayExit(int pid) {
     if (!Task)
         return false;
 
-    if (Task->GetPid() != pid)
+    if (Task->GetWPid() != pid)
         return false;
 
     if (GetState() == EContainerState::Dead)
