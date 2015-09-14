@@ -11,3 +11,6 @@ Any kind of contribution is kindly welcome!
 Either you want to expand functionality, report a bug or add/fix the documentation,
 you can make a significant investment into the Porto project.
 Please, send your pull-request/issues via github.
+
+Also, we are looking for a full-time developer:
+https://yandex.ru/jobs/vacancies/dev/cont_virtual_dev
