@@ -1030,6 +1030,10 @@ int TTask::GetPid() const {
     return Pid;
 }
 
+std::vector<int> TTask::GetPids() const {
+    return {Pid};
+}
+
 bool TTask::IsRunning() const {
     return State == Started;
 }
@@ -1113,9 +1117,9 @@ bool TTask::HasCorrectFreezer() {
     return true;
 }
 
-void TTask::Restore(int pid_) {
+void TTask::Restore(std::vector<int> pids) {
     ExitStatus = 0;
-    Pid = pid_;
+    Pid = pids[0];
     State = Started;
 }
 

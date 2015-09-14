@@ -126,11 +126,13 @@ public:
 
     int GetDefault() const override {
         auto c = GetContainer();
+        std::vector<int> pids;
 
         if (!c->Prop->HasValue(P_RAW_ROOT_PID))
             return -1;
 
-        return c->Prop->Get<int>(P_RAW_ROOT_PID);
+        pids = c->Prop->Get<std::vector<int>>(P_RAW_ROOT_PID);
+        return pids[0];
     }
 };
 

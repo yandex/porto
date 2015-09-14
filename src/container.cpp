@@ -917,7 +917,7 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
 
         L() << GetName() << " started " << std::to_string(Task->GetPid()) << std::endl;
 
-        error = Prop->Set<int>(P_RAW_ROOT_PID, Task->GetPid());
+        error = Prop->Set<std::vector<int>>(P_RAW_ROOT_PID, Task->GetPids());
         if (error)
             goto error;
     }
@@ -1695,11 +1695,12 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
 
     bool started = Prop->HasValue(P_RAW_ROOT_PID);
     if (started) {
-        int pid = Prop->Get<int>(P_RAW_ROOT_PID);
-        if (pid == GetPid())
-            pid = 0;
+        std::vector<int> pids = Prop->Get<std::vector<int>>(P_RAW_ROOT_PID);
 
-        L_ACT() << GetName() << ": restore started container " << pid << std::endl;
+        if (pids[0] == GetPid())
+            pids = {0};
+
+        L_ACT() << GetName() << ": restore started container " << pids[0] << std::endl;
 
         auto parent = Parent;
         while (parent && !parent->IsRoot() && !parent->IsPortoRoot()) {
@@ -1728,7 +1729,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
             return error;
         }
 
-        Task->Restore(pid);
+        Task->Restore(pids);
 
         if (Task->HasCorrectParent()) {
             if (Task->IsZombie()) {
@@ -1902,7 +1903,7 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
     Task->Exit(status);
     SetState(EContainerState::Dead);
 
-    error = Prop->Set<int>(P_RAW_ROOT_PID, 0);
+    error = Prop->Set<std::vector<int>>(P_RAW_ROOT_PID, {0});
     if (error)
         L_ERR() << "Can't set " << P_RAW_ROOT_PID << ": " << error << std::endl;
 
