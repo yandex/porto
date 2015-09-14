@@ -174,6 +174,7 @@ public:
 
     TError Start();
     int GetPid() const;
+    std::vector<int> GetPids() const;
     bool IsRunning() const;
     int GetExitStatus() const;
     TError Kill(int signal) const;
@@ -183,7 +184,7 @@ public:
     TError ChildApplyLimits();
     TError ChildSetHostname();
     TError ChildCallback();
-    void Restore(int pid_);
+    void Restore(std::vector<int> pids);
     TError FixCgroups() const;
     void Abort(const TError &error) const;
 

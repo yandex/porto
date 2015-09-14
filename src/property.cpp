@@ -1479,10 +1479,10 @@ public:
     int GetDefault() const override { return -1; }
 };
 
-class TRawRootPidProperty : public TIntValue, public TContainerValue {
+class TRawRootPidProperty : public TIntListValue, public TContainerValue {
 public:
     TRawRootPidProperty() :
-        TIntValue(HIDDEN_VALUE | PERSISTENT_VALUE),
+        TIntListValue(HIDDEN_VALUE | PERSISTENT_VALUE),
         TContainerValue(P_RAW_ROOT_PID, "", anyState) {}
 };
 
