@@ -56,6 +56,6 @@ $ portoctl exec my_container command='echo "Hello, world!"'
 * [Filesystem isolation](docs/mounts.md)
 * [Volumes](docs/volumes.md)
 * [Networking](docs/networking.md)
-* [C++ API](api/cpp/libporto.hpp)
-* [Python API](api/python/porto/api.py)
+* [C++ API](src/api/cpp/libporto.hpp)
+* [Python API](src/api/python/porto/api.py)
 * [How to contribute?](docs/devel.md)
