@@ -98,7 +98,7 @@ bool TTaskEnv::EnvHasKey(const std::string &key) {
 
 // TTask
 
-void TTask::ReportPid(int pid) const {
+void TTask::ReportPid(pid_t pid) const {
     if (write(Wfd, &pid, sizeof(pid)) != sizeof(pid)) {
         L_ERR() << "partial write of pid: " << std::to_string(pid) << std::endl;
     }
@@ -191,8 +191,7 @@ TError TTask::ReopenStdio() {
     error = Env->ClientMntNs.SetNs();
     if (error) {
         L() << "Can't move task to client mount namespace: " << error << std::endl;
-        ReportPid(-1);
-        Abort(error);
+        return error;
     }
 
     if (!Env->DefaultStdin) {
@@ -787,6 +786,10 @@ TError TTask::ChildCallback() {
     if (read(WaitParentRfd, &ret, sizeof(ret)) != sizeof(ret))
         return TError(EError::Unknown, errno ?: ENODATA, "partial read from child sync pipe");
 
+    /* Report VPid in pid namespace we're enter */
+    if (!Env->Isolate)
+        ReportPid(getpid());
+
     close(Rfd);
     ResetAllSignalHandlers();
     TError error = ChildApplyLimits();
@@ -870,7 +873,7 @@ TError TTask::Start() {
     int ret;
     int pfd[2], syncfd[2];
 
-    Pid = 0;
+    Pid = VPid = WPid = 0;
 
     if (Env->CreateCwd) {
         TError error = CreateCwd();
@@ -920,6 +923,7 @@ TError TTask::Start() {
             if (error) {
                 L() << "Can't attach to cgroup: " << error << std::endl;
                 ReportPid(-1);
+                ReportPid(-1);
                 Abort(error);
             }
         }
@@ -927,12 +931,14 @@ TError TTask::Start() {
         error = ReopenStdio();
         if (error) {
             ReportPid(-1);
+            ReportPid(-1);
             Abort(error);
         }
 
         error = Env->ParentNs.Enter();
         if (error) {
             L() << "Cannot enter namespaces: " << error << std::endl;
+            ReportPid(-1);
             ReportPid(-1);
             Abort(error);
         }
@@ -963,22 +969,32 @@ TError TTask::Start() {
 
         pid_t clonePid = clone(ChildFn, stack + sizeof(stack), cloneFlags, this);
         close(WaitParentRfd);
-        ReportPid(clonePid);
+
         if (clonePid < 0) {
             TError error(errno == ENOMEM ?
                          EError::ResourceNotAvailable :
                          EError::Unknown, errno, "clone()");
             L() << "Can't spawn child: " << error << std::endl;
+            ReportPid(-1);
+            ReportPid(-1);
             Abort(error);
         }
+
+        /* Report WPid in host pid namespace */
+        ReportPid(clonePid);
 
         if (config().network().enabled()) {
             error = IsolateNet(clonePid);
             if (error) {
                 L() << "Can't isolate child network: " << error << std::endl;
+                ReportPid(-1);
                 Abort(error);
             }
         }
+
+        /* Report VPid in parent pid namespace for new pid-ns */
+        if (Env->Isolate)
+            ReportPid(clonePid);
 
         int result = 0;
         ret = write(WaitParentWfd, &result, sizeof(result));
@@ -988,6 +1004,8 @@ TError TTask::Start() {
             Abort(error);
         }
 
+        /* ChildCallback() reports VPid here if !Env->Isolate */
+
         _exit(EXIT_SUCCESS);
     }
     close(Wfd);
@@ -996,11 +1014,19 @@ TError TTask::Start() {
     if (forkResult < 0)
         (void)kill(forkPid, SIGKILL);
 
-    int n = read(Rfd, &Pid, sizeof(Pid));
+    int n = read(Rfd, &WPid, sizeof(WPid));
     if (n <= 0) {
         close(Rfd);
         return TError(EError::InvalidValue, errno, "Container couldn't start due to resource limits");
     }
+
+    n = read(Rfd, &VPid, sizeof(VPid));
+    if (n <= 0) {
+        close(Rfd);
+        return TError(EError::InvalidValue, errno, "Container couldn't start due to resource limits");
+    }
+
+    Pid = WPid;
 
     TError error;
     (void)TError::Deserialize(Rfd, error);
@@ -1010,7 +1036,7 @@ TError TTask::Start() {
             (void)kill(Pid, SIGKILL);
             L_ACT() << "Kill partly constructed container " << Pid << ": " << strerror(errno) << std::endl;
         }
-        Pid = 0;
+        Pid = VPid = WPid = 0;
         ExitStatus = -1;
 
         if (!error)
@@ -1026,12 +1052,26 @@ TError TTask::Start() {
     return TError::Success();
 }
 
-int TTask::GetPid() const {
+pid_t TTask::GetPid() const {
     return Pid;
 }
 
+pid_t TTask::GetWPid() const {
+    return WPid;
+}
+
 std::vector<int> TTask::GetPids() const {
-    return {Pid};
+    return {Pid, VPid, WPid};
+}
+
+pid_t TTask::GetPidFor(pid_t pid) const {
+    if (InPidNamespace(pid, getpid()))
+        return Pid;
+    if (InPidNamespace(pid, WPid))
+        return VPid;
+    if (InPidNamespace(pid, Pid))
+        return 1;
+    return 0;
 }
 
 bool TTask::IsRunning() const {
@@ -1061,7 +1101,7 @@ TError TTask::Kill(int signal) const {
 }
 
 bool TTask::IsZombie() const {
-    TFile f("/proc/" + std::to_string(Pid) + "/status");
+    TFile f("/proc/" + std::to_string(WPid) + "/status");
 
     std::vector<std::string> lines;
     TError err = f.AsLines(lines);
@@ -1077,7 +1117,7 @@ bool TTask::IsZombie() const {
 
 bool TTask::HasCorrectParent() {
     pid_t ppid;
-    TError error = GetTaskParent(Pid, ppid);
+    TError error = GetTaskParent(WPid, ppid);
     if (error) {
         L() << "Can't get ppid of restored task: " << error << std::endl;
         return false;
@@ -1096,9 +1136,9 @@ bool TTask::HasCorrectFreezer() {
     // restore it since pids may have wrapped or previous kvs state
     // is too old
     map<string, string> cgmap;
-    TError error = GetTaskCgroups(Pid, cgmap);
+    TError error = GetTaskCgroups(WPid, cgmap);
     if (error) {
-        L() << "Can't read " << Pid << " cgroups of restored task: " << error << std::endl;
+        L() << "Can't read " << WPid << " cgroups of restored task: " << error << std::endl;
         return false;
     } else {
         auto cg = Env->LeafCgroups.at(freezerSubsystem);
@@ -1107,8 +1147,8 @@ bool TTask::HasCorrectFreezer() {
             if (IsZombie())
                 return true;
 
-            L_WRN() << "Unexpected freezer cgroup of restored task  " << Pid << ": " << cg->Path() << " != " << cgmap["freezer"] << std::endl;
-            Pid = 0;
+            L_WRN() << "Unexpected freezer cgroup of restored task  " << WPid << ": " << cg->Path() << " != " << cgmap["freezer"] << std::endl;
+            Pid = VPid = WPid = 0;
             State = Stopped;
             return false;
         }
@@ -1120,6 +1160,8 @@ bool TTask::HasCorrectFreezer() {
 void TTask::Restore(std::vector<int> pids) {
     ExitStatus = 0;
     Pid = pids[0];
+    VPid = pids[1];
+    WPid = pids[2];
     State = Started;
 }
 
@@ -1128,7 +1170,7 @@ TError TTask::FixCgroups() const {
         return TError::Success();
 
     map<string, string> cgmap;
-    TError error = GetTaskCgroups(Pid, cgmap);
+    TError error = GetTaskCgroups(WPid, cgmap);
     if (error)
         return error;
 
@@ -1146,7 +1188,7 @@ TError TTask::FixCgroups() const {
                 L_WRN() << "No network, disabled " << subsys->GetName() << ":" << path << std::endl;
 
                 auto cg = subsys->GetRootCgroup();
-                error = cg->Attach(Pid);
+                error = cg->Attach(WPid);
                 if (error)
                     L_ERR() << "Can't reattach to root: " << error << std::endl;
                 continue;
@@ -1161,7 +1203,7 @@ TError TTask::FixCgroups() const {
         if (cg && cg->Relpath().ToString() != path) {
             L_WRN() << "Fixed invalid task subsystem for " << subsys->GetName() << ":" << path << std::endl;
 
-            error = cg->Attach(Pid);
+            error = cg->Attach(WPid);
             if (error)
                 L_ERR() << "Can't fix: " << error << std::endl;
         }

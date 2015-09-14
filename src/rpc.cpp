@@ -638,7 +638,7 @@ noinline TError GetContainerData(TContext &context,
         return TError(EError::ContainerDoesNotExist, "container doesn't exist");
 
     string value;
-    err = container->GetData(req.data(), value);
+    err = container->GetData(req.data(), value, client);
     if (!err)
         rsp.mutable_getdata()->set_value(value);
 
@@ -704,7 +704,7 @@ noinline TError GetContainerCombined(TContext &context,
                 if (container->Prop->IsValid(name))
                     error = container->GetProperty(var, value, client);
                 else if (container->Data->IsValid(name))
-                    error = container->GetData(var, value);
+                    error = container->GetData(var, value, client);
                 else
                     error = TError(EError::InvalidValue, "Unknown property or data " + var);
             }

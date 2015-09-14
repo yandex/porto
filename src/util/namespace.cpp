@@ -11,6 +11,17 @@ extern "C" {
 #include <unistd.h>
 }
 
+/* returns true if two processes are in one pid namespace */
+bool InPidNamespace(pid_t pid1, pid_t pid2) {
+    struct stat st1, st2;
+
+    if (stat(("/proc/" + std::to_string(pid1) + "/ns/pid").c_str(), &st1) ||
+        stat(("/proc/" + std::to_string(pid2) + "/ns/pid").c_str(), &st2))
+        return false;
+
+    return st1.st_ino == st2.st_ino;
+}
+
 TError TNamespaceFd::Open(TPath path) {
     Close();
     Fd = open(path.c_str(), O_RDONLY | O_NOCTTY | O_NONBLOCK | O_CLOEXEC);

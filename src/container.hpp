@@ -180,7 +180,8 @@ public:
     TError SetProperty(const std::string &property,
                        const std::string &value, std::shared_ptr<TClient> client);
 
-    TError GetData(const std::string &data, std::string &value);
+    TError GetData(const std::string &data, std::string &value,
+                   std::shared_ptr<TClient> client);
     TError Restore(TScopedLock &holder_lock, const kv::TNode &node);
 
     std::shared_ptr<TCgroup> GetLeafCgroup(std::shared_ptr<TSubsystem> subsys);

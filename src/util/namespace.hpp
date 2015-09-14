@@ -6,6 +6,8 @@
 #include "common.hpp"
 #include "util/unix.hpp"
 
+bool InPidNamespace(pid_t pid1, pid_t pid2);
+
 class TNamespaceFd : public TNonCopyable {
     int Fd;
 public:
