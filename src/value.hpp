@@ -186,6 +186,15 @@ public:
     bool GetDefault() const override;
 };
 
+class TIntListValue : public TValue<std::vector<int>> {
+public:
+    TIntListValue(int flags) : TValue(flags) {}
+
+    std::string ToString(const std::vector<int> &value) const override;
+    TError FromString(const std::string &value) override;
+    std::vector<int> GetDefault() const override;
+};
+
 typedef std::vector<std::string> TStrList;
 
 class TListValue : public TValue<TStrList> {
