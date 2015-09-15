@@ -72,16 +72,32 @@ int SleepWhile(int timeoMs, std::function<int()> handler) {
     return RetryFailed(times, resolution, handler);
 }
 
-int GetPid() {
+pid_t GetPid() {
     return getpid();
 }
 
-int GetPPid() {
+pid_t GetPPid() {
     return getppid();
 }
 
-int GetTid() {
+pid_t GetTid() {
     return syscall(SYS_gettid);
+}
+
+TError GetTaskParent(pid_t pid, pid_t &parent_pid) {
+    std::string path = "/proc/" + std::to_string(pid) + "/stat";
+    int res, ppid;
+    FILE *file;
+
+    file = fopen(path.c_str(), "r");
+    if (!file)
+        return TError(EError::Unknown, errno, "fopen(" + path + ")");
+    res = fscanf(file, "%*d (%*[^)]) %*c %d", &ppid);
+    fclose(file);
+    if (res != 1)
+        return TError(EError::Unknown, errno, "Cannot parse " + path);
+    parent_pid = ppid;
+    return TError::Success();
 }
 
 size_t GetCurrentTimeMs() {

@@ -1073,7 +1073,7 @@ bool TTask::IsZombie() const {
 
 bool TTask::HasCorrectParent() {
     pid_t ppid;
-    TError error = GetPPid(ppid);
+    TError error = GetTaskParent(Pid, ppid);
     if (error) {
         L() << "Can't get ppid of restored task: " << error << std::endl;
         return false;
@@ -1164,23 +1164,6 @@ TError TTask::FixCgroups() const {
     }
 
     return TError::Success();
-}
-
-TError TTask::GetPPid(pid_t &ppid) const {
-    TFile f("/proc/" + std::to_string(Pid) + "/status");
-
-    std::vector<std::string> lines;
-    TError err = f.AsLines(lines);
-    if (err)
-        return err;
-
-    for (auto &l : lines)
-        if (l.compare(0, 6, "PPid:\t") == 0)
-            return StringToInt(l.substr(6), ppid);
-
-    L_WRN() << "Can't parse /proc/pid/status" << std::endl;
-
-    return TError(EError::Unknown, "Can't parse /proc/pid/status");
 }
 
 void TTask::ClearEnv() {
