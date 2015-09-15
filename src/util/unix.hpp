@@ -12,9 +12,12 @@ class TPath;
 int RetryBusy(int times, int timeoMs, std::function<int()> handler);
 int RetryFailed(int times, int timeoMs, std::function<int()> handler);
 int SleepWhile(int timeoMs, std::function<int()> handler);
-int GetPid();
-int GetPPid();
-int GetTid();
+
+pid_t GetPid();
+pid_t GetPPid();
+pid_t GetTid();
+TError GetTaskParent(pid_t pid, pid_t &parent_pid);
+
 size_t GetCurrentTimeMs();
 size_t GetTotalMemory();
 int CreatePidFile(const std::string &path, const int mode);

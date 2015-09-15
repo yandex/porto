@@ -187,7 +187,6 @@ public:
     TError FixCgroups() const;
     void Abort(const TError &error) const;
 
-    TError GetPPid(pid_t &ppid) const;
     bool IsZombie() const;
 
     bool HasCorrectParent();
