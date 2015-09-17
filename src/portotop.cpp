@@ -331,9 +331,9 @@ void TPortoValue::Process(unsigned long gone) {
         std::string name = Container->GetName();
         int level = Container->GetLevel();
         if (level > 0) {
-            name = (Container->HasChildren() ? "+" : "-") +
+            name = (Container->HasChildren() ? "+ " : "- ") +
                 name.substr(1 + name.rfind('/'));
-            AsString = std::string(level, ' ') + name;
+            AsString = std::string(2 * (level - 1), ' ') + name;
         }
         return;
     }
