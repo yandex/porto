@@ -546,7 +546,8 @@ public:
         try {
             auto v = ParseCpuLimit(str);
             if (v < 1 || v > 100)
-                return TError(EError::InvalidValue, "invalid value absolute value " + std::to_string(v));
+                return TError(EError::InvalidValue,
+                        "cpu limit out of range 1-100: " + std::to_string(v));
 
             if (!GetContainer()->ValidHierarchicalProperty(P_CPU_LIMIT, v))
                 return TError(EError::InvalidValue, "invalid hierarchical value");
@@ -572,7 +573,8 @@ public:
         try {
             auto v = ParseCpuLimit(str);
             if (v < 0 || v > 100)
-                return TError(EError::InvalidValue, "invalid value absolute value " + std::to_string(v));
+                return TError(EError::InvalidValue,
+                        "cpu guarantee out of range 0-100: " + std::to_string(v));
 
             return Set((uint64_t)v);
         } catch (...) {
