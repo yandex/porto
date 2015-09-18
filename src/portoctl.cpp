@@ -903,14 +903,19 @@ public:
         return tcsetattr(fd, TCSAFLUSH, &t);
     }
 
-    void MoveData(int from, int to) {
+    bool MoveData(int from, int to) {
         char buf[256];
         int ret;
 
         ret = read(from, buf, sizeof(buf));
-        if (ret > 0)
+        if (ret > 0) {
+            if (ret == 2 && buf[0] == '^' && buf[1] == 'C')
+                return true;
             if (write(to, buf, ret) != ret)
                 std::cerr << "Partial write to " << to << std::endl;
+        }
+
+        return false;
     }
 
     int MakeFifo(const std::string &path) {
@@ -1081,12 +1086,19 @@ public:
 
             for (size_t i = 0; i < fds.size(); i++) {
                 if (fds[i].revents & POLLIN) {
+                    int dest;
+
                     if (fds[i].fd == STDIN_FILENO)
-                        MoveData(STDIN_FILENO, stdinFd);
+                        dest = stdinFd;
                     else if (fds[i].fd == stdoutFd)
-                        MoveData(stdoutFd, STDOUT_FILENO);
+                        dest = STDOUT_FILENO;
                     else if (fds[i].fd == stderrFd)
-                        MoveData(stderrFd, STDERR_FILENO);
+                        dest = STDERR_FILENO;
+                    else
+                        continue;
+
+                    if (MoveData(fds[i].fd, dest))
+                        return EXIT_FAILURE;
                 }
 
                 if (fds[i].revents & POLLHUP) {
