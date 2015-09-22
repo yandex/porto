@@ -102,8 +102,6 @@ struct TTaskEnv : public TNonCopyable {
     bool CreateCwd;
     TPath Root; /* path in ParentNs.Mnt */
     bool RootRdOnly;
-    std::string User;
-    std::string Group;
     std::vector<std::string> Environ;
     bool Isolate = false;
     bool TripleFork;
@@ -128,12 +126,9 @@ struct TTaskEnv : public TNonCopyable {
     std::vector<TIpVec> IpVec;
     bool NewMountNs;
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
-    std::unique_ptr<TScopedMem> GroupList;
     TCred Cred;
     bool NetUp;
 
-    TError GetGroupList();
-    TError Prepare(const TCred &cred);
     const char** GetEnvp() const;
     bool EnvHasKey(const std::string &key);
 };

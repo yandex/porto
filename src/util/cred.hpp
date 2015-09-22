@@ -51,6 +51,7 @@ public:
     bool IsPermitted(const TCred &requirement) const;
 
     TError Parse(const std::string &user, const std::string &group);
+    TError LoadGroups(std::string user = "");
 };
 
 class TCredConf : public TNonCopyable {

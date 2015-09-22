@@ -156,6 +156,24 @@ TError TGroup::Load() {
     return TError(EError::InvalidValue, "Invalid group");
 }
 
+TError TCred::LoadGroups(std::string user) {
+    int ngroups = 0;
+
+    if (user == "") {
+        TUser u(Uid);
+        TError error = u.Load();
+        if (error)
+            return error;
+        user = u.GetName();
+    }
+
+    (void)getgrouplist(user.c_str(), Gid, nullptr, &ngroups);
+    Groups.resize(ngroups);
+    if (getgrouplist(user.c_str(), Gid, Groups.data(), &ngroups) < 0)
+        return TError(EError::Unknown, errno, "Can't get supplementary groups");
+    return TError::Success();
+}
+
 /* FIXME should die */
 bool TCred::IsRootUser() const {
     return Uid == 0 || Gid == 0;

@@ -623,6 +623,8 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
                 if (!Prop->IsDefault(name))
                     return TError(EError::InvalidValue, "Can't use custom " + name + " with " + P_ISOLATE + " == false");
 
+    auto vmode = Prop->Get<int>(P_VIRT_MODE);
+    auto user = Prop->Get<std::string>(P_USER);
     auto taskEnv = std::make_shared<TTaskEnv>();
     auto parent = FindRunningParent();
 
@@ -655,13 +657,14 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
     taskEnv->RootRdOnly = Prop->Get<bool>(P_ROOT_RDONLY);
     taskEnv->CreateCwd = Prop->IsDefault(P_ROOT) && Prop->IsDefault(P_CWD) && !UseParentNamespace();
 
-    TCred cred(OwnerCred);
-    auto vmode = Prop->Get<int>(P_VIRT_MODE);
     if (vmode == VIRT_MODE_OS) {
-        taskEnv->User = "root";
-        cred.Uid = cred.Gid = 0;
+        user = "root";
+        taskEnv->Cred = TCred(0, 0);
     } else {
-        taskEnv->User = Prop->Get<std::string>(P_USER);
+        taskEnv->Cred = OwnerCred;
+        TError error = taskEnv->Cred.LoadGroups(user);
+        if (error)
+            return error;
     }
 
     std::map<std::string, std::string> portoEnv = {
@@ -670,7 +673,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         { "PORTO_NAME", GetName() },
         { "PORTO_HOST", GetHostName() },
         { "HOME", Prop->Get<std::string>(P_CWD) },
-        { "USER", taskEnv->User },
+        { "USER", user },
     };
 
     taskEnv->Environ = Prop->Get<TStrList>(P_ENV);
@@ -823,10 +826,6 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
     // Create new mount namespaces if we have to make any changes
     taskEnv->NewMountNs = taskEnv->Isolate || taskEnv->BindMap.size() ||
                           taskEnv->RootRdOnly || !taskEnv->Root.IsRoot();
-
-    error = taskEnv->Prepare(cred);
-    if (error)
-        return error;
 
     Task = unique_ptr<TTask>(new TTask(taskEnv));
 
