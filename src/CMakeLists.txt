@@ -23,6 +23,10 @@ endif()
 
 find_library(PB NAMES libprotobuf.a)
 find_package(Protobuf REQUIRED)
+# FindProtobuf requires only the libraries to be present
+if(NOT PROTOBUF_PROTOC_EXECUTABLE)
+	message(FATAL_ERROR "Couldn't find protoc executable.")
+endif()
 include_directories(${PROTOBUF_INCLUDE_DIRS})
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
