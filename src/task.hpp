@@ -131,6 +131,8 @@ struct TTaskEnv : public TNonCopyable {
 
     const char** GetEnvp() const;
     bool EnvHasKey(const std::string &key);
+
+    int ReportStage;
 };
 
 class TTask: public TNonCopyable {
@@ -182,7 +184,7 @@ public:
 
     TError ChildApplyLimits();
     TError ChildSetHostname();
-    TError ChildCallback();
+    void StartChild();
     void Restore(std::vector<int> pids);
     TError FixCgroups() const;
     void Abort(const TError &error) const;

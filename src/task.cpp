@@ -80,9 +80,12 @@ void TTask::ReportPid(pid_t pid) const {
     if (write(Wfd, &pid, sizeof(pid)) != sizeof(pid)) {
         L_ERR() << "partial write of pid: " << std::to_string(pid) << std::endl;
     }
+    Env->ReportStage++;
 }
 
 void TTask::Abort(const TError &error) const {
+    while (Env->ReportStage++ < 2)
+        ReportPid(-1);
     TError ret = error.Serialize(Wfd);
     if (ret)
         L_ERR() << ret << std::endl;
@@ -91,10 +94,8 @@ void TTask::Abort(const TError &error) const {
 
 static int ChildFn(void *arg) {
     SetProcessName("portod-spawn-c");
-
     TTask *task = static_cast<TTask*>(arg);
-    TError error = task->ChildCallback();
-    task->Abort(error);
+    task->StartChild();
     return EXIT_FAILURE;
 }
 
@@ -761,30 +762,35 @@ TError TTask::ChildSetHostname() {
     return TError::Success();
 }
 
-TError TTask::ChildCallback() {
+void TTask::StartChild() {
     int ret;
 
     /* Die together with waiter */
     if (Env->TripleFork)
         SetDieOnParentExit(SIGKILL);
+    else
+        Env->ReportStage++;
 
     close(WaitParentWfd);
     if (read(WaitParentRfd, &ret, sizeof(ret)) != sizeof(ret))
-        return TError(EError::Unknown, errno ?: ENODATA, "partial read from child sync pipe");
+        Abort(TError(EError::Unknown, errno ?: ENODATA,
+                    "partial read from child sync pipe"));
     close(WaitParentRfd);
 
     /* Report VPid in pid namespace we're enter */
     if (!Env->Isolate)
         ReportPid(getpid());
+    else
+        Env->ReportStage++;
 
     close(Rfd);
     ResetAllSignalHandlers();
     TError error = ChildApplyLimits();
     if (error)
-        return error;
+        Abort(error);
 
     if (setsid() < 0)
-        return TError(EError::Unknown, errno, "setsid()");
+        Abort(TError(EError::Unknown, errno, "setsid()"));
 
     umask(0);
 
@@ -792,64 +798,67 @@ TError TTask::ChildCallback() {
         // Remount to slave to receive propogations from parent namespace
         error = TMount::Remount("/", MS_REC | MS_SLAVE);
         if (error)
-            return error;
+            Abort(error);
     }
 
     if (Env->Isolate) {
         // remount proc so PID namespace works
         TMount tmpProc("proc", "/proc", "proc", {});
-        if (tmpProc.Detach())
-            return TError(EError::Unknown, errno, "datach procfs");
-        if (tmpProc.MountDir())
-            return TError(EError::Unknown, errno, "remount procfs");
+        error = tmpProc.Detach();
+        if (error)
+            Abort(error);
+        error = tmpProc.MountDir();
+        if (error)
+            Abort(error);
     }
 
     if (Env->NetCfg.NewNetNs) {
         error = ChildEnableNet();
         if (error)
-            return error;
+            Abort(error);
     }
 
     error = ChildMountRootFs();
     if (error)
-        return error;
+        Abort(error);
 
     error = ChildBindDirectores();
     if (error)
-        return error;
+        Abort(error);
 
     error = ChildRemountRootRo();
     if (error)
-        return error;
+        Abort(error);
 
     error = ChildIsolateFs();
     if (error)
-        return error;
+        Abort(error);
 
     error = ChildSetHostname();
     if (error)
-        return error;
+        Abort(error);
 
     error = Env->Cwd.Chdir();
     if (error)
-        return error;
+        Abort(error);
 
     if (Env->NewMountNs) {
         // Make all shared: subcontainers will get propgation from us
         error = TMount::Remount("/", MS_REC | MS_SHARED);
         if (error)
-            return error;
+            Abort(error);
     }
 
     error = ChildApplyCapabilities();
     if (error)
-        return error;
+        Abort(error);
 
     error = ChildDropPriveleges();
     if (error)
-        return error;
+        Abort(error);
 
-    return ChildExec();
+    error = ChildExec();
+    Abort(error);
 }
 
 TError TTask::CreateCwd() {
@@ -908,65 +917,42 @@ TError TTask::Start() {
         // move to target cgroups
         for (auto cg : Env->LeafCgroups) {
             error = cg.second->Attach(getpid());
-            if (error) {
-                L() << "Can't attach to cgroup: " << error << std::endl;
-                ReportPid(-1);
-                ReportPid(-1);
+            if (error)
                 Abort(error);
-            }
         }
 
         error = ReopenStdio();
-        if (error) {
-            ReportPid(-1);
-            ReportPid(-1);
+        if (error)
             Abort(error);
-        }
 
         error = Env->ParentNs.Enter();
-        if (error) {
-            L() << "Cannot enter namespaces: " << error << std::endl;
-            ReportPid(-1);
-            ReportPid(-1);
+        if (error)
             Abort(error);
-        }
 
         int ret = pipe2(syncfd, O_CLOEXEC);
-        if (ret) {
-            TError error(EError::Unknown, errno, "pipe2(pdf)");
-            L() << "Can't create sync pipe for child: " << error << std::endl;
-            ReportPid(-1);
-            ReportPid(-1);
-            Abort(error);
-        }
+        if (ret)
+            Abort(TError(EError::Unknown, errno, "pipe2(pdf)"));
 
         WaitParentRfd = syncfd[0];
         WaitParentWfd = syncfd[1];
 
         if (Env->TripleFork) {
             forkPid = fork();
-            if (forkPid < 0) {
-                TError error(EError::Unknown, errno, "fork()");
-                L() << "Can't do tripple fork " << error << std::endl;
-                ReportPid(-1);
-                ReportPid(-1);
-                Abort(error);
-            } else if (forkPid) {
+            if (forkPid < 0)
+                Abort(TError(EError::Unknown, errno, "fork()"));
+
+            if (forkPid) {
                 /* Report WPid in host pid namespace */
                 ReportPid(forkPid);
                 /* Unblock child and exit */
-                if (write(WaitParentWfd, &forkPid, sizeof(forkPid)) != sizeof(forkPid)) {
-                    L_ERR() << "partial write of pid: " << std::to_string(forkPid) << std::endl;
-                    _exit(EXIT_FAILURE);
-                }
+                if (write(WaitParentWfd, &forkPid, sizeof(forkPid)) != sizeof(forkPid))
+                    Abort(TError(EError::Unknown, errno, "partial write ot child sync pipe"));
                 _exit(EXIT_SUCCESS);
             } else {
                 /* Wait for parent report our host pid */
-                if (read(WaitParentRfd, &forkPid, sizeof(forkPid)) != sizeof(forkPid)) {
-                    error = TError(EError::Unknown, errno, "partial read from child sync pipe");
-                    ReportPid(-1);
-                    Abort(error);
-                }
+                if (read(WaitParentRfd, &forkPid, sizeof(forkPid)) != sizeof(forkPid))
+                    Abort(TError(EError::Unknown, errno, "partial read from child sync pipe"));
+                Env->ReportStage++;
             }
         }
 
@@ -989,9 +975,6 @@ TError TTask::Start() {
             TError error(errno == ENOMEM ?
                          EError::ResourceNotAvailable :
                          EError::Unknown, errno, "clone()");
-            L() << "Can't spawn child: " << error << std::endl;
-            ReportPid(-1);
-            ReportPid(-1);
             Abort(error);
         }
 
@@ -1003,7 +986,6 @@ TError TTask::Start() {
             error = IsolateNet(clonePid);
             if (error) {
                 L() << "Can't isolate child network: " << error << std::endl;
-                ReportPid(-1);
                 Abort(error);
             }
         }
@@ -1014,13 +996,15 @@ TError TTask::Start() {
 
         int result = 0;
         ret = write(WaitParentWfd, &result, sizeof(result));
-        if (ret != sizeof(result)) {
-            TError error(EError::Unknown, "Partial write to child sync pipe (" + std::to_string(ret) + " != " + std::to_string(result) + ")");
-            L() << "Can't spawn child: " << error << std::endl;
-            Abort(error);
-        }
+        if (ret != sizeof(result))
+            Abort(TError(EError::Unknown, errno,
+                        "Partial write to child sync pipe (" +
+                        std::to_string(ret) + " != " +
+                        std::to_string(result) + ")"));
 
         /* ChildCallback() reports VPid here if !Env->Isolate */
+        if (!Env->Isolate)
+            Env->ReportStage++;
 
         close(WaitParentRfd);
         close(WaitParentWfd);
