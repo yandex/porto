@@ -2093,7 +2093,8 @@ static void CreateVethPair(TPortoAPI &api) {
     }
     if (system("ip link | grep veth1") == 0) {
         Say() << "Delete link veth1" << std::endl;
-        ExpectEq(system("ip link delete veth1"), 0);
+        int ret = system("ip link delete veth1");
+        (void)ret;
     }
     ExpectEq(system("ip link add veth0 type veth peer name veth1"), 0);
     AsNobody(api);
