@@ -7,9 +7,9 @@
 #include "container.hpp"
 #include "holder.hpp"
 #include "config.hpp"
+#include "protobuf.hpp"
 #include "util/file.hpp"
 #include "util/log.hpp"
-#include "util/protobuf.hpp"
 #include "util/string.hpp"
 
 extern "C" {

@@ -4,7 +4,7 @@
 #include <csignal>
 
 #include "libporto.hpp"
-#include "util/error.hpp"
+#include "error.hpp"
 
 // Command that is being executed, used for signal handling
 class ICmd;

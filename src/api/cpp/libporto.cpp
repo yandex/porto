@@ -1,6 +1,5 @@
 #include "libporto.hpp"
-
-#include "util/protobuf.hpp"
+#include "protobuf.hpp"
 
 extern "C" {
 #include <unistd.h>

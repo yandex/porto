@@ -54,7 +54,7 @@ add_subdirectory(util)
 
 link_directories(${yandex-porto_BINARY_DIR})
 include_directories(${yandex-porto_BINARY_DIR}/api/cpp)
-add_library(porto STATIC util api/cpp/libporto.cpp)
+add_library(porto STATIC util api/cpp/libporto.cpp api/cpp/error.cpp api/cpp/protobuf.cpp)
 add_dependencies(porto util version.hpp)
 
 add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp holder.cpp event.cpp task.cpp kvalue.cpp subsystem.cpp config.cpp container_value.cpp value.cpp data.cpp property.cpp qdisc.cpp context.cpp volume.cpp epoll.cpp client.cpp)

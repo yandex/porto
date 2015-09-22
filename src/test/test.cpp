@@ -3,7 +3,7 @@
 
 #include "test.hpp"
 #include "config.hpp"
-#include "util/error.hpp"
+#include "error.hpp"
 #include "util/file.hpp"
 #include "util/folder.hpp"
 #include "util/string.hpp"

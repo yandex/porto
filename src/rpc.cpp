@@ -9,8 +9,8 @@
 #include "container_value.hpp"
 #include "volume.hpp"
 #include "event.hpp"
+#include "protobuf.hpp"
 #include "util/log.hpp"
-#include "util/protobuf.hpp"
 #include "util/string.hpp"
 #include "util/cred.hpp"
 

@@ -16,7 +16,7 @@
 #include "util/unix.hpp"
 #include "util/cred.hpp"
 #include "util/idmap.hpp"
-#include "util/protobuf.hpp"
+#include "protobuf.hpp"
 #include "test.hpp"
 #include "rpc.hpp"
 

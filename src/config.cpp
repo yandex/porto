@@ -1,7 +1,7 @@
 #include <iostream>
 
 #include "config.hpp"
-#include "util/protobuf.hpp"
+#include "protobuf.hpp"
 #include "util/unix.hpp"
 #include "util/mount.hpp"
 
