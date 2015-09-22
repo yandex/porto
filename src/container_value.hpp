@@ -27,7 +27,7 @@ public:
     const char *GetName() const { return Name; }
     const char *GetDesc() const { return Desc; }
     const std::set<EContainerState> &GetState() const { return State; }
-    virtual TError PrepareTaskEnv(std::shared_ptr<TTaskEnv> taskEnv) { return TError::Success(); }
+    virtual TError PrepareTaskEnv(TTaskEnv &taskEnv) { return TError::Success(); }
     virtual bool IsImplemented() { return Implemented; }
 };
 

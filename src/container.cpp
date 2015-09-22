@@ -612,7 +612,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
 
     auto vmode = Prop->Get<int>(P_VIRT_MODE);
     auto user = Prop->Get<std::string>(P_USER);
-    auto taskEnv = std::make_shared<TTaskEnv>();
+    auto taskEnv = std::unique_ptr<TTaskEnv>(new TTaskEnv());
     auto parent = FindRunningParent();
 
     taskEnv->LeafCgroups = LeafCgroups;
@@ -711,15 +711,15 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         }
     }
 
-    TError error = Prop->PrepareTaskEnv(P_ULIMIT, taskEnv);
+    TError error = Prop->PrepareTaskEnv(P_ULIMIT, *taskEnv);
     if (error)
         return error;
 
-    error = Prop->PrepareTaskEnv(P_BIND, taskEnv);
+    error = Prop->PrepareTaskEnv(P_BIND, *taskEnv);
     if (error)
         return error;
 
-    error = Prop->PrepareTaskEnv(P_CAPABILITIES, taskEnv);
+    error = Prop->PrepareTaskEnv(P_CAPABILITIES, *taskEnv);
     if (error)
         return error;
 
@@ -732,15 +732,15 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
     }
 
     if (config().network().enabled()) {
-        error = Prop->PrepareTaskEnv(P_IP, taskEnv);
+        error = Prop->PrepareTaskEnv(P_IP, *taskEnv);
         if (error)
             return error;
 
-        error = Prop->PrepareTaskEnv(P_DEFAULT_GW, taskEnv);
+        error = Prop->PrepareTaskEnv(P_DEFAULT_GW, *taskEnv);
         if (error)
             return error;
 
-        error = Prop->PrepareTaskEnv(P_NET, taskEnv);
+        error = Prop->PrepareTaskEnv(P_NET, *taskEnv);
         if (error)
             return error;
     } else {
@@ -813,7 +813,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
     taskEnv->NewMountNs = taskEnv->Isolate || taskEnv->BindMap.size() ||
                           taskEnv->RootRdOnly || !taskEnv->Root.IsRoot();
 
-    Task = unique_ptr<TTask>(new TTask(taskEnv));
+    Task = std::unique_ptr<TTask>(new TTask(taskEnv));
 
     return TError::Success();
 }

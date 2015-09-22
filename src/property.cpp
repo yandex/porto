@@ -74,7 +74,7 @@ TError TPropertyMap::Check(const std::string &property) const {
 }
 
 TError TPropertyMap::PrepareTaskEnv(const std::string &property,
-                                    std::shared_ptr<TTaskEnv> taskEnv) {
+                                    TTaskEnv &taskEnv) {
     auto av = Find(property);
 
     if (IsDefault(property)) {
@@ -856,8 +856,8 @@ public:
         return TError::Success();
     }
 
-    TError PrepareTaskEnv(std::shared_ptr<TTaskEnv> taskEnv) override {
-        taskEnv->Rlimit = Rlimit;
+    TError PrepareTaskEnv(TTaskEnv &taskEnv) override {
+        taskEnv.Rlimit = Rlimit;
         return TError::Success();
     }
 };
@@ -949,8 +949,8 @@ public:
         return TError::Success();
     }
 
-    TError PrepareTaskEnv(std::shared_ptr<TTaskEnv> taskEnv) override {
-        taskEnv->BindMap = BindMap;
+    TError PrepareTaskEnv(TTaskEnv &taskEnv) override {
+        taskEnv.BindMap = BindMap;
         return TError::Success();
     }
 };
@@ -988,8 +988,8 @@ public:
         return TError::Success();
     }
 
-    TError PrepareTaskEnv(std::shared_ptr<TTaskEnv> taskEnv) override {
-        taskEnv->GwVec = GwVec;
+    TError PrepareTaskEnv(TTaskEnv &taskEnv) override {
+        taskEnv.GwVec = GwVec;
         return TError::Success();
     }
 };
@@ -1028,8 +1028,8 @@ public:
         return TError::Success();
     }
 
-    TError PrepareTaskEnv(std::shared_ptr<TTaskEnv> taskEnv) override {
-        taskEnv->IpVec = IpVec;
+    TError PrepareTaskEnv(TTaskEnv &taskEnv) override {
+        taskEnv.IpVec = IpVec;
         return TError::Success();
     }
 };
@@ -1255,8 +1255,8 @@ public:
         return TError::Success();
     }
 
-    TError PrepareTaskEnv(std::shared_ptr<TTaskEnv> taskEnv) override {
-        taskEnv->NetCfg = NetCfg;
+    TError PrepareTaskEnv(TTaskEnv &taskEnv) override {
+        taskEnv.NetCfg = NetCfg;
         return TError::Success();
     }
 };
@@ -1403,8 +1403,8 @@ public:
         return TError::Success();
     }
 
-    TError PrepareTaskEnv(std::shared_ptr<TTaskEnv> taskEnv) override {
-        taskEnv->Caps = Caps;
+    TError PrepareTaskEnv(TTaskEnv &taskEnv) override {
+        taskEnv.Caps = Caps;
         return TError::Success();
     }
 };

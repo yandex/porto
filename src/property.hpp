@@ -99,8 +99,7 @@ public:
 
     TError Check(const std::string &property) const;
 
-    TError PrepareTaskEnv(const std::string &property,
-                          std::shared_ptr<TTaskEnv> taskEnv);
+    TError PrepareTaskEnv(const std::string &property, TTaskEnv &taskEnv);
 
     template<typename T>
     const T Get(const std::string &name) const {

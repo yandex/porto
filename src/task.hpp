@@ -136,7 +136,7 @@ struct TTaskEnv : public TNonCopyable {
 class TTask: public TNonCopyable {
     int Rfd, Wfd;
     int WaitParentRfd, WaitParentWfd;
-    std::shared_ptr<const TTaskEnv> Env;
+    std::unique_ptr<TTaskEnv> Env;
 
     enum ETaskState { Stopped, Started } State;
     int ExitStatus;
@@ -166,8 +166,8 @@ class TTask: public TNonCopyable {
     TError ChildEnableNet();
 
 public:
-    TTask(std::shared_ptr<const TTaskEnv> env) : Env(env) {};
-    TTask(pid_t pid) : Pid(pid) {};
+    TTask(std::unique_ptr<TTaskEnv> &env);
+    TTask(pid_t pid);
 
     TError Start();
     pid_t GetPid() const;

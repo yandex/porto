@@ -70,6 +70,11 @@ bool TTaskEnv::EnvHasKey(const std::string &key) {
 }
 
 // TTask
+//
+
+TTask::TTask(std::unique_ptr<TTaskEnv> &env) : Env(std::move(env)) {}
+
+TTask::TTask(pid_t pid) : Pid(pid) {}
 
 void TTask::ReportPid(pid_t pid) const {
     if (write(Wfd, &pid, sizeof(pid)) != sizeof(pid)) {
