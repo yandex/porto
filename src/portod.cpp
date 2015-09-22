@@ -308,7 +308,7 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
 
     error = CreateRpcServer(config().rpc_sock().file().path(),
                             config().rpc_sock().file().perm(),
-                            cred, sfd);
+                            cred.Uid, cred.Gid, sfd);
     if (error) {
         L_ERR() << "Can't create RPC server: " << error.GetMsg() << std::endl;
         return EXIT_FAILURE;

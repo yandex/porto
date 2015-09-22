@@ -7,7 +7,6 @@
 #include <google/protobuf/io/coded_stream.h>
 
 #include "error.hpp"
-#include "util/cred.hpp"
 
 // http://stackoverflow.com/questions/2340730/are-there-c-equivalents-for-the-protocol-buffers-delimited-i-o-functions-in-ja
 
@@ -20,7 +19,8 @@ bool ReadDelimitedFrom(google::protobuf::io::ZeroCopyInputStream* rawInput,
                        google::protobuf::MessageLite* message);
 
 TError ConnectToRpcServer(const std::string& path, int &fd);
-TError CreateRpcServer(const std::string &path, const int mode, const TCred &cred, int &fd);
+TError CreateRpcServer(const std::string &path, const int mode, const int uid,
+                       const int gid, int &fd);
 
 class InterruptibleInputStream : public google::protobuf::io::ZeroCopyInputStream {
     int Fd;

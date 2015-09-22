@@ -99,7 +99,8 @@ TError ConnectToRpcServer(const std::string& path, int &fd)
     return TError::Success();
 }
 
-TError CreateRpcServer(const std::string &path, const int mode, const TCred &cred, int &fd)
+TError CreateRpcServer(const std::string &path, const int mode, const int uid,
+                       const int gid, int &fd)
 {
     struct sockaddr_un my_addr;
 
@@ -124,9 +125,9 @@ TError CreateRpcServer(const std::string &path, const int mode, const TCred &cre
         return TError(EError::Unknown, errno, "bind(" + path + ")");
     }
 
-    if (chown(path.c_str(), cred.Uid, cred.Gid) < 0) {
+    if (chown(path.c_str(), uid, gid) < 0) {
         close(fd);
-        return TError(EError::Unknown, errno, "chown(" + path + ", " + std::to_string(cred.Uid) + ", " + std::to_string(cred.Gid) + ")");
+        return TError(EError::Unknown, errno, "chown(" + path + ", " + std::to_string(uid) + ", " + std::to_string(gid) + ")");
     }
 
     if (listen(fd, 0) < 0) {
