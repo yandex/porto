@@ -26,7 +26,6 @@ namespace test {
     int ReadPid(const std::string &path);
     int Pgrep(const std::string &name);
     std::string GetRlimit(const std::string &pid, const std::string &type, const bool soft);
-    void WaitExit(TPortoAPI &api, const std::string &pid);
     void WaitProcessExit(const std::string &pid, int sec = 10);
     void WaitState(TPortoAPI &api, const std::string &name, const std::string &state, int sec = 10);
     void WaitContainer(TPortoAPI &api, const std::string &name, int sec = 10);

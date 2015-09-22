@@ -90,25 +90,6 @@ string GetRlimit(const std::string &pid, const std::string &type, const bool sof
     return StringTrim(lines[0]);
 }
 
-void WaitExit(TPortoAPI &api, const std::string &pid) {
-    Say() << "Waiting for " << pid << " to exit..." << std::endl;
-
-    int times = 100;
-    int p = stoi(pid);
-
-    do {
-        if (times-- <= 0)
-            break;
-
-        usleep(100000);
-
-        kill(p, 0);
-    } while (errno != ESRCH);
-
-    if (times <= 0)
-        throw std::string("Waited too long for task to exit");
-}
-
 void WaitProcessExit(const std::string &pid, int sec) {
     Say() << "Waiting for " << pid << " to exit" << std::endl;
 
@@ -129,11 +110,9 @@ void WaitProcessExit(const std::string &pid, int sec) {
 }
 
 void WaitContainer(TPortoAPI &api, const std::string &name, int sec) {
-    std::vector<std::string> containers = {name};
     std::string who;
-    alarm(sec);
-    if (api.Wait(containers, who) == 0)
-        alarm(0);
+    ExpectApiSuccess(api.Wait({name}, who, sec * 1000));
+    ExpectEq(who, name);
 }
 
 void WaitState(TPortoAPI &api, const std::string &name, const std::string &state, int sec) {
@@ -218,13 +197,13 @@ std::string GetStatusLine(const std::string &pid, const std::string &prefix) {
     std::vector<std::string> st;
     TFile f("/proc/" + pid + "/status");
     if (f.AsLines(st))
-        throw std::string("INVALID PID");
+        return "";
 
     for (auto &s : st)
         if (s.substr(0, prefix.length()) == prefix)
             return s;
 
-    throw std::string("INVALID PREFIX");
+    return "";
 }
 
 std::string GetState(const std::string &pid) {

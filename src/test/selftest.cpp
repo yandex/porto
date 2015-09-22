@@ -707,12 +707,15 @@ static void TestEmpty(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy("b"));
 }
 
-static bool TaskRunning(TPortoAPI &api, const string &pid) {
+static bool TaskRunning(const string &pid) {
     int p = stoi(pid);
-    return kill(p, 0) == 0;
+    if (kill(p, 0))
+        return false;
+    auto state = GetState(pid);
+    return state != "Z" && state != "X";
 }
 
-static bool TaskZombie(TPortoAPI &api, const string &pid) {
+static bool TaskZombie(const string &pid) {
     return GetState(pid) == "Z";
 }
 
@@ -837,7 +840,7 @@ static void TestNsCgTc(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
-    ExpectEq(TaskRunning(api, pid), true);
+    ExpectEq(TaskRunning(pid), true);
 
     AsRoot(api);
     Say() << "Check that portod doesn't leak fds" << std::endl;
@@ -893,7 +896,7 @@ static void TestNsCgTc(TPortoAPI &api) {
         ExpectEq(TcClassExist(stoul(root_cls)), true);
         ExpectEq(TcClassExist(stoul(leaf_cls)), true);
         ExpectApiSuccess(api.Destroy(name));
-        ExpectEq(TaskRunning(api, pid), false);
+        ExpectEq(TaskRunning(pid), false);
         ExpectEq(TcClassExist(stoul(leaf_cls)), false);
         ExpectApiSuccess(api.Create(name));
     }
@@ -2109,7 +2112,7 @@ static void TestNetProperty(TPortoAPI &api) {
         ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
         ExpectApiSuccess(api.Start(name));
         ExpectApiSuccess(api.GetData(name, "root_pid", pid));
-        ExpectEq(TaskRunning(api, pid), true);
+        ExpectEq(TaskRunning(pid), true);
 
         AsRoot(api);
         ExpectEq(GetNamespace("self", "net"), GetNamespace(pid, "net"));
@@ -2560,7 +2563,11 @@ static void TestStateMachine(TPortoAPI &api) {
     ExpectApiFailure(api.Start(name), EError::InvalidState);
 
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
-    WaitExit(api, pid);
+    WaitProcessExit(pid);
+    ExpectApiSuccess(api.GetData(name, "state", v));
+    Expect(v == "running" || v == "dead");
+
+    WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "state", v));
     ExpectEq(v, "dead");
 
@@ -2621,22 +2628,44 @@ static void TestStateMachine(TPortoAPI &api) {
     ExpectApiSuccess(api.Pause(name));
     ExpectApiSuccess(api.Destroy(name));
 
-    Say() << "Make sure kill works " << std::endl;
+    Say() << "Make sure kill SIGTERM works" << std::endl;
     ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectApiSuccess(api.Start(name));
 
+    ExpectApiSuccess(api.GetData(name, "root_pid", pid));
+    ExpectEq(TaskRunning(pid), true);
+    ExpectApiSuccess(api.Kill(name, SIGTERM));
+    WaitContainer(api, name);
+    ExpectEq(TaskRunning(pid), false);
+    ExpectApiSuccess(api.GetData(name, "state", v));
+    ExpectEq(v, "dead");
+    ExpectApiSuccess(api.GetData(name, "exit_status", v));
+    ExpectEq(v, string("15"));
+    ExpectApiSuccess(api.Destroy(name));
+
     // if container init process doesn't have custom handler for a signal
     // it's ignored
+    Say() << "Make sure init in container ignores SIGTERM but dies after SIGKILL" << std::endl;
+    ExpectApiSuccess(api.Create(name));
+    AsRoot(api);
+    ExpectApiSuccess(api.SetProperty(name, "virt_mode", "os"));
+    AsNobody(api);
+    ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectApiSuccess(api.Start(name));
+    ExpectApiSuccess(api.GetData(name, "root_pid", pid));
+    ExpectEq(TaskRunning(pid), true);
     ExpectApiSuccess(api.Kill(name, SIGTERM));
     ExpectApiSuccess(api.GetData(name, "state", v));
     ExpectEq(v, "running");
-
+    ExpectEq(TaskRunning(pid), true);
     ExpectApiSuccess(api.Kill(name, SIGKILL));
-    ExpectApiSuccess(api.GetData(name, "root_pid", v));
-    WaitExit(api, v);
+    WaitContainer(api, name);
+    ExpectEq(TaskRunning(pid), false);
     ExpectApiSuccess(api.GetData(name, "state", v));
     ExpectEq(v, "dead");
+    ExpectApiSuccess(api.GetData(name, "exit_status", v));
+    ExpectEq(v, string("9"));
 
     // we can't kill root or non-running container
     ExpectApiFailure(api.Kill(name, SIGKILL), EError::InvalidState);
@@ -4452,7 +4481,7 @@ static void KillMaster(TPortoAPI &api, int sig, int times = 10) {
     int pid = ReadPid(config().master_pid().path());
     if (kill(pid, sig))
         throw "Can't send " + std::to_string(sig) + " to master";
-    WaitExit(api, std::to_string(pid));
+    WaitProcessExit(std::to_string(pid));
     WaitPortod(api, times);
 
     std::string v;
@@ -4466,7 +4495,7 @@ static void KillSlave(TPortoAPI &api, int sig, int times = 10) {
     int portodPid = ReadPid(config().slave_pid().path());
     if (kill(portodPid, sig))
         throw "Can't send " + std::to_string(sig) + " to slave";
-    WaitExit(api, std::to_string(portodPid));
+    WaitProcessExit(std::to_string(portodPid));
     WaitPortod(api, times);
     expectedRespawns++;
 
@@ -4664,8 +4693,8 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "private", "ISS-AGENT"));
 
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
-    ExpectEq(TaskRunning(api, pid), true);
-    ExpectEq(TaskZombie(api, pid), false);
+    ExpectEq(TaskRunning(pid), true);
+    ExpectEq(TaskZombie(pid), false);
 
     KillSlave(api, SIGKILL);
 
@@ -4674,8 +4703,8 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData(name, "root_pid", v));
     ExpectEq(v, pid);
 
-    ExpectEq(TaskRunning(api, pid), true);
-    ExpectEq(TaskZombie(api, pid), false);
+    ExpectEq(TaskRunning(pid), true);
+    ExpectEq(TaskZombie(pid), false);
 
     for (auto &pair : props) {
         string v;
