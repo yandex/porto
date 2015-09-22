@@ -603,19 +603,6 @@ void TContainer::CleanupExpiredChildren() {
     }
 }
 
-static TError OpenMetaRoot(TScopedFd &fd) {
-    TPath exe("/proc/self/exe");
-    TPath path;
-    TError error = exe.ReadLink(path);
-    if (error)
-        return error;
-    path = path.DirName() / "portod-meta-root";
-    fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
-    if (fd.GetFd() < 0)
-        return TError(EError::Unknown, errno, "Cannot open " + path.ToString());
-    return TError::Success();
-}
-
 TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
     if (!Prop->Get<bool>(P_ISOLATE))
         for (auto name : Prop->List())
@@ -809,18 +796,16 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
             return error;
     }
 
-    // if command is empty we need to start meta task
-    if (taskEnv->Command.empty()) {
-        taskEnv->Command = "portod-meta-root";
-        error = OpenMetaRoot(taskEnv->ExecFd);
+    if (taskEnv->Command.empty() || taskEnv->TripleFork) {
+        TPath exe("/proc/self/exe");
+        TPath path;
+        TError error = exe.ReadLink(path);
         if (error)
             return error;
-    }
-
-    if (taskEnv->TripleFork) {
-        error = OpenMetaRoot(taskEnv->MetaExecFd);
-        if (error)
-            return error;
+        path = path.DirName() / "portod-meta-root";
+        taskEnv->PortoInitFd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
+        if (taskEnv->PortoInitFd.GetFd() < 0)
+            return TError(EError::Unknown, errno, "Cannot open " + path.ToString());
     }
 
     // Create new mount namespaces if we have to make any changes

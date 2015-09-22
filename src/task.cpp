@@ -243,6 +243,18 @@ TError TTask::ChildExec() {
         char *d = strdup(s.c_str());
         putenv(d);
     }
+    auto envp = Env->GetEnvp();
+
+    if (Env->Command.empty()) {
+        const char *args[] = {
+            "portod-meta-root",
+            NULL,
+        };
+        SetDieOnParentExit(0);
+        fexecve(Env->PortoInitFd.GetFd(), (char *const *)args, (char *const *)envp);
+        return TError(EError::InvalidValue, errno, "fexecve(" +
+                      std::to_string(Env->PortoInitFd.GetFd()) +  ", portod-meta-root)");
+    }
 
     wordexp_t result;
 
@@ -263,7 +275,6 @@ TError TTask::ChildExec() {
         break;
     }
 
-    auto envp = Env->GetEnvp();
     if (config().log().verbose()) {
         L() << "command=" << Env->Command << std::endl;
         for (unsigned i = 0; result.we_wordv[i]; i++)
@@ -272,10 +283,7 @@ TError TTask::ChildExec() {
             L() << "environ[" << i << "]=" << envp[i] << std::endl;
     }
     SetDieOnParentExit(0);
-    if (Env->ExecFd.GetFd() < 0)
-        execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
-    else
-        fexecve(Env->ExecFd.GetFd(), (char *const *)result.we_wordv, (char *const *)envp);
+    execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
 
     return TError(EError::InvalidValue, errno, string("execvpe(") + result.we_wordv[0] + ", " + std::to_string(result.we_wordc) + ", " + std::to_string(Env->Environ.size()) + ")");
 }
@@ -1012,7 +1020,7 @@ TError TTask::Start() {
         close(Wfd);
 
         if (Env->TripleFork) {
-            auto fd = Env->MetaExecFd.GetFd();
+            auto fd = Env->PortoInitFd.GetFd();
             auto pid = std::to_string(clonePid);
             const char * argv[] = {
                 "portod-waiter",
