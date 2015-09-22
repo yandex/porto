@@ -1,8 +1,5 @@
 #include "libporto.hpp"
 
-using std::string;
-using std::vector;
-
 extern "C" {
 #include <unistd.h>
 }
@@ -74,7 +71,7 @@ exit:
     return LastError;
 }
 
-int TPortoAPI::Raw(const std::string &message, string &responce) {
+int TPortoAPI::Raw(const std::string &message, std::string &responce) {
     if (!google::protobuf::TextFormat::ParseFromString(message, &Req) ||
         !Req.IsInitialized())
         return -1;
@@ -86,19 +83,19 @@ int TPortoAPI::Raw(const std::string &message, string &responce) {
     return ret;
 }
 
-int TPortoAPI::Create(const string &name) {
+int TPortoAPI::Create(const std::string &name) {
     Req.mutable_create()->set_name(name);
 
     return Rpc(Req, Rsp);
 }
 
-int TPortoAPI::Destroy(const string &name) {
+int TPortoAPI::Destroy(const std::string &name) {
     Req.mutable_destroy()->set_name(name);
 
     return Rpc(Req, Rsp);
 }
 
-int TPortoAPI::List(vector<string> &clist) {
+int TPortoAPI::List(std::vector<std::string> &clist) {
     Req.mutable_list();
 
     int ret = Rpc(Req, Rsp);
@@ -110,7 +107,7 @@ int TPortoAPI::List(vector<string> &clist) {
     return ret;
 }
 
-int TPortoAPI::Plist(vector<TProperty> &plist) {
+int TPortoAPI::Plist(std::vector<TProperty> &plist) {
     Req.mutable_propertylist();
 
     int ret = Rpc(Req, Rsp);
@@ -125,7 +122,7 @@ int TPortoAPI::Plist(vector<TProperty> &plist) {
     return ret;
 }
 
-int TPortoAPI::Dlist(vector<TData> &dlist) {
+int TPortoAPI::Dlist(std::vector<TData> &dlist) {
     Req.mutable_datalist();
 
     int ret = Rpc(Req, Rsp);
@@ -176,7 +173,8 @@ int TPortoAPI::Get(const std::vector<std::string> &name,
     return ret;
 }
 
-int TPortoAPI::GetProperty(const string &name, const string &property, string &value) {
+int TPortoAPI::GetProperty(const std::string &name, const std::string &property,
+                           std::string &value) {
     Req.mutable_getproperty()->set_name(name);
     Req.mutable_getproperty()->set_property(property);
 
@@ -187,7 +185,8 @@ int TPortoAPI::GetProperty(const string &name, const string &property, string &v
     return ret;
 }
 
-int TPortoAPI::SetProperty(const string &name, const string &property, string value) {
+int TPortoAPI::SetProperty(const std::string &name, const std::string &property,
+                           std::string value) {
     Req.mutable_setproperty()->set_name(name);
     Req.mutable_setproperty()->set_property(property);
     Req.mutable_setproperty()->set_value(value);
@@ -195,7 +194,8 @@ int TPortoAPI::SetProperty(const string &name, const string &property, string va
     return Rpc(Req, Rsp);
 }
 
-int TPortoAPI::GetData(const string &name, const string &data, string &value) {
+int TPortoAPI::GetData(const std::string &name, const std::string &data,
+                       std::string &value) {
     Req.mutable_getdata()->set_name(name);
     Req.mutable_getdata()->set_data(data);
 
@@ -218,13 +218,13 @@ int TPortoAPI::GetVersion(std::string &tag, std::string &revision) {
     return ret;
 }
 
-int TPortoAPI::Start(const string &name) {
+int TPortoAPI::Start(const std::string &name) {
     Req.mutable_start()->set_name(name);
 
     return Rpc(Req, Rsp);
 }
 
-int TPortoAPI::Stop(const string &name) {
+int TPortoAPI::Stop(const std::string &name) {
     Req.mutable_stop()->set_name(name);
 
     return Rpc(Req, Rsp);
@@ -237,19 +237,20 @@ int TPortoAPI::Kill(const std::string &name, int sig) {
     return Rpc(Req, Rsp);
 }
 
-int TPortoAPI::Pause(const string &name) {
+int TPortoAPI::Pause(const std::string &name) {
     Req.mutable_pause()->set_name(name);
 
     return Rpc(Req, Rsp);
 }
 
-int TPortoAPI::Resume(const string &name) {
+int TPortoAPI::Resume(const std::string &name) {
     Req.mutable_resume()->set_name(name);
 
     return Rpc(Req, Rsp);
 }
 
-int TPortoAPI::Wait(const std::vector<std::string> &containers, std::string &name, int timeout) {
+int TPortoAPI::Wait(const std::vector<std::string> &containers,
+                    std::string &name, int timeout) {
     auto wait = Req.mutable_wait();
 
     for (auto &c : containers)

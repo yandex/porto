@@ -1,5 +1,10 @@
 #pragma once
 
+#include <map>
+#include <vector>
+#include <string>
+#include <memory>
+
 #include "rpc.hpp"
 #include "util/protobuf.hpp"
 
