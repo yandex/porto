@@ -105,6 +105,7 @@ struct TTaskEnv : public TNonCopyable {
     std::vector<std::string> Environ;
     bool Isolate = false;
     bool TripleFork;
+    bool QuadroFork;
     TPath StdinPath;
     TPath StdoutPath;
     TPath StderrPath;
@@ -133,6 +134,7 @@ struct TTaskEnv : public TNonCopyable {
     bool EnvHasKey(const std::string &key);
 
     TUnixSocket Sock;
+    TUnixSocket Sock2;
     int ReportStage;
 };
 

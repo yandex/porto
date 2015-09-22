@@ -674,6 +674,9 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
 
     taskEnv->Isolate = Prop->Get<bool>(P_ISOLATE);
     taskEnv->TripleFork = false;
+    taskEnv->QuadroFork = (vmode == VIRT_MODE_APP) &&
+                          taskEnv->Isolate &&
+                          !taskEnv->Command.empty();
 
     taskEnv->DefaultStdin = Prop->IsDefault(P_STDIN_PATH);
     taskEnv->DefaultStdout = Prop->IsDefault(P_STDOUT_PATH);
@@ -797,7 +800,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
             return error;
     }
 
-    if (taskEnv->Command.empty() || taskEnv->TripleFork) {
+    if (taskEnv->Command.empty() || taskEnv->TripleFork || taskEnv->QuadroFork) {
         TPath exe("/proc/self/exe");
         TPath path;
         TError error = exe.ReadLink(path);
@@ -1843,6 +1846,14 @@ std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys
 }
 
 void TContainer::ExitTree(TScopedLock &holder_lock, int status, bool oomKilled) {
+
+    /* Detect fatal signals: portoinit cannot kill itself */
+    if (WIFEXITED(status) && WEXITSTATUS(status) > 128 &&
+            WEXITSTATUS(status) < 128 + SIGRTMIN &&
+            Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_APP &&
+            Prop->Get<bool>(P_ISOLATE) == true)
+        status = WEXITSTATUS(status) - 128;
+
     L_EVT() << "Exit tree " << GetName() << " with status "
             << status << (oomKilled ? " invoked by OOM" : "")
             << std::endl;

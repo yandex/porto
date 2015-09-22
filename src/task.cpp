@@ -860,6 +860,38 @@ void TTask::StartChild() {
     if (error)
         Abort(error);
 
+    if (Env->QuadroFork) {
+        Pid = fork();
+        if (Pid < 0)
+            Abort(TError(EError::Unknown, errno, "fork()"));
+
+        if (Pid) {
+            auto fd = Env->PortoInitFd.GetFd();
+            auto pid_ = std::to_string(Pid);
+            const char * argv[] = {
+                "portoinit",
+                "--container",
+                Env->Container.c_str(),
+                "--wait",
+                pid_.c_str(),
+                NULL,
+            };
+            auto envp = Env->GetEnvp();
+
+            CloseFds(-1, { fd } );
+            fexecve(fd, (char *const *)argv, (char *const *)envp);
+            Abort(TError(EError::Unknown, errno, "fexecve()"));
+        } else {
+            Pid = getpid();
+            error = Env->Sock2.SendPid(Pid);
+            if (error)
+                Abort(error);
+            error = Env->Sock2.RecvZero();
+            if (error)
+                Abort(error);
+        }
+    }
+
     error = ChildDropPriveleges();
     if (error)
         Abort(error);
@@ -873,7 +905,7 @@ TError TTask::CreateCwd() {
 }
 
 TError TTask::Start() {
-    TUnixSocket masterSock;
+    TUnixSocket masterSock, waiterSock;
     TError error;
 
     Pid = VPid = WPid = 0;
@@ -950,6 +982,12 @@ TError TTask::Start() {
             }
         }
 
+        if (Env->QuadroFork) {
+            error = TUnixSocket::SocketPair(waiterSock, Env->Sock2);
+            if (error)
+                Abort(error);
+        }
+
         int cloneFlags = SIGCHLD;
         if (Env->Isolate)
             cloneFlags |= CLONE_NEWPID | CLONE_NEWIPC;
@@ -985,7 +1023,7 @@ TError TTask::Start() {
         }
 
         /* Report VPid in parent pid namespace for new pid-ns */
-        if (Env->Isolate)
+        if (Env->Isolate && !Env->QuadroFork)
             ReportPid(clonePid);
 
         /* Complete external configuration, wakeup child */
@@ -994,8 +1032,24 @@ TError TTask::Start() {
             Abort(error);
 
         /* ChildCallback() reports VPid here if !Env->Isolate */
-        if (!Env->Isolate)
+        if (!Env->Isolate && !Env->QuadroFork)
             Env->ReportStage++;
+
+        /*
+         * QuadroFork waiter receives application VPid from init
+         * task and forwards it into host.
+         */
+        if (Env->QuadroFork) {
+            pid_t appPid, appVPid;
+
+            error = waiterSock.RecvPid(appPid, appVPid);
+            if (error)
+                Abort(error);
+            ReportPid(appPid);
+            error = waiterSock.SendZero();
+            if (error)
+                Abort(error);
+        }
 
         if (Env->TripleFork) {
             auto fd = Env->PortoInitFd.GetFd();
