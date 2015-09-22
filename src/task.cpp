@@ -77,18 +77,27 @@ TTask::TTask(std::unique_ptr<TTaskEnv> &env) : Env(std::move(env)) {}
 TTask::TTask(pid_t pid) : Pid(pid) {}
 
 void TTask::ReportPid(pid_t pid) const {
-    if (write(Wfd, &pid, sizeof(pid)) != sizeof(pid)) {
-        L_ERR() << "partial write of pid: " << std::to_string(pid) << std::endl;
+    TError error = Env->Sock.SendPid(pid);
+    if (error) {
+        L_ERR() << error << std::endl;
+        Abort(error);
     }
     Env->ReportStage++;
 }
 
 void TTask::Abort(const TError &error) const {
-    while (Env->ReportStage++ < 2)
-        ReportPid(-1);
-    TError ret = error.Serialize(Wfd);
-    if (ret)
-        L_ERR() << ret << std::endl;
+    TError error2;
+
+    while (Env->ReportStage++ < 2) {
+        error2 = Env->Sock.SendPid(getpid());
+        if (error2)
+            L_ERR() << error2 << std::endl;
+    }
+
+    error2 = Env->Sock.SendError(error);
+    if (error2)
+        L_ERR() << error2 << std::endl;
+
     exit(EXIT_FAILURE);
 }
 
@@ -144,7 +153,7 @@ TError TTask::ChildOpenStdFile(const TPath &path, int expected) {
 TError TTask::ReopenStdio() {
     TError error;
 
-    CloseFds(3, { Wfd, TLogger::GetFd() });
+    CloseFds(3, { Env->Sock.GetFd(), TLogger::GetFd() });
 
     if (Env->DefaultStdin) {
         int ret = open(Env->StdinPath.ToString().c_str(), O_CREAT | O_RDONLY, 0660);
@@ -763,7 +772,7 @@ TError TTask::ChildSetHostname() {
 }
 
 void TTask::StartChild() {
-    int ret;
+    TError error;
 
     /* Die together with waiter */
     if (Env->TripleFork)
@@ -771,11 +780,10 @@ void TTask::StartChild() {
     else
         Env->ReportStage++;
 
-    close(WaitParentWfd);
-    if (read(WaitParentRfd, &ret, sizeof(ret)) != sizeof(ret))
-        Abort(TError(EError::Unknown, errno ?: ENODATA,
-                    "partial read from child sync pipe"));
-    close(WaitParentRfd);
+    /* Wait for external configuration */
+    error = Env->Sock.RecvZero();
+    if (error)
+        Abort(error);
 
     /* Report VPid in pid namespace we're enter */
     if (!Env->Isolate)
@@ -783,9 +791,8 @@ void TTask::StartChild() {
     else
         Env->ReportStage++;
 
-    close(Rfd);
     ResetAllSignalHandlers();
-    TError error = ChildApplyLimits();
+    error = ChildApplyLimits();
     if (error)
         Abort(error);
 
@@ -866,8 +873,8 @@ TError TTask::CreateCwd() {
 }
 
 TError TTask::Start() {
-    int ret;
-    int pfd[2], syncfd[2];
+    TUnixSocket masterSock;
+    TError error;
 
     Pid = VPid = WPid = 0;
 
@@ -882,15 +889,9 @@ TError TTask::Start() {
 
     ExitStatus = 0;
 
-    ret = pipe2(pfd, O_CLOEXEC);
-    if (ret) {
-        TError error(EError::Unknown, errno, "pipe2(pdf)");
-        L_ERR() << "Can't create communication pipe for child: " << error << std::endl;
+    error = TUnixSocket::SocketPair(masterSock, Env->Sock);
+    if (error)
         return error;
-    }
-
-    Rfd = pfd[0];
-    Wfd = pfd[1];
 
     // we want our child to have portod master as parent, so we
     // are doing double fork here (fork + clone);
@@ -900,13 +901,10 @@ TError TTask::Start() {
     if (forkPid < 0) {
         TError error(EError::Unknown, errno, "fork()");
         L() << "Can't spawn child: " << error << std::endl;
-        close(Rfd);
-        close(Wfd);
         return error;
     } else if (forkPid == 0) {
         TError error;
 
-        close(Rfd);
         SetDieOnParentExit(SIGKILL);
         SetProcessName("portod-spawn-p");
 
@@ -929,13 +927,6 @@ TError TTask::Start() {
         if (error)
             Abort(error);
 
-        int ret = pipe2(syncfd, O_CLOEXEC);
-        if (ret)
-            Abort(TError(EError::Unknown, errno, "pipe2(pdf)"));
-
-        WaitParentRfd = syncfd[0];
-        WaitParentWfd = syncfd[1];
-
         if (Env->TripleFork) {
             forkPid = fork();
             if (forkPid < 0)
@@ -944,14 +935,17 @@ TError TTask::Start() {
             if (forkPid) {
                 /* Report WPid in host pid namespace */
                 ReportPid(forkPid);
+
                 /* Unblock child and exit */
-                if (write(WaitParentWfd, &forkPid, sizeof(forkPid)) != sizeof(forkPid))
-                    Abort(TError(EError::Unknown, errno, "partial write ot child sync pipe"));
+                error = masterSock.SendZero();
+                if (error)
+                    Abort(error);
                 _exit(EXIT_SUCCESS);
             } else {
                 /* Wait for parent report our host pid */
-                if (read(WaitParentRfd, &forkPid, sizeof(forkPid)) != sizeof(forkPid))
-                    Abort(TError(EError::Unknown, errno, "partial read from child sync pipe"));
+                error = Env->Sock.RecvZero();
+                if (error)
+                    Abort(error);
                 Env->ReportStage++;
             }
         }
@@ -994,21 +988,14 @@ TError TTask::Start() {
         if (Env->Isolate)
             ReportPid(clonePid);
 
-        int result = 0;
-        ret = write(WaitParentWfd, &result, sizeof(result));
-        if (ret != sizeof(result))
-            Abort(TError(EError::Unknown, errno,
-                        "Partial write to child sync pipe (" +
-                        std::to_string(ret) + " != " +
-                        std::to_string(result) + ")"));
+        /* Complete external configuration, wakeup child */
+        error = masterSock.SendZero();
+        if (error)
+            Abort(error);
 
         /* ChildCallback() reports VPid here if !Env->Isolate */
         if (!Env->Isolate)
             Env->ReportStage++;
-
-        close(WaitParentRfd);
-        close(WaitParentWfd);
-        close(Wfd);
 
         if (Env->TripleFork) {
             auto fd = Env->PortoInitFd.GetFd();
@@ -1031,37 +1018,23 @@ TError TTask::Start() {
 
         _exit(EXIT_SUCCESS);
     }
-    close(Wfd);
+
+    Env->Sock.Close();
+
     int status = 0;
     int forkResult = waitpid(forkPid, &status, 0);
     if (forkResult < 0)
         (void)kill(forkPid, SIGKILL);
 
-    int n = read(Rfd, &WPid, sizeof(WPid));
-    if (n <= 0) {
-        close(Rfd);
+    error = masterSock.RecvPid(WPid, VPid);
+    if (error)
         return TError(EError::InvalidValue, errno, "Container couldn't start due to resource limits");
-    }
 
-    n = read(Rfd, &VPid, sizeof(VPid));
-    if (n <= 0) {
-        close(Rfd);
+    error = masterSock.RecvPid(Pid, VPid);
+    if (error)
         return TError(EError::InvalidValue, errno, "Container couldn't start due to resource limits");
-    }
 
-    Pid = WPid;
-
-    if (Env->TripleFork) {
-        std::vector<pid_t> childs;
-
-        TError error = GetTaskChildrens(WPid, childs);
-        if (!error && childs.size() == 1)
-            Pid = childs[0];
-    }
-
-    TError error;
-    (void)TError::Deserialize(Rfd, error);
-    close(Rfd);
+    error = masterSock.RecvError();
     if (error || status) {
         if (Pid > 0) {
             (void)kill(Pid, SIGKILL);

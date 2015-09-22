@@ -132,12 +132,11 @@ struct TTaskEnv : public TNonCopyable {
     const char** GetEnvp() const;
     bool EnvHasKey(const std::string &key);
 
+    TUnixSocket Sock;
     int ReportStage;
 };
 
 class TTask: public TNonCopyable {
-    int Rfd, Wfd;
-    int WaitParentRfd, WaitParentWfd;
     std::unique_ptr<TTaskEnv> Env;
 
     enum ETaskState { Stopped, Started } State;
