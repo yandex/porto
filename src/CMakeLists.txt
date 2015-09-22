@@ -64,10 +64,10 @@ add_executable(portoctl ${PYTHON_SOURCES} portoctl.cpp cli.cpp config.cpp portot
 add_dependencies(portoctl version.hpp)
 target_link_libraries(portoctl porto protobufs util ${PB} rt ${CURSES_LIBRARIES} ${LIBNL} ${LIBNL_ROUTE})
 
-add_executable(portod-meta-root meta_root.cpp util/signal.cpp)
-add_dependencies(portod-meta-root version.hpp)
+add_executable(portoinit portoinit.cpp util/signal.cpp)
+add_dependencies(portoinit version.hpp)
 if(NOT ENABLE_ASAN)
-	set_target_properties(portod-meta-root PROPERTIES LINK_FLAGS "-static")
+	set_target_properties(portoinit PROPERTIES LINK_FLAGS "-static")
 endif()
 
 set(TEST_TARGETS "")
@@ -79,7 +79,7 @@ if(ENABLE_TEST)
 endif()
 
 install(
-    TARGETS portod portoctl ${TEST_TARGETS} portod-meta-root
+    TARGETS portod portoctl ${TEST_TARGETS} portoinit
     RUNTIME DESTINATION sbin
     LIBRARY DESTINATION lib
 )

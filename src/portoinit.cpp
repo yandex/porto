@@ -10,6 +10,7 @@ extern "C" {
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/prctl.h>
 }
 
 pid_t target = -1;
@@ -40,6 +41,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
+    prctl(PR_SET_NAME, "portoinit");
     RegisterSignal(SIGTERM, ForwardSignal);
     RegisterSignal(SIGINT, ForwardSignal);
     RegisterSignal(SIGQUIT, ForwardSignal);

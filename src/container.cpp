@@ -802,7 +802,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         TError error = exe.ReadLink(path);
         if (error)
             return error;
-        path = path.DirName() / "portod-meta-root";
+        path = path.DirName() / "portoinit";
         taskEnv->PortoInitFd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
         if (taskEnv->PortoInitFd.GetFd() < 0)
             return TError(EError::Unknown, errno, "Cannot open " + path.ToString());

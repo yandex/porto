@@ -247,13 +247,13 @@ TError TTask::ChildExec() {
 
     if (Env->Command.empty()) {
         const char *args[] = {
-            "portod-meta-root",
+            "portoinit",
             NULL,
         };
         SetDieOnParentExit(0);
         fexecve(Env->PortoInitFd.GetFd(), (char *const *)args, (char *const *)envp);
         return TError(EError::InvalidValue, errno, "fexecve(" +
-                      std::to_string(Env->PortoInitFd.GetFd()) +  ", portod-meta-root)");
+                      std::to_string(Env->PortoInitFd.GetFd()) +  ", portoinit)");
     }
 
     wordexp_t result;
@@ -1023,7 +1023,7 @@ TError TTask::Start() {
             auto fd = Env->PortoInitFd.GetFd();
             auto pid = std::to_string(clonePid);
             const char * argv[] = {
-                "portod-waiter",
+                "portoinit",
                 "--wait",
                 pid.c_str(),
                 NULL,

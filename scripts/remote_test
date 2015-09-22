@@ -10,7 +10,7 @@ run() { ssh -4 -t "$HOST" sudo -i "bash -c \"$@\""; }
 
 rsync -4 -av $ROOTDIR ${HOST}:src
 run "ln -sf /home/$USER/src/porto/portod /usr/sbin && \
-     ln -sf /home/$USER/src/porto/portod-meta-root /usr/sbin && \
+     ln -sf /home/$USER/src/porto/portoinit /usr/sbin && \
      ln -sf /home/$USER/src/porto/portoctl /usr/sbin && \
      ln -sf /home/$USER/src/porto/portotest /usr/sbin && \
      chmod 0755 /home/$USER/src/porto/porto* && \

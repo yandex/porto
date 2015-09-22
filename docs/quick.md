@@ -323,7 +323,7 @@ $ portoctl run meta/child2 isolate=false command="ps aux"
 # child1 and child2 work in the parent namespace
 $ portoctl get meta/child2 stdout
 USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
-root         1  0.0  0.0   1696   260 ?        Ss   15:18   0:00 /place/porto/meta/portod-meta-root
+root         1  0.0  0.0   1696   260 ?        Ss   15:18   0:00 /place/porto/meta/portoinit
 root         2  0.0  0.0   4312   352 ?        Ss   15:18   0:00 sleep 1000
 root         3  0.0  0.0  15280  1132 ?        Rs   15:18   0:00 ps aux
 $ portoctl destroy meta
