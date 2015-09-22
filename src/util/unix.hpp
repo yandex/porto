@@ -69,3 +69,23 @@ TError UnpackTarball(const TPath &tar, const TPath &path);
 TError CopyRecursive(const TPath &src, const TPath &dst);
 void DumpMallocInfo();
 std::string GetCwd();
+
+class TUnixSocket : public TNonCopyable {
+    int SockFd;
+public:
+    static TError SocketPair(TUnixSocket &sock1, TUnixSocket &sock2);
+    TUnixSocket(int sock = -1) : SockFd(sock) {};
+    ~TUnixSocket() { Close(); };
+    void operator=(int sock);
+    TUnixSocket& operator=(TUnixSocket&& Sock);
+    void Close();
+    int GetFd() const { return SockFd; }
+    TError SendInt(int val) const;
+    TError RecvInt(int &val) const;
+    TError SendZero() const { return SendInt(0); }
+    TError RecvZero() const { int zero; return RecvInt(zero); }
+    TError SendPid(pid_t pid) const;
+    TError RecvPid(pid_t &pid, pid_t &vpid) const;
+    TError SendError(const TError &error) const;
+    TError RecvError() const;
+};

@@ -26,6 +26,8 @@ extern "C" {
 #include <sys/wait.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 }
 
 int RetryBusy(int times, int timeoMs, std::function<int()> handler) {
@@ -574,4 +576,144 @@ std::string GetCwd() {
     std::string s(cwd);
     free(cwd);
     return s;
+}
+
+void TUnixSocket::Close() {
+    if (SockFd >= 0)
+        close(SockFd);
+    SockFd = -1;
+}
+
+void TUnixSocket::operator=(int sock) {
+    Close();
+    SockFd = sock;
+}
+
+TUnixSocket& TUnixSocket::operator=(TUnixSocket&& Sock) {
+    Close();
+    SockFd = Sock.SockFd;
+    Sock.SockFd = -1;
+    return *this;
+}
+
+TError TUnixSocket::SocketPair(TUnixSocket &sock1, TUnixSocket &sock2) {
+    int sockfds[2];
+    int ret, one = 1;
+
+    ret = socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sockfds);
+    if (ret)
+        return TError(EError::Unknown, errno, "socketpair(AF_UNIX)");
+
+    if (setsockopt(sockfds[0], SOL_SOCKET, SO_PASSCRED, &one, sizeof(int)) < 0 ||
+        setsockopt(sockfds[0], SOL_SOCKET, SO_PASSCRED, &one, sizeof(int)) < 0) {
+        close(sockfds[0]);
+        close(sockfds[1]);
+        return TError(EError::Unknown, errno, "setsockopt(SO_PASSCRED)");
+    }
+
+    sock1 = sockfds[0];
+    sock2 = sockfds[1];
+    return TError::Success();
+}
+
+TError TUnixSocket::SendInt(int val) const {
+    ssize_t ret;
+
+    ret = write(SockFd, &val, sizeof(val));
+    if (ret < 0)
+        return TError(EError::Unknown, errno, "cannot send int");
+    if (ret != sizeof(val))
+        return TError(EError::Unknown, "partial read of int: " + std::to_string(ret));
+    return TError::Success();
+}
+
+TError TUnixSocket::RecvInt(int &val) const {
+    ssize_t ret;
+
+    ret = read(SockFd, &val, sizeof(val));
+    if (ret < 0)
+        return TError(EError::Unknown, errno, "cannot receive int");
+    if (ret != sizeof(val))
+        return TError(EError::Unknown, "partial read of int: " + std::to_string(ret));
+    return TError::Success();
+}
+
+TError TUnixSocket::SendPid(pid_t pid) const {
+    struct iovec iovec = {
+        .iov_base = &pid,
+        .iov_len = sizeof(pid),
+    };
+    char buffer[CMSG_SPACE(sizeof(struct ucred))];
+    struct msghdr msghdr = {
+        .msg_name = NULL,
+        .msg_namelen = 0,
+        .msg_iov = &iovec,
+        .msg_iovlen = 1,
+        .msg_control = buffer,
+        .msg_controllen = sizeof(buffer),
+        .msg_flags = 0,
+    };
+    struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msghdr);
+    struct ucred *ucred = (struct ucred *)CMSG_DATA(cmsg);
+    ssize_t ret;
+
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_CREDENTIALS;
+    cmsg->cmsg_len = CMSG_LEN(sizeof(struct ucred));
+    ucred->pid = pid;
+    ucred->uid = getuid();
+    ucred->gid = getgid();
+
+    ret = sendmsg(SockFd, &msghdr, 0);
+    if (ret < 0)
+        return TError(EError::Unknown, errno, "cannot report real pid");
+    if (ret != sizeof(pid))
+        return TError(EError::Unknown, "partial sendmsg: " + std::to_string(ret));
+    return TError::Success();
+}
+
+TError TUnixSocket::RecvPid(pid_t &pid, pid_t &vpid) const {
+    struct iovec iovec = {
+        .iov_base = &vpid,
+        .iov_len = sizeof(vpid),
+    };
+    char buffer[CMSG_SPACE(sizeof(struct ucred))];
+    struct msghdr msghdr = {
+        .msg_name = NULL,
+        .msg_namelen = 0,
+        .msg_iov = &iovec,
+        .msg_iovlen = 1,
+        .msg_control = buffer,
+        .msg_controllen = sizeof(buffer),
+        .msg_flags = 0,
+    };
+    struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msghdr);
+    struct ucred *ucred = (struct ucred *)CMSG_DATA(cmsg);
+    ssize_t ret;
+
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_CREDENTIALS;
+    cmsg->cmsg_len = CMSG_LEN(sizeof(struct ucred));
+
+    ret = recvmsg(SockFd, &msghdr, 0);
+    if (ret < 0)
+        return TError(EError::Unknown, errno, "cannot receive real pid");
+    if (ret != sizeof(pid))
+        return TError(EError::Unknown, "partial recvmsg: " + std::to_string(ret));
+    cmsg = CMSG_FIRSTHDR(&msghdr);
+    if (!cmsg || cmsg->cmsg_level != SOL_SOCKET || cmsg->cmsg_type != SCM_CREDENTIALS)
+        return TError(EError::Unknown, "no credetntials after recvmsg");
+    pid = ucred->pid;
+    return TError::Success();
+}
+
+TError TUnixSocket::SendError(const TError &error) const {
+    return error.Serialize(SockFd);
+}
+
+TError TUnixSocket::RecvError() const {
+    TError error;
+
+    TError::Deserialize(SockFd, error);
+    return error;
 }
