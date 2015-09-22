@@ -1,5 +1,6 @@
 #include <iostream>
 #include <iomanip>
+#include <climits>
 
 #include "cli.hpp"
 #include "version.hpp"

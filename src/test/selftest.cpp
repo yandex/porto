@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <csignal>
 #include <cstdio>
+#include <climits>
 #include <algorithm>
 
 #include "version.hpp"
@@ -15,7 +16,9 @@
 #include "util/unix.hpp"
 #include "util/cred.hpp"
 #include "util/idmap.hpp"
+#include "util/protobuf.hpp"
 #include "test.hpp"
+#include "rpc.hpp"
 
 #define HOSTNAME "portotest"
 const std::string TMPDIR = "/tmp/porto/selftest";

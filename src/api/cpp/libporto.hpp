@@ -6,7 +6,6 @@
 #include <memory>
 
 #include "rpc.hpp"
-#include "util/protobuf.hpp"
 
 struct TProperty {
     std::string Name;
@@ -42,23 +41,19 @@ struct TPortoGetResponse {
     std::string ErrorMsg;
 };
 
+class TPortoAPIImpl;
+
 class TPortoAPI {
-    int Fd;
-    const int Retries;
-    const int RetryDelayUs = 1000000;
-    const std::string RpcSocketPath;
     rpc::TContainerRequest Req;
     rpc::TContainerResponse Rsp;
-    int LastError;
-    std::string LastErrorMsg;
-
-    int Recv(rpc::TContainerResponse &rsp);
-    int SendReceive(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp);
-    int Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp);
+    std::unique_ptr<TPortoAPIImpl> Impl;
 
 public:
     TPortoAPI(const std::string &path, int retries = 5);
     ~TPortoAPI();
+
+    void Cleanup(); // TODO: remove
+
     int Create(const std::string &name);
     int Destroy(const std::string &name);
 
@@ -86,7 +81,6 @@ public:
 
     int Raw(const std::string &message, std::string &response);
     void GetLastError(int &error, std::string &msg) const;
-    void Cleanup();
 
     // VolumeAPI
     int ListVolumeProperties(std::vector<TProperty> &properties);
@@ -107,6 +101,4 @@ public:
     int ExportLayer(const std::string &volume, const std::string &tarball);
     int RemoveLayer(const std::string &layer);
     int ListLayers(std::vector<std::string> &layers);
-
-    void Send(rpc::TContainerRequest &req);
 };
