@@ -955,14 +955,14 @@ static void TestIsolateProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "stdout", ret));
-    ExpectEq(ret, string("1\n"));
+    Expect(ret == "1\n" || ret == "2\n");
     ExpectApiSuccess(api.Stop(name));
 
     ExpectApiSuccess(api.SetProperty(name, "command", "ps aux"));
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "stdout", ret));
-    ExpectEq(std::count(ret.begin(), ret.end(), '\n'), 2);
+    Expect(std::count(ret.begin(), ret.end(), '\n') < 4);
 
     if (NetworkEnabled()) {
         Say() << "Make sure container has correct network class" << std::endl;
