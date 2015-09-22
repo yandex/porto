@@ -248,6 +248,8 @@ TError TTask::ChildExec() {
     if (Env->Command.empty()) {
         const char *args[] = {
             "portoinit",
+            "--container",
+            Env->Container.c_str(),
             NULL,
         };
         SetDieOnParentExit(0);
@@ -1024,6 +1026,8 @@ TError TTask::Start() {
             auto pid = std::to_string(clonePid);
             const char * argv[] = {
                 "portoinit",
+                "--container",
+                Env->Container.c_str(),
                 "--wait",
                 pid.c_str(),
                 NULL,

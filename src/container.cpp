@@ -617,6 +617,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
 
     taskEnv->LeafCgroups = LeafCgroups;
 
+    taskEnv->Container = GetName();
     taskEnv->Command = Prop->Get<std::string>(P_COMMAND);
     taskEnv->Cwd = Prop->Get<std::string>(P_CWD);
 

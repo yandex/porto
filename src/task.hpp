@@ -95,6 +95,7 @@ struct TNetCfg {
 };
 
 struct TTaskEnv : public TNonCopyable {
+    std::string Container;
     std::string Command;
     TScopedFd PortoInitFd;
     TPath Cwd;
