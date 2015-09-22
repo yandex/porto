@@ -5,8 +5,6 @@
 #include <string>
 #include <memory>
 
-#include "rpc.hpp"
-
 struct TProperty {
     std::string Name;
     std::string Description;
@@ -44,8 +42,6 @@ struct TPortoGetResponse {
 class TPortoAPIImpl;
 
 class TPortoAPI {
-    rpc::TContainerRequest Req;
-    rpc::TContainerResponse Rsp;
     std::unique_ptr<TPortoAPIImpl> Impl;
 
 public:

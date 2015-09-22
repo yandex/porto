@@ -1,30 +1,37 @@
 #include "libporto.hpp"
 
+#include "util/protobuf.hpp"
+
 extern "C" {
 #include <unistd.h>
 }
 
-#include "util/protobuf.hpp"
-
 class TPortoAPIImpl {
-    friend TPortoAPI;
-
 private:
     int Fd;
     const int Retries;
     const int RetryDelayUs = 1000000;
     const std::string RpcSocketPath;
+
+    friend TPortoAPI;
     int LastError;
     std::string LastErrorMsg;
+
+    rpc::TContainerRequest Req;
+    rpc::TContainerResponse Rsp;
 
 public:
     TPortoAPIImpl(const std::string &path, int retries);
     ~TPortoAPIImpl();
 
+    rpc::TContainerRequest& GetReq() { return Req; }
+    rpc::TContainerResponse& GetResp() { return Rsp; }
+
     void Send(rpc::TContainerRequest &req);
     int Recv(rpc::TContainerResponse &rsp);
     int SendReceive(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp);
-    int Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp);
+
+    int Rpc();
     void Cleanup();
 };
 
@@ -76,7 +83,7 @@ void TPortoAPI::Cleanup() {
     Impl->Cleanup();
 }
 
-int TPortoAPIImpl::Rpc(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
+int TPortoAPIImpl::Rpc() {
     int ret;
     int retries = Retries;
     LastErrorMsg = "";
@@ -96,8 +103,8 @@ retry:
         }
     }
 
-    rsp.Clear();
-    ret = SendReceive(req, rsp);
+    Rsp.Clear();
+    ret = SendReceive(Req, Rsp);
     if (ret < 0) {
         Cleanup();
 
@@ -109,53 +116,53 @@ exit_or_retry:
     }
 
 exit:
-    req.Clear();
+    Req.Clear();
 
     return LastError;
 }
 
 int TPortoAPI::Raw(const std::string &message, std::string &responce) {
-    if (!google::protobuf::TextFormat::ParseFromString(message, &Req) ||
-        !Req.IsInitialized())
+    if (!google::protobuf::TextFormat::ParseFromString(message, &Impl->GetReq()) ||
+        !Impl->GetReq().IsInitialized())
         return -1;
 
-    int ret = Impl->Rpc(Req, Rsp);
+    int ret = Impl->Rpc();
     if (!ret)
-        responce = Rsp.ShortDebugString();
+        responce = Impl->GetResp().ShortDebugString();
 
     return ret;
 }
 
 int TPortoAPI::Create(const std::string &name) {
-    Req.mutable_create()->set_name(name);
+    Impl->GetReq().mutable_create()->set_name(name);
 
-    return Impl->Rpc(Req, Rsp);
+    return Impl->Rpc();
 }
 
 int TPortoAPI::Destroy(const std::string &name) {
-    Req.mutable_destroy()->set_name(name);
+    Impl->GetReq().mutable_destroy()->set_name(name);
 
-    return Impl->Rpc(Req, Rsp);
+    return Impl->Rpc();
 }
 
 int TPortoAPI::List(std::vector<std::string> &clist) {
-    Req.mutable_list();
+    Impl->GetReq().mutable_list();
 
-    int ret = Impl->Rpc(Req, Rsp);
+    int ret = Impl->Rpc();
     if (!ret) {
-        for (int i = 0; i < Rsp.list().name_size(); i++)
-            clist.push_back(Rsp.list().name(i));
+        for (int i = 0; i < Impl->GetResp().list().name_size(); i++)
+            clist.push_back(Impl->GetResp().list().name(i));
     }
 
     return ret;
 }
 
 int TPortoAPI::Plist(std::vector<TProperty> &plist) {
-    Req.mutable_propertylist();
+    Impl->GetReq().mutable_propertylist();
 
-    int ret = Impl->Rpc(Req, Rsp);
+    int ret = Impl->Rpc();
     if (!ret) {
-        auto list = Rsp.propertylist();
+        auto list = Impl->GetResp().propertylist();
 
         for (int i = 0; i < list.list_size(); i++)
             plist.push_back(TProperty(list.list(i).name(),
@@ -166,11 +173,11 @@ int TPortoAPI::Plist(std::vector<TProperty> &plist) {
 }
 
 int TPortoAPI::Dlist(std::vector<TData> &dlist) {
-    Req.mutable_datalist();
+    Impl->GetReq().mutable_datalist();
 
-    int ret = Impl->Rpc(Req, Rsp);
+    int ret = Impl->Rpc();
     if (!ret) {
-        auto list = Rsp.datalist();
+        auto list = Impl->GetResp().datalist();
 
         for (int i = 0; i < list.list_size(); i++)
             dlist.push_back(TData(list.list(i).name(),
@@ -183,17 +190,17 @@ int TPortoAPI::Dlist(std::vector<TData> &dlist) {
 int TPortoAPI::Get(const std::vector<std::string> &name,
                    const std::vector<std::string> &variable,
                    std::map<std::string, std::map<std::string, TPortoGetResponse>> &result) {
-    auto get = Req.mutable_get();
+    auto get = Impl->GetReq().mutable_get();
 
     for (auto n : name)
         get->add_name(n);
     for (auto v : variable)
         get->add_variable(v);
 
-    int ret = Impl->Rpc(Req, Rsp);
+    int ret = Impl->Rpc();
     if (!ret) {
-         for (int i = 0; i < Rsp.get().list_size(); i++) {
-             auto entry = Rsp.get().list(i);
+         for (int i = 0; i < Impl->GetResp().get().list_size(); i++) {
+             auto entry = Impl->GetResp().get().list(i);
              auto name = entry.name();
 
              for (int j = 0; j < entry.keyval_size(); j++) {
@@ -218,83 +225,83 @@ int TPortoAPI::Get(const std::vector<std::string> &name,
 
 int TPortoAPI::GetProperty(const std::string &name, const std::string &property,
                            std::string &value) {
-    Req.mutable_getproperty()->set_name(name);
-    Req.mutable_getproperty()->set_property(property);
+    Impl->GetReq().mutable_getproperty()->set_name(name);
+    Impl->GetReq().mutable_getproperty()->set_property(property);
 
-    int ret = Impl->Rpc(Req, Rsp);
+    int ret = Impl->Rpc();
     if (!ret)
-        value.assign(Rsp.getproperty().value());
+        value.assign(Impl->GetResp().getproperty().value());
 
     return ret;
 }
 
 int TPortoAPI::SetProperty(const std::string &name, const std::string &property,
                            std::string value) {
-    Req.mutable_setproperty()->set_name(name);
-    Req.mutable_setproperty()->set_property(property);
-    Req.mutable_setproperty()->set_value(value);
+    Impl->GetReq().mutable_setproperty()->set_name(name);
+    Impl->GetReq().mutable_setproperty()->set_property(property);
+    Impl->GetReq().mutable_setproperty()->set_value(value);
 
-    return Impl->Rpc(Req, Rsp);
+    return Impl->Rpc();
 }
 
 int TPortoAPI::GetData(const std::string &name, const std::string &data,
                        std::string &value) {
-    Req.mutable_getdata()->set_name(name);
-    Req.mutable_getdata()->set_data(data);
+    Impl->GetReq().mutable_getdata()->set_name(name);
+    Impl->GetReq().mutable_getdata()->set_data(data);
 
-    int ret = Impl->Rpc(Req, Rsp);
+    int ret = Impl->Rpc();
     if (!ret)
-        value.assign(Rsp.getdata().value());
+        value.assign(Impl->GetResp().getdata().value());
 
     return ret;
 }
 
 int TPortoAPI::GetVersion(std::string &tag, std::string &revision) {
-    Req.mutable_version();
+    Impl->GetReq().mutable_version();
 
-    int ret = Impl->Rpc(Req, Rsp);
+    int ret = Impl->Rpc();
     if (!ret) {
-        tag = Rsp.version().tag();
-        revision = Rsp.version().revision();
+        tag = Impl->GetResp().version().tag();
+        revision = Impl->GetResp().version().revision();
     }
 
     return ret;
 }
 
 int TPortoAPI::Start(const std::string &name) {
-    Req.mutable_start()->set_name(name);
+    Impl->GetReq().mutable_start()->set_name(name);
 
-    return Impl->Rpc(Req, Rsp);
+    return Impl->Rpc();
 }
 
 int TPortoAPI::Stop(const std::string &name) {
-    Req.mutable_stop()->set_name(name);
+    Impl->GetReq().mutable_stop()->set_name(name);
 
-    return Impl->Rpc(Req, Rsp);
+    return Impl->Rpc();
 }
 
 int TPortoAPI::Kill(const std::string &name, int sig) {
-    Req.mutable_kill()->set_name(name);
-    Req.mutable_kill()->set_sig(sig);
+    Impl->GetReq().mutable_kill()->set_name(name);
+    Impl->GetReq().mutable_kill()->set_sig(sig);
 
-    return Impl->Rpc(Req, Rsp);
+    return Impl->Rpc();
 }
 
 int TPortoAPI::Pause(const std::string &name) {
-    Req.mutable_pause()->set_name(name);
+    Impl->GetReq().mutable_pause()->set_name(name);
 
-    return Impl->Rpc(Req, Rsp);
+    return Impl->Rpc();
 }
 
 int TPortoAPI::Resume(const std::string &name) {
-    Req.mutable_resume()->set_name(name);
+    Impl->GetReq().mutable_resume()->set_name(name);
 
-    return Impl->Rpc(Req, Rsp);
+    return Impl->Rpc();
 }
 
 int TPortoAPI::Wait(const std::vector<std::string> &containers,
                     std::string &name, int timeout) {
-    auto wait = Req.mutable_wait();
+    auto wait = Impl->GetReq().mutable_wait();
 
     for (auto &c : containers)
         wait->add_name(c);
@@ -302,8 +309,8 @@ int TPortoAPI::Wait(const std::vector<std::string> &containers,
     if (timeout >= 0)
         wait->set_timeout(timeout);
 
-    int ret = Impl->Rpc(Req, Rsp);
-    name.assign(Rsp.wait().name());
+    int ret = Impl->Rpc();
+    name.assign(Impl->GetResp().wait().name());
     return ret;
 }
 
@@ -313,10 +320,10 @@ void TPortoAPI::GetLastError(int &error, std::string &msg) const {
 }
 
 int TPortoAPI::ListVolumeProperties(std::vector<TProperty> &properties) {
-    Req.mutable_listvolumeproperties();
-    int ret = Impl->Rpc(Req, Rsp);
+    Impl->GetReq().mutable_listvolumeproperties();
+    int ret = Impl->Rpc();
     if (!ret) {
-        for (auto prop: Rsp.volumepropertylist().properties())
+        for (auto prop: Impl->GetResp().volumepropertylist().properties())
             properties.push_back(TProperty(prop.name(), prop.desc()));
     }
     return ret;
@@ -325,7 +332,7 @@ int TPortoAPI::ListVolumeProperties(std::vector<TProperty> &properties) {
 int TPortoAPI::CreateVolume(const std::string &path,
                             const std::map<std::string, std::string> &config,
                             TVolumeDescription &result) {
-    auto req = Req.mutable_createvolume();
+    auto req = Impl->GetReq().mutable_createvolume();
 
     req->set_path(path);
 
@@ -335,9 +342,9 @@ int TPortoAPI::CreateVolume(const std::string &path,
         prop->set_value(kv.second);
     }
 
-    int ret = Impl->Rpc(Req, Rsp);
+    int ret = Impl->Rpc();
     if (!ret) {
-        auto volume = Rsp.volume();
+        auto volume = Impl->GetResp().volume();
         result.Path = volume.path();
         result.Containers = std::vector<std::string>(std::begin(volume.containers()), std::end(volume.containers()));
         result.Properties.clear();
@@ -357,29 +364,29 @@ int TPortoAPI::CreateVolume(std::string &path,
 }
 
 int TPortoAPI::LinkVolume(const std::string &path, const std::string &container) {
-    auto req = Req.mutable_linkvolume();
+    auto req = Impl->GetReq().mutable_linkvolume();
 
     req->set_path(path);
     if (container != "")
         req->set_container(container);
 
-    return Impl->Rpc(Req, Rsp);
+    return Impl->Rpc();
 }
 
 int TPortoAPI::UnlinkVolume(const std::string &path, const std::string &container) {
-    auto req = Req.mutable_unlinkvolume();
+    auto req = Impl->GetReq().mutable_unlinkvolume();
 
     req->set_path(path);
     if (container != "")
         req->set_container(container);
 
-    return Impl->Rpc(Req, Rsp);
+    return Impl->Rpc();
 }
 
 int TPortoAPI::ListVolumes(const std::string &path,
                            const std::string &container,
                            std::vector<TVolumeDescription> &volumes) {
-    auto req = Req.mutable_listvolumes();
+    auto req = Impl->GetReq().mutable_listvolumes();
 
     if (path != "")
         req->set_path(path);
@@ -387,9 +394,9 @@ int TPortoAPI::ListVolumes(const std::string &path,
     if (container != "")
         req->set_container(container);
 
-    int ret = Impl->Rpc(Req, Rsp);
+    int ret = Impl->Rpc();
     if (!ret) {
-        auto list = Rsp.volumelist();
+        auto list = Impl->GetResp().volumelist();
 
         for (auto v: list.volumes()) {
             std::map<std::string, std::string> properties;
@@ -407,36 +414,36 @@ int TPortoAPI::ListVolumes(const std::string &path,
 
 int TPortoAPI::ImportLayer(const std::string &layer,
                            const std::string &tarball, bool merge) {
-    auto req = Req.mutable_importlayer();
+    auto req = Impl->GetReq().mutable_importlayer();
 
     req->set_layer(layer);
     req->set_tarball(tarball);
     req->set_merge(merge);
-    return Impl->Rpc(Req, Rsp);
+    return Impl->Rpc();
 }
 
 int TPortoAPI::ExportLayer(const std::string &volume,
                            const std::string &tarball) {
-    auto req = Req.mutable_exportlayer();
+    auto req = Impl->GetReq().mutable_exportlayer();
 
     req->set_volume(volume);
     req->set_tarball(tarball);
-    return Impl->Rpc(Req, Rsp);
+    return Impl->Rpc();
 }
 
 int TPortoAPI::RemoveLayer(const std::string &layer) {
-    auto req = Req.mutable_removelayer();
+    auto req = Impl->GetReq().mutable_removelayer();
 
     req->set_layer(layer);
-    return Impl->Rpc(Req, Rsp);
+    return Impl->Rpc();
 }
 
 int TPortoAPI::ListLayers(std::vector<std::string> &layers) {
-    Req.mutable_listlayers();
+    Impl->GetReq().mutable_listlayers();
 
-    int ret = Impl->Rpc(Req, Rsp);
+    int ret = Impl->Rpc();
     if (!ret) {
-        auto list = Rsp.layers().layer();
+        auto list = Impl->GetResp().layers().layer();
         layers.clear();
         layers.reserve(list.size());
         copy(list.begin(), list.end(), std::back_inserter(layers));

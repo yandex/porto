@@ -1,6 +1,7 @@
 #include <vector>
 #include <string>
 #include <thread>
+#include <csignal>
 
 #include "config.hpp"
 #include "test.hpp"
