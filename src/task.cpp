@@ -1097,7 +1097,7 @@ std::vector<int> TTask::GetPids() const {
 pid_t TTask::GetPidFor(pid_t pid) const {
     if (InPidNamespace(pid, getpid()))
         return Pid;
-    if (InPidNamespace(pid, WPid))
+    if (WPid != Pid && InPidNamespace(pid, WPid))
         return VPid;
     if (InPidNamespace(pid, Pid))
         return 1;
