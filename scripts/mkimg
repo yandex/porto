@@ -147,7 +147,7 @@ initnet() {
 }
 
 __start() {
-	pctl run $CONTAINER command="/sbin/init" root="$IMAGE" hostname="$(hostname -f)" user=root group=root bind="$CONF /config ro; $BIND_PROPERTY; $CGTMPDIR /sys/fs/cgroup ro" bind_dns=false allowed_devices="$ALLOWED_DEVICES" net="host veth1" default_gw="$1" ip="$2" stdout_path="/dev/null" stderr_path="/dev/null"
+	pctl run $CONTAINER virt_mode=os command="/sbin/init" root="$IMAGE" hostname="$(hostname -f)" user=root group=root bind="$CONF /config ro; $BIND_PROPERTY; $CGTMPDIR /sys/fs/cgroup ro" bind_dns=false allowed_devices="$ALLOWED_DEVICES" net="host veth1" default_gw="$1" ip="$2" stdout_path="/dev/null" stderr_path="/dev/null"
 }
 
 start_init() {
