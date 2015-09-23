@@ -3198,7 +3198,9 @@ static void TestLimits(TPortoAPI &api) {
     ExpectEq(current, "1");
 
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
-    Expect(current == std::to_string(LLONG_MAX) || current == std::to_string(ULLONG_MAX));
+    Expect(current == std::to_string(LLONG_MAX) ||
+           current == std::to_string(ULLONG_MAX) ||
+           current == std::to_string(LLONG_MAX - 4095));
 
     if (KernelSupports(KernelFeature::LOW_LIMIT)) {
         current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
@@ -3686,7 +3688,8 @@ static void TestDynamic(TPortoAPI &api) {
 
     string current;
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
-    Expect(current == std::to_string(LLONG_MAX) || current == std::to_string(ULLONG_MAX));
+    Expect(current == std::to_string(LLONG_MAX) || current == std::to_string(ULLONG_MAX) ||
+           current == std::to_string(LLONG_MAX - 4095));
 
     string exp_limit = "268435456";
     ExpectApiSuccess(api.SetProperty(name, "memory_limit", exp_limit));
