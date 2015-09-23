@@ -19,9 +19,9 @@ namespace test {
     extern std::vector<std::shared_ptr<TNlLink>> links;
 
     std::basic_ostream<char> &Say(std::basic_ostream<char> &stream = std::cout);
-    void ExpectReturn(int ret, int exp, int line, const char *func);
-    void ExpectError(const TError &ret, const TError &exp, int line, const char *func);
-    void ExpectApi(TPortoAPI &api, int ret, int exp, int line, const char *func);
+    void ExpectReturn(int ret, int exp, const char *func);
+    void ExpectError(const TError &ret, const TError &exp, const char *where);
+    void ExpectApi(TPortoAPI &api, int ret, int exp, const char *where);
 
     int ReadPid(const std::string &path);
     int Pgrep(const std::string &name);
@@ -88,22 +88,29 @@ namespace test {
     void InitKernelFeatures();
     bool KernelSupports(const KernelFeature &feature);
 
-    void _ExpectEq(size_t ret, size_t exp, size_t line, const char *func);
-    void _ExpectEq(const std::string &ret, const std::string &exp, size_t line, const char *func);
-    void _ExpectNeq(size_t ret, size_t exp, size_t line, const char *func);
-    void _ExpectNeq(const std::string &ret, const std::string &exp, size_t line, const char *func);
-    void _ExpectLess(size_t ret, size_t exp, size_t line, const char *func);
-    void _ExpectLess(const std::string &ret, const std::string &exp, size_t line, const char *func);
+    void _ExpectEq(size_t ret, size_t exp, const char *where);
+    void _ExpectEq(const std::string &ret, const std::string &exp,
+                   const char *where);
+    void _ExpectNeq(size_t ret, size_t exp, const char *where);
+    void _ExpectNeq(const std::string &ret, const std::string &exp,
+                    const char *where);
+    void _ExpectLess(size_t ret, size_t exp, const char *where);
+    void _ExpectLess(const std::string &ret, const std::string &exp,
+                     const char *where);
 }
 
-#define Expect(ret) ExpectReturn(ret, true, __LINE__, __func__)
+#define STRINGIFY(x) #x
+#define TOSTRING(x) STRINGIFY(x)
+#define WHERE __FILE__ ":" TOSTRING(__LINE__)
 
-#define ExpectSuccess(ret) ExpectError(ret, TError::Success(), __LINE__, __func__)
-#define ExpectFailure(ret, exp) ExpectError(ret, exp, __LINE__, __func__)
+#define Expect(ret) ExpectReturn(ret, true, WHERE)
 
-#define ExpectApiSuccess(ret) ExpectApi(api, ret, 0, __LINE__, __func__)
-#define ExpectApiFailure(ret, exp) ExpectApi(api, ret, exp, __LINE__, __func__)
+#define ExpectSuccess(ret) ExpectError(ret, TError::Success(), WHERE)
+#define ExpectFailure(ret, exp) ExpectError(ret, exp, WHERE)
 
-#define ExpectEq(ret, exp) _ExpectEq(ret, exp, __LINE__, __func__)
-#define ExpectNeq(ret, exp) _ExpectNeq(ret, exp, __LINE__, __func__)
-#define ExpectLess(ret, exp) _ExpectLess(ret, exp, __LINE__, __func__)
+#define ExpectApiSuccess(ret) ExpectApi(api, ret, 0, WHERE)
+#define ExpectApiFailure(ret, exp) ExpectApi(api, ret, exp, WHERE)
+
+#define ExpectEq(ret, exp) _ExpectEq(ret, exp, WHERE)
+#define ExpectNeq(ret, exp) _ExpectNeq(ret, exp, WHERE)
+#define ExpectLess(ret, exp) _ExpectLess(ret, exp, WHERE)

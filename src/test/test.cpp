@@ -38,24 +38,24 @@ std::basic_ostream<char> &Say(std::basic_ostream<char> &stream) {
         return std::cerr << "- ";
 }
 
-void ExpectReturn(int ret, int exp, int line, const char *func) {
+void ExpectReturn(int ret, int exp, const char *where) {
     if (ret == exp)
         return;
-    throw std::string("Got " + std::to_string(ret) + ", but expected " + std::to_string(exp) + " at " + func + ":" + std::to_string(line));
+    throw std::string("Got " + std::to_string(ret) + ", but expected " + std::to_string(exp) + " at " + where);
 }
 
-void ExpectError(const TError &ret, const TError &exp, int line, const char *func) {
+void ExpectError(const TError &ret, const TError &exp, const char *where) {
     std::stringstream ss;
 
     if (ret == exp)
         return;
 
-    ss << "Got " << ret << ", but expected " << exp << " at " << func << ":" << line;
+    ss << "Got " << ret << ", but expected " << exp << " at " << where;
 
     throw ss.str();
 }
 
-void ExpectApi(TPortoAPI &api, int ret, int exp, int line, const char *func) {
+void ExpectApi(TPortoAPI &api, int ret, int exp, const char *where) {
     std::stringstream ss;
 
     if (ret == exp)
@@ -65,7 +65,7 @@ void ExpectApi(TPortoAPI &api, int ret, int exp, int line, const char *func) {
     std::string msg;
     api.GetLastError(err, msg);
     TError error((rpc::EError)err, msg);
-    ss << "Got error from libporto: " << error << " (" << ret << " != " << exp << ") at " << func << ":" << line;
+    ss << "Got error from libporto: " << error << " (" << ret << " != " << exp << ") at " << where;
 
     throw ss.str();
 }
@@ -768,50 +768,50 @@ void InitKernelFeatures() {
 }
 
 template<typename T>
-static inline void ExpectEqTemplate(T ret, T exp, size_t line, const char *func) {
+static inline void ExpectEqTemplate(T ret, T exp, const char *where) {
     if (ret != exp) {
-        Say() << "Unexpected " << ret << " != " << exp << " at " << func << ":" << line << std::endl;
+        Say() << "Unexpected " << ret << " != " << exp << " at " << where << std::endl;
         abort();
     }
 }
 
 template<typename T>
-static inline void ExpectNeqTemplate(T ret, T exp, size_t line, const char *func) {
+static inline void ExpectNeqTemplate(T ret, T exp, const char *where) {
     if (ret == exp) {
-        Say() << "Unexpected " << ret << " == " << exp << " at " << func << ":" << line << std::endl;
+        Say() << "Unexpected " << ret << " == " << exp << " at " << where << std::endl;
         abort();
     }
 }
 
 template<typename T>
-static inline void ExpectLessTemplate(T ret, T exp, size_t line, const char *func) {
+static inline void ExpectLessTemplate(T ret, T exp, const char *where) {
     if (ret >= exp) {
-        Say() << "Unexpected " << ret << " >= " << exp << " at " << func << ":" << line << std::endl;
+        Say() << "Unexpected " << ret << " >= " << exp << " at " << where << std::endl;
         abort();
     }
 }
 
-void _ExpectEq(size_t ret, size_t exp, size_t line, const char *func) {
-    ExpectEqTemplate(ret, exp, line, func);
+void _ExpectEq(size_t ret, size_t exp, const char *where) {
+    ExpectEqTemplate(ret, exp, where);
 }
 
-void _ExpectEq(const std::string &ret, const std::string &exp, size_t line, const char *func) {
-    ExpectEqTemplate(ret, exp, line, func);
+void _ExpectEq(const std::string &ret, const std::string &exp, const char *where) {
+    ExpectEqTemplate(ret, exp, where);
 }
 
-void _ExpectNeq(size_t ret, size_t exp, size_t line, const char *func) {
-    ExpectNeqTemplate(ret, exp, line, func);
+void _ExpectNeq(size_t ret, size_t exp, const char *where) {
+    ExpectNeqTemplate(ret, exp, where);
 }
 
-void _ExpectNeq(const std::string &ret, const std::string &exp, size_t line, const char *func) {
-    ExpectNeqTemplate(ret, exp, line, func);
+void _ExpectNeq(const std::string &ret, const std::string &exp, const char *where) {
+    ExpectNeqTemplate(ret, exp, where);
 }
 
-void _ExpectLess(size_t ret, size_t exp, size_t line, const char *func) {
-    ExpectLessTemplate(ret, exp, line, func);
+void _ExpectLess(size_t ret, size_t exp, const char *where) {
+    ExpectLessTemplate(ret, exp, where);
 }
 
-void _ExpectLess(const std::string &ret, const std::string &exp, size_t line, const char *func) {
-    ExpectLessTemplate(ret, exp, line, func);
+void _ExpectLess(const std::string &ret, const std::string &exp, const char *where) {
+    ExpectLessTemplate(ret, exp, where);
 }
 }

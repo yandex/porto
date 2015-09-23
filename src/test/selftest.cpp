@@ -56,11 +56,12 @@ static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"ut
 
 static int LeakConainersNr;
 
-#define ExpectState(api, name, state) _ExpectState(api, name, state, __LINE__, __func__)
-void _ExpectState(TPortoAPI &api, const std::string &name, const std::string &state, size_t line, const char *func) {
+#define ExpectState(api, name, state) _ExpectState(api, name, state, "somewhere")
+void _ExpectState(TPortoAPI &api, const std::string &name, const std::string &state,
+                  const char *where) {
     std::string v;
-    ExpectApi(api, api.GetData(name, "state", v), 0, line, func);
-    _ExpectEq(v, state, line, func);
+    ExpectApi(api, api.GetData(name, "state", v), 0, where);
+    _ExpectEq(v, state, where);
 }
 
 static std::string StartWaitAndGetData(TPortoAPI &api, const std::string &name, const std::string &data) {
