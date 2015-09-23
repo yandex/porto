@@ -722,6 +722,12 @@ public:
             return EXIT_FAILURE;
         }
 
+        if (!pid) {
+            std::cerr << "Task pid in this namespace is unknown." << std::endl;
+            std::cerr << "Try enter parent container or enter from host." << std::endl;
+            return EXIT_FAILURE;
+        }
+
         TNamespaceSnapshot ns;
         error = ns.Open(pid);
         if (error) {
