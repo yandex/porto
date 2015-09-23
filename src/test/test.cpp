@@ -1,6 +1,7 @@
 #include <sstream>
 #include <csignal>
 #include <iomanip>
+#include <unordered_map>
 
 #include "test.hpp"
 #include "config.hpp"
@@ -19,6 +20,9 @@ extern "C" {
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#define _FILE_OFFSET_BITS 64
+#include <sys/time.h>
+#include <sys/resource.h>
 }
 
 namespace test {
@@ -84,11 +88,17 @@ int Pgrep(const std::string &name) {
 }
 
 string GetRlimit(const std::string &pid, const std::string &type, const bool soft) {
-    string kind = soft ? "SOFT" : "HARD";
-    string cmd = "prlimit --pid " + pid + " --" + type + " -o " + kind + " --noheading";
-    vector<string> lines;
-    ExpectSuccess(Popen(cmd, lines));
-    return StringTrim(lines[0]);
+    const std::unordered_map<std::string, enum __rlimit_resource> resources = {
+        {"nproc", RLIMIT_NPROC},
+        {"nofile", RLIMIT_NOFILE},
+        {"data", RLIMIT_DATA},
+        {"memlock", RLIMIT_MEMLOCK}
+    };
+
+    struct rlimit limit;
+    ExpectEq(prlimit(stoi(pid), resources.at(type), nullptr, &limit), 0);
+
+    return std::to_string(soft ? limit.rlim_cur : limit.rlim_max);
 }
 
 void WaitProcessExit(const std::string &pid, int sec) {
