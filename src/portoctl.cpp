@@ -654,7 +654,12 @@ public:
 
 class TEnterCmd : public ICmd {
 public:
-    TEnterCmd(TPortoAPI *api) : ICmd(api, "enter", 1, "[-C] <container> [command]", "execute command in container namespace") {}
+    TEnterCmd(TPortoAPI *api) : ICmd(api, "enter", 1,
+            "[-C] <container> [command]",
+            "execute command in container namespace",
+            "    -C          do not enter cgroups\n"
+            "                default command is /bin/bash\n"
+            ) {}
 
     void PrintErrno(const string &str) {
         std::cerr << str << ": " << strerror(errno) << std::endl;
@@ -737,14 +742,14 @@ public:
                 TPath root;
                 TError error = GetCgMount(cg.first, root);
                 if (error) {
-                    PrintError(error, "Can't get task cgroups");
+                    PrintError(error, "Cannot find cgroup mounts, try option \"-C\"");
                     return EXIT_FAILURE;
                 }
 
                 TFile f(root / cg.second / "cgroup.procs");
                 error = f.AppendString(std::to_string(GetPid()));
                 if (error) {
-                    PrintError(error, "Can't get task cgroups");
+                    PrintError(error, "Cannot enter cgroups, try option \"-C\"");
                     return EXIT_FAILURE;
                 }
             }
