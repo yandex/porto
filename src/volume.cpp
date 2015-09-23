@@ -873,7 +873,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
                 return TError(EError::Permission, "Layer path not permitted");
         } else {
             if (l.find('/') != std::string::npos)
-                return TError(EError::InvalidValue, "Internal layer storage has no direcrotories");
+                return TError(EError::InvalidValue, "Internal layer storage has no directories");
             layer = TPath(config().volumes().layers_dir()) / layer;
         }
         if (!layer.Exists())
