@@ -187,7 +187,8 @@ public:
     TError ChildSetHostname();
     void StartChild();
     void Restore(std::vector<int> pids);
-    TError FixCgroups() const;
+    TError SyncTaskCgroups(pid_t pid) const;
+    TError SyncCgroupsWithFreezer() const;
     void Abort(const TError &error) const;
 
     bool IsZombie() const;

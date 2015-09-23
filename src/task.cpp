@@ -1223,12 +1223,12 @@ void TTask::Restore(std::vector<int> pids) {
     State = Started;
 }
 
-TError TTask::FixCgroups() const {
+TError TTask::SyncTaskCgroups(pid_t pid) const {
     if (IsZombie())
         return TError::Success();
 
     map<string, string> cgmap;
-    TError error = GetTaskCgroups(WPid, cgmap);
+    TError error = GetTaskCgroups(pid, cgmap);
     if (error)
         return error;
 
@@ -1246,7 +1246,7 @@ TError TTask::FixCgroups() const {
                 L_WRN() << "No network, disabled " << subsys->GetName() << ":" << path << std::endl;
 
                 auto cg = subsys->GetRootCgroup();
-                error = cg->Attach(WPid);
+                error = cg->Attach(pid);
                 if (error)
                     L_ERR() << "Can't reattach to root: " << error << std::endl;
                 continue;
@@ -1261,10 +1261,33 @@ TError TTask::FixCgroups() const {
         if (cg && cg->Relpath().ToString() != path) {
             L_WRN() << "Fixed invalid task subsystem for " << subsys->GetName() << ":" << path << std::endl;
 
-            error = cg->Attach(WPid);
+            error = cg->Attach(pid);
             if (error)
                 L_ERR() << "Can't fix: " << error << std::endl;
         }
+    }
+
+    return TError::Success();
+}
+
+TError TTask::SyncCgroupsWithFreezer() const {
+    auto freezer = Env->LeafCgroups.at(freezerSubsystem);
+    std::vector<pid_t> tasks;
+
+    TError error = freezer->GetTasks(tasks);
+    if (error)
+        return error;
+
+    if (std::find(tasks.begin(), tasks.end(), Pid) == tasks.end())
+        return TError(EError::Unknown, "Pid " + std::to_string(Pid) + " not in freezer");
+
+    if (Pid != WPid && std::find(tasks.begin(), tasks.end(), WPid) == tasks.end())
+        return TError(EError::Unknown, "WPid " + std::to_string(Pid) + " not in freezer");
+
+    for (pid_t pid : tasks) {
+        error = SyncTaskCgroups(pid);
+        if (error)
+            L_WRN() << "Cannot sync cgroups of " << pid << " : " << error << std::endl;
     }
 
     return TError::Success();

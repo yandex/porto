@@ -1753,9 +1753,9 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
                 if (Task->HasCorrectFreezer()) {
                     L() << "Task is running and belongs to porto" << std::endl;
 
-                    TError error = Task->FixCgroups();
+                    TError error = Task->SyncCgroupsWithFreezer();
                     if (error)
-                        L_WRN() << "Can't fix cgroups: " << error << std::endl;
+                        L_WRN() << "Cannot sync cgroups: " << error << std::endl;
                 } else {
                     L_WRN() << "Task is running, belongs to porto but doesn't have valid freezer" << std::endl;
                     LostAndRestored = true;
