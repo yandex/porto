@@ -467,10 +467,13 @@ TError Popen(const std::string &cmd, std::vector<std::string> &lines) {
     while (getline(&line, &n, f) >= 0)
         lines.push_back(line);
 
-    fclose(f);
+    auto ret = pclose(f);
     free(line);
 
-    return TError::Success();
+    if (ret == 127)
+        return TError(EError::Unknown, "popen(" + cmd + ") failed");
+    else
+        return TError::Success();
 }
 
 // https://github.com/lxc/lxc/commit/2d489f9e87fa0cccd8a1762680a43eeff2fe1b6e
