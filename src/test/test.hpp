@@ -72,15 +72,21 @@ namespace test {
     int StressTest(int threads, int iter, bool killPorto);
     int FuzzyTest(int threads, int iter);
 
-    bool HaveCfsBandwidth();
-    bool HaveCfsGroupSched();
-    bool HaveSmart();
-    bool HaveIoLimit();
-    bool HaveLowLimit();
-    bool HaveRechargeOnPgfault();
-    bool HaveMaxRss();
-    bool HaveIpVlan();
-    bool IsCfqActive();
+    enum class KernelFeature {
+        SMART,
+        LOW_LIMIT,
+        RECHARGE_ON_PGFAULT,
+        FSIO,
+        CFS_BANDWIDTH,
+        CFS_GROUPSCHED,
+        IPVLAN,
+        MAX_RSS,
+        CFQ,
+        LAST
+    };
+
+    void InitKernelFeatures();
+    bool KernelSupports(const KernelFeature &feature);
 
     void _ExpectEq(size_t ret, size_t exp, size_t line, const char *func);
     void _ExpectEq(const std::string &ret, const std::string &exp, size_t line, const char *func);

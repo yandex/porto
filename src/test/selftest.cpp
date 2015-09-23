@@ -129,7 +129,7 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectEq(v, GetDefaultGroup());
     ExpectApiSuccess(api.GetProperty(name, "env", v));
     ExpectEq(v, string(""));
-    if (HaveLowLimit()) {
+    if (KernelSupports(KernelFeature::LOW_LIMIT)) {
         ExpectApiSuccess(api.GetProperty(name, "memory_guarantee", v));
         ExpectEq(v, string("0"));
     }
@@ -141,11 +141,11 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectEq(v, "100");
     ExpectApiSuccess(api.GetProperty(name, "cpu_guarantee", v));
     ExpectEq(v, "0");
-    if (IsCfqActive()) {
+    if (KernelSupports(KernelFeature::CFQ)) {
         ExpectApiSuccess(api.GetProperty(name, "io_policy", v));
         ExpectEq(v, "normal");
     }
-    if (HaveIoLimit()) {
+    if (KernelSupports(KernelFeature::FSIO)) {
         ExpectApiSuccess(api.GetProperty(name, "io_limit", v));
         ExpectEq(v, "0");
     }
@@ -163,17 +163,17 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
 
     ExpectApiSuccess(api.GetProperty(name, "respawn", v));
     ExpectEq(v, string("false"));
-    if (HaveSmart()) {
+    if (KernelSupports(KernelFeature::SMART)) {
         ExpectApiSuccess(api.GetProperty(name, "cpu.smart", v));
         ExpectEq(v, string("0"));
     }
     ExpectApiSuccess(api.GetProperty(name, "memory.limit_in_bytes", v));
     ExpectEq(v, string("0"));
-    if (HaveLowLimit()) {
+    if (KernelSupports(KernelFeature::LOW_LIMIT)) {
         ExpectApiSuccess(api.GetProperty(name, "memory.low_limit_in_bytes", v));
         ExpectEq(v, string("0"));
     }
-    if (HaveRechargeOnPgfault()) {
+    if (KernelSupports(KernelFeature::RECHARGE_ON_PGFAULT)) {
         ExpectApiSuccess(api.GetProperty(name, "memory.recharge_on_pgfault", v));
         ExpectEq(v, string("0"));
     }
@@ -193,7 +193,7 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectEq(v, "a *:* rwm");
     ExpectApiSuccess(api.GetProperty(name, "capabilities", v));
     ExpectEq(v, "");
-    if (HaveRechargeOnPgfault()) {
+    if (KernelSupports(KernelFeature::RECHARGE_ON_PGFAULT)) {
         ExpectApiSuccess(api.GetProperty(name, "recharge_on_pgfault", v));
         ExpectEq(v, "false");
     }
@@ -245,7 +245,7 @@ static void ShouldHaveValidRunningData(TPortoAPI &api, const string &name) {
     ExpectApiSuccess(api.GetData(name, "major_faults", v));
     ExpectSuccess(StringToInt(v, intval));
     Expect(intval >= 0);
-    if (HaveMaxRss()) {
+    if (KernelSupports(KernelFeature::MAX_RSS)) {
         ExpectApiSuccess(api.GetData(name, "max_rss", v));
         ExpectSuccess(StringToInt(v, intval));
         Expect(intval >= 0);
@@ -256,7 +256,7 @@ static void ShouldHaveValidRunningData(TPortoAPI &api, const string &name) {
     ExpectEq(v, string("0"));
     ExpectApiSuccess(api.GetData(name, "parent", v));
     ExpectEq(v, string("/porto"));
-    if (IsCfqActive()) {
+    if (KernelSupports(KernelFeature::CFQ)) {
         ExpectApiSuccess(api.GetData(name, "io_read", v));
         ExpectApiSuccess(api.GetData(name, "io_write", v));
     }
@@ -288,7 +288,7 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     }
     ExpectApiFailure(api.GetData(name, "minor_faults", v), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "major_faults", v), EError::InvalidState);
-    if (HaveMaxRss()) {
+    if (KernelSupports(KernelFeature::MAX_RSS)) {
         ExpectApiFailure(api.GetData(name, "max_rss", v), EError::InvalidState);
     }
 
@@ -296,7 +296,7 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     ExpectApiFailure(api.GetData(name, "respawn_count", v), EError::InvalidState);
     ExpectApiSuccess(api.GetData(name, "parent", v));
     ExpectEq(v, string("/porto"));
-    if (IsCfqActive()) {
+    if (KernelSupports(KernelFeature::CFQ)) {
         ExpectApiFailure(api.GetData(name, "io_read", v), EError::InvalidState);
         ExpectApiFailure(api.GetData(name, "io_write", v), EError::InvalidState);
     }
@@ -2316,7 +2316,7 @@ static void TestNetProperty(TPortoAPI &api) {
     AsNobody(api);
 
     AsRoot(api);
-    if (HaveIpVlan()) {
+    if (KernelSupports(KernelFeature::IPVLAN)) {
         AsNobody(api);
         Say() << "Check net=ipvlan" << std::endl;
         AsRoot(api);
@@ -2840,13 +2840,13 @@ static void TestRoot(TPortoAPI &api) {
         "enable_porto",
     };
 
-    if (HaveLowLimit())
+    if (KernelSupports(KernelFeature::LOW_LIMIT))
         properties.push_back("memory_guarantee");
 
-    if (HaveRechargeOnPgfault())
+    if (KernelSupports(KernelFeature::RECHARGE_ON_PGFAULT))
         properties.push_back("recharge_on_pgfault");
 
-    if (HaveIoLimit())
+    if (KernelSupports(KernelFeature::FSIO))
         properties.push_back("io_limit");
 
     if (NetworkEnabled()) {
@@ -2884,7 +2884,7 @@ static void TestRoot(TPortoAPI &api) {
         data.push_back("net_overlimits");
     }
 
-    if (HaveMaxRss())
+    if (KernelSupports(KernelFeature::MAX_RSS))
         data.push_back("max_rss");
 
     std::vector<TProperty> plist;
@@ -2920,7 +2920,7 @@ static void TestRoot(TPortoAPI &api) {
         ExpectEq(v, "0");
     }
 
-    if (IsCfqActive()) {
+    if (KernelSupports(KernelFeature::CFQ)) {
         ExpectApiSuccess(api.GetData(porto_root, "io_read", v));
         ExpectEq(v, "");
         ExpectApiSuccess(api.GetData(porto_root, "io_write", v));
@@ -2975,11 +2975,11 @@ static void TestRoot(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy("b"));
 
     Say() << "Check cpu_limit/cpu_guarantee" << std::endl;
-    if (HaveCfsBandwidth())
+    if (KernelSupports(KernelFeature::CFS_BANDWIDTH))
         ExpectEq(GetCgKnob("cpu", "", "cpu.cfs_quota_us"), "-1");
-    if (HaveCfsGroupSched())
+    if (KernelSupports(KernelFeature::CFS_GROUPSCHED))
         ExpectEq(GetCgKnob("cpu", "", "cpu.shares"), "1024");
-    if (IsCfqActive())
+    if (KernelSupports(KernelFeature::CFQ))
         ExpectEq(GetCgKnob("blkio", "", "blkio.weight"), "1000");
 }
 
@@ -3075,7 +3075,7 @@ static void TestData(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData(root, "memory_usage", v));
     Expect(v != "0" && v != "-1");
 
-    if (IsCfqActive()) {
+    if (KernelSupports(KernelFeature::CFQ)) {
         Say() << "Make sure io_write counters are valid" << std::endl;
         ExpectApiSuccess(api.GetData(root, "io_write", v));
         ExpectNeq(v, "");
@@ -3090,7 +3090,7 @@ static void TestData(TPortoAPI &api) {
     Expect(v != "0" && v != "-1");
     ExpectApiSuccess(api.GetData(wget, "memory_usage", v));
     Expect(v != "0" && v != "-1");
-    if (IsCfqActive()) {
+    if (KernelSupports(KernelFeature::CFQ)) {
         ExpectApiSuccess(api.GetData(wget, "io_write", v));
         ExpectNeq(v, "");
         ExpectApiSuccess(api.GetData(wget, "io_read", v));
@@ -3101,7 +3101,7 @@ static void TestData(TPortoAPI &api) {
     Expect(v != "0" && v != "-1");
     ExpectApiSuccess(api.GetData(noop, "memory_usage", v));
     Expect(v != "0" && v != "-1");
-    if (IsCfqActive()) {
+    if (KernelSupports(KernelFeature::CFQ)) {
         ExpectApiSuccess(api.GetData(noop, "io_write", v));
         ExpectEq(v, "");
         ExpectApiSuccess(api.GetData(noop, "io_read", v));
@@ -3135,13 +3135,13 @@ static void TestData(TPortoAPI &api) {
 }
 
 static bool CanTestLimits() {
-    if (!HaveLowLimit())
+    if (!KernelSupports(KernelFeature::LOW_LIMIT))
         return false;
 
-    if (!HaveRechargeOnPgfault())
+    if (!KernelSupports(KernelFeature::RECHARGE_ON_PGFAULT))
         return false;
 
-    if (!HaveSmart())
+    if (!KernelSupports(KernelFeature::SMART))
         return false;
 
     return true;
@@ -3200,7 +3200,7 @@ static void TestLimits(TPortoAPI &api) {
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
     Expect(current == std::to_string(LLONG_MAX) || current == std::to_string(ULLONG_MAX));
 
-    if (HaveLowLimit()) {
+    if (KernelSupports(KernelFeature::LOW_LIMIT)) {
         current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
         ExpectEq(current, "0");
     }
@@ -3216,13 +3216,13 @@ static void TestLimits(TPortoAPI &api) {
     ExpectEq(current, "1073741824");
 
     ExpectApiSuccess(api.SetProperty(name, "memory_limit", exp_limit));
-    if (HaveLowLimit())
+    if (KernelSupports(KernelFeature::LOW_LIMIT))
         ExpectApiSuccess(api.SetProperty(name, "memory_guarantee", exp_guar));
     ExpectApiSuccess(api.Start(name));
 
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
     ExpectEq(current, exp_limit);
-    if (HaveLowLimit()) {
+    if (KernelSupports(KernelFeature::LOW_LIMIT)) {
         current = GetCgKnob("memory", name, "memory.low_limit_in_bytes");
         ExpectEq(current, exp_guar);
     }
@@ -3235,7 +3235,7 @@ static void TestLimits(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "memory_limit", "0"));
 
     Say() << "Check cpu_limit and cpu_guarantee range" << std::endl;
-    if (HaveCfsBandwidth()) {
+    if (KernelSupports(KernelFeature::CFS_BANDWIDTH)) {
         ExpectApiFailure(api.SetProperty(name, "cpu_limit", "test"), EError::InvalidValue);
         ExpectApiFailure(api.SetProperty(name, "cpu_limit", "0"), EError::InvalidValue);
         ExpectApiFailure(api.SetProperty(name, "cpu_limit", "101"), EError::InvalidValue);
@@ -3243,7 +3243,7 @@ static void TestLimits(TPortoAPI &api) {
         ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "100"));
     }
 
-    if (HaveCfsGroupSched()) {
+    if (KernelSupports(KernelFeature::CFS_GROUPSCHED)) {
         ExpectApiFailure(api.SetProperty(name, "cpu_guarantee", "test"), EError::InvalidValue);
         ExpectApiFailure(api.SetProperty(name, "cpu_guarantee", "-1"), EError::InvalidValue);
         ExpectApiFailure(api.SetProperty(name, "cpu_guarantee", "101"), EError::InvalidValue);
@@ -3257,7 +3257,7 @@ static void TestLimits(TPortoAPI &api) {
     ExpectApiFailure(api.SetProperty(name, "cpu_policy", "somecrap"), EError::InvalidValue);
     ExpectApiFailure(api.SetProperty(name, "cpu_policy", "idle"), EError::NotSupported);
 
-    if (HaveSmart()) {
+    if (KernelSupports(KernelFeature::SMART)) {
         ExpectApiSuccess(api.SetProperty(name, "cpu_policy", "rt"));
         ExpectApiSuccess(api.Start(name));
         smart = GetCgKnob("cpu", name, "cpu.smart");
@@ -3271,7 +3271,7 @@ static void TestLimits(TPortoAPI &api) {
         ExpectApiSuccess(api.Stop(name));
     }
 
-    if (HaveCfsBandwidth()) {
+    if (KernelSupports(KernelFeature::CFS_BANDWIDTH)) {
         Say() << "Check cpu_limit" << std::endl;
         ExpectApiSuccess(api.SetProperty(name, "cpu_policy", "normal"));
 
@@ -3309,7 +3309,7 @@ static void TestLimits(TPortoAPI &api) {
         TestCoresConvertion(api, name, "cpu_limit");
     }
 
-    if (HaveCfsGroupSched()) {
+    if (KernelSupports(KernelFeature::CFS_GROUPSCHED)) {
         Say() << "Check cpu_guarantee" << std::endl;
         uint64_t rootShares, shares;
         ExpectSuccess(StringToUint64(GetCgKnob("cpu", "", "cpu.shares"), rootShares));
@@ -3335,7 +3335,7 @@ static void TestLimits(TPortoAPI &api) {
         TestCoresConvertion(api, name, "cpu_guarantee");
     }
 
-    if (IsCfqActive()) {
+    if (KernelSupports(KernelFeature::CFQ)) {
         Say() << "Check io_policy" << std::endl;
         uint64_t rootWeight, weight;
         ExpectSuccess(StringToUint64(GetCgKnob("blkio", "", "blkio.weight"), rootWeight));
@@ -3355,7 +3355,7 @@ static void TestLimits(TPortoAPI &api) {
         ExpectApiSuccess(api.Stop(name));
     }
 
-    if (HaveIoLimit()) {
+    if (KernelSupports(KernelFeature::FSIO)) {
         Say() << "Check io_limit" << std::endl;
 
         ExpectApiSuccess(api.SetProperty(name, "io_limit", "0"));
@@ -3579,11 +3579,11 @@ static void TestVirtModeProperty(TPortoAPI &api) {
 }
 
 static void TestAlias(TPortoAPI &api) {
-    if (!HaveLowLimit())
+    if (!KernelSupports(KernelFeature::LOW_LIMIT))
         return;
-    if (!HaveRechargeOnPgfault())
+    if (!KernelSupports(KernelFeature::RECHARGE_ON_PGFAULT))
         return;
-    if (!HaveSmart())
+    if (!KernelSupports(KernelFeature::SMART))
         return;
 
     string name = "a";
@@ -3707,7 +3707,7 @@ static void TestDynamic(TPortoAPI &api) {
 }
 
 static void TestLimitsHierarchy(TPortoAPI &api) {
-    if (!HaveLowLimit())
+    if (!KernelSupports(KernelFeature::LOW_LIMIT))
         return;
 
     //
@@ -4766,7 +4766,8 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData(parent, "state", v));
     ExpectEq(v, "meta");
 
-    ExpectApiSuccess(api.SetProperty(parent, "recharge_on_pgfault", "true"));
+    if (KernelSupports(KernelFeature::RECHARGE_ON_PGFAULT))
+        ExpectApiSuccess(api.SetProperty(parent, "recharge_on_pgfault", "true"));
     ExpectApiFailure(api.SetProperty(parent, "env", "a=b"), EError::InvalidState);
 
     ExpectApiSuccess(api.GetData(child, "state", v));
@@ -5305,19 +5306,19 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
     std::cerr << "SUCCESS: All tests successfully passed!" << std::endl;
     if (!CanTestLimits())
         std::cerr << "WARNING: Due to missing kernel support, memory_guarantee/cpu_policy has not been tested!" << std::endl;
-    if (!HaveCfsBandwidth())
+    if (!KernelSupports(KernelFeature::CFS_BANDWIDTH))
         std::cerr << "WARNING: CFS bandwidth is not enabled, skipping cpu_limit tests" << std::endl;
-    if (!HaveCfsGroupSched())
+    if (!KernelSupports(KernelFeature::CFS_GROUPSCHED))
         std::cerr << "WARNING: CFS group scheduling is not enabled, skipping cpu_guarantee tests" << std::endl;
-    if (!IsCfqActive())
+    if (!KernelSupports(KernelFeature::CFQ))
         std::cerr << "WARNING: CFQ is not enabled for one of your block devices, skipping io_read and io_write tests" << std::endl;
     if (!NetworkEnabled())
         std::cerr << "WARNING: Network support is not tested" << std::endl;
     if (links.size() == 1)
         std::cerr << "WARNING: Multiple network support is not tested" << std::endl;
-    if (!HaveMaxRss())
+    if (!KernelSupports(KernelFeature::MAX_RSS))
         std::cerr << "WARNING: max_rss is not tested" << std::endl;
-    if (!HaveIoLimit())
+    if (!KernelSupports(KernelFeature::FSIO))
         std::cerr << "WARNING: io_limit is not tested" << std::endl;
 
 exit:

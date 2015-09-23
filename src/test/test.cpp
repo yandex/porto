@@ -1,5 +1,6 @@
 #include <sstream>
 #include <csignal>
+#include <iomanip>
 
 #include "test.hpp"
 #include "config.hpp"
@@ -641,31 +642,7 @@ void TestDaemon(TPortoAPI &api) {
     // TODO: check rtnl classes
 }
 
-bool HaveCfsBandwidth() {
-    return HaveCgKnob("cpu", "cpu.cfs_period_us");
-}
-
-bool HaveCfsGroupSched() {
-    return HaveCgKnob("cpu", "cpu.shares");
-}
-
-bool HaveSmart() {
-    return HaveCgKnob("cpu", "cpu.smart");
-}
-
-bool HaveIoLimit() {
-    return HaveCgKnob("memory", "memory.fs_bps_limit");
-}
-
-bool HaveLowLimit() {
-    return HaveCgKnob("memory", "memory.low_limit_in_bytes");
-}
-
-bool HaveRechargeOnPgfault() {
-    return HaveCgKnob("memory", "memory.recharge_on_pgfault");
-}
-
-bool HaveMaxRss() {
+static bool HaveMaxRss() {
     TFile f(CgRoot("memory", "") + "memory.stat");
 
     std::vector<std::string> lines;
@@ -689,7 +666,7 @@ bool HaveMaxRss() {
     return false;
 }
 
-bool HaveIpVlan() {
+static bool HaveIpVlan() {
     auto nl = std::make_shared<TNl>();
     TError error = nl->Connect();
     if (error)
@@ -707,7 +684,7 @@ bool HaveIpVlan() {
     }
 }
 
-bool IsCfqActive() {
+static bool IsCfqActive() {
     TFolder f("/sys/block");
     std::vector<std::string> items;
     (void)f.Items(EFileType::Any, items);
@@ -734,6 +711,50 @@ bool IsCfqActive() {
         }
     }
     return true;
+}
+
+static bool kernel_features[static_cast<int>(KernelFeature::LAST)];
+
+bool KernelSupports(const KernelFeature &feature) {
+    return kernel_features[static_cast<int>(feature)];
+}
+
+void InitKernelFeatures() {
+    kernel_features[static_cast<int>(KernelFeature::CFS_BANDWIDTH)] =
+        HaveCgKnob("cpu", "cpu.cfs_period_us");
+    kernel_features[static_cast<int>(KernelFeature::CFS_GROUPSCHED)] =
+        HaveCgKnob("cpu", "cpu.shares");
+    kernel_features[static_cast<int>(KernelFeature::SMART)] =
+        HaveCgKnob("cpu", "cpu.smart");
+    kernel_features[static_cast<int>(KernelFeature::FSIO)] =
+        HaveCgKnob("memory", "memory.fs_bps_limit");
+    kernel_features[static_cast<int>(KernelFeature::LOW_LIMIT)] =
+        HaveCgKnob("memory", "memory.low_limit_in_bytes");
+    kernel_features[static_cast<int>(KernelFeature::RECHARGE_ON_PGFAULT)] =
+        HaveCgKnob("memory", "memory.recharge_on_pgfault");
+    kernel_features[static_cast<int>(KernelFeature::IPVLAN)] = HaveIpVlan();
+    kernel_features[static_cast<int>(KernelFeature::MAX_RSS)] = HaveMaxRss();
+    kernel_features[static_cast<int>(KernelFeature::CFQ)] = IsCfqActive();
+
+    std::cout << "Kernel features:" << std::endl;
+    std::cout << std::left << std::setw(30) << "  SMART" <<
+        (KernelSupports(KernelFeature::SMART) ? "yes" : "no") << std::endl;
+    std::cout << std::left << std::setw(30) << "  CFS_BANDWIDTH" <<
+        (KernelSupports(KernelFeature::CFS_BANDWIDTH) ? "yes" : "no") << std::endl;
+    std::cout << std::left << std::setw(30) << "  CFS_GROUPSCHED" <<
+        (KernelSupports(KernelFeature::CFS_GROUPSCHED) ? "yes" : "no") << std::endl;
+    std::cout << std::left << std::setw(30) << "  FSIO" <<
+        (KernelSupports(KernelFeature::FSIO) ? "yes" : "no") << std::endl;
+    std::cout << std::left << std::setw(30) << "  LOW_LIMIT" <<
+        (KernelSupports(KernelFeature::LOW_LIMIT) ? "yes" : "no") << std::endl;
+    std::cout << std::left << std::setw(30) << "  RECHARGE_ON_PGFAULT" <<
+        (KernelSupports(KernelFeature::RECHARGE_ON_PGFAULT) ? "yes" : "no") << std::endl;
+    std::cout << std::left << std::setw(30) << "  IPVLAN" <<
+        (KernelSupports(KernelFeature::IPVLAN) ? "yes" : "no") << std::endl;
+    std::cout << std::left << std::setw(30) << "  MAX_RSS" <<
+        (KernelSupports(KernelFeature::MAX_RSS) ? "yes" : "no") << std::endl;
+    std::cout << std::left << std::setw(30) << "  CFQ" <<
+        (KernelSupports(KernelFeature::CFQ) ? "yes" : "no") << std::endl;
 }
 
 template<typename T>

@@ -106,6 +106,8 @@ int main(int argc, char *argv[])
                 throw error.GetMsg();
         }
 
+        test::InitKernelFeatures();
+
         string what = "";
         if (argc >= 2)
             what = argv[1];
