@@ -129,8 +129,10 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectEq(v, GetDefaultGroup());
     ExpectApiSuccess(api.GetProperty(name, "env", v));
     ExpectEq(v, string(""));
-    ExpectApiSuccess(api.GetProperty(name, "memory_guarantee", v));
-    ExpectEq(v, string("0"));
+    if (HaveLowLimit()) {
+        ExpectApiSuccess(api.GetProperty(name, "memory_guarantee", v));
+        ExpectEq(v, string("0"));
+    }
     ExpectApiSuccess(api.GetProperty(name, "memory_limit", v));
     ExpectEq(v, string("0"));
     ExpectApiSuccess(api.GetProperty(name, "cpu_policy", v));
@@ -161,14 +163,20 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
 
     ExpectApiSuccess(api.GetProperty(name, "respawn", v));
     ExpectEq(v, string("false"));
-    ExpectApiSuccess(api.GetProperty(name, "cpu.smart", v));
-    ExpectEq(v, string("0"));
+    if (HaveSmart()) {
+        ExpectApiSuccess(api.GetProperty(name, "cpu.smart", v));
+        ExpectEq(v, string("0"));
+    }
     ExpectApiSuccess(api.GetProperty(name, "memory.limit_in_bytes", v));
     ExpectEq(v, string("0"));
-    ExpectApiSuccess(api.GetProperty(name, "memory.low_limit_in_bytes", v));
-    ExpectEq(v, string("0"));
-    ExpectApiSuccess(api.GetProperty(name, "memory.recharge_on_pgfault", v));
-    ExpectEq(v, string("0"));
+    if (HaveLowLimit()) {
+        ExpectApiSuccess(api.GetProperty(name, "memory.low_limit_in_bytes", v));
+        ExpectEq(v, string("0"));
+    }
+    if (HaveRechargeOnPgfault()) {
+        ExpectApiSuccess(api.GetProperty(name, "memory.recharge_on_pgfault", v));
+        ExpectEq(v, string("0"));
+    }
     ExpectApiSuccess(api.GetProperty(name, "stdin_path", v));
     ExpectEq(v, string("/dev/null"));
     ExpectApiSuccess(api.GetProperty(name, "stdout_path", v));
@@ -185,8 +193,10 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectEq(v, "a *:* rwm");
     ExpectApiSuccess(api.GetProperty(name, "capabilities", v));
     ExpectEq(v, "");
-    ExpectApiSuccess(api.GetProperty(name, "recharge_on_pgfault", v));
-    ExpectEq(v, "false");
+    if (HaveRechargeOnPgfault()) {
+        ExpectApiSuccess(api.GetProperty(name, "recharge_on_pgfault", v));
+        ExpectEq(v, "false");
+    }
     ExpectApiSuccess(api.GetProperty(name, "isolate", v));
     ExpectEq(v, "true");
     ExpectApiSuccess(api.GetProperty(name, "stdout_limit", v));
