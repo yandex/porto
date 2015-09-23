@@ -477,6 +477,21 @@ public:
     }
 };
 
+class TDirtyLimitProperty : public TUintValue, public TContainerValue {
+public:
+    TDirtyLimitProperty() :
+        TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE),
+        TContainerValue(P_DIRTY_LIMIT,
+                        "Dirty memory limit [bytes]",
+                        dynamicProperty) {
+        Implemented = memorySubsystem->SupportDirtyLimit();
+    }
+
+    uint64_t GetDefault() const override {
+        return 0;
+    }
+};
+
 class TRechargeOnPgfaultProperty : public TBoolValue, public TContainerValue {
 public:
     TRechargeOnPgfaultProperty() :
@@ -1534,6 +1549,7 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TStdoutLimitProperty,
         new TMemoryGuaranteeProperty,
         new TMemoryLimitProperty,
+        new TDirtyLimitProperty,
         new TRechargeOnPgfaultProperty,
         new TCpuPolicyProperty,
         new TCpuLimitProperty,

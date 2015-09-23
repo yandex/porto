@@ -21,6 +21,10 @@ All limits can be set in stopped and running states (if not specified otherwise)
   Memory allocation over limit will be rejected (returns ENOMEM). Page fault
   will case OOM killer invocation.
 
+* dirty\_limit (bytes, default 0)
+
+  Hard limit for dirty memory (unwritten to disk).
+
 # CPU
 
 * cpu\_guarantee ([0, 100]%, default 0%)

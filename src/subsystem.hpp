@@ -37,11 +37,13 @@ public:
     bool SupportGuarantee();
     TError SetGuarantee(std::shared_ptr<TCgroup> cg, uint64_t guarantee);
     bool SupportIoLimit();
+    bool SupportDirtyLimit();
     TError SetLimit(std::shared_ptr<TCgroup> cg, uint64_t limit);
     bool SupportRechargeOnPgfault();
     bool SupportSwap();
     TError RechargeOnPgfault(std::shared_ptr<TCgroup> cg, bool enable);
     TError SetIoLimit(std::shared_ptr<TCgroup> cg, uint64_t limit);
+    TError SetDirtyLimit(std::shared_ptr<TCgroup> cg, uint64_t limit);
 };
 
 class TFreezerSubsystem : public TSubsystem {

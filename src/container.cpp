@@ -418,6 +418,12 @@ TError TContainer::ApplyDynamicProperties() {
         return error;
     }
 
+    error = memorySubsystem->SetDirtyLimit(memcg, Prop->Get<uint64_t>(P_DIRTY_LIMIT));
+    if (error) {
+        L_ERR() << "Can't set " << P_DIRTY_LIMIT << ": " << error << std::endl;
+        return error;
+    }
+
     return TError::Success();
 }
 

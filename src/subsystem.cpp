@@ -168,11 +168,25 @@ bool TMemorySubsystem::SupportIoLimit() {
     return GetRootCgroup()->HasKnob("memory.fs_bps_limit");
 }
 
+bool TMemorySubsystem::SupportDirtyLimit() {
+    return GetRootCgroup()->HasKnob("memory.dirty_limit_in_bytes");
+}
+
 TError TMemorySubsystem::SetIoLimit(std::shared_ptr<TCgroup> cg, uint64_t limit) {
     if (!SupportIoLimit())
         return TError::Success();
 
     return cg->SetKnobValue("memory.fs_bps_limit", std::to_string(limit), false);
+}
+
+TError TMemorySubsystem::SetDirtyLimit(std::shared_ptr<TCgroup> cg, uint64_t limit) {
+    if (!SupportDirtyLimit())
+        return TError::Success();
+
+    if (limit)
+        return cg->SetKnobValue("memory.dirty_limit_in_bytes", std::to_string(limit), false);
+    else
+        return cg->SetKnobValue("memory.dirty_ratio", "50", false);
 }
 
 // Freezer
