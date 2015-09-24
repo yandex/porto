@@ -177,6 +177,15 @@ public:
     uint64_t GetDefault() const override;
 };
 
+class TDoubleValue : public TValue<double> {
+public:
+    TDoubleValue(int flags) : TValue(flags) {}
+
+    std::string ToString(const double &value) const override;
+    TError FromString(const std::string &value) override;
+    double GetDefault() const override;
+};
+
 class TBoolValue : public TValue<bool> {
 public:
     TBoolValue(int flags) : TValue(flags) {}

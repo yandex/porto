@@ -81,6 +81,29 @@ uint64_t TUintValue::GetDefault() const {
     return 0;
 }
 
+std::string TDoubleValue::ToString(const double &value) const {
+    char buffer[256];
+    snprintf(buffer, sizeof(buffer), "%lg", value);
+    return std::string(buffer);
+}
+
+TError TDoubleValue::FromString(const std::string &value) {
+    double tmp;
+    TError error = StringToDouble(value, tmp);
+    if (error)
+        return TError(EError::InvalidValue, "Invalid unsigned integer value " + value);
+
+    error = CheckValue(tmp);
+    if (error)
+        return error;
+
+    return Set(tmp);
+}
+
+double TDoubleValue::GetDefault() const {
+    return 0;
+}
+
 std::string TBoolValue::ToString(const bool &value) const {
     if (value)
         return "true";
