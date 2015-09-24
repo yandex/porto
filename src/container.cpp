@@ -303,8 +303,9 @@ std::shared_ptr<TNlLink> TContainer::GetLink(const std::string &name) const {
     return nullptr;
 }
 
-uint64_t TContainer::GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except, uint64_t exceptVal) const {
-    uint64_t val = 0;
+template <typename T>
+T TContainer::GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except, T exceptVal) const {
+    T val = 0;
 
     for (auto iter : Children)
         if (auto child = iter.lock()) {
@@ -313,7 +314,7 @@ uint64_t TContainer::GetChildrenSum(const std::string &property, std::shared_ptr
                 continue;
             }
 
-            uint64_t childval = child->Prop->Get<uint64_t>(property);
+            T childval = child->Prop->Get<T>(property);
             if (childval)
                 val += childval;
             else
@@ -323,26 +324,33 @@ uint64_t TContainer::GetChildrenSum(const std::string &property, std::shared_ptr
     return val;
 }
 
-bool TContainer::ValidHierarchicalProperty(const std::string &property, const uint64_t value) const {
-    uint64_t children = GetChildrenSum(property);
+template uint64_t TContainer::GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except = nullptr, uint64_t exceptVal = 0) const;
+template double TContainer::GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except = nullptr, double exceptVal = 0) const;
+
+template <typename T>
+bool TContainer::ValidHierarchicalProperty(const std::string &property, const T value) const {
+    T children = GetChildrenSum<T>(property);
     if (children && value < children)
         return false;
 
     for (auto c = GetParent(); c; c = c->GetParent()) {
-        uint64_t parent = c->Prop->Get<uint64_t>(property);
+        T parent = c->Prop->Get<T>(property);
         if (parent && value > parent)
             return false;
     }
 
     if (GetParent()) {
-        uint64_t parent = GetParent()->Prop->Get<uint64_t>(property);
-        uint64_t children = GetParent()->GetChildrenSum(property, shared_from_this(), value);
+        T parent = GetParent()->Prop->Get<T>(property);
+        T children = GetParent()->GetChildrenSum<T>(property, shared_from_this(), value);
         if (parent && children > parent)
             return false;
     }
 
     return true;
 }
+
+template bool TContainer::ValidHierarchicalProperty(const std::string &property, const uint64_t value) const;
+template bool TContainer::ValidHierarchicalProperty(const std::string &property, const double_t value) const;
 
 vector<pid_t> TContainer::Processes() {
     auto cg = GetLeafCgroup(freezerSubsystem);

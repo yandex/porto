@@ -157,8 +157,11 @@ public:
     bool ValidLink(const std::string &name) const;
     std::shared_ptr<TNlLink> GetLink(const std::string &name) const;
 
-    uint64_t GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except = nullptr, uint64_t exceptVal = 0) const;
-    bool ValidHierarchicalProperty(const std::string &property, const uint64_t value) const;
+    template <typename T>
+    T GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except = nullptr, T exceptVal = 0) const;
+    template <typename T>
+    bool ValidHierarchicalProperty(const std::string &property, const T value) const;
+
     std::vector<pid_t> Processes();
 
     TError SendSignal(int signal);
