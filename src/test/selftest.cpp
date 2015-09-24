@@ -3240,9 +3240,11 @@ static void TestLimits(TPortoAPI &api) {
     Say() << "Check cpu_limit and cpu_guarantee range" << std::endl;
     if (KernelSupports(KernelFeature::CFS_BANDWIDTH)) {
         ExpectApiFailure(api.SetProperty(name, "cpu_limit", "test"), EError::InvalidValue);
-        ExpectApiFailure(api.SetProperty(name, "cpu_limit", "0"), EError::InvalidValue);
         ExpectApiFailure(api.SetProperty(name, "cpu_limit", "101"), EError::InvalidValue);
+        ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "0"));
+        ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "0.5"));
         ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "1"));
+        ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "1.5"));
         ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "100"));
     }
 
@@ -3251,6 +3253,7 @@ static void TestLimits(TPortoAPI &api) {
         ExpectApiFailure(api.SetProperty(name, "cpu_guarantee", "-1"), EError::InvalidValue);
         ExpectApiFailure(api.SetProperty(name, "cpu_guarantee", "101"), EError::InvalidValue);
         ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "0"));
+        ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "1.5"));
         ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "100"));
     }
 
