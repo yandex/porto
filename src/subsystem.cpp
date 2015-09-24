@@ -260,11 +260,11 @@ TError TCpuSubsystem::SetPolicy(std::shared_ptr<TCgroup> cg, const std::string &
     return TError::Success();
 }
 
-TError TCpuSubsystem::SetLimit(std::shared_ptr<TCgroup> cg, const uint64_t limit) {
+TError TCpuSubsystem::SetLimit(std::shared_ptr<TCgroup> cg, double limit) {
     if (!SupportLimit())
         return TError::Success();
 
-    if (limit == 100)
+    if (limit >= 100)
         return cg->SetKnobValue("cpu.cfs_quota_us", "-1", false);
 
     std::string periodStr;
@@ -284,7 +284,7 @@ TError TCpuSubsystem::SetLimit(std::shared_ptr<TCgroup> cg, const uint64_t limit
     return cg->SetKnobValue("cpu.cfs_quota_us", std::to_string(runtime), false);
 }
 
-TError TCpuSubsystem::SetGuarantee(std::shared_ptr<TCgroup> cg, uint64_t guarantee) {
+TError TCpuSubsystem::SetGuarantee(std::shared_ptr<TCgroup> cg, double guarantee) {
     if (!SupportGuarantee())
         return TError::Success();
 
@@ -300,7 +300,8 @@ TError TCpuSubsystem::SetGuarantee(std::shared_ptr<TCgroup> cg, uint64_t guarant
     if (guarantee == 0)
         guarantee = 1;
 
-    return cg->SetKnobValue("cpu.shares", std::to_string(guarantee * rootShares), false);
+    return cg->SetKnobValue("cpu.shares", std::to_string(lround(guarantee * rootShares)),
+                            false);
 }
 
 bool TCpuSubsystem::SupportSmart() {

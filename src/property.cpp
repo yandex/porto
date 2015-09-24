@@ -543,41 +543,41 @@ double ParseCpuLimit(const std::string &str) {
     return v;
 }
 
-class TCpuLimitProperty : public TUintValue, public TContainerValue {
+class TCpuLimitProperty : public TDoubleValue, public TContainerValue {
 public:
     TCpuLimitProperty() :
-        TUintValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TDoubleValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_CPU_LIMIT,
                         "CPU limit: 1-100",
                         dynamicProperty) {
         Implemented = cpuSubsystem->SupportLimit();
     }
 
-    uint64_t GetDefault() const override {
+    double GetDefault() const override {
         return 100;
     }
 
     TError FromString(const std::string &str) override {
         try {
             auto v = ParseCpuLimit(str);
-            if (v < 1 || v > 100)
+            if (v < 0 || v > 100)
                 return TError(EError::InvalidValue,
-                        "cpu limit out of range 1-100: " + std::to_string(v));
+                        "cpu limit out of range 0-100: " + std::to_string(v));
 
             if (!GetContainer()->ValidHierarchicalProperty(P_CPU_LIMIT, v))
                 return TError(EError::InvalidValue, "invalid hierarchical value");
 
-            return Set((uint64_t)v);
+            return Set(v);
         } catch (...) {
             return TError(EError::InvalidValue, "invalid value");
         }
     }
 };
 
-class TCpuGuaranteeProperty : public TUintValue, public TContainerValue {
+class TCpuGuaranteeProperty : public TDoubleValue, public TContainerValue {
 public:
     TCpuGuaranteeProperty() :
-        TUintValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TDoubleValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_CPU_GUARANTEE,
                         "CPU guarantee: 0-100",
                         dynamicProperty) {
@@ -591,7 +591,7 @@ public:
                 return TError(EError::InvalidValue,
                         "cpu guarantee out of range 0-100: " + std::to_string(v));
 
-            return Set((uint64_t)v);
+            return Set(v);
         } catch (...) {
             return TError(EError::InvalidValue, "invalid value");
         }

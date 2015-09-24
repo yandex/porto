@@ -400,13 +400,13 @@ TError TContainer::ApplyDynamicProperties() {
     }
 
     if (Prop->Get<std::string>(P_CPU_POLICY) == "normal") {
-        error = cpuSubsystem->SetLimit(cpucg, Prop->Get<uint64_t>(P_CPU_LIMIT));
+        error = cpuSubsystem->SetLimit(cpucg, Prop->Get<double>(P_CPU_LIMIT));
         if (error) {
             L_ERR() << "Can't set " << P_CPU_LIMIT << ": " << error << std::endl;
             return error;
         }
 
-        error = cpuSubsystem->SetGuarantee(cpucg, Prop->Get<uint64_t>(P_CPU_GUARANTEE));
+        error = cpuSubsystem->SetGuarantee(cpucg, Prop->Get<double>(P_CPU_GUARANTEE));
         if (error) {
             L_ERR() << "Can't set " << P_CPU_GUARANTEE << ": " << error << std::endl;
             return error;

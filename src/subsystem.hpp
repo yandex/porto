@@ -64,8 +64,8 @@ class TCpuSubsystem : public TSubsystem {
 public:
     TCpuSubsystem() : TSubsystem("cpu") {}
     TError SetPolicy(std::shared_ptr<TCgroup> cg, const std::string &policy);
-    TError SetLimit(std::shared_ptr<TCgroup> cg, const uint64_t limit);
-    TError SetGuarantee(std::shared_ptr<TCgroup> cg, uint64_t guarantee);
+    TError SetLimit(std::shared_ptr<TCgroup> cg, double limit);
+    TError SetGuarantee(std::shared_ptr<TCgroup> cg, double guarantee);
     bool SupportSmart();
     bool SupportLimit();
     bool SupportGuarantee();
