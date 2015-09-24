@@ -1,3 +1,5 @@
+#include <cmath>
+
 #include "subsystem.hpp"
 #include "config.hpp"
 #include "cgroup.hpp"
