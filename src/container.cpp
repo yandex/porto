@@ -2219,6 +2219,7 @@ void TContainerWaiter::Signal(const TContainer *who) {
             if (who)
                 err = container->RelativeName(*who, name);
             Callback(client, err, name);
+            Client.reset();
         }
 
         client->Waiter = nullptr;
