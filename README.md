@@ -1,6 +1,8 @@
 Porto
 =====
 
+[![Build Status](https://travis-ci.org/yandex/porto.svg?branch=master)](https://travis-ci.org/yandex/porto)
+
 # OVERVIEW #
 
 Porto is a Linux container management system, developed by Yandex.
