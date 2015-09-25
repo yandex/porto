@@ -25,5 +25,3 @@ addons:
     - protobuf-compiler
     - gcc-4.7
     - g++-4.7
-
-sudo: false
