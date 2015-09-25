@@ -1,5 +1,740 @@
+yandex-porto (2.4) precise; urgency=low
+
+  * selftest: fix tests after supporting float cpu limit and guarantee
+  * container: allow setting float cpu limit and guarantee
+  * container: make GetChildrenSum() and ValidHierarchicalProperty() templates
+  * value: introduce TDoubleValue
+  * util: introduce StringToDouble()
+
+  * porto: do not send second response from wait timeout
+
+  * selftest: output __FILE__ instead of __func__ on error
+  * selftest: don't use prlimit binary in tests
+  * selftest: add memory.limit_in_bytes of root cgroup on modern kernels
+  * unix: Popen() shouldn't report sucess if process quit with error
+  * selftest: introduce kernel features infrastructure
+  * selftest: fix ShouldHaveValidProperties() on non-yandex kernels
+
+  * portoctl: print warning if pid is unknown at enter
+  * portoctl: update help for portoctl enter
+  * porto: add property "dirty_limit"
+  * test/perf: double creation time
+  * container: never ignore exit events
+  * scripts/mkimg: start os container with virt_mode=os
+  * porto: at restore sync all container cgroups for all tasks with freezer
+  * porto: start portoinit for isolated application containers
+  * porto: use TUnixSocket for communication with starting task
+  * util/unix: TUnixSocket
+  * porto: cleanup erorr handling in starting sequence
+  * porto: convert TTaskEnv into mutable unique_ptr
+
+  * test: fix race between delete veth0 and delete veth1
+  * test: ignore init task in isolated container
+  * test: fix races in waiting process exit
+
+  * porto: add "--container $name" into portoinit commandline
+  * porto: rename portod-meta-root into portoinit
+  * porto: merge meta-root and waiter fd for fexecve
+  * porto: use VPid only for triple-fork mode
+  * container: refactor initialization of supplementary groups
+
+  * C++ API: finish separation of C++ API
+  * C++ API: move error.hpp/cpp and protobuf.hpp/cpp to C++ API
+  * C++ API: remove dependency to cred.hpp from protobuf.hpp/cpp
+  * C++ API: don't use rpc.hpp in libporto
+  * C++ API: introduce TPortoAPIImpl
+  * C++ API: cosmetic changes (add std::, etc)
+
+  * docs: fix some grammar errors
+
+  * portoctl: fix Ctrl-C in portoctl exec command
+  * portotop: increase indent in container tree
+  * property: human friendly message for cpu limit/guarantee out-of-range error
+
+ -- Roman Gushchin <klamm@yandex-team.ru>  Thu, 24 Sep 2015 17:52:32 +0300
+
+yandex-porto (2.3.2) precise; urgency=low
+
+  * move sources into src
+  * do not start porto service in porto-container
+  * always get default allowed_devices from parent
+  * inherit default root from parent
+  * open default stdio from host mount namespace
+  * fork mount namespace from parent namespace for loop root
+  * rework hostname inheritance
+  * refactor permission checks, respects supplementary groups
+  * return error on starting already running sub-container
+  * start meta init using fexecve
+  * virtualize root_pid
+  * fork isolated pid-ns from parent pid-ns
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 16 Sep 2015 13:00:00 +0300
+
+yandex-porto (2.2) precise; urgency=low
+
+  * net: don't touch already configured interfaces in OS virt mode
+  * docs: merge docs from openporto branch
+
+ -- Roman Gushchin <klamm@yandex-team.ru>  Mon, 31 Aug 2015 18:14:50 +0300
+
+yandex-porto (2.1) precise; urgency=low
+
+  * fix tc issues
+  * new error codes in VolumeAPI
+  * fix bash-completion
+  * fix root/bind inheritance
+  * deny custom root/root_readonly/bind when isolate is false
+  * private property for volumes
+  * support net=netns <name> network mode
+  * cleanup and prepare for opensource
+
+ -- Roman Gushchin <klamm@yandex-team.ru>  Wed, 26 Aug 2015 15:04:21 +0300
+
+yandex-porto (2.0) precise; urgency=low
+
+  * enable scoped unlock by default (threading)
+  * don't print backtrace on SIGPIPE
+  * portoctl: add build command to build image layer
+  * support root_readonly=true for root=/
+  * fix meta container start when portod binary is updated (without restart)
+  * rework bind property (/<dir> binds to root <dir> binds to <root>/<cwd>)
+  * don't update dynamic properties when private is set
+  * add container journals
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Wed, 12 Aug 2015 17:52:00 +0300
+
+yandex-porto (1.18) precise; urgency=low
+
+  * add ceph rbd backend for volume
+  * add portoctl build command to build volume layer from config
+  * when virt_mode == os net defaults to none
+  * default net is set to inherited (use parent network)
+  * multithreading can be enabled via config option
+  * fix wrong macvlan default type (vepa) and broadcast address
+  * create temporary directory for default stdout/stderr when root is loop
+  * fix hangup when child writes to log after fork (localtime_r)
+  * don't fail if no suitable link found (just start without network support)
+  * move modprobe cls_cgroup to upstart script
+  * refuse to start portod in container
+  * check cpu_limit hierarchical value
+  * make sure partly constructed container dies when porto dies
+  * remove trailing spaces from portoctl list -1
+  * move killed frozen tasks into /porto when removing snapshot
+  * don't remove container tc class if it's shared with parent
+  * fix restart when client identify fails (wrong descriptor added to epoll)
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Fri, 31 Jul 2015 17:55:00 +0300
+
+yandex-porto (1.17) precise; urgency=low
+
+  * fix portod crash when can't lock child container
+  * python api: fix reading long replies (partial read)
+  * fix invalid tc classes on links that are created after porto startup
+  * portoctl: reset terminal on exec error
+  * portoctl: fail with correct exit status when can't access socket
+  * portotop: fixed crash when tab is pressed
+  * rpc: non-blocking reads and writes with 30s timeout (fixes portod hangs)
+  * wait for one minute for porto to destroy containers when sending SIGINT
+  * mkimg: add support for ipv6 in container
+  * validate number of messages in incoming rpc requests
+  * request handling time in log now includes stream flush time
+  * stability fixes in volume api
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 06 Jul 2015 14:36:00 +0300
+
+yandex-porto (1.16) precise; urgency=low
+
+  * convert docker2porto to new volume api
+  * fix hang in initgroups
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 23 Jun 2015 20:33:00 +0300
+
+yandex-porto (1.15) precise; urgency=low
+
+  * rework volume api (docker2porto doesn't work anymore)
+  * portoctl: fix signal handling
+  * allow time data in meta state
+  * support ipvlan in net property
+  * fix missing property value for SetProperty response in log
+  * support real numbers in cpu_limit/cpu_guarantee
+  * don't add predefined environment if user defines it
+  * multiple worker threads with single global lock in daemon
+  * fix portod memory leaks
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 22 Jun 2015 18:43:00 +0300
+
+yandex-porto (1.14) precise; urgency=low
+
+  * support for wait operation in python API
+  * fix for restoring stopped child in dead parent
+  * fix portoctl signal handling
+  * check parent container credentials when creating child
+  * check whether container belongs to porto while restoring
+  * fix wrong combined get error
+  * convert some errors/warnings to notice
+  * change socket permissions and check for porto group when client connects
+  * add enable_porto property
+  * fix max_rss - return hierarchical value
+  * support timeout in wait operation
+  * create tc filter for all protocols
+  * fix stdout/stderr permissions (700 -> 660)
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 08 Jun 2015 18:18:00 +0300
+
+yandex-porto (1.13) precise; urgency=low
+
+  * rework meta behavior (don't depend on isolate, don't change to stopped when all children exit)
+  * new combined get RPC
+  * new wait RPC
+  * / container now contains statistics for all host processes
+  * /porto container contains statistics for all porto containers
+  * set small soft limit for meta containers without running children
+  * enable dynamic network ifaces by default
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Wed, 27 May 2015 18:32:00 +0300
+
+yandex-porto (1.12) precise; urgency=low
+
+  * don't let user specify bind target that points to host root
+  * print usage and total in error code on memory_guarantee overcommitment
+  * support cores in cpu_limit/cpu_guarantee (for example 3c)
+  * portotop: common statistics, auto adjusting fields, custom update interval
+  * dot container
+  * remove net_bps & net_pps (never worked)
+  * fix task kill when isolate = false
+  * fix broken log rotate
+  * try to collapse log files instead of truncating
+  * don't reap processes until slave ack
+  * don't accept requests from unknown clients
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Fri, 22 May 2015 14:25:00 +0300
+
+yandex-porto (1.11) precise; urgency=low
+
+  * container namespaces
+  * deprecate "root_pid" and "parent" data
+  * bash completion for portoctl
+  * fix race, which caused porto to display -1 exit_code of dead container
+  * fix invalid state after OOM in parent container
+  * portoctl: top fixes (sorting, ...)
+
+ -- Roman Gushchin <klamm@yandex-team.ru>  Wed, 13 May 2015 17:30:01 +0300
+
+yandex-porto (1.10) precise; urgency=low
+
+  * hide non-supported properties/data
+  * python API: read varint properly
+  * portotop: repair container entering: bash and top
+
+ -- Roman Gushchin <klamm@yandex-team.ru>  Thu, 30 Apr 2015 15:32:05 +0300
+
+yandex-porto (1.9) precise; urgency=low
+
+  * python API: revert 60525de7a811601ce2a6e18d180562dc7b4e8282
+  * portoctl: fix differential values
+
+ -- Roman Gushchin <klamm@yandex-team.ru>  Mon, 27 Apr 2015 21:20:51 +0300
+
+yandex-porto (1.8) precise; urgency=low
+
+  * portoctl: several "portoctl top" bugfixes (broken terminal, etc) and enhancements
+
+ -- Roman Gushchin <klamm@yandex-team.ru>  Mon, 27 Apr 2015 16:55:50 +0300
+
+yandex-porto (1.7) precise; urgency=low
+
+  * Skip tasks with invalid freezer cgroup upon restore (fixes restoring wrong processes)
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Wed, 22 Apr 2015 17:18:00 +0400
+
+yandex-porto (1.6) precise; urgency=low
+
+  * Don't print non-modifying requests/replies to the log
+  * task: don't change restored cgroup if pid == portod pid (fixes hang)
+  * portoctl: add find command to find container by pid
+  * portoctl: complete top rewrite (old version is available as sort command)
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Fri, 17 Apr 2015 19:15:00 +0400
+
+yandex-porto (1.5) precise; urgency=low
+
+  * Set memory+swap limit if available for memory_limit
+  * Don't print error messages to log if network disabled for net_bytes, net_packets, net_drops, net_overlimits, net_bps, net_pss
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Thu, 16 Apr 2015 16:01:00 +0400
+
+yandex-porto (1.4) precise; urgency=low
+
+  * Fix wrong oom_killed for subcontainers with isolate=false
+  * portoctl: humanify max_rss
+  * debian: remove /etc/logrotate.d/yandex-porto
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 13 Apr 2015 21:09:00 +0400
+
+yandex-porto (1.3) precise; urgency=low
+
+  * New logrotate scheme (every hour, 400mb limit)
+  * Add NoSpace error
+  * Revise error messages (add more details)
+  * Return error from Destroy
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 13 Apr 2015 21:09:00 +0400
+
+yandex-porto (1.2) precise; urgency=low
+
+  * Use cp -a to copy volume resource data (fixes wrong links)
+  * Add container name to stdout/stderr default paths
+  * Hide allowed_devices and capabilities properties
+  * Remove cpu_priority property
+  * Support numeric ids in user/group properties
+  * Change cgroup stop timeout from 1s to 30s
+  * Add aging_time property
+  * Enable volumes support by default and automatically detect best backend (loop/overlayfs)
+  * Increase cgconfig wait timeout to 1m
+  * Rework docker2porto script which downloads docker image and converts it to porto (doesn't rely on docker binary anymore)
+  * Add memory_usage to porto_stat
+  * python: fix variant decoding
+  * portod: print warning when message is longer than expected
+  * portod: move daemon into cgroup and set 1g memory limit
+  * portoctl: add gc command
+  * portoctl: add find command
+  * portoctl: don't show time for dead containers in list
+  * portoctl: add -f option in list to print ascii art
+  * portoctl: add -t option in list to show topmost containers
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 07 Apr 2015 16:41:00 +0400
+
+yandex-porto (1.1) precise; urgency=low
+
+  * Fix memory leak
+  * Change freezer timeout to 30 seconds
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 30 Mar 2015 15:18:00 +0400
+
 yandex-porto (1.0) precise; urgency=low
+
+  * Refill link cache upon network even (fixes broken dynamic_ifaces)
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 23 Mar 2015 18:07:00 +0400
+
+yandex-porto (0.99) precise; urgency=low
+
+  * Fix net_ceil name (net_limit)
+  * Change error message when container can't be started due to resource limits
+  * Add pid of client to rpc request/response
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Fri, 20 Mar 2015 14:07:00 +0400
+
+yandex-porto (0.98) precise; urgency=low
+
+  * Fix setting memory_guarantee to 0 (previous versions ignored it)
+  * Support all resource limits with isolate=false
+  * portod: handle events from master before client events
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 16 Mar 2015 20:41:00 +0400
+
+yandex-porto (0.97) precise; urgency=low
+
+  * Fix interrupted message error when message size is 1024
+  * Fix io_limit on 3.18
+  * Fix error when OOM kills portod-spawn-X
+  * Add net_tos dummy
+  * Return correct error when can't change memory_limit
+  * portoctl: add -k option to dget/pget
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Thu, 12 Mar 2015 16:05:00 +0400
+
+yandex-porto (0.96) precise; urgency=low
+
+  * Dump stack on SIGSEGV and SIGPIPE
+  * Change default max clients 128 -> 512
+  * Add number of running containers to porto_stat
+  * Don't die on SIGPIPE (regression)
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Wed, 04 Mar 2015 16:18:00 +0400
+
+yandex-porto (0.95) precise; urgency=low
+
+  * Don't fail on cpu.cfs_period_us/cpu.shares with default cpu_policy/cpu_guarantee
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Fri, 27 Feb 2015 17:10:00 +0400
+
+yandex-porto (0.94) precise; urgency=low
+
+  * Add checks for [] in non-map properties
+  * Set default network guarantee to 1 byte/sec
+  * Make sure all interfaces specified for net map
+  * Add net_bps and net_pps statistics
+  * Skip all links without queue
+  * Add number of interrupted reads to statistics
+  * portoctl: print more details about failed property in run
+  * Deprecate cpu_priority, add cpu_limit and cpu_guarantee properties
+  * Add io_policy and io_limit properties
+  * Don't leak sockets with dynamic_ifaces and improve performance
+  * Fix description for net property
+  * Fix wrong unlimited spelling for ulimit property
+  * Fix capabilities property on 3.18
+  * Try to create tc class even if qdisk exists
+  * Use pivot_root instead of chroot for filesystem isolation
+  * Set correct cwd for child(isolate=false) with parent (isolate=true)
+  * mkimg: use /dev/null as main container stdout_path and stderr_path
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Thu, 26 Feb 2015 17:32:00 +0400
+
+yandex-porto (0.93) precise; urgency=low
+
+  * Fix wrong error code when destroying container that doesn't exist
+  * Fix wrong container state (running) when we didn't get exit event
+  * portoctl: fix help for exec
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 17 Feb 2015 16:45:00 +0400
+
+yandex-porto (0.92) precise; urgency=low
+
+  * Don't show error when can't kill process that doesn't exist
+  * Generate new id if the one we are recovering is already used
+  * Fix resource reusage and volume recovery
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Fri, 13 Feb 2015 15:52:00 +0400
+
+yandex-porto (0.91) precise; urgency=low
+
+  * Fix sparse id map range
+  * Fix check for already running instance
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Thu, 12 Feb 2015 19:05:00 +0400
+
+yandex-porto (0.90) precise; urgency=low
+
+  * Volume API (disabled by default)
+  * Add more logging for process creation
+  * Skip restricted_root checks for root user
+  * Don't remove custom stdout/stderr
+  * Stop dead children when stopping root
+  * Run portod-meta-root in meta container with isolate=true
+  * Remove restriction on memory_guarantee/recharge_on_pgfault with isolate=false
+  * portoctl: fix 100% cpu load for exec
+  * portoctl: make list time column longer
+  * Count number of successful containers starts in porto_stat
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Thu, 12 Feb 2015 15:00:00 +0400
+
+yandex-porto (0.34) precise; urgency=low
+
+  * use_hierarchy=true by default (kernels should be already updated)
+  * Print contents on interrupted message
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 09 Feb 2015 19:22:00 +0400
+
+yandex-porto (0.33) precise; urgency=low
+
+  * Fix loop devices removal
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 09 Feb 2015 18:18:00 +0400
+
+yandex-porto (0.32) precise; urgency=low
+
+  * Don't remove custom stdout/stderr
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Thu, 05 Feb 2015 14:41:00 +0400
+
+yandex-porto (0.31) precise; urgency=low
+
+  * Add SYS_RESOURCE to restricted_root
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 20 Jan 2015 20:57:00 +0400
+
+yandex-porto (0.30) precise; urgency=low
+
+  * Poppulate /run on tmpfs
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 20 Jan 2015 13:53:00 +0400
+
+yandex-porto (0.29) precise; urgency=low
+
+  * Add restricted_root support
+  * portod: make evtfd O_NONBLOCK
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 19 Jan 2015 22:04:00 +0400
+
+yandex-porto (0.28) precise; urgency=low
+
+  * Add loop allocation debug printouts
+  * Don't fail on error when restoring
+  * Set ip address after interface is up
+  * Change default /run/porto/kvs permission
+  * Support G/M/K suffix for memory_limit/memory_guarantee
+  * portoctl: don't create tty in exec when STDIN is not a tty
+  * portoctl: fix exec environment parsing
+  * portoctl: don't handle stdin POLLHUP in exec
+  * mkimg: make sure we find only one network interface
+  * mkimg: don't use colors when stdout is file
+  * mkimg: remove ifconfig
+  * mkimg: remove sudo
+  * mkimg: fix link UP check
+  * mkimg: support customization script
+  * mkimg: use NAT for networking inside container
+  * mkimg: use non-interactive debconf frontend
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 13 Jan 2015 16:50:00 +0400
+
+yandex-porto (0.27) precise; urgency=low
+
+  * Fix version
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Thu, 18 Dec 2014 21:03:00 +0400
+
+yandex-porto (0.26) precise; urgency=low
+
+  * Destroy child containers when parent is destroyed
+  * Fix child mounts when isolate=false
+  * Fix possible invalid state detection after recovery
+  * Make root_readonly work even if root is not specified
+  * Support dynamic network interfaces (off by default)
+  * Support privileged users in config
+  * Don't restrict /proc/sys for privileged containers
+  * Fix bind for sockets/devices/etc
+  * debian: start after yandex-network is configured
+  * net: generate default mac based on hostname
+  * net: add mtu support
+  * net: veth support mac address
+  * portoctl: fix wrong terminal size when doing exec
+  * portoctl: humanify properties in top
+  * portoctl: handle signals in portoctl exec
+  * portoctl: print help to stderr
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Thu, 18 Dec 2014 20:39:00 +0400
+
+yandex-porto (0.25) precise; urgency=low
+
+  * upstart: fix possible race with cgroup-bin
+  * Use either root or cwd as bind prefix but not both
+  * Change freeze timeout to 2 sec
+  * Make sure child is dead before respawning
+  * Fix broken daemon when spawning with network error
+  * Tune RLIMIT_NOFILE limit in portod
+  * Add limit for total container number
+  * Fix empty /etc/hostname
+  * Create /dev/fd link to /proc/self/fd when root is isolated
+  * portoctl: support multiple containers in create/get/pget/dget/start/stop/pause/resume/destroy
+  * portoctl: support properties in top
+  * portoctl: show dead containers in top
+  * portoctl: show time since container death in list
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 08 Dec 2014 17:32:00 +0400
+
+yandex-porto (0.24) precise; urgency=low
+
+  * TEMPORARY: set use_hierarchy to 0 by default
+  * Don't show root in portoctl list
+  * Add network interface aliases
+  * Make kill timeout configurable
+  * Change date formate in log
+  * Send SIGKILL in destroy
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 01 Dec 2014 21:28:00 +0400
+
+yandex-porto (0.23) precise; urgency=low
+
+  * Bring back functionality which removes old dead containers
+  * Fix master leak (status queue always grows and never shrinks)
+  * Convert daemon statistics to shared mmap and add more data
+  * Add small ack queue to master to remove unneeded events
+  * Don't kill container when network is switched off on update
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Wed, 26 Nov 2014 13:36:00 +0400
+
+yandex-porto (0.22) precise; urgency=low
+
+  * Add network defaults into config
+  * Fix oom_killed data when non-root process is killed
+  * Convert some errors to warnings
+  * Rotate logs on SIGUSR1
+  * Change default net_guarantee
+  * Fix possible error when container changes state to stopped, not dead
+  * portoctl: support index in properties\data
+  * Fix std files path when root doesn't exist
+  * Fix error message format when task can't start
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 24 Nov 2014 18:51:00 +0400
+
+yandex-porto (0.21) precise; urgency=low
+
+  * Fix version generation
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 18 Nov 2014 19:27:00 +0400
+
+yandex-porto (0.20) precise; urgency=low
+
+  * Allow . (dot) in container name
+  * Support ext4 formatted file as rootfs (loop mounted)
+  * Don't read stdout/stderr in case of device/pipe/socket
+  * Add capabilities property
+  * Always restrict /proc and /sys
+  * Fix bind property to support binding into container /sys subdirectory
+  * Add daemon version request to RPC
+  * Fix network data persistence
+  * Fix paused state recovery
+  * Fix portod socket removal upon shutdown
+  * Adjust portod OOM score
+  * libporto: Don't retry RPC if socket doesn't exist
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 18 Nov 2014 18:46:00 +0400
+
+yandex-porto (0.19) precise; urgency=low
+
+  * Fix recovery
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Wed, 12 Nov 2014 19:23:00 +0400
+
+yandex-porto (0.18) precise; urgency=low
+
+  * fix release version
+
+ -- Stas Ivanichkin <sivanichkin@yandex-team.ru>  Tue, 11 Nov 2014 23:13:06 +0300
+
+yandex-porto (0.17ubuntu1) precise; urgency=low
+
+  * added new packege yandex-search-group-porto
+  * added new package yandex-search-porto
+
+ -- Stas Ivanichkin <sivanichkin@yandex-team.ru>  Tue, 11 Nov 2014 22:18:56 +0300
+
+yandex-porto (0.17) precise; urgency=low
+
+  * Fix network sharing when network support is disabled
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Tue, 11 Nov 2014 14:30:00 +0400
+
+yandex-porto (0.16) precise; urgency=low
+
+  * Another attempt to fix package upgrade :-(
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 10 Nov 2014 23:13:00 +0400
+
+yandex-porto (0.15) precise; urgency=low
+
+  * Fix package upgrade spelling
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 10 Nov 2014 22:43:00 +0400
+
+yandex-porto (0.14) precise; urgency=low
+
+  * Fix package upgrade
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 10 Nov 2014 22:18:00 +0400
+
+yandex-porto (0.13) precise; urgency=low
+
+  * Fix invalid task cgroups upon recovery
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 10 Nov 2014 21:31:00 +0400
+
+yandex-porto (0.12) precise; urgency=low
+
+  * Phase 3 beta release new features:
+   - Multiple networks support: network data and properties are now per-device
+   - New privilege mode: only root can create and start containers with custom user/group
+   - New allowed_devices property
+   - New net property to isolate container network and create macvlans
+   - New bind property to bind host directories into container
+   - New max_respawns property to limit total number of container respawns
+   - New python api with OOP
+   - New root property to isolate container filesystem
+   - New hostname property to change container hostname and isolate UTS
+   - New bind_dns property which binds host /etc/hosts and /etc/resolv.conf into container
+   - New readonly_root property
+   - New io_read/io_write data with container per device IO statistics
+   - Set PORTO_HOST environment variable which contains host name
+   - Set PORTO_NAME environment variable which contains container name
+   - New meta containers as a way to limit resources for children containers
+
+  * Fixes:
+   - Don't depend on system libnl version, build and use our own
+   - Containers basedir is removed upon portod startup (when no containers restored)
+   - Default number of clients changed to 128
+   - Fix libporto crash on long protobuf messages
+   - Start() error message is now returned via API (not via syslog)
+   - Don't add container cwd to $PATH
+   - Minor/major_faults now include children
+   - Default net_guarantee is changed to 10Mbit
+   - IPC is now isolated when isolate property is true
+   - cpu_priority property is now dynamic
+   - portoctl doesn't add extra newline for get
+   - Fix libporto hang when client doesn't have permissions to connect to socket
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 10 Nov 2014 18:21:00 +0400
+
+yandex-porto (0.11) precise; urgency=low
+
+  * added new package python-portopy (python API for porto)
+
+ -- Stas Ivanichkin <sivanichkin@yandex-team.ru>  Mon, 10 Nov 2014 14:17:07 +0300
+
+yandex-porto (0.10) precise; urgency=low
+
+  * Add ulimit property
+  * Add portoctl exec command
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 13 Oct 2014 19:24:04 +0400
+
+yandex-porto (0.9) precise; urgency=low
+
+  * Fix recovery for containers with colon in name
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Fri, 10 Oct 2014 18:09:47 +0400
+
+yandex-porto (0.8) precise; urgency=low
+
+  * Fix sorting in portoctl top
+  * Add missing log rotate for portoloop.log
+  * Remove cmake from build requirements
+  * Rework isolate=false for child containers (now share namespace with parent)
+  * Add private property so users can attach application specific data to containers
+  * Add stdout_limit property to limit number of bytes returned from stdout/stderr data
+  * When client disconnects print it's pid, gid and uid in the log
+  * Fix bug which prevents setting empty string to properties
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Fri, 10 Oct 2014 16:45:26 +0400
+
+yandex-porto (0.7) precise; urgency=low
+
+  * Fix permission 
+
+ -- Eugene Kilimchuk <ekilimchuk@yandex-team.ru>  Wed, 08 Oct 2014 18:03:06 +0400
+
+yandex-porto (0.6) stable; urgency=low
+
+  * Merge portoexec to portoctl and fixed chown for portoctl. 
+
+ -- Eugene Kilimchuk <ekilimchuk@yandex-team.ru>  Mon, 06 Oct 2014 21:21:50 +0400
+
+yandex-porto (0.5) stable; urgency=low
+
+  * Added portoexec. 
+
+ -- Eugene Kilimchuk <ekilimchuk@yandex-team.ru>  Tue, 30 Sep 2014 14:14:57 +0400
+
+yandex-porto (0.4) stable; urgency=low
+
+  * Phase 2 beta release 2.
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 29 Sep 2014 21:45:00 +0400
+
+yandex-porto (0.3) stable; urgency=low
+
+  * Phase 2 beta release.
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 29 Sep 2014 17:32:00 +0400
+
+yandex-porto (0.2) stable; urgency=low
+
+  * Phase 1 release.
+
+ -- Stanislav Fomichev <stfomichev@yandex-team.ru>  Mon, 01 Sep 2014 15:48:46 +0400
+
+yandex-porto (0.1) stable; urgency=low
 
   * Initial release.
 
- -- Roman Gushchin <klamm@yandex-team.ru>  Wed, 26 Aug 2015 15:04:21 +0300
+ -- Eugene Kilimchuk <ekilimchuk@yandex-team.ru>  Wed, 27 Aug 2014 20:55:00 +0400
