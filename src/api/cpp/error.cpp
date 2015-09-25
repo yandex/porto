@@ -1,7 +1,6 @@
 #include "error.hpp"
 
 extern "C" {
-#include <string.h>
 #include <unistd.h>
 }
 
@@ -95,13 +94,13 @@ bool TError::Deserialize(int fd, TError &error) {
     return true;
 }
 
-const TError& TError::Success() {
-    static TError e;
+const TError &TError::Success() {
+    static const TError e;
     return e;
 }
 
-const TError& TError::Queued() {
-    static TError e(EError::Queued, "Queued");
+const TError &TError::Queued() {
+    static const TError e(EError::Queued, "Queued");
     return e;
 }
 
@@ -109,7 +108,7 @@ TError TError::FromErrno(const std::string &description) {
     return TError(EError::Unknown, errno, description);
 }
 
-std::ostream& operator<<(std::ostream& os, const TError& err) {
+std::ostream &operator<<(std::ostream &os, const TError &err) {
     os << err.GetErrorName() << " (" << err.GetMsg() << ")";
     return os;
 }
