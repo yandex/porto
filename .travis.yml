@@ -9,6 +9,9 @@ compiler: gcc
 branches:
   only: master
 
+env:
+  - DISTRO=ubuntu-trusty
+
 addons:
   apt:
     # For gcc-4.7
@@ -25,4 +28,3 @@ addons:
     - protobuf-compiler
     - gcc-4.7
     - g++-4.7
-    - linux-libc-dev=3.13.0-29
