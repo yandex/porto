@@ -23,6 +23,10 @@ endif()
 
 find_library(PB NAMES libprotobuf.a)
 find_package(Protobuf REQUIRED)
+# FindProtobuf requires only the libraries to be present
+if(NOT PROTOBUF_PROTOC_EXECUTABLE)
+	message(FATAL_ERROR "Couldn't find protoc executable.")
+endif()
 include_directories(${PROTOBUF_INCLUDE_DIRS})
 
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
@@ -35,13 +39,16 @@ set(PYTHON_SOURCES "")
 if(ENABLE_PYTHON)
 	add_custom_command(
 		OUTPUT "api/python/porto/rpc_pb2.py"
-		COMMAND protoc ARGS --python_out=${CMAKE_CURRENT_SOURCE_DIR}/api/python/porto/ --proto_path=${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/rpc.proto
+		COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} ARGS --python_out=${CMAKE_CURRENT_SOURCE_DIR}/api/python/porto/ --proto_path=${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/rpc.proto
 		DEPENDS rpc.proto
 		VERBATIM)
 	set(PYTHON_SOURCES "api/python/porto/rpc_pb2.py")
 endif()
 
-add_custom_target(version.hpp ${CMAKE_SOURCE_DIR}/GIT-VERSION-GEN VERBATIM)
+add_custom_target(version.hpp
+	COMMAND ./GIT-VERSION-GEN ${CMAKE_CURRENT_BINARY_DIR}/version.hpp
+	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+	VERBATIM)
 
 set_source_files_properties(tags PROPERTIES GENERATED true)
 add_custom_target(tags COMMAND ctags -R --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -82,4 +89,7 @@ install(
     TARGETS portod portoctl ${TEST_TARGETS} portoinit
     RUNTIME DESTINATION sbin
     LIBRARY DESTINATION lib
+)
+install(
+    DIRECTORY api/python/porto/ DESTINATION share/pyshared/porto
 )

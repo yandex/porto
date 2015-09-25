@@ -9,10 +9,14 @@ fi
 TEXT="${HASH}\nconst std::string GIT_TAG = \"$TAG\";"
 
 TMP="GIT-VERSION-NEW"
+TARGET=$1
+if [ -z $TARGET ]; then
+	TARGET=./version.hpp
+fi
 
 echo -e "$TEXT" > $TMP
-if [ ! "$(cat $TMP)" = "$(cat version.hpp)" ]; then
-	mv $TMP version.hpp
+if [ ! -f $TARGET ] || [ ! "$(cat $TMP)" = "$(cat $TARGET)" ]; then
+	mv $TMP $TARGET
 else
 	rm $TMP
 fi
