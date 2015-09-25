@@ -4997,7 +4997,7 @@ static void TestCgroups(TPortoAPI &api) {
 
     TFolder qwerty(freezerCg);
     ExpectEq(qwerty.Exists(), true);
-    ExpectEq(qwerty.Remove(), false);
+    ExpectSuccess(qwerty.Remove());
 
     Say() << "Make sure we can remove freezed cgroups" << std::endl;
 
@@ -5081,7 +5081,7 @@ static void TestBadClient(TPortoAPI &api) {
     int fd;
     string buf = "xyz";
     alarm(sec);
-    ExpectApiSuccess(ConnectToRpcServer(config().rpc_sock().file().path(), fd));
+    ExpectSuccess(ConnectToRpcServer(config().rpc_sock().file().path(), fd));
     ExpectEq(write(fd, buf.c_str(), buf.length()), buf.length());
 
     TPortoAPI api2(config().rpc_sock().file().path(), 0);
