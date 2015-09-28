@@ -39,9 +39,9 @@ struct TPortoGetResponse {
     std::string ErrorMsg;
 };
 
-class TPortoAPIImpl;
-
 class TPortoAPI {
+    class TPortoAPIImpl;
+
     std::unique_ptr<TPortoAPIImpl> Impl;
 
 public:

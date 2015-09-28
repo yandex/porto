@@ -5,7 +5,7 @@ extern "C" {
 #include <unistd.h>
 }
 
-class TPortoAPIImpl {
+class TPortoAPI::TPortoAPIImpl {
 private:
     int Fd;
     const int Retries;
@@ -34,27 +34,27 @@ public:
     void Cleanup();
 };
 
-TPortoAPIImpl::TPortoAPIImpl(const std::string &path, int retries) : Fd(-1),
+TPortoAPI::TPortoAPIImpl::TPortoAPIImpl(const std::string &path, int retries) : Fd(-1),
                                                                      Retries(retries),
                                                                      RpcSocketPath(path) {
 }
 
-TPortoAPIImpl::~TPortoAPIImpl() {
+TPortoAPI::TPortoAPIImpl::~TPortoAPIImpl() {
     Cleanup();
 }
 
-void TPortoAPIImpl::Cleanup() {
+void TPortoAPI::TPortoAPIImpl::Cleanup() {
     close(Fd);
     Fd = -1;
 }
 
-void TPortoAPIImpl::Send(rpc::TContainerRequest &req) {
+void TPortoAPI::TPortoAPIImpl::Send(rpc::TContainerRequest &req) {
     google::protobuf::io::FileOutputStream post(Fd);
     WriteDelimitedTo(req, &post);
     post.Flush();
 }
 
-int TPortoAPIImpl::Recv(rpc::TContainerResponse &rsp) {
+int TPortoAPI::TPortoAPIImpl::Recv(rpc::TContainerResponse &rsp) {
     google::protobuf::io::FileInputStream pist(Fd);
     if (ReadDelimitedFrom(&pist, &rsp)) {
         LastErrorMsg = rsp.errormsg();
@@ -65,24 +65,12 @@ int TPortoAPIImpl::Recv(rpc::TContainerResponse &rsp) {
     }
 }
 
-int TPortoAPIImpl::SendReceive(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
+int TPortoAPI::TPortoAPIImpl::SendReceive(rpc::TContainerRequest &req, rpc::TContainerResponse &rsp) {
     Send(req);
     return Recv(rsp);
 }
 
-TPortoAPI::TPortoAPI(const std::string &path, int retries) :
-    Impl(new TPortoAPIImpl(path, retries)) {
-}
-
-TPortoAPI::~TPortoAPI() {
-    Impl = nullptr;
-}
-
-void TPortoAPI::Cleanup() {
-    Impl->Cleanup();
-}
-
-int TPortoAPIImpl::Rpc() {
+int TPortoAPI::TPortoAPIImpl::Rpc() {
     int ret;
     int retries = Retries;
     LastErrorMsg = "";
@@ -118,6 +106,18 @@ exit:
     Req.Clear();
 
     return LastError;
+}
+
+TPortoAPI::TPortoAPI(const std::string &path, int retries) :
+    Impl(new TPortoAPIImpl(path, retries)) {
+}
+
+TPortoAPI::~TPortoAPI() {
+    Impl = nullptr;
+}
+
+void TPortoAPI::Cleanup() {
+    Impl->Cleanup();
 }
 
 int TPortoAPI::Raw(const std::string &message, std::string &responce) {
