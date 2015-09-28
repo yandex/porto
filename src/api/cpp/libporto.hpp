@@ -41,12 +41,15 @@ struct TPortoGetResponse {
     std::string ErrorMsg;
 };
 
-using TResponceMap = std::map<std::string, std::map<std::string, TPortoGetResponse>>;
+using TGetResponceMap = std::map<std::string, std::map<std::string, TPortoGetResponse>>;
 
 class TPortoAPI {
     class TPortoAPIImpl;
 
     std::unique_ptr<TPortoAPIImpl> Impl;
+
+    TPortoAPI(const TPortoAPI&) = delete;
+    void operator=(const TPortoAPI&) = delete;
 
 public:
     TPortoAPI(const std::string &path, int retries = 5);
@@ -71,7 +74,7 @@ public:
 
     int Get(const TStringVector &name,
             const TStringVector &variable,
-            TResponceMap &result);
+            TGetResponceMap &result);
 
     int GetProperty(const std::string &name, const std::string &property, std::string &value);
     int SetProperty(const std::string &name, const std::string &property, std::string value);
@@ -89,12 +92,12 @@ public:
                      TVolumeDescription &result);
     int CreateVolume(std::string &path,
                      const std::map<std::string, std::string> &config);
-    int LinkVolume(const std::string &path, const std::string &container = "");
-    int UnlinkVolume(const std::string &path, const std::string &container = "");
+    int LinkVolume(const std::string &path, const std::string &container = std::string());
+    int UnlinkVolume(const std::string &path, const std::string &container = std::string());
     int ListVolumes(const std::string &path, const std::string &container,
                     std::vector<TVolumeDescription> &volumes);
     int ListVolumes(std::vector<TVolumeDescription> &volumes) {
-        return ListVolumes("", "", volumes);
+        return ListVolumes(std::string(), std::string(), volumes);
     }
 
     int ImportLayer(const std::string &layer, const std::string &tarball, bool merge = false);

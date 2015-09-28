@@ -85,7 +85,7 @@ int TPortoAPI::TPortoAPIImpl::SendReceive(rpc::TContainerRequest &req, rpc::TCon
 int TPortoAPI::TPortoAPIImpl::Rpc() {
     int ret;
     int retries = Retries;
-    LastErrorMsg = "";
+    LastErrorMsg.clear();
     LastError = (int)EError::Unknown;
 
 retry:
@@ -200,7 +200,7 @@ int TPortoAPI::Dlist(std::vector<TData> &dlist) {
 
 int TPortoAPI::Get(const TStringVector &name,
                    const TStringVector &variable,
-                   TResponceMap &result) {
+                   TGetResponceMap &result) {
     auto get = Impl->GetReq().mutable_get();
 
     for (const auto &n : name)
