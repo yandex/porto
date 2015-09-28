@@ -78,7 +78,7 @@ static void Create(TPortoAPI &api, const std::string &name, const std::string &c
         TFolder f(cwd);
         if (!f.Exists()) {
             TError error = f.Create(0755, true);
-            ExpectEq(error, false);
+            ExpectSuccess(error);
         }
     }
 }

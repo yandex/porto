@@ -169,7 +169,8 @@ size_t GetTotalMemory() {
 int CreatePidFile(const std::string &path, const int mode) {
     TFile f(path, mode);
 
-    return f.WriteStringNoAppend(std::to_string(getpid()));
+    const auto& error = f.WriteStringNoAppend(std::to_string(getpid()));
+    return error ? 1 : 0;
 }
 
 void RemovePidFile(const std::string &path) {

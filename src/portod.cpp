@@ -908,7 +908,7 @@ static int MasterMain(bool respawn) {
     std::shared_ptr<TEpollLoop> ELoop = std::make_shared<TEpollLoop>();
     TError error = ELoop->Create();
     if (error)
-        return error;
+        return EXIT_FAILURE;
 
     // We want propogate mounts into containers
     error = TMount::Remount("/", MS_REC | MS_SHARED);

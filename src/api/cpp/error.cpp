@@ -1,19 +1,22 @@
 #include "error.hpp"
 
 extern "C" {
-#include <string.h>
 #include <unistd.h>
 }
 
 TError::TError() : Error(EError::Success) {
 }
 
-TError::TError(EError e, std::string description, int eno) :
+TError::TError(EError e, const std::string &description, int eno) :
     Error(e), Description(description), Errno(eno) {
 }
 
-TError::TError(EError e, int eno, std::string description) :
+TError::TError(EError e, int eno, const std::string &description) :
     Error(e), Description(std::string(strerror(eno)) + ": " + description), Errno(eno) {
+}
+
+TError::TError(EError e, std::string &&description, int eno) :
+    Error(e), Description(std::move(description)), Errno(eno) {
 }
 
 TError::operator bool() const {
@@ -42,16 +45,16 @@ TError TError::Serialize(int fd) const {
 
     ret = write(fd, &Error, sizeof(Error));
     if (ret != sizeof(Error))
-        return TError(EError::Unknown, errno, "Can't serialize error");
+        return FromErrno("Can't serialize error");
     ret = write(fd, &Errno, sizeof(Errno));
     if (ret != sizeof(Errno))
-        return TError(EError::Unknown, errno, "Can't serialize errno");
+        return FromErrno("Can't serialize errno");
     ret = write(fd, &len, sizeof(len));
     if (ret != sizeof(len))
-        return TError(EError::Unknown, errno, "Can't serialize length");
+        return FromErrno("Can't serialize length");
     ret = write(fd, Description.data(), len);
     if (ret != len)
-        return TError(EError::Unknown, errno, "Can't serialize description");
+        return FromErrno("Can't serialize description");
 
     return TError::Success();
 }
@@ -59,7 +62,6 @@ TError TError::Serialize(int fd) const {
 bool TError::Deserialize(int fd, TError &error) {
     EError err;
     int errno;
-    std::string desc;
     int ret;
     int len;
 
@@ -67,46 +69,46 @@ bool TError::Deserialize(int fd, TError &error) {
     if (ret == 0)
         return false;
     if (ret != sizeof(Error)) {
-        error = TError(EError::Unknown, errno, "Can't deserialize error");
+        error = FromErrno("Can't deserialize error");
         return true;
     }
     ret = read(fd, &errno, sizeof(Errno));
     if (ret != sizeof(Errno)) {
-        error = TError(EError::Unknown, errno, "Can't deserialize errno");
+        error = FromErrno("Can't deserialize errno");
         return true;
     }
     ret = read(fd, &len, sizeof(len));
     if (ret != sizeof(len)) {
-        error = TError(EError::Unknown, errno, "Can't deserialize length");
+        error = FromErrno("Can't deserialize length");
         return true;
     }
 
-    char *buf = new char[len];
-    ret = read(fd, buf, len);
+    std::string desc(len, '\0');
+    ret = read(fd, &desc[0], len);
     if (ret != len) {
-        delete[] buf;
-        error = TError(EError::Unknown, errno, "Can't deserialize description");
+        error = FromErrno("Can't deserialize description");
         return true;
     }
 
-    desc = std::string(buf, len);
-    delete[] buf;
-
-    error = TError(err, desc, errno);
+    error = TError(err, std::move(desc), errno);
     return true;
 }
 
-const TError& TError::Success() {
-    static TError e;
+const TError &TError::Success() {
+    static const TError e;
     return e;
 }
 
-const TError& TError::Queued() {
-    static TError e(EError::Queued, "Queued");
+const TError &TError::Queued() {
+    static const TError e(EError::Queued, "Queued");
     return e;
 }
 
-std::ostream& operator<<(std::ostream& os, const TError& err) {
+TError TError::FromErrno(const std::string &description) {
+    return TError(EError::Unknown, errno, description);
+}
+
+std::ostream &operator<<(std::ostream &os, const TError &err) {
     os << err.GetErrorName() << " (" << err.GetMsg() << ")";
     return os;
 }

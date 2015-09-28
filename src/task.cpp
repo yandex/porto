@@ -761,7 +761,7 @@ TError TTask::ChildSetHostname() {
             string host = Env->Hostname + "\n";
             TError error = f.WriteStringNoAppend(host);
             if (error)
-                return TError(EError::Unknown, error, "write(/etc/hostname)");
+                return TError(EError::Unknown, error.GetErrno(), "write(/etc/hostname)");
         }
     }
 
