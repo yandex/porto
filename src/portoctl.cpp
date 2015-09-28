@@ -295,14 +295,14 @@ public:
     }
 };
 
-class TRawCmd : public ICmd {
+class TRawCmd final : public ICmd {
 public:
     TRawCmd(TPortoAPI *api) : ICmd(api, "raw", 1, "<message>", "send raw protobuf message") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(TCommandEnviroment *env) final override {
         stringstream msg;
 
-        std::vector<std::string> args(argv, argv + argc);
+        const auto &args = env->GetArgs();
         copy(args.begin(), args.end(), ostream_iterator<string>(msg, " "));
 
         string resp;
@@ -313,13 +313,13 @@ public:
     }
 };
 
-class TCreateCmd : public ICmd {
+class TCreateCmd final : public ICmd {
 public:
     TCreateCmd(TPortoAPI *api) : ICmd(api, "create", 1, "<container1> [container2...]", "create container") {}
 
-    int Execute(int argc, char *argv[]) {
-        for (int i = 0; i < argc; i++) {
-            int ret = Api->Create(argv[i]);
+    int Execute(TCommandEnviroment *env) final override {
+        for (const auto &arg : env->GetArgs()) {
+            int ret = Api->Create(arg);
             if (ret) {
                 PrintError("Can't create container");
                 return ret;
@@ -330,25 +330,25 @@ public:
     }
 };
 
-class TGetPropertyCmd : public ICmd {
+class TGetPropertyCmd final : public ICmd {
 public:
     TGetPropertyCmd(TPortoAPI *api) : ICmd(api, "pget", 2, "[-k] <container> <property> [property...]", "get raw container property") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(TCommandEnviroment *env) final override {
         bool printKey = false;
-        int start = GetOpt(argc, argv, {
+        const auto &args = env->GetOpts({
             { 'k', false, [&](const char *arg) { printKey = true; } },
         });
 
-        for (int i = start + 1; i < argc; i++) {
+        for (size_t i = 1; i < args.size(); ++i) {
             string value;
-            int ret = Api->GetProperty(argv[start], argv[i], value);
+            int ret = Api->GetProperty(args[0], args[i], value);
             if (ret) {
                 PrintError("Can't get property");
                 return ret;
             }
             if (printKey)
-                PrintPair(argv[i], value);
+                PrintPair(args[i], value);
             else
                 Print(value);
         }
@@ -357,18 +357,20 @@ public:
     }
 };
 
-class TSetPropertyCmd : public ICmd {
+class TSetPropertyCmd final : public ICmd {
 public:
     TSetPropertyCmd(TPortoAPI *api) : ICmd(api, "set", 3, "<container> <property>", "set container property") {}
 
-    int Execute(int argc, char *argv[]) {
-        string val = argv[2];
-        for (int i = 3; i < argc; i++) {
+    int Execute(TCommandEnviroment *env) final override {
+        const auto &args = env->GetArgs();
+        PORTO_ASSERT(args.size() >= static_cast<size_t>(NeedArgs));
+        string val = args[2];
+        for (size_t i = 3; i < args.size(); ++i) {
             val += " ";
-            val += argv[i];
+            val += args[i];
         }
 
-        int ret = Api->SetProperty(argv[0], argv[1], val);
+        int ret = Api->SetProperty(args[0], args[1], val);
         if (ret)
             PrintError("Can't set property");
 
@@ -376,25 +378,25 @@ public:
     }
 };
 
-class TGetDataCmd : public ICmd {
+class TGetDataCmd final : public ICmd {
 public:
     TGetDataCmd(TPortoAPI *api) : ICmd(api, "dget", 2, "[-k] <container> <data> [data...]", "get raw container data") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(TCommandEnviroment *env) final override {
         bool printKey = false;
-        int start = GetOpt(argc, argv, {
+        const auto &args = env->GetOpts({
             { 'k', false, [&](const char *arg) { printKey = true; } },
         });
 
-        for (int i = start + 1; i < argc; i++) {
+        for (size_t i = 1; i < args.size(); ++i) {
             string value;
-            int ret = Api->GetData(argv[start], argv[i], value);
+            int ret = Api->GetData(args[0], args[i], value);
             if (ret) {
                 PrintError("Can't get data");
                 return ret;
             }
             if (printKey)
-                PrintPair(argv[i], value);
+                PrintPair(args[i], value);
             else
                 Print(value);
         }
@@ -403,13 +405,13 @@ public:
     }
 };
 
-class TStartCmd : public ICmd {
+class TStartCmd final : public ICmd {
 public:
     TStartCmd(TPortoAPI *api) : ICmd(api, "start", 1, "<container1> [container2...]", "start container") {}
 
-    int Execute(int argc, char *argv[]) {
-        for (int i = 0; i < argc; i++) {
-            int ret = Api->Start(argv[i]);
+    int Execute(TCommandEnviroment *env) final override {
+        for (const auto &arg : env->GetArgs()) {
+            int ret = Api->Start(arg);
             if (ret) {
                 PrintError("Can't start container");
                 return ret;
@@ -470,14 +472,16 @@ static const map<string, int> sigMap = {
     { "SIGUNUSED",  SIGUNUSED },
 };
 
-class TKillCmd : public ICmd {
+class TKillCmd final : public ICmd {
 public:
     TKillCmd(TPortoAPI *api) : ICmd(api, "kill", 1, "<container> [signal]", "send signal to container") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(TCommandEnviroment *env) final override {
         int sig = SIGTERM;
-        if (argc >= 2) {
-            string sigName = argv[1];
+        const auto &args = env->GetArgs();
+        PORTO_ASSERT(!args.empty());
+        if (args.size() >= 2) {
+            const string &sigName = args[1];
 
             if (sigMap.find(sigName) != sigMap.end()) {
                 sig = sigMap.at(sigName);
@@ -490,7 +494,7 @@ public:
             }
         }
 
-        int ret = Api->Kill(argv[0], sig);
+        int ret = Api->Kill(args[0], sig);
         if (ret)
             PrintError("Can't send signal to container");
 
@@ -498,13 +502,13 @@ public:
     }
 };
 
-class TStopCmd : public ICmd {
+class TStopCmd final : public ICmd {
 public:
     TStopCmd(TPortoAPI *api) : ICmd(api, "stop", 1, "<container1> [container2...]", "stop container") {}
 
-    int Execute(int argc, char *argv[]) {
-        for (int i = 0; i < argc; i++) {
-            int ret = Api->Stop(argv[0]);
+    int Execute(TCommandEnviroment *env) final override {
+        for (const auto &arg : env->GetArgs()) {
+            int ret = Api->Stop(arg);
             if (ret) {
                 PrintError("Can't stop container");
                 return ret;
@@ -515,19 +519,19 @@ public:
     }
 };
 
-class TRestartCmd : public ICmd {
+class TRestartCmd final : public ICmd {
 public:
     TRestartCmd(TPortoAPI *api) : ICmd(api, "restart", 1, "<container1> [container2...]", "restart container") {}
 
-    int Execute(int argc, char *argv[]) {
-        for (int i = 0; i < argc; i++) {
-            int ret = Api->Stop(argv[0]);
+    int Execute(TCommandEnviroment *env) final override {
+        for (const auto &arg : env->GetArgs()) {
+            int ret = Api->Stop(arg);
             if (ret) {
                 PrintError("Can't stop container");
                 return ret;
             }
 
-            ret = Api->Start(argv[0]);
+            ret = Api->Start(arg);
             if (ret) {
                 PrintError("Can't start container");
                 return ret;
@@ -538,13 +542,13 @@ public:
     }
 };
 
-class TPauseCmd : public ICmd {
+class TPauseCmd final : public ICmd {
 public:
     TPauseCmd(TPortoAPI *api) : ICmd(api, "pause", 1, "<container> [name...]", "pause container") {}
 
-    int Execute(int argc, char *argv[]) {
-        for (int i = 0; i < argc; i++) {
-            int ret = Api->Pause(argv[0]);
+    int Execute(TCommandEnviroment *env) final override {
+        for (const auto &arg : env->GetArgs()) {
+            int ret = Api->Pause(arg);
             if (ret) {
                 PrintError("Can't pause container");
                 return ret;
@@ -555,13 +559,13 @@ public:
     }
 };
 
-class TResumeCmd : public ICmd {
+class TResumeCmd final : public ICmd {
 public:
     TResumeCmd(TPortoAPI *api) : ICmd(api, "resume", 1, "<container1> [container2...]", "resume container") {}
 
-    int Execute(int argc, char *argv[]) {
-        for (int i = 0; i < argc; i++) {
-            int ret = Api->Resume(argv[0]);
+    int Execute(TCommandEnviroment *env) final override {
+        for (const auto &arg : env->GetArgs()) {
+            int ret = Api->Resume(arg);
             if (ret) {
                 PrintError("Can't resume container");
                 return ret;
@@ -572,11 +576,11 @@ public:
     }
 };
 
-class TGetCmd : public ICmd {
+class TGetCmd final : public ICmd {
 public:
     TGetCmd(TPortoAPI *api) : ICmd(api, "get", 1, "<container> <variable> [variable...]", "get container property or data") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(TCommandEnviroment *env) final override {
         string value;
         int ret;
         bool printKey = true;
@@ -596,18 +600,19 @@ public:
             return EXIT_FAILURE;
         }
 
-        std::string container = argv[0];
+        const auto &args = env->GetArgs();
+        std::string container = args[0];
         std::vector<std::string> clist = { container };
         std::vector<std::string> vars;
 
-        if (argc > 1) {
-            for (int i = 1; i < argc; i++)
-                vars.push_back(argv[i]);
+        if (args.size() > 1) {
+            vars.insert(vars.end(), args.begin() + 1, args.end());
             // we want to preserve old behavior:
             // - get without arguments prints all properties/data prefixed with name
             // - get with arguments prints specified properties/data without prefix
             printKey = false;
         } else {
+            vars.reserve(plist.size() + dlist.size());
             for (auto p : plist)
                 vars.push_back(p.Name);
             for (auto d : dlist)
@@ -629,7 +634,7 @@ public:
         auto &data = result[container];
 
         if (printErrors)
-            for (auto key : vars) {
+            for (const auto &key : vars) {
                 if (data[key].Error) {
                     TError error((rpc::EError)data[key].Error, data[key].ErrorMsg);
                     PrintError(error, "Can't get " + key);
@@ -637,7 +642,7 @@ public:
                 }
             }
 
-        for (auto key : vars) {
+        for (const auto &key : vars) {
             if (data[key].Error)
                 continue;
 
@@ -652,7 +657,7 @@ public:
     }
 };
 
-class TEnterCmd : public ICmd {
+class TEnterCmd final : public ICmd {
 public:
     TEnterCmd(TPortoAPI *api) : ICmd(api, "enter", 1,
             "[-C] <container> [command]",
@@ -693,15 +698,15 @@ public:
         return TError(EError::Unknown, "Can't find root for " + subsys);
     }
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(TCommandEnviroment *env) final override {
         bool enterCgroups = true;
-        int start = GetOpt(argc, argv, {
+        const auto &args = env->GetOpts({
             { 'C', false, [&](const char *arg) { enterCgroups = false; } },
         });
 
-        string cmd = "";
-        for (int i = start + 1; i < argc; i++) {
-            cmd += argv[i];
+        string cmd;
+        for (size_t i = 1; i < args.size(); ++i) {
+            cmd += args[i];
             cmd += " ";
         }
 
@@ -709,7 +714,7 @@ public:
             cmd = "/bin/bash";
 
         string pidStr;
-        int ret = Api->GetData(argv[start], "root_pid", pidStr);
+        int ret = Api->GetData(args[0], "root_pid", pidStr);
         if (ret) {
             PrintError("Can't get container root_pid");
             return EXIT_FAILURE;
@@ -791,7 +796,7 @@ public:
     }
 };
 
-class TRunCmd : public ICmd {
+class TRunCmd final : public ICmd {
     TVolumeBuilder VolumeBuilder;
 public:
     TRunCmd(TPortoAPI *api) : ICmd(api, "run", 2, "[-L layers] <container> [properties]", "create and start container with given properties"), VolumeBuilder(api) {}
@@ -814,24 +819,24 @@ public:
         return EXIT_SUCCESS;
     }
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(TCommandEnviroment *env) final override {
         std::string layers;
-        int start = GetOpt(argc, argv, {
+        const auto &args = env->GetOpts({
             { 'L', true, [&](const char *arg) { layers = arg; } },
         });
 
-        string containerName = argv[start];
+        const string &containerName = args[0];
         std::vector<std::pair<std::string, std::string>> properties;
 
         int ret;
 
-        for (int i = start + 1; i < argc; i++) {
+        for (size_t i = 1; i < args.size(); ++i) {
             string key, val;
-            ret = Parser(argv[i], key, val);
+            ret = Parser(args[i], key, val);
             if (ret)
                 return ret;
 
-            properties.push_back(std::make_pair(key, val));
+            properties.emplace_back(std::make_pair(key, val));
         }
 
         if (!layers.empty()) {
@@ -841,7 +846,7 @@ public:
                 return EXIT_FAILURE;
             }
 
-            properties.push_back(std::make_pair("root", VolumeBuilder.GetVolumePath()));
+            properties.emplace_back(std::make_pair("root", VolumeBuilder.GetVolumePath()));
         }
 
         ret = Api->Create(containerName);
@@ -872,7 +877,7 @@ public:
     }
 };
 
-class TExecCmd : public ICmd {
+class TExecCmd final : public ICmd {
     string containerName;
     struct termios SavedAttrs;
     bool Canonical = true;
@@ -949,13 +954,13 @@ public:
         return fd;
     }
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(TCommandEnviroment *environment) final override {
         bool hasTty = isatty(STDIN_FILENO);
         std::vector<std::string> args;
         std::string env;
         std::string layers;
 
-        int start = GetOpt(argc, argv, {
+        const auto &argv = environment->GetOpts({
             { 'C', false, [&](const char *arg) { Cleanup = false; } },
             { 'T', false, [&](const char *arg) { hasTty = false; } },
             { 'L', true, [&](const char *arg) { layers = arg; } },
@@ -965,10 +970,10 @@ public:
         if (hasTty)
             env = std::string("TERM=") + getenv("TERM");
 
-        args.push_back(argv[start]);
-        for (int i = start + 1; i < argc; i++)
-            if (strncmp(argv[i], "env=", 4) == 0)
-                env = env + "; " + std::string(argv[i] + 4);
+        args.push_back(argv[0]);
+        for (size_t i = 1; i < argv.size(); ++i)
+            if (argv[i].find("env=", 0, 4) != std::string::npos)
+                env += "; " + argv[i].substr(4);
             else
                 args.push_back(argv[i]);
 
@@ -1081,8 +1086,8 @@ public:
         if (env.length())
             args.push_back("env=" + env);
 
-        containerName = argv[start];
-        int ret = RunCmd<TRunCmd>(args);
+        containerName = argv[0];
+        int ret = RunCmd<TRunCmd>(args, environment);
         if (ret)
             return ret;
 
@@ -1151,11 +1156,11 @@ public:
     }
 };
 
-class TGcCmd : public ICmd {
+class TGcCmd final : public ICmd {
 public:
     TGcCmd(TPortoAPI *api) : ICmd(api, "gc", 0, "", "remove all dead containers") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(TCommandEnviroment *env) final override {
         vector<string> clist;
         int ret = Api->List(clist);
         if (ret) {
@@ -1163,7 +1168,7 @@ public:
             return ret;
         }
 
-        for (auto c : clist) {
+        for (const auto &c : clist) {
             if (c == "/")
                 continue;
 
@@ -1188,15 +1193,16 @@ public:
     }
 };
 
-class TFindCmd : public ICmd {
+class TFindCmd final : public ICmd {
 public:
     TFindCmd(TPortoAPI *api) : ICmd(api, "find", 1, "", "find container for given process id") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(TCommandEnviroment *env) final override {
         int pid;
-        TError error = StringToInt(argv[0], pid);
+        const auto &args = env->GetArgs();
+        TError error = StringToInt(args[0], pid);
         if (error) {
-            std::cerr << "Can't parse pid " << argv[0] << std::endl;
+            std::cerr << "Can't parse pid " << args[0] << std::endl;
             return EXIT_FAILURE;
         }
 
@@ -1225,14 +1231,14 @@ public:
     }
 };
 
-class TDestroyCmd : public ICmd {
+class TDestroyCmd final : public ICmd {
 public:
     TDestroyCmd(TPortoAPI *api) : ICmd(api, "destroy", 1, "<container1> [container2...]", "destroy container") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(TCommandEnviroment *env) final override {
         int exitStatus = EXIT_SUCCESS;
-        for (int i = 0; i < argc; i++) {
-            int ret = Api->Destroy(argv[i]);
+        for (const auto &arg : env->GetArgs()) {
+            int ret = Api->Destroy(arg);
             if (ret) {
                 PrintError("Can't destroy container");
                 exitStatus = ret;
@@ -1243,19 +1249,15 @@ public:
     }
 };
 
-class TWaitCmd : public ICmd {
+class TWaitCmd final : public ICmd {
 public:
     TWaitCmd(TPortoAPI *api) : ICmd(api, "wait", 1, "<container1> [container2] ...", "wait for listed containers") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(TCommandEnviroment *env) final override {
         int timeout = -1;
-        int start = GetOpt(argc, argv, {
+        const auto &containers = env->GetOpts({
             { 't', true, [&](const char *arg) { timeout = std::stoi(arg); } },
         });
-
-        std::vector<std::string> containers;
-        for (int i = start; i < argc; i++)
-            containers.push_back(argv[i]);
 
         std::string name;
         int ret = Api->Wait(containers, name, timeout);
@@ -1273,7 +1275,7 @@ public:
     }
 };
 
-class TListCmd : public ICmd {
+class TListCmd final : public ICmd {
 public:
     TListCmd(TPortoAPI *api) : ICmd(api, "list", 0, "[-1] [-f] [-t]", "list created containers") {}
 
@@ -1293,11 +1295,11 @@ public:
             return child.substr(0, lastSlash);
     }
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(TCommandEnviroment *env) final override {
         bool details = true;
         bool forest = false;
         bool toplevel = false;
-        (void)GetOpt(argc, argv, {
+        (void)env->GetOpts({
             { '1', false, [&](const char *arg) { details = false; } },
             { 'f', false, [&](const char *arg) { forest = true; } },
             { 't', false, [&](const char *arg) { toplevel = true; } },
@@ -1376,23 +1378,24 @@ public:
 };
 
 extern int portotop(TPortoAPI *api, std::string config);
-class TTopCmd : public ICmd {
+class TTopCmd final : public ICmd {
 public:
     TTopCmd(TPortoAPI *api) : ICmd(api, "top", 0, "[config]", "top-like tool for container monitoring and control") {}
 
-    int Execute(int argc, char *argv[]) {
-        if (argc == 0)
+    int Execute(TCommandEnviroment *env) final override {
+        const auto &args = env->GetArgs();
+        if (args.empty())
             return portotop(Api, "");
         else
-            return portotop(Api, argv[0]);
+            return portotop(Api, args[0]);
     }
 };
 
-class TSortCmd : public ICmd {
+class TSortCmd final : public ICmd {
 public:
     TSortCmd(TPortoAPI *api) : ICmd(api, "sort", 0, "[sort-by]", "print containers sorted by resource usage") {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(TCommandEnviroment *env) final override {
         vector<string> clist;
         int ret = Api->List(clist);
         if (ret) {
@@ -1401,9 +1404,9 @@ public:
         }
 
         vector<pair<string, map<string, string>>> containerData;
-        vector<string> showData;
+        vector<string> showData = env->GetArgs();
 
-        if (argc == 0) {
+        if (showData.empty()) {
             showData.push_back("cpu_usage");
             showData.push_back("memory_usage");
             showData.push_back("major_faults");
@@ -1428,16 +1431,12 @@ public:
                 return EXIT_FAILURE;
             }
 
-            for (int i = 0; i < argc; i++) {
-                string arg = argv[i];
-
+            for (const auto &arg : showData) {
                 if (!ValidData(dlist, arg) && !ValidProperty(plist, arg)) {
                     TError error(EError::InvalidValue, "Invalid value");
                     PrintError(error, "Can't parse argument");
                     return EXIT_FAILURE;
                 }
-
-                showData.push_back(arg);
             }
         }
 
@@ -1516,16 +1515,17 @@ public:
     }
 };
 
-class TCreateVolumeCmd : public ICmd {
+class TCreateVolumeCmd final : public ICmd {
 public:
     TCreateVolumeCmd(TPortoAPI *api) : ICmd(api, "vcreate", 1, "-A|<path> [property=value...]",
         "create volume",
         "    -A        choose path automatically\n"
         ) {}
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(TCommandEnviroment *env) final override {
         std::map<std::string, std::string> properties;
-        std::string path(argv[0]);
+        const auto &args = env->GetArgs();
+        std::string path = args[0];
 
         if (path == "-A") {
             path = "";
@@ -1534,8 +1534,8 @@ public:
             return EXIT_FAILURE;
         }
 
-        for (int i = 1; i < argc; i++) {
-            std::string arg(argv[i]);
+        for (size_t i = 1; i < args.size(); i++) {
+            const std::string &arg = args[i];
             std::size_t sep = arg.find('=');
             if (sep == string::npos)
                 properties[arg] = "";
@@ -1557,35 +1557,37 @@ public:
     }
 };
 
-class TLinkVolumeCmd : public ICmd {
+class TLinkVolumeCmd final : public ICmd {
 public:
     TLinkVolumeCmd(TPortoAPI *api) : ICmd(api, "vlink", 1, "<path> [container]",
                     "link volume to container", "default container - current\n") {}
 
-    int Execute(int argc, char *argv[]) {
-        int ret = Api->LinkVolume(argv[0], (argc > 1) ? argv[1] : "");
+    int Execute(TCommandEnviroment *env) final override {
+        const auto &args = env->GetArgs();
+        int ret = Api->LinkVolume(args[0], (args.size() > 1) ? args[1] : "");
         if (ret)
             PrintError("Can't link volume");
         return ret;
     }
 };
 
-class TUnlinkVolumeCmd : public ICmd {
+class TUnlinkVolumeCmd final : public ICmd {
 public:
     TUnlinkVolumeCmd(TPortoAPI *api) : ICmd(api, "vunlink", 1, "<path> [container]",
                     "unlink volume from container",
                     "default container - current\n"
                     "removing last link deletes volume\n") {}
 
-    int Execute(int argc, char *argv[]) {
-        int ret = Api->UnlinkVolume(argv[0], (argc > 1) ? argv[1] : "");
+    int Execute(TCommandEnviroment *env) final override {
+        const auto &args = env->GetArgs();
+        int ret = Api->UnlinkVolume(args[0], (args.size() > 1) ? args[1] : "");
         if (ret)
             PrintError("Can't unlink volume");
         return ret;
     }
 };
 
-class TListVolumesCmd : public ICmd {
+class TListVolumesCmd final : public ICmd {
     bool details = true;
     bool verbose = false;
     bool inodes = false;
@@ -1667,8 +1669,8 @@ public:
         std::cout << std::endl;
     }
 
-    int Execute(int argc, char *argv[]) {
-        int start = GetOpt(argc, argv, {
+    int Execute(TCommandEnviroment *env) final override {
+        const auto &args = env->GetOpts({
             { '1', false, [&](const char *arg) { details = false; } },
             { 'i', false, [&](const char *arg) { inodes = true; } },
             { 'v', false, [&](const char *arg) { verbose = true; details = false; } },
@@ -1685,24 +1687,24 @@ public:
             std::cout << std::left << " Containers" << std::endl;
         }
 
-        if (start == argc) {
+        if (args.empty()) {
           int ret = Api->ListVolumes(vlist);
           if (ret) {
               PrintError("Can't list volumes");
               return ret;
           }
 
-          for (auto v : vlist)
+          for (auto &v : vlist)
               ShowVolume(v);
         } else {
-            for (int i = start; i < argc; i++) {
+            for (const auto &arg : args) {
                 vlist.clear();
-                int ret = Api->ListVolumes(argv[i], "", vlist);
+                int ret = Api->ListVolumes(arg, "", vlist);
                 if (ret) {
-                    PrintError(argv[i]);
+                    PrintError(arg);
                     continue;
                 }
-                for (auto v : vlist)
+                for (auto &v : vlist)
                     ShowVolume(v);
             }
         }
@@ -1711,7 +1713,7 @@ public:
     }
 };
 
-class TLayerCmd : public ICmd {
+class TLayerCmd final : public ICmd {
 public:
     TLayerCmd(TPortoAPI *api) : ICmd(api, "layer", 1,
         "-I|-M|-R|-L|-F|-E <layer> [tarball]",
@@ -1731,9 +1733,9 @@ public:
     bool export_ = false;
     bool flush = false;
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(TCommandEnviroment *env) final override {
         int ret = EXIT_SUCCESS;
-        int start = GetOpt(argc, argv, {
+        const auto &args = env->GetOpts({
             { 'I', false, [&](const char *arg) { import = true; } },
             { 'M', false, [&](const char *arg) { merge  = true; } },
             { 'R', false, [&](const char *arg) { remove = true; } },
@@ -1743,29 +1745,29 @@ public:
         });
 
         if (import) {
-            if (argc < start + 2)
+            if (args.size() < 2)
                 return EXIT_FAILURE;
-            ret = Api->ImportLayer(argv[start], argv[start + 1]);
+            ret = Api->ImportLayer(args[0], args[1]);
             if (ret)
                 PrintError("Can't import layer");
         } else if (export_) {
-            if (argc < start + 2)
+            if (args.size() < 2)
                 return EXIT_FAILURE;
-            ret = Api->ExportLayer(argv[start], argv[start + 1]);
+            ret = Api->ExportLayer(args[0], args[1]);
             if (ret)
                 PrintError("Can't export layer");
         } else if (merge) {
-            if (argc < start + 2)
+            if (args.size() < 2)
                 return EXIT_FAILURE;
-            ret = Api->ImportLayer(argv[start], argv[start + 1], true);
+            ret = Api->ImportLayer(args[0], args[1], true);
             if (ret)
                 PrintError("Can't merge layer");
         } else if (remove) {
-            if (argc < start + 1)
+            if (args.size() < 1)
                 return EXIT_FAILURE;
 
-            for (int i = start; i < argc; i++) {
-                ret = Api->RemoveLayer(argv[i]);
+            for (const auto &arg : args) {
+                ret = Api->RemoveLayer(arg);
                 if (ret)
                     PrintError("Can't remove layer");
             }
@@ -1776,7 +1778,7 @@ public:
                 PrintError("Can't list layers");
                 return EXIT_FAILURE;
             } else {
-                for (auto l: layers)
+                for (const auto &l: layers)
                     (void)Api->RemoveLayer(l);
             }
         } else if (list) {
@@ -1785,7 +1787,7 @@ public:
             if (ret) {
                 PrintError("Can't list layers");
             } else {
-                for (auto l: layers)
+                for (const auto &l: layers)
                     std::cout << l << std::endl;
             }
         } else
@@ -1795,7 +1797,7 @@ public:
     }
 };
 
-class TBuildCmd : public ICmd {
+class TBuildCmd final : public ICmd {
     TVolumeBuilder VolumeBuilder;
     bool Cleanup = true;
     char *TmpFile = nullptr;
@@ -1819,12 +1821,11 @@ public:
         }
     }
 
-    int Execute(int argc, char *argv[]) {
+    int Execute(TCommandEnviroment *environment) final override {
         TPath output = TPath(GetCwd()) / "layer.tar";
         std::vector<std::string> args;
         std::vector<std::string> env;
-
-        int start = GetOpt(argc, argv, {
+        const auto &opts = environment->GetOpts({
             { 'o', true, [&](const char *arg) { output = TPath(GetCwd()) / arg; } },
             { 'C', false, [&](const char *arg) { Cleanup = false; } },
             { 'E', true, [&](const char *arg) { env.push_back(arg); } },
@@ -1837,7 +1838,7 @@ public:
         // don't use PTY in exec, use simple pipes so Ctrl-C works
         args.push_back("-T");
 
-        TPath script = TPath(argv[start]).RealPath();
+        TPath script = TPath(opts[0]).RealPath();
         if (!script.Exists()) {
             std::cerr << "Invalid script path " << script.ToString() << std::endl;
             return EXIT_FAILURE;
@@ -1863,13 +1864,10 @@ public:
         if (selinux.Exists())
             bind.push_back("/sys/fs/selinux /sys/fs/selinux ro");
 
-        std::vector<std::string> layers;
-        for (auto i = start + 1; i < argc; i++)
-            layers.push_back(argv[i]);
-
+        std::vector<std::string> layers(opts.begin() + 1, opts.end());
         args.push_back(name);
 
-        if (layers.size()) {
+        if (!layers.empty()) {
             // custom layer
 
             TError error = VolumeBuilder.Prepare(layers);
@@ -1906,7 +1904,7 @@ public:
         args.push_back("group=root");
         args.push_back("env=" + CommaSeparatedList(env, ";"));
 
-        int ret = RunCmd<TExecCmd>(args);
+        int ret = RunCmd<TExecCmd>(args, environment);
         if (ret)
             return ret;
 
@@ -1923,42 +1921,42 @@ public:
 int main(int argc, char *argv[]) {
     config.Load(true);
     TPortoAPI api(config().rpc_sock().file().path());
+    TCommandHandler handler(api);
 
-    RegisterCommand(new THelpCmd(&api, true));
-    RegisterCommand(new TCreateCmd(&api));
-    RegisterCommand(new TDestroyCmd(&api));
-    RegisterCommand(new TListCmd(&api));
-    RegisterCommand(new TTopCmd(&api));
-    RegisterCommand(new TSortCmd(&api));
-    RegisterCommand(new TStartCmd(&api));
-    RegisterCommand(new TStopCmd(&api));
-    RegisterCommand(new TRestartCmd(&api));
-    RegisterCommand(new TKillCmd(&api));
-    RegisterCommand(new TPauseCmd(&api));
-    RegisterCommand(new TResumeCmd(&api));
-    RegisterCommand(new TGetPropertyCmd(&api));
-    RegisterCommand(new TSetPropertyCmd(&api));
-    RegisterCommand(new TGetDataCmd(&api));
-    RegisterCommand(new TGetCmd(&api));
-    RegisterCommand(new TRawCmd(&api));
-    RegisterCommand(new TEnterCmd(&api));
-    RegisterCommand(new TRunCmd(&api));
-    RegisterCommand(new TExecCmd(&api));
-    RegisterCommand(new TGcCmd(&api));
-    RegisterCommand(new TFindCmd(&api));
-    RegisterCommand(new TWaitCmd(&api));
+    handler.RegisterCommand<TCreateCmd>();
+    handler.RegisterCommand<TDestroyCmd>();
+    handler.RegisterCommand<TListCmd>();
+    handler.RegisterCommand<TTopCmd>();
+    handler.RegisterCommand<TSortCmd>();
+    handler.RegisterCommand<TStartCmd>();
+    handler.RegisterCommand<TStopCmd>();
+    handler.RegisterCommand<TRestartCmd>();
+    handler.RegisterCommand<TKillCmd>();
+    handler.RegisterCommand<TPauseCmd>();
+    handler.RegisterCommand<TResumeCmd>();
+    handler.RegisterCommand<TGetPropertyCmd>();
+    handler.RegisterCommand<TSetPropertyCmd>();
+    handler.RegisterCommand<TGetDataCmd>();
+    handler.RegisterCommand<TGetCmd>();
+    handler.RegisterCommand<TRawCmd>();
+    handler.RegisterCommand<TEnterCmd>();
+    handler.RegisterCommand<TRunCmd>();
+    handler.RegisterCommand<TExecCmd>();
+    handler.RegisterCommand<TGcCmd>();
+    handler.RegisterCommand<TFindCmd>();
+    handler.RegisterCommand<TWaitCmd>();
 
-    RegisterCommand(new TCreateVolumeCmd(&api));
-    RegisterCommand(new TLinkVolumeCmd(&api));
-    RegisterCommand(new TUnlinkVolumeCmd(&api));
-    RegisterCommand(new TListVolumesCmd(&api));
+    handler.RegisterCommand<TCreateVolumeCmd>();
+    handler.RegisterCommand<TLinkVolumeCmd>();
+    handler.RegisterCommand<TUnlinkVolumeCmd>();
+    handler.RegisterCommand<TListVolumesCmd>();
 
-    RegisterCommand(new TLayerCmd(&api));
-    RegisterCommand(new TBuildCmd(&api));
+    handler.RegisterCommand<TLayerCmd>();
+    handler.RegisterCommand<TBuildCmd>();
 
     TLogger::DisableLog();
 
-    int ret = HandleCommand(&api, argc, argv);
+    int ret = handler.HandleCommand(argc, argv);
     if (ret < 0) {
         ResetAllSignalHandlers();
         raise(-ret);
