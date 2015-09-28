@@ -1,9 +1,11 @@
+#include <csignal>
 #include <iostream>
 #include <iomanip>
 #include <climits>
 
 #include "cli.hpp"
 #include "version.hpp"
+#include "util/log.hpp"
 #include "util/signal.hpp"
 #include "util/unix.hpp"
 
@@ -16,33 +18,188 @@ using std::string;
 using std::map;
 using std::vector;
 
-ICmd *CurrentCmd;
+namespace {
+// Command that is being executed, used for signal handling
+ICmd *CurrentCmd = nullptr;
 
-size_t MaxFieldLength(std::vector<std::string> &vec, size_t min) {
-    size_t len = 0;
-    for (auto &i : vec)
-        if (i.length() > len)
-            len  = i.length();
-
-    return (len > min ? len : min) + 2;
+void SigInt(int sig) {
+    if (CurrentCmd)
+        CurrentCmd->Signal(sig);
 }
 
-ICmd::ICmd(TPortoAPI *api, const string& name, int args,
-           const string& usage, const string& desc, const string& help) :
+void PrintAligned(const std::string &name, const std::string &desc,
+                         const size_t nameWidth, const size_t termWidth) {
+    std::vector<std::string> v;
+    size_t descWidth = termWidth - nameWidth - 4;
+
+    size_t start = 0;
+    for (size_t i = 0; i < desc.length(); i++) {
+        if (i - start > descWidth) {
+            v.push_back(std::string(desc, start, i - start));
+            start = i;
+        }
+    }
+    std::string last = std::string(desc, start, desc.length());
+    if (last.length())
+        v.push_back(last);
+
+    std::cerr << "  " << std::left << std::setw(nameWidth) << name
+        << v[0] << std::endl;
+    for (size_t i = 1; i < v.size(); i++)
+        std::cerr << "  " << std::left << std::setw(nameWidth) << " "
+            << v[i] << std::endl;
+}
+
+template <typename Collection, typename MapFunction>
+size_t MaxFieldLength(const Collection &coll, MapFunction mapper, size_t min = MIN_FIELD_LENGTH) {
+    size_t len = 0;
+    for (const auto &i : coll) {
+        const auto length = mapper(i).length();
+        if (length > len)
+            len  = length;
+    }
+
+    return std::max(len, min) + 2;
+}
+
+class THelpCmd final : public ICmd {
+    const bool UsagePrintData;
+    TCommandHandler &Handler;
+
+public:
+    THelpCmd(TCommandHandler &handler, bool usagePrintData)
+        : ICmd(&handler.GetPortoApi(), "help", 1,
+               "[command]", "print help message for command"),
+          UsagePrintData(usagePrintData),
+          Handler(handler) {}
+
+    void Usage();
+    int Execute(TCommandEnviroment *env) final override;
+};
+
+void THelpCmd::Usage() {
+    int termWidth = 80;
+
+    struct winsize w;
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0)
+        termWidth = w.ws_col;
+
+    std::cerr << "Usage: " << program_invocation_short_name << " <command> [<args>]" << std::endl;
+    std::cerr << std::endl;
+    std::cerr << "Command list:" << std::endl;
+
+    using CmdPair = TCommandHandler::RegisteredCommands::value_type;
+    int nameWidth = MaxFieldLength(Handler.GetCommands(), [](const CmdPair &p) { return p.first; });
+
+    for (const auto &i : Handler.GetCommands())
+        PrintAligned(i.second->GetName(), i.second->GetDescription(), nameWidth, termWidth);
+
+    std::cerr << std::endl << "Volume properties:" << std::endl;
+    vector<TProperty> vlist;
+    int ret = Api->ListVolumeProperties(vlist);
+    if (ret) {
+        PrintError("Unavailable");
+    } else {
+        nameWidth = MaxFieldLength(vlist, [](const TProperty &p) { return p.Name; });
+
+        for (const auto &p : vlist)
+            PrintAligned(p.Name, p.Description, nameWidth, termWidth);
+    }
+
+    std::cerr << std::endl << "Property list:" << std::endl;
+    vector<TProperty> plist;
+    ret = Api->Plist(plist);
+    if (ret) {
+        PrintError("Unavailable");
+    } else {
+        nameWidth = MaxFieldLength(vlist, [](const TProperty &p) { return p.Name; });
+
+        for (const auto &p : plist)
+            PrintAligned(p.Name, p.Description, nameWidth, termWidth);
+    }
+
+    if (!UsagePrintData)
+        return;
+
+    std::cerr << std::endl << "Data list:" << std::endl;
+    vector<TData> dlist;
+    ret = Api->Dlist(dlist);
+    if (ret) {
+        PrintError("Unavailable");
+    } else {
+        nameWidth = MaxFieldLength(dlist, [](const TData &d) { return d.Name; });
+
+        for (const auto &d : dlist)
+            PrintAligned(d.Name, d.Description, nameWidth, termWidth);
+    }
+    std::cerr << std::endl;
+}
+
+int THelpCmd::Execute(TCommandEnviroment *env) {
+    int ret = EXIT_FAILURE;
+    const auto &args = env->GetArgs();
+
+    if (args.empty()) {
+        Usage();
+        return ret;
+    }
+
+    const string &name = args[0];
+    const auto it = Handler.GetCommands().find(name);
+    if (it == Handler.GetCommands().end()) {
+        Usage();
+    } else {
+        std::cerr << "Usage: " << program_invocation_short_name
+                  << " " << name << " " << it->second->GetUsage()
+                  << std::endl;
+        std::cerr << std::endl;
+        std::cerr << it->second->GetDescription() << std::endl;
+        std::cerr << it->second->GetHelp();
+        ret = EXIT_SUCCESS;
+    }
+    
+    return ret;
+}
+}  // namespace
+
+size_t MaxFieldLength(const std::vector<std::string> &vec, size_t min) {
+    return MaxFieldLength(vec, [](const string &s) { return s; }, min);
+}
+
+int ICmd::RunCmdImpl(const std::vector<std::string> &args,
+                     std::unique_ptr<ICmd> cmd,
+                     TCommandEnviroment *env) {
+    ICmd *prevCmd = CurrentCmd;
+    cmd->SetDieOnSignal(false);
+
+    CurrentCmd = cmd.get();
+
+    TCommandEnviroment childEnv(env, args);
+    int ret = cmd->Execute(&childEnv);
+    CurrentCmd = prevCmd;
+
+    if (GotSignal())
+        return InterruptedSignal;
+
+    return ret;
+}
+
+ICmd::ICmd(TPortoAPI *api, const string &name, int args,
+           const string &usage, const string &desc, const string &help) :
     Api(api), Name(name), Usage(usage), Desc(desc), Help(help), NeedArgs(args) {}
 
-    string& ICmd::GetName() { return Name; }
-    string& ICmd::GetUsage() { return Usage; }
-    string& ICmd::GetDescription() { return Desc; }
-    string& ICmd::GetHelp() { return Help; }
+const string &ICmd::GetName() const { return Name; }
+const string &ICmd::GetUsage() const { return Usage; }
+const string &ICmd::GetDescription() const { return Desc; }
+const string &ICmd::GetHelp() const { return Help; }
 
-    const string &ICmd::ErrorName(int err) {
-        if (err == INT_MAX) {
-            static const string err = "portod unavailable";
-            return err;
-        }
-        return rpc::EError_Name(static_cast<rpc::EError>(err));
+const string &ICmd::ErrorName(int err) {
+    if (err == INT_MAX) {
+        static const string err = "portod unavailable";
+        return err;
     }
+    return rpc::EError_Name(static_cast<rpc::EError>(err));
+}
 
 void ICmd::Print(const std::string &val) {
     std::cout << val;
@@ -72,12 +229,12 @@ void ICmd::PrintError(const string &str) {
     PrintError(error, str);
 }
 
-bool ICmd::ValidArgs(int argc, char *argv[]) {
-    if (argc < NeedArgs)
+bool ICmd::ValidArgs(const std::vector<std::string> &args) {
+    if (args.size() < NeedArgs)
         return false;
 
-    if (argc >= 1) {
-        string arg(argv[0]);
+    if (args.size() >= 1) {
+        const string &arg = args[0];
         if (arg == "-h" || arg == "--help" || arg == "help")
             return false;;
     }
@@ -99,153 +256,17 @@ void ICmd::Signal(int sig) {
     }
 }
 
-static map<string, ICmd *> commands;
-
-THelpCmd::THelpCmd(TPortoAPI *api, bool usagePrintData) : ICmd(api, "help", 1, "[command]", "print help message for command"), UsagePrintData(usagePrintData) {}
-
-static void PrintAligned(const std::string &name, const std::string &desc,
-                         const size_t nameWidth, const size_t termWidth) {
-    std::vector<std::string> v;
-    size_t descWidth = termWidth - nameWidth - 4;
-
-    size_t start = 0;
-    for (size_t i = 0; i < desc.length(); i++) {
-        if (i - start > descWidth) {
-            v.push_back(std::string(desc, start, i - start));
-            start = i;
-        }
-    }
-    std::string last = std::string(desc, start, desc.length());
-    if (last.length())
-        v.push_back(last);
-
-    std::cerr << "  " << std::left << std::setw(nameWidth) << name
-        << v[0] << std::endl;
-    for (size_t i = 1; i < v.size(); i++)
-        std::cerr << "  " << std::left << std::setw(nameWidth) << " "
-            << v[i] << std::endl;
-}
-
-
-void THelpCmd::Usage() {
-    int nameWidth;
-    int termWidth = 80;
-
-    struct winsize w;
-    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0)
-        termWidth = w.ws_col;
-
-    std::cerr << "Usage: " << program_invocation_short_name << " <command> [<args>]" << std::endl;
-    std::cerr << std::endl;
-    std::cerr << "Command list:" << std::endl;
-
-    std::vector<std::string> tmpVec;
-    for (auto i : commands)
-        tmpVec.push_back(i.first);
-    nameWidth = MaxFieldLength(tmpVec);
-
-    for (auto i : commands)
-        PrintAligned(i.second->GetName(), i.second->GetDescription(), nameWidth, termWidth);
-
-    int ret;
-
-    std::cerr << std::endl << "Volume properties:" << std::endl;
-    vector<TProperty> vlist;
-    ret = Api->ListVolumeProperties(vlist);
-    if (ret) {
-        PrintError("Unavailable");
-    } else {
-        tmpVec.clear();
-        for (auto p : vlist)
-            tmpVec.push_back(p.Name);
-        nameWidth = MaxFieldLength(tmpVec);
-
-        for (auto p : vlist)
-            PrintAligned(p.Name, p.Description, nameWidth, termWidth);
-    }
-
-    std::cerr << std::endl << "Property list:" << std::endl;
-    vector<TProperty> plist;
-    ret = Api->Plist(plist);
-    if (ret) {
-        PrintError("Unavailable");
-    } else {
-        tmpVec.clear();
-        for (auto p : plist)
-            tmpVec.push_back(p.Name);
-        nameWidth = MaxFieldLength(tmpVec);
-
-        for (auto p : plist)
-            PrintAligned(p.Name, p.Description, nameWidth, termWidth);
-    }
-
-    if (!UsagePrintData)
-        return;
-
-    std::cerr << std::endl << "Data list:" << std::endl;
-    vector<TData> dlist;
-    ret = Api->Dlist(dlist);
-    if (ret) {
-        PrintError("Unavailable");
-    } else {
-        tmpVec.clear();
-        for (auto d : dlist)
-            tmpVec.push_back(d.Name);
-        nameWidth = MaxFieldLength(tmpVec);
-
-        for (auto d : dlist)
-            PrintAligned(d.Name, d.Description, nameWidth, termWidth);
-    }
-    std::cerr << std::endl;
-}
-
-int THelpCmd::Execute(int argc, char *argv[]) {
-    if (argc == 0) {
-        Usage();
+int TCommandHandler::TryExec(const std::string &commandName,
+                             const std::vector<std::string> &commandArgs) {
+    const auto it = Commands.find(commandName);
+    if (it == Commands.end()) {
+        std::cerr << "Invalid command " << commandName << "!" << std::endl;
         return EXIT_FAILURE;
     }
 
-    string name(argv[0]);
-    for (auto i : commands) {
-        if (i.second->GetName() == name) {
-            std::cerr << "Usage: " << program_invocation_short_name << " " << name << " " << i.second->GetUsage() << std::endl;
-            std::cerr << std::endl;
-            std::cerr << i.second->GetDescription() << std::endl;
-            std::cerr << i.second->GetHelp();
-            return EXIT_SUCCESS;
-        }
-    }
-
-    Usage();
-    return EXIT_FAILURE;
-}
-
-static void Usage(const char *command) {
-    ICmd *cmd = commands["help"];
-    char *argv[] = { (char *)command, NULL };
-
-    cmd->Execute(command ? 1 : 0, argv);
-}
-
-void RegisterCommand(ICmd *cmd) {
-    commands[cmd->GetName()] = cmd;
-}
-
-void SigInt(int sig) {
-    if (CurrentCmd)
-        CurrentCmd->Signal(sig);
-}
-
-static int TryExec(int argc, char *argv[]) {
-    string name(argv[1]);
-
-    if (commands.find(name) == commands.end()) {
-        std::cerr << "Invalid command " << name << "!" << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    ICmd *cmd = commands[name];
-    if (!cmd->ValidArgs(argc - 2, argv + 2)) {
+    ICmd *cmd = it->second.get();
+    PORTO_ASSERT(cmd);
+    if (!cmd->ValidArgs(commandArgs)) {
         Usage(cmd->GetName().c_str());
         return EXIT_FAILURE;
     }
@@ -257,29 +278,42 @@ static int TryExec(int argc, char *argv[]) {
     (void)RegisterSignal(SIGINT, SigInt);
     (void)RegisterSignal(SIGTERM, SigInt);
 
-    int ret = cmd->Execute(argc - 2, argv + 2);
+    TCommandEnviroment commandEnv{*this, commandArgs};
+    int ret = cmd->Execute(&commandEnv);
     if (cmd->GotSignal())
         return -cmd->InterruptedSignal;
     else
         return ret;
 }
 
-int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
+TCommandHandler::TCommandHandler(TPortoAPI &api) : PortoApi(api) {
+    RegisterCommand(std::unique_ptr<ICmd>(new THelpCmd(*this, true)));
+}
+
+TCommandHandler::~TCommandHandler() {
+}
+
+void TCommandHandler::RegisterCommand(std::unique_ptr<ICmd> cmd) {
+    PORTO_ASSERT(cmd);
+    Commands[cmd->GetName()] = std::move(cmd);
+}
+
+int TCommandHandler::HandleCommand(int argc, char *argv[]) {
     if (argc <= 1) {
-        Usage(NULL);
+        Usage(nullptr);
         return EXIT_FAILURE;
     }
 
-    string name(argv[1]);
+    const string name(argv[1]);
     if (name == "-h" || name == "--help") {
-        Usage(NULL);
+        Usage(nullptr);
         return EXIT_FAILURE;
     }
 
     if (name == "-v" || name == "--version") {
         std::cerr << "client: " << GIT_TAG << " " << GIT_REVISION << std::endl;
         std::string tag, revision;
-        int ret = api->GetVersion(tag, revision);
+        int ret = PortoApi.GetVersion(tag, revision);
 
         if (!ret)
             std::cerr << "server: " << tag << " " << revision << std::endl;
@@ -289,8 +323,13 @@ int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
 
     int ret = EXIT_FAILURE;
     try {
-        ret = TryExec(argc, argv);
-    } catch (string err) {
+        // Skip program name and command name to build
+        // a list of command arguments.
+        const std::vector<std::string> commandArgs(argv + 2, argv + argc);
+        ret = TryExec(name, commandArgs);
+    } catch (const std::exception &exc) {
+        std::cerr << exc.what() << std::endl;
+    } catch (const string &err) {
         std::cerr << err << std::endl;
     } catch (const char *err) {
         std::cerr << err << std::endl;
@@ -298,15 +337,23 @@ int HandleCommand(TPortoAPI *api, int argc, char *argv[]) {
         std::cerr << "Got unknown error" << std::endl;
     }
 
-    for (auto pair : commands)
-        delete pair.second;
-
     return ret;
 }
 
-int GetOpt(int argc, char *argv[], const std::vector<Option> &opts) {
+void TCommandHandler::Usage(const char *command) {
+    ICmd *cmd = Commands["help"].get();
+    PORTO_ASSERT(cmd);
+
+    std::vector<std::string> args;
+    if (command)
+        args.push_back(command);
+    TCommandEnviroment commandEnv{*this, args};
+    cmd->Execute(&commandEnv);
+}
+
+vector<string> TCommandEnviroment::GetOpts(const vector<Option> &options) {
     std::string optstring;
-    for (auto o : opts) {
+    for (const auto &o : options) {
         optstring += o.key;
         if (o.hasArg)
             optstring += ":";
@@ -314,9 +361,14 @@ int GetOpt(int argc, char *argv[], const std::vector<Option> &opts) {
 
     optind = 1;
     int opt;
-    while ((opt = getopt(argc + 1, argv - 1, optstring.c_str())) != -1) {
+    vector<string> mutableBuffer = Arguments;
+    vector<char*> rawArgs;
+    rawArgs.reserve(mutableBuffer.size());
+    for (auto &arg : mutableBuffer)
+        rawArgs.push_back(&arg[0]);
+    while ((opt = getopt(rawArgs.size(), &rawArgs[0], optstring.c_str())) != -1) {
         bool found = false;
-        for (auto o : opts) {
+        for (const auto &o : options) {
             if (o.key == opt) {
                 o.handler(optarg);
                 found = true;
@@ -325,10 +377,10 @@ int GetOpt(int argc, char *argv[], const std::vector<Option> &opts) {
         }
 
         if (!found) {
-            Usage(NULL);
+            Handler.Usage(nullptr);
             exit(EXIT_FAILURE);
         }
     }
 
-    return optind - 1;
+    return vector<string>(Arguments.begin() + optind - 1, Arguments.end());
 }

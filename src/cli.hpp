@@ -1,83 +1,56 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <csignal>
+#include <vector>
 
 #include "libporto.hpp"
 #include "error.hpp"
 
-// Command that is being executed, used for signal handling
-class ICmd;
-extern ICmd *CurrentCmd;
+class TCommandEnviroment;
 
 class ICmd {
 protected:
     TPortoAPI *Api;
     std::string Name, Usage, Desc, Help;
-    int NeedArgs;
+    size_t NeedArgs;
     sig_atomic_t Interrupted = 0;
     bool DieOnSignal = false;
 
-    template <typename T>
-    int RunCmd(const std::vector<std::string> &args) {
-        ICmd *prevCmd = CurrentCmd;
-
-        std::vector<char *> cargs;
-        cargs.push_back(strdup(program_invocation_name));
-        for (auto arg : args)
-            cargs.push_back(strdup(arg.c_str()));
-
-        auto cmd = new T(Api);
-        cmd->SetDieOnSignal(false);
-
-        CurrentCmd = cmd;
-        int ret = cmd->Execute(cargs.size() - 1, ((char **)cargs.data()) + 1);
-        CurrentCmd = prevCmd;
-
-        for (auto arg : cargs)
-            free(arg);
-
-        delete cmd;
-
-        if (GotSignal())
-            return InterruptedSignal;
-
-        return ret;
-    }
+    int RunCmdImpl(const std::vector<std::string> &args,
+                   std::unique_ptr<ICmd> command,
+                   TCommandEnviroment *env);
 
 public:
     int InterruptedSignal;
 
-    bool GotSignal() {
+    bool GotSignal() const {
         return Interrupted;
     }
 
-    ICmd(TPortoAPI *api, const std::string& name, int args,
-         const std::string& usage, const std::string& desc, const std::string& help = "");
+    ICmd(TPortoAPI *api, const std::string &name, int args,
+         const std::string &usage, const std::string &desc, const std::string &help = "");
     virtual ~ICmd() {}
-    std::string &GetName();
-    std::string &GetUsage();
-    std::string &GetDescription();
-    std::string &GetHelp();
+    const std::string &GetName() const;
+    const std::string &GetUsage() const;
+    const std::string &GetDescription() const;
+    const std::string &GetHelp() const;
 
     const std::string &ErrorName(int err);
     void Print(const std::string &val);
     void PrintPair(const std::string &key, const std::string &val);
     void PrintError(const TError &error, const std::string &str);
     void PrintError(const std::string &str);
-    bool ValidArgs(int argc, char *argv[]);
+    bool ValidArgs(const std::vector<std::string> &args);
     void SetDieOnSignal(bool die);
     void Signal(int sig);
-    virtual int Execute(int argc, char *argv[]) = 0;
-};
+    virtual int Execute(TCommandEnviroment *env) = 0;
 
-class THelpCmd : public ICmd {
-    bool UsagePrintData;
-public:
-    THelpCmd(TPortoAPI *api, bool usagePrintData);
-
-    void Usage();
-    int Execute(int argc, char *argv[]);
+    template <typename T>
+    int RunCmd(const std::vector<std::string> &args, TCommandEnviroment *env) {
+        return RunCmdImpl(args, std::unique_ptr<T>(new T(Api)), env);
+    }
 };
 
 struct Option {
@@ -86,8 +59,56 @@ struct Option {
     std::function<void(const char *arg)> handler;
 };
 
-int GetOpt(int argc, char *argv[], const std::vector<Option> &opts);
+class TCommandHandler {
+    void operator=(const TCommandHandler&) = delete;
+    TCommandHandler(const TCommandHandler&) = delete;
 
-size_t MaxFieldLength(std::vector<std::string> &vec, size_t min = 8);
-void RegisterCommand(ICmd *cmd);
-int HandleCommand(TPortoAPI *api, int argc, char *argv[]);
+    int TryExec(const std::string &commandName, const std::vector<std::string> &commandArgs);
+
+public:
+    using RegisteredCommands = std::map<std::string, std::unique_ptr<ICmd>>;
+
+    explicit TCommandHandler(TPortoAPI &api);
+    ~TCommandHandler();
+
+    void RegisterCommand(std::unique_ptr<ICmd> cmd);
+    int HandleCommand(int argc, char *argv[]);
+    void Usage(const char *command);
+
+    TPortoAPI &GetPortoApi() { return PortoApi; }
+    const RegisteredCommands &GetCommands() const { return Commands; }
+
+    template <typename TCommand>
+    void RegisterCommand() {
+        RegisterCommand(std::unique_ptr<ICmd>(new TCommand(&PortoApi)));
+    }
+
+private:
+    RegisteredCommands Commands;
+    TPortoAPI &PortoApi;
+};
+
+class TCommandEnviroment {
+    TCommandHandler &Handler;
+    const std::vector<std::string> &Arguments;
+
+    TCommandEnviroment() = delete;
+    TCommandEnviroment(const TCommandEnviroment &) = delete;
+
+public:
+    TCommandEnviroment(TCommandHandler &handler,
+                       const std::vector<std::string> &arguments)
+        : Handler(handler),
+          Arguments(arguments) {}
+
+    TCommandEnviroment(TCommandEnviroment *env,
+                       const std::vector<std::string> &arguments)
+        : Handler(env->Handler),
+          Arguments(arguments) {}
+
+    std::vector<std::string> GetOpts(const std::vector<Option> &options);
+    const std::vector<std::string> &GetArgs() const { return Arguments; }
+};
+
+constexpr size_t MIN_FIELD_LENGTH = 8;
+size_t MaxFieldLength(const std::vector<std::string> &vec, size_t min = MIN_FIELD_LENGTH);
