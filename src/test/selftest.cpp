@@ -2847,8 +2847,10 @@ static void TestRoot(TPortoAPI &api) {
     if (KernelSupports(KernelFeature::RECHARGE_ON_PGFAULT))
         properties.push_back("recharge_on_pgfault");
 
-    if (KernelSupports(KernelFeature::FSIO))
+    if (KernelSupports(KernelFeature::FSIO)) {
         properties.push_back("io_limit");
+        properties.push_back("dirty_limit");
+    }
 
     if (NetworkEnabled()) {
         properties.push_back("net");
