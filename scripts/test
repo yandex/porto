@@ -1,48 +1,71 @@
 #!/bin/bash
 
-set -e
+set -ex
 
 ROOTDIR=$(cd $(dirname $0)/../ && pwd)
-
-say() { [ ! -t 1 ] || tput setaf 3; echo "$@"; [ ! -t 1 ] || tput sgr0; }
+PORTO_VERSION=$(git describe --match "v[0-9]*" --abbrev=7 | sed -e 's/^v//')
+PORTO_DPKG="$PWD/../yandex-porto_${PORTO_VERSION}_amd64.deb"
+PYTHON_DPKG="$PWD/../python-portopy_${PORTO_VERSION}_all.deb"
+SUDO=sudo
 
 update_config() {
-	echo "log { verbose: true } network { enabled: $1 dynamic_ifaces: $2 } container { use_hierarchy: true empty_wait_timeout_ms: 1000 } privileges { root_user: \"$USER\" restricted_root_user: \"daemon\" } volumes { enabled: true }" > /etc/portod.conf
+	echo "log { verbose: true } network { enabled: $1 dynamic_ifaces: $2 } container { use_hierarchy: true empty_wait_timeout_ms: 1000 } privileges { root_user: \"$USER\" restricted_root_user: \"daemon\" } volumes { enabled: true }" | $SUDO tee /etc/portod.conf
+}
+
+say() { [ ! -t 1 ] || tput setaf 3; echo "$@"; [ ! -t 1 ] || tput sgr0; }
+die() { echo $@ ; exit 1; }
+
+getver() { portoctl -v 2>&1 | grep $1 | awk '{print $2}'; }
+checkver() { [ "$2" = "$3" ] || { echo "Invalid $1 version ($2 != $3)"; }; }
+
+build() {
+	say "Build"
+	rm -f "$PORTO_DPKG" "$PYTHON_DPKG"
+	dch --newversion $PORTO_VERSION "test build"
+	debuild -i -us -uc -b -j$(grep -c "^processor" /proc/cpuinfo)
+	install
+}
+
+install() {
+	say "Install"
+	$SUDO dpkg -i "$PORTO_DPKG" #"$PYTHON_DPKG"
+	checkver server v$PORTO_VERSION $(getver server)
+	checkver client v$PORTO_VERSION $(getver client)
 }
 
 selftest() {
-	say "Self test with network=$1"
+	say "Self test"
 	update_config true true
-	portotest "$@"
+	$SUDO portotest "$@"
 }
 
 stresstest() {
 	say "Stress test"
 	update_config true true
-	portotest stress "$@"
+	$SUDO portotest stress "$@"
 }
 
 fuzzytest() {
 	say "Fuzzy test"
 	update_config true true
-	portotest fuzzy "$@"
+	$SUDO portotest fuzzy "$@"
 }
 
 pkgtest() {
 	say "Package test"
 	mkdir -p /place
-	for f in $ROOTDIR/yandex/dist/*.conf; do
+	for f in $(find $ROOTDIR/scripts/dist/ -name '*.conf'); do
 		img=/place/$(basename $f).img
-		touch $img
-		$ROOTDIR/scripts/mkimg 10G $img $f -vTd -c $ROOTDIR
+		$SUDO touch $img
+		$SUDO $ROOTDIR/scripts/mkimg 10G $img $f -vTd -c $ROOTDIR
 	done
 }
 
 threadstest() {
 	say "Threads test"
-	restart yandex-porto
-	python $ROOTDIR/src/test/threads.py "$@"
-	sudo NOCHECK=y portotest self daemon
+	$SUDO restart yandex-porto
+	$SUDO python $ROOTDIR/src/test/threads.py "$@"
+	$SUDO NOCHECK=y portotest self daemon
 }
 
 HOST=${HOST:-__please_specify_host__}
@@ -189,6 +212,10 @@ mvlantest() {
 	portoctl exec ping command="ping $host_ip" net="macvlan $iface eth0" ip="eth0 $container_ip/$host_mask" default_gw="$default_gw"
 }
 
+update() {
+	$ROOTDIR/scripts/test_update "$PORTO_DPKG"
+}
+
 fixcg() {
 	# make current task belongs to root cgroups
 	for cg in /sys/fs/cgroup/*; do
@@ -198,22 +225,5 @@ fixcg() {
 
 fixcg
 
-[ ! $# -eq 0 ] || set -- self pkg stress
-for t in "$@"; do
-	case $t in
-		self) selftest ; exit ;;
-		selfargs) selftest "$@" ; exit ;;
-		stress) stresstest ;;
-		fuzzy) shift; fuzzytest ;;
-		fuzzyargs) shift; fuzzytest "$@" ;;
-		threads) threadstest ;;
-		threadsargs) shift; threadstest top_iss "$@"; exit $? ;;
-		stressargs) shift; stresstest "$@"; exit $? ;;
-		pkg) pkgtest ;;
-		net) nettest ;;
-		macvlan) mvlantest ;;
-		nop) : ;;
-		script) shift; eval "$@"; exit ;;
-		*) say "Invalid test $t"; exit 1 ;;
-	esac
-done
+compgen -A function | grep -qx "$1" || die "Invalid test $1"
+eval "$@"
