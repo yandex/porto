@@ -101,7 +101,7 @@ pctl() {
 pexec() { pctl exec ${CONTAINER}-sudo command="/bin/bash -c '$*'" user="root" group="root"; }
 
 allocate_image() {
-	run fallocate -l $SIZE $IMAGE || run dd if=/dev/zero of=$IMAGE bs=1 count=1 seek=$SIZE
+	run truncate -s $SIZE $IMAGE || run dd if=/dev/zero of=$IMAGE bs=1 count=1 seek=$SIZE
 	run mkfs.ext4 -F -F $IMAGE
 }
 
