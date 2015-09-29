@@ -4479,9 +4479,7 @@ static void TestSigPipe(TPortoAPI &api) {
     rpc::TContainerRequest req;
     req.mutable_list();
 
-    google::protobuf::io::FileOutputStream post(fd);
-    WriteDelimitedTo(req, &post);
-    post.Flush();
+    WriteDelimitedTo(req, fd, true);
 
     close(fd);
     WaitPortod(api);

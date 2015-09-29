@@ -1,5 +1,8 @@
 #include <string>
 
+#include <google/protobuf/io/coded_stream.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+
 #include "protobuf.hpp"
 
 extern "C" {
@@ -37,14 +40,20 @@ bool WriteDelimitedTo(
     return true;
 }
 
+bool WriteDelimitedTo(const google::protobuf::MessageLite& message, int fd, bool flush) {
+    google::protobuf::io::FileOutputStream post(fd);
+    const bool result = WriteDelimitedTo(message, &post);
+
+    if (result && flush)
+        post.Flush();
+
+    return result;
+}
+
 bool ReadDelimitedFrom(
                        google::protobuf::io::ZeroCopyInputStream* rawInput,
                        google::protobuf::MessageLite* message) {
-    InterruptibleInputStream *is = nullptr;
-    try {
-        is = dynamic_cast<InterruptibleInputStream *>(rawInput);
-    } catch (...) { }
-
+    auto* is = dynamic_cast<InterruptibleInputStream *>(rawInput);
     if (is)
         is->SetLimit(8, false);
 
@@ -84,7 +93,7 @@ TError ConnectToRpcServer(const std::string& path, int &fd)
 
     fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (fd < 0)
-        return TError(EError::Unknown, errno, "socket()");
+        return TError::FromErrno("socket()");
 
     peer_addr.sun_family = AF_UNIX;
     strncpy(peer_addr.sun_path, path.c_str(), sizeof(peer_addr.sun_path) - 1);
@@ -93,7 +102,7 @@ TError ConnectToRpcServer(const std::string& path, int &fd)
     if (connect(fd, (struct sockaddr *) &peer_addr, peer_addr_size) < 0) {
         close(fd);
         fd = -1;
-        return TError(EError::Unknown, errno, "connect(" + path + ")");
+        return TError::FromErrno("connect(" + path + ")");
     }
 
     return TError::Success();
@@ -106,35 +115,37 @@ TError CreateRpcServer(const std::string &path, const int mode, const int uid,
 
     memset(&my_addr, 0, sizeof(struct sockaddr_un));
 
-    fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
-    if (fd < 0)
-        return TError(EError::Unknown, errno, "socket()");
+    fd = -1;
+    int rpc_socket = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
+    if (rpc_socket < 0)
+        return TError::FromErrno("socket()");
 
     my_addr.sun_family = AF_UNIX;
     strncpy(my_addr.sun_path, path.c_str(), sizeof(my_addr.sun_path) - 1);
 
     (void)unlink(path.c_str());
-    if (fchmod(fd, mode) < 0) {
-        close(fd);
-        return TError(EError::Unknown, errno, "fchmod(" + path + ", " + std::to_string(mode) + ")");
+    if (fchmod(rpc_socket, mode) < 0) {
+        close(rpc_socket);
+        return TError::FromErrno("fchmod(" + path + ", " + std::to_string(mode) + ")");
     }
 
-    if (::bind(fd, (struct sockaddr *) &my_addr,
+    if (::bind(rpc_socket, (struct sockaddr *) &my_addr,
              sizeof(struct sockaddr_un)) < 0) {
-        close(fd);
-        return TError(EError::Unknown, errno, "bind(" + path + ")");
+        close(rpc_socket);
+        return TError::FromErrno("bind(" + path + ")");
     }
 
     if (chown(path.c_str(), uid, gid) < 0) {
-        close(fd);
-        return TError(EError::Unknown, errno, "chown(" + path + ", " + std::to_string(uid) + ", " + std::to_string(gid) + ")");
+        close(rpc_socket);
+        return TError::FromErrno("chown(" + path + ", " + std::to_string(uid) + ", " + std::to_string(gid) + ")");
     }
 
-    if (listen(fd, 0) < 0) {
-        close(fd);
-        return TError(EError::Unknown, errno, "listen()");
+    if (listen(rpc_socket, 0) < 0) {
+        close(rpc_socket);
+        return TError::FromErrno("listen()");
     }
 
+    fd = rpc_socket;
     return TError::Success();
 }
 
@@ -190,7 +201,7 @@ bool InterruptibleInputStream::Next(const void **data, int *size) {
         ReserveChunk();
     }
     if (n < 0 && errno == EINTR)
-        interrupted++;
+        InterruptedCount++;
 
     *data = &Buf[startPos];
     *size = sz;
@@ -217,8 +228,8 @@ int64_t InterruptibleInputStream::ByteCount() const {
     return Pos - Backed;
 }
 
-int InterruptibleInputStream::Interrupted() {
-    return interrupted;
+int InterruptibleInputStream::Interrupted() const {
+    return InterruptedCount;
 }
 
 void InterruptibleInputStream::GetBuf(uint8_t **buf, size_t *pos) const {

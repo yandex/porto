@@ -1,5 +1,8 @@
 #include <iostream>
 
+#include <google/protobuf/text_format.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+
 #include "config.hpp"
 #include "protobuf.hpp"
 #include "util/unix.hpp"
