@@ -9,9 +9,9 @@
 
 class TPath;
 
-int RetryBusy(int times, int timeoMs, std::function<int()> handler);
-int RetryFailed(int times, int timeoMs, std::function<int()> handler);
-int SleepWhile(int timeoMs, std::function<int()> handler);
+bool RetryIfBusy(std::function<int()> handler, int &ret, int times = 10, int timeoMs = 100);
+bool RetryIfFailed(std::function<int()> handler, int &ret, int times = 10, int timeoMs = 100);
+bool SleepWhile(std::function<int()> handler, int &ret, int timeoMs);
 
 pid_t GetPid();
 pid_t GetPPid();

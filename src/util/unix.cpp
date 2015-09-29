@@ -30,49 +30,41 @@ extern "C" {
 #include <sys/un.h>
 }
 
-int RetryBusy(int times, int timeoMs, std::function<int()> handler) {
-    int ret = 0;
-
-    if (!times)
-        times = 1;
-
+bool RetryIfBusy(std::function<int()> handler, int &ret, int times, int timeoMs) {
     while (times-- > 0) {
-        ret = handler();
-        if (!ret || errno != EBUSY)
-            return ret;
-        if (usleep(timeoMs * 1000) < 0)
-            return -1;
+        auto tmp = handler();
+
+        if (!tmp || errno != EBUSY) {
+            ret = tmp;
+            return true;
+        }
+
+        usleep(timeoMs * 1000);
     }
 
-    return ret;
+    return false;
 }
 
-int RetryFailed(int times, int timeoMs, std::function<int()> handler) {
-    int ret = 0;
-
-    if (!times)
-        times = 1;
-
+bool RetryIfFailed(std::function<int()> handler, int &ret, int times, int timeoMs) {
     while (times-- > 0) {
-        ret = handler();
+        auto tmp = handler();
 
-        if (ret == 0)
-            return ret;
-        if (usleep(timeoMs * 1000) < 0)
-            return -1;
+        if (tmp == 0) {
+            ret = tmp;
+            return true;
+        }
+
+        usleep(timeoMs * 1000);
     }
 
-    return ret;
+    return false;
 }
 
-int SleepWhile(int timeoMs, std::function<int()> handler) {
+bool SleepWhile(std::function<int()> handler, int &ret, int timeoMs) {
     const int resolution = 5;
     int times = timeoMs / resolution;
 
-    if (!times)
-        times = 0;
-
-    return RetryFailed(times, resolution, handler);
+    return RetryIfFailed(handler, ret, times, resolution);
 }
 
 pid_t GetPid() {

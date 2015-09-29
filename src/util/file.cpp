@@ -30,9 +30,9 @@ TError TFile::Remove(bool silent) const {
     if (!silent)
         L_ACT() << "Unlink " << Path << std::endl;
 
-    int ret = RetryBusy(10, 100, [&]{ return unlink(Path.ToString().c_str()); });
-
-    if (ret && (errno != ENOENT))
+    int ret;
+    if (!RetryIfBusy([&]{ return unlink(Path.ToString().c_str()); }, ret) ||
+        (ret && (errno != ENOENT)))
         return TError(EError::Unknown, errno, "unlink(" + Path.ToString() + ")");
 
     return TError::Success();

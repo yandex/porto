@@ -84,22 +84,24 @@ TError TMount::Find(TPath path, const TPath mounts) {
 TError TMount::Mount(unsigned long flags) const {
     L_ACT() << "mount " << Target << " " << flags << std::endl;
 
-    int ret = RetryBusy(10, 100, [&]{ return mount(Source.ToString().c_str(),
-                                                   Target.ToString().c_str(),
-                                                   Type.c_str(),
-                                                   flags,
-                                                   CommaSeparatedList(Data).c_str()); });
-    if (ret)
-        return TError(EError::Unknown, errno, "mount(" + Source.ToString() + ", " + Target.ToString() + ", " + Type + ", " + std::to_string(flags) + ", " + CommaSeparatedList(Data) + ")");
-
+    int ret;
+    if (!RetryIfBusy([&]{ return mount(Source.ToString().c_str(),
+                                       Target.ToString().c_str(),
+                                       Type.c_str(),
+                                       flags,
+                                       CommaSeparatedList(Data).c_str()); },
+            ret) || ret)
+        return TError(EError::Unknown, errno, "mount(" + Source.ToString() +
+                      ", " + Target.ToString() + ", " + Type + ", " +
+                      std::to_string(flags) + ", " + CommaSeparatedList(Data) + ")");
     return TError::Success();
 }
 
 TError TMount::Umount(int flags) const {
     L_ACT() << "umount " << Target << std::endl;
 
-    int ret = RetryBusy(10, 100, [&]{ return umount2(Target.ToString().c_str(), flags); });
-    if (ret)
+    int ret;
+    if (!RetryIfBusy([&]{ return umount2(Target.ToString().c_str(), flags); }, ret) || ret)
         return TError(EError::Unknown, errno, "umount(" + Target.ToString() + ")");
 
     return TError::Success();

@@ -195,16 +195,15 @@ TError TMemorySubsystem::SetDirtyLimit(std::shared_ptr<TCgroup> cg, uint64_t lim
 TError TFreezerSubsystem::WaitState(std::shared_ptr<TCgroup> cg,
                                     const std::string &state) const {
 
-    int ret = RetryFailed(config().daemon().freezer_wait_timeout_s() * 10, 100, [&]{
-        string s;
-        TError error = cg->GetKnobValue("freezer.state", s);
-        if (error)
-            L_ERR() << "Can't freeze cgroup: " << error << std::endl;
+    int ret;
+    if (!RetryIfFailed([&] {
+                string s;
+                TError error = cg->GetKnobValue("freezer.state", s);
+                if (error)
+                    L_ERR() << "Can't freeze cgroup: " << error << std::endl;
 
-        return StringTrim(s) != state;
-    });
-
-    if (ret) {
+                return StringTrim(s) != state;
+            }, ret, config().daemon().freezer_wait_timeout_s() * 10, 100) || ret) {
         string s = "?";
         (void)cg->GetKnobValue("freezer.state", s);
 

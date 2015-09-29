@@ -181,11 +181,9 @@ TError TCgroup::Remove() {
     // at this point we should have gracefully terminated all tasks
     // in the container; if anything is still alive we have no other choice
     // but to kill it with SIGKILL
-    int ret = RetryFailed(config().daemon().cgroup_remove_timeout_s() * 10, 100,
-                          [&]{ Kill(SIGKILL);
-                               return !IsEmpty(); });
-
-    if (ret)
+    int ret;
+    if (!RetryIfFailed([&]{ Kill(SIGKILL); return !IsEmpty(); }, ret,
+                       config().daemon().cgroup_remove_timeout_s() * 10) || ret)
         L_ERR() << "Can't kill all tasks in cgroup " << Path() << std::endl;
 
     L_ACT() << "Remove cgroup " << Path() << std::endl;
@@ -206,7 +204,7 @@ TError TCgroup::Kill(int signal) const {
     if (!IsRoot()) {
         vector<pid_t> tasks;
         if (!GetTasks(tasks)) {
-            for (auto pid : tasks) {
+            for (const auto &pid : tasks) {
                 TTask task(pid);
                 TError error = task.Kill(signal);
                 if (error && error.GetErrno() != ESRCH)

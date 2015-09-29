@@ -1051,9 +1051,9 @@ TError TContainer::KillAll(TScopedLock &holder_lock) {
     // try to stop all tasks gracefully
     if (!SendSignal(SIGTERM)) {
         TScopedUnlock unlock(holder_lock);
-        int ret = SleepWhile(config().container().kill_timeout_ms(),
-                             [&]{ return cg->IsEmpty() == false; });
-        if (ret)
+        int ret;
+        if (!SleepWhile([&]{ return cg->IsEmpty() == false; }, ret,
+                        config().container().kill_timeout_ms()) || ret)
             L() << "Child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
     }
 
@@ -1269,14 +1269,13 @@ TError TContainer::Stop(TScopedLock &holder_lock) {
         auto cg = GetLeafCgroup(freezerSubsystem);
 
         TScopedUnlock unlock(holder_lock);
-        int ret = SleepWhile(config().container().stop_timeout_ms(),
-                             [&] () -> int {
-                                 if (cg && cg->IsEmpty())
-                                     return 0;
-                                 kill(Task->GetPid(), 0);
-                                 return errno != ESRCH;
-                             });
-        if (ret) {
+        int ret;
+        if (!SleepWhile([&] () -> int {
+                    if (cg && cg->IsEmpty())
+                        return 0;
+                    kill(Task->GetPid(), 0);
+                    return errno != ESRCH;
+                }, ret, config().container().stop_timeout_ms()) || ret) {
             L_ERR() << "Can't wait for container to stop" << std::endl;
             return TError(EError::Unknown, "Container didn't stop in " + std::to_string(config().container().stop_timeout_ms()) + "ms");
         }

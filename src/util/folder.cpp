@@ -76,8 +76,8 @@ TError TFolder::Remove(bool recursive, bool silent) const {
     if (!Path.Exists())
         return TError::Success();
 
-    int ret = RetryBusy(10, 100, [&]{ return rmdir(Path.ToString().c_str()); });
-    if (ret)
+    int ret;
+    if (!RetryIfBusy([&]{ return rmdir(Path.ToString().c_str()); }, ret) || ret)
         return TError(EError::Unknown, errno, "rmdir(" + Path.ToString() + ")");
 
     return TError::Success();
