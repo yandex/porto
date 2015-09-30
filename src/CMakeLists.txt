@@ -21,6 +21,8 @@ else()
 	find_package(FLEX REQUIRED)
 
 	ExternalProject_Add(libnl
+		GIT_REPOSITORY git://github.com/tgraf/libnl.git
+		GIT_TAG libnl3_2_25
 		BUILD_COMMAND $(MAKE)
 		INSTALL_COMMAND $(MAKE) install
 		SOURCE_DIR ${CMAKE_SOURCE_DIR}/contrib/libnl
