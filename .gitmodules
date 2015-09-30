@@ -1,3 +1,0 @@
-[submodule "libnl"]
-	path = contrib/libnl
-	url = git://github.com/tgraf/libnl.git
