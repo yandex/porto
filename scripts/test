@@ -28,7 +28,8 @@ build() {
 
 install() {
 	say "Install"
-	$SUDO dpkg -i "$PORTO_DPKG" #"$PYTHON_DPKG"
+	$SUDO dpkg -i "$PORTO_DPKG"
+	$SUDO dpkg -i "$PYTHON_DPKG"
 	checkver server v$PORTO_VERSION $(getver server)
 	checkver client v$PORTO_VERSION $(getver client)
 }
