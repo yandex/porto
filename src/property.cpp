@@ -1321,6 +1321,7 @@ struct TCapDesc {
 
 #ifndef CAP_AUDIT_READ
 #define CAP_AUDIT_READ 37
+#define CAP_BLOCK_SUSPEND=36
 #endif
 
 class TCapabilitiesProperty : public TListValue, public TContainerValue {
