@@ -9,7 +9,7 @@ PYTHON_DPKG="$PWD/../python-portopy_${PORTO_VERSION}_all.deb"
 SUDO=sudo
 
 update_config() {
-	echo "log { verbose: true } network { enabled: $1 dynamic_ifaces: $2 } container { use_hierarchy: true empty_wait_timeout_ms: 1000 } privileges { root_user: \"$USER\" restricted_root_user: \"daemon\" } volumes { enabled: true }" | $SUDO tee /etc/portod.conf
+	echo "log { verbose: true } network { enabled: $1 dynamic_ifaces: $2 } container { use_hierarchy: true empty_wait_timeout_ms: 1000 } privileges { restricted_root_user: \"daemon\" } volumes { enabled: true }" | $SUDO tee /etc/portod.conf
 }
 
 say() { [ ! -t 1 ] || tput setaf 3; echo "$@"; [ ! -t 1 ] || tput sgr0; }
