@@ -23,8 +23,6 @@ Porto into your existing infrastructure.
 # BUILDING #
 
 ```
-$ git submodule init
-$ git submodule update
 $ cmake .
 $ make
 $ make install DESTDIR=/usr/local
