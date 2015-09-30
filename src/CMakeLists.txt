@@ -8,6 +8,18 @@ if(USE_SYSTEM_LIBNL)
 	include_directories(${LIBNL_INCLUDE_DIR})
 else()
 	include(ExternalProject)
+
+	if(NOT EXISTS "/usr/bin/autoreconf")
+		message(FATAL_ERROR "dh-autoreconf is required to build libnl")
+	endif()
+
+	if(NOT EXISTS "/usr/bin/pkg-config")
+		message(FATAL_ERROR "pkg-config is required to build libnl")
+	endif()
+
+	find_package(BISON REQUIRED)
+	find_package(FLEX REQUIRED)
+
 	ExternalProject_Add(libnl
 		BUILD_COMMAND $(MAKE)
 		INSTALL_COMMAND $(MAKE) install
