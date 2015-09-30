@@ -253,12 +253,8 @@ static void SendReply(std::shared_ptr<TClient> client,
         return;
     }
 
-    google::protobuf::io::FileOutputStream post(client->GetFd());
-
     if (response.IsInitialized()) {
-        if (WriteDelimitedTo(response, &post)) {
-            post.Flush();
-
+        if (WriteDelimitedTo(response, client->GetFd(), true)) {
             if (log)
                 L_RSP() << ResponseAsString(response) << " to " << *client
                         << " (request took " << client->GetRequestTime() << "ms)"

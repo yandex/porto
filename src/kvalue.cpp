@@ -7,6 +7,8 @@
 #include "util/folder.hpp"
 #include "util/unix.hpp"
 
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+
 extern "C" {
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -99,8 +101,7 @@ TError TKeyValueNode::Append(const kv::TNode &node) const {
         return error;
     }
     try {
-        google::protobuf::io::FileOutputStream post(fd.GetFd());
-        if (!WriteDelimitedTo(node, &post))
+        if (!WriteDelimitedTo(node, fd.GetFd()))
             error = TError(EError::Unknown, __class__ + ": protobuf write error");
     } catch (...) {
         if (config().daemon().debug())
@@ -119,8 +120,7 @@ TError TKeyValueNode::Save(const kv::TNode &node) const {
     fd = open(Path.ToString().c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0755);
     TError error;
     try {
-        google::protobuf::io::FileOutputStream post(fd.GetFd());
-        if (!WriteDelimitedTo(node, &post))
+        if (!WriteDelimitedTo(node, fd.GetFd()))
             error = TError(EError::Unknown, __class__ + ": protobuf write error");
     } catch (...) {
         if (config().daemon().debug())

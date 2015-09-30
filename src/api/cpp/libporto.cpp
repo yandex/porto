@@ -1,3 +1,8 @@
+#include <climits>
+
+#include <google/protobuf/text_format.h>
+#include <google/protobuf/io/zero_copy_stream_impl.h>
+
 #include "libporto.hpp"
 #include "protobuf.hpp"
 
@@ -49,9 +54,7 @@ void TPortoAPIImpl::Cleanup() {
 }
 
 void TPortoAPIImpl::Send(rpc::TContainerRequest &req) {
-    google::protobuf::io::FileOutputStream post(Fd);
-    WriteDelimitedTo(req, &post);
-    post.Flush();
+    WriteDelimitedTo(req, Fd, true);
 }
 
 int TPortoAPIImpl::Recv(rpc::TContainerResponse &rsp) {
