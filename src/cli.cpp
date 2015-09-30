@@ -359,14 +359,17 @@ vector<string> TCommandEnviroment::GetOpts(const vector<Option> &options) {
             optstring += ":";
     }
 
-    optind = 1;
     int opt;
     vector<string> mutableBuffer = Arguments;
-    vector<char*> rawArgs;
-    rawArgs.reserve(mutableBuffer.size());
+    vector<const char*> rawArgs;
+    rawArgs.reserve(mutableBuffer.size() + 2);
+    std::string fakeCmd = "portoctl";
+    rawArgs.push_back(fakeCmd.c_str());
     for (auto &arg : mutableBuffer)
-        rawArgs.push_back(&arg[0]);
-    while ((opt = getopt(rawArgs.size(), &rawArgs[0], optstring.c_str())) != -1) {
+        rawArgs.push_back(arg.c_str());
+    rawArgs.push_back(nullptr);
+    optind = 1;
+    while ((opt = getopt(rawArgs.size() - 1, (char* const*)rawArgs.data(), optstring.c_str())) != -1) {
         bool found = false;
         for (const auto &o : options) {
             if (o.key == opt) {
