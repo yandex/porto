@@ -30,8 +30,8 @@ make %{?_smp_mflags}
 %install
 make install DESTDIR=%{buildroot}
 
-mkdir -p %{buildroot}/%{python2_sitelib}/porto
-%{__install} src/api/python/porto/*.py %{buildroot}/%{python2_sitelib}/porto
+#mkdir -p %{buildroot}/%{python2_sitelib}/porto
+#%{__install} src/api/python/porto/*.py %{buildroot}/%{python2_sitelib}/porto
 
 %{__install} -D debian/yandex-porto.service %{buildroot}/%{_unitdir}/%{name}.service
 %{__install} -D debian/yandex-porto.cron.d %{buildroot}/%{_sysconfdir}/cron.d/%{name}

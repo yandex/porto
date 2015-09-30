@@ -104,6 +104,7 @@ install(
     RUNTIME DESTINATION sbin
     LIBRARY DESTINATION lib
 )
+
 install(
-    DIRECTORY api/python/porto/ DESTINATION share/pyshared/porto
+    DIRECTORY api/python/porto/ DESTINATION lib/python2.7/site-packages/porto
 )
