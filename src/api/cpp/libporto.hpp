@@ -5,8 +5,6 @@
 #include <string>
 #include <memory>
 
-using TStringVector = std::vector<std::string>;
-
 struct TProperty {
     std::string Name;
     std::string Description;
@@ -26,12 +24,12 @@ struct TData {
 struct TVolumeDescription {
     std::string Path;
     std::map<std::string, std::string> Properties;
-    TStringVector Containers;
+    std::vector<std::string> Containers;
 
     TVolumeDescription() {}
     TVolumeDescription(const std::string &path,
                        const std::map<std::string, std::string> &properties,
-                       const TStringVector &containers) :
+                       const std::vector<std::string> &containers) :
         Path(path), Properties(properties), Containers(containers) {}
 };
 
@@ -41,7 +39,7 @@ struct TPortoGetResponse {
     std::string ErrorMsg;
 };
 
-using TGetResponceMap = std::map<std::string, std::map<std::string, TPortoGetResponse>>;
+using TGetResponseMap = std::map<std::string, std::map<std::string, TPortoGetResponse>>;
 
 class TPortoAPI {
     class TPortoAPIImpl;
@@ -66,15 +64,15 @@ public:
     int Pause(const std::string &name);
     int Resume(const std::string &name);
 
-    int Wait(const TStringVector &containers, std::string &name, int timeout = -1);
+    int Wait(const std::vector<std::string> &containers, std::string &name, int timeout = -1);
 
-    int List(TStringVector &clist);
+    int List(std::vector<std::string> &clist);
     int Plist(std::vector<TProperty> &plist);
     int Dlist(std::vector<TData> &dlist);
 
-    int Get(const TStringVector &name,
-            const TStringVector &variable,
-            TGetResponceMap &result);
+    int Get(const std::vector<std::string> &name,
+            const std::vector<std::string> &variable,
+            TGetResponseMap &result);
 
     int GetProperty(const std::string &name, const std::string &property, std::string &value);
     int SetProperty(const std::string &name, const std::string &property, std::string value);
@@ -103,5 +101,5 @@ public:
     int ImportLayer(const std::string &layer, const std::string &tarball, bool merge = false);
     int ExportLayer(const std::string &volume, const std::string &tarball);
     int RemoveLayer(const std::string &layer);
-    int ListLayers(TStringVector &layers);
+    int ListLayers(std::vector<std::string> &layers);
 };

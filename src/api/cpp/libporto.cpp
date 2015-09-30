@@ -156,7 +156,7 @@ int TPortoAPI::Destroy(const std::string &name) {
     return Impl->Rpc();
 }
 
-int TPortoAPI::List(TStringVector &clist) {
+int TPortoAPI::List(std::vector<std::string> &clist) {
     Impl->GetReq().mutable_list();
 
     int ret = Impl->Rpc();
@@ -198,9 +198,9 @@ int TPortoAPI::Dlist(std::vector<TData> &dlist) {
     return ret;
 }
 
-int TPortoAPI::Get(const TStringVector &name,
-                   const TStringVector &variable,
-                   TGetResponceMap &result) {
+int TPortoAPI::Get(const std::vector<std::string> &name,
+                   const std::vector<std::string> &variable,
+                   TGetResponseMap &result) {
     auto get = Impl->GetReq().mutable_get();
 
     for (const auto &n : name)
@@ -313,7 +313,7 @@ int TPortoAPI::Resume(const std::string &name) {
     return Impl->Rpc();
 }
 
-int TPortoAPI::Wait(const TStringVector &containers,
+int TPortoAPI::Wait(const std::vector<std::string> &containers,
                     std::string &name, int timeout) {
     auto wait = Impl->GetReq().mutable_wait();
 
@@ -360,7 +360,7 @@ int TPortoAPI::CreateVolume(const std::string &path,
     if (!ret) {
         const auto &volume = Impl->GetResp().volume();
         result.Path = volume.path();
-        result.Containers = TStringVector(std::begin(volume.containers()), std::end(volume.containers()));
+        result.Containers = std::vector<std::string>(std::begin(volume.containers()), std::end(volume.containers()));
         result.Properties = NameValueMap(volume.properties());
     }
     return ret;
@@ -414,7 +414,7 @@ int TPortoAPI::ListVolumes(const std::string &path,
             volumes.emplace_back(
                 v.path(),
                 NameValueMap(v.properties()),
-                TStringVector(v.containers().begin(), v.containers().end()));
+                std::vector<std::string>(v.containers().begin(), v.containers().end()));
         }
     }
 
@@ -447,7 +447,7 @@ int TPortoAPI::RemoveLayer(const std::string &layer) {
     return Impl->Rpc();
 }
 
-int TPortoAPI::ListLayers(TStringVector &layers) {
+int TPortoAPI::ListLayers(std::vector<std::string> &layers) {
     Impl->GetReq().mutable_listlayers();
 
     int ret = Impl->Rpc();
