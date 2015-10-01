@@ -168,6 +168,8 @@ class TTask: public TNonCopyable {
     TError ChildIsolateFs();
     TError ChildEnableNet();
 
+    TError DumpProcFsFile(const std::string &filename);
+
 public:
     TTask(std::unique_ptr<TTaskEnv> &env);
     TTask(pid_t pid);
@@ -197,6 +199,8 @@ public:
     bool HasCorrectFreezer();
 
     TError CreateTmpDir(const TPath &path, std::shared_ptr<TFolder> &dir) const;
+
+    void DumpDebugInfo();
 };
 
 TError TaskGetLastCap();

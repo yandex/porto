@@ -1301,3 +1301,24 @@ TError TaskGetLastCap() {
     TFile f("/proc/sys/kernel/cap_last_cap");
     return f.AsInt(lastCap);
 }
+
+TError TTask::DumpProcFsFile(const std::string &filename) {
+    TFile f("/proc/" + std::to_string(Pid) + "/" + filename);
+    std::vector<std::string> lines;
+    TError err = f.AsLines(lines);
+    if (err) {
+        L_ERR() << "Cannot read proc/" << filename << " for pid " << Pid << std::endl;
+        return err;
+    }
+    L() << "Dump proc/" << filename << " status for pid " << Pid << std::endl;
+    for (const auto& line : lines)
+        L() << line << std::endl;
+    L() << "----" << std::endl;
+
+    return TError::Success();
+}
+
+void TTask::DumpDebugInfo() {
+    DumpProcFsFile("status");
+    DumpProcFsFile("stack");
+}
