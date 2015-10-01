@@ -183,8 +183,18 @@ TError TCgroup::Remove() {
     // but to kill it with SIGKILL
     int ret;
     if (!RetryIfFailed([&]{ Kill(SIGKILL); return !IsEmpty(); }, ret,
-                       config().daemon().cgroup_remove_timeout_s() * 10) || ret)
+                       config().daemon().cgroup_remove_timeout_s() * 10)) {
         L_ERR() << "Can't kill all tasks in cgroup " << Path() << std::endl;
+
+        std::vector<pid_t> processes;
+        TError err = GetProcesses(processes);
+        if (!err) {
+            for (const auto& proc: processes) {
+                TTask task(proc);
+                task.DumpDebugInfo();
+            }
+        }
+    }
 
     L_ACT() << "Remove cgroup " << Path() << std::endl;
     TFolder f(Path());
