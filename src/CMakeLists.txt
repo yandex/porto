@@ -25,7 +25,7 @@ else()
 		GIT_TAG libnl3_2_25
 		BUILD_COMMAND $(MAKE)
 		INSTALL_COMMAND $(MAKE) install
-		SOURCE_DIR ${CMAKE_SOURCE_DIR}/contrib/libnl
+		SOURCE_DIR ${CMAKE_SOURCE_DIR}/src/libnl
 		UPDATE_COMMAND autoreconf -fi
 		CONFIGURE_COMMAND <SOURCE_DIR>/configure --prefix=<INSTALL_DIR> --disable-cli --disable-pthreads
 		BUILD_COMMAND ${MAKE})
