@@ -7,7 +7,8 @@ if [ $# -eq 0 ]; then
 	exit
 fi
 
-NEW_DPKG="$1"
+NEW_PORTO_DPKG="$1"
+NEW_PYTHON_DPKG="$2"
 
 expect() {
 	local old="$1"
@@ -73,7 +74,7 @@ wait_porto() {
 }
 
 cleanup_tc
-sudo apt-get install -y --force-yes yandex-porto/stable
+sudo apt-get install -y --force-yes yandex-porto/stable python-portopy/stable
 sudo restart yandex-porto
 wait_porto
 oldver="$(getver)"
@@ -93,7 +94,8 @@ portoctl start a/b
 check_state
 
 cleanup_tc
-sudo dpkg -i "$NEW_DPKG"
+sudo dpkg -i $NEW_PORTO_DPKG
+sudo dpkg -i $NEW_PYTHON_DPKG
 wait_porto
 newver="$(getver)"
 

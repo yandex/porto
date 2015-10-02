@@ -214,7 +214,7 @@ mvlantest() {
 }
 
 update() {
-	$ROOTDIR/scripts/test_update "$PORTO_DPKG"
+	$ROOTDIR/scripts/test_update "$PORTO_DPKG" "$PYTHON_DPKG"
 }
 
 fixcg() {
