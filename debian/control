@@ -1,7 +1,12 @@
 Source: yandex-porto
 Maintainer: Eugene Kilimchuk <ekilimchuk@yandex-team.ru>
-Build-Depends: cmake, debhelper (>= 8.0.0), bison, flex, pkg-config, autoconf, libtool, protobuf-compiler, libprotobuf-dev, g++ (>= 4:4.7) | g++-4.7, libncurses5-dev
+Build-Depends:
+ cmake, debhelper (>= 8.0.0), pkg-config, autoconf, libtool,
+ protobuf-compiler, libprotobuf-dev, libncurses5-dev,
+ bison, flex, g++ (>= 4:4.7) | g++-4.7,
+ dh-python, python-all, python-setuptools,
 Standards-Version: 3.9.2
+X-Python-Version: >= 2.6
 Homepage: https://github.com/yandex/porto
 Vcs-Git: https://github.com/yandex/porto.git
 
@@ -9,7 +14,7 @@ Package: yandex-porto
 Section: utils
 Priority: extra
 Architecture: amd64
-Depends: ${shlibs:Depends}, logrotate
+Depends: ${shlibs:Depends}, ${misc:Depends}, logrotate
 Description: Porto allows to run processes in containers
  Requires Linux kernel version >= 3.4
  .
@@ -19,7 +24,6 @@ Package: python-portopy
 Section: python
 Priority: optional
 Architecture: all
-Depends: python (>= 2.6), python-central, python-protobuf, yandex-porto (= ${binary:Version})
-XS-Python-Version: >= 2.6
-XB-Python-Version: >= 2.6
+Depends: python-protobuf, ${python:Depends}
+Suggests: yandex-porto (= ${binary:Version})
 Description: Python API for porto

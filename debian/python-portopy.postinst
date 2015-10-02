@@ -1,6 +1,0 @@
-#!/bin/sh
-set -e
-
-if which pycentral >/dev/null 2>&1; then
-    pycentral pkginstall python-portopy
-fi

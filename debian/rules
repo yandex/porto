@@ -16,6 +16,7 @@ override_dh_shlibdeps:
 override_dh_install:
 	dh_install
 	-dh_bash-completion
+	dh_python2
 
 %:
 	dh $@ --parallel

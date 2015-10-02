@@ -57,6 +57,11 @@ if(ENABLE_PYTHON)
 		DEPENDS rpc.proto
 		VERBATIM)
 	set(PYTHON_SOURCES "api/python/porto/rpc_pb2.py")
+	include(FindPythonInterp)
+	install(CODE "execute_process(WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/api/python
+			COMMAND ${PYTHON_EXECUTABLE} setup.py install
+			--root=\$ENV{DESTDIR}
+			--prefix=\${CMAKE_INSTALL_PREFIX})")
 endif()
 
 add_custom_target(version.hpp
@@ -103,8 +108,4 @@ install(
     TARGETS portod portoctl ${TEST_TARGETS} portoinit
     RUNTIME DESTINATION sbin
     LIBRARY DESTINATION lib
-)
-
-install(
-    DIRECTORY api/python/porto/ DESTINATION lib/python2.7/site-packages/porto
 )
