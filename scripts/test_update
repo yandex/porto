@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -ex
 
 if [ $# -eq 0 ]; then
 	echo "Please specify new package path"
@@ -41,9 +41,9 @@ check_state() {
 	expect "$(portoctl get z isolate)" = "true"
 	expect "$(portoctl get z state)" = "stopped"
 
-        # current stable version (1.9) reports invalid state
-        # for meta containers; uncomment when stable is 1.16
-        #expect "$(portoctl get a state)" = "meta"
+	# current stable version (1.9) reports invalid state
+	# for meta containers; uncomment when stable is 1.16
+	#expect "$(portoctl get a state)" = "meta"
 
 	expect "$(portoctl get a/b command)" = "sleep 4000"
 	expect "$(portoctl get a/b state)" = "running"
@@ -51,23 +51,23 @@ check_state() {
 
 cleanup_tc() {
 	for link in $(ip -o link | awk -F: '{print $2}'); do
-		tc filter del dev $link pref 10 || :
+		sudo tc filter del dev $link pref 10 || :
 	done
 }
 
 wait_porto() {
-        echo "Waiting porto startup..."
-        # versions prior to 1.17 don't return error when portoctl
-        # can't connect to socket, just sleep here
-        sleep 10
+	echo "Waiting porto startup..."
+	# versions prior to 1.17 don't return error when portoctl
+	# can't connect to socket, just sleep here
+	sleep 10
 
 #       for i in `seq 60`; do
-#               if portoctl list; then
-#                       return
-#               fi
+#		if portoctl list; then
+#			return
+#		fi
 #
-#               sleep 1
-#       done
+#		sleep 1
+#	done
 #
 #       echo "Porto is dead, don't continue"
 #       exit 1
