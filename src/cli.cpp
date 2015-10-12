@@ -368,7 +368,7 @@ vector<string> TCommandEnviroment::GetOpts(const vector<Option> &options) {
     for (auto &arg : mutableBuffer)
         rawArgs.push_back(arg.c_str());
     rawArgs.push_back(nullptr);
-    optind = 1;
+    optind = 0;
     while ((opt = getopt(rawArgs.size() - 1, (char* const*)rawArgs.data(), optstring.c_str())) != -1) {
         bool found = false;
         for (const auto &o : options) {
