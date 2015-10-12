@@ -18,16 +18,12 @@ extern "C" {
 }
 
 static int Selftest(int argc, char *argv[]) {
-    std::vector<std::string> test;
-    int leakNr = 1000;
+    std::vector<std::string> args;
 
-    for (int i = 0; i < argc; i++) {
-        TError error = StringToInt(argv[i], leakNr);
-        if (error)
-            test.push_back(argv[i]);
-    }
+    for (int i = 0; i < argc; i++)
+        args.push_back(argv[i]);
 
-    return test::SelfTest(test, leakNr);
+    return test::SelfTest(args);
 }
 
 static int Stresstest(int argc, char *argv[]) {
@@ -54,7 +50,7 @@ static int Fuzzytest(int argc, char *argv[]) {
 }
 
 static void Usage() {
-    std::cout << "usage: " << program_invocation_short_name << " [selftest name]" << std::endl;
+    std::cout << "usage: " << program_invocation_short_name << " [--except] <selftest>..." << std::endl;
     std::cout << "       " << program_invocation_short_name << " stress [threads] [iterations] [kill=on/off]" << std::endl;
 }
 

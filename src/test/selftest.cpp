@@ -54,7 +54,7 @@ static bool needDaemonChecks;
 static vector<string> subsystems = { "freezer", "memory", "cpu", "cpuacct", "devices" };
 static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"uts" };
 
-static int LeakConainersNr;
+static int LeakConainersNr = 1000;
 
 #define ExpectState(api, name, state) _ExpectState(api, name, state, "somewhere")
 void _ExpectState(TPortoAPI &api, const std::string &name, const std::string &state,
@@ -5203,7 +5203,7 @@ static void TestPackage(TPortoAPI &api) {
     WaitPortod(api);
 }
 
-int SelfTest(std::vector<std::string> name, int leakNr) {
+int SelfTest(std::vector<std::string> args) {
     pair<string, std::function<void(TPortoAPI &)>> tests[] = {
         { "path", TestPath },
         { "idmap", TestIdmap },
@@ -5263,12 +5263,12 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
     };
 
     int ret = EXIT_SUCCESS;
+    bool except = args.size() == 0 || args[0] == "--except";
+
     ExpectSuccess(SetHostName(HOSTNAME));
 
     if (NetworkEnabled())
         subsystems.push_back("net_cls");
-
-    LeakConainersNr = leakNr;
 
     needDaemonChecks = getenv("NOCHECK") == nullptr;
 
@@ -5292,8 +5292,7 @@ int SelfTest(std::vector<std::string> name, int leakNr) {
         ExpectEq(setgroups(1, &portoGid), 0);
 
         for (auto t : tests) {
-            if (name.size() &&
-                std::find(name.begin(), name.end(), t.first) == name.end())
+            if (except ^ (std::find(args.begin(), args.end(), t.first) == args.end()))
                 continue;
 
             std::cerr << ">>> Testing " << t.first << "..." << std::endl;

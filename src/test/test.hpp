@@ -68,7 +68,7 @@ namespace test {
     bool NetworkEnabled();
     void TestDaemon(TPortoAPI &api);
 
-    int SelfTest(std::vector<std::string> name, int leakNr);
+    int SelfTest(std::vector<std::string> args);
     int StressTest(int threads, int iter, bool killPorto);
     int FuzzyTest(int threads, int iter);
 
