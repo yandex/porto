@@ -791,6 +791,14 @@ static inline void ExpectLessTemplate(T ret, T exp, const char *where) {
     }
 }
 
+template<typename T>
+static inline void ExpectLessEqTemplate(T ret, T exp, const char *where) {
+    if (ret > exp) {
+        Say() << "Unexpected " << ret << " > " << exp << " at " << where << std::endl;
+        abort();
+    }
+}
+
 void _ExpectEq(size_t ret, size_t exp, const char *where) {
     ExpectEqTemplate(ret, exp, where);
 }
@@ -813,5 +821,13 @@ void _ExpectLess(size_t ret, size_t exp, const char *where) {
 
 void _ExpectLess(const std::string &ret, const std::string &exp, const char *where) {
     ExpectLessTemplate(ret, exp, where);
+}
+
+void _ExpectLessEq(size_t ret, size_t exp, const char *where) {
+    ExpectLessEqTemplate(ret, exp, where);
+}
+
+void _ExpectLessEq(const std::string &ret, const std::string &exp, const char *where) {
+    ExpectLessEqTemplate(ret, exp, where);
 }
 }

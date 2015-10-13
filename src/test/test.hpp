@@ -97,6 +97,9 @@ namespace test {
     void _ExpectLess(size_t ret, size_t exp, const char *where);
     void _ExpectLess(const std::string &ret, const std::string &exp,
                      const char *where);
+    void _ExpectLessEq(size_t ret, size_t exp, const char *where);
+    void _ExpectLessEq(const std::string &ret, const std::string &exp,
+                       const char *where);
 }
 
 #define STRINGIFY(x) #x
@@ -114,3 +117,4 @@ namespace test {
 #define ExpectEq(ret, exp) _ExpectEq(ret, exp, WHERE)
 #define ExpectNeq(ret, exp) _ExpectNeq(ret, exp, WHERE)
 #define ExpectLess(ret, exp) _ExpectLess(ret, exp, WHERE)
+#define ExpectLessEq(ret, exp) _ExpectLessEq(ret, exp, WHERE)

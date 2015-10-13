@@ -3009,33 +3009,26 @@ static void TestDataMap(TPortoAPI &api, const std::string &name, const std::stri
 
 static void ExpectNonZeroLink(TPortoAPI &api, const std::string &name,
                               const std::string &data) {
-#if 1
-    int nonzero = 0;
-
+    string nonzero = "0";
     for (auto &link : links) {
         string v;
         ExpectApiSuccess(api.GetData(name, data + "[" + link->GetAlias() + "]", v));
-
         if (v != "0" && v != "-1")
-            nonzero++;
+            nonzero = v;
     }
-    ExpectNeq(nonzero, 0);
-#else
-    for (auto &link : links) {
-        string v;
-        ExpectApiSuccess(api.GetData(name, data + "[" + link->GetAlias() + "]", v));
-        Expect(v != "0" && v != "-1");
-    }
-#endif
+    ExpectNeq(nonzero, "0");
 }
 
-static void ExpectRootLink(TPortoAPI &api, const std::string &name,
-                           const std::string &data) {
+static void ExpectLessEqLink(TPortoAPI &api, const std::string &name,
+                             const std::string &parent, const std::string &data) {
     for (auto &link : links) {
         string v, rv;
+        int64_t i, ri;
         ExpectApiSuccess(api.GetData(name, data + "[" + link->GetAlias() + "]", v));
         ExpectApiSuccess(api.GetData("/", data + "[" + link->GetAlias() + "]", rv));
-        ExpectEq(v, rv);
+        ExpectSuccess(StringToInt64(v, i));
+        ExpectSuccess(StringToInt64(rv, ri));
+        ExpectLessEq(i, ri);
     }
 }
 
@@ -3113,13 +3106,15 @@ static void TestData(TPortoAPI &api) {
 
     if (NetworkEnabled()) {
         Say() << "Make sure net_bytes counters are valid" << std::endl;
+        ExpectNonZeroLink(api, wget, "net_bytes");
         ExpectNonZeroLink(api, root, "net_bytes");
-        ExpectRootLink(api, wget, "net_bytes");
+        ExpectLessEqLink(api, wget, root, "net_bytes");
         ExpectZeroLink(api, noop, "net_bytes");
 
         Say() << "Make sure net_packets counters are valid" << std::endl;
+        ExpectNonZeroLink(api, wget, "net_packets");
         ExpectNonZeroLink(api, root, "net_packets");
-        ExpectRootLink(api, wget, "net_packets");
+        ExpectLessEqLink(api, wget, root, "net_packets");
         ExpectZeroLink(api, noop, "net_packets");
 
         Say() << "Make sure net_drops counters are valid" << std::endl;
