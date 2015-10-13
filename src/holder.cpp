@@ -98,27 +98,49 @@ TError TContainerHolder::CreatePortoRoot(TScopedLock &holder_lock) {
     return TError::Success();
 }
 
-bool TContainerHolder::ValidName(const std::string &name) const {
-    if (name == ROOT_CONTAINER || name == PORTO_ROOT_CONTAINER)
-        return true;
+TError TContainerHolder::ValidName(const std::string &name) const {
 
-    if (name.length() == 0 || name.length() > 128)
-        return false;
+    if (name.length() == 0)
+        return TError(EError::InvalidValue, "container path too short");
 
-    for (std::string::size_type i = 0; i + 1 < name.length(); i++)
-        if (name[i] == '/' && name[i + 1] == '/')
-            return false;
+    if (name.length() > CONTAINER_PATH_MAX)
+        return TError(EError::InvalidValue, "container path too long");
 
-    if (*name.begin() == '/')
-        return false;
+    if (name[0] == '/') {
+        if (name == ROOT_CONTAINER || name == PORTO_ROOT_CONTAINER)
+            return TError::Success();
+        return TError(EError::InvalidValue, "container path starts with '/'");
+    }
 
-    if (*(name.end()--) == '/')
-        return false;
+    for (std::string::size_type first = 0, i = 0; i <= name.length(); i++) {
+        switch (name[i]) {
+            case '/':
+            case '\0':
+                if (i == first)
+                    return TError(EError::InvalidValue,
+                            "double/trailing '/' in container path");
+                if (i - first > CONTAINER_NAME_MAX)
+                    return TError(EError::InvalidValue,
+                            "container name too long: '" +
+                            name.substr(first, i - first) + "'");
+                first = i + 1;
+            case 'a'...'z':
+            case 'A'...'Z':
+            case '0'...'9':
+            case '_':
+            case '-':
+            case '@':
+            case ':':
+            case '.':
+                /* Ok */
+                break;
+            default:
+                return TError(EError::InvalidValue, "forbidden character '" +
+                                name.substr(i, 1) + "' in container name");
+        }
+    }
 
-    return find_if(name.begin(), name.end(),
-                   [](const char c) -> bool {
-                        return !(isalnum(c) || c == '_' || c == '/' || c == '-' || c == '@' || c == ':' || c == '.');
-                   }) == name.end();
+    return TError::Success();
 }
 
 std::shared_ptr<TContainer> TContainerHolder::GetParent(const std::string &name) const {
@@ -143,8 +165,11 @@ std::shared_ptr<TContainer> TContainerHolder::GetParent(const std::string &name)
 }
 
 TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &name, const TCred &cred, std::shared_ptr<TContainer> &container) {
-    if (!ValidName(name))
-        return TError(EError::InvalidValue, "invalid container name " + name);
+    TError error;
+
+    error = ValidName(name);
+    if (error)
+        return error;
 
     if (Containers.find(name) != Containers.end())
         return TError(EError::ContainerAlreadyExists, "container " + name + " already exists");
@@ -157,13 +182,13 @@ TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &nam
         return TError(EError::InvalidValue, "invalid parent container");
 
     if (parent && !parent->IsRoot() && !parent->IsPortoRoot()) {
-        TError error = parent->CheckPermission(cred);
+        error = parent->CheckPermission(cred);
         if (error)
             return error;
     }
 
     uint16_t id;
-    TError error = IdMap.Get(id);
+    error = IdMap.Get(id);
     if (error)
         return error;
 

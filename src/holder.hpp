@@ -48,7 +48,7 @@ public:
                      std::shared_ptr<TNetwork> net,
                      std::shared_ptr<TKeyValueStorage> storage) :
         Net(net), Storage(storage), EpollLoop(epollLoop) { }
-    bool ValidName(const std::string &name) const;
+    TError ValidName(const std::string &name) const;
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot(TScopedLock &holder_lock);
     TError CreatePortoRoot(TScopedLock &holder_lock);

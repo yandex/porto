@@ -363,15 +363,22 @@ static void TestHolder(TPortoAPI &api) {
     ExpectApiFailure(api.Pause("a"), EError::ContainerDoesNotExist);
     ExpectApiFailure(api.Resume("a"), EError::ContainerDoesNotExist);
 
-    string value;
+    string name, value;
     ExpectApiFailure(api.GetProperty("a", "command", value), EError::ContainerDoesNotExist);
     ExpectApiFailure(api.SetProperty("a", "command", value), EError::ContainerDoesNotExist);
     ExpectApiFailure(api.GetData("a", "root_pid", value), EError::ContainerDoesNotExist);
 
+    name = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-@:.";
+    Say() << "Try to create and destroy container " << name << std::endl;
+    ExpectApiSuccess(api.Create(name));
+    ExpectApiSuccess(api.Destroy(name));
+
     Say() << "Try to create container with invalid name" << std::endl;
-    string name;
 
     name = "z$";
+    ExpectApiFailure(api.Create(name), EError::InvalidValue);
+
+    name = "\xD0\xAFndex";
     ExpectApiFailure(api.Create(name), EError::InvalidValue);
 
     name = "/invalid";
@@ -400,6 +407,17 @@ static void TestHolder(TPortoAPI &api) {
     name = string(129, 'z');
     ExpectApiFailure(api.Create(name), EError::InvalidValue);
 
+    name = string(129, 'z') + "/z";
+    ExpectApiFailure(api.Create(name), EError::InvalidValue);
+
+    name = "z/" + string(129, 'z');
+    ExpectApiFailure(api.Create(name), EError::InvalidValue);
+
+    name = "z/" + string(129, 'z') + "/z";
+    ExpectApiFailure(api.Create(name), EError::InvalidValue);
+
+    Say() << "Test hierarchy" << std::endl;
+
     string parent = "a";
     string child = "a/b";
     ExpectApiFailure(api.Create(child), EError::InvalidValue);
@@ -410,7 +428,6 @@ static void TestHolder(TPortoAPI &api) {
     ExpectApiFailure(api.GetData(child, "state", v), EError::ContainerDoesNotExist);
     ExpectApiFailure(api.GetData(parent, "state", v), EError::ContainerDoesNotExist);
 
-    Say() << "Test hierarchy" << std::endl;
     ExpectApiSuccess(api.Create("a"));
     containers.clear();
     ExpectApiSuccess(api.List(containers));
@@ -425,6 +442,40 @@ static void TestHolder(TPortoAPI &api) {
     ExpectEq(containers[0], string("/"));
     ExpectEq(containers[1], string("a"));
     ExpectEq(containers[2], string("a/b"));
+
+    Say() << "Try to create long container path" << std::endl;
+
+    name = string(128, 'a');
+    ExpectApiSuccess(api.Create(name));
+
+    name += "/" + string(128, 'a');
+    ExpectApiSuccess(api.Create(name));
+
+    name += "/" + string(128, 'a');
+    ExpectApiSuccess(api.Create(name));
+
+    name += "/" + string(128, 'a');
+    ExpectApiSuccess(api.Create(name));
+
+    name += "/" + string(128, 'a');
+    ExpectApiSuccess(api.Create(name));
+
+    name += "/" + string(128, 'a');
+    ExpectApiSuccess(api.Create(name));
+
+    name += "/" + string(128, 'a');
+    ExpectApiSuccess(api.Create(name));
+
+    name += "/" + string(121, 'a');
+    ExpectEq(name.length(), 1024);
+    ExpectApiSuccess(api.Create(name));
+    ExpectApiSuccess(api.Destroy(name));
+
+    name += "a";
+    ExpectApiFailure(api.Create(name), EError::InvalidValue);
+
+    name = string(128, 'a');
+    ExpectApiSuccess(api.Destroy(name));
 
     Say() << "Check meta soft limits" << std::endl;
 
