@@ -3064,9 +3064,9 @@ static void TestData(TPortoAPI &api) {
 
     ExpectApiSuccess(api.Create(wget));
     if (NetworkEnabled())
-        ExpectApiSuccess(api.SetProperty(wget, "command", "bash -c 'wget yandex.ru && sync'"));
+        ExpectApiSuccess(api.SetProperty(wget, "command", "bash -c 'wget yandex.ru -O - | dd of=index.html conv=fdatasync'"));
     else
-        ExpectApiSuccess(api.SetProperty(wget, "command", "bash -c 'dd if=/dev/urandom bs=4M count=1 of=/tmp/porto.tmp && sync'"));
+        ExpectApiSuccess(api.SetProperty(wget, "command", "bash -c 'dd if=/dev/urandom bs=4k count=1 of=index.html conv=fdatasync'"));
     ExpectApiSuccess(api.Start(wget));
     WaitContainer(api, wget, 60);
 
@@ -4871,7 +4871,7 @@ static void TestRecovery(TPortoAPI &api) {
     if (NetworkEnabled()) {
         Say() << "Make sure network counters are persistent" << std::endl;
         ExpectApiSuccess(api.Create(name));
-        ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'wget yandex.ru && sync'"));
+        ExpectApiSuccess(api.SetProperty(name, "command", "wget yandex.ru -O /dev/null"));
         ExpectApiSuccess(api.Start(name));
         WaitContainer(api, name);
 
