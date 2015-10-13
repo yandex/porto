@@ -68,7 +68,6 @@ TError PackTarball(const TPath &tar, const TPath &path);
 TError UnpackTarball(const TPath &tar, const TPath &path);
 TError CopyRecursive(const TPath &src, const TPath &dst);
 void DumpMallocInfo();
-std::string GetCwd();
 
 class TUnixSocket : public TNonCopyable {
     int SockFd;

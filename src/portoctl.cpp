@@ -1853,13 +1853,13 @@ public:
     }
 
     int Execute(TCommandEnviroment *environment) final override {
-        TPath output = TPath(GetCwd()) / "layer.tar";
+        TPath output = TPath("layer.tar").AbsolutePath();
         std::vector<std::string> args;
         std::vector<std::string> env;
         std::vector<std::string> layers;
         const auto &opts = environment->GetOpts({
             { 'L', true, [&](const char *arg) { layers.push_back(arg); } },
-            { 'o', true, [&](const char *arg) { output = TPath(GetCwd()) / arg; } },
+            { 'o', true, [&](const char *arg) { output =  TPath(arg).AbsolutePath(); } },
             { 'C', false, [&](const char *arg) { Cleanup = false; } },
             { 'E', true, [&](const char *arg) { env.push_back(arg); } },
         });

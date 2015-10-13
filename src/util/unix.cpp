@@ -567,13 +567,6 @@ void DumpMallocInfo() {
     L() << "Topmost releasable block (keepcost):\t" << mi.keepcost << std::endl;
 }
 
-std::string GetCwd() {
-    char *cwd = get_current_dir_name();
-    std::string s(cwd);
-    free(cwd);
-    return s;
-}
-
 void TUnixSocket::Close() {
     if (SockFd >= 0)
         close(SockFd);

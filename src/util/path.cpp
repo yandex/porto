@@ -371,6 +371,18 @@ TPath TPath::NormalPath() const {
     return TPath(path);
 }
 
+TPath TPath::AbsolutePath() const {
+    char cwd[PATH_MAX];
+
+    if (IsAbsolute() || IsEmpty())
+        return TPath(Path);
+
+    if (!getcwd(cwd, sizeof(cwd)))
+        return TPath();
+
+    return TPath(std::string(cwd) + "/" + Path);
+}
+
 TPath TPath::RealPath() const {
     char *p = realpath(Path.c_str(), NULL);
     if (!p)
