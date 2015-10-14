@@ -24,6 +24,6 @@ const std::string PORTO_ROOT_CGROUP = "porto";
 const std::string PORTO_DAEMON_CGROUP = "portod";
 
 constexpr int CONTAINER_NAME_MAX = 128;
-constexpr int CONTAINER_PATH_MAX = 1024;
+constexpr int CONTAINER_PATH_MAX = 200;
 
 extern void AckExitStatus(int pid);

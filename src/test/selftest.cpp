@@ -448,26 +448,8 @@ static void TestHolder(TPortoAPI &api) {
     name = string(128, 'a');
     ExpectApiSuccess(api.Create(name));
 
-    name += "/" + string(128, 'a');
-    ExpectApiSuccess(api.Create(name));
-
-    name += "/" + string(128, 'a');
-    ExpectApiSuccess(api.Create(name));
-
-    name += "/" + string(128, 'a');
-    ExpectApiSuccess(api.Create(name));
-
-    name += "/" + string(128, 'a');
-    ExpectApiSuccess(api.Create(name));
-
-    name += "/" + string(128, 'a');
-    ExpectApiSuccess(api.Create(name));
-
-    name += "/" + string(128, 'a');
-    ExpectApiSuccess(api.Create(name));
-
-    name += "/" + string(121, 'a');
-    ExpectEq(name.length(), 1024);
+    name += "/" + string(200 - 128 - 1, 'a');
+    ExpectEq(name.length(), 200);
     ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.Destroy(name));
 
