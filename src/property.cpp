@@ -1060,6 +1060,7 @@ public:
                         "none | "
                         "inherited | "
                         "host [interface] | "
+                        "container <name> | "
                         "macvlan <master> <name> [bridge|private|vepa|passthru] [mtu] [hw] | "
                         "ipvlan <master> <name> [l2|l3] [mtu] | "
                         "veth <name> <bridge> [mtu] [hw] | "
@@ -1125,6 +1126,11 @@ public:
 
                     cfg.HostIface.push_back(hnet);
                 }
+            } else if (type == "container") {
+                if (settings.size() != 2)
+                    return TError(EError::InvalidValue, "Invalid net in: " + line);
+                cfg.NewNetNs = false;
+                cfg.NetCtName = StringTrim(settings[1]);
             } else if (type == "macvlan") {
                 if (settings.size() < 3)
                     return TError(EError::InvalidValue, "Invalid macvlan in: " + line);

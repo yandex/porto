@@ -814,6 +814,26 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
             return error;
     }
 
+    if (taskEnv->NetCfg.NetCtName != "") {
+        std::shared_ptr<TContainer> clientContainer;
+        error = client->GetContainer(clientContainer);
+        if (error)
+            return error;
+        std::string name;
+        error = clientContainer->AbsoluteName(taskEnv->NetCfg.NetCtName, name);
+        if (error)
+            return error;
+        std::shared_ptr<TContainer> target;
+        error = Holder->Get(name, target);
+        if (error)
+            return error;
+        if (!target->Task)
+            return TError(EError::InvalidValue, "net container not running");
+        error = taskEnv->ParentNs.Net.Open(target->Task->GetPid(), "ns/net");
+        if (client && error)
+            return error;
+    }
+
     if (taskEnv->Command.empty() || taskEnv->TripleFork || taskEnv->QuadroFork) {
         TPath exe("/proc/self/exe");
         TPath path;
