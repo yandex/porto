@@ -104,7 +104,7 @@ TPath TContainer::RootPath() const {
 TPath TContainer::DefaultStdFile(const std::string prefix) const {
     TPath root(Prop->Get<std::string>(P_ROOT));
     std::string cwd(Prop->Get<std::string>(P_CWD));
-    std::string name(prefix + "." + GetName(true, "_"));
+    std::string name(prefix + "." + GetTextId("_"));
 
     if (root.IsRegular())
         return GetTmpDir() / name;
@@ -254,14 +254,16 @@ void TContainer::Destroy(TScopedLock &holder_lock) {
     RemoveKvs();
 }
 
-const string TContainer::GetName(bool recursive, const std::string &sep) const {
-    if (!recursive)
-        return Name;
-
+const std::string TContainer::GetName() const {
     if (IsRoot() || IsPortoRoot() || Parent->IsPortoRoot())
         return Name;
-    else
-        return Parent->GetName(recursive, sep) + sep + Name;
+    return Parent->GetName() + "/" + Name;
+}
+
+const std::string TContainer::GetTextId(const std::string &separator) const {
+     if (IsRoot() || IsPortoRoot() || Parent->IsPortoRoot())
+         return Name;
+     return Parent->GetTextId(separator) + separator + Name;
 }
 
 bool TContainer::IsRoot() const {
@@ -2198,7 +2200,7 @@ TError TContainer::UpdateNetwork() {
 
 bool TContainer::PrepareJournal() {
     if (!JournalStream.is_open()) {
-        std::string filename = config().journal_dir().path() + GetName(true, "+");
+        std::string filename = config().journal_dir().path() + GetTextId();
 
         TFile f(filename);
         if (!f.Exists())

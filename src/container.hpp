@@ -147,7 +147,8 @@ public:
     void Release();
     bool IsAcquired() const;
 
-    const std::string GetName(bool recursive = true, const std::string &sep = "/") const;
+    const std::string GetName() const;
+    const std::string GetTextId(const std::string &separator = "+") const;
     const uint16_t GetId() const { return Id; }
 
     bool IsRoot() const;
