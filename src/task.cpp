@@ -777,13 +777,14 @@ void TTask::StartChild() {
     /* Die together with waiter */
     if (Env->TripleFork)
         SetDieOnParentExit(SIGKILL);
-    else
-        Env->ReportStage++;
 
     /* Wait for external configuration */
     error = Env->Sock.RecvZero();
     if (error)
         Abort(error);
+
+    /* WPid reported by parent */
+    Env->ReportStage++;
 
     /* Report VPid in pid namespace we're enter */
     if (!Env->Isolate)
@@ -960,26 +961,16 @@ TError TTask::Start() {
             Abort(error);
 
         if (Env->TripleFork) {
-            forkPid = fork();
+            /*
+             * Enter into pid-namespace. fork() hangs in libc if child pid
+             * collide with parent pid outside. vfork() has no such problem.
+             */
+            forkPid = vfork();
             if (forkPid < 0)
                 Abort(TError(EError::Unknown, errno, "fork()"));
 
-            if (forkPid) {
-                /* Report WPid in host pid namespace */
-                ReportPid(forkPid);
-
-                /* Unblock child and exit */
-                error = masterSock.SendZero();
-                if (error)
-                    Abort(error);
+            if (forkPid)
                 _exit(EXIT_SUCCESS);
-            } else {
-                /* Wait for parent report our host pid */
-                error = Env->Sock.RecvZero();
-                if (error)
-                    Abort(error);
-                Env->ReportStage++;
-            }
         }
 
         if (Env->QuadroFork) {
@@ -1011,7 +1002,9 @@ TError TTask::Start() {
         }
 
         /* Report WPid in host pid namespace */
-        if (!Env->TripleFork)
+        if (Env->TripleFork)
+            ReportPid(GetTid());
+        else
             ReportPid(clonePid);
 
         if (config().network().enabled()) {
