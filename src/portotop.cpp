@@ -679,6 +679,8 @@ int TPortoTop::Update(TConsoleScreen &screen) {
     ContainerTree.reset(TPortoContainer::ContainerTree(*Api));
     if (ContainerTree) {
         MaxMaxLevel = ContainerTree->GetMaxLevel();
+        if (MaxLevel == -1)
+            MaxLevel = MaxMaxLevel;
 
         for (auto &column : Columns)
             column.Update(*Api, ContainerTree.get(), MaxLevel);

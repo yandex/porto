@@ -207,7 +207,7 @@ private:
     int FirstRow = 0;
     int MaxRows = 0;
     int DisplayRows = 0;
-    int MaxLevel = 1;
+    int MaxLevel = -1; /* -1 -> set to MaxMaxLevel */
     int MaxMaxLevel = 1;
 };
 
