@@ -1,3 +1,64 @@
+yandex-porto (2.5) precise; urgency=low
+
+  * porto: rework container path limits (path <= 200, name <= 128)
+  * network: add mode net="container <name>"
+  * portoctl: rework command "build"
+  * portoctl: rework command line option '-L'
+  * portotop: show full container tree by default
+  * porto: use vfork instead of fork (workaround for libc bug)
+
+  * Move <csignal> header to cli.cpp
+  * Hide ICmd::RunCmd implementation.
+  * Fix formatting and add const modificator in cli.cpp.
+  * Use final and override keywords in ICmd derived classes.
+  * Extract a TCommandHander class and move commands state into it.
+  * Generalize MaxFieldLength and remove temporary vector.
+  * Use TCommandEnviroment to isolate command arguments.
+  * Code cleanup.
+  * Fix formatting issues in cli.{hpp,cpp}.
+  * Add template helper for registering commands.
+  * Check if protoc was found
+  * Enable out-of-tree builds
+  * travis: don't use container-based infrastructure
+  * readme: add travis build status
+  * Add move ctors and operators to TError class.
+  * Fix compilation and some cases in handling TError class objects.
+  * Fix formatting and add const to static objects in error.cpp file.
+  * Hide TPortoAPIImpl from global namespace.
+  * Small set of copy optimizations.
+  * Minor API interface changes.
+  * mkimg: replace fallocate with truncate
+  * debian: add cmake into Build-Depends
+  * selftest: add dirty_limit property
+  * test: fix teamcity testing
+  * Remove TStringVector typedef and fix naming.
+  * scripts/test: remove root user alias
+  * util: make RetryFailed/RetryBusy respectable functions
+  * build: simplify travis build script
+  * docs: update build process in README.md
+  * scripts/test: install python-portopy
+  * build: add libnl build dependecies
+  * build: check out libnl automatically
+  * build: install python API to lib/python2.7/dist-packages/porto
+  * cli: fix getopt wrapper
+  * rpm: cleanup build script
+  * libnl: drop submodule, move libnl into src
+  * task: add DumpDebugInfo() method
+  * task: dump debug information for unkillable tasks
+  * scripts/test: install portopy after update test
+  * build: install python api using setuptools
+  * scripts/test_update: fixes
+  * selftest: add option "--except <test>..."
+  * cli: reset optind to zero before restarting getopt
+  * test/selftest: remove sync/replace with fdatasync
+  * selftest: check container's net_bytes is less or equal than root counters
+  * path: replace GetCwd with AbsolutePath
+  * error: verify error description length
+  * task: fix ReportStage ordering
+  * error: add constructor with additional description prefix
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 16 Oct 2015 16:25:19 +0300
+
 yandex-porto (2.4) precise; urgency=low
 
   * selftest: fix tests after supporting float cpu limit and guarantee
