@@ -83,6 +83,12 @@ bool TError::Deserialize(int fd, TError &error) {
         return true;
     }
 
+    if (len < 0 || len > 4096) {
+        error = TError(EError::Unknown, "Invalid error description length: " +
+                                        std::to_string(len));
+        return true;
+    }
+
     std::string desc(len, '\0');
     ret = read(fd, &desc[0], len);
     if (ret != len) {
