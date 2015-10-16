@@ -3,6 +3,7 @@
 DESTDIR=$(CURDIR)/debian/yandex-porto
 SBINDIR=$(DESTDIR)/usr/sbin
 BUILD_TYPE?=Release
+export DH_VERBOSE=1
 
 override_dh_auto_configure:
 	dh_auto_configure -- -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)
@@ -16,7 +17,6 @@ override_dh_shlibdeps:
 override_dh_install:
 	dh_install
 	-dh_bash-completion
-	dh_python2
 
 %:
-	dh $@ --parallel
+	dh $@ --with python2 --without python-support --parallel
