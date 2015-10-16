@@ -19,6 +19,12 @@ TError::TError(EError e, std::string &&description, int eno) :
     Error(e), Description(std::move(description)), Errno(eno) {
 }
 
+TError::TError(const TError &other, const std::string &prefix) :
+    Error(other.Error),
+    Description(prefix + ": " + other.Description),
+    Errno(other.Errno) {
+}
+
 TError::operator bool() const {
     return Error != EError::Success;
 }

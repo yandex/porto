@@ -20,6 +20,7 @@ public:
     TError(EError e, std::string &&description, int eno = 0);
     TError(const TError &other) = default;
     TError(TError &&other) = default;
+    TError(const TError &other, const std::string &prefix);
     TError &operator=(TError &&other) = default;
     TError &operator=(const TError &other) = default;
 
