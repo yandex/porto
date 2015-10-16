@@ -827,6 +827,9 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         error = Holder->Get(name, target);
         if (error)
             return error;
+        error = target->CheckPermission(client->GetCred());
+        if (error)
+            return TError(error, "net container " + name);
         if (!target->Task)
             return TError(EError::InvalidValue, "net container not running");
         error = taskEnv->ParentNs.Net.Open(target->Task->GetPid(), "ns/net");
