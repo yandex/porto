@@ -789,7 +789,7 @@ void TTask::StartChild() {
     /* Report VPid in pid namespace we're enter */
     if (!Env->Isolate)
         ReportPid(getpid());
-    else
+    else if (!Env->QuadroFork)
         Env->ReportStage++;
 
     ResetAllSignalHandlers();
@@ -890,6 +890,7 @@ void TTask::StartChild() {
             error = Env->Sock2.RecvZero();
             if (error)
                 Abort(error);
+            Env->ReportStage++;
         }
     }
 
