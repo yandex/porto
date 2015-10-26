@@ -1377,9 +1377,11 @@ TError SanitizeLayer(TPath layer, bool merge) {
     for (auto entry: content) {
         TPath path = layer / entry;
 
-        /* Handle aufs whiteouts */
+        /* Handle aufs whiteouts and metadata */
         if (entry.compare(0, 4, ".wh.") == 0) {
-            error = path.Unlink();
+
+            /* Remove it completely */
+            error = path.RemoveAll();
             if (error)
                 return error;
 
