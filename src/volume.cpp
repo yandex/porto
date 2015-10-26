@@ -1385,6 +1385,18 @@ TError SanitizeLayer(TPath layer, bool merge) {
             if (error)
                 return error;
 
+            /* Opaque directory - hide entries in lower layers */
+            if (entry == ".wh..wh..opq") {
+                error = layer.SetXAttr("trusted.overlay.opaque", "y");
+                if (error)
+                    return error;
+            }
+
+            /* Metadata is done */
+            if (entry.compare(0, 8, ".wh..wh.") == 0)
+                continue;
+
+            /* Remove whiteouted entry */
             path = layer / entry.substr(4);
             if (path.Exists()) {
                 error = path.RemoveAll();

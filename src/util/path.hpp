@@ -116,4 +116,5 @@ public:
                    uint64_t &inode_used, uint64_t &inode_avail) const;
     TError StatVFS(uint64_t &space_avail) const;
     TError SecondsSinceMtime(uint64_t &seconds) const;
+    TError SetXAttr(const std::string name, const std::string value) const;
 };

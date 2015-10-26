@@ -630,3 +630,11 @@ TError TPath::SecondsSinceMtime(uint64_t &seconds) const {
 
     return TError::Success();
 }
+
+TError TPath::SetXAttr(const std::string name, const std::string value) const {
+    if (syscall(SYS_setxattr, Path.c_str(), name.c_str(),
+                value.c_str(), value.length(), 0))
+        return TError(EError::Unknown, errno,
+                "setxattr(" + Path + ", " + name + ")");
+    return TError::Success();
+}
