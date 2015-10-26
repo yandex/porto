@@ -403,7 +403,8 @@ public:
             error = work.Mkdir(0755);
             if (error)
                 goto err;
-        }
+        } else
+            work.ClearDirectory();
 
         error = mount.Mount(Volume->GetMountFlags());
         if (!error)
@@ -437,15 +438,13 @@ err:
                 if (!error)
                     error = error2;
                 L_ERR() << "Can't clear overlay storage: " << error2 << std::endl;
-                (void)(storage / "upper").ClearDirectory();
+                (void)(storage / "upper").RemoveAll();
             }
         }
 
         TPath work = storage / "work";
-        if (work.Exists()) {
-            (void)work.ClearDirectory();
-            (void)work.Rmdir();
-        }
+        if (work.Exists())
+            (void)work.RemoveAll();
 
         TMount storage_mount;
         error2 = storage_mount.Find(storage);
@@ -974,17 +973,13 @@ err_save:
     (void)Backend->Destroy();
 err_build:
     if (IsAutoPath()) {
-        (void)path.ClearDirectory();
-        (void)path.Rmdir();
+        (void)path.RemoveAll();
     }
 err_path:
-    if (IsAutoStorage()) {
-        (void)storage.ClearDirectory();
-        (void)storage.Rmdir();
-    }
+    if (IsAutoStorage())
+        (void)storage.RemoveAll();
 err_storage:
-    (void)internal.ClearDirectory();
-    (void)internal.Rmdir();
+    (void)internal.RemoveAll();
 err_internal:
     return error;
 }
@@ -1012,14 +1007,7 @@ TError TVolume::Destroy() {
     }
 
     if (IsAutoStorage() && storage.Exists()) {
-        error = storage.ClearDirectory();
-        if (error) {
-            L_ERR() << "Can't clear storage: " << error << std::endl;
-            if (!ret)
-                ret = error;
-        }
-
-        error = storage.Rmdir();
+        error = storage.RemoveAll();
         if (error) {
             L_ERR() << "Can't remove storage: " << error << std::endl;
             if (!ret)
@@ -1028,14 +1016,7 @@ TError TVolume::Destroy() {
     }
 
     if (IsAutoPath() && path.Exists()) {
-        error = path.ClearDirectory();
-        if (error) {
-            L_ERR() << "Can't clear volume path: " << error << std::endl;
-            if (!ret)
-                ret = error;
-        }
-
-        error = path.Rmdir();
+        error = path.RemoveAll();
         if (error) {
             L_ERR() << "Can't remove volume path: " << error << std::endl;
             if (!ret)
@@ -1044,14 +1025,7 @@ TError TVolume::Destroy() {
     }
 
     if (internal.Exists()) {
-        error = internal.ClearDirectory();
-        if (error) {
-            L_ERR() << "Can't clear internal: " << error << std::endl;
-            if (!ret)
-                ret = error;
-        }
-
-        error = internal.Rmdir();
+        error = internal.RemoveAll();
         if (error) {
             L_ERR() << "Can't remove internal: " << error << std::endl;
             if (!ret)
@@ -1263,9 +1237,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
     TPath layers_tmp = layers / "_tmp_";
     if (layers_tmp.Exists()) {
         L_ACT() << "Remove stale layers..." << std::endl;
-        (void)layers_tmp.ClearDirectory();
-        (void)layers_tmp.Rmdir();
-        (void)layers_tmp.Unlink();
+        (void)layers_tmp.RemoveAll();
     }
 
     TError error = Storage->ListNodes(list);
@@ -1345,10 +1317,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
                 L_ERR() << "Detach umount of " << mnt << ": " << error << std::endl;
             }
         }
-        error = dir.ClearDirectory();
-        if (error)
-            L_ERR() << "Cannot clear directory " << dir << std::endl;
-        error = dir.Rmdir();
+        error = dir.RemoveAll();
         if (error)
             L_ERR() << "Cannot remove directory " << dir << std::endl;
     }
@@ -1416,12 +1385,7 @@ TError SanitizeLayer(TPath layer, bool merge) {
 
             path = layer / entry.substr(4);
             if (path.Exists()) {
-                if (path.IsDirectory()) {
-                    error = path.ClearDirectory();
-                    if (!error)
-                        error = path.Rmdir();
-                } else
-                    error = path.Unlink();
+                error = path.RemoveAll();
                 if (error)
                     return error;
             }

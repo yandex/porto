@@ -108,6 +108,7 @@ public:
     TError Mkdir(unsigned int mode) const;
     TError Rmdir() const;
     TError Unlink() const;
+    TError RemoveAll() const;
     TError Rename(const TPath &dest) const;
     TError ReadDirectory(std::vector<std::string> &result) const;
     TError ClearDirectory(bool verbose = false) const;

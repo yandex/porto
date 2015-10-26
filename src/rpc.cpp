@@ -1279,8 +1279,7 @@ noinline TError ImportLayer(TContext &context,
     return TError::Success();
 
 err:
-    (void)layer_tmp.ClearDirectory();
-    (void)layer_tmp.Rmdir();
+    (void)layer_tmp.RemoveAll();
 err_tmp:
     (void)layers_tmp.Rmdir();
     return error;
@@ -1382,11 +1381,7 @@ noinline TError RemoveLayer(TContext &context,
         goto err;
     vholder_lock.unlock();
 
-    error = layer_tmp.ClearDirectory();
-    if (error)
-        goto err;
-
-    error = layer_tmp.Rmdir();
+    error = layer_tmp.RemoveAll();
 err:
     (void)layers_tmp.Rmdir();
     return error;

@@ -591,6 +591,16 @@ restart:
     return error;
 }
 
+TError TPath::RemoveAll() const {
+    if (IsDirectory()) {
+        TError error = ClearDirectory();
+        if (error)
+            return error;
+        return Rmdir();
+    }
+    return Unlink();
+}
+
 TError TPath::ReadDirectory(std::vector<std::string> &result) const {
     struct dirent *de;
     DIR *dir;
