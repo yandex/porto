@@ -638,3 +638,37 @@ TError TPath::SetXAttr(const std::string name, const std::string value) const {
                 "setxattr(" + Path + ", " + name + ")");
     return TError::Success();
 }
+
+#ifndef FALLOC_FL_COLLAPSE_RANGE
+#define FALLOC_FL_COLLAPSE_RANGE        0x08
+#endif
+
+TError TPath::RotateLog(off_t max_disk_usage) const {
+    struct stat st;
+    off_t hole_len;
+    TError error;
+    int fd;
+
+    if (lstat(c_str(), &st))
+        return TError(EError::Unknown, errno, "lstat(" + Path + ")");
+
+    if (!S_ISREG(st.st_mode) || (off_t)st.st_blocks * 512 <= max_disk_usage)
+        return TError::Success();
+
+    fd = open(c_str(), O_RDWR | O_NOCTTY);
+    if (fd < 0)
+        return TError(EError::Unknown, errno, "open(" + Path + ")");
+
+    /* Keep half of allowed size or trucate to zero */
+    hole_len = st.st_size - max_disk_usage / 2;
+    hole_len -= hole_len % st.st_blksize;
+
+    if (fallocate(fd, FALLOC_FL_COLLAPSE_RANGE, 0, hole_len) &&
+            ftruncate(fd, 0))
+        error = TError(EError::Unknown, errno, "truncate(" + Path + ")");
+    else
+        error = TError::Success();
+
+    close(fd);
+    return error;
+}

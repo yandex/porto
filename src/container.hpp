@@ -89,7 +89,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void StopChildren(TScopedLock &holder_lock);
     TError PrepareResources();
     void RemoveLog(const TPath &path);
-    TError RotateLog(const TPath &path);
     void FreeResources();
     void PropertyToAlias(const std::string &property, std::string &value) const;
     TError AliasToProperty(std::string &property, std::string &value);

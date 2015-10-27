@@ -68,9 +68,9 @@ static void DaemonOpenLog(bool master) {
     TLogger::OpenLog(stdlog, log.path(), log.perm());
 
     if (!master) {
-        TFolder journals(config().journal_dir().path());
+        TPath journals(config().journal_dir().path());
         if (!journals.Exists())
-            journals.Create(config().journal_dir().perm());
+            journals.Mkdir(config().journal_dir().perm());
     }
 }
 

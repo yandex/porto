@@ -2037,20 +2037,6 @@ std::vector<std::string> TContainer::GetChildren() {
     return vec;
 }
 
-TError TContainer::RotateLog(const TPath &path) {
-    off_t max_log_size = config().container().max_log_size();
-
-    if (path.IsRegular()) {
-        TFile file(path);
-
-        TError error = file.RotateLog(max_log_size);
-        if (error)
-            return error;
-    }
-
-    return TError::Success();
-}
-
 void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
     TError error;
     switch (event.Type) {
@@ -2059,13 +2045,21 @@ void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
             break;
         case EEventType::RotateLogs:
             if (GetState() == EContainerState::Running && Task) {
-                TError error = RotateLog(Prop->Get<std::string>(P_STDOUT_PATH));
-                if (error)
-                    L_ERR() << "Can't rotate stdout: " << error << std::endl;
+                off_t max_log_size = config().container().max_log_size();
+                TPath stdout_path(Prop->Get<std::string>(P_STDOUT_PATH));
+                TPath stderr_path(Prop->Get<std::string>(P_STDERR_PATH));
 
-                error = RotateLog(Prop->Get<std::string>(P_STDERR_PATH));
-                if (error)
-                    L_ERR() << "Can't rotate stderr: " << error << std::endl;
+                if (stdout_path.IsRegular()) {
+                    error = stdout_path.RotateLog(max_log_size);
+                    if (error)
+                        L_ERR() << "Can't rotate stdout: " << error << std::endl;
+                }
+
+                if (stderr_path.IsRegular()) {
+                    error = stderr_path.RotateLog(max_log_size);
+                    if (error)
+                        L_ERR() << "Can't rotate stderr: " << error << std::endl;
+                }
             }
             JournalStream.close();
             break;
@@ -2198,18 +2192,20 @@ TError TContainer::UpdateNetwork() {
 
 bool TContainer::PrepareJournal() {
     if (!JournalStream.is_open()) {
-        std::string filename = config().journal_dir().path() + GetTextId();
+        off_t max_log_size = config().container().max_log_size();
+        auto path = TPath(config().journal_dir().path()) / GetTextId();
 
-        TFile f(filename);
-        if (!f.Exists())
-            f.Touch();
-        f.GetPath().Chown(OwnerCred);
-        f.GetPath().Chmod(0644);
-        f.RotateLog(1024 * 1024);
+        if (path.Exists())
+            path.Chmod(0644);
+        else
+            path.Mknod(S_IFREG | 0644, 0);
 
-        JournalStream.open(filename, std::ios_base::app);
+        path.Chown(OwnerCred);
+        path.RotateLog(max_log_size);
+
+        JournalStream.open(path.ToString(), std::ios_base::app);
         if (!JournalStream.is_open()) {
-            L_WRN() << "Can't open " << filename << " for writing container journal"
+            L_WRN() << "Can't open " << path << " for writing container journal"
                     << std::endl;
             return false;
         }

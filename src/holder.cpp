@@ -616,19 +616,19 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
         }
 
         { /* clean old journals */
-            TFolder folder(config().journal_dir().path());
             int64_t journal_ttl_ms = config().journal_ttl_ms();
+            TPath journal_dir(config().journal_dir().path());
             std::vector<std::string> list;
 
-            TError err = folder.Items(EFileType::Regular, list);
-            if (err)
-                L_WRN() << "Can't list container journals" << std::endl;
-            else {
+            TError error = journal_dir.ReadDirectory(list);
+            if (error) {
+                L_WRN() << "Can't list container journals: " << error << std::endl;
+            } else {
                 for (auto &filename : list) {
-                    TPath p(folder.GetPath() + "/" + filename);
+                    TPath path = journal_dir / filename;
 
-                    if (p.SinceModificationMs() > journal_ttl_ms)
-                        p.Unlink();
+                    if (path.SinceModificationMs() > journal_ttl_ms)
+                        path.Unlink();
                 }
             }
         }
