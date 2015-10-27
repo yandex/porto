@@ -50,7 +50,7 @@ void TClient::BeginRequest() {
     RequestStartMs = GetCurrentTimeMs();
 }
 
-size_t TClient::GetRequestTime() {
+uint64_t TClient::GetRequestTimeMs() {
     return GetCurrentTimeMs() - RequestStartMs;
 }
 

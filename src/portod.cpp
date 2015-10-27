@@ -935,8 +935,8 @@ static int MasterMain(bool respawn) {
     map<int,int> exited;
 
     while (true) {
-        size_t started = GetCurrentTimeMs();
-        size_t next = started + config().container().respawn_delay_ms();
+        uint64_t started = GetCurrentTimeMs();
+        uint64_t next = started + config().container().respawn_delay_ms();
         ret = SpawnSlave(ELoop, exited);
         L() << "Returned " << ret << std::endl;
         if (next >= GetCurrentTimeMs())

@@ -33,7 +33,7 @@ public:
     const std::string& GetComm() const;
 
     void BeginRequest();
-    size_t GetRequestTime();
+    uint64_t GetRequestTimeMs();
 
     TError Identify(TContainerHolder &holder, bool full = true);
     std::string GetContainerName() const;
@@ -51,7 +51,7 @@ private:
     pid_t Pid;
     TCred Cred;
     std::string Comm;
-    size_t RequestStartMs;
+    uint64_t RequestStartMs;
 
     TError LoadGroups();
     TError IdentifyContainer(TContainerHolder &holder);

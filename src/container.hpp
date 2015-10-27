@@ -31,8 +31,6 @@ namespace kv {
     class TNode;
 };
 
-extern int64_t BootTime;
-
 enum class EContainerState {
     Unknown,
     Stopped,

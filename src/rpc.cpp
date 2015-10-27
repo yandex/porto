@@ -261,7 +261,7 @@ static void SendReply(std::shared_ptr<TClient> client,
 
             if (log)
                 L_RSP() << ResponseAsString(response) << " to " << *client
-                        << " (request took " << client->GetRequestTime() << "ms)"
+                        << " (request took " << client->GetRequestTimeMs() << "ms)"
                         << std::endl;
         } else {
             L_RSP() << "Protobuf write error for " << client->GetFd() << " " << strerror(errno) << std:: endl;

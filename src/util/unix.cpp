@@ -144,10 +144,10 @@ full_scan:
     return TError::Success();
 }
 
-size_t GetCurrentTimeMs() {
+uint64_t GetCurrentTimeMs() {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+    return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
 
 size_t GetTotalMemory() {
@@ -337,28 +337,6 @@ size_t TScopedMem::GetSize() {
 TError SetOomScoreAdj(int value) {
     TFile f("/proc/self/oom_score_adj");
     return f.WriteStringNoAppend(std::to_string(value));
-}
-
-int64_t GetBootTime() {
-    std::vector<std::string> lines;
-    TFile f("/proc/stat");
-    if (f.AsLines(lines))
-        return 0;
-
-    for (auto &line : lines) {
-        std::vector<std::string> cols;
-        if (SplitString(line, ' ', cols))
-            return 0;
-
-        if (cols[0] == "btime") {
-            int64_t val;
-            if (StringToInt64(cols[1], val))
-                return 0;
-            return val;
-        }
-    }
-
-    return 0;
 }
 
 void CloseFds(int max, const std::set<int> &except, bool openStd) {

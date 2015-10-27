@@ -70,7 +70,7 @@ bool TEvent::operator<(const TEvent& rhs) const {
     return DueMs >= rhs.DueMs;
 }
 
-void TEventQueue::Add(size_t timeoutMs, const TEvent &e) {
+void TEventQueue::Add(uint64_t timeoutMs, const TEvent &e) {
     TEvent copy = e;
     copy.DueMs = GetCurrentTimeMs() + timeoutMs;
 

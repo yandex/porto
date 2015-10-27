@@ -49,8 +49,6 @@ using std::shared_ptr;
 using std::unique_ptr;
 using std::map;
 
-int64_t BootTime = 0;
-
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
                        std::shared_ptr<TKeyValueStorage> storage,
                        const std::string &name, std::shared_ptr<TContainer> parent,

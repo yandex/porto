@@ -19,7 +19,7 @@ pid_t GetTid();
 TError GetTaskParent(pid_t pid, pid_t &parent_pid);
 TError GetTaskChildrens(pid_t pid, std::vector<pid_t> &childrens);
 
-size_t GetCurrentTimeMs();
+uint64_t GetCurrentTimeMs();
 size_t GetTotalMemory();
 int CreatePidFile(const std::string &path, const int mode);
 void RemovePidFile(const std::string &path);
@@ -58,7 +58,6 @@ public:
 
 TError SetOomScoreAdj(int value);
 
-int64_t GetBootTime();
 TError Run(const std::vector<std::string> &command, int &status, bool stdio = false);
 TError AllocLoop(const TPath &path, size_t size);
 TError Popen(const std::string &cmd, std::vector<std::string> &lines);

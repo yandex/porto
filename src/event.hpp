@@ -39,7 +39,7 @@ public:
         std::weak_ptr<TContainerWaiter> Waiter;
     } WaitTimeout;
 
-    size_t DueMs = 0;
+    uint64_t DueMs = 0;
 
     TEvent(EEventType type, std::shared_ptr<TContainer> container = nullptr) :
         Type(type), Container(container) {}
@@ -57,5 +57,5 @@ public:
     void Start();
     void Stop();
 
-    void Add(size_t timeoutMs, const TEvent &e);
+    void Add(uint64_t timeoutMs, const TEvent &e);
 };

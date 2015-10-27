@@ -618,17 +618,17 @@ TError TPath::ReadDirectory(std::vector<std::string> &result) const {
     return TError::Success();
 }
 
-TError TPath::SecondsSinceMtime(uint64_t &seconds) const {
+int64_t TPath::SinceModificationMs() const {
     struct stat st;
 
-    if (stat(c_str(), &st) < 0)
-        return TError(EError::Unknown, "Cannot stat " + Path);
+    if (lstat(Path.c_str(), &st))
+        return -1;
 
-    struct timespec Now = {0};
-    clock_gettime(CLOCK_MONOTONIC, &Now);
-    seconds = Now.tv_sec - st.st_mtim.tv_sec;
+    struct timespec now;
+    clock_gettime(CLOCK_REALTIME, &now);
 
-    return TError::Success();
+    return (int64_t)now.tv_sec * 1000 + now.tv_nsec / 1000000 -
+           (int64_t)st.st_mtim.tv_sec * 1000 - st.st_mtim.tv_nsec / 1000000;
 }
 
 TError TPath::SetXAttr(const std::string name, const std::string value) const {

@@ -45,8 +45,6 @@ TError TContainerHolder::CreateRoot(TScopedLock &holder_lock) {
     if (error)
         return error;
 
-    BootTime = GetBootTime();
-
     std::shared_ptr<TContainer> container;
     error = Create(holder_lock, ROOT_CONTAINER, TCred(0, 0), container);
     if (error)
@@ -619,6 +617,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
 
         { /* clean old journals */
             TFolder folder(config().journal_dir().path());
+            int64_t journal_ttl_ms = config().journal_ttl_ms();
             std::vector<std::string> list;
 
             TError err = folder.Items(EFileType::Regular, list);
@@ -626,10 +625,9 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
                 L_WRN() << "Can't list container journals" << std::endl;
             else {
                 for (auto &filename : list) {
-                    uint64_t seconds;
                     TPath p(folder.GetPath() + "/" + filename);
 
-                    if (!p.SecondsSinceMtime(seconds) && seconds > config().keep_journals())
+                    if (p.SinceModificationMs() > journal_ttl_ms)
                         p.Unlink();
                 }
             }

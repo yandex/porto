@@ -4257,7 +4257,7 @@ static void TestLeaks(TPortoAPI &api) {
 
 static void TestPerf(TPortoAPI &api) {
     std::string name, v;
-    size_t begin, ms;
+    uint64_t begin, ms;
     const int nr = 1000;
     const int createMs = 120;
     const int getStateMs = 1;
@@ -4632,7 +4632,7 @@ static void TestWait(TPortoAPI &api) {
         ExpectApiSuccess(api.Destroy(name));
 
     Say() << "Check wait timeout" << std::endl;
-    size_t begin, end;
+    uint64_t begin, end;
 
     ExpectApiSuccess(api.Create(c));
     ExpectApiSuccess(api.SetProperty(c, "command", "sleep 1000"));

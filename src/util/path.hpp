@@ -88,6 +88,7 @@ public:
     unsigned int GetGid() const;
     off_t GetSize() const;
     off_t GetDiskUsage() const;
+    int64_t SinceModificationMs() const;
     std::string ToString() const;
     bool IsRegular() const;
     bool IsDirectory() const;
@@ -115,6 +116,5 @@ public:
     TError StatVFS(uint64_t &space_used, uint64_t &space_avail,
                    uint64_t &inode_used, uint64_t &inode_avail) const;
     TError StatVFS(uint64_t &space_avail) const;
-    TError SecondsSinceMtime(uint64_t &seconds) const;
     TError SetXAttr(const std::string name, const std::string value) const;
 };
