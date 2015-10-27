@@ -820,7 +820,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         if (error)
             return error;
         std::string name;
-        error = clientContainer->AbsoluteName(taskEnv->NetCfg.NetCtName, name);
+        error = clientContainer->ResolveRelativeName(taskEnv->NetCfg.NetCtName, name);
         if (error)
             return error;
         std::shared_ptr<TContainer> target;
@@ -2103,44 +2103,50 @@ std::string TContainer::GetPortoNamespace() const {
         return "";
 }
 
-TError TContainer::RelativeName(const TContainer &c, std::string &name) const {
+TError TContainer::ComposeRelativeName(const TContainer &target,
+                                       std::string &relative_name) const {
     std::string ns = GetPortoNamespace();
-    if (c.IsRoot()) {
-        name = ROOT_CONTAINER;
+    if (target.IsRoot()) {
+        relative_name = ROOT_CONTAINER;
         return TError::Success();
     } else if (ns == "") {
-        name = c.GetName();
+        relative_name = target.GetName();
         return TError::Success();
     } else {
-        std::string n = c.GetName();
+        std::string n = target.GetName();
         if (n.length() <= ns.length() || n.compare(0, ns.length(), ns) != 0) {
             return TError(EError::ContainerDoesNotExist,
                           "Can't access container " + n + " from namespace " + ns);
         }
 
-        name = n.substr(ns.length());
+        relative_name = n.substr(ns.length());
         return TError::Success();
     }
 }
 
-TError TContainer::AbsoluteName(const std::string &orig, std::string &name,
-                                bool resolve_meta) const {
-    if (!resolve_meta && (orig == DOT_CONTAINER || orig == PORTO_ROOT_CONTAINER ||
-                          orig == ROOT_CONTAINER))
+TError TContainer::ResolveRelativeName(const std::string &relative_name,
+                                       std::string &absolute_name,
+                                       bool resolve_meta) const {
+
+    /* FIXME get rid of this crap */
+    if (!resolve_meta && (relative_name == DOT_CONTAINER ||
+                          relative_name == PORTO_ROOT_CONTAINER ||
+                          relative_name == ROOT_CONTAINER))
         return TError(EError::Permission,
                       "Meta containers (like . and /) are provided in read-only mode");
 
     std::string ns = GetPortoNamespace();
-    if (orig == ROOT_CONTAINER || orig == PORTO_ROOT_CONTAINER)
-        name = orig;
-    else if (orig == DOT_CONTAINER) {
+    if (relative_name == ROOT_CONTAINER ||
+            relative_name == PORTO_ROOT_CONTAINER)
+        absolute_name = relative_name;
+    else if (relative_name == DOT_CONTAINER) {
         size_t off = ns.rfind('/');
         if (off != std::string::npos) {
-            name = ns.substr(0, off);
+            absolute_name = ns.substr(0, off);
         } else
-            name = PORTO_ROOT_CONTAINER;
+            absolute_name = PORTO_ROOT_CONTAINER;
     } else
-        name = ns + orig;
+        absolute_name = ns + relative_name;
 
     return TError::Success();
 }
@@ -2243,7 +2249,7 @@ void TContainerWaiter::Signal(const TContainer *who) {
             std::string name;
             TError err = TError::Success();
             if (who)
-                err = container->RelativeName(*who, name);
+                err = container->ComposeRelativeName(*who, name);
             Callback(client, err, name);
             Client.reset();
         }

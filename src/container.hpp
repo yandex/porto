@@ -197,9 +197,11 @@ public:
     TError CheckPermission(const TCred &ucred);
 
     // *self is observer container
-    TError RelativeName(const TContainer &c, std::string &name) const;
-    TError AbsoluteName(const std::string &orig, std::string &name,
-                        bool resolve_meta = false) const;
+    TError ComposeRelativeName(const TContainer &target,
+                               std::string &relative_name) const;
+    TError ResolveRelativeName(const std::string &relative_name,
+                               std::string &absolute_name,
+                               bool resolve_meta = false) const;
 
     static void ParsePropertyName(std::string &name, std::string &idx);
     size_t GetRunningChildren() { return RunningChildren; }

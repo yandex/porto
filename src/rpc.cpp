@@ -299,7 +299,7 @@ noinline TError CreateContainer(TContext &context,
         return err;
 
     std::string name;
-    err = clientContainer->AbsoluteName(req.name(), name);
+    err = clientContainer->ResolveRelativeName(req.name(), name);
     if (err)
         return err;
 
@@ -386,7 +386,7 @@ noinline TError StartContainer(TContext &context,
 
     /* Check if target container exists */
     std::string name;
-    err = clientContainer->AbsoluteName(req.name(), name);
+    err = clientContainer->ResolveRelativeName(req.name(), name);
     if (err)
         return err;
 
@@ -554,7 +554,7 @@ noinline TError ListContainers(TContext &context,
             return err;
 
         std::string name;
-        err = clientContainer->RelativeName(*c, name);
+        err = clientContainer->ComposeRelativeName(*c, name);
         if (!err)
             rsp.mutable_list()->add_name(name);
     }
@@ -674,7 +674,7 @@ noinline TError GetContainerCombined(TContext &context,
         std::shared_ptr<TContainer> container;
 
         TNestedScopedLock lock;
-        TError containerError = clientContainer->AbsoluteName(relname, name, true);
+        TError containerError = clientContainer->ResolveRelativeName(relname, name, true);
         if (!containerError) {
             containerError = context.Cholder->Get(name, container);
             if (!containerError && container) {
@@ -843,7 +843,7 @@ noinline TError Wait(TContext &context,
     for (int i = 0; i < req.name_size(); i++) {
         std::string name = req.name(i);
         std::string abs_name;
-        err = clientContainer->AbsoluteName(name, abs_name);
+        err = clientContainer->ResolveRelativeName(name, abs_name);
         if (err) {
             rsp.mutable_wait()->set_name(name);
             return err;
@@ -1017,7 +1017,7 @@ noinline TError LinkVolume(TContext &context,
     std::shared_ptr<TContainer> container;
     if (req.has_container()) {
         std::string name;
-        TError err = clientContainer->AbsoluteName(req.container(), name, true);
+        TError err = clientContainer->ResolveRelativeName(req.container(), name, true);
         if (err)
             return err;
 
@@ -1080,7 +1080,7 @@ noinline TError UnlinkVolume(TContext &context,
     std::shared_ptr<TContainer> container;
     if (req.has_container()) {
         std::string name;
-        TError err = clientContainer->AbsoluteName(req.container(), name, true);
+        TError err = clientContainer->ResolveRelativeName(req.container(), name, true);
         if (err)
             return err;
 

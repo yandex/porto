@@ -231,7 +231,7 @@ TError TContainerHolder::GetLocked(TScopedLock &holder_lock,
         if (error)
             return error;
 
-        error = clientContainer->AbsoluteName(name, absoluteName, !checkPerm);
+        error = clientContainer->ResolveRelativeName(name, absoluteName, !checkPerm);
         if (error)
             return error;
     } else {
