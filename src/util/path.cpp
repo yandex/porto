@@ -14,6 +14,7 @@ extern "C" {
 #include <sys/prctl.h>
 #include <libgen.h>
 #include <linux/limits.h>
+#include <linux/fs.h>
 #include <sys/syscall.h>
 #include <dirent.h>
 }
@@ -548,6 +549,24 @@ restart:
         if (errno == ENOENT)
             continue;
 
+        if (errno == EPERM || errno == EACCES) {
+            sub_fd = openat(dir_fd, de->d_name, O_RDONLY | O_CLOEXEC |
+                                    O_NOFOLLOW | O_NOCTTY | O_NONBLOCK);
+            if (sub_fd >= 0) {
+                error = ChattrFd(sub_fd, 0, FS_APPEND_FL | FS_IMMUTABLE_FL);
+                close(sub_fd);
+                if (error)
+                    L_ERR() << "Cannot change "  << de->d_name <<
+                        " attributes: " << error << std::endl;
+            }
+            error = ChattrFd(dir_fd, 0, FS_APPEND_FL | FS_IMMUTABLE_FL);
+            if (error)
+                L_ERR() << "Cannot change directory attributes: " << error << std::endl;
+
+            if (!unlinkat(dir_fd, de->d_name, S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0))
+                continue;
+        }
+
         if (!S_ISDIR(st.st_mode) || (errno != ENOTEMPTY && errno != EEXIST)) {
             error = TError(EError::Unknown, errno, "ClearDirectory unlinkat(" +
                            Path + "/.../" + de->d_name + ")");
@@ -669,6 +688,18 @@ TError TPath::RotateLog(off_t max_disk_usage) const {
     else
         error = TError::Success();
 
+    close(fd);
+    return error;
+}
+
+TError TPath::Chattr(unsigned add_flags, unsigned del_flags) const {
+    int fd;
+
+    fd = open(c_str(), O_RDONLY | O_CLOEXEC | O_NOFOLLOW |
+                       O_NOCTTY | O_NONBLOCK);
+    if (fd < 0)
+        return TError(EError::Unknown, errno, "open(" + Path + ")");
+    TError error = ChattrFd(fd, add_flags, del_flags);
     close(fd);
     return error;
 }

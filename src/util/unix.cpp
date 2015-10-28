@@ -28,6 +28,7 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <linux/fs.h>
 }
 
 bool RetryIfBusy(std::function<int()> handler, int &ret, int times, int timeoMs) {
@@ -683,4 +684,17 @@ TError TUnixSocket::RecvError() const {
 
     TError::Deserialize(SockFd, error);
     return error;
+}
+
+TError ChattrFd(int fd, unsigned add_flags, unsigned del_flags) {
+    unsigned old_flags, new_flags;
+
+    if (ioctl(fd, FS_IOC_GETFLAGS, &old_flags))
+        return TError(EError::Unknown, errno, "ioctlFS_IOC_GETFLAGS)");
+
+    new_flags = (old_flags & ~del_flags) | add_flags;
+    if ((new_flags != old_flags) && ioctl(fd, FS_IOC_SETFLAGS, &new_flags))
+        return TError(EError::Unknown, errno, "ioctl(FS_IOC_SETFLAGS)");
+
+    return TError::Success();
 }

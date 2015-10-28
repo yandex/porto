@@ -118,4 +118,5 @@ public:
     TError StatVFS(uint64_t &space_avail) const;
     TError SetXAttr(const std::string name, const std::string value) const;
     TError RotateLog(off_t max_disk_usage) const;
+    TError Chattr(unsigned add_flags, unsigned del_flags) const;
 };
