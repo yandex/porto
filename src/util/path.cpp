@@ -483,6 +483,25 @@ TError TPath::Mkdir(unsigned int mode) const {
     return TError::Success();
 }
 
+TError TPath::MkdirAll(unsigned int mode) const {
+    std::vector<TPath> paths;
+    TPath path(Path);
+    TError error;
+
+    while (!path.Exists()) {
+        paths.push_back(path);
+        path = path.DirName();
+    }
+
+    for (auto path = paths.rbegin(); path != paths.rend(); path++) {
+        error = path->Mkdir(mode);
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
+}
+
 TError TPath::Rmdir() const {
     if (rmdir(Path.c_str()) < 0)
         return TError(EError::Unknown, errno, "rmdir(" + Path + ")");

@@ -107,6 +107,7 @@ public:
     TError Mkfifo(unsigned int mode) const;
     TError Mknod(unsigned int mode, unsigned int dev) const;
     TError Mkdir(unsigned int mode) const;
+    TError MkdirAll(unsigned int mode) const;
     TError Rmdir() const;
     TError Unlink() const;
     TError RemoveAll() const;
