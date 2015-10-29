@@ -90,7 +90,7 @@ TError TKeyValueNode::Append(const kv::TNode &node) const {
     auto lock = Storage->ScopedLock();
 
     TScopedFd fd;
-    fd = open(Path.ToString().c_str(), O_CREAT | O_WRONLY | O_CLOEXEC, 0755);
+    fd = open(Path.ToString().c_str(), O_CREAT | O_WRONLY | O_CLOEXEC, 0600);
     TError error;
 
     if (lseek(fd.GetFd(), 0, SEEK_END) < 0) {
@@ -116,7 +116,7 @@ TError TKeyValueNode::Save(const kv::TNode &node) const {
     auto lock = Storage->ScopedLock();
 
     TScopedFd fd;
-    fd = open(Path.ToString().c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0755);
+    fd = open(Path.ToString().c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0600);
     TError error;
     try {
         google::protobuf::io::FileOutputStream post(fd.GetFd());
