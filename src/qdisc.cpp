@@ -193,9 +193,6 @@ TError TNetwork::Prepare() {
 }
 
 TError TNetwork::Update() {
-    if (!config().network().dynamic_ifaces())
-        return TError::Success();
-
     L() << "Update network" << std::endl;
 
     std::vector<std::shared_ptr<TNlLink>> newLinks;

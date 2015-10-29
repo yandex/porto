@@ -256,9 +256,7 @@ public:
         TMapValue(0),
         TContainerValue(D_NET_BYTES,
                         "number of tx bytes",
-                        rpdmState) {
-        Implemented = config().network().enabled();
-    }
+                        rpdmState) {}
 
     TUintMap GetDefault() const override {
         TUintMap m;
@@ -273,9 +271,7 @@ public:
         TMapValue(0),
         TContainerValue(D_NET_PACKETS,
                         "number of tx packets",
-                        rpdmState) {
-        Implemented = config().network().enabled();
-    }
+                        rpdmState) {}
 
     TUintMap GetDefault() const override {
         TUintMap m;
@@ -290,9 +286,7 @@ public:
         TMapValue(0),
         TContainerValue(D_NET_DROPS,
                         "number of dropped tx packets",
-                        rpdmState) {
-        Implemented = config().network().enabled();
-    }
+                        rpdmState) {}
 
     TUintMap GetDefault() const override {
         TUintMap m;
@@ -307,9 +301,7 @@ public:
         TMapValue(0),
         TContainerValue(D_NET_OVERLIMITS,
                         "number of tx packets that exceeded the limit",
-                        rpdmState) {
-        Implemented = config().network().enabled();
-    }
+                        rpdmState) {}
 
     TUintMap GetDefault() const override {
         TUintMap m;

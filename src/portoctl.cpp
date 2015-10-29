@@ -1440,10 +1440,7 @@ public:
             showData.push_back("memory_usage");
             showData.push_back("major_faults");
             showData.push_back("minor_faults");
-
-            if (config().network().enabled())
-                showData.push_back("net_packets");
-
+            showData.push_back("net_packets");
             showData.push_back("state");
         } else {
             vector<TData> dlist;

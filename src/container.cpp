@@ -454,9 +454,6 @@ bool TContainer::UseParentNamespace() const {
 }
 
 TError TContainer::PrepareNetwork() {
-    if (!config().network().enabled())
-        return TError::Success();
-
     PORTO_ASSERT(Tclass == nullptr);
 
     if (UseParentNamespace()) {
@@ -544,8 +541,7 @@ TError TContainer::PrepareCgroups() {
     LeafCgroups[memorySubsystem] = GetLeafCgroup(memorySubsystem);
     LeafCgroups[freezerSubsystem] = GetLeafCgroup(freezerSubsystem);
     LeafCgroups[blkioSubsystem] = GetLeafCgroup(blkioSubsystem);
-    if (config().network().enabled())
-        LeafCgroups[netclsSubsystem] = GetLeafCgroup(netclsSubsystem);
+    LeafCgroups[netclsSubsystem] = GetLeafCgroup(netclsSubsystem);
     LeafCgroups[devicesSubsystem] = GetLeafCgroup(devicesSubsystem);
 
     for (auto cg : LeafCgroups) {
@@ -556,14 +552,12 @@ TError TContainer::PrepareCgroups() {
         }
     }
 
-    if (config().network().enabled()) {
-        auto netcls = GetLeafCgroup(netclsSubsystem);
-        uint32_t handle = Tclass->GetHandle();
-        TError error = netcls->SetKnobValue("net_cls.classid", std::to_string(handle), false);
-        if (error) {
-            L_ERR() << "Can't set classid: " << error << std::endl;
-            return error;
-        }
+    auto netcls = GetLeafCgroup(netclsSubsystem);
+    uint32_t handle = Tclass->GetHandle();
+    TError error = netcls->SetKnobValue("net_cls.classid", std::to_string(handle), false);
+    if (error) {
+        L_ERR() << "Can't set classid: " << error << std::endl;
+        return error;
     }
 
     if (!IsRoot()) {
@@ -748,23 +742,17 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         taskEnv->BindMap.push_back(bm);
     }
 
-    if (config().network().enabled()) {
-        error = Prop->PrepareTaskEnv(P_IP, *taskEnv);
-        if (error)
-            return error;
+    error = Prop->PrepareTaskEnv(P_IP, *taskEnv);
+    if (error)
+        return error;
 
-        error = Prop->PrepareTaskEnv(P_DEFAULT_GW, *taskEnv);
-        if (error)
-            return error;
+    error = Prop->PrepareTaskEnv(P_DEFAULT_GW, *taskEnv);
+    if (error)
+        return error;
 
-        error = Prop->PrepareTaskEnv(P_NET, *taskEnv);
-        if (error)
-            return error;
-    } else {
-        taskEnv->NetCfg.Clear();
-        taskEnv->NetCfg.NewNetNs = false;
-        taskEnv->NetCfg.Host = true;
-    }
+    error = Prop->PrepareTaskEnv(P_NET, *taskEnv);
+    if (error)
+        return error;
 
     taskEnv->NetUp = Prop->Get<int>(P_VIRT_MODE) != VIRT_MODE_OS;
 

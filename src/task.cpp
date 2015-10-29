@@ -1008,12 +1008,10 @@ TError TTask::Start() {
         else
             ReportPid(clonePid);
 
-        if (config().network().enabled()) {
-            error = IsolateNet(clonePid);
-            if (error) {
-                L() << "Can't isolate child network: " << error << std::endl;
-                Abort(error);
-            }
+        error = IsolateNet(clonePid);
+        if (error) {
+            L() << "Can't isolate child network: " << error << std::endl;
+            Abort(error);
         }
 
         /* Report VPid in parent pid namespace for new pid-ns */
@@ -1233,7 +1231,7 @@ TError TTask::SyncTaskCgroups(pid_t pid) const {
         if (!subsys || Env->LeafCgroups.find(subsys) == Env->LeafCgroups.end()) {
             if (pair.first.find(',') != std::string::npos)
                 continue;
-            if (pair.first == "net_cls" && !config().network().enabled()) {
+            if (pair.first == "net_cls") {
                 if (path == "/")
                     continue;
 

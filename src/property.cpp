@@ -648,9 +648,7 @@ public:
            const int flags,
            const std::set<EContainerState> &state) :
         TMapValue(flags),
-        TContainerValue(name, desc, state) {
-        Implemented = config().network().enabled();
-    }
+        TContainerValue(name, desc, state) {}
 
     TUintMap GetDefault() const override {
         auto c = GetContainer();
@@ -692,9 +690,7 @@ public:
         TNetMapValue(P_NET_GUARANTEE,
                      "Guaranteed container network bandwidth [bytes/s] (max 32Gbps)",
                      PARENT_DEF_PROPERTY,
-                     staticProperty) {
-        Implemented = config().network().enabled();
-    }
+                     staticProperty) {}
     uint32_t GetDef() const override { return config().network().default_guarantee(); }
     uint32_t GetRootDef() const override { return config().network().default_max_guarantee(); }
 };
@@ -705,9 +701,7 @@ public:
         TNetMapValue(P_NET_LIMIT,
                      "Maximum container network bandwidth [bytes/s] (max 32Gbps)",
                      PARENT_DEF_PROPERTY,
-                     staticProperty) {
-        Implemented = config().network().enabled();
-    }
+                     staticProperty) {}
     uint32_t GetDef() const override { return config().network().default_limit(); }
     uint32_t GetRootDef() const override { return config().network().default_max_guarantee(); }
 };
@@ -718,9 +712,7 @@ public:
         TNetMapValue(P_NET_PRIO,
                      "Container network priority: 0-7",
                      PARENT_DEF_PROPERTY,
-                     staticProperty) {
-        Implemented = config().network().enabled();
-    }
+                     staticProperty) {}
     uint32_t GetDef() const override { return config().network().default_prio(); }
     uint32_t GetRootDef() const override { return config().network().default_prio(); }
 
@@ -1065,9 +1057,7 @@ public:
                         "ipvlan <master> <name> [l2|l3] [mtu] | "
                         "veth <name> <bridge> [mtu] [hw] | "
                         "netns <name>",
-                        staticProperty) {
-        Implemented = config().network().enabled();
-    }
+                        staticProperty) {}
 
     TStrList GetDefault() const override {
         auto c = GetContainer();

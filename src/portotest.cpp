@@ -95,12 +95,10 @@ int main(int argc, char *argv[])
         config.Load();
 
         auto net = std::make_shared<TNetwork>();
-        if (config().network().enabled()) {
-            auto lock = net->ScopedLock();
-            TError error = net->OpenLinks(test::links);
-            if (error)
-                throw error.GetMsg();
-        }
+        auto lock = net->ScopedLock();
+        TError error = net->OpenLinks(test::links);
+        if (error)
+            throw error.GetMsg();
 
         test::InitKernelFeatures();
 
