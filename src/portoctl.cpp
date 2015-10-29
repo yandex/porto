@@ -655,19 +655,17 @@ public:
         }
 
         auto &data = result[container];
-
-        if (printErrors)
-            for (const auto &key : vars) {
-                if (data[key].Error) {
-                    TError error((rpc::EError)data[key].Error, data[key].ErrorMsg);
-                    PrintError(error, "Can't get " + key);
-                    return EXIT_FAILURE;
-                }
-            }
+        ret = EXIT_SUCCESS;
 
         for (const auto &key : vars) {
-            if (data[key].Error)
+            if (data[key].Error) {
+                if (printErrors || key == "state") {
+                    TError error((rpc::EError)data[key].Error, data[key].ErrorMsg);
+                    PrintError(error, "Can't get " + key);
+                    ret = EXIT_FAILURE;
+                }
                 continue;
+            }
 
             auto val = HumanValue(key, data[key].Value);
             if (printKey)
@@ -676,7 +674,7 @@ public:
                 Print(val);
         }
 
-        return EXIT_SUCCESS;
+        return ret;
     }
 };
 
