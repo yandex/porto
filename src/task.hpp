@@ -101,7 +101,6 @@ struct TTaskEnv : public TNonCopyable {
     std::string Command;
     TScopedFd PortoInitFd;
     TPath Cwd;
-    bool CreateCwd;
     TPath Root; /* path in ParentNs.Mnt */
     bool RootRdOnly;
     std::vector<std::string> Environ;
@@ -147,13 +146,11 @@ class TTask: public TNonCopyable {
     int ExitStatus;
 
     pid_t Pid, VPid, WPid;
-    std::shared_ptr<TFolder> Cwd;
 
     void ReportPid(pid_t pid) const;
 
     TError ReopenStdio();
     TError IsolateNet(int childPid);
-    TError CreateCwd();
 
     TError ChildCreateNode(const TPath &path, unsigned int mode, unsigned int dev);
     TError ChildOpenStdFile(const TPath &path, int expected);
@@ -199,8 +196,6 @@ public:
 
     bool HasCorrectParent();
     bool HasCorrectFreezer();
-
-    TError CreateTmpDir(const TPath &path, std::shared_ptr<TFolder> &dir) const;
 
     void DumpDebugInfo();
 };

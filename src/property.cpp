@@ -311,7 +311,7 @@ public:
         if (c->Prop->Get<std::string>(P_ROOT) != "/")
             return "/";
 
-        return (TPath(config().container().tmp_dir()) / c->GetName()).ToString();
+        return c->WorkPath().ToString();
     }
 
     TError CheckValue(const std::string &value) override {

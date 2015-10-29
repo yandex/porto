@@ -108,22 +108,6 @@ static int ChildFn(void *arg) {
     return EXIT_FAILURE;
 }
 
-TError TTask::CreateTmpDir(const TPath &path, std::shared_ptr<TFolder> &dir) const {
-    bool cleanup = path.ToString().find(config().container().tmp_dir()) == 0;
-
-    dir = std::make_shared<TFolder>(path, cleanup);
-    if (!dir->Exists()) {
-        TError error = dir->Create(0755, true);
-        if (error)
-            return error;
-        error = path.Chown(Env->Cred.Uid, Env->Cred.Gid);
-        if (error)
-            return error;
-    }
-
-    return TError::Success();
-}
-
 TError TTask::ChildOpenStdFile(const TPath &path, int expected) {
     int ret = open(path.ToString().c_str(), O_CREAT | O_WRONLY | O_APPEND, 0660);
     if (ret < 0)
@@ -902,25 +886,11 @@ void TTask::StartChild() {
     Abort(error);
 }
 
-TError TTask::CreateCwd() {
-    return CreateTmpDir(Env->Cwd, Cwd);
-}
-
 TError TTask::Start() {
     TUnixSocket masterSock, waiterSock;
     TError error;
 
     Pid = VPid = WPid = 0;
-
-    if (Env->CreateCwd) {
-        TError error = CreateCwd();
-        if (error) {
-            if (error.GetError() != EError::NoSpace)
-                L_ERR() << "Can't create temporary cwd: " << error << std::endl;
-            return error;
-        }
-    }
-
     ExitStatus = 0;
 
     error = TUnixSocket::SocketPair(masterSock, Env->Sock);

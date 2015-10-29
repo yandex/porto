@@ -79,6 +79,11 @@ std::string TContainer::ContainerStateName(EContainerState state) {
     }
 }
 
+/* Working directory in host namespace */
+TPath TContainer::WorkPath() const {
+    return TPath(config().container().tmp_dir()) / GetName();
+}
+
 TPath TContainer::GetTmpDir() const {
     return TPath(config().container().tmp_dir()) / std::to_string(Id);
 }
@@ -651,7 +656,6 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
     }
 
     taskEnv->RootRdOnly = Prop->Get<bool>(P_ROOT_RDONLY);
-    taskEnv->CreateCwd = Prop->IsDefault(P_ROOT) && Prop->IsDefault(P_CWD) && !UseParentNamespace();
 
     if (vmode == VIRT_MODE_OS) {
         user = "root";
@@ -1152,8 +1156,31 @@ TError TContainer::PrepareLoop() {
     return error;
 }
 
+TError TContainer::PrepareWorkDir() {
+    if (IsRoot() || IsPortoRoot())
+        return TError::Success();
+
+    TPath work = WorkPath();
+    if (work.Exists())
+        return TError::Success(); /* FIXME kludge for restore */
+
+    TError error = work.Mkdir(0755);
+    if (!error)
+        error = work.Chown(OwnerCred);
+    return error;
+}
+
 TError TContainer::PrepareResources() {
-    TError error = PrepareNetwork();
+    TError error;
+
+    error = PrepareWorkDir();
+    if (error) {
+        L_ERR() << "Cannot create working dir: " << error << std::endl;
+        FreeResources();
+        return error;
+    }
+
+    error = PrepareNetwork();
     if (error) {
         L_ERR() << "Can't prepare task network: " << error << std::endl;
         FreeResources();
@@ -1225,6 +1252,13 @@ void TContainer::FreeResources() {
         error = temp_path.Rmdir();
         if (error)
             L_ERR() << "Can't remove " << temp_path << ": " << error << std::endl;
+    }
+
+    TPath work_path = WorkPath();
+    if (work_path.Exists()) {
+        error = work_path.RemoveAll();
+        if (error)
+            L_ERR() << "Cannot remove working dir: " << error << std::endl;
     }
 }
 
