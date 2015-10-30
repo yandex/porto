@@ -365,11 +365,22 @@ public:
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
+        TError error;
         TUintMap m;
-        auto cg = GetContainer()->GetLeafCgroup(blkioSubsystem);
+
+        auto memcg = GetContainer()->GetLeafCgroup(memorySubsystem);
+
+        uint64_t io_bytes, write_bytes;
+        error = memorySubsystem->Statistics(memcg, "fs_io_write_bytes", write_bytes);
+        if (!error)
+            error = memorySubsystem->Statistics(memcg, "fs_io_bytes", io_bytes);
+        if (!error)
+            m["fs"] = io_bytes - write_bytes;
+
+        auto blkcg = GetContainer()->GetLeafCgroup(blkioSubsystem);
 
         std::vector<BlkioStat> stat;
-        TError error = blkioSubsystem->Statistics(cg, "blkio.io_service_bytes_recursive", stat);
+        error = blkioSubsystem->Statistics(blkcg, "blkio.io_service_bytes_recursive", stat);
         if (error)
             L_ERR() << "Can't get blkio statistics: " << error << std::endl;
         if (error)
@@ -391,11 +402,20 @@ public:
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
+        TError error;
         TUintMap m;
-        auto cg = GetContainer()->GetLeafCgroup(blkioSubsystem);
+
+        auto memcg = GetContainer()->GetLeafCgroup(memorySubsystem);
+
+        uint64_t write_bytes;
+        error = memorySubsystem->Statistics(memcg, "fs_io_write_bytes", write_bytes);
+        if (!error)
+            m["fs"] = write_bytes;
+
+        auto blkcg = GetContainer()->GetLeafCgroup(blkioSubsystem);
 
         std::vector<BlkioStat> stat;
-        TError error = blkioSubsystem->Statistics(cg, "blkio.io_service_bytes_recursive", stat);
+        error = blkioSubsystem->Statistics(blkcg, "blkio.io_service_bytes_recursive", stat);
         if (error)
             L_ERR() << "Can't get blkio statistics: " << error << std::endl;
         if (error)

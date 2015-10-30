@@ -878,8 +878,8 @@ TPortoTop::TPortoTop(TPortoAPI *api, std::string config) : Api(api),
 
               /* I/O */
               "maj/s: major_faults'",
-              "read b/s: S(io_read)' b",
-              "write b/s: S(io_write)' b",
+              "read b/s: io_read[fs]' b",
+              "write b/s: io_write[fs]' b",
 
               /* Network */
               "net b/s: S(net_bytes) 'b",
