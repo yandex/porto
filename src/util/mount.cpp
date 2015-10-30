@@ -137,35 +137,29 @@ TError TMount::Bind(bool rdonly, unsigned long flags) const {
 }
 
 TError TMount::BindFile(bool rdonly, unsigned long flags) const {
-    TPath p(Target);
-    TFile f(p);
 
-    if (!f.Exists()) {
-        TFolder d(p.DirName());
-        if (!d.Exists()) {
-            TError error = d.Create(0755, true);
+    if (!Target.Exists()) {
+        TPath dir = Target.DirName();
+        TError error;
+
+        if (!dir.Exists()) {
+            error = dir.MkdirAll(0755);
             if (error)
                 return error;
         }
 
-        TError error = f.Touch();
+        /* This fails for broken symlinks */
+        error = Target.Mknod(S_IFREG | 0600, 0);
         if (error)
             return error;
-    }
-
-    if (p.GetType() == EFileType::Link) {
-        // TODO: ?can't mount over link
     }
 
     return Bind(rdonly, flags);
 }
 
 TError TMount::BindDir(bool rdonly, unsigned long flags) const {
-    TPath p(Target);
-    TFolder d(p);
-
-    if (!d.Exists()) {
-        TError error = d.Create(0755, true);
+    if (!Target.Exists()) {
+        TError error = Target.MkdirAll(0755);
         if (error)
             return error;
     }
@@ -174,9 +168,8 @@ TError TMount::BindDir(bool rdonly, unsigned long flags) const {
 }
 
 TError TMount::MountDir(unsigned long flags) const {
-    TFolder dir(Target);
-    if (!dir.Exists()) {
-        TError error = dir.Create();
+    if (!Target.Exists()) {
+        TError error = Target.Mkdir(0755);
         if (error)
             return error;
     }

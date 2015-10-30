@@ -1218,18 +1218,16 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
 
     TPath volumes = config().volumes().volume_dir();
     if (!volumes.IsDirectory()) {
-        TFolder dir(config().volumes().volume_dir());
-        (void)dir.Remove(true);
-        TError error = dir.Create(0755, true);
+        (void)volumes.Unlink();
+        TError error = volumes.MkdirAll(0755);
         if (error)
             return error;
     }
 
     TPath layers = config().volumes().layers_dir();
     if (!layers.IsDirectory()) {
-        TFolder dir(layers.ToString());
-        (void)dir.Remove(true);
-        TError error = layers.Mkdir(0700);
+        (void)layers.Unlink();
+        TError error = layers.MkdirAll(0700);
         if (error)
             return error;
     }
@@ -1291,7 +1289,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
     L_ACT() << "Remove stale volumes..." << std::endl;
 
     std::vector<std::string> subdirs;
-    error = TFolder(volumes).Items(EFileType::Directory, subdirs);
+    error = volumes.ReadDirectory(subdirs);
     if (error)
         L_ERR() << "Cannot list " << volumes << std::endl;
 
