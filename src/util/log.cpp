@@ -147,25 +147,11 @@ void TLogBuf::Open(const TPath &path, const unsigned int mode) {
         return;
     }
 
-    bool needCreate = false;
+    if (path.GetMode() != mode)
+        (void)path.Chmod(mode);
 
-    if (path.Exists()) {
-        if (!path.IsRegular() || path.GetMode() != mode) {
-
-            TFile f(path);
-            (void)f.Remove();
-            needCreate = true;
-        }
-    } else {
-        needCreate = true;
-    }
-
-    if (needCreate) {
-        TFile f(path, mode);
-        (void)f.Touch();
-    }
-
-    logBufFd = open(path.ToString().c_str(), O_WRONLY | O_APPEND | O_CLOEXEC);
+    logBufFd = open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC |
+                                  O_NOFOLLOW | O_NOCTTY, mode);
     if (logBufFd < 0)
         logBufFd = STDERR_FILENO;
 }
