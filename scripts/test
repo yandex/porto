@@ -21,8 +21,10 @@ checkver() { [ "$2" = "$3" ] || { echo "Invalid $1 version ($2 != $3)"; }; }
 build() {
 	say "Build"
 	rm -f "$PORTO_DPKG" "$PYTHON_DPKG"
+	cp debian/changelog debian/changelog.old
 	dch --newversion $PORTO_VERSION "test build"
 	debuild -i -us -uc -b -j$(grep -c "^processor" /proc/cpuinfo)
+	mv debian/changelog.old debian/changelog
 	install
 }
 
