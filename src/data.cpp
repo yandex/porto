@@ -319,13 +319,22 @@ public:
                         rpdmState) {}
 
     uint64_t GetDefault() const override {
-        uint64_t val;
+        uint64_t minor_faults = 0;
         auto cg = GetContainer()->GetLeafCgroup(memorySubsystem);
-        TError error = memorySubsystem->Statistics(cg, "total_pgfault", val);
+        int left = 2;
+        TError error = memorySubsystem->Statistics(cg, [&](std::string k, uint64_t v) -> int {
+            if (k == "total_pgfault") {
+                minor_faults += v;
+                left--;
+            } else if (k == "total_pgmajfault") {
+                minor_faults -= v;
+                left--;
+            }
+            return left;
+        });
         if (error)
             return -1;
-
-        return val;
+        return minor_faults;
     }
 };
 
