@@ -31,8 +31,8 @@ extern "C" {
 #include <linux/capability.h>
 }
 
-const std::string oomMemoryLimit = "1000000000";
-const std::string oomCommand = "dd if=/dev/zero of=/dev/shm/fill bs=1k count=1024k";
+const std::string oomMemoryLimit = "32M";
+const std::string oomCommand = "sort -S 1G /dev/urandom";
 
 const uint32_t DEF_CLASS_MAX_RATE = -1;
 const uint32_t DEF_CLASS_RATE = 1;
