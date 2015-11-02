@@ -1830,8 +1830,8 @@ class TBuildCmd final : public ICmd {
 
 public:
     TBuildCmd(TPortoAPI *api) : ICmd(api, "build", 0,
-            "[-k] [-L layer]... [-o layer.tar] [-E name=value]... "
-            "[-B bootstrap] [-S script] [properties]...",
+            "[-k] [-L layer]... -o layer.tar [-E name=value]... "
+            "[-B bootstrap] -S script [properties]...",
             "build container image",
             "    -L layer|dir|tarball       add lower layer (-L top ... -L bottom)\n"
             "    -o layer.tar               save resulting upper layer\n"
@@ -1862,31 +1862,35 @@ public:
 
         if (output.IsEmpty()) {
             std::cerr << "No output file specified" << std::endl;
+            PrintUsage();
             return EXIT_FAILURE;
         }
 
         if (output.Exists()) {
             std::cerr << "Output file " << output << " already exists" << std::endl;
+            PrintUsage();
             return EXIT_FAILURE;
         }
 
         if (!output.DirName().Exists()) {
             std::cerr << "Output directory " << output.DirName() << " not exists" << std::endl;
+            PrintUsage();
             return EXIT_FAILURE;
         }
 
-        if (bootstrap.IsEmpty() && script.IsEmpty()) {
-            std::cerr << "Not script and bootstrap specified" << std::endl;
+        if (script.IsEmpty()) {
+            std::cerr << "Not script specified" << std::endl;
+            PrintUsage();
+            return EXIT_FAILURE;
+        }
+
+        if (!script.Exists()) {
+            std::cerr << "Script " << script << " not exists" << std::endl;
             return EXIT_FAILURE;
         }
 
         if (!bootstrap.IsEmpty() && !bootstrap.Exists()) {
             std::cerr << "Bootstrap " << bootstrap << " not exists" << std::endl;
-            return EXIT_FAILURE;
-        }
-
-        if (!script.IsEmpty() && !script.Exists()) {
-            std::cerr << "Script " << script << " not exists" << std::endl;
             return EXIT_FAILURE;
         }
 
