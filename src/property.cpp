@@ -681,12 +681,9 @@ public:
     uint32_t GetDef() const override { return config().network().default_guarantee(); }
     uint32_t GetRootDef() const override { return config().network().default_max_guarantee(); }
     TError CheckValue(const TUintMap &value) override {
-        for (auto &kv : value) {
+        for (auto &kv : value)
             if (kv.second > NET_MAX_GUARANTEE)
                 return TError(EError::InvalidValue, "Net guarantee too large");
-            else if (kv.second < NET_MIN_GUARANTEE)
-                return TError(EError::InvalidValue, "Net guarantee too low");
-        }
 
         return TError::Success();
     }
@@ -702,12 +699,9 @@ public:
     uint32_t GetDef() const override { return config().network().default_limit(); }
     uint32_t GetRootDef() const override { return config().network().default_max_guarantee(); }
     TError CheckValue(const TUintMap &value) override {
-        for (auto &kv : value) {
+        for (auto &kv : value)
             if (kv.second > NET_MAX_LIMIT)
                 return TError(EError::InvalidValue, "Net limit too large");
-            else if (kv.second < NET_MIN_LIMIT)
-                return TError(EError::InvalidValue, "Net limit too low");
-        }
 
         return TError::Success();
     }

@@ -59,7 +59,7 @@ All limits can be set in stopped and running states (if not specified otherwise)
 
 # Net
 
-* net\_guarantee (bytes/s, default 1)
+* net\_guarantee (bytes/s, default 0)
 
   _Currently, this property may be changed only in stopped state._
 

@@ -675,9 +675,6 @@ TError TNlClass::Create(uint32_t prio, uint32_t rate, uint32_t ceil) {
     int ret;
     struct rtnl_class *tclass;
 
-    if (!rate)
-        return TError(EError::Unknown, string("tc classifier rate is not specified"));
-
     tclass = rtnl_class_alloc();
     if (!tclass)
         return TError(EError::Unknown, string("Unable to allocate tclass object"));
@@ -692,6 +689,12 @@ TError TNlClass::Create(uint32_t prio, uint32_t rate, uint32_t ceil) {
         goto free_class;
     }
 
+    /*
+     * TC doesn't allow to set 0 rate, but Porto does (because we call them
+     * net_guarantee). So, just map 0 to 1, minimal valid guarantee.
+     */
+    if (rate == 0)
+        rate = 1;
     rtnl_htb_set_rate(tclass, rate);
 
     if (prio)

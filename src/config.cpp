@@ -19,7 +19,7 @@ void TConfig::LoadDefaults() {
     config().mutable_network()->set_debug(false);
     config().mutable_network()->set_default_prio(3);
     config().mutable_network()->set_default_max_guarantee(-1);
-    config().mutable_network()->set_default_guarantee(1);
+    config().mutable_network()->set_default_guarantee(0);
     config().mutable_network()->set_default_limit(-1);
 
     config().mutable_slave_pid()->set_path("/run/portod.pid");
