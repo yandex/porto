@@ -9,6 +9,11 @@ extern "C" {
 #include <arpa/inet.h>
 }
 
+const uint64_t NET_MIN_LIMIT = 0;
+const uint64_t NET_MAX_LIMIT = 0xFFFFFFFF;
+const uint64_t NET_MIN_GUARANTEE = 1;
+const uint64_t NET_MAX_GUARANTEE = 0xFFFFFFFF;
+
 struct nl_sock;
 struct rtnl_link;
 struct nl_cache;

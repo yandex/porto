@@ -652,35 +652,22 @@ public:
 
     TUintMap GetDefault() const override {
         auto c = GetContainer();
-        uint64_t def =  c->IsRoot() || c->IsPortoRoot() ? GetRootDef() : GetDef();
+        uint64_t def =  (c->IsRoot() || c->IsPortoRoot()) ? GetRootDef() : GetDef();
         auto net_lock = c->Net->ScopedLock();
         auto availableLinks = c->Net->GetLinks();
         TUintMap m;
-        for (auto &link : availableLinks)
-            m[link->GetAlias()] = def;
+        m["default"] = def;
         return m;
     }
 
-    TError CheckValue(const TUintMap &value) override {
-        std::set<std::string> validKey;
-        auto c = GetContainer();
-        auto net_lock = c->Net->ScopedLock();
-        auto availableLinks = c->Net->GetLinks();
+    virtual TError Set(const TUintMap &value) override {
+        /* Merge, not replace */
+        TUintMap tmp = Get();
 
-        for (auto &link : availableLinks)
-            validKey.insert(link->GetAlias());
+        for (const auto& iter : value)
+            tmp[iter.first] = iter.second;
 
-        for (auto &kv : value)
-            if (validKey.find(kv.first) == validKey.end())
-                return TError(EError::InvalidValue,
-                              "Invalid interface " + kv.first);
-
-        for (auto iface : validKey)
-            if (value.find(iface) == value.end())
-                return TError(EError::InvalidValue,
-                              "Missing interface " + iface);
-
-        return TError::Success();
+        return TValue::Set(tmp);
     }
 };
 
@@ -693,6 +680,16 @@ public:
                      staticProperty) {}
     uint32_t GetDef() const override { return config().network().default_guarantee(); }
     uint32_t GetRootDef() const override { return config().network().default_max_guarantee(); }
+    TError CheckValue(const TUintMap &value) override {
+        for (auto &kv : value) {
+            if (kv.second > NET_MAX_GUARANTEE)
+                return TError(EError::InvalidValue, "Net guarantee too large");
+            else if (kv.second < NET_MIN_GUARANTEE)
+                return TError(EError::InvalidValue, "Net guarantee too low");
+        }
+
+        return TError::Success();
+    }
 };
 
 class TNetLimitProperty : public TNetMapValue {
@@ -704,6 +701,16 @@ public:
                      staticProperty) {}
     uint32_t GetDef() const override { return config().network().default_limit(); }
     uint32_t GetRootDef() const override { return config().network().default_max_guarantee(); }
+    TError CheckValue(const TUintMap &value) override {
+        for (auto &kv : value) {
+            if (kv.second > NET_MAX_LIMIT)
+                return TError(EError::InvalidValue, "Net limit too large");
+            else if (kv.second < NET_MIN_LIMIT)
+                return TError(EError::InvalidValue, "Net limit too low");
+        }
+
+        return TError::Success();
+    }
 };
 
 class TNetPriorityProperty : public TNetMapValue {

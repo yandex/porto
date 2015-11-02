@@ -1619,19 +1619,15 @@ TError TContainer::SetProperty(const string &origProperty,
         if (error)
             return TError(EError::InvalidValue, "Invalid subscript for property");
 
-        if (m.find(idx) == m.end()) {
-            return TError(EError::InvalidValue, "Invalid index " + idx);
-        } else {
-            uint64_t uval;
-            TError error = StringToUint64(value, uval);
-            if (error)
-                return TError(EError::InvalidValue, "Invalid integer value for index " + idx);
+        uint64_t uval;
+        error = StringToUint64(value, uval);
+        if (error)
+            return TError(EError::InvalidValue, "Invalid integer value for index " + idx);
 
-            m[idx] = uval;
-            error = Prop->Set<TUintMap>(property, m);
-            if (error)
-                return error;
-        }
+        m[idx] = uval;
+        error = Prop->Set<TUintMap>(property, m);
+        if (error)
+            return error;
     } else {
         error = Prop->FromString(property, value);
         if (error)

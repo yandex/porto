@@ -139,7 +139,7 @@ public:
             return GetDefault();
     }
 
-    TError Set(const T &value) {
+    virtual TError Set(const T &value) {
         TError error = CheckValue(value);
         if (error)
             return error;
