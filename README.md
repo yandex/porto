@@ -9,7 +9,7 @@ Porto is a Linux container management system, developed by Yandex.
 The main goal of Porto is to create a convenient, reliable interface over several
 Linux kernel mechanism such as cgroups, namespaces, mounts, networking etc.
 Porto is intended to be used as a base for building large infrastructure projects.
-Porto provides a protobuf-based interface via an Unix socket. C++ and Python APIs are included.
+Porto provides a protobuf-based interface via an Unix socket. C++, Python and Go APIs are included.
 A command line tool (portoctl) for managing Porto-containers is also provided.
 
 Porto has the following key-features:
@@ -58,4 +58,5 @@ $ portoctl exec my_container command='echo "Hello, world!"'
 * [Networking](docs/networking.md)
 * [C++ API](src/api/cpp/libporto.hpp)
 * [Python API](src/api/python/porto/api.py)
+* [Go API](src/api/go/porto.go)
 * [How to contribute?](docs/devel.md)
