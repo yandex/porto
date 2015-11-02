@@ -1115,10 +1115,11 @@ public:
         if (env.length())
             args.push_back("env=" + env);
 
-        containerName = argv[0];
         int ret = RunCmd<TRunCmd>(args, environment);
         if (ret)
             return ret;
+
+        containerName = argv[0];
 
         bool hangup = false;
         while (!hangup) {
