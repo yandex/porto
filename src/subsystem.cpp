@@ -82,13 +82,13 @@ TError TMemorySubsystem::Usage(shared_ptr<TCgroup> cg, uint64_t &value) const {
 }
 
 TError TMemorySubsystem::Statistics(std::shared_ptr<TCgroup> cg,
-                                    const std::string &name,
-                                    uint64_t &val) const {
+                                    std::function<int(std::string, uint64_t)> cb) const {
     vector<string> lines;
     TError error = cg->GetKnobValueAsLines("memory.stat", lines);
     if (error)
         return error;
 
+    int left;
     for (auto &line : lines) {
         vector<string> tokens;
         error = SplitString(line, ' ', tokens);
@@ -98,11 +98,29 @@ TError TMemorySubsystem::Statistics(std::shared_ptr<TCgroup> cg,
         if (tokens.size() != 2)
             continue;
 
-        if (tokens[0] == name)
-            return StringToUint64(tokens[1], val);
-    }
+        uint64_t val;
+        error = StringToUint64(tokens[1], val);
+        if (error)
+            return error;
 
-    return TError(EError::InvalidValue, "Invalid memory cgroup stat: " + name);
+        left = cb(tokens[0], val);
+        if (left <= 0)
+            break;
+    }
+    if (left)
+        return TError(EError::InvalidValue, "Invalid memory cgroup stat");
+    return TError::Success();
+}
+
+TError TMemorySubsystem::Statistics(std::shared_ptr<TCgroup> cg,
+                                    const std::string &name,
+                                    uint64_t &val) const {
+    return Statistics(cg, [&](std::string k, uint64_t v) -> int {
+        if (k != name)
+            return 1;
+        val = v;
+        return 0;
+    });
 }
 
 TError TMemorySubsystem::UseHierarchy(std::shared_ptr<TCgroup> cg, bool enable) const {

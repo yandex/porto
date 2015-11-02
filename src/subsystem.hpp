@@ -29,6 +29,8 @@ public:
     TMemorySubsystem() : TSubsystem("memory") {}
     TError Usage(std::shared_ptr<TCgroup> cg, uint64_t &value) const;
     TError Statistics(std::shared_ptr<TCgroup> cg,
+                      std::function<int(std::string, uint64_t)> cb) const;
+    TError Statistics(std::shared_ptr<TCgroup> cg,
                       const std::string &name,
                       uint64_t &val) const;
     TError UseHierarchy(std::shared_ptr<TCgroup> cg, bool enable) const;
