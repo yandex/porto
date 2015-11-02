@@ -362,12 +362,20 @@ public:
 
         auto memcg = GetContainer()->GetLeafCgroup(memorySubsystem);
 
-        uint64_t io_bytes, write_bytes;
-        error = memorySubsystem->Statistics(memcg, "fs_io_write_bytes", write_bytes);
+        uint64_t read_bytes = 0;
+        int left = 2;
+        error = memorySubsystem->Statistics(memcg, [&](std::string k, uint64_t v) -> int {
+            if (k == "fs_io_bytes") {
+                read_bytes += v;
+                left--;
+            } else if (k == "fs_io_write_bytes") {
+                read_bytes -= v;
+                left--;
+            }
+            return left;
+        });
         if (!error)
-            error = memorySubsystem->Statistics(memcg, "fs_io_bytes", io_bytes);
-        if (!error)
-            m["fs"] = io_bytes - write_bytes;
+            m["fs"] = read_bytes;
 
         auto blkcg = GetContainer()->GetLeafCgroup(blkioSubsystem);
 
