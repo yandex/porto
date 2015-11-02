@@ -664,8 +664,14 @@ public:
         /* Merge, not replace */
         TUintMap tmp = Get();
 
-        for (const auto& iter : value)
+        for (const auto &iter : value) {
+            if (iter.second == NET_MAP_WHITEOUT &&
+                iter.first != "default") {
+                tmp.erase(iter.first);
+                continue;
+            }
             tmp[iter.first] = iter.second;
+        }
 
         return TValue::Set(tmp);
     }
@@ -681,9 +687,12 @@ public:
     uint32_t GetDef() const override { return config().network().default_guarantee(); }
     uint32_t GetRootDef() const override { return config().network().default_max_guarantee(); }
     TError CheckValue(const TUintMap &value) override {
-        for (auto &kv : value)
+        for (auto &kv : value) {
+            if (kv.second == NET_MAP_WHITEOUT && kv.first != "default")
+                continue;
             if (kv.second > NET_MAX_GUARANTEE)
                 return TError(EError::InvalidValue, "Net guarantee too large");
+        }
 
         return TError::Success();
     }
@@ -699,9 +708,12 @@ public:
     uint32_t GetDef() const override { return config().network().default_limit(); }
     uint32_t GetRootDef() const override { return config().network().default_max_guarantee(); }
     TError CheckValue(const TUintMap &value) override {
-        for (auto &kv : value)
+        for (auto &kv : value) {
+            if (kv.second == NET_MAP_WHITEOUT && kv.first != "default")
+                continue;
             if (kv.second > NET_MAX_LIMIT)
                 return TError(EError::InvalidValue, "Net limit too large");
+        }
 
         return TError::Success();
     }
@@ -718,13 +730,12 @@ public:
     uint32_t GetRootDef() const override { return config().network().default_prio(); }
 
     TError CheckValue(const TUintMap &value) override {
-        TError error = TNetMapValue::CheckValue(value);
-        if (error)
-            return error;
-
-        for (auto &kv : value)
+        for (auto &kv : value) {
+            if (kv.second == NET_MAP_WHITEOUT && kv.first != "default")
+                continue;
             if (kv.second > 7)
                 return TError(EError::InvalidValue, "invalid value");
+        }
 
         return TError::Success();
     }

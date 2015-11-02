@@ -11,6 +11,7 @@ extern "C" {
 
 const uint64_t NET_MAX_LIMIT = 0xFFFFFFFF;
 const uint64_t NET_MAX_GUARANTEE = 0xFFFFFFFF;
+const uint64_t NET_MAP_WHITEOUT = 0xFFFFFFFFFFFFFFFF;
 
 struct nl_sock;
 struct rtnl_link;
