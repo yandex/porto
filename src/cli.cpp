@@ -149,15 +149,9 @@ int THelpCmd::Execute(TCommandEnviroment *env) {
     if (it == Handler.GetCommands().end()) {
         Usage();
     } else {
-        std::cerr << "Usage: " << program_invocation_short_name
-                  << " " << name << " " << it->second->GetUsage()
-                  << std::endl;
-        std::cerr << std::endl;
-        std::cerr << it->second->GetDescription() << std::endl;
-        std::cerr << it->second->GetHelp();
+        it->second->PrintUsage();
         ret = EXIT_SUCCESS;
     }
-    
     return ret;
 }
 }  // namespace
@@ -227,6 +221,12 @@ void ICmd::PrintError(const string &str) {
 
     TError error((EError)num, msg);
     PrintError(error, str);
+}
+
+void ICmd::PrintUsage() {
+    std::cerr << "Usage: " << program_invocation_short_name
+              << " " << Name << " " << Usage << std::endl
+              << std::endl << Desc << std::endl << Help;
 }
 
 bool ICmd::ValidArgs(const std::vector<std::string> &args) {

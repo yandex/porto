@@ -42,6 +42,7 @@ public:
     void PrintPair(const std::string &key, const std::string &val);
     void PrintError(const TError &error, const std::string &str);
     void PrintError(const std::string &str);
+    void PrintUsage();
     bool ValidArgs(const std::vector<std::string> &args);
     void SetDieOnSignal(bool die);
     void Signal(int sig);
