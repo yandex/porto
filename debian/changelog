@@ -1,3 +1,40 @@
+yandex-porto (2.6) precise; urgency=low
+
+  * net: treat 0 and 1 rate values as equal when comparing tc classes
+  * net: repair selftests after changing net properties syntax
+  * net: implement whiteouts for net prio/limit/guarantee
+  * net: allow setting net_guarantee to 0
+  * net: allow setting default prio/limit/guarantee
+  * docs: add links to Go API
+  * subsystem/memcg: report actual minor faults not the total count
+  * subsystem/memcg: use callback for capturing fsio read_bytes
+  * subsystem/memcg: add callback into statistics parsing
+  * portoctl/build: make output and script mandatory
+  * cli/ICmd: add method PrintUsage
+  * portoctl/exec: do not remove container if run failed
+  * selftest: use sort for triggering oom
+  * scripts/test: revert changelog changes after build
+  * container: always create and remove working directory
+  * util/log: simplify log file opening
+  * volumes/mount: replace TFolder with TPath
+  * util/path: add MkdirAll
+  * cleanup: remove config().network().enabled()/dynamic_ifaces()
+  * porto: report fsio statistics and use it in portoctl top
+  * portoctl: get command should print error if container does not exist
+  * porto: change mode of key-value files to 0600
+  * go API: initial version
+  * util/path: handle append-only and immutable files
+  * porto: cleanup log rotation
+  * porto: cleanup time management
+  * container: split GetName() and GetTextId()
+  * container: rename relative naming things
+  * volume/overlay: handle opaque directories
+  * volume/overlay: remove aufs metadata directories
+  * util/path: add RemoveAll()
+  * util/path: add IsDirectory() and IsRegular()
+
+ -- Roman Gushchin <klamm@yandex-team.ru>  Tue, 03 Nov 2015 17:19:50 +0300
+
 yandex-porto (2.5) precise; urgency=low
 
   * porto: rework container path limits (path <= 200, name <= 128)
