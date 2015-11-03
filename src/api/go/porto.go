@@ -21,20 +21,6 @@ func SendData(conn net.Conn, data []byte) error {
 	return err
 }
 
-func Append(slice, data []byte) []byte {
-	l := len(slice)
-	if l+len(data) > cap(slice) {
-		newSlice := make([]byte, (l+len(data))*2)
-		copy(newSlice, slice)
-		slice = newSlice
-	}
-	slice = slice[0 : l+len(data)]
-	for i, c := range data {
-		slice[l+i] = c
-	}
-	return slice
-}
-
 func RecvData(conn net.Conn) ([]byte, error) {
 	buf := make([]byte, 1024*1024)
 
@@ -52,7 +38,7 @@ func RecvData(conn net.Conn) ([]byte, error) {
 			return nil, err
 		}
 		len += tmp
-		ret = Append(ret, buf[0:tmp])
+		ret = append(ret, buf...)
 	}
 
 	return ret, nil
