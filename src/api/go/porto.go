@@ -292,11 +292,11 @@ func (conn *PortoConnection) Plist() (ret []TProperty, err error) {
 		PropertyList: new(rpc.TContainerPropertyListRequest),
 	}
 	resp, err := conn.PerformRequest(req)
-	plist := resp.GetPropertyList().GetList()
-	for prop := range plist {
-		var p TProperty
-		p.Name = plist[prop].GetName()
-		p.Description = plist[prop].GetDesc()
+	for _, property := range resp.GetPropertyList().GetList() {
+		var p = TProperty{
+			Name:        property.GetName(),
+			Description: property.GetDesc(),
+		}
 		ret = append(ret, p)
 	}
 	return ret, err
@@ -311,11 +311,11 @@ func (conn *PortoConnection) Dlist() (ret []TData, err error) {
 		return nil, err
 	}
 
-	dlist := resp.GetDataList().GetList()
-	for data := range dlist {
-		var p TData
-		p.Name = dlist[data].GetName()
-		p.Description = dlist[data].GetDesc()
+	for _, data := range resp.GetDataList().GetList() {
+		var p = TData{
+			Name:        data.GetName(),
+			Description: data.GetDesc(),
+		}
 		ret = append(ret, p)
 	}
 
@@ -336,19 +336,19 @@ func (conn *PortoConnection) Get(containers []string, variables []string) (ret m
 		return nil, err
 	}
 
-	for i := range resp.GetGet().GetList() {
-		item := resp.GetGet().GetList()[i]
-		_v := item.GetKeyval()
+	for _, item := range resp.GetGet().GetList() {
+		for _, value := range item.GetKeyval() {
+			var v = TPortoGetResponse{
+				Value:    value.GetValue(),
+				Error:    int(value.GetError()),
+				ErrorMsg: value.GetErrorMsg(),
+			}
 
-		for j := range _v {
-			var v TPortoGetResponse
-			v.Value = _v[j].GetValue()
-			v.Error = int(_v[j].GetError())
-			v.ErrorMsg = _v[j].GetErrorMsg()
-			if ret[item.GetName()] == nil {
+			if _, ok := ret[item.GetName()]; !ok {
 				ret[item.GetName()] = make(map[string]TPortoGetResponse)
 			}
-			ret[item.GetName()][_v[j].GetVariable()] = v
+
+			ret[item.GetName()][value.GetVariable()] = v
 		}
 	}
 	return ret, err
@@ -409,11 +409,11 @@ func (conn *PortoConnection) ListVolumeProperties() (ret []TProperty, err error)
 		return nil, err
 	}
 
-	for i := range resp.GetVolumePropertyList().GetProperties() {
-		prop := resp.GetVolumePropertyList().GetProperties()[i]
-		var desc TProperty
-		desc.Name = prop.GetName()
-		desc.Description = prop.GetDesc()
+	for _, property := range resp.GetVolumePropertyList().GetProperties() {
+		var desc = TProperty{
+			Name:        property.GetName(),
+			Description: property.GetDesc(),
+		}
 		ret = append(ret, desc)
 	}
 	return ret, err
@@ -488,18 +488,21 @@ func (conn *PortoConnection) ListVolumes(path string, container string) (ret []T
 	if container == "" {
 		req.ListVolumes.Container = nil
 	}
+
 	resp, err := conn.PerformRequest(req)
-	for i := range resp.GetVolumeList().GetVolumes() {
+	if err != nil {
+		return nil, err
+	}
+
+	for _, volume := range resp.GetVolumeList().GetVolumes() {
 		var desc TVolumeDescription
-		volume := resp.GetVolumeList().GetVolumes()[i]
 		desc.Path = volume.GetPath()
-		for i := range volume.GetContainers() {
-			desc.Containers = append(desc.Containers, volume.GetContainers()[i])
-		}
+		desc.Containers = append(desc.Containers, volume.GetContainers()...)
 		desc.Properties = make(map[string]string)
-		for i := range volume.GetProperties() {
-			k := volume.GetProperties()[i].GetName()
-			v := volume.GetProperties()[i].GetValue()
+
+		for _, property := range volume.GetProperties() {
+			k := property.GetName()
+			v := property.GetValue()
 			desc.Properties[k] = v
 		}
 		ret = append(ret, desc)
