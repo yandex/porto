@@ -3,9 +3,11 @@ package porto
 import (
 	"encoding/binary"
 	"errors"
-	"github.com/golang/protobuf/proto"
 	"net"
-	"porto/rpc"
+
+	"github.com/golang/protobuf/proto"
+
+	"github.com/yandex/porto/src/api/go/rpc"
 )
 
 const PortoSocket = "/var/run/portod.socket"
@@ -64,7 +66,12 @@ func (conn *PortoConnection) PerformRequest(req *rpc.TContainerRequest) (*rpc.TC
 	}
 
 	resp := new(rpc.TContainerResponse)
-	proto.Unmarshal(data, resp)
+
+	err = proto.Unmarshal(data, resp)
+	if err != nil {
+		return nil, err
+	}
+
 	conn.err = resp.GetError()
 	conn.msg = resp.GetErrorMsg()
 
@@ -172,7 +179,11 @@ func (conn *PortoConnection) GetLastErrorMessage() string {
 func (conn *PortoConnection) GetVersion() (string, string, error) {
 	req := &rpc.TContainerRequest{Version: new(rpc.TVersionRequest)}
 	resp, err := conn.PerformRequest(req)
-	return resp.GetVersion().GetTag(), resp.GetVersion().GetRevision(), err
+	if err != nil {
+		return "", "", err
+	}
+
+	return resp.GetVersion().GetTag(), resp.GetVersion().GetRevision(), nil
 }
 
 // ContainerAPI
@@ -222,13 +233,21 @@ func (conn *PortoConnection) Resume(name string) error {
 func (conn *PortoConnection) Wait(containers []string, timeout int) (string, error) {
 	req := &rpc.TContainerRequest{Wait: &rpc.TContainerWaitRequest{Name: containers}}
 	resp, err := conn.PerformRequest(req)
-	return resp.GetWait().GetName(), err
+	if err != nil {
+		return "", err
+	}
+
+	return resp.GetWait().GetName(), nil
 }
 
 func (conn *PortoConnection) List() ([]string, error) {
 	req := &rpc.TContainerRequest{List: new(rpc.TContainerListRequest)}
 	resp, err := conn.PerformRequest(req)
-	return resp.GetList().GetName(), err
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.GetList().GetName(), nil
 }
 
 func (conn *PortoConnection) Plist() (ret []TProperty, err error) {
@@ -247,6 +266,10 @@ func (conn *PortoConnection) Plist() (ret []TProperty, err error) {
 func (conn *PortoConnection) Dlist() (ret []TData, err error) {
 	req := &rpc.TContainerRequest{DataList: new(rpc.TContainerDataListRequest)}
 	resp, err := conn.PerformRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
 	dlist := resp.GetDataList().GetList()
 	for data := range dlist {
 		var p TData
@@ -254,7 +277,8 @@ func (conn *PortoConnection) Dlist() (ret []TData, err error) {
 		p.Description = dlist[data].GetDesc()
 		ret = append(ret, p)
 	}
-	return ret, err
+
+	return ret, nil
 }
 
 func (conn *PortoConnection) Get(containers []string, variables []string) (ret map[string]map[string]TPortoGetResponse, err error) {
@@ -262,6 +286,10 @@ func (conn *PortoConnection) Get(containers []string, variables []string) (ret m
 	req := &rpc.TContainerRequest{Get: &rpc.TContainerGetRequest{Name: containers,
 		Variable: variables}}
 	resp, err := conn.PerformRequest(req)
+	if err != nil {
+		return nil, err
+	}
+
 	for i := range resp.GetGet().GetList() {
 		item := resp.GetGet().GetList()[i]
 		_v := item.GetKeyval()
@@ -284,7 +312,11 @@ func (conn *PortoConnection) GetProperty(name string, property string) (string, 
 	req := &rpc.TContainerRequest{GetProperty: &rpc.TContainerGetPropertyRequest{
 		Name: &name, Property: &property}}
 	resp, err := conn.PerformRequest(req)
-	return resp.GetGetProperty().GetValue(), err
+	if err != nil {
+		return "", err
+	}
+
+	return resp.GetGetProperty().GetValue(), nil
 }
 
 func (conn *PortoConnection) SetProperty(name string, property string, value string) error {
@@ -298,7 +330,11 @@ func (conn *PortoConnection) GetData(name string, data string) (string, error) {
 	req := &rpc.TContainerRequest{GetData: &rpc.TContainerGetDataRequest{
 		Name: &name, Data: &data}}
 	resp, err := conn.PerformRequest(req)
-	return resp.GetGetData().GetValue(), err
+	if err != nil {
+		return "", err
+	}
+
+	return resp.GetGetData().GetValue(), nil
 }
 
 // VolumeAPI
@@ -405,5 +441,9 @@ func (conn *PortoConnection) RemoveLayer(layer string) error {
 func (conn *PortoConnection) ListLayers() ([]string, error) {
 	req := &rpc.TContainerRequest{ListLayers: &rpc.TLayerListRequest{}}
 	resp, err := conn.PerformRequest(req)
-	return resp.GetLayers().GetLayer(), err
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.GetLayers().GetLayer(), nil
 }
