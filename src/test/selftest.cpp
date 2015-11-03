@@ -35,7 +35,7 @@ const std::string oomMemoryLimit = "32M";
 const std::string oomCommand = "sort -S 1G /dev/urandom";
 
 const uint32_t DEF_CLASS_MAX_RATE = -1;
-const uint32_t DEF_CLASS_RATE = 1;
+const uint32_t DEF_CLASS_RATE = 0;
 const uint32_t DEF_CLASS_CEIL = DEF_CLASS_MAX_RATE;
 const uint32_t DEF_CLASS_NET_PRIO = 3;
 
@@ -151,16 +151,15 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
         ExpectEq(v, "0");
     }
 
-    for (auto &link : links) {
-        ExpectApiSuccess(api.GetProperty(name, "net_guarantee[" + link->GetAlias() + "]", v));
-        ExpectEq(v, std::to_string(DEF_CLASS_RATE));
-        ExpectApiSuccess(api.GetProperty(name, "net_limit[" + link->GetAlias() + "]", v));
-        ExpectEq(v, std::to_string(DEF_CLASS_CEIL));
-        ExpectApiSuccess(api.GetProperty(name, "net_priority[" + link->GetAlias() + "]", v));
-        ExpectEq(v, std::to_string(DEF_CLASS_NET_PRIO));
-        ExpectApiSuccess(api.GetProperty(name, "net", v));
-        ExpectEq(v, "inherited");
-    }
+    ExpectApiSuccess(api.GetProperty(name, "net_guarantee[default]", v));
+    ExpectEq(v, std::to_string(DEF_CLASS_RATE));
+    ExpectApiSuccess(api.GetProperty(name, "net_limit[default]", v));
+    ExpectEq(v, std::to_string(DEF_CLASS_CEIL));
+    ExpectApiSuccess(api.GetProperty(name, "net_priority[default]", v));
+    ExpectEq(v, std::to_string(DEF_CLASS_NET_PRIO));
+
+    ExpectApiSuccess(api.GetProperty(name, "net", v));
+    ExpectEq(v, "inherited");
 
     ExpectApiSuccess(api.GetProperty(name, "respawn", v));
     ExpectEq(v, string("false"));
@@ -3413,7 +3412,7 @@ static void TestLimits(TPortoAPI &api) {
     for (auto &link : links) {
         ExpectApiSuccess(api.SetProperty(name, "net_guarantee[" + link->GetAlias() + "]", std::to_string(netGuarantee + i)));
         ExpectApiSuccess(api.SetProperty(name, "net_limit[" + link->GetAlias() + "]", std::to_string(netCeil + i)));
-        ExpectApiFailure(api.SetProperty(name, "net_priority[" + link->GetAlias() + "]", "-1"), EError::InvalidValue);
+        ExpectApiFailure(api.SetProperty(name, "net_priority[" + link->GetAlias() + "]", "-2"), EError::InvalidValue);
         ExpectApiFailure(api.SetProperty(name, "net_priority[" + link->GetAlias() + "]", "8"), EError::InvalidValue);
         ExpectApiSuccess(api.SetProperty(name, "net_priority[" + link->GetAlias() + "]", "0"));
         ExpectApiSuccess(api.SetProperty(name, "net_priority[" + link->GetAlias() + "]", std::to_string(netPrio + i)));
