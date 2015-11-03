@@ -809,6 +809,13 @@ TError TNlClass::GetProperties(uint32_t &prio, uint32_t &rate, uint32_t &ceil) {
 bool TNlClass::Valid(uint32_t prio, uint32_t rate, uint32_t ceil) {
     bool valid = true;
 
+    /*
+     * TC doesn't allow to set 0 rate, but Porto does (because we call them
+     * net_guarantee). So, just map 0 to 1, minimal valid guarantee.
+     */
+    if (rate == 0)
+        rate = 1;
+
     auto realParent = Parent;
     if (realParent == TcHandle(1, 0))
         realParent = TC_H_ROOT;
