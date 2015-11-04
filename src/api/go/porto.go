@@ -3,6 +3,7 @@ package porto
 import (
 	"encoding/binary"
 	"errors"
+	"io"
 	"net"
 
 	"github.com/golang/protobuf/proto"
@@ -12,10 +13,12 @@ import (
 
 const PortoSocket = "/var/run/portod.socket"
 
-func SendData(conn net.Conn, data []byte) error {
+func SendData(conn io.Writer, data []byte) error {
+	// First we have to send actual data size,
+	// then the data itself
 	buf := make([]byte, 64)
 	len := binary.PutUvarint(buf, uint64(len(data)))
-	_, err := conn.Write(buf[0:len])
+	_, err := conn.Write(buf[:len])
 	if err != nil {
 		return err
 	}
@@ -23,24 +26,32 @@ func SendData(conn net.Conn, data []byte) error {
 	return err
 }
 
-func RecvData(conn net.Conn) ([]byte, error) {
+func RecvData(conn io.Reader) ([]byte, error) {
 	buf := make([]byte, 1024*1024)
 
 	len, err := conn.Read(buf)
 	if err != nil {
 		return nil, err
 	}
+
 	exp, shift := binary.Uvarint(buf)
 
-	ret := buf[shift:]
+	// length of result is exp,
+	// so preallocate a buffer for it.
+	var ret = make([]byte, exp)
+	// bytes after an encoded uint64 and up to len
+	// are belong to a packed structure, so copy them
+	copy(ret, buf[shift:len])
 
-	for uint64(len+shift) < exp {
-		tmp, err := conn.Read(buf)
+	// we don't need to check that
+	// len > shift, as we ask to read enough data
+	// to decode uint64. Otherwise we would have an error before.
+	for pos := len - shift; uint64(pos) < exp; {
+		n, err := conn.Read(ret[pos:])
 		if err != nil {
 			return nil, err
 		}
-		len += tmp
-		ret = append(ret, buf...)
+		pos += n
 	}
 
 	return ret, nil
