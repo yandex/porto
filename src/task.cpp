@@ -329,8 +329,8 @@ TError TTask::ChildBindDirectores() {
 
         // drop nosuid,noexec,nodev from volumes
         if (Env->NewMountNs) {
-            error = TMount::Remount(dest, MS_REMOUNT | MS_BIND |
-                                    (bindMap.Rdonly ? MS_RDONLY : 0));
+            error = dest.Remount(MS_REMOUNT | MS_BIND |
+                                 (bindMap.Rdonly ? MS_RDONLY : 0));
             if (error)
                 return error;
         }
@@ -480,9 +480,7 @@ TError TTask::ChildRemountRootRo() {
         if (skip)
             continue;
 
-        L_ACT() << "Remount " << path << " ro" << std::endl;
-        error =  TMount::Remount(mnt->GetMountpoint(),
-                                 MS_REMOUNT | MS_BIND | MS_RDONLY);
+        error = mnt->GetMountpoint().Remount(MS_REMOUNT | MS_BIND | MS_RDONLY);
         if (error)
             return error;
     }
@@ -566,8 +564,8 @@ TError TTask::ChildIsolateFs() {
     }
 
     // Allow suid binaries and device nodes at container root.
-    error = TMount::Remount("/", MS_REMOUNT | MS_BIND |
-                                 (Env->RootRdOnly ? MS_RDONLY : 0));
+    error = TPath("/").Remount(MS_REMOUNT | MS_BIND |
+                               (Env->RootRdOnly ? MS_RDONLY : 0));
     if (error) {
         L_ERR() << "Can't remount / as suid and dev:" << error << std::endl;
         return error;
@@ -788,7 +786,7 @@ void TTask::StartChild() {
 
     if (Env->NewMountNs) {
         // Remount to slave to receive propogations from parent namespace
-        error = TMount::Remount("/", MS_REC | MS_SLAVE);
+        error = TPath("/").Remount(MS_SLAVE | MS_REC);
         if (error)
             Abort(error);
     }
@@ -836,7 +834,7 @@ void TTask::StartChild() {
 
     if (Env->NewMountNs) {
         // Make all shared: subcontainers will get propgation from us
-        error = TMount::Remount("/", MS_REC | MS_SHARED);
+        error = TPath("/").Remount(MS_SHARED | MS_REC);
         if (error)
             Abort(error);
     }

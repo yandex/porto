@@ -177,12 +177,6 @@ TError TMount::MountDir(unsigned long flags) const {
     return Mount(flags);
 }
 
-TError TMount::Remount(TPath path, unsigned long flags) {
-    if (mount(NULL, path.c_str(), NULL, flags, NULL))
-        return TError(EError::Unknown, errno, "mount(NULL, " + path.ToString() + ", NULL, " + std::to_string(flags) + ", NULL)");
-    return TError::Success();
-}
-
 TError SetupLoopDevice(TPath image, int &dev)
 {
     static std::mutex BigLoopLock;

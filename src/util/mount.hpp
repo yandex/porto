@@ -52,8 +52,6 @@ public:
     static TError Snapshot(std::vector<std::shared_ptr<TMount>> &result,
                            const TPath mounts = "/proc/self/mounts");
 
-    static TError Remount(TPath path, unsigned long flags);
-
     TError Mount(unsigned long flags = 0) const;
     TError Bind(bool rdonly, unsigned long flags = 0) const;
     TError BindFile(bool rdonly, unsigned long flags = 0) const;
