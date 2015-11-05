@@ -117,45 +117,6 @@ TError TFolder::Items(const EFileType type, std::vector<std::string> &list) cons
     return TError::Success();
 }
 
-TError TFolder::Copy(const TPath &dir) const {
-    L_ACT() << "cp " << Path << " " << dir << std::endl;
-
-    std::vector<std::string> list;
-    TError error = Items(EFileType::Any, list);
-    if (error)
-        return error;
-
-    for (auto &entry : list) {
-        TPath from(Path / entry);
-        TPath to(dir / entry);
-        TFolder fromDir(from);
-        TFolder toDir(to);
-        switch(from.GetType()) {
-        case EFileType::Directory:
-            if (!toDir.Exists()) {
-                error = toDir.Create(from.GetMode(), true);
-                if (error)
-                    return error;
-            }
-
-            error = fromDir.Copy(to);
-            break;
-        default:
-            error = from.Copy(to);
-            break;
-        }
-
-        if (error)
-            return error;
-
-        error = to.Chown(from.GetUid(), from.GetGid());
-        if (error)
-            return error;
-    }
-
-    return TError::Success();
-}
-
 void RemoveIf(const TPath &path,
               EFileType type,
               std::function<bool(const std::string &name, const TPath &path)> f) {
