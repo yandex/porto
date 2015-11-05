@@ -1742,7 +1742,7 @@ static void TestRootProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "command", "/ls -1 /dev"));
     v = StartWaitAndGetData(api, name, "stdout");
 
-    vector<string> devs = { "null", "zero", "full", "urandom", "random", "console" };
+    vector<string> devs = { "null", "zero", "full", "urandom", "random", "console", "tty" };
     vector<string> other = { "ptmx", "pts", "shm", "fd" };
     vector<string> tokens;
     TError error = SplitString(v, '\n', tokens);
@@ -3540,7 +3540,7 @@ static void TestVirtModeProperty(TPortoAPI &api) {
         { "bind_dns", "false" },
         { "bind", "" },
         { "cwd", "/" },
-        { "allowed_devices", "c 1:3 rwm; c 1:5 rwm; c 1:7 rwm; c 1:9 rwm; c 1:8 rwm; c 136:* rw; c 5:2 rwm; c 254:0 rm; c 254:0 rm; c 10:237 rmw; b 7:* rmw" },
+        { "allowed_devices", "c 1:3 rwm; c 1:5 rwm; c 1:7 rwm; c 1:8 rwm; c 1:9 rwm; c 5:0 rwm; c 5:2 rwm; c 136:* rw; c 254:0 rm; c 10:237 rmw; b 7:* rmw" },
         { "capabilities", "CHOWN; DAC_OVERRIDE; FOWNER; FSETID; IPC_LOCK; KILL; NET_ADMIN; NET_BIND_SERVICE; NET_RAW; SETGID; SETUID; SYS_CHROOT; SYS_RESOURCE" },
     };
     std::string s;

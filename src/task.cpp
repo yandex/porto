@@ -437,6 +437,7 @@ TError TTask::ChildMountRootFs() {
         { "/dev/full",    0666 | S_IFCHR, MKDEV(1, 7) },
         { "/dev/random",  0666 | S_IFCHR, MKDEV(1, 8) },
         { "/dev/urandom", 0666 | S_IFCHR, MKDEV(1, 9) },
+        { "/dev/tty",     0666 | S_IFCHR, MKDEV(5, 0) },
         { "/dev/console", 0600 | S_IFCHR, MKDEV(1, 3) }, /* to /dev/null */
     };
 
