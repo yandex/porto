@@ -38,22 +38,22 @@ public:
 
 class TKeyValueStorage : public std::enable_shared_from_this<TKeyValueStorage>,
                          public TLockable, public TNonCopyable {
-    const TMount Tmpfs;
+    const TPath Root;
     const size_t DirnameLen;
 
     TPath ToPath(const std::string &name) const;
 
 public:
-    TError MountTmpfs();
+    TError MountTmpfs(std::string size);
 
-    TKeyValueStorage(const TMount &mount);
+    TKeyValueStorage(const TPath root);
 
     std::shared_ptr<TKeyValueNode> GetNode(const TPath &path);
     std::shared_ptr<TKeyValueNode> GetNode(uint16_t id);
     TError Dump();
     TError ListNodes(std::vector<std::shared_ptr<TKeyValueNode>> &list);
     TError Destroy();
-    std::string GetRoot() const { return Tmpfs.GetMountpoint().ToString() + "/"; }
+    std::string GetRoot() const { return Root.ToString() + "/"; }
 
     static TError Get(const kv::TNode &node, const std::string &name, std::string &val);
     static std::string FromPath(const std::string &path);

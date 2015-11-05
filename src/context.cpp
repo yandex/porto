@@ -12,8 +12,8 @@
 #include "util/mount.hpp"
 
 TContext::TContext() {
-    Storage = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().keyval().file().path(), "tmpfs", { config().keyval().size() }));
-    VolumeStorage = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().volumes().keyval().file().path(), "tmpfs", { config().volumes().keyval().size() }));
+    Storage = std::make_shared<TKeyValueStorage>(config().keyval().file().path());
+    VolumeStorage = std::make_shared<TKeyValueStorage>(config().volumes().keyval().file().path());
     Net = std::make_shared<TNetwork>();
     EpollLoop = std::make_shared<TEpollLoop>();
     Cholder = std::make_shared<TContainerHolder>(EpollLoop, Net, Storage);
@@ -57,10 +57,10 @@ TError TContext::Initialize() {
         return error;
 
     // don't fail, try to recover anyway
-    error = Storage->MountTmpfs();
+    error = Storage->MountTmpfs(config().keyval().size());
     if (error)
         L_ERR() << "Can't create key-value storage, skipping recovery: " << error << std::endl;
-    error = VolumeStorage->MountTmpfs();
+    error = VolumeStorage->MountTmpfs(config().volumes().keyval().size());
     if (error)
         L_ERR() << "Can't create key-value storage, skipping recovery: " << error << std::endl;
 

@@ -27,7 +27,7 @@ TPath TKeyValueStorage::ToPath(const std::string &name) const {
     for (std::string::size_type i = 0; i < s.length(); i++)
         if (s[i] == '/')
             s[i] = SLASH_SUBST;
-    return Tmpfs.GetMountpoint() / s;
+    return Root / s;
 }
 
 std::string TKeyValueStorage::FromPath(const std::string &path) {
@@ -137,10 +137,10 @@ TError TKeyValueNode::Remove() const {
     return node.Remove();
 }
 
-TKeyValueStorage::TKeyValueStorage(const TMount &mount) :
-    Tmpfs(mount), DirnameLen((Tmpfs.GetMountpoint().ToString() + "/").length()) {}
+TKeyValueStorage::TKeyValueStorage(const TPath root) :
+    Root(root), DirnameLen(root.ToString().length() + 1) {}
 
-TError TKeyValueStorage::MountTmpfs() {
+TError TKeyValueStorage::MountTmpfs(std::string size) {
     vector<shared_ptr<TMount>> mounts;
     TError error = TMount::Snapshot(mounts);
     if (error) {
@@ -148,9 +148,9 @@ TError TKeyValueStorage::MountTmpfs() {
         return error;
     }
 
-    TFolder dir(Tmpfs.GetMountpoint());
+    TFolder dir(Root);
     for (auto m : mounts)
-        if (m->GetMountpoint() == Tmpfs.GetMountpoint()) {
+        if (m->GetMountpoint() == Root) {
             // FIXME remove when all users are updated to v0.28
             // make sure permissions of existing directory are correct
             error = dir.GetPath().Chmod(config().keyval().file().perm());
@@ -172,7 +172,9 @@ TError TKeyValueStorage::MountTmpfs() {
         }
     }
 
-    error = Tmpfs.Mount();
+    error = Root.Mount("tmpfs", "tmpfs",
+                       MS_NOEXEC | MS_NOSUID | MS_NODEV,
+                       { size });
     if (error)
         L_ERR() << "Can't mount key-value tmpfs: " << error << std::endl;
     return error;
@@ -191,13 +193,13 @@ std::shared_ptr<TKeyValueNode> TKeyValueStorage::GetNode(uint16_t id) {
 
 TError TKeyValueStorage::ListNodes(std::vector<std::shared_ptr<TKeyValueNode>> &list) {
     vector<string> tmp;
-    TFolder f(Tmpfs.GetMountpoint());
+    TFolder f(Root);
     TError error = f.Items(EFileType::Regular, tmp);
     if (error)
         return error;
 
     for (auto s : tmp)
-        list.push_back(GetNode(Tmpfs.GetMountpoint() / s));
+        list.push_back(GetNode(Root / s));
 
     return TError::Success();
 }
@@ -236,7 +238,7 @@ TError TKeyValueStorage::Dump() {
 }
 
 TError TKeyValueStorage::Destroy() {
-    return Tmpfs.Umount();
+    return Root.Umount(UMOUNT_NOFOLLOW);
 }
 
 TError TKeyValueNode::Create() const {

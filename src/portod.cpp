@@ -482,15 +482,15 @@ exit:
 static void KvDump() {
     TLogger::OpenLog(true, "", 0);
 
-    auto containers = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().keyval().file().path(), "tmpfs", { config().keyval().size() }));
-    TError error = containers->MountTmpfs();
+    auto containers = std::make_shared<TKeyValueStorage>(config().keyval().file().path());
+    TError error = containers->MountTmpfs(config().keyval().size());
     if (error)
         L_ERR() << "Can't mount containers key-value storage: " << error << std::endl;
     else
         containers->Dump();
 
-    auto volumes = std::make_shared<TKeyValueStorage>(TMount("tmpfs", config().volumes().keyval().file().path(), "tmpfs", { config().volumes().keyval().size() }));
-    error = volumes->MountTmpfs();
+    auto volumes = std::make_shared<TKeyValueStorage>(config().volumes().keyval().file().path());
+    error = volumes->MountTmpfs(config().volumes().keyval().size());
     if (error)
         L_ERR() << "Can't mount volumes key-value storage: " << error << std::endl;
     else
