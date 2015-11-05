@@ -59,7 +59,6 @@ public:
     TError MountDir(unsigned long flags = 0) const;
     TError Umount(int flags = UMOUNT_NOFOLLOW) const;
     TError Move(TPath destination);
-    TError Detach() const;
 
     bool HasFlag(const std::string flag) const {
         return std::find(Data.begin(), Data.end(), flag) != Data.end();

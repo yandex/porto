@@ -77,17 +77,10 @@ public:
     }
 
     TError Destroy() override {
-        auto storage = Volume->GetStorage();
-        TMount Mount(storage, Volume->GetPath(), "none", {});
-        TError error = Mount.Umount();
-        if (error) {
+        TPath path = Volume->GetPath();
+        TError error = path.UmountAll();
+        if (error)
             L_ERR() << "Can't umount volume: " << error << std::endl;
-            if (error.GetErrno() != EINVAL) {
-                L_ACT() << "Detach mount " << Mount.GetMountpoint() << std::endl;
-                (void)Mount.Detach();
-            }
-        }
-
         return error;
     }
 
@@ -153,17 +146,13 @@ public:
 
     TError Destroy() override {
         auto storage = Volume->GetStorage();
-        TMount mount(storage, Volume->GetPath(), "none", {});
-        TError error = mount.Umount(), error2;
-        if (error) {
+        auto path = Volume->GetPath();
+        TError error = path.UmountAll();
+        if (error)
             L_ERR() << "Can't umount volume: " << error << std::endl;
-            if (error.GetErrno() != EINVAL) {
-                L_ACT() << "Detach mount " << mount.GetMountpoint() << std::endl;
-                (void)mount.Detach();
-            }
-        }
 
-        error2 = mount.Find(storage);
+        TMount mount;
+        TError error2 = mount.Find(storage);
         if (error2) {
             L_ERR() << "Can't find storage mount: " << error2 << std::endl;
         } else if (config().volumes().enable_quota() &&
@@ -230,7 +219,7 @@ public:
         TPath path = Volume->GetPath();
         TPath image = GetLoopImage();
         uint64_t space_limit, inode_limit;
-        TError error, error2;
+        TError error;
 
         Volume->GetQuota(space_limit, inode_limit);
         if (!space_limit)
@@ -249,8 +238,7 @@ public:
         if (error)
             return error;
 
-        TMount mount(GetLoopDevice(), path, "ext4", {});
-        error = mount.Mount(Volume->GetMountFlags());
+        error = path.Mount(GetLoopDevice(), "ext4", Volume->GetMountFlags(), {});
         if (error)
             goto free_loop;
 
@@ -267,11 +255,7 @@ public:
         return TError::Success();
 
 umount_loop:
-        error2 = mount.Umount();
-        if (error2 && error2.GetErrno() != EINVAL) {
-            L_ACT() << "Detach mount " << mount.GetMountpoint() << std::endl;
-            (void)mount.Detach();
-        }
+        (void)path.UmountAll();
 free_loop:
         PutLoopDev(LoopDev);
         LoopDev = -1;
@@ -281,18 +265,12 @@ free_loop:
     TError Destroy() override {
         TPath loop = GetLoopDevice();
         TPath path = Volume->GetPath();
-        TError error;
 
         if (LoopDev < 0)
             return TError::Success();
 
         L_ACT() << "Destroy loop " << loop << std::endl;
-        TMount mount(loop, path, "ext4", {});
-        error = mount.Umount();
-        if (error && error.GetErrno() != EINVAL) {
-            L_ACT() << "Detach volume " << mount.GetMountpoint() << std::endl;
-            (void)mount.Detach();
-        }
+        TError error = path.UmountAll();
         TError error2 = PutLoopDev(LoopDev);
         if (!error)
             error = error2;
@@ -422,15 +400,12 @@ err:
 
     TError Destroy() override {
         TPath storage = Volume->GetStorage();
-        TMount mount("overlay", Volume->GetPath(), "overlay", {});
-        TError error = mount.Umount(), error2;
-        if (error) {
+        TPath path = Volume->GetPath();
+        TError error, error2;
+
+        error = path.UmountAll();
+        if (error)
             L_ERR() << "Can't umount overlay: " << error << std::endl;
-            if (error.GetErrno() != EINVAL) {
-                L_ACT() << "Detach mount " << mount.GetMountpoint() << std::endl;
-                (void)mount.Detach();
-            }
-        }
 
         if (Volume->IsAutoStorage()) {
             error2 = storage.ClearDirectory();
@@ -583,13 +558,7 @@ public:
         if (DeviceIndex < 0)
             return TError::Success();
 
-        TMount mount(device, path, "ext4", {});
-        error = mount.Umount();
-        if (error && error.GetErrno() != EINVAL) {
-            L_ACT() << "Detach volume " << mount.GetMountpoint() << std::endl;
-            (void)mount.Detach();
-        }
-
+        error = path.UmountAll();
         error2 = UnmapDevice(device);
         if (!error)
             error = error2;
@@ -1307,13 +1276,9 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
         TPath dir = volumes / dir_name;
         TPath mnt = dir / "volume";
         if (mnt.Exists()) {
-            TMount mount(mnt, mnt, "", {});
-            error = mount.Umount();
-            if (error && error.GetErrno() != EINVAL) {
-                L_ERR() << "Cannot umount volume directory " << mnt << ": " << error << std::endl;
-                error = mount.Umount(UMOUNT_NOFOLLOW | MNT_DETACH | MNT_FORCE);
-                L_ERR() << "Detach umount of " << mnt << ": " << error << std::endl;
-            }
+            error = mnt.UmountAll();
+            if (error)
+                L_ERR() << "Cannot umount volume " << mnt << ": " << error << std::endl;
         }
         error = dir.RemoveAll();
         if (error)

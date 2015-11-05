@@ -115,13 +115,6 @@ TError TMount::Move(TPath destination) {
     return TError::Success();
 }
 
-TError TMount::Detach() const {
-    int ret = umount2(Target.ToString().c_str(), MNT_DETACH | UMOUNT_NOFOLLOW);
-    if (ret)
-        return TError(EError::Unknown, errno, "umount2(" + Target.ToString() + ", MNT_DETACH | UMOUNT_NOFOLLOW)");
-    return TError::Success();
-}
-
 TError TMount::Bind(bool rdonly, unsigned long flags) const {
     TError error = Mount(MS_BIND);
     if (error)

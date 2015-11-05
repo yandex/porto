@@ -793,11 +793,12 @@ void TTask::StartChild() {
 
     if (Env->Isolate) {
         // remount proc so PID namespace works
-        TMount tmpProc("proc", "/proc", "proc", {});
-        error = tmpProc.Detach();
+        TPath tmpProc("/proc");
+        error = tmpProc.UmountAll();
         if (error)
             Abort(error);
-        error = tmpProc.MountDir();
+        error = tmpProc.Mount("proc", "proc",
+                              MS_NOEXEC | MS_NOSUID | MS_NODEV, {});
         if (error)
             Abort(error);
     }
