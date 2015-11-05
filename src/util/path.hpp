@@ -4,6 +4,7 @@
 #include <functional>
 
 #include "error.hpp"
+#include "string.hpp"
 #include "util/cred.hpp"
 
 enum class EFileType {
@@ -120,4 +121,17 @@ public:
     TError SetXAttr(const std::string name, const std::string value) const;
     TError RotateLog(off_t max_disk_usage) const;
     TError Chattr(unsigned add_flags, unsigned del_flags) const;
+
+
+    static const TFlagsNames MountFlags;
+    static const TFlagsNames UmountFlags;
+    static std::string MountFlagsToString(unsigned long flags);
+    static std::string UmountFlagsToString(unsigned long flags);
+
+    TError Mount(TPath source, std::string type, unsigned long flags,
+                 std::vector<std::string> options) const;
+    TError Bind(TPath source, unsigned long flags) const;
+    TError Remount(unsigned long flags) const;
+    TError Umount(unsigned long flags) const;
+    TError UmountAll() const;
 };

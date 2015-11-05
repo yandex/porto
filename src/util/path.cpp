@@ -727,3 +727,97 @@ TError TPath::Chattr(unsigned add_flags, unsigned del_flags) const {
     close(fd);
     return error;
 }
+
+#ifndef MS_LAZYTIME
+# define MS_LAZYTIME    (1<<25)
+#endif
+
+const TFlagsNames TPath::MountFlags = {
+    { MS_RDONLY,        "ro" },
+    { MS_NOSUID,        "nosuid" },
+    { MS_NODEV,         "nodev" },
+    { MS_NOEXEC,        "noexec" },
+    { MS_SYNCHRONOUS,   "sync" },
+    { MS_REMOUNT,       "remount" },
+    { MS_MANDLOCK,      "mand" },
+    { MS_DIRSYNC,       "dirsync" },
+    { MS_NOATIME,       "noatime" },
+    { MS_NODIRATIME,    "nodiratime" },
+    { MS_BIND,          "bind" },
+    { MS_MOVE,          "move" },
+    { MS_REC,           "rec" },
+    { MS_SILENT,        "silent" },
+    { MS_POSIXACL,      "acl" },
+    { MS_UNBINDABLE,    "unbindable" },
+    { MS_PRIVATE,       "private" },
+    { MS_SLAVE,         "slave" },
+    { MS_SHARED,        "shared" },
+    { MS_RELATIME,      "relatime" },
+    { MS_I_VERSION,     "iversion" },
+    { MS_STRICTATIME,   "strictatime" },
+    { MS_LAZYTIME,      "lazyatime" },
+};
+
+const TFlagsNames TPath::UmountFlags = {
+    { MNT_FORCE,        "force" },
+    { MNT_DETACH,       "detach" },
+    { MNT_EXPIRE,       "expire" },
+    { UMOUNT_NOFOLLOW,  "nofollow" },
+};
+
+std::string TPath::MountFlagsToString(unsigned long flags) {
+    return FlagsToString(flags, MountFlags);
+}
+
+std::string TPath::UmountFlagsToString(unsigned long flags) {
+    return FlagsToString(flags, UmountFlags);
+}
+
+TError TPath::Mount(TPath source, std::string type, unsigned long flags,
+                    std::vector<std::string> options) const {
+    std::string data = CommaSeparatedList(options);
+    L_ACT() << "mount -t " << type << " " << source << " " << Path
+            << " -o " << data <<  " " << MountFlagsToString(flags) << std::endl;
+    if (mount(source.c_str(), Path.c_str(), type.c_str(), flags, data.c_str()))
+        TError(EError::Unknown, errno, "mount(" + source.ToString() + ", " +
+                Path + ", " + type + ", " + MountFlagsToString(flags) + ", " + data + ")");
+    return TError::Success();
+}
+
+TError TPath::Bind(TPath source, unsigned long flags) const {
+    L_ACT() << "bind mount " << Path << " " << source << " "
+            << MountFlagsToString(flags) << std::endl;
+    if (mount(source.c_str(), Path.c_str(), NULL, MS_BIND | flags, NULL))
+        return TError(EError::Unknown, errno, "mount(" + source.ToString() +
+                ", " + Path + ", , " + MountFlagsToString(flags) + ", )");
+    if (flags & ~(MS_BIND | MS_REC))
+        return Remount(MS_BIND | MS_REMOUNT | flags);
+    return TError::Success();
+}
+
+TError TPath::Remount(unsigned long flags) const {
+    L_ACT() << "remount " << Path << " "
+            << MountFlagsToString(flags) << std::endl;
+    if (mount(NULL, Path.c_str(), NULL, flags, NULL))
+        return TError(EError::Unknown, errno, "mount(NULL, " + Path +
+                      ", NULL, " + MountFlagsToString(flags) + ", NULL)");
+    return TError::Success();
+}
+
+TError TPath::Umount(unsigned long flags) const {
+    L_ACT() << "umount " << Path << " "
+            << UmountFlagsToString(flags) << std::endl;
+    if (umount2(Path.c_str(), flags))
+        return TError(EError::Unknown, errno, "umount2(" + Path + ", " +
+                                        UmountFlagsToString(flags) +  ")");
+    return TError::Success();
+}
+
+TError TPath::UmountAll() const {
+    TError error = Umount(UMOUNT_NOFOLLOW);
+    if (error && error.GetErrno() == EINVAL)
+        return TError::Success(); /* not a mountpoint */
+    if (error)
+        error = Umount(UMOUNT_NOFOLLOW | MNT_DETACH);
+    return error;
+}
