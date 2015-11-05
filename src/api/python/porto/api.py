@@ -257,6 +257,66 @@ class _RPC(object):
             raise exceptions.EError.Create(resp.error, resp.errorMsg)
         return resp.wait.name
 
+    def ListVolumeProperties(self):
+        request = rpc_pb2.TContainerRequest()
+        request.listVolumeProperties.CopyFrom(rpc_pb2.TVolumePropertyListRequest())
+        return self.call(request, self.timeout).volumePropertyList.properties
+
+    def ListVolumes(self, path=None, container=None):
+        request = rpc_pb2.TContainerRequest()
+        request.listVolumes.CopyFrom(rpc_pb2.TVolumeListRequest())
+        if path:
+            request.listVolumes.path = path
+        if container:
+            request.listVolumes.container = container
+        return self.call(request, self.timeout).volumeList.volumes
+
+    def CreateVolume(self, path=None, **properties):
+        request = rpc_pb2.TContainerRequest()
+        request.createVolume.CopyFrom(rpc_pb2.TVolumeCreateRequest())
+        if path:
+            request.createVolume.path = path
+        for name, value in properties.iteritems():
+            prop = request.createVolume.properties.add()
+            prop.name, prop.value = name, value
+        return self.call(request, self.timeout).volume
+
+    def LinkVolume(self, path, container):
+        request = rpc_pb2.TContainerRequest()
+        request.linkVolume.path = path
+        request.linkVolume.container = container
+        self.call(request, self.timeout)
+
+    def UnlinkVolume(self, path, container=None):
+        request = rpc_pb2.TContainerRequest()
+        request.unlinkVolume.path = path
+        if container:
+            request.unlinkVolume.container = container
+        self.call(request, self.timeout)
+
+    def ImportLayer(self, layer, tarball, merge=False):
+        request = rpc_pb2.TContainerRequest()
+        request.importLayer.layer = layer
+        request.importLayer.tarball = tarball
+        request.importLayer.merge = merge
+        self.call(request, self.timeout)
+
+    def ExportLayer(self, volume, tarball):
+        request = rpc_pb2.TContainerRequest()
+        request.exportLayer.volume = volume
+        request.exportLayer.tarball = tarball
+        self.call(request, self.timeout)
+
+    def RemoveLayer(self, layer):
+        request = rpc_pb2.TContainerRequest()
+        request.removeLayer.layer = layer
+        self.call(request, self.timeout)
+
+    def ListLayers(self):
+        request = rpc_pb2.TContainerRequest()
+        request.listLayers.CopyFrom(rpc_pb2.TLayerListRequest())
+        return self.call(request, self.timeout).layers.layer
+
 class Container(object):
     def __init__(self, rpc, name):
         self.rpc = rpc
@@ -304,6 +364,63 @@ class Container(object):
 
     def Destroy(self):
         self.rpc.Destroy(self.name)
+
+
+class Layer(object):
+    def __init__(self, rpc, name):
+        self.rpc = rpc
+        self.name = name
+
+    def __str__(self):
+        return 'Layer `{}`'.format(self.name)
+
+    def Import(self, tarball):
+        self.rpc.ImportLayer(self.name, tarball)
+
+    def Merge(self, tarball):
+        self.rpc.ImportLayer(self.name, tarball, merge=True)
+
+    def Remove(self):
+        self.rpc.RemoveLayer(self.name)
+
+class Volume(object):
+    def __init__(self, rpc, path):
+        self.rpc = rpc
+        self.path = path
+
+    def __str__(self):
+        return 'Volume `{}`'.format(self.path)
+
+    def GetProperties(self):
+        return { p.name: p.value for p in self.rpc.ListVolumes(path=self.path)[0].properties }
+
+    def GetProperty(self, name):
+        return self.GetProperties()[name]
+
+    def GetContainers(self):
+        return [ Container(self.rpc, c) for c in self.rpc.ListVolumes(path=self.path)[0].containers ]
+
+    def GetLayers(self):
+        layers = self.GetProperty('layers')
+        layers = layers.split(';') if layers else []
+        return [ Layer(self.rpc, l) for l in layers ]
+
+    def Link(self, container):
+        if isinstance(container, Container):
+            container = container.name
+        self.rpc.LinkVolume(self.path, container)
+
+    def Unlink(self, container=None):
+        if isinstance(container, Container):
+            container = container.name
+        self.rpc.UnlinkVolume(self.path, container)
+
+    def Export(self, tarball):
+        self.rpc.ExportLayer(self.path, tarball)
+
+    def Destroy(self):
+        for container in self.GetContainers():
+            self.Unlink(container)
 
 class Connection(object):
     def __init__(self, socket_path='/run/portod.socket', timeout=5):
@@ -371,9 +488,38 @@ class Connection(object):
     def Dlist(self):
         return self.rpc.Dlist()
 
+    def Vlist(self):
+        return [ prop.name for prop in self.rpc.ListVolumeProperties() ]
+
     def Wait(self, containers, timeout=None):
         return self.rpc.Wait(containers, timeout)
 
+    def CreateVolume(self, path=None, layers=[], **properties):
+        if layers:
+            layers = [ l.name if isinstance(l, Layer) else l for l in layers ]
+            properties['layers'] = ';'.join(layers);
+        return Volume(self.rpc, self.rpc.CreateVolume(path, **properties).path)
+
+    def FindVolume(self, path):
+        self.rpc.ListVolumes(path=path)
+        return Volume(self.rpc, path)
+
+    def ListVolumes(self, container=None):
+        if isinstance(container, Container):
+            container = container.name
+        return [ Volume(self.rpc, v.path) for v in self.rpc.ListVolumes(container=container) ]
+
+    def ImportLayer(self, name, tarball):
+        self.rpc.ImportLayer(name, tarball)
+        return Layer(self.rpc, name)
+
+    def FindLayer(self, layer):
+        if not layer in self.rpc.ListLayers():
+            raise exceptions.LayerNotFound("layer `%s` not found" % layer)
+        return Layer(self.rpc, layer)
+
+    def ListLayers(self):
+        return [ Layer(self.rpc, l) for l in self.rpc.ListLayers() ]
 
 # Example:
 # from porto import *
