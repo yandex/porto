@@ -274,3 +274,28 @@ std::string MapToStr(const std::map<std::string, uint64_t> &m) {
     }
     return ss.str();
 }
+
+std::string FlagsToString(uint64_t flags, const TFlagsNames &names,
+                          const std::string sep) {
+    std::stringstream result;
+    bool first = true;
+
+    for (auto &n : names) {
+        if (n.first & flags) {
+            if (first)
+                first = false;
+            else
+                result << sep;
+            result << n.second;
+            flags &= ~n.first;
+        }
+    }
+
+    if (flags) {
+        if (!first)
+            result << sep;
+        result << std::to_string(flags);
+    }
+
+    return result.str();
+}

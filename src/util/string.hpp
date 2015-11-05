@@ -32,3 +32,7 @@ std::string StringReplaceAll(const std::string &str, const std::string &from, co
 bool StringStartsWith(const std::string &str, const std::string &prefix);
 bool StringEndsWith(const std::string &str, const std::string &prefix);
 std::string MapToStr(const std::map<std::string, uint64_t> &m);
+
+typedef std::vector<std::pair<uint64_t, std::string>> TFlagsNames;
+std::string FlagsToString(uint64_t flags, const TFlagsNames &names,
+                          const std::string sep = ",");
