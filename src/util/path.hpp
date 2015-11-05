@@ -97,6 +97,7 @@ public:
     bool AccessOk(EFileAccess type, const TCred &cred) const;
     TError Chdir() const;
     TError Chroot() const;
+    TError PivotRoot() const;
     TError Chown(const TCred &cred) const;
     TError Chown(const std::string &user, const std::string &group) const;
     TError Chown(unsigned int uid, unsigned int gid) const;

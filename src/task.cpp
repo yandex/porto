@@ -556,7 +556,7 @@ TError TTask::ChildIsolateFs() {
     if (Env->Root.IsRoot())
         return TError::Success();
 
-    TError error = PivotRoot(Env->Root);
+    TError error = Env->Root.PivotRoot();
     if (error) {
         L_WRN() << "Can't pivot root, roll back to chroot: " << error << std::endl;
 

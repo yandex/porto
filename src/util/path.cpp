@@ -10,6 +10,7 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
+#include <sys/mount.h>
 #include <fcntl.h>
 #include <sys/prctl.h>
 #include <libgen.h>
@@ -219,6 +220,36 @@ TError TPath::Chdir() const {
 TError TPath::Chroot() const {
     if (chroot(Path.c_str()) < 0)
         return TError(EError::Unknown, errno, "chroot(" + Path + ")");
+
+    return TError::Success();
+}
+
+// https://github.com/lxc/lxc/commit/2d489f9e87fa0cccd8a1762680a43eeff2fe1b6e
+TError TPath::PivotRoot() const {
+    TScopedFd oldroot, newroot;
+
+    oldroot = open("/", O_DIRECTORY | O_RDONLY | O_CLOEXEC);
+    if (oldroot.GetFd() < 0)
+        return TError(EError::Unknown, errno, "open(/)");
+
+    newroot = open(Path.c_str(), O_DIRECTORY | O_RDONLY | O_CLOEXEC);
+    if (newroot.GetFd() < 0)
+        return TError(EError::Unknown, errno, "open(" + Path + ")");
+
+    if (fchdir(newroot.GetFd()))
+        return TError(EError::Unknown, errno, "fchdir(newroot)");
+
+    if (syscall(__NR_pivot_root, ".", "."))
+        return TError(EError::Unknown, errno, "pivot_root()");
+
+    if (fchdir(oldroot.GetFd()) < 0)
+        return TError(EError::Unknown, errno, "fchdir(oldroot)");
+
+    if (umount2(".", MNT_DETACH) < 0)
+        return TError(EError::Unknown, errno, "umount2(.)");
+
+    if (fchdir(newroot.GetFd()) < 0)
+        return TError(EError::Unknown, errno, "fchdir(newroot) reenter");
 
     return TError::Success();
 }

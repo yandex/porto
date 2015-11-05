@@ -20,7 +20,6 @@ extern "C" {
 #include <sys/prctl.h>
 #include <poll.h>
 #include <linux/capability.h>
-#include <sys/mount.h>
 #include <sys/syscall.h>
 #include <fcntl.h>
 #include <sys/wait.h>
@@ -28,6 +27,7 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/ioctl.h>
 #include <linux/fs.h>
 }
 
@@ -446,36 +446,6 @@ TError Popen(const std::string &cmd, std::vector<std::string> &lines) {
         return TError(EError::Unknown, "popen(" + cmd + ") failed");
     else
         return TError::Success();
-}
-
-// https://github.com/lxc/lxc/commit/2d489f9e87fa0cccd8a1762680a43eeff2fe1b6e
-TError PivotRoot(const TPath &rootfs) {
-    TScopedFd oldroot, newroot;
-
-    oldroot = open("/", O_DIRECTORY | O_RDONLY | O_CLOEXEC);
-    if (oldroot.GetFd() < 0)
-        return TError(EError::Unknown, errno, "open(/)");
-
-    newroot = open(rootfs.ToString().c_str(), O_DIRECTORY | O_RDONLY | O_CLOEXEC);
-    if (newroot.GetFd() < 0)
-        return TError(EError::Unknown, errno, "open(" + rootfs.ToString() + ")");
-
-    if (fchdir(newroot.GetFd()))
-        return TError(EError::Unknown, errno, "fchdir(newroot)");
-
-    if (syscall(__NR_pivot_root, ".", "."))
-        return TError(EError::Unknown, errno, "pivot_root()");
-
-    if (fchdir(oldroot.GetFd()) < 0)
-        return TError(EError::Unknown, errno, "fchdir(oldroot)");
-
-    if (umount2(".", MNT_DETACH) < 0)
-        return TError(EError::Unknown, errno, "umount2(.)");
-
-    if (fchdir(newroot.GetFd()) < 0)
-        return TError(EError::Unknown, errno, "fchdir(newroot) reenter");
-
-    return TError::Success();
 }
 
 size_t GetNumCores() {
