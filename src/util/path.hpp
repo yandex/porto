@@ -103,7 +103,7 @@ public:
     TError Chown(unsigned int uid, unsigned int gid) const;
     TError Chmod(const int mode) const;
     TError ReadLink(TPath &value) const;
-    TError Symlink(const TPath &to) const;
+    TError Symlink(const TPath &target) const;
     TError Mkfifo(unsigned int mode) const;
     TError Mknod(unsigned int mode, unsigned int dev) const;
     TError Mkdir(unsigned int mode) const;
