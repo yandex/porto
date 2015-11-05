@@ -1,10 +1,13 @@
 package porto
 
 import (
+	"bytes"
+	"crypto/rand"
 	"os"
 	"os/exec"
 	"testing"
-	"porto/rpc"
+
+	"github.com/yandex/porto/src/api/go/rpc"
 )
 
 func FailOnError(t *testing.T, conn *PortoConnection, err error) {
@@ -304,3 +307,24 @@ func TestRemoveLayer(t *testing.T) {
 	FailOnError(t, conn, conn.RemoveLayer(test_layer))
 }
 
+func TestSendRecvData(t *testing.T) {
+	buff := new(bytes.Buffer)
+	data := make([]byte, 1024*1024+1024)
+	_, err := rand.Read(data)
+	if err != nil {
+		t.Fatalf("unable to generate random array: %v", err)
+	}
+
+	if err := SendData(buff, data); err != nil {
+		t.Fatalf("SendData returns unexpected error: %v", err)
+	}
+
+	result, err := RecvData(buff)
+	if err != nil {
+		t.Fatalf("RecvData returns unexpected error: %v", err)
+	}
+
+	if !bytes.Equal(data, result) {
+		t.Fatalf("result is not the same as input")
+	}
+}
