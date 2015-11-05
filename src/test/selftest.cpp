@@ -1639,10 +1639,10 @@ static void TestRootRdOnlyProperty(TPortoAPI &api) {
 
         // dev
         "/dev",
-        "/dev/shm",
         "/dev/pts",
 
         "/proc",
+        "/run",
         "/sys",
         "/",
     };

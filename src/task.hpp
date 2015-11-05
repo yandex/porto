@@ -152,17 +152,13 @@ class TTask: public TNonCopyable {
     TError ReopenStdio();
     TError IsolateNet(int childPid);
 
-    TError ChildCreateNode(const TPath &path, unsigned int mode, unsigned int dev);
     TError ChildOpenStdFile(const TPath &path, int expected);
     TError ChildApplyCapabilities();
     TError ChildDropPriveleges();
     TError ChildExec();
     TError ChildBindDns();
     TError ChildBindDirectores();
-    TError ChildRestrictProc(bool restrictProcSys);
     TError ChildMountRootFs();
-    TError ChildMountDev();
-    TError ChildMountRun();
     TError ChildRemountRootRo();
     TError ChildIsolateFs();
     TError ChildEnableNet();

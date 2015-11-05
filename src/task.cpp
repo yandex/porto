@@ -339,110 +339,6 @@ TError TTask::ChildBindDirectores() {
     return TError::Success();
 }
 
-TError TTask::ChildCreateNode(const TPath &path, unsigned int mode, unsigned int dev) {
-    if (mknod(path.ToString().c_str(), mode, dev) < 0)
-        return TError(EError::Unknown, errno, "mknod(" + path.ToString() + ")");
-
-    return TError::Success();
-}
-
-static const std::vector<std::string> roproc = { "/proc/sysrq-trigger", "/proc/irq", "/proc/bus" };
-
-TError TTask::ChildRestrictProc(bool restrictProcSys) {
-    std::vector<std::string> dirs = roproc;
-
-    if (restrictProcSys)
-        dirs.push_back("/proc/sys");
-
-    for (auto &path : dirs) {
-        TMount mnt(Env->Root + path, Env->Root + path, "none", {});
-        TError error = mnt.BindFile(true);
-        if (error)
-            return error;
-    }
-
-    TMount mnt("/dev/null", Env->Root + "/proc/kcore", "", {});
-    TError error = mnt.Bind(false);
-    if (error)
-        return error;
-
-    return TError::Success();
-}
-
-TError TTask::ChildMountRun() {
-    TPath run = Env->Root + "/run";
-    std::vector<std::string> subdirs;
-    TFolder dir(run);
-    if (!dir.Exists()) {
-        TError error = dir.Create();
-        if (error)
-            return error;
-    } else {
-        TError error = dir.Items(EFileType::Directory, subdirs);
-        if (error)
-            return error;
-    }
-
-    TMount dev("tmpfs", run, "tmpfs", { "mode=755", "size=32m" });
-    TError error = dev.MountDir(MS_NOSUID | MS_STRICTATIME);
-    if (error)
-        return error;
-
-    for (auto name : subdirs) {
-        TFolder d(run + "/" + name);
-        TError error = d.Create();
-        if (error)
-            return error;
-    }
-
-    return TError::Success();
-}
-
-TError TTask::ChildMountDev() {
-    struct {
-        const std::string path;
-        unsigned int mode;
-        unsigned int dev;
-    } node[] = {
-        { "/dev/null",    0666 | S_IFCHR, MKDEV(1, 3) },
-        { "/dev/zero",    0666 | S_IFCHR, MKDEV(1, 5) },
-        { "/dev/full",    0666 | S_IFCHR, MKDEV(1, 7) },
-        { "/dev/random",  0666 | S_IFCHR, MKDEV(1, 8) },
-        { "/dev/urandom", 0666 | S_IFCHR, MKDEV(1, 9) },
-    };
-
-    TMount dev("tmpfs", Env->Root + "/dev", "tmpfs", { "mode=755", "size=32m" });
-    TError error = dev.MountDir(MS_NOSUID | MS_STRICTATIME);
-    if (error)
-        return error;
-
-    TMount devpts("devpts", Env->Root + "/dev/pts", "devpts",
-                  { "newinstance", "ptmxmode=0666", "mode=620" ,"gid=5" });
-    error = devpts.MountDir(MS_NOSUID | MS_NOEXEC);
-    if (error)
-        return error;
-
-    for (size_t i = 0; i < sizeof(node) / sizeof(node[0]); i++) {
-        error = ChildCreateNode(Env->Root + node[i].path,
-                           node[i].mode, node[i].dev);
-        if (error)
-            return error;
-    }
-
-    TPath ptmx = Env->Root + "/dev/ptmx";
-    if (symlink("pts/ptmx", ptmx.ToString().c_str()) < 0)
-        return TError(EError::Unknown, errno, "symlink(/dev/pts/ptmx)");
-
-    TPath fd = Env->Root + "/dev/fd";
-    if (symlink("/proc/self/fd", fd.ToString().c_str()) < 0)
-        return TError(EError::Unknown, errno, "symlink(/dev/fd)");
-
-    TFile f(Env->Root + "/dev/console", 0755);
-    (void)f.Touch();
-
-    return TError::Success();
-}
-
 TError TTask::ChildRemountRootRo() {
     if (!Env->RootRdOnly || Env->LoopDev >= 0)
         return TError::Success();
@@ -459,15 +355,6 @@ TError TTask::ChildRemountRootRo() {
             continue;
 
         bool skip = false;
-        for (auto dir : roproc) {
-            if (!path.InnerPath(dir).IsEmpty()) {
-                skip = true;
-                break;
-            }
-        }
-        if (skip)
-            continue;
-
         for (auto &bindMap : Env->BindMap) {
             TPath dest = bindMap.Dest;
 
@@ -476,7 +363,6 @@ TError TTask::ChildRemountRootRo() {
                 break;
             }
         }
-
         if (skip)
             continue;
 
@@ -489,54 +375,110 @@ TError TTask::ChildRemountRootRo() {
 }
 
 TError TTask::ChildMountRootFs() {
+    TError error;
 
     if (Env->Root.IsRoot())
         return TError::Success();
 
-    if (Env->LoopDev >= 0) {
-        TMount root("/dev/loop" + std::to_string(Env->LoopDev),
-                    Env->Root, "ext4", {});
-        TError error = root.Mount(Env->RootRdOnly ? MS_RDONLY : 0);
-        if (error)
-            return error;
-    } else {
-        TMount root(Env->Root, Env->Root, "none", {});
-        TError error = root.BindDir(false);
-        if (error)
-            return error;
-    }
-
-    unsigned long defaultFlags = MS_NOEXEC | MS_NOSUID | MS_NODEV;
-    unsigned long sysfsFlags = defaultFlags | MS_RDONLY;
-
-    TMount sysfs("sysfs", Env->Root + "/sys", "sysfs", {});
-    TError error = sysfs.MountDir(sysfsFlags);
+    if (Env->LoopDev >= 0)
+        error = Env->Root.Mount("/dev/loop" + std::to_string(Env->LoopDev),
+                                "ext4", Env->RootRdOnly ? MS_RDONLY : 0, {});
+    else
+        error = Env->Root.Bind(Env->Root, 0);
     if (error)
         return error;
 
-    TMount proc("proc", Env->Root + "/proc", "proc", {});
-    error = proc.MountDir(defaultFlags);
-    if (error)
-        return error;
+    struct {
+        std::string target;
+        std::string type;
+        unsigned long flags;
+        std::vector<std::string> opts;
+    } mounts[] = {
+        { "/dev", "tmpfs", MS_NOSUID | MS_STRICTATIME,
+            { "mode=755", "size=32m" } },
+        { "/dev/pts", "devpts", MS_NOSUID | MS_NOEXEC,
+            { "newinstance", "ptmxmode=0666", "mode=620" ,"gid=5" }},
+        { "/proc", "proc", MS_NOSUID | MS_NOEXEC | MS_NODEV, {}},
+        { "/run", "tmpfs", MS_NOSUID | MS_NODEV | MS_STRICTATIME,
+            { "mode=755", "size=32m" }},
+        { "/sys", "sysfs", MS_NOSUID | MS_NOEXEC | MS_NODEV | MS_RDONLY, {}},
+    };
 
-    bool privileged = Env->Cred.IsRootUser();
-    error = ChildRestrictProc(!privileged);
-    if (error)
-        return error;
-
-    error = ChildMountDev();
-    if (error)
-        return error;
-
-    if (Env->LoopDev >= 0) {
-        error = ChildMountRun();
+    for (auto &m : mounts) {
+        TPath target = Env->Root + m.target;
+        error = target.MkdirAll(0755);
+        if (!error)
+            error = target.Mount(m.type, m.type, m.flags, m.opts);
         if (error)
             return error;
     }
 
-    TMount shm("shm", Env->Root + "/dev/shm", "tmpfs",
-               { "mode=1777", "size=65536k" });
-    error = shm.MountDir(defaultFlags);
+    struct {
+        const std::string path;
+        mode_t mode;
+    } dirs[] = {
+        { "/run/lock",  01777 },
+        { "/run/shm",   01777 },
+    };
+
+    for (auto &d : dirs) {
+        error = (Env->Root + d.path).Mkdir(d.mode);
+        if (error)
+            return error;
+    }
+
+    struct {
+        const std::string path;
+        mode_t mode;
+        dev_t dev;
+    } nodes[] = {
+        { "/dev/null",    0666 | S_IFCHR, MKDEV(1, 3) },
+        { "/dev/zero",    0666 | S_IFCHR, MKDEV(1, 5) },
+        { "/dev/full",    0666 | S_IFCHR, MKDEV(1, 7) },
+        { "/dev/random",  0666 | S_IFCHR, MKDEV(1, 8) },
+        { "/dev/urandom", 0666 | S_IFCHR, MKDEV(1, 9) },
+        { "/dev/console", 0600 | S_IFCHR, MKDEV(1, 3) }, /* to /dev/null */
+    };
+
+    for (auto &n : nodes) {
+        error = (Env->Root + n.path).Mknod(n.mode, n.dev);
+        if (error)
+            return error;
+    }
+
+    struct {
+        const std::string path;
+        const std::string target;
+    } symlinks[] = {
+        { "/dev/ptmx", "pts/ptmx" },
+        { "/dev/fd", "/proc/self/fd" },
+        { "/dev/shm", "../run/shm" },
+    };
+
+    for (auto &s : symlinks) {
+        error = (Env->Root + s.path).Symlink(s.target);
+        if (error)
+            return error;
+    }
+
+    std::vector<std::string> proc_ro = {
+        "/proc/sysrq-trigger",
+        "/proc/irq",
+        "/proc/bus",
+    };
+
+    if (!Env->Cred.IsRootUser())
+        proc_ro.push_back("/proc/sys");
+
+    for (auto &p : proc_ro) {
+        TPath path = Env->Root + p;
+        error = path.Bind(path, MS_RDONLY);
+        if (error)
+            return error;
+    }
+
+    TPath proc_kcore = Env->Root + "/proc/kcore";
+    error = proc_kcore.Bind(Env->Root + "/dev/null", MS_RDONLY);
     if (error)
         return error;
 
