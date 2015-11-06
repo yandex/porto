@@ -277,7 +277,7 @@ class Container(object):
     def Pause(self):
         self.rpc.Pause(self.name)
 
-    def Resume(self, name):
+    def Resume(self):
         self.rpc.Resume(self.name)
 
     def Get(self, var):
@@ -343,8 +343,6 @@ class Connection(object):
         self.rpc.Kill(name, sig)
 
     def Pause(self, name):
-        request = rpc_pb2.TContainerRequest()
-        request.pause.name = name
         self.rpc.Pause(name)
 
     def Resume(self, name):
