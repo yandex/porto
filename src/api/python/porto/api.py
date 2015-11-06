@@ -321,6 +321,9 @@ class Connection(object):
     def List(self):
         return self.rpc.List()
 
+    def ListContainers(self):
+        return [ Container(self.rpc, name) for name in self.rpc.List() ]
+
     def Find(self, name):
         if name not in self.List():
             raise exceptions.ContainerDoesNotExist("no such container")
