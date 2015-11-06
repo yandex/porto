@@ -210,10 +210,10 @@ class _RPC(object):
             return True
         return res
 
-    def Get(self, name, var):
+    def Get(self, containers, variables):
         request = rpc_pb2.TContainerRequest()
-        request.get.name.extend(name)
-        request.get.variable.extend(var)
+        request.get.name.extend(containers)
+        request.get.variable.extend(variables)
         resp = self.call(request, self.timeout)
         if resp.error != rpc_pb2.Success:
             raise exceptions.EError.Create(resp.error, resp.errorMsg)
@@ -280,8 +280,8 @@ class Container(object):
     def Resume(self):
         self.rpc.Resume(self.name)
 
-    def Get(self, var):
-        return self.rpc.Get(self.name, var)[self.name]
+    def Get(self, variables):
+        return self.rpc.Get([self.name], variables)[self.name]
 
     def GetProperties(self):
         return self.Get(self.rpc.Plist())
@@ -348,8 +348,8 @@ class Connection(object):
     def Resume(self, name):
         self.rpc.Resume(name)
 
-    def Get(self, name, var):
-        return self.rpc.Get(name, var)
+    def Get(self, containers, variables):
+        return self.rpc.Get(containers, variables)
 
     def GetProperty(self, name, property):
         return self.rpc.GetProperty(name, property)
