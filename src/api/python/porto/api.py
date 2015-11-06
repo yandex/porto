@@ -302,6 +302,8 @@ class Container(object):
     def __str__(self):
         return 'Container `{}`'.format(self.name)
 
+    def Destroy(self):
+        self.rpc.Destroy(self.name)
 
 class Connection(object):
     def __init__(self, socket_path='/run/portod.socket', timeout=5):
