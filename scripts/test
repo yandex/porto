@@ -71,6 +71,11 @@ threadstest() {
 	$SUDO NOCHECK=y portotest self daemon
 }
 
+apipytest() {
+	say "Python API test"
+	python $ROOTDIR/src/test/test-api.py
+}
+
 HOST=${HOST:-__please_specify_host__}
 PORT=8081
 
