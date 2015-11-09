@@ -592,6 +592,13 @@ static int SlaveMain() {
             return EXIT_FAILURE;
         }
 
+        TPath tmp_dir(config().container().tmp_dir());
+        if (!tmp_dir.IsDirectory()) {
+            error = tmp_dir.MkdirAll(0755);
+            L_ERR() << "Cannot create " << tmp_dir << " : " << error << std::endl;
+            return EXIT_FAILURE;
+        }
+
         bool restored = context.Cholder->RestoreFromStorage();
         context.Vholder->RestoreFromStorage(context.Cholder);
 
@@ -603,11 +610,9 @@ static int SlaveMain() {
 
         if (!restored) {
             L() << "Remove container leftovers from previous run..." << std::endl;
-            RemoveIf(config().container().tmp_dir(),
-                     EFileType::Directory,
-                     [](const std::string &name, const TPath &path) {
-                        return name != TPath(config().volumes().volume_dir()).BaseName();
-                     });
+            error = tmp_dir.ClearDirectory();
+            if (error)
+                L_ERR() << "Cannot clear " << tmp_dir << " : " << error << std::endl;
         }
 
         ret = SlaveRpc(context, worker);

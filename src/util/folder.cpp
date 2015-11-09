@@ -116,33 +116,3 @@ TError TFolder::Items(const EFileType type, std::vector<std::string> &list) cons
     closedir(dirp);
     return TError::Success();
 }
-
-void RemoveIf(const TPath &path,
-              EFileType type,
-              std::function<bool(const std::string &name, const TPath &path)> f) {
-    std::vector<std::string> list;
-    TFolder dir(path);
-
-    TError error = dir.Items(type, list);
-    if (error)
-        return;
-
-    for (auto &entry : list) {
-        TPath id = path / entry;
-        if (f(entry, id)) {
-            L_ACT() << "Removing " << id << std::endl;
-            TMount m(id, id, "", {});
-            (void)m.Umount();
-
-            if (id.IsDirectory()) {
-                TFolder d(id);
-                error = d.Remove(true);
-            } else {
-                TFile f(id);
-                error = f.Remove();
-            }
-            if (error)
-                L_WRN() << "Can't remove " << id << ": " << error << std::endl;
-        }
-    }
-}
