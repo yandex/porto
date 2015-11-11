@@ -806,7 +806,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
             return error;
     }
 
-    if (taskEnv->NetCfg.NetCtName != "") {
+    if (taskEnv->NetCfg.NetCtName != "" && client) {
         std::shared_ptr<TContainer> clientContainer;
         error = client->GetContainer(clientContainer);
         if (error)
@@ -825,7 +825,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         if (!target->Task)
             return TError(EError::InvalidValue, "net container not running");
         error = taskEnv->ParentNs.Net.Open(target->Task->GetPid(), "ns/net");
-        if (client && error)
+        if (error)
             return error;
     }
 
