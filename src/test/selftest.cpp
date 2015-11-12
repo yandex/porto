@@ -2080,7 +2080,6 @@ static void TestXvlan(TPortoAPI &api, const std::string &name, const std::vector
     bool shouldShareMac = type == "ipvlan";
     ExpectApiSuccess(api.SetProperty(name, "command", "ip -o link show"));
     ExpectApiFailure(api.SetProperty(name, "net", type), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "net", type + " invalid " + link), EError::InvalidValue);
     ExpectApiFailure(api.SetProperty(name, "net", type + " " + link), EError::InvalidValue);
     ExpectApiSuccess(api.SetProperty(name, "net", type + " " + link + " " + link));
     auto s = StartWaitAndGetData(api, name, "stdout");
@@ -2223,7 +2222,6 @@ static void TestNetProperty(TPortoAPI &api) {
 
     CreateVethPair(api);
 
-    ExpectApiFailure(api.SetProperty(name, "net", "host invalid"), EError::InvalidValue);
     ExpectApiSuccess(api.SetProperty(name, "net", "host veth0"));
     s = StartWaitAndGetData(api, name, "stdout");
     containerLink = StringToVec(s);
@@ -2310,7 +2308,6 @@ static void TestNetProperty(TPortoAPI &api) {
     AsNobody(api);
 
     ExpectApiSuccess(api.Create(name));
-    ExpectApiFailure(api.SetProperty(name, "net", "veth eth0 invalid"), EError::InvalidValue);
     ExpectApiSuccess(api.SetProperty(name, "net", "veth eth0 portobr0"));
     ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'sleep 1 && ip -o link show'"));
 
