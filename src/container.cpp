@@ -291,26 +291,6 @@ std::shared_ptr<TContainer> TContainer::GetParent() const {
     return Parent;
 }
 
-bool TContainer::ValidLink(const std::string &name) const {
-    auto lock = Net->ScopedLock();
-
-    if (Net->Empty())
-        return false;
-
-    std::shared_ptr<TNl> nl = Net->GetNl();
-    return nl->ValidLink(name);
-}
-
-std::shared_ptr<TNlLink> TContainer::GetLink(const std::string &name) const {
-    auto lock = Net->ScopedLock();
-
-    for (auto &link : Net->GetLinks())
-        if (link->GetAlias() == name)
-            return link;
-
-    return nullptr;
-}
-
 template <typename T>
 T TContainer::GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except, T exceptVal) const {
     T val = 0;
@@ -452,13 +432,6 @@ std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
     }
 
     return nullptr;
-}
-
-bool TContainer::UseParentNamespace() const {
-    if (Prop->GetRaw<bool>(P_ISOLATE))
-        return false;
-
-    return FindRunningParent() != nullptr;
 }
 
 TError TContainer::PrepareNetwork() {

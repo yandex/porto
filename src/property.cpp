@@ -653,8 +653,6 @@ public:
     TUintMap GetDefault() const override {
         auto c = GetContainer();
         uint64_t def =  (c->IsRoot() || c->IsPortoRoot()) ? GetRootDef() : GetDef();
-        auto net_lock = c->Net->ScopedLock();
-        auto availableLinks = c->Net->GetLinks();
         TUintMap m;
         m["default"] = def;
         return m;
@@ -1120,12 +1118,6 @@ public:
                     cfg.Host = true;
                 } else {
                     hnet.Dev = StringTrim(settings[1]);
-
-                    auto link = c->ValidLink(hnet.Dev);
-                    if (!link)
-                        return TError(EError::InvalidValue,
-                                      "Invalid host interface " + hnet.Dev);
-
                     cfg.HostIface.push_back(hnet);
                 }
             } else if (type == "container") {
@@ -1142,11 +1134,6 @@ public:
                 std::string type = "bridge";
                 std::string hw = "";
                 int mtu = -1;
-
-                auto link = c->GetLink(master);
-                if (!link)
-                    return TError(EError::InvalidValue,
-                                  "Invalid macvlan master " + master);
 
                 if (settings.size() > 3) {
                     type = StringTrim(settings[3]);
@@ -1169,10 +1156,6 @@ public:
                                       "Invalid macvlan address " + hw);
                 }
 
-                int idx = link->FindIndex(master);
-                if (idx < 0)
-                    return TError(EError::InvalidValue, "Interface " + master + " doesn't exist or not in running state");
-
                 TMacVlanNetCfg mvlan;
                 mvlan.Master = master;
                 mvlan.Name = name;
@@ -1190,11 +1173,6 @@ public:
                 std::string mode = "l2";
                 int mtu = -1;
 
-                auto link = c->GetLink(master);
-                if (!link)
-                    return TError(EError::InvalidValue,
-                                  "Invalid ipvlan master " + master);
-
                 if (settings.size() > 3) {
                     mode = StringTrim(settings[3]);
                     if (!TNlLink::ValidIpVlanMode(mode))
@@ -1208,10 +1186,6 @@ public:
                         return TError(EError::InvalidValue,
                                       "Invalid ipvlan mtu " + settings[4]);
                 }
-
-                int idx = link->FindIndex(master);
-                if (idx < 0)
-                    return TError(EError::InvalidValue, "Interface " + master + " doesn't exist or not in running state");
 
                 TIpVlanNetCfg ipvlan;
                 ipvlan.Master = master;
@@ -1241,9 +1215,6 @@ public:
                         return TError(EError::InvalidValue,
                                       "Invalid veth address " + hw);
                 }
-
-                if (!c->ValidLink(bridge))
-                    return TError(EError::InvalidValue, "Interface " + bridge + " doesn't exist or not in running state");
 
                 TVethNetCfg veth;
                 veth.Bridge = bridge;

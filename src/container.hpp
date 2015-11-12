@@ -154,8 +154,6 @@ public:
     bool IsPortoRoot() const;
     std::shared_ptr<const TContainer> GetRoot() const;
     std::shared_ptr<TContainer> GetParent() const;
-    bool ValidLink(const std::string &name) const;
-    std::shared_ptr<TNlLink> GetLink(const std::string &name) const;
 
     template <typename T>
     T GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except = nullptr, T exceptVal = 0) const;
@@ -191,7 +189,6 @@ public:
     bool CanRemoveDead() const;
     std::vector<std::string> GetChildren();
     std::shared_ptr<TContainer> FindRunningParent() const;
-    bool UseParentNamespace() const;
     void DeliverEvent(TScopedLock &holder_lock, const TEvent &event);
 
     TError CheckPermission(const TCred &ucred);
