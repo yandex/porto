@@ -748,8 +748,10 @@ void TTask::StartChild() {
 
     if (Env->NetCfg.NewNetNs) {
         error = ChildEnableNet();
-        if (error)
+        if (error) {
+            L_ERR() << error << std::endl;
             Abort(error);
+        }
     }
 
     error = ChildMountRootFs();
