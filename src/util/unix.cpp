@@ -640,7 +640,7 @@ TError TUnixSocket::RecvPid(pid_t &pid, pid_t &vpid) const {
         return TError(EError::Unknown, "partial recvmsg: " + std::to_string(ret));
     cmsg = CMSG_FIRSTHDR(&msghdr);
     if (!cmsg || cmsg->cmsg_level != SOL_SOCKET || cmsg->cmsg_type != SCM_CREDENTIALS)
-        return TError(EError::Unknown, "no credetntials after recvmsg");
+        return TError(EError::Unknown, "no credentials after recvmsg");
     pid = ucred->pid;
     return TError::Success();
 }
