@@ -877,7 +877,7 @@ TError TNlHtb::Create(uint32_t defaultClass) {
         goto free_qdisc;
     }
 
-    rtnl_htb_set_defcls(qdisc, TcHandle(1, defaultClass));
+    rtnl_htb_set_defcls(qdisc, TC_H_MIN(defaultClass));
     rtnl_htb_set_rate2quantum(qdisc, 10);
 
     Link->LogObj("add", qdisc);
