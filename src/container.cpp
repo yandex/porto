@@ -435,22 +435,45 @@ std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
 }
 
 TError TContainer::PrepareNetwork() {
-    PORTO_ASSERT(Tclass == nullptr);
+    TError error;
 
-    if (UseParentNamespace()) {
-        Tclass = Parent->Tclass;
-        return TError::Success();
+    if (IsRoot()) {
+        Net = std::make_shared<TNetwork>();
+        if (Net) {
+            error = Net->Connect();
+            L() << "host network for " << Name << std::endl;
+            if (!error)
+                error = Net->Prepare();
+        }
+    } else if (Task && Task->GetNetLinkFd() != -1) {
+        Net = std::make_shared<TNetwork>();
+        if (Net) {
+            error = Net->Connect(Task->GetNetLinkFd());
+            L() << "custom network for " << Name << std::endl;
+            if (!error)
+                error = Net->Prepare();
+        }
+    } else {
+        /* Take parent's network */
+        Net = Parent->Net;
+        L() << "parent network for " << Name << std::endl;
     }
 
-    if (Parent) {
+    if (error)
+        return error;
+
+    PORTO_ASSERT(Net != nullptr);
+    PORTO_ASSERT(Tclass == nullptr);
+
+    if (IsRoot()) {
+        uint32_t handle = TcHandle(TcMajor(Net->GetQdisc()->GetHandle()), Id);
+        Tclass = std::make_shared<TTclass>(Net, Net->GetQdisc(), handle);
+    } else {
         PORTO_ASSERT(Parent->Tclass != nullptr);
 
         auto tclass = Parent->Tclass;
         uint32_t handle = TcHandle(TcMajor(tclass->GetHandle()), Id);
         Tclass = std::make_shared<TTclass>(Net, tclass, handle);
-    } else {
-        uint32_t handle = TcHandle(TcMajor(Net->GetQdisc()->GetHandle()), Id);
-        Tclass = std::make_shared<TTclass>(Net, Net->GetQdisc(), handle);
     }
 
     TUintMap prio, rate, ceil;
@@ -461,13 +484,24 @@ TError TContainer::PrepareNetwork() {
     Tclass->Prepare(prio, rate, ceil);
 
     auto net_lock = Net->ScopedLock();
-    TError error = Tclass->Create();
+    error = Tclass->Create();
     if (error) {
         L_ERR() << "Can't create tclass: " << error << std::endl;
         return error;
     }
 
-    return TError::Success();
+    if (IsRoot())
+        return error;
+
+    auto netcls = GetLeafCgroup(netclsSubsystem);
+    uint32_t handle = Tclass->GetHandle();
+    error = netcls->SetKnobValue("net_cls.classid", std::to_string(handle), false);
+    if (error) {
+        L_ERR() << "Can't set classid: " << error << std::endl;
+        return error;
+    }
+
+    return error;
 }
 
 void TContainer::ShutdownOom() {
@@ -531,14 +565,6 @@ TError TContainer::PrepareCgroups() {
             LeafCgroups.clear();
             return ret;
         }
-    }
-
-    auto netcls = GetLeafCgroup(netclsSubsystem);
-    uint32_t handle = Tclass->GetHandle();
-    TError error = netcls->SetKnobValue("net_cls.classid", std::to_string(handle), false);
-    if (error) {
-        L_ERR() << "Can't set classid: " << error << std::endl;
-        return error;
     }
 
     if (!IsRoot()) {
@@ -933,6 +959,10 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
             goto error;
     }
 
+    error = PrepareNetwork();
+    if (error)
+        goto error;
+
     IsMeta = meta;
     if (meta)
         SetState(EContainerState::Meta);
@@ -1156,13 +1186,6 @@ TError TContainer::PrepareResources() {
         return error;
     }
 
-    error = PrepareNetwork();
-    if (error) {
-        L_ERR() << "Can't prepare task network: " << error << std::endl;
-        FreeResources();
-        return error;
-    }
-
     error = PrepareCgroups();
     if (error) {
         L_ERR() << "Can't prepare task cgroups: " << error << std::endl;
@@ -1191,7 +1214,7 @@ void TContainer::RemoveLog(const TPath &path) {
 void TContainer::FreeResources() {
     LeafCgroups.clear();
 
-    if (!Parent || Parent->Tclass != Tclass) {
+    if (Tclass && (!Parent || Parent->Tclass != Tclass)) {
         auto lock = Net->ScopedLock();
 
         TError error = Tclass->Remove();
