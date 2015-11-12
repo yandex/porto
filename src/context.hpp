@@ -9,8 +9,6 @@ class TCgroup;
 class TSubsystem;
 class TKeyValueStorage;
 class TEventQueue;
-class TNetwork;
-class TNl;
 class TContainerHolder;
 class TVolumeHolder;
 
@@ -21,8 +19,6 @@ public:
     std::shared_ptr<TKeyValueStorage> Storage;
     std::shared_ptr<TKeyValueStorage> VolumeStorage;
     std::shared_ptr<TEventQueue> Queue;
-    std::shared_ptr<TNetwork> Net;
-    std::shared_ptr<TNl> NetEvt;
     std::shared_ptr<TContainerHolder> Cholder;
     std::shared_ptr<TVolumeHolder> Vholder;
     std::shared_ptr<TEpollLoop> EpollLoop;

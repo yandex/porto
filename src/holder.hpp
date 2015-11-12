@@ -10,7 +10,6 @@
 #include "util/cred.hpp"
 #include "util/locks.hpp"
 
-class TNetwork;
 class TContainer;
 class TIdMap;
 class TEventQueue;
@@ -27,7 +26,6 @@ namespace kv {
 
 class TContainerHolder : public std::enable_shared_from_this<TContainerHolder>,
                          public TLockable {
-    std::shared_ptr<TNetwork> Net;
     std::map<std::string, std::shared_ptr<TContainer>> Containers;
     TIdMap IdMap;
     std::shared_ptr<TKeyValueStorage> Storage;
@@ -45,9 +43,8 @@ public:
     std::shared_ptr<TEpollLoop> EpollLoop;
 
     TContainerHolder(std::shared_ptr<TEpollLoop> epollLoop,
-                     std::shared_ptr<TNetwork> net,
                      std::shared_ptr<TKeyValueStorage> storage) :
-        Net(net), Storage(storage), EpollLoop(epollLoop) { }
+        Storage(storage), EpollLoop(epollLoop) { }
     TError ValidName(const std::string &name) const;
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot(TScopedLock &holder_lock);

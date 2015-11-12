@@ -7,7 +7,6 @@
 #include "property.hpp"
 #include "data.hpp"
 #include "event.hpp"
-#include "qdisc.hpp"
 #include "client.hpp"
 #include "task.hpp"
 #include "kvalue.hpp"
@@ -190,7 +189,7 @@ TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &nam
     if (error)
         return error;
 
-    auto c = std::make_shared<TContainer>(shared_from_this(), Storage, name, parent, id, Net);
+    auto c = std::make_shared<TContainer>(shared_from_this(), Storage, name, parent, id);
     error = c->Create(cred);
     if (error)
         return error;
@@ -454,7 +453,7 @@ TError TContainerHolder::Restore(TScopedLock &holder_lock, const std::string &na
     if (!id)
         return TError(EError::Unknown, "Couldn't restore container id");
 
-    auto c = std::make_shared<TContainer>(shared_from_this(), Storage, name, parent, id, Net);
+    auto c = std::make_shared<TContainer>(shared_from_this(), Storage, name, parent, id);
     error = c->Restore(holder_lock, node);
     if (error) {
         L_ERR() << "Can't restore container " << name << ": " << error << std::endl;
@@ -645,23 +644,6 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
 
         ScheduleLogRotatation();
         Statistics->Rotated++;
-        delivered = true;
-        break;
-    }
-    case EEventType::UpdateNetwork:
-    {
-        L() << "Refresh containers tc classes" << std::endl;
-
-        auto list = List(true);
-        for (auto &target : list) {
-            TNestedScopedLock lock(*target, holder_lock);
-            if (!target->IsValid())
-                continue;
-
-            TError error = target->UpdateNetwork();
-            if (error)
-                L_WRN() << "Can't update " << target->GetName() << " network: " << error << std::endl;
-        }
         delivered = true;
         break;
     }

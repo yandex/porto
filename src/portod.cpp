@@ -328,17 +328,6 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
         return EXIT_FAILURE;
     }
 
-    std::shared_ptr<TEpollSource> NetworkSource;
-    if (context.NetEvt) {
-        NetworkSource = std::make_shared<TEpollSource>(context.EpollLoop,
-                                                       context.NetEvt->GetFd());
-        error = context.EpollLoop->AddSource(NetworkSource);
-        if (error) {
-            L_ERR() << "Can't add netlink events fd to epoll: " << error << std::endl;
-            return EXIT_FAILURE;
-        }
-    }
-
     std::vector<int> signals;
     std::vector<struct epoll_event> events;
 
@@ -424,17 +413,6 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                 // from the clients (so clients see updated view of the
                 // world as soon as possible)
                 continue;
-            } else if (context.NetEvt && source->Fd == context.NetEvt->GetFd()) {
-                L() << "Refresh list of available network interfaces" << std::endl;
-
-                context.NetEvt->FlushEvents();
-
-                TError error = context.Net->Update();
-                if (error)
-                    L_ERR() << "Can't refresh list of network interfaces: " << error << std::endl;
-
-                TEvent e(EEventType::UpdateNetwork);
-                context.Queue->Add(0, e);
             } else if (source->Flags & EPOLL_EVENT_OOM) {
                 auto container = source->Container.lock();
                 if (container) {

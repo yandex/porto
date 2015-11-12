@@ -52,9 +52,9 @@ using std::map;
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
                        std::shared_ptr<TKeyValueStorage> storage,
                        const std::string &name, std::shared_ptr<TContainer> parent,
-                       uint16_t id, std::shared_ptr<TNetwork> net) :
+                       uint16_t id) :
     Holder(holder), Name(StripParentName(name)), Parent(parent),
-    Storage(storage), Id(id), Net(net) { }
+    Storage(storage), Id(id) { }
 
 TContainer::~TContainer() {
     // Tclass destructor should be called with TNetwork locked,
@@ -133,8 +133,11 @@ void TContainer::SyncStateWithCgroup(TScopedLock &holder_lock) {
 }
 
 TError TContainer::GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) {
-    auto lock = Net->ScopedLock();
-    return Tclass->GetStat(stat, m);
+    if (Net && Tclass) {
+        auto lock = Net->ScopedLock();
+        return Tclass->GetStat(stat, m);
+    } else
+        return TError(EError::NotSupported, "Network statistics is not available");
 }
 
 void TContainer::UpdateRunningChildren(size_t diff) {

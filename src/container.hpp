@@ -136,7 +136,7 @@ public:
     TContainer(std::shared_ptr<TContainerHolder> holder,
                std::shared_ptr<TKeyValueStorage> storage,
                const std::string &name, std::shared_ptr<TContainer> parent,
-               uint16_t id, std::shared_ptr<TNetwork> net);
+               uint16_t id);
     ~TContainer();
 
     std::string GetPortoNamespace() const;
