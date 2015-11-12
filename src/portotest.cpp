@@ -95,8 +95,11 @@ int main(int argc, char *argv[])
         config.Load();
 
         auto net = std::make_shared<TNetwork>();
+        TError error = net->Connect();
+        if (error)
+            throw error.GetMsg();
         auto lock = net->ScopedLock();
-        TError error = net->OpenLinks(test::links);
+        error = net->OpenLinks(test::links);
         if (error)
             throw error.GetMsg();
 

@@ -268,27 +268,25 @@ TError TNetwork::PrepareLink(std::shared_ptr<TNlLink> link) {
     return TError::Success();
 }
 
+TNetwork::TNetwork() {
+    Nl = std::make_shared<TNl>();
+    if (!Nl)
+        throw std::bad_alloc();
+}
+
+TError TNetwork::Connect(int fd) {
+    return Nl->Connect(fd);
+}
+
 TError TNetwork::OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links) {
     std::vector<std::string> devices;
     for (auto &device : config().network().devices())
         devices.push_back(device);
 
-    if (!Nl) {
-        Nl = std::make_shared<TNl>();
-        if (!Nl)
-            throw std::bad_alloc();
-
-        TError error = Nl->Connect();
-        if (error) {
-            L_ERR() << "Can't open link: " << error << std::endl;
-            return error;
-        }
-    } else {
-        TError error = Nl->RefillCache();
-        if (error) {
-            L_ERR() << "Can't refill link cache: " << error << std::endl;
-            return error;
-        }
+    TError error = Nl->RefillCache();
+    if (error) {
+        L_ERR() << "Can't refill link cache: " << error << std::endl;
+        return error;
     }
 
     if (!devices.size()) {

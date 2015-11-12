@@ -63,6 +63,8 @@ class TNetwork : public std::enable_shared_from_this<TNetwork>,
     TError PrepareLink(std::shared_ptr<TNlLink> link);
 
 public:
+    TNetwork();
+    TError Connect(int fd = -1);
     TError Prepare();
     TError Update();
     // OpenLinks doesn't lock TNetwork
