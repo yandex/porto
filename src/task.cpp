@@ -955,6 +955,48 @@ TError TTask::Start() {
                 Abort(error);
         }
 
+        if (Env->NetCfg.NewNetNs) {
+            TNamespaceFd my_nsfd;
+            TNamespaceFd nsfd;
+
+            TError error = my_nsfd.Open(GetTid(), "ns/net");
+            if (error)
+                Abort(error);
+
+            error = nsfd.Open(clonePid, "ns/net");
+            if (error)
+                Abort(error);
+
+            error = nsfd.SetNs(CLONE_NEWNET);
+            if (error) {
+                L_ERR() << error << std::endl;
+                Abort(error);
+            }
+
+            auto nl = std::make_shared<TNl>();
+            if (!nl)
+                throw std::bad_alloc();
+
+            error = nl->Connect();
+            if (error) {
+                L_ERR() << error << std::endl;
+                Abort(error);
+            }
+            int fd = nl->GetFd();
+
+            error = my_nsfd.SetNs(CLONE_NEWNET);
+            if (error) {
+                L_ERR() << error << std::endl;
+                Abort(error);
+            }
+
+            error = Env->Sock.SendFd(fd);
+            if (error) {
+                L_ERR() << error << std::endl;
+                Abort(error);
+            }
+        }
+
         if (Env->TripleFork) {
             auto fd = Env->PortoInitFd.GetFd();
             auto pid = std::to_string(clonePid);
@@ -991,6 +1033,14 @@ TError TTask::Start() {
     error = masterSock.RecvPid(Pid, VPid);
     if (error)
         return TError(EError::InvalidValue, errno, "Container couldn't start due to resource limits");
+
+    if (Env->NetCfg.NewNetNs) {
+        error = masterSock.RecvFd(NetLinkFd);
+        if (error) {
+            L_ERR() << error << std::endl;
+            return TError(EError::Unknown, errno, "Cannot receive container's netlink fd");
+        }
+    }
 
     error = masterSock.RecvError();
     if (error || status) {
@@ -1225,4 +1275,9 @@ TError TTask::DumpProcFsFile(const std::string &filename) {
 void TTask::DumpDebugInfo() {
     DumpProcFsFile("status");
     DumpProcFsFile("stack");
+}
+
+TTask::~TTask() {
+    if (NetLinkFd != -1)
+        close(NetLinkFd);
 }
