@@ -86,4 +86,6 @@ public:
     TError RecvPid(pid_t &pid, pid_t &vpid) const;
     TError SendError(const TError &error) const;
     TError RecvError() const;
+    TError SendFd(int fd) const;
+    TError RecvFd(int &fd) const;
 };

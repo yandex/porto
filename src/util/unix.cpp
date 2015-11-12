@@ -656,6 +656,78 @@ TError TUnixSocket::RecvError() const {
     return error;
 }
 
+TError TUnixSocket::SendFd(int fd) const {
+    char data[1];
+    struct iovec iovec = {
+        .iov_base = data,
+        .iov_len = sizeof(data),
+    };
+    char buffer[CMSG_SPACE(sizeof(int))] = {0};
+    struct msghdr msghdr = {
+        .msg_name = NULL,
+        .msg_namelen = 0,
+        .msg_iov = &iovec,
+        .msg_iovlen = 1,
+        .msg_control = buffer,
+        .msg_controllen = sizeof(buffer),
+        .msg_flags = 0,
+    };
+
+    struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msghdr);
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_RIGHTS;
+    cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+    *((int*)CMSG_DATA(cmsg)) = fd;
+
+    ssize_t ret = sendmsg(SockFd, &msghdr, 0);
+
+    if (ret <= 0)
+        return TError(EError::Unknown, errno, "cannot send fd");
+    if (ret != sizeof(data))
+        return TError(EError::Unknown, "partial sendmsg: " + std::to_string(ret));
+
+    return TError::Success();
+}
+
+TError TUnixSocket::RecvFd(int &fd) const {
+    char data[1];
+    struct iovec iovec = {
+        .iov_base = data,
+        .iov_len = sizeof(data),
+    };
+    char buffer[CMSG_SPACE(sizeof(int)) + CMSG_SPACE(sizeof(struct ucred))] = {0};
+    struct msghdr msghdr = {
+        .msg_name = NULL,
+        .msg_namelen = 0,
+        .msg_iov = &iovec,
+        .msg_iovlen = 1,
+        .msg_control = buffer,
+        .msg_controllen = sizeof(buffer),
+        .msg_flags = 0,
+    };
+    struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msghdr);
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_RIGHTS;
+    cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+
+    int ret = recvmsg(SockFd, &msghdr, 0);
+    if (ret <= 0)
+        return TError(EError::Unknown, errno, "cannot receive fd");
+    if (ret != sizeof(data))
+        return TError(EError::Unknown, "partial recvmsg: " + std::to_string(ret));
+
+    for (struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msghdr); cmsg;
+         cmsg = CMSG_NXTHDR(&msghdr, cmsg)) {
+
+        if ((cmsg->cmsg_level == SOL_SOCKET) &&
+            (cmsg->cmsg_type == SCM_RIGHTS)) {
+            fd = *((int*) CMSG_DATA(cmsg));
+            return TError::Success();
+        }
+    }
+    return TError(EError::Unknown, "no rights after recvmsg");
+}
+
 TError ChattrFd(int fd, unsigned add_flags, unsigned del_flags) {
     unsigned old_flags, new_flags;
 
