@@ -39,17 +39,17 @@ if not Catch(c.Find, container_name):
     c.Destroy(container_name)
 
 if not Catch(c.FindVolume, volume_path):
-    c.FindVolume(volume_path).Destroy()
+    c.DestroyVolume(volume_path)
 
 if os.access(volume_path, os.F_OK):
     os.rmdir(volume_path)
 
 for v in c.ListVolumes():
     if v.GetProperties().get("private") == volume_private:
-            v.Destroy()
+        c.DestroyVolume(v.path)
 
 if not Catch(c.FindLayer, layer_name):
-    c.FindLayer(layer_name).Remove()
+    c.RemoveLayer(layer_name)
 
 if os.access(tarball_path, os.F_OK):
     os.unlink(tarball_path)
@@ -141,7 +141,7 @@ assert len(w.GetContainers()) == 1
 assert w.GetContainers()[0].name == container_name
 assert Catch(l.Remove) == porto.exceptions.Busy
 
-v.Destroy()
+v.Unlink()
 assert Catch(c.FindVolume, v.path) == porto.exceptions.VolumeNotFound
 
 c.Destroy(a)
