@@ -935,8 +935,10 @@ bool TNlHtb::Valid(uint32_t defaultClass) {
     bool valid = true;
 
     ret = rtnl_qdisc_alloc_cache(Link->GetSock(), &qdiscCache);
-    if (ret < 0)
+    if (ret < 0) {
+        L_ERR() << "can't alloc qdisc cache" << std::endl;
         return false;
+    }
 
     Link->LogCache(qdiscCache);
 
