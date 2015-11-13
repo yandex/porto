@@ -504,6 +504,43 @@ TError TContainer::PrepareNetwork() {
     return error;
 }
 
+TError TContainer::RestoreNetwork() {
+    TError error;
+
+    if (1) {
+        /* Take parent's network */
+        Net = Parent->Net;
+        L() << "parent network for " << Name << std::endl;
+    }
+
+    if (error)
+        return error;
+
+    PORTO_ASSERT(Net != nullptr);
+    PORTO_ASSERT(Tclass == nullptr);
+    PORTO_ASSERT(Parent->Tclass != nullptr);
+
+    auto tclass = Parent->Tclass;
+    uint32_t handle = TcHandle(TcMajor(tclass->GetHandle()), Id);
+    Tclass = std::make_shared<TTclass>(Net, tclass, handle);
+
+    TUintMap prio, rate, ceil;
+    prio = Prop->Get<TUintMap>(P_NET_PRIO);
+    rate = Prop->Get<TUintMap>(P_NET_GUARANTEE);
+    ceil = Prop->Get<TUintMap>(P_NET_LIMIT);
+
+    Tclass->Prepare(prio, rate, ceil);
+
+    auto net_lock = Net->ScopedLock();
+    error = Tclass->Create();
+    if (error) {
+        L_ERR() << "Can't create tclass: " << error << std::endl;
+        return error;
+    }
+
+    return error;
+}
+
 void TContainer::ShutdownOom() {
     if (Source)
         Holder->EpollLoop->RemoveSource(Source);
@@ -1818,6 +1855,12 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
                 L() << "Task is not running or has been reparented" << std::endl;
                 LostAndRestored = true;
             }
+        }
+
+        error = RestoreNetwork();
+        if (error) {
+            L_ERR() << error << std::endl;
+            return error;
         }
 
         auto state = Data->Get<std::string>(D_STATE);
