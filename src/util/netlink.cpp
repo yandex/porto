@@ -952,7 +952,7 @@ bool TNlHtb::Valid(uint32_t defaultClass) {
             valid = false;
         else if (rtnl_tc_get_kind(TC_CAST(qdisc)) != string("htb"))
             valid = false;
-        else if (rtnl_htb_get_defcls(qdisc) != defaultClass)
+        else if (rtnl_htb_get_defcls(qdisc) != TC_H_MIN(defaultClass))
             valid = false;
     } else {
         valid = false;
