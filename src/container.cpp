@@ -436,31 +436,59 @@ std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
 
 TError TContainer::PrepareNetwork() {
     TError error;
+    bool initialized = false;
 
     if (IsRoot()) {
+        /*
+         * Root container is always created first, so there is no need
+         * to search existing TNetwork, just create a new one.
+         */
         Net = std::make_shared<TNetwork>();
-        if (Net) {
-            error = Net->Connect();
-            L() << "host network for " << Name << std::endl;
-            if (!error)
-                error = Net->Prepare();
-        }
-    } else if (Task && Task->GetNetLinkFd() != -1) {
-        Net = std::make_shared<TNetwork>();
-        if (Net) {
+        if (Net == nullptr)
+            throw std::bad_alloc();
+        error = Net->Connect();
+        L() << "host network for " << Name << std::endl;
+
+        TNamespaceFd fd;
+        error = fd.Open(GetTid(), "ns/net");
+        if (!error)
+            Holder->NetNsMap[fd.GetInode()] = Net;
+
+    } else if (Task) {
+        TNamespaceFd fd;
+        error = fd.Open(Task->GetPid(), "ns/net");
+        auto inode = fd.GetInode();
+        std::shared_ptr<TNetwork> net;
+        if (Holder->NetNsMap.find(inode) != Holder->NetNsMap.end() &&
+            (net = Holder->NetNsMap[inode].lock())) {
+            /* Take existing TNetwork */
+            Net = net;
+            initialized = true;
+            L() << "take existing network for " << Name << std::endl;
+
+        } else {
+            /* Create new TNetwork */
+            Net = std::make_shared<TNetwork>();
+            if (Net == nullptr)
+                throw std::bad_alloc();
+
             error = Net->Connect(Task->GetNetLinkFd());
-            L() << "custom network for " << Name << std::endl;
             if (!error)
-                error = Net->Prepare();
+                Holder->NetNsMap[fd.GetInode()] = Net;
+            L() << "custom new network for " << Name << std::endl;
         }
     } else {
         /* Take parent's network */
         Net = Parent->Net;
+        initialized = true;
         L() << "parent network for " << Name << std::endl;
     }
 
     if (error)
         return error;
+
+    if (!initialized)
+        error = Net->Prepare();
 
     PORTO_ASSERT(Net != nullptr);
     PORTO_ASSERT(Tclass == nullptr);
@@ -507,7 +535,53 @@ TError TContainer::PrepareNetwork() {
 TError TContainer::RestoreNetwork() {
     TError error;
 
-    if (1) {
+    if (Task) {
+        TNamespaceFd my_nsfd;
+        TNamespaceFd nsfd;
+
+        TError error = nsfd.Open(Task->GetPid(), "ns/net");
+        if (error)
+            return error;
+
+        std::shared_ptr<TNetwork> net;
+        ino_t inode = nsfd.GetInode();
+        if (Holder->NetNsMap.find(inode) != Holder->NetNsMap.end() &&
+            (net = Holder->NetNsMap[inode].lock())) {
+            Net = net;
+            L() << "existing network for " << Name << std::endl;
+        } else {
+            error = my_nsfd.Open(GetTid(), "ns/net");
+            if (error)
+                return error;
+
+            error = nsfd.SetNs(CLONE_NEWNET);
+            if (error) {
+                L_ERR() << error << std::endl;
+                return error;
+            }
+
+            Net = std::make_shared<TNetwork>();
+            if (Net != nullptr) {
+                error = Net->Connect();
+                L() << "existing network namespace for " << Name << std::endl;
+
+                if (!error) {
+                    TNamespaceFd fd;
+                    error = fd.Open(GetTid(), "ns/net");
+                    Holder->NetNsMap[fd.GetInode()] = Net;
+                }
+            }
+
+            error = my_nsfd.SetNs(CLONE_NEWNET);
+            if (error) {
+                L_ERR() << error << std::endl;
+                return error;
+            }
+
+            if (Net == nullptr)
+                throw std::bad_alloc();
+        }
+    } else {
         /* Take parent's network */
         Net = Parent->Net;
         L() << "parent network for " << Name << std::endl;

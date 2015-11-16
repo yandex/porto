@@ -4,6 +4,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <unordered_map>
 
 #include "common.hpp"
 #include "util/idmap.hpp"
@@ -19,6 +20,7 @@ class TClient;
 class TContainer;
 class TKeyValueStorage;
 class TKeyValueNode;
+class TNetwork;
 
 namespace kv {
     class TNode;
@@ -41,6 +43,7 @@ class TContainerHolder : public std::enable_shared_from_this<TContainerHolder>,
 public:
     std::shared_ptr<TEventQueue> Queue = nullptr;
     std::shared_ptr<TEpollLoop> EpollLoop;
+    std::unordered_map<ino_t, std::weak_ptr<TNetwork>> NetNsMap;
 
     TContainerHolder(std::shared_ptr<TEpollLoop> epollLoop,
                      std::shared_ptr<TKeyValueStorage> storage) :
