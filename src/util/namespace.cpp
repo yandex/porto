@@ -72,6 +72,13 @@ bool TNamespaceFd::operator!=(const TNamespaceFd &other) const {
     return !(*this == other);
 }
 
+ino_t TNamespaceFd::GetInode() const {
+    struct stat st;
+    if (Fd > 0 && fstat(Fd, &st) == 0)
+        return st.st_ino;
+    return -1;
+}
+
 TError TNamespaceSnapshot::Open(pid_t pid) {
     TError error;
 

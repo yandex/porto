@@ -22,6 +22,7 @@ public:
     TError Chdir() const;
     bool operator==(const TNamespaceFd &other) const;
     bool operator!=(const TNamespaceFd &other) const;
+    ino_t GetInode() const;
 };
 
 class TNamespaceSnapshot : public TNonCopyable {
