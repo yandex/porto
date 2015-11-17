@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"os"
 	"os/exec"
+	"syscall"
 	"testing"
 
 	"github.com/yandex/porto/src/api/go/rpc"
@@ -143,7 +144,7 @@ func TestResume(t *testing.T) {
 func TestKill(t *testing.T) {
 	conn := ConnectToPorto(t)
 	defer conn.Close()
-	FailOnError(t, conn, conn.Kill(testContainer, 15)) // Send SIGTERM
+	FailOnError(t, conn, conn.Kill(testContainer, syscall.SIGTERM))
 }
 
 func TestWait(t *testing.T) {
