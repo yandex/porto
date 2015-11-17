@@ -3,9 +3,12 @@ package porto
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
+	"math"
 	"net"
 	"syscall"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 
@@ -96,7 +99,7 @@ type API interface {
 	Pause(name string) error
 	Resume(name string) error
 
-	Wait(containers []string, timeout int) (string, error)
+	Wait(containers []string, timeout time.Duration) (string, error)
 
 	List() ([]string, error)
 	Plist() ([]TProperty, error)
@@ -276,12 +279,22 @@ func (conn *portoConnection) Resume(name string) error {
 	return err
 }
 
-func (conn *portoConnection) Wait(containers []string, timeout int) (string, error) {
+func (conn *portoConnection) Wait(containers []string, timeout time.Duration) (string, error) {
 	req := &rpc.TContainerRequest{
 		Wait: &rpc.TContainerWaitRequest{
 			Name: containers,
 		},
 	}
+
+	if timeout >= 0 {
+		if timeout/time.Millisecond > math.MaxUint32 {
+			return "", fmt.Errorf("timeout must be less than %d ms", math.MaxUint32)
+		}
+
+		timeoutms := uint32(timeout / time.Millisecond)
+		req.Wait.Timeout = &timeoutms
+	}
+
 	resp, err := conn.performRequest(req)
 	if err != nil {
 		return "", err
