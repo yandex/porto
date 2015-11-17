@@ -1362,6 +1362,8 @@ void TContainer::FreeResources() {
     }
     Tclass = nullptr;
     Task = nullptr;
+    if (IsRoot())
+        Net->Destroy();
     Net = nullptr;
     ShutdownOom();
 
@@ -1960,10 +1962,12 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
             }
         }
 
-        error = RestoreNetwork();
-        if (error) {
-            L_ERR() << error << std::endl;
-            return error;
+        if (!LostAndRestored) {
+            error = RestoreNetwork();
+            if (error) {
+                L_ERR() << error << std::endl;
+                return error;
+            }
         }
 
         auto state = Data->Get<std::string>(D_STATE);
