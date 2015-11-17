@@ -110,13 +110,12 @@ TError TQdisc::Remove(const std::vector<std::shared_ptr<TNlLink>> &links) {
 }
 
 class TFilter : public TNonCopyable {
-    std::shared_ptr<TNetwork> Net;
     const std::shared_ptr<TQdisc> Parent;
     bool Exists(std::shared_ptr<TNlLink> link);
 
 public:
-    TFilter(std::shared_ptr<TNetwork> net, const std::shared_ptr<TQdisc> parent) : Net(net), Parent(parent) { }
-    TError Create();
+    TFilter(const std::shared_ptr<TQdisc> parent) : Parent(parent) { }
+    TError Create(const std::vector<std::shared_ptr<TNlLink>> &links);
 };
 
 bool TFilter::Exists(std::shared_ptr<TNlLink> link) {
@@ -124,8 +123,8 @@ bool TFilter::Exists(std::shared_ptr<TNlLink> link) {
     return filter.Exists();
 }
 
-TError TFilter::Create() {
-    for (auto &link : Net->GetLinks()) {
+TError TFilter::Create(const std::vector<std::shared_ptr<TNlLink>> &links) {
+    for (auto &link : links) {
         TNlCgFilter filter(link, Parent->GetHandle(), 1);
         TError error = filter.Create();
         if (error)
@@ -138,17 +137,19 @@ TError TFilter::Create() {
 TError TNetwork::Destroy() {
     auto lock = ScopedLock();
 
+    auto links = GetLinks();
+
     L_ACT() << "Removing network..." << std::endl;
 
     if (Tclass) {
-        TError error = Tclass->Remove(GetLinks());
+        TError error = Tclass->Remove(links);
         if (error)
             return error;
         Tclass = nullptr;
     }
 
     if (Qdisc) {
-        TError error = Qdisc->Remove(GetLinks());
+        TError error = Qdisc->Remove(links);
         if (error)
             return error;
         Qdisc = nullptr;
@@ -176,7 +177,7 @@ TError TNetwork::Prepare() {
     }
 
     Qdisc = std::make_shared<TQdisc>(rootHandle, defClass);
-    Filter = std::make_shared<TFilter>(shared_from_this(), Qdisc);
+    Filter = std::make_shared<TFilter>(Qdisc);
     Tclass = std::make_shared<TTclass>(Qdisc, defClass);
 
     return TError::Success();
