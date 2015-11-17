@@ -457,6 +457,10 @@ TError TContainer::PrepareNetwork() {
     } else if (Task) {
         TNamespaceFd fd;
         error = fd.Open(Task->GetPid(), "ns/net");
+        if (error) {
+            L_ERR() << "Can't get task net namespace: " << error << std::endl;
+            return TError::Success();
+        }
         auto inode = fd.GetInode();
         std::shared_ptr<TNetwork> net;
         if (Holder->NetNsMap.find(inode) != Holder->NetNsMap.end() &&
@@ -1055,7 +1059,23 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
         if (error)
             goto error;
 
-        error = Task->Start();
+        TUnixSocket sock;
+        int status;
+        error = Task->Start(sock, status);
+        if (error) {
+            TError e = Data->Set<int>(D_START_ERRNO, error.GetErrno());
+            if (e)
+                L_ERR() << "Can't set start_errno: " << e << std::endl;
+            goto error;
+        }
+        error = PrepareNetwork();
+        if (error) {
+            TError e = Data->Set<int>(D_START_ERRNO, error.GetErrno());
+            if (e)
+                L_ERR() << "Can't set start_errno: " << e << std::endl;
+            goto error;
+        }
+        error = Task->Start2(sock, status);
         if (error) {
             TError e = Data->Set<int>(D_START_ERRNO, error.GetErrno());
             if (e)
@@ -1072,11 +1092,13 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
         error = Prop->Set<std::vector<int>>(P_RAW_ROOT_PID, Task->GetPids());
         if (error)
             goto error;
+    } else if (meta) {
+        error = PrepareNetwork();
+        if (error) {
+            L_ERR() << error << std::endl;
+            return error;
+        }
     }
-
-    error = PrepareNetwork();
-    if (error)
-        goto error;
 
     IsMeta = meta;
     if (meta)
@@ -1340,6 +1362,7 @@ void TContainer::FreeResources() {
     }
     Tclass = nullptr;
     Task = nullptr;
+    Net = nullptr;
     ShutdownOom();
 
     if (IsRoot() || IsPortoRoot())

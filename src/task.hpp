@@ -136,7 +136,7 @@ struct TTaskEnv : public TNonCopyable {
 
     TUnixSocket Sock;
     TUnixSocket Sock2;
-    int ReportStage;
+    int ReportStage = 0;
 };
 
 class TTask: public TNonCopyable {
@@ -171,7 +171,9 @@ public:
     TTask(pid_t pid);
     ~TTask();
 
-    TError Start();
+    TError Start(TUnixSocket &masterSock, int &status);
+    /* Network should be initialized between Start() and Start2() */
+    TError Start2(TUnixSocket &masterSock, int &status);
     pid_t GetPid() const;
     pid_t GetWPid() const;
     pid_t GetPidFor(pid_t pid) const;

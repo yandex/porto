@@ -88,10 +88,29 @@ void TTask::ReportPid(pid_t pid) const {
 void TTask::Abort(const TError &error) const {
     TError error2;
 
-    while (Env->ReportStage++ < 2) {
-        error2 = Env->Sock.SendPid(getpid());
-        if (error2)
-            L_ERR() << error2 << std::endl;
+    /*
+     * stage0: RecvPid
+     * stage1: RecvPid*
+     * stage2: RecvFd*
+     * stage3: RecvPid
+     * stage4: RecvError
+     *
+     * *only if NetCfg.NewNetNs is set
+     */
+    L() << "abort " << Env->ReportStage << " " << Env->NetCfg.NewNetNs << std::endl;
+
+    for (int stage = Env->ReportStage; stage < 4; stage++) {
+        if (!Env->NetCfg.NewNetNs && (stage == 1 || stage == 2))
+            continue;
+        else if (stage == 2) {
+            error2 = Env->Sock.SendFd(-1);
+            if (error2)
+                L_ERR() << error2 << std::endl;
+        } else {
+            error2 = Env->Sock.SendPid(getpid());
+            if (error2)
+                L_ERR() << error2 << std::endl;
+        }
     }
 
     error2 = Env->Sock.SendError(error);
@@ -818,7 +837,7 @@ void TTask::StartChild() {
             error = Env->Sock2.RecvZero();
             if (error)
                 Abort(error);
-            Env->ReportStage++;
+            Env->ReportStage += 3;
         }
     }
 
@@ -830,8 +849,8 @@ void TTask::StartChild() {
     Abort(error);
 }
 
-TError TTask::Start() {
-    TUnixSocket masterSock, waiterSock;
+TError TTask::Start(TUnixSocket &masterSock, int &status) {
+    TUnixSocket waiterSock;
     TError error;
 
     Pid = VPid = WPid = 0;
@@ -928,6 +947,47 @@ TError TTask::Start() {
             Abort(error);
         }
 
+        if (Env->NetCfg.NewNetNs) {
+            TNamespaceFd my_nsfd;
+            TNamespaceFd nsfd;
+
+            error = nsfd.Open(clonePid, "ns/net");
+            if (error)
+                Abort(error);
+
+            error = nsfd.SetNs(CLONE_NEWNET);
+            if (error) {
+                L_ERR() << error << std::endl;
+                Abort(error);
+            }
+
+            auto nl = std::make_shared<TNl>();
+            if (!nl)
+                throw std::bad_alloc();
+
+            error = nl->Connect();
+            if (error) {
+                L_ERR() << error << std::endl;
+                Abort(error);
+            }
+            int fd = nl->GetFd();
+
+            error = Env->Sock.SendPid(clonePid);
+            if (error) {
+                L_ERR() << error << std::endl;
+                Abort(error);
+            }
+            Env->ReportStage++;
+
+            error = Env->Sock.SendFd(fd);
+            if (error) {
+                L_ERR() << error << std::endl;
+                Abort(error);
+            }
+            Env->ReportStage++;
+        } else
+            Env->ReportStage += 2;
+
         /* Report VPid in parent pid namespace for new pid-ns */
         if (Env->Isolate && !Env->QuadroFork)
             ReportPid(clonePid);
@@ -957,48 +1017,6 @@ TError TTask::Start() {
                 Abort(error);
         }
 
-        if (Env->NetCfg.NewNetNs) {
-            TNamespaceFd my_nsfd;
-            TNamespaceFd nsfd;
-
-            TError error = my_nsfd.Open(GetTid(), "ns/net");
-            if (error)
-                Abort(error);
-
-            error = nsfd.Open(clonePid, "ns/net");
-            if (error)
-                Abort(error);
-
-            error = nsfd.SetNs(CLONE_NEWNET);
-            if (error) {
-                L_ERR() << error << std::endl;
-                Abort(error);
-            }
-
-            auto nl = std::make_shared<TNl>();
-            if (!nl)
-                throw std::bad_alloc();
-
-            error = nl->Connect();
-            if (error) {
-                L_ERR() << error << std::endl;
-                Abort(error);
-            }
-            int fd = nl->GetFd();
-
-            error = my_nsfd.SetNs(CLONE_NEWNET);
-            if (error) {
-                L_ERR() << error << std::endl;
-                Abort(error);
-            }
-
-            error = Env->Sock.SendFd(fd);
-            if (error) {
-                L_ERR() << error << std::endl;
-                Abort(error);
-            }
-        }
-
         if (Env->TripleFork) {
             auto fd = Env->PortoInitFd.GetFd();
             auto pid = std::to_string(clonePid);
@@ -1023,7 +1041,7 @@ TError TTask::Start() {
 
     Env->Sock.Close();
 
-    int status = 0;
+    status = 0;
     int forkResult = waitpid(forkPid, &status, 0);
     if (forkResult < 0)
         (void)kill(forkPid, SIGKILL);
@@ -1032,17 +1050,30 @@ TError TTask::Start() {
     if (error)
         return TError(EError::InvalidValue, errno, "Container couldn't start due to resource limits");
 
-    error = masterSock.RecvPid(Pid, VPid);
-    if (error)
-        return TError(EError::InvalidValue, errno, "Container couldn't start due to resource limits");
-
     if (Env->NetCfg.NewNetNs) {
+        pid_t unused;
+        error = masterSock.RecvPid(Pid, unused);
+        if (error) {
+            L_ERR() << error << std::endl;
+            return error;
+        }
+
         error = masterSock.RecvFd(NetLinkFd);
         if (error) {
             L_ERR() << error << std::endl;
             return TError(EError::Unknown, errno, "Cannot receive container's netlink fd");
         }
+    } else {
+        Pid = WPid;
     }
+
+    return error;
+}
+
+TError TTask::Start2(TUnixSocket &masterSock, int &status) {
+    TError error = masterSock.RecvPid(Pid, VPid);
+    if (error)
+        return TError(EError::InvalidValue, errno, "Container couldn't start due to resource limits");
 
     error = masterSock.RecvError();
     if (error || status) {
