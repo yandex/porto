@@ -458,7 +458,7 @@ TError TContainer::PrepareNetwork() {
         TNamespaceFd fd;
         error = fd.Open(Task->GetPid(), "ns/net");
         if (error) {
-            L_ERR() << "Can't get task net namespace: " << error << std::endl;
+            L() << "Can't get task net namespace: " << error << std::endl;
             return TError::Success();
         }
         auto inode = fd.GetInode();
