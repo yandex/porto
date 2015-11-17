@@ -4892,20 +4892,6 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectNeq(v, "0");
     ExpectApiSuccess(api.Destroy(name));
 
-    if (NetworkEnabled()) {
-        Say() << "Make sure network counters are persistent" << std::endl;
-        ExpectApiSuccess(api.Create(name));
-        ExpectApiSuccess(api.SetProperty(name, "command", "wget yandex.ru -O /dev/null"));
-        ExpectApiSuccess(api.Start(name));
-        WaitContainer(api, name);
-
-        ExpectNonZeroLink(api, name, "net_bytes");
-        KillSlave(api, SIGKILL);
-        ExpectNonZeroLink(api, name, "net_bytes");
-
-        ExpectApiSuccess(api.Destroy(name));
-    }
-
     Say() << "Make sure respawn_count ticks after recovery " << std::endl;
     ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.SetProperty(name, "command", "true"));
