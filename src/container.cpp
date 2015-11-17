@@ -135,7 +135,7 @@ void TContainer::SyncStateWithCgroup(TScopedLock &holder_lock) {
 TError TContainer::GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) {
     if (Net && Tclass) {
         auto lock = Net->ScopedLock();
-        return Tclass->GetStat(stat, m);
+        return Tclass->GetStat(Net->GetLinks(), stat, m);
     } else
         return TError(EError::NotSupported, "Network statistics is not available");
 }
@@ -495,13 +495,13 @@ TError TContainer::PrepareNetwork() {
 
     if (IsRoot()) {
         uint32_t handle = TcHandle(TcMajor(Net->GetQdisc()->GetHandle()), Id);
-        Tclass = std::make_shared<TTclass>(Net, Net->GetQdisc(), handle);
+        Tclass = std::make_shared<TTclass>(Net->GetQdisc(), handle);
     } else {
         PORTO_ASSERT(Parent->Tclass != nullptr);
 
         auto tclass = Parent->Tclass;
         uint32_t handle = TcHandle(TcMajor(tclass->GetHandle()), Id);
-        Tclass = std::make_shared<TTclass>(Net, tclass, handle);
+        Tclass = std::make_shared<TTclass>(tclass, handle);
     }
 
     TUintMap prio, rate, ceil;
@@ -512,7 +512,7 @@ TError TContainer::PrepareNetwork() {
     Tclass->Prepare(prio, rate, ceil);
 
     auto net_lock = Net->ScopedLock();
-    error = Tclass->Create();
+    error = Tclass->Create(Net->GetLinks());
     if (error) {
         L_ERR() << "Can't create tclass: " << error << std::endl;
         return error;
@@ -596,7 +596,7 @@ TError TContainer::RestoreNetwork() {
 
     auto tclass = Parent->Tclass;
     uint32_t handle = TcHandle(TcMajor(tclass->GetHandle()), Id);
-    Tclass = std::make_shared<TTclass>(Net, tclass, handle);
+    Tclass = std::make_shared<TTclass>(tclass, handle);
 
     TUintMap prio, rate, ceil;
     prio = Prop->Get<TUintMap>(P_NET_PRIO);
@@ -606,7 +606,7 @@ TError TContainer::RestoreNetwork() {
     Tclass->Prepare(prio, rate, ceil);
 
     auto net_lock = Net->ScopedLock();
-    error = Tclass->Create();
+    error = Tclass->Create(Net->GetLinks());
     if (error) {
         L_ERR() << "Can't create tclass: " << error << std::endl;
         return error;
@@ -1328,7 +1328,7 @@ void TContainer::FreeResources() {
     if (Tclass && (!Parent || Parent->Tclass != Tclass)) {
         auto lock = Net->ScopedLock();
 
-        TError error = Tclass->Remove();
+        TError error = Tclass->Remove(Net->GetLinks());
         if (error)
             L_ERR() << "Can't remove tc classifier: " << error << std::endl;
     }
@@ -2319,7 +2319,7 @@ TError TContainer::UpdateNetwork() {
         Tclass->Prepare(prio, rate, ceil);
 
         auto net_lock = Net->ScopedLock();
-        return Tclass->Create();
+        return Tclass->Create(Net->GetLinks());
     }
     return TError::Success();
 }

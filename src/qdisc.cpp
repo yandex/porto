@@ -11,8 +11,9 @@ bool TTclass::Exists(std::shared_ptr<TNlLink> link) {
     return tclass.Exists();
 }
 
-TError TTclass::GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) {
-    for (auto &link : Net->GetLinks()) {
+TError TTclass::GetStat(const std::vector<std::shared_ptr<TNlLink>> &links,
+                        ETclassStat stat, std::map<std::string, uint64_t> &m) {
+    for (auto &link : links) {
         uint64_t val;
         TNlClass tclass(link, GetParent(), Handle);
         TError error = tclass.GetStat(stat, val);
@@ -41,10 +42,10 @@ void TTclass::Prepare(std::map<std::string, uint64_t> prio,
     Ceil = ceil;
 }
 
-TError TTclass::Create() {
+TError TTclass::Create(const std::vector<std::shared_ptr<TNlLink>> &links) {
     TError firstError = TError::Success();
 
-    for (auto &link : Net->GetLinks()) {
+    for (auto &link : links) {
         auto alias = link->GetAlias();
         auto prio = (Prio.find(alias) != Prio.end()) ? Prio[alias] : Prio["default"];
         auto rate = (Rate.find(alias) != Rate.end()) ? Rate[alias] : Rate["default"];
@@ -66,8 +67,8 @@ TError TTclass::Create() {
     return firstError;
 }
 
-TError TTclass::Remove() {
-    for (auto &link : Net->GetLinks()) {
+TError TTclass::Remove(const std::vector<std::shared_ptr<TNlLink>> &links) {
+    for (auto &link : links) {
         if (!Exists(link))
             continue;
 
@@ -80,12 +81,8 @@ TError TTclass::Remove() {
     return TError::Success();
 }
 
-std::shared_ptr<TNetwork> TQdisc::GetNet() {
-    return Net;
-}
-
-TError TQdisc::Create() {
-    for (auto &link : Net->GetLinks()) {
+TError TQdisc::Create(const std::vector<std::shared_ptr<TNlLink>> &links) {
+    for (auto &link : links) {
         TNlHtb qdisc(link, TcRootHandle(), Handle);
 
         if (qdisc.Valid(DefClass))
@@ -101,8 +98,8 @@ TError TQdisc::Create() {
     return TError::Success();
 }
 
-TError TQdisc::Remove() {
-    for (auto &link : Net->GetLinks()) {
+TError TQdisc::Remove(const std::vector<std::shared_ptr<TNlLink>> &links) {
+    for (auto &link : links) {
         TNlHtb qdisc(link, TcRootHandle(), Handle);
         TError error = qdisc.Remove();
         if (error)
@@ -144,14 +141,14 @@ TError TNetwork::Destroy() {
     L_ACT() << "Removing network..." << std::endl;
 
     if (Tclass) {
-        TError error = Tclass->Remove();
+        TError error = Tclass->Remove(GetLinks());
         if (error)
             return error;
         Tclass = nullptr;
     }
 
     if (Qdisc) {
-        TError error = Qdisc->Remove();
+        TError error = Qdisc->Remove(GetLinks());
         if (error)
             return error;
         Qdisc = nullptr;
@@ -178,9 +175,9 @@ TError TNetwork::Prepare() {
             return error;
     }
 
-    Qdisc = std::make_shared<TQdisc>(shared_from_this(), rootHandle, defClass);
+    Qdisc = std::make_shared<TQdisc>(rootHandle, defClass);
     Filter = std::make_shared<TFilter>(shared_from_this(), Qdisc);
-    Tclass = std::make_shared<TTclass>(shared_from_this(), Qdisc, defClass);
+    Tclass = std::make_shared<TTclass>(Qdisc, defClass);
 
     return TError::Success();
 }
