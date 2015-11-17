@@ -365,8 +365,8 @@ bool TcClassExist(uint32_t handle) {
     size_t nr = 0;
     for (auto &link : links) {
         ExpectSuccess(link->RefillClassCache());
-        TNlClass tclass(link, -1, handle);
-        if (tclass.Exists())
+        TNlClass tclass(-1, handle);
+        if (tclass.Exists(*link))
             nr++;
     }
     return nr == links.size();
@@ -375,8 +375,8 @@ bool TcClassExist(uint32_t handle) {
 bool TcQdiscExist(uint32_t handle) {
     size_t nr = 0;
     for (auto &link : links) {
-        TNlHtb qdisc(link, -1, handle);
-        if (qdisc.Exists())
+        TNlHtb qdisc(-1, handle);
+        if (qdisc.Exists(*link))
             nr++;
     }
     return nr == links.size();
@@ -385,8 +385,8 @@ bool TcQdiscExist(uint32_t handle) {
 bool TcCgFilterExist(uint32_t parent, uint32_t handle) {
     size_t nr = 0;
     for (auto &link : links) {
-        TNlCgFilter filter(link, parent, handle);
-        if (filter.Exists())
+        TNlCgFilter filter(parent, handle);
+        if (filter.Exists(*link))
             nr++;
     }
     return nr == links.size();

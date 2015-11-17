@@ -3424,8 +3424,8 @@ static void TestLimits(TPortoAPI &api) {
         for (auto &link : links) {
             ExpectSuccess(link->RefillClassCache());
             uint32_t prio, rate, ceil;
-            TNlClass tclass(link, -1, stoul(handle));
-            ExpectSuccess(tclass.GetProperties(prio, rate, ceil));
+            TNlClass tclass(-1, stoul(handle));
+            ExpectSuccess(tclass.GetProperties(*link, prio, rate, ceil));
             ExpectEq(prio, netPrio + i);
             ExpectEq(rate, netGuarantee + i);
             ExpectEq(ceil, netCeil + i);

@@ -328,7 +328,7 @@ bool TNlLink::Valid() {
     return l != nullptr;
 }
 
-int TNlLink::GetIndex() {
+int TNlLink::GetIndex() const {
     return rtnl_link_get_ifindex(Link);
 }
 
@@ -587,7 +587,7 @@ TError TNlLink::AddVeth(const std::string &name, const std::string &peerName, co
     return TError::Success();
 }
 
-const std::string &TNlLink::GetAlias() {
+const std::string &TNlLink::GetAlias() const {
     if (Alias.length())
         return Alias;
     else
@@ -638,7 +638,7 @@ TError TNlLink::RefillClassCache() {
     return TError::Success();
 }
 
-void TNlLink::LogObj(const std::string &prefix, void *obj) {
+void TNlLink::LogObj(const std::string &prefix, void *obj) const {
     static std::function<void(struct nl_dump_params *, char *)> handler;
 
     struct nl_dump_params dp = {};
@@ -654,7 +654,7 @@ void TNlLink::LogObj(const std::string &prefix, void *obj) {
     nl_object_dump(OBJ_CAST(obj), &dp);
 }
 
-void TNlLink::LogCache(struct nl_cache *cache) {
+void TNlLink::LogCache(struct nl_cache *cache) const {
     if (!debug)
         return;
 
@@ -674,7 +674,7 @@ void TNlLink::LogCache(struct nl_cache *cache) {
     nl_cache_dump(cache, &dp);
 }
 
-TError TNlClass::Create(uint32_t prio, uint32_t rate, uint32_t ceil) {
+TError TNlClass::Create(TNlLink &link, uint32_t prio, uint32_t rate, uint32_t ceil) {
     TError error = TError::Success();
     int ret;
     struct rtnl_class *tclass;
@@ -683,7 +683,7 @@ TError TNlClass::Create(uint32_t prio, uint32_t rate, uint32_t ceil) {
     if (!tclass)
         return TError(EError::Unknown, string("Unable to allocate tclass object"));
 
-    rtnl_tc_set_link(TC_CAST(tclass), Link->GetLink());
+    rtnl_tc_set_link(TC_CAST(tclass), link.GetLink());
     rtnl_tc_set_parent(TC_CAST(tclass), Parent);
     rtnl_tc_set_handle(TC_CAST(tclass), Handle);
 
@@ -714,22 +714,22 @@ TError TNlClass::Create(uint32_t prio, uint32_t rate, uint32_t ceil) {
        rtnl_htb_set_cbuffer(tclass, cburst);
        */
 
-    Link->LogObj("add", tclass);
+    link.LogObj("add", tclass);
 
-    ret = rtnl_class_add(Link->GetSock(), tclass, NLM_F_CREATE);
+    ret = rtnl_class_add(link.GetSock(), tclass, NLM_F_CREATE);
     if (ret < 0)
-        error = TError(EError::Unknown, "Unable to add tclass for link " + Link->GetAlias() + ": " + nl_geterror(ret));
+        error = TError(EError::Unknown, "Unable to add tclass for link " + link.GetAlias() + ": " + nl_geterror(ret));
 
 free_class:
     rtnl_class_put(tclass);
 
     if (!error)
-        error = Link->RefillClassCache();
+        error = link.RefillClassCache();
 
     return error;
 }
 
-TError TNlClass::Remove() {
+TError TNlClass::Remove(TNlLink &link) {
     TError error = TError::Success();
     int ret;
     struct rtnl_class *tclass;
@@ -738,26 +738,26 @@ TError TNlClass::Remove() {
     if (!tclass)
         return TError(EError::Unknown, string("Unable to allocate tclass object"));
 
-    rtnl_tc_set_link(TC_CAST(tclass), Link->GetLink());
+    rtnl_tc_set_link(TC_CAST(tclass), link.GetLink());
     rtnl_tc_set_parent(TC_CAST(tclass), Parent);
     rtnl_tc_set_handle(TC_CAST(tclass), Handle);
 
-    ret = rtnl_class_delete(Link->GetSock(), tclass);
+    ret = rtnl_class_delete(link.GetSock(), tclass);
     if (ret < 0)
         error = TError(EError::Unknown, string("Unable to remove tclass: ") + nl_geterror(ret));
 
-    Link->LogObj("remove", tclass);
+    link.LogObj("remove", tclass);
 
     rtnl_class_put(tclass);
 
     if (!error)
-        error = Link->RefillClassCache();
+        error = link.RefillClassCache();
 
     return error;
 }
 
-TError TNlClass::GetStat(ETclassStat stat, uint64_t &val) {
-    TError error = Link->RefillClassCache();
+TError TNlClass::GetStat(TNlLink &link, ETclassStat stat, uint64_t &val) {
+    TError error = link.RefillClassCache();
     if (error)
         return error;
 
@@ -786,7 +786,7 @@ TError TNlClass::GetStat(ETclassStat stat, uint64_t &val) {
         return TError(EError::Unknown, "Unsupported netlink statistics");
     }
 
-    struct rtnl_class *tclass = rtnl_class_get(Link->GetClassCache(), Link->GetIndex(), Handle);
+    struct rtnl_class *tclass = rtnl_class_get(link.GetClassCache(), link.GetIndex(), Handle);
     if (!tclass)
         return TError(EError::Unknown, "Can't get class statistics");
 
@@ -796,8 +796,8 @@ TError TNlClass::GetStat(ETclassStat stat, uint64_t &val) {
     return TError::Success();
 }
 
-TError TNlClass::GetProperties(uint32_t &prio, uint32_t &rate, uint32_t &ceil) {
-    struct rtnl_class *tclass = rtnl_class_get(Link->GetClassCache(), Link->GetIndex(), Handle);
+TError TNlClass::GetProperties(const TNlLink &link, uint32_t &prio, uint32_t &rate, uint32_t &ceil) {
+    struct rtnl_class *tclass = rtnl_class_get(link.GetClassCache(), link.GetIndex(), Handle);
     if (!tclass)
         return TError(EError::Unknown, "Can't find tc class");
 
@@ -810,7 +810,7 @@ TError TNlClass::GetProperties(uint32_t &prio, uint32_t &rate, uint32_t &ceil) {
     return TError::Success();
 }
 
-bool TNlClass::Valid(uint32_t prio, uint32_t rate, uint32_t ceil) {
+bool TNlClass::Valid(const TNlLink &link, uint32_t prio, uint32_t rate, uint32_t ceil) {
     bool valid = true;
 
     /*
@@ -824,9 +824,9 @@ bool TNlClass::Valid(uint32_t prio, uint32_t rate, uint32_t ceil) {
     if (realParent == TcHandle(1, 0))
         realParent = TC_H_ROOT;
 
-    struct rtnl_class *tclass = rtnl_class_get(Link->GetClassCache(), Link->GetIndex(), Handle);
+    struct rtnl_class *tclass = rtnl_class_get(link.GetClassCache(), link.GetIndex(), Handle);
     if (tclass) {
-        if (rtnl_tc_get_link(TC_CAST(tclass)) != Link->GetLink())
+        if (rtnl_tc_get_link(TC_CAST(tclass)) != link.GetLink())
             valid = false;
         else if (rtnl_tc_get_parent(TC_CAST(tclass)) != realParent)
             valid = false;
@@ -849,16 +849,16 @@ bool TNlClass::Valid(uint32_t prio, uint32_t rate, uint32_t ceil) {
     return valid;
 }
 
-bool TNlClass::Exists() {
-    struct rtnl_class *tclass = rtnl_class_get(Link->GetClassCache(),
-                                               Link->GetIndex(),
+bool TNlClass::Exists(const TNlLink &link) {
+    struct rtnl_class *tclass = rtnl_class_get(link.GetClassCache(),
+                                               link.GetIndex(),
                                                Handle);
     rtnl_class_put(tclass);
 
     return tclass != nullptr;
 }
 
-TError TNlHtb::Create(uint32_t defaultClass) {
+TError TNlHtb::Create(const TNlLink &link, uint32_t defaultClass) {
     TError error = TError::Success();
     int ret;
     struct rtnl_qdisc *qdisc;
@@ -867,7 +867,7 @@ TError TNlHtb::Create(uint32_t defaultClass) {
     if (!qdisc)
         return TError(EError::Unknown, string("Unable to allocate qdisc object"));
 
-    rtnl_tc_set_link(TC_CAST(qdisc), Link->GetLink());
+    rtnl_tc_set_link(TC_CAST(qdisc), link.GetLink());
     rtnl_tc_set_parent(TC_CAST(qdisc), Parent);
     rtnl_tc_set_handle(TC_CAST(qdisc), Handle);
 
@@ -880,9 +880,9 @@ TError TNlHtb::Create(uint32_t defaultClass) {
     rtnl_htb_set_defcls(qdisc, TC_H_MIN(defaultClass));
     rtnl_htb_set_rate2quantum(qdisc, 10);
 
-    Link->LogObj("add", qdisc);
+    link.LogObj("add", qdisc);
 
-    ret = rtnl_qdisc_add(Link->GetSock(), qdisc, NLM_F_CREATE);
+    ret = rtnl_qdisc_add(link.GetSock(), qdisc, NLM_F_CREATE);
     if (ret < 0)
         error = TError(EError::Unknown, string("Unable to add qdisc: ") + nl_geterror(ret));
 
@@ -892,36 +892,36 @@ free_qdisc:
     return error;
 }
 
-TError TNlHtb::Remove() {
+TError TNlHtb::Remove(const TNlLink &link) {
     struct rtnl_qdisc *qdisc;
 
     qdisc = rtnl_qdisc_alloc();
     if (!qdisc)
         return TError(EError::Unknown, string("Unable to allocate qdisc object"));
 
-    rtnl_tc_set_link(TC_CAST(qdisc), Link->GetLink());
+    rtnl_tc_set_link(TC_CAST(qdisc), link.GetLink());
     rtnl_tc_set_parent(TC_CAST(qdisc), Parent);
 
-    Link->LogObj("remove", qdisc);
+    link.LogObj("remove", qdisc);
 
-    rtnl_qdisc_delete(Link->GetSock(), qdisc);
+    rtnl_qdisc_delete(link.GetSock(), qdisc);
     rtnl_qdisc_put(qdisc);
 
     return TError::Success();
 }
 
-bool TNlHtb::Exists() {
+bool TNlHtb::Exists(const TNlLink &link) {
     int ret;
     struct nl_cache *qdiscCache;
     bool exists;
 
-    ret = rtnl_qdisc_alloc_cache(Link->GetSock(), &qdiscCache);
+    ret = rtnl_qdisc_alloc_cache(link.GetSock(), &qdiscCache);
     if (ret < 0)
         return false;
 
-    Link->LogCache(qdiscCache);
+    link.LogCache(qdiscCache);
 
-    struct rtnl_qdisc *qdisc = rtnl_qdisc_get(qdiscCache, Link->GetIndex(), Handle);
+    struct rtnl_qdisc *qdisc = rtnl_qdisc_get(qdiscCache, link.GetIndex(), Handle);
     exists = qdisc != nullptr;
     rtnl_qdisc_put(qdisc);
     nl_cache_free(qdiscCache);
@@ -929,22 +929,22 @@ bool TNlHtb::Exists() {
     return exists;
 }
 
-bool TNlHtb::Valid(uint32_t defaultClass) {
+bool TNlHtb::Valid(const TNlLink &link, uint32_t defaultClass) {
     int ret;
     struct nl_cache *qdiscCache;
     bool valid = true;
 
-    ret = rtnl_qdisc_alloc_cache(Link->GetSock(), &qdiscCache);
+    ret = rtnl_qdisc_alloc_cache(link.GetSock(), &qdiscCache);
     if (ret < 0) {
         L_ERR() << "can't alloc qdisc cache" << std::endl;
         return false;
     }
 
-    Link->LogCache(qdiscCache);
+    link.LogCache(qdiscCache);
 
-    struct rtnl_qdisc *qdisc = rtnl_qdisc_get(qdiscCache, Link->GetIndex(), Handle);
+    struct rtnl_qdisc *qdisc = rtnl_qdisc_get(qdiscCache, link.GetIndex(), Handle);
     if (qdisc) {
-        if (rtnl_tc_get_link(TC_CAST(qdisc)) != Link->GetLink())
+        if (rtnl_tc_get_link(TC_CAST(qdisc)) != link.GetLink())
             valid = false;
         else if (rtnl_tc_get_parent(TC_CAST(qdisc)) != Parent)
             valid = false;
@@ -964,14 +964,14 @@ bool TNlHtb::Valid(uint32_t defaultClass) {
     return valid;
 }
 
-TError TNlCgFilter::Create() {
+TError TNlCgFilter::Create(const TNlLink &link) {
     TError error = TError::Success();
     struct nl_msg *msg;
     int ret;
 	struct tcmsg tchdr;
 
     tchdr.tcm_family = AF_UNSPEC;
-    tchdr.tcm_ifindex = Link->GetIndex();
+    tchdr.tcm_ifindex = link.GetIndex();
     tchdr.tcm_handle = Handle;
     tchdr.tcm_parent = Parent;
 	tchdr.tcm_info = TC_H_MAKE(FilterPrio << 16, htons(ETH_P_ALL));
@@ -998,36 +998,36 @@ TError TNlCgFilter::Create() {
 		goto free_msg;
     }
 
-    L() << "netlink " << rtnl_link_get_name(Link->GetLink())
+    L() << "netlink " << rtnl_link_get_name(link.GetLink())
         << ": add tfilter id 0x" << std::hex << Handle
         << " parent 0x" << Parent << std::dec  << std::endl;
 
-    ret = nl_send_sync(Link->GetSock(), msg);
+    ret = nl_send_sync(link.GetSock(), msg);
     if (ret)
         error = TError(EError::Unknown, string("Unable to add filter: ") + nl_geterror(ret));
 
-    if (!Exists())
+    if (!Exists(link))
         error = TError(EError::Unknown, "BUG: created filter doesn't exist");
 
     return error;
 
 free_msg:
-	nlmsg_free(msg);
+    nlmsg_free(msg);
 
     return error;
 }
 
-bool TNlCgFilter::Exists() {
+bool TNlCgFilter::Exists(const TNlLink &link) {
     int ret;
     struct nl_cache *clsCache;
 
-    ret = rtnl_cls_alloc_cache(Link->GetSock(), Link->GetIndex(), Parent, &clsCache);
+    ret = rtnl_cls_alloc_cache(link.GetSock(), link.GetIndex(), Parent, &clsCache);
     if (ret < 0) {
         L_ERR() << "Can't allocate filter cache: " << nl_geterror(ret) << std::endl;
         return false;
     }
 
-    Link->LogCache(clsCache);
+    link.LogCache(clsCache);
 
     struct CgFilterIter {
         uint32_t parent;
@@ -1045,7 +1045,7 @@ bool TNlCgFilter::Exists() {
     return data.exists;
 }
 
-TError TNlCgFilter::Remove() {
+TError TNlCgFilter::Remove(const TNlLink &link) {
     TError error = TError::Success();
     struct rtnl_cls *cls;
     int ret;
@@ -1054,7 +1054,7 @@ TError TNlCgFilter::Remove() {
     if (!cls)
         return TError(EError::Unknown, string("Unable to allocate filter object"));
 
-    rtnl_tc_set_link(TC_CAST(cls), Link->GetLink());
+    rtnl_tc_set_link(TC_CAST(cls), link.GetLink());
 
     ret = rtnl_tc_set_kind(TC_CAST(cls), FilterType);
     if (ret < 0) {
@@ -1066,9 +1066,9 @@ TError TNlCgFilter::Remove() {
     rtnl_cls_set_protocol(cls, 0);
     rtnl_tc_set_parent(TC_CAST(cls), Parent);
 
-    Link->LogObj("remove", cls);
+    link.LogObj("remove", cls);
 
-    ret = rtnl_cls_delete(Link->GetSock(), cls, 0);
+    ret = rtnl_cls_delete(link.GetSock(), cls, 0);
     if (ret < 0)
         error = TError(EError::Unknown, string("Unable to remove filter: ") + nl_geterror(ret));
 

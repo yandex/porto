@@ -18,8 +18,8 @@ class TQdisc : public TNonCopyable {
 public:
     TQdisc(uint32_t handle, uint32_t defClass) : Handle(handle), DefClass(defClass) { }
 
-    TError Create(const std::vector<std::shared_ptr<TNlLink>> &links);
-    TError Remove(const std::vector<std::shared_ptr<TNlLink>> &links);
+    TError Create(const TNlLink &link);
+    TError Remove(const TNlLink &link);
     uint32_t GetHandle() { return Handle; }
 };
 
@@ -27,7 +27,7 @@ class TTclass : public TNonCopyable {
     const std::shared_ptr<TQdisc> ParentQdisc;
     const std::shared_ptr<TTclass> ParentTclass;
     const uint32_t Handle;
-    bool Exists(std::shared_ptr<TNlLink> link);
+    bool Exists(const TNlLink &link);
     uint32_t GetParent();
 
     std::map<std::string, uint64_t> Prio;
@@ -39,11 +39,10 @@ public:
     TTclass(const std::shared_ptr<TTclass> tclass, uint32_t handle) : ParentTclass(tclass), Handle(handle) { }
 
     void Prepare(std::map<std::string, uint64_t> prio, std::map<std::string, uint64_t> rate, std::map<std::string, uint64_t> ceil);
-    TError Create(const std::vector<std::shared_ptr<TNlLink>> &links);
-    TError Remove(const std::vector<std::shared_ptr<TNlLink>> &links);
+    TError Create(TNlLink &link);
+    TError Remove(TNlLink &link);
     uint32_t GetHandle() { return Handle; }
-    TError GetStat(const std::vector<std::shared_ptr<TNlLink>> &links,
-                   ETclassStat stat, std::map<std::string, uint64_t> &m);
+    TError GetStat(const std::vector<std::shared_ptr<TNlLink>> &links, ETclassStat stat, std::map<std::string, uint64_t> &m);
 };
 
 class TNetwork : public std::enable_shared_from_this<TNetwork>,
@@ -58,7 +57,7 @@ class TNetwork : public std::enable_shared_from_this<TNetwork>,
     const uint32_t defClass = TcHandle(1, 2);
     const uint32_t rootHandle = TcHandle(1, 0);
 
-    TError PrepareLink(std::shared_ptr<TNlLink> link);
+    TError PrepareLink(TNlLink &link);
 
 public:
     TNetwork();

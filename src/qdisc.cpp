@@ -6,17 +6,17 @@
 #include "util/log.hpp"
 #include "util/string.hpp"
 
-bool TTclass::Exists(std::shared_ptr<TNlLink> link) {
-    TNlClass tclass(link, GetParent(), Handle);
-    return tclass.Exists();
+bool TTclass::Exists(const TNlLink &link) {
+    TNlClass tclass(GetParent(), Handle);
+    return tclass.Exists(link);
 }
 
 TError TTclass::GetStat(const std::vector<std::shared_ptr<TNlLink>> &links,
                         ETclassStat stat, std::map<std::string, uint64_t> &m) {
     for (auto &link : links) {
         uint64_t val;
-        TNlClass tclass(link, GetParent(), Handle);
-        TError error = tclass.GetStat(stat, val);
+        TNlClass tclass(GetParent(), Handle);
+        TError error = tclass.GetStat(*link, stat, val);
         if (error)
             return error;
 
@@ -42,96 +42,60 @@ void TTclass::Prepare(std::map<std::string, uint64_t> prio,
     Ceil = ceil;
 }
 
-TError TTclass::Create(const std::vector<std::shared_ptr<TNlLink>> &links) {
-    TError firstError = TError::Success();
+TError TTclass::Create(TNlLink &link) {
+    auto alias = link.GetAlias();
+    auto prio = (Prio.find(alias) != Prio.end()) ? Prio[alias] : Prio["default"];
+    auto rate = (Rate.find(alias) != Rate.end()) ? Rate[alias] : Rate["default"];
+    auto ceil = (Ceil.find(alias) != Ceil.end()) ? Ceil[alias] : Ceil["default"];
 
-    for (auto &link : links) {
-        auto alias = link->GetAlias();
-        auto prio = (Prio.find(alias) != Prio.end()) ? Prio[alias] : Prio["default"];
-        auto rate = (Rate.find(alias) != Rate.end()) ? Rate[alias] : Rate["default"];
-        auto ceil = (Ceil.find(alias) != Ceil.end()) ? Ceil[alias] : Ceil["default"];
+    TNlClass tclass(GetParent(), Handle);
+    if (tclass.Exists(link)) {
+        if (tclass.Valid(link, prio, rate, ceil))
+            return TError::Success();
 
-        TNlClass tclass(link, GetParent(), Handle);
-        if (tclass.Exists()) {
-            if (!tclass.Valid(prio, rate, ceil))
-                (void)tclass.Remove();
-            else
-                continue;
-        }
-
-        TError error = tclass.Create(prio, rate, ceil);
-        if (!firstError)
-            firstError = error;
+        (void)tclass.Remove(link);
     }
-
-    return firstError;
+    return tclass.Create(link, prio, rate, ceil);
 }
 
-TError TTclass::Remove(const std::vector<std::shared_ptr<TNlLink>> &links) {
-    for (auto &link : links) {
-        if (!Exists(link))
-            continue;
+TError TTclass::Remove(TNlLink &link) {
+    TNlClass tclass(GetParent(), Handle);
+    return tclass.Remove(link);
+}
 
-        TNlClass tclass(link, GetParent(), Handle);
-        TError error = tclass.Remove();
-        if (error)
-            return error;
+TError TQdisc::Create(const TNlLink &link) {
+    TNlHtb qdisc(TcRootHandle(), Handle);
+
+    if (!qdisc.Valid(link, DefClass)) {
+        (void)qdisc.Remove(link);
+        return qdisc.Create(link, DefClass);
     }
 
     return TError::Success();
 }
 
-TError TQdisc::Create(const std::vector<std::shared_ptr<TNlLink>> &links) {
-    for (auto &link : links) {
-        TNlHtb qdisc(link, TcRootHandle(), Handle);
-
-        if (qdisc.Valid(DefClass))
-            continue;
-
-        (void)qdisc.Remove();
-
-        TError error = qdisc.Create(DefClass);
-        if (error)
-            return error;
-    }
-
-    return TError::Success();
-}
-
-TError TQdisc::Remove(const std::vector<std::shared_ptr<TNlLink>> &links) {
-    for (auto &link : links) {
-        TNlHtb qdisc(link, TcRootHandle(), Handle);
-        TError error = qdisc.Remove();
-        if (error)
-            return error;
-    }
-
-    return TError::Success();
+TError TQdisc::Remove(const TNlLink &link) {
+    TNlHtb qdisc(TcRootHandle(), Handle);
+    return qdisc.Remove(link);
 }
 
 class TFilter : public TNonCopyable {
     const std::shared_ptr<TQdisc> Parent;
-    bool Exists(std::shared_ptr<TNlLink> link);
+    bool Exists(const TNlLink &link);
 
 public:
     TFilter(const std::shared_ptr<TQdisc> parent) : Parent(parent) { }
-    TError Create(const std::vector<std::shared_ptr<TNlLink>> &links);
+    TError Create(TNlLink &link);
 };
 
-bool TFilter::Exists(std::shared_ptr<TNlLink> link) {
-    TNlCgFilter filter(link, Parent->GetHandle(), 1);
-    return filter.Exists();
+bool TFilter::Exists(const TNlLink &link) {
+    TNlCgFilter filter(Parent->GetHandle(), 1);
+    return filter.Exists(link);
 }
 
-TError TFilter::Create(const std::vector<std::shared_ptr<TNlLink>> &links) {
-    for (auto &link : links) {
-        TNlCgFilter filter(link, Parent->GetHandle(), 1);
-        TError error = filter.Create();
-        if (error)
-            return error;
-    }
-
-    return TError::Success();
+TError TFilter::Create(TNlLink &link) {
+    TNlCgFilter filter(Parent->GetHandle(), 1);
+    return filter.Create(link);
 }
 
 TError TNetwork::Destroy() {
@@ -142,16 +106,20 @@ TError TNetwork::Destroy() {
     L_ACT() << "Removing network..." << std::endl;
 
     if (Tclass) {
-        TError error = Tclass->Remove(links);
-        if (error)
-            return error;
+        for (const auto &link : links) {
+            TError error = Tclass->Remove(*link);
+            if (error)
+                return error;
+        }
         Tclass = nullptr;
     }
 
     if (Qdisc) {
-        TError error = Qdisc->Remove(links);
-        if (error)
-            return error;
+        for (const auto &link : links) {
+            TError error = Qdisc->Remove(*link);
+            if (error)
+                return error;
+        }
         Qdisc = nullptr;
     }
 
@@ -171,7 +139,7 @@ TError TNetwork::Prepare() {
         return error;
 
     for (auto link : Links) {
-        TError error = PrepareLink(link);
+        TError error = PrepareLink(*link);
         if (error)
             return error;
     }
@@ -202,7 +170,7 @@ TError TNetwork::Update() {
 
         if (i == Links.end()) {
             L() << "Found new link: " << link->GetAlias() << std::endl;
-            TError error = PrepareLink(link);
+            TError error = PrepareLink(*link);
             if (error)
                 return error;
         } else {
@@ -217,46 +185,46 @@ TError TNetwork::Update() {
     return TError::Success();
 }
 
-TError TNetwork::PrepareLink(std::shared_ptr<TNlLink> link) {
+TError TNetwork::PrepareLink(TNlLink &link) {
     // 1:0 qdisc
     // 1:2 default class    1:1 root class
     // (unclassified        1:3 container a, 1:4 container b
     //          traffic)    1:5 container a/c
 
-    L() << "Prepare link " << link->GetAlias() << " " << link->GetIndex() << std::endl;
+    L() << "Prepare link " << link.GetAlias() << " " << link.GetIndex() << std::endl;
 
-    TNlHtb qdisc(link, TcRootHandle(), rootHandle);
+    TNlHtb qdisc(TcRootHandle(), rootHandle);
 
-    if (!qdisc.Valid(defClass)) {
-        (void)qdisc.Remove();
-        TError error = qdisc.Create(defClass);
+    if (!qdisc.Valid(link, defClass)) {
+        (void)qdisc.Remove(link);
+        TError error = qdisc.Create(link, defClass);
         if (error) {
             L_ERR() << "Can't create root qdisc: " << error << std::endl;
             return error;
         }
     }
 
-    TNlCgFilter filter(link, rootHandle, 1);
-    if (filter.Exists())
-        (void)filter.Remove();
+    TNlCgFilter filter(rootHandle, 1);
+    if (filter.Exists(link))
+        (void)filter.Remove(link);
 
-    TError error = filter.Create();
+    TError error = filter.Create(link);
     if (error) {
         L_ERR() << "Can't create tc filter: " << error << std::endl;
         return error;
     }
 
-    TNlClass tclass(link, rootHandle, defClass);
+    TNlClass tclass(rootHandle, defClass);
 
     uint64_t prio, rate, ceil;
     prio = config().network().default_prio();
     rate = config().network().default_max_guarantee();
     ceil = config().network().default_limit();
 
-    if (!tclass.Valid(prio, rate, ceil)) {
-        (void)tclass.Remove();
+    if (!tclass.Valid(link, prio, rate, ceil)) {
+        (void)tclass.Remove(link);
 
-        TError error = tclass.Create(prio, rate, ceil);
+        TError error = tclass.Create(link, prio, rate, ceil);
         if (error) {
             L_ERR() << "Can't create default tclass: " << error << std::endl;
             return error;

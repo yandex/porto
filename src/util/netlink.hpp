@@ -117,7 +117,7 @@ public:
                       int mtu);
     TError Enslave(const std::string &name);
     TError AddVeth(const std::string &name, const std::string &peerName, const std::string &hw, int mtu, int nsPid);
-    const std::string &GetAlias();
+    const std::string &GetAlias() const;
     void SetAlias(const std::string &alias) { Alias = alias; }
 
     static bool ValidIpVlanMode(const std::string &mode);
@@ -129,56 +129,52 @@ public:
     bool HasQueue();
     bool IsLoopback();
 
-    int GetIndex();
-    struct rtnl_link *GetLink() { return Link; }
-    struct nl_sock *GetSock() { return Nl->GetSock(); }
+    int GetIndex() const;
+    struct rtnl_link *GetLink() const { return Link; }
+    struct nl_sock *GetSock() const { return Nl->GetSock(); }
     std::shared_ptr<TNl> GetNl() { return Nl; };
 
-    void LogObj(const std::string &prefix, void *obj);
-    void LogCache(struct nl_cache *cache);
+    void LogObj(const std::string &prefix, void *obj) const;
+    void LogCache(struct nl_cache *cache) const;
     TError RefillClassCache();
-    struct nl_cache *GetClassCache() { return ClassCache; }
+    struct nl_cache *GetClassCache() const { return ClassCache; }
 };
 
 class TNlClass : public TNonCopyable {
-    std::shared_ptr<TNlLink> Link;
     const uint32_t Parent, Handle;
 
 public:
-    TNlClass(std::shared_ptr<TNlLink> link, uint32_t parent, uint32_t handle) : Link(link), Parent(parent), Handle(handle) {}
+    TNlClass(uint32_t parent, uint32_t handle) : Parent(parent), Handle(handle) {}
 
-    TError Create(uint32_t prio, uint32_t rate, uint32_t ceil);
-    bool Valid(uint32_t prio, uint32_t rate, uint32_t ceil);
-    TError Remove();
-    TError GetStat(ETclassStat stat, uint64_t &val);
-    TError GetProperties(uint32_t &prio, uint32_t &rate, uint32_t &ceil);
-    bool Exists();
+    TError Create(TNlLink &link, uint32_t prio, uint32_t rate, uint32_t ceil);
+    bool Valid(const TNlLink &link, uint32_t prio, uint32_t rate, uint32_t ceil);
+    TError Remove(TNlLink &link);
+    TError GetStat(TNlLink &link, ETclassStat stat, uint64_t &val);
+    TError GetProperties(const TNlLink &link, uint32_t &prio, uint32_t &rate, uint32_t &ceil);
+    bool Exists(const TNlLink &link);
 };
 
 class TNlHtb : public TNonCopyable {
-    std::shared_ptr<TNlLink> Link;
     const uint32_t Parent, Handle;
 
 public:
-    TNlHtb(std::shared_ptr<TNlLink> link, uint32_t parent, uint32_t handle) : Link(link), Parent(parent), Handle(handle) {}
-    TError Create(uint32_t defaultClass);
-    TError Remove();
-    bool Exists();
-    bool Valid(uint32_t defaultClass);
+    TNlHtb(uint32_t parent, uint32_t handle) : Parent(parent), Handle(handle) {}
+    TError Create(const TNlLink &link, uint32_t defaultClass);
+    TError Remove(const TNlLink &link);
+    bool Exists(const TNlLink &link);
+    bool Valid(const TNlLink &link, uint32_t defaultClass);
 };
 
 class TNlCgFilter : public TNonCopyable {
     const int FilterPrio = 10;
     const char *FilterType = "cgroup";
-
-    std::shared_ptr<TNlLink> Link;
     const uint32_t Parent, Handle;
 
 public:
-    TNlCgFilter(std::shared_ptr<TNlLink> link, uint32_t parent, uint32_t handle) : Link(link), Parent(parent), Handle(handle) {}
-    TError Create();
-    bool Exists();
-    TError Remove();
+    TNlCgFilter(uint32_t parent, uint32_t handle) : Parent(parent), Handle(handle) {}
+    TError Create(const TNlLink &link);
+    bool Exists(const TNlLink &link);
+    TError Remove(const TNlLink &link);
 };
 
 TError ParseIpPrefix(const std::string &s, TNlAddr &addr, int &prefix);

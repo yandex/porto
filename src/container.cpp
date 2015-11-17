@@ -512,10 +512,12 @@ TError TContainer::PrepareNetwork() {
     Tclass->Prepare(prio, rate, ceil);
 
     auto net_lock = Net->ScopedLock();
-    error = Tclass->Create(Net->GetLinks());
-    if (error) {
-        L_ERR() << "Can't create tclass: " << error << std::endl;
-        return error;
+    for (const auto& link : Net->GetLinks()) {
+        error = Tclass->Create(*link);
+        if (error) {
+            L_ERR() << "Can't create tclass: " << error << std::endl;
+            return error;
+        }
     }
 
     if (IsRoot())
@@ -606,10 +608,12 @@ TError TContainer::RestoreNetwork() {
     Tclass->Prepare(prio, rate, ceil);
 
     auto net_lock = Net->ScopedLock();
-    error = Tclass->Create(Net->GetLinks());
-    if (error) {
-        L_ERR() << "Can't create tclass: " << error << std::endl;
-        return error;
+    for (const auto& link : Net->GetLinks()) {
+        error = Tclass->Create(*link);
+        if (error) {
+            L_ERR() << "Can't create tclass: " << error << std::endl;
+            return error;
+        }
     }
 
     return error;
@@ -1328,9 +1332,11 @@ void TContainer::FreeResources() {
     if (Tclass && (!Parent || Parent->Tclass != Tclass)) {
         auto lock = Net->ScopedLock();
 
-        TError error = Tclass->Remove(Net->GetLinks());
-        if (error)
-            L_ERR() << "Can't remove tc classifier: " << error << std::endl;
+        for (const auto& link : Net->GetLinks()) {
+            TError error = Tclass->Remove(*link);
+            if (error)
+                L_ERR() << "Can't remove tc classifier: " << error << std::endl;
+        }
     }
     Tclass = nullptr;
     Task = nullptr;
@@ -2319,7 +2325,9 @@ TError TContainer::UpdateNetwork() {
         Tclass->Prepare(prio, rate, ceil);
 
         auto net_lock = Net->ScopedLock();
-        return Tclass->Create(Net->GetLinks());
+
+        for (const auto& link : Net->GetLinks())
+            Tclass->Create(*link);
     }
     return TError::Success();
 }
