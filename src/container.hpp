@@ -75,7 +75,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError ApplyDynamicProperties();
     TError PrepareWorkDir();
     TError PrepareNetwork();
-    TError RestoreNetwork();
+    TError RestoreNetwork(bool valid_task);
     TError PrepareOomMonitor();
     TError PrepareLoop();
     void ShutdownOom();

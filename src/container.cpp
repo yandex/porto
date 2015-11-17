@@ -538,10 +538,10 @@ TError TContainer::PrepareNetwork() {
     return error;
 }
 
-TError TContainer::RestoreNetwork() {
+TError TContainer::RestoreNetwork(bool valid_task) {
     TError error;
 
-    if (Task) {
+    if (valid_task) {
         TNamespaceFd my_nsfd;
         TNamespaceFd nsfd;
 
@@ -1962,12 +1962,10 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
             }
         }
 
-        if (!LostAndRestored) {
-            error = RestoreNetwork();
-            if (error) {
-                L_ERR() << error << std::endl;
-                return error;
-            }
+        error = RestoreNetwork(!LostAndRestored);
+        if (error) {
+            L_ERR() << error << std::endl;
+            return error;
         }
 
         auto state = Data->Get<std::string>(D_STATE);
