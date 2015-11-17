@@ -225,7 +225,7 @@ public:
     TEnvProperty() :
         TListValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_ENV,
-                        "Container environment variables: <name>: <value>; ...",
+                        "Container environment variables: <name>=<value>; ...",
                         staticProperty) {}
 };
 
