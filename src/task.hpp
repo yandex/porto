@@ -171,9 +171,7 @@ public:
     TTask(pid_t pid);
     ~TTask();
 
-    TError Start(TUnixSocket &masterSock, int &status);
-    /* Network should be initialized between Start() and Start2() */
-    TError Start2(TUnixSocket &masterSock, int &status);
+    TError Start();
     pid_t GetPid() const;
     pid_t GetWPid() const;
     pid_t GetPidFor(pid_t pid) const;

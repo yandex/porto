@@ -1059,9 +1059,7 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
         if (error)
             goto error;
 
-        TUnixSocket sock;
-        int status;
-        error = Task->Start(sock, status);
+        error = Task->Start();
         if (error) {
             TError e = Data->Set<int>(D_START_ERRNO, error.GetErrno());
             if (e)
@@ -1069,13 +1067,6 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
             goto error;
         }
         error = PrepareNetwork();
-        if (error) {
-            TError e = Data->Set<int>(D_START_ERRNO, error.GetErrno());
-            if (e)
-                L_ERR() << "Can't set start_errno: " << e << std::endl;
-            goto error;
-        }
-        error = Task->Start2(sock, status);
         if (error) {
             TError e = Data->Set<int>(D_START_ERRNO, error.GetErrno());
             if (e)
