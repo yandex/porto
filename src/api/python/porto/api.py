@@ -317,6 +317,7 @@ class _RPC(object):
         request.listLayers.CopyFrom(rpc_pb2.TLayerListRequest())
         return self.call(request, self.timeout).layers.layer
 
+
 class Container(object):
     def __init__(self, rpc, name):
         self.rpc = rpc
@@ -374,14 +375,12 @@ class Layer(object):
     def __str__(self):
         return 'Layer `{}`'.format(self.name)
 
-    def Import(self, tarball):
-        self.rpc.ImportLayer(self.name, tarball)
-
     def Merge(self, tarball):
         self.rpc.ImportLayer(self.name, tarball, merge=True)
 
     def Remove(self):
         self.rpc.RemoveLayer(self.name)
+
 
 class Volume(object):
     def __init__(self, rpc, path):
@@ -417,10 +416,6 @@ class Volume(object):
 
     def Export(self, tarball):
         self.rpc.ExportLayer(self.path, tarball)
-
-    def Destroy(self):
-        for container in self.GetContainers():
-            self.Unlink(container)
 
 class Connection(object):
     def __init__(self, socket_path='/run/portod.socket', timeout=5):
@@ -504,6 +499,21 @@ class Connection(object):
         self.rpc.ListVolumes(path=path)
         return Volume(self.rpc, path)
 
+    def DestroyVolume(self, volume, containers=None):
+        path = volume.path if isinstance(volume, Volume) else volume
+        if containers is None:
+            containers = self.rpc.ListVolumes(path=path)[0].containers
+        for container in containers:
+            try:
+                self.rpc.UnlinkVolume(path, container)
+            except exceptions.VolumeNotLinked:
+                pass
+        try:
+            self.rpc.ListVolumes(path=path)
+            raise exceptions.Busy("layer `%s` is busy" % path)
+        except exceptions.LayerNotFound:
+            pass
+
     def ListVolumes(self, container=None):
         if isinstance(container, Container):
             container = container.name
@@ -517,6 +527,9 @@ class Connection(object):
         if not layer in self.rpc.ListLayers():
             raise exceptions.LayerNotFound("layer `%s` not found" % layer)
         return Layer(self.rpc, layer)
+
+    def RemoveLayer(self, name):
+        self.rpc.RemoveLayer(name)
 
     def ListLayers(self):
         return [ Layer(self.rpc, l) for l in self.rpc.ListLayers() ]
