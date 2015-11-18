@@ -143,7 +143,9 @@ type portoConnection struct {
 	msg  string
 }
 
-func NewConnection() (API, error) {
+//Connect establishes connection to a Porto daemon via unix socket.
+//Close must be called when the API is not needed anymore.
+func Connect() (API, error) {
 	c, err := net.Dial("unix", portoSocket)
 	if err != nil {
 		return nil, err
