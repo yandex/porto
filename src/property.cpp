@@ -548,7 +548,7 @@ public:
     TCpuLimitProperty() :
         TDoubleValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_CPU_LIMIT,
-                        "CPU limit: 1-100",
+                        "CPU limit: 0-100.0 [%] | 0.0c-<CPUS>c [cores]",
                         dynamicProperty) {
         Implemented = cpuSubsystem->SupportLimit();
     }
@@ -579,7 +579,7 @@ public:
     TCpuGuaranteeProperty() :
         TDoubleValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_CPU_GUARANTEE,
-                        "CPU guarantee: 0-100",
+                        "CPU guarantee: 0-100.0 [%] | 0.0c-<CPUS>c [cores]",
                         dynamicProperty) {
         Implemented = cpuSubsystem->SupportGuarantee();
     }
