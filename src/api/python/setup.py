@@ -5,7 +5,7 @@ def readme():
         return f.read()
 
 setup(name='portopy',
-    version='0.1',
+    version='2.6.1',
     description='Python API for porto',
     long_description=readme(),
     url='https://github.com/yandex/porto',
