@@ -482,7 +482,7 @@ public:
     TDirtyLimitProperty() :
         TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE),
         TContainerValue(P_DIRTY_LIMIT,
-                        "Dirty memory limit [bytes]",
+                        "Dirty file cache limit [bytes]",
                         dynamicProperty) {
         Implemented = memorySubsystem->SupportDirtyLimit();
     }
@@ -625,7 +625,7 @@ public:
     TIoLimitProperty() :
         TUintValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | UINT_UNIT_VALUE),
         TContainerValue(P_IO_LIMIT,
-                        "IO limit",
+                        "Filesystem bandwidth limit [bytes/s]",
                         dynamicProperty) {
         Implemented = memorySubsystem->SupportIoLimit();
     }
