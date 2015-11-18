@@ -1,3 +1,31 @@
+yandex-porto (2.6.1) precise; urgency=low
+
+  [ Anton Tiurin ]
+  * go API: remove Append as there is standart way to do it
+  * go API: Check errors before reading a result
+  * go API: Expand sturcts initializations
+  * go API: range over values in arrays to use a value. Append to arrays without iteration, when it's possible
+  * go API: Bugfix: RecvData returned invalid result if incoming data
+
+  [ Konstantin Khlebnikov ]
+  * api/python: remove unneeded argument of Container.Resume
+  * api/python: fix Container.Get()
+  * api/python: add method Container.Destroy()
+  * api/python: add method Connection.ListContainers()
+  * api/python: add volume-api
+  * test: add test-api.py
+  * test-api.py: fixup Container.Resume()
+  * test-api.py: fixup formatting
+  * portod: create and cleanup /place/porto at startup
+  * container: fix crash in restoring borrowed network
+  * api/python: cleanup new api
+  * property: fix 'env' format specification description
+  * property: porto_namespace is a container namespace
+  * property: update io_limit description
+  * property: cpu limit/guarantee can be zero, float and might be in cores
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 18 Nov 2015 12:15:52 +0300
+
 yandex-porto (2.6) precise; urgency=low
 
   * net: treat 0 and 1 rate values as equal when comparing tc classes
