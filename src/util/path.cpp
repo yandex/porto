@@ -317,27 +317,6 @@ TError TPath::RegularCopy(const TPath &to, unsigned int mode) const {
     return TError::Success();
 }
 
-TError TPath::Copy(const TPath &to) const {
-    switch(GetType()) {
-    case EFileType::Directory:
-        return TError(EError::Unknown, "Can't copy directory " + Path);
-    case EFileType::Regular:
-        return RegularCopy(to, GetMode());
-    case EFileType::Block:
-        return to.Mkfifo(GetMode());
-    case EFileType::Socket:
-    case EFileType::Character:
-    case EFileType::Fifo:
-        return to.Mknod(GetMode(), GetDev());
-    case EFileType::Link:
-        return Symlink(to);
-    case EFileType::Unknown:
-    case EFileType::Any:
-        break;
-    }
-    return TError(EError::Unknown, "Unknown file type " + Path);
-}
-
 TPath TPath::NormalPath() const {
     std::stringstream ss(Path);
     std::string component, path;
