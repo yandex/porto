@@ -76,7 +76,7 @@ a.Start()
 assert a.GetData("state") == "running"
 a.Pause()
 assert a.GetData("state") == "paused"
-a.Resume("")
+a.Resume()
 assert a.GetData("state") == "running"
 a.Kill(9)
 assert a.Wait() == a.name
