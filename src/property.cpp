@@ -234,7 +234,7 @@ public:
     TPortoNamespaceProperty() :
         TStringValue(PERSISTENT_VALUE),
         TContainerValue(P_PORTO_NAMESPACE,
-                        "Porto containers/volumes namespace",
+                        "Porto containers namespace",
                         staticProperty) {}
 };
 
