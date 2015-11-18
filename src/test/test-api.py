@@ -147,6 +147,9 @@ assert Catch(c.FindVolume, v.path) == porto.exceptions.VolumeNotFound
 c.Destroy(a)
 assert Catch(c.FindVolume, w.path) == porto.exceptions.VolumeNotFound
 
+v = c.CreateVolume()
+c.DestroyVolume(v.path)
+
 l.Remove()
 os.rmdir(volume_path)
 c.disconnect()

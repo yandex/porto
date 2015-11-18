@@ -511,7 +511,7 @@ class Connection(object):
         try:
             self.rpc.ListVolumes(path=path)
             raise exceptions.Busy("layer `%s` is busy" % path)
-        except exceptions.LayerNotFound:
+        except exceptions.VolumeNotFound:
             pass
 
     def ListVolumes(self, container=None):
