@@ -60,6 +60,7 @@ TContainer::~TContainer() {
     // Tclass destructor should be called with TNetwork locked,
     // so call them explicitly in Tcontainer::Destroy()
     PORTO_ASSERT(Tclass == nullptr);
+    PORTO_ASSERT(Net == nullptr);
 };
 
 std::string TContainer::ContainerStateName(EContainerState state) {
@@ -257,6 +258,11 @@ void TContainer::Destroy(TScopedLock &holder_lock) {
 
     SetState(EContainerState::Unknown);
     DestroyVolumes(holder_lock);
+    if (Net) {
+        auto lock = Net->ScopedLock();
+        Tclass = nullptr;
+        Net = nullptr;
+    }
     RemoveKvs();
 }
 
