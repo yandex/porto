@@ -68,8 +68,6 @@ class TTaskEnv;
 const unsigned int SUPERUSER_PROPERTY = (1 << 0);
 // Property should return parent value as default
 const unsigned int PARENT_DEF_PROPERTY = (1 << 1);
-// When child container is shared with parent these properties can't be changed
-const unsigned int PARENT_RO_PROPERTY = (1 << 2);
 // Property can be modified only by restricted root
 const unsigned int RESTROOT_PROPERTY = (1 << 3);
 // Properties marked with this flag are reverted to default upon container

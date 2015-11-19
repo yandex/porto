@@ -623,12 +623,6 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
 
 TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
                                struct TNetCfg *NetCfg) {
-    if (!Prop->Get<bool>(P_ISOLATE))
-        for (auto name : Prop->List())
-            if (Prop->Find(name)->GetFlags() & PARENT_RO_PROPERTY)
-                if (!Prop->IsDefault(name))
-                    return TError(EError::InvalidValue, "Can't use custom " + name + " with " + P_ISOLATE + " == false");
-
     auto vmode = Prop->Get<int>(P_VIRT_MODE);
     auto user = Prop->Get<std::string>(P_USER);
     auto taskEnv = std::unique_ptr<TTaskEnv>(new TTaskEnv());
@@ -1542,10 +1536,6 @@ TError TContainer::SetProperty(const string &origProperty,
 
     if (!Prop->HasState(property, GetState()))
         return TError(EError::InvalidState, "Can't set dynamic property " + property + " in state " + ContainerStateName(GetState()));
-
-    if (Parent && !Parent->IsRoot() && !Parent->IsPortoRoot() &&
-        !Prop->GetRaw<bool>(P_ISOLATE) && Prop->HasFlags(property, PARENT_RO_PROPERTY))
-        return TError(EError::NotSupported, "Can't set " + property + " for child container");
 
     if (idx.length()) {
         TUintMap m;
