@@ -434,67 +434,74 @@ std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
     return nullptr;
 }
 
-TError TContainer::PrepareNetwork() {
-    TError error;
-    bool initialized = false;
+TError TContainer::SetTNetwork(pid_t pid) {
+    TNamespaceFd fd;
 
-    if (IsRoot()) {
-        /*
-         * Root container is always created first, so there is no need
-         * to search existing TNetwork, just create a new one.
-         */
+    TError error = fd.Open(pid, "ns/net");
+    if (!error) {
+        Net = Holder->SearchInNsMap(fd.GetInode());
+
+        /* Found existing TNetwork */
+        if (Net != nullptr)
+            return TError::Success();
+
+        /* Create a new one */
         Net = std::make_shared<TNetwork>();
-        if (Net == nullptr)
-            throw std::bad_alloc();
-        error = Net->Connect();
-        L() << "host network for " << Name << std::endl;
+        PORTO_ASSERT(Net);
 
-        TNamespaceFd fd;
-        TError error2 = fd.Open(GetTid(), "ns/net");
-        if (!error2)
-            Holder->AddToNsMap(fd.GetInode(), Net);
-
-    } else if (Task) {
-        TNamespaceFd fd;
-        TError error2 = fd.Open(Task->GetPid(), "ns/net");
-        if (!error2) {
-            auto inode = fd.GetInode();
-            std::shared_ptr<TNetwork> net = Holder->SearchInNsMap(inode);
-            if (net) {
-                /* Take existing TNetwork */
-                Net = net;
-                initialized = true;
-                L() << "take existing network for " << Name << std::endl;
-
-            } else {
-                /* Create new TNetwork */
-                Net = std::make_shared<TNetwork>();
-                if (Net == nullptr)
-                    throw std::bad_alloc();
-
-                error = Net->Connect(Task->GetNetLinkFd());
-                if (!error)
-                    Holder->AddToNsMap(fd.GetInode(), Net);
-                L() << "custom new network for " << Name << std::endl;
+        PORTO_ASSERT(IsRoot() || Task);
+        auto netlink_fd = Task ? Task->GetNetLinkFd() : -1;
+        if (netlink_fd != -1) {
+            /* If there is an open netlink socket, use it. */
+            error = Net->Connect(netlink_fd);
+        } else {
+            /* Otherwise, jump to net ns and open it. */
+            TNamespaceFd my_nsfd;
+            error = my_nsfd.Open(GetTid(), "ns/net");
+            if (error) {
+                L_ERR() << error << std::endl;
+                Net = nullptr;
+                return error;
             }
+
+            error = fd.SetNs(CLONE_NEWNET);
+            if (error) {
+                L_ERR() << error << std::endl;
+                Net = nullptr;
+                return error;
+            }
+
+            Net = std::make_shared<TNetwork>();
+            PORTO_ASSERT(Net);
+            if (Net != nullptr)
+                error = Net->Connect();
+
+            PORTO_ASSERT(!my_nsfd.SetNs(CLONE_NEWNET));
         }
+
+        if (!error) {
+            Holder->AddToNsMap(fd.GetInode(), Net);
+            error = Net->Prepare();
+        } else
+            Net = nullptr;
+
+        return error;
     }
 
-    if (Net == nullptr) {
-        /* Take host network */
-        std::shared_ptr<TContainer> root;
-        Holder->Get(ROOT_CONTAINER, root);
-        PORTO_ASSERT(root);
-        Net = root->Net;
-        initialized = true;
-        L() << "host network for " << Name << std::endl;
-    }
+    /* Take host network */
+    std::shared_ptr<TContainer> root;
+    Holder->Get(ROOT_CONTAINER, root);
+    PORTO_ASSERT(root);
+    Net = root->Net;
+    PORTO_ASSERT(Net);
 
+    return TError::Success();
+}
+
+TError TContainer::PrepareNetwork() {
+    TError error = SetTNetwork(Task ? Task->GetPid() : GetTid());
     if (error)
         return error;
-
-    if (!initialized)
-        error = Net->Prepare();
 
     PORTO_ASSERT(Net != nullptr);
     PORTO_ASSERT(Tclass == nullptr);
@@ -526,78 +533,21 @@ TError TContainer::PrepareNetwork() {
         }
     }
 
-    if (IsRoot())
-        return error;
-
-    auto netcls = GetLeafCgroup(netclsSubsystem);
-    uint32_t handle = Tclass->GetHandle();
-    error = netcls->SetKnobValue("net_cls.classid", std::to_string(handle), false);
-    if (error) {
-        L_ERR() << "Can't set classid: " << error << std::endl;
-        return error;
+    if (!IsRoot()) {
+        auto netcls = GetLeafCgroup(netclsSubsystem);
+        uint32_t handle = Tclass->GetHandle();
+        error = netcls->SetKnobValue("net_cls.classid", std::to_string(handle), false);
+        if (error) {
+            L_ERR() << "Can't set classid: " << error << std::endl;
+            return error;
+        }
     }
 
     return error;
 }
 
 TError TContainer::RestoreNetwork(bool valid_task) {
-    TError error;
-
-    if (valid_task) {
-        TNamespaceFd my_nsfd;
-        TNamespaceFd nsfd;
-
-        TError error2 = nsfd.Open(Task->GetPid(), "ns/net");
-        if (!error2) {
-            ino_t inode = nsfd.GetInode();
-            std::shared_ptr<TNetwork> net = Holder->SearchInNsMap(inode);
-            if (net) {
-                Net = net;
-                L() << "existing network for " << Name << std::endl;
-            } else {
-                error = my_nsfd.Open(GetTid(), "ns/net");
-                if (error)
-                    return error;
-
-                error = nsfd.SetNs(CLONE_NEWNET);
-                if (error) {
-                    L_ERR() << error << std::endl;
-                    return error;
-                }
-
-                Net = std::make_shared<TNetwork>();
-                if (Net != nullptr) {
-                    error = Net->Connect();
-                    L() << "existing network namespace for " << Name << std::endl;
-
-                    if (!error) {
-                        TNamespaceFd fd;
-                        error = fd.Open(GetTid(), "ns/net");
-                        Holder->AddToNsMap(fd.GetInode(), Net);
-                    }
-                }
-
-                error = my_nsfd.SetNs(CLONE_NEWNET);
-                if (error) {
-                    L_ERR() << error << std::endl;
-                    return error;
-                }
-
-                if (Net == nullptr)
-                    throw std::bad_alloc();
-            }
-        }
-    }
-
-    if (Net == nullptr) {
-        /* Take host network */
-        std::shared_ptr<TContainer> root;
-        Holder->Get(ROOT_CONTAINER, root);
-        PORTO_ASSERT(root);
-        Net = root->Net;
-        L() << "host network for " << Name << std::endl;
-    }
-
+    TError error = SetTNetwork(valid_task ? Task->GetPid() : GetTid());
     if (error)
         return error;
 

@@ -119,6 +119,8 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     bool PrepareJournal();
 
+    TError SetTNetwork(pid_t pid);
+
 public:
     TCred OwnerCred;
 
