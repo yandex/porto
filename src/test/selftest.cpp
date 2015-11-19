@@ -3086,7 +3086,7 @@ static void TestData(TPortoAPI &api) {
 
     ExpectApiSuccess(api.Create(wget));
     if (NetworkEnabled())
-        ExpectApiSuccess(api.SetProperty(wget, "command", "bash -c 'wget yandex.ru -O - | dd of=index.html conv=fdatasync'"));
+        ExpectApiSuccess(api.SetProperty(wget, "command", "bash -c 'sleep 3 && wget yandex.ru -O - | dd of=index.html conv=fdatasync'"));
     else
         ExpectApiSuccess(api.SetProperty(wget, "command", "bash -c 'dd if=/dev/urandom bs=4k count=1 of=index.html conv=fdatasync'"));
     ExpectApiSuccess(api.Start(wget));
