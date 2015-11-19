@@ -769,7 +769,7 @@ public:
 class THostnameProperty : public TStringValue, public TContainerValue {
 public:
     THostnameProperty() :
-        TStringValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
+        TStringValue(PERSISTENT_VALUE),
         TContainerValue(P_HOSTNAME,
                         "Container hostname",
                         staticProperty) {}

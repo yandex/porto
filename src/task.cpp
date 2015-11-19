@@ -758,6 +758,7 @@ TError TTask::Start() {
         if (Env->NewMountNs)
             cloneFlags |= CLONE_NEWNS;
 
+        /* Create UTS namspace if hostname is changed or isolate=true */
         if (Env->Isolate || Env->Hostname != "")
             cloneFlags |= CLONE_NEWUTS;
 
