@@ -855,7 +855,7 @@ public:
 class TDefaultGwProperty : public TListValue, public TContainerValue {
 public:
     TDefaultGwProperty() :
-        TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | HIDDEN_VALUE),
+        TListValue(PERSISTENT_VALUE | HIDDEN_VALUE),
         TContainerValue(P_DEFAULT_GW,
                         "Default gateway: <interface> <ip>; ...",
                         staticProperty) {}
@@ -870,7 +870,7 @@ public:
 class TIpProperty : public TListValue, public TContainerValue {
 public:
     TIpProperty() :
-        TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE | HIDDEN_VALUE),
+        TListValue(PERSISTENT_VALUE | HIDDEN_VALUE),
         TContainerValue(P_IP,
                         "IP configuration: <interface> <ip>/<prefix>; ...",
                         staticProperty) {}
@@ -885,7 +885,7 @@ public:
 class TNetProperty : public TListValue, public TContainerValue {
 public:
     TNetProperty() :
-        TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
+        TListValue(PERSISTENT_VALUE),
         TContainerValue(P_NET,
                         "Container network settings: "
                         "none | "
@@ -917,7 +917,7 @@ public:
 class TNetTosProperty : public TUintValue, public TContainerValue {
 public:
     TNetTosProperty() :
-        TUintValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
+        TUintValue(PERSISTENT_VALUE),
         TContainerValue(P_NET_TOS,
                         "IP TOS",
                         staticProperty) {
