@@ -452,16 +452,15 @@ TError TContainer::PrepareNetwork() {
         TNamespaceFd fd;
         TError error2 = fd.Open(GetTid(), "ns/net");
         if (!error2)
-            Holder->NetNsMap[fd.GetInode()] = Net;
+            Holder->AddToNsMap(fd.GetInode(), Net);
 
     } else if (Task) {
         TNamespaceFd fd;
         TError error2 = fd.Open(Task->GetPid(), "ns/net");
         if (!error2) {
             auto inode = fd.GetInode();
-            std::shared_ptr<TNetwork> net;
-            if (Holder->NetNsMap.find(inode) != Holder->NetNsMap.end() &&
-                (net = Holder->NetNsMap[inode].lock())) {
+            std::shared_ptr<TNetwork> net = Holder->SearchInNsMap(inode);
+            if (net) {
                 /* Take existing TNetwork */
                 Net = net;
                 initialized = true;
@@ -475,7 +474,7 @@ TError TContainer::PrepareNetwork() {
 
                 error = Net->Connect(Task->GetNetLinkFd());
                 if (!error)
-                    Holder->NetNsMap[fd.GetInode()] = Net;
+                    Holder->AddToNsMap(fd.GetInode(), Net);
                 L() << "custom new network for " << Name << std::endl;
             }
         }
@@ -550,10 +549,9 @@ TError TContainer::RestoreNetwork(bool valid_task) {
 
         TError error2 = nsfd.Open(Task->GetPid(), "ns/net");
         if (!error2) {
-            std::shared_ptr<TNetwork> net;
             ino_t inode = nsfd.GetInode();
-            if (Holder->NetNsMap.find(inode) != Holder->NetNsMap.end() &&
-                (net = Holder->NetNsMap[inode].lock())) {
+            std::shared_ptr<TNetwork> net = Holder->SearchInNsMap(inode);
+            if (net) {
                 Net = net;
                 L() << "existing network for " << Name << std::endl;
             } else {
@@ -575,7 +573,7 @@ TError TContainer::RestoreNetwork(bool valid_task) {
                     if (!error) {
                         TNamespaceFd fd;
                         error = fd.Open(GetTid(), "ns/net");
-                        Holder->NetNsMap[fd.GetInode()] = Net;
+                        Holder->AddToNsMap(fd.GetInode(), Net);
                     }
                 }
 

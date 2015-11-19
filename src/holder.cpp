@@ -656,3 +656,23 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
 
     return delivered;
 }
+
+void TContainerHolder::AddToNsMap(ino_t inode, std::shared_ptr<TNetwork> &net) {
+    NetNsMap[inode] = net;
+
+    /* Gc */
+    for (auto iter = NetNsMap.begin(); iter != NetNsMap.end(); ) {
+        if (iter->second.expired())
+            iter = NetNsMap.erase(iter);
+        else
+            iter++;
+    }
+}
+
+std::shared_ptr<TNetwork> TContainerHolder::SearchInNsMap(ino_t inode) {
+    std::shared_ptr<TNetwork> net;
+    const auto &iter = NetNsMap.find(inode);
+    if (iter != NetNsMap.end())
+        net = iter->second.lock();
+    return net;
+}
