@@ -20,8 +20,6 @@ extern "C" {
 #include <dirent.h>
 }
 
-using std::string;
-
 std::string AccessTypeToString(EFileAccess type) {
     if (type == EFileAccess::Read)
         return "read";
@@ -45,7 +43,7 @@ std::string TPath::DirNameStr() const {
 }
 
 TPath TPath::DirName() const {
-    string s = DirNameStr();
+    std::string s = DirNameStr();
     return TPath(s);
 }
 
@@ -661,7 +659,27 @@ TError TPath::ReadDirectory(std::vector<std::string> &result) const {
 
     while ((de = readdir(dir))) {
         if (strcmp(de->d_name, ".") && strcmp(de->d_name, ".."))
-            result.push_back(string(de->d_name));
+            result.push_back(std::string(de->d_name));
+    }
+    closedir(dir);
+    return TError::Success();
+}
+
+TError TPath::ListSubdirs(std::vector<std::string> &result) const {
+    struct dirent *de;
+    DIR *dir;
+
+    result.clear();
+    dir = opendir(c_str());
+    if (!dir)
+        return TError(EError::Unknown, errno, "Cannot open directory " + Path);
+
+    while ((de = readdir(dir))) {
+        if (strcmp(de->d_name, ".") && strcmp(de->d_name, "..") &&
+            (de->d_type == DT_DIR ||
+             (de->d_type == DT_UNKNOWN &&
+              (*this / std::string(de->d_name)).IsDirectory())))
+            result.push_back(std::string(de->d_name));
     }
     closedir(dir);
     return TError::Success();

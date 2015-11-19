@@ -124,6 +124,7 @@ public:
     TError RemoveAll() const;
     TError Rename(const TPath &dest) const;
     TError ReadDirectory(std::vector<std::string> &result) const;
+    TError ListSubdirs(std::vector<std::string> &result) const;
     TError ClearDirectory(bool verbose = false) const;
     TError StatVFS(uint64_t &space_used, uint64_t &space_avail,
                    uint64_t &inode_used, uint64_t &inode_avail) const;
