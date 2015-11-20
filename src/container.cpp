@@ -1027,7 +1027,16 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
                 L_ERR() << "Can't set start_errno: " << e << std::endl;
             goto error;
         }
+
         error = PrepareNetwork();
+        if (error) {
+            TError e = Data->Set<int>(D_START_ERRNO, error.GetErrno());
+            if (e)
+                L_ERR() << "Can't set start_errno: " << e << std::endl;
+            goto error;
+        }
+
+        error = Task->Wakeup();
         if (error) {
             TError e = Data->Set<int>(D_START_ERRNO, error.GetErrno());
             if (e)

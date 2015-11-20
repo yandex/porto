@@ -844,19 +844,24 @@ void TTask::StartChild() {
     if (error)
         Abort(error);
 
+    /* Wait for Wakeup */
+    error = Env->Sock.RecvZero();
+    if (error)
+        Abort(error);
+
     error = ChildExec();
     Abort(error);
 }
 
 TError TTask::Start() {
-    TUnixSocket masterSock, waiterSock;
+    TUnixSocket waiterSock;
     int status;
     TError error;
 
     Pid = VPid = WPid = 0;
     ExitStatus = 0;
 
-    error = TUnixSocket::SocketPair(masterSock, Env->Sock);
+    error = TUnixSocket::SocketPair(Env->MasterSock, Env->Sock);
     if (error)
         return error;
 
@@ -988,7 +993,7 @@ TError TTask::Start() {
             ReportPid(clonePid);
 
         /* Complete external configuration, wakeup child */
-        error = masterSock.SendZero();
+        error = Env->MasterSock.SendZero();
         if (error)
             Abort(error);
 
@@ -1041,42 +1046,49 @@ TError TTask::Start() {
     if (forkResult < 0)
         (void)kill(forkPid, SIGKILL);
 
-    error = masterSock.RecvPid(WPid, VPid);
+    error = Env->MasterSock.RecvPid(WPid, VPid);
     if (error)
         return TError(EError::InvalidValue, errno, "Container couldn't start due to resource limits");
 
     if (Env->NetCfg.NewNetNs) {
-        error = masterSock.RecvFd(NetLinkFd);
+        error = Env->MasterSock.RecvFd(NetLinkFd);
         if (error) {
             L_ERR() << error << std::endl;
             return TError(EError::Unknown, errno, "Cannot receive container's netlink fd");
         }
     }
 
-    error = masterSock.RecvPid(Pid, VPid);
+    error = Env->MasterSock.RecvPid(Pid, VPid);
     if (error)
         return TError(EError::InvalidValue, errno, "Container couldn't start due to resource limits");
 
-    error = masterSock.RecvError();
-    if (error || status) {
+    return TError::Success();
+}
+
+TError TTask::Wakeup() {
+    TError error, error2;
+
+    error = Env->MasterSock.SendZero();
+    if (error)
+        error = TError(error, "Container couldn't start due to resource limits");
+
+    error2 = Env->MasterSock.RecvError();
+    if (error2)
+        error = error2;
+
+    ClearEnv();
+
+    if (error) {
         if (Pid > 0) {
             (void)kill(Pid, SIGKILL);
             L_ACT() << "Kill partly constructed container " << Pid << ": " << strerror(errno) << std::endl;
         }
         Pid = VPid = WPid = 0;
         ExitStatus = -1;
+    } else
+        State = Started;
 
-        if (!error)
-            error = TError(EError::InvalidValue, errno, "Container couldn't start due to resource limits (child terminated with " + std::to_string(status) + ")");
-
-        return error;
-    }
-
-    State = Started;
-
-    ClearEnv();
-
-    return TError::Success();
+    return error;
 }
 
 pid_t TTask::GetPid() const {

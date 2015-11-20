@@ -134,7 +134,7 @@ struct TTaskEnv : public TNonCopyable {
     const char** GetEnvp() const;
     bool EnvHasKey(const std::string &key);
 
-    TUnixSocket Sock;
+    TUnixSocket Sock, MasterSock;
     TUnixSocket Sock2;
     int ReportStage = 0;
 };
@@ -172,6 +172,7 @@ public:
     ~TTask();
 
     TError Start();
+    TError Wakeup();
     pid_t GetPid() const;
     pid_t GetWPid() const;
     pid_t GetPidFor(pid_t pid) const;
