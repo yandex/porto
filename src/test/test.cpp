@@ -619,12 +619,13 @@ void TestDaemon(TPortoAPI &api) {
 
     int nl = NetworkEnabled() ? 1 : 0;
 
-    nl++; // event netlink
+    //nl++; // event netlink
 
     // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 4(rpc socket) 5(epoll) 6(netlink socket) 128(event pipe) 129(ack pipe)
     int nr = scandir(path.c_str(), &lst, NULL, alphasort);
     PrintFds(path, lst, nr);
-    Expect(nr >= 2 + 8 + nl && nr <= 2 + 8 + nl + sssFd);
+    ExpectLessEq(nr, 2 + 8 + nl + sssFd);
+    ExpectLessEq(2 + 8 + nl, nr);
 
     Say() << "Make sure portod-master doesn't have zombies" << std::endl;
     pid = ReadPid(config().master_pid().path());
