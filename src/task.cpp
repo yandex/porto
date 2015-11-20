@@ -89,17 +89,15 @@ void TTask::Abort(const TError &error) const {
     TError error2;
 
     /*
-     * stage0: RecvPid
-     * stage1: RecvFd*
-     * stage2: RecvPid
+     * stage0: RecvPid WPid
+     * stage1: RecvPid VPid
+     * stage2: RecvFd NetLinkFd if NetCfg.NewNetNs
      * stage3: RecvError
-     *
-     * *only if NetCfg.NewNetNs is set
      */
     L() << "abort " << Env->ReportStage << " " << Env->NetCfg.NewNetNs << std::endl;
 
     for (int stage = Env->ReportStage; stage < 3; stage++) {
-        if (stage == 1) {
+        if (stage == 2) {
             if (Env->NetCfg.NewNetNs) {
                 error2 = Env->Sock.SendFd(-1);
                 if (error2)
@@ -836,8 +834,29 @@ void TTask::StartChild() {
             error = Env->Sock2.RecvZero();
             if (error)
                 Abort(error);
-            Env->ReportStage += 3;
+            /* Parent forwards VPid */
+            Env->ReportStage++;
         }
+    }
+
+    if (Env->NetCfg.NewNetNs) {
+        auto nl = std::make_shared<TNl>();
+        if (!nl)
+            throw std::bad_alloc();
+
+        error = nl->Connect();
+        if (error) {
+            L_ERR() << error << std::endl;
+            Abort(error);
+        }
+        int fd = nl->GetFd();
+
+        error = Env->Sock.SendFd(fd);
+        if (error) {
+            L_ERR() << error << std::endl;
+            Abort(error);
+        }
+        Env->ReportStage++;
     }
 
     error = ChildDropPriveleges();
@@ -952,42 +971,6 @@ TError TTask::Start() {
             Abort(error);
         }
 
-        if (Env->NetCfg.NewNetNs) {
-            TNamespaceFd my_nsfd;
-            TNamespaceFd nsfd;
-
-            error = nsfd.Open(clonePid, "ns/net");
-            if (error) {
-                L_ERR() << error << std::endl;
-                Abort(error);
-            }
-
-            error = nsfd.SetNs(CLONE_NEWNET);
-            if (error) {
-                L_ERR() << error << std::endl;
-                Abort(error);
-            }
-
-            auto nl = std::make_shared<TNl>();
-            if (!nl)
-                throw std::bad_alloc();
-
-            error = nl->Connect();
-            if (error) {
-                L_ERR() << error << std::endl;
-                Abort(error);
-            }
-            int fd = nl->GetFd();
-
-            error = Env->Sock.SendFd(fd);
-            if (error) {
-                L_ERR() << error << std::endl;
-                Abort(error);
-            }
-            Env->ReportStage++;
-        } else
-            Env->ReportStage++;
-
         /* Report VPid in parent pid namespace for new pid-ns */
         if (Env->Isolate && !Env->QuadroFork)
             ReportPid(clonePid);
@@ -1011,6 +994,7 @@ TError TTask::Start() {
             error = waiterSock.RecvPid(appPid, appVPid);
             if (error)
                 Abort(error);
+            /* Forward VPid */
             ReportPid(appPid);
             error = waiterSock.SendZero();
             if (error)
@@ -1050,6 +1034,10 @@ TError TTask::Start() {
     if (error)
         return TError(EError::InvalidValue, errno, "Container couldn't start due to resource limits");
 
+    error = Env->MasterSock.RecvPid(Pid, VPid);
+    if (error)
+        return TError(EError::InvalidValue, errno, "Container couldn't start due to resource limits");
+
     if (Env->NetCfg.NewNetNs) {
         error = Env->MasterSock.RecvFd(NetLinkFd);
         if (error) {
@@ -1057,11 +1045,6 @@ TError TTask::Start() {
             return TError(EError::Unknown, errno, "Cannot receive container's netlink fd");
         }
     }
-
-    error = Env->MasterSock.RecvPid(Pid, VPid);
-    if (error)
-        return TError(EError::InvalidValue, errno, "Container couldn't start due to resource limits");
-
     return TError::Success();
 }
 
