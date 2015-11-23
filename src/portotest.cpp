@@ -3,7 +3,7 @@
 
 #include "config.hpp"
 #include "version.hpp"
-#include "qdisc.hpp"
+#include "network.hpp"
 #include "util/signal.hpp"
 #include "util/unix.hpp"
 #include "util/string.hpp"
