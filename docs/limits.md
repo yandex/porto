@@ -3,7 +3,7 @@ All limits can be set in stopped and running states (if not specified otherwise)
 
 # Process
 
-* ulimit - container resource limits, syntax: <type> <soft> <hard>; ... (man 2 getrlimit); use unlim/unlimited to indicate RLIM\_INFINITY
+* ulimit - container resource limits, syntax: <type>: <soft> <hard>; ... (man 2 getrlimit); use unlim/unlimited to indicate RLIM\_INFINITY
 
 # Memory
 
