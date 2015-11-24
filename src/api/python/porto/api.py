@@ -323,9 +323,6 @@ class Container(object):
         self.rpc = rpc
         self.name = name
 
-    def _rpc(self, request):
-        return self.rpc.call(request)
-
     def Start(self):
         self.rpc.Start(self.name)
 
@@ -427,9 +424,6 @@ class Connection(object):
 
     def disconnect(self):
         self.rpc.disconnect()
-
-    def _rpc(self, request):
-        return self.rpc.call(request)
 
     def List(self):
         return self.rpc.List()
