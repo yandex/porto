@@ -1313,7 +1313,7 @@ struct TCapDesc {
 
 class TCapabilitiesProperty : public TListValue, public TContainerValue {
     uint64_t Caps;
-    const std::map<std::string, TCapDesc> supported = {
+    const std::map<std::string, TCapDesc> Supported = {
         { "AUDIT_READ",         { CAP_AUDIT_READ, 0 } },
         { "CHOWN",              { CAP_CHOWN, RESTRICTED_CAP } },
         { "DAC_OVERRIDE",       { CAP_DAC_OVERRIDE, RESTRICTED_CAP } },
@@ -1379,8 +1379,9 @@ public:
         bool restricted = vmode == VIRT_MODE_OS;
 
         uint64_t lastCap = GetLastCap();
-        for (auto kv : supported)
-            if ((root || (restricted && kv.second.flags & RESTRICTED_CAP)) && kv.second.id <= lastCap)
+        for (const auto &kv : Supported)
+            if ((root || (restricted && kv.second.flags & RESTRICTED_CAP))
+                && kv.second.id <= lastCap)
                 v.push_back(kv.first);
         return v;
     }
@@ -1390,15 +1391,15 @@ public:
 
         uint64_t lastCap = GetLastCap();
         for (auto &line: lines) {
-            if (supported.find(line) == supported.end())
+            if (Supported.find(line) == Supported.end())
                 return TError(EError::InvalidValue,
                               "Unsupported capability " + line);
 
-            if (supported.at(line).id > lastCap)
+            if (Supported.at(line).id > lastCap)
                 return TError(EError::InvalidValue,
                               "Unsupported kernel capability " + line);
 
-            allowed |= (1ULL << supported.at(line).id);
+            allowed |= (1ULL << Supported.at(line).id);
         }
 
         Caps = allowed;
