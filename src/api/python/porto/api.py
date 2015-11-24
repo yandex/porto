@@ -61,8 +61,8 @@ _DecodeVarint32 = _VarintDecoder((1 << 32) - 1)
 
 
 class _RPC(object):
-    def __init__(self, socket_path, timeout, socket_constructor):
-        self.lock = threading.Lock()
+    def __init__(self, socket_path, timeout, socket_constructor, lock_constructor):
+        self.lock = lock_constructor()
         self.socket_path = socket_path
         self.timeout = timeout
         self.socket_constructor = socket_constructor
@@ -417,8 +417,15 @@ class Volume(object):
 
 
 class Connection(object):
-    def __init__(self, socket_path='/run/portod.socket', timeout=5, socket_constructor=socket.socket):
-        self.rpc = _RPC(socket_path=socket_path, timeout=timeout, socket_constructor=socket_constructor)
+    def __init__(self,
+                 socket_path='/run/portod.socket',
+                 timeout=5,
+                 socket_constructor=socket.socket,
+                 lock_constructor=threading.Lock):
+        self.rpc = _RPC(socket_path=socket_path,
+                        timeout=timeout,
+                        socket_constructor=socket_constructor,
+                        lock_constructor=lock_constructor)
 
     def connect(self):
         self.rpc.connect()
