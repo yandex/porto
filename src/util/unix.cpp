@@ -251,32 +251,31 @@ TError DropBoundedCap(int cap) {
 }
 
 TError SetCap(uint64_t effective, uint64_t permitted, uint64_t inheritable) {
-    cap_user_header_t hdrp = (cap_user_header_t)malloc(sizeof(*hdrp));
-    cap_user_data_t datap = (cap_user_data_t)malloc(sizeof(*datap) * 2);
-    if (!hdrp || !datap)
-        throw std::bad_alloc();
+    struct __user_cap_header_struct hdrp = {
+        .version = _LINUX_CAPABILITY_VERSION_3,
+        .pid = getpid(),
+    };
 
-    hdrp->version = _LINUX_CAPABILITY_VERSION_3;
-    hdrp->pid = getpid();
-    datap[0].effective = (uint32_t)effective;
-    datap[1].effective = (uint32_t)(effective >> 32);
-    datap[0].permitted = (uint32_t)permitted;
-    datap[1].permitted = (uint32_t)(permitted >> 32);
-    datap[0].inheritable = (uint32_t)inheritable;
-    datap[1].inheritable = (uint32_t)(inheritable >> 32);
+    struct __user_cap_data_struct datap[2] = {
+        {
+            .effective = (uint32_t)effective,
+            .permitted = (uint32_t)permitted,
+            .inheritable = (uint32_t)inheritable,
+        },
+        {
+            .effective = (uint32_t)(effective >> 32),
+            .permitted = (uint32_t)(permitted >> 32),
+            .inheritable = (uint32_t)(inheritable >> 32),
+        }
+    };
 
     if (syscall(SYS_capset, hdrp, datap) < 0) {
         int err = errno;
-        free(hdrp);
-        free(datap);
         return TError(EError::Unknown, err, "capset(" +
                       std::to_string(effective) + ", " +
                       std::to_string(permitted) + ", " +
                       std::to_string(inheritable) + ")");
     }
-
-    free(hdrp);
-    free(datap);
 
     return TError::Success();
 }
