@@ -52,12 +52,17 @@ class TNetwork : public std::enable_shared_from_this<TNetwork>,
     std::vector<std::shared_ptr<TNlLink>> Links;
     std::shared_ptr<TQdisc> Qdisc;
 
+    std::vector<std::pair<std::string, int>> ifaces;
+    struct nl_sock *rtnl;
+
     const uint32_t defClass = TcHandle(1, 2);
     const uint32_t rootHandle = TcHandle(1, 0);
 
     TError PrepareLink(TNlLink &link);
 
 public:
+    TError UpdateInterfaces();
+
     TNetwork();
     ~TNetwork();
     TError Connect();
@@ -67,8 +72,9 @@ public:
     TError OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links);
     TError Destroy();
 
-    std::shared_ptr<TNl> GetNl() { return Nl; }
     std::vector<std::shared_ptr<TNlLink>> GetLinks() { return Links; }
     std::shared_ptr<TQdisc> GetQdisc() { return Qdisc; }
-    bool Empty() { return Links.size() == 0; }
+
+    static TError NetlinkError(int error, const std::string description);
+    static void DumpNetlinkObject(const std::string &prefix, void *obj);
 };

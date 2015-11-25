@@ -6,6 +6,10 @@
 #include "util/log.hpp"
 #include "util/string.hpp"
 
+extern "C" {
+#include <netlink/route/link.h>
+}
+
 bool TTclass::Exists(const TNlLink &link) {
     TNlClass tclass(GetParent(), Handle);
     return tclass.Exists(link);
@@ -102,9 +106,14 @@ TError TNetwork::Prepare() {
     PORTO_ASSERT(Qdisc == nullptr);
     PORTO_ASSERT(Links.size() == 0);
 
+    TError error;
     auto lock = ScopedLock();
 
-    TError error = OpenLinks(Links);
+    error = UpdateInterfaces();
+    if (error)
+        return error;
+
+    error = OpenLinks(Links);
     if (error)
         return error;
 
@@ -222,7 +231,58 @@ TNetwork::~TNetwork() {
 }
 
 TError TNetwork::Connect() {
-    return Nl->Connect();
+    TError error = Nl->Connect();
+    if (!error)
+        rtnl = Nl->GetSock();
+    return error;
+}
+
+TError TNetwork::NetlinkError(int error, const std::string description) {
+    return TError(EError::Unknown, description + ": " +
+                                   std::string(nl_geterror(error)));
+}
+
+void TNetwork::DumpNetlinkObject(const std::string &prefix, void *obj) {
+    std::stringstream ss;
+    struct nl_dump_params dp = {};
+
+    dp.dp_type = NL_DUMP_DETAILS;
+    dp.dp_data = &ss;
+    dp.dp_cb = [](struct nl_dump_params *dp, char *buf) {
+            auto ss = (std::stringstream *)dp->dp_data;
+            *ss << std::string(buf);
+    };
+    nl_object_dump(OBJ_CAST(obj), &dp);
+
+    L() << "netlink " << prefix << " " << ss.str() << std::endl;
+}
+
+TError TNetwork::UpdateInterfaces() {
+    struct nl_cache *cache;
+    int ret;
+
+    ret = rtnl_link_alloc_cache(rtnl, AF_UNSPEC, &cache);
+    if (ret < 0)
+        return NetlinkError(ret, "Cannot allocate link cache");
+
+    ifaces.clear();
+
+    for (auto obj = nl_cache_get_first(cache); obj; obj = nl_cache_get_next(obj)) {
+        auto link = (struct rtnl_link *)obj;
+        int ifindex = rtnl_link_get_ifindex(link);
+        int flags = rtnl_link_get_flags(link);
+        const char *name = rtnl_link_get_name(link);
+
+        DumpNetlinkObject("link", link);
+
+        if ((flags & IFF_LOOPBACK) || !(flags & IFF_RUNNING))
+            continue;
+
+        ifaces.push_back(std::make_pair(std::string(name), ifindex));
+    }
+
+    nl_cache_free(cache);
+    return TError::Success();
 }
 
 TError TNetwork::OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links) {
