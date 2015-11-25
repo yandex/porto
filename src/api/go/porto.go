@@ -465,7 +465,12 @@ func (conn *portoConnection) ListVolumeProperties() (ret []TProperty, err error)
 func (conn *portoConnection) CreateVolume(path string, config map[string]string) (desc TVolumeDescription, err error) {
 	var properties []*rpc.TVolumeProperty
 	for k, v := range config {
-		prop := &rpc.TVolumeProperty{Name: &k, Value: &v}
+		// NOTE: `k`, `v` save their addresses during `range`.
+		// If we append pointers to them into an array,
+		// all elements in the array will be the same.
+		// So a pointer to the copy must be used.
+		name, value := k, v
+		prop := &rpc.TVolumeProperty{Name: &name, Value: &value}
 		properties = append(properties, prop)
 	}
 
