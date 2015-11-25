@@ -35,8 +35,7 @@ std::string AccessTypeToString(EFileAccess type) {
 
 std::string TPath::DirNameStr() const {
     char *dup = strdup(Path.c_str());
-    if (!dup)
-        throw std::bad_alloc();
+    PORTO_ASSERT(dup != nullptr);
 
     char *p = dirname(dup);
     std::string out(p);
@@ -52,9 +51,7 @@ TPath TPath::DirName() const {
 
 std::string TPath::BaseName() const {
     char *dup = strdup(Path.c_str());
-    if (!dup)
-        throw std::bad_alloc();
-
+    PORTO_ASSERT(dup != nullptr);
     char *p = basename(dup);
     std::string out(p);
     free(dup);

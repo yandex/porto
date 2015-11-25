@@ -57,8 +57,7 @@ static void AllocStatistics() {
     Statistics = (TStatistics *)mmap(nullptr, sizeof(*Statistics),
                                      PROT_READ | PROT_WRITE,
                                      MAP_SHARED | MAP_ANONYMOUS, -1, 0);
-    if (!Statistics)
-        throw std::bad_alloc();
+    PORTO_ASSERT(Statistics != nullptr);
 }
 
 static void DaemonOpenLog(bool master) {

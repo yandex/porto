@@ -1771,9 +1771,9 @@ TError TContainer::Prepare() {
         kvnode = Storage->GetNode(Id);
 
     Prop = std::make_shared<TPropertyMap>(kvnode, shared_from_this());
+    PORTO_ASSERT(Prop != nullptr);
     Data = std::make_shared<TValueMap>(kvnode);
-    if (!Prop || !Data)
-        throw std::bad_alloc();
+    PORTO_ASSERT(Data != nullptr);
 
     RegisterData(Data, shared_from_this());
     RegisterProperties(Prop, shared_from_this());

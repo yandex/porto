@@ -536,9 +536,7 @@ TError TTask::ChildIsolateFs() {
 
 TError TTask::ChildEnableNet() {
     auto nl = std::make_shared<TNl>();
-    if (!nl)
-        throw std::bad_alloc();
-
+    PORTO_ASSERT(nl != nullptr);
     TError error = nl->Connect();
     if (error)
         return error;
@@ -605,8 +603,7 @@ static std::string GenerateHw(const std::string &host, const std::string &name) 
 
 TError TTask::IsolateNet(int childPid) {
     auto nl = std::make_shared<TNl>();
-    if (!nl)
-        throw std::bad_alloc();
+    PORTO_ASSERT(nl != nullptr);
 
     TError error = nl->Connect();
     if (error)
@@ -841,8 +838,7 @@ void TTask::StartChild() {
 
     if (Env->NetCfg.NewNetNs) {
         auto nl = std::make_shared<TNl>();
-        if (!nl)
-            throw std::bad_alloc();
+        PORTO_ASSERT(nl != nullptr);
 
         error = nl->Connect();
         if (error) {

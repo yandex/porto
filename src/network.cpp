@@ -247,8 +247,7 @@ TError TNetwork::PrepareLink(TNlLink &link) {
 
 TNetwork::TNetwork() {
     Nl = std::make_shared<TNl>();
-    if (!Nl)
-        throw std::bad_alloc();
+    PORTO_ASSERT(Nl != nullptr);
 }
 
 TError TNetwork::Connect(int fd) {
@@ -280,8 +279,7 @@ TError TNetwork::OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links) {
 
     for (auto &name : devices) {
         auto l = std::make_shared<TNlLink>(Nl, name);
-        if (!l)
-            throw std::bad_alloc();
+        PORTO_ASSERT(l != nullptr);
 
         TError error = l->Load();
         if (error) {
