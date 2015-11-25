@@ -79,25 +79,6 @@ TError TQdisc::Remove(const TNlLink &link) {
     return qdisc.Remove(link);
 }
 
-class TFilter : public TNonCopyable {
-    const std::shared_ptr<TQdisc> Parent;
-    bool Exists(const TNlLink &link);
-
-public:
-    TFilter(const std::shared_ptr<TQdisc> parent) : Parent(parent) { }
-    TError Create(TNlLink &link);
-};
-
-bool TFilter::Exists(const TNlLink &link) {
-    TNlCgFilter filter(Parent->GetHandle(), 1);
-    return filter.Exists(link);
-}
-
-TError TFilter::Create(TNlLink &link) {
-    TNlCgFilter filter(Parent->GetHandle(), 1);
-    return filter.Create(link);
-}
-
 TError TNetwork::Destroy() {
     auto lock = ScopedLock();
 
@@ -129,7 +110,6 @@ TError TNetwork::Destroy() {
 TError TNetwork::Prepare() {
     PORTO_ASSERT(Qdisc == nullptr);
     PORTO_ASSERT(Tclass == nullptr);
-    PORTO_ASSERT(Filter == nullptr);
     PORTO_ASSERT(Links.size() == 0);
 
     auto lock = ScopedLock();
@@ -145,7 +125,6 @@ TError TNetwork::Prepare() {
     }
 
     Qdisc = std::make_shared<TQdisc>(rootHandle, defClass);
-    Filter = std::make_shared<TFilter>(Qdisc);
     Tclass = std::make_shared<TTclass>(Qdisc, defClass);
 
     return TError::Success();

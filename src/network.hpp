@@ -9,7 +9,6 @@
 #include "util/locks.hpp"
 
 class TNetwork;
-class TFilter;
 
 class TQdisc : public TNonCopyable {
     const uint32_t Handle;
@@ -53,7 +52,6 @@ class TNetwork : public std::enable_shared_from_this<TNetwork>,
     std::vector<std::shared_ptr<TNlLink>> Links;
     std::shared_ptr<TQdisc> Qdisc;
     std::shared_ptr<TTclass> Tclass;
-    std::shared_ptr<TFilter> Filter;
 
     const uint32_t defClass = TcHandle(1, 2);
     const uint32_t rootHandle = TcHandle(1, 0);
