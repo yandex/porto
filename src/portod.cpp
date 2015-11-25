@@ -51,7 +51,6 @@ using std::vector;
 static pid_t slavePid;
 static bool stdlog = false;
 static bool failsafe = false;
-static bool noNetwork = false;
 
 static void AllocStatistics() {
     Statistics = (TStatistics *)mmap(nullptr, sizeof(*Statistics),
@@ -76,8 +75,6 @@ static void DaemonOpenLog(bool master) {
 static int DaemonSyncConfig(bool master) {
     config.Load();
 
-    if (noNetwork)
-        config().mutable_network()->set_enabled(false);
     TNl::EnableDebug(config().network().debug());
 
     const auto &pid = master ? config().master_pid() : config().slave_pid();
@@ -1016,8 +1013,6 @@ int main(int argc, char * const argv[]) {
             respawn = false;
         } else if (arg == "--failsafe") {
             failsafe = true;
-        } else if (arg == "--nonet") {
-            noNetwork = true;
         } else if (arg == "-t") {
             if (argn + 1 >= argc)
                 return EXIT_FAILURE;
