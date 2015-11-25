@@ -24,6 +24,7 @@ public:
 };
 
 class TTclass : public TNonCopyable {
+    // Someone, please KILL ME
     const std::shared_ptr<TQdisc> ParentQdisc;
     const std::shared_ptr<TTclass> ParentTclass;
     const uint32_t Handle;

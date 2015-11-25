@@ -518,9 +518,16 @@ TError TContainer::PrepareNetwork() {
     } else {
         PORTO_ASSERT(Parent->Tclass != nullptr);
 
-        auto tclass = Parent->Tclass;
-        uint32_t handle = TcHandle(TcMajor(tclass->GetHandle()), Id);
-        Tclass = std::make_shared<TTclass>(tclass, handle);
+        if (Net == Parent->Net) {
+            auto tclass = Parent->Tclass;
+            uint32_t handle = TcHandle(TcMajor(tclass->GetHandle()), Id);
+            Tclass = std::make_shared<TTclass>(tclass, handle);
+        } else {
+            uint32_t porto_handle = TcHandle(TcMajor(Net->GetQdisc()->GetHandle()), PORTO_ROOT_CONTAINER_ID);
+            auto porto_tclass = std::make_shared<TTclass>(Net->GetQdisc(), porto_handle);
+            uint32_t handle = TcHandle(TcMajor(porto_tclass->GetHandle()), Id);
+            Tclass = std::make_shared<TTclass>(porto_tclass, handle);
+        }
     }
 
     TUintMap prio, rate, ceil;

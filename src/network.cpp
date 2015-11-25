@@ -215,6 +215,7 @@ TError TNetwork::PrepareLink(TNlLink &link) {
     }
 
     TNlClass tclass(rootHandle, defClass);
+    TNlClass porto_tclass(rootHandle, TcHandle(TcMajor(rootHandle), PORTO_ROOT_CONTAINER_ID));
 
     uint64_t prio, rate, ceil;
     prio = config().network().default_prio();
@@ -227,6 +228,16 @@ TError TNetwork::PrepareLink(TNlLink &link) {
         TError error = tclass.Create(link, prio, rate, ceil);
         if (error) {
             L_ERR() << "Can't create default tclass: " << error << std::endl;
+            return error;
+        }
+    }
+
+    if (!porto_tclass.Valid(link, prio, rate, ceil)) {
+        (void)porto_tclass.Remove(link);
+
+        TError error = porto_tclass.Create(link, prio, rate, ceil);
+        if (error) {
+            L_ERR() << "Can't create porto tclass: " << error << std::endl;
             return error;
         }
     }
