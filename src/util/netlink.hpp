@@ -73,7 +73,6 @@ public:
 class TNlLink : public TNonCopyable {
     std::shared_ptr<TNl> Nl;
     std::string Name;
-    std::string Alias;
     struct nl_cache *ClassCache = nullptr;
 
     TError AddXVlan(const std::string &vlantype,
@@ -103,7 +102,6 @@ public:
     TError Enslave(const std::string &name);
     TError AddVeth(const std::string &name, const std::string &peerName, const std::string &hw, int mtu, int nsPid);
     const std::string &GetAlias() const;
-    void SetAlias(const std::string &alias) { Alias = alias; }
 
     static bool ValidIpVlanMode(const std::string &mode);
     static bool ValidMacVlanType(const std::string &type);

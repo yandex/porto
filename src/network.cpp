@@ -227,26 +227,19 @@ TError TNetwork::Connect() {
 
 TError TNetwork::OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links) {
     std::vector<std::string> devices;
-    for (auto &device : config().network().devices())
-        devices.push_back(device);
+    TError error;
 
-    TError error = Nl->RefillCache();
+    error = Nl->RefillCache();
     if (error) {
         L_ERR() << "Can't refill link cache: " << error << std::endl;
         return error;
     }
 
-    if (!devices.size()) {
-        TError error = Nl->GetDefaultLink(devices);
-        if (error) {
-            L_ERR() << "Can't open link: " << error << std::endl;
-            return error;
-        }
+    error = Nl->GetDefaultLink(devices);
+    if (error) {
+        L_ERR() << "Can't open link: " << error << std::endl;
+        return error;
     }
-
-    std::map<std::string, std::string> aliasMap;
-    for (auto &alias : config().network().alias())
-        aliasMap[alias.iface()] = alias.name();
 
     for (auto &name : devices) {
         auto l = std::make_shared<TNlLink>(Nl, name);
@@ -257,9 +250,6 @@ TError TNetwork::OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links) {
             L_ERR() << "Can't open link: " << error << std::endl;
             return error;
         }
-
-        if (aliasMap.find(name) != aliasMap.end())
-            l->SetAlias(aliasMap.at(name));
 
         links.push_back(l);
     }

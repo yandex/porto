@@ -584,10 +584,7 @@ TError TNlLink::AddVeth(const std::string &name, const std::string &peerName, co
 }
 
 const std::string &TNlLink::GetAlias() const {
-    if (Alias.length())
-        return Alias;
-    else
-        return Name;
+    return Name;
 }
 
 bool TNlLink::ValidIpVlanMode(const std::string &mode) {

@@ -4,7 +4,7 @@ message TCfg {
 	message TNetworkCfg {
 		optional bool enabled = 1; /* deprecated */
 		optional bool debug = 2;
-		repeated string devices = 3;
+		repeated string devices = 3; /* deprecated */
 		optional uint32 default_prio = 4;
 		optional uint32 default_max_guarantee = 5;
 		optional uint32 default_guarantee = 6;
@@ -13,7 +13,7 @@ message TCfg {
 			required string iface = 1;
 			required string name = 2;
 		}
-		repeated TNetworkAlias alias = 8;
+		repeated TNetworkAlias alias = 8; /* deprecated */
 		optional bool dynamic_ifaces = 9; /* deprecated */
 	}
 
