@@ -71,10 +71,10 @@ static size_t GetPwSize() {
 
 TError TUser::Load() {
     struct passwd pwd, *p;
-    TScopedMem buf(GetPwSize());
+    std::vector<char> buf(GetPwSize()) ;
 
     if (Id >= 0) {
-        getpwuid_r(Id, &pwd, (char *)buf.GetData(), buf.GetSize(), &p);
+        getpwuid_r(Id, &pwd, buf.data(), buf.size(), &p);
         if (p) {
             Id = p->pw_uid;
             Name = p->pw_name;
@@ -85,7 +85,7 @@ TError TUser::Load() {
     }
 
     if (Name.length()) {
-        getpwnam_r(Name.c_str(), &pwd, (char *)buf.GetData(), buf.GetSize(), &p);
+        getpwnam_r(Name.c_str(), &pwd, buf.data(), buf.size(), &p);
         if (p) {
             Id = p->pw_uid;
             Name = p->pw_name;
@@ -99,7 +99,7 @@ TError TUser::Load() {
         if (error)
             return TError(EError::InvalidValue, "Invalid user: " + Name);
 
-        getpwuid_r(Id, &pwd, (char *)buf.GetData(), buf.GetSize(), &p);
+        getpwuid_r(Id, &pwd, buf.data(), buf.size(), &p);
         if (p) {
             Id = p->pw_uid;
             Name = p->pw_name;
@@ -114,10 +114,10 @@ TError TUser::Load() {
 
 TError TGroup::Load() {
     struct group grp, *g;
-    TScopedMem buf(GetPwSize());
+    std::vector<char> buf(GetPwSize());
 
     if (Id >= 0) {
-        getgrgid_r(Id, &grp, (char *)buf.GetData(), buf.GetSize(), &g);
+        getgrgid_r(Id, &grp, buf.data(), buf.size(), &g);
         if (g) {
             Id = g->gr_gid;
             Name = g->gr_name;
@@ -129,7 +129,7 @@ TError TGroup::Load() {
     }
 
     if (Name.length()) {
-        getgrnam_r(Name.c_str(), &grp, (char *)buf.GetData(), buf.GetSize(), &g);
+        getgrnam_r(Name.c_str(), &grp, buf.data(), buf.size(), &g);
         if (g) {
             Id = g->gr_gid;
             Name = g->gr_name;
@@ -143,7 +143,7 @@ TError TGroup::Load() {
         if (error)
             return TError(EError::InvalidValue, "Invalid group: " + Name);
 
-        getgrgid_r(Id, &grp, (char *)buf.GetData(), buf.GetSize(), &g);
+        getgrgid_r(Id, &grp, buf.data(), buf.size(), &g);
         if (g) {
             Id = g->gr_gid;
             Name = g->gr_name;

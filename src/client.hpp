@@ -62,7 +62,7 @@ private:
     EClientState State;
     uint64_t Length;
     uint64_t Pos;
-    TScopedMem Request;
+    std::vector<char> Request;
 
     void SetState(EClientState state);
 };

@@ -194,20 +194,20 @@ bool TClient::ReadRequest(rpc::TContainerRequest &req, bool &hangup) {
                 return false;
             }
 
-            Request.Alloc(Length);
+            Request.resize(Length);
             SetState(EClientState::ReadingData);
         }
     }
 
     if (State == EClientState::ReadingData) {
-        int ret = recv(Fd, (uint8_t *)Request.GetData() + Pos, Request.GetSize() - Pos, MSG_DONTWAIT);
+        int ret = recv(Fd, &Request[Pos], Request.size() - Pos, MSG_DONTWAIT);
         if (ret <= 0)
             return false;
 
         Pos += ret;
 
-        if (Pos >= Request.GetSize()) {
-            bool ret = req.ParseFromArray(Request.GetData(), Request.GetSize());
+        if (Pos >= Request.size()) {
+            bool ret = req.ParseFromArray(Request.data(), Request.size());
             if (!ret) {
                 L_WRN() << "Couldn't parse request from client " << Fd << std::endl;
                 hangup = true;

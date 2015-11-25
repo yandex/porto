@@ -31,8 +31,8 @@ TError TMount::Snapshot(std::vector<std::shared_ptr<TMount>> &result, const TPat
         return TError(EError::Unknown, errno, "setmntent(" + mounts.ToString() + ")");
 
     struct mntent* m, mntbuf;
-    TScopedMem buf(4096);
-    while ((m = getmntent_r(f, &mntbuf, (char *)buf.GetData(), buf.GetSize()))) {
+    std::array<char, 4096> buf;
+    while ((m = getmntent_r(f, &mntbuf, buf.data(), buf.size()))) {
         vector<string> flags;
         TError error = SplitString(m->mnt_opts, ',', flags);
         if (error) {
@@ -57,10 +57,10 @@ TError TMount::Find(TPath path, const TPath mounts) {
         return TError(EError::Unknown, errno, "setmntent(" + mounts.ToString() + ")");
 
     struct mntent* m, mntbuf;
-    TScopedMem buf(4096);
+    std::array<char, 4096> buf;
     TError error(EError::Unknown, "mountpoint not found: " + path.ToString() + ")");
 
-    while ((m = getmntent_r(f, &mntbuf, (char *)buf.GetData(), buf.GetSize()))) {
+    while ((m = getmntent_r(f, &mntbuf, buf.data(), buf.size()))) {
 
         TPath source(m->mnt_fsname);
         TPath target(m->mnt_dir);

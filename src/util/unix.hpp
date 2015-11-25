@@ -44,19 +44,6 @@ public:
     TScopedFd &operator=(int fd);
 };
 
-class TScopedMem : public TNonCopyable {
-    size_t Size;
-    void *Data = nullptr;
-public:
-    TScopedMem();
-    TScopedMem(size_t size);
-    ~TScopedMem();
-    void Alloc(size_t size);
-    void Free();
-    void *GetData();
-    size_t GetSize();
-};
-
 TError SetOomScoreAdj(int value);
 
 TError Run(const std::vector<std::string> &command, int &status, bool stdio = false);

@@ -301,39 +301,6 @@ TScopedFd &TScopedFd::operator=(int fd) {
     return *this;
 }
 
-TScopedMem::TScopedMem() : Size(0) {
-}
-
-TScopedMem::TScopedMem(size_t size) : Size(size) {
-    Alloc(size);
-}
-
-void TScopedMem::Alloc(size_t size) {
-    Size = size;
-    Free();
-    if (size) {
-        Data = malloc(size);
-        PORTO_ASSERT(Data != nullptr);
-    }
-}
-
-void TScopedMem::Free() {
-    free(Data);
-    Data = nullptr;
-}
-
-TScopedMem::~TScopedMem() {
-    Free();
-}
-
-void *TScopedMem::GetData() {
-    return Data;
-}
-
-size_t TScopedMem::GetSize() {
-    return Size;
-}
-
 TError SetOomScoreAdj(int value) {
     TFile f("/proc/self/oom_score_adj");
     return f.WriteStringNoAppend(std::to_string(value));
