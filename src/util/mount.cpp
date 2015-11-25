@@ -20,11 +20,6 @@ extern "C" {
 #include <unistd.h>
 }
 
-using std::string;
-using std::vector;
-using std::set;
-using std::shared_ptr;
-
 TError TMount::Snapshot(std::vector<std::shared_ptr<TMount>> &result, const TPath mounts) {
     FILE* f = setmntent(mounts.c_str(), "r");
     if (!f)
@@ -33,7 +28,7 @@ TError TMount::Snapshot(std::vector<std::shared_ptr<TMount>> &result, const TPat
     struct mntent* m, mntbuf;
     std::array<char, 4096> buf;
     while ((m = getmntent_r(f, &mntbuf, buf.data(), buf.size()))) {
-        vector<string> flags;
+        std::vector<std::string> flags;
         TError error = SplitString(m->mnt_opts, ',', flags);
         if (error) {
             endmntent(f);
