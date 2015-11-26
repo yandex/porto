@@ -540,8 +540,8 @@ TError TTask::ChildEnableNet() {
         if (error)
             return error;
 
-        bool hasIp = find_if(Env->IpVec.begin(), Env->IpVec.end(), [&](const TIpVec &i)->bool { return i.Iface == dev; }) != Env->IpVec.end();
-        bool hasGw = find_if(Env->GwVec.begin(), Env->GwVec.end(), [&](const TGwVec &i)->bool { return i.Iface == dev; }) != Env->GwVec.end();
+        bool hasIp = find_if(Env->NetCfg.IpVec.begin(), Env->NetCfg.IpVec.end(), [&](const TIpVec &i)->bool { return i.Iface == dev; }) != Env->NetCfg.IpVec.end();
+        bool hasGw = find_if(Env->NetCfg.GwVec.begin(), Env->NetCfg.GwVec.end(), [&](const TGwVec &i)->bool { return i.Iface == dev; }) != Env->NetCfg.GwVec.end();
 
         /* Don't touch non-loopback interfaces, that seems to be up. */
         if (link->IsLoopback() || Env->NetUp || hasIp || hasGw) {
@@ -550,7 +550,7 @@ TError TTask::ChildEnableNet() {
                 return error;
         }
 
-        for (auto ip : Env->IpVec) {
+        for (auto ip : Env->NetCfg.IpVec) {
             if (ip.Addr.IsEmpty())
                 continue;
 
@@ -561,7 +561,7 @@ TError TTask::ChildEnableNet() {
             }
         }
 
-        for (auto gw : Env->GwVec) {
+        for (auto gw : Env->NetCfg.GwVec) {
             if (gw.Addr.IsEmpty())
                 continue;
 

@@ -1006,7 +1006,7 @@ public:
     }
 
     TError PrepareTaskEnv(TTaskEnv &taskEnv) override {
-        taskEnv.GwVec = GwVec;
+        taskEnv.NetCfg.GwVec = GwVec;
         return TError::Success();
     }
 };
@@ -1046,7 +1046,7 @@ public:
     }
 
     TError PrepareTaskEnv(TTaskEnv &taskEnv) override {
-        taskEnv.IpVec = IpVec;
+        taskEnv.NetCfg.IpVec = IpVec;
         return TError::Success();
     }
 };

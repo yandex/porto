@@ -81,6 +81,8 @@ struct TNetCfg {
     std::vector<TVethNetCfg> Veth;
     std::string NetNsName;
     std::string NetCtName;
+    std::vector<TGwVec> GwVec;
+    std::vector<TIpVec> IpVec;
 
     void Clear() {
         /* default - create new empty netns */
@@ -124,8 +126,6 @@ struct TTaskEnv : public TNonCopyable {
     TNetCfg NetCfg;
     int LoopDev;
     uint64_t Caps;
-    std::vector<TGwVec> GwVec;
-    std::vector<TIpVec> IpVec;
     bool NewMountNs;
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
     TCred Cred;
