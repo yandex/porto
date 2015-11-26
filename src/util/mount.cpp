@@ -1,5 +1,6 @@
 #include <sstream>
 #include <mutex>
+#include <array>
 
 #include "util/mount.hpp"
 #include "util/file.hpp"
