@@ -269,7 +269,7 @@ TError SetCap(uint64_t effective, uint64_t permitted, uint64_t inheritable) {
         }
     };
 
-    if (syscall(SYS_capset, hdrp, datap) < 0) {
+    if (syscall(SYS_capset, &hdrp, datap) < 0) {
         int err = errno;
         return TError(EError::Unknown, err, "capset(" +
                       std::to_string(effective) + ", " +
