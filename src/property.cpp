@@ -241,7 +241,7 @@ public:
 class TRootProperty : public TStringValue, public TContainerValue {
 public:
     TRootProperty() :
-        TStringValue(PATH_PROPERTY | PARENT_RO_PROPERTY | PERSISTENT_VALUE),
+        TStringValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_ROOT,
                      "Container root directory (container will be chrooted into this directory)",
                      staticProperty) {}
@@ -322,7 +322,7 @@ public:
 class TStdinPathProperty : public TStringValue, public TContainerValue {
 public:
     TStdinPathProperty() :
-        TStringValue(PATH_PROPERTY | PERSISTENT_VALUE),
+        TStringValue(PERSISTENT_VALUE),
         TContainerValue(P_STDIN_PATH,
                         "Container standard input path",
                         staticProperty) {}
@@ -345,7 +345,7 @@ public:
 class TStdoutPathProperty : public TStringValue, public TContainerValue {
 public:
     TStdoutPathProperty() :
-        TStringValue(PATH_PROPERTY | PERSISTENT_VALUE),
+        TStringValue(PERSISTENT_VALUE),
         TContainerValue(P_STDOUT_PATH,
                         "Container standard input path",
                         staticProperty) {}
@@ -378,7 +378,7 @@ public:
 class TStderrPathProperty : public TStringValue, public TContainerValue {
 public:
     TStderrPathProperty() :
-        TStringValue(PATH_PROPERTY | PERSISTENT_VALUE),
+        TStringValue(PERSISTENT_VALUE),
         TContainerValue(P_STDERR_PATH,
                         "Container standard error path",
                         staticProperty) {}

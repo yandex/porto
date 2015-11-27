@@ -1583,17 +1583,6 @@ TError TContainer::GetProperty(const string &origProperty, string &value,
     }
     PropertyToAlias(origProperty, value);
 
-    if (Prop->HasFlags(property, PATH_PROPERTY) && client) {
-        std::shared_ptr<TContainer> clientContainer;
-        TError error = client->GetContainer(clientContainer);
-        if (error)
-            return error;
-        TPath clientRoot = clientContainer->RootPath();
-        if (clientRoot.IsEmpty())
-            return TError(EError::InvalidValue, "Cannot get client root path");
-        value = clientRoot.InnerPath(value, true).ToString();
-    }
-
     return TError::Success();
 }
 
@@ -1641,17 +1630,6 @@ TError TContainer::SetProperty(const string &origProperty,
 
     if (Prop->HasFlags(property, RESTROOT_PROPERTY) && !superuser && !CredConf.RestrictedUser(OwnerCred))
         return TError(EError::Permission, "Only restricted root can change this property");
-
-    if (Prop->HasFlags(property, PATH_PROPERTY) && client) {
-        std::shared_ptr<TContainer> clientContainer;
-        TError error = client->GetContainer(clientContainer);
-        if (error)
-            return error;
-        TPath clientRoot = clientContainer->RootPath();
-        if (clientRoot.IsEmpty())
-            return TError(EError::InvalidValue, "Cannot get client root path");
-        value = (clientRoot / value).ToString();
-    }
 
     if (!Prop->HasState(property, GetState()))
         return TError(EError::InvalidState, "Can't set dynamic property " + property + " in state " + ContainerStateName(GetState()));
