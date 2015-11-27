@@ -98,29 +98,6 @@ TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
     return TError::Success();
 }
 
-static TError ValidPath(const std::string &str) {
-    if (!str.length() || str[0] != '/')
-        return TError(EError::InvalidValue, "invalid directory");
-
-    return TError::Success();
-}
-
-static TError PathAccessible(std::shared_ptr<TContainer> c,
-                             const TPath &path,
-                             EFileAccess type) {
-    if (!path.AccessOk(type, c->OwnerCred))
-        return TError(EError::InvalidValue, "insufficient " + AccessTypeToString(type) + " permission for " + path.ToString());
-
-    return TError::Success();
-}
-
-static TError ExistingFile(const std::string &str) {
-    TFile f(str);
-    if (!f.Exists())
-        return TError(EError::InvalidValue, "file doesn't exist");
-    return TError::Success();
-}
-
 static std::set<EContainerState> staticProperty = {
     EContainerState::Stopped,
 };
@@ -241,7 +218,7 @@ public:
 class TRootProperty : public TStringValue, public TContainerValue {
 public:
     TRootProperty() :
-        TStringValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
+        TStringValue(PERSISTENT_VALUE),
         TContainerValue(P_ROOT,
                      "Container root directory (container will be chrooted into this directory)",
                      staticProperty) {}
@@ -255,18 +232,6 @@ public:
 
     TError CheckValue(const std::string &value) override {
         auto c = GetContainer();
-
-        TError error = ValidPath(value);
-        if (error)
-            return error;
-        if (value != "/") {
-            error = PathAccessible(c, value, EFileAccess::Read);
-            if (error)
-                return error;
-            error = PathAccessible(c, value, EFileAccess::Write);
-            if (error)
-                return error;
-        }
 
         if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS) {
             TPath root(value);
@@ -284,7 +249,7 @@ public:
 class TRootRdOnlyProperty : public TBoolValue, public TContainerValue {
 public:
     TRootRdOnlyProperty() :
-        TBoolValue(PARENT_RO_PROPERTY | PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TBoolValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_ROOT_RDONLY,
                         "Mount root directory in read-only mode",
                         staticProperty) {}
@@ -311,11 +276,10 @@ public:
         if (c->Prop->Get<std::string>(P_ROOT) != "/")
             return "/";
 
-        return c->WorkPath().ToString();
-    }
+        if (c->IsRoot() || c->IsPortoRoot())
+            return "/";
 
-    TError CheckValue(const std::string &value) override {
-        return ValidPath(value);
+        return c->WorkPath().ToString();
     }
 };
 
@@ -329,16 +293,6 @@ public:
 
     std::string GetDefault() const override {
         return "/dev/null";
-    }
-
-    TError CheckValue(const std::string &value) override {
-        TError error = ExistingFile(value);
-        if (error)
-            return TError::Success();
-        error = PathAccessible(GetContainer(), value, EFileAccess::Read);
-        if (error)
-            return error;
-        return TError::Success();
     }
 };
 
@@ -358,21 +312,6 @@ public:
 
         return c->DefaultStdFile("stdout").ToString();
     }
-
-    TError CheckValue(const std::string &value) override {
-        TError error = ValidPath(value);
-        if (error)
-            return error;
-        TPath path(value);
-        if (!path.Exists())
-            path = path.DirName();
-        if (!path.Exists())
-            return TError::Success();
-        error = PathAccessible(GetContainer(), path, EFileAccess::Write);
-        if (error)
-            return error;
-        return TError::Success();
-    }
 };
 
 class TStderrPathProperty : public TStringValue, public TContainerValue {
@@ -390,21 +329,6 @@ public:
             return "/dev/null";
 
         return c->DefaultStdFile("stderr").ToString();
-    }
-
-    TError CheckValue(const std::string &value) override {
-        TError error = ValidPath(value);
-        if (error)
-            return error;
-        TPath path(value);
-        if (!path.Exists())
-            path = path.DirName();
-        if (!path.Exists())
-            return TError::Success();
-        error = PathAccessible(GetContainer(), path, EFileAccess::Write);
-        if (error)
-            return error;
-        return TError::Success();
     }
 };
 
@@ -891,7 +815,7 @@ public:
 class TBindDnsProperty : public TBoolValue, public TContainerValue {
 public:
     TBindDnsProperty() :
-        TBoolValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
+        TBoolValue(PERSISTENT_VALUE),
         TContainerValue(P_BIND_DNS,
                         "Bind /etc/resolv.conf and /etc/hosts of host to container",
                         staticProperty) {}
@@ -917,7 +841,7 @@ class TBindProperty : public TListValue, public TContainerValue {
 
 public:
     TBindProperty() :
-        TListValue(PARENT_RO_PROPERTY | PERSISTENT_VALUE),
+        TListValue(PERSISTENT_VALUE),
         TContainerValue(P_BIND,
                         "Share host directories with container: <host_path> <container_path> [ro|rw]; ...",
                         staticProperty) {}
@@ -950,13 +874,6 @@ public:
                 else
                     return TError(EError::InvalidValue, "Invalid bind type in: " + line);
             }
-
-            if (!m.Source.Exists())
-                return TError(EError::InvalidValue, "Source bind " + m.Source.ToString() + " doesn't exist");
-
-            error = PathAccessible(c, m.Source, m.Rdonly ? EFileAccess::Read : EFileAccess::Write);
-            if (error)
-                return error;
 
             bm.push_back(m);
         }
