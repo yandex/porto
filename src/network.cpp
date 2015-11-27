@@ -218,6 +218,9 @@ TNetwork::TNetwork() {
     PORTO_ASSERT(Nl != nullptr);
 }
 
+TNetwork::~TNetwork() {
+}
+
 TError TNetwork::Connect() {
     return Nl->Connect();
 }

@@ -489,14 +489,7 @@ TError TContainer::SetTNetwork(pid_t pid) {
         return error;
     }
 
-    /* Take host network */
-    std::shared_ptr<TContainer> root;
-    Holder->Get(ROOT_CONTAINER, root);
-    PORTO_ASSERT(root);
-    Net = root->Net;
-    PORTO_ASSERT(Net);
-
-    return TError::Success();
+    return error;
 }
 
 TError TContainer::PrepareNetwork() {
@@ -1311,21 +1304,26 @@ void TContainer::RemoveLog(const TPath &path) {
 }
 
 void TContainer::FreeResources() {
+    TError error;
+
     LeafCgroups.clear();
 
-    if (Tclass && (!Parent || Parent->Tclass != Tclass)) {
+    if (Net && Tclass && (!Parent || Parent->Tclass != Tclass)) {
         auto lock = Net->ScopedLock();
 
         for (const auto& link : Net->GetLinks()) {
-            TError error = Tclass->Remove(*link);
+            error = Tclass->Remove(*link);
             if (error)
                 L_ERR() << "Can't remove tc classifier: " << error << std::endl;
         }
     }
     Tclass = nullptr;
     Task = nullptr;
-    if (IsRoot())
-        Net->Destroy();
+    if (Net && IsRoot()) {
+        error = Net->Destroy();
+        if (error)
+            L_ERR() << "Cannot destroy network: " << error << std::endl;
+    }
     Net = nullptr;
     ShutdownOom();
 
@@ -1340,7 +1338,7 @@ void TContainer::FreeResources() {
 
     int loopNr = Prop->Get<int>(P_RAW_LOOP_DEV);
 
-    TError error = Prop->Set<int>(P_RAW_LOOP_DEV, -1);
+    error = Prop->Set<int>(P_RAW_LOOP_DEV, -1);
     if (error)
         L_ERR() << "Can't set " << P_RAW_LOOP_DEV << ": " << error << std::endl;
 
@@ -1924,10 +1922,13 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
             }
         }
 
-        error = RestoreNetwork(!LostAndRestored);
-        if (error) {
-            L_ERR() << error << std::endl;
-            return error;
+        if (!LostAndRestored) {
+            error = RestoreNetwork(true);
+            if (error) {
+                if (Task->HasCorrectParent() && !Task->IsZombie())
+                    L_ERR() << "Cannot restore network: " << error << std::endl;
+                LostAndRestored = true;
+            }
         }
 
         auto state = Data->Get<std::string>(D_STATE);
@@ -2310,7 +2311,7 @@ void TContainer::CleanupWaiters() {
 }
 
 TError TContainer::UpdateNetwork() {
-    if (Tclass) {
+    if (Net && Tclass) {
         TUintMap prio, rate, ceil;
         prio = Prop->Get<TUintMap>(P_NET_PRIO);
         rate = Prop->Get<TUintMap>(P_NET_GUARANTEE);

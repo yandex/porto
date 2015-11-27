@@ -59,9 +59,7 @@ class TNetwork : public std::enable_shared_from_this<TNetwork>,
 
 public:
     TNetwork();
-    ~TNetwork() {
-        Destroy();
-    }
+    ~TNetwork();
     TError Connect();
     TError Prepare();
     TError Update();
