@@ -117,7 +117,6 @@ struct TTaskEnv : public TNonCopyable {
     bool DefaultStderr = false;
     TNamespaceSnapshot ParentNs;
     bool CloneParentMntNs;
-    TNamespaceFd ClientMntNs;
     std::map<int,struct rlimit> Rlimit;
     std::string Hostname;
     bool SetEtcHostname;
@@ -149,7 +148,7 @@ class TTask: public TNonCopyable {
 
     void ReportPid(pid_t pid) const;
 
-    TError ReopenStdio();
+    TError ReopenStdio(bool open_default);
     TError IsolateNet(int childPid);
 
     TError ChildOpenStdFile(const TPath &path, int expected);

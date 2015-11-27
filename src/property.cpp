@@ -310,7 +310,7 @@ public:
         if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
             return "/dev/null";
 
-        return c->DefaultStdFile("stdout").ToString();
+        return "stdout";
     }
 };
 
@@ -328,7 +328,7 @@ public:
         if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
             return "/dev/null";
 
-        return c->DefaultStdFile("stderr").ToString();
+        return "stderr";
     }
 };
 

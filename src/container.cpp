@@ -103,15 +103,32 @@ TPath TContainer::RootPath() const {
     return path;
 }
 
-TPath TContainer::DefaultStdFile(const std::string prefix) const {
-    TPath root(Prop->Get<std::string>(P_ROOT));
-    std::string cwd(Prop->Get<std::string>(P_CWD));
-    std::string name(prefix + "." + GetTextId("_"));
+TPath TContainer::ActualStdPath(const std::string &property, bool host) const {
+    TPath path = Prop->Get<std::string>(property);
 
-    if (root.IsRegular())
-        return GetTmpDir() / name;
+    if (Prop->IsDefault(property)) {
+        /* /dev/null is /dev/null */
+        if (path == "/dev/null")
+            return path;
 
-    return root / cwd / name;
+        /* By default, std files are located on host in a special folder */
+        return WorkPath() / path;
+    } else {
+	/* Custom std paths are given relative to container root and/or cwd. */
+        TPath cwd(Prop->Get<std::string>(P_CWD));
+        TPath root(Prop->Get<std::string>(P_ROOT));
+        TPath ret;
+
+        if (host)
+            ret = root;
+
+        if (path.IsAbsolute())
+            ret /= path;
+        else
+            ret /= cwd / path;
+
+        return ret;
+    }
 }
 
 EContainerState TContainer::GetState() const {
@@ -718,9 +735,9 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
     taskEnv->DefaultStdin = Prop->IsDefault(P_STDIN_PATH);
     taskEnv->DefaultStdout = Prop->IsDefault(P_STDOUT_PATH);
     taskEnv->DefaultStderr = Prop->IsDefault(P_STDERR_PATH);
-    taskEnv->StdinPath = Prop->Get<std::string>(P_STDIN_PATH);
-    taskEnv->StdoutPath = Prop->Get<std::string>(P_STDOUT_PATH);
-    taskEnv->StderrPath = Prop->Get<std::string>(P_STDERR_PATH);
+    taskEnv->StdinPath = ActualStdPath(P_STDIN_PATH, false);
+    taskEnv->StdoutPath = ActualStdPath(P_STDOUT_PATH, false);
+    taskEnv->StderrPath = ActualStdPath(P_STDERR_PATH, false);
 
     taskEnv->Hostname = Prop->Get<std::string>(P_HOSTNAME);
     taskEnv->SetEtcHostname = (vmode == VIRT_MODE_OS) &&
@@ -728,28 +745,6 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
                                 !taskEnv->RootRdOnly;
 
     taskEnv->BindDns = Prop->Get<bool>(P_BIND_DNS);
-
-    if (client) {
-        std::shared_ptr<TContainer> clientContainer;
-        TError error = client->GetContainer(clientContainer);
-        if (error)
-            return error;
-        TPath clientRoot = clientContainer->RootPath();
-        if (clientRoot.IsEmpty())
-            return TError(EError::InvalidValue, "Cannot get client root path");
-        if (!clientRoot.IsRoot()) {
-            TError error = taskEnv->ClientMntNs.Open(client->GetPid(), "ns/mnt");
-            if (error)
-                return error;
-
-            if (!taskEnv->DefaultStdin)
-                taskEnv->StdinPath = clientRoot.InnerPath(taskEnv->StdinPath, true);
-            if (!taskEnv->DefaultStdout)
-                taskEnv->StdoutPath = clientRoot.InnerPath(taskEnv->StdoutPath, true);
-            if (!taskEnv->DefaultStderr)
-                taskEnv->StderrPath = clientRoot.InnerPath(taskEnv->StderrPath, true);
-        }
-    }
 
     TError error = Prop->PrepareTaskEnv(P_ULIMIT, *taskEnv);
     if (error)
@@ -1277,10 +1272,10 @@ void TContainer::FreeResources() {
         return;
 
     if (Prop->IsDefault(P_STDOUT_PATH))
-        RemoveLog(Prop->Get<std::string>(P_STDOUT_PATH));
+        RemoveLog(ActualStdPath(P_STDOUT_PATH, true));
 
     if (Prop->IsDefault(P_STDERR_PATH))
-        RemoveLog(Prop->Get<std::string>(P_STDERR_PATH));
+        RemoveLog(ActualStdPath(P_STDOUT_PATH, true));
 
     int loopNr = Prop->Get<int>(P_RAW_LOOP_DEV);
 
@@ -2105,8 +2100,8 @@ void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
         case EEventType::RotateLogs:
             if (GetState() == EContainerState::Running && Task) {
                 off_t max_log_size = config().container().max_log_size();
-                TPath stdout_path(Prop->Get<std::string>(P_STDOUT_PATH));
-                TPath stderr_path(Prop->Get<std::string>(P_STDERR_PATH));
+                TPath stdout_path = ActualStdPath(P_STDOUT_PATH, true);
+                TPath stderr_path = ActualStdPath(P_STDERR_PATH, true);
 
                 if (stdout_path.IsRegular()) {
                     error = stdout_path.RotateLog(max_log_size);

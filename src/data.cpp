@@ -176,7 +176,7 @@ public:
 
     std::string GetDefault() const override {
         auto c = GetContainer();
-        return ReadStdio(c->Prop->Get<std::string>(P_STDOUT_PATH),
+        return ReadStdio(c->ActualStdPath(P_STDOUT_PATH, true),
                          c->Prop->Get<uint64_t>(P_STDOUT_LIMIT));
     }
 };
@@ -191,7 +191,7 @@ public:
 
     std::string GetDefault() const override {
         auto c = GetContainer();
-        return ReadStdio(c->Prop->Get<std::string>(P_STDERR_PATH),
+        return ReadStdio(c->ActualStdPath(P_STDERR_PATH, true),
                          c->Prop->Get<uint64_t>(P_STDOUT_LIMIT));
     }
 };

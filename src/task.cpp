@@ -93,7 +93,7 @@ void TTask::Abort(const TError &error) const {
      * stage1: RecvPid VPid
      * stage2: RecvError
      */
-    L() << "abort " << Env->ReportStage << std::endl;
+    L() << "abort due to " << error << std::endl;
 
     for (int stage = Env->ReportStage; stage < 2; stage++) {
         error2 = Env->Sock.SendPid(getpid());
@@ -141,54 +141,30 @@ TError TTask::ChildOpenStdFile(const TPath &path, int expected) {
     return TError::Success();
 }
 
-TError TTask::ReopenStdio() {
+TError TTask::ReopenStdio(bool open_default) {
     TError error;
 
-    CloseFds(3, { Env->Sock.GetFd(), TLogger::GetFd() });
-
-    if (Env->DefaultStdin) {
+    if (open_default == Env->DefaultStdin) {
         int ret = open(Env->StdinPath.ToString().c_str(), O_CREAT | O_RDONLY, 0660);
         if (ret < 0)
             return TError(EError::Unknown, errno, "open(" + Env->StdinPath.ToString() + ") -> 0");
-
-        if (ret != 0)
-            return TError(EError::Unknown, EINVAL, "open(0): unexpected fd");
+        if (ret != 0) {
+            if (dup2(ret, 0) < 0) {
+                close(ret);
+                return TError(EError::Unknown, errno, "dup2(" + std::to_string(ret) + ", 0)");
+            }
+            close(ret);
+            ret = 0;
+        }
     }
 
-    if (Env->DefaultStdout) {
+    if (open_default == Env->DefaultStdout) {
         error = ChildOpenStdFile(Env->StdoutPath, 1);
         if (error)
             return error;
     }
 
-    if (Env->DefaultStderr) {
-        error = ChildOpenStdFile(Env->StderrPath, 2);
-        if (error)
-            return error;
-    }
-
-    error = Env->ClientMntNs.SetNs();
-    if (error) {
-        L() << "Can't move task to client mount namespace: " << error << std::endl;
-        return error;
-    }
-
-    if (!Env->DefaultStdin) {
-        int ret = open(Env->StdinPath.ToString().c_str(), O_CREAT | O_RDONLY, 0660);
-        if (ret < 0)
-            return TError(EError::Unknown, errno, "open(" + Env->StdinPath.ToString() + ") -> 0");
-
-        if (ret != 0)
-            return TError(EError::Unknown, EINVAL, "open(0): unexpected fd");
-    }
-
-    if (!Env->DefaultStdout) {
-        TError error = ChildOpenStdFile(Env->StdoutPath, 1);
-        if (error)
-            return error;
-    }
-
-    if (!Env->DefaultStderr) {
+    if (open_default == Env->DefaultStderr) {
         error = ChildOpenStdFile(Env->StderrPath, 2);
         if (error)
             return error;
@@ -815,6 +791,10 @@ TError TTask::ConfigureChild() {
     if (error)
         return error;
 
+    error = ReopenStdio(false);
+    if (error)
+        return error;
+
     return TError::Success();
 }
 
@@ -887,10 +867,12 @@ TError TTask::Start() {
                 Abort(error);
         }
 
-        error = ReopenStdio();
+        /* Default stdio/stderr are in host mount namespace */
+        error = ReopenStdio(true);
         if (error)
             Abort(error);
 
+        /* Enter parent namespaces */
         error = Env->ParentNs.Enter();
         if (error)
             Abort(error);
