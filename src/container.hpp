@@ -73,13 +73,14 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     TError ApplyDynamicProperties();
     TError PrepareWorkDir();
-    TError PrepareNetwork();
-    TError RestoreNetwork(bool valid_task);
+    TError RestoreNetwork();
     TError PrepareOomMonitor();
     TError PrepareLoop();
     void ShutdownOom();
     TError PrepareCgroups();
-    TError PrepareTask(std::shared_ptr<TClient> client);
+    TError PrepareNetwork(struct TNetCfg &NetCfg);
+    TError ConfigureNetwork(struct TNetCfg &NetCfg);
+    TError PrepareTask(std::shared_ptr<TClient> client, struct TNetCfg *NetCfg);
     TError KillAll(TScopedLock &holder_lock);
     void RemoveKvs();
 
@@ -117,8 +118,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError Freeze(TScopedLock &holder_lock);
 
     bool PrepareJournal();
-
-    TError SetTNetwork(pid_t pid);
 
 public:
     TCred OwnerCred;

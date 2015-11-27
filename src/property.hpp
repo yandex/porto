@@ -62,7 +62,6 @@ constexpr int VIRT_MODE_APP = 0;
 constexpr int VIRT_MODE_OS = 1;
 
 class TBindMap;
-class TNetCfg;
 class TTaskEnv;
 
 // Property can be modified only by privileged user

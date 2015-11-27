@@ -7,10 +7,7 @@
 
 #include "util/namespace.hpp"
 #include "util/path.hpp"
-#include "util/netlink.hpp"
 #include "util/cred.hpp"
-
-#include "network.hpp" // for TNetCfg
 
 extern "C" {
 #include <sys/resource.h>
@@ -60,13 +57,11 @@ struct TTaskEnv : public TNonCopyable {
     bool SetEtcHostname;
     bool BindDns;
     std::vector<TBindMap> BindMap;
-    TNetCfg NetCfg;
     int LoopDev;
     uint64_t Caps;
     bool NewMountNs;
     std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
     TCred Cred;
-    bool NetUp;
 
     const char** GetEnvp() const;
     bool EnvHasKey(const std::string &key);
@@ -87,7 +82,6 @@ class TTask: public TNonCopyable {
     void ReportPid(pid_t pid) const;
 
     TError ReopenStdio(bool open_default);
-    TError IsolateNet(int childPid);
 
     TError ChildOpenStdFile(const TPath &path, int expected);
     TError ChildApplyCapabilities();
@@ -98,7 +92,6 @@ class TTask: public TNonCopyable {
     TError ChildMountRootFs();
     TError ChildRemountRootRo();
     TError ChildIsolateFs();
-    TError ChildEnableNet();
 
     TError DumpProcFsFile(const std::string &filename);
 

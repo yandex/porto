@@ -93,13 +93,13 @@ public:
 
     TError Remove();
     TError Up();
-    TError ChangeNs(const std::string &newName, int pid);
+    TError ChangeNs(const std::string &newName, int nsFd);
     TError AddIpVlan(const std::string &master,
                      const std::string &mode, int mtu);
     TError AddMacVlan(const std::string &master,
                       const std::string &type, const std::string &hw,
                       int mtu);
-    TError AddVeth(const std::string &name, const std::string &peerName, const std::string &hw, int mtu, int nsPid);
+    TError AddVeth(const std::string &name, const std::string &peerName, const std::string &hw, int mtu, int nsFd);
 
     static bool ValidIpVlanMode(const std::string &mode);
     static bool ValidMacVlanType(const std::string &type);

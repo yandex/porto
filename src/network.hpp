@@ -8,6 +8,7 @@
 #include "util/netlink.hpp"
 #include "util/locks.hpp"
 #include "util/namespace.hpp"
+#include "util/cred.hpp"
 
 class TNetwork : public std::enable_shared_from_this<TNetwork>,
                  public TNonCopyable,
@@ -27,6 +28,8 @@ public:
     TError Connect();
     TError ConnectNetns(TNamespaceFd &netns);
     TError ConnectNew(TNamespaceFd &netns);
+    std::shared_ptr<TNl> GetNl() { return Nl; };
+
     TError Prepare();
     TError Destroy();
 
@@ -83,11 +86,21 @@ struct TVethNetCfg {
     int Mtu;
 };
 
+class TContainerHolder;
+class TContainer;
+
 struct TNetCfg {
+    std::shared_ptr<TContainerHolder> Holder;
+    std::shared_ptr<TContainer> Parent;
+    std::shared_ptr<TNetwork> Net;
     unsigned Id;
+    unsigned ParentId;
+    TCred OwnerCred;
     bool NewNetNs;
     bool Inherited;
     bool Host;
+    bool NetUp;
+    std::string Hostname;
     std::vector<THostNetCfg> HostIface;
     std::vector<TMacVlanNetCfg> MacVlan;
     std::vector<TIpVlanNetCfg> IpVlan;
@@ -97,8 +110,13 @@ struct TNetCfg {
     std::vector<TGwVec> GwVec;
     std::vector<TIpVec> IpVec;
 
+    TNamespaceFd NetNs;
+
     void Reset();
     TError ParseNet(std::vector<std::string> lines);
     TError ParseIp(std::vector<std::string> lines);
     TError ParseGw(std::vector<std::string> lines);
+    std::string GenerateHw(const std::string &name);
+    TError ConfigureInterfaces(std::shared_ptr<TNetwork> &ParentNet);
+    TError PrepareNetwork();
 };

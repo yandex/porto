@@ -196,12 +196,12 @@ TError TNlLink::Remove() {
     return TError::Success();
 }
 
-TError TNlLink::ChangeNs(const std::string &newName, int pid) {
+TError TNlLink::ChangeNs(const std::string &newName, int nsFd) {
     auto change = rtnl_link_alloc();
     if (!change)
         return Error(-NLE_NOMEM, "Cannot allocate link");
     rtnl_link_set_name(change, newName.c_str());
-    rtnl_link_set_ns_pid(change, pid);
+    rtnl_link_set_ns_fd(change, nsFd);
     Dump("change ns", change);
     int ret = rtnl_link_change(GetSock(), Link, change, 0);
     rtnl_link_put(change);
@@ -430,7 +430,7 @@ TError TNlLink::AddMacVlan(const std::string &master,
 }
 
 TError TNlLink::AddVeth(const std::string &name, const std::string &peerName,
-                        const std::string &hw, int mtu, int nsPid) {
+                        const std::string &hw, int mtu, int nsFd) {
     struct rtnl_link *veth, *peer;
     int ret;
     TError error;
@@ -450,7 +450,7 @@ TError TNlLink::AddVeth(const std::string &name, const std::string &peerName,
 
     veth = rtnl_link_veth_get_peer(peer);
     rtnl_link_set_name(veth, name.c_str());
-    rtnl_link_set_ns_pid(veth, nsPid);
+    rtnl_link_set_ns_fd(veth, nsFd);
 
     if (mtu > 0) {
         rtnl_link_set_mtu(peer, (unsigned int)mtu);

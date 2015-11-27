@@ -14,8 +14,6 @@
 #include "util/signal.hpp"
 #include "util/unix.hpp"
 #include "util/cred.hpp"
-#include "util/netlink.hpp"
-#include "util/crc32.hpp"
 
 extern "C" {
 #include <string.h>
@@ -506,148 +504,6 @@ TError TTask::ChildIsolateFs() {
     return newRoot.Chdir();
 }
 
-TError TTask::ChildEnableNet() {
-    auto nl = std::make_shared<TNl>();
-    PORTO_ASSERT(nl != nullptr);
-    TError error = nl->Connect();
-    if (error)
-        return error;
-
-    std::vector<std::shared_ptr<TNlLink>> links;
-    error = nl->OpenLinks(links, true);
-    if (error)
-        return error;
-
-    for (auto &link : links) {
-        std::string dev = link->GetName();
-
-        bool hasIp = find_if(Env->NetCfg.IpVec.begin(), Env->NetCfg.IpVec.end(), [&](const TIpVec &i)->bool { return i.Iface == dev; }) != Env->NetCfg.IpVec.end();
-        bool hasGw = find_if(Env->NetCfg.GwVec.begin(), Env->NetCfg.GwVec.end(), [&](const TGwVec &i)->bool { return i.Iface == dev; }) != Env->NetCfg.GwVec.end();
-
-        /* Don't touch non-loopback interfaces, that seems to be up. */
-        if (link->IsLoopback() || Env->NetUp || hasIp || hasGw) {
-            error = link->Up();
-            if (error)
-                return error;
-        }
-
-        for (auto ip : Env->NetCfg.IpVec) {
-            if (ip.Addr.IsEmpty())
-                continue;
-
-            if (ip.Iface == dev) {
-                TError error = link->SetIpAddr(ip.Addr, ip.Prefix);
-                if (error)
-                    return error;
-            }
-        }
-
-        for (auto gw : Env->NetCfg.GwVec) {
-            if (gw.Addr.IsEmpty())
-                continue;
-
-            if (gw.Iface == dev) {
-                error = link->SetDefaultGw(gw.Addr);
-                if (error)
-                    return error;
-            }
-        }
-    }
-
-    return TError::Success();
-}
-
-static std::string GenerateHw(const std::string &host, const std::string &name) {
-    uint32_t n = Crc32(name);
-    uint32_t h = Crc32(host);
-
-    char buf[32];
-
-    sprintf(buf, "02:%02x:%02x:%02x:%02x:%02x",
-            (n & 0x000000FF) >> 0,
-            (h & 0xFF000000) >> 24,
-            (h & 0x00FF0000) >> 16,
-            (h & 0x0000FF00) >> 8,
-            (h & 0x000000FF) >> 0);
-
-    return std::string(buf);
-}
-
-TError TTask::IsolateNet(int childPid) {
-    auto nl = std::make_shared<TNl>();
-    PORTO_ASSERT(nl != nullptr);
-
-    TError error = nl->Connect();
-    if (error)
-        return error;
-
-
-    for (auto &host : Env->NetCfg.HostIface) {
-        auto link = std::make_shared<TNlLink>(nl, host.Dev);
-        TError error = link->ChangeNs(host.Dev, childPid);
-        if (error)
-            return error;
-    }
-
-    for (auto &ipvlan : Env->NetCfg.IpVlan) {
-        auto link = std::make_shared<TNlLink>(nl, "piv" + std::to_string(GetTid()));
-        (void)link->Remove();
-
-        TError error = link->AddIpVlan(ipvlan.Master, ipvlan.Mode, ipvlan.Mtu);
-        if (error)
-            return error;
-
-        error = link->ChangeNs(ipvlan.Name, childPid);
-        if (error) {
-            (void)link->Remove();
-            return error;
-        }
-    }
-
-    std::string hostname = GetHostName();
-
-    for (auto &mvlan : Env->NetCfg.MacVlan) {
-        auto link = std::make_shared<TNlLink>(nl, "pmv" + std::to_string(GetTid()));
-        (void)link->Remove();
-
-        string hw = mvlan.Hw;
-        if (hw.empty())
-            hw = GenerateHw(Env->Hostname, mvlan.Master + mvlan.Name);
-
-        L() << "Using " << (hw.empty() ? " generated " : "") << hw << " for " << mvlan.Name << "@" << mvlan.Master << std::endl;
-
-        TError error = link->AddMacVlan(mvlan.Master, mvlan.Type, hw, mvlan.Mtu);
-        if (error)
-            return error;
-
-        error = link->ChangeNs(mvlan.Name, childPid);
-        if (error) {
-            (void)link->Remove();
-            return error;
-        }
-    }
-
-    for (auto &veth : Env->NetCfg.Veth) {
-        auto bridge = std::make_shared<TNlLink>(nl, veth.Bridge);
-        TError error = bridge->Load();
-        if (error)
-            return error;
-
-        string hw = veth.Hw;
-        if (hw.empty())
-            hw = GenerateHw(Env->Hostname, veth.Name + veth.Peer);
-
-        if (config().network().debug())
-            L() << "Using " << hw << " for " << veth.Name << " -> " << veth.Peer << std::endl;
-
-        error = bridge->AddVeth(veth.Name, veth.Peer, hw, veth.Mtu, childPid);
-        if (error)
-            return error;
-    }
-
-    return TError::Success();
-}
-
 TError TTask::ChildApplyLimits() {
     for (auto pair : Env->Rlimit) {
         int ret = setrlimit(pair.first, &pair.second);
@@ -713,12 +569,6 @@ TError TTask::ConfigureChild() {
             return error;
         error = tmpProc.Mount("proc", "proc",
                               MS_NOEXEC | MS_NOSUID | MS_NODEV, {});
-        if (error)
-            return error;
-    }
-
-    if (Env->NetCfg.NewNetNs) {
-        error = ChildEnableNet();
         if (error)
             return error;
     }
@@ -809,7 +659,7 @@ void TTask::StartChild() {
     /* WPid reported by parent */
     Env->ReportStage++;
 
-    /* Wait for external configuration */
+    /* Wait for report WPid in parent */
     error = Env->Sock.RecvZero();
     if (error)
         Abort(error);
@@ -911,9 +761,6 @@ TError TTask::Start() {
         if (Env->Isolate || Env->Hostname != "")
             cloneFlags |= CLONE_NEWUTS;
 
-        if (Env->NetCfg.NewNetNs)
-            cloneFlags |= CLONE_NEWNET;
-
         pid_t clonePid = clone(ChildFn, stack + sizeof(stack), cloneFlags, this);
 
         if (clonePid < 0) {
@@ -929,17 +776,11 @@ TError TTask::Start() {
         else
             ReportPid(clonePid);
 
-        error = IsolateNet(clonePid);
-        if (error) {
-            L() << "Can't isolate child network: " << error << std::endl;
-            Abort(error);
-        }
-
         /* Report VPid in parent pid namespace for new pid-ns */
         if (Env->Isolate && !Env->QuadroFork)
             ReportPid(clonePid);
 
-        /* Complete external configuration, wakeup child */
+        /* WPid reported, wakeup child */
         error = Env->MasterSock.SendZero();
         if (error)
             Abort(error);

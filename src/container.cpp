@@ -25,7 +25,6 @@
 #include "util/log.hpp"
 #include "util/file.hpp"
 #include "util/string.hpp"
-#include "util/netlink.hpp"
 #include "util/cred.hpp"
 #include "util/unix.hpp"
 #include "client.hpp"
@@ -461,96 +460,6 @@ std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
     return nullptr;
 }
 
-TError TContainer::SetTNetwork(pid_t pid) {
-    TNamespaceFd fd;
-
-    TError error = fd.Open(pid, "ns/net");
-    if (!error) {
-        Net = Holder->SearchInNsMap(fd.GetInode());
-
-        /* Found existing TNetwork */
-        if (Net != nullptr)
-            return TError::Success();
-
-        /* Create a new one */
-        Net = std::make_shared<TNetwork>();
-        PORTO_ASSERT(Net);
-
-        PORTO_ASSERT(IsRoot() || Task);
-        {
-            TNamespaceFd my_nsfd;
-            error = my_nsfd.Open(GetTid(), "ns/net");
-            if (error) {
-                L_ERR() << error << std::endl;
-                Net = nullptr;
-                return error;
-            }
-
-            error = fd.SetNs(CLONE_NEWNET);
-            if (error) {
-                L_ERR() << error << std::endl;
-                Net = nullptr;
-                return error;
-            }
-
-            Net = std::make_shared<TNetwork>();
-            PORTO_ASSERT(Net);
-            if (Net != nullptr)
-                error = Net->Connect();
-
-            PORTO_ASSERT(!my_nsfd.SetNs(CLONE_NEWNET));
-        }
-
-        if (!error) {
-            Holder->AddToNsMap(fd.GetInode(), Net);
-            error = Net->Prepare();
-        } else
-            Net = nullptr;
-
-        return error;
-    }
-
-    return error;
-}
-
-TError TContainer::PrepareNetwork() {
-    TError error = SetTNetwork(Task ? Task->GetPid() : GetTid());
-    if (error)
-        return error;
-
-    PORTO_ASSERT(Net != nullptr);
-
-    error = UpdateTrafficClasses();
-    if (error) {
-        L_ERR() << "Can't create traffic classes: " << error << std::endl;
-        return error;
-    }
-
-    if (!IsRoot()) {
-        auto netcls = GetLeafCgroup(netclsSubsystem);
-        error = netcls->SetKnobValue("net_cls.classid",
-                std::to_string(TcHandle(ROOT_TC_MAJOR, Id)), false);
-        if (error) {
-            L_ERR() << "Can't set classid: " << error << std::endl;
-            return error;
-        }
-    }
-
-    return error;
-}
-
-TError TContainer::RestoreNetwork(bool valid_task) {
-    TError error = SetTNetwork(valid_task ? Task->GetPid() : GetTid());
-    if (error)
-        return error;
-
-    PORTO_ASSERT(Net != nullptr);
-
-    error = UpdateTrafficClasses();
-
-    return error;
-}
-
 void TContainer::ShutdownOom() {
     if (Source)
         Holder->EpollLoop->RemoveSource(Source);
@@ -665,7 +574,55 @@ void TContainer::CleanupExpiredChildren() {
     }
 }
 
-TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
+TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
+    TError error;
+
+    NetCfg.Parent = Parent;
+    NetCfg.Id = Id;
+    NetCfg.Hostname = Prop->Get<std::string>(P_HOSTNAME);
+    NetCfg.NetUp = Prop->Get<int>(P_VIRT_MODE) != VIRT_MODE_OS;
+    NetCfg.Holder = Holder;
+    NetCfg.OwnerCred = OwnerCred;
+
+    error = NetCfg.ParseNet(Prop->Get<std::vector<std::string>>(P_NET));
+    if (error)
+        return error;
+
+    error = NetCfg.ParseIp(Prop->Get<std::vector<std::string>>(P_IP));
+    if (error)
+        return error;
+
+    error = NetCfg.ParseGw(Prop->Get<std::vector<std::string>>(P_DEFAULT_GW));
+    if (error)
+        return error;
+
+    error = NetCfg.PrepareNetwork();
+    if (error)
+        return error;
+
+    Net = NetCfg.Net;
+
+    error = UpdateTrafficClasses();
+    if (error) {
+        L_ERR() << "Can't create traffic classes: " << error << std::endl;
+        return error;
+    }
+
+    if (!IsRoot()) {
+        auto netcls = GetLeafCgroup(netclsSubsystem);
+        error = netcls->SetKnobValue("net_cls.classid",
+                std::to_string(TcHandle(ROOT_TC_MAJOR, Id)), false);
+        if (error) {
+            L_ERR() << "Can't set classid: " << error << std::endl;
+            return error;
+        }
+    }
+
+    return TError::Success();
+}
+
+TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
+                               struct TNetCfg *NetCfg) {
     if (!Prop->Get<bool>(P_ISOLATE))
         for (auto name : Prop->List())
             if (Prop->Find(name)->GetFlags() & PARENT_RO_PROPERTY)
@@ -774,22 +731,6 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         taskEnv->BindMap.push_back(bm);
     }
 
-    taskEnv->NetCfg.Id = Id;
-
-    error = taskEnv->NetCfg.ParseNet(Prop->Get<std::vector<std::string>>(P_NET));
-    if (error)
-        return error;
-
-    error = taskEnv->NetCfg.ParseIp(Prop->Get<std::vector<std::string>>(P_IP));
-    if (error)
-        return error;
-
-    error = taskEnv->NetCfg.ParseGw(Prop->Get<std::vector<std::string>>(P_DEFAULT_GW));
-    if (error)
-        return error;
-
-    taskEnv->NetUp = Prop->Get<int>(P_VIRT_MODE) != VIRT_MODE_OS;
-
     if (parent) {
         pid_t parent_pid = parent->Task->GetPid();
 
@@ -803,11 +744,6 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
                 if (client && error)
                     return error;
                 taskEnv->TripleFork = true;
-            }
-            if (taskEnv->NetCfg.Inherited) {
-                error = taskEnv->ParentNs.Net.Open(parent_pid, "ns/net");
-                if (client && error)
-                    return error;
             }
             if (taskEnv->CloneParentMntNs) {
                 error = taskEnv->ParentNs.Mnt.Open(parent_pid, "ns/mnt");
@@ -829,35 +765,8 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
             return error;
     }
 
-    if (taskEnv->NetCfg.NetNsName != "") {
-        error = taskEnv->ParentNs.Net.Open("/var/run/netns/" +
-                                           taskEnv->NetCfg.NetNsName);
-        if (client && error)
-            return error;
-    }
-
-    if (taskEnv->NetCfg.NetCtName != "" && client) {
-        std::shared_ptr<TContainer> clientContainer;
-        error = client->GetContainer(clientContainer);
-        if (error)
-            return error;
-        std::string name;
-        error = clientContainer->ResolveRelativeName(taskEnv->NetCfg.NetCtName, name);
-        if (error)
-            return error;
-        std::shared_ptr<TContainer> target;
-        error = Holder->Get(name, target);
-        if (error)
-            return error;
-        error = target->CheckPermission(client->GetCred());
-        if (error)
-            return TError(error, "net container " + name);
-        if (!target->Task)
-            return TError(EError::InvalidValue, "net container not running");
-        error = taskEnv->ParentNs.Net.Open(target->Task->GetPid(), "ns/net");
-        if (error)
-            return error;
-    }
+    if (NetCfg && NetCfg->NetNs.IsOpened())
+        taskEnv->ParentNs.Net.EatFd(NetCfg->NetNs);
 
     if (taskEnv->Command.empty() || taskEnv->TripleFork || taskEnv->QuadroFork) {
         TPath exe("/proc/self/exe");
@@ -962,19 +871,19 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
     if (error)
         return error;
 
+    struct TNetCfg NetCfg;
+
+    error = PrepareNetwork(NetCfg);
+    if (error)
+        goto error;
+
     if (!meta || (meta && Prop->Get<bool>(P_ISOLATE))) {
 
-        error = PrepareTask(client);
+        error = PrepareTask(client, &NetCfg);
         if (error)
             goto error;
 
         error = Task->Start();
-
-        if (!error) {
-            error = PrepareNetwork();
-            if (error)
-                (void)Task->Kill(9);
-        }
 
         TError reported_error = Task->Wakeup();
         if (reported_error)
@@ -1000,12 +909,6 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
         error = Prop->Set<std::vector<int>>(P_RAW_ROOT_PID, Task->GetPids());
         if (error)
             goto error;
-    } else if (meta) {
-        error = PrepareNetwork();
-        if (error) {
-            L_ERR() << error << std::endl;
-            return error;
-        }
     }
 
     IsMeta = meta;
@@ -1735,6 +1638,39 @@ TError TContainer::Prepare() {
     return TError::Success();
 }
 
+TError TContainer::RestoreNetwork() {
+    TNamespaceFd netns;
+    TError error;
+
+    error = OpenNetns(netns);
+    if (error)
+        return error;
+
+    Net = Holder->SearchInNsMap(netns.GetInode());
+    if (Net)
+        return TError::Success();
+
+    /* Create a new one */
+    Net = std::make_shared<TNetwork>();
+    PORTO_ASSERT(Net);
+
+    error = Net->ConnectNetns(netns);
+    if (error)
+        return error;
+
+    Holder->AddToNsMap(netns.GetInode(), Net);
+
+    error = Net->Prepare();
+    if (error)
+        return error;
+
+    error = UpdateTrafficClasses();
+    if (error)
+        return error;
+
+    return TError::Success();
+}
+
 TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
     L_ACT() << "Restore " << GetName() << " with id " << Id << std::endl;
 
@@ -1818,7 +1754,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
         if (error)
             return error;
 
-        error = PrepareTask(nullptr);
+        error = PrepareTask(nullptr, nullptr);
         if (error) {
             FreeResources();
             return error;
@@ -1852,7 +1788,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
         }
 
         if (!LostAndRestored) {
-            error = RestoreNetwork(true);
+            error = RestoreNetwork();
             if (error) {
                 if (Task->HasCorrectParent() && !Task->IsZombie())
                     L_ERR() << "Cannot restore network: " << error << std::endl;

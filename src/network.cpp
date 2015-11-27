@@ -2,9 +2,12 @@
 #include <sstream>
 
 #include "network.hpp"
+#include "container.hpp"
+#include "holder.hpp"
 #include "config.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
+#include "util/crc32.hpp"
 
 extern "C" {
 #include <netlink/route/link.h>
@@ -628,5 +631,213 @@ TError TNetCfg::ParseGw(std::vector<std::string> lines) {
             return error;
         GwVec.push_back(gw);
     }
+    return TError::Success();
+}
+
+std::string TNetCfg::GenerateHw(const std::string &name) {
+    uint32_t n = Crc32(name);
+    uint32_t h = Crc32(Hostname);
+
+    char buf[32];
+
+    sprintf(buf, "02:%02x:%02x:%02x:%02x:%02x",
+            (n & 0x000000FF) >> 0,
+            (h & 0xFF000000) >> 24,
+            (h & 0x00FF0000) >> 16,
+            (h & 0x0000FF00) >> 8,
+            (h & 0x000000FF) >> 0);
+
+    return std::string(buf);
+}
+
+TError TNetCfg::ConfigureInterfaces(std::shared_ptr<TNetwork> &ParentNet) {
+    auto parent_lock = ParentNet->ScopedLock();
+    auto source_nl = ParentNet->GetNl();
+    auto target_nl = Net->GetNl();
+    TError error;
+
+    for (auto &host : HostIface) {
+        TNlLink link(source_nl, host.Dev);
+        error = link.ChangeNs(host.Dev, NetNs.GetFd());
+        if (error)
+            return error;
+    }
+
+    for (auto &ipvlan : IpVlan) {
+        TNlLink link(source_nl, "piv" + std::to_string(GetTid()));
+        error = link.AddIpVlan(ipvlan.Master, ipvlan.Mode, ipvlan.Mtu);
+        if (error)
+            return error;
+
+        error = link.ChangeNs(ipvlan.Name, NetNs.GetFd());
+        if (error) {
+            (void)link.Remove();
+            return error;
+        }
+    }
+
+    for (auto &mvlan : MacVlan) {
+        std::string hw = mvlan.Hw;
+        if (hw.empty())
+            hw = GenerateHw(mvlan.Master + mvlan.Name);
+
+        TNlLink link(source_nl, "pmv" + std::to_string(GetTid()));
+        error = link.AddMacVlan(mvlan.Master, mvlan.Type, hw, mvlan.Mtu);
+        if (error)
+                return error;
+
+        error = link.ChangeNs(mvlan.Name, NetNs.GetFd());
+        if (error) {
+            (void)link.Remove();
+            return error;
+        }
+    }
+
+    for (auto &veth : Veth) {
+        TNlLink bridge(source_nl, veth.Bridge);
+        error = bridge.Load();
+        if (error)
+            return error;
+
+        std::string hw = veth.Hw;
+        if (hw.empty())
+            hw = GenerateHw(veth.Name + veth.Peer);
+
+        error = bridge.AddVeth(veth.Name, veth.Peer, hw, veth.Mtu, NetNs.GetFd());
+        if (error)
+            return error;
+    }
+
+    parent_lock.unlock();
+
+    std::vector<std::shared_ptr<TNlLink>> links;
+    error = target_nl->OpenLinks(links, true);
+    if (error)
+        return error;
+
+    for (auto &link: links) {
+        std::string dev = link->GetName();
+
+        TError error = link->Load();
+        if (error)
+            return error;
+
+        bool hasIp = find_if(IpVec.begin(), IpVec.end(), [&](const TIpVec &i)->bool { return i.Iface == dev; }) != IpVec.end();
+        bool hasGw = find_if(GwVec.begin(), GwVec.end(), [&](const TGwVec &i)->bool { return i.Iface == dev; }) != GwVec.end();
+
+        if (link->IsLoopback() || NetUp || hasIp || hasGw) {
+            error = link->Up();
+            if (error)
+                return error;
+        }
+    }
+
+    for (auto ip : IpVec) {
+        TNlLink link(target_nl, ip.Iface);
+        error = link.Load();
+        if (error)
+            return error;
+        error = link.SetIpAddr(ip.Addr, ip.Prefix);
+        if (error)
+            return error;
+    }
+
+    for (auto gw : GwVec) {
+        TNlLink link(target_nl, gw.Iface);
+        error = link.Load();
+        if (error)
+            return error;
+        error = link.SetDefaultGw(gw.Addr);
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
+}
+
+TError TNetCfg::PrepareNetwork() {
+    TError error;
+
+    if (Inherited) {
+
+        Net = Parent->Net;
+        ParentId = Parent->GetId();
+        error = Parent->OpenNetns(NetNs);
+        if (error)
+            return error;
+
+    } else if (NewNetNs) {
+
+        Net = std::make_shared<TNetwork>();
+        ParentId = PORTO_ROOT_CONTAINER_ID;
+
+        error = Net->ConnectNew(NetNs);
+        if (error)
+            return error;
+
+        error = ConfigureInterfaces(Parent->Net);
+        if (error)
+            return error;
+
+        error = Net->Prepare();
+        if (error)
+            return error;
+
+    } else if (Host) {
+
+        Net = std::make_shared<TNetwork>();
+        ParentId = ROOT_TC_MINOR;
+
+        error = Net->Connect();
+        if (error)
+            return error;
+
+        error = Net->Prepare();
+        if (error)
+            return error;
+
+    } else if (NetNsName != "") {
+
+        error = NetNs.Open("/var/run/netns/" + NetNsName);
+        if (error)
+            return error;
+
+        Net = Holder->SearchInNsMap(NetNs.GetInode());
+        if (!Net) {
+            Net = std::make_shared<TNetwork>();
+
+            error = Net->ConnectNetns(NetNs);
+            if (error)
+                return error;
+
+            error = Net->Prepare();
+            if (error)
+                return error;
+
+            Holder->AddToNsMap(NetNs.GetInode(), Net);
+        }
+
+        ParentId = PORTO_ROOT_CONTAINER_ID;
+
+    } else if (NetCtName != "") {
+
+        std::shared_ptr<TContainer> target;
+        error = Holder->Get(NetCtName, target);
+        if (error)
+            return error;
+
+        error = target->CheckPermission(OwnerCred);
+        if (error)
+            return TError(error, "net container " + NetCtName);
+
+        error = target->OpenNetns(NetNs);
+        if (error)
+            return error;
+
+        Net = target->Net;
+        ParentId = target->GetId();
+
+    }
+
     return TError::Success();
 }
