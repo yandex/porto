@@ -91,23 +91,14 @@ void TTask::Abort(const TError &error) const {
     /*
      * stage0: RecvPid WPid
      * stage1: RecvPid VPid
-     * stage2: RecvFd NetLinkFd if NetCfg.NewNetNs
-     * stage3: RecvError
+     * stage2: RecvError
      */
-    L() << "abort " << Env->ReportStage << " " << Env->NetCfg.NewNetNs << std::endl;
+    L() << "abort " << Env->ReportStage << std::endl;
 
-    for (int stage = Env->ReportStage; stage < 3; stage++) {
-        if (stage == 2) {
-            if (Env->NetCfg.NewNetNs) {
-                error2 = Env->Sock.SendFd(-1);
-                if (error2)
-                    L_ERR() << error2 << std::endl;
-            }
-        } else {
-            error2 = Env->Sock.SendPid(getpid());
-            if (error2)
-                L_ERR() << error2 << std::endl;
-        }
+    for (int stage = Env->ReportStage; stage < 2; stage++) {
+        error2 = Env->Sock.SendPid(getpid());
+        if (error2)
+            L_ERR() << error2 << std::endl;
     }
 
     error2 = Env->Sock.SendError(error);
@@ -836,25 +827,6 @@ void TTask::StartChild() {
         }
     }
 
-    if (Env->NetCfg.NewNetNs) {
-        auto nl = std::make_shared<TNl>();
-        PORTO_ASSERT(nl != nullptr);
-
-        error = nl->Connect();
-        if (error) {
-            L_ERR() << error << std::endl;
-            Abort(error);
-        }
-        int fd = nl->GetFd();
-
-        error = Env->Sock.SendFd(fd);
-        if (error) {
-            L_ERR() << error << std::endl;
-            Abort(error);
-        }
-        Env->ReportStage++;
-    }
-
     error = ChildDropPriveleges();
     if (error)
         Abort(error);
@@ -1034,13 +1006,6 @@ TError TTask::Start() {
     if (error)
         return TError(EError::InvalidValue, errno, "Container couldn't start due to resource limits");
 
-    if (Env->NetCfg.NewNetNs) {
-        error = Env->MasterSock.RecvFd(NetLinkFd);
-        if (error) {
-            L_ERR() << error << std::endl;
-            return TError(EError::Unknown, errno, "Cannot receive container's netlink fd");
-        }
-    }
     return TError::Success();
 }
 
@@ -1284,6 +1249,4 @@ void TTask::DumpDebugInfo() {
 }
 
 TTask::~TTask() {
-    if (NetLinkFd != -1)
-        close(NetLinkFd);
 }

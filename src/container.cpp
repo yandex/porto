@@ -456,12 +456,7 @@ TError TContainer::SetTNetwork(pid_t pid) {
         PORTO_ASSERT(Net);
 
         PORTO_ASSERT(IsRoot() || Task);
-        auto netlink_fd = Task ? Task->GetNetLinkFd() : -1;
-        if (netlink_fd != -1) {
-            /* If there is an open netlink socket, use it. */
-            error = Net->Connect(netlink_fd);
-        } else {
-            /* Otherwise, jump to net ns and open it. */
+        {
             TNamespaceFd my_nsfd;
             error = my_nsfd.Open(GetTid(), "ns/net");
             if (error) {

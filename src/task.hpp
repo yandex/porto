@@ -146,7 +146,6 @@ class TTask: public TNonCopyable {
     int ExitStatus;
 
     pid_t Pid, VPid, WPid;
-    int NetLinkFd = -1;
 
     void ReportPid(pid_t pid) const;
 
@@ -197,10 +196,6 @@ public:
     bool HasCorrectFreezer();
 
     void DumpDebugInfo();
-
-    int GetNetLinkFd() const {
-        return NetLinkFd;
-    }
 };
 
 TError TaskGetLastCap();

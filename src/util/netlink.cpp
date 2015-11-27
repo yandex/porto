@@ -42,7 +42,7 @@ uint16_t TcMajor(uint32_t handle) {
     return (uint16_t)(handle >> 16);
 }
 
-TError TNl::Connect(int fd) {
+TError TNl::Connect() {
     int ret;
     TError error;
 
@@ -50,14 +50,10 @@ TError TNl::Connect(int fd) {
     if (!Sock)
         return TError(EError::Unknown, string("Unable to allocate netlink socket"));
 
-    if (fd == -1) {
-        ret = nl_connect(Sock, NETLINK_ROUTE);
-        if (ret < 0) {
-            error = TError(EError::Unknown, string("Unable to connect netlink socket: ") + nl_geterror(ret));
-            goto free_socket;
-        }
-    } else {
-        Sock->s_fd = fd;
+    ret = nl_connect(Sock, NETLINK_ROUTE);
+    if (ret < 0) {
+        error = TError(EError::Unknown, string("Unable to connect netlink socket: ") + nl_geterror(ret));
+        goto free_socket;
     }
 
     ret = rtnl_link_alloc_cache(Sock, AF_UNSPEC, &LinkCache);

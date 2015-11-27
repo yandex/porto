@@ -65,7 +65,7 @@ public:
     ~TNetwork() {
         Destroy();
     }
-    TError Connect(int fd = -1);
+    TError Connect();
     TError Prepare();
     TError Update();
     // OpenLinks doesn't lock TNetwork

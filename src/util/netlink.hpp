@@ -44,21 +44,6 @@ uint32_t TcHandle(uint16_t maj, uint16_t min);
 uint32_t TcRootHandle();
 uint16_t TcMajor(uint32_t handle);
 
-// from netlink
-struct nl_sock
-{
-    struct sockaddr_nl	s_local;
-    struct sockaddr_nl	s_peer;
-    int			s_fd;
-    int			s_proto;
-    unsigned int		s_seq_next;
-    unsigned int		s_seq_expect;
-    int			s_flags;
-    struct nl_cb *		s_cb;
-    size_t			s_bufsize;
-};
-//
-
 class TNl : public TNonCopyable {
     struct nl_sock *Sock = nullptr;
     struct nl_cache *LinkCache = nullptr;
@@ -68,7 +53,7 @@ public:
     TNl() {}
     ~TNl() { Disconnect(); }
 
-    TError Connect(int fd = -1);
+    TError Connect();
     void Disconnect();
     std::vector<std::string> FindLink(int flags);
     bool ValidLink(const std::string &name);

@@ -250,8 +250,8 @@ TNetwork::TNetwork() {
     PORTO_ASSERT(Nl != nullptr);
 }
 
-TError TNetwork::Connect(int fd) {
-    return Nl->Connect(fd);
+TError TNetwork::Connect() {
+    return Nl->Connect();
 }
 
 TError TNetwork::OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links) {
