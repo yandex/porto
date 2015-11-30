@@ -78,7 +78,7 @@ TError TMount::Find(TPath path, const TPath mounts) {
 }
 
 TError TMount::Mount(unsigned long flags) const {
-    L_ACT() << "mount " << Target << " " << flags << std::endl;
+    L_ACT() << "mount " << Source << " " << Target << " " << flags << std::endl;
 
     int ret;
     if (!RetryIfBusy([&]{ return mount(Source.ToString().c_str(),
