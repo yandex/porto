@@ -51,7 +51,6 @@ class TNetwork : public std::enable_shared_from_this<TNetwork>,
     std::shared_ptr<TNl> Nl;
     std::vector<std::shared_ptr<TNlLink>> Links;
     std::shared_ptr<TQdisc> Qdisc;
-    std::shared_ptr<TTclass> Tclass;
 
     const uint32_t defClass = TcHandle(1, 2);
     const uint32_t rootHandle = TcHandle(1, 0);

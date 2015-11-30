@@ -86,15 +86,6 @@ TError TNetwork::Destroy() {
 
     L_ACT() << "Removing network..." << std::endl;
 
-    if (Tclass) {
-        for (const auto &link : links) {
-            TError error = Tclass->Remove(*link);
-            if (error)
-                return error;
-        }
-        Tclass = nullptr;
-    }
-
     if (Qdisc) {
         for (const auto &link : links) {
             TError error = Qdisc->Remove(*link);
@@ -109,7 +100,6 @@ TError TNetwork::Destroy() {
 
 TError TNetwork::Prepare() {
     PORTO_ASSERT(Qdisc == nullptr);
-    PORTO_ASSERT(Tclass == nullptr);
     PORTO_ASSERT(Links.size() == 0);
 
     auto lock = ScopedLock();
@@ -125,7 +115,6 @@ TError TNetwork::Prepare() {
     }
 
     Qdisc = std::make_shared<TQdisc>(rootHandle, defClass);
-    Tclass = std::make_shared<TTclass>(Qdisc, defClass);
 
     return TError::Success();
 }
