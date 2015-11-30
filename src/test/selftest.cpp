@@ -5159,6 +5159,19 @@ static void TestLogRotate(TPortoAPI &api) {
     SetLogRotateTimeout(api, defaultTimeout);
 }
 
+static void CheckErrorCounters(TPortoAPI &api) {
+    std::string v;
+
+    ExpectApiSuccess(api.GetData("/", "porto_stat[spawned]", v));
+    ExpectEq(v, std::to_string(expectedRespawns + 1));
+
+    ExpectApiSuccess(api.GetData("/", "porto_stat[errors]", v));
+    ExpectEq(v, std::to_string(expectedErrors));
+
+    ExpectApiSuccess(api.GetData("/", "porto_stat[warnings]", v));
+    ExpectEq(v, std::to_string(expectedWarns));
+}
+
 static void TestStats(TPortoAPI &api) {
     if (!needDaemonChecks)
         return;
@@ -5179,10 +5192,6 @@ static void TestStats(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData("/", "porto_stat[warnings]", v));
     ExpectEq(v, std::to_string(warns));
 
-    if (WordCount(config().slave_log().path(),
-                  "Task belongs to invalid subsystem") > 1)
-        throw string("ERROR: Some task belongs to invalid subsystem!");
-
     if (respawns - 1 != expectedRespawns)
         throw string("ERROR: Unexpected number of respawns: " + std::to_string(respawns));
 
@@ -5191,6 +5200,8 @@ static void TestStats(TPortoAPI &api) {
 
     if (warns != expectedWarns)
         throw string("ERROR: Unexpected number of warnings: " + std::to_string(warns));
+
+    AsNobody(api);
 }
 
 static void TestPackage(TPortoAPI &api) {
@@ -5211,6 +5222,8 @@ static void TestPackage(TPortoAPI &api) {
 
     ExpectEq(system("start yandex-porto"), 0);
     WaitPortod(api);
+
+    expectedErrors = expectedRespawns = expectedWarns = 0;
 }
 
 int SelfTest(std::vector<std::string> args) {
@@ -5309,6 +5322,8 @@ int SelfTest(std::vector<std::string> args) {
             AsNobody(api);
 
             t.second(api);
+
+            CheckErrorCounters(api);
         }
 
         AsRoot(api);
