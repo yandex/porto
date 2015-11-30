@@ -615,7 +615,7 @@ void TestDaemon(TPortoAPI &api) {
     // when sssd is running getgrnam opens unix socket to read database
     int sssFd = 0;
     if (WordCount("/etc/nsswitch.conf", "sss"))
-        sssFd = 2;
+        sssFd = 3;
 
     int nl = NetworkEnabled() ? 1 : 0;
 
