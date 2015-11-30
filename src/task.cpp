@@ -700,34 +700,20 @@ TError TTask::ChildSetHostname() {
     return TError::Success();
 }
 
-void TTask::StartChild() {
+TError TTask::ConfigureChild() {
     TError error;
 
     /* Die together with waiter */
     if (Env->TripleFork)
         SetDieOnParentExit(SIGKILL);
 
-    /* Wait for external configuration */
-    error = Env->Sock.RecvZero();
-    if (error)
-        Abort(error);
-
-    /* WPid reported by parent */
-    Env->ReportStage++;
-
-    /* Report VPid in pid namespace we're enter */
-    if (!Env->Isolate)
-        ReportPid(getpid());
-    else if (!Env->QuadroFork)
-        Env->ReportStage++;
-
     ResetAllSignalHandlers();
     error = ChildApplyLimits();
     if (error)
-        Abort(error);
+        return error;
 
     if (setsid() < 0)
-        Abort(TError(EError::Unknown, errno, "setsid()"));
+        return TError(EError::Unknown, errno, "setsid()");
 
     umask(0);
 
@@ -735,7 +721,7 @@ void TTask::StartChild() {
         // Remount to slave to receive propogations from parent namespace
         error = TPath("/").Remount(MS_SLAVE | MS_REC);
         if (error)
-            Abort(error);
+            return error;
     }
 
     if (Env->Isolate) {
@@ -743,60 +729,58 @@ void TTask::StartChild() {
         TPath tmpProc("/proc");
         error = tmpProc.UmountAll();
         if (error)
-            Abort(error);
+            return error;
         error = tmpProc.Mount("proc", "proc",
                               MS_NOEXEC | MS_NOSUID | MS_NODEV, {});
         if (error)
-            Abort(error);
+            return error;
     }
 
     if (Env->NetCfg.NewNetNs) {
         error = ChildEnableNet();
-        if (error) {
-            L_ERR() << error << std::endl;
-            Abort(error);
-        }
+        if (error)
+            return error;
     }
 
     error = ChildMountRootFs();
     if (error)
-        Abort(error);
+        return error;
 
     error = ChildBindDirectores();
     if (error)
-        Abort(error);
+        return error;
 
     error = ChildRemountRootRo();
     if (error)
-        Abort(error);
+        return error;
 
     error = ChildIsolateFs();
     if (error)
-        Abort(error);
+        return error;
 
     error = ChildSetHostname();
     if (error)
-        Abort(error);
+        return error;
 
     error = Env->Cwd.Chdir();
     if (error)
-        Abort(error);
+        return error;
 
     if (Env->NewMountNs) {
         // Make all shared: subcontainers will get propgation from us
         error = TPath("/").Remount(MS_SHARED | MS_REC);
         if (error)
-            Abort(error);
+            return error;
     }
 
     error = ChildApplyCapabilities();
     if (error)
-        Abort(error);
+        return error;
 
     if (Env->QuadroFork) {
         Pid = fork();
         if (Pid < 0)
-            Abort(TError(EError::Unknown, errno, "fork()"));
+            return TError(EError::Unknown, errno, "fork()");
 
         if (Pid) {
             auto fd = Env->PortoInitFd.GetFd();
@@ -813,21 +797,46 @@ void TTask::StartChild() {
 
             CloseFds(-1, { fd } );
             fexecve(fd, (char *const *)argv, (char *const *)envp);
-            Abort(TError(EError::Unknown, errno, "fexecve()"));
+            return TError(EError::Unknown, errno, "fexecve()");
         } else {
             Pid = getpid();
             error = Env->Sock2.SendPid(Pid);
             if (error)
-                Abort(error);
+                return error;
             error = Env->Sock2.RecvZero();
             if (error)
-                Abort(error);
+                return error;
             /* Parent forwards VPid */
             Env->ReportStage++;
         }
     }
 
     error = ChildDropPriveleges();
+    if (error)
+        return error;
+
+    return TError::Success();
+}
+
+void TTask::StartChild() {
+    TError error;
+
+    /* WPid reported by parent */
+    Env->ReportStage++;
+
+    /* Wait for external configuration */
+    error = Env->Sock.RecvZero();
+    if (error)
+        Abort(error);
+
+    /* Report VPid in pid namespace we're enter */
+    if (!Env->Isolate)
+        ReportPid(getpid());
+    else if (!Env->QuadroFork)
+        Env->ReportStage++;
+
+    /* Apply configuration */
+    error = ConfigureChild();
     if (error)
         Abort(error);
 
@@ -1000,25 +1009,27 @@ TError TTask::Start() {
 
     error = Env->MasterSock.RecvPid(WPid, VPid);
     if (error)
-        return TError(EError::InvalidValue, errno, "Container couldn't start due to resource limits");
+        return error;
 
     error = Env->MasterSock.RecvPid(Pid, VPid);
     if (error)
-        return TError(EError::InvalidValue, errno, "Container couldn't start due to resource limits");
+        return error;
+
+    if (status)
+        return TError(EError::Unknown, "Start failed, status " + std::to_string(status));
 
     return TError::Success();
 }
 
 TError TTask::Wakeup() {
-    TError error, error2;
+    TError error, wakeup_error;
 
-    error = Env->MasterSock.SendZero();
-    if (error)
-        error = TError(error, "Container couldn't start due to resource limits");
+    wakeup_error = Env->MasterSock.SendZero();
 
-    error2 = Env->MasterSock.RecvError();
-    if (error2)
-        error = error2;
+    error = Env->MasterSock.RecvError();
+
+    if (!error && wakeup_error)
+        error = wakeup_error;
 
     ClearEnv();
 

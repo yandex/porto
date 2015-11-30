@@ -184,6 +184,7 @@ public:
 
     TError ChildApplyLimits();
     TError ChildSetHostname();
+    TError ConfigureChild();
     void StartChild();
     void Restore(std::vector<int> pids);
     TError SyncTaskCgroups(pid_t pid) const;

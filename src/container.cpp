@@ -1023,22 +1023,21 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
             goto error;
 
         error = Task->Start();
-        if (error) {
-            TError e = Data->Set<int>(D_START_ERRNO, error.GetErrno());
-            if (e)
-                L_ERR() << "Can't set start_errno: " << e << std::endl;
-            goto error;
+
+        if (!error) {
+            error = PrepareNetwork();
+            if (error)
+                (void)Task->Kill(9);
         }
 
-        error = PrepareNetwork();
-        if (error) {
-            TError e = Data->Set<int>(D_START_ERRNO, error.GetErrno());
-            if (e)
-                L_ERR() << "Can't set start_errno: " << e << std::endl;
-            goto error;
-        }
+        TError reported_error = Task->Wakeup();
+        if (reported_error)
+            error = reported_error;
 
-        error = Task->Wakeup();
+        /* Always report oom stuation if any */
+        if (error && HasOomReceived())
+            error = TError(EError::InvalidValue, ENOMEM, "Cannot start due to memory limit");
+
         if (error) {
             TError e = Data->Set<int>(D_START_ERRNO, error.GetErrno());
             if (e)
@@ -2123,6 +2122,13 @@ bool TContainer::MayReceiveOom(int fd) {
         return false;
 
     return true;
+}
+
+// Works only once
+bool TContainer::HasOomReceived() {
+    uint64_t val;
+
+    return read(Efd.GetFd(), &val, sizeof(val)) == sizeof(val) && val != 0;
 }
 
 void TContainer::ScheduleRespawn() {

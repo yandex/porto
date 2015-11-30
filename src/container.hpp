@@ -217,6 +217,7 @@ public:
     bool MayExit(int pid);
     bool MayRespawn();
     bool MayReceiveOom(int fd);
+    bool HasOomReceived();
 
     bool IsFrozen();
     bool IsValid();
