@@ -5264,13 +5264,13 @@ int SelfTest(std::vector<std::string> args) {
         { "permissions", TestPermissions },
         { "respawn_property", TestRespawnProperty },
         { "hierarchy", TestLimitsHierarchy },
-        { "leaks", TestLeaks },
-        { "perf", TestPerf },
         { "vholder", TestVolumeHolder },
         { "volume_impl", TestVolumeImpl },
         { "sigpipe", TestSigPipe },
         { "stats", TestStats },
         { "daemon", TestDaemon },
+        { "leaks", TestLeaks },
+        { "perf", TestPerf },
 
         // the following tests will restart porto several times
         { "bad_client", TestBadClient },
