@@ -180,9 +180,9 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectApiSuccess(api.GetProperty(name, "stdin_path", v));
     ExpectEq(v, string("/dev/null"));
     ExpectApiSuccess(api.GetProperty(name, "stdout_path", v));
-    ExpectEq(v, config().container().tmp_dir() + "/" + name + "/stdout." + name);
+    ExpectEq(v, "stdout");
     ExpectApiSuccess(api.GetProperty(name, "stderr_path", v));
-    ExpectEq(v, config().container().tmp_dir() + "/" + name + "/stderr." + name);
+    ExpectEq(v, "stderr");
     ExpectApiSuccess(api.GetProperty(name, "ulimit", v));
     ExpectEq(v, "");
     ExpectApiSuccess(api.GetProperty(name, "hostname", v));
@@ -1447,9 +1447,6 @@ static void TestCwdProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
 
-    ExpectEq(access(("/tmp/stdout." + name).c_str(), F_OK), 0);
-    ExpectEq(access(("/tmp/stderr." + name).c_str(), F_OK), 0);
-
     cwd = GetCwd(pid);
 
     ExpectEq(cwd, "/tmp");
@@ -1477,7 +1474,7 @@ static void TestCwdProperty(TPortoAPI &api) {
 static void TestStdPathProperty(TPortoAPI &api) {
     string pid;
     string name = "a";
-    std::string stdinPath, stdoutPath, stderrPath;
+    std::string cwd, stdinPath, stdoutPath, stderrPath;
 
     AsRoot(api);
 
@@ -1488,20 +1485,22 @@ static void TestStdPathProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.GetProperty(name, "stdout_path", stdoutPath));
     ExpectApiSuccess(api.GetProperty(name, "stderr_path", stderrPath));
 
+    ExpectApiSuccess(api.GetProperty(name, "cwd", cwd));
+
     Expect(!FileExists(stdoutPath));
     Expect(!FileExists(stderrPath));
     ExpectApiSuccess(api.Start(name));
-    Expect(FileExists(stdoutPath));
-    Expect(FileExists(stderrPath));
+    Expect(FileExists(cwd + "/" + stdoutPath));
+    Expect(FileExists(cwd + "/" + stderrPath));
 
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
     ExpectEq(ReadLink("/proc/" + pid + "/fd/0"), "/dev/null");
-    ExpectEq(ReadLink("/proc/" + pid + "/fd/1"), stdoutPath);
-    ExpectEq(ReadLink("/proc/" + pid + "/fd/2"), stderrPath);
+    ExpectEq(ReadLink("/proc/" + pid + "/fd/1"), cwd + "/" + stdoutPath);
+    ExpectEq(ReadLink("/proc/" + pid + "/fd/2"), cwd + "/" + stderrPath);
     ExpectApiSuccess(api.Stop(name));
 
-    Expect(!FileExists(stdoutPath));
-    Expect(!FileExists(stderrPath));
+    Expect(!FileExists(cwd + "/" + stdoutPath));
+    Expect(!FileExists(cwd + "/" + stderrPath));
 
     Say() << "Check custom stdin/stdout/stderr" << std::endl;
     stdinPath = "/tmp/a_stdin";
@@ -1793,7 +1792,7 @@ static void TestRootProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "command", "ls -1 " + cwd));
 
     v = StartWaitAndGetData(api, name, "stdout");
-    ExpectEq(v, "stderr." + name + "\nstdout." + name + "\n");
+    ExpectEq(v, "stderr\nstdout\n");
 
     ExpectApiSuccess(api.Destroy(name));
 }
@@ -1893,10 +1892,11 @@ static void TestHostnameProperty(TPortoAPI &api) {
         ExpectSuccess(d.Create());
     ExpectSuccess(f.Touch());
     ExpectSuccess(f.GetPath().Chown(GetDefaultUser(), GetDefaultGroup()));
+    ExpectApiSuccess(api.SetProperty(name, "user", "root"));
     AsNobody(api);
 
     ExpectApiSuccess(api.SetProperty(name, "command", "/cat /etc/hostname"));
-    ExpectApiSuccess(api.SetProperty(name, "stdout_path", path + "/stdout"));
+    ExpectApiSuccess(api.SetProperty(name, "stdout_path", "stdout"));
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "stdout", v));
@@ -1917,14 +1917,12 @@ static void TestBindProperty(TPortoAPI &api) {
 
     Say() << "Check bind parsing" << std::endl;
     ExpectApiFailure(api.SetProperty(name, "bind", "/tmp"), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "bind", "qwerty /tmp"), EError::InvalidValue);
     ExpectApiSuccess(api.SetProperty(name, "bind", "/tmp /bin"));
     ExpectApiFailure(api.SetProperty(name, "bind", "/tmp /bin xyz"), EError::InvalidValue);
     ExpectApiSuccess(api.SetProperty(name, "bind", "/tmp /bin ro"));
     ExpectApiSuccess(api.SetProperty(name, "bind", "/tmp /bin rw"));
     ExpectApiFailure(api.SetProperty(name, "bind", "/tmp /bin ro; q"), EError::InvalidValue);
     ExpectApiSuccess(api.SetProperty(name, "bind", "/tmp /bin ro; /tmp /sbin"));
-    ExpectApiFailure(api.SetProperty(name, "bind", "/bin /sbin"), EError::InvalidValue);
 
     Say() << "Check bind without root isolation" << std::endl;
     string path = config().container().tmp_dir() + "/" + name;
@@ -3848,10 +3846,10 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
     string parentProperty, childProperty;
     ExpectApiSuccess(api.GetProperty(parent, "stdout_path", parentProperty));
     ExpectApiSuccess(api.GetProperty(child, "stdout_path", childProperty));
-    ExpectNeq(parentProperty, childProperty);
+    ExpectEq(parentProperty, childProperty);
     ExpectApiSuccess(api.GetProperty(parent, "stderr_path", parentProperty));
     ExpectApiSuccess(api.GetProperty(child, "stderr_path", childProperty));
-    ExpectNeq(parentProperty, childProperty);
+    ExpectEq(parentProperty, childProperty);
 
     string parentPid, childPid;
 
@@ -3950,7 +3948,6 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty("a", "root", "/tmp"));
 
     ExpectApiSuccess(api.SetProperty("a/b", "isolate", "false"));
-    ExpectApiFailure(api.SetProperty("a/b", "root", "/tmp"), EError::NotSupported);
     ExpectApiSuccess(api.SetProperty("a/b/c", "isolate", "false"));
 
     ExpectApiSuccess(api.GetProperty("a/b", "root", val));
@@ -5150,11 +5147,14 @@ static void TestLogRotate(TPortoAPI &api) {
     ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.GetProperty(name, "stdout_path", v));
     ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'dd if=/dev/zero bs=1M count=100 && sleep 5'"));
+    std::string cwd;
+    ExpectApiSuccess(api.GetProperty(name, "cwd", cwd));
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
 
-    TPath stdoutPath(v);
-    ExpectLess(stdoutPath.GetDiskUsage(), config().container().max_log_size());
+    TPath stdoutPath(cwd + "/" + v);
+    ExpectLess(stdoutPath.GetDiskUsage(),
+               config().container().max_log_size());
 
     SetLogRotateTimeout(api, defaultTimeout);
 }
