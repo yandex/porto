@@ -1797,6 +1797,89 @@ static void TestRootProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(name));
 }
 
+static bool TestPathsHelper(TPortoAPI &api,
+                            const std::string &cmd,
+                            const std::string &root,
+                            const std::string &cwd,
+                            const std::string &bind,
+                            const std::string &cout_path,
+                            const std::string &cerr_path) {
+    static const std::string name = "paths_test_container";
+    std::string container;
+    std::vector<std::string> waitlist = {name};
+    std::string log = "Paths test: cmd=" + cmd;
+
+    ExpectApiSuccess(api.Create(name));
+    ExpectApiSuccess(api.SetProperty(name, "command", cmd));
+
+    if (root.length() > 0) {
+        ExpectApiSuccess(api.SetProperty(name, "root", root));
+        log += " root=" + root;
+    }
+    if (cwd.length() > 0) {
+        ExpectApiSuccess(api.SetProperty(name, "cwd", cwd));
+        log += " cwd=" + cwd;
+    }
+    if (bind.length() > 0) {
+        ExpectApiSuccess(api.SetProperty(name, "bind", bind));
+        log += " bind=" + bind;
+    }
+    if (cout_path.length() > 0) {
+        log += " cout_path=" + cout_path;
+        ExpectApiSuccess(api.SetProperty(name, "stdout_path", cout_path));
+    }
+    if (cerr_path.length() > 0) {
+        log += " cerr_path=" + cerr_path;
+        ExpectApiSuccess(api.SetProperty(name, "stderr_path", cerr_path));
+    }
+
+    Say() << log << std::endl;
+
+    std::string ret;
+    ExpectApiSuccess(api.SetProperty(name, "isolate", "true"));
+    ExpectApiSuccess(api.Start(name));
+    ExpectApiSuccess(api.Wait(waitlist, container));
+    ExpectEq(container, name);
+    ExpectApiSuccess(api.GetData(name, "stdout", ret));
+    ExpectApiSuccess(api.GetData(name, "stderr", ret));
+    ExpectApiSuccess(api.Stop(name));
+
+    ExpectApiSuccess(api.SetProperty(name, "isolate", "false"));
+    ExpectApiSuccess(api.Start(name));
+    ExpectApiSuccess(api.Wait(waitlist, container));
+    ExpectEq(container, name);
+    ExpectApiSuccess(api.GetData(name, "stdout", ret));
+    ExpectApiSuccess(api.GetData(name, "stderr", ret));
+    ExpectApiSuccess(api.Stop(name));
+
+    ExpectApiSuccess(api.Destroy(name));
+
+    return true;
+}
+
+static void TestPaths(TPortoAPI &api) {
+    std::string cmd = "mkdir -p /myroot/bin && cp /usr/sbin/portoinit /myroot/bin/test2";
+    AsRoot(api);
+    ExpectEq(system(cmd.c_str()), 0);
+    AsNobody(api);
+
+    /* isolate, root, cwd, bind, cout_path, cerr_path */
+    TestPathsHelper(api, "/myroot/bin/test2 -v", "", "", "", "", "");
+    TestPathsHelper(api, "/bin/test2 -v", "/myroot", "", "", "", "");
+    TestPathsHelper(api, "test2 -v", "/myroot", "/bin", "", "", "");
+    TestPathsHelper(api, "sbin/test2 -v", "/myroot", "/bin", "/myroot/bin sbin ro",
+                    "", "");
+    TestPathsHelper(api, "/myroot/sbin/test2 -v", "", "", "/myroot/bin /myroot/sbin ro", "", "");
+
+    TestPathsHelper(api, "/myroot/bin/test2 -v", "", "", "", "my.stdout", "my.stderr");
+    TestPathsHelper(api, "/bin/test2 -v", "/myroot", "", "", "/my.stdout", "/my.stderr");
+    TestPathsHelper(api, "test2 -v", "/myroot", "/bin", "", "my.stdout", "my.stderr");
+
+    AsRoot(api);
+    ExpectEq(system("rm -rf /myroot/"), 0);
+    AsNobody(api);
+}
+
 static string GetHostname() {
     char buf[1024];
     ExpectEq(gethostname(buf, sizeof(buf)), 0);
@@ -5246,6 +5329,7 @@ int SelfTest(std::vector<std::string> args) {
         { "env_trim", TestEnvTrim },
         { "env_property", TestEnvProperty },
         { "user_group_property", TestUserGroupProperty },
+        { "paths", TestPaths },
         { "cwd_property", TestCwdProperty },
         { "stdpath_property", TestStdPathProperty },
         { "root_property", TestRootProperty },
