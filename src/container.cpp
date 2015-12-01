@@ -57,9 +57,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     Storage(storage), Id(id) { }
 
 TContainer::~TContainer() {
-    // Tclass destructor should be called with TNetwork locked,
     // so call them explicitly in Tcontainer::Destroy()
-    PORTO_ASSERT(Tclass == nullptr);
     PORTO_ASSERT(Net == nullptr);
 };
 
@@ -134,9 +132,9 @@ void TContainer::SyncStateWithCgroup(TScopedLock &holder_lock) {
 }
 
 TError TContainer::GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m) {
-    if (Net && Tclass) {
+    if (Net) {
         auto lock = Net->ScopedLock();
-        return Tclass->GetStat(Net->GetLinks(), stat, m);
+        return Net->GetTrafficCounters(Id, stat, m);
     } else
         return TError(EError::NotSupported, "Network statistics is not available");
 }
@@ -260,7 +258,6 @@ void TContainer::Destroy(TScopedLock &holder_lock) {
     DestroyVolumes(holder_lock);
     if (Net) {
         auto lock = Net->ScopedLock();
-        Tclass = nullptr;
         Net = nullptr;
     }
     RemoveKvs();
@@ -498,46 +495,17 @@ TError TContainer::PrepareNetwork() {
         return error;
 
     PORTO_ASSERT(Net != nullptr);
-    PORTO_ASSERT(Tclass == nullptr);
 
-    if (IsRoot()) {
-        uint32_t handle = TcHandle(TcMajor(Net->GetQdisc()->GetHandle()), Id);
-        Tclass = std::make_shared<TTclass>(Net->GetQdisc(), handle);
-    } else {
-        PORTO_ASSERT(Parent->Tclass != nullptr);
-
-        if (Net == Parent->Net) {
-            auto tclass = Parent->Tclass;
-            uint32_t handle = TcHandle(TcMajor(tclass->GetHandle()), Id);
-            Tclass = std::make_shared<TTclass>(tclass, handle);
-        } else {
-            uint32_t porto_handle = TcHandle(TcMajor(Net->GetQdisc()->GetHandle()), PORTO_ROOT_CONTAINER_ID);
-            auto porto_tclass = std::make_shared<TTclass>(Net->GetQdisc(), porto_handle);
-            uint32_t handle = TcHandle(TcMajor(porto_tclass->GetHandle()), Id);
-            Tclass = std::make_shared<TTclass>(porto_tclass, handle);
-        }
-    }
-
-    TUintMap prio, rate, ceil;
-    prio = Prop->Get<TUintMap>(P_NET_PRIO);
-    rate = Prop->Get<TUintMap>(P_NET_GUARANTEE);
-    ceil = Prop->Get<TUintMap>(P_NET_LIMIT);
-
-    Tclass->Prepare(prio, rate, ceil);
-
-    auto net_lock = Net->ScopedLock();
-    for (const auto& link : Net->GetLinks()) {
-        error = Tclass->Create(*link);
-        if (error) {
-            L_ERR() << "Can't create tclass: " << error << std::endl;
-            return error;
-        }
+    error = UpdateTrafficClasses();
+    if (error) {
+        L_ERR() << "Can't create traffic classes: " << error << std::endl;
+        return error;
     }
 
     if (!IsRoot()) {
         auto netcls = GetLeafCgroup(netclsSubsystem);
-        uint32_t handle = Tclass->GetHandle();
-        error = netcls->SetKnobValue("net_cls.classid", std::to_string(handle), false);
+        error = netcls->SetKnobValue("net_cls.classid",
+                std::to_string(TcHandle(ROOT_TC_MAJOR, Id)), false);
         if (error) {
             L_ERR() << "Can't set classid: " << error << std::endl;
             return error;
@@ -553,28 +521,8 @@ TError TContainer::RestoreNetwork(bool valid_task) {
         return error;
 
     PORTO_ASSERT(Net != nullptr);
-    PORTO_ASSERT(Tclass == nullptr);
-    PORTO_ASSERT(Parent->Tclass != nullptr);
 
-    auto tclass = Parent->Tclass;
-    uint32_t handle = TcHandle(TcMajor(tclass->GetHandle()), Id);
-    Tclass = std::make_shared<TTclass>(tclass, handle);
-
-    TUintMap prio, rate, ceil;
-    prio = Prop->Get<TUintMap>(P_NET_PRIO);
-    rate = Prop->Get<TUintMap>(P_NET_GUARANTEE);
-    ceil = Prop->Get<TUintMap>(P_NET_LIMIT);
-
-    Tclass->Prepare(prio, rate, ceil);
-
-    auto net_lock = Net->ScopedLock();
-    for (const auto& link : Net->GetLinks()) {
-        error = Tclass->Create(*link);
-        if (error) {
-            L_ERR() << "Can't create tclass: " << error << std::endl;
-            return error;
-        }
-    }
+    error = UpdateTrafficClasses();
 
     return error;
 }
@@ -1308,16 +1256,14 @@ void TContainer::FreeResources() {
 
     LeafCgroups.clear();
 
-    if (Net && Tclass && (!Parent || Parent->Tclass != Tclass)) {
+    if (Net) {
         auto lock = Net->ScopedLock();
 
-        for (const auto& link : Net->GetLinks()) {
-            error = Tclass->Remove(*link);
-            if (error)
-                L_ERR() << "Can't remove tc classifier: " << error << std::endl;
-        }
+        error = Net->RemoveTrafficClasses(Id);
+        if (error)
+            L_ERR() << "Can't remove traffic class: " << error << std::endl;
     }
-    Tclass = nullptr;
+
     Task = nullptr;
     if (Net && IsRoot()) {
         error = Net->Destroy();
@@ -2310,19 +2256,24 @@ void TContainer::CleanupWaiters() {
     }
 }
 
-TError TContainer::UpdateNetwork() {
-    if (Net && Tclass) {
+TError TContainer::UpdateTrafficClasses() {
+    if (Net) {
         TUintMap prio, rate, ceil;
         prio = Prop->Get<TUintMap>(P_NET_PRIO);
         rate = Prop->Get<TUintMap>(P_NET_GUARANTEE);
         ceil = Prop->Get<TUintMap>(P_NET_LIMIT);
 
-        Tclass->Prepare(prio, rate, ceil);
+        int parentId;
+
+        if (IsRoot())
+            parentId = 0;
+        else if (Net == Parent->Net)
+            parentId = Parent->Id;
+        else
+            parentId = PORTO_ROOT_CONTAINER_ID;
 
         auto net_lock = Net->ScopedLock();
-
-        for (const auto& link : Net->GetLinks())
-            Tclass->Create(*link);
+        return Net->UpdateTrafficClasses(parentId, Id, prio, rate, ceil);
     }
     return TError::Success();
 }

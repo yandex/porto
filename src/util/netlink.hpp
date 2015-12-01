@@ -41,7 +41,6 @@ enum class ETclassStat {
 };
 
 uint32_t TcHandle(uint16_t maj, uint16_t min);
-uint32_t TcRootHandle();
 uint16_t TcMajor(uint32_t handle);
 
 class TNl : public TNonCopyable {
@@ -129,10 +128,6 @@ class TNlClass : public TNonCopyable {
 public:
     TNlClass(uint32_t parent, uint32_t handle) : Parent(parent), Handle(handle) {}
 
-    TError Create(TNlLink &link, uint32_t prio, uint32_t rate, uint32_t ceil);
-    bool Valid(const TNlLink &link, uint32_t prio, uint32_t rate, uint32_t ceil);
-    TError Remove(TNlLink &link);
-    TError GetStat(TNlLink &link, ETclassStat stat, uint64_t &val);
     TError GetProperties(const TNlLink &link, uint32_t &prio, uint32_t &rate, uint32_t &ceil);
     bool Exists(const TNlLink &link);
 };

@@ -20,7 +20,6 @@ class TEvent;
 class TContainerHolder;
 class TNetwork;
 class TNlLink;
-class TTclass;
 class TTask;
 class TContainerWaiter;
 class TClient;
@@ -46,7 +45,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     std::shared_ptr<TContainerHolder> Holder;
     const std::string Name;
     const std::shared_ptr<TContainer> Parent;
-    std::shared_ptr<TTclass> Tclass;
     std::vector<std::weak_ptr<TContainer>> Children;
     std::shared_ptr<TKeyValueStorage> Storage;
     EContainerState State = EContainerState::Unknown;
@@ -212,7 +210,7 @@ public:
     void SyncStateWithCgroup(TScopedLock &holder_lock);
     bool IsNamespaceIsolated();
     void CleanupExpiredChildren();
-    TError UpdateNetwork();
+    TError UpdateTrafficClasses();
 
     bool MayExit(int pid);
     bool MayRespawn();

@@ -34,10 +34,6 @@ uint32_t TcHandle(uint16_t maj, uint16_t min) {
     return TC_HANDLE(maj, min);
 }
 
-uint32_t TcRootHandle() {
-    return TC_H_ROOT;
-}
-
 uint16_t TcMajor(uint32_t handle) {
     return (uint16_t)(handle >> 16);
 }
@@ -667,128 +663,6 @@ void TNlLink::LogCache(struct nl_cache *cache) const {
     nl_cache_dump(cache, &dp);
 }
 
-TError TNlClass::Create(TNlLink &link, uint32_t prio, uint32_t rate, uint32_t ceil) {
-    TError error = TError::Success();
-    int ret;
-    struct rtnl_class *tclass;
-
-    tclass = rtnl_class_alloc();
-    if (!tclass)
-        return TError(EError::Unknown, string("Unable to allocate tclass object"));
-
-    rtnl_tc_set_link(TC_CAST(tclass), link.GetLink());
-    rtnl_tc_set_parent(TC_CAST(tclass), Parent);
-    rtnl_tc_set_handle(TC_CAST(tclass), Handle);
-
-    ret = rtnl_tc_set_kind(TC_CAST(tclass), "htb");
-    if (ret < 0) {
-        error = TError(EError::Unknown, string("Unable to set HTB to tclass: ") + nl_geterror(ret));
-        goto free_class;
-    }
-
-    /*
-     * TC doesn't allow to set 0 rate, but Porto does (because we call them
-     * net_guarantee). So, just map 0 to 1, minimal valid guarantee.
-     */
-    if (rate == 0)
-        rate = 1;
-    rtnl_htb_set_rate(tclass, rate);
-
-    if (prio)
-        rtnl_htb_set_prio(tclass, prio);
-
-    if (ceil)
-        rtnl_htb_set_ceil(tclass, ceil);
-
-    rtnl_htb_set_quantum(tclass, 10000);
-
-    /*
-       rtnl_htb_set_rbuffer(tclass, burst);
-       rtnl_htb_set_cbuffer(tclass, cburst);
-       */
-
-    link.LogObj("add", tclass);
-
-    ret = rtnl_class_add(link.GetSock(), tclass, NLM_F_CREATE);
-    if (ret < 0)
-        error = TError(EError::Unknown, "Unable to add tclass for link " + link.GetAlias() + ": " + nl_geterror(ret));
-
-free_class:
-    rtnl_class_put(tclass);
-
-    if (!error)
-        error = link.RefillClassCache();
-
-    return error;
-}
-
-TError TNlClass::Remove(TNlLink &link) {
-    TError error = TError::Success();
-    int ret;
-    struct rtnl_class *tclass;
-
-    tclass = rtnl_class_alloc();
-    if (!tclass)
-        return TError(EError::Unknown, string("Unable to allocate tclass object"));
-
-    rtnl_tc_set_link(TC_CAST(tclass), link.GetLink());
-    rtnl_tc_set_parent(TC_CAST(tclass), Parent);
-    rtnl_tc_set_handle(TC_CAST(tclass), Handle);
-
-    ret = rtnl_class_delete(link.GetSock(), tclass);
-    if (ret < 0)
-        error = TError(EError::Unknown, string("Unable to remove tclass: ") + nl_geterror(ret));
-
-    link.LogObj("remove", tclass);
-
-    rtnl_class_put(tclass);
-
-    if (!error)
-        error = link.RefillClassCache();
-
-    return error;
-}
-
-TError TNlClass::GetStat(TNlLink &link, ETclassStat stat, uint64_t &val) {
-    TError error = link.RefillClassCache();
-    if (error)
-        return error;
-
-    rtnl_tc_stat rtnlStat;
-
-    switch (stat) {
-    case ETclassStat::Packets:
-        rtnlStat = RTNL_TC_PACKETS;
-        break;
-    case ETclassStat::Bytes:
-        rtnlStat = RTNL_TC_BYTES;
-        break;
-    case ETclassStat::Drops:
-        rtnlStat = RTNL_TC_DROPS;
-        break;
-    case ETclassStat::Overlimits:
-        rtnlStat = RTNL_TC_OVERLIMITS;
-        break;
-    case ETclassStat::BPS:
-        rtnlStat = RTNL_TC_RATE_BPS;
-        break;
-    case ETclassStat::PPS:
-        rtnlStat = RTNL_TC_RATE_PPS;
-        break;
-    default:
-        return TError(EError::Unknown, "Unsupported netlink statistics");
-    }
-
-    struct rtnl_class *tclass = rtnl_class_get(link.GetClassCache(), link.GetIndex(), Handle);
-    if (!tclass)
-        return TError(EError::Unknown, "Can't get class statistics");
-
-    val = rtnl_tc_get_stat(TC_CAST(tclass), (rtnl_tc_stat)rtnlStat);
-    rtnl_class_put(tclass);
-
-    return TError::Success();
-}
-
 TError TNlClass::GetProperties(const TNlLink &link, uint32_t &prio, uint32_t &rate, uint32_t &ceil) {
     struct rtnl_class *tclass = rtnl_class_get(link.GetClassCache(), link.GetIndex(), Handle);
     if (!tclass)
@@ -801,45 +675,6 @@ TError TNlClass::GetProperties(const TNlLink &link, uint32_t &prio, uint32_t &ra
     rtnl_class_put(tclass);
 
     return TError::Success();
-}
-
-bool TNlClass::Valid(const TNlLink &link, uint32_t prio, uint32_t rate, uint32_t ceil) {
-    bool valid = true;
-
-    /*
-     * TC doesn't allow to set 0 rate, but Porto does (because we call them
-     * net_guarantee). So, just map 0 to 1, minimal valid guarantee.
-     */
-    if (rate == 0)
-        rate = 1;
-
-    auto realParent = Parent;
-    if (realParent == TcHandle(1, 0))
-        realParent = TC_H_ROOT;
-
-    struct rtnl_class *tclass = rtnl_class_get(link.GetClassCache(), link.GetIndex(), Handle);
-    if (tclass) {
-        if (rtnl_tc_get_link(TC_CAST(tclass)) != link.GetLink())
-            valid = false;
-        else if (rtnl_tc_get_parent(TC_CAST(tclass)) != realParent)
-            valid = false;
-        else if (rtnl_tc_get_handle(TC_CAST(tclass)) != Handle)
-            valid = false;
-        else if (rtnl_tc_get_kind(TC_CAST(tclass)) != string("htb"))
-            valid = false;
-        else if (rtnl_htb_get_rate(tclass) != rate)
-            valid = false;
-        else if (prio && rtnl_htb_get_prio(tclass) != prio)
-            valid = false;
-        else if (valid && rtnl_htb_get_ceil(tclass) != ceil)
-            valid = false;
-    } else {
-        valid = false;
-    }
-
-    rtnl_class_put(tclass);
-
-    return valid;
 }
 
 bool TNlClass::Exists(const TNlLink &link) {

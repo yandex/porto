@@ -15,6 +15,10 @@ private:
     TNonCopyable& operator= (TNonCopyable const&&) = delete;
 };
 
+constexpr uint16_t ROOT_TC_MAJOR = 1;
+constexpr uint16_t ROOT_TC_MINOR = 0;
+constexpr uint16_t DEFAULT_TC_MINOR = 2;
+
 const std::string ROOT_CONTAINER = "/";
 constexpr uint16_t ROOT_CONTAINER_ID = 1;
 const std::string DOT_CONTAINER = ".";
