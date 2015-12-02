@@ -22,7 +22,7 @@ build() {
 	say "Build"
 	rm -f "$PORTO_DPKG" "$PYTHON_DPKG"
 	cp debian/changelog debian/changelog.old
-	dch --newversion $PORTO_VERSION "test build"
+	dch --force-bad-version --newversion $PORTO_VERSION "test build"
 	debuild -i -us -uc -b -j$(grep -c "^processor" /proc/cpuinfo)
 	mv debian/changelog.old debian/changelog
 	install
