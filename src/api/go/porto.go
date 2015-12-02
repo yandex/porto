@@ -2,7 +2,6 @@ package porto
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -81,6 +80,16 @@ type TPortoGetResponse struct {
 	Value    string
 	Error    int
 	ErrorMsg string
+}
+
+type Error struct {
+	Errno   rpc.EError
+	ErrName string
+	Message string
+}
+
+func (e *Error) Error() string {
+	return fmt.Sprintf("[%d] %s: %s", e.Errno, e.ErrName, e.Message)
 }
 
 type API interface {
@@ -199,7 +208,11 @@ func (conn *portoConnection) performRequest(req *rpc.TContainerRequest) (*rpc.TC
 	conn.msg = resp.GetErrorMsg()
 
 	if resp.GetError() != rpc.EError_Success {
-		return resp, errors.New(rpc.EError_name[int32(resp.GetError())])
+		return resp, &Error{
+			Errno:   conn.err,
+			ErrName: rpc.EError_name[int32(conn.err)],
+			Message: conn.msg,
+		}
 	}
 
 	return resp, nil
