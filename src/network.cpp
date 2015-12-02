@@ -57,10 +57,21 @@ TError TNetwork::Prepare() {
 TError TNetwork::PrepareLink(int index, std::string name) {
     TError error;
 
+    //
     // 1:0 qdisc
-    // 1:2 default class    1:1 root class
-    // (unclassified        1:3 container a, 1:4 container b
-    //          traffic)    1:5 container a/c
+    //  |
+    // 1:1 / class
+    //  |
+    //  +- 1:2 default class
+    //  |
+    //  +- 1:3 /porto class
+    //      |
+    //      +- 1:4 container a
+    //      |   |
+    //      |   +- 1:5 container a/b
+    //      |
+    //      +- 1:6 container b
+    //
 
     L() << "Prepare link " << name << " " << index << std::endl;
 
@@ -98,6 +109,15 @@ TError TNetwork::PrepareLink(int index, std::string name) {
 
     error = AddTrafficClass(index,
                             TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR),
+                            TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID),
+                            prio, rate, ceil);
+    if (error) {
+        L_ERR() << "Can't create root tclass: " << error << std::endl;
+        return error;
+    }
+
+    error = AddTrafficClass(index,
+                            TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID),
                             TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR),
                             prio, rate, ceil);
     if (error) {
@@ -106,7 +126,7 @@ TError TNetwork::PrepareLink(int index, std::string name) {
     }
 
     error = AddTrafficClass(index,
-                            TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR),
+                            TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID),
                             TC_HANDLE(ROOT_TC_MAJOR, PORTO_ROOT_CONTAINER_ID),
                             prio, rate, ceil);
     if (error) {
