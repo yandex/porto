@@ -157,7 +157,7 @@ TError TGroup::Load() {
 }
 
 TError TCred::LoadGroups(std::string user) {
-    int ngroups = 0;
+    int ngroups, ret;
 
     if (user == "") {
         TUser u(Uid);
@@ -167,10 +167,27 @@ TError TCred::LoadGroups(std::string user) {
         user = u.GetName();
     }
 
+    ngroups = 0;
     (void)getgrouplist(user.c_str(), Gid, nullptr, &ngroups);
     Groups.resize(ngroups);
-    if (getgrouplist(user.c_str(), Gid, Groups.data(), &ngroups) < 0)
-        return TError(EError::Unknown, errno, "Can't get supplementary groups");
+    ret = getgrouplist(user.c_str(), Gid, Groups.data(), &ngroups);
+    if (ret < 0 || ngroups <= 0) {
+        L_ERR() << "Cannot get supplementary groups for " << user
+                << " " << Uid << ":" << Gid
+                << " ngroups = " << ngroups << std::endl;
+        if (ngroups > (int)Groups.size())
+            Groups.resize(ngroups);
+        ret = getgrouplist(user.c_str(), Gid, Groups.data(), &ngroups);
+        if (ret < 0 || ngroups <= 0) {
+            L_ERR() << "Still cannot get supplementary groups"
+                    << " ngroups = " << ngroups
+                    << " Fallback to single group " << Gid << std::endl;
+            ngroups = 1;
+            Groups.resize(ngroups);
+            Groups[0] = Gid;
+        }
+    }
+    Groups.resize(ngroups);
     return TError::Success();
 }
 
