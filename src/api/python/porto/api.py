@@ -391,18 +391,18 @@ class Volume(object):
         return 'Volume `{}`'.format(self.path)
 
     def GetProperties(self):
-        return { p.name: p.value for p in self.rpc.ListVolumes(path=self.path)[0].properties }
+        return {p.name: p.value for p in self.rpc.ListVolumes(path=self.path)[0].properties}
 
     def GetProperty(self, name):
         return self.GetProperties()[name]
 
     def GetContainers(self):
-        return [ Container(self.rpc, c) for c in self.rpc.ListVolumes(path=self.path)[0].containers ]
+        return [Container(self.rpc, c) for c in self.rpc.ListVolumes(path=self.path)[0].containers]
 
     def GetLayers(self):
         layers = self.GetProperty('layers')
         layers = layers.split(';') if layers else []
-        return [ Layer(self.rpc, l) for l in layers ]
+        return [Layer(self.rpc, l) for l in layers]
 
     def Link(self, container):
         if isinstance(container, Container):
@@ -416,6 +416,7 @@ class Volume(object):
 
     def Export(self, tarball):
         self.rpc.ExportLayer(self.path, tarball)
+
 
 class Connection(object):
     def __init__(self, socket_path='/run/portod.socket', timeout=5):
@@ -434,7 +435,7 @@ class Connection(object):
         return self.rpc.List()
 
     def ListContainers(self):
-        return [ Container(self.rpc, name) for name in self.rpc.List() ]
+        return [Container(self.rpc, name) for name in self.rpc.List()]
 
     def Find(self, name):
         if name not in self.List():
@@ -484,15 +485,15 @@ class Connection(object):
         return self.rpc.Dlist()
 
     def Vlist(self):
-        return [ prop.name for prop in self.rpc.ListVolumeProperties() ]
+        return [prop.name for prop in self.rpc.ListVolumeProperties()]
 
     def Wait(self, containers, timeout=None):
         return self.rpc.Wait(containers, timeout)
 
     def CreateVolume(self, path=None, layers=[], **properties):
         if layers:
-            layers = [ l.name if isinstance(l, Layer) else l for l in layers ]
-            properties['layers'] = ';'.join(layers);
+            layers = [l.name if isinstance(l, Layer) else l for l in layers]
+            properties['layers'] = ';'.join(layers)
         return Volume(self.rpc, self.rpc.CreateVolume(path, **properties).path)
 
     def FindVolume(self, path):
@@ -517,14 +518,14 @@ class Connection(object):
     def ListVolumes(self, container=None):
         if isinstance(container, Container):
             container = container.name
-        return [ Volume(self.rpc, v.path) for v in self.rpc.ListVolumes(container=container) ]
+        return [Volume(self.rpc, v.path) for v in self.rpc.ListVolumes(container=container)]
 
     def ImportLayer(self, name, tarball):
         self.rpc.ImportLayer(name, tarball)
         return Layer(self.rpc, name)
 
     def FindLayer(self, layer):
-        if not layer in self.rpc.ListLayers():
+        if layer not in self.rpc.ListLayers():
             raise exceptions.LayerNotFound("layer `%s` not found" % layer)
         return Layer(self.rpc, layer)
 
@@ -532,7 +533,7 @@ class Connection(object):
         self.rpc.RemoveLayer(name)
 
     def ListLayers(self):
-        return [ Layer(self.rpc, l) for l in self.rpc.ListLayers() ]
+        return [Layer(self.rpc, l) for l in self.rpc.ListLayers()]
 
 # Example:
 # from porto import *
