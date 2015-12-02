@@ -35,7 +35,7 @@ func FailOnError(t *testing.T, conn API, err error) {
 }
 
 func ConnectToPorto(t *testing.T) API {
-	conn, err := NewConnection()
+	conn, err := Connect()
 	if conn == nil {
 		t.Error(err)
 		t.FailNow()
