@@ -1275,7 +1275,7 @@ void TContainer::FreeResources() {
         RemoveLog(ActualStdPath(P_STDOUT_PATH, true));
 
     if (Prop->IsDefault(P_STDERR_PATH))
-        RemoveLog(ActualStdPath(P_STDOUT_PATH, true));
+        RemoveLog(ActualStdPath(P_STDERR_PATH, true));
 
     int loopNr = Prop->Get<int>(P_RAW_LOOP_DEV);
 
