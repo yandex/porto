@@ -1870,10 +1870,11 @@ static void TestPaths(TPortoAPI &api) {
     TestPathsHelper(api, "sbin/test2 -v", "/myroot", "/bin", "/myroot/bin sbin ro",
                     "", "");
     TestPathsHelper(api, "/myroot/sbin/test2 -v", "", "", "/myroot/bin /myroot/sbin ro", "", "");
-
+    AsRoot(api);
     TestPathsHelper(api, "/myroot/bin/test2 -v", "", "", "", "my.stdout", "my.stderr");
     TestPathsHelper(api, "/bin/test2 -v", "/myroot", "", "", "/my.stdout", "/my.stderr");
     TestPathsHelper(api, "test2 -v", "/myroot", "/bin", "", "my.stdout", "my.stderr");
+    AsNobody(api);
 
     AsRoot(api);
     ExpectEq(system("rm -rf /myroot/"), 0);
