@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net"
+	"syscall"
 
 	"github.com/golang/protobuf/proto"
 
@@ -91,7 +92,7 @@ type API interface {
 
 	Start(name string) error
 	Stop(name string) error
-	Kill(name string, sig int32) error
+	Kill(name string, sig syscall.Signal) error
 	Pause(name string) error
 	Resume(name string) error
 
@@ -242,11 +243,12 @@ func (conn *portoConnection) Stop(name string) error {
 	return err
 }
 
-func (conn *portoConnection) Kill(name string, sig int32) error {
+func (conn *portoConnection) Kill(name string, sig syscall.Signal) error {
+	signum := int32(sig)
 	req := &rpc.TContainerRequest{
 		Kill: &rpc.TContainerKillRequest{
 			Name: &name,
-			Sig:  &sig,
+			Sig:  &signum,
 		},
 	}
 	_, err := conn.performRequest(req)
