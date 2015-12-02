@@ -34,10 +34,6 @@ uint32_t TcHandle(uint16_t maj, uint16_t min) {
     return TC_HANDLE(maj, min);
 }
 
-uint16_t TcMajor(uint32_t handle) {
-    return (uint16_t)(handle >> 16);
-}
-
 TError TNl::Connect() {
     int ret;
     TError error;
@@ -97,57 +93,12 @@ std::vector<std::string> TNl::FindLink(int flags) {
     return data.devices;
 }
 
-bool TNl::ValidLink(const std::string &name) {
-    (void)nl_cache_refill(Sock, LinkCache);
-
-    struct Iter { const std::string name; bool found; } data = { name, false };
-    nl_cache_foreach(LinkCache, [](struct nl_object *obj, void *data) {
-                     Iter *p = (Iter *)data;
-                     struct rtnl_link *l = (struct rtnl_link *)obj;
-
-                     if (rtnl_link_get_name(l) == p->name)
-                        p->found = true;
-                     }, &data);
-
-    return data.found;
-}
-
 void TNl::EnableDebug(bool enable) {
     debug = enable;
 }
 
-TError TNl::GetDefaultLink(std::vector<std::string> &links) {
-    struct FindDevIter { string name; vector<string> ifaces; } data;
-    nl_cache_foreach(GetCache(), [](struct nl_object *obj, void *data) {
-                     FindDevIter *p = (FindDevIter *)data;
-                     struct rtnl_link *l = (struct rtnl_link *)obj;
-
-                     if ((rtnl_link_get_flags(l) & IFF_RUNNING) &&
-                        !(rtnl_link_get_flags(l) & IFF_LOOPBACK))
-                        p->ifaces.push_back(rtnl_link_get_name(l));
-                     }, &data);
-
-    links = data.ifaces;
-
-    return TError::Success();
-}
-
 int TNl::GetFd() {
     return nl_socket_get_fd(Sock);
-}
-
-TError TNl::SubscribeToLinkUpdates() {
-    nl_socket_disable_seq_check(Sock);
-
-    int ret = nl_socket_add_membership(Sock, RTNLGRP_LINK);
-    if (ret < 0)
-        return TError(EError::Unknown, string("Unable to set subscribe to group: ") + nl_geterror(ret));
-
-    return TError::Success();
-}
-
-void TNl::FlushEvents() {
-    nl_recvmsgs_default(Sock);
 }
 
 TNlLink::~TNlLink() {

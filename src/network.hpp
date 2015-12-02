@@ -8,31 +8,15 @@
 #include "util/netlink.hpp"
 #include "util/locks.hpp"
 
-class TNetwork;
-
-class TQdisc : public TNonCopyable {
-    const uint32_t Handle;
-    const uint32_t DefClass;
-
-public:
-    TQdisc(uint32_t handle, uint32_t defClass) : Handle(handle), DefClass(defClass) { }
-
-    TError Create(const TNlLink &link);
-    TError Remove(const TNlLink &link);
-    uint32_t GetHandle() { return Handle; }
-};
-
 class TNetwork : public std::enable_shared_from_this<TNetwork>,
                  public TNonCopyable,
                  public TLockable {
     std::shared_ptr<TNl> Nl;
-    std::vector<std::shared_ptr<TNlLink>> Links;
-    std::shared_ptr<TQdisc> Qdisc;
 
     std::vector<std::pair<std::string, int>> ifaces;
     struct nl_sock *rtnl;
 
-    TError PrepareLink(TNlLink &link);
+    TError PrepareLink(int index, std::string name);
 
 public:
     TError UpdateInterfaces();
@@ -41,13 +25,9 @@ public:
     ~TNetwork();
     TError Connect();
     TError Prepare();
-    TError Update();
     // OpenLinks doesn't lock TNetwork
     TError OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links);
     TError Destroy();
-
-    std::vector<std::shared_ptr<TNlLink>> GetLinks() { return Links; }
-    std::shared_ptr<TQdisc> GetQdisc() { return Qdisc; }
 
     TError GetTrafficCounters(int minor, ETclassStat stat,
                               std::map<std::string, uint64_t> &result);

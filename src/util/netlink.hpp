@@ -41,7 +41,6 @@ enum class ETclassStat {
 };
 
 uint32_t TcHandle(uint16_t maj, uint16_t min);
-uint16_t TcMajor(uint32_t handle);
 
 class TNl : public TNonCopyable {
     struct nl_sock *Sock = nullptr;
@@ -55,17 +54,13 @@ public:
     TError Connect();
     void Disconnect();
     std::vector<std::string> FindLink(int flags);
-    bool ValidLink(const std::string &name);
 
     static void EnableDebug(bool enable);
 
     struct nl_sock *GetSock() { return Sock; }
     struct nl_cache *GetCache() { return LinkCache; }
 
-    TError GetDefaultLink(std::vector<std::string> &links);
     int GetFd();
-    TError SubscribeToLinkUpdates();
-    void FlushEvents();
     TError RefillCache();
 };
 

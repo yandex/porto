@@ -99,6 +99,11 @@ int main(int argc, char *argv[])
         if (error)
             throw error.GetMsg();
         auto lock = net->ScopedLock();
+
+        error = net->UpdateInterfaces();
+        if (error)
+            throw error.GetMsg();
+
         error = net->OpenLinks(test::links);
         if (error)
             throw error.GetMsg();

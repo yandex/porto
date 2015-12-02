@@ -13,45 +13,31 @@ extern "C" {
 #include <netlink/route/qdisc/htb.h>
 }
 
-TError TQdisc::Create(const TNlLink &link) {
-    TNlHtb qdisc(TC_H_ROOT, Handle);
-
-    if (!qdisc.Valid(link, DefClass)) {
-        (void)qdisc.Remove(link);
-        return qdisc.Create(link, DefClass);
-    }
-
-    return TError::Success();
-}
-
-TError TQdisc::Remove(const TNlLink &link) {
-    TNlHtb qdisc(TC_H_ROOT, Handle);
-    return qdisc.Remove(link);
-}
-
 TError TNetwork::Destroy() {
     auto lock = ScopedLock();
-
-    auto links = GetLinks();
+    TError error;
 
     L_ACT() << "Removing network..." << std::endl;
 
-    if (Qdisc) {
-        for (const auto &link : links) {
-            TError error = Qdisc->Remove(*link);
-            if (error)
-                return error;
+    for (auto &iface: ifaces) {
+        TNlLink link(Nl, iface.first);
+
+        error = link.Load();
+        if (error) {
+            L_ERR() << "Cannot open link: " << error << std::endl;
+            continue;
         }
-        Qdisc = nullptr;
+
+        TNlHtb htb(TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
+        error = htb.Remove(link);
+        if (error)
+            L_ERR() << "Cannot remove htb: " << error << std::endl;
     }
 
     return TError::Success();
 }
 
 TError TNetwork::Prepare() {
-    PORTO_ASSERT(Qdisc == nullptr);
-    PORTO_ASSERT(Links.size() == 0);
-
     TError error;
     auto lock = ScopedLock();
 
@@ -59,88 +45,31 @@ TError TNetwork::Prepare() {
     if (error)
         return error;
 
-    error = OpenLinks(Links);
-    if (error)
-        return error;
-
-    for (auto link : Links) {
-        TError error = PrepareLink(*link);
+    for (auto iface: ifaces) {
+        error = PrepareLink(iface.second, iface.first);
         if (error)
             return error;
     }
 
-
-    uint64_t prio = config().network().default_prio();
-    uint64_t rate = config().network().default_max_guarantee();
-    uint64_t ceil = config().network().default_limit();
-
-    for (auto iface: ifaces) {
-        error = AddTrafficClass(iface.second,
-                    TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR),
-                    TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR),
-                    prio, rate, ceil);
-        if (error) {
-            L_ERR() << "Can't create default tclass: " << error << std::endl;
-            return error;
-        }
-
-        error = AddTrafficClass(iface.second,
-                    TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR),
-                    TC_HANDLE(ROOT_TC_MAJOR, PORTO_ROOT_CONTAINER_ID),
-                    prio, rate, ceil);
-        if (error) {
-            L_ERR() << "Can't create porto tclass: " << error << std::endl;
-            return error;
-        }
-    }
-
-    Qdisc = std::make_shared<TQdisc>(TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR),
-                                     TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR));
-
     return TError::Success();
 }
 
-TError TNetwork::Update() {
-    L() << "Update network" << std::endl;
+TError TNetwork::PrepareLink(int index, std::string name) {
+    TError error;
 
-    std::vector<std::shared_ptr<TNlLink>> newLinks;
-
-    auto net_lock = ScopedLock();
-
-    TError error = OpenLinks(newLinks);
-    if (error)
-        return error;
-
-    for (auto link : newLinks) {
-        auto i = std::find_if(Links.begin(), Links.end(),
-                              [link](std::shared_ptr<TNlLink> i) {
-                                 return i->GetAlias() == link->GetAlias();
-                              });
-
-        if (i == Links.end()) {
-            L() << "Found new link: " << link->GetAlias() << std::endl;
-            TError error = PrepareLink(*link);
-            if (error)
-                return error;
-        } else {
-            L() << "Found existing link: " << link->GetAlias() << std::endl;
-            TError error = link->RefillClassCache();
-            if (error)
-                return error;
-        }
-    }
-
-    Links = newLinks;
-    return TError::Success();
-}
-
-TError TNetwork::PrepareLink(TNlLink &link) {
     // 1:0 qdisc
     // 1:2 default class    1:1 root class
     // (unclassified        1:3 container a, 1:4 container b
     //          traffic)    1:5 container a/c
 
-    L() << "Prepare link " << link.GetAlias() << " " << link.GetIndex() << std::endl;
+    L() << "Prepare link " << name << " " << index << std::endl;
+
+    TNlLink link(Nl, name);
+    error = link.Load();
+    if (error) {
+        L_ERR() << "Can't open link: " << error << std::endl;
+        return error;
+    }
 
     TNlHtb qdisc(TC_H_ROOT, TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR));
 
@@ -157,9 +86,31 @@ TError TNetwork::PrepareLink(TNlLink &link) {
     if (filter.Exists(link))
         (void)filter.Remove(link);
 
-    TError error = filter.Create(link);
+    error = filter.Create(link);
     if (error) {
         L_ERR() << "Can't create tc filter: " << error << std::endl;
+        return error;
+    }
+
+    uint64_t prio = config().network().default_prio();
+    uint64_t rate = config().network().default_max_guarantee();
+    uint64_t ceil = config().network().default_limit();
+
+    error = AddTrafficClass(index,
+                            TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR),
+                            TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR),
+                            prio, rate, ceil);
+    if (error) {
+        L_ERR() << "Can't create default tclass: " << error << std::endl;
+        return error;
+    }
+
+    error = AddTrafficClass(index,
+                            TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR),
+                            TC_HANDLE(ROOT_TC_MAJOR, PORTO_ROOT_CONTAINER_ID),
+                            prio, rate, ceil);
+    if (error) {
+        L_ERR() << "Can't create porto tclass: " << error << std::endl;
         return error;
     }
 
@@ -417,23 +368,10 @@ TError TNetwork::RemoveTrafficClasses(int minor) {
 }
 
 TError TNetwork::OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links) {
-    std::vector<std::string> devices;
     TError error;
 
-    error = Nl->RefillCache();
-    if (error) {
-        L_ERR() << "Can't refill link cache: " << error << std::endl;
-        return error;
-    }
-
-    error = Nl->GetDefaultLink(devices);
-    if (error) {
-        L_ERR() << "Can't open link: " << error << std::endl;
-        return error;
-    }
-
-    for (auto &name : devices) {
-        auto l = std::make_shared<TNlLink>(Nl, name);
+    for (auto &iface : ifaces) {
+        auto l = std::make_shared<TNlLink>(Nl, iface.first);
         PORTO_ASSERT(l != nullptr);
 
         TError error = l->Load();
