@@ -1,3 +1,29 @@
+yandex-porto (2.6.2) precise; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * util/cred: fallback to single group if cannot get supplementary
+  * api/python: fix exception handling in Connection.DestroyVolume
+  * scripts/test: use dch --force-bad-version
+
+  [ Vsevolod Velichko ]
+  * api/python: pep8 fixes
+  * api/python: remove unused _rpc methods
+  * api/python: add custom socket constructor
+  * api/python: add optional constructor argument for connection lock
+
+  [ Anton Tiurin ]
+  * go API: hide private methods and fix naming style
+  * go API: Kill accepts syscall.Signal as sig number
+  * go API: Wait accepts time.Duration as timeout
+  * go API: Convenient wrapper for RPC EError
+  * go API: rename NewConnection to Connect
+  * go API: bugfix in CreateVolume
+
+  [ Roman Gushchin ]
+  * docs: fix ulimit syntax description
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 02 Dec 2015 11:55:10 +0300
+
 yandex-porto (2.6.1) precise; urgency=low
 
   [ Anton Tiurin ]
