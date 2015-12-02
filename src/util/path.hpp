@@ -74,6 +74,11 @@ public:
         return a.AddComponent(b);
     }
 
+    TPath& operator/=(const TPath &b) {
+        *this = AddComponent(b);
+        return *this;
+    }
+
     TPath DirName() const;
     std::string BaseName() const;
     TPath NormalPath() const;
