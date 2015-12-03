@@ -8,7 +8,6 @@
 extern "C" {
 #include <fcntl.h>
 #include <unistd.h>
-#include "util/ext4_proj_quota.h"
 }
 
 using std::string;
@@ -82,17 +81,10 @@ void TConfig::LoadDefaults() {
     config().mutable_volumes()->set_volume_dir("/place/porto_volumes");
     config().mutable_volumes()->set_layers_dir("/place/porto_layers");
     config().mutable_volumes()->set_enabled(true);
-    config().mutable_volumes()->set_enable_quota(false);
+    config().mutable_volumes()->set_enable_quota(true);
 
     config().mutable_version()->set_path("/run/portod.version");
     config().mutable_version()->set_perm(0644);
-
-    TMount storage_mount;
-    if (!storage_mount.Find(config().volumes().volume_dir()) &&
-        ext4_support_project(storage_mount.GetSource().c_str(),
-                             storage_mount.GetType().c_str(),
-                             storage_mount.GetMountpoint().c_str()))
-        config().mutable_volumes()->set_enable_quota(true);
 }
 
 bool TConfig::LoadFile(const std::string &path, bool silent) {
