@@ -1290,7 +1290,7 @@ void TContainer::FreeResources() {
 
     TPath temp_path = GetTmpDir();
     if (temp_path.Exists()) {
-        error = temp_path.Rmdir();
+        error = temp_path.RemoveAll();
         if (error)
             L_ERR() << "Can't remove " << temp_path << ": " << error << std::endl;
     }
