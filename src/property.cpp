@@ -142,25 +142,12 @@ public:
                         staticProperty) {}
 
     TError CheckValue(const std::string &value) override {
-        auto c = GetContainer();
-        TUser u(value);
-        TError error(EError::InvalidValue, "");
-
-        if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS) {
-            TPath root = c->Prop->Get<std::string>(P_ROOT);
-            TPath passwd = root / "etc" / "passwd";
-            if (root.ToString() != "/" && passwd.Exists())
-                error = u.LoadFromFile(passwd);
-        }
-
-        if (error) {
-            error = u.Load();
-            if (error)
-                return error;
-        }
+        TUser user(value);
+        TError error = user.Load();
+        if (error)
+            return error;
 
         c->OwnerCred.Uid = u.GetId();
-
         return TError::Success();
     }
 };
@@ -174,25 +161,12 @@ public:
                         staticProperty) {}
 
     TError CheckValue(const std::string &value) override {
-        auto c = GetContainer();
-        TGroup g(value);
-        TError error(EError::InvalidValue, "");
-
-        if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS) {
-            TPath root = c->Prop->Get<std::string>(P_ROOT);
-            TPath group = root / "etc" / "group";
-            if (root.ToString() != "/" && group.Exists())
-                error = g.LoadFromFile(group);
-        }
-
-        if (error) {
-            error = g.Load();
-            if (error)
-                return error;
-        }
+        TGroup group(value);
+        TError error = group.Load();
+        if (error)
+            return error;
 
         c->OwnerCred.Gid = g.GetId();
-
         return TError::Success();
     }
 };

@@ -28,40 +28,6 @@ int TUserEntry::GetId() const {
     return Id;
 }
 
-TError TUserEntry::LoadFromFile(const TPath &path) {
-    std::vector<std::string> lines;
-
-    TFile f(path);
-    TError error = f.AsLines(lines);
-    for (auto line : lines) {
-        std::vector<std::string> tok;
-        TError error = SplitString(line, ':', tok);
-        if (error)
-            return error;
-        if (tok.size() < 3)
-            continue;
-
-        int entryId;
-        error = StringToInt(tok[2], entryId);
-        if (error)
-            continue;
-
-        if (Id >= 0) {
-            if (entryId == Id) {
-                Name = tok[0];
-                return TError::Success();
-            }
-        } else {
-            if (tok[0] == Name) {
-                Id = entryId;
-                return TError::Success();
-            }
-        }
-    }
-
-    return TError(EError::InvalidValue, "Entry not found in " + path.ToString());
-}
-
 static size_t GetPwSize() {
     long bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
     if (bufsize < 32768)

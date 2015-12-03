@@ -16,7 +16,6 @@ public:
     TUserEntry(const int id) : Name(""), Id(id) {}
     std::string GetName() const;
     int GetId() const;
-    TError LoadFromFile(const TPath &path);
 };
 
 class TUser : public TUserEntry {
