@@ -224,10 +224,7 @@ public:
                      staticProperty) {}
 
     std::string GetDefault() const override {
-        auto c = GetContainer();
-        if (c->IsRoot() || c->IsPortoRoot())
-            return "/";
-        return c->GetParent()->Prop->Get<std::string>(P_ROOT);
+        return "/";
     }
 
     TError CheckValue(const std::string &value) override {

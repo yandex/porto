@@ -4035,9 +4035,9 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty("a/b/c", "isolate", "false"));
 
     ExpectApiSuccess(api.GetProperty("a/b", "root", val));
-    ExpectEq(val, "/tmp");
+    ExpectEq(val, "/");
     ExpectApiSuccess(api.GetProperty("a/b/c", "root", val));
-    ExpectEq(val, "/tmp");
+    ExpectEq(val, "/");
 
     ExpectApiSuccess(api.SetProperty("a", "memory_limit", "12345"));
     ExpectApiSuccess(api.GetProperty("a/b", "memory_limit", val));

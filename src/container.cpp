@@ -100,7 +100,7 @@ TPath TContainer::RootPath() const {
         path = path.NormalPath();
     }
 
-    return path;
+    return Parent->RootPath() / path;
 }
 
 TPath TContainer::ActualStdPath(const std::string &property, bool host) const {
@@ -116,11 +116,10 @@ TPath TContainer::ActualStdPath(const std::string &property, bool host) const {
     } else {
 	/* Custom std paths are given relative to container root and/or cwd. */
         TPath cwd(Prop->Get<std::string>(P_CWD));
-        TPath root(Prop->Get<std::string>(P_ROOT));
         TPath ret;
 
         if (host)
-            ret = root;
+            ret = RootPath();
 
         if (path.IsAbsolute())
             ret /= path;
