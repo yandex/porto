@@ -59,7 +59,7 @@ static std::string PrintNumber(double number, int base,
     return std::string(buf);
 };
 
-static double DfDt(double curr, double prev, unsigned long gone_ms) {
+static double DfDt(double curr, double prev,double gone_ms) {
     return 1000.0d * (curr - prev) / gone_ms;
 };
 
@@ -643,8 +643,10 @@ bool TPortoTop::AddColumn(std::string desc) {
             case '\'':
                 flags |= ValueFlags::DfDt;
                 break;
-            case '%':
+            case '/':
                 flags |= ValueFlags::PartOfRoot;
+                break;
+            case '%':
                 flags |= ValueFlags::Percents;
                 break;
             case ' ':
@@ -833,9 +835,9 @@ std::string TPortoTop::SelectedContainer() {
     return ContainerTree->ContainerAt(FirstRow + SelectedRow, MaxLevel);
 }
 void TPortoTop::AddCommon(int row, const std::string &title, const std::string &var,
-                          TPortoContainer &container, int flags) {
+                          TPortoContainer &container, int flags, double multiplier) {
     Common.resize(row + 1);
-    TPortoValue v(Cache, &container, var, flags);
+    TPortoValue v(Cache, &container, var, flags, multiplier);
     Common[row].push_back(TCommonValue(title, v));
 }
 TPortoTop::TPortoTop(TPortoAPI *api, std::string config) : Api(api),
@@ -857,8 +859,8 @@ TPortoTop::TPortoTop(TPortoAPI *api, std::string config) : Api(api),
     AddCommon(1, ": ", "memory_usage", PortoContainer, ValueFlags::Bytes | ValueFlags::PartOfRoot |
         ValueFlags::Percents);
 
-    AddCommon(1, "CPU: ", "cpu_usage", PortoContainer, ValueFlags::DfDt | ValueFlags::PartOfRoot |
-        ValueFlags::Percents);
+    AddCommon(1, "CPU: ", "cpu_usage", PortoContainer, ValueFlags::DfDt | ValueFlags::Percents |
+              ValueFlags::Multiplier, 1E9);
 
     if (LoadConfig() != -1)
         return;
@@ -868,7 +870,7 @@ TPortoTop::TPortoTop(TPortoAPI *api, std::string config) : Api(api),
 
               /* CPU */
               "policy: cpu_policy",
-              "cpu%: cpu_usage'%",
+              "cpu%: cpu_usage'% 1e9",
               "cpu: cpu_usage 1e9s",
 
               /* Memory */

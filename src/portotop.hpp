@@ -183,7 +183,7 @@ public:
 
 private:
     void AddCommon(int row, const std::string &title, const std::string &var,
-                   TPortoContainer &container, int flags);
+                   TPortoContainer &container, int flags, double multiplier = 1.0);
     void AddColumn(const TColumn &c);
     void PrintTitle(int y, TConsoleScreen &screen);
     int PrintCommon(TConsoleScreen &screen);
