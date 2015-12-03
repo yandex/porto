@@ -142,13 +142,12 @@ public:
                         staticProperty) {}
 
     TError CheckValue(const std::string &value) override {
+        auto container = GetContainer();
         TUser user(value);
         TError error = user.Load();
-        if (error)
-            return error;
-
-        c->OwnerCred.Uid = u.GetId();
-        return TError::Success();
+        if (!error)
+            container->OwnerCred.Uid = user.GetId();
+        return error;
     }
 };
 
@@ -161,13 +160,12 @@ public:
                         staticProperty) {}
 
     TError CheckValue(const std::string &value) override {
+        auto container = GetContainer();
         TGroup group(value);
         TError error = group.Load();
-        if (error)
-            return error;
-
-        c->OwnerCred.Gid = g.GetId();
-        return TError::Success();
+        if (!error)
+            container->OwnerCred.Gid = group.GetId();
+        return error;
     }
 };
 
