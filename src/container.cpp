@@ -1895,9 +1895,9 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
 
     if (GetState() == EContainerState::Stopped) {
         if (Prop->IsDefault(P_STDOUT_PATH))
-            RemoveLog(Prop->Get<std::string>(P_STDOUT_PATH));
+            RemoveLog(ActualStdPath(P_STDOUT_PATH, true));
         if (Prop->IsDefault(P_STDERR_PATH))
-            RemoveLog(Prop->Get<std::string>(P_STDERR_PATH));
+            RemoveLog(ActualStdPath(P_STDERR_PATH, true));
     }
 
     if (Task)
