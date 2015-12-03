@@ -113,6 +113,15 @@ unsigned int TPath::GetBlockDev() const {
     return st.st_rdev;
 }
 
+ino_t TPath::GetInode() const {
+    struct stat st;
+
+    if (lstat(Path.c_str(), &st))
+        return 0;
+
+    return st.st_ino;
+}
+
 unsigned int TPath::GetUid() const {
     return Stat([](struct stat *st) { return st->st_uid; });
 }
