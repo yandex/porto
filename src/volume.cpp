@@ -164,10 +164,10 @@ public:
             L_ERR() << "Can't umount volume: " << error << std::endl;
 
         if (config().volumes().enable_quota() && quota.Exists()) {
-            L_ACT() << "Destroying project quota " << quota.Path << std::endl;
+            L_ACT() << "Destroying project quota: " << quota.Path << std::endl;
             error = quota.Destroy();
             if (error)
-                L_ERR() << "Can't destroy quota: " << errno << std::endl;
+                L_ERR() << "Can't destroy quota: " << error << std::endl;
         }
 
         return error;
