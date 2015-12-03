@@ -267,13 +267,8 @@ public:
     std::string GetDefault() const override {
         auto c = GetContainer();
 
-        if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
-            return "/";
-
-        if (c->Prop->Get<std::string>(P_ROOT) != "/")
-            return "/";
-
-        if (c->IsRoot() || c->IsPortoRoot())
+        if (c->IsRoot() || c->IsPortoRoot() || !c->RootPath().IsRoot() ||
+                c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
             return "/";
 
         return c->WorkPath().ToString();
