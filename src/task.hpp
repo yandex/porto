@@ -103,6 +103,7 @@ struct TTaskEnv : public TNonCopyable {
     std::string Command;
     TScopedFd PortoInitFd;
     TPath Cwd;
+    TPath ParentCwd;
     TPath Root; /* path in ParentNs.Mnt */
     bool RootRdOnly;
     std::vector<std::string> Environ;

@@ -674,6 +674,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
     taskEnv->Container = GetName();
     taskEnv->Command = Prop->Get<std::string>(P_COMMAND);
     taskEnv->Cwd = Prop->Get<std::string>(P_CWD);
+    taskEnv->ParentCwd = Parent->Prop->Get<std::string>(P_CWD);
 
     taskEnv->Root = Prop->Get<std::string>(P_ROOT);
     taskEnv->LoopDev = Prop->Get<int>(P_RAW_LOOP_DEV);
