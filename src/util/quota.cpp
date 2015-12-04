@@ -307,6 +307,16 @@ TError TProjectQuota::Create() {
 	if (error)
 		return error;
 
+	uint32_t CurrentId;
+	error = GetProjectId(Path, CurrentId);
+	if (error)
+		return error;
+
+	if (CurrentId && CurrentId != ProjectId)
+		return TError(EError::Unknown, "Cannot create nested project quota: " +
+				Path.ToString() + " already in project " +
+				std::to_string(CurrentId));
+
 	if (quotactl(QCMD(Q_GETQUOTA, PRJQUOTA), Device.c_str(),
 				ProjectId, (caddr_t)&quota))
 		return TError(EError::Unknown, "Cannot get quota state");
