@@ -1,3 +1,100 @@
+yandex-porto (2.7) precise; urgency=low
+
+  * properties: resolve relative bind src based on parent cwd
+  * volume: fix typo
+  * util: remove old quota
+  * volume: rewrite quota management
+  * util/quota: rewrite quota management
+  * util/path: add GetInode
+  * portotop: show cpu usage as percent of system time, not system usage
+  * properties: fix compilation
+  * container: remove loop temporary directory recursively
+  * container: correctly remove stdout/err at restore
+  * credentials: do not load user/group from chroot
+  * properties: set default cwd to / if we're chrooted in any way
+  * properties: root path is now relative to parent container's root
+  * network: unify traffic class hierarchy
+  * selftest: fix paths test
+  * util/cred: fallback to single group if cannot get supplementary
+  * network: refactor qdisc
+  * container: fix typo in FreeResources()
+  * selftest: implement new paths test
+  * selftest: sssd can open up to 3 file descriptors
+  * selftest: rearrange tests to get errors faster
+  * selftest: don't expect bind path's check for accessibility
+  * container: resolve stdin/stdout/stderr relative to parent namespace
+  * properties: don't check paths for existance and accesibility
+  * properties: don't convert paths in properties
+  * util/path: implement /= operator
+  * util: log mount source as well as destination
+  * network: refactor traffic classes
+  * network: add simple cache of interfaces
+  * network: move ip/gw configuration into NetCfg
+  * network: deprerecate network.devices and network.alias
+  * network: do not use host network for dead containers
+  * test: check error counters after each testcase
+  * task: rework error report ordering
+  * network: do not remove default traffic class
+  * network: remove unused TFilter
+  * network: always open rtnl via jumping into namespace
+  * util: fix SetCap()
+  * util: fix build
+  * cosmetic
+  * portod: remove obsolete --nonet CLI option
+  * cleanup: don't throw std::bad_alloc if there is no memory
+  * cleanup: remove TScopedMem
+  * Merge pull request #19 from noxiouz/bugfix_goapi_createvolume
+  * cosmetic: follow code style
+  * util: remove unnecessary malloc in SetCap()
+  * network: create intermediate htb class 1:3 in isolated net namespaces
+  * go API: bugfix in CreateVolume
+  * api/python: add optional constructor argument for connection lock
+  * api/python: add custom socket constructor
+  * api/python: remove unused _rpc methods
+  * api/python: pep8 fixes
+  * docs: fix ulimit syntax description
+  * porto: rename qdisc into network
+  * test: for now there is no netlink event socket
+  * test/selftest: remove sleep kludge
+  * porto: send netlink socket from child task
+  * porto: syncrhonze network configuration
+  * Merge pull request #18 from noxiouz/goapi_improvements
+  * net: release TNetwork in TContainer::Destroy()
+  * net: call TNetwork::Destroy() from destructor
+  * net: add TContainer::SetTNetwork(), rearrange code
+  * net: make TContainerHolder::NetNsMap private, add simple gc
+  * net: take host network whenever it isn't possible to get proper net ns
+  * task: simplify start procedure
+  * net: fix network restoration
+  * selftest: don't expect that network counters are persistent
+  * net: don't restore network for reparented and dead processes
+  * cotnainer: don't report imaginary errors
+  * container: split Start() into Start() and Start2()
+  * util/net: make TNlClass, TNlHtb, TNlCgFilter, etc stateless
+  * net: remove shared_ptr link to TNetwork from TFilter
+  * net: remove shared_ptr links to TNetwork from TTclass and TQdisc
+  * net: keep [net ns inode]->std::shared_ptr<TNetwork> map in Holder
+  * util: implement TNamespaceFd::GetInode()
+  * container: restore network (no net nemspaces yet!!!)
+  * net: compare htb qdiscs default classes correctly
+  * net: log rtnl_qdisc_alloc_cache() errors
+  * selftest: don't expect network ifaces check on setting properties
+  * net: initialize TNetwork just after container start
+  * net: don't check network ifaces on properties setting
+  * net: remote links to TNetwork from TContext and TContainerHolder
+  * net: open netlink connection in TNetwork::Connect()
+  * task: log errors during container start
+  * task: enter new net namespace, get netlink fd and pass to portod
+  * util: set default class for htb qdisc properly
+  * util: add ability to specify netlink socket on connect
+  * util: add methods for sending/receiving fds via unix sockets
+  * cosmetic: fix typo
+  * go API: rename NewConnection to Connect
+  * scripts/test: use dch --force-bad-version
+  * api/python: fix exception handling in Connection.DestroyVolume
+
+ -- Roman Gushchin <klamm@yandex-team.ru>  Fri, 04 Dec 2015 16:56:33 +0300
+
 yandex-porto (2.6.1) precise; urgency=low
 
   [ Anton Tiurin ]
