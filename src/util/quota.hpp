@@ -17,6 +17,7 @@ class TProjectQuota {
 	static TError GetProjectId(const TPath &path, uint32_t &id);
 	static TError SetProjectIdOne(const char *path, uint32_t id);
 	static TError SetProjectIdAll(const TPath &path, uint32_t id);
+	static TError InventProjectId(const TPath &path, uint32_t &id);
 public:
 	TPath Path;
 

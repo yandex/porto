@@ -206,6 +206,15 @@ TError TProjectQuota::SetProjectIdAll(const TPath &path, uint32_t id) {
 	return error;
 }
 
+/* Construct unique project id from directory inode number. */
+TError TProjectQuota::InventProjectId(const TPath &path, uint32_t &id) {
+	id = path.GetInode();
+	if (!id)
+		return TError(EError::Unknown, "Cannot get inode number: " + path.ToString());
+	id |= 1u << 31;
+	return TError::Success();
+}
+
 TError TProjectQuota::FindDevice() {
 	TMount mount;
 	TError error;
@@ -247,6 +256,15 @@ TError TProjectQuota::Load() {
 			return error;
 		if (!ProjectId)
 			return TError(EError::InvalidValue, "Project id not found");
+
+		uint32_t ExpectedId;
+		error = InventProjectId(Path, ExpectedId);
+		if (error)
+			return error;
+		if (ProjectId != ExpectedId)
+			return TError(EError::InvalidValue, "Project id not match with inode: " + Path.ToString() +
+					" found: " + std::to_string(ProjectId) +
+					" expected: " + std::to_string(ExpectedId));
 	}
 
 	if (Device.IsEmpty()) {
@@ -285,11 +303,9 @@ TError TProjectQuota::Create() {
 	if (error)
 		return error;
 
-	/* Construct unique project id from top directory inode number. */
-	ProjectId = Path.GetInode();
-	if (!ProjectId)
-		return TError(EError::Unknown, "Cannot get inode number");
-	ProjectId |= 1u << 31;
+	error = InventProjectId(Path, ProjectId);
+	if (error)
+		return error;
 
 	if (quotactl(QCMD(Q_GETQUOTA, PRJQUOTA), Device.c_str(),
 				ProjectId, (caddr_t)&quota))
