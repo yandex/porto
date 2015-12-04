@@ -766,15 +766,15 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         taskEnv->BindMap.push_back(bm);
     }
 
+    error = Prop->PrepareTaskEnv(P_NET, *taskEnv);
+    if (error)
+        return error;
+
     error = Prop->PrepareTaskEnv(P_IP, *taskEnv);
     if (error)
         return error;
 
     error = Prop->PrepareTaskEnv(P_DEFAULT_GW, *taskEnv);
-    if (error)
-        return error;
-
-    error = Prop->PrepareTaskEnv(P_NET, *taskEnv);
     if (error)
         return error;
 
