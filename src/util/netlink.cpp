@@ -452,22 +452,9 @@ TError TNlLink::AddMacVlan(const std::string &master,
     return AddXVlan("macvlan", master, macvlanType.at(type), hw, mtu);
 }
 
-TError TNlLink::Enslave(const std::string &name) {
-    int ret;
-    struct rtnl_link *slave = rtnl_link_get_by_name(Nl->GetCache(), name.c_str());
-    if (!slave)
-        return TError(EError::Unknown, "Invalid link " + name);
-
-    ret = rtnl_link_enslave(GetSock(), Link, slave);
-    rtnl_link_put(slave);
-    if (ret < 0)
-        return TError(EError::Unknown, string("Unable to enslave interface: ") + nl_geterror(ret));
-
-    return TError::Success();
-}
-
-TError TNlLink::AddVeth(const std::string &name, const std::string &peerName, const std::string &hw, int mtu, int nsPid) {
-	struct rtnl_link *veth, *peer;
+TError TNlLink::AddVeth(const std::string &name, const std::string &peerName,
+                        const std::string &hw, int mtu, int nsPid) {
+    struct rtnl_link *veth, *peer;
     int ret;
     TError error;
 
@@ -478,15 +465,15 @@ TError TNlLink::AddVeth(const std::string &name, const std::string &peerName, co
             return TError(EError::Unknown, "Invalid VETH mac address " + hw);
     }
 
-	veth = rtnl_link_veth_alloc();
-    if (!veth)
+    peer = rtnl_link_veth_alloc();
+    if (!peer)
         return TError(EError::Unknown, "Unable to allocate veth");
 
-	peer = rtnl_link_veth_get_peer(veth);
+    rtnl_link_set_name(peer, peerName.c_str());
 
-    rtnl_link_set_name(peer, name.c_str());
-    rtnl_link_set_ns_pid(peer, nsPid);
-    rtnl_link_set_name(veth, peerName.c_str());
+    veth = rtnl_link_veth_get_peer(peer);
+    rtnl_link_set_name(veth, name.c_str());
+    rtnl_link_set_ns_pid(veth, nsPid);
 
     if (mtu > 0) {
         rtnl_link_set_mtu(peer, (unsigned int)mtu);
@@ -495,32 +482,42 @@ TError TNlLink::AddVeth(const std::string &name, const std::string &peerName, co
 
     if (ea) {
         struct nl_addr *addr = nl_addr_build(AF_LLC, ea, ETH_ALEN);
-        rtnl_link_set_addr(peer, addr);
         rtnl_link_set_addr(veth, addr);
         nl_addr_put(addr);
     }
 
-	ret = rtnl_link_add(GetSock(), veth, NLM_F_CREATE | NLM_F_EXCL);
+    rtnl_link_put(veth);
+
+    ret = rtnl_link_add(GetSock(), peer, NLM_F_CREATE | NLM_F_EXCL);
     if (ret < 0) {
-        rtnl_link_put(veth);
+        rtnl_link_put(peer);
         return TError(EError::Unknown, string("Unable to add veth: ") + nl_geterror(ret));
     }
 
     error = RefillCache();
     if (error) {
         (void)rtnl_link_delete(GetSock(), peer);
-        rtnl_link_put(veth);
+        rtnl_link_put(peer);
         return error;
     }
 
-    error = Enslave(peerName);
-    if (error) {
+    /* reconstruct link: workaround for libnl bug */
+    rtnl_link_put(peer);
+    peer = rtnl_link_alloc();
+    rtnl_link_set_name(peer, peerName.c_str());
+
+    rtnl_link_set_master(peer, GetIndex());
+    rtnl_link_set_flags(peer, IFF_UP);
+
+    ret = rtnl_link_change(GetSock(), peer, peer, 0);
+    if (ret < 0) {
         (void)rtnl_link_delete(GetSock(), peer);
-        rtnl_link_put(veth);
-        return error;
+        rtnl_link_put(peer);
+        return TError(EError::Unknown, string("Unable to enslave interface: ") + nl_geterror(ret));
     }
 
-    rtnl_link_put(veth);
+    rtnl_link_put(peer);
+
     return TError::Success();
 }
 

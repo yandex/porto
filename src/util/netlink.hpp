@@ -92,7 +92,6 @@ public:
     TError AddMacVlan(const std::string &master,
                       const std::string &type, const std::string &hw,
                       int mtu);
-    TError Enslave(const std::string &name);
     TError AddVeth(const std::string &name, const std::string &peerName, const std::string &hw, int mtu, int nsPid);
     const std::string &GetAlias() const;
 
