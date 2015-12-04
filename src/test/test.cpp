@@ -364,7 +364,6 @@ int GetVmRss(const std::string &pid) {
 bool TcClassExist(uint32_t handle) {
     size_t nr = 0;
     for (auto &link : links) {
-        ExpectSuccess(link->RefillClassCache());
         TNlClass tclass(-1, handle);
         if (tclass.Exists(*link))
             nr++;

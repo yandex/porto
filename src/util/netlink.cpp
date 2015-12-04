@@ -104,10 +104,6 @@ int TNl::GetFd() {
 TNlLink::~TNlLink() {
     if (Link)
         rtnl_link_put(Link);
-    if (ClassCache) {
-        nl_cache_free(ClassCache);
-        ClassCache = nullptr;
-    }
 }
 
 TError TNlLink::SetDefaultGw(const TNlAddr &addr) {
@@ -309,8 +305,6 @@ TError TNlLink::RefillCache() {
     TError error = Nl->RefillCache();
     if (error)
         return error;
-    if (ClassCache)
-        error = RefillClassCache();
     return error;
 }
 
@@ -557,24 +551,6 @@ TError TNlLink::Load() {
     if (!Link)
         return TError(EError::Unknown, string("Invalid link ") + Name);
 
-    int ret = rtnl_class_alloc_cache(Nl->GetSock(), GetIndex(), &ClassCache);
-    if (ret < 0) {
-        (void)Remove();
-        return TError(EError::Unknown, string("Unable to allocate class cache: ") + nl_geterror(ret));
-    }
-
-    LogCache(ClassCache);
-
-    return TError::Success();
-}
-
-TError TNlLink::RefillClassCache() {
-    int ret = nl_cache_refill(GetSock(), ClassCache);
-    if (ret < 0)
-        return TError(EError::Unknown, string("Can't refill class cache: ") + nl_geterror(ret));
-
-    LogCache(ClassCache);
-
     return TError::Success();
 }
 
@@ -615,26 +591,34 @@ void TNlLink::LogCache(struct nl_cache *cache) const {
 }
 
 TError TNlClass::GetProperties(const TNlLink &link, uint32_t &prio, uint32_t &rate, uint32_t &ceil) {
-    struct rtnl_class *tclass = rtnl_class_get(link.GetClassCache(), link.GetIndex(), Handle);
-    if (!tclass)
+    struct nl_cache *cache;
+    struct rtnl_class *tclass;
+    int index = link.GetIndex();
+
+    int ret = rtnl_class_alloc_cache(link.GetSock(), index, &cache);
+    if (ret < 0)
+            return TError(EError::Unknown, string("Unable to allocate class cache: ") + nl_geterror(ret));
+
+    tclass = rtnl_class_get(cache, index, Handle);
+    if (!tclass) {
+        nl_cache_free(cache);
         return TError(EError::Unknown, "Can't find tc class");
+    }
 
     prio = rtnl_htb_get_prio(tclass);
     rate = rtnl_htb_get_rate(tclass);
     ceil = rtnl_htb_get_ceil(tclass);
 
     rtnl_class_put(tclass);
+    nl_cache_free(cache);
 
     return TError::Success();
 }
 
 bool TNlClass::Exists(const TNlLink &link) {
-    struct rtnl_class *tclass = rtnl_class_get(link.GetClassCache(),
-                                               link.GetIndex(),
-                                               Handle);
-    rtnl_class_put(tclass);
+    uint32_t prio, rate, ceil;
 
-    return tclass != nullptr;
+    return !GetProperties(link, prio, rate, ceil);
 }
 
 TError TNlHtb::Create(const TNlLink &link, uint32_t defaultClass) {

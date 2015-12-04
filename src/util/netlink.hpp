@@ -67,7 +67,6 @@ public:
 class TNlLink : public TNonCopyable {
     std::shared_ptr<TNl> Nl;
     std::string Name;
-    struct nl_cache *ClassCache = nullptr;
 
     TError AddXVlan(const std::string &vlantype,
                     const std::string &master,
@@ -113,8 +112,6 @@ public:
 
     void LogObj(const std::string &prefix, void *obj) const;
     void LogCache(struct nl_cache *cache) const;
-    TError RefillClassCache();
-    struct nl_cache *GetClassCache() const { return ClassCache; }
 };
 
 class TNlClass : public TNonCopyable {
