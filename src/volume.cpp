@@ -57,6 +57,14 @@ class TVolumePlainBackend : public TVolumeBackend {
 public:
     TVolumePlainBackend(std::shared_ptr<TVolume> volume) : TVolumeBackend(volume) {}
 
+    TError Configure(std::shared_ptr<TValueMap> Config) override {
+
+        if (Volume->HaveQuota())
+            return TError(EError::NotSupported, "Plain backend have no support of quota");
+
+        return TError::Success();
+    }
+
     TError Build() override {
         TPath storage = Volume->GetStorage();
 
@@ -117,9 +125,7 @@ public:
 
     TError Configure(std::shared_ptr<TValueMap> Config) override {
 
-        if (!config().volumes().enable_quota() &&
-            (Config->HasValue(V_SPACE_LIMIT) ||
-             Config->HasValue(V_INODE_LIMIT)))
+        if (!config().volumes().enable_quota() && Volume->HaveQuota())
             return TError(EError::NotSupported, "project quota is disabled");
 
         return TError::Success();
@@ -130,11 +136,12 @@ public:
         TProjectQuota quota(storage);
         TError error;
 
-        if (config().volumes().enable_quota()) {
+        if (Volume->HaveQuota()) {
             Volume->GetQuota(quota.SpaceLimit, quota.InodeLimit);
-            L_ACT() << "Crearing project quota: " << quota.Path << std::endl;
+            L_ACT() << "Creating project quota: " << quota.Path << " bytes: "
+                    << quota.SpaceLimit << " inodes: " << quota.InodeLimit << std::endl;
             error = quota.Create();
-            if (error && (quota.SpaceLimit || quota.InodeLimit))
+            if (error)
                 return error;
         }
 
@@ -163,7 +170,7 @@ public:
         if (error)
             L_ERR() << "Can't umount volume: " << error << std::endl;
 
-        if (config().volumes().enable_quota() && quota.Exists()) {
+        if (Volume->HaveQuota() && quota.Exists()) {
             L_ACT() << "Destroying project quota: " << quota.Path << std::endl;
             error = quota.Destroy();
             if (error)
@@ -183,6 +190,10 @@ public:
 
         quota.SpaceLimit = space_limit;
         quota.InodeLimit = inode_limit;
+        if (!Volume->HaveQuota()) {
+            L_ACT() << "Creating project quota: " << quota.Path << std::endl;
+            return quota.Create();
+        }
         L_ACT() << "Resizing project quota: " << quota.Path << std::endl;
         return quota.Resize();
     }
@@ -319,9 +330,7 @@ public:
         if (!Supported())
             return TError(EError::InvalidValue, "overlay not supported");
 
-        if (!config().volumes().enable_quota() &&
-            (Config->HasValue(V_SPACE_LIMIT) ||
-             Config->HasValue(V_INODE_LIMIT)))
+        if (!config().volumes().enable_quota() && Volume->HaveQuota())
             return TError(EError::NotSupported, "project quota is disabled");
 
         return TError::Success();
@@ -336,12 +345,13 @@ public:
         std::stringstream lower;
         int index = 0;
 
-        if (config().volumes().enable_quota()) {
+        if (Volume->HaveQuota()) {
             Volume->GetQuota(quota.SpaceLimit, quota.InodeLimit);
-            L_ACT() << "Creating project quota: " << quota.Path << std::endl;
+            L_ACT() << "Creating project quota: " << quota.Path << " bytes: "
+                    << quota.SpaceLimit << " inodes: " << quota.InodeLimit << std::endl;
             error = quota.Create();
-            if (error && (quota.SpaceLimit || quota.InodeLimit))
-                    return error;
+            if (error)
+                  return error;
         }
 
         for (auto layer: Volume->GetLayers()) {
@@ -380,7 +390,7 @@ public:
         if (!error)
             return error;
 err:
-        if (config().volumes().enable_quota())
+        if (Volume->HaveQuota())
             (void)quota.Destroy();
         return error;
     }
@@ -413,7 +423,7 @@ err:
         if (work.Exists())
             (void)work.RemoveAll();
 
-        if (config().volumes().enable_quota() && quota.Exists()) {
+        if (Volume->HaveQuota() && quota.Exists()) {
             L_ACT() << "Destroying project quota: " << quota.Path << std::endl;
             error = quota.Destroy();
             if (error)
@@ -433,6 +443,10 @@ err:
 
         quota.SpaceLimit = space_limit;
         quota.InodeLimit = inode_limit;
+        if (!Volume->HaveQuota()) {
+            L_ACT() << "Creating project quota: " << quota.Path << std::endl;
+            return quota.Create();
+        }
         L_ACT() << "Resizing project quota: " << quota.Path << std::endl;
         return quota.Resize();
     }
@@ -848,8 +862,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             error = Config->Set<std::string>(V_BACKEND, "overlay");
         else if (TVolumeNativeBackend::Supported())
             error = Config->Set<std::string>(V_BACKEND, "native");
-        else if (Config->HasValue(V_SPACE_LIMIT) ||
-                 Config->HasValue(V_INODE_LIMIT))
+        else if (HaveQuota())
             error = Config->Set<std::string>(V_BACKEND, "loop");
         else
             error = Config->Set<std::string>(V_BACKEND, "plain");
@@ -877,7 +890,8 @@ TError TVolume::Build() {
     TPath path = GetPath();
     TPath internal = GetInternal("");
 
-    L_ACT() << "Build volume " << path << std::endl;
+    L_ACT() << "Build volume: " << path
+            << " backend: " << GetBackend() << std::endl;
 
     TError error = internal.Mkdir(0755);
     if (error)
@@ -904,7 +918,7 @@ TError TVolume::Build() {
         goto err_save;
 
     if (Config->HasValue(V_LAYERS) && GetBackend() != "overlay") {
-        L_ACT() << "Merge layers into volume " << path << std::endl;
+        L_ACT() << "Merge layers into volume: " << path << std::endl;
         for (auto layer: GetLayers()) {
             error = CopyRecursive(layer, path);
             if (error)
@@ -934,7 +948,7 @@ err_internal:
 }
 
 TError TVolume::Clear() {
-    L_ACT() << "Clear volume " << GetPath() << std::endl;
+    L_ACT() << "Clear volume: " << GetPath() << std::endl;
     return Backend->Clear();
 }
 
@@ -944,7 +958,8 @@ TError TVolume::Destroy() {
     TPath path = GetPath();
     TError ret = TError::Success(), error;
 
-    L_ACT() << "Destroy volume " << GetPath() << std::endl;
+    L_ACT() << "Destroy volume: " << GetPath()
+            << " backend: " << GetBackend() << std::endl;
 
     if (Backend) {
         error = Backend->Destroy();
@@ -991,7 +1006,8 @@ TError TVolume::GetStat(uint64_t &space_used, uint64_t &space_avail,
 }
 
 TError TVolume::Resize(uint64_t space_limit, uint64_t inode_limit) {
-    L_ACT() << "Resize volume " << GetPath() << " to " << space_limit << " " << inode_limit << std::endl;
+    L_ACT() << "Resize volume: " << GetPath() << " to bytes: "
+            << space_limit << " inodes: " << inode_limit << std::endl;
     TError error = Backend->Resize(space_limit, inode_limit);
     if (error)
         return error;
@@ -1164,11 +1180,12 @@ void TVolumeHolder::Remove(std::shared_ptr<TVolume> volume) {
 
 TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Cholder) {
     std::vector<std::shared_ptr<TKeyValueNode>> list;
+    TError error;
 
     TPath volumes = config().volumes().volume_dir();
     if (!volumes.IsDirectory()) {
         (void)volumes.Unlink();
-        TError error = volumes.MkdirAll(0755);
+        error = volumes.MkdirAll(0755);
         if (error)
             return error;
     }
@@ -1176,7 +1193,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
     TPath layers = config().volumes().layers_dir();
     if (!layers.IsDirectory()) {
         (void)layers.Unlink();
-        TError error = layers.MkdirAll(0700);
+        error = layers.MkdirAll(0700);
         if (error)
             return error;
     }
@@ -1184,15 +1201,17 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
     TPath layers_tmp = layers / "_tmp_";
     if (layers_tmp.Exists()) {
         L_ACT() << "Remove stale layers..." << std::endl;
-        (void)layers_tmp.RemoveAll();
+        error = layers_tmp.RemoveAll();
+        if (error)
+            L_ERR() << "Cannot remove stale layers: " << error << std::endl;
     }
 
-    TError error = Storage->ListNodes(list);
+    error = Storage->ListNodes(list);
     if (error)
         return error;
 
     for (auto &node : list) {
-        L_ACT() << "Restore volume " << node->GetName() << std::endl;
+        L_ACT() << "Restore volume: " << node->GetName() << std::endl;
 
         auto config = std::make_shared<TValueMap>(node);
         RegisterVolumeProperties(config);

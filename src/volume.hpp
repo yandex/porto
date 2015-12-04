@@ -120,6 +120,11 @@ public:
     }
     TError CheckGuarantee(TVolumeHolder &holder) const;
 
+    bool HaveQuota() const {
+        return Config->HasValue(V_SPACE_LIMIT) ||
+               Config->HasValue(V_INODE_LIMIT);
+    }
+
     void GetQuota(uint64_t &space_limit, uint64_t &inode_limit) const {
         space_limit = Config->Get<uint64_t>(V_SPACE_LIMIT);
         inode_limit = Config->Get<uint64_t>(V_INODE_LIMIT);
