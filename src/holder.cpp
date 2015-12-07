@@ -60,6 +60,10 @@ TError TContainerHolder::CreateRoot(TScopedLock &holder_lock) {
     if (error)
         return error;
 
+    error = container->Prop->Set<std::vector<std::string>>(P_NET, { "host" });
+    if (error)
+        return error;
+
     error = container->Start(nullptr, true);
     if (error)
         return error;
