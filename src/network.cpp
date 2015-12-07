@@ -405,3 +405,225 @@ TError TNetwork::OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links) {
 
     return TError::Success();
 }
+
+
+void TNetCfg::Reset() {
+    /* default - create new empty netns */
+    NewNetNs = true;
+    Host = false;
+    Inherited = false;
+    HostIface.clear();
+    MacVlan.clear();
+    IpVlan.clear();
+    Veth.clear();
+    NetNsName = "";
+    NetCtName = "";
+}
+
+TError TNetCfg::ParseNet(std::vector<std::string> lines) {
+    bool none = false;
+    int idx = 0;
+
+    Reset();
+
+    if (lines.size() == 0)
+        return TError(EError::InvalidValue, "Configuration is not specified");
+
+    for (auto &line : lines) {
+        std::vector<std::string> settings;
+
+        TError error = SplitEscapedString(line, ' ', settings);
+        if (error)
+            return error;
+
+        if (settings.size() == 0)
+            return TError(EError::InvalidValue, "Invalid net in: " + line);
+
+        std::string type = StringTrim(settings[0]);
+
+        if (type == "none") {
+            none = true;
+        } else if (type == "inherited") {
+            NewNetNs = false;
+            Inherited = true;
+        } else if (type == "host") {
+            THostNetCfg hnet;
+
+            if (settings.size() > 2)
+                return TError(EError::InvalidValue, "Invalid net in: " + line);
+
+            if (settings.size() == 1) {
+                NewNetNs = false;
+                Host = true;
+            } else {
+                hnet.Dev = StringTrim(settings[1]);
+                HostIface.push_back(hnet);
+            }
+        } else if (type == "container") {
+            if (settings.size() != 2)
+                return TError(EError::InvalidValue, "Invalid net in: " + line);
+            NewNetNs = false;
+            NetCtName = StringTrim(settings[1]);
+        } else if (type == "macvlan") {
+            if (settings.size() < 3)
+                return TError(EError::InvalidValue, "Invalid macvlan in: " + line);
+
+            std::string master = StringTrim(settings[1]);
+            std::string name = StringTrim(settings[2]);
+            std::string type = "bridge";
+            std::string hw = "";
+            int mtu = -1;
+
+            if (settings.size() > 3) {
+                type = StringTrim(settings[3]);
+                if (!TNlLink::ValidMacVlanType(type))
+                    return TError(EError::InvalidValue,
+                            "Invalid macvlan type " + type);
+            }
+
+            if (settings.size() > 4) {
+                TError error = StringToInt(settings[4], mtu);
+                if (error)
+                    return TError(EError::InvalidValue,
+                            "Invalid macvlan mtu " + settings[4]);
+            }
+
+            if (settings.size() > 5) {
+                hw = StringTrim(settings[5]);
+                if (!TNlLink::ValidMacAddr(hw))
+                    return TError(EError::InvalidValue,
+                            "Invalid macvlan address " + hw);
+            }
+
+            TMacVlanNetCfg mvlan;
+            mvlan.Master = master;
+            mvlan.Name = name;
+            mvlan.Type = type;
+            mvlan.Hw = hw;
+            mvlan.Mtu = mtu;
+
+            MacVlan.push_back(mvlan);
+        } else if (type == "ipvlan") {
+            if (settings.size() < 3)
+                return TError(EError::InvalidValue, "Invalid ipvlan in: " + line);
+
+            std::string master = StringTrim(settings[1]);
+            std::string name = StringTrim(settings[2]);
+            std::string mode = "l2";
+            int mtu = -1;
+
+            if (settings.size() > 3) {
+                mode = StringTrim(settings[3]);
+                if (!TNlLink::ValidIpVlanMode(mode))
+                    return TError(EError::InvalidValue,
+                            "Invalid ipvlan mode " + mode);
+            }
+
+            if (settings.size() > 4) {
+                TError error = StringToInt(settings[4], mtu);
+                if (error)
+                    return TError(EError::InvalidValue,
+                            "Invalid ipvlan mtu " + settings[4]);
+            }
+
+            TIpVlanNetCfg ipvlan;
+            ipvlan.Master = master;
+            ipvlan.Name = name;
+            ipvlan.Mode = mode;
+            ipvlan.Mtu = mtu;
+
+            IpVlan.push_back(ipvlan);
+        } else if (type == "veth") {
+            if (settings.size() < 3)
+                return TError(EError::InvalidValue, "Invalid veth in: " + line);
+            std::string name = StringTrim(settings[1]);
+            std::string bridge = StringTrim(settings[2]);
+            std::string hw = "";
+            int mtu = -1;
+
+            if (settings.size() > 3) {
+                TError error = StringToInt(settings[3], mtu);
+                if (error)
+                    return TError(EError::InvalidValue,
+                            "Invalid veth mtu " + settings[3]);
+            }
+
+            if (settings.size() > 4) {
+                hw = StringTrim(settings[4]);
+                if (!TNlLink::ValidMacAddr(hw))
+                    return TError(EError::InvalidValue,
+                            "Invalid veth address " + hw);
+            }
+
+            TVethNetCfg veth;
+            veth.Bridge = bridge;
+            veth.Name = name;
+            veth.Hw = hw;
+            veth.Mtu = mtu;
+            veth.Peer = "portove-" + std::to_string(Id) + "-" + std::to_string(idx++);
+
+            Veth.push_back(veth);
+        } else if (type == "netns") {
+            if (settings.size() != 2)
+                return TError(EError::InvalidValue, "Invalid netns in: " + line);
+            std::string name = StringTrim(settings[1]);
+            TPath path("/var/run/netns/" + name);
+            if (!path.Exists())
+                return TError(EError::InvalidValue, "net namespace not found: " + name);
+            NewNetNs = false;
+            NetNsName = name;
+        } else {
+            return TError(EError::InvalidValue, "Configuration is not specified");
+        }
+    }
+
+    int single = none + Host + Inherited;
+    int mixed = HostIface.size() + MacVlan.size() + IpVlan.size() + Veth.size();
+
+    if (single > 1 || (single == 1 && mixed))
+        return TError(EError::InvalidValue, "none/host/inherited can't be mixed with other types");
+
+    return TError::Success();
+}
+
+TError TNetCfg::ParseIp(std::vector<std::string> lines) {
+    IpVec.clear();
+    for (auto &line : lines) {
+        std::vector<std::string> settings;
+        TError error = SplitEscapedString(line, ' ', settings);
+        if (error)
+            return error;
+
+        if (settings.size() != 2)
+            return TError(EError::InvalidValue, "Invalid ip address/prefix in: " + line);
+
+        TIpVec ip;
+        ip.Iface = settings[0];
+        error = ParseIpPrefix(settings[1], ip.Addr, ip.Prefix);
+        if (error)
+            return error;
+        IpVec.push_back(ip);
+    }
+    return TError::Success();
+}
+
+TError TNetCfg::ParseGw(std::vector<std::string> lines) {
+    GwVec.clear();
+    for (auto &line : lines) {
+        std::vector<std::string> settings;
+        TError error = SplitEscapedString(line, ' ', settings);
+        if (error)
+            return error;
+
+        if (settings.size() != 2)
+            return TError(EError::InvalidValue, "Invalid gateway address/prefix in: " + line);
+
+        TGwVec gw;
+        gw.Iface = settings[0];
+        error = gw.Addr.Parse(settings[1]);
+        if (error)
+            return error;
+        GwVec.push_back(gw);
+    }
+    return TError::Success();
+}

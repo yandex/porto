@@ -45,3 +45,62 @@ public:
     static TError NetlinkError(int error, const std::string description);
     static void DumpNetlinkObject(const std::string &prefix, void *obj);
 };
+
+
+struct THostNetCfg {
+    std::string Dev;
+};
+
+struct TMacVlanNetCfg {
+    std::string Master;
+    std::string Name;
+    std::string Type;
+    std::string Hw;
+    int Mtu;
+};
+
+struct TIpVlanNetCfg {
+    std::string Master;
+    std::string Name;
+    std::string Mode;
+    int Mtu;
+};
+
+struct TIpVec {
+    std::string Iface;
+    TNlAddr Addr;
+    int Prefix;
+};
+
+struct TGwVec {
+    std::string Iface;
+    TNlAddr Addr;
+};
+
+struct TVethNetCfg {
+    std::string Bridge;
+    std::string Name;
+    std::string Hw;
+    std::string Peer;
+    int Mtu;
+};
+
+struct TNetCfg {
+    unsigned Id;
+    bool NewNetNs;
+    bool Inherited;
+    bool Host;
+    std::vector<THostNetCfg> HostIface;
+    std::vector<TMacVlanNetCfg> MacVlan;
+    std::vector<TIpVlanNetCfg> IpVlan;
+    std::vector<TVethNetCfg> Veth;
+    std::string NetNsName;
+    std::string NetCtName;
+    std::vector<TGwVec> GwVec;
+    std::vector<TIpVec> IpVec;
+
+    void Reset();
+    TError ParseNet(std::vector<std::string> lines);
+    TError ParseIp(std::vector<std::string> lines);
+    TError ParseGw(std::vector<std::string> lines);
+};

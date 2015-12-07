@@ -766,15 +766,17 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client) {
         taskEnv->BindMap.push_back(bm);
     }
 
-    error = Prop->PrepareTaskEnv(P_NET, *taskEnv);
+    taskEnv->NetCfg.Id = Id;
+
+    error = taskEnv->NetCfg.ParseNet(Prop->Get<std::vector<std::string>>(P_NET));
     if (error)
         return error;
 
-    error = Prop->PrepareTaskEnv(P_IP, *taskEnv);
+    error = taskEnv->NetCfg.ParseIp(Prop->Get<std::vector<std::string>>(P_IP));
     if (error)
         return error;
 
-    error = Prop->PrepareTaskEnv(P_DEFAULT_GW, *taskEnv);
+    error = taskEnv->NetCfg.ParseGw(Prop->Get<std::vector<std::string>>(P_DEFAULT_GW));
     if (error)
         return error;
 
