@@ -310,6 +310,14 @@ std::shared_ptr<TContainer> TContainer::GetParent() const {
     return Parent;
 }
 
+TError TContainer::OpenNetns(TNamespaceFd &netns) const {
+    if (Task)
+        return netns.Open(Task->GetPid(), "ns/net");
+    if (Net == GetRoot()->Net)
+        return netns.Open(GetTid(), "ns/net");
+    return TError(EError::InvalidValue, "Cannot open netns: container not running");
+}
+
 template <typename T>
 T TContainer::GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except, T exceptVal) const {
     T val = 0;

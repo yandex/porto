@@ -19,6 +19,7 @@ enum class ETclassStat;
 class TEvent;
 class TContainerHolder;
 class TNetwork;
+class TNamespaceFd;
 class TNlLink;
 class TTask;
 class TContainerWaiter;
@@ -155,6 +156,7 @@ public:
     bool IsPortoRoot() const;
     std::shared_ptr<const TContainer> GetRoot() const;
     std::shared_ptr<TContainer> GetParent() const;
+    TError OpenNetns(TNamespaceFd &netns) const;
 
     template <typename T>
     T GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except = nullptr, T exceptVal = 0) const;

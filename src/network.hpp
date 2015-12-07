@@ -7,6 +7,7 @@
 #include "common.hpp"
 #include "util/netlink.hpp"
 #include "util/locks.hpp"
+#include "util/namespace.hpp"
 
 class TNetwork : public std::enable_shared_from_this<TNetwork>,
                  public TNonCopyable,
@@ -24,6 +25,8 @@ public:
     TNetwork();
     ~TNetwork();
     TError Connect();
+    TError ConnectNetns(TNamespaceFd &netns);
+    TError ConnectNew(TNamespaceFd &netns);
     TError Prepare();
     TError Destroy();
 

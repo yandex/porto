@@ -149,6 +149,50 @@ TError TNetwork::Connect() {
     return Nl->Connect();
 }
 
+TError TNetwork::ConnectNetns(TNamespaceFd &netns) {
+    TNamespaceFd my_netns;
+    TError error;
+
+    error = my_netns.Open(GetTid(), "ns/net");
+    if (error)
+        return error;
+
+    error = netns.SetNs(CLONE_NEWNET);
+    if (error)
+        return error;
+
+    error = Connect();
+
+    TError error2 = my_netns.SetNs(CLONE_NEWNET);
+    PORTO_ASSERT(!error2);
+
+    return error;
+}
+
+TError TNetwork::ConnectNew(TNamespaceFd &netns) {
+    TNamespaceFd my_netns;
+    TError error;
+
+    error = my_netns.Open(GetTid(), "ns/net");
+    if (error)
+        return error;
+
+    if (unshare(CLONE_NEWNET))
+        return TError(EError::Unknown, errno, "unshare(CLONE_NEWNET)");
+
+    error = netns.Open(GetTid(), "ns/net");
+    if (!error) {
+        error = Connect();
+        if (error)
+            netns.Close();
+    }
+
+    TError error2 = my_netns.SetNs(CLONE_NEWNET);
+    PORTO_ASSERT(!error2);
+
+    return error;
+}
+
 TError TNetwork::UpdateInterfaces() {
     struct nl_cache *cache;
     int ret;
