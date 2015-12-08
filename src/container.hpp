@@ -118,6 +118,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError Freeze(TScopedLock &holder_lock);
 
     bool PrepareJournal();
+    void RestoreStdPath(const std::string &property);
 
 public:
     TCred OwnerCred;

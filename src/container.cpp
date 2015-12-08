@@ -1671,6 +1671,32 @@ TError TContainer::RestoreNetwork() {
     return TError::Success();
 }
 
+void TContainer::RestoreStdPath(const std::string &property) {
+    TPath path = ActualStdPath(property, true);
+    bool def = Prop->IsDefault(property);
+
+    if (def && !path.Exists()) {
+        TPath root(Prop->Get<std::string>(P_ROOT));
+        std::string cwd(Prop->Get<std::string>(P_CWD));
+        std::string name(Prop->Get<std::string>(property) + "." + GetTextId("_"));
+
+        if (root.IsRegular())
+            path = GetTmpDir() / name;
+        else
+            path = root / cwd / name;
+
+        /* Restore from < 2.7 */
+        if (path.IsRegular()) {
+            L_ACT() << GetName() << ": restore " << property << " "
+                    << path.ToString() << std::endl;
+            Prop->Set<std::string>(property, path.ToString());
+        }
+    }
+
+    if (def && GetState() == EContainerState::Stopped)
+        RemoveLog(path);
+}
+
 TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
     L_ACT() << "Restore " << GetName() << " with id " << Id << std::endl;
 
@@ -1840,12 +1866,8 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
         Task = nullptr;
     }
 
-    if (GetState() == EContainerState::Stopped) {
-        if (Prop->IsDefault(P_STDOUT_PATH))
-            RemoveLog(ActualStdPath(P_STDOUT_PATH, true));
-        if (Prop->IsDefault(P_STDERR_PATH))
-            RemoveLog(ActualStdPath(P_STDERR_PATH, true));
-    }
+    RestoreStdPath(P_STDOUT_PATH);
+    RestoreStdPath(P_STDERR_PATH);
 
     if (Task)
         Task->ClearEnv();
