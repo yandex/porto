@@ -3,12 +3,12 @@
 
 #include "config.hpp"
 #include "version.hpp"
-#include "network.hpp"
 #include "util/signal.hpp"
 #include "util/unix.hpp"
 #include "util/string.hpp"
 #include "util/log.hpp"
 #include "test/test.hpp"
+#include "util/netlink.hpp"
 
 using std::string;
 
@@ -94,17 +94,12 @@ int main(int argc, char *argv[])
     try {
         config.Load();
 
-        auto net = std::make_shared<TNetwork>();
-        TError error = net->Connect();
-        if (error)
-            throw error.GetMsg();
-        auto lock = net->ScopedLock();
-
-        error = net->UpdateInterfaces();
+        auto nl = std::make_shared<TNl>();
+        TError error = nl->Connect();
         if (error)
             throw error.GetMsg();
 
-        error = net->OpenLinks(test::links);
+        error = nl->OpenLinks(test::links, false);
         if (error)
             throw error.GetMsg();
 

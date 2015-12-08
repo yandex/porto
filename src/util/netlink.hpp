@@ -18,6 +18,7 @@ struct nl_sock;
 struct rtnl_link;
 struct nl_cache;
 struct nl_addr;
+class TNlLink;
 
 class TNlAddr {
     struct nl_addr *Addr = nullptr;
@@ -42,9 +43,9 @@ enum class ETclassStat {
 
 uint32_t TcHandle(uint16_t maj, uint16_t min);
 
-class TNl : public TNonCopyable {
+class TNl : public std::enable_shared_from_this<TNl>,
+            public TNonCopyable {
     struct nl_sock *Sock = nullptr;
-    struct nl_cache *LinkCache = nullptr;
 
 public:
 
@@ -53,20 +54,21 @@ public:
 
     TError Connect();
     void Disconnect();
-    std::vector<std::string> FindLink(int flags);
 
     static void EnableDebug(bool enable);
 
     struct nl_sock *GetSock() { return Sock; }
-    struct nl_cache *GetCache() { return LinkCache; }
 
     int GetFd();
-    TError RefillCache();
+    TError OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links, bool all);
+
+    static TError Error(int nl_err, const std::string &desc);
+    void Dump(const std::string &prefix, void *obj);
 };
 
 class TNlLink : public TNonCopyable {
     std::shared_ptr<TNl> Nl;
-    std::string Name;
+    struct rtnl_link *Link = nullptr;
 
     TError AddXVlan(const std::string &vlantype,
                     const std::string &master,
@@ -75,25 +77,29 @@ class TNlLink : public TNonCopyable {
                     int mtu);
 
 public:
-    struct rtnl_link *Link = nullptr;
 
-    TNlLink(std::shared_ptr<TNl> nl, const std::string &name) : Nl(nl), Name(name) {}
+    TNlLink(std::shared_ptr<TNl> sock, const std::string &name);
+    TNlLink(std::shared_ptr<TNl> sock, struct rtnl_link *link);
     ~TNlLink();
     TError Load();
+
+    int GetIndex() const;
+    std::string GetName() const;
+    std::string GetDesc() const;
+    bool IsLoopback() const;
+    bool IsRunning() const;
+    TError Error(int nl_err, const std::string &desc) const;
+    void Dump(const std::string &prefix, void *obj = nullptr) const;
 
     TError Remove();
     TError Up();
     TError ChangeNs(const std::string &newName, int pid);
-    bool Valid();
-    int FindIndex(const std::string &device);
-    TError RefillCache();
     TError AddIpVlan(const std::string &master,
                      const std::string &mode, int mtu);
     TError AddMacVlan(const std::string &master,
                       const std::string &type, const std::string &hw,
                       int mtu);
     TError AddVeth(const std::string &name, const std::string &peerName, const std::string &hw, int mtu, int nsPid);
-    const std::string &GetAlias() const;
 
     static bool ValidIpVlanMode(const std::string &mode);
     static bool ValidMacVlanType(const std::string &type);
@@ -101,15 +107,11 @@ public:
 
     TError SetDefaultGw(const TNlAddr &addr);
     TError SetIpAddr(const TNlAddr &addr, const int prefix);
-    bool HasQueue();
-    bool IsLoopback();
 
-    int GetIndex() const;
     struct rtnl_link *GetLink() const { return Link; }
     struct nl_sock *GetSock() const { return Nl->GetSock(); }
     std::shared_ptr<TNl> GetNl() { return Nl; };
 
-    void LogObj(const std::string &prefix, void *obj) const;
     void LogCache(struct nl_cache *cache) const;
 };
 

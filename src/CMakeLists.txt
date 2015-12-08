@@ -98,7 +98,7 @@ endif()
 
 set(TEST_TARGETS "")
 if(ENABLE_TEST)
-	add_executable(portotest portotest.cpp config.cpp network.cpp test/selftest.cpp test/stresstest.cpp test/fuzzytest.cpp test/test.cpp config.cpp)
+	add_executable(portotest portotest.cpp config.cpp test/selftest.cpp test/stresstest.cpp test/fuzzytest.cpp test/test.cpp config.cpp)
 	add_dependencies(portotest version.hpp)
 	target_link_libraries(portotest porto protobufs util ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
 	set(TEST_TARGETS "portotest")

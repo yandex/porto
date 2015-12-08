@@ -513,13 +513,13 @@ TError TTask::ChildEnableNet() {
     if (error)
         return error;
 
-    std::vector<std::string> devices = nl->FindLink(0);
-    for (auto &dev : devices) {
-        auto link = std::make_shared<TNlLink>(nl, dev);
+    std::vector<std::shared_ptr<TNlLink>> links;
+    error = nl->OpenLinks(links, true);
+    if (error)
+        return error;
 
-        TError error = link->Load();
-        if (error)
-            return error;
+    for (auto &link : links) {
+        std::string dev = link->GetName();
 
         bool hasIp = find_if(Env->NetCfg.IpVec.begin(), Env->NetCfg.IpVec.end(), [&](const TIpVec &i)->bool { return i.Iface == dev; }) != Env->NetCfg.IpVec.end();
         bool hasGw = find_if(Env->NetCfg.GwVec.begin(), Env->NetCfg.GwVec.end(), [&](const TGwVec &i)->bool { return i.Iface == dev; }) != Env->NetCfg.GwVec.end();

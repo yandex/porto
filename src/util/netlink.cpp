@@ -1,3 +1,5 @@
+#include <sstream>
+
 #include "netlink.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
@@ -25,13 +27,29 @@ extern "C" {
 #include <netlink/route/addr.h>
 }
 
-using std::string;
-using std::vector;
-
 static bool debug = false;
 
 uint32_t TcHandle(uint16_t maj, uint16_t min) {
     return TC_HANDLE(maj, min);
+}
+
+TError TNl::Error(int nl_err, const std::string &desc) {
+    return TError(EError::Unknown, desc + ": " + std::string(nl_geterror(nl_err)));
+}
+
+void TNl::Dump(const std::string &prefix, void *obj) {
+    std::stringstream ss;
+    struct nl_dump_params dp = {};
+
+    dp.dp_type = debug ? NL_DUMP_STATS : NL_DUMP_LINE;
+    dp.dp_data = &ss;
+    dp.dp_cb = [](struct nl_dump_params *dp, char *buf) {
+            auto ss = (std::stringstream *)dp->dp_data;
+            *ss << std::string(buf);
+    };
+    nl_object_dump(OBJ_CAST(obj), &dp);
+
+    L() << "netlink " << prefix << " " << ss.str() << std::endl;
 }
 
 TError TNl::Connect() {
@@ -40,38 +58,18 @@ TError TNl::Connect() {
 
     Sock = nl_socket_alloc();
     if (!Sock)
-        return TError(EError::Unknown, string("Unable to allocate netlink socket"));
+        return TError(EError::Unknown, "Cannot allocate netlink socket");
 
     ret = nl_connect(Sock, NETLINK_ROUTE);
     if (ret < 0) {
-        error = TError(EError::Unknown, string("Unable to connect netlink socket: ") + nl_geterror(ret));
-        goto free_socket;
+        nl_socket_free(Sock);
+        return Error(ret, "Cannot connect netlink socket");
     }
-
-    ret = rtnl_link_alloc_cache(Sock, AF_UNSPEC, &LinkCache);
-    if (ret < 0) {
-        error = TError(EError::Unknown, string("Unable to allocate link cache: ") + nl_geterror(ret));
-        goto close_socket;
-    }
-
-    nl_cache_mngt_provide(LinkCache);
 
     return TError::Success();
-
-close_socket:
-    nl_close(Sock);
-free_socket:
-    nl_socket_free(Sock);
-
-    return error;
 }
 
 void TNl::Disconnect() {
-    if (LinkCache) {
-        nl_cache_mngt_unprovide(LinkCache);
-        nl_cache_free(LinkCache);
-        LinkCache = nullptr;
-    }
     if (Sock) {
         nl_close(Sock);
         nl_socket_free(Sock);
@@ -79,18 +77,29 @@ void TNl::Disconnect() {
     }
 }
 
-std::vector<std::string> TNl::FindLink(int flags) {
-    struct Iter { int flags; vector<string> devices; } data;
-    data.flags = flags;
-    nl_cache_foreach(LinkCache, [](struct nl_object *obj, void *data) {
-                     Iter *p = (Iter *)data;
-                     struct rtnl_link *l = (struct rtnl_link *)obj;
+TError TNl::OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links, bool all) {
+    struct nl_cache *cache;
+    int ret;
 
-                     if (!p->flags || (rtnl_link_get_flags(l) & p->flags))
-                        p->devices.push_back(rtnl_link_get_name(l));
-                     }, &data);
+    ret = rtnl_link_alloc_cache(GetSock(), AF_UNSPEC, &cache);
+    if (ret < 0)
+        return Error(ret, "Cannot allocate link cache");
 
-    return data.devices;
+    for (auto obj = nl_cache_get_first(cache); obj;
+            obj = nl_cache_get_next(obj)) {
+        auto link = (struct rtnl_link *)obj;
+
+        if (!all && ((rtnl_link_get_flags(link) &
+                        (IFF_LOOPBACK | IFF_RUNNING)) != IFF_RUNNING))
+            continue;
+
+        auto l = std::make_shared<TNlLink>(shared_from_this(), link);
+        links.push_back(l);
+    }
+
+    nl_cache_free(cache);
+
+    return TError::Success();
 }
 
 void TNl::EnableDebug(bool enable) {
@@ -101,9 +110,104 @@ int TNl::GetFd() {
     return nl_socket_get_fd(Sock);
 }
 
+
+
+TNlLink::TNlLink(std::shared_ptr<TNl> sock, const std::string &name) {
+    Nl = sock;
+    Link = rtnl_link_alloc();
+    PORTO_ASSERT(Link);
+    rtnl_link_set_name(Link, name.c_str());
+}
+
+TNlLink::TNlLink(std::shared_ptr<TNl> sock, struct rtnl_link *link) {
+    Nl = sock;
+    Link = link;
+    nl_object_get(OBJ_CAST(Link));
+}
+
 TNlLink::~TNlLink() {
     if (Link)
         rtnl_link_put(Link);
+}
+
+TError TNlLink::Load() {
+    struct rtnl_link *link;
+    int ret;
+
+    ret = rtnl_link_get_kernel(GetSock(), rtnl_link_get_ifindex(Link),
+                                       rtnl_link_get_name(Link), &link);
+    if (ret)
+        return Error(ret, "Cannot load link");
+    rtnl_link_put(Link);
+    Link = link;
+    return TError::Success();
+}
+
+int TNlLink::GetIndex() const {
+    return rtnl_link_get_ifindex(Link);
+}
+
+std::string TNlLink::GetName() const {
+    return std::string(rtnl_link_get_name(Link) ?: "???");
+}
+
+std::string TNlLink::GetDesc() const {
+    return std::to_string(GetIndex()) + ":" + GetName();
+}
+
+bool TNlLink::IsLoopback() const {
+    return rtnl_link_get_flags(Link) & IFF_LOOPBACK;
+}
+
+bool TNlLink::IsRunning() const {
+    return rtnl_link_get_flags(Link) & IFF_RUNNING;
+}
+
+TError TNlLink::Error(int nl_err, const std::string &desc) const {
+    return TNl::Error(nl_err, GetDesc() + " " + desc);
+}
+
+void TNlLink::Dump(const std::string &prefix, void *obj) const {
+    if (obj)
+        Nl->Dump(GetDesc() + " " + prefix, obj);
+    else
+        Nl->Dump(prefix, Link);
+}
+
+TError TNlLink::Up() {
+    Dump("up");
+
+    auto change = rtnl_link_alloc();
+    if (!change)
+        return Error(-NLE_NOMEM, "Cannot allocate link");
+    rtnl_link_set_flags(change, IFF_UP);
+    int ret = rtnl_link_change(GetSock(), Link, change, 0);
+    rtnl_link_put(change);
+    if (ret < 0)
+        return Error(ret, "Cannot set up");
+    return TError::Success();
+}
+
+TError TNlLink::Remove() {
+    Dump("remove");
+    int ret = rtnl_link_delete(GetSock(), Link);
+    if (ret)
+        return Error(ret, "Cannot remove");
+    return TError::Success();
+}
+
+TError TNlLink::ChangeNs(const std::string &newName, int pid) {
+    auto change = rtnl_link_alloc();
+    if (!change)
+        return Error(-NLE_NOMEM, "Cannot allocate link");
+    rtnl_link_set_name(change, newName.c_str());
+    rtnl_link_set_ns_pid(change, pid);
+    Dump("change ns", change);
+    int ret = rtnl_link_change(GetSock(), Link, change, 0);
+    rtnl_link_put(change);
+    if (ret < 0)
+        return Error(ret, "Cannot change ns");
+    return TError::Success();
 }
 
 TError TNlLink::SetDefaultGw(const TNlAddr &addr) {
@@ -120,14 +224,14 @@ TError TNlLink::SetDefaultGw(const TNlAddr &addr) {
     ret = nl_addr_parse("default", nl_addr_get_family(addr.GetAddr()), &a);
     if (ret < 0) {
         rtnl_route_put(route);
-        return TError(EError::Unknown, string("Unable to parse default address: ") + nl_geterror(ret));
+        return TError(EError::Unknown, std::string("Unable to parse default address: ") + nl_geterror(ret));
     }
 
     ret = rtnl_route_set_dst(route, a);
     nl_addr_put(a);
     if (ret < 0) {
         rtnl_route_put(route);
-        return TError(EError::Unknown, string("Unable to set route destination: ") + nl_geterror(ret));
+        return TError(EError::Unknown, std::string("Unable to set route destination: ") + nl_geterror(ret));
     }
 
     nh = rtnl_route_nh_alloc();
@@ -143,18 +247,10 @@ TError TNlLink::SetDefaultGw(const TNlAddr &addr) {
     ret = rtnl_route_add(GetSock(), route, NLM_F_MATCH);
     rtnl_route_put(route);
     if (ret < 0) {
-        return TError(EError::Unknown, string("Unable to set default gateway: ") + nl_geterror(ret) + string(" ") + std::to_string(ret));
+        return TError(EError::Unknown, std::string("Unable to set default gateway: ") + nl_geterror(ret) + std::string(" ") + std::to_string(ret));
     }
 
     return TError::Success();
-}
-
-bool TNlLink::HasQueue() {
-    return !(rtnl_link_get_flags(Link) & (IFF_LOOPBACK | IFF_POINTOPOINT | IFF_SLAVE));
-}
-
-bool TNlLink::IsLoopback() {
-    return rtnl_link_get_flags(Link) & IFF_LOOPBACK;
 }
 
 TError TNlLink::SetIpAddr(const TNlAddr &addr, const int prefix) {
@@ -169,143 +265,19 @@ TError TNlLink::SetIpAddr(const TNlAddr &addr, const int prefix) {
     ret = rtnl_addr_set_local(a, addr.GetAddr());
     if (ret < 0) {
         rtnl_addr_put(a);
-        return TError(EError::Unknown, string("Unable to set local address: ") + nl_geterror(ret));
+        return TError(EError::Unknown, std::string("Unable to set local address: ") + nl_geterror(ret));
     }
     rtnl_addr_set_prefixlen(a, prefix);
 
     ret = rtnl_addr_add(GetSock(), a, 0);
     if (ret < 0) {
         rtnl_addr_put(a);
-        return TError(EError::Unknown, string("Unable to add address: ") + nl_geterror(ret) + string(" ") + std::to_string(prefix));
+        return TError(EError::Unknown, std::string("Unable to add address: ") + nl_geterror(ret) + std::string(" ") + std::to_string(prefix));
     }
 
     rtnl_addr_put(a);
 
     return TError::Success();
-}
-
-TError TNlLink::Remove() {
-    TError error = TError::Success();
-    struct rtnl_link *hostLink = rtnl_link_alloc();
-    rtnl_link_set_name(hostLink, Name.c_str());
-    LogObj("remove", hostLink);
-    int ret = rtnl_link_delete(GetSock(), hostLink);
-    if (ret < 0)
-        error = TError(EError::Unknown, string("Unable to remove link: ") + nl_geterror(ret));
-    rtnl_link_put(hostLink);
-
-    return error;
-}
-
-TError TNlLink::Up() {
-    int ret;
-    struct rtnl_link *oldLink = rtnl_link_alloc();
-    if (!oldLink)
-        return TError(EError::Unknown, "Unable to allocate link");
-    struct rtnl_link *newLink = rtnl_link_alloc();
-    if (!newLink) {
-        rtnl_link_put(oldLink);
-        return TError(EError::Unknown, "Unable to allocate link");
-    }
-
-    rtnl_link_set_name(oldLink, Name.c_str());
-    rtnl_link_set_name(newLink, Name.c_str());
-    rtnl_link_set_flags(newLink, IFF_UP);
-
-    LogObj("up", newLink);
-
-    ret = rtnl_link_change(GetSock(), oldLink, newLink, 0);
-    if (ret < 0) {
-        rtnl_link_put(oldLink);
-        rtnl_link_put(newLink);
-        return TError(EError::Unknown, "Unable to change " + Name + " status: " + nl_geterror(ret));
-    }
-
-    rtnl_link_put(newLink);
-    rtnl_link_put(oldLink);
-
-    return TError::Success();
-}
-
-TError TNlLink::ChangeNs(const std::string &newName, int pid) {
-    int ret;
-    struct rtnl_link *newLink;
-    struct rtnl_link *oldLink = rtnl_link_get_by_name(Nl->GetCache(), Name.c_str());
-    if (!oldLink)
-        return TError(EError::Unknown, "Invalid link " + Name);
-
-    newLink = rtnl_link_alloc();
-    if (!newLink) {
-        rtnl_link_put(oldLink);
-        return TError(EError::Unknown, "Can't allocate link");
-    }
-
-    rtnl_link_set_ifindex(newLink, rtnl_link_get_ifindex(oldLink));
-    rtnl_link_set_name(newLink, newName.c_str());
-    rtnl_link_set_ns_pid(newLink, pid);
-
-    LogObj("change old", oldLink);
-    LogObj("change new", newLink);
-
-    ret = rtnl_link_change(GetSock(), oldLink, newLink, 0);
-    if (ret < 0) {
-        rtnl_link_put(oldLink);
-        rtnl_link_put(newLink);
-        return TError(EError::Unknown, "Unable to change " + Name + " namespace: " + nl_geterror(ret));
-    }
-
-    rtnl_link_put(newLink);
-    rtnl_link_put(oldLink);
-
-    return TError::Success();
-}
-
-bool TNlLink::Valid() {
-    struct rtnl_link *l = rtnl_link_get_by_name(Nl->GetCache(), Name.c_str());
-    rtnl_link_put(l);
-
-    return l != nullptr;
-}
-
-int TNlLink::GetIndex() const {
-    return rtnl_link_get_ifindex(Link);
-}
-
-int TNlLink::FindIndex(const std::string &device) {
-    struct Iter { string name; int idx; } data = { device, -1 };
-    nl_cache_foreach(Nl->GetCache(), [](struct nl_object *obj, void *data) {
-                     Iter *p = (Iter *)data;
-                     struct rtnl_link *l = (struct rtnl_link *)obj;
-
-                     if (p->idx >= 0)
-                         return;
-
-                     if (strncmp(rtnl_link_get_name(l), p->name.c_str(),
-                                 p->name.length()) == 0 &&
-                         rtnl_link_get_flags(l) & IFF_RUNNING)
-
-                         p->idx = rtnl_link_get_ifindex(l);
-                     }, &data);
-    return data.idx;
-}
-
-TError TNl::RefillCache() {
-    TError error;
-
-    int ret = nl_cache_refill(GetSock(), GetCache());
-    if (ret < 0) {
-        error = TError(EError::Unknown, string("Can't refill cache: ") + nl_geterror(ret));
-        L_ERR() << error << std::endl;
-    }
-
-    return error;
-}
-
-TError TNlLink::RefillCache() {
-    TError error = Nl->RefillCache();
-    if (error)
-        return error;
-    return error;
 }
 
 #ifdef IFLA_IPVLAN_MAX
@@ -329,11 +301,12 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
                          int mtu) {
     TError error = TError::Success();
     int ret;
-    uint32_t masterIdx = FindIndex(master);
+    uint32_t masterIdx;
     struct nl_msg *msg;
     struct nlattr *linkinfo, *infodata;
     struct ifinfomsg ifi = { 0 };
     struct ether_addr *ea = nullptr;
+    auto Name = GetName();
 
     if (hw.length()) {
         // FIXME THREADS
@@ -342,14 +315,20 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
             return TError(EError::Unknown, "Invalid " + vlantype + " mac address " + hw);
     }
 
-	msg = nlmsg_alloc_simple(RTM_NEWLINK, NLM_F_CREATE);
-	if (!msg)
+    TNlLink masterLink(Nl, master);
+    error = masterLink.Load();
+    if (error)
+        return error;
+    masterIdx = masterLink.GetIndex();
+
+    msg = nlmsg_alloc_simple(RTM_NEWLINK, NLM_F_CREATE);
+    if (!msg)
         return TError(EError::Unknown, "Unable to add " + vlantype + ": no memory");
 
-	ret = nlmsg_append(msg, &ifi, sizeof(ifi), NLMSG_ALIGNTO);
+    ret = nlmsg_append(msg, &ifi, sizeof(ifi), NLMSG_ALIGNTO);
     if (ret < 0) {
         error = TError(EError::Unknown, "Unable to add " + vlantype + ": " + nl_geterror(ret));
-		goto free_msg;
+        goto free_msg;
     }
 
     /* link configuration */
@@ -386,7 +365,7 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
     linkinfo = nla_nest_start(msg, IFLA_LINKINFO);
     if (!linkinfo) {
         error = TError(EError::Unknown, "Unable to add " + vlantype + ": can't nest IFLA_LINKINFO");
-		goto free_msg;
+        goto free_msg;
     }
     ret = nla_put(msg, IFLA_INFO_KIND, vlantype.length() + 1, vlantype.c_str());
     if (ret < 0) {
@@ -395,10 +374,10 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
     }
 
     /* xvlan specific */
-	infodata = nla_nest_start(msg, IFLA_INFO_DATA);
+    infodata = nla_nest_start(msg, IFLA_INFO_DATA);
     if (!infodata) {
         error = TError(EError::Unknown, "Unable to add " + vlantype + ": can't nest IFLA_INFO_DATA");
-		goto free_msg;
+        goto free_msg;
     }
 
     if (vlantype == "macvlan") {
@@ -425,14 +404,12 @@ TError TNlLink::AddXVlan(const std::string &vlantype,
 
     ret = nl_send_sync(GetSock(), msg);
     if (ret)
-        error = TError(EError::Unknown, "Unable to add " + vlantype + ": " + nl_geterror(ret));
+        return Error(ret, "Cannot add " + vlantype);
 
-    if (!error)
-       error = RefillCache();
-    return error;
+    return Load();
 
 free_msg:
-	nlmsg_free(msg);
+    nlmsg_free(msg);
     return error;
 
 }
@@ -491,14 +468,7 @@ TError TNlLink::AddVeth(const std::string &name, const std::string &peerName,
     ret = rtnl_link_add(GetSock(), peer, NLM_F_CREATE | NLM_F_EXCL);
     if (ret < 0) {
         rtnl_link_put(peer);
-        return TError(EError::Unknown, string("Unable to add veth: ") + nl_geterror(ret));
-    }
-
-    error = RefillCache();
-    if (error) {
-        (void)rtnl_link_delete(GetSock(), peer);
-        rtnl_link_put(peer);
-        return error;
+        return TError(EError::Unknown, std::string("Unable to add veth: ") + nl_geterror(ret));
     }
 
     /* reconstruct link: workaround for libnl bug */
@@ -513,16 +483,12 @@ TError TNlLink::AddVeth(const std::string &name, const std::string &peerName,
     if (ret < 0) {
         (void)rtnl_link_delete(GetSock(), peer);
         rtnl_link_put(peer);
-        return TError(EError::Unknown, string("Unable to enslave interface: ") + nl_geterror(ret));
+        return TError(EError::Unknown, std::string("Unable to enslave interface: ") + nl_geterror(ret));
     }
 
     rtnl_link_put(peer);
 
     return TError::Success();
-}
-
-const std::string &TNlLink::GetAlias() const {
-    return Name;
 }
 
 bool TNlLink::ValidIpVlanMode(const std::string &mode) {
@@ -539,32 +505,6 @@ bool TNlLink::ValidMacVlanType(const std::string &type) {
 
 bool TNlLink::ValidMacAddr(const std::string &hw) {
     return ether_aton(hw.c_str()) != nullptr;
-}
-
-TError TNlLink::Load() {
-    LogCache(Nl->GetCache());
-
-    Link = rtnl_link_get_by_name(Nl->GetCache(), Name.c_str());
-    if (!Link)
-        return TError(EError::Unknown, string("Invalid link ") + Name);
-
-    return TError::Success();
-}
-
-void TNlLink::LogObj(const std::string &prefix, void *obj) const {
-    static std::function<void(struct nl_dump_params *, char *)> handler;
-
-    struct nl_dump_params dp = {};
-    dp.dp_cb = [](struct nl_dump_params *params, char *buf) { handler(params, buf); };
-
-    auto &str = L();
-    handler = [&](struct nl_dump_params *params, char *buf) { str << buf; };
-
-    if (Link)
-        str << "netlink " << rtnl_link_get_name(Link) << ": " << prefix << " ";
-    else
-        str << "netlink: " << prefix << " ";
-    nl_object_dump(OBJ_CAST(obj), &dp);
 }
 
 void TNlLink::LogCache(struct nl_cache *cache) const {
@@ -594,7 +534,7 @@ TError TNlClass::GetProperties(const TNlLink &link, uint32_t &prio, uint32_t &ra
 
     int ret = rtnl_class_alloc_cache(link.GetSock(), index, &cache);
     if (ret < 0)
-            return TError(EError::Unknown, string("Unable to allocate class cache: ") + nl_geterror(ret));
+            return TError(EError::Unknown, std::string("Unable to allocate class cache: ") + nl_geterror(ret));
 
     tclass = rtnl_class_get(cache, index, Handle);
     if (!tclass) {
@@ -625,7 +565,7 @@ TError TNlHtb::Create(const TNlLink &link, uint32_t defaultClass) {
 
     qdisc = rtnl_qdisc_alloc();
     if (!qdisc)
-        return TError(EError::Unknown, string("Unable to allocate qdisc object"));
+        return TError(EError::Unknown, std::string("Unable to allocate qdisc object"));
 
     rtnl_tc_set_link(TC_CAST(qdisc), link.GetLink());
     rtnl_tc_set_parent(TC_CAST(qdisc), Parent);
@@ -633,18 +573,18 @@ TError TNlHtb::Create(const TNlLink &link, uint32_t defaultClass) {
 
     ret = rtnl_tc_set_kind(TC_CAST(qdisc), "htb");
     if (ret < 0) {
-        error = TError(EError::Unknown, string("Unable to set qdisc type: ") + nl_geterror(ret));
+        error = TError(EError::Unknown, std::string("Unable to set qdisc type: ") + nl_geterror(ret));
         goto free_qdisc;
     }
 
     rtnl_htb_set_defcls(qdisc, TC_H_MIN(defaultClass));
     rtnl_htb_set_rate2quantum(qdisc, 10);
 
-    link.LogObj("add", qdisc);
+    link.Dump("add", qdisc);
 
     ret = rtnl_qdisc_add(link.GetSock(), qdisc, NLM_F_CREATE);
     if (ret < 0)
-        error = TError(EError::Unknown, string("Unable to add qdisc: ") + nl_geterror(ret));
+        error = TError(EError::Unknown, std::string("Unable to add qdisc: ") + nl_geterror(ret));
 
 free_qdisc:
     rtnl_qdisc_put(qdisc);
@@ -657,12 +597,12 @@ TError TNlHtb::Remove(const TNlLink &link) {
 
     qdisc = rtnl_qdisc_alloc();
     if (!qdisc)
-        return TError(EError::Unknown, string("Unable to allocate qdisc object"));
+        return TError(EError::Unknown, std::string("Unable to allocate qdisc object"));
 
     rtnl_tc_set_link(TC_CAST(qdisc), link.GetLink());
     rtnl_tc_set_parent(TC_CAST(qdisc), Parent);
 
-    link.LogObj("remove", qdisc);
+    link.Dump("remove", qdisc);
 
     rtnl_qdisc_delete(link.GetSock(), qdisc);
     rtnl_qdisc_put(qdisc);
@@ -710,7 +650,7 @@ bool TNlHtb::Valid(const TNlLink &link, uint32_t defaultClass) {
             valid = false;
         else if (rtnl_tc_get_handle(TC_CAST(qdisc)) != Handle)
             valid = false;
-        else if (rtnl_tc_get_kind(TC_CAST(qdisc)) != string("htb"))
+        else if (rtnl_tc_get_kind(TC_CAST(qdisc)) != std::string("htb"))
             valid = false;
         else if (rtnl_htb_get_defcls(qdisc) != TC_H_MIN(defaultClass))
             valid = false;
@@ -742,19 +682,19 @@ TError TNlCgFilter::Create(const TNlLink &link) {
 
     ret = nlmsg_append(msg, &tchdr, sizeof(tchdr), NLMSG_ALIGNTO);
     if (ret < 0) {
-        error = TError(EError::Unknown, string("Unable to add filter: ") + nl_geterror(ret));
+        error = TError(EError::Unknown, std::string("Unable to add filter: ") + nl_geterror(ret));
 		goto free_msg;
     }
 
     ret = nla_put(msg, TCA_KIND, strlen(FilterType) + 1, FilterType);
     if (ret < 0) {
-        error = TError(EError::Unknown, string("Unable to add filter: ") + nl_geterror(ret));
+        error = TError(EError::Unknown, std::string("Unable to add filter: ") + nl_geterror(ret));
 		goto free_msg;
     }
 
     ret = nla_put(msg, TCA_OPTIONS, 0, NULL);
     if (ret < 0) {
-        error = TError(EError::Unknown, string("Unable to add filter: ") + nl_geterror(ret));
+        error = TError(EError::Unknown, std::string("Unable to add filter: ") + nl_geterror(ret));
 		goto free_msg;
     }
 
@@ -764,7 +704,7 @@ TError TNlCgFilter::Create(const TNlLink &link) {
 
     ret = nl_send_sync(link.GetSock(), msg);
     if (ret)
-        error = TError(EError::Unknown, string("Unable to add filter: ") + nl_geterror(ret));
+        error = TError(EError::Unknown, std::string("Unable to add filter: ") + nl_geterror(ret));
 
     if (!Exists(link))
         error = TError(EError::Unknown, "BUG: created filter doesn't exist");
@@ -812,13 +752,13 @@ TError TNlCgFilter::Remove(const TNlLink &link) {
 
     cls = rtnl_cls_alloc();
     if (!cls)
-        return TError(EError::Unknown, string("Unable to allocate filter object"));
+        return TError(EError::Unknown, std::string("Unable to allocate filter object"));
 
     rtnl_tc_set_link(TC_CAST(cls), link.GetLink());
 
     ret = rtnl_tc_set_kind(TC_CAST(cls), FilterType);
     if (ret < 0) {
-        error = TError(EError::Unknown, string("Unable to set filter type: ") + nl_geterror(ret));
+        error = TError(EError::Unknown, std::string("Unable to set filter type: ") + nl_geterror(ret));
         goto free_cls;
     }
 
@@ -826,11 +766,11 @@ TError TNlCgFilter::Remove(const TNlLink &link) {
     rtnl_cls_set_protocol(cls, 0);
     rtnl_tc_set_parent(TC_CAST(cls), Parent);
 
-    link.LogObj("remove", cls);
+    link.Dump("remove", cls);
 
     ret = rtnl_cls_delete(link.GetSock(), cls, 0);
     if (ret < 0)
-        error = TError(EError::Unknown, string("Unable to remove filter: ") + nl_geterror(ret));
+        error = TError(EError::Unknown, std::string("Unable to remove filter: ") + nl_geterror(ret));
 
 free_cls:
     rtnl_cls_put(cls);

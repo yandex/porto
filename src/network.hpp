@@ -12,9 +12,9 @@ class TNetwork : public std::enable_shared_from_this<TNetwork>,
                  public TNonCopyable,
                  public TLockable {
     std::shared_ptr<TNl> Nl;
+    struct nl_sock *GetSock() const { return Nl->GetSock(); }
 
     std::vector<std::pair<std::string, int>> ifaces;
-    struct nl_sock *rtnl;
 
     TError PrepareLink(int index, std::string name);
 
@@ -25,8 +25,6 @@ public:
     ~TNetwork();
     TError Connect();
     TError Prepare();
-    // OpenLinks doesn't lock TNetwork
-    TError OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links);
     TError Destroy();
 
     TError GetTrafficCounters(int minor, ETclassStat stat,
@@ -41,9 +39,6 @@ public:
     TError AddTrafficClass(int ifIndex, uint32_t parent, uint32_t handle,
                            uint64_t prio, uint64_t rate, uint64_t ceil);
     TError DelTrafficClass(int ifIndex, uint32_t handle);
-
-    static TError NetlinkError(int error, const std::string description);
-    static void DumpNetlinkObject(const std::string &prefix, void *obj);
 };
 
 

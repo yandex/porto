@@ -684,7 +684,7 @@ static bool HaveIpVlan() {
     auto link = std::make_shared<TNlLink>(nl, "portoivcheck");
     (void)link->Remove();
 
-    error = link->AddIpVlan(links[0]->GetAlias(), "l2", -1);
+    error = link->AddIpVlan(links[0]->GetName(), "l2", -1);
     if (error) {
         return false;
     } else {

@@ -146,39 +146,16 @@ TNetwork::~TNetwork() {
 }
 
 TError TNetwork::Connect() {
-    TError error = Nl->Connect();
-    if (!error)
-        rtnl = Nl->GetSock();
-    return error;
-}
-
-TError TNetwork::NetlinkError(int error, const std::string description) {
-    return TError(EError::Unknown, description + ": " +
-                                   std::string(nl_geterror(error)));
-}
-
-void TNetwork::DumpNetlinkObject(const std::string &prefix, void *obj) {
-    std::stringstream ss;
-    struct nl_dump_params dp = {};
-
-    dp.dp_type = NL_DUMP_DETAILS;
-    dp.dp_data = &ss;
-    dp.dp_cb = [](struct nl_dump_params *dp, char *buf) {
-            auto ss = (std::stringstream *)dp->dp_data;
-            *ss << std::string(buf);
-    };
-    nl_object_dump(OBJ_CAST(obj), &dp);
-
-    L() << "netlink " << prefix << " " << ss.str() << std::endl;
+    return Nl->Connect();
 }
 
 TError TNetwork::UpdateInterfaces() {
     struct nl_cache *cache;
     int ret;
 
-    ret = rtnl_link_alloc_cache(rtnl, AF_UNSPEC, &cache);
+    ret = rtnl_link_alloc_cache(GetSock(), AF_UNSPEC, &cache);
     if (ret < 0)
-        return NetlinkError(ret, "Cannot allocate link cache");
+        return Nl->Error(ret, "Cannot allocate link cache");
 
     ifaces.clear();
 
@@ -188,7 +165,7 @@ TError TNetwork::UpdateInterfaces() {
         int flags = rtnl_link_get_flags(link);
         const char *name = rtnl_link_get_name(link);
 
-        DumpNetlinkObject("link", link);
+        Nl->Dump("link", link);
 
         if ((flags & IFF_LOOPBACK) || !(flags & IFF_RUNNING))
             continue;
@@ -233,9 +210,9 @@ TError TNetwork::GetTrafficCounters(int minor, ETclassStat stat,
         struct rtnl_class *cls;
 
         /* TODO optimize this stuff */
-        int ret = rtnl_class_alloc_cache(rtnl, iface.second, &cache);
+        int ret = rtnl_class_alloc_cache(GetSock(), iface.second, &cache);
         if (ret < 0)
-            return NetlinkError(ret, "Cannot allocate class cache");
+            return Nl->Error(ret, "Cannot allocate class cache");
 
         cls = rtnl_class_get(cache, iface.second, handle);
         if (!cls) {
@@ -267,7 +244,7 @@ TError TNetwork::AddTrafficClass(int ifIndex, uint32_t parent, uint32_t handle,
 
     ret = rtnl_tc_set_kind(TC_CAST(cls), "htb");
     if (ret < 0) {
-        error = NetlinkError(ret, "Cannot set HTB class");
+        error = Nl->Error(ret, "Cannot set HTB class");
         goto free_class;
     }
 
@@ -290,10 +267,10 @@ TError TNetwork::AddTrafficClass(int ifIndex, uint32_t parent, uint32_t handle,
        rtnl_htb_set_cbuffer(tclass, cburst);
        */
 
-    DumpNetlinkObject("add", cls);
-    ret = rtnl_class_add(rtnl, cls, NLM_F_CREATE | NLM_F_REPLACE);
+    Nl->Dump("add", cls);
+    ret = rtnl_class_add(GetSock(), cls, NLM_F_CREATE | NLM_F_REPLACE);
     if (ret < 0)
-        error = NetlinkError(ret, "Cannot add traffic class to " + std::to_string(ifIndex));
+        error = Nl->Error(ret, "Cannot add traffic class to " + std::to_string(ifIndex));
 
 free_class:
     rtnl_class_put(cls);
@@ -312,17 +289,17 @@ TError TNetwork::DelTrafficClass(int ifIndex, uint32_t handle) {
     rtnl_tc_set_ifindex(TC_CAST(cls), ifIndex);
     rtnl_tc_set_handle(TC_CAST(cls), handle);
 
-    DumpNetlinkObject("del", cls);
-    ret = rtnl_class_delete(rtnl, cls);
+    Nl->Dump("del", cls);
+    ret = rtnl_class_delete(GetSock(), cls);
 
     /* If busy -> remove recursively */
     if (ret == -NLE_BUSY) {
         std::vector<uint32_t> handles({handle});
         struct nl_cache *cache;
 
-        ret = rtnl_class_alloc_cache(rtnl, ifIndex, &cache);
+        ret = rtnl_class_alloc_cache(GetSock(), ifIndex, &cache);
         if (ret < 0) {
-            error = NetlinkError(ret, "Cannot allocate class cache");
+            error = Nl->Error(ret, "Cannot allocate class cache");
             goto out;
         }
 
@@ -340,15 +317,15 @@ TError TNetwork::DelTrafficClass(int ifIndex, uint32_t handle) {
 
         for (int i = handles.size() - 1; i >= 0; i--) {
             rtnl_tc_set_handle(TC_CAST(cls), handles[i]);
-            DumpNetlinkObject("del", cls);
-            ret = rtnl_class_delete(rtnl, cls);
+            Nl->Dump("del", cls);
+            ret = rtnl_class_delete(GetSock(), cls);
             if (ret < 0)
                 break;
         }
     }
 
     if (ret < 0)
-        error = NetlinkError(ret, "Cannot remove traffic class");
+        error = Nl->Error(ret, "Cannot remove traffic class");
 out:
     rtnl_class_put(cls);
     return error;
@@ -387,24 +364,6 @@ TError TNetwork::RemoveTrafficClasses(int minor) {
     return TError::Success();
 }
 
-TError TNetwork::OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links) {
-    TError error;
-
-    for (auto &iface : ifaces) {
-        auto l = std::make_shared<TNlLink>(Nl, iface.first);
-        PORTO_ASSERT(l != nullptr);
-
-        TError error = l->Load();
-        if (error) {
-            L_ERR() << "Can't open link: " << error << std::endl;
-            return error;
-        }
-
-        links.push_back(l);
-    }
-
-    return TError::Success();
-}
 
 
 void TNetCfg::Reset() {
