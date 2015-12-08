@@ -781,8 +781,9 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     }
 
     // Create new mount namespaces if we have to make any changes
-    taskEnv->NewMountNs = taskEnv->Isolate || taskEnv->BindMap.size() ||
-                          taskEnv->RootRdOnly || !taskEnv->Root.IsRoot();
+    taskEnv->NewMountNs = taskEnv->Isolate ||
+                          taskEnv->BindMap.size() || taskEnv->BindDns ||
+                          !taskEnv->Root.IsRoot() || taskEnv->RootRdOnly;
 
     Task = std::unique_ptr<TTask>(new TTask(taskEnv));
 
