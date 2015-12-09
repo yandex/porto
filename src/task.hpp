@@ -51,7 +51,6 @@ struct TTaskEnv : public TNonCopyable {
     bool DefaultStdout = false;
     bool DefaultStderr = false;
     TNamespaceSnapshot ParentNs;
-    bool CloneParentMntNs;
     std::map<int,struct rlimit> Rlimit;
     std::string Hostname;
     bool SetEtcHostname;

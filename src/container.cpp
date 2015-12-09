@@ -635,26 +635,11 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     taskEnv->Cwd = Prop->Get<std::string>(P_CWD);
     taskEnv->ParentCwd = Parent->Prop->Get<std::string>(P_CWD);
 
-    taskEnv->Root = Prop->Get<std::string>(P_ROOT);
     taskEnv->LoopDev = Prop->Get<int>(P_RAW_LOOP_DEV);
-    taskEnv->CloneParentMntNs = false;
-
-    if (taskEnv->LoopDev >= 0) {
+    if (taskEnv->LoopDev >= 0)
         taskEnv->Root = GetTmpDir();
-    } else if (parent) {
-        if (Prop->IsDefault(P_ROOT) ||
-                taskEnv->Root == parent->Prop->Get<std::string>(P_ROOT)) {
-            taskEnv->Root = "/";
-            taskEnv->CloneParentMntNs = true;
-        } else {
-            auto inner_root = parent->RootPath().InnerPath(taskEnv->Root, true);
-
-            if (!inner_root.IsEmpty()) {
-                taskEnv->Root = inner_root;
-                taskEnv->CloneParentMntNs = true;
-            }
-        }
-    }
+    else
+        taskEnv->Root = Prop->Get<std::string>(P_ROOT);
 
     taskEnv->RootRdOnly = Prop->Get<bool>(P_ROOT_RDONLY);
 
@@ -725,38 +710,16 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
         taskEnv->BindMap.push_back(bm);
     }
 
-    if (parent) {
+    if (parent && client) {
         pid_t parent_pid = parent->Task->GetPid();
 
-        if (!taskEnv->Isolate) {
-            error = taskEnv->ParentNs.Open(parent_pid);
-            if (client && error)
-                return error;
-        } else {
-            if (!InPidNamespace(parent_pid, getpid())) {
-                error = taskEnv->ParentNs.Pid.Open(parent_pid, "ns/pid");
-                if (client && error)
-                    return error;
-                taskEnv->TripleFork = true;
-            }
-            if (taskEnv->CloneParentMntNs) {
-                error = taskEnv->ParentNs.Mnt.Open(parent_pid, "ns/mnt");
-                if (client && error)
-                    return error;
-            }
-            if (taskEnv->Hostname == "") {
-                error = taskEnv->ParentNs.Uts.Open(parent_pid, "ns/uts");
-                if (client && error)
-                    return error;
-            }
-        }
-    }
-
-    if (!taskEnv->CloneParentMntNs) {
-        /* We'll return into host after trip into ClientMntNs */
-        error = taskEnv->ParentNs.Mnt.Open(getpid(), "ns/mnt");
-        if (client && error)
+        error = taskEnv->ParentNs.Open(parent_pid);
+        if (error)
             return error;
+
+        /* one more fork for creating nested pid-namespace */
+        if (taskEnv->Isolate && !InPidNamespace(parent_pid, getpid()))
+            taskEnv->TripleFork = true;
     }
 
     if (NetCfg && NetCfg->NetNs.IsOpened())
