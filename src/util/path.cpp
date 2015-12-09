@@ -692,11 +692,13 @@ TError TPath::SetXAttr(const std::string name, const std::string value) const {
 #define FALLOC_FL_COLLAPSE_RANGE        0x08
 #endif
 
-TError TPath::RotateLog(off_t max_disk_usage) const {
+TError TPath::RotateLog(off_t max_disk_usage, off_t &loss) const {
     struct stat st;
     off_t hole_len;
     TError error;
     int fd;
+
+    loss = 0;
 
     if (lstat(c_str(), &st))
         return TError(EError::Unknown, errno, "lstat(" + Path + ")");
@@ -711,12 +713,13 @@ TError TPath::RotateLog(off_t max_disk_usage) const {
     /* Keep half of allowed size or trucate to zero */
     hole_len = st.st_size - max_disk_usage / 2;
     hole_len -= hole_len % st.st_blksize;
+    loss = hole_len;
 
-    if (fallocate(fd, FALLOC_FL_COLLAPSE_RANGE, 0, hole_len) &&
-            ftruncate(fd, 0))
-        error = TError(EError::Unknown, errno, "truncate(" + Path + ")");
-    else
-        error = TError::Success();
+    if (fallocate(fd, FALLOC_FL_COLLAPSE_RANGE, 0, hole_len)) {
+        loss = st.st_size;
+        if (ftruncate(fd, 0))
+            error = TError(EError::Unknown, errno, "truncate(" + Path + ")");
+    }
 
     close(fd);
     return error;

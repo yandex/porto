@@ -132,6 +132,9 @@ public:
     TPath RootPath() const;
     TPath WorkPath() const;
     TPath ActualStdPath(const std::string &property, bool host) const;
+    TError RotateStdFile(const std::string &type);
+    TError ReadStdFile(const std::string &type, std::string &text,
+                       const std::string &start_offset="") const;
     EContainerState GetState() const;
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);
 

@@ -282,7 +282,7 @@ public:
         TUintValue(PERSISTENT_VALUE),
         TContainerValue(P_STDOUT_LIMIT,
                         "Return no more than given number of bytes from standard output/error",
-                        staticProperty) {}
+                        anyState) {}
 
     uint64_t GetDefault() const override {
         return config().container().stdout_limit();

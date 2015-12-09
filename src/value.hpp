@@ -54,6 +54,21 @@ public:
     virtual TError SetIndexed(const std::string &index, const std::string &value) =0;
 };
 
+class TTextValue : public TValue {
+public:
+    TTextValue(int flags) : TValue(flags) {}
+
+    void Reset() override {  }
+
+    TError SetString(const std::string &value) override {
+        return TError(EError::InvalidValue, "This is read-only value");
+    }
+
+    TError SetIndexed(const std::string &index, const std::string &value) override {
+        return TError(EError::InvalidValue, "This is read-only value");
+    }
+};
+
 template<typename T>
 class TStoredValue : public TValue {
 private:

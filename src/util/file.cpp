@@ -97,42 +97,6 @@ TError TFile::AsLines(vector<string> &value) const {
     return TError::Success();
 }
 
-TError TFile::LastStrings(const size_t size, std::string &value) const {
-    int fd = open(Path.ToString().c_str(), O_RDONLY);
-    if (fd < 0)
-        return TError(EError::Unknown, errno, "open(" + Path.ToString() + ")");
-
-    size_t end = lseek(fd, 0, SEEK_END);
-    size_t copy = end < size ? end : size;
-
-    lseek(fd, -copy, SEEK_END);
-
-    vector<char> s;
-    s.resize(copy);
-
-    int n = read(fd, s.data(), copy);
-    if (close(fd) < 0)
-        return TError(EError::Unknown, errno, "close(" + Path.ToString() + ")");
-    if (n < 0)
-        return TError(EError::Unknown, errno, "read(" + Path.ToString() + ")");
-
-    if (end > size) {
-        auto iter = s.begin();
-
-        for (; iter != s.end(); iter++)
-            if (*iter == '\n') {
-                iter++;
-                break;
-            }
-
-        value.assign(iter, s.end());
-    } else {
-        value.assign(s.begin(), s.begin() + copy);
-    }
-
-    return TError::Success();
-}
-
 TError TFile::Write(int flags, const string &str) const {
     TError error = TError::Success();
 

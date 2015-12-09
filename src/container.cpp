@@ -129,6 +129,73 @@ TPath TContainer::ActualStdPath(const std::string &property, bool host) const {
     }
 }
 
+TError TContainer::ReadStdFile(const std::string &type, std::string &text,
+                               const std::string &start_offset) const {
+    auto path = ActualStdPath(type + "_path", true);
+    off_t limit = Prop->Get<uint64_t>(P_STDOUT_LIMIT);
+    uint64_t offset = 0;
+    TError error;
+
+    if (start_offset != "") {
+        uint64_t base;
+
+        TError error = StringToUint64(start_offset, offset);
+        if (error)
+            return error;
+
+        base = Data->Get<uint64_t>(type + "_offset");
+        if (offset < base)
+            return TError(EError::InvalidData,
+                    "requested offset lower current: " + std::to_string(base));
+        offset -= base;
+    }
+
+    int fd = open(path.c_str(), O_RDONLY | O_NOCTTY | O_NOFOLLOW | O_CLOEXEC);
+    if (fd < 0)
+        return TError(EError::Unknown, errno, "open(" + path.ToString() + ")");
+
+    uint64_t size = lseek(fd, 0, SEEK_END);
+
+    if (size <= offset)
+        limit = 0;
+    else if (size <= offset + limit)
+        limit = size - offset;
+    else if (start_offset == "")
+        offset = size - limit;
+
+    if (limit) {
+        text.resize(limit);
+        auto result = pread(fd, &text[0], limit, offset);
+
+        if (result < 0)
+            error = TError(EError::Unknown, errno, "read(" + path.ToString() + ")");
+        else if (result < limit)
+            text.resize(result);
+    }
+
+    close(fd);
+    return error;
+}
+
+TError TContainer::RotateStdFile(const std::string &type) {
+    off_t max_log_size = config().container().max_log_size();
+    TPath path = ActualStdPath(type + "_path", true);
+    TError error;
+    off_t loss;
+
+    if (path.IsRegular()) {
+        error = path.RotateLog(max_log_size, loss);
+        if (error) {
+            L_ERR() << "Can't rotate " + type + ": " << error << std::endl;
+        } else if (loss) {
+            uint64_t offset = Data->Get<uint64_t>(type + "_offset");
+            Data->Set<uint64_t>(type + "_offset", offset + loss);
+        }
+    }
+
+    return error;
+}
+
 EContainerState TContainer::GetState() const {
     return State;
 }
@@ -1914,6 +1981,9 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
     if (error)
         L_ERR() << "Can't set " << P_RAW_ROOT_PID << ": " << error << std::endl;
 
+    RotateStdFile(D_STDOUT);
+    RotateStdFile(D_STDERR);
+
     if (MayRespawn())
         ScheduleRespawn();
 }
@@ -2009,21 +2079,8 @@ void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
             break;
         case EEventType::RotateLogs:
             if (GetState() == EContainerState::Running && Task) {
-                off_t max_log_size = config().container().max_log_size();
-                TPath stdout_path = ActualStdPath(P_STDOUT_PATH, true);
-                TPath stderr_path = ActualStdPath(P_STDERR_PATH, true);
-
-                if (stdout_path.IsRegular()) {
-                    error = stdout_path.RotateLog(max_log_size);
-                    if (error)
-                        L_ERR() << "Can't rotate stdout: " << error << std::endl;
-                }
-
-                if (stderr_path.IsRegular()) {
-                    error = stderr_path.RotateLog(max_log_size);
-                    if (error)
-                        L_ERR() << "Can't rotate stderr: " << error << std::endl;
-                }
+                RotateStdFile(D_STDOUT);
+                RotateStdFile(D_STDERR);
             }
             JournalStream.close();
             break;
@@ -2165,6 +2222,7 @@ bool TContainer::PrepareJournal() {
     if (!JournalStream.is_open()) {
         off_t max_log_size = config().container().max_log_size();
         auto path = TPath(config().journal_dir().path()) / GetTextId();
+        off_t loss;
 
         if (path.Exists())
             path.Chmod(0644);
@@ -2172,7 +2230,7 @@ bool TContainer::PrepareJournal() {
             path.Mknod(S_IFREG | 0644, 0);
 
         path.Chown(OwnerCred);
-        path.RotateLog(max_log_size);
+        path.RotateLog(max_log_size, loss);
 
         JournalStream.open(path.ToString(), std::ios_base::app);
         if (!JournalStream.is_open()) {

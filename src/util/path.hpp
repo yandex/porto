@@ -129,7 +129,7 @@ public:
                    uint64_t &inode_used, uint64_t &inode_avail) const;
     TError StatVFS(uint64_t &space_avail) const;
     TError SetXAttr(const std::string name, const std::string value) const;
-    TError RotateLog(off_t max_disk_usage) const;
+    TError RotateLog(off_t max_disk_usage, off_t &loss) const;
     TError Chattr(unsigned add_flags, unsigned del_flags) const;
 
 

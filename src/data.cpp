@@ -154,46 +154,63 @@ public:
                         sState) {}
 };
 
-static std::string ReadStdio(const TPath &path, size_t limit) {
-    if (!path.IsRegular())
-        return "";
-
-    std::string s;
-    TFile f(path);
-    TError error(f.LastStrings(limit, s));
-    if (error)
-        L_ERR() << "Can't read container stdout: " << error << std::endl;
-    return s;
-}
-
-class TStdoutData : public TStringValue, public TContainerValue {
+class TStdoutData : public TTextValue, public TContainerValue {
 public:
     TStdoutData() :
-        TStringValue(0),
+        TTextValue(READ_ONLY_VALUE),
         TContainerValue(D_STDOUT,
                         "return task stdout",
                         rpdState) {}
 
-    std::string GetDefault() const override {
+    std::string GetString() const override {
         auto c = GetContainer();
-        return ReadStdio(c->ActualStdPath(P_STDOUT_PATH, true),
-                         c->Prop->Get<uint64_t>(P_STDOUT_LIMIT));
+        std::string text;
+        if (c->ReadStdFile(D_STDOUT, text))
+            text = "";
+        return text;
+    }
+
+    TError GetIndexed(const std::string &index, std::string &value) const override {
+        auto c = GetContainer();
+        return c->ReadStdFile(D_STDOUT, value, index);
     }
 };
 
-class TStderrData : public TStringValue, public TContainerValue {
+class TStderrData : public TTextValue, public TContainerValue {
 public:
     TStderrData() :
-        TStringValue(0),
+        TTextValue(READ_ONLY_VALUE),
         TContainerValue(D_STDERR,
                         "return task stderr",
                         rpdState) {}
 
-    std::string GetDefault() const override {
+
+    std::string GetString() const override {
         auto c = GetContainer();
-        return ReadStdio(c->ActualStdPath(P_STDERR_PATH, true),
-                         c->Prop->Get<uint64_t>(P_STDOUT_LIMIT));
+        std::string text;
+        if (c->ReadStdFile(D_STDERR, text))
+            text = "";
+        return text;
     }
+
+    TError GetIndexed(const std::string &index, std::string &value) const override {
+        auto c = GetContainer();
+        return c->ReadStdFile(D_STDERR, value, index);
+    }
+};
+
+class TStdoutOffset : public TUintValue, public TContainerValue {
+public:
+    TStdoutOffset() :
+        TUintValue(READ_ONLY_VALUE),
+        TContainerValue(D_STDOUT_OFFSET, "stdout offset", rpdState) {}
+};
+
+class TStderrOffset : public TUintValue, public TContainerValue {
+public:
+    TStderrOffset() :
+        TUintValue(READ_ONLY_VALUE),
+        TContainerValue(D_STDERR_OFFSET, "stderr offset", rpdState) {}
 };
 
 class TCpuUsageData : public TUintValue, public TContainerValue {
@@ -548,6 +565,8 @@ void RegisterData(std::shared_ptr<TRawValueMap> m,
         new TStartErrnoData,
         new TStdoutData,
         new TStderrData,
+        new TStdoutOffset,
+        new TStderrOffset,
         new TCpuUsageData,
         new TMemUsageData,
         new TNetBytesData,

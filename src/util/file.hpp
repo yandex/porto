@@ -25,7 +25,6 @@ public:
     TError AsInt(int &value) const;
     TError AsUint64(uint64_t &value) const;
     TError AsLines(std::vector<std::string> &value) const;
-    TError LastStrings(const size_t size, std::string &value) const;
 
     TError WriteStringNoAppend(const std::string &str) const;
     TError AppendString(const std::string &str) const;
