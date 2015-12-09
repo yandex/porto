@@ -83,7 +83,7 @@ int ReadPid(const std::string &path) {
 
 int Pgrep(const std::string &name) {
     vector<string> lines;
-    ExpectSuccess(Popen("pgrep -x " + name, lines));
+    ExpectSuccess(Popen("pgrep -x " + name + " || true", lines));
     return lines.size();
 }
 
@@ -594,7 +594,7 @@ bool NetworkEnabled() {
 
 static size_t ChildrenNum(int pid) {
     vector<string> lines;
-    ExpectSuccess(Popen("pgrep -P " + std::to_string(pid), lines));
+    ExpectSuccess(Popen("pgrep -P " + std::to_string(pid) + " || true", lines));
     return lines.size();
 }
 
