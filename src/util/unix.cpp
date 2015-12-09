@@ -408,10 +408,10 @@ TError Popen(const std::string &cmd, std::vector<std::string> &lines) {
     auto ret = pclose(f);
     free(line);
 
-    if (ret == 127)
-        return TError(EError::Unknown, "popen(" + cmd + ") failed");
-    else
-        return TError::Success();
+    if (ret)
+        return TError(EError::Unknown, "popen(" + cmd + ") failed: " + std::to_string(ret));
+
+    return TError::Success();
 }
 
 size_t GetNumCores() {
