@@ -217,6 +217,7 @@ std::string GetStatusLine(const std::string &pid, const std::string &prefix) {
     return "";
 }
 
+//FIXME ugly and racy
 std::string GetState(const std::string &pid) {
     std::stringstream ss(GetStatusLine(pid, "State:"));
 
@@ -226,8 +227,11 @@ std::string GetState(const std::string &pid) {
     ss>> state;
     ss>> desc;
 
-    if (name != "State:")
+    if (name != "State:") {
+        if (kill(stoi(pid), 0))
+            return "X";
         throw std::string("PARSING ERROR");
+    }
 
     return state;
 }
