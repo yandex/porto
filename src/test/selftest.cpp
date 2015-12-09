@@ -3908,7 +3908,6 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
 
     string exp_limit = "268435456";
     ExpectApiSuccess(api.SetProperty(child, "memory_limit", exp_limit));
-    ExpectApiSuccess(api.SetProperty(child, "hostname", "qwerty"));
     ExpectApiSuccess(api.SetProperty(child, "cpu_limit", "10"));
     ExpectApiSuccess(api.SetProperty(child, "cpu_guarantee", "10"));
     ExpectApiSuccess(api.SetProperty(child, "respawn", "true"));
