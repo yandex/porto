@@ -2351,31 +2351,34 @@ static void TestNetProperty(TPortoAPI &api) {
     TestXvlan(api, name, hostLink, link, "macvlan");
 
     Say() << "Check net=macvlan statistics" << std::endl;
-    // create macvlan on default interface and ping ya.ru
+    /*
+    create macvlan on default interface and ping ya.ru
     string uniq = "123";
     string gw = System("ip -o route | grep default | cut -d' ' -f3");
     string dev = System("ip -o route get " + gw + " | awk '{print $3}'");
     string addr = System("ip -o addr show " + dev + " | grep -w inet | awk '{print $4}'");
     string ip = System("echo " + addr + " | sed -e 's@\\([0-9]*\\.[0-9]*\\.[0-9]*\\.\\)[0-9]*\\(.*\\)@\\1" + uniq + "\\2@'");
 
+    Say() << "Using device " << dev " and ipv6ra" << std::endl;
     Say() << "Using device " << dev << " gateway " << gw << " ip " << addr << " -> " << ip << std::endl;
     ExpectApiSuccess(api.SetProperty(name, "net", "macvlan " + dev + " " + dev));
     ExpectApiSuccess(api.SetProperty(name, "command", "false"));
-    /* we now catch all packets (neighbor solicitation), not only ipv4, so can't expect 0 here
+    we now catch all packets (neighbor solicitation), not only ipv4, so can't expect 0 here
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
     ExpectApiSuccess(api.GetData(name, "net_bytes[" + dev + "]", s));
     ExpectEq(s, "0");
 
     ExpectApiSuccess(api.Stop(name));
-    */
-    ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'ip addr add " + ip + " dev " + dev + " && ip route add default via " + gw + " && ping ya.ru -c 1 -w 1'"));
-    AsRoot(api);
-    ExpectApiSuccess(api.SetProperty(name, "user", "root"));
-    ExpectApiSuccess(api.SetProperty(name, "group", "root"));
 
+    ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'ip addr add " + ip + " dev " + dev + " && ip route add default via " + gw + " && ping ya.ru -c 1 -w 1'"));
+    */
+
+    // create macvlan on default interface and ping ya.ru
+    string dev = System("ip -6 -o route get 2a02:6b8::3 | awk '{print $7}'");
+    ExpectApiSuccess(api.SetProperty(name, "net", "macvlan " + dev + " " + dev));
+    ExpectApiSuccess(api.SetProperty(name, "command", "bash -c 'for i in {0..9}; do ping6 -c 1 -w 1 2a02:6b8::3 && break || sleep 1; done'"));
     ExpectApiSuccess(api.Start(name));
-    AsNobody(api);
     WaitContainer(api, name, 60);
     ExpectApiSuccess(api.GetData(name, "net_bytes[" + dev + "]", s));
     ExpectNeq(s, "0");
