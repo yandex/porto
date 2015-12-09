@@ -640,10 +640,9 @@ bool TNlHtb::Valid(const TNlLink &link, uint32_t defaultClass) {
         return false;
     }
 
-    link.LogCache(qdiscCache);
-
     struct rtnl_qdisc *qdisc = rtnl_qdisc_get(qdiscCache, link.GetIndex(), Handle);
     if (qdisc) {
+        link.Dump("found", qdisc);
         if (rtnl_tc_get_link(TC_CAST(qdisc)) != link.GetLink())
             valid = false;
         else if (rtnl_tc_get_parent(TC_CAST(qdisc)) != Parent)
