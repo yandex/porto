@@ -567,7 +567,7 @@ TError TNlHtb::Create(const TNlLink &link, uint32_t defaultClass) {
     if (!qdisc)
         return TError(EError::Unknown, std::string("Unable to allocate qdisc object"));
 
-    rtnl_tc_set_link(TC_CAST(qdisc), link.GetLink());
+    rtnl_tc_set_ifindex(TC_CAST(qdisc), link.GetIndex());
     rtnl_tc_set_parent(TC_CAST(qdisc), Parent);
     rtnl_tc_set_handle(TC_CAST(qdisc), Handle);
 
@@ -599,7 +599,7 @@ TError TNlHtb::Remove(const TNlLink &link) {
     if (!qdisc)
         return TError(EError::Unknown, std::string("Unable to allocate qdisc object"));
 
-    rtnl_tc_set_link(TC_CAST(qdisc), link.GetLink());
+    rtnl_tc_set_ifindex(TC_CAST(qdisc), link.GetIndex());
     rtnl_tc_set_parent(TC_CAST(qdisc), Parent);
 
     link.Dump("remove", qdisc);
@@ -643,7 +643,7 @@ bool TNlHtb::Valid(const TNlLink &link, uint32_t defaultClass) {
     struct rtnl_qdisc *qdisc = rtnl_qdisc_get(qdiscCache, link.GetIndex(), Handle);
     if (qdisc) {
         link.Dump("found", qdisc);
-        if (rtnl_tc_get_link(TC_CAST(qdisc)) != link.GetLink())
+        if (rtnl_tc_get_ifindex(TC_CAST(qdisc)) != link.GetIndex())
             valid = false;
         else if (rtnl_tc_get_parent(TC_CAST(qdisc)) != Parent)
             valid = false;
@@ -697,7 +697,7 @@ TError TNlCgFilter::Create(const TNlLink &link) {
 		goto free_msg;
     }
 
-    L() << "netlink " << rtnl_link_get_name(link.GetLink())
+    L() << "netlink " << link.GetDesc()
         << ": add tfilter id 0x" << std::hex << Handle
         << " parent 0x" << Parent << std::dec  << std::endl;
 
@@ -753,7 +753,7 @@ TError TNlCgFilter::Remove(const TNlLink &link) {
     if (!cls)
         return TError(EError::Unknown, std::string("Unable to allocate filter object"));
 
-    rtnl_tc_set_link(TC_CAST(cls), link.GetLink());
+    rtnl_tc_set_ifindex(TC_CAST(cls), link.GetIndex());
 
     ret = rtnl_tc_set_kind(TC_CAST(cls), FilterType);
     if (ret < 0) {

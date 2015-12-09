@@ -108,7 +108,6 @@ public:
     TError SetDefaultGw(const TNlAddr &addr);
     TError SetIpAddr(const TNlAddr &addr, const int prefix);
 
-    struct rtnl_link *GetLink() const { return Link; }
     struct nl_sock *GetSock() const { return Nl->GetSock(); }
     std::shared_ptr<TNl> GetNl() { return Nl; };
 
