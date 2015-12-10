@@ -62,7 +62,8 @@ TError TMount::Find(TPath path, const TPath mounts) {
         TPath target(m->mnt_dir);
 
         if (target.InnerPath(path).IsEmpty() ||
-                source.GetBlockDev() != device)
+                (target.GetDev() != device &&
+                 source.GetBlockDev() != device))
             continue;
 
         Source = source;
