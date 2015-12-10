@@ -1231,6 +1231,9 @@ noinline TError ImportLayer(TContext &context,
 
     tarball = clientContainer->RootPath() / tarball;
 
+    if (!tarball.Exists())
+        return TError(EError::InvalidValue, "tarball not found");
+
     if (!tarball.IsRegular())
         return TError(EError::InvalidValue, "tarball not a file");
 
