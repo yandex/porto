@@ -8,23 +8,41 @@
 #include "util/mount.hpp"
 #include "util/locks.hpp"
 
-class TKeyValueStorage;
+class TKeyValueNode;
 
 namespace kv {
     class TNode;
 };
 
-class TKeyValueNode : public TNonCopyable {
-    std::shared_ptr<TKeyValueStorage> Storage;
-    const TPath Path;
-    const std::string Name;
-
-    void Merge(kv::TNode &node, kv::TNode &next) const;
+class TKeyValueStorage : public std::enable_shared_from_this<TKeyValueStorage>,
+                         public TLockable, public TNonCopyable {
 
 public:
+    const TPath Root;
+    TKeyValueStorage(const TPath &root) : Root(root) {}
+
+    TError MountTmpfs(std::string size);
+
+    std::shared_ptr<TKeyValueNode> GetNode(const std::string &name);
+    std::shared_ptr<TKeyValueNode> GetNode(uint64_t id);
+    TError Dump();
+    TError ListNodes(std::vector<std::shared_ptr<TKeyValueNode>> &list);
+    TError Destroy();
+
+    static TError Get(const kv::TNode &node, const std::string &name, std::string &val);
+};
+
+class TKeyValueNode : public TNonCopyable {
+    std::shared_ptr<TKeyValueStorage> Storage;
+
+    void Merge(kv::TNode &node, kv::TNode &next) const;
+    TPath GetPath() const { return Storage->Root / Name; }
+public:
+    const std::string Name;
+
     TKeyValueNode(std::shared_ptr<TKeyValueStorage> storage,
-                  const TPath &path, const std::string &name) :
-        Storage(storage), Path(path), Name(name) {}
+                  const std::string &name) :
+        Storage(storage), Name(name) {}
 
     TError Load(kv::TNode &node) const;
     TError Save(const kv::TNode &node) const;
@@ -32,29 +50,4 @@ public:
     TError Append(const std::string& key, const std::string& value) const;
     TError Remove() const;
     TError Create() const;
-    const TPath &GetPath() const { return Path; }
-    const std::string &GetName() const { return Name; }
-};
-
-class TKeyValueStorage : public std::enable_shared_from_this<TKeyValueStorage>,
-                         public TLockable, public TNonCopyable {
-    const TPath Root;
-    const size_t DirnameLen;
-
-    TPath ToPath(const std::string &name) const;
-
-public:
-    TError MountTmpfs(std::string size);
-
-    TKeyValueStorage(const TPath root);
-
-    std::shared_ptr<TKeyValueNode> GetNode(const TPath &path);
-    std::shared_ptr<TKeyValueNode> GetNode(uint16_t id);
-    TError Dump();
-    TError ListNodes(std::vector<std::shared_ptr<TKeyValueNode>> &list);
-    TError Destroy();
-    std::string GetRoot() const { return Root.ToString() + "/"; }
-
-    static TError Get(const kv::TNode &node, const std::string &name, std::string &val);
-    static std::string FromPath(const std::string &path);
 };

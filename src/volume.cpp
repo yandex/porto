@@ -1211,7 +1211,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
         return error;
 
     for (auto &node : list) {
-        L_ACT() << "Restore volume: " << node->GetName() << std::endl;
+        L_ACT() << "Restore volume: " << node->Name << std::endl;
 
         auto config = std::make_shared<TValueMap>(node);
         RegisterVolumeProperties(config);

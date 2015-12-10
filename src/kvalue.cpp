@@ -3,39 +3,11 @@
 #include "config.hpp"
 #include "protobuf.hpp"
 #include "util/log.hpp"
-#include "util/file.hpp"
-#include "util/folder.hpp"
 #include "util/unix.hpp"
 
 extern "C" {
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
-}
-
-using std::string;
-using std::set;
-using std::shared_ptr;
-using std::vector;
-
-// use some forbidden character to represent slash in container name
-const char SLASH_SUBST = '+';
-
-TPath TKeyValueStorage::ToPath(const std::string &name) const {
-    std::string s = name;
-    for (std::string::size_type i = 0; i < s.length(); i++)
-        if (s[i] == '/')
-            s[i] = SLASH_SUBST;
-    return Root / s;
-}
-
-std::string TKeyValueStorage::FromPath(const std::string &path) {
-    std::string s = path;
-    for (std::string::size_type i = 0; i < s.length(); i++)
-        if (s[i] == SLASH_SUBST)
-            s[i] = '/';
-    return s;
 }
 
 void TKeyValueNode::Merge(kv::TNode &node, kv::TNode &next) const {
@@ -63,6 +35,7 @@ void TKeyValueNode::Merge(kv::TNode &node, kv::TNode &next) const {
 
 TError TKeyValueNode::Load(kv::TNode &node) const {
     auto lock = Storage->ScopedLock();
+    auto Path = GetPath();
 
     TScopedFd fd;
     fd = open(Path.ToString().c_str(), O_RDONLY | O_CLOEXEC);
@@ -88,6 +61,7 @@ TError TKeyValueNode::Load(kv::TNode &node) const {
 
 TError TKeyValueNode::Append(const kv::TNode &node) const {
     auto lock = Storage->ScopedLock();
+    auto Path = GetPath();
 
     TScopedFd fd;
     fd = open(Path.ToString().c_str(), O_CREAT | O_WRONLY | O_CLOEXEC, 0600);
@@ -114,6 +88,7 @@ TError TKeyValueNode::Append(const kv::TNode &node) const {
 
 TError TKeyValueNode::Save(const kv::TNode &node) const {
     auto lock = Storage->ScopedLock();
+    auto Path = GetPath();
 
     TScopedFd fd;
     fd = open(Path.ToString().c_str(), O_CREAT | O_WRONLY | O_TRUNC | O_CLOEXEC, 0600);
@@ -133,73 +108,53 @@ TError TKeyValueNode::Save(const kv::TNode &node) const {
 TError TKeyValueNode::Remove() const {
     auto lock = Storage->ScopedLock();
 
-    TFile node(Path);
-    return node.Remove();
+    return GetPath().Unlink();
 }
 
-TKeyValueStorage::TKeyValueStorage(const TPath root) :
-    Root(root), DirnameLen(root.ToString().length() + 1) {}
-
 TError TKeyValueStorage::MountTmpfs(std::string size) {
-    vector<shared_ptr<TMount>> mounts;
-    TError error = TMount::Snapshot(mounts);
-    if (error) {
-        L_ERR() << "Can't create mount snapshot: " << error << std::endl;
-        return error;
-    }
+    TError error;
+    TMount mount;
 
-    TFolder dir(Root);
-    for (auto m : mounts)
-        if (m->GetMountpoint() == Root) {
-            // FIXME remove when all users are updated to v0.28
-            // make sure permissions of existing directory are correct
-            error = dir.GetPath().Chmod(config().keyval().file().perm());
-            if (!error && dir.GetPath() == "/run/porto/kvs") {
-                TFolder dir("/run/porto");
-                error = dir.GetPath().Chmod(config().keyval().file().perm());
-            }
-            if (error)
-                L_ERR() << error << ": can't change permissions of " << dir.GetPath() << std::endl;
-
-            return TError::Success();
-        }
-
-    if (!dir.Exists()) {
-        error = dir.Create(config().keyval().file().perm(), true);
+    if (!Root.IsDirectory()) {
+        if (Root.Exists())
+            (void)Root.Unlink();
+        error = Root.MkdirAll(config().keyval().file().perm());
         if (error) {
             L_ERR() << "Can't create key-value mount point: " << error << std::endl;
             return error;
         }
     }
 
-    error = Root.Mount("tmpfs", "tmpfs",
-                       MS_NOEXEC | MS_NOSUID | MS_NODEV,
-                       { size });
-    if (error)
-        L_ERR() << "Can't mount key-value tmpfs: " << error << std::endl;
+    error = mount.Find(Root);
+    if (error || mount.GetMountpoint() != Root) {
+        error = Root.Mount("tmpfs", "tmpfs",
+                           MS_NOEXEC | MS_NOSUID | MS_NODEV,
+                           { size });
+        if (error)
+            L_ERR() << "Can't mount key-value tmpfs: " << error << std::endl;
+    }
+
     return error;
 }
 
-std::shared_ptr<TKeyValueNode> TKeyValueStorage::GetNode(const TPath &path) {
-    PORTO_ASSERT(path.ToString().length() > DirnameLen);
-    return std::make_shared<TKeyValueNode>(shared_from_this(), path, path.ToString().substr(DirnameLen));
+std::shared_ptr<TKeyValueNode> TKeyValueStorage::GetNode(const std::string &name) {
+    return std::make_shared<TKeyValueNode>(shared_from_this(), name);
 }
 
-std::shared_ptr<TKeyValueNode> TKeyValueStorage::GetNode(uint16_t id) {
-    TPath path = ToPath(std::to_string(id));
-    PORTO_ASSERT(path.ToString().length() > DirnameLen);
-    return std::make_shared<TKeyValueNode>(shared_from_this(), path, path.ToString().substr(DirnameLen));
+std::shared_ptr<TKeyValueNode> TKeyValueStorage::GetNode(uint64_t id) {
+    return GetNode(std::to_string(id));
 }
 
 TError TKeyValueStorage::ListNodes(std::vector<std::shared_ptr<TKeyValueNode>> &list) {
-    vector<string> tmp;
-    TFolder f(Root);
-    TError error = f.Items(EFileType::Regular, tmp);
+    std::vector<std::string> names;
+    TError error;
+
+    error = Root.ReadDirectory(names);
     if (error)
         return error;
 
-    for (auto s : tmp)
-        list.push_back(GetNode(Root / s));
+    for (auto &name: names)
+        list.push_back(GetNode(name));
 
     return TError::Success();
 }
@@ -218,7 +173,7 @@ TError TKeyValueStorage::Dump() {
         kv::TNode node;
         node.Clear();
 
-        L() << n->GetName() << ":" << std::endl;
+        L() << n->Name << ":" << std::endl;
 
         error = n->Load(node);
         if (error) {
@@ -243,7 +198,7 @@ TError TKeyValueStorage::Destroy() {
 
 TError TKeyValueNode::Create() const {
     if (config().log().verbose())
-        L_ACT() << "Create key-value node " << Path << std::endl;
+        L_ACT() << "Create key-value node " << Name << std::endl;
 
     kv::TNode node;
     return Save(node);
@@ -257,7 +212,7 @@ TError TKeyValueNode::Append(const std::string& key, const std::string& value) c
     pair->set_val(value);
 
     if (config().log().verbose())
-        L_ACT() << "Append " << key << "=" << value << " to key-value node " << Path << std::endl;
+        L_ACT() << "Append " << key << "=" << value << " to key-value node " << Name << std::endl;
 
     return Append(node);
 }

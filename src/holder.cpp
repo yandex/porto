@@ -369,18 +369,19 @@ std::map<std::string, std::shared_ptr<TKeyValueNode>> TContainerHolder::SortNode
     std::map<std::string, std::shared_ptr<TKeyValueNode>> name2node;
 
     for (auto node : nodes) {
+        std::string name;
         kv::TNode n;
+
         TError error = node->Load(n);
+        if (!error)
+            error = TKeyValueStorage::Get(n, P_RAW_NAME, name);
+
         if (error) {
-            L_ERR() << "Can't load key-value node " << node->GetPath() << ": " << error << std::endl;
+            L_ERR() << "Can't load key-value node " << node->Name << ": " << error << std::endl;
             node->Remove();
             Statistics->RestoreFailed++;
             continue;
         }
-
-        std::string name;
-        if (TKeyValueStorage::Get(n, P_RAW_NAME, name))
-            name = TKeyValueStorage::FromPath(node->GetName());
 
         name2node[name] = node;
     }

@@ -233,7 +233,7 @@ void TContainer::RemoveKvs() {
     auto kvnode = Storage->GetNode(Id);
     TError error = kvnode->Remove();
     if (error)
-        L_ERR() << "Can't remove key-value node " << kvnode->GetName() << ": " << error << std::endl;
+        L_ERR() << "Can't remove key-value node " << kvnode->Name << ": " << error << std::endl;
 }
 
 void TContainer::DestroyVolumes(TScopedLock &holder_lock) {
