@@ -518,6 +518,9 @@ func (conn *portoConnection) UnlinkVolume(path string, container string) error {
 			Container: &container,
 		},
 	}
+	if container == "" {
+		req.UnlinkVolume.Container = nil
+	}
 	_, err := conn.performRequest(req)
 	return err
 }
