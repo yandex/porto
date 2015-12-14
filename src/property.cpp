@@ -246,7 +246,7 @@ public:
     TStdoutPathProperty() :
         TStringValue(PERSISTENT_VALUE),
         TContainerValue(P_STDOUT_PATH,
-                        "Container standard input path",
+                        "Container standard output path",
                         staticProperty) {}
 
     std::string GetDefault() const override {
