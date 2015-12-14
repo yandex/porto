@@ -244,7 +244,7 @@ void TContainer::DestroyVolumes(TScopedLock &holder_lock) {
     TScopedLock vholder_lock = VolumeHolder->ScopedLock();
 
     for (auto volume: Volumes) {
-        if (!volume->UnlinkContainer(Name))
+        if (!volume->UnlinkContainer(GetName()))
             continue; /* Still linked to somebody */
         vholder_lock.unlock();
         auto volume_lock = volume->ScopedLock();
