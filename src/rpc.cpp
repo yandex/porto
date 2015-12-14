@@ -583,7 +583,7 @@ noinline TError GetContainerProperty(TContext &context,
         return TError(EError::ContainerDoesNotExist, "container doesn't exist");
 
     string value;
-    err = container->GetProperty(req.property(), value, client);
+    err = container->GetProperty(req.property(), value);
     if (!err)
         rsp.mutable_getproperty()->set_value(value);
 
@@ -701,9 +701,9 @@ noinline TError GetContainerCombined(TContext &context,
                 std::string name = var, idx;
                 TContainer::ParsePropertyName(name, idx);
 
-                if (container->Prop->IsValid(name))
-                    error = container->GetProperty(var, value, client);
-                else if (container->Data->IsValid(name))
+                if (container->Prop->Find(name))
+                    error = container->GetProperty(var, value);
+                else if (container->Data->Find(name))
                     error = container->GetData(var, value, client);
                 else
                     error = TError(EError::InvalidValue, "Unknown property or data " + var);
@@ -736,7 +736,7 @@ noinline TError ListProperty(TContext &context,
 
     for (auto name : container->Prop->List()) {
         auto av = container->Prop->Find(name);
-        if (av->GetFlags() & HIDDEN_VALUE)
+        if (av->HasFlag(HIDDEN_VALUE))
             continue;
 
         auto cv = ToContainerValue(av);
@@ -765,7 +765,7 @@ noinline TError ListData(TContext &context,
 
     for (auto name : container->Data->List()) {
         auto av = container->Data->Find(name);
-        if (av->GetFlags() & HIDDEN_VALUE)
+        if (av->HasFlag(HIDDEN_VALUE))
             continue;
 
         auto cv = ToContainerValue(av);

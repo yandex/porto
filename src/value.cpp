@@ -7,28 +7,13 @@
 #include "util/log.hpp"
 #include "util/string.hpp"
 
-bool TAbstractValue::HasValue() const {
-    return Variant.HasValue();
-}
-
-void TAbstractValue::Reset() {
-    Variant.Reset();
-}
-
-int TAbstractValue::GetFlags() const {
-    return Flags;
-}
-
 std::string TStringValue::ToString(const std::string &value) const {
     return value;
 }
 
-TError TStringValue::FromString(const std::string &value) {
-    TError error = CheckValue(value);
-    if (error)
-        return error;
-
-    return Set(value);
+TError TStringValue::FromString(const std::string &value, std::string &result) const {
+    result = value;
+    return TError::Success();
 }
 
 std::string TStringValue::GetDefault() const {
@@ -39,17 +24,10 @@ std::string TIntValue::ToString(const int &value) const {
     return std::to_string(value);
 }
 
-TError TIntValue::FromString(const std::string &value) {
-    int tmp;
-    TError error = StringToInt(value, tmp);
-    if (error)
+TError TIntValue::FromString(const std::string &value, int &result) const {
+    if (StringToInt(value, result))
         return TError(EError::InvalidValue, "Invalid integer value " + value);
-
-    error = CheckValue(tmp);
-    if (error)
-        return error;
-
-    return Set(tmp);
+    return TError::Success();
 }
 
 int TIntValue::GetDefault() const {
@@ -60,21 +38,18 @@ std::string TUintValue::ToString(const uint64_t &value) const {
     return std::to_string(value);
 }
 
-TError TUintValue::FromString(const std::string &value) {
+TError TUintValue::FromString(const std::string &value, uint64_t &result) const {
     TError error;
-    uint64_t tmp;
-    if (GetFlags() & UINT_UNIT_VALUE)
-        error = StringWithUnitToUint64(value, tmp);
+
+    if (HasFlag(UINT_UNIT_VALUE))
+        error = StringWithUnitToUint64(value, result);
     else
-        error = StringToUint64(value, tmp);
+        error = StringToUint64(value, result);
+
     if (error)
         return TError(EError::InvalidValue, "Invalid unsigned integer value " + value);
 
-    error = CheckValue(tmp);
-    if (error)
-        return error;
-
-    return Set(tmp);
+    return TError::Success();
 }
 
 uint64_t TUintValue::GetDefault() const {
@@ -87,17 +62,12 @@ std::string TDoubleValue::ToString(const double &value) const {
     return std::string(buffer);
 }
 
-TError TDoubleValue::FromString(const std::string &value) {
-    double tmp;
-    TError error = StringToDouble(value, tmp);
+TError TDoubleValue::FromString(const std::string &value, double &result) const {
+    TError error = StringToDouble(value, result);
     if (error)
         return TError(EError::InvalidValue, "Invalid unsigned integer value " + value);
 
-    error = CheckValue(tmp);
-    if (error)
-        return error;
-
-    return Set(tmp);
+    return TError::Success();
 }
 
 double TDoubleValue::GetDefault() const {
@@ -110,21 +80,14 @@ std::string TBoolValue::ToString(const bool &value) const {
     return "false";
 }
 
-TError TBoolValue::FromString(const std::string &value) {
-    bool tmp;
-
+TError TBoolValue::FromString(const std::string &value, bool &result) const {
     if (value == "true")
-        tmp = true;
+        result = true;
     else if (value == "false")
-        tmp = false;
+        result = false;
     else
         return TError(EError::InvalidValue, "Invalid bool value");
-
-    TError error = CheckValue(tmp);
-    if (error)
-        return error;
-
-    return Set(tmp);
+    return TError::Success();
 }
 
 bool TBoolValue::GetDefault() const {
@@ -146,20 +109,14 @@ std::string TIntListValue::ToString(const std::vector<int> &value) const {
    return str.str();
 }
 
-TError TIntListValue::FromString(const std::string &value) {
+TError TIntListValue::FromString(const std::string &value, std::vector<int> &result) const {
    std::vector<std::string> strings;
-   std::vector<int> integers;
 
    TError error = SplitEscapedString(value, ';', strings);
    if (error)
       return error;
 
-   error = StringsToIntegers(strings, integers);
-   if (error)
-      return error;
-
-   Set(integers);
-   return TError::Success();
+   return StringsToIntegers(strings, result);
 }
 
 std::vector<int> TIntListValue::GetDefault() const {
@@ -178,9 +135,8 @@ std::string TListValue::ToString(const TStrList &value) const {
     return str.str();
 }
 
-TError TListValue::FromString(const std::string &value) {
+TError TListValue::FromString(const std::string &value, TStrList &result) const {
     std::vector<std::string> vec;
-    TStrList m;
     TError error = SplitEscapedString(value, ';', vec);
     if (error)
         return error;
@@ -189,14 +145,8 @@ TError TListValue::FromString(const std::string &value) {
         std::string tmp = StringTrim(val);
         if (!tmp.length())
             continue;
-        m.push_back(tmp);
+        result.push_back(tmp);
     }
-
-    error = CheckValue(m);
-    if (error)
-        return error;
-
-    Set(m);
 
     return TError::Success();
 }
@@ -217,8 +167,7 @@ std::string TMapValue::ToString(const TUintMap &value) const {
     return str.str();
 }
 
-TError TMapValue::FromString(const std::string &value) {
-    TUintMap m;
+TError TMapValue::FromString(const std::string &value, TUintMap &result) const {
     std::vector<std::string> lines;
     TError error = SplitEscapedString(value, ';', lines);
     if (error)
@@ -238,14 +187,8 @@ TError TMapValue::FromString(const std::string &value) {
         if (error)
             return TError(EError::InvalidValue, "Invalid value " + nameval[1]);
 
-        m[key] = val;
+        result[key] = val;
     }
-
-    error = CheckValue(m);
-    if (error)
-        return error;
-
-    Set(m);
 
     return TError::Success();
 }
@@ -254,29 +197,51 @@ TUintMap TMapValue::GetDefault() const {
     return TUintMap{};
 }
 
-TRawValueMap::~TRawValueMap() {
-    for (auto pair : AbstractValues)
-        delete pair.second;
-}
+TError TMapValue::GetIndexed(const std::string &index, std::string &value) const {
+    auto map = Get();
+    auto it = map.find(index);
 
-TError TRawValueMap::Add(const std::string &name, TAbstractValue *av) {
-    if (AbstractValues.find(name) != AbstractValues.end())
-        PORTO_RUNTIME_ERROR("Duplicate value");
+    if (it == map.end())
+        return TError(EError::InvalidValue, "invalid index " + index);
 
-    AbstractValues[name] = av;
+    value = std::to_string(it->second);
     return TError::Success();
 }
 
-TAbstractValue *TRawValueMap::Find(const std::string &name) const {
-    return AbstractValues.at(name);
+TError TMapValue::SetIndexed(const std::string &index, const std::string &value) {
+    auto map = Get();
+    uint64_t uval;
+    TError error = StringToUint64(value, uval);
+    if (error)
+        return error;
+    map[index] = uval;
+    return Set(map);
 }
 
-bool TRawValueMap::IsValid(const std::string &name) const {
-   return AbstractValues.find(name) != AbstractValues.end();
+TRawValueMap::~TRawValueMap() {
+    for (auto pair : Values)
+        delete pair.second;
+}
+
+TError TRawValueMap::Add(const std::string &name, TValue *av) {
+    if (Values.find(name) != Values.end())
+        PORTO_RUNTIME_ERROR("Duplicate value");
+
+    Values[name] = av;
+    return TError::Success();
+}
+
+TValue *TRawValueMap::Find(const std::string &name) const {
+    auto it = Values.find(name);
+
+    if (it == Values.end())
+       return NULL;
+
+    return it->second;
 }
 
 bool TRawValueMap::IsReadOnly(const std::string &name) const {
-   return Find(name)->GetFlags() & READ_ONLY_VALUE;
+   return Find(name)->HasFlag(READ_ONLY_VALUE);
 }
 
 bool TRawValueMap::IsDefault(const std::string &name) const {
@@ -284,13 +249,13 @@ bool TRawValueMap::IsDefault(const std::string &name) const {
 }
 
 bool TRawValueMap::HasValue(const std::string &name) const {
-    TAbstractValue *p = AbstractValues.at(name);
+    TValue *p = Values.at(name);
     return p->HasValue();
 }
 
 std::vector<std::string> TRawValueMap::List() const {
     std::vector<std::string> v;
-    for (auto pair : AbstractValues)
+    for (auto pair : Values)
         v.push_back(pair.first);
     return v;
 }
@@ -314,17 +279,14 @@ TError TValueMap::Restore(const kv::TNode &node) {
         auto key = node.pairs(i).key();
         auto value = node.pairs(i).val();
 
-        if (!IsValid(key))
-            continue;
-
         auto *av = Find(key);
-        if (!(av->GetFlags() & PERSISTENT_VALUE))
+        if (!av || !av->HasFlag(PERSISTENT_VALUE))
             continue;
 
         if (config().log().verbose())
             L_ACT() << "Restoring " << key << " = " << value << std::endl;
 
-        TError error = av->FromString(value);
+        TError error = av->SetString(value);
         if (error)
             L_ERR() << error << ": Can't restore " << key << ", skipped" << std::endl;
     }
@@ -364,47 +326,35 @@ TError TValueMap::Sync() {
         return TError::Success();
 
     kv::TNode node;
-    for (auto kv : AbstractValues) {
+    for (auto kv : Values) {
         auto name = kv.first;
         auto av = kv.second;
 
-        if (!(av->GetFlags() & PERSISTENT_VALUE))
-            continue;
-
-        if (IsDefault(name))
+        if (!av->HasFlag(PERSISTENT_VALUE) || !av->HasValue())
             continue;
 
         auto pair = node.add_pairs();
         pair->set_key(name);
-        pair->set_val(av->ToString());
+        pair->set_val(av->GetString());
 
         if (config().log().verbose())
-            L_ACT() << "Sync " << name << " = " << av->ToString() << std::endl;
+            L_ACT() << "Sync " << name << " = " << av->GetString() << std::endl;
     }
 
     return KvNode->Append(node);
 }
 
-std::string TValueMap::ToString(const std::string &name) const {
-    return Find(name)->ToString();
-}
+TError TValueMap::SetString(const std::string &name, const std::string &value) {
+    auto val = Find(name);
+    if (!val)
+       return TError(EError::InvalidValue, "Invalid value name " + name);
 
-TError TValueMap::FromString(const std::string &name, const std::string &value, bool apply) {
-    bool resetOnDefault = HasValue(name) && Find(name)->DefaultString() == value;
-
-    TError error = Find(name)->FromString(value);
+    TError error = val->SetString(value);
     if (error)
         return error;
 
-    if (apply && KvNode && Find(name)->GetFlags() & PERSISTENT_VALUE)
+    if (KvNode && val->HasFlag(PERSISTENT_VALUE))
         error = KvNode->Append(name, value);
 
-    if (resetOnDefault)
-        Find(name)->Reset();
-
     return error;
-}
-
-void TValueMap::Reset(const std::string &name) {
-    Find(name)->Reset();
 }

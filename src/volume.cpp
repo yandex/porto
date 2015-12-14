@@ -622,7 +622,7 @@ bool TVolume::IsAutoStorage() const {
 TPath TVolume::GetStorage() const {
     auto val = Config->Find(V_STORAGE);
     if (val->HasValue())
-        return val->Get<std::string>();
+        return val->GetString();
     else
         return GetInternal(GetBackend());
 }
@@ -793,11 +793,12 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
 
     /* Apply properties */
     for (auto p: properties) {
-        if (!Config->IsValid(p.first))
+        auto prop = Config->Find(p.first);
+        if (!prop)
             return TError(EError::InvalidValue, "Invalid volume property: " + p.first);
-        if (Config->IsReadOnly(p.first))
+        if (prop->HasFlag(READ_ONLY_VALUE))
             return TError(EError::InvalidValue, "Read-only volume property: " + p.first);
-        error = Config->FromString(p.first, p.second);
+        error = Config->SetString(p.first, p.second);
         if (error)
             return error;
     }
@@ -1054,8 +1055,8 @@ std::map<std::string, std::string> TVolume::GetProperties(TPath container_root) 
 
     for (auto name: Config->List()) {
         auto property = Config->Find(name);
-        if (!(property->GetFlags() & HIDDEN_VALUE) && property->HasValue())
-            ret[name] = property->ToString();
+        if (!property->HasFlag(HIDDEN_VALUE) && property->HasValue())
+            ret[name] = property->GetString();
     }
 
     if (Config->HasValue(V_LAYERS)) {

@@ -85,15 +85,12 @@ public:
         TValueMap(kvnode),
         Container(c) {}
 
-    std::string ToString(const std::string &name) const;
     bool ParentDefault(std::shared_ptr<TContainer> &c,
                        const std::string &property) const;
 
     bool HasFlags(const std::string &property, int flags) const;
     bool HasState(const std::string &property, EContainerState state) const;
     bool IsImplemented(const std::string &property) const;
-
-    TError Check(const std::string &property) const;
 
     TError PrepareTaskEnv(const std::string &property, TTaskEnv &taskEnv);
 
@@ -111,8 +108,6 @@ public:
 
     template<typename T>
     TError Set(const std::string &name, const T& value) {
-        if (!IsValid(name))
-            return TError(EError::InvalidValue, name + " not found");
         return TValueMap::Set<T>(name, value);
     }
 

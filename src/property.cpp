@@ -16,17 +16,6 @@ extern "C" {
 #include <linux/capability.h>
 }
 
-std::string TPropertyMap::ToString(const std::string &name) const {
-    if (IsDefault(name)) {
-        std::shared_ptr<TContainer> c;
-        if (ParentDefault(c, name))
-            if (c && c->GetParent())
-                return c->GetParent()->Prop->ToString(name);
-    }
-
-    return TValueMap::ToString(name);
-}
-
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
                                  const std::string &property) const {
     TError error = GetSharedContainer(c);
@@ -39,23 +28,22 @@ bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
 }
 
 bool TPropertyMap::HasFlags(const std::string &property, int flags) const {
-    TError error = Check(property);
-    if (error) {
-        L_ERR() << error << std::endl;
+    auto prop = Find(property);
+    if (!prop) {
+        L_ERR() << TError(EError::Unknown, "Invalid property " + property) << std::endl;
         return false;
     }
-
-    return Find(property)->GetFlags() & flags;
+    return prop->HasFlag(flags);
 }
 
 bool TPropertyMap::HasState(const std::string &property, EContainerState state) const {
-    TError error = Check(property);
-    if (error) {
-        L_ERR() << error << std::endl;
+    auto prop = Find(property);
+    if (!prop) {
+        L_ERR() << TError(EError::Unknown, "Invalid property " + property) << std::endl;
         return false;
     }
 
-    auto cv = ToContainerValue(Find(property));
+    auto cv = ToContainerValue(prop);
     auto valueState = cv->GetState();
 
     return valueState.find(state) != valueState.end();
@@ -65,28 +53,21 @@ bool TPropertyMap::IsImplemented(const std::string &property) const {
     return ToContainerValue(Find(property))->IsImplemented();
 }
 
-TError TPropertyMap::Check(const std::string &property) const {
-    if (!IsValid(property))
-        return TError(EError::Unknown, "Invalid property " + property);
-
-    return TError::Success();
-}
-
 TError TPropertyMap::PrepareTaskEnv(const std::string &property,
                                     TTaskEnv &taskEnv) {
-    auto av = Find(property);
+    auto prop = Find(property);
 
-    if (IsDefault(property)) {
+    // FIXME must die
+    if (!prop->HasValue()) {
         // if the value is default we still need PrepareTaskEnv method
         // to be called, so set value to default and then reset it
-        TError error = av->FromString(av->DefaultString());
+        TError error = prop->SetString(prop->DefaultString());
         if (error)
             return error;
-
-        av->Reset();
+        prop->Reset();
     }
 
-    return ToContainerValue(av)->PrepareTaskEnv(taskEnv);
+    return ToContainerValue(prop)->PrepareTaskEnv(taskEnv);
 }
 
 TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
@@ -444,17 +425,17 @@ public:
         return 100;
     }
 
-    TError FromString(const std::string &str) override {
+    TError FromString(const std::string &str, double &limit) const override {
         try {
-            auto v = ParseCpuLimit(str);
-            if (v < 0 || v > 100)
+            limit = ParseCpuLimit(str);
+            if (limit < 0 || limit > 100)
                 return TError(EError::InvalidValue,
-                        "cpu limit out of range 0-100: " + std::to_string(v));
+                        "cpu limit out of range 0-100: " + std::to_string(limit));
 
-            if (!GetContainer()->ValidHierarchicalProperty(P_CPU_LIMIT, v))
+            if (!GetContainer()->ValidHierarchicalProperty(P_CPU_LIMIT, limit))
                 return TError(EError::InvalidValue, "invalid hierarchical value");
 
-            return Set(v);
+            return TError::Success();
         } catch (...) {
             return TError(EError::InvalidValue, "invalid value");
         }
@@ -471,14 +452,14 @@ public:
         Implemented = cpuSubsystem->SupportGuarantee();
     }
 
-    TError FromString(const std::string &str) override {
+    TError FromString(const std::string &str, double &limit) const override {
         try {
-            auto v = ParseCpuLimit(str);
-            if (v < 0 || v > 100)
+            limit = ParseCpuLimit(str);
+            if (limit < 0 || limit > 100)
                 return TError(EError::InvalidValue,
-                        "cpu guarantee out of range 0-100: " + std::to_string(v));
+                        "cpu guarantee out of range 0-100: " + std::to_string(limit));
 
-            return Set(v);
+            return TError::Success();
         } catch (...) {
             return TError(EError::InvalidValue, "invalid value");
         }
@@ -558,7 +539,7 @@ public:
             tmp[iter.first] = iter.second;
         }
 
-        return TValue::Set(tmp);
+        return TStoredValue::Set(tmp);
     }
 };
 
@@ -1089,14 +1070,15 @@ public:
             return "unknown " + std::to_string(value);
     }
 
-    TError FromString(const std::string &value) override {
+    TError FromString(const std::string &value, int &mode) const override {
         if (value == "app") {
-            return Set(VIRT_MODE_APP);
+            mode = VIRT_MODE_APP;
         } else if (value == "os") {
-            return Set(VIRT_MODE_OS);
+            mode = VIRT_MODE_OS;
         } else {
             return TError(EError::InvalidValue, std::string("Unsupported ") + P_VIRT_MODE + ": " + value);
         }
+        return TError::Success();
     }
 };
 
@@ -1182,7 +1164,7 @@ public:
 
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
-    const std::vector<TAbstractValue *> properties = {
+    const std::vector<TValue *> properties = {
         new TCommandProperty,
         new TUserProperty,
         new TGroupProperty,

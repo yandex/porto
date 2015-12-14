@@ -788,23 +788,26 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
 
     auto vmode = Prop->Get<int>(P_VIRT_MODE);
     if (vmode == VIRT_MODE_OS && !CredConf.PrivilegedUser(OwnerCred)) {
-        for (auto name : Prop->List())
-            if (Prop->Find(name)->GetFlags() & OS_MODE_PROPERTY)
-                Prop->Reset(name);
+        for (auto name : Prop->List()) {
+            auto prop = Prop->Find(name);
+            if (prop && prop->HasFlag(OS_MODE_PROPERTY))
+                prop->Reset();
+        }
     }
 
     if (!meta && !Prop->Get<std::string>(P_COMMAND).length())
         return TError(EError::InvalidValue, "container command is empty");
 
+    // FIXME must die
     // since we now have a complete picture of properties, check
     // them once again (so we don't miss something due to set order)
     for (auto name : Prop->List()) {
-        if (Prop->IsDefault(name))
-            continue;
-
-        TError error = Prop->FromString(name, Prop->ToString(name), false);
-        if (error)
-            return error;
+        auto prop = Prop->Find(name);
+        if (prop->HasValue()) {
+            error = prop->SetString(prop->GetString());
+            if (error)
+                return error;
+        }
     }
 
     L_ACT() << "Start " << GetName() << " " << Id << std::endl;
@@ -1347,10 +1350,11 @@ TError TContainer::GetData(const string &origName, string &value,
     std::string idx;
     ParsePropertyName(name, idx);
 
-    if (!Data->IsValid(name))
+    auto data = Data->Find(name);
+    if (!data)
         return TError(EError::InvalidData, "invalid container data");
 
-    auto cv = ToContainerValue(Data->Find(name));
+    auto cv = ToContainerValue(data);
     if (!cv->IsImplemented())
         return TError(EError::NotSupported, name + " is not implemented");
 
@@ -1363,15 +1367,10 @@ TError TContainer::GetData(const string &origName, string &value,
         return TError::Success();
     }
 
-    if (idx.length()) {
-        TUintMap m = Data->Get<TUintMap>(name);
-        if (m.find(idx) == m.end())
-            return TError(EError::InvalidValue, "invalid index " + idx);
+    if (idx.length())
+        return data->GetIndexed(idx, value);
 
-        value = std::to_string(m.at(idx));
-    } else {
-        value = Data->ToString(name);
-    }
+    value = data->GetString();
 
     return TError::Success();
 }
@@ -1415,8 +1414,9 @@ static std::map<std::string, std::string> alias = {
     { "memory.recharge_on_pgfault", P_RECHARGE_ON_PGFAULT },
 };
 
-TError TContainer::GetProperty(const string &origProperty, string &value,
-                               std::shared_ptr<TClient> client) const {
+TError TContainer::GetProperty(const string &origProperty, string &value) const {
+    TError error;
+
     if (IsRoot() || IsPortoRoot())
         return TError(EError::InvalidProperty, "no properties for container " + GetName());
 
@@ -1427,26 +1427,26 @@ TError TContainer::GetProperty(const string &origProperty, string &value,
     if (alias.find(origProperty) != alias.end())
         property = alias.at(origProperty);
 
-    TError error = Prop->Check(property);
-    if (error)
-        return error;
+    auto prop = Prop->Find(property);
+    if (!prop)
+        return TError(EError::Unknown, "Invalid property " + property);
 
     if (!Prop->IsImplemented(property))
         return TError(EError::NotSupported, property + " is not implemented");
 
-    if (idx.length()) {
-        TUintMap m;
-        TError error = Prop->GetChecked<TUintMap>(property, m);
-        if (error)
-            return TError(EError::InvalidValue, "Invalid subscript for property");
-
-        if (m.find(idx) == m.end())
-            return TError(EError::InvalidValue, "invalid index " + idx);
-
-        value = std::to_string(m.at(idx));
-    } else {
-        value = Prop->ToString(property);
+    if (!prop->HasValue() && prop->HasFlag(PARENT_DEF_PROPERTY) &&
+            !Prop->Get<bool>(P_ISOLATE)) {
+        for (auto p = Parent; p; p = p->Parent) {
+            prop = p->Prop->Find(property);
+            if (prop->HasValue() || p->Prop->Get<bool>(P_ISOLATE))
+                break;
+        }
     }
+
+    if (idx.length())
+        return prop->GetIndexed(idx, value);
+
+    value = prop->GetString();
     PropertyToAlias(origProperty, value);
 
     return TError::Success();
@@ -1481,45 +1481,33 @@ TError TContainer::SetProperty(const string &origProperty,
     if (error)
         return error;
 
-    error = Prop->Check(property);
-    if (error)
-        return error;
+    auto prop = Prop->Find(property);
+    if (!prop)
+        return TError(EError::Unknown, "Invalid property " + property);
 
     if (!Prop->IsImplemented(property))
         return TError(EError::NotSupported, property + " is not implemented");
 
     bool superuser = client && client->GetCred().IsPrivileged();
 
-    if (Prop->HasFlags(property, SUPERUSER_PROPERTY) && !superuser)
-        if (Prop->ToString(property) != value)
-            return TError(EError::Permission, "Only root can change this property");
+    if (prop->HasFlag(SUPERUSER_PROPERTY) &&
+            !superuser && prop->GetString() != value)
+        return TError(EError::Permission, "Only root can change this property");
 
-    if (Prop->HasFlags(property, RESTROOT_PROPERTY) && !superuser && !CredConf.RestrictedUser(OwnerCred))
+    if (prop->HasFlag(RESTROOT_PROPERTY) &&
+            !superuser && !CredConf.RestrictedUser(OwnerCred))
         return TError(EError::Permission, "Only restricted root can change this property");
 
     if (!Prop->HasState(property, GetState()))
         return TError(EError::InvalidState, "Can't set dynamic property " + property + " in state " + ContainerStateName(GetState()));
 
-    if (idx.length()) {
-        TUintMap m;
-        TError error = Prop->GetChecked<TUintMap>(property, m);
-        if (error)
-            return TError(EError::InvalidValue, "Invalid subscript for property");
+    if (idx.length())
+        error = prop->SetIndexed(idx, value);
+    else
+        error = prop->SetString(value);
 
-        uint64_t uval;
-        error = StringToUint64(value, uval);
-        if (error)
-            return TError(EError::InvalidValue, "Invalid integer value for index " + idx);
-
-        m[idx] = uval;
-        error = Prop->Set<TUintMap>(property, m);
-        if (error)
-            return error;
-    } else {
-        error = Prop->FromString(property, value);
-        if (error)
-            return error;
-    }
+    if (error)
+        return error;
 
     if (ShouldApplyProperty(property)) {
         error = ApplyDynamicProperties();

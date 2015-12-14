@@ -32,7 +32,7 @@ public:
 };
 
 class TRawValueMap;
-class TAbstractValue;
+class TValue;
 
-void AddContainerValue(std::shared_ptr<TRawValueMap> m, std::shared_ptr<TContainer> c, TAbstractValue *av);
-TContainerValue *ToContainerValue(TAbstractValue *av);
+void AddContainerValue(std::shared_ptr<TRawValueMap> m, std::shared_ptr<TContainer> c, TValue *av);
+TContainerValue *ToContainerValue(TValue *av);

@@ -2,7 +2,7 @@
 #include "container_value.hpp"
 #include "value.hpp"
 
-void AddContainerValue(std::shared_ptr<TRawValueMap> m, std::shared_ptr<TContainer> c, TAbstractValue *av) {
+void AddContainerValue(std::shared_ptr<TRawValueMap> m, std::shared_ptr<TContainer> c, TValue *av) {
     auto cv = ToContainerValue(av);
     cv->SetContainer(c);
     m->Add(cv->GetName(), av);
@@ -14,7 +14,7 @@ std::shared_ptr<TContainer> TContainerValue::GetContainer() const {
     return container;
 }
 
-TContainerValue *ToContainerValue(TAbstractValue *av) {
+TContainerValue *ToContainerValue(TValue *av) {
     try {
         auto p = dynamic_cast<TContainerValue *>(av);
         if (!p)
