@@ -1,3 +1,37 @@
+yandex-porto (2.7.1) precise; urgency=low
+
+  [ Konstantin Khlebnikov ]
+  * util/netlink: bring up slave interface
+  * net: fix ip configuration inside container
+  * network: move network configuration into network code
+  * network: set net=host for root container
+  * network: refactor netlink once again
+  * network: prepare new connect operations
+  * network: create and configure network before starting container
+  * container: restore stdpaths from porto older than 2.7
+  * property: allow creation new netns together with isolate=false
+  * property: allow changing hostname together with isolate=false
+  * container: create new mount namespace if bind_dns=true
+  * property: completely remove PARENT_RO_PROPERTY
+  * network: dump found qdisc at restore
+  * selftest: custom hostname in isolate=false now supported
+  * selftest: custom hostname in isolate=false now supported v2
+  * container: remove kludge for nested mount namespace
+  * network: hide rtnl_link poriner in TNlLink
+  * util/unix: really check errors from popen
+  * selftest: check mavclan statistics using ipv6/ra setup
+  * selftest: race in GetState
+  * selftest: non-zero exit from pgrep is ok
+  * layer: tell if tarball not found at import
+  * util/mount: also check device of target when looking for mountpoint
+  * kvalue: cleanup
+
+  [ Roman Gushchin ]
+  * volumes: use full container name when unlinking volumes
+  * go API: don't fill container field with empty string
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 14 Dec 2015 18:09:24 +0300
+
 yandex-porto (2.7) precise; urgency=low
 
   * properties: resolve relative bind src based on parent cwd
