@@ -2994,6 +2994,9 @@ static void TestRoot(TPortoAPI &api) {
         "aging_time",
         "porto_namespace",
         "enable_porto",
+        "stdout_type",
+        "stdin_type",
+        "stderr_type",
     };
 
     if (KernelSupports(KernelFeature::LOW_LIMIT))

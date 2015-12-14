@@ -8,6 +8,7 @@
 #include "util/namespace.hpp"
 #include "util/path.hpp"
 #include "util/cred.hpp"
+#include "std.hpp"
 
 extern "C" {
 #include <sys/resource.h>
@@ -44,12 +45,7 @@ struct TTaskEnv : public TNonCopyable {
     bool Isolate = false;
     bool TripleFork;
     bool QuadroFork;
-    TPath StdinPath;
-    TPath StdoutPath;
-    TPath StderrPath;
-    bool DefaultStdin = false;
-    bool DefaultStdout = false;
-    bool DefaultStderr = false;
+    TStdStream Stdin, Stdout, Stderr;
     TNamespaceSnapshot ParentNs;
     std::map<int,struct rlimit> Rlimit;
     std::string Hostname;
@@ -80,9 +76,6 @@ class TTask: public TNonCopyable {
 
     void ReportPid(pid_t pid) const;
 
-    TError ReopenStdio(bool open_default);
-
-    TError ChildOpenStdFile(const TPath &path, int expected);
     TError ChildApplyCapabilities();
     TError ChildDropPriveleges();
     TError ChildExec();

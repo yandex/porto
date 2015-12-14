@@ -164,12 +164,15 @@ public:
 
     TError GetString(std::string &value) const override {
         auto c = GetContainer();
-        return c->ReadStdFile(D_STDOUT, value);
+        return c->GetStdout().Read(value, c->Prop->Get<uint64_t>(P_STDOUT_LIMIT),
+                                   c->Data->Get<uint64_t>(P_STDOUT_OFFSET));
     }
 
     TError GetIndexed(const std::string &index, std::string &value) const override {
         auto c = GetContainer();
-        return c->ReadStdFile(D_STDOUT, value, index);
+        return c->GetStdout().Read(value, c->Prop->Get<uint64_t>(P_STDOUT_LIMIT),
+                                   c->Data->Get<uint64_t>(P_STDOUT_OFFSET),
+                                   index);
     }
 };
 
@@ -184,12 +187,14 @@ public:
 
     TError GetString(std::string &value) const override {
         auto c = GetContainer();
-        return c->ReadStdFile(D_STDERR, value);
+        return c->GetStderr().Read(value, c->Prop->Get<uint64_t>(P_STDOUT_LIMIT),
+                                   c->Data->Get<uint64_t>(P_STDOUT_OFFSET));
     }
 
     TError GetIndexed(const std::string &index, std::string &value) const override {
         auto c = GetContainer();
-        return c->ReadStdFile(D_STDERR, value, index);
+        return c->GetStderr().Read(value, c->Prop->Get<uint64_t>(P_STDOUT_LIMIT),
+                                   c->Data->Get<uint64_t>(P_STDERR_OFFSET), index);
     }
 };
 

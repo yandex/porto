@@ -8,6 +8,7 @@
 #include "util/unix.hpp"
 #include "util/locks.hpp"
 #include "util/log.hpp"
+#include "std.hpp"
 
 class TKeyValueStorage;
 class TEpollSource;
@@ -64,6 +65,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     bool IsMeta = false;
 
     std::ofstream JournalStream;
+    TStdStream Stdin, Stdout, Stderr;
 
     // data
     void UpdateRunningChildren(size_t diff);
@@ -90,10 +92,13 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError Respawn(TScopedLock &holder_lock);
     void StopChildren(TScopedLock &holder_lock);
     TError PrepareResources();
-    void RemoveLog(const TPath &path);
     void FreeResources();
     void PropertyToAlias(const std::string &property, std::string &value) const;
     TError AliasToProperty(std::string &property, std::string &value);
+
+    void RestoreStdPath(const std::string &property);
+    void CreateStdStreams();
+    TError PrepareStdStreams();
 
     void ExitTree(TScopedLock &holder_lock, int status, bool oomKilled);
     void Exit(TScopedLock &holder_lock, int status, bool oomKilled);
@@ -118,7 +123,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError Freeze(TScopedLock &holder_lock);
 
     bool PrepareJournal();
-    void RestoreStdPath(const std::string &property);
 
 public:
     TCred OwnerCred;
@@ -132,9 +136,7 @@ public:
     TPath RootPath() const;
     TPath WorkPath() const;
     TPath ActualStdPath(const std::string &property, bool host) const;
-    TError RotateStdFile(const std::string &type);
-    TError ReadStdFile(const std::string &type, std::string &text,
-                       const std::string &start_offset="") const;
+    TError RotateStdFile(TStdStream &stream, const std::string &type);
     EContainerState GetState() const;
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);
 
@@ -247,6 +249,10 @@ public:
     void Journal(const std::string &message, std::shared_ptr<TClient> client);
     // for recursive actions, like stopping tree of containers
     void Journal(const std::string &message, std::shared_ptr<TContainer> root);
+
+    const TStdStream& GetStdin() const { return Stdin; }
+    const TStdStream& GetStdout() const { return Stdout; }
+    const TStdStream& GetStderr() const { return Stderr; }
 };
 
 class TScopedAcquire : public TNonCopyable {

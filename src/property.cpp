@@ -241,6 +241,43 @@ public:
     }
 };
 
+class TStdSwitchProperty : public TStringValue {
+public:
+    TStdSwitchProperty() : TStringValue(PERSISTENT_VALUE) {}
+
+    std::string GetDefault() const override {
+        return STD_TYPE_FILE;
+    }
+
+    TError CheckValue(const std::string &value) override {
+        if (value == STD_TYPE_FILE || value == STD_TYPE_FIFO)
+            return TError::Success();
+        else
+            return TError(EError::InvalidValue, "Invalid std type value");
+    }
+};
+
+class TStdInSwitchProperty : public TStdSwitchProperty, public TContainerValue {
+public:
+    TStdInSwitchProperty() : TContainerValue(P_STDIN_TYPE,
+                                             "Container standard input type [file, pipe, pty]",
+                                             staticProperty) {}
+};
+
+class TStdOutSwitchProperty : public TStdSwitchProperty, public TContainerValue {
+public:
+    TStdOutSwitchProperty() : TContainerValue(P_STDOUT_TYPE,
+                                              "Container standard output type [file, pipe, pty]",
+                                              staticProperty) {}
+};
+
+class TStdErrSwitchProperty : public TStdSwitchProperty, public TContainerValue {
+public:
+    TStdErrSwitchProperty() : TContainerValue(P_STDERR_TYPE,
+                                              "Container standard error output type [file, pipe, pty]",
+                                              staticProperty) {}
+};
+
 class TStdoutPathProperty : public TStringValue, public TContainerValue {
 public:
     TStdoutPathProperty() :
@@ -1197,6 +1234,9 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TRootProperty,
         new TRootRdOnlyProperty,
         new TCwdProperty,
+        new TStdInSwitchProperty,
+        new TStdOutSwitchProperty,
+        new TStdErrSwitchProperty,
         new TStdinPathProperty,
         new TStdoutPathProperty,
         new TStderrPathProperty,

@@ -113,66 +113,6 @@ static int ChildFn(void *arg) {
     return EXIT_FAILURE;
 }
 
-TError TTask::ChildOpenStdFile(const TPath &path, int expected) {
-    int ret = open(path.ToString().c_str(), O_CREAT | O_WRONLY | O_APPEND, 0660);
-    if (ret < 0)
-        return TError(EError::InvalidValue, errno,
-                      "open(" + path.ToString() + ") -> " +
-                      std::to_string(expected));
-
-    if (ret != expected) {
-        if (dup2(ret, expected) < 0) {
-            close(ret);
-            return TError(EError::Unknown, errno,
-                    "dup2(" + std::to_string(ret) + ", " + std::to_string(expected) + ")");
-        }
-        close(ret);
-        ret = expected;
-    }
-
-    if (path.IsRegular()) {
-        ret = fchown(ret, Env->Cred.Uid, Env->Cred.Gid);
-        if (ret < 0)
-            return TError(EError::Unknown, errno,
-                    "fchown(" + path.ToString() + ") -> " +
-                    std::to_string(expected));
-    }
-
-    return TError::Success();
-}
-
-TError TTask::ReopenStdio(bool open_default) {
-    TError error;
-
-    if (open_default == Env->DefaultStdin) {
-        int ret = open(Env->StdinPath.ToString().c_str(), O_CREAT | O_RDONLY, 0660);
-        if (ret < 0)
-            return TError(EError::Unknown, errno, "open(" + Env->StdinPath.ToString() + ") -> 0");
-        if (ret != 0) {
-            if (dup2(ret, 0) < 0) {
-                close(ret);
-                return TError(EError::Unknown, errno, "dup2(" + std::to_string(ret) + ", 0)");
-            }
-            close(ret);
-            ret = 0;
-        }
-    }
-
-    if (open_default == Env->DefaultStdout) {
-        error = ChildOpenStdFile(Env->StdoutPath, 1);
-        if (error)
-            return error;
-    }
-
-    if (open_default == Env->DefaultStderr) {
-        error = ChildOpenStdFile(Env->StderrPath, 2);
-        if (error)
-            return error;
-    }
-
-    return TError::Success();
-}
-
 TError TTask::ChildApplyCapabilities() {
     uint64_t effective, permitted, inheritable;
 
@@ -258,6 +198,18 @@ TError TTask::ChildExec() {
     case 0:
         break;
     }
+
+    TError error = Env->Stdin.OpenInChild(Env->Cred);
+    if (error)
+        return error;
+
+    error = Env->Stdout.OpenInChild(Env->Cred);
+    if (error)
+        return error;
+
+    error = Env->Stderr.OpenInChild(Env->Cred);
+    if (error)
+        return error;
 
     if (config().log().verbose()) {
         L() << "command=" << Env->Command << std::endl;
@@ -648,10 +600,6 @@ TError TTask::ConfigureChild() {
     if (error)
         return error;
 
-    error = ReopenStdio(false);
-    if (error)
-        return error;
-
     return TError::Success();
 }
 
@@ -724,8 +672,16 @@ TError TTask::Start() {
                 Abort(error);
         }
 
-        /* Default stdio/stderr are in host mount namespace */
-        error = ReopenStdio(true);
+        /* Default stdin/stdio/stderr are in host mount namespace */
+        error = Env->Stdin.OpenOnHost(Env->Cred);
+        if (error)
+            Abort(error);
+
+        error = Env->Stdout.OpenOnHost(Env->Cred);
+        if (error)
+            Abort(error);
+
+        error = Env->Stderr.OpenOnHost(Env->Cred);
         if (error)
             Abort(error);
 

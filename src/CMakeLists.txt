@@ -82,7 +82,7 @@ add_subdirectory(util)
 link_directories(${yandex-porto_BINARY_DIR})
 include_directories(${yandex-porto_BINARY_DIR}/api/cpp)
 
-add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp holder.cpp event.cpp task.cpp network.cpp kvalue.cpp subsystem.cpp config.cpp container_value.cpp value.cpp data.cpp property.cpp context.cpp volume.cpp epoll.cpp client.cpp)
+add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp holder.cpp event.cpp task.cpp network.cpp kvalue.cpp subsystem.cpp config.cpp container_value.cpp value.cpp data.cpp property.cpp context.cpp volume.cpp epoll.cpp client.cpp std.cpp)
 add_dependencies(portod version.hpp)
 target_link_libraries(portod porto protobufs util ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
 

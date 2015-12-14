@@ -28,6 +28,7 @@
 #include "util/cred.hpp"
 #include "util/unix.hpp"
 #include "client.hpp"
+#include "std.hpp"
 
 #include "portod.hpp"
 
@@ -129,74 +130,42 @@ TPath TContainer::ActualStdPath(const std::string &property, bool host) const {
     }
 }
 
-TError TContainer::ReadStdFile(const std::string &type, std::string &text,
-                               const std::string &start_offset) const {
-    auto path = ActualStdPath(type + "_path", true);
-    off_t limit = Prop->Get<uint64_t>(P_STDOUT_LIMIT);
-    uint64_t offset = 0;
-    TError error;
-
-    if (!path.IsRegular())
-        return TError(EError::InvalidData, type + " file is non-regular");
-
-    if (start_offset != "") {
-        uint64_t base;
-
-        TError error = StringToUint64(start_offset, offset);
-        if (error)
-            return error;
-
-        base = Data->Get<uint64_t>(type + "_offset");
-        if (offset < base)
-            return TError(EError::InvalidData,
-                    "requested offset lower than current " + std::to_string(base));
-        offset -= base;
+TError TContainer::RotateStdFile(TStdStream &stream, const std::string &type) {
+    off_t loss;
+    TError error = stream.Rotate(config().container().max_log_size(), loss);
+    if (error) {
+        L_ERR() << "Can't rotate " + type + ": " << error << std::endl;
+    } else if (loss) {
+            uint64_t offset = Data->Get<uint64_t>(type);
+            Data->Set<uint64_t>(type, offset + loss);
     }
 
-    int fd = open(path.c_str(), O_RDONLY | O_NOCTTY | O_NOFOLLOW | O_CLOEXEC);
-    if (fd < 0)
-        return TError(EError::Unknown, errno, "open(" + path.ToString() + ")");
-
-    uint64_t size = lseek(fd, 0, SEEK_END);
-
-    if (size <= offset)
-        limit = 0;
-    else if (size <= offset + limit)
-        limit = size - offset;
-    else if (start_offset == "")
-        offset = size - limit;
-
-    if (limit) {
-        text.resize(limit);
-        auto result = pread(fd, &text[0], limit, offset);
-
-        if (result < 0)
-            error = TError(EError::Unknown, errno, "read(" + path.ToString() + ")");
-        else if (result < limit)
-            text.resize(result);
-    }
-
-    close(fd);
     return error;
 }
 
-TError TContainer::RotateStdFile(const std::string &type) {
-    off_t max_log_size = config().container().max_log_size();
-    TPath path = ActualStdPath(type + "_path", true);
-    TError error;
-    off_t loss;
+void TContainer::CreateStdStreams() {
+    Stdin = TStdStream(0, Prop->Get<std::string>(P_STDIN_TYPE),
+                       ActualStdPath(P_STDIN_PATH, false),
+                       ActualStdPath(P_STDIN_PATH, true),
+                       Prop->IsDefault(P_STDIN_PATH));
+    Stdout = TStdStream(1, Prop->Get<std::string>(P_STDOUT_TYPE),
+                        ActualStdPath(P_STDOUT_PATH, false),
+                        ActualStdPath(P_STDOUT_PATH, true),
+                        Prop->IsDefault(P_STDOUT_PATH));
+    Stderr = TStdStream(2, Prop->Get<std::string>(P_STDERR_TYPE),
+                        ActualStdPath(P_STDERR_PATH, false),
+                        ActualStdPath(P_STDERR_PATH, true),
+                        Prop->IsDefault(P_STDERR_PATH));
+}
 
-    if (path.IsRegular()) {
-        error = path.RotateLog(max_log_size, loss);
-        if (error) {
-            L_ERR() << "Can't rotate " + type + ": " << error << std::endl;
-        } else if (loss) {
-            uint64_t offset = Data->Get<uint64_t>(type + "_offset");
-            Data->Set<uint64_t>(type + "_offset", offset + loss);
-        }
-    }
-
-    return error;
+TError TContainer::PrepareStdStreams() {
+    TError err = Stdin.Prepare(OwnerCred);
+    if (err)
+        return err;
+    err = Stdout.Prepare(OwnerCred);
+    if (err)
+        return err;
+    return Stderr.Prepare(OwnerCred);
 }
 
 EContainerState TContainer::GetState() const {
@@ -752,19 +721,16 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
                           taskEnv->Isolate &&
                           !taskEnv->Command.empty();
 
-    taskEnv->DefaultStdin = Prop->IsDefault(P_STDIN_PATH);
-    taskEnv->DefaultStdout = Prop->IsDefault(P_STDOUT_PATH);
-    taskEnv->DefaultStderr = Prop->IsDefault(P_STDERR_PATH);
-    taskEnv->StdinPath = ActualStdPath(P_STDIN_PATH, false);
-    taskEnv->StdoutPath = ActualStdPath(P_STDOUT_PATH, false);
-    taskEnv->StderrPath = ActualStdPath(P_STDERR_PATH, false);
-
     taskEnv->Hostname = Prop->Get<std::string>(P_HOSTNAME);
     taskEnv->SetEtcHostname = (vmode == VIRT_MODE_OS) &&
                                 !taskEnv->Root.IsRoot() &&
                                 !taskEnv->RootRdOnly;
 
     taskEnv->BindDns = Prop->Get<bool>(P_BIND_DNS);
+
+    taskEnv->Stdin = Stdin;
+    taskEnv->Stdout = Stdout;
+    taskEnv->Stderr = Stderr;
 
     TError error = Prop->PrepareTaskEnv(P_ULIMIT, *taskEnv);
     if (error)
@@ -1189,15 +1155,15 @@ TError TContainer::PrepareResources() {
         return error;
     }
 
-    return TError::Success();
-}
-
-void TContainer::RemoveLog(const TPath &path) {
-    if (path.IsRegular()) {
-        TError error = path.Unlink();
-        if (error)
-            L_ERR() << "Can't remove stdio file " << path << ": " << error << std::endl;
+    CreateStdStreams();
+    error = PrepareStdStreams();
+    if (error) {
+        L_ERR() << "Can't prepare std streams: " << error << std::endl;
+        FreeResources();
+        return error;
     }
+
+    return TError::Success();
 }
 
 void TContainer::FreeResources() {
@@ -1225,11 +1191,9 @@ void TContainer::FreeResources() {
     if (IsRoot() || IsPortoRoot())
         return;
 
-    if (Prop->IsDefault(P_STDOUT_PATH))
-        RemoveLog(ActualStdPath(P_STDOUT_PATH, true));
-
-    if (Prop->IsDefault(P_STDERR_PATH))
-        RemoveLog(ActualStdPath(P_STDERR_PATH, true));
+    Stdin.Cleanup();
+    Stdout.Cleanup();
+    Stderr.Cleanup();
 
     int loopNr = Prop->Get<int>(P_RAW_LOOP_DEV);
 
@@ -1721,8 +1685,8 @@ void TContainer::RestoreStdPath(const std::string &property) {
         }
     }
 
-    if (def && GetState() == EContainerState::Stopped)
-        RemoveLog(path);
+    if (def && GetState() == EContainerState::Stopped && path.IsRegular())
+        path.Unlink();
 }
 
 TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
@@ -1896,6 +1860,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
 
     RestoreStdPath(P_STDOUT_PATH);
     RestoreStdPath(P_STDERR_PATH);
+    CreateStdStreams();
 
     if (Task)
         Task->ClearEnv();
@@ -2000,8 +1965,8 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
     if (error)
         L_ERR() << "Can't set " << P_RAW_ROOT_PID << ": " << error << std::endl;
 
-    RotateStdFile(D_STDOUT);
-    RotateStdFile(D_STDERR);
+    RotateStdFile(Stdout, D_STDOUT_OFFSET);
+    RotateStdFile(Stderr, D_STDERR_OFFSET);
 
     if (MayRespawn())
         ScheduleRespawn();
@@ -2098,8 +2063,8 @@ void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
             break;
         case EEventType::RotateLogs:
             if (GetState() == EContainerState::Running && Task) {
-                RotateStdFile(D_STDOUT);
-                RotateStdFile(D_STDERR);
+                RotateStdFile(Stdout, D_STDOUT_OFFSET);
+                RotateStdFile(Stderr, D_STDERR_OFFSET);
             }
             JournalStream.close();
             break;
