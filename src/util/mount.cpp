@@ -71,7 +71,6 @@ TError TMount::Find(TPath path, const TPath mounts) {
         Type = m->mnt_type;
         Data.clear();
         error = SplitString(m->mnt_opts, ',', Data);
-        break;
     }
     endmntent(f);
 
