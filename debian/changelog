@@ -1,3 +1,9 @@
+yandex-porto (2.7.2) precise; urgency=low
+
+  * util/mount: get the last matching mountpoint
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 15 Dec 2015 14:57:27 +0300
+
 yandex-porto (2.7.1) precise; urgency=low
 
   [ Konstantin Khlebnikov ]
