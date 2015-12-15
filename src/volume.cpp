@@ -820,32 +820,36 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
     if (error)
         return error;
 
-    /* Verify layers */
-    auto layers = Config->Get<std::vector<std::string>>(V_LAYERS);
-    for (auto &l: layers) {
-        TPath layer(l);
-        if (!layer.IsNormal())
-            return TError(EError::InvalidValue, "Layer path must be normalized");
-        if (layer.IsAbsolute()) {
-            layer = container_root / layer;
-            l = layer.ToString();
+    /* Verify and resolve layers */
+    if (Config->HasValue(V_LAYERS)) {
+        auto layers = Config->Get<std::vector<std::string>>(V_LAYERS);
+
+        for (auto &l: layers) {
+            TPath layer(l);
+            if (!layer.IsNormal())
+                return TError(EError::InvalidValue, "Layer path must be normalized");
+            if (layer.IsAbsolute()) {
+                layer = container_root / layer;
+                l = layer.ToString();
+                if (!layer.Exists())
+                    return TError(EError::LayerNotFound, "Layer not found");
+                if (!layer.AccessOk(EFileAccess::Write, creator_cred))
+                    return TError(EError::Permission, "Layer path not permitted");
+            } else {
+                if (l.find('/') != std::string::npos)
+                    return TError(EError::InvalidValue, "Internal layer storage has no directories");
+                layer = TPath(config().volumes().layers_dir()) / layer;
+            }
             if (!layer.Exists())
                 return TError(EError::LayerNotFound, "Layer not found");
-            if (!layer.AccessOk(EFileAccess::Write, creator_cred))
-                return TError(EError::Permission, "Layer path not permitted");
-        } else {
-            if (l.find('/') != std::string::npos)
-                return TError(EError::InvalidValue, "Internal layer storage has no directories");
-            layer = TPath(config().volumes().layers_dir()) / layer;
+            if (!layer.IsDirectory())
+                return TError(EError::InvalidValue, "Layer must be a directory");
         }
-        if (!layer.Exists())
-            return TError(EError::LayerNotFound, "Layer not found");
-        if (!layer.IsDirectory())
-            return TError(EError::InvalidValue, "Layer must be a directory");
+
+        error = Config->Set<std::vector<std::string>>(V_LAYERS, layers);
+        if (error)
+            return error;
     }
-    error = Config->Set<std::vector<std::string>>(V_LAYERS, layers);
-    if (error)
-        return error;
 
     /* Verify guarantees */
     if (Config->HasValue(V_SPACE_LIMIT) && Config->HasValue(V_SPACE_GUARANTEE) &&
