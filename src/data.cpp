@@ -454,6 +454,47 @@ public:
     }
 };
 
+class TIoOpsData : public TMapValue, public TContainerValue {
+public:
+    TIoOpsData() :
+        TMapValue(0),
+        TContainerValue(D_IO_OPS,
+                        "return number of disk io operations",
+                        rpdmState) {}
+
+    TUintMap GetDefault() const override {
+        TError error;
+        TUintMap m;
+
+        auto memcg = GetContainer()->GetLeafCgroup(memorySubsystem);
+
+        uint64_t ops = 0;
+        error = memorySubsystem->Statistics(memcg, [&](std::string k, uint64_t v) -> int {
+            if (k == "fs_io_operations") {
+                ops += v;
+                return 0;
+            }
+            return 1;
+        });
+        if (!error)
+            m["fs"] = ops;
+
+        auto blkcg = GetContainer()->GetLeafCgroup(blkioSubsystem);
+
+        std::vector<BlkioStat> stat;
+        error = blkioSubsystem->Statistics(blkcg, "blkio.io_serviced_recursive", stat);
+        if (error)
+            L_ERR() << "Can't get blkio statistics: " << error << std::endl;
+        if (error)
+            return m;
+
+        for (auto &s : stat)
+            m[s.Device] = s.Read + s.Write;
+
+        return m;
+    }
+};
+
 class TTimeData : public TUintValue, public TContainerValue {
 public:
     TTimeData() :
@@ -577,6 +618,7 @@ void RegisterData(std::shared_ptr<TRawValueMap> m,
         new TMajorFaultsData,
         new TIoReadData,
         new TIoWriteData,
+        new TIoOpsData,
         new TTimeData,
         new TMaxRssData,
         new TPortoStatData,

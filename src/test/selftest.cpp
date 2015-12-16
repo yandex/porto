@@ -261,6 +261,7 @@ static void ShouldHaveValidRunningData(TPortoAPI &api, const string &name) {
     if (KernelSupports(KernelFeature::CFQ)) {
         ExpectApiSuccess(api.GetData(name, "io_read", v));
         ExpectApiSuccess(api.GetData(name, "io_write", v));
+        ExpectApiSuccess(api.GetData(name, "io_ops", v));
     }
 }
 
@@ -301,6 +302,7 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     if (KernelSupports(KernelFeature::CFQ)) {
         ExpectApiFailure(api.GetData(name, "io_read", v), EError::InvalidState);
         ExpectApiFailure(api.GetData(name, "io_write", v), EError::InvalidState);
+        ExpectApiFailure(api.GetData(name, "io_ops", v), EError::InvalidState);
     }
     ExpectApiSuccess(api.GetProperty(name, "max_respawns", v));
     ExpectEq(v, "-1");
@@ -2996,6 +2998,7 @@ static void TestRoot(TPortoAPI &api) {
         "major_faults",
         "io_read",
         "io_write",
+        "io_ops",
         "time",
     };
 
@@ -3046,6 +3049,8 @@ static void TestRoot(TPortoAPI &api) {
         ExpectApiSuccess(api.GetData(porto_root, "io_read", v));
         ExpectEq(v, "");
         ExpectApiSuccess(api.GetData(porto_root, "io_write", v));
+        ExpectEq(v, "");
+        ExpectApiSuccess(api.GetData(porto_root, "io_ops", v));
         ExpectEq(v, "");
     }
 
@@ -3200,6 +3205,11 @@ static void TestData(TPortoAPI &api) {
         ExpectApiSuccess(api.GetData(root, "io_read", v));
         Expect(v != "");
         TestDataMap(api, root, "io_read");
+
+        Say() << "Make sure io_ops counters are valid" << std::endl;
+        ExpectApiSuccess(api.GetData(root, "io_ops", v));
+        Expect(v != "");
+        TestDataMap(api, root, "io_ops");
     }
     ExpectApiSuccess(api.GetData(wget, "cpu_usage", v));
     Expect(v != "0" && v != "-1");
@@ -3209,6 +3219,8 @@ static void TestData(TPortoAPI &api) {
         ExpectApiSuccess(api.GetData(wget, "io_write", v));
         ExpectNeq(v, "");
         ExpectApiSuccess(api.GetData(wget, "io_read", v));
+        ExpectNeq(v, "");
+        ExpectApiSuccess(api.GetData(wget, "io_ops", v));
         ExpectNeq(v, "");
     }
 
@@ -3220,6 +3232,8 @@ static void TestData(TPortoAPI &api) {
         ExpectApiSuccess(api.GetData(noop, "io_write", v));
         ExpectEq(v, "");
         ExpectApiSuccess(api.GetData(noop, "io_read", v));
+        ExpectEq(v, "");
+        ExpectApiSuccess(api.GetData(noop, "io_ops", v));
         ExpectEq(v, "");
     }
 
