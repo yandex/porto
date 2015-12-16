@@ -37,6 +37,7 @@ constexpr const char *P_CPU_GUARANTEE = "cpu_guarantee";
 constexpr const char *P_CPU_LIMIT = "cpu_limit";
 constexpr const char *P_IO_POLICY = "io_policy";
 constexpr const char *P_IO_LIMIT = "io_limit";
+constexpr const char *P_IOPS_LIMIT = "iops_limit";
 constexpr const char *P_NET_GUARANTEE = "net_guarantee";
 constexpr const char *P_NET_LIMIT = "net_limit";
 constexpr const char *P_NET_PRIO = "net_priority";

@@ -199,6 +199,13 @@ TError TMemorySubsystem::SetIoLimit(std::shared_ptr<TCgroup> cg, uint64_t limit)
     return cg->SetKnobValue("memory.fs_bps_limit", std::to_string(limit), false);
 }
 
+TError TMemorySubsystem::SetIopsLimit(std::shared_ptr<TCgroup> cg, uint64_t limit) {
+    if (!SupportIoLimit())
+        return TError::Success();
+
+    return cg->SetKnobValue("memory.fs_iops_limit", std::to_string(limit), false);
+}
+
 TError TMemorySubsystem::SetDirtyLimit(std::shared_ptr<TCgroup> cg, uint64_t limit) {
     if (!SupportDirtyLimit())
         return TError::Success();

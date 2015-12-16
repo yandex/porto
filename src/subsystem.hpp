@@ -45,6 +45,7 @@ public:
     bool SupportSwap();
     TError RechargeOnPgfault(std::shared_ptr<TCgroup> cg, bool enable);
     TError SetIoLimit(std::shared_ptr<TCgroup> cg, uint64_t limit);
+    TError SetIopsLimit(std::shared_ptr<TCgroup> cg, uint64_t limit);
     TError SetDirtyLimit(std::shared_ptr<TCgroup> cg, uint64_t limit);
 };
 

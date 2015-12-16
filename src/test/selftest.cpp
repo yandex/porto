@@ -149,6 +149,8 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     if (KernelSupports(KernelFeature::FSIO)) {
         ExpectApiSuccess(api.GetProperty(name, "io_limit", v));
         ExpectEq(v, "0");
+        ExpectApiSuccess(api.GetProperty(name, "iops_limit", v));
+        ExpectEq(v, "0");
     }
 
     ExpectApiSuccess(api.GetProperty(name, "net_guarantee[default]", v));
@@ -2963,6 +2965,7 @@ static void TestRoot(TPortoAPI &api) {
 
     if (KernelSupports(KernelFeature::FSIO)) {
         properties.push_back("io_limit");
+        properties.push_back("iops_limit");
         properties.push_back("dirty_limit");
     }
 
@@ -3485,6 +3488,18 @@ static void TestLimits(TPortoAPI &api) {
         ExpectApiSuccess(api.SetProperty(name, "io_limit", "1000"));
         ExpectApiSuccess(api.Start(name));
         ExpectEq(GetCgKnob("memory", name, "memory.fs_bps_limit"), "1000");
+        ExpectApiSuccess(api.Stop(name));
+
+        Say() << "Check iops_limit" << std::endl;
+
+        ExpectApiSuccess(api.SetProperty(name, "iops_limit", "0"));
+        ExpectApiSuccess(api.Start(name));
+        ExpectEq(GetCgKnob("memory", name, "memory.fs_iops_limit"), "0");
+        ExpectApiSuccess(api.Stop(name));
+
+        ExpectApiSuccess(api.SetProperty(name, "iops_limit", "1000"));
+        ExpectApiSuccess(api.Start(name));
+        ExpectEq(GetCgKnob("memory", name, "memory.fs_iops_limit"), "1000");
         ExpectApiSuccess(api.Stop(name));
     }
 

@@ -503,6 +503,21 @@ public:
     }
 };
 
+class TIopsLimitProperty : public TUintValue, public TContainerValue {
+public:
+    TIopsLimitProperty() :
+        TUintValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | UINT_UNIT_VALUE),
+        TContainerValue(P_IOPS_LIMIT,
+                        "Filesystem iops limit [op/s]",
+                        dynamicProperty) {
+        Implemented = memorySubsystem->SupportIoLimit();
+    }
+
+    uint64_t GetDefault() const override {
+        return 0;
+    }
+};
+
 class TNetMapValue : public TMapValue, public TContainerValue {
     uint64_t Def, RootDef;
 
@@ -1186,6 +1201,7 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TCpuGuaranteeProperty,
         new TIoPolicyProperty,
         new TIoLimitProperty,
+        new TIopsLimitProperty,
         new TNetGuaranteeProperty,
         new TNetLimitProperty,
         new TNetPriorityProperty,
