@@ -162,12 +162,9 @@ public:
                         "return task stdout",
                         rpdState) {}
 
-    std::string GetString() const override {
+    TError GetString(std::string &value) const override {
         auto c = GetContainer();
-        std::string text;
-        if (c->ReadStdFile(D_STDOUT, text))
-            text = "";
-        return text;
+        return c->ReadStdFile(D_STDOUT, value);
     }
 
     TError GetIndexed(const std::string &index, std::string &value) const override {
@@ -185,12 +182,9 @@ public:
                         rpdState) {}
 
 
-    std::string GetString() const override {
+    TError GetString(std::string &value) const override {
         auto c = GetContainer();
-        std::string text;
-        if (c->ReadStdFile(D_STDERR, text))
-            text = "";
-        return text;
+        return c->ReadStdFile(D_STDERR, value);
     }
 
     TError GetIndexed(const std::string &index, std::string &value) const override {

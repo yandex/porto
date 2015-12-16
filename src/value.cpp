@@ -322,6 +322,8 @@ TError TValueMap::Flush() {
 }
 
 TError TValueMap::Sync() {
+    TError error;
+
     if (!KvNode)
         return TError::Success();
 
@@ -329,16 +331,21 @@ TError TValueMap::Sync() {
     for (auto kv : Values) {
         auto name = kv.first;
         auto av = kv.second;
+        std::string value;
 
         if (!av->HasFlag(PERSISTENT_VALUE) || !av->HasValue())
             continue;
 
+        error = av->GetString(value);
+        if (error)
+            return error;
+
         auto pair = node.add_pairs();
         pair->set_key(name);
-        pair->set_val(av->GetString());
+        pair->set_val(value);
 
         if (config().log().verbose())
-            L_ACT() << "Sync " << name << " = " << av->GetString() << std::endl;
+            L_ACT() << "Sync " << name << " = " << value << std::endl;
     }
 
     return KvNode->Append(node);

@@ -47,7 +47,7 @@ public:
 
     virtual void Reset() = 0;
 
-    virtual std::string GetString() const =0;
+    virtual TError GetString(std::string &value) const =0;
     virtual TError SetString(const std::string &value) =0;
 
     virtual TError GetIndexed(const std::string &index, std::string &value) const =0;
@@ -80,8 +80,9 @@ public:
     virtual std::string ToString(const T &value) const =0;
     virtual TError FromString(const std::string &value, T &result) const =0;
 
-    virtual std::string GetString() const override {
-        return ToString(Get());
+    virtual TError GetString(std::string &value) const override {
+        value = ToString(Get());
+        return TError::Success();
     }
 
     virtual TError SetString(const std::string &value) override {
@@ -259,7 +260,7 @@ public:
                 PORTO_RUNTIME_ERROR(std::string("Bad cast"));
             TError error = p->Set(value);
             if (!error && KvNode && p->HasFlag(PERSISTENT_VALUE))
-                error = KvNode->Append(name, p->GetString());
+                error = KvNode->Append(name, p->ToString(value));
             return error;
         } catch (std::bad_cast &e) {
             PORTO_RUNTIME_ERROR(std::string("Bad cast: ") + e.what());

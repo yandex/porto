@@ -880,7 +880,11 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
     for (auto name : Prop->List()) {
         auto prop = Prop->Find(name);
         if (prop->HasValue()) {
-            error = prop->SetString(prop->GetString());
+            std::string value;
+
+            error = prop->GetString(value);
+            if (!error)
+                error = prop->SetString(value);
             if (error)
                 return error;
         }
@@ -1446,9 +1450,7 @@ TError TContainer::GetData(const string &origName, string &value,
     if (idx.length())
         return data->GetIndexed(idx, value);
 
-    value = data->GetString();
-
-    return TError::Success();
+    return data->GetString(value);
 }
 
 void TContainer::PropertyToAlias(const string &property, string &value) const {
@@ -1522,7 +1524,10 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
     if (idx.length())
         return prop->GetIndexed(idx, value);
 
-    value = prop->GetString();
+    error = prop->GetString(value);
+    if (error)
+        return error;
+
     PropertyToAlias(origProperty, value);
 
     return TError::Success();
@@ -1566,9 +1571,14 @@ TError TContainer::SetProperty(const string &origProperty,
 
     bool superuser = client && client->GetCred().IsPrivileged();
 
-    if (prop->HasFlag(SUPERUSER_PROPERTY) &&
-            !superuser && prop->GetString() != value)
-        return TError(EError::Permission, "Only root can change this property");
+    if (prop->HasFlag(SUPERUSER_PROPERTY) && !superuser) {
+        std::string current;
+        error = prop->GetString(current);
+        if (error)
+            return error;
+        if (value != current)
+            return TError(EError::Permission, "Only root can change this property");
+    }
 
     if (prop->HasFlag(RESTROOT_PROPERTY) &&
             !superuser && !CredConf.RestrictedUser(OwnerCred))

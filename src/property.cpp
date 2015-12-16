@@ -59,9 +59,14 @@ TError TPropertyMap::PrepareTaskEnv(const std::string &property,
 
     // FIXME must die
     if (!prop->HasValue()) {
+        std::string value;
+        TError error;
+
         // if the value is default we still need PrepareTaskEnv method
         // to be called, so set value to default and then reset it
-        TError error = prop->SetString(prop->GetString());
+        error = prop->GetString(value);
+        if (!error)
+            error = prop->SetString(value);
         if (error)
             return error;
         prop->Reset();

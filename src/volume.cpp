@@ -620,9 +620,8 @@ bool TVolume::IsAutoStorage() const {
 }
 
 TPath TVolume::GetStorage() const {
-    auto val = Config->Find(V_STORAGE);
-    if (val->HasValue())
-        return val->GetString();
+    if (Config->HasValue(V_STORAGE))
+        return TPath(Config->Get<std::string>(V_STORAGE));
     else
         return GetInternal(GetBackend());
 }
@@ -1056,7 +1055,7 @@ std::map<std::string, std::string> TVolume::GetProperties(TPath container_root) 
     for (auto name: Config->List()) {
         auto property = Config->Find(name);
         if (!property->HasFlag(HIDDEN_VALUE) && property->HasValue())
-            ret[name] = property->GetString();
+            property->GetString(ret[name]);
     }
 
     if (Config->HasValue(V_LAYERS)) {
