@@ -64,16 +64,6 @@ constexpr int VIRT_MODE_OS = 1;
 class TBindMap;
 class TTaskEnv;
 
-// Property can be modified only by privileged user
-const unsigned int SUPERUSER_PROPERTY = (1 << 0);
-// Property should return parent value as default
-const unsigned int PARENT_DEF_PROPERTY = (1 << 1);
-// Property can be modified only by restricted root
-const unsigned int RESTROOT_PROPERTY = (1 << 3);
-// Properties marked with this flag are reverted to default upon container
-// start with virt_mode==os
-const unsigned int OS_MODE_PROPERTY = (1 << 4);
-
 class TPropertyMap : public TValueMap {
     std::weak_ptr<TContainer> Container;
 

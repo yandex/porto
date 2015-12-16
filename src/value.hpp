@@ -9,18 +9,28 @@
 #include "kvalue.hpp"
 #include "util/log.hpp"
 
-// Value is not shown in the property/data list
-const unsigned int HIDDEN_VALUE = (1 << 31);
-// Value should be preserved upon recovery
-const unsigned int PERSISTENT_VALUE = (1 << 30);
-// Uint value can include options G/M/K suffix
-const unsigned int UINT_UNIT_VALUE = (1 << 29);
-// User cannot modify value
-const unsigned int READ_ONLY_VALUE = (1 << 28);
-// Value has non-default value
-const unsigned int HAS_VALUE = (1 << 27);
+// Property can be modified only by privileged user
+const unsigned int SUPERUSER_PROPERTY = (1 << 0);
+// Property should return parent value as default
+const unsigned int PARENT_DEF_PROPERTY = (1 << 1);
+// Property can be modified only by restricted root
+const unsigned int RESTROOT_PROPERTY = (1 << 3);
+// Properties marked with this flag are reverted to default upon container
+// start with virt_mode==os
+const unsigned int OS_MODE_PROPERTY = (1 << 4);
+
 // Value has not saved
 const unsigned int DIRTY_VALUE = (1 << 26);
+// Value has non-default value
+const unsigned int HAS_VALUE = (1 << 27);
+// User cannot modify value
+const unsigned int READ_ONLY_VALUE = (1 << 28);
+// Uint value can include options G/M/K suffix
+const unsigned int UINT_UNIT_VALUE = (1 << 29);
+// Value should be preserved upon recovery
+const unsigned int PERSISTENT_VALUE = (1 << 30);
+// Value is not shown in the property/data list
+const unsigned int HIDDEN_VALUE = (1 << 31);
 
 class TValue : public TNonCopyable {
 protected:
@@ -36,8 +46,6 @@ public:
     bool HasValue() const { return HasFlag(HAS_VALUE); }
 
     virtual void Reset() = 0;
-
-    virtual std::string DefaultString() const =0;
 
     virtual std::string GetString() const =0;
     virtual TError SetString(const std::string &value) =0;
@@ -56,10 +64,6 @@ public:
     virtual T GetDefault() const =0;
     virtual std::string ToString(const T &value) const =0;
     virtual TError FromString(const std::string &value, T &result) const =0;
-
-    virtual std::string DefaultString() const override {
-        return ToString(GetDefault());
-    }
 
     virtual std::string GetString() const override {
         return ToString(Get());

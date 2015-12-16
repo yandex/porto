@@ -61,7 +61,7 @@ TError TPropertyMap::PrepareTaskEnv(const std::string &property,
     if (!prop->HasValue()) {
         // if the value is default we still need PrepareTaskEnv method
         // to be called, so set value to default and then reset it
-        TError error = prop->SetString(prop->DefaultString());
+        TError error = prop->SetString(prop->GetString());
         if (error)
             return error;
         prop->Reset();
