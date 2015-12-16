@@ -548,7 +548,7 @@ public:
     TNetGuaranteeProperty() :
         TNetMapValue(P_NET_GUARANTEE,
                      "Guaranteed container network bandwidth [bytes/s] (max 32Gbps)",
-                     PARENT_DEF_PROPERTY,
+                     PERSISTENT_VALUE | PARENT_DEF_PROPERTY,
                      staticProperty) {}
     uint32_t GetDef() const override { return config().network().default_guarantee(); }
     uint32_t GetRootDef() const override { return config().network().default_max_guarantee(); }
@@ -569,7 +569,7 @@ public:
     TNetLimitProperty() :
         TNetMapValue(P_NET_LIMIT,
                      "Maximum container network bandwidth [bytes/s] (max 32Gbps)",
-                     PARENT_DEF_PROPERTY,
+                     PERSISTENT_VALUE | PARENT_DEF_PROPERTY,
                      staticProperty) {}
     uint32_t GetDef() const override { return config().network().default_limit(); }
     uint32_t GetRootDef() const override { return config().network().default_max_guarantee(); }
@@ -590,7 +590,7 @@ public:
     TNetPriorityProperty() :
         TNetMapValue(P_NET_PRIO,
                      "Container network priority: 0-7",
-                     PARENT_DEF_PROPERTY,
+                     PERSISTENT_VALUE | PARENT_DEF_PROPERTY,
                      staticProperty) {}
     uint32_t GetDef() const override { return config().network().default_prio(); }
     uint32_t GetRootDef() const override { return config().network().default_prio(); }
