@@ -136,6 +136,9 @@ TError TContainer::ReadStdFile(const std::string &type, std::string &text,
     uint64_t offset = 0;
     TError error;
 
+    if (!path.IsRegular())
+        return TError(EError::InvalidData, type + " file is non-regular");
+
     if (start_offset != "") {
         uint64_t base;
 
@@ -146,7 +149,7 @@ TError TContainer::ReadStdFile(const std::string &type, std::string &text,
         base = Data->Get<uint64_t>(type + "_offset");
         if (offset < base)
             return TError(EError::InvalidData,
-                    "requested offset lower current: " + std::to_string(base));
+                    "requested offset lower than current " + std::to_string(base));
         offset -= base;
     }
 
