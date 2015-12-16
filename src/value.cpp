@@ -351,16 +351,17 @@ TError TValueMap::Sync() {
     return KvNode->Append(node);
 }
 
-TError TValueMap::SetString(const std::string &name, const std::string &value) {
+TError TValueMap::SetValue(const std::string &name, const std::string &value) {
+
     auto val = Find(name);
     if (!val)
-       return TError(EError::InvalidValue, "Invalid value name " + name);
+       return TError(EError::InvalidValue, "Invalid value name: " + name);
+
+    if (val->HasFlag(READ_ONLY_VALUE))
+       return TError(EError::InvalidValue, "Read-only value: " + name);
 
     TError error = val->SetString(value);
-    if (error)
-        return error;
-
-    if (KvNode && val->HasFlag(PERSISTENT_VALUE))
+    if (!error && KvNode && val->HasFlag(PERSISTENT_VALUE))
         error = KvNode->Append(name, value);
 
     return error;

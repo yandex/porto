@@ -792,12 +792,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
 
     /* Apply properties */
     for (auto p: properties) {
-        auto prop = Config->Find(p.first);
-        if (!prop)
-            return TError(EError::InvalidValue, "Invalid volume property: " + p.first);
-        if (prop->HasFlag(READ_ONLY_VALUE))
-            return TError(EError::InvalidValue, "Read-only volume property: " + p.first);
-        error = Config->SetString(p.first, p.second);
+        error = Config->SetValue(p.first, p.second);
         if (error)
             return error;
     }

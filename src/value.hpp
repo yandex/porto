@@ -237,7 +237,7 @@ public:
     TError Flush();
     TError Sync();
 
-    TError SetString(const std::string &name, const std::string &value);
+    TError SetValue(const std::string &name, const std::string &value);
 
     template<typename T>
     const T Get(const std::string &name) const {
