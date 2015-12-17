@@ -537,7 +537,7 @@ public:
         auto err = memorySubsystem->Statistics(memorySubsystem->GetRootCgroup(),
                                                "total_max_rss", val);
         if (err)
-            Implemented = false;
+            SetFlag(UNSUPPORTED_FEATURE);
     }
 
     uint64_t GetDefault() const override {

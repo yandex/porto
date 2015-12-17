@@ -49,10 +49,6 @@ bool TPropertyMap::HasState(const std::string &property, EContainerState state) 
     return valueState.find(state) != valueState.end();
 }
 
-bool TPropertyMap::IsImplemented(const std::string &property) const {
-    return ToContainerValue(Find(property))->IsImplemented();
-}
-
 TError TPropertyMap::PrepareTaskEnv(const std::string &property,
                                     TTaskEnv &taskEnv) {
     auto prop = Find(property);
@@ -312,7 +308,8 @@ public:
         TContainerValue(P_MEM_GUARANTEE,
                         "Guaranteed amount of memory [bytes]",
                         dynamicProperty) {
-        Implemented = memorySubsystem->SupportGuarantee();
+        if (!memorySubsystem->SupportGuarantee())
+            SetFlag(UNSUPPORTED_FEATURE);
     }
 
     TError CheckValue(const uint64_t &value) override {
@@ -357,7 +354,8 @@ public:
         TContainerValue(P_DIRTY_LIMIT,
                         "Dirty file cache limit [bytes]",
                         dynamicProperty) {
-        Implemented = memorySubsystem->SupportDirtyLimit();
+        if (!memorySubsystem->SupportDirtyLimit())
+            SetFlag(UNSUPPORTED_FEATURE);
     }
 
     uint64_t GetDefault() const override {
@@ -372,7 +370,8 @@ public:
         TContainerValue(P_RECHARGE_ON_PGFAULT,
                         "Recharge memory on page fault",
                         dynamicProperty) {
-        Implemented = memorySubsystem->SupportRechargeOnPgfault();
+        if (!memorySubsystem->SupportRechargeOnPgfault())
+            SetFlag(UNSUPPORTED_FEATURE);
     }
 
     bool GetDefault() const override {
@@ -423,7 +422,8 @@ public:
         TContainerValue(P_CPU_LIMIT,
                         "CPU limit: 0-100.0 [%] | 0.0c-<CPUS>c [cores]",
                         dynamicProperty) {
-        Implemented = cpuSubsystem->SupportLimit();
+        if (!cpuSubsystem->SupportLimit())
+            SetFlag(UNSUPPORTED_FEATURE);
     }
 
     double GetDefault() const override {
@@ -454,7 +454,8 @@ public:
         TContainerValue(P_CPU_GUARANTEE,
                         "CPU guarantee: 0-100.0 [%] | 0.0c-<CPUS>c [cores]",
                         dynamicProperty) {
-        Implemented = cpuSubsystem->SupportGuarantee();
+        if (!cpuSubsystem->SupportGuarantee())
+            SetFlag(UNSUPPORTED_FEATURE);
     }
 
     TError FromString(const std::string &str, double &limit) const override {
@@ -478,7 +479,8 @@ public:
         TContainerValue(P_IO_POLICY,
                         "IO policy: normal, batch",
                         dynamicProperty) {
-        Implemented = blkioSubsystem->SupportPolicy();
+        if (!blkioSubsystem->SupportPolicy())
+            SetFlag(UNSUPPORTED_FEATURE);
     }
 
     std::string GetDefault() const override {
@@ -500,7 +502,8 @@ public:
         TContainerValue(P_IO_LIMIT,
                         "Filesystem bandwidth limit [bytes/s]",
                         dynamicProperty) {
-        Implemented = memorySubsystem->SupportIoLimit();
+        if (!memorySubsystem->SupportIoLimit())
+            SetFlag(UNSUPPORTED_FEATURE);
     }
 
     uint64_t GetDefault() const override {
@@ -515,7 +518,8 @@ public:
         TContainerValue(P_IOPS_LIMIT,
                         "Filesystem iops limit [op/s]",
                         dynamicProperty) {
-        Implemented = memorySubsystem->SupportIoLimit();
+        if (!memorySubsystem->SupportIoLimit())
+            SetFlag(UNSUPPORTED_FEATURE);
     }
 
     uint64_t GetDefault() const override {
@@ -922,7 +926,7 @@ public:
         TContainerValue(P_NET_TOS,
                         "IP TOS",
                         staticProperty) {
-        Implemented = false;
+        SetFlag(UNSUPPORTED_FEATURE);
     }
 };
 

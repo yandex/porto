@@ -1434,10 +1434,10 @@ TError TContainer::GetData(const string &origName, string &value,
     if (!data)
         return TError(EError::InvalidData, "invalid container data");
 
-    auto cv = ToContainerValue(data);
-    if (!cv->IsImplemented())
-        return TError(EError::NotSupported, name + " is not implemented");
+    if (data->HasFlag(UNSUPPORTED_FEATURE))
+        return TError(EError::NotSupported, name + " is not supported");
 
+    auto cv = ToContainerValue(data);
     auto validState = cv->GetState();
     if (validState.find(GetState()) == validState.end())
         return TError(EError::InvalidState, "invalid container state");
@@ -1509,8 +1509,8 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
     if (!prop)
         return TError(EError::Unknown, "Invalid property " + property);
 
-    if (!Prop->IsImplemented(property))
-        return TError(EError::NotSupported, property + " is not implemented");
+    if (prop->HasFlag(UNSUPPORTED_FEATURE))
+        return TError(EError::NotSupported, property + " is not supported");
 
     if (!prop->HasValue() && prop->HasFlag(PARENT_DEF_PROPERTY) &&
             !Prop->Get<bool>(P_ISOLATE)) {
@@ -1566,8 +1566,8 @@ TError TContainer::SetProperty(const string &origProperty,
     if (!prop)
         return TError(EError::Unknown, "Invalid property " + property);
 
-    if (!Prop->IsImplemented(property))
-        return TError(EError::NotSupported, property + " is not implemented");
+    if (prop->HasFlag(UNSUPPORTED_FEATURE))
+        return TError(EError::NotSupported, property + " is not supported");
 
     bool superuser = client && client->GetCred().IsPrivileged();
 

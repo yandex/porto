@@ -736,14 +736,11 @@ noinline TError ListProperty(TContext &context,
 
     for (auto name : container->Prop->List()) {
         auto av = container->Prop->Find(name);
-        if (av->HasFlag(HIDDEN_VALUE))
+        if (av->HasFlag(HIDDEN_VALUE) || av->HasFlag(UNSUPPORTED_FEATURE))
             continue;
 
         auto cv = ToContainerValue(av);
-        if (!cv->IsImplemented())
-            continue;
         auto entry = list->add_list();
-
         entry->set_name(name);
         entry->set_desc(cv->GetDesc());
     }
@@ -765,14 +762,11 @@ noinline TError ListData(TContext &context,
 
     for (auto name : container->Data->List()) {
         auto av = container->Data->Find(name);
-        if (av->HasFlag(HIDDEN_VALUE))
+        if (av->HasFlag(HIDDEN_VALUE) || av->HasFlag(UNSUPPORTED_FEATURE))
             continue;
 
         auto cv = ToContainerValue(av);
-        if (!cv->IsImplemented())
-            continue;
         auto entry = list->add_list();
-
         entry->set_name(name);
         entry->set_desc(cv->GetDesc());
     }

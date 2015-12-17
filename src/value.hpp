@@ -19,6 +19,8 @@ const unsigned int RESTROOT_PROPERTY = (1 << 3);
 // start with virt_mode==os
 const unsigned int OS_MODE_PROPERTY = (1 << 4);
 
+// Lack of support in kernel
+const unsigned int UNSUPPORTED_FEATURE = (1 << 25);
 // Value has not saved
 const unsigned int DIRTY_VALUE = (1 << 26);
 // Value has non-default value
