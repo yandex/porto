@@ -258,7 +258,8 @@ static void ShouldHaveValidRunningData(TPortoAPI &api, const string &name) {
     ExpectEq(v, string("0"));
     ExpectApiSuccess(api.GetData(name, "parent", v));
     ExpectEq(v, string("/porto"));
-    if (KernelSupports(KernelFeature::CFQ)) {
+    if (KernelSupports(KernelFeature::FSIO) ||
+            KernelSupports(KernelFeature::CFQ)) {
         ExpectApiSuccess(api.GetData(name, "io_read", v));
         ExpectApiSuccess(api.GetData(name, "io_write", v));
         ExpectApiSuccess(api.GetData(name, "io_ops", v));
@@ -299,7 +300,8 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     ExpectApiFailure(api.GetData(name, "respawn_count", v), EError::InvalidState);
     ExpectApiSuccess(api.GetData(name, "parent", v));
     ExpectEq(v, string("/porto"));
-    if (KernelSupports(KernelFeature::CFQ)) {
+    if (KernelSupports(KernelFeature::FSIO) ||
+            KernelSupports(KernelFeature::CFQ)) {
         ExpectApiFailure(api.GetData(name, "io_read", v), EError::InvalidState);
         ExpectApiFailure(api.GetData(name, "io_write", v), EError::InvalidState);
         ExpectApiFailure(api.GetData(name, "io_ops", v), EError::InvalidState);
@@ -3045,7 +3047,8 @@ static void TestRoot(TPortoAPI &api) {
         ExpectEq(v, "0");
     }
 
-    if (KernelSupports(KernelFeature::CFQ)) {
+    if (KernelSupports(KernelFeature::FSIO) ||
+            KernelSupports(KernelFeature::CFQ)) {
         ExpectApiSuccess(api.GetData(porto_root, "io_read", v));
         ExpectEq(v, "");
         ExpectApiSuccess(api.GetData(porto_root, "io_write", v));
@@ -3195,7 +3198,8 @@ static void TestData(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData(root, "memory_usage", v));
     Expect(v != "0" && v != "-1");
 
-    if (KernelSupports(KernelFeature::CFQ)) {
+    if (KernelSupports(KernelFeature::FSIO) ||
+            KernelSupports(KernelFeature::CFQ)) {
         Say() << "Make sure io_write counters are valid" << std::endl;
         ExpectApiSuccess(api.GetData(root, "io_write", v));
         ExpectNeq(v, "");
@@ -3215,7 +3219,8 @@ static void TestData(TPortoAPI &api) {
     Expect(v != "0" && v != "-1");
     ExpectApiSuccess(api.GetData(wget, "memory_usage", v));
     Expect(v != "0" && v != "-1");
-    if (KernelSupports(KernelFeature::CFQ)) {
+    if (KernelSupports(KernelFeature::FSIO) ||
+            KernelSupports(KernelFeature::CFQ)) {
         ExpectApiSuccess(api.GetData(wget, "io_write", v));
         ExpectNeq(v, "");
         ExpectApiSuccess(api.GetData(wget, "io_read", v));
@@ -3228,7 +3233,8 @@ static void TestData(TPortoAPI &api) {
     Expect(v != "0" && v != "-1");
     ExpectApiSuccess(api.GetData(noop, "memory_usage", v));
     Expect(v != "0" && v != "-1");
-    if (KernelSupports(KernelFeature::CFQ)) {
+    if (KernelSupports(KernelFeature::FSIO) ||
+            KernelSupports(KernelFeature::CFQ)) {
         ExpectApiSuccess(api.GetData(noop, "io_write", v));
         ExpectEq(v, "");
         ExpectApiSuccess(api.GetData(noop, "io_read", v));
