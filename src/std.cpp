@@ -48,46 +48,44 @@ TError TStdStream::Prepare(const TCred &cred) {
 }
 
 TError TStdStream::Open(const TPath &path, const TCred &cred) const {
-    if (Impl == STD_TYPE_FILE || Impl == STD_TYPE_FIFO) {
-        int flags;
-        if (Impl == STD_TYPE_FIFO)
-            flags = Type ? O_WRONLY : O_RDONLY;
-        else
-            flags = Type ? (O_CREAT | O_WRONLY | O_APPEND) : O_RDONLY;
+    int flags;
+    if (Impl == STD_TYPE_FIFO || Impl == STD_TYPE_PTY)
+        flags = Type ? O_WRONLY : O_RDONLY;
+    else
+        flags = Type ? (O_CREAT | O_WRONLY | O_APPEND) : O_RDONLY;
 
-        int ret = open(path.ToString().c_str(), flags, 0660);
-        if (ret < 0)
-            return TError(EError::InvalidValue, errno,
-                          "open(" + path.ToString() + ") -> " +
-                          std::to_string(ret));
-        if (ret != Type) {
-            if (dup2(ret, Type) < 0) {
-                close(ret);
-                return TError(EError::Unknown, errno, "dup2(" + std::to_string(ret) +
-                              ", " + std::to_string(Type) + ")");
-            }
+    int ret = open(path.ToString().c_str(), flags, 0660);
+    if (ret < 0)
+        return TError(EError::InvalidValue, errno,
+                      "open(" + path.ToString() + ") -> " +
+                      std::to_string(ret));
+    if (ret != Type) {
+        if (dup2(ret, Type) < 0) {
             close(ret);
-            ret = Type;
+            return TError(EError::Unknown, errno, "dup2(" + std::to_string(ret) +
+                          ", " + std::to_string(Type) + ")");
         }
+        close(ret);
+        ret = Type;
+    }
 
-        if (Impl == STD_TYPE_FILE && path.IsRegular()) {
-            ret = fchown(ret, cred.Uid, cred.Gid);
-            if (ret < 0)
-                return TError(EError::Unknown, errno, "fchown(" + path.ToString() + ")");
-        }
+    if (Impl == STD_TYPE_FILE && path.IsRegular()) {
+        ret = fchown(ret, cred.Uid, cred.Gid);
+        if (ret < 0)
+            return TError(EError::Unknown, errno, "fchown(" + path.ToString() + ")");
     }
     return TError::Success();
 }
 
 TError TStdStream::OpenOnHost(const TCred &cred) const {
-    if (ManagedByPorto && (Impl == STD_TYPE_FILE || Impl == STD_TYPE_FIFO))
+    if (ManagedByPorto)
         return Open(PathOnHost, cred);
     else
         return TError::Success();
 }
 
 TError TStdStream::OpenInChild(const TCred &cred) const {
-    if (!ManagedByPorto && (Impl == STD_TYPE_FILE || Impl == STD_TYPE_FIFO))
+    if (!ManagedByPorto)
         return Open(PathInContainer, cred);
     else
         return TError::Success();

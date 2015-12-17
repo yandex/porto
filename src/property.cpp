@@ -250,7 +250,7 @@ public:
     }
 
     TError CheckValue(const std::string &value) override {
-        if (value == STD_TYPE_FILE || value == STD_TYPE_FIFO)
+        if (value == STD_TYPE_FILE || value == STD_TYPE_FIFO || value == STD_TYPE_PTY)
             return TError::Success();
         else
             return TError(EError::InvalidValue, "Invalid std type value");

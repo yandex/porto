@@ -6,6 +6,7 @@
 
 constexpr const char* STD_TYPE_FILE = "file";
 constexpr const char* STD_TYPE_FIFO = "fifo";
+constexpr const char* STD_TYPE_PTY = "pty";
 
 class TStdStream {
 private:

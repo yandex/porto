@@ -963,16 +963,6 @@ public:
         return false;
     }
 
-    int MakeFifo(const std::string &path) {
-        if (mkfifo(path.c_str(), 0755) < 0) {
-            TError error(EError::Unknown, errno, "mkfifo()");
-            PrintError(error, "Can't create temporary file " + path);
-            return EXIT_FAILURE;
-        }
-
-        return EXIT_SUCCESS;
-    }
-
     int OpenTemp(const std::string &path, int flags) {
         int fd = open(path.c_str(), flags);
         if (fd < 0) {
@@ -1068,6 +1058,21 @@ public:
             stdinFd = ptm;
             stdoutFd = ptm;
             stderrFd = ptm;
+
+            args.push_back("stdin_path=" + stdinPath);
+            args.push_back("stdout_path=" + stdoutPath);
+            args.push_back("stderr_path=" + stderrPath);
+
+            args.push_back("stdin_type=pty");
+            args.push_back("stdout_type=pty");
+            args.push_back("stderr_type=pty");
+
+            if (env.length())
+                args.push_back("env=" + env);
+
+            int ret = RunCmd<TRunCmd>(args, environment);
+            if (ret)
+                return ret;
         } else {
             TmpDir = mkdtemp(strdup("/tmp/portoctl-exec-XXXXXX"));
             if (!TmpDir) {
@@ -1077,16 +1082,23 @@ public:
             }
 
             stdinPath = string(TmpDir) + "/stdin";
-            if (MakeFifo(stdinPath))
-                return EXIT_FAILURE;
-
             stdoutPath = string(TmpDir) + "/stdout";
-            if (MakeFifo(stdoutPath))
-                return EXIT_FAILURE;
-
             stderrPath = string(TmpDir) + "/stderr";
-            if (MakeFifo(stderrPath))
-                return EXIT_FAILURE;
+
+            args.push_back("stdin_path=" + stdinPath);
+            args.push_back("stdout_path=" + stdoutPath);
+            args.push_back("stderr_path=" + stderrPath);
+
+            args.push_back("stdin_type=fifo");
+            args.push_back("stdout_type=fifo");
+            args.push_back("stderr_type=fifo");
+
+            if (env.length())
+                args.push_back("env=" + env);
+
+            int ret = RunCmd<TRunCmd>(args, environment);
+            if (ret)
+                return ret;
 
             stdinFd = OpenTemp(stdinPath, O_RDWR | O_NONBLOCK);
             if (stdinFd < 0)
@@ -1109,16 +1121,6 @@ public:
             fds.push_back(pfd);
         }
 
-        args.push_back("stdin_path=" + stdinPath);
-        args.push_back("stdout_path=" + stdoutPath);
-        args.push_back("stderr_path=" + stderrPath);
-        if (env.length())
-            args.push_back("env=" + env);
-
-        int ret = RunCmd<TRunCmd>(args, environment);
-        if (ret)
-            return ret;
-
         containerName = argv[0];
 
         bool hangup = false;
@@ -1126,7 +1128,7 @@ public:
             if (GotSignal())
                 return EXIT_FAILURE;
 
-            ret = poll(fds.data(), fds.size(), -1);
+            int ret = poll(fds.data(), fds.size(), -1);
             if (ret < 0)
                 break;
 
@@ -1159,7 +1161,7 @@ public:
             return EXIT_FAILURE;
 
         std::string tmp;
-        ret = Api->Wait({ containerName }, tmp);
+        int ret = Api->Wait({ containerName }, tmp);
         if (GotSignal())
             return EXIT_FAILURE;
         if (ret) {
