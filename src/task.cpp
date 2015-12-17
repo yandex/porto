@@ -130,11 +130,13 @@ TError TTask::ChildOpenStdFile(const TPath &path, int expected) {
         ret = expected;
     }
 
-    ret = fchown(ret, Env->Cred.Uid, Env->Cred.Gid);
-    if (ret < 0)
-        return TError(EError::Unknown, errno,
-                      "fchown(" + path.ToString() + ") -> " +
-                      std::to_string(expected));
+    if (path.IsRegular()) {
+        ret = fchown(ret, Env->Cred.Uid, Env->Cred.Gid);
+        if (ret < 0)
+            return TError(EError::Unknown, errno,
+                    "fchown(" + path.ToString() + ") -> " +
+                    std::to_string(expected));
+    }
 
     return TError::Success();
 }
