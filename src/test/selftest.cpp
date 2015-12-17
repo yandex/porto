@@ -112,6 +112,39 @@ static void ShouldHaveOnlyRoot(TPortoAPI &api) {
     ExpectEq(containers[0], string("/"));
 }
 
+static void TestDataMap(TPortoAPI &api, const std::string &name, const std::string &data, bool zero) {
+    std::string full;
+    vector<string> lines;
+    int nr_nonzero = 0;
+
+    ExpectApiSuccess(api.GetData(name, data, full));
+    ExpectSuccess(SplitString(full, ';', lines));
+
+    if (!zero) {
+        ExpectNeq(full, "");
+        ExpectNeq(lines.size(), 0);
+    }
+
+    for (auto line: lines) {
+        string tmp;
+        vector<string> tokens;
+
+        ExpectSuccess(SplitString(line, ':', tokens));
+        ExpectApiSuccess(api.GetData(name, data + "[" + StringTrim(tokens[0]) + "]", tmp));
+        ExpectEq(tmp, StringTrim(tokens[1]));
+
+        if (tmp != "0")
+            nr_nonzero++;
+    }
+
+    if (zero)
+        ExpectEq(nr_nonzero, 0);
+    else
+        ExpectNeq(nr_nonzero, 0);
+
+    ExpectApiFailure(api.GetData(name, data + "[invalid]", full), EError::InvalidValue);
+}
+
 static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     string v;
 
@@ -3049,12 +3082,9 @@ static void TestRoot(TPortoAPI &api) {
 
     if (KernelSupports(KernelFeature::FSIO) ||
             KernelSupports(KernelFeature::CFQ)) {
-        ExpectApiSuccess(api.GetData(porto_root, "io_read", v));
-        ExpectEq(v, "");
-        ExpectApiSuccess(api.GetData(porto_root, "io_write", v));
-        ExpectEq(v, "");
-        ExpectApiSuccess(api.GetData(porto_root, "io_ops", v));
-        ExpectEq(v, "");
+        TestDataMap(api, porto_root, "io_write", true);
+        TestDataMap(api, porto_root, "io_read", true);
+        TestDataMap(api, porto_root, "io_ops", true);
     }
 
     if (NetworkEnabled()) {
@@ -3113,27 +3143,6 @@ static void TestRoot(TPortoAPI &api) {
         ExpectEq(GetCgKnob("blkio", "", "blkio.weight"), "1000");
 }
 
-static void TestDataMap(TPortoAPI &api, const std::string &name, const std::string &data) {
-    std::string full;
-    vector<string> lines;
-
-    ExpectApiSuccess(api.GetData(name, data, full));
-    ExpectNeq(full, "");
-    ExpectSuccess(SplitString(full, ';', lines));
-
-    ExpectNeq(lines.size(), 0);
-    for (auto line: lines) {
-        string tmp;
-        vector<string> tokens;
-
-        ExpectSuccess(SplitString(line, ':', tokens));
-        ExpectApiSuccess(api.GetData(name, data + "[" + StringTrim(tokens[0]) + "]", tmp));
-        ExpectEq(tmp, StringTrim(tokens[1]));
-    }
-
-    ExpectApiFailure(api.GetData(name, data + "[invalid]", full), EError::InvalidValue);
-}
-
 static void ExpectNonZeroLink(TPortoAPI &api, const std::string &name,
                               const std::string &data) {
     string nonzero = "0";
@@ -3179,6 +3188,7 @@ static void TestData(TPortoAPI &api) {
     // this will cause io read and noop will not have io_read
     ExpectEq(system("ls -la /bin >/dev/null"), 0);
     ExpectApiSuccess(api.SetProperty(noop, "command", "ls -la /bin"));
+    ExpectApiSuccess(api.SetProperty(noop, "stdout_path", "/dev/null"));
     ExpectApiSuccess(api.Start(noop));
     WaitContainer(api, noop);
 
@@ -3201,32 +3211,25 @@ static void TestData(TPortoAPI &api) {
     if (KernelSupports(KernelFeature::FSIO) ||
             KernelSupports(KernelFeature::CFQ)) {
         Say() << "Make sure io_write counters are valid" << std::endl;
-        ExpectApiSuccess(api.GetData(root, "io_write", v));
-        ExpectNeq(v, "");
-        TestDataMap(api, root, "io_write");
+        TestDataMap(api, root, "io_write", false);
 
         Say() << "Make sure io_read counters are valid" << std::endl;
-        ExpectApiSuccess(api.GetData(root, "io_read", v));
-        Expect(v != "");
-        TestDataMap(api, root, "io_read");
+        TestDataMap(api, root, "io_read", false);
 
         Say() << "Make sure io_ops counters are valid" << std::endl;
-        ExpectApiSuccess(api.GetData(root, "io_ops", v));
-        Expect(v != "");
-        TestDataMap(api, root, "io_ops");
+        TestDataMap(api, root, "io_ops", false);
     }
+
     ExpectApiSuccess(api.GetData(wget, "cpu_usage", v));
     Expect(v != "0" && v != "-1");
+
     ExpectApiSuccess(api.GetData(wget, "memory_usage", v));
     Expect(v != "0" && v != "-1");
+
     if (KernelSupports(KernelFeature::FSIO) ||
             KernelSupports(KernelFeature::CFQ)) {
-        ExpectApiSuccess(api.GetData(wget, "io_write", v));
-        ExpectNeq(v, "");
-        ExpectApiSuccess(api.GetData(wget, "io_read", v));
-        ExpectNeq(v, "");
-        ExpectApiSuccess(api.GetData(wget, "io_ops", v));
-        ExpectNeq(v, "");
+        TestDataMap(api, wget, "io_write", false);
+        TestDataMap(api, wget, "io_ops", false);
     }
 
     ExpectApiSuccess(api.GetData(noop, "cpu_usage", v));
@@ -3235,12 +3238,9 @@ static void TestData(TPortoAPI &api) {
     Expect(v != "0" && v != "-1");
     if (KernelSupports(KernelFeature::FSIO) ||
             KernelSupports(KernelFeature::CFQ)) {
-        ExpectApiSuccess(api.GetData(noop, "io_write", v));
-        ExpectEq(v, "");
-        ExpectApiSuccess(api.GetData(noop, "io_read", v));
-        ExpectEq(v, "");
-        ExpectApiSuccess(api.GetData(noop, "io_ops", v));
-        ExpectEq(v, "");
+        TestDataMap(api, noop, "io_write", true);
+        TestDataMap(api, noop, "io_read", true);
+        TestDataMap(api, noop, "io_ops", true);
     }
 
     if (NetworkEnabled()) {
