@@ -117,6 +117,8 @@ static void TestDataMap(TPortoAPI &api, const std::string &name, const std::stri
     vector<string> lines;
     int nr_nonzero = 0;
 
+    Say() << "Test " << name << " data map " << data << " zero:" << zero << std::endl;
+
     ExpectApiSuccess(api.GetData(name, data, full));
     ExpectSuccess(SplitString(full, ';', lines));
 
@@ -3194,9 +3196,9 @@ static void TestData(TPortoAPI &api) {
 
     ExpectApiSuccess(api.Create(wget));
     if (NetworkEnabled())
-        ExpectApiSuccess(api.SetProperty(wget, "command", "bash -c 'wget yandex.ru -O - | dd of=index.html conv=fdatasync'"));
+        ExpectApiSuccess(api.SetProperty(wget, "command", "bash -c 'wget yandex.ru -O - | dd of=index.html oflag=direct'"));
     else
-        ExpectApiSuccess(api.SetProperty(wget, "command", "bash -c 'dd if=/dev/urandom bs=4k count=1 of=index.html conv=fdatasync'"));
+        ExpectApiSuccess(api.SetProperty(wget, "command", "bash -c 'dd if=/dev/urandom bs=4k count=1 of=index.html oflag=direct'"));
     ExpectApiSuccess(api.Start(wget));
     WaitContainer(api, wget, 60);
 
@@ -3210,13 +3212,8 @@ static void TestData(TPortoAPI &api) {
 
     if (KernelSupports(KernelFeature::FSIO) ||
             KernelSupports(KernelFeature::CFQ)) {
-        Say() << "Make sure io_write counters are valid" << std::endl;
         TestDataMap(api, root, "io_write", false);
-
-        Say() << "Make sure io_read counters are valid" << std::endl;
         TestDataMap(api, root, "io_read", false);
-
-        Say() << "Make sure io_ops counters are valid" << std::endl;
         TestDataMap(api, root, "io_ops", false);
     }
 
