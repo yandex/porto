@@ -7,18 +7,6 @@
 #include "string.hpp"
 #include "util/cred.hpp"
 
-enum class EFileType {
-    Regular,
-    Directory,
-    Block,
-    Character,
-    Fifo,
-    Link,
-    Socket,
-    Unknown,
-    Any
-};
-
 enum class EFileAccess {
     Read,
     Write,
@@ -90,7 +78,6 @@ public:
     TPath RealPath() const;
     TPath InnerPath(const TPath &path, bool absolute = true) const;
 
-    EFileType GetType() const;
     unsigned int GetMode() const;
     unsigned int GetDev() const;
     ino_t GetInode() const;

@@ -57,33 +57,6 @@ std::string TPath::BaseName() const {
     return out;
 }
 
-EFileType TPath::GetType() const {
-    struct stat st;
-
-    if (!Path.length())
-        return EFileType::Unknown;
-
-    if (lstat(Path.c_str(), &st))
-        return EFileType::Unknown;
-
-    if (S_ISREG(st.st_mode))
-        return EFileType::Regular;
-    else if (S_ISDIR(st.st_mode))
-        return EFileType::Directory;
-    else if (S_ISCHR(st.st_mode))
-        return EFileType::Character;
-    else if (S_ISBLK(st.st_mode))
-        return EFileType::Block;
-    else if (S_ISFIFO(st.st_mode))
-        return EFileType::Fifo;
-    else if (S_ISLNK(st.st_mode))
-        return EFileType::Link;
-    else if (S_ISSOCK(st.st_mode))
-        return EFileType::Socket;
-    else
-        return EFileType::Unknown;
-}
-
 unsigned int TPath::Stat(std::function<unsigned int(struct stat *st)> f) const {
     struct stat st;
 
