@@ -1955,8 +1955,7 @@ static void TestHostnameProperty(TPortoAPI &api) {
     RemakeDir(api, path);
 
     AsRoot(api);
-    TMount tmpfs(name, path, "tmpfs", {"size=32m"});
-    ExpectSuccess(tmpfs.Mount());
+    ExpectSuccess(path.Mount(name, "tmpfs", 0, {"size=32m"}));
     AsNobody(api);
 
     AsRoot(api);
@@ -2028,7 +2027,7 @@ static void TestHostnameProperty(TPortoAPI &api) {
 
     AsRoot(api);
     ExpectSuccess(etc.RemoveAll());
-    ExpectSuccess(tmpfs.Umount());
+    ExpectSuccess(path.Umount(0));
     AsNobody(api);
 
     ExpectApiSuccess(api.Destroy(name));
@@ -3699,12 +3698,11 @@ static void TestVirtModeProperty(TPortoAPI &api) {
     TError error = SetupLoopDevice(tmpimg, nr);
     if (error)
         throw error.GetMsg();
-    TMount m("/dev/loop" + std::to_string(nr), tmpdir, "ext4", {});
     AsDaemon(api);
 
     try {
         AsRoot(api);
-        ExpectSuccess(m.Mount());
+        ExpectSuccess(tmpdir.Mount("/dev/loop" + std::to_string(nr), "ext4", 0, {}));
         AsDaemon(api);
 
         ExpectApiSuccess(api.SetProperty(name, "isolate", "false"));
@@ -3716,12 +3714,12 @@ static void TestVirtModeProperty(TPortoAPI &api) {
         ExpectEq(system(cmd.c_str()), 0);
         cmd = std::string("mv ") + tmpdir.ToString() + "/id " + tmpdir.ToString() + "/sbin/init";
         ExpectEq(system(cmd.c_str()), 0);
-        (void)m.Umount();
+        (void)tmpdir.Umount(0);
         (void)PutLoopDev(nr);
         AsDaemon(api);
     } catch (...) {
         AsRoot(api);
-        (void)m.Umount();
+        (void)tmpdir.Umount(0);
         (void)PutLoopDev(nr);
         ExpectApiSuccess(api.Destroy(name));
         tmpdir.RemoveAll();

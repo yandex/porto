@@ -702,12 +702,14 @@ public:
             return error;
 
         for (auto &mount : mounts) {
+            auto data = mount->GetData();
             bool found = true;
-            for (auto &ss : subsystems)
-                if (!mount->HasFlag(ss)) {
+            for (auto &ss : subsystems) {
+                if (std::find(data.begin(), data.end(), ss) == data.end()) {
                     found = false;
                     break;
                 }
+            }
 
             if (found) {
                 root = mount->GetMountpoint();

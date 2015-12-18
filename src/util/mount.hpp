@@ -52,18 +52,6 @@ public:
     static TError Snapshot(std::vector<std::shared_ptr<TMount>> &result,
                            const TPath mounts = "/proc/self/mounts");
 
-    TError Mount(unsigned long flags = 0) const;
-    TError Bind(bool rdonly, unsigned long flags = 0) const;
-    TError BindFile(bool rdonly, unsigned long flags = 0) const;
-    TError BindDir(bool rdonly, unsigned long flags = 0) const;
-    TError MountDir(unsigned long flags = 0) const;
-    TError Umount(int flags = UMOUNT_NOFOLLOW) const;
-    TError Move(TPath destination);
-
-    bool HasFlag(const std::string flag) const {
-        return std::find(Data.begin(), Data.end(), flag) != Data.end();
-    }
-
     friend std::ostream& operator<<(std::ostream& stream, const TMount& mount) {
         stream << mount.Source << " " << mount.Target << " " << mount.Type << " ";
 

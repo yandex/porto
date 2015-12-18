@@ -58,7 +58,6 @@ public:
     virtual TError Build() =0;
     virtual TError Destroy() =0;
     virtual TError Clear();
-    virtual TError Move(TPath dest);
     virtual TError Resize(uint64_t space_limit, uint64_t inode_limit);
     virtual TError GetStat(uint64_t &space_used, uint64_t &space_avail,
                            uint64_t &inode_used, uint64_t &inode_avail);

@@ -288,7 +288,6 @@ TError TProjectQuota::Load() {
 TError TProjectQuota::Create() {
 	struct if_dqblk quota;
 	TError error;
-	TMount mount;
 
 	if (!Path.IsDirectory())
 		return TError(EError::InvalidValue, "Not a directory " + Path.ToString());

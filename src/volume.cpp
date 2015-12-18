@@ -40,10 +40,6 @@ TError TVolumeBackend::Resize(uint64_t space_limit, uint64_t inode_limit) {
     return TError(EError::NotSupported, "not implemented");
 }
 
-TError TVolumeBackend::Move(TPath) {
-    return TError(EError::NotSupported, "not implemented");
-}
-
 TError TVolumeBackend::GetStat(uint64_t &space_used, uint64_t &space_avail,
                                uint64_t &inode_used, uint64_t &inode_avail) {
     return Volume->GetPath().StatVFS(space_used, space_avail,
@@ -75,8 +71,7 @@ public:
         if (error)
             return error;
 
-        TMount Mount = TMount(storage, Volume->GetPath(), "none", {});
-        return Mount.Bind(false, Volume->GetMountFlags());
+        return Volume->GetPath().Bind(storage, Volume->GetMountFlags());
     }
 
     TError Clear() override {
@@ -89,11 +84,6 @@ public:
         if (error)
             L_ERR() << "Can't umount volume: " << error << std::endl;
         return error;
-    }
-
-    TError Move(TPath dest) override {
-        TMount mount(Volume->GetStorage(), Volume->GetPath(), "none", {});
-        return mount.Move(dest);
     }
 };
 
@@ -152,8 +142,7 @@ public:
         if (error)
             return error;
 
-        TMount mount(storage, Volume->GetPath(), "none", {});
-        return mount.Bind(false, Volume->GetMountFlags());
+        return Volume->GetPath().Bind(storage, Volume->GetMountFlags());
     }
 
     TError Clear() override {
@@ -177,11 +166,6 @@ public:
         }
 
         return error;
-    }
-
-    TError Move(TPath dest) override {
-        TMount mount(Volume->GetStorage(), Volume->GetPath(), "none", {});
-        return mount.Move(dest);
     }
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
@@ -292,11 +276,6 @@ free_loop:
         return Volume->GetPath().ClearDirectory();
     }
 
-    TError Move(TPath dest) override {
-        TMount mount(GetLoopDevice(), Volume->GetPath(), "ext4", {});
-        return mount.Move(dest);
-    }
-
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
         return TError(EError::NotSupported, "loop backend doesn't suppport resize");
     }
@@ -359,11 +338,6 @@ public:
             lower << layer;
         }
 
-        TMount mount("overlay", Volume->GetPath(), "overlay",
-                { "lowerdir=" + lower.str(),
-                  "upperdir=" + upper.ToString(),
-                  "workdir=" + work.ToString() });
-
         if (!upper.Exists()) {
             error = upper.Mkdir(0755);
             if (error)
@@ -385,7 +359,11 @@ public:
         } else
             work.ClearDirectory();
 
-        error = mount.Mount(Volume->GetMountFlags());
+        error = Volume->GetPath().Mount("overlay", "overlay",
+                                        Volume->GetMountFlags(),
+                                        { "lowerdir=" + lower.str(),
+                                          "upperdir=" + upper.ToString(),
+                                          "workdir=" + work.ToString() });
         if (!error)
             return error;
 err:
@@ -430,11 +408,6 @@ err:
         }
 
         return error;
-    }
-
-    TError Move(TPath dest) override {
-        TMount mount("overlay", Volume->GetPath(), "overlay", {});
-        return mount.Move(dest);
     }
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
@@ -536,8 +509,7 @@ public:
             return error;
         }
 
-        TMount mount(device, path, "ext4", {});
-        error = mount.Mount(Volume->GetMountFlags());
+        error = path.Mount(device, "ext4", Volume->GetMountFlags(), {});
         if (error)
             UnmapDevice(device);
         return error;
@@ -561,11 +533,6 @@ public:
 
     TError Clear() override {
         return Volume->GetPath().ClearDirectory();
-    }
-
-    TError Move(TPath dest) override {
-        TMount mount(GetDevice(), Volume->GetPath(), "ext4", {});
-        return mount.Move(dest);
     }
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {

@@ -228,8 +228,12 @@ TError TTask::ChildBindDns() {
     vector<string> files = { "/etc/hosts", "/etc/resolv.conf" };
 
     for (auto &file : files) {
-        TMount mnt(file, Env->Root + file, "none", {});
-        TError error = mnt.BindFile(true);
+        TPath path = Env->Root / file;
+        TError error;
+
+        error = path.CreateAll(0600);
+        if (!error)
+            error = path.Bind(file, MS_RDONLY);
         if (error)
             return error;
     }
@@ -257,13 +261,18 @@ TError TTask::ChildBindDirectores() {
                           + dest.RealPath().ToString()
                           + " (" + Env->Root.ToString() + ")");
 
-        TMount mnt(src, dest, "none", {});
-
         TError error;
         if (src.IsDirectory())
-            error = mnt.BindDir(bindMap.Rdonly);
+            error = dest.MkdirAll(0755);
         else
-            error = mnt.BindFile(bindMap.Rdonly);
+            error = dest.CreateAll(0600);
+
+        unsigned long flags = 0;
+        if (bindMap.Rdonly)
+            flags |= MS_RDONLY;
+
+        if (!error)
+            error = dest.Bind(src, flags);
         if (error)
             return error;
 

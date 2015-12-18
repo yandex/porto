@@ -124,9 +124,11 @@ TPath TCgroup::Relpath() const {
 }
 
 TError TCgroup::Create() {
+    TError error;
+
     if (IsRoot()) {
         vector<shared_ptr<TMount>> mounts;
-        TError error = TMount::Snapshot(mounts);
+        error = TMount::Snapshot(mounts);
         if (error) {
             L_ERR() << "Can't create mount snapshot: " << error << std::endl;
             return error;
@@ -141,8 +143,8 @@ TError TCgroup::Create() {
         }
 
         if (mountRoot) {
-            TMount root("cgroup", config().daemon().sysfs_root(), "tmpfs", {});
-            TError error = root.Mount();
+            TPath root(config().daemon().sysfs_root());
+            error = root.Mount("cgroup", "tmpfs", 0, {});
             if (error) {
                 L_ERR() << "Can't mount root cgroup: " << error << std::endl;
                 return error;
@@ -155,7 +157,7 @@ TError TCgroup::Create() {
     if (!path.Exists()) {
         L_ACT() << "Create cgroup " << path << std::endl;
 
-        TError error = path.Mkdir(Mode);
+        error = path.Mkdir(Mode);
         if (error) {
             L_ERR() << "Can't create cgroup directory: " << error << std::endl;
             return error;
@@ -163,7 +165,7 @@ TError TCgroup::Create() {
     }
 
     if (IsRoot()) {
-        TError error = Mount->Mount();
+        error = path.Mount(Mount->GetSource(), Mount->GetType(), 0, Mount->GetData());
         if (error) {
             L_ERR() << "Can't mount root cgroup for root container: " << error << std::endl;
             return error;
