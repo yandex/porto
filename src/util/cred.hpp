@@ -40,6 +40,7 @@ public:
 
     TCred(uid_t uid, gid_t gid) : Uid(uid), Gid(gid) {}
     TCred() : Uid(0), Gid(0) {}
+    static TCred Current();
 
     std::string UserAsString() const;
     std::string GroupAsString() const;

@@ -734,7 +734,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             return TError(EError::InvalidValue, "Volume path must be normalized");
         if (!path.IsDirectory())
             return TError(EError::InvalidValue, "Volume path must be a directory");
-        if (!path.AccessOk(EFileAccess::Write, creator_cred))
+        if (!path.CanWrite(creator_cred))
             return TError(EError::Permission, "Volume path usage not permitted");
         error = Config->Set<std::string>(V_PATH, path.ToString());
         if (error)
@@ -766,7 +766,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             return TError(EError::InvalidValue, "Storage path must be normalized");
         if (!storage.IsDirectory())
             return TError(EError::InvalidValue, "Storage path must be a directory");
-        if (!storage.AccessOk(EFileAccess::Write, creator_cred))
+        if (!storage.CanWrite(creator_cred))
             return TError(EError::Permission, "Storage path usage not permitted");
     }
 
@@ -827,7 +827,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
                 l = layer.ToString();
                 if (!layer.Exists())
                     return TError(EError::LayerNotFound, "Layer not found");
-                if (!layer.AccessOk(EFileAccess::Write, creator_cred))
+                if (!layer.CanWrite(creator_cred))
                     return TError(EError::Permission, "Layer path not permitted");
             } else {
                 if (l.find('/') != std::string::npos)

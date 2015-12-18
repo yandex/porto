@@ -1231,7 +1231,7 @@ noinline TError ImportLayer(TContext &context,
     if (!tarball.IsRegular())
         return TError(EError::InvalidValue, "tarball not a file");
 
-    if (!tarball.AccessOk(EFileAccess::Read, client->GetCred()))
+    if (!tarball.CanRead(client->GetCred()))
         return TError(EError::Permission, "client has not read access to tarball");
 
     if (!layers_tmp.Exists()) {
@@ -1308,7 +1308,7 @@ noinline TError ExportLayer(TContext &context,
     if (tarball.Exists())
         return TError(EError::InvalidValue, "tarball already exists");
 
-    if (!tarball.DirName().AccessOk(EFileAccess::Write, client->GetCred()))
+    if (!tarball.DirName().CanWrite(client->GetCred()))
         return TError(EError::Permission, "client has no write access to tarball directory");
 
     auto vholder_lock = context.Vholder->ScopedLock();

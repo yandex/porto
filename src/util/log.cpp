@@ -139,7 +139,7 @@ TLogBuf::TLogBuf(const size_t size) {
 }
 
 void TLogBuf::Open(const TPath &path, const unsigned int mode) {
-    if (!path.DirName().AccessOk(EFileAccess::Write)) {
+    if (!path.DirName().CanWrite(TCred::Current())) {
         logBufFd = open("/dev/kmsg", O_WRONLY | O_APPEND | O_CLOEXEC);
         if (logBufFd < 0)
             logBufFd = STDERR_FILENO;

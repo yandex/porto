@@ -20,17 +20,6 @@ extern "C" {
 #include <dirent.h>
 }
 
-std::string AccessTypeToString(EFileAccess type) {
-    if (type == EFileAccess::Read)
-        return "read";
-    else if (type == EFileAccess::Write)
-        return "write";
-    else if (type == EFileAccess::Execute)
-        return "execute";
-    else
-        return "unknown";
-}
-
 std::string TPath::DirNameStr() const {
     char *dup = strdup(Path.c_str());
     PORTO_ASSERT(dup != nullptr);
@@ -133,41 +122,24 @@ bool TPath::Exists() const {
     return access(Path.c_str(), F_OK) == 0;
 }
 
-bool TPath::AccessOk(EFileAccess type) const {
-    switch (type) {
-    case EFileAccess::Read:
-        return access(Path.c_str(), R_OK) == 0;
-    case EFileAccess::Write:
-        return access(Path.c_str(), W_OK) == 0;
-    case EFileAccess::Execute:
-        return access(Path.c_str(), X_OK) == 0;
-    default:
+bool TPath::HasAccess(const TCred &cred, int mask) const {
+    struct stat st;
+    int mode;
+
+    if (!cred.Uid && !access(c_str(), mask))
+        return true;
+
+    if (stat(c_str(), &st))
         return false;
-    }
-}
 
-bool TPath::AccessOk(EFileAccess type, const TCred &cred) const {
-    int ret;
-    bool result = false;
+    if (cred.Uid == st.st_uid)
+        mode = st.st_mode >> 6;
+    else if (cred.IsMemberOf(st.st_gid))
+        mode = st.st_mode >> 3;
+    else
+        mode = st.st_mode;
 
-    /*
-     * Set real uid/gid -- syscall access uses it for checks.
-     * Use raw syscalls because libc wrapper changes uid for all threads.
-     */
-    ret = syscall(SYS_setreuid, cred.Uid, 0);
-    if (ret)
-        goto exit;
-    ret = syscall(SYS_setregid, cred.Gid, 0);
-    if (ret)
-        goto exit;
-
-    result = AccessOk(type);
-
-exit:
-    (void)syscall(SYS_setreuid, 0, 0);
-    (void)syscall(SYS_setregid, 0, 0);
-
-    return result;
+    return (mode & mask) == mask;
 }
 
 std::string TPath::ToString() const {

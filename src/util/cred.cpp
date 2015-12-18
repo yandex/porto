@@ -157,6 +157,18 @@ TError TCred::LoadGroups(std::string user) {
     return TError::Success();
 }
 
+TCred TCred::Current() {
+    TCred cred(geteuid(), getegid());
+
+    cred.Groups.resize(getgroups(0, nullptr));
+    if (getgroups(cred.Groups.size(), cred.Groups.data()) < 0) {
+        L_ERR() << "Cannot get supplementary groups: " << errno << std::endl;
+        cred.Groups.resize(0);
+    }
+
+    return cred;
+}
+
 /* FIXME should die */
 bool TCred::IsRootUser() const {
     return Uid == 0 || Gid == 0;

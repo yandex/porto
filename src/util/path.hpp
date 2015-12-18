@@ -7,14 +7,6 @@
 #include "string.hpp"
 #include "util/cred.hpp"
 
-enum class EFileAccess {
-    Read,
-    Write,
-    Execute
-};
-
-std::string AccessTypeToString(EFileAccess type);
-
 class TPath {
     std::string Path;
 
@@ -91,8 +83,11 @@ public:
     bool IsRegular() const;
     bool IsDirectory() const;
     bool Exists() const;
-    bool AccessOk(EFileAccess type) const;
-    bool AccessOk(EFileAccess type, const TCred &cred) const;
+
+    bool HasAccess(const TCred &cred, int mask) const;
+    bool CanRead(const TCred &cred) const { return HasAccess(cred, 4); }
+    bool CanWrite(const TCred &cred) const { return HasAccess(cred, 2); }
+
     TError Chdir() const;
     TError Chroot() const;
     TError PivotRoot() const;
