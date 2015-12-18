@@ -9,7 +9,6 @@
 #include "config.hpp"
 #include "util/file.hpp"
 #include "util/string.hpp"
-#include "util/folder.hpp"
 #include "test.hpp"
 
 extern "C" {
@@ -75,9 +74,9 @@ static void Create(TPortoAPI &api, const std::string &name, const std::string &c
     Expect(std::find(containers.begin(),containers.end(),name) != containers.end());
 
     if (cwd.length()) {
-        TFolder f(cwd);
+        TPath f(cwd);
         if (!f.Exists()) {
-            TError error = f.Create(0755, true);
+            TError error = f.MkdirAll(0755);
             ExpectSuccess(error);
         }
     }
@@ -189,10 +188,8 @@ static void Destroy(TPortoAPI &api, const std::string &name, const std::string &
     ExpectApiSuccess(api.List(containers));
     Expect(std::find(containers.begin(),containers.end(),name) == containers.end());
 
-    if (cwd.length()) {
-        TFolder f(cwd);
-        f.Remove(true);
-    }
+    if (cwd.length())
+        (void)TPath(cwd).RemoveAll();
 }
 
 static void Tasks(int n, int iter) {

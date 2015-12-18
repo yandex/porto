@@ -19,7 +19,6 @@
 #include "protobuf.hpp"
 #include "util/log.hpp"
 #include "util/file.hpp"
-#include "util/folder.hpp"
 #include "util/signal.hpp"
 #include "util/unix.hpp"
 #include "util/string.hpp"

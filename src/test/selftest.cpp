@@ -11,7 +11,6 @@
 #include "value.hpp"
 #include "util/netlink.hpp"
 #include "util/file.hpp"
-#include "util/folder.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
 #include "util/cred.hpp"
@@ -73,16 +72,15 @@ static std::string StartWaitAndGetData(TPortoAPI &api, const std::string &name, 
 }
 
 static void RemakeDir(TPortoAPI &api, const TPath &path) {
-    TFolder f(path);
-    if (f.Exists()) {
+    if (path.Exists()) {
         bool drop = geteuid() != 0;
         if (drop)
             AsRoot(api);
-        ExpectSuccess(f.Remove(true));
+        ExpectSuccess(path.RemoveAll());
         if (drop)
             AsNobody(api);
     }
-    ExpectSuccess(f.Create(0755, true));
+    ExpectSuccess(path.MkdirAll(0755));
 }
 
 static void ExpectCorrectCgroups(const string &pid, const string &name) {
@@ -1820,10 +1818,10 @@ static void TestRootProperty(TPortoAPI &api) {
 
     cwd = config().container().tmp_dir() + "/" + name;
 
-    TFolder f(cwd);
+    TPath f(cwd);
     AsRoot(api);
     if (f.Exists()) {
-        error = f.Remove(true);
+        error = f.RemoveAll();
         if (error)
             throw error.GetMsg();
     }
@@ -1932,7 +1930,7 @@ static void TestHostnameProperty(TPortoAPI &api) {
     string pid, v;
     string name = "a";
     string host = "porto_" + name;
-    string path = TMPDIR + "/" + name;
+    TPath path(TMPDIR + "/" + name);
 
     ExpectApiSuccess(api.Create(name));
 
@@ -1967,7 +1965,7 @@ static void TestHostnameProperty(TPortoAPI &api) {
     BootstrapCommand("/bin/cat", path, false);
     AsNobody(api);
 
-    ExpectApiSuccess(api.SetProperty(name, "root", path));
+    ExpectApiSuccess(api.SetProperty(name, "root", path.ToString()));
 
     Say() << "Check default isolated hostname" << std::endl;
     ExpectApiSuccess(api.SetProperty(name, "command", "/sleep 1000"));
@@ -2010,11 +2008,11 @@ static void TestHostnameProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(name, "virt_mode", "os"));
     AsNobody(api);
 
-    TFolder d(path + "/etc");
+    TPath etc = path / "etc";
     TFile f(path + "/etc/hostname");
     AsRoot(api);
-    if (!d.Exists())
-        ExpectSuccess(d.Create());
+    if (!etc.Exists())
+        ExpectSuccess(etc.Mkdir(0755));
     ExpectSuccess(f.Touch());
     ExpectSuccess(f.GetPath().Chown(GetDefaultUser(), GetDefaultGroup()));
     ExpectApiSuccess(api.SetProperty(name, "user", "root"));
@@ -2029,7 +2027,7 @@ static void TestHostnameProperty(TPortoAPI &api) {
     ExpectEq(v, host + "\n");
 
     AsRoot(api);
-    ExpectSuccess(d.Remove(true));
+    ExpectSuccess(etc.RemoveAll());
     ExpectSuccess(tmpfs.Umount());
     AsNobody(api);
 
@@ -2052,12 +2050,12 @@ static void TestBindProperty(TPortoAPI &api) {
     Say() << "Check bind without root isolation" << std::endl;
     string path = config().container().tmp_dir() + "/" + name;
 
-    TFolder tmp("/tmp/27389");
+    TPath tmp("/tmp/27389");
     if (tmp.Exists())
-        ExpectSuccess(tmp.Remove(true));
-    ExpectSuccess(tmp.Create(0755, true));
+        ExpectSuccess(tmp.RemoveAll());
+    ExpectSuccess(tmp.MkdirAll(0755));
 
-    TFile f(tmp.GetPath() + "/porto");
+    TFile f(tmp / "porto");
     ExpectSuccess(f.Touch());
 
     ExpectApiSuccess(api.SetProperty(name, "command", "cat /proc/self/mountinfo"));
@@ -3684,9 +3682,8 @@ static void TestVirtModeProperty(TPortoAPI &api) {
 
     ExpectEq(system(cmd.c_str()), 0);
 
-    TFolder dir(tmpdir, true);
-    dir.Remove(true);
-    ExpectSuccess(dir.Create(0755, false));
+    tmpdir.RemoveAll();
+    ExpectSuccess(tmpdir.MkdirAll(0755));
 
     int nr;
     AsRoot(api);
@@ -3718,6 +3715,7 @@ static void TestVirtModeProperty(TPortoAPI &api) {
         (void)m.Umount();
         (void)PutLoopDev(nr);
         ExpectApiSuccess(api.Destroy(name));
+        tmpdir.RemoveAll();
         throw;
     }
 
@@ -3729,6 +3727,7 @@ static void TestVirtModeProperty(TPortoAPI &api) {
         ExpectEq(s, kv.second);
     }
     ExpectApiSuccess(api.Destroy(name));
+    tmpdir.RemoveAll();
 }
 
 static void TestAlias(TPortoAPI &api) {
@@ -4425,9 +4424,9 @@ static void TestPerf(TPortoAPI &api) {
 
 static void CleanupVolume(TPortoAPI &api, const std::string &path) {
     AsRoot(api);
-    TFolder dir(path);
+    TPath dir(path);
     if (dir.Exists()) {
-        TError error = dir.Remove(true);
+        TError error = dir.RemoveAll();
         if (error)
             throw error.GetMsg();
     }
@@ -5077,10 +5076,10 @@ static void TestVolumeRecovery(TPortoAPI &api) {
     ExpectApiSuccess(api.CreateVolume(a, prop_limited));
     ExpectApiSuccess(api.CreateVolume(b, prop_unlimit));
 
-    TFolder volume(config().volumes().volume_dir() + "/leftover_volume");
+    TPath volume(config().volumes().volume_dir() + "/leftover_volume");
     AsRoot(api);
-    volume.Remove(true);
-    ExpectSuccess(volume.Create());
+    volume.RemoveAll();
+    ExpectSuccess(volume.Mkdir(0755));
     AsNobody(api);
 
     ExpectEq(volume.Exists(), true);
@@ -5120,25 +5119,24 @@ static void TestCgroups(TPortoAPI &api) {
 
     Say() << "Make sure we don't remove non-porto cgroups" << std::endl;
 
-    string freezerCg = "/sys/fs/cgroup/freezer/qwerty/asdfg";
+    TPath freezerCg = "/sys/fs/cgroup/freezer/qwerty/asdfg";
 
-    RemakeDir(api, freezerCg);
+    ExpectSuccess(freezerCg.MkdirAll(0755));
 
     KillSlave(api, SIGINT);
 
-    TFolder qwerty(freezerCg);
-    ExpectEq(qwerty.Exists(), true);
-    ExpectSuccess(qwerty.Remove());
+    ExpectEq(freezerCg.Exists(), true);
+    ExpectSuccess(freezerCg.Rmdir());
 
     Say() << "Make sure we can remove freezed cgroups" << std::endl;
 
     freezerCg = "/sys/fs/cgroup/freezer/porto/asdf";
-    string memoryCg = "/sys/fs/cgroup/memory/porto/asdf";
-    string cpuCg = "/sys/fs/cgroup/cpu/porto/asdf";
+    TPath memoryCg = "/sys/fs/cgroup/memory/porto/asdf";
+    TPath cpuCg = "/sys/fs/cgroup/cpu/porto/asdf";
 
-    RemakeDir(api, freezerCg);
-    RemakeDir(api, memoryCg);
-    RemakeDir(api, cpuCg);
+    ExpectSuccess(freezerCg.MkdirAll(0755));
+    ExpectSuccess(memoryCg.MkdirAll(0755));
+    ExpectSuccess(cpuCg.MkdirAll(0755));
 
     int pid = fork();
     if (pid == 0) {
@@ -5154,12 +5152,9 @@ static void TestCgroups(TPortoAPI &api) {
 
     KillSlave(api, SIGKILL);
 
-    TFolder freezer(freezerCg);
-    ExpectEq(freezer.Exists(), false);
-    TFolder memory(memoryCg);
-    ExpectEq(memory.Exists(), false);
-    TFolder cpu(cpuCg);
-    ExpectEq(cpu.Exists(), false);
+    ExpectEq(freezerCg.Exists(), false);
+    ExpectEq(memoryCg.Exists(), false);
+    ExpectEq(cpuCg.Exists(), false);
 }
 
 static void TestVersion(TPortoAPI &api) {

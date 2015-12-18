@@ -7,7 +7,6 @@
 #include "holder.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
-#include "util/folder.hpp"
 #include "util/unix.hpp"
 #include "util/quota.hpp"
 #include "util/sha256.hpp"

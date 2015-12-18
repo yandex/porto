@@ -14,7 +14,6 @@
 #include "util/unix.hpp"
 #include "util/namespace.hpp"
 #include "util/file.hpp"
-#include "util/folder.hpp"
 #include "util/log.hpp"
 
 extern "C" {
@@ -923,10 +922,8 @@ public:
             TPortoAPI api(config().rpc_sock().file().path());
             (void)api.Destroy(containerName);
         }
-        if (TmpDir) {
-            TFolder dir(TmpDir);
-            (void)dir.Remove(true);
-        }
+        if (TmpDir)
+            (void)TPath(TmpDir).RemoveAll();
         if (!Canonical)
             tcsetattr(STDIN_FILENO, TCSANOW, &SavedAttrs);
     }

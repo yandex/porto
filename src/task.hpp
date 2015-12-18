@@ -16,7 +16,6 @@ extern "C" {
 
 class TTask;
 class TContainerEnv;
-class TFolder;
 class TCgroup;
 class TSubsystem;
 

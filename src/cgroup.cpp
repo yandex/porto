@@ -10,8 +10,8 @@
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
+#include "util/file.hpp"
 #include "util/mount.hpp"
-#include "util/folder.hpp"
 
 using std::string;
 using std::vector;
@@ -61,10 +61,9 @@ shared_ptr<TCgroup> TCgroup::GetChild(const std::string& name) {
 }
 
 TError TCgroup::FindChildren(std::vector<std::shared_ptr<TCgroup>> &cglist) {
-    TFolder f(Path());
     vector<string> list;
 
-    TError error = f.Subfolders(list);
+    TError error = Path().ListSubdirs(list);
     if (error)
         return error;
 
@@ -152,11 +151,11 @@ TError TCgroup::Create() {
     } else
         Parent->Create();
 
-    TFolder f(Path());
-    if (!f.Exists()) {
-        L_ACT() << "Create cgroup " << Path() << std::endl;
+    TPath path = Path();
+    if (!path.Exists()) {
+        L_ACT() << "Create cgroup " << path << std::endl;
 
-        TError error = f.Create(Mode);
+        TError error = path.Mkdir(Mode);
         if (error) {
             L_ERR() << "Can't create cgroup directory: " << error << std::endl;
             return error;
@@ -175,7 +174,7 @@ TError TCgroup::Create() {
 }
 
 TError TCgroup::Remove() {
-    if (IsRoot())
+    if (IsRoot() || !Exists())
         return TError::Success();
 
     // at this point we should have gracefully terminated all tasks
@@ -197,13 +196,11 @@ TError TCgroup::Remove() {
     }
 
     L_ACT() << "Remove cgroup " << Path() << std::endl;
-    TFolder f(Path());
-    return f.Remove();
+    return Path().Rmdir();
 }
 
 bool TCgroup::Exists() {
-    TFolder f(Path());
-    return f.Exists();
+    return Path().Exists();
 }
 
 std::shared_ptr<TMount> TCgroup::GetMount() {

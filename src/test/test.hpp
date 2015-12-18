@@ -60,7 +60,7 @@ namespace test {
     void AsDaemon(TPortoAPI &api);
     std::string GetDefaultUser();
     std::string GetDefaultGroup();
-    void BootstrapCommand(const std::string &cmd, const std::string &path, bool remove = true);
+    void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove = true);
 
     void RotateDaemonLogs(TPortoAPI &api);
     void RestartDaemon(TPortoAPI &api);

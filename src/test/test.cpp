@@ -7,7 +7,6 @@
 #include "config.hpp"
 #include "error.hpp"
 #include "util/file.hpp"
-#include "util/folder.hpp"
 #include "util/string.hpp"
 #include "util/netlink.hpp"
 #include "util/cred.hpp"
@@ -484,10 +483,9 @@ std::string GetDefaultGroup() {
     return "daemon";
 }
 
-void BootstrapCommand(const std::string &cmd, const std::string &path, bool remove) {
-    TFolder d(path);
+void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove) {
     if (remove)
-        (void)d.Remove(true);
+        (void)path.RemoveAll();
 
     vector<string> lines;
     ExpectSuccess(Popen("ldd " + cmd, lines));
@@ -514,16 +512,16 @@ void BootstrapCommand(const std::string &cmd, const std::string &path, bool remo
             continue;
         }
 
-        TFolder dest(path + "/" + from.DirName().ToString());
+        TPath dest = path / from.DirName();
         if (!dest.Exists()) {
-            error = dest.Create(0755, true);
+            error = dest.MkdirAll(0755);
             if (error)
                 throw error.GetMsg();
         }
 
-        Expect(system(("cp " + from.ToString() + " " + dest.GetPath().ToString() + "/" + name).c_str()) == 0);
+        Expect(system(("cp " + from.ToString() + " " + dest.ToString() + "/" + name).c_str()) == 0);
     }
-    Expect(system(("cp " + cmd + " " + path).c_str()) == 0);
+    Expect(system(("cp " + cmd + " " + path.ToString()).c_str()) == 0);
 }
 
 void RotateDaemonLogs(TPortoAPI &api) {
@@ -698,9 +696,8 @@ static bool HaveIpVlan() {
 }
 
 static bool IsCfqActive() {
-    TFolder f("/sys/block");
     std::vector<std::string> items;
-    (void)f.Items(EFileType::Any, items);
+    (void)TPath("/sys/block").ReadDirectory(items);
     for (auto d : items) {
         if ( (d.find(std::string("loop")) != std::string::npos) || (d.find(std::string("ram")) != std::string::npos) )
             continue;
