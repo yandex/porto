@@ -456,6 +456,25 @@ TError TPath::MkdirAll(unsigned int mode) const {
     return TError::Success();
 }
 
+TError TPath::CreateAll(unsigned int mode) const {
+    if (!Exists()) {
+        TPath dir = DirName();
+        TError error;
+
+        if (!dir.Exists()) {
+            error = dir.MkdirAll(0755);
+            if (error)
+                return error;
+        }
+
+        /* This fails for broken symlinks */
+        return Mknod(S_IFREG | mode, 0);
+    } else if (IsDirectory())
+        return TError(EError::Unknown, EINVAL, "Path " + Path + " not a file");
+
+    return TError::Success();
+}
+
 TError TPath::Rmdir() const {
     if (rmdir(Path.c_str()) < 0)
         return TError(EError::Unknown, errno, "rmdir(" + Path + ")");
