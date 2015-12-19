@@ -552,8 +552,8 @@ class TIopsLimitProperty : public TUintValue, public TContainerValue {
 public:
     TIopsLimitProperty() :
         TUintValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | UINT_UNIT_VALUE),
-        TContainerValue(P_IOPS_LIMIT,
-                        "Filesystem iops limit [op/s]",
+        TContainerValue(P_IO_OPS_LIMIT,
+                        "Filesystem IOPS limit [operations/s]",
                         dynamicProperty) {
         if (!memorySubsystem->SupportIoLimit())
             SetFlag(UNSUPPORTED_FEATURE);

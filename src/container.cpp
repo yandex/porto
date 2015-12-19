@@ -479,9 +479,9 @@ TError TContainer::ApplyDynamicProperties() {
         return error;
     }
 
-    error = memorySubsystem->SetIopsLimit(memcg, Prop->Get<uint64_t>(P_IOPS_LIMIT));
+    error = memorySubsystem->SetIopsLimit(memcg, Prop->Get<uint64_t>(P_IO_OPS_LIMIT));
     if (error) {
-        L_ERR() << "Can't set " << P_IOPS_LIMIT << ": " << error << std::endl;
+        L_ERR() << "Can't set " << P_IO_OPS_LIMIT << ": " << error << std::endl;
         return error;
     }
 
