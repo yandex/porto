@@ -3188,9 +3188,10 @@ static void TestData(TPortoAPI &api) {
 
     ExpectApiSuccess(api.Create(noop));
     // this will cause io read and noop will not have io_read
-    ExpectEq(system("ls -la /bin >/dev/null"), 0);
-    ExpectApiSuccess(api.SetProperty(noop, "command", "ls -la /bin"));
+    ExpectEq(system("true"), 0);
+    ExpectApiSuccess(api.SetProperty(noop, "command", "true"));
     ExpectApiSuccess(api.SetProperty(noop, "stdout_path", "/dev/null"));
+    ExpectApiSuccess(api.SetProperty(noop, "stderr_path", "/dev/null"));
     ExpectApiSuccess(api.Start(noop));
     WaitContainer(api, noop);
 
