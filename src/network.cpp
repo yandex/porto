@@ -48,7 +48,7 @@ TError TNetwork::Prepare() {
     if (error)
         return error;
 
-    for (auto iface: ifaces) {
+    for (auto &iface: ifaces) {
         error = PrepareLink(iface.second, iface.first);
         if (error)
             return error;
@@ -252,7 +252,7 @@ TError TNetwork::GetTrafficCounters(int minor, ETclassStat stat,
         return TError(EError::Unknown, "Unsupported netlink statistics");
     }
 
-    for (auto iface: ifaces) {
+    for (auto &iface: ifaces) {
         struct nl_cache *cache;
         struct rtnl_class *cls;
 
@@ -383,8 +383,10 @@ TError TNetwork::UpdateTrafficClasses(int parent, int minor,
         std::map<std::string, uint64_t> &Rate,
         std::map<std::string, uint64_t> &Ceil) {
     TError error;
+    int retry = 1;
 
-    for (auto iface: ifaces) {
+again:
+    for (auto &iface: ifaces) {
         auto name = iface.first;
         auto prio = (Prio.find(name) != Prio.end()) ? Prio[name] : Prio["default"];
         auto rate = (Rate.find(name) != Rate.end()) ? Rate[name] : Rate["default"];
@@ -393,8 +395,13 @@ TError TNetwork::UpdateTrafficClasses(int parent, int minor,
                                 TC_HANDLE(ROOT_TC_MAJOR, parent),
                                 TC_HANDLE(ROOT_TC_MAJOR, minor),
                                 prio, rate, ceil);
-        if (error)
+        if (error) {
+            if (retry--) {
+                UpdateInterfaces();
+                goto again;
+            }
             return error;
+        }
     }
 
     return TError::Success();
@@ -403,7 +410,7 @@ TError TNetwork::UpdateTrafficClasses(int parent, int minor,
 TError TNetwork::RemoveTrafficClasses(int minor) {
     TError error;
 
-    for (auto iface: ifaces) {
+    for (auto &iface: ifaces) {
         error = DelTrafficClass(iface.second, TC_HANDLE(ROOT_TC_MAJOR, minor));
         if (error)
             return error;
