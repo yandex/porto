@@ -52,7 +52,7 @@ using std::map;
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
                        std::shared_ptr<TKeyValueStorage> storage,
                        const std::string &name, std::shared_ptr<TContainer> parent,
-                       uint16_t id) :
+                       int id) :
     Holder(holder), Name(StripParentName(name)), Parent(parent),
     Storage(storage), Id(id) { }
 

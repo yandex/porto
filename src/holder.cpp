@@ -28,16 +28,6 @@ void TContainerHolder::DestroyRoot(TScopedLock &holder_lock) {
     }
 }
 
-TError TContainerHolder::ReserveDefaultClassId() {
-    uint16_t id;
-    TError error = IdMap.Get(id);
-    if (error)
-        return error;
-    if (id != 2)
-        return TError(EError::Unknown, "Unexpected default class id " + std::to_string(id));
-    return TError::Success();
-}
-
 TError TContainerHolder::CreateRoot(TScopedLock &holder_lock) {
     TError error = TaskGetLastCap();
     if (error)
@@ -51,7 +41,7 @@ TError TContainerHolder::CreateRoot(TScopedLock &holder_lock) {
     if (container->GetId() != ROOT_CONTAINER_ID)
         return TError(EError::Unknown, "Unexpected root container id " + std::to_string(container->GetId()));
 
-    error = ReserveDefaultClassId();
+    error = IdMap.GetAt(DEFAULT_TC_MINOR);
     if (error)
         return error;
 
@@ -187,7 +177,7 @@ TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &nam
             return error;
     }
 
-    uint16_t id;
+    int id;
     error = IdMap.Get(id);
     if (error)
         return error;
@@ -329,19 +319,19 @@ std::vector<std::shared_ptr<TContainer> > TContainerHolder::List(bool all) const
     return ret;
 }
 
-TError TContainerHolder::RestoreId(const kv::TNode &node, uint16_t &id) {
+TError TContainerHolder::RestoreId(const kv::TNode &node, int &id) {
     std::string value = "";
 
     TError error = Storage->Get(node, P_RAW_ID, value);
     if (error) {
         // FIXME before v1.0 we didn't store id for meta or stopped containers;
         // don't try to recover, just assign new safe one
-        error = IdMap.GetSince(config().container().max_total(), id);
+        error = IdMap.Get(id);
         if (error)
             return error;
         L_WRN() << "Couldn't restore container id, using " << id << std::endl;
     } else {
-        error = StringToUint16(value, id);
+        error = StringToInt(value, id);
         if (error)
             return error;
 
@@ -350,12 +340,12 @@ TError TContainerHolder::RestoreId(const kv::TNode &node, uint16_t &id) {
             // FIXME before v1.0 there was a possibility for two containers
             // to use the same id, allocate new one upon restore we see this
 
-            error = IdMap.GetSince(config().container().max_total(), id);
+            error = IdMap.Get(id);
             if (error)
                 return error;
             L_WRN() << "Container ids clashed, using new " << id << std::endl;
         }
-            return error;
+        return error;
     }
 
     return TError::Success();
@@ -449,7 +439,7 @@ TError TContainerHolder::Restore(TScopedLock &holder_lock, const std::string &na
     if (!parent)
         return TError(EError::InvalidValue, "invalid parent container");
 
-    uint16_t id = 0;
+    int id = 0;
     TError error = RestoreId(node, id);
     if (error)
         return error;

@@ -1,19 +1,39 @@
 #pragma once
 
-#include <cstdint>
+#include <vector>
+#include <algorithm>
 
 #include "common.hpp"
-
-constexpr size_t BITS_PER_LLONG = sizeof(unsigned long long) * 8;
-constexpr uint16_t MAX_UINT16 = (uint16_t)-1;
+#include "log.hpp"
 
 class TIdMap : public TNonCopyable {
-    unsigned long long Ids[MAX_UINT16 / BITS_PER_LLONG];
-
+private:
+    std::vector<bool> Used;
 public:
-    TIdMap();
-    TError Get(uint16_t &id);
-    TError GetSince(uint16_t since, uint16_t &id);
-    TError GetAt(uint16_t id);
-    void Put(uint16_t id);
+    TIdMap(int size) {
+        Used.resize(size, false);
+    }
+
+    TError GetAt(int id) {
+        if (id < 1 || id > (int)Used.size())
+            return TError(EError::Unknown, "Id " + std::to_string(id) + " out of range");
+        if (Used[id - 1])
+            return TError(EError::Unknown, "Id " + std::to_string(id) + " already used");
+        Used[id - 1] = true;
+        return TError::Success();
+    }
+
+    TError Get(int &id) {
+        auto it = std::find(Used.begin(), Used.end(), false);
+        if (it == Used.end())
+            TError(EError::ResourceNotAvailable, "Cannot allocate id");
+        id = it - Used.begin() + 1;
+        return GetAt(id);
+    }
+
+    void Put(int id) {
+        PORTO_ASSERT(id > 0 && id <= (int)Used.size());
+        PORTO_ASSERT(Used[id - 1]);
+        Used[id - 1] = false;
+    }
 };

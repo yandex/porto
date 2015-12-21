@@ -2936,26 +2936,19 @@ static void TestPath(TPortoAPI &api) {
 }
 
 static void TestIdmap(TPortoAPI &api) {
-    TIdMap idmap;
-    uint16_t id;
+    TIdMap idmap(CONTAINER_ID_MAX);
+    int id;
 
-    for (uint16_t i = 1; i < 256; i++) {
+    for (int i = 1; i < 256; i++) {
         ExpectSuccess(idmap.Get(id));
         ExpectEq(id, i);
     }
 
-    for (uint16_t i = 1; i < 256; i++)
+    for (int i = 1; i < 256; i++)
         idmap.Put(i);
 
     ExpectSuccess(idmap.Get(id));
     ExpectEq(id, 1);
-
-    uint16_t id1, id2;
-    ExpectSuccess(idmap.GetSince(5000, id1));
-    ExpectSuccess(idmap.GetSince(5000, id2));
-    Expect(id1 > 5000);
-    Expect(id2 > 5000);
-    ExpectNeq(id1, id2);
 }
 
 static void TestRoot(TPortoAPI &api) {

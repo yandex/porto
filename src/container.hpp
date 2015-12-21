@@ -51,7 +51,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     std::shared_ptr<TKeyValueStorage> Storage;
     EContainerState State = EContainerState::Unknown;
     int Acquired = 0;
-    uint16_t Id;
+    int Id;
     int TaskStartErrno = -1;
     TScopedFd Efd;
     size_t CgroupEmptySince = 0;
@@ -143,7 +143,7 @@ public:
     TContainer(std::shared_ptr<TContainerHolder> holder,
                std::shared_ptr<TKeyValueStorage> storage,
                const std::string &name, std::shared_ptr<TContainer> parent,
-               uint16_t id);
+               int id);
     ~TContainer();
 
     std::string GetPortoNamespace() const;
@@ -155,7 +155,7 @@ public:
 
     const std::string GetName() const;
     const std::string GetTextId(const std::string &separator = "+") const;
-    const uint16_t GetId() const { return Id; }
+    const int GetId() const { return Id; }
 
     bool IsRoot() const;
     bool IsPortoRoot() const;

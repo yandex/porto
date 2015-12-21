@@ -33,10 +33,9 @@ class TContainerHolder : public std::enable_shared_from_this<TContainerHolder>,
     std::shared_ptr<TKeyValueStorage> Storage;
     std::unordered_map<ino_t, std::weak_ptr<TNetwork>> NetNsMap;
 
-    TError RestoreId(const kv::TNode &node, uint16_t &id);
+    TError RestoreId(const kv::TNode &node, int &id);
     void ScheduleLogRotatation();
     void ScheduleCgroupSync();
-    TError ReserveDefaultClassId();
     std::map<std::string, std::shared_ptr<TKeyValueNode>>
         SortNodes(const std::vector<std::shared_ptr<TKeyValueNode>> &nodes);
     void Unlink(TScopedLock &holder_lock, std::shared_ptr<TContainer> c);
@@ -47,7 +46,7 @@ public:
 
     TContainerHolder(std::shared_ptr<TEpollLoop> epollLoop,
                      std::shared_ptr<TKeyValueStorage> storage) :
-        Storage(storage), EpollLoop(epollLoop) { }
+        IdMap(CONTAINER_ID_MAX), Storage(storage), EpollLoop(epollLoop) { }
     TError ValidName(const std::string &name) const;
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot(TScopedLock &holder_lock);
