@@ -26,8 +26,6 @@ std::string StringTrim(const std::string& s, const std::string &what = " \t\n");
 bool StringOnlyDigits(const std::string &s);
 std::string StringReplaceAll(const std::string &str, const std::string &from, const std::string &to);
 bool StringStartsWith(const std::string &str, const std::string &prefix);
-bool StringEndsWith(const std::string &str, const std::string &prefix);
-std::string MapToStr(const std::map<std::string, uint64_t> &m);
 
 typedef std::vector<std::pair<uint64_t, std::string>> TFlagsNames;
 std::string StringFormatFlags(uint64_t flags,
