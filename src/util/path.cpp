@@ -757,11 +757,11 @@ const TFlagsNames TPath::UmountFlags = {
 };
 
 std::string TPath::MountFlagsToString(unsigned long flags) {
-    return FlagsToString(flags, MountFlags);
+    return StringFormatFlags(flags, MountFlags);
 }
 
 std::string TPath::UmountFlagsToString(unsigned long flags) {
-    return FlagsToString(flags, UmountFlags);
+    return StringFormatFlags(flags, UmountFlags);
 }
 
 TError TPath::Mount(TPath source, std::string type, unsigned long flags,

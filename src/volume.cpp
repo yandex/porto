@@ -1112,11 +1112,11 @@ static void RegisterVolumeProperties(std::shared_ptr<TRawValueMap> m) {
     m->Add(V_READ_ONLY, new TBoolValue(PERSISTENT_VALUE));
     m->Add(V_LAYERS, new TListValue(HIDDEN_VALUE | PERSISTENT_VALUE));
 
-    m->Add(V_SPACE_LIMIT, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
-    m->Add(V_INODE_LIMIT, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
+    m->Add(V_SPACE_LIMIT, new TSizeValue(PERSISTENT_VALUE));
+    m->Add(V_INODE_LIMIT, new TSizeValue(PERSISTENT_VALUE));
 
-    m->Add(V_SPACE_GUARANTEE, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
-    m->Add(V_INODE_GUARANTEE, new TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE));
+    m->Add(V_SPACE_GUARANTEE, new TSizeValue(PERSISTENT_VALUE));
+    m->Add(V_INODE_GUARANTEE, new TSizeValue(PERSISTENT_VALUE));
 }
 
 TError TVolumeHolder::Create(std::shared_ptr<TVolume> &volume) {

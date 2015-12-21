@@ -314,10 +314,10 @@ public:
     }
 };
 
-class TStdoutLimitProperty : public TUintValue, public TContainerValue {
+class TStdoutLimitProperty : public TSizeValue, public TContainerValue {
 public:
     TStdoutLimitProperty() :
-        TUintValue(PERSISTENT_VALUE),
+        TSizeValue(PERSISTENT_VALUE),
         TContainerValue(P_STDOUT_LIMIT,
                         "Return no more than given number of bytes from standard output/error",
                         anyState) {}
@@ -338,10 +338,10 @@ public:
     }
 };
 
-class TMemoryGuaranteeProperty : public TUintValue, public TContainerValue {
+class TMemoryGuaranteeProperty : public TSizeValue, public TContainerValue {
 public:
     TMemoryGuaranteeProperty() :
-        TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE),
+        TSizeValue(PERSISTENT_VALUE),
         TContainerValue(P_MEM_GUARANTEE,
                         "Guaranteed amount of memory [bytes]",
                         dynamicProperty) {
@@ -368,10 +368,10 @@ public:
     }
 };
 
-class TMemoryLimitProperty : public TUintValue, public TContainerValue {
+class TMemoryLimitProperty : public TSizeValue, public TContainerValue {
 public:
     TMemoryLimitProperty() :
-        TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE),
+        TSizeValue(PERSISTENT_VALUE),
         TContainerValue(P_MEM_LIMIT,
                         "Memory hard limit [bytes]",
                         dynamicProperty) {}
@@ -384,10 +384,10 @@ public:
     }
 };
 
-class TDirtyLimitProperty : public TUintValue, public TContainerValue {
+class TDirtyLimitProperty : public TSizeValue, public TContainerValue {
 public:
     TDirtyLimitProperty() :
-        TUintValue(PERSISTENT_VALUE | UINT_UNIT_VALUE),
+        TSizeValue(PERSISTENT_VALUE),
         TContainerValue(P_DIRTY_LIMIT,
                         "Dirty file cache limit [bytes]",
                         dynamicProperty) {
@@ -532,10 +532,10 @@ public:
     }
 };
 
-class TIoLimitProperty : public TUintValue, public TContainerValue {
+class TIoLimitProperty : public TSizeValue, public TContainerValue {
 public:
     TIoLimitProperty() :
-        TUintValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | UINT_UNIT_VALUE),
+        TSizeValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_IO_LIMIT,
                         "Filesystem bandwidth limit [bytes/s]",
                         dynamicProperty) {
@@ -548,10 +548,10 @@ public:
     }
 };
 
-class TIopsLimitProperty : public TUintValue, public TContainerValue {
+class TIopsLimitProperty : public TSizeValue, public TContainerValue {
 public:
     TIopsLimitProperty() :
-        TUintValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | UINT_UNIT_VALUE),
+        TSizeValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_IO_OPS_LIMIT,
                         "Filesystem IOPS limit [operations/s]",
                         dynamicProperty) {

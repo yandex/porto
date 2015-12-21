@@ -1638,7 +1638,7 @@ public:
       else if (raw)
           std::cout << std::setw(w) << val;
       else
-          std::cout << std::setw(w) << StringWithUnit(val);
+          std::cout << std::setw(w) << StringFormatSize(val);
     }
 
     void ShowPercent(TVolumeDescription &v, const char *u, const char *a, int w) {

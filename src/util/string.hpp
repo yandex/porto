@@ -18,8 +18,6 @@ TError StringToInt64(const std::string &str, int64_t &value);
 TError StringToInt(const std::string &string, int &value);
 TError StringToOct(const std::string &str, unsigned &value);
 TError StringToDouble(const std::string &str, double &value);
-TError StringWithUnitToUint64(const std::string &str, uint64_t &value);
-std::string StringWithUnit(uint64_t value, int precision = 1);
 
 TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens, size_t maxFields = -1);
 TError SplitEscapedString(const std::string &s, const char sep, std::vector<std::string> &tokens);
@@ -32,8 +30,14 @@ bool StringEndsWith(const std::string &str, const std::string &prefix);
 std::string MapToStr(const std::map<std::string, uint64_t> &m);
 
 typedef std::vector<std::pair<uint64_t, std::string>> TFlagsNames;
-std::string FlagsToString(uint64_t flags, const TFlagsNames &names,
-                          const std::string sep = ",");
+std::string StringFormatFlags(uint64_t flags,
+                              const TFlagsNames &names,
+                              const std::string sep = ",");
 
 std::string StringFormat(const char *format, ...)
                          __attribute__ ((format (printf, 1, 2)));
+
+std::string StringFormatSize(uint64_t value);
+
+TError StringToValue(const std::string &str, double &value, std::string &unit);
+TError StringToSize(const std::string &str, uint64_t &size);

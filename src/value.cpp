@@ -39,20 +39,22 @@ std::string TUintValue::ToString(const uint64_t &value) const {
 }
 
 TError TUintValue::FromString(const std::string &value, uint64_t &result) const {
-    TError error;
-
-    if (HasFlag(UINT_UNIT_VALUE))
-        error = StringWithUnitToUint64(value, result);
-    else
-        error = StringToUint64(value, result);
-
-    if (error)
-        return TError(EError::InvalidValue, "Invalid unsigned integer value " + value);
-
-    return TError::Success();
+    return StringToUint64(value, result);
 }
 
 uint64_t TUintValue::GetDefault() const {
+    return 0;
+}
+
+std::string TSizeValue::ToString(const uint64_t &value) const {
+    return std::to_string(value);
+}
+
+TError TSizeValue::FromString(const std::string &value, uint64_t &result) const {
+    return StringToSize(value, result);
+}
+
+uint64_t TSizeValue::GetDefault() const {
     return 0;
 }
 

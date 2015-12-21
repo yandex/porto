@@ -27,8 +27,6 @@ const unsigned int DIRTY_VALUE = (1 << 26);
 const unsigned int HAS_VALUE = (1 << 27);
 // User cannot modify value
 const unsigned int READ_ONLY_VALUE = (1 << 28);
-// Uint value can include options G/M/K suffix
-const unsigned int UINT_UNIT_VALUE = (1 << 29);
 // Value should be preserved upon recovery
 const unsigned int PERSISTENT_VALUE = (1 << 30);
 // Value is not shown in the property/data list
@@ -153,6 +151,15 @@ public:
 class TUintValue : public TStoredValue<uint64_t> {
 public:
     TUintValue(int flags) : TStoredValue(flags) {}
+
+    std::string ToString(const uint64_t &value) const override;
+    TError FromString(const std::string &value, uint64_t &result) const override;
+    uint64_t GetDefault() const override;
+};
+
+class TSizeValue : public TStoredValue<uint64_t> {
+public:
+    TSizeValue(int flags) : TStoredValue(flags) {}
 
     std::string ToString(const uint64_t &value) const override;
     TError FromString(const std::string &value, uint64_t &result) const override;

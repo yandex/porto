@@ -2951,6 +2951,29 @@ static void TestIdmap(TPortoAPI &api) {
     ExpectEq(id, 1);
 }
 
+static void TestFormat(TPortoAPI &api) {
+    uint64_t v;
+
+    ExpectEq(StringFormat("%s %d", "a", 1), "a 1");
+    ExpectEq(StringFormatSize(1), "1B");
+    ExpectEq(StringFormatSize(1<<20), "1M");
+    ExpectSuccess(StringToSize("1", v));
+    ExpectEq(v, 1);
+    ExpectSuccess(StringToSize("1kb", v));
+    ExpectEq(v, 1<<10);
+    ExpectSuccess(StringToSize("1M", v));
+    ExpectEq(v, 1<<20);
+    ExpectSuccess(StringToSize("1 Gb", v));
+    ExpectEq(v, 1ull<<30);
+    ExpectSuccess(StringToSize("1TiB", v));
+    ExpectEq(v, 1ull<<40);
+    ExpectSuccess(StringToSize("\t1\tPB\t", v));
+    ExpectEq(v, 1ull<<50);
+    Expect(!!StringToSize("", v));
+    Expect(!!StringToSize("z", v));
+    Expect(!!StringToSize("1z", v));
+}
+
 static void TestRoot(TPortoAPI &api) {
     string v;
     string root = "/";
@@ -5348,6 +5371,7 @@ int SelfTest(std::vector<std::string> args) {
     pair<string, std::function<void(TPortoAPI &)>> tests[] = {
         { "path", TestPath },
         { "idmap", TestIdmap },
+        { "format", TestFormat },
         { "root", TestRoot },
         { "data", TestData },
         { "holder", TestHolder },

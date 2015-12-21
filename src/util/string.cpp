@@ -1,6 +1,7 @@
 #include <sstream>
 #include <iomanip>
 #include <cstdarg>
+#include <cctype>
 
 #include "util/string.hpp"
 
@@ -91,53 +92,78 @@ TError StringToDouble(const std::string &str, double &value) {
     return TError::Success();
 }
 
-TError StringWithUnitToUint64(const std::string &str, uint64_t &value) {
-    try {
-        size_t pos = 0;
-        value = stoull(str, &pos);
-        if (pos > 0 && pos < str.length()) {
-            switch (str[pos]) {
-            case 'G':
-            case 'g':
-                value <<= 10;
-            case 'M':
-            case 'm':
-                value <<= 10;
-            case 'K':
-            case 'k':
-                value <<= 10;
-            default:
-                break;
-            }
-        }
-    } catch (...) {
-        return TError(EError::Unknown, string(__func__) + ": Bad integer value " + str);
-    }
 
+TError StringToValue(const std::string &str, double &value, std::string &unit) {
+    const char *ptr = str.c_str();
+    char *end;
+
+    value = strtod(ptr, &end);
+    if (end == ptr)
+        return TError(EError::InvalidValue, "Bad value: " + str);
+
+    while (isblank(*end))
+        end++;
+    size_t len = strlen(end);
+    while (len && isblank(end[len-1]))
+        len--;
+    unit = std::string(end, len);
     return TError::Success();
 }
 
-std::string StringWithUnit(uint64_t value, int precision)
-{
-    std::ostringstream ret;
-    double val = value / 1024;
+static char size_unit[] = {'B', 'K', 'M', 'G', 'T', 'P', 'E', 0};
 
-    if (value < 1024) {
-        ret << value << "B";
-    } else if (value <= 1024ull * 1024) {
-        ret << std::fixed << std::setprecision(precision) << val << "K";
-    } else if (value <= 1024ull * 1024 * 1024) {
-        val /= 1024;
-        ret << std::fixed << std::setprecision(precision) << val << "M";
-    } else if (value <= 1024ull * 1024 * 1024 * 1024) {
-        val /= 1024 * 1024;
-        ret << std::fixed << std::setprecision(precision) << val << "G";
-    } else {
-        val /= 1024ull * 1024 * 1024;
-        ret << std::fixed << std::setprecision(precision) << val << "T";
+TError StringToSize(const std::string &str, uint64_t &size) {
+    std::string unit;
+    double value;
+    TError error;
+
+    error = StringToValue(str, value, unit);
+    if (error)
+        return error;
+
+    if (!unit[0]) {
+        size = value;
+        goto ok;
     }
 
-    return ret.str();
+    for (int i = 0; size_unit[i]; i++) {
+        if (unit[0] == size_unit[i] ||
+            unit[0] == tolower(size_unit[i])) {
+
+            size = value * (1ull << (10 * i));
+
+            /* allow K Kb kB KiB */
+            switch (unit[1]) {
+                case 'b': /* FIXME turn into bits? */
+                case 'B':
+                    if (i && unit[2] == '\0')
+                        goto ok;
+                    break;
+                case 'i':
+                    if (!i || unit[2] != 'B')
+                        break;
+                case '\0':
+                    goto ok;
+            }
+
+            break;
+        }
+    }
+
+    return TError(EError::InvalidValue, "Bad value unit: " + unit);
+
+ok:
+    return TError::Success();
+}
+
+std::string StringFormatSize(uint64_t value)
+{
+    int i = 0;
+
+    while (value >= (1ull<<(10*(i+1))) && size_unit[i+1])
+        i++;
+
+    return StringFormat("%g%c", (double)value / (1ull<<(10*i)), size_unit[i]);
 }
 
 TError SplitString(const std::string &s, const char sep, std::vector<std::string> &tokens, size_t maxFields) {
@@ -253,8 +279,9 @@ std::string MapToStr(const std::map<std::string, uint64_t> &m) {
     return ss.str();
 }
 
-std::string FlagsToString(uint64_t flags, const TFlagsNames &names,
-                          const std::string sep) {
+std::string StringFormatFlags(uint64_t flags,
+                              const TFlagsNames &names,
+                              const std::string sep) {
     std::stringstream result;
     bool first = true;
 
@@ -272,7 +299,7 @@ std::string FlagsToString(uint64_t flags, const TFlagsNames &names,
     if (flags) {
         if (!first)
             result << sep;
-        result << std::to_string(flags);
+        result << std::hex << flags;
     }
 
     return result.str();
