@@ -28,18 +28,16 @@ static double ParseValue(const std::string &value, bool map) {
 static std::string PrintNumber(double number, int base,
                                bool seconds, bool percents,
                                double multiplier) {
-    char buf[20];
-
     number /= multiplier;
 
     if (percents) {
-        snprintf(buf, sizeof(buf), "%.1lf%%", 100 * number);
+        return StringFormat("%.1lf%%", 100 * number);
     } else if (seconds) {
         double seconds = number;
         double minutes = std::floor(seconds / 60);
         seconds -= minutes * 60;
 
-        snprintf(buf, sizeof(buf), "%4.lf:%2.2lf", minutes, seconds);
+        return StringFormat("%4.lf:%2.2lf", minutes, seconds);
     } else {
         char s = 0;
         if (number > base * base * base) {
@@ -53,10 +51,8 @@ static std::string PrintNumber(double number, int base,
             s = 'k';
         }
 
-        snprintf(buf, sizeof(buf), "%.1lf%c", number, s);
+        return StringFormat("%.1lf%c", number, s);
     }
-
-    return std::string(buf);
 };
 
 static double DfDt(double curr, double prev,double gone_ms) {

@@ -11,6 +11,7 @@
 #include <unordered_set>
 
 #include "util/namespace.hpp"
+#include "util/string.hpp"
 #include "libporto.hpp"
 
 extern "C" {

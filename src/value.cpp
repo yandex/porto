@@ -57,9 +57,7 @@ uint64_t TUintValue::GetDefault() const {
 }
 
 std::string TDoubleValue::ToString(const double &value) const {
-    char buffer[256];
-    snprintf(buffer, sizeof(buffer), "%lg", value);
-    return std::string(buffer);
+    return StringFormat("%lg", value);
 }
 
 TError TDoubleValue::FromString(const std::string &value, double &result) const {

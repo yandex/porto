@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 #include <sstream>
 
 #include "statistics.hpp"
@@ -123,10 +124,8 @@ std::string TLogger::GetTime() {
             ss << buf;
         }
 
-        if (config().log().verbose()) {
-            snprintf(buf, sizeof(buf), ".%06lu", tv.tv_usec);
-            ss << buf;
-        }
+        if (config().log().verbose())
+            ss << "." << std::setw(6) << std::setfill('0') << tv.tv_usec;
     }
 
     return ss.str();

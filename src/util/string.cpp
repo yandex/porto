@@ -1,5 +1,6 @@
 #include <sstream>
 #include <iomanip>
+#include <cstdarg>
 
 #include "util/string.hpp"
 
@@ -275,4 +276,22 @@ std::string FlagsToString(uint64_t flags, const TFlagsNames &names,
     }
 
     return result.str();
+}
+
+std::string StringFormat(const char *format, ...) {
+    std::string result;
+    int length;
+    va_list ap;
+
+    va_start(ap, format);
+    length = vsnprintf(nullptr, 0, format, ap);
+    va_end(ap);
+
+    result.resize(length);
+
+    va_start(ap, format);
+    vsnprintf(&result[0], length + 1, format, ap);
+    va_end(ap);
+
+    return result;
 }

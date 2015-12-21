@@ -34,3 +34,6 @@ std::string MapToStr(const std::map<std::string, uint64_t> &m);
 typedef std::vector<std::pair<uint64_t, std::string>> TFlagsNames;
 std::string FlagsToString(uint64_t flags, const TFlagsNames &names,
                           const std::string sep = ",");
+
+std::string StringFormat(const char *format, ...)
+                         __attribute__ ((format (printf, 1, 2)));

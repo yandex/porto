@@ -638,16 +638,12 @@ std::string TNetCfg::GenerateHw(const std::string &name) {
     uint32_t n = Crc32(name);
     uint32_t h = Crc32(Hostname);
 
-    char buf[32];
-
-    sprintf(buf, "02:%02x:%02x:%02x:%02x:%02x",
+    return StringFormat("02:%02x:%02x:%02x:%02x:%02x",
             (n & 0x000000FF) >> 0,
             (h & 0xFF000000) >> 24,
             (h & 0x00FF0000) >> 16,
             (h & 0x0000FF00) >> 8,
             (h & 0x000000FF) >> 0);
-
-    return std::string(buf);
 }
 
 TError TNetCfg::ConfigureInterfaces(std::shared_ptr<TNetwork> &ParentNet) {
