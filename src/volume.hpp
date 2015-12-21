@@ -103,7 +103,7 @@ public:
     TPath GetStorage() const;
     TPath GetInternal(std::string type) const;
     TPath GetChrootInternal(TPath container_root, std::string type) const;
-    int GetId() const { return Config->Get<int>(V_ID); }
+    std::string GetId() const { return Config->Get<std::string>(V_ID); }
     bool IsReadOnly() const { return Config->Get<bool>(V_READ_ONLY); }
     unsigned long GetMountFlags() const;
 
@@ -152,7 +152,7 @@ class TVolumeHolder : public std::enable_shared_from_this<TVolumeHolder>,
                       public TNonCopyable {
     std::shared_ptr<TKeyValueStorage> Storage;
     std::map<TPath, std::shared_ptr<TVolume>> Volumes;
-    TIdMap IdMap;
+    uint64_t NextId = 1;
 public:
     TVolumeHolder(std::shared_ptr<TKeyValueStorage> storage) : Storage(storage) {}
     const std::vector<std::pair<std::string, std::string>> ListProperties();

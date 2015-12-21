@@ -562,7 +562,7 @@ TError TVolume::OpenBackend() {
 
 /* /place/porto_volumes/<id>/<type> */
 TPath TVolume::GetInternal(std::string type) const {
-    return TPath(config().volumes().volume_dir()) / std::to_string(GetId()) / type;
+    return TPath(config().volumes().volume_dir()) / GetId() / type;
 }
 
 /* /chroot/porto/<type>_<id> */
@@ -570,7 +570,7 @@ TPath TVolume::GetChrootInternal(TPath container_root, std::string type) const {
     TPath porto_path = container_root / config().container().chroot_porto_dir();
     if (!porto_path.Exists() && porto_path.Mkdir(0755))
         return TPath();
-    return porto_path / (type + "_" + std::to_string(GetId()));
+    return porto_path / (type + "_" + GetId());
 }
 
 TPath TVolume::GetPath() const {
@@ -1103,7 +1103,7 @@ static void RegisterVolumeProperties(std::shared_ptr<TRawValueMap> m) {
     m->Add(V_PERMISSIONS, new TStringValue(PERSISTENT_VALUE));
     m->Add(V_CREATOR, new TStringValue(READ_ONLY_VALUE | PERSISTENT_VALUE));
 
-    m->Add(V_ID, new TIntValue(HIDDEN_VALUE | PERSISTENT_VALUE));
+    m->Add(V_ID, new TStringValue(HIDDEN_VALUE | PERSISTENT_VALUE));
     m->Add(V_READY, new TBoolValue(READ_ONLY_VALUE | PERSISTENT_VALUE));
     m->Add(V_PRIVATE, new TStringValue(PERSISTENT_VALUE));
     m->Add(V_CONTAINERS, new TListValue(HIDDEN_VALUE | PERSISTENT_VALUE));
@@ -1120,27 +1120,22 @@ static void RegisterVolumeProperties(std::shared_ptr<TRawValueMap> m) {
 }
 
 TError TVolumeHolder::Create(std::shared_ptr<TVolume> &volume) {
-    uint16_t id;
-
-    TError error = IdMap.Get(id);
-    if (error)
-        return error;
+    std::string id = std::to_string(NextId);
     auto node = Storage->GetNode(id);
     auto config = std::make_shared<TValueMap>(node);
     RegisterVolumeProperties(config);
-    error = config->Set<int>(V_ID, id);
+    TError error = config->Set<std::string>(V_ID, id);
     if (error) {
         config->Remove();
-        IdMap.Put(id);
         return error;
     }
     volume = std::make_shared<TVolume>(config);
+    NextId++;
     return TError::Success();
 }
 
 void TVolumeHolder::Remove(std::shared_ptr<TVolume> volume) {
     volume->Config->Remove();
-    IdMap.Put(volume->GetId());
 }
 
 TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Cholder) {
@@ -1181,11 +1176,16 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
         auto config = std::make_shared<TValueMap>(node);
         RegisterVolumeProperties(config);
         error = config->Restore();
-        if (error || !config->HasValue(V_ID) ||
-                IdMap.GetAt(config->Get<int>(V_ID))) {
+        if (error || !config->HasValue(V_ID)) {
             L_WRN() << "Corrupted volume config " << node << " removed: " << error << std::endl;
             (void)config->Remove();
             continue;
+        }
+
+        uint64_t id;
+        if (!StringToUint64(config->Get<std::string>(V_ID), id)) {
+            if (id >= NextId)
+                NextId = id + 1;
         }
 
         auto volume = std::make_shared<TVolume>(config);
@@ -1229,7 +1229,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
     for (auto dir_name: subdirs) {
         bool used = false;
         for (auto v: Volumes) {
-            if (std::to_string(v.second->GetId()) == dir_name) {
+            if (v.second->GetId() == dir_name) {
                 used = true;
                 break;
             }
