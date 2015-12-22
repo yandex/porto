@@ -10,6 +10,7 @@
 #include "util/crc32.hpp"
 
 extern "C" {
+#include <netlink/route/addr.h>
 #include <netlink/route/link.h>
 #include <netlink/route/tc.h>
 #include <netlink/route/class.h>
@@ -224,6 +225,83 @@ TError TNetwork::UpdateInterfaces() {
     return TError::Success();
 }
 
+TError TNetwork::GetGateAddress(TNlAddr &gate4, TNlAddr &gate6) {
+    struct nl_cache *cache;
+    int ret;
+
+    ret = rtnl_addr_alloc_cache(GetSock(), &cache);
+    if (ret < 0)
+        return Nl->Error(ret, "Cannot allocate addr cache");
+
+    for (auto obj = nl_cache_get_first(cache); obj; obj = nl_cache_get_next(obj)) {
+         auto addr = (struct rtnl_addr *)obj;
+         auto local = rtnl_addr_get_local(addr);
+
+         if (!local || rtnl_addr_get_scope(addr) == RT_SCOPE_HOST)
+             continue;
+
+         if (gate4.IsEmpty() && nl_addr_get_family(local) == AF_INET) {
+             nl_addr_set_prefixlen(local, 32);
+             gate4 = TNlAddr(local);
+         }
+
+         if (gate6.IsEmpty() && nl_addr_get_family(local) == AF_INET6) {
+             nl_addr_set_prefixlen(local, 128);
+             gate6 = TNlAddr(local);
+         }
+    }
+
+    nl_cache_free(cache);
+
+    return TError::Success();
+}
+
+TError TNetwork::AddAnnounce(const TNlAddr &addr) {
+    struct nl_cache *cache;
+    TError error;
+    int ret;
+
+    ret = rtnl_addr_alloc_cache(GetSock(), &cache);
+    if (ret < 0)
+        return Nl->Error(ret, "Cannot allocate addr cache");
+
+    for (auto &iface : ifaces) {
+        bool reachable = false;
+
+        for (auto obj = nl_cache_get_first(cache); obj;
+                obj = nl_cache_get_next(obj)) {
+            auto raddr = (struct rtnl_addr *)obj;
+            auto local = rtnl_addr_get_local(raddr);
+
+            if (rtnl_addr_get_ifindex(raddr) == iface.second &&
+                    local && nl_addr_cmp_prefix(local, addr.Addr) == 0) {
+                reachable = true;
+                break;
+            }
+        }
+
+        /* Add proxy entry only if address is directly reachable */
+        if (reachable) {
+            error = Nl->ProxyNeighbour(iface.second, addr, true);
+            if (error)
+                break;
+        }
+    }
+
+    nl_cache_free(cache);
+
+    return error;
+}
+
+TError TNetwork::DelAnnounce(const TNlAddr &addr) {
+    TError error;
+
+    for (auto &iface : ifaces)
+        error = Nl->ProxyNeighbour(iface.second, addr, false);
+
+    return error;
+}
+
 TError TNetwork::GetTrafficCounters(int minor, ETclassStat stat,
                                     std::map<std::string, uint64_t> &result) {
     uint32_t handle = TC_HANDLE(ROOT_TC_MAJOR, minor);
@@ -429,6 +507,7 @@ void TNetCfg::Reset() {
     MacVlan.clear();
     IpVlan.clear();
     Veth.clear();
+    L3lan.clear();
     NetNsName = "";
     NetCtName = "";
 }
@@ -576,6 +655,23 @@ TError TNetCfg::ParseNet(std::vector<std::string> lines) {
             veth.Peer = "portove-" + std::to_string(Id) + "-" + std::to_string(idx++);
 
             Veth.push_back(veth);
+
+        } else if (type == "L3") {
+            if (settings.size() < 2)
+                return TError(EError::InvalidValue, "Invalid L3 in: " + line);
+
+            TL3NetCfg l3;
+            l3.Name = StringTrim(settings[1]);
+            l3.Mtu = -1;
+
+            if (settings.size() > 2) {
+                TError error = StringToInt(settings[2], l3.Mtu);
+                if (error)
+                    return error;
+            }
+
+            L3lan.push_back(l3);
+
         } else if (type == "netns") {
             if (settings.size() != 2)
                 return TError(EError::InvalidValue, "Invalid netns in: " + line);
@@ -591,7 +687,7 @@ TError TNetCfg::ParseNet(std::vector<std::string> lines) {
     }
 
     int single = none + Host + Inherited;
-    int mixed = HostIface.size() + MacVlan.size() + IpVlan.size() + Veth.size();
+    int mixed = HostIface.size() + MacVlan.size() + IpVlan.size() + Veth.size() + L3lan.size();
 
     if (single > 1 || (single == 1 && mixed))
         return TError(EError::InvalidValue, "none/host/inherited can't be mixed with other types");
@@ -612,10 +708,18 @@ TError TNetCfg::ParseIp(std::vector<std::string> lines) {
 
         TIpVec ip;
         ip.Iface = settings[0];
-        error = ParseIpPrefix(settings[1], ip.Addr, ip.Prefix);
+        error = ip.Addr.Parse(AF_UNSPEC, settings[1]);
         if (error)
             return error;
         IpVec.push_back(ip);
+
+        for (auto &l3: L3lan) {
+            if (l3.Name == ip.Iface) {
+                if (!ip.Addr.IsHost())
+                    return TError(EError::InvalidValue, "Invalid ip prefix for L3 network");
+                l3.Addrs.push_back(ip.Addr);
+            }
+        }
     }
     return TError::Success();
 }
@@ -633,7 +737,7 @@ TError TNetCfg::ParseGw(std::vector<std::string> lines) {
 
         TGwVec gw;
         gw.Iface = settings[0];
-        error = gw.Addr.Parse(settings[1]);
+        error = gw.Addr.Parse(AF_UNSPEC, settings[1]);
         if (error)
             return error;
         GwVec.push_back(gw);
@@ -653,7 +757,102 @@ std::string TNetCfg::GenerateHw(const std::string &name) {
             (h & 0x000000FF) >> 0);
 }
 
-TError TNetCfg::ConfigureInterfaces(std::shared_ptr<TNetwork> &ParentNet) {
+TError TNetCfg::ConfigureVeth(TVethNetCfg &veth) {
+    auto parentNl = ParentNet->GetNl();
+    TNlLink peer(parentNl, veth.Peer);
+    TError error;
+
+    std::string hw = veth.Hw;
+    if (hw.empty() && !Hostname.empty())
+        hw = GenerateHw(veth.Name + veth.Peer);
+
+    error = peer.AddVeth(veth.Name, hw, veth.Mtu, NetNs.GetFd());
+    if (error)
+        return error;
+
+    if (!veth.Bridge.empty()) {
+        TNlLink bridge(parentNl, veth.Bridge);
+        error = bridge.Load();
+        if (error)
+            return error;
+
+        error = bridge.Enslave(veth.Peer);
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
+}
+
+TError TNetCfg::ConfigureL3(TL3NetCfg &l3) {
+    std::string peerName = StringFormat("L3-%u-%s", Id, l3.Name.c_str());
+    auto parentNl = ParentNet->GetNl();
+    TNlLink peer(parentNl, peerName);
+    TNlAddr gate4, gate6;
+    TError error;
+
+    error = ParentNet->GetGateAddress(gate4, gate6);
+    if (error)
+        return error;
+
+    for (auto &addr : l3.Addrs) {
+        if (addr.Family() == AF_INET && gate4.IsEmpty())
+            return TError(EError::InvalidValue, "Ipv4 gateway not found");
+        if (addr.Family() == AF_INET6 && gate6.IsEmpty())
+            return TError(EError::InvalidValue, "Ipv6 gateway not found");
+    }
+
+    error = peer.AddVeth(l3.Name, "", l3.Mtu, NetNs.GetFd());
+    if (error)
+        return error;
+
+    TNlLink link(Net->GetNl(), l3.Name);
+    error = link.Load();
+    if (error)
+        return error;
+
+    error = link.Up();
+    if (error)
+        return error;
+
+    if (!gate4.IsEmpty()) {
+        error = parentNl->ProxyNeighbour(peer.GetIndex(), gate4, true);
+        if (error)
+            return error;
+        error = link.AddDirectRoute(gate4);
+        if (error)
+            return error;
+        error = link.SetDefaultGw(gate4);
+        if (error)
+            return error;
+    }
+
+    if (!gate6.IsEmpty()) {
+        error = parentNl->ProxyNeighbour(peer.GetIndex(), gate6, true);
+        if (error)
+            return error;
+        error = link.AddDirectRoute(gate6);
+        if (error)
+            return error;
+        error = link.SetDefaultGw(gate6);
+        if (error)
+            return error;
+    }
+
+    for (auto &addr : l3.Addrs) {
+        error = peer.AddDirectRoute(addr);
+        if (error)
+            return error;
+
+        error = ParentNet->AddAnnounce(addr);
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
+}
+
+TError TNetCfg::ConfigureInterfaces() {
     auto parent_lock = ParentNet->ScopedLock();
     auto source_nl = ParentNet->GetNl();
     auto target_nl = Net->GetNl();
@@ -697,16 +896,13 @@ TError TNetCfg::ConfigureInterfaces(std::shared_ptr<TNetwork> &ParentNet) {
     }
 
     for (auto &veth : Veth) {
-        TNlLink bridge(source_nl, veth.Bridge);
-        error = bridge.Load();
+        error = ConfigureVeth(veth);
         if (error)
             return error;
+    }
 
-        std::string hw = veth.Hw;
-        if (hw.empty())
-            hw = GenerateHw(veth.Name + veth.Peer);
-
-        error = bridge.AddVeth(veth.Name, veth.Peer, hw, veth.Mtu, NetNs.GetFd());
+    for (auto &l3 : L3lan) {
+        error = ConfigureL3(l3);
         if (error)
             return error;
     }
@@ -740,7 +936,7 @@ TError TNetCfg::ConfigureInterfaces(std::shared_ptr<TNetwork> &ParentNet) {
         error = link.Load();
         if (error)
             return error;
-        error = link.SetIpAddr(ip.Addr, ip.Prefix);
+        error = link.AddAddress(ip.Addr);
         if (error)
             return error;
     }
@@ -778,7 +974,7 @@ TError TNetCfg::PrepareNetwork() {
         if (error)
             return error;
 
-        error = ConfigureInterfaces(Parent->Net);
+        error = ConfigureInterfaces();
         if (error)
             return error;
 
@@ -843,4 +1039,19 @@ TError TNetCfg::PrepareNetwork() {
     }
 
     return TError::Success();
+}
+
+TError TNetCfg::DestroyNetwork() {
+    TError error;
+
+    if (!ParentNet)
+        return TError::Success();
+
+    for (auto &l3 : L3lan) {
+        auto lock = ParentNet->ScopedLock();
+        for (auto &addr : l3.Addrs)
+            error = ParentNet->DelAnnounce(addr);
+    }
+
+    return error;
 }

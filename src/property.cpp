@@ -912,7 +912,7 @@ public:
 class TIpProperty : public TListValue, public TContainerValue {
 public:
     TIpProperty() :
-        TListValue(PERSISTENT_VALUE | HIDDEN_VALUE),
+        TListValue(PERSISTENT_VALUE),
         TContainerValue(P_IP,
                         "IP configuration: <interface> <ip>/<prefix>; ...",
                         staticProperty) {}
@@ -937,6 +937,7 @@ public:
                         "macvlan <master> <name> [bridge|private|vepa|passthru] [mtu] [hw] | "
                         "ipvlan <master> <name> [l2|l3] [mtu] | "
                         "veth <name> <bridge> [mtu] [hw] | "
+                        "L3 <name> [mtu] |"
                         "netns <name>",
                         staticProperty) {}
 

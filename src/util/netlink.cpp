@@ -22,6 +22,7 @@ extern "C" {
 #include <netlink/route/link.h>
 #include <netlink/route/link/macvlan.h>
 #include <netlink/route/link/veth.h>
+#include <netlink/route/neighbour.h>
 
 #include <netlink/route/route.h>
 #include <netlink/route/addr.h>
@@ -98,6 +99,41 @@ TError TNl::OpenLinks(std::vector<std::shared_ptr<TNlLink>> &links, bool all) {
     }
 
     nl_cache_free(cache);
+
+    return TError::Success();
+}
+
+TError TNl::ProxyNeighbour(int ifindex, const TNlAddr &addr, bool add) {
+    struct rtnl_neigh *neigh;
+    int ret;
+
+    neigh = rtnl_neigh_alloc();
+    if (!neigh)
+        return TError(EError::Unknown, "Cannot allocate neighbour");
+
+    ret = rtnl_neigh_set_dst(neigh, addr.Addr);
+    if (ret) {
+        rtnl_neigh_put(neigh);
+        return Error(ret, "Cannot set neighbour dst");
+    }
+
+    rtnl_neigh_set_flags(neigh, NTF_PROXY);
+    rtnl_neigh_set_state(neigh, NUD_PERMANENT);
+    rtnl_neigh_set_ifindex(neigh, ifindex);
+
+    if (add) {
+        Dump("add", neigh);
+        ret = rtnl_neigh_add(Sock, neigh, NLM_F_CREATE | NLM_F_REPLACE);
+    } else {
+        Dump("del", neigh);
+        ret = rtnl_neigh_delete(Sock, neigh, 0);
+
+        if (ret == -NLE_OBJ_NOTFOUND)
+            ret = 0;
+    }
+    rtnl_neigh_put(neigh);
+    if (ret)
+        return Error(ret, "Cannot modify neighbour for l3 network");
 
     return TError::Success();
 }
@@ -210,28 +246,58 @@ TError TNlLink::ChangeNs(const std::string &newName, int nsFd) {
     return TError::Success();
 }
 
-TError TNlLink::SetDefaultGw(const TNlAddr &addr) {
+TError TNlLink::AddDirectRoute(const TNlAddr &addr) {
     struct rtnl_route *route;
     struct rtnl_nexthop *nh;
     int ret;
 
-    struct nl_addr *a;
+    route = rtnl_route_alloc();
+    if (!route)
+        return TError(EError::Unknown, "Cannot allocate route");
+
+    ret = rtnl_route_set_dst(route, addr.Addr);
+    if (ret < 0) {
+        rtnl_route_put(route);
+        return Error(ret, "Cannot set route destination");
+    }
+
+    nh = rtnl_route_nh_alloc();
+    if (!route) {
+        rtnl_route_put(route);
+        return TError(EError::Unknown, "Cannot allocate next hop");
+    }
+
+    rtnl_route_nh_set_ifindex(nh, GetIndex());
+    rtnl_route_add_nexthop(route, nh);
+
+    Dump("add", route);
+    ret = rtnl_route_add(GetSock(), route, NLM_F_CREATE | NLM_F_REPLACE);
+    rtnl_route_put(route);
+    if (ret < 0)
+        return Error(ret, "Cannot add direct route");
+
+    return TError::Success();
+}
+
+TError TNlLink::SetDefaultGw(const TNlAddr &addr) {
+    struct rtnl_route *route;
+    struct rtnl_nexthop *nh;
+    TError error;
+    TNlAddr all;
+    int ret;
+
+    error = all.Parse(addr.Family(), "default");
+    if (error)
+        return error;
 
     route = rtnl_route_alloc();
     if (!route)
         return TError(EError::Unknown, "Unable to allocate route");
 
-    ret = nl_addr_parse("default", nl_addr_get_family(addr.GetAddr()), &a);
+    ret = rtnl_route_set_dst(route, all.Addr);
     if (ret < 0) {
         rtnl_route_put(route);
-        return TError(EError::Unknown, std::string("Unable to parse default address: ") + nl_geterror(ret));
-    }
-
-    ret = rtnl_route_set_dst(route, a);
-    nl_addr_put(a);
-    if (ret < 0) {
-        rtnl_route_put(route);
-        return TError(EError::Unknown, std::string("Unable to set route destination: ") + nl_geterror(ret));
+        return Error(ret, "Cannot set route destination");
     }
 
     nh = rtnl_route_nh_alloc();
@@ -240,39 +306,37 @@ TError TNlLink::SetDefaultGw(const TNlAddr &addr) {
         return TError(EError::Unknown, "Unable to allocate next hop");
     }
 
-    rtnl_route_nh_set_gateway(nh, addr.GetAddr());
+    rtnl_route_nh_set_gateway(nh, addr.Addr);
     rtnl_route_nh_set_ifindex(nh, GetIndex());
     rtnl_route_add_nexthop(route, nh);
 
+    Dump("add", route);
     ret = rtnl_route_add(GetSock(), route, NLM_F_MATCH);
     rtnl_route_put(route);
-    if (ret < 0) {
-        return TError(EError::Unknown, std::string("Unable to set default gateway: ") + nl_geterror(ret) + std::string(" ") + std::to_string(ret));
-    }
+    if (ret < 0)
+        return Error(ret, "Cannot set default gateway");
 
     return TError::Success();
 }
 
-TError TNlLink::SetIpAddr(const TNlAddr &addr, const int prefix) {
-    int ret;
+TError TNlLink::AddAddress(const TNlAddr &addr) {
     struct rtnl_addr *a = rtnl_addr_alloc();
     if (!a)
-        return TError(EError::Unknown, "Unable to allocate address");
+        return TError(EError::Unknown, "Cannot allocate address");
 
     rtnl_addr_set_link(a, Link);
-    rtnl_addr_set_family(a, nl_addr_get_family(addr.GetAddr()));
+    rtnl_addr_set_family(a, nl_addr_get_family(addr.Addr));
 
-    ret = rtnl_addr_set_local(a, addr.GetAddr());
+    int ret = rtnl_addr_set_local(a, addr.Addr);
     if (ret < 0) {
         rtnl_addr_put(a);
-        return TError(EError::Unknown, std::string("Unable to set local address: ") + nl_geterror(ret));
+        return Error(ret, "Cannot set local address");
     }
-    rtnl_addr_set_prefixlen(a, prefix);
 
     ret = rtnl_addr_add(GetSock(), a, 0);
     if (ret < 0) {
         rtnl_addr_put(a);
-        return TError(EError::Unknown, std::string("Unable to add address: ") + nl_geterror(ret) + std::string(" ") + std::to_string(prefix));
+        return Error(ret, "Cannot add address");
     }
 
     rtnl_addr_put(a);
@@ -429,66 +493,75 @@ TError TNlLink::AddMacVlan(const std::string &master,
     return AddXVlan("macvlan", master, macvlanType.at(type), hw, mtu);
 }
 
-TError TNlLink::AddVeth(const std::string &name, const std::string &peerName,
-                        const std::string &hw, int mtu, int nsFd) {
+TError TNlLink::Enslave(const std::string &name) {
+    struct rtnl_link *link;
+    int ret;
+
+    link = rtnl_link_alloc();
+    rtnl_link_set_name(link, name.c_str());
+
+    rtnl_link_set_master(link, GetIndex());
+    rtnl_link_set_flags(link, IFF_UP);
+
+    Dump("mod", link);
+    ret = rtnl_link_change(GetSock(), link, link, 0);
+    if (ret < 0) {
+        Dump("del", link);
+        (void)rtnl_link_delete(GetSock(), link);
+        rtnl_link_put(link);
+        return Error(ret, "Cannot enslave interface " + name);
+    }
+
+    rtnl_link_put(link);
+    return TError::Success();
+}
+
+TError TNlLink::AddVeth(const std::string &name,
+                        const std::string &hw,
+                        int mtu, int nsFd) {
     struct rtnl_link *veth, *peer;
     int ret;
-    TError error;
-
-    struct ether_addr *ea = nullptr;
-    if (hw.length()) {
-        ea = ether_aton(hw.c_str());
-        if (!ea)
-            return TError(EError::Unknown, "Invalid VETH mac address " + hw);
-    }
 
     peer = rtnl_link_veth_alloc();
     if (!peer)
         return TError(EError::Unknown, "Unable to allocate veth");
 
-    rtnl_link_set_name(peer, peerName.c_str());
+    rtnl_link_set_name(peer, rtnl_link_get_name(Link));
 
     veth = rtnl_link_veth_get_peer(peer);
     rtnl_link_set_name(veth, name.c_str());
-    rtnl_link_set_ns_fd(veth, nsFd);
+
+    if (nsFd >= 0)
+        rtnl_link_set_ns_fd(veth, nsFd);
 
     if (mtu > 0) {
-        rtnl_link_set_mtu(peer, (unsigned int)mtu);
-        rtnl_link_set_mtu(veth, (unsigned int)mtu);
+        rtnl_link_set_mtu(peer, mtu);
+        rtnl_link_set_mtu(veth, mtu);
     }
 
-    if (ea) {
-        struct nl_addr *addr = nl_addr_build(AF_LLC, ea, ETH_ALEN);
-        rtnl_link_set_addr(veth, addr);
-        nl_addr_put(addr);
+    if (!hw.empty()) {
+        TNlAddr addr;
+        TError error = addr.Parse(AF_LLC, hw.c_str());
+        if (error)
+            return error;
+        rtnl_link_set_addr(veth, addr.Addr);
     }
 
+    rtnl_link_set_flags(peer, IFF_UP);
+
+    Dump("add", veth);
     rtnl_link_put(veth);
 
+    Dump("add", peer);
     ret = rtnl_link_add(GetSock(), peer, NLM_F_CREATE | NLM_F_EXCL);
     if (ret < 0) {
         rtnl_link_put(peer);
-        return TError(EError::Unknown, std::string("Unable to add veth: ") + nl_geterror(ret));
-    }
-
-    /* reconstruct link: workaround for libnl bug */
-    rtnl_link_put(peer);
-    peer = rtnl_link_alloc();
-    rtnl_link_set_name(peer, peerName.c_str());
-
-    rtnl_link_set_master(peer, GetIndex());
-    rtnl_link_set_flags(peer, IFF_UP);
-
-    ret = rtnl_link_change(GetSock(), peer, peer, 0);
-    if (ret < 0) {
-        (void)rtnl_link_delete(GetSock(), peer);
-        rtnl_link_put(peer);
-        return TError(EError::Unknown, std::string("Unable to enslave interface: ") + nl_geterror(ret));
+        return Error(ret, "Cannot add veth");
     }
 
     rtnl_link_put(peer);
 
-    return TError::Success();
+    return Load();
 }
 
 bool TNlLink::ValidIpVlanMode(const std::string &mode) {
@@ -777,6 +850,10 @@ free_cls:
     return error;
 }
 
+TNlAddr::TNlAddr(struct nl_addr *addr) {
+    Addr = nl_addr_get(addr);
+}
+
 TNlAddr::TNlAddr(const TNlAddr &other) {
     if (other.Addr)
         Addr = nl_addr_clone(other.Addr);
@@ -796,40 +873,32 @@ TNlAddr &TNlAddr::operator=(const TNlAddr &other) {
 }
 
 TNlAddr::~TNlAddr() {
+    Forget();
+}
+
+void TNlAddr::Forget() {
     nl_addr_put(Addr);
+    Addr = nullptr;
 }
 
 bool TNlAddr::IsEmpty() const {
     return !Addr || nl_addr_iszero(Addr);
 }
 
-TError TNlAddr::Parse(const std::string &s) {
-    nl_addr_put(Addr);
-    Addr = nullptr;
-
-    int ret = nl_addr_parse(s.c_str(), AF_UNSPEC, &Addr);
-    if (ret)
-        return TError(EError::InvalidValue, "Unable to parse IP address " + s);
-
-    return TError::Success();
+int TNlAddr::Family() const {
+    return Addr ? nl_addr_get_family(Addr) : AF_UNSPEC;
 }
 
-TError ParseIpPrefix(const std::string &s, TNlAddr &addr, int &prefix) {
-    std::vector<std::string> lines;
-    TError error = SplitString(s, '/', lines);
-    if (error)
-        return error;
+bool TNlAddr::IsHost() const {
+    return Addr && nl_addr_get_prefixlen(Addr) == nl_addr_get_len(Addr) * 8;
+}
 
-    if (lines.size() != 2)
-        return TError(EError::InvalidValue, "Invalid IP address/prefix " + s);
+TError TNlAddr::Parse(int family, const std::string &string) {
+    Forget();
 
-    error = addr.Parse(lines[0]);
-    if (error)
-        return error;
-
-    error = StringToInt(lines[1], prefix);
-    if (error)
-        return TError(EError::InvalidValue, "Invalid IP address/prefix " + s);
+    int ret = nl_addr_parse(string.c_str(), family, &Addr);
+    if (ret)
+        return TNl::Error(ret, "Cannot parse address " + string);
 
     return TError::Success();
 }

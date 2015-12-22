@@ -21,15 +21,19 @@ struct nl_addr;
 class TNlLink;
 
 class TNlAddr {
-    struct nl_addr *Addr = nullptr;
 public:
+    struct nl_addr *Addr = nullptr;
+
     TNlAddr() {}
+    TNlAddr(struct nl_addr *addr);
     TNlAddr(const TNlAddr &other);
     TNlAddr &operator=(const TNlAddr &other);
     ~TNlAddr();
-    TError Parse(const std::string &s);
-    struct nl_addr *GetAddr() const { return Addr; }
+    void Forget();
+    TError Parse(int family, const std::string &string);
     bool IsEmpty() const;
+    int Family() const;
+    bool IsHost() const;
 };
 
 enum class ETclassStat {
@@ -64,6 +68,8 @@ public:
 
     static TError Error(int nl_err, const std::string &desc);
     void Dump(const std::string &prefix, void *obj);
+
+    TError ProxyNeighbour(int ifindex, const TNlAddr &addr, bool add);
 };
 
 class TNlLink : public TNonCopyable {
@@ -93,20 +99,22 @@ public:
 
     TError Remove();
     TError Up();
+    TError Enslave(const std::string &name);
     TError ChangeNs(const std::string &newName, int nsFd);
     TError AddIpVlan(const std::string &master,
                      const std::string &mode, int mtu);
     TError AddMacVlan(const std::string &master,
                       const std::string &type, const std::string &hw,
                       int mtu);
-    TError AddVeth(const std::string &name, const std::string &peerName, const std::string &hw, int mtu, int nsFd);
+    TError AddVeth(const std::string &name, const std::string &hw, int mtu, int nsFd);
 
     static bool ValidIpVlanMode(const std::string &mode);
     static bool ValidMacVlanType(const std::string &type);
     static bool ValidMacAddr(const std::string &hw);
 
+    TError AddDirectRoute(const TNlAddr &addr);
     TError SetDefaultGw(const TNlAddr &addr);
-    TError SetIpAddr(const TNlAddr &addr, const int prefix);
+    TError AddAddress(const TNlAddr &addr);
 
     struct nl_sock *GetSock() const { return Nl->GetSock(); }
     std::shared_ptr<TNl> GetNl() { return Nl; };
@@ -146,5 +154,3 @@ public:
     bool Exists(const TNlLink &link);
     TError Remove(const TNlLink &link);
 };
-
-TError ParseIpPrefix(const std::string &s, TNlAddr &addr, int &prefix);

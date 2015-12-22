@@ -45,6 +45,10 @@ public:
     TError AddTrafficClass(int ifIndex, uint32_t parent, uint32_t handle,
                            uint64_t prio, uint64_t rate, uint64_t ceil);
     TError DelTrafficClass(int ifIndex, uint32_t handle);
+
+    TError GetGateAddress(TNlAddr &gate4, TNlAddr &gate6);
+    TError AddAnnounce(const TNlAddr &addr);
+    TError DelAnnounce(const TNlAddr &addr);
 };
 
 
@@ -70,7 +74,6 @@ struct TIpVlanNetCfg {
 struct TIpVec {
     std::string Iface;
     TNlAddr Addr;
-    int Prefix;
 };
 
 struct TGwVec {
@@ -86,12 +89,19 @@ struct TVethNetCfg {
     int Mtu;
 };
 
+struct TL3NetCfg {
+    std::string Name;
+    int Mtu;
+    std::vector<TNlAddr> Addrs;
+};
+
 class TContainerHolder;
 class TContainer;
 
 struct TNetCfg {
     std::shared_ptr<TContainerHolder> Holder;
     std::shared_ptr<TContainer> Parent;
+    std::shared_ptr<TNetwork> ParentNet;
     std::shared_ptr<TNetwork> Net;
     unsigned Id;
     unsigned ParentId;
@@ -105,6 +115,7 @@ struct TNetCfg {
     std::vector<TMacVlanNetCfg> MacVlan;
     std::vector<TIpVlanNetCfg> IpVlan;
     std::vector<TVethNetCfg> Veth;
+    std::vector<TL3NetCfg> L3lan;
     std::string NetNsName;
     std::string NetCtName;
     std::vector<TGwVec> GwVec;
@@ -117,6 +128,9 @@ struct TNetCfg {
     TError ParseIp(std::vector<std::string> lines);
     TError ParseGw(std::vector<std::string> lines);
     std::string GenerateHw(const std::string &name);
-    TError ConfigureInterfaces(std::shared_ptr<TNetwork> &ParentNet);
+    TError ConfigureVeth(TVethNetCfg &veth);
+    TError ConfigureL3(TL3NetCfg &l3);
+    TError ConfigureInterfaces();
     TError PrepareNetwork();
+    TError DestroyNetwork();
 };

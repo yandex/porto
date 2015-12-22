@@ -619,7 +619,7 @@ void TContainer::CleanupExpiredChildren() {
     }
 }
 
-TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
+TError TContainer::ParseNetConfig(struct TNetCfg &NetCfg) {
     TError error;
 
     NetCfg.Parent = Parent;
@@ -640,6 +640,18 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
     error = NetCfg.ParseGw(Prop->Get<std::vector<std::string>>(P_DEFAULT_GW));
     if (error)
         return error;
+
+    if (Parent)
+        NetCfg.ParentNet = Parent->Net;
+
+    if (Net)
+        NetCfg.Net = Net;
+
+    return TError::Success();
+}
+
+TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
+    TError error;
 
     error = NetCfg.PrepareNetwork();
     if (error)
@@ -879,6 +891,10 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
         return error;
 
     struct TNetCfg NetCfg;
+
+    error = ParseNetConfig(NetCfg);
+    if (error)
+        return error;
 
     error = PrepareNetwork(NetCfg);
     if (error)
@@ -1172,6 +1188,14 @@ void TContainer::FreeResources() {
     LeafCgroups.clear();
 
     if (Net) {
+        struct TNetCfg NetCfg;
+
+        error = ParseNetConfig(NetCfg);
+        if (!error)
+            error = NetCfg.DestroyNetwork();
+        if (error)
+            L_ERR() << "Cannot free network resources: " << error << std::endl;
+
         auto lock = Net->ScopedLock();
 
         error = Net->RemoveTrafficClasses(Id);

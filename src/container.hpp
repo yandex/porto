@@ -80,6 +80,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareLoop();
     void ShutdownOom();
     TError PrepareCgroups();
+    TError ParseNetConfig(struct TNetCfg &NetCfg);
     TError PrepareNetwork(struct TNetCfg &NetCfg);
     TError ConfigureNetwork(struct TNetCfg &NetCfg);
     TError PrepareTask(std::shared_ptr<TClient> client, struct TNetCfg *NetCfg);

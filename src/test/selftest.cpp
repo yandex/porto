@@ -3026,6 +3026,7 @@ static void TestRoot(TPortoAPI &api) {
 
     if (NetworkEnabled()) {
         properties.push_back("net");
+        properties.push_back("ip");
         /*
         properties.push_back("net_tos");
         */
