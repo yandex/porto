@@ -3,6 +3,7 @@ import threading
 
 from . import rpc_pb2
 from . import exceptions
+from . import linuxpty
 
 __all__ = ['Connection']
 
@@ -363,6 +364,29 @@ class Container(object):
 
     def Destroy(self):
         self.rpc.Destroy(self.name)
+
+    def SetTty(self):
+        """
+        Create and configure TTY for container.
+        TTY will be applied to all the default streams
+        (stdin, stdout, stderr).
+
+        :note: you should set TERM variable in `env` container property to properly use this TTY
+        :rtype: int
+        :return: master pty fileno
+
+        """
+        ptm, slavept = linuxpty.make_tty()
+
+        self.SetProperty("stdin_path", slavept)
+        self.SetProperty("stdout_path", slavept)
+        self.SetProperty("stderr_path", slavept)
+
+        self.SetProperty("stdin_type", "pty")
+        self.SetProperty("stdout_type", "pty")
+        self.SetProperty("stderr_type", "pty")
+
+        return ptm
 
 
 class Layer(object):
