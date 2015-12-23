@@ -414,15 +414,15 @@ TError Popen(const std::string &cmd, std::vector<std::string> &lines) {
     return TError::Success();
 }
 
-size_t GetNumCores() {
-    long ncores = sysconf(_SC_NPROCESSORS_CONF);
+int GetNumCores() {
+    int ncores = sysconf(_SC_NPROCESSORS_CONF);
     if (ncores <= 0) {
         TError error(EError::Unknown, "Can't get number of CPU cores");
         L_ERR() << error << std::endl;
         return 1;
     }
 
-    return (size_t)ncores;
+    return ncores;
 }
 
 TError PackTarball(const TPath &tar, const TPath &path) {

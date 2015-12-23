@@ -444,7 +444,7 @@ public:
     }
 };
 
-double ParseCpuLimit(const std::string &str) {
+static double ParseCpuLimit(const std::string &str) {
     size_t pos = 0;
     double v = stod(str, &pos);
     if (pos > 0 && pos < str.length() && str[pos] == 'c')
@@ -465,6 +465,10 @@ public:
 
     double GetDefault() const override {
         return 100;
+    }
+
+    std::string ToString(const double &value) const override {
+        return StringFormat("%lgc", value / 100 * GetNumCores());
     }
 
     TError FromString(const std::string &str, double &limit) const override {
@@ -493,6 +497,10 @@ public:
                         dynamicProperty) {
         if (!cpuSubsystem->SupportGuarantee())
             SetFlag(UNSUPPORTED_FEATURE);
+    }
+
+    std::string ToString(const double &value) const override {
+        return StringFormat("%lgc", value / 100 * GetNumCores());
     }
 
     TError FromString(const std::string &str, double &limit) const override {

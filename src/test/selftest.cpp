@@ -172,9 +172,9 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectApiSuccess(api.GetProperty(name, "cpu_policy", v));
     ExpectEq(v, string("normal"));
     ExpectApiSuccess(api.GetProperty(name, "cpu_limit", v));
-    ExpectEq(v, "100");
+    ExpectEq(v, StringFormat("%dc", GetNumCores()));
     ExpectApiSuccess(api.GetProperty(name, "cpu_guarantee", v));
-    ExpectEq(v, "0");
+    ExpectEq(v, "0c");
     if (KernelSupports(KernelFeature::CFQ)) {
         ExpectApiSuccess(api.GetProperty(name, "io_policy", v));
         ExpectEq(v, "normal");
@@ -3359,13 +3359,13 @@ static void TestCoresConvertion(TPortoAPI &api, const std::string &name, const s
     auto cores = GetNumCores();
     std::string v;
 
-    ExpectApiSuccess(api.SetProperty(name, property, std::to_string(cores) + "c"));
+    ExpectApiSuccess(api.SetProperty(name, property, "100"));
     ExpectApiSuccess(api.GetProperty(name, property, v));
-    ExpectEq(v, "100");
+    ExpectEq(v, StringFormat("%dc", cores));
 
-    ExpectApiSuccess(api.SetProperty(name, property, std::to_string(cores / 2) + "c"));
+    ExpectApiSuccess(api.SetProperty(name, property, "50"));
     ExpectApiSuccess(api.GetProperty(name, property, v));
-    ExpectEq(v, "50");
+    ExpectEq(v, StringFormat("%gc", 0.5 * cores));
 }
 
 static void TestLimits(TPortoAPI &api) {
@@ -3432,6 +3432,8 @@ static void TestLimits(TPortoAPI &api) {
         ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "1"));
         ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "1.5"));
         ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "100"));
+        ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "1c"));
+        ExpectApiSuccess(api.SetProperty(name, "cpu_limit", "1.5c"));
     }
 
     if (KernelSupports(KernelFeature::CFS_GROUPSCHED)) {
@@ -3441,6 +3443,8 @@ static void TestLimits(TPortoAPI &api) {
         ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "0"));
         ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "1.5"));
         ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "100"));
+        ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "1c"));
+        ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "1.5c"));
     }
 
     Say() << "Check cpu_policy" << std::endl;
