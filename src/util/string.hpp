@@ -8,6 +8,8 @@
 
 #include "error.hpp"
 
+typedef std::map<std::string, uint64_t> TUintMap;
+
 std::string CommaSeparatedList(const std::vector<std::string> &list, const std::string &sep = ",");
 std::string CommaSeparatedList(const std::set<std::string> &list);
 
@@ -39,3 +41,6 @@ std::string StringFormatSize(uint64_t value);
 
 TError StringToValue(const std::string &str, double &value, std::string &unit);
 TError StringToSize(const std::string &str, uint64_t &size);
+
+std::string StringFormatUintMap(const TUintMap &value);
+TError StringToUintMap(const std::string &value, TUintMap &result);

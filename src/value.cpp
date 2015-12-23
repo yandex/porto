@@ -156,41 +156,11 @@ TStrList TListValue::GetDefault() const {
 }
 
 std::string TMapValue::ToString(const TUintMap &value) const {
-    std::stringstream str;
-
-    for (auto kv : value) {
-        if (str.str().length())
-            str << "; ";
-        str << kv.first << ": " << kv.second;
-    }
-
-    return str.str();
+    return StringFormatUintMap(value);
 }
 
 TError TMapValue::FromString(const std::string &value, TUintMap &result) const {
-    std::vector<std::string> lines;
-    TError error = SplitEscapedString(value, ';', lines);
-    if (error)
-        return error;
-
-    for (auto &line : lines) {
-        std::vector<std::string> nameval;
-
-        (void)SplitEscapedString(line, ':', nameval);
-        if (nameval.size() != 2)
-            return TError(EError::InvalidValue, "Invalid format");
-
-        std::string key = StringTrim(nameval[0]);
-        uint64_t val;
-
-        error = StringToUint64(nameval[1], val);
-        if (error)
-            return TError(EError::InvalidValue, "Invalid value " + nameval[1]);
-
-        result[key] = val;
-    }
-
-    return TError::Success();
+    return StringToUintMap(value, result);
 }
 
 TUintMap TMapValue::GetDefault() const {

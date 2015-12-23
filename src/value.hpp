@@ -204,8 +204,6 @@ public:
     TStrList GetDefault() const override;
 };
 
-typedef std::map<std::string, uint64_t> TUintMap;
-
 class TMapValue : public TStoredValue<TUintMap> {
 public:
     TMapValue(int flags) : TStoredValue(flags) {}
