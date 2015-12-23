@@ -225,13 +225,20 @@ TError TNetwork::UpdateInterfaces() {
     return TError::Success();
 }
 
-TError TNetwork::GetGateAddress(TNlAddr &gate4, TNlAddr &gate6) {
-    struct nl_cache *cache;
+TError TNetwork::GetGateAddress(std::vector<TNlAddr> addrs,
+                                TNlAddr &gate4, TNlAddr &gate6, int &mtu) {
+    struct nl_cache *cache, *lcache;
     int ret;
 
     ret = rtnl_addr_alloc_cache(GetSock(), &cache);
     if (ret < 0)
         return Nl->Error(ret, "Cannot allocate addr cache");
+
+    ret = rtnl_link_alloc_cache(GetSock(), AF_UNSPEC, &lcache);
+    if (ret < 0) {
+        nl_cache_free(cache);
+        return Nl->Error(ret, "Cannot allocate link cache");
+    }
 
     for (auto obj = nl_cache_get_first(cache); obj; obj = nl_cache_get_next(obj)) {
          auto addr = (struct rtnl_addr *)obj;
@@ -240,18 +247,50 @@ TError TNetwork::GetGateAddress(TNlAddr &gate4, TNlAddr &gate6) {
          if (!local || rtnl_addr_get_scope(addr) == RT_SCOPE_HOST)
              continue;
 
-         if (gate4.IsEmpty() && nl_addr_get_family(local) == AF_INET) {
-             nl_addr_set_prefixlen(local, 32);
-             gate4 = TNlAddr(local);
-         }
+         for (auto &a: addrs) {
 
-         if (gate6.IsEmpty() && nl_addr_get_family(local) == AF_INET6) {
-             nl_addr_set_prefixlen(local, 128);
-             gate6 = TNlAddr(local);
+             if (nl_addr_get_family(a.Addr) == nl_addr_get_family(local)) {
+
+                 /* get any gate of required family */
+                 if (nl_addr_get_family(local) == AF_INET && !gate4.Addr)
+                     gate4 = TNlAddr(local);
+
+                 if (nl_addr_get_family(local) == AF_INET6 && !gate6.Addr)
+                     gate6 = TNlAddr(local);
+             }
+
+             if (nl_addr_cmp_prefix(local, a.Addr) == 0) {
+
+                 /* choose best matching gate address */
+                 if (nl_addr_get_family(local) == AF_INET &&
+                         nl_addr_cmp_prefix(gate4.Addr, a.Addr) != 0)
+                     gate4 = TNlAddr(local);
+
+                 if (nl_addr_get_family(local) == AF_INET6 &&
+                         nl_addr_cmp_prefix(gate6.Addr, a.Addr) != 0)
+                     gate6 = TNlAddr(local);
+
+                 auto link = rtnl_link_get(lcache, rtnl_addr_get_ifindex(addr));
+                 if (link) {
+                     int link_mtu = rtnl_link_get_mtu(link);
+
+                     if (mtu < 0 || link_mtu < mtu)
+                         mtu = link_mtu;
+
+                     rtnl_link_put(link);
+                 }
+             }
          }
     }
 
+    nl_cache_free(lcache);
     nl_cache_free(cache);
+
+    if (gate4.Addr)
+        nl_addr_set_prefixlen(gate4.Addr, 32);
+
+    if (gate6.Addr)
+        nl_addr_set_prefixlen(gate6.Addr, 128);
 
     return TError::Success();
 }
@@ -791,7 +830,7 @@ TError TNetCfg::ConfigureL3(TL3NetCfg &l3) {
     TNlAddr gate4, gate6;
     TError error;
 
-    error = ParentNet->GetGateAddress(gate4, gate6);
+    error = ParentNet->GetGateAddress(l3.Addrs, gate4, gate6, l3.Mtu);
     if (error)
         return error;
 

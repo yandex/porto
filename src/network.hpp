@@ -46,7 +46,8 @@ public:
                            uint64_t prio, uint64_t rate, uint64_t ceil);
     TError DelTrafficClass(int ifIndex, uint32_t handle);
 
-    TError GetGateAddress(TNlAddr &gate4, TNlAddr &gate6);
+    TError GetGateAddress(std::vector<TNlAddr> addrs,
+                          TNlAddr &gate4, TNlAddr &gate6, int &mtu);
     TError AddAnnounce(const TNlAddr &addr);
     TError DelAnnounce(const TNlAddr &addr);
 };
