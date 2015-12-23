@@ -326,6 +326,7 @@ TError TNlLink::AddAddress(const TNlAddr &addr) {
 
     rtnl_addr_set_link(a, Link);
     rtnl_addr_set_family(a, nl_addr_get_family(addr.Addr));
+    rtnl_addr_set_flags(a, IFA_F_NODAD);
 
     int ret = rtnl_addr_set_local(a, addr.Addr);
     if (ret < 0) {
