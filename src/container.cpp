@@ -1483,9 +1483,6 @@ static std::map<std::string, std::string> alias = {
 TError TContainer::GetProperty(const string &origProperty, string &value) const {
     TError error;
 
-    if (IsRoot() || IsPortoRoot())
-        return TError(EError::InvalidProperty, "no properties for container " + GetName());
-
     string property = origProperty;
     std::string idx;
     ParsePropertyName(property, idx);
@@ -1538,8 +1535,9 @@ bool TContainer::ShouldApplyProperty(const std::string &property) {
 TError TContainer::SetProperty(const string &origProperty,
                                const string &origValue,
                                std::shared_ptr<TClient> client) {
+
     if (IsRoot() || IsPortoRoot())
-        return TError(EError::InvalidValue, "Can't set property for container " + GetName());
+        return TError(EError::Permission, "System containers are read only");
 
     string property = origProperty;
     std::string idx;
@@ -2155,8 +2153,7 @@ TError TContainer::ResolveRelativeName(const std::string &relative_name,
     if (!resolve_meta && (relative_name == DOT_CONTAINER ||
                           relative_name == PORTO_ROOT_CONTAINER ||
                           relative_name == ROOT_CONTAINER))
-        return TError(EError::Permission,
-                      "Meta containers (like . and /) are provided in read-only mode");
+        return TError(EError::Permission, "System containers are read only");
 
     std::string ns = GetPortoNamespace();
     if (relative_name == ROOT_CONTAINER ||

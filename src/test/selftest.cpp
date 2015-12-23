@@ -3141,7 +3141,7 @@ static void TestRoot(TPortoAPI &api) {
 
     Say() << "Check root properties & data" << std::endl;
     for (auto p : properties)
-        ExpectApiFailure(api.GetProperty(root, p, v), EError::InvalidProperty);
+        ExpectApiSuccess(api.GetProperty(root, p, v));
 
     ExpectApiSuccess(api.GetData(root, "state", v));
     ExpectEq(v, string("meta"));
