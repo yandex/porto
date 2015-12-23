@@ -368,6 +368,7 @@ TError TNetwork::GetInterfaceCounters(ETclassStat stat,
         auto link = rtnl_link_get(cache, iface.second);
         if (link)
             result[iface.first] = rtnl_link_get_stat(link, id);
+        rtnl_link_put(link);
     }
 
     nl_cache_free(cache);
