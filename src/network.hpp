@@ -36,6 +36,9 @@ public:
     TError GetTrafficCounters(int minor, ETclassStat stat,
                               std::map<std::string, uint64_t> &result);
 
+    TError GetInterfaceCounters(ETclassStat stat,
+                                std::map<std::string, uint64_t> &result);
+
     TError UpdateTrafficClasses(int parent, int minor,
             std::map<std::string, uint64_t> &Prio,
             std::map<std::string, uint64_t> &Rate,

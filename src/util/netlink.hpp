@@ -41,8 +41,10 @@ enum class ETclassStat {
     Bytes,
     Drops,
     Overlimits,
-    BPS,
-    PPS,
+
+    RxPackets,
+    RxBytes,
+    RxDrops,
 };
 
 uint32_t TcHandle(uint16_t maj, uint16_t min);

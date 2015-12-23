@@ -271,6 +271,10 @@ static void ShouldHaveValidRunningData(TPortoAPI &api, const string &name) {
         ExpectApiSuccess(api.GetData(name, "net_packets", v));
         ExpectApiSuccess(api.GetData(name, "net_drops", v));
         ExpectApiSuccess(api.GetData(name, "net_overlimits", v));
+
+        ExpectApiSuccess(api.GetData(name, "net_rx_bytes", v));
+        ExpectApiSuccess(api.GetData(name, "net_rx_packets", v));
+        ExpectApiSuccess(api.GetData(name, "net_rx_drops", v));
     }
 
     int intval;
@@ -317,11 +321,13 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
 
     if (NetworkEnabled()) {
         ExpectApiFailure(api.GetData(name, "net_bytes", v), EError::InvalidState);
-        //ExpectApiFailure(api.GetData(name, "net_bps", v), EError::InvalidState);
-        //ExpectApiFailure(api.GetData(name, "net_pps", v), EError::InvalidState);
         ExpectApiFailure(api.GetData(name, "net_packets", v), EError::InvalidState);
         ExpectApiFailure(api.GetData(name, "net_drops", v), EError::InvalidState);
         ExpectApiFailure(api.GetData(name, "net_overlimits", v), EError::InvalidState);
+
+        ExpectApiFailure(api.GetData(name, "net_rx_bytes", v), EError::InvalidState);
+        ExpectApiFailure(api.GetData(name, "net_rx_packets", v), EError::InvalidState);
+        ExpectApiFailure(api.GetData(name, "net_rx_drops", v), EError::InvalidState);
     }
     ExpectApiFailure(api.GetData(name, "minor_faults", v), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "major_faults", v), EError::InvalidState);
@@ -3061,6 +3067,10 @@ static void TestRoot(TPortoAPI &api) {
         data.push_back("net_packets");
         data.push_back("net_drops");
         data.push_back("net_overlimits");
+
+        data.push_back("net_rx_bytes");
+        data.push_back("net_rx_packets");
+        data.push_back("net_rx_drops");
     }
 
     if (KernelSupports(KernelFeature::MAX_RSS))
@@ -3097,6 +3107,10 @@ static void TestRoot(TPortoAPI &api) {
         ExpectEq(v, "0");
         ExpectApiSuccess(api.GetData(porto_root, "net_overlimits[" + link->GetName() + "]", v));
         ExpectEq(v, "0");
+
+        ExpectApiSuccess(api.GetData(porto_root, "net_rx_bytes[" + link->GetName() + "]", v));
+        ExpectApiSuccess(api.GetData(porto_root, "net_rx_packets[" + link->GetName() + "]", v));
+        ExpectApiSuccess(api.GetData(porto_root, "net_rx_drops[" + link->GetName() + "]", v));
     }
 
     if (KernelSupports(KernelFeature::FSIO) ||
@@ -3289,6 +3303,18 @@ static void TestData(TPortoAPI &api) {
         ExpectZeroLink(api, root, "net_overlimits");
         ExpectZeroLink(api, wget, "net_overlimits");
         ExpectZeroLink(api, noop, "net_overlimits");
+
+        Say() << "Make sure net_rx_bytes counters are valid" << std::endl;
+        ExpectNonZeroLink(api, wget, "net_rx_bytes");
+        ExpectNonZeroLink(api, root, "net_rx_bytes");
+        ExpectLessEqLink(api, wget, root, "net_rx_bytes");
+        ExpectNonZeroLink(api, noop, "net_rx_bytes");
+
+        Say() << "Make sure net_rx_packets counters are valid" << std::endl;
+        ExpectNonZeroLink(api, wget, "net_rx_packets");
+        ExpectNonZeroLink(api, root, "net_rx_packets");
+        ExpectLessEqLink(api, wget, root, "net_rx_packets");
+        ExpectNonZeroLink(api, noop, "net_rx_packets");
     }
 
     ExpectApiSuccess(api.Destroy(wget));
@@ -4275,6 +4301,9 @@ static void ReadPropsAndData(TPortoAPI &api, const std::string &name) {
         "net_packets",
         "net_drops",
         "net_overlimits",
+        "net_rx_bytes",
+        "net_rx_packets",
+        "net_rx_drops",
     };
 
     std::vector<TProperty> plist;

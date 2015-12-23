@@ -326,6 +326,51 @@ public:
     }
 };
 
+class TNetRxBytes : public TMapValue, public TContainerValue {
+public:
+    TNetRxBytes() :
+        TMapValue(0),
+        TContainerValue(D_NET_RX_BYTES,
+                        "number of rx bytes",
+                        rpdmState) {}
+
+    TUintMap GetDefault() const override {
+        TUintMap m;
+        (void)GetContainer()->GetStat(ETclassStat::RxBytes, m);
+        return m;
+    }
+};
+
+class TNetRxPackets : public TMapValue, public TContainerValue {
+public:
+    TNetRxPackets() :
+        TMapValue(0),
+        TContainerValue(D_NET_RX_PACKETS,
+                        "number of rx packets",
+                        rpdmState) {}
+
+    TUintMap GetDefault() const override {
+        TUintMap m;
+        (void)GetContainer()->GetStat(ETclassStat::RxPackets, m);
+        return m;
+    }
+};
+
+class TNetRxDrops : public TMapValue, public TContainerValue {
+public:
+    TNetRxDrops() :
+        TMapValue(0),
+        TContainerValue(D_NET_RX_DROPS,
+                        "number of dropped rx packets",
+                        rpdmState) {}
+
+    TUintMap GetDefault() const override {
+        TUintMap m;
+        (void)GetContainer()->GetStat(ETclassStat::RxDrops, m);
+        return m;
+    }
+};
+
 class TMinorFaultsData : public TUintValue, public TContainerValue {
 public:
     TMinorFaultsData() :
@@ -613,6 +658,9 @@ void RegisterData(std::shared_ptr<TRawValueMap> m,
         new TNetPacketsData,
         new TNetDropsData,
         new TNetOverlimitsData,
+        new TNetRxBytes,
+        new TNetRxPackets,
+        new TNetRxDrops,
         new TMinorFaultsData,
         new TMajorFaultsData,
         new TIoReadData,

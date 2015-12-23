@@ -341,6 +341,40 @@ TError TNetwork::DelAnnounce(const TNlAddr &addr) {
     return error;
 }
 
+TError TNetwork::GetInterfaceCounters(ETclassStat stat,
+                                      std::map<std::string, uint64_t> &result) {
+    struct nl_cache *cache;
+    rtnl_link_stat_id_t id;
+
+    switch (stat) {
+        case ETclassStat::RxBytes:
+            id = RTNL_LINK_RX_BYTES;
+            break;
+        case ETclassStat::RxPackets:
+            id = RTNL_LINK_RX_PACKETS;
+            break;
+        case ETclassStat::RxDrops:
+            id = RTNL_LINK_RX_DROPPED;
+            break;
+        default:
+            return TError(EError::Unknown, "Unsupported netlink statistics");
+    }
+
+    int ret = rtnl_link_alloc_cache(GetSock(), AF_UNSPEC, &cache);
+    if (ret < 0)
+        return Nl->Error(ret, "Cannot allocate link cache");
+
+    for (auto &iface: ifaces) {
+        auto link = rtnl_link_get(cache, iface.second);
+        if (link)
+            result[iface.first] = rtnl_link_get_stat(link, id);
+    }
+
+    nl_cache_free(cache);
+    return TError::Success();
+}
+
+
 TError TNetwork::GetTrafficCounters(int minor, ETclassStat stat,
                                     std::map<std::string, uint64_t> &result) {
     uint32_t handle = TC_HANDLE(ROOT_TC_MAJOR, minor);
@@ -359,12 +393,10 @@ TError TNetwork::GetTrafficCounters(int minor, ETclassStat stat,
     case ETclassStat::Overlimits:
         rtnlStat = RTNL_TC_OVERLIMITS;
         break;
-    case ETclassStat::BPS:
-        rtnlStat = RTNL_TC_RATE_BPS;
-        break;
-    case ETclassStat::PPS:
-        rtnlStat = RTNL_TC_RATE_PPS;
-        break;
+    case ETclassStat::RxBytes:
+    case ETclassStat::RxPackets:
+    case ETclassStat::RxDrops:
+        return GetInterfaceCounters(stat, result);
     default:
         return TError(EError::Unknown, "Unsupported netlink statistics");
     }
