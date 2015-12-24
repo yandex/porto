@@ -1989,6 +1989,9 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
 
     RotateStdFile(Stdout, D_STDOUT_OFFSET);
     RotateStdFile(Stderr, D_STDERR_OFFSET);
+    Stdin.Close();
+    Stdout.Close();
+    Stderr.Close();
 
     if (MayRespawn())
         ScheduleRespawn();

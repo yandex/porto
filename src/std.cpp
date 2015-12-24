@@ -98,18 +98,27 @@ TError TStdStream::Rotate(off_t limit, off_t &loss) const {
         return TError::Success();
 }
 
-TError TStdStream::Cleanup() const {
+TError TStdStream::Cleanup() {
     if (ManagedByPorto && Impl == STD_TYPE_FILE && PathOnHost.IsRegular() && Type) {
+        Close();
         TError err = PathOnHost.Unlink();
         if (err)
             L_ERR() << "Can't remove std log: " << err << std::endl;
         return err;
     } else if (Impl == STD_TYPE_FIFO) {
-        close(PipeFd);
         TError err = PathOnHost.Unlink();
         if (err)
             L_ERR() << "Can't remove fifo: " << err << std::endl;
         return err;
+    }
+
+    return TError::Success();
+}
+
+TError TStdStream::Close() {
+    if (Impl == STD_TYPE_FIFO && PipeFd != -1) {
+        close(PipeFd);
+        PipeFd = -1;
     }
 
     return TError::Success();

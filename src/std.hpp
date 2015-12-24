@@ -15,7 +15,7 @@ private:
     TPath PathOnHost;
     TPath PathInContainer;
     bool ManagedByPorto;
-    int PipeFd;
+    int PipeFd = -1;
 
     TError Open(const TPath &path, const TCred &cred) const;
 
@@ -31,7 +31,8 @@ public:
     TError OpenInChild(const TCred &cred) const; // called before actual execve
 
     TError Rotate(off_t limit, off_t &loss) const;
-    TError Cleanup() const;
+    TError Cleanup();
+    TError Close();
 
     TError Read(std::string &text, off_t limit, uint64_t base,
                 const std::string &start_offset = "") const;
