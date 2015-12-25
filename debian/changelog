@@ -1,3 +1,53 @@
+yandex-porto (2.7.3) precise; urgency=low
+
+  * std: close fifo's when container dies
+  * property: return cpu_limit and cpu_guarantee in cores
+  * property: allow read-only access to properies of / and /porto
+  * network: plug leak in GetInterfaceCounters
+  * properties: add network RX counters
+  * util/string: add UintMap operations
+  * network: detect L3 mtu automatically
+  * network: disable DAD for assigned ip addresses
+  * network: add L3 configuration
+  * api/python: update package version
+  * api/python: add SetTty method
+  * network: update interfaces if tc update failed
+  * util/string: cleanup
+  * property: refactor size value parsing and formatting
+  * util/string: add StringFormat
+  * idmap: remove custom bitmap
+  * volume: use string volume id
+  * selftest: use /bin/true as noop command
+  * property: rename iops_limit into io_ops_limit
+  * util/mount: remove mountpoint operations
+  * util/path: add CreateAll
+  * selftest/data: noop memory usage must be zero
+  * util/path: refactor permissions check
+  * util/path: remove GetType
+  * util: remove TFolder
+  * util/path: add ListSubdirs
+  * std: add support for pty std type
+  * std: refactor stdin/stdout/stderr handling and support for fifo std type
+  * cosmetic: fix a typo
+  * selftest: use direct-io in data test
+  * selftest: check io stat more carefully
+  * task: do not chown non-regular stdout
+  * selftest: io stat works both for cfq and fsio
+  * property: add flag UNSUPPORTED_FEATURE
+  * property: rename TValueMap::SetString into SetValue
+  * property: return error from GetString method
+  * property: do not read content of non-regular stdout
+  * data: add io_ops like io_read/write it shows fs and blk statistics
+  * property: add iops_limit
+  * selftest: fixup data test
+  * container: track stdout offset and allow indexed access
+  * property: network config must be persistent
+  * property: cleanup
+  * properties: refactoring
+  * volume: do not verify empty set of layers
+
+ -- Roman Gushchin <klamm@yandex-team.ru>  Fri, 25 Dec 2015 17:13:22 +0300
+
 yandex-porto (2.7.2) precise; urgency=low
 
   * util/mount: get the last matching mountpoint
