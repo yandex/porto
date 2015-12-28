@@ -457,3 +457,82 @@ int TPortoAPI::ListLayers(std::vector<std::string> &layers) {
     }
     return ret;
 }
+
+TPortoAPIContainer::TPortoAPIContainer(TPortoAPI &api, const std::string &name) :
+    TPortoAPIExtentionBase(api),
+    Name(name) {
+}
+
+int TPortoAPIContainer::Create() {
+    return Api.Create(Name);
+}
+
+int TPortoAPIContainer::Destroy() {
+    return Api.Destroy(Name);
+}
+
+int TPortoAPIContainer::Start() {
+    return Api.Start(Name);
+}
+
+int TPortoAPIContainer::Stop() {
+    return Api.Stop(Name);
+}
+
+int TPortoAPIContainer::Kill(int sig) {
+    return Api.Kill(Name, sig);
+}
+
+int TPortoAPIContainer::Pause() {
+    return Api.Pause(Name);
+}
+
+int TPortoAPIContainer::Resume() {
+    return Api.Resume(Name);
+}
+
+TPortoAPIVolume::TPortoAPIVolume(TPortoAPI &api) : TPortoAPIExtentionBase(api) {}
+
+TPortoAPIVolume::TPortoAPIVolume(TPortoAPI &api, const std::string &path) :
+    TPortoAPIExtentionBase(api),
+    Path(path) {
+}
+
+int TPortoAPIVolume::Create(const std::map<std::string, std::string> &config,
+                         TVolumeDescription &result) {
+    return Api.CreateVolume(Path, config, result);
+}
+
+int TPortoAPIVolume::Create(const std::map<std::string, std::string> &config) {
+    return Api.CreateVolume(Path, config);
+}
+
+int TPortoAPIVolume::Link(const std::string &container) {
+    return Api.LinkVolume(Path, container);
+}
+
+int TPortoAPIVolume::Unlink(const std::string &container) {
+    return Api.UnlinkVolume(Path, container);
+}
+
+int TPortoAPIVolume::List(const std::string &container,
+                       std::vector<TVolumeDescription> &volumes) {
+    return Api.ListVolumes(Path, container, volumes);
+}
+
+TPortoAPILayer::TPortoAPILayer(TPortoAPI &api, const std::string &name) :
+    TPortoAPIExtentionBase(api),
+    Name(name) {
+}
+
+int TPortoAPILayer::Import(const std::string &tarball, bool merge) {
+    return Api.ImportLayer(Name, tarball, merge);
+}
+
+int TPortoAPILayer::Export(const std::string &volume, const std::string &tarball) {
+    return Api.ExportLayer(tarball, tarball);
+}
+
+int TPortoAPILayer::Remove() {
+    return Api.RemoveLayer(Name);
+}

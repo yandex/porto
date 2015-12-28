@@ -103,3 +103,62 @@ public:
     int RemoveLayer(const std::string &layer);
     int ListLayers(std::vector<std::string> &layers);
 };
+
+class TPortoAPIExtentionBase {
+    TPortoAPIExtentionBase(const TPortoAPIExtentionBase &) = delete;
+    void operator=(const TPortoAPIExtentionBase &) = delete;
+
+public:
+    TPortoAPIExtentionBase(TPortoAPI &api) : Api(api) {}
+
+protected:
+    TPortoAPI &Api;
+};
+
+class TPortoAPIContainer : public TPortoAPIExtentionBase {
+    const std::string Name;
+
+public:
+    TPortoAPIContainer(TPortoAPI &api, const std::string &name);
+
+    const std::string &GetName() const { return Name; }
+
+    int Create();
+    int Destroy();
+    int Start();
+    int Stop();
+    int Kill(int sig);
+    int Pause();
+    int Resume();
+};
+
+class TPortoAPIVolume : public TPortoAPIExtentionBase {
+    std::string Path;
+
+public:
+    explicit TPortoAPIVolume(TPortoAPI &api);
+    TPortoAPIVolume(TPortoAPI &api, const std::string &path);
+
+    const std::string &GetPath() const { return Path; }
+
+    int Create(const std::map<std::string, std::string> &config,
+               TVolumeDescription &result);
+    int Create(const std::map<std::string, std::string> &config);
+    int Link(const std::string &container = std::string());
+    int Unlink(const std::string &container = std::string());
+    int List(const std::string &container,
+             std::vector<TVolumeDescription> &volumes);
+};
+
+class TPortoAPILayer : public TPortoAPIExtentionBase {
+    const std::string Name;
+
+public:
+    TPortoAPILayer(TPortoAPI &api, const std::string &name);
+
+    const std::string &GetName() const { return Name; }
+
+    int Import(const std::string &tarball, bool merge = false);
+    int Export(const std::string &volume, const std::string &tarball);
+    int Remove();
+};
