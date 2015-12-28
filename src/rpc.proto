@@ -115,6 +115,12 @@ message TContainerKillRequest {
 message TVersionRequest {
 }
 
+message TConvertPathRequest {
+	required string path = 1;
+	required string source = 2;
+	required string destination = 3;
+}
+
 // Get multiple properties/data of many containers with one request
 // (useful for monitoring)
 message TContainerGetRequest {
@@ -161,6 +167,8 @@ message TContainerRequest {
 	optional TLayerRemoveRequest removeLayer = 111;
 	optional TLayerListRequest listLayers = 112;
 	optional TLayerExportRequest exportLayer = 113;
+
+	optional TConvertPathRequest convertPath = 200;
 }
 
 message TContainerListResponse {
@@ -219,6 +227,10 @@ message TContainerWaitResponse {
 	required string name = 1;
 }
 
+message TConvertPathResponse {
+	required string path = 1;
+}
+
 message TContainerResponse {
 	required EError error = 1;
 	// Optional error message
@@ -237,6 +249,7 @@ message TContainerResponse {
 	optional TVolumePropertyListResponse volumePropertyList = 12;
 	optional TVolumeDescription volume = 13;
 	optional TLayerListResponse layers = 14;
+	optional TConvertPathResponse convertPath = 15;
 }
 
 // VolumeAPI
