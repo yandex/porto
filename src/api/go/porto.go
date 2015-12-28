@@ -134,6 +134,8 @@ type API interface {
 	RemoveLayer(layer string) error
 	ListLayers() ([]string, error)
 
+	ConvertPath(path string, src string, dest string) (string, error)
+
 	Close() error
 }
 
@@ -605,4 +607,21 @@ func (conn *portoConnection) ListLayers() ([]string, error) {
 	}
 
 	return resp.GetLayers().GetLayer(), nil
+}
+
+func (conn *portoConnection) ConvertPath(path string, src string, dest string) (string, error) {
+	req := &rpc.TContainerRequest{
+		ConvertPath: &rpc.TConvertPathRequest{
+			Path:        &path,
+			Source:      &src,
+			Destination: &dest,
+		},
+	}
+
+	resp, err := conn.performRequest(req)
+	if err != nil {
+		return "", err
+	}
+
+	return resp.GetConvertPath().GetPath(), nil
 }

@@ -23,6 +23,7 @@ It has these top-level messages:
 	TContainerDataListRequest
 	TContainerKillRequest
 	TVersionRequest
+	TConvertPathRequest
 	TContainerGetRequest
 	TContainerWaitRequest
 	TContainerRequest
@@ -34,6 +35,7 @@ It has these top-level messages:
 	TVersionResponse
 	TContainerGetResponse
 	TContainerWaitResponse
+	TConvertPathResponse
 	TContainerResponse
 	TVolumeProperty
 	TVolumePropertyDescription
@@ -408,6 +410,38 @@ func (m *TVersionRequest) Reset()         { *m = TVersionRequest{} }
 func (m *TVersionRequest) String() string { return proto.CompactTextString(m) }
 func (*TVersionRequest) ProtoMessage()    {}
 
+type TConvertPathRequest struct {
+	Path             *string `protobuf:"bytes,1,req,name=path" json:"path,omitempty"`
+	Source           *string `protobuf:"bytes,2,req,name=source" json:"source,omitempty"`
+	Destination      *string `protobuf:"bytes,3,req,name=destination" json:"destination,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *TConvertPathRequest) Reset()         { *m = TConvertPathRequest{} }
+func (m *TConvertPathRequest) String() string { return proto.CompactTextString(m) }
+func (*TConvertPathRequest) ProtoMessage()    {}
+
+func (m *TConvertPathRequest) GetPath() string {
+	if m != nil && m.Path != nil {
+		return *m.Path
+	}
+	return ""
+}
+
+func (m *TConvertPathRequest) GetSource() string {
+	if m != nil && m.Source != nil {
+		return *m.Source
+	}
+	return ""
+}
+
+func (m *TConvertPathRequest) GetDestination() string {
+	if m != nil && m.Destination != nil {
+		return *m.Destination
+	}
+	return ""
+}
+
 // Get multiple properties/data of many containers with one request
 // (useful for monitoring)
 type TContainerGetRequest struct {
@@ -489,6 +523,7 @@ type TContainerRequest struct {
 	RemoveLayer          *TLayerRemoveRequest           `protobuf:"bytes,111,opt,name=removeLayer" json:"removeLayer,omitempty"`
 	ListLayers           *TLayerListRequest             `protobuf:"bytes,112,opt,name=listLayers" json:"listLayers,omitempty"`
 	ExportLayer          *TLayerExportRequest           `protobuf:"bytes,113,opt,name=exportLayer" json:"exportLayer,omitempty"`
+	ConvertPath          *TConvertPathRequest           `protobuf:"bytes,200,opt,name=convertPath" json:"convertPath,omitempty"`
 	XXX_unrecognized     []byte                         `json:"-"`
 }
 
@@ -667,6 +702,13 @@ func (m *TContainerRequest) GetListLayers() *TLayerListRequest {
 func (m *TContainerRequest) GetExportLayer() *TLayerExportRequest {
 	if m != nil {
 		return m.ExportLayer
+	}
+	return nil
+}
+
+func (m *TContainerRequest) GetConvertPath() *TConvertPathRequest {
+	if m != nil {
+		return m.ConvertPath
 	}
 	return nil
 }
@@ -939,6 +981,22 @@ func (m *TContainerWaitResponse) GetName() string {
 	return ""
 }
 
+type TConvertPathResponse struct {
+	Path             *string `protobuf:"bytes,1,req,name=path" json:"path,omitempty"`
+	XXX_unrecognized []byte  `json:"-"`
+}
+
+func (m *TConvertPathResponse) Reset()         { *m = TConvertPathResponse{} }
+func (m *TConvertPathResponse) String() string { return proto.CompactTextString(m) }
+func (*TConvertPathResponse) ProtoMessage()    {}
+
+func (m *TConvertPathResponse) GetPath() string {
+	if m != nil && m.Path != nil {
+		return *m.Path
+	}
+	return ""
+}
+
 type TContainerResponse struct {
 	Error *EError `protobuf:"varint,1,req,name=error,enum=rpc.EError" json:"error,omitempty"`
 	// Optional error message
@@ -955,6 +1013,7 @@ type TContainerResponse struct {
 	VolumePropertyList *TVolumePropertyListResponse    `protobuf:"bytes,12,opt,name=volumePropertyList" json:"volumePropertyList,omitempty"`
 	Volume             *TVolumeDescription             `protobuf:"bytes,13,opt,name=volume" json:"volume,omitempty"`
 	Layers             *TLayerListResponse             `protobuf:"bytes,14,opt,name=layers" json:"layers,omitempty"`
+	ConvertPath        *TConvertPathResponse           `protobuf:"bytes,15,opt,name=convertPath" json:"convertPath,omitempty"`
 	XXX_unrecognized   []byte                          `json:"-"`
 }
 
@@ -1056,6 +1115,13 @@ func (m *TContainerResponse) GetVolume() *TVolumeDescription {
 func (m *TContainerResponse) GetLayers() *TLayerListResponse {
 	if m != nil {
 		return m.Layers
+	}
+	return nil
+}
+
+func (m *TContainerResponse) GetConvertPath() *TConvertPathResponse {
+	if m != nil {
+		return m.ConvertPath
 	}
 	return nil
 }

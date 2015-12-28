@@ -187,6 +187,17 @@ func TestGet(t *testing.T) {
 	}
 }
 
+func TestConvertPath(t *testing.T) {
+	conn := ConnectToPorto(t)
+	defer conn.Close()
+	resp, err := conn.ConvertPath("/", testContainer, testContainer)
+	FailOnError(t, conn, err)
+	if resp != "/" {
+		t.Error("Got wrong path conversion")
+		t.FailNow()
+	}
+}
+
 func TestStop(t *testing.T) {
 	conn := ConnectToPorto(t)
 	defer conn.Close()
