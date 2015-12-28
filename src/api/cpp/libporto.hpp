@@ -102,4 +102,7 @@ public:
     int ExportLayer(const std::string &volume, const std::string &tarball);
     int RemoveLayer(const std::string &layer);
     int ListLayers(std::vector<std::string> &layers);
+
+    int ConvertPath(const std::string &path, const std::string &src,
+                    const std::string &dest, std::string &res);
 };

@@ -457,3 +457,16 @@ int TPortoAPI::ListLayers(std::vector<std::string> &layers) {
     }
     return ret;
 }
+
+int TPortoAPI::ConvertPath(const std::string &path, const std::string &src,
+                           const std::string &dest, std::string &res) {
+    auto req = Impl->GetReq().mutable_convertpath();
+    req->set_path(path);
+    req->set_source(src);
+    req->set_destination(dest);
+
+    auto ret = Impl->Rpc();
+    if (!ret)
+        res = Impl->GetResp().convertpath().path();
+    return ret;
+}
