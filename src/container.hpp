@@ -66,6 +66,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     std::ofstream JournalStream;
     TStdStream Stdin, Stdout, Stderr;
+    int Level; // 0 for root, 1 for porto_root, etc
 
     // data
     void UpdateRunningChildren(size_t diff);
@@ -157,6 +158,7 @@ public:
     const std::string GetName() const;
     const std::string GetTextId(const std::string &separator = "+") const;
     const int GetId() const { return Id; }
+    const int GetLevel() const { return Level; }
 
     bool IsRoot() const;
     bool IsPortoRoot() const;

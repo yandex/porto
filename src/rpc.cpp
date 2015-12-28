@@ -86,6 +86,10 @@ static std::string RequestAsString(const rpc::TContainerRequest &req) {
                                       req.unlinkvolume().container();
     else if (req.has_listvolumes())
         return "volumeAPI: list volumes";
+    else if (req.has_convertpath())
+        return "convert " + req.convertpath().path() +
+            " from " + req.convertpath().source() +
+            " to " + req.convertpath().destination();
     else
         return req.ShortDebugString();
 }
@@ -135,6 +139,8 @@ static std::string ResponseAsString(const rpc::TContainerResponse &resp) {
             ret = resp.version().tag() + " #" + resp.version().revision();
         else if (resp.has_wait())
             ret = resp.wait().name() + " isn't running";
+        else if (resp.has_convertpath())
+            ret = resp.convertpath().path();
         else
             ret = "Ok";
         return ret;
@@ -213,7 +219,8 @@ static bool InfoRequest(const rpc::TContainerRequest &req) {
         req.has_wait() ||
         req.has_listvolumeproperties() ||
         req.has_listvolumes() ||
-        req.has_listlayers();
+        req.has_listlayers() ||
+        req.has_convertpath();
 }
 
 static bool ValidRequest(const rpc::TContainerRequest &req) {
@@ -242,7 +249,8 @@ static bool ValidRequest(const rpc::TContainerRequest &req) {
         req.has_importlayer() +
         req.has_exportlayer() +
         req.has_removelayer() +
-        req.has_listlayers() == 1;
+        req.has_listlayers() +
+        req.has_convertpath() == 1;
 }
 
 static void SendReply(std::shared_ptr<TClient> client,
@@ -864,6 +872,93 @@ noinline TError Wait(TContext &context,
     return TError::Queued();
 }
 
+noinline TError ConvertPath(TContext &context,
+                            const rpc::TConvertPathRequest &req,
+                            rpc::TContainerResponse &rsp,
+                            std::shared_ptr<TClient> client) {
+    auto lock = context.Cholder->ScopedLock();
+    std::string source, destination;
+    std::shared_ptr<TContainer> clientContainer, sourceContainer, destContainer;
+
+    TError err = client->GetContainer(clientContainer);
+    if (err)
+        return err;
+
+    if (req.has_source() && req.source() != "") {
+        err = clientContainer->ResolveRelativeName(req.source(), source, true);
+        if (err)
+            return err;
+
+        err = context.Cholder->Get(source, sourceContainer);
+        if (err)
+            return err;
+    } else
+        sourceContainer = clientContainer;
+
+    if (req.has_destination() && req.destination() != "") {
+        err = clientContainer->ResolveRelativeName(req.destination(), destination, true);
+        if (err)
+            return err;
+
+        err = context.Cholder->Get(destination, destContainer);
+        if (err)
+            return err;
+    } else
+        destContainer = clientContainer;
+
+    if (sourceContainer == destContainer) {
+        rsp.mutable_convertpath()->set_path(req.path());
+        return TError::Success();
+    }
+
+    // There are 3 possible options:
+    // 1) destination is an ancestor of source
+    // 2) source and destination are siblings with identical root
+    // 3) we can't do anything
+    auto src = sourceContainer;
+    auto dest = destContainer;
+    bool src_isolated = false;
+    bool dest_isolated = false;
+    std::string details;
+
+    for (;;) {
+        L() << "source: " << src->GetName() << std::endl
+            << "destination: " << dest->GetName() << std::endl;
+        if (src == dest) {
+            if (!dest_isolated) {
+                // 1) or 2), build path
+                TPath path = TPath(req.path());
+                for (src = sourceContainer; src != dest; src = src->GetParent()) {
+                    path = TPath(src->Prop->Get<std::string>(P_ROOT)) / TPath(path);
+                }
+                rsp.mutable_convertpath()->set_path(path.ToString());
+                return TError::Success();
+            } else {
+                // unreachable place, but, technically, 3)
+                PORTO_ASSERT(1);
+            }
+        }
+        if (src->GetLevel() > dest->GetLevel()) {
+            // TODO: think about bind mounts
+            if (!src_isolated && src->Prop->Get<std::string>(P_ROOT) != "/") {
+                src_isolated = true;
+            }
+            src = src->GetParent();
+        } else {
+            // TODO: think about bind mounts
+            if (!dest_isolated && dest->Prop->Get<std::string>(P_ROOT) != "/") {
+                dest_isolated = true;
+                details = "source container is unreachable from destination container";
+                // We can't do anything
+                break;
+            }
+            dest = dest->GetParent();
+        }
+    }
+
+    return TError(EError::InvalidValue, "Can't resolve path: " + details);
+}
+
 noinline TError ListVolumeProperties(TContext &context,
                                      const rpc::TVolumePropertyListRequest &req,
                                      rpc::TContainerResponse &rsp,
@@ -1478,6 +1573,8 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
             error = RemoveLayer(context, req.removelayer(), client);
         else if (req.has_listlayers())
             error = ListLayers(context, rsp);
+        else if (req.has_convertpath())
+            error = ConvertPath(context, req.convertpath(), rsp, client);
         else
             error = TError(EError::InvalidMethod, "invalid RPC method");
     } catch (std::bad_alloc exc) {
