@@ -238,6 +238,14 @@ class _RPC(object):
 
         return res
 
+    def ConvertPath(self, path, source, destination):
+        request = rpc_pb2.TConvertPathRequest()
+        request.convertPath.path = path
+        request.convertPath.source = source
+        request.convertPath.destination = destination
+        res = self.call(request, self.timeout).convertPath.path
+        return res
+
     def Plist(self):
         request = rpc_pb2.TContainerRequest()
         request.propertyList.CopyFrom(rpc_pb2.TContainerPropertyListRequest())
@@ -560,6 +568,9 @@ class Connection(object):
 
     def ListLayers(self):
         return [Layer(self.rpc, l) for l in self.rpc.ListLayers()]
+
+    def ConvertPath(self, path, source, destination):
+        return self.rpc.ConvertPath(self.rpc, path, source, destination)
 
 # Example:
 # from porto import *
