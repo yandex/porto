@@ -9,7 +9,6 @@
 
 class TPath;
 
-bool RetryIfBusy(std::function<int()> handler, int &ret, int times = 10, int timeoMs = 100);
 bool RetryIfFailed(std::function<int()> handler, int &ret, int times = 10, int timeoMs = 100);
 bool SleepWhile(std::function<int()> handler, int &ret, int timeoMs);
 
@@ -22,7 +21,6 @@ TError GetTaskChildrens(pid_t pid, std::vector<pid_t> &childrens);
 uint64_t GetCurrentTimeMs();
 size_t GetTotalMemory();
 int CreatePidFile(const std::string &path, const int mode);
-void RemovePidFile(const std::string &path);
 void SetProcessName(const std::string &name);
 void SetDieOnParentExit(int sig);
 std::string GetProcessName();

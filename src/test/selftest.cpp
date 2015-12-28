@@ -1552,12 +1552,12 @@ static void TestStdPathProperty(TPortoAPI &api) {
     stdoutPath = "/tmp/a_stdout";
     stderrPath = "/tmp/a_stderr";
 
-    TFile stdinFile(stdinPath);
-    (void)stdinFile.Remove();
-    TFile stdoutFile(stdoutPath);
-    (void)stdoutFile.Remove();
-    TFile stderrFile(stderrPath);
-    (void)stderrFile.Remove();
+    TPath stdinFile(stdinPath);
+    (void)stdinFile.Unlink();
+    TPath stdoutFile(stdoutPath);
+    (void)stdoutFile.Unlink();
+    TPath stderrFile(stderrPath);
+    (void)stderrFile.Unlink();
 
     TFile f(stdinPath);
     ExpectSuccess(f.Touch());

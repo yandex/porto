@@ -31,21 +31,6 @@ extern "C" {
 #include <linux/fs.h>
 }
 
-bool RetryIfBusy(std::function<int()> handler, int &ret, int times, int timeoMs) {
-    while (times-- > 0) {
-        auto tmp = handler();
-
-        if (!tmp || errno != EBUSY) {
-            ret = tmp;
-            return true;
-        }
-
-        usleep(timeoMs * 1000);
-    }
-
-    return false;
-}
-
 bool RetryIfFailed(std::function<int()> handler, int &ret, int times, int timeoMs) {
     while (times-- > 0) {
         auto tmp = handler();
@@ -164,12 +149,6 @@ int CreatePidFile(const std::string &path, const int mode) {
 
     const auto& error = f.WriteStringNoAppend(std::to_string(getpid()));
     return error ? 1 : 0;
-}
-
-void RemovePidFile(const std::string &path) {
-    TFile f(path);
-    if (f.Exists())
-        (void)f.Remove();
 }
 
 static __thread std::string *processName;
@@ -354,8 +333,7 @@ TError AllocLoop(const TPath &path, size_t size) {
     return TError::Success();
 
 remove_file:
-    TFile f(path);
-    (void)f.Remove();
+    (void)path.Unlink();
 
     return error;
 }

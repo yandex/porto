@@ -526,8 +526,8 @@ void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove) {
 
 void RotateDaemonLogs(TPortoAPI &api) {
     // Truncate slave log
-    TFile slaveLog(config().slave_log().path());
-    ExpectSuccess(slaveLog.Remove());
+    TPath slaveLog(config().slave_log().path());
+    ExpectSuccess(slaveLog.Unlink());
 
     int pid = ReadPid(config().slave_pid().path());
     if (kill(pid, SIGUSR1))
@@ -536,8 +536,8 @@ void RotateDaemonLogs(TPortoAPI &api) {
     WaitPortod(api);
 
     // Truncate master log
-    TFile masterLog(config().master_log().path());
-    ExpectSuccess(masterLog.Remove());
+    TPath masterLog(config().master_log().path());
+    ExpectSuccess(masterLog.Unlink());
 
     pid = ReadPid(config().master_pid().path());
     if (kill(pid, SIGUSR1))

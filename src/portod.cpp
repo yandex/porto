@@ -105,20 +105,20 @@ static int DaemonPrepare(bool master) {
 }
 
 static void DaemonShutdown(bool master, int ret) {
-    const auto &pid = master ? config().master_pid() : config().slave_pid();
+    TPath pidFile(master ? config().master_pid().path() : config().slave_pid().path());
 
     L_SYS() << "Stopped " << ret << std::endl;
 
     TLogger::CloseLog();
-    RemovePidFile(pid.path());
+    (void)pidFile.Unlink();
 
     if (ret < 0)
         RaiseSignal(-ret);
 }
 
 static void RemoveRpcServer(const string &path) {
-    TFile f(path);
-    TError error = f.Remove();
+    TPath f(path);
+    TError error = f.Unlink();
     if (error)
         L_ERR() << "Can't remove socket file: " << error << std::endl;
 }
