@@ -2005,6 +2005,35 @@ public:
     }
 };
 
+class TConvertPathCmd final : public ICmd {
+
+public:
+    TConvertPathCmd(TPortoAPI *api) : ICmd(api, "convert", 1,
+                                           "<path> [-s container] [-d container]",
+                                           "convert paths between different containers",
+                                           "    -s container    source container (client container if ommited)\n"
+                                           "    -d container    destination container (client container if ommited)\n") {
+        SetDieOnSignal(false);
+    }
+
+    int Execute(TCommandEnviroment *environment) final override {
+        std::string path, src, dest;
+        const auto &opts = environment->GetOpts({
+                {'s', true, [&](const char *arg) { src = arg; }},
+                {'d', true, [&](const char *arg) { dest = arg; }}
+            });
+        path = environment->GetArgs()[0];
+
+        std::string converted;
+        auto ret = Api->ConvertPath(path, src, dest, converted);
+        if (ret)
+            PrintError("Can't convert path");
+        else
+            std::cout << converted << std::endl;
+        return ret;
+    }
+};
+
 int main(int argc, char *argv[]) {
     config.Load(true);
     TPortoAPI api(config().rpc_sock().file().path());
@@ -2040,6 +2069,8 @@ int main(int argc, char *argv[]) {
 
     handler.RegisterCommand<TLayerCmd>();
     handler.RegisterCommand<TBuildCmd>();
+
+    handler.RegisterCommand<TConvertPathCmd>();
 
     TLogger::DisableLog();
 
