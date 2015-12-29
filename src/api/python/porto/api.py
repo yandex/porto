@@ -372,8 +372,8 @@ class Container(object):
         (stdin, stdout, stderr).
 
         :note: you should set TERM variable in `env` container property to properly use this TTY
-        :rtype: int
-        :return: master pty fileno
+        :rtype: tuple
+        :return: pair of `int` with master pty fileno and `str` with slave pty filepath
 
         """
         ptm, slavept = linuxpty.make_tty()
@@ -386,7 +386,7 @@ class Container(object):
         self.SetProperty("stdout_type", "pty")
         self.SetProperty("stderr_type", "pty")
 
-        return ptm
+        return ptm, slavept
 
 
 class Layer(object):
