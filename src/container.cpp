@@ -552,6 +552,8 @@ TError TContainer::PrepareOomMonitor() {
 }
 
 TError TContainer::PrepareCgroups() {
+    TError error;
+
     LeafCgroups[cpuSubsystem] = GetLeafCgroup(cpuSubsystem);
     LeafCgroups[cpuacctSubsystem] = GetLeafCgroup(cpuacctSubsystem);
     LeafCgroups[memorySubsystem] = GetLeafCgroup(memorySubsystem);
@@ -560,22 +562,20 @@ TError TContainer::PrepareCgroups() {
     LeafCgroups[netclsSubsystem] = GetLeafCgroup(netclsSubsystem);
     LeafCgroups[devicesSubsystem] = GetLeafCgroup(devicesSubsystem);
 
-    for (auto cg : LeafCgroups) {
-        auto ret = cg.second->Create();
-        if (ret) {
-            LeafCgroups.clear();
-            return ret;
-        }
+    for (auto &cg: LeafCgroups) {
+        error = cg.second->Create();
+        if (error)
+            return error;
     }
 
     if (!IsRoot()) {
-        TError error = ApplyDynamicProperties();
+        error = ApplyDynamicProperties();
         if (error)
             return error;
     }
 
     if (!IsRoot() && !IsPortoRoot()) {
-        TError error = PrepareOomMonitor();
+        error = PrepareOomMonitor();
         if (error) {
             L_ERR() << "Can't prepare OOM monitoring: " << error << std::endl;
             return error;
@@ -1001,15 +1001,11 @@ bool TContainer::IsValid() {
 }
 
 TError TContainer::SendSignal(int signal) {
+    if (IsRoot())
+        return TError(EError::Permission, "Cannot kill root container");
     L_ACT() << "Send signal " << signal << " to " << GetName() << std::endl;
-
-    vector<pid_t> reap;
     auto cg = GetLeafCgroup(freezerSubsystem);
-    TError error = cg->GetTasks(reap);
-    if (error)
-        return error;
-
-    return cg->Kill(signal);
+    return cg->KillAll(signal);
 }
 
 TError TContainer::SendTreeSignal(TScopedLock &holder_lock, int signal) {
@@ -1022,9 +1018,8 @@ TError TContainer::SendTreeSignal(TScopedLock &holder_lock, int signal) {
         (void)child.SendSignal(SIGKILL);
         return TError::Success();
     });
-    (void)SendSignal(SIGKILL);
 
-    return TError::Success();
+    return SendSignal(SIGKILL);
 }
 
 TError TContainer::KillAll(TScopedLock &holder_lock) {
@@ -1185,7 +1180,13 @@ TError TContainer::PrepareResources() {
 void TContainer::FreeResources() {
     TError error;
 
-    LeafCgroups.clear();
+    if (!IsRoot()) {
+        for (auto &cg: LeafCgroups) {
+            error = cg.second->Remove();
+            if (error)
+                L_ERR() << "Can't remove cgroup directory: " << error << std::endl;
+        }
+    }
 
     if (Net) {
         struct TNetCfg NetCfg;

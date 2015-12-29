@@ -13,6 +13,10 @@
 #include "util/file.hpp"
 #include "util/mount.hpp"
 
+extern "C" {
+#include <unistd.h>
+}
+
 using std::string;
 using std::vector;
 using std::shared_ptr;
@@ -35,12 +39,6 @@ TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems,
         Mount = std::make_shared<TMount>("cgroup", TPath(config().daemon().sysfs_root()) / CommaSeparatedList(flags),
                                          "cgroup", flags);
     }
-}
-
-TCgroup::~TCgroup() {
-    TError error = Remove();
-    if (error)
-        L_ERR() << "Can't remove cgroup directory: " << error << std::endl;
 }
 
 shared_ptr<TCgroup> TCgroup::GetChild(const std::string& name) {
@@ -176,29 +174,26 @@ TError TCgroup::Create() {
 }
 
 TError TCgroup::Remove() {
+    TError error;
+
     if (IsRoot() || !Exists())
         return TError::Success();
 
-    // at this point we should have gracefully terminated all tasks
-    // in the container; if anything is still alive we have no other choice
-    // but to kill it with SIGKILL
-    int ret;
-    if (!RetryIfFailed([&]{ Kill(SIGKILL); return !IsEmpty(); }, ret,
-                       config().daemon().cgroup_remove_timeout_s() * 10)) {
-        L_ERR() << "Can't kill all tasks in cgroup " << Path() << std::endl;
+    L_ACT() << "Remove cgroup " << Path() << std::endl;
+    error = Path().Rmdir();
 
-        std::vector<pid_t> processes;
-        TError err = GetProcesses(processes);
-        if (!err) {
-            for (const auto& proc: processes) {
-                TTask task(proc);
-                task.DumpDebugInfo();
-            }
+    /* workaround for bad synchronization */
+    if (error && error.GetErrno() == EBUSY &&
+            Path().GetNLinks() == 2) {
+        for (int i = 0; i < 100; i++) {
+            usleep(config().daemon().cgroup_remove_timeout_s() * 10000);
+            error = Path().Rmdir();
+            if (!error || error.GetErrno() != EBUSY)
+                break;
         }
     }
 
-    L_ACT() << "Remove cgroup " << Path() << std::endl;
-    return Path().Rmdir();
+    return error;
 }
 
 bool TCgroup::Exists() {
@@ -209,19 +204,18 @@ std::shared_ptr<TMount> TCgroup::GetMount() {
     return Mount;
 }
 
-TError TCgroup::Kill(int signal) const {
-    if (!IsRoot()) {
-        vector<pid_t> tasks;
-        if (!GetTasks(tasks)) {
-            for (const auto &pid : tasks) {
-                TTask task(pid);
-                TError error = task.Kill(signal);
-                if (error && error.GetErrno() != ESRCH)
-                    L_ERR() << "Can't kill child process: " << error << std::endl;
+TError TCgroup::KillAll(int signal) const {
+    std::vector<pid_t> tasks;
+    TError error = GetTasks(tasks);
+    if (!error) {
+        for (pid_t pid: tasks) {
+            if (kill(pid, signal) && errno != ESRCH) {
+                error = TError(EError::Unknown, errno, StringFormat("kill(%d, %d)", pid, signal));
+                L_ERR() << "Cannot kill process: " << error << std::endl;
             }
         }
     }
-    return TError::Success();
+    return error;
 }
 
 bool TCgroup::HasKnob(const std::string &knob) const {
@@ -289,7 +283,7 @@ void TCgroupSnapshot::Destroy() {
     std::shared_ptr<TCgroup> root = freezerSubsystem->GetRootCgroup()->GetChild(PORTO_ROOT_CGROUP);
 
     for (auto cg: Cgroups) {
-        // Thaw cgroups that we will definitely remove
+        // keep cgroups that in use
         if (cg.use_count() > 2)
             continue;
 
@@ -308,7 +302,9 @@ void TCgroupSnapshot::Destroy() {
             }
 
         (void)freezerSubsystem->Unfreeze(cg);
-    }
 
-    Cgroups.clear();
+        error = cg->Remove();
+        if (error)
+            L_WRN() << "Can't remove cgroup directory: " << error << std::endl;
+    }
 }

@@ -23,8 +23,6 @@ public:
     TCgroup(const std::string &name, const std::shared_ptr<TCgroup> parent) :
         Name(name), Parent(parent) {}
 
-    ~TCgroup();
-
     std::shared_ptr<TCgroup> GetChild(const std::string& name);
 
     bool IsRoot() const;
@@ -37,7 +35,7 @@ public:
     bool Exists();
     std::shared_ptr<TMount> GetMount();
 
-    TError Kill(int signal) const;
+    TError KillAll(int signal) const;
 
     TError FindChildren(std::vector<std::shared_ptr<TCgroup>> &cgroups);
 

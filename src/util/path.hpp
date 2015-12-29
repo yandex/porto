@@ -78,6 +78,7 @@ public:
     unsigned int GetGid() const;
     off_t GetSize() const;
     off_t GetDiskUsage() const;
+    int GetNLinks() const;
     int64_t SinceModificationMs() const;
     std::string ToString() const;
     bool IsRegular() const;

@@ -108,6 +108,15 @@ off_t TPath::GetDiskUsage() const {
     return st.st_blocks * 512;
 }
 
+int TPath::GetNLinks() const {
+    struct stat st;
+
+    if (lstat(Path.c_str(), &st))
+        return 0;
+
+    return st.st_nlink;
+}
+
 bool TPath::IsRegular() const {
     struct stat st;
     return !lstat(c_str(), &st) && S_ISREG(st.st_mode);

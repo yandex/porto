@@ -273,7 +273,7 @@ TError TContainerHolder::Get(int pid, std::shared_ptr<TContainer> &c) {
 }
 
 TError TContainerHolder::Destroy(TScopedLock &holder_lock, std::shared_ptr<TContainer> c) {
-    if (c->GetState() != EContainerState::Stopped) {
+    if (!c->IsRoot() && c->GetState() != EContainerState::Stopped) {
         // we are destroying container and we don't need any exit status, so
         // forcefully kill all processes for destroy to be faster
         TError error = c->SendTreeSignal(holder_lock, SIGKILL);
