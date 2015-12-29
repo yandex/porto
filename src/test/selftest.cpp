@@ -5401,6 +5401,47 @@ static void TestPackage(TPortoAPI &api) {
     expectedErrors = expectedRespawns = expectedWarns = 0;
 }
 
+static void TestConvertPath(TPortoAPI &api) {
+    ExpectApiSuccess(api.Create("abc"));
+    ExpectApiSuccess(api.SetProperty("abc", "root", "/root_abc"));
+
+    ExpectApiSuccess(api.Create("abc/def"));
+    ExpectApiSuccess(api.SetProperty("abc/def", "root", "/root_def"));
+
+    ExpectApiSuccess(api.Create("abc/def/gik"));
+    ExpectApiSuccess(api.SetProperty("abc/def/gik", "root", "/root_gik"));
+
+    std::string res;
+
+    ExpectApiSuccess(api.ConvertPath("/", "/", "", res));
+    ExpectEq(res, "/");
+    ExpectApiSuccess(api.ConvertPath("/", "",  "/", res));
+    ExpectEq(res, "/");
+    ExpectApiSuccess(api.ConvertPath("/", "/", "/", res));
+    ExpectEq(res, "/");
+
+    ExpectApiSuccess(api.ConvertPath("/", "abc", "", res));
+    ExpectEq(res, "/root_abc");
+    ExpectApiSuccess(api.ConvertPath("/", "abc/def", "", res));
+    ExpectEq(res, "/root_abc/root_def");
+    ExpectApiSuccess(api.ConvertPath("/", "abc/def/gik", "", res));
+    ExpectEq(res, "/root_abc/root_def/root_gik");
+
+    ExpectApiFailure(api.ConvertPath("/", "", "abc", res), EError::InvalidValue);
+    ExpectApiFailure(api.ConvertPath("/", "", "abc/def", res), EError::InvalidValue);
+    ExpectApiFailure(api.ConvertPath("/", "", "abc/def/gik", res), EError::InvalidValue);
+    ExpectApiFailure(api.ConvertPath("/", "abc", "abc/def", res), EError::InvalidValue);
+
+    ExpectApiSuccess(api.ConvertPath("/", "abc/def", "abc", res));
+    ExpectEq(res, "/root_def");
+    ExpectApiSuccess(api.ConvertPath("/", "abc/def/gik", "abc", res));
+    ExpectEq(res, "/root_def/root_gik");
+    ExpectApiSuccess(api.ConvertPath("/", "abc/def/gik", "abc/def", res));
+    ExpectEq(res, "/root_gik");
+
+    ExpectApiSuccess(api.Destroy("abc"));
+}
+
 int SelfTest(std::vector<std::string> args) {
     pair<string, std::function<void(TPortoAPI &)>> tests[] = {
         { "path", TestPath },
@@ -5446,6 +5487,7 @@ int SelfTest(std::vector<std::string> args) {
         { "sigpipe", TestSigPipe },
         { "stats", TestStats },
         { "daemon", TestDaemon },
+        { "convert", TestConvertPath },
         { "leaks", TestLeaks },
         { "perf", TestPerf },
 
