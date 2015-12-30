@@ -237,7 +237,7 @@ TError TPath::Chown(const std::string &user, const std::string &group) const {
 TError TPath::Chmod(const int mode) const {
     int ret = chmod(Path.c_str(), mode);
     if (ret)
-        return TError(EError::Unknown, errno, "chmod(" + Path + ", " + std::to_string(mode) + ")");
+        return TError(EError::Unknown, errno, "chmod(" + Path + ", " + StringFormat("%#o", mode) + ")");
 
     return TError::Success();
 }
@@ -266,14 +266,16 @@ TError TPath::Symlink(const TPath &target) const {
 TError TPath::Mkfifo(unsigned int mode) const {
     int ret = mkfifo(Path.c_str(), mode);
     if (ret)
-        return TError(EError::Unknown, errno, "mkfifo(" + Path + ", " + std::to_string(mode) + ")");
+        return TError(EError::Unknown, errno, "mkfifo(" + Path + ", " +
+                StringFormat("%#o", mode) + ")");
     return TError::Success();
 }
 
 TError TPath::Mknod(unsigned int mode, unsigned int dev) const {
     int ret = mknod(Path.c_str(), mode, dev);
     if (ret)
-        return TError(EError::Unknown, errno, "mknod(" + Path + ", " + std::to_string(mode) + ", " + std::to_string(dev) + ")");
+        return TError(EError::Unknown, errno, "mknod(" + Path + ", " +
+                StringFormat("%#o", mode) + ", " + StringFormat("%#x", dev) + ")");
     return TError::Success();
 }
 
@@ -442,7 +444,7 @@ TError TPath::Mkdir(unsigned int mode) const {
     if (mkdir(Path.c_str(), mode) < 0)
         return TError(errno == ENOSPC ? EError::NoSpace :
                                         EError::Unknown,
-                      errno, "mkdir(" + Path + ", " + std::to_string(mode) + ")");
+                      errno, "mkdir(" + Path + ", " + StringFormat("%#o", mode) + ")");
     return TError::Success();
 }
 
