@@ -2018,10 +2018,10 @@ public:
 
     int Execute(TCommandEnviroment *environment) final override {
         std::string path, src, dest;
-        const auto &opts = environment->GetOpts({
+        environment->GetOpts({
                 {'s', true, [&](const char *arg) { src = arg; }},
                 {'d', true, [&](const char *arg) { dest = arg; }}
-            });
+	  });
         path = environment->GetArgs()[0];
 
         std::string converted;
