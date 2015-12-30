@@ -54,7 +54,7 @@ struct TTaskEnv : public TNonCopyable {
     int LoopDev;
     uint64_t Caps;
     bool NewMountNs;
-    std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
+    std::vector<TCgroup> Cgroups;
     TCred Cred;
 
     const char** GetEnvp() const;
@@ -108,14 +108,11 @@ public:
     TError ConfigureChild();
     void StartChild();
     void Restore(std::vector<int> pids);
-    TError SyncTaskCgroups(pid_t pid) const;
-    TError SyncCgroupsWithFreezer() const;
     void Abort(const TError &error) const;
 
     bool IsZombie() const;
 
     bool HasCorrectParent();
-    bool HasCorrectFreezer();
 
     void DumpDebugInfo();
 };

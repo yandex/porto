@@ -1,60 +1,248 @@
 #pragma once
 
 #include <string>
-#include <memory>
 
 #include "common.hpp"
 #include "util/path.hpp"
 
-class TSubsystem;
-class TMount;
+class TCgroup;
 
-class TCgroup : public std::enable_shared_from_this<TCgroup>,
-                public TNonCopyable {
-    const std::string Name;
-    const std::shared_ptr<TCgroup> Parent;
-    std::vector<std::weak_ptr<TCgroup>> Children;
-    std::shared_ptr<TMount> Mount;
-    mode_t Mode = 0755;
-
+class TSubsystem {
 public:
-    TCgroup(const std::vector<std::shared_ptr<TSubsystem>> subsystems,
-            std::shared_ptr<TMount> m = nullptr);
-    TCgroup(const std::string &name, const std::shared_ptr<TCgroup> parent) :
-        Name(name), Parent(parent) {}
+    const std::string Type;
+    const TSubsystem *Hierarchy;
+    TPath Root;
 
-    std::shared_ptr<TCgroup> GetChild(const std::string& name);
+    TSubsystem(const std::string &type) : Type(type) { }
 
-    bool IsRoot() const;
+    TCgroup RootCgroup() const;
+    TCgroup Cgroup(const std::string &name) const;
+
+    TError TaskCgroup(pid_t pid, TCgroup &cgroup) const;
+};
+
+class TCgroup {
+public:
+    const TSubsystem *Subsystem;
+    std::string Name;
+
+    TCgroup() { }
+    TCgroup(const TSubsystem *subsystem, const std::string &name) :
+        Subsystem(subsystem), Name(name) { }
+
+    bool Secondary() const {
+        return !Subsystem || Subsystem->Hierarchy != Subsystem;
+    }
+
+    std::string Type() const {
+        return Subsystem ? Subsystem->Type : "(null)";
+    }
+
+    friend std::ostream& operator<<(std::ostream& os, const TCgroup& cgroup) {
+        return os << cgroup.Type() << ":" << cgroup.Name;
+    }
+
+    friend bool operator==(const TCgroup& lhs, const TCgroup& rhs) {
+        return lhs.Name == rhs.Name;
+    }
+
+    friend bool operator!=(const TCgroup& lhs, const TCgroup& rhs) {
+        return lhs.Name != rhs.Name;
+    }
+
+    TCgroup Child(const std::string& name) const;
+    TError Childs(std::vector<TCgroup> &cgroups) const;
+    TError ChildsAll(std::vector<TCgroup> &cgroups) const;
 
     TPath Path() const;
-    TPath Relpath() const;
+    bool IsRoot() const;
+    bool Exists() const;
 
-    TError Create();
-    TError Remove();
-    bool Exists();
-    std::shared_ptr<TMount> GetMount();
+    TError Create() const;
+    TError Remove() const;
 
     TError KillAll(int signal) const;
 
-    TError FindChildren(std::vector<std::shared_ptr<TCgroup>> &cgroups);
+    TError GetProcesses(std::vector<pid_t> &pids) const {
+        return GetPids("cgroup.procs", pids);
+    }
 
-    TError GetProcesses(std::vector<pid_t> &processes) const;
-    TError GetTasks(std::vector<pid_t> &tasks) const;
+    TError GetTasks(std::vector<pid_t> &pids) const {
+        return GetPids("tasks", pids);
+    }
+
     bool IsEmpty() const;
 
-    TError Attach(int pid) const;
+    TError Attach(pid_t pid) const;
 
-    bool HasKnob(const std::string &knob) const;
-    TError GetKnobValue(const std::string &knob, std::string &value) const;
-    TError GetKnobValueAsLines(const std::string &knob, std::vector<std::string> &lines) const;
-    TError SetKnobValue(const std::string &knob, const std::string &value, bool append = false) const;
+    TPath Knob(const std::string &knob) const;
+    bool Has(const std::string &knob) const;
+    TError Get(const std::string &knob, std::string &value) const;
+    TError Set(const std::string &knob, const std::string &value) const;
+
+    TError GetPids(const std::string &knob, std::vector<pid_t> &pids) const;
+
+    TError GetUint64(const std::string &knob, uint64_t &value) const;
+    TError SetUint64(const std::string &knob, uint64_t value) const;
+
+    TError GetBool(const std::string &knob, bool &value) const;
+    TError SetBool(const std::string &knob, bool value) const;
+
+    TError GetUintMap(const std::string &knob, TUintMap &value) const;
 };
 
-class TCgroupSnapshot : public TNonCopyable {
-    std::vector<std::shared_ptr<TCgroup>> Cgroups;
+class TMemorySubsystem : public TSubsystem {
 public:
-    TCgroupSnapshot() {}
-    TError Create();
-    void Destroy();
+    const std::string STAT = "memory.stat";
+    const std::string USE_HIERARCHY = "memory.use_hierarchy";
+    const std::string RECHARGE_ON_PAGE_FAULT = "memory.recharge_on_pgfault";
+    const std::string USAGE = "memory.usage_in_bytes";
+    const std::string LIMIT = "memory.limit_in_bytes";
+    const std::string SOFT_LIMIT = "memory.soft_limit_in_bytes";
+    const std::string LOW_LIMIT = "memory.low_limit_in_bytes";
+    const std::string MEM_SWAP_LIMIT = "memory.memsw.limit_in_bytes";
+    const std::string DIRTY_LIMIT = "memory.dirty_limit_in_bytes";
+    const std::string DIRTY_RATIO = "memory.dirty_ratio";
+    const std::string FS_BPS_LIMIT = "memory.fs_bps_limit";
+    const std::string FS_IOPS_LIMIT = "memory.fs_iops_limit";
+
+    TMemorySubsystem() : TSubsystem("memory") {}
+
+    TError Statistics(TCgroup &cg, TUintMap &stat) const {
+        return cg.GetUintMap(STAT, stat);
+    }
+
+    TError Usage(TCgroup &cg, uint64_t &value) const {
+        return cg.GetUint64(USAGE, value);
+    }
+
+    TError UseHierarchy(TCgroup &cg, bool enable) const {
+        return cg.SetBool(USE_HIERARCHY, enable);
+    }
+
+    TError GetSoftLimit(TCgroup &cg, uint64_t &limit) const {
+        return cg.GetUint64(SOFT_LIMIT, limit);
+    }
+
+    TError SetSoftLimit(TCgroup &cg, uint64_t limit) const {
+        return cg.SetUint64(SOFT_LIMIT, limit);
+    }
+
+    bool SupportGuarantee() const {
+        return RootCgroup().Has(LOW_LIMIT);
+    }
+
+    TError SetGuarantee(TCgroup &cg, uint64_t guarantee) const {
+        if (!SupportGuarantee())
+            return TError::Success();
+        return cg.SetUint64(LOW_LIMIT, guarantee);
+    }
+
+    bool SupportIoLimit() const {
+        return RootCgroup().Has(FS_BPS_LIMIT);
+    }
+
+    bool SupportDirtyLimit() const {
+        return RootCgroup().Has(DIRTY_LIMIT);
+    }
+
+    bool SupportSwap() const {
+        return RootCgroup().Has(MEM_SWAP_LIMIT);
+    }
+
+    bool SupportRechargeOnPgfault() const {
+        return RootCgroup().Has(RECHARGE_ON_PAGE_FAULT);
+    }
+
+    TError RechargeOnPgfault(TCgroup &cg, bool enable) const {
+        if (!SupportRechargeOnPgfault())
+            return TError::Success();
+        return cg.SetBool(RECHARGE_ON_PAGE_FAULT, enable);
+    }
+
+    TError SetLimit(TCgroup &cg, uint64_t limit);
+    TError SetIoLimit(TCgroup &cg, uint64_t limit);
+    TError SetIopsLimit(TCgroup &cg, uint64_t limit);
+    TError SetDirtyLimit(TCgroup &cg, uint64_t limit);
 };
+
+class TFreezerSubsystem : public TSubsystem {
+public:
+    TFreezerSubsystem() : TSubsystem("freezer") {}
+
+    TError WaitState(TCgroup &cg,
+                     const std::string &state) const;
+    TError Freeze(TCgroup &cg) const;
+    TError Unfreeze(TCgroup &cg) const;
+    bool IsFrozen(TCgroup &cg) const;
+
+    TError WaitForFreeze(TCgroup &cg) const;
+    TError WaitForUnfreeze(TCgroup &cg) const;
+};
+
+class TCpuSubsystem : public TSubsystem {
+public:
+    TCpuSubsystem() : TSubsystem("cpu") {}
+    TError SetPolicy(TCgroup &cg, const std::string &policy);
+    TError SetLimit(TCgroup &cg, double limit);
+    TError SetGuarantee(TCgroup &cg, double guarantee);
+    bool SupportSmart();
+    bool SupportLimit();
+    bool SupportGuarantee();
+};
+
+class TCpuacctSubsystem : public TSubsystem {
+public:
+    TCpuacctSubsystem() : TSubsystem("cpuacct") {}
+    TError Usage(TCgroup &cg, uint64_t &value) const;
+};
+
+class TNetclsSubsystem : public TSubsystem {
+public:
+    TNetclsSubsystem() : TSubsystem("net_cls") {}
+};
+
+struct BlkioStat {
+    std::string Device;
+    uint64_t Read;
+    uint64_t Write;
+    uint64_t Sync;
+    uint64_t Async;
+};
+
+class TBlkioSubsystem : public TSubsystem {
+    TError GetStatLine(const std::vector<std::string> &lines,
+                       const size_t i,
+                       const std::string &name,
+                       uint64_t &val) const;
+    TError GetDevice(const std::string &majmin,
+                     std::string &device) const;
+public:
+    TBlkioSubsystem() : TSubsystem("blkio") {}
+    TError Statistics(TCgroup &cg,
+                      const std::string &file,
+                      std::vector<BlkioStat> &stat) const;
+    TError SetPolicy(TCgroup &cg, bool batch);
+    bool SupportPolicy();
+};
+
+class TDevicesSubsystem : public TSubsystem {
+public:
+    TDevicesSubsystem() : TSubsystem("devices") {}
+    TError AllowDevices(TCgroup &cg, const std::vector<std::string> &allowed);
+};
+
+extern TMemorySubsystem     MemorySubsystem;
+extern TFreezerSubsystem    FreezerSubsystem;
+extern TCpuSubsystem        CpuSubsystem;
+extern TCpuacctSubsystem    CpuacctSubsystem;
+extern TNetclsSubsystem     NetclsSubsystem;
+extern TBlkioSubsystem      BlkioSubsystem;
+extern TDevicesSubsystem    DevicesSubsystem;
+
+extern std::vector<TSubsystem *> AllSubsystems;
+extern std::vector<TSubsystem *> Subsystems;
+extern std::vector<TSubsystem *> Hierarchies;
+
+TError InitializeCgroups();
+TError InitializeDaemonCgroups();

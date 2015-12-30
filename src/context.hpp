@@ -13,8 +13,6 @@ class TContainerHolder;
 class TVolumeHolder;
 
 class TContext : public TNonCopyable {
-    TError CreateDaemonCgs();
-
 public:
     std::shared_ptr<TKeyValueStorage> Storage;
     std::shared_ptr<TKeyValueStorage> VolumeStorage;
@@ -22,7 +20,6 @@ public:
     std::shared_ptr<TContainerHolder> Cholder;
     std::shared_ptr<TVolumeHolder> Vholder;
     std::shared_ptr<TEpollLoop> EpollLoop;
-    std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> DaemonCgs;
 
     TContext();
     TError Initialize();

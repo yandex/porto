@@ -5,7 +5,6 @@
 #include "container.hpp"
 #include "container_value.hpp"
 #include "property.hpp"
-#include "subsystem.hpp"
 #include "network.hpp"
 #include "cgroup.hpp"
 #include "util/file.hpp"
@@ -221,15 +220,10 @@ public:
                         rpdmState) {}
 
     uint64_t GetDefault() const override {
-        auto subsys = cpuacctSubsystem;
-        auto cg = GetContainer()->GetLeafCgroup(subsys);
-        if (!cg) {
-            L_ERR() << "Can't find cpuacct cgroup" << std::endl;
-            return -1;
-        }
+        auto cg = GetContainer()->GetCgroup(CpuacctSubsystem);
 
         uint64_t val;
-        TError error = subsys->Usage(cg, val);
+        TError error = CpuacctSubsystem.Usage(cg, val);
         if (error) {
             L_ERR() << "Can't get CPU usage: " << error << std::endl;
             return -1;
@@ -248,15 +242,10 @@ public:
                         rpdmState) {}
 
     uint64_t GetDefault() const override {
-        auto subsys = memorySubsystem;
-        auto cg = GetContainer()->GetLeafCgroup(subsys);
-        if (!cg) {
-            L_ERR() << "Can't find memory cgroup" << std::endl;
-            return -1;
-        }
+        auto cg = GetContainer()->GetCgroup(MemorySubsystem);
 
         uint64_t val;
-        TError error = subsys->Usage(cg, val);
+        TError error = MemorySubsystem.Usage(cg, val);
         if (error) {
             L_ERR() << "Can't get memory usage: " << error << std::endl;
             return -1;
@@ -380,22 +369,12 @@ public:
                         rpdmState) {}
 
     uint64_t GetDefault() const override {
-        uint64_t minor_faults = 0;
-        auto cg = GetContainer()->GetLeafCgroup(memorySubsystem);
-        int left = 2;
-        TError error = memorySubsystem->Statistics(cg, [&](std::string k, uint64_t v) -> int {
-            if (k == "total_pgfault") {
-                minor_faults += v;
-                left--;
-            } else if (k == "total_pgmajfault") {
-                minor_faults -= v;
-                left--;
-            }
-            return left;
-        });
+        auto cg = GetContainer()->GetCgroup(MemorySubsystem);
+        TUintMap stat;
+        TError error = MemorySubsystem.Statistics(cg, stat);
         if (error)
             return -1;
-        return minor_faults;
+        return stat["total_pgfault"] - stat["total_pgmajfault"];
     }
 };
 
@@ -408,13 +387,12 @@ public:
                         rpdmState) {}
 
     uint64_t GetDefault() const override {
-        uint64_t val;
-        auto cg = GetContainer()->GetLeafCgroup(memorySubsystem);
-        TError error = memorySubsystem->Statistics(cg, "total_pgmajfault", val);
+        auto cg = GetContainer()->GetCgroup(MemorySubsystem);
+        TUintMap stat;
+        TError error = MemorySubsystem.Statistics(cg, stat);
         if (error)
             return -1;
-
-        return val;
+        return stat["total_pgmajfault"];
     }
 };
 
@@ -427,39 +405,23 @@ public:
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
+        auto memCg = GetContainer()->GetCgroup(MemorySubsystem);
+        auto blkCg = GetContainer()->GetCgroup(BlkioSubsystem);
+        TUintMap memStat, result;
         TError error;
-        TUintMap m;
 
-        auto memcg = GetContainer()->GetLeafCgroup(memorySubsystem);
-
-        uint64_t read_bytes = 0;
-        int left = 2;
-        error = memorySubsystem->Statistics(memcg, [&](std::string k, uint64_t v) -> int {
-            if (k == "fs_io_bytes") {
-                read_bytes += v;
-                left--;
-            } else if (k == "fs_io_write_bytes") {
-                read_bytes -= v;
-                left--;
-            }
-            return left;
-        });
+        error = MemorySubsystem.Statistics(memCg, memStat);
         if (!error)
-            m["fs"] = read_bytes;
+            result["fs"] = memStat["fs_io_bytes"] - memStat["fs_io_write_bytes"];
 
-        auto blkcg = GetContainer()->GetLeafCgroup(blkioSubsystem);
+        std::vector<BlkioStat> blkStat;
+        error = BlkioSubsystem.Statistics(blkCg, "blkio.io_service_bytes_recursive", blkStat);
+        if (!error) {
+            for (auto &s : blkStat)
+                result[s.Device] = s.Read;
+        }
 
-        std::vector<BlkioStat> stat;
-        error = blkioSubsystem->Statistics(blkcg, "blkio.io_service_bytes_recursive", stat);
-        if (error)
-            L_ERR() << "Can't get blkio statistics: " << error << std::endl;
-        if (error)
-            return m;
-
-        for (auto &s : stat)
-            m[s.Device] = s.Read;
-
-        return m;
+        return result;
     }
 };
 
@@ -472,29 +434,23 @@ public:
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
+        auto memCg = GetContainer()->GetCgroup(MemorySubsystem);
+        auto blkCg = GetContainer()->GetCgroup(BlkioSubsystem);
+        TUintMap memStat, result;
         TError error;
-        TUintMap m;
 
-        auto memcg = GetContainer()->GetLeafCgroup(memorySubsystem);
-
-        uint64_t write_bytes;
-        error = memorySubsystem->Statistics(memcg, "fs_io_write_bytes", write_bytes);
+        error = MemorySubsystem.Statistics(memCg, memStat);
         if (!error)
-            m["fs"] = write_bytes;
+            result["fs"] = memStat["fs_io_write_bytes"];
 
-        auto blkcg = GetContainer()->GetLeafCgroup(blkioSubsystem);
+        std::vector<BlkioStat> blkStat;
+        error = BlkioSubsystem.Statistics(blkCg, "blkio.io_service_bytes_recursive", blkStat);
+        if (!error) {
+            for (auto &s : blkStat)
+                result[s.Device] = s.Write;
+        }
 
-        std::vector<BlkioStat> stat;
-        error = blkioSubsystem->Statistics(blkcg, "blkio.io_service_bytes_recursive", stat);
-        if (error)
-            L_ERR() << "Can't get blkio statistics: " << error << std::endl;
-        if (error)
-            return m;
-
-        for (auto &s : stat)
-            m[s.Device] = s.Write;
-
-        return m;
+        return result;
     }
 };
 
@@ -507,35 +463,23 @@ public:
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
+        auto memCg = GetContainer()->GetCgroup(MemorySubsystem);
+        auto blkCg = GetContainer()->GetCgroup(BlkioSubsystem);
+        TUintMap result, memStat;
         TError error;
-        TUintMap m;
 
-        auto memcg = GetContainer()->GetLeafCgroup(memorySubsystem);
-
-        uint64_t ops = 0;
-        error = memorySubsystem->Statistics(memcg, [&](std::string k, uint64_t v) -> int {
-            if (k == "fs_io_operations") {
-                ops += v;
-                return 0;
-            }
-            return 1;
-        });
+        error = MemorySubsystem.Statistics(memCg, memStat);
         if (!error)
-            m["fs"] = ops;
+            result["fs"] = memStat["fs_io_operations"];
 
-        auto blkcg = GetContainer()->GetLeafCgroup(blkioSubsystem);
+        std::vector<BlkioStat> blkStat;
+        error = BlkioSubsystem.Statistics(blkCg, "blkio.io_serviced_recursive", blkStat);
+        if (!error) {
+            for (auto &s : blkStat)
+                result[s.Device] = s.Read + s.Write;
+        }
 
-        std::vector<BlkioStat> stat;
-        error = blkioSubsystem->Statistics(blkcg, "blkio.io_serviced_recursive", stat);
-        if (error)
-            L_ERR() << "Can't get blkio statistics: " << error << std::endl;
-        if (error)
-            return m;
-
-        for (auto &s : stat)
-            m[s.Device] = s.Read + s.Write;
-
-        return m;
+        return result;
     }
 };
 
@@ -583,21 +527,18 @@ public:
         TContainerValue(D_MAX_RSS,
                         "maximum amount of anonymous memory container consumed",
                         rpdmState) {
-        uint64_t val;
-        auto err = memorySubsystem->Statistics(memorySubsystem->GetRootCgroup(),
-                                               "total_max_rss", val);
-        if (err)
+        TCgroup rootCg = MemorySubsystem.RootCgroup();
+        TUintMap stat;
+        TError error = MemorySubsystem.Statistics(rootCg, stat);
+        if (error || stat.find("total_max_rss") == stat.end())
             SetFlag(UNSUPPORTED_FEATURE);
     }
 
     uint64_t GetDefault() const override {
-        uint64_t val;
-        auto cg = GetContainer()->GetLeafCgroup(memorySubsystem);
-        TError error = memorySubsystem->Statistics(cg, "total_max_rss", val);
-        if (error)
-            return 0;
-
-        return val;
+        TCgroup cg = GetContainer()->GetCgroup(MemorySubsystem);
+        TUintMap stat;
+        MemorySubsystem.Statistics(cg, stat);
+        return stat["total_max_rss"];
     }
 };
 
@@ -627,7 +568,8 @@ public:
         m["started"] = Statistics->Started;
         m["running"] = GetContainer()->GetRunningChildren();
         uint64_t usage = 0;
-        TError error = memorySubsystem->Usage(memorySubsystem->GetRootCgroup()->GetChild(PORTO_DAEMON_CGROUP), usage);
+        auto cg = MemorySubsystem.Cgroup(PORTO_DAEMON_CGROUP);
+        TError error = MemorySubsystem.Usage(cg, usage);
         if (error)
             L_ERR() << "Can't get memory usage of portod" << std::endl;
         m["memory_usage_mb"] = usage / 1024 / 1024;

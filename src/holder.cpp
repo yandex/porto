@@ -9,6 +9,7 @@
 #include "event.hpp"
 #include "client.hpp"
 #include "task.hpp"
+#include "cgroup.hpp"
 #include "kvalue.hpp"
 #include "kv.pb.h"
 #include "util/string.hpp"
@@ -457,6 +458,26 @@ TError TContainerHolder::Restore(TScopedLock &holder_lock, const std::string &na
     Containers[name] = c;
     Statistics->Created++;
     return TError::Success();
+}
+
+void TContainerHolder::RemoveLeftovers() {
+    TError error;
+
+    for (auto hy: Hierarchies) {
+        std::vector<TCgroup> cgroups;
+
+        error = hy->Cgroup(PORTO_ROOT_CGROUP).ChildsAll(cgroups);
+        if (error) {
+            L_ERR() << "Cannot dump cgroups " << error << std::endl;
+            continue;
+        }
+        for (auto cg = cgroups.rbegin(); cg != cgroups.rend(); cg++) {
+            std::string name = cg->Name.substr(PORTO_ROOT_CGROUP.length() + 1);
+            if (Containers.count(name))
+                continue;
+            error = cg->Remove();
+        }
+    }
 }
 
 void TContainerHolder::ScheduleLogRotatation() {

@@ -6,7 +6,6 @@
 #include "task.hpp"
 #include "config.hpp"
 #include "cgroup.hpp"
-#include "subsystem.hpp"
 #include "util/log.hpp"
 #include "util/mount.hpp"
 #include "util/string.hpp"
@@ -675,8 +674,8 @@ TError TTask::Start() {
         (void)setsid();
 
         // move to target cgroups
-        for (auto cg : Env->LeafCgroups) {
-            error = cg.second->Attach(getpid());
+        for (auto &cg : Env->Cgroups) {
+            error = cg.Attach(getpid());
             if (error)
                 Abort(error);
         }
@@ -921,108 +920,12 @@ bool TTask::HasCorrectParent() {
     return true;
 }
 
-bool TTask::HasCorrectFreezer() {
-    // if task belongs to different freezer cgroup we don't
-    // restore it since pids may have wrapped or previous kvs state
-    // is too old
-    map<string, string> cgmap;
-    TError error = GetTaskCgroups(WPid, cgmap);
-    if (error) {
-        L() << "Can't read " << WPid << " cgroups of restored task: " << error << std::endl;
-        return false;
-    } else {
-        auto cg = Env->LeafCgroups.at(freezerSubsystem);
-        if (cg && cg->Relpath().ToString() != cgmap["freezer"]) {
-            // if at this point task is zombie we don't have any cgroup info
-            if (IsZombie())
-                return true;
-
-            L_WRN() << "Unexpected freezer cgroup of restored task  " << WPid << ": " << cg->Path() << " != " << cgmap["freezer"] << std::endl;
-            Pid = VPid = WPid = 0;
-            State = Stopped;
-            return false;
-        }
-    }
-
-    return true;
-}
-
 void TTask::Restore(std::vector<int> pids) {
     ExitStatus = 0;
     Pid = pids[0];
     VPid = pids[1];
     WPid = pids[2];
     State = Started;
-}
-
-TError TTask::SyncTaskCgroups(pid_t pid) const {
-    if (IsZombie())
-        return TError::Success();
-
-    map<string, string> cgmap;
-    TError error = GetTaskCgroups(pid, cgmap);
-    if (error)
-        return error;
-
-    for (auto pair : cgmap) {
-        auto subsys = TSubsystem::Get(pair.first);
-        auto &path = pair.second;
-
-        if (!subsys || Env->LeafCgroups.find(subsys) == Env->LeafCgroups.end()) {
-            if (pair.first.find(',') != std::string::npos)
-                continue;
-            if (pair.first == "net_cls") {
-                if (path == "/")
-                    continue;
-
-                L_WRN() << "No network, disabled " << subsys->GetName() << ":" << path << std::endl;
-
-                auto cg = subsys->GetRootCgroup();
-                error = cg->Attach(pid);
-                if (error)
-                    L_ERR() << "Can't reattach to root: " << error << std::endl;
-                continue;
-            }
-
-            error = TError(EError::Unknown, "Task belongs to unknown subsystem " + pair.first);
-            L_WRN() << "Skip " << pair.first << ": " << error << std::endl;
-            continue;
-        }
-
-        auto cg = Env->LeafCgroups.at(subsys);
-        if (cg && cg->Relpath().ToString() != path) {
-            L_WRN() << "Fixed invalid task subsystem for " << subsys->GetName() << ":" << path << std::endl;
-
-            error = cg->Attach(pid);
-            if (error)
-                L_ERR() << "Can't fix: " << error << std::endl;
-        }
-    }
-
-    return TError::Success();
-}
-
-TError TTask::SyncCgroupsWithFreezer() const {
-    auto freezer = Env->LeafCgroups.at(freezerSubsystem);
-    std::vector<pid_t> tasks;
-
-    TError error = freezer->GetTasks(tasks);
-    if (error)
-        return error;
-
-    if (std::find(tasks.begin(), tasks.end(), Pid) == tasks.end())
-        return TError(EError::Unknown, "Pid " + std::to_string(Pid) + " not in freezer");
-
-    if (Pid != WPid && std::find(tasks.begin(), tasks.end(), WPid) == tasks.end())
-        return TError(EError::Unknown, "WPid " + std::to_string(Pid) + " not in freezer");
-
-    for (pid_t pid : tasks) {
-        error = SyncTaskCgroups(pid);
-        if (error)
-            L_WRN() << "Cannot sync cgroups of " << pid << " : " << error << std::endl;
-    }
-
-    return TError::Success();
 }
 
 void TTask::ClearEnv() {

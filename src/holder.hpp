@@ -65,6 +65,7 @@ public:
     TError Restore(TScopedLock &holder_lock, const std::string &name,
                    const kv::TNode &node);
     bool RestoreFromStorage();
+    void RemoveLeftovers();
     TError Destroy(TScopedLock &holder_lock, std::shared_ptr<TContainer> c);
     void DestroyRoot(TScopedLock &holder_lock);
 

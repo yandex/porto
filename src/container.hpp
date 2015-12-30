@@ -60,7 +60,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     std::unique_ptr<TTask> Task;
     std::vector<std::weak_ptr<TContainerWaiter>> Waiters;
 
-    std::map<std::shared_ptr<TSubsystem>, std::shared_ptr<TCgroup>> LeafCgroups;
     std::shared_ptr<TEpollSource> Source;
     bool IsMeta = false;
 
@@ -195,7 +194,7 @@ public:
                    std::shared_ptr<TClient> client);
     TError Restore(TScopedLock &holder_lock, const kv::TNode &node);
 
-    std::shared_ptr<TCgroup> GetLeafCgroup(std::shared_ptr<TSubsystem> subsys);
+    TCgroup GetCgroup(const TSubsystem &subsystem) const;
     bool CanRemoveDead() const;
     std::vector<std::string> GetChildren();
     std::shared_ptr<TContainer> FindRunningParent() const;

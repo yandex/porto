@@ -1,7 +1,6 @@
 #include "property.hpp"
 #include "task.hpp"
 #include "config.hpp"
-#include "subsystem.hpp"
 #include "cgroup.hpp"
 #include "container.hpp"
 #include "container_value.hpp"
@@ -345,7 +344,7 @@ public:
         TContainerValue(P_MEM_GUARANTEE,
                         "Guaranteed amount of memory [bytes]",
                         dynamicProperty) {
-        if (!memorySubsystem->SupportGuarantee())
+        if (!MemorySubsystem.SupportGuarantee())
             SetFlag(UNSUPPORTED_FEATURE);
     }
 
@@ -391,7 +390,7 @@ public:
         TContainerValue(P_DIRTY_LIMIT,
                         "Dirty file cache limit [bytes]",
                         dynamicProperty) {
-        if (!memorySubsystem->SupportDirtyLimit())
+        if (!MemorySubsystem.SupportDirtyLimit())
             SetFlag(UNSUPPORTED_FEATURE);
     }
 
@@ -407,7 +406,7 @@ public:
         TContainerValue(P_RECHARGE_ON_PGFAULT,
                         "Recharge memory on page fault",
                         dynamicProperty) {
-        if (!memorySubsystem->SupportRechargeOnPgfault())
+        if (!MemorySubsystem.SupportRechargeOnPgfault())
             SetFlag(UNSUPPORTED_FEATURE);
     }
 
@@ -433,7 +432,7 @@ public:
             return TError(EError::InvalidValue, "invalid policy");
 
         if (value == "rt") {
-            if (!cpuSubsystem->SupportSmart())
+            if (!CpuSubsystem.SupportSmart())
                 return TError(EError::NotSupported, "invalid kernel (no Yandex extensions)");
         }
 
@@ -459,7 +458,7 @@ public:
         TContainerValue(P_CPU_LIMIT,
                         "CPU limit: 0-100.0 [%] | 0.0c-<CPUS>c [cores]",
                         dynamicProperty) {
-        if (!cpuSubsystem->SupportLimit())
+        if (!CpuSubsystem.SupportLimit())
             SetFlag(UNSUPPORTED_FEATURE);
     }
 
@@ -495,7 +494,7 @@ public:
         TContainerValue(P_CPU_GUARANTEE,
                         "CPU guarantee: 0-100.0 [%] | 0.0c-<CPUS>c [cores]",
                         dynamicProperty) {
-        if (!cpuSubsystem->SupportGuarantee())
+        if (!CpuSubsystem.SupportGuarantee())
             SetFlag(UNSUPPORTED_FEATURE);
     }
 
@@ -524,7 +523,7 @@ public:
         TContainerValue(P_IO_POLICY,
                         "IO policy: normal, batch",
                         dynamicProperty) {
-        if (!blkioSubsystem->SupportPolicy())
+        if (!BlkioSubsystem.SupportPolicy())
             SetFlag(UNSUPPORTED_FEATURE);
     }
 
@@ -547,7 +546,7 @@ public:
         TContainerValue(P_IO_LIMIT,
                         "Filesystem bandwidth limit [bytes/s]",
                         dynamicProperty) {
-        if (!memorySubsystem->SupportIoLimit())
+        if (!MemorySubsystem.SupportIoLimit())
             SetFlag(UNSUPPORTED_FEATURE);
     }
 
@@ -563,7 +562,7 @@ public:
         TContainerValue(P_IO_OPS_LIMIT,
                         "Filesystem IOPS limit [operations/s]",
                         dynamicProperty) {
-        if (!memorySubsystem->SupportIoLimit())
+        if (!MemorySubsystem.SupportIoLimit())
             SetFlag(UNSUPPORTED_FEATURE);
     }
 

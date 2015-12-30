@@ -552,13 +552,22 @@ static int SlaveMain() {
     if (error)
         L_ERR() << "Can't adjust OOM score: " << error << std::endl;
 
+    error = InitializeCgroups();
+    if (error) {
+        L_ERR() << "Cannot initalize cgroups: " << error << std::endl;
+        if (!failsafe)
+            return EXIT_FAILURE;
+    }
+
+    error = InitializeDaemonCgroups();
+    if (error) {
+        L_ERR() << "Cannot initalize daemon cgroups: " << error << std::endl;
+        if (!failsafe)
+            return EXIT_FAILURE;
+    }
+
     TContext context;
     try {
-        TCgroupSnapshot cs;
-        error = cs.Create();
-        if (error)
-            L_ERR() << "Can't create cgroup snapshot: " << error << std::endl;
-
         error = context.Initialize();
         if (error) {
             L_ERR() << "Initialization error: " << error << std::endl;
@@ -576,8 +585,7 @@ static int SlaveMain() {
         context.Vholder->RestoreFromStorage(context.Cholder);
 
         L() << "Remove cgroup leftovers..." << std::endl;
-
-        cs.Destroy();
+        context.Cholder->RemoveLeftovers();
 
         L() << "Done restoring" << std::endl;
 

@@ -10,7 +10,6 @@
 #include "config.hpp"
 #include "task.hpp"
 #include "cgroup.hpp"
-#include "subsystem.hpp"
 #include "property.hpp"
 #include "data.hpp"
 #include "event.hpp"
@@ -210,20 +209,21 @@ TError TContainer::UpdateSoftLimit() {
     if (GetState() == EContainerState::Meta) {
         uint64_t defaultLimit;
 
-        TError error = memorySubsystem->GetSoftLimit(memorySubsystem->GetRootCgroup(), defaultLimit);
+        auto rootCg = MemorySubsystem.RootCgroup();
+        TError error = MemorySubsystem.GetSoftLimit(rootCg, defaultLimit);
         if (error)
             return error;
 
         uint64_t limit = RunningChildren ? defaultLimit : 1 * 1024 * 1024;
         uint64_t currentLimit;
 
-        auto cg = GetLeafCgroup(memorySubsystem);
-        error = memorySubsystem->GetSoftLimit(cg, currentLimit);
+        auto cg = GetCgroup(MemorySubsystem);
+        error = MemorySubsystem.GetSoftLimit(cg, currentLimit);
         if (error)
             return error;
 
         if (currentLimit != limit) {
-            error = memorySubsystem->SetSoftLimit(cg, limit);
+            error = MemorySubsystem.SetSoftLimit(cg, limit);
             if (error)
                 return error;
         }
@@ -406,31 +406,31 @@ template bool TContainer::ValidHierarchicalProperty(const std::string &property,
 template bool TContainer::ValidHierarchicalProperty(const std::string &property, const double_t value) const;
 
 vector<pid_t> TContainer::Processes() {
-    auto cg = GetLeafCgroup(freezerSubsystem);
+    auto cg = GetCgroup(FreezerSubsystem);
 
     vector<pid_t> ret;
-    cg->GetProcesses(ret);
+    cg.GetProcesses(ret);
     return ret;
 }
 
 TError TContainer::ApplyDynamicProperties() {
-    auto memcg = GetLeafCgroup(memorySubsystem);
+    auto memcg = GetCgroup(MemorySubsystem);
 
-    TError error = memorySubsystem->UseHierarchy(memcg, config().container().use_hierarchy());
+    TError error = MemorySubsystem.UseHierarchy(memcg, config().container().use_hierarchy());
     if (error) {
-        L_ERR() << "Can't set use_hierarchy for " << memcg->Relpath() << ": " << error << std::endl;
+        L_ERR() << "Can't set use_hierarchy for " << memcg << " : " << error << std::endl;
         // we don't want to get this error endlessly when user switches config
         // so be tolerant
         //return error;
     }
 
-    error = memorySubsystem->SetGuarantee(memcg, Prop->Get<uint64_t>(P_MEM_GUARANTEE));
+    error = MemorySubsystem.SetGuarantee(memcg, Prop->Get<uint64_t>(P_MEM_GUARANTEE));
     if (error) {
         L_ERR() << "Can't set " << P_MEM_GUARANTEE << ": " << error << std::endl;
         return error;
     }
 
-    error = memorySubsystem->SetLimit(memcg, Prop->Get<uint64_t>(P_MEM_LIMIT));
+    error = MemorySubsystem.SetLimit(memcg, Prop->Get<uint64_t>(P_MEM_LIMIT));
     if (error) {
         if (error.GetErrno() == EBUSY)
             return TError(EError::InvalidValue, std::string(P_MEM_LIMIT) + " is too low");
@@ -439,53 +439,53 @@ TError TContainer::ApplyDynamicProperties() {
         return error;
     }
 
-    error = memorySubsystem->RechargeOnPgfault(memcg, Prop->Get<bool>(P_RECHARGE_ON_PGFAULT));
+    error = MemorySubsystem.RechargeOnPgfault(memcg, Prop->Get<bool>(P_RECHARGE_ON_PGFAULT));
     if (error) {
         L_ERR() << "Can't set " << P_RECHARGE_ON_PGFAULT << ": " << error << std::endl;
         return error;
     }
 
-    auto cpucg = GetLeafCgroup(cpuSubsystem);
-    error = cpuSubsystem->SetPolicy(cpucg, Prop->Get<std::string>(P_CPU_POLICY));
+    auto cpucg = GetCgroup(CpuSubsystem);
+    error = CpuSubsystem.SetPolicy(cpucg, Prop->Get<std::string>(P_CPU_POLICY));
     if (error) {
         L_ERR() << "Can't set " << P_CPU_POLICY << ": " << error << std::endl;
         return error;
     }
 
     if (Prop->Get<std::string>(P_CPU_POLICY) == "normal") {
-        error = cpuSubsystem->SetLimit(cpucg, Prop->Get<double>(P_CPU_LIMIT));
+        error = CpuSubsystem.SetLimit(cpucg, Prop->Get<double>(P_CPU_LIMIT));
         if (error) {
             L_ERR() << "Can't set " << P_CPU_LIMIT << ": " << error << std::endl;
             return error;
         }
 
-        error = cpuSubsystem->SetGuarantee(cpucg, Prop->Get<double>(P_CPU_GUARANTEE));
+        error = CpuSubsystem.SetGuarantee(cpucg, Prop->Get<double>(P_CPU_GUARANTEE));
         if (error) {
             L_ERR() << "Can't set " << P_CPU_GUARANTEE << ": " << error << std::endl;
             return error;
         }
     }
 
-    auto blkcg = GetLeafCgroup(blkioSubsystem);
-    error = blkioSubsystem->SetPolicy(blkcg, Prop->Get<std::string>(P_IO_POLICY) == "batch");
+    auto blkcg = GetCgroup(BlkioSubsystem);
+    error = BlkioSubsystem.SetPolicy(blkcg, Prop->Get<std::string>(P_IO_POLICY) == "batch");
     if (error) {
         L_ERR() << "Can't set " << P_IO_POLICY << ": " << error << std::endl;
         return error;
     }
 
-    error = memorySubsystem->SetIoLimit(memcg, Prop->Get<uint64_t>(P_IO_LIMIT));
+    error = MemorySubsystem.SetIoLimit(memcg, Prop->Get<uint64_t>(P_IO_LIMIT));
     if (error) {
         L_ERR() << "Can't set " << P_IO_LIMIT << ": " << error << std::endl;
         return error;
     }
 
-    error = memorySubsystem->SetIopsLimit(memcg, Prop->Get<uint64_t>(P_IO_OPS_LIMIT));
+    error = MemorySubsystem.SetIopsLimit(memcg, Prop->Get<uint64_t>(P_IO_OPS_LIMIT));
     if (error) {
         L_ERR() << "Can't set " << P_IO_OPS_LIMIT << ": " << error << std::endl;
         return error;
     }
 
-    error = memorySubsystem->SetDirtyLimit(memcg, Prop->Get<uint64_t>(P_DIRTY_LIMIT));
+    error = MemorySubsystem.SetDirtyLimit(memcg, Prop->Get<uint64_t>(P_DIRTY_LIMIT));
     if (error) {
         L_ERR() << "Can't set " << P_DIRTY_LIMIT << ": " << error << std::endl;
         return error;
@@ -513,7 +513,7 @@ void TContainer::ShutdownOom() {
 }
 
 TError TContainer::PrepareOomMonitor() {
-    auto memcg = GetLeafCgroup(memorySubsystem);
+    auto memcg = GetCgroup(MemorySubsystem);
 
     Efd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
     if (Efd.GetFd() < 0) {
@@ -531,16 +531,16 @@ TError TContainer::PrepareOomMonitor() {
         return error;
     }
 
-    auto cfdPath = memcg->Path() / "memory.oom_control";
+    auto cfdPath = memcg.Path() / "memory.oom_control";
     TScopedFd cfd(open(cfdPath.c_str(), O_RDONLY | O_CLOEXEC));
     if (cfd.GetFd() < 0) {
         ShutdownOom();
-        TError error(EError::Unknown, errno, "Can't open " + memcg->Path().ToString());
+        TError error(EError::Unknown, errno, "Can't open " + memcg.Path().ToString());
         L_ERR() << "Can't update OOM settings: " << error << std::endl;
         return error;
     }
 
-    TFile f(memcg->Path() / "cgroup.event_control");
+    TFile f(memcg.Path() / "cgroup.event_control");
     string s = std::to_string(Efd.GetFd()) + " " + std::to_string(cfd.GetFd());
     error = f.WriteStringNoAppend(s);
     if (error) {
@@ -554,16 +554,13 @@ TError TContainer::PrepareOomMonitor() {
 TError TContainer::PrepareCgroups() {
     TError error;
 
-    LeafCgroups[cpuSubsystem] = GetLeafCgroup(cpuSubsystem);
-    LeafCgroups[cpuacctSubsystem] = GetLeafCgroup(cpuacctSubsystem);
-    LeafCgroups[memorySubsystem] = GetLeafCgroup(memorySubsystem);
-    LeafCgroups[freezerSubsystem] = GetLeafCgroup(freezerSubsystem);
-    LeafCgroups[blkioSubsystem] = GetLeafCgroup(blkioSubsystem);
-    LeafCgroups[netclsSubsystem] = GetLeafCgroup(netclsSubsystem);
-    LeafCgroups[devicesSubsystem] = GetLeafCgroup(devicesSubsystem);
+    for (auto hy: Hierarchies) {
+        TCgroup cg = GetCgroup(*hy);
 
-    for (auto &cg: LeafCgroups) {
-        error = cg.second->Create();
+        if (cg.Exists()) //FIXME kludge for root and restore
+            continue;
+
+        error = cg.Create();
         if (error)
             return error;
     }
@@ -581,8 +578,8 @@ TError TContainer::PrepareCgroups() {
             return error;
         }
 
-        auto devices = GetLeafCgroup(devicesSubsystem);
-        error = devicesSubsystem->AllowDevices(devices,
+        auto devices = GetCgroup(DevicesSubsystem);
+        error = DevicesSubsystem.AllowDevices(devices,
                                                Prop->Get<TStrList>(P_ALLOWED_DEVICES));
         if (error) {
             L_ERR() << "Can't set " << P_ALLOWED_DEVICES << ": " << error << std::endl;
@@ -666,9 +663,9 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
     }
 
     if (!IsRoot()) {
-        auto netcls = GetLeafCgroup(netclsSubsystem);
-        error = netcls->SetKnobValue("net_cls.classid",
-                std::to_string(TcHandle(ROOT_TC_MAJOR, Id)), false);
+        auto netcls = GetCgroup(NetclsSubsystem);
+        error = netcls.Set("net_cls.classid",
+                std::to_string(TcHandle(ROOT_TC_MAJOR, Id)));
         if (error) {
             L_ERR() << "Can't set classid: " << error << std::endl;
             return error;
@@ -685,9 +682,11 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     auto taskEnv = std::unique_ptr<TTaskEnv>(new TTaskEnv());
     auto parent = FindRunningParent();
 
-    taskEnv->LeafCgroups = LeafCgroups;
-
     taskEnv->Container = GetName();
+
+    for (auto hy: Hierarchies)
+        taskEnv->Cgroups.push_back(GetCgroup(*hy));
+
     taskEnv->Command = Prop->Get<std::string>(P_COMMAND);
     taskEnv->Cwd = Prop->Get<std::string>(P_CWD);
     taskEnv->ParentCwd = Parent->Prop->Get<std::string>(P_CWD);
@@ -952,8 +951,8 @@ error:
 }
 
 TError TContainer::Freeze(TScopedLock &holder_lock) {
-    auto cg = GetLeafCgroup(freezerSubsystem);
-    TError error = freezerSubsystem->Freeze(cg);
+    auto cg = GetCgroup(FreezerSubsystem);
+    TError error = FreezerSubsystem.Freeze(cg);
     if (error) {
         L_ERR() << "Can't freeze container: " << error << std::endl;
         return error;
@@ -961,7 +960,7 @@ TError TContainer::Freeze(TScopedLock &holder_lock) {
 
     {
         TScopedUnlock unlock(holder_lock);
-        error = freezerSubsystem->WaitForFreeze(cg);
+        error = FreezerSubsystem.WaitForFreeze(cg);
         if (error) {
             L_ERR() << "Can't wait for freeze container: " << error << std::endl;
             return error;
@@ -972,8 +971,8 @@ TError TContainer::Freeze(TScopedLock &holder_lock) {
 }
 
 TError TContainer::Unfreeze(TScopedLock &holder_lock) {
-    auto cg = GetLeafCgroup(freezerSubsystem);
-    TError error = freezerSubsystem->Unfreeze(cg);
+    auto cg = GetCgroup(FreezerSubsystem);
+    TError error = FreezerSubsystem.Unfreeze(cg);
     if (error) {
         L_ERR() << "Can't unfreeze container: " << error << std::endl;
         return error;
@@ -981,7 +980,7 @@ TError TContainer::Unfreeze(TScopedLock &holder_lock) {
 
     {
         TScopedUnlock unlock(holder_lock);
-        error = freezerSubsystem->WaitForUnfreeze(cg);
+        error = FreezerSubsystem.WaitForUnfreeze(cg);
         if (error) {
             L_ERR() << "Can't wait for unfreeze container: " << error << std::endl;
             return error;
@@ -992,8 +991,8 @@ TError TContainer::Unfreeze(TScopedLock &holder_lock) {
 }
 
 bool TContainer::IsFrozen() {
-    auto cg = GetLeafCgroup(freezerSubsystem);
-    return freezerSubsystem->IsFrozen(cg);
+    auto cg = GetCgroup(FreezerSubsystem);
+    return FreezerSubsystem.IsFrozen(cg);
 }
 
 bool TContainer::IsValid() {
@@ -1004,8 +1003,8 @@ TError TContainer::SendSignal(int signal) {
     if (IsRoot())
         return TError(EError::Permission, "Cannot kill root container");
     L_ACT() << "Send signal " << signal << " to " << GetName() << std::endl;
-    auto cg = GetLeafCgroup(freezerSubsystem);
-    return cg->KillAll(signal);
+    auto cg = GetCgroup(FreezerSubsystem);
+    return cg.KillAll(signal);
 }
 
 TError TContainer::SendTreeSignal(TScopedLock &holder_lock, int signal) {
@@ -1023,7 +1022,7 @@ TError TContainer::SendTreeSignal(TScopedLock &holder_lock, int signal) {
 }
 
 TError TContainer::KillAll(TScopedLock &holder_lock) {
-    auto cg = GetLeafCgroup(freezerSubsystem);
+    auto cg = GetCgroup(FreezerSubsystem);
 
     L_ACT() << "Kill all " << GetName() << std::endl;
 
@@ -1039,7 +1038,7 @@ TError TContainer::KillAll(TScopedLock &holder_lock) {
     if (!SendSignal(SIGTERM)) {
         TScopedUnlock unlock(holder_lock);
         int ret;
-        if (!SleepWhile([&]{ return cg->IsEmpty() == false; }, ret,
+        if (!SleepWhile([&]{ return cg.IsEmpty() == false; }, ret,
                         config().container().kill_timeout_ms()) || ret)
             L() << "Child didn't exit via SIGTERM, sending SIGKILL" << std::endl;
     }
@@ -1181,10 +1180,11 @@ void TContainer::FreeResources() {
     TError error;
 
     if (!IsRoot()) {
-        for (auto &cg: LeafCgroups) {
-            error = cg.second->Remove();
-            if (error)
-                L_ERR() << "Can't remove cgroup directory: " << error << std::endl;
+        for (auto hy: Hierarchies) {
+            auto cg = GetCgroup(*hy);
+
+            error = cg.Remove();
+            (void)error; //Logged inside
         }
     }
 
@@ -1292,12 +1292,12 @@ TError TContainer::Stop(TScopedLock &holder_lock) {
             return error;
         }
 
-        auto cg = GetLeafCgroup(freezerSubsystem);
+        auto cg = GetCgroup(FreezerSubsystem);
 
         TScopedUnlock unlock(holder_lock);
         int ret;
         if (!SleepWhile([&] () -> int {
-                    if (cg && cg->IsEmpty())
+                    if (!cg.Exists() || cg.IsEmpty())
                         return 0;
                     kill(Task->GetPid(), 0);
                     return errno != ESRCH;
@@ -1803,32 +1803,51 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
 
         Task->Restore(pids);
 
-        if (Task->HasCorrectParent()) {
-            if (Task->IsZombie()) {
-                    L() << "Task is zombie and belongs to porto" << std::endl;
-            } else {
-                if (Task->HasCorrectFreezer()) {
-                    L() << "Task is running and belongs to porto" << std::endl;
+        pid_t pid = Task->GetWPid();
+        pid_t ppid;
 
-                    TError error = Task->SyncCgroupsWithFreezer();
-                    if (error)
-                        L_WRN() << "Cannot sync cgroups: " << error << std::endl;
-                } else {
-                    L_WRN() << "Task is running, belongs to porto but doesn't have valid freezer" << std::endl;
-                    LostAndRestored = true;
+        TCgroup taskCg, freezerCg = GetCgroup(FreezerSubsystem);
+
+        error = GetTaskParent(pid, ppid);
+        if (!error)
+            error = FreezerSubsystem.TaskCgroup(pid, taskCg);
+
+        if (error) {
+            L() << "Cannot get ppid or cgroup of restored task: " << error << std::endl;
+            LostAndRestored = true;
+        } else if (ppid != getppid()) {
+            L() << "Invalid ppid of restored task: " << ppid << " != " << getppid() << std::endl;
+            LostAndRestored = true;
+        } else if (Task->IsZombie()) {
+            L() << "Task is zombie and belongs to porto" << std::endl;
+        } else if (taskCg != freezerCg) {
+            L_WRN() << "Task is running, belongs to porto but doesn't have valid freezer" << std::endl;
+            LostAndRestored = true;
+        } else {
+            L() << "Task is running and belongs to porto" << std::endl;
+
+            std::vector<pid_t> tasks;
+            error = freezerCg.GetTasks(tasks);
+            if (error) {
+                L_WRN() << "Cannot dump cgroups " << freezerCg << " " << error << std::endl;
+                LostAndRestored = true;
+            } else {
+                /* Sweep all tasks from freezer cgroup into correct cgroups */
+                for (auto hy: Hierarchies) {
+                    auto correctCg = GetCgroup(*hy);
+
+                    for (pid_t pid: tasks) {
+                        TCgroup currentCg;
+                        error = hy->TaskCgroup(pid, currentCg);
+                        if (!error && currentCg != correctCg) {
+                            L_WRN() << "Process " << pid << " in " << currentCg
+                                    << " while should be in " << correctCg << std::endl;
+                            (void)correctCg.Attach(pid);
+                        }
+                    }
                 }
             }
-        } else {
-            if (Task->HasCorrectFreezer()) {
-                L() << "Task is dead or doesn't belong to porto" << std::endl;
-                LostAndRestored = true;
-            } else {
-                L() << "Task is not running or has been reparented" << std::endl;
-                LostAndRestored = true;
-            }
-        }
 
-        if (!LostAndRestored) {
             error = RestoreNetwork();
             if (error) {
                 if (Task->HasCorrectParent() && !Task->IsZombie())
@@ -1856,8 +1875,8 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
             else
                 SetState(EContainerState::Running);
 
-            auto cg = GetLeafCgroup(freezerSubsystem);
-            if (freezerSubsystem->IsFrozen(cg))
+            auto cg = GetCgroup(FreezerSubsystem);
+            if (FreezerSubsystem.IsFrozen(cg))
                 SetState(EContainerState::Paused);
         }
 
@@ -1872,8 +1891,8 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
         // we didn't report to user that we started container,
         // make sure nobody is running
 
-        auto cg = GetLeafCgroup(freezerSubsystem);
-        TError error = cg->Create();
+        auto cg = GetCgroup(FreezerSubsystem);
+        TError error = cg.Create();
         if (error)
             (void)KillAll(holder_lock);
 
@@ -1896,16 +1915,12 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
     return TError::Success();
 }
 
-std::shared_ptr<TCgroup> TContainer::GetLeafCgroup(shared_ptr<TSubsystem> subsys) {
-    if (LeafCgroups.find(subsys) != LeafCgroups.end())
-        return LeafCgroups[subsys];
-
+TCgroup TContainer::GetCgroup(const TSubsystem &subsystem) const {
     if (IsRoot())
-        return subsys->GetRootCgroup();
-    else if (IsPortoRoot())
-        return subsys->GetRootCgroup()->GetChild(PORTO_ROOT_CGROUP);
-
-    return Parent->GetLeafCgroup(subsys)->GetChild(Name);
+        return subsystem.RootCgroup();
+    if (IsPortoRoot())
+        return subsystem.Cgroup(PORTO_ROOT_CGROUP);
+    return subsystem.Cgroup(PORTO_ROOT_CGROUP + "/" + GetName());
 }
 
 void TContainer::ExitTree(TScopedLock &holder_lock, int status, bool oomKilled) {

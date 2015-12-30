@@ -1,190 +1,64 @@
-#include <iostream>
-#include <sstream>
 #include <algorithm>
 #include <csignal>
 
 #include "cgroup.hpp"
 #include "config.hpp"
-#include "subsystem.hpp"
-#include "task.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
-#include "util/file.hpp"
 #include "util/mount.hpp"
 
 extern "C" {
 #include <unistd.h>
 }
 
-using std::string;
-using std::vector;
-using std::shared_ptr;
-using std::weak_ptr;
-using std::set;
-
-// TCgroup
-TCgroup::TCgroup(const vector<shared_ptr<TSubsystem>> subsystems,
-                 const std::shared_ptr<TMount> m) :
-    Name("/"), Parent(shared_ptr<TCgroup>(nullptr)) {
-
-    if (m)
-        Mount = m;
-    else {
-        vector<string> flags;
-
-        for (auto c : subsystems)
-            flags.push_back(c->GetName());
-
-        Mount = std::make_shared<TMount>("cgroup", TPath(config().daemon().sysfs_root()) / CommaSeparatedList(flags),
-                                         "cgroup", flags);
-    }
+TPath TCgroup::Path() const {
+    if (!Subsystem)
+        return TPath();
+    return Subsystem->Root / Name;
 }
 
-shared_ptr<TCgroup> TCgroup::GetChild(const std::string& name) {
-    for (auto iter = Children.begin(); iter != Children.end();) {
-        if (auto child = iter->lock()) {
-            if (child->Name == name)
-                return child;
-        } else {
-            iter = Children.erase(iter);
-            continue;
-        }
-        iter++;
-    }
-
-    auto child = std::make_shared<TCgroup>(name, shared_from_this());
-    Children.push_back(weak_ptr<TCgroup>(child));
-    return child;
-}
-
-TError TCgroup::FindChildren(std::vector<std::shared_ptr<TCgroup>> &cglist) {
-    vector<string> list;
-
-    TError error = Path().ListSubdirs(list);
-    if (error)
-        return error;
-
-    for (auto s : list) {
-        // Ignore non-porto subtrees
-        if (IsRoot() && s != PORTO_ROOT_CGROUP)
-            continue;
-
-        auto cg = GetChild(s);
-        cglist.push_back(cg);
-
-        TError error = cg->FindChildren(cglist);
-        if (error)
-            return error;
-    }
-
-    return TError::Success();
-}
-
-TError TCgroup::GetProcesses(vector<pid_t> &processes) const {
-    vector<string> lines;
-    TError ret = GetKnobValueAsLines("cgroup.procs", lines);
-    if (ret)
-        return ret;
-    return StringsToIntegers(lines, processes);
-}
-
-TError TCgroup::GetTasks(vector<pid_t> &tasks) const {
-    vector<string> lines;
-    TError ret = GetKnobValueAsLines("tasks", lines);
-    if (ret)
-        return ret;
-    return StringsToIntegers(lines, tasks);
-}
-
-bool TCgroup::IsEmpty() const {
-    vector<pid_t> tasks;
-    GetTasks(tasks);
-    return tasks.empty();
+TPath TCgroup::Knob(const std::string &knob) const {
+    if (!Subsystem)
+        return TPath();
+    return Subsystem->Root / Name / knob;
 }
 
 bool TCgroup::IsRoot() const {
-    return !Parent;
+    return Name == "/";
 }
 
-TPath TCgroup::Path() const {
-    if (IsRoot())
-        return Mount->GetMountpoint();
-    else
-        return Parent->Path() / Name;
+bool TCgroup::Exists() const {
+    if (!Subsystem)
+        return false;
+    return Path().Exists();
 }
 
-TPath TCgroup::Relpath() const {
-    if (IsRoot())
-        return "";
-    else
-        return Parent->Relpath() / Name;
-}
-
-TError TCgroup::Create() {
+TError TCgroup::Create() const {
     TError error;
 
-    if (IsRoot()) {
-        vector<shared_ptr<TMount>> mounts;
-        error = TMount::Snapshot(mounts);
-        if (error) {
-            L_ERR() << "Can't create mount snapshot: " << error << std::endl;
-            return error;
-        }
+    if (Secondary())
+        return TError(EError::Unknown, "Cannot create secondary cgroup " + Type());
 
-        bool mountRoot = true;
-        for (auto m : mounts) {
-            if (m->GetMountpoint() == config().daemon().sysfs_root() && m->GetType() == "tmpfs")
-                mountRoot = false;
-            if (*m == *Mount)
-                return TError::Success();
-        }
+    L_ACT() << "Create cgroup " << *this << std::endl;
+    error = Path().Mkdir(0755);
+    if (error)
+        L_ERR() << "Cannot create cgroup " << *this << " : " << error << std::endl;
 
-        if (mountRoot) {
-            TPath root(config().daemon().sysfs_root());
-            error = root.Mount("cgroup", "tmpfs", 0, {});
-            if (error) {
-                L_ERR() << "Can't mount root cgroup: " << error << std::endl;
-                return error;
-            }
-        }
-    } else
-        Parent->Create();
-
-    TPath path = Path();
-    if (!path.Exists()) {
-        L_ACT() << "Create cgroup " << path << std::endl;
-
-        error = path.Mkdir(Mode);
-        if (error) {
-            L_ERR() << "Can't create cgroup directory: " << error << std::endl;
-            return error;
-        }
-    }
-
-    if (IsRoot()) {
-        error = path.Mount(Mount->GetSource(), Mount->GetType(), 0, Mount->GetData());
-        if (error) {
-            L_ERR() << "Can't mount root cgroup for root container: " << error << std::endl;
-            return error;
-        }
-    }
-
-    return TError::Success();
+    return error;
 }
 
-TError TCgroup::Remove() {
+TError TCgroup::Remove() const {
     TError error;
 
-    if (IsRoot() || !Exists())
-        return TError::Success();
+    if (Secondary())
+        return TError(EError::Unknown, "Cannot create secondary cgroup " + Type());
 
-    L_ACT() << "Remove cgroup " << Path() << std::endl;
+    L_ACT() << "Remove cgroup " << *this << std::endl;
     error = Path().Rmdir();
 
     /* workaround for bad synchronization */
-    if (error && error.GetErrno() == EBUSY &&
-            Path().GetNLinks() == 2) {
+    if (error && error.GetErrno() == EBUSY && Path().GetNLinks() == 2) {
         for (int i = 0; i < 100; i++) {
             usleep(config().daemon().cgroup_remove_timeout_s() * 10000);
             error = Path().Rmdir();
@@ -193,118 +67,625 @@ TError TCgroup::Remove() {
         }
     }
 
+    if (error)
+        L_ERR() << "Cannot remove cgroup " << *this << " : " << error << std::endl;
+
     return error;
 }
 
-bool TCgroup::Exists() {
-    return Path().Exists();
+bool TCgroup::Has(const std::string &knob) const {
+    if (!Subsystem)
+        return false;
+    return Knob(knob).Exists();
+    }
+
+TError TCgroup::Get(const std::string &knob, std::string &value) const {
+    if (!Subsystem)
+        return TError(EError::Unknown, "Cannot get from null cgroup");
+    return Knob(knob).ReadAll(value);
 }
 
-std::shared_ptr<TMount> TCgroup::GetMount() {
-    return Mount;
+TError TCgroup::Set(const std::string &knob, const std::string &value) const {
+    if (!Subsystem)
+        return TError(EError::Unknown, "Cannot set to null cgroup");
+    L_ACT() << "Set " << *this << " " << knob << " = " << value << std::endl;
+    return Knob(knob).WriteAll(value);
+}
+
+TError TCgroup::GetUint64(const std::string &knob, uint64_t &value) const {
+    std::string string;
+    TError error = Get(knob, string);
+    if (!error)
+        error = StringToUint64(string, value);
+    return error;
+}
+
+TError TCgroup::SetUint64(const std::string &knob, uint64_t value) const {
+    return Set(knob, std::to_string(value));
+}
+
+TError TCgroup::GetBool(const std::string &knob, bool &value) const {
+    std::string string;
+    TError error = Get(knob, string);
+    if (!error)
+        value = string != "0";
+    return error;
+}
+
+TError TCgroup::SetBool(const std::string &knob, bool value) const {
+    return Set(knob, value ? "1" : "0");
+}
+
+TError TCgroup::GetUintMap(const std::string &knob, TUintMap &value) const {
+    if (!Subsystem)
+        return TError(EError::Unknown, "Cannot get from null cgroup");
+
+    FILE *file = fopen(Knob(knob).c_str(), "r");
+    char *key;
+    unsigned long long val;
+
+    if (!file)
+        return TError(EError::Unknown, errno, "Cannot open knob " + knob);
+
+    while (fscanf(file, "%ms %llu\n", &key, &val) == 2) {
+        value[std::string(key)] = val;
+        free(key);
+    }
+
+    fclose(file);
+    return TError::Success();
+}
+
+TError TCgroup::Attach(pid_t pid) const {
+    if (Secondary())
+        return TError(EError::Unknown, "Cannot attach to secondary cgroup " + Type());
+
+    L_ACT() << "Attach process " << pid << " to " << *this << std::endl;
+    TError error = Knob("cgroup.procs").WriteAll(std::to_string(pid));
+    if (error)
+        L_ERR() << "Cannot attach process " << pid << " to " << *this << " : " << error << std::endl;
+
+    return error;
+}
+
+TCgroup TCgroup::Child(const std::string& name) const {
+    if (IsRoot())
+        return TCgroup(Subsystem, "/" + name);
+    return TCgroup(Subsystem, Name + "/" + name);
+}
+
+TError TCgroup::Childs(std::vector<TCgroup> &cgroups) const {
+    std::vector<std::string> subdirs;
+
+    TError error = Path().ListSubdirs(subdirs);
+    if (error)
+        return error;
+
+    for (auto name : subdirs) {
+        // FIXME Ignore non-porto subtrees
+        if (IsRoot() && name != PORTO_ROOT_CGROUP)
+            continue;
+
+        cgroups.push_back(Child(name));
+    }
+
+    return TError::Success();
+}
+
+TError TCgroup::ChildsAll(std::vector<TCgroup> &cgroups) const {
+    TError error;
+
+    error = Childs(cgroups);
+    if (!error) {
+        for (auto &cg: cgroups) {
+            error = cg.Childs(cgroups);
+            if (error)
+                break;
+        }
+    }
+
+    return error;
+}
+
+TError TCgroup::GetPids(const std::string &knob, std::vector<pid_t> &pids) const {
+    FILE *file;
+    int pid;
+
+    if (!Subsystem)
+        return TError(EError::Unknown, "Cannot get from null cgroup");
+
+    file = fopen(Knob(knob).c_str(), "r");;
+    if (!file)
+        return TError(EError::Unknown, errno, "Cannot open knob " + knob);
+    while (fscanf(file, "%d", &pid) == 1)
+        pids.push_back(pid);
+    fclose(file);
+
+    return TError::Success();
+}
+
+bool TCgroup::IsEmpty() const {
+    std::vector<pid_t> tasks;
+
+    GetTasks(tasks);
+    return tasks.empty();
 }
 
 TError TCgroup::KillAll(int signal) const {
     std::vector<pid_t> tasks;
-    TError error = GetTasks(tasks);
+    TError error;
+
+    L_ACT() << "KillAll " << signal << " " << *this << std::endl;
+
+    error = GetTasks(tasks);
     if (!error) {
-        for (pid_t pid: tasks) {
+        for (const auto &pid : tasks) {
             if (kill(pid, signal) && errno != ESRCH) {
                 error = TError(EError::Unknown, errno, StringFormat("kill(%d, %d)", pid, signal));
-                L_ERR() << "Cannot kill process: " << error << std::endl;
+                L_ERR() << "Cannot kill process " << pid << " : " << error << std::endl;
             }
         }
     }
+
     return error;
 }
 
-bool TCgroup::HasKnob(const std::string &knob) const {
-    TFile f(Path() / knob);
-    return f.Exists();
+
+TCgroup TSubsystem::RootCgroup() const {
+    return TCgroup(this, "/");
 }
 
-TError TCgroup::GetKnobValue(const std::string &knob, std::string &value) const {
-    TFile f(Path() / knob);
-    return f.AsString(value);
+TCgroup TSubsystem::Cgroup(const std::string &name) const {
+    return TCgroup(this, name);
 }
 
-TError TCgroup::GetKnobValueAsLines(const std::string &knob, vector<string> &lines) const {
-    TFile f(Path() / knob);
-    return f.AsLines(lines);
+TError TSubsystem::TaskCgroup(pid_t pid, TCgroup &cgroup) const {
+    FILE *file = fopen(("/proc/" + std::to_string(pid) + "/cgroup").c_str(), "r");
+
+    if (file) {
+        int id;
+        char *ss, *cg;
+        std::string pattern = "," + Type + ",";
+
+        while (fscanf(file, "%d:%ms:%ms\n", &id, &ss, &cg) == 3) {
+            std::string line = "," + std::string(ss) + ",";
+            free(ss);
+            if (line.find(pattern) == std::string::npos) {
+                free(cg);
+                continue;
+            }
+            cgroup.Subsystem = this;
+            cgroup.Name = std::string(cg);
+            free(cg);
+            fclose(file);
+            return TError::Success();
+        }
+        fclose(file);
+    }
+
+    return TError(EError::Unknown, "Cannot find " + Type +
+                    " cgroup for process " + std::to_string(pid));
 }
 
-TError TCgroup::SetKnobValue(const std::string &knob, const std::string &value, bool append) const {
-    TFile f(Path() / knob);
-
-    L_ACT() << "Set " << Path() << "/" << knob << " = " << value << std::endl;
-
-    if (append)
-        return f.AppendString(value);
-    else
-        return f.WriteStringNoAppend(value);
+// Memory
+TError TMemorySubsystem::SetLimit(TCgroup &cg, uint64_t limit) {
+    if (!limit)
+        limit = UINT64_MAX;
+    TError error = cg.SetUint64(LIMIT, limit);
+    if (SupportSwap() && !error)
+        error = cg.SetUint64(MEM_SWAP_LIMIT, limit);
+    return error;
 }
 
-TError TCgroup::Attach(int pid) const {
-    TError error = SetKnobValue("cgroup.procs", std::to_string(pid), true);
+TError TMemorySubsystem::SetIoLimit(TCgroup &cg, uint64_t limit) {
+    if (!SupportIoLimit())
+        return TError::Success();
+    return cg.SetUint64(FS_BPS_LIMIT, limit);
+}
+
+TError TMemorySubsystem::SetIopsLimit(TCgroup &cg, uint64_t limit) {
+    if (!SupportIoLimit())
+        return TError::Success();
+    return cg.SetUint64(FS_IOPS_LIMIT, limit);
+}
+
+TError TMemorySubsystem::SetDirtyLimit(TCgroup &cg, uint64_t limit) {
+    if (!SupportDirtyLimit())
+        return TError::Success();
+    if (limit)
+        return cg.SetUint64(DIRTY_LIMIT, limit);
+    return cg.SetUint64(DIRTY_RATIO, 50);
+}
+
+// Freezer
+TError TFreezerSubsystem::WaitState(TCgroup &cg,
+                                    const std::string &state) const {
+    int ret;
+    if (!RetryIfFailed([&] {
+                std::string s;
+                TError error = cg.Get("freezer.state", s);
+                if (error)
+                    L_ERR() << "Can't freeze cgroup: " << error << std::endl;
+
+                return StringTrim(s) != state;
+            }, ret, config().daemon().freezer_wait_timeout_s() * 10, 100) || ret) {
+        std::string s = "?";
+        (void)cg.Get("freezer.state", s);
+
+        TError error(EError::Unknown, "Can't wait " + std::to_string(config().daemon().freezer_wait_timeout_s()) + "s for freezer state " + state + ", current state is " + s);
+        if (error)
+            L_ERR() << cg << ": " << error << std::endl;
+        return error;
+    }
+    return TError::Success();
+}
+
+TError TFreezerSubsystem::Freeze(TCgroup &cg) const {
+    return cg.Set("freezer.state", "FROZEN");
+}
+
+TError TFreezerSubsystem::Unfreeze(TCgroup &cg) const {
+    return cg.Set("freezer.state", "THAWED");
+}
+
+TError TFreezerSubsystem::WaitForFreeze(TCgroup &cg) const {
+    return WaitState(cg, "FROZEN");
+}
+
+TError TFreezerSubsystem::WaitForUnfreeze(TCgroup &cg) const {
+    return WaitState(cg, "THAWED");
+}
+
+bool TFreezerSubsystem::IsFrozen(TCgroup &cg) const {
+    std::string s;
+    TError error = cg.Get("freezer.state", s);
     if (error)
-        L_ERR() << "Can't attach " << pid << " to " << Name << ": " << error << std::endl;
+        return false;
+    return StringTrim(s) != "THAWED";
+}
+
+// Cpu
+TError TCpuSubsystem::SetPolicy(TCgroup &cg, const std::string &policy) {
+    if (!SupportSmart())
+        return TError::Success();
+
+    if (policy == "normal") {
+        TError error = cg.Set("cpu.smart", "0");
+        if (error) {
+            L_ERR() << "Can't disable smart: " << error << std::endl;
+            return error;
+        }
+    } else if (policy == "rt") {
+        TError error = cg.Set("cpu.smart", "1");
+        if (error) {
+            L_ERR() << "Can't set enable smart: " << error << std::endl;
+            return error;
+        }
+    }
 
     return TError::Success();
 }
 
-// TCgroupSnapshot
-TError TCgroupSnapshot::Create() {
-     vector<shared_ptr<TMount>> mounts;
-     TError error = TMount::Snapshot(mounts);
-     if (error) {
-         L_ERR() << "Can't create mount snapshot: " << error << std::endl;
-         return error;
-     }
+TError TCpuSubsystem::SetLimit(TCgroup &cg, double limit) {
+    if (!SupportLimit())
+        return TError::Success();
 
-     for (auto mount : mounts) {
-         for (auto name : mount->GetData()) {
-             auto subsys = TSubsystem::Get(name);
-             if (!subsys)
-                 continue;
+    if (limit >= 100)
+        return cg.Set("cpu.cfs_quota_us", "-1");
 
-             auto root = subsys->GetRootCgroup(mount);
-             TError error = root->FindChildren(Cgroups);
-             if (error) {
-                 L_ERR() << "Can't find children for " << root->Relpath() << ": " << error << std::endl;
-                 return error;
-             }
-         }
-     }
+    std::string periodStr;
+    TError error = cg.Get("cpu.cfs_period_us", periodStr);
+    if (error)
+        return error;
+
+    uint64_t period;
+    error = StringToUint64(periodStr, period);
+    if (error)
+        return TError(EError::Unknown, "Can't parse cpu.cfs_period_us");
+
+    uint64_t runtime = GetNumCores() * period * limit / 100;
+    const uint64_t minQuota = 1000;
+    if (runtime < minQuota)
+        runtime = minQuota;
+    return cg.Set("cpu.cfs_quota_us", std::to_string(runtime));
+}
+
+TError TCpuSubsystem::SetGuarantee(TCgroup &cg, double guarantee) {
+    if (!SupportGuarantee())
+        return TError::Success();
+
+    uint64_t rootShares;
+    std::string str;
+    TError error = RootCgroup().Get("cpu.shares", str);
+    if (error)
+        return TError(EError::Unknown, "Can't get root cpu.shares");
+    error = StringToUint64(str, rootShares);
+    if (error)
+        return TError(EError::Unknown, "Can't parse root cpu.shares");
+
+    if (guarantee == 0)
+        guarantee = 1;
+
+    return cg.Set("cpu.shares", std::to_string(lround(guarantee * rootShares)));
+}
+
+bool TCpuSubsystem::SupportSmart() {
+    return RootCgroup().Has("cpu.smart");
+}
+
+bool TCpuSubsystem::SupportLimit() {
+    return RootCgroup().Has("cpu.cfs_period_us");
+}
+
+bool TCpuSubsystem::SupportGuarantee() {
+    return RootCgroup().Has("cpu.shares");
+}
+
+// Cpuacct
+TError TCpuacctSubsystem::Usage(TCgroup &cg, uint64_t &value) const {
+    std::string s;
+    TError error = cg.Get("cpuacct.usage", s);
+    if (error)
+        return error;
+    return StringToUint64(s, value);
+}
+
+// Netcls
+
+// Blkio
+
+TError TBlkioSubsystem::GetStatLine(const std::vector<std::string> &lines,
+                                    const size_t i,
+                                    const std::string &name,
+                                    uint64_t &val) const {
+    std::vector<std::string> tokens;
+    TError error = SplitString(lines[i], ' ', tokens);
+    if (error)
+        return error;
+
+    if (tokens.size() < 3 || tokens[1] != name)
+        return TError(EError::Unknown, "Unexpected field in blkio statistics");
+
+    return StringToUint64(tokens[2], val);
+}
+
+TError TBlkioSubsystem::GetDevice(const std::string &majmin,
+                                  std::string &device) const {
+    TPath sym("/sys/dev/block/" + majmin), dev;
+    TError error = sym.ReadLink(dev);
+    if (!error)
+        device = dev.BaseName();
+    return error;
+}
+
+TError TBlkioSubsystem::Statistics(TCgroup &cg,
+                                   const std::string &file,
+                                   std::vector<BlkioStat> &stat) const {
+    std::vector<std::string> lines;
+    TError error = cg.Knob(file).ReadLines(lines);
+    if (error)
+        return error;
+
+    BlkioStat s;
+    for (size_t i = 0; i < lines.size(); i += 5) {
+        std::vector<std::string> tokens;
+        error = SplitString(lines[i], ' ', tokens);
+        if (error)
+            return error;
+
+        if (tokens.size() == 3) {
+            error = GetDevice(tokens[0], s.Device);
+            if (error)
+                return error;
+        } else {
+            continue; /* Total */
+        }
+
+        error = GetStatLine(lines, i + 0, "Read", s.Read);
+        if (error)
+            return error;
+        error = GetStatLine(lines, i + 1, "Write", s.Write);
+        if (error)
+            return error;
+        error = GetStatLine(lines, i + 2, "Sync", s.Sync);
+        if (error)
+            return error;
+        error = GetStatLine(lines, i + 3, "Async", s.Async);
+        if (error)
+            return error;
+
+        stat.push_back(s);
+    }
 
     return TError::Success();
 }
 
-void TCgroupSnapshot::Destroy() {
-    std::shared_ptr<TCgroup> root = freezerSubsystem->GetRootCgroup()->GetChild(PORTO_ROOT_CGROUP);
+TError TBlkioSubsystem::SetPolicy(TCgroup &cg, bool batch) {
+    if (!SupportPolicy())
+        return TError::Success();
 
-    for (auto cg: Cgroups) {
-        // keep cgroups that in use
-        if (cg.use_count() > 2)
-            continue;
+    std::string rootWeight;
+    if (!batch) {
+        TError error = RootCgroup().Get("blkio.weight", rootWeight);
+        if (error)
+            return TError(EError::Unknown, "Can't get root blkio.weight");
+    }
 
-        L() << "About to remove " << cg->Relpath() << std::endl;
+    return cg.Set("blkio.weight", batch ? std::to_string(config().container().batch_io_weight()) : rootWeight);
+}
 
-        // don't let these poor suckaz fork away
-        (void)freezerSubsystem->Freeze(cg);
+bool TBlkioSubsystem::SupportPolicy() {
+    return RootCgroup().Has("blkio.weight");
+}
 
-        std::vector<pid_t> tasks;
-        TError error = cg->GetTasks(tasks);
-        if (!error)
-            for (auto pid : tasks) {
-                L() << "Kill " << pid << " and reattach it to /" << PORTO_ROOT_CGROUP << std::endl;
-                kill(pid, SIGKILL);
-                root->Attach(pid);
+// Devices
+
+TError TDevicesSubsystem::AllowDevices(TCgroup &cg, const std::vector<std::string> &allowed) {
+    std::vector<std::string> lines;
+
+    TError error = cg.Knob("devices.list").ReadLines(lines);
+    if (error)
+        return error;
+
+    bool needUpdate = lines.size() != allowed.size();
+    if (!needUpdate) {
+        for (auto &line : lines) {
+            for (auto &dev : allowed) {
+                if (StringTrim(line) != StringTrim(dev)) {
+                    needUpdate = true;
+                    break;
+                }
+            }
+            if (needUpdate)
+                break;
+        }
+
+        if (!needUpdate) {
+            L() << "Don't update allowed devices" << std::endl;
+            return TError::Success();
+        }
+    }
+
+    error = cg.Set("devices.deny", "a");
+    if (error)
+        return error;
+
+    for (auto &dev : allowed) {
+        error = cg.Set("devices.allow", dev);
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
+}
+
+
+TMemorySubsystem    MemorySubsystem;
+TFreezerSubsystem   FreezerSubsystem;
+TCpuSubsystem       CpuSubsystem;
+TCpuacctSubsystem   CpuacctSubsystem;
+TNetclsSubsystem    NetclsSubsystem;
+TBlkioSubsystem     BlkioSubsystem;
+TDevicesSubsystem   DevicesSubsystem;
+
+std::vector<TSubsystem *> AllSubsystems = {
+    { &MemorySubsystem   },
+    { &FreezerSubsystem  },
+    { &CpuSubsystem      },
+    { &CpuacctSubsystem  },
+    { &NetclsSubsystem   },
+    { &BlkioSubsystem    },
+    { &DevicesSubsystem  },
+};
+
+std::vector<TSubsystem *> Subsystems;
+std::vector<TSubsystem *> Hierarchies;
+
+
+TError InitializeCgroups() {
+    TPath root(config().daemon().sysfs_root());
+    std::vector<std::shared_ptr<TMount>> mounts;
+    TMount mount;
+    TError error;
+
+    error = mount.Find(root);
+    if (error) {
+        L_ERR() << "Cannot find cgroups root mount: " << error << std::endl;
+        return error;
+    }
+
+    if (mount.GetMountpoint() != root) {
+        error = root.Mount("cgroup", "tmpfs", 0, {});
+        if (error) {
+            L_ERR() << "Cannot mount cgroups root: " << error << std::endl;
+            return error;
+        }
+    }
+
+    error = TMount::Snapshot(mounts);
+    if (error) {
+        L_ERR() << "Can't create mount snapshot: " << error << std::endl;
+        return error;
+    }
+
+    for (auto subsys: AllSubsystems) {
+        for (auto &mnt: mounts) {
+            auto data = mnt->GetData();
+            if (mnt->GetType() == "cgroup" &&
+                    std::find(data.begin(), data.end(), subsys->Type) != data.end()) {
+                subsys->Root = mnt->GetMountpoint();
+                L() << "Found cgroup subsysm " << subsys->Type << " mounted at " << subsys->Root << std::endl;
+                break;
+            }
+        }
+
+        if (subsys->Root.IsEmpty()) {
+            subsys->Root = root / subsys->Type;
+
+            L() << "Mount cgroup subsysm " << subsys->Type << " at " << subsys->Root << std::endl;
+            if (!subsys->Root.Exists()) {
+                error = subsys->Root.Mkdir(0755);
+                if (error) {
+                    L_ERR() << "Cannot create cgroup mountpoint: " << error << std::endl;
+                    return error;
+                }
             }
 
-        (void)freezerSubsystem->Unfreeze(cg);
+            error = subsys->Root.Mount("cgroup", "cgroup", 0, {subsys->Type});
+            if (error) {
+                L_ERR() << "Cannot mount cgroup: " << error << std::endl;
+                (void)subsys->Root.Rmdir();
+                return error;
+            }
+        }
 
-        error = cg->Remove();
-        if (error)
-            L_WRN() << "Can't remove cgroup directory: " << error << std::endl;
+        Subsystems.push_back(subsys);
+
+        subsys->Hierarchy = subsys;
+        for (auto hy: Hierarchies) {
+            if (subsys->Root == hy->Root) {
+                subsys->Hierarchy = hy;
+                break;
+            }
+        }
+        if (subsys->Hierarchy == subsys)
+            Hierarchies.push_back(subsys);
     }
+
+    return error;
+}
+
+TError InitializeDaemonCgroups() {
+    std::vector<TCgroup> cgroups = {
+        MemorySubsystem.Cgroup(PORTO_DAEMON_CGROUP),
+        CpuacctSubsystem.Cgroup(PORTO_DAEMON_CGROUP),
+    };
+
+    for (auto cg : cgroups) {
+        TError error;
+
+        if (!cg.Exists()) {
+            error = cg.Create();
+            if (error)
+                return error;
+        }
+
+        // portod-slave
+        error = cg.Attach(GetPid());
+        if (error)
+            return error;
+
+        // portod master
+        error = cg.Attach(GetPPid());
+        if (error)
+            return error;
+    }
+
+    if (!config().daemon().debug()) {
+        TError error = MemorySubsystem.SetLimit(cgroups[0], config().daemon().memory_limit());
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
 }
