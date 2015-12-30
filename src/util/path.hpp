@@ -129,4 +129,9 @@ public:
     TError Remount(unsigned long flags) const;
     TError Umount(unsigned long flags) const;
     TError UmountAll() const;
+
+    TError ReadAll(std::string &text, size_t max = 1048576) const;
+    TError WriteAll(const std::string &text) const;
+
+    TError ReadLines(std::vector<std::string> &lines, size_t max = 1048576) const;
 };

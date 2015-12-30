@@ -823,3 +823,113 @@ TError TPath::UmountAll() const {
         error = Umount(UMOUNT_NOFOLLOW | MNT_DETACH);
     return error;
 }
+
+TError TPath::ReadAll(std::string &text, size_t max) const {
+    TError error;
+
+    int fd = open(Path.c_str(), O_RDONLY | O_CLOEXEC);
+    if (fd < 0)
+        return TError(EError::Unknown, errno, "Cannot open for read: " + Path);
+
+    struct stat st;
+    if (fstat(fd, &st) < 0) {
+        close(fd);
+        return TError(EError::Unknown, errno, "stat(" + Path + ")");
+    }
+
+    if (st.st_size > (off_t)max) {
+        close(fd);
+        return TError(EError::Unknown, "File too large: " + Path);
+    }
+
+    size_t size = st.st_size;
+    if (st.st_size < 4096)
+        size = 4096;
+    text.resize(size);
+
+    size_t off = 0;
+    ssize_t ret;
+    do {
+        if (size - off < 1024) {
+            size += 16384;
+            if (size > max) {
+                error = TError(EError::Unknown, "File too large: " + Path);
+                break;
+            }
+            text.resize(size);
+        }
+        ret = read(fd, &text[off], size - off);
+        if (ret < 0) {
+            error = TError(EError::Unknown, errno, "read(" + Path + ")");
+            break;
+        }
+        off += ret;
+    } while (ret > 0);
+
+    text.resize(off);
+    close(fd);
+
+    return error;
+}
+
+TError TPath::WriteAll(const std::string &text) const {
+    TError error;
+
+    int fd = open(Path.c_str(), O_WRONLY | O_CLOEXEC | O_TRUNC);
+    if (fd < 0)
+        return TError(EError::Unknown, errno, "Cannot open for write: " + Path);
+
+    size_t len = text.length(), off = 0;
+    do {
+        ssize_t ret = write(fd, &text[off], len - off);
+        if (ret < 0) {
+            error = TError(EError::Unknown, errno, "write(" + Path + ")");
+            break;
+        }
+        off += ret;
+    } while (off < len);
+
+    if (close(fd) < 0 && !error)
+        error = TError(EError::Unknown, errno, "close(" + Path + ")");
+
+    return error;
+}
+
+TError TPath::ReadLines(std::vector<std::string> &lines, size_t max) const {
+    char *line = nullptr;
+    size_t line_len = 0;
+    size_t size = 0;
+    ssize_t len;
+    struct stat st;
+    FILE *file;
+    TError error;
+
+    file = fopen(Path.c_str(), "r");
+    if (!file)
+        return TError(EError::Unknown, errno, "Cannot open for read: " + Path);
+
+    if (fstat(fileno(file), &st) < 0) {
+        error = TError(EError::Unknown, errno, "stat(" + Path + ")");
+        goto out;
+    }
+
+    if (st.st_size > (off_t)max) {
+        error = TError(EError::Unknown, "File too large: " + Path);
+        goto out;
+    }
+
+    while ((len = getline(&line, &line_len, file)) >= 0) {
+        size += len;
+        if (size > max) {
+            error = TError(EError::Unknown, "File too large: " + Path);
+            goto out;
+        }
+        lines.push_back(std::string(line, len - 1));
+    }
+
+out:
+    fclose(file);
+    free(line);
+
+    return error;
+}
