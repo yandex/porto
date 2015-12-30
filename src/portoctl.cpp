@@ -905,8 +905,6 @@ public:
 
 class TExecCmd final : public ICmd {
     string containerName;
-    struct termios SavedAttrs;
-    bool Canonical = true;
     TVolumeBuilder VolumeBuilder;
     bool Cleanup = true;
     char *TmpDir = nullptr;
@@ -926,25 +924,6 @@ public:
         }
         if (TmpDir)
             (void)TPath(TmpDir).RemoveAll();
-        if (!Canonical)
-            tcsetattr(STDIN_FILENO, TCSANOW, &SavedAttrs);
-    }
-
-    int SwithToNonCanonical(int fd) {
-        if (!isatty(fd))
-            return 0;
-
-        if (tcgetattr(fd, &SavedAttrs) < 0)
-            return -1;
-        Canonical = false;
-
-        static struct termios t = SavedAttrs;
-        t.c_lflag &= ~(ICANON | ISIG | IEXTEN | ECHO);
-        t.c_iflag &= ~(BRKINT | ICRNL | IGNBRK | IGNCR | INLCR |
-                       INPCK | ISTRIP | IXON | PARMRK);
-        t.c_cc[VMIN] = 1;
-        t.c_cc[VTIME] = 0;
-        return tcsetattr(fd, TCSAFLUSH, &t);
     }
 
     bool MoveData(int from, int to) {
@@ -1004,64 +983,9 @@ public:
             args.push_back("root=" + VolumeBuilder.GetVolumePath());
         }
 
-        vector<struct pollfd> fds;
-
-        struct pollfd pfd = {};
-        pfd.fd = STDIN_FILENO;
-        pfd.events = POLLIN;
-        fds.push_back(pfd);
-
-        string stdinPath, stdoutPath, stderrPath;
-        int stdinFd, stdoutFd, stderrFd;
+        containerName = argv[0];
 
         if (hasTty) {
-            int ptm = posix_openpt(O_RDWR);
-            if (ptm < 0) {
-                TError error(EError::Unknown, errno, "posix_openpt()");
-                PrintError(error, "Can't open pseudoterminal");
-                return EXIT_FAILURE;
-            }
-
-            struct winsize ws;
-            if (ioctl(STDIN_FILENO, TIOCGWINSZ, &ws) == 0)
-                (void)ioctl(ptm, TIOCSWINSZ, &ws);
-
-            if (grantpt(ptm) < 0) {
-                TError error(EError::Unknown, errno, "grantpt()");
-                PrintError(error, "Can't open pseudoterminal");
-                return EXIT_FAILURE;
-            }
-
-            if (unlockpt(ptm) < 0) {
-                TError error(EError::Unknown, errno, "unlockpt()");
-                PrintError(error, "Can't open pseudoterminal");
-                return EXIT_FAILURE;
-            }
-
-            char *slavept = ptsname(ptm);
-
-            if (SwithToNonCanonical(STDIN_FILENO) < 0) {
-                TError error(EError::Unknown, errno, "SwithToNonCanonical()");
-                PrintError(error, "Can't open pseudoterminal");
-                return EXIT_FAILURE;
-            }
-
-            pfd.fd = ptm;
-            pfd.events = POLLIN;
-            fds.push_back(pfd);
-
-            stdinPath = slavept;
-            stdoutPath = slavept;
-            stderrPath = slavept;
-
-            stdinFd = ptm;
-            stdoutFd = ptm;
-            stderrFd = ptm;
-
-            args.push_back("stdin_path=" + stdinPath);
-            args.push_back("stdout_path=" + stdoutPath);
-            args.push_back("stderr_path=" + stderrPath);
-
             args.push_back("stdin_type=pty");
             args.push_back("stdout_type=pty");
             args.push_back("stderr_type=pty");
@@ -1073,6 +997,16 @@ public:
             if (ret)
                 return ret;
         } else {
+            vector<struct pollfd> fds;
+
+            struct pollfd pfd = {};
+            pfd.fd = STDIN_FILENO;
+            pfd.events = POLLIN;
+            fds.push_back(pfd);
+
+            string stdinPath, stdoutPath, stderrPath;
+            int stdinFd, stdoutFd, stderrFd;
+
             TmpDir = mkdtemp(strdup("/tmp/portoctl-exec-XXXXXX"));
             if (!TmpDir) {
                 TError error(EError::Unknown, errno, "mkdtemp()");
@@ -1118,40 +1052,38 @@ public:
             pfd.fd = stderrFd;
             pfd.events = POLLIN;
             fds.push_back(pfd);
-        }
 
-        containerName = argv[0];
+            bool hangup = false;
+            while (!hangup) {
+                if (GotSignal())
+                    return EXIT_FAILURE;
 
-        bool hangup = false;
-        while (!hangup) {
-            if (GotSignal())
-                return EXIT_FAILURE;
+                int ret = poll(fds.data(), fds.size(), -1);
+                if (ret < 0)
+                    break;
 
-            int ret = poll(fds.data(), fds.size(), -1);
-            if (ret < 0)
-                break;
+                for (size_t i = 0; i < fds.size(); i++) {
+                    if (fds[i].revents & POLLIN) {
+                        int dest;
 
-            for (size_t i = 0; i < fds.size(); i++) {
-                if (fds[i].revents & POLLIN) {
-                    int dest;
+                        if (fds[i].fd == STDIN_FILENO)
+                            dest = stdinFd;
+                        else if (fds[i].fd == stdoutFd)
+                            dest = STDOUT_FILENO;
+                        else if (fds[i].fd == stderrFd)
+                            dest = STDERR_FILENO;
+                        else
+                            continue;
 
-                    if (fds[i].fd == STDIN_FILENO)
-                        dest = stdinFd;
-                    else if (fds[i].fd == stdoutFd)
-                        dest = STDOUT_FILENO;
-                    else if (fds[i].fd == stderrFd)
-                        dest = STDERR_FILENO;
-                    else
-                        continue;
+                        if (MoveData(fds[i].fd, dest))
+                            return EXIT_FAILURE;
+                    }
 
-                    if (MoveData(fds[i].fd, dest))
-                        return EXIT_FAILURE;
-                }
-
-                if (fds[i].revents & POLLHUP) {
-                    if (fds[i].fd != STDIN_FILENO)
-                        hangup = true;
-                    fds.erase(fds.begin() + i);
+                    if (fds[i].revents & POLLHUP) {
+                        if (fds[i].fd != STDIN_FILENO)
+                            hangup = true;
+                        fds.erase(fds.begin() + i);
+                    }
                 }
             }
         }

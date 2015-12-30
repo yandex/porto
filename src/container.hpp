@@ -93,14 +93,14 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     bool ShouldApplyProperty(const std::string &property);
     TError Respawn(TScopedLock &holder_lock);
     void StopChildren(TScopedLock &holder_lock);
-    TError PrepareResources();
+    TError PrepareResources(std::shared_ptr<TClient> client);
     void FreeResources();
     void PropertyToAlias(const std::string &property, std::string &value) const;
     TError AliasToProperty(std::string &property, std::string &value);
 
     void RestoreStdPath(const std::string &property);
     void CreateStdStreams();
-    TError PrepareStdStreams();
+    TError PrepareStdStreams(std::shared_ptr<TClient> client);
 
     void ExitTree(TScopedLock &holder_lock, int status, bool oomKilled);
     void Exit(TScopedLock &holder_lock, int status, bool oomKilled);

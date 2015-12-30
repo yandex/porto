@@ -1,12 +1,15 @@
 #pragma once
 
 #include <string>
+#include <memory>
 
 #include <util/path.hpp>
 
 constexpr const char* STD_TYPE_FILE = "file";
 constexpr const char* STD_TYPE_FIFO = "fifo";
 constexpr const char* STD_TYPE_PTY = "pty";
+
+class TClient;
 
 class TStdStream {
 private:
@@ -25,7 +28,7 @@ public:
                const TPath &inner_path, const TPath &host_path,
                bool managed_by_porto);
 
-    TError Prepare(const TCred &cred);
+    TError Prepare(const TCred &cred, std::shared_ptr<TClient> client);
 
     TError OpenOnHost(const TCred &cred) const; // called in child, but host ns
     TError OpenInChild(const TCred &cred) const; // called before actual execve

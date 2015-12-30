@@ -2,6 +2,7 @@
 #include "config.hpp"
 #include "util/log.hpp"
 #include "util/file.hpp"
+#include "client.hpp"
 
 extern "C" {
 #include <sys/types.h>
@@ -19,7 +20,7 @@ TStdStream::TStdStream(int type, const std::string &impl,
     Type(type), Impl(impl), PathOnHost(host_path), PathInContainer(inner_path),
     ManagedByPorto(managed_by_porto) {}
 
-TError TStdStream::Prepare(const TCred &cred) {
+TError TStdStream::Prepare(const TCred &cred, std::shared_ptr<TClient> client) {
     if (Impl == STD_TYPE_FIFO) {
         if (mkfifo(PathOnHost.ToString().c_str(), 0600)) {
             return TError(EError::Unknown, errno, "mkfifo()");
@@ -43,6 +44,11 @@ TError TStdStream::Prepare(const TCred &cred) {
         auto res = fcntl(PipeFd, F_SETFL, flags | O_NONBLOCK);
         if (res == -1)
             return TError(EError::Unknown, errno, "fcntl");
+    } else if (Impl == STD_TYPE_PTY && client != nullptr) {
+        TError err = TPath("/proc/" + std::to_string(client->GetPid()) + "/fd/" +
+                           std::to_string(Type)).ReadLink(PathOnHost);
+        if (err)
+            return TError(EError::Unknown, "Can't get client pty path");
     }
     return TError::Success();
 }
@@ -78,7 +84,7 @@ TError TStdStream::Open(const TPath &path, const TCred &cred) const {
 }
 
 TError TStdStream::OpenOnHost(const TCred &cred) const {
-    if (ManagedByPorto)
+    if (ManagedByPorto || Impl == STD_TYPE_PTY)
         return Open(PathOnHost, cred);
     else
         return TError::Success();

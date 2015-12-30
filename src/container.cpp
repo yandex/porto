@@ -158,14 +158,14 @@ void TContainer::CreateStdStreams() {
                         Prop->IsDefault(P_STDERR_PATH));
 }
 
-TError TContainer::PrepareStdStreams() {
-    TError err = Stdin.Prepare(OwnerCred);
+TError TContainer::PrepareStdStreams(std::shared_ptr<TClient> client) {
+    TError err = Stdin.Prepare(OwnerCred, client);
     if (err)
         return err;
-    err = Stdout.Prepare(OwnerCred);
+    err = Stdout.Prepare(OwnerCred, client);
     if (err)
         return err;
-    return Stderr.Prepare(OwnerCred);
+    return Stderr.Prepare(OwnerCred, client);
 }
 
 EContainerState TContainer::GetState() const {
@@ -886,7 +886,7 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
     if (error)
         return error;
 
-    error = PrepareResources();
+    error = PrepareResources(client);
     if (error)
         return error;
 
@@ -1142,7 +1142,7 @@ TError TContainer::PrepareWorkDir() {
     return error;
 }
 
-TError TContainer::PrepareResources() {
+TError TContainer::PrepareResources(std::shared_ptr<TClient> client) {
     TError error;
 
     error = PrepareWorkDir();
@@ -1167,7 +1167,7 @@ TError TContainer::PrepareResources() {
     }
 
     CreateStdStreams();
-    error = PrepareStdStreams();
+    error = PrepareStdStreams(client);
     if (error) {
         L_ERR() << "Can't prepare std streams: " << error << std::endl;
         FreeResources();
@@ -1791,7 +1791,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
             parent = parent->Parent;
         }
 
-        TError error = PrepareResources();
+        TError error = PrepareResources(nullptr);
         if (error)
             return error;
 
