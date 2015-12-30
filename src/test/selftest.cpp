@@ -4345,17 +4345,20 @@ static void TestLeaks(TPortoAPI &api) {
     string slavePid, masterPid;
     string name;
     int slack = 4096 * 2;
+    int perct = 64;
+    uint64_t time;
 
     TFile slaveFile(config().slave_pid().path());
     ExpectSuccess(slaveFile.AsString(slavePid));
     TFile masterFile(config().master_pid().path());
     ExpectSuccess(masterFile.AsString(masterPid));
 
-    int prevSlave = GetVmRss(slavePid);
-    int prevMaster = GetVmRss(masterPid);
+    int initSlave = GetVmRss(slavePid);
+    int initMaster = GetVmRss(masterPid);
 
     int createDestroyNr = 50000;
 
+    time = GetCurrentTimeMs();
     Say() << "Create and destroy single container " << createDestroyNr << " times" << std::endl;
     name = "a";
     for (int i = 0; i < createDestroyNr; i++) {
@@ -4368,35 +4371,87 @@ static void TestLeaks(TPortoAPI &api) {
     int nowSlave = GetVmRss(slavePid);
     int nowMaster = GetVmRss(masterPid);
 
-    Say() << "Expected slave " << nowSlave << " < " << prevSlave + slack << std::endl;
-    Expect(nowSlave <= prevSlave + slack);
+    int expSlave = initSlave + slack;
+    int expMaster = initMaster + slack;
 
-    Say() << "Expected master " << nowMaster << " < " << prevMaster + slack << std::endl;
-    Expect(nowMaster <= prevMaster + slack);
+    time = GetCurrentTimeMs() - time;
+    Say() << time << " ms " << "Master " << nowMaster << " kb Slave " << nowSlave << " kb" << std::endl;
 
-    Say() << "Create and destroy " << LeakConainersNr << " containers" << std::endl;
+    ExpectLessEq(nowSlave, expSlave);
+    ExpectLessEq(nowMaster, expMaster);
+
+    time = GetCurrentTimeMs();
+    Say() << "Create " << LeakConainersNr << " containers" << std::endl;
     for (int i = 0; i < LeakConainersNr; i++) {
         name = "a" + std::to_string(i);
         ExpectApiSuccess(api.Create(name));
         ExpectApiSuccess(api.SetProperty(name, "command", "true"));
-        ExpectApiSuccess(api.Start(name));
+    }
 
+    nowSlave = GetVmRss(slavePid);
+    nowMaster = GetVmRss(masterPid);
+
+    expSlave = initSlave + slack + perct * LeakConainersNr;
+
+    time = GetCurrentTimeMs() - time;
+    Say() << time << " ms " << "Master " << nowMaster << " kb Slave " << nowSlave << " kb" << std::endl;
+
+    ExpectLessEq(nowSlave, expSlave);
+    ExpectLessEq(nowMaster, expMaster);
+
+    time = GetCurrentTimeMs();
+    Say() << "Start " << LeakConainersNr << " containers" << std::endl;
+
+    for (int i = 0; i < LeakConainersNr; i++) {
+        name = "a" + std::to_string(i);
+        ExpectApiSuccess(api.Start(name));
+    }
+
+    nowSlave = GetVmRss(slavePid);
+    nowMaster = GetVmRss(masterPid);
+
+    time = GetCurrentTimeMs() - time;
+    Say() << time << " ms " << "Master " << nowMaster << " kb Slave " << nowSlave << " kb" << std::endl;
+
+    ExpectLessEq(nowSlave, expSlave);
+    ExpectLessEq(nowMaster, expMaster);
+
+    time = GetCurrentTimeMs();
+    Say() << "Read properties of " << LeakConainersNr << " containers" << std::endl;
+
+    for (int i = 0; i < LeakConainersNr; i++) {
+        name = "a" + std::to_string(i);
         ReadPropsAndData(api, name);
     }
 
-    name = "a0";
-    for (int i = 0; i < LeakConainersNr; i++)
-        ReadPropsAndData(api, name);
+    nowSlave = GetVmRss(slavePid);
+    nowMaster = GetVmRss(masterPid);
+
+    time = GetCurrentTimeMs() - time;
+    Say() << time << " ms " << "Master " << nowMaster << " kb Slave " << nowSlave << " kb" << std::endl;
+
+    ExpectLessEq(nowSlave, expSlave);
+    ExpectLessEq(nowMaster, expMaster);
+
+    time = GetCurrentTimeMs();
+    Say() << "Destroy " << LeakConainersNr << " containers" << std::endl;
 
     for (int i = 0; i < LeakConainersNr; i++) {
         name = "a" + std::to_string(i);
         ExpectApiSuccess(api.Destroy(name));
     }
 
-    prevSlave = GetVmRss(slavePid);
-    prevMaster = GetVmRss(masterPid);
+    nowSlave = GetVmRss(slavePid);
+    nowMaster = GetVmRss(masterPid);
 
-    Say() << "Create and destroy " << LeakConainersNr << " containers, current RSS " << prevMaster << "/" << prevSlave << std::endl;
+    time = GetCurrentTimeMs() - time;
+    Say() << time << " ms " << "Master " << nowMaster << " kb Slave " << nowSlave << " kb" << std::endl;
+
+    ExpectLessEq(nowSlave, expSlave);
+    ExpectLessEq(nowMaster, expMaster);
+
+    time = GetCurrentTimeMs();
+    Say() << "Create and start " << LeakConainersNr << " containers" << std::endl;
 
     for (int i = 0; i < LeakConainersNr; i++) {
         name = "b" + std::to_string(i);
@@ -4407,9 +4462,33 @@ static void TestLeaks(TPortoAPI &api) {
         api.Cleanup();
     }
 
+    nowSlave = GetVmRss(slavePid);
+    nowMaster = GetVmRss(masterPid);
+
+    time = GetCurrentTimeMs() - time;
+    Say() << time << " ms " << "Master " << nowMaster << " kb Slave " << nowSlave << " kb" << std::endl;
+
+    ExpectLessEq(nowSlave, expSlave);
+    ExpectLessEq(nowMaster, expMaster);
+
+    time = GetCurrentTimeMs();
+    Say() << "Read properties of " << LeakConainersNr << " containers" << std::endl;
+
     name = "b0";
     for (int i = 0; i < LeakConainersNr; i++)
         ReadPropsAndData(api, name);
+
+    nowSlave = GetVmRss(slavePid);
+    nowMaster = GetVmRss(masterPid);
+
+    time = GetCurrentTimeMs() - time;
+    Say() << time << " ms " << "Master " << nowMaster << " kb Slave " << nowSlave << " kb" << std::endl;
+
+    ExpectLessEq(nowSlave, expSlave);
+    ExpectLessEq(nowMaster, expMaster);
+
+    time = GetCurrentTimeMs();
+    Say() << "Destroy " << LeakConainersNr << " containers" << std::endl;
 
     for (int i = 0; i < LeakConainersNr; i++) {
         name = "b" + std::to_string(i);
@@ -4420,11 +4499,11 @@ static void TestLeaks(TPortoAPI &api) {
     nowSlave = GetVmRss(slavePid);
     nowMaster = GetVmRss(masterPid);
 
-    Say() << "Expected slave " << nowSlave << " < " << prevSlave + slack << std::endl;
-    Expect(nowSlave <= prevSlave + slack);
+    time = GetCurrentTimeMs() - time;
+    Say() << time << " ms " << "Master " << nowMaster << " kb Slave " << nowSlave << " kb" << std::endl;
 
-    Say() << "Expected master " << nowMaster << " < " << prevMaster + slack << std::endl;
-    Expect(nowMaster <= prevMaster + slack);
+    ExpectLessEq(nowSlave, expSlave);
+    ExpectLessEq(nowMaster, expMaster);
 }
 
 static void TestPerf(TPortoAPI &api) {
