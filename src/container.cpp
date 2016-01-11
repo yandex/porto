@@ -1821,7 +1821,8 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
         } else if (Task->IsZombie()) {
             L() << "Task is zombie and belongs to porto" << std::endl;
         } else if (taskCg != freezerCg) {
-            L_WRN() << "Task is running, belongs to porto but doesn't have valid freezer" << std::endl;
+            L_WRN() << "Task belongs to wrong freezer cgroup: "
+                    << taskCg << " should be " << freezerCg << std::endl;
             LostAndRestored = true;
         } else {
             L() << "Task is running and belongs to porto" << std::endl;

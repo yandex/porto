@@ -244,21 +244,27 @@ TError TSubsystem::TaskCgroup(pid_t pid, TCgroup &cgroup) const {
 
     if (file) {
         int id;
-        char *ss, *cg;
-        std::string pattern = "," + Type + ",";
 
-        while (fscanf(file, "%d:%ms:%ms\n", &id, &ss, &cg) == 3) {
-            std::string line = "," + std::string(ss) + ",";
-            free(ss);
-            if (line.find(pattern) == std::string::npos) {
-                free(cg);
-                continue;
+        while (fscanf(file, "%d:", &id) == 1) {
+            bool found = false;
+            char *ss, *cg;
+
+            while (fscanf(file, "%m[^:,],", &ss) == 1) {
+                if (std::string(ss) == Type)
+                    found = true;
+                free(ss);
             }
-            cgroup.Subsystem = this;
-            cgroup.Name = std::string(cg);
-            free(cg);
-            fclose(file);
-            return TError::Success();
+
+            if (fscanf(file, ":/%ms\n", &cg) == 1) {
+                if (found) {
+                    cgroup.Subsystem = this;
+                    cgroup.Name = cg[0] ? std::string(cg) : "/";
+                    free(cg);
+                    fclose(file);
+                    return TError::Success();
+                }
+                free(cg);
+            }
         }
         fclose(file);
     }
