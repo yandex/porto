@@ -1762,6 +1762,8 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
     if (!created)
         return TError(EError::Unknown, "Container has not been created");
 
+    auto state = Data->Get<std::string>(D_STATE);
+
     bool started = Prop->HasValue(P_RAW_ROOT_PID);
     if (started) {
         std::vector<int> pids = Prop->Get<std::vector<int>>(P_RAW_ROOT_PID);
@@ -1857,7 +1859,6 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
             }
         }
 
-        auto state = Data->Get<std::string>(D_STATE);
         if (state == ContainerStateName(EContainerState::Dead)) {
             // we started recording death time since porto v1.15,
             // use some sensible default
@@ -1892,12 +1893,15 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
         // we didn't report to user that we started container,
         // make sure nobody is running
 
-        auto cg = GetCgroup(FreezerSubsystem);
-        TError error = cg.Create();
-        if (error)
-            (void)KillAll(holder_lock);
+        auto freezerCg = GetCgroup(FreezerSubsystem);
+        if (freezerCg.Exists() && !freezerCg.IsEmpty())
+            (void)freezerCg.KillAll(9);
 
-        SetState(EContainerState::Stopped);
+        if (state == ContainerStateName(EContainerState::Meta) &&
+                Prop->Get<std::string>(P_COMMAND).empty())
+            SetState(EContainerState::Meta);
+        else
+            SetState(EContainerState::Stopped);
         Task = nullptr;
     }
 
