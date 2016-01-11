@@ -471,11 +471,15 @@ void TContainerHolder::RemoveLeftovers() {
             L_ERR() << "Cannot dump cgroups " << error << std::endl;
             continue;
         }
+
         for (auto cg = cgroups.rbegin(); cg != cgroups.rend(); cg++) {
             std::string name = cg->Name.substr(PORTO_ROOT_CGROUP.length() + 1);
             if (Containers.count(name))
                 continue;
-            error = cg->Remove();
+
+            if (!cg->IsEmpty())
+                (void)cg->KillAll(9);
+            (void)cg->Remove();
         }
     }
 }
