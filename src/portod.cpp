@@ -171,21 +171,20 @@ static bool QueueRequest(TContext &context,
     return false;
 }
 
-static int AcceptClient(TContext &context, int sfd,
-                        std::map<int, std::shared_ptr<TClient>> &clients, int &fd) {
-    int cfd;
+static TError AcceptClient(TContext &context, int sfd,
+                           std::map<int, std::shared_ptr<TClient>> &clients) {
     struct sockaddr_un peer_addr;
     socklen_t peer_addr_size;
+    TError error;
+    int cfd;
 
     peer_addr_size = sizeof(struct sockaddr_un);
     cfd = accept4(sfd, (struct sockaddr *) &peer_addr,
                   &peer_addr_size, SOCK_CLOEXEC);
     if (cfd < 0) {
         if (errno == EAGAIN)
-            return 0;
-
-        L_ERR() << "accept() error: " << strerror(errno) << std::endl;
-        return -1;
+            return TError::Success(); //FIXME
+        return TError(EError::Unknown, errno, "accept4()");
     }
 
     if (!config().daemon().blocking_write()) {
@@ -194,19 +193,23 @@ static int AcceptClient(TContext &context, int sfd,
         to.tv_usec = 0;
 
         if (setsockopt(cfd, SOL_SOCKET, SO_SNDTIMEO, (void *)&to, sizeof(to)) < 0) {
-            L_ERR() << "setsockopt() error: " << strerror(errno) << std::endl;
-            return -1;
+            close(cfd);
+            return TError(EError::Unknown, errno, "setsockopt(SO_SNDTIMEO)");
         }
     }
 
     auto client = std::make_shared<TClient>(context.EpollLoop, cfd);
-    TError error = client->Identify(*context.Cholder);
-    if (error)
-        return -1;
 
-    fd = cfd;
+    error = client->Identify(*context.Cholder);
+    if (error)
+        return error;
+
+    error = context.EpollLoop->AddSource(client);
+    if (error)
+        return error;
+
     clients[cfd] = client;
-    return 0;
+    return error;
 }
 
 static bool AnotherInstanceRunning(const string &path) {
@@ -391,18 +394,9 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                     continue;
                 }
 
-                int fd = -1;
-                ret = AcceptClient(context, sfd, clients, fd);
-                if (ret)
-                    goto exit;
-
-                error = context.EpollLoop->AddSource(clients[fd]);
-                if (error) {
-                    L_ERR() << "Can't add client fd to epoll: " << error << std::endl;
-                    ret = EXIT_FAILURE;
-                    goto exit;
-                }
-
+                error = AcceptClient(context, sfd, clients);
+                if (error)
+                    L_ERR() << "Cannot accept client: " << error << std::endl;
             } else if (source->Fd == REAP_EVT_FD) {
                 // we handled all events from the master before events
                 // from the clients (so clients see updated view of the
