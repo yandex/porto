@@ -131,7 +131,7 @@ TError TClient::LoadGroups() {
 
 TError TClient::IdentifyContainer(TContainerHolder &holder) {
     std::shared_ptr<TContainer> c;
-    TError err = holder.Get(Pid, c);
+    TError err = holder.FindTaskContainer(Pid, c);
     if (err)
         return err;
     Container = c;

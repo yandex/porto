@@ -251,26 +251,19 @@ TError TContainerHolder::GetLocked(TScopedLock &holder_lock,
     return TError::Success();
 }
 
-TError TContainerHolder::Get(int pid, std::shared_ptr<TContainer> &c) {
+TError TContainerHolder::FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &c) {
+    TCgroup freezerCg;
+    TError error;
 
-    std::map<std::string, std::string> cgmap;
-    TError error = GetTaskCgroups(pid, cgmap);
+    error = FreezerSubsystem.TaskCgroup(pid, freezerCg);
     if (error)
         return error;
 
-    if (cgmap.find("freezer") == cgmap.end())
-        return TError(EError::Unknown, "Can't determine freezer cgroup of client process");
-
-    auto freezer = cgmap["freezer"];
     auto prefix = PORTO_ROOT_CGROUP + "/";
-    std::string name;
+    if (freezerCg.Name.substr(0, prefix.length()) != prefix)
+        return Get(ROOT_CONTAINER, c);
 
-    if (freezer.length() > prefix.length() && freezer.substr(0, prefix.length()) == prefix)
-        name = freezer.substr(prefix.length());
-    else
-        name = ROOT_CONTAINER;
-
-    return Get(name, c);
+    return Get(freezerCg.Name.substr(prefix.length()), c);
 }
 
 TError TContainerHolder::Destroy(TScopedLock &holder_lock, std::shared_ptr<TContainer> c) {

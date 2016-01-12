@@ -53,7 +53,7 @@ public:
     TError CreatePortoRoot(TScopedLock &holder_lock);
     TError Create(TScopedLock &holder_lock, const std::string &name, const TCred &cred, std::shared_ptr<TContainer> &container);
     TError Get(const std::string &name, std::shared_ptr<TContainer> &c);
-    TError Get(int pid, std::shared_ptr<TContainer> &c);
+    TError FindTaskContainer(pid_t pid, std::shared_ptr<TContainer> &c);
 
     TError GetLocked(TScopedLock &holder_lock,
                      const std::shared_ptr<TClient> client,
