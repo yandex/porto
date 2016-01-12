@@ -94,6 +94,8 @@ public:
 class TMemorySubsystem : public TSubsystem {
 public:
     const std::string STAT = "memory.stat";
+    const std::string OOM_CONTROL = "memory.oom_control";
+    const std::string EVENT_CONTROL = "cgroup.event_control";
     const std::string USE_HIERARCHY = "memory.use_hierarchy";
     const std::string RECHARGE_ON_PAGE_FAULT = "memory.recharge_on_pgfault";
     const std::string USAGE = "memory.usage_in_bytes";
@@ -164,6 +166,7 @@ public:
     TError SetIoLimit(TCgroup &cg, uint64_t limit);
     TError SetIopsLimit(TCgroup &cg, uint64_t limit);
     TError SetDirtyLimit(TCgroup &cg, uint64_t limit);
+    TError SetupOOMEvent(TCgroup &cg, int &fd);
 };
 
 class TFreezerSubsystem : public TSubsystem {

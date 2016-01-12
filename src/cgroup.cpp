@@ -9,7 +9,9 @@
 #include "util/mount.hpp"
 
 extern "C" {
+#include <fcntl.h>
 #include <unistd.h>
+#include <sys/eventfd.h>
 }
 
 TPath TCgroup::Path() const {
@@ -303,6 +305,27 @@ TError TMemorySubsystem::SetDirtyLimit(TCgroup &cg, uint64_t limit) {
     if (limit)
         return cg.SetUint64(DIRTY_LIMIT, limit);
     return cg.SetUint64(DIRTY_RATIO, 50);
+}
+
+TError TMemorySubsystem::SetupOOMEvent(TCgroup &cg, int &fd) {
+    TError error;
+    int cfd;
+
+    fd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
+    if (fd < 0)
+        return TError(EError::Unknown, errno, "Cannot create eventfd");
+
+    cfd = open(cg.Knob(OOM_CONTROL).c_str(), O_RDONLY | O_CLOEXEC);
+    if (cfd < 0) {
+        close(fd);
+        return TError(EError::Unknown, errno, "Cannot open oom_control");
+    }
+
+    error = cg.Set(EVENT_CONTROL, std::to_string(fd) + " " + std::to_string(cfd));
+    if (error)
+        close(fd);
+    close(cfd);
+    return error;
 }
 
 // Freezer

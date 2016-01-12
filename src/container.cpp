@@ -37,7 +37,6 @@ extern "C" {
 #include <sys/time.h>
 #include <sys/reboot.h>
 #include <fcntl.h>
-#include <sys/eventfd.h>
 #include <sys/fsuid.h>
 #include <sys/stat.h>
 }
@@ -513,42 +512,23 @@ void TContainer::ShutdownOom() {
 }
 
 TError TContainer::PrepareOomMonitor() {
-    auto memcg = GetCgroup(MemorySubsystem);
+    TCgroup memoryCg = GetCgroup(MemorySubsystem);
+    TError error;
+    int fd;
 
-    Efd = eventfd(0, EFD_CLOEXEC | EFD_NONBLOCK);
-    if (Efd.GetFd() < 0) {
-        TError error(EError::Unknown, errno, "Can't create eventfd");
-        L_ERR() << "Can't update OOM settings: " << error << std::endl;
+    error = MemorySubsystem.SetupOOMEvent(memoryCg, fd);
+    if (error)
         return error;
-    }
 
-    Source = std::make_shared<TEpollSource>(Holder->EpollLoop, Efd.GetFd(),
+    Efd = fd;
+    Source = std::make_shared<TEpollSource>(Holder->EpollLoop, fd,
                                             EPOLL_EVENT_OOM, shared_from_this());
 
-    TError error = Holder->EpollLoop->AddSource(Source);
-    if (error) {
+    error = Holder->EpollLoop->AddSource(Source);
+    if (error)
         ShutdownOom();
-        return error;
-    }
 
-    auto cfdPath = memcg.Path() / "memory.oom_control";
-    TScopedFd cfd(open(cfdPath.c_str(), O_RDONLY | O_CLOEXEC));
-    if (cfd.GetFd() < 0) {
-        ShutdownOom();
-        TError error(EError::Unknown, errno, "Can't open " + memcg.Path().ToString());
-        L_ERR() << "Can't update OOM settings: " << error << std::endl;
-        return error;
-    }
-
-    TFile f(memcg.Path() / "cgroup.event_control");
-    string s = std::to_string(Efd.GetFd()) + " " + std::to_string(cfd.GetFd());
-    error = f.WriteStringNoAppend(s);
-    if (error) {
-        ShutdownOom();
-        return error;
-    }
-
-    return TError::Success();
+    return error;
 }
 
 TError TContainer::PrepareCgroups() {
