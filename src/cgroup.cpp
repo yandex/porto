@@ -164,7 +164,7 @@ TError TCgroup::Childs(std::vector<TCgroup> &cgroups) const {
     if (error)
         return error;
 
-    for (auto name : subdirs) {
+    for (auto &name : subdirs) {
         // FIXME Ignore non-porto subtrees
         if (IsRoot() && "/" + name != PORTO_ROOT_CGROUP)
             continue;
@@ -180,8 +180,8 @@ TError TCgroup::ChildsAll(std::vector<TCgroup> &cgroups) const {
 
     error = Childs(cgroups);
     if (!error) {
-        for (auto &cg: cgroups) {
-            error = cg.Childs(cgroups);
+        for (std::vector<TCgroup>::size_type i = 0; i < cgroups.size(); i++) {
+            error = cgroups[i].Childs(cgroups);
             if (error)
                 break;
         }
