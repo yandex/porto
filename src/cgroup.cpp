@@ -662,14 +662,19 @@ TError InitializeCgroups() {
 }
 
 TError InitializeDaemonCgroups() {
-    std::vector<TCgroup> cgroups = {
-        MemorySubsystem.Cgroup(PORTO_DAEMON_CGROUP),
-        CpuacctSubsystem.Cgroup(PORTO_DAEMON_CGROUP),
+    std::vector<TSubsystem *> DaemonSubsystems = {
+        { &MemorySubsystem   },
+        { &CpuacctSubsystem  },
     };
 
-    for (auto cg : cgroups) {
+    for (auto subsys : DaemonSubsystems) {
+        auto hy = subsys->Hierarchy;
         TError error;
 
+        if (!hy)
+            continue;
+
+        TCgroup cg = hy->Cgroup(PORTO_DAEMON_CGROUP);
         if (!cg.Exists()) {
             error = cg.Create();
             if (error)
@@ -688,7 +693,8 @@ TError InitializeDaemonCgroups() {
     }
 
     if (!config().daemon().debug()) {
-        TError error = MemorySubsystem.SetLimit(cgroups[0], config().daemon().memory_limit());
+        TCgroup cg = MemorySubsystem.Cgroup(PORTO_DAEMON_CGROUP);
+        TError error = MemorySubsystem.SetLimit(cg, config().daemon().memory_limit());
         if (error)
             return error;
     }
