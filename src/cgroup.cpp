@@ -645,7 +645,7 @@ TError InitializeCgroups() {
             if (mnt->GetType() == "cgroup" &&
                     std::find(data.begin(), data.end(), subsys->Type) != data.end()) {
                 subsys->Root = mnt->GetMountpoint();
-                L() << "Found cgroup subsysm " << subsys->Type << " mounted at " << subsys->Root << std::endl;
+                L() << "Found cgroup subsystem " << subsys->Type << " mounted at " << subsys->Root << std::endl;
                 break;
             }
         }
@@ -675,6 +675,8 @@ TError InitializeCgroups() {
         subsys->Hierarchy = subsys;
         for (auto hy: Hierarchies) {
             if (subsys->Root == hy->Root) {
+                L() << "Cgroup subsystem " << subsys->Type
+                    << " bound to hierarchy " << hy->Type << std::endl;
                 subsys->Hierarchy = hy;
                 break;
             }

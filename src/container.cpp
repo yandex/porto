@@ -1795,19 +1795,21 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
             error = FreezerSubsystem.TaskCgroup(pid, taskCg);
 
         if (error) {
-            L() << "Cannot get ppid or cgroup of restored task: " << error << std::endl;
+            L() << "Cannot get ppid or cgroup of restored task " << pid
+                << ": " << error << std::endl;
             LostAndRestored = true;
         } else if (ppid != getppid()) {
-            L() << "Invalid ppid of restored task: " << ppid << " != " << getppid() << std::endl;
+            L() << "Invalid ppid of restored task " << pid << ": "
+                << ppid << " != " << getppid() << std::endl;
             LostAndRestored = true;
         } else if (Task->IsZombie()) {
-            L() << "Task is zombie and belongs to porto" << std::endl;
+            L() << "Task " << pid << " is zombie and belongs to porto" << std::endl;
         } else if (taskCg != freezerCg) {
-            L_WRN() << "Task belongs to wrong freezer cgroup: "
+            L_WRN() << "Task " << pid << " belongs to wrong freezer cgroup: "
                     << taskCg << " should be " << freezerCg << std::endl;
             LostAndRestored = true;
         } else {
-            L() << "Task is running and belongs to porto" << std::endl;
+            L() << "Task " << pid << " is running and belongs to porto" << std::endl;
 
             std::vector<pid_t> tasks;
             error = freezerCg.GetTasks(tasks);
