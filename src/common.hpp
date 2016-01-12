@@ -24,8 +24,8 @@ constexpr int ROOT_CONTAINER_ID = 1;
 const std::string DOT_CONTAINER = ".";
 constexpr int PORTO_ROOT_CONTAINER_ID = 3;
 const std::string PORTO_ROOT_CONTAINER = "/porto";
-const std::string PORTO_ROOT_CGROUP = "porto";
-const std::string PORTO_DAEMON_CGROUP = "portod";
+const std::string PORTO_ROOT_CGROUP = "/porto";
+const std::string PORTO_DAEMON_CGROUP = "/portod";
 
 constexpr unsigned int CONTAINER_NAME_MAX = 128;
 constexpr unsigned int CONTAINER_PATH_MAX = 200;

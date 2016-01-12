@@ -149,6 +149,7 @@ TError TCgroup::Attach(pid_t pid) const {
 }
 
 TCgroup TCgroup::Child(const std::string& name) const {
+    PORTO_ASSERT(name[0] != '/');
     if (IsRoot())
         return TCgroup(Subsystem, "/" + name);
     return TCgroup(Subsystem, Name + "/" + name);
@@ -163,7 +164,7 @@ TError TCgroup::Childs(std::vector<TCgroup> &cgroups) const {
 
     for (auto name : subdirs) {
         // FIXME Ignore non-porto subtrees
-        if (IsRoot() && name != PORTO_ROOT_CGROUP)
+        if (IsRoot() && "/" + name != PORTO_ROOT_CGROUP)
             continue;
 
         cgroups.push_back(Child(name));
@@ -236,6 +237,7 @@ TCgroup TSubsystem::RootCgroup() const {
 }
 
 TCgroup TSubsystem::Cgroup(const std::string &name) const {
+    PORTO_ASSERT(name[0] == '/');
     return TCgroup(this, name);
 }
 
@@ -255,10 +257,10 @@ TError TSubsystem::TaskCgroup(pid_t pid, TCgroup &cgroup) const {
                 free(ss);
             }
 
-            if (fscanf(file, ":/%ms\n", &cg) == 1) {
+            if (fscanf(file, ":%ms\n", &cg) == 1) {
                 if (found) {
                     cgroup.Subsystem = this;
-                    cgroup.Name = cg[0] ? std::string(cg) : "/";
+                    cgroup.Name = std::string(cg);
                     free(cg);
                     fclose(file);
                     return TError::Success();

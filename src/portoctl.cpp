@@ -1182,7 +1182,7 @@ public:
         }
 
         auto freezer = cgmap["freezer"];
-        auto prefix = "/" + PORTO_ROOT_CGROUP + "/";
+        auto prefix = PORTO_ROOT_CGROUP + "/";
         if (freezer.length() < prefix.length() || freezer.substr(0, prefix.length()) != prefix) {
             std::cerr << "Process " << pid << " is not managed by porto" << std::endl;
             return EXIT_FAILURE;
