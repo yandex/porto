@@ -2230,6 +2230,7 @@ TError TContainer::UpdateTrafficClasses() {
 }
 
 bool TContainer::PrepareJournal() {
+    return false;
     if (!JournalStream.is_open()) {
         off_t max_log_size = config().container().max_log_size();
         auto path = TPath(config().journal_dir().path()) / GetTextId();

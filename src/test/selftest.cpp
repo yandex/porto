@@ -936,7 +936,7 @@ static void TestNsCgTc(TPortoAPI &api) {
     std::string path = "/proc/" + pid + "/fd/";
     int nr = scandir(path.c_str(), &lst, NULL, alphasort);
     PrintFds(path, lst, nr);
-    ExpectEq(nr, 2 + 4);
+    ExpectEq(nr, 2 + 3);
 
     Say() << "Check that task namespaces are correct" << std::endl;
     ExpectNeq(GetNamespace("self", "pid"), GetNamespace(pid, "pid"));
