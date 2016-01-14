@@ -27,6 +27,8 @@ public:
     TClient(std::shared_ptr<TEpollLoop> loop, int fd);
     ~TClient();
 
+    void CloseConnection();
+
     int GetFd() const;
     pid_t GetPid() const;
     const TCred& GetCred() const;
@@ -51,6 +53,7 @@ private:
     pid_t Pid;
     TCred Cred;
     std::string Comm;
+    uint64_t ConnectionTime;
     uint64_t RequestStartMs;
 
     TError LoadGroups();

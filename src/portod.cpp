@@ -208,8 +208,11 @@ static TError AcceptClient(TContext &context, int sfd,
     if (error)
         return error;
 
+    if (config().log().verbose())
+        L() << "Client " << cfd << " connected : " << *client << std::endl;
+
     clients[cfd] = client;
-    return error;
+    return TError::Success();
 }
 
 static bool AnotherInstanceRunning(const string &path) {
@@ -423,6 +426,7 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
 
                 if ((ev.events & EPOLLHUP) || needClose) {
                     context.EpollLoop->RemoveSource(source);
+                    client->CloseConnection();
                     clients.erase(source->Fd);
                 }
             } else {

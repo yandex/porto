@@ -20,14 +20,22 @@ extern "C" {
 
 TClient::TClient(std::shared_ptr<TEpollLoop> loop, int fd) : TEpollSource(loop, fd) {
     SetState(EClientState::ReadingLength);
-    if (config().log().verbose())
-        L() << "Client connected " << Fd << std::endl;
+    ConnectionTime = GetCurrentTimeMs();
 }
 
 TClient::~TClient() {
-    if (config().log().verbose())
-        L() << "Client disconnected " << Fd << std::endl;
-    close(Fd);
+    CloseConnection();
+}
+
+void TClient::CloseConnection() {
+    if (Fd >= 0) {
+        ConnectionTime = GetCurrentTimeMs() - ConnectionTime;
+        if (config().log().verbose())
+            L() << "Client " << Fd << " disconnected : " << *this
+                << " : " << ConnectionTime << " ms" <<  std::endl;
+        close(Fd);
+        Fd = -1;
+    }
 }
 
 int TClient::GetFd() const {
