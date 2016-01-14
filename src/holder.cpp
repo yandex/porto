@@ -460,10 +460,9 @@ void TContainerHolder::RemoveLeftovers() {
         std::vector<TCgroup> cgroups;
 
         error = hy->Cgroup(PORTO_ROOT_CGROUP).ChildsAll(cgroups);
-        if (error) {
-            L_ERR() << "Cannot dump cgroups " << error << std::endl;
-            continue;
-        }
+        if (error)
+            L_ERR() << "Cannot dump porto " << hy->Type << " cgroups : "
+                    << error << std::endl;
 
         for (auto cg = cgroups.rbegin(); cg != cgroups.rend(); cg++) {
             std::string name = cg->Name.substr(PORTO_ROOT_CGROUP.length() + 1);

@@ -181,9 +181,14 @@ TError TCgroup::ChildsAll(std::vector<TCgroup> &cgroups) const {
     error = Childs(cgroups);
     if (!error) {
         for (std::vector<TCgroup>::size_type i = 0; i < cgroups.size(); i++) {
-            error = cgroups[i].Childs(cgroups);
-            if (error)
-                break;
+            TCgroup cgroup = cgroups[i];
+            TError error2 = cgroup.Childs(cgroups);
+            if (error2) {
+                L_ERR() << "Cannot dump childs of " << cgroup << " : "
+                        << error << std::endl;
+                if (!error)
+                    error = error2;
+            }
         }
     }
 
