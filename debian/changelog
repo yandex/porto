@@ -1,3 +1,41 @@
+yandex-porto (2.7.4) precise; urgency=medium
+
+  [ Vsevolod Velichko ]
+  * api/python: return slavept filepath in SetTty
+
+  [ Roman Gushchin ]
+  * rpc: add path convertation ability to rpc
+  * rpc: handle path convertation request
+  * C++ API: add path convertation function
+  * go API: add path convertation function
+  * python API: add path convertation function
+  * portoctl: add path convertation option
+  * test: add test for path conversion
+  * build: fix compiler warnings
+  * std: rework pty std type implementation
+
+  [ Konstantin Khlebnikov ]
+  * util/file: remove ugly Remove
+  * cgroup: rework removing
+  * util/path: print mode in octal format
+  * util/path: add ReadAll, WriteAll and ReadLines
+  * cgroup: refactoring
+  * selftest: update leak test
+  * cgroup: fix proc/pid/cgroup parser
+  * portod: do not leak fd on error paths in AcceptClient
+  * container: restore non-isolated meta containers
+  * cgroup: remove leftovers harder
+  * cgroup: attach daemon into correct hierarchies
+  * cgroup: keep leading slash in cgroup name
+  * cgroup: cleanup pid to container lookup
+  * cgroup: cleanup oom event setup
+  * cgroup: fix some log messages
+  * cgroup: fix crash in ChildsAll
+  * portod: close client connections explicitly and print some useful details
+  * portod: disable journals
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 14 Jan 2016 12:11:19 +0300
+
 yandex-porto (2.7.3) precise; urgency=low
 
   * std: close fifo's when container dies
