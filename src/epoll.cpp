@@ -64,6 +64,8 @@ TError TEpollLoop::Create() {
         return error;
     }
 
+    Statistics->EpollSources = 0;
+
     return TError::Success();
 }
 
@@ -124,70 +126,70 @@ TError TEpollLoop::GetEvents(std::vector<int> &signals,
 }
 
 TError TEpollLoop::AddSource(std::shared_ptr<TEpollSource> source) {
+    int fd = source->Fd;
     auto lock = ScopedLock();
 
-    void *ptr = static_cast<void *>(source.get());
-    Sources[ptr] = source;
-    Statistics->EpollSources = Sources.size();
+    if ((int)Sources.size() <= fd)
+        Sources.resize(fd + 256);
+
+    if (!Sources[fd].expired()) {
+        L_ERR() << "Duplicate epoll fd " << fd << std::endl;
+        return TError(EError::Unknown, "dublicate epoll fd");
+    }
+
+    Sources[fd] = source;
+    Statistics->EpollSources++;
 
     struct epoll_event ev;
     ev.events = EPOLLIN | EPOLLHUP;
-    ev.data.ptr = ptr;
-    if (epoll_ctl(EpollFd, EPOLL_CTL_ADD, source->Fd, &ev) < 0)
-        return TError(EError::Unknown, errno, "epoll_add(" + std::to_string(source->Fd) + ")");
-    return TError::Success();
-}
+    ev.data.fd = fd;
+    if (epoll_ctl(EpollFd, EPOLL_CTL_ADD, fd, &ev) < 0)
+        return TError(EError::Unknown, errno, "epoll_add(" + std::to_string(fd) + ")");
 
-TError TEpollLoop::RemoveFd(int fd) {
-    if (epoll_ctl(EpollFd, EPOLL_CTL_DEL, fd, nullptr) < 0)
-        return TError(EError::Unknown, errno, "epoll_del(" + std::to_string(fd) + ")");
     return TError::Success();
 }
 
 void TEpollLoop::RemoveSource(std::shared_ptr<TEpollSource> source) {
+    int fd = source->Fd;
     auto lock = ScopedLock();
 
-    void *ptr = static_cast<void *>(source.get());
-    if (Sources.find(ptr) == Sources.end())
-        return;
+    if (fd < (int)Sources.size() && !Sources[fd].expired()) {
+        Sources[fd].reset();
+        Statistics->EpollSources--;
+    } else
+        L_ERR() << "Invalid epoll fd " << fd << std::endl;
 
-    Sources.erase(ptr);
-    Statistics->EpollSources = Sources.size();
-
-    TError error = RemoveFd(source->Fd);
-    if (error)
-        L() << "Can't remove fd " << source->Fd << " from epoll: " << error << std::endl;
+    if (epoll_ctl(EpollFd, EPOLL_CTL_DEL, fd, nullptr) < 0)
+        L_ERR() << "Cannot remove epoll " << fd << " : "
+                << TError(EError::Unknown, errno, "epoll_ctl") << std::endl;
 }
 
-TError TEpollLoop::ModifySourceEvents(std::shared_ptr<TEpollSource> source, bool in) {
-    auto lock = ScopedLock();
-
-    void *ptr = static_cast<void *>(source.get());
-    if (Sources.find(ptr) != Sources.end()) {
-        struct epoll_event ev;
-        ev.events = EPOLLHUP;
-        if (in)
-            ev.events |= EPOLLIN;
-        ev.data.ptr = ptr;
-        if (epoll_ctl(EpollFd, EPOLL_CTL_MOD, source->Fd, &ev) < 0)
-            return TError(EError::Unknown, errno, "epoll_mod(" + std::to_string(source->Fd) + ")");
-    }
+TError TEpollLoop::ModifySourceEvents(int fd, uint32_t events) const {
+    struct epoll_event ev;
+    ev.events = events;
+    ev.data.fd = fd;
+    if (epoll_ctl(EpollFd, EPOLL_CTL_MOD, fd, &ev) < 0)
+        return TError(EError::Unknown, errno, "epoll_mod(" + std::to_string(fd) + ")");
     return TError::Success();
 }
 
-TError TEpollLoop::EnableSource(std::shared_ptr<TEpollSource> source) {
-    return ModifySourceEvents(source, true);
+TError TEpollLoop::StartInput(int fd) const {
+    return ModifySourceEvents(fd, EPOLLIN);
 }
 
-TError TEpollLoop::DisableSource(std::shared_ptr<TEpollSource> source) {
-    return ModifySourceEvents(source, false);
+TError TEpollLoop::StopInput(int fd) const {
+    return ModifySourceEvents(fd, 0);
 }
 
-std::shared_ptr<TEpollSource> TEpollLoop::GetSource(void *ptr) {
+TError TEpollLoop::StartOutput(int fd) const {
+    return ModifySourceEvents(fd, EPOLLOUT);
+}
+
+std::shared_ptr<TEpollSource> TEpollLoop::GetSource(int fd) {
     auto lock = ScopedLock();
 
-    if (Sources.find(ptr) == Sources.end())
+    if (fd >= (int)Sources.size())
         return nullptr;
 
-    return Sources.at(ptr).lock();
+    return Sources[fd].lock();
 }

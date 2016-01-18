@@ -17,11 +17,6 @@ namespace rpc {
     class TContainerRequest;
 }
 
-enum class EClientState {
-    ReadingLength,
-    ReadingData,
-};
-
 class TClient : public TEpollSource {
 public:
     TClient(std::shared_ptr<TEpollLoop> loop, int fd);
@@ -46,8 +41,11 @@ public:
     std::shared_ptr<TContainerWaiter> Waiter;
     bool Readonly();
 
-    bool ReadRequest(rpc::TContainerRequest &req, bool &hangup);
+    TError ReadRequest(rpc::TContainerRequest &request);
     bool ReadInterrupted();
+
+    TError QueueResponse(rpc::TContainerResponse &response);
+    TError SendResponse(bool first);
 
 private:
     pid_t Pid;
@@ -62,10 +60,7 @@ private:
 
     bool FullLog = true;
 
-    EClientState State;
-    uint64_t Length;
-    uint64_t Pos;
-    std::vector<char> Request;
-
-    void SetState(EClientState state);
+    uint64_t Length = 0;
+    uint64_t Offset = 0;
+    std::vector<uint8_t> Buffer;
 };

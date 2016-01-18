@@ -12,6 +12,8 @@
 #include "util/log.hpp"
 #include "util/string.hpp"
 
+#include <google/protobuf/io/coded_stream.h>
+
 extern "C" {
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -19,7 +21,6 @@ extern "C" {
 };
 
 TClient::TClient(std::shared_ptr<TEpollLoop> loop, int fd) : TEpollSource(loop, fd) {
-    SetState(EClientState::ReadingLength);
     ConnectionTime = GetCurrentTimeMs();
 }
 
@@ -172,60 +173,85 @@ bool TClient::Readonly() {
     return !Cred.IsPrivileged() && !Cred.IsMemberOf(CredConf.GetPortoGid());
 }
 
-void TClient::SetState(EClientState state) {
-    Pos = 0;
-    Length = 0;
-
-    State = state;
-}
-
-bool TClient::ReadRequest(rpc::TContainerRequest &req, bool &hangup) {
+TError TClient::ReadRequest(rpc::TContainerRequest &request) {
     if (config().daemon().blocking_read()) {
         InterruptibleInputStream InputStream(Fd);
-        return ReadDelimitedFrom(&InputStream, &req);
+        ReadDelimitedFrom(&InputStream, &request);
+        return TError::Success();
     }
 
-    while (State == EClientState::ReadingLength) {
-        uint8_t byte;
-        int ret = recv(Fd, &byte, sizeof(byte), MSG_DONTWAIT);
-        if (ret <= 0)
-            return false;
+    if (Offset >= Buffer.size())
+        Buffer.resize(Offset + 4096);
 
-        Length |= (byte & 0x7f) << Pos;
-        Pos += 7;
+    ssize_t len = recv(Fd, &Buffer[Offset], Buffer.size() - Offset, MSG_DONTWAIT);
+    if (len > 0)
+        Offset += len;
+    else if (len == 0 || (errno != EAGAIN && errno != EWOULDBLOCK))
+        return TError(EError::Unknown, len ? errno : EIO, "recv request failed");
 
-        if ((byte & 0x80) == 0) {
-            if (Length > config().daemon().max_msg_len()) {
-                L_WRN() << "Got oversized request " << Length << " from client " << Fd << std::endl;
-                SetState(EClientState::ReadingLength);
-                hangup = true;
-                return false;
-            }
+    if (Length && Offset < Length)
+        return TError::Queued();
 
-            Request.resize(Length);
-            SetState(EClientState::ReadingData);
-        }
+    google::protobuf::io::CodedInputStream input(&Buffer[0], Offset);
+
+    uint32_t length;
+    if (!input.ReadVarint32(&length))
+        return TError::Queued();
+
+    if (!Length) {
+        if (length > config().daemon().max_msg_len())
+            return TError(EError::Unknown, "oversized request: " + std::to_string(length));
+
+        Length = length + google::protobuf::io::CodedOutputStream::VarintSize32(length);
+        if (Buffer.size() < Length)
+            Buffer.resize(Length);
+
+        if (Offset < Length)
+            return TError::Queued();
     }
 
-    if (State == EClientState::ReadingData) {
-        int ret = recv(Fd, &Request[Pos], Request.size() - Pos, MSG_DONTWAIT);
-        if (ret <= 0)
-            return false;
+    if (!request.ParseFromCodedStream(&input))
+        return TError(EError::Unknown, "cannot parse request");
 
-        Pos += ret;
+    if (Offset > Length)
+        return TError(EError::Unknown, "garbage after request");
 
-        if (Pos >= Request.size()) {
-            bool ret = req.ParseFromArray(Request.data(), Request.size());
-            if (!ret) {
-                L_WRN() << "Couldn't parse request from client " << Fd << std::endl;
-                hangup = true;
-            }
-            SetState(EClientState::ReadingLength);
-            return ret;
-        }
+    return EpollLoop->StopInput(Fd);
+}
+
+TError TClient::SendResponse(bool first) {
+    ssize_t len = send(Fd, &Buffer[Offset], Length - Offset, MSG_DONTWAIT);
+    if (len > 0)
+        Offset += len;
+    else if (len == 0 || (errno != EAGAIN && errno != EWOULDBLOCK))
+        return TError(EError::Unknown, len ? errno : EIO, "send response failed");
+
+    if (Offset >= Length) {
+        Length = Offset = 0;
+        return EpollLoop->StartInput(Fd);
     }
 
-    return false;
+    if (first)
+        return EpollLoop->StartOutput(Fd);
+
+    return TError::Success();
+}
+
+TError TClient::QueueResponse(rpc::TContainerResponse &response) {
+    uint32_t length = response.ByteSize();
+    size_t lengthSize = google::protobuf::io::CodedOutputStream::VarintSize32(length);
+
+    Offset = 0;
+    Length = lengthSize + length;
+
+    if (Buffer.size() < Length)
+        Buffer.resize(Length);
+
+    google::protobuf::io::CodedOutputStream::WriteVarint32ToArray(length, &Buffer[0]);
+    if (!response.SerializeToArray(&Buffer[lengthSize], length))
+        return TError(EError::Unknown, "cannot serialize response");
+
+    return SendResponse(true);
 }
 
 std::ostream& operator<<(std::ostream& stream, TClient& client) {

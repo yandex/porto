@@ -144,33 +144,6 @@ public:
     }
 };
 
-static bool QueueRequest(TContext &context,
-                         std::shared_ptr<TEpollSource> source,
-                         TRpcWorker &worker, std::shared_ptr<TClient> client) {
-    TRequest req{&context, client};
-    bool hangup = false;
-    bool fullMessage = client->ReadRequest(req.Request, hangup);
-
-    if (hangup)
-        return true;
-
-    if (!fullMessage)
-        return false;
-
-    if (client->Identify(*context.Cholder, false))
-        return true;
-
-    TError error = context.EpollLoop->DisableSource(source);
-    if (error) {
-        L_WRN() << "Can't disable client " << client->GetFd() << ": " << error << std::endl;
-        return true;
-    }
-
-    worker.Push(req);
-
-    return false;
-}
-
 static TError AcceptClient(TContext &context, int sfd,
                            std::map<int, std::shared_ptr<TClient>> &clients) {
     struct sockaddr_un peer_addr;
@@ -385,7 +358,7 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
         }
 
         for (auto ev : events) {
-            auto source = context.EpollLoop->GetSource(ev.data.ptr);
+            auto source = context.EpollLoop->GetSource(ev.data.fd);
             if (!source)
                 continue;
 
@@ -407,24 +380,35 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                 continue;
             } else if (source->Flags & EPOLL_EVENT_OOM) {
                 auto container = source->Container.lock();
+
+                // we don't want any repeated events from OOM fd
+                context.EpollLoop->StopInput(source->Fd);
+
                 if (container) {
                     TEvent e(EEventType::OOM, container);
                     e.OOM.Fd = source->Fd;
                     context.Queue->Add(0, e);
                 }
 
-                // we don't want any repeated events from OOM fd, so remove
-                // it from epoll
-                context.EpollLoop->RemoveSource(source);
-
             } else if (clients.find(source->Fd) != clients.end()) {
                 auto client = clients[source->Fd];
-                bool needClose = false;
 
-                if (ev.events & EPOLLIN)
-                    needClose = QueueRequest(context, source, worker, client);
+                if (ev.events & EPOLLIN) {
+                    TRequest req {&context, client};
+                    error = client->ReadRequest(req.Request);
 
-                if ((ev.events & EPOLLHUP) || needClose) {
+                    if (!error) {
+                        error = client->Identify(*context.Cholder, false);
+                        if (!error)
+                            worker.Push(req);
+                    }
+                }
+
+                if (ev.events & EPOLLOUT)
+                    error = client->SendResponse(false);
+
+                if ((ev.events & EPOLLHUP) || (ev.events & EPOLLERR) ||
+                        (error && error.GetError() != EError::Queued)) {
                     context.EpollLoop->RemoveSource(source);
                     client->CloseConnection();
                     clients.erase(source->Fd);
@@ -828,7 +812,7 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
         }
 
         for (auto ev : events) {
-            auto source = loop->GetSource(ev.data.ptr);
+            auto source = loop->GetSource(ev.data.fd);
             if (!source)
                 continue;
 

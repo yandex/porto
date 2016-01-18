@@ -256,31 +256,14 @@ static bool ValidRequest(const rpc::TContainerRequest &req) {
 static void SendReply(std::shared_ptr<TClient> client,
                       rpc::TContainerResponse &response,
                       bool log) {
-    if (!client) {
-        std::cout << "no client" << std::endl;
-        return;
-    }
-
-    google::protobuf::io::FileOutputStream post(client->GetFd());
-
-    if (response.IsInitialized()) {
-        if (WriteDelimitedTo(response, &post)) {
-            post.Flush();
-
-            if (log)
-                L_RSP() << ResponseAsString(response) << " to " << *client
-                        << " (request took " << client->GetRequestTimeMs() << "ms)"
-                        << std::endl;
-        } else {
-            L_RSP() << "Protobuf write error for " << client->GetFd() << " " << strerror(errno) << std:: endl;
-        }
-    }
-
-    auto loop = client->EpollLoop.lock();
-    if (loop) {
-        TError error = loop->EnableSource(client);
-        if (error)
-            L_WRN() << "Can't enable client " << client->GetFd() << ": " << error << std::endl;
+    TError error = client->QueueResponse(response);
+    if (!error) {
+        if (log)
+            L_RSP() << ResponseAsString(response) << " to " << *client
+                << " (request took " << client->GetRequestTimeMs() << "ms)"
+                << std::endl;
+    } else {
+        L_RSP() << "Protobuf write error for " << *client << " : " << error << std:: endl;
     }
 }
 

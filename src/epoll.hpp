@@ -22,7 +22,7 @@ class TContainer;
 class TEpollLoop;
 
 struct TEpollSource : public TNonCopyable {
-    std::weak_ptr<TEpollLoop> EpollLoop;
+    std::shared_ptr<TEpollLoop> EpollLoop;
     int Fd;
     int Flags;
     std::weak_ptr<TContainer> Container;
@@ -45,10 +45,9 @@ class TEpollLoop : public TLockable, public TNonCopyable {
     size_t MaxEvents = 0;
     struct epoll_event *Events = nullptr;
 
-    std::map<void *, std::weak_ptr<TEpollSource>> Sources;
+    std::vector<std::weak_ptr<TEpollSource>> Sources;
 
-    TError RemoveFd(int fd);
-    TError ModifySourceEvents(std::shared_ptr<TEpollSource> source, bool in);
+    TError ModifySourceEvents(int fd, uint32_t events) const;
 
 public:
     TError Create();
@@ -57,9 +56,12 @@ public:
 
     TError AddSource(std::shared_ptr<TEpollSource> source);
     void RemoveSource(std::shared_ptr<TEpollSource> source);
-    std::shared_ptr<TEpollSource> GetSource(void *ptr);
-    TError EnableSource(std::shared_ptr<TEpollSource> source);
-    TError DisableSource(std::shared_ptr<TEpollSource> source);
+    std::shared_ptr<TEpollSource> GetSource(int fd);
+
+    TError StartInput(int fd) const;
+    TError StopInput(int fd) const;
+    TError StartOutput(int fd) const;
+
     TError GetEvents(std::vector<int> &signals,
                      std::vector<struct epoll_event> &evts,
                      int timeout);
