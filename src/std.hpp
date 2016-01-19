@@ -13,8 +13,9 @@ class TClient;
 
 class TStdStream {
 private:
-    int Type; /* 0 - stdin, 1 - stdout, 2 - stderr */
-    std::string Impl; /* file/pipe/pty */
+    int Stream;             /* 0 - stdin, 1 - stdout, 2 - stderr */
+    std::string Type;       /* file, pipe, pty */
+
     TPath PathOnHost;
     TPath PathInContainer;
     bool ManagedByPorto;
@@ -24,7 +25,7 @@ private:
 
 public:
     TStdStream();
-    TStdStream(int type, const std::string &impl,
+    TStdStream(int stream, const std::string &type,
                const TPath &inner_path, const TPath &host_path,
                bool managed_by_porto);
 

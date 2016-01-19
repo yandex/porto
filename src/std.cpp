@@ -14,14 +14,15 @@ extern "C" {
 TStdStream::TStdStream() {
 }
 
-TStdStream::TStdStream(int type, const std::string &impl,
+TStdStream::TStdStream(int stream, const std::string &type,
                        const TPath &inner_path, const TPath &host_path,
                        bool managed_by_porto) :
-    Type(type), Impl(impl), PathOnHost(host_path), PathInContainer(inner_path),
+    Stream(stream), Type(type),
+    PathOnHost(host_path), PathInContainer(inner_path),
     ManagedByPorto(managed_by_porto) {}
 
 TError TStdStream::Prepare(const TCred &cred, std::shared_ptr<TClient> client) {
-    if (Impl == STD_TYPE_FIFO) {
+    if (Type == STD_TYPE_FIFO) {
         if (mkfifo(PathOnHost.ToString().c_str(), 0600)) {
             return TError(EError::Unknown, errno, "mkfifo()");
         }
@@ -44,9 +45,9 @@ TError TStdStream::Prepare(const TCred &cred, std::shared_ptr<TClient> client) {
         auto res = fcntl(PipeFd, F_SETFL, flags | O_NONBLOCK);
         if (res == -1)
             return TError(EError::Unknown, errno, "fcntl");
-    } else if (Impl == STD_TYPE_PTY && client != nullptr) {
+    } else if (Type == STD_TYPE_PTY && client != nullptr) {
         TError err = TPath("/proc/" + std::to_string(client->GetPid()) + "/fd/" +
-                           std::to_string(Type)).ReadLink(PathOnHost);
+                           std::to_string(Stream)).ReadLink(PathOnHost);
         if (err)
             return TError(EError::Unknown, "Can't get client pty path");
     }
@@ -55,27 +56,28 @@ TError TStdStream::Prepare(const TCred &cred, std::shared_ptr<TClient> client) {
 
 TError TStdStream::Open(const TPath &path, const TCred &cred) const {
     int flags;
-    if (Impl == STD_TYPE_FIFO || Impl == STD_TYPE_PTY)
-        flags = Type ? O_WRONLY : O_RDONLY;
+    if (Type == STD_TYPE_FIFO || Type == STD_TYPE_PTY)
+        flags = Stream ? O_WRONLY : O_RDONLY;
     else
-        flags = Type ? (O_CREAT | O_WRONLY | O_APPEND) : O_RDONLY;
+        flags = Stream ? (O_CREAT | O_WRONLY | O_APPEND) : O_RDONLY;
 
     int ret = open(path.ToString().c_str(), flags, 0660);
     if (ret < 0)
         return TError(EError::InvalidValue, errno,
                       "open(" + path.ToString() + ") -> " +
                       std::to_string(ret));
-    if (ret != Type) {
-        if (dup2(ret, Type) < 0) {
+
+    if (ret != Stream) {
+        if (dup2(ret, Stream) < 0) {
             close(ret);
             return TError(EError::Unknown, errno, "dup2(" + std::to_string(ret) +
-                          ", " + std::to_string(Type) + ")");
+                          ", " + std::to_string(Stream) + ")");
         }
         close(ret);
-        ret = Type;
+        ret = Stream;
     }
 
-    if (Impl == STD_TYPE_FILE && path.IsRegular()) {
+    if (Type == STD_TYPE_FILE && path.IsRegular()) {
         ret = fchown(ret, cred.Uid, cred.Gid);
         if (ret < 0)
             return TError(EError::Unknown, errno, "fchown(" + path.ToString() + ")");
@@ -84,7 +86,7 @@ TError TStdStream::Open(const TPath &path, const TCred &cred) const {
 }
 
 TError TStdStream::OpenOnHost(const TCred &cred) const {
-    if (ManagedByPorto || Impl == STD_TYPE_PTY)
+    if (ManagedByPorto || Type == STD_TYPE_PTY)
         return Open(PathOnHost, cred);
     else
         return TError::Success();
@@ -98,20 +100,21 @@ TError TStdStream::OpenInChild(const TCred &cred) const {
 }
 
 TError TStdStream::Rotate(off_t limit, off_t &loss) const {
-    if (Impl == STD_TYPE_FILE && PathOnHost.IsRegular()) {
+    if (Type == STD_TYPE_FILE && PathOnHost.IsRegular()) {
         return PathOnHost.RotateLog(config().container().max_log_size(), loss);
     } else
         return TError::Success();
 }
 
 TError TStdStream::Cleanup() {
-    if (ManagedByPorto && Impl == STD_TYPE_FILE && PathOnHost.IsRegular() && Type) {
+    if (ManagedByPorto && Type == STD_TYPE_FILE &&
+            PathOnHost.IsRegular() && Stream) {
         Close();
         TError err = PathOnHost.Unlink();
         if (err)
             L_ERR() << "Can't remove std log: " << err << std::endl;
         return err;
-    } else if (Impl == STD_TYPE_FIFO) {
+    } else if (Type == STD_TYPE_FIFO) {
         TError err = PathOnHost.Unlink();
         if (err)
             L_ERR() << "Can't remove fifo: " << err << std::endl;
@@ -122,7 +125,7 @@ TError TStdStream::Cleanup() {
 }
 
 TError TStdStream::Close() {
-    if (Impl == STD_TYPE_FIFO && PipeFd != -1) {
+    if (Type == STD_TYPE_FIFO && PipeFd != -1) {
         close(PipeFd);
         PipeFd = -1;
     }
@@ -131,7 +134,7 @@ TError TStdStream::Close() {
 }
 
 TError TStdStream::Read(std::string &text, off_t limit, uint64_t base, const std::string &start_offset) const {
-    if (Impl == STD_TYPE_FILE) {
+    if (Type == STD_TYPE_FILE) {
         uint64_t offset = 0;
         TError error;
 
@@ -173,7 +176,7 @@ TError TStdStream::Read(std::string &text, off_t limit, uint64_t base, const std
         }
 
         close(fd);
-    } else if (Impl == STD_TYPE_FIFO) {
+    } else if (Type == STD_TYPE_FIFO) {
             char buf[limit];
 
             auto len = read(PipeFd, buf, sizeof(buf));
