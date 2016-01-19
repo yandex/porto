@@ -507,7 +507,7 @@ std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
 void TContainer::ShutdownOom() {
     if (Source)
         Holder->EpollLoop->RemoveSource(Source);
-    Efd = -1;
+    OomEventFd = -1;
     Source = nullptr;
 }
 
@@ -520,7 +520,7 @@ TError TContainer::PrepareOomMonitor() {
     if (error)
         return error;
 
-    Efd = fd;
+    OomEventFd = fd;
     Source = std::make_shared<TEpollSource>(Holder->EpollLoop, fd,
                                             EPOLL_EVENT_OOM, shared_from_this());
 
@@ -2024,7 +2024,7 @@ bool TContainer::MayRespawn() {
 }
 
 bool TContainer::MayReceiveOom(int fd) {
-    if (Efd.GetFd() != fd)
+    if (OomEventFd.GetFd() != fd)
         return false;
 
     if (!Task)
@@ -2040,7 +2040,7 @@ bool TContainer::MayReceiveOom(int fd) {
 bool TContainer::HasOomReceived() {
     uint64_t val;
 
-    return read(Efd.GetFd(), &val, sizeof(val)) == sizeof(val) && val != 0;
+    return read(OomEventFd.GetFd(), &val, sizeof(val)) == sizeof(val) && val != 0;
 }
 
 void TContainer::ScheduleRespawn() {
@@ -2087,7 +2087,7 @@ void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
     TError error;
     switch (event.Type) {
         case EEventType::Exit:
-            ExitTree(holder_lock, event.Exit.Status, FdHasEvent(Efd.GetFd()));
+            ExitTree(holder_lock, event.Exit.Status, FdHasEvent(OomEventFd.GetFd()));
             break;
         case EEventType::RotateLogs:
             if (GetState() == EContainerState::Running && Task) {

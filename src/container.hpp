@@ -53,7 +53,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     int Acquired = 0;
     int Id;
     int TaskStartErrno = -1;
-    TScopedFd Efd;
+    TScopedFd OomEventFd;
     size_t CgroupEmptySince = 0;
     size_t RunningChildren = 0; // changed under holder lock
     bool LostAndRestored = false;
