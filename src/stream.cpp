@@ -19,7 +19,13 @@ TStdStream::TStdStream(int stream, const std::string &type,
                        bool managed_by_porto) :
     Stream(stream), Type(type),
     PathOnHost(host_path), PathInContainer(inner_path),
-    ManagedByPorto(managed_by_porto) {}
+    ManagedByPorto(managed_by_porto)
+{
+    if (PathInContainer == "/dev/null") {
+        PathOnHost = "/dev/null";
+        ManagedByPorto = true;
+    }
+}
 
 TError TStdStream::Prepare(const TCred &cred, std::shared_ptr<TClient> client) {
     if (Type == STD_TYPE_FIFO) {
