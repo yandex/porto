@@ -70,7 +70,9 @@ void TLogger::OpenLog(bool std, const TPath &path, const unsigned int mode) {
     if (std) {
         // because in task.cpp we expect that nothing should be in 0-2 fd,
         // we need to duplicate our std log somewhere else
-        logBuf->SetFd(dup(STDOUT_FILENO));
+        int logFd = fcntl(STDOUT_FILENO, F_DUPFD_CLOEXEC);
+        PORTO_ASSERT(logFd >= 0);
+        logBuf->SetFd(logFd);
     } else {
         logBuf->Open(path, mode);
     }
