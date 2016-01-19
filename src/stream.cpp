@@ -25,6 +25,9 @@ TStdStream::TStdStream(int stream, const std::string &type,
         PathOnHost = "/dev/null";
         ManagedByPorto = true;
     }
+
+    if (PathInContainer == "/dev/tty" || Type == STD_TYPE_PTY)
+        ManagedByPorto = true;
 }
 
 TError TStdStream::Prepare(const TCred &cred, std::shared_ptr<TClient> client) {
@@ -51,21 +54,23 @@ TError TStdStream::Prepare(const TCred &cred, std::shared_ptr<TClient> client) {
         auto res = fcntl(PipeFd, F_SETFL, flags | O_NONBLOCK);
         if (res == -1)
             return TError(EError::Unknown, errno, "fcntl");
-    } else if (Type == STD_TYPE_PTY && client != nullptr) {
-        TError err = TPath("/proc/" + std::to_string(client->GetPid()) + "/fd/" +
-                           std::to_string(Stream)).ReadLink(PathOnHost);
-        if (err)
-            return TError(EError::Unknown, "Can't get client pty path");
+    }
+
+    if (PathInContainer == "/dev/tty" || Type == STD_TYPE_PTY) {
+        if (client) {
+            auto l = StringFormat("/proc/%u/fd/%u", client->GetPid(), Stream);
+            return TPath(l).ReadLink(PathOnHost);
+        }
+        PathOnHost = "/dev/null";
     }
     return TError::Success();
 }
 
 TError TStdStream::Open(const TPath &path, const TCred &cred) const {
-    int flags;
-    if (Type == STD_TYPE_FIFO || Type == STD_TYPE_PTY)
-        flags = Stream ? O_WRONLY : O_RDONLY;
-    else
-        flags = Stream ? (O_CREAT | O_WRONLY | O_APPEND) : O_RDONLY;
+    int flags = Stream ? O_WRONLY : O_RDONLY;
+
+    if (Stream && Type == STD_TYPE_FILE)
+        flags |= O_CREAT | O_APPEND;
 
     int ret = open(path.ToString().c_str(), flags, 0660);
     if (ret < 0)
@@ -88,11 +93,12 @@ TError TStdStream::Open(const TPath &path, const TCred &cred) const {
         if (ret < 0)
             return TError(EError::Unknown, errno, "fchown(" + path.ToString() + ")");
     }
+
     return TError::Success();
 }
 
 TError TStdStream::OpenOnHost(const TCred &cred) const {
-    if (ManagedByPorto || Type == STD_TYPE_PTY)
+    if (ManagedByPorto)
         return Open(PathOnHost, cred);
     else
         return TError::Success();

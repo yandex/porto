@@ -986,9 +986,9 @@ public:
         containerName = argv[0];
 
         if (hasTty) {
-            args.push_back("stdin_type=pty");
-            args.push_back("stdout_type=pty");
-            args.push_back("stderr_type=pty");
+            args.push_back("stdin_path=/dev/tty");
+            args.push_back("stdout_path=/dev/tty");
+            args.push_back("stderr_path=/dev/tty");
 
             if (env.length())
                 args.push_back("env=" + env);
