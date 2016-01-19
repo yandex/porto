@@ -8,7 +8,7 @@
 #include "util/unix.hpp"
 #include "util/locks.hpp"
 #include "util/log.hpp"
-#include "std.hpp"
+#include "stream.hpp"
 
 class TKeyValueStorage;
 class TEpollSource;

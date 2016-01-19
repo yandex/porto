@@ -27,7 +27,7 @@
 #include "util/cred.hpp"
 #include "util/unix.hpp"
 #include "client.hpp"
-#include "std.hpp"
+#include "stream.hpp"
 
 #include "portod.hpp"
 
