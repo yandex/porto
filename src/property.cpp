@@ -240,9 +240,9 @@ public:
     }
 };
 
-class TStdSwitchProperty : public TStringValue {
+class TStdTypeProperty : public TStringValue {
 public:
-    TStdSwitchProperty() : TStringValue(PERSISTENT_VALUE) {}
+    TStdTypeProperty() : TStringValue(PERSISTENT_VALUE) {}
 
     std::string GetDefault() const override {
         return STD_TYPE_FILE;
@@ -256,25 +256,25 @@ public:
     }
 };
 
-class TStdInSwitchProperty : public TStdSwitchProperty, public TContainerValue {
+class TStdInTypeProperty : public TStdTypeProperty, public TContainerValue {
 public:
-    TStdInSwitchProperty() : TContainerValue(P_STDIN_TYPE,
-                                             "Container standard input type [file, pipe, pty]",
-                                             staticProperty) {}
+    TStdInTypeProperty() : TContainerValue(P_STDIN_TYPE,
+            "Container standard input type [file, pipe, pty]",
+            staticProperty) { }
 };
 
-class TStdOutSwitchProperty : public TStdSwitchProperty, public TContainerValue {
+class TStdOutTypeProperty : public TStdTypeProperty, public TContainerValue {
 public:
-    TStdOutSwitchProperty() : TContainerValue(P_STDOUT_TYPE,
-                                              "Container standard output type [file, pipe, pty]",
-                                              staticProperty) {}
+    TStdOutTypeProperty() : TContainerValue(P_STDOUT_TYPE,
+            "Container standard output type [file, pipe, pty]",
+            staticProperty) { }
 };
 
-class TStdErrSwitchProperty : public TStdSwitchProperty, public TContainerValue {
+class TStdErrTypeProperty : public TStdTypeProperty, public TContainerValue {
 public:
-    TStdErrSwitchProperty() : TContainerValue(P_STDERR_TYPE,
-                                              "Container standard error output type [file, pipe, pty]",
-                                              staticProperty) {}
+    TStdErrTypeProperty() : TContainerValue(P_STDERR_TYPE,
+            "Container standard error output type [file, pipe, pty]",
+            staticProperty) { }
 };
 
 class TStdoutPathProperty : public TStringValue, public TContainerValue {
@@ -1242,9 +1242,9 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TRootProperty,
         new TRootRdOnlyProperty,
         new TCwdProperty,
-        new TStdInSwitchProperty,
-        new TStdOutSwitchProperty,
-        new TStdErrSwitchProperty,
+        new TStdInTypeProperty,
+        new TStdOutTypeProperty,
+        new TStdErrTypeProperty,
         new TStdinPathProperty,
         new TStdoutPathProperty,
         new TStderrPathProperty,
