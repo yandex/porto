@@ -242,7 +242,7 @@ public:
 
 class TStdTypeProperty : public TStringValue {
 public:
-    TStdTypeProperty() : TStringValue(PERSISTENT_VALUE) {}
+    TStdTypeProperty() : TStringValue(PERSISTENT_VALUE | HIDDEN_VALUE) {}
 
     std::string GetDefault() const override {
         return STD_TYPE_FILE;
