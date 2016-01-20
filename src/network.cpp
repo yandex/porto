@@ -952,7 +952,7 @@ TError TNetCfg::ConfigureInterfaces() {
 
     for (auto &mvlan : MacVlan) {
         std::string hw = mvlan.Hw;
-        if (hw.empty())
+        if (hw.empty() && !Hostname.empty())
             hw = GenerateHw(mvlan.Master + mvlan.Name);
 
         TNlLink link(source_nl, "pmv" + std::to_string(GetTid()));
