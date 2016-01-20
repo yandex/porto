@@ -136,7 +136,7 @@ TError TNetwork::PrepareLink(int index, std::string name) {
     return TError::Success();
 }
 
-TNetwork::TNetwork() {
+TNetwork::TNetwork() : NatBitmap(0, 0) {
     Nl = std::make_shared<TNl>();
     PORTO_ASSERT(Nl != nullptr);
 }
@@ -334,6 +334,45 @@ TError TNetwork::DelAnnounce(const TNlAddr &addr) {
         error = Nl->ProxyNeighbour(iface.second, addr, false);
 
     return error;
+}
+
+TError TNetwork::GetNatAddress(std::vector<TNlAddr> &addrs) {
+    TError error;
+    int offset;
+
+    error = NatBitmap.Get(offset);
+    if (error)
+        return TError(error, "Cannot allocate NAT address");
+
+    if (!NatBaseV4.IsEmpty()) {
+        TNlAddr addr = NatBaseV4;
+        addr.AddOffset(offset);
+        addrs.push_back(addr);
+    }
+
+    if (!NatBaseV6.IsEmpty()) {
+        TNlAddr addr = NatBaseV6;
+        addr.AddOffset(offset);
+        addrs.push_back(addr);
+    }
+
+    return TError::Success();
+}
+
+TError TNetwork::PutNatAddress(const std::vector<TNlAddr> &addrs) {
+
+    for (auto &addr: addrs) {
+        if (addr.Family() == AF_INET && !NatBaseV4.IsEmpty()) {
+            uint64_t offset =  addr.GetOffset(NatBaseV4);
+            return NatBitmap.Put(offset);
+        }
+        if (addr.Family() == AF_INET6 && !NatBaseV6.IsEmpty()) {
+            uint64_t offset =  addr.GetOffset(NatBaseV6);
+            return NatBitmap.Put(offset);
+        }
+    }
+
+    return TError::Success();
 }
 
 TError TNetwork::GetInterfaceCounters(ETclassStat stat,
@@ -724,13 +763,13 @@ TError TNetCfg::ParseNet(std::vector<std::string> lines) {
             Veth.push_back(veth);
 
         } else if (type == "L3") {
-            if (settings.size() < 2)
-                return TError(EError::InvalidValue, "Invalid L3 in: " + line);
-
             TL3NetCfg l3;
-            l3.Name = StringTrim(settings[1]);
-            l3.Mtu = -1;
 
+            l3.Name = "eth0";
+            if (settings.size() > 1)
+                l3.Name = StringTrim(settings[1]);
+
+            l3.Mtu = -1;
             if (settings.size() > 2) {
                 TError error = StringToInt(settings[2], l3.Mtu);
                 if (error)
@@ -738,6 +777,23 @@ TError TNetCfg::ParseNet(std::vector<std::string> lines) {
             }
 
             L3lan.push_back(l3);
+
+        } else if (type == "NAT") {
+            TL3NetCfg nat;
+
+            nat.Nat = true;
+            nat.Name = "eth0";
+            if (settings.size() > 1)
+                nat.Name = StringTrim(settings[1]);
+
+            nat.Mtu = -1;
+            if (settings.size() > 2) {
+                TError error = StringToInt(settings[2], nat.Mtu);
+                if (error)
+                    return error;
+            }
+
+            L3lan.push_back(nat);
 
         } else if (type == "netns") {
             if (settings.size() != 2)
@@ -788,6 +844,12 @@ TError TNetCfg::ParseIp(std::vector<std::string> lines) {
             }
         }
     }
+    return TError::Success();
+}
+
+TError TNetCfg::FormatIp(std::vector<std::string> &lines) {
+    for (auto &ip: IpVec)
+        lines.push_back(ip.Iface + " " + ip.Addr.Format());
     return TError::Success();
 }
 
@@ -857,6 +919,21 @@ TError TNetCfg::ConfigureL3(TL3NetCfg &l3) {
     TNlLink peer(parentNl, peerName);
     TNlAddr gate4, gate6;
     TError error;
+
+    if (l3.Nat && l3.Addrs.empty()) {
+        error = ParentNet->GetNatAddress(l3.Addrs);
+        if (error)
+            return error;
+
+        for (auto &addr: l3.Addrs) {
+            TIpVec ip;
+            ip.Iface = l3.Name;
+            ip.Addr = addr;
+            IpVec.push_back(ip);
+        }
+
+        SaveIp = true;
+    }
 
     error = ParentNet->GetGateAddress(l3.Addrs, gate4, gate6, l3.Mtu);
     if (error)
@@ -1055,8 +1132,10 @@ TError TNetCfg::PrepareNetwork() {
             return error;
 
         error = ConfigureInterfaces();
-        if (error)
+        if (error) {
+            (void)DestroyNetwork();
             return error;
+        }
 
         error = Net->PrepareLinks();
         if (error)
@@ -1078,6 +1157,13 @@ TError TNetCfg::PrepareNetwork() {
         error = Net->PrepareLinks();
         if (error)
             return error;
+
+        if (config().network().has_nat_first_ipv4())
+            Net->NatBaseV4.Parse(AF_INET, config().network().nat_first_ipv4());
+        if (config().network().has_nat_first_ipv6())
+            Net->NatBaseV6.Parse(AF_INET6, config().network().nat_first_ipv6());
+        if (config().network().has_nat_count())
+            Net->NatBitmap.Resize(config().network().nat_count());
 
     } else if (NetNsName != "") {
 
@@ -1137,8 +1223,17 @@ TError TNetCfg::DestroyNetwork() {
 
     for (auto &l3 : L3lan) {
         auto lock = ParentNet->ScopedLock();
-        for (auto &addr : l3.Addrs)
+        for (auto &addr : l3.Addrs) {
             error = ParentNet->DelAnnounce(addr);
+            if (error)
+                L_ERR() << "Cannot remove announce " << addr.Format()
+                        << " : " << error << std::endl;
+        }
+        if (l3.Nat) {
+            error = ParentNet->PutNatAddress(l3.Addrs);
+            if (error)
+                L_ERR() << "Cannot put NAT address : " << error << std::endl;
+        }
     }
 
     return error;

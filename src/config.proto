@@ -15,6 +15,9 @@ message TCfg {
 		}
 		repeated TNetworkAlias alias = 8; /* deprecated */
 		optional bool dynamic_ifaces = 9; /* deprecated */
+		optional string nat_first_ipv4 = 10;
+		optional string nat_first_ipv6 = 11;
+		optional uint32 nat_count = 12;
 	}
 
 	message TFileCfg {

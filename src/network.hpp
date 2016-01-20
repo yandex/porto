@@ -9,6 +9,7 @@
 #include "util/locks.hpp"
 #include "util/namespace.hpp"
 #include "util/cred.hpp"
+#include "util/idmap.hpp"
 
 class TNetwork : public std::enable_shared_from_this<TNetwork>,
                  public TNonCopyable,
@@ -26,6 +27,10 @@ public:
     void AddInterface(TNlLink &link) {
         ifaces.emplace_back(link.GetName(), link.GetIndex());
     }
+
+    TNlAddr NatBaseV4;
+    TNlAddr NatBaseV6;
+    TIdMap NatBitmap;
 
     TNetwork();
     ~TNetwork();
@@ -57,6 +62,9 @@ public:
                           TNlAddr &gate4, TNlAddr &gate6, int &mtu);
     TError AddAnnounce(const TNlAddr &addr);
     TError DelAnnounce(const TNlAddr &addr);
+
+    TError GetNatAddress(std::vector <TNlAddr> &addrs);
+    TError PutNatAddress(const std::vector <TNlAddr> &addrs);
 };
 
 
@@ -101,6 +109,7 @@ struct TL3NetCfg {
     std::string Name;
     int Mtu;
     std::vector<TNlAddr> Addrs;
+    bool Nat;
 };
 
 class TContainerHolder;
@@ -118,6 +127,7 @@ struct TNetCfg {
     bool Inherited;
     bool Host;
     bool NetUp;
+    bool SaveIp;
     std::string Hostname;
     std::vector<THostNetCfg> HostIface;
     std::vector<TMacVlanNetCfg> MacVlan;
@@ -134,6 +144,7 @@ struct TNetCfg {
     void Reset();
     TError ParseNet(std::vector<std::string> lines);
     TError ParseIp(std::vector<std::string> lines);
+    TError FormatIp(std::vector<std::string> &lines);
     TError ParseGw(std::vector<std::string> lines);
     std::string GenerateHw(const std::string &name);
     TError ConfigureVeth(TVethNetCfg &veth);

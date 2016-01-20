@@ -638,6 +638,16 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
     if (error)
         return error;
 
+    if (NetCfg.SaveIp) {
+        std::vector<std::string> lines;
+        error = NetCfg.FormatIp(lines);
+        if (error)
+            return error;
+        error = Prop->Set<std::vector<std::string>>(P_IP, lines);
+        if (error)
+            return error;
+    }
+
     Net = NetCfg.Net;
 
     error = UpdateTrafficClasses();
