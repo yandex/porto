@@ -50,7 +50,6 @@ TError TVolumeBackend::GetStat(uint64_t &space_used, uint64_t &space_avail,
 
 class TVolumePlainBackend : public TVolumeBackend {
 public:
-    TVolumePlainBackend(std::shared_ptr<TVolume> volume) : TVolumeBackend(volume) {}
 
     TError Configure(std::shared_ptr<TValueMap> Config) override {
 
@@ -91,7 +90,6 @@ public:
 
 class TVolumeNativeBackend : public TVolumeBackend {
 public:
-    TVolumeNativeBackend(std::shared_ptr<TVolume> volume) : TVolumeBackend(volume) {}
 
     static bool Supported() {
         static bool supported = false, tested = false;
@@ -188,7 +186,6 @@ class TVolumeLoopBackend : public TVolumeBackend {
     int LoopDev = -1;
 
 public:
-    TVolumeLoopBackend(std::shared_ptr<TVolume> volume) : TVolumeBackend(volume) { }
 
     TPath GetLoopImage() {
         return Volume->GetStorage() / "loop.img";
@@ -285,7 +282,6 @@ free_loop:
 
 class TVolumeOverlayBackend : public TVolumeBackend {
 public:
-    TVolumeOverlayBackend(std::shared_ptr<TVolume> volume) : TVolumeBackend(volume) {}
 
     static bool Supported() {
         static bool supported = false, tested = false;
@@ -431,7 +427,6 @@ class TVolumeRbdBackend : public TVolumeBackend {
     int DeviceIndex = -1;
 
 public:
-    TVolumeRbdBackend(std::shared_ptr<TVolume> volume) : TVolumeBackend(volume) { }
 
     std::string GetDevice() {
         if (DeviceIndex < 0)
@@ -545,17 +540,19 @@ public:
 
 TError TVolume::OpenBackend() {
     if (GetBackend() == "plain")
-        Backend = std::unique_ptr<TVolumeBackend>(new TVolumePlainBackend(shared_from_this()));
+        Backend = std::unique_ptr<TVolumeBackend>(new TVolumePlainBackend());
     else if (GetBackend() == "native")
-        Backend = std::unique_ptr<TVolumeBackend>(new TVolumeNativeBackend(shared_from_this()));
+        Backend = std::unique_ptr<TVolumeBackend>(new TVolumeNativeBackend());
     else if (GetBackend() == "overlay")
-        Backend = std::unique_ptr<TVolumeBackend>(new TVolumeOverlayBackend(shared_from_this()));
+        Backend = std::unique_ptr<TVolumeBackend>(new TVolumeOverlayBackend());
     else if (GetBackend() == "loop")
-        Backend = std::unique_ptr<TVolumeBackend>(new TVolumeLoopBackend(shared_from_this()));
+        Backend = std::unique_ptr<TVolumeBackend>(new TVolumeLoopBackend());
     else if (GetBackend() == "rbd")
-        Backend = std::unique_ptr<TVolumeBackend>(new TVolumeRbdBackend(shared_from_this()));
+        Backend = std::unique_ptr<TVolumeBackend>(new TVolumeRbdBackend());
     else
         return TError(EError::InvalidValue, "Unknown volume backend: " + GetBackend());
+
+    Backend->Volume = this;
 
     return TError::Success();
 }

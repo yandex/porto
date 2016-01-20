@@ -49,10 +49,8 @@ class TContainerHolder;
 TError SanitizeLayer(TPath layer, bool merge);
 
 class TVolumeBackend {
-protected:
-    std::shared_ptr<TVolume> Volume;
 public:
-    TVolumeBackend(std::shared_ptr<TVolume> volume) : Volume(volume) {}
+    TVolume *Volume;
     virtual TError Configure(std::shared_ptr<TValueMap> Config);
     virtual TError Save(std::shared_ptr<TValueMap> Config);
     virtual TError Restore(std::shared_ptr<TValueMap> Config);
