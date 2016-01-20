@@ -574,6 +574,9 @@ public:
             L_ERR() << "Can't get memory usage of portod" << std::endl;
         m["memory_usage_mb"] = usage / 1024 / 1024;
         m["epoll_sources"] = Statistics->EpollSources;
+        m["containers"] = Statistics->Containers;
+        m["volumes"] = Statistics->Volumes;
+        m["clients"] = Statistics->Clients;
 
         return m;
     }

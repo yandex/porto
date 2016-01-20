@@ -17,6 +17,9 @@ struct TStatistics {
     std::atomic<uint64_t> Rotated;
     std::atomic<uint64_t> RestoreFailed;
     std::atomic<uint64_t> EpollSources;
+    std::atomic<uint64_t> Containers;
+    std::atomic<uint64_t> Volumes;
+    std::atomic<uint64_t> Clients;
 };
 
 extern TStatistics *Statistics;

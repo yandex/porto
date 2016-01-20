@@ -6,6 +6,7 @@
 #include "kvalue.hpp"
 #include "common.hpp"
 #include "value.hpp"
+#include "statistics.hpp"
 #include "util/mount.hpp"
 #include "util/cred.hpp"
 #include "util/idmap.hpp"
@@ -75,7 +76,12 @@ class TVolume : public std::enable_shared_from_this<TVolume>,
     TError OpenBackend();
 
 public:
-    TVolume(std::shared_ptr<TValueMap> config) : Config(config) {}
+    TVolume(std::shared_ptr<TValueMap> config) : Config(config) {
+        Statistics->Volumes++;
+    }
+    ~TVolume() {
+        Statistics->Volumes--;
+    }
     TError Configure(const TPath &path, const TCred &creator_cred,
                      std::shared_ptr<TContainer> creator_container,
                      const std::map<std::string, std::string> &properties,

@@ -503,6 +503,9 @@ static int SlaveMain() {
         AllocStatistics();
 
     Statistics->SlaveStarted = GetCurrentTimeMs();
+    Statistics->Containers = 0;
+    Statistics->Clients = 0;
+    Statistics->Volumes = 0;
 
     ret = DaemonPrepare(false);
     if (ret)

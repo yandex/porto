@@ -52,11 +52,15 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
                        const std::string &name, std::shared_ptr<TContainer> parent,
                        int id) :
     Holder(holder), Name(StripParentName(name)), Parent(parent),
-    Storage(storage), Id(id), Level(parent == nullptr ? 0 : parent->GetLevel() + 1) { }
+    Storage(storage), Id(id), Level(parent == nullptr ? 0 : parent->GetLevel() + 1)
+{
+    Statistics->Containers++;
+}
 
 TContainer::~TContainer() {
     // so call them explicitly in Tcontainer::Destroy()
     PORTO_ASSERT(Net == nullptr);
+    Statistics->Containers--;
 };
 
 std::string TContainer::ContainerStateName(EContainerState state) {

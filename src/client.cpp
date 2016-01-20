@@ -5,6 +5,7 @@
 #include "rpc.hpp"
 #include "client.hpp"
 #include "container.hpp"
+#include "statistics.hpp"
 #include "holder.hpp"
 #include "config.hpp"
 #include "protobuf.hpp"
@@ -22,10 +23,12 @@ extern "C" {
 
 TClient::TClient(std::shared_ptr<TEpollLoop> loop, int fd) : TEpollSource(loop, fd) {
     ConnectionTime = GetCurrentTimeMs();
+    Statistics->Clients++;
 }
 
 TClient::~TClient() {
     CloseConnection();
+    Statistics->Clients--;
 }
 
 void TClient::CloseConnection() {
