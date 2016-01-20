@@ -23,6 +23,10 @@ class TNetwork : public std::enable_shared_from_this<TNetwork>,
 public:
     TError UpdateInterfaces();
 
+    void AddInterface(TNlLink &link) {
+        ifaces.emplace_back(link.GetName(), link.GetIndex());
+    }
+
     TNetwork();
     ~TNetwork();
     TError Connect();
@@ -30,7 +34,7 @@ public:
     TError ConnectNew(TNamespaceFd &netns);
     std::shared_ptr<TNl> GetNl() { return Nl; };
 
-    TError Prepare();
+    TError PrepareLinks();
     TError Destroy();
 
     TError GetTrafficCounters(int minor, ETclassStat stat,

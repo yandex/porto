@@ -1659,7 +1659,11 @@ TError TContainer::RestoreNetwork() {
 
     Holder->AddToNsMap(netns.GetInode(), Net);
 
-    error = Net->Prepare();
+    error = Net->UpdateInterfaces();
+    if (error)
+        return error;
+
+    error = Net->PrepareLinks();
     if (error)
         return error;
 

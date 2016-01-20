@@ -41,13 +41,8 @@ TError TNetwork::Destroy() {
     return TError::Success();
 }
 
-TError TNetwork::Prepare() {
+TError TNetwork::PrepareLinks() {
     TError error;
-    auto lock = ScopedLock();
-
-    error = UpdateInterfaces();
-    if (error)
-        return error;
 
     for (auto &iface: ifaces) {
         error = PrepareLink(iface.second, iface.first);
@@ -925,6 +920,7 @@ TError TNetCfg::ConfigureL3(TL3NetCfg &l3) {
 }
 
 TError TNetCfg::ConfigureInterfaces() {
+    std::vector<std::string> links;
     auto parent_lock = ParentNet->ScopedLock();
     auto source_nl = ParentNet->GetNl();
     auto target_nl = Net->GetNl();
@@ -935,6 +931,7 @@ TError TNetCfg::ConfigureInterfaces() {
         error = link.ChangeNs(host.Dev, NetNs.GetFd());
         if (error)
             return error;
+        links.emplace_back(host.Dev);
     }
 
     for (auto &ipvlan : IpVlan) {
@@ -948,6 +945,7 @@ TError TNetCfg::ConfigureInterfaces() {
             (void)link.Remove();
             return error;
         }
+        links.emplace_back(ipvlan.Name);
     }
 
     for (auto &mvlan : MacVlan) {
@@ -965,62 +963,72 @@ TError TNetCfg::ConfigureInterfaces() {
             (void)link.Remove();
             return error;
         }
+        links.emplace_back(mvlan.Name);
     }
 
     for (auto &veth : Veth) {
         error = ConfigureVeth(veth);
         if (error)
             return error;
+        links.emplace_back(veth.Name);
     }
 
     for (auto &l3 : L3lan) {
         error = ConfigureL3(l3);
         if (error)
             return error;
+        links.emplace_back(l3.Name);
     }
 
     parent_lock.unlock();
 
-    std::vector<std::shared_ptr<TNlLink>> links;
-    error = target_nl->OpenLinks(links, true);
+    TNlLink loopback(target_nl, "lo");
+    error = loopback.Load();
+    if (error)
+        return error;
+    error = loopback.Up();
     if (error)
         return error;
 
-    for (auto &link: links) {
-        std::string dev = link->GetName();
+    for (auto &name: links) {
+        TNlLink link(target_nl, name);
+        bool hasConfig = false;
 
-        TError error = link->Load();
+        error = link.Load();
         if (error)
             return error;
 
-        bool hasIp = find_if(IpVec.begin(), IpVec.end(), [&](const TIpVec &i)->bool { return i.Iface == dev; }) != IpVec.end();
-        bool hasGw = find_if(GwVec.begin(), GwVec.end(), [&](const TGwVec &i)->bool { return i.Iface == dev; }) != GwVec.end();
+        for (auto &ip: IpVec)
+            if (ip.Iface == name)
+                hasConfig = true;
 
-        if (link->IsLoopback() || NetUp || hasIp || hasGw) {
-            error = link->Up();
+        for (auto &gw: GwVec)
+            if (gw.Iface == name)
+                hasConfig = true;
+
+        if (NetUp || hasConfig) {
+            error = link.Up();
             if (error)
                 return error;
         }
-    }
 
-    for (auto ip : IpVec) {
-        TNlLink link(target_nl, ip.Iface);
-        error = link.Load();
-        if (error)
-            return error;
-        error = link.AddAddress(ip.Addr);
-        if (error)
-            return error;
-    }
+        for (auto &ip: IpVec) {
+            if (ip.Iface == name) {
+                error = link.AddAddress(ip.Addr);
+                if (error)
+                    return error;
+            }
+        }
 
-    for (auto gw : GwVec) {
-        TNlLink link(target_nl, gw.Iface);
-        error = link.Load();
-        if (error)
-            return error;
-        error = link.SetDefaultGw(gw.Addr);
-        if (error)
-            return error;
+        for (auto &gw: GwVec) {
+            if (gw.Iface == name) {
+                error = link.SetDefaultGw(gw.Addr);
+                if (error)
+                    return error;
+            }
+        }
+
+        Net->AddInterface(link);
     }
 
     return TError::Success();
@@ -1050,7 +1058,7 @@ TError TNetCfg::PrepareNetwork() {
         if (error)
             return error;
 
-        error = Net->Prepare();
+        error = Net->PrepareLinks();
         if (error)
             return error;
 
@@ -1063,7 +1071,11 @@ TError TNetCfg::PrepareNetwork() {
         if (error)
             return error;
 
-        error = Net->Prepare();
+        error = Net->UpdateInterfaces();
+        if (error)
+            return error;
+
+        error = Net->PrepareLinks();
         if (error)
             return error;
 
@@ -1081,7 +1093,11 @@ TError TNetCfg::PrepareNetwork() {
             if (error)
                 return error;
 
-            error = Net->Prepare();
+            error = Net->UpdateInterfaces();
+            if (error)
+                return error;
+
+            error = Net->PrepareLinks();
             if (error)
                 return error;
 
