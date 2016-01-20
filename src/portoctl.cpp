@@ -1596,14 +1596,14 @@ public:
             if (v.Path.length() > 40)
                 std::cout << std::endl << std::setw(40) << " ";
             if (inodes) {
-                ShowSizeProperty(v, V_INODE_LIMIT, 8, true);
-                ShowSizeProperty(v, V_INODE_USED, 8, true);
-                ShowSizeProperty(v, V_INODE_AVAILABLE, 8, true);
+                ShowSizeProperty(v, V_INODE_LIMIT, 10, true);
+                ShowSizeProperty(v, V_INODE_USED, 10, true);
+                ShowSizeProperty(v, V_INODE_AVAILABLE, 10, true);
                 ShowPercent(v, V_INODE_USED, V_INODE_AVAILABLE, 5);
             } else {
-                ShowSizeProperty(v, V_SPACE_LIMIT, 8);
-                ShowSizeProperty(v, V_SPACE_USED, 8);
-                ShowSizeProperty(v, V_SPACE_AVAILABLE, 8);
+                ShowSizeProperty(v, V_SPACE_LIMIT, 10);
+                ShowSizeProperty(v, V_SPACE_USED, 10);
+                ShowSizeProperty(v, V_SPACE_AVAILABLE, 10);
                 ShowPercent(v, V_SPACE_USED, V_SPACE_AVAILABLE, 5);
             }
 
@@ -1640,9 +1640,9 @@ public:
 
         if (details) {
             std::cout << std::left << std::setw(40) << "Volume" << std::right;
-            std::cout << std::setw(8) << "Limit";
-            std::cout << std::setw(8) << "Used";
-            std::cout << std::setw(8) << "Avail";
+            std::cout << std::setw(10) << "Limit";
+            std::cout << std::setw(10) << "Used";
+            std::cout << std::setw(10) << "Avail";
             std::cout << std::setw(5) << "Use%";
             std::cout << std::left << " Containers" << std::endl;
         }
