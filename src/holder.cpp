@@ -295,7 +295,8 @@ void TContainerHolder::Unlink(TScopedLock &holder_lock, std::shared_ptr<TContain
 
     c->Destroy(holder_lock);
 
-    IdMap.Put(c->GetId());
+    TError error = IdMap.Put(c->GetId());
+    PORTO_ASSERT(!error);
     Containers.erase(c->GetName());
     Statistics->Created--;
 }

@@ -46,7 +46,7 @@ public:
 
     TContainerHolder(std::shared_ptr<TEpollLoop> epollLoop,
                      std::shared_ptr<TKeyValueStorage> storage) :
-        IdMap(CONTAINER_ID_MAX), Storage(storage), EpollLoop(epollLoop) { }
+        IdMap(1, CONTAINER_ID_MAX), Storage(storage), EpollLoop(epollLoop) { }
     TError ValidName(const std::string &name) const;
     std::shared_ptr<TContainer> GetParent(const std::string &name) const;
     TError CreateRoot(TScopedLock &holder_lock);

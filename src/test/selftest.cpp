@@ -2942,7 +2942,7 @@ static void TestPath(TPortoAPI &api) {
 }
 
 static void TestIdmap(TPortoAPI &api) {
-    TIdMap idmap(CONTAINER_ID_MAX);
+    TIdMap idmap(1, CONTAINER_ID_MAX);
     int id;
 
     for (int i = 1; i < 256; i++) {

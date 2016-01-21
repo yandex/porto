@@ -8,18 +8,24 @@
 
 class TIdMap : public TNonCopyable {
 private:
+    int Base;
     std::vector<bool> Used;
 public:
-    TIdMap(int size) {
+    TIdMap(int base, int size) {
+        Base = base;
+        Resize(size);
+    }
+
+    void Resize(int size) {
         Used.resize(size, false);
     }
 
     TError GetAt(int id) {
-        if (id < 1 || id > (int)Used.size())
+        if (id < Base || id >= Base + (int)Used.size())
             return TError(EError::Unknown, "Id " + std::to_string(id) + " out of range");
-        if (Used[id - 1])
+        if (Used[id - Base])
             return TError(EError::Unknown, "Id " + std::to_string(id) + " already used");
-        Used[id - 1] = true;
+        Used[id - Base] = true;
         return TError::Success();
     }
 
@@ -27,13 +33,17 @@ public:
         auto it = std::find(Used.begin(), Used.end(), false);
         if (it == Used.end())
             TError(EError::ResourceNotAvailable, "Cannot allocate id");
-        id = it - Used.begin() + 1;
-        return GetAt(id);
+        id = Base + (it - Used.begin());
+        *it = true;
+        return TError::Success();
     }
 
-    void Put(int id) {
-        PORTO_ASSERT(id > 0 && id <= (int)Used.size());
-        PORTO_ASSERT(Used[id - 1]);
-        Used[id - 1] = false;
+    TError Put(int id) {
+        if (id < Base || id >= Base + (int)Used.size())
+            return TError(EError::Unknown, "Id out of range");
+        if (!Used[id - Base])
+            return TError(EError::Unknown, "Freeing not allocated id");
+        Used[id - Base] = false;
+        return TError::Success();
     }
 };
