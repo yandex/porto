@@ -128,6 +128,7 @@ TError TStdStream::OpenInChild(const TCred &cred) const {
 }
 
 TError TStdStream::Rotate(off_t limit, off_t &loss) const {
+    loss = 0;
     if (Type == STD_TYPE_FILE && PathOnHost.IsRegular()) {
         return PathOnHost.RotateLog(config().container().max_log_size(), loss);
     } else
