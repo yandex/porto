@@ -68,10 +68,15 @@ TError TStdStream::Prepare(const TCred &cred, std::shared_ptr<TClient> client) {
 
     if (clientFd >= 0) {
         if (client) {
-            auto l = StringFormat("/proc/%u/fd/%u", client->GetPid(), clientFd);
-            return TPath(l).ReadLink(PathOnHost);
-        }
-        PathOnHost = "/dev/null";
+            TPath fd(StringFormat("/proc/%u/fd/%u", client->GetPid(), clientFd));
+            if (!fd.HasAccess(client->GetCred(), Stream ? 2 : 4))
+                return TError(EError::Permission,
+                              std::string("client have no ") +
+                              (Stream ? "write" : "read") +
+                              " access to " + PathInContainer.ToString());
+            PathOnHost = fd;
+        } else
+            PathOnHost = "/dev/null";
     }
 
     return TError::Success();
