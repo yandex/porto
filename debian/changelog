@@ -1,3 +1,25 @@
+yandex-porto (2.7.6) precise; urgency=medium
+
+  * container: Efd -> OomEventFd
+  * porto: do not leak log fd into task in "stdlog" mode
+  * property: TStdSwitchProperty -> TStdTypeProperty
+  * stream: Type -> Stream, Impl -> Type
+  * stream: move std -> stream
+  * stream: hide std*_type properties
+  * stream: open /dev/null from host
+  * stream: open /dev/tty as client tty
+  * test/selftest: comment std*type
+  * network: do not generate mac for macvlan if hostname is not set
+  * statistics: count containers, volumes and clients
+  * volume: plug memory leak, break reference loop
+  * portoctl: fix columns in vlist
+  * network: manage all created interfaces in new netns
+  * stream: drop /dev/tty, redirect /dev/fd/%d into path of client file descriptor
+  * stream: check client permissions for fd before redirection
+  * stream: initialize rotation loss to zero
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 21 Jan 2016 12:57:27 +0300
+
 yandex-porto (2.7.5) precise; urgency=medium
 
   * cgroup: fix another crash in ChildsAll
