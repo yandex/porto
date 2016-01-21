@@ -26,7 +26,7 @@ TStdStream::TStdStream(int stream, const std::string &type,
         ManagedByPorto = true;
     }
 
-    if (PathInContainer == "/dev/tty" || Type == STD_TYPE_PTY)
+    if (StringStartsWith(PathInContainer.ToString(), "/dev/fd/") || Type == STD_TYPE_PTY)
         ManagedByPorto = true;
 }
 
@@ -56,13 +56,24 @@ TError TStdStream::Prepare(const TCred &cred, std::shared_ptr<TClient> client) {
             return TError(EError::Unknown, errno, "fcntl");
     }
 
-    if (PathInContainer == "/dev/tty" || Type == STD_TYPE_PTY) {
+    int clientFd = -1;
+
+    if (Type == STD_TYPE_PTY)
+        clientFd = Stream;
+
+    if (StringStartsWith(PathInContainer.ToString(), "/dev/fd/") &&
+            StringToInt(PathInContainer.ToString().substr(8), clientFd))
+        return TError(EError::InvalidValue, "invalid std path: " +
+                                            PathInContainer.ToString());
+
+    if (clientFd >= 0) {
         if (client) {
-            auto l = StringFormat("/proc/%u/fd/%u", client->GetPid(), Stream);
+            auto l = StringFormat("/proc/%u/fd/%u", client->GetPid(), clientFd);
             return TPath(l).ReadLink(PathOnHost);
         }
         PathOnHost = "/dev/null";
     }
+
     return TError::Success();
 }
 
