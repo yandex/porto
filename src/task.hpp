@@ -50,6 +50,7 @@ struct TTaskEnv : public TNonCopyable {
     std::string Hostname;
     bool SetEtcHostname;
     bool BindDns;
+    std::string ResolvConf;
     std::vector<TBindMap> BindMap;
     int LoopDev;
     uint64_t Caps;

@@ -3013,6 +3013,7 @@ static void TestRoot(TPortoAPI &api) {
         "aging_time",
         "porto_namespace",
         "enable_porto",
+        "resolv_conf",
 /*
         "stdout_type",
         "stdin_type",

@@ -665,6 +665,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     auto user = Prop->Get<std::string>(P_USER);
     auto taskEnv = std::unique_ptr<TTaskEnv>(new TTaskEnv());
     auto parent = FindRunningParent();
+    TError error;
 
     taskEnv->Container = GetName();
 
@@ -688,7 +689,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
         taskEnv->Cred = TCred(0, 0);
     } else {
         taskEnv->Cred = OwnerCred;
-        TError error = taskEnv->Cred.LoadGroups(user);
+        error = taskEnv->Cred.LoadGroups(user);
         if (error)
             return error;
     }
@@ -723,11 +724,15 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
 
     taskEnv->BindDns = Prop->Get<bool>(P_BIND_DNS);
 
+    error = Prop->PrepareTaskEnv(P_RESOLV_CONF, *taskEnv);
+    if (error)
+        return error;
+
     taskEnv->Stdin = Stdin;
     taskEnv->Stdout = Stdout;
     taskEnv->Stderr = Stderr;
 
-    TError error = Prop->PrepareTaskEnv(P_ULIMIT, *taskEnv);
+    error = Prop->PrepareTaskEnv(P_ULIMIT, *taskEnv);
     if (error)
         return error;
 

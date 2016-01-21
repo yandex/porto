@@ -435,6 +435,18 @@ TError TTask::ChildMountRootFs() {
         error = ChildBindDns();
         if (error)
             return error;
+    } else if (Env->ResolvConf.length()) {
+        TPath resolvconf = Env->Root + "/etc/resolv.conf";
+        if (!resolvconf.IsRegular()) {
+            if (!resolvconf.Exists())
+                error = resolvconf.Mknod(S_IFREG | 0644, 0);
+            else
+                error = TError(EError::InvalidState, "non-regular file");
+        }
+        if (!error)
+            error = resolvconf.WriteAll(Env->ResolvConf);
+        if (error)
+            return TError(error, "cannot write /etc/resolv.conf");
     }
 
     return TError::Success();

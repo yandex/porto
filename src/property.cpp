@@ -1187,6 +1187,28 @@ public:
     }
 };
 
+class TResolvConfProperty : public TListValue, public TContainerValue {
+public:
+    TResolvConfProperty() :
+        TListValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TContainerValue(P_RESOLV_CONF,
+                        "DNS resolver configuration: <resolv.conf option>;...",
+                        staticProperty) {}
+
+    TError PrepareTaskEnv(TTaskEnv &taskEnv) override {
+        if (HasValue()) {
+            if (taskEnv.Root.IsRoot())
+                return TError(EError::InvalidValue,
+                        "resolv_conf requires separate root");
+            taskEnv.BindDns = false;
+            auto lines = Get();
+            for (auto &line: lines)
+                taskEnv.ResolvConf += line + "\n";
+        }
+        return TError::Success();
+    }
+};
+
 class TRawIdProperty : public TIntValue, public TContainerValue {
 public:
     TRawIdProperty() :
@@ -1279,6 +1301,7 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TVirtModeProperty,
         new TAgingTimeProperty,
         new TEnablePortoProperty,
+        new TResolvConfProperty,
 
         new TRawIdProperty,
         new TRawRootPidProperty,
