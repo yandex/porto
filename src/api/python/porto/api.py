@@ -379,29 +379,6 @@ class Container(object):
     def Destroy(self):
         self.rpc.Destroy(self.name)
 
-    def SetTty(self):
-        """
-        Create and configure TTY for container.
-        TTY will be applied to all the default streams
-        (stdin, stdout, stderr).
-
-        :note: you should set TERM variable in `env` container property to properly use this TTY
-        :rtype: tuple
-        :return: pair of `int` with master pty fileno and `str` with slave pty filepath
-
-        """
-        ptm, slavept = linuxpty.make_tty()
-
-        self.SetProperty("stdin_path", slavept)
-        self.SetProperty("stdout_path", slavept)
-        self.SetProperty("stderr_path", slavept)
-
-        self.SetProperty("stdin_type", "pty")
-        self.SetProperty("stdout_type", "pty")
-        self.SetProperty("stderr_type", "pty")
-
-        return ptm, slavept
-
 
 class Layer(object):
     def __init__(self, rpc, name):
