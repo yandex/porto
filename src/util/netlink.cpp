@@ -903,3 +903,32 @@ TError TNlAddr::Parse(int family, const std::string &string) {
 
     return TError::Success();
 }
+
+std::string TNlAddr::Format() {
+    char buf[128];
+    return std::string(nl_addr2str(Addr, buf, sizeof(buf)));
+}
+
+void TNlAddr::AddOffset(uint64_t offset) {
+    uint8_t *byte = (uint8_t *)nl_addr_get_binary_addr(Addr);
+
+    for (int i = nl_addr_get_len(Addr) - 1; offset && i >= 0; i--) {
+        offset += byte[i];
+        byte[i] = offset & 0xFF;
+        offset >>= 8;
+    }
+}
+
+uint64_t TNlAddr::GetOffset(const TNlAddr &base) const {
+    uint8_t *byte = (uint8_t *)nl_addr_get_binary_addr(Addr);
+    uint8_t *base_byte = (uint8_t *)nl_addr_get_binary_addr(base.Addr);
+    int len = nl_addr_get_len(Addr);
+    uint64_t offset = 0;
+
+    for (int i = 0; i < len; i++) {
+        offset <<= 8;
+        offset += byte[i] - base_byte[i];
+    }
+
+    return offset;
+}

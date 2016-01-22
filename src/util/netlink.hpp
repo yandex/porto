@@ -29,11 +29,18 @@ public:
     TNlAddr(const TNlAddr &other);
     TNlAddr &operator=(const TNlAddr &other);
     ~TNlAddr();
+
     void Forget();
+
     TError Parse(int family, const std::string &string);
-    bool IsEmpty() const;
+    std::string Format();
+
     int Family() const;
+    bool IsEmpty() const;
     bool IsHost() const;
+
+    void AddOffset(uint64_t offset);
+    uint64_t GetOffset(const TNlAddr &base) const;
 };
 
 enum class ETclassStat {
