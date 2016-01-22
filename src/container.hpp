@@ -177,6 +177,7 @@ public:
     void AddChild(std::shared_ptr<TContainer> child);
     TError Create(const TCred &cred);
     void Destroy(TScopedLock &holder_lock);
+    void DestroyWeak();
     TError Start(std::shared_ptr<TClient> client, bool meta);
     TError Stop(TScopedLock &holder_lock);
     TError StopTree(TScopedLock &holder_lock);

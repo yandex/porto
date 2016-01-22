@@ -1210,6 +1210,19 @@ public:
     }
 };
 
+class TWeakProperty : public TBoolValue, public TContainerValue {
+public:
+    TWeakProperty() :
+        TBoolValue(PERSISTENT_VALUE),
+        TContainerValue(P_WEAK,
+                        "Destroy container when client disconnects",
+                        anyState) {}
+
+    bool GetDefault() const override {
+        return false;
+    }
+};
+
 class TRawIdProperty : public TIntValue, public TContainerValue {
 public:
     TRawIdProperty() :
@@ -1303,6 +1316,7 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TAgingTimeProperty,
         new TEnablePortoProperty,
         new TResolvConfProperty,
+        new TWeakProperty,
 
         new TRawIdProperty,
         new TRawRootPidProperty,

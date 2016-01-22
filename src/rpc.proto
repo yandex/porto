@@ -59,6 +59,7 @@ enum EError {
 
 message TContainerCreateRequest {
 	required string name = 1;
+	optional bool weak = 2;
 }
 
 message TContainerDestroyRequest {

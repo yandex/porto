@@ -40,6 +40,12 @@ void TClient::CloseConnection() {
         close(Fd);
         Fd = -1;
     }
+
+    for (auto &weakCt: WeakContainers) {
+        auto container = weakCt.lock();
+        if (container)
+            container->DestroyWeak();
+    }
 }
 
 int TClient::GetFd() const {

@@ -56,6 +56,7 @@ public:
     void Cleanup(); // TODO: remove
 
     int Create(const std::string &name);
+    int CreateWeakContainer(const std::string &name);
     int Destroy(const std::string &name);
 
     int Start(const std::string &name);

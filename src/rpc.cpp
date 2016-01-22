@@ -21,7 +21,9 @@ static std::string RequestAsString(const rpc::TContainerRequest &req) {
         return req.ShortDebugString();
 
     if (req.has_create())
-        return "create " + req.create().name();
+        return std::string("create ") +
+            ((req.create().has_weak() && req.create().weak()) ? "weak " : "") +
+            req.create().name();
     else if (req.has_destroy())
         return "destroy " + req.destroy().name();
     else if (req.has_list())
@@ -311,6 +313,11 @@ noinline TError CreateContainer(TContext &context,
         TNestedScopedLock lock(*container, holder_lock);
         if (container->IsValid())
             container->Journal("created", client);
+    }
+
+    if (!err && req.has_weak() && req.weak()) {
+        container->Prop->Set<bool>(P_WEAK, true);
+        client->WeakContainers.emplace_back(container);
     }
 
     return err;

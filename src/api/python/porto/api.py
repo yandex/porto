@@ -143,6 +143,12 @@ class _RPC(object):
         request.create.name = name
         self.call(request, self.timeout)
 
+    def CreateWeakContainer(self, name):
+        request = rpc_pb2.TContainerRequest()
+        request.create.name = name
+        request.create.weak = True
+        self.call(request, self.timeout)
+
     def Destroy(self, name):
         request = rpc_pb2.TContainerRequest()
         request.destroy.name = name

@@ -61,6 +61,8 @@ std::string TEvent::GetMsg() const {
             return "wait timeout";
         case EEventType::UpdateNetwork:
             return "update network";
+        case EEventType::DestroyWeak:
+            return "destroy weak";
         default:
             return "unknown event";
     }

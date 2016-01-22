@@ -320,6 +320,13 @@ void TContainer::Destroy(TScopedLock &holder_lock) {
     RemoveKvs();
 }
 
+void TContainer::DestroyWeak() {
+    if (Prop->Get<bool>(P_WEAK)) {
+        TEvent event(EEventType::DestroyWeak, shared_from_this());
+        Holder->Queue->Add(0, event);
+    }
+}
+
 const std::string TContainer::GetName() const {
     if (IsRoot() || IsPortoRoot() || Parent->IsPortoRoot())
         return Name;

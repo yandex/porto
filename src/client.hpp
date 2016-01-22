@@ -2,6 +2,7 @@
 
 #include <string>
 #include <mutex>
+#include <list>
 
 #include "common.hpp"
 #include "epoll.hpp"
@@ -46,6 +47,8 @@ public:
 
     TError QueueResponse(rpc::TContainerResponse &response);
     TError SendResponse(bool first);
+
+    std::list<std::weak_ptr<TContainer>> WeakContainers;
 
 private:
     pid_t Pid;

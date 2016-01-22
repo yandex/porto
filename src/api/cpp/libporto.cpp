@@ -150,6 +150,13 @@ int TPortoAPI::Create(const std::string &name) {
     return Impl->Rpc();
 }
 
+int TPortoAPI::CreateWeakContainer(const std::string &name) {
+    Impl->GetReq().mutable_create()->set_name(name);
+    Impl->GetReq().mutable_create()->set_weak(true);
+
+    return Impl->Rpc();
+}
+
 int TPortoAPI::Destroy(const std::string &name) {
     Impl->GetReq().mutable_destroy()->set_name(name);
 

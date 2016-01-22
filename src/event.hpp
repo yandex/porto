@@ -17,6 +17,7 @@ enum class EEventType {
     CgroupSync,
     WaitTimeout,
     UpdateNetwork,
+    DestroyWeak,
 };
 
 class TEventWorker;

@@ -475,6 +475,15 @@ void TContainerHolder::RemoveLeftovers() {
             (void)cg->Remove();
         }
     }
+
+    for (auto it: Containers) {
+        auto container = it.second;
+        if (container->Prop->Get<bool>(P_WEAK)) {
+            auto holder_lock = ScopedLock();
+            L_ACT() << "Destroy weak container " << it.first << std::endl;
+            Destroy(holder_lock, container);
+        }
+    }
 }
 
 void TContainerHolder::ScheduleLogRotatation() {
@@ -589,6 +598,14 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
             w->Signal(nullptr);
         delivered = true;
         break;
+    }
+    case EEventType::DestroyWeak:
+    {
+        auto container = event.Container.lock();
+        if (container) {
+            L_ACT() << "Destroy weak container " << container->GetName() << std::endl;
+            Destroy(holder_lock, container);
+        }
     }
     case EEventType::RotateLogs:
     {
