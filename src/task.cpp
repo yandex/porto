@@ -198,18 +198,6 @@ TError TTask::ChildExec() {
         break;
     }
 
-    TError error = Env->Stdin.OpenInChild(Env->Cred);
-    if (error)
-        return error;
-
-    error = Env->Stdout.OpenInChild(Env->Cred);
-    if (error)
-        return error;
-
-    error = Env->Stderr.OpenInChild(Env->Cred);
-    if (error)
-        return error;
-
     if (config().log().verbose()) {
         L() << "command=" << Env->Command << std::endl;
         for (unsigned i = 0; result.we_wordv[i]; i++)
@@ -613,10 +601,25 @@ TError TTask::ConfigureChild() {
                 return error;
             /* Parent forwards VPid */
             Env->ReportStage++;
+
+            if (setsid() < 0)
+                return TError(EError::Unknown, errno, "setsid()");
         }
     }
 
     error = ChildDropPriveleges();
+    if (error)
+        return error;
+
+    error = Env->Stdin.OpenInChild(Env->Cred);
+    if (error)
+        return error;
+
+    error = Env->Stdout.OpenInChild(Env->Cred);
+    if (error)
+        return error;
+
+    error = Env->Stderr.OpenInChild(Env->Cred);
     if (error)
         return error;
 

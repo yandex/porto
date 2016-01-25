@@ -5,6 +5,7 @@
 #include "client.hpp"
 
 extern "C" {
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -88,6 +89,9 @@ TError TStdStream::Open(const TPath &path, const TCred &cred) const {
     if (Stream && Type == STD_TYPE_FILE)
         flags |= O_CREAT | O_APPEND;
 
+    /* Never assign controlling terminal at open */
+    flags |= O_NOCTTY;
+
     int ret = open(path.ToString().c_str(), flags, 0660);
     if (ret < 0)
         return TError(EError::InvalidValue, errno,
@@ -116,15 +120,20 @@ TError TStdStream::Open(const TPath &path, const TCred &cred) const {
 TError TStdStream::OpenOnHost(const TCred &cred) const {
     if (ManagedByPorto)
         return Open(PathOnHost, cred);
-    else
-        return TError::Success();
+    return TError::Success();
 }
 
 TError TStdStream::OpenInChild(const TCred &cred) const {
+    TError error;
+
     if (!ManagedByPorto)
-        return Open(PathInContainer, cred);
-    else
-        return TError::Success();
+        error = Open(PathInContainer, cred);
+
+    /* Assign controlling terminal for our own session */
+    if (!error && isatty(Stream))
+        (void)ioctl(Stream, TIOCSCTTY, 0);
+
+    return error;
 }
 
 TError TStdStream::Rotate(off_t limit, off_t &loss) const {
