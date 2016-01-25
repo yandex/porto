@@ -3014,6 +3014,7 @@ static void TestRoot(TPortoAPI &api) {
         "porto_namespace",
         "enable_porto",
         "resolv_conf",
+        "weak",
 /*
         "stdout_type",
         "stdin_type",
