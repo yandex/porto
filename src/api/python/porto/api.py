@@ -3,7 +3,6 @@ import threading
 
 from . import rpc_pb2
 from . import exceptions
-from . import linuxpty
 
 __all__ = ['Connection']
 
