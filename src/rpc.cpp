@@ -21,9 +21,9 @@ static std::string RequestAsString(const rpc::TContainerRequest &req) {
         return req.ShortDebugString();
 
     if (req.has_create())
-        return std::string("create ") +
-            ((req.create().has_weak() && req.create().weak()) ? "weak " : "") +
-            req.create().name();
+        return std::string("create ") + req.create().name();
+    else if (req.has_createweak())
+        return std::string("create weak ") + req.create().name();
     else if (req.has_destroy())
         return "destroy " + req.destroy().name();
     else if (req.has_list())
@@ -228,6 +228,7 @@ static bool InfoRequest(const rpc::TContainerRequest &req) {
 static bool ValidRequest(const rpc::TContainerRequest &req) {
     return
         req.has_create() +
+        req.has_createweak() +
         req.has_destroy() +
         req.has_list() +
         req.has_getproperty() +
@@ -276,8 +277,8 @@ static TError CheckRequestPermissions(std::shared_ptr<TClient> client) {
     return TError::Success();
 }
 
-noinline TError CreateContainer(TContext &context,
-                                const rpc::TContainerCreateRequest &req,
+static noinline TError CreateContainer(TContext &context,
+                                std::string reqName, bool weak,
                                 rpc::TContainerResponse &rsp,
                                 std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
@@ -292,7 +293,7 @@ noinline TError CreateContainer(TContext &context,
         return err;
 
     std::string name;
-    err = clientContainer->ResolveRelativeName(req.name(), name);
+    err = clientContainer->ResolveRelativeName(reqName, name);
     if (err)
         return err;
 
@@ -315,7 +316,7 @@ noinline TError CreateContainer(TContext &context,
             container->Journal("created", client);
     }
 
-    if (!err && req.has_weak() && req.weak()) {
+    if (!err && weak) {
         container->Prop->Set<bool>(P_WEAK, true);
         client->WeakContainers.emplace_back(container);
     }
@@ -1514,7 +1515,9 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
             L_ERR() << "Invalid request " << req.ShortDebugString() << " from " << *client << std::endl;
             error = TError(EError::InvalidMethod, "invalid request");
         } else if (req.has_create())
-            error = CreateContainer(context, req.create(), rsp, client);
+            error = CreateContainer(context, req.create().name(), false, rsp, client);
+        else if (req.has_createweak())
+            error = CreateContainer(context, req.createweak().name(), true, rsp, client);
         else if (req.has_destroy())
             error = DestroyContainer(context, req.destroy(), rsp, client);
         else if (req.has_list())

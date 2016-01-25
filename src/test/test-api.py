@@ -152,4 +152,15 @@ c.DestroyVolume(v.path)
 
 l.Remove()
 os.rmdir(volume_path)
+
+a = c.CreateWeakContainer(container_name)
+a.SetProperty("command", "sleep 60")
+a.Start()
+c.disconnect()
+c.connect()
+if Catch(c.Find, container_name) != porto.exceptions.ContainerDoesNotExist:
+    Catch(c.Wait, [container_name], 1000)
+    assert Catch(c.Find, container_name) == porto.exceptions.ContainerDoesNotExist
+
+Catch(c.Destroy, container_name)
 c.disconnect()

@@ -603,6 +603,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     {
         auto container = event.Container.lock();
         if (container) {
+            TNestedScopedLock lock(*container, holder_lock);
             L_ACT() << "Destroy weak container " << container->GetName() << std::endl;
             Destroy(holder_lock, container);
         }

@@ -59,7 +59,6 @@ enum EError {
 
 message TContainerCreateRequest {
 	required string name = 1;
-	optional bool weak = 2;
 }
 
 message TContainerDestroyRequest {
@@ -157,6 +156,7 @@ message TContainerRequest {
 	optional TVersionRequest version = 14;
 	optional TContainerGetRequest get = 15;
 	optional TContainerWaitRequest wait = 16;
+	optional TContainerCreateRequest createWeak = 17;
 
 	optional TVolumePropertyListRequest listVolumeProperties = 103;
 	optional TVolumeCreateRequest createVolume = 104;

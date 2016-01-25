@@ -46,6 +46,7 @@ void TClient::CloseConnection() {
         if (container)
             container->DestroyWeak();
     }
+    WeakContainers.clear();
 }
 
 int TClient::GetFd() const {

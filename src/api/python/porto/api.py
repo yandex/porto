@@ -137,11 +137,14 @@ class _RPC(object):
         request.list.CopyFrom(rpc_pb2.TContainerListRequest())
         return self.call(request, self.timeout).list.name
 
-    def Create(self, name, weak=False):
+    def Create(self, name):
         request = rpc_pb2.TContainerRequest()
         request.create.name = name
-        if weak:
-            request.create.weak = True
+        self.call(request, self.timeout)
+
+    def CreateWeak(self, name):
+        request = rpc_pb2.TContainerRequest()
+        request.createWeak.name = name
         self.call(request, self.timeout)
 
     def Destroy(self, name):
@@ -459,7 +462,7 @@ class Connection(object):
         return Container(self.rpc, name)
 
     def CreateWeakContainer(self, name):
-        self.rpc.Create(name, weak=True)
+        self.rpc.CreateWeak(name)
         return Container(self.rpc, name)
 
     def Destroy(self, container):
