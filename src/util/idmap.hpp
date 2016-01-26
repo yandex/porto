@@ -32,7 +32,7 @@ public:
     TError Get(int &id) {
         auto it = std::find(Used.begin(), Used.end(), false);
         if (it == Used.end())
-            TError(EError::ResourceNotAvailable, "Cannot allocate id");
+            return TError(EError::ResourceNotAvailable, "Cannot allocate id");
         id = Base + (it - Used.begin());
         *it = true;
         return TError::Success();
