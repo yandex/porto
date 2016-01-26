@@ -581,7 +581,11 @@ again:
                                 prio, rate, ceil);
         if (error) {
             if (retry--) {
-                UpdateInterfaces();
+                L_WRN() << "Cannot add tc class: " << error
+                        << " Update interfaces and retry." << std::endl;
+                error = UpdateInterfaces();
+                if (error)
+                    return error;
                 goto again;
             }
             return error;
