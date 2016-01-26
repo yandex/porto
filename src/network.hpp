@@ -25,6 +25,7 @@ public:
     TError UpdateInterfaces();
 
     void AddInterface(TNlLink &link) {
+        link.Dump("managed link");
         ifaces.emplace_back(link.GetName(), link.GetIndex());
     }
 

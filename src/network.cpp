@@ -207,12 +207,17 @@ TError TNetwork::UpdateInterfaces() {
         int ifindex = rtnl_link_get_ifindex(link);
         int flags = rtnl_link_get_flags(link);
         const char *name = rtnl_link_get_name(link);
-
-        Nl->Dump("link", link);
+        const char *type = rtnl_link_get_type(link);
 
         if ((flags & IFF_LOOPBACK) || !(flags & IFF_RUNNING))
             continue;
 
+        if (type && !strcmp(type, "veth") &&
+                (!strncmp(name, "portove-", 8) ||
+                 !strncmp(name, "L3-", 3)))
+            continue;
+
+        Nl->Dump("managed link", link);
         ifaces.push_back(std::make_pair(std::string(name), ifindex));
     }
 
