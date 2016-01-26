@@ -1,3 +1,32 @@
+yandex-porto (2.7.7) precise; urgency=medium
+
+  [ Konstantin Khlebnikov ]
+  * property: add resolv_conf
+  * idmap: add dynamic base index and error code to put
+  * util/netlink: more address operations
+  * network: add net=NAT
+  * portod: add weak containers
+
+  [ Vsevolod Velichko ]
+  * api/python: remove SetTty
+
+  [ Konstantin Khlebnikov ]
+  * stream: assign controlling termianal for child task
+
+  [ Vsevolod Velichko ]
+  * api/python: remove linuxtty import
+  * api/python: fix api for weak containers
+
+  [ Konstantin Khlebnikov ]
+  * selftest: add property "weak"
+  * portod: add separate rpc request for weak containers
+  * idmap: fix typo
+  * network: log interfaces update when adding tc classes
+  * network: do not manage host end of veth
+  * portod: remove ack source when slave process exits
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 26 Jan 2016 18:00:19 +0300
+
 yandex-porto (2.7.6) precise; urgency=medium
 
   * container: Efd -> OomEventFd
