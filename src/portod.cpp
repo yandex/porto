@@ -708,6 +708,8 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
         return EXIT_FAILURE;
     }
 
+    auto AckSource = std::make_shared<TEpollSource>(loop, ackfd[0]);
+
     slavePid = fork();
     if (slavePid < 0) {
         L_ERR() << "fork(): " << strerror(errno) << std::endl;
@@ -738,7 +740,6 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
     UpdateQueueSize(exited);
 
     {
-    auto AckSource = std::make_shared<TEpollSource>(loop, ackfd[0]);
     error = loop->AddSource(AckSource);
     if (error) {
         L_ERR() << "Can't add ackfd[0] to epoll: " << error << std::endl;
@@ -840,6 +841,8 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
     }
 
 exit:
+    loop->RemoveSource(AckSource);
+
     close(evtfd[0]);
     close(evtfd[1]);
 
