@@ -295,10 +295,18 @@ TError TNetwork::GetGateAddress(std::vector<TNlAddr> addrs,
     return TError::Success();
 }
 
-TError TNetwork::AddAnnounce(const TNlAddr &addr) {
+TError TNetwork::AddAnnounce(const TNlAddr &addr, std::string master) {
     struct nl_cache *cache;
     TError error;
     int ret;
+
+    if (master != "") {
+        for (auto &iface : ifaces) {
+            if (iface.first == master)
+                return Nl->ProxyNeighbour(iface.second, addr, true);
+        }
+        return TError(EError::InvalidValue, "Master link not found: " + master);
+    }
 
     ret = rtnl_addr_alloc_cache(GetSock(), &cache);
     if (ret < 0)
@@ -779,11 +787,8 @@ TError TNetCfg::ParseNet(std::vector<std::string> lines) {
                 l3.Name = StringTrim(settings[1]);
 
             l3.Mtu = -1;
-            if (settings.size() > 2) {
-                TError error = StringToInt(settings[2], l3.Mtu);
-                if (error)
-                    return error;
-            }
+            if (settings.size() > 2)
+                l3.Master = StringTrim(settings[2]);
 
             L3lan.push_back(l3);
 
@@ -792,17 +797,51 @@ TError TNetCfg::ParseNet(std::vector<std::string> lines) {
 
             nat.Nat = true;
             nat.Name = "eth0";
+            nat.Mtu = -1;
+
             if (settings.size() > 1)
                 nat.Name = StringTrim(settings[1]);
 
-            nat.Mtu = -1;
-            if (settings.size() > 2) {
-                TError error = StringToInt(settings[2], nat.Mtu);
-                if (error)
-                    return error;
+            L3lan.push_back(nat);
+
+        } else if (type == "MTU") {
+            if (settings.size() != 3)
+                return TError(EError::InvalidValue, "Invalid MTU in: " + line);
+
+            int mtu;
+            TError error = StringToInt(settings[2], mtu);
+            if (error)
+                return error;
+
+            for (auto &link: L3lan) {
+                if (link.Name == settings[1]) {
+                    link.Mtu = mtu;
+                    return TError::Success();
+                }
             }
 
-            L3lan.push_back(nat);
+            for (auto &link: Veth) {
+                if (link.Name == settings[1]) {
+                    link.Mtu = mtu;
+                    return TError::Success();
+                }
+            }
+
+            for (auto &link: MacVlan) {
+                if (link.Name == settings[1]) {
+                    link.Mtu = mtu;
+                    return TError::Success();
+                }
+            }
+
+            for (auto &link: IpVlan) {
+                if (link.Name == settings[1]) {
+                    link.Mtu = mtu;
+                    return TError::Success();
+                }
+            }
+
+            return TError(EError::InvalidValue, "Link not found: " + settings[1]);
 
         } else if (type == "netns") {
             if (settings.size() != 2)
@@ -997,7 +1036,7 @@ TError TNetCfg::ConfigureL3(TL3NetCfg &l3) {
         if (error)
             return error;
 
-        error = ParentNet->AddAnnounce(addr);
+        error = ParentNet->AddAnnounce(addr, l3.Master);
         if (error)
             return error;
     }

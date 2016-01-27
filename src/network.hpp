@@ -61,7 +61,7 @@ public:
 
     TError GetGateAddress(std::vector<TNlAddr> addrs,
                           TNlAddr &gate4, TNlAddr &gate6, int &mtu);
-    TError AddAnnounce(const TNlAddr &addr);
+    TError AddAnnounce(const TNlAddr &addr, std::string master);
     TError DelAnnounce(const TNlAddr &addr);
 
     TError GetNatAddress(std::vector <TNlAddr> &addrs);
@@ -108,6 +108,7 @@ struct TVethNetCfg {
 
 struct TL3NetCfg {
     std::string Name;
+    std::string Master;
     int Mtu;
     std::vector<TNlAddr> Addrs;
     bool Nat;

@@ -944,8 +944,9 @@ public:
                         "macvlan <master> <name> [bridge|private|vepa|passthru] [mtu] [hw] | "
                         "ipvlan <master> <name> [l2|l3] [mtu] | "
                         "veth <name> <bridge> [mtu] [hw] | "
-                        "L3 [name] [mtu] | "
-                        "NAT [name] [mtu] | "
+                        "L3 <name> [master] | "
+                        "NAT [name] | "
+                        "MTU <name> <mtu> | "
                         "netns <name>",
                         staticProperty) {}
 
