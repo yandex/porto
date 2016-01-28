@@ -1281,6 +1281,15 @@ TError TNetCfg::DestroyNetwork() {
             error = ParentNet->PutNatAddress(l3.Addrs);
             if (error)
                 L_ERR() << "Cannot put NAT address : " << error << std::endl;
+
+            auto ip = IpVec.begin();
+            while (ip != IpVec.end()) {
+                if (ip->Iface == l3.Name)
+                    ip = IpVec.erase(ip);
+                else
+                    ++ip;
+            }
+            SaveIp = true;
         }
     }
 

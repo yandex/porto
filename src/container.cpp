@@ -1200,6 +1200,11 @@ void TContainer::FreeResources() {
         error = ParseNetConfig(NetCfg);
         if (!error)
             error = NetCfg.DestroyNetwork();
+        if (NetCfg.SaveIp) {
+            std::vector<std::string> lines;
+            if (!NetCfg.FormatIp(lines))
+                Prop->Set<std::vector<std::string>>(P_IP, lines);
+        }
         if (error)
             L_ERR() << "Cannot free network resources: " << error << std::endl;
 
