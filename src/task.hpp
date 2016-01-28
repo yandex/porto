@@ -62,7 +62,7 @@ struct TTaskEnv : public TNonCopyable {
     bool EnvHasKey(const std::string &key);
 
     TUnixSocket Sock, MasterSock;
-    TUnixSocket Sock2;
+    TUnixSocket Sock2,  MasterSock2;
     int ReportStage = 0;
 };
 

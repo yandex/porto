@@ -593,6 +593,9 @@ TError TTask::ConfigureChild() {
             return TError(EError::Unknown, errno, "fexecve()");
         } else {
             Pid = getpid();
+
+            Env->MasterSock2.Close();
+
             error = Env->Sock2.SendPid(Pid);
             if (error)
                 return error;
@@ -601,6 +604,8 @@ TError TTask::ConfigureChild() {
                 return error;
             /* Parent forwards VPid */
             Env->ReportStage++;
+
+            Env->Sock2.Close();
 
             if (setsid() < 0)
                 return TError(EError::Unknown, errno, "setsid()");
@@ -658,7 +663,6 @@ void TTask::StartChild() {
 }
 
 TError TTask::Start() {
-    TUnixSocket waiterSock;
     int status;
     TError error;
 
@@ -727,7 +731,7 @@ TError TTask::Start() {
         }
 
         if (Env->QuadroFork) {
-            error = TUnixSocket::SocketPair(waiterSock, Env->Sock2);
+            error = TUnixSocket::SocketPair(Env->MasterSock2, Env->Sock2);
             if (error)
                 Abort(error);
         }
@@ -778,14 +782,19 @@ TError TTask::Start() {
         if (Env->QuadroFork) {
             pid_t appPid, appVPid;
 
-            error = waiterSock.RecvPid(appPid, appVPid);
+            /* close other side before reading */
+            Env->Sock2.Close();
+
+            error = Env->MasterSock2.RecvPid(appPid, appVPid);
             if (error)
                 Abort(error);
             /* Forward VPid */
             ReportPid(appPid);
-            error = waiterSock.SendZero();
+            error = Env->MasterSock2.SendZero();
             if (error)
                 Abort(error);
+
+            Env->MasterSock2.Close();
         }
 
         if (Env->TripleFork) {
