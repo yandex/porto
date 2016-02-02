@@ -651,7 +651,7 @@ TError TNlHtb::Create(const TNlLink &link, uint32_t defaultClass) {
         goto free_qdisc;
     }
 
-    rtnl_htb_set_defcls(qdisc, TC_H_MIN(defaultClass));
+    rtnl_htb_set_defcls(qdisc, defaultClass);
     rtnl_htb_set_rate2quantum(qdisc, 10);
 
     link.Dump("add", qdisc);
@@ -725,7 +725,7 @@ bool TNlHtb::Valid(const TNlLink &link, uint32_t defaultClass) {
             valid = false;
         else if (rtnl_tc_get_kind(TC_CAST(qdisc)) != std::string("htb"))
             valid = false;
-        else if (rtnl_htb_get_defcls(qdisc) != TC_H_MIN(defaultClass))
+        else if (TC_H_MIN(rtnl_htb_get_defcls(qdisc)) != TC_H_MIN(defaultClass))
             valid = false;
     } else {
         valid = false;
