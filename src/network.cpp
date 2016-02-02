@@ -1198,6 +1198,12 @@ TError TNetCfg::PrepareNetwork() {
         if (error)
             return error;
 
+        error = NetNs.Open(GetTid(), "ns/net");
+        if (error)
+            return error;
+
+        Holder->AddToNsMap(NetNs.GetInode(), Net);
+
         error = Net->UpdateInterfaces();
         if (error)
             return error;
