@@ -1,9 +1,9 @@
 /var/log/portod.log {
-        size 400M
-        missingok
-        rotate 7
-        compress
-        notifempty
+	size 400M
+	missingok
+	rotate 7
+	compress
+	notifempty
 	nocreate
 
 	postrotate
@@ -13,11 +13,11 @@
 }
 
 /var/log/portoloop.log {
-        size 400M
-        missingok
-        rotate 7
-        compress
-        notifempty
+	size 400M
+	missingok
+	rotate 7
+	compress
+	notifempty
 	nocreate
 
 	postrotate

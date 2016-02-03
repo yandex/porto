@@ -1,1 +1,1 @@
-13 *    * * *  root    sleep $(($(hexdump -n 2 -e '/2 "\%u"' /dev/urandom)\%300)) && test -x /usr/sbin/logrotate && flock -n /run/logrotate-porto.lock -c '/usr/sbin/logrotate /etc/porto/logrotate-porto.conf 1>/dev/null 2>&1'
+13 *    * * *  root    sleep $(($(hexdump -n 2 -e '/2 "\%u"' /dev/urandom)\%300)) && test -x /usr/sbin/logrotate && flock -n /run/logrotate-porto.lock -c '/usr/sbin/logrotate /etc/logrotate.d/yandex-porto 1>/dev/null 2>&1'
