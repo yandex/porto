@@ -29,17 +29,17 @@ pre-start script
 		rm -rf /run/porto/pkvs /run/porto/kvs /tmp/portod.pidmap || :
 	fi
 
-	# if there is cgroup-bin installed, we need to wait while it mounts
-	# sysfs and creates controllers
+	# if there is cgroup-bin or cgroup-lite installed
+	# we need to wait while it mounts sysfs and controllers
 	timeout=60
-	if [ -f /usr/sbin/cgrulesengd ]; then
+	for service in cgred cgroup-lite; do if status $service; then
 		for i in `seq $timeout`; do
-			if status cgred | grep -q "^cgred start/running" > /dev/null; then
+			if status $service | grep -q "^$service start/running" > /dev/null; then
 				break
 			fi
 			sleep 1
 		done
-	fi
+	fi ; done
 
 	grep -q net_cls /proc/cgroups || modprobe cls_cgroup
 end script
