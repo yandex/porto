@@ -914,7 +914,7 @@ TError TTask::Kill(int signal) const {
 }
 
 bool TTask::IsZombie() const {
-    TFile f("/proc/" + std::to_string(WPid) + "/status");
+    TFile f("/proc/" + std::to_string(Pid) + "/status");
 
     std::vector<std::string> lines;
     TError err = f.AsLines(lines);

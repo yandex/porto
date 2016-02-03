@@ -1820,12 +1820,12 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
 
         Task->Restore(pids);
 
-        pid_t pid = Task->GetWPid();
+        pid_t pid = Task->GetPid();
         pid_t ppid;
 
         TCgroup taskCg, freezerCg = GetCgroup(FreezerSubsystem);
 
-        error = GetTaskParent(pid, ppid);
+        error = GetTaskParent(Task->GetWPid(), ppid);
         if (!error)
             error = FreezerSubsystem.TaskCgroup(pid, taskCg);
 
@@ -1871,7 +1871,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
             error = RestoreNetwork();
             if (error) {
                 if (Task->HasCorrectParent() && !Task->IsZombie())
-                    L_ERR() << "Cannot restore network: " << error << std::endl;
+                    L_WRN() << "Cannot restore network: " << error << std::endl;
                 LostAndRestored = true;
             }
         }
