@@ -3276,7 +3276,11 @@ static void TestData(TPortoAPI &api) {
     ExpectNeq(v, "-1");
 
     ExpectApiSuccess(api.GetData(noop, "memory_usage", v));
-    ExpectEq(v, "0");
+    ExpectNeq(v, "-1");
+
+    uint64_t val;
+    ExpectSuccess(StringToUint64(v, val));
+    ExpectLess(val, 1024 * 16);
 
     if (KernelSupports(KernelFeature::FSIO) ||
             KernelSupports(KernelFeature::CFQ)) {
