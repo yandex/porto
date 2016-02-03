@@ -1,3 +1,25 @@
+yandex-porto (2.7.8) precise; urgency=medium
+
+  * network: add optional master device for L3 and separate option for MTU
+  * util/idmap: plug false-positive warnings about uninitialized id
+  * task: close other side of control socket before reading
+  * network: remove freed nat ip from property
+  * network: add host network into map
+  * network: fix htb qdisc validation
+  * network: restore tc classes in shared network
+  * selftest: noop memory usage could be non-zero
+  * netlink: remove extra new line after dump
+  * portod: fix false-positive warnings when client suddenly disconnects
+  * porto: fix false-positive errors at restoring network for zombies
+  * test/stress: ignore lost status after restore
+  * debian: remove portod.conf
+  * debian: put logrotate into logrotate.d, rotate daily and hourly
+  * debian: remove portotest
+  * debian: wait for cgred on precise and cgroup-lite on trusty
+  * util/log: do not break logging completely at first early warning
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Thu, 04 Feb 2016 13:21:34 +0300
+
 yandex-porto (2.7.7) precise; urgency=medium
 
   [ Konstantin Khlebnikov ]
