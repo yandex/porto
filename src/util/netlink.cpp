@@ -50,7 +50,7 @@ void TNl::Dump(const std::string &prefix, void *obj) {
     };
     nl_object_dump(OBJ_CAST(obj), &dp);
 
-    L() << "netlink " << prefix << " " << ss.str() << std::endl;
+    L() << "netlink " << prefix << " " << ss.str();
 }
 
 TError TNl::Connect() {
