@@ -1673,26 +1673,26 @@ TError TContainer::RestoreNetwork() {
         return error;
 
     Net = Holder->SearchInNsMap(netns.GetInode());
-    if (Net)
-        return TError::Success();
 
     /* Create a new one */
-    Net = std::make_shared<TNetwork>();
-    PORTO_ASSERT(Net);
+    if (!Net) {
+        Net = std::make_shared<TNetwork>();
+        PORTO_ASSERT(Net);
 
-    error = Net->ConnectNetns(netns);
-    if (error)
-        return error;
+        error = Net->ConnectNetns(netns);
+        if (error)
+            return error;
 
-    Holder->AddToNsMap(netns.GetInode(), Net);
+        Holder->AddToNsMap(netns.GetInode(), Net);
 
-    error = Net->UpdateInterfaces();
-    if (error)
-        return error;
+        error = Net->UpdateInterfaces();
+        if (error)
+            return error;
 
-    error = Net->PrepareLinks();
-    if (error)
-        return error;
+        error = Net->PrepareLinks();
+        if (error)
+            return error;
+    }
 
     error = UpdateTrafficClasses();
     if (error)
