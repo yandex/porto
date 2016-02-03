@@ -168,7 +168,8 @@ static void CheckExit(TPortoAPI &api, std::string name, std::string stream) {
     std::string ret;
     Say() << "CheckExit container: " << name << std::endl;
     ExpectApiSuccess(api.GetData(name, "exit_status", ret));
-    ExpectEq(ret, stream);
+    if (ret != "-1")
+        ExpectEq(ret, stream);
 }
 
 static void Destroy(TPortoAPI &api, const std::string &name, const std::string &cwd) {
