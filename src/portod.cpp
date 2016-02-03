@@ -153,22 +153,11 @@ static TError AcceptClient(TContext &context, int sfd,
 
     peer_addr_size = sizeof(struct sockaddr_un);
     cfd = accept4(sfd, (struct sockaddr *) &peer_addr,
-                  &peer_addr_size, SOCK_CLOEXEC);
+                  &peer_addr_size, SOCK_NONBLOCK | SOCK_CLOEXEC);
     if (cfd < 0) {
         if (errno == EAGAIN)
             return TError::Success(); //FIXME
         return TError(EError::Unknown, errno, "accept4()");
-    }
-
-    if (!config().daemon().blocking_write()) {
-        struct timeval to;
-        to.tv_sec = 30;
-        to.tv_usec = 0;
-
-        if (setsockopt(cfd, SOL_SOCKET, SO_SNDTIMEO, (void *)&to, sizeof(to)) < 0) {
-            close(cfd);
-            return TError(EError::Unknown, errno, "setsockopt(SO_SNDTIMEO)");
-        }
     }
 
     auto client = std::make_shared<TClient>(context.EpollLoop, cfd);
@@ -365,7 +354,7 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
             if (source->Fd == sfd) {
                 if (!accept_paused && clients.size() >= config().daemon().max_clients()) {
                     L_WRN() << "Pause accepting connections" << std::endl;
-                    context.EpollLoop->RemoveSource(AcceptSource);
+                    context.EpollLoop->RemoveSource(AcceptSource->Fd);
                     accept_paused = true;
                     continue;
                 }
@@ -409,13 +398,12 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
 
                 if ((ev.events & EPOLLHUP) || (ev.events & EPOLLERR) ||
                         (error && error.GetError() != EError::Queued)) {
-                    context.EpollLoop->RemoveSource(source);
                     client->CloseConnection();
                     clients.erase(source->Fd);
                 }
             } else {
                 L_WRN() << "Unknown event " << source->Fd << std::endl;
-                context.EpollLoop->RemoveSource(source);
+                context.EpollLoop->RemoveSource(source->Fd);
             }
         }
     }
@@ -423,8 +411,9 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
 exit:
     StopWorkers(context, worker);
 
-    for (auto pair : clients)
-        close(pair.first);
+    for (auto c : clients)
+        c.second->CloseConnection();
+    clients.clear();
 
     close(sfd);
 
@@ -826,8 +815,8 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
                     goto exit;
                 }
             } else {
-                L() << "Unknown event " << source->Fd << std::endl;
-                loop->RemoveSource(source);
+                L_WRN() << "Unknown event " << source->Fd << std::endl;
+                loop->RemoveSource(source->Fd);
             }
         }
 
@@ -841,7 +830,7 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
     }
 
 exit:
-    loop->RemoveSource(AckSource);
+    loop->RemoveSource(AckSource->Fd);
 
     close(evtfd[0]);
     close(evtfd[1]);

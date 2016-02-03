@@ -517,7 +517,7 @@ std::shared_ptr<TContainer> TContainer::FindRunningParent() const {
 
 void TContainer::ShutdownOom() {
     if (Source)
-        Holder->EpollLoop->RemoveSource(Source);
+        Holder->EpollLoop->RemoveSource(Source->Fd);
     OomEventFd = -1;
     Source = nullptr;
 }

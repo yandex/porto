@@ -266,7 +266,7 @@ static void SendReply(std::shared_ptr<TClient> client,
                 << " (request took " << client->GetRequestTimeMs() << "ms)"
                 << std::endl;
     } else {
-        L_RSP() << "Protobuf write error for " << *client << " : " << error << std:: endl;
+        L_WRN() << "Response error for " << *client << " : " << error << std:: endl;
     }
 }
 

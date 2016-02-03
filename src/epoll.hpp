@@ -55,7 +55,7 @@ public:
     ~TEpollLoop();
 
     TError AddSource(std::shared_ptr<TEpollSource> source);
-    void RemoveSource(std::shared_ptr<TEpollSource> source);
+    void RemoveSource(int fd);
     std::shared_ptr<TEpollSource> GetSource(int fd);
 
     TError StartInput(int fd) const;

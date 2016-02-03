@@ -149,8 +149,7 @@ TError TEpollLoop::AddSource(std::shared_ptr<TEpollSource> source) {
     return TError::Success();
 }
 
-void TEpollLoop::RemoveSource(std::shared_ptr<TEpollSource> source) {
-    int fd = source->Fd;
+void TEpollLoop::RemoveSource(int fd) {
     auto lock = ScopedLock();
 
     if (fd < (int)Sources.size() && !Sources[fd].expired()) {

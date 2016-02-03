@@ -32,7 +32,10 @@ TClient::~TClient() {
 }
 
 void TClient::CloseConnection() {
+    TScopedLock lock(Mutex);
+
     if (Fd >= 0) {
+        EpollLoop->RemoveSource(Fd);
         ConnectionTime = GetCurrentTimeMs() - ConnectionTime;
         if (config().log().verbose())
             L() << "Client " << Fd << " disconnected : " << *this
@@ -184,11 +187,10 @@ bool TClient::Readonly() {
 }
 
 TError TClient::ReadRequest(rpc::TContainerRequest &request) {
-    if (config().daemon().blocking_read()) {
-        InterruptibleInputStream InputStream(Fd);
-        ReadDelimitedFrom(&InputStream, &request);
-        return TError::Success();
-    }
+    TScopedLock lock(Mutex);
+
+    if (Fd < 0)
+        return TError(EError::Unknown, "Connection closed");
 
     if (Offset >= Buffer.size())
         Buffer.resize(Offset + 4096);
@@ -214,7 +216,7 @@ TError TClient::ReadRequest(rpc::TContainerRequest &request) {
 
         Length = length + google::protobuf::io::CodedOutputStream::VarintSize32(length);
         if (Buffer.size() < Length)
-            Buffer.resize(Length);
+            Buffer.resize(Length + 4096);
 
         if (Offset < Length)
             return TError::Queued();
@@ -230,6 +232,11 @@ TError TClient::ReadRequest(rpc::TContainerRequest &request) {
 }
 
 TError TClient::SendResponse(bool first) {
+    TScopedLock lock(Mutex);
+
+    if (Fd < 0)
+        return TError::Success(); /* Connection closed */
+
     ssize_t len = send(Fd, &Buffer[Offset], Length - Offset, MSG_DONTWAIT);
     if (len > 0)
         Offset += len;

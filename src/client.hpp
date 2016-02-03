@@ -51,6 +51,7 @@ public:
     std::list<std::weak_ptr<TContainer>> WeakContainers;
 
 private:
+    std::mutex Mutex;
     pid_t Pid;
     TCred Cred;
     std::string Comm;
