@@ -5,6 +5,7 @@
 #include "common.hpp"
 #include "util/path.hpp"
 
+struct TDevice;
 class TCgroup;
 
 class TSubsystem {
@@ -228,7 +229,8 @@ public:
 class TDevicesSubsystem : public TSubsystem {
 public:
     TDevicesSubsystem() : TSubsystem("devices") {}
-    TError AllowDevices(TCgroup &cg, const std::vector<std::string> &allowed);
+    TError ApplyDefault(TCgroup &cg);
+    TError ApplyDevice(TCgroup &cg, const TDevice &device);
 };
 
 extern TMemorySubsystem     MemorySubsystem;

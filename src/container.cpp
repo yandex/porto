@@ -10,6 +10,7 @@
 #include "config.hpp"
 #include "task.hpp"
 #include "cgroup.hpp"
+#include "device.hpp"
 #include "property.hpp"
 #include "data.hpp"
 #include "event.hpp"
@@ -17,7 +18,6 @@
 #include "network.hpp"
 #include "context.hpp"
 #include "container_value.hpp"
-#include "task.hpp"
 #include "epoll.hpp"
 #include "kvalue.hpp"
 #include "volume.hpp"
@@ -509,6 +509,40 @@ TError TContainer::PrepareOomMonitor() {
     return error;
 }
 
+TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
+    auto config = Prop->Get<TStrList>(P_DEVICES);
+    auto cg = GetCgroup(DevicesSubsystem);
+    TDevice device;
+    TError error;
+
+    if (IsRoot() || IsPortoRoot())
+        return TError::Success();
+
+    if (Parent->IsPortoRoot()) {
+        error = DevicesSubsystem.ApplyDefault(cg);
+        if (error)
+            return error;
+    }
+
+    for (auto &cfg: config) {
+        error = device.Parse(cfg);
+        if (error)
+            return TError(error, "device: " + cfg);
+
+        error = device.Permitted(OwnerCred);
+        if (error)
+            return TError(error, "device: " + cfg);
+
+        error = DevicesSubsystem.ApplyDevice(cg, device);
+        if (error)
+            return TError(error, "device: " + cfg);
+
+        devices.push_back(device);
+    }
+
+    return TError::Success();
+}
+
 TError TContainer::PrepareCgroups() {
     TError error;
 
@@ -539,14 +573,6 @@ TError TContainer::PrepareCgroups() {
         error = PrepareOomMonitor();
         if (error) {
             L_ERR() << "Can't prepare OOM monitoring: " << error << std::endl;
-            return error;
-        }
-
-        auto devices = GetCgroup(DevicesSubsystem);
-        error = DevicesSubsystem.AllowDevices(devices,
-                                               Prop->Get<TStrList>(P_ALLOWED_DEVICES));
-        if (error) {
-            L_ERR() << "Can't set " << P_ALLOWED_DEVICES << ": " << error << std::endl;
             return error;
         }
     }
@@ -740,6 +766,14 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
                         false };
 
         taskEnv->BindMap.push_back(bm);
+    }
+
+    if (client) {
+        error = ConfigureDevices(taskEnv->Devices);
+        if (error) {
+            L_ERR() << "Cannot configure devices: " << error << std::endl;
+            return error;
+        }
     }
 
     if (parent && client) {

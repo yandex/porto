@@ -224,8 +224,8 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectEq(v, "");
     ExpectApiSuccess(api.GetProperty(name, "bind_dns", v));
     ExpectEq(v, "false");
-    ExpectApiSuccess(api.GetProperty(name, "allowed_devices", v));
-    ExpectEq(v, "a *:* rwm");
+    ExpectApiSuccess(api.GetProperty(name, "devices", v));
+    ExpectEq(v, "");
     ExpectApiSuccess(api.GetProperty(name, "capabilities", v));
     ExpectEq(v, "");
     if (KernelSupports(KernelFeature::RECHARGE_ON_PGFAULT)) {
@@ -2535,27 +2535,6 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy("a"));
 }
 
-static void TestAllowedDevicesProperty(TPortoAPI &api) {
-    string name = "a";
-    ExpectApiSuccess(api.Create(name));
-
-    Say() << "Checking default allowed_devices" << std::endl;
-
-    ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
-    ExpectApiSuccess(api.Start(name));
-    ExpectEq(GetCgKnob("devices", name, "devices.list"), "a *:* rwm");
-    ExpectApiSuccess(api.Stop(name));
-
-    Say() << "Checking custom allowed_devices" << std::endl;
-
-    ExpectApiSuccess(api.SetProperty(name, "allowed_devices", "c 1:3 rwm; c 1:5 rwm"));
-    ExpectApiSuccess(api.Start(name));
-    ExpectEq(GetCgKnob("devices", name, "devices.list"), "c 1:3 rwm\nc 1:5 rwm");
-    ExpectApiSuccess(api.Stop(name));
-
-    ExpectApiSuccess(api.Destroy(name));
-}
-
 static void TestCapabilitiesProperty(TPortoAPI &api) {
     string pid;
     string name = "a";
@@ -2996,6 +2975,7 @@ static void TestRoot(TPortoAPI &api) {
         "cpu_policy",
         "cpu_limit",
         "cpu_guarantee",
+        "devices",
         "io_policy",
         "respawn",
         "isolate",
@@ -3722,7 +3702,7 @@ static void TestVirtModeProperty(TPortoAPI &api) {
         { "bind_dns", "false" },
         { "bind", "" },
         { "cwd", "/" },
-        { "allowed_devices", "c 1:3 rwm; c 1:5 rwm; c 1:7 rwm; c 1:8 rwm; c 1:9 rwm; c 5:0 rwm; c 5:2 rwm; c 136:* rw; c 254:0 rm; c 10:237 rmw; b 7:* rmw" },
+        { "devices", "" },
         { "capabilities", "CHOWN; DAC_OVERRIDE; FOWNER; FSETID; IPC_LOCK; KILL; NET_ADMIN; NET_BIND_SERVICE; NET_RAW; SETGID; SETUID; SYS_CHROOT; SYS_RESOURCE" },
     };
     std::string s;
@@ -5532,7 +5512,6 @@ int SelfTest(std::vector<std::string> args) {
         { "hostname_property", TestHostnameProperty },
         { "bind_property", TestBindProperty },
         { "net_property", TestNetProperty },
-        { "allowed_devices_property", TestAllowedDevicesProperty },
         { "capabilities_property", TestCapabilitiesProperty },
         { "enable_porto_property", TestEnablePortoProperty },
         { "limits", TestLimits },

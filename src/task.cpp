@@ -4,8 +4,8 @@
 #include <csignal>
 
 #include "task.hpp"
+#include "device.hpp"
 #include "config.hpp"
-#include "cgroup.hpp"
 #include "util/log.hpp"
 #include "util/mount.hpp"
 #include "util/string.hpp"
@@ -394,6 +394,12 @@ TError TTask::ChildMountRootFs() {
 
     for (auto &s : symlinks) {
         error = (Env->Root + s.path).Symlink(s.target);
+        if (error)
+            return error;
+    }
+
+    for (auto &dev: Env->Devices) {
+        error = dev.Makedev(Env->Root);
         if (error)
             return error;
     }

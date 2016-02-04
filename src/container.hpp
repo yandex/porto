@@ -9,6 +9,7 @@
 #include "util/locks.hpp"
 #include "util/log.hpp"
 #include "stream.hpp"
+#include "cgroup.hpp"
 
 class TKeyValueStorage;
 class TEpollSource;
@@ -80,6 +81,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareLoop();
     void ShutdownOom();
     TError PrepareCgroups();
+    TError ConfigureDevices(std::vector<TDevice> &devices);
     TError ParseNetConfig(struct TNetCfg &NetCfg);
     TError PrepareNetwork(struct TNetCfg &NetCfg);
     TError ConfigureNetwork(struct TNetCfg &NetCfg);

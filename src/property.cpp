@@ -958,37 +958,13 @@ public:
     }
 };
 
-class TAllowedDevicesProperty : public TListValue, public TContainerValue {
+class TDevicesProperty : public TListValue, public TContainerValue {
 public:
-    TAllowedDevicesProperty() :
-        TListValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | HIDDEN_VALUE | OS_MODE_PROPERTY),
-        TContainerValue(P_ALLOWED_DEVICES,
-                        "Devices that container can create/read/write: <c|b|a> <maj>:<min> [r][m][w]; ...",
-                        staticProperty) {}
-
-    TStrList GetDefault() const override {
-        auto c = GetContainer();
-
-        if (c->IsRoot() || c->IsPortoRoot())
-            return TStrList{ "a *:* rwm" };
-
-        if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
-            return TStrList {
-                "c 1:3 rwm",    // /dev/null
-                "c 1:5 rwm",    // /dev/zero
-                "c 1:7 rwm",    // /dev/full
-                "c 1:8 rwm",    // /dev/random
-                "c 1:9 rwm",    // /dev/urandom
-                "c 5:0 rwm",    // /dev/tty
-                "c 5:2 rwm",    // /dev/ptmx
-                "c 136:* rw",   // /dev/pts/*
-                "c 254:0 rm",   // /dev/rtc0
-                "c 10:237 rmw", // /dev/loopcontrol FIXME
-                "b 7:* rmw"     // /dev/loop*       FIXME
-            };
-
-        return c->GetParent()->Prop->Get<TStrList>(P_ALLOWED_DEVICES);
-    }
+    TDevicesProperty():
+        TListValue(PERSISTENT_VALUE),
+        TContainerValue(P_DEVICES, "Devices that container can access: "
+                "<device> [r][w][m][-] [name] [mode] [user] [group]; ...",
+                staticProperty) {}
 };
 
 struct TCapDesc {
@@ -1290,7 +1266,7 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TBindProperty,
         new TNetProperty,
         new TNetTosProperty,
-        new TAllowedDevicesProperty,
+        new TDevicesProperty,
         new TCapabilitiesProperty,
         new TIpProperty,
         new TDefaultGwProperty,

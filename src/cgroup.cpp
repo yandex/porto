@@ -2,6 +2,7 @@
 #include <csignal>
 
 #include "cgroup.hpp"
+#include "device.hpp"
 #include "config.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
@@ -556,45 +557,41 @@ bool TBlkioSubsystem::SupportPolicy() {
 
 // Devices
 
-TError TDevicesSubsystem::AllowDevices(TCgroup &cg, const std::vector<std::string> &allowed) {
-    std::vector<std::string> lines;
-
-    TError error = cg.Knob("devices.list").ReadLines(lines);
+TError TDevicesSubsystem::ApplyDefault(TCgroup &cg) {
+    TError error = cg.Set("devices.deny", "a");
     if (error)
         return error;
 
-    bool needUpdate = lines.size() != allowed.size();
-    if (!needUpdate) {
-        for (auto &line : lines) {
-            for (auto &dev : allowed) {
-                if (StringTrim(line) != StringTrim(dev)) {
-                    needUpdate = true;
-                    break;
-                }
-            }
-            if (needUpdate)
-                break;
-        }
+    //FIXME 'm' required only for start
+    std::vector<std::string> rules = {
+        "c 1:3 rwm",     // /dev/null
+        "c 1:5 rwm",     // /dev/zero
+        "c 1:7 rwm",     // /dev/full
+        "c 1:8 rwm",     // /dev/random
+        "c 1:9 rwm",     // /dev/urandom
+        "c 5:0 rwm",     // /dev/tty
+        "c 5:2 rw",     // /dev/ptmx
+        "c 136:* rw",   // /dev/pts/*
+        "c 254:0 rm",   // /dev/rtc0         FIXME
+        "c 10:237 rmw", // /dev/loop-control FIXME
+        "b 7:* rmw"     // /dev/loop*        FIXME
+    };
 
-        if (!needUpdate) {
-            L() << "Don't update allowed devices" << std::endl;
-            return TError::Success();
-        }
-    }
-
-    error = cg.Set("devices.deny", "a");
-    if (error)
-        return error;
-
-    for (auto &dev : allowed) {
-        error = cg.Set("devices.allow", dev);
+    for (auto &rule: rules) {
+        error = cg.Set("devices.allow", rule);
         if (error)
-            return error;
+            break;
     }
 
-    return TError::Success();
+    return error;
 }
 
+TError TDevicesSubsystem::ApplyDevice(TCgroup &cg, const TDevice &device) {
+    TError error = cg.Set("devices.allow", device.CgroupRule(true));
+    if (!error)
+        error = cg.Set("devices.deny", device.CgroupRule(false));
+    return error;
+}
 
 TMemorySubsystem    MemorySubsystem;
 TFreezerSubsystem   FreezerSubsystem;

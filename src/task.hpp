@@ -9,6 +9,7 @@
 #include "util/path.hpp"
 #include "util/cred.hpp"
 #include "stream.hpp"
+#include "cgroup.hpp"
 
 extern "C" {
 #include <sys/resource.h>
@@ -52,6 +53,7 @@ struct TTaskEnv : public TNonCopyable {
     bool BindDns;
     std::string ResolvConf;
     std::vector<TBindMap> BindMap;
+    std::vector<TDevice> Devices;
     int LoopDev;
     uint64_t Caps;
     bool NewMountNs;
