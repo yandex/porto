@@ -19,7 +19,9 @@ extern "C" {
 
 TStatistics *Statistics = nullptr;
 
-static int logBufFd = -1;
+//FIXME KILL THIS SHIT
+
+static int logBufFd = STDERR_FILENO;
 class TLogBuf : public std::streambuf {
     std::vector<char> Data;
 public:
