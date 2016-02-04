@@ -65,25 +65,31 @@ class _RPC(object):
         self.lock = lock_constructor()
         self.socket_path = socket_path
         self.timeout = timeout
+        self.socket_timeout = timeout
         self.socket_constructor = socket_constructor
-        self._timeout = timeout
+        self.sock = None
 
     def connect(self):
         self.sock = self.socket_constructor(socket.AF_UNIX, socket.SOCK_STREAM)
-        self.sock.settimeout(self.timeout)
+        self.sock.settimeout(self.socket_timeout)
         try:
             self.sock.connect(self.socket_path)
         except socket.error as e:
-            raise exceptions.SocketError("Can't open {} for write: {}".format(self.socket_path, e))
+            self.sock = None
+            raise exceptions.SocketError("Cannot connect to {}: {}".format(self.socket_path, e))
 
     def disconnect(self):
         self.sock.close()
+        self.sock = None
 
     def _sendall(self, data, flags=0):
         try:
             return self.sock.sendall(data, flags)
         except socket.timeout:
-            raise exceptions.SocketTimeout("Got timeout %d" % self.timeout)
+            raise exceptions.SocketTimeout("Got timeout: {}".format(self.socket_timeout))
+        except socket.error as e:
+            self.sock = None
+            raise exceptions.SocketError("Send error: {}".format(e))
 
     def _recv(self, count, flags=0):
         try:
@@ -92,7 +98,10 @@ class _RPC(object):
                 buf += self.sock.recv(count - len(buf), flags)
             return buf
         except socket.timeout:
-            raise exceptions.SocketTimeout("Got timeout %d" % self.timeout)
+            raise exceptions.SocketTimeout("Got timeout: {}".format(self.socket_timeout))
+        except socket.error as e:
+            self.sock = None
+            raise exceptions.SocketError("Recv error: {}".format(e))
 
     def call(self, request, timeout):
         data = request.SerializeToString()
@@ -100,13 +109,21 @@ class _RPC(object):
         _EncodeVarint(hdr.append, len(data))
 
         with self.lock:
-            if timeout != self.timeout:
-                self.sock.settimeout(timeout)
-                self._timeout = self.timeout
-                self.timeout = timeout
+            if timeout != self.socket_timeout:
+                if self.sock is not None:
+                    self.sock.settimeout(timeout)
+                self.socket_timeout = timeout
+
+            if self.sock is None:
+                self.connect()
 
             try:
-                self._sendall(hdr)
+                try:
+                    self._sendall(hdr)
+                except exceptions.SocketError:
+                    self.connect()
+                    self._sendall(hdr)
+
                 self._sendall(data)
 
                 msb = 1
@@ -122,8 +139,10 @@ class _RPC(object):
             except:
                 raise
             finally:
-                self.timeout = self._timeout
-                self.sock.settimeout(self.timeout)
+                if self.socket_timeout != self.timeout:
+                    if self.sock is not None:
+                        self.sock.settimeout(self.timeout)
+                    self.socket_timeout = self.timeout
 
         resp.ParseFromString(buf[length[1]:])
 
