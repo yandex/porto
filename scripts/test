@@ -8,6 +8,11 @@ PORTO_DPKG="$PWD/../yandex-porto_${PORTO_VERSION}_amd64.deb"
 PYTHON_DPKG="$PWD/../python-portopy_${PORTO_VERSION}_all.deb"
 SUDO=sudo
 
+PORTOTEST="portotest"
+if [ -x ./obj-x86_64-linux-gnu/portotest ] ; then
+	PORTOTEST="./obj-x86_64-linux-gnu/portotest"
+fi
+
 update_config() {
 	echo "log { verbose: true } network { enabled: $1 dynamic_ifaces: $2 } container { use_hierarchy: true empty_wait_timeout_ms: 1000 } privileges { restricted_root_user: \"daemon\" } volumes { enabled: true }" | $SUDO tee /etc/portod.conf
 }
@@ -39,19 +44,19 @@ install() {
 selftest() {
 	say "Self test"
 	update_config true true
-	$SUDO portotest "$@"
+	$SUDO $PORTOTEST "$@"
 }
 
 stresstest() {
 	say "Stress test"
 	update_config true true
-	$SUDO portotest stress "$@"
+	$SUDO $PORTOTEST stress "$@"
 }
 
 fuzzytest() {
 	say "Fuzzy test"
 	update_config true true
-	$SUDO portotest fuzzy "$@"
+	$SUDO $PORTOTEST fuzzy "$@"
 }
 
 pkgtest() {
@@ -68,7 +73,7 @@ threadstest() {
 	say "Threads test"
 	$SUDO restart yandex-porto
 	$SUDO python $ROOTDIR/src/test/threads.py "$@"
-	$SUDO NOCHECK=y portotest self daemon
+	$SUDO NOCHECK=y $PORTOTEST self daemon
 }
 
 apipytest() {

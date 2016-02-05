@@ -2660,7 +2660,7 @@ static void TestEnablePortoProperty(TPortoAPI &api) {
 
     RemakeDir(api, path);
     AsRoot(api);
-    BootstrapCommand("/usr/sbin/portotest", path.ToString());
+    BootstrapCommand(program_invocation_name, path.ToString());
     path.Chown("nobody", "nogroup");
     AsNobody(api);
 
