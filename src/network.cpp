@@ -388,6 +388,16 @@ TError TNetwork::PutNatAddress(const std::vector<TNlAddr> &addrs) {
     return TError::Success();
 }
 
+std::string TNetwork::GetIfaceName(const std::string &prefix) {
+    for (int retry = 0; retry < 100; retry++) {
+        std::string name = prefix + std::to_string(IfaceName++);
+        TNlLink link(Nl, name);
+        if (link.Load())
+            return name;
+    }
+    return prefix + "0";
+}
+
 TError TNetwork::GetInterfaceCounters(ETclassStat stat,
                                       std::map<std::string, uint64_t> &result) {
     struct nl_cache *cache;
@@ -936,7 +946,7 @@ std::string TNetCfg::GenerateHw(const std::string &name) {
 
 TError TNetCfg::ConfigureVeth(TVethNetCfg &veth) {
     auto parentNl = ParentNet->GetNl();
-    TNlLink peer(parentNl, veth.Peer);
+    TNlLink peer(parentNl, ParentNet->GetIfaceName("portove-"));
     TError error;
 
     std::string hw = veth.Hw;
@@ -953,7 +963,7 @@ TError TNetCfg::ConfigureVeth(TVethNetCfg &veth) {
         if (error)
             return error;
 
-        error = bridge.Enslave(veth.Peer);
+        error = bridge.Enslave(peer.GetName());
         if (error)
             return error;
     }
@@ -962,7 +972,7 @@ TError TNetCfg::ConfigureVeth(TVethNetCfg &veth) {
 }
 
 TError TNetCfg::ConfigureL3(TL3NetCfg &l3) {
-    std::string peerName = StringFormat("L3-%u-%s", Id, l3.Name.c_str());
+    std::string peerName = ParentNet->GetIfaceName("L3-");
     auto parentNl = ParentNet->GetNl();
     TNlLink peer(parentNl, peerName);
     TNlAddr gate4, gate6;

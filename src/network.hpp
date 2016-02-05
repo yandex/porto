@@ -17,6 +17,8 @@ class TNetwork : public std::enable_shared_from_this<TNetwork>,
     std::shared_ptr<TNl> Nl;
     struct nl_sock *GetSock() const { return Nl->GetSock(); }
 
+    unsigned IfaceName = 0;
+
     std::vector<std::pair<std::string, int>> ifaces;
 
     TError PrepareLink(int index, std::string name);
@@ -66,6 +68,8 @@ public:
 
     TError GetNatAddress(std::vector <TNlAddr> &addrs);
     TError PutNatAddress(const std::vector <TNlAddr> &addrs);
+
+    std::string GetIfaceName(const std::string &prefix);
 };
 
 
