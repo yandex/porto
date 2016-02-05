@@ -793,6 +793,7 @@ TError TNetCfg::ParseNet(std::vector<std::string> lines) {
             TL3NetCfg l3;
 
             l3.Name = "eth0";
+            l3.Nat = false;
             if (settings.size() > 1)
                 l3.Name = StringTrim(settings[1]);
 
