@@ -1,3 +1,13 @@
+yandex-porto (2.7.9) precise; urgency=medium
+
+  * api/python: connect and reconnect automatically
+  * script/test: run portotest from build directory
+  * network: generate names of veth host side automatically
+  * network: fix L3/NAT separation
+  * properties: remove hierarchy validation
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 08 Feb 2016 19:34:28 +0300
+
 yandex-porto (2.7.8) precise; urgency=medium
 
   * network: add optional master device for L3 and separate option for MTU
