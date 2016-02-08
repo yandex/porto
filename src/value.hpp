@@ -166,13 +166,14 @@ public:
     uint64_t GetDefault() const override;
 };
 
-class TDoubleValue : public TStoredValue<double> {
+class TCpusValue : public TStoredValue<double> {
 public:
-    TDoubleValue(int flags) : TStoredValue(flags) {}
+    TCpusValue(int flags) : TStoredValue(flags) {}
 
     std::string ToString(const double &value) const override;
     TError FromString(const std::string &value, double &result) const override;
     double GetDefault() const override;
+    TError CheckValue(const double &value) override;
 };
 
 class TBoolValue : public TStoredValue<bool> {

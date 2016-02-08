@@ -168,7 +168,7 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectApiSuccess(api.GetProperty(name, "cpu_limit", v));
     ExpectEq(v, StringFormat("%dc", GetNumCores()));
     ExpectApiSuccess(api.GetProperty(name, "cpu_guarantee", v));
-    ExpectEq(v, "0c");
+    ExpectEq(v, "0.01c");
     if (KernelSupports(KernelFeature::CFQ)) {
         ExpectApiSuccess(api.GetProperty(name, "io_policy", v));
         ExpectEq(v, "normal");
@@ -3498,19 +3498,19 @@ static void TestLimits(TPortoAPI &api) {
         ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "0"));
         ExpectApiSuccess(api.Start(name));
         ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
-        ExpectEq(shares, rootShares);
+        ExpectEq(shares, 2);
         ExpectApiSuccess(api.Stop(name));
 
-        ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "1"));
+        ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "1c"));
         ExpectApiSuccess(api.Start(name));
         ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
         ExpectEq(shares, rootShares);
         ExpectApiSuccess(api.Stop(name));
 
-        ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "100"));
+        ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "10c"));
         ExpectApiSuccess(api.Start(name));
         ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
-        ExpectEq(shares, rootShares * 100);
+        ExpectEq(shares, rootShares * 10);
         ExpectApiSuccess(api.Stop(name));
 
         TestCoresConvertion(api, name, "cpu_guarantee");

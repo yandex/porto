@@ -58,20 +58,38 @@ uint64_t TSizeValue::GetDefault() const {
     return 0;
 }
 
-std::string TDoubleValue::ToString(const double &value) const {
-    return StringFormat("%lg", value);
+std::string TCpusValue::ToString(const double &value) const {
+    return StringFormat("%lgc", value);
 }
 
-TError TDoubleValue::FromString(const std::string &value, double &result) const {
-    TError error = StringToDouble(value, result);
-    if (error)
-        return TError(EError::InvalidValue, "Invalid unsigned integer value " + value);
+TError TCpusValue::FromString(const std::string &value, double &result) const {
+    double val;
+    std::string unit;
+
+    TError error = StringToValue(value, val, unit);
+    if (error || val < 0)
+        return TError(EError::InvalidValue, "Invalid cpu value " + value);
+
+    if (unit == "")
+        result = val / 100 * GetNumCores();
+    else if (unit == "c")
+        result = val;
+    else
+        return TError(EError::InvalidValue, "Invalid cpu unit " + value);
 
     return TError::Success();
 }
 
-double TDoubleValue::GetDefault() const {
+double TCpusValue::GetDefault() const {
     return 0;
+}
+
+TError TCpusValue::CheckValue(const double &value) {
+    if (value < 0)
+        return TError(EError::InvalidValue, "negative cpu count");
+    if (value > GetNumCores())
+        return TError(EError::InvalidValue, "value exceeds cpu count");
+    return TError::Success();
 }
 
 std::string TBoolValue::ToString(const bool &value) const {

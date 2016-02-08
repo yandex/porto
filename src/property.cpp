@@ -427,18 +427,10 @@ public:
     }
 };
 
-static double ParseCpuLimit(const std::string &str) {
-    size_t pos = 0;
-    double v = stod(str, &pos);
-    if (pos > 0 && pos < str.length() && str[pos] == 'c')
-        v = v * 100 / GetNumCores();
-    return v;
-}
-
-class TCpuLimitProperty : public TDoubleValue, public TContainerValue {
+class TCpuLimitProperty : public TCpusValue, public TContainerValue {
 public:
     TCpuLimitProperty() :
-        TDoubleValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TCpusValue(PERSISTENT_VALUE),
         TContainerValue(P_CPU_LIMIT,
                         "CPU limit: 0-100.0 [%] | 0.0c-<CPUS>c [cores]",
                         dynamicProperty) {
@@ -447,31 +439,14 @@ public:
     }
 
     double GetDefault() const override {
-        return 100;
-    }
-
-    std::string ToString(const double &value) const override {
-        return StringFormat("%lgc", value / 100 * GetNumCores());
-    }
-
-    TError FromString(const std::string &str, double &limit) const override {
-        try {
-            limit = ParseCpuLimit(str);
-            if (limit < 0 || limit > 100)
-                return TError(EError::InvalidValue,
-                        "cpu limit out of range 0-100: " + std::to_string(limit));
-
-            return TError::Success();
-        } catch (...) {
-            return TError(EError::InvalidValue, "invalid value");
-        }
+        return GetNumCores();
     }
 };
 
-class TCpuGuaranteeProperty : public TDoubleValue, public TContainerValue {
+class TCpuGuaranteeProperty : public TCpusValue, public TContainerValue {
 public:
     TCpuGuaranteeProperty() :
-        TDoubleValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TCpusValue(PERSISTENT_VALUE),
         TContainerValue(P_CPU_GUARANTEE,
                         "CPU guarantee: 0-100.0 [%] | 0.0c-<CPUS>c [cores]",
                         dynamicProperty) {
@@ -479,21 +454,11 @@ public:
             SetFlag(UNSUPPORTED_FEATURE);
     }
 
-    std::string ToString(const double &value) const override {
-        return StringFormat("%lgc", value / 100 * GetNumCores());
-    }
-
-    TError FromString(const std::string &str, double &limit) const override {
-        try {
-            limit = ParseCpuLimit(str);
-            if (limit < 0 || limit > 100)
-                return TError(EError::InvalidValue,
-                        "cpu guarantee out of range 0-100: " + std::to_string(limit));
-
-            return TError::Success();
-        } catch (...) {
-            return TError(EError::InvalidValue, "invalid value");
-        }
+    double GetDefault() const override {
+        auto c = GetContainer();
+        if (c->IsRoot() || c->IsPortoRoot())
+            return 1;
+        return 0.01;
     }
 };
 

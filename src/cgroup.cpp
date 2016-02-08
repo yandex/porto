@@ -4,6 +4,7 @@
 #include "cgroup.hpp"
 #include "device.hpp"
 #include "config.hpp"
+#include "value.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
@@ -416,46 +417,39 @@ TError TCpuSubsystem::SetPolicy(TCgroup &cg, const std::string &policy) {
 }
 
 TError TCpuSubsystem::SetLimit(TCgroup &cg, double limit) {
+    uint64_t period, quota;
+
     if (!SupportLimit())
         return TError::Success();
 
-    if (limit >= 100)
+    if (limit >= GetNumCores())
         return cg.Set("cpu.cfs_quota_us", "-1");
 
-    std::string periodStr;
-    TError error = cg.Get("cpu.cfs_period_us", periodStr);
+    TError error = cg.GetUint64("cpu.cfs_period_us", period);
     if (error)
         return error;
 
-    uint64_t period;
-    error = StringToUint64(periodStr, period);
-    if (error)
-        return TError(EError::Unknown, "Can't parse cpu.cfs_period_us");
+    quota = std::ceil(limit * period);
 
-    uint64_t runtime = GetNumCores() * period * limit / 100;
     const uint64_t minQuota = 1000;
-    if (runtime < minQuota)
-        runtime = minQuota;
-    return cg.Set("cpu.cfs_quota_us", std::to_string(runtime));
+    if (quota < minQuota)
+        quota = minQuota;
+
+    return cg.SetUint64("cpu.cfs_quota_us", quota);
 }
 
 TError TCpuSubsystem::SetGuarantee(TCgroup &cg, double guarantee) {
+    uint64_t base, shares;
+
     if (!SupportGuarantee())
         return TError::Success();
 
-    uint64_t rootShares;
-    std::string str;
-    TError error = RootCgroup().Get("cpu.shares", str);
+    TError error = RootCgroup().GetUint64("cpu.shares", base);
     if (error)
-        return TError(EError::Unknown, "Can't get root cpu.shares");
-    error = StringToUint64(str, rootShares);
-    if (error)
-        return TError(EError::Unknown, "Can't parse root cpu.shares");
+        return error;
 
-    if (guarantee == 0)
-        guarantee = 1;
-
-    return cg.Set("cpu.shares", std::to_string(lround(guarantee * rootShares)));
+    shares = std::floor(guarantee * base);
+    return cg.SetUint64("cpu.shares", shares);
 }
 
 bool TCpuSubsystem::SupportSmart() {
