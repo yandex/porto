@@ -351,9 +351,6 @@ public:
     TError CheckValue(const uint64_t &value) override {
         auto c = GetContainer();
 
-        if (!c->ValidHierarchicalProperty(P_MEM_GUARANTEE, value))
-            return TError(EError::InvalidValue, "invalid hierarchical value");
-
         uint64_t usage = c->GetRoot()->GetChildrenSum(P_MEM_GUARANTEE, c, value);
         uint64_t total = GetTotalMemory();
         uint64_t reserve = config().daemon().memory_guarantee_reserve();
@@ -374,13 +371,6 @@ public:
         TContainerValue(P_MEM_LIMIT,
                         "Memory hard limit [bytes]",
                         dynamicProperty) {}
-
-    TError CheckValue(const uint64_t &value) override {
-        if (!GetContainer()->ValidHierarchicalProperty(P_MEM_LIMIT, value))
-            return TError(EError::InvalidValue, "invalid hierarchical value");
-
-        return TError::Success();
-    }
 };
 
 class TDirtyLimitProperty : public TSizeValue, public TContainerValue {
@@ -476,9 +466,6 @@ public:
             if (limit < 0 || limit > 100)
                 return TError(EError::InvalidValue,
                         "cpu limit out of range 0-100: " + std::to_string(limit));
-
-            if (!GetContainer()->ValidHierarchicalProperty(P_CPU_LIMIT, limit))
-                return TError(EError::InvalidValue, "invalid hierarchical value");
 
             return TError::Success();
         } catch (...) {

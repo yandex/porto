@@ -167,8 +167,6 @@ public:
 
     template <typename T>
     T GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except = nullptr, T exceptVal = 0) const;
-    template <typename T>
-    bool ValidHierarchicalProperty(const std::string &property, const T value) const;
 
     std::vector<pid_t> Processes();
 

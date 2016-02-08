@@ -3968,26 +3968,6 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty(monit, "memory_guarantee", std::to_string(0)));
     ExpectApiSuccess(api.SetProperty(system, "memory_guarantee", std::to_string(0)));
 
-    auto CheckPropertyHierarhcy = [&](TPortoAPI &api, const std::string &property) {
-        Say() << "Parent can't have less guarantee than sum of children" << std::endl;
-        ExpectApiSuccess(api.SetProperty(slot1, property, std::to_string(chunk)));
-        ExpectApiSuccess(api.SetProperty(slot2, property, std::to_string(chunk)));
-        ExpectApiFailure(api.SetProperty(prod, property, std::to_string(chunk)), EError::InvalidValue);
-        ExpectApiFailure(api.SetProperty(box, property, std::to_string(chunk)), EError::InvalidValue);
-
-        Say() << "Child can't go over parent guarantee" << std::endl;
-        ExpectApiSuccess(api.SetProperty(prod, property, std::to_string(2 * chunk)));
-        ExpectApiFailure(api.SetProperty(slot1, property, std::to_string(2 * chunk)), EError::InvalidValue);
-
-        Say() << "Can lower guarantee if possible" << std::endl;
-        ExpectApiFailure(api.SetProperty(prod, property, std::to_string(chunk)), EError::InvalidValue);
-        ExpectApiSuccess(api.SetProperty(slot2, property, std::to_string(0)));
-        ExpectApiSuccess(api.SetProperty(prod, property, std::to_string(chunk)));
-    };
-
-    CheckPropertyHierarhcy(api, "memory_guarantee");
-    CheckPropertyHierarhcy(api, "memory_limit");
-
     ExpectApiSuccess(api.Destroy(monit));
     ExpectApiSuccess(api.Destroy(system));
     ExpectApiSuccess(api.Destroy(slot2));
