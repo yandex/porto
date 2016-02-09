@@ -46,6 +46,12 @@ std::string TPath::BaseName() const {
     return out;
 }
 
+TError TPath::Stat(struct stat &st) const {
+    if (stat(Path.c_str(), &st))
+        return TError(EError::Unknown, errno, "stat " + Path);
+    return TError::Success();
+}
+
 unsigned int TPath::Stat(std::function<unsigned int(struct stat *st)> f) const {
     struct stat st;
 

@@ -70,6 +70,8 @@ public:
     TPath RealPath() const;
     TPath InnerPath(const TPath &path, bool absolute = true) const;
 
+    TError Stat(struct stat &st) const;
+
     unsigned int GetMode() const;
     unsigned int GetDev() const;
     ino_t GetInode() const;
