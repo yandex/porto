@@ -16,145 +16,98 @@ extern "C" {
 #include <sys/types.h>
 }
 
-TUserEntry::TUserEntry(const std::string &name) :
-    Name(!name.empty() && StringOnlyDigits(name) ? "" : name),
-    Id(!name.empty() && StringOnlyDigits(name) ? stoi(name) : -1) {}
+static gid_t PortoGid;
 
-std::string TUserEntry::GetName() const {
-    return Name;
-}
+static std::vector<uid_t> PrivilegedUid = { 0, };
+static std::vector<gid_t> PrivilegedGid = { 0, };
 
-int TUserEntry::GetId() const {
-    return Id;
-}
+static std::vector<uid_t> RestrictedRootUid;
+static std::vector<gid_t> RestrictedRootGid;
 
-static size_t GetPwSize() {
-    long bufsize = sysconf(_SC_GETPW_R_SIZE_MAX);
-    if (bufsize < 32768)
-        return 32768;
-    return bufsize;
-}
+static size_t PwdBufSize = sysconf(_SC_GETPW_R_SIZE_MAX) > 0 ?
+                           sysconf(_SC_GETPW_R_SIZE_MAX) : 16384;
 
-TError TUser::Load() {
-    struct passwd pwd, *p;
-    std::vector<char> buf(GetPwSize()) ;
+TError FindUser(const std::string &user, uid_t &uid, gid_t &gid) {
+    struct passwd pwd, *ptr;
+    char buf[PwdBufSize];
 
-    if (Id >= 0) {
-        getpwuid_r(Id, &pwd, buf.data(), buf.size(), &p);
-        if (p) {
-            Id = p->pw_uid;
-            Name = p->pw_name;
-        } else if (errno == ENOMEM || errno == ERANGE) {
-            L_WRN() << "Not enough space in buffer for credentials" << std::endl;
-        }
-        return TError::Success();
-    }
+    if (getpwnam_r(user.c_str(), &pwd, buf, PwdBufSize, &ptr) || !ptr)
+        return TError(EError::InvalidValue, errno, "Cannot find user: " + user);
 
-    if (Name.length()) {
-        getpwnam_r(Name.c_str(), &pwd, buf.data(), buf.size(), &p);
-        if (p) {
-            Id = p->pw_uid;
-            Name = p->pw_name;
-            return TError::Success();
-        } else if (errno == ENOMEM || errno == ERANGE) {
-            L_WRN() << "Not enough space in buffer for credentials" << std::endl;
-        }
-
-        int uid;
-        TError error = StringToInt(Name, uid);
-        if (error)
-            return TError(EError::InvalidValue, "Invalid user: " + Name);
-
-        getpwuid_r(Id, &pwd, buf.data(), buf.size(), &p);
-        if (p) {
-            Id = p->pw_uid;
-            Name = p->pw_name;
-            return TError::Success();
-        } else if (errno == ENOMEM || errno == ERANGE) {
-            L_WRN() << "Not enough space in buffer for credentials" << std::endl;
-        }
-    }
-
-    return TError(EError::InvalidValue, "Invalid user");
-}
-
-TError TGroup::Load() {
-    struct group grp, *g;
-    std::vector<char> buf(GetPwSize());
-
-    if (Id >= 0) {
-        getgrgid_r(Id, &grp, buf.data(), buf.size(), &g);
-        if (g) {
-            Id = g->gr_gid;
-            Name = g->gr_name;
-        } else if (errno == ENOMEM || errno == ERANGE) {
-            L_WRN() << "Not enough space in buffer for credentials" << std::endl;
-        }
-
-        return TError::Success();
-    }
-
-    if (Name.length()) {
-        getgrnam_r(Name.c_str(), &grp, buf.data(), buf.size(), &g);
-        if (g) {
-            Id = g->gr_gid;
-            Name = g->gr_name;
-            return TError::Success();
-        } else if (errno == ENOMEM || errno == ERANGE) {
-            L_WRN() << "Not enough space in buffer for credentials" << std::endl;
-        }
-
-        int uid;
-        TError error = StringToInt(Name, uid);
-        if (error)
-            return TError(EError::InvalidValue, "Invalid group: " + Name);
-
-        getgrgid_r(Id, &grp, buf.data(), buf.size(), &g);
-        if (g) {
-            Id = g->gr_gid;
-            Name = g->gr_name;
-            return TError::Success();
-        } else if (errno == ENOMEM || errno == ERANGE) {
-            L_WRN() << "Not enough space in buffer for credentials" << std::endl;
-        }
-    }
-
-    return TError(EError::InvalidValue, "Invalid group");
-}
-
-TError TCred::LoadGroups(std::string user) {
-    int ngroups, ret;
-
-    if (user == "") {
-        TUser u(Uid);
-        TError error = u.Load();
-        if (error)
-            return error;
-        user = u.GetName();
-    }
-
-    ngroups = 0;
-    (void)getgrouplist(user.c_str(), Gid, nullptr, &ngroups);
-    Groups.resize(ngroups);
-    ret = getgrouplist(user.c_str(), Gid, Groups.data(), &ngroups);
-    if (ret < 0 || ngroups <= 0) {
-        L_ERR() << "Cannot get supplementary groups for " << user
-                << " " << Uid << ":" << Gid
-                << " ngroups = " << ngroups << std::endl;
-        if (ngroups > (int)Groups.size())
-            Groups.resize(ngroups);
-        ret = getgrouplist(user.c_str(), Gid, Groups.data(), &ngroups);
-        if (ret < 0 || ngroups <= 0) {
-            L_ERR() << "Still cannot get supplementary groups"
-                    << " ngroups = " << ngroups
-                    << " Fallback to single group " << Gid << std::endl;
-            ngroups = 1;
-            Groups.resize(ngroups);
-            Groups[0] = Gid;
-        }
-    }
-    Groups.resize(ngroups);
+    uid = pwd.pw_uid;
+    gid = pwd.pw_gid;
     return TError::Success();
+}
+
+TError FindGroups(const std::string &user, gid_t gid, std::vector<gid_t> &groups) {
+    int ngroups = 32;
+
+    for (int retry = 0; retry < 3; retry++) {
+        groups.resize(ngroups);
+        if (getgrouplist(user.c_str(), gid, groups.data(), &ngroups) >= 0) {
+            groups.resize(ngroups);
+            return TError::Success();
+        }
+    }
+
+    return TError(EError::Unknown, "Cannot list groups for " + user);
+}
+
+TError UserId(const std::string &user, uid_t &uid) {
+    struct passwd pwd, *ptr;
+    char buf[PwdBufSize];
+    int id;
+
+    if (isdigit(user[0]) && !StringToInt(user, id) && id >= 0) {
+        uid = id;
+        return TError::Success();
+    }
+
+    if (getpwnam_r(user.c_str(), &pwd, buf, PwdBufSize, &ptr) || !ptr)
+        return TError(EError::InvalidValue, errno, "Cannot find user: " + user);
+
+    uid = pwd.pw_uid;
+    return TError::Success();
+}
+
+std::string UserName(uid_t uid) {
+    struct passwd pwd, *ptr;
+    char buf[PwdBufSize];
+
+    if (getpwuid_r(uid, &pwd, buf, PwdBufSize, &ptr) || !ptr)
+        return std::to_string(uid);
+
+    return std::string(pwd.pw_name);
+}
+
+static size_t GrpBufSize = sysconf(_SC_GETGR_R_SIZE_MAX) > 0 ?
+                           sysconf(_SC_GETGR_R_SIZE_MAX) : 16384;
+
+TError GroupId(const std::string &group, gid_t &gid) {
+    struct group grp, *ptr;
+    char buf[GrpBufSize];
+    int id;
+
+    if (isdigit(group[0]) && !StringToInt(group, id) && id >= 0) {
+        gid = id;
+        return TError::Success();
+    }
+
+    if (getgrnam_r(group.c_str(), &grp, buf, GrpBufSize, &ptr) || !ptr)
+        return TError(EError::InvalidValue, errno, "Cannot find group: " + group);
+
+    gid = grp.gr_gid;
+    return TError::Success();
+}
+
+std::string GroupName(gid_t gid) {
+    struct group grp, *ptr;
+    char buf[GrpBufSize];
+
+    if (getgrgid_r(gid, &grp, buf, GrpBufSize, &ptr) || !ptr)
+        return std::to_string(gid);
+
+    return std::string(grp.gr_name);
 }
 
 TCred TCred::Current() {
@@ -162,11 +115,28 @@ TCred TCred::Current() {
 
     cred.Groups.resize(getgroups(0, nullptr));
     if (getgroups(cred.Groups.size(), cred.Groups.data()) < 0) {
-        L_ERR() << "Cannot get supplementary groups: " << errno << std::endl;
-        cred.Groups.resize(0);
+        L_ERR() << "Cannot get supplementary groups for " << cred.Uid << std::endl;
+        cred.Groups.resize(1);
+        cred.Groups[0] = cred.Gid;
     }
 
     return cred;
+}
+
+TError TCred::LoadGroups(const std::string &user) {
+    if (FindGroups(user, Gid, Groups)) {
+        L_ERR() << "Cannot load groups for " << user << std::endl;
+        Groups.resize(1);
+        Groups[0] = Gid;
+    }
+    return TError::Success();
+}
+
+TError TCred::Load(const std::string &user) {
+    TError error = FindUser(user, Uid, Gid);
+    if (!error)
+        error = LoadGroups(user);
+    return error;
 }
 
 /* FIXME should die */
@@ -174,11 +144,27 @@ bool TCred::IsRootUser() const {
     return Uid == 0 || Gid == 0;
 }
 
-bool TCred::IsPrivileged() const {
-    if (IsRootUser())
+bool TCred::IsPrivilegedUser() const {
+    if (std::find(PrivilegedUid.begin(), PrivilegedUid.end(), Uid) != PrivilegedUid.end() ||
+        std::find(PrivilegedGid.begin(), PrivilegedGid.end(), Gid) != PrivilegedGid.end())
         return true;
 
-    return CredConf.PrivilegedUser(*this);
+    return IsRootUser();
+}
+
+bool TCred::IsRestrictedRootUser() const {
+    if (std::find(RestrictedRootUid.begin(), RestrictedRootUid.end(), Uid) != RestrictedRootUid.end() || 
+        std::find(RestrictedRootGid.begin(), RestrictedRootGid.end(), Gid) != RestrictedRootGid.end())
+        return true;
+
+    return IsPrivilegedUser();
+}
+
+bool TCred::IsPortoUser() const {
+    if (IsMemberOf(PortoGid))
+        return true;
+
+    return IsPrivilegedUser();
 }
 
 /* Returns true for priveleged or if uid/gid intersects */
@@ -187,7 +173,7 @@ bool TCred::IsPermitted(const TCred &requirement) const {
     if (Uid == requirement.Uid)
         return true;
 
-    if (IsPrivileged())
+    if (IsPrivilegedUser())
         return true;
 
     if (IsMemberOf(requirement.Gid))
@@ -204,104 +190,38 @@ bool TCred::IsMemberOf(gid_t gid) const {
     return Gid == gid || std::find(Groups.begin(), Groups.end(), gid) != Groups.end();
 }
 
-std::string TCred::UserAsString() const {
-    TUser u(Uid);
-
-    (void)u.Load();
-    if (u.GetName().empty())
-        return std::to_string(Uid);
-    else
-        return u.GetName();
-}
-
-std::string TCred::GroupAsString() const {
-    TGroup g(Gid);
-
-    (void)g.Load();
-    if (g.GetName().empty())
-        return std::to_string(Gid);
-    else
-        return g.GetName();
-};
-
-TError TCred::Parse(const std::string &user, const std::string &group) {
-    TUser u(user);
-    TError error = u.Load();
-    if (error)
-        return error;
-
-    TGroup g(group);
-    error = g.Load();
-    if (error)
-        return error;
-
-    Uid = u.GetId();
-    Gid = g.GetId();
-
-    return TError::Success();
-}
-
 static void ParseUserConf(const ::google::protobuf::RepeatedPtrField<std::string> &source,
-                          std::set<int> &target) {
-    for (auto &val : source) {
-        TUser u(val);
-        TError error = u.Load();
-        if (error) {
-            L_WRN() << "Can't add privileged user: " << error << std::endl;
-            continue;
-        }
-
-        target.insert(u.GetId());
+                          std::vector<uid_t> &target) {
+    for (auto &user : source) {
+        uid_t uid;
+        TError error = UserId(user, uid);
+        if (error)
+            L_WRN() << "Can't add privileged user " << user << " : "  << error << std::endl;
+        else
+            target.push_back(uid);
     }
 }
 
 static void ParseGroupConf(const ::google::protobuf::RepeatedPtrField<std::string> &source,
-                          std::set<int> &target) {
-    for (auto &val : source) {
-        TGroup g(val);
-        TError error = g.Load();
-        if (error) {
-            L_WRN() << "Can't add privileged group: " << error << std::endl;
-            continue;
-        }
-
-        target.insert(g.GetId());
+                          std::vector<gid_t> &target) {
+    for (auto &group : source) {
+        gid_t gid;
+        TError error = GroupId(group, gid);
+        if (error)
+            L_WRN() << "Can't add privileged group " << group << " : " << error << std::endl;
+        else
+            target.push_back(gid);
     }
 }
 
-void TCredConf::Load() {
+void InitCred() {
     ParseUserConf(config().privileges().root_user(), PrivilegedUid);
     ParseGroupConf(config().privileges().root_group(), PrivilegedGid);
 
     ParseUserConf(config().privileges().restricted_root_user(), RestrictedRootUid);
     ParseGroupConf(config().privileges().restricted_root_group(), RestrictedRootGid);
 
-    TGroup porto("porto");
-    TError error = porto.Load();
+    TError error = GroupId("porto", PortoGid);
     if (error)
-            L_WRN() << "Cannot load group porto: " << error << std::endl;
-    else
-        PortoGid = porto.GetId();
+        L_WRN() << "Cannot find group porto: " << error << std::endl;
 }
-
-bool TCredConf::PrivilegedUser(const TCred &cred) {
-    if (PrivilegedUid.find(cred.Uid) != PrivilegedUid.end())
-        return true;
-
-    if (PrivilegedGid.find(cred.Gid) != PrivilegedGid.end())
-        return true;
-
-    return false;
-}
-
-bool TCredConf::RestrictedUser(const TCred &cred) {
-    if (RestrictedRootUid.find(cred.Uid) != RestrictedRootUid.end())
-        return true;
-
-    if (RestrictedRootGid.find(cred.Gid) != RestrictedRootGid.end())
-        return true;
-
-    return false;
-}
-
-TCredConf CredConf;

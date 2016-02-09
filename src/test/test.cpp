@@ -17,6 +17,7 @@ using std::vector;
 
 extern "C" {
 #include <unistd.h>
+#include <grp.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #define _FILE_OFFSET_BITS 64
@@ -278,24 +279,6 @@ void GetUidGid(const std::string &pid, int &uid, int &gid) {
         throw std::string("Invalid gid");
 }
 
-int UserUid(const std::string &user) {
-    TUser u(user);
-    TError error = u.Load();
-    if (error)
-        throw error.GetMsg();
-
-    return u.GetId();
-}
-
-int GroupGid(const std::string &group) {
-    TGroup g(group);
-    TError error = g.Load();
-    if (error)
-        throw error.GetMsg();
-
-    return g.GetId();
-}
-
 std::string GetEnv(const std::string &pid) {
     std::string env;
     TFile f("/proc/" + pid + "/environ");
@@ -415,72 +398,60 @@ bool FileExists(const std::string &path) {
     return f.Exists();
 }
 
-void AsUser(TPortoAPI &api, TUser &user, TGroup &group) {
-    AsRoot(api);
+TCred Nobody;
+TCred Alice;
+TCred Bob;
 
-    Expect(setregid(0, group.GetId()) == 0);
-    Expect(setreuid(0, user.GetId()) == 0);
+void InitUsersAndGroups() {
+    TError error;
+
+    error = Nobody.Load("nobody");
+    if (error)
+        throw error.GetMsg();
+
+    error = Alice.Load("porto-alice");
+    if (error)
+        throw error.GetMsg();
+
+    error = Bob.Load("porto-bob");
+    if (error)
+        throw error.GetMsg();
+
+    ExpectNeq(Alice.Uid, Bob.Uid);
+    ExpectNeq(Alice.Gid, Bob.Gid);
+
+    Expect(!Nobody.IsPortoUser());
+    Expect(Alice.IsPortoUser());
+    Expect(Bob.IsPortoUser());
+    Expect(Bob.IsRestrictedRootUser());
 }
 
 void AsRoot(TPortoAPI &api) {
     api.Cleanup();
 
-    Expect(seteuid(0) == 0);
-    Expect(setegid(0) == 0);
+    ExpectEq(seteuid(0), 0);
+    ExpectEq(setegid(0), 0);
+    ExpectEq(setgroups(0, nullptr), 0);
+}
+
+void AsUser(TPortoAPI &api, TCred &cred) {
+    AsRoot(api);
+
+    ExpectEq(setgroups(cred.Groups.size(), cred.Groups.data()), 0);
+    ExpectEq(setregid(0, cred.Gid), 0);
+    ExpectEq(setreuid(0, cred.Uid), 0);
 }
 
 void AsNobody(TPortoAPI &api) {
-    TUser nobody(GetDefaultUser());
-    TError error = nobody.Load();
-    if (error)
-        throw error.GetMsg();
-
-    TGroup nogroup(GetDefaultGroup());
-    error = nogroup.Load();
-    if (error)
-        throw error.GetMsg();
-
-    AsUser(api, nobody, nogroup);
+    AsUser(api, Nobody);
 }
 
-void AsDaemon(TPortoAPI &api) {
-    TUser daemonUser("daemon");
-    TError error = daemonUser.Load();
-    if (error)
-        throw error.GetMsg();
-
-    TGroup daemonGroup("daemon");
-    error = daemonGroup.Load();
-    if (error)
-        throw error.GetMsg();
-
-    AsUser(api, daemonUser, daemonGroup);
+void AsAlice(TPortoAPI &api) {
+    AsUser(api, Alice);
 }
 
-std::string GetDefaultUser() {
-    std::string users[] = { "nobody" };
-
-    for (auto &user : users) {
-        TUser u(user);
-        TError error = u.Load();
-        if (!error)
-            return u.GetName();
-    }
-
-    return "daemon";
-}
-
-std::string GetDefaultGroup() {
-    std::string groups[] = { "nobody", "nogroup" };
-
-    for (auto &group : groups) {
-        TGroup g(group);
-        TError error = g.Load();
-        if (!error)
-            return g.GetName();
-    }
-
-    return "daemon";
+void AsBob(TPortoAPI &api) {
+    AsUser(api, Bob);
 }
 
 void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove) {
@@ -639,7 +610,7 @@ void TestDaemon(TPortoAPI &api) {
     // . .. 0(stdin) 1(stdout) 2(stderr) 3(log) 4(epoll) 5(event pipe) 6(ack pipe)
     nr = scandir(path.c_str(), &lst, NULL, alphasort);
     PrintFds(path, lst, nr);
-    Expect(nr == 2 + 7);
+    ExpectLessEq(nr, 2 + 7 + sssFd);
 
     Say() << "Check portod-master queue size" << std::endl;
     std::string v;

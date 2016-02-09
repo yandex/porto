@@ -5,65 +5,48 @@
 
 #include "common.hpp"
 
-class TPath;
+TError FindUser(const std::string &user, uid_t &uid, gid_t &gid);
+TError FindGroups(const std::string &user, gid_t gid, std::vector<gid_t> &groups);
 
-class TUserEntry : public TNonCopyable {
-protected:
-    std::string Name;
-    int Id;
-public:
-    TUserEntry(const std::string &name);
-    TUserEntry(const int id) : Name(""), Id(id) {}
-    std::string GetName() const;
-    int GetId() const;
-};
+/* Allows numeric user-group prepresentation */
+TError UserId(const std::string &user, uid_t &uid);
+std::string UserName(uid_t uid);
 
-class TUser : public TUserEntry {
-public:
-    TUser(const std::string &name) : TUserEntry(name) {}
-    TUser(const int id) : TUserEntry(id) {}
-    TError Load();
-};
+TError GroupId(const std::string &group, gid_t &gid);
+std::string GroupName(gid_t gid);
 
-class TGroup : public TUserEntry {
-public:
-    TGroup(const std::string &name) : TUserEntry(name) {}
-    TGroup(const int id) : TUserEntry(id) {}
-    TError Load();
-};
+void InitCred();
 
 struct TCred {
-public:
     uid_t Uid;
     gid_t Gid;
     std::vector<gid_t> Groups;
 
     TCred(uid_t uid, gid_t gid) : Uid(uid), Gid(gid) {}
-    TCred() : Uid(0), Gid(0) {}
+    TCred() : Uid(-1), Gid(-1) {}
+
     static TCred Current();
 
-    std::string UserAsString() const;
-    std::string GroupAsString() const;
+    TError Load(const std::string &user);
+    TError LoadGroups(const std::string &user);
 
+    std::string User() const {
+        return UserName(Uid);
+    }
+
+    std::string Group() const {
+        return GroupName(Gid);
+    }
+
+    bool IsPortoUser() const;
+    bool IsRestrictedRootUser() const;
+    bool IsPrivilegedUser() const;
     bool IsRootUser() const;
-    bool IsPrivileged() const;
+
     bool IsMemberOf(gid_t gid) const;
     bool IsPermitted(const TCred &requirement) const;
 
-    TError Parse(const std::string &user, const std::string &group);
-    TError LoadGroups(std::string user = "");
+    friend std::ostream& operator<<(std::ostream& os, const TCred& cred) {
+        return os << cred.User() << ":" << cred.Group();
+    }
 };
-
-class TCredConf : public TNonCopyable {
-private:
-    std::set<int> PrivilegedUid, PrivilegedGid;
-    std::set<int> RestrictedRootUid, RestrictedRootGid;
-    gid_t PortoGid;
-public:
-    void Load();
-    bool PrivilegedUser(const TCred &cred);
-    bool RestrictedUser(const TCred &cred);
-    gid_t GetPortoGid() { return PortoGid; }
-};
-
-extern TCredConf CredConf;

@@ -78,7 +78,7 @@ static void RemakeDir(TPortoAPI &api, const TPath &path) {
             AsRoot(api);
         ExpectSuccess(path.RemoveAll());
         if (drop)
-            AsNobody(api);
+            AsAlice(api);
     }
     ExpectSuccess(path.MkdirAll(0755));
 }
@@ -158,9 +158,9 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectApiSuccess(api.GetProperty(name, "root", v));
     ExpectEq(v, "/");
     ExpectApiSuccess(api.GetProperty(name, "user", v));
-    ExpectEq(v, GetDefaultUser());
+    ExpectEq(v, Alice.User());
     ExpectApiSuccess(api.GetProperty(name, "group", v));
-    ExpectEq(v, GetDefaultGroup());
+    ExpectEq(v, Alice.Group());
     ExpectApiSuccess(api.GetProperty(name, "env", v));
     ExpectEq(v, string(""));
     if (KernelSupports(KernelFeature::LOW_LIMIT)) {
@@ -708,7 +708,7 @@ static void TestGet(TPortoAPI &api) {
     ExpectEq(result["a"].size(), 4);
     ExpectEq(result["b"].size(), 4);
 
-    std::string user = GetDefaultUser();
+    std::string user = Alice.User();
 
     ExpectEq(result["a"]["user"].Value, user);
     ExpectEq(result["a"]["user"].Error, 0);
@@ -957,7 +957,7 @@ static void TestNsCgTc(TPortoAPI &api) {
     }
 
     ExpectCorrectCgroups(pid, name);
-    AsNobody(api);
+    AsAlice(api);
 
     string root_cls;
     string leaf_cls;
@@ -1077,7 +1077,7 @@ static void TestIsolateProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData("meta/test", "root_pid", pid));
     AsRoot(api);
     ExpectEq(GetNamespace("self", "pid"), GetNamespace(pid, "pid"));
-    AsNobody(api);
+    AsAlice(api);
     ExpectApiSuccess(api.Stop("meta/test"));
 
     ExpectApiSuccess(api.SetProperty("meta/test", "isolate", "true"));
@@ -1086,7 +1086,7 @@ static void TestIsolateProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData("meta/test", "root_pid", pid));
     AsRoot(api);
     ExpectNeq(GetNamespace("self", "pid"), GetNamespace(pid, "pid"));
-    AsNobody(api);
+    AsAlice(api);
     ExpectApiSuccess(api.Stop("meta/test"));
 
     ExpectApiSuccess(api.Destroy("meta/test"));
@@ -1106,7 +1106,7 @@ static void TestIsolateProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData("test/meta/test", "root_pid", ret));
     AsRoot(api);
     ExpectNeq(GetNamespace(ret, "pid"), GetNamespace(pid, "pid"));
-    AsNobody(api);
+    AsAlice(api);
     ExpectApiSuccess(api.Stop("test/meta/test"));
 
     ExpectApiSuccess(api.SetProperty("test/meta/test", "isolate", "false"));
@@ -1115,7 +1115,7 @@ static void TestIsolateProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData("test/meta/test", "root_pid", ret));
     AsRoot(api);
     ExpectEq(GetNamespace(ret, "pid"), GetNamespace(pid, "pid"));
-    AsNobody(api);
+    AsAlice(api);
     ExpectApiSuccess(api.Stop("test/meta/test"));
 
     ExpectApiSuccess(api.Destroy("test/meta/test"));
@@ -1151,7 +1151,7 @@ static void TestIsolateProperty(TPortoAPI &api) {
     ExpectNeq(GetNamespace("self", "pid"), GetNamespace(hook1Pid, "pid"));
     ExpectNeq(GetNamespace("self", "pid"), GetNamespace(hook2Pid, "pid"));
     ExpectEq(GetNamespace(hook1Pid, "pid"), GetNamespace(hook2Pid, "pid"));
-    AsNobody(api);
+    AsAlice(api);
 
     ExpectApiSuccess(api.Stop("iss/container"));
 
@@ -1162,8 +1162,8 @@ static void TestIsolateProperty(TPortoAPI &api) {
     RemakeDir(api, path);
     AsRoot(api);
     BootstrapCommand("/bin/sleep", path.ToString());
-    path.Chown("nobody", "nogroup");
-    AsNobody(api);
+    path.Chown(Alice);
+    AsAlice(api);
 
     ExpectApiSuccess(api.SetProperty("iss/container", "root", path.ToString()));
     ExpectApiSuccess(api.SetProperty("iss/container/hook1", "command", "/sleep 1000"));
@@ -1182,7 +1182,7 @@ static void TestIsolateProperty(TPortoAPI &api) {
     ExpectNeq(GetNamespace("self", "pid"), GetNamespace(hook1Pid, "pid"));
     ExpectNeq(GetNamespace("self", "pid"), GetNamespace(hook2Pid, "pid"));
     ExpectEq(GetNamespace(hook1Pid, "pid"), GetNamespace(hook2Pid, "pid"));
-    AsNobody(api);
+    AsAlice(api);
 
     ExpectApiSuccess(api.Destroy("iss"));
 
@@ -1347,7 +1347,7 @@ static void TestEnvProperty(TPortoAPI &api) {
         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
         "PORTO_HOST=" HOSTNAME "\0"
         "PORTO_NAME=a\0"
-        "USER=nobody\0"
+        "USER=porto-alice\0"
         "container=lxc\0";
     ExpectEnv(api, name, "", empty_env, sizeof(empty_env));
 
@@ -1359,7 +1359,7 @@ static void TestEnvProperty(TPortoAPI &api) {
         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
         "PORTO_HOST=" HOSTNAME "\0"
         "PORTO_NAME=a\0"
-        "USER=nobody\0"
+        "USER=porto-alice\0"
         "container=lxc\0";
 
     ExpectEnv(api, name, "a=b;c=d;", ab_env, sizeof(ab_env));
@@ -1372,7 +1372,7 @@ static void TestEnvProperty(TPortoAPI &api) {
         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
         "PORTO_HOST=" HOSTNAME "\0"
         "PORTO_NAME=a\0"
-        "USER=nobody\0"
+        "USER=porto-alice\0"
         "container=lxc\0";
     ExpectEnv(api, name, "a=e\\;b;c=d;", asb_env, sizeof(asb_env));
 
@@ -1398,27 +1398,29 @@ static void TestUserGroupProperty(TPortoAPI &api) {
 
     GetUidGid(pid, uid, gid);
 
-    ExpectEq(uid, UserUid(GetDefaultUser()));
-    ExpectEq(gid, GroupGid(GetDefaultGroup()));
+    ExpectEq(uid, Alice.Uid);
+    ExpectEq(gid, Alice.Gid);
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check custom user & group" << std::endl;
 
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
 
-    ExpectApiFailure(api.SetProperty(name, "user", "daemon"), EError::Permission);
-    ExpectApiFailure(api.SetProperty(name, "group", "bin"), EError::Permission);
+    ExpectApiFailure(api.SetProperty(name, "user", Bob.User()), EError::Permission);
+    ExpectApiFailure(api.SetProperty(name, "group", Bob.Group()), EError::Permission);
 
     string user, group;
     ExpectApiSuccess(api.GetProperty(name, "user", user));
     ExpectApiSuccess(api.GetProperty(name, "group", group));
+    ExpectEq(user, Alice.User());
+    ExpectEq(group, Alice.Group());
     ExpectApiSuccess(api.SetProperty(name, "user", user));
     ExpectApiSuccess(api.SetProperty(name, "group", group));
 
     AsRoot(api);
-    ExpectApiSuccess(api.SetProperty(name, "user", "daemon"));
-    ExpectApiSuccess(api.SetProperty(name, "group", "bin"));
-    AsNobody(api);
+    ExpectApiSuccess(api.SetProperty(name, "user", Bob.User()));
+    ExpectApiSuccess(api.SetProperty(name, "group", Bob.Group()));
+    AsAlice(api);
 
     ExpectApiFailure(api.Start(name), EError::Permission);
 
@@ -1428,8 +1430,8 @@ static void TestUserGroupProperty(TPortoAPI &api) {
 
     GetUidGid(pid, uid, gid);
 
-    ExpectEq(uid, UserUid("daemon"));
-    ExpectEq(gid, GroupGid("bin"));
+    ExpectEq(uid, Bob.Uid);
+    ExpectEq(gid, Bob.Gid);
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check integer user & group" << std::endl;
@@ -1441,7 +1443,7 @@ static void TestUserGroupProperty(TPortoAPI &api) {
     ExpectEq(group, "234");
 
     ExpectApiSuccess(api.Destroy(name));
-    AsNobody(api);
+    AsAlice(api);
 }
 
 static void TestCwdProperty(TPortoAPI &api) {
@@ -1513,7 +1515,7 @@ static void TestCwdProperty(TPortoAPI &api) {
     ExpectEq(StringTrim(s), "/tmp");
     ExpectApiSuccess(api.Destroy(parent));
 
-    AsNobody(api);
+    AsAlice(api);
 }
 
 static void TestStdPathProperty(TPortoAPI &api) {
@@ -1596,7 +1598,7 @@ static void TestStdPathProperty(TPortoAPI &api) {
     Expect(FileExists(stdoutPath));
     Expect(FileExists(stderrPath));
 
-    AsNobody(api);
+    AsAlice(api);
 }
 
 struct TMountInfo {
@@ -1654,8 +1656,8 @@ static void TestRootRdOnlyProperty(TPortoAPI &api) {
     AsRoot(api);
     BootstrapCommand("/usr/bin/touch", path.ToString());
     BootstrapCommand("/bin/cat", path.ToString(), false);
-    path.Chown("nobody", "nogroup");
-    AsNobody(api);
+    path.Chown(Alice);
+    AsAlice(api);
 
     ExpectApiSuccess(api.SetProperty(name, "command", "/touch test"));
     ExpectApiSuccess(api.Start(name));
@@ -1744,7 +1746,7 @@ static void TestRootProperty(TPortoAPI &api) {
     BootstrapCommand("/bin/sleep", path, false);
     BootstrapCommand("/bin/pwd", path, false);
     BootstrapCommand("/bin/ls", path, false);
-    AsNobody(api);
+    AsAlice(api);
 
     ExpectApiSuccess(api.SetProperty(name, "command", "/sleep 1000"));
     string bindDns;
@@ -1769,7 +1771,7 @@ static void TestRootProperty(TPortoAPI &api) {
     AsRoot(api);
     ExpectEq(GetInode("/proc/" + pid + "/cwd"), GetInode(path));
     ExpectEq(GetInode("/proc/" + pid + "/root"), GetInode(path));
-    AsNobody(api);
+    AsAlice(api);
 
     ExpectApiSuccess(api.Stop(name));
 
@@ -1804,7 +1806,7 @@ static void TestRootProperty(TPortoAPI &api) {
     RemakeDir(api, path);
     AsRoot(api);
     BootstrapCommand("/bin/cat", path, false);
-    AsNobody(api);
+    AsAlice(api);
 
     ExpectApiSuccess(api.SetProperty(name, "command", "/cat /proc/self/mountinfo"));
     v = StartWaitAndGetData(api, name, "stdout");
@@ -1831,7 +1833,7 @@ static void TestRootProperty(TPortoAPI &api) {
         if (error)
             throw error.GetMsg();
     }
-    AsNobody(api);
+    AsAlice(api);
 
     ExpectApiSuccess(api.SetProperty(name, "root", "/"));
     ExpectApiSuccess(api.SetProperty(name, "command", "ls -1 " + cwd));
@@ -1906,7 +1908,7 @@ static void TestPaths(TPortoAPI &api) {
     std::string cmd = "mkdir -p /myroot/bin && cp /usr/sbin/portoinit /myroot/bin/test2";
     AsRoot(api);
     ExpectEq(system(cmd.c_str()), 0);
-    AsNobody(api);
+    AsAlice(api);
 
     /* isolate, root, cwd, bind, cout_path, cerr_path */
     TestPathsHelper(api, "/myroot/bin/test2 -v", "", "", "", "", "");
@@ -1919,11 +1921,11 @@ static void TestPaths(TPortoAPI &api) {
     TestPathsHelper(api, "/myroot/bin/test2 -v", "", "", "", "my.stdout", "my.stderr");
     TestPathsHelper(api, "/bin/test2 -v", "/myroot", "", "", "/my.stdout", "/my.stderr");
     TestPathsHelper(api, "test2 -v", "/myroot", "/bin", "", "my.stdout", "my.stderr");
-    AsNobody(api);
+    AsAlice(api);
 
     AsRoot(api);
     ExpectEq(system("rm -rf /myroot/"), 0);
-    AsNobody(api);
+    AsAlice(api);
 }
 
 static string GetHostname() {
@@ -1948,7 +1950,7 @@ static void TestHostnameProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
     AsRoot(api);
     ExpectEq(GetNamespace("self", "uts"), GetNamespace(pid, "uts"));
-    AsNobody(api);
+    AsAlice(api);
     ExpectApiSuccess(api.Stop(name));
 
     ExpectApiSuccess(api.SetProperty(name, "command", "/bin/hostname"));
@@ -1962,13 +1964,13 @@ static void TestHostnameProperty(TPortoAPI &api) {
 
     AsRoot(api);
     ExpectSuccess(path.Mount(name, "tmpfs", 0, {"size=32m"}));
-    AsNobody(api);
+    AsAlice(api);
 
     AsRoot(api);
     BootstrapCommand("/bin/hostname", path, false);
     BootstrapCommand("/bin/sleep", path, false);
     BootstrapCommand("/bin/cat", path, false);
-    AsNobody(api);
+    AsAlice(api);
 
     ExpectApiSuccess(api.SetProperty(name, "root", path.ToString()));
 
@@ -1979,7 +1981,7 @@ static void TestHostnameProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
     AsRoot(api);
     ExpectNeq(GetNamespace("self", "uts"), GetNamespace(pid, "uts"));
-    AsNobody(api);
+    AsAlice(api);
     ExpectApiSuccess(api.Stop(name));
 
     ExpectApiSuccess(api.SetProperty(name, "command", "/hostname"));
@@ -1997,7 +1999,7 @@ static void TestHostnameProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
     AsRoot(api);
     ExpectNeq(GetNamespace("self", "uts"), GetNamespace(pid, "uts"));
-    AsNobody(api);
+    AsAlice(api);
     ExpectApiSuccess(api.Stop(name));
 
     ExpectApiSuccess(api.SetProperty(name, "command", "/hostname"));
@@ -2011,7 +2013,7 @@ static void TestHostnameProperty(TPortoAPI &api) {
     Say() << "Check /etc/hostname" << std::endl;
     AsRoot(api);
     ExpectApiSuccess(api.SetProperty(name, "virt_mode", "os"));
-    AsNobody(api);
+    AsAlice(api);
 
     TPath etc = path / "etc";
     TFile f(path + "/etc/hostname");
@@ -2019,9 +2021,9 @@ static void TestHostnameProperty(TPortoAPI &api) {
     if (!etc.Exists())
         ExpectSuccess(etc.Mkdir(0755));
     ExpectSuccess(f.Touch());
-    ExpectSuccess(f.GetPath().Chown(GetDefaultUser(), GetDefaultGroup()));
+    ExpectSuccess(f.GetPath().Chown(Alice));
     ExpectApiSuccess(api.SetProperty(name, "user", "root"));
-    AsNobody(api);
+    AsAlice(api);
 
     ExpectApiSuccess(api.SetProperty(name, "command", "/cat /etc/hostname"));
     ExpectApiSuccess(api.SetProperty(name, "stdout_path", "stdout"));
@@ -2034,7 +2036,7 @@ static void TestHostnameProperty(TPortoAPI &api) {
     AsRoot(api);
     ExpectSuccess(etc.RemoveAll());
     ExpectSuccess(path.Umount(0));
-    AsNobody(api);
+    AsAlice(api);
 
     ExpectApiSuccess(api.Destroy(name));
 }
@@ -2077,7 +2079,7 @@ static void TestBindProperty(TPortoAPI &api) {
     RemakeDir(api, path);
     AsRoot(api);
     BootstrapCommand("/bin/cat", path, false);
-    AsNobody(api);
+    AsAlice(api);
 
     ExpectApiSuccess(api.SetProperty(name, "command", "/cat /proc/self/mountinfo"));
     ExpectApiSuccess(api.SetProperty(name, "root", path));
@@ -2265,7 +2267,7 @@ static void CreateVethPair(TPortoAPI &api) {
         (void)ret;
     }
     ExpectEq(system("ip link add veth0 type veth peer name veth1"), 0);
-    AsNobody(api);
+    AsAlice(api);
 }
 
 static void TestNetProperty(TPortoAPI &api) {
@@ -2372,7 +2374,7 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectEq(system("ip link"), 0);
     ExpectEq(system("ip link add veth0 type veth peer name veth1"), 0);
     ExpectEq(system("ip addr add dev veth0 1.2.3.4"), 0);
-    AsNobody(api);
+    AsAlice(api);
 
     ExpectApiSuccess(api.SetProperty(name, "command", "ip -o -d addr show dev veth0 to 1.2.3.4"));
     ExpectApiSuccess(api.SetProperty(name, "net", "host veth0"));
@@ -2434,7 +2436,7 @@ static void TestNetProperty(TPortoAPI &api) {
         ExpectEq(system("ip link delete portobr0"), 0);
     ExpectEq(system("ip link add portobr0 type bridge"), 0);
     ExpectEq(system("ip link set portobr0 up"), 0);
-    AsNobody(api);
+    AsAlice(api);
 
     ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.SetProperty(name, "net", "veth eth0 portobr0"));
@@ -2472,19 +2474,19 @@ static void TestNetProperty(TPortoAPI &api) {
     Expect(post.find("portobr0") != post.end());
     AsRoot(api);
     ExpectEq(system("ip link delete portobr0"), 0);
-    AsNobody(api);
+    AsAlice(api);
 
     AsRoot(api);
     if (KernelSupports(KernelFeature::IPVLAN)) {
-        AsNobody(api);
+        AsAlice(api);
         Say() << "Check net=ipvlan" << std::endl;
         AsRoot(api);
-        ExpectApiSuccess(api.SetProperty(name, "user", GetDefaultUser()));
-        ExpectApiSuccess(api.SetProperty(name, "group", GetDefaultGroup()));
-        AsNobody(api);
+        ExpectApiSuccess(api.SetProperty(name, "user", Alice.User()));
+        ExpectApiSuccess(api.SetProperty(name, "group", Alice.Group()));
+        AsAlice(api);
         TestXvlan(api, name, hostLink, link, "ipvlan");
     }
-    AsNobody(api);
+    AsAlice(api);
 
     ExpectApiSuccess(api.Destroy(name));
 
@@ -2504,7 +2506,7 @@ static void TestNetProperty(TPortoAPI &api) {
     AsRoot(api);
     ExpectEq(GetNamespace(aPid, "net"), GetNamespace(abPid, "net"));
     ExpectEq(GetNamespace(aPid, "net"), GetNamespace("self", "net"));
-    AsNobody(api);
+    AsAlice(api);
     ExpectApiSuccess(api.Stop("a"));
 
     CreateVethPair(api);
@@ -2517,7 +2519,7 @@ static void TestNetProperty(TPortoAPI &api) {
     AsRoot(api);
     ExpectEq(GetNamespace(aPid, "net"), GetNamespace(abPid, "net"));
     ExpectNeq(GetNamespace(aPid, "net"), GetNamespace("self", "net"));
-    AsNobody(api);
+    AsAlice(api);
     ExpectApiSuccess(api.Stop("a"));
 
     CreateVethPair(api);
@@ -2529,7 +2531,7 @@ static void TestNetProperty(TPortoAPI &api) {
     AsRoot(api);
     ExpectNeq(GetNamespace(aPid, "net"), GetNamespace(abPid, "net"));
     ExpectNeq(GetNamespace(aPid, "net"), GetNamespace("self", "net"));
-    AsNobody(api);
+    AsAlice(api);
     ExpectApiSuccess(api.Destroy("a"));
 }
 
@@ -2661,8 +2663,8 @@ static void TestEnablePortoProperty(TPortoAPI &api) {
     RemakeDir(api, path);
     AsRoot(api);
     BootstrapCommand(program_invocation_name, path.ToString());
-    path.Chown("nobody", "nogroup");
-    AsNobody(api);
+    path.Chown(Alice);
+    AsAlice(api);
 
     ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.SetProperty(name, "command", "/portotest connectivity"));
@@ -2785,7 +2787,7 @@ static void TestStateMachine(TPortoAPI &api) {
 
     AsRoot(api);
     SetFreezer(name, "FROZEN");
-    AsNobody(api);
+    AsAlice(api);
 
     v = GetFreezer(name);
     ExpectEq(v, "FROZEN\n");
@@ -2820,7 +2822,7 @@ static void TestStateMachine(TPortoAPI &api) {
     ExpectApiSuccess(api.Create(name));
     AsRoot(api);
     ExpectApiSuccess(api.SetProperty(name, "virt_mode", "os"));
-    AsNobody(api);
+    AsAlice(api);
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
@@ -3725,7 +3727,7 @@ static void TestVirtModeProperty(TPortoAPI &api) {
     };
     std::string s;
 
-    AsDaemon(api);
+    AsBob(api);
     ExpectApiSuccess(api.Create(name));
     ExpectApiFailure(api.SetProperty(name, "virt_mode", "invalid"), EError::InvalidValue);
     ExpectApiSuccess(api.SetProperty(name, "virt_mode", "os"));
@@ -3754,12 +3756,12 @@ static void TestVirtModeProperty(TPortoAPI &api) {
     TError error = SetupLoopDevice(tmpimg, nr);
     if (error)
         throw error.GetMsg();
-    AsDaemon(api);
+    AsBob(api);
 
     try {
         AsRoot(api);
         ExpectSuccess(tmpdir.Mount("/dev/loop" + std::to_string(nr), "ext4", 0, {}));
-        AsDaemon(api);
+        AsBob(api);
 
         ExpectApiSuccess(api.SetProperty(name, "isolate", "false"));
         ExpectApiSuccess(api.SetProperty(name, "root", tmpimg.ToString()));
@@ -3772,7 +3774,7 @@ static void TestVirtModeProperty(TPortoAPI &api) {
         ExpectEq(system(cmd.c_str()), 0);
         (void)tmpdir.Umount(0);
         (void)PutLoopDev(nr);
-        AsDaemon(api);
+        AsBob(api);
     } catch (...) {
         AsRoot(api);
         (void)tmpdir.Umount(0);
@@ -4156,70 +4158,62 @@ static void TestPermissions(TPortoAPI &api) {
 
     Say() << "Only user that created container can start/stop/destroy/etc it" << std::endl;
 
-    TUser daemonUser("daemon");
-    TError error = daemonUser.Load();
-    if (error)
-        throw error.GetMsg();
-
-    TGroup daemonGroup("daemon");
-    error = daemonGroup.Load();
-    if (error)
-        throw error.GetMsg();
-
-    TUser binUser("bin");
-    error = binUser.Load();
-    if (error)
-        throw error.GetMsg();
-
-    TGroup binGroup("bin");
-    error = binGroup.Load();
-    if (error)
-        throw error.GetMsg();
-
     string s;
 
-    AsUser(api, daemonUser, daemonGroup);
-           ExpectApiSuccess(api.Create(name));
+    AsAlice(api);
 
-    AsUser(api, binUser, binGroup);
-           ExpectApiFailure(api.Start(name), EError::Permission);
-           ExpectApiFailure(api.Destroy(name), EError::Permission);
-           ExpectApiFailure(api.SetProperty(name, "command", "sleep 1000"), EError::Permission);
-           ExpectApiSuccess(api.GetProperty(name, "command", s));
+    ExpectApiSuccess(api.Create(name));
 
-    AsUser(api, daemonUser, daemonGroup);
-        ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
-        ExpectApiFailure(api.SetProperty(name, "user", "mail"), EError::Permission);
-        ExpectApiFailure(api.SetProperty(name, "group", "mail"), EError::Permission);
-        ExpectApiSuccess(api.GetProperty(name, "command", s));
-        ExpectApiSuccess(api.Start(name));
-        ExpectApiSuccess(api.GetData(name, "root_pid", s));
+    AsBob(api);
 
-    AsUser(api, binUser, binGroup);
-        ExpectApiSuccess(api.GetData(name, "root_pid", s));
-        ExpectApiFailure(api.Stop(name), EError::Permission);
-        ExpectApiFailure(api.Pause(name), EError::Permission);
+    ExpectApiFailure(api.Start(name), EError::Permission);
+    ExpectApiFailure(api.Destroy(name), EError::Permission);
+    ExpectApiFailure(api.SetProperty(name, "command", "sleep 1000"), EError::Permission);
+    ExpectApiSuccess(api.GetProperty(name, "command", s));
 
-    AsUser(api, daemonUser, daemonGroup);
-        ExpectApiSuccess(api.Pause(name));
+    AsAlice(api);
 
-    AsUser(api, binUser, binGroup);
-        ExpectApiFailure(api.Destroy(name), EError::Permission);
-        ExpectApiFailure(api.Resume(name), EError::Permission);
+    ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
+    ExpectApiFailure(api.SetProperty(name, "user", Bob.User()), EError::Permission);
+    ExpectApiFailure(api.SetProperty(name, "group", Bob.Group()), EError::Permission);
+    ExpectApiSuccess(api.GetProperty(name, "command", s));
+    ExpectApiSuccess(api.Start(name));
+    ExpectApiSuccess(api.GetData(name, "root_pid", s));
+
+    AsBob(api);
+
+    ExpectApiSuccess(api.GetData(name, "root_pid", s));
+    ExpectApiFailure(api.Stop(name), EError::Permission);
+    ExpectApiFailure(api.Pause(name), EError::Permission);
+
+    AsAlice(api);
+
+    ExpectApiSuccess(api.Pause(name));
+
+    AsBob(api);
+
+    ExpectApiFailure(api.Destroy(name), EError::Permission);
+    ExpectApiFailure(api.Resume(name), EError::Permission);
 
     AsRoot(api);
+
     ExpectApiSuccess(api.Destroy(name));
-    AsNobody(api);
+
+    AsAlice(api);
 
     Say() << "Make sure we can't create child for parent with different uid/gid " << std::endl;
-    AsUser(api, binUser, binGroup);
-           ExpectApiSuccess(api.Create("a"));
 
-    AsUser(api, daemonUser, daemonGroup);
-           ExpectApiFailure(api.Create("a/b"), EError::Permission);
+    AsAlice(api);
 
-    AsUser(api, binUser, binGroup);
-           ExpectApiSuccess(api.Destroy("a"));
+    ExpectApiSuccess(api.Create("a"));
+
+    AsBob(api);
+
+    ExpectApiFailure(api.Create("a/b"), EError::Permission);
+
+    AsAlice(api);
+
+    ExpectApiSuccess(api.Destroy("a"));
 }
 
 static void WaitRespawn(TPortoAPI &api, const std::string &name, int expected, int maxTries = 10) {
@@ -4555,7 +4549,7 @@ static void CleanupVolume(TPortoAPI &api, const std::string &path) {
         if (error)
             throw error.GetMsg();
     }
-    AsNobody(api);
+    AsAlice(api);
 }
 
 static void TestVolumeHolder(TPortoAPI &api) {
@@ -4698,7 +4692,7 @@ static void TestVolumeImpl(TPortoAPI &api) {
         std::string loopDev = m[a].source;
         AsRoot(api);
         std::string img = System("losetup " + loopDev + " | sed -e 's/[^(]*(\\([^)]*\\)).*/\\1/'");
-        AsNobody(api);
+        AsAlice(api);
 
         Say() << "Make sure loop device has correct size" << std::endl;
         TFile loopFile(img);
@@ -4763,7 +4757,7 @@ static void TestSigPipe(TPortoAPI &api) {
 static void KillMaster(TPortoAPI &api, int sig, int times = 10) {
     AsRoot(api);
     RotateDaemonLogs(api);
-    AsNobody(api);
+    AsAlice(api);
 
     int pid = ReadPid(config().master_pid().path());
     if (kill(pid, sig))
@@ -4932,8 +4926,8 @@ static void TestRecovery(TPortoAPI &api) {
 
     map<string,string> props = {
         { "command", "sleep 1000" },
-        { "user", "bin" },
-        { "group", "daemon" },
+        { "user", Alice.User() },
+        { "group", Bob.Group() },
         { "env", "a=a; b=b" },
     };
 
@@ -5000,7 +4994,7 @@ static void TestRecovery(TPortoAPI &api) {
     }
 
     ExpectApiSuccess(api.Destroy(name));
-    AsNobody(api);
+    AsAlice(api);
 
     Say() << "Make sure meta gets correct state upon recovery" << std::endl;
     string parent = "a";
@@ -5014,7 +5008,7 @@ static void TestRecovery(TPortoAPI &api) {
 
     AsRoot(api);
     KillSlave(api, SIGKILL);
-    AsNobody(api);
+    AsAlice(api);
 
     ExpectApiSuccess(api.GetData(parent, "state", v));
     ExpectEq(v, "meta");
@@ -5031,7 +5025,7 @@ static void TestRecovery(TPortoAPI &api) {
 
     AsRoot(api);
     KillSlave(api, SIGKILL);
-    AsNobody(api);
+    AsAlice(api);
 
     containers.clear();
     ExpectApiSuccess(api.List(containers));
@@ -5065,7 +5059,7 @@ static void TestRecovery(TPortoAPI &api) {
     auto cgmap = GetCgroups(pid);
     ExpectEq(cgmap["memory"], "/porto");
     KillSlave(api, SIGKILL);
-    AsNobody(api);
+    AsAlice(api);
     expectedWarns++; // Task belongs to invalid subsystem
 
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
@@ -5205,7 +5199,7 @@ static void TestVolumeRecovery(TPortoAPI &api) {
     AsRoot(api);
     volume.RemoveAll();
     ExpectSuccess(volume.Mkdir(0755));
-    AsNobody(api);
+    AsAlice(api);
 
     ExpectEq(volume.Exists(), true);
 
@@ -5299,7 +5293,7 @@ static void SetWorkersNr(TPortoAPI &api, size_t nr) {
 
     KillSlave(api, SIGTERM);
 
-    AsNobody(api);
+    AsAlice(api);
 }
 
 static void TestBadClient(TPortoAPI &api) {
@@ -5352,7 +5346,7 @@ static void SetLogRotateTimeout(TPortoAPI &api, size_t s) {
 
     KillSlave(api, SIGTERM);
 
-    AsNobody(api);
+    AsAlice(api);
 }
 
 static void TestRemoveDead(TPortoAPI &api) {
@@ -5443,7 +5437,7 @@ static void TestStats(TPortoAPI &api) {
     if (warns != expectedWarns)
         throw string("ERROR: Unexpected number of warnings: " + std::to_string(warns));
 
-    AsNobody(api);
+    AsAlice(api);
 }
 
 static void TestPackage(TPortoAPI &api) {
@@ -5584,6 +5578,8 @@ int SelfTest(std::vector<std::string> args) {
     config.Load();
     TPortoAPI api(config().rpc_sock().file().path(), 0);
 
+    InitUsersAndGroups();
+
     try {
         if (needDaemonChecks) {
             RestartDaemon(api);
@@ -5592,20 +5588,12 @@ int SelfTest(std::vector<std::string> args) {
             ExpectEq(WordCount(config().slave_log().path(), "Started"), 1);
         }
 
-        TGroup portoGroup("porto");
-        TError error = portoGroup.Load();
-        if (error)
-            throw error.GetMsg();
-
-        gid_t portoGid = portoGroup.GetId();
-        ExpectEq(setgroups(1, &portoGid), 0);
-
         for (auto t : tests) {
             if (except ^ (std::find(args.begin(), args.end(), t.first) == args.end()))
                 continue;
 
             std::cerr << ">>> Testing " << t.first << "..." << std::endl;
-            AsNobody(api);
+            AsAlice(api);
 
             t.second(api);
 

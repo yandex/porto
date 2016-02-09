@@ -218,26 +218,11 @@ TError TPath::PivotRoot() const {
     return TError::Success();
 }
 
-TError TPath::Chown(const TCred &cred) const {
-    return Chown(cred.UserAsString(), cred.GroupAsString());
-}
-
-TError TPath::Chown(unsigned int uid, unsigned int gid) const {
-    int ret = chown(Path.c_str(), uid, gid);
-    if (ret)
-        return TError(EError::Unknown, errno, "chown(" + Path + ", " + std::to_string(uid) + ", " + std::to_string(gid) + ")");
-
+TError TPath::Chown(uid_t uid, gid_t gid) const {
+    if (chown(Path.c_str(), uid, gid))
+        return TError(EError::Unknown, errno, "chown(" + Path + ", " +
+                        UserName(uid) + ", " + GroupName(gid) + ")");
     return TError::Success();
-}
-
-TError TPath::Chown(const std::string &user, const std::string &group) const {
-    TCred cred;
-
-    TError error = cred.Parse(user, group);
-    if (error)
-        return error;
-
-    return Chown(cred.Uid, cred.Gid);
 }
 
 TError TPath::Chmod(const int mode) const {

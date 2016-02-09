@@ -260,14 +260,9 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
     bool accept_paused = false;
 
     TCred cred(getuid(), getgid());
-
-    TGroup g(config().rpc_sock().group().c_str());
-    TError error = g.Load();
+    TError error = GroupId(config().rpc_sock().group(), cred.Gid);
     if (error)
         L_ERR() << "Can't get gid for " << config().rpc_sock().group() << ": " << error << std::endl;
-
-    if (!error)
-        cred.Gid = g.GetId();
 
     error = CreateRpcServer(config().rpc_sock().file().path(),
                             config().rpc_sock().file().perm(),

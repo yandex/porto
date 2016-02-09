@@ -123,11 +123,8 @@ public:
 
     TError CheckValue(const std::string &value) override {
         auto container = GetContainer();
-        TUser user(value);
-        TError error = user.Load();
-        if (!error)
-            container->OwnerCred.Uid = user.GetId();
-        return error;
+
+        return UserId(value, container->OwnerCred.Uid);
     }
 };
 
@@ -141,11 +138,8 @@ public:
 
     TError CheckValue(const std::string &value) override {
         auto container = GetContainer();
-        TGroup group(value);
-        TError error = group.Load();
-        if (!error)
-            container->OwnerCred.Gid = group.GetId();
-        return error;
+
+        return GroupId(value, container->OwnerCred.Gid);
     }
 };
 
@@ -186,7 +180,7 @@ public:
             TPath root(value);
             TPath realRoot("/");
 
-            if (!GetContainer()->OwnerCred.IsPrivileged() &&
+            if (!GetContainer()->OwnerCred.IsPrivilegedUser() &&
                 root.IsDirectory() && root.GetDev() == realRoot.GetDev())
                 return TError(EError::Permission, "Can't start OS container on the same mount point as /");
         }

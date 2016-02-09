@@ -794,11 +794,11 @@ TError TContainer::Create(const TCred &cred) {
 
     OwnerCred = TCred(cred.Uid, cred.Gid);
 
-    error = Prop->Set<std::string>(P_USER, cred.UserAsString());
+    error = Prop->Set<std::string>(P_USER, cred.User());
     if (error)
         return error;
 
-    error = Prop->Set<std::string>(P_GROUP, cred.GroupAsString());
+    error = Prop->Set<std::string>(P_GROUP, cred.Group());
     if (error)
         return error;
 
@@ -819,7 +819,7 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
         return error;
 
     auto vmode = Prop->Get<int>(P_VIRT_MODE);
-    if (vmode == VIRT_MODE_OS && !CredConf.PrivilegedUser(OwnerCred)) {
+    if (vmode == VIRT_MODE_OS && !OwnerCred.IsPrivilegedUser()) {
         for (auto name : Prop->List()) {
             auto prop = Prop->Find(name);
             if (prop && prop->HasFlag(OS_MODE_PROPERTY))
@@ -1540,7 +1540,7 @@ TError TContainer::SetProperty(const string &origProperty,
     if (prop->HasFlag(UNSUPPORTED_FEATURE))
         return TError(EError::NotSupported, property + " is not supported");
 
-    bool superuser = client && client->GetCred().IsPrivileged();
+    bool superuser = client && client->GetCred().IsPrivilegedUser();
 
     if (prop->HasFlag(SUPERUSER_PROPERTY) && !superuser) {
         std::string current;
@@ -1552,7 +1552,7 @@ TError TContainer::SetProperty(const string &origProperty,
     }
 
     if (prop->HasFlag(RESTROOT_PROPERTY) &&
-            !superuser && !CredConf.RestrictedUser(OwnerCred))
+            !superuser && !OwnerCred.IsRestrictedRootUser())
         return TError(EError::Permission, "Only restricted root can change this property");
 
     if (!Prop->HasState(property, GetState()))

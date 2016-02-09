@@ -736,15 +736,15 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
 
     /* Save original creator. Just for the record. */
     error = Config->Set<std::string>(V_CREATOR, creator_container->GetName() + " " +
-                    creator_cred.UserAsString() + " " + creator_cred.GroupAsString());
+                    creator_cred.User() + " " + creator_cred.Group());
     if (error)
         return error;
 
     /* Set default credentials to creator */
-    error = Config->Set<std::string>(V_USER, creator_cred.UserAsString());
+    error = Config->Set<std::string>(V_USER, creator_cred.User());
     if (error)
         return error;
-    error = Config->Set<std::string>(V_GROUP, creator_cred.GroupAsString());
+    error = Config->Set<std::string>(V_GROUP, creator_cred.Group());
     if (error)
         return error;
 
@@ -760,16 +760,19 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             return error;
     }
 
-    error = Cred.Parse(Config->Get<std::string>(V_USER),
-                       Config->Get<std::string>(V_GROUP));
+    error = UserId(Config->Get<std::string>(V_USER), Cred.Uid);
+    if (error)
+        return error;
+
+    error = GroupId(Config->Get<std::string>(V_GROUP), Cred.Gid);
     if (error)
         return error;
 
     /* Verify default credentials */
-    if (Cred.Uid != creator_cred.Uid && !creator_cred.IsPrivileged())
+    if (Cred.Uid != creator_cred.Uid && !creator_cred.IsPrivilegedUser())
         return TError(EError::Permission, "Changing user is not permitted");
 
-    if (Cred.Gid != creator_cred.Gid && !creator_cred.IsPrivileged() &&
+    if (Cred.Gid != creator_cred.Gid && !creator_cred.IsPrivilegedUser() &&
             !creator_cred.IsMemberOf(Cred.Gid))
         return TError(EError::Permission, "Changing group is not permitted");
 
@@ -1037,11 +1040,14 @@ TError TVolume::CheckPermission(const TCred &ucred) const {
 }
 
 TError TVolume::Restore() {
+    TError error;
+
     if (!IsReady())
         return TError(EError::Busy, "Volume not ready");
 
-    TError error = Cred.Parse(Config->Get<std::string>(V_USER),
-                              Config->Get<std::string>(V_GROUP));
+    error = UserId(Config->Get<std::string>(V_USER), Cred.Uid);
+    if (!error)
+        error = GroupId(Config->Get<std::string>(V_GROUP), Cred.Gid);
     if (error)
         return TError(EError::InvalidValue, "Bad volume " + GetPath().ToString() + " credentials: " +
                       Config->Get<std::string>(V_USER) + " " +

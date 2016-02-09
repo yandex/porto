@@ -94,9 +94,13 @@ public:
     TError Chdir() const;
     TError Chroot() const;
     TError PivotRoot() const;
-    TError Chown(const TCred &cred) const;
-    TError Chown(const std::string &user, const std::string &group) const;
-    TError Chown(unsigned int uid, unsigned int gid) const;
+
+    TError Chown(uid_t uid, gid_t gid) const;
+
+    TError Chown(const TCred &cred) const {
+        return Chown(cred.Uid, cred.Gid);
+    }
+
     TError Chmod(const int mode) const;
     TError ReadLink(TPath &value) const;
     TError Symlink(const TPath &target) const;

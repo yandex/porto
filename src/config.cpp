@@ -121,7 +121,7 @@ void TConfig::Load(bool silent) {
     }
 
 load_cred:
-    CredConf.Load();
+    InitCred();
 }
 
 int TConfig::Test(const std::string &path) {

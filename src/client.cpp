@@ -183,7 +183,7 @@ bool TClient::Readonly() {
     if (c->IsNamespaceIsolated())
         return false;
 
-    return !Cred.IsPrivileged() && !Cred.IsMemberOf(CredConf.GetPortoGid());
+    return !Cred.IsPortoUser();
 }
 
 TError TClient::ReadRequest(rpc::TContainerRequest &request) {
@@ -275,9 +275,7 @@ std::ostream& operator<<(std::ostream& stream, TClient& client) {
     if (client.FullLog) {
         client.FullLog = false;
         stream << client.Comm << "(" << client.Pid << ") "
-            << client.Cred.UserAsString() << ":"
-            << client.Cred.GroupAsString() << " "
-            << client.GetContainerName();
+               << client.Cred << " " << client.GetContainerName();
     } else {
         stream << client.Comm << "(" << client.Pid << ")";
     }

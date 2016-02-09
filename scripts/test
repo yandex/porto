@@ -13,10 +13,6 @@ if [ -x ./obj-x86_64-linux-gnu/portotest ] ; then
 	PORTOTEST="./obj-x86_64-linux-gnu/portotest"
 fi
 
-update_config() {
-	echo "log { verbose: true } network { enabled: $1 dynamic_ifaces: $2 } container { use_hierarchy: true empty_wait_timeout_ms: 1000 } privileges { restricted_root_user: \"daemon\" } volumes { enabled: true }" | $SUDO tee /etc/portod.conf
-}
-
 say() { [ ! -t 1 ] || tput setaf 3; echo "$@"; [ ! -t 1 ] || tput sgr0; }
 die() { echo $@ ; exit 1; }
 
@@ -43,19 +39,16 @@ install() {
 
 selftest() {
 	say "Self test"
-	update_config true true
 	$SUDO $PORTOTEST "$@"
 }
 
 stresstest() {
 	say "Stress test"
-	update_config true true
 	$SUDO $PORTOTEST stress "$@"
 }
 
 fuzzytest() {
 	say "Fuzzy test"
-	update_config true true
 	$SUDO $PORTOTEST fuzzy "$@"
 }
 

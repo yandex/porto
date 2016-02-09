@@ -56,8 +56,8 @@ static void Usage() {
 
 static int TestConnectivity() {
     using namespace test;
-    config.Load();
-    TPortoAPI api(config().rpc_sock().file().path(), 0);
+
+    TPortoAPI api("/run/portod.socket", 0);
 
     std::vector<std::string> containers;
     ExpectApiSuccess(api.List(containers));
@@ -71,6 +71,9 @@ static int TestConnectivity() {
 
 int main(int argc, char *argv[])
 {
+    if (argc == 2 && !strcmp(argv[1], "connectivity"))
+        return TestConnectivity();
+
     // in case client closes pipe we are writing to in the protobuf code
     (void)RegisterSignal(SIGPIPE, SIG_IGN);
 
@@ -94,6 +97,8 @@ int main(int argc, char *argv[])
     try {
         config.Load();
 
+        test::InitUsersAndGroups();
+
         auto nl = std::make_shared<TNl>();
         TError error = nl->Connect();
         if (error)
@@ -113,8 +118,6 @@ int main(int argc, char *argv[])
             return Stresstest(argc - 2, argv + 2);
         if (what == "fuzzy")
             return Fuzzytest(argc - 2, argv + 2);
-        else if (what == "connectivity")
-            return TestConnectivity();
         else
             return Selftest(argc - 1, argv + 1);
     } catch (string err) {

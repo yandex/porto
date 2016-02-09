@@ -6,6 +6,7 @@
 
 #include "libporto.hpp"
 #include "util/cred.hpp"
+#include "util/path.hpp"
 
 extern "C" {
 #include <dirent.h>
@@ -38,8 +39,6 @@ namespace test {
     std::string GetState(const std::string &pid);
     uint64_t GetCap(const std::string &pid, const std::string &type);
     void GetUidGid(const std::string &pid, int &uid, int &gid);
-    int UserUid(const std::string &user);
-    int GroupGid(const std::string &group);
     std::string GetEnv(const std::string &pid);
     bool CgExists(const std::string &subsystem, const std::string &name);
     std::string CgRoot(const std::string &subsystem, const std::string &name);
@@ -54,12 +53,18 @@ namespace test {
     int WordCount(const std::string &path, const std::string &word);
     std::string ReadLink(const std::string &path);
     bool FileExists(const std::string &path);
-    void AsUser(TPortoAPI &api, TUser &user, TGroup &group);
+
+    void InitUsersAndGroups();
+
+    extern TCred Nobody;
+    extern TCred Alice;
+    extern TCred Bob;
+
     void AsRoot(TPortoAPI &api);
     void AsNobody(TPortoAPI &api);
-    void AsDaemon(TPortoAPI &api);
-    std::string GetDefaultUser();
-    std::string GetDefaultGroup();
+    void AsAlice(TPortoAPI &api);
+    void AsBob(TPortoAPI &api);
+
     void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove = true);
 
     void RotateDaemonLogs(TPortoAPI &api);
