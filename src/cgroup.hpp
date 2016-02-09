@@ -118,10 +118,6 @@ public:
         return cg.GetUint64(USAGE, value);
     }
 
-    TError UseHierarchy(TCgroup &cg, bool enable) const {
-        return cg.SetBool(USE_HIERARCHY, enable);
-    }
-
     TError GetSoftLimit(TCgroup &cg, uint64_t &limit) const {
         return cg.GetUint64(SOFT_LIMIT, limit);
     }

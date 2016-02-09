@@ -399,14 +399,7 @@ vector<pid_t> TContainer::Processes() {
 
 TError TContainer::ApplyDynamicProperties() {
     auto memcg = GetCgroup(MemorySubsystem);
-
-    TError error = MemorySubsystem.UseHierarchy(memcg, config().container().use_hierarchy());
-    if (error) {
-        L_ERR() << "Can't set use_hierarchy for " << memcg << " : " << error << std::endl;
-        // we don't want to get this error endlessly when user switches config
-        // so be tolerant
-        //return error;
-    }
+    TError error;
 
     error = MemorySubsystem.SetGuarantee(memcg, Prop->Get<uint64_t>(P_MEM_GUARANTEE));
     if (error) {
@@ -526,6 +519,12 @@ TError TContainer::PrepareCgroups() {
             continue;
 
         error = cg.Create();
+        if (error)
+            return error;
+    }
+
+    if (IsPortoRoot()) {
+        error = GetCgroup(MemorySubsystem).SetBool(MemorySubsystem.USE_HIERARCHY, true);
         if (error)
             return error;
     }
