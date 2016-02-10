@@ -27,6 +27,8 @@ const std::string PORTO_ROOT_CONTAINER = "/porto";
 const std::string PORTO_ROOT_CGROUP = "/porto";
 const std::string PORTO_DAEMON_CGROUP = "/portod";
 
+const std::string PORTO_GROUP_NAME = "porto";
+
 constexpr unsigned int CONTAINER_NAME_MAX = 128;
 constexpr unsigned int CONTAINER_PATH_MAX = 200;
 

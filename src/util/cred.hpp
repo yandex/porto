@@ -1,9 +1,8 @@
 #pragma once
 
 #include <string>
-#include <set>
 
-#include "common.hpp"
+#include "error.hpp"
 
 TError FindUser(const std::string &user, uid_t &uid, gid_t &gid);
 TError FindGroups(const std::string &user, gid_t gid, std::vector<gid_t> &groups);
@@ -40,10 +39,9 @@ struct TCred {
 
     bool IsPortoUser() const;
     bool IsRestrictedRootUser() const;
-    bool IsPrivilegedUser() const;
-    bool IsRootUser() const;
+    bool IsRootUser() const { return Uid == 0; }
 
-    bool IsMemberOf(gid_t gid) const;
+    bool IsMemberOf(gid_t group) const;
     bool IsPermitted(const TCred &requirement) const;
 
     friend std::ostream& operator<<(std::ostream& os, const TCred& cred) {

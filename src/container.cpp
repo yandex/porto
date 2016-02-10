@@ -819,7 +819,7 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
         return error;
 
     auto vmode = Prop->Get<int>(P_VIRT_MODE);
-    if (vmode == VIRT_MODE_OS && !OwnerCred.IsPrivilegedUser()) {
+    if (vmode == VIRT_MODE_OS && !OwnerCred.IsRootUser()) {
         for (auto name : Prop->List()) {
             auto prop = Prop->Find(name);
             if (prop && prop->HasFlag(OS_MODE_PROPERTY))
@@ -1540,7 +1540,7 @@ TError TContainer::SetProperty(const string &origProperty,
     if (prop->HasFlag(UNSUPPORTED_FEATURE))
         return TError(EError::NotSupported, property + " is not supported");
 
-    bool superuser = client && client->GetCred().IsPrivilegedUser();
+    bool superuser = client && client->GetCred().IsRootUser();
 
     if (prop->HasFlag(SUPERUSER_PROPERTY) && !superuser) {
         std::string current;

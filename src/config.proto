@@ -73,10 +73,10 @@ message TCfg {
 	}
 
 	message TPrivilegesCfg {
-		repeated string root_user = 1;
-		repeated string root_group = 2;
+		repeated string root_user = 1;  /* deprecated */
+		repeated string root_group = 2; /* deprecated */
 		repeated string restricted_root_user = 3;
-		repeated string restricted_root_group = 4;
+		repeated string restricted_root_group = 4; /* deprecated */
 	}
 
 	message TVolumesCfg {

@@ -1,28 +1,17 @@
-#include <algorithm>
-
-#include "util/string.hpp"
-#include "util/log.hpp"
 #include "util/cred.hpp"
-#include "util/unix.hpp"
-#include "util/file.hpp"
-#include "util/string.hpp"
-
+#include "util/log.hpp"
 #include "config.hpp"
+#include "common.hpp"
 
 extern "C" {
 #include <grp.h>
 #include <pwd.h>
 #include <unistd.h>
-#include <sys/types.h>
 }
 
-static gid_t PortoGid;
-
-static std::vector<uid_t> PrivilegedUid = { 0, };
-static std::vector<gid_t> PrivilegedGid = { 0, };
+static gid_t PortoGroup;
 
 static std::vector<uid_t> RestrictedRootUid;
-static std::vector<gid_t> RestrictedRootGid;
 
 static size_t PwdBufSize = sysconf(_SC_GETPW_R_SIZE_MAX) > 0 ?
                            sysconf(_SC_GETPW_R_SIZE_MAX) : 16384;
@@ -139,32 +128,19 @@ TError TCred::Load(const std::string &user) {
     return error;
 }
 
-/* FIXME should die */
-bool TCred::IsRootUser() const {
-    return Uid == 0 || Gid == 0;
-}
+//FIXME should be euqal to IsPortoUser
+bool TCred::IsRestrictedRootUser() const {
 
-bool TCred::IsPrivilegedUser() const {
-    if (std::find(PrivilegedUid.begin(), PrivilegedUid.end(), Uid) != PrivilegedUid.end() ||
-        std::find(PrivilegedGid.begin(), PrivilegedGid.end(), Gid) != PrivilegedGid.end())
-        return true;
+    for (auto id: RestrictedRootUid) {
+        if (Uid == id)
+            return true;
+    }
 
     return IsRootUser();
 }
 
-bool TCred::IsRestrictedRootUser() const {
-    if (std::find(RestrictedRootUid.begin(), RestrictedRootUid.end(), Uid) != RestrictedRootUid.end() || 
-        std::find(RestrictedRootGid.begin(), RestrictedRootGid.end(), Gid) != RestrictedRootGid.end())
-        return true;
-
-    return IsPrivilegedUser();
-}
-
 bool TCred::IsPortoUser() const {
-    if (IsMemberOf(PortoGid))
-        return true;
-
-    return IsPrivilegedUser();
+    return IsRootUser() || IsMemberOf(PortoGroup);
 }
 
 /* Returns true for priveleged or if uid/gid intersects */
@@ -173,7 +149,7 @@ bool TCred::IsPermitted(const TCred &requirement) const {
     if (Uid == requirement.Uid)
         return true;
 
-    if (IsPrivilegedUser())
+    if (IsRootUser())
         return true;
 
     if (IsMemberOf(requirement.Gid))
@@ -186,42 +162,29 @@ bool TCred::IsPermitted(const TCred &requirement) const {
     return false;
 }
 
-bool TCred::IsMemberOf(gid_t gid) const {
-    return Gid == gid || std::find(Groups.begin(), Groups.end(), gid) != Groups.end();
-}
+bool TCred::IsMemberOf(gid_t group) const {
 
-static void ParseUserConf(const ::google::protobuf::RepeatedPtrField<std::string> &source,
-                          std::vector<uid_t> &target) {
-    for (auto &user : source) {
-        uid_t uid;
-        TError error = UserId(user, uid);
-        if (error)
-            L_WRN() << "Can't add privileged user " << user << " : "  << error << std::endl;
-        else
-            target.push_back(uid);
+    for (auto id: Groups) {
+        if (id == group)
+            return true;
     }
-}
 
-static void ParseGroupConf(const ::google::protobuf::RepeatedPtrField<std::string> &source,
-                          std::vector<gid_t> &target) {
-    for (auto &group : source) {
-        gid_t gid;
-        TError error = GroupId(group, gid);
-        if (error)
-            L_WRN() << "Can't add privileged group " << group << " : " << error << std::endl;
-        else
-            target.push_back(gid);
-    }
+    return Gid == group;
 }
 
 void InitCred() {
-    ParseUserConf(config().privileges().root_user(), PrivilegedUid);
-    ParseGroupConf(config().privileges().root_group(), PrivilegedGid);
+    TError error;
 
-    ParseUserConf(config().privileges().restricted_root_user(), RestrictedRootUid);
-    ParseGroupConf(config().privileges().restricted_root_group(), RestrictedRootGid);
-
-    TError error = GroupId("porto", PortoGid);
+    error = GroupId(PORTO_GROUP_NAME, PortoGroup);
     if (error)
         L_WRN() << "Cannot find group porto: " << error << std::endl;
+
+    for (auto &user: config().privileges().restricted_root_user()) {
+        uid_t uid;
+        error = UserId(user, uid);
+        if (error)
+            L_WRN() << "Can't add privileged user " << user << " : "  << error << std::endl;
+        else
+            RestrictedRootUid.push_back(uid);
+    }
 }
