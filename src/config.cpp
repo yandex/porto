@@ -70,7 +70,6 @@ void TConfig::LoadDefaults() {
 
     config().mutable_volumes()->set_volume_dir("/place/porto_volumes");
     config().mutable_volumes()->set_layers_dir("/place/porto_layers");
-    config().mutable_volumes()->set_enabled(true);
     config().mutable_volumes()->set_enable_quota(true);
 }
 

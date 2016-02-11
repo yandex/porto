@@ -923,10 +923,6 @@ noinline TError ListVolumeProperties(TContext &context,
                                      const rpc::TVolumePropertyListRequest &req,
                                      rpc::TContainerResponse &rsp,
                                      std::shared_ptr<TClient> client) {
-
-    if (!config().volumes().enabled())
-        return TError(EError::InvalidMethod, "volume api is disabled");
-
     auto list = rsp.mutable_volumepropertylist();
     for (auto kv: context.Vholder->ListProperties()) {
         auto p = list->add_properties();
@@ -954,10 +950,6 @@ noinline TError CreateVolume(TContext &context,
                              const rpc::TVolumeCreateRequest &req,
                              rpc::TContainerResponse &rsp,
                              std::shared_ptr<TClient> client) {
-
-    if (!config().volumes().enabled())
-        return TError(EError::InvalidMethod, "volume api is disabled");
-
     TError error = CheckRequestPermissions(client);
     if (error)
         return error;
@@ -1049,10 +1041,6 @@ noinline TError LinkVolume(TContext &context,
                            const rpc::TVolumeLinkRequest &req,
                            rpc::TContainerResponse &rsp,
                            std::shared_ptr<TClient> client) {
-
-    if (!config().volumes().enabled())
-        return TError(EError::InvalidMethod, "volume api is disabled");
-
     TError error = CheckRequestPermissions(client);
     if (error)
         return error;
@@ -1110,10 +1098,6 @@ noinline TError UnlinkVolume(TContext &context,
                              const rpc::TVolumeUnlinkRequest &req,
                              rpc::TContainerResponse &rsp,
                              std::shared_ptr<TClient> client) {
-
-    if (!config().volumes().enabled())
-        return TError(EError::InvalidMethod, "volume api is disabled");
-
     TError error = CheckRequestPermissions(client);
     if (error)
         return error;
@@ -1189,10 +1173,6 @@ noinline TError ListVolumes(TContext &context,
                             const rpc::TVolumeListRequest &req,
                             rpc::TContainerResponse &rsp,
                             std::shared_ptr<TClient> client) {
-
-    if (!config().volumes().enabled())
-        return TError(EError::InvalidMethod, "volume api is disabled");
-
     std::shared_ptr<TContainer> clientContainer;
     TError error = client->GetContainer(clientContainer);
     if (error)
@@ -1251,10 +1231,6 @@ static bool LayerInUse(TContext &context, TPath layer) {
 noinline TError ImportLayer(TContext &context,
                             const rpc::TLayerImportRequest &req,
                             std::shared_ptr<TClient> client) {
-
-    if (!config().volumes().enabled())
-        return TError(EError::InvalidMethod, "volume api is disabled");
-
     TError error = CheckRequestPermissions(client);
     if (error)
         return error;
@@ -1340,10 +1316,6 @@ err_tmp:
 noinline TError ExportLayer(TContext &context,
                             const rpc::TLayerExportRequest &req,
                             std::shared_ptr<TClient> client) {
-
-    if (!config().volumes().enabled())
-        return TError(EError::InvalidMethod, "volume api is disabled");
-
     TError error = CheckRequestPermissions(client);
     if (error)
         return error;
@@ -1402,10 +1374,6 @@ noinline TError ExportLayer(TContext &context,
 noinline TError RemoveLayer(TContext &context,
                             const rpc::TLayerRemoveRequest &req,
                             std::shared_ptr<TClient> client) {
-
-    if (!config().volumes().enabled())
-        return TError(EError::InvalidMethod, "volume api is disabled");
-
     TError error = CheckRequestPermissions(client);
     if (error)
         return error;
@@ -1441,10 +1409,6 @@ err:
 
 noinline TError ListLayers(TContext &context,
                            rpc::TContainerResponse &rsp) {
-
-    if (!config().volumes().enabled())
-        return TError(EError::InvalidMethod, "volume api is disabled");
-
     TPath layers_dir = TPath(config().volumes().layers_dir());
     std::vector<std::string> layers;
 

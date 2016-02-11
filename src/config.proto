@@ -82,7 +82,7 @@ message TCfg {
 	message TVolumesCfg {
 		optional TKeyvalCfg keyval = 1;
 		optional string volume_dir = 2;
-		optional bool enabled = 5;
+		optional bool enabled = 5 [deprecated=true];
 		optional string layers_dir = 6;
 		optional bool enable_quota = 7;
 	}
