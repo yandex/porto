@@ -50,7 +50,7 @@ class TPortoAPI {
     void operator=(const TPortoAPI&) = delete;
 
 public:
-    TPortoAPI(const std::string &path, int retries = 5);
+    TPortoAPI(const std::string &path = "/run/portod.socket", int retries = 5);
     ~TPortoAPI();
 
     void Cleanup(); // TODO: remove

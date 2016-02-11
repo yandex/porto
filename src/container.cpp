@@ -761,9 +761,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
         return error;
 
     if (Prop->Get<bool>(P_ENABLE_PORTO) && IsNamespaceIsolated()) {
-        TBindMap bm = { config().rpc_sock().file().path(),
-                        config().rpc_sock().file().path(),
-                        false };
+        TBindMap bm = { PORTO_SOCKET_PATH, PORTO_SOCKET_PATH, false };
 
         taskEnv->BindMap.push_back(bm);
     }
@@ -1949,7 +1947,7 @@ TCgroup TContainer::GetCgroup(const TSubsystem &subsystem) const {
         return subsystem.RootCgroup();
     if (IsPortoRoot())
         return subsystem.Cgroup(PORTO_ROOT_CGROUP);
-    return subsystem.Cgroup(PORTO_ROOT_CGROUP + "/" + GetName());
+    return subsystem.Cgroup(std::string(PORTO_ROOT_CGROUP) + "/" + GetName());
 }
 
 void TContainer::ExitTree(TScopedLock &holder_lock, int status, bool oomKilled) {

@@ -92,14 +92,14 @@ message TCfg {
 	optional TFileCfg slave_pid = 3;
 	optional TFileCfg master_log = 4;
 	optional TFileCfg slave_log = 5;
-	optional TRpcSockCfg rpc_sock = 6;
+	optional TRpcSockCfg rpc_sock = 6; /* deprecated */
 	optional TLogCfg log = 7;
 	optional TKeyvalCfg keyval = 8;
 	optional TDaemonCfg daemon = 9;
 	optional TContainerCfg container = 10;
 	optional TPrivilegesCfg privileges = 11;
 	optional TVolumesCfg volumes = 12;
-	optional TFileCfg version = 13;
+	optional TFileCfg version = 13; /* deprecated */
 	optional TFileCfg journal_dir = 14;
 	optional uint64 journal_ttl_ms = 15;
 }

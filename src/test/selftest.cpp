@@ -4717,7 +4717,7 @@ static void TestSigPipe(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData("/", "porto_stat[spawned]", before));
 
     int fd;
-    ExpectSuccess(ConnectToRpcServer(config().rpc_sock().file().path(), fd));
+    ExpectSuccess(ConnectToRpcServer(PORTO_SOCKET_PATH, fd));
 
     rpc::TContainerRequest req;
     req.mutable_list();
@@ -5306,10 +5306,10 @@ static void TestBadClient(TPortoAPI &api) {
     int fd;
     string buf = "xyz";
     alarm(sec);
-    ExpectSuccess(ConnectToRpcServer(config().rpc_sock().file().path(), fd));
+    ExpectSuccess(ConnectToRpcServer(PORTO_SOCKET_PATH, fd));
     ExpectEq(write(fd, buf.c_str(), buf.length()), buf.length());
 
-    TPortoAPI api2(config().rpc_sock().file().path(), 0);
+    TPortoAPI api2(PORTO_SOCKET_PATH, 0);
     ExpectApiSuccess(api2.List(clist));
     close(fd);
     alarm(0);
@@ -5428,13 +5428,13 @@ static void TestPackage(TPortoAPI &api) {
 
     Expect(FileExists(config().master_log().path()));
     Expect(FileExists(config().slave_log().path()));
-    Expect(FileExists(config().rpc_sock().file().path()));
+    Expect(FileExists(PORTO_SOCKET_PATH));
 
     ExpectEq(system("stop yandex-porto"), 0);
 
     Expect(FileExists(config().master_log().path()));
     Expect(FileExists(config().slave_log().path()));
-    ExpectEq(FileExists(config().rpc_sock().file().path()), false);
+    ExpectEq(FileExists(PORTO_SOCKET_PATH), false);
 
     ExpectEq(system("start yandex-porto"), 0);
     WaitPortod(api);
@@ -5555,7 +5555,7 @@ int SelfTest(std::vector<std::string> args) {
     needDaemonChecks = getenv("NOCHECK") == nullptr;
 
     config.Load();
-    TPortoAPI api(config().rpc_sock().file().path(), 0);
+    TPortoAPI api(PORTO_SOCKET_PATH, 0);
 
     InitUsersAndGroups();
 

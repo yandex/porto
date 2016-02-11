@@ -919,7 +919,7 @@ public:
 
     ~TExecCmd() {
         if (Cleanup && !containerName.empty()) {
-            TPortoAPI api(config().rpc_sock().file().path());
+            TPortoAPI api;
             (void)api.Destroy(containerName);
         }
         if (TmpDir)
@@ -1182,7 +1182,7 @@ public:
         }
 
         auto freezer = cgmap["freezer"];
-        auto prefix = PORTO_ROOT_CGROUP + "/";
+        auto prefix = std::string(PORTO_ROOT_CGROUP) + "/";
         if (freezer.length() < prefix.length() || freezer.substr(0, prefix.length()) != prefix) {
             std::cerr << "Process " << pid << " is not managed by porto" << std::endl;
             return EXIT_FAILURE;
@@ -1968,7 +1968,7 @@ public:
 
 int main(int argc, char *argv[]) {
     config.Load(true);
-    TPortoAPI api(config().rpc_sock().file().path());
+    TPortoAPI api;
     TCommandHandler handler(api);
 
     handler.RegisterCommand<TCreateCmd>();

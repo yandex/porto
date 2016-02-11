@@ -260,12 +260,11 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
     bool accept_paused = false;
 
     TCred cred(getuid(), getgid());
-    TError error = GroupId(config().rpc_sock().group(), cred.Gid);
+    TError error = GroupId(PORTO_GROUP_NAME, cred.Gid);
     if (error)
-        L_ERR() << "Can't get gid for " << config().rpc_sock().group() << ": " << error << std::endl;
+        L_ERR() << "Can't get gid for " << PORTO_GROUP_NAME << ": " << error << std::endl;
 
-    error = CreateRpcServer(config().rpc_sock().file().path(),
-                            config().rpc_sock().file().perm(),
+    error = CreateRpcServer(PORTO_SOCKET_PATH, PORTO_SOCKET_MODE,
                             cred.Uid, cred.Gid, sfd);
     if (error) {
         L_ERR() << "Can't create RPC server: " << error.GetMsg() << std::endl;
@@ -568,7 +567,7 @@ static int SlaveMain() {
         ret = SlaveRpc(context, worker);
         L_SYS() << "Shutting down..." << std::endl;
 
-        RemoveRpcServer(config().rpc_sock().file().path());
+        RemoveRpcServer(PORTO_SOCKET_PATH);
     } catch (string s) {
         if (config().daemon().debug())
             throw;
@@ -842,7 +841,7 @@ void CheckVersion(int &prevMaj, int &prevMin) {
     prevMaj = 0;
     prevMin = 0;
 
-    TFile f(config().version().path(), config().version().perm());
+    TFile f(PORTO_VERSION_FILE, 0644);
 
     TError error = f.AsString(prevVer);
     if (!error)
@@ -1002,7 +1001,7 @@ int main(int argc, char * const argv[]) {
         }
     }
 
-    if (!slaveMode && AnotherInstanceRunning(config().rpc_sock().file().path())) {
+    if (!slaveMode && AnotherInstanceRunning(PORTO_SOCKET_PATH)) {
         std::cerr << "Another instance of portod is running!" << std::endl;
         return EXIT_FAILURE;
     }

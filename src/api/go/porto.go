@@ -14,7 +14,7 @@ import (
 	"github.com/yandex/porto/src/api/go/rpc"
 )
 
-const portoSocket = "/var/run/portod.socket"
+const portoSocket = "/run/portod.socket"
 
 func sendData(conn io.Writer, data []byte) error {
 	// First we have to send actual data size,

@@ -259,7 +259,7 @@ TError TContainerHolder::FindTaskContainer(pid_t pid, std::shared_ptr<TContainer
     if (error)
         return error;
 
-    auto prefix = PORTO_ROOT_CGROUP + "/";
+    auto prefix = std::string(PORTO_ROOT_CGROUP) + "/";
     if (freezerCg.Name.substr(0, prefix.length()) != prefix)
         return Get(ROOT_CONTAINER, c);
 
@@ -466,7 +466,7 @@ void TContainerHolder::RemoveLeftovers() {
                     << error << std::endl;
 
         for (auto cg = cgroups.rbegin(); cg != cgroups.rend(); cg++) {
-            std::string name = cg->Name.substr(PORTO_ROOT_CGROUP.length() + 1);
+            std::string name = cg->Name.substr(strlen(PORTO_ROOT_CGROUP) + 1);
             if (Containers.count(name))
                 continue;
 

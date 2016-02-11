@@ -34,10 +34,6 @@ void TConfig::LoadDefaults() {
     config().mutable_master_log()->set_path("/var/log/portoloop.log");
     config().mutable_master_log()->set_perm(0644);
 
-    config().mutable_rpc_sock()->mutable_file()->set_path("/run/portod.socket");
-    config().mutable_rpc_sock()->mutable_file()->set_perm(0666);
-    config().mutable_rpc_sock()->set_group("porto");
-
     config().mutable_log()->set_verbose(false);
 
     config().mutable_keyval()->mutable_file()->set_path("/run/porto/kvs");
@@ -81,9 +77,6 @@ void TConfig::LoadDefaults() {
     config().mutable_volumes()->set_layers_dir("/place/porto_layers");
     config().mutable_volumes()->set_enabled(true);
     config().mutable_volumes()->set_enable_quota(true);
-
-    config().mutable_version()->set_path("/run/portod.version");
-    config().mutable_version()->set_perm(0644);
 }
 
 bool TConfig::LoadFile(const std::string &path, bool silent) {

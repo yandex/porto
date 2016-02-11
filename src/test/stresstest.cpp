@@ -198,7 +198,7 @@ static void Tasks(int n, int iter) {
     Say() << "Run task" << std::to_string(n) << std::endl;
     usleep(10000 * n);
     try {
-        TPortoAPI api(config().rpc_sock().file().path(), retries);
+        TPortoAPI api(PORTO_SOCKET_PATH, retries);
         for (; iter; iter--) {
             if (iter % 10 == 0)
                 Say() << std::to_string(iter) << " iterations left" << std::endl;
@@ -241,7 +241,7 @@ static void Tasks(int n, int iter) {
 }
 
 static void StressKill() {
-    TPortoAPI api(config().rpc_sock().file().path(), retries);
+    TPortoAPI api(PORTO_SOCKET_PATH, retries);
     std::cout << "Run kill" << std::endl;
     while (!done) {
         usleep(1000000);
@@ -272,7 +272,7 @@ int StressTest(int threads, int iter, bool killPorto) {
         (void)signal(SIGPIPE, SIG_IGN);
 
         config.Load();
-        TPortoAPI api(config().rpc_sock().file().path(), retries);
+        TPortoAPI api(PORTO_SOCKET_PATH, retries);
         RestartDaemon(api);
 
         for (i = 1; i <= threads; i++)

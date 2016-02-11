@@ -161,7 +161,7 @@ static void ThreadMain(int n, int iter) {
     seed = (unsigned int)time(nullptr);
     tid = n + 1;
 
-    TPortoAPI api(config().rpc_sock().file().path());
+    TPortoAPI api;
 
     while (iter--) {
         auto op = GetRandElem(handlers);
@@ -182,7 +182,7 @@ int FuzzyTest(int thrnr, int iter) {
     (void)signal(SIGPIPE, SIG_IGN);
 
     config.Load();
-    TPortoAPI api(config().rpc_sock().file().path());
+    TPortoAPI api;
     RestartDaemon(api);
 
     for (auto i = 0; i < thrnr; i++)
