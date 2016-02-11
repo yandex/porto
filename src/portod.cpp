@@ -92,7 +92,7 @@ static int DaemonPrepare(bool master) {
         return ret;
 
     L_SYS() << string(80, '-') << std::endl;
-    L_SYS() << "Started " << GIT_TAG << " " << GIT_REVISION << " " << GetPid() << (config().container().scoped_unlock() ? " with scoped unlock" : "")<< std::endl;
+    L_SYS() << "Started " << GIT_TAG << " " << GIT_REVISION << " " << GetPid() << std::endl;
     L_SYS() << config().DebugString() << std::endl;
 
     return EXIT_SUCCESS;

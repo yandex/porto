@@ -2,19 +2,17 @@
 #include "config.hpp"
 #include "util/log.hpp"
 
+//FIXME KILL THIS CRAP
+
 TScopedUnlock::TScopedUnlock(TScopedLock &lock) {
-    if (config().container().scoped_unlock()) {
-        PORTO_ASSERT(lock.owns_lock());
-        Lock = &lock;
-        Lock->unlock();
-    }
+    PORTO_ASSERT(lock.owns_lock());
+    Lock = &lock;
+    Lock->unlock();
 }
 
 TScopedUnlock::~TScopedUnlock() {
-    if (config().container().scoped_unlock()) {
-        PORTO_ASSERT(!Lock->owns_lock());
-        Lock->lock();
-    }
+    PORTO_ASSERT(!Lock->owns_lock());
+    Lock->lock();
 }
 
 TScopedLock TLockable::ScopedLock() {
@@ -36,19 +34,15 @@ TNestedScopedLock& TNestedScopedLock::operator=(TNestedScopedLock &&src) {
 TNestedScopedLock::TNestedScopedLock(TLockable &inner, TScopedLock &outer) {
     PORTO_ASSERT(outer.owns_lock());
 
-    if (config().container().scoped_unlock()) {
-        TScopedUnlock unlock(outer);
-        InnerLock = inner.ScopedLock();
-    }
+    TScopedUnlock unlock(outer);
+    InnerLock = inner.ScopedLock();
 }
 
 TNestedScopedLock::TNestedScopedLock(TLockable &inner, TScopedLock &outer, std::try_to_lock_t t) {
     PORTO_ASSERT(outer.owns_lock());
 
-    if (config().container().scoped_unlock()) {
-        TScopedUnlock unlock(outer);
-        InnerLock = inner.TryScopedLock();
-    }
+    TScopedUnlock unlock(outer);
+    InnerLock = inner.TryScopedLock();
 }
 
 bool TNestedScopedLock::IsLocked() {
