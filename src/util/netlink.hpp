@@ -68,8 +68,6 @@ public:
     TError Connect();
     void Disconnect();
 
-    static void EnableDebug(bool enable);
-
     struct nl_sock *GetSock() { return Sock; }
 
     int GetFd();

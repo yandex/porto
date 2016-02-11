@@ -4,6 +4,7 @@
 #include "protobuf.hpp"
 #include "util/unix.hpp"
 #include "util/mount.hpp"
+#include "util/log.hpp"
 
 extern "C" {
 #include <fcntl.h>
@@ -15,7 +16,6 @@ using std::string;
 TConfig config;
 
 void TConfig::LoadDefaults() {
-    config().mutable_network()->set_debug(false);
     config().mutable_network()->set_default_prio(3);
     config().mutable_network()->set_default_max_guarantee(-1);
     config().mutable_network()->set_default_guarantee(0);
@@ -107,6 +107,8 @@ void TConfig::Load(bool silent) {
     }
 
 load_cred:
+    Verbose = config().log().verbose();
+
     InitCred();
 }
 

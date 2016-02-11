@@ -497,7 +497,7 @@ void TContainerHolder::ScheduleCgroupSync() {
 }
 
 bool TContainerHolder::DeliverEvent(const TEvent &event) {
-    if (config().log().verbose())
+    if (Verbose)
         L_EVT() << "Deliver event " << event.GetMsg() << std::endl;
 
     bool delivered = false;

@@ -68,8 +68,6 @@ static void DaemonOpenLog(bool master) {
 static int DaemonSyncConfig(bool master) {
     config.Load();
 
-    TNl::EnableDebug(config().network().debug());
-
     const auto &pid = master ? config().master_pid() : config().slave_pid();
 
     DaemonOpenLog(master);
@@ -164,7 +162,7 @@ static TError AcceptClient(TContext &context, int sfd,
     if (error)
         return error;
 
-    if (config().log().verbose())
+    if (Verbose)
         L() << "Client " << cfd << " connected : " << *client << std::endl;
 
     clients[cfd] = client;

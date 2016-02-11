@@ -17,7 +17,7 @@
 using std::string;
 
 static std::string RequestAsString(const rpc::TContainerRequest &req) {
-    if (config().log().verbose())
+    if (Verbose)
         return req.ShortDebugString();
 
     if (req.has_create())
@@ -97,7 +97,7 @@ static std::string RequestAsString(const rpc::TContainerRequest &req) {
 }
 
 static std::string ResponseAsString(const rpc::TContainerResponse &resp) {
-    if (config().log().verbose())
+    if (Verbose)
         return resp.ShortDebugString();
 
     switch (resp.error()) {
@@ -1429,7 +1429,7 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
 
     client->BeginRequest();
 
-    bool log = config().log().verbose() || !InfoRequest(req);
+    bool log = Verbose || !InfoRequest(req);
     if (log) {
         std::string ns = "";
         std::shared_ptr<TContainer> clientContainer;

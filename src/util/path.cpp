@@ -487,7 +487,7 @@ TError TPath::Rmdir() const {
  * Removes everything in the directory but not directory itself.
  * Works only on one filesystem and aborts if sees mountpint.
  */
-TError TPath::ClearDirectory(bool verbose) const {
+TError TPath::ClearDirectory() const {
     int top_fd, dir_fd, sub_fd;
     DIR *top = NULL, *dir;
     struct dirent *de;
@@ -535,7 +535,7 @@ restart:
             break;
         }
 
-        if (verbose)
+        if (Verbose)
             L_ACT() << "ClearDirectory unlink " << de->d_name << std::endl;
         if (!unlinkat(dir_fd, de->d_name, S_ISDIR(st.st_mode) ? AT_REMOVEDIR : 0))
             continue;
@@ -575,7 +575,7 @@ restart:
             else
                 top = dir;
             dir_fd = sub_fd;
-            if (verbose)
+            if (Verbose)
                 L_ACT() << "ClearDirectory enter " << de->d_name << std::endl;
             goto deeper;
         }
@@ -594,7 +594,7 @@ restart:
             rewinddir(top);
             dir = top;
             dir_fd = top_fd;
-            if (verbose)
+            if (Verbose)
                 L_ACT() << "ClearDirectory restart " << Path << std::endl;
             goto restart; /* Restart from top directory */
         }

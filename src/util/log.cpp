@@ -17,6 +17,8 @@ extern "C" {
 #include <sys/time.h>
 }
 
+bool Verbose = true; /* be verbose while loading config */
+
 TStatistics *Statistics = nullptr;
 
 //FIXME KILL THIS SHIT
@@ -128,7 +130,7 @@ std::string TLogger::GetTime() {
             ss << buf;
         }
 
-        if (config().log().verbose())
+        if (Verbose)
             ss << "." << std::setw(6) << std::setfill('0') << tv.tv_usec;
     }
 

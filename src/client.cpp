@@ -37,7 +37,7 @@ void TClient::CloseConnection() {
     if (Fd >= 0) {
         EpollLoop->RemoveSource(Fd);
         ConnectionTime = GetCurrentTimeMs() - ConnectionTime;
-        if (config().log().verbose())
+        if (Verbose)
             L() << "Client " << Fd << " disconnected : " << *this
                 << " : " << ConnectionTime << " ms" <<  std::endl;
         close(Fd);

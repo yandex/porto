@@ -28,8 +28,6 @@ extern "C" {
 #include <netlink/route/addr.h>
 }
 
-static bool debug = false;
-
 uint32_t TcHandle(uint16_t maj, uint16_t min) {
     return TC_HANDLE(maj, min);
 }
@@ -42,7 +40,7 @@ void TNl::Dump(const std::string &prefix, void *obj) {
     std::stringstream ss;
     struct nl_dump_params dp = {};
 
-    dp.dp_type = debug ? NL_DUMP_STATS : NL_DUMP_LINE;
+    dp.dp_type = Verbose ? NL_DUMP_STATS : NL_DUMP_LINE;
     dp.dp_data = &ss;
     dp.dp_cb = [](struct nl_dump_params *dp, char *buf) {
             auto ss = (std::stringstream *)dp->dp_data;
@@ -138,14 +136,9 @@ TError TNl::ProxyNeighbour(int ifindex, const TNlAddr &addr, bool add) {
     return TError::Success();
 }
 
-void TNl::EnableDebug(bool enable) {
-    debug = enable;
-}
-
 int TNl::GetFd() {
     return nl_socket_get_fd(Sock);
 }
-
 
 
 TNlLink::TNlLink(std::shared_ptr<TNl> sock, const std::string &name) {
@@ -582,7 +575,8 @@ bool TNlLink::ValidMacAddr(const std::string &hw) {
 }
 
 void TNlLink::LogCache(struct nl_cache *cache) const {
-    if (!debug)
+
+    if (!Verbose)
         return;
 
     static std::function<void(struct nl_dump_params *, char *)> handler;

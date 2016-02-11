@@ -76,7 +76,7 @@ void TEventQueue::Add(uint64_t timeoutMs, const TEvent &e) {
     TEvent copy = e;
     copy.DueMs = GetCurrentTimeMs() + timeoutMs;
 
-    if (config().log().verbose())
+    if (Verbose)
         L() << "Schedule event " << e.GetMsg() << " in " << timeoutMs << " (now " << GetCurrentTimeMs() << " will fire at " << copy.DueMs << ")" << std::endl;
 
     Worker->Push(copy);

@@ -198,7 +198,7 @@ TError TTask::ChildExec() {
         break;
     }
 
-    if (config().log().verbose()) {
+    if (Verbose) {
         L() << "command=" << Env->Command << std::endl;
         for (unsigned i = 0; result.we_wordv[i]; i++)
             L() << "argv[" << i << "]=" << result.we_wordv[i] << std::endl;

@@ -1264,14 +1264,14 @@ void TContainer::FreeResources() {
 }
 
 void TContainer::AcquireForced() {
-    if (config().log().verbose())
+    if (Verbose)
         L() << "Acquire " << GetName() << " (forced)" << std::endl;
     Acquired++;
 }
 
 bool TContainer::Acquire() {
     if (!IsAcquired()) {
-        if (config().log().verbose())
+        if (Verbose)
             L() << "Acquire " << GetName() << std::endl;
         Acquired++;
         return true;
@@ -1280,7 +1280,7 @@ bool TContainer::Acquire() {
 }
 
 void TContainer::Release() {
-    if (config().log().verbose())
+    if (Verbose)
         L() << "Release " << GetName() << std::endl;
     PORTO_ASSERT(Acquired > 0);
     Acquired--;

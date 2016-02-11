@@ -253,7 +253,7 @@ TError TValueMap::Restore(const kv::TNode &node) {
         if (!av || !av->HasFlag(PERSISTENT_VALUE))
             continue;
 
-        if (config().log().verbose())
+        if (Verbose)
             L_ACT() << "Restoring " << key << " = " << value << std::endl;
 
         TError error = av->SetString(value);
@@ -314,7 +314,7 @@ TError TValueMap::Sync() {
         pair->set_key(name);
         pair->set_val(value);
 
-        if (config().log().verbose())
+        if (Verbose)
             L_ACT() << "Sync " << name << " = " << value << std::endl;
     }
 

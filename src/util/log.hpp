@@ -11,6 +11,8 @@
 #define PORTO_ASSERT(EXPR) if (!(EXPR)) porto_assert(#EXPR, __LINE__, __FILE__)
 #define PORTO_RUNTIME_ERROR(MSG) porto_runtime_error((MSG), __LINE__, __FILE__)
 
+extern bool Verbose;
+
 enum ELogLevel {
     LOG_NOTICE = 0,
     LOG_WARN = 1,

@@ -197,7 +197,7 @@ TError TKeyValueStorage::Destroy() {
 }
 
 TError TKeyValueNode::Create() const {
-    if (config().log().verbose())
+    if (Verbose)
         L_ACT() << "Create key-value node " << Name << std::endl;
 
     kv::TNode node;
@@ -211,7 +211,7 @@ TError TKeyValueNode::Append(const std::string& key, const std::string& value) c
     pair->set_key(key);
     pair->set_val(value);
 
-    if (config().log().verbose())
+    if (Verbose)
         L_ACT() << "Append " << key << "=" << value << " to key-value node " << Name << std::endl;
 
     return Append(node);
