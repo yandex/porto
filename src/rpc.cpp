@@ -310,11 +310,6 @@ static noinline TError CreateContainer(TContext &context,
 
     std::shared_ptr<TContainer> container;
     err = context.Cholder->Create(holder_lock, name, client->GetCred(), container);
-    if (!err) {
-        TNestedScopedLock lock(*container, holder_lock);
-        if (container->IsValid())
-            container->Journal("created", client);
-    }
 
     if (!err && weak) {
         container->Prop->Set<bool>(P_WEAK, true);
@@ -356,8 +351,6 @@ noinline TError DestroyContainer(TContext &context,
             if (err)
                 return err;
         }
-
-        container->Journal("destroyed", client);
     }
 
     if (parent) {
@@ -446,11 +439,6 @@ noinline TError StartContainer(TContext &context,
 
         if (err)
             goto release;
-
-        if (topContainer == container)
-            container->Journal("started", client);
-        else
-            container->Journal("started", target);
     }
 
 release:
@@ -480,11 +468,7 @@ noinline TError StopContainer(TContext &context,
     if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't stop busy container");
 
-    err = container->StopTree(holder_lock);
-    if (!err)
-        container->Journal("stopped", client);
-
-    return err;
+    return container->StopTree(holder_lock);
 }
 
 noinline TError PauseContainer(TContext &context,
@@ -507,11 +491,7 @@ noinline TError PauseContainer(TContext &context,
     if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't pause busy container");
 
-    err = container->Pause(holder_lock);
-    if (!err)
-        container->Journal("paused", client);
-
-    return err;
+    return container->Pause(holder_lock);
 }
 
 noinline TError ResumeContainer(TContext &context,
@@ -534,11 +514,7 @@ noinline TError ResumeContainer(TContext &context,
     if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't resume busy container");
 
-    err = container->Resume(holder_lock);
-    if (!err)
-        container->Journal("resumed", client);
-
-    return err;
+    return container->Resume(holder_lock);
 }
 
 noinline TError ListContainers(TContext &context,
@@ -609,11 +585,7 @@ noinline TError SetContainerProperty(TContext &context,
     if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't set property " + req.property() + " of busy container " + container->GetName());
 
-    err = container->SetProperty(req.property(), req.value(), client);
-    if (!err)
-        container->Journal("set " + req.property() + " to " + req.value(), client);
-
-    return err;
+    return container->SetProperty(req.property(), req.value(), client);
 }
 
 noinline TError GetContainerData(TContext &context,
@@ -793,10 +765,7 @@ noinline TError Kill(TContext &context,
     if (!acquire.IsAcquired())
         return TError(EError::Busy, "Can't kill busy container");
 
-    err = container->Kill(req.sig());
-    if (!err)
-        container->Journal("killed with " + req.sig(), client);
-    return err;
+    return container->Kill(req.sig());
 }
 
 noinline TError Version(TContext &context,

@@ -63,12 +63,6 @@ static void DaemonOpenLog(bool master) {
 
     TLogger::CloseLog();
     TLogger::OpenLog(stdlog, log.path(), log.perm());
-
-    if (!master) {
-        TPath journals(config().journal_dir().path());
-        if (!journals.Exists())
-            journals.Mkdir(config().journal_dir().perm());
-    }
 }
 
 static int DaemonSyncConfig(bool master) {

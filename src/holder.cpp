@@ -644,24 +644,6 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
             }
         }
 
-        { /* clean old journals */
-            int64_t journal_ttl_ms = config().journal_ttl_ms();
-            TPath journal_dir(config().journal_dir().path());
-            std::vector<std::string> list;
-
-            TError error = journal_dir.ReadDirectory(list);
-            if (error) {
-                L_WRN() << "Can't list container journals: " << error << std::endl;
-            } else {
-                for (auto &filename : list) {
-                    TPath path = journal_dir / filename;
-
-                    if (path.SinceModificationMs() > journal_ttl_ms)
-                        path.Unlink();
-                }
-            }
-        }
-
         auto list = List();
         for (auto &target : list) {
             if (target->IsAcquired())

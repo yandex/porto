@@ -1369,7 +1369,6 @@ TError TContainer::Pause(TScopedLock &holder_lock) {
         if (child.GetState() == EContainerState::Running ||
             child.GetState() == EContainerState::Meta) {
             child.SetState(EContainerState::Paused);
-            child.Journal("paused", shared_from_this());
         }
         return TError::Success();
     });
@@ -1401,7 +1400,6 @@ TError TContainer::Resume(TScopedLock &holder_lock) {
                                            TContainer &child) {
         if (child.GetState() == EContainerState::Paused) {
             child.SetState(EContainerState::Running);
-            child.Journal("resumed", shared_from_this());
         }
         return TError::Success();
     });
@@ -1937,8 +1935,6 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
     if (Parent)
         Parent->AddChild(shared_from_this());
 
-    Journal("restored");
-
     return TError::Success();
 }
 
@@ -1976,15 +1972,10 @@ void TContainer::ExitTree(TScopedLock &holder_lock, int status, bool oomKilled) 
             (void)child.Resume(holder_lock);
 
         child.Exit(holder_lock, status, oomKilled);
-        Journal(oomKilled ? "killed by OOM" : "killed", shared_from_this());
         return TError::Success();
     });
 
     Exit(holder_lock, status, oomKilled);
-    if (oomKilled)
-        Journal("killed by OOM");
-    else
-        Journal("init process quitted, exit code " + std::to_string(status));
 }
 
 void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
@@ -2100,11 +2091,7 @@ TError TContainer::Respawn(TScopedLock &holder_lock) {
     uint64_t tmp = Data->Get<uint64_t>(D_RESPAWN_COUNT);
     error = Start(nullptr, false);
     Data->Set<uint64_t>(D_RESPAWN_COUNT, tmp + 1);
-    if (error)
-        return error;
-
-    Journal("respawned");
-    return TError::Success();
+    return error;
 }
 
 bool TContainer::CanRemoveDead() const {
@@ -2134,7 +2121,6 @@ void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
                 RotateStdFile(Stdout, D_STDOUT_OFFSET);
                 RotateStdFile(Stderr, D_STDERR_OFFSET);
             }
-            JournalStream.close();
             break;
         case EEventType::Respawn:
             error = Respawn(holder_lock);
@@ -2269,48 +2255,6 @@ TError TContainer::UpdateTrafficClasses() {
     return TError::Success();
 }
 
-bool TContainer::PrepareJournal() {
-    return false;
-    if (!JournalStream.is_open()) {
-        off_t max_log_size = config().container().max_log_size();
-        auto path = TPath(config().journal_dir().path()) / GetTextId();
-        off_t loss;
-
-        if (path.Exists())
-            path.Chmod(0644);
-        else
-            path.Mknod(S_IFREG | 0644, 0);
-
-        path.Chown(OwnerCred);
-        path.RotateLog(max_log_size, loss);
-
-        JournalStream.open(path.ToString(), std::ios_base::app);
-        if (!JournalStream.is_open()) {
-            L_WRN() << "Can't open " << path << " for writing container journal"
-                    << std::endl;
-            return false;
-        }
-    }
-    return true;
-}
-
-void TContainer::Journal(const std::string &message) {
-    if (PrepareJournal())
-        JournalStream << TLogger::GetTime() << " " << message << std::endl;
-}
-
-void TContainer::Journal(const std::string &message, std::shared_ptr<TClient> client) {
-    if (PrepareJournal())
-        JournalStream << TLogger::GetTime() << " " << message
-                      << " by " << *client << std::endl;
-}
-
-void TContainer::Journal(const std::string &message, std::shared_ptr<TContainer> root) {
-    if (PrepareJournal())
-        JournalStream << TLogger::GetTime() << " " << message
-                      << " due to container " << root->GetName() << std::endl;
-}
-
 TContainerWaiter::TContainerWaiter(std::shared_ptr<TClient> client,
                                    std::function<void (std::shared_ptr<TClient>,
                                                        TError, std::string)> callback) :
@@ -2350,12 +2294,8 @@ TError TContainer::StopTree(TScopedLock &holder_lock) {
                 return error;
         }
 
-        if (child.GetState() != EContainerState::Stopped) {
-            TError err = child.Stop(holder_lock);
-            if (!err && !IsRoot())
-                child.Journal("stopped", shared_from_this());
-            return err;
-        }
+        if (child.GetState() != EContainerState::Stopped)
+            return child.Stop(holder_lock);
         return TError::Success();
     });
 
