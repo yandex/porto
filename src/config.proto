@@ -52,7 +52,7 @@ message TCfg {
 		optional bool blocking_read = 10 [deprecated=true];
 		optional bool blocking_write = 11 [deprecated=true];
 		optional uint32 event_workers = 12;
-		optional bool debug = 13;
+		optional bool debug = 13 [deprecated=true];
 	}
 
 	message TContainerCfg {

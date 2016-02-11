@@ -441,15 +441,6 @@ static int TuneLimits() {
     if (ret)
         return EXIT_FAILURE;
 
-    if (config().daemon().debug()) {
-        rlim.rlim_max = RLIM_INFINITY;
-        rlim.rlim_cur = RLIM_INFINITY;
-
-        ret = setrlimit(RLIMIT_CORE, &rlim);
-        if (ret)
-            return EXIT_FAILURE;
-    }
-
     return EXIT_SUCCESS;
 }
 
@@ -561,23 +552,15 @@ static int SlaveMain() {
 
         RemoveRpcServer(PORTO_SOCKET_PATH);
     } catch (string s) {
-        if (config().daemon().debug())
-            throw;
         L_ERR() << "EXCEPTION: " << s << std::endl;
         Crash();
     } catch (const char *s) {
-        if (config().daemon().debug())
-            throw;
         L_ERR() << "EXCEPTION: " << s << std::endl;
         Crash();
     } catch (const std::exception &exc) {
-        if (config().daemon().debug())
-            throw;
         L_ERR() << "EXCEPTION: " << exc.what() << std::endl;
         Crash();
     } catch (...) {
-        if (config().daemon().debug())
-            throw;
         L_ERR() << "EXCEPTION: uncaught exception!" << std::endl;
         Crash();
     }
@@ -892,13 +875,10 @@ static int MasterMain(bool respawn) {
             usleep((next - GetCurrentTimeMs()) * 1000);
 
         if (slavePid) {
-            if (config().daemon().debug()) {
-                (void)waitpid(slavePid, nullptr, 0);
-            } else {
-                (void)kill(slavePid, SIGKILL);
-                Reap(slavePid);
-            }
+            (void)kill(slavePid, SIGKILL);
+            Reap(slavePid);
         }
+
         if (ret < 0)
             break;
         if (!respawn)
@@ -1013,23 +993,15 @@ int main(int argc, char * const argv[]) {
         else
             return MasterMain(respawn);
     } catch (std::string s) {
-        if (config().daemon().debug())
-            throw;
         L_ERR() << "EXCEPTION: " << s << std::endl;
         Crash();
     } catch (const char *s) {
-        if (config().daemon().debug())
-            throw;
         L_ERR() << "EXCEPTION: " << s << std::endl;
         Crash();
     } catch (const std::exception &exc) {
-        if (config().daemon().debug())
-            throw;
         L_ERR() << "EXCEPTION: " << exc.what() << std::endl;
         Crash();
     } catch (...) {
-        if (config().daemon().debug())
-            throw;
         L_ERR() << "EXCEPTION: uncaught exception!" << std::endl;
         Crash();
     }

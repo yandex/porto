@@ -1504,23 +1504,15 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
         else
             error = TError(EError::InvalidMethod, "invalid RPC method");
     } catch (std::bad_alloc exc) {
-        if (config().daemon().debug())
-            throw;
         rsp.Clear();
         error = TError(EError::Unknown, "memory allocation failure");
     } catch (std::string exc) {
-        if (config().daemon().debug())
-            throw;
         rsp.Clear();
         error = TError(EError::Unknown, exc);
     } catch (const std::exception &exc) {
-        if (config().daemon().debug())
-            throw;
         rsp.Clear();
         error = TError(EError::Unknown, exc.what());
     } catch (...) {
-        if (config().daemon().debug())
-            throw;
         rsp.Clear();
         error = TError(EError::Unknown, "unknown error");
     }

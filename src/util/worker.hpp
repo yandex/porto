@@ -57,8 +57,7 @@ public:
     void WorkerFn(const std::string &name) {
         try {
             BlockAllSignals();
-            if (!config().daemon().debug())
-                RegisterSignal(SIGSEGV, DumpStackAndDie);
+            RegisterSignal(SIGSEGV, DumpStackAndDie);
             SetProcessName(name);
             auto lock = ScopedLock();
             while (Valid) {
@@ -83,23 +82,15 @@ public:
                 }
             }
         } catch (std::string s) {
-            if (config().daemon().debug())
-                throw;
             L_ERR() << "EXCEPTION: " << s << std::endl;
             Crash();
         } catch (const char *s) {
-            if (config().daemon().debug())
-                throw;
             L_ERR() << "EXCEPTION: " << s << std::endl;
             Crash();
         } catch (const std::exception &exc) {
-            if (config().daemon().debug())
-                throw;
             L_ERR() << "EXCEPTION: " << exc.what() << std::endl;
             Crash();
         } catch (...) {
-            if (config().daemon().debug())
-                throw;
             L_ERR() << "EXCEPTION: uncaught exception!" << std::endl;
             Crash();
         }

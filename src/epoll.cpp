@@ -43,9 +43,8 @@ TError TEpollLoop::InitializeSignals() {
             return TError(EError::Unknown, errno, "Can't add signal to mask");
     }
 
-    if (!config().daemon().debug())
-        if (RegisterSignal(SIGSEGV, DumpStackAndDie))
-            return TError(EError::Unknown, errno, "Can't register SIGSEGV handler");
+    if (RegisterSignal(SIGSEGV, DumpStackAndDie))
+        return TError(EError::Unknown, errno, "Can't register SIGSEGV handler");
 
     if (sigprocmask(SIG_SETMASK, &mask, NULL) < 0)
         return TError(EError::Unknown, errno, "Can't set signal mask: ");

@@ -721,12 +721,10 @@ TError InitializeDaemonCgroups() {
             return error;
     }
 
-    if (!config().daemon().debug()) {
-        TCgroup cg = MemorySubsystem.Cgroup(PORTO_DAEMON_CGROUP);
-        TError error = MemorySubsystem.SetLimit(cg, config().daemon().memory_limit());
-        if (error)
-            return error;
-    }
+    TCgroup cg = MemorySubsystem.Cgroup(PORTO_DAEMON_CGROUP);
+    TError error = MemorySubsystem.SetLimit(cg, config().daemon().memory_limit());
+    if (error)
+        return error;
 
     return TError::Success();
 }
