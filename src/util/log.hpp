@@ -5,7 +5,6 @@
 #include <vector>
 #include <streambuf>
 
-#include "util/crash.hpp"
 #include "util/path.hpp"
 
 #define PORTO_ASSERT(EXPR) if (!(EXPR)) porto_assert(#EXPR, __LINE__, __FILE__)

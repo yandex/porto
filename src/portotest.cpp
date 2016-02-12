@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
         return TestConnectivity();
 
     // in case client closes pipe we are writing to in the protobuf code
-    (void)RegisterSignal(SIGPIPE, SIG_IGN);
+    Signal(SIGPIPE, SIG_IGN);
 
     TLogger::DisableLog();
 

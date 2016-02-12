@@ -2008,8 +2008,6 @@ int main(int argc, char *argv[]) {
 
     int ret = handler.HandleCommand(argc, argv);
     if (ret < 0) {
-        ResetAllSignalHandlers();
-        raise(-ret);
         return EXIT_FAILURE;
     } else {
         return ret;

@@ -4,17 +4,7 @@
 #include <memory>
 
 #include "common.hpp"
-#include "util/signal.hpp"
 #include "util/locks.hpp"
-
-constexpr int updateSignal = SIGHUP;
-constexpr int rotateSignal = SIGUSR1;
-constexpr int debugSignal = SIGUSR2;
-
-static constexpr int HANDLE_SIGNALS[] = {SIGINT, SIGTERM,
-                                         updateSignal, rotateSignal,
-                                         debugSignal, SIGALRM, SIGPIPE};
-static constexpr int HANDLE_SIGNALS_WAIT[] = {SIGCHLD};
 
 constexpr int EPOLL_EVENT_OOM = 1;
 
@@ -37,9 +27,6 @@ struct TEpollSource : public TNonCopyable {
 };
 
 class TEpollLoop : public TLockable, public TNonCopyable {
-    TError InitializeSignals();
-    bool GetSignals(std::vector<int> &signals);
-
     int EpollFd;
 
     size_t MaxEvents = 0;
@@ -62,7 +49,5 @@ public:
     TError StopInput(int fd) const;
     TError StartOutput(int fd) const;
 
-    TError GetEvents(std::vector<int> &signals,
-                     std::vector<struct epoll_event> &evts,
-                     int timeout);
+    TError GetEvents(std::vector<struct epoll_event> &evts, int timeout);
 };

@@ -22,7 +22,6 @@
 #include "util/signal.hpp"
 #include "util/unix.hpp"
 #include "util/string.hpp"
-#include "util/crash.hpp"
 #include "util/cred.hpp"
 #include "util/worker.hpp"
 
@@ -104,8 +103,12 @@ static void DaemonShutdown(bool master, int ret) {
     TLogger::CloseLog();
     (void)pidFile.Unlink();
 
-    if (ret < 0)
-        RaiseSignal(-ret);
+    if (ret < 0) {
+        int sig = -ret;
+        Signal(sig, SIG_DFL);
+        raise(sig);
+        exit(128 + sig);
+    }
 }
 
 static void RemoveRpcServer(const string &path) {
@@ -231,10 +234,6 @@ retry:
     return 0;
 }
 
-static inline int EncodeSignal(int sig) {
-    return -sig;
-}
-
 static void StartWorkers(TContext &context, TRpcWorker &worker) {
     worker.Start();
     context.Queue->Start();
@@ -277,7 +276,16 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
         return EXIT_FAILURE;
     }
 
-    std::vector<int> signals;
+    /* Don't disturb threads. Deliver signals via signalfd. */
+    int sigFd = SignalFd();
+
+    auto sigSource = std::make_shared<TEpollSource>(context.EpollLoop, sigFd);
+    error = context.EpollLoop->AddSource(sigSource);
+    if (error) {
+        L_ERR() << "Can't add sigSource to epoll: " << error << std::endl;
+        return EXIT_FAILURE;
+    }
+
     std::vector<struct epoll_event> events;
 
     StartWorkers(context, worker);
@@ -295,35 +303,11 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
             accept_paused = false;
         }
 
-        error = context.EpollLoop->GetEvents(signals, events, -1);
+        error = context.EpollLoop->GetEvents(events, -1);
         if (error) {
             L_ERR() << "slave: epoll error " << error << std::endl;
             ret = EXIT_FAILURE;
             goto exit;
-        }
-
-        for (auto s : signals) {
-            switch (s) {
-            case SIGINT:
-                discardState = true;
-                // no break here
-            case SIGTERM:
-                ret = EncodeSignal(s);
-                goto exit;
-            case updateSignal:
-                L_EVT() << "Updating" << std::endl;
-                ret = EncodeSignal(s);
-                goto exit;
-            case rotateSignal:
-                DaemonOpenLog(false);
-                break;
-            case debugSignal:
-                DumpMallocInfo();
-                break;
-            default:
-                /* Ignore other signals */
-                break;
-            }
         }
 
         if (!failsafe) {
@@ -337,7 +321,39 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
             if (!source)
                 continue;
 
-            if (source->Fd == sfd) {
+            if (source->Fd == sigFd) {
+                struct signalfd_siginfo sigInfo;
+
+                if (read(sigFd, &sigInfo, sizeof sigInfo) != sizeof sigInfo) {
+                    L_ERR() << "SignalFd read failed" << std::endl;
+                    continue;
+                }
+
+                switch (sigInfo.ssi_signo) {
+                    case SIGINT:
+                        discardState = true;
+                        ret = -SIGTERM;
+                        goto exit;
+                    case SIGTERM:
+                        ret = -SIGTERM;
+                        goto exit;
+                    case SIGHUP:
+                        L_EVT() << "Updating" << std::endl;
+                        ret = -SIGHUP;
+                        goto exit;
+                    case SIGUSR1:
+                        DaemonOpenLog(false);
+                        break;
+                    case SIGUSR2:
+                        DumpMallocInfo();
+                        break;
+                    case SIGCHLD:
+                        break;
+                    default:
+                        L_WRN() << "Unexpected signal: " << sigInfo.ssi_signo << std::endl;
+                        break;
+                }
+            } else if (source->Fd == sfd) {
                 if (!accept_paused && clients.size() >= config().daemon().max_clients()) {
                     L_WRN() << "Pause accepting connections" << std::endl;
                     context.EpollLoop->RemoveSource(AcceptSource->Fd);
@@ -566,6 +582,7 @@ static int SlaveMain() {
     }
 
     DaemonShutdown(false, ret);
+    //FIXME ret >= 0 -> destroy kv storage? why???
     context.Destroy();
 
     return ret;
@@ -668,6 +685,10 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
 
     auto AckSource = std::make_shared<TEpollSource>(loop, ackfd[0]);
 
+    int sigFd = SignalFd();
+
+    auto sigSource = std::make_shared<TEpollSource>(loop, sigFd);
+
     slavePid = fork();
     if (slavePid < 0) {
         L_ERR() << "fork(): " << strerror(errno) << std::endl;
@@ -682,6 +703,7 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
         dup2(ackfd[1], REAP_ACK_FD);
         close(evtfd[0]);
         close(ackfd[1]);
+        close(sigFd);
 
         exit(SlaveMain());
     }
@@ -697,25 +719,33 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
 
     UpdateQueueSize(exited);
 
-    {
     error = loop->AddSource(AckSource);
     if (error) {
         L_ERR() << "Can't add ackfd[0] to epoll: " << error << std::endl;
         return EXIT_FAILURE;
     }
 
+    error = loop->AddSource(sigSource);
+    if (error) {
+        L_ERR() << "Can't add sigSource to epoll: " << error << std::endl;
+        return EXIT_FAILURE;
+    }
+
     while (true) {
-        std::vector<int> signals;
         std::vector<struct epoll_event> events;
         int tmp;
 
-        error = loop->GetEvents(signals, events, -1);
+        error = loop->GetEvents(events, -1);
         if (error) {
             L_ERR() << "master: epoll error " << error << std::endl;
             return EXIT_FAILURE;
         }
 
-        for (auto s : signals) {
+        struct signalfd_siginfo sigInfo;
+
+        while (read(sigFd, &sigInfo, sizeof sigInfo) == sizeof sigInfo) {
+            int s = sigInfo.ssi_signo;
+
             switch (s) {
             case SIGINT:
             case SIGTERM:
@@ -726,9 +756,12 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
                 RetryIfFailed([&]() { return waitpid(slavePid, nullptr, WNOHANG) != slavePid; },
                               tmp, 60 * 10, 100);
 
-                ret = EncodeSignal(s);
+                ret = -s;
                 goto exit;
-            case debugSignal:
+            case SIGUSR1:
+                DaemonOpenLog(true);
+                break;
+            case SIGUSR2:
                 DumpMallocInfo();
 
                 L() << "Statuses:" << std::endl;
@@ -736,7 +769,7 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
                     L() << pair.first << "=" << pair.second << std::endl;;
 
                 break;
-            case updateSignal:
+            case SIGHUP:
             {
                 int ret = DaemonSyncConfig(true);
                 if (ret)
@@ -748,8 +781,8 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
                 if (stdlog)
                     stdlogArg = "--stdlog";
 
-                if (kill(slavePid, updateSignal) < 0) {
-                    L_ERR() << "Can't send " << updateSignal << " to slave: " << strerror(errno) << std::endl;
+                if (kill(slavePid, SIGHUP) < 0) {
+                    L_ERR() << "Can't send SIGHUP to slave: " << strerror(errno) << std::endl;
                 } else {
                     if (waitpid(slavePid, NULL, 0) != slavePid)
                         L_ERR() << "Can't wait for slave exit status: " << strerror(errno) << std::endl;
@@ -762,11 +795,7 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
                 std::cerr << "Can't execlp(" << program_invocation_name << ", " << program_invocation_name << ", NULL)" << strerror(errno) << std::endl;
                 ret = EXIT_FAILURE;
                 goto exit;
-                break;
             }
-            case rotateSignal:
-                DaemonOpenLog(true);
-                break;
             default:
                 /* Ignore other signals */
                 break;
@@ -778,7 +807,10 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
             if (!source)
                 continue;
 
-            if (source->Fd == ackfd[0]) {
+
+            if (source->Fd == sigFd) {
+
+            } else if (source->Fd == ackfd[0]) {
                 if (!ReceiveAcks(ackfd[0], exited)) {
                     ret = EXIT_FAILURE;
                     goto exit;
@@ -796,9 +828,11 @@ static int SpawnSlave(std::shared_ptr<TEpollLoop> loop, map<int,int> &exited) {
             goto exit;
         }
     }
-    }
 
 exit:
+    loop->RemoveSource(sigFd);
+    close(sigFd);
+
     loop->RemoveSource(AckSource->Fd);
 
     close(evtfd[0]);
@@ -942,6 +976,8 @@ int main(int argc, char * const argv[]) {
         return EXIT_FAILURE;
     }
 
+    CatchFatalSignals();
+
     AllocStatistics();
 
     config.Load();
@@ -1006,4 +1042,3 @@ int main(int argc, char * const argv[]) {
         Crash();
     }
 }
-

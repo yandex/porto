@@ -929,10 +929,10 @@ void exit_handler(int unused) {
 }
 
 int portotop(TPortoAPI *api, std::string config) {
-    signal(SIGINT, exit_handler);
-    signal(SIGTERM, exit_handler);
-    signal(SIGTTOU, SIG_IGN);
-    signal(SIGTTIN, SIG_IGN);
+    Signal(SIGINT, exit_handler);
+    Signal(SIGTERM, exit_handler);
+    Signal(SIGTTOU, SIG_IGN);
+    Signal(SIGTTIN, SIG_IGN);
 
     TPortoTop top(api, config);
 

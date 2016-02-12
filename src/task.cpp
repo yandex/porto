@@ -509,7 +509,6 @@ TError TTask::ConfigureChild() {
     if (Env->TripleFork)
         SetDieOnParentExit(SIGKILL);
 
-    ResetAllSignalHandlers();
     error = ChildApplyLimits();
     if (error)
         return error;
@@ -661,6 +660,9 @@ void TTask::StartChild() {
     if (error)
         Abort(error);
 
+    /* Reset signals before exec, signal block already lifted */
+    ResetIgnoredSignals();
+
     error = ChildExec();
     Abort(error);
 }
@@ -688,7 +690,11 @@ TError TTask::Start() {
     } else if (forkPid == 0) {
         TError error;
 
+        /* Switch from signafd back to normal signal delivery */
+        ResetBlockedSignals();
+
         SetDieOnParentExit(SIGKILL);
+
         SetProcessName("portod-spawn-p");
 
         char stack[8192];

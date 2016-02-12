@@ -9,15 +9,6 @@ extern "C" {
 #include <sys/epoll.h>
 }
 
-static volatile sig_atomic_t signal_mask;
-static void MultiHandler(int sig) {
-    if (sig < 32) /* Ignore other boring signals */
-        signal_mask |= (1 << sig);
-
-    if (sig == debugSignal)
-        PrintTrace();
-}
-
 static TError EpollCreate(int &epfd) {
     epfd = epoll_create1(EPOLL_CLOEXEC);
     if (epfd < 0)
@@ -25,43 +16,10 @@ static TError EpollCreate(int &epfd) {
     return TError::Success();
 }
 
-TError TEpollLoop::InitializeSignals() {
-    sigset_t mask;
-
-    if (sigemptyset(&mask) < 0)
-        return TError(EError::Unknown, errno, "Can't initialize signal mask");
-
-    for (auto sig: HANDLE_SIGNALS) {
-        if (RegisterSignal(sig, MultiHandler))
-            return TError(EError::Unknown, errno, "Can't register signal");
-    }
-
-    for (auto sig: HANDLE_SIGNALS_WAIT) {
-        if (RegisterSignal(sig, MultiHandler))
-            return TError(EError::Unknown, errno, "Can't register signal");
-        if (sigaddset(&mask, sig) < 0)
-            return TError(EError::Unknown, errno, "Can't add signal to mask");
-    }
-
-    if (RegisterSignal(SIGSEGV, DumpStackAndDie))
-        return TError(EError::Unknown, errno, "Can't register SIGSEGV handler");
-
-    if (sigprocmask(SIG_SETMASK, &mask, NULL) < 0)
-        return TError(EError::Unknown, errno, "Can't set signal mask: ");
-
-    return TError::Success();
-}
-
 TError TEpollLoop::Create() {
     TError error = EpollCreate(EpollFd);
     if (error)
         return error;
-
-    error = InitializeSignals();
-    if (error) {
-        Destroy();
-        return error;
-    }
 
     Statistics->EpollSources = 0;
 
@@ -75,26 +33,11 @@ void TEpollLoop::Destroy() {
     EpollFd = -1;
 }
 
-bool TEpollLoop::GetSignals(std::vector<int> &signals) {
-    signals.clear();
-
-    bool ret = false;
-    for (int sig = ffs(signal_mask) - 1; sig > 0; sig = ffs(signal_mask) - 1) {
-        signal_mask &= ~ (1 << sig);
-        signals.push_back(sig);
-        ret = true;
-    }
-
-    return ret;
-}
-
 TEpollLoop::~TEpollLoop() {
     delete[] Events;
 }
 
-TError TEpollLoop::GetEvents(std::vector<int> &signals,
-                             std::vector<struct epoll_event> &evts,
-                             int timeout) {
+TError TEpollLoop::GetEvents(std::vector<struct epoll_event> &evts, int timeout) {
     evts.clear();
 
     if (MaxEvents != config().daemon().max_clients()) {
@@ -104,22 +47,14 @@ TError TEpollLoop::GetEvents(std::vector<int> &signals,
     }
     PORTO_ASSERT(Events);
 
-    sigset_t mask;
-    if (sigemptyset(&mask) < 0)
-        return TError(EError::Unknown, "Can't initialize signal mask: ", errno);
-
-    if (!GetSignals(signals)) {
-        int nr = epoll_pwait(EpollFd, Events, MaxEvents, timeout, &mask);
-        if (nr < 0) {
-            if (errno != EINTR)
-                return TError(EError::Unknown, "epoll() error: ", errno);
-        }
-
-        GetSignals(signals);
-
-        for (int i = 0; i < nr; i++)
-            evts.push_back(Events[i]);
+    int nr = epoll_wait(EpollFd, Events, MaxEvents, timeout);
+    if (nr < 0) {
+        if (errno != EINTR)
+            return TError(EError::Unknown, "epoll() error: ", errno);
     }
+
+    for (int i = 0; i < nr; i++)
+        evts.push_back(Events[i]);
 
     return TError::Success();
 }

@@ -1,10 +1,17 @@
 #pragma once
 
-#include <csignal>
+extern "C" {
+#include <signal.h>
+#include <sys/signalfd.h>
+}
 
-int RegisterSignal(int signum, void (*handler)(int));
-int RegisterSignal(int signum, void (*handler)(int sig, siginfo_t *si, void *unused));
-void ResetSignalHandler(int signum);
-void ResetAllSignalHandlers(void);
-void RaiseSignal(int signum);
-void BlockAllSignals();
+void Stacktrace();
+void Crash();
+
+void FatalSignal(int sig);
+void CatchFatalSignals();
+void ResetBlockedSignals();
+void ResetIgnoredSignals();
+
+void Signal(int signum, void (*handler)(int));
+int SignalFd();

@@ -250,8 +250,7 @@ void ICmd::Signal(int sig) {
     Interrupted = 1;
     InterruptedSignal = sig;
     if (DieOnSignal) {
-        // TODO: don't raise signal here, try to handle in each command
-        ResetAllSignalHandlers();
+        signal(sig, SIG_DFL);
         raise(sig);
     }
 }
@@ -274,9 +273,9 @@ int TCommandHandler::TryExec(const std::string &commandName,
     CurrentCmd = cmd;
 
     // in case client closes pipe we are writing to in the protobuf code
-    (void)RegisterSignal(SIGPIPE, SIG_IGN);
-    (void)RegisterSignal(SIGINT, SigInt);
-    (void)RegisterSignal(SIGTERM, SigInt);
+    Signal(SIGPIPE, SIG_IGN);
+    Signal(SIGINT, SigInt);
+    Signal(SIGTERM, SigInt);
 
     TCommandEnviroment commandEnv{*this, commandArgs};
     int ret = cmd->Execute(&commandEnv);
