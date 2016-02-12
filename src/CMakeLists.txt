@@ -64,10 +64,7 @@ if(ENABLE_PYTHON)
 			--prefix=\${CMAKE_INSTALL_PREFIX})")
 endif()
 
-add_custom_target(version.hpp
-	COMMAND ./GIT-VERSION-GEN ${CMAKE_CURRENT_BINARY_DIR}/version.hpp
-	WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-	VERBATIM)
+add_custom_target(version.hpp COMMAND ${CMAKE_SOURCE_DIR}/GIT-VERSION-GEN VERBATIM)
 
 set_source_files_properties(tags PROPERTIES GENERATED true)
 add_custom_target(tags COMMAND ctags -R --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -90,7 +87,7 @@ add_executable(portoctl ${PYTHON_SOURCES} portoctl.cpp cli.cpp config.cpp portot
 add_dependencies(portoctl version.hpp)
 target_link_libraries(portoctl porto protobufs util ${PB} rt ${CURSES_LIBRARIES} ${LIBNL} ${LIBNL_ROUTE})
 
-add_executable(portoinit portoinit.cpp util/signal.cpp)
+add_executable(portoinit portoinit.c)
 add_dependencies(portoinit version.hpp)
 if(NOT ENABLE_ASAN)
 	set_target_properties(portoinit PROPERTIES LINK_FLAGS "-static")

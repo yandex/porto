@@ -1,22 +1,9 @@
-#!/bin/bash
+#!/bin/sh
 
-TAG="$(git describe --match "v[0-9]*" --abbrev=7 HEAD 2>/dev/null)"
-HASH="$(git log -1 "--format=format:const std::string GIT_REVISION = \"%H\";" HEAD)"
-if [ -z "$HASH" ]; then
-    HASH="const std::string GIT_REVISION = \"\";"
-fi
+FMT="#define GIT_TAG \"%s\"\n#define GIT_REVISION \"%s\"\n"
+TAG="`git describe --match "v[0-9]*" --abbrev=7 HEAD 2>/dev/null`"
+REV="`git rev-parse HEAD`"
 
-TEXT="${HASH}\nconst std::string GIT_TAG = \"$TAG\";"
-
-TMP="GIT-VERSION-NEW"
-TARGET=$1
-if [ -z $TARGET ]; then
-	TARGET=./version.hpp
-fi
-
-echo -e "$TEXT" > $TMP
-if [ ! -f $TARGET ] || [ ! "$(cat $TMP)" = "$(cat $TARGET)" ]; then
-	mv $TMP $TARGET
-else
-	rm $TMP
+if [ "`cat version.hpp`" != "`printf "$FMT" "$TAG" "$REV"`" ] ; then
+	printf "$FMT" "$TAG" "$REV" > version.hpp
 fi
