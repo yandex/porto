@@ -285,11 +285,23 @@ TError TSubsystem::TaskCgroup(pid_t pid, TCgroup &cgroup) const {
 
 // Memory
 TError TMemorySubsystem::SetLimit(TCgroup &cg, uint64_t limit) {
-    if (!limit)
-        limit = UINT64_MAX;
-    TError error = cg.SetUint64(LIMIT, limit);
-    if (SupportSwap() && !error)
-        error = cg.SetUint64(MEM_SWAP_LIMIT, limit);
+    std::string str_limit = limit ? std::to_string(limit) : "-1";
+    uint64_t memswap;
+
+    /* Memory limit cannot be bigger than Memory+Swap limit. */
+    if (SupportSwap() && !cg.GetUint64(MEM_SWAP_LIMIT, memswap) &&
+            (!limit || memswap < limit))
+        (void)cg.Set(MEM_SWAP_LIMIT, str_limit);
+
+    /*
+     * Maxumum value depends on arch, kernel version and bugs
+     * "-1" works everywhere since 2.6.31
+     */
+    TError error = cg.Set(LIMIT, str_limit);
+
+    if (!error && SupportSwap())
+        cg.Set(MEM_SWAP_LIMIT, str_limit);
+
     return error;
 }
 
