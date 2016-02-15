@@ -123,6 +123,10 @@ std::string TDevice::Format() const {
 std::string TDevice::CgroupRule(bool allow) const {
     std::string rule;
 
+    /* cgroup cannot parse rules with empty permissions */
+    if (Read != allow && Write != allow && Mknod != allow)
+        return "";
+
     if (S_ISBLK(Mode))
         rule = "b ";
     else

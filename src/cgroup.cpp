@@ -587,9 +587,15 @@ TError TDevicesSubsystem::ApplyDefault(TCgroup &cg) {
 }
 
 TError TDevicesSubsystem::ApplyDevice(TCgroup &cg, const TDevice &device) {
-    TError error = cg.Set("devices.allow", device.CgroupRule(true));
-    if (!error)
-        error = cg.Set("devices.deny", device.CgroupRule(false));
+    std::string rule;
+    TError error;
+
+    rule = device.CgroupRule(true);
+    if (rule != "")
+        error = cg.Set("devices.allow", rule);
+    rule = device.CgroupRule(false);
+    if (!error && rule != "")
+        error = cg.Set("devices.deny", rule);
     return error;
 }
 
