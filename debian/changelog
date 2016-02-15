@@ -1,3 +1,20 @@
+yandex-porto (2.7.10) precise; urgency=medium
+
+  * cgroup: enable memory.use_hierarchy unconditionally
+  * util/path: add plain stat
+  * util/cred: refactoring
+  * cred: deprecate custom root users and groups
+  * property: devices
+  * porto: remove socket path from config
+  * config: mark deprecated options with attribute
+  * porto: deprecate journals
+  * porto: deprecate volumes.enabled
+  * porto: deprecate container.scoped_unlock
+  * porto: deprecate network.debug
+  * porto: deprecate daemon.debug
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 15 Feb 2016 16:43:01 +0300
+
 yandex-porto (2.7.9) precise; urgency=medium
 
   * api/python: connect and reconnect automatically
