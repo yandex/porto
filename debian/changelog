@@ -1,3 +1,9 @@
+yandex-porto (2.7.11) precise; urgency=medium
+
+  * cgroup: fix unlimited memory limit
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 15 Feb 2016 22:18:56 +0300
+
 yandex-porto (2.7.10) precise; urgency=medium
 
   * cgroup: enable memory.use_hierarchy unconditionally
