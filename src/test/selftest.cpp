@@ -3262,7 +3262,7 @@ static void TestData(TPortoAPI &api) {
 
     uint64_t val;
     ExpectSuccess(StringToUint64(v, val));
-    ExpectLess(val, 1024 * 16);
+    ExpectLess(val, 1024 * 1024);
 
     if (KernelSupports(KernelFeature::FSIO) ||
             KernelSupports(KernelFeature::CFQ)) {
