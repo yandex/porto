@@ -2,6 +2,10 @@
 
 #include "error.hpp"
 
+#define __STDC_LIMIT_MACROS
+#include <cstdint>
+#undef __STDC_LIMIT_MACROS
+
 #define noinline __attribute__((noinline))
 
 class TNonCopyable {

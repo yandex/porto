@@ -1,10 +1,11 @@
 #pragma once
 
+#include "common.hpp"
+
 #include <functional>
 #include <vector>
 #include <set>
 
-#include "common.hpp"
 #include "util/signal.hpp"
 
 class TPath;

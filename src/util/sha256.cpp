@@ -3,7 +3,6 @@
 This code is based on public domain code from Wei Dai's Crypto++ library. */
 
 #include <sstream>
-#include <cstdint>
 #include <iomanip>
 #include "sha256.hpp"
 

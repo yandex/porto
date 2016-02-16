@@ -1,3 +1,5 @@
+#include "common.hpp"
+
 #include <atomic>
 
 #include "util/log.hpp"
