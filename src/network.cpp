@@ -102,9 +102,9 @@ TError TNetwork::PrepareLink(int index, std::string name) {
         return error;
     }
 
-    uint64_t prio = config().network().default_prio();
-    uint64_t rate = config().network().default_max_guarantee();
-    uint64_t ceil = config().network().default_limit();
+    uint64_t prio = NET_DEFAULT_PRIO;
+    uint64_t rate = NET_MAX_GUARANTEE;
+    uint64_t ceil = NET_MAX_LIMIT;
 
     error = AddTrafficClass(index,
                             TC_HANDLE(ROOT_TC_MAJOR, ROOT_TC_MINOR),
@@ -301,10 +301,9 @@ TError TNetwork::AddAnnounce(const TNlAddr &addr, std::string master) {
     int ret;
 
     if (master != "") {
-        for (auto &iface : ifaces) {
-            if (iface.first == master)
-                return Nl->ProxyNeighbour(iface.second, addr, true);
-        }
+        int index = InterfaceIndex(master);
+        if (index)
+            return Nl->ProxyNeighbour(index, addr, true);
         return TError(EError::InvalidValue, "Master link not found: " + master);
     }
 
@@ -508,11 +507,16 @@ TError TNetwork::AddTrafficClass(int ifIndex, uint32_t parent, uint32_t handle,
      */
     rtnl_htb_set_rate(cls, rate ?: 1);
 
-    if (prio)
-        rtnl_htb_set_prio(cls, prio);
+    rtnl_htb_set_prio(cls, prio);
 
+    /*
+     * Zero ceil must be no limit.
+     * Libnl set default ceil equal to rate.
+     */
     if (ceil)
         rtnl_htb_set_ceil(cls, ceil);
+    else
+        rtnl_htb_set_ceil(cls, UINT32_MAX);
 
     rtnl_htb_set_quantum(cls, 10000);
 
@@ -591,6 +595,21 @@ TError TNetwork::UpdateTrafficClasses(int parent, int minor,
         std::map<std::string, uint64_t> &Ceil) {
     TError error;
     int retry = 1;
+
+    for (auto &i: Prio) {
+        if (i.first != "default" && !InterfaceIndex(i.first))
+            L_WRN() <<  "Interface " + i.first + " not found" << std::endl;
+    }
+
+    for (auto &i: Rate) {
+        if (i.first != "default" && !InterfaceIndex(i.first))
+            L_WRN() <<  "Interface " + i.first + " not found" << std::endl;
+    }
+
+    for (auto &i: Ceil) {
+        if (i.first != "default" && !InterfaceIndex(i.first))
+            L_WRN() <<  "Interface " + i.first + " not found" << std::endl;
+    }
 
 again:
     for (auto &iface: ifaces) {

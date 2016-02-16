@@ -5,10 +5,10 @@ message TCfg {
 		optional bool enabled = 1 [deprecated=true];
 		optional bool debug = 2 [deprecated=true];
 		repeated string devices = 3 [deprecated=true];
-		optional uint32 default_prio = 4;
-		optional uint32 default_max_guarantee = 5;
-		optional uint32 default_guarantee = 6;
-		optional uint32 default_limit = 7;
+		optional uint32 default_prio = 4 [deprecated=true];
+		optional uint32 default_max_guarantee = 5 [deprecated=true];
+		optional uint32 default_guarantee = 6 [deprecated=true];
+		optional uint32 default_limit = 7 [deprecated=true];
 		message TNetworkAlias {
 			required string iface = 1;
 			required string name = 2;

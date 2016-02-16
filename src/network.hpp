@@ -31,6 +31,13 @@ public:
         ifaces.emplace_back(link.GetName(), link.GetIndex());
     }
 
+    int InterfaceIndex(const std::string &name) {
+        for (auto iface: ifaces)
+            if (iface.first == name)
+                return iface.second;
+        return 0;
+    }
+
     TNlAddr NatBaseV4;
     TNlAddr NatBaseV6;
     TIdMap NatBitmap;

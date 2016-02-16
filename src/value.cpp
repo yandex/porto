@@ -156,11 +156,41 @@ TStrList TListValue::GetDefault() const {
 }
 
 std::string TMapValue::ToString(const TUintMap &value) const {
-    return StringFormatUintMap(value);
+    std::stringstream str;
+
+    for (auto kv : value) {
+        if (str.str().length())
+            str << "; ";
+        str << kv.first << ": " << kv.second;
+    }
+
+    return str.str();
 }
 
 TError TMapValue::FromString(const std::string &value, TUintMap &result) const {
-    return StringToUintMap(value, result);
+    std::vector<std::string> lines;
+    TError error = SplitEscapedString(value, ';', lines);
+    if (error)
+        return error;
+
+    for (auto &line : lines) {
+        std::vector<std::string> nameval;
+
+        (void)SplitEscapedString(line, ':', nameval);
+        if (nameval.size() != 2)
+            return TError(EError::InvalidValue, "Invalid format");
+
+        std::string key = StringTrim(nameval[0]);
+        uint64_t val;
+
+        error = StringToSize(nameval[1], val);
+        if (error)
+            return TError(EError::InvalidValue, "Invalid value " + nameval[1]);
+
+        result[key] = val;
+    }
+
+    return TError::Success();
 }
 
 TUintMap TMapValue::GetDefault() const {
@@ -181,7 +211,7 @@ TError TMapValue::GetIndexed(const std::string &index, std::string &value) const
 TError TMapValue::SetIndexed(const std::string &index, const std::string &value) {
     auto map = Get();
     uint64_t uval;
-    TError error = StringToUint64(value, uval);
+    TError error = StringToSize(value, uval);
     if (error)
         return error;
     map[index] = uval;

@@ -552,107 +552,67 @@ public:
     }
 };
 
-class TNetMapValue : public TMapValue, public TContainerValue {
-    uint64_t Def, RootDef;
-
+class TNetGuaranteeProperty : public TMapValue, public TContainerValue {
 public:
-    virtual uint32_t GetDef() const { return 0; }
-    virtual uint32_t GetRootDef() const { return 0; }
+    TNetGuaranteeProperty() : TMapValue(PERSISTENT_VALUE),
+    TContainerValue(P_NET_GUARANTEE,
+            "Guaranteed container network bandwidth: <interface>|default <Bps>;...",
+            staticProperty) { }
 
-    TNetMapValue(
-           const char *name,
-           const char *desc,
-           const int flags,
-           const std::set<EContainerState> &state) :
-        TMapValue(flags),
-        TContainerValue(name, desc, state) {}
-
-    TUintMap GetDefault() const override {
-        auto c = GetContainer();
-        uint64_t def =  (c->IsRoot() || c->IsPortoRoot()) ? GetRootDef() : GetDef();
-        TUintMap m;
-        m["default"] = def;
-        return m;
-    }
-
-    virtual TError Set(const TUintMap &value) override {
-        /* Merge, not replace */
-        TUintMap tmp = Get();
-
-        for (const auto &iter : value) {
-            if (iter.second == NET_MAP_WHITEOUT &&
-                iter.first != "default") {
-                tmp.erase(iter.first);
-                continue;
-            }
-            tmp[iter.first] = iter.second;
-        }
-
-        return TStoredValue::Set(tmp);
-    }
-};
-
-class TNetGuaranteeProperty : public TNetMapValue {
-public:
-    TNetGuaranteeProperty() :
-        TNetMapValue(P_NET_GUARANTEE,
-                     "Guaranteed container network bandwidth [bytes/s] (max 32Gbps)",
-                     PERSISTENT_VALUE | PARENT_DEF_PROPERTY,
-                     staticProperty) {}
-    uint32_t GetDef() const override { return config().network().default_guarantee(); }
-    uint32_t GetRootDef() const override { return config().network().default_max_guarantee(); }
     TError CheckValue(const TUintMap &value) override {
-        for (auto &kv : value) {
-            if (kv.second == NET_MAP_WHITEOUT && kv.first != "default")
-                continue;
+        for (auto &kv: value) {
             if (kv.second > NET_MAX_GUARANTEE)
                 return TError(EError::InvalidValue, "Net guarantee too large");
         }
-
         return TError::Success();
+    }
+
+    TUintMap GetDefault() const override {
+        auto c = GetContainer();
+        uint64_t rate = 0;
+        if (c->IsRoot() || c->IsPortoRoot())
+            rate = NET_MAX_GUARANTEE;
+        return TUintMap({{ "default", rate }});
     }
 };
 
-class TNetLimitProperty : public TNetMapValue {
+class TNetLimitProperty : public TMapValue, public TContainerValue {
 public:
-    TNetLimitProperty() :
-        TNetMapValue(P_NET_LIMIT,
-                     "Maximum container network bandwidth [bytes/s] (max 32Gbps)",
-                     PERSISTENT_VALUE | PARENT_DEF_PROPERTY,
-                     staticProperty) {}
-    uint32_t GetDef() const override { return config().network().default_limit(); }
-    uint32_t GetRootDef() const override { return config().network().default_max_guarantee(); }
+    TNetLimitProperty() : TMapValue(PERSISTENT_VALUE),
+    TContainerValue(P_NET_LIMIT,
+            "Maximum container network bandwidth: <interface>|default <Bps>;...",
+            staticProperty) { }
+
     TError CheckValue(const TUintMap &value) override {
-        for (auto &kv : value) {
-            if (kv.second == NET_MAP_WHITEOUT && kv.first != "default")
-                continue;
+        for (auto &kv: value) {
             if (kv.second > NET_MAX_LIMIT)
                 return TError(EError::InvalidValue, "Net limit too large");
         }
-
         return TError::Success();
+    }
+
+    TUintMap GetDefault() const override {
+        return TUintMap({{ "default", 0 }});
     }
 };
 
-class TNetPriorityProperty : public TNetMapValue {
+class TNetPriorityProperty : public TMapValue, public TContainerValue {
 public:
-    TNetPriorityProperty() :
-        TNetMapValue(P_NET_PRIO,
-                     "Container network priority: 0-7",
-                     PERSISTENT_VALUE | PARENT_DEF_PROPERTY,
-                     staticProperty) {}
-    uint32_t GetDef() const override { return config().network().default_prio(); }
-    uint32_t GetRootDef() const override { return config().network().default_prio(); }
+    TNetPriorityProperty() : TMapValue(PERSISTENT_VALUE),
+    TContainerValue(P_NET_PRIO,
+            "Container network priority: <interface>|default 0-7;...",
+            staticProperty) { }
 
     TError CheckValue(const TUintMap &value) override {
         for (auto &kv : value) {
-            if (kv.second == NET_MAP_WHITEOUT && kv.first != "default")
-                continue;
             if (kv.second > 7)
                 return TError(EError::InvalidValue, "invalid value");
         }
-
         return TError::Success();
+    }
+
+    TUintMap GetDefault() const override {
+        return TUintMap({{"default", NET_DEFAULT_PRIO }});
     }
 };
 

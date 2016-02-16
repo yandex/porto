@@ -260,7 +260,7 @@ public:
     TNetBytesData() :
         TMapValue(0),
         TContainerValue(D_NET_BYTES,
-                        "number of tx bytes",
+                        "number of tx bytes: <interface>: <bytes>;...",
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
@@ -275,7 +275,7 @@ public:
     TNetPacketsData() :
         TMapValue(0),
         TContainerValue(D_NET_PACKETS,
-                        "number of tx packets",
+                        "number of tx packets: <interface>: <packets>;...",
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
@@ -290,7 +290,7 @@ public:
     TNetDropsData() :
         TMapValue(0),
         TContainerValue(D_NET_DROPS,
-                        "number of dropped tx packets",
+                        "number of dropped tx packets: <interface>: <packets>;...",
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
@@ -305,7 +305,7 @@ public:
     TNetOverlimitsData() :
         TMapValue(0),
         TContainerValue(D_NET_OVERLIMITS,
-                        "number of tx packets that exceeded the limit",
+                        "number of tx packets that exceeded the limit: <interface>: <packets>;...",
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
@@ -320,7 +320,7 @@ public:
     TNetRxBytes() :
         TMapValue(0),
         TContainerValue(D_NET_RX_BYTES,
-                        "number of rx bytes",
+                        "number of rx bytes: <interface>: <bytes>;...",
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
@@ -335,7 +335,7 @@ public:
     TNetRxPackets() :
         TMapValue(0),
         TContainerValue(D_NET_RX_PACKETS,
-                        "number of rx packets",
+                        "number of rx packets: <interface>: <packets>;...",
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
@@ -350,7 +350,7 @@ public:
     TNetRxDrops() :
         TMapValue(0),
         TContainerValue(D_NET_RX_DROPS,
-                        "number of dropped rx packets",
+                        "number of dropped rx packets: <interface>: <packets>;...",
                         rpdmState) {}
 
     TUintMap GetDefault() const override {
