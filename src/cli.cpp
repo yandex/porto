@@ -95,24 +95,24 @@ void THelpCmd::Usage() {
         PrintAligned(i.second->GetName(), i.second->GetDescription(), nameWidth, termWidth);
 
     std::cerr << std::endl << "Volume properties:" << std::endl;
-    vector<TProperty> vlist;
+    vector<TPortoProperty> vlist;
     int ret = Api->ListVolumeProperties(vlist);
     if (ret) {
         PrintError("Unavailable");
     } else {
-        nameWidth = MaxFieldLength(vlist, [](const TProperty &p) { return p.Name; });
+        nameWidth = MaxFieldLength(vlist, [](const TPortoProperty &p) { return p.Name; });
 
         for (const auto &p : vlist)
             PrintAligned(p.Name, p.Description, nameWidth, termWidth);
     }
 
     std::cerr << std::endl << "Property list:" << std::endl;
-    vector<TProperty> plist;
+    vector<TPortoProperty> plist;
     ret = Api->Plist(plist);
     if (ret) {
         PrintError("Unavailable");
     } else {
-        nameWidth = MaxFieldLength(vlist, [](const TProperty &p) { return p.Name; });
+        nameWidth = MaxFieldLength(vlist, [](const TPortoProperty &p) { return p.Name; });
 
         for (const auto &p : plist)
             PrintAligned(p.Name, p.Description, nameWidth, termWidth);
@@ -122,12 +122,12 @@ void THelpCmd::Usage() {
         return;
 
     std::cerr << std::endl << "Data list:" << std::endl;
-    vector<TData> dlist;
+    vector<TPortoProperty> dlist;
     ret = Api->Dlist(dlist);
     if (ret) {
         PrintError("Unavailable");
     } else {
-        nameWidth = MaxFieldLength(dlist, [](const TData &d) { return d.Name; });
+        nameWidth = MaxFieldLength(dlist, [](const TPortoProperty &d) { return d.Name; });
 
         for (const auto &d : dlist)
             PrintAligned(d.Name, d.Description, nameWidth, termWidth);

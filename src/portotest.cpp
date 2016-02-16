@@ -57,7 +57,7 @@ static void Usage() {
 static int TestConnectivity() {
     using namespace test;
 
-    TPortoAPI api("/run/portod.socket", 0);
+    TPortoAPI api;
 
     std::vector<std::string> containers;
     ExpectApiSuccess(api.List(containers));

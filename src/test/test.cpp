@@ -5,7 +5,6 @@
 
 #include "test.hpp"
 #include "config.hpp"
-#include "error.hpp"
 #include "util/file.hpp"
 #include "util/string.hpp"
 #include "util/netlink.hpp"
@@ -427,7 +426,7 @@ void InitUsersAndGroups() {
 }
 
 void AsRoot(TPortoAPI &api) {
-    api.Cleanup();
+    api.Close();
 
     ExpectEq(seteuid(0), 0);
     ExpectEq(setegid(0), 0);
@@ -573,7 +572,7 @@ void TestDaemon(TPortoAPI &api) {
 
     AsRoot(api);
 
-    api.Cleanup();
+    api.Close();
     sleep(1);
 
     Say() << "Make sure portod-slave doesn't have zombies" << std::endl;

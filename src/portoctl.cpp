@@ -107,15 +107,15 @@ static const std::string StripIdx(const std::string &name) {
         return name;
 }
 
-static bool ValidData(const vector<TData> &dlist, const string &name) {
+static bool ValidData(const vector<TPortoProperty> &dlist, const string &name) {
     return find_if(dlist.begin(), dlist.end(),
-                   [&](const TData &i)->bool { return i.Name == StripIdx(name); })
+                   [&](const TPortoProperty &i)->bool { return i.Name == StripIdx(name); })
         != dlist.end();
 }
 
-static bool ValidProperty(const vector<TProperty> &plist, const string &name) {
+static bool ValidProperty(const vector<TPortoProperty> &plist, const string &name) {
     return find_if(plist.begin(), plist.end(),
-                   [&](const TProperty &i)->bool { return i.Name == StripIdx(name); })
+                   [&](const TPortoProperty &i)->bool { return i.Name == StripIdx(name); })
         != plist.end();
 }
 
@@ -194,7 +194,7 @@ class TVolumeBuilder {
 
     TError CreateOverlayVolume(const std::vector<std::string> &layers,
                                std::string &path) {
-        TVolumeDescription volume;
+        TPortoVolume volume;
         std::map<std::string, std::string> config;
         config["backend"] = "overlay";
         config["layers"] = CommaSeparatedList(layers, ";");
@@ -207,7 +207,7 @@ class TVolumeBuilder {
     }
 
     TError CreatePlainVolume(std::string &path) {
-        TVolumeDescription volume;
+        TPortoVolume volume;
         std::map<std::string, std::string> config;
         int ret = Api->CreateVolume("", config, volume);
         if (ret)
@@ -608,14 +608,14 @@ public:
         bool printKey = true;
         bool printErrors = true;
 
-        vector<TProperty> plist;
+        vector<TPortoProperty> plist;
         ret = Api->Plist(plist);
         if (ret) {
             PrintError("Can't list properties");
             return EXIT_FAILURE;
         }
 
-        vector<TData> dlist;
+        vector<TPortoProperty> dlist;
         ret = Api->Dlist(dlist);
         if (ret) {
             PrintError("Can't list data");
@@ -1377,14 +1377,14 @@ public:
             showData.push_back("net_packets");
             showData.push_back("state");
         } else {
-            vector<TData> dlist;
+            vector<TPortoProperty> dlist;
             ret = Api->Dlist(dlist);
             if (ret) {
                 PrintError("Can't list data");
                 return EXIT_FAILURE;
             }
 
-            vector<TProperty> plist;
+            vector<TPortoProperty> plist;
             ret = Api->Plist(plist);
             if (ret) {
                 PrintError("Can't list properties");
@@ -1503,7 +1503,7 @@ public:
                 properties[arg.substr(0, sep)] = arg.substr(sep + 1);
         }
 
-        TVolumeDescription volume;
+        TPortoVolume volume;
         int ret = Api->CreateVolume(path, properties, volume);
         if (ret) {
             PrintError("Can't create volume");
@@ -1560,7 +1560,7 @@ public:
         "    -v        list all properties\n"
         ) {}
 
-    void ShowSizeProperty(TVolumeDescription &v, const char *p, int w, bool raw = false) {
+    void ShowSizeProperty(TPortoVolume &v, const char *p, int w, bool raw = false) {
       uint64_t val;
 
       if (!v.Properties.count(std::string(p)))
@@ -1573,7 +1573,7 @@ public:
           std::cout << std::setw(w) << StringFormatSize(val);
     }
 
-    void ShowPercent(TVolumeDescription &v, const char *u, const char *a, int w) {
+    void ShowPercent(TPortoVolume &v, const char *u, const char *a, int w) {
       uint64_t used, avail;
 
       if (!v.Properties.count(std::string(u)) |
@@ -1588,7 +1588,7 @@ public:
           std::cout << std::setw(w) << "inf";
     }
 
-    void ShowVolume(TVolumeDescription &v) {
+    void ShowVolume(TPortoVolume &v) {
         if (!details) {
             std::cout << v.Path << std::endl;
         } else {
@@ -1636,7 +1636,7 @@ public:
             { 'v', false, [&](const char *arg) { verbose = true; details = false; } },
         });
 
-        vector<TVolumeDescription> vlist;
+        vector<TPortoVolume> vlist;
 
         if (details) {
             std::cout << std::left << std::setw(40) << "Volume" << std::right;

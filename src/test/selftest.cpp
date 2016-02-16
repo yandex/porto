@@ -3057,7 +3057,7 @@ static void TestRoot(TPortoAPI &api) {
     if (KernelSupports(KernelFeature::MAX_RSS))
         data.push_back("max_rss");
 
-    std::vector<TProperty> plist;
+    std::vector<TPortoProperty> plist;
 
     ExpectApiSuccess(api.Plist(plist));
     ExpectEq(plist.size(), properties.size());
@@ -3065,7 +3065,7 @@ static void TestRoot(TPortoAPI &api) {
     for (auto p: plist)
         Expect(std::find(properties.begin(), properties.end(), p.Name) != properties.end());
 
-    std::vector<TData> dlist;
+    std::vector<TPortoProperty> dlist;
 
     ExpectApiSuccess(api.Dlist(dlist));
     ExpectEq(dlist.size(), data.size());
@@ -4267,8 +4267,8 @@ static void ReadPropsAndData(TPortoAPI &api, const std::string &name) {
         "net_rx_drops",
     };
 
-    std::vector<TProperty> plist;
-    std::vector<TData> dlist;
+    std::vector<TPortoProperty> plist;
+    std::vector<TPortoProperty> dlist;
 
     ExpectApiSuccess(api.Plist(plist));
     ExpectApiSuccess(api.Dlist(dlist));
@@ -4276,14 +4276,14 @@ static void ReadPropsAndData(TPortoAPI &api, const std::string &name) {
     if (!NetworkEnabled()) {
         plist.erase(std::remove_if(plist.begin(),
                                    plist.end(),
-                                   [&](TProperty &p){
+                                   [&](TPortoProperty &p){
                                        return skipNet.find(p.Name) != skipNet.end();
                                    }),
                     plist.end());
 
         dlist.erase(std::remove_if(dlist.begin(),
                                    dlist.end(),
-                                   [&](TData &d){
+                                   [&](TPortoProperty &d){
                                        return skipNet.find(d.Name) != skipNet.end();
                                    }),
                     dlist.end());
@@ -4320,9 +4320,9 @@ static void TestLeaks(TPortoAPI &api) {
     name = "a";
     for (int i = 0; i < createDestroyNr; i++) {
         ExpectApiSuccess(api.Create(name));
-        api.Cleanup();
+        api.Close();
         ExpectApiSuccess(api.Destroy(name));
-        api.Cleanup();
+        api.Close();
     }
 
     int nowSlave = GetVmRss(slavePid);
@@ -4416,7 +4416,7 @@ static void TestLeaks(TPortoAPI &api) {
         ExpectApiSuccess(api.SetProperty(name, "command", "true"));
         ExpectApiSuccess(api.Start(name));
         ReadPropsAndData(api, name);
-        api.Cleanup();
+        api.Close();
     }
 
     nowSlave = GetVmRss(slavePid);
@@ -4450,7 +4450,7 @@ static void TestLeaks(TPortoAPI &api) {
     for (int i = 0; i < LeakConainersNr; i++) {
         name = "b" + std::to_string(i);
         ExpectApiSuccess(api.Destroy(name));
-        api.Cleanup();
+        api.Close();
     }
 
     nowSlave = GetVmRss(slavePid);
@@ -4528,7 +4528,7 @@ static void CleanupVolume(TPortoAPI &api, const std::string &path) {
 }
 
 static void TestVolumeHolder(TPortoAPI &api) {
-    std::vector<TVolumeDescription> volumes;
+    std::vector<TPortoVolume> volumes;
 
     volumes.clear();
     ExpectApiSuccess(api.ListVolumes(volumes));
@@ -4630,7 +4630,7 @@ static void TestVolumeHolder(TPortoAPI &api) {
 }
 
 static void TestVolumeImpl(TPortoAPI &api) {
-    std::vector<TVolumeDescription> volumes;
+    std::vector<TPortoVolume> volumes;
     std::map<std::string, std::string> prop_loop = {{"backend", "loop"}, {"space_limit", "100m"}};
     std::map<std::string, std::string> prop_limited = {{"space_limit", "100m"}, {"inode_limit", "1000"}};
     std::map<std::string, std::string> prop_unlimit = {};
@@ -5163,7 +5163,7 @@ static void TestVolumeRecovery(TPortoAPI &api) {
     CleanupVolume(api, a);
     ExpectSuccess(TPath(a).Mkdir(0775));
 
-    std::vector<TVolumeDescription> volumes;
+    std::vector<TPortoVolume> volumes;
     ExpectApiSuccess(api.ListVolumes(volumes));
     ExpectEq(volumes.size(), 0);
 
@@ -5290,7 +5290,7 @@ static void TestBadClient(TPortoAPI &api) {
     ExpectSuccess(ConnectToRpcServer(PORTO_SOCKET_PATH, fd));
     ExpectEq(write(fd, buf.c_str(), buf.length()), buf.length());
 
-    TPortoAPI api2(PORTO_SOCKET_PATH, 0);
+    TPortoAPI api2;
     ExpectApiSuccess(api2.List(clist));
     close(fd);
     alarm(0);
@@ -5510,7 +5510,7 @@ int SelfTest(std::vector<std::string> args) {
     needDaemonChecks = getenv("NOCHECK") == nullptr;
 
     config.Load();
-    TPortoAPI api(PORTO_SOCKET_PATH, 0);
+    TPortoAPI api;
 
     InitUsersAndGroups();
 

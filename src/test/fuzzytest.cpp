@@ -91,20 +91,20 @@ static const std::vector<std::function<int(TPortoAPI&, int)>> handlers = {
     },
 
     [](TPortoAPI &api, int n) {
-        std::vector<TProperty> list;
+        std::vector<TPortoProperty> list;
         Say() << "Property list" << std::endl;
         return api.Plist(list);
     },
 
     [](TPortoAPI &api, int n) {
-        std::vector<TData> list;
+        std::vector<TPortoProperty> list;
         Say() << "Data list" << std::endl;
         return api.Dlist(list);
     },
 
     [](TPortoAPI &api, int n) {
         auto name = GetContainer(n);
-        std::vector<TProperty> list;
+        std::vector<TPortoProperty> list;
         (void)api.Plist(list);
 
         auto prop = GetRandElem(list);
@@ -125,10 +125,10 @@ static const std::vector<std::function<int(TPortoAPI&, int)>> handlers = {
     },
 
     [](TPortoAPI &api, int n) {
-        std::vector<TProperty> plist;
+        std::vector<TPortoProperty> plist;
         (void)api.Plist(plist);
 
-        std::vector<TData> dlist;
+        std::vector<TPortoProperty> dlist;
         (void)api.Dlist(dlist);
 
         std::vector<std::string> getvar;
@@ -145,7 +145,7 @@ static const std::vector<std::function<int(TPortoAPI&, int)>> handlers = {
 
     [](TPortoAPI &api, int n) {
         auto name = GetContainer(n);
-        std::vector<TData> list;
+        std::vector<TPortoProperty> list;
         (void)api.Dlist(list);
 
         auto data = GetRandElem(list);
@@ -173,7 +173,7 @@ static void ThreadMain(int n, int iter) {
             Say() << "ERR " << msg << " (" << err << ")" << std::endl;
         }
     }
-    api.Cleanup();
+    api.Close();
 }
 
 int FuzzyTest(int thrnr, int iter) {

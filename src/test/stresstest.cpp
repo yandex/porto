@@ -18,8 +18,6 @@ extern "C" {
 
 namespace test {
 
-static const int retries = 10;
-
 static std::vector<std::map<std::string, std::string>> vtasks =
 {
     {
@@ -198,7 +196,7 @@ static void Tasks(int n, int iter) {
     Say() << "Run task" << std::to_string(n) << std::endl;
     usleep(10000 * n);
     try {
-        TPortoAPI api(PORTO_SOCKET_PATH, retries);
+        TPortoAPI api;
         for (; iter; iter--) {
             if (iter % 10 == 0)
                 Say() << std::to_string(iter) << " iterations left" << std::endl;
@@ -241,7 +239,7 @@ static void Tasks(int n, int iter) {
 }
 
 static void StressKill() {
-    TPortoAPI api(PORTO_SOCKET_PATH, retries);
+    TPortoAPI api;
     std::cout << "Run kill" << std::endl;
     while (!done) {
         usleep(1000000);
@@ -272,7 +270,7 @@ int StressTest(int threads, int iter, bool killPorto) {
         (void)signal(SIGPIPE, SIG_IGN);
 
         config.Load();
-        TPortoAPI api(PORTO_SOCKET_PATH, retries);
+        TPortoAPI api;
         RestartDaemon(api);
 
         for (i = 1; i <= threads; i++)
