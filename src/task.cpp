@@ -499,10 +499,7 @@ TError TTask::ChildSetHostname() {
         }
     }
 
-    if (sethostname(Env->Hostname.c_str(), Env->Hostname.length()) < 0)
-        return TError(EError::Unknown, errno, "sethostname()");
-
-    return TError::Success();
+    return SetHostName(Env->Hostname);
 }
 
 TError TTask::ConfigureChild() {

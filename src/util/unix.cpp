@@ -196,7 +196,7 @@ TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap) 
 }
 
 std::string GetHostName() {
-    char buf[256];
+    char buf[HOST_NAME_MAX + 1];
     int ret = gethostname(buf, sizeof(buf));
     if (ret < 0)
         return "";

@@ -19,7 +19,6 @@
 #include "test.hpp"
 #include "rpc.hpp"
 
-#define HOSTNAME "portotest"
 const std::string TMPDIR = "/tmp/porto/selftest";
 
 extern "C" {
@@ -1316,11 +1315,12 @@ static void TestEnvTrim(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(name));
 }
 
+static std::string EnvSep(1, '\0');
+
 static void ExpectEnv(TPortoAPI &api,
                       const std::string &name,
                       const std::string &env,
-                      const char expected[],
-                      size_t expectedLen) {
+                      const std::string expected) {
     string pid;
 
     ExpectApiSuccess(api.SetProperty(name, "env", env));
@@ -1329,7 +1329,7 @@ static void ExpectEnv(TPortoAPI &api,
 
     string ret = GetEnv(pid);
 
-    ExpectEq(memcmp(expected, ret.data(), expectedLen), 0);
+    Expect(ret == expected);
     ExpectApiSuccess(api.Stop(name));
 }
 
@@ -1342,39 +1342,39 @@ static void TestEnvProperty(TPortoAPI &api) {
 
     Say() << "Check default environment" << std::endl;
 
-    static const char empty_env[] =
-        "HOME=/place/porto/a\0"
-        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
-        "PORTO_HOST=" HOSTNAME "\0"
-        "PORTO_NAME=a\0"
-        "USER=porto-alice\0"
-        "container=lxc\0";
-    ExpectEnv(api, name, "", empty_env, sizeof(empty_env));
+    static const std::string empty_env =
+        "HOME=/place/porto/a" + EnvSep +
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" + EnvSep +
+        "PORTO_HOST=" + GetHostName() + EnvSep +
+        "PORTO_NAME=a" + EnvSep +
+        "USER=porto-alice" + EnvSep +
+        "container=lxc" + EnvSep;
+    ExpectEnv(api, name, "", empty_env);
 
     Say() << "Check user-defined environment" << std::endl;
-    static const char ab_env[] =
-        "a=b\0"
-        "c=d\0"
-        "HOME=/place/porto/a\0"
-        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
-        "PORTO_HOST=" HOSTNAME "\0"
-        "PORTO_NAME=a\0"
-        "USER=porto-alice\0"
-        "container=lxc\0";
+    static const std::string ab_env =
+        "a=b" + EnvSep +
+        "c=d" + EnvSep +
+        "HOME=/place/porto/a" + EnvSep +
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" + EnvSep +
+        "PORTO_HOST=" + GetHostName() + EnvSep +
+        "PORTO_NAME=a" + EnvSep +
+        "USER=porto-alice" + EnvSep +
+        "container=lxc" + EnvSep;
 
-    ExpectEnv(api, name, "a=b;c=d;", ab_env, sizeof(ab_env));
-    ExpectEnv(api, name, "a=b;;c=d;", ab_env, sizeof(ab_env));
+    ExpectEnv(api, name, "a=b;c=d;", ab_env);
+    ExpectEnv(api, name, "a=b;;c=d;", ab_env);
 
-    static const char asb_env[] =
-        "a=e;b\0"
-        "c=d\0"
-        "HOME=/place/porto/a\0"
-        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\0"
-        "PORTO_HOST=" HOSTNAME "\0"
-        "PORTO_NAME=a\0"
-        "USER=porto-alice\0"
-        "container=lxc\0";
-    ExpectEnv(api, name, "a=e\\;b;c=d;", asb_env, sizeof(asb_env));
+    static const std::string asb_env =
+        "a=e;b" + EnvSep +
+        "c=d" + EnvSep +
+        "HOME=/place/porto/a" + EnvSep +
+        "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" + EnvSep +
+        "PORTO_HOST=" + GetHostName() + EnvSep +
+        "PORTO_NAME=a" + EnvSep +
+        "USER=porto-alice" + EnvSep +
+        "container=lxc" + EnvSep;
+    ExpectEnv(api, name, "a=e\\;b;c=d;", asb_env);
 
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep $N"));
     ExpectApiSuccess(api.SetProperty(name, "env", "N=1"));
@@ -5546,8 +5546,6 @@ int SelfTest(std::vector<std::string> args) {
 
     int ret = EXIT_SUCCESS;
     bool except = args.size() == 0 || args[0] == "--except";
-
-    ExpectSuccess(SetHostName(HOSTNAME));
 
     if (NetworkEnabled())
         subsystems.push_back("net_cls");
