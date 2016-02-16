@@ -1,6 +1,6 @@
 #pragma once
 
-#include "error.hpp"
+#include "util/error.hpp"
 
 #define __STDC_LIMIT_MACROS
 #include <cstdint>

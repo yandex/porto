@@ -3,7 +3,7 @@
 #include <string>
 #include <functional>
 
-#include "error.hpp"
+#include "util/error.hpp"
 #include "string.hpp"
 #include "util/cred.hpp"
 

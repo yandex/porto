@@ -153,10 +153,6 @@ InterruptibleInputStream::~InterruptibleInputStream() {
     free(Buf);
 }
 
-const uint64_t InterruptibleInputStream::GetLeftovers() const {
-    return Leftovers;
-}
-
 bool InterruptibleInputStream::Next(const void **data, int *size) {
     int n;
 

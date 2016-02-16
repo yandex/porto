@@ -244,6 +244,45 @@ static void StopWorkers(TContext &context, TRpcWorker &worker) {
     worker.Stop();
 }
 
+static TError CreateRpcServer(const std::string &path, const int mode,
+                              const int uid, const int gid, int &fd)
+{
+    struct sockaddr_un my_addr;
+
+    memset(&my_addr, 0, sizeof(struct sockaddr_un));
+
+    fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
+    if (fd < 0)
+        return TError(EError::Unknown, errno, "socket()");
+
+    my_addr.sun_family = AF_UNIX;
+    strncpy(my_addr.sun_path, path.c_str(), sizeof(my_addr.sun_path) - 1);
+
+    (void)unlink(path.c_str());
+    if (fchmod(fd, mode) < 0) {
+        close(fd);
+        return TError(EError::Unknown, errno, "fchmod(" + path + ", " + std::to_string(mode) + ")");
+    }
+
+    if (::bind(fd, (struct sockaddr *) &my_addr,
+             sizeof(struct sockaddr_un)) < 0) {
+        close(fd);
+        return TError(EError::Unknown, errno, "bind(" + path + ")");
+    }
+
+    if (chown(path.c_str(), uid, gid) < 0) {
+        close(fd);
+        return TError(EError::Unknown, errno, "chown(" + path + ", " + std::to_string(uid) + ", " + std::to_string(gid) + ")");
+    }
+
+    if (listen(fd, 0) < 0) {
+        close(fd);
+        return TError(EError::Unknown, errno, "listen()");
+    }
+
+    return TError::Success();
+}
+
 static int SlaveRpc(TContext &context, TRpcWorker &worker) {
     int ret = 0;
     int sfd;

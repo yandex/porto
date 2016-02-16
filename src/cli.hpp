@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "libporto.hpp"
-#include "error.hpp"
+#include "util/error.hpp"
 
 class TCommandEnviroment;
 

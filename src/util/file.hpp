@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "error.hpp"
+#include "util/error.hpp"
 #include "util/path.hpp"
 
 class TFile {

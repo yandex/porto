@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "error.hpp"
+#include "util/error.hpp"
 
 TError FindUser(const std::string &user, uid_t &uid, gid_t &gid);
 TError FindGroups(const std::string &user, gid_t gid, std::vector<gid_t> &groups);

@@ -6,7 +6,7 @@
 #include <vector>
 #include <algorithm>
 
-#include "error.hpp"
+#include "util/error.hpp"
 #include "util/path.hpp"
 
 extern "C" {
