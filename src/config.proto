@@ -69,7 +69,7 @@ message TCfg {
 		optional uint32 batch_io_weight = 12;
 		optional uint32 empty_wait_timeout_ms = 13;
 		optional string chroot_porto_dir = 14;
-		optional bool scoped_unlock = 15 [deprecated=true];
+		optional bool scoped_unlock = 15 /* [deprecated=true] */;
 	}
 
 	message TPrivilegesCfg {
