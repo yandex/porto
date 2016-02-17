@@ -35,6 +35,386 @@ using std::pair;
 using std::set;
 using std::shared_ptr;
 
+static int ForwardPtyMaster;
+
+static void ForwardWinch(int sig) {
+    struct winsize winsize;
+
+    /* Copy window size into master terminal */
+    if (!ioctl(STDIN_FILENO, TIOCGWINSZ, &winsize))
+        (void)ioctl(ForwardPtyMaster, TIOCSWINSZ, &winsize);
+}
+
+volatile int ChildDead = 0;
+
+static void CatchChild(int sig) {
+    ChildDead = 1;
+}
+
+class TLauncher {
+public:
+    TPortoAPI *Api;
+    TLauncher(TPortoAPI *api) : Api(api) {}
+
+    bool WeakContainer = false;
+    bool StartContainer = true;
+    bool NeedVolume = false;
+    bool ChrootVolume = true;
+    bool ForwardTerminal = false;
+    bool WaitExit = false;
+
+    std::string Container;
+    std::vector<std::string> Properties;
+    std::vector<std::string> Environment;
+
+    TPortoVolume Volume;
+    std::string SpaceLimit;
+    std::vector<std::string> Layers;
+    std::vector<std::string> VolumeLayers;
+    std::vector<std::string> ImportedLayers;
+    bool VolumeLinked = false;
+    int LayerIndex = 0;
+
+    int MasterPty = -1;
+    int SlavePty = -1;
+
+    int WaitTimeout = -1;
+
+    int ExitCode = -1;
+    int ExitSignal = -1;
+    std::string ExitMessage = "";
+
+    TError GetLastError() {
+        int error;
+        std::string msg;
+        Api->GetLastError(error, msg);
+        return TError((EError)error, msg);
+    }
+
+    TError SetProperty(std::string prop) {
+        std::string::size_type n = prop.find('=');
+        if (n == std::string::npos)
+            return TError(EError::InvalidValue, "Invalid value: " + prop);
+        std::string key = prop.substr(0, n);
+        std::string val = prop.substr(n + 1);
+
+        if (key == "env") {
+            Environment.push_back(val);
+        } else if (key == "space_limit") {
+            SpaceLimit = val;
+            NeedVolume = true;
+        } else if (key == "layers") {
+            NeedVolume = true;
+            return SplitEscapedString(val, ';', Layers);
+        } else if (Api->SetProperty(Container, key, val))
+            return GetLastError();
+
+        return TError::Success();
+    }
+
+    TError ImportLayer(const TPath &path, std::string &id) {
+        id = "portoctl-" + std::to_string(GetPid()) + "-" +
+             std::to_string(LayerIndex++) + "-" + path.BaseName();
+        std::cerr << "Importing layer " << path << " as " << id << std::endl;
+        if (Api->ImportLayer(id, path.ToString()))
+            return GetLastError();
+        ImportedLayers.push_back(id);
+        return TError::Success();
+    }
+
+    TError ImportLayers() {
+        std::vector<std::string> known;
+        TError error;
+
+        if (Api->ListLayers(known))
+            return GetLastError();
+
+        for (auto &layer : Layers) {
+            if (std::find(known.begin(), known.end(), layer) != known.end()) {
+                VolumeLayers.push_back(layer);
+                continue;
+            }
+
+            auto path = TPath(layer).RealPath();
+
+            if (path.IsDirectoryFollow()) {
+                VolumeLayers.push_back(path.ToString());
+                continue;
+            }
+
+            std::string id;
+            error = ImportLayer(path, id);
+            if (error)
+                break;
+
+            VolumeLayers.push_back(id);
+        }
+
+        return error;
+    }
+
+    TError CreateVolume() {
+        std::map<std::string, std::string> config;
+        TError error;
+
+        if (SpaceLimit != "")
+            config["space_limit"] = SpaceLimit;
+
+        if (!Layers.empty()) {
+            error = ImportLayers();
+            if (error)
+                return error;
+            config["backend"] = "overlay";
+            config["layers"] = CommaSeparatedList(VolumeLayers, ";");
+        }
+
+        if (Api->CreateVolume("", config, Volume))
+            return GetLastError();
+        VolumeLinked = true;
+
+        if (Container != "") {
+            if (Api->LinkVolume(Volume.Path, Container))
+                return GetLastError();
+            if (Api->UnlinkVolume(Volume.Path, ""))
+                return GetLastError();
+            VolumeLinked = false;
+        }
+
+        return TError::Success();
+    }
+
+    TError WaitContainer(int timeout) {
+        std::vector<std::string> containers = { Container };
+        std::string result;
+        TError error;
+        int status;
+
+        if (Api->Wait(containers, result, timeout))
+            return GetLastError();
+
+        if (result == "")
+            return TError(EError::Busy, "Wait timeout");
+
+        if (Api->GetData(Container, "exit_status", result))
+            return GetLastError();
+
+        error = StringToInt(result, status);
+        if (!error) {
+            if (WIFSIGNALED(status)) {
+                ExitSignal = WTERMSIG(status);
+                ExitMessage = StringFormat("Container killed by signal: %d (%s)",
+                                            ExitSignal, strsignal(ExitSignal));
+            } else if (WIFEXITED(status)) {
+                ExitCode = WEXITSTATUS(status);
+                ExitMessage = StringFormat("Container exit code: %d", ExitCode);
+            }
+        }
+        return error;
+    }
+
+    TError OpenPty() {
+        MasterPty = posix_openpt(O_RDWR | O_NOCTTY | O_CLOEXEC);
+        if (MasterPty < 0)
+            return TError(EError::Unknown, errno, "Cannot open master terminal");
+
+        char slave[128];
+        if (ptsname_r(MasterPty, slave, sizeof(slave)))
+            return TError(EError::Unknown, errno, "Cannot get terminal name");
+
+        if (unlockpt(MasterPty))
+            return TError(EError::Unknown, errno, "Cannot unlock terminal");
+
+        SlavePty = open(slave, O_RDWR | O_NOCTTY | O_CLOEXEC);
+        if (SlavePty < 0)
+            return TError(EError::Unknown, errno, "Cannot open slave terminal");
+
+        return TError::Success();
+    }
+
+    TError ForwardPty() {
+        struct termios termios;
+        char buf[4096];
+        ssize_t nread;
+
+        close(SlavePty);
+        SlavePty = -1;
+
+        ForwardPtyMaster = MasterPty;
+        Signal(SIGWINCH, ForwardWinch);
+        ForwardWinch(SIGWINCH);
+
+        /* switch outer terminal into raw mode, disable echo, etc */
+        if (!tcgetattr(STDIN_FILENO, &termios)) {
+            struct termios raw = termios;
+
+            cfmakeraw(&raw);
+            (void)tcsetattr(STDIN_FILENO, TCSANOW, &raw);
+        }
+
+        Signal(SIGCHLD, CatchChild);
+
+        pid_t pid = fork();
+
+        if (pid < 0)
+            return TError(EError::Unknown, errno, "cannot fork");
+
+        if (!pid) {
+            while (1) {
+                if ((nread = read(MasterPty, &buf, sizeof buf)) <= 0) {
+                    if (errno == EINTR || errno == EAGAIN)
+                        continue;
+                    break;
+                }
+                if (write(STDOUT_FILENO, &buf, nread) < 0)
+                    break;
+            }
+            exit(0);
+        } else {
+            int escape = 0;
+
+            while (!ChildDead) {
+                if ((nread = read(STDIN_FILENO, &buf, sizeof buf)) <= 0) {
+                    if (errno == EINTR || errno == EAGAIN)
+                        continue;
+                    break;
+                }
+
+                for (int i = 0; i < nread; i++) {
+                    if (buf[i] == '\3')
+                        escape++;
+                    else
+                        escape = 0;
+                }
+
+                if (escape >= 7) {
+                    if (Api->Kill(Container, 9))
+                        std::cerr << "Cannot kill container : " << GetLastError() << std::endl;
+                    break;
+                }
+
+                if (write(MasterPty, &buf, nread) < 0)
+                    break;
+            }
+
+            kill(pid, SIGKILL);
+        }
+
+        /* restore state of outer terminal */
+        (void)tcsetattr(STDIN_FILENO, TCSANOW, &termios);
+
+        Signal(SIGWINCH, SIG_DFL);
+        Signal(SIGCHLD, SIG_DFL);
+
+        close(MasterPty);
+        MasterPty = -1;
+
+        return TError::Success();
+    }
+
+    TError Launch() {
+        TError error;
+
+        if (WeakContainer) {
+            if (Api->CreateWeakContainer(Container))
+                return GetLastError();
+        } else {
+            if (Api->Create(Container))
+                return GetLastError();
+        }
+
+        if (ForwardTerminal) {
+            error = OpenPty();
+            if (error)
+                goto err;
+            std::string tty = "/dev/fd/" + std::to_string(SlavePty);
+            if (Api->SetProperty(Container, "stdin_path", tty) ||
+                    Api->SetProperty(Container, "stdout_path", tty) ||
+                    Api->SetProperty(Container, "stderr_path", tty)) {
+                error = GetLastError();
+                goto err;
+            }
+            std::string term = getenv("TERM") ?: "xterm";
+            Environment.push_back("TERM=" + term);
+        }
+
+        for (auto &prop : Properties) {
+            error = SetProperty(prop);
+            if (error)
+                goto err;
+        }
+
+        if (Api->SetProperty(Container, "env",
+                    CommaSeparatedList(Environment, ";"))) {
+            error = GetLastError();
+            goto err;
+        }
+
+        if (NeedVolume) {
+            error = CreateVolume();
+            if (error)
+                goto err;
+
+            if (ChrootVolume)
+                error = SetProperty("root=" + Volume.Path);
+            else
+                error = SetProperty("cwd=" + Volume.Path);
+            if (error)
+                goto err;
+        }
+
+        if (StartContainer) {
+            if (Api->Start(Container)) {
+                error = GetLastError();
+                goto err;
+            }
+        }
+
+        if (ForwardTerminal) {
+            error = ForwardPty();
+            if (error)
+                goto err;
+        }
+
+        if (WaitExit) {
+            error = WaitContainer(WaitTimeout);
+            if (error)
+                goto err;
+        }
+
+        return TError::Success();
+
+err:
+        Cleanup();
+        return error;
+    }
+
+    void Cleanup() {
+        if (Container != "") {
+            if (Api->Destroy(Container))
+                std::cerr << "Cannot destroy container " << Container << " : " << GetLastError() << std::endl;
+        }
+        Container = "";
+
+        if (VolumeLinked) {
+            if (Api->UnlinkVolume(Volume.Path, ""))
+                std::cerr << "Cannot unlink volume " << Volume.Path << " : " << GetLastError() << std::endl;
+            VolumeLinked = false;
+        }
+
+        for (auto &layer : ImportedLayers) {
+            if (Api->RemoveLayer(layer))
+                std::cerr << "Cannot remove layer " << layer << " : " << GetLastError() << std::endl;
+        }
+        ImportedLayers.clear();
+        VolumeLayers.clear();
+
+        if (SlavePty >= 0)
+            close(SlavePty);
+        if (MasterPty >= 0)
+            close(MasterPty);
+    }
+};
+
 static string HumanNsec(const string &val) {
     double n = stod(val);
     string suf = "ns";
@@ -164,157 +544,6 @@ static string HumanValue(const string &name, const string &val) {
 
     return val;
 }
-
-class TVolumeBuilder {
-    TPortoAPI *Api;
-    std::string Volume;
-    std::vector<std::string> Layers;
-    std::vector<std::string> ImportedLayers;
-    bool Cleanup = true;
-    int LayerIdx = 0;
-
-    TError GetLastError() {
-        int error;
-        std::string msg;
-        Api->GetLastError(error, msg);
-        return TError((EError)error, msg);
-    }
-
-    TError ImportLayer(const TPath &path, std::string &id) {
-        id = "portoctl-" + std::to_string(GetPid()) + "-" +
-             std::to_string(LayerIdx++) + "-" + path.BaseName();
-        std::cout << "Importing layer " << path << " as " << id << std::endl;
-        int ret = Api->ImportLayer(id, path.ToString());
-        if (ret)
-            return GetLastError();
-        ImportedLayers.push_back(id);
-        return TError::Success();
-    }
-
-    TError CreateOverlayVolume(const std::vector<std::string> &layers,
-                               std::string &path) {
-        TPortoVolume volume;
-        std::map<std::string, std::string> config;
-        config["backend"] = "overlay";
-        config["layers"] = CommaSeparatedList(layers, ";");
-        int ret = Api->CreateVolume("", config, volume);
-        if (ret)
-            return GetLastError();
-
-        path = volume.Path;
-        return TError::Success();
-    }
-
-    TError CreatePlainVolume(std::string &path) {
-        TPortoVolume volume;
-        std::map<std::string, std::string> config;
-        int ret = Api->CreateVolume("", config, volume);
-        if (ret)
-            return GetLastError();
-
-        path = volume.Path;
-        return TError::Success();
-    }
-
-public:
-    TVolumeBuilder(TPortoAPI *api) : Api(api) {}
-
-    std::string GetVolumePath() {
-        return Volume;
-    }
-
-    void NeedCleanup(bool cleanup) { Cleanup = cleanup; }
-
-    ~TVolumeBuilder() {
-        if (Cleanup) {
-            if (!Volume.empty()) {
-                int ret = Api->UnlinkVolume(Volume, "");
-                if (ret)
-                    std::cerr << "Can't unlink volume: " << GetLastError() << std::endl;
-            }
-
-            for (auto id : ImportedLayers) {
-                std::cout << "Removing layer " << id << std::endl;
-                int ret = Api->RemoveLayer(id);
-                if (ret)
-                    std::cerr << "Can't remove layer " << id << ": " << GetLastError() << std::endl;
-            }
-        }
-    }
-
-    TError Prepare() {
-        return CreatePlainVolume(Volume);
-    }
-
-    TError Prepare(const std::vector<std::string> &layers) {
-        std::vector<std::string> known;
-
-        if (layers.empty())
-            return CreatePlainVolume(Volume);
-
-        if (Api->ListLayers(known))
-            return GetLastError();
-
-        for (auto layer : layers) {
-            layer = StringTrim(layer);
-
-            if (layer.empty())
-                continue;
-
-            if (std::find(known.begin(), known.end(), layer) != known.end()) {
-                Layers.push_back(layer);
-                continue;
-            }
-
-            auto path = TPath(layer).RealPath();
-
-            if (path.IsDirectoryFollow()) {
-                Layers.push_back(path.ToString());
-                continue;
-            }
-
-            std::string id;
-            TError error = ImportLayer(path, id);
-            if (error)
-                return error;
-
-            Layers.push_back(id);
-        }
-
-        return CreateOverlayVolume(Layers, Volume);
-    }
-
-    TError Prepare(const std::string &s) {
-        std::vector<std::string> layers;
-
-        TError error = SplitString(s, ';', layers);
-        if (error)
-            return error;
-
-        return Prepare(layers);
-    }
-
-    TError ExportLayer(const TPath &path) {
-        int ret = Api->ExportLayer(Volume, path.RealPath().ToString());
-        if (ret)
-            return GetLastError();
-        return TError::Success();
-    }
-
-    TError Link(const std::string &container) {
-        int ret = Api->LinkVolume(Volume, container);
-        if (ret)
-            return GetLastError();
-        return TError::Success();
-    }
-
-    TError Unlink() {
-        int ret = Api->UnlinkVolume(Volume, "");
-        if (ret)
-            return GetLastError();
-        return TError::Success();
-    }
-};
 
 class TRawCmd final : public ICmd {
 public:
@@ -818,303 +1047,135 @@ public:
 };
 
 class TRunCmd final : public ICmd {
-    TVolumeBuilder VolumeBuilder;
 public:
     TRunCmd(TPortoAPI *api) : ICmd(api, "run", 2,
             "[-L layer]... <container> [properties]",
             "create and start container with given properties",
-            "    -L layer|dir|tarball        add lower layer (-L top ... -L bottom)\n"
-            ), VolumeBuilder(api) {}
-
-    int Parser(string property, string &key, string &val) {
-        string::size_type n;
-        n = property.find('=');
-        if (n == string::npos) {
-            TError error(EError::InvalidValue, "Invalid value");
-            PrintError(error, "Can't parse property (no value): " + property);
-            return EXIT_FAILURE;
-        }
-        key = property.substr(0, n);
-        val = property.substr(n + 1, property.size());
-        if (key == "" || val == "") {
-            TError error(EError::InvalidValue, "Invalid value");
-            PrintError(error, "Can't parse property (key or value is nil): " + property);
-            return EXIT_FAILURE;
-        }
-        return EXIT_SUCCESS;
-    }
+            "    -L layer|dir|tarball        add lower layer (-L top ... -L bottom)\n")
+    {}
 
     int Execute(TCommandEnviroment *env) final override {
-        std::vector<std::string> layers;
+        TLauncher launcher(Api);
+        TError error;
+
         const auto &args = env->GetOpts({
-            { 'L', true, [&](const char *arg) { layers.push_back(arg); } },
+            { 'L', true, [&](const char *arg) {
+                    launcher.Layers.push_back(arg);
+                    launcher.NeedVolume = true;
+                }
+            },
         });
 
-        const string &containerName = args[0];
-        std::vector<std::pair<std::string, std::string>> properties;
+        launcher.Container = args[0];
+        launcher.Properties.insert(launcher.Properties.end(), args.begin() + 1, args.end());
 
-        int ret;
-
-        for (size_t i = 1; i < args.size(); ++i) {
-            string key, val;
-            ret = Parser(args[i], key, val);
-            if (ret)
-                return ret;
-
-            properties.emplace_back(std::make_pair(key, val));
-        }
-
-        if (!layers.empty()) {
-            TError error = VolumeBuilder.Prepare(layers);
-            if (error) {
-                std::cerr << "Can't create volume: " << error << std::endl;
-                return EXIT_FAILURE;
-            }
-
-            properties.emplace_back(std::make_pair("root", VolumeBuilder.GetVolumePath()));
-        }
-
-        ret = Api->Create(containerName);
-        if (ret) {
-            PrintError("Can't create container");
+        error = launcher.Launch();
+        if (error) {
+            std::cerr << "Cannot start container: " << error << std::endl;
             return EXIT_FAILURE;
         }
-        if (!VolumeBuilder.GetVolumePath().empty()) {
-            VolumeBuilder.Link(containerName);
-            VolumeBuilder.Unlink();
-            VolumeBuilder.NeedCleanup(false);
-        }
-        for (auto iter: properties) {
-            ret = Api->SetProperty(containerName, iter.first, iter.second);
-            if (ret) {
-                PrintError("Can't set property " + iter.first);
-                (void)Api->Destroy(containerName);
-                return EXIT_FAILURE;
-            }
-        }
-        ret = Api->Start(containerName);
-        if (ret) {
-            PrintError("Can't start container");
-            (void)Api->Destroy(containerName);
-            return EXIT_FAILURE;
-        }
+
         return EXIT_SUCCESS;
     }
 };
 
 class TExecCmd final : public ICmd {
-    string containerName;
-    TVolumeBuilder VolumeBuilder;
-    bool Cleanup = true;
-    char *TmpDir = nullptr;
 public:
     TExecCmd(TPortoAPI *api) : ICmd(api, "exec", 2,
         "[-C] [-T] [-L layer]... <container> command=<command> [properties]",
-        "create pty, execute and wait for command in container",
+        "Execute command in container, forward terminal, destroy container at the end",
         "    -L layer|dir|tarball        add lower layer (-L top ... -L bottom)\n"
-        ), VolumeBuilder(api) {
+        ) {
         SetDieOnSignal(false);
     }
 
-    ~TExecCmd() {
-        if (Cleanup && !containerName.empty()) {
-            TPortoAPI api;
-            (void)api.Destroy(containerName);
-        }
-        if (TmpDir)
-            (void)TPath(TmpDir).RemoveAll();
-    }
+    int Execute(TCommandEnviroment *environment) final override {
+        TLauncher launcher(Api);
+        TError error;
 
-    bool MoveData(int from, int to) {
-        char buf[256];
-        int ret;
+        launcher.WeakContainer = true;
+        launcher.ForwardTerminal = isatty(STDIN_FILENO);
+        launcher.WaitExit = true;
 
-        ret = read(from, buf, sizeof(buf));
-        if (ret > 0) {
-            if (ret == 2 && buf[0] == '^' && buf[1] == 'C')
-                return true;
-            if (write(to, buf, ret) != ret)
-                std::cerr << "Partial write to " << to << std::endl;
-        }
+        const auto &args = environment->GetOpts({
+            { 'C', false, [&](const char *arg) { launcher.WeakContainer = false; } },
+            { 'T', false, [&](const char *arg) { launcher.ForwardTerminal = false; } },
+            { 'L', true, [&](const char *arg) { launcher.Layers.push_back(arg); launcher.NeedVolume = true; } },
+        });
 
-        return false;
-    }
+        launcher.Container = args[0];
+        launcher.Properties.insert(launcher.Properties.end(), args.begin() + 1, args.end());
 
-    int OpenTemp(const std::string &path, int flags) {
-        int fd = open(path.c_str(), flags);
-        if (fd < 0) {
-            TError error(EError::Unknown, errno, "open()");
-            PrintError(error, "Can't open temporary file " + path);
+        error = launcher.Launch();
+        if (error) {
+            std::cerr << "Cannot start container: " << error << std::endl;
+            return EXIT_FAILURE;
         }
 
-        return fd;
+        if (launcher.WeakContainer)
+            launcher.Cleanup();
+
+        if (launcher.ExitSignal > 0) {
+            std::cerr << launcher.ExitMessage << std::endl;
+            return 128 + launcher.ExitSignal;
+        }
+
+        if (launcher.ExitCode > 0) {
+            std::cerr << launcher.ExitMessage << std::endl;
+            return launcher.ExitCode;
+        }
+
+        return EXIT_SUCCESS;
     }
+};
+
+class TShellCmd final : public ICmd {
+public:
+    TShellCmd(TPortoAPI *api) : ICmd(api, "shell", 1,
+            "<container> [command] [argument]...",
+            "start shell (default /bin/bash) in container") { }
 
     int Execute(TCommandEnviroment *environment) final override {
-        bool hasTty = isatty(STDIN_FILENO);
-        std::vector<std::string> args;
-        std::string env;
-        std::vector<std::string> layers;
+        std::string user = getenv("SUDO_USER") ?: getenv("USER") ?: "unknown";
+        std::string command = "/bin/bash";
+        const auto &args = environment->GetArgs();
+        TLauncher launcher(Api);
+        TError error;
 
-        const auto &argv = environment->GetOpts({
-            { 'C', false, [&](const char *arg) { Cleanup = false; } },
-            { 'T', false, [&](const char *arg) { hasTty = false; } },
-            { 'L', true, [&](const char *arg) { layers.push_back(arg); } },
-        });
-        VolumeBuilder.NeedCleanup(Cleanup);
-
-        if (hasTty)
-            env = std::string("TERM=") + getenv("TERM");
-
-        args.push_back(argv[0]);
-        for (size_t i = 1; i < argv.size(); ++i)
-            if (argv[i].find("env=", 0, 4) != std::string::npos)
-                env += "; " + argv[i].substr(4);
-            else
-                args.push_back(argv[i]);
-
-        if (!layers.empty()) {
-            TError error = VolumeBuilder.Prepare(layers);
-            if (error) {
-                std::cerr << "Can't create volume: " << error << std::endl;
-                return EXIT_FAILURE;
-            }
-            args.push_back("root=" + VolumeBuilder.GetVolumePath());
+        if (args.size() > 1) {
+            command = args[1];
+            for (size_t i = 2; i < args.size(); ++i)
+                command += " " + args[i];
         }
 
-        containerName = argv[0];
+        launcher.WeakContainer = true;
+        launcher.ForwardTerminal = isatty(STDIN_FILENO);
+        launcher.WaitExit = true;
 
-        if (hasTty) {
-            args.push_back("stdin_path=/dev/fd/0");
-            args.push_back("stdout_path=/dev/fd/1");
-            args.push_back("stderr_path=/dev/fd/2");
+        launcher.Container = args[0] + "/shell-" + user + "-" + std::to_string(GetPid());
+        launcher.Properties.push_back("command=" + command);
+        launcher.Properties.push_back("isolate=false");
+        launcher.Environment.push_back("debian_chroot=" + args[0]);
 
-            if (env.length())
-                args.push_back("env=" + env);
-
-            int ret = RunCmd<TRunCmd>(args, environment);
-            if (ret)
-                return ret;
-        } else {
-            vector<struct pollfd> fds;
-
-            struct pollfd pfd = {};
-            pfd.fd = STDIN_FILENO;
-            pfd.events = POLLIN;
-            fds.push_back(pfd);
-
-            string stdinPath, stdoutPath, stderrPath;
-            int stdinFd, stdoutFd, stderrFd;
-
-            TmpDir = mkdtemp(strdup("/tmp/portoctl-exec-XXXXXX"));
-            if (!TmpDir) {
-                TError error(EError::Unknown, errno, "mkdtemp()");
-                PrintError(error, "Can't create temporary directory");
-                return EXIT_FAILURE;
-            }
-
-            stdinPath = string(TmpDir) + "/stdin";
-            stdoutPath = string(TmpDir) + "/stdout";
-            stderrPath = string(TmpDir) + "/stderr";
-
-            args.push_back("stdin_path=" + stdinPath);
-            args.push_back("stdout_path=" + stdoutPath);
-            args.push_back("stderr_path=" + stderrPath);
-
-            args.push_back("stdin_type=fifo");
-            args.push_back("stdout_type=fifo");
-            args.push_back("stderr_type=fifo");
-
-            if (env.length())
-                args.push_back("env=" + env);
-
-            int ret = RunCmd<TRunCmd>(args, environment);
-            if (ret)
-                return ret;
-
-            stdinFd = OpenTemp(stdinPath, O_RDWR | O_NONBLOCK);
-            if (stdinFd < 0)
-                return EXIT_FAILURE;
-
-            stdoutFd = OpenTemp(stdoutPath, O_RDONLY | O_NONBLOCK);
-            if (stdoutFd < 0)
-                return EXIT_FAILURE;
-
-            stderrFd = OpenTemp(stderrPath, O_RDONLY | O_NONBLOCK);
-            if (stderrFd < 0)
-                return EXIT_FAILURE;
-
-            pfd.fd = stdoutFd;
-            pfd.events = POLLIN;
-            fds.push_back(pfd);
-
-            pfd.fd = stderrFd;
-            pfd.events = POLLIN;
-            fds.push_back(pfd);
-
-            bool hangup = false;
-            while (!hangup) {
-                if (GotSignal())
-                    return EXIT_FAILURE;
-
-                int ret = poll(fds.data(), fds.size(), -1);
-                if (ret < 0)
-                    break;
-
-                for (size_t i = 0; i < fds.size(); i++) {
-                    if (fds[i].revents & POLLIN) {
-                        int dest;
-
-                        if (fds[i].fd == STDIN_FILENO)
-                            dest = stdinFd;
-                        else if (fds[i].fd == stdoutFd)
-                            dest = STDOUT_FILENO;
-                        else if (fds[i].fd == stderrFd)
-                            dest = STDERR_FILENO;
-                        else
-                            continue;
-
-                        if (MoveData(fds[i].fd, dest))
-                            return EXIT_FAILURE;
-                    }
-
-                    if (fds[i].revents & POLLHUP) {
-                        if (fds[i].fd != STDIN_FILENO)
-                            hangup = true;
-                        fds.erase(fds.begin() + i);
-                    }
-                }
-            }
-        }
-
-        if (GotSignal())
-            return EXIT_FAILURE;
-
-        std::string tmp;
-        int ret = Api->Wait({ containerName }, tmp);
-        if (GotSignal())
-            return EXIT_FAILURE;
-        if (ret) {
-            PrintError("Can't get state");
+        error = launcher.Launch();
+        if (error) {
+            std::cerr << "Cannot start container: " << error << std::endl;
             return EXIT_FAILURE;
         }
 
-        string s;
-        ret = Api->GetData(containerName, "exit_status", s);
-        if (ret) {
-            PrintError("Can't get exit_status");
-            return EXIT_FAILURE;
+        launcher.Cleanup();
+
+        if (launcher.ExitSignal > 0) {
+            std::cerr << launcher.ExitMessage << std::endl;
+            return 128 + launcher.ExitSignal;
         }
 
-        int status = stoi(s);
-        if (WIFEXITED(status)) {
-            return WEXITSTATUS(status);
-        } else {
-            Interrupted = 1;
-            InterruptedSignal = WTERMSIG(status);
+        if (launcher.ExitCode > 0) {
+            std::cerr << launcher.ExitMessage << std::endl;
+            return launcher.ExitCode;
         }
 
-        return EXIT_FAILURE;
+        return EXIT_SUCCESS;
     }
 };
 
@@ -1789,9 +1850,6 @@ public:
 };
 
 class TBuildCmd final : public ICmd {
-    TVolumeBuilder VolumeBuilder;
-    bool Cleanup = true;
-
 public:
     TBuildCmd(TPortoAPI *api) : ICmd(api, "build", 0,
             "[-k] [-L layer]... -o layer.tar [-E name=value]... "
@@ -1803,25 +1861,38 @@ public:
             "    -B bootstrap               bash script runs outside (with cwd=volume)\n"
             "    -S script                  bash script runs inside (with root=volume)\n"
             "    -k                         keep volume and container\n"
-            ), VolumeBuilder(api) {
+            ) {
         SetDieOnSignal(false);
     }
 
     ~TBuildCmd() { }
 
     int Execute(TCommandEnviroment *environment) final override {
-        std::string name = "portoctl-build-" + std::to_string(GetPid());
+        TLauncher launcher(Api);
+        TLauncher executor(Api);
+        TError error;
+
+        launcher.Container = "portoctl-build-" + std::to_string(GetPid());
+        launcher.WeakContainer = true;
+        launcher.NeedVolume = true;
+        launcher.StartContainer = false;
+        launcher.ChrootVolume = false;
+
+        executor.Container = launcher.Container + "/executor";
+        executor.ForwardTerminal = true;
+        executor.WaitExit = true;
+
         TPath output;
         std::vector<std::string> env;
         std::vector<std::string> layers;
         TPath bootstrap, script;
         const auto &opts = environment->GetOpts({
-            { 'L', true, [&](const char *arg) { layers.push_back(arg); } },
+            { 'L', true, [&](const char *arg) { launcher.Layers.push_back(arg); } },
             { 'o', true, [&](const char *arg) { output =  TPath(arg).AbsolutePath(); } },
-            { 'E', true, [&](const char *arg) { env.push_back(arg); } },
+            { 'E', true, [&](const char *arg) { executor.Environment.push_back(arg); } },
             { 'B', true, [&](const char *arg) { bootstrap = TPath(arg).RealPath(); } },
             { 'S', true, [&](const char *arg) { script = TPath(arg).RealPath(); } },
-            { 'k', false, [&](const char *arg) { Cleanup = false; } },
+            { 'k', false, [&](const char *arg) { launcher.WeakContainer = false; } },
         });
 
         if (output.IsEmpty()) {
@@ -1858,113 +1929,82 @@ public:
             return EXIT_FAILURE;
         }
 
-        TError error = VolumeBuilder.Prepare(layers);
+        /* add properies from commandline */
+        launcher.Properties.insert(launcher.Properties.end(), opts.begin(), opts.end());
+
+        error = launcher.Launch();
         if (error) {
             std::cerr << "Cannot create volume: " << error << std::endl;
             return EXIT_FAILURE;
         }
-        VolumeBuilder.NeedCleanup(Cleanup);
 
-        auto volume = VolumeBuilder.GetVolumePath();
+        std::string volume = launcher.Volume.Path;
 
         if (!bootstrap.IsEmpty()) {
-            std::vector<std::string> args;
             std::vector<std::string> bind;
 
-            /* don't use PTY in exec, use simple pipes so Ctrl-C works FIXME */
-            args.push_back("-T");
-
-            args.push_back(name + "-" + bootstrap.BaseName());
-
-            args.push_back("isolate=true");
-            args.push_back("env=" + CommaSeparatedList(env, ";"));
+            executor.Properties.push_back("isolate=true");
 
             /* give write access only to volume and /tmp */
-            args.push_back("root_readonly=true");
             bind.push_back("/tmp /tmp rw");
             bind.push_back(volume + " " + volume + " rw");
-            args.push_back("bind=" + CommaSeparatedList(bind, ";"));
+            executor.Properties.push_back("root_readonly=true");
+            executor.Properties.push_back("bind=" + CommaSeparatedList(bind, ";"));
 
-            /* add properies from commandline */
-            for (auto opt : opts)
-                args.push_back(opt);
+            executor.Properties.push_back("cwd=" + volume);
+            executor.Properties.push_back("command=/bin/bash -e -x -c '. " + bootstrap.ToString() + "'");
 
-            args.push_back("cwd=" + volume);
-            args.push_back("command=/bin/bash -e -x -c '. " + bootstrap.ToString() + "'");
+            std::cout << "Starting bootstrap " << bootstrap << std::endl;
 
-            std::cout << "Starting bootstrap: exec " << CommaSeparatedList(args, "  ") << std::endl;
+            error = executor.Launch();
+            if (error) {
+                std::cout << "Cannot start bootstrap: " << error << std::endl;
+                goto err;
+            }
 
-            int ret = RunCmd<TExecCmd>(args, environment);
-            if (ret) {
-                std::cout << "Bootstrap failed with exitcode: " << ret << std::endl;
-                return ret;
+            if (executor.ExitCode) {
+                std::cout << "Bootstrap: " << executor.ExitMessage << std::endl;
+                goto err;
             }
         }
+
+        Api->SetProperty(launcher.Container, "virt_mode", "os");
+        Api->SetProperty(launcher.Container, "root", volume);
+        Api->SetProperty(launcher.Container, "bind", script.ToString() + " /script ro");
 
         if (!script.IsEmpty()) {
-            std::vector<std::string> args;
-            std::vector<std::string> bind;
+            executor.Properties.clear();
 
-            args.push_back(name);
-            args.push_back("virt_mode=os");
+            executor.Properties.push_back("isolate=false");
+            executor.Properties.push_back("command=/bin/bash -e -x -c '. /script'");
 
-            /* add properies from commandline */
-            for (auto opt : opts)
-                args.push_back(opt);
-
-            /* Mount host selinux into container (for fedora) */
-            TPath selinux("/sys/fs/selinux");
-            if (selinux.Exists())
-                bind.push_back("/sys/fs/selinux /sys/fs/selinux ro");
-
-            bind.push_back(script.ToString() + " /" + name + " ro");
-            args.push_back("bind=" + CommaSeparatedList(bind, ";"));
-            args.push_back("root=" + volume);
-
-            std::cout << "Creating container: run " << CommaSeparatedList(args, "  ") << std::endl;
-
-            int ret = RunCmd<TRunCmd>(args, environment);
-            if (ret)
-                return ret;
-
-            args.clear();
-            args.push_back("-T");
-            args.push_back(name + "/" + script.BaseName());
-            args.push_back("isolate=false");
-            args.push_back("env=" + CommaSeparatedList(env, ";"));
-            args.push_back("command=/bin/bash -e -x -c '. /" + name + "'");
-
-            std::cout << "Starting script: exec " << CommaSeparatedList(args, "  ") << std::endl;
-
-            int ret2 = RunCmd<TExecCmd>(args, environment);
-            if (ret2)
-                std::cout << "Script failed with exitcode: " << ret2 << std::endl;
-
-            if (Cleanup) {
-                std::cout << "Destroying container: destroy " + name << std::endl;
-
-                args.clear();
-                args.push_back(name);
-                ret = RunCmd<TDestroyCmd>(args, environment);
-                if (ret)
-                    return ret;
+            error = executor.Launch();
+            if (error) {
+                std::cout << "Cannot start script: " << error << std::endl;
+                goto err;
             }
 
-            if (ret2)
-                return ret2;
+            if (executor.ExitCode) {
+                std::cout << "Script: " << executor.ExitMessage << std::endl;
+                goto err;
+            }
         }
 
-        TPath(volume + "/" + name).Unlink();
+        TPath(volume + "/script").Unlink();
 
         std::cout << "Exporting upper layer into " << output.ToString() << std::endl;
 
-        error = VolumeBuilder.ExportLayer(output);
-        if (error) {
-            std::cerr << "Can't export layer:" << error << std::endl;
-            return EXIT_FAILURE;
+        if (Api->ExportLayer(volume, output.ToString())) {
+            std::cerr << "Can't export layer:" << launcher.GetLastError() << std::endl;
+            goto err;
         }
 
         return EXIT_SUCCESS;
+
+err:
+        if (launcher.WeakContainer)
+            launcher.Cleanup();
+        return EXIT_FAILURE;
     }
 };
 
@@ -2020,6 +2060,7 @@ int main(int argc, char *argv[]) {
     handler.RegisterCommand<TEnterCmd>();
     handler.RegisterCommand<TRunCmd>();
     handler.RegisterCommand<TExecCmd>();
+    handler.RegisterCommand<TShellCmd>();
     handler.RegisterCommand<TGcCmd>();
     handler.RegisterCommand<TFindCmd>();
     handler.RegisterCommand<TWaitCmd>();

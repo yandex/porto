@@ -2,7 +2,7 @@
 
 _porto_containers ()
 {
-	COMPREPLY=( $( compgen -W "$(portoctl list -1 2>/dev/null) / /porto $1" -- "$cur" ) )
+	COMPREPLY=( $( compgen -W "$(portoctl list -1 2>/dev/null) $*" -- "$cur" ) )
 	__ltrim_colon_completions "$cur"
 }
 
@@ -60,26 +60,36 @@ _portoctl ()
 			compopt -o nospace
 		fi
 		;;
+	shell)
+		case "$cword" in
+		2)
+			_porto_containers
+			;;
+		*)
+			_command_offset 3
+			;;
+		esac
+		;;
 	find)
 		_pids
 		;;
 	get)
 		if [ -z "$ct" ] ; then
-			_porto_containers
+			_porto_containers / /porto
 		else
 			COMPREPLY=( $( compgen -W "$_porto_data $_porto_properies" -- $cur ) )
 		fi
 		;;
 	pget)
 		if [ -z "$ct" ] ; then
-			_porto_containers "-k"
+			_porto_containers / /porto "-k"
 		else
 			COMPREPLY=( $( compgen -W "$_porto_properies" -- $cur ) )
 		fi
 		;;
 	dget)
 		if [ -z "$ct" ] ; then
-			_porto_containers "-k"
+			_porto_containers / /porto "-k"
 		else
 			COMPREPLY=( $( compgen -W "$_porto_data" -- $cur ) )
 		fi
@@ -144,7 +154,7 @@ _portoctl ()
 			_porto_volumes
 			;;
 		3)
-			_porto_containers
+			_porto_containers /
 			;;
 		esac
 		;;

@@ -795,11 +795,6 @@ int TPortoTop::RunCmdInContainer(TConsoleScreen &screen, std::string cmd) {
     bool enter = (SelectedContainer() != "/");
     int ret = -1;
 
-    if (enter && getuid()) {
-        screen.Dialog("You have to be root to enter containers.", {"Ok"});
-        return -1;
-    }
-
     screen.Save();
     switch (fork()) {
     case -1:
@@ -809,7 +804,7 @@ int TPortoTop::RunCmdInContainer(TConsoleScreen &screen, std::string cmd) {
     {
         if (enter)
             exit(execlp(program_invocation_name, program_invocation_name,
-                        "enter", SelectedContainer().c_str(), cmd.c_str(), nullptr));
+                        "shell", SelectedContainer().c_str(), cmd.c_str(), nullptr));
         else
             exit(execlp(cmd.c_str(), cmd.c_str(), nullptr));
         break;
