@@ -3507,10 +3507,10 @@ static void TestLimits(TPortoAPI &api) {
         ExpectEq(shares, rootShares);
         ExpectApiSuccess(api.Stop(name));
 
-        ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "10c"));
+        ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "0.5c"));
         ExpectApiSuccess(api.Start(name));
         ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
-        ExpectEq(shares, rootShares * 10);
+        ExpectEq(shares, rootShares / 2);
         ExpectApiSuccess(api.Stop(name));
 
         TestCoresConvertion(api, name, "cpu_guarantee");
