@@ -488,32 +488,24 @@ public:
 class TIoLimitProperty : public TSizeValue, public TContainerValue {
 public:
     TIoLimitProperty() :
-        TSizeValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TSizeValue(PERSISTENT_VALUE),
         TContainerValue(P_IO_LIMIT,
                         "Filesystem bandwidth limit [bytes/s]",
                         dynamicProperty) {
         if (!MemorySubsystem.SupportIoLimit())
             SetFlag(UNSUPPORTED_FEATURE);
     }
-
-    uint64_t GetDefault() const override {
-        return 0;
-    }
 };
 
 class TIopsLimitProperty : public TSizeValue, public TContainerValue {
 public:
     TIopsLimitProperty() :
-        TSizeValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TSizeValue(PERSISTENT_VALUE),
         TContainerValue(P_IO_OPS_LIMIT,
                         "Filesystem IOPS limit [operations/s]",
                         dynamicProperty) {
         if (!MemorySubsystem.SupportIoLimit())
             SetFlag(UNSUPPORTED_FEATURE);
-    }
-
-    uint64_t GetDefault() const override {
-        return 0;
     }
 };
 
