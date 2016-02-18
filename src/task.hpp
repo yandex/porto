@@ -9,6 +9,7 @@
 #include "util/cred.hpp"
 #include "stream.hpp"
 #include "cgroup.hpp"
+#include "env.hpp"
 
 extern "C" {
 #include <sys/resource.h>
@@ -40,7 +41,7 @@ struct TTaskEnv : public TNonCopyable {
     TPath ParentCwd;
     TPath Root; /* path in ParentNs.Mnt */
     bool RootRdOnly;
-    std::vector<std::string> Environ;
+    TEnv Env;
     bool Isolate = false;
     bool TripleFork;
     bool QuadroFork;
@@ -58,9 +59,6 @@ struct TTaskEnv : public TNonCopyable {
     bool NewMountNs;
     std::vector<TCgroup> Cgroups;
     TCred Cred;
-
-    const char** GetEnvp() const;
-    bool EnvHasKey(const std::string &key);
 
     TUnixSocket Sock, MasterSock;
     TUnixSocket Sock2,  MasterSock2;

@@ -33,6 +33,8 @@ namespace kv {
     class TNode;
 };
 
+struct TEnv;
+
 enum class EContainerState {
     Unknown,
     Stopped,
@@ -246,6 +248,8 @@ public:
     const TStdStream& GetStdin() const { return Stdin; }
     const TStdStream& GetStdout() const { return Stdout; }
     const TStdStream& GetStderr() const { return Stderr; }
+
+    TError GetEnvironment(TEnv &env);
 };
 
 class TScopedAcquire : public TNonCopyable {

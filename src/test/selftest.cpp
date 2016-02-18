@@ -1338,37 +1338,37 @@ static void TestEnvProperty(TPortoAPI &api) {
     Say() << "Check default environment" << std::endl;
 
     static const std::string empty_env =
-        "HOME=/place/porto/a" + EnvSep +
         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" + EnvSep +
-        "PORTO_HOST=" + GetHostName() + EnvSep +
-        "PORTO_NAME=a" + EnvSep +
+        "HOME=/place/porto/a" + EnvSep +
         "USER=porto-alice" + EnvSep +
-        "container=lxc" + EnvSep;
+        "container=lxc" + EnvSep +
+        "PORTO_NAME=a" + EnvSep +
+        "PORTO_HOST=" + GetHostName() + EnvSep;
     ExpectEnv(api, name, "", empty_env);
 
     Say() << "Check user-defined environment" << std::endl;
     static const std::string ab_env =
-        "a=b" + EnvSep +
-        "c=d" + EnvSep +
-        "HOME=/place/porto/a" + EnvSep +
         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" + EnvSep +
-        "PORTO_HOST=" + GetHostName() + EnvSep +
-        "PORTO_NAME=a" + EnvSep +
+        "HOME=/place/porto/a" + EnvSep +
         "USER=porto-alice" + EnvSep +
-        "container=lxc" + EnvSep;
+        "container=lxc" + EnvSep +
+        "PORTO_NAME=a" + EnvSep +
+        "PORTO_HOST=" + GetHostName() + EnvSep +
+        "a=b" + EnvSep +
+        "c=d" + EnvSep;
 
     ExpectEnv(api, name, "a=b;c=d;", ab_env);
     ExpectEnv(api, name, "a=b;;c=d;", ab_env);
 
     static const std::string asb_env =
-        "a=e;b" + EnvSep +
-        "c=d" + EnvSep +
-        "HOME=/place/porto/a" + EnvSep +
         "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" + EnvSep +
-        "PORTO_HOST=" + GetHostName() + EnvSep +
-        "PORTO_NAME=a" + EnvSep +
+        "HOME=/place/porto/a" + EnvSep +
         "USER=porto-alice" + EnvSep +
-        "container=lxc" + EnvSep;
+        "container=lxc" + EnvSep +
+        "PORTO_NAME=a" + EnvSep +
+        "PORTO_HOST=" + GetHostName() + EnvSep +
+        "a=e;b" + EnvSep +
+        "c=d" + EnvSep;
     ExpectEnv(api, name, "a=e\\;b;c=d;", asb_env);
 
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep $N"));

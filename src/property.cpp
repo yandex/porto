@@ -146,10 +146,36 @@ public:
 class TEnvProperty : public TListValue, public TContainerValue {
 public:
     TEnvProperty() :
-        TListValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TListValue(PERSISTENT_VALUE),
         TContainerValue(P_ENV,
                         "Container environment variables: <name>=<value>; ...",
                         staticProperty) {}
+
+    TError GetIndexed(const std::string &index, std::string &value) const override {
+        auto c = GetContainer();
+        TError error;
+        TEnv env;
+
+        error = c->GetEnvironment(env);
+        if (!error && !env.GetEnv(index, value))
+            error = TError(EError::InvalidValue, "Variable " + index + " not defined");
+        return error;
+    }
+
+    TError SetIndexed(const std::string &index, const std::string &value) {
+        auto cfg = Get();
+        TError error;
+        TEnv env;
+
+        error = env.Parse(cfg, true);
+        if (!error) {
+            error = env.Parse({index + "=" + value}, true);
+            env.Format(cfg);
+        }
+        if (!error)
+            error = Set(cfg);
+        return error;
+    }
 };
 
 class TPortoNamespaceProperty : public TStringValue, public TContainerValue {

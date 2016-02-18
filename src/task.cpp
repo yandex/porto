@@ -37,35 +37,6 @@ using std::map;
 
 static int lastCap;
 
-// TTaskEnv
-
-const char** TTaskEnv::GetEnvp() const {
-    auto envp = new const char* [Environ.size() + 1];
-    for (size_t i = 0; i < Environ.size(); i++)
-        envp[i] = strdup(Environ[i].c_str());
-    envp[Environ.size()] = NULL;
-
-    return envp;
-}
-
-bool TTaskEnv::EnvHasKey(const std::string &key) {
-    for (auto str : Environ) {
-        std::string envKey;
-
-        std::vector<std::string> tok;
-        TError error = SplitString(str, '=', tok, 2);
-        if (error)
-            envKey = str;
-        else
-            envKey = tok[0];
-
-        if (key == envKey)
-            return true;
-    }
-
-    return false;
-}
-
 // TTask
 //
 
@@ -158,13 +129,11 @@ TError TTask::ChildDropPriveleges() {
 }
 
 TError TTask::ChildExec() {
-    clearenv();
 
-    for (auto &s : Env->Environ) {
-        char *d = strdup(s.c_str());
-        putenv(d);
-    }
-    auto envp = Env->GetEnvp();
+    /* set environment for wordexp */
+    TError error = Env->Env.Apply();
+
+    auto envp = Env->Env.Envp();
 
     if (Env->Command.empty()) {
         const char *args[] = {
@@ -174,7 +143,7 @@ TError TTask::ChildExec() {
             NULL,
         };
         SetDieOnParentExit(0);
-        fexecve(Env->PortoInitFd.GetFd(), (char *const *)args, (char *const *)envp);
+        fexecve(Env->PortoInitFd.GetFd(), (char *const *)args, envp);
         return TError(EError::InvalidValue, errno, "fexecve(" +
                       std::to_string(Env->PortoInitFd.GetFd()) +  ", portoinit)");
     }
@@ -206,9 +175,9 @@ TError TTask::ChildExec() {
             L() << "environ[" << i << "]=" << envp[i] << std::endl;
     }
     SetDieOnParentExit(0);
-    execvpe(result.we_wordv[0], (char *const *)result.we_wordv, (char *const *)envp);
+    execvpe(result.we_wordv[0], (char *const *)result.we_wordv, envp);
 
-    return TError(EError::InvalidValue, errno, string("execvpe(") + result.we_wordv[0] + ", " + std::to_string(result.we_wordc) + ", " + std::to_string(Env->Environ.size()) + ")");
+    return TError(EError::InvalidValue, errno, string("execvpe(") + result.we_wordv[0] + ", " + std::to_string(result.we_wordc) + ")");
 }
 
 TError TTask::ChildBindDns() {
@@ -588,10 +557,10 @@ TError TTask::ConfigureChild() {
                 pid_.c_str(),
                 NULL,
             };
-            auto envp = Env->GetEnvp();
+            auto envp = Env->Env.Envp();
 
             CloseFds(-1, { fd } );
-            fexecve(fd, (char *const *)argv, (char *const *)envp);
+            fexecve(fd, (char *const *)argv, envp);
             return TError(EError::Unknown, errno, "fexecve()");
         } else {
             Pid = getpid();
@@ -817,10 +786,10 @@ TError TTask::Start() {
                 pid.c_str(),
                 NULL,
             };
-            auto envp = Env->GetEnvp();
+            auto envp = Env->Env.Envp();
 
             CloseFds(-1, { fd } );
-            fexecve(fd, (char *const *)argv, (char *const *)envp);
+            fexecve(fd, (char *const *)argv, envp);
             kill(clonePid, SIGKILL);
             _exit(EXIT_FAILURE);
         }

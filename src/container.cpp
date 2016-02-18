@@ -675,6 +675,31 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
     return TError::Success();
 }
 
+TError TContainer::GetEnvironment(TEnv &env) {
+    env.ClearEnv();
+
+    env.SetEnv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
+    env.SetEnv("HOME", Prop->Get<std::string>(P_CWD));
+    env.SetEnv("USER", Prop->Get<std::string>(P_USER));
+
+    env.SetEnv("container", "lxc");
+
+    /* lock these two */
+    env.SetEnv("PORTO_NAME", GetName(), true, true);
+    env.SetEnv("PORTO_HOST", GetHostName(), true, true);
+
+    /* inherit environment from all parent containers */
+    bool overwrite = true;
+    for (auto ct = this; ct; ct = ct->Parent.get()) {
+        TError error = env.Parse(ct->Prop->Get<TStrList>(P_ENV), overwrite);
+        if (error && overwrite)
+            return error;
+        overwrite = false;
+    }
+
+    return TError::Success();
+}
+
 TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
                                struct TNetCfg *NetCfg) {
     auto vmode = Prop->Get<int>(P_VIRT_MODE);
@@ -710,22 +735,9 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
             return error;
     }
 
-    std::map<std::string, std::string> portoEnv = {
-        { "PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin" },
-        { "container", "lxc" },
-        { "PORTO_NAME", GetName() },
-        { "PORTO_HOST", GetHostName() },
-        { "HOME", Prop->Get<std::string>(P_CWD) },
-        { "USER", user },
-    };
-
-    taskEnv->Environ = Prop->Get<TStrList>(P_ENV);
-    for (auto pair : portoEnv) {
-        if (taskEnv->EnvHasKey(pair.first))
-            continue;
-
-        taskEnv->Environ.push_back(pair.first + "=" + pair.second);
-    }
+    error = GetEnvironment(taskEnv->Env);
+    if (error)
+        return error;
 
     taskEnv->Isolate = Prop->Get<bool>(P_ISOLATE);
     taskEnv->TripleFork = false;
