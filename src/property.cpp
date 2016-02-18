@@ -192,7 +192,7 @@ public:
 class TRootRdOnlyProperty : public TBoolValue, public TContainerValue {
 public:
     TRootRdOnlyProperty() :
-        TBoolValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TBoolValue(PERSISTENT_VALUE),
         TContainerValue(P_ROOT_RDONLY,
                         "Mount root directory in read-only mode",
                         staticProperty) {}
@@ -1066,7 +1066,7 @@ public:
 class TResolvConfProperty : public TListValue, public TContainerValue {
 public:
     TResolvConfProperty() :
-        TListValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TListValue(PERSISTENT_VALUE),
         TContainerValue(P_RESOLV_CONF,
                         "DNS resolver configuration: <resolv.conf option>;...",
                         staticProperty) {}
