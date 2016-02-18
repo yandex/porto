@@ -116,7 +116,7 @@ public:
 class TUserProperty : public TStringValue, public TContainerValue {
 public:
     TUserProperty() :
-        TStringValue(SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TStringValue(SUPERUSER_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_USER,
                         "Start command with given user",
                         staticProperty) {}
@@ -131,7 +131,7 @@ public:
 class TGroupProperty : public TStringValue, public TContainerValue {
 public:
     TGroupProperty() :
-        TStringValue(SUPERUSER_PROPERTY | PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
+        TStringValue(SUPERUSER_PROPERTY | PERSISTENT_VALUE),
         TContainerValue(P_GROUP,
                         "Start command with given group",
                         staticProperty) {}
