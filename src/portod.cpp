@@ -139,39 +139,6 @@ public:
     }
 };
 
-static TError AcceptClient(TContext &context, int sfd,
-                           std::map<int, std::shared_ptr<TClient>> &clients) {
-    struct sockaddr_un peer_addr;
-    socklen_t peer_addr_size;
-    TError error;
-    int cfd;
-
-    peer_addr_size = sizeof(struct sockaddr_un);
-    cfd = accept4(sfd, (struct sockaddr *) &peer_addr,
-                  &peer_addr_size, SOCK_NONBLOCK | SOCK_CLOEXEC);
-    if (cfd < 0) {
-        if (errno == EAGAIN)
-            return TError::Success(); //FIXME
-        return TError(EError::Unknown, errno, "accept4()");
-    }
-
-    auto client = std::make_shared<TClient>(context.EpollLoop, cfd);
-
-    error = client->Identify(*context.Cholder);
-    if (error)
-        return error;
-
-    error = context.EpollLoop->AddSource(client);
-    if (error)
-        return error;
-
-    if (Verbose)
-        L() << "Client " << cfd << " connected : " << *client << std::endl;
-
-    clients[cfd] = client;
-    return TError::Success();
-}
-
 static bool AnotherInstanceRunning(const string &path) {
     int fd;
     if (ConnectToRpcServer(path, fd))
@@ -400,8 +367,13 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                     continue;
                 }
 
-                error = AcceptClient(context, sfd, clients);
-                if (error)
+                auto client = std::make_shared<TClient>(context.EpollLoop);
+                error = client->AcceptConnection(context, sfd);
+                if (!error)
+                    error = context.EpollLoop->AddSource(client);
+                if (!error)
+                    clients[client->Fd] = client;
+                else if (error.GetError() != EError::Permission)
                     L_ERR() << "Cannot accept client: " << error << std::endl;
             } else if (source->Fd == REAP_EVT_FD) {
                 // we handled all events from the master before events
@@ -428,7 +400,7 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                     error = client->ReadRequest(req.Request);
 
                     if (!error) {
-                        error = client->Identify(*context.Cholder, false);
+                        error = client->IdentifyClient(*context.Cholder, false);
                         if (!error)
                             worker.Push(req);
                     }

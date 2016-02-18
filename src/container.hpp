@@ -202,13 +202,6 @@ public:
 
     TError CheckPermission(const TCred &ucred);
 
-    // *self is observer container
-    TError ComposeRelativeName(const TContainer &target,
-                               std::string &relative_name) const;
-    TError ResolveRelativeName(const std::string &relative_name,
-                               std::string &absolute_name,
-                               bool resolve_meta = false) const;
-
     static void ParsePropertyName(std::string &name, std::string &idx);
     size_t GetRunningChildren() { return RunningChildren; }
 
@@ -216,7 +209,6 @@ public:
 
     bool IsLostAndRestored() const;
     void SyncStateWithCgroup(TScopedLock &holder_lock);
-    bool IsNamespaceIsolated();
     void CleanupExpiredChildren();
     TError UpdateTrafficClasses();
 

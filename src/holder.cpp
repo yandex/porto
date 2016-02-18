@@ -214,15 +214,11 @@ TError TContainerHolder::GetLocked(TScopedLock &holder_lock,
                                    std::shared_ptr<TContainer> &c,
                                    TNestedScopedLock &l) {
     std::string absoluteName;
+    TError error;
 
     // resolve name
     if (client) {
-        std::shared_ptr<TContainer> clientContainer;
-        TError error = client->GetContainer(clientContainer);
-        if (error)
-            return error;
-
-        error = clientContainer->ResolveRelativeName(name, absoluteName, !checkPerm);
+        error = client->ResolveRelativeName(name, absoluteName, !checkPerm);
         if (error)
             return error;
     } else {
@@ -230,7 +226,7 @@ TError TContainerHolder::GetLocked(TScopedLock &holder_lock,
     }
 
     // get container
-    TError error = Get(absoluteName, c);
+    error = Get(absoluteName, c);
     if (error)
         return error;
 

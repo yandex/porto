@@ -13,6 +13,7 @@ class TContainer;
 class TContainerHolder;
 class TContainerWaiter;
 class TEpollLoop;
+class TContext;
 
 namespace rpc {
     class TContainerRequest;
@@ -20,9 +21,12 @@ namespace rpc {
 
 class TClient : public TEpollSource {
 public:
-    TClient(std::shared_ptr<TEpollLoop> loop, int fd);
+    TClient(std::shared_ptr<TEpollLoop> loop);
     ~TClient();
 
+    bool ReadOnlyAccess;
+
+    TError AcceptConnection(TContext &context, int listenFd);
     void CloseConnection();
 
     int GetFd() const;
@@ -33,14 +37,21 @@ public:
     void BeginRequest();
     uint64_t GetRequestTimeMs();
 
-    TError Identify(TContainerHolder &holder, bool full = true);
+    TError IdentifyClient(TContainerHolder &holder, bool initial);
+    TError GetClientContainer(std::shared_ptr<TContainer> &container) const;
+
     std::string GetContainerName() const;
-    TError GetContainer(std::shared_ptr<TContainer> &container) const;
+
+    TError ComposeRelativeName(const TContainer &target,
+                               std::string &relative_name) const;
+
+    TError ResolveRelativeName(const std::string &relative_name,
+                               std::string &absolute_name,
+                               bool resolve_meta = false) const;
 
     friend std::ostream& operator<<(std::ostream& stream, TClient& client);
 
     std::shared_ptr<TContainerWaiter> Waiter;
-    bool Readonly();
 
     TError ReadRequest(rpc::TContainerRequest &request);
     bool ReadInterrupted();
@@ -59,12 +70,11 @@ private:
     uint64_t RequestStartMs;
 
     TError LoadGroups();
-    TError IdentifyContainer(TContainerHolder &holder);
-    std::weak_ptr<TContainer> Container;
 
     bool FullLog = true;
 
     uint64_t Length = 0;
     uint64_t Offset = 0;
     std::vector<uint8_t> Buffer;
+    std::weak_ptr<TContainer> ClientContainer;
 };

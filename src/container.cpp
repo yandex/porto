@@ -580,20 +580,6 @@ TError TContainer::PrepareCgroups() {
     return TError::Success();
 }
 
-bool TContainer::IsNamespaceIsolated() {
-    if (IsRoot() || IsPortoRoot())
-        return false;
-
-    if (Prop->Get<std::string>(P_ROOT) != "/" &&
-        Prop->Get<bool>(P_ENABLE_PORTO))
-        return true;
-
-    if (Parent)
-        return Parent->IsNamespaceIsolated();
-
-    return false;
-}
-
 void TContainer::CleanupExpiredChildren() {
     for (auto iter = Children.begin(); iter != Children.end();) {
         auto child = iter->lock();
@@ -772,7 +758,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     if (error)
         return error;
 
-    if (Prop->Get<bool>(P_ENABLE_PORTO) && IsNamespaceIsolated()) {
+    if (!taskEnv->Root.IsRoot() && Prop->Get<bool>(P_ENABLE_PORTO)) {
         TBindMap bm = { PORTO_SOCKET_PATH, PORTO_SOCKET_PATH, false };
 
         taskEnv->BindMap.push_back(bm);
@@ -2168,53 +2154,6 @@ std::string TContainer::GetPortoNamespace() const {
         return "";
 }
 
-TError TContainer::ComposeRelativeName(const TContainer &target,
-                                       std::string &relative_name) const {
-    std::string ns = GetPortoNamespace();
-    if (target.IsRoot()) {
-        relative_name = ROOT_CONTAINER;
-        return TError::Success();
-    } else if (ns == "") {
-        relative_name = target.GetName();
-        return TError::Success();
-    } else {
-        std::string n = target.GetName();
-        if (n.length() <= ns.length() || n.compare(0, ns.length(), ns) != 0) {
-            return TError(EError::ContainerDoesNotExist,
-                          "Can't access container " + n + " from namespace " + ns);
-        }
-
-        relative_name = n.substr(ns.length());
-        return TError::Success();
-    }
-}
-
-TError TContainer::ResolveRelativeName(const std::string &relative_name,
-                                       std::string &absolute_name,
-                                       bool resolve_meta) const {
-
-    /* FIXME get rid of this crap */
-    if (!resolve_meta && (relative_name == DOT_CONTAINER ||
-                          relative_name == PORTO_ROOT_CONTAINER ||
-                          relative_name == ROOT_CONTAINER))
-        return TError(EError::Permission, "System containers are read only");
-
-    std::string ns = GetPortoNamespace();
-    if (relative_name == ROOT_CONTAINER ||
-            relative_name == PORTO_ROOT_CONTAINER)
-        absolute_name = relative_name;
-    else if (relative_name == DOT_CONTAINER) {
-        size_t off = ns.rfind('/');
-        if (off != std::string::npos) {
-            absolute_name = ns.substr(0, off);
-        } else
-            absolute_name = PORTO_ROOT_CONTAINER;
-    } else
-        absolute_name = ns + relative_name;
-
-    return TError::Success();
-}
-
 void TContainer::AddWaiter(std::shared_ptr<TContainerWaiter> waiter) {
     if (GetState() == EContainerState::Running) {
         CleanupWaiters();
@@ -2276,17 +2215,12 @@ TContainerWaiter::TContainerWaiter(std::shared_ptr<TClient> client,
 void TContainerWaiter::Signal(const TContainer *who) {
     std::shared_ptr<TClient> client = Client.lock();
     if (client) {
-        std::shared_ptr<TContainer> container;
-        TError error = client->GetContainer(container);
-        if (!error) {
-            std::string name;
-            TError err = TError::Success();
-            if (who)
-                err = container->ComposeRelativeName(*who, name);
-            Callback(client, err, name);
-            Client.reset();
-        }
-
+        std::string name;
+        TError err;
+        if (who)
+            err = client->ComposeRelativeName(*who, name);
+        Callback(client, err, name);
+        Client.reset();
         client->Waiter = nullptr;
     }
 }

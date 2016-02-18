@@ -2632,6 +2632,7 @@ static void CheckConnectivity(TPortoAPI &api, const std::string &name,
 
 static void TestEnablePortoProperty(TPortoAPI &api) {
     string name = "a";
+    string name2 = "a/b";
     TPath path(TMPDIR + "/" + name);
 
     RemakeDir(api, path);
@@ -2641,12 +2642,19 @@ static void TestEnablePortoProperty(TPortoAPI &api) {
     AsAlice(api);
 
     ExpectApiSuccess(api.Create(name));
+    ExpectApiSuccess(api.Create(name2));
+
     ExpectApiSuccess(api.SetProperty(name, "command", "/portotest connectivity"));
 
     Say() << "Non-isolated" << std::endl;
 
-    ExpectApiFailure(api.SetProperty(name, "enable_porto", "false"), EError::InvalidValue);
+    ExpectApiSuccess(api.SetProperty(name, "enable_porto", "false"));
+    ExpectApiSuccess(api.SetProperty(name2, "enable_porto", "false"));
+    ExpectApiFailure(api.SetProperty(name2, "enable_porto", "true"), EError::InvalidValue);
+
     ExpectApiSuccess(api.SetProperty(name, "enable_porto", "true"));
+    ExpectApiSuccess(api.SetProperty(name2, "enable_porto", "false"));
+    ExpectApiSuccess(api.SetProperty(name2, "enable_porto", "true"));
 
     Say() << "Root-isolated" << std::endl;
 
@@ -2658,7 +2666,7 @@ static void TestEnablePortoProperty(TPortoAPI &api) {
 
     ExpectApiSuccess(api.SetProperty(name, "root", "/"));
     ExpectApiSuccess(api.SetProperty(name, "porto_namespace", "a/"));
-    ExpectApiFailure(api.SetProperty(name, "enable_porto", "false"), EError::InvalidValue);
+    ExpectApiSuccess(api.SetProperty(name, "enable_porto", "false"));
     ExpectApiSuccess(api.SetProperty(name, "enable_porto", "true"));
 
     Say() << "Isolated" << std::endl;
@@ -2687,7 +2695,7 @@ static void TestEnablePortoProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.SetProperty("a", "porto_namespace", "a/"));
     ExpectApiSuccess(api.SetProperty("a", "root", path.ToString()));
 
-    CheckConnectivity(api, "a/b", true, false);
+    CheckConnectivity(api, "a/b", true, true);
 
     ExpectApiSuccess(api.Destroy("a"));
 }

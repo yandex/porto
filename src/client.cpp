@@ -5,6 +5,7 @@
 #include "rpc.hpp"
 #include "client.hpp"
 #include "container.hpp"
+#include "property.hpp"
 #include "statistics.hpp"
 #include "holder.hpp"
 #include "config.hpp"
@@ -18,10 +19,11 @@
 extern "C" {
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 #include <unistd.h>
 };
 
-TClient::TClient(std::shared_ptr<TEpollLoop> loop, int fd) : TEpollSource(loop, fd) {
+TClient::TClient(std::shared_ptr<TEpollLoop> loop) : TEpollSource(loop, -1) {
     ConnectionTime = GetCurrentTimeMs();
     Statistics->Clients++;
 }
@@ -29,6 +31,33 @@ TClient::TClient(std::shared_ptr<TEpollLoop> loop, int fd) : TEpollSource(loop, 
 TClient::~TClient() {
     CloseConnection();
     Statistics->Clients--;
+}
+
+TError TClient::AcceptConnection(TContext &context, int listenFd) {
+    struct sockaddr_un peer_addr;
+    socklen_t peer_addr_size;
+    TError error;
+
+    peer_addr_size = sizeof(struct sockaddr_un);
+    Fd = accept4(listenFd, (struct sockaddr *) &peer_addr,
+                  &peer_addr_size, SOCK_NONBLOCK | SOCK_CLOEXEC);
+    if (Fd < 0) {
+        if (errno == EAGAIN)
+            return TError::Success(); //FIXME
+        return TError(EError::Unknown, errno, "accept4()");
+    }
+
+    error = IdentifyClient(*context.Cholder, true);
+    if (error) {
+        close(Fd);
+        Fd = -1;
+        return error;
+    }
+
+    if (Verbose)
+        L() << "Client " << Fd << " connected : " << *this << std::endl;
+
+    return TError::Success();
 }
 
 void TClient::CloseConnection() {
@@ -76,47 +105,48 @@ uint64_t TClient::GetRequestTimeMs() {
     return GetCurrentTimeMs() - RequestStartMs;
 }
 
-TError TClient::Identify(TContainerHolder &holder, bool full) {
+TError TClient::IdentifyClient(TContainerHolder &holder, bool initial) {
     struct ucred cr;
     socklen_t len = sizeof(cr);
+    TError error;
 
-    if (getsockopt(Fd, SOL_SOCKET, SO_PEERCRED, &cr, &len) == 0) {
-        if (full) {
-            TFile f("/proc/" + std::to_string(cr.pid) + "/comm");
-            std::string comm;
+    if (getsockopt(Fd, SOL_SOCKET, SO_PEERCRED, &cr, &len))
+        return TError(EError::Unknown, errno, "Cannot identify client: getsockopt() failed");
 
-            if (f.AsString(comm))
-                comm = "unknown process";
-
-            comm.erase(std::remove(comm.begin(), comm.end(), '\n'), comm.end());
-
-            Pid = cr.pid;
-            Comm = comm;
-
-            TError err = LoadGroups();
-            if (err) {
-                L_WRN() << "Can't load supplementary group list" << cr.pid
-                    << " : " << err << std::endl;
-            }
-
-            err = IdentifyContainer(holder);
-            if (err) {
-                L_WRN() << "Can't identify container of pid " << cr.pid
-                        << " : " << err << std::endl;
-                return err;
-            }
-        } else {
-            if (Container.expired())
-                return TError(EError::Unknown, "Can't identify client (container is dead)");
-        }
-
-        Cred.Uid = cr.uid;
-        Cred.Gid = cr.gid;
-
+    if (!initial && Pid == cr.pid && Cred.Uid == cr.uid && Cred.Gid == cr.gid &&
+            !ClientContainer.expired())
         return TError::Success();
-    } else {
-        return TError(EError::Unknown, "Can't identify client (getsockopt() failed)");
+
+    Cred.Uid = cr.uid;
+    Cred.Gid = cr.gid;
+    Pid = cr.pid;
+
+    error = TPath("/proc/" + std::to_string(Pid) + "/comm").ReadAll(Comm, 64);
+    if (error)
+        Comm = "<unknown process>";
+    else
+        Comm.resize(Comm.length() - 1); /* cut \n at the end */
+
+    error = LoadGroups();
+    if (error)
+        L_WRN() << "Cannot load supplementary group list" << Pid
+                << " : " << error << std::endl;
+
+    ReadOnlyAccess = !Cred.IsPortoUser();
+
+    std::shared_ptr<TContainer> container;
+    error = holder.FindTaskContainer(Pid, container);
+    if (error) {
+        L_WRN() << "Cannot identify container of pid " << Pid
+                << " : " << error << std::endl;
+        return error;
     }
+
+    if (!container->Prop->Get<bool>(P_ENABLE_PORTO))
+        return TError(EError::Permission, "Porto disabled in container " + container->GetName());
+
+    ClientContainer = container;
+    return TError::Success();
 }
 
 TError TClient::LoadGroups() {
@@ -151,39 +181,74 @@ TError TClient::LoadGroups() {
     return TError::Success();
 }
 
-TError TClient::IdentifyContainer(TContainerHolder &holder) {
-    std::shared_ptr<TContainer> c;
-    TError err = holder.FindTaskContainer(Pid, c);
-    if (err)
-        return err;
-    Container = c;
-    return TError::Success();
-}
-
 std::string TClient::GetContainerName() const {
-    auto c = Container.lock();
+    auto c = ClientContainer.lock();
     if (c)
         return c->GetName();
     else
         return "<deleted container>";
 }
 
-TError TClient::GetContainer(std::shared_ptr<TContainer> &container) const {
-    container = Container.lock();
-    if (!container)
-        return TError(EError::ContainerDoesNotExist, "Can't find client container");
+TError TClient::ComposeRelativeName(const TContainer &target,
+                                    std::string &relative_name) const {
+    std::string name = target.GetName();
+    auto base = ClientContainer.lock();
+    if (!base)
+        return TError(EError::ContainerDoesNotExist, "Cannot find client container");
+    std::string ns = base->GetPortoNamespace();
+
+    if (target.IsRoot()) {
+        relative_name = ROOT_CONTAINER;
+        return TError::Success();
+    }
+
+    if (ns == "") {
+        relative_name = name;
+        return TError::Success();
+    }
+
+    if (name.length() <= ns.length() || name.compare(0, ns.length(), ns) != 0)
+        return TError(EError::ContainerDoesNotExist,
+                "Cannot access container " + name + " from namespace " + ns);
+
+    relative_name = name.substr(ns.length());
     return TError::Success();
 }
 
-bool TClient::Readonly() {
-    auto c = Container.lock();
-    if (!c)
-        return true;
+TError TClient::ResolveRelativeName(const std::string &relative_name,
+                                    std::string &absolute_name,
+                                    bool resolve_meta) const {
+    auto base = ClientContainer.lock();
+    if (!base)
+        return TError(EError::ContainerDoesNotExist, "Cannot find client container");
+    std::string ns = base->GetPortoNamespace();
 
-    if (c->IsNamespaceIsolated())
-        return false;
+    /* FIXME get rid of this crap */
+    if (!resolve_meta && (relative_name == DOT_CONTAINER ||
+                          relative_name == PORTO_ROOT_CONTAINER ||
+                          relative_name == ROOT_CONTAINER))
+        return TError(EError::Permission, "System containers are read only");
 
-    return !Cred.IsPortoUser();
+    if (relative_name == ROOT_CONTAINER ||
+            relative_name == PORTO_ROOT_CONTAINER)
+        absolute_name = relative_name;
+    else if (relative_name == DOT_CONTAINER) {
+        size_t off = ns.rfind('/');
+        if (off != std::string::npos)
+            absolute_name = ns.substr(0, off);
+        else
+            absolute_name = PORTO_ROOT_CONTAINER;
+    } else
+        absolute_name = ns + relative_name;
+
+    return TError::Success();
+}
+
+TError TClient::GetClientContainer(std::shared_ptr<TContainer> &container) const {
+    container = ClientContainer.lock();
+    if (!container)
+        return TError(EError::ContainerDoesNotExist, "Cannot find client container");
+    return TError::Success();
 }
 
 TError TClient::ReadRequest(rpc::TContainerRequest &request) {

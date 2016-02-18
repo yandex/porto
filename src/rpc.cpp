@@ -270,10 +270,9 @@ static void SendReply(std::shared_ptr<TClient> client,
     }
 }
 
-static TError CheckRequestPermissions(std::shared_ptr<TClient> client) {
-    if (client->Readonly())
+static TError CheckPortoWriteAccess(std::shared_ptr<TClient> client) {
+    if (client->ReadOnlyAccess)
         return TError(EError::Permission, "Client is not a member of porto group");
-
     return TError::Success();
 }
 
@@ -283,17 +282,12 @@ static noinline TError CreateContainer(TContext &context,
                                 std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
-    TError err = CheckRequestPermissions(client);
-    if (err)
-        return err;
-
-    std::shared_ptr<TContainer> clientContainer;
-    err = client->GetContainer(clientContainer);
+    TError err = CheckPortoWriteAccess(client);
     if (err)
         return err;
 
     std::string name;
-    err = clientContainer->ResolveRelativeName(reqName, name);
+    err = client->ResolveRelativeName(reqName, name);
     if (err)
         return err;
 
@@ -325,7 +319,7 @@ noinline TError DestroyContainer(TContext &context,
                                  std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
-    TError err = CheckRequestPermissions(client);
+    TError err = CheckPortoWriteAccess(client);
     if (err)
         return err;
 
@@ -367,18 +361,13 @@ noinline TError StartContainer(TContext &context,
                                std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
-    TError err = CheckRequestPermissions(client);
-    if (err)
-        return err;
-
-    std::shared_ptr<TContainer> clientContainer;
-    err = client->GetContainer(clientContainer);
+    TError err = CheckPortoWriteAccess(client);
     if (err)
         return err;
 
     /* Check if target container exists */
     std::string name;
-    err = clientContainer->ResolveRelativeName(req.name(), name);
+    err = client->ResolveRelativeName(req.name(), name);
     if (err)
         return err;
 
@@ -454,7 +443,7 @@ noinline TError StopContainer(TContext &context,
                               std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
-    TError err = CheckRequestPermissions(client);
+    TError err = CheckPortoWriteAccess(client);
     if (err)
         return err;
 
@@ -477,7 +466,7 @@ noinline TError PauseContainer(TContext &context,
                                std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
-    TError err = CheckRequestPermissions(client);
+    TError err = CheckPortoWriteAccess(client);
     if (err)
         return err;
 
@@ -500,7 +489,7 @@ noinline TError ResumeContainer(TContext &context,
                                 std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
-    TError err = CheckRequestPermissions(client);
+    TError err = CheckPortoWriteAccess(client);
     if (err)
         return err;
 
@@ -523,14 +512,8 @@ noinline TError ListContainers(TContext &context,
     auto holder_lock = context.Cholder->ScopedLock();
 
     for (auto &c : context.Cholder->List()) {
-        std::shared_ptr<TContainer> clientContainer;
-        TError err = client->GetContainer(clientContainer);
-        if (err)
-            return err;
-
         std::string name;
-        err = clientContainer->ComposeRelativeName(*c, name);
-        if (!err)
+        if (!client->ComposeRelativeName(*c, name))
             rsp.mutable_list()->add_name(name);
     }
 
@@ -543,11 +526,6 @@ noinline TError GetContainerProperty(TContext &context,
                                      std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
-    std::shared_ptr<TContainer> clientContainer;
-    TError err = client->GetContainer(clientContainer);
-    if (err)
-        return err;
-
     std::shared_ptr<TContainer> container;
     TNestedScopedLock lock;
     TError error = context.Cholder->GetLocked(holder_lock, client, req.name(), false, container, lock);
@@ -558,11 +536,11 @@ noinline TError GetContainerProperty(TContext &context,
         return TError(EError::ContainerDoesNotExist, "container doesn't exist");
 
     string value;
-    err = container->GetProperty(req.property(), value);
-    if (!err)
+    error = container->GetProperty(req.property(), value);
+    if (!error)
         rsp.mutable_getproperty()->set_value(value);
 
-    return err;
+    return error;
 }
 
 noinline TError SetContainerProperty(TContext &context,
@@ -571,7 +549,7 @@ noinline TError SetContainerProperty(TContext &context,
                                      std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
-    TError err = CheckRequestPermissions(client);
+    TError err = CheckPortoWriteAccess(client);
     if (err)
         return err;
 
@@ -594,11 +572,6 @@ noinline TError GetContainerData(TContext &context,
                                  std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
-    std::shared_ptr<TContainer> clientContainer;
-    TError err = client->GetContainer(clientContainer);
-    if (err)
-        return err;
-
     std::shared_ptr<TContainer> container;
     TNestedScopedLock lock;
     TError error = context.Cholder->GetLocked(holder_lock, client, req.name(), false, container, lock);
@@ -609,11 +582,11 @@ noinline TError GetContainerData(TContext &context,
         return TError(EError::ContainerDoesNotExist, "container doesn't exist");
 
     string value;
-    err = container->GetData(req.data(), value, client);
-    if (!err)
+    error = container->GetData(req.data(), value, client);
+    if (!error)
         rsp.mutable_getdata()->set_value(value);
 
-    return err;
+    return error;
 }
 
 noinline TError GetContainerCombined(TContext &context,
@@ -628,11 +601,6 @@ noinline TError GetContainerCombined(TContext &context,
     if (!req.name_size())
         return TError(EError::InvalidValue, "Containers are not specified");
 
-    std::shared_ptr<TContainer> clientContainer;
-    TError err = client->GetContainer(clientContainer);
-    if (err)
-        return err;
-
     auto get = rsp.mutable_get();
 
     for (int i = 0; i < req.name_size(); i++) {
@@ -645,7 +613,7 @@ noinline TError GetContainerCombined(TContext &context,
         std::shared_ptr<TContainer> container;
 
         TNestedScopedLock lock;
-        TError containerError = clientContainer->ResolveRelativeName(relname, name, true);
+        TError containerError = client->ResolveRelativeName(relname, name, true);
         if (!containerError) {
             containerError = context.Cholder->Get(name, container);
             if (!containerError && container) {
@@ -751,7 +719,7 @@ noinline TError Kill(TContext &context,
                      std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
 
-    TError err = CheckRequestPermissions(client);
+    TError err = CheckPortoWriteAccess(client);
     if (err)
         return err;
 
@@ -787,11 +755,6 @@ noinline TError Wait(TContext &context,
     if (!req.name_size())
         return TError(EError::InvalidValue, "Containers are not specified");
 
-    std::shared_ptr<TContainer> clientContainer;
-    TError err = client->GetContainer(clientContainer);
-    if (err)
-        return err;
-
     auto fn = [] (std::shared_ptr<TClient> client,
                   TError error, std::string name) {
         rpc::TContainerResponse response;
@@ -805,7 +768,7 @@ noinline TError Wait(TContext &context,
     for (int i = 0; i < req.name_size(); i++) {
         std::string name = req.name(i);
         std::string abs_name;
-        err = clientContainer->ResolveRelativeName(name, abs_name);
+        TError err = client->ResolveRelativeName(name, abs_name);
         if (err) {
             rsp.mutable_wait()->set_name(name);
             return err;
@@ -838,33 +801,26 @@ noinline TError ConvertPath(TContext &context,
                             std::shared_ptr<TClient> client) {
     auto lock = context.Cholder->ScopedLock();
     std::string source, destination;
-    std::shared_ptr<TContainer> clientContainer, sourceContainer, destContainer;
+    std::shared_ptr<TContainer> sourceContainer, destContainer;
+    TError err;
 
-    TError err = client->GetContainer(clientContainer);
+    if (req.has_source() && req.source() != "") {
+        err = client->ResolveRelativeName(req.source(), source, true);
+        if (!err)
+            err = context.Cholder->Get(source, sourceContainer);
+    } else
+        err = client->GetClientContainer(sourceContainer);
     if (err)
         return err;
 
-    if (req.has_source() && req.source() != "") {
-        err = clientContainer->ResolveRelativeName(req.source(), source, true);
-        if (err)
-            return err;
-
-        err = context.Cholder->Get(source, sourceContainer);
-        if (err)
-            return err;
-    } else
-        sourceContainer = clientContainer;
-
     if (req.has_destination() && req.destination() != "") {
-        err = clientContainer->ResolveRelativeName(req.destination(), destination, true);
-        if (err)
-            return err;
-
-        err = context.Cholder->Get(destination, destContainer);
-        if (err)
-            return err;
+        err = client->ResolveRelativeName(req.destination(), destination, true);
+        if (!err)
+            err = context.Cholder->Get(destination, destContainer);
     } else
-        destContainer = clientContainer;
+        err = client->GetClientContainer(destContainer);
+    if (err)
+        return err;
 
     if (sourceContainer == destContainer) {
         rsp.mutable_convertpath()->set_path(req.path());
@@ -950,12 +906,12 @@ noinline TError CreateVolume(TContext &context,
                              const rpc::TVolumeCreateRequest &req,
                              rpc::TContainerResponse &rsp,
                              std::shared_ptr<TClient> client) {
-    TError error = CheckRequestPermissions(client);
+    TError error = CheckPortoWriteAccess(client);
     if (error)
         return error;
 
     std::shared_ptr<TContainer> clientContainer;
-    error = client->GetContainer(clientContainer);
+    error = client->GetClientContainer(clientContainer);
     if (error)
         return error;
 
@@ -1041,12 +997,12 @@ noinline TError LinkVolume(TContext &context,
                            const rpc::TVolumeLinkRequest &req,
                            rpc::TContainerResponse &rsp,
                            std::shared_ptr<TClient> client) {
-    TError error = CheckRequestPermissions(client);
+    TError error = CheckPortoWriteAccess(client);
     if (error)
         return error;
 
     std::shared_ptr<TContainer> clientContainer;
-    error = client->GetContainer(clientContainer);
+    error = client->GetClientContainer(clientContainer);
     if (error)
         return error;
 
@@ -1054,7 +1010,7 @@ noinline TError LinkVolume(TContext &context,
     std::shared_ptr<TContainer> container;
     if (req.has_container()) {
         std::string name;
-        TError err = clientContainer->ResolveRelativeName(req.container(), name, true);
+        TError err = client->ResolveRelativeName(req.container(), name, true);
         if (err)
             return err;
 
@@ -1098,12 +1054,12 @@ noinline TError UnlinkVolume(TContext &context,
                              const rpc::TVolumeUnlinkRequest &req,
                              rpc::TContainerResponse &rsp,
                              std::shared_ptr<TClient> client) {
-    TError error = CheckRequestPermissions(client);
+    TError error = CheckPortoWriteAccess(client);
     if (error)
         return error;
 
     std::shared_ptr<TContainer> clientContainer;
-    error = client->GetContainer(clientContainer);
+    error = client->GetClientContainer(clientContainer);
     if (error)
         return error;
 
@@ -1113,7 +1069,7 @@ noinline TError UnlinkVolume(TContext &context,
     std::shared_ptr<TContainer> container;
     if (req.has_container()) {
         std::string name;
-        TError err = clientContainer->ResolveRelativeName(req.container(), name, true);
+        TError err = client->ResolveRelativeName(req.container(), name, true);
         if (err)
             return err;
 
@@ -1174,7 +1130,7 @@ noinline TError ListVolumes(TContext &context,
                             rpc::TContainerResponse &rsp,
                             std::shared_ptr<TClient> client) {
     std::shared_ptr<TContainer> clientContainer;
-    TError error = client->GetContainer(clientContainer);
+    TError error = client->GetClientContainer(clientContainer);
     if (error)
         return error;
 
@@ -1231,12 +1187,12 @@ static bool LayerInUse(TContext &context, TPath layer) {
 noinline TError ImportLayer(TContext &context,
                             const rpc::TLayerImportRequest &req,
                             std::shared_ptr<TClient> client) {
-    TError error = CheckRequestPermissions(client);
+    TError error = CheckPortoWriteAccess(client);
     if (error)
         return error;
 
     std::shared_ptr<TContainer> clientContainer;
-    error = client->GetContainer(clientContainer);
+    error = client->GetClientContainer(clientContainer);
     if (error)
         return error;
 
@@ -1316,12 +1272,12 @@ err_tmp:
 noinline TError ExportLayer(TContext &context,
                             const rpc::TLayerExportRequest &req,
                             std::shared_ptr<TClient> client) {
-    TError error = CheckRequestPermissions(client);
+    TError error = CheckPortoWriteAccess(client);
     if (error)
         return error;
 
     std::shared_ptr<TContainer> clientContainer;
-    error = client->GetContainer(clientContainer);
+    error = client->GetClientContainer(clientContainer);
     if (error)
         return error;
 
@@ -1374,7 +1330,7 @@ noinline TError ExportLayer(TContext &context,
 noinline TError RemoveLayer(TContext &context,
                             const rpc::TLayerRemoveRequest &req,
                             std::shared_ptr<TClient> client) {
-    TError error = CheckRequestPermissions(client);
+    TError error = CheckPortoWriteAccess(client);
     if (error)
         return error;
 
@@ -1433,7 +1389,7 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
     if (log) {
         std::string ns = "";
         std::shared_ptr<TContainer> clientContainer;
-        TError error = client->GetContainer(clientContainer);
+        TError error = client->GetClientContainer(clientContainer);
         if (!error)
             ns = clientContainer->GetPortoNamespace();
 
