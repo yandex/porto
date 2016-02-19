@@ -87,7 +87,6 @@ public:
                        const std::string &property) const;
 
     bool HasFlags(const std::string &property, int flags) const;
-    bool HasState(const std::string &property, EContainerState state) const;
 
     TError PrepareTaskEnv(const std::string &property, TTaskEnv &taskEnv);
 

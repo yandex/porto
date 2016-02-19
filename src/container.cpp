@@ -1438,10 +1438,13 @@ TError TContainer::GetData(const string &origName, string &value,
     if (data->HasFlag(UNSUPPORTED_FEATURE))
         return TError(EError::NotSupported, name + " is not supported");
 
-    auto cv = ToContainerValue(data);
-    auto validState = cv->GetState();
-    if (validState.find(GetState()) == validState.end())
-        return TError(EError::InvalidState, "invalid container state");
+    auto state = GetState();
+
+    if (state == EContainerState::Stopped && data->HasFlag(RUNTIME_VALUE))
+        return TError(EError::InvalidState, "Not available in stopped state");
+
+    if (state != EContainerState::Dead && data->HasFlag(POSTMORTEM_VALUE))
+        return TError(EError::InvalidState, "Available only in dead state");
 
     if (name == D_ROOT_PID && Task && client) {
         value = std::to_string(Task->GetPidFor(client->GetPid()));
@@ -1531,20 +1534,6 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
     return TError::Success();
 }
 
-bool TContainer::ShouldApplyProperty(const std::string &property) {
-    if (!Prop->HasState(property, EContainerState::Running))
-       return false;
-
-    auto state = GetState();
-    if (state == EContainerState::Dead || state == EContainerState::Stopped)
-        return false;
-
-    if (property == P_PRIVATE)
-        return false;
-
-    return true;
-}
-
 TError TContainer::SetProperty(const string &origProperty,
                                const string &origValue,
                                std::shared_ptr<TClient> client) {
@@ -1568,6 +1557,12 @@ TError TContainer::SetProperty(const string &origProperty,
     if (prop->HasFlag(UNSUPPORTED_FEATURE))
         return TError(EError::NotSupported, property + " is not supported");
 
+    if (State == EContainerState::Dead)
+        return TError(EError::InvalidState, "Cannot change in dead state");
+
+    if (State != EContainerState::Stopped && !prop->HasFlag(DYNAMIC_VALUE))
+        return TError(EError::InvalidState, "Cannot change in runtime");
+
     bool superuser = client && client->GetCred().IsRootUser();
 
     if (prop->HasFlag(SUPERUSER_PROPERTY) && !superuser) {
@@ -1583,9 +1578,6 @@ TError TContainer::SetProperty(const string &origProperty,
             !superuser && !OwnerCred.IsRestrictedRootUser())
         return TError(EError::Permission, "Only restricted root can change this property");
 
-    if (!Prop->HasState(property, GetState()))
-        return TError(EError::InvalidState, "Can't set dynamic property " + property + " in state " + ContainerStateName(GetState()));
-
     if (idx.length())
         error = prop->SetIndexed(idx, value);
     else
@@ -1594,7 +1586,7 @@ TError TContainer::SetProperty(const string &origProperty,
     if (error)
         return error;
 
-    if (ShouldApplyProperty(property)) {
+    if (State != EContainerState::Stopped && property != P_PRIVATE) {
         error = ApplyDynamicProperties();
         if (error)
             return error;

@@ -250,7 +250,6 @@ static void ShouldHaveValidRunningData(TPortoAPI &api, const string &name) {
     ExpectApiSuccess(api.GetData(name, "state", v));
     ExpectEq(v, string("running"));
     ExpectApiFailure(api.GetData(name, "exit_status", v), EError::InvalidState);
-    ExpectApiFailure(api.GetData(name, "start_errno", v), EError::InvalidState);
 
     ExpectApiSuccess(api.GetData(name, "root_pid", v));
     Expect(v != "" && v != "-1" && v != "0");
@@ -305,8 +304,6 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     ExpectApiSuccess(api.GetData(name, "state", v));
     ExpectEq(v, string("stopped"));
     ExpectApiFailure(api.GetData(name, "exit_status", v), EError::InvalidState);
-    ExpectApiSuccess(api.GetData(name, "start_errno", v));
-    ExpectEq(v, string("-1"));
     ExpectApiFailure(api.GetData(name, "root_pid", v), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "stdout", v), EError::InvalidState);
     ExpectApiFailure(api.GetData(name, "stderr", v), EError::InvalidState);
@@ -330,7 +327,7 @@ static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
     }
 
     ExpectApiFailure(api.GetData(name, "oom_killed", v), EError::InvalidState);
-    ExpectApiFailure(api.GetData(name, "respawn_count", v), EError::InvalidState);
+    ExpectApiSuccess(api.GetData(name, "respawn_count", v));
     ExpectApiSuccess(api.GetData(name, "parent", v));
     ExpectEq(v, string("/porto"));
     if (KernelSupports(KernelFeature::FSIO) ||
@@ -816,7 +813,6 @@ static void TestExitStatus(TPortoAPI &api) {
     ExpectEq(ret, string("256"));
     ExpectApiSuccess(api.GetData(name, "oom_killed", ret));
     ExpectEq(ret, string("false"));
-    ExpectApiFailure(api.GetData(name, "start_errno", ret), EError::InvalidState);
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check exit status of 'true'" << std::endl;
@@ -827,7 +823,6 @@ static void TestExitStatus(TPortoAPI &api) {
     ExpectEq(ret, string("0"));
     ExpectApiSuccess(api.GetData(name, "oom_killed", ret));
     ExpectEq(ret, string("false"));
-    ExpectApiFailure(api.GetData(name, "start_errno", ret), EError::InvalidState);
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check exit status of invalid command" << std::endl;
@@ -863,7 +858,6 @@ static void TestExitStatus(TPortoAPI &api) {
     ExpectEq(ret, string("9"));
     ExpectApiSuccess(api.GetData(name, "oom_killed", ret));
     ExpectEq(ret, string("false"));
-    ExpectApiFailure(api.GetData(name, "start_errno", ret), EError::InvalidState);
     ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check oom_killed property" << std::endl;
@@ -3135,12 +3129,11 @@ static void TestRoot(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData(root, "state", v));
     ExpectEq(v, string("meta"));
     ExpectApiFailure(api.GetData(root, "exit_status", v), EError::InvalidState);
-    ExpectApiFailure(api.GetData(root, "start_errno", v), EError::InvalidState);
     ExpectApiSuccess(api.GetData(root, "root_pid", v));
-    ExpectApiFailure(api.GetData(root, "stdout", v), EError::InvalidState);
+    ExpectApiFailure(api.GetData(root, "stdout", v), EError::InvalidData);
     ExpectApiSuccess(api.GetData(root, "parent", v));
     ExpectEq(v, "");
-    ExpectApiFailure(api.GetData(root, "stderr", v), EError::InvalidState);
+    ExpectApiFailure(api.GetData(root, "stderr", v), EError::InvalidData);
     ExpectApiSuccess(api.GetData(root, "time", v));
 
     Say() << "Check that stop on root stops all children" << std::endl;

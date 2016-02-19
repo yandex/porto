@@ -2,7 +2,6 @@
 
 #include <string>
 #include <vector>
-#include <set>
 #include <map>
 
 #include "util/error.hpp"
@@ -10,7 +9,6 @@
 typedef std::map<std::string, uint64_t> TUintMap;
 
 std::string CommaSeparatedList(const std::vector<std::string> &list, const std::string &sep = ",");
-std::string CommaSeparatedList(const std::set<std::string> &list);
 
 TError StringsToIntegers(const std::vector<std::string> &strings,
                          std::vector<int> &integers);

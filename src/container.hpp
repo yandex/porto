@@ -91,7 +91,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 
     const std::string StripParentName(const std::string &name) const;
     void ScheduleRespawn();
-    bool ShouldApplyProperty(const std::string &property);
     TError Respawn(TScopedLock &holder_lock);
     void StopChildren(TScopedLock &holder_lock);
     TError PrepareResources(std::shared_ptr<TClient> client);

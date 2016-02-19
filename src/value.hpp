@@ -3,7 +3,6 @@
 #include <string>
 #include <map>
 #include <memory>
-#include <set>
 
 #include "common.hpp"
 #include "kvalue.hpp"
@@ -19,6 +18,12 @@ const unsigned int RESTROOT_PROPERTY = (1 << 3);
 // start with virt_mode==os
 const unsigned int OS_MODE_PROPERTY = (1 << 4);
 
+// Data only in dead state
+constexpr unsigned POSTMORTEM_VALUE = (1 << 22);
+// No data in stopped state
+constexpr unsigned RUNTIME_VALUE    = (1 << 23);
+// Could be changed in running state
+constexpr unsigned DYNAMIC_VALUE    = (1 << 24);
 // Lack of support in kernel
 const unsigned int UNSUPPORTED_FEATURE = (1 << 25);
 // Value has not saved
