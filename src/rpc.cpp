@@ -981,7 +981,11 @@ noinline TError CreateVolume(TContext &context,
         context.Vholder->Remove(volume);
         return error;
     }
-    clientContainer->LinkVolume(context.Vholder, volume);
+
+    //FIXME kill it
+    if (!clientContainer->VolumeHolder)
+        clientContainer->VolumeHolder = context.Vholder;
+    clientContainer->Volumes.emplace_back(volume);
     cholder_lock.unlock();
 
     volume->SetReady(true);
@@ -1044,9 +1048,13 @@ noinline TError LinkVolume(TContext &context,
         return error;
 
     vholder_lock.lock();
-    if (!container->LinkVolume(context.Vholder, volume))
+    auto link = std::find(container->Volumes.begin(), container->Volumes.end(), volume);
+    if (link != container->Volumes.end())
         return TError(EError::VolumeAlreadyLinked, "Already linked");
 
+    if (!container->VolumeHolder)
+        container->VolumeHolder = context.Vholder;
+    container->Volumes.emplace_back(volume);
     return volume->LinkContainer(container->GetName());
 }
 
@@ -1094,9 +1102,11 @@ noinline TError UnlinkVolume(TContext &context,
     if (error)
         return error;
 
-    if (!container->UnlinkVolume(volume))
+    auto link = std::find(container->Volumes.begin(), container->Volumes.end(), volume);
+    if (link == container->Volumes.end())
         return TError(EError::VolumeNotLinked, "Container not linked to the volume");
 
+    container->Volumes.erase(link);
     if (!volume->UnlinkContainer(container->GetName()))
         return TError::Success(); /* Still linked to somebody */
 

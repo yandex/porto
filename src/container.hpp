@@ -3,7 +3,6 @@
 #include <string>
 #include <vector>
 #include <memory>
-#include <set>
 
 #include "util/unix.hpp"
 #include "util/locks.hpp"
@@ -221,21 +220,9 @@ public:
     bool IsValid();
 
     std::shared_ptr<TVolumeHolder> VolumeHolder;
+
     /* protected with TVolumeHolder->Lock */
-    std::set<std::shared_ptr<TVolume>> Volumes;
-
-    bool LinkVolume(std::shared_ptr<TVolumeHolder> holder,
-                    std::shared_ptr<TVolume> volume) {
-        if (!VolumeHolder)
-            VolumeHolder = holder;
-        else
-            PORTO_ASSERT(VolumeHolder == holder);
-        return Volumes.insert(volume).second;
-    }
-
-    bool UnlinkVolume(std::shared_ptr<TVolume> volume) {
-        return Volumes.erase(volume);
-    }
+    std::vector<std::shared_ptr<TVolume>> Volumes;
 
     const TStdStream& GetStdin() const { return Stdin; }
     const TStdStream& GetStdout() const { return Stdout; }
