@@ -146,15 +146,15 @@ TError TContainer::RotateStdFile(TStdStream &stream, const std::string &type) {
 }
 
 void TContainer::CreateStdStreams() {
-    Stdin = TStdStream(0, Prop->Get<std::string>(P_STDIN_TYPE),
+    Stdin = TStdStream(STDIN_FILENO,
                        ActualStdPath(P_STDIN_PATH, false),
                        ActualStdPath(P_STDIN_PATH, true),
                        Prop->IsDefault(P_STDIN_PATH));
-    Stdout = TStdStream(1, Prop->Get<std::string>(P_STDOUT_TYPE),
+    Stdout = TStdStream(STDOUT_FILENO,
                         ActualStdPath(P_STDOUT_PATH, false),
                         ActualStdPath(P_STDOUT_PATH, true),
                         Prop->IsDefault(P_STDOUT_PATH));
-    Stderr = TStdStream(2, Prop->Get<std::string>(P_STDERR_TYPE),
+    Stderr = TStdStream(STDERR_FILENO,
                         ActualStdPath(P_STDERR_PATH, false),
                         ActualStdPath(P_STDERR_PATH, true),
                         Prop->IsDefault(P_STDERR_PATH));
@@ -2013,9 +2013,6 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
 
     RotateStdFile(Stdout, D_STDOUT_OFFSET);
     RotateStdFile(Stderr, D_STDERR_OFFSET);
-    Stdin.Close();
-    Stdout.Close();
-    Stderr.Close();
 
     if (MayRespawn())
         ScheduleRespawn();

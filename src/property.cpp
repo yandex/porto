@@ -219,40 +219,6 @@ public:
     }
 };
 
-class TStdTypeProperty : public TStringValue {
-public:
-    TStdTypeProperty() : TStringValue(PERSISTENT_VALUE | HIDDEN_VALUE) {}
-
-    std::string GetDefault() const override {
-        return STD_TYPE_FILE;
-    }
-
-    TError CheckValue(const std::string &value) override {
-        if (value == STD_TYPE_FILE || value == STD_TYPE_FIFO || value == STD_TYPE_PTY)
-            return TError::Success();
-        else
-            return TError(EError::InvalidValue, "Invalid std type value");
-    }
-};
-
-class TStdInTypeProperty : public TStdTypeProperty, public TContainerValue {
-public:
-    TStdInTypeProperty() : TContainerValue(P_STDIN_TYPE,
-            "Container standard input type [file, pipe, pty]") { }
-};
-
-class TStdOutTypeProperty : public TStdTypeProperty, public TContainerValue {
-public:
-    TStdOutTypeProperty() : TContainerValue(P_STDOUT_TYPE,
-            "Container standard output type [file, pipe, pty]") { }
-};
-
-class TStdErrTypeProperty : public TStdTypeProperty, public TContainerValue {
-public:
-    TStdErrTypeProperty() : TContainerValue(P_STDERR_TYPE,
-            "Container standard error output type [file, pipe, pty]") { }
-};
-
 class TStdoutPathProperty : public TStringValue, public TContainerValue {
 public:
     TStdoutPathProperty() :
@@ -1093,9 +1059,6 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TRootProperty,
         new TRootRdOnlyProperty,
         new TCwdProperty,
-        new TStdInTypeProperty,
-        new TStdOutTypeProperty,
-        new TStdErrTypeProperty,
         new TStdinPathProperty,
         new TStdoutPathProperty,
         new TStderrPathProperty,

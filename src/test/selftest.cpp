@@ -2994,11 +2994,6 @@ static void TestRoot(TPortoAPI &api) {
         "enable_porto",
         "resolv_conf",
         "weak",
-/*
-        "stdout_type",
-        "stdin_type",
-        "stderr_type",
-*/
     };
 
     if (KernelSupports(KernelFeature::LOW_LIMIT))
