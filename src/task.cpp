@@ -10,7 +10,6 @@
 #include "util/string.hpp"
 #include "util/signal.hpp"
 #include "util/unix.hpp"
-#include "util/file.hpp"
 #include "util/cred.hpp"
 
 extern "C" {
@@ -397,7 +396,7 @@ TError TTask::ChildMountRootFs() {
         TPath resolvconf = Env->Root + "/etc/resolv.conf";
         if (!resolvconf.IsRegularStrict()) {
             if (!resolvconf.Exists())
-                error = resolvconf.Mknod(S_IFREG | 0644, 0);
+                error = resolvconf.Mkfile(0644);
             else
                 error = TError(EError::InvalidState, "non-regular file");
         }
@@ -454,12 +453,11 @@ TError TTask::ChildSetHostname() {
         return TError::Success();
 
     if (Env->SetEtcHostname) {
-        TFile f("/etc/hostname");
-        if (f.Exists()) {
-            string host = Env->Hostname + "\n";
-            TError error = f.WriteStringNoAppend(host);
+        TPath path("/etc/hostname");
+        if (path.Exists()) {
+            TError error = path.WriteAll(Env->Hostname + "\n");
             if (error)
-                return TError(EError::Unknown, error.GetErrno(), "write(/etc/hostname)");
+                return error;
         }
     }
 
@@ -887,10 +885,8 @@ TError TTask::Kill(int signal) const {
 }
 
 bool TTask::IsZombie() const {
-    TFile f("/proc/" + std::to_string(Pid) + "/status");
-
     std::vector<std::string> lines;
-    TError err = f.AsLines(lines);
+    TError err = TPath("/proc/" + std::to_string(Pid) + "/status").ReadLines(lines);
     if (err)
         return false;
 
@@ -927,27 +923,6 @@ void TTask::Restore(std::vector<int> pids) {
 
 void TTask::ClearEnv() {
     Env = nullptr;
-}
-
-TError TTask::DumpProcFsFile(const std::string &filename) {
-    TFile f("/proc/" + std::to_string(Pid) + "/" + filename);
-    std::vector<std::string> lines;
-    TError err = f.AsLines(lines);
-    if (err) {
-        L_ERR() << "Cannot read proc/" << filename << " for pid " << Pid << std::endl;
-        return err;
-    }
-    L() << "Dump proc/" << filename << " status for pid " << Pid << std::endl;
-    for (const auto& line : lines)
-        L() << line << std::endl;
-    L() << "----" << std::endl;
-
-    return TError::Success();
-}
-
-void TTask::DumpDebugInfo() {
-    DumpProcFsFile("status");
-    DumpProcFsFile("stack");
 }
 
 TTask::~TTask() {

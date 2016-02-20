@@ -18,7 +18,6 @@
 #include "volume.hpp"
 #include "protobuf.hpp"
 #include "util/log.hpp"
-#include "util/file.hpp"
 #include "util/signal.hpp"
 #include "util/unix.hpp"
 #include "util/string.hpp"
@@ -71,7 +70,11 @@ static int DaemonSyncConfig(bool master) {
 
     DaemonOpenLog(master);
 
-    if (CreatePidFile(pid.path(), pid.perm())) {
+    TPath pidPath(pid.path());
+    if (!pidPath.Exists())
+        pidPath.Mkfile(pid.perm());
+
+    if (pidPath.WriteAll(std::to_string(getpid()))) {
         L_ERR() << "Can't create pid file " << pid.path() << "!" << std::endl;
         return EXIT_FAILURE;
     }
@@ -859,19 +862,18 @@ exit:
 }
 
 void CheckVersion(int &prevMaj, int &prevMin) {
+    TPath path(PORTO_VERSION_FILE);
     std::string prevVer;
 
     prevMaj = 0;
     prevMin = 0;
 
-    TFile f(PORTO_VERSION_FILE, 0644);
-
-    TError error = f.AsString(prevVer);
-    if (!error)
+    if (!path.ReadAll(prevVer))
         (void)sscanf(prevVer.c_str(), "v%d.%d", &prevMaj, &prevMin);
+    else
+        (void)path.Mkfile(0644);
 
-    error = f.WriteStringNoAppend(GIT_TAG);
-    if (error)
+    if (path.WriteAll(GIT_TAG))
         L_ERR() << "Can't update current version" << std::endl;
 }
 

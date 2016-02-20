@@ -5,7 +5,6 @@
 
 #include "test.hpp"
 #include "config.hpp"
-#include "util/file.hpp"
 #include "util/string.hpp"
 #include "util/netlink.hpp"
 #include "util/cred.hpp"
@@ -70,10 +69,9 @@ void ExpectApi(TPortoAPI &api, int ret, int exp, const char *where) {
 }
 
 int ReadPid(const std::string &path) {
-    TFile f(path);
     int pid = 0;
 
-    TError error = f.AsInt(pid);
+    TError error = TPath(path).ReadInt(pid);
     if (error)
         throw std::string(error.GetMsg());
 
@@ -185,9 +183,8 @@ std::string GetNamespace(const std::string &pid, const std::string &ns) {
 
 std::map<std::string, std::string> GetCgroups(const std::string &pid) {
     std::map<std::string, std::string> cgmap;
-    TFile f("/proc/" + pid + "/cgroup");
     std::vector<std::string> lines;
-    TError error = f.AsLines(lines);
+    TError error = TPath("/proc/" + pid + "/cgroup").ReadLines(lines);
     if (error)
         throw std::string("Can't get cgroups: " + error.GetMsg());
 
@@ -205,8 +202,7 @@ std::map<std::string, std::string> GetCgroups(const std::string &pid) {
 
 std::string GetStatusLine(const std::string &pid, const std::string &prefix) {
     std::vector<std::string> st;
-    TFile f("/proc/" + pid + "/status");
-    if (f.AsLines(st))
+    if (TPath("/proc/" + pid + "/status").ReadLines(st))
         return "";
 
     for (auto &s : st)
@@ -280,16 +276,14 @@ void GetUidGid(const std::string &pid, int &uid, int &gid) {
 
 std::string GetEnv(const std::string &pid) {
     std::string env;
-    TFile f("/proc/" + pid + "/environ");
-    if (f.AsString(env))
+    if (TPath("/proc/" + pid + "/environ").ReadAll(env))
         throw std::string("Can't get environment");
 
     return env;
 }
 
 bool CgExists(const std::string &subsystem, const std::string &name) {
-    TFile f(CgRoot(subsystem, name));
-    return f.Exists();
+    return TPath(CgRoot(subsystem, name)).Exists();
 }
 
 std::string CgRoot(const std::string &subsystem, const std::string &name) {
@@ -298,15 +292,13 @@ std::string CgRoot(const std::string &subsystem, const std::string &name) {
 
 std::string GetFreezer(const std::string &name) {
     std::string state;
-    TFile m(CgRoot("freezer", name) + "freezer.state");
-    if (m.AsString(state))
+    if (TPath(CgRoot("freezer", name) + "freezer.state").ReadAll(state))
         throw std::string("Can't get freezer");
     return state;
 }
 
 void SetFreezer(const std::string &name, const std::string &state) {
-    TFile m(CgRoot("freezer", name) + "freezer.state");
-    if (m.WriteStringNoAppend(state))
+    if (TPath(CgRoot("freezer", name) + "freezer.state").WriteAll(state))
         throw std::string("Can't set freezer");
 
     int retries = 1000000;
@@ -319,16 +311,13 @@ void SetFreezer(const std::string &name, const std::string &state) {
 
 std::string GetCgKnob(const std::string &subsys, const std::string &name, const std::string &knob) {
     std::string val;
-    TFile m(CgRoot(subsys, name) + knob);
-    if (m.AsString(val))
-        throw std::string("Can't get cgroup knob " + m.GetPath().ToString());
+    if (TPath(CgRoot(subsys, name) + knob).ReadAll(val))
+        throw std::string("Can't get cgroup knob ");
     return StringTrim(val, "\n");
 }
 
 bool HaveCgKnob(const std::string &subsys, const std::string &knob) {
-    std::string val;
-    TFile m(CgRoot(subsys, "") + knob);
-    return m.Exists();
+    return TPath(CgRoot(subsys, "") + knob).Exists();
 }
 
 int GetVmRss(const std::string &pid) {
@@ -380,8 +369,7 @@ int WordCount(const std::string &path, const std::string &word) {
     int nr = 0;
 
     std::vector<std::string> lines;
-    TFile log(path);
-    if (log.AsLines(lines))
+    if (TPath(path).ReadLines(lines, 1 << 30))
         throw "Can't read log " + path;
 
     for (auto s : lines) {
@@ -390,11 +378,6 @@ int WordCount(const std::string &path, const std::string &word) {
     }
 
     return nr;
-}
-
-bool FileExists(const std::string &path) {
-    TFile f(path);
-    return f.Exists();
 }
 
 TCred Nobody;
@@ -624,10 +607,8 @@ void TestDaemon(TPortoAPI &api) {
 }
 
 static bool HaveMaxRss() {
-    TFile f(CgRoot("memory", "") + "memory.stat");
-
     std::vector<std::string> lines;
-    TError error = f.AsLines(lines);
+    TError error = TPath(CgRoot("memory", "") + "memory.stat").ReadLines(lines);
     if (error)
         return false;
 
@@ -671,11 +652,10 @@ static bool IsCfqActive() {
     for (auto d : items) {
         if ( (d.find(std::string("loop")) != std::string::npos) || (d.find(std::string("ram")) != std::string::npos) )
             continue;
-        TFile f(std::string("/sys/block/" + d + "/queue/scheduler"));
         std::string data;
         std::vector<std::string> tokens;
 
-        TError error = f.AsString(data);
+        TError error = TPath("/sys/block/" + d + "/queue/scheduler").ReadAll(data);
         if (error)
             throw error.GetMsg();
         error = SplitString(data, ' ', tokens);

@@ -21,7 +21,6 @@ TError GetTaskChildrens(pid_t pid, std::vector<pid_t> &childrens);
 
 uint64_t GetCurrentTimeMs();
 size_t GetTotalMemory();
-int CreatePidFile(const std::string &path, const int mode);
 void SetProcessName(const std::string &name);
 void SetDieOnParentExit(int sig);
 std::string GetProcessName();

@@ -14,7 +14,6 @@
 #include "kv.pb.h"
 #include "util/string.hpp"
 #include "util/cred.hpp"
-#include "util/file.hpp"
 
 void TContainerHolder::DestroyRoot(TScopedLock &holder_lock) {
     auto list = List(true);

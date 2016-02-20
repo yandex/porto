@@ -112,8 +112,8 @@ public:
     TError Chmod(const int mode) const;
     TError ReadLink(TPath &value) const;
     TError Symlink(const TPath &target) const;
-    TError Mkfifo(unsigned int mode) const;
     TError Mknod(unsigned int mode, unsigned int dev) const;
+    TError Mkfile(unsigned int mode) const;
     TError Mkdir(unsigned int mode) const;
     TError MkdirAll(unsigned int mode) const;
     TError CreateAll(unsigned int mode) const;
@@ -143,7 +143,8 @@ public:
     TError UmountAll() const;
 
     TError ReadAll(std::string &text, size_t max = 1048576) const;
-    TError WriteAll(const std::string &text) const;
-
     TError ReadLines(std::vector<std::string> &lines, size_t max = 1048576) const;
+    TError ReadInt(int &value) const;
+
+    TError WriteAll(const std::string &text) const;
 };

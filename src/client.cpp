@@ -10,7 +10,6 @@
 #include "holder.hpp"
 #include "config.hpp"
 #include "protobuf.hpp"
-#include "util/file.hpp"
 #include "util/log.hpp"
 #include "util/string.hpp"
 
@@ -150,10 +149,8 @@ TError TClient::IdentifyClient(TContainerHolder &holder, bool initial) {
 }
 
 TError TClient::LoadGroups() {
-    TFile f("/proc/" + std::to_string(Pid) + "/status");
-
     std::vector<std::string> lines;
-    TError error = f.AsLines(lines);
+    TError error = TPath("/proc/" + std::to_string(Pid) + "/status").ReadLines(lines);
     if (error)
         return error;
 

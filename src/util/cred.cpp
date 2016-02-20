@@ -175,15 +175,13 @@ bool TCred::IsMemberOf(gid_t group) const {
 }
 
 void InitCred() {
-    std::string str;
     TError error;
 
     error = GroupId(PORTO_GROUP_NAME, PortoGroup);
     if (error)
         L_WRN() << "Cannot find group porto: " << error << std::endl;
 
-    if (TPath("/proc/sys/kernel/cap_last_cap").ReadAll(str) ||
-            StringToInt(str, LastCapability)) {
+    if (TPath("/proc/sys/kernel/cap_last_cap").ReadInt(LastCapability)) {
         L_WRN() << "Can't read /proc/sys/kernel/cap_last_cap, assuming 36" << std::endl;
         LastCapability = 36; //FIXME
     }

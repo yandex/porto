@@ -5,6 +5,7 @@
 
 #include "common.hpp"
 #include "util/unix.hpp"
+#include "util/path.hpp"
 
 bool InPidNamespace(pid_t pid1, pid_t pid2);
 

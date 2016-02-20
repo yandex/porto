@@ -1,7 +1,6 @@
 #include "stream.hpp"
 #include "config.hpp"
 #include "util/log.hpp"
-#include "util/file.hpp"
 #include "client.hpp"
 
 extern "C" {

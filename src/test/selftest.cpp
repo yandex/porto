@@ -10,7 +10,6 @@
 #include "config.hpp"
 #include "value.hpp"
 #include "util/netlink.hpp"
-#include "util/file.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
 #include "util/cred.hpp"
@@ -1445,8 +1444,7 @@ static void TestCwdProperty(TPortoAPI &api) {
     string name = "a";
     ExpectApiSuccess(api.Create(name));
 
-    TFile portod(config().slave_pid().path());
-    (void)portod.AsString(portodPid);
+    (void)TPath(config().slave_pid().path()).ReadAll(portodPid);
     portodCwd = GetCwd(portodPid);
 
     Say() << "Check default working directory" << std::endl;
@@ -1510,64 +1508,69 @@ static void TestCwdProperty(TPortoAPI &api) {
 static void TestStdPathProperty(TPortoAPI &api) {
     string pid;
     string name = "a";
-    std::string cwd, stdinPath, stdoutPath, stderrPath;
+    std::string cwd, stdinName, stdoutName, stderrName;
+    TPath stdinPath, stdoutPath, stderrPath;
 
-    AsRoot(api);
-
+    AsRoot(api); // FIXME
     ExpectApiSuccess(api.Create(name));
 
     Say() << "Check default stdin/stdout/stderr" << std::endl;
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
-    ExpectApiSuccess(api.GetProperty(name, "stdout_path", stdoutPath));
-    ExpectApiSuccess(api.GetProperty(name, "stderr_path", stderrPath));
-
     ExpectApiSuccess(api.GetProperty(name, "cwd", cwd));
 
-    Expect(!FileExists(stdoutPath));
-    Expect(!FileExists(stderrPath));
+    ExpectApiSuccess(api.GetProperty(name, "stdin_path", stdinName));
+    ExpectEq(stdinName, "/dev/null");
+
+    ExpectApiSuccess(api.GetProperty(name, "stdout_path", stdoutName));
+    ExpectEq(stdoutName, "stdout");
+
+    ExpectApiSuccess(api.GetProperty(name, "stderr_path", stderrName));
+    ExpectEq(stderrName, "stderr");
+
+    stdoutPath = TPath(cwd) / stdoutName;
+    stderrPath = TPath(cwd) / stderrName;
+
+    Expect(!stdoutPath.Exists());
+    Expect(!stderrPath.Exists());
     ExpectApiSuccess(api.Start(name));
-    Expect(FileExists(cwd + "/" + stdoutPath));
-    Expect(FileExists(cwd + "/" + stderrPath));
+    Expect(stdoutPath.Exists());
+    Expect(stderrPath.Exists());
 
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
     ExpectEq(ReadLink("/proc/" + pid + "/fd/0"), "/dev/null");
-    ExpectEq(ReadLink("/proc/" + pid + "/fd/1"), cwd + "/" + stdoutPath);
-    ExpectEq(ReadLink("/proc/" + pid + "/fd/2"), cwd + "/" + stderrPath);
+    ExpectEq(ReadLink("/proc/" + pid + "/fd/1"), stdoutPath.ToString());
+    ExpectEq(ReadLink("/proc/" + pid + "/fd/2"), stderrPath.ToString());
     ExpectApiSuccess(api.Stop(name));
 
-    Expect(!FileExists(cwd + "/" + stdoutPath));
-    Expect(!FileExists(cwd + "/" + stderrPath));
+    Expect(!stdoutPath.Exists());
+    Expect(!stderrPath.Exists());
 
     Say() << "Check custom stdin/stdout/stderr" << std::endl;
     stdinPath = "/tmp/a_stdin";
     stdoutPath = "/tmp/a_stdout";
     stderrPath = "/tmp/a_stderr";
 
-    TPath stdinFile(stdinPath);
-    (void)stdinFile.Unlink();
-    TPath stdoutFile(stdoutPath);
-    (void)stdoutFile.Unlink();
-    TPath stderrFile(stderrPath);
-    (void)stderrFile.Unlink();
+    (void)stdinPath.Unlink();
+    (void)stdoutPath.Unlink();
+    (void)stderrPath.Unlink();
 
-    TFile f(stdinPath);
-    ExpectSuccess(f.Touch());
-    ExpectSuccess(f.WriteStringNoAppend("hi"));
+    ExpectSuccess(stdinPath.Mkfile(0600));
+    ExpectSuccess(stdinPath.WriteAll("hi"));
 
     ExpectApiSuccess(api.SetProperty(name, "stdin_path", "/tmp/a_stdin"));
     ExpectApiSuccess(api.SetProperty(name, "stdout_path", "/tmp/a_stdout"));
     ExpectApiSuccess(api.SetProperty(name, "stderr_path", "/tmp/a_stderr"));
-    Expect(!FileExists(stdoutPath));
-    Expect(!FileExists(stderrPath));
+    Expect(!stdoutPath.Exists());
+    Expect(!stderrPath.Exists());
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
     ExpectEq(ReadLink("/proc/" + pid + "/fd/0"), "/tmp/a_stdin");
     ExpectEq(ReadLink("/proc/" + pid + "/fd/1"), "/tmp/a_stdout");
     ExpectEq(ReadLink("/proc/" + pid + "/fd/2"), "/tmp/a_stderr");
     ExpectApiSuccess(api.Stop(name));
-    Expect(FileExists(stdinPath));
-    Expect(FileExists(stdoutPath));
-    Expect(FileExists(stderrPath));
+    Expect(stdinPath.Exists());
+    Expect(stdoutPath.Exists());
+    Expect(stderrPath.Exists());
 
     Say() << "Make sure custom stdin is not removed" << std::endl;
     string ret;
@@ -1579,15 +1582,13 @@ static void TestStdPathProperty(TPortoAPI &api) {
 
     ExpectApiSuccess(api.Destroy(name));
 
-    Expect(FileExists(stdinPath));
-    Expect(FileExists(stdoutPath));
-    Expect(FileExists(stderrPath));
+    Expect(stdinPath.Exists());
+    Expect(stdoutPath.Exists());
+    Expect(stderrPath.Exists());
 
-    Expect(FileExists(stdinPath));
-    Expect(FileExists(stdoutPath));
-    Expect(FileExists(stderrPath));
-
-    AsAlice(api);
+    ExpectSuccess(stdinPath.Unlink());
+    ExpectSuccess(stdoutPath.Unlink());
+    ExpectSuccess(stderrPath.Unlink());
 }
 
 struct TMountInfo {
@@ -1953,9 +1954,7 @@ static void TestHostnameProperty(TPortoAPI &api) {
 
     AsRoot(api);
     ExpectSuccess(path.Mount(name, "tmpfs", 0, {"size=32m"}));
-    AsAlice(api);
-
-    AsRoot(api);
+    ExpectSuccess(TPath(path + "/etc/hostname").CreateAll(0644));
     BootstrapCommand("/bin/hostname", path, false);
     BootstrapCommand("/bin/sleep", path, false);
     BootstrapCommand("/bin/cat", path, false);
@@ -1998,22 +1997,15 @@ static void TestHostnameProperty(TPortoAPI &api) {
     ExpectNeq(v, GetHostname() + "\n");
     ExpectEq(v, host + "\n");
     ExpectApiSuccess(api.Stop(name));
+    ExpectApiSuccess(api.Destroy(name));
 
     Say() << "Check /etc/hostname" << std::endl;
-    AsRoot(api);
+
+    AsBob(api);
+    ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.SetProperty(name, "virt_mode", "os"));
-    AsAlice(api);
-
-    TPath etc = path / "etc";
-    TFile f(path + "/etc/hostname");
-    AsRoot(api);
-    if (!etc.Exists())
-        ExpectSuccess(etc.Mkdir(0755));
-    ExpectSuccess(f.Touch());
-    ExpectSuccess(f.GetPath().Chown(Alice));
-    ExpectApiSuccess(api.SetProperty(name, "user", "root"));
-    AsAlice(api);
-
+    ExpectApiSuccess(api.SetProperty(name, "root", path.ToString()));
+    ExpectApiSuccess(api.SetProperty(name, "hostname", host));
     ExpectApiSuccess(api.SetProperty(name, "command", "/cat /etc/hostname"));
     ExpectApiSuccess(api.SetProperty(name, "stdout_path", "stdout"));
     ExpectApiSuccess(api.Start(name));
@@ -2022,12 +2014,11 @@ static void TestHostnameProperty(TPortoAPI &api) {
     ExpectNeq(v, GetHostname() + "\n");
     ExpectEq(v, host + "\n");
 
+    ExpectApiSuccess(api.Destroy(name));
+
     AsRoot(api);
-    ExpectSuccess(etc.RemoveAll());
     ExpectSuccess(path.Umount(0));
     AsAlice(api);
-
-    ExpectApiSuccess(api.Destroy(name));
 }
 
 static void TestBindProperty(TPortoAPI &api) {
@@ -2050,9 +2041,6 @@ static void TestBindProperty(TPortoAPI &api) {
     if (tmp.Exists())
         ExpectSuccess(tmp.RemoveAll());
     ExpectSuccess(tmp.MkdirAll(0755));
-
-    TFile f(tmp / "porto");
-    ExpectSuccess(f.Touch());
 
     ExpectApiSuccess(api.SetProperty(name, "command", "cat /proc/self/mountinfo"));
     ExpectApiSuccess(api.SetProperty(name, "bind", "/bin bin ro; /tmp/27389 tmp"));
@@ -2529,8 +2517,7 @@ static void TestCapabilitiesProperty(TPortoAPI &api) {
     string name = "a";
 
     int lastCap;
-    TFile f("/proc/sys/kernel/cap_last_cap");
-    TError error = f.AsInt(lastCap);
+    TError error = TPath("/proc/sys/kernel/cap_last_cap").ReadInt(lastCap);
     if (error)
         throw error.GetMsg();
 
@@ -4301,10 +4288,8 @@ static void TestLeaks(TPortoAPI &api) {
     int perct = 64;
     uint64_t time;
 
-    TFile slaveFile(config().slave_pid().path());
-    ExpectSuccess(slaveFile.AsString(slavePid));
-    TFile masterFile(config().master_pid().path());
-    ExpectSuccess(masterFile.AsString(masterPid));
+    ExpectSuccess(TPath(config().slave_pid().path()).ReadAll(slavePid));
+    ExpectSuccess(TPath(config().master_pid().path()).ReadAll(masterPid));
 
     int initSlave = GetVmRss(slavePid);
     int initMaster = GetVmRss(masterPid);
@@ -4662,7 +4647,7 @@ static void TestVolumeImpl(TPortoAPI &api) {
         Expect(StringStartsWith(m[a].source, "/dev/loop"));
         std::string loopDev = m[a].source;
         AsRoot(api);
-        std::string img = System("losetup " + loopDev + " | sed -e 's/[^(]*(\\([^)]*\\)).*/\\1/'");
+        TPath loopFile(System("losetup " + loopDev + " | sed -e 's/[^(]*(\\([^)]*\\)).*/\\1/'"));
         AsAlice(api);
 
         Say() << "Make sure loop device has correct size" << std::endl;
@@ -4670,7 +4655,7 @@ static void TestVolumeImpl(TPortoAPI &api) {
         off_t mistake = 1 * 1024 * 1024;
 
         struct stat st;
-        ExpectSuccess(TPath(img).StatStrict(st));
+        ExpectSuccess(loopFile.StatStrict(st));
         Expect(st.st_size > expected - mistake && st.st_size < expected + mistake);
 
         Say() << "Make sure no loop device is created without quota" << std::endl;
@@ -5027,8 +5012,7 @@ static void TestRecovery(TPortoAPI &api) {
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
 
     AsRoot(api);
-    TFile f("/sys/fs/cgroup/memory/porto/cgroup.procs");
-    ExpectSuccess(f.AppendString(pid));
+    ExpectSuccess(TPath("/sys/fs/cgroup/memory/porto/cgroup.procs").WriteAll(pid));
     auto cgmap = GetCgroups(pid);
     ExpectEq(cgmap["memory"], "/porto");
     KillSlave(api, SIGKILL);
@@ -5232,12 +5216,9 @@ static void TestCgroups(TPortoAPI &api) {
 
     int pid = fork();
     if (pid == 0) {
-        TFile freezer(freezerCg + "/cgroup.procs");
-        ExpectSuccess(freezer.AppendString(std::to_string(getpid())));
-        TFile memory(memoryCg + "/cgroup.procs");
-        ExpectSuccess(memory.AppendString(std::to_string(getpid())));
-        TFile cpu(cpuCg + "/cgroup.procs");
-        ExpectSuccess(cpu.AppendString(std::to_string(getpid())));
+        ExpectSuccess(TPath(freezerCg + "/cgroup.procs").WriteAll(std::to_string(getpid())));
+        ExpectSuccess(TPath(memoryCg + "/cgroup.procs").WriteAll(std::to_string(getpid())));
+        ExpectSuccess(TPath(cpuCg + "/cgroup.procs").WriteAll(std::to_string(getpid())));
         execlp("sleep", "sleep", "1000", nullptr);
         abort();
     }
@@ -5383,15 +5364,15 @@ static void TestPackage(TPortoAPI &api) {
 
     AsRoot(api);
 
-    Expect(FileExists(config().master_log().path()));
-    Expect(FileExists(config().slave_log().path()));
-    Expect(FileExists(PORTO_SOCKET_PATH));
+    Expect(TPath(config().master_log().path()).Exists());
+    Expect(TPath(config().slave_log().path()).Exists());
+    Expect(TPath(PORTO_SOCKET_PATH).Exists());
 
     ExpectEq(system("stop yandex-porto"), 0);
 
-    Expect(FileExists(config().master_log().path()));
-    Expect(FileExists(config().slave_log().path()));
-    ExpectEq(FileExists(PORTO_SOCKET_PATH), false);
+    Expect(TPath(config().master_log().path()).Exists());
+    Expect(TPath(config().slave_log().path()).Exists());
+    Expect(!TPath(PORTO_SOCKET_PATH).Exists());
 
     ExpectEq(system("start yandex-porto"), 0);
     WaitPortod(api);

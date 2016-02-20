@@ -7,7 +7,6 @@
 #include <algorithm>
 
 #include "config.hpp"
-#include "util/file.hpp"
 #include "util/string.hpp"
 #include "test.hpp"
 
@@ -243,12 +242,11 @@ static void StressKill() {
     std::cout << "Run kill" << std::endl;
     while (!done) {
         usleep(1000000);
-        TFile f(config().slave_pid().path());
         int pid;
         std::vector<std::string> containers;
         if (api.List(containers) != 0)
             continue;
-        if (f.AsInt(pid))
+        if (TPath(config().slave_pid().path()).ReadInt(pid))
             Say(std::cerr) << "ERROR: Don't open " << config().slave_pid().path() << std::endl;
         if (kill(pid, SIGKILL)) {
             Say(std::cerr) << "ERROR: Don't send kill to " << pid << std::endl;

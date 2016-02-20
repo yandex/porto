@@ -6,7 +6,6 @@
 #include "container_value.hpp"
 #include "network.hpp"
 #include "util/log.hpp"
-#include "util/file.hpp"
 #include "util/string.hpp"
 #include "util/unix.hpp"
 #include "util/cred.hpp"

@@ -217,20 +217,16 @@ TError TPath::Symlink(const TPath &target) const {
     return TError::Success();
 }
 
-TError TPath::Mkfifo(unsigned int mode) const {
-    int ret = mkfifo(Path.c_str(), mode);
-    if (ret)
-        return TError(EError::Unknown, errno, "mkfifo(" + Path + ", " +
-                StringFormat("%#o", mode) + ")");
-    return TError::Success();
-}
-
 TError TPath::Mknod(unsigned int mode, unsigned int dev) const {
     int ret = mknod(Path.c_str(), mode, dev);
     if (ret)
         return TError(EError::Unknown, errno, "mknod(" + Path + ", " +
                 StringFormat("%#o", mode) + ", " + StringFormat("%#x", dev) + ")");
     return TError::Success();
+}
+
+TError TPath::Mkfile(unsigned int mode) const {
+    return Mknod(S_IFREG | (mode & 0777), 0);
 }
 
 TPath TPath::NormalPath() const {
@@ -406,7 +402,7 @@ TError TPath::CreateAll(unsigned int mode) const {
         }
 
         /* This fails for broken symlinks */
-        return Mknod(S_IFREG | mode, 0);
+        return Mkfile(mode);
     } else if (IsDirectoryFollow())
         return TError(EError::Unknown, "Is a directory: " + Path);
 
@@ -858,5 +854,13 @@ out:
     fclose(file);
     free(line);
 
+    return error;
+}
+
+TError TPath::ReadInt(int &value) const {
+    std::string text;
+    TError error = ReadAll(text);
+    if (!error)
+        error = StringToInt(text, value);
     return error;
 }

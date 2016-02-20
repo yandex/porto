@@ -12,7 +12,6 @@
 #include "util/signal.hpp"
 #include "util/unix.hpp"
 #include "util/namespace.hpp"
-#include "util/file.hpp"
 #include "util/log.hpp"
 
 extern "C" {
@@ -1007,8 +1006,7 @@ public:
                     return EXIT_FAILURE;
                 }
 
-                TFile f(root / cg.second / "cgroup.procs");
-                error = f.AppendString(std::to_string(GetPid()));
+                error = TPath(root / cg.second / "cgroup.procs").WriteAll(std::to_string(GetPid()));
                 if (error) {
                     PrintError(error, "Cannot enter cgroups, try option \"-C\"");
                     return EXIT_FAILURE;

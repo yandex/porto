@@ -84,8 +84,6 @@ class TTask: public TNonCopyable {
     TError ChildRemountRootRo();
     TError ChildIsolateFs();
 
-    TError DumpProcFsFile(const std::string &filename);
-
 public:
     TTask(std::unique_ptr<TTaskEnv> &env);
     TTask(pid_t pid);
@@ -113,8 +111,4 @@ public:
     bool IsZombie() const;
 
     bool HasCorrectParent();
-
-    void DumpDebugInfo();
 };
-
-TError TaskGetLastCap();

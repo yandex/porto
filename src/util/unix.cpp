@@ -1,7 +1,6 @@
 #include <string>
 #include <algorithm>
 
-#include "util/file.hpp"
 #include "util/string.hpp"
 #include "util/cred.hpp"
 #include "util/path.hpp"
@@ -144,13 +143,6 @@ size_t GetTotalMemory() {
     return si.totalram;
 }
 
-int CreatePidFile(const std::string &path, const int mode) {
-    TFile f(path, mode);
-
-    const auto& error = f.WriteStringNoAppend(std::to_string(getpid()));
-    return error ? 1 : 0;
-}
-
 static __thread std::string *processName;
 
 void SetProcessName(const std::string &name) {
@@ -177,9 +169,8 @@ std::string GetProcessName() {
 }
 
 TError GetTaskCgroups(const int pid, std::map<std::string, std::string> &cgmap) {
-    TFile f("/proc/" + std::to_string(pid) + "/cgroup");
     std::vector<std::string> lines;
-    TError error = f.AsLines(lines);
+    TError error = TPath("/proc/" + std::to_string(pid) + "/cgroup").ReadLines(lines);
     if (error)
         return error;
 
@@ -281,8 +272,7 @@ TScopedFd &TScopedFd::operator=(int fd) {
 }
 
 TError SetOomScoreAdj(int value) {
-    TFile f("/proc/self/oom_score_adj");
-    return f.WriteStringNoAppend(std::to_string(value));
+    return TPath("/proc/self/oom_score_adj").WriteAll(std::to_string(value));
 }
 
 void CloseFds(int max, const std::set<int> &except, bool openStd) {
