@@ -16,6 +16,8 @@ static std::vector<uid_t> RestrictedRootUid;
 static size_t PwdBufSize = sysconf(_SC_GETPW_R_SIZE_MAX) > 0 ?
                            sysconf(_SC_GETPW_R_SIZE_MAX) : 16384;
 
+int LastCapability;
+
 TError FindUser(const std::string &user, uid_t &uid, gid_t &gid) {
     struct passwd pwd, *ptr;
     char buf[PwdBufSize];
@@ -173,11 +175,18 @@ bool TCred::IsMemberOf(gid_t group) const {
 }
 
 void InitCred() {
+    std::string str;
     TError error;
 
     error = GroupId(PORTO_GROUP_NAME, PortoGroup);
     if (error)
         L_WRN() << "Cannot find group porto: " << error << std::endl;
+
+    if (TPath("/proc/sys/kernel/cap_last_cap").ReadAll(str) ||
+            StringToInt(str, LastCapability)) {
+        L_WRN() << "Can't read /proc/sys/kernel/cap_last_cap, assuming 36" << std::endl;
+        LastCapability = 36; //FIXME
+    }
 
     for (auto &user: config().privileges().restricted_root_user()) {
         uid_t uid;

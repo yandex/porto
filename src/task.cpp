@@ -35,8 +35,6 @@ using std::string;
 using std::vector;
 using std::map;
 
-static int lastCap;
-
 // TTask
 //
 
@@ -89,8 +87,6 @@ TError TTask::ChildApplyCapabilities() {
     if (!Env->Cred.IsRootUser())
         return TError::Success();
 
-    PORTO_ASSERT(lastCap != 0);
-
     effective = permitted = -1;
     inheritable = Env->Caps;
 
@@ -98,7 +94,7 @@ TError TTask::ChildApplyCapabilities() {
     if (error)
         return error;
 
-    for (int i = 0; i <= lastCap; i++) {
+    for (int i = 0; i <= LastCapability; i++) {
         if (!(Env->Caps & (1ULL << i)) && i != CAP_SETPCAP) {
             TError error = DropBoundedCap(i);
             if (error)
@@ -932,11 +928,6 @@ void TTask::Restore(std::vector<int> pids) {
 
 void TTask::ClearEnv() {
     Env = nullptr;
-}
-
-TError TaskGetLastCap() {
-    TFile f("/proc/sys/kernel/cap_last_cap");
-    return f.AsInt(lastCap);
 }
 
 TError TTask::DumpProcFsFile(const std::string &filename) {

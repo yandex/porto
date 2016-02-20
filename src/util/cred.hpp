@@ -16,6 +16,8 @@ std::string GroupName(gid_t gid);
 
 void InitCred();
 
+extern int LastCapability;
+
 struct TCred {
     uid_t Uid;
     gid_t Gid;

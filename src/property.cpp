@@ -838,7 +838,7 @@ public:
 };
 
 struct TCapDesc {
-    uint64_t id;
+    int id;
     int flags;
 };
 
@@ -898,15 +898,6 @@ public:
         TContainerValue(P_CAPABILITIES,
                         "Limit container capabilities: list of capabilities without CAP_ prefix (man 7 capabilities)") {}
 
-    uint64_t GetLastCap() const {
-        uint64_t lastCap = 36;
-        TFile f("/proc/sys/kernel/cap_last_cap");
-        TError error = f.AsUint64(lastCap);
-        if (error)
-            L_WRN() << "Can't read /proc/sys/kernel/cap_last_cap, assuming 3.10 kernel" << std::endl;
-        return lastCap;
-    }
-
     TStrList GetDefault() const override {
         TStrList v;
         auto c = GetContainer();
@@ -915,10 +906,9 @@ public:
         auto vmode = c->Prop->Get<int>(P_VIRT_MODE);
         bool restricted = vmode == VIRT_MODE_OS;
 
-        uint64_t lastCap = GetLastCap();
         for (const auto &kv : Supported)
             if ((root || (restricted && kv.second.flags & RESTRICTED_CAP))
-                && kv.second.id <= lastCap)
+                && kv.second.id <= LastCapability)
                 v.push_back(kv.first);
         return v;
     }
@@ -926,13 +916,12 @@ public:
     TError CheckValue(const std::vector<std::string> &lines) override {
         uint64_t allowed = 0;
 
-        uint64_t lastCap = GetLastCap();
         for (auto &line: lines) {
             if (Supported.find(line) == Supported.end())
                 return TError(EError::InvalidValue,
                               "Unsupported capability " + line);
 
-            if (Supported.at(line).id > lastCap)
+            if (Supported.at(line).id > LastCapability)
                 return TError(EError::InvalidValue,
                               "Unsupported kernel capability " + line);
 

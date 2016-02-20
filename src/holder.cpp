@@ -30,11 +30,9 @@ void TContainerHolder::DestroyRoot(TScopedLock &holder_lock) {
 }
 
 TError TContainerHolder::CreateRoot(TScopedLock &holder_lock) {
-    TError error = TaskGetLastCap();
-    if (error)
-        return error;
-
     std::shared_ptr<TContainer> container;
+    TError error;
+
     error = Create(holder_lock, ROOT_CONTAINER, TCred(0, 0), container);
     if (error)
         return error;
