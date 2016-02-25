@@ -66,7 +66,7 @@ void TConfig::LoadDefaults() {
     config().mutable_volumes()->set_enable_quota(true);
 }
 
-bool TConfig::LoadFile(const std::string &path, bool silent) {
+bool TConfig::LoadFile(const std::string &path) {
     TScopedFd fd(open(path.c_str(), O_RDONLY | O_CLOEXEC));
     if (fd.GetFd() < 0)
         return false;
@@ -78,21 +78,15 @@ bool TConfig::LoadFile(const std::string &path, bool silent) {
         return false;
     }
 
-    if (!silent)
-        std::cerr << "Using config " << path << std::endl;
-
     return true;
 }
 
-void TConfig::Load(bool silent) {
+void TConfig::Load() {
     LoadDefaults();
 
     for (auto &path : ConfigFiles)
-        if (LoadFile(path, silent))
+        if (LoadFile(path))
             goto load_cred;
-
-    if (!silent)
-        std::cerr << "Using default config" << std::endl;
 
     if (config().container().default_aging_time_s() <
         config().daemon().rotate_logs_timeout_s()) {

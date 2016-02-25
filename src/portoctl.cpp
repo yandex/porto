@@ -6,7 +6,6 @@
 #include <cmath>
 
 #include "libporto.hpp"
-#include "config.hpp"
 #include "cli.hpp"
 #include "volume.hpp"
 #include "util/string.hpp"
@@ -1999,7 +1998,6 @@ public:
 };
 
 int main(int argc, char *argv[]) {
-    config.Load(true);
     TPortoAPI api;
     TCommandHandler handler(api);
 

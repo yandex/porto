@@ -6,7 +6,6 @@
 #include "log.hpp"
 #include "util/unix.hpp"
 #include "util/file.hpp"
-#include "config.hpp"
 #include "common.hpp"
 
 extern "C" {

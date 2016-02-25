@@ -1,5 +1,4 @@
 #include "locks.hpp"
-#include "config.hpp"
 #include "util/log.hpp"
 
 //FIXME KILL THIS CRAP

@@ -5,7 +5,6 @@
 
 #include "task.hpp"
 #include "device.hpp"
-#include "config.hpp"
 #include "util/log.hpp"
 #include "util/mount.hpp"
 #include "util/string.hpp"
