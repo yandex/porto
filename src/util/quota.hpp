@@ -10,6 +10,7 @@ class TProjectQuota {
 	TPath Device;
 	TPath RootPath;
 
+	TError FindProject();
 	TError FindDevice();
 	TError EnableProjectQuota();
 
@@ -21,11 +22,11 @@ class TProjectQuota {
 public:
 	TPath Path;
 
-	uint32_t ProjectId;
-	uint64_t SpaceLimit;
-	uint64_t SpaceUsage;
-	uint64_t InodeLimit;
-	uint64_t InodeUsage;
+	uint32_t ProjectId = 0;
+	uint64_t SpaceLimit = 0;
+	uint64_t SpaceUsage = 0;
+	uint64_t InodeLimit = 0;
+	uint64_t InodeUsage = 0;
 
 	TProjectQuota(const TPath &path) { Path = path; }
 

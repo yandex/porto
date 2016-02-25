@@ -215,9 +215,37 @@ TError TProjectQuota::InventProjectId(const TPath &path, uint32_t &id) {
 	return TError::Success();
 }
 
+TError TProjectQuota::FindProject() {
+	TError error;
+
+	error = GetProjectId(Path, ProjectId);
+	if (error)
+		return error;
+
+	if (!ProjectId)
+		return TError(EError::InvalidValue, "Project id not found");
+
+	uint32_t ExpectedId;
+	error = InventProjectId(Path, ExpectedId);
+	if (error)
+		return error;
+
+	if (ProjectId != ExpectedId)
+		return TError(EError::InvalidValue,
+				"Project id not match with inode: " + Path.ToString() +
+				" found: " + std::to_string(ProjectId) +
+				" expected: " + std::to_string(ExpectedId));
+
+	return TError::Success();
+}
+
 TError TProjectQuota::FindDevice() {
 	TMount mount;
 	TError error;
+
+	/* alredy found */
+	if (!Device.IsEmpty())
+		return TError::Success();
 
 	error = mount.Find(Path);
 	if (error)
@@ -233,11 +261,7 @@ TError TProjectQuota::FindDevice() {
 }
 
 bool TProjectQuota::Supported() {
-	if (Device.IsEmpty() && FindDevice())
-		return false;
-	if (EnableProjectQuota())
-		return false;
-	return true;
+	return !FindDevice() && !EnableProjectQuota();
 }
 
 bool TProjectQuota::Exists() {
@@ -250,28 +274,13 @@ TError TProjectQuota::Load() {
 	struct if_dqblk quota;
 	TError error;
 
-	if (!ProjectId) {
-		error = GetProjectId(Path, ProjectId);
-		if (error)
-			return error;
-		if (!ProjectId)
-			return TError(EError::InvalidValue, "Project id not found");
+	error = FindProject();
+	if (error)
+		return error;
 
-		uint32_t ExpectedId;
-		error = InventProjectId(Path, ExpectedId);
-		if (error)
-			return error;
-		if (ProjectId != ExpectedId)
-			return TError(EError::InvalidValue, "Project id not match with inode: " + Path.ToString() +
-					" found: " + std::to_string(ProjectId) +
-					" expected: " + std::to_string(ExpectedId));
-	}
-
-	if (Device.IsEmpty()) {
-		error = FindDevice();
-		if (error)
-			return error;
-	}
+	error = FindDevice();
+	if (error)
+		return error;
 
 	if (quotactl(QCMD(Q_GETQUOTA, PRJQUOTA), Device.c_str(),
 				ProjectId, (caddr_t)&quota))
@@ -292,11 +301,9 @@ TError TProjectQuota::Create() {
 	if (!Path.IsDirectory())
 		return TError(EError::InvalidValue, "Not a directory " + Path.ToString());
 
-	if (Device.IsEmpty()) {
-		error = FindDevice();
-		if (error)
-			return error;
-	}
+	error = FindDevice();
+	if (error)
+		return error;
 
 	error = EnableProjectQuota();
 	if (error)
@@ -352,11 +359,13 @@ TError TProjectQuota::Resize() {
 	struct if_dqblk quota;
 	TError error;
 
-	if (Device.IsEmpty()) {
-		error = Load();
-		if (error)
-			return error;
-	}
+	error = FindProject();
+	if (error)
+		return error;
+
+	error = FindDevice();
+	if (error)
+		return error;
 
 	memset(&quota, 0, sizeof(quota));
 	quota.dqb_bhardlimit = SpaceLimit / QIF_DQBLKSIZE;
@@ -374,11 +383,13 @@ TError TProjectQuota::Destroy() {
 	struct if_dqblk quota;
 	TError error;
 
-	if (Device.IsEmpty()) {
-		error = Load();
-		if (error)
-			return error;
-	}
+	error = FindProject();
+	if (error)
+		return error;
+
+	error = FindDevice();
+	if (error)
+		return error;
 
 	error = SetProjectIdAll(Path, 0);
 	if (error)
