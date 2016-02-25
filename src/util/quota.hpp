@@ -37,4 +37,7 @@ public:
 	TError Create();
 	TError Resize();
 	TError Destroy();
+
+	TError StatVFS(uint64_t &spaceUsed, uint64_t &spaceAvail,
+		       uint64_t &inodeUsed, uint64_t &inodeAvail);
 };

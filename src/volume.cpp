@@ -165,6 +165,13 @@ public:
         L_ACT() << "Resizing project quota: " << quota.Path << std::endl;
         return quota.Resize();
     }
+
+    TError GetStat(uint64_t &spaceUsed, uint64_t &spaceAvail,
+                   uint64_t &inodeUsed, uint64_t &inodeAvail) override {
+        TProjectQuota quota(Volume->GetPath());
+
+        return quota.StatVFS(spaceUsed, spaceAvail, inodeUsed, inodeAvail);
+    }
 };
 
 /* TVolumeNativeBackend - project quota + bindmount */
@@ -243,6 +250,14 @@ public:
         }
         L_ACT() << "Resizing project quota: " << quota.Path << std::endl;
         return quota.Resize();
+    }
+
+    TError GetStat(uint64_t &spaceUsed, uint64_t &spaceAvail,
+                   uint64_t &inodeUsed, uint64_t &inodeAvail) override {
+        TProjectQuota quota(Volume->GetStorage());
+        if (Volume->HaveQuota())
+            return quota.StatVFS(spaceUsed, spaceAvail, inodeUsed, inodeAvail);
+        return Volume->GetPath().StatVFS(spaceUsed, spaceAvail, inodeUsed, inodeAvail);
     }
 };
 
@@ -483,6 +498,14 @@ err:
         }
         L_ACT() << "Resizing project quota: " << quota.Path << std::endl;
         return quota.Resize();
+    }
+
+    TError GetStat(uint64_t &spaceUsed, uint64_t &spaceAvail,
+                   uint64_t &inodeUsed, uint64_t &inodeAvail) override {
+        TProjectQuota quota(Volume->GetStorage());
+        if (Volume->HaveQuota())
+            return quota.StatVFS(spaceUsed, spaceAvail, inodeUsed, inodeAvail);
+        return Volume->GetPath().StatVFS(spaceUsed, spaceAvail, inodeUsed, inodeAvail);
     }
 };
 

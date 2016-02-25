@@ -406,3 +406,36 @@ TError TProjectQuota::Destroy() {
 	quotactl(QCMD(Q_SYNC, PRJQUOTA), Device.c_str(), 0, NULL);
 	return TError::Success();
 }
+
+TError TProjectQuota::StatVFS(uint64_t &spaceUsed, uint64_t &spaceAvail,
+			      uint64_t &inodeUsed, uint64_t &inodeAvail) {
+	TError error;
+
+	error = Path.StatVFS(spaceUsed, spaceAvail, inodeUsed, inodeAvail);
+	if (error)
+		return error;
+
+	error = Load();
+	if (error)
+		return error;
+
+	spaceUsed = SpaceUsage;
+
+	if (SpaceLimit && SpaceLimit < SpaceUsage + spaceAvail) {
+		if (SpaceLimit > SpaceUsage)
+			spaceAvail = SpaceLimit - SpaceUsage;
+		else
+			spaceAvail = 0;
+	}
+
+	inodeUsed = InodeUsage;
+
+	if (InodeLimit && InodeLimit < InodeUsage + inodeAvail) {
+		if (InodeLimit > InodeUsage)
+			inodeAvail = InodeLimit - InodeUsage;
+		else
+			inodeAvail = 0;
+	}
+
+	return TError::Success();
+}
