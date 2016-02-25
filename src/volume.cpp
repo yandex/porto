@@ -787,6 +787,8 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             return TError(EError::InvalidValue, "Volume path must be absolute");
         if (!path.IsNormal())
             return TError(EError::InvalidValue, "Volume path must be normalized");
+        if (!path.Exists())
+            return TError(EError::InvalidValue, "Volume path does not exist");
         if (!path.IsDirectory())
             return TError(EError::InvalidValue, "Volume path must be a directory");
         if (!path.CanWrite(creator_cred))
@@ -819,6 +821,8 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             return TError(EError::InvalidValue, "Storage path must be absolute");
         if (!storage.IsNormal())
             return TError(EError::InvalidValue, "Storage path must be normalized");
+        if (!storage.Exists())
+            return TError(EError::InvalidValue, "Storage path does not exist");
         if (!storage.IsDirectory())
             return TError(EError::InvalidValue, "Storage path must be a directory");
         if (!storage.CanWrite(creator_cred))
