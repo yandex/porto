@@ -311,15 +311,24 @@ TError TProjectQuota::Create() {
 	if (error)
 		return error;
 
-	if (CurrentId && CurrentId != ProjectId)
-		return TError(EError::Unknown, "Cannot create nested project quota: " +
-				Path.ToString() + " already in project " +
-				std::to_string(CurrentId));
+	if (CurrentId) {
+		if (CurrentId != ProjectId)
+			return TError(EError::Unknown,
+					"Cannot create nested project quota: " +
+					Path.ToString() + " already in project " +
+					std::to_string(CurrentId));
+
+		/* Reset current project id */
+		error = SetProjectIdAll(Path, 0);
+		if (error)
+			return error;
+	}
 
 	if (quotactl(QCMD(Q_GETQUOTA, PRJQUOTA), Device.c_str(),
 				ProjectId, (caddr_t)&quota))
 		return TError(EError::Unknown, "Cannot get quota state");
 
+	/* Reset quota counters */
 	memset(&quota, 0, sizeof(quota));
 	quota.dqb_bhardlimit = SpaceLimit / QIF_DQBLKSIZE;
 	quota.dqb_ihardlimit = InodeLimit;
@@ -331,6 +340,7 @@ TError TProjectQuota::Create() {
 
 	quotactl(QCMD(Q_SYNC, PRJQUOTA), Device.c_str(), 0, NULL);
 
+	/* Move files into project */
 	error = SetProjectIdAll(Path, ProjectId);
 	if (error)
 		(void)Destroy();
