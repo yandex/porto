@@ -337,7 +337,8 @@ TError TProjectQuota::Create() {
 
 	/* Reset quota counters */
 	memset(&quota, 0, sizeof(quota));
-	quota.dqb_bhardlimit = SpaceLimit / QIF_DQBLKSIZE;
+	quota.dqb_bhardlimit = SpaceLimit / QIF_DQBLKSIZE +
+				!!(SpaceLimit % QIF_DQBLKSIZE);
 	quota.dqb_ihardlimit = InodeLimit;
 	quota.dqb_valid = QIF_ALL;
 
@@ -368,7 +369,8 @@ TError TProjectQuota::Resize() {
 		return error;
 
 	memset(&quota, 0, sizeof(quota));
-	quota.dqb_bhardlimit = SpaceLimit / QIF_DQBLKSIZE;
+	quota.dqb_bhardlimit = SpaceLimit / QIF_DQBLKSIZE +
+				!!(SpaceLimit % QIF_DQBLKSIZE);
 	quota.dqb_ihardlimit = InodeLimit;
 	quota.dqb_valid = QIF_LIMITS;
 
