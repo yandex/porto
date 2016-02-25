@@ -1489,9 +1489,8 @@ public:
 
         if (path == "-A") {
             path = "";
-        } else if (path[0] != '/') {
-            std::cerr << "Volume path must be absolute" << std::endl;
-            return EXIT_FAILURE;
+        } else {
+            path = TPath(path).RealPath().ToString();
         }
 
         for (size_t i = 1; i < args.size(); i++) {
@@ -1524,7 +1523,8 @@ public:
 
     int Execute(TCommandEnviroment *env) final override {
         const auto &args = env->GetArgs();
-        int ret = Api->LinkVolume(args[0], (args.size() > 1) ? args[1] : "");
+        const auto path = TPath(args[0]).RealPath().ToString();
+        int ret = Api->LinkVolume(path, (args.size() > 1) ? args[1] : "");
         if (ret)
             PrintError("Can't link volume");
         return ret;
@@ -1540,7 +1540,8 @@ public:
 
     int Execute(TCommandEnviroment *env) final override {
         const auto &args = env->GetArgs();
-        int ret = Api->UnlinkVolume(args[0], (args.size() > 1) ? args[1] : "");
+        const auto path = TPath(args[0]).RealPath().ToString();
+        int ret = Api->UnlinkVolume(path, (args.size() > 1) ? args[1] : "");
         if (ret)
             PrintError("Can't unlink volume");
         return ret;
@@ -1658,8 +1659,10 @@ public:
               ShowVolume(v);
         } else {
             for (const auto &arg : args) {
+                const auto path = TPath(arg).RealPath().ToString();
+
                 vlist.clear();
-                int ret = Api->ListVolumes(arg, "", vlist);
+                int ret = Api->ListVolumes(path, "", vlist);
                 if (ret) {
                     PrintError(arg);
                     continue;
@@ -1681,12 +1684,7 @@ public:
     int Execute(TCommandEnviroment *env) final override {
         std::map<std::string, std::string> properties;
         const auto &args = env->GetArgs();
-        std::string path = args[0];
-
-        if (path[0] != '/') {
-            std::cerr << "Volume path must be absolute" << std::endl;
-            return EXIT_FAILURE;
-        }
+        const auto path = TPath(args[0]).RealPath().ToString();
 
         for (size_t i = 1; i < args.size(); i++) {
             const std::string &arg = args[i];
