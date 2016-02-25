@@ -86,9 +86,9 @@ public:
     }
 };
 
-/* TVolumeNativeBackend - project quota + bindmount */
+/* TVolumeQuotaBackend - project quota */
 
-class TVolumeNativeBackend : public TVolumeBackend {
+class TVolumeQuotaBackend : public TVolumeBackend {
 public:
 
     static bool Supported() {
@@ -108,6 +108,72 @@ public:
         }
 
         return supported;
+    }
+
+    TError Configure(std::shared_ptr<TValueMap> Config) override {
+
+        if (Volume->IsAutoPath())
+            return TError(EError::NotSupported, "Quota backend requires path");
+
+        if (!Volume->HaveQuota())
+            return TError(EError::NotSupported, "Quota backend requires space_limit");
+
+        if (Volume->IsReadOnly())
+            return TError(EError::NotSupported, "Quota backed doesn't support read_only");
+
+        if (!Volume->IsAutoStorage())
+            return TError(EError::NotSupported, "Quota backed doesn't support storage");
+
+        if (Config->HasValue(V_LAYERS))
+            return TError(EError::NotSupported, "Quota backed doesn't support layers");
+
+        return TError::Success();
+    }
+
+    TError Build() override {
+        TPath path = Volume->GetPath();
+        TProjectQuota quota(path);
+        TError error;
+
+        Volume->GetQuota(quota.SpaceLimit, quota.InodeLimit);
+        L_ACT() << "Creating project quota: " << quota.Path << " bytes: "
+                << quota.SpaceLimit << " inodes: " << quota.InodeLimit << std::endl;
+        return quota.Create();
+    }
+
+    TError Clear() override {
+        return TError(EError::NotSupported, "Quota backend cannot be cleared");
+    }
+
+    TError Destroy() override {
+        TProjectQuota quota(Volume->GetPath());
+        TError error;
+
+        L_ACT() << "Destroying project quota: " << quota.Path << std::endl;
+        error = quota.Destroy();
+        if (error)
+            L_ERR() << "Can't destroy quota: " << error << std::endl;
+
+        return error;
+    }
+
+    TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
+        TProjectQuota quota(Volume->GetPath());
+
+        quota.SpaceLimit = space_limit;
+        quota.InodeLimit = inode_limit;
+        L_ACT() << "Resizing project quota: " << quota.Path << std::endl;
+        return quota.Resize();
+    }
+};
+
+/* TVolumeNativeBackend - project quota + bindmount */
+
+class TVolumeNativeBackend : public TVolumeBackend {
+public:
+
+    static bool Supported() {
+        return TVolumeQuotaBackend::Supported();
     }
 
     TError Configure(std::shared_ptr<TValueMap> Config) override {
@@ -541,6 +607,8 @@ public:
 TError TVolume::OpenBackend() {
     if (GetBackend() == "plain")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumePlainBackend());
+    if (GetBackend() == "quota")
+        Backend = std::unique_ptr<TVolumeBackend>(new TVolumeQuotaBackend());
     else if (GetBackend() == "native")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeNativeBackend());
     else if (GetBackend() == "overlay")
@@ -1072,7 +1140,7 @@ TError TVolume::Restore() {
 
 const std::vector<std::pair<std::string, std::string>> TVolumeHolder::ListProperties() {
     return {
-        { V_BACKEND,     "plain|native|loop|overlay     (default - autodetect)" },
+        { V_BACKEND,     "plain|quota|native|overlay|loop|rbd  (default - autodetect)" },
         { V_STORAGE,     "path to data storage          (default - internal)" },
         { V_READY,       "true|false                    (readonly)" },
         { V_PRIVATE,     "                              (user-defined property)" },
