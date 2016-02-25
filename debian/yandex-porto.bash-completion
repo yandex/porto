@@ -148,6 +148,17 @@ _portoctl ()
 			;;
 		esac
 		;;
+	vtune)
+		case "$cword" in
+		2)
+			_porto_volumes
+			;;
+		*)
+			COMPREPLY=( $( compgen -S "=" -W "$_porto_volume_properies" -- "$cur" ) )
+			compopt -o nospace
+			;;
+		esac
+		;;
 	layer)
 		case "$cword" in
 		2)

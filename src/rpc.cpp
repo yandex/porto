@@ -88,7 +88,12 @@ static std::string RequestAsString(const rpc::TContainerRequest &req) {
                                       req.unlinkvolume().container();
     else if (req.has_listvolumes())
         return "volumeAPI: list volumes";
-    else if (req.has_convertpath())
+    else if (req.has_tunevolume()) {
+        std::string ret = "volumeAPI: tune " + req.tunevolume().path();
+        for (auto p: req.tunevolume().properties())
+            ret += " " + p.name() + "=" + p.value();
+        return ret;
+    } else if (req.has_convertpath())
         return "convert " + req.convertpath().path() +
             " from " + req.convertpath().source() +
             " to " + req.convertpath().destination();
@@ -249,6 +254,7 @@ static bool ValidRequest(const rpc::TContainerRequest &req) {
         req.has_linkvolume() +
         req.has_unlinkvolume() +
         req.has_listvolumes() +
+        req.has_tunevolume() +
         req.has_importlayer() +
         req.has_exportlayer() +
         req.has_removelayer() +
@@ -997,6 +1003,43 @@ noinline TError CreateVolume(TContext &context,
     return TError::Success();
 }
 
+noinline TError TuneVolume(TContext &context,
+                           const rpc::TVolumeTuneRequest &req,
+                           rpc::TContainerResponse &rsp,
+                           std::shared_ptr<TClient> client) {
+    TError error = CheckPortoWriteAccess(client);
+    if (error)
+        return error;
+
+    std::shared_ptr<TContainer> clientContainer;
+    error = client->GetClientContainer(clientContainer);
+    if (error)
+        return error;
+
+    std::map<std::string, std::string> properties;
+    for (auto p: req.properties())
+        properties[p.name()] = p.value();
+
+    TPath volume_path = clientContainer->RootPath() / req.path();
+
+    auto vholder_lock = context.Vholder->ScopedLock();
+    auto volume = context.Vholder->Find(volume_path);
+
+    if (!volume)
+        return TError(EError::VolumeNotFound, "Volume not found");
+    vholder_lock.unlock();
+
+    auto volume_lock = volume->ScopedLock();
+    if (!volume->IsReady())
+        return TError(EError::Busy, "Volume not ready");
+
+    error = volume->CheckPermission(client->GetCred());
+    if (error)
+        return error;
+
+    return volume->Tune(properties);
+}
+
 noinline TError LinkVolume(TContext &context,
                            const rpc::TVolumeLinkRequest &req,
                            rpc::TContainerResponse &rsp,
@@ -1457,6 +1500,8 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
             error = UnlinkVolume(context, req.unlinkvolume(), rsp, client);
         else if (req.has_listvolumes())
             error = ListVolumes(context, req.listvolumes(), rsp, client);
+        else if (req.has_tunevolume())
+            error = TuneVolume(context, req.tunevolume(), rsp, client);
         else if (req.has_importlayer())
             error = ImportLayer(context, req.importlayer(), client);
         else if (req.has_exportlayer())

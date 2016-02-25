@@ -1673,6 +1673,40 @@ public:
     }
 };
 
+class TTuneVolumeCmd final : public ICmd {
+public:
+    TTuneVolumeCmd(TPortoAPI *api) :
+        ICmd(api, "vtune", 1, "<path> [property=value...]", "tune volume") { }
+
+    int Execute(TCommandEnviroment *env) final override {
+        std::map<std::string, std::string> properties;
+        const auto &args = env->GetArgs();
+        std::string path = args[0];
+
+        if (path[0] != '/') {
+            std::cerr << "Volume path must be absolute" << std::endl;
+            return EXIT_FAILURE;
+        }
+
+        for (size_t i = 1; i < args.size(); i++) {
+            const std::string &arg = args[i];
+            std::size_t sep = arg.find('=');
+            if (sep == string::npos)
+                properties[arg] = "";
+            else
+                properties[arg.substr(0, sep)] = arg.substr(sep + 1);
+        }
+
+        int ret = Api->TuneVolume(path, properties);
+        if (ret) {
+            PrintError("Cannot tune volume");
+            return ret;
+        }
+
+        return 0;
+    }
+};
+
 class TLayerCmd final : public ICmd {
 public:
     TLayerCmd(TPortoAPI *api) : ICmd(api, "layer", 1,
@@ -1998,6 +2032,7 @@ int main(int argc, char *argv[]) {
     handler.RegisterCommand<TLinkVolumeCmd>();
     handler.RegisterCommand<TUnlinkVolumeCmd>();
     handler.RegisterCommand<TListVolumesCmd>();
+    handler.RegisterCommand<TTuneVolumeCmd>();
 
     handler.RegisterCommand<TLayerCmd>();
     handler.RegisterCommand<TBuildCmd>();

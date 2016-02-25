@@ -1061,6 +1061,39 @@ TError TVolume::GetStat(uint64_t &space_used, uint64_t &space_avail,
     return Backend->GetStat(space_used, space_avail, inode_used, inode_avail);
 }
 
+TError TVolume::Tune(const std::map<std::string, std::string> &properties) {
+    TError error;
+
+    for (auto p: properties) {
+        auto prop = Config->Find(p.first);
+        if (!prop)
+            return TError(EError::InvalidProperty,
+                    "Invalid volume property: " + p.first);
+        if (!prop->HasFlag(DYNAMIC_VALUE))
+            return TError(EError::InvalidProperty,
+                    "Volume property " + p.first + " cannot be changed");
+    }
+
+    if (properties.count(V_SPACE_LIMIT) || properties.count(V_INODE_LIMIT)) {
+        uint64_t spaceLimit, inodeLimit;
+
+        GetQuota(spaceLimit, inodeLimit);
+        if (properties.count(V_SPACE_LIMIT)) {
+            error = StringToSize(properties.at(V_SPACE_LIMIT), spaceLimit);
+            if (error)
+                return error;
+        }
+        if (properties.count(V_INODE_LIMIT)) {
+            error = StringToSize(properties.at(V_INODE_LIMIT), inodeLimit);
+            if (error)
+                return error;
+        }
+        error = Resize(spaceLimit, inodeLimit);
+    }
+
+    return error;
+}
+
 TError TVolume::Resize(uint64_t space_limit, uint64_t inode_limit) {
     L_ACT() << "Resize volume: " << GetPath() << " to bytes: "
             << space_limit << " inodes: " << inode_limit << std::endl;
@@ -1206,8 +1239,8 @@ static void RegisterVolumeProperties(std::shared_ptr<TRawValueMap> m) {
     m->Add(V_READ_ONLY, new TBoolValue(PERSISTENT_VALUE));
     m->Add(V_LAYERS, new TListValue(HIDDEN_VALUE | PERSISTENT_VALUE));
 
-    m->Add(V_SPACE_LIMIT, new TSizeValue(PERSISTENT_VALUE));
-    m->Add(V_INODE_LIMIT, new TSizeValue(PERSISTENT_VALUE));
+    m->Add(V_SPACE_LIMIT, new TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE));
+    m->Add(V_INODE_LIMIT, new TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE));
 
     m->Add(V_SPACE_GUARANTEE, new TSizeValue(PERSISTENT_VALUE));
     m->Add(V_INODE_GUARANTEE, new TSizeValue(PERSISTENT_VALUE));

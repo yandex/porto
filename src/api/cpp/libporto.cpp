@@ -456,6 +456,21 @@ int TPortoAPI::ListVolumes(const std::string &path,
     return ret;
 }
 
+int TPortoAPI::TuneVolume(const std::string &path,
+                          const std::map<std::string, std::string> &config) {
+    auto req = Impl->Req.mutable_tunevolume();
+
+    req->set_path(path);
+
+    for (const auto &kv: config) {
+        auto prop = req->add_properties();
+        prop->set_name(kv.first);
+        prop->set_value(kv.second);
+    }
+
+    return Impl->Rpc();
+}
+
 int TPortoAPI::ImportLayer(const std::string &layer,
                            const std::string &tarball, bool merge) {
     auto req = Impl->Req.mutable_importlayer();

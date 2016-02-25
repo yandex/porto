@@ -327,6 +327,15 @@ class _RPC(object):
             request.unlinkVolume.container = container
         self.call(request, self.timeout)
 
+    def TuneVolume(self, path, **properties):
+        request = rpc_pb2.TContainerRequest()
+        request.tuneVolume.CopyFrom(rpc_pb2.TVolumeTuneRequest())
+        request.tuneVolume.path = path
+        for name, value in properties.iteritems():
+            prop = request.tuneVolume.properties.add()
+            prop.name, prop.value = name, value
+        self.call(request, self.timeout)
+
     def ImportLayer(self, layer, tarball, merge=False):
         request = rpc_pb2.TContainerRequest()
         request.importLayer.layer = layer
@@ -444,6 +453,9 @@ class Volume(object):
             container = container.name
         self.rpc.UnlinkVolume(self.path, container)
 
+    def Tune(self, **properties):
+        self.rpc.TuneVolume(self.path, **properties)
+
     def Export(self, tarball):
         self.rpc.ExportLayer(self.path, tarball)
 
@@ -557,6 +569,9 @@ class Connection(object):
         if isinstance(container, Container):
             container = container.name
         return [Volume(self.rpc, v.path) for v in self.rpc.ListVolumes(container=container)]
+
+    def TuneVolume(self, path, **properties):
+        self.rpc.TuneVolume(path, **properties)
 
     def ImportLayer(self, name, tarball):
         self.rpc.ImportLayer(name, tarball)

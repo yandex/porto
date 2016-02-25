@@ -114,6 +114,8 @@ public:
     TError SetReady(bool ready) { return Config->Set<bool>(V_READY, ready); }
     bool IsReady() const { return Config->Get<bool>(V_READY); }
 
+    TError Tune(const std::map<std::string, std::string> &properties);
+
     TError Resize(uint64_t space_limit, uint64_t inode_limit);
 
     void GetGuarantee(uint64_t &space_guarantee, uint64_t &inode_guarantee) const {

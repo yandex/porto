@@ -87,6 +87,8 @@ public:
     int ListVolumes(std::vector<TPortoVolume> &volumes) {
         return ListVolumes(std::string(), std::string(), volumes);
     }
+    int TuneVolume(const std::string &path,
+                   const std::map<std::string, std::string> &config);
 
     int ImportLayer(const std::string &layer, const std::string &tarball,
                     bool merge = false);
