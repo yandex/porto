@@ -553,10 +553,13 @@ static int SlaveMain() {
         }
 
         TPath tmp_dir(config().container().tmp_dir());
-        if (!tmp_dir.IsDirectory()) {
+        if (!tmp_dir.IsDirectoryFollow()) {
+            (void)tmp_dir.Unlink();
             error = tmp_dir.MkdirAll(0755);
-            L_ERR() << "Cannot create " << tmp_dir << " : " << error << std::endl;
-            return EXIT_FAILURE;
+            if (error) {
+                L_ERR() << "Cannot create " << tmp_dir << " : " << error << std::endl;
+                return EXIT_FAILURE;
+            }
         }
 
         bool restored = context.Cholder->RestoreFromStorage();

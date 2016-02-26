@@ -109,7 +109,7 @@ TError TKeyValueStorage::MountTmpfs(std::string size) {
     TError error;
     TMount mount;
 
-    if (!Root.IsDirectory()) {
+    if (!Root.IsDirectoryStrict()) {
         if (Root.Exists())
             (void)Root.Unlink();
         error = Root.MkdirAll(config().keyval().file().perm());

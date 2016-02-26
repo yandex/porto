@@ -116,7 +116,3 @@ TError TFile::Truncate(size_t size) const {
 
     return TError::Success();
 }
-
-off_t TFile::GetSize() const {
-    return Path.GetSize();
-}

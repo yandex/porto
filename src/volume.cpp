@@ -789,7 +789,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             return TError(EError::InvalidValue, "Volume path must be normalized");
         if (!path.Exists())
             return TError(EError::InvalidValue, "Volume path does not exist");
-        if (!path.IsDirectory())
+        if (!path.IsDirectoryStrict())
             return TError(EError::InvalidValue, "Volume path must be a directory");
         if (!path.CanWrite(creator_cred))
             return TError(EError::Permission, "Volume path usage not permitted");
@@ -823,7 +823,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             return TError(EError::InvalidValue, "Storage path must be normalized");
         if (!storage.Exists())
             return TError(EError::InvalidValue, "Storage path does not exist");
-        if (!storage.IsDirectory())
+        if (!storage.IsDirectoryFollow())
             return TError(EError::InvalidValue, "Storage path must be a directory");
         if (!storage.CanWrite(creator_cred))
             return TError(EError::Permission, "Storage path usage not permitted");
@@ -898,7 +898,7 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
             }
             if (!layer.Exists())
                 return TError(EError::LayerNotFound, "Layer not found");
-            if (!layer.IsDirectory())
+            if (!layer.IsDirectoryFollow())
                 return TError(EError::InvalidValue, "Layer must be a directory");
         }
 
@@ -1274,7 +1274,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
     TError error;
 
     TPath volumes = config().volumes().volume_dir();
-    if (!volumes.IsDirectory()) {
+    if (!volumes.IsDirectoryFollow()) {
         (void)volumes.Unlink();
         error = volumes.MkdirAll(0755);
         if (error)
@@ -1282,7 +1282,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
     }
 
     TPath layers = config().volumes().layers_dir();
-    if (!layers.IsDirectory()) {
+    if (!layers.IsDirectoryFollow()) {
         (void)layers.Unlink();
         error = layers.MkdirAll(0700);
         if (error)
@@ -1473,7 +1473,7 @@ TError SanitizeLayer(TPath layer, bool merge) {
             continue;
         }
 
-        if (path.IsDirectory()) {
+        if (path.IsDirectoryStrict()) {
             error = SanitizeLayer(path, merge);
             if (error)
                 return error;

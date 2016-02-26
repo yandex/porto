@@ -11,8 +11,6 @@ class TPath {
     std::string Path;
 
     std::string DirNameStr() const;
-    TError RegularCopy(const TPath &to, unsigned int mode) const;
-    unsigned int Stat(std::function<unsigned int(struct stat *st)> f) const;
     TPath AddComponent(const TPath &component) const;
 
 public:
@@ -70,21 +68,20 @@ public:
     TPath RealPath() const;
     TPath InnerPath(const TPath &path, bool absolute = true) const;
 
-    TError Stat(struct stat &st) const;
+    TError StatStrict(struct stat &st) const;
+    TError StatFollow(struct stat &st) const;
 
-    unsigned int GetMode() const;
+    bool IsRegularStrict() const;
+    bool IsRegularFollow() const;
+
+    bool IsDirectoryStrict() const;
+    bool IsDirectoryFollow() const;
+
     unsigned int GetDev() const;
-    ino_t GetInode() const;
     unsigned int GetBlockDev() const;
-    unsigned int GetUid() const;
-    unsigned int GetGid() const;
-    off_t GetSize() const;
-    off_t GetDiskUsage() const;
-    int GetNLinks() const;
+
     int64_t SinceModificationMs() const;
     std::string ToString() const;
-    bool IsRegular() const;
-    bool IsDirectory() const;
     bool Exists() const;
 
     bool HasAccess(const TCred &cred, int mask) const;

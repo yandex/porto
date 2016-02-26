@@ -22,7 +22,7 @@ TError TDevice::Parse(const std::string &cfg) {
     if (!Path.IsNormal())
         return TError(EError::InvalidValue, "Non-normalized name: " + Name);
 
-    error = Path.Stat(st);
+    error = Path.StatFollow(st);
     if (error)
         return error;
 

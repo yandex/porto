@@ -213,7 +213,7 @@ TError TTask::ChildBindDirectores() {
                           + " (" + Env->Root.ToString() + ")");
 
         TError error;
-        if (src.IsDirectory())
+        if (src.IsDirectoryFollow())
             error = dest.MkdirAll(0755);
         else
             error = dest.CreateAll(0600);
@@ -395,7 +395,7 @@ TError TTask::ChildMountRootFs() {
             return error;
     } else if (Env->ResolvConf.length()) {
         TPath resolvconf = Env->Root + "/etc/resolv.conf";
-        if (!resolvconf.IsRegular()) {
+        if (!resolvconf.IsRegularStrict()) {
             if (!resolvconf.Exists())
                 error = resolvconf.Mknod(S_IFREG | 0644, 0);
             else

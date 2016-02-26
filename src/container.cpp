@@ -97,7 +97,7 @@ TPath TContainer::RootPath() const {
 
     TPath path(Prop->Get<std::string>(P_ROOT));
     if (!path.IsRoot()) {
-        if (path.IsRegular())
+        if (path.IsRegularFollow())
             path = GetTmpDir();
         path = path.NormalPath();
     }
@@ -1109,7 +1109,7 @@ TError TContainer::ApplyForTreePostorder(TScopedLock &holder_lock,
 
 TError TContainer::PrepareLoop() {
     TPath loop_image(Prop->Get<std::string>(P_ROOT));
-    if (!loop_image.IsRegular())
+    if (!loop_image.IsRegularFollow())
         return TError::Success();
 
     TError error;
@@ -1703,20 +1703,20 @@ void TContainer::RestoreStdPath(const std::string &property) {
         std::string cwd(Prop->Get<std::string>(P_CWD));
         std::string name(Prop->Get<std::string>(property) + "." + GetTextId("_"));
 
-        if (root.IsRegular())
+        if (root.IsRegularFollow())
             path = GetTmpDir() / name;
         else
             path = root / cwd / name;
 
         /* Restore from < 2.7 */
-        if (path.IsRegular()) {
+        if (path.IsRegularStrict()) {
             L_ACT() << GetName() << ": restore " << property << " "
                     << path.ToString() << std::endl;
             Prop->Set<std::string>(property, path.ToString());
         }
     }
 
-    if (def && GetState() == EContainerState::Stopped && path.IsRegular())
+    if (def && GetState() == EContainerState::Stopped && path.IsRegularStrict())
         path.Unlink();
 }
 

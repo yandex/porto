@@ -1268,7 +1268,7 @@ noinline TError ImportLayer(TContext &context,
     if (!tarball.Exists())
         return TError(EError::InvalidValue, "tarball not found");
 
-    if (!tarball.IsRegular())
+    if (!tarball.IsRegularFollow())
         return TError(EError::InvalidValue, "tarball not a file");
 
     if (!tarball.CanRead(client->GetCred()))

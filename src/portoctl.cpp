@@ -268,7 +268,7 @@ public:
 
             auto path = TPath(layer).RealPath();
 
-            if (path.IsDirectory()) {
+            if (path.IsDirectoryFollow()) {
                 Layers.push_back(path.ToString());
                 continue;
             }

@@ -53,6 +53,7 @@ TError TCgroup::Create() const {
 }
 
 TError TCgroup::Remove() const {
+    struct stat st;
     TError error;
 
     if (Secondary())
@@ -62,7 +63,8 @@ TError TCgroup::Remove() const {
     error = Path().Rmdir();
 
     /* workaround for bad synchronization */
-    if (error && error.GetErrno() == EBUSY && Path().GetNLinks() == 2) {
+    if (error && error.GetErrno() == EBUSY &&
+            !Path().StatStrict(st) && st.st_nlink == 2) {
         for (int i = 0; i < 100; i++) {
             usleep(config().daemon().cgroup_remove_timeout_s() * 10000);
             error = Path().Rmdir();

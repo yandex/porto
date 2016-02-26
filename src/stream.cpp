@@ -80,7 +80,7 @@ TError TStdStream::Open(const TPath &path, const TCred &cred) const {
         ret = Stream;
     }
 
-    if (path.IsRegular()) {
+    if (path.IsRegularStrict()) {
         ret = fchown(ret, cred.Uid, cred.Gid);
         if (ret < 0)
             return TError(EError::Unknown, errno, "fchown(" + path.ToString() + ")");
@@ -110,13 +110,13 @@ TError TStdStream::OpenInChild(const TCred &cred) const {
 
 TError TStdStream::Rotate(off_t limit, off_t &loss) const {
     loss = 0;
-    if (PathOnHost.IsRegular())
+    if (PathOnHost.IsRegularStrict())
         return PathOnHost.RotateLog(config().container().max_log_size(), loss);
     return TError::Success();
 }
 
 TError TStdStream::Cleanup() {
-    if (ManagedByPorto && PathOnHost.IsRegular() && Stream) {
+    if (ManagedByPorto && PathOnHost.IsRegularStrict() && Stream) {
         TError err = PathOnHost.Unlink();
         if (err)
             L_ERR() << "Can't remove std log: " << err << std::endl;
@@ -130,7 +130,7 @@ TError TStdStream::Read(std::string &text, off_t limit, uint64_t base, const std
     uint64_t offset = 0;
     TError error;
 
-    if (!PathOnHost.IsRegular()) {
+    if (!PathOnHost.IsRegularStrict()) {
         if (!PathOnHost.Exists())
             return TError(EError::InvalidData, "file not found");
         return TError(EError::InvalidData, "file is non-regular");

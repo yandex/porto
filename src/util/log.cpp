@@ -150,7 +150,8 @@ void TLogBuf::Open(const TPath &path, const unsigned int mode) {
         return;
     }
 
-    if (path.GetMode() != mode)
+    struct stat st;
+    if (!path.StatFollow(st) && (st.st_mode & 0777) != mode)
         (void)path.Chmod(mode);
 
     logBufFd = open(path.c_str(), O_WRONLY | O_APPEND | O_CREAT | O_CLOEXEC |

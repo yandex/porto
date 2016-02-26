@@ -46,30 +46,47 @@ std::string TPath::BaseName() const {
     return out;
 }
 
-TError TPath::Stat(struct stat &st) const {
+TError TPath::StatStrict(struct stat &st) const {
+    if (lstat(Path.c_str(), &st))
+        return TError(EError::Unknown, errno, "lstat " + Path);
+    return TError::Success();
+}
+
+TError TPath::StatFollow(struct stat &st) const {
     if (stat(Path.c_str(), &st))
         return TError(EError::Unknown, errno, "stat " + Path);
     return TError::Success();
 }
 
-unsigned int TPath::Stat(std::function<unsigned int(struct stat *st)> f) const {
+bool TPath::IsRegularStrict() const {
     struct stat st;
-
-    if (lstat(Path.c_str(), &st))
-        return 0;
-
-    return f(&st);
+    return !lstat(c_str(), &st) && S_ISREG(st.st_mode);
 }
 
-unsigned int TPath::GetMode() const {
-    return Stat([](struct stat *st) { return st->st_mode & 0x1FF; });
+bool TPath::IsRegularFollow() const {
+    struct stat st;
+    return !stat(c_str(), &st) && S_ISREG(st.st_mode);
+}
+
+bool TPath::IsDirectoryStrict() const {
+    struct stat st;
+    return !lstat(c_str(), &st) && S_ISDIR(st.st_mode);
+}
+
+bool TPath::IsDirectoryFollow() const {
+    struct stat st;
+    return !stat(c_str(), &st) && S_ISDIR(st.st_mode);
 }
 
 unsigned int TPath::GetDev() const {
-    return Stat([](struct stat *st) { return st->st_dev; });
+    struct stat st;
+
+    if (stat(Path.c_str(), &st))
+        return 0;
+
+    return st.st_dev;
 }
 
-/* Follows symlinks */
 unsigned int TPath::GetBlockDev() const {
     struct stat st;
 
@@ -77,60 +94,6 @@ unsigned int TPath::GetBlockDev() const {
         return 0;
 
     return st.st_rdev;
-}
-
-ino_t TPath::GetInode() const {
-    struct stat st;
-
-    if (lstat(Path.c_str(), &st))
-        return 0;
-
-    return st.st_ino;
-}
-
-unsigned int TPath::GetUid() const {
-    return Stat([](struct stat *st) { return st->st_uid; });
-}
-
-unsigned int TPath::GetGid() const {
-    return Stat([](struct stat *st) { return st->st_gid; });
-}
-
-off_t TPath::GetSize() const {
-    struct stat st;
-
-    if (lstat(Path.c_str(), &st))
-        return -1;
-
-    return st.st_size;
-}
-
-off_t TPath::GetDiskUsage() const {
-    struct stat st;
-
-    if (lstat(Path.c_str(), &st))
-        return -1;
-
-    return st.st_blocks * 512;
-}
-
-int TPath::GetNLinks() const {
-    struct stat st;
-
-    if (lstat(Path.c_str(), &st))
-        return 0;
-
-    return st.st_nlink;
-}
-
-bool TPath::IsRegular() const {
-    struct stat st;
-    return !lstat(c_str(), &st) && S_ISREG(st.st_mode);
-}
-
-bool TPath::IsDirectory() const {
-    struct stat st;
-    return !lstat(c_str(), &st) && S_ISDIR(st.st_mode);
 }
 
 bool TPath::Exists() const {
@@ -267,30 +230,6 @@ TError TPath::Mknod(unsigned int mode, unsigned int dev) const {
     if (ret)
         return TError(EError::Unknown, errno, "mknod(" + Path + ", " +
                 StringFormat("%#o", mode) + ", " + StringFormat("%#x", dev) + ")");
-    return TError::Success();
-}
-
-TError TPath::RegularCopy(const TPath &to, unsigned int mode) const {
-    TScopedFd in, out;
-
-    in = open(Path.c_str(), O_RDONLY);
-    if (in.GetFd() < 0)
-        return TError(EError::Unknown, errno, "open(" + Path + ")");
-    out = creat(to.ToString().c_str(), mode);
-    if (out.GetFd() < 0)
-        return TError(EError::Unknown, errno, "creat(" + to.ToString() + ")");
-
-    int n, ret;
-    char buf[4096];
-    while ((n = read(in.GetFd(), buf, sizeof(buf))) > 0) {
-        ret = write(out.GetFd(), buf, n);
-        if (ret != n)
-            return TError(EError::Unknown, errno, "partial copy(" + Path + ", " + to.ToString() + ")");
-    }
-
-    if (n < 0)
-        return TError(EError::Unknown, errno, "copy(" + Path + ", " + to.ToString() + ")");
-
     return TError::Success();
 }
 
@@ -449,6 +388,9 @@ TError TPath::MkdirAll(unsigned int mode) const {
         path = path.DirName();
     }
 
+    if (!path.IsDirectoryFollow())
+        return TError(EError::Unknown, "Not a directory: " + path.ToString());
+
     for (auto path = paths.rbegin(); path != paths.rend(); path++) {
         error = path->Mkdir(mode);
         if (error)
@@ -471,8 +413,8 @@ TError TPath::CreateAll(unsigned int mode) const {
 
         /* This fails for broken symlinks */
         return Mknod(S_IFREG | mode, 0);
-    } else if (IsDirectory())
-        return TError(EError::Unknown, EINVAL, "Path " + Path + " not a file");
+    } else if (IsDirectoryFollow())
+        return TError(EError::Unknown, "Is a directory: " + Path);
 
     return TError::Success();
 }
@@ -605,7 +547,7 @@ restart:
 }
 
 TError TPath::RemoveAll() const {
-    if (IsDirectory()) {
+    if (IsDirectoryStrict()) {
         TError error = ClearDirectory();
         if (error)
             return error;
@@ -644,7 +586,7 @@ TError TPath::ListSubdirs(std::vector<std::string> &result) const {
         if (strcmp(de->d_name, ".") && strcmp(de->d_name, "..") &&
             (de->d_type == DT_DIR ||
              (de->d_type == DT_UNKNOWN &&
-              (*this / std::string(de->d_name)).IsDirectory())))
+              (*this / std::string(de->d_name)).IsDirectoryStrict())))
             result.push_back(std::string(de->d_name));
     }
     closedir(dir);

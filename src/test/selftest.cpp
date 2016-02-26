@@ -4666,10 +4666,12 @@ static void TestVolumeImpl(TPortoAPI &api) {
         AsAlice(api);
 
         Say() << "Make sure loop device has correct size" << std::endl;
-        TFile loopFile(img);
         off_t expected = 100 * 1024 * 1024;
         off_t mistake = 1 * 1024 * 1024;
-        Expect(loopFile.GetSize() > expected - mistake && loopFile.GetSize() < expected + mistake);
+
+        struct stat st;
+        ExpectSuccess(TPath(img).StatStrict(st));
+        Expect(st.st_size > expected - mistake && st.st_size < expected + mistake);
 
         Say() << "Make sure no loop device is created without quota" << std::endl;
         Expect(!StringStartsWith(m[b].source, "/dev/loop"));
@@ -5314,6 +5316,7 @@ static void TestRemoveDead(TPortoAPI &api) {
 
 static void TestLogRotate(TPortoAPI &api) {
     std::string v;
+    struct stat st;
 
     std::string name = "biglog";
     ExpectApiSuccess(api.Create(name));
@@ -5325,7 +5328,8 @@ static void TestLogRotate(TPortoAPI &api) {
     WaitContainer(api, name);
 
     TPath stdoutPath(cwd + "/" + v);
-    ExpectLess(stdoutPath.GetDiskUsage(), config().container().max_log_size());
+    ExpectSuccess(stdoutPath.StatFollow(st));
+    ExpectLess(st.st_blocks * 512, config().container().max_log_size());
 }
 
 static void CheckErrorCounters(TPortoAPI &api) {

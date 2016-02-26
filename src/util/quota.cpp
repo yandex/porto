@@ -208,10 +208,14 @@ TError TProjectQuota::SetProjectIdAll(const TPath &path, uint32_t id) {
 
 /* Construct unique project id from directory inode number. */
 TError TProjectQuota::InventProjectId(const TPath &path, uint32_t &id) {
-	id = path.GetInode();
-	if (!id)
-		return TError(EError::Unknown, "Cannot get inode number: " + path.ToString());
-	id |= 1u << 31;
+	struct stat st;
+	TError error;
+
+	error = path.StatStrict(st);
+	if (error)
+		return error;
+
+	id = st.st_ino | (1u << 31);
 	return TError::Success();
 }
 
@@ -298,8 +302,13 @@ TError TProjectQuota::Create() {
 	struct if_dqblk quota;
 	TError error;
 
-	if (!Path.IsDirectory())
-		return TError(EError::InvalidValue, "Not a directory " + Path.ToString());
+	if (!Path.IsDirectoryStrict()) {
+		if (!Path.Exists())
+			return TError(EError::InvalidValue,
+					"Directory not found: " + Path.ToString());
+		return TError(EError::InvalidValue,
+				"Not a directory: " + Path.ToString());
+	}
 
 	error = FindDevice();
 	if (error)
