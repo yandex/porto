@@ -703,16 +703,14 @@ std::vector<TPath> TVolume::GetLayers() const {
     return result;
 }
 
-TError TVolume::CheckGuarantee(TVolumeHolder &holder) const {
-    uint64_t space_guarantee, inode_guarantee;
+TError TVolume::CheckGuarantee(TVolumeHolder &holder,
+        uint64_t space_guarantee, uint64_t inode_guarantee) const {
     auto backend = GetBackend();
     TStatFS current, total;
     TPath storage;
 
     if (backend == "rbd")
         return TError::Success();
-
-    GetGuarantee(space_guarantee, inode_guarantee);
 
     if (!space_guarantee && !inode_guarantee)
         return TError::Success();
@@ -966,7 +964,9 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
     if (error)
         return error;
 
-    error = CheckGuarantee(holder);
+    uint64_t space_guarantee, inode_guarantee;
+    GetGuarantee(space_guarantee, inode_guarantee);
+    error = CheckGuarantee(holder, space_guarantee, inode_guarantee);
     if (error)
         return error;
 
@@ -1092,7 +1092,8 @@ TError TVolume::StatFS(TStatFS &result) const {
     return Backend->StatFS(result);
 }
 
-TError TVolume::Tune(const std::map<std::string, std::string> &properties) {
+TError TVolume::Tune(TVolumeHolder &holder,
+        const std::map<std::string, std::string> &properties) {
     TError error;
 
     for (auto p: properties) {
@@ -1120,6 +1121,29 @@ TError TVolume::Tune(const std::map<std::string, std::string> &properties) {
                 return error;
         }
         error = Resize(spaceLimit, inodeLimit);
+    }
+
+    if (properties.count(V_SPACE_GUARANTEE) || properties.count(V_INODE_GUARANTEE)) {
+        uint64_t space_guarantee, inode_guarantee;
+
+        GetGuarantee(space_guarantee, inode_guarantee);
+        if (properties.count(V_SPACE_GUARANTEE)) {
+            error = StringToSize(properties.at(V_SPACE_GUARANTEE), space_guarantee);
+            if (error)
+                return error;
+        }
+        if (properties.count(V_INODE_GUARANTEE)) {
+            error = StringToSize(properties.at(V_INODE_GUARANTEE), inode_guarantee);
+            if (error)
+                return error;
+        }
+
+        auto lock = holder.ScopedLock();
+        error = CheckGuarantee(holder, space_guarantee, inode_guarantee);
+        if (error)
+            return error;
+        Config->Set<uint64_t>(V_SPACE_GUARANTEE, space_guarantee);
+        Config->Set<uint64_t>(V_INODE_GUARANTEE, inode_guarantee);
     }
 
     return error;
@@ -1276,8 +1300,8 @@ static void RegisterVolumeProperties(std::shared_ptr<TRawValueMap> m) {
     m->Add(V_SPACE_LIMIT, new TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE));
     m->Add(V_INODE_LIMIT, new TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE));
 
-    m->Add(V_SPACE_GUARANTEE, new TSizeValue(PERSISTENT_VALUE));
-    m->Add(V_INODE_GUARANTEE, new TSizeValue(PERSISTENT_VALUE));
+    m->Add(V_SPACE_GUARANTEE, new TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE));
+    m->Add(V_INODE_GUARANTEE, new TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE));
 }
 
 TError TVolumeHolder::Create(std::shared_ptr<TVolume> &volume) {

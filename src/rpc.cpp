@@ -1037,7 +1037,7 @@ noinline TError TuneVolume(TContext &context,
     if (error)
         return error;
 
-    return volume->Tune(properties);
+    return volume->Tune(*context.Vholder, properties);
 }
 
 noinline TError LinkVolume(TContext &context,

@@ -113,7 +113,8 @@ public:
     TError SetReady(bool ready) { return Config->Set<bool>(V_READY, ready); }
     bool IsReady() const { return Config->Get<bool>(V_READY); }
 
-    TError Tune(const std::map<std::string, std::string> &properties);
+    TError Tune(TVolumeHolder &holder,
+            const std::map<std::string, std::string> &properties);
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit);
 
@@ -121,7 +122,8 @@ public:
         space_guarantee = Config->Get<uint64_t>(V_SPACE_GUARANTEE);
         inode_guarantee = Config->Get<uint64_t>(V_INODE_GUARANTEE);
     }
-    TError CheckGuarantee(TVolumeHolder &holder) const;
+    TError CheckGuarantee(TVolumeHolder &holder,
+            uint64_t space_guarantee, uint64_t inode_guarantee) const;
 
     bool HaveQuota() const {
         return Config->HasValue(V_SPACE_LIMIT) ||
