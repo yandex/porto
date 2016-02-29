@@ -416,11 +416,10 @@ TError TProjectQuota::Destroy() {
 	return TError::Success();
 }
 
-TError TProjectQuota::StatVFS(uint64_t &spaceUsed, uint64_t &spaceAvail,
-			      uint64_t &inodeUsed, uint64_t &inodeAvail) {
+TError TProjectQuota::StatFS(TStatFS &result) {
 	TError error;
 
-	error = Path.StatVFS(spaceUsed, spaceAvail, inodeUsed, inodeAvail);
+	error = Path.StatFS(result);
 	if (error)
 		return error;
 
@@ -428,22 +427,22 @@ TError TProjectQuota::StatVFS(uint64_t &spaceUsed, uint64_t &spaceAvail,
 	if (error)
 		return error;
 
-	spaceUsed = SpaceUsage;
+	result.SpaceUsage = SpaceUsage;
 
-	if (SpaceLimit && SpaceLimit < SpaceUsage + spaceAvail) {
+	if (SpaceLimit && SpaceLimit < SpaceUsage + result.SpaceAvail) {
 		if (SpaceLimit > SpaceUsage)
-			spaceAvail = SpaceLimit - SpaceUsage;
+			result.SpaceAvail = SpaceLimit - SpaceUsage;
 		else
-			spaceAvail = 0;
+			result.SpaceAvail = 0;
 	}
 
-	inodeUsed = InodeUsage;
+	result.InodeUsage = InodeUsage;
 
-	if (InodeLimit && InodeLimit < InodeUsage + inodeAvail) {
+	if (InodeLimit && InodeLimit < InodeUsage + result.InodeAvail) {
 		if (InodeLimit > InodeUsage)
-			inodeAvail = InodeLimit - InodeUsage;
+			result.InodeAvail = InodeLimit - InodeUsage;
 		else
-			inodeAvail = 0;
+			result.InodeAvail = 0;
 	}
 
 	return TError::Success();

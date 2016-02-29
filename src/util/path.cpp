@@ -338,24 +338,18 @@ TPath TPath::InnerPath(const TPath &path, bool absolute) const {
         return TPath(path.Path.substr(len + 1));
 }
 
-TError TPath::StatVFS(uint64_t &space_used, uint64_t &space_avail,
-                      uint64_t &inode_used, uint64_t &inode_avail) const {
+TError TPath::StatFS(TStatFS &result) const {
     struct statvfs st;
 
     int ret = statvfs(Path.c_str(), &st);
     if (ret)
         return TError(EError::Unknown, errno, "statvfs(" + Path + ")");
 
-    space_used = (uint64_t)(st.f_blocks - st.f_bfree) * st.f_bsize;
-    space_avail = (uint64_t)(st.f_bavail) * st.f_bsize;
-    inode_used = st.f_files - st.f_ffree;
-    inode_avail = st.f_favail;
+    result.SpaceUsage = (uint64_t)(st.f_blocks - st.f_bfree) * st.f_bsize;
+    result.SpaceAvail = (uint64_t)(st.f_bavail) * st.f_bsize;
+    result.InodeUsage = st.f_files - st.f_ffree;
+    result.InodeAvail = st.f_favail;
     return TError::Success();
-}
-
-TError TPath::StatVFS(uint64_t &space_avail) const {
-    uint64_t space_used, inode_used, inode_avail;
-    return StatVFS(space_used, space_avail, inode_used, inode_avail);
 }
 
 TError TPath::Unlink() const {

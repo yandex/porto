@@ -7,6 +7,17 @@
 #include "string.hpp"
 #include "util/cred.hpp"
 
+struct TStatFS {
+    uint64_t SpaceUsage;
+    uint64_t SpaceAvail;
+    uint64_t InodeUsage;
+    uint64_t InodeAvail;
+
+    void Reset() {
+        SpaceUsage = SpaceAvail = InodeUsage = InodeAvail = 0;
+    }
+};
+
 class TPath {
     std::string Path;
 
@@ -113,9 +124,7 @@ public:
     TError ReadDirectory(std::vector<std::string> &result) const;
     TError ListSubdirs(std::vector<std::string> &result) const;
     TError ClearDirectory() const;
-    TError StatVFS(uint64_t &space_used, uint64_t &space_avail,
-                   uint64_t &inode_used, uint64_t &inode_avail) const;
-    TError StatVFS(uint64_t &space_avail) const;
+    TError StatFS(TStatFS &result) const;
     TError SetXAttr(const std::string name, const std::string value) const;
     TError RotateLog(off_t max_disk_usage, off_t &loss) const;
     TError Chattr(unsigned add_flags, unsigned del_flags) const;

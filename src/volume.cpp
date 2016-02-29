@@ -40,12 +40,6 @@ TError TVolumeBackend::Resize(uint64_t space_limit, uint64_t inode_limit) {
     return TError(EError::NotSupported, "not implemented");
 }
 
-TError TVolumeBackend::GetStat(uint64_t &space_used, uint64_t &space_avail,
-                               uint64_t &inode_used, uint64_t &inode_avail) {
-    return Volume->GetPath().StatVFS(space_used, space_avail,
-                                     inode_used, inode_avail);
-}
-
 /* TVolumePlainBackend - bindmount */
 
 class TVolumePlainBackend : public TVolumeBackend {
@@ -83,6 +77,10 @@ public:
         if (error)
             L_ERR() << "Can't umount volume: " << error << std::endl;
         return error;
+    }
+
+    TError StatFS(TStatFS &result) override {
+        return Volume->GetPath().StatFS(result);
     }
 };
 
@@ -166,11 +164,8 @@ public:
         return quota.Resize();
     }
 
-    TError GetStat(uint64_t &spaceUsed, uint64_t &spaceAvail,
-                   uint64_t &inodeUsed, uint64_t &inodeAvail) override {
-        TProjectQuota quota(Volume->GetPath());
-
-        return quota.StatVFS(spaceUsed, spaceAvail, inodeUsed, inodeAvail);
+    TError StatFS(TStatFS &result) override {
+        return TProjectQuota(Volume->GetPath()).StatFS(result);
     }
 };
 
@@ -252,12 +247,10 @@ public:
         return quota.Resize();
     }
 
-    TError GetStat(uint64_t &spaceUsed, uint64_t &spaceAvail,
-                   uint64_t &inodeUsed, uint64_t &inodeAvail) override {
-        TProjectQuota quota(Volume->GetStorage());
+    TError StatFS(TStatFS &result) override {
         if (Volume->HaveQuota())
-            return quota.StatVFS(spaceUsed, spaceAvail, inodeUsed, inodeAvail);
-        return Volume->GetPath().StatVFS(spaceUsed, spaceAvail, inodeUsed, inodeAvail);
+            return TProjectQuota(Volume->GetStorage()).StatFS(result);
+        return Volume->GetPath().StatFS(result);
     }
 };
 
@@ -356,6 +349,10 @@ free_loop:
 
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
         return TError(EError::NotSupported, "loop backend doesn't suppport resize");
+    }
+
+    TError StatFS(TStatFS &result) override {
+        return Volume->GetPath().StatFS(result);
     }
 };
 
@@ -500,12 +497,10 @@ err:
         return quota.Resize();
     }
 
-    TError GetStat(uint64_t &spaceUsed, uint64_t &spaceAvail,
-                   uint64_t &inodeUsed, uint64_t &inodeAvail) override {
-        TProjectQuota quota(Volume->GetStorage());
+    TError StatFS(TStatFS &result) override {
         if (Volume->HaveQuota())
-            return quota.StatVFS(spaceUsed, spaceAvail, inodeUsed, inodeAvail);
-        return Volume->GetPath().StatVFS(spaceUsed, spaceAvail, inodeUsed, inodeAvail);
+            return TProjectQuota(Volume->GetStorage()).StatFS(result);
+        return Volume->GetPath().StatFS(result);
     }
 };
 
@@ -622,6 +617,10 @@ public:
     TError Resize(uint64_t space_limit, uint64_t inode_limit) override {
         return TError(EError::NotSupported, "rbd backend doesn't suppport resize");
     }
+
+    TError StatFS(TStatFS &result) override {
+        return Volume->GetPath().StatFS(result);
+    }
 };
 
 
@@ -705,11 +704,13 @@ std::vector<TPath> TVolume::GetLayers() const {
 }
 
 TError TVolume::CheckGuarantee(TVolumeHolder &holder) const {
-    uint64_t total_space_used, total_space_avail;
-    uint64_t total_inode_used, total_inode_avail;
-    uint64_t space_used, space_avail, space_guarantee;
-    uint64_t inode_used, inode_avail, inode_guarantee;
+    uint64_t space_guarantee, inode_guarantee;
+    auto backend = GetBackend();
+    TStatFS current, total;
     TPath storage;
+
+    if (backend == "rbd")
+        return TError::Success();
 
     GetGuarantee(space_guarantee, inode_guarantee);
 
@@ -721,54 +722,81 @@ TError TVolume::CheckGuarantee(TVolumeHolder &holder) const {
     else
         storage = GetStorage();
 
-    TError error = storage.StatVFS(total_space_used, total_space_avail,
-                                   total_inode_used, total_inode_avail);
+    TError error = storage.StatFS(total);
     if (error)
         return error;
 
-    if (!IsReady() || GetStat(space_used, space_avail,
-                              inode_used, inode_avail))
-            space_used = inode_used = 0;
+    if (!IsReady() || StatFS(current))
+        current.Reset();
 
     /* Check available space as is */
-    if (total_space_avail + space_used < space_guarantee)
-        return TError(EError::NoSpace, "Not enough space for volume guarantee");
+    if (total.SpaceAvail + current.SpaceUsage < space_guarantee)
+        return TError(EError::NoSpace, "Not enough space for volume guarantee: " +
+                      std::to_string(total.SpaceAvail) + " available " +
+                      std::to_string(current.SpaceUsage) + " used");
 
-    if (total_inode_avail + inode_used < inode_guarantee)
-        return TError(EError::NoSpace, "Not enough inodes for volume guarantee");
+    if (total.InodeAvail + current.InodeUsage < inode_guarantee &&
+            backend != "loop")
+        return TError(EError::NoSpace, "Not enough inodes for volume guarantee: " +
+                      std::to_string(total.InodeAvail) + " available " +
+                      std::to_string(current.InodeUsage) + " used");
 
-    /* Estimate unclaimed reservation */
-    uint64_t total_space_reserved = 0, total_inode_reserved = 0;
+    /* Estimate unclaimed guarantees */
+    uint64_t space_claimed = 0, space_guaranteed = 0;
+    uint64_t inode_claimed = 0, inode_guaranteed = 0;
     for (auto path : holder.ListPaths()) {
         auto volume = holder.Find(path);
         if (volume == nullptr || volume.get() == this ||
                 volume->GetStorage().GetDev() != storage.GetDev())
             continue;
 
-        uint64_t volume_space_used, volume_space_avail, volume_space_guarantee;
-        uint64_t volume_inode_used, volume_inode_avail, volume_inode_guarantee;
+        auto volume_backend = volume->GetBackend();
+
+        /* rbd stored remotely, plain cannot provide usage */
+        if (volume_backend == "rbd" || volume_backend == "plain")
+            continue;
+
+        TStatFS stat;
+        uint64_t volume_space_guarantee, volume_inode_guarantee;
 
         volume->GetGuarantee(volume_space_guarantee, volume_inode_guarantee);
         if (!volume_space_guarantee && !volume_inode_guarantee)
             continue;
 
-        if (!volume->IsReady() ||
-            volume->GetStat(volume_space_used, volume_space_avail,
-                            volume_inode_used, volume_inode_avail))
-            volume_space_used = volume_inode_used = 0;
+        if (!volume->IsReady() || volume->StatFS(stat))
+            stat.Reset();
 
-        if (volume_space_guarantee > volume_space_used)
-            total_space_reserved += volume_space_guarantee - volume_space_used;
+        space_guaranteed += volume_space_guarantee;
+        if (stat.SpaceUsage < volume_space_guarantee)
+            space_claimed += stat.SpaceUsage;
+        else
+            space_claimed += volume_space_guarantee;
 
-        if (volume_inode_guarantee > volume_inode_used)
-            total_inode_reserved += volume_inode_guarantee - volume_inode_used;
+        if (volume_backend != "loop") {
+            inode_guaranteed += volume_inode_guarantee;
+            if (stat.InodeUsage < volume_inode_guarantee)
+                inode_claimed += stat.InodeUsage;
+            else
+                inode_claimed += volume_inode_guarantee;
+        }
     }
 
-    if (total_space_avail + space_used < space_guarantee + total_space_reserved)
-        return TError(EError::NoSpace, "Not enough space for volume guarantee");
+    if (total.SpaceAvail + current.SpaceUsage + space_claimed <
+            space_guarantee + space_guaranteed)
+        return TError(EError::NoSpace, "Not enough space for volume guarantee: " +
+                      std::to_string(total.SpaceAvail) + " available " +
+                      std::to_string(current.SpaceUsage) + " used " +
+                      std::to_string(space_claimed) + " claimed " +
+                      std::to_string(space_guaranteed) + " guaranteed");
 
-    if (total_inode_avail + inode_used < inode_guarantee + total_inode_reserved)
-        return TError(EError::NoSpace, "Not enough inodes for volume guarantee");
+    if (backend != "loop" &&
+            total.InodeAvail + current.InodeUsage + inode_claimed <
+            inode_guarantee + inode_guaranteed)
+        return TError(EError::NoSpace, "Not enough inodes for volume guarantee: " +
+                      std::to_string(total.InodeAvail) + " available " +
+                      std::to_string(current.InodeUsage) + " used " +
+                      std::to_string(inode_claimed) + " claimed " +
+                      std::to_string(inode_guaranteed) + " guaranteed");
 
     return TError::Success();
 }
@@ -1060,9 +1088,8 @@ TError TVolume::Destroy() {
     return ret;
 }
 
-TError TVolume::GetStat(uint64_t &space_used, uint64_t &space_avail,
-                        uint64_t &inode_used, uint64_t &inode_avail) const {
-    return Backend->GetStat(space_used, space_avail, inode_used, inode_avail);
+TError TVolume::StatFS(TStatFS &result) const {
+    return Backend->StatFS(result);
 }
 
 TError TVolume::Tune(const std::map<std::string, std::string> &properties) {
@@ -1131,14 +1158,14 @@ bool TVolume::UnlinkContainer(std::string name) {
 }
 
 std::map<std::string, std::string> TVolume::GetProperties(TPath container_root) {
-    uint64_t space_used, space_avail, inode_used, inode_avail;
     std::map<std::string, std::string> ret;
+    TStatFS stat;
 
-    if (IsReady() && !GetStat(space_used, space_avail, inode_used, inode_avail)) {
-        ret[V_SPACE_USED] = std::to_string(space_used);
-        ret[V_INODE_USED] = std::to_string(inode_used);
-        ret[V_SPACE_AVAILABLE] = std::to_string(space_avail);
-        ret[V_INODE_AVAILABLE] = std::to_string(inode_avail);
+    if (IsReady() && !StatFS(stat)) {
+        ret[V_SPACE_USED] = std::to_string(stat.SpaceUsage);
+        ret[V_INODE_USED] = std::to_string(stat.InodeUsage);
+        ret[V_SPACE_AVAILABLE] = std::to_string(stat.SpaceAvail);
+        ret[V_INODE_AVAILABLE] = std::to_string(stat.InodeAvail);
     }
 
     for (auto name: Config->List()) {

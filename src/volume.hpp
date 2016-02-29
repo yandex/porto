@@ -55,10 +55,9 @@ public:
     virtual TError Restore(std::shared_ptr<TValueMap> Config);
     virtual TError Build() =0;
     virtual TError Destroy() =0;
+    virtual TError StatFS(TStatFS &result) =0;
     virtual TError Clear();
     virtual TError Resize(uint64_t space_limit, uint64_t inode_limit);
-    virtual TError GetStat(uint64_t &space_used, uint64_t &space_avail,
-                           uint64_t &inode_used, uint64_t &inode_avail);
 };
 
 class TVolume : public std::enable_shared_from_this<TVolume>,
@@ -134,13 +133,7 @@ public:
         inode_limit = Config->Get<uint64_t>(V_INODE_LIMIT);
     }
 
-    TError GetStat(uint64_t &space_used, uint64_t &space_avail,
-                   uint64_t &inode_used, uint64_t &inode_avail) const;
-
-    TError GetStat(uint64_t &space_used, uint64_t &space_avail) const {
-        uint64_t inode_used, inode_avail;
-        return GetStat(space_used, space_avail, inode_used, inode_avail);
-    }
+    TError StatFS(TStatFS &result) const;
 
     TError GetUpperLayer(TPath &upper);
 
