@@ -1238,14 +1238,17 @@ const std::vector<std::pair<std::string, std::string>> TVolumeHolder::ListProper
         { V_READ_ONLY,   "true|false                    (default - false)" },
         { V_LAYERS,      "top-layer;...;bottom-layer    (overlayfs layers)" },
         { V_SPACE_LIMIT, "disk space limit              (default - unlimited)" },
-//      { V_INODE_LIMIT, " " },
-//      { V_SPACE_GUARANTEE, " " },
-//      { V_INODE_GUARANTEE, " " },
+        { V_INODE_LIMIT, "disk inode limit              (default - unlimited)"},
+        { V_SPACE_GUARANTEE,
+                         "disk space guarantee          (default - zero)" },
+        { V_INODE_GUARANTEE,
+                         "disk inode guarantee          (default - zero)" },
         { V_SPACE_USED,  "current disk space usage      (readonly)" },
-//      { V_INODE_USED, " " },
+        { V_INODE_USED,  "current disk inode used       (readonly)" },
         { V_SPACE_AVAILABLE,
                          "available disk space          (readonly)" },
-//      { V_INODE_AVAILABLE, " " },
+        { V_INODE_AVAILABLE,
+                         "available disk inodes         (readonly)" },
     };
 }
 
