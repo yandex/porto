@@ -630,7 +630,7 @@ public:
 TError TVolume::OpenBackend() {
     if (GetBackend() == "plain")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumePlainBackend());
-    if (GetBackend() == "quota")
+    else if (GetBackend() == "quota")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeQuotaBackend());
     else if (GetBackend() == "native")
         Backend = std::unique_ptr<TVolumeBackend>(new TVolumeNativeBackend());
