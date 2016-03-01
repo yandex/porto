@@ -2782,10 +2782,9 @@ static void TestStateMachine(TPortoAPI &api) {
     // if container init process doesn't have custom handler for a signal
     // it's ignored
     Say() << "Make sure init in container ignores SIGTERM but dies after SIGKILL" << std::endl;
-    ExpectApiSuccess(api.Create(name));
     AsRoot(api);
+    ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.SetProperty(name, "virt_mode", "os"));
-    AsAlice(api);
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
     ExpectApiSuccess(api.Start(name));
     ExpectApiSuccess(api.GetData(name, "root_pid", pid));
@@ -2807,6 +2806,7 @@ static void TestStateMachine(TPortoAPI &api) {
     ExpectApiFailure(api.Kill("/", SIGKILL), EError::Permission);
 
     ExpectApiSuccess(api.Destroy(name));
+    AsAlice(api);
 }
 
 static void TestPath(TPortoAPI &api) {
@@ -3681,7 +3681,7 @@ static void TestVirtModeProperty(TPortoAPI &api) {
         { "bind", "" },
         { "cwd", "/" },
         { "devices", "" },
-        { "capabilities", "CHOWN; DAC_OVERRIDE; FOWNER; FSETID; IPC_LOCK; KILL; NET_ADMIN; NET_BIND_SERVICE; NET_RAW; SETGID; SETUID; SYS_CHROOT; SYS_RESOURCE" },
+        { "capabilities", "AUDIT_WRITE; CHOWN; DAC_OVERRIDE; FOWNER; FSETID; IPC_LOCK; KILL; MKNOD; NET_ADMIN; NET_BIND_SERVICE; NET_RAW; SETGID; SETUID; SYS_CHROOT; SYS_RESOURCE" },
     };
     std::string s;
 
@@ -3694,8 +3694,6 @@ static void TestVirtModeProperty(TPortoAPI &api) {
         ExpectApiSuccess(api.GetProperty(name, kv.first, s));
         ExpectEq(s, kv.second);
     }
-
-    ExpectApiFailure(api.SetProperty(name, "root", "/tmp"), EError::Permission);
 
     Say() << "Check credentials and default roolback" << std::endl;
 

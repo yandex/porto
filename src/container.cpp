@@ -854,6 +854,8 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
             if (prop && prop->HasFlag(OS_MODE_PROPERTY))
                 prop->Reset();
         }
+        if (RootPath().IsRoot())
+            return TError(EError::Permission, "virt_mode=os without chroot only for root");
     }
 
     if (!meta && !Prop->Get<std::string>(P_COMMAND).length())

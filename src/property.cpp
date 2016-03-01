@@ -159,22 +159,6 @@ public:
     std::string GetDefault() const override {
         return "/";
     }
-
-    TError CheckValue(const std::string &value) override {
-        auto c = GetContainer();
-
-        if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS) {
-            TPath root(value);
-            TPath realRoot("/");
-
-            if (!GetContainer()->OwnerCred.IsRootUser() &&
-                    !root.IsRegularFollow() &&
-                    root.GetDev() == realRoot.GetDev())
-                return TError(EError::Permission, "Can't start OS container on the same mount point as /");
-        }
-
-        return TError::Success();
-    }
 };
 
 class TRootRdOnlyProperty : public TBoolValue, public TContainerValue {
@@ -846,9 +830,9 @@ class TCapabilitiesProperty : public TListValue, public TContainerValue {
         { "SYS_RESOURCE",       { CAP_SYS_RESOURCE, RESTRICTED_CAP } },
         { "SYS_TIME",           { CAP_SYS_TIME, 0 } },
         { "SYS_TTY_CONFIG",     { CAP_SYS_TTY_CONFIG, 0 } },
-        { "MKNOD",              { CAP_MKNOD, 0 } },
+        { "MKNOD",              { CAP_MKNOD, RESTRICTED_CAP } },
         { "LEASE",              { CAP_LEASE, 0 } },
-        { "AUDIT_WRITE",        { CAP_AUDIT_WRITE, 0 } },
+        { "AUDIT_WRITE",        { CAP_AUDIT_WRITE, RESTRICTED_CAP } },
         { "AUDIT_CONTROL",      { CAP_AUDIT_CONTROL, 0 } },
         { "SETFCAP",            { CAP_SETFCAP, 0 } },
         { "MAC_OVERRIDE",       { CAP_MAC_OVERRIDE, 0 } },
