@@ -517,7 +517,8 @@ TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
     if (IsRoot() || IsPortoRoot())
         return TError::Success();
 
-    if (Parent->IsPortoRoot()) {
+    if (Parent->IsPortoRoot() &&
+            (!config.empty() || !OwnerCred.IsRootUser())) {
         error = DevicesSubsystem.ApplyDefault(cg);
         if (error)
             return error;
