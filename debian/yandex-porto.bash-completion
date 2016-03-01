@@ -12,6 +12,11 @@ _porto_volumes ()
 	__ltrim_colon_completions "$cur"
 }
 
+_porto_layers ()
+{
+	COMPREPLY=( $( compgen -f -W "$(portoctl layer -L 2>/dev/null)" -- "$cur" ) )
+}
+
 _portoctl ()
 {
 	local i cur prev ct=
@@ -49,9 +54,9 @@ _portoctl ()
 			_command_offset $(( $COMP_CWORD + $ct - $cword + 1 ))
 		fi
 		;;
-	exec|run|build)
+	exec|run)
 		if [ "$prev" = "-L" ] ; then
-			COMPREPLY=( $( compgen -f -W "$(portoctl layer -L 2>/dev/null)" -- "$cur" ) )
+			_porto_layers
 		elif [ -z "$ct" ] ; then
 			_porto_containers "-C -T -L"
 		else
@@ -59,6 +64,22 @@ _portoctl ()
 			COMPREPLY=( $( compgen -S "=" -W "$_porto_properies" -- "$cur" ) )
 			compopt -o nospace
 		fi
+		;;
+	build)
+		case "$prev" in
+		-l|-L)
+			_porto_layers
+			;;
+		-B|-S|-o)
+			_filedir
+			;;
+		*)
+			COMPREPLY=( $( compgen -W "-M -l -L -B -S -o -k" -- "$cur" ) )
+			compopt -o filenames
+			COMPREPLY+=( $( compgen -S "=" -W "$_porto_properies" -- "$cur" ) )
+			compopt -o nospace
+			;;
+		esac
 		;;
 	shell)
 		case "$cword" in

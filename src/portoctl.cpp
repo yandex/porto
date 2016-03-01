@@ -1910,14 +1910,14 @@ public:
 class TBuildCmd final : public ICmd {
 public:
     TBuildCmd(TPortoAPI *api) : ICmd(api, "build", 0,
-            "[-k] [-L layer]... -o layer.tar [-E name=value]... "
-            "[-B bootstrap] -S script [properties]...",
+            "[-k] [-M] [-l|-L layer]... -o layer.tar [-B bootstrap] [-S script]... [properties]...",
             "build container image",
+            "    -l layer|dir|tarball       layer for bootstrap, if empty run in host\n"
             "    -L layer|dir|tarball       add lower layer (-L top ... -L bottom)\n"
-            "    -o layer.tar               save resulting upper layer\n"
-            "    -E name=value              set environment variable\n"
+            "    -o layer.tar               file for saving resulting layer\n"
             "    -B bootstrap               bash script runs outside (with cwd=volume)\n"
             "    -S script                  bash script runs inside (with root=volume)\n"
+            "    -M                         merge all layers together\n"
             "    -k                         keep volume and container\n"
             ) {
         SetDieOnSignal(false);
@@ -1927,30 +1927,31 @@ public:
 
     int Execute(TCommandEnviroment *environment) final override {
         TLauncher launcher(Api);
-        TLauncher executor(Api);
+        TLauncher bootstrap(Api);
         TError error;
 
         launcher.Container = "portoctl-build-" + std::to_string(GetPid());
+        launcher.SetProperty("net", "NAT");
         launcher.WeakContainer = true;
         launcher.NeedVolume = true;
         launcher.StartContainer = false;
         launcher.ChrootVolume = false;
-
-        executor.Container = launcher.Container + "/executor";
-        executor.ForwardTerminal = true;
-        executor.WaitExit = true;
+        launcher.StartOS = true;
 
         TPath output;
         std::vector<std::string> env;
         std::vector<std::string> layers;
-        TPath bootstrap, script;
+        std::vector<TPath> scripts;
+        TPath bootstrap_script;
+
         const auto &opts = environment->GetOpts({
             { 'L', true, [&](const char *arg) { launcher.Layers.push_back(arg); } },
+            { 'l', true, [&](const char *arg) { bootstrap.Layers.push_back(arg); bootstrap.NeedVolume = true; } },
             { 'o', true, [&](const char *arg) { output =  TPath(arg).AbsolutePath(); } },
-            { 'E', true, [&](const char *arg) { executor.Environment.push_back(arg); } },
-            { 'B', true, [&](const char *arg) { bootstrap = TPath(arg).RealPath(); } },
-            { 'S', true, [&](const char *arg) { script = TPath(arg).RealPath(); } },
+            { 'B', true, [&](const char *arg) { bootstrap_script = TPath(arg).RealPath(); } },
+            { 'S', true, [&](const char *arg) { scripts.push_back(TPath(arg).RealPath()); } },
             { 'k', false, [&](const char *arg) { launcher.WeakContainer = false; } },
+            { 'M', false, [&](const char *arg) { launcher.MergeLayers = true; } },
         });
 
         if (output.IsEmpty()) {
@@ -1961,29 +1962,23 @@ public:
 
         if (output.Exists()) {
             std::cerr << "Output file " << output << " already exists" << std::endl;
-            PrintUsage();
             return EXIT_FAILURE;
         }
 
         if (!output.DirName().Exists()) {
             std::cerr << "Output directory " << output.DirName() << " not exists" << std::endl;
-            PrintUsage();
             return EXIT_FAILURE;
         }
 
-        if (script.IsEmpty()) {
-            std::cerr << "Not script specified" << std::endl;
-            PrintUsage();
-            return EXIT_FAILURE;
+        for (auto &script: scripts) {
+            if (!script.Exists()) {
+                std::cerr << "Script " << script << " not exists" << std::endl;
+                return EXIT_FAILURE;
+            }
         }
 
-        if (!script.Exists()) {
-            std::cerr << "Script " << script << " not exists" << std::endl;
-            return EXIT_FAILURE;
-        }
-
-        if (!bootstrap.IsEmpty() && !bootstrap.Exists()) {
-            std::cerr << "Bootstrap " << bootstrap << " not exists" << std::endl;
+        if (!bootstrap_script.IsEmpty() && !bootstrap_script.Exists()) {
+            std::cerr << "Bootstrap " << bootstrap_script << " not exists" << std::endl;
             return EXIT_FAILURE;
         }
 
@@ -1996,6 +1991,10 @@ public:
             }
         }
 
+        /* do not start os for bootstrap */
+        bool StartOS = launcher.StartOS;
+        launcher.StartOS = false;
+
         error = launcher.Launch();
         if (error) {
             std::cerr << "Cannot create volume: " << error << std::endl;
@@ -2003,44 +2002,81 @@ public:
         }
 
         std::string volume = launcher.Volume.Path;
+        TPath volume_script(volume + "/script");
 
-        if (!bootstrap.IsEmpty()) {
+        volume_script.Mkfile(0644);
+
+        if (!bootstrap_script.IsEmpty()) {
+            bootstrap.Container = launcher.Container + "/bootstrap";
+            bootstrap.ForwardTerminal = true;
+            bootstrap.WaitExit = true;
+            bootstrap.StartOS = true;
+
             std::vector<std::string> bind;
 
-            executor.SetProperty("isolate", "true");
+            bootstrap.SetProperty("isolate", "true");
+            bootstrap.SetProperty("net", "inherited");
 
             /* give write access only to volume and /tmp */
             bind.push_back("/tmp /tmp rw");
             bind.push_back(volume + " " + volume + " rw");
-            executor.SetProperty("root_readonly", "true");
-            executor.SetProperty("bind", CommaSeparatedList(bind, ";"));
+            bind.push_back(bootstrap_script.ToString() + " " + volume_script.ToString() + " ro");
+            bootstrap.SetProperty("root_readonly" "true");
+            bootstrap.SetProperty("bind", CommaSeparatedList(bind, ";"));
 
-            executor.SetProperty("cwd", volume);
-            executor.SetProperty("command", "/bin/bash -e -x -c '. " + bootstrap.ToString() + "'");
+            bootstrap.SetProperty("cwd", volume);
+            bootstrap.SetProperty("command", "/bin/bash -e -x -c '. ./script'");
 
-            std::cout << "Starting bootstrap " << bootstrap << std::endl;
+            std::cout << "Starting bootstrap " << bootstrap_script << std::endl;
 
-            error = executor.Launch();
+            error = bootstrap.Launch();
             if (error) {
                 std::cout << "Cannot start bootstrap: " << error << std::endl;
                 goto err;
             }
 
-            if (executor.ExitCode) {
-                std::cout << "Bootstrap: " << executor.ExitMessage << std::endl;
+            if (bootstrap.ExitCode) {
+                std::cout << "Bootstrap: " << bootstrap.ExitMessage << std::endl;
                 goto err;
             }
+
+            bootstrap.Cleanup();
+
+            if (launcher.StopContainer())
+                goto err;
         }
 
-        Api->SetProperty(launcher.Container, "virt_mode", "os");
-        Api->SetProperty(launcher.Container, "root", volume);
-        Api->SetProperty(launcher.Container, "bind", script.ToString() + " /script ro");
+        launcher.ChrootVolume = true;
+        launcher.StartOS = StartOS;
 
-        if (!script.IsEmpty()) {
-            executor.Properties.clear();
+        error = launcher.ApplyConfig();
+        if (error) {
+            std::cout << "Cannot configure launcher: " << error << std::endl;
+            goto err;
+        }
+
+        for (auto &script: scripts) {
+            TLauncher executor(Api);
+
+            std::string script_text;
+            error = script.ReadAll(script_text);
+            if (!error)
+                error = volume_script.WriteAll(script_text);
+            if (error) {
+                std::cout << "Cannot copy script: " << error << std::endl;
+                goto err;
+            }
+
+            executor.Container = launcher.Container + "/script";
+            executor.ForwardTerminal = true;
+            executor.WaitExit = true;
 
             executor.SetProperty("isolate", "false");
-            executor.SetProperty("command", "/bin/bash -e -x -c '. /script'");
+            executor.SetProperty("virt_mode", "os");
+            executor.SetProperty("net", "inherited");
+            executor.SetProperty("command", "/bin/bash -e -x -c '. ./script'");
+
+            std::cout << "Starting script " << script << std::endl;
 
             error = executor.Launch();
             if (error) {
@@ -2052,14 +2088,20 @@ public:
                 std::cout << "Script: " << executor.ExitMessage << std::endl;
                 goto err;
             }
+
+            executor.Cleanup();
+            volume_script.WriteAll("");
         }
 
-        TPath(volume + "/script").Unlink();
+        if (!scripts.empty() && launcher.StopContainer())
+            goto err;
 
-        std::cout << "Exporting upper layer into " << output.ToString() << std::endl;
+        volume_script.Unlink();
+
+        std::cout << "Exporting layer into " << output.ToString() << std::endl;
 
         if (Api->ExportLayer(volume, output.ToString())) {
-            std::cerr << "Can't export layer:" << launcher.GetLastError() << std::endl;
+            std::cerr << "Cannot export layer:" << launcher.GetLastError() << std::endl;
             goto err;
         }
 
