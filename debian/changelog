@@ -1,3 +1,51 @@
+yandex-porto (2.8) unstable; urgency=low
+
+  * selftest: do not change hostname
+  * selftest: do not touch porto config
+  * portoinit: rewrite in c
+  * porto: include stdint with __STDC_LIMIT_MACROS
+  * selftest: bump noop memory_usage threshold
+  * property: refactor net_limit, net_guarantee, net_priority
+  * util/signal: refactoring
+  * api/cpp: refactoring
+  * api/cpp: separate client and server code
+  * property: refactor cpu_limit and cpu_guarantee
+  * porto: silence warning about deprecated container.scoped_unlock in config
+  * selftest: check cpu_guarantee 0.5c instead of 10c
+  * property: user:group always set to creator
+  * property: io_limit and io_ops_limit are hierarchical
+  * property: root_readonly and resolv_conf affects all childs
+  * property: refactor environment variables
+  * property: refactor enable_porto and porto_namespace
+  * volumes: repalce set with vector
+  * property: replace set of states with three bits
+  * util/cred: add LastCapability
+  * quota: reset current project id before creation
+  * quota: always lookup project before resize and destruction
+  * quota: round space hard limit up to QIF_DQBLKSIZE
+  * volume: add backend=quota
+  * volume: get space usege from quota
+  * porto: add volume tune request
+  * volume: tell if volume path or storage not exist
+  * portoctl: get volume absolute path before requesting
+  * portoctl: remove config
+  * stream: remove std*type
+  * util/path: carefully handle symlinks
+  * portoctl: rewrite run, exec, shell, build
+  * volume: fix creation of backend=plain
+  * volume: rework statfs and guarantees
+  * volume: show inode limit/usage/available and guarantee properties
+  * volume: make guarantees tunable
+  * util/file: remove
+  * portod: add CAP_MKNOD and CAP_AUDIT_WRITE to VM and drop root device check
+  * portod: do not restrict default devices for root user
+  * portod: auto remove layers with names begins with "_weak_"
+  * portoctl: get absolute path for tarballs
+  * portoctl: parse properties in launcher
+  * portoctl: rework build command for non-root users
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 02 Mar 2016 16:20:17 +0300
+
 yandex-porto (2.7.11) precise; urgency=medium
 
   * cgroup: fix unlimited memory limit
