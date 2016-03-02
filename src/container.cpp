@@ -297,7 +297,7 @@ void TContainer::DestroyVolumes(TScopedLock &holder_lock) {
         vholder_lock.lock();
         TError error = volume->SetReady(false);
         vholder_lock.unlock();
-        error = volume->Destroy();
+        error = volume->Destroy(*VolumeHolder);
         vholder_lock.lock();
         VolumeHolder->Unregister(volume);
         VolumeHolder->Remove(volume);

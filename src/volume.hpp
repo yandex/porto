@@ -85,7 +85,7 @@ public:
 
     /* Protected with TVolume->Lock() */
     TError Build();
-    TError Destroy();
+    TError Destroy(TVolumeHolder &holder);
 
     TError Restore();
     TError Clear();
@@ -164,4 +164,7 @@ public:
     std::vector<TPath> ListPaths() const;
     TError RestoreFromStorage(std::shared_ptr<TContainerHolder> Cholder);
     void Destroy();
+
+    bool LayerInUse(TPath layer);
+    TError RemoveLayer(const std::string &name);
 };

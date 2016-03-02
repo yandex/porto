@@ -1040,7 +1040,7 @@ TError TVolume::Clear() {
     return Backend->Clear();
 }
 
-TError TVolume::Destroy() {
+TError TVolume::Destroy(TVolumeHolder &holder) {
     TPath internal = GetInternal("");
     TPath storage = GetStorage();
     TPath path = GetPath();
@@ -1082,6 +1082,18 @@ TError TVolume::Destroy() {
             L_ERR() << "Can't remove internal: " << error << std::endl;
             if (!ret)
                 ret = error;
+        }
+    }
+
+    if (Config->HasValue(V_LAYERS)) {
+        auto layers = Config->Get<std::vector<std::string>>(V_LAYERS);
+        Config->Set<std::vector<std::string>>(V_LAYERS, {});
+        for (auto &layer: layers) {
+            if (StringStartsWith(layer, "_weak_")) {
+                error = holder.RemoveLayer(layer);
+                if (error && error.GetError() != EError::Busy)
+                    L_ERR() << "Cannot remove layer: " << error << std::endl;
+            }
         }
     }
 
@@ -1377,7 +1389,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
         error = volume->Restore();
         if (error) {
             L_WRN() << "Corrupted volume " << node << " removed: " << error << std::endl;
-            (void)volume->Destroy();
+            (void)volume->Destroy(*this);
             (void)Remove(volume);
             continue;
         }
@@ -1385,7 +1397,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
         error = Register(volume);
         if (error) {
             L_WRN() << "Cannot register volume " << node << " removed: " << error << std::endl;
-            (void)volume->Destroy();
+            (void)volume->Destroy(*this);
             (void)Remove(volume);
             continue;
         }
@@ -1396,7 +1408,7 @@ TError TVolumeHolder::RestoreFromStorage(std::shared_ptr<TContainerHolder> Chold
                 container->VolumeHolder = shared_from_this();
                 container->Volumes.emplace_back(volume);
             } else if (!volume->UnlinkContainer(name)) {
-                (void)volume->Destroy();
+                (void)volume->Destroy(*this);
                 (void)Unregister(volume);
                 (void)Remove(volume);
             }
@@ -1442,7 +1454,7 @@ void TVolumeHolder::Destroy() {
     while (Volumes.begin() != Volumes.end()) {
         auto name = Volumes.begin()->first;
         auto volume = Volumes.begin()->second;
-        TError error = volume->Destroy();
+        TError error = volume->Destroy(*this);
         if (error)
             L_ERR() << "Can't destroy volume " << name << ": " << error << std::endl;
         Unregister(volume);
@@ -1478,6 +1490,45 @@ std::vector<TPath> TVolumeHolder::ListPaths() const {
         ret.push_back(v.first);
 
     return ret;
+}
+
+bool TVolumeHolder::LayerInUse(TPath layer) {
+    for (auto &volume : Volumes) {
+        for (auto &l: volume.second->GetLayers()) {
+            if (l.NormalPath() == layer)
+                return true;
+        }
+    }
+    return false;
+}
+
+TError TVolumeHolder::RemoveLayer(const std::string &name) {
+    TPath layers = TPath(config().volumes().layers_dir());
+    TPath layer = layers / name;
+    TError error;
+
+    if (!layer.Exists())
+        return TError(EError::LayerNotFound, "Layer " + name + " not found");
+
+    TPath layers_tmp = layers / "_tmp_";
+    TPath layer_tmp = layers_tmp / name;
+    if (!layers_tmp.Exists()) {
+        error = layers_tmp.Mkdir(0700);
+        if (error)
+            return error;
+    }
+
+    auto lock = ScopedLock();
+    if (LayerInUse(layer))
+        error = TError(EError::Busy, "Layer " + name + "in use");
+    else
+        error = layer.Rename(layer_tmp);
+    lock.unlock();
+
+    if (!error)
+        error = layer_tmp.RemoveAll();
+    (void)layers_tmp.Rmdir();
+    return error;
 }
 
 TError SanitizeLayer(TPath layer, bool merge) {

@@ -112,7 +112,7 @@ public:
     }
 
     TError ImportLayer(const TPath &path, std::string &id) {
-        id = "portoctl-" + std::to_string(GetPid()) + "-" +
+        id = "_weak_portoctl-" + std::to_string(GetPid()) + "-" +
              std::to_string(LayerIndex++) + "-" + path.BaseName();
         std::cerr << "Importing layer " << path << " as " << id << std::endl;
         if (Api->ImportLayer(id, path.ToString()))
@@ -401,7 +401,7 @@ err:
         }
 
         for (auto &layer : ImportedLayers) {
-            if (Api->RemoveLayer(layer))
+            if (Api->RemoveLayer(layer) && GetLastError().GetError() != EError::LayerNotFound)
                 std::cerr << "Cannot remove layer " << layer << " : " << GetLastError() << std::endl;
         }
         ImportedLayers.clear();

@@ -982,7 +982,7 @@ noinline TError CreateVolume(TContext &context,
         cholder_lock.unlock();
 
         L_WRN() << "Can't link volume" << std::endl;
-        (void)volume->Destroy();
+        (void)volume->Destroy(*context.Vholder);
         context.Vholder->Unregister(volume);
         context.Vholder->Remove(volume);
         return error;
@@ -1166,7 +1166,7 @@ noinline TError UnlinkVolume(TContext &context,
         return error;
 
     vholder_lock.unlock();
-    error = volume->Destroy();
+    error = volume->Destroy(*context.Vholder);
 
     vholder_lock.lock();
     context.Vholder->Unregister(volume);
@@ -1224,19 +1224,6 @@ noinline TError ListVolumes(TContext &context,
     return TError::Success();
 }
 
-static bool LayerInUse(TContext &context, TPath layer) {
-    for (auto path : context.Vholder->ListPaths()) {
-        auto volume = context.Vholder->Find(path);
-        if (volume == nullptr)
-            continue;
-        for (auto l: volume->GetLayers()) {
-            if (l.NormalPath() == layer)
-                return true;
-        }
-    }
-    return false;
-}
-
 noinline TError ImportLayer(TContext &context,
                             const rpc::TLayerImportRequest &req,
                             std::shared_ptr<TClient> client) {
@@ -1286,7 +1273,7 @@ noinline TError ImportLayer(TContext &context,
             error = TError(EError::LayerAlreadyExists, "Layer already exists");
             goto err_tmp;
         }
-        if (LayerInUse(context, layer)) {
+        if (context.Vholder->LayerInUse(layer)) {
             error = TError(EError::Busy, "layer in use");
             goto err_tmp;
         }
@@ -1387,33 +1374,7 @@ noinline TError RemoveLayer(TContext &context,
     if (error)
         return error;
 
-    TPath layers = TPath(config().volumes().layers_dir());
-    TPath layer = layers / req.layer();
-    if (!layer.Exists())
-        return TError(EError::LayerNotFound, "Layer not found");
-
-    TPath layers_tmp = layers / "_tmp_";
-    TPath layer_tmp = layers_tmp / req.layer();
-    if (!layers_tmp.Exists()) {
-        error = layers_tmp.Mkdir(0700);
-        if (error)
-            return error;
-    }
-
-    auto vholder_lock = context.Vholder->ScopedLock();
-    if (LayerInUse(context, layer)) {
-        error = TError(EError::Busy, "layer in use");
-        goto err;
-    }
-    error = layer.Rename(layer_tmp);
-    if (error)
-        goto err;
-    vholder_lock.unlock();
-
-    error = layer_tmp.RemoveAll();
-err:
-    (void)layers_tmp.Rmdir();
-    return error;
+    return context.Vholder->RemoveLayer(req.layer());
 }
 
 noinline TError ListLayers(TContext &context,
