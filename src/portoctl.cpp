@@ -44,7 +44,7 @@ static void ForwardWinch(int sig) {
         (void)ioctl(ForwardPtyMaster, TIOCSWINSZ, &winsize);
 }
 
-volatile int ChildDead = 0;
+volatile int ChildDead;
 
 static void CatchChild(int sig) {
     ChildDead = 1;
@@ -59,11 +59,13 @@ public:
     bool StartContainer = true;
     bool NeedVolume = false;
     bool ChrootVolume = true;
+    bool MergeLayers = false;
+    bool StartOS = false;
     bool ForwardTerminal = false;
     bool WaitExit = false;
 
     std::string Container;
-    std::vector<std::string> Properties;
+    std::vector<std::pair<std::string, std::string>> Properties;
     std::vector<std::string> Environment;
 
     TPortoVolume Volume;
@@ -71,6 +73,7 @@ public:
     std::vector<std::string> Layers;
     std::vector<std::string> VolumeLayers;
     std::vector<std::string> ImportedLayers;
+    bool ContainerCreated = false;
     bool VolumeLinked = false;
     int LayerIndex = 0;
 
@@ -83,6 +86,11 @@ public:
     int ExitSignal = -1;
     std::string ExitMessage = "";
 
+    ~TLauncher() {
+        CloseSlavePty();
+        CloseMasterPty();
+    }
+
     TError GetLastError() {
         int error;
         std::string msg;
@@ -90,14 +98,11 @@ public:
         return TError((EError)error, msg);
     }
 
-    TError SetProperty(std::string prop) {
-        std::string::size_type n = prop.find('=');
-        if (n == std::string::npos)
-            return TError(EError::InvalidValue, "Invalid value: " + prop);
-        std::string key = prop.substr(0, n);
-        std::string val = prop.substr(n + 1);
+    TError SetProperty(const std::string &key, const std::string &val) {
 
-        if (key == "env") {
+        if (key == "virt_mode") {
+            StartOS = val == "os";
+        } else if (key == "env") {
             Environment.push_back(val);
         } else if (key == "space_limit") {
             SpaceLimit = val;
@@ -105,10 +110,19 @@ public:
         } else if (key == "layers") {
             NeedVolume = true;
             return SplitEscapedString(val, ';', Layers);
-        } else if (Api->SetProperty(Container, key, val))
-            return GetLastError();
+        } else
+            Properties.emplace_back(key, val);
 
         return TError::Success();
+    }
+
+    TError SetProperty(const std::string &prop) {
+        std::string::size_type n = prop.find('=');
+        if (n == std::string::npos)
+            return TError(EError::InvalidValue, "Invalid value: " + prop);
+        std::string key = prop.substr(0, n);
+        std::string val = prop.substr(n + 1);
+        return SetProperty(key, val);
     }
 
     TError ImportLayer(const TPath &path, std::string &id) {
@@ -138,15 +152,14 @@ public:
 
             if (path.IsDirectoryFollow()) {
                 VolumeLayers.push_back(path.ToString());
-                continue;
-            }
-
-            std::string id;
-            error = ImportLayer(path, id);
-            if (error)
-                break;
-
-            VolumeLayers.push_back(id);
+            } else if (path.IsRegularFollow()) {
+                std::string id;
+                error = ImportLayer(path, id);
+                if (error)
+                    break;
+                VolumeLayers.push_back(id);
+            } else
+                return TError(EError::LayerNotFound, layer);
         }
 
         return error;
@@ -163,7 +176,10 @@ public:
             error = ImportLayers();
             if (error)
                 return error;
-            config["backend"] = "overlay";
+            if (MergeLayers)
+                config["backend"] = "native";
+            else
+                config["backend"] = "overlay";
             config["layers"] = CommaSeparatedList(VolumeLayers, ";");
         }
 
@@ -230,13 +246,24 @@ public:
         return TError::Success();
     }
 
+    void CloseSlavePty() {
+        if (SlavePty >= 0)
+            close(SlavePty);
+        SlavePty = -1;
+    }
+
+    void CloseMasterPty() {
+        if (MasterPty >= 0)
+            close(MasterPty);
+        MasterPty = -1;
+    }
+
     TError ForwardPty() {
         struct termios termios;
         char buf[4096];
         ssize_t nread;
 
-        close(SlavePty);
-        SlavePty = -1;
+        CloseSlavePty();
 
         ForwardPtyMaster = MasterPty;
         Signal(SIGWINCH, ForwardWinch);
@@ -250,6 +277,7 @@ public:
             (void)tcsetattr(STDIN_FILENO, TCSANOW, &raw);
         }
 
+        ChildDead = 0;
         Signal(SIGCHLD, CatchChild);
 
         pid_t pid = fork();
@@ -304,10 +332,42 @@ public:
         Signal(SIGWINCH, SIG_DFL);
         Signal(SIGCHLD, SIG_DFL);
 
-        close(MasterPty);
-        MasterPty = -1;
+        CloseMasterPty();
 
         return TError::Success();
+    }
+
+    TError ApplyConfig() {
+
+        if (Api->SetProperty(Container, "virt_mode", StartOS ? "os" : "app"))
+            goto err;
+
+        if (ForwardTerminal) {
+            std::string tty = "/dev/fd/" + std::to_string(SlavePty);
+            if (Api->SetProperty(Container, "stdin_path", tty) ||
+                    Api->SetProperty(Container, "stdout_path", tty) ||
+                    Api->SetProperty(Container, "stderr_path", tty))
+                goto err;
+        }
+
+        if (NeedVolume) {
+            if (Api->SetProperty(Container, "root", ChrootVolume ? Volume.Path : "/"))
+                goto err;
+            if (Api->SetProperty(Container, "cwd", ChrootVolume ? "/" : Volume.Path))
+                goto err;
+        }
+
+        for (auto &prop : Properties) {
+            if (Api->SetProperty(Container, prop.first, prop.second))
+                goto err;
+        }
+
+        if (Api->SetProperty(Container, "env", CommaSeparatedList(Environment, ";")))
+            goto err;
+
+        return TError::Success();
+err:
+        return GetLastError();
     }
 
     TError Launch() {
@@ -320,46 +380,25 @@ public:
             if (Api->Create(Container))
                 return GetLastError();
         }
-
-        if (ForwardTerminal) {
-            error = OpenPty();
-            if (error)
-                goto err;
-            std::string tty = "/dev/fd/" + std::to_string(SlavePty);
-            if (Api->SetProperty(Container, "stdin_path", tty) ||
-                    Api->SetProperty(Container, "stdout_path", tty) ||
-                    Api->SetProperty(Container, "stderr_path", tty)) {
-                error = GetLastError();
-                goto err;
-            }
-            std::string term = getenv("TERM") ?: "xterm";
-            Environment.push_back("TERM=" + term);
-        }
-
-        for (auto &prop : Properties) {
-            error = SetProperty(prop);
-            if (error)
-                goto err;
-        }
-
-        if (Api->SetProperty(Container, "env",
-                    CommaSeparatedList(Environment, ";"))) {
-            error = GetLastError();
-            goto err;
-        }
+        ContainerCreated = true;
 
         if (NeedVolume) {
             error = CreateVolume();
             if (error)
                 goto err;
+        }
 
-            if (ChrootVolume)
-                error = SetProperty("root=" + Volume.Path);
-            else
-                error = SetProperty("cwd=" + Volume.Path);
+        if (ForwardTerminal) {
+            error = OpenPty();
             if (error)
                 goto err;
+            std::string term = getenv("TERM") ?: "xterm";
+            Environment.push_back("TERM=" + term);
         }
+
+        error = ApplyConfig();
+        if (error)
+            goto err;
 
         if (StartContainer) {
             if (Api->Start(Container)) {
@@ -387,12 +426,20 @@ err:
         return error;
     }
 
+    TError StopContainer() {
+        if (Api->Stop(Container)) {
+            std::cerr << "Cannot stop container " << Container << " : " << GetLastError() << std::endl;
+            return GetLastError();
+        }
+        return TError::Success();
+    }
+
     void Cleanup() {
-        if (Container != "") {
+        if (ContainerCreated) {
             if (Api->Destroy(Container))
                 std::cerr << "Cannot destroy container " << Container << " : " << GetLastError() << std::endl;
+            ContainerCreated = false;
         }
-        Container = "";
 
         if (VolumeLinked) {
             if (Api->UnlinkVolume(Volume.Path, ""))
@@ -406,11 +453,8 @@ err:
         }
         ImportedLayers.clear();
         VolumeLayers.clear();
-
-        if (SlavePty >= 0)
-            close(SlavePty);
-        if (MasterPty >= 0)
-            close(MasterPty);
+        CloseSlavePty();
+        CloseMasterPty();
     }
 };
 
@@ -1065,7 +1109,13 @@ public:
         });
 
         launcher.Container = args[0];
-        launcher.Properties.insert(launcher.Properties.end(), args.begin() + 1, args.end());
+        for (size_t i = 1; i < args.size(); ++i) {
+            error = launcher.SetProperty(args[i]);
+            if (error) {
+                std::cerr << "Cannot set property: " << error << std::endl;
+                return EXIT_FAILURE;
+            }
+        }
 
         error = launcher.Launch();
         if (error) {
@@ -1102,7 +1152,13 @@ public:
         });
 
         launcher.Container = args[0];
-        launcher.Properties.insert(launcher.Properties.end(), args.begin() + 1, args.end());
+        for (size_t i = 1; i < args.size(); ++i) {
+            error = launcher.SetProperty(args[i]);
+            if (error) {
+                std::cerr << "Cannot set property: " << error << std::endl;
+                return EXIT_FAILURE;
+            }
+        }
 
         error = launcher.Launch();
         if (error) {
@@ -1151,8 +1207,8 @@ public:
         launcher.WaitExit = true;
 
         launcher.Container = args[0] + "/shell-" + user + "-" + std::to_string(GetPid());
-        launcher.Properties.push_back("command=" + command);
-        launcher.Properties.push_back("isolate=false");
+        launcher.SetProperty("command", command);
+        launcher.SetProperty("isolate", "false");
         launcher.Environment.push_back("debian_chroot=" + args[0]);
 
         error = launcher.Launch();
@@ -1932,7 +1988,13 @@ public:
         }
 
         /* add properies from commandline */
-        launcher.Properties.insert(launcher.Properties.end(), opts.begin(), opts.end());
+        for (auto &arg: opts) {
+            error = launcher.SetProperty(arg);
+            if (error) {
+                std::cerr << "Cannot set property: " << error << std::endl;
+                return EXIT_FAILURE;
+            }
+        }
 
         error = launcher.Launch();
         if (error) {
@@ -1945,16 +2007,16 @@ public:
         if (!bootstrap.IsEmpty()) {
             std::vector<std::string> bind;
 
-            executor.Properties.push_back("isolate=true");
+            executor.SetProperty("isolate", "true");
 
             /* give write access only to volume and /tmp */
             bind.push_back("/tmp /tmp rw");
             bind.push_back(volume + " " + volume + " rw");
-            executor.Properties.push_back("root_readonly=true");
-            executor.Properties.push_back("bind=" + CommaSeparatedList(bind, ";"));
+            executor.SetProperty("root_readonly", "true");
+            executor.SetProperty("bind", CommaSeparatedList(bind, ";"));
 
-            executor.Properties.push_back("cwd=" + volume);
-            executor.Properties.push_back("command=/bin/bash -e -x -c '. " + bootstrap.ToString() + "'");
+            executor.SetProperty("cwd", volume);
+            executor.SetProperty("command", "/bin/bash -e -x -c '. " + bootstrap.ToString() + "'");
 
             std::cout << "Starting bootstrap " << bootstrap << std::endl;
 
@@ -1977,8 +2039,8 @@ public:
         if (!script.IsEmpty()) {
             executor.Properties.clear();
 
-            executor.Properties.push_back("isolate=false");
-            executor.Properties.push_back("command=/bin/bash -e -x -c '. /script'");
+            executor.SetProperty("isolate", "false");
+            executor.SetProperty("command", "/bin/bash -e -x -c '. /script'");
 
             error = executor.Launch();
             if (error) {
