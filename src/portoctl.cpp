@@ -1794,22 +1794,26 @@ public:
             { 'E', false, [&](const char *arg) { export_= true; } },
         });
 
+        std::string path;
+        if (args.size() >= 2)
+            path = TPath(args[1]).AbsolutePath().ToString();
+
         if (import) {
             if (args.size() < 2)
                 return EXIT_FAILURE;
-            ret = Api->ImportLayer(args[0], args[1]);
+            ret = Api->ImportLayer(args[0], path);
             if (ret)
                 PrintError("Can't import layer");
         } else if (export_) {
             if (args.size() < 2)
                 return EXIT_FAILURE;
-            ret = Api->ExportLayer(args[0], args[1]);
+            ret = Api->ExportLayer(args[0], path);
             if (ret)
                 PrintError("Can't export layer");
         } else if (merge) {
             if (args.size() < 2)
                 return EXIT_FAILURE;
-            ret = Api->ImportLayer(args[0], args[1], true);
+            ret = Api->ImportLayer(args[0], path, true);
             if (ret)
                 PrintError("Can't merge layer");
         } else if (remove) {
