@@ -71,6 +71,8 @@ public:
 
     TPortoVolume Volume;
     std::string SpaceLimit;
+    std::string VolumeBackend;
+    std::string VolumeStorage;
     std::vector<std::string> Layers;
     std::vector<std::string> VolumeLayers;
     std::vector<std::string> ImportedLayers;
@@ -108,6 +110,10 @@ public:
         } else if (key == "space_limit") {
             SpaceLimit = val;
             NeedVolume = true;
+        } else if (key == "backend") {
+            VolumeBackend = val;
+        } else if (key == "storage") {
+            VolumeStorage = val;
         } else if (key == "layers") {
             NeedVolume = true;
             return SplitEscapedString(val, ';', Layers);
@@ -177,12 +183,18 @@ public:
             error = ImportLayers();
             if (error)
                 return error;
-            if (MergeLayers)
-                config["backend"] = "native";
-            else
-                config["backend"] = "overlay";
             config["layers"] = CommaSeparatedList(VolumeLayers, ";");
         }
+
+        if (VolumeBackend != "")
+            config["backend"] = VolumeBackend;
+        else if (MergeLayers || Layers.empty())
+            config["backend"] = "native";
+        else
+            config["backend"] = "overlay";
+
+        if (VolumeStorage != "")
+            config["storage"] = VolumeStorage;
 
         if (Api->CreateVolume("", config, Volume))
             return GetLastError();
@@ -1916,11 +1928,12 @@ public:
 class TBuildCmd final : public ICmd {
 public:
     TBuildCmd(TPortoAPI *api) : ICmd(api, "build", 0,
-            "[-k] [-M] [-l|-L layer]... -o layer.tar [-B bootstrap] [-S script]... [properties]...",
+            "[-k] [-M] [-l|-L layer]... [-o layer.tar] [-O image.img] [-B bootstrap] [-S script]... [properties]...",
             "build container image",
             "    -l layer|dir|tarball       layer for bootstrap, if empty run in host\n"
             "    -L layer|dir|tarball       add lower layer (-L top ... -L bottom)\n"
-            "    -o layer.tar               file for saving resulting layer\n"
+            "    -o layer.tar               save as overlayfs layer\n"
+            "    -O image.img               save as filesystem image\n"
             "    -B bootstrap               bash script runs outside (with cwd=volume)\n"
             "    -S script                  bash script runs inside (with root=volume)\n"
             "    -M                         merge all layers together\n"
@@ -1943,6 +1956,8 @@ public:
         launcher.StartOS = true;
 
         TPath output;
+        TPath outputImage;
+        TPath loopStorage, loopImage;
         std::vector<std::string> env;
         std::vector<std::string> layers;
         std::vector<TPath> scripts;
@@ -1951,27 +1966,40 @@ public:
         const auto &opts = environment->GetOpts({
             { 'L', true, [&](const char *arg) { launcher.Layers.push_back(arg); } },
             { 'l', true, [&](const char *arg) { bootstrap.Layers.push_back(arg); bootstrap.NeedVolume = true; } },
-            { 'o', true, [&](const char *arg) { output =  TPath(arg).AbsolutePath(); } },
+            { 'o', true, [&](const char *arg) { output = TPath(arg).AbsolutePath(); } },
+            { 'O', true, [&](const char *arg) { outputImage = TPath(arg).AbsolutePath(); } },
             { 'B', true, [&](const char *arg) { bootstrap_script = TPath(arg).RealPath(); } },
             { 'S', true, [&](const char *arg) { scripts.push_back(TPath(arg).RealPath()); } },
             { 'k', false, [&](const char *arg) { launcher.WeakContainer = false; } },
             { 'M', false, [&](const char *arg) { launcher.MergeLayers = true; } },
         });
 
-        if (output.IsEmpty()) {
+        if (output.IsEmpty() && outputImage.IsEmpty()) {
             std::cerr << "No output file specified" << std::endl;
             PrintUsage();
             return EXIT_FAILURE;
         }
 
-        if (output.Exists()) {
-            std::cerr << "Output file " << output << " already exists" << std::endl;
-            return EXIT_FAILURE;
+        if (!output.IsEmpty()) {
+            if (output.Exists()) {
+                std::cerr << "Output file " << output << " already exists" << std::endl;
+                return EXIT_FAILURE;
+            }
+            if (!output.DirName().Exists()) {
+                std::cerr << "Output directory " << output.DirName() << " not exists" << std::endl;
+                return EXIT_FAILURE;
+            }
         }
 
-        if (!output.DirName().Exists()) {
-            std::cerr << "Output directory " << output.DirName() << " not exists" << std::endl;
-            return EXIT_FAILURE;
+        if (!outputImage.IsEmpty()) {
+            if (outputImage.Exists()) {
+                std::cerr << "Output file " << outputImage << " already exists" << std::endl;
+                return EXIT_FAILURE;
+            }
+            if (!outputImage.DirName().Exists()) {
+                std::cerr << "Output directory " << outputImage.DirName() << " not exists" << std::endl;
+                return EXIT_FAILURE;
+            }
         }
 
         for (auto &script: scripts) {
@@ -1995,20 +2023,39 @@ public:
             }
         }
 
+        if (!outputImage.IsEmpty()) {
+            error = loopStorage.MkdirTmp(outputImage.DirName(), "loop.", 0755);
+            if (error) {
+                std::cerr << "Cannot create storage for loop: " << error << std::endl;
+                return EXIT_FAILURE;
+            }
+            launcher.VolumeBackend = "loop";
+            launcher.VolumeStorage = loopStorage.ToString();
+            loopImage = loopStorage / "loop.img";
+        }
+
         /* do not start os for bootstrap */
         bool StartOS = launcher.StartOS;
         launcher.StartOS = false;
 
+        std::string volume;
+        TPath volume_script;
+
         error = launcher.Launch();
         if (error) {
             std::cerr << "Cannot create volume: " << error << std::endl;
-            return EXIT_FAILURE;
+            goto err;
         }
 
-        std::string volume = launcher.Volume.Path;
-        TPath volume_script(volume + "/script");
+        volume = launcher.Volume.Path;
 
-        volume_script.Mkfile(0644);
+        volume_script = TPath(volume + "/script");
+        volume_script.Unlink();
+        error = volume_script.Mkfile(0644);
+        if (error) {
+            std::cerr << "Cannot create script: " << error << std::endl;
+            goto err;
+        }
 
         if (!bootstrap_script.IsEmpty()) {
             bootstrap.Container = launcher.Container + "/bootstrap";
@@ -2016,18 +2063,26 @@ public:
             bootstrap.WaitExit = true;
             bootstrap.StartOS = true;
 
-            std::vector<std::string> bind;
+            std::string script_text;
+            error = bootstrap_script.ReadAll(script_text);
+            if (!error)
+                error = volume_script.WriteAll(script_text);
+            if (error) {
+                std::cout << "Cannot copy script: " << error << std::endl;
+                goto err;
+            }
 
             bootstrap.SetProperty("stdin_path", "/dev/null");
             bootstrap.SetProperty("isolate", "true");
             bootstrap.SetProperty("net", "inherited");
 
             /* give write access only to volume and /tmp */
-            bind.push_back("/tmp /tmp rw");
-            bind.push_back(volume + " " + volume + " rw");
-            bind.push_back(bootstrap_script.ToString() + " " + volume_script.ToString() + " ro");
-            bootstrap.SetProperty("root_readonly" "true");
-            bootstrap.SetProperty("bind", CommaSeparatedList(bind, ";"));
+            if (bootstrap.Layers.empty()) {
+                bootstrap.SetProperty("bind", volume + " " + volume + " rw;/tmp /tmp rw");
+                bootstrap.SetProperty("root_readonly" "true");
+            } else {
+                bootstrap.SetProperty("bind", volume + " " + volume + " rw");
+            }
 
             bootstrap.SetProperty("cwd", volume);
             bootstrap.SetProperty("command", "/bin/bash -e -x -c '. ./script'");
@@ -2104,11 +2159,27 @@ public:
 
         volume_script.Unlink();
 
-        std::cout << "Exporting layer into " << output.ToString() << std::endl;
+        if (!output.IsEmpty()) {
+            std::cout << "Exporting layer into " << output.ToString() << std::endl;
 
-        if (Api->ExportLayer(volume, output.ToString())) {
-            std::cerr << "Cannot export layer:" << launcher.GetLastError() << std::endl;
-            goto err;
+            if (Api->ExportLayer(volume, output.ToString())) {
+                std::cerr << "Cannot export layer:" << launcher.GetLastError() << std::endl;
+                goto err;
+            }
+        }
+
+        if (launcher.WeakContainer)
+            launcher.Cleanup();
+
+        if (!outputImage.IsEmpty()) {
+            std::cout << "Exporting image into " << outputImage.ToString() << std::endl;
+
+            error = loopImage.Rename(outputImage);
+            if (error) {
+                std::cerr << "Cannot export image:" << error << std::endl;
+                goto err;
+            }
+            (void)loopStorage.Rmdir();
         }
 
         return EXIT_SUCCESS;
@@ -2116,6 +2187,10 @@ public:
 err:
         if (launcher.WeakContainer)
             launcher.Cleanup();
+        if (!loopImage.IsEmpty()) {
+            (void)loopImage.Unlink();
+            (void)loopStorage.Rmdir();
+        }
         return EXIT_FAILURE;
     }
 };

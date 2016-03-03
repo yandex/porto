@@ -116,6 +116,7 @@ public:
     TError Mkfile(unsigned int mode) const;
     TError Mkdir(unsigned int mode) const;
     TError MkdirAll(unsigned int mode) const;
+    TError MkdirTmp(const TPath &parent, const std::string &prefix, unsigned int mode);
     TError CreateAll(unsigned int mode) const;
     TError Rmdir() const;
     TError Unlink() const;

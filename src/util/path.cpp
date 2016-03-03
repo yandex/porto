@@ -390,6 +390,15 @@ TError TPath::MkdirAll(unsigned int mode) const {
     return TError::Success();
 }
 
+TError TPath::MkdirTmp(const TPath &parent, const std::string &prefix, unsigned int mode) {
+    Path = (parent / (prefix + "XXXXXX")).Path;
+    if (!mkdtemp(&Path[0]))
+        return TError(EError::Unknown, errno, "mkdtemp(" + Path + ")");
+    if (mode != 0700)
+        return Chmod(mode);
+    return TError::Success();
+}
+
 TError TPath::CreateAll(unsigned int mode) const {
     if (!Exists()) {
         TPath dir = DirName();

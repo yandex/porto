@@ -70,11 +70,11 @@ _portoctl ()
 		-l|-L)
 			_porto_layers
 			;;
-		-B|-S|-o)
+		-B|-S|-o|-O)
 			_filedir
 			;;
 		*)
-			COMPREPLY=( $( compgen -W "-M -l -L -B -S -o -k" -- "$cur" ) )
+			COMPREPLY=( $( compgen -W "-M -l -L -B -S -o -O -k" -- "$cur" ) )
 			compopt -o filenames
 			COMPREPLY+=( $( compgen -S "=" -W "$_porto_properies" -- "$cur" ) )
 			compopt -o nospace
