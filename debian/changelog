@@ -1,3 +1,12 @@
+yandex-porto (2.8.1) unstable; urgency=low
+
+  * portod: fix missing errors from mount
+  * volume: fallocate loop image and chown to user
+  * portoctl: fix forwarding non-termianl streams
+  * portoctl: allow building filesystem images
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 04 Mar 2016 18:46:14 +0300
+
 yandex-porto (2.8) unstable; urgency=low
 
   * selftest: do not change hostname
