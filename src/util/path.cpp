@@ -704,8 +704,8 @@ TError TPath::Mount(TPath source, std::string type, unsigned long flags,
     L_ACT() << "mount -t " << type << " " << source << " " << Path
             << " -o " << data <<  " " << MountFlagsToString(flags) << std::endl;
     if (mount(source.c_str(), Path.c_str(), type.c_str(), flags, data.c_str()))
-        TError(EError::Unknown, errno, "mount(" + source.ToString() + ", " +
-                Path + ", " + type + ", " + MountFlagsToString(flags) + ", " + data + ")");
+        return TError(EError::Unknown, errno, "mount(" + source.ToString() + ", " +
+                      Path + ", " + type + ", " + MountFlagsToString(flags) + ", " + data + ")");
     return TError::Success();
 }
 

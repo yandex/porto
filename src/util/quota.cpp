@@ -100,7 +100,7 @@ TError TProjectQuota::EnableProjectQuota() {
 
 	ret = mount(NULL, RootPath.c_str(), NULL, MS_REMOUNT, "quota");
 	if (ret)
-		TError(EError::Unknown, errno, "Cannot enable quota");
+		return TError(EError::Unknown, errno, "Cannot enable quota");
 
 	TPath quota = RootPath / PROJECT_QUOTA_FILE;
 	if (!quota.Exists()) {
