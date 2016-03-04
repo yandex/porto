@@ -293,41 +293,6 @@ void CloseFds(int max, const std::set<int> &except, bool openStd) {
     }
 }
 
-TError AllocLoop(const TPath &path, size_t size) {
-    TError error;
-    TScopedFd fd;
-    int status;
-    std::vector<std::string> lines;
-
-    fd = open(path.ToString().c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0644);
-    if (fd.GetFd() < 0)
-        return TError(EError::Unknown, errno, "open(" + path.ToString() + ")");
-
-    int ret = ftruncate(fd.GetFd(), size);
-    if (ret < 0) {
-        error = TError(EError::Unknown, errno, "truncate(" + path.ToString() + ")");
-        goto remove_file;
-    }
-
-    fd = -1;
-
-    error = Run({ "mkfs.ext4", "-F", "-F", path.ToString()}, status);
-    if (error)
-        goto remove_file;
-
-    if (status) {
-        error = TError(EError::Unknown, error.GetErrno(), "mkfs returned " + std::to_string(status) + ": " + error.GetMsg());
-        goto remove_file;
-    }
-
-    return TError::Success();
-
-remove_file:
-    (void)path.Unlink();
-
-    return error;
-}
-
 TError Run(const std::vector<std::string> &command, int &status, bool stdio) {
     int pid = fork();
     if (pid < 0) {

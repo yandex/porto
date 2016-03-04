@@ -13,6 +13,8 @@
 #include "config.hpp"
 
 extern "C" {
+#include <unistd.h>
+#include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/vfs.h>
 #include <sys/mount.h>
@@ -280,6 +282,47 @@ public:
         return TError::Success();
     }
 
+    static TError MakeImage(const TPath &path, const TCred &cred, off_t size) {
+        int fd, status;
+        TError error;
+
+        fd = open(path.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0644);
+        if (fd < 0)
+            return TError(EError::Unknown, errno, "creat(" + path.ToString() + ")");
+
+        if (fchown(fd, cred.Uid, cred.Gid)) {
+            error = TError(EError::Unknown, errno, "chown(" + path.ToString() + ")");
+            goto remove_file;
+        }
+
+        if (fallocate(fd, 0, 0, size) && ftruncate(fd, size)) {
+            error = TError(EError::Unknown, errno, "truncate(" + path.ToString() + ")");
+            goto remove_file;
+        }
+
+        close(fd);
+        fd = -1;
+
+        error = Run({ "mkfs.ext4", "-F", path.ToString()}, status);
+        if (error)
+            goto remove_file;
+
+        if (status) {
+            error = TError(EError::Unknown, error.GetErrno(),
+                    "mkfs.ext4 returned " + std::to_string(status) + ": " + error.GetMsg());
+            goto remove_file;
+        }
+
+        return TError::Success();
+
+remove_file:
+        (void)path.Unlink();
+        if (fd >= 0)
+            close(fd);
+
+        return error;
+    }
+
     TError Build() override {
         TPath path = Volume->GetPath();
         TPath image = GetLoopImage();
@@ -292,7 +335,7 @@ public:
 
         if (!image.Exists()) {
             L_ACT() << "Allocate loop image with size " << space_limit << std::endl;
-            error = AllocLoop(image, space_limit);
+            error = MakeImage(image, Volume->GetCred(), space_limit);
             if (error)
                 return error;
         } else {
@@ -1007,14 +1050,25 @@ TError TVolume::Build() {
 
     if (Config->HasValue(V_LAYERS) && GetBackend() != "overlay") {
         L_ACT() << "Merge layers into volume: " << path << std::endl;
-        for (auto layer: GetLayers()) {
-            error = CopyRecursive(layer, path);
+
+        auto layers = GetLayers();
+        for (auto layer = layers.rbegin(); layer != layers.rend(); ++layer) {
+            error = CopyRecursive(*layer, path);
             if (error)
                 goto err_merge;
         }
+
         error = SanitizeLayer(path, true);
         if (error)
             goto err_merge;
+
+        error = path.Chown(GetCred());
+        if (error)
+            return error;
+
+        error = path.Chmod(GetPermissions());
+        if (error)
+            return error;
     }
 
     return TError::Success();
