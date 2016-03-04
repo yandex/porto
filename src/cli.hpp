@@ -16,18 +16,7 @@ protected:
     std::string Name, Usage, Desc, Help;
     size_t NeedArgs;
     sig_atomic_t Interrupted = 0;
-    bool DieOnSignal = false;
-
-    int RunCmdImpl(const std::vector<std::string> &args,
-                   std::unique_ptr<ICmd> command,
-                   TCommandEnviroment *env);
-
 public:
-    int InterruptedSignal;
-
-    bool GotSignal() const {
-        return Interrupted;
-    }
 
     ICmd(TPortoAPI *api, const std::string &name, int args,
          const std::string &usage, const std::string &desc, const std::string &help = "");
@@ -44,14 +33,7 @@ public:
     void PrintError(const std::string &str);
     void PrintUsage();
     bool ValidArgs(const std::vector<std::string> &args);
-    void SetDieOnSignal(bool die);
-    void Signal(int sig);
     virtual int Execute(TCommandEnviroment *env) = 0;
-
-    template <typename T>
-    int RunCmd(const std::vector<std::string> &args, TCommandEnviroment *env) {
-        return RunCmdImpl(args, std::unique_ptr<T>(new T(Api)), env);
-    }
 };
 
 struct Option {

@@ -62,6 +62,7 @@ public:
     bool MergeLayers = false;
     bool StartOS = false;
     bool ForwardTerminal = false;
+    bool ForwardStreams = false;
     bool WaitExit = false;
 
     std::string Container;
@@ -347,6 +348,11 @@ public:
             if (Api->SetProperty(Container, "stdin_path", tty) ||
                     Api->SetProperty(Container, "stdout_path", tty) ||
                     Api->SetProperty(Container, "stderr_path", tty))
+                goto err;
+        } else if (ForwardStreams) {
+            if (Api->SetProperty(Container, "stdin_path", "/dev/fd/0") ||
+                    Api->SetProperty(Container, "stdout_path", "/dev/fd/1") ||
+                    Api->SetProperty(Container, "stderr_path", "/dev/fd/2"))
                 goto err;
         }
 
@@ -1133,9 +1139,7 @@ public:
         "[-C] [-T] [-L layer]... <container> command=<command> [properties]",
         "Execute command in container, forward terminal, destroy container at the end",
         "    -L layer|dir|tarball        add lower layer (-L top ... -L bottom)\n"
-        ) {
-        SetDieOnSignal(false);
-    }
+        ) { }
 
     int Execute(TCommandEnviroment *environment) final override {
         TLauncher launcher(Api);
@@ -1143,6 +1147,7 @@ public:
 
         launcher.WeakContainer = true;
         launcher.ForwardTerminal = isatty(STDIN_FILENO);
+        launcher.ForwardStreams = true;
         launcher.WaitExit = true;
 
         const auto &args = environment->GetOpts({
@@ -1204,6 +1209,7 @@ public:
 
         launcher.WeakContainer = true;
         launcher.ForwardTerminal = isatty(STDIN_FILENO);
+        launcher.ForwardStreams = true;
         launcher.WaitExit = true;
 
         launcher.Container = args[0] + "/shell-" + user + "-" + std::to_string(GetPid());
@@ -1919,9 +1925,7 @@ public:
             "    -S script                  bash script runs inside (with root=volume)\n"
             "    -M                         merge all layers together\n"
             "    -k                         keep volume and container\n"
-            ) {
-        SetDieOnSignal(false);
-    }
+            ) { }
 
     ~TBuildCmd() { }
 
@@ -2008,12 +2012,13 @@ public:
 
         if (!bootstrap_script.IsEmpty()) {
             bootstrap.Container = launcher.Container + "/bootstrap";
-            bootstrap.ForwardTerminal = true;
+            bootstrap.ForwardStreams = true;
             bootstrap.WaitExit = true;
             bootstrap.StartOS = true;
 
             std::vector<std::string> bind;
 
+            bootstrap.SetProperty("stdin_path", "/dev/null");
             bootstrap.SetProperty("isolate", "true");
             bootstrap.SetProperty("net", "inherited");
 
@@ -2068,9 +2073,10 @@ public:
             }
 
             executor.Container = launcher.Container + "/script";
-            executor.ForwardTerminal = true;
+            executor.ForwardStreams = true;
             executor.WaitExit = true;
 
+            executor.SetProperty("stdin_path", "/dev/null");
             executor.SetProperty("isolate", "false");
             executor.SetProperty("virt_mode", "os");
             executor.SetProperty("net", "inherited");
@@ -2120,10 +2126,8 @@ public:
     TConvertPathCmd(TPortoAPI *api) : ICmd(api, "convert", 1,
                                            "<path> [-s container] [-d container]",
                                            "convert paths between different containers",
-                                           "    -s container    source container (client container if ommited)\n"
-                                           "    -d container    destination container (client container if ommited)\n") {
-        SetDieOnSignal(false);
-    }
+                                           "    -s container    source container (client container if omitted)\n"
+                                           "    -d container    destination container (client container if omitted)\n") { }
 
     int Execute(TCommandEnviroment *environment) final override {
         std::string path, src, dest;

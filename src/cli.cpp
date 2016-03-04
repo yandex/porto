@@ -19,13 +19,6 @@ using std::map;
 using std::vector;
 
 namespace {
-// Command that is being executed, used for signal handling
-ICmd *CurrentCmd = nullptr;
-
-void SigInt(int sig) {
-    if (CurrentCmd)
-        CurrentCmd->Signal(sig);
-}
 
 void PrintAligned(const std::string &name, const std::string &desc,
                          const size_t nameWidth, const size_t termWidth) {
@@ -160,24 +153,6 @@ size_t MaxFieldLength(const std::vector<std::string> &vec, size_t min) {
     return MaxFieldLength(vec, [](const string &s) { return s; }, min);
 }
 
-int ICmd::RunCmdImpl(const std::vector<std::string> &args,
-                     std::unique_ptr<ICmd> cmd,
-                     TCommandEnviroment *env) {
-    ICmd *prevCmd = CurrentCmd;
-    cmd->SetDieOnSignal(false);
-
-    CurrentCmd = cmd.get();
-
-    TCommandEnviroment childEnv(env, args);
-    int ret = cmd->Execute(&childEnv);
-    CurrentCmd = prevCmd;
-
-    if (GotSignal())
-        return InterruptedSignal;
-
-    return ret;
-}
-
 ICmd::ICmd(TPortoAPI *api, const string &name, int args,
            const string &usage, const string &desc, const string &help) :
     Api(api), Name(name), Usage(usage), Desc(desc), Help(help), NeedArgs(args) {}
@@ -242,19 +217,6 @@ bool ICmd::ValidArgs(const std::vector<std::string> &args) {
     return true;
 }
 
-void ICmd::SetDieOnSignal(bool die) {
-    DieOnSignal = die;
-}
-
-void ICmd::Signal(int sig) {
-    Interrupted = 1;
-    InterruptedSignal = sig;
-    if (DieOnSignal) {
-        signal(sig, SIG_DFL);
-        raise(sig);
-    }
-}
-
 int TCommandHandler::TryExec(const std::string &commandName,
                              const std::vector<std::string> &commandArgs) {
     const auto it = Commands.find(commandName);
@@ -270,19 +232,11 @@ int TCommandHandler::TryExec(const std::string &commandName,
         return EXIT_FAILURE;
     }
 
-    CurrentCmd = cmd;
-
     // in case client closes pipe we are writing to in the protobuf code
     Signal(SIGPIPE, SIG_IGN);
-    Signal(SIGINT, SigInt);
-    Signal(SIGTERM, SigInt);
 
     TCommandEnviroment commandEnv{*this, commandArgs};
-    int ret = cmd->Execute(&commandEnv);
-    if (cmd->GotSignal())
-        return -cmd->InterruptedSignal;
-    else
-        return ret;
+    return cmd->Execute(&commandEnv);
 }
 
 TCommandHandler::TCommandHandler(TPortoAPI &api) : PortoApi(api) {
