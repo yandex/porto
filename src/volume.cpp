@@ -66,7 +66,7 @@ public:
         if (error)
             return error;
 
-        return Volume->GetPath().Bind(storage, Volume->GetMountFlags());
+        return Volume->GetPath().BindRemount(storage, Volume->GetMountFlags());
     }
 
     TError Clear() override {
@@ -210,7 +210,7 @@ public:
         if (error)
             return error;
 
-        return Volume->GetPath().Bind(storage, Volume->GetMountFlags());
+        return Volume->GetPath().BindRemount(storage, Volume->GetMountFlags());
     }
 
     TError Clear() override {

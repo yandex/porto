@@ -183,7 +183,7 @@ TError TTask::ChildBindDns() {
 
         error = path.CreateAll(0600);
         if (!error)
-            error = path.Bind(file, MS_RDONLY);
+            error = path.BindRemount(file, MS_RDONLY);
         if (error)
             return error;
     }
@@ -216,23 +216,13 @@ TError TTask::ChildBindDirectores() {
             error = dest.MkdirAll(0755);
         else
             error = dest.CreateAll(0600);
-
-        unsigned long flags = 0;
-        if (bindMap.Rdonly)
-            flags |= MS_RDONLY;
-
-        if (!error)
-            error = dest.Bind(src, flags);
         if (error)
             return error;
 
-        // drop nosuid,noexec,nodev from volumes
-        if (Env->NewMountNs) {
-            error = dest.Remount(MS_REMOUNT | MS_BIND |
-                                 (bindMap.Rdonly ? MS_RDONLY : 0));
-            if (error)
-                return error;
-        }
+        // Drop nosuid,noexec,nodev
+        error = dest.BindRemount(src, bindMap.Rdonly ? MS_RDONLY : 0);
+        if (error)
+            return error;
     }
 
     return TError::Success();
@@ -283,7 +273,7 @@ TError TTask::ChildMountRootFs() {
         error = Env->Root.Mount("/dev/loop" + std::to_string(Env->LoopDev),
                                 "ext4", Env->RootRdOnly ? MS_RDONLY : 0, {});
     else
-        error = Env->Root.Bind(Env->Root, 0);
+        error = Env->Root.Bind(Env->Root);
     if (error)
         return error;
 
@@ -378,13 +368,13 @@ TError TTask::ChildMountRootFs() {
 
     for (auto &p : proc_ro) {
         TPath path = Env->Root + p;
-        error = path.Bind(path, MS_RDONLY);
+        error = path.BindRemount(path, MS_RDONLY);
         if (error)
             return error;
     }
 
     TPath proc_kcore = Env->Root + "/proc/kcore";
-    error = proc_kcore.Bind(Env->Root + "/dev/null", MS_RDONLY);
+    error = proc_kcore.BindRemount(Env->Root + "/dev/null", MS_RDONLY);
     if (error)
         return error;
 

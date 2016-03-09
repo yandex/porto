@@ -138,8 +138,9 @@ public:
 
     TError Mount(TPath source, std::string type, unsigned long flags,
                  std::vector<std::string> options) const;
-    TError Bind(TPath source, unsigned long flags) const;
+    TError Bind(TPath source) const;
     TError Remount(unsigned long flags) const;
+    TError BindRemount(TPath source, unsigned long flags) const;
     TError Umount(unsigned long flags) const;
     TError UmountAll() const;
 

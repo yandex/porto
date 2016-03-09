@@ -718,14 +718,11 @@ TError TPath::Mount(TPath source, std::string type, unsigned long flags,
     return TError::Success();
 }
 
-TError TPath::Bind(TPath source, unsigned long flags) const {
-    L_ACT() << "bind mount " << Path << " " << source << " "
-            << MountFlagsToString(flags) << std::endl;
-    if (mount(source.c_str(), Path.c_str(), NULL, MS_BIND | flags, NULL))
+TError TPath::Bind(TPath source) const {
+    L_ACT() << "bind mount " << Path << " " << source << " " << std::endl;
+    if (mount(source.c_str(), Path.c_str(), NULL, MS_BIND, NULL))
         return TError(EError::Unknown, errno, "mount(" + source.ToString() +
-                ", " + Path + ", , " + MountFlagsToString(flags) + ", )");
-    if (flags & ~(MS_BIND | MS_REC))
-        return Remount(MS_BIND | MS_REMOUNT | flags);
+                ", " + Path + ", , M_BIND, )");
     return TError::Success();
 }
 
@@ -736,6 +733,13 @@ TError TPath::Remount(unsigned long flags) const {
         return TError(EError::Unknown, errno, "mount(NULL, " + Path +
                       ", NULL, " + MountFlagsToString(flags) + ", NULL)");
     return TError::Success();
+}
+
+TError TPath::BindRemount(TPath source, unsigned long flags) const {
+    TError error = Bind(source);
+    if (!error)
+        error = Remount(MS_REMOUNT | MS_BIND | flags);
+    return error;
 }
 
 TError TPath::Umount(unsigned long flags) const {
