@@ -3,10 +3,13 @@ package porto
 import (
 	"bytes"
 	"crypto/rand"
+	"io"
+	"net"
 	"os"
 	"os/exec"
 	"syscall"
 	"testing"
+	"time"
 
 	"github.com/yandex/porto/src/api/go/rpc"
 )
@@ -338,5 +341,53 @@ func TestSendRecvData(t *testing.T) {
 
 	if !bytes.Equal(data, result) {
 		t.Fatalf("result is not the same as input")
+	}
+}
+
+func TestTimeout(t *testing.T) {
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		t.Fatalf("unable to setup test TCP server %v", err)
+	}
+	defer l.Close()
+	go func() {
+		for {
+			conn, err := l.Accept()
+			if err != nil {
+				return
+			}
+
+			go func(conn net.Conn) {
+				time.Sleep(time.Second * 2)
+				conn.Close()
+			}(conn)
+		}
+	}()
+
+	conn, err := net.Dial("tcp", l.Addr().String())
+	if err != nil {
+		t.Fatalf("unable to create test conn: %v", err)
+	}
+	defer conn.Close()
+
+	porto := &portoConnection{conn: conn}
+
+	// Check non-zero timeout
+	porto.SetTimeout(time.Millisecond * 100)
+	_, _, err = porto.GetVersion()
+	switch err := err.(type) {
+	case net.Error:
+		if !err.Timeout() {
+			t.Fatalf("net.Error must be a timeout")
+		}
+	default:
+		t.Fatalf("error must be net.Error. Got: %v", err)
+	}
+
+	// Check zero timeout
+	porto.SetTimeout(time.Millisecond * 0)
+	_, _, err = porto.GetVersion()
+	if err != io.EOF {
+		t.Fatalf("error must be io.EOF as the test TCP Server closes the conn. Got: %v", err)
 	}
 }

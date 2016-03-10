@@ -93,6 +93,8 @@ func (e *Error) Error() string {
 }
 
 type API interface {
+	SetTimeout(time.Duration)
+
 	GetVersion() (string, string, error)
 
 	GetLastError() rpc.EError
@@ -143,6 +145,8 @@ type portoConnection struct {
 	conn net.Conn
 	err  rpc.EError
 	msg  string
+
+	timeout time.Duration
 }
 
 //Connect establishes connection to a Porto daemon via unix socket.
@@ -156,6 +160,12 @@ func Connect() (API, error) {
 	ret := new(portoConnection)
 	ret.conn = c
 	return ret, nil
+}
+
+// SetTimeout sets timeout for all operations
+// Passing zero timeout cleans this behavior
+func (conn *portoConnection) SetTimeout(timeout time.Duration) {
+	conn.timeout = timeout
 }
 
 func (conn *portoConnection) Close() error {
@@ -189,6 +199,13 @@ func (conn *portoConnection) performRequest(req *rpc.TContainerRequest) (*rpc.TC
 	data, err := proto.Marshal(req)
 	if err != nil {
 		return nil, err
+	}
+
+	if conn.timeout != 0 {
+		conn.conn.SetDeadline(time.Now().Add(conn.timeout))
+		// passing zero time should
+		var zeroTime time.Time
+		defer conn.conn.SetDeadline(zeroTime)
 	}
 
 	err = sendData(conn.conn, data)
