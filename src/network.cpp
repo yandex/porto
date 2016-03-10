@@ -10,6 +10,7 @@
 #include "util/crc32.hpp"
 
 extern "C" {
+#include <fnmatch.h>
 #include <netlink/route/addr.h>
 #include <netlink/route/link.h>
 #include <netlink/route/tc.h>
@@ -395,6 +396,14 @@ std::string TNetwork::GetIfaceName(const std::string &prefix) {
             return name;
     }
     return prefix + "0";
+}
+
+std::string TNetwork::MatchIface(const std::string &pattern) {
+    for (auto &iface: ifaces) {
+        if (!fnmatch(pattern.c_str(), iface.first.c_str(), 0))
+            return iface.first;
+    }
+    return pattern;
 }
 
 TError TNetwork::GetInterfaceCounters(ETclassStat stat,
@@ -1066,7 +1075,7 @@ TError TNetCfg::ConfigureL3(TL3NetCfg &l3) {
         if (error)
             return error;
 
-        error = ParentNet->AddAnnounce(addr, l3.Master);
+        error = ParentNet->AddAnnounce(addr, ParentNet->MatchIface(l3.Master));
         if (error)
             return error;
     }
@@ -1090,8 +1099,10 @@ TError TNetCfg::ConfigureInterfaces() {
     }
 
     for (auto &ipvlan : IpVlan) {
+        std::string master = ParentNet->MatchIface(ipvlan.Master);
+
         TNlLink link(source_nl, "piv" + std::to_string(GetTid()));
-        error = link.AddIpVlan(ipvlan.Master, ipvlan.Mode, ipvlan.Mtu);
+        error = link.AddIpVlan(master, ipvlan.Mode, ipvlan.Mtu);
         if (error)
             return error;
 
@@ -1104,12 +1115,14 @@ TError TNetCfg::ConfigureInterfaces() {
     }
 
     for (auto &mvlan : MacVlan) {
+        std::string master = ParentNet->MatchIface(mvlan.Master);
+
         std::string hw = mvlan.Hw;
         if (hw.empty() && !Hostname.empty())
-            hw = GenerateHw(mvlan.Master + mvlan.Name);
+            hw = GenerateHw(master + mvlan.Name);
 
         TNlLink link(source_nl, "pmv" + std::to_string(GetTid()));
-        error = link.AddMacVlan(mvlan.Master, mvlan.Type, hw, mvlan.Mtu);
+        error = link.AddMacVlan(master, mvlan.Type, hw, mvlan.Mtu);
         if (error)
                 return error;
 

@@ -77,6 +77,7 @@ public:
     TError PutNatAddress(const std::vector <TNlAddr> &addrs);
 
     std::string GetIfaceName(const std::string &prefix);
+    std::string MatchIface(const std::string &pattern);
 };
 
 
