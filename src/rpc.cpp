@@ -142,11 +142,14 @@ static std::string ResponseAsString(const rpc::TContainerResponse &resp) {
                     else if (entry.keyval(j).has_value())
                         ret += " " + entry.keyval(j).variable() + "=" + entry.keyval(j).value();
             }
-        } else if (resp.has_version())
+        } else if (resp.has_version()) {
             ret = resp.version().tag() + " #" + resp.version().revision();
-        else if (resp.has_wait())
-            ret = resp.wait().name() + " isn't running";
-        else if (resp.has_convertpath())
+        } else if (resp.has_wait()) {
+            if (resp.wait().name().empty())
+                ret = "Wait timeout";
+            else
+                ret = "Wait " + resp.wait().name();
+        } else if (resp.has_convertpath())
             ret = resp.convertpath().path();
         else
             ret = "Ok";
