@@ -710,6 +710,9 @@ std::string TPath::UmountFlagsToString(unsigned long flags) {
 TError TPath::Mount(TPath source, std::string type, unsigned long flags,
                     std::vector<std::string> options) const {
     std::string data = CommaSeparatedList(options);
+    if (data.length() > 4096)
+        return TError(EError::Unknown, E2BIG, "mount option too big: " +
+                      std::to_string(data.length()));
     L_ACT() << "mount -t " << type << " " << source << " " << Path
             << " -o " << data <<  " " << MountFlagsToString(flags) << std::endl;
     if (mount(source.c_str(), Path.c_str(), type.c_str(), flags, data.c_str()))
