@@ -104,7 +104,7 @@ void Crash() {
 }
 
 void FatalSignal(int sig) {
-    L_ERR() << "Fatal signal " << *strsignal(sig) << std::endl;
+    L_ERR() << "Fatal signal: " << std::string(strsignal(sig)) << std::endl;
     Stacktrace();
 
     /* ok, die */
