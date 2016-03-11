@@ -76,7 +76,7 @@ message TCfg {
 	message TPrivilegesCfg {
 		repeated string root_user = 1 [deprecated=true];
 		repeated string root_group = 2 [deprecated=true];
-		repeated string restricted_root_user = 3;
+		repeated string restricted_root_user = 3 /* [deprecated=true] */;
 		repeated string restricted_root_group = 4 [deprecated=true];
 	}
 
@@ -98,7 +98,7 @@ message TCfg {
 	optional TKeyvalCfg keyval = 8;
 	optional TDaemonCfg daemon = 9;
 	optional TContainerCfg container = 10;
-	optional TPrivilegesCfg privileges = 11;
+	optional TPrivilegesCfg privileges = 11 /* [deprecated=true] */;
 	optional TVolumesCfg volumes = 12;
 	optional TFileCfg version = 13 [deprecated=true];
 	optional TFileCfg journal_dir = 14 [deprecated=true];

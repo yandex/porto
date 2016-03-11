@@ -3662,12 +3662,6 @@ static void TestUlimitProperty(TPortoAPI &api) {
 static void TestVirtModeProperty(TPortoAPI &api) {
     std::string name = "lxc";
 
-    Say() << "Check permissions " << std::endl;
-
-    ExpectApiSuccess(api.Create(name));
-    ExpectApiFailure(api.SetProperty(name, "virt_mode", "os"), EError::Permission);
-    ExpectApiSuccess(api.Destroy(name));
-
     Say() << "Check that we can't start without loop" << std::endl;
 
     std::map<std::string, std::string> expected = {
@@ -3719,7 +3713,6 @@ static void TestVirtModeProperty(TPortoAPI &api) {
         ExpectSuccess(tmpdir.Mount("/dev/loop" + std::to_string(nr), "ext4", 0, {}));
         AsBob(api);
 
-        ExpectApiSuccess(api.SetProperty(name, "isolate", "false"));
         ExpectApiSuccess(api.SetProperty(name, "root", tmpimg.ToString()));
 
         AsRoot(api);

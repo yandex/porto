@@ -516,7 +516,7 @@ public:
 class TIsolateProperty : public TBoolValue, public TContainerValue {
 public:
     TIsolateProperty() :
-        TBoolValue(PERSISTENT_VALUE | OS_MODE_PROPERTY),
+        TBoolValue(PERSISTENT_VALUE),
         TContainerValue(P_ISOLATE,
                         "Isolate container from parent") {}
 
@@ -893,7 +893,7 @@ public:
 class TVirtModeProperty : public TIntValue, public TContainerValue {
 public:
     TVirtModeProperty() :
-        TIntValue(PERSISTENT_VALUE | RESTROOT_PROPERTY),
+        TIntValue(PERSISTENT_VALUE),
         TContainerValue(P_VIRT_MODE,
                         "Virtualization mode: os|app") {}
 

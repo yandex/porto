@@ -11,8 +11,6 @@ extern "C" {
 
 static gid_t PortoGroup;
 
-static std::vector<uid_t> RestrictedRootUid;
-
 static size_t PwdBufSize = sysconf(_SC_GETPW_R_SIZE_MAX) > 0 ?
                            sysconf(_SC_GETPW_R_SIZE_MAX) : 16384;
 
@@ -130,17 +128,6 @@ TError TCred::Load(const std::string &user) {
     return error;
 }
 
-//FIXME should be euqal to IsPortoUser
-bool TCred::IsRestrictedRootUser() const {
-
-    for (auto id: RestrictedRootUid) {
-        if (Uid == id)
-            return true;
-    }
-
-    return IsRootUser();
-}
-
 bool TCred::IsPortoUser() const {
     return IsRootUser() || IsMemberOf(PortoGroup);
 }
@@ -184,14 +171,5 @@ void InitCred() {
     if (TPath("/proc/sys/kernel/cap_last_cap").ReadInt(LastCapability)) {
         L_WRN() << "Can't read /proc/sys/kernel/cap_last_cap, assuming 36" << std::endl;
         LastCapability = 36; //FIXME
-    }
-
-    for (auto &user: config().privileges().restricted_root_user()) {
-        uid_t uid;
-        error = UserId(user, uid);
-        if (error)
-            L_WRN() << "Can't add privileged user " << user << " : "  << error << std::endl;
-        else
-            RestrictedRootUid.push_back(uid);
     }
 }

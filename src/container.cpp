@@ -853,11 +853,8 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
 
     auto vmode = Prop->Get<int>(P_VIRT_MODE);
     if (vmode == VIRT_MODE_OS && !OwnerCred.IsRootUser()) {
-        for (auto name : Prop->List()) {
-            auto prop = Prop->Find(name);
-            if (prop && prop->HasFlag(OS_MODE_PROPERTY))
-                prop->Reset();
-        }
+        if (!Prop->Get<bool>(P_ISOLATE))
+            return TError(EError::Permission, "virt_mode=os without isolation only for root");
         if (RootPath().IsRoot())
             return TError(EError::Permission, "virt_mode=os without chroot only for root");
     }
@@ -1578,10 +1575,6 @@ TError TContainer::SetProperty(const string &origProperty,
         if (value != current)
             return TError(EError::Permission, "Only root can change this property");
     }
-
-    if (prop->HasFlag(RESTROOT_PROPERTY) &&
-            !superuser && !OwnerCred.IsRestrictedRootUser())
-        return TError(EError::Permission, "Only restricted root can change this property");
 
     if (idx.length())
         error = prop->SetIndexed(idx, value);

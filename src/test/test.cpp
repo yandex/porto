@@ -405,7 +405,6 @@ void InitUsersAndGroups() {
     Expect(!Nobody.IsPortoUser());
     Expect(Alice.IsPortoUser());
     Expect(Bob.IsPortoUser());
-    Expect(Bob.IsRestrictedRootUser());
 }
 
 void AsRoot(TPortoAPI &api) {

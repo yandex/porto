@@ -12,11 +12,6 @@
 const unsigned int SUPERUSER_PROPERTY = (1 << 0);
 // Property should return parent value as default
 const unsigned int PARENT_DEF_PROPERTY = (1 << 1);
-// Property can be modified only by restricted root
-const unsigned int RESTROOT_PROPERTY = (1 << 3);
-// Properties marked with this flag are reverted to default upon container
-// start with virt_mode==os
-const unsigned int OS_MODE_PROPERTY = (1 << 4);
 
 // Data only in dead state
 constexpr unsigned POSTMORTEM_VALUE = (1 << 22);

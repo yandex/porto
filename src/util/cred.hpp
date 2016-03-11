@@ -40,7 +40,6 @@ struct TCred {
     }
 
     bool IsPortoUser() const;
-    bool IsRestrictedRootUser() const;
     bool IsRootUser() const { return Uid == 0; }
 
     bool IsMemberOf(gid_t group) const;
