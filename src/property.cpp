@@ -751,6 +751,7 @@ public:
                         "L3 <name> [master] | "
                         "NAT [name] | "
                         "MTU <name> <mtu> | "
+                        "autoconf <name> | "
                         "netns <name>") {}
 
     TStrList GetDefault() const override {

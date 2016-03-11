@@ -887,6 +887,10 @@ TError TNetCfg::ParseNet(std::vector<std::string> lines) {
 
             return TError(EError::InvalidValue, "Link not found: " + settings[1]);
 
+        } else if (type == "autoconf") {
+            if (settings.size() != 2)
+                return TError(EError::InvalidValue, "Invalid autoconf in: " + line);
+            Autoconf.push_back(StringTrim(settings[1]));
         } else if (type == "netns") {
             if (settings.size() != 2)
                 return TError(EError::InvalidValue, "Invalid netns in: " + line);
@@ -1177,6 +1181,10 @@ TError TNetCfg::ConfigureInterfaces() {
 
         for (auto &gw: GwVec)
             if (gw.Iface == name)
+                hasConfig = true;
+
+        for (auto &ac: Autoconf)
+            if (ac == name)
                 hasConfig = true;
 
         if (NetUp || hasConfig) {

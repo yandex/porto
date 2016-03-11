@@ -338,6 +338,45 @@ TError TNlLink::AddAddress(const TNlAddr &addr) {
     return TError::Success();
 }
 
+TError TNlLink::WaitAddress(int timeout_s) {
+    struct nl_cache *cache;
+    int ret;
+
+    L() << "Wait for autoconf at " << GetDesc() << std::endl;
+
+    ret = rtnl_addr_alloc_cache(GetSock(), &cache);
+    if (ret < 0)
+        return Nl->Error(ret, "Cannot allocate addr cache");
+
+    do {
+        for (auto obj = nl_cache_get_first(cache); obj; obj = nl_cache_get_next(obj)) {
+            auto addr = (struct rtnl_addr *)obj;
+
+            if (!rtnl_addr_get_local(addr) ||
+                    rtnl_addr_get_ifindex(addr) != GetIndex() ||
+                    rtnl_addr_get_family(addr) != AF_INET6 ||
+                    rtnl_addr_get_scope(addr) >= RT_SCOPE_LINK ||
+                    (rtnl_addr_get_flags(addr) &
+                     (IFA_F_TENTATIVE | IFA_F_DEPRECATED)))
+                continue;
+
+            L() << "Got " << TNlAddr(rtnl_addr_get_local(addr)).Format()
+                << " at " << GetDesc() << std::endl;
+
+            nl_cache_free(cache);
+            return TError::Success();
+        }
+
+        usleep(1000000);
+        ret = nl_cache_refill(GetSock(), cache);
+        if (ret < 0)
+            return Nl->Error(ret, "Cannot refill address cache");
+    } while (--timeout_s > 0);
+
+    nl_cache_free(cache);
+    return TError(EError::Unknown, "Network autoconf timeout");
+}
+
 #ifdef IFLA_IPVLAN_MAX
 static const std::map<std::string, int> ipvlanMode = {
     { "l2", IPVLAN_MODE_L2 },

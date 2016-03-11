@@ -64,6 +64,8 @@ void TConfig::LoadDefaults() {
     config().mutable_volumes()->set_volume_dir("/place/porto_volumes");
     config().mutable_volumes()->set_layers_dir("/place/porto_layers");
     config().mutable_volumes()->set_enable_quota(true);
+
+    config().mutable_network()->set_autoconf_timeout_s(120);
 }
 
 bool TConfig::LoadFile(const std::string &path) {

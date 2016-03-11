@@ -787,6 +787,9 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     if (NetCfg && NetCfg->NetNs.IsOpened())
         taskEnv->ParentNs.Net.EatFd(NetCfg->NetNs);
 
+    if (NetCfg)
+        taskEnv->Autoconf = NetCfg->Autoconf;
+
     if (taskEnv->Command.empty() || taskEnv->TripleFork || taskEnv->QuadroFork) {
         TPath exe("/proc/self/exe");
         TPath path;

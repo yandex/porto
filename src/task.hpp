@@ -54,6 +54,7 @@ struct TTaskEnv : public TNonCopyable {
     std::string ResolvConf;
     std::vector<TBindMap> BindMap;
     std::vector<TDevice> Devices;
+    std::vector<std::string> Autoconf;
     int LoopDev;
     uint64_t Caps;
     bool NewMountNs;
@@ -104,6 +105,7 @@ public:
     TError ChildApplyLimits();
     TError ChildSetHostname();
     TError ConfigureChild();
+    TError WaitAutoconf();
     void StartChild();
     void Restore(std::vector<int> pids);
     void Abort(const TError &error) const;

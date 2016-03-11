@@ -18,6 +18,7 @@ message TCfg {
 		optional string nat_first_ipv4 = 10;
 		optional string nat_first_ipv6 = 11;
 		optional uint32 nat_count = 12;
+		optional uint32 autoconf_timeout_s = 13;
 	}
 
 	message TFileCfg {

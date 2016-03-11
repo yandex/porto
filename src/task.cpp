@@ -5,12 +5,14 @@
 
 #include "task.hpp"
 #include "device.hpp"
+#include "config.hpp"
 #include "util/log.hpp"
 #include "util/mount.hpp"
 #include "util/string.hpp"
 #include "util/signal.hpp"
 #include "util/unix.hpp"
 #include "util/cred.hpp"
+#include "util/netlink.hpp"
 
 extern "C" {
 #include <string.h>
@@ -585,6 +587,32 @@ TError TTask::ConfigureChild() {
     return TError::Success();
 }
 
+TError TTask::WaitAutoconf() {
+    if (Env->Autoconf.empty())
+        return TError::Success();
+
+    SetProcessName("portod-autoconf");
+
+    auto sock = std::make_shared<TNl>();
+    TError error = sock->Connect();
+    if (error)
+        return error;
+
+    for (auto &name: Env->Autoconf) {
+        TNlLink link(sock, name);
+
+        error = link.Load();
+        if (error)
+            return error;
+
+        error = link.WaitAddress(config().network().autoconf_timeout_s());
+        if (error)
+            return error;
+    }
+
+    return TError::Success();
+}
+
 void TTask::StartChild() {
     TError error;
 
@@ -614,6 +642,10 @@ void TTask::StartChild() {
 
     /* Reset signals before exec, signal block already lifted */
     ResetIgnoredSignals();
+
+    error = WaitAutoconf();
+    if (error)
+        Abort(error);
 
     error = ChildExec();
     Abort(error);
@@ -806,7 +838,9 @@ TError TTask::Wakeup() {
 
     wakeup_error = Env->MasterSock.SendZero();
 
-    error = Env->MasterSock.RecvError();
+    /* do not wait for exec if container waits for autoconf */
+    if (Env->Autoconf.empty())
+        error = Env->MasterSock.RecvError();
 
     if (!error && wakeup_error)
         error = wakeup_error;

@@ -152,6 +152,7 @@ struct TNetCfg {
     std::string NetCtName;
     std::vector<TGwVec> GwVec;
     std::vector<TIpVec> IpVec;
+    std::vector<std::string> Autoconf;
 
     TNamespaceFd NetNs;
 
