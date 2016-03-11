@@ -639,3 +639,21 @@ TError ChattrFd(int fd, unsigned add_flags, unsigned del_flags) {
 
     return TError::Success();
 }
+
+TError SetSysctl(const std::string &name, const std::string &value) {
+    std::string path = "/proc/sys/" + name;
+    std::replace(path.begin() + 10, path.end(), '.', '/');
+
+    int fd = open(path.c_str(), O_WRONLY | O_CLOEXEC);
+    if (fd < 0)
+        return TError(EError::Unknown, errno, "Cannot open sysctl " + name);
+
+    ssize_t ret = write(fd, value.c_str(), value.length());
+    if (ret != (ssize_t)value.length()) {
+        close(fd);
+        return TError(EError::Unknown, errno, "Cannot write sysctl " + name);
+    }
+
+    close(fd);
+    return TError::Success();
+}

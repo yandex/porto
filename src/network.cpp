@@ -187,6 +187,11 @@ TError TNetwork::ConnectNew(TNamespaceFd &netns) {
             netns.Close();
     }
 
+    if (!error)
+        error = SetSysctl("net.ipv6.conf.all.accept_dad", "0");
+    if (!error)
+        error = SetSysctl("net.ipv6.conf.default.accept_dad", "0");
+
     TError error2 = my_netns.SetNs(CLONE_NEWNET);
     PORTO_ASSERT(!error2);
 
