@@ -352,7 +352,7 @@ public:
 
     TError ApplyConfig() {
 
-        if (Api->SetProperty(Container, "virt_mode", StartOS ? "os" : "app"))
+        if (StartOS && Api->SetProperty(Container, "virt_mode", "os"))
             goto err;
 
         if (ForwardTerminal) {
