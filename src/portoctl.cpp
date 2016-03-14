@@ -1867,7 +1867,7 @@ public:
 
 class TLayerCmd final : public ICmd {
 public:
-    TLayerCmd(TPortoAPI *api) : ICmd(api, "layer", 1,
+    TLayerCmd(TPortoAPI *api) : ICmd(api, "layer", 0,
         "-I|-M|-R|-L|-F|-E <layer> [tarball]",
         "Manage overlayfs layers in internal storage",
         "    -I <layer> <tarball>     import layer from tarball\n"
