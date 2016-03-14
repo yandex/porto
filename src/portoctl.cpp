@@ -13,6 +13,7 @@
 #include "util/unix.hpp"
 #include "util/namespace.hpp"
 #include "util/log.hpp"
+#include "util/cred.hpp"
 
 extern "C" {
 #include <unistd.h>
@@ -1203,15 +1204,26 @@ public:
 class TShellCmd final : public ICmd {
 public:
     TShellCmd(TPortoAPI *api) : ICmd(api, "shell", 1,
-            "<container> [command] [argument]...",
+            "[-u <user>] [-g <group>] <container> [command] [argument]...",
             "start shell (default /bin/bash) in container") { }
 
     int Execute(TCommandEnviroment *environment) final override {
-        std::string user = getenv("SUDO_USER") ?: getenv("USER") ?: "unknown";
+        std::string current_user = getenv("SUDO_USER") ?: getenv("USER") ?: "unknown";
         std::string command = "/bin/bash";
-        const auto &args = environment->GetArgs();
+        std::string user, group;
+
+        const auto &args = environment->GetOpts({
+            { 'u', true, [&](const char *arg) { user = arg; } },
+            { 'g', true, [&](const char *arg) { group = arg; } },
+        });
+
         TLauncher launcher(Api);
         TError error;
+
+        if (args.size() < 1) {
+            PrintUsage();
+            return EXIT_FAILURE;
+        }
 
         if (args.size() > 1) {
             command = args[1];
@@ -1224,10 +1236,26 @@ public:
         launcher.ForwardStreams = true;
         launcher.WaitExit = true;
 
-        launcher.Container = args[0] + "/shell-" + user + "-" + std::to_string(GetPid());
+        launcher.Container = args[0] + "/shell-" + current_user + "-" + std::to_string(GetPid());
         launcher.SetProperty("command", command);
         launcher.SetProperty("isolate", "false");
         launcher.Environment.push_back("debian_chroot=" + args[0]);
+
+        if (user != "") {
+            if (user == "root")
+                launcher.SetProperty("virt_mode", "os");
+            else
+                launcher.SetProperty("user", user);
+
+            if (group == "") {
+                TCred cred;
+                if (!cred.Load(user))
+                    group = cred.Group();
+            }
+        }
+
+        if (group != "" && (user != "root" || group != "root"))
+            launcher.SetProperty("group", group);
 
         error = launcher.Launch();
         if (error) {

@@ -37,6 +37,7 @@ _portoctl ()
 	fi
 
 	for ((i=2; i<cword; i++)); do
+		[[ "${words[i]}" == "-u" || "${words[i]}" == "-g" ]] && : $((i++)) && continue
 		[[ "${words[i]}" != -* ]] && ct=$i && break
 	done
 
@@ -82,12 +83,19 @@ _portoctl ()
 		esac
 		;;
 	shell)
-		case "$cword" in
-		2)
-			_porto_containers
+		case "$prev" in
+		-u)
+			COMPREPLY=( $( compgen -u -- "$cur" ) )
+			;;
+		-g)
+			COMPREPLY=( $( compgen -g -- "$cur" ) )
 			;;
 		*)
-			_command_offset 3
+			if [ -z "$ct" ] ; then
+				_porto_containers "-u -g"
+			else
+				_command_offset $(( $COMP_CWORD + $ct - $cword + 1 ))
+			fi
 			;;
 		esac
 		;;
