@@ -1,3 +1,23 @@
+yandex-porto (2.8.2) unstable; urgency=low
+
+  * util/path: split Bind and BindRemount operations
+  * util/path: mount option string must fit into page
+  * porto: explain wait result in log
+  * util/signal: fix message in FatalSignal
+  * portoctl: do not set virt_mode=app in launcher
+  * network: match master interfaces with wildcards
+  * network: disable IPv6 DAD in new network namespaces
+  * network: add IPv6-SLAAC autoconf
+  * porto: remove restricted root user
+  * porto: allow owner to start isolate=false virt_mode=os sub-containers
+  * portoctl: add -u/g for shell subcommand
+  * portoctl: do not permute non-option arguments
+  * portoctl: check arguments count after parsing options
+  * portoctl: layer -L needs no arguments
+  * network: wait in start for autoconf
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 14 Mar 2016 18:04:20 +0300
+
 yandex-porto (2.8.1) unstable; urgency=low
 
   * portod: fix missing errors from mount
