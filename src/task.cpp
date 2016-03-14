@@ -838,10 +838,7 @@ TError TTask::Wakeup() {
 
     wakeup_error = Env->MasterSock.SendZero();
 
-    /* do not wait for exec if container waits for autoconf */
-    if (Env->Autoconf.empty())
-        error = Env->MasterSock.RecvError();
-
+    error = Env->MasterSock.RecvError();
     if (!error && wakeup_error)
         error = wakeup_error;
 
