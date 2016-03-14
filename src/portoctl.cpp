@@ -1479,7 +1479,7 @@ public:
                 continue;
 
             auto state = result[c]["state"];
-            if (state.Error)
+            if (state.Error == EError::ContainerDoesNotExist)
                 continue;
 
             if (toplevel && CountChar(c, '/'))
@@ -1491,7 +1491,12 @@ public:
             std::cout << displayName[i];
 
             if (details) {
-                std::cout << std::right << std::setw(stateLen) << state.Value;
+                if (state.Error == EError::Busy)
+                    std::cout << std::right << std::setw(stateLen) << "busy";
+                else if (state.Error)
+                    std::cout << std::right << std::setw(stateLen) << state.ErrorMsg;
+                else
+                    std::cout << std::right << std::setw(stateLen) << state.Value;
 
                 auto time = result[c]["time"];
                 bool showTime = state.Value == "running" ||
