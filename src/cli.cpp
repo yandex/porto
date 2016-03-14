@@ -205,7 +205,7 @@ void ICmd::PrintUsage() {
 }
 
 bool ICmd::ValidArgs(const std::vector<std::string> &args) {
-    if (args.size() < NeedArgs)
+    if ((int)args.size() < NeedArgs)
         return false;
 
     if (args.size() >= 1) {
@@ -236,6 +236,7 @@ int TCommandHandler::TryExec(const std::string &commandName,
     Signal(SIGPIPE, SIG_IGN);
 
     TCommandEnviroment commandEnv{*this, commandArgs};
+    commandEnv.NeedArgs = cmd->NeedArgs;
     return cmd->Execute(&commandEnv);
 }
 
@@ -336,6 +337,11 @@ vector<string> TCommandEnviroment::GetOpts(const vector<Option> &options) {
             Handler.Usage(nullptr);
             exit(EXIT_FAILURE);
         }
+    }
+
+    if ((int)Arguments.size() - optind + 1 < NeedArgs) {
+            Handler.Usage(nullptr);
+            exit(EXIT_FAILURE);
     }
 
     return vector<string>(Arguments.begin() + optind - 1, Arguments.end());

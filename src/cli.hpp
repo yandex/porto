@@ -14,9 +14,9 @@ class ICmd {
 protected:
     TPortoAPI *Api;
     std::string Name, Usage, Desc, Help;
-    size_t NeedArgs;
     sig_atomic_t Interrupted = 0;
 public:
+    int NeedArgs;
 
     ICmd(TPortoAPI *api, const std::string &name, int args,
          const std::string &usage, const std::string &desc, const std::string &help = "");
@@ -79,6 +79,7 @@ class TCommandEnviroment {
     TCommandEnviroment(const TCommandEnviroment &) = delete;
 
 public:
+    int NeedArgs = 0;
     TCommandEnviroment(TCommandHandler &handler,
                        const std::vector<std::string> &arguments)
         : Handler(handler),
