@@ -853,8 +853,8 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
 
     auto vmode = Prop->Get<int>(P_VIRT_MODE);
     if (vmode == VIRT_MODE_OS && !OwnerCred.IsRootUser()) {
-        if (!Prop->Get<bool>(P_ISOLATE))
-            return TError(EError::Permission, "virt_mode=os without isolation only for root");
+        if (!Prop->Get<bool>(P_ISOLATE) && OwnerCred.Uid != Parent->OwnerCred.Uid)
+            return TError(EError::Permission, "virt_mode=os without isolation only for root or owner");
         if (RootPath().IsRoot())
             return TError(EError::Permission, "virt_mode=os without chroot only for root");
     }
