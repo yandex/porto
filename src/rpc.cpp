@@ -433,7 +433,11 @@ noinline TError StartContainer(TContext &context,
             }
         }
 
+        holder_lock.unlock();
+
         err = container->Start(client, meta);
+
+        holder_lock.lock();
 
         if (err)
             goto release;
