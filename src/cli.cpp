@@ -305,7 +305,7 @@ void TCommandHandler::Usage(const char *command) {
 }
 
 vector<string> TCommandEnviroment::GetOpts(const vector<Option> &options) {
-    std::string optstring;
+    std::string optstring = "+";
     for (const auto &o : options) {
         optstring += o.key;
         if (o.hasArg)
