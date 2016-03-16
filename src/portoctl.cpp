@@ -1242,9 +1242,10 @@ public:
         launcher.Environment.push_back("debian_chroot=" + args[0]);
 
         if (user != "") {
-            if (user == "root")
+            if (user == "root") {
                 launcher.SetProperty("virt_mode", "os");
-            else
+                launcher.SetProperty("net", "inherited");
+            } else
                 launcher.SetProperty("user", user);
 
             if (group == "") {
