@@ -218,7 +218,7 @@ public:
         TError error;
         int status;
 
-        if (Api->Wait(containers, result, timeout))
+        if (Api->WaitContainers(containers, result, timeout))
             return GetLastError();
 
         if (result == "")
@@ -1375,16 +1375,19 @@ public:
 
 class TWaitCmd final : public ICmd {
 public:
-    TWaitCmd(Porto::Connection *api) : ICmd(api, "wait", 1, "<container1> [container2] ...", "wait for listed containers") {}
+    TWaitCmd(Porto::Connection *api) : ICmd(api, "wait", 1,
+             "[-T <seconds>] <container1> [container2] ...",
+             "wait for listed containers") {}
 
     int Execute(TCommandEnviroment *env) final override {
         int timeout = -1;
         const auto &containers = env->GetOpts({
-            { 't', true, [&](const char *arg) { timeout = std::stoi(arg); } },
+            { 't', true, [&](const char *arg) { timeout = (std::stoi(arg) + 999) / 1000; } },
+            { 'T', true, [&](const char *arg) { timeout = std::stoi(arg); } },
         });
 
         std::string name;
-        int ret = Api->Wait(containers, name, timeout);
+        int ret = Api->WaitContainers(containers, name, timeout);
         if (ret) {
             PrintError("Can't wait for containers");
             return ret;
@@ -2254,6 +2257,8 @@ public:
 int main(int argc, char *argv[]) {
     Porto::Connection api;
     TCommandHandler handler(api);
+
+    api.SetTimeout(60);
 
     handler.RegisterCommand<TCreateCmd>();
     handler.RegisterCommand<TDestroyCmd>();

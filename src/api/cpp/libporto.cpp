@@ -21,6 +21,7 @@ static const char PortoSocket[] = "/run/portod.socket";
 class Connection::ConnectionImpl {
 public:
     int Fd = -1;
+    int Timeout = 0;
 
     rpc::TContainerRequest Req;
     rpc::TContainerResponse Rsp;
@@ -42,6 +43,8 @@ public:
     }
 
     int Connect();
+
+    int SetTimeout(int direction, int timeout);
 
     void Close() {
         if (Fd >= 0)
@@ -66,6 +69,9 @@ int Connection::ConnectionImpl::Connect()
     if (Fd < 0)
         return Error(errno, "socket");
 
+    if (Timeout && SetTimeout(3, Timeout))
+        return LastError;
+
     memset(&peer_addr, 0, sizeof(struct sockaddr_un));
     peer_addr.sun_family = AF_UNIX;
     strncpy(peer_addr.sun_path, PortoSocket, sizeof(PortoSocket) - 1);
@@ -73,6 +79,24 @@ int Connection::ConnectionImpl::Connect()
     peer_addr_size = sizeof(struct sockaddr_un);
     if (connect(Fd, (struct sockaddr *) &peer_addr, peer_addr_size) < 0)
         return Error(errno, "connect");
+
+    return EError::Success;
+}
+
+int Connection::ConnectionImpl::SetTimeout(int direction, int timeout)
+{
+    struct timeval tv;
+
+    tv.tv_sec = timeout;
+    tv.tv_usec = 0;
+
+    if ((direction & 1) && setsockopt(Fd, SOL_SOCKET,
+                SO_SNDTIMEO, &tv, sizeof tv))
+        return Error(errno, "set send timeout");
+
+    if ((direction & 2) && setsockopt(Fd, SOL_SOCKET,
+                SO_RCVTIMEO, &tv, sizeof tv))
+        return Error(errno, "set recv timeout");
 
     return EError::Success;
 }
@@ -143,6 +167,13 @@ Connection::~Connection() {
 
 int Connection::Connect() {
     return Impl->Connect();
+}
+
+int Connection::SetTimeout(int timeout) {
+    Impl->Timeout = timeout;
+    if (Impl->Fd >= 0)
+        return Impl->SetTimeout(3, timeout);
+    return EError::Success;
 }
 
 void Connection::Close() {
@@ -338,17 +369,30 @@ int Connection::Resume(const std::string &name) {
     return Impl->Rpc();
 }
 
-int Connection::Wait(const std::vector<std::string> &containers,
-                    std::string &name, int timeout) {
+int Connection::WaitContainers(const std::vector<std::string> &containers,
+                               std::string &name, int timeout) {
     auto wait = Impl->Req.mutable_wait();
+    int ret, recv_timeout = 0;
 
     for (const auto &c : containers)
         wait->add_name(c);
 
-    if (timeout >= 0)
-        wait->set_timeout(timeout);
+    if (timeout >= 0) {
+        wait->set_timeout(timeout * 1000);
+        recv_timeout = timeout + (Impl->Timeout ?: timeout);
+    }
 
-    int ret = Impl->Rpc();
+    if (Impl->Fd < 0 && Connect())
+        return Impl->LastError;
+
+    if (timeout && Impl->SetTimeout(2, recv_timeout))
+        return Impl->LastError;
+
+    ret = Impl->Rpc();
+
+    if (timeout && Impl->Fd >= 0)
+        Impl->SetTimeout(2, Impl->Timeout);
+
     name.assign(Impl->Rsp.wait().name());
     return ret;
 }

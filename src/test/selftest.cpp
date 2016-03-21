@@ -1875,7 +1875,7 @@ static bool TestPathsHelper(Porto::Connection &api,
     std::string ret;
     ExpectApiSuccess(api.SetProperty(name, "isolate", "true"));
     ExpectApiSuccess(api.Start(name));
-    ExpectApiSuccess(api.Wait(waitlist, container));
+    ExpectApiSuccess(api.WaitContainers(waitlist, container, -1));
     ExpectEq(container, name);
     ExpectApiSuccess(api.GetData(name, "stdout", ret));
     ExpectApiSuccess(api.GetData(name, "stderr", ret));
@@ -1883,7 +1883,7 @@ static bool TestPathsHelper(Porto::Connection &api,
 
     ExpectApiSuccess(api.SetProperty(name, "isolate", "false"));
     ExpectApiSuccess(api.Start(name));
-    ExpectApiSuccess(api.Wait(waitlist, container));
+    ExpectApiSuccess(api.WaitContainers(waitlist, container, -1));
     ExpectEq(container, name);
     ExpectApiSuccess(api.GetData(name, "stdout", ret));
     ExpectApiSuccess(api.GetData(name, "stderr", ret));
@@ -4753,24 +4753,24 @@ static void TestWait(Porto::Connection &api) {
     std::string tmp;
 
     Say() << "Check wait for non-existing and invalid containers" << std::endl;
-    ExpectApiFailure(api.Wait({c}, tmp), EError::ContainerDoesNotExist);
-    ExpectApiFailure(api.Wait({"/"}, tmp), EError::Permission);
-    ExpectApiFailure(api.Wait({}, tmp), EError::InvalidValue);
+    ExpectApiFailure(api.WaitContainers({c}, tmp, -1), EError::ContainerDoesNotExist);
+    ExpectApiFailure(api.WaitContainers({"/"}, tmp, -1), EError::Permission);
+    ExpectApiFailure(api.WaitContainers({}, tmp, -1), EError::InvalidValue);
 
     Say() << "Check wait for stopped container" << std::endl;
     ExpectApiSuccess(api.Create(c));
-    ExpectApiSuccess(api.Wait({c}, tmp));
+    ExpectApiSuccess(api.WaitContainers({c}, tmp, -1));
     ExpectEq(c, tmp);
 
     Say() << "Check wait for running/dead container" << std::endl;
     ExpectApiSuccess(api.SetProperty(c, "command", "sleep 1"));
     ExpectApiSuccess(api.Start(c));
-    ExpectApiSuccess(api.Wait({c}, tmp));
+    ExpectApiSuccess(api.WaitContainers({c}, tmp, -1));
     ExpectEq(c, tmp);
     ExpectApiSuccess(api.GetData(c, "state", tmp));
     ExpectEq(tmp, "dead");
 
-    ExpectApiSuccess(api.Wait({c}, tmp));
+    ExpectApiSuccess(api.WaitContainers({c}, tmp, -1));
     ExpectEq(c, tmp);
     ExpectApiSuccess(api.GetData(c, "state", tmp));
     ExpectEq(tmp, "dead");
@@ -4785,7 +4785,7 @@ static void TestWait(Porto::Connection &api) {
     ExpectApiSuccess(api.Start(d));
     ExpectApiSuccess(api.GetData(c, "state", tmp));
     ExpectEq(tmp, "meta");
-    ExpectApiSuccess(api.Wait({c}, tmp));
+    ExpectApiSuccess(api.WaitContainers({c}, tmp, -1));
     ExpectEq(c, tmp);
     ExpectApiSuccess(api.Stop(d));
     ExpectApiSuccess(api.Destroy(d));
@@ -4805,7 +4805,7 @@ static void TestWait(Porto::Connection &api) {
     }
 
     ExpectApiSuccess(api.Kill(containers[50], 9));
-    ExpectApiSuccess(api.Wait(containers, tmp));
+    ExpectApiSuccess(api.WaitContainers(containers, tmp, -1));
     ExpectEq(tmp, containers[50]);
     ExpectApiSuccess(api.GetData(containers[50], "state", tmp));
     ExpectEq(tmp, "dead");
@@ -4821,13 +4821,13 @@ static void TestWait(Porto::Connection &api) {
     ExpectApiSuccess(api.Start(c));
 
     begin = GetCurrentTimeMs();
-    ExpectApiSuccess(api.Wait({c}, tmp, 0));
+    ExpectApiSuccess(api.WaitContainers({c}, tmp, 0));
     end = GetCurrentTimeMs();
     ExpectEq(tmp, "");
     Expect(end - begin < 100);
 
     begin = GetCurrentTimeMs();
-    ExpectApiSuccess(api.Wait({c}, tmp, 2000));
+    ExpectApiSuccess(api.WaitContainers({c}, tmp, 2));
     end = GetCurrentTimeMs();
     ExpectEq(tmp, "");
     Expect(end - begin >= 2000);
@@ -4848,7 +4848,7 @@ static void TestWaitRecovery(Porto::Connection &api) {
 
     KillSlave(api, SIGKILL);
 
-    ExpectApiSuccess(api.Wait({c}, tmp));
+    ExpectApiSuccess(api.WaitContainers({c}, tmp, -1));
     ExpectEq(c, tmp);
     ExpectApiSuccess(api.GetData(c, "state", tmp));
     ExpectEq(tmp, "dead");
@@ -4860,7 +4860,7 @@ static void TestWaitRecovery(Porto::Connection &api) {
 
     KillMaster(api, SIGKILL);
 
-    ExpectApiSuccess(api.Wait({c}, tmp));
+    ExpectApiSuccess(api.WaitContainers({c}, tmp, -1));
     ExpectEq(c, tmp);
     ExpectApiSuccess(api.GetData(c, "state", tmp));
     ExpectEq(tmp, "dead");

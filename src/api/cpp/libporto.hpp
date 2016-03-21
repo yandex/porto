@@ -40,6 +40,9 @@ public:
     int Connect();
     void Close();
 
+    /* request timeout in seconds */
+    int SetTimeout(int timeout);
+
     int Create(const std::string &name);
     int CreateWeakContainer(const std::string &name);
     int Destroy(const std::string &name);
@@ -50,8 +53,8 @@ public:
     int Pause(const std::string &name);
     int Resume(const std::string &name);
 
-    int Wait(const std::vector<std::string> &containers,
-             std::string &name, int timeout = -1);
+    int WaitContainers(const std::vector<std::string> &containers,
+                       std::string &name, int timeout);
 
     int List(std::vector<std::string> &clist);
     int Plist(std::vector<Property> &list);
