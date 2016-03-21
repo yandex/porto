@@ -22,15 +22,15 @@ namespace test {
     std::basic_ostream<char> &Say(std::basic_ostream<char> &stream = std::cout);
     void ExpectReturn(int ret, int exp, const char *func);
     void ExpectError(const TError &ret, const TError &exp, const char *where);
-    void ExpectApi(TPortoAPI &api, int ret, int exp, const char *where);
+    void ExpectApi(Porto::Connection &api, int ret, int exp, const char *where);
 
     int ReadPid(const std::string &path);
     int Pgrep(const std::string &name);
     std::string GetRlimit(const std::string &pid, const std::string &type, const bool soft);
     void WaitProcessExit(const std::string &pid, int sec = 10);
-    void WaitState(TPortoAPI &api, const std::string &name, const std::string &state, int sec = 10);
-    void WaitContainer(TPortoAPI &api, const std::string &name, int sec = 10);
-    void WaitPortod(TPortoAPI &api, int times = 10);
+    void WaitState(Porto::Connection &api, const std::string &name, const std::string &state, int sec = 10);
+    void WaitContainer(Porto::Connection &api, const std::string &name, int sec = 10);
+    void WaitPortod(Porto::Connection &api, int times = 10);
     std::string GetCwd(const std::string &pid);
     std::string GetRoot(const std::string &pid);
     std::string GetNamespace(const std::string &pid, const std::string &ns);
@@ -59,18 +59,18 @@ namespace test {
     extern TCred Alice;
     extern TCred Bob;
 
-    void AsRoot(TPortoAPI &api);
-    void AsNobody(TPortoAPI &api);
-    void AsAlice(TPortoAPI &api);
-    void AsBob(TPortoAPI &api);
+    void AsRoot(Porto::Connection &api);
+    void AsNobody(Porto::Connection &api);
+    void AsAlice(Porto::Connection &api);
+    void AsBob(Porto::Connection &api);
 
     void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove = true);
 
-    void RotateDaemonLogs(TPortoAPI &api);
-    void RestartDaemon(TPortoAPI &api);
+    void RotateDaemonLogs(Porto::Connection &api);
+    void RestartDaemon(Porto::Connection &api);
     void PrintFds(const std::string &path, struct dirent **lst, int nr);
     bool NetworkEnabled();
-    void TestDaemon(TPortoAPI &api);
+    void TestDaemon(Porto::Connection &api);
 
     int SelfTest(std::vector<std::string> args);
     int StressTest(int threads, int iter, bool killPorto);

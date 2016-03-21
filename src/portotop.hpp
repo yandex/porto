@@ -46,7 +46,7 @@ public:
     void Save();
     void Restore();
     int Dialog(std::string text, const std::vector<std::string> &buttons);
-    void ErrorDialog(TPortoAPI &api);
+    void ErrorDialog(Porto::Connection &api);
     void ErrorDialog(std::string message, int error);
     void InfoDialog(std::vector<std::string> lines);
     void HelpDialog();
@@ -57,7 +57,7 @@ private:
 class TPortoContainer {
 public:
     TPortoContainer(std::string container);
-    static TPortoContainer* ContainerTree(TPortoAPI &api);
+    static TPortoContainer* ContainerTree(Porto::Connection &api);
     ~TPortoContainer();
     std::string GetName();
     int GetLevel();
@@ -84,12 +84,12 @@ public:
     void Unregister(const std::string &container, const std::string &variable);
     std::string GetValue(const std::string &container, const std::string &variable,
                          bool prev);
-    int Update(TPortoAPI &api);
+    int Update(Porto::Connection &api);
 private:
     std::unordered_map<std::string, unsigned long> Containers;
     std::unordered_map<std::string, unsigned long> Variables;
     bool CacheSelector = false;
-    std::map<std::string, std::map<std::string, TPortoGetResponse>> Cache[2];
+    std::map<std::string, std::map<std::string, Porto::GetResponse>> Cache[2];
 };
 
 namespace ValueFlags {
@@ -143,7 +143,7 @@ public:
     TColumn(std::string title, TPortoValue var, bool left_aligned = false);
     int PrintTitle(int x, int y, TConsoleScreen &screen);
     int Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, bool selected);
-    void Update(TPortoAPI &api, TPortoContainer* tree, int maxlevel);
+    void Update(Porto::Connection &api, TPortoContainer* tree, int maxlevel);
     TPortoValue& At(TPortoContainer &row);
     void Highlight(bool enable);
     void Process(unsigned long gone);
@@ -162,7 +162,7 @@ private:
 
 class TPortoTop {
 public:
-    TPortoTop(TPortoAPI *api, std::string config);
+    TPortoTop(Porto::Connection *api, std::string config);
     void Print(TConsoleScreen &screen);
 
     bool AddColumn(std::string desc);
@@ -189,7 +189,7 @@ private:
     void PrintTitle(int y, TConsoleScreen &screen);
     int PrintCommon(TConsoleScreen &screen);
 
-    TPortoAPI *Api;
+    Porto::Connection *Api;
     TPortoValueCache Cache;
     std::string ConfigFile;
     std::vector<std::string> Config;

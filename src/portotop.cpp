@@ -173,7 +173,7 @@ int TConsoleScreen::Dialog(std::string text, const std::vector<std::string> &but
 
     return -1;
 }
-void TConsoleScreen::ErrorDialog(TPortoAPI &api) {
+void TConsoleScreen::ErrorDialog(Porto::Connection &api) {
     std::string message;
     int error;
 
@@ -276,7 +276,7 @@ std::string TPortoValueCache::GetValue(const std::string &container,
     return Cache[CacheSelector ^ prev][container][variable].Value;
 }
 
-int TPortoValueCache::Update(TPortoAPI &api) {
+int TPortoValueCache::Update(Porto::Connection &api) {
     std::vector<std::string> _containers;
     for (auto &iter : Containers)
         _containers.push_back(iter.first);
@@ -415,7 +415,7 @@ TPortoContainer::~TPortoContainer() {
         delete c;
 }
 
-TPortoContainer* TPortoContainer::ContainerTree(TPortoAPI &api) {
+TPortoContainer* TPortoContainer::ContainerTree(Porto::Connection &api) {
     std::vector<std::string> containers;
     int ret = api.List(containers);
     if (ret)
@@ -510,7 +510,7 @@ int TColumn::Print(TPortoContainer &row, int x, int y, TConsoleScreen &screen, b
     screen.PrintAt(p, x, y, Width, LeftAligned, selected ? A_REVERSE : 0);
     return Width;
 }
-void TColumn::Update(TPortoAPI &api, TPortoContainer* tree, int maxlevel) {
+void TColumn::Update(Porto::Connection &api, TPortoContainer* tree, int maxlevel) {
     tree->ForEachChild([&] (TPortoContainer &row) {
             TPortoValue val(RootValue, &row);
             Cache.insert(std::make_pair(row.GetName(), val));
@@ -831,7 +831,7 @@ void TPortoTop::AddCommon(int row, const std::string &title, const std::string &
     TPortoValue v(Cache, &container, var, flags, multiplier);
     Common[row].push_back(TCommonValue(title, v));
 }
-TPortoTop::TPortoTop(TPortoAPI *api, std::string config) : Api(api),
+TPortoTop::TPortoTop(Porto::Connection *api, std::string config) : Api(api),
                                                            RootContainer("/"),
                                                            DotContainer("."),
                                                            PortoContainer("/porto") {
@@ -923,7 +923,7 @@ void exit_handler(int unused) {
     exit_immediatly = true;
 }
 
-int portotop(TPortoAPI *api, std::string config) {
+int portotop(Porto::Connection *api, std::string config) {
     Signal(SIGINT, exit_handler);
     Signal(SIGTERM, exit_handler);
     Signal(SIGTTOU, SIG_IGN);

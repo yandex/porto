@@ -41,70 +41,70 @@ const std::string &GetContainer(int n) {
     return names[n % names.size()];
 }
 
-static const std::vector<std::function<int(TPortoAPI&, int)>> handlers = {
-    [](TPortoAPI &api, int n) {
+static const std::vector<std::function<int(Porto::Connection&, int)>> handlers = {
+    [](Porto::Connection &api, int n) {
         auto name = GetContainer(n);
         Say() << "Create " << name << std::endl;
         return api.Create(name);
     },
 
-    [](TPortoAPI &api, int n) {
+    [](Porto::Connection &api, int n) {
         auto name = GetContainer(n);
         Say() << "Destroy " << name << std::endl;
         return api.Destroy(name);
     },
 
-    [](TPortoAPI &api, int n) {
+    [](Porto::Connection &api, int n) {
         auto name = GetContainer(n);
         Say() << "Kill " << name << std::endl;
         return api.Kill(name, 9);
     },
 
-    [](TPortoAPI &api, int n) {
+    [](Porto::Connection &api, int n) {
         auto name = GetContainer(n);
         Say() << "Start " << name << std::endl;
         return api.Start(name);
     },
 
-    [](TPortoAPI &api, int n) {
+    [](Porto::Connection &api, int n) {
         auto name = GetContainer(n);
         Say() << "Stop " << name << std::endl;
         return api.Stop(name);
     },
 
-    [](TPortoAPI &api, int n) {
+    [](Porto::Connection &api, int n) {
         auto name = GetContainer(n);
         Say() << "Pause " << name << std::endl;
         return api.Pause(name);
     },
 
-    [](TPortoAPI &api, int n) {
+    [](Porto::Connection &api, int n) {
         auto name = GetContainer(n);
         Say() << "Resume " << name << std::endl;
         return api.Resume(name);
     },
 
-    [](TPortoAPI &api, int n) {
+    [](Porto::Connection &api, int n) {
         std::vector<std::string> list;
         Say() << "List" << std::endl;
         return api.List(list);
     },
 
-    [](TPortoAPI &api, int n) {
-        std::vector<TPortoProperty> list;
+    [](Porto::Connection &api, int n) {
+        std::vector<Porto::Property> list;
         Say() << "Property list" << std::endl;
         return api.Plist(list);
     },
 
-    [](TPortoAPI &api, int n) {
-        std::vector<TPortoProperty> list;
+    [](Porto::Connection &api, int n) {
+        std::vector<Porto::Property> list;
         Say() << "Data list" << std::endl;
         return api.Dlist(list);
     },
 
-    [](TPortoAPI &api, int n) {
+    [](Porto::Connection &api, int n) {
         auto name = GetContainer(n);
-        std::vector<TPortoProperty> list;
+        std::vector<Porto::Property> list;
         (void)api.Plist(list);
 
         auto prop = GetRandElem(list);
@@ -114,7 +114,7 @@ static const std::vector<std::function<int(TPortoAPI&, int)>> handlers = {
         return api.GetProperty(name, prop.Name, val);
     },
 
-    [](TPortoAPI &api, int n) {
+    [](Porto::Connection &api, int n) {
         auto name = GetContainer(n);
         auto prop = GetRandElem(propval);
         auto key = prop.first;
@@ -124,11 +124,11 @@ static const std::vector<std::function<int(TPortoAPI&, int)>> handlers = {
         return api.SetProperty(name, key, val);
     },
 
-    [](TPortoAPI &api, int n) {
-        std::vector<TPortoProperty> plist;
+    [](Porto::Connection &api, int n) {
+        std::vector<Porto::Property> plist;
         (void)api.Plist(plist);
 
-        std::vector<TPortoProperty> dlist;
+        std::vector<Porto::Property> dlist;
         (void)api.Dlist(dlist);
 
         std::vector<std::string> getvar;
@@ -137,15 +137,15 @@ static const std::vector<std::function<int(TPortoAPI&, int)>> handlers = {
         for (auto d : dlist)
             getvar.push_back(d.Name);
 
-        std::map<std::string, std::map<std::string, TPortoGetResponse>> result;
+        std::map<std::string, std::map<std::string, Porto::GetResponse>> result;
 
         Say() << "Combined get " << std::endl;
         return api.Get(names, getvar, result);
     },
 
-    [](TPortoAPI &api, int n) {
+    [](Porto::Connection &api, int n) {
         auto name = GetContainer(n);
-        std::vector<TPortoProperty> list;
+        std::vector<Porto::Property> list;
         (void)api.Dlist(list);
 
         auto data = GetRandElem(list);
@@ -161,7 +161,7 @@ static void ThreadMain(int n, int iter) {
     seed = (unsigned int)time(nullptr);
     tid = n + 1;
 
-    TPortoAPI api;
+    Porto::Connection api;
 
     while (iter--) {
         auto op = GetRandElem(handlers);
@@ -182,7 +182,7 @@ int FuzzyTest(int thrnr, int iter) {
     (void)signal(SIGPIPE, SIG_IGN);
 
     config.Load();
-    TPortoAPI api;
+    Porto::Connection api;
     RestartDaemon(api);
 
     for (auto i = 0; i < thrnr; i++)

@@ -49,14 +49,14 @@ static vector<string> namespaces = { "pid", "mnt", "ipc", "net", /*"user", */"ut
 static int LeakConainersNr = 1000;
 
 #define ExpectState(api, name, state) _ExpectState(api, name, state, "somewhere")
-void _ExpectState(TPortoAPI &api, const std::string &name, const std::string &state,
+void _ExpectState(Porto::Connection &api, const std::string &name, const std::string &state,
                   const char *where) {
     std::string v;
     ExpectApi(api, api.GetData(name, "state", v), 0, where);
     _ExpectEq(v, state, where);
 }
 
-static std::string StartWaitAndGetData(TPortoAPI &api, const std::string &name, const std::string &data) {
+static std::string StartWaitAndGetData(Porto::Connection &api, const std::string &name, const std::string &data) {
     string v;
     ExpectApiSuccess(api.Start(name));
     WaitContainer(api, name);
@@ -64,7 +64,7 @@ static std::string StartWaitAndGetData(TPortoAPI &api, const std::string &name, 
     return v;
 }
 
-static void RemakeDir(TPortoAPI &api, const TPath &path) {
+static void RemakeDir(Porto::Connection &api, const TPath &path) {
     if (path.Exists()) {
         bool drop = geteuid() != 0;
         if (drop)
@@ -94,7 +94,7 @@ static void ExpectCorrectCgroups(const string &pid, const string &name) {
     ExpectEq(expected, 0);
 }
 
-static void ShouldHaveOnlyRoot(TPortoAPI &api) {
+static void ShouldHaveOnlyRoot(Porto::Connection &api) {
     std::vector<std::string> containers;
 
     containers.clear();
@@ -103,7 +103,7 @@ static void ShouldHaveOnlyRoot(TPortoAPI &api) {
     ExpectEq(containers[0], string("/"));
 }
 
-static void TestDataMap(TPortoAPI &api, const std::string &name, const std::string &data, bool zero) {
+static void TestDataMap(Porto::Connection &api, const std::string &name, const std::string &data, bool zero) {
     std::string full;
     vector<string> lines;
     int nr_nonzero = 0;
@@ -138,7 +138,7 @@ static void TestDataMap(TPortoAPI &api, const std::string &name, const std::stri
     ExpectApiFailure(api.GetData(name, data + "[invalid]", full), EError::InvalidValue);
 }
 
-static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
+static void ShouldHaveValidProperties(Porto::Connection &api, const string &name) {
     string v;
 
     ExpectApiFailure(api.GetProperty(name, "command[1]", v), EError::InvalidValue);
@@ -241,7 +241,7 @@ static void ShouldHaveValidProperties(TPortoAPI &api, const string &name) {
     ExpectEq(v, "true");
 }
 
-static void ShouldHaveValidRunningData(TPortoAPI &api, const string &name) {
+static void ShouldHaveValidRunningData(Porto::Connection &api, const string &name) {
     string v;
 
     ExpectApiFailure(api.GetData(name, "__invalid_data__", v), EError::InvalidData);
@@ -295,7 +295,7 @@ static void ShouldHaveValidRunningData(TPortoAPI &api, const string &name) {
     }
 }
 
-static void ShouldHaveValidData(TPortoAPI &api, const string &name) {
+static void ShouldHaveValidData(Porto::Connection &api, const string &name) {
     string v;
 
     ExpectApiFailure(api.GetData(name, "__invalid_data__", v), EError::InvalidData);
@@ -344,7 +344,7 @@ static void ExpectTclass(string name, bool exp) {
     ExpectEq(TcClassExist(stoul(cls)), exp);
 }
 
-static void TestHolder(TPortoAPI &api) {
+static void TestHolder(Porto::Connection &api) {
     ShouldHaveOnlyRoot(api);
 
     std::vector<std::string> containers;
@@ -656,7 +656,7 @@ static void TestHolder(TPortoAPI &api) {
     ShouldHaveOnlyRoot(api);
 }
 
-static void TestGet(TPortoAPI &api) {
+static void TestGet(Porto::Connection &api) {
     ExpectApiSuccess(api.Create("a"));
     ExpectApiSuccess(api.Create("b"));
 
@@ -668,7 +668,7 @@ static void TestGet(TPortoAPI &api) {
 
     std::vector<std::string> name;
     std::vector<std::string> variable;
-    std::map<std::string, std::map<std::string, TPortoGetResponse>> result;
+    std::map<std::string, std::map<std::string, Porto::GetResponse>> result;
 
     ExpectApiFailure(api.Get(name, variable, result), EError::InvalidValue);
     ExpectEq(result.size(), 0);
@@ -730,7 +730,7 @@ static void TestGet(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy("b"));
 }
 
-static void TestMeta(TPortoAPI &api) {
+static void TestMeta(Porto::Connection &api) {
     std::string state;
     ShouldHaveOnlyRoot(api);
 
@@ -778,7 +778,7 @@ static void TestMeta(TPortoAPI &api) {
     }
 }
 
-static void TestEmpty(TPortoAPI &api) {
+static void TestEmpty(Porto::Connection &api) {
     Say() << "Make sure we can't start empty container" << std::endl;
     ExpectApiSuccess(api.Create("b"));
     ExpectApiFailure(api.Start("b"), EError::InvalidValue);
@@ -797,7 +797,7 @@ static bool TaskZombie(const string &pid) {
     return GetState(pid) == "Z";
 }
 
-static void TestExitStatus(TPortoAPI &api) {
+static void TestExitStatus(Porto::Connection &api) {
     string pid;
     string ret;
 
@@ -876,7 +876,7 @@ static void TestExitStatus(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(name));
 }
 
-static void TestStreams(TPortoAPI &api) {
+static void TestStreams(Porto::Connection &api) {
     string ret;
 
     string name = "a";
@@ -905,7 +905,7 @@ static void TestStreams(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(name));
 }
 
-static void TestNsCgTc(TPortoAPI &api) {
+static void TestNsCgTc(Porto::Connection &api) {
     string pid;
 
     string name = "a";
@@ -1001,7 +1001,7 @@ static void TestNsCgTc(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(name));
 }
 
-static void TestIsolateProperty(TPortoAPI &api) {
+static void TestIsolateProperty(Porto::Connection &api) {
     string ret;
 
     string name = "a";
@@ -1204,7 +1204,7 @@ static void TestIsolateProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy("a"));
 }
 
-static void TestContainerNamespaces(TPortoAPI &api) {
+static void TestContainerNamespaces(Porto::Connection &api) {
     std::string val;
 
     Say() << "Test container namespaces" << std::endl;
@@ -1254,7 +1254,7 @@ static void TestContainerNamespaces(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy("c"));
 }
 
-static void TestEnvTrim(TPortoAPI &api) {
+static void TestEnvTrim(Porto::Connection &api) {
     string val;
     string name = "a";
     ExpectApiSuccess(api.Create(name));
@@ -1305,7 +1305,7 @@ static void TestEnvTrim(TPortoAPI &api) {
 
 static std::string EnvSep(1, '\0');
 
-static void ExpectEnv(TPortoAPI &api,
+static void ExpectEnv(Porto::Connection &api,
                       const std::string &name,
                       const std::string &env,
                       const std::string expected) {
@@ -1321,7 +1321,7 @@ static void ExpectEnv(TPortoAPI &api,
     ExpectApiSuccess(api.Stop(name));
 }
 
-static void TestEnvProperty(TPortoAPI &api) {
+static void TestEnvProperty(Porto::Connection &api) {
     string name = "a";
     ExpectApiSuccess(api.Create(name));
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
@@ -1372,7 +1372,7 @@ static void TestEnvProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(name));
 }
 
-static void TestUserGroupProperty(TPortoAPI &api) {
+static void TestUserGroupProperty(Porto::Connection &api) {
     int uid, gid;
     string pid;
 
@@ -1434,7 +1434,7 @@ static void TestUserGroupProperty(TPortoAPI &api) {
     AsAlice(api);
 }
 
-static void TestCwdProperty(TPortoAPI &api) {
+static void TestCwdProperty(Porto::Connection &api) {
     string pid;
     string cwd;
     string portodPid, portodCwd;
@@ -1505,7 +1505,7 @@ static void TestCwdProperty(TPortoAPI &api) {
     AsAlice(api);
 }
 
-static void TestStdPathProperty(TPortoAPI &api) {
+static void TestStdPathProperty(Porto::Connection &api) {
     string pid;
     string name = "a";
     std::string cwd, stdinName, stdoutName, stderrName;
@@ -1628,7 +1628,7 @@ static map<string, TMountInfo> ParseMountinfo(string s) {
     return m;
 }
 
-static void TestRootRdOnlyProperty(TPortoAPI &api) {
+static void TestRootRdOnlyProperty(Porto::Connection &api) {
     string name = "a";
     TPath path(TMPDIR + "/" + name);
     string ROnly;
@@ -1705,7 +1705,7 @@ unsigned long GetInode(const TPath &path) {
     return st.st_ino;
 }
 
-static void TestRootProperty(TPortoAPI &api) {
+static void TestRootProperty(Porto::Connection &api) {
     string pid;
     string v;
 
@@ -1834,7 +1834,7 @@ static void TestRootProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(name));
 }
 
-static bool TestPathsHelper(TPortoAPI &api,
+static bool TestPathsHelper(Porto::Connection &api,
                             const std::string &cmd,
                             const std::string &root,
                             const std::string &cwd,
@@ -1894,7 +1894,7 @@ static bool TestPathsHelper(TPortoAPI &api,
     return true;
 }
 
-static void TestPaths(TPortoAPI &api) {
+static void TestPaths(Porto::Connection &api) {
     std::string cmd = "mkdir -p /myroot/bin && cp /usr/sbin/portoinit /myroot/bin/test2";
     AsRoot(api);
     ExpectEq(system(cmd.c_str()), 0);
@@ -1924,7 +1924,7 @@ static string GetHostname() {
     return buf;
 }
 
-static void TestHostnameProperty(TPortoAPI &api) {
+static void TestHostnameProperty(Porto::Connection &api) {
     string pid, v;
     string name = "a";
     string host = "porto_" + name;
@@ -2021,7 +2021,7 @@ static void TestHostnameProperty(TPortoAPI &api) {
     AsAlice(api);
 }
 
-static void TestBindProperty(TPortoAPI &api) {
+static void TestBindProperty(Porto::Connection &api) {
     string name = "a";
     ExpectApiSuccess(api.Create(name));
 
@@ -2181,7 +2181,7 @@ static string System(const std::string &cmd) {
     return StringTrim(lines[0]);
 }
 
-static void TestXvlan(TPortoAPI &api, const std::string &name, const std::vector<std::string> &hostLink, const std::string &link, const std::string &type) {
+static void TestXvlan(Porto::Connection &api, const std::string &name, const std::vector<std::string> &hostLink, const std::string &link, const std::string &type) {
     bool shouldShareMac = type == "ipvlan";
     ExpectApiSuccess(api.SetProperty(name, "command", "ip -o link show"));
     ExpectApiFailure(api.SetProperty(name, "net", type), EError::InvalidValue);
@@ -2232,7 +2232,7 @@ static void TestXvlan(TPortoAPI &api, const std::string &name, const std::vector
     }
 }
 
-static void CreateVethPair(TPortoAPI &api) {
+static void CreateVethPair(Porto::Connection &api) {
     AsRoot(api);
     if (system("ip link | grep veth0") == 0) {
         Say() << "Delete link veth0" << std::endl;
@@ -2247,7 +2247,7 @@ static void CreateVethPair(TPortoAPI &api) {
     AsAlice(api);
 }
 
-static void TestNetProperty(TPortoAPI &api) {
+static void TestNetProperty(Porto::Connection &api) {
     if (!NetworkEnabled()) {
         Say() << "Make sure network namespace is shared when network disabled" << std::endl;
 
@@ -2512,7 +2512,7 @@ static void TestNetProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy("a"));
 }
 
-static void TestCapabilitiesProperty(TPortoAPI &api) {
+static void TestCapabilitiesProperty(Porto::Connection &api) {
     string pid;
     string name = "a";
 
@@ -2588,7 +2588,7 @@ static void TestCapabilitiesProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(name));
 }
 
-static void CheckConnectivity(TPortoAPI &api, const std::string &name,
+static void CheckConnectivity(Porto::Connection &api, const std::string &name,
                               bool enabled, bool disabled) {
     string v;
 
@@ -2611,7 +2611,7 @@ static void CheckConnectivity(TPortoAPI &api, const std::string &name,
     }
 }
 
-static void TestEnablePortoProperty(TPortoAPI &api) {
+static void TestEnablePortoProperty(Porto::Connection &api) {
     string name = "a";
     string name2 = "a/b";
     TPath path(TMPDIR + "/" + name);
@@ -2681,7 +2681,7 @@ static void TestEnablePortoProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy("a"));
 }
 
-static void TestStateMachine(TPortoAPI &api) {
+static void TestStateMachine(Porto::Connection &api) {
     string name = "a";
     string pid;
     string v;
@@ -2809,7 +2809,7 @@ static void TestStateMachine(TPortoAPI &api) {
     AsAlice(api);
 }
 
-static void TestPath(TPortoAPI &api) {
+static void TestPath(Porto::Connection &api) {
     vector<pair<string, string>> normalize = {
         { "",   "" },
         { ".",  "." },
@@ -2906,7 +2906,7 @@ static void TestPath(TPortoAPI &api) {
     }
 }
 
-static void TestIdmap(TPortoAPI &api) {
+static void TestIdmap(Porto::Connection &api) {
     TIdMap idmap(1, CONTAINER_ID_MAX);
     int id;
 
@@ -2922,7 +2922,7 @@ static void TestIdmap(TPortoAPI &api) {
     ExpectEq(id, 1);
 }
 
-static void TestFormat(TPortoAPI &api) {
+static void TestFormat(Porto::Connection &api) {
     uint64_t v;
 
     ExpectEq(StringFormat("%s %d", "a", 1), "a 1");
@@ -2945,7 +2945,7 @@ static void TestFormat(TPortoAPI &api) {
     Expect(!!StringToSize("1z", v));
 }
 
-static void TestRoot(TPortoAPI &api) {
+static void TestRoot(Porto::Connection &api) {
     string v;
     string root = "/";
     string porto_root = "/porto";
@@ -3041,7 +3041,7 @@ static void TestRoot(TPortoAPI &api) {
     if (KernelSupports(KernelFeature::MAX_RSS))
         data.push_back("max_rss");
 
-    std::vector<TPortoProperty> plist;
+    std::vector<Porto::Property> plist;
 
     ExpectApiSuccess(api.Plist(plist));
     ExpectEq(plist.size(), properties.size());
@@ -3049,7 +3049,7 @@ static void TestRoot(TPortoAPI &api) {
     for (auto p: plist)
         Expect(std::find(properties.begin(), properties.end(), p.Name) != properties.end());
 
-    std::vector<TPortoProperty> dlist;
+    std::vector<Porto::Property> dlist;
 
     ExpectApiSuccess(api.Dlist(dlist));
     ExpectEq(dlist.size(), data.size());
@@ -3140,7 +3140,7 @@ static void TestRoot(TPortoAPI &api) {
         ExpectEq(GetCgKnob("blkio", "", "blkio.weight"), "1000");
 }
 
-static void ExpectNonZeroLink(TPortoAPI &api, const std::string &name,
+static void ExpectNonZeroLink(Porto::Connection &api, const std::string &name,
                               const std::string &data) {
     string nonzero = "0";
     for (auto &link : links) {
@@ -3152,7 +3152,7 @@ static void ExpectNonZeroLink(TPortoAPI &api, const std::string &name,
     ExpectNeq(nonzero, "0");
 }
 
-static void ExpectLessEqLink(TPortoAPI &api, const std::string &name,
+static void ExpectLessEqLink(Porto::Connection &api, const std::string &name,
                              const std::string &parent, const std::string &data) {
     for (auto &link : links) {
         string v, rv;
@@ -3165,7 +3165,7 @@ static void ExpectLessEqLink(TPortoAPI &api, const std::string &name,
     }
 }
 
-static void ExpectZeroLink(TPortoAPI &api, const std::string &name,
+static void ExpectZeroLink(Porto::Connection &api, const std::string &name,
                            const std::string &data) {
     for (auto &link : links) {
         string v;
@@ -3174,7 +3174,7 @@ static void ExpectZeroLink(TPortoAPI &api, const std::string &name,
     }
 }
 
-static void TestData(TPortoAPI &api) {
+static void TestData(Porto::Connection &api) {
     // should be executed right after TestRoot because assumes empty statistics
 
     string root = "/";
@@ -3323,7 +3323,7 @@ static TUintMap ParseMap(const std::string &s) {
     return m;
 }
 
-static void TestCoresConvertion(TPortoAPI &api, const std::string &name, const std::string &property) {
+static void TestCoresConvertion(Porto::Connection &api, const std::string &name, const std::string &property) {
     auto cores = GetNumCores();
     std::string v;
 
@@ -3336,7 +3336,7 @@ static void TestCoresConvertion(TPortoAPI &api, const std::string &name, const s
     ExpectEq(v, StringFormat("%gc", 0.5 * cores));
 }
 
-static void TestLimits(TPortoAPI &api) {
+static void TestLimits(Porto::Connection &api) {
     string name = "a";
     ExpectApiSuccess(api.Create(name));
 
@@ -3605,7 +3605,7 @@ static void TestLimits(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(name));
 }
 
-static void TestUlimitProperty(TPortoAPI &api) {
+static void TestUlimitProperty(Porto::Connection &api) {
     string name = "a";
     ExpectApiSuccess(api.Create(name));
 
@@ -3659,7 +3659,7 @@ static void TestUlimitProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(name));
 }
 
-static void TestVirtModeProperty(TPortoAPI &api) {
+static void TestVirtModeProperty(Porto::Connection &api) {
     std::string name = "lxc";
 
     Say() << "Check that we can't start without loop" << std::endl;
@@ -3744,7 +3744,7 @@ static void TestVirtModeProperty(TPortoAPI &api) {
     tmpdir.RemoveAll();
 }
 
-static void TestAlias(TPortoAPI &api) {
+static void TestAlias(Porto::Connection &api) {
     if (!KernelSupports(KernelFeature::LOW_LIMIT))
         return;
     if (!KernelSupports(KernelFeature::RECHARGE_ON_PGFAULT))
@@ -3843,7 +3843,7 @@ static void TestAlias(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(name));
 }
 
-static void TestDynamic(TPortoAPI &api) {
+static void TestDynamic(Porto::Connection &api) {
     string name = "a";
     ExpectApiSuccess(api.Create(name));
 
@@ -3873,7 +3873,7 @@ static void TestDynamic(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(name));
 }
 
-static void TestLimitsHierarchy(TPortoAPI &api) {
+static void TestLimitsHierarchy(Porto::Connection &api) {
     if (!KernelSupports(KernelFeature::LOW_LIMIT))
         return;
 
@@ -4079,7 +4079,7 @@ static void TestLimitsHierarchy(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy("a"));
 }
 
-static void TestPermissions(TPortoAPI &api) {
+static void TestPermissions(Porto::Connection &api) {
     struct stat st;
     string path;
 
@@ -4165,7 +4165,7 @@ static void TestPermissions(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy("a"));
 }
 
-static void WaitRespawn(TPortoAPI &api, const std::string &name, int expected, int maxTries = 10) {
+static void WaitRespawn(Porto::Connection &api, const std::string &name, int expected, int maxTries = 10) {
     std::string respawnCount;
     int successRespawns = 0;
     for(int i = 0; i < maxTries; i++) {
@@ -4180,7 +4180,7 @@ static void WaitRespawn(TPortoAPI &api, const std::string &name, int expected, i
     ExpectEq(std::to_string(expected), respawnCount);
 }
 
-static void TestRespawnProperty(TPortoAPI &api) {
+static void TestRespawnProperty(Porto::Connection &api) {
     string pid, respawnPid;
     string ret;
 
@@ -4222,7 +4222,7 @@ static void TestRespawnProperty(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(name));
 }
 
-static void ReadPropsAndData(TPortoAPI &api, const std::string &name) {
+static void ReadPropsAndData(Porto::Connection &api, const std::string &name) {
     static const std::set<std::string> skipNet = {
         "net",
         "net_tos",
@@ -4241,8 +4241,8 @@ static void ReadPropsAndData(TPortoAPI &api, const std::string &name) {
         "net_rx_drops",
     };
 
-    std::vector<TPortoProperty> plist;
-    std::vector<TPortoProperty> dlist;
+    std::vector<Porto::Property> plist;
+    std::vector<Porto::Property> dlist;
 
     ExpectApiSuccess(api.Plist(plist));
     ExpectApiSuccess(api.Dlist(dlist));
@@ -4250,14 +4250,14 @@ static void ReadPropsAndData(TPortoAPI &api, const std::string &name) {
     if (!NetworkEnabled()) {
         plist.erase(std::remove_if(plist.begin(),
                                    plist.end(),
-                                   [&](TPortoProperty &p){
+                                   [&](Porto::Property &p){
                                        return skipNet.find(p.Name) != skipNet.end();
                                    }),
                     plist.end());
 
         dlist.erase(std::remove_if(dlist.begin(),
                                    dlist.end(),
-                                   [&](TPortoProperty &d){
+                                   [&](Porto::Property &d){
                                        return skipNet.find(d.Name) != skipNet.end();
                                    }),
                     dlist.end());
@@ -4272,7 +4272,7 @@ static void ReadPropsAndData(TPortoAPI &api, const std::string &name) {
         (void)api.GetData(name, d.Name, v);
 }
 
-static void TestLeaks(TPortoAPI &api) {
+static void TestLeaks(Porto::Connection &api) {
     string slavePid, masterPid;
     string name;
     int slack = 4096 * 2;
@@ -4435,7 +4435,7 @@ static void TestLeaks(TPortoAPI &api) {
     ExpectLessEq(nowMaster, expMaster);
 }
 
-static void TestPerf(TPortoAPI &api) {
+static void TestPerf(Porto::Connection &api) {
     std::string name, v;
     uint64_t begin, ms;
     const int nr = 1000;
@@ -4465,7 +4465,7 @@ static void TestPerf(TPortoAPI &api) {
 
     std::vector<std::string> containers;
     std::vector<std::string> variables = { "state" };
-    std::map<std::string, std::map<std::string, TPortoGetResponse>> result;
+    std::map<std::string, std::map<std::string, Porto::GetResponse>> result;
 
     for (int i = 0; i < nr; i++)
         containers.push_back("perf" + std::to_string(i));
@@ -4488,7 +4488,7 @@ static void TestPerf(TPortoAPI &api) {
     Expect(ms < destroyMs * nr);
 }
 
-static void CleanupVolume(TPortoAPI &api, const std::string &path) {
+static void CleanupVolume(Porto::Connection &api, const std::string &path) {
     AsRoot(api);
     TPath dir(path);
     if (dir.Exists()) {
@@ -4499,8 +4499,8 @@ static void CleanupVolume(TPortoAPI &api, const std::string &path) {
     AsAlice(api);
 }
 
-static void TestVolumeHolder(TPortoAPI &api) {
-    std::vector<TPortoVolume> volumes;
+static void TestVolumeHolder(Porto::Connection &api) {
+    std::vector<Porto::Volume> volumes;
 
     volumes.clear();
     ExpectApiSuccess(api.ListVolumes(volumes));
@@ -4601,8 +4601,8 @@ static void TestVolumeHolder(TPortoAPI &api) {
     ExpectApiFailure(api.CreateVolume(a, prop_invalid), EError::InvalidValue);
 }
 
-static void TestVolumeImpl(TPortoAPI &api) {
-    std::vector<TPortoVolume> volumes;
+static void TestVolumeImpl(Porto::Connection &api) {
+    std::vector<Porto::Volume> volumes;
     std::map<std::string, std::string> prop_loop = {{"backend", "loop"}, {"space_limit", "100m"}};
     std::map<std::string, std::string> prop_limited = {{"space_limit", "100m"}, {"inode_limit", "1000"}};
     std::map<std::string, std::string> prop_unlimit = {};
@@ -4681,7 +4681,7 @@ static void TestVolumeImpl(TPortoAPI &api) {
     ExpectEq(TPath(b).Exists(), false);
 }
 
-static void TestSigPipe(TPortoAPI &api) {
+static void TestSigPipe(Porto::Connection &api) {
     std::string before;
     ExpectApiSuccess(api.GetData("/", "porto_stat[spawned]", before));
 
@@ -4703,7 +4703,7 @@ static void TestSigPipe(TPortoAPI &api) {
     ExpectEq(before, after);
 }
 
-static void KillMaster(TPortoAPI &api, int sig, int times = 10) {
+static void KillMaster(Porto::Connection &api, int sig, int times = 10) {
     AsRoot(api);
     RotateDaemonLogs(api);
     AsAlice(api);
@@ -4721,7 +4721,7 @@ static void KillMaster(TPortoAPI &api, int sig, int times = 10) {
     expectedErrors = expectedRespawns = expectedWarns = 0;
 }
 
-static void KillSlave(TPortoAPI &api, int sig, int times = 10) {
+static void KillSlave(Porto::Connection &api, int sig, int times = 10) {
     int portodPid = ReadPid(config().slave_pid().path());
     if (kill(portodPid, sig))
         throw "Can't send " + std::to_string(sig) + " to slave";
@@ -4734,7 +4734,7 @@ static void KillSlave(TPortoAPI &api, int sig, int times = 10) {
     ExpectEq(v, std::to_string(expectedRespawns + 1));
 }
 
-static bool RespawnTicks(TPortoAPI &api, const std::string &name, int maxTries = 3) {
+static bool RespawnTicks(Porto::Connection &api, const std::string &name, int maxTries = 3) {
     std::string respawnCount, v;
     ExpectApiSuccess(api.GetData(name, "respawn_count", respawnCount));
     for(int i = 0; i < maxTries; i++) {
@@ -4747,7 +4747,7 @@ static bool RespawnTicks(TPortoAPI &api, const std::string &name, int maxTries =
     return false;
 }
 
-static void TestWait(TPortoAPI &api) {
+static void TestWait(Porto::Connection &api) {
     std::string c = "aaa";
     std::string d = "aaa/bbb";
     std::string tmp;
@@ -4835,7 +4835,7 @@ static void TestWait(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(c));
 }
 
-static void TestWaitRecovery(TPortoAPI &api) {
+static void TestWaitRecovery(Porto::Connection &api) {
     std::string c = "aaa";
     std::string d = "aaa/bbb";
     std::string tmp;
@@ -4868,7 +4868,7 @@ static void TestWaitRecovery(TPortoAPI &api) {
     ExpectApiSuccess(api.Destroy(c));
 }
 
-static void TestRecovery(TPortoAPI &api) {
+static void TestRecovery(Porto::Connection &api) {
     string pid, v;
     string name = "a:b";
     std::vector<std::string> containers;
@@ -5119,7 +5119,7 @@ static void TestRecovery(TPortoAPI &api) {
     }
 }
 
-static void TestVolumeFiles(TPortoAPI &api, const std::string &path) {
+static void TestVolumeFiles(Porto::Connection &api, const std::string &path) {
     vector<string> v;
 
     ExpectSuccess(Popen("cat /proc/self/mountinfo", v));
@@ -5127,7 +5127,7 @@ static void TestVolumeFiles(TPortoAPI &api, const std::string &path) {
     Expect(m.find(path) != m.end());
 }
 
-static void TestVolumeRecovery(TPortoAPI &api) {
+static void TestVolumeRecovery(Porto::Connection &api) {
     Say() << "Make sure porto removes leftover volumes" << std::endl;
     std::string a = "/tmp/volume_c", b = "";
     std::map<std::string, std::string> prop_limited = {{"space_limit", "100m"}, {"inode_limit", "1000"}};
@@ -5136,7 +5136,7 @@ static void TestVolumeRecovery(TPortoAPI &api) {
     CleanupVolume(api, a);
     ExpectSuccess(TPath(a).Mkdir(0775));
 
-    std::vector<TPortoVolume> volumes;
+    std::vector<Porto::Volume> volumes;
     ExpectApiSuccess(api.ListVolumes(volumes));
     ExpectEq(volumes.size(), 0);
 
@@ -5181,7 +5181,7 @@ static void TestVolumeRecovery(TPortoAPI &api) {
     ExpectEq(TPath(b).Exists(), false);
 }
 
-static void TestCgroups(TPortoAPI &api) {
+static void TestCgroups(Porto::Connection &api) {
     AsRoot(api);
 
     Say() << "Make sure we don't remove non-porto cgroups" << std::endl;
@@ -5221,7 +5221,7 @@ static void TestCgroups(TPortoAPI &api) {
     ExpectEq(cpuCg.Exists(), false);
 }
 
-static void TestVersion(TPortoAPI &api) {
+static void TestVersion(Porto::Connection &api) {
     string tag, revision;
     ExpectApiSuccess(api.GetVersion(tag, revision));
 
@@ -5229,7 +5229,7 @@ static void TestVersion(TPortoAPI &api) {
     ExpectEq(revision, GIT_REVISION);
 }
 
-static void TestBadClient(TPortoAPI &api) {
+static void TestBadClient(Porto::Connection &api) {
     std::vector<std::string> clist;
     int sec = 120;
 
@@ -5260,13 +5260,13 @@ static void TestBadClient(TPortoAPI &api) {
     ExpectSuccess(ConnectToRpcServer(PORTO_SOCKET_PATH, fd));
     ExpectEq(write(fd, buf.c_str(), buf.length()), buf.length());
 
-    TPortoAPI api2;
+    Porto::Connection api2;
     ExpectApiSuccess(api2.List(clist));
     close(fd);
     alarm(0);
 }
 
-static void TestRemoveDead(TPortoAPI &api) {
+static void TestRemoveDead(Porto::Connection &api) {
     std::string v;
     ExpectApiSuccess(api.GetData("/", "porto_stat[remove_dead]", v));
     ExpectEq(v, std::to_string(0));
@@ -5286,7 +5286,7 @@ static void TestRemoveDead(TPortoAPI &api) {
     ExpectEq(v, std::to_string(1));
 }
 
-static void TestLogRotate(TPortoAPI &api) {
+static void TestLogRotate(Porto::Connection &api) {
     std::string v;
     struct stat st;
 
@@ -5304,7 +5304,7 @@ static void TestLogRotate(TPortoAPI &api) {
     ExpectLess(st.st_blocks * 512, config().container().max_log_size());
 }
 
-static void CheckErrorCounters(TPortoAPI &api) {
+static void CheckErrorCounters(Porto::Connection &api) {
     std::string v;
 
     ExpectApiSuccess(api.GetData("/", "porto_stat[spawned]", v));
@@ -5317,7 +5317,7 @@ static void CheckErrorCounters(TPortoAPI &api) {
     ExpectEq(v, std::to_string(expectedWarns));
 }
 
-static void TestStats(TPortoAPI &api) {
+static void TestStats(Porto::Connection &api) {
     if (!needDaemonChecks)
         return;
 
@@ -5349,7 +5349,7 @@ static void TestStats(TPortoAPI &api) {
     AsAlice(api);
 }
 
-static void TestPackage(TPortoAPI &api) {
+static void TestPackage(Porto::Connection &api) {
     if (!needDaemonChecks)
         return;
 
@@ -5371,7 +5371,7 @@ static void TestPackage(TPortoAPI &api) {
     expectedErrors = expectedRespawns = expectedWarns = 0;
 }
 
-static void TestConvertPath(TPortoAPI &api) {
+static void TestConvertPath(Porto::Connection &api) {
     ExpectApiSuccess(api.Create("abc"));
     ExpectApiSuccess(api.SetProperty("abc", "root", "/root_abc"));
 
@@ -5413,7 +5413,7 @@ static void TestConvertPath(TPortoAPI &api) {
 }
 
 int SelfTest(std::vector<std::string> args) {
-    pair<string, std::function<void(TPortoAPI &)>> tests[] = {
+    pair<string, std::function<void(Porto::Connection &)>> tests[] = {
         { "path", TestPath },
         { "idmap", TestIdmap },
         { "format", TestFormat },
@@ -5482,7 +5482,7 @@ int SelfTest(std::vector<std::string> args) {
     needDaemonChecks = getenv("NOCHECK") == nullptr;
 
     config.Load();
-    TPortoAPI api;
+    Porto::Connection api;
 
     InitUsersAndGroups();
 

@@ -5,34 +5,36 @@
 #include <string>
 #include <memory>
 
-struct TPortoProperty {
+namespace Porto {
+
+struct Property {
     std::string Name;
     std::string Description;
 };
 
-struct TPortoVolume {
+struct Volume {
     std::string Path;
     std::map<std::string, std::string> Properties;
     std::vector<std::string> Containers;
 };
 
-struct TPortoGetResponse {
+struct GetResponse {
     std::string Value;
     int Error;
     std::string ErrorMsg;
 };
 
-class TPortoAPI {
-    class TPortoAPIImpl;
+class Connection {
+    class ConnectionImpl;
 
-    std::unique_ptr<TPortoAPIImpl> Impl;
+    std::unique_ptr<ConnectionImpl> Impl;
 
-    TPortoAPI(const TPortoAPI&) = delete;
-    void operator=(const TPortoAPI&) = delete;
+    Connection(const Connection&) = delete;
+    void operator=(const Connection&) = delete;
 
 public:
-    TPortoAPI();
-    ~TPortoAPI();
+    Connection();
+    ~Connection();
 
     /* each rpc call does auto-connect/reconnect */
     int Connect();
@@ -52,13 +54,12 @@ public:
              std::string &name, int timeout = -1);
 
     int List(std::vector<std::string> &clist);
-    int Plist(std::vector<TPortoProperty> &list);
-    int Dlist(std::vector<TPortoProperty> &list);
+    int Plist(std::vector<Property> &list);
+    int Dlist(std::vector<Property> &list);
 
     int Get(const std::vector<std::string> &name,
             const std::vector<std::string> &variable,
-            std::map<std::string, std::map<std::string,
-                            TPortoGetResponse>> &result);
+            std::map<std::string, std::map<std::string, GetResponse>> &result);
 
     int GetProperty(const std::string &name,
             const std::string &property, std::string &value);
@@ -72,10 +73,10 @@ public:
     int Raw(const std::string &message, std::string &response);
     void GetLastError(int &error, std::string &msg) const;
 
-    int ListVolumeProperties(std::vector<TPortoProperty> &list);
+    int ListVolumeProperties(std::vector<Property> &list);
     int CreateVolume(const std::string &path,
                      const std::map<std::string, std::string> &config,
-                     TPortoVolume &result);
+                     Volume &result);
     int CreateVolume(std::string &path,
                      const std::map<std::string, std::string> &config);
     int LinkVolume(const std::string &path,
@@ -83,8 +84,8 @@ public:
     int UnlinkVolume(const std::string &path,
             const std::string &container = std::string());
     int ListVolumes(const std::string &path, const std::string &container,
-                    std::vector<TPortoVolume> &volumes);
-    int ListVolumes(std::vector<TPortoVolume> &volumes) {
+                    std::vector<Volume> &volumes);
+    int ListVolumes(std::vector<Volume> &volumes) {
         return ListVolumes(std::string(), std::string(), volumes);
     }
     int TuneVolume(const std::string &path,
@@ -99,3 +100,5 @@ public:
     int ConvertPath(const std::string &path, const std::string &src,
                     const std::string &dest, std::string &res);
 };
+
+} /* namespace Porto */

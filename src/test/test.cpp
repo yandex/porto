@@ -53,7 +53,7 @@ void ExpectError(const TError &ret, const TError &exp, const char *where) {
     throw ss.str();
 }
 
-void ExpectApi(TPortoAPI &api, int ret, int exp, const char *where) {
+void ExpectApi(Porto::Connection &api, int ret, int exp, const char *where) {
     std::stringstream ss;
 
     if (ret == exp)
@@ -117,13 +117,13 @@ void WaitProcessExit(const std::string &pid, int sec) {
         throw std::string("Waited too long for process to exit");
 }
 
-void WaitContainer(TPortoAPI &api, const std::string &name, int sec) {
+void WaitContainer(Porto::Connection &api, const std::string &name, int sec) {
     std::string who;
     ExpectApiSuccess(api.Wait({name}, who, sec * 1000));
     ExpectEq(who, name);
 }
 
-void WaitState(TPortoAPI &api, const std::string &name, const std::string &state, int sec) {
+void WaitState(Porto::Connection &api, const std::string &name, const std::string &state, int sec) {
     Say() << "Waiting for " << name << " to be in state " << state << std::endl;
 
     int times = sec * 10;
@@ -142,7 +142,7 @@ void WaitState(TPortoAPI &api, const std::string &name, const std::string &state
         throw std::string("Waited too long for task to change state");
 }
 
-void WaitPortod(TPortoAPI &api, int times) {
+void WaitPortod(Porto::Connection &api, int times) {
     Say() << "Waiting for portod startup" << std::endl;
 
     std::vector<std::string> clist;
@@ -407,7 +407,7 @@ void InitUsersAndGroups() {
     Expect(Bob.IsPortoUser());
 }
 
-void AsRoot(TPortoAPI &api) {
+void AsRoot(Porto::Connection &api) {
     api.Close();
 
     ExpectEq(seteuid(0), 0);
@@ -415,7 +415,7 @@ void AsRoot(TPortoAPI &api) {
     ExpectEq(setgroups(0, nullptr), 0);
 }
 
-void AsUser(TPortoAPI &api, TCred &cred) {
+void AsUser(Porto::Connection &api, TCred &cred) {
     AsRoot(api);
 
     ExpectEq(setgroups(cred.Groups.size(), cred.Groups.data()), 0);
@@ -423,15 +423,15 @@ void AsUser(TPortoAPI &api, TCred &cred) {
     ExpectEq(setreuid(0, cred.Uid), 0);
 }
 
-void AsNobody(TPortoAPI &api) {
+void AsNobody(Porto::Connection &api) {
     AsUser(api, Nobody);
 }
 
-void AsAlice(TPortoAPI &api) {
+void AsAlice(Porto::Connection &api) {
     AsUser(api, Alice);
 }
 
-void AsBob(TPortoAPI &api) {
+void AsBob(Porto::Connection &api) {
     AsUser(api, Bob);
 }
 
@@ -476,7 +476,7 @@ void BootstrapCommand(const std::string &cmd, const TPath &path, bool remove) {
     Expect(system(("cp " + cmd + " " + path.ToString()).c_str()) == 0);
 }
 
-void RotateDaemonLogs(TPortoAPI &api) {
+void RotateDaemonLogs(Porto::Connection &api) {
     // Truncate slave log
     TPath slaveLog(config().slave_log().path());
     ExpectSuccess(slaveLog.Unlink());
@@ -498,7 +498,7 @@ void RotateDaemonLogs(TPortoAPI &api) {
     WaitPortod(api);
 }
 
-void RestartDaemon(TPortoAPI &api) {
+void RestartDaemon(Porto::Connection &api) {
     std::cerr << ">>> Truncating logs and restarting porto..." << std::endl;
 
     if (Pgrep("portod") != 1)
@@ -548,7 +548,7 @@ static size_t ChildrenNum(int pid) {
     return lines.size();
 }
 
-void TestDaemon(TPortoAPI &api) {
+void TestDaemon(Porto::Connection &api) {
     struct dirent **lst;
     int pid;
 

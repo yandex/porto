@@ -88,24 +88,24 @@ void THelpCmd::Usage() {
         PrintAligned(i.second->GetName(), i.second->GetDescription(), nameWidth, termWidth);
 
     std::cerr << std::endl << "Volume properties:" << std::endl;
-    vector<TPortoProperty> vlist;
+    vector<Porto::Property> vlist;
     int ret = Api->ListVolumeProperties(vlist);
     if (ret) {
         PrintError("Unavailable");
     } else {
-        nameWidth = MaxFieldLength(vlist, [](const TPortoProperty &p) { return p.Name; });
+        nameWidth = MaxFieldLength(vlist, [](const Porto::Property &p) { return p.Name; });
 
         for (const auto &p : vlist)
             PrintAligned(p.Name, p.Description, nameWidth, termWidth);
     }
 
     std::cerr << std::endl << "Property list:" << std::endl;
-    vector<TPortoProperty> plist;
+    vector<Porto::Property> plist;
     ret = Api->Plist(plist);
     if (ret) {
         PrintError("Unavailable");
     } else {
-        nameWidth = MaxFieldLength(vlist, [](const TPortoProperty &p) { return p.Name; });
+        nameWidth = MaxFieldLength(vlist, [](const Porto::Property &p) { return p.Name; });
 
         for (const auto &p : plist)
             PrintAligned(p.Name, p.Description, nameWidth, termWidth);
@@ -115,12 +115,12 @@ void THelpCmd::Usage() {
         return;
 
     std::cerr << std::endl << "Data list:" << std::endl;
-    vector<TPortoProperty> dlist;
+    vector<Porto::Property> dlist;
     ret = Api->Dlist(dlist);
     if (ret) {
         PrintError("Unavailable");
     } else {
-        nameWidth = MaxFieldLength(dlist, [](const TPortoProperty &d) { return d.Name; });
+        nameWidth = MaxFieldLength(dlist, [](const Porto::Property &d) { return d.Name; });
 
         for (const auto &d : dlist)
             PrintAligned(d.Name, d.Description, nameWidth, termWidth);
@@ -153,7 +153,7 @@ size_t MaxFieldLength(const std::vector<std::string> &vec, size_t min) {
     return MaxFieldLength(vec, [](const string &s) { return s; }, min);
 }
 
-ICmd::ICmd(TPortoAPI *api, const string &name, int args,
+ICmd::ICmd(Porto::Connection *api, const string &name, int args,
            const string &usage, const string &desc, const string &help) :
     Api(api), Name(name), Usage(usage), Desc(desc), Help(help), NeedArgs(args) {}
 
@@ -240,7 +240,7 @@ int TCommandHandler::TryExec(const std::string &commandName,
     return cmd->Execute(&commandEnv);
 }
 
-TCommandHandler::TCommandHandler(TPortoAPI &api) : PortoApi(api) {
+TCommandHandler::TCommandHandler(Porto::Connection &api) : PortoApi(api) {
     RegisterCommand(std::unique_ptr<ICmd>(new THelpCmd(*this, true)));
 }
 
