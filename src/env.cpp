@@ -1,4 +1,5 @@
 #include "env.hpp"
+#include "util/log.hpp"
 
 void TEnv::ClearEnv() {
     Vars.clear();
@@ -22,8 +23,11 @@ TError TEnv::SetEnv(const std::string &name, const std::string &value,
             continue;
         if (!overwrite)
             return TError(EError::InvalidValue, "variable " + name + " already set");
-        if (var.Locked)
-            return TError(EError::InvalidValue, "variable " + name + " locked");
+        if (var.Locked) {
+            L_WRN() << "Variable " << name << " locked to " << var.Value
+                    << ", value " << value << " is ignored" << std::endl;
+            return TError::Success();
+        }
         var.Value = value;
         var.Set = true;
         var.Locked = lock;
@@ -39,8 +43,11 @@ TError TEnv::UnsetEnv(const std::string &name, bool overwrite /* true */) {
             continue;
         if (!overwrite && var.Set)
             return TError(EError::InvalidValue, "variable " + name + " already set");
-        if (var.Locked)
-            return TError(EError::InvalidValue, "variable " + name + " locked");
+        if (var.Locked) {
+            L_WRN() << "Variable " << name << " locked to " << var.Value
+                    << ", unset is ignored" << std::endl;
+            return TError::Success();
+        }
         var.Value = "";
         var.Set = false;
         return TError::Success();
