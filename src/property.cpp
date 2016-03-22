@@ -146,7 +146,7 @@ public:
     TPortoNamespaceProperty() :
         TStringValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_PORTO_NAMESPACE,
-                        "Porto containers namespace (container name prefix)") {}
+                        "Porto containers namespace (container name prefix) (dynamic)") {}
 };
 
 class TRootProperty : public TStringValue, public TContainerValue {
@@ -242,7 +242,7 @@ public:
     TStdoutLimitProperty() :
         TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_STDOUT_LIMIT,
-                        "Return no more than given number of bytes from standard output/error") {}
+                        "Limit returned stdout/stderr size (dynamic)") {}
 
     uint64_t GetDefault() const override {
         return config().container().stdout_limit();
@@ -265,7 +265,7 @@ public:
     TMemoryGuaranteeProperty() :
         TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_MEM_GUARANTEE,
-                        "Guaranteed amount of memory [bytes]") {
+                        "Guaranteed amount of memory [bytes] (dynamic)") {
         if (!MemorySubsystem.SupportGuarantee())
             SetFlag(UNSUPPORTED_FEATURE);
     }
@@ -291,7 +291,7 @@ public:
     TMemoryLimitProperty() :
         TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_MEM_LIMIT,
-                        "Memory hard limit [bytes]") {}
+                        "Memory hard limit [bytes] (dynamic)") {}
 };
 
 class TDirtyLimitProperty : public TSizeValue, public TContainerValue {
@@ -299,7 +299,7 @@ public:
     TDirtyLimitProperty() :
         TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_DIRTY_LIMIT,
-                        "Dirty file cache limit [bytes]") {
+                        "Dirty file cache limit [bytes] (dynamic)") {
         if (!MemorySubsystem.SupportDirtyLimit())
             SetFlag(UNSUPPORTED_FEATURE);
     }
@@ -314,7 +314,7 @@ public:
     TRechargeOnPgfaultProperty() :
         TBoolValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_RECHARGE_ON_PGFAULT,
-                        "Recharge memory on page fault") {
+                        "Recharge memory on page fault (dynamic)") {
         if (!MemorySubsystem.SupportRechargeOnPgfault())
             SetFlag(UNSUPPORTED_FEATURE);
     }
@@ -329,7 +329,7 @@ public:
     TCpuPolicyProperty() :
         TStringValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_CPU_POLICY,
-                        "CPU policy: rt, normal, idle") {}
+                        "CPU policy: rt, normal, idle (dynamic)") {}
 
     std::string GetDefault() const override {
         return "normal";
@@ -356,7 +356,7 @@ public:
     TCpuLimitProperty() :
         TCpusValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_CPU_LIMIT,
-                        "CPU limit: 0-100.0 [%] | 0.0c-<CPUS>c [cores]") {
+                        "CPU limit: 0-100.0 [%] | 0.0c-<CPUS>c [cores] (dynamic)") {
         if (!CpuSubsystem.SupportLimit())
             SetFlag(UNSUPPORTED_FEATURE);
     }
@@ -371,7 +371,7 @@ public:
     TCpuGuaranteeProperty() :
         TCpusValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_CPU_GUARANTEE,
-                        "CPU guarantee: 0-100.0 [%] | 0.0c-<CPUS>c [cores]") {
+                        "CPU guarantee: 0-100.0 [%] | 0.0c-<CPUS>c [cores] (dynamic)") {
         if (!CpuSubsystem.SupportGuarantee())
             SetFlag(UNSUPPORTED_FEATURE);
     }
@@ -389,7 +389,7 @@ public:
     TIoPolicyProperty() :
         TStringValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_IO_POLICY,
-                        "IO policy: normal, batch") {
+                        "IO policy: normal, batch (dynamic)") {
         if (!BlkioSubsystem.SupportPolicy())
             SetFlag(UNSUPPORTED_FEATURE);
     }
@@ -411,7 +411,7 @@ public:
     TIoLimitProperty() :
         TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_IO_LIMIT,
-                        "Filesystem bandwidth limit [bytes/s]") {
+                        "Filesystem bandwidth limit [bytes/s] (dynamic)") {
         if (!MemorySubsystem.SupportIoLimit())
             SetFlag(UNSUPPORTED_FEATURE);
     }
@@ -422,7 +422,7 @@ public:
     TIopsLimitProperty() :
         TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_IO_OPS_LIMIT,
-                        "Filesystem IOPS limit [operations/s]") {
+                        "Filesystem IOPS limit [operations/s] (dynamic)") {
         if (!MemorySubsystem.SupportIoLimit())
             SetFlag(UNSUPPORTED_FEATURE);
     }
@@ -432,7 +432,7 @@ class TNetGuaranteeProperty : public TMapValue, public TContainerValue {
 public:
     TNetGuaranteeProperty() : TMapValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
     TContainerValue(P_NET_GUARANTEE,
-            "Guaranteed container network bandwidth: <interface>|default <Bps>;...") { }
+            "Guaranteed container network bandwidth: <interface>|default <Bps>;... (dynamic)") { }
 
     TError CheckValue(const TUintMap &value) override {
         for (auto &kv: value) {
@@ -455,7 +455,7 @@ class TNetLimitProperty : public TMapValue, public TContainerValue {
 public:
     TNetLimitProperty() : TMapValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
     TContainerValue(P_NET_LIMIT,
-            "Maximum container network bandwidth: <interface>|default <Bps>;...") { }
+            "Maximum container network bandwidth: <interface>|default <Bps>;... (dynamic)") { }
 
     TError CheckValue(const TUintMap &value) override {
         for (auto &kv: value) {
@@ -474,7 +474,7 @@ class TNetPriorityProperty : public TMapValue, public TContainerValue {
 public:
     TNetPriorityProperty() : TMapValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
     TContainerValue(P_NET_PRIO,
-            "Container network priority: <interface>|default 0-7;...") { }
+            "Container network priority: <interface>|default 0-7;... (dynamic)") { }
 
     TError CheckValue(const TUintMap &value) override {
         for (auto &kv : value) {
@@ -494,7 +494,7 @@ public:
     TRespawnProperty() :
         TBoolValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_RESPAWN,
-                        "Automatically respawn dead container") {}
+                        "Automatically respawn dead container (dynamic)") {}
 
     bool GetDefault() const override {
         return false;
@@ -506,7 +506,7 @@ public:
     TMaxRespawnsProperty() :
         TIntValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_MAX_RESPAWNS,
-                        "Limit respawn count for specific container") {}
+                        "Limit respawn count for specific container (dynamic)") {}
 
     int GetDefault() const override {
         return -1;
@@ -530,7 +530,7 @@ public:
     TPrivateProperty() :
         TStringValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_PRIVATE,
-                        "User-defined property") {}
+                        "User-defined property (dynamic)") {}
 
     std::string GetDefault() const override {
         return "";
@@ -923,7 +923,7 @@ public:
     TAgingTimeProperty() :
         TUintValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_AGING_TIME,
-                        "After given number of seconds container in dead state is automatically removed") {}
+                        "After given number of seconds container in dead state is automatically removed (dynamic)") {}
 
     uint64_t GetDefault() const override {
         return config().container().default_aging_time_s();
@@ -935,7 +935,7 @@ public:
     TEnablePortoProperty() :
         TBoolValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_ENABLE_PORTO,
-                        "Allow container communication with porto") {}
+                        "Allow container communication with porto (dynamic)") {}
 
     bool GetDefault() const override {
         for (auto c = GetContainer(); c; c = c->GetParent()) {
@@ -982,7 +982,7 @@ public:
     TWeakProperty() :
         TBoolValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_WEAK,
-                        "Destroy container when client disconnects") {}
+                        "Destroy container when client disconnects (dynamic)") {}
 
     bool GetDefault() const override {
         return false;

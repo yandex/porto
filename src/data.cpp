@@ -20,15 +20,14 @@ public:
     TStateData() :
         TStringValue(READ_ONLY_VALUE | PERSISTENT_VALUE),
         TContainerValue(D_STATE,
-                        "container state") {}
+                        "container state (ro)") {}
 };
 
 class TOomKilledData : public TBoolValue, public TContainerValue {
 public:
     TOomKilledData() :
         TBoolValue(READ_ONLY_VALUE | PERSISTENT_VALUE | POSTMORTEM_VALUE),
-        TContainerValue(D_OOM_KILLED,
-                        "indicates whether container has been killed by OOM") {}
+        TContainerValue(D_OOM_KILLED, "container has been killed by OOM (ro)") {}
 };
 
 class TAbsoluteNameData : public TStringValue, public TContainerValue {
@@ -36,7 +35,7 @@ public:
     TAbsoluteNameData() :
         TStringValue(READ_ONLY_VALUE),
         TContainerValue(D_ABSOLUTE_NAME,
-                        "Absolute name of Porto container") {};
+                        "container name including porto namespaces (ro)") {};
 
     std::string GetDefault() const override {
         return GetContainer()->GetName();
@@ -48,7 +47,7 @@ public:
     TParentData() :
         TStringValue(READ_ONLY_VALUE | HIDDEN_VALUE),
         TContainerValue(D_PARENT,
-                        "parent container name (deprecated)") {}
+                        "parent container name (ro) (deprecated)") {}
 
     std::string GetDefault() const override {
         return GetContainer()->GetParent() ?
@@ -61,26 +60,14 @@ public:
     TRespawnCountData() :
         TUintValue(READ_ONLY_VALUE | PERSISTENT_VALUE),
         TContainerValue(D_RESPAWN_COUNT,
-                        "how many times container was automatically respawned") {}
+                        "current respawn count (ro)") {}
 };
 
 class TRootPidData : public TIntValue, public TContainerValue {
 public:
     TRootPidData() :
         TIntValue(READ_ONLY_VALUE | HIDDEN_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_ROOT_PID,
-                        "root process id (deprecated)") {}
-
-    int GetDefault() const override {
-        auto c = GetContainer();
-        std::vector<int> pids;
-
-        if (!c->Prop->HasValue(P_RAW_ROOT_PID))
-            return -1;
-
-        pids = c->Prop->Get<std::vector<int>>(P_RAW_ROOT_PID);
-        return pids[0];
-    }
+        TContainerValue(D_ROOT_PID, "root task pid (ro)") {}
 };
 
 class TExitStatusData : public TIntValue, public TContainerValue {
@@ -88,7 +75,7 @@ public:
     TExitStatusData() :
         TIntValue(READ_ONLY_VALUE | PERSISTENT_VALUE | POSTMORTEM_VALUE),
         TContainerValue(D_EXIT_STATUS,
-                        "container exit status") {}
+                        "container exit status (ro)") {}
 };
 
 class TStartErrnoData : public TIntValue, public TContainerValue {
@@ -96,7 +83,7 @@ public:
     TStartErrnoData() :
         TIntValue(READ_ONLY_VALUE),
         TContainerValue(D_START_ERRNO,
-                        "container start error") {}
+                        "container start error (ro)") {}
 };
 
 class TStdoutData : public TTextValue, public TContainerValue {
@@ -104,7 +91,7 @@ public:
     TStdoutData() :
         TTextValue(READ_ONLY_VALUE | RUNTIME_VALUE),
         TContainerValue(D_STDOUT,
-                        "return task stdout") {}
+                        "stdout (optional start [offset]) (ro)") {}
 
     TError GetString(std::string &value) const override {
         auto c = GetContainer();
@@ -125,7 +112,7 @@ public:
     TStderrData() :
         TTextValue(READ_ONLY_VALUE | RUNTIME_VALUE),
         TContainerValue(D_STDERR,
-                        "return task stderr") {}
+                        "stderr (optional start [offset]) (ro)") {}
 
 
     TError GetString(std::string &value) const override {
@@ -145,14 +132,14 @@ class TStdoutOffset : public TUintValue, public TContainerValue {
 public:
     TStdoutOffset() :
         TUintValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_STDOUT_OFFSET, "stdout offset") {}
+        TContainerValue(D_STDOUT_OFFSET, "stored stdout offset (ro)") {}
 };
 
 class TStderrOffset : public TUintValue, public TContainerValue {
 public:
     TStderrOffset() :
         TUintValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_STDERR_OFFSET, "stderr offset") {}
+        TContainerValue(D_STDERR_OFFSET, "stored stderr offset (ro)") {}
 };
 
 class TCpuUsageData : public TUintValue, public TContainerValue {
@@ -160,7 +147,7 @@ public:
     TCpuUsageData() :
         TUintValue(READ_ONLY_VALUE | RUNTIME_VALUE),
         TContainerValue(D_CPU_USAGE,
-                        "return consumed CPU time in nanoseconds") {}
+                        "consumed CPU time [nanoseconds] (ro)") {}
 
     uint64_t GetDefault() const override {
         auto cg = GetContainer()->GetCgroup(CpuacctSubsystem);
@@ -181,7 +168,7 @@ public:
     TMemUsageData() :
         TUintValue(READ_ONLY_VALUE | RUNTIME_VALUE),
         TContainerValue(D_MEMORY_USAGE,
-                        "return consumed memory in bytes") {}
+                        "current memory usage [bytes] (ro)") {}
 
     uint64_t GetDefault() const override {
         auto cg = GetContainer()->GetCgroup(MemorySubsystem);
@@ -202,7 +189,7 @@ public:
     TNetBytesData() :
         TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
         TContainerValue(D_NET_BYTES,
-                        "number of tx bytes: <interface>: <bytes>;...") {}
+                        "tx bytes: <interface>: <bytes>;... (ro)") {}
 
     TUintMap GetDefault() const override {
         TUintMap m;
@@ -216,7 +203,7 @@ public:
     TNetPacketsData() :
         TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
         TContainerValue(D_NET_PACKETS,
-                        "number of tx packets: <interface>: <packets>;...") {}
+                        "tx packets: <interface>: <packets>;... (ro)") {}
 
     TUintMap GetDefault() const override {
         TUintMap m;
@@ -230,7 +217,7 @@ public:
     TNetDropsData() :
         TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
         TContainerValue(D_NET_DROPS,
-                        "number of dropped tx packets: <interface>: <packets>;...") {}
+                        "dropped tx packets: <interface>: <packets>;... (ro)") {}
 
     TUintMap GetDefault() const override {
         TUintMap m;
@@ -244,7 +231,7 @@ public:
     TNetOverlimitsData() :
         TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
         TContainerValue(D_NET_OVERLIMITS,
-                        "number of tx packets that exceeded the limit: <interface>: <packets>;...") {}
+                        "overlimit tx packets: <interface>: <packets>;... (ro)") {}
 
     TUintMap GetDefault() const override {
         TUintMap m;
@@ -258,7 +245,7 @@ public:
     TNetRxBytes() :
         TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
         TContainerValue(D_NET_RX_BYTES,
-                        "number of rx bytes: <interface>: <bytes>;...") {}
+                        "rx bytes: <interface>: <bytes>;... (ro)") {}
 
     TUintMap GetDefault() const override {
         TUintMap m;
@@ -272,7 +259,7 @@ public:
     TNetRxPackets() :
         TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
         TContainerValue(D_NET_RX_PACKETS,
-                        "number of rx packets: <interface>: <packets>;...") {}
+                        "rx packets: <interface>: <packets>;... (ro)") {}
 
     TUintMap GetDefault() const override {
         TUintMap m;
@@ -286,7 +273,7 @@ public:
     TNetRxDrops() :
         TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
         TContainerValue(D_NET_RX_DROPS,
-                        "number of dropped rx packets: <interface>: <packets>;...") {}
+                        "dropped rx packets: <interface>: <packets>;... (ro)") {}
 
     TUintMap GetDefault() const override {
         TUintMap m;
@@ -300,7 +287,7 @@ public:
     TMinorFaultsData() :
         TUintValue(READ_ONLY_VALUE | RUNTIME_VALUE),
         TContainerValue(D_MINOR_FAULTS,
-                        "return number of minor page faults") {}
+                        "minor page faults (ro)") {}
 
     uint64_t GetDefault() const override {
         auto cg = GetContainer()->GetCgroup(MemorySubsystem);
@@ -317,7 +304,7 @@ public:
     TMajorFaultsData() :
         TUintValue(READ_ONLY_VALUE | RUNTIME_VALUE),
         TContainerValue(D_MAJOR_FAULTS,
-                        "return number of major page faults") {}
+                        "major page faults (ro)") {}
 
     uint64_t GetDefault() const override {
         auto cg = GetContainer()->GetCgroup(MemorySubsystem);
@@ -334,7 +321,7 @@ public:
     TIoReadData() :
         TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
         TContainerValue(D_IO_READ,
-                        "return number of bytes read from disk") {}
+                        "read from disk [bytes] (ro)") {}
 
     TUintMap GetDefault() const override {
         auto memCg = GetContainer()->GetCgroup(MemorySubsystem);
@@ -361,8 +348,7 @@ class TIoWriteData : public TMapValue, public TContainerValue {
 public:
     TIoWriteData() :
         TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_IO_WRITE,
-                        "return number of bytes written to disk") {}
+        TContainerValue(D_IO_WRITE, "written to disk [bytes] (ro)") {}
 
     TUintMap GetDefault() const override {
         auto memCg = GetContainer()->GetCgroup(MemorySubsystem);
@@ -389,8 +375,7 @@ class TIoOpsData : public TMapValue, public TContainerValue {
 public:
     TIoOpsData() :
         TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_IO_OPS,
-                        "return number of disk io operations") {}
+        TContainerValue(D_IO_OPS, "io operations (ro)") {}
 
     TUintMap GetDefault() const override {
         auto memCg = GetContainer()->GetCgroup(MemorySubsystem);
@@ -417,8 +402,7 @@ class TTimeData : public TUintValue, public TContainerValue {
 public:
     TTimeData() :
         TUintValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_TIME,
-                        "container running time") {}
+        TContainerValue(D_TIME, "running time [seconds] (ro)") {}
 
     uint64_t GetDefault() const override {
         auto c = GetContainer();
@@ -454,7 +438,7 @@ public:
     TMaxRssData() :
         TUintValue(READ_ONLY_VALUE | RUNTIME_VALUE),
         TContainerValue(D_MAX_RSS,
-                        "maximum amount of anonymous memory container consumed") {
+                        "peak anonymous memory usage [bytes] (ro)") {
         TCgroup rootCg = MemorySubsystem.RootCgroup();
         TUintMap stat;
         TError error = MemorySubsystem.Statistics(rootCg, stat);
@@ -475,7 +459,7 @@ public:
     TPortoStatData() :
         TMapValue(READ_ONLY_VALUE | HIDDEN_VALUE),
         TContainerValue(D_PORTO_STAT,
-                        "") {}
+                        "porto statistics (ro)") {}
 
     TUintMap GetDefault() const override {
         TUintMap m;
