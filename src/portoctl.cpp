@@ -1697,17 +1697,41 @@ public:
 
 class TUnlinkVolumeCmd final : public ICmd {
 public:
-    TUnlinkVolumeCmd(Porto::Connection *api) : ICmd(api, "vunlink", 1, "<path> [container]",
+    TUnlinkVolumeCmd(Porto::Connection *api) : ICmd(api, "vunlink", 1,
+                    "[-A] <path> [container]",
                     "unlink volume from container",
+                    "    -A        unlink from all containers\n"
                     "default container - current\n"
                     "removing last link deletes volume\n") {}
 
     int Execute(TCommandEnviroment *env) final override {
-        const auto &args = env->GetArgs();
+        bool all = false;
+        const auto &args = env->GetOpts({
+            { 'A', false, [&](const char *arg) { all = true; } },
+        });
         const auto path = TPath(args[0]).RealPath().ToString();
-        int ret = Api->UnlinkVolume(path, (args.size() > 1) ? args[1] : "");
-        if (ret)
-            PrintError("Can't unlink volume");
+        std::vector<Porto::Volume> vol;
+        int ret;
+
+        if (all) {
+            ret = Api->ListVolumes(path, "", vol);
+            if (ret || vol.size() != 1) {
+                PrintError("Cannot list volume");
+                return EXIT_FAILURE;
+            }
+
+            for (auto ct: vol[0].Containers) {
+                ret = Api->UnlinkVolume(path, ct);
+                if (ret) {
+                    PrintError("Cannot unlink volume from " + ct);
+                    break;
+                }
+            }
+        } else {
+            ret = Api->UnlinkVolume(path, (args.size() > 1) ? args[1] : "");
+            if (ret)
+                PrintError("Cannot unlink volume");
+        }
         return ret;
     }
 };
