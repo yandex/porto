@@ -167,7 +167,7 @@ static void ShouldHaveValidProperties(Porto::Connection &api, const string &name
     ExpectApiSuccess(api.GetProperty(name, "cpu_limit", v));
     ExpectEq(v, StringFormat("%dc", GetNumCores()));
     ExpectApiSuccess(api.GetProperty(name, "cpu_guarantee", v));
-    ExpectEq(v, "0.01c");
+    ExpectEq(v, "1c");
     if (KernelSupports(KernelFeature::CFQ)) {
         ExpectApiSuccess(api.GetProperty(name, "io_policy", v));
         ExpectEq(v, "normal");

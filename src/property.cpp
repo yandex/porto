@@ -380,7 +380,7 @@ public:
         auto c = GetContainer();
         if (c->IsRoot() || c->IsPortoRoot())
             return 1;
-        return 0.01;
+        return 1;
     }
 };
 
