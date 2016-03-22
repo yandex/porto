@@ -1588,6 +1588,14 @@ TError TContainer::SetProperty(const string &origProperty,
         error = ApplyDynamicProperties();
         if (error)
             return error;
+
+        if (property == P_NET_LIMIT || property == P_NET_GUARANTEE) {
+            error = UpdateTrafficClasses();
+            if (error) {
+                L_ERR() << "Cannot update tc : " << error << std::endl;
+                return error;
+            }
+        }
     }
 
     // Write KVS snapshot, otherwise it may grow indefinitely and on next
