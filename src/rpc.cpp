@@ -769,7 +769,7 @@ noinline TError Wait(TContext &context,
         rpc::TContainerResponse response;
         response.set_error(error.GetError());
         response.mutable_wait()->set_name(name);
-        SendReply(client, response, true);
+        SendReply(client, response, error || !name.empty());
     };
 
     auto waiter = std::make_shared<TContainerWaiter>(client, fn);
