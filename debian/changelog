@@ -1,3 +1,16 @@
+yandex-porto (2.8.3) unstable; urgency=medium
+
+  * portoctl: do not isolate network for shell -u root
+  * libporto: move into namespace Porto
+  * porto: ignore setting locked variables PORTO_HOST and PORTO_NAME
+  * portoctl: add connection timeout
+  * porto: do not log wait timeout responses
+  * portoctl: vunlink -A for unlinking from all containers
+  * porto: update description of container and volume properties
+  * porto: revert default cpu_guaratee=1c / cpu.shares=1024
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 22 Mar 2016 13:06:30 +0300
+
 yandex-porto (2.8.2) unstable; urgency=low
 
   * util/path: split Bind and BindRemount operations
