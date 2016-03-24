@@ -644,8 +644,25 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
 
     error = UpdateTrafficClasses();
     if (error) {
-        L_ERR() << "Can't create traffic classes: " << error << std::endl;
-        return error;
+        L_ACT() << "Rebuild network" << std::endl;
+
+        error = Net->UpdateInterfaces();
+        if (error)
+            L_ERR() << "Cannot update interfaces: " << error << std::endl;
+
+        error = Net->PrepareLinks();
+        if (error)
+            L_ERR() << "Cannot prepare interfaces: " << error << std::endl;
+
+        std::shared_ptr<TContainer> root;
+        if (!Holder->Get(ROOT_CONTAINER, root))
+            root->RebuildTC(Net);
+
+        error = UpdateTrafficClasses();
+        if (error) {
+            L_ERR() << "Network rebuild failed" << std::endl;
+            return error;
+        }
     }
 
     if (!IsRoot()) {
@@ -2199,6 +2216,23 @@ TError TContainer::UpdateTrafficClasses() {
         return Net->UpdateTrafficClasses(parentId, Id, prio, rate, ceil);
     }
     return TError::Success();
+}
+
+void TContainer::RebuildTC(std::shared_ptr<TNetwork> net) {
+
+    if (Net == net) {
+        TError error = UpdateTrafficClasses();
+        if (error)
+            L_ERR() << "Cannot rebuild tc for " << GetName()
+                    << " : " << error << std::endl;
+    }
+
+    for (auto iter : Children)
+        if (auto child = iter.lock())
+            if (child->GetState() == EContainerState::Running ||
+                child->GetState() == EContainerState::Meta)
+                child->RebuildTC(net);
+
 }
 
 TContainerWaiter::TContainerWaiter(std::shared_ptr<TClient> client,

@@ -209,6 +209,7 @@ public:
     void SyncStateWithCgroup(TScopedLock &holder_lock);
     void CleanupExpiredChildren();
     TError UpdateTrafficClasses();
+    void RebuildTC(std::shared_ptr<TNetwork> net);
 
     bool MayExit(int pid);
     bool MayRespawn();

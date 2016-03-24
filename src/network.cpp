@@ -607,8 +607,7 @@ TError TNetwork::UpdateTrafficClasses(int parent, int minor,
         std::map<std::string, uint64_t> &Prio,
         std::map<std::string, uint64_t> &Rate,
         std::map<std::string, uint64_t> &Ceil) {
-    TError error;
-    int retry = 1;
+    TError error, result;
 
     for (auto &i: Prio) {
         if (i.first != "default" && !InterfaceIndex(i.first))
@@ -625,7 +624,6 @@ TError TNetwork::UpdateTrafficClasses(int parent, int minor,
             L_WRN() <<  "Interface " + i.first + " not found" << std::endl;
     }
 
-again:
     for (auto &iface: ifaces) {
         auto name = iface.first;
         auto prio = (Prio.find(name) != Prio.end()) ? Prio[name] : Prio["default"];
@@ -636,19 +634,13 @@ again:
                                 TC_HANDLE(ROOT_TC_MAJOR, minor),
                                 prio, rate, ceil);
         if (error) {
-            if (retry--) {
-                L_WRN() << "Cannot add tc class: " << error
-                        << " Update interfaces and retry." << std::endl;
-                error = UpdateInterfaces();
-                if (error)
-                    return error;
-                goto again;
-            }
-            return error;
+            L_WRN() << "Cannot add tc class " << iface.first << " " << error << std::endl;
+            if (!result)
+                result = error;
         }
     }
 
-    return TError::Success();
+    return result;
 }
 
 TError TNetwork::RemoveTrafficClasses(int minor) {
