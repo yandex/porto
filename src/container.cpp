@@ -1174,7 +1174,10 @@ TError TContainer::PrepareResources(std::shared_ptr<TClient> client) {
 
     error = PrepareWorkDir();
     if (error) {
-        L_ERR() << "Cannot create working dir: " << error << std::endl;
+        if (error.GetErrno() == ENOSPC)
+            L() << "Cannot create working dir: " << error << std::endl;
+        else
+            L_ERR() << "Cannot create working dir: " << error << std::endl;
         FreeResources();
         return error;
     }
