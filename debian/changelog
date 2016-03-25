@@ -1,3 +1,16 @@
+yandex-porto (2.8.4) unstable; urgency=medium
+
+  * porto: update network limit and guarantee in runtime
+  * porto: warn in log about missing tc classes
+  * porto: rebuild tc classes if creation fails
+  * porto: add test for tc rebuild
+  * porto: do not log remove error if cgroup doesn't exist
+  * porto: log ENOSPC from PrepareWorkDir as notice
+  * porto: log attempt of changing locked variable as notice
+  * porto: less racy task cgroup fixup during restore
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 25 Mar 2016 17:10:21 +0300
+
 yandex-porto (2.8.3) unstable; urgency=medium
 
   * portoctl: do not isolate network for shell -u root
