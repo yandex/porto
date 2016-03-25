@@ -45,7 +45,7 @@ _portoctl ()
 	help)
 		COMPREPLY=( $(compgen -W "$_porto_commands" -- $cur) )
 		;;
-	create|destroy|start|stop|restart|pause|resume)
+	create|destroy|start|stop|restart|pause|resume|wait)
 		_porto_containers
 		;;
 	enter)
