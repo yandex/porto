@@ -482,13 +482,13 @@ TError TNetwork::GetTrafficCounters(int minor, ETclassStat stat,
             return Nl->Error(ret, "Cannot allocate class cache");
 
         cls = rtnl_class_get(cache, iface.second, handle);
-        if (!cls) {
-            nl_cache_free(cache);
-            return TError(EError::Unknown, "Cannot find class statistics for " + iface.first);
+        if (cls) {
+            result[iface.first] = rtnl_tc_get_stat(TC_CAST(cls), rtnlStat);
+            rtnl_class_put(cls);
+        } else {
+            L_WRN() << "Cannot find tc class " << minor << " at "
+                    << iface.second << ":" << iface.first << std::endl;
         }
-
-        result[iface.first] = rtnl_tc_get_stat(TC_CAST(cls), rtnlStat);
-        rtnl_class_put(cls);
         nl_cache_free(cache);
     }
 
