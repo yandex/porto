@@ -1872,17 +1872,22 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
                 LostAndRestored = true;
             } else {
                 /* Sweep all tasks from freezer cgroup into correct cgroups */
-                for (auto hy: Hierarchies) {
-                    auto correctCg = GetCgroup(*hy);
-
-                    for (pid_t pid: tasks) {
-                        TCgroup currentCg;
+                for (pid_t pid: tasks) {
+                    for (auto hy: Hierarchies) {
+                        TCgroup currentCg, correctCg = GetCgroup(*hy);
                         error = hy->TaskCgroup(pid, currentCg);
-                        if (!error && currentCg != correctCg) {
-                            L_WRN() << "Process " << pid << " in " << currentCg
-                                    << " while should be in " << correctCg << std::endl;
-                            (void)correctCg.Attach(pid);
-                        }
+                        if (error || currentCg == correctCg)
+                            continue;
+
+                        /* Recheck freezer cgroup */
+                        TCgroup currentFr;
+                        error = FreezerSubsystem.TaskCgroup(pid, currentFr);
+                        if (error || currentFr != freezerCg)
+                            continue;
+
+                        L_WRN() << "Process " << pid << " in " << currentCg
+                                << " while should be in " << correctCg << std::endl;
+                        (void)correctCg.Attach(pid);
                     }
                 }
             }
