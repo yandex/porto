@@ -77,7 +77,7 @@ void THelpCmd::Usage() {
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &w) == 0)
         termWidth = w.ws_col;
 
-    std::cerr << "Usage: " << program_invocation_short_name << " <command> [<args>]" << std::endl;
+    std::cerr << "Usage: " << program_invocation_short_name << " [-t|--timeout <seconds>] <command> [<args>]" << std::endl;
     std::cerr << std::endl;
     std::cerr << "Command list:" << std::endl;
 
@@ -253,6 +253,14 @@ void TCommandHandler::RegisterCommand(std::unique_ptr<ICmd> cmd) {
 }
 
 int TCommandHandler::HandleCommand(int argc, char *argv[]) {
+
+    if (argc > 2 && (std::string(argv[1]) == "-t" ||
+                     std::string(argv[1]) == "--timeout")) {
+        PortoApi.SetTimeout(atoi(argv[2]));
+        argc -= 2;
+        argv += 2;
+    }
+
     if (argc <= 1) {
         Usage(nullptr);
         return EXIT_FAILURE;
