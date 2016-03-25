@@ -73,7 +73,7 @@ TError TCgroup::Remove() const {
         }
     }
 
-    if (error)
+    if (error && (error.GetErrno() != ENOENT || Exists()))
         L_ERR() << "Cannot remove cgroup " << *this << " : " << error << std::endl;
 
     return error;
@@ -83,7 +83,7 @@ bool TCgroup::Has(const std::string &knob) const {
     if (!Subsystem)
         return false;
     return Knob(knob).Exists();
-    }
+}
 
 TError TCgroup::Get(const std::string &knob, std::string &value) const {
     if (!Subsystem)
