@@ -1,3 +1,11 @@
+yandex-porto (2.8.5) unstable; urgency=medium
+
+  * portoctl: add option for changing timeout and increase default to 600s
+  * portoctl: add bash completion for wait
+  * portoctl: remove default request timeout
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 28 Mar 2016 10:20:11 +0300
+
 yandex-porto (2.8.4) unstable; urgency=medium
 
   * porto: update network limit and guarantee in runtime
