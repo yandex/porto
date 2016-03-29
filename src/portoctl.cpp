@@ -407,6 +407,11 @@ err:
                 goto err;
         }
 
+        /* forward terminal only if all streams are tty */
+        if (ForwardTerminal)
+             ForwardTerminal = isatty(STDIN_FILENO) &&
+                 isatty(STDOUT_FILENO) && isatty(STDERR_FILENO);
+
         if (ForwardTerminal) {
             error = OpenPty();
             if (error)
@@ -1159,7 +1164,7 @@ public:
         TError error;
 
         launcher.WeakContainer = true;
-        launcher.ForwardTerminal = isatty(STDIN_FILENO);
+        launcher.ForwardTerminal = true;
         launcher.ForwardStreams = true;
         launcher.WaitExit = true;
 
@@ -1232,7 +1237,7 @@ public:
         }
 
         launcher.WeakContainer = true;
-        launcher.ForwardTerminal = isatty(STDIN_FILENO);
+        launcher.ForwardTerminal = true;
         launcher.ForwardStreams = true;
         launcher.WaitExit = true;
 
