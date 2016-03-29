@@ -33,6 +33,7 @@ constexpr auto PORTO_ROOT_CONTAINER_ID = 3;
 
 constexpr auto ROOT_CONTAINER = "/";
 constexpr auto DOT_CONTAINER = ".";
+constexpr auto SELF_CONTAINER = "self";
 constexpr auto PORTO_ROOT_CONTAINER = "/porto";
 
 constexpr auto PORTO_ROOT_CGROUP = "/porto";

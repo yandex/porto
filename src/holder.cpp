@@ -111,6 +111,9 @@ TError TContainerHolder::ValidName(const std::string &name) const {
                     return TError(EError::InvalidValue,
                             "container name too long: '" +
                             name.substr(first, i - first) + "'");
+                if (name.substr(first, i - first) == SELF_CONTAINER)
+                    return TError(EError::InvalidValue,
+                            "container name 'self' is reserved");
                 first = i + 1;
             case 'a'...'z':
             case 'A'...'Z':

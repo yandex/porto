@@ -229,7 +229,13 @@ TError TClient::ResolveRelativeName(const std::string &relative_name,
     if (relative_name == ROOT_CONTAINER ||
             relative_name == PORTO_ROOT_CONTAINER)
         absolute_name = relative_name;
-    else if (relative_name == DOT_CONTAINER) {
+    else if (relative_name == SELF_CONTAINER)
+        absolute_name = base->GetName();
+    else if (StringStartsWith(relative_name,
+                std::string(SELF_CONTAINER) + "/")) {
+        absolute_name = (base->IsRoot() ? "" : base->GetName() + "/") +
+            relative_name.substr(std::string(SELF_CONTAINER).length() + 1);
+    } else if (relative_name == DOT_CONTAINER) {
         size_t off = ns.rfind('/');
         if (off != std::string::npos)
             absolute_name = ns.substr(0, off);
