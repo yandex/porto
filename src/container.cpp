@@ -691,13 +691,16 @@ TError TContainer::GetEnvironment(TEnv &env) {
     env.SetEnv("PORTO_NAME", GetName(), true, true);
     env.SetEnv("PORTO_HOST", GetHostName(), true, true);
 
-    /* inherit environment from all parent containers */
+    /* inherit environment from all parent application containers */
     bool overwrite = true;
     for (auto ct = this; ct; ct = ct->Parent.get()) {
         TError error = env.Parse(ct->Prop->Get<TStrList>(P_ENV), overwrite);
         if (error && overwrite)
             return error;
         overwrite = false;
+
+        if (ct->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
+            break;
     }
 
     return TError::Success();
