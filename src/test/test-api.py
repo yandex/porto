@@ -117,6 +117,15 @@ assert c.FindLayer(layer_name).name == layer_name
 
 assert Catch(c.CreateVolume, volume_path) == porto.exceptions.InvalidValue
 os.mkdir(volume_path)
+w = c.CreateVolume(volume_path, layers=[layer_name])
+assert w.path == volume_path
+assert c.FindVolume(volume_path).path == volume_path
+assert len(w.GetLayers()) == 1
+assert w.GetLayers()[0].name == layer_name
+f = file(w.path + "/file", 'r+')
+assert f.read() == "test"
+w.Unlink()
+
 w = c.CreateVolume(volume_path, layers=[layer_name], space_limit=str(volume_size))
 assert w.path == volume_path
 assert c.FindVolume(volume_path).path == volume_path

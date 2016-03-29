@@ -987,12 +987,12 @@ TError TVolume::Configure(const TPath &path, const TCred &creator_cred,
 
     /* Autodetect volume backend */
     if (!Config->HasValue(V_BACKEND)) {
-        if (Config->HasValue(V_LAYERS) && TVolumeOverlayBackend::Supported())
+        if (HaveQuota() && !TVolumeNativeBackend::Supported())
+            error = Config->Set<std::string>(V_BACKEND, "loop");
+        else if (Config->HasValue(V_LAYERS) && TVolumeOverlayBackend::Supported())
             error = Config->Set<std::string>(V_BACKEND, "overlay");
         else if (TVolumeNativeBackend::Supported())
             error = Config->Set<std::string>(V_BACKEND, "native");
-        else if (HaveQuota())
-            error = Config->Set<std::string>(V_BACKEND, "loop");
         else
             error = Config->Set<std::string>(V_BACKEND, "plain");
         if (error)
