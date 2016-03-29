@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <csignal>
 
-#include "portod.hpp"
 #include "version.hpp"
 #include "statistics.hpp"
 #include "rpc.hpp"
@@ -114,13 +113,6 @@ static void DaemonShutdown(bool master, int ret) {
     }
 }
 
-static void RemoveRpcServer(const string &path) {
-    TPath f(path);
-    TError error = f.Unlink();
-    if (error)
-        L_ERR() << "Can't remove socket file: " << error << std::endl;
-}
-
 struct TRequest {
     TContext *Context;
     std::shared_ptr<TClient> Client;
@@ -142,8 +134,69 @@ public:
     }
 };
 
+static TError CreatePortoSocket() {
+    TPath path(PORTO_SOCKET_PATH);
+    struct sockaddr_un addr;
+    TScopedFd fd;
+    TError error;
+
+    if (dup2(PORTO_SK_FD, PORTO_SK_FD) == PORTO_SK_FD) {
+        struct stat fd_stat, sk_stat;
+
+        if (fstat(PORTO_SK_FD, &fd_stat) || !S_ISSOCK(fd_stat.st_mode))
+            Crash();
+
+        if (!path.StatStrict(sk_stat) && S_ISSOCK(sk_stat.st_mode)) {
+            time_t now = time(nullptr);
+            L_SYS() << "Reuse porto socket: "
+                    << "inode " << fd_stat.st_ino << ":" << sk_stat.st_ino
+                    << " age " << now - fd_stat.st_ctime << ":" << now - sk_stat.st_ctime
+                    << std::endl;
+            return TError::Success();
+        }
+
+        L_WRN() << "Unlinked porto socket. Recreating..." << std::endl;
+    }
+
+    fd = socket(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    if (fd.GetFd() < 0)
+        return TError(EError::Unknown, errno, "socket()");
+
+    memset(&addr, 0, sizeof(addr));
+    addr.sun_family = AF_UNIX;
+    strncpy(addr.sun_path, path.c_str(), sizeof(addr.sun_path) - 1);
+
+    (void)path.Unlink();
+
+    if (fchmod(fd.GetFd(), PORTO_SOCKET_MODE) < 0)
+        return TError(EError::Unknown, errno, "fchmod()");
+
+    if (bind(fd.GetFd(), (struct sockaddr *) &addr, sizeof(addr)) < 0)
+        return TError(EError::Unknown, errno, "bind()");
+
+    error = path.Chown(0, GetPortoGroupId());
+    if (error)
+        return error;
+
+    error = path.Chmod(PORTO_SOCKET_MODE);
+    if (error)
+        return error;
+
+    if (listen(fd.GetFd(), 0) < 0)
+        return TError(EError::Unknown, errno, "listen()");
+
+    if (dup2(fd.GetFd(), PORTO_SK_FD) != PORTO_SK_FD)
+        return TError(EError::Unknown, errno, "dup2()");
+
+    return TError::Success();
+}
+
 static bool AnotherInstanceRunning(const string &path) {
     int fd;
+
+    if (dup2(PORTO_SK_FD, PORTO_SK_FD) == PORTO_SK_FD)
+        return false;
+
     if (ConnectToRpcServer(path, fd))
         return false;
 
@@ -214,64 +267,13 @@ static void StopWorkers(TContext &context, TRpcWorker &worker) {
     worker.Stop();
 }
 
-static TError CreateRpcServer(const std::string &path, const int mode,
-                              const int uid, const int gid, int &fd)
-{
-    struct sockaddr_un my_addr;
-
-    memset(&my_addr, 0, sizeof(struct sockaddr_un));
-
-    fd = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK, 0);
-    if (fd < 0)
-        return TError(EError::Unknown, errno, "socket()");
-
-    my_addr.sun_family = AF_UNIX;
-    strncpy(my_addr.sun_path, path.c_str(), sizeof(my_addr.sun_path) - 1);
-
-    (void)unlink(path.c_str());
-    if (fchmod(fd, mode) < 0) {
-        close(fd);
-        return TError(EError::Unknown, errno, "fchmod(" + path + ", " + std::to_string(mode) + ")");
-    }
-
-    if (::bind(fd, (struct sockaddr *) &my_addr,
-             sizeof(struct sockaddr_un)) < 0) {
-        close(fd);
-        return TError(EError::Unknown, errno, "bind(" + path + ")");
-    }
-
-    if (chown(path.c_str(), uid, gid) < 0) {
-        close(fd);
-        return TError(EError::Unknown, errno, "chown(" + path + ", " + std::to_string(uid) + ", " + std::to_string(gid) + ")");
-    }
-
-    if (listen(fd, 0) < 0) {
-        close(fd);
-        return TError(EError::Unknown, errno, "listen()");
-    }
-
-    return TError::Success();
-}
-
 static int SlaveRpc(TContext &context, TRpcWorker &worker) {
     int ret = 0;
-    int sfd;
     std::map<int, std::shared_ptr<TClient>> clients;
     bool accept_paused = false;
+    TError error;
 
-    TCred cred(getuid(), getgid());
-    TError error = GroupId(PORTO_GROUP_NAME, cred.Gid);
-    if (error)
-        L_ERR() << "Can't get gid for " << PORTO_GROUP_NAME << ": " << error << std::endl;
-
-    error = CreateRpcServer(PORTO_SOCKET_PATH, PORTO_SOCKET_MODE,
-                            cred.Uid, cred.Gid, sfd);
-    if (error) {
-        L_ERR() << "Can't create RPC server: " << error.GetMsg() << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    auto AcceptSource = std::make_shared<TEpollSource>(context.EpollLoop, sfd);
+    auto AcceptSource = std::make_shared<TEpollSource>(context.EpollLoop, PORTO_SK_FD);
     error = context.EpollLoop->AddSource(AcceptSource);
     if (error) {
         L_ERR() << "Can't add RPC server fd to epoll: " << error << std::endl;
@@ -362,7 +364,7 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                         L_WRN() << "Unexpected signal: " << sigInfo.ssi_signo << std::endl;
                         break;
                 }
-            } else if (source->Fd == sfd) {
+            } else if (source->Fd == PORTO_SK_FD) {
                 if (!accept_paused && clients.size() >= config().daemon().max_clients()) {
                     L_WRN() << "Pause accepting connections" << std::endl;
                     context.EpollLoop->RemoveSource(AcceptSource->Fd);
@@ -371,7 +373,7 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                 }
 
                 auto client = std::make_shared<TClient>(context.EpollLoop);
-                error = client->AcceptConnection(context, sfd);
+                error = client->AcceptConnection(context, PORTO_SK_FD);
                 if (!error)
                     error = context.EpollLoop->AddSource(client);
                 if (!error)
@@ -431,8 +433,6 @@ exit:
         c.second->CloseConnection();
     clients.clear();
 
-    close(sfd);
-
     if (discardState)
         context.Destroy();
 
@@ -487,6 +487,8 @@ static void postChildFork(void) {
 }
 
 static int SlaveMain() {
+    TError error;
+
     SetDieOnParentExit(SIGKILL);
 
     int ret = pthread_atfork(preParentFork, postParentFork, postChildFork);
@@ -515,6 +517,17 @@ static int SlaveMain() {
         return ret;
     }
 
+    error = CreatePortoSocket();
+    if (error) {
+        L_ERR() << "Cannot create porto socket: " << error << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    if (fcntl(PORTO_SK_FD, F_SETFD, FD_CLOEXEC) < 0) {
+        L_ERR() << "Can't set close-on-exec flag on PORTO_SK_FD: " << strerror(errno) << std::endl;
+        return EXIT_FAILURE;
+    }
+
     if (fcntl(REAP_EVT_FD, F_SETFD, FD_CLOEXEC) < 0) {
         L_ERR() << "Can't set close-on-exec flag on REAP_EVT_FD: " << strerror(errno) << std::endl;
         if (!failsafe)
@@ -529,7 +542,7 @@ static int SlaveMain() {
 
     umask(0);
 
-    TError error = SetOomScoreAdj(0);
+    error = SetOomScoreAdj(0);
     if (error)
         L_ERR() << "Can't adjust OOM score: " << error << std::endl;
 
@@ -582,8 +595,6 @@ static int SlaveMain() {
 
         ret = SlaveRpc(context, worker);
         L_SYS() << "Shutting down..." << std::endl;
-
-        RemoveRpcServer(PORTO_SOCKET_PATH);
     } catch (string s) {
         L_ERR() << "EXCEPTION: " << s << std::endl;
         Crash();
@@ -914,6 +925,12 @@ static int MasterMain(bool respawn) {
     if (error)
         L_ERR() << "Can't adjust OOM score: " << error << std::endl;
 
+    error = CreatePortoSocket();
+    if (error) {
+        L_ERR() << "Cannot create porto socket: " << error << std::endl;
+        return EXIT_FAILURE;
+    }
+
     map<int,int> exited;
 
     while (true) {
@@ -934,6 +951,10 @@ static int MasterMain(bool respawn) {
         if (!respawn)
             break;
     }
+
+    error = TPath(PORTO_SOCKET_PATH).Unlink();
+    if (error)
+        L_ERR() << "Cannot unlink socket file: " << error << std::endl;
 
     DaemonShutdown(true, ret);
 

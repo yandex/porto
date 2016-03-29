@@ -28,8 +28,6 @@
 #include "client.hpp"
 #include "stream.hpp"
 
-#include "portod.hpp"
-
 extern "C" {
 #include <sys/types.h>
 #include <unistd.h>

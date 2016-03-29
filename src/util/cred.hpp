@@ -16,6 +16,8 @@ std::string GroupName(gid_t gid);
 
 void InitCred();
 
+extern gid_t GetPortoGroupId();
+
 extern int LastCapability;
 
 struct TCred {

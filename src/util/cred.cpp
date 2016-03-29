@@ -11,6 +11,11 @@ extern "C" {
 
 static gid_t PortoGroup;
 
+gid_t GetPortoGroupId() {
+    PORTO_ASSERT(PortoGroup);
+    return PortoGroup;
+}
+
 static size_t PwdBufSize = sysconf(_SC_GETPW_R_SIZE_MAX) > 0 ?
                            sysconf(_SC_GETPW_R_SIZE_MAX) : 16384;
 

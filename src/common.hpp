@@ -43,6 +43,10 @@ constexpr auto PORTO_GROUP_NAME = "porto";
 constexpr auto PORTO_SOCKET_PATH = "/run/portod.socket";
 constexpr auto PORTO_SOCKET_MODE = 0666;
 
+constexpr int  REAP_EVT_FD = 128;
+constexpr int  REAP_ACK_FD = 129;
+constexpr int  PORTO_SK_FD = 130;
+
 constexpr auto PORTO_VERSION_FILE = "/run/portod.version";
 
 constexpr auto CONTAINER_NAME_MAX = 128;
