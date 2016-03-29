@@ -52,9 +52,9 @@ include_directories(${CURSES_INCLUDE_DIR})
 set(PYTHON_SOURCES "")
 if(ENABLE_PYTHON)
 	add_custom_command(
-		OUTPUT "api/python/porto/rpc_pb2.py"
+		OUTPUT ${CMAKE_CURRENT_SOURCE_DIR}/api/python/porto/rpc_pb2.py
 		COMMAND ${PROTOBUF_PROTOC_EXECUTABLE} ARGS --python_out=${CMAKE_CURRENT_SOURCE_DIR}/api/python/porto/ --proto_path=${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/rpc.proto
-		DEPENDS rpc.proto
+		DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/rpc.proto
 		VERBATIM)
 	set(PYTHON_SOURCES "api/python/porto/rpc_pb2.py")
 	include(FindPythonInterp)
