@@ -1,3 +1,18 @@
+yandex-porto (2.8.6) unstable; urgency=medium
+
+  * porto: add pseudo-container "self" as an alias for client container
+  * portoctl: forward terminal only if all streams are tty
+  * api/python: fix protobuf generation
+  * porto/volume: always use loop by default if quota requested but not supported
+  * porto: do not inherit parent environment by os container
+  * porto: reuse server socket during reload and upgrade
+  * selftest: check total_max_rss instead of max_rss
+  * porto: make absolute names really absolute
+  * porto: unlock herarchy during start
+  * portoctl: show busy containers in list
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Wed, 30 Mar 2016 12:11:20 +0300
+
 yandex-porto (2.8.5) unstable; urgency=medium
 
   * portoctl: add option for changing timeout and increase default to 600s
