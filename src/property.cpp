@@ -147,6 +147,11 @@ public:
         TStringValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_PORTO_NAMESPACE,
                         "Porto containers namespace (container name prefix) (dynamic)") {}
+    std::string GetDefault() const override {
+        if (GetContainer()->IsRoot())
+            return std::string(PORTO_ROOT_CONTAINER) + "/";
+        return "";
+    }
 };
 
 class TRootProperty : public TStringValue, public TContainerValue {

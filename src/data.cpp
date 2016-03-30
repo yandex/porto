@@ -38,7 +38,23 @@ public:
                         "container name including porto namespaces (ro)") {};
 
     std::string GetDefault() const override {
-        return GetContainer()->GetName();
+        auto ct = GetContainer();
+        if (ct->IsRoot() || ct->IsPortoRoot())
+            return ct->GetName();
+        return std::string(PORTO_ROOT_CONTAINER) + "/" + ct->GetName();
+    }
+};
+
+class TAbsoluteNamespaceData : public TStringValue, public TContainerValue {
+public:
+    TAbsoluteNamespaceData() :
+        TStringValue(READ_ONLY_VALUE),
+        TContainerValue(D_ABSOLUTE_NAMESPACE,
+                        "container namespace including parent namespaces (ro)") {};
+
+    std::string GetDefault() const override {
+        return std::string(PORTO_ROOT_CONTAINER) + "/" +
+                        GetContainer()->GetPortoNamespace();
     }
 };
 
@@ -498,6 +514,7 @@ void RegisterData(std::shared_ptr<TRawValueMap> m,
     const std::vector<TValue *> data = {
         new TStateData,
         new TAbsoluteNameData,
+        new TAbsoluteNamespaceData,
         new TOomKilledData,
         new TParentData,
         new TRespawnCountData,

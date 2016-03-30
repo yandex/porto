@@ -235,6 +235,13 @@ TError TClient::ResolveRelativeName(const std::string &relative_name,
                 std::string(SELF_CONTAINER) + "/")) {
         absolute_name = (base->IsRoot() ? "" : base->GetName() + "/") +
             relative_name.substr(std::string(SELF_CONTAINER).length() + 1);
+    } else if (StringStartsWith(relative_name,
+                std::string(PORTO_ROOT_CONTAINER) + "/")) {
+        absolute_name = relative_name.substr(
+                std::string(PORTO_ROOT_CONTAINER).length() + 1);
+        if (!StringStartsWith(absolute_name, ns))
+            return TError(EError::Permission,
+                    "Absolute container name out of current namespace");
     } else if (relative_name == DOT_CONTAINER) {
         size_t off = ns.rfind('/');
         if (off != std::string::npos)

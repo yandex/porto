@@ -1248,7 +1248,7 @@ static void TestContainerNamespaces(Porto::Connection &api) {
     ExpectApiSuccess(api.Start("c/d"));
     WaitContainer(api, "c/d");
     ExpectApiSuccess(api.GetData("c/second-prefix-test", "absolute_name", val));
-    ExpectEq(val, "c/second-prefix-test");
+    ExpectEq(val, "/porto/c/second-prefix-test");
     ExpectApiSuccess(api.Stop("c/d"));
     ExpectApiSuccess(api.Destroy("c/d"));
     ExpectApiSuccess(api.Destroy("c"));
@@ -3008,6 +3008,7 @@ static void TestRoot(Porto::Connection &api) {
 
     vector<string> data = {
         "absolute_name",
+        "absolute_namespace",
         "state",
         "oom_killed",
         "respawn_count",
