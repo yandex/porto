@@ -620,7 +620,7 @@ static bool HaveMaxRss() {
         if (tokens.size() != 2)
             continue;
 
-        if (tokens[0] == "max_rss")
+        if (tokens[0] == "total_max_rss")
             return true;
     }
 
