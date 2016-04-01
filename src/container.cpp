@@ -644,6 +644,7 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
     if (error) {
         L_ACT() << "Rebuild network" << std::endl;
 
+        auto net_lock = Net->ScopedLock();
         error = Net->UpdateInterfaces();
         if (error)
             L_ERR() << "Cannot update interfaces: " << error << std::endl;
@@ -651,6 +652,7 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
         error = Net->PrepareLinks();
         if (error)
             L_ERR() << "Cannot prepare interfaces: " << error << std::endl;
+        net_lock.unlock();
 
         std::shared_ptr<TContainer> root;
         if (!Holder->Get(ROOT_CONTAINER, root))
