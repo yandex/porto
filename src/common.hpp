@@ -52,5 +52,6 @@ constexpr auto PORTO_VERSION_FILE = "/run/portod.version";
 constexpr auto CONTAINER_NAME_MAX = 128;
 constexpr auto CONTAINER_PATH_MAX = 200;
 constexpr auto CONTAINER_ID_MAX = 16384;
+constexpr auto CONTAINER_LEVEL_MAX = 7;
 
 extern void AckExitStatus(int pid);

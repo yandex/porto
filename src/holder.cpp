@@ -172,6 +172,9 @@ TError TContainerHolder::Create(TScopedLock &holder_lock, const std::string &nam
     if (!parent && name != ROOT_CONTAINER)
         return TError(EError::InvalidValue, "invalid parent container");
 
+    if (parent && parent->GetLevel() == CONTAINER_LEVEL_MAX)
+        return TError(EError::InvalidValue, "You shall not go deeper!");
+
     if (parent && !parent->IsRoot() && !parent->IsPortoRoot()) {
         error = parent->CheckPermission(cred);
         if (error)
