@@ -416,8 +416,8 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
 
                 if ((ev.events & EPOLLHUP) || (ev.events & EPOLLERR) ||
                         (error && error.GetError() != EError::Queued)) {
-                    client->CloseConnection();
                     clients.erase(source->Fd);
+                    client->CloseConnection();
                 }
             } else {
                 L_WRN() << "Unknown event " << source->Fd << std::endl;
