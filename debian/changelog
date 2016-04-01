@@ -1,3 +1,12 @@
+yandex-porto (2.8.7) unstable; urgency=medium
+
+  * portod: fix leak of client slots
+  * task: close other end of control unix socket if fork fails
+  * network: lock network while reconstructing interfaces
+  * porto: limit maximum container nesting level
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 01 Apr 2016 13:14:42 +0300
+
 yandex-porto (2.8.6) unstable; urgency=medium
 
   * porto: add pseudo-container "self" as an alias for client container
