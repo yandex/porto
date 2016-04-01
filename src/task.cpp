@@ -668,6 +668,7 @@ TError TTask::Start() {
 
     pid_t forkPid = fork();
     if (forkPid < 0) {
+        Env->Sock.Close();
         TError error(EError::Unknown, errno, "fork()");
         L() << "Can't spawn child: " << error << std::endl;
         return error;
