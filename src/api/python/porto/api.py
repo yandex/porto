@@ -95,7 +95,11 @@ class _RPC(object):
         try:
             buf = ""
             while len(buf) < count:
-                buf += self.sock.recv(count - len(buf), flags)
+                got = self.sock.recv(count - len(buf), flags)
+                if got:
+                    buf += got
+                else:
+                    raise exceptions.SocketError("Got EOF after %d bytes, want %d bytes".format(len(buf), count))
             return buf
         except socket.timeout:
             raise exceptions.SocketTimeout("Got timeout: {}".format(self.socket_timeout))
