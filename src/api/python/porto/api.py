@@ -1,3 +1,4 @@
+import os
 import socket
 import threading
 
@@ -93,10 +94,15 @@ class _RPC(object):
 
     def _recv(self, count, flags=0):
         try:
-            buf = ""
-            while len(buf) < count:
-                buf += self.sock.recv(count - len(buf), flags)
-            return buf
+            buf = []
+            l = 0
+            while l < count:
+                piece = self.sock.recv(count - l, flags)
+                if len(piece) == 0:  # this means that socket is in invalid state
+                    raise socket.error(socket.errno.ECONNRESET, os.strerror(socket.errno.ECONNRESET))
+                buf.append(piece)
+                l += len(piece)
+            return ''.join(buf)
         except socket.timeout:
             raise exceptions.SocketTimeout("Got timeout: {}".format(self.socket_timeout))
         except socket.error as e:
@@ -136,8 +142,6 @@ class _RPC(object):
                 length = _DecodeVarint32(buf, 0)
                 resp = rpc_pb2.TContainerResponse()
                 buf += self._recv(length[0])
-            except:
-                raise
             finally:
                 if self.socket_timeout != self.timeout:
                     if self.sock is not None:
