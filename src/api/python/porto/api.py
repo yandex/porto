@@ -80,7 +80,8 @@ class _RPC(object):
             raise exceptions.SocketError("Cannot connect to {}: {}".format(self.socket_path, e))
 
     def disconnect(self):
-        self.sock.close()
+        if self.sock is not None:
+            self.sock.close()
         self.sock = None
 
     def _sendall(self, data, flags=0):
