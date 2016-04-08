@@ -31,8 +31,8 @@ pre-start script
 
 	# if there is cgroup-bin or cgroup-lite installed
 	# we need to wait while it mounts sysfs and controllers
-	timeout=60
-	for service in cgred cgroup-lite; do if status $service; then
+	timeout=360
+	for service in cgred cgroup-lite yandex-networking; do if status $service; then
 		for i in `seq $timeout`; do
 			if status $service | grep -q "^$service start/running" > /dev/null; then
 				break
