@@ -1,3 +1,18 @@
+yandex-porto (2.8.8) unstable; urgency=medium
+
+  [ Vsevolod Velichko ]
+  * api/python: invalidate connection on read failure
+  * api/python: check on disconnect if sock is already removed
+
+  [ Konstantin Khlebnikov ]
+  * debian/yandex-porto.upstart: wait for yandex-networking
+  * client: always log client fd
+  * client: warn if request comes before previous response
+  * client: handle zero send return at fastpath
+  * client: ignore error if client has died before identification
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Mon, 11 Apr 2016 13:47:50 +0300
+
 yandex-porto (2.8.7) unstable; urgency=medium
 
   * portod: fix leak of client slots
