@@ -54,7 +54,7 @@ TError TClient::AcceptConnection(TContext &context, int listenFd) {
     }
 
     if (Verbose)
-        L() << "Client " << Fd << " connected : " << *this << std::endl;
+        L() << "Client connected: " << *this << std::endl;
 
     return TError::Success();
 }
@@ -66,7 +66,7 @@ void TClient::CloseConnection() {
         EpollLoop->RemoveSource(Fd);
         ConnectionTime = GetCurrentTimeMs() - ConnectionTime;
         if (Verbose)
-            L() << "Client " << Fd << " disconnected : " << *this
+            L() << "Client disconnected: " << *this
                 << " : " << ConnectionTime << " ms" <<  std::endl;
         close(Fd);
         Fd = -1;
@@ -349,10 +349,10 @@ TError TClient::QueueResponse(rpc::TContainerResponse &response) {
 std::ostream& operator<<(std::ostream& stream, TClient& client) {
     if (client.FullLog) {
         client.FullLog = false;
-        stream << client.Comm << "(" << client.Pid << ") "
+        stream << client.Fd << ":" <<  client.Comm << "(" << client.Pid << ") "
                << client.Cred << " " << client.GetContainerName();
     } else {
-        stream << client.Comm << "(" << client.Pid << ")";
+        stream << client.Fd << ":" << client.Comm << "(" << client.Pid << ")";
     }
     return stream;
 }
