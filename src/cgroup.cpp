@@ -282,7 +282,7 @@ TError TSubsystem::TaskCgroup(pid_t pid, TCgroup &cgroup) const {
         fclose(file);
     }
 
-    return TError(EError::Unknown, "Cannot find " + Type +
+    return TError(EError::Unknown, errno, "Cannot find " + Type +
                     " cgroup for process " + std::to_string(pid));
 }
 

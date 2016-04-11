@@ -378,8 +378,6 @@ static int SlaveRpc(TContext &context, TRpcWorker &worker) {
                     error = context.EpollLoop->AddSource(client);
                 if (!error)
                     clients[client->Fd] = client;
-                else if (error.GetError() != EError::Permission)
-                    L_ERR() << "Cannot accept client: " << error << std::endl;
             } else if (source->Fd == REAP_EVT_FD) {
                 // we handled all events from the master before events
                 // from the clients (so clients see updated view of the

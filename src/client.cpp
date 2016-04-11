@@ -41,9 +41,10 @@ TError TClient::AcceptConnection(TContext &context, int listenFd) {
     Fd = accept4(listenFd, (struct sockaddr *) &peer_addr,
                   &peer_addr_size, SOCK_NONBLOCK | SOCK_CLOEXEC);
     if (Fd < 0) {
-        if (errno == EAGAIN)
-            return TError::Success(); //FIXME
-        return TError(EError::Unknown, errno, "accept4()");
+        error = TError(EError::Unknown, errno, "accept4()");
+        if (error.GetErrno() != EAGAIN)
+            L_WRN() << "Cannot accept client: " << error << std::endl;
+        return error;
     }
 
     error = IdentifyClient(*context.Cholder, true);
@@ -127,7 +128,7 @@ TError TClient::IdentifyClient(TContainerHolder &holder, bool initial) {
         Comm.resize(Comm.length() - 1); /* cut \n at the end */
 
     error = LoadGroups();
-    if (error)
+    if (error && error.GetErrno() != ENOENT)
         L_WRN() << "Cannot load supplementary group list" << Pid
                 << " : " << error << std::endl;
 
@@ -135,11 +136,11 @@ TError TClient::IdentifyClient(TContainerHolder &holder, bool initial) {
 
     std::shared_ptr<TContainer> container;
     error = holder.FindTaskContainer(Pid, container);
-    if (error) {
+    if (error && error.GetErrno() != ENOENT)
         L_WRN() << "Cannot identify container of pid " << Pid
                 << " : " << error << std::endl;
+    if (error)
         return error;
-    }
 
     if (!container->Prop->Get<bool>(P_ENABLE_PORTO))
         return TError(EError::Permission, "Porto disabled in container " + container->GetName());
