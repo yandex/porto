@@ -264,6 +264,11 @@ TError TClient::GetClientContainer(std::shared_ptr<TContainer> &container) const
 TError TClient::ReadRequest(rpc::TContainerRequest &request) {
     TScopedLock lock(Mutex);
 
+    if (Processing) {
+        L_WRN() << "Client request before response: " << *this << std::endl;
+        return TError::Success();
+    }
+
     if (Fd < 0)
         return TError(EError::Unknown, "Connection closed");
 
@@ -303,6 +308,7 @@ TError TClient::ReadRequest(rpc::TContainerRequest &request) {
     if (Offset > Length)
         return TError(EError::Unknown, "garbage after request");
 
+    Processing = true;
     return EpollLoop->StopInput(Fd);
 }
 
@@ -320,6 +326,7 @@ TError TClient::SendResponse(bool first) {
 
     if (Offset >= Length) {
         Length = Offset = 0;
+        Processing = false;
         return EpollLoop->StartInput(Fd);
     }
 

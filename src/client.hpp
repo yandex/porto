@@ -68,6 +68,7 @@ private:
     std::string Comm;
     uint64_t ConnectionTime;
     uint64_t RequestStartMs;
+    bool Processing = false;
 
     TError LoadGroups();
 
