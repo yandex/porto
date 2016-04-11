@@ -278,8 +278,10 @@ TError TClient::ReadRequest(rpc::TContainerRequest &request) {
     ssize_t len = recv(Fd, &Buffer[Offset], Buffer.size() - Offset, MSG_DONTWAIT);
     if (len > 0)
         Offset += len;
-    else if (len == 0 || (errno != EAGAIN && errno != EWOULDBLOCK))
-        return TError(EError::Unknown, len ? errno : EIO, "recv request failed");
+    else if (len == 0)
+        return TError(EError::Unknown, "recv return zero");
+    else if (errno != EAGAIN && errno != EWOULDBLOCK)
+        return TError(EError::Unknown, errno, "recv request failed");
 
     if (Length && Offset < Length)
         return TError::Queued();
@@ -321,8 +323,11 @@ TError TClient::SendResponse(bool first) {
     ssize_t len = send(Fd, &Buffer[Offset], Length - Offset, MSG_DONTWAIT);
     if (len > 0)
         Offset += len;
-    else if (len == 0 || (errno != EAGAIN && errno != EWOULDBLOCK))
-        return TError(EError::Unknown, len ? errno : EIO, "send response failed");
+    else if (len == 0) {
+        if (!first)
+            return TError(EError::Unknown, "send return zero");
+    } else if (errno != EAGAIN && errno != EWOULDBLOCK)
+        return TError(EError::Unknown, errno, "send response failed");
 
     if (Offset >= Length) {
         Length = Offset = 0;
