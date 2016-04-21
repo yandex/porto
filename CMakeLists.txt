@@ -4,7 +4,7 @@ PROJECT(yandex-porto)
 
 OPTION(ENABLE_TEST "Enables building portotest utility" ON)
 OPTION(ENABLE_PYTHON "Enables building python API" ON)
-OPTION(USE_SYSTEM_LIBNL "Use system libnl" OFF)
+OPTION(USE_SYSTEM_LIBNL "Use system libnl" ON)
 OPTION(ENABLE_ASAN "Enables address sanitizer" OFF)
 
 if(NOT CMAKE_BUILD_TYPE OR CMAKE_BUILD_TYPE MATCHES None)
