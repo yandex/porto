@@ -72,6 +72,7 @@ message TCfg {
 		optional string chroot_porto_dir = 14;
 		optional bool scoped_unlock = 15 /* [deprecated=true] */;
 		optional uint32 start_timeout_ms = 16;
+		optional bool enable_smart = 17;
 	}
 
 	message TPrivilegesCfg {

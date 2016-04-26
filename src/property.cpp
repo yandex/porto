@@ -355,14 +355,6 @@ public:
         if (value != "normal" && value != "rt" && value != "idle")
             return TError(EError::InvalidValue, "invalid policy");
 
-        if (value == "rt") {
-            if (!CpuSubsystem.SupportSmart())
-                return TError(EError::NotSupported, "invalid kernel (no Yandex extensions)");
-        }
-
-        if (value == "idle")
-            return TError(EError::NotSupported, "not implemented");
-
         return TError::Success();
     }
 };
@@ -372,10 +364,7 @@ public:
     TCpuLimitProperty() :
         TCpusValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_CPU_LIMIT,
-                        "CPU limit: 0-100.0 [%] | 0.0c-<CPUS>c [cores] (dynamic)") {
-        if (!CpuSubsystem.SupportLimit())
-            SetFlag(UNSUPPORTED_FEATURE);
-    }
+                "CPU limit: 0-100.0 [%] | 0.0c-<CPUS>c [cores] (dynamic)") { }
 
     double GetDefault() const override {
         return GetNumCores();
@@ -387,17 +376,7 @@ public:
     TCpuGuaranteeProperty() :
         TCpusValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
         TContainerValue(P_CPU_GUARANTEE,
-                        "CPU guarantee: 0-100.0 [%] | 0.0c-<CPUS>c [cores] (dynamic)") {
-        if (!CpuSubsystem.SupportGuarantee())
-            SetFlag(UNSUPPORTED_FEATURE);
-    }
-
-    double GetDefault() const override {
-        auto c = GetContainer();
-        if (c->IsRoot() || c->IsPortoRoot())
-            return 1;
-        return 1;
-    }
+                "CPU guarantee: 0-100.0 [%] | 0.0c-<CPUS>c [cores] (dynamic)") { }
 };
 
 class TIoPolicyProperty : public TStringValue, public TContainerValue {

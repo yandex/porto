@@ -431,24 +431,13 @@ TError TContainer::ApplyDynamicProperties() {
     }
 
     auto cpucg = GetCgroup(CpuSubsystem);
-    error = CpuSubsystem.SetPolicy(cpucg, Prop->Get<std::string>(P_CPU_POLICY));
+    error = CpuSubsystem.SetCpuPolicy(cpucg,
+            Prop->Get<std::string>(P_CPU_POLICY),
+            Prop->Get<double>(P_CPU_GUARANTEE),
+            Prop->Get<double>(P_CPU_LIMIT));
     if (error) {
-        L_ERR() << "Can't set " << P_CPU_POLICY << ": " << error << std::endl;
+        L_ERR() << "Cannot set cpu policy: " << error << std::endl;
         return error;
-    }
-
-    if (Prop->Get<std::string>(P_CPU_POLICY) == "normal") {
-        error = CpuSubsystem.SetLimit(cpucg, Prop->Get<double>(P_CPU_LIMIT));
-        if (error) {
-            L_ERR() << "Can't set " << P_CPU_LIMIT << ": " << error << std::endl;
-            return error;
-        }
-
-        error = CpuSubsystem.SetGuarantee(cpucg, Prop->Get<double>(P_CPU_GUARANTEE));
-        if (error) {
-            L_ERR() << "Can't set " << P_CPU_GUARANTEE << ": " << error << std::endl;
-            return error;
-        }
     }
 
     auto blkcg = GetCgroup(BlkioSubsystem);

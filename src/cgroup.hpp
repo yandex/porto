@@ -15,6 +15,7 @@ public:
     TPath Root;
 
     TSubsystem(const std::string &type) : Type(type) { }
+    virtual void InitializeSubsystem() { }
 
     TCgroup RootCgroup() const;
     TCgroup Cgroup(const std::string &name) const;
@@ -188,13 +189,12 @@ public:
 
 class TCpuSubsystem : public TSubsystem {
 public:
-    TCpuSubsystem() : TSubsystem("cpu") {}
-    TError SetPolicy(TCgroup &cg, const std::string &policy);
-    TError SetLimit(TCgroup &cg, double limit);
-    TError SetGuarantee(TCgroup &cg, double guarantee);
-    bool SupportSmart();
-    bool SupportLimit();
-    bool SupportGuarantee();
+    bool HasShares, HasQuota, HasSmart, HasReserve;
+    uint64_t BasePeriod, BaseShares;
+    TCpuSubsystem() : TSubsystem("cpu") { }
+    void InitializeSubsystem() override;
+    TError SetCpuPolicy(TCgroup &cg, const std::string &policy,
+                        double guarantee, double limit);
 };
 
 class TCpuacctSubsystem : public TSubsystem {

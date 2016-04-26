@@ -421,73 +421,100 @@ bool TFreezerSubsystem::IsFrozen(TCgroup &cg) const {
 }
 
 // Cpu
-TError TCpuSubsystem::SetPolicy(TCgroup &cg, const std::string &policy) {
-    if (!SupportSmart())
-        return TError::Success();
+void TCpuSubsystem::InitializeSubsystem() {
+    TCgroup cg = RootCgroup();
 
-    if (policy == "normal") {
-        TError error = cg.Set("cpu.smart", "0");
-        if (error) {
-            L_ERR() << "Can't disable smart: " << error << std::endl;
+    HasShares = cg.Has("cpu.shares");
+    if (HasShares && cg.GetUint64("cpu.shares", BaseShares))
+        BaseShares = 1024;
+
+    HasQuota = cg.Has("cpu.cfs_quota_us") &&
+               cg.Has("cpu.cfs_period_us");
+
+    HasReserve = HasShares && HasQuota &&
+                 cg.Has("cpu.cfs_reserve_us") &&
+                 cg.Has("cpu.cfs_reserve_shares");
+
+    if (HasQuota && cg.GetUint64("cpu.cfs_period_us", BasePeriod))
+        BasePeriod = 100000;
+
+    HasSmart = cg.Has("cpu.smart");
+
+    L_SYS() << GetNumCores() << " cores" << std::endl;
+    if (HasShares)
+        L_SYS() << "base shares " << BaseShares << std::endl;
+    if (HasQuota)
+        L_SYS() << "quota period " << BasePeriod << std::endl;
+    if (HasReserve)
+        L_SYS() << "support reserves" << std::endl;
+    if (HasSmart)
+        L_SYS() << "support smart" << std::endl;
+}
+
+TError TCpuSubsystem::SetCpuPolicy(TCgroup &cg, const std::string &policy,
+                                   double guarantee, double limit) {
+    TError error;
+
+    if (HasQuota) {
+        int64_t quota = std::ceil(limit * BasePeriod);
+
+        if (quota < 1000)
+            quota = 1000;
+
+        if (limit >= GetNumCores())
+            quota = -1;
+
+        error = cg.Set("cpu.cfs_quota_us", std::to_string(quota));
+        if (error)
             return error;
+    }
+
+    if (HasReserve) {
+        uint64_t reserve = std::floor(guarantee * BasePeriod);
+        uint64_t shares = BaseShares, reserve_shares = BaseShares;
+
+        if (policy == "rt") {
+            shares *= 16;
+            reserve_shares *= 256;
+        } else if (policy == "normal") {
+            reserve_shares *= 16;
+        } else if (policy == "idle") {
+            shares /= 16;
         }
-    } else if (policy == "rt") {
-        TError error = cg.Set("cpu.smart", "1");
-        if (error) {
-            L_ERR() << "Can't set enable smart: " << error << std::endl;
+
+        error = cg.SetUint64("cpu.shares", shares);
+        if (error)
             return error;
-        }
+
+        error = cg.SetUint64("cpu.cfs_reserve_shares", reserve_shares);
+        if (error)
+            return error;
+
+        error = cg.SetUint64("cpu.cfs_reserve_us", reserve);
+        if (error)
+            return error;
+
+    } else if (HasShares) {
+        uint64_t shares = std::floor((guarantee ?: 1.) * BaseShares);
+
+        if (policy == "rt" && (!HasSmart || !config().container().enable_smart()))
+            shares *= 16;
+        else if (policy == "idle")
+            shares /= 16;
+
+        error = cg.SetUint64("cpu.shares", shares);
+        if (error)
+            return error;
+    }
+
+    if (HasSmart) {
+        error = cg.SetUint64("cpu.smart", (policy == "rt" &&
+                    config().container().enable_smart()) ? 1 : 0);
+        if (error)
+            return error;
     }
 
     return TError::Success();
-}
-
-TError TCpuSubsystem::SetLimit(TCgroup &cg, double limit) {
-    uint64_t period, quota;
-
-    if (!SupportLimit())
-        return TError::Success();
-
-    if (limit >= GetNumCores())
-        return cg.Set("cpu.cfs_quota_us", "-1");
-
-    TError error = cg.GetUint64("cpu.cfs_period_us", period);
-    if (error)
-        return error;
-
-    quota = std::ceil(limit * period);
-
-    const uint64_t minQuota = 1000;
-    if (quota < minQuota)
-        quota = minQuota;
-
-    return cg.SetUint64("cpu.cfs_quota_us", quota);
-}
-
-TError TCpuSubsystem::SetGuarantee(TCgroup &cg, double guarantee) {
-    uint64_t base, shares;
-
-    if (!SupportGuarantee())
-        return TError::Success();
-
-    TError error = RootCgroup().GetUint64("cpu.shares", base);
-    if (error)
-        return error;
-
-    shares = std::floor(guarantee * base);
-    return cg.SetUint64("cpu.shares", shares);
-}
-
-bool TCpuSubsystem::SupportSmart() {
-    return RootCgroup().Has("cpu.smart");
-}
-
-bool TCpuSubsystem::SupportLimit() {
-    return RootCgroup().Has("cpu.cfs_period_us");
-}
-
-bool TCpuSubsystem::SupportGuarantee() {
-    return RootCgroup().Has("cpu.shares");
 }
 
 // Cpuacct
@@ -732,6 +759,8 @@ TError InitializeCgroups() {
         }
         if (subsys->Hierarchy == subsys)
             Hierarchies.push_back(subsys);
+
+        subsys->InitializeSubsystem();
     }
 
     return error;
