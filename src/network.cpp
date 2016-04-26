@@ -11,6 +11,7 @@
 
 extern "C" {
 #include <fnmatch.h>
+#include <linux/if.h>
 #include <netlink/route/addr.h>
 #include <netlink/route/link.h>
 #include <netlink/route/tc.h>
