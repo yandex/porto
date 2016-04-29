@@ -458,9 +458,13 @@ static void KvDump() {
 static int TuneLimits() {
     struct rlimit rlim;
 
-    // we need two FDs for each container (to monitor OOM event and
-    // to write journal), plus some spare ones
-    int maxFd = config().container().max_total() * 2 + 100;
+    /*
+     * two FDs for each container: OOM event and netlink
+     * one for each client
+     * plus some extra
+     */
+    int maxFd = config().container().max_total() * 2 +
+                config().daemon().max_clients() + 1000;
 
     rlim.rlim_max = maxFd;
     rlim.rlim_cur = maxFd;

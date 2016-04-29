@@ -32,7 +32,7 @@ void TConfig::LoadDefaults() {
     config().mutable_keyval()->mutable_file()->set_perm(0755);
     config().mutable_keyval()->set_size("size=32m");
 
-    config().mutable_daemon()->set_max_clients(512);
+    config().mutable_daemon()->set_max_clients(1000);
     config().mutable_daemon()->set_cgroup_remove_timeout_s(5);
     config().mutable_daemon()->set_freezer_wait_timeout_s(5 * 60);
     config().mutable_daemon()->set_memory_guarantee_reserve(2 * 1024 * 1024 * 1024UL);
