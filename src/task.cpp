@@ -652,7 +652,6 @@ void TTask::StartChild() {
 }
 
 TError TTask::Start() {
-    int status;
     TError error;
 
     Pid = VPid = WPid = 0;
@@ -819,23 +818,38 @@ TError TTask::Start() {
 
     Env->Sock.Close();
 
-    status = 0;
-    int forkResult = waitpid(forkPid, &status, 0);
-    if (forkResult < 0)
-        (void)kill(forkPid, SIGKILL);
+    error = Env->MasterSock.SetRecvTimeout(config().container().start_timeout_ms());
+    if (error)
+        goto kill_all;
 
     error = Env->MasterSock.RecvPid(WPid, VPid);
-    if (error)
-        return error;
+    if (error) {
+        L_ERR() << "RecvPid failed: " << error << std::endl;
+        goto kill_all;
+    }
 
     error = Env->MasterSock.RecvPid(Pid, VPid);
-    if (error)
-        return error;
+    if (error) {
+        L_ERR() << "RecvPid failed: " << error << std::endl;
+        goto kill_all;
+    }
 
-    if (status)
-        return TError(EError::Unknown, "Start failed, status " + std::to_string(status));
+    int status;
+    if (waitpid(forkPid, &status, 0) < 0) {
+        error = TError(EError::Unknown, errno, "wait for middle task failed");
+        goto kill_all;
+    } else if (status)
+        return TError(EError::Unknown, "Start failed, status " +
+                      std::to_string(status));
 
     return TError::Success();
+
+kill_all:
+    for (auto &cg : Env->Cgroups)
+        (void)cg.KillAll(SIGKILL);
+    (void)kill(forkPid, SIGKILL);
+    (void)waitpid(forkPid, nullptr, 0);
+    return error;
 }
 
 TError TTask::Wakeup() {

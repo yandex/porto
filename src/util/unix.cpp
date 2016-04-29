@@ -627,6 +627,18 @@ TError TUnixSocket::RecvFd(int &fd) const {
     return TError(EError::Unknown, "no rights after recvmsg");
 }
 
+TError TUnixSocket::SetRecvTimeout(int timeout_ms) const {
+    struct timeval tv;
+
+    tv.tv_sec = timeout_ms / 1000;
+    tv.tv_usec = (timeout_ms % 1000) * 1000;
+
+    if (setsockopt(SockFd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv))
+        return TError(EError::Unknown, errno, "setsockopt(SO_RCVTIMEO)");
+
+    return TError::Success();
+}
+
 TError ChattrFd(int fd, unsigned add_flags, unsigned del_flags) {
     unsigned old_flags, new_flags;
 

@@ -73,4 +73,5 @@ public:
     TError RecvError() const;
     TError SendFd(int fd) const;
     TError RecvFd(int &fd) const;
+    TError SetRecvTimeout(int timeout_ms) const;
 };

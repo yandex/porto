@@ -51,6 +51,7 @@ void TConfig::LoadDefaults() {
     config().mutable_container()->set_stdout_limit(8 * 1024 * 1024);
     config().mutable_container()->set_private_max(1024);
     config().mutable_container()->set_kill_timeout_ms(1000);
+    config().mutable_container()->set_start_timeout_ms(300 * 1000);
     // wait 30 seconds for container process to exit after SIGKILL
     config().mutable_container()->set_stop_timeout_ms(30 * 1000);
     config().mutable_container()->set_max_total(3000);
