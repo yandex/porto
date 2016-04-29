@@ -662,6 +662,8 @@ TError TTask::Start() {
     if (error)
         return error;
 
+    TLogger::PreparePostFork();
+
     // we want our child to have portod master as parent, so we
     // are doing double fork here (fork + clone);
     // we also need to know child pid so we are using pipe to send it back
@@ -674,6 +676,8 @@ TError TTask::Start() {
         return error;
     } else if (forkPid == 0) {
         TError error;
+
+        TLogger::ActivatePostFork();
 
         /* Switch from signafd back to normal signal delivery */
         ResetBlockedSignals();

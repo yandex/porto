@@ -472,28 +472,11 @@ static int TuneLimits() {
     return EXIT_SUCCESS;
 }
 
-static void preParentFork(void) {
-    TLogger::DisableLocaltime();
-}
-
-static void postParentFork(void) {
-    TLogger::EnableLocaltime();
-}
-
-static void postChildFork(void) {
-    TLogger::ClearBuffer();
-}
-
 static int SlaveMain() {
     TError error;
+    int ret;
 
     SetDieOnParentExit(SIGKILL);
-
-    int ret = pthread_atfork(preParentFork, postParentFork, postChildFork);
-    if (ret) {
-        std::cerr << "Can't set fork handlers: " << strerror(ret) << std::endl;
-        return EXIT_FAILURE;
-    }
 
     if (failsafe)
         AllocStatistics();

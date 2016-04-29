@@ -48,22 +48,18 @@ static inline void PrepareLog() {
     }
 }
 
-static __thread struct tm logForkTm;
-static __thread struct timeval logForkTimeval;
+static bool PostForkActive;
+static struct timeval PostForkBase;
+static struct tm PostForkTime;
 
-void TLogger::DisableLocaltime() {
-    gettimeofday(&logForkTimeval, NULL);
-    localtime_r(&logForkTimeval.tv_sec, &logForkTm);
+void TLogger::PreparePostFork(void) {
+    PORTO_ASSERT(!PostForkActive);
+    gettimeofday(&PostForkBase, NULL);
+    localtime_r(&PostForkBase.tv_sec, &PostForkTime);
 }
 
-void TLogger::EnableLocaltime() {
-    memset(&logForkTm, 0, sizeof(logForkTm));
-    memset(&logForkTimeval, 0, sizeof(logForkTimeval));
-}
-
-void TLogger::ClearBuffer() {
-    PrepareLog();
-    logBuf->ClearBuffer();
+void TLogger::ActivatePostFork(void) {
+    PostForkActive = true;
 }
 
 void TLogger::OpenLog(bool std, const TPath &path, const unsigned int mode) {
@@ -99,37 +95,33 @@ void TLogger::CloseLog() {
     logBuf->ClearBuffer();
 }
 
-static long tvdiff(struct timeval *start, struct timeval *stop) {
-    constexpr auto NSEC_PER_SEC = 1000000000L;
-    auto secdiff = stop->tv_sec - start->tv_sec;
-    if (secdiff == 1)
-        return NSEC_PER_SEC - start->tv_usec + stop->tv_usec >= NSEC_PER_SEC;
-    else
-        return secdiff;
-}
-
 std::string TLogger::GetTime() {
+    struct timeval tv, delta;
+    std::stringstream ss;
+    struct tm tm;
     char buf[256];
-    struct timeval tv;
+
     gettimeofday(&tv, NULL);
 
-    std::stringstream ss;
-    if (logForkTimeval.tv_sec) {
-        strftime(buf, sizeof(buf), "%F %T", &logForkTm);
-        ss << buf;
-        auto offset = tvdiff(&logForkTimeval, &tv);
-        if (offset)
-            ss << "+" << offset;
-    } else {
-        struct tm *tmp, result;
-        if ((tmp = localtime_r(&tv.tv_sec, &result)) != nullptr) {
-            strftime(buf, sizeof(buf), "%F %T", tmp);
-            ss << buf;
-        }
+    // localtime_r it's not safe to use it after fork because of lock inside
+    if (PostForkActive) {
+        timersub(&tv, &PostForkBase, &delta);
+        PostForkBase = tv;
 
-        if (Verbose)
-            ss << "." << std::setw(6) << std::setfill('0') << tv.tv_usec;
-    }
+        auto d = PostForkTime.tm_sec + delta.tv_sec;
+        PostForkTime.tm_sec = d % 60;
+        d = PostForkTime.tm_min + d / 60;
+        PostForkTime.tm_min = d % 60;
+        PostForkTime.tm_hour += d / 60;
+        tm = PostForkTime;
+    } else
+        localtime_r(&tv.tv_sec, &tm);
+
+    strftime(buf, sizeof(buf), "%F %T", &tm);
+    ss << buf;
+
+    if (Verbose)
+        ss << "," << std::setw(6) << std::setfill('0') << tv.tv_usec;
 
     return ss.str();
 }

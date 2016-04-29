@@ -26,11 +26,8 @@ enum ELogLevel {
 class TLogger {
 public:
     static std::string GetTime();
-    static void ClearBuffer();
-    // localtime_r grabs tz lock inside glibc so it's not safe to use
-    // it after fork
-    static void DisableLocaltime();
-    static void EnableLocaltime();
+    static void PreparePostFork(void);
+    static void ActivatePostFork(void);
     static void OpenLog(bool std, const TPath &path, const unsigned int mode);
     static void CloseLog();
     static void DisableLog();
