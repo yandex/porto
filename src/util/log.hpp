@@ -25,9 +25,6 @@ enum ELogLevel {
 
 class TLogger {
 public:
-    static std::string GetTime();
-    static void PreparePostFork(void);
-    static void ActivatePostFork(void);
     static void OpenLog(bool std, const TPath &path, const unsigned int mode);
     static void CloseLog();
     static void DisableLog();

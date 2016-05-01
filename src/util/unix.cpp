@@ -1,5 +1,8 @@
 #include <string>
+#include <sstream>
 #include <algorithm>
+#include <mutex>
+#include <iomanip>
 
 #include "util/string.hpp"
 #include "util/cred.hpp"
@@ -23,6 +26,7 @@ extern "C" {
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -668,4 +672,61 @@ TError SetSysctl(const std::string &name, const std::string &value) {
 
     close(fd);
     return TError::Success();
+}
+
+static std::mutex ForkLock;
+static bool PostFork = false;
+static struct timeval ForkTime;
+static struct tm ForkLocalTime;
+
+// after that fork use only syscalls and signal-safe functions
+pid_t ForkFromThread(void) {
+    pid_t ret;
+
+    PORTO_ASSERT(!PostFork);
+    ForkLock.lock();
+    gettimeofday(&ForkTime, NULL);
+    localtime_r(&ForkTime.tv_sec, &ForkLocalTime);
+    ret = fork();
+    if (!ret)
+        PostFork = true;
+    ForkLock.unlock();
+    return ret;
+}
+
+// localtime_r isn't safe after fork because of lock inside
+static void CurrentTime(struct timeval &tv, struct tm &tm) {
+    gettimeofday(&tv, NULL);
+    if (!PostFork) {
+        localtime_r(&tv.tv_sec, &tm);
+    } else {
+        struct timeval delta;
+        time_t diff;
+
+        timersub(&tv, &ForkTime, &delta);
+        tm = ForkLocalTime;
+        diff = tm.tm_sec + delta.tv_sec;
+        tm.tm_sec = diff % 60;
+        diff = tm.tm_min + diff / 60;
+        tm.tm_min = diff % 60;
+        diff = tm.tm_hour + diff / 60;
+        tm.tm_hour = diff % 24;
+        tm.tm_mday += diff / 24;
+    }
+}
+
+std::string CurrentTimeFormat(const char *fmt, bool msec) {
+    std::stringstream ss;
+    struct timeval tv;
+    struct tm tm;
+    char buf[256];
+
+    CurrentTime(tv, tm);
+    strftime(buf, sizeof(buf), fmt, &tm);
+    ss << buf;
+
+    if (msec)
+        ss << "," << std::setw(6) << std::setfill('0') << tv.tv_usec;
+
+    return ss.str();
 }

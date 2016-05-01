@@ -1,6 +1,4 @@
 #include <iostream>
-#include <iomanip>
-#include <sstream>
 
 #include "statistics.hpp"
 #include "log.hpp"
@@ -12,7 +10,6 @@ extern "C" {
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-#include <sys/time.h>
 }
 
 bool Verbose = true; /* be verbose while loading config */
@@ -48,20 +45,6 @@ static inline void PrepareLog() {
     }
 }
 
-static bool PostForkActive;
-static struct timeval PostForkBase;
-static struct tm PostForkTime;
-
-void TLogger::PreparePostFork(void) {
-    PORTO_ASSERT(!PostForkActive);
-    gettimeofday(&PostForkBase, NULL);
-    localtime_r(&PostForkBase.tv_sec, &PostForkTime);
-}
-
-void TLogger::ActivatePostFork(void) {
-    PostForkActive = true;
-}
-
 void TLogger::OpenLog(bool std, const TPath &path, const unsigned int mode) {
     PrepareLog();
     if (std) {
@@ -93,37 +76,6 @@ void TLogger::CloseLog() {
         close(fd);
     logBuf->SetFd(STDOUT_FILENO);
     logBuf->ClearBuffer();
-}
-
-std::string TLogger::GetTime() {
-    struct timeval tv, delta;
-    std::stringstream ss;
-    struct tm tm;
-    char buf[256];
-
-    gettimeofday(&tv, NULL);
-
-    // localtime_r it's not safe to use it after fork because of lock inside
-    if (PostForkActive) {
-        timersub(&tv, &PostForkBase, &delta);
-        PostForkBase = tv;
-
-        auto d = PostForkTime.tm_sec + delta.tv_sec;
-        PostForkTime.tm_sec = d % 60;
-        d = PostForkTime.tm_min + d / 60;
-        PostForkTime.tm_min = d % 60;
-        PostForkTime.tm_hour += d / 60;
-        tm = PostForkTime;
-    } else
-        localtime_r(&tv.tv_sec, &tm);
-
-    strftime(buf, sizeof(buf), "%F %T", &tm);
-    ss << buf;
-
-    if (Verbose)
-        ss << "," << std::setw(6) << std::setfill('0') << tv.tv_usec;
-
-    return ss.str();
 }
 
 TLogBuf::TLogBuf(const size_t size) {
@@ -194,7 +146,8 @@ std::basic_ostream<char> &TLogger::Log(ELogLevel level) {
             Statistics->Errors++;
     }
 
-    return (*logStream) << GetTime() << " " << name << "[" << GetTid() << "]: " << prefix[level];
+    return (*logStream) << CurrentTimeFormat("%F %T", Verbose)
+                        << " " << name << "[" << GetTid() << "]: " << prefix[level];
 }
 
 void porto_assert(const char *msg, size_t line, const char *file) {

@@ -10,6 +10,9 @@
 
 class TPath;
 
+pid_t ForkFromThread(void);
+std::string CurrentTimeFormat(const char *fmt, bool msec = false);
+
 bool RetryIfFailed(std::function<int()> handler, int &ret, int times = 10, int timeoMs = 100);
 bool SleepWhile(std::function<int()> handler, int &ret, int timeoMs);
 
