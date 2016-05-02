@@ -91,7 +91,6 @@ public:
     ~TTask();
 
     TError Start();
-    TError Wakeup();
     pid_t GetPid() const;
     pid_t GetWPid() const;
     pid_t GetPidFor(pid_t pid) const;

@@ -938,13 +938,13 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
 
         error = Task->Start();
 
-        TError reported_error = Task->Wakeup();
-        if (reported_error)
-            error = reported_error;
-
-        /* Always report oom stuation if any */
-        if (error && HasOomReceived())
-            error = TError(EError::InvalidValue, ENOMEM, "Cannot start due to memory limit");
+        /* Always report OOM stuation if any */
+        if (error && HasOomReceived()) {
+            if (error)
+                L() << "Start error: " << error << std::endl;
+            error = TError(EError::InvalidValue, ENOMEM,
+                           "OOM, memory limit too low");
+        }
 
         if (error) {
             TError e = Data->Set<int>(D_START_ERRNO, error.GetErrno());

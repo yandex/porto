@@ -820,56 +820,49 @@ TError TTask::Start() {
         goto kill_all;
 
     error = Env->MasterSock.RecvPid(WPid, VPid);
-    if (error) {
-        L_ERR() << "RecvPid failed: " << error << std::endl;
+    if (error)
         goto kill_all;
-    }
 
     error = Env->MasterSock.RecvPid(Pid, VPid);
-    if (error) {
-        L_ERR() << "RecvPid failed: " << error << std::endl;
+    if (error)
         goto kill_all;
-    }
 
     int status;
     if (waitpid(forkPid, &status, 0) < 0) {
         error = TError(EError::Unknown, errno, "wait for middle task failed");
         goto kill_all;
-    } else if (status)
-        return TError(EError::Unknown, "Start failed, status " +
-                      std::to_string(status));
+    }
+    forkPid = 0;
 
+    /* Task was alive, even if it already died we'll get zombie */
+    error = Env->MasterSock.SendZero();
+    if (error)
+        L() << "Task wakeup error: " << error << std::endl;
+
+    /* Prefer reported error if any */
+    error = Env->MasterSock.RecvError();
+    if (error)
+        goto kill_all;
+
+    if (!error && status) {
+        error = TError(EError::Unknown, "Start failed, status " + std::to_string(status));
+        goto kill_all;
+    }
+
+    ClearEnv();
+    State = Started;
     return TError::Success();
 
 kill_all:
+    L_ACT() << "Kill partialy constructed container: " << error << std::endl;
     for (auto &cg : Env->Cgroups)
         (void)cg.KillAll(SIGKILL);
-    (void)kill(forkPid, SIGKILL);
-    (void)waitpid(forkPid, nullptr, 0);
-    return error;
-}
-
-TError TTask::Wakeup() {
-    TError error, wakeup_error;
-
-    wakeup_error = Env->MasterSock.SendZero();
-
-    error = Env->MasterSock.RecvError();
-    if (!error && wakeup_error)
-        error = wakeup_error;
-
-    ClearEnv();
-
-    if (error) {
-        if (Pid > 0) {
-            (void)kill(Pid, SIGKILL);
-            L_ACT() << "Kill partly constructed container " << Pid << ": " << strerror(errno) << std::endl;
-        }
-        Pid = VPid = WPid = 0;
-        ExitStatus = -1;
-    } else
-        State = Started;
-
+    if (forkPid) {
+        (void)kill(forkPid, SIGKILL);
+        (void)waitpid(forkPid, nullptr, 0);
+    }
+    Pid = VPid = WPid = 0;
+    ExitStatus = -1;
     return error;
 }
 
