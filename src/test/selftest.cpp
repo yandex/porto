@@ -4753,9 +4753,12 @@ static void TestWait(Porto::Connection &api) {
     std::string d = "aaa/bbb";
     std::string tmp;
 
+    Say() << "Check wait for / container" << std::endl;
+    ExpectApiSuccess(api.WaitContainers({"/"}, tmp, -1));
+    ExpectEq("/", tmp);
+
     Say() << "Check wait for non-existing and invalid containers" << std::endl;
     ExpectApiFailure(api.WaitContainers({c}, tmp, -1), EError::ContainerDoesNotExist);
-    ExpectApiFailure(api.WaitContainers({"/"}, tmp, -1), EError::Permission);
     ExpectApiFailure(api.WaitContainers({}, tmp, -1), EError::InvalidValue);
 
     Say() << "Check wait for stopped container" << std::endl;

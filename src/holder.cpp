@@ -594,7 +594,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
     {
         auto w = event.WaitTimeout.Waiter.lock();
         if (w)
-            w->Signal(nullptr);
+            w->WakeupWaiter(nullptr);
         delivered = true;
         break;
     }

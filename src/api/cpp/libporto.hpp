@@ -54,7 +54,7 @@ public:
     int Resume(const std::string &name);
 
     int WaitContainers(const std::vector<std::string> &containers,
-                       std::string &name, int timeout);
+                       std::string &name, int timeout, bool all = false);
 
     int List(std::vector<std::string> &clist);
     int Plist(std::vector<Property> &list);

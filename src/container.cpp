@@ -195,6 +195,9 @@ TError TContainer::GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m)
 void TContainer::UpdateRunningChildren(size_t diff) {
     RunningChildren += diff;
 
+    if (!RunningChildren && State == EContainerState::Meta)
+        NotifyWaiters();
+
     if (Parent)
         Parent->UpdateRunningChildren(diff);
 }
@@ -249,7 +252,8 @@ void TContainer::SetState(EContainerState newState) {
     State = newState;
     Data->Set<std::string>(D_STATE, ContainerStateName(State));
 
-    NotifyWaiters();
+    if (newState != EContainerState::Running && newState != EContainerState::Meta)
+        NotifyWaiters();
 }
 
 const string TContainer::StripParentName(const string &name) const {
@@ -2178,23 +2182,19 @@ std::string TContainer::GetPortoNamespace() const {
 }
 
 void TContainer::AddWaiter(std::shared_ptr<TContainerWaiter> waiter) {
-    if (GetState() == EContainerState::Running) {
-        CleanupWaiters();
-        Waiters.push_back(waiter);
-    } else {
-        waiter->Signal(this);
-    }
+    CleanupWaiters();
+    Waiters.push_back(waiter);
 }
 
 void TContainer::NotifyWaiters() {
-    if (GetState() != EContainerState::Running) {
-        CleanupWaiters();
-        for (auto &w : Waiters) {
-            auto waiter = w.lock();
-            if (waiter)
-                waiter->Signal(this);
-        }
+    CleanupWaiters();
+    for (auto &w : Waiters) {
+        auto waiter = w.lock();
+        if (waiter)
+            waiter->WakeupWaiter(this);
     }
+    if (!IsRoot() && !IsPortoRoot())
+        TContainerWaiter::WakeupWildcard(this);
 }
 
 void TContainer::CleanupWaiters() {
@@ -2252,17 +2252,45 @@ TContainerWaiter::TContainerWaiter(std::shared_ptr<TClient> client,
     Client(client), Callback(callback) {
 }
 
-void TContainerWaiter::Signal(const TContainer *who) {
+void TContainerWaiter::WakeupWaiter(const TContainer *who, bool wildcard) {
     std::shared_ptr<TClient> client = Client.lock();
     if (client) {
         std::string name;
         TError err;
         if (who)
             err = client->ComposeRelativeName(*who, name);
+        if (err && wildcard)
+            return;
         Callback(client, err, name);
         Client.reset();
         client->Waiter = nullptr;
     }
+}
+
+std::mutex TContainerWaiter::WildcardLock;
+std::list<std::weak_ptr<TContainerWaiter>> TContainerWaiter::WildcardWaiters;
+
+void TContainerWaiter::WakeupWildcard(const TContainer *who) {
+    WildcardLock.lock();
+    for (auto &w : WildcardWaiters) {
+        auto waiter = w.lock();
+        if (waiter)
+            waiter->WakeupWaiter(who, true);
+    }
+    WildcardLock.unlock();
+}
+
+void TContainerWaiter::AddWildcard(std::shared_ptr<TContainerWaiter> &waiter) {
+    WildcardLock.lock();
+    for (auto iter = WildcardWaiters.begin(); iter != WildcardWaiters.end();) {
+        if (iter->expired()) {
+            iter = WildcardWaiters.erase(iter);
+            continue;
+        }
+        iter++;
+    }
+    WildcardWaiters.push_back(waiter);
+    WildcardLock.unlock();
 }
 
 TError TContainer::StopTree(TScopedLock &holder_lock) {

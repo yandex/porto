@@ -75,6 +75,16 @@ static std::string RequestAsString(const rpc::TContainerRequest &req) {
             ret += " timeout " + std::to_string(req.wait().timeout());
 
         return ret;
+    } else if (req.has_waitall()) {
+        std::string ret = "waitAll";
+
+        for (int i = 0; i < req.waitall().name_size(); i++)
+            ret += " " + req.waitall().name(i);
+
+        if (req.waitall().has_timeout())
+            ret += " timeout " + std::to_string(req.waitall().timeout());
+
+        return ret;
     } else if (req.has_createvolume()) {
         std::string ret = "volumeAPI: create " + req.createvolume().path();
         for (auto p: req.createvolume().properties())
@@ -227,6 +237,7 @@ static bool InfoRequest(const rpc::TContainerRequest &req) {
         req.has_datalist() ||
         req.has_version() ||
         req.has_wait() ||
+        req.has_waitall() ||
         req.has_listvolumeproperties() ||
         req.has_listvolumes() ||
         req.has_listlayers() ||
@@ -252,6 +263,7 @@ static bool ValidRequest(const rpc::TContainerRequest &req) {
         req.has_kill() +
         req.has_version() +
         req.has_wait() +
+        req.has_waitall() +
         req.has_listvolumeproperties() +
         req.has_createvolume() +
         req.has_linkvolume() +
@@ -781,7 +793,7 @@ noinline TError Wait(TContext &context,
     for (int i = 0; i < req.name_size(); i++) {
         std::string name = req.name(i);
         std::string abs_name;
-        TError err = client->ResolveRelativeName(name, abs_name);
+        TError err = client->ResolveRelativeName(name, abs_name, true);
         if (err) {
             rsp.mutable_wait()->set_name(name);
             return err;
@@ -794,8 +806,70 @@ noinline TError Wait(TContext &context,
             return err;
         }
 
+        auto state = container->GetState();
+        if (state != EContainerState::Running &&
+                (state != EContainerState::Meta ||
+                 !container->GetRunningChildren())) {
+            rsp.mutable_wait()->set_name(name);
+            return TError::Success();
+        }
+
         container->AddWaiter(waiter);
     }
+
+    client->Waiter = waiter;
+
+    if (req.has_timeout()) {
+        TEvent e(EEventType::WaitTimeout, nullptr);
+        e.WaitTimeout.Waiter = waiter;
+        context.Queue->Add(req.timeout(), e);
+    }
+
+    return TError::Queued();
+}
+
+noinline TError WaitAll(TContext &context,
+                        const rpc::TContainerWaitRequest &req,
+                        rpc::TContainerResponse &rsp,
+                        std::shared_ptr<TClient> client) {
+    auto lock = context.Cholder->ScopedLock();
+
+    auto fn = [] (std::shared_ptr<TClient> client,
+                  TError error, std::string name) {
+        rpc::TContainerResponse response;
+        response.set_error(error.GetError());
+        response.mutable_wait()->set_name(name);
+        SendReply(client, response, error || !name.empty());
+    };
+
+    auto waiter = std::make_shared<TContainerWaiter>(client, fn);
+
+    for (auto &container : context.Cholder->List()) {
+        std::string name;
+        if (container->IsRoot() || container->IsPortoRoot() ||
+                client->ComposeRelativeName(*container, name))
+            continue;
+
+        bool skip = false;
+        for (int i = 0; i < req.name_size(); i++) {
+            if (name != req.name(i))
+                continue;
+            skip = true;
+            break;
+        }
+        if (skip)
+            continue;
+
+        auto state = container->GetState();
+        if (state != EContainerState::Running &&
+                (state != EContainerState::Meta ||
+                 !container->GetRunningChildren())) {
+            rsp.mutable_wait()->set_name(name);
+            return TError::Success();
+        }
+    }
+
+    TContainerWaiter::AddWildcard(waiter);
 
     client->Waiter = waiter;
 
@@ -1458,6 +1532,8 @@ void HandleRpcRequest(TContext &context, const rpc::TContainerRequest &req,
             error = Version(context, rsp);
         else if (req.has_wait())
             error = Wait(context, req.wait(), rsp, client);
+        else if (req.has_waitall())
+            error = WaitAll(context, req.waitall(), rsp, client);
         else if (req.has_listvolumeproperties())
             error = ListVolumeProperties(context, req.listvolumeproperties(), rsp, client);
         else if (req.has_createvolume())
