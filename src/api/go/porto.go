@@ -1,3 +1,5 @@
+//go:generate protoc -I ../.. ../../rpc.proto --go_out=rpc
+
 package porto
 
 import (
@@ -11,7 +13,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"github.com/yandex/porto/src/api/go/rpc"
+	"./rpc"
 )
 
 const portoSocket = "/run/portod.socket"
@@ -100,6 +102,7 @@ type API interface {
 
 	// ContainerAPI
 	Create(name string) error
+	CreateWeak(name string) error
 	Destroy(name string) error
 
 	Start(name string) error
@@ -109,6 +112,7 @@ type API interface {
 	Resume(name string) error
 
 	Wait(containers []string, timeout time.Duration) (string, error)
+	WaitAll(except_containers []string, timeout time.Duration) (string, error)
 
 	List() ([]string, error)
 	Plist() ([]TProperty, error)
@@ -124,6 +128,7 @@ type API interface {
 	// VolumeAPI
 	ListVolumeProperties() ([]TProperty, error)
 	CreateVolume(path string, config map[string]string) (TVolumeDescription, error)
+	TuneVolume(path string, config map[string]string) error
 	LinkVolume(path string, container string) error
 	UnlinkVolume(path string, container string) error
 	ListVolumes(path string, container string) ([]TVolumeDescription, error)
@@ -233,6 +238,16 @@ func (conn *portoConnection) Create(name string) error {
 	return err
 }
 
+func (conn *portoConnection) CreateWeak(name string) error {
+	req := &rpc.TContainerRequest{
+		CreateWeak: &rpc.TContainerCreateRequest{
+			Name: &name,
+		},
+	}
+	_, err := conn.performRequest(req)
+	return err
+}
+
 func (conn *portoConnection) Destroy(name string) error {
 	req := &rpc.TContainerRequest{
 		Destroy: &rpc.TContainerDestroyRequest{
@@ -310,6 +325,30 @@ func (conn *portoConnection) Wait(containers []string, timeout time.Duration) (s
 
 		timeoutms := uint32(timeout / time.Millisecond)
 		req.Wait.Timeout = &timeoutms
+	}
+
+	resp, err := conn.performRequest(req)
+	if err != nil {
+		return "", err
+	}
+
+	return resp.GetWait().GetName(), nil
+}
+
+func (conn *portoConnection) WaitAll(except_containers []string, timeout time.Duration) (string, error) {
+	req := &rpc.TContainerRequest{
+		WaitAll: &rpc.TContainerWaitRequest{
+			Name: except_containers,
+		},
+	}
+
+	if timeout >= 0 {
+		if timeout/time.Millisecond > math.MaxUint32 {
+			return "", fmt.Errorf("timeout must be less than %d ms", math.MaxUint32)
+		}
+
+		timeoutms := uint32(timeout / time.Millisecond)
+		req.WaitAll.Timeout = &timeoutms
 	}
 
 	resp, err := conn.performRequest(req)
@@ -500,6 +539,23 @@ func (conn *portoConnection) CreateVolume(path string, config map[string]string)
 	}
 
 	return desc, err
+}
+
+func (conn *portoConnection) TuneVolume(path string, config map[string]string) error {
+	var properties []*rpc.TVolumeProperty
+	for k, v := range config {
+		name, value := k, v
+		prop := &rpc.TVolumeProperty{Name: &name, Value: &value}
+		properties = append(properties, prop)
+	}
+	req := &rpc.TContainerRequest{
+		TuneVolume: &rpc.TVolumeTuneRequest{
+			Path:       &path,
+			Properties: properties,
+		},
+	}
+	_, err := conn.performRequest(req)
+	return err
 }
 
 func (conn *portoConnection) LinkVolume(path string, container string) error {

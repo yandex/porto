@@ -7,8 +7,9 @@ import (
 	"os/exec"
 	"syscall"
 	"testing"
+	"time"
 
-	"github.com/yandex/porto/src/api/go/rpc"
+	"./rpc"
 )
 
 func FailOnError(t *testing.T, conn API, err error) {
@@ -86,6 +87,19 @@ func TestDlist(t *testing.T) {
 	t.FailNow()
 }
 
+func TestCreateWeak(t *testing.T) {
+	conn := ConnectToPorto(t)
+	FailOnError(t, conn, conn.CreateWeak(testContainer))
+	conn.Close()
+
+	conn = ConnectToPorto(t)
+	defer conn.Close()
+	err := conn.Destroy(testContainer)
+	if err == nil {
+		t.Fail()
+	}
+}
+
 func TestCreate(t *testing.T) {
 	conn := ConnectToPorto(t)
 	defer conn.Close()
@@ -155,6 +169,18 @@ func TestWait(t *testing.T) {
 	FailOnError(t, conn, err)
 	if container != testContainer {
 		t.Error("Wait returned a wrong container")
+		t.FailNow()
+	}
+}
+
+func TestWaitAll(t *testing.T) {
+	conn := ConnectToPorto(t)
+	defer conn.Close()
+	containers := []string{}
+	container, err := conn.WaitAll(containers, time.Millisecond)
+	FailOnError(t, conn, err)
+	if container != testContainer {
+		t.Error("WaitAll returned a wrong container")
 		t.FailNow()
 	}
 }

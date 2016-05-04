@@ -46,6 +46,7 @@ It has these top-level messages:
 	TVolumeLinkRequest
 	TVolumeUnlinkRequest
 	TVolumeListRequest
+	TVolumeTuneRequest
 	TVolumeListResponse
 	TLayerImportRequest
 	TLayerExportRequest
@@ -56,12 +57,10 @@ It has these top-level messages:
 package rpc
 
 import proto "github.com/golang/protobuf/proto"
-import fmt "fmt"
 import math "math"
 
 // Reference imports to suppress errors if they are not otherwise used.
 var _ = proto.Marshal
-var _ = fmt.Errorf
 var _ = math.Inf
 
 // List of error codes
@@ -514,11 +513,14 @@ type TContainerRequest struct {
 	Version              *TVersionRequest               `protobuf:"bytes,14,opt,name=version" json:"version,omitempty"`
 	Get                  *TContainerGetRequest          `protobuf:"bytes,15,opt,name=get" json:"get,omitempty"`
 	Wait                 *TContainerWaitRequest         `protobuf:"bytes,16,opt,name=wait" json:"wait,omitempty"`
+	CreateWeak           *TContainerCreateRequest       `protobuf:"bytes,17,opt,name=createWeak" json:"createWeak,omitempty"`
+	WaitAll              *TContainerWaitRequest         `protobuf:"bytes,18,opt,name=waitAll" json:"waitAll,omitempty"`
 	ListVolumeProperties *TVolumePropertyListRequest    `protobuf:"bytes,103,opt,name=listVolumeProperties" json:"listVolumeProperties,omitempty"`
 	CreateVolume         *TVolumeCreateRequest          `protobuf:"bytes,104,opt,name=createVolume" json:"createVolume,omitempty"`
 	LinkVolume           *TVolumeLinkRequest            `protobuf:"bytes,105,opt,name=linkVolume" json:"linkVolume,omitempty"`
 	UnlinkVolume         *TVolumeUnlinkRequest          `protobuf:"bytes,106,opt,name=unlinkVolume" json:"unlinkVolume,omitempty"`
 	ListVolumes          *TVolumeListRequest            `protobuf:"bytes,107,opt,name=listVolumes" json:"listVolumes,omitempty"`
+	TuneVolume           *TVolumeTuneRequest            `protobuf:"bytes,108,opt,name=tuneVolume" json:"tuneVolume,omitempty"`
 	ImportLayer          *TLayerImportRequest           `protobuf:"bytes,110,opt,name=importLayer" json:"importLayer,omitempty"`
 	RemoveLayer          *TLayerRemoveRequest           `protobuf:"bytes,111,opt,name=removeLayer" json:"removeLayer,omitempty"`
 	ListLayers           *TLayerListRequest             `protobuf:"bytes,112,opt,name=listLayers" json:"listLayers,omitempty"`
@@ -643,6 +645,20 @@ func (m *TContainerRequest) GetWait() *TContainerWaitRequest {
 	return nil
 }
 
+func (m *TContainerRequest) GetCreateWeak() *TContainerCreateRequest {
+	if m != nil {
+		return m.CreateWeak
+	}
+	return nil
+}
+
+func (m *TContainerRequest) GetWaitAll() *TContainerWaitRequest {
+	if m != nil {
+		return m.WaitAll
+	}
+	return nil
+}
+
 func (m *TContainerRequest) GetListVolumeProperties() *TVolumePropertyListRequest {
 	if m != nil {
 		return m.ListVolumeProperties
@@ -674,6 +690,13 @@ func (m *TContainerRequest) GetUnlinkVolume() *TVolumeUnlinkRequest {
 func (m *TContainerRequest) GetListVolumes() *TVolumeListRequest {
 	if m != nil {
 		return m.ListVolumes
+	}
+	return nil
+}
+
+func (m *TContainerRequest) GetTuneVolume() *TVolumeTuneRequest {
+	if m != nil {
+		return m.TuneVolume
 	}
 	return nil
 }
@@ -1324,6 +1347,30 @@ func (m *TVolumeListRequest) GetContainer() string {
 		return *m.Container
 	}
 	return ""
+}
+
+type TVolumeTuneRequest struct {
+	Path             *string            `protobuf:"bytes,1,req,name=path" json:"path,omitempty"`
+	Properties       []*TVolumeProperty `protobuf:"bytes,2,rep,name=properties" json:"properties,omitempty"`
+	XXX_unrecognized []byte             `json:"-"`
+}
+
+func (m *TVolumeTuneRequest) Reset()         { *m = TVolumeTuneRequest{} }
+func (m *TVolumeTuneRequest) String() string { return proto.CompactTextString(m) }
+func (*TVolumeTuneRequest) ProtoMessage()    {}
+
+func (m *TVolumeTuneRequest) GetPath() string {
+	if m != nil && m.Path != nil {
+		return *m.Path
+	}
+	return ""
+}
+
+func (m *TVolumeTuneRequest) GetProperties() []*TVolumeProperty {
+	if m != nil {
+		return m.Properties
+	}
+	return nil
 }
 
 type TVolumeListResponse struct {
