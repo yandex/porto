@@ -263,4 +263,7 @@ public:
     void WakeupWaiter(const TContainer *who, bool wildcard = false);
     static void WakeupWildcard(const TContainer *who);
     static void AddWildcard(std::shared_ptr<TContainerWaiter> &waiter);
+
+    std::vector<std::string> Wildcards;
+    bool MatchWildcard(const std::string &name);
 };

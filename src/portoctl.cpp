@@ -1381,8 +1381,8 @@ public:
 class TWaitCmd final : public ICmd {
 public:
     TWaitCmd(Porto::Connection *api) : ICmd(api, "wait", 0,
-             "[-T <seconds>] <container1> [container2] ...",
-             "wait for any listed container change state to non-running",
+             "[-T <seconds>] <container|wildcard> ...",
+             "Wait for any listed container change state to dead or meta without running children",
              "    -T <seconds>  timeout\n"
              ) {}
 

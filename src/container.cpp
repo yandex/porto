@@ -36,6 +36,7 @@ extern "C" {
 #include <fcntl.h>
 #include <sys/fsuid.h>
 #include <sys/stat.h>
+#include <fnmatch.h>
 }
 
 using std::string;
@@ -2259,7 +2260,7 @@ void TContainerWaiter::WakeupWaiter(const TContainer *who, bool wildcard) {
         TError err;
         if (who)
             err = client->ComposeRelativeName(*who, name);
-        if (err && wildcard)
+        if (wildcard && (err || !MatchWildcard(name)))
             return;
         Callback(client, err, name);
         Client.reset();
@@ -2291,6 +2292,13 @@ void TContainerWaiter::AddWildcard(std::shared_ptr<TContainerWaiter> &waiter) {
     }
     WildcardWaiters.push_back(waiter);
     WildcardLock.unlock();
+}
+
+bool TContainerWaiter::MatchWildcard(const std::string &name) {
+    for (const auto &wildcard: Wildcards)
+        if (!fnmatch(wildcard.c_str(), name.c_str(), FNM_PATHNAME))
+            return true;
+    return false;
 }
 
 TError TContainer::StopTree(TScopedLock &holder_lock) {

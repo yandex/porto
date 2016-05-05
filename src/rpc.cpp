@@ -764,6 +764,7 @@ noinline TError Wait(TContext &context,
                      rpc::TContainerResponse &rsp,
                      std::shared_ptr<TClient> client) {
     auto lock = context.Cholder->ScopedLock();
+    bool queueWait = !req.has_timeout() || req.timeout() != 0;
 
     if (!req.name_size())
         return TError(EError::InvalidValue, "Containers are not specified");
@@ -781,6 +782,12 @@ noinline TError Wait(TContext &context,
     for (int i = 0; i < req.name_size(); i++) {
         std::string name = req.name(i);
         std::string abs_name;
+
+        if (name.find('*') != string::npos) {
+            waiter->Wildcards.push_back(name);
+            continue;
+        }
+
         TError err = client->ResolveRelativeName(name, abs_name, true);
         if (err) {
             rsp.mutable_wait()->set_name(name);
@@ -794,6 +801,7 @@ noinline TError Wait(TContext &context,
             return err;
         }
 
+        /* Explicit wait notifies non-running and hollow meta immediately */
         auto state = container->GetState();
         if (state != EContainerState::Running &&
                 (state != EContainerState::Meta ||
@@ -802,7 +810,37 @@ noinline TError Wait(TContext &context,
             return TError::Success();
         }
 
-        container->AddWaiter(waiter);
+        if (queueWait)
+            container->AddWaiter(waiter);
+    }
+
+    if (!waiter->Wildcards.empty()) {
+        for (auto &container : context.Cholder->List()) {
+            if (container->IsRoot() || container->IsPortoRoot())
+                continue;
+
+            /* Wildcard notifies immediately only dead and hollow meta */
+            auto state = container->GetState();
+            if (state != EContainerState::Dead &&
+                (state != EContainerState::Meta ||
+                 container->GetRunningChildren()))
+                continue;
+
+            std::string name;
+            if (!client->ComposeRelativeName(*container, name) &&
+                    waiter->MatchWildcard(name)) {
+                rsp.mutable_wait()->set_name(name);
+                return TError::Success();
+            }
+        }
+
+        if (queueWait)
+            TContainerWaiter::AddWildcard(waiter);
+    }
+
+    if (!queueWait) {
+        rsp.mutable_wait()->set_name("");
+        return TError::Success();
     }
 
     client->Waiter = waiter;
