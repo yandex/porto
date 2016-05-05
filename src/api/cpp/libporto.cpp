@@ -370,8 +370,8 @@ int Connection::Resume(const std::string &name) {
 }
 
 int Connection::WaitContainers(const std::vector<std::string> &containers,
-                               std::string &name, int timeout, bool all) {
-    auto wait = all ? Impl->Req.mutable_waitall() : Impl->Req.mutable_wait();
+                               std::string &name, int timeout) {
+    auto wait = Impl->Req.mutable_wait();
     int ret, recv_timeout = 0;
 
     for (const auto &c : containers)

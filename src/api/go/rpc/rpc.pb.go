@@ -514,7 +514,6 @@ type TContainerRequest struct {
 	Get                  *TContainerGetRequest          `protobuf:"bytes,15,opt,name=get" json:"get,omitempty"`
 	Wait                 *TContainerWaitRequest         `protobuf:"bytes,16,opt,name=wait" json:"wait,omitempty"`
 	CreateWeak           *TContainerCreateRequest       `protobuf:"bytes,17,opt,name=createWeak" json:"createWeak,omitempty"`
-	WaitAll              *TContainerWaitRequest         `protobuf:"bytes,18,opt,name=waitAll" json:"waitAll,omitempty"`
 	ListVolumeProperties *TVolumePropertyListRequest    `protobuf:"bytes,103,opt,name=listVolumeProperties" json:"listVolumeProperties,omitempty"`
 	CreateVolume         *TVolumeCreateRequest          `protobuf:"bytes,104,opt,name=createVolume" json:"createVolume,omitempty"`
 	LinkVolume           *TVolumeLinkRequest            `protobuf:"bytes,105,opt,name=linkVolume" json:"linkVolume,omitempty"`
@@ -648,13 +647,6 @@ func (m *TContainerRequest) GetWait() *TContainerWaitRequest {
 func (m *TContainerRequest) GetCreateWeak() *TContainerCreateRequest {
 	if m != nil {
 		return m.CreateWeak
-	}
-	return nil
-}
-
-func (m *TContainerRequest) GetWaitAll() *TContainerWaitRequest {
-	if m != nil {
-		return m.WaitAll
 	}
 	return nil
 }

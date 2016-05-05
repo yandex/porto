@@ -1381,28 +1381,25 @@ public:
 class TWaitCmd final : public ICmd {
 public:
     TWaitCmd(Porto::Connection *api) : ICmd(api, "wait", 0,
-             "[-A] [-T <seconds>] <container1> [container2] ...",
+             "[-T <seconds>] <container1> [container2] ...",
              "wait for any listed container change state to non-running",
-             "    -A            wait for all containers except listed\n"
              "    -T <seconds>  timeout\n"
              ) {}
 
     int Execute(TCommandEnviroment *env) final override {
         int timeout = -1;
-        bool all = false;
         const auto &containers = env->GetOpts({
             { 't', true, [&](const char *arg) { timeout = (std::stoi(arg) + 999) / 1000; } },
             { 'T', true, [&](const char *arg) { timeout = std::stoi(arg); } },
-            { 'A', false, [&](const char *arg) { all = true; } },
         });
 
-        if (!all && containers.empty()) {
+        if (containers.empty()) {
             PrintUsage();
             return EXIT_FAILURE;
         }
 
         std::string name;
-        int ret = Api->WaitContainers(containers, name, timeout, all);
+        int ret = Api->WaitContainers(containers, name, timeout);
         if (ret) {
             PrintError("Can't wait for containers");
             return ret;

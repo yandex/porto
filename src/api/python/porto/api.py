@@ -295,18 +295,6 @@ class _RPC(object):
             raise exceptions.EError.Create(resp.error, resp.errorMsg)
         return resp.wait.name
 
-    def WaitAll(self, except_containers, timeout=None):
-        request = rpc_pb2.TContainerRequest()
-        request.waitAll.CopyFrom(rpc_pb2.TContainerWaitRequest())
-        request.waitAll.name.extend(except_containers)
-        if timeout is not None and timeout >= 0:
-            request.waitAll.timeout = timeout
-
-        resp = self.call(request, None)
-        if resp.error != rpc_pb2.Success:
-            raise exceptions.EError.Create(resp.error, resp.errorMsg)
-        return resp.wait.name
-
     def ListVolumeProperties(self):
         request = rpc_pb2.TContainerRequest()
         request.listVolumeProperties.CopyFrom(rpc_pb2.TVolumePropertyListRequest())
@@ -556,9 +544,6 @@ class Connection(object):
 
     def Wait(self, containers, timeout=None):
         return self.rpc.Wait(containers, timeout)
-
-    def WaitAll(self, except_containers, timeout=None):
-        return self.rpc.WaitAll(except_containers, timeout)
 
     def CreateVolume(self, path=None, layers=[], **properties):
         if layers:

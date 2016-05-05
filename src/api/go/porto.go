@@ -112,7 +112,6 @@ type API interface {
 	Resume(name string) error
 
 	Wait(containers []string, timeout time.Duration) (string, error)
-	WaitAll(except_containers []string, timeout time.Duration) (string, error)
 
 	List() ([]string, error)
 	Plist() ([]TProperty, error)
@@ -325,30 +324,6 @@ func (conn *portoConnection) Wait(containers []string, timeout time.Duration) (s
 
 		timeoutms := uint32(timeout / time.Millisecond)
 		req.Wait.Timeout = &timeoutms
-	}
-
-	resp, err := conn.performRequest(req)
-	if err != nil {
-		return "", err
-	}
-
-	return resp.GetWait().GetName(), nil
-}
-
-func (conn *portoConnection) WaitAll(except_containers []string, timeout time.Duration) (string, error) {
-	req := &rpc.TContainerRequest{
-		WaitAll: &rpc.TContainerWaitRequest{
-			Name: except_containers,
-		},
-	}
-
-	if timeout >= 0 {
-		if timeout/time.Millisecond > math.MaxUint32 {
-			return "", fmt.Errorf("timeout must be less than %d ms", math.MaxUint32)
-		}
-
-		timeoutms := uint32(timeout / time.Millisecond)
-		req.WaitAll.Timeout = &timeoutms
 	}
 
 	resp, err := conn.performRequest(req)

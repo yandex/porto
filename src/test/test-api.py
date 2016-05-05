@@ -70,8 +70,6 @@ assert a.Wait() == a.name
 assert a.GetData("state") == "dead"
 assert a.GetData("exit_status") == "0"
 
-assert c.WaitAll([]) == a.name
-
 a.Stop()
 assert a.GetData("state") == "stopped"
 

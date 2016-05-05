@@ -7,7 +7,6 @@ import (
 	"os/exec"
 	"syscall"
 	"testing"
-	"time"
 
 	"./rpc"
 )
@@ -169,18 +168,6 @@ func TestWait(t *testing.T) {
 	FailOnError(t, conn, err)
 	if container != testContainer {
 		t.Error("Wait returned a wrong container")
-		t.FailNow()
-	}
-}
-
-func TestWaitAll(t *testing.T) {
-	conn := ConnectToPorto(t)
-	defer conn.Close()
-	containers := []string{}
-	container, err := conn.WaitAll(containers, time.Millisecond)
-	FailOnError(t, conn, err)
-	if container != testContainer {
-		t.Error("WaitAll returned a wrong container")
 		t.FailNow()
 	}
 }
