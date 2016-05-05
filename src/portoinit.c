@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
 
     for (argn = 1; argn < argc; argn++) {
         if (!strcmp(argv[argn], "-v") || !strcmp(argv[argn], "--version")) {
-            printf("%s %s\n", GIT_TAG, GIT_REVISION);
+            printf("%s %s\n", PORTO_VERSION, PORTO_REVISION);
             return EXIT_SUCCESS;
         }
 

@@ -64,7 +64,12 @@ if(ENABLE_PYTHON)
 			--prefix=\${CMAKE_INSTALL_PREFIX})")
 endif()
 
-add_custom_target(version.hpp COMMAND ${CMAKE_SOURCE_DIR}/GIT-VERSION-GEN VERBATIM)
+
+add_custom_target(version ALL
+		   COMMAND ${CMAKE_SOURCE_DIR}/GIT-VERSION-GEN
+			   ${CMAKE_SOURCE_DIR}/debian/changelog
+			   ${CMAKE_CURRENT_BINARY_DIR}/version.c VERBATIM)
+add_custom_command(OUTPUT version.c DEPENDS version)
 
 set_source_files_properties(tags PROPERTIES GENERATED true)
 add_custom_target(tags COMMAND ctags -R --c++-kinds=+p --fields=+iaS --extra=+q . WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
@@ -79,24 +84,20 @@ add_subdirectory(util)
 link_directories(${yandex-porto_BINARY_DIR})
 include_directories(${yandex-porto_BINARY_DIR}/api/cpp)
 
-add_executable(portod portod.cpp cgroup.cpp rpc.cpp container.cpp holder.cpp event.cpp task.cpp env.cpp device.cpp network.cpp kvalue.cpp config.cpp container_value.cpp value.cpp data.cpp property.cpp context.cpp volume.cpp epoll.cpp client.cpp stream.cpp protobuf.cpp)
-add_dependencies(portod version.hpp)
+add_executable(portod portod.cpp version.c cgroup.cpp rpc.cpp container.cpp holder.cpp event.cpp task.cpp env.cpp device.cpp network.cpp kvalue.cpp config.cpp container_value.cpp value.cpp data.cpp property.cpp context.cpp volume.cpp epoll.cpp client.cpp stream.cpp protobuf.cpp)
 target_link_libraries(portod porto protobufs util ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
 
-add_executable(portoctl ${PYTHON_SOURCES} portoctl.cpp cli.cpp config.cpp portotop.cpp)
-add_dependencies(portoctl version.hpp)
+add_executable(portoctl ${PYTHON_SOURCES} portoctl.cpp version.c cli.cpp config.cpp portotop.cpp)
 target_link_libraries(portoctl porto protobufs util ${PB} rt ${CURSES_LIBRARIES} ${LIBNL} ${LIBNL_ROUTE})
 
-add_executable(portoinit portoinit.c)
-add_dependencies(portoinit version.hpp)
+add_executable(portoinit portoinit.c version.c)
 if(NOT ENABLE_ASAN)
 	set_target_properties(portoinit PROPERTIES LINK_FLAGS "-static")
 endif()
 
 set(TEST_TARGETS "")
 if(ENABLE_TEST)
-	add_executable(portotest portotest.cpp config.cpp protobuf.cpp test/selftest.cpp test/stresstest.cpp test/fuzzytest.cpp test/test.cpp)
-	add_dependencies(portotest version.hpp)
+	add_executable(portotest portotest.cpp version.c config.cpp protobuf.cpp test/selftest.cpp test/stresstest.cpp test/fuzzytest.cpp test/test.cpp)
 	target_link_libraries(portotest porto protobufs util ${PB} ${LIBNL} ${LIBNL_ROUTE} pthread rt)
 	set(TEST_TARGETS "portotest")
 endif()

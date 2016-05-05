@@ -91,7 +91,7 @@ static int DaemonPrepare(bool master) {
         return ret;
 
     L_SYS() << string(80, '-') << std::endl;
-    L_SYS() << "Started " << GIT_TAG << " " << GIT_REVISION << " " << GetPid() << std::endl;
+    L_SYS() << "Started " << PORTO_VERSION << " " << PORTO_REVISION << " " << GetPid() << std::endl;
     L_SYS() << config().DebugString() << std::endl;
 
     return EXIT_SUCCESS;
@@ -857,22 +857,6 @@ exit:
     return ret;
 }
 
-void CheckVersion(int &prevMaj, int &prevMin) {
-    TPath path(PORTO_VERSION_FILE);
-    std::string prevVer;
-
-    prevMaj = 0;
-    prevMin = 0;
-
-    if (!path.ReadAll(prevVer))
-        (void)sscanf(prevVer.c_str(), "v%d.%d", &prevMaj, &prevMin);
-    else
-        (void)path.Mkfile(0644);
-
-    if (path.WriteAll(GIT_TAG))
-        L_ERR() << "Can't update current version" << std::endl;
-}
-
 static int MasterMain(bool respawn) {
     Statistics->MasterStarted = GetCurrentTimeMs();
 
@@ -880,9 +864,16 @@ static int MasterMain(bool respawn) {
     if (ret)
         return ret;
 
-    int prevMaj, prevMin;
-    CheckVersion(prevMaj, prevMin);
-    L_SYS() << "Updating from previous version v" << prevMaj << "." << prevMin << std::endl;
+    TPath pathVer(PORTO_VERSION_FILE);
+    std::string prevVer;
+
+    if (pathVer.ReadAll(prevVer))
+        (void)pathVer.Mkfile(0644);
+    else
+        L_SYS() << "Updating from previous version: " << prevVer << std::endl;
+
+    if (pathVer.WriteAll(PORTO_VERSION))
+        L_ERR() << "Can't update current version" << std::endl;
 
     std::shared_ptr<TEpollLoop> ELoop = std::make_shared<TEpollLoop>();
     TError error = ELoop->Create();
@@ -1008,7 +999,7 @@ int main(int argc, char * const argv[]) {
         string arg(argv[argn]);
 
         if (arg == "-v" || arg == "--version") {
-            std::cout << GIT_TAG << " " << GIT_REVISION <<std::endl;
+            std::cout << PORTO_VERSION << " " << PORTO_REVISION << std::endl;
             return EXIT_SUCCESS;
         } else if (arg == "--kv-dump") {
             KvDump();

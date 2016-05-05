@@ -1,9 +1,9 @@
 #!/bin/sh
 
-FMT="#define GIT_TAG \"%s\"\n#define GIT_REVISION \"%s\"\n"
-TAG="`git describe --match "v[0-9]*" --abbrev=7 HEAD 2>/dev/null`"
-REV="`git rev-parse HEAD`"
+FMT="const char PORTO_VERSION[] = \"%s\";\nconst char PORTO_REVISION[] = \"%s\";\n"
+VER="`sed -nE 's#.*\((.*)\).*#\1#p;q' $1`"
+REV="`git describe --tags --dirty=-dirty`"
 
-if [ "`cat version.hpp`" != "`printf "$FMT" "$TAG" "$REV"`" ] ; then
-	printf "$FMT" "$TAG" "$REV" > version.hpp
+if [ "`cat $2`" != "`printf "$FMT" "$VER" "$REV"`" ] ; then
+	printf "$FMT" "$VER" "$REV" > $2
 fi

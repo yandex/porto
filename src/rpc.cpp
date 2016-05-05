@@ -753,8 +753,8 @@ noinline TError Version(TContext &context,
                         rpc::TContainerResponse &rsp) {
     auto ver = rsp.mutable_version();
 
-    ver->set_tag(GIT_TAG);
-    ver->set_revision(GIT_REVISION);
+    ver->set_tag(PORTO_VERSION);
+    ver->set_revision(PORTO_REVISION);
 
     return TError::Success();
 }

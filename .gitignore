@@ -7,7 +7,7 @@ portotest
 *.pb.cc
 *.pb.h
 *.py[oc]
-version.hpp
+version.c
 CMakeCache.txt
 CMakeFiles
 cmake_install.cmake

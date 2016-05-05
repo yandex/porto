@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
         }
 
         if (name == "-v" || name == "--version") {
-            std::cout << GIT_TAG << " " << GIT_REVISION <<std::endl;
+            std::cout << PORTO_VERSION << " " << PORTO_REVISION << std::endl;
             return EXIT_FAILURE;
         }
     }

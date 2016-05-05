@@ -5226,11 +5226,11 @@ static void TestCgroups(Porto::Connection &api) {
 }
 
 static void TestVersion(Porto::Connection &api) {
-    string tag, revision;
-    ExpectApiSuccess(api.GetVersion(tag, revision));
+    string version, revision;
+    ExpectApiSuccess(api.GetVersion(version, revision));
 
-    ExpectEq(tag, GIT_TAG);
-    ExpectEq(revision, GIT_REVISION);
+    ExpectEq(version, PORTO_VERSION);
+    ExpectEq(revision, PORTO_REVISION);
 }
 
 static void TestBadClient(Porto::Connection &api) {
