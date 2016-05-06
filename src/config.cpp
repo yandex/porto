@@ -98,7 +98,7 @@ void TConfig::Load() {
     }
 
 load_cred:
-    Verbose = config().log().verbose();
+    Verbose |= config().log().verbose();
 
     InitCred();
 }

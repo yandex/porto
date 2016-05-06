@@ -12,7 +12,7 @@ extern "C" {
 #include <fcntl.h>
 }
 
-bool Verbose = true; /* be verbose while loading config */
+bool Verbose;
 
 TStatistics *Statistics = nullptr;
 

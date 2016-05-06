@@ -1008,6 +1008,8 @@ int main(int argc, char * const argv[]) {
             slaveMode = true;
         } else if (arg == "--stdlog") {
             stdlog = true;
+        } else if (arg == "--verbose") {
+            Verbose = true;
         } else if (arg == "--norespawn") {
             respawn = false;
         } else if (arg == "--failsafe") {
