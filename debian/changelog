@@ -1,3 +1,22 @@
+yandex-porto (2.9) unstable; urgency=medium
+
+  * network: include net/if.h for flags IFF_*
+  * util/log: fix deadlock around localtime_r kludge
+  * porto: increase clients limit and update fd rlimit
+  * porto: add container start timeout
+  * util: move fork/localtime kludge from log into unix
+  * porto: cleanup task start and wakeup sequence
+  * portoctl: implement WaitAll operation
+  * api/go: regenerate rpc, add CreateWeak TuneVolume WaitAll
+  * porto: remove WaitAll
+  * porto: add wildcard wait
+  * porto: refactor version management
+  * porto: add command line option "--verbose"
+  * porto: use system libnl
+  * porto: add anon_usage and anon_limit
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 06 May 2016 19:54:25 +0300
+
 yandex-porto (2.8.8) unstable; urgency=medium
 
   [ Vsevolod Velichko ]
