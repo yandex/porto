@@ -569,7 +569,8 @@ static string HumanValue(const string &name, const string &val) {
     if (val == "")
         return val;
 
-    if (name == "memory_guarantee" || name == "memory_limit") {
+    if (name == "memory_guarantee" || name == "memory_limit" ||
+            name == "anon_usage" || name == "anon_limit") {
         return HumanSize(val);
     } else if (name == "exit_status") {
         int status;

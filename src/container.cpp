@@ -418,6 +418,12 @@ TError TContainer::ApplyDynamicProperties() {
         return error;
     }
 
+    error = MemorySubsystem.SetAnonLimit(memcg, Prop->Get<uint64_t>(P_ANON_LIMIT));
+    if (error) {
+        L_ERR() << "Can't set " << P_ANON_LIMIT << ": " << error << std::endl;
+        return error;
+    }
+
     error = MemorySubsystem.RechargeOnPgfault(memcg, Prop->Get<bool>(P_RECHARGE_ON_PGFAULT));
     if (error) {
         L_ERR() << "Can't set " << P_RECHARGE_ON_PGFAULT << ": " << error << std::endl;

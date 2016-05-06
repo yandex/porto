@@ -20,6 +20,7 @@ constexpr const char *D_STDOUT_OFFSET = "stdout_offset";
 constexpr const char *D_STDERR_OFFSET = "stderr_offset";
 constexpr const char *D_CPU_USAGE = "cpu_usage";
 constexpr const char *D_MEMORY_USAGE = "memory_usage";
+constexpr const char *D_ANON_USAGE = "anon_usage";
 constexpr const char *D_NET_BYTES = "net_bytes";
 constexpr const char *D_NET_PACKETS = "net_packets";
 constexpr const char *D_NET_DROPS = "net_drops";

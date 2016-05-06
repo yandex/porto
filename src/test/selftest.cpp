@@ -3007,6 +3007,7 @@ static void TestRoot(Porto::Connection &api) {
     }
 
     vector<string> data = {
+        "anon_usage",
         "absolute_name",
         "absolute_namespace",
         "state",
@@ -3045,18 +3046,24 @@ static void TestRoot(Porto::Connection &api) {
     std::vector<Porto::Property> plist;
 
     ExpectApiSuccess(api.Plist(plist));
-    ExpectEq(plist.size(), properties.size());
 
-    for (auto p: plist)
-        Expect(std::find(properties.begin(), properties.end(), p.Name) != properties.end());
+    for (auto name: properties) {
+        bool found = false;
+        for (auto p: plist)
+            found |= p.Name == name;
+        Expect(found);
+    }
 
     std::vector<Porto::Property> dlist;
 
     ExpectApiSuccess(api.Dlist(dlist));
-    ExpectEq(dlist.size(), data.size());
 
-    for (auto d: dlist)
-        Expect(std::find(data.begin(), data.end(), d.Name) != data.end());
+    for (auto name: data) {
+        bool found = false;
+        for (auto d: dlist)
+            found |= d.Name == name;
+        Expect(found);
+    }
 
     Say() << "Check root cpu_usage & memory_usage" << std::endl;
     ExpectApiSuccess(api.GetData(porto_root, "cpu_usage", v));

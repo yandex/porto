@@ -308,6 +308,30 @@ TError TMemorySubsystem::SetLimit(TCgroup &cg, uint64_t limit) {
     return error;
 }
 
+TError TMemorySubsystem::GetAnonUsage(TCgroup &cg, uint64_t &usage) const {
+    if (cg.Has(ANON_USAGE))
+        return cg.GetUint64(ANON_USAGE, usage);
+
+    TUintMap stat;
+    TError error = Statistics(cg, stat);
+    if (!error)
+        usage = stat["total_inactive_anon"] +
+                stat["total_active_anon"] +
+                stat["unevictable"] +
+                stat["total_swap"];
+    return error;
+}
+
+bool TMemorySubsystem::SupportAnonLimit() const {
+    return Cgroup(PORTO_DAEMON_CGROUP).Has(ANON_LIMIT);
+}
+
+TError TMemorySubsystem::SetAnonLimit(TCgroup &cg, uint64_t limit) const {
+    if (cg.Has(ANON_LIMIT))
+        return cg.Set(ANON_LIMIT, limit ? std::to_string(limit) : "-1");
+    return TError::Success();
+}
+
 TError TMemorySubsystem::SetIoLimit(TCgroup &cg, uint64_t limit) {
     if (!SupportIoLimit())
         return TError::Success();

@@ -299,6 +299,17 @@ public:
                         "Memory hard limit [bytes] (dynamic)") {}
 };
 
+class TAnonLimitProperty : public TSizeValue, public TContainerValue {
+public:
+    TAnonLimitProperty() :
+        TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
+        TContainerValue(P_ANON_LIMIT,
+                        "Anonymous memory limit [bytes] (dynamic)") {
+            if (!MemorySubsystem.SupportAnonLimit())
+                SetFlag(UNSUPPORTED_FEATURE);
+        }
+};
+
 class TDirtyLimitProperty : public TSizeValue, public TContainerValue {
 public:
     TDirtyLimitProperty() :
@@ -1055,6 +1066,7 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TStdoutLimitProperty,
         new TMemoryGuaranteeProperty,
         new TMemoryLimitProperty,
+        new TAnonLimitProperty,
         new TDirtyLimitProperty,
         new TRechargeOnPgfaultProperty,
         new TCpuPolicyProperty,

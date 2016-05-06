@@ -108,6 +108,8 @@ public:
     const std::string DIRTY_RATIO = "memory.dirty_ratio";
     const std::string FS_BPS_LIMIT = "memory.fs_bps_limit";
     const std::string FS_IOPS_LIMIT = "memory.fs_iops_limit";
+    const std::string ANON_USAGE = "memory.anon.usage";
+    const std::string ANON_LIMIT = "memory.anon.limit";
 
     TMemorySubsystem() : TSubsystem("memory") {}
 
@@ -158,6 +160,10 @@ public:
             return TError::Success();
         return cg.SetBool(RECHARGE_ON_PAGE_FAULT, enable);
     }
+
+    TError GetAnonUsage(TCgroup &cg, uint64_t &usage) const;
+    bool SupportAnonLimit() const;
+    TError SetAnonLimit(TCgroup &cg, uint64_t limit) const;
 
     TError SetLimit(TCgroup &cg, uint64_t limit);
     TError SetIoLimit(TCgroup &cg, uint64_t limit);

@@ -200,6 +200,22 @@ public:
     }
 };
 
+class TAnonUsageData : public TUintValue, public TContainerValue {
+public:
+    TAnonUsageData() :
+        TUintValue(READ_ONLY_VALUE | RUNTIME_VALUE),
+        TContainerValue(D_ANON_USAGE,
+                        "current anonymous memory usage [bytes] (ro)") {}
+
+    uint64_t GetDefault() const override {
+        auto cg = GetContainer()->GetCgroup(MemorySubsystem);
+        uint64_t val;
+        if (MemorySubsystem.GetAnonUsage(cg, val))
+            return 0;
+        return val;
+    }
+};
+
 class TNetBytesData : public TMapValue, public TContainerValue {
 public:
     TNetBytesData() :
@@ -527,6 +543,7 @@ void RegisterData(std::shared_ptr<TRawValueMap> m,
         new TStderrOffset,
         new TCpuUsageData,
         new TMemUsageData,
+        new TAnonUsageData,
         new TNetBytesData,
         new TNetPacketsData,
         new TNetDropsData,
