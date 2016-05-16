@@ -35,7 +35,7 @@ bool TCgroup::IsRoot() const {
 bool TCgroup::Exists() const {
     if (!Subsystem)
         return false;
-    return Path().Exists();
+    return Path().IsDirectoryStrict();
 }
 
 TError TCgroup::Create() const {
@@ -82,7 +82,7 @@ TError TCgroup::Remove() const {
 bool TCgroup::Has(const std::string &knob) const {
     if (!Subsystem)
         return false;
-    return Knob(knob).Exists();
+    return Knob(knob).IsRegularStrict();
 }
 
 TError TCgroup::Get(const std::string &knob, std::string &value) const {
