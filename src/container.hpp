@@ -96,8 +96,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void StopChildren(TScopedLock &holder_lock);
     TError PrepareResources(std::shared_ptr<TClient> client);
     void FreeResources();
-    void PropertyToAlias(const std::string &property, std::string &value) const;
-    TError AliasToProperty(std::string &property, std::string &value);
 
     void RestoreStdPath(const std::string &property);
     void CreateStdStreams();

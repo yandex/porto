@@ -1461,55 +1461,31 @@ void TContainer::ParsePropertyName(std::string &name, std::string &idx) {
     idx = StringTrim(tokens[1], " \t\n]");
 }
 
-void TContainer::PropertyToAlias(const string &property, string &value) const {
-        if (property == "cpu.smart") {
-            if (value == "rt")
-                value = "1";
-            else
-                value = "0";
-        } else if (property == "memory.recharge_on_pgfault") {
-            value = value == "true" ? "1" : "0";
-        }
-}
-
-TError TContainer::AliasToProperty(string &property, string &value) {
-        if (property == "cpu.smart") {
-            if (value == "0") {
-                property = P_CPU_POLICY;
-                value = "normal";
-            } else {
-                property = P_CPU_POLICY;
-                value = "rt";
-            }
-        } else if (property == "memory.limit_in_bytes") {
-            property = P_MEM_LIMIT;
-        } else if (property == "memory.low_limit_in_bytes") {
-            property = P_MEM_GUARANTEE;
-        } else if (property == "memory.recharge_on_pgfault") {
-            property = P_RECHARGE_ON_PGFAULT;
-            value = value == "0" ? "false" : "true";
-        }
-
-        return TError::Success();
-}
-
-static std::map<std::string, std::string> alias = {
-    { "cpu.smart", P_CPU_POLICY },
-    { "memory.limit_in_bytes", P_MEM_LIMIT },
-    { "memory.low_limit_in_bytes", P_MEM_GUARANTEE },
-    { "memory.recharge_on_pgfault", P_RECHARGE_ON_PGFAULT },
-};
-
 TError TContainer::GetProperty(const string &origProperty, string &value,
                                std::shared_ptr<TClient> &client) const {
+    std::string property = origProperty;
+    auto dot = property.find('.');
     TError error;
 
-    string property = origProperty;
+    if (dot != string::npos) {
+        std::string type = property.substr(0, dot);
+        if (State == EContainerState::Stopped)
+            return TError(EError::InvalidState,
+                          "Not available in stopped state: " + property);
+        for (auto subsys: Subsystems) {
+            if (subsys->Type == type) {
+                auto cg = GetCgroup(*subsys);
+                if (!cg.Has(property))
+                    break;
+                return cg.Get(property, value);
+            }
+        }
+        return TError(EError::InvalidProperty,
+                      "Unknown cgroup attribute: " + property);
+    }
+
     std::string idx;
     ParsePropertyName(property, idx);
-
-    if (alias.find(origProperty) != alias.end())
-        property = alias.at(origProperty);
 
     auto prop = Prop->Find(property);
     if (!prop) {
@@ -1551,15 +1527,12 @@ TError TContainer::GetProperty(const string &origProperty, string &value,
     if (error)
         return error;
 
-    PropertyToAlias(origProperty, value);
-
     return TError::Success();
 }
 
 TError TContainer::SetProperty(const string &origProperty,
                                const string &origValue,
                                std::shared_ptr<TClient> &client) {
-
     if (IsRoot() || IsPortoRoot())
         return TError(EError::Permission, "System containers are read only");
 
@@ -1567,10 +1540,7 @@ TError TContainer::SetProperty(const string &origProperty,
     std::string idx;
     ParsePropertyName(property, idx);
     string value = StringTrim(origValue);
-
-    TError error = AliasToProperty(property, value);
-    if (error)
-        return error;
+    TError error;
 
     auto prop = Prop->Find(property);
     if (!prop)

@@ -561,6 +561,28 @@ noinline TError SetContainerProperty(TContext &context,
                                      rpc::TContainerResponse &rsp,
                                      std::shared_ptr<TClient> client) {
     auto holder_lock = context.Cholder->ScopedLock();
+    std::string property = req.property();
+    std::string value = req.value();
+
+    /* legacy kludge */
+    if (property.find('.') != string::npos) {
+        if (property == "cpu.smart") {
+            if (value == "0") {
+                property = P_CPU_POLICY;
+                value = "normal";
+            } else {
+                property = P_CPU_POLICY;
+                value = "rt";
+            }
+        } else if (property == "memory.limit_in_bytes") {
+            property = P_MEM_LIMIT;
+        } else if (property == "memory.low_limit_in_bytes") {
+            property = P_MEM_GUARANTEE;
+        } else if (property == "memory.recharge_on_pgfault") {
+            property = P_RECHARGE_ON_PGFAULT;
+            value = value == "0" ? "false" : "true";
+        }
+    }
 
     TError err = CheckPortoWriteAccess(client);
     if (err)
@@ -574,9 +596,9 @@ noinline TError SetContainerProperty(TContext &context,
 
     TScopedAcquire acquire(container);
     if (!acquire.IsAcquired())
-        return TError(EError::Busy, "Can't set property " + req.property() + " of busy container " + container->GetName());
+        return TError(EError::Busy, "Can't set property " + property + " of busy container " + container->GetName());
 
-    return container->SetProperty(req.property(), req.value(), client);
+    return container->SetProperty(property, value, client);
 }
 
 noinline TError GetContainerData(TContext &context,

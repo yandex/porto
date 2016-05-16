@@ -191,18 +191,10 @@ static void ShouldHaveValidProperties(Porto::Connection &api, const string &name
 
     ExpectApiSuccess(api.GetProperty(name, "respawn", v));
     ExpectEq(v, string("false"));
-    if (KernelSupports(KernelFeature::SMART)) {
-        ExpectApiSuccess(api.GetProperty(name, "cpu.smart", v));
-        ExpectEq(v, string("0"));
-    }
-    ExpectApiSuccess(api.GetProperty(name, "memory.limit_in_bytes", v));
+    ExpectApiSuccess(api.GetProperty(name, "memory_limit", v));
     ExpectEq(v, string("0"));
     if (KernelSupports(KernelFeature::LOW_LIMIT)) {
-        ExpectApiSuccess(api.GetProperty(name, "memory.low_limit_in_bytes", v));
-        ExpectEq(v, string("0"));
-    }
-    if (KernelSupports(KernelFeature::RECHARGE_ON_PGFAULT)) {
-        ExpectApiSuccess(api.GetProperty(name, "memory.recharge_on_pgfault", v));
+        ExpectApiSuccess(api.GetProperty(name, "memory_guarantee", v));
         ExpectEq(v, string("0"));
     }
     ExpectApiSuccess(api.GetProperty(name, "stdin_path", v));
@@ -3761,28 +3753,13 @@ static void TestAlias(Porto::Connection &api) {
     if (!KernelSupports(KernelFeature::SMART))
         return;
 
-    string name = "a";
+    std::string name = "a", current, alias, real;
+
     ExpectApiSuccess(api.Create(name));
 
     Say() << "Check default limits" << std::endl;
-    string current;
-    string alias, real;
 
     ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
-    ExpectApiSuccess(api.GetProperty(name, "memory.limit_in_bytes", alias));
-    ExpectApiSuccess(api.GetProperty(name, "memory_limit", real));
-    ExpectEq(alias, real);
-    ExpectApiSuccess(api.GetProperty(name, "memory.low_limit_in_bytes", alias));
-    ExpectApiSuccess(api.GetProperty(name, "memory_guarantee", real));
-    ExpectEq(alias, real);
-    ExpectApiSuccess(api.GetProperty(name, "memory.recharge_on_pgfault", alias));
-    ExpectApiSuccess(api.GetProperty(name, "recharge_on_pgfault", real));
-    ExpectEq(alias, "0");
-    ExpectEq(real, "false");
-    ExpectApiSuccess(api.GetProperty(name, "cpu.smart", alias));
-    ExpectApiSuccess(api.GetProperty(name, "cpu_policy", real));
-    ExpectEq(alias, "0");
-    ExpectEq(real, "normal");
     ExpectApiSuccess(api.Start(name));
 
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
@@ -3796,25 +3773,17 @@ static void TestAlias(Porto::Connection &api) {
 
     current = GetCgKnob("cpu", name, "cpu.smart");
     ExpectEq(current, "0");
-    ExpectApiSuccess(api.Stop(name));
 
     Say() << "Check custom limits" << std::endl;
     string exp_limit = "52428800";
     string exp_guar = "16384";
-    ExpectApiSuccess(api.SetProperty(name, "command", "sleep 1000"));
 
-    ExpectApiSuccess(api.SetProperty(name, "memory.limit_in_bytes", "1"));
-    ExpectApiSuccess(api.GetProperty(name, "memory.limit_in_bytes", alias));
-    ExpectEq(alias, "1");
-    ExpectApiSuccess(api.SetProperty(name, "memory.limit_in_bytes", "1k"));
-    ExpectApiSuccess(api.GetProperty(name, "memory.limit_in_bytes", alias));
-    ExpectEq(alias, "1024");
     ExpectApiSuccess(api.SetProperty(name, "memory.limit_in_bytes", "12m"));
     ExpectApiSuccess(api.GetProperty(name, "memory.limit_in_bytes", alias));
-    ExpectEq(alias, "12582912");
+    ExpectEq(alias, "12582912\n");
     ExpectApiSuccess(api.SetProperty(name, "memory.limit_in_bytes", "123g"));
     ExpectApiSuccess(api.GetProperty(name, "memory.limit_in_bytes", alias));
-    ExpectEq(alias, "132070244352");
+    ExpectEq(alias, "132070244352\n");
 
     ExpectApiSuccess(api.SetProperty(name, "memory.limit_in_bytes", exp_limit));
     ExpectApiSuccess(api.SetProperty(name, "memory.low_limit_in_bytes", exp_guar));
@@ -3823,20 +3792,18 @@ static void TestAlias(Porto::Connection &api) {
 
     ExpectApiSuccess(api.GetProperty(name, "memory.limit_in_bytes", alias));
     ExpectApiSuccess(api.GetProperty(name, "memory_limit", real));
-    ExpectEq(alias, real);
+    ExpectEq(alias, real+"\n");
     ExpectApiSuccess(api.GetProperty(name, "memory.low_limit_in_bytes", alias));
     ExpectApiSuccess(api.GetProperty(name, "memory_guarantee", real));
-    ExpectEq(alias, real);
+    ExpectEq(alias, real+"\n");
     ExpectApiSuccess(api.GetProperty(name, "memory.recharge_on_pgfault", alias));
     ExpectApiSuccess(api.GetProperty(name, "recharge_on_pgfault", real));
-    ExpectEq(alias, "1");
+    ExpectEq(alias, "1\n");
     ExpectEq(real, "true");
     ExpectApiSuccess(api.GetProperty(name, "cpu.smart", alias));
     ExpectApiSuccess(api.GetProperty(name, "cpu_policy", real));
-    ExpectEq(alias, "1");
+    ExpectEq(alias, "1\n");
     ExpectEq(real, "rt");
-
-    ExpectApiSuccess(api.Start(name));
 
     current = GetCgKnob("memory", name, "memory.limit_in_bytes");
     ExpectEq(current, exp_limit);
