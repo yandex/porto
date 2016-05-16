@@ -244,7 +244,7 @@ static void ShouldHaveValidProperties(Porto::Connection &api, const string &name
 static void ShouldHaveValidRunningData(Porto::Connection &api, const string &name) {
     string v;
 
-    ExpectApiFailure(api.GetData(name, "__invalid_data__", v), EError::InvalidData);
+    ExpectApiFailure(api.GetData(name, "__invalid_data__", v), EError::InvalidProperty);
 
     ExpectApiSuccess(api.GetData(name, "state", v));
     ExpectEq(v, string("running"));
@@ -298,7 +298,7 @@ static void ShouldHaveValidRunningData(Porto::Connection &api, const string &nam
 static void ShouldHaveValidData(Porto::Connection &api, const string &name) {
     string v;
 
-    ExpectApiFailure(api.GetData(name, "__invalid_data__", v), EError::InvalidData);
+    ExpectApiFailure(api.GetData(name, "__invalid_data__", v), EError::InvalidProperty);
 
     ExpectApiSuccess(api.GetData(name, "state", v));
     ExpectEq(v, string("stopped"));
@@ -710,7 +710,7 @@ static void TestGet(Porto::Connection &api) {
     ExpectEq(result["a"]["state"].Error, 0);
     ExpectEq(result["a"]["state"].ErrorMsg, "");
     ExpectEq(result["a"]["invalid"].Value, "");
-    ExpectEq(result["a"]["invalid"].Error, (int)EError::InvalidValue);
+    ExpectEq(result["a"]["invalid"].Error, (int)EError::InvalidProperty);
     ExpectNeq(result["a"]["invalid"].ErrorMsg, "");
 
     ExpectEq(result["b"]["user"].Value, user);
@@ -723,7 +723,7 @@ static void TestGet(Porto::Connection &api) {
     ExpectEq(result["b"]["state"].Error, 0);
     ExpectEq(result["b"]["state"].ErrorMsg, "");
     ExpectEq(result["b"]["invalid"].Value, "");
-    ExpectEq(result["b"]["invalid"].Error, (int)EError::InvalidValue);
+    ExpectEq(result["b"]["invalid"].Error, (int)EError::InvalidProperty);
     ExpectNeq(result["b"]["invalid"].ErrorMsg, "");
 
     ExpectApiSuccess(api.Destroy("a"));

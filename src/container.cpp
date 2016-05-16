@@ -1461,38 +1461,6 @@ void TContainer::ParsePropertyName(std::string &name, std::string &idx) {
     idx = StringTrim(tokens[1], " \t\n]");
 }
 
-TError TContainer::GetData(const string &origName, string &value,
-                           std::shared_ptr<TClient> client) {
-    std::string name = origName;
-    std::string idx;
-    ParsePropertyName(name, idx);
-
-    auto data = Data->Find(name);
-    if (!data)
-        return TError(EError::InvalidData, "invalid container data");
-
-    if (data->HasFlag(UNSUPPORTED_FEATURE))
-        return TError(EError::NotSupported, name + " is not supported");
-
-    auto state = GetState();
-
-    if (state == EContainerState::Stopped && data->HasFlag(RUNTIME_VALUE))
-        return TError(EError::InvalidState, "Not available in stopped state");
-
-    if (state != EContainerState::Dead && data->HasFlag(POSTMORTEM_VALUE))
-        return TError(EError::InvalidState, "Available only in dead state");
-
-    if (name == D_ROOT_PID && Task && client) {
-        value = std::to_string(Task->GetPidFor(client->GetPid()));
-        return TError::Success();
-    }
-
-    if (idx.length())
-        return data->GetIndexed(idx, value);
-
-    return data->GetString(value);
-}
-
 void TContainer::PropertyToAlias(const string &property, string &value) const {
         if (property == "cpu.smart") {
             if (value == "rt")
@@ -1532,7 +1500,8 @@ static std::map<std::string, std::string> alias = {
     { "memory.recharge_on_pgfault", P_RECHARGE_ON_PGFAULT },
 };
 
-TError TContainer::GetProperty(const string &origProperty, string &value) const {
+TError TContainer::GetProperty(const string &origProperty, string &value,
+                               std::shared_ptr<TClient> &client) const {
     TError error;
 
     string property = origProperty;
@@ -1543,11 +1512,28 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
         property = alias.at(origProperty);
 
     auto prop = Prop->Find(property);
-    if (!prop)
-        return TError(EError::Unknown, "Invalid property " + property);
+    if (!prop) {
+        prop = Data->Find(property);
+        if (!prop)
+            return TError(EError::InvalidProperty,
+                          "Unknown container property: " + property);
+    }
 
     if (prop->HasFlag(UNSUPPORTED_FEATURE))
-        return TError(EError::NotSupported, property + " is not supported");
+        return TError(EError::NotSupported, "Not supported: " + property);
+
+    if (State == EContainerState::Stopped && prop->HasFlag(RUNTIME_VALUE))
+        return TError(EError::InvalidState,
+                      "Not available in stopped state: " + property);
+
+    if (State != EContainerState::Dead && prop->HasFlag(POSTMORTEM_VALUE))
+        return TError(EError::InvalidState,
+                      "Available only in dead state: " + property);
+
+    if (property == D_ROOT_PID && Task && client) {
+        value = std::to_string(Task->GetPidFor(client->GetPid()));
+        return TError::Success();
+    }
 
     if (!prop->HasValue() && prop->HasFlag(PARENT_DEF_PROPERTY) &&
             !Prop->Get<bool>(P_ISOLATE)) {
@@ -1572,7 +1558,7 @@ TError TContainer::GetProperty(const string &origProperty, string &value) const 
 
 TError TContainer::SetProperty(const string &origProperty,
                                const string &origValue,
-                               std::shared_ptr<TClient> client) {
+                               std::shared_ptr<TClient> &client) {
 
     if (IsRoot() || IsPortoRoot())
         return TError(EError::Permission, "System containers are read only");

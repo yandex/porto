@@ -549,7 +549,7 @@ noinline TError GetContainerProperty(TContext &context,
         return TError(EError::ContainerDoesNotExist, "container doesn't exist");
 
     string value;
-    error = container->GetProperty(req.property(), value);
+    error = container->GetProperty(req.property(), value, client);
     if (!error)
         rsp.mutable_getproperty()->set_value(value);
 
@@ -595,7 +595,7 @@ noinline TError GetContainerData(TContext &context,
         return TError(EError::ContainerDoesNotExist, "container doesn't exist");
 
     string value;
-    error = container->GetData(req.data(), value, client);
+    error = container->GetProperty(req.data(), value, client);
     if (!error)
         rsp.mutable_getdata()->set_value(value);
 
@@ -649,17 +649,8 @@ noinline TError GetContainerCombined(TContext &context,
             std::string value;
 
             TError error = containerError;
-            if (!error && container) {
-                std::string name = var, idx;
-                TContainer::ParsePropertyName(name, idx);
-
-                if (container->Prop->Find(name))
-                    error = container->GetProperty(var, value);
-                else if (container->Data->Find(name))
-                    error = container->GetData(var, value, client);
-                else
-                    error = TError(EError::InvalidValue, "Unknown property or data " + var);
-            }
+            if (!error && container)
+                error = container->GetProperty(var, value, client);
 
             keyval->set_variable(var);
             if (error) {

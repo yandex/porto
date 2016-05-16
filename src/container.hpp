@@ -185,12 +185,11 @@ public:
     TError Resume(TScopedLock &holder_lock);
     TError Kill(int sig);
 
-    TError GetProperty(const std::string &property, std::string &value) const;
-    TError SetProperty(const std::string &property,
-                       const std::string &value, std::shared_ptr<TClient> client);
+    TError GetProperty(const std::string &property, std::string &value,
+                       std::shared_ptr<TClient> &client) const;
+    TError SetProperty(const std::string &property, const std::string &value,
+                       std::shared_ptr<TClient> &client);
 
-    TError GetData(const std::string &data, std::string &value,
-                   std::shared_ptr<TClient> client);
     TError Restore(TScopedLock &holder_lock, const kv::TNode &node);
 
     TCgroup GetCgroup(const TSubsystem &subsystem) const;
