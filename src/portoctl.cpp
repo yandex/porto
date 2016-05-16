@@ -604,7 +604,7 @@ static string HumanValue(const string &name, const string &val) {
         return ret + " (" + val + ")";
     } else if (name == "memory_usage" || name == "max_rss") {
         return HumanSize(val);
-    } else if (name == "cpu_usage") {
+    } else if (name == "cpu_usage" || name == "cpu_usage_system") {
         return HumanNsec(val);
     } else if (name == "time") {
         return HumanSec(val);

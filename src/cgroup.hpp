@@ -201,6 +201,7 @@ class TCpuacctSubsystem : public TSubsystem {
 public:
     TCpuacctSubsystem() : TSubsystem("cpuacct") {}
     TError Usage(TCgroup &cg, uint64_t &value) const;
+    TError SystemUsage(TCgroup &cg, uint64_t &value) const;
 };
 
 class TNetclsSubsystem : public TSubsystem {

@@ -179,6 +179,27 @@ public:
     }
 };
 
+class TCpuSystemData : public TUintValue, public TContainerValue {
+public:
+    TCpuSystemData() :
+        TUintValue(READ_ONLY_VALUE | RUNTIME_VALUE),
+        TContainerValue(D_CPU_SYSTEM,
+                        "consumed system CPU time [nanoseconds] (ro)") {}
+
+    uint64_t GetDefault() const override {
+        auto cg = GetContainer()->GetCgroup(CpuacctSubsystem);
+
+        uint64_t val;
+        TError error = CpuacctSubsystem.SystemUsage(cg, val);
+        if (error) {
+            L_ERR() << "Can't get system CPU usage: " << error << std::endl;
+            return -1;
+        }
+
+        return val;
+    }
+};
+
 class TMemUsageData : public TUintValue, public TContainerValue {
 public:
     TMemUsageData() :
@@ -542,6 +563,7 @@ void RegisterData(std::shared_ptr<TRawValueMap> m,
         new TStdoutOffset,
         new TStderrOffset,
         new TCpuUsageData,
+        new TCpuSystemData,
         new TMemUsageData,
         new TAnonUsageData,
         new TNetBytesData,

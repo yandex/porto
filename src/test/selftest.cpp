@@ -3020,6 +3020,7 @@ static void TestRoot(Porto::Connection &api) {
         "stderr",
         "stderr_offset",
         "cpu_usage",
+        "cpu_usage_system",
         "memory_usage",
         "minor_faults",
         "major_faults",

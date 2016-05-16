@@ -499,6 +499,15 @@ TError TCpuacctSubsystem::Usage(TCgroup &cg, uint64_t &value) const {
     return StringToUint64(s, value);
 }
 
+TError TCpuacctSubsystem::SystemUsage(TCgroup &cg, uint64_t &value) const {
+    TUintMap stat;
+    TError error = cg.GetUintMap("cpuacct.stat", stat);
+    if (error)
+        return error;
+    value = stat["system"] * (1000000000 / sysconf(_SC_CLK_TCK));
+    return TError::Success();
+}
+
 // Netcls
 
 // Blkio
