@@ -648,13 +648,9 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
         L_ACT() << "Rebuild network" << std::endl;
 
         auto net_lock = Net->ScopedLock();
-        error = Net->UpdateInterfaces();
+        error = Net->RefreshDevices();
         if (error)
-            L_ERR() << "Cannot update interfaces: " << error << std::endl;
-
-        error = Net->PrepareLinks();
-        if (error)
-            L_ERR() << "Cannot prepare interfaces: " << error << std::endl;
+            L_ERR() << "Cannot refresh network devices: " << error << std::endl;
         net_lock.unlock();
 
         std::shared_ptr<TContainer> root;
@@ -1666,11 +1662,7 @@ TError TContainer::RestoreNetwork() {
 
         TNetwork::AddNetwork(netns.GetInode(), Net);
 
-        error = Net->UpdateInterfaces();
-        if (error)
-            return error;
-
-        error = Net->PrepareLinks();
+        error = Net->RefreshDevices();
         if (error)
             return error;
     }

@@ -94,6 +94,7 @@ public:
 
     int GetIndex() const;
     std::string GetName() const;
+    std::string GetType() const;
     std::string GetDesc() const;
     bool IsLoopback() const;
     bool IsRunning() const;

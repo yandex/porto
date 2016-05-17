@@ -19,6 +19,8 @@ message TCfg {
 		optional string nat_first_ipv6 = 11;
 		optional uint32 nat_count = 12;
 		optional uint32 autoconf_timeout_s = 13;
+		repeated string unmanaged_device = 14;
+		repeated string unmanaged_group = 15;
 	}
 
 	message TFileCfg {

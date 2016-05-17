@@ -11,6 +11,16 @@
 #include "util/cred.hpp"
 #include "util/idmap.hpp"
 
+class TNetworkDevice {
+public:
+    std::string Name;
+    std::string Type;
+    int Index;
+    bool Managed;
+    bool Prepared;
+    bool Missing;
+};
+
 class TNetwork : public std::enable_shared_from_this<TNetwork>,
                  public TNonCopyable,
                  public TLockable {
@@ -19,22 +29,16 @@ class TNetwork : public std::enable_shared_from_this<TNetwork>,
 
     unsigned IfaceName = 0;
 
-    std::vector<std::pair<std::string, int>> ifaces;
-
-    TError PrepareLink(int index, std::string name);
-
 public:
-    TError UpdateInterfaces();
+    std::vector<TNetworkDevice> Devices;
 
-    void AddInterface(TNlLink &link) {
-        link.Dump("managed link");
-        ifaces.emplace_back(link.GetName(), link.GetIndex());
-    }
+    TError PrepareDevice(TNetworkDevice &dev);
+    TError RefreshDevices();
 
-    int InterfaceIndex(const std::string &name) {
-        for (auto iface: ifaces)
-            if (iface.first == name)
-                return iface.second;
+    int DeviceIndex(const std::string &name) {
+        for (auto dev: Devices)
+            if (dev.Name == name)
+                return dev.Index;
         return 0;
     }
 
@@ -49,7 +53,6 @@ public:
     TError ConnectNew(TNamespaceFd &netns);
     std::shared_ptr<TNl> GetNl() { return Nl; };
 
-    TError PrepareLinks();
     TError Destroy();
 
     TError GetTrafficCounters(int minor, ETclassStat stat,
@@ -81,6 +84,8 @@ public:
 
     static void AddNetwork(ino_t inode, std::shared_ptr<TNetwork> &net);
     static std::shared_ptr<TNetwork> GetNetwork(ino_t inode);
+
+    static void InitializeUnmanagedDevices();
 };
 
 

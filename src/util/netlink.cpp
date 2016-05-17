@@ -180,6 +180,10 @@ std::string TNlLink::GetName() const {
     return std::string(rtnl_link_get_name(Link) ?: "???");
 }
 
+std::string TNlLink::GetType() const {
+    return std::string(rtnl_link_get_type(Link) ?: "");
+}
+
 std::string TNlLink::GetDesc() const {
     return std::to_string(GetIndex()) + ":" + GetName();
 }

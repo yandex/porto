@@ -545,6 +545,8 @@ static int SlaveMain() {
             return EXIT_FAILURE;
     }
 
+    TNetwork::InitializeUnmanagedDevices();
+
     TContext context;
     try {
         error = context.Initialize();
