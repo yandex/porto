@@ -16,6 +16,8 @@ using std::string;
 TConfig config;
 
 void TConfig::LoadDefaults() {
+    config().Clear();
+
     config().mutable_slave_pid()->set_path("/run/portod.pid");
     config().mutable_slave_pid()->set_perm(0644);
     config().mutable_slave_log()->set_path("/var/log/portod.log");
