@@ -1650,7 +1650,7 @@ TError TContainer::RestoreNetwork() {
     if (error)
         return error;
 
-    Net = Holder->SearchInNsMap(netns.GetInode());
+    Net = TNetwork::GetNetwork(netns.GetInode());
 
     /* Create a new one */
     if (!Net) {
@@ -1661,7 +1661,7 @@ TError TContainer::RestoreNetwork() {
         if (error)
             return error;
 
-        Holder->AddToNsMap(netns.GetInode(), Net);
+        TNetwork::AddNetwork(netns.GetInode(), Net);
 
         error = Net->UpdateInterfaces();
         if (error)

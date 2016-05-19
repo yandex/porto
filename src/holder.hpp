@@ -31,7 +31,6 @@ class TContainerHolder : public std::enable_shared_from_this<TContainerHolder>,
     std::map<std::string, std::shared_ptr<TContainer>> Containers;
     TIdMap IdMap;
     std::shared_ptr<TKeyValueStorage> Storage;
-    std::unordered_map<ino_t, std::weak_ptr<TNetwork>> NetNsMap;
 
     TError RestoreId(const kv::TNode &node, int &id);
     void ScheduleLogRotatation();
@@ -72,7 +71,4 @@ public:
     std::vector<std::shared_ptr<TContainer> > List(bool all = false) const;
 
     bool DeliverEvent(const TEvent &event);
-
-    void AddToNsMap(ino_t inode, std::shared_ptr<TNetwork> &net);
-    std::shared_ptr<TNetwork> SearchInNsMap(ino_t inode);
 };

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <unordered_map>
 #include <sstream>
 
 #include "network.hpp"
@@ -17,6 +18,33 @@ extern "C" {
 #include <netlink/route/tc.h>
 #include <netlink/route/class.h>
 #include <netlink/route/qdisc/htb.h>
+}
+
+static std::unordered_map<ino_t, std::weak_ptr<TNetwork>> Networks;
+static std::mutex NetworksMutex;
+
+static inline std::unique_lock<std::mutex> LockNetworks() {
+    return std::unique_lock<std::mutex>(NetworksMutex);
+}
+
+void TNetwork::AddNetwork(ino_t inode, std::shared_ptr<TNetwork> &net) {
+    auto lock = LockNetworks();
+    Networks[inode] = net;
+
+    for (auto it = Networks.begin(); it != Networks.end(); ) {
+        if (it->second.expired())
+            it = Networks.erase(it);
+        else
+            it++;
+    }
+}
+
+std::shared_ptr<TNetwork> TNetwork::GetNetwork(ino_t inode) {
+    auto lock = LockNetworks();
+    auto it = Networks.find(inode);
+    if (it != Networks.end())
+        return it->second.lock();
+    return nullptr;
 }
 
 TError TNetwork::Destroy() {
@@ -1238,6 +1266,8 @@ TError TNetCfg::PrepareNetwork() {
         if (error)
             return error;
 
+        TNetwork::AddNetwork(NetNs.GetInode(), Net);
+
     } else if (Host) {
 
         Net = std::make_shared<TNetwork>();
@@ -1251,7 +1281,7 @@ TError TNetCfg::PrepareNetwork() {
         if (error)
             return error;
 
-        Holder->AddToNsMap(NetNs.GetInode(), Net);
+        TNetwork::AddNetwork(NetNs.GetInode(), Net);
 
         error = Net->UpdateInterfaces();
         if (error)
@@ -1274,7 +1304,7 @@ TError TNetCfg::PrepareNetwork() {
         if (error)
             return error;
 
-        Net = Holder->SearchInNsMap(NetNs.GetInode());
+        Net = TNetwork::GetNetwork(NetNs.GetInode());
         if (!Net) {
             Net = std::make_shared<TNetwork>();
 
@@ -1290,7 +1320,7 @@ TError TNetCfg::PrepareNetwork() {
             if (error)
                 return error;
 
-            Holder->AddToNsMap(NetNs.GetInode(), Net);
+            TNetwork::AddNetwork(NetNs.GetInode(), Net);
         }
 
         ParentId = PORTO_ROOT_CONTAINER_ID;
