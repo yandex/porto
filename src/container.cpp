@@ -645,21 +645,11 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
 
     error = UpdateTrafficClasses();
     if (error) {
-        L_ACT() << "Rebuild network" << std::endl;
-
-        auto net_lock = Net->ScopedLock();
-        error = Net->RefreshDevices();
-        if (error)
-            L_ERR() << "Cannot refresh network devices: " << error << std::endl;
-        net_lock.unlock();
-
-        std::shared_ptr<TContainer> root;
-        if (!Holder->Get(ROOT_CONTAINER, root))
-            root->RebuildTC(Net);
-
+        L_ACT() << "Refresh network" << std::endl;
+        Net->RefreshClasses(true);
         error = UpdateTrafficClasses();
         if (error) {
-            L_ERR() << "Network rebuild failed" << std::endl;
+            L_ERR() << "Network refresh failed" << std::endl;
             return error;
         }
     }
@@ -1665,6 +1655,7 @@ TError TContainer::RestoreNetwork() {
         error = Net->RefreshDevices();
         if (error)
             return error;
+        Net->NewManagedDevices = false;
     }
 
     error = UpdateTrafficClasses();
@@ -2174,23 +2165,6 @@ TError TContainer::UpdateTrafficClasses() {
         return Net->UpdateTrafficClasses(parentId, Id, prio, rate, ceil);
     }
     return TError::Success();
-}
-
-void TContainer::RebuildTC(std::shared_ptr<TNetwork> net) {
-
-    if (Net == net) {
-        TError error = UpdateTrafficClasses();
-        if (error)
-            L_ERR() << "Cannot rebuild tc for " << GetName()
-                    << " : " << error << std::endl;
-    }
-
-    for (auto iter : Children)
-        if (auto child = iter.lock())
-            if (child->GetState() == EContainerState::Running ||
-                child->GetState() == EContainerState::Meta)
-                child->RebuildTC(net);
-
 }
 
 TContainerWaiter::TContainerWaiter(std::shared_ptr<TClient> client,

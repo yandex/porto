@@ -48,6 +48,15 @@ std::shared_ptr<TNetwork> TNetwork::GetNetwork(ino_t inode) {
     return nullptr;
 }
 
+void TNetwork::RefreshNetworks() {
+    auto lock = LockNetworks();
+    for (auto &it: Networks) {
+        auto net = it.second.lock();
+        if (net)
+            net->RefreshClasses(false);
+    }
+}
+
 static std::vector<std::string> UnmanagedDevices;
 static std::vector<int> UnmanagedGroups;
 
@@ -333,7 +342,33 @@ TError TNetwork::RefreshDevices() {
         TError error = PrepareDevice(dev);
         if (error)
             return error;
+        NewManagedDevices = true;
     }
+
+    return TError::Success();
+}
+
+TError TNetwork::RefreshClasses(bool force) {
+    auto netLock = ScopedLock();
+    TError error = RefreshDevices();
+    if (error || (!force && !NewManagedDevices))
+        return error;
+    NewManagedDevices = false;
+    netLock.unlock();
+
+    auto ctLock = LockContainers();
+    for (auto &it: Containers) {
+        auto ct = it.second.get();
+        if (ct->Net.get() == this &&
+            (ct->GetState() == EContainerState::Running ||
+             ct->GetState() == EContainerState::Meta)) {
+            error = ct->UpdateTrafficClasses();
+            if (error)
+                L_ERR() << "Cannot refresh tc for " << ct->GetName()
+                        << " : " << error << std::endl;
+        }
+    }
+    L() << "done" << std::endl;
 
     return TError::Success();
 }
@@ -1381,6 +1416,7 @@ TError TNetCfg::PrepareNetwork() {
         error = Net->RefreshDevices();
         if (error)
             return error;
+        Net->NewManagedDevices = false;
 
         if (config().network().has_nat_first_ipv4())
             Net->NatBaseV4.Parse(AF_INET, config().network().nat_first_ipv4());
@@ -1406,6 +1442,7 @@ TError TNetCfg::PrepareNetwork() {
             error = Net->RefreshDevices();
             if (error)
                 return error;
+            Net->NewManagedDevices = false;
 
             TNetwork::AddNetwork(NetNs.GetInode(), Net);
         }

@@ -34,6 +34,9 @@ public:
 
     TError PrepareDevice(TNetworkDevice &dev);
     TError RefreshDevices();
+    TError RefreshClasses(bool force);
+
+    bool NewManagedDevices = false;
 
     int DeviceIndex(const std::string &name) {
         for (auto dev: Devices)
@@ -86,6 +89,8 @@ public:
     static std::shared_ptr<TNetwork> GetNetwork(ino_t inode);
 
     static void InitializeUnmanagedDevices();
+
+    static void RefreshNetworks();
 };
 
 

@@ -10,6 +10,7 @@
 #include "client.hpp"
 #include "task.hpp"
 #include "cgroup.hpp"
+#include "network.hpp"
 #include "kvalue.hpp"
 #include "kv.pb.h"
 #include "util/string.hpp"
@@ -655,6 +656,10 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
 
         ScheduleLogRotatation();
         Statistics->Rotated++;
+
+        holder_lock.unlock();
+        TNetwork::RefreshNetworks();
+
         delivered = true;
         break;
     }
