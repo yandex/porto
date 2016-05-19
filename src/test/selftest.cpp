@@ -167,7 +167,7 @@ static void ShouldHaveValidProperties(Porto::Connection &api, const string &name
     ExpectApiSuccess(api.GetProperty(name, "cpu_limit", v));
     ExpectEq(v, StringFormat("%dc", GetNumCores()));
     ExpectApiSuccess(api.GetProperty(name, "cpu_guarantee", v));
-    ExpectEq(v, "1c");
+    ExpectEq(v, "0c");
     if (KernelSupports(KernelFeature::CFQ)) {
         ExpectApiSuccess(api.GetProperty(name, "io_policy", v));
         ExpectEq(v, "normal");
@@ -3420,7 +3420,7 @@ static void TestLimits(Porto::Connection &api) {
     string smart;
 
     ExpectApiFailure(api.SetProperty(name, "cpu_policy", "somecrap"), EError::InvalidValue);
-    ExpectApiFailure(api.SetProperty(name, "cpu_policy", "idle"), EError::NotSupported);
+    ExpectApiSuccess(api.SetProperty(name, "cpu_policy", "idle"));
 
     if (KernelSupports(KernelFeature::SMART)) {
         ExpectApiSuccess(api.SetProperty(name, "cpu_policy", "rt"));
@@ -3482,7 +3482,7 @@ static void TestLimits(Porto::Connection &api) {
         ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "0"));
         ExpectApiSuccess(api.Start(name));
         ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
-        ExpectEq(shares, 2);
+        ExpectEq(shares, 1024);
         ExpectApiSuccess(api.Stop(name));
 
         ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "1c"));
