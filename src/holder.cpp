@@ -375,7 +375,7 @@ std::map<std::string, std::shared_ptr<TKeyValueNode>> TContainerHolder::SortNode
 bool TContainerHolder::RestoreFromStorage() {
     std::vector<std::shared_ptr<TKeyValueNode>> nodes;
 
-    auto holder_lock = ScopedLock();
+    auto holder_lock = LockContainers();
 
     TError error = Storage->ListNodes(nodes);
     if (error) {
@@ -478,7 +478,7 @@ void TContainerHolder::RemoveLeftovers() {
     for (auto it: Containers) {
         auto container = it.second;
         if (container->Prop->Get<bool>(P_WEAK)) {
-            auto holder_lock = ScopedLock();
+            auto holder_lock = LockContainers();
             L_ACT() << "Destroy weak container " << it.first << std::endl;
             Destroy(holder_lock, container);
         }
@@ -501,7 +501,7 @@ bool TContainerHolder::DeliverEvent(const TEvent &event) {
 
     bool delivered = false;
 
-    auto holder_lock = ScopedLock();
+    auto holder_lock = LockContainers();
 
     switch (event.Type) {
     case EEventType::OOM:

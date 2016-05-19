@@ -39,6 +39,9 @@ extern "C" {
 #include <fnmatch.h>
 }
 
+std::mutex ContainersMutex;
+std::map<std::string, std::shared_ptr<TContainer>> Containers;
+
 using std::string;
 using std::vector;
 using std::shared_ptr;

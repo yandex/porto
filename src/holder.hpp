@@ -26,9 +26,7 @@ namespace kv {
     class TNode;
 };
 
-class TContainerHolder : public std::enable_shared_from_this<TContainerHolder>,
-                         public TLockable {
-    std::map<std::string, std::shared_ptr<TContainer>> Containers;
+class TContainerHolder : public std::enable_shared_from_this<TContainerHolder> {
     TIdMap IdMap;
     std::shared_ptr<TKeyValueStorage> Storage;
 

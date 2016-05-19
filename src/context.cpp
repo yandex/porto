@@ -5,6 +5,7 @@
 #include "event.hpp"
 #include "holder.hpp"
 #include "volume.hpp"
+#include "container.hpp"
 #include "util/log.hpp"
 #include "util/unix.hpp"
 #include "util/mount.hpp"
@@ -32,7 +33,7 @@ TError TContext::Initialize() {
     if (error)
         L_ERR() << "Can't create key-value storage, skipping recovery: " << error << std::endl;
 
-    auto holder_lock = Cholder->ScopedLock();
+    auto holder_lock = LockContainers();
 
     error = Cholder->CreateRoot(holder_lock);
     if (error) {
@@ -53,7 +54,7 @@ TError TContext::Destroy() {
     TError error;
 
     {
-        auto holder_lock = Cholder->ScopedLock();
+        auto holder_lock = LockContainers();
         Cholder->DestroyRoot(holder_lock);
         Vholder->Destroy();
     }
