@@ -302,9 +302,11 @@ TError TNetwork::RefreshDevices() {
              StringStartsWith(dev.Name, "L3-")))
             continue;
 
-        if (std::find(UnmanagedDevices.begin(), UnmanagedDevices.end(),
-                      dev.Name) != UnmanagedDevices.end() ||
-            std::find(UnmanagedGroups.begin(), UnmanagedGroups.end(),
+        for (auto &pattern: UnmanagedDevices)
+            if (!fnmatch(pattern.c_str(), dev.Name.c_str(), 0))
+                dev.Managed = false;
+
+        if (std::find(UnmanagedGroups.begin(), UnmanagedGroups.end(),
                       group) != UnmanagedGroups.end())
             dev.Managed = false;
 
@@ -322,6 +324,8 @@ TError TNetwork::RefreshDevices() {
         }
         if (!found) {
             Nl->Dump("New network device", link);
+            if (!dev.Managed)
+                L() << "Unmanaged device " << dev.Index << ":" << dev.Name << std::endl;
             Devices.push_back(dev);
         }
     }
