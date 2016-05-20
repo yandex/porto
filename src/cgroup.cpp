@@ -495,7 +495,7 @@ TError TCpuSubsystem::SetCpuPolicy(TCgroup &cg, const std::string &policy,
             return error;
 
     } else if (HasShares) {
-        uint64_t shares = std::floor((guarantee ?: 1.) * BaseShares);
+        uint64_t shares = std::floor((guarantee + 1) * BaseShares);
 
         if (policy == "rt" && (!HasSmart || !config().container().enable_smart()))
             shares *= 16;

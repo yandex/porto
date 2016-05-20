@@ -3488,13 +3488,13 @@ static void TestLimits(Porto::Connection &api) {
         ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "1c"));
         ExpectApiSuccess(api.Start(name));
         ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
-        ExpectEq(shares, rootShares);
+        ExpectEq(shares, 1024 + 1024);
         ExpectApiSuccess(api.Stop(name));
 
         ExpectApiSuccess(api.SetProperty(name, "cpu_guarantee", "0.5c"));
         ExpectApiSuccess(api.Start(name));
         ExpectSuccess(StringToUint64(GetCgKnob("cpu", name, "cpu.shares"), shares));
-        ExpectEq(shares, rootShares / 2);
+        ExpectEq(shares, 1024 + 512);
         ExpectApiSuccess(api.Stop(name));
 
         TestCoresConvertion(api, name, "cpu_guarantee");
