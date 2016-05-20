@@ -1,3 +1,22 @@
+yandex-porto (2.10) unstable; urgency=low
+
+  * util/cgroup: test cgroup harder
+  * porto: add knob cpu_usage_system
+  * porto: merge container property and data
+  * porto: proxy properties for cgroup attributes
+  * porto: use cfs reserves for cpu policy and guarantee if available
+  * porto: clear config state before reload
+  * porto: keep map of shared network namespaces
+  * porto: move containers map and lock out of crappy code
+  * porto: add unmanaged network devices and device groups
+  * porto: rebuild network classes for new devices
+  * porto/test: default cpu guarantee is 0
+  * porto: match unmanaged devices as wildcard
+  * porto: remove host qdisc from managed network devices at stop
+  * porto: shift base cpu shares to 1024 and add guarantees to it
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Fri, 20 May 2016 17:56:27 +0300
+
 yandex-porto (2.9) unstable; urgency=medium
 
   * network: include net/if.h for flags IFF_*
