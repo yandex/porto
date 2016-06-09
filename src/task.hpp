@@ -81,6 +81,7 @@ class TTask: public TNonCopyable {
     TError ChildExec();
     TError ChildBindDns();
     TError ChildBindDirectores();
+    TError ChildMountRun();
     TError ChildMountRootFs();
     TError ChildRemountRootRo();
     TError ChildIsolateFs();
