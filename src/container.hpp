@@ -189,6 +189,7 @@ public:
                        std::shared_ptr<TClient> &client);
 
     TError Restore(TScopedLock &holder_lock, const kv::TNode &node);
+    TError Save(void);
 
     TCgroup GetCgroup(const TSubsystem &subsystem) const;
     bool CanRemoveDead() const;

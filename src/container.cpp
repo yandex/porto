@@ -846,7 +846,7 @@ TError TContainer::Create(const TCred &cred) {
 
     SetState(EContainerState::Stopped);
 
-    return TError::Success();
+    return Save(); /* Serialize on creation  */
 }
 
 TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
@@ -1569,17 +1569,7 @@ TError TContainer::SetProperty(const string &origProperty,
     // Write KVS snapshot, otherwise it may grow indefinitely and on next
     // restart we will merge it forever
 
-    error = Prop->Flush();
-    if (error)
-        return error;
-
-    error = Prop->Sync();
-    if (error)
-        return error;
-
-    error = Data->Sync();
-
-    return error;
+    return Save();
 }
 
 TError TContainer::Prepare() {
@@ -1691,6 +1681,56 @@ void TContainer::RestoreStdPath(const std::string &property) {
         path.Unlink();
 }
 
+TError TContainer::Save(void) {
+
+    /* Ensure that we're saving context with lock acquired... */
+
+    auto kvnode = Storage->GetNode(Id);
+    kv::TNode new_node;
+    TError error;
+
+    /* By creating we truncate existing node */
+    kvnode->Create();
+
+    for (auto knob_name : Prop->List()) {
+
+        auto knob = Prop->Find(knob_name);
+
+        if (!knob->HasFlag(PERSISTENT_VALUE) || !knob->HasValue())
+            continue;
+
+        std::string value;
+        error = knob->GetString(value);
+        if (error)
+            return error;
+
+        auto pair = new_node.add_pairs();
+        pair->set_key(knob_name);
+        pair->set_val(value);
+
+    }
+
+    for (auto data_knob_name : Data->List()) {
+
+        auto data_knob = Data->Find(data_knob_name);
+
+        if (!data_knob->HasFlag(PERSISTENT_VALUE) || !data_knob->HasValue())
+            continue;
+
+        std::string value;
+        error = data_knob->GetString(value);
+        if (error)
+            return error;
+
+        auto pair = new_node.add_pairs();
+        pair->set_key(data_knob_name);
+        pair->set_val(value);
+
+    }
+
+    return kvnode->Append(new_node);
+}
+
 TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
     L_ACT() << "Restore " << GetName() << " with id " << Id << std::endl;
 
@@ -1698,27 +1738,42 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
     if (error)
         return error;
 
-    error = Prop->Restore(node);
-    if (error)
-        return error;
+    for (int i = 0; i < node.pairs_size(); i++) {
 
-    error = Data->Restore(node);
-    if (error)
-        return error;
+        std::string key = node.pairs(i).key();
+        std::string value = node.pairs(i).val();
+        error = TError::Success();
 
-    error = Prop->Flush();
-    if (error)
-        return error;
+        auto pv = Prop->Find(key);
 
-    error = Data->Flush();
-    if (error)
-        return error;
+        if (pv && pv->HasFlag(PERSISTENT_VALUE)) {
 
-    error = Prop->Sync();
-    if (error)
-        return error;
+            if (Verbose)
+                L_ACT() << "Restoring as property " << key << " = " << value << std::endl;
 
-    error = Data->Sync();
+            error = pv->SetString(value);
+            if (!error)
+                continue;
+        }
+
+        auto dv = Data->Find(key);
+
+        if (dv && dv->HasFlag(PERSISTENT_VALUE)) {
+
+            if (Verbose)
+                L_ACT() << "Restoring as data " << key << " = " << value << std::endl;
+
+            error = dv->SetString(value);
+            if (!error)
+                continue;
+        }
+
+        if (error)
+            L_ERR() << error << ": Can't restore " << key << ", skipped" << std::endl;
+
+    }
+
+    error = Save(); /* FIXME: maybe we need do it at the end of func? */
     if (error)
         return error;
 
