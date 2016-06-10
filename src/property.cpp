@@ -14,6 +14,12 @@ extern "C" {
 #include <linux/capability.h>
 }
 
+extern __thread TContainer *CurrentContainer;
+extern __thread TClient *CurrentClient;
+extern TContainerUser ContainerUser;
+extern TContainerGroup ContainerGroup;
+extern std::map<std::string, TContainerProperty*> ContainerPropMap;
+
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
                                  const std::string &property) const {
     TError error = GetSharedContainer(c);
@@ -76,34 +82,6 @@ public:
             return "/sbin/init";
 
         return "";
-    }
-};
-
-class TUserProperty : public TStringValue, public TContainerValue {
-public:
-    TUserProperty() :
-        TStringValue(SUPERUSER_PROPERTY | PERSISTENT_VALUE),
-        TContainerValue(P_USER,
-                        "Start command with given user") {}
-
-    TError CheckValue(const std::string &value) override {
-        auto container = GetContainer();
-
-        return UserId(value, container->OwnerCred.Uid);
-    }
-};
-
-class TGroupProperty : public TStringValue, public TContainerValue {
-public:
-    TGroupProperty() :
-        TStringValue(SUPERUSER_PROPERTY | PERSISTENT_VALUE),
-        TContainerValue(P_GROUP,
-                        "Start command with given group") {}
-
-    TError CheckValue(const std::string &value) override {
-        auto container = GetContainer();
-
-        return GroupId(value, container->OwnerCred.Gid);
     }
 };
 
@@ -1032,8 +1010,6 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> properties = {
         new TCommandProperty,
-        new TUserProperty,
-        new TGroupProperty,
         new TEnvProperty,
         new TPortoNamespaceProperty,
         new TRootProperty,
@@ -1087,4 +1063,101 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
 
     for (auto p : properties)
         AddContainerValue(m, c, p);
+}
+
+/*
+ * Note for other properties:
+ * Dead state 2-line check is mandatory for all properties
+ * Some properties require to check if the property is supported
+ * Some properties may forbid changing it in runtime
+ * Of course, some properties can be read-only
+ */
+
+TError TContainerUser::Set(const std::string &username) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    uid_t new_uid;
+    error = UserId(username, new_uid);
+    if (error)
+        return error;
+
+    TCred &owner = CurrentContainer->OwnerCred;
+    TCred new_user(new_uid, owner.Gid);
+    error = FindGroups(username, new_user.Gid, new_user.Groups);
+    if (error)
+        return error;
+
+    TCred &cur_user = CurrentClient->Cred;
+
+    if (cur_user.CanControl(new_user)) {
+        owner.Uid = new_user.Uid;
+        owner.Groups.clear();
+        owner.Groups.insert(owner.Groups.end(), new_user.Groups.begin(),
+                            new_user.Groups.end());
+
+        return TError::Success();
+    }
+
+    return TError(EError::Permission,
+                  "Client is not allowed to set user : " + username);
+}
+
+TError TContainerUser::Get(std::string &value) {
+    value = UserName(CurrentContainer->OwnerCred.Uid);
+
+    return TError::Success();
+}
+
+TError TContainerGroup::Set(const std::string &groupname) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    gid_t new_gid;
+    error = GroupId(groupname, new_gid);
+    if (error)
+        return error;
+
+    if (CurrentClient->Cred.IsRootUser()) {
+        CurrentContainer->OwnerCred.Gid = new_gid;
+        return TError::Success();
+    }
+
+    if (CurrentContainer->OwnerCred.IsMemberOf(new_gid)) {
+        CurrentContainer->OwnerCred.Gid = new_gid;
+
+        return TError::Success();
+    }
+
+    return TError(EError::Permission, "Desired group : " + groupname +
+                  " isn't in current user supplementary group list");
+}
+    TError SetValue(const std::string &value);
+
+TError TContainerGroup::Get(std::string &value) {
+    value = GroupName(CurrentContainer->OwnerCred.Gid);
+
+    return TError::Success();
+}
+
+void InitContainerProperties(void) {
+    ContainerPropMap[ContainerUser.Name] = &ContainerUser;
+    ContainerPropMap[ContainerGroup.Name] = &ContainerGroup;
+}
+
+TError TContainerProperty::IsAliveAndStopped(void) {
+    auto state = CurrentContainer->GetState();
+
+    if (state == EContainerState::Dead)
+        return TError(EError::InvalidState,
+                      "Cannot change property while in the dead state");
+
+    if (state != EContainerState::Stopped &&
+        state != EContainerState::Unknown)
+        return TError(EError::InvalidState,
+                "Cannot change property in runtime");
+
+    return TError::Success();
 }

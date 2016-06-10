@@ -16,6 +16,8 @@
 
 using std::string;
 
+extern std::map<std::string, TContainerProperty*> ContainerPropMap;
+
 static std::string RequestAsString(const rpc::TContainerRequest &req) {
     if (Verbose)
         return req.ShortDebugString();
@@ -708,6 +710,12 @@ noinline TError ListProperty(TContext &context,
         auto entry = list->add_list();
         entry->set_name(name);
         entry->set_desc(cv->GetDesc());
+    }
+
+    for (auto elem : ContainerPropMap) {
+        auto entry = list->add_list();
+        entry->set_name(elem.first);
+        entry->set_desc(elem.second->Desc.c_str());
     }
 
     return TError::Success();

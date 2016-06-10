@@ -22,6 +22,7 @@
 #include "util/string.hpp"
 #include "util/cred.hpp"
 #include "util/worker.hpp"
+#include "property.hpp"
 
 extern "C" {
 #include <fcntl.h>
@@ -546,6 +547,7 @@ static int SlaveMain() {
     }
 
     TNetwork::InitializeUnmanagedDevices();
+    InitContainerProperties();
 
     TContext context;
     try {

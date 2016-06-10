@@ -27,6 +27,7 @@
 #include "util/unix.hpp"
 #include "client.hpp"
 #include "stream.hpp"
+#include "kv.pb.h"
 
 extern "C" {
 #include <sys/types.h>
@@ -47,6 +48,13 @@ using std::vector;
 using std::shared_ptr;
 using std::unique_ptr;
 using std::map;
+
+__thread TContainer *CurrentContainer = nullptr;
+__thread TClient *CurrentClient = nullptr;
+
+TContainerUser ContainerUser(P_USER, "Start command with given user");
+TContainerGroup ContainerGroup(P_GROUP, "Start command with given group");
+std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
                        std::shared_ptr<TKeyValueStorage> storage,
@@ -672,7 +680,7 @@ TError TContainer::GetEnvironment(TEnv &env) {
 
     env.SetEnv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
     env.SetEnv("HOME", Prop->Get<std::string>(P_CWD));
-    env.SetEnv("USER", Prop->Get<std::string>(P_USER));
+    env.SetEnv("USER", UserName(OwnerCred.Uid));
 
     env.SetEnv("container", "lxc");
 
@@ -698,7 +706,7 @@ TError TContainer::GetEnvironment(TEnv &env) {
 TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
                                struct TNetCfg *NetCfg) {
     auto vmode = Prop->Get<int>(P_VIRT_MODE);
-    auto user = Prop->Get<std::string>(P_USER);
+    auto user = UserName(OwnerCred.Uid);
     auto taskEnv = std::unique_ptr<TTaskEnv>(new TTaskEnv());
     auto parent = FindRunningParent();
     TError error;
@@ -836,13 +844,11 @@ TError TContainer::Create(const TCred &cred) {
 
     OwnerCred = TCred(cred.Uid, cred.Gid);
 
-    error = Prop->Set<std::string>(P_USER, cred.User());
-    if (error)
+    error = FindGroups(UserName(OwnerCred.Uid), OwnerCred.Gid, OwnerCred.Groups);
+    if (error) {
+        L_ERR() << "Can't set container owner: " << error << std::endl;
         return error;
-
-    error = Prop->Set<std::string>(P_GROUP, cred.Group());
-    if (error)
-        return error;
+    }
 
     SetState(EContainerState::Stopped);
 
@@ -1468,9 +1474,19 @@ TError TContainer::GetProperty(const string &origProperty, string &value,
     auto prop = Prop->Find(property);
     if (!prop) {
         prop = Data->Find(property);
-        if (!prop)
-            return TError(EError::InvalidProperty,
-                          "Unknown container property: " + property);
+        if (!prop) {
+            auto new_prop = ContainerPropMap.find(property);
+            if (new_prop == ContainerPropMap.end())
+                return TError(EError::InvalidProperty,
+                              "Unknown container property: " + property);
+
+            CurrentContainer = const_cast<TContainer *>(this);
+            CurrentClient = client.get();
+            error = (*new_prop).second->Get(value);
+            CurrentContainer = nullptr;
+            CurrentClient = nullptr;
+            return error;
+        }
     }
 
     if (prop->HasFlag(UNSUPPORTED_FEATURE))
@@ -1521,8 +1537,21 @@ TError TContainer::SetProperty(const string &origProperty,
     TError error;
 
     auto prop = Prop->Find(property);
-    if (!prop)
-        return TError(EError::Unknown, "Invalid property " + property);
+    if (!prop) {
+        auto new_prop = ContainerPropMap.find(property);
+        if (new_prop == ContainerPropMap.end())
+            return TError(EError::Unknown, "Invalid property " + property);
+
+        CurrentContainer = const_cast<TContainer *>(this);
+        CurrentClient = client.get();
+        error = (*new_prop).second->Set(value);
+        CurrentContainer = nullptr;
+        CurrentClient = nullptr;
+
+        if (!error)
+            return Save();
+        return error;
+    }
 
     if (prop->HasFlag(UNSUPPORTED_FEATURE))
         return TError(EError::NotSupported, property + " is not supported");
@@ -1728,6 +1757,25 @@ TError TContainer::Save(void) {
 
     }
 
+    TClient fakeroot(TCred(0,0));
+    CurrentContainer = const_cast<TContainer *>(this);
+    CurrentClient = &fakeroot;
+
+    for (auto knob : ContainerPropMap) {
+        std::string value;
+
+        error = knob.second->Get(value);
+        if (error)
+            return error;
+
+        auto pair = new_node.add_pairs();
+        pair->set_key(knob.first);
+        pair->set_val(value);
+    }
+
+    CurrentContainer = nullptr;
+    CurrentClient = nullptr;
+
     return kvnode->Append(new_node);
 }
 
@@ -1737,6 +1785,10 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
     TError error = Prepare();
     if (error)
         return error;
+
+    TClient fakeroot(TCred(0,0));
+    CurrentContainer = const_cast<TContainer *>(this);
+    CurrentClient = &fakeroot;
 
     for (int i = 0; i < node.pairs_size(); i++) {
 
@@ -1768,10 +1820,25 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
                 continue;
         }
 
+        auto prop = ContainerPropMap.find(key);
+
+        if (prop != ContainerPropMap.end()) {
+
+            if (Verbose)
+                L_ACT() << "Restoring as new property" << key << " = " << value << std::endl;
+
+            error = (*prop).second->Set(value);
+            if (!error)
+                continue;
+        }
+
         if (error)
             L_ERR() << error << ": Can't restore " << key << ", skipped" << std::endl;
 
     }
+
+    CurrentContainer = nullptr;
+    CurrentClient = nullptr;
 
     error = Save(); /* FIXME: maybe we need do it at the end of func? */
     if (error)

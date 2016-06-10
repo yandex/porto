@@ -9,6 +9,7 @@
 #include "kvalue.hpp"
 #include "value.hpp"
 #include "container.hpp"
+#include "client.hpp"
 
 constexpr const char *P_RAW_ROOT_PID = "_root_pid";
 constexpr const char *P_RAW_ID = "_id";
@@ -113,3 +114,33 @@ public:
 
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c);
+
+class TContainerProperty {
+public:
+    std::string Name;
+    std::string Desc;
+    TError IsAliveAndStopped(void);
+    virtual TError Set(const std::string &value) = 0;
+    virtual TError Get(std::string &value) = 0;
+    TContainerProperty(std::string name, std::string desc)
+                       : Name(name), Desc(desc) {}
+};
+
+class TContainerUser : public TContainerProperty {
+public:
+    TError Set(const std::string &username);
+    TError Get(std::string &value);
+    TContainerUser(std::string name, std::string desc)
+                   : TContainerProperty(name, desc) {}
+};
+
+
+class TContainerGroup : public TContainerProperty {
+public:
+    TError Set(const std::string &groupname);
+    TError Get(std::string &value);
+    TContainerGroup(std::string name, std::string desc)
+                    : TContainerProperty(name, desc) {}
+};
+
+void InitContainerProperties(void);

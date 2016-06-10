@@ -44,9 +44,14 @@ enum class EContainerState {
     Meta
 };
 
+class TContainerProperty;
+class TContainerPropertyMap;
+
 class TContainer : public std::enable_shared_from_this<TContainer>,
                    public TNonCopyable,
                    public TLockable {
+    friend class TContainerProperty;
+
     std::shared_ptr<TContainerHolder> Holder;
     const std::string Name;
     const std::shared_ptr<TContainer> Parent;
