@@ -27,6 +27,10 @@ TClient::TClient(std::shared_ptr<TEpollLoop> loop) : TEpollSource(loop, -1) {
     Statistics->Clients++;
 }
 
+TClient::TClient(TCred cred) : TEpollSource(), Cred(cred) {
+    Statistics->Clients++;
+}
+
 TClient::~TClient() {
     CloseConnection();
     Statistics->Clients--;

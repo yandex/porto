@@ -24,6 +24,7 @@ struct TEpollSource : public TNonCopyable {
     TEpollSource(std::shared_ptr<TEpollLoop> loop, int fd) : EpollLoop(loop),
                                                              Fd(fd), Flags(0),
                                                              Container() {}
+    TEpollSource() : EpollLoop(nullptr), Fd(-1), Flags(0), Container() {}
 };
 
 class TEpollLoop : public TLockable, public TNonCopyable {

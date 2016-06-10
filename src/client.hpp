@@ -21,7 +21,9 @@ namespace rpc {
 
 class TClient : public TEpollSource {
 public:
+    TCred Cred;
     TClient(std::shared_ptr<TEpollLoop> loop);
+    TClient(TCred cred);
     ~TClient();
 
     bool ReadOnlyAccess;
@@ -64,7 +66,6 @@ public:
 private:
     std::mutex Mutex;
     pid_t Pid;
-    TCred Cred;
     std::string Comm;
     uint64_t ConnectionTime;
     uint64_t RequestStartMs;
