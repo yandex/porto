@@ -166,6 +166,15 @@ bool TCred::IsMemberOf(gid_t group) const {
     return Gid == group;
 }
 
+bool TCred::IsMemberOf(std::string groupname) const {
+    gid_t gid;
+
+    if (GroupId(groupname, gid))
+        return false;
+
+    return IsMemberOf(gid);
+}
+
 void InitCred() {
     TError error;
 

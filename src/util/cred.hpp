@@ -45,6 +45,7 @@ struct TCred {
     bool IsRootUser() const { return Uid == 0; }
 
     bool IsMemberOf(gid_t group) const;
+    bool IsMemberOf(std::string groupname) const;
     bool IsPermitted(const TCred &requirement) const;
 
     friend std::ostream& operator<<(std::ostream& os, const TCred& cred) {
