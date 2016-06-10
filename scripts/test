@@ -70,8 +70,13 @@ threadstest() {
 }
 
 apipytest() {
-	say "Python API test"
-	python $ROOTDIR/src/test/test-api.py
+    say "Python API test"
+    python $ROOTDIR/src/test/test-api.py
+}
+
+unprivcred() {
+	say "Python unprivileged user control test"
+	$SUDO python $ROOTDIR/src/test/test-unpriv-cred.py
 }
 
 HOST=${HOST:-__please_specify_host__}

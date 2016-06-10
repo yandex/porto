@@ -1,0 +1,10 @@
+#!/bin/bash
+
+SUDO=sudo
+
+$SUDO groupdel porto-bob-containers || true
+$SUDO groupdel porto-alice-group || true
+$SUDO userdel porto-alice || true
+$SUDO userdel porto-bob || true
+$SUDO userdel porto-charlie || true
+$SUDO userdel porto-david || true
