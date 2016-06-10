@@ -2161,7 +2161,7 @@ TError TContainer::CheckPermission(const TCred &ucred) {
     if (IsRoot() || IsPortoRoot())
         return TError::Success();
 
-    if (ucred.IsPermitted(OwnerCred))
+    if (ucred.CanControl(OwnerCred))
         return TError::Success();
 
     return TError(EError::Permission, "Permission error");

@@ -40,6 +40,8 @@ constexpr auto PORTO_ROOT_CGROUP = "/porto";
 constexpr auto PORTO_DAEMON_CGROUP = "/portod";
 
 constexpr auto PORTO_GROUP_NAME = "porto";
+constexpr auto PORTO_CONT_GROUP_NAME = "porto-containers";
+constexpr auto CONT_SUFFIX = "-containers";
 constexpr auto PORTO_SOCKET_PATH = "/run/portod.socket";
 constexpr auto PORTO_SOCKET_MODE = 0666;
 

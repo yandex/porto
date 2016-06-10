@@ -187,3 +187,13 @@ void InitCred() {
         LastCapability = 36; //FIXME
     }
 }
+
+bool TCred::CanControl(TCred &cred) const {
+    if (IsRootUser() || Uid == cred.Uid)
+        return true;
+
+    if (cred.IsMemberOf(PORTO_CONT_GROUP_NAME))
+        return true;
+
+    return cred.IsMemberOf(UserName(Uid) + CONT_SUFFIX);
+}

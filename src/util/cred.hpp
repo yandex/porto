@@ -43,6 +43,7 @@ struct TCred {
 
     bool IsPortoUser() const;
     bool IsRootUser() const { return Uid == 0; }
+    bool CanControl(TCred &cred) const;
 
     bool IsMemberOf(gid_t group) const;
     bool IsMemberOf(std::string groupname) const;
