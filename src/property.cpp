@@ -1097,6 +1097,8 @@ TError TContainerUser::Set(const std::string &username) {
         owner.Groups.insert(owner.Groups.end(), new_user.Groups.begin(),
                             new_user.Groups.end());
 
+        CurrentContainer->PropMask |= USER_SET;
+
         return TError::Success();
     }
 
@@ -1122,11 +1124,14 @@ TError TContainerGroup::Set(const std::string &groupname) {
 
     if (CurrentClient->Cred.IsRootUser()) {
         CurrentContainer->OwnerCred.Gid = new_gid;
+        CurrentContainer->PropMask |= GROUP_SET;
+
         return TError::Success();
     }
 
     if (CurrentContainer->OwnerCred.IsMemberOf(new_gid)) {
         CurrentContainer->OwnerCred.Gid = new_gid;
+        CurrentContainer->PropMask |= GROUP_SET;
 
         return TError::Success();
     }

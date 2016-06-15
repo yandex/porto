@@ -19,7 +19,9 @@ constexpr const char *P_RAW_START_TIME = "_start_time";
 constexpr const char *P_RAW_DEATH_TIME = "_death_time";
 constexpr const char *P_COMMAND = "command";
 constexpr const char *P_USER = "user";
+constexpr uint64_t USER_SET = (1lu << 7);
 constexpr const char *P_GROUP = "group";
+constexpr uint64_t GROUP_SET = (1lu << 8);
 constexpr const char *P_ENV = "env";
 constexpr const char *P_PORTO_NAMESPACE = "porto_namespace";
 constexpr const char *P_ROOT = "root";
@@ -118,20 +120,21 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
 class TContainerProperty {
 public:
     std::string Name;
+    uint64_t SetMask;
     std::string Desc;
     TError IsAliveAndStopped(void);
     virtual TError Set(const std::string &value) = 0;
     virtual TError Get(std::string &value) = 0;
-    TContainerProperty(std::string name, std::string desc)
-                       : Name(name), Desc(desc) {}
+    TContainerProperty(std::string name, uint64_t set_mask, std::string desc)
+                       : Name(name), SetMask(set_mask), Desc(desc) {}
 };
 
 class TContainerUser : public TContainerProperty {
 public:
     TError Set(const std::string &username);
     TError Get(std::string &value);
-    TContainerUser(std::string name, std::string desc)
-                   : TContainerProperty(name, desc) {}
+    TContainerUser(std::string name, uint64_t set_mask, std::string desc)
+                   : TContainerProperty(name, set_mask, desc) {}
 };
 
 
@@ -139,8 +142,8 @@ class TContainerGroup : public TContainerProperty {
 public:
     TError Set(const std::string &groupname);
     TError Get(std::string &value);
-    TContainerGroup(std::string name, std::string desc)
-                    : TContainerProperty(name, desc) {}
+    TContainerGroup(std::string name, uint64_t set_mask, std::string desc)
+                    : TContainerProperty(name, set_mask, desc) {}
 };
 
 void InitContainerProperties(void);

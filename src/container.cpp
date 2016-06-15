@@ -52,8 +52,8 @@ using std::map;
 __thread TContainer *CurrentContainer = nullptr;
 __thread TClient *CurrentClient = nullptr;
 
-TContainerUser ContainerUser(P_USER, "Start command with given user");
-TContainerGroup ContainerGroup(P_GROUP, "Start command with given group");
+TContainerUser ContainerUser(P_USER, USER_SET, "Start command with given user");
+TContainerGroup ContainerGroup(P_GROUP, GROUP_SET. "Start command with given group");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -64,6 +64,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     Storage(storage), Id(id), Level(parent == nullptr ? 0 : parent->GetLevel() + 1)
 {
     Statistics->Containers++;
+    PropMask = 0lu;
 }
 
 TContainer::~TContainer() {
@@ -843,6 +844,8 @@ TError TContainer::Create(const TCred &cred) {
     }
 
     OwnerCred = TCred(cred.Uid, cred.Gid);
+
+    PropMask |= USER_SET | GROUP_SET;
 
     error = FindGroups(UserName(OwnerCred.Uid), OwnerCred.Gid, OwnerCred.Groups);
     if (error) {
@@ -1764,6 +1767,9 @@ TError TContainer::Save(void) {
     for (auto knob : ContainerPropMap) {
         std::string value;
 
+        if (!(PropMask & knob.second->SetMask))
+            continue; /* Skip knobs without a value */
+
         error = knob.second->Get(value);
         if (error)
             return error;
@@ -1830,6 +1836,8 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
             error = (*prop).second->Set(value);
             if (!error)
                 continue;
+
+            PropMask |= (*prop).second->SetMask; /* Indicate that we've set the value */
         }
 
         if (error)

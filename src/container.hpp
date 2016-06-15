@@ -129,6 +129,7 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError Freeze(TScopedLock &holder_lock);
 
 public:
+    uint64_t PropMask;
     TCred OwnerCred;
 
     // TODO: make private
