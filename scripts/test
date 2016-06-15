@@ -79,6 +79,11 @@ unprivcred() {
 	$SUDO python $ROOTDIR/src/test/test-unpriv-cred.py
 }
 
+memovercommit() {
+	say "Python memory guarantee overcommit prevention test"
+	$SUDO python $ROOTDIR/src/test/test-mem-overcommit.py
+}
+
 HOST=${HOST:-__please_specify_host__}
 PORT=8081
 
