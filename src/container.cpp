@@ -1483,6 +1483,9 @@ TError TContainer::GetProperty(const string &origProperty, string &value,
                 return TError(EError::InvalidProperty,
                               "Unknown container property: " + property);
 
+            if (!(*new_prop).second->IsSupported)
+                return TError(EError::NotSupported, "Not supported: " + property);
+
             CurrentContainer = const_cast<TContainer *>(this);
             CurrentClient = client.get();
             error = (*new_prop).second->Get(value);
@@ -1544,6 +1547,9 @@ TError TContainer::SetProperty(const string &origProperty,
         auto new_prop = ContainerPropMap.find(property);
         if (new_prop == ContainerPropMap.end())
             return TError(EError::Unknown, "Invalid property " + property);
+
+        if (!(*new_prop).second->IsSupported)
+            return TError(EError::NotSupported, property + " is not supported");
 
         CurrentContainer = const_cast<TContainer *>(this);
         CurrentClient = client.get();

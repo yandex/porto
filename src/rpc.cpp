@@ -713,6 +713,9 @@ noinline TError ListProperty(TContext &context,
     }
 
     for (auto elem : ContainerPropMap) {
+        if (!elem.second->IsSupported)
+            continue;
+
         auto entry = list->add_list();
         entry->set_name(elem.first);
         entry->set_desc(elem.second->Desc.c_str());

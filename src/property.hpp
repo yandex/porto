@@ -122,11 +122,13 @@ public:
     std::string Name;
     uint64_t SetMask;
     std::string Desc;
+    bool IsSupported;
     TError IsAliveAndStopped(void);
     virtual TError Set(const std::string &value) = 0;
     virtual TError Get(std::string &value) = 0;
     TContainerProperty(std::string name, uint64_t set_mask, std::string desc)
-                       : Name(name), SetMask(set_mask), Desc(desc) {}
+                       : Name(name), SetMask(set_mask), Desc(desc),
+                       IsSupported(true) {}
 };
 
 class TContainerUser : public TContainerProperty {
