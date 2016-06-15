@@ -53,7 +53,10 @@ __thread TContainer *CurrentContainer = nullptr;
 __thread TClient *CurrentClient = nullptr;
 
 TContainerUser ContainerUser(P_USER, USER_SET, "Start command with given user");
-TContainerGroup ContainerGroup(P_GROUP, GROUP_SET. "Start command with given group");
+TContainerGroup ContainerGroup(P_GROUP, GROUP_SET, "Start command with given group");
+TContainerMemoryGuarantee ContainerMemoryGuarantee(P_MEM_GUARANTEE, MEM_GUARANTEE_SET,
+                                                    "Guaranteed amount of memory "
+                                                    "[bytes] (dynamic)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -65,6 +68,8 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
 {
     Statistics->Containers++;
     PropMask = 0lu;
+    MemGuarantee = 0;
+    CurrentMemGuarantee = 0;
 }
 
 TContainer::~TContainer() {
@@ -380,28 +385,15 @@ TError TContainer::OpenNetns(TNamespaceFd &netns) const {
     return TError(EError::InvalidValue, "Cannot open netns: container not running");
 }
 
-template <typename T>
-T TContainer::GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except, T exceptVal) const {
-    T val = 0;
+uint64_t TContainer::GetHierarchyMemGuarantee(void) const {
+    uint64_t val = 0lu;
 
     for (auto iter : Children)
-        if (auto child = iter.lock()) {
-            if (except && except == child) {
-                val += exceptVal;
-                continue;
-            }
+        if (auto child = iter.lock())
+            val += child->GetHierarchyMemGuarantee();
 
-            T childval = child->Prop->Get<T>(property);
-            if (childval)
-                val += childval;
-            else
-                val += child->GetChildrenSum(property, except, exceptVal);
-        }
-
-    return val;
+    return (CurrentMemGuarantee > val) ? CurrentMemGuarantee : val;
 }
-
-template uint64_t TContainer::GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except = nullptr, uint64_t exceptVal = 0) const;
 
 vector<pid_t> TContainer::Processes() {
     auto cg = GetCgroup(FreezerSubsystem);
@@ -415,7 +407,7 @@ TError TContainer::ApplyDynamicProperties() {
     auto memcg = GetCgroup(MemorySubsystem);
     TError error;
 
-    error = MemorySubsystem.SetGuarantee(memcg, Prop->Get<uint64_t>(P_MEM_GUARANTEE));
+    error = MemorySubsystem.SetGuarantee(memcg, MemGuarantee);
     if (error) {
         L_ERR() << "Can't set " << P_MEM_GUARANTEE << ": " << error << std::endl;
         return error;

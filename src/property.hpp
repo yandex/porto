@@ -34,6 +34,7 @@ constexpr const char *P_STDOUT_LIMIT = "stdout_limit";
 constexpr const char *P_STDOUT_OFFSET = "stdout_offset";
 constexpr const char *P_STDERR_OFFSET = "stderr_offset";
 constexpr const char *P_MEM_GUARANTEE = "memory_guarantee";
+constexpr uint64_t MEM_GUARANTEE_SET = (1lu << 20);
 constexpr const char *P_MEM_LIMIT = "memory_limit";
 constexpr const char *P_DIRTY_LIMIT = "dirty_limit";
 constexpr const char *P_ANON_LIMIT = "anon_limit";
@@ -124,6 +125,7 @@ public:
     std::string Desc;
     bool IsSupported;
     TError IsAliveAndStopped(void);
+    TError IsAlive(void);
     virtual TError Set(const std::string &value) = 0;
     virtual TError Get(std::string &value) = 0;
     TContainerProperty(std::string name, uint64_t set_mask, std::string desc)
@@ -146,6 +148,20 @@ public:
     TError Get(std::string &value);
     TContainerGroup(std::string name, uint64_t set_mask, std::string desc)
                     : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerMemoryGuarantee : public TContainerProperty {
+public:
+    TError Set(const std::string &mem_guarantee);
+    TError Get(std::string &value);
+    TContainerMemoryGuarantee(std::string name, uint64_t set_mask,
+                              std::string desc)
+                              : TContainerProperty(name, set_mask, desc) {}
+    TError Init(void) {
+        IsSupported = MemorySubsystem.SupportGuarantee();
+
+        return TError::Success();
+    }
 };
 
 void InitContainerProperties(void);

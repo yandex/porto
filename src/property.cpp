@@ -18,6 +18,7 @@ extern __thread TContainer *CurrentContainer;
 extern __thread TClient *CurrentClient;
 extern TContainerUser ContainerUser;
 extern TContainerGroup ContainerGroup;
+extern TContainerMemoryGuarantee ContainerMemoryGuarantee;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -238,32 +239,6 @@ public:
             return TError(EError::InvalidValue,
                           "Maximum number of bytes: " +
                           std::to_string(max));
-
-        return TError::Success();
-    }
-};
-
-class TMemoryGuaranteeProperty : public TSizeValue, public TContainerValue {
-public:
-    TMemoryGuaranteeProperty() :
-        TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-        TContainerValue(P_MEM_GUARANTEE,
-                        "Guaranteed amount of memory [bytes] (dynamic)") {
-        if (!MemorySubsystem.SupportGuarantee())
-            SetFlag(UNSUPPORTED_FEATURE);
-    }
-
-    TError CheckValue(const uint64_t &value) override {
-        auto c = GetContainer();
-
-        uint64_t usage = c->GetRoot()->GetChildrenSum(P_MEM_GUARANTEE, c, value);
-        uint64_t total = GetTotalMemory();
-        uint64_t reserve = config().daemon().memory_guarantee_reserve();
-        if (usage + reserve > total)
-            return TError(EError::ResourceNotAvailable,
-                          "can't guarantee all available memory: requested " +
-                          std::to_string(value) + " (will be " + std::to_string(usage) +
-                          " of " + std::to_string(total) + ", reserve " + std::to_string(reserve) + ")");
 
         return TError::Success();
     }
@@ -1019,7 +994,6 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TStdoutPathProperty,
         new TStderrPathProperty,
         new TStdoutLimitProperty,
-        new TMemoryGuaranteeProperty,
         new TMemoryLimitProperty,
         new TAnonLimitProperty,
         new TDirtyLimitProperty,
@@ -1150,6 +1124,8 @@ TError TContainerGroup::Get(std::string &value) {
 void InitContainerProperties(void) {
     ContainerPropMap[ContainerUser.Name] = &ContainerUser;
     ContainerPropMap[ContainerGroup.Name] = &ContainerGroup;
+    ContainerMemoryGuarantee.Init();
+    ContainerPropMap[ContainerMemoryGuarantee.Name] = &ContainerMemoryGuarantee;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1163,6 +1139,65 @@ TError TContainerProperty::IsAliveAndStopped(void) {
         state != EContainerState::Unknown)
         return TError(EError::InvalidState,
                 "Cannot change property in runtime");
+
+    return TError::Success();
+}
+
+TError TContainerProperty::IsAlive(void) {
+    auto state = CurrentContainer->GetState();
+
+    if (state == EContainerState::Dead)
+        return TError(EError::InvalidState,
+                      "Cannot change property while in the dead state");
+
+    return TError::Success();
+}
+
+TError TContainerMemoryGuarantee::Set(const std::string &mem_guarantee) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    uint64_t new_val = 0lu;
+    error = StringToSize(mem_guarantee, new_val);
+    if (error)
+        return error;
+
+    CurrentContainer->CurrentMemGuarantee = new_val;
+
+    uint64_t usage = CurrentContainer->GetRoot()->GetHierarchyMemGuarantee();
+    uint64_t total = GetTotalMemory();
+    uint64_t reserve = config().daemon().memory_guarantee_reserve();
+    if (usage + reserve > total) {
+        CurrentContainer->CurrentMemGuarantee = CurrentContainer->MemGuarantee;
+
+        return TError(EError::ResourceNotAvailable,
+                "can't guarantee all available memory: requested " +
+                std::to_string(new_val) + " (will be " + std::to_string(usage) +
+                " of " + std::to_string(total) + ", reserve " + std::to_string(reserve) + ")");
+    }
+
+    if (CurrentContainer->GetState() == EContainerState::Running ||
+        CurrentContainer->GetState() == EContainerState::Meta ||
+        CurrentContainer->GetState() == EContainerState::Paused) {
+        auto memcg = CurrentContainer->GetCgroup(MemorySubsystem);
+        error = MemorySubsystem.SetGuarantee(memcg, new_val);
+        if (error) {
+            CurrentContainer->CurrentMemGuarantee = CurrentContainer->MemGuarantee;
+            L_ERR() << "Can't set " << P_MEM_GUARANTEE << ": " << error << std::endl;
+
+            return error;
+        }
+    }
+
+    CurrentContainer->MemGuarantee = new_val;
+    CurrentContainer->PropMask |= MEM_GUARANTEE_SET;
+
+    return TError::Success();
+}
+
+TError TContainerMemoryGuarantee::Get(std::string &value) {
+    value = std::to_string(CurrentContainer->MemGuarantee);
 
     return TError::Success();
 }

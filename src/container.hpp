@@ -131,6 +131,8 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
 public:
     uint64_t PropMask;
     TCred OwnerCred;
+    uint64_t MemGuarantee;
+    uint64_t CurrentMemGuarantee;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;
@@ -162,15 +164,13 @@ public:
     const std::string GetTextId(const std::string &separator = "+") const;
     const int GetId() const { return Id; }
     const int GetLevel() const { return Level; }
+    uint64_t GetHierarchyMemGuarantee(void) const;
 
     bool IsRoot() const;
     bool IsPortoRoot() const;
     std::shared_ptr<const TContainer> GetRoot() const;
     std::shared_ptr<TContainer> GetParent() const;
     TError OpenNetns(TNamespaceFd &netns) const;
-
-    template <typename T>
-    T GetChildrenSum(const std::string &property, std::shared_ptr<const TContainer> except = nullptr, T exceptVal = 0) const;
 
     std::vector<pid_t> Processes();
 
