@@ -747,6 +747,15 @@ noinline TError ListData(TContext &context,
         entry->set_desc(cv->GetDesc());
     }
 
+    for (auto elem : ContainerPropMap) {
+        if (!elem.second->IsSupported || !elem.second->IsReadOnly)
+            continue;
+
+        auto entry = list->add_list();
+        entry->set_name(elem.first);
+        entry->set_desc(elem.second->Desc.c_str());
+    }
+
     return TError::Success();
 }
 

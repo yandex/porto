@@ -124,13 +124,22 @@ public:
     uint64_t SetMask;
     std::string Desc;
     bool IsSupported;
+    bool IsReadOnly;
     TError IsAliveAndStopped(void);
     TError IsAlive(void);
-    virtual TError Set(const std::string &value) = 0;
+    virtual TError Set(const std::string &value) {
+        if (IsReadOnly)
+            return TError(EError::InvalidValue, "Read-only value: " + Name);
+
+        return TError::Success();
+    }
     virtual TError Get(std::string &value) = 0;
     TContainerProperty(std::string name, uint64_t set_mask, std::string desc)
                        : Name(name), SetMask(set_mask), Desc(desc),
-                       IsSupported(true) {}
+                       IsSupported(true), IsReadOnly(false) {}
+    TContainerProperty(std::string name, std::string desc, bool ro) : Name(name), Desc(desc),
+                       IsSupported(true), IsReadOnly(ro) {}
+
 };
 
 class TContainerUser : public TContainerProperty {
