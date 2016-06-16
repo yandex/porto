@@ -141,6 +141,13 @@ public:
     TContainerProperty(std::string name, std::string desc) :
                        Name(name), SetMask(0), Desc(desc),
                        IsSupported(true), IsReadOnly(true) {}
+
+    virtual TError GetIndexed(const std::string &index, std::string &value) {
+        return TError(EError::InvalidValue, "Invalid subscript for property");
+    }
+    virtual TError SetIndexed(const std::string &index, const std::string &value) {
+        return TError(EError::InvalidValue, "Invalid subscript for property");
+    }
 };
 
 class TContainerUser : public TContainerProperty {

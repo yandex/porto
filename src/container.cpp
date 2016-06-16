@@ -1484,7 +1484,10 @@ TError TContainer::GetProperty(const string &origProperty, string &value,
 
             CurrentContainer = const_cast<TContainer *>(this);
             CurrentClient = client.get();
-            error = (*new_prop).second->Get(value);
+            if (idx.length())
+                error = (*new_prop).second->GetIndexed(idx, value);
+            else
+                error = (*new_prop).second->Get(value);
             CurrentContainer = nullptr;
             CurrentClient = nullptr;
             return error;
@@ -1549,7 +1552,10 @@ TError TContainer::SetProperty(const string &origProperty,
 
         CurrentContainer = const_cast<TContainer *>(this);
         CurrentClient = client.get();
-        error = (*new_prop).second->Set(value);
+        if (idx.length())
+            error = (*new_prop).second->SetIndexed(idx, value);
+        else
+            error = (*new_prop).second->Set(value);
         CurrentContainer = nullptr;
         CurrentClient = nullptr;
 
