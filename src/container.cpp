@@ -103,6 +103,8 @@ TContainerEnv ContainerEnv(P_ENV, ENV_SET,
 TContainerBind ContainerBind(P_BIND, BIND_SET,
                              "Share host directories with container: "
                              "<host_path> <container_path> [ro|rw]; ...");
+TContainerIp ContainerIp(P_IP, IP_SET,
+                         "IP configuration: <interface> <ip>/<prefix>; ...");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -671,7 +673,7 @@ TError TContainer::ParseNetConfig(struct TNetCfg &NetCfg) {
     if (error)
         return error;
 
-    error = NetCfg.ParseIp(Prop->Get<std::vector<std::string>>(P_IP));
+    error = NetCfg.ParseIp(IpList);
     if (error)
         return error;
 
@@ -700,9 +702,7 @@ TError TContainer::PrepareNetwork(struct TNetCfg &NetCfg) {
         error = NetCfg.FormatIp(lines);
         if (error)
             return error;
-        error = Prop->Set<std::vector<std::string>>(P_IP, lines);
-        if (error)
-            return error;
+        IpList = lines;
     }
 
     Net = NetCfg.Net;
@@ -1280,7 +1280,7 @@ void TContainer::FreeResources() {
         if (NetCfg.SaveIp) {
             std::vector<std::string> lines;
             if (!NetCfg.FormatIp(lines))
-                Prop->Set<std::vector<std::string>>(P_IP, lines);
+                IpList = lines;
         }
         if (error)
             L_ERR() << "Cannot free network resources: " << error << std::endl;

@@ -35,6 +35,7 @@ extern TContainerHostname ContainerHostname;
 extern TContainerRootRo ContainerRootRo;
 extern TContainerEnv ContainerEnv;
 extern TContainerBind ContainerBind;
+extern TContainerIp ContainerIp;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -453,20 +454,6 @@ public:
     }
 };
 
-class TIpProperty : public TListValue, public TContainerValue {
-public:
-    TIpProperty() :
-        TListValue(PERSISTENT_VALUE),
-        TContainerValue(P_IP,
-                        "IP configuration: <interface> <ip>/<prefix>; ...") {}
-
-    TError CheckValue(const std::vector<std::string> &lines) override {
-        TNetCfg cfg;
-
-        return cfg.ParseIp(lines);
-    }
-};
-
 class TNetTosProperty : public TUintValue, public TContainerValue {
 public:
     TNetTosProperty() :
@@ -726,7 +713,6 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TNetTosProperty,
         new TDevicesProperty,
         new TCapabilitiesProperty,
-        new TIpProperty,
         new TDefaultGwProperty,
         new TAgingTimeProperty,
         new TEnablePortoProperty,
@@ -848,6 +834,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerRootRo.Name] = &ContainerRootRo;
     ContainerPropMap[ContainerEnv.Name] = &ContainerEnv;
     ContainerPropMap[ContainerBind.Name] = &ContainerBind;
+    ContainerPropMap[ContainerIp.Name] = &ContainerIp;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1367,4 +1354,29 @@ TError TContainerBind::Get(std::string &value) {
                                 (m.Rdonly ? " ro" : " rw"));
     
     return StrListToString(bind_str_list, value);
+}
+
+TError TContainerIp::Set(const std::string &ipaddr) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    std::vector<std::string> ipaddrs;
+    error = StringToStrList(ipaddr, ipaddrs);
+    if (error)
+        return error;
+
+    TNetCfg cfg;
+    error = cfg.ParseIp(ipaddrs);
+    if (error)
+        return error;
+
+    CurrentContainer->IpList = ipaddrs;
+    CurrentContainer->PropMask |= IP_SET;
+
+    return TError::Success();
+}
+
+TError TContainerIp::Get(std::string &value) {
+    return StrListToString(CurrentContainer->IpList, value);
 }

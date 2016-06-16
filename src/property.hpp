@@ -74,6 +74,7 @@ constexpr const char *P_NET_TOS = "net_tos";
 constexpr const char *P_DEVICES = "devices";
 constexpr const char *P_CAPABILITIES = "capabilities";
 constexpr const char *P_IP = "ip";
+constexpr uint64_t IP_SET = (1lu << 46);
 constexpr const char *P_DEFAULT_GW = "default_gw";
 constexpr const char *P_VIRT_MODE = "virt_mode";
 constexpr uint64_t VIRT_MODE_SET = (1lu << 48);
@@ -324,4 +325,13 @@ public:
     TContainerBind(std::string name, uint64_t set_mask, std::string desc)
                    : TContainerProperty(name, set_mask, desc) {}
 };
+
+class TContainerIp : public TContainerProperty {
+public:
+    TError Set(const std::string &ipaddr);
+    TError Get(std::string &value);
+    TContainerIp(std::string name, uint64_t set_mask, std::string desc)
+                 : TContainerProperty(name, set_mask, desc) {}
+};
+
 void InitContainerProperties(void);
