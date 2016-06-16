@@ -9,6 +9,7 @@
 #include "util/string.hpp"
 #include "util/unix.hpp"
 #include "util/cred.hpp"
+#include <sstream>
 
 extern "C" {
 #include <linux/capability.h>
@@ -20,6 +21,16 @@ extern TContainerUser ContainerUser;
 extern TContainerGroup ContainerGroup;
 extern TContainerMemoryGuarantee ContainerMemoryGuarantee;
 extern TContainerMemTotalGuarantee ContainerMemTotalGuarantee;
+extern TContainerVirtMode ContainerVirtMode;
+extern TContainerCommand ContainerCommand;
+extern TContainerCwd ContainerCwd;
+extern TContainerStdinPath ContainerStdinPath;
+extern TContainerStdoutPath ContainerStdoutPath;
+extern TContainerStderrPath ContainerStderrPath;
+extern TContainerBindDns ContainerBindDns;
+extern TContainerIsolate ContainerIsolate;
+extern TContainerRoot ContainerRoot;
+extern TContainerNet ContainerNet;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -30,7 +41,7 @@ bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
         return false;
     }
 
-    return HasFlags(property, PARENT_DEF_PROPERTY) && !GetRaw<bool>(P_ISOLATE);
+    return HasFlags(property, PARENT_DEF_PROPERTY) && !c->Isolate;
 }
 
 bool TPropertyMap::HasFlags(const std::string &property, int flags) const {
@@ -71,21 +82,6 @@ TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
 
     return TError::Success();
 }
-
-class TCommandProperty : public TStringValue, public TContainerValue {
-public:
-    TCommandProperty() :
-        TStringValue(PERSISTENT_VALUE),
-        TContainerValue(P_COMMAND,
-                        "Command executed upon container start") {}
-
-    std::string GetDefault() const override {
-        if (GetContainer()->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
-            return "/sbin/init";
-
-        return "";
-    }
-};
 
 class TEnvProperty : public TListValue, public TContainerValue {
 public:
@@ -134,18 +130,6 @@ public:
     }
 };
 
-class TRootProperty : public TStringValue, public TContainerValue {
-public:
-    TRootProperty() :
-        TStringValue(PERSISTENT_VALUE),
-        TContainerValue(P_ROOT,
-                     "Container root directory (container will be chrooted into this directory)") {}
-
-    std::string GetDefault() const override {
-        return "/";
-    }
-};
-
 class TRootRdOnlyProperty : public TBoolValue, public TContainerValue {
 public:
     TRootRdOnlyProperty() :
@@ -155,70 +139,6 @@ public:
 
     bool GetDefault() const override {
         return false;
-    }
-};
-
-class TCwdProperty : public TStringValue, public TContainerValue {
-public:
-    TCwdProperty() :
-        TStringValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
-        TContainerValue(P_CWD,
-                        "Container working directory") {}
-
-    std::string GetDefault() const override {
-        auto c = GetContainer();
-
-        if (c->IsRoot() || c->IsPortoRoot() || !c->RootPath().IsRoot() ||
-                c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
-            return "/";
-
-        return c->WorkPath().ToString();
-    }
-};
-
-class TStdinPathProperty : public TStringValue, public TContainerValue {
-public:
-    TStdinPathProperty() :
-        TStringValue(PERSISTENT_VALUE),
-        TContainerValue(P_STDIN_PATH,
-                        "Container standard input path") {}
-
-    std::string GetDefault() const override {
-        return "/dev/null";
-    }
-};
-
-class TStdoutPathProperty : public TStringValue, public TContainerValue {
-public:
-    TStdoutPathProperty() :
-        TStringValue(PERSISTENT_VALUE),
-        TContainerValue(P_STDOUT_PATH,
-                        "Container standard output path") {}
-
-    std::string GetDefault() const override {
-        auto c = GetContainer();
-
-        if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
-            return "/dev/null";
-
-        return "stdout";
-    }
-};
-
-class TStderrPathProperty : public TStringValue, public TContainerValue {
-public:
-    TStderrPathProperty() :
-        TStringValue(PERSISTENT_VALUE),
-        TContainerValue(P_STDERR_PATH,
-                        "Container standard error path") {}
-
-    std::string GetDefault() const override {
-        auto c = GetContainer();
-
-        if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
-            return "/dev/null";
-
-        return "stderr";
     }
 };
 
@@ -462,18 +382,6 @@ public:
     }
 };
 
-class TIsolateProperty : public TBoolValue, public TContainerValue {
-public:
-    TIsolateProperty() :
-        TBoolValue(PERSISTENT_VALUE),
-        TContainerValue(P_ISOLATE,
-                        "Isolate container from parent") {}
-
-    bool GetDefault() const override {
-        return true;
-    }
-};
-
 class TPrivateProperty : public TStringValue, public TContainerValue {
 public:
     TPrivateProperty() :
@@ -581,29 +489,6 @@ public:
                         "Container hostname") {}
 };
 
-class TBindDnsProperty : public TBoolValue, public TContainerValue {
-public:
-    TBindDnsProperty() :
-        TBoolValue(PERSISTENT_VALUE),
-        TContainerValue(P_BIND_DNS,
-                        "Bind /etc/resolv.conf and /etc/hosts of host to container") {}
-
-    bool GetDefault() const override {
-        auto c = GetContainer();
-
-        auto vmode = c->Prop->Get<int>(P_VIRT_MODE);
-        if (vmode == VIRT_MODE_OS)
-            return false;
-
-        if (!c->Prop->Get<bool>(P_ISOLATE))
-            return false;
-        else if (c->Prop->IsDefault(P_ROOT))
-            return false;
-        else
-            return true;
-    }
-};
-
 class TBindProperty : public TListValue, public TContainerValue {
     std::vector<TBindMap> BindMap;
 
@@ -681,41 +566,6 @@ public:
         TNetCfg cfg;
 
         return cfg.ParseIp(lines);
-    }
-};
-
-class TNetProperty : public TListValue, public TContainerValue {
-public:
-    TNetProperty() :
-        TListValue(PERSISTENT_VALUE),
-        TContainerValue(P_NET,
-                        "Container network settings: "
-                        "none | "
-                        "inherited | "
-                        "host [interface] | "
-                        "container <name> | "
-                        "macvlan <master> <name> [bridge|private|vepa|passthru] [mtu] [hw] | "
-                        "ipvlan <master> <name> [l2|l3] [mtu] | "
-                        "veth <name> <bridge> [mtu] [hw] | "
-                        "L3 <name> [master] | "
-                        "NAT [name] | "
-                        "MTU <name> <mtu> | "
-                        "autoconf <name> | "
-                        "netns <name>") {}
-
-    TStrList GetDefault() const override {
-        auto c = GetContainer();
-
-        if (c->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
-            return TStrList{ "none" };
-
-        return TStrList{ "inherited" };
-    }
-
-    TError CheckValue(const std::vector<std::string> &lines) override {
-        TNetCfg cfg;
-
-        return cfg.ParseNet(lines);
     }
 };
 
@@ -803,8 +653,7 @@ public:
         auto c = GetContainer();
 
         bool root = c->OwnerCred.IsRootUser();
-        auto vmode = c->Prop->Get<int>(P_VIRT_MODE);
-        bool restricted = vmode == VIRT_MODE_OS;
+        bool restricted = c->VirtMode == VIRT_MODE_OS;
 
         for (const auto &kv : Supported)
             if ((root || (restricted && kv.second.flags & RESTRICTED_CAP))
@@ -835,34 +684,6 @@ public:
 
     TError PrepareTaskEnv(TTaskEnv &taskEnv) override {
         taskEnv.Caps = Caps;
-        return TError::Success();
-    }
-};
-
-class TVirtModeProperty : public TIntValue, public TContainerValue {
-public:
-    TVirtModeProperty() :
-        TIntValue(PERSISTENT_VALUE),
-        TContainerValue(P_VIRT_MODE,
-                        "Virtualization mode: os|app") {}
-
-    std::string ToString(const int &value) const override {
-        if (value == VIRT_MODE_OS)
-            return "os";
-        else if (value == VIRT_MODE_APP)
-            return "app";
-        else
-            return "unknown " + std::to_string(value);
-    }
-
-    TError FromString(const std::string &value, int &mode) const override {
-        if (value == "app") {
-            mode = VIRT_MODE_APP;
-        } else if (value == "os") {
-            mode = VIRT_MODE_OS;
-        } else {
-            return TError(EError::InvalidValue, std::string("Unsupported ") + P_VIRT_MODE + ": " + value);
-        }
         return TError::Success();
     }
 };
@@ -985,15 +806,9 @@ public:
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> properties = {
-        new TCommandProperty,
         new TEnvProperty,
         new TPortoNamespaceProperty,
-        new TRootProperty,
         new TRootRdOnlyProperty,
-        new TCwdProperty,
-        new TStdinPathProperty,
-        new TStdoutPathProperty,
-        new TStderrPathProperty,
         new TStdoutLimitProperty,
         new TMemoryLimitProperty,
         new TAnonLimitProperty,
@@ -1010,19 +825,15 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TNetPriorityProperty,
         new TRespawnProperty,
         new TMaxRespawnsProperty,
-        new TIsolateProperty,
         new TPrivateProperty,
         new TUlimitProperty,
         new THostnameProperty,
-        new TBindDnsProperty,
         new TBindProperty,
-        new TNetProperty,
         new TNetTosProperty,
         new TDevicesProperty,
         new TCapabilitiesProperty,
         new TIpProperty,
         new TDefaultGwProperty,
-        new TVirtModeProperty,
         new TAgingTimeProperty,
         new TEnablePortoProperty,
         new TResolvConfProperty,
@@ -1129,6 +940,16 @@ void InitContainerProperties(void) {
     ContainerMemTotalGuarantee.Init();
     ContainerPropMap[ContainerMemoryGuarantee.Name] = &ContainerMemoryGuarantee;
     ContainerPropMap[ContainerMemTotalGuarantee.Name] = &ContainerMemTotalGuarantee;
+    ContainerPropMap[ContainerCommand.Name] = &ContainerCommand;
+    ContainerPropMap[ContainerVirtMode.Name] = &ContainerVirtMode;
+    ContainerPropMap[ContainerCwd.Name] = &ContainerCwd;
+    ContainerPropMap[ContainerStdinPath.Name] = &ContainerStdinPath;
+    ContainerPropMap[ContainerStdoutPath.Name] = &ContainerStdoutPath;
+    ContainerPropMap[ContainerStderrPath.Name] = &ContainerStderrPath;
+    ContainerPropMap[ContainerIsolate.Name] = &ContainerIsolate;
+    ContainerPropMap[ContainerBindDns.Name] = &ContainerBindDns;
+    ContainerPropMap[ContainerRoot.Name] = &ContainerRoot;
+    ContainerPropMap[ContainerNet.Name] = &ContainerNet;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1211,4 +1032,288 @@ TError TContainerMemTotalGuarantee::Get(std::string &value) {
     value = std::to_string(total);
 
     return TError::Success();
+}
+
+TError TContainerCommand::Set(const std::string &command) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    CurrentContainer->Command = command;
+    CurrentContainer->PropMask |= COMMAND_SET;
+
+    return TError::Success();
+}
+
+TError TContainerCommand::Get(std::string &value) {
+    std::string virt_mode;
+
+    value = CurrentContainer->Command;
+
+    return TError::Success();
+}
+
+TError TContainerVirtMode::Set(const std::string &virt_mode) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    if (virt_mode == P_VIRT_MODE_APP)
+        CurrentContainer->VirtMode = VIRT_MODE_APP;
+
+    else if (virt_mode == P_VIRT_MODE_OS)
+        CurrentContainer->VirtMode = VIRT_MODE_OS;
+
+    else
+        return TError(EError::InvalidValue, std::string("Unsupported ") +
+                      P_VIRT_MODE + ": " + virt_mode);
+
+    if (CurrentContainer->VirtMode == VIRT_MODE_OS) {
+        if (!(CurrentContainer->PropMask & CWD_SET)) {
+
+            CurrentContainer->Cwd = "/";
+            ContainerCwd.Propagate("/");
+        }
+
+        if (!(CurrentContainer->PropMask & COMMAND_SET))
+            CurrentContainer->Command = "/sbin/init";
+
+        if (!(CurrentContainer->PropMask & STDOUT_SET))
+            CurrentContainer->StdoutPath = "/dev/null";
+
+        if (!(CurrentContainer->PropMask & STDERR_SET))
+            CurrentContainer->StderrPath = "/dev/null";
+
+        if (!(CurrentContainer->PropMask & BIND_DNS_SET))
+            CurrentContainer->BindDns = false;
+
+        if (!(CurrentContainer->PropMask & NET_SET))
+            CurrentContainer->NetProp = { "none" };
+
+        /* TODO: Add capabilities */
+
+    }
+
+    CurrentContainer->PropMask |= VIRT_MODE_SET;
+
+    return TError::Success();
+}
+
+TError TContainerVirtMode::Get(std::string &value) {
+
+    switch (CurrentContainer->VirtMode) {
+        case VIRT_MODE_APP:
+            value = P_VIRT_MODE_APP;
+            break;
+        case VIRT_MODE_OS:
+            value = P_VIRT_MODE_OS;
+            break;
+        default:
+            value = "unknown " + std::to_string(CurrentContainer->VirtMode);
+            break;
+    }
+
+    return TError::Success();
+}
+
+TError TContainerStdinPath::Set(const std::string &path) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    CurrentContainer->StdinPath = path;
+    CurrentContainer->PropMask |= STDIN_SET;
+
+    return TError::Success();
+}
+
+TError TContainerStdinPath::Get(std::string &value) {
+    value = CurrentContainer->StdinPath;
+
+    return TError::Success();
+}
+
+TError TContainerStdoutPath::Set(const std::string &path) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    CurrentContainer->StdoutPath = path;
+    CurrentContainer->PropMask |= STDOUT_SET;
+
+    return TError::Success();
+}
+
+TError TContainerStdoutPath::Get(std::string &value) {
+    value = CurrentContainer->StdoutPath;
+
+    return TError::Success();
+}
+
+TError TContainerStderrPath::Set(const std::string &path) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    CurrentContainer->StderrPath = path;
+    CurrentContainer->PropMask |= STDERR_SET;
+
+    return TError::Success();
+}
+
+TError TContainerStderrPath::Get(std::string &value) {
+    value = CurrentContainer->StderrPath;
+
+    return TError::Success();
+}
+
+TError TContainerBindDns::Get(std::string &value) {
+    value = CurrentContainer->BindDns ? "true" : "false";
+
+    return TError::Success();
+}
+
+TError TContainerBindDns::Set(const std::string &bind_needed) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    if (bind_needed == "true")
+        CurrentContainer->BindDns = true;
+    else if (bind_needed == "false")
+        CurrentContainer->BindDns = false;
+    else
+        return TError(EError::InvalidValue, "Invalid bool value");
+
+    CurrentContainer->PropMask |= BIND_DNS_SET;
+
+    return TError::Success();
+}
+
+TError TContainerIsolate::Get(std::string &value) {
+    value = CurrentContainer->Isolate ? "true" : "false";
+
+    return TError::Success();
+}
+
+TError TContainerIsolate::Set(const std::string &isolate_needed) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    if (isolate_needed == "true")
+        CurrentContainer->Isolate = true;
+    else if (isolate_needed == "false")
+        CurrentContainer->Isolate = false;
+    else
+        return TError(EError::InvalidValue, "Invalid bool value");
+
+    if (!CurrentContainer->Isolate) {
+        if (!(CurrentContainer->PropMask & BIND_DNS_SET))
+            CurrentContainer->BindDns = false;
+
+        auto p = CurrentContainer->GetParent();
+        if (p) {
+            if (!(CurrentContainer->PropMask & CWD_SET)) {
+                CurrentContainer->Cwd = p->Cwd;
+
+                ContainerCwd.Propagate(p->Cwd);
+            }
+        }
+
+    }
+
+    CurrentContainer->PropMask |= ISOLATE_SET;
+
+    return TError::Success();
+}
+
+TError TContainerRoot::Get(std::string &value) {
+    value = CurrentContainer->Root;
+
+    return TError::Success();
+}
+
+TError TContainerRoot::Set(const std::string &root) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    CurrentContainer->Root = root;
+
+    if (root != "/") {
+        if (!(CurrentContainer->PropMask & BIND_DNS_SET) &&
+            CurrentContainer->VirtMode != VIRT_MODE_OS &&
+            CurrentContainer->Isolate) {
+            CurrentContainer->BindDns = true;
+        }
+
+        if (!(CurrentContainer->PropMask & CWD_SET)) {
+            CurrentContainer->Cwd = "/";
+            ContainerCwd.Propagate("/");
+        }
+    }
+    CurrentContainer->PropMask |= ROOT_SET;
+
+    return TError::Success();
+}
+
+TError TContainerNet::Set(const std::string &net_desc) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    std::vector<std::string> new_net_desc;
+    error = StringToStrList(net_desc, new_net_desc);
+
+    TNetCfg cfg;
+    error = cfg.ParseNet(new_net_desc);
+    if (error)
+        return error;
+
+    CurrentContainer->NetProp = new_net_desc; /* FIXME: Copy vector contents? */
+
+    CurrentContainer->PropMask |= NET_SET;
+    return TError::Success();
+}
+
+TError TContainerNet::Get(std::string &value) {
+    return StrListToString(CurrentContainer->NetProp, value);
+}
+
+TError TContainerCwd::Set(const std::string &cwd) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    CurrentContainer->Cwd = cwd;
+    Propagate(cwd);
+    CurrentContainer->PropMask |= CWD_SET;
+
+    return TError::Success();
+}
+
+TError TContainerCwd::Get(std::string &value) {
+    value = CurrentContainer->Cwd;
+
+    return TError::Success();
+}
+
+void TContainerCwd::Propagate(const std::string &cwd) {
+
+    for (auto iter : CurrentContainer->Children) {
+        if (auto child = iter.lock()) {
+
+            auto old = CurrentContainer;
+            CurrentContainer = child.get();
+
+            if (!(CurrentContainer->PropMask & CWD_SET) &&
+                !(CurrentContainer->Isolate)) {
+
+                CurrentContainer->Cwd = cwd;
+                ContainerCwd.Propagate(cwd);
+            }
+            CurrentContainer = old;
+        }
+    }
 }

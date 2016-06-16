@@ -10,6 +10,7 @@
 #include "util/log.hpp"
 #include "stream.hpp"
 #include "cgroup.hpp"
+#include "task.hpp"
 
 class TKeyValueStorage;
 class TEpollSource;
@@ -55,7 +56,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     std::shared_ptr<TContainerHolder> Holder;
     const std::string Name;
     const std::shared_ptr<TContainer> Parent;
-    std::vector<std::weak_ptr<TContainer>> Children;
     std::shared_ptr<TKeyValueStorage> Storage;
     EContainerState State = EContainerState::Unknown;
     int Acquired = 0;
@@ -102,7 +102,8 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     TError PrepareResources(std::shared_ptr<TClient> client);
     void FreeResources();
 
-    void RestoreStdPath(const std::string &property);
+    void RestoreStdPath(const std::string &property,
+                        const std::string &path, bool is_default);
     void CreateStdStreams();
     TError PrepareStdStreams(std::shared_ptr<TClient> client);
 
@@ -133,6 +134,17 @@ public:
     TCred OwnerCred;
     uint64_t MemGuarantee;
     uint64_t CurrentMemGuarantee;
+    std::string Command;
+    std::string Cwd;
+    std::string StdinPath;
+    std::string StdoutPath;
+    std::string StderrPath;
+    std::string Root;
+    int VirtMode = 0;
+    bool BindDns;
+    bool Isolate;
+    std::vector<std::string> NetProp;
+    std::vector<std::weak_ptr<TContainer>> Children;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;
@@ -142,7 +154,7 @@ public:
     TPath GetTmpDir() const;
     TPath RootPath() const;
     TPath WorkPath() const;
-    TPath ActualStdPath(const std::string &property, bool host) const;
+    TPath ActualStdPath(const std::string &path_str, bool is_default, bool host) const;
     TError RotateStdFile(TStdStream &stream, const std::string &type);
     EContainerState GetState() const;
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);

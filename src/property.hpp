@@ -18,6 +18,7 @@ constexpr const char *P_RAW_NAME = "_name";
 constexpr const char *P_RAW_START_TIME = "_start_time";
 constexpr const char *P_RAW_DEATH_TIME = "_death_time";
 constexpr const char *P_COMMAND = "command";
+constexpr uint64_t COMMAND_SET = (1 << 6);
 constexpr const char *P_USER = "user";
 constexpr uint64_t USER_SET = (1lu << 7);
 constexpr const char *P_GROUP = "group";
@@ -25,11 +26,16 @@ constexpr uint64_t GROUP_SET = (1lu << 8);
 constexpr const char *P_ENV = "env";
 constexpr const char *P_PORTO_NAMESPACE = "porto_namespace";
 constexpr const char *P_ROOT = "root";
+constexpr uint64_t ROOT_SET = (1 << 11);
 constexpr const char *P_ROOT_RDONLY = "root_readonly";
 constexpr const char *P_CWD = "cwd";
+constexpr uint64_t CWD_SET = (1 << 13);
 constexpr const char *P_STDIN_PATH = "stdin_path";
+constexpr uint64_t STDIN_SET = (1 << 14);
 constexpr const char *P_STDOUT_PATH = "stdout_path";
+constexpr uint64_t STDOUT_SET = (1 << 15);
 constexpr const char *P_STDERR_PATH = "stderr_path";
+constexpr uint64_t STDERR_SET = (1 << 16);
 constexpr const char *P_STDOUT_LIMIT = "stdout_limit";
 constexpr const char *P_STDOUT_OFFSET = "stdout_offset";
 constexpr const char *P_STDERR_OFFSET = "stderr_offset";
@@ -51,18 +57,22 @@ constexpr const char *P_NET_PRIO = "net_priority";
 constexpr const char *P_RESPAWN = "respawn";
 constexpr const char *P_MAX_RESPAWNS = "max_respawns";
 constexpr const char *P_ISOLATE = "isolate";
+constexpr uint64_t ISOLATE_SET = (1lu << 36);
 constexpr const char *P_PRIVATE = "private";
 constexpr const char *P_ULIMIT = "ulimit";
 constexpr const char *P_HOSTNAME = "hostname";
 constexpr const char *P_BIND_DNS = "bind_dns";
+constexpr uint64_t BIND_DNS_SET = (1lu << 40);
 constexpr const char *P_BIND = "bind";
 constexpr const char *P_NET = "net";
+constexpr uint64_t NET_SET = (1lu << 42);
 constexpr const char *P_NET_TOS = "net_tos";
 constexpr const char *P_DEVICES = "devices";
 constexpr const char *P_CAPABILITIES = "capabilities";
 constexpr const char *P_IP = "ip";
 constexpr const char *P_DEFAULT_GW = "default_gw";
 constexpr const char *P_VIRT_MODE = "virt_mode";
+constexpr uint64_t VIRT_MODE_SET = (1lu << 48);
 constexpr const char *P_AGING_TIME = "aging_time";
 constexpr const char *P_ENABLE_PORTO = "enable_porto";
 constexpr const char *P_RESOLV_CONF = "resolv_conf";
@@ -70,7 +80,10 @@ constexpr const char *P_WEAK = "weak";
 constexpr const char *P_MEM_TOTAL_GUARANTEE = "memory_guarantee_total";
 
 constexpr int VIRT_MODE_APP = 0;
+constexpr const char *P_VIRT_MODE_APP = "app";
 constexpr int VIRT_MODE_OS = 1;
+constexpr const char *P_VIRT_MODE_OS = "os";
+constexpr const char *P_CMD_VIRT_MODE_OS = "/sbin/init";
 
 class TBindMap;
 class TTaskEnv;
@@ -191,6 +204,87 @@ public:
 
         return TError::Success();
     }
+};
+
+class TContainerVirtMode : public TContainerProperty {
+public:
+    TError Set(const std::string &virt_mode);
+    TError Get(std::string &value);
+    TContainerVirtMode(std::string name, uint64_t set_mask, std::string desc)
+                       : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerCommand : public TContainerProperty {
+public:
+    TError Set(const std::string &command);
+    TError Get(std::string &value);
+    TContainerCommand(std::string name, uint64_t set_mask, std::string desc)
+                      : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerCwd : public TContainerProperty {
+public:
+    TError Set(const std::string &cwd);
+    TError Get(std::string &value);
+    TContainerCwd(std::string name, uint64_t set_mask, std::string desc)
+                  : TContainerProperty(name, set_mask, desc) {}
+    void Propagate(const std::string &value);
+};
+
+class TContainerStdinPath : public TContainerProperty {
+public:
+    TError Set(const std::string &path);
+    TError Get(std::string &value);
+    TContainerStdinPath(std::string name, uint64_t set_mask, std::string desc)
+                    : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerStdoutPath : public TContainerProperty {
+public:
+    TError Set(const std::string &path);
+    TError Get(std::string &value);
+    TContainerStdoutPath(std::string name, uint64_t set_mask, std::string desc)
+                     : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerStderrPath : public TContainerProperty {
+public:
+    TError Set(const std::string &path);
+    TError Get(std::string &value);
+    TContainerStderrPath(std::string name, uint64_t set_mask, std::string desc)
+                     : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerBindDns : public TContainerProperty {
+public:
+    TError Set(const std::string &bind_needed);
+    TError Get(std::string &value);
+    TContainerBindDns(std::string name, uint64_t set_mask, std::string desc)
+                    : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerIsolate : public TContainerProperty {
+public:
+    TError Set(const std::string &isolate_needed);
+    TError Get(std::string &value);
+    TContainerIsolate(std::string name, uint64_t set_mask, std::string desc)
+                      : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerRoot : public TContainerProperty {
+public:
+    TError Set(const std::string &root);
+    TError Get(std::string &value);
+    TContainerRoot(std::string name, uint64_t set_mask, std::string desc)
+                   : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerNet : public TContainerProperty {
+public:
+    TError Set(const std::string &net_desc);
+    TError Get(std::string &value);
+    TContainerNet(std::string name, uint64_t set_mask, std::string desc)
+                  : TContainerProperty(name, set_mask, desc) {}
 };
 
 void InitContainerProperties(void);

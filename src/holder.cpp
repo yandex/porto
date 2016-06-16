@@ -44,13 +44,9 @@ TError TContainerHolder::CreateRoot(TScopedLock &holder_lock) {
     if (error)
         return error;
 
-    error = container->Prop->Set<bool>(P_ISOLATE, false);
-    if (error)
-        return error;
+    container->Isolate = false;
 
-    error = container->Prop->Set<std::vector<std::string>>(P_NET, { "host" });
-    if (error)
-        return error;
+    container->NetProp = { "host" };
 
     error = container->Start(nullptr, true);
     if (error)
@@ -68,9 +64,7 @@ TError TContainerHolder::CreatePortoRoot(TScopedLock &holder_lock) {
     if (container->GetId() != PORTO_ROOT_CONTAINER_ID)
         return TError(EError::Unknown, "Unexpected /porto container id " + std::to_string(container->GetId()));
 
-    error = container->Prop->Set<bool>(P_ISOLATE, false);
-    if (error)
-        return error;
+    container->Isolate = false;
 
     error = container->Start(nullptr, true);
     if (error)

@@ -422,7 +422,7 @@ noinline TError StartContainer(TContext &context,
                 return TError(EError::Busy, "Can't start busy container " + topContainer->GetName());
         }
 
-        std::string cmd = container->Prop->Get<std::string>(P_COMMAND);
+        std::string cmd = container->Command;
         bool meta = i + 1 != nameVec.end() && cmd.empty();
 
         auto parent = container->GetParent();
@@ -937,7 +937,7 @@ noinline TError ConvertPath(TContext &context,
                 // 1) or 2), build path
                 TPath path = TPath(req.path());
                 for (src = sourceContainer; src != dest; src = src->GetParent()) {
-                    path = TPath(src->Prop->Get<std::string>(P_ROOT)) / TPath(path);
+                    path = TPath(src->Root) / TPath(path);
                 }
                 rsp.mutable_convertpath()->set_path(path.ToString());
                 return TError::Success();
@@ -948,13 +948,13 @@ noinline TError ConvertPath(TContext &context,
         }
         if (src->GetLevel() > dest->GetLevel()) {
             // TODO: think about bind mounts
-            if (!src_isolated && src->Prop->Get<std::string>(P_ROOT) != "/") {
+            if (!src_isolated && src->Root != "/") {
                 src_isolated = true;
             }
             src = src->GetParent();
         } else {
             // TODO: think about bind mounts
-            if (!dest_isolated && dest->Prop->Get<std::string>(P_ROOT) != "/") {
+            if (!dest_isolated && dest->Root != "/") {
                 dest_isolated = true;
                 details = "source container is unreachable from destination container";
                 // We can't do anything

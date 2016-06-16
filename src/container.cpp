@@ -61,6 +61,39 @@ TContainerMemTotalGuarantee ContainerMemTotalGuarantee(P_MEM_TOTAL_GUARANTEE,
                                                        "Total amount of memory "
                                                        "guaranteed for porto "
                                                        "containers");
+TContainerVirtMode ContainerVirtMode(P_VIRT_MODE, VIRT_MODE_SET,
+                                     "Virtualization mode: os|app");
+TContainerCommand ContainerCommand(P_COMMAND, COMMAND_SET,
+                                   "Command executed upon container start");
+TContainerCwd ContainerCwd(P_CWD, CWD_SET, "Container working directory");
+TContainerStdinPath ContainerStdinPath(P_STDIN_PATH, STDIN_SET,
+                                       "Container standard input path");
+TContainerStdoutPath ContainerStdoutPath(P_STDOUT_PATH, STDOUT_SET,
+                                         "Container standard output path");
+TContainerStderrPath ContainerStderrPath(P_STDERR_PATH, STDERR_SET,
+                                         "Container standard error path");
+TContainerBindDns ContainerBindDns(P_BIND_DNS, BIND_DNS_SET,
+                                   "Bind /etc/resolv.conf and /etc/hosts"
+                                   " of host to container");
+TContainerIsolate ContainerIsolate(P_ISOLATE, ISOLATE_SET,
+                                   "Isolate container from parent");
+TContainerRoot ContainerRoot(P_ROOT, ROOT_SET, "Container root directory "
+                             "(container will be chrooted into this directory)");
+TContainerNet ContainerNet(P_NET, NET_SET,
+                            "Container network settings: "
+                            "none | "
+                            "inherited | "
+                            "host [interface] | "
+                            "container <name> | "
+                            "macvlan <master> <name> [bridge|private|vepa|passthru] "
+                            "[mtu] [hw] | "
+                            "ipvlan <master> <name> [l2|l3] [mtu] | "
+                            "veth <name> <bridge> [mtu] [hw] | "
+                            "L3 <name> [master] | "
+                            "NAT [name] | "
+                            "MTU <name> <mtu> | "
+                            "autoconf <name> | "
+                            "netns <name>");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -74,6 +107,20 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     PropMask = 0lu;
     MemGuarantee = 0;
     CurrentMemGuarantee = 0;
+
+    if (IsRoot() || IsPortoRoot())
+        Cwd = "/";
+    else
+        Cwd = WorkPath().ToString();
+
+    StdinPath = "/dev/null";
+    StdoutPath = "stdout";
+    StderrPath = "stderr";
+    Root = "/";
+    Isolate = true;
+    BindDns = false; /* Because root is default */
+    VirtMode = VIRT_MODE_APP;
+    NetProp = { "inherited" };
 }
 
 TContainer::~TContainer() {
@@ -114,7 +161,7 @@ TPath TContainer::RootPath() const {
     if (IsRoot() || IsPortoRoot())
         return TPath("/");
 
-    TPath path(Prop->Get<std::string>(P_ROOT));
+    TPath path(Root);
     if (!path.IsRoot()) {
         if (path.IsRegularFollow())
             path = GetTmpDir();
@@ -124,10 +171,11 @@ TPath TContainer::RootPath() const {
     return Parent->RootPath() / path;
 }
 
-TPath TContainer::ActualStdPath(const std::string &property, bool host) const {
-    TPath path = Prop->Get<std::string>(property);
+TPath TContainer::ActualStdPath(const std::string &path_str,
+                                bool is_default, bool host) const {
+    TPath path(path_str);
 
-    if (Prop->IsDefault(property)) {
+    if (is_default) {
         /* /dev/null is /dev/null */
         if (path == "/dev/null")
             return path;
@@ -136,7 +184,7 @@ TPath TContainer::ActualStdPath(const std::string &property, bool host) const {
         return WorkPath() / path;
     } else {
 	/* Custom std paths are given relative to container root and/or cwd. */
-        TPath cwd(Prop->Get<std::string>(P_CWD));
+        TPath cwd(Cwd);
         TPath ret;
 
         if (host)
@@ -166,17 +214,17 @@ TError TContainer::RotateStdFile(TStdStream &stream, const std::string &type) {
 
 void TContainer::CreateStdStreams() {
     Stdin = TStdStream(STDIN_FILENO,
-                       ActualStdPath(P_STDIN_PATH, false),
-                       ActualStdPath(P_STDIN_PATH, true),
-                       Prop->IsDefault(P_STDIN_PATH));
+                       ActualStdPath(StdinPath, !(PropMask & STDIN_SET), false),
+                       ActualStdPath(StdinPath, !(PropMask & STDIN_SET) > 0, true),
+                       !(PropMask & STDIN_SET));
     Stdout = TStdStream(STDOUT_FILENO,
-                        ActualStdPath(P_STDOUT_PATH, false),
-                        ActualStdPath(P_STDOUT_PATH, true),
-                        Prop->IsDefault(P_STDOUT_PATH));
+                        ActualStdPath(StdoutPath, !(PropMask & STDOUT_SET), false),
+                        ActualStdPath(StdoutPath, !(PropMask & STDOUT_SET), true),
+                        !(PropMask & STDOUT_SET));
     Stderr = TStdStream(STDERR_FILENO,
-                        ActualStdPath(P_STDERR_PATH, false),
-                        ActualStdPath(P_STDERR_PATH, true),
-                        Prop->IsDefault(P_STDERR_PATH));
+                        ActualStdPath(StderrPath, !(PropMask & STDERR_SET), false),
+                        ActualStdPath(StderrPath, !(PropMask & STDERR_SET), true),
+                        !(PropMask & STDERR_SET));
 }
 
 TError TContainer::PrepareStdStreams(std::shared_ptr<TClient> client) {
@@ -604,11 +652,11 @@ TError TContainer::ParseNetConfig(struct TNetCfg &NetCfg) {
     NetCfg.Parent = Parent;
     NetCfg.Id = Id;
     NetCfg.Hostname = Prop->Get<std::string>(P_HOSTNAME);
-    NetCfg.NetUp = Prop->Get<int>(P_VIRT_MODE) != VIRT_MODE_OS;
+    NetCfg.NetUp = VirtMode != VIRT_MODE_OS;
     NetCfg.Holder = Holder;
     NetCfg.OwnerCred = OwnerCred;
 
-    error = NetCfg.ParseNet(Prop->Get<std::vector<std::string>>(P_NET));
+    error = NetCfg.ParseNet(NetProp);
     if (error)
         return error;
 
@@ -676,7 +724,7 @@ TError TContainer::GetEnvironment(TEnv &env) {
     env.ClearEnv();
 
     env.SetEnv("PATH", "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin");
-    env.SetEnv("HOME", Prop->Get<std::string>(P_CWD));
+    env.SetEnv("HOME", Cwd);
     env.SetEnv("USER", UserName(OwnerCred.Uid));
 
     env.SetEnv("container", "lxc");
@@ -693,7 +741,7 @@ TError TContainer::GetEnvironment(TEnv &env) {
             return error;
         overwrite = false;
 
-        if (ct->Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_OS)
+        if (ct->VirtMode == VIRT_MODE_OS)
             break;
     }
 
@@ -702,7 +750,6 @@ TError TContainer::GetEnvironment(TEnv &env) {
 
 TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
                                struct TNetCfg *NetCfg) {
-    auto vmode = Prop->Get<int>(P_VIRT_MODE);
     auto user = UserName(OwnerCred.Uid);
     auto taskEnv = std::unique_ptr<TTaskEnv>(new TTaskEnv());
     auto parent = FindRunningParent();
@@ -713,19 +760,19 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     for (auto hy: Hierarchies)
         taskEnv->Cgroups.push_back(GetCgroup(*hy));
 
-    taskEnv->Command = Prop->Get<std::string>(P_COMMAND);
-    taskEnv->Cwd = Prop->Get<std::string>(P_CWD);
-    taskEnv->ParentCwd = Parent->Prop->Get<std::string>(P_CWD);
+    taskEnv->Command = Command;
+    taskEnv->Cwd = Cwd;
+    taskEnv->ParentCwd = Parent->Cwd;
 
     taskEnv->LoopDev = Prop->Get<int>(P_RAW_LOOP_DEV);
     if (taskEnv->LoopDev >= 0)
         taskEnv->Root = GetTmpDir();
     else
-        taskEnv->Root = Prop->Get<std::string>(P_ROOT);
+        taskEnv->Root = Root;
 
     taskEnv->RootRdOnly = Prop->Get<bool>(P_ROOT_RDONLY);
 
-    if (vmode == VIRT_MODE_OS) {
+    if (VirtMode == VIRT_MODE_OS) {
         user = "root";
         taskEnv->Cred = TCred(0, 0);
     } else {
@@ -739,18 +786,18 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     if (error)
         return error;
 
-    taskEnv->Isolate = Prop->Get<bool>(P_ISOLATE);
+    taskEnv->Isolate = Isolate;
     taskEnv->TripleFork = false;
-    taskEnv->QuadroFork = (vmode == VIRT_MODE_APP) &&
+    taskEnv->QuadroFork = (VirtMode == VIRT_MODE_APP) &&
                           taskEnv->Isolate &&
                           !taskEnv->Command.empty();
 
     taskEnv->Hostname = Prop->Get<std::string>(P_HOSTNAME);
-    taskEnv->SetEtcHostname = (vmode == VIRT_MODE_OS) &&
+    taskEnv->SetEtcHostname = (VirtMode == VIRT_MODE_OS) &&
                                 !taskEnv->Root.IsRoot() &&
                                 !taskEnv->RootRdOnly;
 
-    taskEnv->BindDns = Prop->Get<bool>(P_BIND_DNS);
+    taskEnv->BindDns = BindDns;
 
     error = Prop->PrepareTaskEnv(P_RESOLV_CONF, *taskEnv);
     if (error)
@@ -865,15 +912,14 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
     if (error)
         return error;
 
-    auto vmode = Prop->Get<int>(P_VIRT_MODE);
-    if (vmode == VIRT_MODE_OS && !OwnerCred.IsRootUser()) {
-        if (!Prop->Get<bool>(P_ISOLATE) && OwnerCred.Uid != Parent->OwnerCred.Uid)
+    if (VirtMode == VIRT_MODE_OS && !OwnerCred.IsRootUser()) {
+        if (!Isolate && OwnerCred.Uid != Parent->OwnerCred.Uid)
             return TError(EError::Permission, "virt_mode=os without isolation only for root or owner");
         if (RootPath().IsRoot())
             return TError(EError::Permission, "virt_mode=os without chroot only for root");
     }
 
-    if (!meta && !Prop->Get<std::string>(P_COMMAND).length())
+    if (!meta && !Command.length())
         return TError(EError::InvalidValue, "container command is empty");
 
     // FIXME must die
@@ -924,7 +970,7 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
     if (error)
         goto error;
 
-    if (!meta || (meta && Prop->Get<bool>(P_ISOLATE))) {
+    if (!meta || (meta && Isolate)) {
 
         error = PrepareTask(client, &NetCfg);
         if (error)
@@ -1124,7 +1170,7 @@ TError TContainer::ApplyForTreePostorder(TScopedLock &holder_lock,
 }
 
 TError TContainer::PrepareLoop() {
-    TPath loop_image(Prop->Get<std::string>(P_ROOT));
+    TPath loop_image(Root);
     if (!loop_image.IsRegularFollow())
         return TError::Success();
 
@@ -1136,8 +1182,8 @@ TError TContainer::PrepareLoop() {
             return error;
     }
 
-    if (Prop->IsDefault(P_ROOT) ||
-            loop_image == Parent->Prop->Get<std::string>(P_ROOT))
+    if (!(PropMask & ROOT_SET) ||
+            loop_image == Parent->Root)
         return TError::Success();
 
     int loop_dev;
@@ -1511,10 +1557,10 @@ TError TContainer::GetProperty(const string &origProperty, string &value,
     }
 
     if (!prop->HasValue() && prop->HasFlag(PARENT_DEF_PROPERTY) &&
-            !Prop->Get<bool>(P_ISOLATE)) {
+            !Isolate) {
         for (auto p = Parent; p; p = p->Parent) {
             prop = p->Prop->Find(property);
-            if (prop->HasValue() || p->Prop->Get<bool>(P_ISOLATE))
+            if (prop->HasValue() || p->Isolate)
                 break;
         }
     }
@@ -1695,14 +1741,15 @@ TError TContainer::RestoreNetwork() {
     return TError::Success();
 }
 
-void TContainer::RestoreStdPath(const std::string &property) {
-    TPath path = ActualStdPath(property, true);
-    bool def = Prop->IsDefault(property);
+void TContainer::RestoreStdPath(const std::string &property,
+                                const std::string &stdpath,
+                                bool is_default) {
+    TPath path = ActualStdPath(stdpath, is_default, true);
 
-    if (def && !path.Exists()) {
-        TPath root(Prop->Get<std::string>(P_ROOT));
-        std::string cwd(Prop->Get<std::string>(P_CWD));
-        std::string name(Prop->Get<std::string>(property) + "." + GetTextId("_"));
+    if (is_default && !path.Exists()) {
+        TPath root(Root);
+        std::string cwd(Cwd);
+        std::string name(stdpath + "." + GetTextId("_"));
 
         if (root.IsRegularFollow())
             path = GetTmpDir() / name;
@@ -1717,7 +1764,7 @@ void TContainer::RestoreStdPath(const std::string &property) {
         }
     }
 
-    if (def && GetState() == EContainerState::Stopped && path.IsRegularStrict())
+    if (is_default && GetState() == EContainerState::Stopped && path.IsRegularStrict())
         path.Unlink();
 }
 
@@ -1899,7 +1946,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
                 parent->GetState() == EContainerState::Meta ||
                 parent->GetState() == EContainerState::Dead)
                 break;
-            bool meta = parent->Prop->Get<std::string>(P_COMMAND).empty();
+            bool meta = parent->Command.empty();
 
             L() << "Start parent " << parent->GetName() << " meta " << meta << std::endl;
 
@@ -1996,7 +2043,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
             if (!Prop->HasValue(P_RAW_START_TIME))
                 Prop->Set<uint64_t>(P_RAW_START_TIME, GetCurrentTimeMs());
 
-            if (Prop->Get<std::string>(P_COMMAND).empty())
+            if (Command.empty())
                 SetState(EContainerState::Meta);
             else
                 SetState(EContainerState::Running);
@@ -2022,15 +2069,15 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
             (void)freezerCg.KillAll(9);
 
         if (state == ContainerStateName(EContainerState::Meta) &&
-                Prop->Get<std::string>(P_COMMAND).empty())
+                Command.empty())
             SetState(EContainerState::Meta);
         else
             SetState(EContainerState::Stopped);
         Task = nullptr;
     }
 
-    RestoreStdPath(P_STDOUT_PATH);
-    RestoreStdPath(P_STDERR_PATH);
+    RestoreStdPath(P_STDOUT_PATH, StdoutPath, !(PropMask & STDOUT_SET));
+    RestoreStdPath(P_STDERR_PATH, StderrPath, !(PropMask & STDERR_SET));
     CreateStdStreams();
 
     if (Task)
@@ -2055,8 +2102,8 @@ void TContainer::ExitTree(TScopedLock &holder_lock, int status, bool oomKilled) 
     /* Detect fatal signals: portoinit cannot kill itself */
     if (WIFEXITED(status) && WEXITSTATUS(status) > 128 &&
             WEXITSTATUS(status) < 128 + SIGRTMIN &&
-            Prop->Get<int>(P_VIRT_MODE) == VIRT_MODE_APP &&
-            Prop->Get<bool>(P_ISOLATE) == true)
+            VirtMode == VIRT_MODE_APP &&
+            Isolate == true)
         status = WEXITSTATUS(status) - 128;
 
     L_EVT() << "Exit tree " << GetName() << " with status "
@@ -2112,7 +2159,7 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
             L_WRN() << "Can't kill all tasks in container: " << error << std::endl;
     }
 
-    if (!Prop->Get<bool>(P_ISOLATE)) {
+    if (!Isolate) {
         TError error = KillAll(holder_lock);
         if (error)
             L_WRN() << "Can't kill all tasks in non-isolated container: " << error << std::endl;
