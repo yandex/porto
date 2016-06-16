@@ -294,3 +294,37 @@ std::string StringFormat(const char *format, ...) {
 
     return result;
 }
+
+TError StrListToString(const std::vector<std::string> lines, std::string &value) {
+    std::stringstream str;
+
+    for (auto v : lines) {
+        if (str.str().length())
+            str << "; ";
+        str << StringReplaceAll(v, ";", "\\;");
+    }
+
+    value = str.str();
+
+    return TError::Success();
+}
+
+TError StringToStrList(const std::string &str, std::vector<std::string> &value) {
+    std::vector<std::string> split;
+
+    TError error = SplitEscapedString(str, ';', split);
+    if (error)
+        return error;
+
+    value.clear();
+
+    for (auto &val : split) {
+        std::string tmp = StringTrim(val);
+        if (!tmp.length())
+            continue;
+
+        value.push_back(tmp);
+    }
+
+    return TError::Success();
+}
