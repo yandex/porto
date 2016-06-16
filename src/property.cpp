@@ -19,6 +19,7 @@ extern __thread TClient *CurrentClient;
 extern TContainerUser ContainerUser;
 extern TContainerGroup ContainerGroup;
 extern TContainerMemoryGuarantee ContainerMemoryGuarantee;
+extern TContainerMemTotalGuarantee ContainerMemTotalGuarantee;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -1126,6 +1127,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerGroup.Name] = &ContainerGroup;
     ContainerMemoryGuarantee.Init();
     ContainerPropMap[ContainerMemoryGuarantee.Name] = &ContainerMemoryGuarantee;
+    ContainerPropMap[ContainerMemTotalGuarantee.Name] = &ContainerMemTotalGuarantee;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1182,6 +1184,7 @@ TError TContainerMemoryGuarantee::Set(const std::string &mem_guarantee) {
         CurrentContainer->GetState() == EContainerState::Paused) {
         auto memcg = CurrentContainer->GetCgroup(MemorySubsystem);
         error = MemorySubsystem.SetGuarantee(memcg, new_val);
+
         if (error) {
             CurrentContainer->CurrentMemGuarantee = CurrentContainer->MemGuarantee;
             L_ERR() << "Can't set " << P_MEM_GUARANTEE << ": " << error << std::endl;
@@ -1198,6 +1201,13 @@ TError TContainerMemoryGuarantee::Set(const std::string &mem_guarantee) {
 
 TError TContainerMemoryGuarantee::Get(std::string &value) {
     value = std::to_string(CurrentContainer->MemGuarantee);
+
+    return TError::Success();
+}
+
+TError TContainerMemTotalGuarantee::Get(std::string &value) {
+    uint64_t total = CurrentContainer->GetHierarchyMemGuarantee();
+    value = std::to_string(total);
 
     return TError::Success();
 }

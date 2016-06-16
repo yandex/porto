@@ -57,6 +57,10 @@ TContainerGroup ContainerGroup(P_GROUP, GROUP_SET, "Start command with given gro
 TContainerMemoryGuarantee ContainerMemoryGuarantee(P_MEM_GUARANTEE, MEM_GUARANTEE_SET,
                                                     "Guaranteed amount of memory "
                                                     "[bytes] (dynamic)");
+TContainerMemTotalGuarantee ContainerMemTotalGuarantee(P_MEM_TOTAL_GUARANTEE,
+                                                       "Total amount of memory "
+                                                       "guaranteed for porto "
+                                                       "containers");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,

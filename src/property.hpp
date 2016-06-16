@@ -67,6 +67,7 @@ constexpr const char *P_AGING_TIME = "aging_time";
 constexpr const char *P_ENABLE_PORTO = "enable_porto";
 constexpr const char *P_RESOLV_CONF = "resolv_conf";
 constexpr const char *P_WEAK = "weak";
+constexpr const char *P_MEM_TOTAL_GUARANTEE = "memory_guarantee_total";
 
 constexpr int VIRT_MODE_APP = 0;
 constexpr int VIRT_MODE_OS = 1;
@@ -171,6 +172,13 @@ public:
 
         return TError::Success();
     }
+};
+
+class TContainerMemTotalGuarantee : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerMemTotalGuarantee(std::string name, std::string desc)
+                                : TContainerProperty(name, desc, true) {}
 };
 
 void InitContainerProperties(void);
