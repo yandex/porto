@@ -98,6 +98,8 @@ TContainerNet ContainerNet(P_NET, NET_SET,
                             "netns <name>");
 TContainerHostname ContainerHostname(P_HOSTNAME, HOSTNAME_SET,
                                      "Container hostname");
+TContainerEnv ContainerEnv(P_ENV, ENV_SET,
+                           "Container environment variables: <name>=<value>; ...");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -742,7 +744,7 @@ TError TContainer::GetEnvironment(TEnv &env) {
     /* inherit environment from all parent application containers */
     bool overwrite = true;
     for (auto ct = this; ct; ct = ct->Parent.get()) {
-        TError error = env.Parse(ct->Prop->Get<TStrList>(P_ENV), overwrite);
+        TError error = env.Parse(EnvCfg, overwrite);
         if (error && overwrite)
             return error;
         overwrite = false;

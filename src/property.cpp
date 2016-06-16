@@ -33,6 +33,7 @@ extern TContainerRoot ContainerRoot;
 extern TContainerNet ContainerNet;
 extern TContainerHostname ContainerHostname;
 extern TContainerRootRo ContainerRootRo;
+extern TContainerEnv ContainerEnv;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -84,40 +85,6 @@ TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
 
     return TError::Success();
 }
-
-class TEnvProperty : public TListValue, public TContainerValue {
-public:
-    TEnvProperty() :
-        TListValue(PERSISTENT_VALUE),
-        TContainerValue(P_ENV,
-                        "Container environment variables: <name>=<value>; ...") {}
-
-    TError GetIndexed(const std::string &index, std::string &value) const override {
-        auto c = GetContainer();
-        TError error;
-        TEnv env;
-
-        error = c->GetEnvironment(env);
-        if (!error && !env.GetEnv(index, value))
-            error = TError(EError::InvalidValue, "Variable " + index + " not defined");
-        return error;
-    }
-
-    TError SetIndexed(const std::string &index, const std::string &value) {
-        auto cfg = Get();
-        TError error;
-        TEnv env;
-
-        error = env.Parse(cfg, true);
-        if (!error) {
-            error = env.Parse({index + "=" + value}, true);
-            env.Format(cfg);
-        }
-        if (!error)
-            error = Set(cfg);
-        return error;
-    }
-};
 
 class TPortoNamespaceProperty : public TStringValue, public TContainerValue {
 public:
@@ -788,7 +755,6 @@ public:
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> properties = {
-        new TEnvProperty,
         new TPortoNamespaceProperty,
         new TStdoutLimitProperty,
         new TMemoryLimitProperty,
@@ -932,6 +898,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerNet.Name] = &ContainerNet;
     ContainerPropMap[ContainerHostname.Name] = &ContainerHostname;
     ContainerPropMap[ContainerRootRo.Name] = &ContainerRootRo;
+    ContainerPropMap[ContainerEnv.Name] = &ContainerEnv;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1336,6 +1303,64 @@ TError TContainerHostname::Set(const std::string &hostname) {
 
 TError TContainerHostname::Get(std::string &value) {
     value = CurrentContainer->Hostname;
+
+    return TError::Success();
+}
+
+TError TContainerEnv::Set(const std::string &env_val) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    std::vector<std::string> envs;
+
+    error = StringToStrList(env_val, envs);
+    if (error)
+        return error;
+
+    TEnv env;
+    error =  env.Parse(envs, true);
+    if (error)
+        return error;
+
+    env.Format(CurrentContainer->EnvCfg);
+    CurrentContainer->PropMask |= ENV_SET;
+
+    return TError::Success();
+}
+
+TError TContainerEnv::Get(std::string &value) {
+    return StrListToString(CurrentContainer->EnvCfg, value);
+}
+
+TError TContainerEnv::SetIndexed(const std::string &index, const std::string &env_val) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    TEnv env;
+    error = env.Parse(CurrentContainer->EnvCfg, true);
+    if (error)
+        return error;
+
+    error = env.Parse({index + "=" + env_val}, true);
+    if (error)
+        return error;
+
+    env.Format(CurrentContainer->EnvCfg);
+    CurrentContainer->PropMask |= ENV_SET;
+
+    return TError::Success();
+}
+
+TError TContainerEnv::GetIndexed(const std::string &index, std::string &value) {
+    TEnv env;
+    TError error = CurrentContainer->GetEnvironment(env);
+    if (error)
+        return error;
+
+    if (!env.GetEnv(index, value))
+        return TError(EError::InvalidValue, "Variable " + index + " not defined");
 
     return TError::Success();
 }

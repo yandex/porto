@@ -147,6 +147,7 @@ public:
     std::vector<std::string> NetProp;
     std::vector<std::weak_ptr<TContainer>> Children;
     std::string Hostname;
+    std::vector<std::string> EnvCfg;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;
