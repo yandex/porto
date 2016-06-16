@@ -146,6 +146,7 @@ public:
     bool Isolate;
     std::vector<std::string> NetProp;
     std::vector<std::weak_ptr<TContainer>> Children;
+    std::string Hostname;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;

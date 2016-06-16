@@ -62,6 +62,7 @@ constexpr uint64_t ISOLATE_SET = (1lu << 36);
 constexpr const char *P_PRIVATE = "private";
 constexpr const char *P_ULIMIT = "ulimit";
 constexpr const char *P_HOSTNAME = "hostname";
+constexpr uint64_t HOSTNAME_SET = (1lu << 39);
 constexpr const char *P_BIND_DNS = "bind_dns";
 constexpr uint64_t BIND_DNS_SET = (1lu << 40);
 constexpr const char *P_BIND = "bind";
@@ -286,6 +287,14 @@ public:
     TError Get(std::string &value);
     TContainerNet(std::string name, uint64_t set_mask, std::string desc)
                   : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerHostname : public TContainerProperty {
+public:
+    TError Set(const std::string &hostname);
+    TError Get(std::string &value);
+    TContainerHostname(std::string name, uint64_t set_mask, std::string desc)
+                       : TContainerProperty(name, set_mask, desc) {}
 };
 
 class TContainerRootRo : public TContainerProperty {

@@ -31,6 +31,7 @@ extern TContainerBindDns ContainerBindDns;
 extern TContainerIsolate ContainerIsolate;
 extern TContainerRoot ContainerRoot;
 extern TContainerNet ContainerNet;
+extern TContainerHostname ContainerHostname;
 extern TContainerRootRo ContainerRootRo;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
@@ -470,14 +471,6 @@ public:
     }
 };
 
-class THostnameProperty : public TStringValue, public TContainerValue {
-public:
-    THostnameProperty() :
-        TStringValue(PERSISTENT_VALUE),
-        TContainerValue(P_HOSTNAME,
-                        "Container hostname") {}
-};
-
 class TBindProperty : public TListValue, public TContainerValue {
     std::vector<TBindMap> BindMap;
 
@@ -815,7 +808,6 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TMaxRespawnsProperty,
         new TPrivateProperty,
         new TUlimitProperty,
-        new THostnameProperty,
         new TBindProperty,
         new TNetTosProperty,
         new TDevicesProperty,
@@ -938,6 +930,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerBindDns.Name] = &ContainerBindDns;
     ContainerPropMap[ContainerRoot.Name] = &ContainerRoot;
     ContainerPropMap[ContainerNet.Name] = &ContainerNet;
+    ContainerPropMap[ContainerHostname.Name] = &ContainerHostname;
     ContainerPropMap[ContainerRootRo.Name] = &ContainerRootRo;
 }
 
@@ -1326,6 +1319,23 @@ TError TContainerRootRo::Set(const std::string &ro) {
 
 TError TContainerRootRo::Get(std::string &ro) {
     ro = CurrentContainer->RootRo ? "true" : "false";
+
+    return TError::Success();
+}
+
+TError TContainerHostname::Set(const std::string &hostname) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    CurrentContainer->Hostname = hostname;
+    CurrentContainer->PropMask |= HOSTNAME_SET;
+
+    return TError::Success();
+}
+
+TError TContainerHostname::Get(std::string &value) {
+    value = CurrentContainer->Hostname;
 
     return TError::Success();
 }

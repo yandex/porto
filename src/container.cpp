@@ -96,6 +96,8 @@ TContainerNet ContainerNet(P_NET, NET_SET,
                             "MTU <name> <mtu> | "
                             "autoconf <name> | "
                             "netns <name>");
+TContainerHostname ContainerHostname(P_HOSTNAME, HOSTNAME_SET,
+                                     "Container hostname");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -124,6 +126,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     BindDns = false; /* Because root is default */
     VirtMode = VIRT_MODE_APP;
     NetProp = { "inherited" };
+    Hostname = "";
 }
 
 TContainer::~TContainer() {
@@ -654,7 +657,7 @@ TError TContainer::ParseNetConfig(struct TNetCfg &NetCfg) {
 
     NetCfg.Parent = Parent;
     NetCfg.Id = Id;
-    NetCfg.Hostname = Prop->Get<std::string>(P_HOSTNAME);
+    NetCfg.Hostname = Hostname;
     NetCfg.NetUp = VirtMode != VIRT_MODE_OS;
     NetCfg.Holder = Holder;
     NetCfg.OwnerCred = OwnerCred;
@@ -795,7 +798,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
                           taskEnv->Isolate &&
                           !taskEnv->Command.empty();
 
-    taskEnv->Hostname = Prop->Get<std::string>(P_HOSTNAME);
+    taskEnv->Hostname = Hostname;
     taskEnv->SetEtcHostname = (VirtMode == VIRT_MODE_OS) &&
                                 !taskEnv->Root.IsRoot() &&
                                 !taskEnv->RootRdOnly;
