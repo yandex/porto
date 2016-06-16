@@ -28,6 +28,7 @@ constexpr const char *P_PORTO_NAMESPACE = "porto_namespace";
 constexpr const char *P_ROOT = "root";
 constexpr uint64_t ROOT_SET = (1 << 11);
 constexpr const char *P_ROOT_RDONLY = "root_readonly";
+constexpr uint64_t ROOT_RDONLY_SET = (1 << 12);
 constexpr const char *P_CWD = "cwd";
 constexpr uint64_t CWD_SET = (1 << 13);
 constexpr const char *P_STDIN_PATH = "stdin_path";
@@ -285,6 +286,14 @@ public:
     TError Get(std::string &value);
     TContainerNet(std::string name, uint64_t set_mask, std::string desc)
                   : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerRootRo : public TContainerProperty {
+public:
+    TError Set(const std::string &ro);
+    TError Get(std::string &value);
+    TContainerRootRo(std::string name, uint64_t set_mask, std::string desc)
+                     : TContainerProperty(name, set_mask, desc) {}
 };
 
 void InitContainerProperties(void);

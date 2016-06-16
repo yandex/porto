@@ -140,6 +140,7 @@ public:
     std::string StdoutPath;
     std::string StderrPath;
     std::string Root;
+    bool RootRo;
     int VirtMode = 0;
     bool BindDns;
     bool Isolate;

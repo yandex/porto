@@ -79,6 +79,8 @@ TContainerIsolate ContainerIsolate(P_ISOLATE, ISOLATE_SET,
                                    "Isolate container from parent");
 TContainerRoot ContainerRoot(P_ROOT, ROOT_SET, "Container root directory "
                              "(container will be chrooted into this directory)");
+TContainerRootRo ContainerRootRo(P_ROOT_RDONLY, ROOT_RDONLY_SET,
+                                 "Mount root directory in read-only mode");
 TContainerNet ContainerNet(P_NET, NET_SET,
                             "Container network settings: "
                             "none | "
@@ -117,6 +119,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     StdoutPath = "stdout";
     StderrPath = "stderr";
     Root = "/";
+    RootRo = false;
     Isolate = true;
     BindDns = false; /* Because root is default */
     VirtMode = VIRT_MODE_APP;
@@ -770,7 +773,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     else
         taskEnv->Root = Root;
 
-    taskEnv->RootRdOnly = Prop->Get<bool>(P_ROOT_RDONLY);
+    taskEnv->RootRdOnly = RootRo;
 
     if (VirtMode == VIRT_MODE_OS) {
         user = "root";

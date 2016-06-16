@@ -31,6 +31,7 @@ extern TContainerBindDns ContainerBindDns;
 extern TContainerIsolate ContainerIsolate;
 extern TContainerRoot ContainerRoot;
 extern TContainerNet ContainerNet;
+extern TContainerRootRo ContainerRootRo;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -127,18 +128,6 @@ public:
         if (GetContainer()->IsRoot())
             return std::string(PORTO_ROOT_CONTAINER) + "/";
         return "";
-    }
-};
-
-class TRootRdOnlyProperty : public TBoolValue, public TContainerValue {
-public:
-    TRootRdOnlyProperty() :
-        TBoolValue(PERSISTENT_VALUE),
-        TContainerValue(P_ROOT_RDONLY,
-                        "Mount root directory in read-only mode") {}
-
-    bool GetDefault() const override {
-        return false;
     }
 };
 
@@ -808,7 +797,6 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
     const std::vector<TValue *> properties = {
         new TEnvProperty,
         new TPortoNamespaceProperty,
-        new TRootRdOnlyProperty,
         new TStdoutLimitProperty,
         new TMemoryLimitProperty,
         new TAnonLimitProperty,
@@ -950,6 +938,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerBindDns.Name] = &ContainerBindDns;
     ContainerPropMap[ContainerRoot.Name] = &ContainerRoot;
     ContainerPropMap[ContainerNet.Name] = &ContainerNet;
+    ContainerPropMap[ContainerRootRo.Name] = &ContainerRootRo;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1316,4 +1305,27 @@ void TContainerCwd::Propagate(const std::string &cwd) {
             CurrentContainer = old;
         }
     }
+}
+
+TError TContainerRootRo::Set(const std::string &ro) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    if (ro == "true")
+        CurrentContainer->RootRo = true;
+    else if (ro == "false")
+        CurrentContainer->RootRo = false;
+    else
+        return TError(EError::InvalidValue, "Invalid bool value");
+    
+    CurrentContainer->PropMask |= ROOT_RDONLY_SET;
+
+    return TError::Success();
+}
+
+TError TContainerRootRo::Get(std::string &ro) {
+    ro = CurrentContainer->RootRo ? "true" : "false";
+
+    return TError::Success();
 }
