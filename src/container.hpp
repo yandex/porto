@@ -148,6 +148,7 @@ public:
     std::vector<std::weak_ptr<TContainer>> Children;
     std::string Hostname;
     std::vector<std::string> EnvCfg;
+    std::vector<TBindMap> BindMap;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;

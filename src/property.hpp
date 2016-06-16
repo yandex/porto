@@ -67,6 +67,7 @@ constexpr uint64_t HOSTNAME_SET = (1lu << 39);
 constexpr const char *P_BIND_DNS = "bind_dns";
 constexpr uint64_t BIND_DNS_SET = (1lu << 40);
 constexpr const char *P_BIND = "bind";
+constexpr uint64_t BIND_SET = (1lu << 41);
 constexpr const char *P_NET = "net";
 constexpr uint64_t NET_SET = (1lu << 42);
 constexpr const char *P_NET_TOS = "net_tos";
@@ -316,4 +317,11 @@ public:
                   : TContainerProperty(name, set_mask, desc) {}
 };
 
+class TContainerBind : public TContainerProperty {
+public:
+    TError Set(const std::string &bind_str);
+    TError Get(std::string &value);
+    TContainerBind(std::string name, uint64_t set_mask, std::string desc)
+                   : TContainerProperty(name, set_mask, desc) {}
+};
 void InitContainerProperties(void);

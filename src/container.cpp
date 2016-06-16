@@ -100,6 +100,9 @@ TContainerHostname ContainerHostname(P_HOSTNAME, HOSTNAME_SET,
                                      "Container hostname");
 TContainerEnv ContainerEnv(P_ENV, ENV_SET,
                            "Container environment variables: <name>=<value>; ...");
+TContainerBind ContainerBind(P_BIND, BIND_SET,
+                             "Share host directories with container: "
+                             "<host_path> <container_path> [ro|rw]; ...");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -819,9 +822,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     if (error)
         return error;
 
-    error = Prop->PrepareTaskEnv(P_BIND, *taskEnv);
-    if (error)
-        return error;
+    taskEnv->BindMap = BindMap;
 
     error = Prop->PrepareTaskEnv(P_CAPABILITIES, *taskEnv);
     if (error)

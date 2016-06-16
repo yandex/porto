@@ -34,6 +34,7 @@ extern TContainerNet ContainerNet;
 extern TContainerHostname ContainerHostname;
 extern TContainerRootRo ContainerRootRo;
 extern TContainerEnv ContainerEnv;
+extern TContainerBind ContainerBind;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -438,58 +439,6 @@ public:
     }
 };
 
-class TBindProperty : public TListValue, public TContainerValue {
-    std::vector<TBindMap> BindMap;
-
-public:
-    TBindProperty() :
-        TListValue(PERSISTENT_VALUE),
-        TContainerValue(P_BIND,
-                        "Share host directories with container: <host_path> <container_path> [ro|rw]; ...") {}
-
-    TError CheckValue(const std::vector<std::string> &lines) override {
-        auto c = GetContainer();
-
-        std::vector<TBindMap> bm;
-
-        for (auto &line : lines) {
-            std::vector<std::string> tok;
-            TBindMap m;
-
-            TError error = SplitEscapedString(line, ' ', tok);
-            if (error)
-                return error;
-
-            if (tok.size() != 2 && tok.size() != 3)
-                return TError(EError::InvalidValue, "Invalid bind in: " + line);
-
-            m.Source = tok[0];
-            m.Dest = tok[1];
-            m.Rdonly = false;
-
-            if (tok.size() == 3) {
-                if (tok[2] == "ro")
-                    m.Rdonly = true;
-                else if (tok[2] == "rw")
-                    m.Rdonly = false;
-                else
-                    return TError(EError::InvalidValue, "Invalid bind type in: " + line);
-            }
-
-            bm.push_back(m);
-        }
-
-        BindMap = bm;
-
-        return TError::Success();
-    }
-
-    TError PrepareTaskEnv(TTaskEnv &taskEnv) override {
-        taskEnv.BindMap = BindMap;
-        return TError::Success();
-    }
-};
-
 class TDefaultGwProperty : public TListValue, public TContainerValue {
 public:
     TDefaultGwProperty() :
@@ -774,7 +723,6 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TMaxRespawnsProperty,
         new TPrivateProperty,
         new TUlimitProperty,
-        new TBindProperty,
         new TNetTosProperty,
         new TDevicesProperty,
         new TCapabilitiesProperty,
@@ -899,6 +847,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerHostname.Name] = &ContainerHostname;
     ContainerPropMap[ContainerRootRo.Name] = &ContainerRootRo;
     ContainerPropMap[ContainerEnv.Name] = &ContainerEnv;
+    ContainerPropMap[ContainerBind.Name] = &ContainerBind;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1363,4 +1312,59 @@ TError TContainerEnv::GetIndexed(const std::string &index, std::string &value) {
         return TError(EError::InvalidValue, "Variable " + index + " not defined");
 
     return TError::Success();
+}
+
+TError TContainerBind::Set(const std::string &bind_str) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    std::vector<std::string> binds;
+    error = StringToStrList(bind_str, binds);
+    if (error)
+        return error;
+
+    std::vector<TBindMap> bm;
+
+    for (auto &line : binds) {
+        std::vector<std::string> tok;
+        TBindMap m;
+
+        TError error = SplitEscapedString(line, ' ', tok);
+        if (error)
+            return error;
+
+        if (tok.size() != 2 && tok.size() != 3)
+            return TError(EError::InvalidValue, "Invalid bind in: " + line);
+
+        m.Source = tok[0];
+        m.Dest = tok[1];
+        m.Rdonly = false;
+
+        if (tok.size() == 3) {
+            if (tok[2] == "ro")
+                m.Rdonly = true;
+            else if (tok[2] == "rw")
+                m.Rdonly = false;
+            else
+                return TError(EError::InvalidValue, "Invalid bind type in: " + line);
+        }
+
+        bm.push_back(m);
+
+    }
+
+    CurrentContainer->BindMap = bm;
+    CurrentContainer->PropMask |= BIND_SET;
+
+    return TError::Success();
+}
+
+TError TContainerBind::Get(std::string &value) {
+    std::vector<std::string> bind_str_list;
+    for (auto m : CurrentContainer->BindMap)
+        bind_str_list.push_back(m.Source.ToString() + " " + m.Dest.ToString() + 
+                                (m.Rdonly ? " ro" : " rw"));
+    
+    return StrListToString(bind_str_list, value);
 }
