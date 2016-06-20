@@ -144,6 +144,7 @@ public:
     std::string Desc;
     bool IsSupported;
     bool IsReadOnly;
+    bool IsHidden;
     TError IsAliveAndStopped(void);
     TError IsAlive(void);
     virtual TError Set(const std::string &value) {
@@ -153,12 +154,14 @@ public:
         return TError::Success();
     }
     virtual TError Get(std::string &value) = 0;
-    TContainerProperty(std::string name, uint64_t set_mask, std::string desc)
+    TContainerProperty(std::string name, uint64_t set_mask,
+                       std::string desc, bool hidden = false)
                        : Name(name), SetMask(set_mask), Desc(desc),
-                       IsSupported(true), IsReadOnly(false) {}
-    TContainerProperty(std::string name, std::string desc) :
-                       Name(name), SetMask(0), Desc(desc),
-                       IsSupported(true), IsReadOnly(true) {}
+                       IsSupported(true), IsReadOnly(false), IsHidden(hidden) {}
+
+    TContainerProperty(std::string name, std::string desc, bool hidden = false)
+                       : Name(name), SetMask(0), Desc(desc), IsSupported(true),
+                       IsReadOnly(true), IsHidden(hidden) {}
 
     virtual TError GetIndexed(const std::string &index, std::string &value) {
         return TError(EError::InvalidValue, "Invalid subscript for property");
