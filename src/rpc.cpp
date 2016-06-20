@@ -713,7 +713,7 @@ noinline TError ListProperty(TContext &context,
     }
 
     for (auto elem : ContainerPropMap) {
-        if (!elem.second->IsSupported)
+        if (!elem.second->IsSupported || elem.second->IsReadOnly)
             continue;
 
         auto entry = list->add_list();
