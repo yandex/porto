@@ -179,6 +179,11 @@ public:
     TError Get(std::string &value);
     TContainerMemTotalGuarantee(std::string name, std::string desc)
                                 : TContainerProperty(name, desc, true) {}
+    TError Init(void) {
+        IsSupported = MemorySubsystem.SupportGuarantee();
+
+        return TError::Success();
+    }
 };
 
 void InitContainerProperties(void);

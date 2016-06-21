@@ -1126,6 +1126,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerUser.Name] = &ContainerUser;
     ContainerPropMap[ContainerGroup.Name] = &ContainerGroup;
     ContainerMemoryGuarantee.Init();
+    ContainerMemTotalGuarantee.Init();
     ContainerPropMap[ContainerMemoryGuarantee.Name] = &ContainerMemoryGuarantee;
     ContainerPropMap[ContainerMemTotalGuarantee.Name] = &ContainerMemTotalGuarantee;
 }
