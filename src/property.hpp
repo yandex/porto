@@ -11,6 +11,10 @@
 #include "container.hpp"
 #include "client.hpp"
 
+extern "C" {
+#include <linux/capability.h>
+}
+
 constexpr const char *P_RAW_ROOT_PID = "_root_pid";
 constexpr const char *P_RAW_ID = "_id";
 constexpr const char *P_RAW_LOOP_DEV = "_loop_dev";
@@ -73,6 +77,7 @@ constexpr uint64_t NET_SET = (1lu << 42);
 constexpr const char *P_NET_TOS = "net_tos";
 constexpr const char *P_DEVICES = "devices";
 constexpr const char *P_CAPABILITIES = "capabilities";
+constexpr uint64_t CAPABILITIES_SET = (1lu << 45);
 constexpr const char *P_IP = "ip";
 constexpr uint64_t IP_SET = (1lu << 46);
 constexpr const char *P_DEFAULT_GW = "default_gw";
@@ -335,6 +340,82 @@ public:
     TError Get(std::string &value);
     TContainerIp(std::string name, uint64_t set_mask, std::string desc)
                  : TContainerProperty(name, set_mask, desc) {}
+};
+
+#ifndef CAP_AUDIT_READ
+#define CAP_AUDIT_READ 37
+#define CAP_BLOCK_SUSPEND 36
+#endif
+
+#define CAP_MASK(CAP) (1ULL << CAP)
+constexpr const uint64_t PermittedCaps = CAP_MASK(CAP_CHOWN) |
+                                         CAP_MASK(CAP_DAC_OVERRIDE) |
+                                         CAP_MASK(CAP_FOWNER) |
+                                         CAP_MASK(CAP_FSETID) |
+                                         CAP_MASK(CAP_KILL) |
+                                         CAP_MASK(CAP_SETGID) |
+                                         CAP_MASK(CAP_SETUID) |
+                                         CAP_MASK(CAP_NET_BIND_SERVICE) |
+                                         CAP_MASK(CAP_NET_ADMIN) |
+                                         CAP_MASK(CAP_NET_RAW) |
+                                         CAP_MASK(CAP_IPC_LOCK) |
+                                         CAP_MASK(CAP_SYS_CHROOT) |
+                                         CAP_MASK(CAP_SYS_RESOURCE) |
+                                         CAP_MASK(CAP_MKNOD) |
+                                         CAP_MASK(CAP_AUDIT_WRITE);
+
+class TContainerCapabilities : public TContainerProperty {
+public:
+    const std::map<std::string, uint64_t> SupportedCaps = {
+        { "AUDIT_READ",         CAP_AUDIT_READ },
+        { "CHOWN",              CAP_CHOWN },
+        { "DAC_OVERRIDE",       CAP_DAC_OVERRIDE },
+        { "DAC_READ_SEARCH",    CAP_DAC_READ_SEARCH },
+        { "FOWNER",             CAP_FOWNER },
+        { "FSETID",             CAP_FSETID },
+        { "KILL",               CAP_KILL },
+        { "SETGID",             CAP_SETGID },
+        { "SETUID",             CAP_SETUID },
+        { "SETPCAP",            CAP_SETPCAP },
+        { "LINUX_IMMUTABLE",    CAP_LINUX_IMMUTABLE },
+        { "NET_BIND_SERVICE",   CAP_NET_BIND_SERVICE },
+        { "NET_BROADCAST",      CAP_NET_BROADCAST },
+        { "NET_ADMIN",          CAP_NET_ADMIN },
+        { "NET_RAW",            CAP_NET_RAW },
+        { "IPC_LOCK",           CAP_IPC_LOCK },
+        { "IPC_OWNER",          CAP_IPC_OWNER },
+        { "SYS_MODULE",         CAP_SYS_MODULE },
+        { "SYS_RAWIO",          CAP_SYS_RAWIO },
+        { "SYS_CHROOT",         CAP_SYS_CHROOT },
+        { "SYS_PTRACE",         CAP_SYS_PTRACE },
+        { "SYS_PACCT",          CAP_SYS_PACCT },
+        { "SYS_ADMIN",          CAP_SYS_ADMIN },
+        { "SYS_BOOT",           CAP_SYS_BOOT },
+        { "SYS_NICE",           CAP_SYS_NICE },
+        { "SYS_RESOURCE",       CAP_SYS_RESOURCE },
+        { "SYS_TIME",           CAP_SYS_TIME },
+        { "SYS_TTY_CONFIG",     CAP_SYS_TTY_CONFIG },
+        { "MKNOD",              CAP_MKNOD },
+        { "LEASE",              CAP_LEASE },
+        { "AUDIT_WRITE",        CAP_AUDIT_WRITE },
+        { "AUDIT_CONTROL",      CAP_AUDIT_CONTROL },
+        { "SETFCAP",            CAP_SETFCAP },
+        { "MAC_OVERRIDE",       CAP_MAC_OVERRIDE },
+        { "MAC_ADMIN",          CAP_MAC_ADMIN },
+        { "SYSLOG",             CAP_SYSLOG },
+        { "WAKE_ALARM",         CAP_WAKE_ALARM },
+        { "BLOCK_SUSPEND",      CAP_BLOCK_SUSPEND },
+    };
+    uint64_t AllCaps;
+    TError Init(void) {
+        AllCaps = 0xffffffffffffffff >> (63 - LastCapability);
+
+        return TError::Success();
+    }
+    TError Set(const std::string &caps);
+    TError Get(std::string &value);
+    TContainerCapabilities(std::string name, uint64_t set_mask, std::string desc)
+                           : TContainerProperty(name, set_mask, desc, true) {}
 };
 
 void InitContainerProperties(void);

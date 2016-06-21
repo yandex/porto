@@ -36,6 +36,7 @@ extern TContainerRootRo ContainerRootRo;
 extern TContainerEnv ContainerEnv;
 extern TContainerBind ContainerBind;
 extern TContainerIp ContainerIp;
+extern TContainerCapabilities ContainerCapabilities;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -472,107 +473,6 @@ public:
                 "<device> [r][w][m][-] [name] [mode] [user] [group]; ...") {}
 };
 
-struct TCapDesc {
-    int id;
-    int flags;
-};
-
-#define RESTRICTED_CAP 1
-
-#ifndef CAP_AUDIT_READ
-#define CAP_AUDIT_READ 37
-#define CAP_BLOCK_SUSPEND 36
-#endif
-
-class TCapabilitiesProperty : public TListValue, public TContainerValue {
-    uint64_t Caps;
-    const std::map<std::string, TCapDesc> Supported = {
-        { "AUDIT_READ",         { CAP_AUDIT_READ, 0 } },
-        { "CHOWN",              { CAP_CHOWN, RESTRICTED_CAP } },
-        { "DAC_OVERRIDE",       { CAP_DAC_OVERRIDE, RESTRICTED_CAP } },
-        { "DAC_READ_SEARCH",    { CAP_DAC_READ_SEARCH, 0 } },
-        { "FOWNER",             { CAP_FOWNER, RESTRICTED_CAP } },
-        { "FSETID",             { CAP_FSETID, RESTRICTED_CAP } },
-        { "KILL",               { CAP_KILL, RESTRICTED_CAP } },
-        { "SETGID",             { CAP_SETGID, RESTRICTED_CAP } },
-        { "SETUID",             { CAP_SETUID, RESTRICTED_CAP } },
-        { "SETPCAP",            { CAP_SETPCAP, 0 } },
-        { "LINUX_IMMUTABLE",    { CAP_LINUX_IMMUTABLE, 0 } },
-        { "NET_BIND_SERVICE",   { CAP_NET_BIND_SERVICE, RESTRICTED_CAP } },
-        { "NET_BROADCAST",      { CAP_NET_BROADCAST, 0 } },
-        { "NET_ADMIN",          { CAP_NET_ADMIN, RESTRICTED_CAP } },
-        { "NET_RAW",            { CAP_NET_RAW, RESTRICTED_CAP } },
-        { "IPC_LOCK",           { CAP_IPC_LOCK, RESTRICTED_CAP } },
-        { "IPC_OWNER",          { CAP_IPC_OWNER, 0 } },
-        { "SYS_MODULE",         { CAP_SYS_MODULE, 0 } },
-        { "SYS_RAWIO",          { CAP_SYS_RAWIO, 0 } },
-        { "SYS_CHROOT",         { CAP_SYS_CHROOT, RESTRICTED_CAP } },
-        { "SYS_PTRACE",         { CAP_SYS_PTRACE, 0 } },
-        { "SYS_PACCT",          { CAP_SYS_PACCT, 0 } },
-        { "SYS_ADMIN",          { CAP_SYS_ADMIN, 0 } },
-        { "SYS_BOOT",           { CAP_SYS_BOOT, 0 } },
-        { "SYS_NICE",           { CAP_SYS_NICE, 0 } },
-        { "SYS_RESOURCE",       { CAP_SYS_RESOURCE, RESTRICTED_CAP } },
-        { "SYS_TIME",           { CAP_SYS_TIME, 0 } },
-        { "SYS_TTY_CONFIG",     { CAP_SYS_TTY_CONFIG, 0 } },
-        { "MKNOD",              { CAP_MKNOD, RESTRICTED_CAP } },
-        { "LEASE",              { CAP_LEASE, 0 } },
-        { "AUDIT_WRITE",        { CAP_AUDIT_WRITE, RESTRICTED_CAP } },
-        { "AUDIT_CONTROL",      { CAP_AUDIT_CONTROL, 0 } },
-        { "SETFCAP",            { CAP_SETFCAP, 0 } },
-        { "MAC_OVERRIDE",       { CAP_MAC_OVERRIDE, 0 } },
-        { "MAC_ADMIN",          { CAP_MAC_ADMIN, 0 } },
-        { "SYSLOG",             { CAP_SYSLOG, 0 } },
-        { "WAKE_ALARM",         { CAP_WAKE_ALARM, 0 } },
-        { "BLOCK_SUSPEND",      { CAP_BLOCK_SUSPEND, 0 } },
-    };
-
-public:
-    TCapabilitiesProperty() :
-        TListValue(PERSISTENT_VALUE | SUPERUSER_PROPERTY | HIDDEN_VALUE),
-        TContainerValue(P_CAPABILITIES,
-                        "Limit container capabilities: list of capabilities without CAP_ prefix (man 7 capabilities)") {}
-
-    TStrList GetDefault() const override {
-        TStrList v;
-        auto c = GetContainer();
-
-        bool root = c->OwnerCred.IsRootUser();
-        bool restricted = c->VirtMode == VIRT_MODE_OS;
-
-        for (const auto &kv : Supported)
-            if ((root || (restricted && kv.second.flags & RESTRICTED_CAP))
-                && kv.second.id <= LastCapability)
-                v.push_back(kv.first);
-        return v;
-    }
-
-    TError CheckValue(const std::vector<std::string> &lines) override {
-        uint64_t allowed = 0;
-
-        for (auto &line: lines) {
-            if (Supported.find(line) == Supported.end())
-                return TError(EError::InvalidValue,
-                              "Unsupported capability " + line);
-
-            if (Supported.at(line).id > LastCapability)
-                return TError(EError::InvalidValue,
-                              "Unsupported kernel capability " + line);
-
-            allowed |= (1ULL << Supported.at(line).id);
-        }
-
-        Caps = allowed;
-
-        return TError::Success();
-    }
-
-    TError PrepareTaskEnv(TTaskEnv &taskEnv) override {
-        taskEnv.Caps = Caps;
-        return TError::Success();
-    }
-};
-
 class TAgingTimeProperty : public TUintValue, public TContainerValue {
 public:
     TAgingTimeProperty() :
@@ -712,7 +612,6 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TUlimitProperty,
         new TNetTosProperty,
         new TDevicesProperty,
-        new TCapabilitiesProperty,
         new TDefaultGwProperty,
         new TAgingTimeProperty,
         new TEnablePortoProperty,
@@ -762,6 +661,15 @@ TError TContainerUser::Set(const std::string &username) {
         owner.Groups.clear();
         owner.Groups.insert(owner.Groups.end(), new_user.Groups.begin(),
                             new_user.Groups.end());
+
+        if (!(CurrentContainer->PropMask & CAPABILITIES_SET)) {
+            if (owner.IsRootUser())
+                CurrentContainer->Caps = ContainerCapabilities.AllCaps;
+            else if (CurrentContainer->VirtMode == VIRT_MODE_OS)
+                CurrentContainer->Caps = PermittedCaps;
+            else
+                CurrentContainer->Caps = 0;
+        }
 
         CurrentContainer->PropMask |= USER_SET;
 
@@ -835,6 +743,8 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerEnv.Name] = &ContainerEnv;
     ContainerPropMap[ContainerBind.Name] = &ContainerBind;
     ContainerPropMap[ContainerIp.Name] = &ContainerIp;
+    ContainerCapabilities.Init();
+    ContainerPropMap[ContainerCapabilities.Name] = &ContainerCapabilities;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -975,8 +885,8 @@ TError TContainerVirtMode::Set(const std::string &virt_mode) {
         if (!(CurrentContainer->PropMask & NET_SET))
             CurrentContainer->NetProp = { "none" };
 
-        /* TODO: Add capabilities */
-
+        if (!(CurrentContainer->PropMask & CAPABILITIES_SET))
+            CurrentContainer->Caps = PermittedCaps;
     }
 
     CurrentContainer->PropMask |= VIRT_MODE_SET;
@@ -1379,4 +1289,47 @@ TError TContainerIp::Set(const std::string &ipaddr) {
 
 TError TContainerIp::Get(std::string &value) {
     return StrListToString(CurrentContainer->IpList, value);
+}
+
+TError TContainerCapabilities::Set(const std::string &caps_str) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    if (!CurrentClient->Cred.IsRootUser())
+        return TError(EError::Permission, "Only root can change this property");
+
+    std::vector<std::string> caps;
+    error = StringToStrList(caps_str, caps);
+    if (error)
+        return error;
+
+    uint64_t cap_mask = 0lu;
+
+    for (auto &cap: caps) {
+        if (SupportedCaps.find(cap) == SupportedCaps.end())
+            return TError(EError::InvalidValue,
+                    "Unsupported capability " + cap);
+
+        if (SupportedCaps.at(cap) > LastCapability)
+            return TError(EError::InvalidValue,
+                    "Unsupported kernel capability " + cap);
+
+        cap_mask |= CAP_MASK(SupportedCaps.at(cap));
+
+    }
+    CurrentContainer->Caps = cap_mask;
+    CurrentContainer->PropMask |= CAPABILITIES_SET;
+
+    return TError::Success();
+}
+
+TError TContainerCapabilities::Get(std::string &value) {
+   std::vector<std::string> caps;
+
+    for (const auto &cap : SupportedCaps)
+        if (CurrentContainer->Caps & cap.second)
+            caps.push_back(cap.first);
+
+    return StrListToString(caps, value);
 }

@@ -105,6 +105,11 @@ TContainerBind ContainerBind(P_BIND, BIND_SET,
                              "<host_path> <container_path> [ro|rw]; ...");
 TContainerIp ContainerIp(P_IP, IP_SET,
                          "IP configuration: <interface> <ip>/<prefix>; ...");
+TContainerCapabilities ContainerCapabilities(P_CAPABILITIES, CAPABILITIES_SET,
+                                             "Limit container capabilities: "
+                                             "list of capabilities without CAP_"
+                                             " prefix (man 7 capabilities)"
+                                             );
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -134,6 +139,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     VirtMode = VIRT_MODE_APP;
     NetProp = { "inherited" };
     Hostname = "";
+    Caps = 0;
 }
 
 TContainer::~TContainer() {
@@ -824,9 +830,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
 
     taskEnv->BindMap = BindMap;
 
-    error = Prop->PrepareTaskEnv(P_CAPABILITIES, *taskEnv);
-    if (error)
-        return error;
+    taskEnv->Caps = Caps;
 
     if (!taskEnv->Root.IsRoot() && Prop->Get<bool>(P_ENABLE_PORTO)) {
         TBindMap bm = { PORTO_SOCKET_PATH, PORTO_SOCKET_PATH, false };
@@ -904,6 +908,9 @@ TError TContainer::Create(const TCred &cred) {
         L_ERR() << "Can't set container owner: " << error << std::endl;
         return error;
     }
+
+    if (OwnerCred.IsRootUser())
+        Caps = ContainerCapabilities.AllCaps;
 
     SetState(EContainerState::Stopped);
 

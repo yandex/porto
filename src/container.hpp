@@ -150,6 +150,7 @@ public:
     std::vector<std::string> EnvCfg;
     std::vector<TBindMap> BindMap;
     std::vector<std::string> IpList;
+    uint64_t Caps;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;
