@@ -2207,9 +2207,19 @@ std::vector<std::string> TContainer::GetChildren() {
 
 void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
     TError error;
+
     switch (event.Type) {
         case EEventType::Exit:
-            ExitTree(holder_lock, event.Exit.Status, FdHasEvent(OomEventFd.GetFd()));
+            {
+                uint64_t failcnt = 0lu;
+                auto cg = GetCgroup(MemorySubsystem);
+                error = MemorySubsystem.GetFailCnt(cg, failcnt);
+                if (error)
+                    L_WRN() << "Can't get container memory.failcnt" << std::endl;
+
+                ExitTree(holder_lock, event.Exit.Status,
+                         FdHasEvent(OomEventFd.GetFd()) || failcnt);
+            }
             break;
         case EEventType::RotateLogs:
             if (GetState() == EContainerState::Running && Task) {
