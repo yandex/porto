@@ -1,3 +1,26 @@
+yandex-porto (2.11) unstable; urgency=low
+
+  * porto: recreate $ROOTFS/run subdirectories in the container
+  * porto: rework container save/restore code
+  * porto: check group membership also by group name string
+  * porto: let TClient instance be created without TEpollSource backing
+  * porto: let unprivileged users manipulate containers with non-matching owner
+  * porto: let unprivileged user change container user/group
+  * porto: add test for unprivileged client setting container credentials
+  * porto: add set state tracking for reworked knobs
+  * porto: add unsupported flag for reworked properties
+  * porto: fix hierarchy memory guarantee accounting
+  * porto: add test for memory guarantee overcommit prevention
+  * porto: add read-only flag for reworked properties
+  * porto: add memory_guarantee_total read-only knob
+  * porto: minor fix for memory_guarantee_total knob
+  * porto: hide memory_guarantee_total if no supported
+  * porto: set oom_killed if application hit the limit during the execution
+  * network: set default rate to 1mbit for all htb classes except root
+  * test/selftest: fix net_guarantee
+
+ -- Konstantin Khlebnikov <khlebnikov@yandex-team.ru>  Tue, 21 Jun 2016 15:33:01 +0300
+
 yandex-porto (2.10) unstable; urgency=low
 
   * util/cgroup: test cgroup harder
