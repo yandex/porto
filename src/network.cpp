@@ -186,6 +186,8 @@ TError TNetwork::PrepareDevice(TNetworkDevice &dev) {
         return error;
     }
 
+    rate = config().network().default_guarantee();
+
     error = AddTrafficClass(dev.Index,
                             TC_HANDLE(ROOT_TC_MAJOR, ROOT_CONTAINER_ID),
                             TC_HANDLE(ROOT_TC_MAJOR, DEFAULT_TC_MINOR),
@@ -668,25 +670,28 @@ TError TNetwork::AddTrafficClass(int ifIndex, uint32_t parent, uint32_t handle,
      * TC doesn't allow to set 0 rate, but Porto does (because we call them
      * net_guarantee). So, just map 0 to 1, minimal valid guarantee.
      */
-    rtnl_htb_set_rate(cls, rate ?: 1);
+    if (!rate)
+        rate = 1;
+
+    rtnl_htb_set_rate(cls, rate);
+
+    /*
+     * Zero ceil must be no limit. Libnl set default ceil equal to rate.
+     */
+    if (!ceil || ceil > NET_MAX_LIMIT)
+        ceil = NET_MAX_LIMIT;
+
+    rtnl_htb_set_ceil(cls, ceil);
 
     rtnl_htb_set_prio(cls, prio);
 
-    /*
-     * Zero ceil must be no limit.
-     * Libnl set default ceil equal to rate.
-     */
-    if (ceil)
-        rtnl_htb_set_ceil(cls, ceil);
-    else
-        rtnl_htb_set_ceil(cls, UINT32_MAX);
-
     rtnl_htb_set_quantum(cls, 10000);
 
-    /*
-       rtnl_htb_set_rbuffer(tclass, burst);
-       rtnl_htb_set_cbuffer(tclass, cburst);
-       */
+    rtnl_tc_set_mtu(TC_CAST(cls), 9000);
+
+    rtnl_htb_set_rbuffer(cls, 10000);
+
+    /* rtnl_htb_set_cbuffer(tclass, cburst); */
 
     Nl->Dump("add", cls);
     ret = rtnl_class_add(GetSock(), cls, NLM_F_CREATE | NLM_F_REPLACE);
