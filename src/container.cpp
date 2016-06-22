@@ -1854,10 +1854,11 @@ TError TContainer::Save(void) {
     for (auto knob : ContainerPropMap) {
         std::string value;
 
-        if (!(PropMask & knob.second->SetMask))
+        if (!(knob.second->IsSerializable) ||
+            !(PropMask & knob.second->SetMask))
             continue; /* Skip knobs without a value */
 
-        error = knob.second->Get(value);
+        error = knob.second->GetToSave(value);
         if (error)
             return error;
 
@@ -1920,7 +1921,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
             if (Verbose)
                 L_ACT() << "Restoring as new property" << key << " = " << value << std::endl;
 
-            error = (*prop).second->Set(value);
+            error = (*prop).second->SetFromRestore(value);
             if (!error) {
                 PropMask |= (*prop).second->SetMask; /* Indicate that we've set the value */
                 continue;

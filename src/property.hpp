@@ -153,6 +153,7 @@ public:
     bool IsSupported;
     bool IsReadOnly;
     bool IsHidden;
+    bool IsSerializable;
     TError IsAliveAndStopped(void);
     TError IsAlive(void);
     virtual TError Set(const std::string &value) {
@@ -163,19 +164,36 @@ public:
     }
     virtual TError Get(std::string &value) = 0;
     TContainerProperty(std::string name, uint64_t set_mask,
-                       std::string desc, bool hidden = false)
+                       std::string desc, bool hidden = false,
+                       bool serializable = true)
                        : Name(name), SetMask(set_mask), Desc(desc),
-                       IsSupported(true), IsReadOnly(false), IsHidden(hidden) {}
+                       IsSupported(true), IsReadOnly(false), IsHidden(hidden),
+                       IsSerializable(serializable) {}
 
-    TContainerProperty(std::string name, std::string desc, bool hidden = false)
+    TContainerProperty(std::string name, std::string desc,
+                       bool hidden = false, bool serializable = false)
                        : Name(name), SetMask(0), Desc(desc), IsSupported(true),
-                       IsReadOnly(true), IsHidden(hidden) {}
+                       IsReadOnly(true), IsHidden(hidden),
+                       IsSerializable(serializable) {}
 
     virtual TError GetIndexed(const std::string &index, std::string &value) {
         return TError(EError::InvalidValue, "Invalid subscript for property");
     }
     virtual TError SetIndexed(const std::string &index, const std::string &value) {
         return TError(EError::InvalidValue, "Invalid subscript for property");
+    }
+
+    virtual TError GetToSave(std::string &value) {
+        if (IsSerializable)
+            return Get(value);
+        else
+            return TError(EError::Unknown, "Trying to save non-serializable value");
+    }
+    virtual TError SetFromRestore(const std::string &value) {
+        if (IsSerializable)
+            return Set(value);
+        else
+            return TError(EError::Unknown, "Trying to restore non-serializable value");
     }
 };
 
