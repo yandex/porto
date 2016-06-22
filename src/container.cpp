@@ -119,6 +119,10 @@ TContainerDevices ContainerDevices(P_DEVICES, DEVICES_SET,
                                    "Devices that container can access: "
                                    "<device> [r][w][m][-] [name] [mode] "
                                    "[user] [group]; ...");
+TContainerRawRootPid ContainerRawRootPid(P_RAW_ROOT_PID, "");
+TContainerRawLoopDev ContainerRawLoopDev(P_RAW_LOOP_DEV, "");
+TContainerRawStartTime ContainerRawStartTime(P_RAW_START_TIME, "");
+TContainerRawDeathTime ContainerRawDeathTime(P_RAW_DEATH_TIME, "");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -149,6 +153,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     NetProp = { "inherited" };
     Hostname = "";
     Caps = 0;
+    LoopDev = -1;
 }
 
 TContainer::~TContainer() {
@@ -790,7 +795,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     taskEnv->Cwd = Cwd;
     taskEnv->ParentCwd = Parent->Cwd;
 
-    taskEnv->LoopDev = Prop->Get<int>(P_RAW_LOOP_DEV);
+    taskEnv->LoopDev = LoopDev;
     if (taskEnv->LoopDev >= 0)
         taskEnv->Root = GetTmpDir();
     else
@@ -984,9 +989,8 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
     if (error)
         return error;
 
-    error = Prop->Set<uint64_t>(P_RAW_START_TIME, GetCurrentTimeMs());
-    if (error)
-        return error;
+    StartTime = GetCurrentTimeMs();
+    PropMask |= START_TIME_SET;
 
     error = PrepareResources(client);
     if (error)
@@ -1031,9 +1035,8 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
 
         L() << GetName() << " started " << std::to_string(Task->GetPid()) << std::endl;
 
-        error = Prop->Set<std::vector<int>>(P_RAW_ROOT_PID, Task->GetPids());
-        if (error)
-            goto error;
+        RootPid = Task->GetPids();
+        PropMask |= ROOT_PID_SET;
     }
 
     IsMeta = meta;
@@ -1046,7 +1049,7 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
     if (error)
         L_ERR() << "Can't update meta soft limit: " << error << std::endl;
 
-    return TError::Success();
+    return Save();
 
 error:
     FreeResources();
@@ -1223,9 +1226,8 @@ TError TContainer::PrepareLoop() {
     if (error)
         return error;
 
-    error = Prop->Set<int>(P_RAW_LOOP_DEV, loop_dev);
-    if (error)
-        (void)PutLoopDev(loop_dev);
+    LoopDev = loop_dev;
+    PropMask |= LOOP_DEV_SET;
 
     return error;
 }
@@ -1331,11 +1333,9 @@ void TContainer::FreeResources() {
     Stdout.Cleanup();
     Stderr.Cleanup();
 
-    int loopNr = Prop->Get<int>(P_RAW_LOOP_DEV);
-
-    error = Prop->Set<int>(P_RAW_LOOP_DEV, -1);
-    if (error)
-        L_ERR() << "Can't set " << P_RAW_LOOP_DEV << ": " << error << std::endl;
+    int loopNr = LoopDev;
+    LoopDev = -1;
+    PropMask |= LOOP_DEV_SET;
 
     if (loopNr >= 0) {
         error = PutLoopDev(loopNr);
@@ -1726,14 +1726,6 @@ TError TContainer::Prepare() {
             return error;
     }
 
-    error = Prop->Set<std::string>(P_RAW_NAME, GetName());
-    if (error)
-        return error;
-
-    error = Prop->Set<int>(P_RAW_ID, (int)Id);
-    if (error)
-        return error;
-
     CgroupEmptySince = 0;
 
     return TError::Success();
@@ -1810,6 +1802,21 @@ TError TContainer::Save(void) {
 
     /* By creating we truncate existing node */
     kvnode->Create();
+
+    /*
+     * _id and _name are exceptional knobs.
+     * We restore Id and Name earlier than other knobs
+     * (because of proper container restore order and id sets).
+     * So let's save them manually.
+     */
+
+    auto pair = new_node.add_pairs();
+    pair->set_key(std::string(P_RAW_ID));
+    pair->set_val(std::to_string(Id));
+
+    pair = new_node.add_pairs();
+    pair->set_key(std::string(P_RAW_NAME));
+    pair->set_val(GetName());
 
     for (auto knob_name : Prop->List()) {
 
@@ -1961,9 +1968,9 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
 
     auto state = Data->Get<std::string>(D_STATE);
 
-    bool started = Prop->HasValue(P_RAW_ROOT_PID);
+    bool started = (PropMask & ROOT_PID_SET) > 0;
     if (started) {
-        std::vector<int> pids = Prop->Get<std::vector<int>>(P_RAW_ROOT_PID);
+        std::vector<int> pids = RootPid;
 
         if (pids.size() == 1)
             pids = {pids[0], 0, pids[0]};
@@ -2066,15 +2073,19 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
         if (state == ContainerStateName(EContainerState::Dead)) {
             // we started recording death time since porto v1.15,
             // use some sensible default
-            if (!Prop->HasValue(P_RAW_DEATH_TIME))
-                Prop->Set<uint64_t>(P_RAW_DEATH_TIME, GetCurrentTimeMs());
+            if (!(PropMask & DEATH_TIME_SET)) {
+                DeathTime = GetCurrentTimeMs();
+                PropMask |= DEATH_TIME_SET;
+            }
 
             SetState(EContainerState::Dead);
         } else {
             // we started recording start time since porto v1.15,
             // use some sensible default
-            if (!Prop->HasValue(P_RAW_START_TIME))
-                Prop->Set<uint64_t>(P_RAW_START_TIME, GetCurrentTimeMs());
+            if (!(PropMask & START_TIME_SET)) {
+                StartTime = GetCurrentTimeMs();
+                PropMask |= START_TIME_SET;
+            }
 
             if (Command.empty())
                 SetState(EContainerState::Meta);
@@ -2176,9 +2187,8 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
     if (error)
         L_ERR() << "Can't set " << D_EXIT_STATUS << ": " << error << std::endl;
 
-    error = Prop->Set<uint64_t>(P_RAW_DEATH_TIME, GetCurrentTimeMs());
-    if (error)
-        L_ERR() << "Can't set " << P_RAW_DEATH_TIME << ": " << error << std::endl;
+    DeathTime = GetCurrentTimeMs();
+    PropMask |= DEATH_TIME_SET;
 
     if (oomKilled) {
         L_EVT() << Task->GetPid() << " killed by OOM" << std::endl;
@@ -2201,9 +2211,8 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
     Task->Exit(status);
     SetState(EContainerState::Dead);
 
-    error = Prop->Set<std::vector<int>>(P_RAW_ROOT_PID, {0, 0, 0});
-    if (error)
-        L_ERR() << "Can't set " << P_RAW_ROOT_PID << ": " << error << std::endl;
+    RootPid = {0, 0, 0};
+    PropMask |= ROOT_PID_SET;
 
     RotateStdFile(Stdout, D_STDOUT_OFFSET);
     RotateStdFile(Stderr, D_STDERR_OFFSET);
@@ -2277,7 +2286,7 @@ TError TContainer::Respawn(TScopedLock &holder_lock) {
 
 bool TContainer::CanRemoveDead() const {
     return State == EContainerState::Dead &&
-        Prop->Get<uint64_t>(P_RAW_DEATH_TIME) / 1000 +
+        DeathTime / 1000 +
         Prop->Get<uint64_t>(P_AGING_TIME) <= GetCurrentTimeMs() / 1000;
 }
 

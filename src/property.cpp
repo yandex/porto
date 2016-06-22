@@ -40,6 +40,10 @@ extern TContainerCapabilities ContainerCapabilities;
 extern TContainerDefaultGw ContainerDefaultGw;
 extern TContainerResolvConf ContainerResolvConf;
 extern TContainerDevices ContainerDevices;
+extern TContainerRawRootPid ContainerRawRootPid;
+extern TContainerRawLoopDev ContainerRawLoopDev;
+extern TContainerRawStartTime ContainerRawStartTime;
+extern TContainerRawDeathTime ContainerRawDeathTime;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -504,50 +508,6 @@ public:
     }
 };
 
-class TRawIdProperty : public TIntValue, public TContainerValue {
-public:
-    TRawIdProperty() :
-        TIntValue(HIDDEN_VALUE | PERSISTENT_VALUE),
-        TContainerValue(P_RAW_ID, "") {}
-    int GetDefault() const override { return -1; }
-};
-
-class TRawRootPidProperty : public TIntListValue, public TContainerValue {
-public:
-    TRawRootPidProperty() :
-        TIntListValue(HIDDEN_VALUE | PERSISTENT_VALUE),
-        TContainerValue(P_RAW_ROOT_PID, "") {}
-};
-
-class TRawLoopDevProperty : public TIntValue, public TContainerValue {
-public:
-    TRawLoopDevProperty() :
-        TIntValue(HIDDEN_VALUE | PERSISTENT_VALUE),
-        TContainerValue(P_RAW_LOOP_DEV, "") {}
-    int GetDefault() const override { return -1; }
-};
-
-class TRawNameProperty : public TStringValue, public TContainerValue {
-public:
-    TRawNameProperty() :
-        TStringValue(HIDDEN_VALUE | PERSISTENT_VALUE),
-        TContainerValue(P_RAW_NAME, "") {}
-};
-
-class TRawStartTimeProperty : public TUintValue, public TContainerValue {
-public:
-    TRawStartTimeProperty() :
-        TUintValue(HIDDEN_VALUE | PERSISTENT_VALUE),
-        TContainerValue(P_RAW_START_TIME, "") {}
-};
-
-class TRawDeathTimeProperty : public TUintValue, public TContainerValue {
-public:
-    TRawDeathTimeProperty() :
-        TUintValue(HIDDEN_VALUE | PERSISTENT_VALUE),
-        TContainerValue(P_RAW_DEATH_TIME, "") {}
-};
-
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> properties = {
@@ -574,13 +534,6 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TAgingTimeProperty,
         new TEnablePortoProperty,
         new TWeakProperty,
-
-        new TRawIdProperty,
-        new TRawRootPidProperty,
-        new TRawLoopDevProperty,
-        new TRawNameProperty,
-        new TRawStartTimeProperty,
-        new TRawDeathTimeProperty,
     };
 
     for (auto p : properties)
@@ -705,6 +658,10 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerDefaultGw.Name] = &ContainerDefaultGw;
     ContainerPropMap[ContainerResolvConf.Name] = &ContainerResolvConf;
     ContainerPropMap[ContainerDevices.Name] = &ContainerDevices;
+    ContainerPropMap[ContainerRawRootPid.Name] = &ContainerRawRootPid;
+    ContainerPropMap[ContainerRawLoopDev.Name] = &ContainerRawLoopDev;
+    ContainerPropMap[ContainerRawStartTime.Name] = &ContainerRawStartTime;
+    ContainerPropMap[ContainerRawDeathTime.Name] = &ContainerRawDeathTime;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1356,4 +1313,59 @@ TError TContainerDevices::Set(const std::string &dev_str) {
 
 TError TContainerDevices::Get(std::string &value) {
     return StrListToString(CurrentContainer->Devices, value);
+}
+
+TError TContainerRawRootPid::SetFromRestore(const std::string &value) {
+    std::vector<std::string> str_list;
+    TError error = StringToStrList(value, str_list);
+    if (error)
+        return error;
+
+    return StringsToIntegers(str_list, CurrentContainer->RootPid);
+}
+
+TError TContainerRawRootPid::Get(std::string &value) {
+    std::stringstream str;
+    bool first = true;
+
+    for (auto v : CurrentContainer->RootPid) {
+        if (first)
+             first = false;
+        else
+             str << ";";
+        str << v;
+   }
+
+   value = str.str();
+   return TError::Success();
+}
+
+TError TContainerRawLoopDev::SetFromRestore(const std::string &value) {
+    return StringToInt(value, CurrentContainer->LoopDev);
+}
+
+TError TContainerRawLoopDev::Get(std::string &value) {
+    value = std::to_string(CurrentContainer->LoopDev);
+
+    return TError::Success();
+}
+
+TError TContainerRawStartTime::SetFromRestore(const std::string &value) {
+    return StringToUint64(value, CurrentContainer->StartTime);
+}
+
+TError TContainerRawStartTime::Get(std::string &value) {
+    value = std::to_string(CurrentContainer->StartTime);
+
+    return TError::Success();
+}
+
+TError TContainerRawDeathTime::SetFromRestore(const std::string &value) {
+    return StringToUint64(value, CurrentContainer->DeathTime);
+}
+
+TError TContainerRawDeathTime::Get(std::string &value) {
+    value = std::to_string(CurrentContainer->DeathTime);
+
+    return TError::Success();
 }

@@ -154,6 +154,10 @@ public:
     std::vector<std::string> DefaultGw;
     std::vector<std::string> ResolvConf;
     std::vector<std::string> Devices;
+    std::vector<int> RootPid;
+    int LoopDev;
+    uint64_t StartTime;
+    uint64_t DeathTime;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;

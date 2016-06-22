@@ -16,11 +16,15 @@ extern "C" {
 }
 
 constexpr const char *P_RAW_ROOT_PID = "_root_pid";
+constexpr uint64_t ROOT_PID_SET = (1lu << 0);
 constexpr const char *P_RAW_ID = "_id";
 constexpr const char *P_RAW_LOOP_DEV = "_loop_dev";
+constexpr uint64_t LOOP_DEV_SET = (1lu << 2);
 constexpr const char *P_RAW_NAME = "_name";
 constexpr const char *P_RAW_START_TIME = "_start_time";
+constexpr uint64_t START_TIME_SET = (1lu << 4);
 constexpr const char *P_RAW_DEATH_TIME = "_death_time";
+constexpr uint64_t DEATH_TIME_SET = (1lu << 5);
 constexpr const char *P_COMMAND = "command";
 constexpr uint64_t COMMAND_SET = (1 << 6);
 constexpr const char *P_USER = "user";
@@ -461,6 +465,46 @@ public:
     TError Get(std::string &value);
     TContainerDevices(std::string name, uint64_t set_mask, std::string desc)
                       : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerRawRootPid : public TContainerProperty {
+public:
+    TError SetFromRestore(const std::string &value);
+    TError Get(std::string &value);
+    TContainerRawRootPid(std::string name, std::string desc)
+                         : TContainerProperty(name, desc, true, true) {
+        SetMask = ROOT_PID_SET;
+    }
+};
+
+class TContainerRawLoopDev : public TContainerProperty {
+public:
+    TError SetFromRestore(const std::string &value);
+    TError Get(std::string &value);
+    TContainerRawLoopDev(std::string name, std::string desc)
+                    : TContainerProperty(name, desc, true, true) {
+        SetMask = LOOP_DEV_SET;
+    }
+};
+
+class TContainerRawStartTime : public TContainerProperty {
+public:
+    TError SetFromRestore(const std::string &value);
+    TError Get(std::string &value);
+    TContainerRawStartTime(std::string name, std::string desc)
+                           : TContainerProperty(name, desc, true, true) {
+        SetMask = START_TIME_SET;
+    }
+};
+
+class TContainerRawDeathTime : public TContainerProperty {
+public:
+    TError SetFromRestore(const std::string &value);
+    TError Get(std::string &value);
+    TContainerRawDeathTime(std::string name, std::string desc)
+                           : TContainerProperty(name, desc, true, true) {
+        SetMask = DEATH_TIME_SET;
+    }
 };
 
 void InitContainerProperties(void);
