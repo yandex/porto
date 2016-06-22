@@ -76,6 +76,7 @@ constexpr const char *P_NET = "net";
 constexpr uint64_t NET_SET = (1lu << 42);
 constexpr const char *P_NET_TOS = "net_tos";
 constexpr const char *P_DEVICES = "devices";
+constexpr uint64_t DEVICES_SET = (1lu << 44);
 constexpr const char *P_CAPABILITIES = "capabilities";
 constexpr uint64_t CAPABILITIES_SET = (1lu << 45);
 constexpr const char *P_IP = "ip";
@@ -434,6 +435,14 @@ public:
     TError Get(std::string &value);
     TContainerResolvConf(std::string name, uint64_t set_mask, std::string desc)
                          : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerDevices : public TContainerProperty {
+public:
+    TError Set(const std::string &dev);
+    TError Get(std::string &value);
+    TContainerDevices(std::string name, uint64_t set_mask, std::string desc)
+                      : TContainerProperty(name, set_mask, desc) {}
 };
 
 void InitContainerProperties(void);

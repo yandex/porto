@@ -153,6 +153,7 @@ public:
     uint64_t Caps;
     std::vector<std::string> DefaultGw;
     std::vector<std::string> ResolvConf;
+    std::vector<std::string> Devices;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;

@@ -115,6 +115,10 @@ TContainerDefaultGw ContainerDefaultGw(P_DEFAULT_GW, DEFAULT_GW_SET,
 TContainerResolvConf ContainerResolvConf(P_RESOLV_CONF, RESOLV_CONF_SET,
                                          "DNS resolver configuration: "
                                          "<resolv.conf option>;...");
+TContainerDevices ContainerDevices(P_DEVICES, DEVICES_SET,
+                                   "Devices that container can access: "
+                                   "<device> [r][w][m][-] [name] [mode] "
+                                   "[user] [group]; ...");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -587,7 +591,7 @@ TError TContainer::PrepareOomMonitor() {
 }
 
 TError TContainer::ConfigureDevices(std::vector<TDevice> &devices) {
-    auto config = Prop->Get<TStrList>(P_DEVICES);
+    auto config = Devices;
     auto cg = GetCgroup(DevicesSubsystem);
     TDevice device;
     TError error;

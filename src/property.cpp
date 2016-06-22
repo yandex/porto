@@ -39,6 +39,7 @@ extern TContainerIp ContainerIp;
 extern TContainerCapabilities ContainerCapabilities;
 extern TContainerDefaultGw ContainerDefaultGw;
 extern TContainerResolvConf ContainerResolvConf;
+extern TContainerDevices ContainerDevices;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -453,14 +454,6 @@ public:
     }
 };
 
-class TDevicesProperty : public TListValue, public TContainerValue {
-public:
-    TDevicesProperty():
-        TListValue(PERSISTENT_VALUE),
-        TContainerValue(P_DEVICES, "Devices that container can access: "
-                "<device> [r][w][m][-] [name] [mode] [user] [group]; ...") {}
-};
-
 class TAgingTimeProperty : public TUintValue, public TContainerValue {
 public:
     TAgingTimeProperty() :
@@ -578,7 +571,6 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TPrivateProperty,
         new TUlimitProperty,
         new TNetTosProperty,
-        new TDevicesProperty,
         new TAgingTimeProperty,
         new TEnablePortoProperty,
         new TWeakProperty,
@@ -712,6 +704,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerCapabilities.Name] = &ContainerCapabilities;
     ContainerPropMap[ContainerDefaultGw.Name] = &ContainerDefaultGw;
     ContainerPropMap[ContainerResolvConf.Name] = &ContainerResolvConf;
+    ContainerPropMap[ContainerDevices.Name] = &ContainerDevices;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1346,4 +1339,21 @@ TError TContainerResolvConf::Set(const std::string &conf_str) {
 
 TError TContainerResolvConf::Get(std::string &value) {
     return StrListToString(CurrentContainer->ResolvConf, value);
+}
+
+TError TContainerDevices::Set(const std::string &dev_str) {
+    std::vector<std::string> dev_list;
+
+    TError error = StringToStrList(dev_str, dev_list);
+    if (error)
+        return error;
+
+    CurrentContainer->Devices = dev_list;
+    CurrentContainer->PropMask |= DEVICES_SET;
+
+    return TError::Success();
+}
+
+TError TContainerDevices::Get(std::string &value) {
+    return StrListToString(CurrentContainer->Devices, value);
 }
