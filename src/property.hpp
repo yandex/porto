@@ -138,9 +138,9 @@ public:
     TContainerProperty(std::string name, uint64_t set_mask, std::string desc)
                        : Name(name), SetMask(set_mask), Desc(desc),
                        IsSupported(true), IsReadOnly(false) {}
-    TContainerProperty(std::string name, std::string desc, bool ro) : Name(name), Desc(desc),
-                       IsSupported(true), IsReadOnly(ro) {}
-
+    TContainerProperty(std::string name, std::string desc) :
+                       Name(name), SetMask(0), Desc(desc),
+                       IsSupported(true), IsReadOnly(true) {}
 };
 
 class TContainerUser : public TContainerProperty {
@@ -178,7 +178,7 @@ class TContainerMemTotalGuarantee : public TContainerProperty {
 public:
     TError Get(std::string &value);
     TContainerMemTotalGuarantee(std::string name, std::string desc)
-                                : TContainerProperty(name, desc, true) {}
+                                : TContainerProperty(name, desc) {}
     TError Init(void) {
         IsSupported = MemorySubsystem.SupportGuarantee();
 
