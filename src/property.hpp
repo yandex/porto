@@ -70,6 +70,7 @@ constexpr const char *P_ISOLATE = "isolate";
 constexpr uint64_t ISOLATE_SET = (1lu << 36);
 constexpr const char *P_PRIVATE = "private";
 constexpr const char *P_ULIMIT = "ulimit";
+constexpr uint64_t ULIMIT_SET = (1lu << 38);
 constexpr const char *P_HOSTNAME = "hostname";
 constexpr uint64_t HOSTNAME_SET = (1lu << 39);
 constexpr const char *P_BIND_DNS = "bind_dns";
@@ -505,6 +506,33 @@ public:
                            : TContainerProperty(name, desc, true, true) {
         SetMask = DEATH_TIME_SET;
     }
+};
+
+class TContainerUlimit : public TContainerProperty {
+    const std::map<std::string,int> nameToIdx = {
+        { "as", RLIMIT_AS },
+        { "core", RLIMIT_CORE },
+        { "cpu", RLIMIT_CPU },
+        { "data", RLIMIT_DATA },
+        { "fsize", RLIMIT_FSIZE },
+        { "locks", RLIMIT_LOCKS },
+        { "memlock", RLIMIT_MEMLOCK },
+        { "msgqueue", RLIMIT_MSGQUEUE },
+        { "nice", RLIMIT_NICE },
+        { "nofile", RLIMIT_NOFILE },
+        { "nproc", RLIMIT_NPROC },
+        { "rss", RLIMIT_RSS },
+        { "rtprio", RLIMIT_RTPRIO },
+        { "rttime", RLIMIT_RTTIME },
+        { "sigpending", RLIMIT_SIGPENDING },
+        { "stask", RLIMIT_STACK },
+    };
+public:
+    TError Set(const std::string &ulimit);
+    TError Get(std::string &value);
+    TContainerUlimit(std::string name, uint64_t set_mask, std::string desc)
+                     : TContainerProperty(name, set_mask, desc) {}
+    void Propagate(std::map<int, struct rlimit> &ulimits);
 };
 
 void InitContainerProperties(void);

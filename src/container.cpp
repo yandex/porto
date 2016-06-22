@@ -123,6 +123,9 @@ TContainerRawRootPid ContainerRawRootPid(P_RAW_ROOT_PID, "");
 TContainerRawLoopDev ContainerRawLoopDev(P_RAW_LOOP_DEV, "");
 TContainerRawStartTime ContainerRawStartTime(P_RAW_START_TIME, "");
 TContainerRawDeathTime ContainerRawDeathTime(P_RAW_DEATH_TIME, "");
+TContainerUlimit ContainerUlimit(P_ULIMIT, ULIMIT_SET,
+                                 "Container resource limits: "
+                                 "<type> <soft> <hard>; ... (man 2 getrlimit)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -845,9 +848,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
     taskEnv->Stdout = Stdout;
     taskEnv->Stderr = Stderr;
 
-    error = Prop->PrepareTaskEnv(P_ULIMIT, *taskEnv);
-    if (error)
-        return error;
+    taskEnv->Rlimit = Rlimit;
 
     taskEnv->BindMap = BindMap;
 

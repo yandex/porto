@@ -44,6 +44,7 @@ extern TContainerRawRootPid ContainerRawRootPid;
 extern TContainerRawLoopDev ContainerRawLoopDev;
 extern TContainerRawStartTime ContainerRawStartTime;
 extern TContainerRawDeathTime ContainerRawDeathTime;
+extern TContainerUlimit ContainerUlimit;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -370,84 +371,6 @@ public:
     }
 };
 
-class TUlimitProperty : public TListValue, public TContainerValue {
-    std::map<int,struct rlimit> Rlimit;
-
-public:
-    TUlimitProperty() :
-        TListValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE),
-        TContainerValue(P_ULIMIT,
-                        "Container resource limits: <type> <soft> <hard>; ... (man 2 getrlimit)") {}
-
-    TError CheckValue(const std::vector<std::string> &lines) override {
-        Rlimit.clear();
-
-        static const std::map<std::string,int> nameToIdx = {
-            { "as", RLIMIT_AS },
-            { "core", RLIMIT_CORE },
-            { "cpu", RLIMIT_CPU },
-            { "data", RLIMIT_DATA },
-            { "fsize", RLIMIT_FSIZE },
-            { "locks", RLIMIT_LOCKS },
-            { "memlock", RLIMIT_MEMLOCK },
-            { "msgqueue", RLIMIT_MSGQUEUE },
-            { "nice", RLIMIT_NICE },
-            { "nofile", RLIMIT_NOFILE },
-            { "nproc", RLIMIT_NPROC },
-            { "rss", RLIMIT_RSS },
-            { "rtprio", RLIMIT_RTPRIO },
-            { "rttime", RLIMIT_RTTIME },
-            { "sigpending", RLIMIT_SIGPENDING },
-            { "stask", RLIMIT_STACK },
-        };
-
-        for (auto &limit : lines) {
-            std::vector<std::string> nameval;
-
-            (void)SplitString(limit, ':', nameval);
-            if (nameval.size() != 2)
-                return TError(EError::InvalidValue, "Invalid limits format");
-
-            std::string name = StringTrim(nameval[0]);
-            if (nameToIdx.find(name) == nameToIdx.end())
-                return TError(EError::InvalidValue, "Invalid limit " + name);
-            int idx = nameToIdx.at(name);
-
-            std::vector<std::string> softhard;
-            (void)SplitString(StringTrim(nameval[1]), ' ', softhard);
-            if (softhard.size() != 2)
-                return TError(EError::InvalidValue, "Invalid limits number for " + name);
-
-            rlim_t soft, hard;
-            if (softhard[0] == "unlim" || softhard[0] == "unlimited") {
-                soft = RLIM_INFINITY;
-            } else {
-                TError error = StringToUint64(softhard[0], soft);
-                if (error)
-                    return TError(EError::InvalidValue, "Invalid soft limit for " + name);
-            }
-
-            if (softhard[1] == "unlim" || softhard[1] == "unlimited") {
-                hard = RLIM_INFINITY;
-            } else {
-                TError error = StringToUint64(softhard[1], hard);
-                if (error)
-                    return TError(EError::InvalidValue, "Invalid hard limit for " + name);
-            }
-
-            Rlimit[idx].rlim_cur = soft;
-            Rlimit[idx].rlim_max = hard;
-        }
-
-        return TError::Success();
-    }
-
-    TError PrepareTaskEnv(TTaskEnv &taskEnv) override {
-        taskEnv.Rlimit = Rlimit;
-        return TError::Success();
-    }
-};
-
 class TNetTosProperty : public TUintValue, public TContainerValue {
 public:
     TNetTosProperty() :
@@ -529,7 +452,6 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TRespawnProperty,
         new TMaxRespawnsProperty,
         new TPrivateProperty,
-        new TUlimitProperty,
         new TNetTosProperty,
         new TAgingTimeProperty,
         new TEnablePortoProperty,
@@ -662,6 +584,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerRawLoopDev.Name] = &ContainerRawLoopDev;
     ContainerPropMap[ContainerRawStartTime.Name] = &ContainerRawStartTime;
     ContainerPropMap[ContainerRawDeathTime.Name] = &ContainerRawDeathTime;
+    ContainerPropMap[ContainerUlimit.Name] = &ContainerUlimit;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -930,6 +853,11 @@ TError TContainerIsolate::Set(const std::string &isolate_needed) {
                 CurrentContainer->Cwd = p->Cwd;
 
                 ContainerCwd.Propagate(p->Cwd);
+            }
+            if (!(CurrentContainer->PropMask & ULIMIT_SET)) {
+               CurrentContainer->Rlimit = p->Rlimit;
+
+               ContainerUlimit.Propagate(CurrentContainer->Rlimit);
             }
         }
 
@@ -1368,4 +1296,109 @@ TError TContainerRawDeathTime::Get(std::string &value) {
     value = std::to_string(CurrentContainer->DeathTime);
 
     return TError::Success();
+}
+
+TError TContainerUlimit::Set(const std::string &ulimit_str) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    std::vector<std::string> ulimits;
+    error = StringToStrList(ulimit_str, ulimits);
+    if (error)
+        return error;
+
+    /*
+     * The final copy will be slow, but we don't want
+     * to have inconsistent ulimits inside the container...
+     */
+
+    std::map<int,struct rlimit> new_limit;
+    for (auto &limit : ulimits) {
+        std::vector<std::string> nameval;
+
+        (void)SplitString(limit, ':', nameval);
+        if (nameval.size() != 2)
+            return TError(EError::InvalidValue, "Invalid limits format");
+
+        std::string name = StringTrim(nameval[0]);
+        if (nameToIdx.find(name) == nameToIdx.end())
+            return TError(EError::InvalidValue, "Invalid limit " + name);
+        int idx = nameToIdx.at(name);
+
+        std::vector<std::string> softhard;
+        (void)SplitString(StringTrim(nameval[1]), ' ', softhard);
+        if (softhard.size() != 2)
+            return TError(EError::InvalidValue, "Invalid limits number for " + name);
+
+        rlim_t soft, hard;
+        if (softhard[0] == "unlim" || softhard[0] == "unlimited") {
+            soft = RLIM_INFINITY;
+        } else {
+            TError error = StringToUint64(softhard[0], soft);
+            if (error)
+                return TError(EError::InvalidValue, "Invalid soft limit for " + name);
+        }
+
+        if (softhard[1] == "unlim" || softhard[1] == "unlimited") {
+            hard = RLIM_INFINITY;
+        } else {
+            TError error = StringToUint64(softhard[1], hard);
+            if (error)
+                return TError(EError::InvalidValue, "Invalid hard limit for " + name);
+        }
+
+        new_limit[idx].rlim_cur = soft;
+        new_limit[idx].rlim_max = hard;
+    }
+
+    CurrentContainer->Rlimit = new_limit;
+    CurrentContainer->PropMask |= ULIMIT_SET;
+    Propagate(new_limit);
+
+    return TError::Success();
+}
+
+TError TContainerUlimit::Get(std::string &value) {
+    std::stringstream str;
+    bool first = true;
+
+   for (auto limit_elem : nameToIdx) {
+        auto value = CurrentContainer->Rlimit.find(limit_elem.second);
+        if (value == CurrentContainer->Rlimit.end())
+            continue;
+
+        if (first)
+             first = false;
+        else
+             str << ";";
+
+        str << limit_elem.first << " " <<
+            std::to_string((*value).second.rlim_cur) << " " <<
+            std::to_string((*value).second.rlim_max);
+
+   }
+
+   value = str.str();
+
+   return TError::Success();
+}
+
+void TContainerUlimit::Propagate(std::map<int, struct rlimit> &ulimits) {
+
+    for (auto iter : CurrentContainer->Children) {
+        if (auto child = iter.lock()) {
+
+            auto old = CurrentContainer;
+            CurrentContainer = child.get();
+
+            if (!(CurrentContainer->PropMask & ULIMIT_SET) &&
+                !(CurrentContainer->Isolate)) {
+
+                CurrentContainer->Rlimit = ulimits;
+                ContainerUlimit.Propagate(ulimits);
+            }
+            CurrentContainer = old;
+        }
+    }
 }
