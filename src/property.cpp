@@ -38,6 +38,7 @@ extern TContainerBind ContainerBind;
 extern TContainerIp ContainerIp;
 extern TContainerCapabilities ContainerCapabilities;
 extern TContainerDefaultGw ContainerDefaultGw;
+extern TContainerResolvConf ContainerResolvConf;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -498,27 +499,6 @@ public:
     }
 };
 
-class TResolvConfProperty : public TListValue, public TContainerValue {
-public:
-    TResolvConfProperty() :
-        TListValue(PERSISTENT_VALUE),
-        TContainerValue(P_RESOLV_CONF,
-                        "DNS resolver configuration: <resolv.conf option>;...") {}
-
-    TError PrepareTaskEnv(TTaskEnv &taskEnv) override {
-        if (HasValue()) {
-            if (taskEnv.Root.IsRoot())
-                return TError(EError::InvalidValue,
-                        "resolv_conf requires separate root");
-            taskEnv.BindDns = false;
-            auto lines = Get();
-            for (auto &line: lines)
-                taskEnv.ResolvConf += line + "\n";
-        }
-        return TError::Success();
-    }
-};
-
 class TWeakProperty : public TBoolValue, public TContainerValue {
 public:
     TWeakProperty() :
@@ -601,7 +581,6 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TDevicesProperty,
         new TAgingTimeProperty,
         new TEnablePortoProperty,
-        new TResolvConfProperty,
         new TWeakProperty,
 
         new TRawIdProperty,
@@ -732,6 +711,7 @@ void InitContainerProperties(void) {
     ContainerCapabilities.Init();
     ContainerPropMap[ContainerCapabilities.Name] = &ContainerCapabilities;
     ContainerPropMap[ContainerDefaultGw.Name] = &ContainerDefaultGw;
+    ContainerPropMap[ContainerResolvConf.Name] = &ContainerResolvConf;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1345,4 +1325,25 @@ TError TContainerDefaultGw::Set(const std::string &gw) {
 
 TError TContainerDefaultGw::Get(std::string &value) {
     return StrListToString(CurrentContainer->DefaultGw, value);
+}
+
+TError TContainerResolvConf::Set(const std::string &conf_str) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    std::vector<std::string> conf;
+
+    error = StringToStrList(conf_str, conf);
+    if (error)
+        return error;
+
+    CurrentContainer->ResolvConf = conf;
+    CurrentContainer->PropMask |= RESOLV_CONF_SET;
+
+    return TError::Success();
+}
+
+TError TContainerResolvConf::Get(std::string &value) {
+    return StrListToString(CurrentContainer->ResolvConf, value);
 }

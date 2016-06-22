@@ -152,6 +152,7 @@ public:
     std::vector<std::string> IpList;
     uint64_t Caps;
     std::vector<std::string> DefaultGw;
+    std::vector<std::string> ResolvConf;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;

@@ -87,6 +87,7 @@ constexpr uint64_t VIRT_MODE_SET = (1lu << 48);
 constexpr const char *P_AGING_TIME = "aging_time";
 constexpr const char *P_ENABLE_PORTO = "enable_porto";
 constexpr const char *P_RESOLV_CONF = "resolv_conf";
+constexpr uint64_t RESOLV_CONF_SET = (1lu << 51);
 constexpr const char *P_WEAK = "weak";
 constexpr const char *P_MEM_TOTAL_GUARANTEE = "memory_guarantee_total";
 
@@ -425,6 +426,14 @@ public:
     TError Get(std::string &value);
     TContainerDefaultGw(std::string name, uint64_t set_mask, std::string desc)
                         : TContainerProperty(name, set_mask, desc, true) {}
+};
+
+class TContainerResolvConf : public TContainerProperty {
+public:
+    TError Set(const std::string &conf);
+    TError Get(std::string &value);
+    TContainerResolvConf(std::string name, uint64_t set_mask, std::string desc)
+                         : TContainerProperty(name, set_mask, desc) {}
 };
 
 void InitContainerProperties(void);

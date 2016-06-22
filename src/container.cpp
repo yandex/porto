@@ -112,6 +112,9 @@ TContainerCapabilities ContainerCapabilities(P_CAPABILITIES, CAPABILITIES_SET,
                                              );
 TContainerDefaultGw ContainerDefaultGw(P_DEFAULT_GW, DEFAULT_GW_SET,
                                        "Default gateway: <interface> <ip>; ...");
+TContainerResolvConf ContainerResolvConf(P_RESOLV_CONF, RESOLV_CONF_SET,
+                                         "DNS resolver configuration: "
+                                         "<resolv.conf option>;...");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -818,9 +821,16 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
 
     taskEnv->BindDns = BindDns;
 
-    error = Prop->PrepareTaskEnv(P_RESOLV_CONF, *taskEnv);
-    if (error)
-        return error;
+    if (PropMask & RESOLV_CONF_SET) {
+        if (taskEnv->Root.IsRoot())
+            return TError(EError::InvalidValue,
+                    "resolv_conf requires separate root");
+
+        taskEnv->BindDns = false;
+        CurrentContainer->BindDns = false;
+        for (auto &line: ResolvConf)
+            taskEnv->ResolvConf += line + "\n";
+    }
 
     taskEnv->Stdin = Stdin;
     taskEnv->Stdout = Stdout;
