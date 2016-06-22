@@ -37,6 +37,7 @@ extern TContainerEnv ContainerEnv;
 extern TContainerBind ContainerBind;
 extern TContainerIp ContainerIp;
 extern TContainerCapabilities ContainerCapabilities;
+extern TContainerDefaultGw ContainerDefaultGw;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -441,20 +442,6 @@ public:
     }
 };
 
-class TDefaultGwProperty : public TListValue, public TContainerValue {
-public:
-    TDefaultGwProperty() :
-        TListValue(PERSISTENT_VALUE | HIDDEN_VALUE),
-        TContainerValue(P_DEFAULT_GW,
-                        "Default gateway: <interface> <ip>; ...") {}
-
-    TError CheckValue(const std::vector<std::string> &lines) override {
-        TNetCfg cfg;
-
-        return cfg.ParseGw(lines);
-    }
-};
-
 class TNetTosProperty : public TUintValue, public TContainerValue {
 public:
     TNetTosProperty() :
@@ -612,7 +599,6 @@ void RegisterProperties(std::shared_ptr<TRawValueMap> m,
         new TUlimitProperty,
         new TNetTosProperty,
         new TDevicesProperty,
-        new TDefaultGwProperty,
         new TAgingTimeProperty,
         new TEnablePortoProperty,
         new TResolvConfProperty,
@@ -745,6 +731,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerIp.Name] = &ContainerIp;
     ContainerCapabilities.Init();
     ContainerPropMap[ContainerCapabilities.Name] = &ContainerCapabilities;
+    ContainerPropMap[ContainerDefaultGw.Name] = &ContainerDefaultGw;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1328,8 +1315,34 @@ TError TContainerCapabilities::Get(std::string &value) {
    std::vector<std::string> caps;
 
     for (const auto &cap : SupportedCaps)
-        if (CurrentContainer->Caps & cap.second)
+        if (CurrentContainer->Caps & CAP_MASK(cap.second))
             caps.push_back(cap.first);
 
     return StrListToString(caps, value);
+}
+
+TError TContainerDefaultGw::Set(const std::string &gw) {
+    TError error = IsAliveAndStopped();
+    if (error)
+        return error;
+
+    TNetCfg cfg;
+    std::vector<std::string> gws;
+
+    error = StringToStrList(gw, gws);
+    if (error)
+        return error;
+
+    error = cfg.ParseGw(gws);
+    if (error)
+        return error;
+
+    CurrentContainer->DefaultGw = gws;
+    CurrentContainer->PropMask |= DEFAULT_GW_SET;
+
+    return TError::Success();
+}
+
+TError TContainerDefaultGw::Get(std::string &value) {
+    return StrListToString(CurrentContainer->DefaultGw, value);
 }

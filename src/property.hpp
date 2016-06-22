@@ -81,6 +81,7 @@ constexpr uint64_t CAPABILITIES_SET = (1lu << 45);
 constexpr const char *P_IP = "ip";
 constexpr uint64_t IP_SET = (1lu << 46);
 constexpr const char *P_DEFAULT_GW = "default_gw";
+constexpr uint64_t DEFAULT_GW_SET = (1lu << 47);
 constexpr const char *P_VIRT_MODE = "virt_mode";
 constexpr uint64_t VIRT_MODE_SET = (1lu << 48);
 constexpr const char *P_AGING_TIME = "aging_time";
@@ -416,6 +417,14 @@ public:
     TError Get(std::string &value);
     TContainerCapabilities(std::string name, uint64_t set_mask, std::string desc)
                            : TContainerProperty(name, set_mask, desc, true) {}
+};
+
+class TContainerDefaultGw : public TContainerProperty {
+public:
+    TError Set(const std::string &gw);
+    TError Get(std::string &value);
+    TContainerDefaultGw(std::string name, uint64_t set_mask, std::string desc)
+                        : TContainerProperty(name, set_mask, desc, true) {}
 };
 
 void InitContainerProperties(void);

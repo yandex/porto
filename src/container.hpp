@@ -151,6 +151,7 @@ public:
     std::vector<TBindMap> BindMap;
     std::vector<std::string> IpList;
     uint64_t Caps;
+    std::vector<std::string> DefaultGw;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;

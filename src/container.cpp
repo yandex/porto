@@ -110,6 +110,8 @@ TContainerCapabilities ContainerCapabilities(P_CAPABILITIES, CAPABILITIES_SET,
                                              "list of capabilities without CAP_"
                                              " prefix (man 7 capabilities)"
                                              );
+TContainerDefaultGw ContainerDefaultGw(P_DEFAULT_GW, DEFAULT_GW_SET,
+                                       "Default gateway: <interface> <ip>; ...");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -683,7 +685,7 @@ TError TContainer::ParseNetConfig(struct TNetCfg &NetCfg) {
     if (error)
         return error;
 
-    error = NetCfg.ParseGw(Prop->Get<std::vector<std::string>>(P_DEFAULT_GW));
+    error = NetCfg.ParseGw(DefaultGw);
     if (error)
         return error;
 
