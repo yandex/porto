@@ -1836,10 +1836,10 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
                 L_ACT() << "Restoring as new property" << key << " = " << value << std::endl;
 
             error = (*prop).second->Set(value);
-            if (!error)
+            if (!error) {
+                PropMask |= (*prop).second->SetMask; /* Indicate that we've set the value */
                 continue;
-
-            PropMask |= (*prop).second->SetMask; /* Indicate that we've set the value */
+            }
         }
 
         if (error)
