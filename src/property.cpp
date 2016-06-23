@@ -48,6 +48,7 @@ extern TContainerUlimit ContainerUlimit;
 extern TContainerPortoNamespace ContainerPortoNamespace;
 extern TContainerStdoutLimit ContainerStdoutLimit;
 extern TContainerMemoryLimit ContainerMemoryLimit;
+extern TContainerAnonLimit ContainerAnonLimit;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -99,17 +100,6 @@ TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
 
     return TError::Success();
 }
-
-class TAnonLimitProperty : public TSizeValue, public TContainerValue {
-public:
-    TAnonLimitProperty() :
-        TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-        TContainerValue(P_ANON_LIMIT,
-                        "Anonymous memory limit [bytes] (dynamic)") {
-            if (!MemorySubsystem.SupportAnonLimit())
-                SetFlag(UNSUPPORTED_FEATURE);
-        }
-};
 
 class TDirtyLimitProperty : public TSizeValue, public TContainerValue {
 public:
@@ -393,7 +383,6 @@ public:
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> properties = {
-        new TAnonLimitProperty,
         new TDirtyLimitProperty,
         new TRechargeOnPgfaultProperty,
         new TCpuPolicyProperty,
@@ -544,6 +533,8 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerPortoNamespace.Name] = &ContainerPortoNamespace;
     ContainerPropMap[ContainerStdoutLimit.Name] = &ContainerStdoutLimit;
     ContainerPropMap[ContainerMemoryLimit.Name] = &ContainerMemoryLimit;
+    ContainerAnonLimit.Init();
+    ContainerPropMap[ContainerAnonLimit.Name] = &ContainerAnonLimit;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1442,6 +1433,42 @@ TError TContainerMemoryLimit::Set(const std::string &limit) {
 
 TError TContainerMemoryLimit::Get(std::string &value) {
     value = std::to_string(CurrentContainer->MemLimit);
+
+    return TError::Success();
+}
+
+TError TContainerAnonLimit::Set(const std::string &limit) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    uint64_t new_size = 0lu;
+    error = StringToSize(limit, new_size);
+    if (error)
+        return error;
+
+    if (CurrentContainer->GetState() == EContainerState::Running ||
+        CurrentContainer->GetState() == EContainerState::Meta ||
+        CurrentContainer->GetState() == EContainerState::Paused) {
+
+        auto memcg = CurrentContainer->GetCgroup(MemorySubsystem);
+        error = MemorySubsystem.SetAnonLimit(memcg, new_size);
+
+        if (error) {
+            L_ERR() << "Can't set " << P_ANON_LIMIT << ": " << error << std::endl;
+
+            return error;
+        }
+    }
+
+    CurrentContainer->AnonMemLimit = new_size;
+    CurrentContainer->PropMask |= ANON_LIMIT_SET;
+
+    return TError::Success();
+}
+
+TError TContainerAnonLimit::Get(std::string &value) {
+    value = std::to_string(CurrentContainer->AnonMemLimit);
 
     return TError::Success();
 }

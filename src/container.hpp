@@ -162,6 +162,7 @@ public:
     std::string NsName;
     uint64_t StdoutLimit;
     uint64_t MemLimit;
+    uint64_t AnonMemLimit;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;

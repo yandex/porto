@@ -135,6 +135,8 @@ TContainerStdoutLimit ContainerStdoutLimit(P_STDOUT_LIMIT, STDOUT_LIMIT_SET,
                                            "size (dynamic)");
 TContainerMemoryLimit ContainerMemoryLimit(P_MEM_LIMIT, MEM_LIMIT_SET,
                                            "Memory hard limit [bytes] (dynamic)");
+TContainerAnonLimit ContainerAnonLimit(P_ANON_LIMIT, ANON_LIMIT_SET,
+                                       "Anonymous memory limit [bytes] (dynamic)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -174,6 +176,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
 
     StdoutLimit = config().container().stdout_limit();
     MemLimit = 0;
+    AnonMemLimit = 0;
 }
 
 TContainer::~TContainer() {
@@ -527,7 +530,7 @@ TError TContainer::ApplyDynamicProperties() {
         return error;
     }
 
-    error = MemorySubsystem.SetAnonLimit(memcg, Prop->Get<uint64_t>(P_ANON_LIMIT));
+    error = MemorySubsystem.SetAnonLimit(memcg, AnonMemLimit);
     if (error) {
         L_ERR() << "Can't set " << P_ANON_LIMIT << ": " << error << std::endl;
         return error;
