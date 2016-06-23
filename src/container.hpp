@@ -174,6 +174,8 @@ public:
     TUintMap NetGuarantee;
     TUintMap NetLimit;
     TUintMap NetPriority;
+    bool ToRespawn;
+    int MaxRespawns;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;

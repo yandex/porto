@@ -171,6 +171,12 @@ TContainerNetPriority ContainerNetPriority(P_NET_PRIO, NET_PRIO_SET,
                                            "Container network priority: "
                                            "<interface>|default 0-7;... "
                                            "(dynamic)");
+TContainerRespawn ContainerRespawn(P_RESPAWN, RESPAWN_SET,
+                                   "Automatically respawn dead container "
+                                   "(dynamic)");
+TContainerMaxRespawns ContainerMaxRespawns(P_MAX_RESPAWNS, MAX_RESPAWNS_SET,
+                                           "Limit respawn count for specific "
+                                           "container (dynamic)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -227,6 +233,8 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
 
     NetLimit["default"] = 0;
     NetPriority["default"] = NET_DEFAULT_PRIO;
+    ToRespawn = false;
+    MaxRespawns = -1;
 }
 
 TContainer::~TContainer() {
@@ -2302,10 +2310,10 @@ bool TContainer::MayRespawn() {
     if (GetState() != EContainerState::Dead)
         return false;
 
-    if (!Prop->Get<bool>(P_RESPAWN))
+    if (!ToRespawn)
         return false;
 
-    return Prop->Get<int>(P_MAX_RESPAWNS) < 0 || Data->Get<uint64_t>(D_RESPAWN_COUNT) < (uint64_t)Prop->Get<int>(P_MAX_RESPAWNS);
+    return MaxRespawns < 0 || Data->Get<uint64_t>(D_RESPAWN_COUNT) < (uint64_t)MaxRespawns;
 }
 
 bool TContainer::MayReceiveOom(int fd) {

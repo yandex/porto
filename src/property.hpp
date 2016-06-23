@@ -80,7 +80,9 @@ constexpr uint64_t NET_LIMIT_SET = (1lu << 32);
 constexpr const char *P_NET_PRIO = "net_priority";
 constexpr uint64_t NET_PRIO_SET = (1lu << 33);
 constexpr const char *P_RESPAWN = "respawn";
+constexpr uint64_t RESPAWN_SET = (1lu << 34);
 constexpr const char *P_MAX_RESPAWNS = "max_respawns";
+constexpr uint64_t MAX_RESPAWNS_SET = (1lu << 35);
 constexpr const char *P_ISOLATE = "isolate";
 constexpr uint64_t ISOLATE_SET = (1lu << 36);
 constexpr const char *P_PRIVATE = "private";
@@ -724,6 +726,24 @@ public:
     TContainerNetPriority(std::string name, uint64_t set_mask,
                            std::string desc)
                            : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerRespawn : public TContainerProperty {
+public:
+    TError Set(const std::string &respawn);
+    TError Get(std::string &value);
+    TContainerRespawn(std::string name, uint64_t set_mask,
+                      std::string desc)
+                      : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerMaxRespawns : public TContainerProperty {
+public:
+    TError Set(const std::string &max);
+    TError Get(std::string &value);
+    TContainerMaxRespawns(std::string name, uint64_t set_mask,
+                          std::string desc)
+                          : TContainerProperty(name, set_mask, desc) {}
 };
 
 void InitContainerProperties(void);

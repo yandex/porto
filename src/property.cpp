@@ -60,6 +60,8 @@ extern TContainerIopsLimit ContainerIopsLimit;
 extern TContainerNetGuarantee ContainerNetGuarantee;
 extern TContainerNetLimit ContainerNetLimit;
 extern TContainerNetPriority ContainerNetPriority;
+extern TContainerRespawn ContainerRespawn;
+extern TContainerMaxRespawns ContainerMaxRespawns;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -111,30 +113,6 @@ TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
 
     return TError::Success();
 }
-
-class TRespawnProperty : public TBoolValue, public TContainerValue {
-public:
-    TRespawnProperty() :
-        TBoolValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-        TContainerValue(P_RESPAWN,
-                        "Automatically respawn dead container (dynamic)") {}
-
-    bool GetDefault() const override {
-        return false;
-    }
-};
-
-class TMaxRespawnsProperty : public TIntValue, public TContainerValue {
-public:
-    TMaxRespawnsProperty() :
-        TIntValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-        TContainerValue(P_MAX_RESPAWNS,
-                        "Limit respawn count for specific container (dynamic)") {}
-
-    int GetDefault() const override {
-        return -1;
-    }
-};
 
 class TPrivateProperty : public TStringValue, public TContainerValue {
 public:
@@ -220,8 +198,6 @@ public:
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> properties = {
-        new TRespawnProperty,
-        new TMaxRespawnsProperty,
         new TPrivateProperty,
         new TNetTosProperty,
         new TAgingTimeProperty,
@@ -377,6 +353,8 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerNetGuarantee.Name] = &ContainerNetGuarantee;
     ContainerPropMap[ContainerNetLimit.Name] = &ContainerNetLimit;
     ContainerPropMap[ContainerNetPriority.Name] = &ContainerNetPriority;
+    ContainerPropMap[ContainerRespawn.Name] = &ContainerRespawn;
+    ContainerPropMap[ContainerMaxRespawns.Name] = &ContainerMaxRespawns;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1920,6 +1898,50 @@ TError TContainerNetPriority::GetIndexed(const std::string &index,
         return TError(EError::InvalidValue, "invalid index " + index);
 
     value = std::to_string(CurrentContainer->NetPriority[index]);
+
+    return TError::Success();
+}
+
+TError TContainerRespawn::Set(const std::string &respawn) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    if (respawn == "true")
+        CurrentContainer->ToRespawn = true;
+    else if (respawn == "false")
+        CurrentContainer->ToRespawn = false;
+    else
+        return TError(EError::InvalidValue, "Invalid bool value");
+
+    CurrentContainer->PropMask |= RESPAWN_SET;
+
+    return TError::Success();
+}
+
+TError TContainerRespawn::Get(std::string &value) {
+    value = CurrentContainer->ToRespawn ? "true" : "false";
+
+    return TError::Success();
+}
+
+TError TContainerMaxRespawns::Set(const std::string &max) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    int new_value;
+    if (StringToInt(max, new_value))
+        return TError(EError::InvalidValue, "Invalid integer value " + max);
+
+    CurrentContainer->MaxRespawns = new_value;
+    CurrentContainer->PropMask |= MAX_RESPAWNS_SET;
+
+    return TError::Success();
+}
+
+TError TContainerMaxRespawns::Get(std::string &value) {
+    value = std::to_string(CurrentContainer->MaxRespawns);
 
     return TError::Success();
 }
