@@ -429,6 +429,9 @@ TError TTask::ChildMountRootFs() {
     } symlinks[] = {
         { "/dev/ptmx", "pts/ptmx" },
         { "/dev/fd", "/proc/self/fd" },
+        { "/dev/stdin", "/proc/self/fd/0" },
+        { "/dev/stdout", "/proc/self/fd/1" },
+        { "/dev/stderr", "/proc/self/fd/2" },
         { "/dev/shm", "../run/shm" },
     };
 
