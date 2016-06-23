@@ -180,6 +180,10 @@ TContainerMaxRespawns ContainerMaxRespawns(P_MAX_RESPAWNS, MAX_RESPAWNS_SET,
 TContainerPrivate ContainerPrivate(P_PRIVATE, PRIVATE_SET,
                                    "User-defined property (dynamic)");
 TContainerNetTos ContainerNetTos(P_NET_TOS, NET_TOS_SET, "IP TOS");
+TContainerAgingTime ContainerAgingTime(P_AGING_TIME, AGING_TIME_SET,
+                                      "After given number of seconds "
+                                      "container in dead state is "
+                                      "automatically removed (dynamic)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -239,6 +243,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     ToRespawn = false;
     MaxRespawns = -1;
     Private = "";
+    AgingTime = config().container().default_aging_time_s();
 }
 
 TContainer::~TContainer() {
@@ -2363,7 +2368,7 @@ TError TContainer::Respawn(TScopedLock &holder_lock) {
 bool TContainer::CanRemoveDead() const {
     return State == EContainerState::Dead &&
         DeathTime / 1000 +
-        Prop->Get<uint64_t>(P_AGING_TIME) <= GetCurrentTimeMs() / 1000;
+        AgingTime <= GetCurrentTimeMs() / 1000;
 }
 
 std::vector<std::string> TContainer::GetChildren() {

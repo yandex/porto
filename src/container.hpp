@@ -177,6 +177,7 @@ public:
     bool ToRespawn;
     int MaxRespawns;
     std::string Private;
+    uint64_t AgingTime;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;

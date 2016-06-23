@@ -64,6 +64,7 @@ extern TContainerRespawn ContainerRespawn;
 extern TContainerMaxRespawns ContainerMaxRespawns;
 extern TContainerPrivate ContainerPrivate;
 extern TContainerNetTos ContainerNetTos;
+extern TContainerAgingTime ContainerAgingTime;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -116,18 +117,6 @@ TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
     return TError::Success();
 }
 
-class TAgingTimeProperty : public TUintValue, public TContainerValue {
-public:
-    TAgingTimeProperty() :
-        TUintValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-        TContainerValue(P_AGING_TIME,
-                        "After given number of seconds container in dead state is automatically removed (dynamic)") {}
-
-    uint64_t GetDefault() const override {
-        return config().container().default_aging_time_s();
-    }
-};
-
 class TEnablePortoProperty : public TBoolValue, public TContainerValue {
 public:
     TEnablePortoProperty() :
@@ -169,7 +158,6 @@ public:
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> properties = {
-        new TAgingTimeProperty,
         new TEnablePortoProperty,
         new TWeakProperty,
     };
@@ -326,6 +314,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerMaxRespawns.Name] = &ContainerMaxRespawns;
     ContainerPropMap[ContainerPrivate.Name] = &ContainerPrivate;
     ContainerPropMap[ContainerNetTos.Name] = &ContainerNetTos;
+    ContainerPropMap[ContainerAgingTime.Name] = &ContainerAgingTime;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1933,6 +1922,28 @@ TError TContainerPrivate::Set(const std::string &value) {
 
 TError TContainerPrivate::Get(std::string &value) {
     value = CurrentContainer->Private;
+
+    return TError::Success();
+}
+
+TError TContainerAgingTime::Set(const std::string &time) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    uint64_t new_time;
+    error = StringToUint64(time, new_time);
+    if (error)
+        return error;
+
+    CurrentContainer->AgingTime = new_time;
+    CurrentContainer->PropMask |= AGING_TIME_SET;
+
+    return TError::Success();
+}
+
+TError TContainerAgingTime::Get(std::string &value) {
+    value = std::to_string(CurrentContainer->AgingTime);
 
     return TError::Success();
 }
