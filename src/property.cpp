@@ -57,6 +57,9 @@ extern TContainerCpuGuarantee ContainerCpuGuarantee;
 extern TContainerIoPolicy ContainerIoPolicy;
 extern TContainerIoLimit ContainerIoLimit;
 extern TContainerIopsLimit ContainerIopsLimit;
+extern TContainerNetGuarantee ContainerNetGuarantee;
+extern TContainerNetLimit ContainerNetLimit;
+extern TContainerNetPriority ContainerNetPriority;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -108,67 +111,6 @@ TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
 
     return TError::Success();
 }
-
-class TNetGuaranteeProperty : public TMapValue, public TContainerValue {
-public:
-    TNetGuaranteeProperty() : TMapValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-    TContainerValue(P_NET_GUARANTEE,
-            "Guaranteed container network bandwidth: <interface>|default <Bps>;... (dynamic)") { }
-
-    TError CheckValue(const TUintMap &value) override {
-        for (auto &kv: value) {
-            if (kv.second > NET_MAX_GUARANTEE)
-                return TError(EError::InvalidValue, "Net guarantee too large");
-        }
-        return TError::Success();
-    }
-
-    TUintMap GetDefault() const override {
-        auto c = GetContainer();
-        uint64_t rate = config().network().default_guarantee();
-        if (c->IsRoot())
-            rate = NET_MAX_GUARANTEE;
-        return TUintMap({{ "default", rate }});
-    }
-};
-
-class TNetLimitProperty : public TMapValue, public TContainerValue {
-public:
-    TNetLimitProperty() : TMapValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-    TContainerValue(P_NET_LIMIT,
-            "Maximum container network bandwidth: <interface>|default <Bps>;... (dynamic)") { }
-
-    TError CheckValue(const TUintMap &value) override {
-        for (auto &kv: value) {
-            if (kv.second > NET_MAX_LIMIT)
-                return TError(EError::InvalidValue, "Net limit too large");
-        }
-        return TError::Success();
-    }
-
-    TUintMap GetDefault() const override {
-        return TUintMap({{ "default", 0 }});
-    }
-};
-
-class TNetPriorityProperty : public TMapValue, public TContainerValue {
-public:
-    TNetPriorityProperty() : TMapValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-    TContainerValue(P_NET_PRIO,
-            "Container network priority: <interface>|default 0-7;... (dynamic)") { }
-
-    TError CheckValue(const TUintMap &value) override {
-        for (auto &kv : value) {
-            if (kv.second > 7)
-                return TError(EError::InvalidValue, "invalid value");
-        }
-        return TError::Success();
-    }
-
-    TUintMap GetDefault() const override {
-        return TUintMap({{"default", NET_DEFAULT_PRIO }});
-    }
-};
 
 class TRespawnProperty : public TBoolValue, public TContainerValue {
 public:
@@ -278,9 +220,6 @@ public:
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> properties = {
-        new TNetGuaranteeProperty,
-        new TNetLimitProperty,
-        new TNetPriorityProperty,
         new TRespawnProperty,
         new TMaxRespawnsProperty,
         new TPrivateProperty,
@@ -435,6 +374,9 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerIoLimit.Name] = &ContainerIoLimit;
     ContainerIopsLimit.Init();
     ContainerPropMap[ContainerIopsLimit.Name] = &ContainerIopsLimit;
+    ContainerPropMap[ContainerNetGuarantee.Name] = &ContainerNetGuarantee;
+    ContainerPropMap[ContainerNetLimit.Name] = &ContainerNetLimit;
+    ContainerPropMap[ContainerNetPriority.Name] = &ContainerNetPriority;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1756,6 +1698,228 @@ TError TContainerIopsLimit::Set(const std::string &limit) {
 
 TError TContainerIopsLimit::Get(std::string &value) {
     value = std::to_string(CurrentContainer->IopsLimit);
+
+    return TError::Success();
+}
+
+TError TContainerNetGuarantee::Set(const std::string &guarantee) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    TUintMap new_guarantee;
+    error = StringToUintMap(guarantee, new_guarantee);
+    if (error)
+        return error;
+
+    for (auto &kv : new_guarantee) {
+        if (kv.second > NET_MAX_GUARANTEE)
+            return TError(EError::InvalidValue, "Net guarantee too large");
+    }
+
+    TUintMap old_guarantee = CurrentContainer->NetGuarantee;
+    CurrentContainer->NetGuarantee = new_guarantee;
+
+    error = CurrentContainer->UpdateTrafficClasses();
+    if (!error) {
+        CurrentContainer->PropMask |= NET_GUARANTEE_SET;
+    } else {
+        L_ERR() << "Cannot update tc : " << error << std::endl;
+        CurrentContainer->NetGuarantee = old_guarantee;
+    }
+
+    return error;
+}
+
+TError TContainerNetGuarantee::Get(std::string &value) {
+    return UintMapToString(CurrentContainer->NetGuarantee, value);
+}
+
+TError TContainerNetGuarantee::SetIndexed(const std::string &index,
+                                          const std::string &guarantee) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    uint64_t val;
+    error = StringToSize(guarantee, val);
+    if (error)
+        return TError(EError::InvalidValue, "Invalid value " + guarantee);
+
+    if (val > NET_MAX_GUARANTEE)
+        return TError(EError::InvalidValue, "Net guarantee too large");
+
+    uint64_t old_guarantee = CurrentContainer->NetGuarantee[index];
+    CurrentContainer->NetGuarantee[index] = val;
+
+    error = CurrentContainer->UpdateTrafficClasses();
+    if (!error) {
+        CurrentContainer->PropMask |= NET_GUARANTEE_SET;
+    } else {
+        L_ERR() << "Cannot update tc : " << error << std::endl;
+        CurrentContainer->NetGuarantee[index] = old_guarantee;
+    }
+
+    return error;
+}
+
+TError TContainerNetGuarantee::GetIndexed(const std::string &index,
+                                          std::string &value) {
+
+    if (CurrentContainer->NetGuarantee.find(index) ==
+        CurrentContainer->NetGuarantee.end())
+
+        return TError(EError::InvalidValue, "invalid index " + index);
+
+    value = std::to_string(CurrentContainer->NetGuarantee[index]);
+
+    return TError::Success();
+}
+
+TError TContainerNetLimit::Set(const std::string &limit) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    TUintMap new_limit;
+    error = StringToUintMap(limit, new_limit);
+    if (error)
+        return error;
+
+    for (auto &kv : new_limit) {
+        if (kv.second > NET_MAX_LIMIT)
+            return TError(EError::InvalidValue, "Net limit too large");
+    }
+
+    TUintMap old_limit = CurrentContainer->NetLimit;
+    CurrentContainer->NetLimit = new_limit;
+
+    error = CurrentContainer->UpdateTrafficClasses();
+    if (!error) {
+        CurrentContainer->PropMask |= NET_LIMIT_SET;
+    } else {
+        L_ERR() << "Cannot update tc : " << error << std::endl;
+        CurrentContainer->NetLimit = old_limit;
+    }
+
+    return error;
+}
+
+TError TContainerNetLimit::Get(std::string &value) {
+    return UintMapToString(CurrentContainer->NetLimit, value);
+}
+
+TError TContainerNetLimit::SetIndexed(const std::string &index,
+                                      const std::string &limit) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    uint64_t val;
+    error = StringToSize(limit, val);
+    if (error)
+        return TError(EError::InvalidValue, "Invalid value " + limit);
+
+    if (val > NET_MAX_LIMIT)
+        return TError(EError::InvalidValue, "Net limit too large");
+
+    uint64_t old_limit = CurrentContainer->NetLimit[index];
+    CurrentContainer->NetLimit[index] = val;
+
+    error = CurrentContainer->UpdateTrafficClasses();
+    if (!error) {
+        CurrentContainer->PropMask |= NET_LIMIT_SET;
+    } else {
+        L_ERR() << "Cannot update tc : " << error << std::endl;
+        CurrentContainer->NetLimit[index] = old_limit;
+    }
+
+    return error;
+}
+
+TError TContainerNetLimit::GetIndexed(const std::string &index,
+                                      std::string &value) {
+
+    if (CurrentContainer->NetLimit.find(index) ==
+        CurrentContainer->NetLimit.end())
+
+        return TError(EError::InvalidValue, "invalid index " + index);
+
+    value = std::to_string(CurrentContainer->NetLimit[index]);
+
+    return TError::Success();
+}
+
+TError TContainerNetPriority::Set(const std::string &prio) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    TUintMap new_prio;
+    error = StringToUintMap(prio, new_prio);
+    if (error)
+        return error;
+
+    for (auto &kv : new_prio) {
+        if (kv.second > 7)
+            return TError(EError::InvalidValue, "invalid value");
+    }
+
+    TUintMap old_prio = CurrentContainer->NetPriority;
+    CurrentContainer->NetPriority = new_prio;
+
+    error = CurrentContainer->UpdateTrafficClasses();
+    if (!error) {
+        CurrentContainer->PropMask |= NET_PRIO_SET;
+    } else {
+        L_ERR() << "Cannot update tc : " << error << std::endl;
+        CurrentContainer->NetPriority = old_prio;
+    }
+
+    return error;
+}
+
+TError TContainerNetPriority::Get(std::string &value) {
+    return UintMapToString(CurrentContainer->NetPriority, value);
+}
+
+TError TContainerNetPriority::SetIndexed(const std::string &index,
+                                      const std::string &prio) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    uint64_t val;
+    error = StringToSize(prio, val);
+    if (error)
+        return TError(EError::InvalidValue, "Invalid value " + prio);
+
+    if (val > 7)
+        return TError(EError::InvalidValue, "invalid value");
+
+    uint64_t old_prio = CurrentContainer->NetPriority[index];
+    CurrentContainer->NetPriority[index] = val;
+
+    error = CurrentContainer->UpdateTrafficClasses();
+    if (!error) {
+        CurrentContainer->PropMask |= NET_PRIO_SET;
+    } else {
+        L_ERR() << "Cannot update tc : " << error << std::endl;
+        CurrentContainer->NetPriority[index] = old_prio;
+    }
+
+    return error;
+}
+
+TError TContainerNetPriority::GetIndexed(const std::string &index,
+                                      std::string &value) {
+
+    if (CurrentContainer->NetPriority.find(index) ==
+        CurrentContainer->NetPriority.end())
+
+        return TError(EError::InvalidValue, "invalid index " + index);
+
+    value = std::to_string(CurrentContainer->NetPriority[index]);
 
     return TError::Success();
 }

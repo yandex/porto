@@ -171,6 +171,9 @@ public:
     std::string IoPolicy;
     uint64_t IoLimit;
     uint64_t IopsLimit;
+    TUintMap NetGuarantee;
+    TUintMap NetLimit;
+    TUintMap NetPriority;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;

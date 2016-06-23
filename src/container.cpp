@@ -160,6 +160,17 @@ TContainerIoLimit ContainerIoLimit(P_IO_LIMIT, IO_LIMIT_SET,
 TContainerIopsLimit ContainerIopsLimit(P_IO_OPS_LIMIT, IO_OPS_LIMIT_SET,
                                        "Filesystem IOPS limit "
                                        "[operations/s] (dynamic)");
+TContainerNetGuarantee ContainerNetGuarantee(P_NET_GUARANTEE, NET_GUARANTEE_SET,
+                                             "Guaranteed container network "
+                                             "bandwidth: <interface>|default "
+                                             "<Bps>;... (dynamic)");
+TContainerNetLimit ContainerNetLimit(P_NET_LIMIT, NET_LIMIT_SET,
+                                     "Maximum container network bandwidth: "
+                                     "<interface>|default <Bps>;... (dynamic)");
+TContainerNetPriority ContainerNetPriority(P_NET_PRIO, NET_PRIO_SET,
+                                           "Container network priority: "
+                                           "<interface>|default 0-7;... "
+                                           "(dynamic)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -208,6 +219,14 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     IoPolicy = "normal";
     IoLimit = 0;
     IopsLimit = 0;
+
+    if (IsRoot())
+        NetGuarantee["default"] = NET_MAX_GUARANTEE;
+    else
+        NetGuarantee["default"] = config().network().default_guarantee();
+
+    NetLimit["default"] = 0;
+    NetPriority["default"] = NET_DEFAULT_PRIO;
 }
 
 TContainer::~TContainer() {
@@ -1727,13 +1746,6 @@ TError TContainer::SetProperty(const string &origProperty,
         if (error)
             return error;
 
-        if (property == P_NET_LIMIT || property == P_NET_GUARANTEE) {
-            error = UpdateTrafficClasses();
-            if (error) {
-                L_ERR() << "Cannot update tc : " << error << std::endl;
-                return error;
-            }
-        }
     }
 
     // Write KVS snapshot, otherwise it may grow indefinitely and on next
@@ -2436,11 +2448,6 @@ void TContainer::CleanupWaiters() {
 
 TError TContainer::UpdateTrafficClasses() {
     if (Net) {
-        TUintMap prio, rate, ceil;
-        prio = Prop->Get<TUintMap>(P_NET_PRIO);
-        rate = Prop->Get<TUintMap>(P_NET_GUARANTEE);
-        ceil = Prop->Get<TUintMap>(P_NET_LIMIT);
-
         int parentId;
 
         if (IsRoot())
@@ -2451,7 +2458,7 @@ TError TContainer::UpdateTrafficClasses() {
             parentId = PORTO_ROOT_CONTAINER_ID;
 
         auto net_lock = Net->ScopedLock();
-        return Net->UpdateTrafficClasses(parentId, Id, prio, rate, ceil);
+        return Net->UpdateTrafficClasses(parentId, Id, NetPriority, NetGuarantee, NetLimit);
     }
     return TError::Success();
 }

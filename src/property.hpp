@@ -74,8 +74,11 @@ constexpr uint64_t IO_LIMIT_SET = (1lu << 29);
 constexpr const char *P_IO_OPS_LIMIT = "io_ops_limit";
 constexpr uint64_t IO_OPS_LIMIT_SET = (1lu << 30);
 constexpr const char *P_NET_GUARANTEE = "net_guarantee";
+constexpr uint64_t NET_GUARANTEE_SET = (1lu << 31);
 constexpr const char *P_NET_LIMIT = "net_limit";
+constexpr uint64_t NET_LIMIT_SET = (1lu << 32);
 constexpr const char *P_NET_PRIO = "net_priority";
+constexpr uint64_t NET_PRIO_SET = (1lu << 33);
 constexpr const char *P_RESPAWN = "respawn";
 constexpr const char *P_MAX_RESPAWNS = "max_respawns";
 constexpr const char *P_ISOLATE = "isolate";
@@ -688,6 +691,39 @@ public:
 
         return TError::Success();
     }
+};
+
+class TContainerNetGuarantee : public TContainerProperty {
+public:
+    TError Set(const std::string &guarantee);
+    TError Get(std::string &value);
+    TError SetIndexed(const std::string &index, const std::string &guarantee);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetGuarantee(std::string name, uint64_t set_mask,
+                           std::string desc)
+                           : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerNetLimit : public TContainerProperty {
+public:
+    TError Set(const std::string &limit);
+    TError Get(std::string &value);
+    TError SetIndexed(const std::string &index, const std::string &limit);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetLimit(std::string name, uint64_t set_mask,
+                           std::string desc)
+                           : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerNetPriority : public TContainerProperty {
+public:
+    TError Set(const std::string &prio);
+    TError Get(std::string &value);
+    TError SetIndexed(const std::string &index, const std::string &prio);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetPriority(std::string name, uint64_t set_mask,
+                           std::string desc)
+                           : TContainerProperty(name, set_mask, desc) {}
 };
 
 void InitContainerProperties(void);
