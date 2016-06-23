@@ -47,6 +47,7 @@ extern TContainerRawDeathTime ContainerRawDeathTime;
 extern TContainerUlimit ContainerUlimit;
 extern TContainerPortoNamespace ContainerPortoNamespace;
 extern TContainerStdoutLimit ContainerStdoutLimit;
+extern TContainerMemoryLimit ContainerMemoryLimit;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -98,14 +99,6 @@ TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
 
     return TError::Success();
 }
-
-class TMemoryLimitProperty : public TSizeValue, public TContainerValue {
-public:
-    TMemoryLimitProperty() :
-        TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-        TContainerValue(P_MEM_LIMIT,
-                        "Memory hard limit [bytes] (dynamic)") {}
-};
 
 class TAnonLimitProperty : public TSizeValue, public TContainerValue {
 public:
@@ -400,7 +393,6 @@ public:
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> properties = {
-        new TMemoryLimitProperty,
         new TAnonLimitProperty,
         new TDirtyLimitProperty,
         new TRechargeOnPgfaultProperty,
@@ -551,6 +543,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerUlimit.Name] = &ContainerUlimit;
     ContainerPropMap[ContainerPortoNamespace.Name] = &ContainerPortoNamespace;
     ContainerPropMap[ContainerStdoutLimit.Name] = &ContainerStdoutLimit;
+    ContainerPropMap[ContainerMemoryLimit.Name] = &ContainerMemoryLimit;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1409,6 +1402,46 @@ TError TContainerStdoutLimit::Set(const std::string &limit) {
 
 TError TContainerStdoutLimit::Get(std::string &value) {
     value = std::to_string(CurrentContainer->StdoutLimit);
+
+    return TError::Success();
+}
+
+TError TContainerMemoryLimit::Set(const std::string &limit) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    uint64_t new_size = 0lu;
+    error = StringToSize(limit, new_size);
+    if (error)
+        return error;
+
+    if (CurrentContainer->GetState() == EContainerState::Running ||
+        CurrentContainer->GetState() == EContainerState::Meta ||
+        CurrentContainer->GetState() == EContainerState::Paused) {
+
+        auto memcg = CurrentContainer->GetCgroup(MemorySubsystem);
+        error = MemorySubsystem.SetLimit(memcg, new_size);
+
+        if (error) {
+            if (error.GetErrno() == EBUSY)
+                return TError(EError::InvalidValue,
+                              std::string(P_MEM_LIMIT) + " is too low");
+
+            L_ERR() << "Can't set " << P_MEM_LIMIT << ": " << error << std::endl;
+
+            return error;
+        }
+    }
+
+    CurrentContainer->MemLimit = new_size;
+    CurrentContainer->PropMask |= MEM_LIMIT_SET;
+
+    return TError::Success();
+}
+
+TError TContainerMemoryLimit::Get(std::string &value) {
+    value = std::to_string(CurrentContainer->MemLimit);
 
     return TError::Success();
 }

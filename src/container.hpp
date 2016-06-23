@@ -161,6 +161,7 @@ public:
     std::map<int, struct rlimit> Rlimit;
     std::string NsName;
     uint64_t StdoutLimit;
+    uint64_t MemLimit;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;

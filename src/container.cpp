@@ -133,6 +133,8 @@ TContainerPortoNamespace ContainerPortoNamespace(P_PORTO_NAMESPACE,
 TContainerStdoutLimit ContainerStdoutLimit(P_STDOUT_LIMIT, STDOUT_LIMIT_SET,
                                            "Limit returned stdout/stderr "
                                            "size (dynamic)");
+TContainerMemoryLimit ContainerMemoryLimit(P_MEM_LIMIT, MEM_LIMIT_SET,
+                                           "Memory hard limit [bytes] (dynamic)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -171,6 +173,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
         NsName = "";
 
     StdoutLimit = config().container().stdout_limit();
+    MemLimit = 0;
 }
 
 TContainer::~TContainer() {
@@ -515,10 +518,10 @@ TError TContainer::ApplyDynamicProperties() {
         return error;
     }
 
-    error = MemorySubsystem.SetLimit(memcg, Prop->Get<uint64_t>(P_MEM_LIMIT));
+    error = MemorySubsystem.SetLimit(memcg, MemLimit);
     if (error) {
         if (error.GetErrno() == EBUSY)
-            return TError(EError::InvalidValue, std::string(P_MEM_LIMIT) + " is too low");
+            return TError(EError::InvalidValue, std::to_string(MemLimit) + " is too low");
 
         L_ERR() << "Can't set " << P_MEM_LIMIT << ": " << error << std::endl;
         return error;
