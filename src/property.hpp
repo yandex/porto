@@ -116,6 +116,7 @@ constexpr uint64_t ENABLE_PORTO_SET = (1lu << 50);
 constexpr const char *P_RESOLV_CONF = "resolv_conf";
 constexpr uint64_t RESOLV_CONF_SET = (1lu << 51);
 constexpr const char *P_WEAK = "weak";
+constexpr uint64_t WEAK_SET = (1lu << 52);
 constexpr const char *P_MEM_TOTAL_GUARANTEE = "memory_guarantee_total";
 
 constexpr int VIRT_MODE_APP = 0;
@@ -787,6 +788,14 @@ public:
     TContainerEnablePorto(std::string name, uint64_t set_mask, std::string desc)
                           : TContainerProperty(name, set_mask, desc) {}
     void Propagate(bool value);
+};
+
+class TContainerWeak : public TContainerProperty {
+public:
+    TError Set(const std::string &weak);
+    TError Get(std::string &value);
+    TContainerWeak(std::string name, uint64_t set_mask, std::string desc)
+                          : TContainerProperty(name, set_mask, desc) {}
 };
 
 void InitContainerProperties(void);

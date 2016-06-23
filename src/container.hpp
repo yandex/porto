@@ -179,6 +179,7 @@ public:
     std::string Private;
     uint64_t AgingTime;
     bool PortoEnabled;
+    bool IsWeak;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;

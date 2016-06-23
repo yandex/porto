@@ -476,7 +476,7 @@ void TContainerHolder::RemoveLeftovers() {
 
     for (auto it: Containers) {
         auto container = it.second;
-        if (container->Prop->Get<bool>(P_WEAK)) {
+        if (container->IsWeak) {
             auto holder_lock = LockContainers();
             L_ACT() << "Destroy weak container " << it.first << std::endl;
             Destroy(holder_lock, container);

@@ -187,6 +187,8 @@ TContainerAgingTime ContainerAgingTime(P_AGING_TIME, AGING_TIME_SET,
 TContainerEnablePorto ContainerEnablePorto(P_ENABLE_PORTO, ENABLE_PORTO_SET,
                                            "Allow container communication "
                                            "with porto (dynamic)");
+TContainerWeak ContainerWeak(P_WEAK, WEAK_SET, "Destroy container when "
+                                               "client disconnects (dynamic)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -251,6 +253,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     for (auto c = parent; c; c = c->GetParent()) {
         PortoEnabled &= c->PortoEnabled;
     }
+    IsWeak = false;
 }
 
 TContainer::~TContainer() {
@@ -522,7 +525,7 @@ void TContainer::Destroy(TScopedLock &holder_lock) {
 }
 
 void TContainer::DestroyWeak() {
-    if (Prop->Get<bool>(P_WEAK)) {
+    if (IsWeak) {
         TEvent event(EEventType::DestroyWeak, shared_from_this());
         Holder->Queue->Add(0, event);
     }

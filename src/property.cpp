@@ -66,6 +66,7 @@ extern TContainerPrivate ContainerPrivate;
 extern TContainerNetTos ContainerNetTos;
 extern TContainerAgingTime ContainerAgingTime;
 extern TContainerEnablePorto ContainerEnablePorto;
+extern TContainerWeak ContainerWeak;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -118,23 +119,9 @@ TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
     return TError::Success();
 }
 
-class TWeakProperty : public TBoolValue, public TContainerValue {
-public:
-    TWeakProperty() :
-        TBoolValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-        TContainerValue(P_WEAK,
-                        "Destroy container when client disconnects (dynamic)") {}
-
-    bool GetDefault() const override {
-        return false;
-    }
-};
-
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
-    const std::vector<TValue *> properties = {
-        new TWeakProperty,
-    };
+    const std::vector<TValue *> properties = {};
 
     for (auto p : properties)
         AddContainerValue(m, c, p);
@@ -290,6 +277,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerNetTos.Name] = &ContainerNetTos;
     ContainerPropMap[ContainerAgingTime.Name] = &ContainerAgingTime;
     ContainerPropMap[ContainerEnablePorto.Name] = &ContainerEnablePorto;
+    ContainerPropMap[ContainerWeak.Name] = &ContainerWeak;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1968,4 +1956,27 @@ void TContainerEnablePorto::Propagate(bool value) {
             CurrentContainer = old;
         }
     }
+}
+
+TError TContainerWeak::Set(const std::string &weak) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    if (weak == "true")
+        CurrentContainer->IsWeak = true;
+    else if (weak == "false")
+        CurrentContainer->IsWeak = false;
+    else
+        return TError(EError::InvalidValue, "Invalid bool value");
+
+    CurrentContainer->PropMask |= WEAK_SET;
+
+    return TError::Success();
+}
+
+TError TContainerWeak::Get(std::string &value) {
+    value = CurrentContainer->IsWeak ? "true" : "false";
+
+    return TError::Success();
 }
