@@ -126,6 +126,10 @@ TContainerRawDeathTime ContainerRawDeathTime(P_RAW_DEATH_TIME, "");
 TContainerUlimit ContainerUlimit(P_ULIMIT, ULIMIT_SET,
                                  "Container resource limits: "
                                  "<type> <soft> <hard>; ... (man 2 getrlimit)");
+TContainerPortoNamespace ContainerPortoNamespace(P_PORTO_NAMESPACE,
+                                            PORTO_NAMESPACE_SET,
+                                            "Porto containers namespace "
+                                            "(container name prefix) (dynamic)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -157,6 +161,12 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     Hostname = "";
     Caps = 0;
     LoopDev = -1;
+
+    if (IsRoot())
+        NsName = std::string(PORTO_ROOT_CONTAINER) + "/";
+    else
+        NsName = "";
+
 }
 
 TContainer::~TContainer() {
@@ -2352,7 +2362,7 @@ TError TContainer::CheckPermission(const TCred &ucred) {
 
 std::string TContainer::GetPortoNamespace() const {
     if (Parent)
-        return Parent->GetPortoNamespace() + Prop->Get<std::string>(P_PORTO_NAMESPACE);
+        return Parent->GetPortoNamespace() + NsName;
     else
         return "";
 }

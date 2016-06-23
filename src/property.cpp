@@ -45,6 +45,7 @@ extern TContainerRawLoopDev ContainerRawLoopDev;
 extern TContainerRawStartTime ContainerRawStartTime;
 extern TContainerRawDeathTime ContainerRawDeathTime;
 extern TContainerUlimit ContainerUlimit;
+extern TContainerPortoNamespace ContainerPortoNamespace;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -96,19 +97,6 @@ TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
 
     return TError::Success();
 }
-
-class TPortoNamespaceProperty : public TStringValue, public TContainerValue {
-public:
-    TPortoNamespaceProperty() :
-        TStringValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-        TContainerValue(P_PORTO_NAMESPACE,
-                        "Porto containers namespace (container name prefix) (dynamic)") {}
-    std::string GetDefault() const override {
-        if (GetContainer()->IsRoot())
-            return std::string(PORTO_ROOT_CONTAINER) + "/";
-        return "";
-    }
-};
 
 class TStdoutLimitProperty : public TSizeValue, public TContainerValue {
 public:
@@ -434,7 +422,6 @@ public:
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> properties = {
-        new TPortoNamespaceProperty,
         new TStdoutLimitProperty,
         new TMemoryLimitProperty,
         new TAnonLimitProperty,
@@ -585,6 +572,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerRawStartTime.Name] = &ContainerRawStartTime;
     ContainerPropMap[ContainerRawDeathTime.Name] = &ContainerRawDeathTime;
     ContainerPropMap[ContainerUlimit.Name] = &ContainerUlimit;
+    ContainerPropMap[ContainerPortoNamespace.Name] = &ContainerPortoNamespace;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1401,4 +1389,21 @@ void TContainerUlimit::Propagate(std::map<int, struct rlimit> &ulimits) {
             CurrentContainer = old;
         }
     }
+}
+
+TError TContainerPortoNamespace::Set(const std::string &ns) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    CurrentContainer->NsName = ns;
+    CurrentContainer->PropMask |= PORTO_NAMESPACE_SET;
+
+    return TError::Success();
+}
+
+TError TContainerPortoNamespace::Get(std::string &value) {
+    value = CurrentContainer->NsName;
+
+    return TError::Success();
 }

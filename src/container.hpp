@@ -159,6 +159,7 @@ public:
     uint64_t StartTime;
     uint64_t DeathTime;
     std::map<int, struct rlimit> Rlimit;
+    std::string NsName;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;

@@ -34,6 +34,7 @@ constexpr uint64_t GROUP_SET = (1lu << 8);
 constexpr const char *P_ENV = "env";
 constexpr uint64_t ENV_SET = (1 << 9);
 constexpr const char *P_PORTO_NAMESPACE = "porto_namespace";
+constexpr uint64_t PORTO_NAMESPACE_SET = (1lu << 10);
 constexpr const char *P_ROOT = "root";
 constexpr uint64_t ROOT_SET = (1 << 11);
 constexpr const char *P_ROOT_RDONLY = "root_readonly";
@@ -533,6 +534,15 @@ public:
     TContainerUlimit(std::string name, uint64_t set_mask, std::string desc)
                      : TContainerProperty(name, set_mask, desc) {}
     void Propagate(std::map<int, struct rlimit> &ulimits);
+};
+
+class TContainerPortoNamespace : public TContainerProperty {
+public:
+    TError Set(const std::string &ns);
+    TError Get(std::string &value);
+    TContainerPortoNamespace(std::string name, uint64_t set_mask,
+                              std::string desc)
+                              : TContainerProperty(name, set_mask, desc) {}
 };
 
 void InitContainerProperties(void);
