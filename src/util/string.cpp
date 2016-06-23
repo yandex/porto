@@ -353,3 +353,43 @@ TError StringToCpuValue(const std::string &str, double &value) {
 
     return TError::Success();
 }
+
+TError UintMapToString(const TUintMap &map, std::string &value) {
+    std::stringstream str;
+
+    for (auto kv : map) {
+        if (str.str().length())
+            str << "; ";
+        str << kv.first << ": " << kv.second;
+    }
+
+    value = str.str();
+
+    return TError::Success();
+}
+
+TError StringToUintMap(const std::string &value, TUintMap &result) {
+    std::vector<std::string> lines;
+    TError error = SplitEscapedString(value, ';', lines);
+    if (error)
+        return error;
+
+    for (auto &line : lines) {
+        std::vector<std::string> nameval;
+
+        (void)SplitEscapedString(line, ':', nameval);
+        if (nameval.size() != 2)
+            return TError(EError::InvalidValue, "Invalid format");
+
+        std::string key = StringTrim(nameval[0]);
+        uint64_t val;
+
+        error = StringToSize(nameval[1], val);
+        if (error)
+            return TError(EError::InvalidValue, "Invalid value " + nameval[1]);
+
+        result[key] = val;
+    }
+
+    return TError::Success();
+}
