@@ -144,6 +144,14 @@ TContainerRechargeOnPgfault ContainerRechargeOnPgfault(P_RECHARGE_ON_PGFAULT,
                                                        RECHARGE_ON_PGFAULT_SET,
                                                        "Recharge memory on "
                                                        "page fault (dynamic)");
+TContainerCpuPolicy ContainerCpuPolicy(P_CPU_POLICY, CPU_POLICY_SET,
+                                       "CPU policy: rt, normal, idle (dynamic)");
+TContainerCpuLimit ContainerCpuLimit(P_CPU_LIMIT, CPU_LIMIT_SET,
+                                     "CPU limit: 0-100.0 [%] | 0.0c-<CPUS>c "
+                                     " [cores] (dynamic)");
+TContainerCpuGuarantee ContainerCpuGuarantee(P_CPU_GUARANTEE, CPU_GUARANTEE_SET,
+                                             "CPU guarantee: 0-100.0 [%] | "
+                                             "0.0c-<CPUS>c [cores] (dynamic)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -186,6 +194,9 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     AnonMemLimit = 0;
     DirtyMemLimit = 0;
     RechargeOnPgfault = false;
+    CpuPolicy = "normal";
+    CpuLimit = GetNumCores();
+    CpuGuarantee = 0;
 }
 
 TContainer::~TContainer() {
@@ -553,9 +564,9 @@ TError TContainer::ApplyDynamicProperties() {
 
     auto cpucg = GetCgroup(CpuSubsystem);
     error = CpuSubsystem.SetCpuPolicy(cpucg,
-            Prop->Get<std::string>(P_CPU_POLICY),
-            Prop->Get<double>(P_CPU_GUARANTEE),
-            Prop->Get<double>(P_CPU_LIMIT));
+            CpuPolicy,
+            CpuGuarantee,
+            CpuLimit);
     if (error) {
         L_ERR() << "Cannot set cpu policy: " << error << std::endl;
         return error;

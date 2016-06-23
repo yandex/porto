@@ -62,8 +62,11 @@ constexpr uint64_t ANON_LIMIT_SET = (1lu << 23);
 constexpr const char *P_RECHARGE_ON_PGFAULT = "recharge_on_pgfault";
 constexpr uint64_t RECHARGE_ON_PGFAULT_SET = (1lu << 24);
 constexpr const char *P_CPU_POLICY = "cpu_policy";
+constexpr uint64_t CPU_POLICY_SET = (1lu << 25);
 constexpr const char *P_CPU_GUARANTEE = "cpu_guarantee";
+constexpr uint64_t CPU_GUARANTEE_SET = (1lu << 26);
 constexpr const char *P_CPU_LIMIT = "cpu_limit";
+constexpr uint64_t CPU_LIMIT_SET = (1lu << 27);
 constexpr const char *P_IO_POLICY = "io_policy";
 constexpr const char *P_IO_LIMIT = "io_limit";
 constexpr const char *P_IO_OPS_LIMIT = "io_ops_limit";
@@ -611,6 +614,34 @@ public:
         return TError::Success();
     }
 
+};
+
+class TContainerCpuPolicy : public TContainerProperty {
+public:
+    TError Set(const std::string &policy);
+    TError Get(std::string &value);
+    TContainerCpuPolicy(std::string name, uint64_t set_mask,
+                        std::string desc)
+                        : TContainerProperty(name, set_mask, desc) {}
+    TError Propagate(const std::string &policy);
+};
+
+class TContainerCpuLimit : public TContainerProperty {
+public:
+    TError Set(const std::string &limit);
+    TError Get(std::string &value);
+    TContainerCpuLimit(std::string name, uint64_t set_mask,
+                       std::string desc)
+                       : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerCpuGuarantee : public TContainerProperty {
+public:
+    TError Set(const std::string &guarantee);
+    TError Get(std::string &value);
+    TContainerCpuGuarantee(std::string name, uint64_t set_mask,
+                           std::string desc)
+                           : TContainerProperty(name, set_mask, desc) {}
 };
 
 void InitContainerProperties(void);

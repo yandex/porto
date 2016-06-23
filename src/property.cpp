@@ -51,6 +51,9 @@ extern TContainerMemoryLimit ContainerMemoryLimit;
 extern TContainerAnonLimit ContainerAnonLimit;
 extern TContainerDirtyLimit ContainerDirtyLimit;
 extern TContainerRechargeOnPgfault ContainerRechargeOnPgfault;
+extern TContainerCpuPolicy ContainerCpuPolicy;
+extern TContainerCpuLimit ContainerCpuLimit;
+extern TContainerCpuGuarantee ContainerCpuGuarantee;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -102,45 +105,6 @@ TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
 
     return TError::Success();
 }
-
-class TCpuPolicyProperty : public TStringValue, public TContainerValue {
-public:
-    TCpuPolicyProperty() :
-        TStringValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | DYNAMIC_VALUE),
-        TContainerValue(P_CPU_POLICY,
-                        "CPU policy: rt, normal, idle (dynamic)") {}
-
-    std::string GetDefault() const override {
-        return "normal";
-    }
-
-    TError CheckValue(const std::string &value) override {
-        if (value != "normal" && value != "rt" && value != "idle")
-            return TError(EError::InvalidValue, "invalid policy");
-
-        return TError::Success();
-    }
-};
-
-class TCpuLimitProperty : public TCpusValue, public TContainerValue {
-public:
-    TCpuLimitProperty() :
-        TCpusValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-        TContainerValue(P_CPU_LIMIT,
-                "CPU limit: 0-100.0 [%] | 0.0c-<CPUS>c [cores] (dynamic)") { }
-
-    double GetDefault() const override {
-        return GetNumCores();
-    }
-};
-
-class TCpuGuaranteeProperty : public TCpusValue, public TContainerValue {
-public:
-    TCpuGuaranteeProperty() :
-        TCpusValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-        TContainerValue(P_CPU_GUARANTEE,
-                "CPU guarantee: 0-100.0 [%] | 0.0c-<CPUS>c [cores] (dynamic)") { }
-};
 
 class TIoPolicyProperty : public TStringValue, public TContainerValue {
 public:
@@ -355,9 +319,6 @@ public:
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> properties = {
-        new TCpuPolicyProperty,
-        new TCpuLimitProperty,
-        new TCpuGuaranteeProperty,
         new TIoPolicyProperty,
         new TIoLimitProperty,
         new TIopsLimitProperty,
@@ -509,6 +470,9 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerDirtyLimit.Name] = &ContainerDirtyLimit;
     ContainerRechargeOnPgfault.Init();
     ContainerPropMap[ContainerRechargeOnPgfault.Name] = &ContainerRechargeOnPgfault;
+    ContainerPropMap[ContainerCpuPolicy.Name] = &ContainerCpuPolicy;
+    ContainerPropMap[ContainerCpuLimit.Name] = &ContainerCpuLimit;
+    ContainerPropMap[ContainerCpuGuarantee.Name] = &ContainerCpuGuarantee;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -782,6 +746,11 @@ TError TContainerIsolate::Set(const std::string &isolate_needed) {
                CurrentContainer->Rlimit = p->Rlimit;
 
                ContainerUlimit.Propagate(CurrentContainer->Rlimit);
+            }
+            if (!(CurrentContainer->PropMask & CPU_POLICY_SET)) {
+                CurrentContainer->CpuPolicy = p->CpuPolicy;
+
+                ContainerCpuPolicy.Propagate(CurrentContainer->CpuPolicy);
             }
         }
 
@@ -1517,6 +1486,163 @@ TError TContainerRechargeOnPgfault::Set(const std::string &recharge) {
 
 TError TContainerRechargeOnPgfault::Get(std::string &value) {
     value = CurrentContainer->RechargeOnPgfault ? "true" : "false";
+
+    return TError::Success();
+}
+
+TError TContainerCpuPolicy::Set(const std::string &policy) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    if (policy != "normal" && policy != "rt" && policy != "idle")
+        return TError(EError::InvalidValue, "invalid policy");
+
+
+    if (CurrentContainer->GetState() == EContainerState::Running ||
+        CurrentContainer->GetState() == EContainerState::Meta ||
+        CurrentContainer->GetState() == EContainerState::Paused) {
+
+        auto cpucg = CurrentContainer->GetCgroup(CpuSubsystem);
+        error = CpuSubsystem.SetCpuPolicy(cpucg, policy,
+                                          CurrentContainer->CpuGuarantee,
+                                          CurrentContainer->CpuLimit);
+
+        if (error) {
+            L_ERR() << "Cannot set cpu policy: " << error << std::endl;
+            return error;
+        }
+
+    }
+
+    error = Propagate(policy);
+    if (error)
+        return error;
+
+    CurrentContainer->CpuPolicy = policy;
+    CurrentContainer->PropMask |= CPU_POLICY_SET;
+
+    return TError::Success();
+}
+
+TError TContainerCpuPolicy::Get(std::string &value) {
+    value = CurrentContainer->CpuPolicy;
+
+    return TError::Success();
+}
+
+TError TContainerCpuPolicy::Propagate(const std::string &policy) {
+    TError error = TError::Success();
+
+    for (auto iter : CurrentContainer->Children) {
+        if (auto child = iter.lock()) {
+
+            auto old = CurrentContainer;
+            CurrentContainer = child.get();
+
+            if (!(CurrentContainer->PropMask & CPU_POLICY_SET) &&
+                !(CurrentContainer->Isolate)) {
+
+                if (CurrentContainer->GetState() == EContainerState::Running ||
+                    CurrentContainer->GetState() == EContainerState::Meta ||
+                    CurrentContainer->GetState() == EContainerState::Paused) {
+
+                    auto cpucg = CurrentContainer->GetCgroup(CpuSubsystem);
+                    error = CpuSubsystem.SetCpuPolicy(cpucg, policy,
+                                                      CurrentContainer->CpuGuarantee,
+                                                      CurrentContainer->CpuLimit);
+                }
+
+                if (error) {
+                    L_ERR() << "Cannot set cpu policy: " << error << std::endl;
+                } else {
+                    /* FIXME: Inconsistent state of child tree cpu policy! */
+                    CurrentContainer->CpuPolicy = policy;
+                    error = Propagate(policy);
+                }
+            }
+
+            CurrentContainer = old;
+            if (error)
+                break;
+        }
+    }
+
+    return error;
+}
+
+TError TContainerCpuLimit::Set(const std::string &limit) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    double new_limit;
+    error = StringToCpuValue(limit, new_limit);
+    if (error)
+        return error;
+
+    if (CurrentContainer->GetState() == EContainerState::Running ||
+        CurrentContainer->GetState() == EContainerState::Meta ||
+        CurrentContainer->GetState() == EContainerState::Paused) {
+
+        auto cpucg = CurrentContainer->GetCgroup(CpuSubsystem);
+        error = CpuSubsystem.SetCpuPolicy(cpucg, CurrentContainer->CpuPolicy,
+                                          CurrentContainer->CpuGuarantee,
+                                          new_limit);
+
+        if (error) {
+            L_ERR() << "Cannot set cpu policy: " << error << std::endl;
+            return error;
+        }
+
+    }
+
+    CurrentContainer->CpuLimit = new_limit;
+    CurrentContainer->PropMask |= CPU_LIMIT_SET;
+
+    return TError::Success();
+}
+
+TError TContainerCpuLimit::Get(std::string &value) {
+    value = StringFormat("%lgc", CurrentContainer->CpuLimit);
+
+    return TError::Success();
+}
+
+TError TContainerCpuGuarantee::Set(const std::string &guarantee) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    double new_guarantee;
+    error = StringToCpuValue(guarantee, new_guarantee);
+    if (error)
+        return error;
+
+    if (CurrentContainer->GetState() == EContainerState::Running ||
+        CurrentContainer->GetState() == EContainerState::Meta ||
+        CurrentContainer->GetState() == EContainerState::Paused) {
+
+        auto cpucg = CurrentContainer->GetCgroup(CpuSubsystem);
+        error = CpuSubsystem.SetCpuPolicy(cpucg, CurrentContainer->CpuPolicy,
+                                          new_guarantee,
+                                          CurrentContainer->CpuLimit);
+
+        if (error) {
+            L_ERR() << "Cannot set cpu policy: " << error << std::endl;
+            return error;
+        }
+
+    }
+
+    CurrentContainer->CpuGuarantee = new_guarantee;
+    CurrentContainer->PropMask |= CPU_GUARANTEE_SET;
+
+    return TError::Success();
+}
+
+TError TContainerCpuGuarantee::Get(std::string &value) {
+    value = StringFormat("%lgc", CurrentContainer->CpuGuarantee);
 
     return TError::Success();
 }

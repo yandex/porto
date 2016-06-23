@@ -165,6 +165,9 @@ public:
     uint64_t AnonMemLimit;
     uint64_t DirtyMemLimit;
     bool RechargeOnPgfault;
+    std::string CpuPolicy;
+    double CpuLimit;
+    double CpuGuarantee;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;
