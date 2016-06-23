@@ -177,6 +177,8 @@ TContainerRespawn ContainerRespawn(P_RESPAWN, RESPAWN_SET,
 TContainerMaxRespawns ContainerMaxRespawns(P_MAX_RESPAWNS, MAX_RESPAWNS_SET,
                                            "Limit respawn count for specific "
                                            "container (dynamic)");
+TContainerPrivate ContainerPrivate(P_PRIVATE, PRIVATE_SET,
+                                   "User-defined property (dynamic)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -235,6 +237,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     NetPriority["default"] = NET_DEFAULT_PRIO;
     ToRespawn = false;
     MaxRespawns = -1;
+    Private = "";
 }
 
 TContainer::~TContainer() {
@@ -1749,7 +1752,7 @@ TError TContainer::SetProperty(const string &origProperty,
     if (error)
         return error;
 
-    if (State != EContainerState::Stopped && property != P_PRIVATE) {
+    if (State != EContainerState::Stopped) {
         error = ApplyDynamicProperties();
         if (error)
             return error;

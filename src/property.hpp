@@ -86,6 +86,7 @@ constexpr uint64_t MAX_RESPAWNS_SET = (1lu << 35);
 constexpr const char *P_ISOLATE = "isolate";
 constexpr uint64_t ISOLATE_SET = (1lu << 36);
 constexpr const char *P_PRIVATE = "private";
+constexpr uint64_t PRIVATE_SET = (1lu << 37);
 constexpr const char *P_ULIMIT = "ulimit";
 constexpr uint64_t ULIMIT_SET = (1lu << 38);
 constexpr const char *P_HOSTNAME = "hostname";
@@ -744,6 +745,15 @@ public:
     TContainerMaxRespawns(std::string name, uint64_t set_mask,
                           std::string desc)
                           : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerPrivate : public TContainerProperty {
+public:
+    TError Set(const std::string &max);
+    TError Get(std::string &value);
+    TContainerPrivate(std::string name, uint64_t set_mask,
+                      std::string desc)
+                      : TContainerProperty(name, set_mask, desc) {}
 };
 
 void InitContainerProperties(void);

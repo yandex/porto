@@ -176,6 +176,7 @@ public:
     TUintMap NetPriority;
     bool ToRespawn;
     int MaxRespawns;
+    std::string Private;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;

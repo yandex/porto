@@ -62,6 +62,7 @@ extern TContainerNetLimit ContainerNetLimit;
 extern TContainerNetPriority ContainerNetPriority;
 extern TContainerRespawn ContainerRespawn;
 extern TContainerMaxRespawns ContainerMaxRespawns;
+extern TContainerPrivate ContainerPrivate;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -113,27 +114,6 @@ TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
 
     return TError::Success();
 }
-
-class TPrivateProperty : public TStringValue, public TContainerValue {
-public:
-    TPrivateProperty() :
-        TStringValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-        TContainerValue(P_PRIVATE,
-                        "User-defined property (dynamic)") {}
-
-    std::string GetDefault() const override {
-        return "";
-    }
-
-    TError CheckValue(const std::string &value) override {
-        uint32_t max = config().container().private_max();
-
-        if (value.length() > max)
-            return TError(EError::InvalidValue, "Value is too long");
-
-        return TError::Success();
-    }
-};
 
 class TNetTosProperty : public TUintValue, public TContainerValue {
 public:
@@ -198,7 +178,6 @@ public:
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> properties = {
-        new TPrivateProperty,
         new TNetTosProperty,
         new TAgingTimeProperty,
         new TEnablePortoProperty,
@@ -355,6 +334,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerNetPriority.Name] = &ContainerNetPriority;
     ContainerPropMap[ContainerRespawn.Name] = &ContainerRespawn;
     ContainerPropMap[ContainerMaxRespawns.Name] = &ContainerMaxRespawns;
+    ContainerPropMap[ContainerPrivate.Name] = &ContainerPrivate;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1942,6 +1922,26 @@ TError TContainerMaxRespawns::Set(const std::string &max) {
 
 TError TContainerMaxRespawns::Get(std::string &value) {
     value = std::to_string(CurrentContainer->MaxRespawns);
+
+    return TError::Success();
+}
+
+TError TContainerPrivate::Set(const std::string &value) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    uint32_t max = config().container().private_max();
+    if (value.length() > max)
+        return TError(EError::InvalidValue, "Value is too long");
+
+    CurrentContainer->Private = value;
+
+    return TError::Success();
+}
+
+TError TContainerPrivate::Get(std::string &value) {
+    value = CurrentContainer->Private;
 
     return TError::Success();
 }
