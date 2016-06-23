@@ -63,6 +63,7 @@ extern TContainerNetPriority ContainerNetPriority;
 extern TContainerRespawn ContainerRespawn;
 extern TContainerMaxRespawns ContainerMaxRespawns;
 extern TContainerPrivate ContainerPrivate;
+extern TContainerNetTos ContainerNetTos;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -114,16 +115,6 @@ TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
 
     return TError::Success();
 }
-
-class TNetTosProperty : public TUintValue, public TContainerValue {
-public:
-    TNetTosProperty() :
-        TUintValue(PERSISTENT_VALUE),
-        TContainerValue(P_NET_TOS,
-                        "IP TOS") {
-        SetFlag(UNSUPPORTED_FEATURE);
-    }
-};
 
 class TAgingTimeProperty : public TUintValue, public TContainerValue {
 public:
@@ -178,7 +169,6 @@ public:
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> properties = {
-        new TNetTosProperty,
         new TAgingTimeProperty,
         new TEnablePortoProperty,
         new TWeakProperty,
@@ -335,6 +325,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerRespawn.Name] = &ContainerRespawn;
     ContainerPropMap[ContainerMaxRespawns.Name] = &ContainerMaxRespawns;
     ContainerPropMap[ContainerPrivate.Name] = &ContainerPrivate;
+    ContainerPropMap[ContainerNetTos.Name] = &ContainerNetTos;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {

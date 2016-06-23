@@ -179,6 +179,7 @@ TContainerMaxRespawns ContainerMaxRespawns(P_MAX_RESPAWNS, MAX_RESPAWNS_SET,
                                            "container (dynamic)");
 TContainerPrivate ContainerPrivate(P_PRIVATE, PRIVATE_SET,
                                    "User-defined property (dynamic)");
+TContainerNetTos ContainerNetTos(P_NET_TOS, NET_TOS_SET, "IP TOS");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,

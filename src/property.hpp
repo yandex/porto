@@ -98,6 +98,7 @@ constexpr uint64_t BIND_SET = (1lu << 41);
 constexpr const char *P_NET = "net";
 constexpr uint64_t NET_SET = (1lu << 42);
 constexpr const char *P_NET_TOS = "net_tos";
+constexpr uint64_t NET_TOS_SET = (1lu << 43);
 constexpr const char *P_DEVICES = "devices";
 constexpr uint64_t DEVICES_SET = (1lu << 44);
 constexpr const char *P_CAPABILITIES = "capabilities";
@@ -754,6 +755,19 @@ public:
     TContainerPrivate(std::string name, uint64_t set_mask,
                       std::string desc)
                       : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerNetTos : public TContainerProperty {
+public:
+    TError Set(const std::string &tos) {
+        return TError(EError::NotSupported, Name + " is not supported");
+    }
+    TError Get(std::string &value) {
+        return TError(EError::NotSupported, "Not supported: " + Name);
+    }
+    TContainerNetTos(std::string name, uint64_t set_mask,
+                     std::string desc)
+                     : TContainerProperty(name, set_mask, desc) {}
 };
 
 void InitContainerProperties(void);
