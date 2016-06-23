@@ -140,6 +140,10 @@ TContainerAnonLimit ContainerAnonLimit(P_ANON_LIMIT, ANON_LIMIT_SET,
 TContainerDirtyLimit ContainerDirtyLimit(P_DIRTY_LIMIT, DIRTY_LIMIT_SET,
                                          "Dirty file cache limit [bytes] "
                                          "(dynamic)");
+TContainerRechargeOnPgfault ContainerRechargeOnPgfault(P_RECHARGE_ON_PGFAULT,
+                                                       RECHARGE_ON_PGFAULT_SET,
+                                                       "Recharge memory on "
+                                                       "page fault (dynamic)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -181,6 +185,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     MemLimit = 0;
     AnonMemLimit = 0;
     DirtyMemLimit = 0;
+    RechargeOnPgfault = false;
 }
 
 TContainer::~TContainer() {
@@ -540,7 +545,7 @@ TError TContainer::ApplyDynamicProperties() {
         return error;
     }
 
-    error = MemorySubsystem.RechargeOnPgfault(memcg, Prop->Get<bool>(P_RECHARGE_ON_PGFAULT));
+    error = MemorySubsystem.RechargeOnPgfault(memcg, RechargeOnPgfault);
     if (error) {
         L_ERR() << "Can't set " << P_RECHARGE_ON_PGFAULT << ": " << error << std::endl;
         return error;

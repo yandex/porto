@@ -50,6 +50,7 @@ extern TContainerStdoutLimit ContainerStdoutLimit;
 extern TContainerMemoryLimit ContainerMemoryLimit;
 extern TContainerAnonLimit ContainerAnonLimit;
 extern TContainerDirtyLimit ContainerDirtyLimit;
+extern TContainerRechargeOnPgfault ContainerRechargeOnPgfault;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -101,21 +102,6 @@ TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
 
     return TError::Success();
 }
-
-class TRechargeOnPgfaultProperty : public TBoolValue, public TContainerValue {
-public:
-    TRechargeOnPgfaultProperty() :
-        TBoolValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-        TContainerValue(P_RECHARGE_ON_PGFAULT,
-                        "Recharge memory on page fault (dynamic)") {
-        if (!MemorySubsystem.SupportRechargeOnPgfault())
-            SetFlag(UNSUPPORTED_FEATURE);
-    }
-
-    bool GetDefault() const override {
-        return false;
-    }
-};
 
 class TCpuPolicyProperty : public TStringValue, public TContainerValue {
 public:
@@ -369,7 +355,6 @@ public:
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> properties = {
-        new TRechargeOnPgfaultProperty,
         new TCpuPolicyProperty,
         new TCpuLimitProperty,
         new TCpuGuaranteeProperty,
@@ -522,6 +507,8 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerAnonLimit.Name] = &ContainerAnonLimit;
     ContainerDirtyLimit.Init();
     ContainerPropMap[ContainerDirtyLimit.Name] = &ContainerDirtyLimit;
+    ContainerRechargeOnPgfault.Init();
+    ContainerPropMap[ContainerRechargeOnPgfault.Name] = &ContainerRechargeOnPgfault;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1492,6 +1479,44 @@ TError TContainerDirtyLimit::Set(const std::string &limit) {
 
 TError TContainerDirtyLimit::Get(std::string &value) {
     value = std::to_string(CurrentContainer->DirtyMemLimit);
+
+    return TError::Success();
+}
+
+TError TContainerRechargeOnPgfault::Set(const std::string &recharge) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    bool new_val;
+    if (recharge == "true")
+        new_val = true;
+    else if (recharge == "false")
+        new_val = false;
+    else
+        return TError(EError::InvalidValue, "Invalid bool value");
+
+    if (CurrentContainer->GetState() == EContainerState::Running ||
+        CurrentContainer->GetState() == EContainerState::Meta ||
+        CurrentContainer->GetState() == EContainerState::Paused) {
+
+        auto memcg = CurrentContainer->GetCgroup(MemorySubsystem);
+        error = MemorySubsystem.RechargeOnPgfault(memcg, new_val);
+
+        if (error) {
+            L_ERR() << "Can't set " << P_ANON_LIMIT << ": " << error << std::endl;
+            return error;
+        }
+    }
+
+    CurrentContainer->RechargeOnPgfault = new_val;
+    CurrentContainer->PropMask |= RECHARGE_ON_PGFAULT_SET;
+
+    return TError::Success();
+}
+
+TError TContainerRechargeOnPgfault::Get(std::string &value) {
+    value = CurrentContainer->RechargeOnPgfault ? "true" : "false";
 
     return TError::Success();
 }
