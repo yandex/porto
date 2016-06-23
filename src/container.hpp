@@ -168,6 +168,9 @@ public:
     std::string CpuPolicy;
     double CpuLimit;
     double CpuGuarantee;
+    std::string IoPolicy;
+    uint64_t IoLimit;
+    uint64_t IopsLimit;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;

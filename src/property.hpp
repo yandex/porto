@@ -68,8 +68,11 @@ constexpr uint64_t CPU_GUARANTEE_SET = (1lu << 26);
 constexpr const char *P_CPU_LIMIT = "cpu_limit";
 constexpr uint64_t CPU_LIMIT_SET = (1lu << 27);
 constexpr const char *P_IO_POLICY = "io_policy";
+constexpr uint64_t IO_POLICY_SET = (1lu << 28);
 constexpr const char *P_IO_LIMIT = "io_limit";
+constexpr uint64_t IO_LIMIT_SET = (1lu << 29);
 constexpr const char *P_IO_OPS_LIMIT = "io_ops_limit";
+constexpr uint64_t IO_OPS_LIMIT_SET = (1lu << 30);
 constexpr const char *P_NET_GUARANTEE = "net_guarantee";
 constexpr const char *P_NET_LIMIT = "net_limit";
 constexpr const char *P_NET_PRIO = "net_priority";
@@ -642,6 +645,49 @@ public:
     TContainerCpuGuarantee(std::string name, uint64_t set_mask,
                            std::string desc)
                            : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerIoPolicy : public TContainerProperty {
+public:
+    TError Set(const std::string &policy);
+    TError Get(std::string &value);
+    TContainerIoPolicy(std::string name, uint64_t set_mask,
+                       std::string desc)
+                       : TContainerProperty(name, set_mask, desc) {}
+    TError Init(void) {
+        IsSupported = BlkioSubsystem.SupportPolicy();
+
+        return TError::Success();
+    }
+    TError Propagate(const std::string &policy);
+};
+
+class TContainerIoLimit : public TContainerProperty {
+public:
+    TError Set(const std::string &limit);
+    TError Get(std::string &value);
+    TContainerIoLimit(std::string name, uint64_t set_mask,
+                      std::string desc)
+                      : TContainerProperty(name, set_mask, desc) {}
+    TError Init(void) {
+        IsSupported = MemorySubsystem.SupportIoLimit();
+
+        return TError::Success();
+    }
+};
+
+class TContainerIopsLimit : public TContainerProperty {
+public:
+    TError Set(const std::string &limit);
+    TError Get(std::string &value);
+    TContainerIopsLimit(std::string name, uint64_t set_mask,
+                        std::string desc)
+                        : TContainerProperty(name, set_mask, desc) {}
+    TError Init(void) {
+        IsSupported = MemorySubsystem.SupportIoLimit();
+
+        return TError::Success();
+    }
 };
 
 void InitContainerProperties(void);

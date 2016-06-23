@@ -152,6 +152,14 @@ TContainerCpuLimit ContainerCpuLimit(P_CPU_LIMIT, CPU_LIMIT_SET,
 TContainerCpuGuarantee ContainerCpuGuarantee(P_CPU_GUARANTEE, CPU_GUARANTEE_SET,
                                              "CPU guarantee: 0-100.0 [%] | "
                                              "0.0c-<CPUS>c [cores] (dynamic)");
+TContainerIoPolicy ContainerIoPolicy(P_IO_POLICY, IO_POLICY_SET,
+                                     "IO policy: normal, batch (dynamic)");
+TContainerIoLimit ContainerIoLimit(P_IO_LIMIT, IO_LIMIT_SET,
+                                   "Filesystem bandwidth limit [bytes/s] "
+                                   "(dynamic)");
+TContainerIopsLimit ContainerIopsLimit(P_IO_OPS_LIMIT, IO_OPS_LIMIT_SET,
+                                       "Filesystem IOPS limit "
+                                       "[operations/s] (dynamic)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -197,6 +205,9 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     CpuPolicy = "normal";
     CpuLimit = GetNumCores();
     CpuGuarantee = 0;
+    IoPolicy = "normal";
+    IoLimit = 0;
+    IopsLimit = 0;
 }
 
 TContainer::~TContainer() {
@@ -573,19 +584,19 @@ TError TContainer::ApplyDynamicProperties() {
     }
 
     auto blkcg = GetCgroup(BlkioSubsystem);
-    error = BlkioSubsystem.SetPolicy(blkcg, Prop->Get<std::string>(P_IO_POLICY) == "batch");
+    error = BlkioSubsystem.SetPolicy(blkcg, IoPolicy == "batch");
     if (error) {
         L_ERR() << "Can't set " << P_IO_POLICY << ": " << error << std::endl;
         return error;
     }
 
-    error = MemorySubsystem.SetIoLimit(memcg, Prop->Get<uint64_t>(P_IO_LIMIT));
+    error = MemorySubsystem.SetIoLimit(memcg, IoLimit);
     if (error) {
         L_ERR() << "Can't set " << P_IO_LIMIT << ": " << error << std::endl;
         return error;
     }
 
-    error = MemorySubsystem.SetIopsLimit(memcg, Prop->Get<uint64_t>(P_IO_OPS_LIMIT));
+    error = MemorySubsystem.SetIopsLimit(memcg, IopsLimit);
     if (error) {
         L_ERR() << "Can't set " << P_IO_OPS_LIMIT << ": " << error << std::endl;
         return error;

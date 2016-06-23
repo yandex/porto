@@ -54,6 +54,9 @@ extern TContainerRechargeOnPgfault ContainerRechargeOnPgfault;
 extern TContainerCpuPolicy ContainerCpuPolicy;
 extern TContainerCpuLimit ContainerCpuLimit;
 extern TContainerCpuGuarantee ContainerCpuGuarantee;
+extern TContainerIoPolicy ContainerIoPolicy;
+extern TContainerIoLimit ContainerIoLimit;
+extern TContainerIopsLimit ContainerIopsLimit;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -105,50 +108,6 @@ TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
 
     return TError::Success();
 }
-
-class TIoPolicyProperty : public TStringValue, public TContainerValue {
-public:
-    TIoPolicyProperty() :
-        TStringValue(PARENT_DEF_PROPERTY | PERSISTENT_VALUE | DYNAMIC_VALUE),
-        TContainerValue(P_IO_POLICY,
-                        "IO policy: normal, batch (dynamic)") {
-        if (!BlkioSubsystem.SupportPolicy())
-            SetFlag(UNSUPPORTED_FEATURE);
-    }
-
-    std::string GetDefault() const override {
-        return "normal";
-    }
-
-    TError CheckValue(const std::string &value) override {
-        if (value != "normal" && value != "batch")
-            return TError(EError::InvalidValue, "invalid policy");
-
-        return TError::Success();
-    }
-};
-
-class TIoLimitProperty : public TSizeValue, public TContainerValue {
-public:
-    TIoLimitProperty() :
-        TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-        TContainerValue(P_IO_LIMIT,
-                        "Filesystem bandwidth limit [bytes/s] (dynamic)") {
-        if (!MemorySubsystem.SupportIoLimit())
-            SetFlag(UNSUPPORTED_FEATURE);
-    }
-};
-
-class TIopsLimitProperty : public TSizeValue, public TContainerValue {
-public:
-    TIopsLimitProperty() :
-        TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-        TContainerValue(P_IO_OPS_LIMIT,
-                        "Filesystem IOPS limit [operations/s] (dynamic)") {
-        if (!MemorySubsystem.SupportIoLimit())
-            SetFlag(UNSUPPORTED_FEATURE);
-    }
-};
 
 class TNetGuaranteeProperty : public TMapValue, public TContainerValue {
 public:
@@ -319,9 +278,6 @@ public:
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> properties = {
-        new TIoPolicyProperty,
-        new TIoLimitProperty,
-        new TIopsLimitProperty,
         new TNetGuaranteeProperty,
         new TNetLimitProperty,
         new TNetPriorityProperty,
@@ -473,6 +429,12 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerCpuPolicy.Name] = &ContainerCpuPolicy;
     ContainerPropMap[ContainerCpuLimit.Name] = &ContainerCpuLimit;
     ContainerPropMap[ContainerCpuGuarantee.Name] = &ContainerCpuGuarantee;
+    ContainerIoPolicy.Init();
+    ContainerPropMap[ContainerIoPolicy.Name] = &ContainerIoPolicy;
+    ContainerIoLimit.Init();
+    ContainerPropMap[ContainerIoLimit.Name] = &ContainerIoLimit;
+    ContainerIopsLimit.Init();
+    ContainerPropMap[ContainerIopsLimit.Name] = &ContainerIopsLimit;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -751,6 +713,11 @@ TError TContainerIsolate::Set(const std::string &isolate_needed) {
                 CurrentContainer->CpuPolicy = p->CpuPolicy;
 
                 ContainerCpuPolicy.Propagate(CurrentContainer->CpuPolicy);
+            }
+            if (!(CurrentContainer->PropMask & IO_POLICY_SET)) {
+                CurrentContainer->IoPolicy = p->IoPolicy;
+
+                ContainerIoPolicy.Propagate(CurrentContainer->IoPolicy);
             }
         }
 
@@ -1643,6 +1610,152 @@ TError TContainerCpuGuarantee::Set(const std::string &guarantee) {
 
 TError TContainerCpuGuarantee::Get(std::string &value) {
     value = StringFormat("%lgc", CurrentContainer->CpuGuarantee);
+
+    return TError::Success();
+}
+
+TError TContainerIoPolicy::Set(const std::string &policy) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    if (policy != "normal" && policy != "batch")
+        return TError(EError::InvalidValue, "invalid policy");
+
+
+    if (CurrentContainer->GetState() == EContainerState::Running ||
+        CurrentContainer->GetState() == EContainerState::Meta ||
+        CurrentContainer->GetState() == EContainerState::Paused) {
+
+        auto blkcg = CurrentContainer->GetCgroup(BlkioSubsystem);
+        error = BlkioSubsystem.SetPolicy(blkcg, policy == "batch");
+
+        if (error) {
+            L_ERR() << "Can't set " << P_IO_POLICY << ": " << error << std::endl;
+            return error;
+        }
+
+    }
+
+    error = Propagate(policy);
+    if (error)
+        return error;
+
+    CurrentContainer->IoPolicy = policy;
+    CurrentContainer->PropMask |= IO_POLICY_SET;
+
+    return TError::Success();
+}
+
+TError TContainerIoPolicy::Get(std::string &value) {
+    value = CurrentContainer->IoPolicy;
+
+    return TError::Success();
+}
+
+TError TContainerIoPolicy::Propagate(const std::string &policy) {
+    TError error = TError::Success();
+
+    for (auto iter : CurrentContainer->Children) {
+        if (auto child = iter.lock()) {
+
+            auto old = CurrentContainer;
+            CurrentContainer = child.get();
+
+            if (!(CurrentContainer->PropMask & IO_POLICY_SET) &&
+                !(CurrentContainer->Isolate)) {
+
+                if (CurrentContainer->GetState() == EContainerState::Running ||
+                    CurrentContainer->GetState() == EContainerState::Meta ||
+                    CurrentContainer->GetState() == EContainerState::Paused) {
+
+                    auto blkcg = CurrentContainer->GetCgroup(BlkioSubsystem);
+                    error = BlkioSubsystem.SetPolicy(blkcg, policy == "batch");
+                }
+
+                if (error) {
+                    L_ERR() << "Can't set " << P_IO_POLICY << ": " << error
+                            << std::endl;
+                } else {
+                    /* FIXME: Inconsistent state of child tree IO policy! */
+                    CurrentContainer->IoPolicy = policy;
+                    error = Propagate(policy);
+                }
+            }
+
+            CurrentContainer = old;
+            if (error)
+                break;
+        }
+    }
+
+    return error;
+}
+
+TError TContainerIoLimit::Set(const std::string &limit) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    uint64_t new_limit = 0lu;
+    error = StringToSize(limit, new_limit);
+    if (error)
+        return error;
+
+    if (CurrentContainer->GetState() == EContainerState::Running ||
+        CurrentContainer->GetState() == EContainerState::Meta ||
+        CurrentContainer->GetState() == EContainerState::Paused) {
+
+        auto memcg = CurrentContainer->GetCgroup(MemorySubsystem);
+        error = MemorySubsystem.SetIoLimit(memcg, new_limit);
+        if (error) {
+            L_ERR() << "Can't set " << P_IO_LIMIT << ": " << error << std::endl;
+            return error;
+        }
+    }
+
+    CurrentContainer->IoLimit = new_limit;
+    CurrentContainer->PropMask |= IO_LIMIT_SET;
+
+    return TError::Success();
+}
+
+TError TContainerIoLimit::Get(std::string &value) {
+    value = std::to_string(CurrentContainer->IoLimit);
+
+    return TError::Success();
+}
+
+TError TContainerIopsLimit::Set(const std::string &limit) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    uint64_t new_limit = 0lu;
+    error = StringToSize(limit, new_limit);
+    if (error)
+        return error;
+
+    if (CurrentContainer->GetState() == EContainerState::Running ||
+        CurrentContainer->GetState() == EContainerState::Meta ||
+        CurrentContainer->GetState() == EContainerState::Paused) {
+
+        auto memcg = CurrentContainer->GetCgroup(MemorySubsystem);
+        error = MemorySubsystem.SetIopsLimit(memcg, new_limit);
+        if (error) {
+            L_ERR() << "Can't set " << P_IO_OPS_LIMIT << ": " << error << std::endl;
+            return error;
+        }
+    }
+
+    CurrentContainer->IopsLimit = new_limit;
+    CurrentContainer->PropMask |= IO_OPS_LIMIT_SET;
+
+    return TError::Success();
+}
+
+TError TContainerIopsLimit::Get(std::string &value) {
+    value = std::to_string(CurrentContainer->IopsLimit);
 
     return TError::Success();
 }
