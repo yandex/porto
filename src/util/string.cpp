@@ -4,6 +4,7 @@
 #include <cctype>
 
 #include "util/string.hpp"
+#include "util/unix.hpp"
 
 using std::string;
 using std::vector;
@@ -325,6 +326,30 @@ TError StringToStrList(const std::string &str, std::vector<std::string> &value) 
 
         value.push_back(tmp);
     }
+
+    return TError::Success();
+}
+
+TError StringToCpuValue(const std::string &str, double &value) {
+    double val;
+    std::string unit;
+
+    TError error = StringToValue(str, val, unit);
+    if (error || val < 0)
+        return TError(EError::InvalidValue, "Invalid cpu value " + str);
+
+    if (unit == "")
+        value = val / 100 * GetNumCores();
+    else if (unit == "c")
+        value = val;
+    else
+        return TError(EError::InvalidValue, "Invalid cpu unit " + str);
+
+    if (value < 0)
+        return TError(EError::InvalidValue, "negative cpu count");
+
+    if (value > GetNumCores())
+        return TError(EError::InvalidValue, "value exceeds cpu count");
 
     return TError::Success();
 }

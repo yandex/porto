@@ -40,3 +40,4 @@ TError StringToValue(const std::string &str, double &value, std::string &unit);
 TError StringToSize(const std::string &str, uint64_t &size);
 TError StringToStrList(const std::string &str, std::vector<std::string> &value);
 TError StrListToString(const std::vector<std::string> lines, std::string &value);
+TError StringToCpuValue(const std::string &str, double &value);
