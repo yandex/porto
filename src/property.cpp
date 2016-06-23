@@ -65,6 +65,7 @@ extern TContainerMaxRespawns ContainerMaxRespawns;
 extern TContainerPrivate ContainerPrivate;
 extern TContainerNetTos ContainerNetTos;
 extern TContainerAgingTime ContainerAgingTime;
+extern TContainerEnablePorto ContainerEnablePorto;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -117,32 +118,6 @@ TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
     return TError::Success();
 }
 
-class TEnablePortoProperty : public TBoolValue, public TContainerValue {
-public:
-    TEnablePortoProperty() :
-        TBoolValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-        TContainerValue(P_ENABLE_PORTO,
-                        "Allow container communication with porto (dynamic)") {}
-
-    bool GetDefault() const override {
-        for (auto c = GetContainer(); c; c = c->GetParent()) {
-            if (c->Prop->HasValue(P_ENABLE_PORTO))
-                return c->Prop->Get<bool>(P_ENABLE_PORTO);
-        }
-        return true;
-    }
-
-    TError CheckValue(const bool &value) override {
-        if (value == true) {
-            auto c = GetContainer();
-            auto p = c->GetParent();
-            if (p && !p->Prop->Get<bool>(P_ENABLE_PORTO))
-                return TError(EError::InvalidValue, "Porto disabled in parent container");
-        }
-        return TError::Success();
-    }
-};
-
 class TWeakProperty : public TBoolValue, public TContainerValue {
 public:
     TWeakProperty() :
@@ -158,7 +133,6 @@ public:
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> properties = {
-        new TEnablePortoProperty,
         new TWeakProperty,
     };
 
@@ -315,6 +289,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerPrivate.Name] = &ContainerPrivate;
     ContainerPropMap[ContainerNetTos.Name] = &ContainerNetTos;
     ContainerPropMap[ContainerAgingTime.Name] = &ContainerAgingTime;
+    ContainerPropMap[ContainerEnablePorto.Name] = &ContainerEnablePorto;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1946,4 +1921,51 @@ TError TContainerAgingTime::Get(std::string &value) {
     value = std::to_string(CurrentContainer->AgingTime);
 
     return TError::Success();
+}
+
+TError TContainerEnablePorto::Set(const std::string &enabled) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    if (enabled == "true") {
+        auto p = CurrentContainer->GetParent();
+        if (p && !p->PortoEnabled)
+            return TError(EError::InvalidValue, "Porto disabled in parent container");
+
+        CurrentContainer->PortoEnabled = true;
+        Propagate(true);
+
+    } else if (enabled == "false") {
+        CurrentContainer->PortoEnabled = false;
+        Propagate(false);
+
+    } else {
+        return TError(EError::InvalidValue, "Invalid bool value");
+    }
+
+    CurrentContainer->PropMask |= ENABLE_PORTO_SET;
+
+    return TError::Success();
+}
+
+TError TContainerEnablePorto::Get(std::string &value) {
+    value = CurrentContainer->PortoEnabled ? "true" : "false";
+
+    return TError::Success();
+}
+
+void TContainerEnablePorto::Propagate(bool value) {
+    for (auto iter : CurrentContainer->Children) {
+        if (auto child = iter.lock()) {
+            auto old = CurrentContainer;
+            CurrentContainer = child.get();
+
+            if (!(CurrentContainer->PropMask & ENABLE_PORTO_SET))
+                CurrentContainer->PortoEnabled = value;
+
+            Propagate(value);
+            CurrentContainer = old;
+        }
+    }
 }

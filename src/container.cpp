@@ -184,6 +184,9 @@ TContainerAgingTime ContainerAgingTime(P_AGING_TIME, AGING_TIME_SET,
                                       "After given number of seconds "
                                       "container in dead state is "
                                       "automatically removed (dynamic)");
+TContainerEnablePorto ContainerEnablePorto(P_ENABLE_PORTO, ENABLE_PORTO_SET,
+                                           "Allow container communication "
+                                           "with porto (dynamic)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -244,6 +247,10 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     MaxRespawns = -1;
     Private = "";
     AgingTime = config().container().default_aging_time_s();
+    PortoEnabled = true;
+    for (auto c = parent; c; c = c->GetParent()) {
+        PortoEnabled &= c->PortoEnabled;
+    }
 }
 
 TContainer::~TContainer() {
@@ -941,7 +948,7 @@ TError TContainer::PrepareTask(std::shared_ptr<TClient> client,
 
     taskEnv->Caps = Caps;
 
-    if (!taskEnv->Root.IsRoot() && Prop->Get<bool>(P_ENABLE_PORTO)) {
+    if (!taskEnv->Root.IsRoot() && PortoEnabled) {
         TBindMap bm = { PORTO_SOCKET_PATH, PORTO_SOCKET_PATH, false };
 
         taskEnv->BindMap.push_back(bm);

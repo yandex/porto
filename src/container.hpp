@@ -178,6 +178,7 @@ public:
     int MaxRespawns;
     std::string Private;
     uint64_t AgingTime;
+    bool PortoEnabled;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;

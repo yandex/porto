@@ -146,7 +146,7 @@ TError TClient::IdentifyClient(TContainerHolder &holder, bool initial) {
     if (error)
         return error;
 
-    if (!container->Prop->Get<bool>(P_ENABLE_PORTO))
+    if (!container->PortoEnabled)
         return TError(EError::Permission, "Porto disabled in container " + container->GetName());
 
     ClientContainer = container;
