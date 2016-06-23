@@ -56,6 +56,7 @@ constexpr uint64_t MEM_GUARANTEE_SET = (1lu << 20);
 constexpr const char *P_MEM_LIMIT = "memory_limit";
 constexpr uint64_t MEM_LIMIT_SET = (1lu << 21);
 constexpr const char *P_DIRTY_LIMIT = "dirty_limit";
+constexpr uint64_t DIRTY_LIMIT_SET = (1lu << 22);
 constexpr const char *P_ANON_LIMIT = "anon_limit";
 constexpr uint64_t ANON_LIMIT_SET = (1lu << 23);
 constexpr const char *P_RECHARGE_ON_PGFAULT = "recharge_on_pgfault";
@@ -575,6 +576,21 @@ public:
                         : TContainerProperty(name, set_mask, desc) {}
     TError Init(void) {
         IsSupported = MemorySubsystem.SupportAnonLimit();
+
+        return TError::Success();
+    }
+
+};
+
+class TContainerDirtyLimit : public TContainerProperty {
+public:
+    TError Set(const std::string &limit);
+    TError Get(std::string &value);
+    TContainerDirtyLimit(std::string name, uint64_t set_mask,
+                        std::string desc)
+                        : TContainerProperty(name, set_mask, desc) {}
+    TError Init(void) {
+        IsSupported = MemorySubsystem.SupportDirtyLimit();
 
         return TError::Success();
     }

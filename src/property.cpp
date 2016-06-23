@@ -49,6 +49,7 @@ extern TContainerPortoNamespace ContainerPortoNamespace;
 extern TContainerStdoutLimit ContainerStdoutLimit;
 extern TContainerMemoryLimit ContainerMemoryLimit;
 extern TContainerAnonLimit ContainerAnonLimit;
+extern TContainerDirtyLimit ContainerDirtyLimit;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -100,21 +101,6 @@ TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
 
     return TError::Success();
 }
-
-class TDirtyLimitProperty : public TSizeValue, public TContainerValue {
-public:
-    TDirtyLimitProperty() :
-        TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-        TContainerValue(P_DIRTY_LIMIT,
-                        "Dirty file cache limit [bytes] (dynamic)") {
-        if (!MemorySubsystem.SupportDirtyLimit())
-            SetFlag(UNSUPPORTED_FEATURE);
-    }
-
-    uint64_t GetDefault() const override {
-        return 0;
-    }
-};
 
 class TRechargeOnPgfaultProperty : public TBoolValue, public TContainerValue {
 public:
@@ -383,7 +369,6 @@ public:
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> properties = {
-        new TDirtyLimitProperty,
         new TRechargeOnPgfaultProperty,
         new TCpuPolicyProperty,
         new TCpuLimitProperty,
@@ -535,6 +520,8 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerMemoryLimit.Name] = &ContainerMemoryLimit;
     ContainerAnonLimit.Init();
     ContainerPropMap[ContainerAnonLimit.Name] = &ContainerAnonLimit;
+    ContainerDirtyLimit.Init();
+    ContainerPropMap[ContainerDirtyLimit.Name] = &ContainerDirtyLimit;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1469,6 +1456,42 @@ TError TContainerAnonLimit::Set(const std::string &limit) {
 
 TError TContainerAnonLimit::Get(std::string &value) {
     value = std::to_string(CurrentContainer->AnonMemLimit);
+
+    return TError::Success();
+}
+
+TError TContainerDirtyLimit::Set(const std::string &limit) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    uint64_t new_size = 0lu;
+    error = StringToSize(limit, new_size);
+    if (error)
+        return error;
+
+    if (CurrentContainer->GetState() == EContainerState::Running ||
+        CurrentContainer->GetState() == EContainerState::Meta ||
+        CurrentContainer->GetState() == EContainerState::Paused) {
+
+        auto memcg = CurrentContainer->GetCgroup(MemorySubsystem);
+        error = MemorySubsystem.SetDirtyLimit(memcg, new_size);
+
+        if (error) {
+            L_ERR() << "Can't set " << P_ANON_LIMIT << ": " << error << std::endl;
+
+            return error;
+        }
+    }
+
+    CurrentContainer->DirtyMemLimit = new_size;
+    CurrentContainer->PropMask |= ANON_LIMIT_SET;
+
+    return TError::Success();
+}
+
+TError TContainerDirtyLimit::Get(std::string &value) {
+    value = std::to_string(CurrentContainer->DirtyMemLimit);
 
     return TError::Success();
 }
