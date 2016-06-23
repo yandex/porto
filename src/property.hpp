@@ -48,6 +48,7 @@ constexpr uint64_t STDOUT_SET = (1 << 15);
 constexpr const char *P_STDERR_PATH = "stderr_path";
 constexpr uint64_t STDERR_SET = (1 << 16);
 constexpr const char *P_STDOUT_LIMIT = "stdout_limit";
+constexpr uint64_t STDOUT_LIMIT_SET = (1lu << 17);
 constexpr const char *P_STDOUT_OFFSET = "stdout_offset";
 constexpr const char *P_STDERR_OFFSET = "stderr_offset";
 constexpr const char *P_MEM_GUARANTEE = "memory_guarantee";
@@ -543,6 +544,15 @@ public:
     TContainerPortoNamespace(std::string name, uint64_t set_mask,
                               std::string desc)
                               : TContainerProperty(name, set_mask, desc) {}
+};
+
+class TContainerStdoutLimit : public TContainerProperty {
+public:
+    TError Set(const std::string &limit);
+    TError Get(std::string &value);
+    TContainerStdoutLimit(std::string name, uint64_t set_mask,
+                          std::string desc)
+                          : TContainerProperty(name, set_mask, desc) {}
 };
 
 void InitContainerProperties(void);

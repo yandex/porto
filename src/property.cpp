@@ -46,6 +46,7 @@ extern TContainerRawStartTime ContainerRawStartTime;
 extern TContainerRawDeathTime ContainerRawDeathTime;
 extern TContainerUlimit ContainerUlimit;
 extern TContainerPortoNamespace ContainerPortoNamespace;
+extern TContainerStdoutLimit ContainerStdoutLimit;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -97,29 +98,6 @@ TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
 
     return TError::Success();
 }
-
-class TStdoutLimitProperty : public TSizeValue, public TContainerValue {
-public:
-    TStdoutLimitProperty() :
-        TSizeValue(PERSISTENT_VALUE | DYNAMIC_VALUE),
-        TContainerValue(P_STDOUT_LIMIT,
-                        "Limit returned stdout/stderr size (dynamic)") {}
-
-    uint64_t GetDefault() const override {
-        return config().container().stdout_limit();
-    }
-
-    TError CheckValue(const uint64_t &value) override {
-        uint32_t max = config().container().stdout_limit();
-
-        if (value > max)
-            return TError(EError::InvalidValue,
-                          "Maximum number of bytes: " +
-                          std::to_string(max));
-
-        return TError::Success();
-    }
-};
 
 class TMemoryLimitProperty : public TSizeValue, public TContainerValue {
 public:
@@ -422,7 +400,6 @@ public:
 void RegisterProperties(std::shared_ptr<TRawValueMap> m,
                         std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> properties = {
-        new TStdoutLimitProperty,
         new TMemoryLimitProperty,
         new TAnonLimitProperty,
         new TDirtyLimitProperty,
@@ -573,6 +550,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerRawDeathTime.Name] = &ContainerRawDeathTime;
     ContainerPropMap[ContainerUlimit.Name] = &ContainerUlimit;
     ContainerPropMap[ContainerPortoNamespace.Name] = &ContainerPortoNamespace;
+    ContainerPropMap[ContainerStdoutLimit.Name] = &ContainerStdoutLimit;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1404,6 +1382,33 @@ TError TContainerPortoNamespace::Set(const std::string &ns) {
 
 TError TContainerPortoNamespace::Get(std::string &value) {
     value = CurrentContainer->NsName;
+
+    return TError::Success();
+}
+
+TError TContainerStdoutLimit::Set(const std::string &limit) {
+    TError error = IsAlive();
+    if (error)
+        return error;
+
+    uint64_t new_size = 0lu;
+    error = StringToSize(limit, new_size);
+    if (error)
+        return error;
+
+    auto max = config().container().stdout_limit();
+    if (new_size > max)
+        return TError(EError::InvalidValue, "Maximum number of bytes: " +
+                      std::to_string(max));
+
+    CurrentContainer->StdoutLimit = new_size;
+    CurrentContainer->PropMask |= STDOUT_LIMIT_SET;
+
+    return TError::Success();
+}
+
+TError TContainerStdoutLimit::Get(std::string &value) {
+    value = std::to_string(CurrentContainer->StdoutLimit);
 
     return TError::Success();
 }

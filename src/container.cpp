@@ -130,6 +130,9 @@ TContainerPortoNamespace ContainerPortoNamespace(P_PORTO_NAMESPACE,
                                             PORTO_NAMESPACE_SET,
                                             "Porto containers namespace "
                                             "(container name prefix) (dynamic)");
+TContainerStdoutLimit ContainerStdoutLimit(P_STDOUT_LIMIT, STDOUT_LIMIT_SET,
+                                           "Limit returned stdout/stderr "
+                                           "size (dynamic)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -167,6 +170,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     else
         NsName = "";
 
+    StdoutLimit = config().container().stdout_limit();
 }
 
 TContainer::~TContainer() {
