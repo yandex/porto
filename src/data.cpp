@@ -15,14 +15,6 @@ extern "C" {
 #include <sys/sysinfo.h>
 }
 
-class TExitStatusData : public TIntValue, public TContainerValue {
-public:
-    TExitStatusData() :
-        TIntValue(READ_ONLY_VALUE | PERSISTENT_VALUE | POSTMORTEM_VALUE),
-        TContainerValue(D_EXIT_STATUS,
-                        "container exit status (ro)") {}
-};
-
 class TStartErrnoData : public TIntValue, public TContainerValue {
 public:
     TStartErrnoData() :
@@ -480,7 +472,6 @@ public:
 void RegisterData(std::shared_ptr<TRawValueMap> m,
                   std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> data = {
-        new TExitStatusData,
         new TStartErrnoData,
         new TStdoutData,
         new TStderrData,

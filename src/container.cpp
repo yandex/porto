@@ -204,6 +204,8 @@ TContainerParent ContainerParent(D_PARENT,
 TContainerRespawnCount ContainerRespawnCount(D_RESPAWN_COUNT,
                                              "current respawn count (ro)");
 TContainerRootPid ContainerRootPid(D_ROOT_PID, "root task pid (ro)");
+TContainerExitStatus ContainerExitStatus(D_EXIT_STATUS,
+                                         "container exit status (ro)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -270,6 +272,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
         PortoEnabled &= c->PortoEnabled;
     }
     IsWeak = false;
+    ExitStatus = 0;
 }
 
 TContainer::~TContainer() {
@@ -1094,9 +1097,8 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
 
     L_ACT() << "Start " << GetName() << " " << Id << std::endl;
 
-    error = Data->Set<int>(D_EXIT_STATUS, -1);
-    if (error)
-        return error;
+    ExitStatus = -1;
+    PropMask |= EXIT_STATUS_SET;
 
     OomKilled = false;
     PropMask |= OOM_KILLED_SET;
@@ -2293,6 +2295,8 @@ void TContainer::ExitTree(TScopedLock &holder_lock, int status, bool oomKilled) 
 }
 
 void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
+    TError error;
+
     if (!Task)
         return;
 
@@ -2302,9 +2306,8 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
 
     ShutdownOom();
 
-    TError error = Data->Set<int>(D_EXIT_STATUS, status);
-    if (error)
-        L_ERR() << "Can't set " << D_EXIT_STATUS << ": " << error << std::endl;
+    ExitStatus = status;
+    PropMask |= EXIT_STATUS_SET;
 
     DeathTime = GetCurrentTimeMs();
     PropMask |= DEATH_TIME_SET;

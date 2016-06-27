@@ -74,6 +74,7 @@ extern TContainerOomKilled ContainerOomKilled;
 extern TContainerParent ContainerParent;
 extern TContainerRespawnCount ContainerRespawnCount;
 extern TContainerRootPid ContainerRootPid;
+extern TContainerExitStatus ContainerExitStatus;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -292,6 +293,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerParent.Name] = &ContainerParent;
     ContainerPropMap[ContainerRespawnCount.Name] = &ContainerRespawnCount;
     ContainerPropMap[ContainerRootPid.Name] = &ContainerRootPid;
+    ContainerPropMap[ContainerExitStatus.Name] = &ContainerExitStatus;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -2123,4 +2125,22 @@ TError TContainerRootPid::Get(std::string &value) {
         value = "";
 
     return TError::Success();
+}
+
+TError TContainerExitStatus::SetFromRestore(const std::string &value) {
+    return StringToInt(value, CurrentContainer->ExitStatus);
+}
+
+TError TContainerExitStatus::GetToSave(std::string &value) {
+    value = std::to_string(CurrentContainer->ExitStatus);
+
+    return TError::Success();
+}
+
+TError TContainerExitStatus::Get(std::string &value) {
+    TError error = IsDead();
+    if (error)
+        return error;
+
+    return GetToSave(value);
 }

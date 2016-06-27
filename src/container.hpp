@@ -180,6 +180,7 @@ public:
     bool IsWeak;
     EContainerState State = EContainerState::Unknown;
     bool OomKilled;
+    int ExitStatus;
 
     // TODO: make private
     std::unique_ptr<TTask> Task;

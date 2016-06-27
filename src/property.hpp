@@ -135,6 +135,8 @@ constexpr const char *D_PARENT = "parent";
 constexpr const char *D_RESPAWN_COUNT = "respawn_count";
 constexpr uint64_t RESPAWN_COUNT_SET = (1lu << 55);
 constexpr const char *D_ROOT_PID = "root_pid";
+constexpr const char *D_EXIT_STATUS = "exit_status";
+constexpr uint64_t EXIT_STATUS_SET = (1lu << 56);
 
 class TBindMap;
 class TTaskEnv;
@@ -870,6 +872,17 @@ public:
     TError Get(std::string &value);
     TContainerRootPid(std::string name, std::string desc)
                       : TContainerProperty(name, desc, true) {}
+};
+
+class TContainerExitStatus : public TContainerProperty {
+public:
+    TError SetFromRestore(const std::string &value);
+    TError GetToSave(std::string &value);
+    TError Get(std::string &value);
+    TContainerExitStatus(std::string name, std::string desc)
+                         : TContainerProperty(name, desc, false, true) {
+        SetMask = EXIT_STATUS_SET;
+    }
 };
 
 void InitContainerProperties(void);
