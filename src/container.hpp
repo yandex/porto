@@ -174,6 +174,7 @@ public:
     TUintMap NetPriority;
     bool ToRespawn;
     int MaxRespawns;
+    uint64_t RespawnCount;
     std::string Private;
     uint64_t AgingTime;
     bool PortoEnabled;

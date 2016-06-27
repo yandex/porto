@@ -201,6 +201,8 @@ TContainerOomKilled ContainerOomKilled(D_OOM_KILLED,
                                        "container has been killed by OOM (ro)");
 TContainerParent ContainerParent(D_PARENT,
                                  "parent container name (ro) (deprecated)");
+TContainerRespawnCount ContainerRespawnCount(D_RESPAWN_COUNT,
+                                             "current respawn count (ro)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -259,6 +261,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     NetPriority["default"] = NET_DEFAULT_PRIO;
     ToRespawn = false;
     MaxRespawns = -1;
+    RespawnCount = 0;
     Private = "";
     AgingTime = config().container().default_aging_time_s();
     PortoEnabled = true;
@@ -1045,6 +1048,9 @@ TError TContainer::Create(const TCred &cred) {
     SetState(EContainerState::Stopped);
     PropMask |= STATE_SET;
 
+    RespawnCount = 0;
+    PropMask |= RESPAWN_COUNT_SET;
+
     return Save(); /* Serialize on creation  */
 }
 
@@ -1086,10 +1092,6 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
     }
 
     L_ACT() << "Start " << GetName() << " " << Id << std::endl;
-
-    error = Data->Set<uint64_t>(D_RESPAWN_COUNT, 0);
-    if (error)
-        return error;
 
     error = Data->Set<int>(D_EXIT_STATUS, -1);
     if (error)
@@ -2365,7 +2367,7 @@ bool TContainer::MayRespawn() {
     if (!ToRespawn)
         return false;
 
-    return MaxRespawns < 0 || Data->Get<uint64_t>(D_RESPAWN_COUNT) < (uint64_t)MaxRespawns;
+    return MaxRespawns < 0 || RespawnCount < (uint64_t)MaxRespawns;
 }
 
 bool TContainer::MayReceiveOom(int fd) {
@@ -2402,10 +2404,15 @@ TError TContainer::Respawn(TScopedLock &holder_lock) {
     if (error)
         return error;
 
-    uint64_t tmp = Data->Get<uint64_t>(D_RESPAWN_COUNT);
+
     error = Start(nullptr, false);
-    Data->Set<uint64_t>(D_RESPAWN_COUNT, tmp + 1);
-    return error;
+    RespawnCount++;
+    PropMask |= RESPAWN_COUNT_SET;
+
+    if (error)
+        return error;
+
+    return Save();
 }
 
 bool TContainer::CanRemoveDead() const {

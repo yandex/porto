@@ -15,14 +15,6 @@ extern "C" {
 #include <sys/sysinfo.h>
 }
 
-class TRespawnCountData : public TUintValue, public TContainerValue {
-public:
-    TRespawnCountData() :
-        TUintValue(READ_ONLY_VALUE | PERSISTENT_VALUE),
-        TContainerValue(D_RESPAWN_COUNT,
-                        "current respawn count (ro)") {}
-};
-
 class TRootPidData : public TIntValue, public TContainerValue {
 public:
     TRootPidData() :
@@ -495,7 +487,6 @@ public:
 void RegisterData(std::shared_ptr<TRawValueMap> m,
                   std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> data = {
-        new TRespawnCountData,
         new TRootPidData,
         new TExitStatusData,
         new TStartErrnoData,

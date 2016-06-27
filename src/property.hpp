@@ -132,6 +132,8 @@ constexpr uint64_t STATE_SET = (1lu << 53);
 constexpr const char *D_OOM_KILLED = "oom_killed";
 constexpr uint64_t OOM_KILLED_SET = (1lu << 54);
 constexpr const char *D_PARENT = "parent";
+constexpr const char *D_RESPAWN_COUNT = "respawn_count";
+constexpr uint64_t RESPAWN_COUNT_SET = (1lu << 55);
 
 class TBindMap;
 class TTaskEnv;
@@ -849,6 +851,16 @@ public:
     TError Get(std::string &value);
     TContainerParent(std::string name, std::string desc)
                      : TContainerProperty(name, desc, true, false) {}
+};
+
+class TContainerRespawnCount : public TContainerProperty {
+public:
+    TError SetFromRestore(const std::string &value);
+    TError Get(std::string &value);
+    TContainerRespawnCount(std::string name, std::string desc)
+                           : TContainerProperty(name, desc, false, true) {
+        SetMask = RESPAWN_COUNT_SET;
+    }
 };
 
 void InitContainerProperties(void);

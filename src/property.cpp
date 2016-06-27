@@ -72,6 +72,7 @@ extern TContainerAbsoluteNamespace ContainerAbsoluteNamespace;
 extern TContainerState ContainerState;
 extern TContainerOomKilled ContainerOomKilled;
 extern TContainerParent ContainerParent;
+extern TContainerRespawnCount ContainerRespawnCount;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -288,6 +289,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerOomKilled.Name] = &ContainerOomKilled;
     ContainerPropMap[ContainerState.Name] = &ContainerState;
     ContainerPropMap[ContainerParent.Name] = &ContainerParent;
+    ContainerPropMap[ContainerRespawnCount.Name] = &ContainerRespawnCount;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -2077,6 +2079,16 @@ TError TContainerOomKilled::Get(std::string &value) {
 TError TContainerParent::Get(std::string &value) {
     auto p = CurrentContainer->GetParent();
     value = p ? p->GetName() : "";
+
+    return TError::Success();
+}
+
+TError TContainerRespawnCount::SetFromRestore(const std::string &value) {
+    return StringToUint64(value, CurrentContainer->RespawnCount);
+}
+
+TError TContainerRespawnCount::Get(std::string &value) {
+    value = std::to_string(CurrentContainer->RespawnCount);
 
     return TError::Success();
 }
