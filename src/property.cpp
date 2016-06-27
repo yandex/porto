@@ -71,6 +71,7 @@ extern TContainerAbsoluteName ContainerAbsoluteName;
 extern TContainerAbsoluteNamespace ContainerAbsoluteNamespace;
 extern TContainerState ContainerState;
 extern TContainerOomKilled ContainerOomKilled;
+extern TContainerParent ContainerParent;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -286,6 +287,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerMemTotalGuarantee.Name] = &ContainerMemTotalGuarantee;
     ContainerPropMap[ContainerOomKilled.Name] = &ContainerOomKilled;
     ContainerPropMap[ContainerState.Name] = &ContainerState;
+    ContainerPropMap[ContainerParent.Name] = &ContainerParent;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -2070,4 +2072,11 @@ TError TContainerOomKilled::Get(std::string &value) {
         return error;
 
     return GetToSave(value);
+}
+
+TError TContainerParent::Get(std::string &value) {
+    auto p = CurrentContainer->GetParent();
+    value = p ? p->GetName() : "";
+
+    return TError::Success();
 }

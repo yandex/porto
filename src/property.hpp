@@ -131,6 +131,7 @@ constexpr const char *D_STATE = "state";
 constexpr uint64_t STATE_SET = (1lu << 53);
 constexpr const char *D_OOM_KILLED = "oom_killed";
 constexpr uint64_t OOM_KILLED_SET = (1lu << 54);
+constexpr const char *D_PARENT = "parent";
 
 class TBindMap;
 class TTaskEnv;
@@ -841,6 +842,13 @@ public:
                     : TContainerProperty(name, desc, false, true) {
         SetMask = OOM_KILLED_SET;
     }
+};
+
+class TContainerParent : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerParent(std::string name, std::string desc)
+                     : TContainerProperty(name, desc, true, false) {}
 };
 
 void InitContainerProperties(void);

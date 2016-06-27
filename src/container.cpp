@@ -199,6 +199,8 @@ TContainerAbsoluteNamespace ContainerAbsoluteNamespace(D_ABSOLUTE_NAMESPACE,
 TContainerState ContainerState(D_STATE, "container state (ro)");
 TContainerOomKilled ContainerOomKilled(D_OOM_KILLED,
                                        "container has been killed by OOM (ro)");
+TContainerParent ContainerParent(D_PARENT,
+                                 "parent container name (ro) (deprecated)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,

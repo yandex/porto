@@ -15,19 +15,6 @@ extern "C" {
 #include <sys/sysinfo.h>
 }
 
-class TParentData : public TStringValue, public TContainerValue {
-public:
-    TParentData() :
-        TStringValue(READ_ONLY_VALUE | HIDDEN_VALUE),
-        TContainerValue(D_PARENT,
-                        "parent container name (ro) (deprecated)") {}
-
-    std::string GetDefault() const override {
-        return GetContainer()->GetParent() ?
-            GetContainer()->GetParent()->GetName() : "";
-    }
-};
-
 class TRespawnCountData : public TUintValue, public TContainerValue {
 public:
     TRespawnCountData() :
@@ -508,7 +495,6 @@ public:
 void RegisterData(std::shared_ptr<TRawValueMap> m,
                   std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> data = {
-        new TParentData,
         new TRespawnCountData,
         new TRootPidData,
         new TExitStatusData,
