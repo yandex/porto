@@ -64,7 +64,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     size_t CgroupEmptySince = 0;
     size_t RunningChildren = 0; // changed under holder lock
     bool LostAndRestored = false;
-    std::unique_ptr<TTask> Task;
     std::list<std::weak_ptr<TContainerWaiter>> Waiters;
 
     std::shared_ptr<TEpollSource> Source;
@@ -183,6 +182,7 @@ public:
     bool OomKilled;
 
     // TODO: make private
+    std::unique_ptr<TTask> Task;
     std::shared_ptr<TPropertyMap> Prop;
     std::shared_ptr<TValueMap> Data;
     std::shared_ptr<TNetwork> Net;

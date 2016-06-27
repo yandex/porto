@@ -15,13 +15,6 @@ extern "C" {
 #include <sys/sysinfo.h>
 }
 
-class TRootPidData : public TIntValue, public TContainerValue {
-public:
-    TRootPidData() :
-        TIntValue(READ_ONLY_VALUE | HIDDEN_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_ROOT_PID, "root task pid (ro)") {}
-};
-
 class TExitStatusData : public TIntValue, public TContainerValue {
 public:
     TExitStatusData() :
@@ -487,7 +480,6 @@ public:
 void RegisterData(std::shared_ptr<TRawValueMap> m,
                   std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> data = {
-        new TRootPidData,
         new TExitStatusData,
         new TStartErrnoData,
         new TStdoutData,

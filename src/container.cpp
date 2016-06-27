@@ -203,6 +203,7 @@ TContainerParent ContainerParent(D_PARENT,
                                  "parent container name (ro) (deprecated)");
 TContainerRespawnCount ContainerRespawnCount(D_RESPAWN_COUNT,
                                              "current respawn count (ro)");
+TContainerRootPid ContainerRootPid(D_ROOT_PID, "root task pid (ro)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -1697,11 +1698,6 @@ TError TContainer::GetProperty(const string &origProperty, string &value,
     if (State != EContainerState::Dead && prop->HasFlag(POSTMORTEM_VALUE))
         return TError(EError::InvalidState,
                       "Available only in dead state: " + property);
-
-    if (property == D_ROOT_PID && Task && client) {
-        value = std::to_string(Task->GetPidFor(client->GetPid()));
-        return TError::Success();
-    }
 
     if (!prop->HasValue() && prop->HasFlag(PARENT_DEF_PROPERTY) &&
             !Isolate) {

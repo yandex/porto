@@ -134,6 +134,7 @@ constexpr uint64_t OOM_KILLED_SET = (1lu << 54);
 constexpr const char *D_PARENT = "parent";
 constexpr const char *D_RESPAWN_COUNT = "respawn_count";
 constexpr uint64_t RESPAWN_COUNT_SET = (1lu << 55);
+constexpr const char *D_ROOT_PID = "root_pid";
 
 class TBindMap;
 class TTaskEnv;
@@ -194,6 +195,7 @@ public:
     TError IsAliveAndStopped(void);
     TError IsAlive(void);
     TError IsDead(void);
+    TError IsRunning(void);
     virtual TError Set(const std::string &value) {
         if (IsReadOnly)
             return TError(EError::InvalidValue, "Read-only value: " + Name);
@@ -861,6 +863,13 @@ public:
                            : TContainerProperty(name, desc, false, true) {
         SetMask = RESPAWN_COUNT_SET;
     }
+};
+
+class TContainerRootPid : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerRootPid(std::string name, std::string desc)
+                      : TContainerProperty(name, desc, true) {}
 };
 
 void InitContainerProperties(void);

@@ -73,6 +73,7 @@ extern TContainerState ContainerState;
 extern TContainerOomKilled ContainerOomKilled;
 extern TContainerParent ContainerParent;
 extern TContainerRespawnCount ContainerRespawnCount;
+extern TContainerRootPid ContainerRootPid;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -290,6 +291,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerState.Name] = &ContainerState;
     ContainerPropMap[ContainerParent.Name] = &ContainerParent;
     ContainerPropMap[ContainerRespawnCount.Name] = &ContainerRespawnCount;
+    ContainerPropMap[ContainerRootPid.Name] = &ContainerRootPid;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -323,6 +325,22 @@ TError TContainerProperty::IsDead(void) {
     if (state != EContainerState::Dead)
         return TError(EError::InvalidState,
                       "Available only in dead state: " + Name);
+
+    return TError::Success();
+}
+
+TError TContainerProperty::IsRunning(void) {    
+    auto state = CurrentContainer->GetState();
+    
+    /*
+     * This snippet is taken from TContainer::GetProperty.
+     * The method name misguides a bit, but may be the semantic
+     * of such properties is that we can look at the value in
+     * the dead state too...
+     */
+    if (state == EContainerState::Stopped)
+        return TError(EError::InvalidState,
+                      "Not available in stopped state: " + Name);
 
     return TError::Success();
 }
@@ -2089,6 +2107,20 @@ TError TContainerRespawnCount::SetFromRestore(const std::string &value) {
 
 TError TContainerRespawnCount::Get(std::string &value) {
     value = std::to_string(CurrentContainer->RespawnCount);
+
+    return TError::Success();
+}
+
+TError TContainerRootPid::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+   
+    if (CurrentContainer->Task && CurrentClient)
+        value = std::to_string(CurrentContainer->Task->
+                               GetPidFor(CurrentClient->GetPid()));
+    else
+        value = "";
 
     return TError::Success();
 }
