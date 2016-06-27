@@ -127,6 +127,8 @@ constexpr const char *P_CMD_VIRT_MODE_OS = "/sbin/init";
 
 constexpr const char *D_ABSOLUTE_NAME = "absolute_name";
 constexpr const char *D_ABSOLUTE_NAMESPACE = "absolute_namespace";
+constexpr const char *D_STATE = "state";
+constexpr uint64_t STATE_SET = (1lu << 53);
 
 class TBindMap;
 class TTaskEnv;
@@ -815,6 +817,16 @@ public:
     TError Get(std::string &value);
     TContainerAbsoluteNamespace(std::string name, std::string desc)
                                 : TContainerProperty(name, desc) {}
+};
+
+class TContainerState : public TContainerProperty {
+public:
+    TError SetFromRestore(const std::string &value);
+    TError Get(std::string &value);
+    TContainerState(std::string name, std::string desc)
+                    : TContainerProperty(name, desc, false, true) {
+        SetMask = STATE_SET;
+    }
 };
 
 void InitContainerProperties(void);

@@ -69,6 +69,7 @@ extern TContainerEnablePorto ContainerEnablePorto;
 extern TContainerWeak ContainerWeak;
 extern TContainerAbsoluteName ContainerAbsoluteName;
 extern TContainerAbsoluteNamespace ContainerAbsoluteNamespace;
+extern TContainerState ContainerState;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -282,6 +283,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerAbsoluteNamespace.Name] = &ContainerAbsoluteNamespace;
     ContainerMemTotalGuarantee.Init();
     ContainerPropMap[ContainerMemTotalGuarantee.Name] = &ContainerMemTotalGuarantee;
+    ContainerPropMap[ContainerState.Name] = &ContainerState;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1998,6 +2000,37 @@ TError TContainerAbsoluteName::Get(std::string &value) {
 TError TContainerAbsoluteNamespace::Get(std::string &value) {
     value = std::string(PORTO_ROOT_CONTAINER) + "/" +
             CurrentContainer->GetPortoNamespace();
+
+    return TError::Success();
+}
+
+TError TContainerState::SetFromRestore(const std::string &value) {
+    /*
+     * We are just restoring value indication there.
+     * The container must manually call SetState()
+     * TContainer::Restore() handler.
+     */
+
+    if (value == "stopped")
+        CurrentContainer->State = EContainerState::Stopped;
+    else if (value == "dead")
+        CurrentContainer->State = EContainerState::Dead;
+    else if (value == "running")
+        CurrentContainer->State = EContainerState::Running;
+    else if (value == "paused")
+        CurrentContainer->State = EContainerState::Paused;
+    else if (value == "meta")
+        CurrentContainer->State = EContainerState::Meta;
+    else if (value == "unknown")
+        CurrentContainer->State  = EContainerState::Unknown;
+    else
+        return TError(EError::Unknown, "Invalid container saved state");
+
+    return TError::Success();
+}
+
+TError TContainerState::Get(std::string &value) {
+    value = CurrentContainer->ContainerStateName(CurrentContainer->GetState());
 
     return TError::Success();
 }

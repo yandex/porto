@@ -196,6 +196,7 @@ TContainerAbsoluteNamespace ContainerAbsoluteNamespace(D_ABSOLUTE_NAMESPACE,
                                                        "container namespace "
                                                        "including parent "
                                                        "namespaces (ro)");
+TContainerState ContainerState(D_STATE, "container state (ro)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -460,7 +461,6 @@ void TContainer::SetState(EContainerState newState) {
     }
 
     State = newState;
-    Data->Set<std::string>(D_STATE, ContainerStateName(State));
 
     if (newState != EContainerState::Running && newState != EContainerState::Meta)
         NotifyWaiters();
@@ -1039,6 +1039,7 @@ TError TContainer::Create(const TCred &cred) {
         Caps = ContainerCapabilities.AllCaps;
 
     SetState(EContainerState::Stopped);
+    PropMask |= STATE_SET;
 
     return Save(); /* Serialize on creation  */
 }
@@ -1993,11 +1994,22 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
     CurrentContainer = const_cast<TContainer *>(this);
     CurrentClient = &fakeroot;
 
+    std::string container_state;
+
     for (int i = 0; i < node.pairs_size(); i++) {
 
         std::string key = node.pairs(i).key();
         std::string value = node.pairs(i).val();
         error = TError::Success();
+
+        if (key == D_STATE) {
+            /*
+             * We need to set state at the last moment
+             * because properties depends on the current value
+             */
+            container_state = value;
+            continue;
+        }
 
         auto pv = Prop->Find(key);
 
@@ -2042,6 +2054,12 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
 
     }
 
+    /* Valid container state cannot be empty */
+    if (container_state.length() > 0) {
+        ContainerState.SetFromRestore(container_state);
+        PropMask |= ContainerState.SetMask;
+    }
+
     CurrentContainer = nullptr;
     CurrentClient = nullptr;
 
@@ -2064,11 +2082,9 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
     // { SET respawn_count, oom_killed, start_errno
     // } SET state -> running
 
-    bool created = Data->HasValue(D_STATE);
+    bool created = (PropMask & STATE_SET) > 0;
     if (!created)
         return TError(EError::Unknown, "Container has not been created");
-
-    auto state = Data->Get<std::string>(D_STATE);
 
     bool started = (PropMask & ROOT_PID_SET) > 0;
     if (started) {
@@ -2172,7 +2188,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
             }
         }
 
-        if (state == ContainerStateName(EContainerState::Dead)) {
+        if (State == EContainerState::Dead) {
             // we started recording death time since porto v1.15,
             // use some sensible default
             if (!(PropMask & DEATH_TIME_SET)) {
@@ -2214,7 +2230,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
         if (freezerCg.Exists() && !freezerCg.IsEmpty())
             (void)freezerCg.KillAll(9);
 
-        if (state == ContainerStateName(EContainerState::Meta) &&
+        if (State == EContainerState::Meta &&
                 Command.empty())
             SetState(EContainerState::Meta);
         else

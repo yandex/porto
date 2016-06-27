@@ -15,14 +15,6 @@ extern "C" {
 #include <sys/sysinfo.h>
 }
 
-class TStateData : public TStringValue, public TContainerValue {
-public:
-    TStateData() :
-        TStringValue(READ_ONLY_VALUE | PERSISTENT_VALUE),
-        TContainerValue(D_STATE,
-                        "container state (ro)") {}
-};
-
 class TOomKilledData : public TBoolValue, public TContainerValue {
 public:
     TOomKilledData() :
@@ -523,7 +515,6 @@ public:
 void RegisterData(std::shared_ptr<TRawValueMap> m,
                   std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> data = {
-        new TStateData,
         new TOomKilledData,
         new TParentData,
         new TRespawnCountData,

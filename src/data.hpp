@@ -10,7 +10,6 @@ constexpr const char *D_ROOT_PID = "root_pid";
 constexpr const char *D_EXIT_STATUS = "exit_status";
 constexpr const char *D_START_ERRNO = "start_errno";
 constexpr const char *D_RESPAWN_COUNT = "respawn_count";
-constexpr const char *D_STATE = "state";
 constexpr const char *D_MAX_RSS = "max_rss";
 constexpr const char *D_STDOUT = "stdout";
 constexpr const char *D_STDERR = "stderr";

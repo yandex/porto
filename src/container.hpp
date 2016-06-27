@@ -57,7 +57,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     const std::string Name;
     const std::shared_ptr<TContainer> Parent;
     std::shared_ptr<TKeyValueStorage> Storage;
-    EContainerState State = EContainerState::Unknown;
     int Acquired = 0;
     int Id;
     int TaskStartErrno = -1;
@@ -78,7 +77,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void UpdateRunningChildren(size_t diff);
     TError UpdateSoftLimit();
     void SetState(EContainerState newState);
-    std::string ContainerStateName(EContainerState state);
 
     TError ApplyDynamicProperties();
     TError PrepareWorkDir();
@@ -180,6 +178,7 @@ public:
     uint64_t AgingTime;
     bool PortoEnabled;
     bool IsWeak;
+    EContainerState State = EContainerState::Unknown;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;
@@ -201,6 +200,7 @@ public:
     ~TContainer();
 
     std::string GetPortoNamespace() const;
+    std::string ContainerStateName(EContainerState state);
 
     void AcquireForced();
     bool Acquire();
