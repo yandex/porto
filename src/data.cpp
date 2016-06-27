@@ -30,34 +30,6 @@ public:
         TContainerValue(D_OOM_KILLED, "container has been killed by OOM (ro)") {}
 };
 
-class TAbsoluteNameData : public TStringValue, public TContainerValue {
-public:
-    TAbsoluteNameData() :
-        TStringValue(READ_ONLY_VALUE),
-        TContainerValue(D_ABSOLUTE_NAME,
-                        "container name including porto namespaces (ro)") {};
-
-    std::string GetDefault() const override {
-        auto ct = GetContainer();
-        if (ct->IsRoot() || ct->IsPortoRoot())
-            return ct->GetName();
-        return std::string(PORTO_ROOT_CONTAINER) + "/" + ct->GetName();
-    }
-};
-
-class TAbsoluteNamespaceData : public TStringValue, public TContainerValue {
-public:
-    TAbsoluteNamespaceData() :
-        TStringValue(READ_ONLY_VALUE),
-        TContainerValue(D_ABSOLUTE_NAMESPACE,
-                        "container namespace including parent namespaces (ro)") {};
-
-    std::string GetDefault() const override {
-        return std::string(PORTO_ROOT_CONTAINER) + "/" +
-                        GetContainer()->GetPortoNamespace();
-    }
-};
-
 class TParentData : public TStringValue, public TContainerValue {
 public:
     TParentData() :
@@ -552,8 +524,6 @@ void RegisterData(std::shared_ptr<TRawValueMap> m,
                   std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> data = {
         new TStateData,
-        new TAbsoluteNameData,
-        new TAbsoluteNamespaceData,
         new TOomKilledData,
         new TParentData,
         new TRespawnCountData,

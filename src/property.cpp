@@ -67,6 +67,8 @@ extern TContainerNetTos ContainerNetTos;
 extern TContainerAgingTime ContainerAgingTime;
 extern TContainerEnablePorto ContainerEnablePorto;
 extern TContainerWeak ContainerWeak;
+extern TContainerAbsoluteName ContainerAbsoluteName;
+extern TContainerAbsoluteNamespace ContainerAbsoluteNamespace;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -222,9 +224,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerUser.Name] = &ContainerUser;
     ContainerPropMap[ContainerGroup.Name] = &ContainerGroup;
     ContainerMemoryGuarantee.Init();
-    ContainerMemTotalGuarantee.Init();
     ContainerPropMap[ContainerMemoryGuarantee.Name] = &ContainerMemoryGuarantee;
-    ContainerPropMap[ContainerMemTotalGuarantee.Name] = &ContainerMemTotalGuarantee;
     ContainerPropMap[ContainerCommand.Name] = &ContainerCommand;
     ContainerPropMap[ContainerVirtMode.Name] = &ContainerVirtMode;
     ContainerPropMap[ContainerCwd.Name] = &ContainerCwd;
@@ -278,6 +278,10 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerAgingTime.Name] = &ContainerAgingTime;
     ContainerPropMap[ContainerEnablePorto.Name] = &ContainerEnablePorto;
     ContainerPropMap[ContainerWeak.Name] = &ContainerWeak;
+    ContainerPropMap[ContainerAbsoluteName.Name] = &ContainerAbsoluteName;
+    ContainerPropMap[ContainerAbsoluteNamespace.Name] = &ContainerAbsoluteNamespace;
+    ContainerMemTotalGuarantee.Init();
+    ContainerPropMap[ContainerMemTotalGuarantee.Name] = &ContainerMemTotalGuarantee;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -1977,6 +1981,23 @@ TError TContainerWeak::Set(const std::string &weak) {
 
 TError TContainerWeak::Get(std::string &value) {
     value = CurrentContainer->IsWeak ? "true" : "false";
+
+    return TError::Success();
+}
+
+TError TContainerAbsoluteName::Get(std::string &value) {
+    if (CurrentContainer->IsRoot() || CurrentContainer->IsPortoRoot())
+        value = CurrentContainer->GetName();
+    else
+        value = std::string(PORTO_ROOT_CONTAINER) + "/" +
+                CurrentContainer->GetName();
+
+    return TError::Success();
+}
+
+TError TContainerAbsoluteNamespace::Get(std::string &value) {
+    value = std::string(PORTO_ROOT_CONTAINER) + "/" +
+            CurrentContainer->GetPortoNamespace();
 
     return TError::Success();
 }

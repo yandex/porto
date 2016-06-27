@@ -189,6 +189,13 @@ TContainerEnablePorto ContainerEnablePorto(P_ENABLE_PORTO, ENABLE_PORTO_SET,
                                            "with porto (dynamic)");
 TContainerWeak ContainerWeak(P_WEAK, WEAK_SET, "Destroy container when "
                                                "client disconnects (dynamic)");
+TContainerAbsoluteName ContainerAbsoluteName(D_ABSOLUTE_NAME,
+                                             "container name including porto "
+                                             "namespaces (ro)");
+TContainerAbsoluteNamespace ContainerAbsoluteNamespace(D_ABSOLUTE_NAMESPACE,
+                                                       "container namespace "
+                                                       "including parent "
+                                                       "namespaces (ro)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,

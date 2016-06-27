@@ -125,6 +125,9 @@ constexpr int VIRT_MODE_OS = 1;
 constexpr const char *P_VIRT_MODE_OS = "os";
 constexpr const char *P_CMD_VIRT_MODE_OS = "/sbin/init";
 
+constexpr const char *D_ABSOLUTE_NAME = "absolute_name";
+constexpr const char *D_ABSOLUTE_NAMESPACE = "absolute_namespace";
+
 class TBindMap;
 class TTaskEnv;
 
@@ -796,6 +799,22 @@ public:
     TError Get(std::string &value);
     TContainerWeak(std::string name, uint64_t set_mask, std::string desc)
                           : TContainerProperty(name, set_mask, desc) {}
+};
+
+/* Read-only properties derived from data filelds follow below... */
+
+class TContainerAbsoluteName : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerAbsoluteName(std::string name, std::string desc)
+                           : TContainerProperty(name, desc) {}
+};
+
+class TContainerAbsoluteNamespace : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerAbsoluteNamespace(std::string name, std::string desc)
+                                : TContainerProperty(name, desc) {}
 };
 
 void InitContainerProperties(void);
