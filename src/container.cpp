@@ -1521,7 +1521,7 @@ TError TContainer::Stop(TScopedLock &holder_lock) {
     SetState(EContainerState::Stopped);
     FreeResources();
 
-    return TError::Success();
+    return Save();
 }
 
 TError TContainer::CheckPausedParent() {
@@ -1563,9 +1563,11 @@ TError TContainer::Pause(TScopedLock &holder_lock) {
             child.GetState() == EContainerState::Meta) {
             child.SetState(EContainerState::Paused);
         }
-        return TError::Success();
+
+        return child.Save();
     });
-    return TError::Success();
+
+    return Save();
 }
 
 TError TContainer::Resume(TScopedLock &holder_lock) {
@@ -1594,9 +1596,11 @@ TError TContainer::Resume(TScopedLock &holder_lock) {
         if (child.GetState() == EContainerState::Paused) {
             child.SetState(EContainerState::Running);
         }
-        return TError::Success();
+
+        return child.Save();
     });
-    return TError::Success();
+
+    return Save();
 }
 
 TError TContainer::Kill(int sig) {
@@ -2307,6 +2311,10 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
 
     RotateStdFile(Stdout, D_STDOUT_OFFSET);
     RotateStdFile(Stderr, D_STDERR_OFFSET);
+
+    error = Save();
+    if (error)
+        L_WRN() << "Can't save container state after exit: " << error << std::endl;
 
     if (MayRespawn())
         ScheduleRespawn();
