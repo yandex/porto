@@ -70,6 +70,7 @@ extern TContainerWeak ContainerWeak;
 extern TContainerAbsoluteName ContainerAbsoluteName;
 extern TContainerAbsoluteNamespace ContainerAbsoluteNamespace;
 extern TContainerState ContainerState;
+extern TContainerOomKilled ContainerOomKilled;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -283,6 +284,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerAbsoluteNamespace.Name] = &ContainerAbsoluteNamespace;
     ContainerMemTotalGuarantee.Init();
     ContainerPropMap[ContainerMemTotalGuarantee.Name] = &ContainerMemTotalGuarantee;
+    ContainerPropMap[ContainerOomKilled.Name] = &ContainerOomKilled;
     ContainerPropMap[ContainerState.Name] = &ContainerState;
 }
 
@@ -307,6 +309,16 @@ TError TContainerProperty::IsAlive(void) {
     if (state == EContainerState::Dead)
         return TError(EError::InvalidState,
                       "Cannot change property while in the dead state");
+
+    return TError::Success();
+}
+
+TError TContainerProperty::IsDead(void) {
+    auto state = CurrentContainer->GetState();
+
+    if (state != EContainerState::Dead)
+        return TError(EError::InvalidState,
+                      "Available only in dead state: " + Name);
 
     return TError::Success();
 }
@@ -2033,4 +2045,29 @@ TError TContainerState::Get(std::string &value) {
     value = CurrentContainer->ContainerStateName(CurrentContainer->GetState());
 
     return TError::Success();
+}
+
+TError TContainerOomKilled::SetFromRestore(const std::string &value) {
+    if (value == "true")
+        CurrentContainer->OomKilled = true;
+    else if (value == "false")
+        CurrentContainer->OomKilled = false;
+    else
+        return TError(EError::InvalidValue, "Invalid bool value");
+
+    return TError::Success();
+}
+
+TError TContainerOomKilled::GetToSave(std::string &value) {
+    value = CurrentContainer->OomKilled ? "true" : "false";
+
+    return TError::Success();
+}
+
+TError TContainerOomKilled::Get(std::string &value) {
+    TError error = IsDead();
+    if (error)
+        return error;
+
+    return GetToSave(value);
 }

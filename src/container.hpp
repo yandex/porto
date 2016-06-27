@@ -179,6 +179,7 @@ public:
     bool PortoEnabled;
     bool IsWeak;
     EContainerState State = EContainerState::Unknown;
+    bool OomKilled;
 
     // TODO: make private
     std::shared_ptr<TPropertyMap> Prop;

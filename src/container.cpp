@@ -197,6 +197,8 @@ TContainerAbsoluteNamespace ContainerAbsoluteNamespace(D_ABSOLUTE_NAMESPACE,
                                                        "including parent "
                                                        "namespaces (ro)");
 TContainerState ContainerState(D_STATE, "container state (ro)");
+TContainerOomKilled ContainerOomKilled(D_OOM_KILLED,
+                                       "container has been killed by OOM (ro)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -1091,9 +1093,8 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
     if (error)
         return error;
 
-    error = Data->Set<bool>(D_OOM_KILLED, false);
-    if (error)
-        return error;
+    OomKilled = false;
+    PropMask |= OOM_KILLED_SET;
 
     StartTime = GetCurrentTimeMs();
     PropMask |= START_TIME_SET;
@@ -2311,9 +2312,8 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
     if (oomKilled) {
         L_EVT() << Task->GetPid() << " killed by OOM" << std::endl;
 
-        TError error = Data->Set<bool>(D_OOM_KILLED, true);
-        if (error)
-            L_ERR() << "Can't set " << D_OOM_KILLED << ": " << error << std::endl;
+        OomKilled = true;
+        PropMask |= OOM_KILLED_SET;
 
         error = KillAll(holder_lock);
         if (error)

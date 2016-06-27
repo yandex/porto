@@ -15,13 +15,6 @@ extern "C" {
 #include <sys/sysinfo.h>
 }
 
-class TOomKilledData : public TBoolValue, public TContainerValue {
-public:
-    TOomKilledData() :
-        TBoolValue(READ_ONLY_VALUE | PERSISTENT_VALUE | POSTMORTEM_VALUE),
-        TContainerValue(D_OOM_KILLED, "container has been killed by OOM (ro)") {}
-};
-
 class TParentData : public TStringValue, public TContainerValue {
 public:
     TParentData() :
@@ -515,7 +508,6 @@ public:
 void RegisterData(std::shared_ptr<TRawValueMap> m,
                   std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> data = {
-        new TOomKilledData,
         new TParentData,
         new TRespawnCountData,
         new TRootPidData,

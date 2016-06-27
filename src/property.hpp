@@ -129,6 +129,8 @@ constexpr const char *D_ABSOLUTE_NAME = "absolute_name";
 constexpr const char *D_ABSOLUTE_NAMESPACE = "absolute_namespace";
 constexpr const char *D_STATE = "state";
 constexpr uint64_t STATE_SET = (1lu << 53);
+constexpr const char *D_OOM_KILLED = "oom_killed";
+constexpr uint64_t OOM_KILLED_SET = (1lu << 54);
 
 class TBindMap;
 class TTaskEnv;
@@ -188,6 +190,7 @@ public:
     bool IsSerializable;
     TError IsAliveAndStopped(void);
     TError IsAlive(void);
+    TError IsDead(void);
     virtual TError Set(const std::string &value) {
         if (IsReadOnly)
             return TError(EError::InvalidValue, "Read-only value: " + Name);
@@ -826,6 +829,17 @@ public:
     TContainerState(std::string name, std::string desc)
                     : TContainerProperty(name, desc, false, true) {
         SetMask = STATE_SET;
+    }
+};
+
+class TContainerOomKilled : public TContainerProperty {
+public:
+    TError SetFromRestore(const std::string &value);
+    TError GetToSave(std::string &value);
+    TError Get(std::string &value);
+    TContainerOomKilled(std::string name, std::string desc)
+                    : TContainerProperty(name, desc, false, true) {
+        SetMask = OOM_KILLED_SET;
     }
 };
 
