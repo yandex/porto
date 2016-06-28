@@ -10,6 +10,7 @@
 #include "util/unix.hpp"
 #include "util/cred.hpp"
 #include <sstream>
+#include "statistics.hpp"
 
 extern "C" {
 #include <linux/capability.h>
@@ -99,7 +100,9 @@ extern TContainerIoRead ContainerIoRead;
 extern TContainerIoWrite ContainerIoWrite;
 extern TContainerIoOps ContainerIoOps;
 extern TContainerTime ContainerTime;
+extern TContainerPortoStat ContainerPortoStat;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
+extern TStatistics *Statistics;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
                                  const std::string &property) const {
@@ -342,6 +345,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerIoWrite.Name] = &ContainerIoWrite;
     ContainerPropMap[ContainerIoOps.Name] = &ContainerIoOps;
     ContainerPropMap[ContainerTime.Name] = &ContainerTime;
+    ContainerPropMap[ContainerPortoStat.Name] = &ContainerPortoStat;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -2752,6 +2756,53 @@ TError TContainerTime::Get(std::string &value) {
     else
         value = std::to_string((GetCurrentTimeMs() -
                                CurrentContainer->StartTime) / 1000);
+
+    return TError::Success();
+}
+
+void TContainerPortoStat::Populate(TUintMap &m) {
+    m["spawned"] = Statistics->Spawned;
+    m["errors"] = Statistics->Errors;
+    m["warnings"] = Statistics->Warns;
+    m["master_uptime"] = (GetCurrentTimeMs() - Statistics->MasterStarted) / 1000;
+    m["slave_uptime"] = (GetCurrentTimeMs() - Statistics->SlaveStarted) / 1000;
+    m["queued_statuses"] = Statistics->QueuedStatuses;
+    m["queued_events"] = Statistics->QueuedEvents;
+    m["created"] = Statistics->Created;
+    m["remove_dead"] = Statistics->RemoveDead;
+    m["slave_timeout_ms"] = Statistics->SlaveTimeoutMs;
+    m["rotated"] = Statistics->Rotated;
+    m["restore_failed"] = Statistics->RestoreFailed;
+    m["started"] = Statistics->Started;
+    m["running"] = CurrentContainer->GetRunningChildren();
+    uint64_t usage = 0;
+    auto cg = MemorySubsystem.Cgroup(PORTO_DAEMON_CGROUP);
+    TError error = MemorySubsystem.Usage(cg, usage);
+    if (error)
+        L_ERR() << "Can't get memory usage of portod" << std::endl;
+    m["memory_usage_mb"] = usage / 1024 / 1024;
+    m["epoll_sources"] = Statistics->EpollSources;
+    m["containers"] = Statistics->Containers;
+    m["volumes"] = Statistics->Volumes;
+    m["clients"] = Statistics->Clients;
+}
+
+TError TContainerPortoStat::Get(std::string &value) {
+    TUintMap m;
+    Populate(m);
+
+    return UintMapToString(m, value);
+}
+
+TError TContainerPortoStat::GetIndexed(const std::string &index,
+                                       std::string &value) {
+    TUintMap m;
+    Populate(m);
+
+    if (m.find(index) == m.end())
+        return TError(EError::InvalidValue, "Invalid subscript for property");
+
+    value = std::to_string(m[index]);
 
     return TError::Success();
 }
