@@ -147,6 +147,13 @@ constexpr const char *D_MAJOR_FAULTS = "major_faults";
 constexpr const char *D_MAX_RSS = "max_rss";
 constexpr const char *D_CPU_USAGE = "cpu_usage";
 constexpr const char *D_CPU_SYSTEM = "cpu_usage_system";
+constexpr const char *D_NET_BYTES = "net_bytes";
+constexpr const char *D_NET_PACKETS = "net_packets";
+constexpr const char *D_NET_DROPS = "net_drops";
+constexpr const char *D_NET_OVERLIMITS = "net_overlimits";
+constexpr const char *D_NET_RX_BYTES = "net_rx_bytes";
+constexpr const char *D_NET_RX_PACKETS = "net_rx_packets";
+constexpr const char *D_NET_RX_DROPS = "net_rx_drops";
 
 class TBindMap;
 class TTaskEnv;
@@ -989,6 +996,62 @@ public:
     TError Get(std::string &value);
     TContainerCpuSystem(std::string name, std::string desc)
                         : TContainerProperty(name, desc) {}
+};
+
+class TContainerNetBytes : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetBytes(std::string name, std::string desc)
+                       : TContainerProperty(name, desc) {}
+};
+
+class TContainerNetPackets : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetPackets(std::string name, std::string desc)
+                         : TContainerProperty(name, desc) {}
+};
+
+class TContainerNetDrops : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetDrops(std::string name, std::string desc)
+                       : TContainerProperty(name, desc) {}
+};
+
+class TContainerNetOverlimits : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetOverlimits(std::string name, std::string desc)
+                            : TContainerProperty(name, desc) {}
+};
+
+class TContainerNetRxBytes : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetRxBytes(std::string name, std::string desc)
+                         : TContainerProperty(name, desc) {}
+};
+
+class TContainerNetRxPackets : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetRxPackets(std::string name, std::string desc)
+                           : TContainerProperty(name, desc) {}
+};
+
+class TContainerNetRxDrops : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerNetRxDrops(std::string name, std::string desc)
+                         : TContainerProperty(name, desc) {}
 };
 
 void InitContainerProperties(void);

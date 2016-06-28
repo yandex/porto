@@ -87,6 +87,13 @@ extern TContainerMajorFaults ContainerMajorFaults;
 extern TContainerMaxRss ContainerMaxRss;
 extern TContainerCpuUsage ContainerCpuUsage;
 extern TContainerCpuSystem ContainerCpuSystem;
+extern TContainerNetBytes ContainerNetBytes;
+extern TContainerNetPackets ContainerNetPackets;
+extern TContainerNetDrops ContainerNetDrops;
+extern TContainerNetOverlimits ContainerNetOverlimits;
+extern TContainerNetRxBytes ContainerNetRxBytes;
+extern TContainerNetRxPackets ContainerNetRxPackets;
+extern TContainerNetRxDrops ContainerNetRxDrops;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -319,6 +326,13 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerMaxRss.Name] = &ContainerMaxRss;
     ContainerPropMap[ContainerCpuUsage.Name] = &ContainerCpuUsage;
     ContainerPropMap[ContainerCpuSystem.Name] = &ContainerCpuSystem;
+    ContainerPropMap[ContainerNetBytes.Name] = &ContainerNetBytes;
+    ContainerPropMap[ContainerNetPackets.Name] = &ContainerNetPackets;
+    ContainerPropMap[ContainerNetDrops.Name] = &ContainerNetDrops;
+    ContainerPropMap[ContainerNetOverlimits.Name] = &ContainerNetOverlimits;
+    ContainerPropMap[ContainerNetRxBytes.Name] = &ContainerNetRxBytes;
+    ContainerPropMap[ContainerNetRxPackets.Name] = &ContainerNetRxPackets;
+    ContainerPropMap[ContainerNetRxDrops.Name] = &ContainerNetRxDrops;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -2358,6 +2372,202 @@ TError TContainerCpuSystem::Get(std::string &value) {
     } else {
         value = std::to_string(val);
     }
+
+    return TError::Success();
+}
+
+TError TContainerNetBytes::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    (void)CurrentContainer->GetStat(ETclassStat::Bytes, m);
+
+    return UintMapToString(m, value);
+}
+
+TError TContainerNetBytes::GetIndexed(const std::string &index,
+                                      std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    (void)CurrentContainer->GetStat(ETclassStat::Bytes, m);
+
+    if (m.find(index) == m.end())
+        return TError(EError::InvalidValue, "Invalid subscript for property");
+
+    value = std::to_string(m[index]);
+
+    return TError::Success();
+}
+
+TError TContainerNetPackets::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    (void)CurrentContainer->GetStat(ETclassStat::Packets, m);
+
+    return UintMapToString(m, value);
+}
+
+TError TContainerNetPackets::GetIndexed(const std::string &index,
+                                      std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    (void)CurrentContainer->GetStat(ETclassStat::Packets, m);
+
+    if (m.find(index) == m.end())
+        return TError(EError::InvalidValue, "Invalid subscript for property");
+
+    value = std::to_string(m[index]);
+
+    return TError::Success();
+}
+
+TError TContainerNetDrops::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    (void)CurrentContainer->GetStat(ETclassStat::Drops, m);
+
+    return UintMapToString(m, value);
+}
+
+TError TContainerNetDrops::GetIndexed(const std::string &index,
+                                      std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    (void)CurrentContainer->GetStat(ETclassStat::Drops, m);
+
+    if (m.find(index) == m.end())
+        return TError(EError::InvalidValue, "Invalid subscript for property");
+
+    value = std::to_string(m[index]);
+
+    return TError::Success();
+}
+
+TError TContainerNetOverlimits::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    (void)CurrentContainer->GetStat(ETclassStat::Overlimits, m);
+
+    return UintMapToString(m, value);
+}
+
+TError TContainerNetOverlimits::GetIndexed(const std::string &index,
+                                      std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    (void)CurrentContainer->GetStat(ETclassStat::Overlimits, m);
+
+    if (m.find(index) == m.end())
+        return TError(EError::InvalidValue, "Invalid subscript for property");
+
+    value = std::to_string(m[index]);
+
+    return TError::Success();
+}
+
+TError TContainerNetRxBytes::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    (void)CurrentContainer->GetStat(ETclassStat::RxBytes, m);
+
+    return UintMapToString(m, value);
+}
+
+TError TContainerNetRxBytes::GetIndexed(const std::string &index,
+                                      std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    (void)CurrentContainer->GetStat(ETclassStat::RxBytes, m);
+
+    if (m.find(index) == m.end())
+        return TError(EError::InvalidValue, "Invalid subscript for property");
+
+    value = std::to_string(m[index]);
+
+    return TError::Success();
+}
+
+TError TContainerNetRxPackets::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    (void)CurrentContainer->GetStat(ETclassStat::RxPackets, m);
+
+    return UintMapToString(m, value);
+}
+
+TError TContainerNetRxPackets::GetIndexed(const std::string &index,
+                                      std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    (void)CurrentContainer->GetStat(ETclassStat::RxPackets, m);
+
+    if (m.find(index) == m.end())
+        return TError(EError::InvalidValue, "Invalid subscript for property");
+
+    value = std::to_string(m[index]);
+
+    return TError::Success();
+}
+
+TError TContainerNetRxDrops::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    (void)CurrentContainer->GetStat(ETclassStat::RxDrops, m);
+
+    return UintMapToString(m, value);
+}
+
+TError TContainerNetRxDrops::GetIndexed(const std::string &index,
+                                      std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    (void)CurrentContainer->GetStat(ETclassStat::RxDrops, m);
+
+    if (m.find(index) == m.end())
+        return TError(EError::InvalidValue, "Invalid subscript for property");
+
+    value = std::to_string(m[index]);
 
     return TError::Success();
 }

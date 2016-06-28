@@ -232,6 +232,28 @@ TContainerCpuUsage ContainerCpuUsage(D_CPU_USAGE,
 TContainerCpuSystem ContainerCpuSystem(D_CPU_SYSTEM,
                                      "consumed system CPU time "
                                      "[nanoseconds] (ro)");
+TContainerNetBytes ContainerNetBytes(D_NET_BYTES,
+                                     "tx bytes: <interface>: "
+                                     "<bytes>;... (ro)");
+TContainerNetPackets ContainerNetPackets(D_NET_PACKETS,
+                                         "tx packets: <interface>: "
+                                         "<packets>;... (ro)");
+TContainerNetDrops ContainerNetDrops(D_NET_DROPS,
+                                     "dropped tx packets: <interface>: "
+                                     "<packets>;... (ro)");
+TContainerNetOverlimits ContainerNetOverlimits(D_NET_OVERLIMITS,
+                                               "overlimit tx packets: "
+                                               "<interface>: <packets>;"
+                                               "... (ro)");
+TContainerNetRxBytes ContainerNetRxBytes(D_NET_RX_BYTES,
+                                         "rx bytes: <interface>: "
+                                         "<bytes>;... (ro)");
+TContainerNetRxPackets ContainerNetRxPackets(D_NET_RX_PACKETS,
+                                             "rx packets: <interface>: "
+                                             "<packets>;... (ro)");
+TContainerNetRxDrops ContainerNetRxDrops(D_NET_RX_DROPS,
+                                         "dropped rx packets: <interface>: "
+                                         "<packets>;... (ro)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,

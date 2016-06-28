@@ -4,13 +4,6 @@
 
 class TContainer;
 
-constexpr const char *D_NET_BYTES = "net_bytes";
-constexpr const char *D_NET_PACKETS = "net_packets";
-constexpr const char *D_NET_DROPS = "net_drops";
-constexpr const char *D_NET_OVERLIMITS = "net_overlimits";
-constexpr const char *D_NET_RX_BYTES = "net_rx_bytes";
-constexpr const char *D_NET_RX_PACKETS = "net_rx_packets";
-constexpr const char *D_NET_RX_DROPS = "net_rx_drops";
 constexpr const char *D_IO_READ = "io_read";
 constexpr const char *D_IO_WRITE = "io_write";
 constexpr const char *D_IO_OPS = "io_ops";

@@ -15,104 +15,6 @@ extern "C" {
 #include <sys/sysinfo.h>
 }
 
-class TNetBytesData : public TMapValue, public TContainerValue {
-public:
-    TNetBytesData() :
-        TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_NET_BYTES,
-                        "tx bytes: <interface>: <bytes>;... (ro)") {}
-
-    TUintMap GetDefault() const override {
-        TUintMap m;
-        (void)GetContainer()->GetStat(ETclassStat::Bytes, m);
-        return m;
-    }
-};
-
-class TNetPacketsData : public TMapValue, public TContainerValue {
-public:
-    TNetPacketsData() :
-        TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_NET_PACKETS,
-                        "tx packets: <interface>: <packets>;... (ro)") {}
-
-    TUintMap GetDefault() const override {
-        TUintMap m;
-        (void)GetContainer()->GetStat(ETclassStat::Packets, m);
-        return m;
-    }
-};
-
-class TNetDropsData : public TMapValue, public TContainerValue {
-public:
-    TNetDropsData() :
-        TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_NET_DROPS,
-                        "dropped tx packets: <interface>: <packets>;... (ro)") {}
-
-    TUintMap GetDefault() const override {
-        TUintMap m;
-        (void)GetContainer()->GetStat(ETclassStat::Drops, m);
-        return m;
-    }
-};
-
-class TNetOverlimitsData : public TMapValue, public TContainerValue {
-public:
-    TNetOverlimitsData() :
-        TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_NET_OVERLIMITS,
-                        "overlimit tx packets: <interface>: <packets>;... (ro)") {}
-
-    TUintMap GetDefault() const override {
-        TUintMap m;
-        (void)GetContainer()->GetStat(ETclassStat::Overlimits, m);
-        return m;
-    }
-};
-
-class TNetRxBytes : public TMapValue, public TContainerValue {
-public:
-    TNetRxBytes() :
-        TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_NET_RX_BYTES,
-                        "rx bytes: <interface>: <bytes>;... (ro)") {}
-
-    TUintMap GetDefault() const override {
-        TUintMap m;
-        (void)GetContainer()->GetStat(ETclassStat::RxBytes, m);
-        return m;
-    }
-};
-
-class TNetRxPackets : public TMapValue, public TContainerValue {
-public:
-    TNetRxPackets() :
-        TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_NET_RX_PACKETS,
-                        "rx packets: <interface>: <packets>;... (ro)") {}
-
-    TUintMap GetDefault() const override {
-        TUintMap m;
-        (void)GetContainer()->GetStat(ETclassStat::RxPackets, m);
-        return m;
-    }
-};
-
-class TNetRxDrops : public TMapValue, public TContainerValue {
-public:
-    TNetRxDrops() :
-        TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_NET_RX_DROPS,
-                        "dropped rx packets: <interface>: <packets>;... (ro)") {}
-
-    TUintMap GetDefault() const override {
-        TUintMap m;
-        (void)GetContainer()->GetStat(ETclassStat::RxDrops, m);
-        return m;
-    }
-};
-
 class TIoReadData : public TMapValue, public TContainerValue {
 public:
     TIoReadData() :
@@ -274,13 +176,6 @@ public:
 void RegisterData(std::shared_ptr<TRawValueMap> m,
                   std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> data = {
-        new TNetBytesData,
-        new TNetPacketsData,
-        new TNetDropsData,
-        new TNetOverlimitsData,
-        new TNetRxBytes,
-        new TNetRxPackets,
-        new TNetRxDrops,
         new TIoReadData,
         new TIoWriteData,
         new TIoOpsData,
