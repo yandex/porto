@@ -317,8 +317,12 @@ static noinline TError CreateContainer(TContext &context,
     err = context.Cholder->Create(holder_lock, name, client->GetCred(), container);
 
     if (!err && weak) {
-        container->Prop->Set<bool>(P_WEAK, true);
-        client->WeakContainers.emplace_back(container);
+        container->IsWeak = true;
+        container->PropMask |= WEAK_SET;
+
+        err = container->Save();
+        if (!err)
+            client->WeakContainers.emplace_back(container);
     }
 
     return err;
