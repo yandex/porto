@@ -208,6 +208,14 @@ TContainerExitStatus ContainerExitStatus(D_EXIT_STATUS,
                                          "container exit status (ro)");
 TContainerStartErrno ContainerStartErrno(D_START_ERRNO,
                                          "container start error (ro)");
+TContainerStdout ContainerStdout(D_STDOUT,
+                                 "stdout (optional start [offset]) (ro)");
+TContainerStdoutOffset ContainerStdoutOffset(D_STDOUT_OFFSET,
+                                             "stored stdout offset (ro)");
+TContainerStderr ContainerStderr(D_STDERR,
+                                 "stderr (optional start [offset]) (ro)");
+TContainerStderrOffset ContainerStderrOffset(D_STDERR_OFFSET,
+                                             "stored stderr offset (ro)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -276,6 +284,8 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     IsWeak = false;
     ExitStatus = 0;
     TaskStartErrno = -1;
+    StdoutOffset = 0;
+    StderrOffset = 0;
 }
 
 TContainer::~TContainer() {
@@ -354,14 +364,12 @@ TPath TContainer::ActualStdPath(const std::string &path_str,
     }
 }
 
-TError TContainer::RotateStdFile(TStdStream &stream, const std::string &type) {
+TError TContainer::RotateStdFile(TStdStream &stream, uint64_t &offset_value) {
     off_t loss;
     TError error = stream.Rotate(config().container().max_log_size(), loss);
-    if (error) {
-        L_ERR() << "Can't rotate " + type + ": " << error << std::endl;
-    } else if (loss) {
-            uint64_t offset = Data->Get<uint64_t>(type);
-            Data->Set<uint64_t>(type, offset + loss);
+
+    if (!error && loss) {
+            offset_value += loss;
     }
 
     return error;
@@ -2328,8 +2336,13 @@ void TContainer::Exit(TScopedLock &holder_lock, int status, bool oomKilled) {
     RootPid = {0, 0, 0};
     PropMask |= ROOT_PID_SET;
 
-    RotateStdFile(Stdout, D_STDOUT_OFFSET);
-    RotateStdFile(Stderr, D_STDERR_OFFSET);
+    error = RotateStdFile(Stdout, StdoutOffset);
+    if (error)
+        L_ERR() << "Can't rotate stdout_offset: " << error << std::endl;
+
+    error = RotateStdFile(Stderr, StderrOffset);
+    if (error)
+        L_ERR() << "Can't rotate stderr_offset: " << error << std::endl;
 
     error = Save();
     if (error)
@@ -2441,8 +2454,14 @@ void TContainer::DeliverEvent(TScopedLock &holder_lock, const TEvent &event) {
             break;
         case EEventType::RotateLogs:
             if (GetState() == EContainerState::Running && Task) {
-                RotateStdFile(Stdout, D_STDOUT_OFFSET);
-                RotateStdFile(Stderr, D_STDERR_OFFSET);
+                error = RotateStdFile(Stdout, StdoutOffset);
+                if (error)
+                    L_ERR() << "Can't rotate stdout_offset: " << error
+                            << std::endl;
+                error = RotateStdFile(Stderr, StderrOffset);
+                if (error)
+                    L_ERR() << "Can't rotate stderr_offset: " << error
+                            << std::endl;
             }
             break;
         case EEventType::Respawn:

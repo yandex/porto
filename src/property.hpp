@@ -49,8 +49,6 @@ constexpr const char *P_STDERR_PATH = "stderr_path";
 constexpr uint64_t STDERR_SET = (1 << 16);
 constexpr const char *P_STDOUT_LIMIT = "stdout_limit";
 constexpr uint64_t STDOUT_LIMIT_SET = (1lu << 17);
-constexpr const char *P_STDOUT_OFFSET = "stdout_offset";
-constexpr const char *P_STDERR_OFFSET = "stderr_offset";
 constexpr const char *P_MEM_GUARANTEE = "memory_guarantee";
 constexpr uint64_t MEM_GUARANTEE_SET = (1lu << 20);
 constexpr const char *P_MEM_LIMIT = "memory_limit";
@@ -138,6 +136,10 @@ constexpr const char *D_ROOT_PID = "root_pid";
 constexpr const char *D_EXIT_STATUS = "exit_status";
 constexpr uint64_t EXIT_STATUS_SET = (1lu << 56);
 constexpr const char *D_START_ERRNO = "start_errno";
+constexpr const char *D_STDOUT = "stdout";
+constexpr const char *D_STDOUT_OFFSET = "stdout_offset";
+constexpr const char *D_STDERR = "stderr";
+constexpr const char *D_STDERR_OFFSET = "stderr_offset";
 
 class TBindMap;
 class TTaskEnv;
@@ -891,6 +893,37 @@ public:
     TError Get(std::string &value);
     TContainerStartErrno(std::string name, std::string desc)
                          : TContainerProperty(name, desc) {}
+};
+
+class TContainerStdout : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerStdout(std::string name, std::string desc)
+                     : TContainerProperty(name, desc) {}
+};
+
+class TContainerStdoutOffset : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerStdoutOffset(std::string name, std::string desc)
+                           : TContainerProperty(name, desc) {}
+};
+
+
+class TContainerStderr : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerStderr(std::string name, std::string desc)
+                     : TContainerProperty(name, desc) {}
+};
+
+class TContainerStderrOffset : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerStderrOffset(std::string name, std::string desc)
+                           : TContainerProperty(name, desc) {}
 };
 
 void InitContainerProperties(void);

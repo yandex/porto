@@ -76,6 +76,10 @@ extern TContainerRespawnCount ContainerRespawnCount;
 extern TContainerRootPid ContainerRootPid;
 extern TContainerExitStatus ContainerExitStatus;
 extern TContainerStartErrno ContainerStartErrno;
+extern TContainerStdout ContainerStdout;
+extern TContainerStdoutOffset ContainerStdoutOffset;
+extern TContainerStderr ContainerStderr;
+extern TContainerStderrOffset ContainerStderrOffset;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -296,6 +300,10 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerRootPid.Name] = &ContainerRootPid;
     ContainerPropMap[ContainerExitStatus.Name] = &ContainerExitStatus;
     ContainerPropMap[ContainerStartErrno.Name] = &ContainerStartErrno;
+    ContainerPropMap[ContainerStdout.Name] = &ContainerStdout;
+    ContainerPropMap[ContainerStdoutOffset.Name] = &ContainerStdoutOffset;
+    ContainerPropMap[ContainerStderr.Name] = &ContainerStderr;
+    ContainerPropMap[ContainerStderrOffset.Name] = &ContainerStderrOffset;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -2149,6 +2157,70 @@ TError TContainerExitStatus::Get(std::string &value) {
 
 TError TContainerStartErrno::Get(std::string &value) {
     value = std::to_string(CurrentContainer->TaskStartErrno);
+
+    return TError::Success();
+}
+
+TError TContainerStdout::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    return CurrentContainer->GetStdout().Read(value,
+                                              CurrentContainer->StdoutLimit,
+                                              CurrentContainer->StdoutOffset);
+}
+
+TError TContainerStdout::GetIndexed(const std::string &index,
+                                    std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    return CurrentContainer->GetStdout().Read(value,
+                                              CurrentContainer->StdoutLimit,
+                                              CurrentContainer->StdoutOffset,
+                                              index);
+}
+
+TError TContainerStdoutOffset::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    value = std::to_string(CurrentContainer->StdoutOffset);
+
+    return TError::Success();
+}
+
+TError TContainerStderr::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    return CurrentContainer->GetStderr().Read(value,
+                                              CurrentContainer->StdoutLimit,
+                                              CurrentContainer->StderrOffset);
+}
+
+TError TContainerStderr::GetIndexed(const std::string &index,
+                                    std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    return CurrentContainer->GetStderr().Read(value,
+                                              CurrentContainer->StdoutLimit,
+                                              CurrentContainer->StderrOffset,
+                                              index);
+}
+
+TError TContainerStderrOffset::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    value = std::to_string(CurrentContainer->StderrOffset);
 
     return TError::Success();
 }

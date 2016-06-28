@@ -5,10 +5,6 @@
 class TContainer;
 
 constexpr const char *D_MAX_RSS = "max_rss";
-constexpr const char *D_STDOUT = "stdout";
-constexpr const char *D_STDERR = "stderr";
-constexpr const char *D_STDOUT_OFFSET = "stdout_offset";
-constexpr const char *D_STDERR_OFFSET = "stderr_offset";
 constexpr const char *D_CPU_USAGE = "cpu_usage";
 constexpr const char *D_CPU_SYSTEM = "cpu_usage_system";
 constexpr const char *D_MEMORY_USAGE = "memory_usage";

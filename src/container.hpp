@@ -181,6 +181,8 @@ public:
     bool OomKilled;
     int ExitStatus;
     int TaskStartErrno = -1;
+    uint64_t StdoutOffset;
+    uint64_t StderrOffset;
 
     // TODO: make private
     std::unique_ptr<TTask> Task;
@@ -192,7 +194,7 @@ public:
     TPath RootPath() const;
     TPath WorkPath() const;
     TPath ActualStdPath(const std::string &path_str, bool is_default, bool host) const;
-    TError RotateStdFile(TStdStream &stream, const std::string &type);
+    TError RotateStdFile(TStdStream &stream, uint64_t &offset_value);
     EContainerState GetState() const;
     TError GetStat(ETclassStat stat, std::map<std::string, uint64_t> &m);
 

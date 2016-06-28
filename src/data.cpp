@@ -15,62 +15,6 @@ extern "C" {
 #include <sys/sysinfo.h>
 }
 
-class TStdoutData : public TTextValue, public TContainerValue {
-public:
-    TStdoutData() :
-        TTextValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_STDOUT,
-                        "stdout (optional start [offset]) (ro)") {}
-
-    TError GetString(std::string &value) const override {
-        auto c = GetContainer();
-        return c->GetStdout().Read(value, c->StdoutLimit,
-                                   c->Data->Get<uint64_t>(P_STDOUT_OFFSET));
-    }
-
-    TError GetIndexed(const std::string &index, std::string &value) const override {
-        auto c = GetContainer();
-        return c->GetStdout().Read(value, c->StdoutLimit,
-                                   c->Data->Get<uint64_t>(P_STDOUT_OFFSET),
-                                   index);
-    }
-};
-
-class TStderrData : public TTextValue, public TContainerValue {
-public:
-    TStderrData() :
-        TTextValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_STDERR,
-                        "stderr (optional start [offset]) (ro)") {}
-
-
-    TError GetString(std::string &value) const override {
-        auto c = GetContainer();
-        return c->GetStderr().Read(value, c->StdoutLimit,
-                                   c->Data->Get<uint64_t>(P_STDOUT_OFFSET));
-    }
-
-    TError GetIndexed(const std::string &index, std::string &value) const override {
-        auto c = GetContainer();
-        return c->GetStderr().Read(value, c->StdoutLimit,
-                                   c->Data->Get<uint64_t>(P_STDERR_OFFSET), index);
-    }
-};
-
-class TStdoutOffset : public TUintValue, public TContainerValue {
-public:
-    TStdoutOffset() :
-        TUintValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_STDOUT_OFFSET, "stored stdout offset (ro)") {}
-};
-
-class TStderrOffset : public TUintValue, public TContainerValue {
-public:
-    TStderrOffset() :
-        TUintValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_STDERR_OFFSET, "stored stderr offset (ro)") {}
-};
-
 class TCpuUsageData : public TUintValue, public TContainerValue {
 public:
     TCpuUsageData() :
@@ -464,10 +408,6 @@ public:
 void RegisterData(std::shared_ptr<TRawValueMap> m,
                   std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> data = {
-        new TStdoutData,
-        new TStderrData,
-        new TStdoutOffset,
-        new TStderrOffset,
         new TCpuUsageData,
         new TCpuSystemData,
         new TMemUsageData,
