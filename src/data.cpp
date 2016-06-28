@@ -15,88 +15,6 @@ extern "C" {
 #include <sys/sysinfo.h>
 }
 
-class TIoReadData : public TMapValue, public TContainerValue {
-public:
-    TIoReadData() :
-        TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_IO_READ,
-                        "read from disk [bytes] (ro)") {}
-
-    TUintMap GetDefault() const override {
-        auto memCg = GetContainer()->GetCgroup(MemorySubsystem);
-        auto blkCg = GetContainer()->GetCgroup(BlkioSubsystem);
-        TUintMap memStat, result;
-        TError error;
-
-        error = MemorySubsystem.Statistics(memCg, memStat);
-        if (!error)
-            result["fs"] = memStat["fs_io_bytes"] - memStat["fs_io_write_bytes"];
-
-        std::vector<BlkioStat> blkStat;
-        error = BlkioSubsystem.Statistics(blkCg, "blkio.io_service_bytes_recursive", blkStat);
-        if (!error) {
-            for (auto &s : blkStat)
-                result[s.Device] = s.Read;
-        }
-
-        return result;
-    }
-};
-
-class TIoWriteData : public TMapValue, public TContainerValue {
-public:
-    TIoWriteData() :
-        TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_IO_WRITE, "written to disk [bytes] (ro)") {}
-
-    TUintMap GetDefault() const override {
-        auto memCg = GetContainer()->GetCgroup(MemorySubsystem);
-        auto blkCg = GetContainer()->GetCgroup(BlkioSubsystem);
-        TUintMap memStat, result;
-        TError error;
-
-        error = MemorySubsystem.Statistics(memCg, memStat);
-        if (!error)
-            result["fs"] = memStat["fs_io_write_bytes"];
-
-        std::vector<BlkioStat> blkStat;
-        error = BlkioSubsystem.Statistics(blkCg, "blkio.io_service_bytes_recursive", blkStat);
-        if (!error) {
-            for (auto &s : blkStat)
-                result[s.Device] = s.Write;
-        }
-
-        return result;
-    }
-};
-
-class TIoOpsData : public TMapValue, public TContainerValue {
-public:
-    TIoOpsData() :
-        TMapValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_IO_OPS, "io operations (ro)") {}
-
-    TUintMap GetDefault() const override {
-        auto memCg = GetContainer()->GetCgroup(MemorySubsystem);
-        auto blkCg = GetContainer()->GetCgroup(BlkioSubsystem);
-        TUintMap result, memStat;
-        TError error;
-
-        error = MemorySubsystem.Statistics(memCg, memStat);
-        if (!error)
-            result["fs"] = memStat["fs_io_operations"];
-
-        std::vector<BlkioStat> blkStat;
-        error = BlkioSubsystem.Statistics(blkCg, "blkio.io_serviced_recursive", blkStat);
-        if (!error) {
-            for (auto &s : blkStat)
-                result[s.Device] = s.Read + s.Write;
-        }
-
-        return result;
-    }
-};
-
 class TTimeData : public TUintValue, public TContainerValue {
 public:
     TTimeData() :
@@ -176,9 +94,6 @@ public:
 void RegisterData(std::shared_ptr<TRawValueMap> m,
                   std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> data = {
-        new TIoReadData,
-        new TIoWriteData,
-        new TIoOpsData,
         new TTimeData,
         new TPortoStatData,
     };

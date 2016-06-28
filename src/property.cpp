@@ -94,6 +94,9 @@ extern TContainerNetOverlimits ContainerNetOverlimits;
 extern TContainerNetRxBytes ContainerNetRxBytes;
 extern TContainerNetRxPackets ContainerNetRxPackets;
 extern TContainerNetRxDrops ContainerNetRxDrops;
+extern TContainerIoRead ContainerIoRead;
+extern TContainerIoWrite ContainerIoWrite;
+extern TContainerIoOps ContainerIoOps;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -333,6 +336,9 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerNetRxBytes.Name] = &ContainerNetRxBytes;
     ContainerPropMap[ContainerNetRxPackets.Name] = &ContainerNetRxPackets;
     ContainerPropMap[ContainerNetRxDrops.Name] = &ContainerNetRxDrops;
+    ContainerPropMap[ContainerIoRead.Name] = &ContainerIoRead;
+    ContainerPropMap[ContainerIoWrite.Name] = &ContainerIoWrite;
+    ContainerPropMap[ContainerIoOps.Name] = &ContainerIoOps;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -2563,6 +2569,141 @@ TError TContainerNetRxDrops::GetIndexed(const std::string &index,
 
     TUintMap m;
     (void)CurrentContainer->GetStat(ETclassStat::RxDrops, m);
+
+    if (m.find(index) == m.end())
+        return TError(EError::InvalidValue, "Invalid subscript for property");
+
+    value = std::to_string(m[index]);
+
+    return TError::Success();
+}
+
+void TContainerIoRead::Populate(TUintMap &m) {
+    auto memCg = CurrentContainer->GetCgroup(MemorySubsystem);
+    auto blkCg = CurrentContainer->GetCgroup(BlkioSubsystem);
+    TUintMap memStat;
+
+    TError error = MemorySubsystem.Statistics(memCg, memStat);
+    if (!error)
+        m["fs"] = memStat["fs_io_bytes"] - memStat["fs_io_write_bytes"];
+
+    std::vector<BlkioStat> blkStat;
+    error = BlkioSubsystem.Statistics(blkCg, "blkio.io_service_bytes_recursive", blkStat);
+    if (!error) {
+        for (auto &s : blkStat)
+            m[s.Device] = s.Read;
+    }
+}
+
+TError TContainerIoRead::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    Populate(m);
+
+    return UintMapToString(m, value);
+}
+
+TError TContainerIoRead::GetIndexed(const std::string &index,
+                                    std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    Populate(m);
+
+    if (m.find(index) == m.end())
+        return TError(EError::InvalidValue, "Invalid subscript for property");
+
+    value = std::to_string(m[index]);
+
+    return TError::Success();
+}
+
+void TContainerIoWrite::Populate(TUintMap &m) {
+    auto memCg = CurrentContainer->GetCgroup(MemorySubsystem);
+    auto blkCg = CurrentContainer->GetCgroup(BlkioSubsystem);
+    TUintMap memStat;
+
+    TError error = MemorySubsystem.Statistics(memCg, memStat);
+    if (!error)
+        m["fs"] = memStat["fs_io_write_bytes"];
+
+    std::vector<BlkioStat> blkStat;
+    error = BlkioSubsystem.Statistics(blkCg, "blkio.io_service_bytes_recursive", blkStat);
+    if (!error) {
+        for (auto &s : blkStat)
+            m[s.Device] = s.Write;
+    }
+
+}
+
+TError TContainerIoWrite::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    Populate(m);
+
+    return UintMapToString(m, value);
+}
+
+TError TContainerIoWrite::GetIndexed(const std::string &index, std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    Populate(m);
+
+    if (m.find(index) == m.end())
+        return TError(EError::InvalidValue, "Invalid subscript for property");
+
+    value = std::to_string(m[index]);
+
+    return TError::Success();
+}
+
+void TContainerIoOps::Populate(TUintMap &m) {
+    auto memCg = CurrentContainer->GetCgroup(MemorySubsystem);
+    auto blkCg = CurrentContainer->GetCgroup(BlkioSubsystem);
+    TUintMap memStat;
+
+    TError error = MemorySubsystem.Statistics(memCg, memStat);
+    if (!error)
+        m["fs"] = memStat["fs_io_operations"];
+
+    std::vector<BlkioStat> blkStat;
+    error = BlkioSubsystem.Statistics(blkCg, "blkio.io_service_bytes_recursive", blkStat);
+    if (!error) {
+        for (auto &s : blkStat)
+            m[s.Device] = s.Read + s.Write;
+    }
+}
+
+TError TContainerIoOps::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    Populate(m);
+
+    return UintMapToString(m, value);
+}
+
+TError TContainerIoOps::GetIndexed(const std::string &index,
+                                   std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    TUintMap m;
+    Populate(m);
 
     if (m.find(index) == m.end())
         return TError(EError::InvalidValue, "Invalid subscript for property");

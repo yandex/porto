@@ -154,6 +154,9 @@ constexpr const char *D_NET_OVERLIMITS = "net_overlimits";
 constexpr const char *D_NET_RX_BYTES = "net_rx_bytes";
 constexpr const char *D_NET_RX_PACKETS = "net_rx_packets";
 constexpr const char *D_NET_RX_DROPS = "net_rx_drops";
+constexpr const char *D_IO_READ = "io_read";
+constexpr const char *D_IO_WRITE = "io_write";
+constexpr const char *D_IO_OPS = "io_ops";
 
 class TBindMap;
 class TTaskEnv;
@@ -1052,6 +1055,33 @@ public:
     TError GetIndexed(const std::string &index, std::string &value);
     TContainerNetRxDrops(std::string name, std::string desc)
                          : TContainerProperty(name, desc) {}
+};
+
+class TContainerIoRead : public TContainerProperty {
+public:
+    void Populate(TUintMap &m);
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerIoRead(std::string name, std::string desc)
+                     : TContainerProperty(name, desc) {}
+};
+
+class TContainerIoWrite : public TContainerProperty {
+public:
+    void Populate(TUintMap &m);
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerIoWrite(std::string name, std::string desc)
+                      : TContainerProperty(name, desc) {}
+};
+
+class TContainerIoOps : public TContainerProperty {
+public:
+    void Populate(TUintMap &m);
+    TError Get(std::string &value);
+    TError GetIndexed(const std::string &index, std::string &value);
+    TContainerIoOps(std::string name, std::string desc)
+                    : TContainerProperty(name, desc) {}
 };
 
 void InitContainerProperties(void);
