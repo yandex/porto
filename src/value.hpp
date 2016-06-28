@@ -166,16 +166,6 @@ public:
     uint64_t GetDefault() const override;
 };
 
-class TCpusValue : public TStoredValue<double> {
-public:
-    TCpusValue(int flags) : TStoredValue(flags) {}
-
-    std::string ToString(const double &value) const override;
-    TError FromString(const std::string &value, double &result) const override;
-    double GetDefault() const override;
-    TError CheckValue(const double &value) override;
-};
-
 class TBoolValue : public TStoredValue<bool> {
 public:
     TBoolValue(int flags) : TStoredValue(flags) {}
@@ -183,15 +173,6 @@ public:
     std::string ToString(const bool &value) const override;
     TError FromString(const std::string &value, bool &result) const override;
     bool GetDefault() const override;
-};
-
-class TIntListValue : public TStoredValue<std::vector<int>> {
-public:
-    TIntListValue(int flags) : TStoredValue(flags) {}
-
-    std::string ToString(const std::vector<int> &value) const override;
-    TError FromString(const std::string &value, std::vector<int> &result) const override;
-    std::vector<int> GetDefault() const override;
 };
 
 typedef std::vector<std::string> TStrList;
@@ -203,18 +184,6 @@ public:
     std::string ToString(const TStrList &value) const override;
     TError FromString(const std::string &value, TStrList &result) const override;
     TStrList GetDefault() const override;
-};
-
-class TMapValue : public TStoredValue<TUintMap> {
-public:
-    TMapValue(int flags) : TStoredValue(flags) {}
-
-    std::string ToString(const TUintMap &value) const override;
-    TError FromString(const std::string &value, TUintMap &result) const override;
-    TUintMap GetDefault() const override;
-
-    TError GetIndexed(const std::string &index, std::string &value) const override;
-    TError SetIndexed(const std::string &index, const std::string &value) override;
 };
 
 class TRawValueMap {

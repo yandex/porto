@@ -104,64 +104,6 @@ extern TContainerPortoStat ContainerPortoStat;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 extern TStatistics *Statistics;
 
-bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
-                                 const std::string &property) const {
-    TError error = GetSharedContainer(c);
-    if (error) {
-        L_ERR() << "Can't get default for " << property << ": " << error << std::endl;
-        return false;
-    }
-
-    return HasFlags(property, PARENT_DEF_PROPERTY) && !c->Isolate;
-}
-
-bool TPropertyMap::HasFlags(const std::string &property, int flags) const {
-    auto prop = Find(property);
-    if (!prop) {
-        L_ERR() << TError(EError::Unknown, "Invalid property " + property) << std::endl;
-        return false;
-    }
-    return prop->HasFlag(flags);
-}
-
-TError TPropertyMap::PrepareTaskEnv(const std::string &property,
-                                    TTaskEnv &taskEnv) {
-    auto prop = Find(property);
-
-    // FIXME must die
-    if (!prop->HasValue()) {
-        std::string value;
-        TError error;
-
-        // if the value is default we still need PrepareTaskEnv method
-        // to be called, so set value to default and then reset it
-        error = prop->GetString(value);
-        if (!error)
-            error = prop->SetString(value);
-        if (error)
-            return error;
-        prop->Reset();
-    }
-
-    return ToContainerValue(prop)->PrepareTaskEnv(taskEnv);
-}
-
-TError TPropertyMap::GetSharedContainer(std::shared_ptr<TContainer> &c) const {
-    c = Container.lock();
-    if (!c)
-        return TError(EError::Unknown, "Can't convert weak container reference");
-
-    return TError::Success();
-}
-
-void RegisterProperties(std::shared_ptr<TRawValueMap> m,
-                        std::shared_ptr<TContainer> c) {
-    const std::vector<TValue *> properties = {};
-
-    for (auto p : properties)
-        AddContainerValue(m, c, p);
-}
-
 /*
  * Note for other properties:
  * Dead state 2-line check is mandatory for all properties

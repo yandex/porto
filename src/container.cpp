@@ -12,7 +12,6 @@
 #include "cgroup.hpp"
 #include "device.hpp"
 #include "property.hpp"
-#include "data.hpp"
 #include "event.hpp"
 #include "holder.hpp"
 #include "network.hpp"
@@ -1084,17 +1083,13 @@ void TContainer::AddChild(std::shared_ptr<TContainer> child) {
 TError TContainer::Create(const TCred &cred) {
     L_ACT() << "Create " << GetName() << " with id " << Id << " uid " << cred.Uid << " gid " << cred.Gid << std::endl;
 
-    TError error = Prepare();
-    if (error) {
-        L_ERR() << "Can't prepare container: " << error << std::endl;
-        return error;
-    }
+    CgroupEmptySince = 0;
 
     OwnerCred = TCred(cred.Uid, cred.Gid);
 
     PropMask |= USER_SET | GROUP_SET;
 
-    error = FindGroups(UserName(OwnerCred.Uid), OwnerCred.Gid, OwnerCred.Groups);
+    TError error = FindGroups(UserName(OwnerCred.Uid), OwnerCred.Gid, OwnerCred.Groups);
     if (error) {
         L_ERR() << "Can't set container owner: " << error << std::endl;
         return error;
@@ -1132,22 +1127,6 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
 
     if (!meta && !Command.length())
         return TError(EError::InvalidValue, "container command is empty");
-
-    // FIXME must die
-    // since we now have a complete picture of properties, check
-    // them once again (so we don't miss something due to set order)
-    for (auto name : Prop->List()) {
-        auto prop = Prop->Find(name);
-        if (prop->HasValue()) {
-            std::string value;
-
-            error = prop->GetString(value);
-            if (!error)
-                error = prop->SetString(value);
-            if (error)
-                return error;
-        }
-    }
 
     L_ACT() << "Start " << GetName() << " " << Id << std::endl;
 
@@ -1716,58 +1695,24 @@ TError TContainer::GetProperty(const string &origProperty, string &value,
     std::string idx;
     ParsePropertyName(property, idx);
 
-    auto prop = Prop->Find(property);
-    if (!prop) {
-        prop = Data->Find(property);
-        if (!prop) {
-            auto new_prop = ContainerPropMap.find(property);
-            if (new_prop == ContainerPropMap.end())
-                return TError(EError::InvalidProperty,
+    auto prop = ContainerPropMap.find(property);
+    if (prop == ContainerPropMap.end())
+        return TError(EError::InvalidProperty,
                               "Unknown container property: " + property);
 
-            if (!(*new_prop).second->IsSupported)
-                return TError(EError::NotSupported, "Not supported: " + property);
-
-            CurrentContainer = const_cast<TContainer *>(this);
-            CurrentClient = client.get();
-            if (idx.length())
-                error = (*new_prop).second->GetIndexed(idx, value);
-            else
-                error = (*new_prop).second->Get(value);
-            CurrentContainer = nullptr;
-            CurrentClient = nullptr;
-            return error;
-        }
-    }
-
-    if (prop->HasFlag(UNSUPPORTED_FEATURE))
+    if (!(*prop).second->IsSupported)
         return TError(EError::NotSupported, "Not supported: " + property);
 
-    if (State == EContainerState::Stopped && prop->HasFlag(RUNTIME_VALUE))
-        return TError(EError::InvalidState,
-                      "Not available in stopped state: " + property);
-
-    if (State != EContainerState::Dead && prop->HasFlag(POSTMORTEM_VALUE))
-        return TError(EError::InvalidState,
-                      "Available only in dead state: " + property);
-
-    if (!prop->HasValue() && prop->HasFlag(PARENT_DEF_PROPERTY) &&
-            !Isolate) {
-        for (auto p = Parent; p; p = p->Parent) {
-            prop = p->Prop->Find(property);
-            if (prop->HasValue() || p->Isolate)
-                break;
-        }
-    }
-
+    CurrentContainer = const_cast<TContainer *>(this);
+    CurrentClient = client.get();
     if (idx.length())
-        return prop->GetIndexed(idx, value);
+        error = (*prop).second->GetIndexed(idx, value);
+    else
+        error = (*prop).second->Get(value);
+    CurrentContainer = nullptr;
+    CurrentClient = nullptr;
 
-    error = prop->GetString(value);
-    if (error)
-        return error;
-
-    return TError::Success();
+    return error;
 }
 
 TError TContainer::SetProperty(const string &origProperty,
@@ -1782,103 +1727,29 @@ TError TContainer::SetProperty(const string &origProperty,
     string value = StringTrim(origValue);
     TError error;
 
-    auto prop = Prop->Find(property);
-    if (!prop) {
-        auto new_prop = ContainerPropMap.find(property);
-        if (new_prop == ContainerPropMap.end())
-            return TError(EError::Unknown, "Invalid property " + property);
+    auto new_prop = ContainerPropMap.find(property);
+    if (new_prop == ContainerPropMap.end())
+        return TError(EError::Unknown, "Invalid property " + property);
 
-        if (!(*new_prop).second->IsSupported)
-            return TError(EError::NotSupported, property + " is not supported");
-
-        CurrentContainer = const_cast<TContainer *>(this);
-        CurrentClient = client.get();
-        if (idx.length())
-            error = (*new_prop).second->SetIndexed(idx, value);
-        else
-            error = (*new_prop).second->Set(value);
-        CurrentContainer = nullptr;
-        CurrentClient = nullptr;
-
-        if (!error)
-            return Save();
-        return error;
-    }
-
-    if (prop->HasFlag(UNSUPPORTED_FEATURE))
+    if (!(*new_prop).second->IsSupported)
         return TError(EError::NotSupported, property + " is not supported");
 
-    if (State == EContainerState::Dead)
-        return TError(EError::InvalidState, "Cannot change in dead state");
-
-    if (State != EContainerState::Stopped && !prop->HasFlag(DYNAMIC_VALUE))
-        return TError(EError::InvalidState, "Cannot change in runtime");
-
-    bool superuser = client && client->GetCred().IsRootUser();
-
-    if (prop->HasFlag(SUPERUSER_PROPERTY) && !superuser) {
-        std::string current;
-        error = prop->GetString(current);
-        if (error)
-            return error;
-        if (value != current)
-            return TError(EError::Permission, "Only root can change this property");
-    }
-
+    CurrentContainer = const_cast<TContainer *>(this);
+    CurrentClient = client.get();
     if (idx.length())
-        error = prop->SetIndexed(idx, value);
+        error = (*new_prop).second->SetIndexed(idx, value);
     else
-        error = prop->SetString(value);
+        error = (*new_prop).second->Set(value);
+    CurrentContainer = nullptr;
+    CurrentClient = nullptr;
 
     if (error)
         return error;
-
-    if (State != EContainerState::Stopped) {
-        error = ApplyDynamicProperties();
-        if (error)
-            return error;
-
-    }
 
     // Write KVS snapshot, otherwise it may grow indefinitely and on next
     // restart we will merge it forever
 
     return Save();
-}
-
-TError TContainer::Prepare() {
-    std::shared_ptr<TKeyValueNode> kvnode;
-    if (!IsRoot() && !IsPortoRoot())
-        kvnode = Storage->GetNode(Id);
-
-    Prop = std::make_shared<TPropertyMap>(kvnode, shared_from_this());
-    PORTO_ASSERT(Prop != nullptr);
-    Data = std::make_shared<TValueMap>(kvnode);
-    PORTO_ASSERT(Data != nullptr);
-
-    RegisterData(Data, shared_from_this());
-    RegisterProperties(Prop, shared_from_this());
-
-    if (Name == ROOT_CONTAINER) {
-        auto dataList = Data->List();
-        auto propList = Prop->List();
-
-        for (auto name : dataList)
-            if (std::find(propList.begin(), propList.end(), name) != propList.end())
-                return TError(EError::Unknown, "Data and property names conflict: " + name);
-    }
-
-    TError error = Prop->Create();
-    if (error)
-        return error;
-
-    error = Data->Create();
-    if (error)
-        return error;
-
-   CgroupEmptySince = 0;
-
-    return TError::Success();
 }
 
 TError TContainer::RestoreNetwork() {
@@ -1934,7 +1805,7 @@ void TContainer::RestoreStdPath(const std::string &property,
         if (path.IsRegularStrict()) {
             L_ACT() << GetName() << ": restore " << property << " "
                     << path.ToString() << std::endl;
-            Prop->Set<std::string>(property, path.ToString());
+            ContainerPropMap[property]->Set(path.ToString());
         }
     }
 
@@ -1968,42 +1839,6 @@ TError TContainer::Save(void) {
     pair->set_key(std::string(P_RAW_NAME));
     pair->set_val(GetName());
 
-    for (auto knob_name : Prop->List()) {
-
-        auto knob = Prop->Find(knob_name);
-
-        if (!knob->HasFlag(PERSISTENT_VALUE) || !knob->HasValue())
-            continue;
-
-        std::string value;
-        error = knob->GetString(value);
-        if (error)
-            return error;
-
-        auto pair = new_node.add_pairs();
-        pair->set_key(knob_name);
-        pair->set_val(value);
-
-    }
-
-    for (auto data_knob_name : Data->List()) {
-
-        auto data_knob = Data->Find(data_knob_name);
-
-        if (!data_knob->HasFlag(PERSISTENT_VALUE) || !data_knob->HasValue())
-            continue;
-
-        std::string value;
-        error = data_knob->GetString(value);
-        if (error)
-            return error;
-
-        auto pair = new_node.add_pairs();
-        pair->set_key(data_knob_name);
-        pair->set_val(value);
-
-    }
-
     TClient fakeroot(TCred(0,0));
     CurrentContainer = const_cast<TContainer *>(this);
     CurrentClient = &fakeroot;
@@ -2033,15 +1868,14 @@ TError TContainer::Save(void) {
 TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
     L_ACT() << "Restore " << GetName() << " with id " << Id << std::endl;
 
-    TError error = Prepare();
-    if (error)
-        return error;
+    CgroupEmptySince = 0;
 
     TClient fakeroot(TCred(0,0));
     CurrentContainer = const_cast<TContainer *>(this);
     CurrentClient = &fakeroot;
 
     std::string container_state;
+    TError error;
 
     for (int i = 0; i < node.pairs_size(); i++) {
 
@@ -2058,32 +1892,7 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
             continue;
         }
 
-        auto pv = Prop->Find(key);
-
-        if (pv && pv->HasFlag(PERSISTENT_VALUE)) {
-
-            if (Verbose)
-                L_ACT() << "Restoring as property " << key << " = " << value << std::endl;
-
-            error = pv->SetString(value);
-            if (!error)
-                continue;
-        }
-
-        auto dv = Data->Find(key);
-
-        if (dv && dv->HasFlag(PERSISTENT_VALUE)) {
-
-            if (Verbose)
-                L_ACT() << "Restoring as data " << key << " = " << value << std::endl;
-
-            error = dv->SetString(value);
-            if (!error)
-                continue;
-        }
-
         auto prop = ContainerPropMap.find(key);
-
         if (prop != ContainerPropMap.end()) {
 
             if (Verbose)
@@ -2107,13 +1916,6 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
         PropMask |= ContainerState.SetMask;
     }
 
-    CurrentContainer = nullptr;
-    CurrentClient = nullptr;
-
-    error = Save(); /* FIXME: maybe we need do it at the end of func? */
-    if (error)
-        return error;
-
     // There are several points where we save value to the persistent store
     // which we may use as indication for events like:
     // - Container create failed
@@ -2129,11 +1931,14 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
     // { SET respawn_count, oom_killed, start_errno
     // } SET state -> running
 
-    bool created = (PropMask & STATE_SET) > 0;
-    if (!created)
-        return TError(EError::Unknown, "Container has not been created");
-
     bool started = (PropMask & ROOT_PID_SET) > 0;
+    bool created = (PropMask & STATE_SET) > 0;
+
+    if (!created) {
+        error = TError(EError::Unknown, "Container has not been created");
+        goto error;
+    }
+
     if (started) {
         std::vector<int> pids = RootPid;
 
@@ -2155,21 +1960,21 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
 
             L() << "Start parent " << parent->GetName() << " meta " << meta << std::endl;
 
-            TError error = parent->Start(nullptr, meta);
+            error = parent->Start(nullptr, meta);
             if (error)
-                return error;
+                goto error;
 
             parent = parent->Parent;
         }
 
-        TError error = PrepareResources(nullptr);
+        error = PrepareResources(nullptr);
         if (error)
-            return error;
+            goto error;
 
         error = PrepareTask(nullptr, nullptr);
         if (error) {
             FreeResources();
-            return error;
+            goto error;
         }
 
         Task->Restore(pids);
@@ -2295,7 +2100,16 @@ TError TContainer::Restore(TScopedLock &holder_lock, const kv::TNode &node) {
     if (Parent)
         Parent->AddChild(shared_from_this());
 
-    return TError::Success();
+    CurrentContainer = nullptr;
+    CurrentClient = nullptr;
+
+    return Save();
+
+error:
+    CurrentContainer = nullptr;
+    CurrentClient = nullptr;
+
+    return error;
 }
 
 TCgroup TContainer::GetCgroup(const TSubsystem &subsystem) const {

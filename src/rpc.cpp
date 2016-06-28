@@ -5,7 +5,6 @@
 #include "version.hpp"
 #include "holder.hpp"
 #include "property.hpp"
-#include "data.hpp"
 #include "container_value.hpp"
 #include "volume.hpp"
 #include "event.hpp"
@@ -705,18 +704,7 @@ noinline TError ListProperty(TContext &context,
     if (error)
         return TError(EError::Unknown, "Can't find root container");
 
-    for (auto name : container->Prop->List()) {
-        auto av = container->Prop->Find(name);
-        if (av->HasFlag(HIDDEN_VALUE) || av->HasFlag(UNSUPPORTED_FEATURE))
-            continue;
-
-        auto cv = ToContainerValue(av);
-        auto entry = list->add_list();
-        entry->set_name(name);
-        entry->set_desc(cv->GetDesc());
-    }
-
-    for (auto elem : ContainerPropMap) {
+   for (auto elem : ContainerPropMap) {
         if (!elem.second->IsSupported || elem.second->IsReadOnly ||
             elem.second->IsHidden)
             continue;
@@ -740,17 +728,6 @@ noinline TError ListData(TContext &context,
     TError error = context.Cholder->GetLocked(holder_lock, nullptr, ROOT_CONTAINER, false, container, lock);
     if (error)
         return TError(EError::Unknown, "Can't find root container");
-
-    for (auto name : container->Data->List()) {
-        auto av = container->Data->Find(name);
-        if (av->HasFlag(HIDDEN_VALUE) || av->HasFlag(UNSUPPORTED_FEATURE))
-            continue;
-
-        auto cv = ToContainerValue(av);
-        auto entry = list->add_list();
-        entry->set_name(name);
-        entry->set_desc(cv->GetDesc());
-    }
 
     for (auto elem : ContainerPropMap) {
         if (!elem.second->IsSupported || !elem.second->IsReadOnly ||

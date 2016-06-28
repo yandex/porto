@@ -57,40 +57,6 @@ uint64_t TSizeValue::GetDefault() const {
     return 0;
 }
 
-std::string TCpusValue::ToString(const double &value) const {
-    return StringFormat("%lgc", value);
-}
-
-TError TCpusValue::FromString(const std::string &value, double &result) const {
-    double val;
-    std::string unit;
-
-    TError error = StringToValue(value, val, unit);
-    if (error || val < 0)
-        return TError(EError::InvalidValue, "Invalid cpu value " + value);
-
-    if (unit == "")
-        result = val / 100 * GetNumCores();
-    else if (unit == "c")
-        result = val;
-    else
-        return TError(EError::InvalidValue, "Invalid cpu unit " + value);
-
-    return TError::Success();
-}
-
-double TCpusValue::GetDefault() const {
-    return 0;
-}
-
-TError TCpusValue::CheckValue(const double &value) {
-    if (value < 0)
-        return TError(EError::InvalidValue, "negative cpu count");
-    if (value > GetNumCores())
-        return TError(EError::InvalidValue, "value exceeds cpu count");
-    return TError::Success();
-}
-
 std::string TBoolValue::ToString(const bool &value) const {
     if (value)
         return "true";
@@ -109,35 +75,6 @@ TError TBoolValue::FromString(const std::string &value, bool &result) const {
 
 bool TBoolValue::GetDefault() const {
     return false;
-}
-
-std::string TIntListValue::ToString(const std::vector<int> &value) const {
-   std::stringstream str;
-   bool first = true;
-
-   for (auto v : value) {
-      if (first)
-         first = false;
-      else
-         str << ";";
-      str << v;
-   }
-
-   return str.str();
-}
-
-TError TIntListValue::FromString(const std::string &value, std::vector<int> &result) const {
-   std::vector<std::string> strings;
-
-   TError error = SplitEscapedString(value, ';', strings);
-   if (error)
-      return error;
-
-   return StringsToIntegers(strings, result);
-}
-
-std::vector<int> TIntListValue::GetDefault() const {
-    return std::vector<int>{};
 }
 
 std::string TListValue::ToString(const TStrList &value) const {
@@ -170,69 +107,6 @@ TError TListValue::FromString(const std::string &value, TStrList &result) const 
 
 TStrList TListValue::GetDefault() const {
     return TStrList{};
-}
-
-std::string TMapValue::ToString(const TUintMap &value) const {
-    std::stringstream str;
-
-    for (auto kv : value) {
-        if (str.str().length())
-            str << "; ";
-        str << kv.first << ": " << kv.second;
-    }
-
-    return str.str();
-}
-
-TError TMapValue::FromString(const std::string &value, TUintMap &result) const {
-    std::vector<std::string> lines;
-    TError error = SplitEscapedString(value, ';', lines);
-    if (error)
-        return error;
-
-    for (auto &line : lines) {
-        std::vector<std::string> nameval;
-
-        (void)SplitEscapedString(line, ':', nameval);
-        if (nameval.size() != 2)
-            return TError(EError::InvalidValue, "Invalid format");
-
-        std::string key = StringTrim(nameval[0]);
-        uint64_t val;
-
-        error = StringToSize(nameval[1], val);
-        if (error)
-            return TError(EError::InvalidValue, "Invalid value " + nameval[1]);
-
-        result[key] = val;
-    }
-
-    return TError::Success();
-}
-
-TUintMap TMapValue::GetDefault() const {
-    return TUintMap{};
-}
-
-TError TMapValue::GetIndexed(const std::string &index, std::string &value) const {
-    auto map = Get();
-    auto it = map.find(index);
-
-    if (it == map.end())
-        return TError(EError::InvalidValue, "invalid index " + index);
-
-    value = std::to_string(it->second);
-    return TError::Success();
-}
-
-TError TMapValue::SetIndexed(const std::string &index, const std::string &value) {
-    auto map = Get();
-    uint64_t uval;
-    TError error = StringToSize(value, uval);
-    if (error)
-        return error;
-    map[index] = uval;
-    return Set(map);
 }
 
 TRawValueMap::~TRawValueMap() {

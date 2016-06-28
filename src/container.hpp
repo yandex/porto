@@ -106,8 +106,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     void ExitTree(TScopedLock &holder_lock, int status, bool oomKilled);
     void Exit(TScopedLock &holder_lock, int status, bool oomKilled);
 
-    TError Prepare();
-
     void CleanupWaiters();
     void NotifyWaiters();
 
@@ -186,8 +184,6 @@ public:
 
     // TODO: make private
     std::unique_ptr<TTask> Task;
-    std::shared_ptr<TPropertyMap> Prop;
-    std::shared_ptr<TValueMap> Data;
     std::shared_ptr<TNetwork> Net;
 
     TPath GetTmpDir() const;

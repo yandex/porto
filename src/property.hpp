@@ -160,53 +160,6 @@ constexpr const char *D_IO_OPS = "io_ops";
 constexpr const char *D_TIME = "time";
 constexpr const char *D_PORTO_STAT = "porto_stat";
 
-class TBindMap;
-class TTaskEnv;
-
-class TPropertyMap : public TValueMap {
-    std::weak_ptr<TContainer> Container;
-
-    TError GetSharedContainer(std::shared_ptr<TContainer> &c) const;
-
-public:
-    TPropertyMap(std::shared_ptr<TKeyValueNode> kvnode,
-                 std::shared_ptr<TContainer> c) :
-        TValueMap(kvnode),
-        Container(c) {}
-
-    bool ParentDefault(std::shared_ptr<TContainer> &c,
-                       const std::string &property) const;
-
-    bool HasFlags(const std::string &property, int flags) const;
-
-    TError PrepareTaskEnv(const std::string &property, TTaskEnv &taskEnv);
-
-    template<typename T>
-    const T Get(const std::string &name) const {
-        if (IsDefault(name)) {
-            std::shared_ptr<TContainer> c;
-            if (ParentDefault(c, name))
-                if (c && c->GetParent())
-                    return c->GetParent()->Prop->Get<T>(name);
-        }
-
-        return TValueMap::Get<T>(name);
-    }
-
-    template<typename T>
-    TError Set(const std::string &name, const T& value) {
-        return TValueMap::Set<T>(name, value);
-    }
-
-    template<typename T>
-    const T GetRaw(const std::string &name) const {
-        return TValueMap::Get<T>(name);
-    }
-};
-
-void RegisterProperties(std::shared_ptr<TRawValueMap> m,
-                        std::shared_ptr<TContainer> c);
-
 class TContainerProperty {
 public:
     std::string Name;
