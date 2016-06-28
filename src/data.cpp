@@ -15,14 +15,6 @@ extern "C" {
 #include <sys/sysinfo.h>
 }
 
-class TStartErrnoData : public TIntValue, public TContainerValue {
-public:
-    TStartErrnoData() :
-        TIntValue(READ_ONLY_VALUE),
-        TContainerValue(D_START_ERRNO,
-                        "container start error (ro)") {}
-};
-
 class TStdoutData : public TTextValue, public TContainerValue {
 public:
     TStdoutData() :
@@ -472,7 +464,6 @@ public:
 void RegisterData(std::shared_ptr<TRawValueMap> m,
                   std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> data = {
-        new TStartErrnoData,
         new TStdoutData,
         new TStderrData,
         new TStdoutOffset,

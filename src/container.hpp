@@ -59,7 +59,6 @@ class TContainer : public std::enable_shared_from_this<TContainer>,
     std::shared_ptr<TKeyValueStorage> Storage;
     int Acquired = 0;
     int Id;
-    int TaskStartErrno = -1;
     TScopedFd OomEventFd;
     size_t CgroupEmptySince = 0;
     size_t RunningChildren = 0; // changed under holder lock
@@ -181,6 +180,7 @@ public:
     EContainerState State = EContainerState::Unknown;
     bool OomKilled;
     int ExitStatus;
+    int TaskStartErrno = -1;
 
     // TODO: make private
     std::unique_ptr<TTask> Task;

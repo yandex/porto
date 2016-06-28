@@ -206,6 +206,8 @@ TContainerRespawnCount ContainerRespawnCount(D_RESPAWN_COUNT,
 TContainerRootPid ContainerRootPid(D_ROOT_PID, "root task pid (ro)");
 TContainerExitStatus ContainerExitStatus(D_EXIT_STATUS,
                                          "container exit status (ro)");
+TContainerStartErrno ContainerStartErrno(D_START_ERRNO,
+                                         "container start error (ro)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
@@ -273,6 +275,7 @@ TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,
     }
     IsWeak = false;
     ExitStatus = 0;
+    TaskStartErrno = -1;
 }
 
 TContainer::~TContainer() {
@@ -1137,15 +1140,11 @@ TError TContainer::Start(std::shared_ptr<TClient> client, bool meta) {
         }
 
         if (error) {
-            TError e = Data->Set<int>(D_START_ERRNO, error.GetErrno());
-            if (e)
-                L_ERR() << "Can't set start_errno: " << e << std::endl;
+            TaskStartErrno = error.GetErrno();
             goto error;
         }
 
-        error = Data->Set<int>(D_START_ERRNO, -1);
-        if (error)
-            goto error;
+        TaskStartErrno = -1;
 
         L() << GetName() << " started " << std::to_string(Task->GetPid()) << std::endl;
 
@@ -1826,13 +1825,7 @@ TError TContainer::Prepare() {
     if (error)
         return error;
 
-    if (!Data->HasValue(D_START_ERRNO)) {
-        error = Data->Set<int>(D_START_ERRNO, -1);
-        if (error)
-            return error;
-    }
-
-    CgroupEmptySince = 0;
+   CgroupEmptySince = 0;
 
     return TError::Success();
 }

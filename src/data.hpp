@@ -4,7 +4,6 @@
 
 class TContainer;
 
-constexpr const char *D_START_ERRNO = "start_errno";
 constexpr const char *D_MAX_RSS = "max_rss";
 constexpr const char *D_STDOUT = "stdout";
 constexpr const char *D_STDERR = "stderr";

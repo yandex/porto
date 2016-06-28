@@ -137,6 +137,7 @@ constexpr uint64_t RESPAWN_COUNT_SET = (1lu << 55);
 constexpr const char *D_ROOT_PID = "root_pid";
 constexpr const char *D_EXIT_STATUS = "exit_status";
 constexpr uint64_t EXIT_STATUS_SET = (1lu << 56);
+constexpr const char *D_START_ERRNO = "start_errno";
 
 class TBindMap;
 class TTaskEnv;
@@ -883,6 +884,13 @@ public:
                          : TContainerProperty(name, desc, false, true) {
         SetMask = EXIT_STATUS_SET;
     }
+};
+
+class TContainerStartErrno : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerStartErrno(std::string name, std::string desc)
+                         : TContainerProperty(name, desc) {}
 };
 
 void InitContainerProperties(void);
