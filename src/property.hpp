@@ -145,6 +145,8 @@ constexpr const char *D_ANON_USAGE = "anon_usage";
 constexpr const char *D_MINOR_FAULTS = "minor_faults";
 constexpr const char *D_MAJOR_FAULTS = "major_faults";
 constexpr const char *D_MAX_RSS = "max_rss";
+constexpr const char *D_CPU_USAGE = "cpu_usage";
+constexpr const char *D_CPU_SYSTEM = "cpu_usage_system";
 
 class TBindMap;
 class TTaskEnv;
@@ -973,6 +975,20 @@ public:
 
         return TError::Success();
     }
+};
+
+class TContainerCpuUsage : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerCpuUsage(std::string name, std::string desc)
+                       : TContainerProperty(name, desc) {}
+};
+
+class TContainerCpuSystem : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerCpuSystem(std::string name, std::string desc)
+                        : TContainerProperty(name, desc) {}
 };
 
 void InitContainerProperties(void);

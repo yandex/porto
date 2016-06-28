@@ -227,6 +227,11 @@ TContainerMajorFaults ContainerMajorFaults(D_MAJOR_FAULTS,
                                            "major page faults (ro)");
 TContainerMaxRss ContainerMaxRss(D_MAX_RSS,
                                  "peak anonymous memory usage [bytes] (ro)");
+TContainerCpuUsage ContainerCpuUsage(D_CPU_USAGE,
+                                     "consumed CPU time [nanoseconds] (ro)");
+TContainerCpuSystem ContainerCpuSystem(D_CPU_SYSTEM,
+                                     "consumed system CPU time "
+                                     "[nanoseconds] (ro)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,

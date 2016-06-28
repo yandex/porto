@@ -85,6 +85,8 @@ extern TContainerAnonUsage ContainerAnonUsage;
 extern TContainerMinorFaults ContainerMinorFaults;
 extern TContainerMajorFaults ContainerMajorFaults;
 extern TContainerMaxRss ContainerMaxRss;
+extern TContainerCpuUsage ContainerCpuUsage;
+extern TContainerCpuSystem ContainerCpuSystem;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -315,6 +317,8 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerMajorFaults.Name] = &ContainerMajorFaults;
     ContainerMaxRss.Init();
     ContainerPropMap[ContainerMaxRss.Name] = &ContainerMaxRss;
+    ContainerPropMap[ContainerCpuUsage.Name] = &ContainerCpuUsage;
+    ContainerPropMap[ContainerCpuSystem.Name] = &ContainerCpuSystem;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -2314,6 +2318,46 @@ TError TContainerMaxRss::Get(std::string &value) {
         value = "-1";
     else
         value = std::to_string(stat["total_max_rss"]);
+
+    return TError::Success();
+}
+
+TError TContainerCpuUsage::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    auto cg = CurrentContainer->GetCgroup(CpuacctSubsystem);
+
+    uint64_t val;
+    error = CpuacctSubsystem.Usage(cg, val);
+
+    if (error) {
+        L_ERR() << "Can't get CPU usage: " << error << std::endl;
+        value = "-1";
+    } else {
+        value = std::to_string(val);
+    }
+
+    return TError::Success();
+}
+
+TError TContainerCpuSystem::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    auto cg = CurrentContainer->GetCgroup(CpuacctSubsystem);
+
+    uint64_t val;
+    error = CpuacctSubsystem.SystemUsage(cg, val);
+
+    if (error) {
+        L_ERR() << "Can't get system CPU usage: " << error << std::endl;
+        value = "-1";
+    } else {
+        value = std::to_string(val);
+    }
 
     return TError::Success();
 }

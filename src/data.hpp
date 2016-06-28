@@ -4,8 +4,6 @@
 
 class TContainer;
 
-constexpr const char *D_CPU_USAGE = "cpu_usage";
-constexpr const char *D_CPU_SYSTEM = "cpu_usage_system";
 constexpr const char *D_NET_BYTES = "net_bytes";
 constexpr const char *D_NET_PACKETS = "net_packets";
 constexpr const char *D_NET_DROPS = "net_drops";
