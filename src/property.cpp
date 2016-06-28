@@ -13,6 +13,7 @@
 
 extern "C" {
 #include <linux/capability.h>
+#include <sys/sysinfo.h>
 }
 
 extern __thread TContainer *CurrentContainer;
@@ -97,6 +98,7 @@ extern TContainerNetRxDrops ContainerNetRxDrops;
 extern TContainerIoRead ContainerIoRead;
 extern TContainerIoWrite ContainerIoWrite;
 extern TContainerIoOps ContainerIoOps;
+extern TContainerTime ContainerTime;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -339,6 +341,7 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerIoRead.Name] = &ContainerIoRead;
     ContainerPropMap[ContainerIoWrite.Name] = &ContainerIoWrite;
     ContainerPropMap[ContainerIoOps.Name] = &ContainerIoOps;
+    ContainerPropMap[ContainerTime.Name] = &ContainerTime;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -2709,6 +2712,46 @@ TError TContainerIoOps::GetIndexed(const std::string &index,
         return TError(EError::InvalidValue, "Invalid subscript for property");
 
     value = std::to_string(m[index]);
+
+    return TError::Success();
+}
+
+TError TContainerTime::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    if (CurrentContainer->IsRoot()) {
+        struct sysinfo si;
+        int ret = sysinfo(&si);
+        if (ret)
+            value = "-1";
+        else
+            value = std::to_string(si.uptime);
+
+        return TError::Success();
+    }
+
+    // we started recording raw start/death time since porto v1.15;
+    // in case we updated from old version, return zero
+    if (!(CurrentContainer->PropMask & START_TIME_SET)) {
+        CurrentContainer->StartTime = GetCurrentTimeMs();
+        CurrentContainer->PropMask |= START_TIME_SET;
+    }
+
+    if (!(CurrentContainer->PropMask & DEATH_TIME_SET) &&
+        (CurrentContainer->GetState() == EContainerState::Dead)) {
+
+        CurrentContainer->DeathTime = GetCurrentTimeMs();
+        CurrentContainer->PropMask |= DEATH_TIME_SET;
+    }
+
+    if (CurrentContainer->GetState() == EContainerState::Dead)
+        value = std::to_string((CurrentContainer->DeathTime -
+                               CurrentContainer->StartTime) / 1000);
+    else
+        value = std::to_string((GetCurrentTimeMs() -
+                               CurrentContainer->StartTime) / 1000);
 
     return TError::Success();
 }

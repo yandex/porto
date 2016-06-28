@@ -257,6 +257,7 @@ TContainerNetRxDrops ContainerNetRxDrops(D_NET_RX_DROPS,
 TContainerIoRead ContainerIoRead(D_IO_READ, "read from disk [bytes] (ro)");
 TContainerIoWrite ContainerIoWrite(D_IO_WRITE, "written to disk [bytes] (ro)");
 TContainerIoOps ContainerIoOps(D_IO_OPS, "io operations (ro)");
+TContainerTime ContainerTime(D_TIME, "running time [seconds] (ro)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,

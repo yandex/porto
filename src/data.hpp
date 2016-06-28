@@ -4,7 +4,6 @@
 
 class TContainer;
 
-constexpr const char *D_TIME = "time";
 constexpr const char *D_PORTO_STAT = "porto_stat";
 
 void RegisterData(std::shared_ptr<TRawValueMap> m,

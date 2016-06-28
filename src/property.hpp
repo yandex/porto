@@ -157,6 +157,7 @@ constexpr const char *D_NET_RX_DROPS = "net_rx_drops";
 constexpr const char *D_IO_READ = "io_read";
 constexpr const char *D_IO_WRITE = "io_write";
 constexpr const char *D_IO_OPS = "io_ops";
+constexpr const char *D_TIME = "time";
 
 class TBindMap;
 class TTaskEnv;
@@ -1082,6 +1083,13 @@ public:
     TError GetIndexed(const std::string &index, std::string &value);
     TContainerIoOps(std::string name, std::string desc)
                     : TContainerProperty(name, desc) {}
+};
+
+class TContainerTime : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerTime(std::string name, std::string desc)
+                   : TContainerProperty(name, desc) {}
 };
 
 void InitContainerProperties(void);

@@ -12,45 +12,7 @@
 
 extern "C" {
 #include <unistd.h>
-#include <sys/sysinfo.h>
 }
-
-class TTimeData : public TUintValue, public TContainerValue {
-public:
-    TTimeData() :
-        TUintValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_TIME, "running time [seconds] (ro)") {}
-
-    uint64_t GetDefault() const override {
-        auto c = GetContainer();
-
-        if (c->IsRoot()) {
-            struct sysinfo si;
-            int ret = sysinfo(&si);
-            if (ret)
-                return -1;
-
-            return si.uptime;
-        }
-
-        // we started recording raw start/death time since porto v1.15;
-        // in case we updated from old version, return zero
-        if (!c->StartTime) {
-            c->StartTime = GetCurrentTimeMs();
-            c->PropMask |= START_TIME_SET;
-        }
-
-        if (!c->DeathTime) {
-            c->DeathTime = GetCurrentTimeMs();
-            c->PropMask |= DEATH_TIME_SET;
-        }
-
-        if (c->GetState() == EContainerState::Dead)
-            return (c->DeathTime - c->StartTime) / 1000;
-        else
-            return (GetCurrentTimeMs() - c->StartTime) / 1000;
-    }
-};
 
 class TPortoStatData : public TMapValue, public TContainerValue {
 public:
@@ -94,7 +56,6 @@ public:
 void RegisterData(std::shared_ptr<TRawValueMap> m,
                   std::shared_ptr<TContainer> c) {
     const std::vector<TValue *> data = {
-        new TTimeData,
         new TPortoStatData,
     };
 
