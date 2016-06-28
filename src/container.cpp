@@ -216,6 +216,17 @@ TContainerStderr ContainerStderr(D_STDERR,
                                  "stderr (optional start [offset]) (ro)");
 TContainerStderrOffset ContainerStderrOffset(D_STDERR_OFFSET,
                                              "stored stderr offset (ro)");
+TContainerMemUsage ContainerMemUsage(D_MEMORY_USAGE,
+                                     "current memory usage [bytes] (ro)");
+TContainerAnonUsage ContainerAnonUsage(D_ANON_USAGE,
+                                       "current anonymous memory usage "
+                                       "[bytes] (ro)");
+TContainerMinorFaults ContainerMinorFaults(D_MINOR_FAULTS,
+                                           "minor page faults (ro)");
+TContainerMajorFaults ContainerMajorFaults(D_MAJOR_FAULTS,
+                                           "major page faults (ro)");
+TContainerMaxRss ContainerMaxRss(D_MAX_RSS,
+                                 "peak anonymous memory usage [bytes] (ro)");
 std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 TContainer::TContainer(std::shared_ptr<TContainerHolder> holder,

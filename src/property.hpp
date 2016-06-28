@@ -140,6 +140,11 @@ constexpr const char *D_STDOUT = "stdout";
 constexpr const char *D_STDOUT_OFFSET = "stdout_offset";
 constexpr const char *D_STDERR = "stderr";
 constexpr const char *D_STDERR_OFFSET = "stderr_offset";
+constexpr const char *D_MEMORY_USAGE = "memory_usage";
+constexpr const char *D_ANON_USAGE = "anon_usage";
+constexpr const char *D_MINOR_FAULTS = "minor_faults";
+constexpr const char *D_MAJOR_FAULTS = "major_faults";
+constexpr const char *D_MAX_RSS = "max_rss";
 
 class TBindMap;
 class TTaskEnv;
@@ -924,6 +929,50 @@ public:
     TError Get(std::string &value);
     TContainerStderrOffset(std::string name, std::string desc)
                            : TContainerProperty(name, desc) {}
+};
+
+class TContainerMemUsage : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerMemUsage(std::string name, std::string desc)
+                       : TContainerProperty(name, desc) {}
+};
+
+class TContainerAnonUsage : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerAnonUsage(std::string name, std::string desc)
+                       : TContainerProperty(name, desc) {}
+};
+
+class TContainerMinorFaults : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerMinorFaults(std::string name, std::string desc)
+                          : TContainerProperty(name, desc) {}
+};
+
+class TContainerMajorFaults : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerMajorFaults(std::string name, std::string desc)
+                          : TContainerProperty(name, desc) {}
+};
+
+class TContainerMaxRss : public TContainerProperty {
+public:
+    TError Get(std::string &value);
+    TContainerMaxRss(std::string name, std::string desc)
+                     : TContainerProperty(name, desc) {}
+    TError Init(void) {
+        TCgroup rootCg = MemorySubsystem.RootCgroup();
+        TUintMap stat;
+
+        TError error = MemorySubsystem.Statistics(rootCg, stat);
+        IsSupported = !error && (stat.find("total_max_rss") != stat.end());
+
+        return TError::Success();
+    }
 };
 
 void InitContainerProperties(void);

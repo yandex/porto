@@ -57,43 +57,6 @@ public:
     }
 };
 
-class TMemUsageData : public TUintValue, public TContainerValue {
-public:
-    TMemUsageData() :
-        TUintValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_MEMORY_USAGE,
-                        "current memory usage [bytes] (ro)") {}
-
-    uint64_t GetDefault() const override {
-        auto cg = GetContainer()->GetCgroup(MemorySubsystem);
-
-        uint64_t val;
-        TError error = MemorySubsystem.Usage(cg, val);
-        if (error) {
-            L_ERR() << "Can't get memory usage: " << error << std::endl;
-            return -1;
-        }
-
-        return val;
-    }
-};
-
-class TAnonUsageData : public TUintValue, public TContainerValue {
-public:
-    TAnonUsageData() :
-        TUintValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_ANON_USAGE,
-                        "current anonymous memory usage [bytes] (ro)") {}
-
-    uint64_t GetDefault() const override {
-        auto cg = GetContainer()->GetCgroup(MemorySubsystem);
-        uint64_t val;
-        if (MemorySubsystem.GetAnonUsage(cg, val))
-            return 0;
-        return val;
-    }
-};
-
 class TNetBytesData : public TMapValue, public TContainerValue {
 public:
     TNetBytesData() :
@@ -189,40 +152,6 @@ public:
         TUintMap m;
         (void)GetContainer()->GetStat(ETclassStat::RxDrops, m);
         return m;
-    }
-};
-
-class TMinorFaultsData : public TUintValue, public TContainerValue {
-public:
-    TMinorFaultsData() :
-        TUintValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_MINOR_FAULTS,
-                        "minor page faults (ro)") {}
-
-    uint64_t GetDefault() const override {
-        auto cg = GetContainer()->GetCgroup(MemorySubsystem);
-        TUintMap stat;
-        TError error = MemorySubsystem.Statistics(cg, stat);
-        if (error)
-            return -1;
-        return stat["total_pgfault"] - stat["total_pgmajfault"];
-    }
-};
-
-class TMajorFaultsData : public TUintValue, public TContainerValue {
-public:
-    TMajorFaultsData() :
-        TUintValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_MAJOR_FAULTS,
-                        "major page faults (ro)") {}
-
-    uint64_t GetDefault() const override {
-        auto cg = GetContainer()->GetCgroup(MemorySubsystem);
-        TUintMap stat;
-        TError error = MemorySubsystem.Statistics(cg, stat);
-        if (error)
-            return -1;
-        return stat["total_pgmajfault"];
     }
 };
 
@@ -345,27 +274,6 @@ public:
     }
 };
 
-class TMaxRssData : public TUintValue, public TContainerValue {
-public:
-    TMaxRssData() :
-        TUintValue(READ_ONLY_VALUE | RUNTIME_VALUE),
-        TContainerValue(D_MAX_RSS,
-                        "peak anonymous memory usage [bytes] (ro)") {
-        TCgroup rootCg = MemorySubsystem.RootCgroup();
-        TUintMap stat;
-        TError error = MemorySubsystem.Statistics(rootCg, stat);
-        if (error || stat.find("total_max_rss") == stat.end())
-            SetFlag(UNSUPPORTED_FEATURE);
-    }
-
-    uint64_t GetDefault() const override {
-        TCgroup cg = GetContainer()->GetCgroup(MemorySubsystem);
-        TUintMap stat;
-        MemorySubsystem.Statistics(cg, stat);
-        return stat["total_max_rss"];
-    }
-};
-
 class TPortoStatData : public TMapValue, public TContainerValue {
 public:
     TPortoStatData() :
@@ -410,8 +318,6 @@ void RegisterData(std::shared_ptr<TRawValueMap> m,
     const std::vector<TValue *> data = {
         new TCpuUsageData,
         new TCpuSystemData,
-        new TMemUsageData,
-        new TAnonUsageData,
         new TNetBytesData,
         new TNetPacketsData,
         new TNetDropsData,
@@ -419,13 +325,10 @@ void RegisterData(std::shared_ptr<TRawValueMap> m,
         new TNetRxBytes,
         new TNetRxPackets,
         new TNetRxDrops,
-        new TMinorFaultsData,
-        new TMajorFaultsData,
         new TIoReadData,
         new TIoWriteData,
         new TIoOpsData,
         new TTimeData,
-        new TMaxRssData,
         new TPortoStatData,
     };
 

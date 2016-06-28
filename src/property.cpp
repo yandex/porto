@@ -80,6 +80,11 @@ extern TContainerStdout ContainerStdout;
 extern TContainerStdoutOffset ContainerStdoutOffset;
 extern TContainerStderr ContainerStderr;
 extern TContainerStderrOffset ContainerStderrOffset;
+extern TContainerMemUsage ContainerMemUsage;
+extern TContainerAnonUsage ContainerAnonUsage;
+extern TContainerMinorFaults ContainerMinorFaults;
+extern TContainerMajorFaults ContainerMajorFaults;
+extern TContainerMaxRss ContainerMaxRss;
 extern std::map<std::string, TContainerProperty*> ContainerPropMap;
 
 bool TPropertyMap::ParentDefault(std::shared_ptr<TContainer> &c,
@@ -304,6 +309,12 @@ void InitContainerProperties(void) {
     ContainerPropMap[ContainerStdoutOffset.Name] = &ContainerStdoutOffset;
     ContainerPropMap[ContainerStderr.Name] = &ContainerStderr;
     ContainerPropMap[ContainerStderrOffset.Name] = &ContainerStderrOffset;
+    ContainerPropMap[ContainerMemUsage.Name] = &ContainerMemUsage;
+    ContainerPropMap[ContainerAnonUsage.Name] = &ContainerAnonUsage;
+    ContainerPropMap[ContainerMinorFaults.Name] = &ContainerMinorFaults;
+    ContainerPropMap[ContainerMajorFaults.Name] = &ContainerMajorFaults;
+    ContainerMaxRss.Init();
+    ContainerPropMap[ContainerMaxRss.Name] = &ContainerMaxRss;
 }
 
 TError TContainerProperty::IsAliveAndStopped(void) {
@@ -2221,6 +2232,88 @@ TError TContainerStderrOffset::Get(std::string &value) {
         return error;
 
     value = std::to_string(CurrentContainer->StderrOffset);
+
+    return TError::Success();
+}
+
+TError TContainerMemUsage::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    auto cg = CurrentContainer->GetCgroup(MemorySubsystem);
+
+    uint64_t val;
+    error = MemorySubsystem.Usage(cg, val);
+    if (error) {
+        L_ERR() << "Can't get memory usage: " << error << std::endl;
+        return error;
+    }
+
+    value = std::to_string(val);
+
+    return TError::Success();
+}
+
+TError TContainerAnonUsage::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    auto cg = CurrentContainer->GetCgroup(MemorySubsystem);
+    uint64_t val;
+
+    if (MemorySubsystem.GetAnonUsage(cg, val))
+        value = "0";
+    else
+        value = std::to_string(val);
+
+    return TError::Success();
+}
+
+TError TContainerMinorFaults::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    auto cg = CurrentContainer->GetCgroup(MemorySubsystem);
+    TUintMap stat;
+
+    if (MemorySubsystem.Statistics(cg, stat))
+        value = "-1";
+    else
+        value = std::to_string(stat["total_pgfault"] - stat["total_pgmajfault"]);
+
+    return TError::Success();
+}
+
+TError TContainerMajorFaults::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    auto cg = CurrentContainer->GetCgroup(MemorySubsystem);
+    TUintMap stat;
+
+    if (MemorySubsystem.Statistics(cg, stat))
+        value = "-1";
+    else
+        value = std::to_string(stat["total_pgmajfault"]);
+
+    return TError::Success();
+}
+
+TError TContainerMaxRss::Get(std::string &value) {
+    TError error = IsRunning();
+    if (error)
+        return error;
+
+    auto cg = CurrentContainer->GetCgroup(MemorySubsystem);
+    TUintMap stat;
+    if (MemorySubsystem.Statistics(cg, stat))
+        value = "-1";
+    else
+        value = std::to_string(stat["total_max_rss"]);
 
     return TError::Success();
 }
